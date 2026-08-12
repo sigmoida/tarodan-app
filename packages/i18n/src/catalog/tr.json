@@ -4477,7 +4477,10 @@
         "adjustmentStatus": {
           "open": "Açık",
           "settled": "Kapandı"
-        }
+        },
+        "releaseEarly": "Erken Serbest Bırak",
+        "earlyReleaseHint": "İade penceresi dolmadan bilinçli erken bırakma — gerekçe istenir.",
+        "earlyReleaseWarning": "İade penceresi henüz kapanmadı: bu ödemeyi ERKEN serbest bırakıyorsunuz. İşlem geri alınamaz; sonrasında açılan bir iadede tahsilat satıcıdan yapılmak zorunda kalır. Teslim edilmemiş ya da iadesi süren siparişte sistem yine reddeder."
       },
       "tax": {
         "title": "Vergi Ayarları",
@@ -4816,7 +4819,10 @@
         "legFromWarehouse": "Depodan Alıcılara Gönderiler",
         "legReturns": "İade Gönderileri",
         "markWarehouseArrived": "Depoya Ulaştı",
-        "recipientsWillConfirm": "Bilgi: Alıcılar teslim aldıklarında kendi tarafından onaylayacak.",
+        "markOutboundDelivered": "Teslim Edildi İşaretle",
+        "confirmOutboundDelivered": "Bu kolinin alıcıya fiziksel olarak teslim edildiğini doğruluyor musunuz? İki koli de teslim işaretlendiğinde onay/itiraz penceresi başlar ve süre sonunda takas otomatik tamamlanır.",
+        "outboundDeliveredMsg": "Koli teslim edildi olarak işaretlendi",
+        "recipientsWillConfirm": "Bilgi: Alıcılar teslim aldıklarında kendi tarafından onaylayacak. Onay/itiraz penceresi, iki koli de teslim edildiğinde başlar; taşıyıcı teslimi raporlamazsa aşağıdan elle işaretleyin.",
         "markLost": "Kayıp İşaretle",
         "reject": "Reddet",
         "warehouseReceivedMsg": "Gönderi depoya ulaştı olarak işaretlendi",
@@ -4913,7 +4919,16 @@
           "paymentStatus": "Ödeme durumu",
           "equalTrade": "Eşit takas — nakit fark yok.",
           "paymentsTitle": "Taraf ödemeleri"
-        }
+        },
+        "escrowPanelTitle": "Takas Escrow — Nakit Fark",
+        "escrowPanelBodyDue": "Hold süresi doldu ({date}); nakit fark bir sonraki otomatik turda açılacak. Gecikmişse buradan elle serbest bırakabilirsiniz.",
+        "escrowPanelBodyEarly": "Nakit fark {date} tarihinde otomatik serbest bırakılacak. Gerekirse süreyi beklemeden erken bırakabilirsiniz; işlem geri alınamaz ve iade borcu taşıyan satırlara dokunulmaz.",
+        "escrowReleaseTitle": "Serbest Bırak",
+        "escrowReleaseEarlyTitle": "Erken Serbest Bırak",
+        "escrowReleaseReasonLabel": "Gerekçe",
+        "escrowReleaseReasonPlaceholder": "Örn. iki taraf da teslimatı ve ürünleri teyit etti",
+        "escrowReleaseConfirm": "Serbest Bırak",
+        "escrowReleasedMsg": "Takas nakit ödemesi serbest bırakıldı"
       },
       "refundRequests": {
         "title": "İade Takibi",
@@ -5559,6 +5574,10 @@
         "tradeConfirmationDays": {
           "label": "Onay Süresi (Gün)",
           "helper": "Teslim sonrası onay süresi"
+        },
+        "tradeHoldDays": {
+          "label": "Takas Escrow Bekletme (Gün)",
+          "helper": "Takas tamamlandıktan sonra nakit farkın karşı tarafa açılması için beklenen süre. Satış escrow'unu etkilemez."
         },
         "maxMessageLength": {
           "label": "Maksimum Mesaj Uzunluğu",
@@ -6756,6 +6775,10 @@
       "tradeStuckAtWarehouse": {
         "title": "Sıkışmış Takas — Yönetim Gerekli",
         "message": "{tradeNumber} takası depoya ulaştı fakat süresi doldu; elle force-cancel-stuck gerekiyor."
+      },
+      "tradeOutboundDeliveryMissing": {
+        "title": "Takas Kolisi Teslim Edilmedi — Yönetim Gerekli",
+        "message": "{tradeNumber} takasının çıkış kolileri için taşıyıcıdan teslim bilgisi gelmedi; onay penceresi başlamadı ve takas otomatik tamamlanmayacak."
       },
       "tradeAddressRequired": {
         "title": "Adres Gerekli — Takas Kargosu",

@@ -49,6 +49,20 @@ export class AdminTradeService {
     return this.warehouse.markWarehouseReceived(adminId, tradeId, shipmentId);
   }
 
+  async markOutboundDelivered(
+    adminId: string,
+    tradeId: string,
+    shipmentId: string,
+    note?: string,
+  ) {
+    return this.warehouse.markOutboundDelivered(
+      adminId,
+      tradeId,
+      shipmentId,
+      note,
+    );
+  }
+
   async approveWarehouseTrade(
     adminId: string,
     tradeId: string,

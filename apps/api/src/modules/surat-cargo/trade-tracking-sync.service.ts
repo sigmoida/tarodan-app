@@ -10,12 +10,14 @@ import {
 } from "./surat-status.mapper";
 import { canTransitionShipmentStatus } from "../shipping/shipment-state-machine";
 import { TRADE_VALID_TRANSITIONS } from "../trade/trade.state-machine";
+import { startTradeConfirmationWindowIfDelivered } from "../../common/helpers/trade-escrow";
 import { SuratTrackingClient } from "./surat-tracking.client";
 
 /**
  * TradeTrackingSyncService (Faz 11.3a): takas bacaklarının (TradeShipment) Sürat
  * takip senkronizasyonu — durum çekme, TradeShipmentEvent üretimi, depoya-varış
- * kilidi ve iki bacak teslim olunca at_warehouse geçişi.
+ * kilidi, iki giriş bacağı teslim olunca at_warehouse geçişi ve iki ÇIKIŞ
+ * bacağı teslim olunca escrow onay penceresinin başlatılması.
  */
 @Injectable()
 export class TradeTrackingSyncService {
@@ -144,7 +146,17 @@ export class TradeTrackingSyncService {
       return "ignored";
     }
 
-    await this.syncTradeShipmentEvents(tradeShipment.id, gonderi);
+    // Best-effort hareket geçmişi: CAS'li durum yazımı yukarıda commit oldu;
+    // delivered'a geçen bacak bir daha pollanmayacağı için buradaki bir hata
+    // aşağıdaki tek seferlik geçiş yan etkilerini (at_warehouse / onay
+    // penceresi) sonsuza dek atlatmamalı.
+    try {
+      await this.syncTradeShipmentEvents(tradeShipment.id, gonderi);
+    } catch (err: any) {
+      this.logger.error(
+        `TradeShipment ${tradeShipment.id}: hareket senkronu başarısız (durum yazıldı, devam): ${err?.message}`,
+      );
+    }
 
     if (firstPhysicalHandoff) {
       const recipientId =
@@ -184,6 +196,35 @@ export class TradeTrackingSyncService {
       // semantik) — sonra iki bacak da teslimse at_warehouse'a geçir.
       await this.maybeLockTradeCancelOnArrival(tradeShipment.tradeId);
       await this.maybeTransitionTradeToAtWarehouse(tradeShipment.tradeId);
+    }
+
+    // Çıkış bacağı (depo → kullanıcı) teslim edildi: İKİ koli de teslim
+    // olduysa onay/itiraz penceresini başlat. Escrow saati buradan işler —
+    // kargoya veriliş anından değil, teslimattan.
+    //
+    // try/catch ŞART: delivered CAS'i yukarıda çoktan commit oldu ve delivered
+    // bacak bir daha POLLANMAZ (syncAllActiveTradeShipments terminal durumları
+    // eler). Buradaki geçici bir hata fırlarsa pencere hiç kurulmadan kalırdı.
+    // Loglayıp yutuyoruz; kalıcı ağ = reconciliation cron'daki
+    // startPendingTradeConfirmationWindows taraması, pencereyi kalıcı
+    // deliveredAt değerlerinden kurar.
+    if (isDelivered && tradeShipment.leg === "from_warehouse") {
+      try {
+        const startedAt = await startTradeConfirmationWindowIfDelivered(
+          this.prisma,
+          tradeShipment.tradeId,
+        );
+        if (startedAt) {
+          this.logger.log(
+            `Trade ${tradeShipment.tradeId}: tüm çıkış kolileri teslim edildi, ` +
+              `onay penceresi ${startedAt.toISOString()} tarihine kuruldu`,
+          );
+        }
+      } catch (err: any) {
+        this.logger.error(
+          `Trade ${tradeShipment.tradeId}: onay penceresi kurulamadı (sweep telafi eder): ${err?.message}`,
+        );
+      }
     }
 
     this.logger.log(

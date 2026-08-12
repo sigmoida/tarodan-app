@@ -25,6 +25,11 @@ import {
   getProductStatusFromQuantity,
   getReservedAwareStatus,
 } from "../product/helpers/product-status.helper";
+import {
+  computeTradeConfirmationDeadline,
+  computeTradeHoldReleaseAt,
+  startTradeConfirmationWindowIfDelivered,
+} from "../../common/helpers/trade-escrow";
 import { ACTIVE_TRADE_STATUSES, TRADE_PRICING_V2 } from "./trade.constants";
 import { TRADE_VALID_TRANSITIONS } from "./trade.state-machine";
 import { TradeQuoteService } from "./trade-quote.service";
@@ -1176,19 +1181,12 @@ export class TradeLifecycleService {
         REFERENCE_PREFIX.shipmentFallback,
       );
 
+      // LEGACY doğrudan (depo dışı) akış: burada taşıyıcı takibi yok, teslim
+      // olayı da yok — pencere kargoya veriliş anından sayılır. Güvenli takas
+      // (depolu) akışında saat TESLİMATTAN başlar, bkz. trade-escrow helper'ı.
       let confirmationDeadline: Date | null = null;
       if (newStatus === TradeStatus.both_shipped) {
-        const confirmationDaysSetting = await tx.platformSetting.findUnique({
-          where: { settingKey: "trade_confirmation_deadline_days" },
-        });
-        const confirmationDays = parseInt(
-          confirmationDaysSetting?.settingValue ?? "3",
-        );
-        const now = new Date();
-        confirmationDeadline = new Date(now);
-        confirmationDeadline.setDate(
-          confirmationDeadline.getDate() + confirmationDays,
-        );
+        confirmationDeadline = await computeTradeConfirmationDeadline(tx);
       }
 
       await tx.tradeShipment.create({
@@ -1349,7 +1347,10 @@ export class TradeLifecycleService {
         where: { id: shipment.id },
         data: {
           status: ShipmentStatus.delivered,
-          deliveredAt: new Date(),
+          // Onay penceresi bacakların max(deliveredAt)'inden hesaplandığı için
+          // taşıyıcının yazdığı GERÇEK teslim tarihi kullanıcı onayı anıyla
+          // EZİLMEZ — ezmek pencereyi (ve escrow release'ini) geç kaydırırdı.
+          ...(shipment.deliveredAt ? {} : { deliveredAt: new Date() }),
           confirmedAt: new Date(),
         },
       });
@@ -1418,19 +1419,18 @@ export class TradeLifecycleService {
           where: { tradeId },
         });
         if (cashPayment && cashPayment.status === PaymentStatus.completed) {
-          // Safe-trade escrow: don't release immediately. Set hold for 7 days.
-          const holdDaysSetting = await tx.platformSetting.findUnique({
-            where: { settingKey: "payment_hold_days" },
-          });
-          const holdDays = parseInt(holdDaysSetting?.settingValue ?? "7");
-          const holdReleaseAt = new Date();
-          holdReleaseAt.setDate(holdReleaseAt.getDate() + holdDays);
-
+          // Safe-trade escrow: nakit hemen açılmaz, hold penceresi kadar
+          // beklenir (süre ayardan — trade-escrow helper'ı tek kaynak).
           await tx.tradeCashPayment.updateMany({
             where: { tradeId },
-            data: { holdReleaseAt },
+            data: { holdReleaseAt: await computeTradeHoldReleaseAt(tx) },
           });
         }
+      } else if (trade.status === TradeStatus.shipping_to_recipients) {
+        // Bu bacak teslim/onay aldı ama karşı bacak henüz kapanmadı. Diğer koli
+        // Sürat takibinde çoktan teslim edilmiş olabilir: iki bacak da teslimse
+        // onay/itiraz penceresini ŞİMDİ başlat (idempotent).
+        await startTradeConfirmationWindowIfDelivered(tx, tradeId);
       }
     });
 
@@ -1662,12 +1662,7 @@ export class TradeLifecycleService {
       // damgasız satır = hâlâ iade borcu olan satır (payment-refund.service).
       // compensate_both'ta HİÇBİR satır damgalanmaz — ikisi de iade borcudur.
       if (!compensateBoth) {
-        const holdDaysSetting = await tx.platformSetting.findUnique({
-          where: { settingKey: "payment_hold_days" },
-        });
-        const holdDays = parseInt(holdDaysSetting?.settingValue ?? "7");
-        const holdReleaseAt = new Date();
-        holdReleaseAt.setDate(holdReleaseAt.getDate() + holdDays);
+        const holdReleaseAt = await computeTradeHoldReleaseAt(tx);
         await tx.tradeCashPayment.updateMany({
           where: {
             tradeId,

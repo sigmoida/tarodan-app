@@ -10,6 +10,11 @@ import {
   ShipmentStatus,
   PaymentStatus,
 } from "@prisma/client";
+import {
+  computeTradeHoldReleaseAt,
+  startTradeConfirmationWindowIfDelivered,
+  tradeLostParcelGraceDays,
+} from "../../common/helpers/trade-escrow";
 import { safeDecrementReserved } from "../product/helpers/product-availability.helper";
 import { getProductStatusFromQuantity } from "../product/helpers/product-status.helper";
 import { PaymentService } from "../payment/payment.service";
@@ -41,10 +46,54 @@ export class TradeReconciliationService {
   // AUTO-CANCEL EXPIRED TRADES (Scheduled job)
   // ==========================================================================
   /**
-   * Depoya ulaşıp süresi dolduğu için otomatik iptal edilemeyen ("stuck") takaslar
-   * için aktif admin'lere in-app bildirim gönderir. Her takas için 24s cache dedup
-   * uygular: cron 5 dk'da bir çalıştığından spam olmaz, ama çözülmeyen takas TTL
-   * dolunca tekrar hatırlatılır. Tamamen non-blocking — hata cron'u bozmaz.
+   * Elle müdahale bekleyen takaslar için aktif admin'lere in-app bildirim
+   * gönderir. Her takas için 24s cache dedup uygular: cron 5 dk'da bir
+   * çalıştığından spam olmaz, ama çözülmeyen takas TTL dolunca tekrar
+   * hatırlatılır. Tamamen non-blocking — hata cron'u bozmaz.
+   */
+  private async notifyAdminsOnce(
+    type: NotificationType,
+    cachePrefix: string,
+    items: Array<{ id: string; payload: Record<string, unknown> }>,
+  ): Promise<void> {
+    try {
+      const fresh: typeof items = [];
+      for (const item of items) {
+        const key = `${cachePrefix}:${item.id}`;
+        const already = await this.cache.get<boolean>(key);
+        if (already) continue;
+        fresh.push(item);
+        await this.cache.set(key, true, { ttl: 24 * 60 * 60 });
+      }
+      if (fresh.length === 0) return;
+
+      const admins = await this.prisma.adminUser.findMany({
+        where: { isActive: true },
+        select: { userId: true },
+      });
+      for (const item of fresh) {
+        for (const a of admins) {
+          try {
+            await this.notificationService.createInAppNotification(
+              a.userId,
+              type,
+              item.payload,
+            );
+          } catch (err: any) {
+            this.logger.error(
+              `Admin bildirimi başarısız (type=${type}, trade=${item.id}, admin=${a.userId}): ${err?.message}`,
+            );
+          }
+        }
+      }
+    } catch (err: any) {
+      this.logger.warn(`notifyAdminsOnce(${type}) failed: ${err?.message}`);
+    }
+  }
+
+  /**
+   * Depoya ulaşıp süresi dolduğu için otomatik iptal edilemeyen ("stuck")
+   * takaslar — admin force-cancel-stuck/reject ile çözer.
    */
   private async notifyAdminsOfStuckTrades(
     stuckTrades: Array<{
@@ -54,44 +103,112 @@ export class TradeReconciliationService {
       firstWarehouseArrivalAt: Date | null;
     }>,
   ): Promise<void> {
-    try {
-      const fresh: typeof stuckTrades = [];
-      for (const t of stuckTrades) {
-        const key = `stuck-trade-alerted:${t.id}`;
-        const already = await this.cache.get<boolean>(key);
-        if (already) continue;
-        fresh.push(t);
-        await this.cache.set(key, true, { ttl: 24 * 60 * 60 });
-      }
-      if (fresh.length === 0) return;
+    await this.notifyAdminsOnce(
+      NotificationType.TRADE_STUCK_AT_WAREHOUSE,
+      "stuck-trade-alerted",
+      stuckTrades.map((t) => ({
+        id: t.id,
+        payload: {
+          tradeId: t.id,
+          tradeNumber: t.tradeNumber,
+          arrivedAt: t.firstWarehouseArrivalAt?.toISOString(),
+          deadline: t.shippingDeadline?.toISOString(),
+        },
+      })),
+    );
+  }
 
-      const admins = await this.prisma.adminUser.findMany({
-        where: { isActive: true },
-        select: { userId: true },
-      });
-      for (const t of fresh) {
-        for (const a of admins) {
-          try {
-            await this.notificationService.createInAppNotification(
-              a.userId,
-              NotificationType.TRADE_STUCK_AT_WAREHOUSE,
-              {
-                tradeId: t.id,
-                tradeNumber: t.tradeNumber,
-                arrivedAt: t.firstWarehouseArrivalAt?.toISOString(),
-                deadline: t.shippingDeadline?.toISOString(),
-              },
-            );
-          } catch (err: any) {
-            this.logger.error(
-              `Stuck-trade admin bildirimi başarısız (trade=${t.id}, admin=${a.userId}): ${err?.message}`,
-            );
-          }
+  /**
+   * Kendini onaran tarama: çıkış sevkindeki, penceresi henüz kurulmamış
+   * takaslar için pencereyi KALICI deliveredAt değerlerinden kurmayı dener.
+   * Pencere kuruluşu normalde teslim OLAYINA bağlı tek seferlik bir yan etki
+   * (Sürat poll'u / kullanıcı onayı / admin işareti); olay anındaki geçici bir
+   * hata bacağı poll kümesinden düşürüp takası süresiz askıda bırakabilir.
+   * Helper idempotent olduğundan bu tarama olay yollarıyla yarışsa da güvenli.
+   */
+  private async startPendingTradeConfirmationWindows(): Promise<number> {
+    const candidates = await this.prisma.trade.findMany({
+      where: {
+        status: TradeStatus.shipping_to_recipients,
+        confirmationDeadline: null,
+        // Ön filtre (ucuz): en az bir teslim edilmiş çıkış bacağı olsun.
+        // "Hepsi teslim + iptal/dönüş yok" kararını helper verir.
+        shipments: {
+          some: { leg: "from_warehouse", deliveredAt: { not: null } },
+        },
+      },
+      select: { id: true },
+      orderBy: { updatedAt: "asc" },
+      take: 50,
+    });
+
+    let started = 0;
+    for (const trade of candidates) {
+      try {
+        const startedAt = await startTradeConfirmationWindowIfDelivered(
+          this.prisma,
+          trade.id,
+        );
+        if (startedAt) {
+          started++;
+          this.logger.log(
+            `Sweep: trade ${trade.id} onay penceresi ${startedAt.toISOString()} tarihine kuruldu`,
+          );
         }
+      } catch (err: any) {
+        this.logger.error(
+          `Sweep: trade ${trade.id} onay penceresi kurulamadı: ${err?.message}`,
+        );
       }
-    } catch (err: any) {
-      this.logger.warn(`notifyAdminsOfStuckTrades failed: ${err?.message}`);
     }
+    return started;
+  }
+
+  /**
+   * Çıkış kolisi (depo → kullanıcı) uzun süredir yolda ama taşıyıcıdan TESLİM
+   * raporu gelmedi. Onay/itiraz penceresi teslimattan başladığı için bu
+   * takaslar kendiliğinden tamamlanmaz — ve tamamlanmamalıdır: teslim kanıtı
+   * yokken parayı açmak, düzelttiğimiz "koli yoldayken para serbest" hatasının
+   * ta kendisidir. Bunun yerine admin'e alarm verilir; admin itiraz/tazminat
+   * yollarıyla çözer. Eşik: çıkıştan TRADE_LOST_PARCEL_GRACE_DAYS gün sonra.
+   */
+  private async notifyAdminsOfUndeliveredOutboundTrades(
+    now: Date,
+  ): Promise<number> {
+    const cutoff = new Date(
+      now.getTime() - tradeLostParcelGraceDays() * 24 * 60 * 60 * 1000,
+    );
+    const candidates = await this.prisma.trade.findMany({
+      where: {
+        status: TradeStatus.shipping_to_recipients,
+        confirmationDeadline: null,
+        shipments: {
+          some: { leg: "from_warehouse", shippedAt: { lt: cutoff } },
+        },
+      },
+      select: { id: true, tradeNumber: true },
+      // Deterministik sıra ŞART: sırasız take(20), 20'den kalabalık bir yığında
+      // her turda aynı (çoktan dedup'lanmış) alt kümeyi döndürüp gerisini
+      // sonsuza dek gizleyebilirdi. En eski önce → yığın sırayla boşalır.
+      orderBy: { updatedAt: "asc" },
+      take: 20,
+    });
+    if (candidates.length === 0) return 0;
+
+    this.logger.warn(
+      `Çıkış kolisi teslim raporu gelmeyen takaslar (admin müdahalesi): ${candidates
+        .map((t) => `${t.tradeNumber}(id=${t.id})`)
+        .join(", ")}`,
+    );
+    await this.notifyAdminsOnce(
+      NotificationType.TRADE_OUTBOUND_DELIVERY_MISSING,
+      "outbound-delivery-stuck-alerted",
+      candidates.map((t) => ({
+        id: t.id,
+        payload: { tradeId: t.id, tradeNumber: t.tradeNumber },
+      })),
+    );
+    return candidates.length;
   }
 
   async autoCancelExpiredTrades(): Promise<number> {
@@ -181,6 +298,15 @@ export class TradeReconciliationService {
     // Süresiz askıda da kalmamalı: son tarih + bekleme süresi (varsayılan 14
     // gün) geçtiyse koli kayıp sayılır ve takas otomatik çözülür.
     const lostResolved = await this.autoResolveLostParcelTrades(now);
+
+    // Teslimatları tamamlanmış ama penceresi (olay anındaki geçici bir hata
+    // yüzünden) kurulamamış takasları önce onar, kalan gerçek askıdakileri
+    // admin'e alarm et.
+    await this.startPendingTradeConfirmationWindows();
+
+    // Çıkış bacağında teslim raporu hiç gelmeyen takaslar: otomatik
+    // tamamlanmazlar (teslim kanıtı yok), admin'e alarm verilir.
+    await this.notifyAdminsOfUndeliveredOutboundTrades(now);
 
     let cancelledCount = lostResolved;
 
@@ -335,10 +461,7 @@ export class TradeReconciliationService {
    * süresiz askı üretmesini engeller.
    */
   private async autoResolveLostParcelTrades(now: Date): Promise<number> {
-    const graceDays = Math.max(
-      1,
-      Number(process.env.TRADE_LOST_PARCEL_GRACE_DAYS ?? 14),
-    );
+    const graceDays = tradeLostParcelGraceDays();
     const cutoff = new Date(now.getTime() - graceDays * 24 * 60 * 60 * 1000);
     const candidates = await this.prisma.trade.findMany({
       where: {
@@ -609,7 +732,10 @@ export class TradeReconciliationService {
               where: { id: shipment.id },
               data: {
                 status: ShipmentStatus.delivered,
-                deliveredAt: now,
+                // Onay penceresi ZATEN teslimattan sayıldığı için bacaklar bu
+                // noktada teslim edilmiştir; taşıyıcıdan gelen gerçek teslim
+                // tarihi otomatik onay anıyla EZİLMEZ.
+                ...(shipment.deliveredAt ? {} : { deliveredAt: now }),
                 confirmedAt: now,
               },
             });
@@ -680,16 +806,9 @@ export class TradeReconciliationService {
             where: { tradeId: trade.id },
           });
           if (cashPayment && cashPayment.status === PaymentStatus.completed) {
-            const holdDaysSetting = await tx.platformSetting.findUnique({
-              where: { settingKey: "payment_hold_days" },
-            });
-            const holdDays = parseInt(holdDaysSetting?.settingValue ?? "7");
-            const holdReleaseAt = new Date();
-            holdReleaseAt.setDate(holdReleaseAt.getDate() + holdDays);
-
             await tx.tradeCashPayment.updateMany({
               where: { tradeId: trade.id },
-              data: { holdReleaseAt },
+              data: { holdReleaseAt: await computeTradeHoldReleaseAt(tx) },
             });
           }
         });

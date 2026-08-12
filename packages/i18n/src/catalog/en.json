@@ -4477,7 +4477,10 @@
         "adjustmentStatus": {
           "open": "Open",
           "settled": "Settled"
-        }
+        },
+        "releaseEarly": "Release Early",
+        "earlyReleaseHint": "Deliberate early release before the return window closes — a reason is required.",
+        "earlyReleaseWarning": "The return window has not closed yet: you are releasing this payout EARLY. This cannot be undone; any refund opened afterwards must be recovered from the seller. Undelivered orders or orders with an open refund are still rejected."
       },
       "tax": {
         "title": "Tax Settings",
@@ -4816,7 +4819,10 @@
         "legFromWarehouse": "Shipments from Warehouse to Recipients",
         "legReturns": "Return Shipments",
         "markWarehouseArrived": "Arrived at Warehouse",
-        "recipientsWillConfirm": "Note: Recipients will confirm on their side once they receive the items.",
+        "markOutboundDelivered": "Mark Delivered",
+        "confirmOutboundDelivered": "Confirm this parcel was physically delivered to its recipient? Once both parcels are marked delivered the confirmation window starts and the trade auto-completes when it elapses.",
+        "outboundDeliveredMsg": "Parcel marked as delivered",
+        "recipientsWillConfirm": "Note: recipients confirm on their own side once they receive the parcel. The confirmation window starts when both parcels are delivered; if the carrier never reports delivery, mark it manually below.",
         "markLost": "Mark Lost",
         "reject": "Reject",
         "warehouseReceivedMsg": "Shipment marked as arrived at warehouse",
@@ -4913,7 +4919,16 @@
           "paymentStatus": "Payment status",
           "equalTrade": "Equal trade — no cash difference.",
           "paymentsTitle": "Party payments"
-        }
+        },
+        "escrowPanelTitle": "Trade Escrow — Cash Difference",
+        "escrowPanelBodyDue": "The hold elapsed ({date}); the cash difference will be released on the next automatic run. If it is late you can release it manually here.",
+        "escrowPanelBodyEarly": "The cash difference will be released automatically on {date}. If needed you can release it early; this cannot be undone and rows carrying a refund debt are never touched.",
+        "escrowReleaseTitle": "Release",
+        "escrowReleaseEarlyTitle": "Release Early",
+        "escrowReleaseReasonLabel": "Reason",
+        "escrowReleaseReasonPlaceholder": "E.g. both parties confirmed delivery and the items",
+        "escrowReleaseConfirm": "Release",
+        "escrowReleasedMsg": "Trade cash payment released"
       },
       "refundRequests": {
         "title": "Refund Tracking",
@@ -5559,6 +5574,10 @@
         "tradeConfirmationDays": {
           "label": "Confirmation Time (Days)",
           "helper": "Time to confirm after delivery"
+        },
+        "tradeHoldDays": {
+          "label": "Trade Escrow Hold (Days)",
+          "helper": "How long the cash difference waits after a trade completes before it is released. Does not affect sale escrow."
         },
         "maxMessageLength": {
           "label": "Maximum Message Length",
@@ -6756,6 +6775,10 @@
       "tradeStuckAtWarehouse": {
         "title": "Stuck Trade — Admin Action Required",
         "message": "Trade {tradeNumber} reached the warehouse but timed out; a manual force-cancel-stuck is required."
+      },
+      "tradeOutboundDeliveryMissing": {
+        "title": "Trade Parcel Not Delivered — Admin Action Required",
+        "message": "The carrier reported no delivery for the outbound parcels of trade {tradeNumber}; the confirmation window has not started and the trade will not auto-complete."
       },
       "tradeAddressRequired": {
         "title": "Address Needed — Trade Shipping",

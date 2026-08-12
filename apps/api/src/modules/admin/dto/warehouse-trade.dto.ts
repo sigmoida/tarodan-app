@@ -31,6 +31,16 @@ export class MarkShipmentDto {
   })
   @IsString()
   shipmentId: string;
+
+  @ApiPropertyOptional({
+    description:
+      "How the delivery was verified (carrier call, user statement) — audit note",
+    maxLength: 500,
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  note?: string;
 }
 
 export class MarkReturnLostDto {

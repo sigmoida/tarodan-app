@@ -170,6 +170,34 @@ export class AdminTradeController {
     );
   }
 
+  @Post("trades/:id/mark-outbound-delivered")
+  @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary:
+      "Mark an outgoing (from_warehouse) shipment as delivered to its recipient",
+    description:
+      "Ops fallback when the carrier never reports delivery. Once both outbound legs are delivered the escrow confirmation window starts from that moment.",
+  })
+  @ApiParam({ name: "id", description: "Trade ID" })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description:
+      "Shipment marked delivered; confirmation window started when both legs are delivered",
+  })
+  async markOutboundDelivered(
+    @Param("id") id: string,
+    @CurrentUser("id") adminId: string,
+    @Body() body: MarkShipmentDto,
+  ) {
+    return this.adminService.markOutboundDelivered(
+      adminId,
+      id,
+      body.shipmentId,
+      body.note,
+    );
+  }
+
   @Post("trades/:id/approve")
   @Roles(AdminRole.super_admin, AdminRole.admin)
   @HttpCode(HttpStatus.OK)

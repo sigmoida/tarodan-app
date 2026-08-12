@@ -17,6 +17,8 @@ import {
   type CargoProvider,
 } from "../surat-cargo/cargo-provider";
 import { AdminTradeCommonService } from "./admin-trade-common.service";
+import { startTradeConfirmationWindowIfDelivered } from "../../common/helpers/trade-escrow";
+import { canTransitionShipmentStatus } from "../shipping/shipment-state-machine";
 import { REFERENCE_PREFIX } from "../../common/helpers/code-prefixes";
 import { generateReferenceCode } from "../../common/helpers/generate-reference";
 
@@ -367,6 +369,101 @@ export class AdminTradeWarehouseService {
   }
 
   /**
+   * Admin, ÇIKIŞ (depo → kullanıcı) kolisini elle "teslim edildi" işaretler —
+   * giriş bacağındaki markWarehouseReceived'ın simetriği.
+   *
+   * Neden gerekli: escrow onay penceresi artık TESLİMATTAN başlıyor. Taşıyıcı
+   * teslimi hiç raporlamazsa (yanlış takip no, Sürat kaydı düşmemiş) ve
+   * kullanıcı da onaylamazsa takas askıda kalırdı. notifyAdminsOfUndelivered-
+   * OutboundTrades alarmı bu ucu işaret eder: admin fiziksel teslimi doğrulayıp
+   * işaretler, iki koli de teslim olunca pencere normal akışında başlar.
+   */
+  async markOutboundDelivered(
+    adminId: string,
+    tradeId: string,
+    shipmentId: string,
+    note?: string,
+  ) {
+    return this.prisma.$transaction(async (tx) => {
+      await tx.$queryRaw`SELECT id FROM trades WHERE id = ${tradeId} FOR UPDATE`;
+
+      const trade = await tx.trade.findUnique({
+        where: { id: tradeId },
+        select: { id: true, status: true },
+      });
+      if (!trade) {
+        throw new NotFoundException("Takas bulunamadı");
+      }
+      if (trade.status !== TradeStatus.shipping_to_recipients) {
+        throw new BadRequestException(
+          `Takas durumu '${trade.status}' — yalnız 'shipping_to_recipients' takasta çıkış kolisi teslim işaretlenebilir`,
+        );
+      }
+
+      const shipment = await tx.tradeShipment.findUnique({
+        where: { id: shipmentId },
+      });
+      if (!shipment || shipment.tradeId !== tradeId) {
+        throw new NotFoundException("Gönderim bulunamadı");
+      }
+      if (shipment.leg !== "from_warehouse") {
+        throw new BadRequestException(
+          "Bu gönderim depodan çıkan bir gönderim değil",
+        );
+      }
+
+      const now = new Date();
+      let updatedShipment = shipment;
+      if (!shipment.deliveredAt) {
+        // #86 durum makinesi guard'ı: iptal/dönüş gibi terminal bir bacak
+        // buradan delivered'a ZORLANAMAZ — dönen koliyi teslim saymak,
+        // helper'daki blok kuralını delip escrow'u açardı.
+        if (
+          !canTransitionShipmentStatus(
+            shipment.status as ShipmentStatus,
+            ShipmentStatus.delivered,
+          )
+        ) {
+          throw new BadRequestException(
+            `Gönderim durumu '${shipment.status}' — teslim edildi olarak işaretlenemez`,
+          );
+        }
+        updatedShipment = await tx.tradeShipment.update({
+          where: { id: shipmentId },
+          data: { status: ShipmentStatus.delivered, deliveredAt: now },
+        });
+      }
+      // deliveredAt zaten doluysa hata YOK: bu uç, "koliler teslim ama pencere
+      // kurulamadı" alarmının onarım aracıdır — o durumda yalnız pencere
+      // kurulumuna düşer (idempotent), tarih ötelenmez.
+
+      // İki koli de teslimse onay/itiraz penceresi buradan başlar (tek kaynak).
+      const confirmationDeadline =
+        await startTradeConfirmationWindowIfDelivered(tx, tradeId);
+
+      await this.audit.createAuditLog(
+        adminId,
+        "trade_outbound_delivered",
+        "TradeShipment",
+        shipmentId,
+        shipment,
+        {
+          ...updatedShipment,
+          note: note ?? null,
+          confirmationDeadline,
+        },
+      );
+
+      return {
+        success: true,
+        tradeId,
+        shipmentId,
+        confirmationDeadline,
+      };
+    });
+  }
+
+  /**
    * Admin approves the safe-trade after inspecting both items at the
    * warehouse. Creates two outbound shipments (one to each party, carrying
    * the other party's items) and transitions trade to
@@ -548,26 +645,20 @@ export class AdminTradeWarehouseService {
         },
       });
 
-      // Y12: Safe-trade depodan-çıkış sevkinde confirmationDeadline SET ET. Eskiden
-      // set edilmediği için autoConfirmExpiredReceipts (confirmationDeadline < now filtresi)
-      // safe-trade'lerde hiç eşleşmiyordu → alıcı onaylamazsa para shipping_to_recipients'te
-      // süresiz askıda kalıyordu. Direct akıştaki (both_shipped) ile aynı setting kullanılır.
-      const confirmationDaysSetting = await tx.platformSetting.findUnique({
-        where: { settingKey: "trade_confirmation_deadline_days" },
-      });
-      const confirmationDays = parseInt(
-        confirmationDaysSetting?.settingValue ?? "3",
-      );
-      const confirmationDeadline = new Date(now);
-      confirmationDeadline.setDate(
-        confirmationDeadline.getDate() + confirmationDays,
-      );
-
+      // Onay/itiraz penceresi BURADA başlamaz: saat, koliler TESLİM edildiğinde
+      // kurulur (startTradeConfirmationWindowIfDelivered — Sürat teslim poll'u
+      // ya da kullanıcının elle onayı). Kargoya veriliş anından saymak, yavaş
+      // kargoda takası koli daha yoldayken otomatik tamamlıyor, parayı serbest
+      // bırakıyor ve kullanıcıyı itiraz açamaz duruma düşürüyordu.
+      //
+      // Y12 (süresiz askı) buna rağmen geri gelmez: teslim raporu hiç gelmeyen
+      // çıkış kolileri notifyAdminsOfUndeliveredOutboundTrades ile admin'e
+      // alarm olarak düşer — teslim kanıtı yokken otomatik tamamlama YAPILMAZ.
       const updatedTrade = await tx.trade.update({
         where: { id: tradeId },
         data: {
           status: TradeStatus.shipping_to_recipients,
-          confirmationDeadline,
+          confirmationDeadline: null,
           updatedAt: now,
         },
       });
