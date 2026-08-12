@@ -83,6 +83,19 @@ export class NotificationCommerceService {
     });
   }
 
+  /**
+   * Teslim bildirimi (alıcıya). 48 saatlik onay penceresi KAPALIYKEN tek
+   * teslim sinyali budur: iade hakkının ve satıcı ödeme saatinin başladığı an.
+   */
+  async notifyOrderDelivered(buyerId: string, orderId: string) {
+    return this.dispatch.send({
+      userId: buyerId,
+      type: NotificationType.ORDER_DELIVERED,
+      channels: [NotificationChannel.PUSH, NotificationChannel.IN_APP],
+      data: { orderId },
+    });
+  }
+
   async notifyOrderDeliveredConfirm(
     buyerId: string,
     orderId: string,

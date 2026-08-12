@@ -6876,6 +6876,10 @@
       "tradeAtWarehouse": {
         "title": "Ürünler depomuzda",
         "message": "Takasın iki ürünü de Tarodan deposuna ulaştı. Uzman kontrolünden sonra ürünler yeni sahiplerine gönderilecek."
+      },
+      "orderShipmentDelayed": {
+        "title": "Kargonuz beklenenden uzun sürüyor",
+        "message": "Kargonuzda bir süredir hareket görünmüyor. Ekibimiz taşıyıcıyla durumu takip ediyor; sizin bir işlem yapmanıza gerek yok."
       }
     },
     "auth": {

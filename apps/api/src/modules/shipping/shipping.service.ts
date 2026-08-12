@@ -380,12 +380,22 @@ export class ShippingService {
     });
 
     // tx commit sonrası: alıcıya "kargoya verildi" bildirimi (push + in_app).
+    // KOLİ BAŞINA TEK: aynı koli birden çok sipariş satırı taşır (Shipment satırı
+    // sipariş başınadır); tekilleştirmesiz her kalem için ayrı push giderdi.
     try {
-      await this.notificationService.notifyOrderShipped(
-        shipment.order.buyerId,
-        shipment.orderId,
-        dto.trackingNumber,
-      );
+      if (
+        (await this.paymentService?.claimOrderAnnouncement?.("shipped", {
+          id: shipment.orderId,
+          packageId: shipment.packageId,
+        })) ??
+        true
+      ) {
+        await this.notificationService.notifyOrderShipped(
+          shipment.order.buyerId,
+          shipment.orderId,
+          dto.trackingNumber,
+        );
+      }
     } catch (e: any) {
       this.logger.warn(
         `notifyOrderShipped failed for ${shipment.orderId}: ${e?.message}`,
@@ -433,9 +443,23 @@ export class ShippingService {
       out_for_delivery: ShipmentStatus.out_for_delivery,
       delivered: ShipmentStatus.delivered,
       failed: ShipmentStatus.failed,
+      returned: ShipmentStatus.returned,
+      cancelled: ShipmentStatus.cancelled,
     };
 
-    const newStatus = statusMap[payload.status] || ShipmentStatus.in_transit;
+    // Bilinmeyen durum kodu statüyü DEĞİŞTİRMEZ (Sürat poller'ındaki L2 kuralıyla
+    // aynı). Eskiden eşleşmeyen her değer `in_transit`e düşüyordu: taşıyıcının
+    // gönderdiği "iade"/"iptal" gibi eşlenmemiş bir sinyal sessizce "yolda"ya
+    // dönüşüyor, gerçek durum kayboluyordu. Tanımadığımız kodu yok saymak,
+    // yanlış bildiğimizi sanmaktan iyidir.
+    const newStatus = statusMap[payload.status];
+    if (!newStatus) {
+      this.logger.warn(
+        `Unknown ${provider} webhook status "${payload.status}" for tracking ${reference}; ` +
+          `leaving ${siblings.length} shipment(s) untouched`,
+      );
+      return { status: "ignored" };
+    }
 
     // Y11: Teslimat işlemini tüm yollarla TUTARLI yap. 48h dallanması + escrow schedule
     // artık tek kanonik handler'da (paymentService.handleOrderDelivered) — geldiği yola göre
@@ -495,7 +519,21 @@ export class ShippingService {
 
         return true;
       });
-      if (ok) applied++;
+      if (ok) {
+        applied++;
+        // Teslim duyurusu tx DIŞINDA: bildirim I/O'su teslim yazımını bekletmez
+        // ve hata teslimi geri almaz. Koli başına tekilleştirme duyurunun
+        // içindedir; kardeş satırlar sessiz kalır.
+        if (newStatus === ShipmentStatus.delivered) {
+          await this.paymentService
+            ?.announceOrderDelivered?.(shipment.orderId)
+            ?.catch((e: any) =>
+              this.logger.warn(
+                `announce delivered failed (webhook) for ${shipment.orderId}: ${e?.message}`,
+              ),
+            );
+        }
+      }
     }
 
     return { status: applied > 0 ? "ok" : "ignored" };

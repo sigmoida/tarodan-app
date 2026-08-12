@@ -22,6 +22,7 @@ import { PaymentProviderRegistry } from "../payment-providers/payment-provider.r
 import { PaymentProvider } from "./dto";
 import { EventService } from "../events";
 import { NotificationService } from "../notification/notification.service";
+import { CacheService } from "../cache/cache.service";
 import { NotificationType } from "../notification/dto/notification.dto";
 import { CommissionLedgerService } from "../commission/commission-ledger.service";
 import { ElogoInvoicingService } from "../elogo";
@@ -156,6 +157,11 @@ export class PaymentRefundService {
     // @Optional + best-effort — defter hatası iadeyi BOZMAZ; reconciliation açığı yakalar.
     @Optional()
     private readonly ledger?: LedgerService,
+    // Koli başına TEK bildirim için tekilleştirme anahtarı tutar. @Optional:
+    // birim testleri cache sağlamak zorunda kalmasın — yoksa duyuru yapılır
+    // (eksik bildirimdense fazlası yeğdir).
+    @Optional()
+    private readonly cache?: CacheService,
   ) {
     this.returnWindowDays = resolvePaymentConfigNumber(
       this.configService,
@@ -1995,6 +2001,87 @@ export class PaymentRefundService {
    * Bildirim ÇAĞIRANDA kalır (metod acted + use48h + confirmationDeadline + buyerId döner)
    * ki teslim I/O'su alıcı bildirim çağrısını beklemesin ve mevcut çağıran davranışı korunsun.
    */
+  /**
+   * TESLİM DUYURUSU — post-commit, `handleOrderDelivered` acted=true döndüğünde
+   * çağrılır (poller, webhook, admin: hangisi teslimi ilk yazdıysa yalnız o).
+   *
+   * Teslim, alıcı için sürecin en kritik anıdır: 14 günlük iade hakkı ve satıcı
+   * ödemesinin saati o an başlar. Buna rağmen 48 saatlik onay penceresi bayrağı
+   * KAPALIYKEN (varsayılan) hiçbir bildirim gitmiyordu — `emitOrderDelivered` ve
+   * `ORDER_DELIVERED` şablonu tanımlı ama çağrısız duruyordu. Sessiz teslim,
+   * "kargom geldi mi, iade sürem başladı mı" bileti demektir.
+   *
+   * KOLİ BAŞINA TEK: bir koli birden çok sipariş satırı taşır (Shipment satırı
+   * sipariş başına). Paket kimliğiyle tekilleştirilir, aksi halde tek koli için
+   * kalem sayısı kadar bildirim gider.
+   */
+  async announceOrderDelivered(orderId: string): Promise<void> {
+    const order = await this.prisma.order.findUnique({
+      where: { id: orderId },
+      select: {
+        id: true,
+        orderNumber: true,
+        buyerId: true,
+        packageId: true,
+        buyer: { select: { email: true, ...PUBLIC_NAME_SELECT } },
+        seller: { select: { email: true, ...PUBLIC_NAME_SELECT } },
+      },
+    });
+    if (!order?.buyerId) return;
+
+    if (!(await this.claimPackageAnnouncement("delivered", order))) return;
+
+    try {
+      await this.notificationService.notifyOrderDelivered(
+        order.buyerId,
+        order.id,
+      );
+    } catch (e: any) {
+      this.logger.warn(
+        `notifyOrderDelivered failed for ${orderId}: ${e?.message}`,
+      );
+    }
+
+    try {
+      await this.eventService.emitOrderDelivered({
+        orderId: order.id,
+        orderNumber: order.orderNumber,
+        buyerEmail: order.buyer?.email ?? "",
+        sellerEmail: order.seller?.email ?? "",
+        buyerName: publicName(order.buyer),
+        sellerName: publicName(order.seller),
+      });
+    } catch (e: any) {
+      this.logger.warn(
+        `emitOrderDelivered failed for ${orderId}: ${e?.message}`,
+      );
+    }
+  }
+
+  /**
+   * Koli başına tek duyuru hakkı. Aynı koliye ait ilk sipariş satırı hakkı alır,
+   * kardeşleri sessiz kalır. Paketsiz (eski/manuel) siparişte sipariş kimliğiyle
+   * çalışır — davranış değişmez. Cache yoksa duyuru yapılır: eksik bildirimdense
+   * fazlası yeğdir.
+   */
+  async claimPackageAnnouncement(
+    kind: "shipped" | "delivered",
+    order: { id: string; packageId: string | null },
+  ): Promise<boolean> {
+    if (!this.cache) return true;
+    const scope = order.packageId
+      ? `pkg:${order.packageId}`
+      : `ord:${order.id}`;
+    const key = `notif:order-${kind}:${scope}`;
+    try {
+      if (await this.cache.get(key)) return false;
+      await this.cache.set(key, 1, { ttl: 7 * 24 * 3600 });
+    } catch {
+      return true;
+    }
+    return true;
+  }
+
   async handleOrderDelivered(
     orderId: string,
     deliveredAt: Date,

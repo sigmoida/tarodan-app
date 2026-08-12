@@ -113,6 +113,10 @@ export class NotificationService {
     return this.commerce.notifyOrderShipped(buyerId, orderId, trackingNumber);
   }
 
+  async notifyOrderDelivered(buyerId: string, orderId: string) {
+    return this.commerce.notifyOrderDelivered(buyerId, orderId);
+  }
+
   async notifyOrderDeliveredConfirm(
     buyerId: string,
     orderId: string,

@@ -179,6 +179,22 @@ export class PaymentService {
     return this.paymentRefund.handleOrderDelivered(orderId, deliveredAt, tx);
   }
 
+  /**
+   * Koli başına tek duyuru hakkı (kargoya verildi / teslim edildi). İlk sipariş
+   * satırı hakkı alır, kardeşleri sessiz kalır.
+   */
+  async claimOrderAnnouncement(
+    kind: "shipped" | "delivered",
+    order: { id: string; packageId: string | null },
+  ): Promise<boolean> {
+    return this.paymentRefund.claimPackageAnnouncement(kind, order);
+  }
+
+  /** Teslim duyurusu (post-commit): alıcıya bildirim + e-posta, koli başına tek. */
+  async announceOrderDelivered(orderId: string): Promise<void> {
+    return this.paymentRefund.announceOrderDelivered(orderId);
+  }
+
   async releaseHoldsDue(): Promise<{
     count: number;
     tradeCashReleased: number;

@@ -51,6 +51,8 @@ export class OrderSchedulerService implements OnModuleInit {
     orders: Array<{
       id: string;
       orderNumber: string;
+      buyerId?: string;
+      sellerId?: string;
       shipment: { shippedAt: Date | null } | null;
     }>,
   ): Promise<void> {
@@ -83,6 +85,24 @@ export class OrderSchedulerService implements OnModuleInit {
           } catch (err: any) {
             this.logger.error(
               `Takılı kargo admin bildirimi başarısız (order=${order.id}): ${err?.message}`,
+            );
+          }
+        }
+
+        // Alıcı ve satıcı da bilgilendirilir. Uyarı yalnız admin'e gidince
+        // kullanıcı hareketsizliği kendi fark edip destek açıyordu; "gördük,
+        // takipteyiz" mesajı bileti önler. Aynı 24s dedupe penceresi geçerli.
+        for (const userId of [order.buyerId, order.sellerId]) {
+          if (!userId) continue;
+          try {
+            await this.notificationService.createInAppNotification(
+              userId,
+              NotificationType.ORDER_SHIPMENT_DELAYED,
+              { orderId: order.id, orderNumber: order.orderNumber },
+            );
+          } catch (err: any) {
+            this.logger.warn(
+              `Takılı kargo kullanıcı bildirimi başarısız (order=${order.id}, user=${userId}): ${err?.message}`,
             );
           }
         }
@@ -227,6 +247,7 @@ export class OrderSchedulerService implements OnModuleInit {
         select: {
           id: true,
           orderNumber: true,
+          buyerId: true,
           sellerId: true,
           shipment: { select: { shippedAt: true, trackingNumber: true } },
         },

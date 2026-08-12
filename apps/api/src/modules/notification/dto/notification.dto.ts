@@ -63,6 +63,8 @@ export enum NotificationType {
   // Admin uyarısı: sipariş uzun süredir kargoda ve taşıyıcıdan teslim raporu yok.
   // Teslim yazılmadan escrow release tarihi kurulmaz → satıcı parası askıda kalır.
   ORDER_STUCK_IN_TRANSIT = "order_stuck_in_transit",
+  // Kargo uzun süredir hareketsiz — alıcı ve satıcıya bilgi.
+  ORDER_SHIPMENT_DELAYED = "order_shipment_delayed",
   // Her iki ürün de depoya ulaştı → kontrol aşaması başlıyor.
   TRADE_AT_WAREHOUSE = "trade_at_warehouse",
   // Admin uyarısı: depodan çıkan koli için taşıyıcıdan TESLİM raporu gelmedi. Onay

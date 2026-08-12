@@ -212,13 +212,22 @@ export default function OrderGroupCard({
                     </p>
                   )}
                   {/* Taşıyıcının kendi kodu — Sürat barkodu oluştuğunda dolar. */}
-                  {cargoCode && (
+                  {cargoCode ? (
                     <p>
                       <span className="text-muted">
                         {t("order.trackingNumber")}:
                       </span>{" "}
                       <span className="font-mono">{cargoCode}</span>
                     </p>
+                  ) : (
+                    /* Kod yalnız koli şubede kabul edildikten sonra doluyor. O
+                       aralıkta hiçbir şey yazmamak, kullanıcıyı koli numarasını
+                       takip numarası sanıp taşıyıcı sitesinde aramaya itiyordu. */
+                    pkg.cargo?.shippedAt && (
+                      <p className="text-muted">
+                        {t("order.cargoCodePending")}
+                      </p>
+                    )
                   )}
                   {/* Takip TESLİMAT başına tektir — sorgu anahtarı da bu koddur. */}
                   {(pkg.packageNumber || cargoCode) &&

@@ -795,6 +795,19 @@ export class AdminAnalyticsOrderService {
       return tx.order.findUniqueOrThrow({ where: { id: orderId } });
     });
 
+    // Admin elle teslim işaretlediğinde de alıcı bildirimi + e-posta gider:
+    // taşıyıcı raporlamadığı için elle işaretlenen teslimat, kullanıcı açısından
+    // diğerlerinden farksızdır.
+    if (deliveryResult?.acted) {
+      await this.paymentService
+        ?.announceOrderDelivered?.(orderId)
+        ?.catch((e: any) =>
+          this.logger.warn(
+            `announce delivered failed (admin) for ${orderId}: ${e?.message}`,
+          ),
+        );
+    }
+
     await this.audit.createAuditLog(
       adminId,
       "order_status_update",

@@ -6876,6 +6876,10 @@
       "tradeAtWarehouse": {
         "title": "Items reached our warehouse",
         "message": "Both items in your trade arrived at the Tarodan warehouse. After inspection they will be shipped to their new owners."
+      },
+      "orderShipmentDelayed": {
+        "title": "Your parcel is taking longer than expected",
+        "message": "Your parcel has shown no movement for a while. Our team is following it up with the carrier; you do not need to do anything."
       }
     },
     "auth": {
