@@ -197,8 +197,9 @@ export const visibleCargoCode = (
 const CANCELLABLE_STATUSES = ["pending_payment", "paid", "preparing"];
 
 /**
- * Grup iptali (R4): iptal SEPET bazındadır ve yalnız hiçbir üye kargoya
- * verilmemişken açıktır. Kısmen kargolanmış sepette iptal tamamen kapalıdır.
+ * Grup iptali (R4): SEPET bazlı iptal yalnız hiçbir üye kargoya verilmemişken
+ * açıktır. Kısmen kargolanmış sepette grup iptali kapalıdır — kargolanmamış
+ * kalemler için tek KALEM iptali (isOrderCancellable) devreye girer.
  */
 export const isGroupCancellable = (group: ServerOrderGroup): boolean =>
   group.viewerRole === "buyer" &&
@@ -209,3 +210,37 @@ export const isGroupCancellable = (group: ServerOrderGroup): boolean =>
       !hasShipped(o) &&
       !o.activeRefundRequest,
   );
+
+/**
+ * Kargoya devir sayılmayan gönderi durumları: etiket kesilmiş (label_created)
+ * olabilir ama paket henüz taşıyıcıya geçmemiştir — backend de bu aşamada
+ * iptale izin verir.
+ */
+const PRE_HANDOVER_SHIPMENT_STATUSES = [
+  "pending",
+  "label_created",
+  "cancelled",
+  "failed",
+];
+
+/** Tekil iptal önkoşullarının okuduğu asgari sipariş şekli (Order ⊆, OrderDetail ⊆). */
+export interface CancellableOrderLike {
+  status: string;
+  isBuyer?: boolean;
+  activeRefundRequest?: { id: string } | null;
+  shipment?: { status: string } | null;
+}
+
+/**
+ * Tek KALEM iptali: sipariş kargoya devredilmeden (pending_payment/paid/
+ * preparing, gönderi en fazla etiket aşamasında) ve aktif iade yokken alıcı
+ * tek satırı iptal edebilir. Karışık sepette (bir kalem kargoda, diğeri değil)
+ * grup iptali kapanır ama bu yol açık kalır.
+ */
+export const isOrderCancellable = (o: CancellableOrderLike): boolean => {
+  if (o.isBuyer === false) return false;
+  if (!CANCELLABLE_STATUSES.includes(o.status)) return false;
+  if (o.activeRefundRequest) return false;
+  const s = o.shipment?.status;
+  return !s || PRE_HANDOVER_SHIPMENT_STATUSES.includes(s);
+};

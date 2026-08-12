@@ -21,6 +21,8 @@ import InvoicesSection from "./InvoicesSection";
 export interface OrderItemBlockHandlers {
   onReview: (order: OrderDetail) => void;
   onRequestRefund: (order: OrderDetail) => void;
+  /** Tek KALEM iptali (kargo öncesi) — iptal modalını bu siparişle açar. */
+  onCancelOrder: (order: OrderDetail) => void;
 }
 
 /**
@@ -32,12 +34,15 @@ export default function OrderItemBlock({
   order,
   showHeading,
   showCargoRef = true,
+  allowLineCancel = false,
   handlers,
 }: {
   order: OrderDetail;
   showHeading: boolean;
   /** Paketin ilk siparişi dışındaki bloklarda kargo referans kartı gizlenir (R6). */
   showCargoRef?: boolean;
+  /** Tek KALEM iptal butonu: çoklu sepette ya da grup iptali kapalıyken açılır. */
+  allowLineCancel?: boolean;
   handlers: OrderItemBlockHandlers;
 }) {
   const t = useTranslations();
@@ -85,6 +90,8 @@ export default function OrderItemBlock({
       <RefundActions
         order={order}
         onRequestRefund={() => handlers.onRequestRefund(order)}
+        onCancelOrder={() => handlers.onCancelOrder(order)}
+        showLineCancel={allowLineCancel}
       />
       <OrderSummaryCard order={order} />
       <InvoicesSection order={order} />

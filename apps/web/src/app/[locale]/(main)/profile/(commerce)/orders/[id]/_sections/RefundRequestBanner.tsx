@@ -12,6 +12,7 @@ import {
 import { Button } from "@tarodan/ui";
 import { ButtonLink } from "@/components/ui";
 import { useTranslations } from "next-intl";
+import { statusMetaOf } from "@/app/[locale]/(main)/profile/(finance)/refund-requests/_lib/refund-status";
 import type { OrderDetail } from "../_lib/types";
 
 export default function RefundRequestBanner({ order }: { order: OrderDetail }) {
@@ -19,21 +20,12 @@ export default function RefundRequestBanner({ order }: { order: OrderDetail }) {
   const rr = order.activeRefundRequest;
   if (!rr) return null;
 
-  const labelMap: Record<string, string> = {
-    pending_review: t("refund.statusPendingReview"),
-    approved: t("refund.statusApproved"),
-    wait_for_delivery: t("refund.statusWaitForDelivery"),
-    return_shipment_open: t("refund.statusReturnShipmentOpen"),
-    return_in_transit: t("refund.statusReturnInTransit"),
-    return_delivered: t("refund.statusReturnDelivered"),
-    refunded: t("refund.statusRefunded"),
-    disputed: t("refund.statusDisputed"),
-  };
-
-  const isRefunded = rr.status === "refunded";
   const isReturnReady =
     rr.status === "return_shipment_open" && !!rr.returnTrackingNumber;
-  const lbl = labelMap[rr.status] ?? rr.status;
+  // Durum etiketi tek kaynaktan: web'in refund-status modülü (liste ve detay
+  // sayfalarıyla aynı eşleme) — buradaki üçüncü kopya kaldırıldı.
+  const { labelKey } = statusMetaOf(rr.status);
+  const lbl = labelKey ? t(labelKey) : rr.status;
 
   return (
     <div className="rounded-xl shadow-sm p-6 border border-border bg-surface-alt">

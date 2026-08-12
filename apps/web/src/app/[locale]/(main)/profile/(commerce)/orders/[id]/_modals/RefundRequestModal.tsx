@@ -1,12 +1,14 @@
 "use client";
 
-import { Input, Modal, Select, Textarea } from "@/components/ui";
-import { IconButton, ModalFooter } from "@tarodan/ui";
+import { Modal, Select, Textarea } from "@/components/ui";
+import { ModalFooter } from "@tarodan/ui";
 import { useMutation } from "@tanstack/react-query";
 import { mediaApi, refundsApi, type RefundReason } from "@/lib/api";
 import { useTranslations } from "next-intl";
 import { useState } from "react";
 import toast from "react-hot-toast";
+import EvidencePhotoPicker from "../_components/EvidencePhotoPicker";
+import { buyerRefundReasonOptions } from "../_lib/refund-reasons";
 
 type Phase = "preparing" | "in_cooling_off" | "past_cooling_off";
 
@@ -34,7 +36,6 @@ export default function RefundRequestModal({
   const [reason, setReason] = useState<RefundReason>("changed_mind");
   const [description, setDescription] = useState("");
   const [evidenceFiles, setEvidenceFiles] = useState<File[]>([]);
-  const [evidencePreviews, setEvidencePreviews] = useState<string[]>([]);
   const [refundQuantity, setRefundQuantity] = useState(1);
 
   const submitMutation = useMutation({
@@ -72,25 +73,6 @@ export default function RefundRequestModal({
       ),
   });
 
-  const handleEvidenceAdd = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = Array.from(e.target.files || []);
-    const newFiles = files.slice(0, 5 - evidenceFiles.length);
-    if (newFiles.length === 0) return;
-    setEvidenceFiles((prev) => [...prev, ...newFiles]);
-    newFiles.forEach((file) => {
-      const reader = new FileReader();
-      reader.onload = (ev) =>
-        setEvidencePreviews((prev) => [...prev, ev.target?.result as string]);
-      reader.readAsDataURL(file);
-    });
-    e.target.value = "";
-  };
-
-  const removeEvidence = (index: number) => {
-    setEvidenceFiles((prev) => prev.filter((_, i) => i !== index));
-    setEvidencePreviews((prev) => prev.filter((_, i) => i !== index));
-  };
-
   // Vazgeçme koşulsuz ilerler. Kusur/yanlış ürün iddiaları finansal tarafı
   // değiştirdiği için kanıt ve admin incelemesi gerektirir.
   const isDispute = phase === "past_cooling_off";
@@ -98,44 +80,8 @@ export default function RefundRequestModal({
   const descriptionRequired = isDispute || evidenceRequired;
   const showEvidenceUpload = evidenceRequired;
 
-  const reasonOptions: { value: RefundReason; label: string }[] = [
-    {
-      value: "changed_mind",
-      label: t("order.refundReasonChangedMind"),
-    },
-    {
-      value: "delivery_delayed",
-      label: t("order.refundReasonDeliveryDelayed"),
-    },
-    {
-      value: "damaged",
-      label: t("order.refundReasonDamaged"),
-    },
-    {
-      value: "wrong_item",
-      label: t("order.refundReasonWrongItem"),
-    },
-    {
-      value: "not_as_described",
-      label: t("order.refundReasonNotAsDescribed"),
-    },
-    {
-      value: "missing_parts",
-      label: t("order.refundReasonMissingParts"),
-    },
-    {
-      value: "counterfeit",
-      label: t("order.refundReasonCounterfeit"),
-    },
-    {
-      value: "defective",
-      label: t("order.refundReasonDefective"),
-    },
-    {
-      value: "buyer_damaged",
-      label: t("order.refundReasonBuyerDamaged"),
-    },
-  ];
+  // Değerler paylaşılan listeden, etiketler web i18n'inden (tek kaynak).
+  const reasonOptions = buyerRefundReasonOptions(t);
 
   const handleSubmit = async () => {
     if (descriptionRequired && description.trim().length < 20) {
@@ -253,57 +199,11 @@ export default function RefundRequestModal({
         </div>
 
         {showEvidenceUpload && (
-          <div>
-            <label className="block text-sm font-medium text-body mb-2">
-              {t("order.evidencePhotosMax5")}{" "}
-              {evidenceRequired ? (
-                <span className="text-danger-500">*</span>
-              ) : (
-                <span className="text-muted font-normal">
-                  ({t("common.optional")})
-                </span>
-              )}
-            </label>
-            <div className="flex flex-wrap gap-2">
-              {evidencePreviews.map((src, idx) => (
-                <div
-                  key={idx}
-                  className="relative w-16 h-16 rounded-lg overflow-hidden border border-border"
-                >
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src={src}
-                    alt=""
-                    className="w-full h-full object-cover"
-                  />
-                  <IconButton
-                    type="button"
-                    size="xs"
-                    variant="ghost"
-                    aria-label={t("common.delete")}
-                    onClick={() => removeEvidence(idx)}
-                    className="absolute right-0 top-0 h-5 w-5 rounded-bl-lg bg-danger-500 text-inverted"
-                  >
-                    ×
-                  </IconButton>
-                </div>
-              ))}
-              {evidenceFiles.length < 5 && (
-                <label className="w-16 h-16 border-2 border-dashed flex items-center justify-center cursor-pointer hover:border-primary-400 rounded-lg">
-                  <span className="text-2xl text-subtle">+</span>
-                  <Input
-                    type="file"
-                    accept="image/*"
-                    onChange={handleEvidenceAdd}
-                    className="hidden"
-                  />
-                </label>
-              )}
-            </div>
-            <p className="text-xs text-muted mt-1">
-              {t("order.tapToUploadPhotos")}
-            </p>
-          </div>
+          <EvidencePhotoPicker
+            files={evidenceFiles}
+            onFilesChange={setEvidenceFiles}
+            required={evidenceRequired}
+          />
         )}
       </div>
     </Modal>

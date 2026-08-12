@@ -37,6 +37,7 @@ export function useTradeActions({
   const [tradeAddressId, setTradeAddressId] = useState<string | null>(null);
   const [showRejectModal, setShowRejectModal] = useState(false);
   const [rejectReason, setRejectReason] = useState("");
+  const [showDisputeModal, setShowDisputeModal] = useState(false);
   const [shipAddressId, setShipAddressId] = useState("");
 
   const addressesQuery = useQuery({
@@ -263,6 +264,8 @@ export function useTradeActions({
     setShowRejectModal,
     rejectReason,
     setRejectReason,
+    showDisputeModal,
+    setShowDisputeModal,
     // handlers
     handleCashPayment,
     handleShipSubmit,

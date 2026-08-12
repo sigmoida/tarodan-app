@@ -229,7 +229,6 @@ export const refundsApi = {
     },
   ) => api.post(`/orders/${orderId}/refund-requests`, body),
   myRequests: () => api.get("/refund-requests/me"),
-  sellerRequests: () => api.get("/refund-requests/seller"),
   getById: (id: string) => api.get(`/refund-requests/${id}`),
   cancel: (id: string) => api.post(`/refund-requests/${id}/cancel`),
 };

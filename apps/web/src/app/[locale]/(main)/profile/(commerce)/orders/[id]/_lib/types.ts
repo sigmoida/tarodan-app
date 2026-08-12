@@ -1,6 +1,10 @@
 /** @format */
 
-import { orderStatusConfig } from "@tarodan/ui";
+import {
+  ESCROW_RELEASE_DAYS,
+  REFUND_COOLING_OFF_DAYS,
+  orderStatusConfig,
+} from "@tarodan/ui";
 import { createTranslator } from "next-intl";
 import { getMessages, resolveLocale } from "@tarodan/i18n";
 
@@ -231,24 +235,42 @@ export const hasShipped = (o: OrderDetail): boolean => {
   return !!s && s !== "pending" && s !== "cancelled" && s !== "failed";
 };
 
-// Satıcıya escrow ödeme tarihi: teslim + 14 gün iade penceresi + 1 gün grace.
+// Satıcıya escrow ödeme tarihi: teslim + iade penceresi + 1 gün grace.
+// Gün sayıları @tarodan/shared policy-constants'tan gelir (backend tek kaynak).
 export const computePayoutDate = (o: OrderDetail): Date | null => {
   if (!o.deliveredAt) return null;
   const d = new Date(o.deliveredAt);
   if (Number.isNaN(d.getTime())) return null;
-  d.setDate(d.getDate() + 15);
+  d.setDate(d.getDate() + ESCROW_RELEASE_DAYS);
   return d;
 };
 
-// 14 GÜNDEN SONRA İADE YOK: teslimden 14 günden fazla geçtiyse iade penceresi
-// kapalıdır (backend de reddeder). Teslim edilmemişse pencere henüz başlamadı.
+// PENCEREDEN SONRA İADE YOK: teslimden REFUND_COOLING_OFF_DAYS günden fazla
+// geçtiyse iade penceresi kapalıdır (backend de reddeder). Teslim edilmemişse
+// pencere henüz başlamadı.
 export const isPastRefundWindow = (o: OrderDetail): boolean => {
   if (!o.deliveredAt) return false;
   const d = new Date(o.deliveredAt);
   if (Number.isNaN(d.getTime())) return false;
   const ageDays = (Date.now() - d.getTime()) / (1000 * 3600 * 24);
-  return ageDays > 14;
+  return ageDays > REFUND_COOLING_OFF_DAYS;
 };
+
+/**
+ * Kargo SONRASI iade talep edilebilir mi: alıcı, ödemesi tamamlanmış,
+ * kargolanmış/teslim edilmiş, iade penceresi içinde ve aktif iadesi olmayan
+ * sipariş. Tek kalem iade butonu ile toplu iade seçimi aynı önkoşulu paylaşır.
+ */
+export const isOrderReturnable = (o: OrderDetail): boolean =>
+  o.isBuyer &&
+  !isMembershipOrder(o) &&
+  !!o.payment &&
+  o.payment.status === "completed" &&
+  o.status !== "cancelled" &&
+  o.status !== "refunded" &&
+  !o.activeRefundRequest &&
+  hasShipped(o) &&
+  !isPastRefundWindow(o);
 
 export const inferRefundPhase = (
   o: OrderDetail,
