@@ -1,12 +1,14 @@
 import { Badge } from "@tarodan/ui";
 import { col, type RowActionItem } from "@/components/table";
-import { fmtDate } from "@/lib/format";
+import { fmtDate, fmtTry } from "@/lib/format";
 import {
   type Discount,
   scopeLabels,
   discountStatusConfig,
   getDiscountStatus,
+  audienceLabel,
   discountValueLabel,
+  targetLabel,
 } from "./types";
 import type { useTranslations } from "next-intl";
 
@@ -83,6 +85,45 @@ export function discountColumns(
         </div>
       ),
       { grow: 1, minWidth: 150, sortKey: "scope", sortType: "text" },
+    ),
+    // Hangi kalemi indiriyor + kime: kampanyanın anlamı bu iki alanda.
+    col.custom<Discount>(
+      t("admin.marketing.discounts.targetLabel"),
+      (d) => (
+        <div className="min-w-0">
+          <Badge
+            variant={d.target === "product_price" ? "secondary" : "primary"}
+            size="sm"
+            className={BADGE_SIZE}
+          >
+            {targetLabel(t, d.target)}
+          </Badge>
+          <p className="mt-1 truncate text-xs text-muted">
+            {audienceLabel(t, d.audience)}
+          </p>
+        </div>
+      ),
+      { grow: 1, minWidth: 190, sortKey: "target", sortType: "text" },
+    ),
+    // Bütçe, bedel kampanyasının maliyet kontrolüdür: dolduğunda kampanya durur.
+    col.custom<Discount>(
+      t("admin.marketing.discounts.budgetUsage"),
+      (d) =>
+        d.budgetLimit == null ? (
+          <span className="text-xs text-muted">—</span>
+        ) : (
+          <div className="min-w-0">
+            <span className="whitespace-nowrap text-sm text-heading">
+              {fmtTry(d.budgetSpent)} / {fmtTry(d.budgetLimit)}
+            </span>
+            {d.budgetStoppedAt && (
+              <p className="mt-1 text-xs font-medium text-danger">
+                {t("admin.marketing.discounts.budgetStopped")}
+              </p>
+            )}
+          </div>
+        ),
+      { grow: 1, minWidth: 160, sortKey: "budgetSpent", sortType: "number" },
     ),
     col.muted<Discount>(
       t("admin.marketing.discounts.usage"),

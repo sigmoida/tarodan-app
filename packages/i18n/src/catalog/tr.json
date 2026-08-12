@@ -3612,7 +3612,12 @@
           "nameRequired": "İndirim adı gerekli",
           "valueRequired": "Değer gerekli",
           "startDateRequired": "Başlangıç tarihi gerekli",
-          "endDateRequired": "Bitiş tarihi gerekli"
+          "endDateRequired": "Bitiş tarihi gerekli",
+          "budgetRequired": "Bedel indirimi için bütçe tavanı girin",
+          "tiersRequired": "En az bir üyelik katmanı seçin",
+          "usersRequired": "En az bir kullanıcı kimliği girin",
+          "sellerAudienceRequired": "Satıcı bedeli yalnız satıcı kitlesine hedeflenebilir",
+          "buyerAudienceRequired": "Alıcının ödediği kalem satıcı kitlesine hedeflenemez"
         },
         "codes": {
           "title": "Voucher Kodu Üret",
@@ -3625,7 +3630,35 @@
           "generateFailed": "Kod üretilemedi",
           "rowGenerate": "Kod Üret",
           "rowExport": "Kodları İndir (CSV)"
-        }
+        },
+        "targetLabel": "İndirilecek Kalem",
+        "targetHelper": "Ürün fiyatı satıcıya aittir; platform yalnız kendi bedellerinden indirim yapabilir.",
+        "target": {
+          "product_price": "Ürün fiyatı (satıcıya ait)",
+          "buyer_commission": "Alıcı komisyonu",
+          "buyer_service_fee": "Alıcı koruma hizmet bedeli",
+          "buyer_shipping": "Alıcı kargo payı",
+          "seller_commission": "Satıcı komisyonu",
+          "seller_platform_fee": "Satıcı platform hizmet bedeli",
+          "seller_shipping": "Satıcı kargo payı"
+        },
+        "audienceLabel": "Hedef Kitle",
+        "audienceHelper": "Kalem kimin cebine bakıyorsa kitle o tarafta değerlendirilir.",
+        "audience": {
+          "everyone": "Herkes",
+          "membership_tiers": "Üyelik tipi",
+          "specific_buyers": "Belirli alıcılar",
+          "specific_sellers": "Belirli satıcılar",
+          "all_buyers": "Tüm alıcılar",
+          "all_sellers": "Tüm satıcılar"
+        },
+        "targetTiers": "Hedef üyelik katmanları",
+        "targetUsers": "Hedef kullanıcı kimlikleri",
+        "targetUsersHelper": "Virgülle ayırarak kullanıcı kimliklerini girin.",
+        "budgetLimit": "Bütçe Tavanı (TL)",
+        "budgetHelper": "Bedel indirimlerinde zorunludur: tavan dolduğunda kampanya kendiliğinden durur.",
+        "budgetUsage": "Bütçe",
+        "budgetStopped": "Bütçe doldu"
       },
       "emailTemplates": {
         "title": "E-posta Şablonları",

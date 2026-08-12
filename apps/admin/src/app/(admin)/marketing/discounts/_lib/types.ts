@@ -1,6 +1,7 @@
 import type { StatusConfig } from "@tarodan/ui";
 import { fmtTry } from "@/lib/format";
 import type { useTranslations } from "next-intl";
+import { membershipConfig } from "../../../accounts/seller-performance/_lib/types";
 
 type T = ReturnType<typeof useTranslations<never>>;
 
@@ -34,7 +35,70 @@ export interface Discount {
   createdAt: string;
   isCurrentlyValid: boolean;
   remainingUsage: number | null;
+  /** İndirimin indirdiği kalem — ürün fiyatı yalnız satıcı kampanyalarında olur. */
+  target: DiscountTarget;
+  audience: DiscountAudience;
+  targetTierTypes?: string[];
+  targetUserIds?: string[];
+  budgetLimit: number | null;
+  budgetSpent: number;
+  budgetStoppedAt: string | null;
 }
+
+export type DiscountTarget =
+  | "product_price"
+  | "buyer_commission"
+  | "buyer_service_fee"
+  | "buyer_shipping"
+  | "seller_commission"
+  | "seller_platform_fee"
+  | "seller_shipping";
+
+export type DiscountAudience =
+  | "everyone"
+  | "membership_tiers"
+  | "specific_buyers"
+  | "specific_sellers"
+  | "all_buyers"
+  | "all_sellers";
+
+/** Platformun tanımlayabildiği kalemler — ürün fiyatı satıcıya aittir. */
+export const PLATFORM_TARGETS: DiscountTarget[] = [
+  "buyer_commission",
+  "buyer_service_fee",
+  "buyer_shipping",
+  "seller_commission",
+  "seller_platform_fee",
+  "seller_shipping",
+];
+
+export const targetLabel = (t: T, target: DiscountTarget): string =>
+  t(`admin.marketing.discounts.target.${target}` as never);
+
+export const audienceLabel = (t: T, audience: DiscountAudience): string =>
+  t(`admin.marketing.discounts.audience.${audience}` as never);
+
+export const targetFormOptions = (t: T) =>
+  PLATFORM_TARGETS.map((value) => ({ value, label: targetLabel(t, value) }));
+
+export const audienceFormOptions = (t: T) =>
+  (
+    [
+      "everyone",
+      "all_buyers",
+      "all_sellers",
+      "membership_tiers",
+      "specific_buyers",
+      "specific_sellers",
+    ] as DiscountAudience[]
+  ).map((value) => ({ value, label: audienceLabel(t, value) }));
+
+/** Katman etiketleri tek kaynaktan (satıcı performansı ekranıyla aynı sözlük). */
+export const membershipTierOptions = (t: T) =>
+  Object.entries(membershipConfig(t)).map(([value, config]) => ({
+    value,
+    label: config.label,
+  }));
 
 export const scopeLabels = (t: T): Record<string, string> => ({
   global: t("admin.marketing.discounts.scope.global"),

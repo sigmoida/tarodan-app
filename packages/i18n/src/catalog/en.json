@@ -3612,7 +3612,12 @@
           "nameRequired": "Discount name is required",
           "valueRequired": "Value is required",
           "startDateRequired": "Start date is required",
-          "endDateRequired": "End date is required"
+          "endDateRequired": "End date is required",
+          "budgetRequired": "Enter a budget cap for a fee discount",
+          "tiersRequired": "Select at least one membership tier",
+          "usersRequired": "Enter at least one user ID",
+          "sellerAudienceRequired": "A seller fee can only target a seller audience",
+          "buyerAudienceRequired": "An item the buyer pays cannot target a seller audience"
         },
         "codes": {
           "title": "Generate Voucher Codes",
@@ -3625,7 +3630,35 @@
           "generateFailed": "Failed to generate codes",
           "rowGenerate": "Generate Codes",
           "rowExport": "Export Codes (CSV)"
-        }
+        },
+        "targetLabel": "Discounted item",
+        "targetHelper": "The product price belongs to the seller; the platform may only discount its own fees.",
+        "target": {
+          "product_price": "Product price (seller's)",
+          "buyer_commission": "Buyer commission",
+          "buyer_service_fee": "Buyer protection fee",
+          "buyer_shipping": "Buyer shipping share",
+          "seller_commission": "Seller commission",
+          "seller_platform_fee": "Seller platform fee",
+          "seller_shipping": "Seller shipping share"
+        },
+        "audienceLabel": "Audience",
+        "audienceHelper": "The audience is evaluated on the side whose pocket the item belongs to.",
+        "audience": {
+          "everyone": "Everyone",
+          "membership_tiers": "Membership tier",
+          "specific_buyers": "Specific buyers",
+          "specific_sellers": "Specific sellers",
+          "all_buyers": "All buyers",
+          "all_sellers": "All sellers"
+        },
+        "targetTiers": "Target membership tiers",
+        "targetUsers": "Target user IDs",
+        "targetUsersHelper": "Enter user IDs separated by commas.",
+        "budgetLimit": "Budget cap (TL)",
+        "budgetHelper": "Required for fee discounts: the campaign stops on its own once the cap is reached.",
+        "budgetUsage": "Budget",
+        "budgetStopped": "Budget spent"
       },
       "emailTemplates": {
         "title": "Email Templates",
