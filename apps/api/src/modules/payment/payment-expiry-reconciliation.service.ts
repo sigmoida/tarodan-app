@@ -389,11 +389,16 @@ export class PaymentExpiryReconciliationService {
             return;
           }
 
-          // Cancel order
+          // Cancel order — KARGO ÖNCESİ iptal olduğu için cancellationType
+          // "iptal" yazılır: iade bildirimi bu sınıflandırmayla alıcıya
+          // ORDER_CANCELLED, SATICIYA ORDER_CANCELLED_SELLER + iptal e-postası
+          // gönderir. Eskiden tip yazılmadığından satıcıya iptalin kendisi hiç
+          // bildirilmiyordu (yalnız "para iade edildi" çerçevesi gidiyordu).
           await tx.order.update({
             where: { id: order.id },
             data: {
               status: OrderStatus.cancelled,
+              cancellationType: "iptal",
               cancelReason:
                 "Satıcı belirlenen süre içinde kargoya vermediği için otomatik iptal edildi",
               version: { increment: 1 },
