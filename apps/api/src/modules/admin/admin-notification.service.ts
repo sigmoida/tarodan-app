@@ -6,6 +6,7 @@ import {
 } from "@nestjs/common";
 import { PrismaService } from "../../prisma";
 import { EventService } from "../events/event.service";
+import { isSafeFreeLink } from "../notification/notification-link-safety";
 import { AdminAuditService } from "./admin-audit.service";
 import { Prisma, type NotificationLog } from "@prisma/client";
 import {
@@ -148,6 +149,22 @@ export class AdminNotificationService {
   ) {
     let targetUserIds: string[] = [];
 
+    // ADMIN_BROADCAST serbest link taşır (harita: free("link")). DTO kapısına
+    // (SafeNotificationLinkData) ek olarak burada da süzülür: bu servis iç
+    // çağrılarla DTO doğrulamasından geçmeden de kullanılabiliyor. Güvensiz
+    // link (javascript:, dış http, site dışı yol...) SATIRI düşürmez — yalnız
+    // link alanı atılır, duyurunun kendisi linksiz ulaşır.
+    const data: Record<string, any> = { ...(dto.data ?? {}) };
+    if (
+      data.link !== undefined &&
+      (typeof data.link !== "string" || !isSafeFreeLink(data.link))
+    ) {
+      this.logger.warn(
+        "admin_broadcast: güvensiz bildirim linki düşürüldü (satır korunuyor)",
+      );
+      delete data.link;
+    }
+
     try {
       if (dto.targetType === "user_ids") {
         targetUserIds = dto.userIds || [];
@@ -198,7 +215,7 @@ export class AdminNotificationService {
           type: "admin_broadcast",
           title: dto.title,
           body: dto.body,
-          data: dto.data || ({} as any),
+          data,
           status: "sent",
           sentAt: new Date(),
         });
@@ -212,7 +229,7 @@ export class AdminNotificationService {
               type: "admin_broadcast",
               title: dto.title,
               body: dto.body,
-              data: dto.data || ({} as any),
+              data,
               status: "pending",
             });
           }
@@ -236,7 +253,8 @@ export class AdminNotificationService {
         title: dto.title,
         body: dto.body,
         channels: dto.channels,
-        data: dto.data,
+        // Süzülmüş data: push payload'ına da ham link sızmasın.
+        data,
       });
 
       // Update the logs we created to 'sent' status since we just emitted them

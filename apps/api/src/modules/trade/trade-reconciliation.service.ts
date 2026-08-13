@@ -46,6 +46,19 @@ export class TradeReconciliationService {
   // AUTO-CANCEL EXPIRED TRADES (Scheduled job)
   // ==========================================================================
   /**
+   * Admin alarm linklerinin taban adresi — tüketici sitesi değil admin paneli.
+   * Diğer adminLink üreticileriyle (refund/product-scheduler) aynı kural.
+   */
+  private adminBaseUrl(): string {
+    return (
+      process.env.ADMIN_URL?.replace(/\/$/, "") ||
+      (process.env.NODE_ENV === "production"
+        ? "https://admin.tarodan.com.tr"
+        : "http://localhost:3002")
+    );
+  }
+
+  /**
    * Elle müdahale bekleyen takaslar için aktif admin'lere in-app bildirim
    * gönderir. Her takas için 24s cache dedup uygular: cron 5 dk'da bir
    * çalıştığından spam olmaz, ama çözülmeyen takas TTL dolunca tekrar
@@ -113,6 +126,8 @@ export class TradeReconciliationService {
           tradeNumber: t.tradeNumber,
           arrivedAt: t.firstWarehouseArrivalAt?.toISOString(),
           deadline: t.shippingDeadline?.toISOString(),
+          // Admin alarmı: hedef admin panelindeki takas dosyası (serbest link).
+          adminLink: `${this.adminBaseUrl()}/operations/trades/${encodeURIComponent(t.id)}`,
         },
       })),
     );
@@ -205,7 +220,12 @@ export class TradeReconciliationService {
       "outbound-delivery-stuck-alerted",
       candidates.map((t) => ({
         id: t.id,
-        payload: { tradeId: t.id, tradeNumber: t.tradeNumber },
+        payload: {
+          tradeId: t.id,
+          tradeNumber: t.tradeNumber,
+          // Admin alarmı: hedef admin panelindeki takas dosyası (serbest link).
+          adminLink: `${this.adminBaseUrl()}/operations/trades/${encodeURIComponent(t.id)}`,
+        },
       })),
     );
     return candidates.length;

@@ -20,6 +20,11 @@ describe("LogRetentionService", () => {
     emailLog: {
       deleteMany: jest.fn().mockResolvedValue({ count: counts.email ?? 0 }),
     },
+    notificationLog: {
+      deleteMany: jest
+        .fn()
+        .mockResolvedValue({ count: counts.notification ?? 0 }),
+    },
     auditLog: { deleteMany: jest.fn() },
   });
 
@@ -30,7 +35,12 @@ describe("LogRetentionService", () => {
     Math.round((Date.now() - cutoff.getTime()) / 86_400_000);
 
   it("her tabloyu kendi saklama süresiyle temizler", async () => {
-    const prisma = makePrisma({ error: 120, security: 3, email: 40 });
+    const prisma = makePrisma({
+      error: 120,
+      security: 3,
+      email: 40,
+      notification: 900,
+    });
     const service = new LogRetentionService(prisma as any);
 
     const result = await service.purgeExpiredLogs();
@@ -38,7 +48,32 @@ describe("LogRetentionService", () => {
     expect(daysAgo(cutoffOf(prisma.errorLog.deleteMany))).toBe(30);
     expect(daysAgo(cutoffOf(prisma.securityLog.deleteMany))).toBe(180);
     expect(daysAgo(cutoffOf(prisma.emailLog.deleteMany))).toBe(90);
-    expect(result).toMatchObject({ error: 120, security: 3, email: 40 });
+    // Bildirim satırları (zil + teslimat izleri) süresiz birikiyordu; artık
+    // TÜM kanallar (in_app dahil) varsayılan 180 günde silinir.
+    expect(daysAgo(cutoffOf(prisma.notificationLog.deleteMany))).toBe(180);
+    expect(result).toMatchObject({
+      error: 120,
+      security: 3,
+      email: 40,
+      notification: 900,
+    });
+  });
+
+  it("bildirim saklama süresi NOTIFICATION_LOG_RETENTION_DAYS ile ayarlanır", async () => {
+    process.env.NOTIFICATION_LOG_RETENTION_DAYS = "30";
+    try {
+      const prisma = makePrisma({});
+      const service = new LogRetentionService(prisma as any);
+
+      await service.purgeExpiredLogs();
+
+      expect(daysAgo(cutoffOf(prisma.notificationLog.deleteMany))).toBe(30);
+      // Kanal filtresi YOK: in_app dahil bütün eski satırlar silinir.
+      const where = prisma.notificationLog.deleteMany.mock.calls[0][0].where;
+      expect(where.channel).toBeUndefined();
+    } finally {
+      delete process.env.NOTIFICATION_LOG_RETENTION_DAYS;
+    }
   });
 
   it("çözülmemiş ip_block kayıtları YAŞI NE OLURSA OLSUN silinmez", async () => {
@@ -71,11 +106,12 @@ describe("LogRetentionService", () => {
       error: 0,
       security: 0,
       email: 0,
+      notification: 0,
     });
   });
 
   it("bir tablo patlasa da diğerleri temizlenir", async () => {
-    const prisma = makePrisma({ security: 5, email: 7 });
+    const prisma = makePrisma({ security: 5, email: 7, notification: 11 });
     prisma.errorLog.deleteMany.mockRejectedValue(new Error("lock timeout"));
     const service = new LogRetentionService(prisma as any);
 
@@ -84,5 +120,6 @@ describe("LogRetentionService", () => {
     expect(result.error).toBe(0);
     expect(result.security).toBe(5);
     expect(result.email).toBe(7);
+    expect(result.notification).toBe(11);
   });
 });

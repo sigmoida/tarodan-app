@@ -816,6 +816,9 @@ export class RefundService {
       {
         refundNumber: rr.refundNumber,
         orderId: rr.order.id,
+        // Alıcı KENDİ talebini iptal etti → bildirim SATICIYA gider; hedef
+        // ekran audience'tan seçilir (satıcının sipariş sayfası).
+        audience: "seller",
       },
     );
     return updated;
@@ -1707,6 +1710,8 @@ export class RefundService {
     await this.safeNotify(rr.requesterId, NotificationType.REFUND_CANCELLED, {
       refundNumber: rr.refundNumber,
       orderId: rr.order.id,
+      // Admin kapattı → talebin sahibi olan ALICIYA gider.
+      audience: "buyer",
     });
     return updated;
   }
@@ -2234,6 +2239,8 @@ export class RefundService {
           {
             refundNumber: rr.refundNumber,
             orderId: rr.order.id,
+            // Sistem süre aşımıyla kapattı → talebin sahibi olan ALICIYA gider.
+            audience: "buyer",
           },
         );
         expired++;
@@ -2310,6 +2317,8 @@ export class RefundService {
           {
             refundNumber: rr.refundNumber,
             orderId: rr.order.id,
+            // Sistem süre aşımıyla kapattı → talebin sahibi olan ALICIYA gider.
+            audience: "buyer",
           },
         );
         expired++;

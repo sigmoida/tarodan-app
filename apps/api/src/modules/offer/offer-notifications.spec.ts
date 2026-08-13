@@ -2,6 +2,7 @@ import { BadRequestException } from "@nestjs/common";
 import { OfferStatus, ProductStatus } from "@prisma/client";
 import { OfferService } from "./offer.service";
 import { OfferSchedulerService } from "./offer-scheduler.service";
+import { NotificationType } from "../notification/dto";
 
 /**
  * Teklif sürecinin sessiz kalan üç noktası:
@@ -109,12 +110,16 @@ describe("Teklif — bildirimler ve fiyat tabanı", () => {
 
     await service.accept("offer-1", "seller-1");
 
+    // `offerId` ŞART: aynı kabul event.service üzerinden push kuyruğuna da
+    // gidiyor; worker'ın 60 dk mükerrer filtresi anahtarı ÖNCE offerId'dan
+    // türetir — bu emisyon offerId taşımazsa bildirim çiftlenir.
     expect(notificationService.notifyOfferAccepted).toHaveBeenCalledWith(
       "buyer-1",
       "product-1",
       1000,
       "order-1",
       expect.any(String),
+      "offer-1",
     );
     expect(
       notificationService.notifyOfferCounterAccepted,
@@ -145,6 +150,61 @@ describe("Teklif — bildirimler ve fiyat tabanı", () => {
     await expect(
       service.create("buyer-1", { productId: "product-1", amount: 900 } as any),
     ).rejects.toBeInstanceOf(BadRequestException);
+  });
+
+  /**
+   * Push worker'ın 60 dk mükerrer filtresi anahtarı ÖNCE `offerId`dan türetir
+   * (push.worker saveInAppNotification). Dispatch yolundan yazılan satır
+   * offerId taşımazsa kuyruk yolundan gelen aynı teklif filtreye takılmaz ve
+   * bildirim çiftlenir — üretici artık offerId'yi hep koyar.
+   */
+  it("alıcı karşı teklifinde satıcıya giden OFFER_RECEIVED yeni teklifin offerId'sini taşır", async () => {
+    const sellerCounter = {
+      id: "offer-1",
+      status: OfferStatus.pending,
+      amount: 1000, // satıcının karşı teklifi
+      buyerId: "buyer-1",
+      sellerId: "seller-1",
+      productId: "product-1",
+      buyerMustAccept: true,
+      expiresAt: new Date(Date.now() + 60 * 60 * 1000),
+      product: { ...product, price: 1200, oldPrice: null },
+    };
+    const newOffer = {
+      ...sellerCounter,
+      id: "offer-2",
+      amount: 800,
+      buyerMustAccept: false,
+    };
+    const tx: any = {
+      offer: {
+        findUnique: jest.fn().mockResolvedValue(sellerCounter),
+        update: jest.fn().mockResolvedValue({}),
+        create: jest.fn().mockResolvedValue(newOffer),
+      },
+    };
+    const createInAppNotification = jest.fn().mockResolvedValue(true);
+    const service = new OfferService(
+      {
+        $transaction: jest.fn().mockImplementation((fn: any) => fn(tx)),
+      } as any,
+      { del: jest.fn(), delByPattern: jest.fn() } as any,
+      { get: () => undefined } as any,
+      {} as any,
+      { createInAppNotification } as any,
+      {} as any,
+      {} as any,
+      undefined as any,
+      {} as any,
+    );
+
+    await service.buyerCounter("offer-1", "buyer-1", { amount: 800 } as any);
+
+    expect(createInAppNotification).toHaveBeenCalledWith(
+      "seller-1",
+      NotificationType.OFFER_RECEIVED,
+      expect.objectContaining({ offerId: "offer-2", productId: "product-1" }),
+    );
   });
 });
 

@@ -213,6 +213,10 @@ export class NotificationCommerceService {
   /**
    * Teklif kabul edildi → ALICI'ya. 24 saatlik ödeme penceresi bu bildirimle
    * duyurulur; hedef ilan değil ödenecek SİPARİŞTİR, bu yüzden `orderId` taşınır.
+   *
+   * `offerId` de taşınır: aynı olay event.service üzerinden push kuyruğuna da
+   * gider ve push worker'ın 60 dk mükerrer filtresi anahtarı ÖNCE `offerId`dan
+   * türetir. Bu satır offerId taşımazsa filtre tutmaz → çift zil + çift push.
    */
   async notifyOfferAccepted(
     buyerId: string,
@@ -220,12 +224,13 @@ export class NotificationCommerceService {
     amount: number,
     orderId?: string,
     productTitle?: string,
+    offerId?: string,
   ) {
     return this.dispatch.send({
       userId: buyerId,
       type: NotificationType.OFFER_ACCEPTED,
       channels: [NotificationChannel.PUSH, NotificationChannel.IN_APP],
-      data: { productId, amount, orderId, productTitle },
+      data: { productId, amount, orderId, productTitle, offerId },
     });
   }
 

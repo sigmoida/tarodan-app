@@ -6,10 +6,13 @@ import {
   IsUUID,
   IsDateString,
   IsEnum,
+  IsObject,
   MaxLength,
+  Validate,
 } from "class-validator";
 import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
 import { AdminListQueryDto } from "../../../common/list";
+import { SafeNotificationLinkData } from "../../notification/dto";
 
 // =============================================================================
 // NOTIFICATION TEMPLATE DTOs
@@ -190,6 +193,11 @@ export class SendNotificationDto {
 
   @ApiPropertyOptional({ description: "Additional data to include" })
   @IsOptional()
+  @IsObject()
+  // Yayın satırı serbest link taşır (ADMIN_BROADCAST → free("link")): dışarıdan
+  // gelen hedef, kullanıcıya gönderilen SendNotificationDto ile AYNI kapıdan
+  // geçer — javascript:/dış-site linki DTO sınırında reddedilir.
+  @Validate(SafeNotificationLinkData)
   data?: Record<string, any>;
 }
 

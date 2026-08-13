@@ -521,12 +521,16 @@ export class OfferService {
     // alıcı, 24 saatlik ödeme penceresini yalnız e-postadan öğreniyordu.
     // Karşı teklifi alıcı kabul ettiğinde satıcının da haberi olmuyordu.
     try {
+      // `offerId` push worker'ın mükerrer filtresi için ŞART: aynı kabul,
+      // emitOfferAccepted ile push kuyruğuna da gidiyor ve worker anahtarı
+      // önce offerId'dan türetiyor — bu satır taşımazsa bildirim ÇİFTLENİR.
       await this.notificationService.notifyOfferAccepted(
         result.offer.buyerId,
         result.offer.productId,
         Number(result.offer.amount),
         result.order.id,
         result.offer.product.title,
+        result.offer.id,
       );
       if (result.acceptedByBuyer) {
         await this.notificationService.notifyOfferCounterAccepted(
@@ -879,6 +883,10 @@ export class OfferService {
             productId: offer.productId,
             productTitle: offer.product.title,
             amount: dto.amount,
+            // Push worker'ın mükerrer filtresi anahtarı önce offerId'dan
+            // türetir; kuyruk yolundan gelen aynı teklifin bildirimi ancak
+            // bu satır offerId taşırsa yakalanır (çift zil önlenir).
+            offerId: newOffer.id,
           },
         );
       } catch (e) {

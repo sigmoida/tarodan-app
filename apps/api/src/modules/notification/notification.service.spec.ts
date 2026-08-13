@@ -1,4 +1,5 @@
 import { Test, TestingModule } from "@nestjs/testing";
+import { NotFoundException } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { NotificationService } from "./notification.service";
 import { NotificationDispatchService } from "./notification-dispatch.service";
@@ -38,6 +39,7 @@ describe("NotificationService in-app dedupe", () => {
       create: jest.fn().mockResolvedValue({ id: "log-1" }),
       findFirst: jest.fn().mockResolvedValue(null),
       update: jest.fn().mockResolvedValue({ id: "log-1" }),
+      updateMany: jest.fn().mockResolvedValue({ count: 1 }),
     },
   };
 
@@ -184,6 +186,33 @@ describe("NotificationService in-app dedupe", () => {
         equals: "thread-1",
       });
       expect(inAppCreateCalls()).toHaveLength(1);
+    });
+  });
+
+  /**
+   * Regresyon: markAsRead `channel` filtresiz updateMany yapıyordu — aynı
+   * tabloda duran e-posta/push TESLİMAT İZLEME satırları da (id bilinirse)
+   * "read" yapılabiliyordu; üstelik hiçbir satır eşleşmese bile başarı
+   * dönüyordu. Artık yalnız in_app satırı işaretlenir, eşleşme yoksa 404.
+   */
+  describe("markAsRead", () => {
+    it("yalnız KENDİ in_app satırını işaretler", async () => {
+      await expect(service.markAsRead("log-1", "user-1")).resolves.toBe(true);
+
+      expect(mockPrisma.notificationLog.updateMany).toHaveBeenCalledWith({
+        where: { id: "log-1", userId: "user-1", channel: "in_app" },
+        data: { status: "read" },
+      });
+    });
+
+    it("eşleşen satır yoksa başarı DÖNMEZ (404)", async () => {
+      mockPrisma.notificationLog.updateMany.mockResolvedValueOnce({
+        count: 0,
+      });
+
+      await expect(
+        service.markAsRead("email-delivery-row", "user-1"),
+      ).rejects.toBeInstanceOf(NotFoundException);
     });
   });
 });

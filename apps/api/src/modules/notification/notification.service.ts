@@ -180,6 +180,7 @@ export class NotificationService {
     amount: number,
     orderId?: string,
     productTitle?: string,
+    offerId?: string,
   ) {
     return this.commerce.notifyOfferAccepted(
       buyerId,
@@ -187,6 +188,7 @@ export class NotificationService {
       amount,
       orderId,
       productTitle,
+      offerId,
     );
   }
 

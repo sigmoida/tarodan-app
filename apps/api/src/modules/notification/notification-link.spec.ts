@@ -123,6 +123,12 @@ describe("bildirim hedefleri", () => {
       NotificationType.ORDER_AUTO_COMPLETED,
       NotificationType.ORDER_FORCE_COMPLETED_BY_ADMIN,
       NotificationType.PAYMENT_REFUNDED,
+      // Kargo gecikmesi alıcıya VE satıcıya gider (order-scheduler).
+      NotificationType.ORDER_SHIPMENT_DELAYED,
+      // İade iptali iki yönlü: alıcı iptal edince satıcıya, sistem/admin
+      // kapatınca alıcıya gider — sabit alıcı deseni satıcıyı yanlış ekrana
+      // götürüyordu.
+      NotificationType.REFUND_CANCELLED,
     ];
 
     it.each(AUDIENCE_TYPES)("%s — audience ekranı seçer", (type) => {
@@ -263,6 +269,37 @@ describe("bildirim hedefleri", () => {
           orderId: "o1",
         }),
       ).toBe("/seller/orders/o1");
+    });
+
+    /**
+     * Regresyon: bu üç tip YALNIZ admin'lere gidiyordu ama tüketici sitesinin
+     * `/profile/...` yollarına link veriyordu — admin, tıklayınca kendi
+     * panelinde olmayan bir ekrana düşüyordu. Hedef artık üreticinin verdiği
+     * admin paneli adresidir (diğer admin alarmlarıyla aynı serbest-link kalıbı).
+     */
+    describe("admin alarmları admin paneline gider", () => {
+      const ADMIN_ALARMS = [
+        NotificationType.ORDER_STUCK_IN_TRANSIT,
+        NotificationType.TRADE_STUCK_AT_WAREHOUSE,
+        NotificationType.TRADE_OUTBOUND_DELIVERY_MISSING,
+      ];
+
+      it.each(ADMIN_ALARMS)("%s — adminLink zorunlu serbest link", (type) => {
+        expect(requiredFieldsFor(type)).toEqual(["adminLink"]);
+        expect(
+          resolveWebNotificationLink(type, {
+            adminLink: "https://admin.tarodan.com.tr/operations/trades/t1",
+          }),
+        ).toBe("https://admin.tarodan.com.tr/operations/trades/t1");
+      });
+
+      it.each(ADMIN_ALARMS)("%s — güvensiz adminLink kaydedilmez", (type) => {
+        expect(
+          resolveWebNotificationLink(type, {
+            adminLink: "javascript:alert(1)",
+          }),
+        ).toBeNull();
+      });
     });
 
     it("iade bildirimlerinde satıcı tarafı satıcı ekranına gider", () => {

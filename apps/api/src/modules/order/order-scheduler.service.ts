@@ -70,6 +70,13 @@ export class OrderSchedulerService implements OnModuleInit {
         where: { isActive: true },
         select: { userId: true },
       });
+      // Admin alarmı tüketici sitesine değil admin panelindeki sipariş
+      // dosyasına gitmeli — diğer adminLink üreticileriyle aynı taban URL.
+      const adminBaseUrl =
+        process.env.ADMIN_URL?.replace(/\/$/, "") ||
+        (process.env.NODE_ENV === "production"
+          ? "https://admin.tarodan.com.tr"
+          : "http://localhost:3002");
       for (const order of fresh) {
         for (const admin of admins) {
           try {
@@ -80,6 +87,7 @@ export class OrderSchedulerService implements OnModuleInit {
                 orderId: order.id,
                 orderNumber: order.orderNumber,
                 shippedAt: order.shipment?.shippedAt?.toISOString(),
+                adminLink: `${adminBaseUrl}/operations/orders/${encodeURIComponent(order.id)}`,
               },
             );
           } catch (err: any) {
@@ -92,13 +100,17 @@ export class OrderSchedulerService implements OnModuleInit {
         // Alıcı ve satıcı da bilgilendirilir. Uyarı yalnız admin'e gidince
         // kullanıcı hareketsizliği kendi fark edip destek açıyordu; "gördük,
         // takipteyiz" mesajı bileti önler. Aynı 24s dedupe penceresi geçerli.
-        for (const userId of [order.buyerId, order.sellerId]) {
+        // Aynı tip iki tarafa gittiği için hedef ekran `audience` ile ayrılır.
+        for (const [userId, audience] of [
+          [order.buyerId, "buyer"],
+          [order.sellerId, "seller"],
+        ] as const) {
           if (!userId) continue;
           try {
             await this.notificationService.createInAppNotification(
               userId,
               NotificationType.ORDER_SHIPMENT_DELAYED,
-              { orderId: order.id, orderNumber: order.orderNumber },
+              { orderId: order.id, orderNumber: order.orderNumber, audience },
             );
           } catch (err: any) {
             this.logger.warn(

@@ -23,8 +23,6 @@ import {
 } from "@prisma/client";
 import { getAvailableQuantity } from "../product/helpers/product-availability.helper";
 import { EventService } from "../events";
-import { NotificationService } from "../notification/notification.service";
-import { NotificationType } from "../notification/dto";
 import { DiscountService } from "../discount";
 import { SuratCargoService } from "../surat-cargo/surat-cargo.service";
 import { OrderPricingService } from "./order-pricing.service";
@@ -58,7 +56,6 @@ export class OrderCheckoutDirectService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly eventService: EventService,
-    private readonly notificationService: NotificationService,
     private readonly discountService: DiscountService,
     private readonly suratCargoService: SuratCargoService,
     private readonly orderPricing: OrderPricingService,
@@ -1058,61 +1055,12 @@ export class OrderCheckoutDirectService {
     // Invalidate product cache after successful transaction
     if (productIdForCache) {
       await this.orderCommon.invalidateProductCaches(productIdForCache);
-
-      // Send notifications about product sold
-      await this.sendProductSoldNotifications(
-        productIdForCache,
-        result.seller?.id,
-      );
     }
+
+    // NOT: WISHLIST_SOLD burada GÖNDERİLMEZ. Bu akış siparişi pending_payment
+    // ile oluşturur; ödeme hiç tamamlanmayabilir. "Satıldı" haberi ödeme
+    // başarıyla sonuçlanınca PaymentFulfillmentService'ten (post-commit) çıkar.
 
     return result;
-  }
-
-  /**
-   * Send notifications when product is sold
-   */
-  private async sendProductSoldNotifications(
-    productId: string,
-    sellerId?: string,
-  ): Promise<void> {
-    try {
-      // Get product details
-      const product = await this.prisma.product.findUnique({
-        where: { id: productId },
-        select: { id: true, title: true, sellerId: true },
-      });
-
-      if (!product) return;
-
-      const actualSellerId = sellerId || product.sellerId;
-
-      // NOTE: We intentionally do NOT notify the seller here. This runs at order creation
-      // (status pending_payment) — e.g. when a buyer turns an accepted offer into an order —
-      // before payment is confirmed and the order may still be abandoned. The seller is
-      // notified only after payment succeeds, via the order.paid event ("Yeni Sipariş" email + push).
-
-      // Notify users who have this product in wishlist
-      const wishlistEntries = await this.prisma.wishlistItem.findMany({
-        where: { productId },
-        include: { wishlist: { select: { userId: true } } },
-      });
-
-      for (const entry of wishlistEntries) {
-        const userId = entry.wishlist.userId;
-        if (userId !== actualSellerId) {
-          await this.notificationService.createInAppNotification(
-            userId,
-            NotificationType.WISHLIST_SOLD,
-            {
-              productId: product.id,
-              productTitle: product.title,
-            },
-          );
-        }
-      }
-    } catch (error) {
-      this.logger.warn("Failed to send product sold notifications:", error);
-    }
   }
 }

@@ -33,11 +33,12 @@ export class LogRetentionScheduler implements OnModuleInit {
     log: (msg: string) => void = () => {},
   ): Promise<{ summary: string; stats: Record<string, number> }> {
     const counts = await this.retention.purgeExpiredLogs();
-    const total = counts.error + counts.security + counts.email;
+    const total =
+      counts.error + counts.security + counts.email + counts.notification;
 
     // Gizlilik sözleşmesi: cron kaydına YALNIZ sayaç yazılır, PII yok.
     log(
-      `hata ${counts.error} · güvenlik ${counts.security} · e-posta ${counts.email}`,
+      `hata ${counts.error} · güvenlik ${counts.security} · e-posta ${counts.email} · bildirim ${counts.notification}`,
     );
 
     return {
