@@ -237,8 +237,13 @@ API'de ayrıca kullanılmayan bir ikinci çift var (`/security/password/request-
 | `POST` | `/auth/apple`  | public | `{ identityToken, fullName? }` (throttle 10/dk)              |
 
 - Web auth-code akışı kullanıyor; **mobil `idToken` göndermeli** — backend bu şekli zaten destekliyor.
-- **Apple Sign-In backend'de tam çalışır durumda ama web'de devre dışı.** iOS'ta Google ile giriş
-  sunuluyorsa Apple Sign-In App Store için **zorunludur** → mobilde uygulanmalı.
+- **Apple Sign-In web'de de açık** (2026-08-13): giriş ve kayıt formlarında buton var, popup akışı
+  `id_token` döndürüyor, BFF `/auth/apple`'a iletiyor. Web'in kimliği ayrı bir **Services ID**
+  (`APPLE_SERVICES_ID` / `NEXT_PUBLIC_APPLE_SERVICES_ID`); native bundle id tek başına yetmez, çünkü
+  web token'ının audience'ı Services ID olur. iOS'ta Google ile giriş sunuluyorsa Apple Sign-In
+  App Store için **zorunludur** → mobilde de uygulanmalı.
+- Apple'ın web akışında **client secret gerekmiyor**: `id_token` JWKS ile doğrulanıyor, Apple'ın token
+  endpoint'i hiç çağrılmıyor. `.p8` yalnızca mobilde hesap silme (token iptali) için gerekecek.
 - Yanıt normal login ile aynı: `{ user, tokens }`.
 
 ### Kabul kriterleri
