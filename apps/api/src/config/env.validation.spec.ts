@@ -1,4 +1,4 @@
-import { validateEnv } from "./env.validation";
+import { socialSignInWarnings, validateEnv } from "./env.validation";
 
 /**
  * Boot/unit guard for issues #62 + #68: a missing or placeholder secret under
@@ -172,14 +172,46 @@ describe("validateEnv", () => {
     ).toThrow(/SURAT_KARGO_TEST_MODE/);
   });
 
-  // Sosyal giriş yapılandırması eksikse buton canlıda görünüp tıklanınca
-  // patlıyor; hatanın açılışta çıkması gerekir.
-  it("throws in production when social sign-in configuration is missing", () => {
+  // Sosyal giriş eksikse yalnızca ilgili buton bozulur ve kullanıcı GÖRÜNÜR bir
+  // hata alır. Bu bir dönem fatal'di ve eksik APPLE_CLIENT_ID tüm API'yi açılış
+  // döngüsüne soktu — bir giriş sağlayıcısı yüzünden pazaryeri kapanmamalı.
+  it("does NOT block boot when social sign-in configuration is missing", () => {
     expect(() =>
       validateEnv(
+        without(
+          prodBase,
+          "GOOGLE_CLIENT_ID_WEB",
+          "GOOGLE_CLIENT_SECRET",
+          "APPLE_CLIENT_ID",
+          "APPLE_SERVICES_ID",
+        ),
+      ),
+    ).not.toThrow();
+  });
+
+  it("warns about the social sign-in values that are missing", () => {
+    expect(
+      socialSignInWarnings(
         without(prodBase, "GOOGLE_CLIENT_SECRET", "APPLE_SERVICES_ID"),
       ),
-    ).toThrow(/GOOGLE_CLIENT_SECRET|APPLE_SERVICES_ID/);
+    ).toEqual([
+      expect.stringContaining("GOOGLE_CLIENT_SECRET"),
+      expect.stringContaining("APPLE_SERVICES_ID"),
+    ]);
+  });
+
+  // APPLE_CLIENT_ID native uygulamanın bundle id'si; web akışında kullanılmıyor,
+  // bu yüzden uyarıya bile girmez.
+  it("does not warn about APPLE_CLIENT_ID (native-only, unused by web)", () => {
+    expect(socialSignInWarnings(without(prodBase, "APPLE_CLIENT_ID"))).toEqual(
+      [],
+    );
+  });
+
+  it("stays quiet outside production", () => {
+    expect(
+      socialSignInWarnings({ ...prodBase, NODE_ENV: "development" }),
+    ).toEqual([]);
   });
 
   // NetGSM eksikse sağlayıcı mock'a düşüp "gönderildi" döner: kullanıcı kod

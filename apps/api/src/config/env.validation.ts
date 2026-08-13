@@ -89,10 +89,12 @@ const envSchema = z
     SURAT_CARGO_MAX_RETRIES: z.string().optional(),
     SURAT_CARGO_RETRY_BASE_MS: z.string().optional(),
 
-    // Social sign-in. Required in production: the web Google flow is
-    // authorization-code (the secret is what exchanges it) and the web Apple
-    // flow mints tokens for the Services ID, which must be in the audience.
-    // Without them the buttons render and fail on click.
+    // Social sign-in. Optional everywhere — a missing value breaks one button,
+    // not the API, so it is surfaced by `socialSignInWarnings()` at startup
+    // rather than blocking boot. The web Google flow is authorization-code (the
+    // secret is what exchanges it); web Apple tokens carry APPLE_SERVICES_ID as
+    // their audience, while APPLE_CLIENT_ID is the native bundle id and unused
+    // by web.
     GOOGLE_CLIENT_ID_WEB: z.string().optional(),
     GOOGLE_CLIENT_SECRET: z.string().optional(),
     APPLE_CLIENT_ID: z.string().optional(),
@@ -426,24 +428,12 @@ const envSchema = z
       }
     }
 
-    // Sosyal giriş: butonlar canlıda görünüyorsa arkalarındaki yapılandırma da
-    // tam olmalı. Google web akışı authorization-code — kod değişimi
-    // GOOGLE_CLIENT_SECRET olmadan yapılamaz. Apple web akışında token'ın
-    // audience'ı Services ID'dir; native APPLE_CLIENT_ID tek başına yetmez.
-    for (const key of [
-      "GOOGLE_CLIENT_ID_WEB",
-      "GOOGLE_CLIENT_SECRET",
-      "APPLE_CLIENT_ID",
-      "APPLE_SERVICES_ID",
-    ] as const) {
-      if (!env[key]?.trim()) {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          path: [key],
-          message: `${key} is required in production (social sign-in fails on click without it)`,
-        });
-      }
-    }
+    // NOT: Sosyal giriş yapılandırması BİLEREK fatal değil — aşağıdaki
+    // `socialSignInWarnings` ile yalnızca uyarı verilir. Bir dönem zorunluydu ve
+    // eksik APPLE_CLIENT_ID tüm API'yi açılış döngüsüne soktu; oysa o değer
+    // henüz var olmayan mobil uygulamanın bundle id'si. Sosyal giriş eksikse
+    // hata GÖRÜNÜR (kullanıcı tıklar, 401 alır), NetGSM'deki gibi sessiz değil —
+    // görünür bir hatayı önlemek için pazaryerini kapatmak orantısız.
 
     // NetGSM OTP: bu üçü eksikse sağlayıcı mock'a düşer, kodu log'a yazar ve
     // BAŞARILI döner. Kullanıcı "kod gönderildi" görür, SMS hiç gelmez ve telefon
@@ -551,6 +541,34 @@ export type ValidatedEnv = z.infer<typeof envSchema>;
  * ConfigModule `validate` hook. Throws (fail-fast at boot) on any violation,
  * listing every problem at once. Returns the config unchanged on success.
  */
+/**
+ * Sosyal giriş için eksik yapılandırmaları döndürür (production'da).
+ *
+ * Bunlar açılışı ENGELLEMEZ: eksiklerse yalnızca ilgili sağlayıcının butonu
+ * çalışmaz ve kullanıcı görünür bir hata alır. Yine de sessizce geçmemeleri
+ * gerekir — deploy sonrası "Google girişi neden bozuk" sorusunun cevabı log'un
+ * ilk satırlarında dursun.
+ *
+ * `APPLE_CLIENT_ID` listede yok: o native uygulamanın bundle id'si ve web
+ * akışında kullanılmıyor (web'in kimliği `APPLE_SERVICES_ID`).
+ */
+export function socialSignInWarnings(
+  config: Record<string, unknown>,
+): string[] {
+  if (config.NODE_ENV !== "production") return [];
+  const missing = (
+    [
+      "GOOGLE_CLIENT_ID_WEB",
+      "GOOGLE_CLIENT_SECRET",
+      "APPLE_SERVICES_ID",
+    ] as const
+  ).filter((key) => !String(config[key] ?? "").trim());
+  return missing.map(
+    (key) =>
+      `${key} is not set — the matching sign-in button will fail on click`,
+  );
+}
+
 export function validateEnv(
   config: Record<string, unknown>,
 ): Record<string, unknown> {
@@ -560,6 +578,9 @@ export function validateEnv(
       .map((i) => `  - ${i.path.join(".") || "(root)"}: ${i.message}`)
       .join("\n");
     throw new Error(`Invalid environment configuration:\n${details}`);
+  }
+  for (const warning of socialSignInWarnings(config)) {
+    console.warn(`[env] ${warning}`);
   }
   return result.data;
 }
