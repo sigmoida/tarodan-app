@@ -108,6 +108,8 @@ export class OrderLifecycleService {
   async completeOrder(
     orderId: string,
     type: "manual_ok" | "auto_timeout" | "admin_force",
+    /** admin_force gerekçesi — bildirim payload'una taşınır (matris sözü). */
+    reason?: string,
   ): Promise<{ completed: boolean }> {
     const result = await this.prisma.$transaction(async (tx) => {
       const now = new Date();
@@ -206,11 +208,13 @@ export class OrderLifecycleService {
                 order.buyerId,
                 orderId,
                 "buyer",
+                reason,
               ),
               this.notificationService.notifyOrderForceCompletedByAdmin(
                 order.sellerId,
                 orderId,
                 "seller",
+                reason,
               ),
             ]);
           }
@@ -304,7 +308,9 @@ export class OrderLifecycleService {
     this.logger.log(
       `Admin ${adminId} force-completing order ${orderId}. reason="${reason ?? ""}"`,
     );
-    return this.completeOrder(orderId, "admin_force");
+    // Gerekçe bildirime de taşınır — eskiden yalnız log/audit'te kalıyordu,
+    // kullanıcı payload'da hep undefined görüyordu.
+    return this.completeOrder(orderId, "admin_force", reason);
   }
 
   /**
