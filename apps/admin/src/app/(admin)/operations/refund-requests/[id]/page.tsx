@@ -11,10 +11,6 @@ import { DetailPage } from "@/components/detail/DetailPage";
 import { PartyCard } from "@/components/detail/PartyCard";
 import { RefundStatusStepper } from "./_components/RefundStatusStepper";
 import { RefundNextActionPanel } from "./_components/RefundNextActionPanel";
-import {
-  RefundPolicyCard,
-  type ReturnShippingPayer,
-} from "./_components/RefundPolicyCard";
 import type {
   HistoryEntry,
   RefundDecisionPreview,
@@ -57,48 +53,19 @@ export default function RefundRequestDetailPage() {
       successMessage: t("admin.operations.refundRequests.reviewRejected"),
     },
   );
-  const savePolicy = useAdminMutation(
-    (payload: {
-      refundProductAmount?: boolean;
-      refundShippingFee?: boolean;
-      refundBuyerFee?: boolean;
-      refundSellerCommission?: boolean;
-    }) => adminApi.overrideRefundPolicy(id, payload),
+  const markDisputed = useAdminMutation(
+    (note: string) => adminApi.markRefundDisputed(id, note),
     {
-      invalidates: ["refund-requests"],
-      successMessage: t("admin.operations.refundRequests.policyUpdated"),
+      invalidates: ["refund-requests", "refunds"],
+      successMessage: t("admin.operations.refundRequests.disputeMarked"),
     },
   );
-  const savePayer = useAdminMutation(
-    (payer: ReturnShippingPayer) => adminApi.setReturnShippingPayer(id, payer),
-    {
-      invalidates: ["refund-requests"],
-      successMessage: t("admin.operations.refundRequests.payerUpdated"),
-    },
-  );
-
   const handleForceFinalize = async () => {
     await confirm({
       description: t("admin.operations.refundRequests.forceFinalizeConfirm"),
       destructive: true,
       onConfirm: () => forceFinalize.mutateAsync(),
     });
-  };
-  const handleSavePolicy = async (
-    payload: Parameters<typeof savePolicy.mutateAsync>[0],
-  ) => {
-    try {
-      await savePolicy.mutateAsync(payload);
-    } catch {
-      /* handled by useAdminMutation */
-    }
-  };
-  const handleSavePayer = async (payer: ReturnShippingPayer) => {
-    try {
-      await savePayer.mutateAsync(payer);
-    } catch {
-      /* handled by useAdminMutation */
-    }
   };
 
   return (
@@ -128,7 +95,12 @@ export default function RefundRequestDetailPage() {
     >
       {(rr) => {
         const canForceFinalize =
-          rr.status === "return_delivered" && !rr.refundedAt;
+          (rr.status === "return_delivered" || rr.status === "disputed") &&
+          !rr.refundedAt;
+        const canDispute =
+          (rr.status === "return_in_transit" ||
+            rr.status === "return_delivered") &&
+          !rr.refundedAt;
         const history: HistoryEntry[] = Array.isArray(rr.metadata?.history)
           ? (rr.metadata!.history as HistoryEntry[])
           : [];
@@ -147,6 +119,9 @@ export default function RefundRequestDetailPage() {
               canForceFinalize={canForceFinalize}
               finalizing={forceFinalize.isPending}
               onFinalize={handleForceFinalize}
+              canDispute={canDispute}
+              disputing={markDisputed.isPending}
+              onDispute={(note) => markDisputed.mutate(note)}
               reviewing={approveReview.isPending || rejectReview.isPending}
               onPreview={async (decision) => {
                 const response = await adminApi.previewRefundDecision(
@@ -258,27 +233,6 @@ export default function RefundRequestDetailPage() {
                   </div>
                 </div>
               </div>
-            )}
-
-            {(!rr.policyCode || rr.policyCode === "legacy") && (
-              <RefundPolicyCard
-                initial={{
-                  refundProductAmount: rr.refundProductAmount ?? true,
-                  refundShippingFee: rr.refundShippingFee ?? true,
-                  refundBuyerFee: rr.refundBuyerFee ?? true,
-                  refundSellerCommission: rr.refundSellerCommission ?? true,
-                  returnShippingPayer: rr.returnShippingPayer ?? null,
-                }}
-                order={{
-                  totalAmount: Number(rr.order.totalAmount ?? 0),
-                  shippingCost: Number(rr.order.shippingCost ?? 0),
-                  buyerFeeAmount: Number(rr.order.buyerFeeAmount ?? 0),
-                  commissionAmount: Number(rr.order.commissionAmount ?? 0),
-                }}
-                onSavePolicy={handleSavePolicy}
-                onSavePayer={handleSavePayer}
-                disabled={rr.status === "refunded" || rr.status === "cancelled"}
-              />
             )}
 
             <RefundHistorySection history={history} />

@@ -1,7 +1,17 @@
-import { Injectable, NotFoundException, BadRequestException, Logger } from '@nestjs/common';
-import { PrismaService } from '../../prisma';
-import { CreateAdvertisementDto, AdPosition, AdDeviceType, IAB_STANDARD_SIZES } from './dto/create-advertisement.dto';
-import { UpdateAdvertisementDto } from './dto/update-advertisement.dto';
+import {
+  Injectable,
+  NotFoundException,
+  BadRequestException,
+  Logger,
+} from "@nestjs/common";
+import { PrismaService } from "../../prisma";
+import {
+  CreateAdvertisementDto,
+  AdPosition,
+  AdDeviceType,
+  IAB_STANDARD_SIZES,
+} from "./dto/create-advertisement.dto";
+import { UpdateAdvertisementDto } from "./dto/update-advertisement.dto";
 
 /** Prisma client may not have Advertisement until after prisma generate + migration. */
 type PrismaWithAd = PrismaService & {
@@ -22,32 +32,41 @@ export class AdvertisementService {
 
   constructor(private readonly prisma: PrismaService) {}
 
-  private get adRepo(): PrismaWithAd['advertisement'] {
+  private get adRepo(): PrismaWithAd["advertisement"] {
     return (this.prisma as PrismaWithAd).advertisement;
   }
 
   /**
    * Check if dimensions match IAB standard sizes
    */
-  checkIABCompliance(width?: number, height?: number): { isCompliant: boolean; matchedSize?: string; suggestions: string[] } {
+  checkIABCompliance(
+    width?: number,
+    height?: number,
+  ): { isCompliant: boolean; matchedSize?: string; suggestions: string[] } {
     if (!width || !height) {
-      return { isCompliant: false, suggestions: IAB_STANDARD_SIZES.map(s => `${s.name}: ${s.width}x${s.height}`) };
+      return {
+        isCompliant: false,
+        suggestions: IAB_STANDARD_SIZES.map(
+          (s) => `${s.name}: ${s.width}x${s.height}`,
+        ),
+      };
     }
 
-    const matched = IAB_STANDARD_SIZES.find(s => s.width === width && s.height === height);
+    const matched = IAB_STANDARD_SIZES.find(
+      (s) => s.width === width && s.height === height,
+    );
     if (matched) {
       return { isCompliant: true, matchedSize: matched.name, suggestions: [] };
     }
 
     // Find closest sizes
-    const suggestions = IAB_STANDARD_SIZES
-      .map(s => ({
-        ...s,
-        diff: Math.abs(s.width - width) + Math.abs(s.height - height)
-      }))
+    const suggestions = IAB_STANDARD_SIZES.map((s) => ({
+      ...s,
+      diff: Math.abs(s.width - width) + Math.abs(s.height - height),
+    }))
       .sort((a, b) => a.diff - b.diff)
       .slice(0, 3)
-      .map(s => `${s.name}: ${s.width}x${s.height}`);
+      .map((s) => `${s.name}: ${s.width}x${s.height}`);
 
     return { isCompliant: false, suggestions };
   }
@@ -77,27 +96,65 @@ export class AdvertisementService {
       }
 
       // Filter by device type - include 'all' type as well
-      if (deviceType && deviceType !== 'all') {
-        where.deviceType = { in: [deviceType, 'all'] };
+      if (deviceType && deviceType !== "all") {
+        where.deviceType = { in: [deviceType, "all"] };
       }
 
       const ads = await this.adRepo.findMany({
         where,
-        orderBy: [{ displayOrder: 'asc' }, { createdAt: 'asc' }],
+        orderBy: [{ displayOrder: "asc" }, { createdAt: "asc" }],
+        include: {
+          discount: {
+            select: {
+              id: true,
+              name: true,
+              code: true,
+              target: true,
+              isFlashSale: true,
+              isActive: true,
+              startDate: true,
+              endDate: true,
+              budgetStoppedAt: true,
+            },
+          },
+        },
       });
 
-      return ads.map((a: any) => ({
-      id: a.id,
-      title: a.title,
-      imageUrl: a.imageUrl,
-      linkUrl: a.linkUrl,
-      content: a.content,
-      altText: a.altText,
-      width: a.width,
-      height: a.height,
-      position: a.position,
-      deviceType: a.deviceType,
-    }));
+      return (
+        ads
+          // Kampanya duyurusu, kampanya bitince/durunca kendiliğinden düşer:
+          // yayından kaldırmayı admin'in hatırlamasına bırakmayız.
+          .filter((a: any) => {
+            const campaign = a.discount;
+            if (!campaign) return true;
+            if (!campaign.isActive || campaign.budgetStoppedAt) return false;
+            return campaign.startDate <= now && campaign.endDate >= now;
+          })
+          .map((a: any) => ({
+            id: a.id,
+            title: a.title,
+            imageUrl: a.imageUrl,
+            linkUrl: a.linkUrl,
+            content: a.content,
+            altText: a.altText,
+            width: a.width,
+            height: a.height,
+            position: a.position,
+            deviceType: a.deviceType,
+            campaign: a.discount
+              ? {
+                  id: a.discount.id,
+                  name: a.discount.name,
+                  code: a.discount.code,
+                  target: a.discount.target,
+                  // Flash kampanyada şerit geri sayım gösterir: aciliyet duyurunun
+                  // kendisidir. (Bayrak eskiden hiçbir şey yapmıyordu.)
+                  isFlashSale: a.discount.isFlashSale,
+                  endsAt: a.discount.endDate,
+                }
+              : null,
+          }))
+      );
     } catch (err) {
       this.logger.warn(`getActive failed: ${err}`);
       return [];
@@ -109,7 +166,7 @@ export class AdvertisementService {
    */
   async recordClick(id: string) {
     const ad = await this.adRepo.findUnique({ where: { id } });
-    if (!ad) throw new NotFoundException('Reklam bulunamadı');
+    if (!ad) throw new NotFoundException("Reklam bulunamadı");
     await (this.prisma as PrismaWithAd).advertisement.update({
       where: { id },
       data: { clickCount: { increment: 1 } },
@@ -122,7 +179,7 @@ export class AdvertisementService {
    */
   async recordImpression(id: string) {
     const ad = await this.adRepo.findUnique({ where: { id } });
-    if (!ad) throw new NotFoundException('Reklam bulunamadı');
+    if (!ad) throw new NotFoundException("Reklam bulunamadı");
     await (this.prisma as PrismaWithAd).advertisement.update({
       where: { id },
       data: { impressionCount: { increment: 1 } },
@@ -144,13 +201,13 @@ export class AdvertisementService {
     const where: any = {};
     if (position) where.position = position;
     if (deviceType) where.deviceType = deviceType;
-    if (typeof isActive === 'boolean') where.isActive = isActive;
+    if (typeof isActive === "boolean") where.isActive = isActive;
 
     const ads = await this.adRepo.findMany({
       where,
-      orderBy: [{ displayOrder: 'asc' }, { createdAt: 'desc' }],
+      orderBy: [{ displayOrder: "asc" }, { createdAt: "desc" }],
     });
-    
+
     return ads.map((a: any) => this.toResponse(a));
   }
 
@@ -159,16 +216,25 @@ export class AdvertisementService {
    */
   async getStatistics() {
     const ads = await this.adRepo.findMany({});
-    
+
     const totalAds = ads.length;
     const activeAds = ads.filter((a: any) => a.isActive).length;
-    const totalClicks = ads.reduce((sum: number, a: any) => sum + (a.clickCount || 0), 0);
-    const totalImpressions = ads.reduce((sum: number, a: any) => sum + (a.impressionCount || 0), 0);
-    const avgCTR = totalImpressions > 0 ? ((totalClicks / totalImpressions) * 100).toFixed(2) : '0.00';
-    
+    const totalClicks = ads.reduce(
+      (sum: number, a: any) => sum + (a.clickCount || 0),
+      0,
+    );
+    const totalImpressions = ads.reduce(
+      (sum: number, a: any) => sum + (a.impressionCount || 0),
+      0,
+    );
+    const avgCTR =
+      totalImpressions > 0
+        ? ((totalClicks / totalImpressions) * 100).toFixed(2)
+        : "0.00";
+
     // Group by position
     const byPosition = ads.reduce((acc: any, a: any) => {
-      const pos = a.position || 'header';
+      const pos = a.position || "header";
       if (!acc[pos]) acc[pos] = { count: 0, clicks: 0, impressions: 0 };
       acc[pos].count++;
       acc[pos].clicks += a.clickCount || 0;
@@ -178,7 +244,7 @@ export class AdvertisementService {
 
     // Group by device type
     const byDeviceType = ads.reduce((acc: any, a: any) => {
-      const device = a.deviceType || 'all';
+      const device = a.deviceType || "all";
       if (!acc[device]) acc[device] = { count: 0, clicks: 0, impressions: 0 };
       acc[device].count++;
       acc[device].clicks += a.clickCount || 0;
@@ -203,7 +269,7 @@ export class AdvertisementService {
    */
   async findOne(id: string) {
     const ad = await this.adRepo.findUnique({ where: { id } });
-    if (!ad) throw new NotFoundException('Reklam bulunamadı');
+    if (!ad) throw new NotFoundException("Reklam bulunamadı");
     return this.toResponse(ad);
   }
 
@@ -215,9 +281,10 @@ export class AdvertisementService {
     if (dto.width && dto.height) {
       const compliance = this.checkIABCompliance(dto.width, dto.height);
       if (!compliance.isCompliant) {
-        this.logger.warn('Ad dimensions not IAB compliant');
+        this.logger.warn("Ad dimensions not IAB compliant");
       }
     }
+    await this.assertDiscountExists(dto.discountId);
 
     const ad = await this.adRepo.create({
       data: {
@@ -228,12 +295,16 @@ export class AdvertisementService {
         altText: dto.altText,
         width: dto.width,
         height: dto.height,
-        position: dto.position ?? 'header',
-        deviceType: dto.deviceType ?? 'all',
+        position: dto.position ?? "header",
+        deviceType: dto.deviceType ?? "all",
         displayOrder: dto.displayOrder ?? 0,
         isActive: dto.isActive ?? true,
         startDate: dto.startDate ? new Date(dto.startDate) : null,
         endDate: dto.endDate ? new Date(dto.endDate) : null,
+        // Kampanya bağı: şeritteki kupon kodu + flaş geri sayım ve "kampanya
+        // bitince afiş düşer" süzmesi bu kolondan okunur. Alan DTO'da vardı
+        // ama persist edilmiyordu — bağ hiç kurulamıyordu.
+        discountId: dto.discountId || null,
       },
     });
     return this.toResponse(ad);
@@ -244,16 +315,24 @@ export class AdvertisementService {
    */
   async update(id: string, dto: UpdateAdvertisementDto) {
     const existing = await this.adRepo.findUnique({ where: { id } });
-    if (!existing) throw new NotFoundException('Reklam bulunamadı');
+    if (!existing) throw new NotFoundException("Reklam bulunamadı");
 
     // Check IAB compliance if dimensions changed
     const newWidth = dto.width ?? existing.width;
     const newHeight = dto.height ?? existing.height;
-    if (newWidth && newHeight && (dto.width !== undefined || dto.height !== undefined)) {
+    if (
+      newWidth &&
+      newHeight &&
+      (dto.width !== undefined || dto.height !== undefined)
+    ) {
       const compliance = this.checkIABCompliance(newWidth, newHeight);
       if (!compliance.isCompliant) {
-        this.logger.warn('Ad dimensions not IAB compliant');
+        this.logger.warn("Ad dimensions not IAB compliant");
       }
+    }
+
+    if (dto.discountId) {
+      await this.assertDiscountExists(dto.discountId);
     }
 
     const ad = await (this.prisma as PrismaWithAd).advertisement.update({
@@ -272,9 +351,25 @@ export class AdvertisementService {
         isActive: dto.isActive,
         startDate: dto.startDate != null ? new Date(dto.startDate) : undefined,
         endDate: dto.endDate != null ? new Date(dto.endDate) : undefined,
+        // undefined = dokunma; boş dize = bağı kaldır (SetNull).
+        discountId:
+          dto.discountId === undefined ? undefined : dto.discountId || null,
       },
     });
     return this.toResponse(ad);
+  }
+
+  /** Kampanya bağı doğrulaması: var olmayan kampanyaya bağlanan afiş, süzme
+   *  tarafında sessizce görünmez olurdu — tanım anında net hata ver. */
+  private async assertDiscountExists(discountId?: string | null) {
+    if (!discountId) return;
+    const discount = await this.prisma.discount.findUnique({
+      where: { id: discountId },
+      select: { id: true },
+    });
+    if (!discount) {
+      throw new NotFoundException("Bağlanacak kampanya bulunamadı");
+    }
   }
 
   /**
@@ -282,7 +377,7 @@ export class AdvertisementService {
    */
   async remove(id: string) {
     const existing = await this.adRepo.findUnique({ where: { id } });
-    if (!existing) throw new NotFoundException('Reklam bulunamadı');
+    if (!existing) throw new NotFoundException("Reklam bulunamadı");
     await (this.prisma as PrismaWithAd).advertisement.delete({ where: { id } });
     return { success: true };
   }
@@ -303,10 +398,11 @@ export class AdvertisementService {
   }
 
   private toResponse(ad: any) {
-    const ctr = ad.impressionCount > 0 
-      ? ((ad.clickCount / ad.impressionCount) * 100).toFixed(2) 
-      : '0.00';
-    
+    const ctr =
+      ad.impressionCount > 0
+        ? ((ad.clickCount / ad.impressionCount) * 100).toFixed(2)
+        : "0.00";
+
     // Check IAB compliance
     const iabCompliance = this.checkIABCompliance(ad.width, ad.height);
 
@@ -325,6 +421,7 @@ export class AdvertisementService {
       isActive: ad.isActive,
       startDate: ad.startDate,
       endDate: ad.endDate,
+      discountId: ad.discountId ?? null,
       clickCount: ad.clickCount,
       impressionCount: ad.impressionCount,
       ctr: parseFloat(ctr),

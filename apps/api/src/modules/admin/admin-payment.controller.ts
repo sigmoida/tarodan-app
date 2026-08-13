@@ -52,10 +52,6 @@ import { Public } from "../auth/decorators/public.decorator";
 import { AdminRole } from "@prisma/client";
 import { ForceCompleteOrderDto, ExtendConfirmationDto } from "../order/dto";
 import {
-  OverrideRefundPolicyDto,
-  SetReturnShippingPayerDto,
-} from "../refund/dto";
-import {
   CreateCommissionRuleDto,
   UpdateCommissionRuleDto,
   CommissionRuleResponseDto,
@@ -384,7 +380,12 @@ export class AdminPaymentController {
     @CurrentUser("id") adminId: string,
     @Body() dto: ReleasePayoutDto,
   ) {
-    return this.adminService.releasePayout(adminId, orderId, dto.reason);
+    return this.adminService.releasePayout(
+      adminId,
+      orderId,
+      dto.reason,
+      dto.force ?? false,
+    );
   }
 
   @Post("payouts/release-trade/:tradeId")
@@ -399,8 +400,14 @@ export class AdminPaymentController {
   async releaseTradePaymentHold(
     @Param("tradeId") tradeId: string,
     @CurrentUser("id") adminId: string,
+    @Body() dto: ReleasePayoutDto,
   ) {
-    return this.adminService.releaseTradePaymentHold(adminId, tradeId);
+    return this.adminService.releaseTradePaymentHold(
+      adminId,
+      tradeId,
+      dto.reason,
+      dto.force ?? false,
+    );
   }
 
   @Post("payouts/:transferId/retry")

@@ -1,22 +1,20 @@
+import { Controller, Get, Post, Query, Param, UseGuards } from "@nestjs/common";
+import { ConfigService } from "@nestjs/config";
 import {
-  Controller,
-  Get,
-  Post,
-  Query,
-  Param,
-  UseGuards,
-} from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
-import { SearchService, SearchOptions, SearchResponse, RichAutocompleteResult } from './search.service';
-import { Public } from '../auth/decorators/public.decorator';
-import { Roles } from '../auth/decorators/roles.decorator';
-import { AdminRoute } from '../auth/decorators/admin-route.decorator';
-import { RequirePermission } from '../auth/decorators/require-permission.decorator';
-import { AdminJwtAuthGuard } from '../auth/guards/admin-jwt-auth.guard';
-import { RolesGuard } from '../auth/guards/roles.guard';
-import { AdminRole } from '@prisma/client';
+  SearchService,
+  SearchOptions,
+  SearchResponse,
+  RichAutocompleteResult,
+} from "./search.service";
+import { Public } from "../auth/decorators/public.decorator";
+import { Roles } from "../auth/decorators/roles.decorator";
+import { AdminRoute } from "../auth/decorators/admin-route.decorator";
+import { RequirePermission } from "../auth/decorators/require-permission.decorator";
+import { AdminJwtAuthGuard } from "../auth/guards/admin-jwt-auth.guard";
+import { RolesGuard } from "../auth/guards/roles.guard";
+import { AdminRole } from "@prisma/client";
 
-@Controller('search')
+@Controller("search")
 export class SearchController {
   constructor(
     private readonly searchService: SearchService,
@@ -24,31 +22,31 @@ export class SearchController {
   ) {}
 
   @Public()
-  @Get('products')
+  @Get("products")
   async searchProducts(
-    @Query('q') query: string,
-    @Query('categoryId') categoryId?: string,
-    @Query('brandId') brandId?: string,
-    @Query('manufacturerId') manufacturerId?: string,
-    @Query('carModelId') carModelId?: string,
-    @Query('minPrice') minPrice?: string,
-    @Query('maxPrice') maxPrice?: string,
-    @Query('condition') condition?: string,
-    @Query('brand') brand?: string,
-    @Query('scale') scale?: string,
-    @Query('material') material?: string,
-    @Query('manufacturer') manufacturer?: string,
-    @Query('tradeOnly') tradeOnly?: string,
-    @Query('discountOnly') discountOnly?: string,
-    @Query('preOrder') preOrder?: string,
-    @Query('limited') limited?: string,
-    @Query('set') setFilter?: string,
-    @Query('page') page?: string,
-    @Query('pageSize') pageSize?: string,
-    @Query('sortBy') sortBy?: string,
+    @Query("q") query: string,
+    @Query("categoryId") categoryId?: string,
+    @Query("brandId") brandId?: string,
+    @Query("manufacturerId") manufacturerId?: string,
+    @Query("carModelId") carModelId?: string,
+    @Query("minPrice") minPrice?: string,
+    @Query("maxPrice") maxPrice?: string,
+    @Query("condition") condition?: string,
+    @Query("brand") brand?: string,
+    @Query("scale") scale?: string,
+    @Query("material") material?: string,
+    @Query("manufacturer") manufacturer?: string,
+    @Query("tradeOnly") tradeOnly?: string,
+    @Query("discountOnly") discountOnly?: string,
+    @Query("preOrder") preOrder?: string,
+    @Query("limited") limited?: string,
+    @Query("set") setFilter?: string,
+    @Query("page") page?: string,
+    @Query("pageSize") pageSize?: string,
+    @Query("sortBy") sortBy?: string,
   ): Promise<SearchResponse> {
     const options: SearchOptions = {
-      query: query || '',
+      query: query || "",
       categoryId,
       brandId,
       manufacturerId,
@@ -60,11 +58,11 @@ export class SearchController {
       scale,
       material,
       manufacturer,
-      tradeOnly: tradeOnly === 'true',
-      discountOnly: discountOnly === 'true',
-      preOrder: preOrder === 'true',
-      limited: limited === 'true',
-      set: setFilter === 'true',
+      tradeOnly: tradeOnly === "true",
+      discountOnly: discountOnly === "true",
+      preOrder: preOrder === "true",
+      limited: limited === "true",
+      set: setFilter === "true",
       page: page ? parseInt(page) : 1,
       pageSize: pageSize ? parseInt(pageSize) : 20,
       sortBy,
@@ -74,10 +72,10 @@ export class SearchController {
   }
 
   @Public()
-  @Get('autocomplete')
+  @Get("autocomplete")
   async autocomplete(
-    @Query('q') query: string,
-    @Query('limit') limit?: string,
+    @Query("q") query: string,
+    @Query("limit") limit?: string,
   ): Promise<{ suggestions: string[] }> {
     const suggestions = await this.searchService.autocomplete(
       query,
@@ -87,41 +85,60 @@ export class SearchController {
   }
 
   @Public()
-  @Get('autocomplete-rich')
+  @Get("autocomplete-rich")
   async autocompleteRich(
-    @Query('q') query: string,
+    @Query("q") query: string,
   ): Promise<RichAutocompleteResult> {
-    return this.searchService.autocompleteRich(query || '');
+    return this.searchService.autocompleteRich(query || "");
   }
 
-  @Post('admin/reindex')
+  @Post("admin/reindex")
   @AdminRoute()
   @UseGuards(AdminJwtAuthGuard, RolesGuard)
   @Roles(AdminRole.admin, AdminRole.super_admin)
-  @RequirePermission('products')
+  @RequirePermission("products")
   async reindexAll(): Promise<{ indexed: number }> {
     const indexed = await this.searchService.reindexAll();
     return { indexed };
   }
 
-  @Post('admin/index/:productId')
+  /**
+   * Koleksiyon indeksinin tam yeniden inşası. Ürün tarafındaki `admin/reindex`in
+   * eşi; koleksiyon dokümanı da üye adını denormalize ettiği için kimlik
+   * değişikliklerinden sonra production'da çalıştırılabilir olmalı
+   * (bkz. docs/OPERATIONS.md).
+   */
+  @Post("admin/reindex-collections")
   @AdminRoute()
   @UseGuards(AdminJwtAuthGuard, RolesGuard)
   @Roles(AdminRole.admin, AdminRole.super_admin)
-  @RequirePermission('products')
+  @RequirePermission("products")
+  async reindexAllCollections(): Promise<{ indexed: number }> {
+    const indexed = await this.searchService.reindexAllCollections();
+    return { indexed };
+  }
+
+  @Post("admin/index/:productId")
+  @AdminRoute()
+  @UseGuards(AdminJwtAuthGuard, RolesGuard)
+  @Roles(AdminRole.admin, AdminRole.super_admin)
+  @RequirePermission("products")
   async indexProduct(
-    @Param('productId') productId: string,
+    @Param("productId") productId: string,
   ): Promise<{ success: boolean }> {
     await this.searchService.indexProduct(productId);
     return { success: true };
   }
 
   @Public()
-  @Get('dev/reindex')
+  @Get("dev/reindex")
   async devReindex(): Promise<{ indexed: number; message: string }> {
-    const isDev = this.configService.get('NODE_ENV') === 'development';
+    const isDev = this.configService.get("NODE_ENV") === "development";
     if (!isDev) {
-      return { indexed: 0, message: 'Bu endpoint sadece development modunda çalışır' };
+      return {
+        indexed: 0,
+        message: "Bu endpoint sadece development modunda çalışır",
+      };
     }
     const indexed = await this.searchService.reindexAll();
     return {
@@ -131,11 +148,14 @@ export class SearchController {
   }
 
   @Public()
-  @Get('dev/reindex-collections')
+  @Get("dev/reindex-collections")
   async devReindexCollections(): Promise<{ indexed: number; message: string }> {
-    const isDev = this.configService.get('NODE_ENV') === 'development';
+    const isDev = this.configService.get("NODE_ENV") === "development";
     if (!isDev) {
-      return { indexed: 0, message: 'Bu endpoint sadece development modunda çalışır' };
+      return {
+        indexed: 0,
+        message: "Bu endpoint sadece development modunda çalışır",
+      };
     }
     const indexed = await this.searchService.reindexAllCollections();
     return {
@@ -145,7 +165,7 @@ export class SearchController {
   }
 
   @Public()
-  @Get('status')
+  @Get("status")
   async getStatus() {
     return this.searchService.getStatus();
   }

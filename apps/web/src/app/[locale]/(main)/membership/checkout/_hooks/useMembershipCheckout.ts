@@ -24,7 +24,6 @@ interface TierRow {
   maxImagesPerListing?: number;
   canTrade?: boolean;
   canCreateCollections?: boolean;
-  isAdFree?: boolean;
 }
 
 /**
@@ -98,7 +97,6 @@ export function useMembershipCheckout() {
                 maxImagesPerListing: tierRow.maxImagesPerListing,
                 canTrade: tierRow.canTrade,
                 canCreateCollections: tierRow.canCreateCollections,
-                isAdFree: tierRow.isAdFree,
               },
               tier as TierId,
               t,

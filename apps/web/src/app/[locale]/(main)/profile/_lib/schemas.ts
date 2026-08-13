@@ -2,6 +2,10 @@
 
 import { z } from "zod";
 import { isValidIban } from "@tarodan/ui";
+import { trPhone, trPhoneOptional } from "@tarodan/ui/form";
+
+const TR_PHONE_MESSAGE =
+  "Geçerli bir Türkiye cep numarası girin (5XX XXX XX XX)";
 
 /**
  * Zod schemas for the profile dashboard forms. One source of truth for both
@@ -11,7 +15,7 @@ import { isValidIban } from "@tarodan/ui";
 
 export const profileInfoSchema = z.object({
   displayName: z.string().trim().min(2, "Görünen isim en az 2 karakter olmalı"),
-  phone: z.string().trim().optional().or(z.literal("")),
+  phone: trPhoneOptional(TR_PHONE_MESSAGE),
   birthDate: z.string().optional().or(z.literal("")),
   bio: z
     .string()
@@ -28,13 +32,7 @@ export type ProfileInfoValues = z.infer<typeof profileInfoSchema>;
 export const addressSchema = z.object({
   title: z.string().trim().optional().or(z.literal("")),
   fullName: z.string().trim().min(2, "Ad soyad zorunludur"),
-  // Stored as +90XXXXXXXXXX → 12 digits total.
-  phone: z
-    .string()
-    .refine(
-      (v) => v.replace(/\D/g, "").length >= 12,
-      "Geçerli bir telefon giriniz",
-    ),
+  phone: trPhone(TR_PHONE_MESSAGE),
   city: z.string().min(1, "Şehir seçiniz"),
   district: z.string().min(1, "İlçe seçiniz"),
   address: z.string().trim().min(10, "Adres en az 10 karakter olmalı"),

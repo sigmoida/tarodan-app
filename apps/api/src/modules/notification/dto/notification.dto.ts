@@ -38,8 +38,13 @@ export enum NotificationType {
   OFFER_REJECTED = "offer_rejected",
   OFFER_COUNTER = "offer_counter",
   OFFER_COUNTER_DECLINED = "offer_counter_declined",
+  OFFER_COUNTER_ACCEPTED = "offer_counter_accepted",
   OFFER_EXPIRED = "offer_expired",
+  OFFER_EXPIRED_SELLER = "offer_expired_seller",
+  OFFER_PAYMENT_EXPIRED = "offer_payment_expired",
   OFFER_CANCELLED_OUT_OF_STOCK = "offer_cancelled_out_of_stock",
+  /** İlan satıcı tarafından silindiği için teklif kapandı (stok bitişi DEĞİL). */
+  OFFER_CANCELLED_LISTING_REMOVED = "offer_cancelled_listing_removed",
 
   // Product notifications
   PRODUCT_APPROVED = "product_approved",
@@ -60,6 +65,16 @@ export enum NotificationType {
   TRADE_AUTO_CANCELLED = "trade_auto_cancelled",
   // Admin uyarısı: takas depoya ulaştı ama süresi doldu — elle force-cancel-stuck gerekiyor.
   TRADE_STUCK_AT_WAREHOUSE = "trade_stuck_at_warehouse",
+  // Admin uyarısı: sipariş uzun süredir kargoda ve taşıyıcıdan teslim raporu yok.
+  // Teslim yazılmadan escrow release tarihi kurulmaz → satıcı parası askıda kalır.
+  ORDER_STUCK_IN_TRANSIT = "order_stuck_in_transit",
+  // Kargo uzun süredir hareketsiz — alıcı ve satıcıya bilgi.
+  ORDER_SHIPMENT_DELAYED = "order_shipment_delayed",
+  // Her iki ürün de depoya ulaştı → kontrol aşaması başlıyor.
+  TRADE_AT_WAREHOUSE = "trade_at_warehouse",
+  // Admin uyarısı: depodan çıkan koli için taşıyıcıdan TESLİM raporu gelmedi. Onay
+  // penceresi teslimattan başladığı için takas kendiliğinden tamamlanmaz; admin çözer.
+  TRADE_OUTBOUND_DELIVERY_MISSING = "trade_outbound_delivery_missing",
   // Takas kargosu başlatılamadı: tarafın kayıtlı adresi yok — kullanıcı adres eklemeli
   // (adres eklenince reconciliation cron kargoyu otomatik oluşturur).
   TRADE_ADDRESS_REQUIRED = "trade_address_required",
@@ -87,6 +102,13 @@ export enum NotificationType {
   REFUND_RETURN_DELIVERED_SELLER = "refund_return_delivered_seller",
   REFUND_COMPLETED_SELLER = "refund_completed_seller",
   REFUND_AUTO_ACCEPTED_SELLER = "refund_auto_accepted_seller",
+  // Kusursuz iadede/satıcı-kaynaklı iptalde kupon hakkı geri verildi — kullanıcı
+  // kodu (kişisel voucher ya da paylaşılan kod) yeniden kullanabilir.
+  COUPON_RETURNED = "coupon_returned",
+  // Kampanyanın TL bütçesi doldu ve kampanya otomatik durduruldu — admin'e gider.
+  CAMPAIGN_BUDGET_EXHAUSTED = "campaign_budget_exhausted",
+  // Moderasyonda 48 saatten uzun bekleyen ilan var — adminlere günlük özet.
+  MODERATION_QUEUE_STALE = "moderation_queue_stale",
 
   // Cross-flow auto-rejection
   OFFER_AUTO_REJECTED = "offer_auto_rejected",
@@ -120,6 +142,8 @@ export enum NotificationType {
   LISTING_EXPIRED = "listing_expired",
   LISTING_VIEWS_MILESTONE = "listing_views_milestone",
   BOOST_EXPIRED = "boost_expired",
+  // Öne çıkarma ödemesi tamamlandı ve boost aktifleşti — satın alana gider.
+  BOOST_ACTIVATED = "boost_activated",
 
   // Promotion notifications
   PROMOTION = "promotion",

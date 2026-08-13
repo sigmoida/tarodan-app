@@ -4,10 +4,12 @@ import {
   ForbiddenException,
   BadRequestException,
   Logger,
+  Optional,
 } from "@nestjs/common";
 import { PrismaService } from "../../prisma";
 import { buyerTotalOf } from "./order-total.helper";
 import { chargedProductBaseOf } from "./order-charged-base.helper";
+import { paymentWindowEnd } from "../payment/payment.constants";
 import { resolveSalePrice } from "../product/helpers/product-sale-window";
 import { i18nMessage } from "../i18n";
 import { CheckoutDto } from "./dto";
@@ -31,11 +33,24 @@ import {
 } from "./order-pricing.service";
 import { OrderCommonService } from "./order-common.service";
 import { OrderCheckoutCommonService } from "./order-checkout-common.service";
+import { OrderFeeDiscountService } from "./order-fee-discount.service";
+import type {
+  AppliedFeeDiscount,
+  FeeDiscountCandidate,
+} from "../discount/fee-discount.engine";
+import {
+  allocateCouponAcrossLines,
+  remainingDiscountAllowanceFor,
+} from "../discount/fee-discount.engine";
 import { distanceSalesConsent } from "./distance-sales-contract";
 import {
   calculatePackageDesi,
   type ShippingBuyerShareByTier,
 } from "../shipping/shipping-tariff.helper";
+import {
+  PUBLIC_NAME_SELECT,
+  publicName,
+} from "../../common/helpers/public-identity";
 
 /**
  * Toplu checkout (CheckoutGroup) akışı: sepetteki tüm ürünler tek grup + ürün
@@ -56,6 +71,8 @@ export class OrderCheckoutGroupService {
     private readonly orderPricing: OrderPricingService,
     private readonly orderCommon: OrderCommonService,
     private readonly checkoutCommon: OrderCheckoutCommonService,
+    @Optional()
+    private readonly feeDiscounts?: OrderFeeDiscountService,
   ) {}
 
   private formatCheckoutGroupCreateResponse(group: {
@@ -220,7 +237,9 @@ export class OrderCheckoutGroupService {
               kind: ProductKind.listing,
             },
             include: {
-              seller: { select: { id: true, email: true, displayName: true } },
+              seller: {
+                select: { id: true, email: true, ...PUBLIC_NAME_SELECT },
+              },
             },
           });
           const productMap = new Map(products.map((p) => [p.id, p]));
@@ -429,8 +448,28 @@ export class OrderCheckoutGroupService {
               originalPrice,
               productDiscount: Math.max(0, originalPrice - productPrice),
               couponDiscount: 0,
+              quantityDiscount: 0,
+              quantityCampaignId: null as string | null,
             };
           });
+
+          // Adet koşullu satıcı kampanyaları (bogo / bulk_quantity): satır
+          // bazında, quote ile ORTAK metottan (İ3/İ7) — önizleme = tahsilat.
+          const quantityDiscounts =
+            await this.discountService.quantityDiscountsForLines(
+              pricing.map((entry) => ({
+                productId: entry.productId,
+                sellerId: entry.product.sellerId,
+                categoryId: entry.product.categoryId,
+                unitPrice: entry.productPrice,
+                quantity: entry.quantity,
+              })),
+            );
+          for (const entry of pricing) {
+            const won = quantityDiscounts.get(entry.productId);
+            entry.quantityDiscount = won?.amount ?? 0;
+            entry.quantityCampaignId = won?.discountId ?? null;
+          }
 
           // F1.3: quote'un birim-fiyat hash'i ile doğrula — ürün fiyatı/kampanya quote'tan
           // sonra değiştiyse 409 PRICING_CHANGED (sessiz farklı tahsil yok). Hash yoksa atlanır.
@@ -451,6 +490,9 @@ export class OrderCheckoutGroupService {
           // F2.4: kupon indiriminin platform payı [0,1] — her siparişin
           // platformFundedDiscount snapshot'ını hesaplamak için.
           let appliedPlatformFundedShare = 0;
+          // Bedel hedefli kupon ürün tabanına dokunmaz; motora aday olarak geçer.
+          let couponFeeCandidate: FeeDiscountCandidate | null = null;
+          let couponEligibleIds = new Set<string>();
           if (dto.couponCode) {
             const validation = await this.discountService.validateCoupon(
               {
@@ -478,38 +520,33 @@ export class OrderCheckoutGroupService {
               appliedVoucherCodeId = validation.discount.voucherCodeId;
               appliedPlatformFundedShare =
                 validation.discount.platformFundedShare;
+              couponFeeCandidate =
+                this.feeDiscounts?.couponCandidate(validation.discount) ?? null;
+              couponEligibleIds = new Set(
+                validation.discount.eligibleProductIds,
+              );
               const totalCoupon = validation.discount.estimatedDiscount;
               // Kupon YALNIZ uygun (scope) satırlara, satır toplamı oranında
               // dağıtılır — uygun olmayan satıcı/kategori satırları indirim payı
               // ALMAZ (aksi halde kapsamlı bir kupon başka satıcıların payout
-              // tabanını düşürürdü). Son uygun satıra yuvarlama artığı yazılır.
+              // tabanını düşürürdü). Dağıtım + %50 tavan TEK kaynaktan (quote
+              // ile birebir): kupon satır başına, satıcı indirimleri sonrası
+              // tabanın yüzde MAX_TOTAL_DISCOUNT_PERCENT'ini aşamaz.
               const eligibleIds = new Set(
                 validation.discount.eligibleProductIds,
               );
               const eligibleLines = pricing.filter((p) =>
                 eligibleIds.has(p.productId),
               );
-              const eligiblePriceSum = eligibleLines.reduce(
-                (sum, p) => sum + p.productPrice * p.quantity,
-                0,
+              const allocation = allocateCouponAcrossLines(
+                eligibleLines.map((p) =>
+                  Math.max(0, p.productPrice * p.quantity - p.quantityDiscount),
+                ),
+                totalCoupon,
               );
-              if (eligiblePriceSum > 0) {
-                let allocated = 0;
-                eligibleLines.forEach((p, idx) => {
-                  if (idx === eligibleLines.length - 1) {
-                    p.couponDiscount =
-                      Math.round((totalCoupon - allocated) * 100) / 100;
-                  } else {
-                    p.couponDiscount =
-                      Math.round(
-                        ((totalCoupon * p.productPrice * p.quantity) /
-                          eligiblePriceSum) *
-                          100,
-                      ) / 100;
-                    allocated += p.couponDiscount;
-                  }
-                });
-              }
+              eligibleLines.forEach((p, idx) => {
+                p.couponDiscount = allocation.amounts[idx];
+              });
             }
           }
 
@@ -522,11 +559,13 @@ export class OrderCheckoutGroupService {
               })) > 0,
           );
 
-          const paymentExpiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
+          const paymentExpiresAt = paymentWindowEnd();
           const orderInputs: Array<{
             pricingEntry: (typeof pricing)[number];
             orderNumber: string;
             commissionResult: CommissionResult;
+            /** Bu satıra düşen bedel indirimleri (rapor + iade denetimi). */
+            feeDiscountsApplied?: AppliedFeeDiscount[];
             /** Tahsil edilen ürün tabanı — `Order.subtotal`. */
             subtotal: number;
             shippingCost: number;
@@ -549,6 +588,9 @@ export class OrderCheckoutGroupService {
           // satıcının İLK satırına yüklenir (kardeş satırlar 0) → order.totalAmount +
           // grup toplamı formülü değişmeden per-seller olur.
           const sellerLineSubtotals = new Map<string, number>();
+          // Kupon ÖNCESİ satıcı alt-toplamları — yalnız ücretsiz kargo eşiği
+          // için (İ14): kupon, kazanılmış ücretsiz kargoyu geri alamaz.
+          const sellerListSubtotals = new Map<string, number>();
           const sellerDesiLines = new Map<
             string,
             Array<{ shippingDesi: number; quantity: number }>
@@ -558,10 +600,18 @@ export class OrderCheckoutGroupService {
               unitPrice: entry.productPrice,
               quantity: entry.quantity,
               couponDiscount: entry.couponDiscount,
+              quantityDiscount: entry.quantityDiscount,
             });
             sellerLineSubtotals.set(
               entry.product.sellerId,
               (sellerLineSubtotals.get(entry.product.sellerId) ?? 0) + line,
+            );
+            // Eşik kupon ÖNCESİ tutardan (İ14); satıcının adet kampanyası ise
+            // kendi fiyat indirimi olduğundan eşiğe dahildir.
+            sellerListSubtotals.set(
+              entry.product.sellerId,
+              (sellerListSubtotals.get(entry.product.sellerId) ?? 0) +
+                (entry.productPrice * entry.quantity - entry.quantityDiscount),
             );
             const packageLines =
               sellerDesiLines.get(entry.product.sellerId) ?? [];
@@ -592,14 +642,23 @@ export class OrderCheckoutGroupService {
             string,
             ShippingBuyerShareByTier[]
           >();
+          const lineFeeDiscounts: AppliedFeeDiscount[][] = [];
+          // Toplam indirim tavanı: satır adımının kullanmadığı pay aynı satıcının
+          // paket (kargo) adımına devreder — quote ile birebir aynı muhasebe.
+          const sellerAllowanceLeft = new Map<string, number>();
+          // Kampanyalar sepet başına TEK kez yüklenir; alıcının katmanı da bir kez.
+          const feeCampaigns = (await this.feeDiscounts?.preload()) ?? [];
+          const buyerTier =
+            (await this.feeDiscounts?.resolveBuyerTier(buyerId)) ?? null;
           const pinnedRuleSetId = commissionRuleSet.id;
           for (const entry of pricing) {
             const discountedPrice = chargedProductBaseOf({
               unitPrice: entry.productPrice,
               quantity: entry.quantity,
               couponDiscount: entry.couponDiscount,
+              quantityDiscount: entry.quantityDiscount,
             });
-            const commission = await this.orderPricing.calculateCommission(
+            const rawCommission = await this.orderPricing.calculateCommission(
               discountedPrice,
               entry.product.sellerId,
               entry.product.categoryId,
@@ -609,22 +668,106 @@ export class OrderCheckoutGroupService {
                 : discountedPrice,
               entry.product.id,
             );
+            // Komisyon/hizmet bedeli kampanyaları satır bazında (kargo aşağıda,
+            // paket kararından sonra) — sepet önizlemesiyle birebir aynı sıra.
+            // Tavan tabanı satıcı indirimi (adet kampanyası) SONRASI tutardır.
+            const lineAllowance = remainingDiscountAllowanceFor({
+              lineBase:
+                entry.productPrice * entry.quantity - entry.quantityDiscount,
+              couponDiscount: entry.couponDiscount,
+            });
+            const feeDiscounted = await this.feeDiscounts?.apply({
+              context: {
+                productId: entry.product.id,
+                categoryId: entry.product.categoryId,
+                sellerId: entry.product.sellerId,
+                buyerId,
+                buyerTier,
+                quantity: entry.quantity,
+              },
+              commission: rawCommission,
+              buyerShippingAmount: 0,
+              sellerShippingAmount: 0,
+              remainingAllowance: lineAllowance,
+              preloaded: feeCampaigns,
+              couponCandidates:
+                couponFeeCandidate && couponEligibleIds.has(entry.product.id)
+                  ? [couponFeeCandidate]
+                  : [],
+            });
+            const commission = feeDiscounted?.commission ?? rawCommission;
+            lineFeeDiscounts.push(feeDiscounted?.applied ?? []);
+            sellerAllowanceLeft.set(
+              entry.product.sellerId,
+              (sellerAllowanceLeft.get(entry.product.sellerId) ?? 0) +
+                Math.max(
+                  0,
+                  lineAllowance -
+                    ((feeDiscounted?.buyerTotal ?? 0) +
+                      (feeDiscounted?.sellerTotal ?? 0)),
+                ),
+            );
             lineCommissions.push({ discountedPrice, commission });
             sellerShareLines.set(entry.product.sellerId, [
               ...(sellerShareLines.get(entry.product.sellerId) ?? []),
               commission.shippingBuyerShares,
             ]);
           }
+          const sellerShippingFeeDiscounts = new Map<
+            string,
+            AppliedFeeDiscount[]
+          >();
           const sellerShippingDecision = new Map(
-            [...sellerLineSubtotals.entries()].map(([sellerId, subtotal]) => [
-              sellerId,
-              this.orderPricing.resolveShippingDecision({
-                tariff: shippingTariff.tariff,
-                subtotal,
-                billableDesi: sellerDesi.get(sellerId) ?? 1,
-                lineShares: sellerShareLines.get(sellerId) ?? [],
-              }),
-            ]),
+            await Promise.all(
+              [...sellerLineSubtotals.entries()].map(
+                async ([sellerId, subtotal]) => {
+                  const decision = this.orderPricing.resolveShippingDecision({
+                    tariff: shippingTariff.tariff,
+                    subtotal,
+                    billableDesi: sellerDesi.get(sellerId) ?? 1,
+                    lineShares: sellerShareLines.get(sellerId) ?? [],
+                    thresholdSubtotal:
+                      sellerListSubtotals.get(sellerId) ?? subtotal,
+                  });
+                  const lead = pricing.find(
+                    (entry) => entry.product.sellerId === sellerId,
+                  );
+                  const discounted = await this.feeDiscounts?.applyShipping({
+                    context: {
+                      productId: lead?.product.id ?? "",
+                      categoryId: lead?.product.categoryId ?? null,
+                      sellerId,
+                      buyerId,
+                      buyerTier,
+                    },
+                    buyerShippingAmount: decision.buyer,
+                    sellerShippingAmount: decision.seller,
+                    remainingAllowance: sellerAllowanceLeft.get(sellerId) ?? 0,
+                    preloaded: feeCampaigns,
+                    couponCandidates:
+                      couponFeeCandidate &&
+                      couponEligibleIds.has(lead?.product.id ?? "")
+                        ? [couponFeeCandidate]
+                        : [],
+                  });
+                  if (discounted?.applied.length) {
+                    sellerShippingFeeDiscounts.set(
+                      sellerId,
+                      discounted.applied,
+                    );
+                  }
+                  return [
+                    sellerId,
+                    {
+                      ...decision,
+                      buyer: discounted?.buyerShippingAmount ?? decision.buyer,
+                      seller:
+                        discounted?.sellerShippingAmount ?? decision.seller,
+                    },
+                  ] as const;
+                },
+              ),
+            ),
           );
 
           const sellerShippingCharged = new Set<string>();
@@ -720,6 +863,14 @@ export class OrderCheckoutGroupService {
               serviceVatRate,
               totalAmount,
               suratIdempotencyKey,
+              // Bu satıra düşen bedel indirimleri: satır kampanyaları + (kargo
+              // yalnız satıcının ilk satırına yüklendiği için) kargo kampanyası.
+              feeDiscountsApplied: [
+                ...(lineFeeDiscounts[entryIndex] ?? []),
+                ...(chargedThisLine
+                  ? (sellerShippingFeeDiscounts.get(entrySellerId) ?? [])
+                  : []),
+              ],
             });
           }
 
@@ -792,7 +943,10 @@ export class OrderCheckoutGroupService {
 
           for (const input of orderInputs) {
             const entry = input.pricingEntry;
-            const totalDiscount = entry.productDiscount + entry.couponDiscount;
+            const totalDiscount =
+              entry.productDiscount +
+              entry.quantityDiscount +
+              entry.couponDiscount;
 
             const shippingAddressJson: Record<string, unknown> = {
               id: shippingAddress.id,
@@ -846,6 +1000,10 @@ export class OrderCheckoutGroupService {
                     ? {
                         productDiscount: entry.productDiscount,
                         couponDiscount: entry.couponDiscount,
+                        // Adet koşullu satıcı kampanyası (bogo/bulk_quantity):
+                        // satıcının cebinden, satır bazında.
+                        quantityDiscount: entry.quantityDiscount,
+                        quantityCampaignId: entry.quantityCampaignId,
                         appliedDiscountId,
                         originalPrice: entry.originalPrice,
                       }
@@ -873,6 +1031,15 @@ export class OrderCheckoutGroupService {
                   input.commissionResult.sellerPlatformFeeAmount,
                 buyerShippingAmount: input.buyerShippingAmount,
                 sellerShippingAmount: input.sellerShippingAmount,
+                buyerFeeDiscountAmount: (input.feeDiscountsApplied ?? [])
+                  .filter((line) => line.side === "buyer")
+                  .reduce((sum, line) => sum + line.amount, 0),
+                sellerFeeDiscountAmount: (input.feeDiscountsApplied ?? [])
+                  .filter((line) => line.side === "seller")
+                  .reduce((sum, line) => sum + line.amount, 0),
+                feeDiscountBreakdown: input.feeDiscountsApplied?.length
+                  ? (input.feeDiscountsApplied as unknown as Prisma.InputJsonValue)
+                  : undefined,
                 financialSnapshot: this.checkoutCommon.buildFinancialSnapshot({
                   pricingHash: dto.expectedPricingHash,
                   productId: entry.productId,
@@ -916,6 +1083,14 @@ export class OrderCheckoutGroupService {
               input.commissionResult,
             );
 
+            // Kodsuz (otomatik) kampanyaların bütçesi sipariş oluşurken
+            // harcanır; ödenmeyen sipariş kapanırken geri verilir. Kuponun
+            // bütçesi aşağıdaki reserveUsage ile tutulur.
+            await this.feeDiscounts?.spendBudgets(
+              input.feeDiscountsApplied ?? null,
+              tx,
+            );
+
             await tx.product.update({
               where: { id: entry.productId },
               data: { reservedQuantity: { increment: entry.quantity } },
@@ -931,17 +1106,23 @@ export class OrderCheckoutGroupService {
               productTitle: entry.product.title,
               sellerId: entry.product.sellerId,
               sellerEmail: entry.product.seller?.email ?? null,
-              sellerName: entry.product.seller?.displayName ?? null,
+              sellerName: publicName(entry.product.seller),
             });
           }
 
           // Kupon kotası grup başına BİR KEZ tutulur. Gerçek kullanım ve usedCount
           // yalnız başarılı ödeme sonrasında PaymentFulfillmentService'te yazılır.
           if (appliedDiscountId) {
-            const totalCouponDiscount = pricing.reduce(
-              (sum, p) => sum + p.couponDiscount,
-              0,
-            );
+            const totalCouponDiscount = couponFeeCandidate
+              ? orderInputs.reduce(
+                  (sum, input) =>
+                    sum +
+                    (input.feeDiscountsApplied ?? [])
+                      .filter((line) => line.discountId === appliedDiscountId)
+                      .reduce((lineSum, line) => lineSum + line.amount, 0),
+                  0,
+                )
+              : pricing.reduce((sum, p) => sum + p.couponDiscount, 0);
             if (totalCouponDiscount > 0 && createdOrders.length > 0) {
               await this.discountService.reserveUsage(
                 appliedDiscountId,
@@ -997,7 +1178,7 @@ export class OrderCheckoutGroupService {
       ? null
       : await this.prisma.user.findUnique({
           where: { id: buyerId },
-          select: { email: true, displayName: true },
+          select: { email: true, ...PUBLIC_NAME_SELECT },
         });
 
     for (const order of result.createdOrders) {
@@ -1012,9 +1193,7 @@ export class OrderCheckoutGroupService {
           productTitle: order.productTitle,
           totalAmount: order.totalAmount,
           buyerEmail: isGuest ? guest?.email || "" : buyerUser?.email || "",
-          buyerName: isGuest
-            ? guest?.name || "Misafir"
-            : buyerUser?.displayName || buyerUser?.email || "",
+          buyerName: isGuest ? guest?.name || "Misafir" : publicName(buyerUser),
           sellerEmail: order.sellerEmail || "",
           sellerName: order.sellerName || "Satıcı",
         });

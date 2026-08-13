@@ -1,19 +1,21 @@
+import type { PublicIdentity } from "./user";
+
 export enum ProductStatus {
-  DRAFT = 'DRAFT',
-  PENDING = 'PENDING',
-  ACTIVE = 'ACTIVE',
-  SOLD = 'SOLD',
-  RESERVED = 'RESERVED',
-  INACTIVE = 'INACTIVE',
-  REJECTED = 'REJECTED',
+  DRAFT = "DRAFT",
+  PENDING = "PENDING",
+  ACTIVE = "ACTIVE",
+  SOLD = "SOLD",
+  RESERVED = "RESERVED",
+  INACTIVE = "INACTIVE",
+  REJECTED = "REJECTED",
 }
 
 export enum ProductCondition {
-  NEW = 'NEW',
-  LIKE_NEW = 'LIKE_NEW',
-  GOOD = 'GOOD',
-  FAIR = 'FAIR',
-  POOR = 'POOR',
+  NEW = "NEW",
+  LIKE_NEW = "LIKE_NEW",
+  GOOD = "GOOD",
+  FAIR = "FAIR",
+  POOR = "POOR",
 }
 
 export interface Product {
@@ -40,10 +42,7 @@ export interface Product {
 }
 
 export interface ProductWithSeller extends Product {
-  seller: {
-    id: string;
-    displayName: string;
-    avatarUrl?: string;
+  seller: PublicIdentity & {
     rating?: number;
     ratingCount: number;
   };
@@ -79,7 +78,7 @@ export interface CreateProductDto {
   tags?: string[];
 }
 
-export interface UpdateProductDto extends Partial<CreateProductDto> {}
+export type UpdateProductDto = Partial<CreateProductDto>;
 
 export interface ProductQueryDto {
   page?: number;
@@ -93,8 +92,8 @@ export interface ProductQueryDto {
   maxPrice?: number;
   isTradeEnabled?: boolean;
   search?: string;
-  sortBy?: 'price' | 'createdAt' | 'viewCount' | 'favoriteCount';
-  sortOrder?: 'asc' | 'desc';
+  sortBy?: "price" | "createdAt" | "viewCount" | "favoriteCount";
+  sortOrder?: "asc" | "desc";
 }
 
 export interface PaginatedProducts {

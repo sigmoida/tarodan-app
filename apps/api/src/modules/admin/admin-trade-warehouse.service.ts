@@ -9,17 +9,21 @@ import {
 import { PrismaService } from "../../prisma";
 import { AdminAuditService } from "./admin-audit.service";
 import { ApproveWarehouseTradeDto, RejectWarehouseTradeDto } from "./dto";
-import { PaymentStatus, TradeStatus, ShipmentStatus } from "@prisma/client";
+import { TradeStatus, ShipmentStatus } from "@prisma/client";
 import { PaymentService } from "../payment/payment.service";
+import { NotificationService } from "../notification/notification.service";
+import { NotificationType } from "../notification/dto";
 import { EventService } from "../events/event.service";
 import {
   CARGO_PROVIDER,
   type CargoProvider,
 } from "../surat-cargo/cargo-provider";
 import { AdminTradeCommonService } from "./admin-trade-common.service";
+import { startTradeConfirmationWindowIfDelivered } from "../../common/helpers/trade-escrow";
+import { TRADE_VALID_TRANSITIONS } from "../trade/trade.state-machine";
+import { canTransitionShipmentStatus } from "../shipping/shipment-state-machine";
 import { REFERENCE_PREFIX } from "../../common/helpers/code-prefixes";
 import { generateReferenceCode } from "../../common/helpers/generate-reference";
-import { primaryCashPayment } from "../trade/trade.constants";
 
 /**
  * Safe-trade (depo escrow) admin akışının depo-tarafı: depo teslim alma
@@ -38,6 +42,7 @@ export class AdminTradeWarehouseService {
     private readonly audit: AdminAuditService,
     private readonly paymentService: PaymentService,
     private readonly eventService: EventService,
+    private readonly notificationService: NotificationService,
     private readonly common: AdminTradeCommonService,
     @Optional()
     @Inject(CARGO_PROVIDER)
@@ -118,6 +123,149 @@ export class AdminTradeWarehouseService {
       providerTrackingId: result.trackingCode,
       labelZpl: result.labelData,
     };
+  }
+
+  /**
+   * Çıkış (depo → kullanıcı) bacağının Sürat gönderimi. Onay akışı bunu
+   * transaction DIŞINDA çağırır; iade gönderiminin (`submitReturnToSurat-
+   * ForReject`) simetriğidir ve aynı idempotency anahtarını korur.
+   */
+  private async submitOutboundToSurat(
+    tradeId: string,
+    oid: string,
+    address: any,
+    user: any,
+  ): Promise<{
+    carrier: string;
+    trackingNumber: string;
+    providerTrackingId: string | null;
+    labelZpl: string | null;
+  }> {
+    if (!this.cargo || !this.cargo.isEnabled()) {
+      return {
+        carrier: "Tarodan Warehouse",
+        trackingNumber: generateReferenceCode(
+          REFERENCE_PREFIX.shipmentFallback,
+        ),
+        providerTrackingId: null,
+        labelZpl: null,
+      };
+    }
+    const result = await this.cargo.createShipment({
+      idempotencyKey: `surat:trade:${oid}`,
+      correlationId: `trade-approve-${tradeId}`,
+      reference: oid,
+      recipient: {
+        name: address.fullName || user?.displayName || "Takas Alıcısı",
+        address: address.address,
+        city: address.city,
+        district: address.district,
+        phone: address.phone,
+      },
+      content: "Takas Gönderisi",
+    });
+    if (!result.ok) {
+      const r = result as any;
+      const errMsg = r.kind === "business" ? r.message : `technical: ${r.code}`;
+      throw new BadRequestException(
+        `Sürat kargo onay siparişi reddedildi: ${errMsg}`,
+      );
+    }
+    return {
+      carrier: "surat",
+      trackingNumber: oid,
+      providerTrackingId: result.trackingCode,
+      labelZpl: result.labelData,
+    };
+  }
+
+  /**
+   * Kodsuz kalmış tek bir `from_warehouse` bacağı için Sürat submit'ini
+   * yeniden dener — iade bacağındaki `retryReturnBarcode`'un eşi. OID
+   * deterministik türetilir (üretimdeki formatla BİREBİR), böylece idempotency
+   * anahtarı kaymaz. Throw etmez, boolean döner.
+   */
+  async retryOutboundBarcode(tradeShipmentId: string): Promise<boolean> {
+    if (!this.cargo || !this.cargo.isEnabled()) {
+      return false;
+    }
+
+    const ship = await this.prisma.tradeShipment.findUnique({
+      where: { id: tradeShipmentId },
+      include: {
+        trade: {
+          select: {
+            tradeNumber: true,
+            initiatorId: true,
+            initiatorAddressId: true,
+            receiverAddressId: true,
+          },
+        },
+      },
+    });
+    if (
+      !ship ||
+      ship.leg !== "from_warehouse" ||
+      ship.providerTrackingId ||
+      !ship.recipientUserId ||
+      !["pending", "surat"].includes(ship.carrier) ||
+      ship.status === ShipmentStatus.cancelled
+    ) {
+      return false;
+    }
+
+    const isInitiator = ship.recipientUserId === ship.trade.initiatorId;
+    const oid =
+      ship.trackingNumber ??
+      `${ship.trade.tradeNumber}-${isInitiator ? "INI" : "REC"}`
+        .replace(/[^a-zA-Z0-9-]/g, "")
+        .slice(0, 50);
+
+    const [user, address] = await Promise.all([
+      this.prisma.user.findUnique({ where: { id: ship.recipientUserId } }),
+      this.pickTradeSideAddress(
+        this.prisma,
+        isInitiator
+          ? ship.trade.initiatorAddressId
+          : ship.trade.receiverAddressId,
+        ship.recipientUserId,
+      ),
+    ]);
+    if (!address) {
+      this.logger.warn(
+        `Retry outbound barcode: recipient ${ship.recipientUserId} has no address (trade-shipment=${tradeShipmentId})`,
+      );
+      return false;
+    }
+
+    try {
+      const submitted = await this.submitOutboundToSurat(
+        ship.tradeId,
+        oid,
+        address,
+        user,
+      );
+      await this.prisma.tradeShipment.update({
+        where: { id: tradeShipmentId },
+        data: {
+          carrier: submitted.carrier,
+          trackingNumber: submitted.trackingNumber,
+          providerTrackingId: submitted.providerTrackingId,
+          labelZpl: submitted.labelZpl,
+          status: ShipmentStatus.label_created,
+          shippedAt: ship.shippedAt ?? new Date(),
+        },
+      });
+      this.logger.log(
+        `Retry OK: trade outbound barcode filled ${tradeShipmentId} oid=${oid}`,
+      );
+      return true;
+    } catch (e: any) {
+      this.logger.warn(
+        `Retry outbound barcode failed ${tradeShipmentId} oid=${oid}: ${e?.message}`,
+      );
+      return false;
+    }
   }
 
   /**
@@ -277,14 +425,40 @@ export class AdminTradeWarehouseService {
             "Bu gönderim zaten teslim alındı olarak işaretlenmiş",
           );
         }
+        // Durum makinesi guard'ı (çıkış bacağındaki #86 ile aynı kural): iptal
+        // edilmiş / dönüşe çıkmış bir bacak buradan delivered'a ZORLANAMAZ.
+        // TEK istisna GEÇ GELEN KOLİ kaydıdır (Depo El Kitabı §7): takas
+        // kapanmışken (iptal/tamamlandı) yerelde cancelled bacağın fiziksel
+        // teslim alınışı yine kayda geçirilebilmeli — "işaretle, sistem takası
+        // diriltmez". Statü DEĞİŞMEZ (cancelled kalır, durum makinesi
+        // çiğnenmez); yalnız deliveredAt mühürlenir. Kapalı takas dirilmez:
+        // aşağıdaki tüm geçişler tradeStillOpen guard'ına tabidir.
+        const tradeClosed =
+          trade.status === TradeStatus.cancelled ||
+          trade.status === TradeStatus.completed;
+        const lateArrivalRecord =
+          tradeClosed && shipment.status === ShipmentStatus.cancelled;
+        if (
+          !lateArrivalRecord &&
+          !canTransitionShipmentStatus(
+            shipment.status as ShipmentStatus,
+            ShipmentStatus.delivered,
+          )
+        ) {
+          throw new BadRequestException(
+            `Gönderim durumu '${shipment.status}' — teslim alındı olarak işaretlenemez`,
+          );
+        }
 
         const now = new Date();
         const updatedShipment = await tx.tradeShipment.update({
           where: { id: shipmentId },
-          data: {
-            status: ShipmentStatus.delivered,
-            deliveredAt: now,
-          },
+          data: lateArrivalRecord
+            ? { deliveredAt: now }
+            : {
+                status: ShipmentStatus.delivered,
+                deliveredAt: now,
+              },
         });
 
         // Check if both to_warehouse shipments are now delivered
@@ -298,10 +472,27 @@ export class AdminTradeWarehouseService {
 
         // Lock user-side cancel on the first warehouse arrival. From this point
         // on, only admin can unwind the trade (reject or force-cancel-stuck).
-        const isFirstArrival = trade.firstWarehouseArrivalAt === null;
+        // Kapanmış bir takasa (iptal/dönüş/tamamlandı) iptal kilidi damgalamak
+        // anlamsız: o takas zaten kullanıcı aksiyonuna kapalı.
+        const tradeStillOpen =
+          trade.status === TradeStatus.shipping_to_warehouse ||
+          trade.status === TradeStatus.at_warehouse;
+        const isFirstArrival =
+          trade.firstWarehouseArrivalAt === null && tradeStillOpen;
+
+        // Takas durumu at_warehouse'a GEÇEBİLİYORSA geç. Eski kod yalnız "zaten
+        // at_warehouse değil" diye bakıyordu: iptal edilmiş / dönüşe çıkmış bir
+        // takas, geç gelen bir koli teslim alındığında canlanıp onaylanabilir
+        // hale geliyordu (parası çoktan iade edilmiş olmasına rağmen). Sürat
+        // poller'ındaki aynı hata #3'te düzeltilmişti; manuel yol açıkta kalmış.
+        // FOR UPDATE (yukarıda) okumayı kilitler → whitelist kontrolü CAS'tır.
+        const canEnterWarehouse =
+          TRADE_VALID_TRANSITIONS[trade.status]?.includes(
+            TradeStatus.at_warehouse,
+          ) ?? false;
 
         let nextStatus: TradeStatus = trade.status;
-        if (bothDelivered && trade.status !== TradeStatus.at_warehouse) {
+        if (bothDelivered && canEnterWarehouse) {
           await tx.trade.update({
             where: { id: tradeId },
             data: {
@@ -363,8 +554,186 @@ export class AdminTradeWarehouseService {
             );
           }
         }
+        // İki koli de depoda: taraflara haber ver. Bu bildirim olmadan süreç,
+        // kullanıcı açısından "iptal edemezsin" uyarısından sonra sessizleşiyor
+        // ve kontrol bitene kadar hiçbir sinyal gelmiyordu.
+        if (res.status === TradeStatus.at_warehouse) {
+          await this.notifyTradeAtWarehouse(
+            res.tradeId,
+            res.initiatorId,
+            res.receiverId,
+          );
+        }
         return res;
       });
+  }
+
+  /**
+   * Admin, ÇIKIŞ (depo → kullanıcı) kolisini elle "teslim edildi" işaretler —
+   * giriş bacağındaki markWarehouseReceived'ın simetriği.
+   *
+   * Neden gerekli: escrow onay penceresi artık TESLİMATTAN başlıyor. Taşıyıcı
+   * teslimi hiç raporlamazsa (yanlış takip no, Sürat kaydı düşmemiş) ve
+   * kullanıcı da onaylamazsa takas askıda kalırdı. notifyAdminsOfUndelivered-
+   * OutboundTrades alarmı bu ucu işaret eder: admin fiziksel teslimi doğrulayıp
+   * işaretler, iki koli de teslim olunca pencere normal akışında başlar.
+   */
+  async markOutboundDelivered(
+    adminId: string,
+    tradeId: string,
+    shipmentId: string,
+    note?: string,
+  ) {
+    return this.prisma.$transaction(async (tx) => {
+      await tx.$queryRaw`SELECT id FROM trades WHERE id = ${tradeId} FOR UPDATE`;
+
+      const trade = await tx.trade.findUnique({
+        where: { id: tradeId },
+        select: { id: true, status: true },
+      });
+      if (!trade) {
+        throw new NotFoundException("Takas bulunamadı");
+      }
+      if (trade.status !== TradeStatus.shipping_to_recipients) {
+        throw new BadRequestException(
+          `Takas durumu '${trade.status}' — yalnız 'shipping_to_recipients' takasta çıkış kolisi teslim işaretlenebilir`,
+        );
+      }
+
+      const shipment = await tx.tradeShipment.findUnique({
+        where: { id: shipmentId },
+      });
+      if (!shipment || shipment.tradeId !== tradeId) {
+        throw new NotFoundException("Gönderim bulunamadı");
+      }
+      if (shipment.leg !== "from_warehouse") {
+        throw new BadRequestException(
+          "Bu gönderim depodan çıkan bir gönderim değil",
+        );
+      }
+
+      const now = new Date();
+      let updatedShipment = shipment;
+      if (!shipment.deliveredAt) {
+        // #86 durum makinesi guard'ı: iptal/dönüş gibi terminal bir bacak
+        // buradan delivered'a ZORLANAMAZ — dönen koliyi teslim saymak,
+        // helper'daki blok kuralını delip escrow'u açardı.
+        if (
+          !canTransitionShipmentStatus(
+            shipment.status as ShipmentStatus,
+            ShipmentStatus.delivered,
+          )
+        ) {
+          throw new BadRequestException(
+            `Gönderim durumu '${shipment.status}' — teslim edildi olarak işaretlenemez`,
+          );
+        }
+        updatedShipment = await tx.tradeShipment.update({
+          where: { id: shipmentId },
+          data: { status: ShipmentStatus.delivered, deliveredAt: now },
+        });
+      }
+      // deliveredAt zaten doluysa hata YOK: bu uç, "koliler teslim ama pencere
+      // kurulamadı" alarmının onarım aracıdır — o durumda yalnız pencere
+      // kurulumuna düşer (idempotent), tarih ötelenmez.
+
+      // İki koli de teslimse onay/itiraz penceresi buradan başlar (tek kaynak).
+      const confirmationDeadline =
+        await startTradeConfirmationWindowIfDelivered(tx, tradeId);
+
+      await this.audit.createAuditLog(
+        adminId,
+        "trade_outbound_delivered",
+        "TradeShipment",
+        shipmentId,
+        shipment,
+        {
+          ...updatedShipment,
+          note: note ?? null,
+          confirmationDeadline,
+        },
+      );
+
+      return {
+        success: true,
+        tradeId,
+        shipmentId,
+        confirmationDeadline,
+      };
+    });
+  }
+
+  /**
+   * "Ürünler depoda" bildirimi (iki tarafa). Best-effort: bildirim hatası depo
+   * akışını bozmaz. Sürat poller'ı da aynı bildirimi kendi geçişinde atar.
+   */
+  private async notifyTradeAtWarehouse(
+    tradeId: string,
+    initiatorId: string,
+    receiverId: string,
+  ): Promise<void> {
+    for (const userId of [initiatorId, receiverId]) {
+      try {
+        await this.notificationService.createInAppNotification(
+          userId,
+          NotificationType.TRADE_AT_WAREHOUSE,
+          { tradeId },
+        );
+      } catch (err: any) {
+        this.logger.warn(
+          `TRADE_AT_WAREHOUSE notify failed trade=${tradeId} user=${userId}: ${err?.message}`,
+        );
+      }
+    }
+  }
+
+  /**
+   * Depo kontrolünü BAŞLATIR: `at_warehouse` → `admin_reviewing`.
+   *
+   * `admin_reviewing` şemada ve durum makinesinde vardı ama hiçbir kod onu
+   * yazmıyordu: "uzman kontrolü" aşamasının veri karşılığı yoktu — kontrolün
+   * ne zaman başladığı, kimin baktığı kayıtlı değildi ve kullanıcıya "kontrol
+   * ediliyor" diye bir durum gösterilemiyordu. Kontrolü üstlenen operatör bu
+   * ucu çağırır; kim/ne zaman bilgisi denetim kaydında durur.
+   *
+   * İdempotent: zaten `admin_reviewing` ise sessizce aynı sonucu döner.
+   */
+  async startWarehouseReview(adminId: string, tradeId: string) {
+    return this.prisma.$transaction(async (tx) => {
+      await tx.$queryRaw`SELECT id FROM trades WHERE id = ${tradeId} FOR UPDATE`;
+
+      const trade = await tx.trade.findUnique({
+        where: { id: tradeId },
+        select: { id: true, status: true },
+      });
+      if (!trade) {
+        throw new NotFoundException("Takas bulunamadı");
+      }
+      if (trade.status === TradeStatus.admin_reviewing) {
+        return { success: true, tradeId, status: trade.status, already: true };
+      }
+      if (trade.status !== TradeStatus.at_warehouse) {
+        throw new BadRequestException(
+          `Takas durumu '${trade.status}' — kontrole yalnız 'at_warehouse' takas alınabilir`,
+        );
+      }
+
+      const updated = await tx.trade.update({
+        where: { id: tradeId },
+        data: { status: TradeStatus.admin_reviewing, updatedAt: new Date() },
+      });
+
+      await this.audit.createAuditLog(
+        adminId,
+        "trade_warehouse_review_started",
+        "Trade",
+        tradeId,
+        trade,
+        updated,
+      );
+
+      return { success: true, tradeId, status: updated.status, already: false };
+    });
   }
 
   /**
@@ -378,6 +747,52 @@ export class AdminTradeWarehouseService {
     tradeId: string,
     dto: ApproveWarehouseTradeDto,
   ) {
+    // Idempotency + onarım: takas zaten çıkışa geçtiyse yeniden onaylamaya
+    // çalışmak yerine kodsuz kalmış çıkış bacaklarını Sürat'a yeniden gönder
+    // (reject yolundaki H3 ile aynı davranış).
+    const already = await this.prisma.trade.findUnique({
+      where: { id: tradeId },
+      select: {
+        status: true,
+        shipments: {
+          where: { leg: "from_warehouse" },
+          select: { id: true, carrier: true, providerTrackingId: true },
+        },
+      },
+    });
+    if (!already) {
+      throw new NotFoundException("Takas bulunamadı");
+    }
+    if (
+      already.status === TradeStatus.shipping_to_recipients &&
+      already.shipments.length >= 2
+    ) {
+      const incomplete = already.shipments.filter(
+        (s) =>
+          s.carrier === "pending" ||
+          (s.carrier === "surat" && !s.providerTrackingId),
+      );
+      let resubmitted = 0;
+      for (const s of incomplete) {
+        if (await this.retryOutboundBarcode(s.id)) resubmitted++;
+      }
+      return {
+        success: true,
+        tradeId,
+        status: already.status,
+        idempotent: true,
+        ...(incomplete.length > 0 && {
+          outboundResubmitted: resubmitted,
+          outboundStillPending: incomplete.length - resubmitted,
+        }),
+      };
+    }
+
+    // 1) Transaction YALNIZCA DB durumu değiştirir: doğrula, DRAFT çıkış
+    //    gönderilerini oluştur, statüyü çevir. Sürat çağrıları BİLEREK tx
+    //    dışında — üçüncü taraf API'si yavaşladığında takas satırının
+    //    FOR UPDATE kilidini tutmamak ve Prisma'nın 5 sn'lik interactive
+    //    transaction timeout'una takılmamak için (red yolu ile aynı desen).
     const result = await this.prisma.$transaction(async (tx) => {
       await tx.$queryRaw`SELECT id FROM trades WHERE id = ${tradeId} FOR UPDATE`;
 
@@ -427,13 +842,8 @@ export class AdminTradeWarehouseService {
       const warehouseAddressId =
         await this.common.resolveWarehouseAddressId(tx);
 
-      const genTrackingNumber = () =>
-        generateReferenceCode(REFERENCE_PREFIX.shipmentFallback);
-
       const now = new Date();
 
-      // Submit each warehouse-to-recipient leg to Sürat as a real shipment.
-      // If integration is disabled, falls back to internal tracking number.
       const initiatorOid = `${trade.tradeNumber}-INI`
         .replace(/[^a-zA-Z0-9-]/g, "")
         .slice(0, 50);
@@ -441,89 +851,18 @@ export class AdminTradeWarehouseService {
         .replace(/[^a-zA-Z0-9-]/g, "")
         .slice(0, 50);
 
-      const initiatorUser = await tx.user.findUnique({
-        where: { id: trade.initiatorId },
-      });
-      const receiverUser = await tx.user.findUnique({
-        where: { id: trade.receiverId },
-      });
-
-      const submitToSurat = async (
-        oid: string,
-        addr: any,
-        user: any,
-      ): Promise<{
-        carrier: string;
-        trackingNumber: string;
-        providerTrackingId: string | null;
-        labelZpl: string | null;
-      }> => {
-        if (!this.cargo || !this.cargo.isEnabled()) {
-          return {
-            carrier: "Tarodan Warehouse",
-            trackingNumber: genTrackingNumber(),
-            providerTrackingId: null,
-            labelZpl: null,
-          };
-        }
-        try {
-          const result = await this.cargo.createShipment({
-            idempotencyKey: `surat:trade:${oid}`,
-            correlationId: `trade-approve-${tradeId}`,
-            reference: oid,
-            recipient: {
-              name: addr.fullName || user?.displayName || "Takas Alıcısı",
-              address: addr.address,
-              city: addr.city,
-              district: addr.district,
-              phone: addr.phone,
-            },
-            content: "Takas Gönderisi",
-          });
-          if (!result.ok) {
-            const r = result as any;
-            const errMsg =
-              r.kind === "business" ? r.message : `technical: ${r.code}`;
-            throw new BadRequestException(
-              `Sürat kargo onay siparişi reddedildi: ${errMsg}`,
-            );
-          }
-          return {
-            carrier: "surat",
-            trackingNumber: oid,
-            providerTrackingId: result.trackingCode,
-            labelZpl: result.labelData,
-          };
-        } catch (error: any) {
-          this.logger.error(
-            `Surat shipment submit failed for trade ${tradeId}: ${error.message}`,
-          );
-          throw error;
-        }
-      };
-
-      const initiatorShipResult = await submitToSurat(
-        initiatorOid,
-        initiatorAddress,
-        initiatorUser,
-      );
-      const receiverShipResult = await submitToSurat(
-        receiverOid,
-        receiverAddress,
-        receiverUser,
-      );
-
-      // Shipment heading to the initiator (carrying receiver's items)
+      // DRAFT satırlar — carrier/trackingNumber Sürat yanıtı geldikten sonra
+      // (tx dışında) doldurulur. Sürat patlarsa DRAFT durur ve retry ucu
+      // (retryOutboundBarcode) tamamlar; takas onaylanmış sayılır çünkü
+      // ürünler fiziksel olarak çıkışa hazırlanmıştır.
       const shipmentToInitiator = await tx.tradeShipment.create({
         data: {
           tradeId,
           shipperId: adminId,
           fromAddressId: warehouseAddressId,
-          carrier: initiatorShipResult.carrier,
-          trackingNumber: initiatorShipResult.trackingNumber,
-          providerTrackingId: initiatorShipResult.providerTrackingId,
-          labelZpl: initiatorShipResult.labelZpl,
-          status: ShipmentStatus.label_created,
+          carrier: "pending",
+          trackingNumber: null,
+          status: ShipmentStatus.pending,
           shippedAt: now,
           leg: "from_warehouse",
           recipientType: "user",
@@ -531,17 +870,14 @@ export class AdminTradeWarehouseService {
         },
       });
 
-      // Shipment heading to the receiver (carrying initiator's items)
       const shipmentToReceiver = await tx.tradeShipment.create({
         data: {
           tradeId,
           shipperId: adminId,
           fromAddressId: warehouseAddressId,
-          carrier: receiverShipResult.carrier,
-          trackingNumber: receiverShipResult.trackingNumber,
-          providerTrackingId: receiverShipResult.providerTrackingId,
-          labelZpl: receiverShipResult.labelZpl,
-          status: ShipmentStatus.label_created,
+          carrier: "pending",
+          trackingNumber: null,
+          status: ShipmentStatus.pending,
           shippedAt: now,
           leg: "from_warehouse",
           recipientType: "user",
@@ -549,26 +885,20 @@ export class AdminTradeWarehouseService {
         },
       });
 
-      // Y12: Safe-trade depodan-çıkış sevkinde confirmationDeadline SET ET. Eskiden
-      // set edilmediği için autoConfirmExpiredReceipts (confirmationDeadline < now filtresi)
-      // safe-trade'lerde hiç eşleşmiyordu → alıcı onaylamazsa para shipping_to_recipients'te
-      // süresiz askıda kalıyordu. Direct akıştaki (both_shipped) ile aynı setting kullanılır.
-      const confirmationDaysSetting = await tx.platformSetting.findUnique({
-        where: { settingKey: "trade_confirmation_deadline_days" },
-      });
-      const confirmationDays = parseInt(
-        confirmationDaysSetting?.settingValue ?? "3",
-      );
-      const confirmationDeadline = new Date(now);
-      confirmationDeadline.setDate(
-        confirmationDeadline.getDate() + confirmationDays,
-      );
-
+      // Onay/itiraz penceresi BURADA başlamaz: saat, koliler TESLİM edildiğinde
+      // kurulur (startTradeConfirmationWindowIfDelivered — Sürat teslim poll'u
+      // ya da kullanıcının elle onayı). Kargoya veriliş anından saymak, yavaş
+      // kargoda takası koli daha yoldayken otomatik tamamlıyor, parayı serbest
+      // bırakıyor ve kullanıcıyı itiraz açamaz duruma düşürüyordu.
+      //
+      // Y12 (süresiz askı) buna rağmen geri gelmez: teslim raporu hiç gelmeyen
+      // çıkış kolileri notifyAdminsOfUndeliveredOutboundTrades ile admin'e
+      // alarm olarak düşer — teslim kanıtı yokken otomatik tamamlama YAPILMAZ.
       const updatedTrade = await tx.trade.update({
         where: { id: tradeId },
         data: {
           status: TradeStatus.shipping_to_recipients,
-          confirmationDeadline,
+          confirmationDeadline: null,
           updatedAt: now,
         },
       });
@@ -590,8 +920,53 @@ export class AdminTradeWarehouseService {
         initiatorId: trade.initiatorId,
         receiverId: trade.receiverId,
         status: updatedTrade.status,
+        outboundDrafts: [
+          {
+            id: shipmentToInitiator.id,
+            oid: initiatorOid,
+            address: initiatorAddress,
+            recipientUserId: trade.initiatorId,
+          },
+          {
+            id: shipmentToReceiver.id,
+            oid: receiverOid,
+            address: receiverAddress,
+            recipientUserId: trade.receiverId,
+          },
+        ],
       };
     });
+
+    // 2) Tx dışı: her DRAFT'ı Sürat'a gönder. Sürat OzelKargoTakipNo +
+    //    idempotencyKey üzerinde idempotent olduğundan kısmi hatadan sonraki
+    //    retry aynı etiketi üretir, mükerrer gönderi doğurmaz.
+    for (const draft of result.outboundDrafts) {
+      try {
+        const user = await this.prisma.user.findUnique({
+          where: { id: draft.recipientUserId },
+        });
+        const submitted = await this.submitOutboundToSurat(
+          tradeId,
+          draft.oid,
+          draft.address,
+          user,
+        );
+        await this.prisma.tradeShipment.update({
+          where: { id: draft.id },
+          data: {
+            carrier: submitted.carrier,
+            trackingNumber: submitted.trackingNumber,
+            providerTrackingId: submitted.providerTrackingId,
+            labelZpl: submitted.labelZpl,
+            status: ShipmentStatus.label_created,
+          },
+        });
+      } catch (err: any) {
+        this.logger.error(
+          `Sürat outbound submit failed for trade ${tradeId} draft ${draft.id}: ${err?.message}. DRAFT row preserved for retry.`,
+        );
+      }
+    }
 
     // Emit notifications after transaction commits
     try {
@@ -760,6 +1135,25 @@ export class AdminTradeWarehouseService {
         },
       });
 
+      // KUSUR: kontrolden geçemeyen ürün kimin ise takası o bozmuştur. Diğer
+      // taraf üstüne düşeni eksiksiz yapmıştır → ödemesi hizmet bedeli ve kargo
+      // dahil TAM iade edilir (bkz. trade-refund-policy). "neither" operasyonel
+      // reddir (ör. bizim hatamız): iki taraf da kusursuzdur.
+      const faultlessPayerIds =
+        dto.faultySide === "initiator"
+          ? [trade.receiverId]
+          : dto.faultySide === "receiver"
+            ? [trade.initiatorId]
+            : dto.faultySide === "neither"
+              ? [trade.initiatorId, trade.receiverId]
+              : [];
+      if (faultlessPayerIds.length > 0) {
+        await tx.tradeCashPayment.updateMany({
+          where: { tradeId, payerId: { in: faultlessPayerIds } },
+          data: { fullRefundEntitled: true },
+        });
+      }
+
       const updatedTrade = await tx.trade.update({
         where: { id: tradeId },
         data: {
@@ -778,20 +1172,18 @@ export class AdminTradeWarehouseService {
         {
           ...updatedTrade,
           reason: dto.reason,
+          // Kusur ataması denetim kaydında saklanır: hangi tarafın ürünü
+          // elendi sorusu sonradan raporlanabilsin (mali sonuç bugün her iki
+          // taraf için aynıdır, bkz. iade matrisi).
+          faultySide: dto.faultySide,
           returnShipments: [returnToInitiator.id, returnToReceiver.id],
         },
       );
-
-      const shouldRefund =
-        !!primaryCashPayment(trade.cashPayments) &&
-        primaryCashPayment(trade.cashPayments).status ===
-          PaymentStatus.completed;
 
       return {
         initiatorId: trade.initiatorId,
         receiverId: trade.receiverId,
         status: updatedTrade.status,
-        shouldRefund,
         warehouseAddressId,
         returnDrafts: [
           {
@@ -846,64 +1238,17 @@ export class AdminTradeWarehouseService {
     // Refund failure does NOT roll back the reject: return shipments are
     // already on their way back to users. Instead, the failure is persisted
     // on the trade so the admin UI can surface a "retry refund" affordance.
-    let refundFailureMessage: string | null = null;
-    if (result.shouldRefund) {
-      try {
-        await this.paymentService.refundTradeCashPaymentIfCompleted(tradeId);
-        await this.prisma.trade.update({
-          where: { id: tradeId },
-          data: { refundFailureReason: null, refundFailureAt: null },
-        });
-        try {
-          const cashPayment = await this.prisma.tradeCashPayment.findFirst({
-            where: { tradeId },
-            select: { payerId: true },
-          });
-          await this.eventService.emitTradeRefundCompleted({
-            tradeId,
-            cashPayerId: cashPayment?.payerId ?? null,
-          });
-        } catch (emitErr) {
-          this.logger.error(
-            `Failed to emit trade.refund-completed for trade ${tradeId}: ${emitErr}`,
-          );
-        }
-      } catch (err: any) {
-        refundFailureMessage =
-          err?.message ?? "Bilinmeyen hata (PayTR iade başarısız)";
-        this.logger.error(
-          `refundTradeCashPaymentIfCompleted failed for trade ${tradeId}: ${refundFailureMessage}`,
-        );
-        try {
-          await this.prisma.trade.update({
-            where: { id: tradeId },
-            data: {
-              refundFailureReason: refundFailureMessage.slice(0, 500),
-              refundFailureAt: new Date(),
-            },
-          });
-        } catch (persistErr: any) {
-          this.logger.error(
-            `Failed to persist refund failure for trade ${tradeId}: ${persistErr?.message}`,
-          );
-        }
-        try {
-          const cashPayment = await this.prisma.tradeCashPayment.findFirst({
-            where: { tradeId },
-            select: { payerId: true },
-          });
-          await this.eventService.emitTradeRefundFailed({
-            tradeId,
-            cashPayerId: cashPayment?.payerId ?? null,
-            reason: refundFailureMessage,
-          });
-        } catch (emitErr) {
-          this.logger.error(
-            `Failed to emit trade.refund-failed for trade ${tradeId}: ${emitErr}`,
-          );
-        }
-      }
-    }
+    // MONEY: iade HER ZAMAN failure-tracking'li yoldan denenir (marker + retry
+    // cron + refund-completed/failed event'leri tracked helper'ın içinde);
+    // ödemesiz takasta no-op. Eski shouldRefund kapısı yalnız
+    // primaryCashPayment satırına bakıyordu — v2'de asıl ödeyen DİĞER taraf
+    // olduğunda iade hiç denenmiyor, marker da yazılmadığı için retry cron'u
+    // göremiyordu.
+    const refundResult =
+      await this.paymentService.refundTradeCashTracked(tradeId);
+    const refundFailureMessage = refundResult.failed
+      ? (refundResult.reason ?? "Bilinmeyen hata (PayTR iade başarısız)")
+      : null;
 
     try {
       await this.eventService.emitTradeWarehouseRejected({

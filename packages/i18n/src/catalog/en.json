@@ -253,6 +253,9 @@
     "signInToAccount": "Sign in to your account",
     "continueWithGoogle": "Continue with Google",
     "googleSignInFailed": "Google sign-in failed.",
+    "continueWithApple": "Continue with Apple",
+    "appleSignInFailed": "Apple sign-in failed",
+    "appleScriptFailed": "Apple sign-in could not be loaded",
     "emailNotRegistered": "This email address is not registered.",
     "useDifferentEmail": "Use a different email",
     "googleOnlyAccount": "This account was created with Google. Sign in with Google, or set a password.",
@@ -651,7 +654,8 @@
     "shippingFee": "Shipping fee",
     "sellerEarning": "Your earnings",
     "packageFeeLabel": "Package fee",
-    "sampleDimensionsLabel": "Sample size (W × L × H)"
+    "sampleDimensionsLabel": "Sample size (W × L × H)",
+    "rejectionReason": "Rejection reason"
   },
   "cart": {
     "myCart": "My Cart",
@@ -809,7 +813,15 @@
     "distanceSalesRequired": "Accept the distance sales agreement to continue",
     "buyNowNotice": "Only the item you selected will be paid for; the rest of your cart stays put.",
     "noItemsSelected": "No items selected. Go back to your cart and pick one.",
-    "cardSection": "Card details"
+    "cardSection": "Card details",
+    "feeDiscountLine": "{name}",
+    "campaignSavings": "Your total savings",
+    "quantityCampaignDiscount": "Quantity campaign discount",
+    "feeDiscountTargets": {
+      "buyer_commission": "Commission discount",
+      "buyer_service_fee": "Service fee discount",
+      "buyer_shipping": "Shipping discount"
+    }
   },
   "order": {
     "myOrders": "My Orders",
@@ -1024,7 +1036,18 @@
     "cancelGroupTitle": "Cancel Cart",
     "cancelGroupAllNotice": "This cancels all {count} orders in the cart; the payment is refunded in full. Partial cancellation is not available.",
     "cartSiblings": "This cart has other orders too:",
-    "refundReasonDeliveryDelayed": "Delivery was late"
+    "refundReasonDeliveryDelayed": "Delivery was late",
+    "bulkRefundTitle": "Bulk Return",
+    "bulkRefundIntro": "This purchase has more than one returnable item. Select the items and create the return requests in one go.",
+    "bulkRefundCta": "Select Items to Return",
+    "bulkRefundSelectLabel": "Items to return",
+    "bulkRefundSelectAtLeastOne": "Select at least one item",
+    "bulkRefundAllSuccess": "{count} return requests created",
+    "bulkRefundPartialFail": "{succeeded} return requests created, {failed} failed",
+    "bulkRefundLineCreated": "Return request created",
+    "bulkRefundLineFailed": "Request could not be created",
+    "sellerCampaignAdvantage": "Your campaign advantage",
+    "buyerCampaignSaving": "Your campaign discount"
   },
   "trade": {
     "myTrades": "My Trades",
@@ -1105,6 +1128,7 @@
       "reasonShipmentLost": "Shipment lost / undelivered",
       "reasonShipmentDamaged": "Item arrived damaged",
       "reasonWrongItem": "Wrong item received",
+      "reasonNotAsDescribed": "Item not as described",
       "reasonOther": "Other",
       "descriptionLabel": "Description",
       "descriptionPlaceholder": "Add details (shipping dates, photos available, etc.)",
@@ -1260,7 +1284,7 @@
     "paymentRefunded": "Refunded",
     "waitingCounterpartyPayment": "We received your payment. Waiting for the other party.",
     "bothMustPay": "Items are not handed to the carrier until both payments are complete.",
-    "shippingNotRefundable": "If the trade is cancelled after the items are handed to the carrier, the shipping fee is not refunded.",
+    "shippingNotRefundable": "The service fee covers the secure-trade service and is not refunded on cancellation. If the trade is cancelled after the items are handed to the carrier, the shipping fee is not refunded either.",
     "costPreviewTitle": "What this offer costs",
     "costPreviewYou": "You pay",
     "costPreviewThem": "They pay",
@@ -1298,6 +1322,16 @@
     "statusCounterOffered": "Counter Offered",
     "waitingBuyerCounter": "Waiting for the buyer to respond to your counter-offer.",
     "acceptCounter": "Accept Counter-Offer",
+    "acceptConfirmTitle": "Accept offer",
+    "acceptConfirmDesc": "Are you sure you want to accept this offer? An order will be created for it.",
+    "acceptConfirmDescSeller": "Accepting creates an order at the offered price and starts the buyer's 24-hour payment window. Accepting does not lock the product: other offers stay open and whoever pays first gets it.",
+    "acceptConfirmDescBuyer": "Accepting the counter-offer creates an order at that price and you must pay within 24 hours. The product is reserved at payment; if another buyer pays for it first, your order cannot be fulfilled.",
+    "firstToPayWinsBuyer": "The product is not reserved for you yet. Other accepted offers may exist for it — whoever pays first gets it.",
+    "firstToPayWinsSeller": "The buyer has 24 hours to pay. The product is reserved once payment completes; until then other offers stay open.",
+    "rejectConfirmTitle": "Reject offer",
+    "rejectConfirmDesc": "Are you sure you want to reject this offer? This cannot be undone.",
+    "cancelConfirmTitle": "Cancel offer",
+    "cancelConfirmDesc": "Are you sure you want to cancel this offer? This cannot be undone.",
     "lowerOffer": "Lower Offer",
     "viewOrder": "View Order",
     "listingPriceLabel": "Listing Price",
@@ -1380,6 +1414,7 @@
     "membershipChanged": "Your membership was changed successfully!",
     "membershipDowngraded": "Your membership was changed successfully!",
     "planAlreadyActive": "This plan is already active",
+    "businessRequiresApproval": "The Business plan is available to approved corporate accounts only. You can purchase it once your company application is approved.",
     "loginToContinue": "Please sign in to continue",
     "acceptTerms": "Please accept the terms of service",
     "fillCardInfo": "Please fill in all card information",
@@ -1848,6 +1883,8 @@
     "passwordMin8": "Password must be at least 8 characters",
     "passwordMatch": "Passwords do not match",
     "invalidPhone": "Please enter a valid phone number",
+    "trPhoneOnly": "Enter a valid Turkish mobile number (5XX XXX XX XX)",
+    "phoneLegacyNotice": "Your saved number is not a valid Turkish mobile number. Please enter a current one.",
     "minLength": "Must be at least {min} characters",
     "maxLength": "Must be at most {max} characters",
     "minValue": "Must be at least {min}",
@@ -3564,6 +3601,7 @@
         "fiveHundredExample": "E.g. 500",
         "totalUsageLimit": "Total Usage Limit",
         "perUserLimit": "Per-User Limit",
+        "perUserLimitPlaceholder": "0 = unlimited (guests can only use unlimited codes)",
         "unlimited": "Unlimited",
         "startDate": "Start Date",
         "endDate": "End Date",
@@ -3592,7 +3630,12 @@
           "nameRequired": "Discount name is required",
           "valueRequired": "Value is required",
           "startDateRequired": "Start date is required",
-          "endDateRequired": "End date is required"
+          "endDateRequired": "End date is required",
+          "budgetRequired": "Enter a budget cap for a fee discount",
+          "tiersRequired": "Select at least one membership tier",
+          "usersRequired": "Enter at least one user ID",
+          "sellerAudienceRequired": "A seller fee can only target a seller audience",
+          "buyerAudienceRequired": "An item the buyer pays cannot target a seller audience"
         },
         "codes": {
           "title": "Generate Voucher Codes",
@@ -3605,7 +3648,38 @@
           "generateFailed": "Failed to generate codes",
           "rowGenerate": "Generate Codes",
           "rowExport": "Export Codes (CSV)"
-        }
+        },
+        "targetLabel": "Discounted item",
+        "targetHelper": "The product price belongs to the seller; the platform may only discount its own fees.",
+        "target": {
+          "product_price": "Product price (seller's)",
+          "buyer_commission": "Buyer commission",
+          "buyer_service_fee": "Buyer protection fee",
+          "buyer_shipping": "Buyer shipping share",
+          "seller_commission": "Seller commission",
+          "seller_platform_fee": "Seller platform fee",
+          "seller_shipping": "Seller shipping share",
+          "trade_service_fee": "Trade Service Fee"
+        },
+        "audienceLabel": "Audience",
+        "audienceHelper": "The audience is evaluated on the side whose pocket the item belongs to.",
+        "audience": {
+          "everyone": "Everyone",
+          "membership_tiers": "Membership tier",
+          "specific_buyers": "Specific buyers",
+          "specific_sellers": "Specific sellers",
+          "all_buyers": "All buyers",
+          "all_sellers": "All sellers"
+        },
+        "targetTiers": "Target membership tiers",
+        "targetUsers": "Target user IDs",
+        "targetUsersHelper": "Enter user IDs separated by commas.",
+        "budgetLimit": "Budget cap (TL)",
+        "budgetHelper": "Required for fee discounts: the campaign stops on its own once the cap is reached.",
+        "budgetUsage": "Budget",
+        "budgetStopped": "Budget spent",
+        "platformCost": "Cost to the platform",
+        "budgetRemaining": "Remaining budget"
       },
       "emailTemplates": {
         "title": "Email Templates",
@@ -4461,7 +4535,10 @@
         "adjustmentStatus": {
           "open": "Open",
           "settled": "Settled"
-        }
+        },
+        "releaseEarly": "Release Early",
+        "earlyReleaseHint": "Deliberate early release before the return window closes — a reason is required.",
+        "earlyReleaseWarning": "The return window has not closed yet: you are releasing this payout EARLY. This cannot be undone; any refund opened afterwards must be recovered from the seller. Undelivered orders or orders with an open refund are still rejected."
       },
       "tax": {
         "title": "Tax Settings",
@@ -4800,7 +4877,10 @@
         "legFromWarehouse": "Shipments from Warehouse to Recipients",
         "legReturns": "Return Shipments",
         "markWarehouseArrived": "Arrived at Warehouse",
-        "recipientsWillConfirm": "Note: Recipients will confirm on their side once they receive the items.",
+        "markOutboundDelivered": "Mark Delivered",
+        "confirmOutboundDelivered": "Confirm this parcel was physically delivered to its recipient? Once both parcels are marked delivered the confirmation window starts and the trade auto-completes when it elapses.",
+        "outboundDeliveredMsg": "Parcel marked as delivered",
+        "recipientsWillConfirm": "Note: recipients confirm on their own side once they receive the parcel. The confirmation window starts when both parcels are delivered; if the carrier never reports delivery, mark it manually below.",
         "markLost": "Mark Lost",
         "reject": "Reject",
         "warehouseReceivedMsg": "Shipment marked as arrived at warehouse",
@@ -4830,9 +4910,9 @@
         "resolveTitle": "Resolve Trade",
         "resolution": "Resolution",
         "resolveComplete": "Complete Trade",
-        "resolveCancel": "Cancel Trade (triggers refund)",
-        "compensateInitiator": "Compensate Offerer (cancel + refund + compensation flag)",
-        "compensateReceiver": "Compensate Recipient (cancel + refund + compensation flag)",
+        "compensateInitiator": "Compensate Offerer (refunds their payment + compensation flag)",
+        "compensateReceiver": "Compensate Recipient (refunds their payment + compensation flag)",
+        "compensateBoth": "Compensate Both Parties (refunds both payments — e.g. both parcels lost)",
         "resolutionNoteLabel": "Resolution Note (at least 10 characters)",
         "resolutionPlaceholder": "Summarize the resolution rationale (lost shipment, damage, etc.)",
         "resolvedMsg": "Trade resolved",
@@ -4897,7 +4977,25 @@
           "paymentStatus": "Payment status",
           "equalTrade": "Equal trade — no cash difference.",
           "paymentsTitle": "Party payments"
-        }
+        },
+        "escrowPanelTitle": "Trade Escrow — Cash Difference",
+        "escrowPanelBodyDue": "The hold elapsed ({date}); the cash difference will be released on the next automatic run. If it is late you can release it manually here.",
+        "escrowPanelBodyEarly": "The cash difference will be released automatically on {date}. If needed you can release it early; this cannot be undone and rows carrying a refund debt are never touched.",
+        "escrowReleaseTitle": "Release",
+        "escrowReleaseEarlyTitle": "Release Early",
+        "escrowReleaseReasonLabel": "Reason",
+        "escrowReleaseReasonPlaceholder": "E.g. both parties confirmed delivery and the items",
+        "escrowReleaseConfirm": "Release",
+        "escrowReleasedMsg": "Trade cash payment released",
+        "startReview": "Start inspection",
+        "reviewInProgress": "Trade is under inspection: examine the items, then approve or reject.",
+        "reviewStartedMsg": "Trade taken into inspection",
+        "faultySide": "Which side's item failed?",
+        "faultySideHint": "Select",
+        "faultySideInitiator": "The offering party's item",
+        "faultySideReceiver": "The receiving party's item",
+        "faultySideBoth": "Both parties' items",
+        "faultySideNeither": "Not item related (operational rejection)"
       },
       "refundRequests": {
         "title": "Refund Tracking",
@@ -4912,8 +5010,6 @@
         "reviewNotePlaceholder": "Describe the review result and reasoning",
         "approveButton": "Approve Request",
         "rejectButton": "Reject Request",
-        "policyUpdated": "Refund policy updated",
-        "payerUpdated": "Return shipping payer updated",
         "policyCode": "Financial policy",
         "returnDesi": "Return desi",
         "returnFee": "Return shipping fee",
@@ -5029,6 +5125,10 @@
           "gross": "Gross"
         },
         "forceFinalizeButton": "Finalize Refund",
+        "disputeButton": "Mark Disputed",
+        "disputeNotePlaceholder": "Dispute reason (min 10 characters) — e.g. seller reported the item came back damaged",
+        "disputeConfirm": "Confirm Dispute",
+        "disputeMarked": "Refund marked as disputed; auto-finalize paused",
         "counterfeitTitle": "Counterfeit / fake product complaint",
         "counterfeitBody": "This request was opened on grounds of a counterfeit product. After the refund is approved, consider a sanction for the seller (warning, temporary suspension or termination) and run a risk review on the seller's other products.",
         "policyTitle": "Refund Policy",
@@ -5541,6 +5641,10 @@
         "tradeConfirmationDays": {
           "label": "Confirmation Time (Days)",
           "helper": "Time to confirm after delivery"
+        },
+        "tradeHoldDays": {
+          "label": "Trade Escrow Hold (Days)",
+          "helper": "How long the cash difference waits after a trade completes before it is released. Does not affect sale escrow."
         },
         "maxMessageLength": {
           "label": "Maximum Message Length",
@@ -6370,10 +6474,12 @@
       },
       "refunds": {
         "status": {
+          "pendingReview": "Pending Review",
           "waitForDelivery": "Awaiting Product Delivery",
           "returnShipmentOpen": "Return Shipment Ready",
           "returnInTransit": "Return in Transit",
-          "returnDelivered": "Return Delivered (Refund Pending)"
+          "returnDelivered": "Return Delivered (Refund Pending)",
+          "disputed": "Disputed"
         }
       },
       "errors": {
@@ -6585,13 +6691,29 @@
         "title": "Counter-Offer Declined",
         "message": "The buyer did not accept your counter-offer for {productTitle}."
       },
+      "offerCounterAccepted": {
+        "title": "Your Counter-Offer Was Accepted",
+        "message": "The buyer accepted your {amount} TL counter-offer for {productTitle}. They have 24 hours to pay."
+      },
       "offerExpired": {
         "title": "Your Offer Has Expired",
         "message": "Your offer for {productTitle} has expired."
       },
+      "offerExpiredSeller": {
+        "title": "Offer Closed Unanswered",
+        "message": "The offer you received for {productTitle} expired before you responded."
+      },
+      "offerPaymentExpired": {
+        "title": "Payment Window Expired",
+        "message": "Your 24-hour payment window for {productTitle} expired and the order was closed. If the product is still available you can reopen the order and pay."
+      },
       "offerCancelledOutOfStock": {
         "title": "Your offer was cancelled: product out of stock",
         "message": "Your offer for {productTitle} was cancelled because the product was sold."
+      },
+      "offerCancelledListingRemoved": {
+        "title": "Your offer was cancelled: listing removed",
+        "message": "Your offer for {productTitle} was cancelled because the seller removed the listing."
       },
       "productApproved": {
         "title": "Your Listing Is Live! 🎉",
@@ -6727,7 +6849,11 @@
       },
       "boostExpired": {
         "title": "🚀 Boost period ended",
-        "message": "The boost for your listing \"{productTitle}\" has ended. Auto-renew was on — boost it again with one click."
+        "message": "The boost for \"{productTitle}\" has ended. You can boost your listing again anytime."
+      },
+      "boostActivated": {
+        "title": "🚀 Boost Active",
+        "message": "The boost for \"{productTitle}\" has started. Your listing now ranks at the top of lists."
       },
       "tradeAutoCancelled": {
         "title": "Trade Cancelled Automatically",
@@ -6736,6 +6862,10 @@
       "tradeStuckAtWarehouse": {
         "title": "Stuck Trade — Admin Action Required",
         "message": "Trade {tradeNumber} reached the warehouse but timed out; a manual force-cancel-stuck is required."
+      },
+      "tradeOutboundDeliveryMissing": {
+        "title": "Trade Parcel Not Delivered — Admin Action Required",
+        "message": "The carrier reported no delivery for the outbound parcels of trade {tradeNumber}; the confirmation window has not started and the trade will not auto-complete."
       },
       "tradeAddressRequired": {
         "title": "Address Needed — Trade Shipping",
@@ -6748,6 +6878,10 @@
       "cargoMovementMissing": {
         "title": "No Movement On Your Shipment",
         "message": "You marked the package for order {reference} as handed to cargo, but Sürat has no record of it. If you have not dropped it off yet, please take it to a branch soon — otherwise the order may be cancelled."
+      },
+      "orderStuckInTransit": {
+        "title": "Stuck Shipment — Admin Action Required",
+        "message": "Order {orderNumber} has been in transit for a long time with no carrier delivery report; the seller payout stays on hold until delivery is recorded."
       },
       "offerAutoRejected": {
         "title": "Your Offer Was Closed",
@@ -6772,6 +6906,18 @@
       "refundCompleted": {
         "title": "Your Refund Is Complete",
         "message": "Your refund {refundNumber} has been credited to your account."
+      },
+      "couponReturned": {
+        "title": "Your Coupon Is Back",
+        "message": "Since the cancellation/return was not your fault, your coupon {code} has been restored. You can use the code on a new order."
+      },
+      "campaignBudgetExhausted": {
+        "title": "Campaign Budget Exhausted",
+        "message": "The budget of campaign \"{name}\" has been exhausted and the campaign was stopped automatically. You can raise the budget or leave it stopped."
+      },
+      "moderationQueueStale": {
+        "title": "Moderation Queue Is Backing Up",
+        "message": "{count} listings have been waiting for moderation for over 48 hours. Review the queue."
       },
       "refundRequestReceived": {
         "title": "Your Refund Request Was Received",
@@ -6816,6 +6962,14 @@
       "sellerApplicationRejected": {
         "title": "Your Business Application Was Rejected",
         "message": "Your business account application was rejected.{reason}"
+      },
+      "tradeAtWarehouse": {
+        "title": "Items reached our warehouse",
+        "message": "Both items in your trade arrived at the Tarodan warehouse. After inspection they will be shipped to their new owners."
+      },
+      "orderShipmentDelayed": {
+        "title": "Your parcel is taking longer than expected",
+        "message": "Your parcel has shown no movement for a while. Our team is following it up with the carrier; you do not need to do anything."
       }
     },
     "auth": {
@@ -6937,6 +7091,7 @@
       "invalidShipmentStatus": "Invalid shipment status",
       "itemAlreadyInActiveTrade": "One of the products you offered is already part of an active trade. Cancel the existing trade first or wait for it to be resolved.",
       "membershipExpiredForAccept": "Your membership appears to have expired. Renew your Basic or higher membership to accept a trade.",
+      "counterpartyMembershipExpired": "The offering party's membership no longer allows trades; the offer cannot be accepted.",
       "membershipRequiredForCounter": "A Basic or higher membership is required to send a counter-offer. Please renew your membership.",
       "receiverCannotTrade": "The other party's membership does not allow trading; a trade offer cannot be sent for this listing right now.",
       "noShipmentToConfirm": "No shipment found to confirm",
@@ -7200,6 +7355,7 @@
       "alreadyOnThisPlan": "You are already on this plan",
       "businessTierRequiresCompany": "The business membership is only available to company accounts",
       "categoryNotFound": "Category not found",
+      "corporateMustUseBusinessTier": "Approved corporate accounts can only use the Business membership.",
       "freeTierCannotCancel": "The free membership cannot be cancelled",
       "freeTierNoPaymentNeeded": "No payment is required for the free membership",
       "freeTierNotFound": "Free membership tier not found",
@@ -7210,6 +7366,7 @@
       "platformSellerNotFound": "Platform seller not found",
       "premiumFeatureOnly": "This feature is available to premium memberships and above",
       "savedCardNotFound": "Saved card not found",
+      "scheduledChangeRequiresCard": "Scheduled plan changes require recurring payments and a saved card. You can purchase the plan you want again at the end of your current period.",
       "tierAlreadyExists": "Membership tier already exists: {type}",
       "tierNoPaymentNeeded": "No payment is required for this membership tier",
       "tierNotActive": "This membership tier is not active",
@@ -7222,7 +7379,8 @@
       "tariffNotFound": "Shipping tariff not found",
       "tariffNotEditable": "Only draft tariffs can be edited",
       "tariffArchived": "An archived tariff cannot be reactivated",
-      "tariffNegativeAmount": "Tariff amounts cannot be negative"
+      "tariffNegativeAmount": "Tariff amounts cannot be negative",
+      "invalidRecipientPhone": "Shipment could not be created: the recipient phone is not a valid Turkish mobile number"
     },
     "commission": {
       "noRuleConfigured": "The order cannot be created right now because commission configuration is missing. Please try again later.",

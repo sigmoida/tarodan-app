@@ -10,12 +10,14 @@ interface TradeActionBarProps {
   canReject: boolean;
   canCounter: boolean;
   canCancel: boolean;
+  canDispute: boolean;
   showCancelDisabled: boolean;
   onAddressChange: (id: string | null) => void;
   onAccept: () => void;
   onCounter: () => void;
   onReject: () => void;
   onCancel: () => void;
+  onDispute: () => void;
 }
 
 export default function TradeActionBar({
@@ -24,12 +26,14 @@ export default function TradeActionBar({
   canReject,
   canCounter,
   canCancel,
+  canDispute,
   showCancelDisabled,
   onAddressChange,
   onAccept,
   onCounter,
   onReject,
   onCancel,
+  onDispute,
 }: TradeActionBarProps) {
   const t = useTranslations();
   if (!(
@@ -37,6 +41,7 @@ export default function TradeActionBar({
     canReject ||
     canCounter ||
     canCancel ||
+    canDispute ||
     showCancelDisabled
   ))
     return null;
@@ -112,6 +117,23 @@ export default function TradeActionBar({
             </Button>
             <span className="text-xs text-muted mt-1">
               {t("trade.itemReachedWarehouse")}
+            </span>
+          </div>
+        )}
+        {/* İtiraz: ürünler depodan çıktıktan sonraki pencerede (kilitli iptal
+            tooltip'inin işaret ettiği akış) — modal RaiseDisputeModal'da. */}
+        {canDispute && (
+          <div className="flex-1 min-w-[120px] flex flex-col">
+            <Button
+              variant="secondary"
+              size="lg"
+              onClick={onDispute}
+              disabled={isActionLoading}
+            >
+              {t("trade.dispute.openCta")}
+            </Button>
+            <span className="text-xs text-muted mt-1">
+              {t("trade.dispute.hint")}
             </span>
           </div>
         )}

@@ -9,6 +9,7 @@ import { HeartIcon } from "@heroicons/react/24/solid";
 import { useTranslations } from "next-intl";
 import OptimizedImage from "@/components/OptimizedImage";
 import CollectionVisibilityBadge from "./CollectionVisibilityBadge";
+import { publicNameOf } from "@/lib/public-name";
 
 /** The fields the collection card needs — a superset of the public list, the
  *  liked-collections and the my-collections shapes, so any can be passed in. */
@@ -45,8 +46,7 @@ export default function CollectionCard({
   const ownerId = collection.user?.id ?? collection.userId;
   const ownerName =
     collection.userName ||
-    collection.user?.displayName ||
-    t("collection.anonymous");
+    publicNameOf(collection.user, t("collection.anonymous"));
 
   return (
     <div className="relative group flex h-full flex-col overflow-hidden rounded border border-border bg-surface-elevated transition-all hover:border-primary-300 hover:shadow-md">
@@ -118,10 +118,10 @@ export default function CollectionCard({
             href={`/seller/${ownerId}`}
             className="text-xs text-subtle transition-colors hover:text-primary-600"
           >
-            @{ownerName}
+            {ownerName}
           </Link>
         ) : (
-          <span className="text-xs text-subtle">@{ownerName}</span>
+          <span className="text-xs text-subtle">{ownerName}</span>
         )}
       </div>
 

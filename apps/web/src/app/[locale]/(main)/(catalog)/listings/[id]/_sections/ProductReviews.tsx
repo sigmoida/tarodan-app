@@ -11,6 +11,7 @@ import { Badge, Button, Select, Spinner } from "@tarodan/ui";
 import { SectionCard } from "@/components/ui";
 import UserAvatar from "@/components/UserAvatar";
 import { useListingDetail } from "../_context/ListingDetailContext";
+import { publicNameOf } from "@/lib/public-name";
 
 export default function ProductReviews() {
   const {
@@ -147,7 +148,7 @@ export default function ProductReviews() {
             >
               <div className="flex items-start gap-4">
                 <UserAvatar
-                  displayName={review.userName || review.user?.displayName}
+                  displayName={review.userName || publicNameOf(review.user)}
                   avatarUrl={review.user?.avatarUrl}
                   size="sm"
                 />
@@ -155,9 +156,9 @@ export default function ProductReviews() {
                   <div className="flex items-center flex-wrap gap-2 mb-1">
                     <span className="font-medium text-heading">
                       {review.isAnonymous ||
-                      (!review.userName && !review.user?.displayName)
+                      (!review.userName && !publicNameOf(review.user))
                         ? t("collection.anonymous")
-                        : review.userName || review.user?.displayName}
+                        : review.userName || publicNameOf(review.user)}
                     </span>
                     <div className="flex">
                       {[1, 2, 3, 4, 5].map((star) => (

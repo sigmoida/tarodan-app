@@ -19,6 +19,7 @@ import SellerHeader from "./SellerHeader";
 import ListingsTab from "./tabs/ListingsTab";
 import ReviewsTab from "./tabs/ReviewsTab";
 import CollectionsTab from "./tabs/CollectionsTab";
+import { publicNameOf } from "@/lib/public-name";
 
 const ReportModal = dynamic(
   withChunkErrorLogging(
@@ -160,7 +161,7 @@ export default function SellerProfileClient() {
         onClose={() => setShowReportModal(false)}
         entityType="user"
         entityId={seller.id}
-        entityName={seller.displayName}
+        entityName={publicNameOf(seller)}
         locale={locale}
       />
     </PageShell>

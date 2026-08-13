@@ -348,6 +348,10 @@ export class AdminAnalyticsOrderService {
         discountAmount: num(o.discountAmount),
         discountCode: o.discountCode ?? null,
         platformFundedDiscount: num(o.platformFundedDiscount),
+        // Platformun BEDEL kalemlerinden verdiği indirimler: komisyon geliri bu
+        // kadar düşmüştür, raporda kaybolmasın diye ayrı taşınır.
+        buyerFeeDiscountAmount: num(o.buyerFeeDiscountAmount),
+        sellerFeeDiscountAmount: num(o.sellerFeeDiscountAmount),
         buyerShippingAmount: num(o.buyerShippingAmount),
         sellerShippingAmount: num(o.sellerShippingAmount),
         buyerFeeAmount: num(o.buyerFeeAmount),
@@ -794,6 +798,19 @@ export class AdminAnalyticsOrderService {
       }
       return tx.order.findUniqueOrThrow({ where: { id: orderId } });
     });
+
+    // Admin elle teslim işaretlediğinde de alıcı bildirimi + e-posta gider:
+    // taşıyıcı raporlamadığı için elle işaretlenen teslimat, kullanıcı açısından
+    // diğerlerinden farksızdır.
+    if (deliveryResult?.acted) {
+      await this.paymentService
+        ?.announceOrderDelivered?.(orderId)
+        ?.catch((e: any) =>
+          this.logger.warn(
+            `announce delivered failed (admin) for ${orderId}: ${e?.message}`,
+          ),
+        );
+    }
 
     await this.audit.createAuditLog(
       adminId,

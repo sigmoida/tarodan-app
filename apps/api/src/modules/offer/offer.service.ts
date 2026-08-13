@@ -23,11 +23,20 @@ import { NotificationService } from "../notification/notification.service";
 import { NotificationType } from "../notification/dto";
 import { OrderService } from "../order/order.service";
 import { OrderCheckoutCommonService } from "../order/order-checkout-common.service";
+import { OrderFeeDiscountService } from "../order/order-fee-discount.service";
+import { paymentWindowEnd } from "../payment/payment.constants";
 import { ProductLockService } from "../product/product-lock.service";
 import { getAvailableQuantity } from "../product/helpers/product-availability.helper";
+import { resolveSalePrice } from "../product/helpers/product-sale-window";
 import { generateUniqueReference } from "../../common/helpers/generate-reference";
 import { REFERENCE_PREFIX } from "../../common/helpers/code-prefixes";
 import { i18nMessage } from "../i18n";
+import { OFFER_CANCEL_REASON } from "../trade/trade-cancel-reasons";
+import {
+  PUBLIC_NAME_SELECT,
+  publicName,
+  toPublicIdentity,
+} from "../../common/helpers/public-identity";
 
 @Injectable()
 export class OfferService {
@@ -48,6 +57,8 @@ export class OfferService {
     // Teklif siparişinin bedelleri (kargo + KDV + stopaj + toplam) normal satışla
     // AYNI primitiften gelir; burada ayrı hesap yapılmaz.
     private readonly checkoutCommon: OrderCheckoutCommonService,
+    @Optional()
+    private readonly feeDiscounts?: OrderFeeDiscountService,
   ) {
     this.offerExpiryHours = parseInt(
       this.configService.get("OFFER_EXPIRY_HOURS") || "24",
@@ -91,7 +102,7 @@ export class OfferService {
         where: { id: dto.productId },
         include: {
           seller: {
-            select: { id: true, displayName: true, email: true },
+            select: { id: true, ...PUBLIC_NAME_SELECT, email: true },
           },
         },
       });
@@ -124,7 +135,13 @@ export class OfferService {
       }
 
       // Check minimum offer percentage
-      const productPrice = Number(product.price);
+      //
+      // Taban, ürünün O ANDA geçerli satış fiyatından hesaplanır: `price` kolonu
+      // indirim penceresi kapandığında geri alınmadığı için ham değer, checkout'un
+      // tahsil ettiği fiyattan farklı olabiliyordu (pencere dışında ürün
+      // `oldPrice`tan satılıyor). Tek kaynak `resolveSalePrice`; aksi halde alıcı
+      // gerçek fiyatın %50'sinin altında teklif verebiliyordu.
+      const productPrice = resolveSalePrice(product).price;
       const minOffer = productPrice * (this.minOfferPercentage / 100);
       if (dto.amount < minOffer) {
         throw new BadRequestException(
@@ -176,7 +193,7 @@ export class OfferService {
           buyer: {
             select: {
               id: true,
-              displayName: true,
+              ...PUBLIC_NAME_SELECT,
               isVerified: true,
               email: true,
               avatarUrl: true,
@@ -185,7 +202,7 @@ export class OfferService {
           seller: {
             select: {
               id: true,
-              displayName: true,
+              ...PUBLIC_NAME_SELECT,
               isVerified: true,
               email: true,
               avatarUrl: true,
@@ -199,7 +216,7 @@ export class OfferService {
         productTitle: product.title,
         productPrice,
         sellerEmail: product.seller?.email || "",
-        sellerName: product.seller?.displayName || "",
+        sellerName: publicName(product.seller),
       };
     });
 
@@ -212,7 +229,7 @@ export class OfferService {
         productPrice: result.productPrice,
         offerAmount: Number(result.offer.amount),
         buyerId: result.offer.buyerId,
-        buyerName: result.offer.buyer.displayName || "Alıcı",
+        buyerName: publicName(result.offer.buyer),
         sellerId: result.offer.sellerId,
         sellerEmail: result.sellerEmail,
         sellerName: result.sellerName || "Satıcı",
@@ -236,9 +253,14 @@ export class OfferService {
    * - Normal teklif: yalnızca satıcı kabul eder
    * - Karşı teklif (buyerMustAccept): yalnızca alıcı kabul eder
    * - Uses FOR UPDATE to lock offer and product rows
-   * - Auto-reject other pending offers for same product
    * - Creates order with pending_payment status
    * - Emits offer.accepted event
+   *
+   * TASARIM — kabul teklifi TEKELLEŞTİRMEZ: aynı ürün için birden fazla teklif
+   * kabul edilebilir, diğer pending teklifler otomatik reddedilmez. Kabul yalnız
+   * "anlaşma"dır; stok ödeme başlatıldığında rezerve edilir, dolayısıyla ürünü
+   * ilk ÖDEYEN alır. (Eski docblock "auto-reject other pending offers" diyordu;
+   * kod bunu hiç yapmıyordu.) Ekranlar bu yarışı açıkça göstermek zorundadır.
    */
   async accept(offerId: string, userId: string) {
     const result = await this.prisma.$transaction(async (tx) => {
@@ -338,7 +360,7 @@ export class OfferService {
           buyer: {
             select: {
               id: true,
-              displayName: true,
+              ...PUBLIC_NAME_SELECT,
               isVerified: true,
               email: true,
               avatarUrl: true,
@@ -347,7 +369,7 @@ export class OfferService {
           seller: {
             select: {
               id: true,
-              displayName: true,
+              ...PUBLIC_NAME_SELECT,
               isVerified: true,
               email: true,
               avatarUrl: true,
@@ -369,6 +391,10 @@ export class OfferService {
         sellerId: offerData.sellerId,
         categoryId: productData.categoryId,
         shippingDesi: productData.shippingDesi,
+        // Teklifte kupon geçmez ama platformun OTOMATİK bedel kampanyaları
+        // (ör. üyelik avantajı) burada da geçerlidir — kitle eşleşmesi için
+        // alıcının kimliği gerekir.
+        buyerId: offerData.buyerId,
       });
       const commissionResult = offerPricing.commission;
       const totalAmount = offerPricing.totalAmount;
@@ -398,6 +424,13 @@ export class OfferService {
           buyerServiceTaxAmount: offerPricing.buyerServiceTaxAmount,
           sellerServiceTaxAmount: offerPricing.sellerServiceTaxAmount,
           serviceVatRate: offerPricing.serviceVatRate,
+          // Platformun verdiği bedel indirimleri: kesinti kolonları zaten
+          // indirimli tutarı taşır, bunlar rapor ve iade denetimi içindir.
+          buyerFeeDiscountAmount: offerPricing.buyerFeeDiscountAmount ?? 0,
+          sellerFeeDiscountAmount: offerPricing.sellerFeeDiscountAmount ?? 0,
+          feeDiscountBreakdown: offerPricing.feeDiscounts?.length
+            ? (offerPricing.feeDiscounts as unknown as Prisma.InputJsonValue)
+            : undefined,
           commissionAmount: commissionResult.commissionAmount,
           buyerFeeAmount: commissionResult.buyerFeeAmount,
           sellerFeeAmount: commissionResult.sellerFeeAmount,
@@ -409,12 +442,19 @@ export class OfferService {
           sellerCommissionAmount: commissionResult.sellerCommissionAmount,
           sellerPlatformFeeAmount: commissionResult.sellerPlatformFeeAmount,
           status: OrderStatus.pending_payment,
-          paymentExpiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
+          paymentExpiresAt: paymentWindowEnd(),
         },
       });
 
       this.logger.log(
         `Order ${orderNumber} created for accepted offer ${offerId} (total=${totalAmount}, commission=${commissionResult.commissionAmount}, shipping=${offerPricing.buyerShippingAmount}, tax=${offerPricing.taxAmount})`,
+      );
+
+      // Kodsuz (otomatik) kampanyaların bütçesi sipariş oluşurken harcanır;
+      // ödenmeyen sipariş kapanırken releaseReservedUsageForOrders geri verir.
+      await this.feeDiscounts?.spendBudgets(
+        offerPricing.feeDiscounts ?? null,
+        tx,
       );
 
       // Re-fetch offer with order relation so response includes orderId
@@ -429,7 +469,7 @@ export class OfferService {
           buyer: {
             select: {
               id: true,
-              displayName: true,
+              ...PUBLIC_NAME_SELECT,
               isVerified: true,
               email: true,
               avatarUrl: true,
@@ -438,7 +478,7 @@ export class OfferService {
           seller: {
             select: {
               id: true,
-              displayName: true,
+              ...PUBLIC_NAME_SELECT,
               isVerified: true,
               email: true,
               avatarUrl: true,
@@ -451,6 +491,7 @@ export class OfferService {
       return {
         offer: offerWithOrder!,
         order,
+        acceptedByBuyer: mustBuyerAccept,
       };
     });
 
@@ -465,9 +506,9 @@ export class OfferService {
         offerAmount: Number(result.offer.amount),
         buyerId: result.offer.buyerId,
         buyerEmail: (result.offer.buyer as any).email || "",
-        buyerName: result.offer.buyer.displayName || "Alıcı",
+        buyerName: publicName(result.offer.buyer),
         sellerId: result.offer.sellerId,
-        sellerName: result.offer.seller.displayName || "Satıcı",
+        sellerName: publicName(result.offer.seller),
       });
       this.logger.log(
         `offer.accepted event emitted for offer ${result.offer.id}`,
@@ -475,6 +516,35 @@ export class OfferService {
     } catch (error) {
       this.logger.error(`Failed to emit offer.accepted event: ${error}`);
     }
+
+    // Zil bildirimleri: `notifyOfferAccepted` tanımlıydı ama HİÇ çağrılmıyordu —
+    // alıcı, 24 saatlik ödeme penceresini yalnız e-postadan öğreniyordu.
+    // Karşı teklifi alıcı kabul ettiğinde satıcının da haberi olmuyordu.
+    try {
+      // `offerId` push worker'ın mükerrer filtresi için ŞART: aynı kabul,
+      // emitOfferAccepted ile push kuyruğuna da gidiyor ve worker anahtarı
+      // önce offerId'dan türetiyor — bu satır taşımazsa bildirim ÇİFTLENİR.
+      await this.notificationService.notifyOfferAccepted(
+        result.offer.buyerId,
+        result.offer.productId,
+        Number(result.offer.amount),
+        result.order.id,
+        result.offer.product.title,
+        result.offer.id,
+      );
+      if (result.acceptedByBuyer) {
+        await this.notificationService.notifyOfferCounterAccepted(
+          result.offer.sellerId,
+          result.offer.productId,
+          Number(result.offer.amount),
+          result.order.id,
+          result.offer.product.title,
+        );
+      }
+    } catch (error) {
+      this.logger.warn(`offer accepted notification failed: ${error}`);
+    }
+
     return await this.formatOfferResponse(result.offer);
   }
 
@@ -525,7 +595,7 @@ export class OfferService {
         buyer: {
           select: {
             id: true,
-            displayName: true,
+            ...PUBLIC_NAME_SELECT,
             isVerified: true,
             avatarUrl: true,
           },
@@ -533,7 +603,7 @@ export class OfferService {
         seller: {
           select: {
             id: true,
-            displayName: true,
+            ...PUBLIC_NAME_SELECT,
             isVerified: true,
             avatarUrl: true,
           },
@@ -620,16 +690,20 @@ export class OfferService {
         );
       }
 
-      if (dto.amount > Number(offer.product.price)) {
+      // Tavan da ilan fiyatının TEK kaynağından (`resolveSalePrice`) gelir.
+      if (dto.amount > resolveSalePrice(offer.product).price) {
         throw new BadRequestException(
           i18nMessage("server.offer.counterCannotExceedPrice"),
         );
       }
 
-      // Reject old offer
+      // Önceki tur kapanır — "reddedildi" değil, "karşı teklifle devam etti".
       await tx.offer.update({
         where: { id: offerId },
-        data: { status: OfferStatus.rejected },
+        data: {
+          status: OfferStatus.rejected,
+          cancelReason: OFFER_CANCEL_REASON.supersededBySellerCounter,
+        },
       });
 
       // Yeni kayıt: aynı alıcı/satıcı; kabul hakkı alıcıda (buyerMustAccept)
@@ -656,7 +730,7 @@ export class OfferService {
           buyer: {
             select: {
               id: true,
-              displayName: true,
+              ...PUBLIC_NAME_SELECT,
               isVerified: true,
               avatarUrl: true,
             },
@@ -664,7 +738,7 @@ export class OfferService {
           seller: {
             select: {
               id: true,
-              displayName: true,
+              ...PUBLIC_NAME_SELECT,
               isVerified: true,
               avatarUrl: true,
             },
@@ -734,7 +808,7 @@ export class OfferService {
         throw new BadRequestException(i18nMessage("server.offer.offerExpired"));
       }
 
-      const productPrice = Number(offer.product.price);
+      const productPrice = resolveSalePrice(offer.product).price;
       const minOffer = productPrice * (this.minOfferPercentage / 100);
       const sellerCounterAmount = Number(offer.amount);
 
@@ -756,7 +830,10 @@ export class OfferService {
 
       await tx.offer.update({
         where: { id: offerId },
-        data: { status: OfferStatus.rejected },
+        data: {
+          status: OfferStatus.rejected,
+          cancelReason: OFFER_CANCEL_REASON.supersededByBuyerCounter,
+        },
       });
 
       const expiresAt = new Date();
@@ -782,7 +859,7 @@ export class OfferService {
           buyer: {
             select: {
               id: true,
-              displayName: true,
+              ...PUBLIC_NAME_SELECT,
               isVerified: true,
               avatarUrl: true,
             },
@@ -790,7 +867,7 @@ export class OfferService {
           seller: {
             select: {
               id: true,
-              displayName: true,
+              ...PUBLIC_NAME_SELECT,
               isVerified: true,
               avatarUrl: true,
             },
@@ -806,6 +883,10 @@ export class OfferService {
             productId: offer.productId,
             productTitle: offer.product.title,
             amount: dto.amount,
+            // Push worker'ın mükerrer filtresi anahtarı önce offerId'dan
+            // türetir; kuyruk yolundan gelen aynı teklifin bildirimi ancak
+            // bu satır offerId taşırsa yakalanır (çift zil önlenir).
+            offerId: newOffer.id,
           },
         );
       } catch (e) {
@@ -846,7 +927,7 @@ export class OfferService {
       where: { id: offerId },
       data: {
         status: OfferStatus.cancelled,
-        cancelReason: "Alıcı tarafından iptal edildi",
+        cancelReason: OFFER_CANCEL_REASON.buyerCancelled,
         version: { increment: 1 },
       },
       include: {
@@ -858,7 +939,7 @@ export class OfferService {
         buyer: {
           select: {
             id: true,
-            displayName: true,
+            ...PUBLIC_NAME_SELECT,
             isVerified: true,
             avatarUrl: true,
           },
@@ -866,7 +947,7 @@ export class OfferService {
         seller: {
           select: {
             id: true,
-            displayName: true,
+            ...PUBLIC_NAME_SELECT,
             isVerified: true,
             avatarUrl: true,
           },
@@ -945,7 +1026,7 @@ export class OfferService {
         buyer: {
           select: {
             id: true,
-            displayName: true,
+            ...PUBLIC_NAME_SELECT,
             isVerified: true,
             avatarUrl: true,
           },
@@ -953,7 +1034,7 @@ export class OfferService {
         seller: {
           select: {
             id: true,
-            displayName: true,
+            ...PUBLIC_NAME_SELECT,
             isVerified: true,
             avatarUrl: true,
           },
@@ -991,7 +1072,7 @@ export class OfferService {
         buyer: {
           select: {
             id: true,
-            displayName: true,
+            ...PUBLIC_NAME_SELECT,
             isVerified: true,
             avatarUrl: true,
           },
@@ -999,7 +1080,7 @@ export class OfferService {
         seller: {
           select: {
             id: true,
-            displayName: true,
+            ...PUBLIC_NAME_SELECT,
             isVerified: true,
             avatarUrl: true,
           },
@@ -1074,7 +1155,7 @@ export class OfferService {
         buyer: {
           select: {
             id: true,
-            displayName: true,
+            ...PUBLIC_NAME_SELECT,
             isVerified: true,
             avatarUrl: true,
           },
@@ -1082,7 +1163,7 @@ export class OfferService {
         seller: {
           select: {
             id: true,
-            displayName: true,
+            ...PUBLIC_NAME_SELECT,
             isVerified: true,
             avatarUrl: true,
           },
@@ -1184,21 +1265,23 @@ export class OfferService {
         categoryId:
           offer.product.categoryId ?? offer.product.category?.id ?? undefined,
       },
-      buyer: offer.buyer
-        ? {
-            ...offer.buyer,
-            avatarUrl: await this.resolveOfferAvatarUrl(offer.buyer.avatarUrl),
-          }
-        : offer.buyer,
-      seller: offer.seller
-        ? {
-            ...offer.seller,
-            avatarUrl: await this.resolveOfferAvatarUrl(offer.seller.avatarUrl),
-          }
-        : offer.seller,
+      // Karşı taraf herkese açık kimliğiyle görünür: gerçek ad ve e-posta
+      // (bildirim için seçilir) yüke girmez.
+      buyer: await this.toOfferParty(offer.buyer),
+      seller: await this.toOfferParty(offer.seller),
       cancelReason: offer.cancelReason ?? null,
       createdAt: offer.createdAt,
       updatedAt: offer.updatedAt,
+    };
+  }
+
+  /** Teklifin karşı tarafı: herkese açık kimlik + çözülmüş avatar. */
+  private async toOfferParty(user: any) {
+    if (!user) return user;
+    const { email: _email, ...rest } = user;
+    return {
+      ...toPublicIdentity(rest),
+      avatarUrl: await this.resolveOfferAvatarUrl(user.avatarUrl),
     };
   }
 

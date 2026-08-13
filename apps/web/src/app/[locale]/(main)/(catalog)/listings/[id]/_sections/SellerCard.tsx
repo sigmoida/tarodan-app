@@ -14,6 +14,7 @@ import UserAvatar from "@/components/UserAvatar";
 import { ButtonLink } from "@/components/ui/ButtonLink";
 import { SectionCard } from "@/components/ui";
 import { useListingDetail } from "../_context/ListingDetailContext";
+import { publicNameOf } from "@/lib/public-name";
 
 export default function SellerCard() {
   const { t, listing, isAuthenticated, isOwner, requireAuth } =
@@ -26,7 +27,7 @@ export default function SellerCard() {
   const totalRatings = (seller as { totalRatings?: number }).totalRatings;
   const rating = seller.rating ?? 0;
   const listingsCount = seller.listings_count || seller.productsCount || 0;
-  const name = seller.displayName || seller.username || t("product.seller");
+  const name = publicNameOf(seller, t("product.seller"));
   const profileHref = `/u/${seller.username || seller.id}`;
 
   // Non-auth users get the "sign in to view profile" modal instead of a dead link.
@@ -49,7 +50,7 @@ export default function SellerCard() {
         className="group flex items-center gap-4"
       >
         <UserAvatar
-          displayName={seller.displayName}
+          displayName={name}
           avatarUrl={seller.avatarUrl}
           size="lg"
           className="flex-shrink-0 transition-all group-hover:ring-2 group-hover:ring-primary-500"

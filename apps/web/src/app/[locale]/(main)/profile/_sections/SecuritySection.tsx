@@ -16,8 +16,7 @@ import {
   ModalFooter,
   PhoneInput,
   splitPhone,
-  getFullPhoneNumber,
-  DEFAULT_COUNTRY_CODE,
+  combinePhone,
 } from "@tarodan/ui";
 import { useTranslations } from "next-intl";
 import { Form, FormInput, useZodForm } from "@tarodan/ui/form";
@@ -51,22 +50,24 @@ function PhoneModal({ open, onClose }: { open: boolean; onClose: () => void }) {
   const { user } = useAuthStore();
   const { sendCode, verify } = usePhoneVerification();
   const [step, setStep] = useState<"enter" | "verify">("enter");
-  const initial = splitPhone(user?.phone || "");
-  const [countryCode, setCountryCode] = useState(
-    initial.countryCode || DEFAULT_COUNTRY_CODE,
-  );
+  const initial = splitPhone(user?.phone);
   const [phone, setPhone] = useState(initial.national);
+  const [isLegacy, setIsLegacy] = useState(initial.isLegacy);
   const [code, setCode] = useState("");
 
   useEffect(() => {
     if (open) {
-      const p = splitPhone(user?.phone || "");
+      const p = splitPhone(user?.phone);
       setStep("enter");
-      setCountryCode(p.countryCode || DEFAULT_COUNTRY_CODE);
       setPhone(p.national);
+      setIsLegacy(p.isLegacy);
       setCode("");
     }
   }, [open, user?.phone]);
+
+  // "" until the national part is a complete Turkish mobile — this is what gates
+  // the submit button, so an incomplete number can never reach the API.
+  const fullPhone = combinePhone(phone);
 
   return (
     <Modal
@@ -82,7 +83,7 @@ function PhoneModal({ open, onClose }: { open: boolean; onClose: () => void }) {
           onConfirm={
             step === "enter"
               ? () =>
-                  sendCode.mutate(getFullPhoneNumber(countryCode, phone), {
+                  sendCode.mutate(fullPhone, {
                     onSuccess: () => setStep("verify"),
                   })
               : () => verify.mutate(code, { onSuccess: onClose })
@@ -90,7 +91,7 @@ function PhoneModal({ open, onClose }: { open: boolean; onClose: () => void }) {
           cancelLabel={step === "enter" ? t("common.cancel") : t("common.back")}
           confirmLabel={step === "enter" ? "Kod Gönder" : "Doğrula"}
           isLoading={sendCode.isPending || verify.isPending}
-          disabled={step === "enter" ? !phone : code.length !== 6}
+          disabled={step === "enter" ? !fullPhone : code.length !== 6}
         />
       }
     >
@@ -98,10 +99,14 @@ function PhoneModal({ open, onClose }: { open: boolean; onClose: () => void }) {
         <div className="space-y-4">
           <PhoneInput
             label="Telefon numarası"
-            countryCode={countryCode}
-            onCountryCodeChange={setCountryCode}
             phone={phone}
-            onPhoneChange={setPhone}
+            onPhoneChange={(next) => {
+              setPhone(next);
+              setIsLegacy(false);
+            }}
+            helperText={
+              isLegacy ? t("validation.phoneLegacyNotice") : undefined
+            }
           />
         </div>
       ) : (

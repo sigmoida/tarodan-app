@@ -64,9 +64,15 @@ describe("RefundService policy integration", () => {
   ) => {
     const createdRows: any[] = [];
     const prisma: any = {
-      order: { findUnique: jest.fn().mockResolvedValue(order) },
+      order: {
+        findUnique: jest.fn().mockResolvedValue(order),
+        // Paket kargosu PAKET başına bir kez iade edilir: kardeş satır sayısı
+        // 0 → bu iade paketi kapatır (tek satırlık sipariş davranışı).
+        count: jest.fn().mockResolvedValue(0),
+      },
       refundRequest: {
         count: jest.fn().mockResolvedValue(0),
+        findMany: jest.fn().mockResolvedValue([]),
         create: jest.fn().mockImplementation(({ data }: any) => {
           const row = {
             id: "refund-1",

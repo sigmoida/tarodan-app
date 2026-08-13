@@ -7,8 +7,12 @@ export interface Discount {
   code: string | null;
   name: string;
   description: string | null;
-  type: "percentage" | "fixed_amount";
+  type: "percentage" | "fixed_amount" | "bogo" | "bulk_quantity";
   value: number;
+  /** Adet koşullu kampanyalar (bogo/bulk) — sepette kendiliğinden uygulanır. */
+  minQuantity?: number | null;
+  buyQuantity?: number | null;
+  getQuantity?: number | null;
   scope: "global" | "category" | "product" | "seller";
   targetProductIds: string[];
   minCartValue: number | null;
@@ -38,8 +42,12 @@ export interface DiscountFormData {
   code: string;
   name: string;
   description: string;
-  type: "percentage" | "fixed_amount";
+  type: "percentage" | "fixed_amount" | "bogo" | "bulk_quantity";
   value: number;
+  /** bogo: "X al" / "Y bedava"; bulk_quantity: en az adet. String — input'tan. */
+  buyQuantity: string;
+  getQuantity: string;
+  minQuantity: string;
   scope: "product" | "seller";
   targetProductIds: string[];
   minCartValue: string;
@@ -113,6 +121,9 @@ export const emptyDiscountForm = (): DiscountFormData => ({
   description: "",
   type: "percentage",
   value: 10,
+  buyQuantity: "",
+  getQuantity: "",
+  minQuantity: "",
   scope: "seller",
   targetProductIds: [],
   minCartValue: "",

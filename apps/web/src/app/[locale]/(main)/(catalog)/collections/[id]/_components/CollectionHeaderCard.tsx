@@ -119,7 +119,7 @@ export default function CollectionHeaderCard() {
                 className="!h-6 !w-6"
               />
               <span className="text-sm font-medium text-body">
-                @{collection.userName}
+                {collection.userName}
               </span>
             </Link>
 

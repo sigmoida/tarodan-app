@@ -8,6 +8,7 @@ export interface UserRating {
   createdAt: string;
   giver?: {
     id: string;
+    publicName?: string;
     displayName: string;
     avatarUrl?: string;
   };
@@ -35,7 +36,8 @@ export interface SellerStats {
 
 export interface Seller {
   id: string;
-  username?: string;
+  username?: string | null;
+  publicName?: string;
   displayName: string;
   avatarUrl?: string;
   bio?: string;

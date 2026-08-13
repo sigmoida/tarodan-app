@@ -1299,7 +1299,8 @@ async function main() {
         settingKey: "payment_hold_days",
         settingValue: "3",
         settingType: "number",
-        description: "Ödeme bekletme süresi (gün)",
+        description:
+          "Takas escrow bekletme süresi (gün) — takas tamamlandıktan sonra nakit farkın karşı tarafa açılması için beklenen süre. Satış escrow'unu ETKİLEMEZ (o teslim + iade penceresi + grace'tir).",
       },
     }),
     // ── Vergi politikası: hiçbir oran koda gömülü değil, hepsi buradan ──

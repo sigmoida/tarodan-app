@@ -138,6 +138,52 @@ export function createAuthLogic<TUser>(
     return { status: "error", reason: "unknown", serverMessage: data?.message };
   }
 
+  /**
+   * Exchange an Apple identity token for app tokens. Same contract as
+   * `googleLogin`; requires `endpoints.apple` (web only).
+   *
+   * Apple returns the user's name ONLY on the first authorization, so
+   * `fullName` is optional and forwarded when present — the backend uses it to
+   * seed the display name and ignores it afterwards.
+   */
+  async function appleLogin(payload: {
+    identityToken: string;
+    fullName?: string;
+  }): Promise<AuthLoginResult> {
+    if (!endpoints.apple) {
+      return {
+        status: "error",
+        reason: "unknown",
+        serverMessage: "Apple login not configured",
+      };
+    }
+    let res: Response;
+    try {
+      res = await fetch(`${apiBaseUrl}${endpoints.apple}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+        cache: "no-store",
+      });
+    } catch {
+      return { status: "error", reason: "connection" };
+    }
+
+    const data = await res.json().catch(() => null);
+
+    if (res.ok && data?.tokens?.accessToken) {
+      await session.writeTokens(
+        data.tokens.accessToken,
+        data.tokens.refreshToken,
+      );
+      return { status: "ok" };
+    }
+    if (res.status === 401 || res.status === 400) {
+      return { status: "error", reason: "invalid" };
+    }
+    return { status: "error", reason: "unknown", serverMessage: data?.message };
+  }
+
   async function logout(): Promise<void> {
     const { refresh } = await session.readTokens();
     try {
@@ -166,5 +212,5 @@ export function createAuthLogic<TUser>(
     }
   }
 
-  return { login, googleLogin, logout, forgotPassword };
+  return { login, googleLogin, appleLogin, logout, forgotPassword };
 }

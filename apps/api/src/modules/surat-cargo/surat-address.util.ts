@@ -6,6 +6,8 @@
  * biçimlerde gelebildiğinden, Sürat'a göndermeden önce tek biçime indiriyoruz.
  */
 
+import { BadRequestException } from "@nestjs/common";
+import { i18nMessage } from "../i18n";
 import {
   SuratKargoTuru,
   SuratOdemeTipi,
@@ -15,8 +17,7 @@ import {
   type SuratGonderiPayload,
 } from "./surat-cargo.types";
 
-/** Telefonu `05XXXXXXXXX` (11 hane) biçimine indirger. Çözemezse en iyi çabayla
- *  rakamları döndürür (boşsa boş string). */
+/** Telefonu `05XXXXXXXXX` (11 hane) biçimine indirger. Çözemezse boş string. */
 export function normalizeSuratPhone(raw?: string | null): string {
   const digits = (raw ?? "").replace(/\D/g, "");
   if (!digits) return "";
@@ -34,8 +35,11 @@ export function normalizeSuratPhone(raw?: string | null): string {
   if (national.length === 10 && national.startsWith("5")) {
     return "0" + national;
   }
-  // Çözemedik: olduğu gibi (0 ile başlayacak şekilde) döndür
-  return digits.startsWith("0") ? digits : "0" + digits;
+  // Çözemedik. Eskiden başına 0 eklenip gönderiliyordu; bu, TR olmayan bir
+  // numarayı (+447700900123 → 0447700900123) sessizce uydurma bir TR numarasına
+  // çevirip kuryeye yolluyordu. Boş dönmek, çağıranın eksikliği fark etmesini
+  // sağlar — bozuk bir numarayla gönderi açmaktan iyidir.
+  return "";
 }
 
 /** İl/ilçe isimlerini Sürat için temizler (baştaki/sondaki boşluk + çoklu boşluk). */
@@ -75,13 +79,24 @@ export function buildStandardGonderiPayload(input: {
   /** Çağırana özgü sapmalar; standart değerleri ezmek için en son uygulanır */
   overrides?: Partial<SuratGonderiPayload>;
 }): SuratGonderiPayload {
+  // Tek çıkış noktası: çözülemeyen numarayla gönderi açmak yerine burada dur.
+  // Yazma yollarının hepsi artık +905XXXXXXXXX doğruluyor, dolayısıyla buraya
+  // ancak kural öncesinden kalan bozuk bir kayıt düşebilir — ve o durumda
+  // kuryeye uydurma numara göndermektense net hata vermek gerekir.
+  const phone = normalizeSuratPhone(input.phone);
+  if (!phone) {
+    throw new BadRequestException(
+      i18nMessage("server.shipping.invalidRecipientPhone"),
+    );
+  }
+
   return {
     KisiKurum: input.recipientName.trim() || "Alıcı",
     SahisBirim: input.content,
     AliciAdresi: input.address,
     Il: normalizeSuratLocation(input.city),
     Ilce: normalizeSuratLocation(input.district),
-    TelefonCep: normalizeSuratPhone(input.phone),
+    TelefonCep: phone,
     KargoTuru: SuratKargoTuru.Koli,
     OdemeTipi: SuratOdemeTipi.Pesin,
     OzelKargoTakipNo: input.ref,

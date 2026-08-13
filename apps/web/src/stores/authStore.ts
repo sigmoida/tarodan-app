@@ -4,6 +4,7 @@ import { authApi, userApi } from "@/lib/api";
 import {
   loginAction,
   googleLoginAction,
+  appleLoginAction,
   logoutAction,
 } from "@/lib/server/auth-actions";
 import { hasAuthMarker, clearAuthMarker } from "@/lib/authMarker";
@@ -337,12 +338,18 @@ export const useAuthStore = create<AuthState>()(
           await get().checkAuth();
         },
 
-        // NOTE: Apple sign-in is not wired end-to-end yet — there is no client/BFF
-        // apple action (unlike googleLogin's `googleLoginAction`) and no
-        // `authApi.loginWithApple`. Fail gracefully instead of referencing a
-        // non-existent method (which broke the production build).
-        loginWithApple: async () => {
-          throw new Error("Apple ile giriş şu anda kullanılamıyor.");
+        loginWithApple: async (idToken: string, fullName?: string) => {
+          const result = await appleLoginAction(idToken, fullName);
+          if (result.status === "error") {
+            const error = new Error(result.message) as Error & {
+              code: string;
+            };
+            error.code = result.reason;
+            throw error;
+          }
+          if (result.status === "2fa")
+            throw new Error("İki adımlı doğrulama gerekli");
+          await get().checkAuth();
         },
 
         register: async (

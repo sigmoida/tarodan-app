@@ -131,14 +131,34 @@ export const NOTIFICATION_TEMPLATES: Partial<
     messageKey: "server.notification.offerCounterDeclined.message",
     icon: "❌",
   },
+  [NotificationType.OFFER_COUNTER_ACCEPTED]: {
+    titleKey: "server.notification.offerCounterAccepted.title",
+    messageKey: "server.notification.offerCounterAccepted.message",
+    icon: "✅",
+  },
   [NotificationType.OFFER_EXPIRED]: {
     titleKey: "server.notification.offerExpired.title",
     messageKey: "server.notification.offerExpired.message",
     icon: "⏰",
   },
+  [NotificationType.OFFER_EXPIRED_SELLER]: {
+    titleKey: "server.notification.offerExpiredSeller.title",
+    messageKey: "server.notification.offerExpiredSeller.message",
+    icon: "⏰",
+  },
+  [NotificationType.OFFER_PAYMENT_EXPIRED]: {
+    titleKey: "server.notification.offerPaymentExpired.title",
+    messageKey: "server.notification.offerPaymentExpired.message",
+    icon: "⏳",
+  },
   [NotificationType.OFFER_CANCELLED_OUT_OF_STOCK]: {
     titleKey: "server.notification.offerCancelledOutOfStock.title",
     messageKey: "server.notification.offerCancelledOutOfStock.message",
+    icon: "❌",
+  },
+  [NotificationType.OFFER_CANCELLED_LISTING_REMOVED]: {
+    titleKey: "server.notification.offerCancelledListingRemoved.title",
+    messageKey: "server.notification.offerCancelledListingRemoved.message",
     icon: "❌",
   },
   [NotificationType.PRODUCT_APPROVED]: {
@@ -311,14 +331,39 @@ export const NOTIFICATION_TEMPLATES: Partial<
     messageKey: "server.notification.boostExpired.message",
     icon: "🚀",
   },
+  [NotificationType.BOOST_ACTIVATED]: {
+    titleKey: "server.notification.boostActivated.title",
+    messageKey: "server.notification.boostActivated.message",
+    icon: "🚀",
+  },
   [NotificationType.TRADE_AUTO_CANCELLED]: {
     titleKey: "server.notification.tradeAutoCancelled.title",
     messageKey: "server.notification.tradeAutoCancelled.message",
     icon: "🔄",
   },
+  [NotificationType.TRADE_AT_WAREHOUSE]: {
+    titleKey: "server.notification.tradeAtWarehouse.title",
+    messageKey: "server.notification.tradeAtWarehouse.message",
+    icon: "🏬",
+  },
   [NotificationType.TRADE_STUCK_AT_WAREHOUSE]: {
     titleKey: "server.notification.tradeStuckAtWarehouse.title",
     messageKey: "server.notification.tradeStuckAtWarehouse.message",
+    icon: "⚠️",
+  },
+  [NotificationType.ORDER_SHIPMENT_DELAYED]: {
+    titleKey: "server.notification.orderShipmentDelayed.title",
+    messageKey: "server.notification.orderShipmentDelayed.message",
+    icon: "🕒",
+  },
+  [NotificationType.ORDER_STUCK_IN_TRANSIT]: {
+    titleKey: "server.notification.orderStuckInTransit.title",
+    messageKey: "server.notification.orderStuckInTransit.message",
+    icon: "⚠️",
+  },
+  [NotificationType.TRADE_OUTBOUND_DELIVERY_MISSING]: {
+    titleKey: "server.notification.tradeOutboundDeliveryMissing.title",
+    messageKey: "server.notification.tradeOutboundDeliveryMissing.message",
     icon: "⚠️",
   },
   [NotificationType.TRADE_ADDRESS_REQUIRED]: {
@@ -365,6 +410,21 @@ export const NOTIFICATION_TEMPLATES: Partial<
     titleKey: "server.notification.refundCompleted.title",
     messageKey: "server.notification.refundCompleted.message",
     icon: "💰",
+  },
+  [NotificationType.COUPON_RETURNED]: {
+    titleKey: "server.notification.couponReturned.title",
+    messageKey: "server.notification.couponReturned.message",
+    icon: "🎟️",
+  },
+  [NotificationType.CAMPAIGN_BUDGET_EXHAUSTED]: {
+    titleKey: "server.notification.campaignBudgetExhausted.title",
+    messageKey: "server.notification.campaignBudgetExhausted.message",
+    icon: "🛑",
+  },
+  [NotificationType.MODERATION_QUEUE_STALE]: {
+    titleKey: "server.notification.moderationQueueStale.title",
+    messageKey: "server.notification.moderationQueueStale.message",
+    icon: "⏳",
   },
   [NotificationType.REFUND_REQUEST_RECEIVED]: {
     titleKey: "server.notification.refundRequestReceived.title",

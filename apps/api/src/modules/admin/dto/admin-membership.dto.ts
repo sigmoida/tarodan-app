@@ -1,14 +1,4 @@
-import {
-  IsBoolean,
-  IsEnum,
-  IsIn,
-  IsInt,
-  IsNumber,
-  IsOptional,
-  IsString,
-  MaxLength,
-  Min,
-} from "class-validator";
+import { IsEnum, IsIn, IsOptional } from "class-validator";
 import { MembershipTierType } from "@prisma/client";
 
 /** Admin: kullanıcının üyelik kademesini değiştirir (ödeme yok, admin override). */
@@ -22,73 +12,8 @@ export class AdminChangeMembershipDto {
 }
 
 /**
- * Admin: üyelik kademesi (fiyat/limit/yetki) güncelleme gövdesi. Global
- * ValidationPipe bu DTO üzerinden negatif fiyat/limit ve sınır dışı indirim gibi
- * geçersiz değerleri API seviyesinde reddeder; whitelist bilinmeyen alanları düşürür.
+ * Katman güncelleme DTO'su TEK kaynak: membership modülündeki sınıf. Eskiden
+ * buradaki kopya farklı kurallar uyguluyordu (maxImagesPerListing tavansız,
+ * fiyat tavanı yok) — iki admin rotası aynı gövdeye farklı cevap veriyordu.
  */
-export class UpdateMembershipTierDto {
-  @IsOptional()
-  @IsString()
-  @MaxLength(100)
-  name?: string;
-
-  @IsOptional()
-  @IsString()
-  @MaxLength(500)
-  description?: string;
-
-  @IsOptional()
-  @IsNumber()
-  @Min(0)
-  monthlyPrice?: number;
-
-  @IsOptional()
-  @IsNumber()
-  @Min(0)
-  yearlyPrice?: number;
-
-  @IsOptional()
-  @IsInt()
-  @Min(0)
-  maxFreeListings?: number;
-
-  // -1 = SINIRSIZ (admin UI, web üyelik sayfası ve servis doğrulaması bu
-  // sözleşmeyi paylaşır). @Min(0) burada isteği servise ulaşmadan reddediyor,
-  // dolayısıyla sınırsız tarifeler hiç düzenlenemiyordu. Aralığın geri kalanını
-  // (-1 ya da >= 1) servis denetler.
-  @IsOptional()
-  @IsInt()
-  @Min(-1)
-  maxTotalListings?: number;
-
-  @IsOptional()
-  @IsInt()
-  @Min(0)
-  maxImagesPerListing?: number;
-
-  @IsOptional()
-  @IsBoolean()
-  canCreateCollections?: boolean;
-
-  @IsOptional()
-  @IsBoolean()
-  canTrade?: boolean;
-
-  @IsOptional()
-  @IsBoolean()
-  isAdFree?: boolean;
-
-  // featuredListingSlots + commissionDiscount are intentionally NOT editable here:
-  // the former is superseded by the paid ad-packages boost system, the latter was
-  // never applied by the commission engine (commission-rules-v2). The DB columns are
-  // retained (deprecated) but the admin can no longer set misleading values.
-
-  @IsOptional()
-  @IsBoolean()
-  isActive?: boolean;
-
-  @IsOptional()
-  @IsInt()
-  @Min(0)
-  sortOrder?: number;
-}
+export { UpdateMembershipTierDto } from "../../membership/dto/membership.dto";

@@ -9,6 +9,7 @@ import { resolveOrderBy } from "../../common/list";
 import { TradeCommonService } from "./trade-common.service";
 import { i18nMessage } from "../i18n";
 import { TradeQueryDto, TradeResponseDto, TradeListResponseDto } from "./dto";
+import { PUBLIC_NAME_SELECT } from "../../common/helpers/public-identity";
 
 // Depo-escrow akışındaki "Kargoda" statüleri — trades 'shipping' liste filtresi ve
 // status-counts.shipping tek kaynaktan bunu kullanır (mobil SHIPPING_STATUSES ile birebir).
@@ -40,8 +41,8 @@ export class TradeQueryService {
     const trade = await this.prisma.trade.findUnique({
       where: { id: tradeId },
       include: {
-        initiator: { select: { id: true, displayName: true } },
-        receiver: { select: { id: true, displayName: true } },
+        initiator: { select: { id: true, ...PUBLIC_NAME_SELECT } },
+        receiver: { select: { id: true, ...PUBLIC_NAME_SELECT } },
         items: {
           include: {
             product: {
@@ -147,8 +148,8 @@ export class TradeQueryService {
       this.prisma.trade.findMany({
         where,
         include: {
-          initiator: { select: { id: true, displayName: true } },
-          receiver: { select: { id: true, displayName: true } },
+          initiator: { select: { id: true, ...PUBLIC_NAME_SELECT } },
+          receiver: { select: { id: true, ...PUBLIC_NAME_SELECT } },
           items: {
             include: {
               product: {

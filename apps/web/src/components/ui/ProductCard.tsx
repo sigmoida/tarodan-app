@@ -268,6 +268,18 @@ export default function ProductCard({
                 <span className="hidden sm:inline">{t("faq.trade")}</span>
               </ProductBadge>
             )}
+            {/* Bedel kampanyaları fiyatı DEĞİŞTİRMEZ (komisyonu/kargoyu indirir),
+                bu yüzden vitrinde ancak rozetle görünürler. Yalnız herkese açık
+                kampanyalar duyurulur — üyeliğe özel avantaj burada vaat edilmez. */}
+            {(product.feeCampaigns ?? []).slice(0, 1).map((campaign) => (
+              <ProductBadge
+                key={campaign}
+                variant="rare"
+                className="text-sm px-1.5 py-0.5"
+              >
+                {campaign}
+              </ProductBadge>
+            ))}
           </div>
           {onSale && (
             <div className="absolute top-1.5 right-1.5">

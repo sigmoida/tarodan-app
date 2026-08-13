@@ -427,7 +427,15 @@ export class AdminProductService {
 
     const updated = await this.prisma.product.update({
       where: { id: productId },
-      data: { status: ProductStatus.active },
+      // publishedAt her onayda tazelenir: ilan yaşam süresi (LISTING_TTL_DAYS)
+      // yayın anından sayılır — süresi dolup yeniden onaylanan ilan taze
+      // pencere alır (eskiden createdAt sabit kaldığı için ertesi cron yine
+      // kapatıyordu). Onay, varsa eski red gerekçesini de temizler.
+      data: {
+        status: ProductStatus.active,
+        publishedAt: new Date(),
+        rejectionReason: null,
+      },
     });
 
     await this.audit.createAuditLog(
@@ -452,6 +460,20 @@ export class AdminProductService {
 
     // Web ISR'yi anında tazele (fiyat/indirim değişimi web'e hemen yansısın).
     void notifyWebRevalidate(["products:list", `product:${productId}`]);
+
+    // Satıcıya "ilanınız yayında" bildirimi — şablon tanımlıydı ama hiçbir yol
+    // çağırmıyordu; satıcı yayına girişi ancak listesinden anlıyordu.
+    this.notificationService
+      .createInAppNotification(
+        product.sellerId,
+        NotificationType.PRODUCT_APPROVED,
+        { productId, productTitle: product.title },
+      )
+      .catch((err: any) =>
+        this.logger.warn(
+          `PRODUCT_APPROVED notification failed for ${productId}: ${err?.message}`,
+        ),
+      );
 
     // Yeniden satışa açılan (eski sold/inactive) ilan onaylanıp yayına girince
     // wishlist + son 7 gün stockout-cancelled alıcılara back-in-stock bildirimi
@@ -486,7 +508,9 @@ export class AdminProductService {
 
     const updated = await this.prisma.product.update({
       where: { id: productId },
-      data: { status: ProductStatus.rejected },
+      // Gerekçe KALICI yazılır: bildirim tek seferlikti, satıcı ve admin
+      // detayı gerekçeyi sonradan göremiyordu. Onay temizler.
+      data: { status: ProductStatus.rejected, rejectionReason: dto.reason },
     });
 
     await this.audit.createAuditLog(
@@ -536,72 +560,20 @@ export class AdminProductService {
       throw new BadRequestException("En az bir ürün seçilmelidir");
     }
 
+    // Kanonik yol invaryantı: onay hangi yüzeyden gelirse gelsin
+    // approveProduct çekirdeğinden geçer — komisyon guard'ı, publishedAt
+    // tazeleme, cache/ES/ISR, PRODUCT_APPROVED bildirimi ve back-in-stock
+    // yayını hiçbir yolda ayrışamaz. Eski bulk gövdesi bildirim ve
+    // web-revalidate göndermeyen bir kopyaydı.
     const results: { id: string; success: boolean; error?: string }[] = [];
-
     for (const productId of ids) {
       try {
-        const product = await this.prisma.product.findUnique({
-          where: { id: productId },
-        });
-
-        if (!product) {
-          results.push({
-            id: productId,
-            success: false,
-            error: "Ürün bulunamadı",
-          });
-          continue;
-        }
-
-        if (product.status !== ProductStatus.pending) {
-          results.push({
-            id: productId,
-            success: false,
-            error: "Sadece bekleyen ürünler onaylanabilir",
-          });
-          continue;
-        }
-
-        await this.commissionGuard.assertListingRuleExists({
-          sellerId: product.sellerId,
-          categoryId: product.categoryId,
-          amount: Number(product.price),
-        });
-
-        const updated = await this.prisma.product.update({
-          where: { id: productId },
-          data: { status: ProductStatus.active },
-        });
-
-        await this.audit.createAuditLog(
-          adminId,
-          "product_bulk_approve",
-          "Product",
-          productId,
-          product,
-          { ...updated, note },
-        );
-
-        // Invalidate product cache
-        await this.cache.del(`products:detail:${productId}`);
-
-        // Arama index'ini güncelle: onaylanan ürün aktif → ES'e indexlensin
-        this.searchService
-          .syncProduct(productId)
-          .catch((err) =>
-            this.logger.warn(
-              `ES sync failed for ${productId}: ${err?.message}`,
-            ),
-          );
-
+        await this.approveProduct(adminId, productId, { note });
         results.push({ id: productId, success: true });
       } catch (error) {
         results.push({ id: productId, success: false, error: error.message });
       }
     }
-
-    // Invalidate product list cache
-    await this.cache.delPattern("products:list:*");
 
     const successCount = results.filter((r) => r.success).length;
     const failCount = results.filter((r) => !r.success).length;
@@ -614,7 +586,9 @@ export class AdminProductService {
   }
 
   /**
-   * Bulk reject multiple products
+   * Bulk reject multiple products — tekil rejectProduct çekirdeğine delege
+   * eder: gerekçe KALICI yazılır ve satıcıya PRODUCT_REJECTED bildirimi gider
+   * (eski kopya gövde yalnız statü yazıyordu; satıcı gerekçeyi hiç göremiyordu).
    */
   async bulkRejectProducts(adminId: string, ids: string[], reason: string) {
     if (!ids || ids.length === 0) {
@@ -626,56 +600,14 @@ export class AdminProductService {
     }
 
     const results: { id: string; success: boolean; error?: string }[] = [];
-
     for (const productId of ids) {
       try {
-        const product = await this.prisma.product.findUnique({
-          where: { id: productId },
-        });
-
-        if (!product) {
-          results.push({
-            id: productId,
-            success: false,
-            error: "Ürün bulunamadı",
-          });
-          continue;
-        }
-
-        const updated = await this.prisma.product.update({
-          where: { id: productId },
-          data: { status: ProductStatus.rejected },
-        });
-
-        await this.audit.createAuditLog(
-          adminId,
-          "product_bulk_reject",
-          "Product",
-          productId,
-          product,
-          { ...updated, reason },
-        );
-
-        // Invalidate product cache
-        await this.cache.del(`products:detail:${productId}`);
-
-        // Arama index'ini güncelle: reddedilen ürün listelenemez → ES'ten kaldır
-        this.searchService
-          .syncProduct(productId)
-          .catch((err) =>
-            this.logger.warn(
-              `ES sync failed for ${productId}: ${err?.message}`,
-            ),
-          );
-
+        await this.rejectProduct(adminId, productId, { reason });
         results.push({ id: productId, success: true });
       } catch (error) {
         results.push({ id: productId, success: false, error: error.message });
       }
     }
-
-    // Invalidate product list cache
-    await this.cache.delPattern("products:list:*");
 
     const successCount = results.filter((r) => r.success).length;
     const failCount = results.filter((r) => !r.success).length;
@@ -749,6 +681,18 @@ export class AdminProductService {
       product._count.offers === 0 &&
       product._count.orders === 0
     ) {
+      // Ödemesi süren ya da geçmişte tamamlanmış boost varken hard delete
+      // YASAK: ProductBoost cascade ile silinir — pending'de ödeme sonradan
+      // tamamlanırsa para yanar (aktivasyon kaydı bulamaz), geçmiş satın alma
+      // izlenebilirliği de yok olur. Soft delete her zaman mümkündür.
+      const boostCount = await this.prisma.productBoost.count({
+        where: { productId },
+      });
+      if (boostCount > 0) {
+        throw new BadRequestException(
+          "Öne çıkarma kaydı olan ürün kalıcı silinemez; pasife alın (soft delete)",
+        );
+      }
       // Hard delete - only if no offers and no orders
       await this.prisma.product.delete({
         where: { id: productId },

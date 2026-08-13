@@ -1,6 +1,7 @@
-import { Injectable, Logger } from "@nestjs/common";
+import { Injectable, Logger, Optional } from "@nestjs/common";
 import { PrismaService } from "../../prisma";
 import { DiscountService } from "../discount/discount.service";
+import { FeeDiscountResolver } from "../discount/fee-discount.resolver";
 import { StorageService } from "../storage/storage.service";
 import {
   canTradeFromMembership,
@@ -8,6 +9,7 @@ import {
 } from "../membership/membership.util";
 import { getFreeTierCanTrade } from "../membership/free-tier-trade.helper";
 import { ProductStatus } from "@prisma/client";
+import { publicIdentityFields } from "../../common/helpers/public-identity";
 import { getAvailableQuantity } from "./helpers/product-availability.helper";
 import { resolveSalePrice } from "./helpers/product-sale-window";
 import {
@@ -32,6 +34,8 @@ export class ProductCommonService {
     private readonly prisma: PrismaService,
     private readonly discountService: DiscountService,
     private readonly storageService: StorageService,
+    @Optional()
+    private readonly feeDiscounts?: FeeDiscountResolver,
   ) {}
 
   /**
@@ -189,7 +193,33 @@ export class ProductCommonService {
     const discountPrices =
       await this.discountService.getEffectiveDisplayPriceMany(discountItems);
 
-    const pre = { sellerStats, productRatings, discountPrices };
+    // Bedel kampanyaları vitrin FİYATINI değiştirmez (komisyonu/kargoyu indirir),
+    // bu yüzden ancak bir rozetle görünür olabilirler. Vitrin herkese açıktır:
+    // yalnız kimlik gerektirmeyen (herkese/tüm alıcılara açık) kampanyalar
+    // duyurulur — üyeliğe özel bir avantajı herkese vaat etmiş olmayız.
+    const feeCampaigns = (await this.feeDiscounts?.loadActive()) ?? [];
+    const feeCampaignLabels = new Map<string, string[]>();
+    for (const item of discountItems) {
+      const matched = (
+        this.feeDiscounts?.selectFor(feeCampaigns as any, {
+          productId: item.productId,
+          categoryId: item.categoryId,
+          sellerId: item.sellerId,
+          buyerId: null,
+          buyerTier: null,
+        }) ?? []
+      )
+        .filter((candidate) => candidate.target.startsWith("buyer_"))
+        .map((candidate) => candidate.name);
+      if (matched.length) feeCampaignLabels.set(item.productId, matched);
+    }
+
+    const pre = {
+      sellerStats,
+      productRatings,
+      discountPrices,
+      feeCampaignLabels,
+    };
     return Promise.all(products.map((p) => this.buildProductResponse(p, pre)));
   }
 
@@ -214,6 +244,8 @@ export class ProductCommonService {
       >;
       productRatings: Map<string, { average: number | null; count: number }>;
       discountPrices: Map<string, number | null>;
+      /** Vitrinde rozet olarak gösterilecek bedel kampanyaları (ürün başına). */
+      feeCampaignLabels?: Map<string, string[]>;
     },
   ) {
     const s = product.seller?.id
@@ -281,6 +313,9 @@ export class ProductCommonService {
     return {
       id: product.id,
       productCode: product.productCode,
+      // Bedel kampanyaları fiyatı değiştirmediği için rozetle duyurulur
+      // ("Komisyonsuz alışveriş"); boşsa alan hiç gönderilmez.
+      feeCampaigns: pre.feeCampaignLabels?.get(product.id) ?? undefined,
       sellerId, // flat sellerId (nested seller.id'ye ek) — API tüketicileri için
       title: product.title,
       description: product.description,
@@ -300,6 +335,9 @@ export class ProductCommonService {
       color: product.color,
       isBoxed: product.isBoxed,
       status: product.status,
+      // Moderasyon reddi gerekçesi — yalnız satıcının kendi listesinde anlamlı;
+      // public detay rejected ürünü zaten 404'ler, sızıntı riski yok.
+      rejectionReason: product.rejectionReason ?? null,
       isTradeEnabled: product.isTradeEnabled || false,
       // Satıcının NİYETİ (isTradeEnabled) ile GERÇEKTEN takas edilebilirliği
       // ayrı alanlardır: üyelik bitince yetki düşer, bayrak üründe kalır.
@@ -331,10 +369,12 @@ export class ProductCommonService {
         average: ratingAverage,
         count: ratingCount,
       },
+      // Satıcı kartı herkese açıktır: ad tek zincirden gelir (firma → username
+      // → isim), gerçek ad yüke hiç girmez.
       seller: product.seller
         ? {
             id: product.seller.id,
-            displayName: product.seller.displayName,
+            ...publicIdentityFields(product.seller),
             isVerified: product.seller.isVerified,
             sellerType: product.seller.sellerType,
             avatarUrl: await this.resolveAvatarUrl(

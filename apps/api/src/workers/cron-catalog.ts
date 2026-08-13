@@ -250,4 +250,11 @@ export const CRON_CATALOG: CronCatalogEntry[] = [
     description: "Süresi dolan eski ilanları yayından kaldırır",
     triggerable: false,
   },
+  {
+    key: "pending-moderation-digest",
+    label: "Bekleyen ilan özeti",
+    description:
+      "Moderasyonda 48 saatten uzun bekleyen ilanlar için adminlere günlük özet",
+    triggerable: true,
+  },
 ];

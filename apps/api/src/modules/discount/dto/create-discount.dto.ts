@@ -12,7 +12,14 @@ import {
 } from "class-validator";
 import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
 import { Type } from "class-transformer";
-import { DiscountType, DiscountScope, DiscountFundedBy } from "@prisma/client";
+import {
+  DiscountType,
+  DiscountScope,
+  DiscountFundedBy,
+  DiscountTarget,
+  DiscountAudience,
+  MembershipTierType,
+} from "@prisma/client";
 
 export class CreateDiscountDto {
   @ApiPropertyOptional({
@@ -131,12 +138,14 @@ export class CreateDiscountDto {
   usageLimitTotal?: number;
 
   @ApiPropertyOptional({
-    description: "Kullanıcı başı kullanım limiti",
+    description:
+      "Kullanıcı başı kullanım limiti. 0 = limitsiz (yalnız kitlesi 'herkes' " +
+      "olan kampanyada; misafirler ancak limitsiz kodu kullanabilir).",
     default: 1,
   })
   @IsOptional()
   @IsNumber()
-  @Min(1)
+  @Min(0)
   @Type(() => Number)
   usageLimitPerUser?: number;
 
@@ -193,4 +202,53 @@ export class CreateDiscountDto {
   @Max(1)
   @Type(() => Number)
   platformFundedRatio?: number;
+
+  @ApiPropertyOptional({
+    enum: DiscountTarget,
+    description:
+      "İndirimin indirdiği kalem. product_price yalnız satıcının, bedeller yalnız platformundur",
+    default: "product_price",
+  })
+  @IsOptional()
+  @IsEnum(DiscountTarget)
+  target?: DiscountTarget;
+
+  @ApiPropertyOptional({
+    enum: DiscountAudience,
+    description: "İndirimin hedef kitlesi",
+    default: "everyone",
+  })
+  @IsOptional()
+  @IsEnum(DiscountAudience)
+  audience?: DiscountAudience;
+
+  @ApiPropertyOptional({
+    enum: MembershipTierType,
+    isArray: true,
+    description: "audience=membership_tiers için hedef katmanlar",
+  })
+  @IsOptional()
+  @IsArray()
+  @IsEnum(MembershipTierType, { each: true })
+  targetTierTypes?: MembershipTierType[];
+
+  @ApiPropertyOptional({
+    description:
+      "audience=specific_buyers | specific_sellers için hedef kullanıcı kimlikleri",
+  })
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  targetUserIds?: string[];
+
+  @ApiPropertyOptional({
+    description:
+      "Kampanyanın TL bütçe tavanı. Bedel indirimlerinde zorunludur (maliyeti platform üstlenir)",
+    example: 25000,
+  })
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  @Type(() => Number)
+  budgetLimit?: number;
 }

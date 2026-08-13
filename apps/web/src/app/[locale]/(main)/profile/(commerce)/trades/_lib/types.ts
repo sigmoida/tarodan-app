@@ -1,5 +1,7 @@
 /** @format */
 
+import { publicNameOf } from "@/lib/public-name";
+
 export interface TradeItem {
   id: string;
   productId: string;
@@ -19,8 +21,8 @@ export interface Trade {
   receiverId: string;
   initiatorName?: string;
   receiverName?: string;
-  initiator?: { id: string; displayName?: string };
-  receiver?: { id: string; displayName?: string };
+  initiator?: { id: string; publicName?: string; displayName?: string };
+  receiver?: { id: string; publicName?: string; displayName?: string };
   initiatorItems: TradeItem[];
   receiverItems: TradeItem[];
   cashAmount?: number;
@@ -34,8 +36,8 @@ export interface Trade {
 export const cashPayerName = (trade: Trade): string | null => {
   if (!trade.cashPayerId) return null;
   return trade.cashPayerId === trade.initiatorId
-    ? (trade.initiatorName ?? trade.initiator?.displayName ?? null)
-    : (trade.receiverName ?? trade.receiver?.displayName ?? null);
+    ? (trade.initiatorName ?? publicNameOf(trade.initiator) ?? null)
+    : (trade.receiverName ?? publicNameOf(trade.receiver) ?? null);
 };
 
 const PLACEHOLDER = "https://placehold.co/120x120/f3f4f6/9ca3af?text=Ürün";

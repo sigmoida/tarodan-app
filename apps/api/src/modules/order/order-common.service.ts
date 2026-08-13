@@ -6,6 +6,7 @@ import { OrderStatus, OfferStatus } from "@prisma/client";
 import { getAvailableQuantity } from "../product/helpers/product-availability.helper";
 import { sellerNetAmountOf } from "./order-net.helper";
 import { storedProductBaseOf } from "./order-charged-base.helper";
+import { publicIdentityFields } from "../../common/helpers/public-identity";
 
 /**
  * Sipariş modülü ortak yardımcıları (sipariş yanıtı formatlama + ürün cache
@@ -106,7 +107,15 @@ export class OrderCommonService {
     if (order.status !== OrderStatus.cancelled) return false;
     if (order.buyerId !== userId) return false;
     if (!order.offerId || !order.offer) return false;
-    if (order.offer.status !== OfferStatus.accepted) return false;
+    // `payment_expired` DE yeniden açılabilir — reactivate() bu iki statüyü
+    // kabul eder ve 24 saatlik pencere cron'u teklifi HER ZAMAN
+    // `payment_expired` yapar. Yalnız `accepted` arandığı için buton tam da
+    // var olma sebebi olan senaryoda hiç çıkmıyordu.
+    if (
+      order.offer.status !== OfferStatus.accepted &&
+      order.offer.status !== OfferStatus.payment_expired
+    )
+      return false;
     if (!order.product) return false;
     const available = getAvailableQuantity(order.product);
     if (available !== null && available < 1) return false;
@@ -169,6 +178,22 @@ export class OrderCommonService {
         ? `https://www.suratkargo.com.tr/KargoTakip/?kargotakipno=${encodeURIComponent(cargoCode)}`
         : null;
 
+    // Misafir siparişi: alıcı satırı ortak sentetik hesaptır, gerçek ad
+    // teslimat verisinde tutulur (bkz. order-checkout-group `isGuestOrder`).
+    const shippingAddressJson = order.shippingAddress as {
+      isGuestOrder?: boolean;
+      guestName?: string;
+      fullName?: string;
+    } | null;
+    const guestBuyerName =
+      shippingAddressJson && typeof shippingAddressJson === "object"
+        ? shippingAddressJson.isGuestOrder === true
+          ? shippingAddressJson.guestName ||
+            shippingAddressJson.fullName ||
+            "Misafir Alıcı"
+          : null
+        : null;
+
     const totalAmount = Number(order.totalAmount ?? 0);
     const shippingCost = Number(order.shippingCost ?? 0);
     const buyerFeeAmount = Number(order.buyerFeeAmount ?? 0);
@@ -210,6 +235,11 @@ export class OrderCommonService {
       buyerServiceTaxAmount,
       sellerServiceTaxAmount,
       serviceVatRate: Number(order.serviceVatRate ?? 0),
+      // Platformun verdiği bedel indirimleri: kesinti kolonları zaten indirimli
+      // tutarı taşır, bu iki satır kazancın KAYNAĞINI söyler (alıcı: daha az
+      // ödedi, satıcı: daha çok hak etti).
+      buyerFeeDiscountAmount: Number(order.buyerFeeDiscountAmount ?? 0),
+      sellerFeeDiscountAmount: Number(order.sellerFeeDiscountAmount ?? 0),
       totalAmount,
       sellerNetAmount,
     };
@@ -255,12 +285,27 @@ export class OrderCommonService {
             },
           ]
         : [],
+      // Karşı taraf herkese açık kimliğiyle görünür. Misafir siparişinde alıcı
+      // ortak sentetik hesaptır (GUEST_SYSTEM); gerçek alıcı adı siparişin
+      // teslimat verisinde durur, satıcıya onu gösteririz.
       buyer: {
-        ...order.buyer,
-        avatarUrl: await this.resolveAvatarUrl(order.buyer?.avatarUrl),
+        id: order.buyer?.id ?? order.buyerId,
+        isVerified: guestBuyerName ? false : Boolean(order.buyer?.isVerified),
+        ...(guestBuyerName
+          ? {
+              publicName: guestBuyerName,
+              displayName: guestBuyerName,
+              username: null,
+            }
+          : publicIdentityFields(order.buyer)),
+        avatarUrl: guestBuyerName
+          ? null
+          : await this.resolveAvatarUrl(order.buyer?.avatarUrl),
       },
       seller: {
-        ...order.seller,
+        id: order.seller?.id ?? order.sellerId,
+        isVerified: Boolean(order.seller?.isVerified),
+        ...publicIdentityFields(order.seller),
         avatarUrl: await this.resolveAvatarUrl(order.seller?.avatarUrl),
       },
       shippingAddress:

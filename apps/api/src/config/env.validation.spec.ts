@@ -1,4 +1,4 @@
-import { validateEnv } from "./env.validation";
+import { socialSignInWarnings, validateEnv } from "./env.validation";
 
 /**
  * Boot/unit guard for issues #62 + #68: a missing or placeholder secret under
@@ -41,6 +41,13 @@ describe("validateEnv", () => {
     SURAT_KARGO_TEST_MODE: "false",
     SURAT_KARGO_CARI_KODU: "cargo-account",
     SURAT_KARGO_SIFRE: "cargo-password",
+    GOOGLE_CLIENT_ID_WEB: "google-client-id.apps.googleusercontent.com",
+    GOOGLE_CLIENT_SECRET: "google-client-secret",
+    APPLE_CLIENT_ID: "com.tarodan.app",
+    APPLE_SERVICES_ID: "com.tarodan.web",
+    NETGSM_USERCODE: "netgsm-user",
+    NETGSM_PASSWORD: "netgsm-password",
+    NETGSM_MSGHEADER: "TARODAN",
     ELOGO_ENABLED: "true",
     ELOGO_SOAP_MODE: "live",
     ELOGO_SOAP_URL: "https://elogo.test/PostBoxService.svc",
@@ -163,6 +170,63 @@ describe("validateEnv", () => {
         SURAT_KARGO_SIFRE: "s",
       }),
     ).toThrow(/SURAT_KARGO_TEST_MODE/);
+  });
+
+  // Sosyal giriş eksikse yalnızca ilgili buton bozulur ve kullanıcı GÖRÜNÜR bir
+  // hata alır. Bu bir dönem fatal'di ve eksik APPLE_CLIENT_ID tüm API'yi açılış
+  // döngüsüne soktu — bir giriş sağlayıcısı yüzünden pazaryeri kapanmamalı.
+  it("does NOT block boot when social sign-in configuration is missing", () => {
+    expect(() =>
+      validateEnv(
+        without(
+          prodBase,
+          "GOOGLE_CLIENT_ID_WEB",
+          "GOOGLE_CLIENT_SECRET",
+          "APPLE_CLIENT_ID",
+          "APPLE_SERVICES_ID",
+        ),
+      ),
+    ).not.toThrow();
+  });
+
+  it("warns about the social sign-in values that are missing", () => {
+    expect(
+      socialSignInWarnings(
+        without(prodBase, "GOOGLE_CLIENT_SECRET", "APPLE_SERVICES_ID"),
+      ),
+    ).toEqual([
+      expect.stringContaining("GOOGLE_CLIENT_SECRET"),
+      expect.stringContaining("APPLE_SERVICES_ID"),
+    ]);
+  });
+
+  // APPLE_CLIENT_ID native uygulamanın bundle id'si; web akışında kullanılmıyor,
+  // bu yüzden uyarıya bile girmez.
+  it("does not warn about APPLE_CLIENT_ID (native-only, unused by web)", () => {
+    expect(socialSignInWarnings(without(prodBase, "APPLE_CLIENT_ID"))).toEqual(
+      [],
+    );
+  });
+
+  it("stays quiet outside production", () => {
+    expect(
+      socialSignInWarnings({ ...prodBase, NODE_ENV: "development" }),
+    ).toEqual([]);
+  });
+
+  // NetGSM eksikse sağlayıcı mock'a düşüp "gönderildi" döner: kullanıcı kod
+  // bekler, SMS hiç gelmez. Sessiz kayıp yerine açılışta patlaması gerekir.
+  it("throws in production when the NetGSM OTP credentials are missing", () => {
+    expect(() =>
+      validateEnv(
+        without(
+          prodBase,
+          "NETGSM_USERCODE",
+          "NETGSM_PASSWORD",
+          "NETGSM_MSGHEADER",
+        ),
+      ),
+    ).toThrow(/NETGSM_USERCODE|NETGSM_PASSWORD|NETGSM_MSGHEADER/);
   });
 
   it("throws when cargo enabled in prod but credentials missing", () => {

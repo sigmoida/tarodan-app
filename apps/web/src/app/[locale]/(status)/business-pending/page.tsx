@@ -51,8 +51,11 @@ export default function BusinessPendingPage() {
         </ol>
       </div>
       <div className="flex flex-col gap-3">
-        <ButtonLink href="/seller/documents" className="w-full">
-          Belgeleri Yükle / Tamamla
+        {/* Tam başvuru akışı (şirket bilgileri + ortaklar + 7 belge) profil
+            altındaki kurumsal sayfada — /seller/documents yalnız belge alt
+            kümesini gösteriyordu. */}
+        <ButtonLink href="/profile/business" className="w-full">
+          Başvuruyu Tamamla / Belgeleri Yükle
         </ButtonLink>
         <ButtonLink variant="secondary" href="/contact" className="w-full">
           Destek Ekibiyle İletişime Geç

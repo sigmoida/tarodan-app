@@ -6,6 +6,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import toast from "react-hot-toast";
 import { api } from "@/lib/api";
 import { useTranslations } from "next-intl";
+import { useConfirm } from "@/components/ConfirmProvider";
 import { useWebList } from "@/hooks/useWebResource";
 import { useWebMutation } from "@/hooks/useWebMutation";
 import type { Offer, OfferTab } from "../_lib/types";
@@ -34,9 +35,14 @@ export function useOffers(type: OfferTab, enabled: boolean) {
 
 type OfferActionType = "accept" | "reject" | "cancel";
 
-/** Accept / reject / cancel — one mutation; `pendingId` marks the in-flight offer. */
+/**
+ * Accept / reject / cancel — one mutation; `pendingId` marks the in-flight
+ * offer. Üçü de geri alınamaz olduğundan istek atılmadan önce paylaşılan
+ * onay diyaloğu (useConfirm) gösterilir.
+ */
 export function useOfferAction() {
   const queryClient = useQueryClient();
+  const confirm = useConfirm();
   const t = useTranslations();
   const mutation = useMutation({
     mutationFn: ({
@@ -57,8 +63,51 @@ export function useOfferAction() {
       toast.error(err?.response?.data?.message || fallback);
     },
   });
+
+  const run = async (vars: {
+    offerId: string;
+    action: OfferActionType;
+    /**
+     * Kabulü KİM yapıyor: satıcı gelen teklifi mi, alıcı karşı teklifi mi?
+     * Kabul ürünü kilitlemediği (ilk ödeyen alır) için uyarı metni iki taraf
+     * için farklıdır.
+     */
+    acceptAs?: "seller" | "buyer";
+  }) => {
+    const copy = {
+      accept: {
+        title: t("offer.acceptConfirmTitle"),
+        description:
+          vars.acceptAs === "buyer"
+            ? t("offer.acceptConfirmDescBuyer")
+            : t("offer.acceptConfirmDescSeller"),
+        destructive: false,
+      },
+      reject: {
+        title: t("offer.rejectConfirmTitle"),
+        description: t("offer.rejectConfirmDesc"),
+        destructive: true,
+      },
+      cancel: {
+        title: t("offer.cancelConfirmTitle"),
+        description: t("offer.cancelConfirmDesc"),
+        destructive: true,
+      },
+    }[vars.action];
+    if (
+      !(await confirm({
+        ...copy,
+        confirmLabel: t("common.confirm"),
+        cancelLabel: t("common.cancel"),
+      }))
+    ) {
+      return;
+    }
+    mutation.mutate({ offerId: vars.offerId, action: vars.action });
+  };
+
   return {
-    run: mutation.mutate,
+    run,
     pendingId: mutation.isPending
       ? (mutation.variables?.offerId ?? null)
       : null,

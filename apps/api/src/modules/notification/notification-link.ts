@@ -138,6 +138,17 @@ export const NOTIFICATION_LINKS: Record<
   [NotificationType.ORDER_CANCELLED_SELLER]: SELLER_ORDER,
   [NotificationType.PRODUCT_SOLD]: SELLER_ORDER,
   [NotificationType.CARGO_MOVEMENT_MISSING]: SELLER_ORDER,
+  // Alıcıya VE satıcıya gider (order-scheduler ikisine de atar): hedef ekran
+  // tipten değil `audience`tan seçilir. Eski sabit alıcı deseni satıcıyı
+  // alıcının sipariş ekranına götürüyordu.
+  [NotificationType.ORDER_SHIPMENT_DELAYED]: byAudience(
+    "/profile/orders/{{orderId}}",
+    "/seller/orders/{{orderId}}",
+  ),
+  // Admin alarmı: yalnız admin'lere gider. Tüketici sitesindeki `/profile/...`
+  // ekranı adminin oturumunda açılmaz — hedef admin panelindeki sipariş
+  // dosyasıdır (serbest link, üretici verir).
+  [NotificationType.ORDER_STUCK_IN_TRANSIT]: free("adminLink"),
   // Satıcının ürünü satışa kapandı: alıcı tarafındaki "artık satışta değil"
   // sayfası, kaldırılmış ürünün 404'üne gitmesin.
   [NotificationType.ORDER_CANCELLED_OUT_OF_STOCK]: UNAVAILABLE,
@@ -149,11 +160,23 @@ export const NOTIFICATION_LINKS: Record<
   // Kabul edilen teklifte HENÜZ SİPARİŞ YOKTUR: alıcının ödemesi gerekir.
   // Harita `orderId` istiyordu ama üretici onu hiç göndermiyor; bu yüzden
   // link üretilemiyordu. Hedef, alıcının satın almayı tamamlayacağı ilandır.
-  [NotificationType.OFFER_ACCEPTED]: LISTING,
+  // Kabul edilen teklifte tek iş ÖDEME: hedef ilan değil, ödenecek sipariştir.
+  // (Sipariş henüz oluşmadıysa alıcının teklif listesine düşer.)
+  [NotificationType.OFFER_ACCEPTED]: pattern(
+    "/profile/orders/{{orderId}}",
+    "/profile/offers",
+  ),
+  [NotificationType.OFFER_COUNTER_ACCEPTED]: pattern(
+    "/seller/orders/{{orderId}}",
+    "/profile/offers",
+  ),
+  [NotificationType.OFFER_PAYMENT_EXPIRED]: BUYER_ORDER,
   [NotificationType.OFFER_REJECTED]: LISTING,
   [NotificationType.OFFER_COUNTER_DECLINED]: LISTING,
   [NotificationType.OFFER_EXPIRED]: LISTING,
+  [NotificationType.OFFER_EXPIRED_SELLER]: LISTING,
   [NotificationType.OFFER_CANCELLED_OUT_OF_STOCK]: UNAVAILABLE,
+  [NotificationType.OFFER_CANCELLED_LISTING_REMOVED]: UNAVAILABLE,
 
   // ── Ürün / ilan ──────────────────────────────────────────────────────────
   [NotificationType.PRODUCT_APPROVED]: LISTING,
@@ -168,6 +191,7 @@ export const NOTIFICATION_LINKS: Record<
   [NotificationType.LISTING_EXPIRED]: pattern("/profile/listings"),
   [NotificationType.LISTING_VIEWS_MILESTONE]: LISTING,
   [NotificationType.BOOST_EXPIRED]: pattern("/profile/listings"),
+  [NotificationType.BOOST_ACTIVATED]: pattern("/profile/listings"),
 
   // ── Ödeme (satıcıya) ─────────────────────────────────────────────────────
   // Hedef kitle TİPTEN belli: ikisi de satıcıya gider, `orderId` varlığına
@@ -183,13 +207,34 @@ export const NOTIFICATION_LINKS: Record<
   [NotificationType.TRADE_COMPLETED]: TRADE,
   [NotificationType.TRADE_REJECTED]: pattern("/profile/trades"),
   [NotificationType.TRADE_AUTO_CANCELLED]: pattern("/profile/trades"),
-  [NotificationType.TRADE_STUCK_AT_WAREHOUSE]: pattern("/profile/trades"),
+  [NotificationType.TRADE_AT_WAREHOUSE]: TRADE,
+  // Admin alarmları: yalnız admin'lere gider — kullanıcı sitesindeki takas
+  // listesi değil, admin panelindeki takas dosyası açılmalı (serbest link).
+  [NotificationType.TRADE_STUCK_AT_WAREHOUSE]: free("adminLink"),
+  [NotificationType.TRADE_OUTBOUND_DELIVERY_MISSING]: free("adminLink"),
   [NotificationType.TRADE_ADDRESS_REQUIRED]: pattern("/profile/trades"),
-  // Kargo kodu takasa aittir: üretici serbest link göndermez.
-  [NotificationType.CARGO_CODE_READY]: TRADE,
+  // Kargo kodu satış siparişinin gönderenine (satıcı) gider; takas bacağı için
+  // üretilirse orderId olmaz ve takas listesine düşer.
+  [NotificationType.CARGO_CODE_READY]: pattern(
+    "/seller/orders/{{orderId}}",
+    "/profile/trades",
+  ),
+
+  // Kupon geri verildi: kod mesajın içinde; gidilecek tekil ekran yok.
+  [NotificationType.COUPON_RETURNED]: none,
+  // Admin'e gider: hedef admin panelindeki kampanya listesi (serbest link).
+  [NotificationType.CAMPAIGN_BUDGET_EXHAUSTED]: free("adminLink"),
+  // Admin'e gider: bekleyen ilan kuyruğu (serbest link).
+  [NotificationType.MODERATION_QUEUE_STALE]: free("adminLink"),
 
   // ── İade ─────────────────────────────────────────────────────────────────
-  [NotificationType.REFUND_CANCELLED]: BUYER_ORDER,
+  // İKİ yöne de gider: alıcı kendi talebini iptal edince SATICIYA ("iade talebi
+  // iptal edildi"), sistem/admin kapatınca ALICIYA. Sabit alıcı deseni satıcıyı
+  // alıcının sipariş ekranına deep-link'liyordu — hedef `audience` ile ayrılır.
+  [NotificationType.REFUND_CANCELLED]: byAudience(
+    "/profile/orders/{{orderId}}",
+    "/seller/orders/{{orderId}}",
+  ),
   [NotificationType.REFUND_APPROVED]: BUYER_ORDER,
   [NotificationType.REFUND_RETURN_OPENED]: BUYER_ORDER,
   [NotificationType.REFUND_COMPLETED]: BUYER_ORDER,

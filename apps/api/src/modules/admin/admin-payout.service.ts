@@ -9,6 +9,7 @@ import { PayoutTransactionsQueryDto, PayoutExportQueryDto } from "./dto";
 import {
   Prisma,
   PaymentHoldStatus,
+  PaymentStatus,
   PayoutStatus,
   TradeStatus,
 } from "@prisma/client";
@@ -588,9 +589,19 @@ export class AdminPayoutService {
   }
 
   /**
-   * Release payment hold to seller (admin manual release)
+   * Release payment hold to seller (admin manual release).
+   *
+   * `force` = ERKEN bırakma: iade penceresi (releaseAt) dolmasını beklemeden
+   * açar. Yalnız tarih şartı esner — teslim/payout-uygunluk, açık-iade ve
+   * frozen guard'ları releasePayment içinde aynen geçerli kalır. Audit'e
+   * force olarak yazılır.
    */
-  async releasePayout(adminId: string, orderId: string, reason?: string) {
+  async releasePayout(
+    adminId: string,
+    orderId: string,
+    reason?: string,
+    force = false,
+  ) {
     // Y13: Escrow→satıcı release'i geri DÖNÜLEMEZ. Sebep zorunlu kılınarak kazara/
     // gerekçesiz tetikleme engellenir ve audit izine sebep yazılır.
     if (!reason || !reason.trim()) {
@@ -598,14 +609,19 @@ export class AdminPayoutService {
         "Escrow serbest bırakma için sebep (reason) zorunludur",
       );
     }
-    await this.paymentService.releasePayment(orderId);
+    await this.paymentService.releasePayment(orderId, {
+      ignoreReleaseDate: force,
+    });
     await this.audit.createRequiredAuditLog(
       adminId,
       "payout_release",
       "PaymentHold",
       orderId,
-      { action: "release", reason: reason.trim() },
-      { releasedAt: new Date() },
+      {
+        action: force ? "force_release_early" : "release",
+        reason: reason.trim(),
+      },
+      { releasedAt: new Date(), force },
     );
     return {
       success: true,
@@ -615,17 +631,32 @@ export class AdminPayoutService {
   }
 
   /**
-   * Release trade cash payment hold (admin manual release for trade escrow)
+   * Release trade cash payment hold (admin manual release for trade escrow).
+   *
+   * Sipariş tarafındaki `releasePayout` ile SİMETRİK: sebep zorunlu, audit'li ve
+   * yalnız süresi DOLMUŞ hold'u açar — bu uç cron kaçırdığında kurtarma aracıdır,
+   * bekleme süresini kısaltma aracı değil.
+   *
+   * KRİTİK (v2, takasta taraf başına ödeme satırı var): güncelleme filtresizse
+   * takasın DİĞER tarafına ait, hâlâ iade borcu olan satır da `releasedAt`
+   * damgası yiyordu → payout cron'u o nakit farkı KUSURLU tarafa ödüyor, iade
+   * retry'ı (releasedAt:null arar) kalıcı olarak imkânsızlaşıyordu. Filtre,
+   * iptal/iade işinde kurulan `holdReleaseAt` NİYET DAMGASI sözleşmesini
+   * uygular: damgalı satır = release borcu, damgasız satır = iade borcu
+   * (compensate_* çözümünde mağdurun satırı bilerek damgalanmaz;
+   * compensate_both'ta hiçbir satır damgalanmaz → burada 0 satır açılır).
    */
-  async releaseTradePaymentHold(adminId: string, tradeId: string) {
-    const tcp = await this.prisma.tradeCashPayment.findFirst({
-      where: { tradeId },
-    });
-    if (!tcp) throw new NotFoundException("Trade cash payment bulunamadı");
-    if (tcp.releasedAt)
-      return { success: true, message: "Zaten serbest bırakılmış" };
-    if (tcp.refundedAt)
-      throw new BadRequestException("İade edilmiş ödeme serbest bırakılamaz");
+  async releaseTradePaymentHold(
+    adminId: string,
+    tradeId: string,
+    reason?: string,
+    force = false,
+  ) {
+    if (!reason || !reason.trim()) {
+      throw new BadRequestException(
+        "Escrow serbest bırakma için sebep (reason) zorunludur",
+      );
+    }
 
     // MONEY-M8: Yalnız `completed` takasta nakit hold serbest bırakılabilir. Aksi halde
     // (disputed/returning/admin_reviewing/cancelled) recipient'e ödeme yapılır ve takas
@@ -641,23 +672,61 @@ export class AdminPayoutService {
       );
     }
 
-    // v2: takasta taraf başına ödeme satırı var → hold serbest bırakma TÜM
-    // satırlara uygulanır (v1'de zaten tek satırdı).
-    await this.prisma.tradeCashPayment.updateMany({
-      where: { tradeId },
-      data: { releasedAt: new Date() },
+    const now = new Date();
+    // `force` = ERKEN bırakma: hold süresinin (holdReleaseAt) dolmasını
+    // beklemez. Damga şartı (`not: null`) force'ta da KALIR — damgasız satır
+    // iade borcudur (compensate_*), erken bırakma onu asla kapsayamaz.
+    const released = await this.prisma.tradeCashPayment.updateMany({
+      where: {
+        tradeId,
+        status: PaymentStatus.completed,
+        releasedAt: null,
+        refundedAt: null,
+        holdReleaseAt: force ? { not: null } : { not: null, lte: now },
+      },
+      data: { releasedAt: now },
     });
+
+    if (released.count === 0) {
+      // İdempotent yol: çift tıklama ya da başarılı isteğin ağ zaman aşımı
+      // sonrası retry'ı. Tüm satırlar çoktan kapanmışsa (released/refunded) bu
+      // bir hata değildir; 400 + "iade borcu" mesajı operatörü yanıltırdı.
+      const rows = await this.prisma.tradeCashPayment.findMany({
+        where: { tradeId },
+        select: { releasedAt: true, refundedAt: true },
+      });
+      if (
+        rows.length > 0 &&
+        rows.every((r) => r.releasedAt !== null || r.refundedAt !== null)
+      ) {
+        return {
+          success: true,
+          tradeId,
+          releasedRows: 0,
+          message: "Zaten serbest bırakılmış",
+        };
+      }
+      throw new BadRequestException(
+        "Serbest bırakılabilir nakit hold yok: satırlar iade borcu taşıyor " +
+          "(damgasız) ya da bekleme süresi henüz dolmamış olabilir",
+      );
+    }
+
     await this.audit.createRequiredAuditLog(
       adminId,
       "trade_cash_hold_release",
-      "TradeCashPayment",
-      tcp.id,
-      { action: "manual_release" },
-      { releasedAt: new Date() },
+      "Trade",
+      tradeId,
+      {
+        action: force ? "force_release_early" : "manual_release",
+        reason: reason.trim(),
+      },
+      { releasedAt: now, releasedRows: released.count, force },
     );
     return {
       success: true,
       tradeId,
+      releasedRows: released.count,
       message: "Takas nakit ödemesi serbest bırakıldı",
     };
   }

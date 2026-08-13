@@ -73,6 +73,23 @@ _yetim_ dokümanları eşitler (`deltaSync` = ID kümesi farkı); ID'si zaten
 indekste olan bir ürünün alanlarını tazelemezler. Ürün bir sonraki kez
 düzenlenene kadar bayat kalır — bu yüzden tam reindex zorunlu adımdır.
 
+### Bir kerelik: herkese açık kimlik (username) geçişi sonrası reindex
+
+Arama dokümanlarındaki `sellerName` (ürün) ve `userName` (koleksiyon) alanları
+denormalize edilmiş kopyalardır ve artık **herkese açık ad** ile doldurulur
+(firma adı → kullanıcı adı → isim; bkz. `common/helpers/public-identity.ts`).
+Geçişten önce indekslenmiş dokümanlarda üyelerin **gerçek adı** durur; kod
+deploy edilse bile o dokümanlar aranabilir kalır. Deploy'dan sonra bir kez:
+
+```
+curl -X POST https://<api-host>/api/search/admin/reindex              # ürünler
+curl -X POST https://<api-host>/api/search/admin/reindex-collections  # koleksiyonlar
+```
+
+Yukarıdaki uyarı burada da geçerli: delta/reconcile bu alanları tazelemez.
+Veritabanı tarafında yapılacak bir işlem YOKTUR — şema, benzersiz indeks ve
+`legacy_########` yer tutucuları zaten mevcut (`20260729180000` migration'ı).
+
 ---
 
 ## 2. Staging reset ve seed-assets modeli
@@ -210,6 +227,13 @@ tanımlanmadan açılırsa hiçbir payout tamamlanamaz), `PAYTR_REPORT_SYNC_ENAB
 (panel yetkisi ister), `SHIPPING_WEBHOOK_ENABLED`,
 `FEATURE_48H_CONFIRMATION_WINDOW`, `PAYTR_CARD_STORAGE_ENABLED`,
 `PAYTR_RECURRING_ENABLED`, `BULLBOARD_ENABLED`, `ENABLE_SWAGGER`.
+
+**İade politikası v2 — VARSAYILAN AÇIK:** Bileşen bazlı iade politikası (v2)
+artık kod tarafında varsayılan AÇIKTIR; launch'ta env eklemek GEREKMEZ.
+`REFUND_POLICY_V2_ENABLED=false` yalnız acil-durum anahtarıdır (kill-switch):
+para hesabında beklenmedik sorun çıkarsa v1 oransal formüle döndürür. Birkaç
+stabil haftadan sonra bayrağın ve v1 hesaplayıcının tamamen sökülmesi planlıdır
+(yeni kayıtlar zaten çift yazılır, geri dönüş güvenlidir).
 
 **PayTR panel tarafı:** ödeme bildirim URL'i
 `https://<api-host>/api/payments/callback/paytr` (env'deki `PAYTR_CALLBACK_URL`

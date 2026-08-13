@@ -4,6 +4,7 @@ import {
   ForbiddenException,
   BadRequestException,
   Logger,
+  Optional,
 } from "@nestjs/common";
 import { PrismaService } from "../../prisma";
 import { CacheService } from "../cache/cache.service";
@@ -27,19 +28,84 @@ import {
   DiscountScope,
   DiscountType,
   DiscountFundedBy,
+  DiscountTarget,
+  DiscountAudience,
   CouponReservationStatus,
   Prisma,
 } from "@prisma/client";
+import {
+  assertAudienceConsistent,
+  assertBudgetForTarget,
+  assertCodeAllowedForTarget,
+  assertSellerCampaignHasCode,
+  assertTargetAllowedForActor,
+  audienceMatches,
+} from "./discount-authorization";
+import { isProductInDiscountScope } from "./discount-scope";
+import { FeeDiscountResolver } from "./fee-discount.resolver";
+import { automaticBudgetEntriesOf } from "./fee-discount.engine";
+import { bestQuantityCampaignDiscount } from "./quantity-campaign";
+
+/** Kusursuz iadede geri verilen kupon hakkı — commit SONRASI bildirim için. */
+export interface RestoredCoupon {
+  userId: string;
+  /** Yeniden kullanılabilecek kod (kişisel voucher ya da paylaşılan kod). */
+  code: string;
+  /** Kodun geçerlilik sonu; null = kampanya tarihi geçerli. */
+  expiresAt: Date | null;
+}
 
 /**
- * bogo / bulk_quantity are declared in the schema enum but have NO real redemption
- * logic (they fall through to the flat fixed-amount branch → mispricing). Reject them
- * at create/update until proper buy-X-get-Y / quantity-tier support exists (F4.2).
+ * Kusursuz alıcıya iade edilen kupon, kampanya bittiyse koda özel bu kadar gün
+ * daha yaşar (indirim-teknik §9).
  */
-function assertSupportedDiscountType(type?: DiscountType | null): void {
-  if (type === DiscountType.bogo || type === DiscountType.bulk_quantity) {
+const COUPON_REISSUE_DAYS = 30;
+
+/**
+ * Adet koşullu türlerin (bogo / bulk_quantity) şekil doğrulaması. İkisi de
+ * SATICI ürün-fiyatı kampanyasıdır (cep kuralı: assertTargetAllowedForActor
+ * admin'i zaten engeller), kodsuz-otomatik çalışır ve sepette SATIR bazında
+ * uygulanır (quantity-campaign.ts).
+ */
+function assertQuantityTypeShape(input: {
+  type?: DiscountType | null;
+  target: DiscountTarget;
+  value?: number | null;
+  minQuantity?: number | null;
+  buyQuantity?: number | null;
+  getQuantity?: number | null;
+}): void {
+  const { type } = input;
+  if (type !== DiscountType.bogo && type !== DiscountType.bulk_quantity) {
+    return;
+  }
+  if (input.target !== DiscountTarget.product_price) {
     throw new BadRequestException(
-      "Bu indirim tipi henüz desteklenmiyor (bogo/bulk_quantity)",
+      "Adet koşullu kampanya yalnız ürün fiyatına tanımlanabilir",
+    );
+  }
+  if (type === DiscountType.bogo) {
+    if (
+      !(Number(input.buyQuantity) >= 1) ||
+      !(Number(input.getQuantity) >= 1)
+    ) {
+      throw new BadRequestException(
+        "'Al X, Y bedava' kampanyası için buyQuantity ve getQuantity en az 1 olmalıdır",
+      );
+    }
+    return;
+  }
+  // bulk_quantity: eşik en az 2 (tek adet koşulsuz indirim demektir — o iş
+  // ilan fiyatının), değer 0-100 arası yüzde.
+  if (!(Number(input.minQuantity) >= 2)) {
+    throw new BadRequestException(
+      "Adet koşullu indirim için minQuantity en az 2 olmalıdır",
+    );
+  }
+  const percent = Number(input.value);
+  if (!(percent > 0) || percent > 100) {
+    throw new BadRequestException(
+      "Adet koşullu indirimin değeri 1-100 arası yüzde olmalıdır",
     );
   }
 }
@@ -52,6 +118,8 @@ export class DiscountService {
     private readonly prisma: PrismaService,
     private readonly cache: CacheService,
     private readonly searchService: SearchService,
+    @Optional()
+    private readonly feeDiscountBudget?: FeeDiscountResolver,
   ) {}
 
   /**
@@ -97,11 +165,37 @@ export class DiscountService {
     actorId: string | null,
     isAdmin: boolean,
   ): Promise<DiscountResponseDto> {
-    // bogo / bulk_quantity are NOT implemented in the redemption engine — they would
-    // be silently treated as a flat fixed-amount discount (mispricing, and compounds
-    // the per-line bug). Block their creation until real buy-X-get-Y / quantity-tier
-    // logic exists (F4.2).
-    assertSupportedDiscountType(dto.type);
+    // Cep kuralı: ürün fiyatı satıcının, bedeller platformun. Kupon kodu yalnız
+    // alıcının ödediği kalemlere bağlanır; bedel indirimi TL bütçesi ister.
+    const target = dto.target ?? DiscountTarget.product_price;
+    const audience = dto.audience ?? DiscountAudience.everyone;
+    assertQuantityTypeShape({
+      type: dto.type,
+      target,
+      value: dto.value,
+      minQuantity: dto.minQuantity,
+      buyQuantity: dto.buyQuantity,
+      getQuantity: dto.getQuantity,
+    });
+    assertTargetAllowedForActor(target, isAdmin);
+    assertCodeAllowedForTarget(target, Boolean(dto.code));
+    assertSellerCampaignHasCode(target, isAdmin, Boolean(dto.code), dto.type);
+    assertBudgetForTarget(target, dto.budgetLimit);
+    assertAudienceConsistent({
+      audience,
+      target,
+      tierTypes: dto.targetTierTypes,
+      userIds: dto.targetUserIds,
+    });
+
+    // Limitsiz (kişi-başı limitsiz) kod yalnız kitlesi HERKES olan kampanyada
+    // tanımlanabilir: misafirler ancak böyle bir kodu kullanabilir, kimlik
+    // gerektiren kitlede ise limitsizlik kişi-başı denetimi anlamsız kılar.
+    if (dto.usageLimitPerUser === 0 && audience !== DiscountAudience.everyone) {
+      throw new BadRequestException(
+        "Kişi başı limitsiz kod yalnız 'herkes' kitlesinde tanımlanabilir",
+      );
+    }
 
     // Sellers can only create discounts for their own products
     if (!isAdmin && dto.scope === DiscountScope.global) {
@@ -179,7 +273,10 @@ export class DiscountService {
           ? new Prisma.Decimal(dto.maxDiscountAmount)
           : null,
         usageLimitTotal: dto.usageLimitTotal || null,
-        usageLimitPerUser: dto.usageLimitPerUser || 1,
+        // 0 = bilinçli limitsiz (null): misafirlerin kullanabildiği tek kod türü.
+        // Varsayılan 1 — limitsizlik ancak açıkça istenirse.
+        usageLimitPerUser:
+          dto.usageLimitPerUser === 0 ? null : dto.usageLimitPerUser || 1,
         minQuantity: dto.minQuantity || null,
         buyQuantity: dto.buyQuantity || null,
         getQuantity: dto.getQuantity || null,
@@ -201,6 +298,18 @@ export class DiscountService {
           dto.platformFundedRatio != null
             ? new Prisma.Decimal(dto.platformFundedRatio)
             : null,
+        target,
+        audience,
+        budgetLimit:
+          dto.budgetLimit != null ? new Prisma.Decimal(dto.budgetLimit) : null,
+        targetTiers: dto.targetTierTypes?.length
+          ? {
+              create: dto.targetTierTypes.map((tierType) => ({ tierType })),
+            }
+          : undefined,
+        targetUsers: dto.targetUserIds?.length
+          ? { create: dto.targetUserIds.map((userId) => ({ userId })) }
+          : undefined,
       },
       include: {
         seller: { select: { id: true, displayName: true } },
@@ -235,12 +344,82 @@ export class DiscountService {
       throw new NotFoundException("İndirim bulunamadı");
     }
 
-    // bogo/bulk_quantity unsupported (F4.2) — reject switching to an unimplemented type.
-    assertSupportedDiscountType(dto.type);
-
     // Sellers can only update their own discounts
     if (!isAdmin && discount.sellerId !== actorId) {
       throw new ForbiddenException("Bu indirimi düzenleme yetkiniz yok");
+    }
+
+    // Cep kuralı düzenlemede de geçerlidir: hedef kalem değiştirilerek satıcı
+    // platformun bedellerine, platform da satıcının fiyatına geçemez.
+    const nextTarget = dto.target ?? discount.target;
+    const nextAudience = dto.audience ?? discount.audience;
+    // Adet koşullu tür kuralları birleşik (dto ?? mevcut) değerlerle doğrulanır.
+    assertQuantityTypeShape({
+      type: dto.type ?? discount.type,
+      target: nextTarget,
+      value: dto.value ?? Number(discount.value),
+      minQuantity:
+        dto.minQuantity !== undefined ? dto.minQuantity : discount.minQuantity,
+      buyQuantity:
+        dto.buyQuantity !== undefined ? dto.buyQuantity : discount.buyQuantity,
+      getQuantity:
+        dto.getQuantity !== undefined ? dto.getQuantity : discount.getQuantity,
+    });
+    assertTargetAllowedForActor(nextTarget, isAdmin);
+    assertCodeAllowedForTarget(
+      nextTarget,
+      Boolean(dto.code !== undefined ? dto.code : discount.code),
+    );
+    assertSellerCampaignHasCode(
+      nextTarget,
+      isAdmin,
+      Boolean(dto.code !== undefined ? dto.code : discount.code),
+      dto.type ?? discount.type,
+    );
+    assertBudgetForTarget(
+      nextTarget,
+      dto.budgetLimit !== undefined
+        ? dto.budgetLimit
+        : discount.budgetLimit != null
+          ? Number(discount.budgetLimit)
+          : null,
+    );
+    if (dto.target !== undefined || dto.audience !== undefined) {
+      const [tiers, users] = await Promise.all([
+        dto.targetTierTypes !== undefined
+          ? Promise.resolve(dto.targetTierTypes as string[])
+          : this.prisma.discountTargetTier
+              .findMany({
+                where: { discountId: id },
+                select: { tierType: true },
+              })
+              .then((rows) => rows.map((row) => row.tierType as string)),
+        dto.targetUserIds !== undefined
+          ? Promise.resolve(dto.targetUserIds)
+          : this.prisma.discountTargetUser
+              .findMany({ where: { discountId: id }, select: { userId: true } })
+              .then((rows) => rows.map((row) => row.userId)),
+      ]);
+      assertAudienceConsistent({
+        audience: nextAudience,
+        target: nextTarget,
+        tierTypes: tiers,
+        userIds: users,
+      });
+    }
+
+    // Limitsiz kod kuralı düzenlemede de geçerli (create ile aynı gerekçe).
+    const nextPerUserLimit =
+      dto.usageLimitPerUser !== undefined
+        ? dto.usageLimitPerUser
+        : discount.usageLimitPerUser;
+    if (
+      (nextPerUserLimit === 0 || nextPerUserLimit === null) &&
+      nextAudience !== DiscountAudience.everyone
+    ) {
+      throw new BadRequestException(
+        "Kişi başı limitsiz kod yalnız 'herkes' kitlesinde tanımlanabilir",
+      );
     }
 
     // Check code uniqueness if changing
@@ -296,7 +475,10 @@ export class DiscountService {
         usageLimitTotal: dto.usageLimitTotal,
       }),
       ...(dto.usageLimitPerUser !== undefined && {
-        usageLimitPerUser: dto.usageLimitPerUser,
+        // 0 = bilinçli limitsiz (null) — yalnız 'herkes' kitlesinde (yukarıda
+        // doğrulandı); misafirlerin kullanabildiği tek kod türü.
+        usageLimitPerUser:
+          dto.usageLimitPerUser === 0 ? null : dto.usageLimitPerUser,
       }),
       ...(dto.minQuantity !== undefined && {
         minQuantity: dto.minQuantity,
@@ -324,6 +506,28 @@ export class DiscountService {
               ? new Prisma.Decimal(dto.platformFundedRatio)
               : null,
         }),
+      ...(dto.target !== undefined && { target: dto.target }),
+      ...(dto.audience !== undefined && { audience: dto.audience }),
+      ...(dto.budgetLimit !== undefined && {
+        budgetLimit:
+          dto.budgetLimit != null ? new Prisma.Decimal(dto.budgetLimit) : null,
+        // Tavan yükseltilince durdurulmuş kampanya yeniden akmalıdır.
+        budgetStoppedAt: null,
+      }),
+      // Hedef listeleri gönderildiyse TAMAMEN değiştirilir (kısmi ekleme yok:
+      // "listeden çıkardım ama hâlâ indirim alıyor" durumunu doğururdu).
+      ...(dto.targetTierTypes !== undefined && {
+        targetTiers: {
+          deleteMany: {},
+          create: dto.targetTierTypes.map((tierType) => ({ tierType })),
+        },
+      }),
+      ...(dto.targetUserIds !== undefined && {
+        targetUsers: {
+          deleteMany: {},
+          create: dto.targetUserIds.map((userId) => ({ userId })),
+        },
+      }),
     };
 
     const updated = await this.prisma.discount.update({
@@ -523,6 +727,10 @@ export class DiscountService {
     const sellerCategoryInclude = {
       seller: { select: { id: true, displayName: true } },
       category: { select: { id: true, name: true } },
+      // Hedef kitle eşleşmesi kupon için de geçerlidir: üyelik/kişi hedefli bir
+      // kod, hedefte olmayan alıcıda kabul edilmemelidir.
+      targetTiers: { select: { tierType: true } },
+      targetUsers: { select: { userId: true } },
     };
 
     let discount = await this.prisma.discount.findUnique({
@@ -534,6 +742,7 @@ export class DiscountService {
     // DiscountCode tablosuna bak → parent Discount kuralları geçerli, ek olarak
     // kod tek kullanımlıktır (isRedeemed).
     let voucherCodeId: string | undefined;
+    let voucherHasOwnWindow = false;
     if (!discount) {
       const voucher = await this.prisma.discountCode.findUnique({
         where: { code },
@@ -547,19 +756,89 @@ export class DiscountService {
       }
       discount = voucher.discount;
       voucherCodeId = voucher.id;
+      // Koda özel süre varsa kampanyanın tarih penceresi yerine O geçerlidir:
+      // kusursuz alıcıya iade edilen kupon, kampanya bitmiş olsa da yaşar.
+      if (voucher.expiresAt) {
+        if (new Date() > voucher.expiresAt) {
+          return { isValid: false, error: "Bu kuponun süresi doldu" };
+        }
+        voucherHasOwnWindow = true;
+      }
     }
 
     if (!discount.isActive) {
       return { isValid: false, error: "Bu kupon artık aktif değil" };
     }
 
-    const now = new Date();
-    if (now < discount.startDate) {
-      return { isValid: false, error: "Bu kupon henüz başlamadı" };
+    // Cep kuralı: admin ürün fiyatından İNDİRİM YAPAMAZ. Eski platform/paylaşımlı
+    // fonlu ürün-fiyatı kuponları tanım tarafında çoktan engellendi; aktif kalmış
+    // eski bir kayıt da yeni siparişlere uygulanmaz — aksi halde
+    // `platformFundedDiscount` yeni siparişlerde tekrar dolardı.
+    const couponTargetsPrice =
+      (discount.target ?? DiscountTarget.product_price) ===
+      DiscountTarget.product_price;
+    if (couponTargetsPrice && discount.fundedBy !== DiscountFundedBy.seller) {
+      return { isValid: false, error: "Bu kupon artık geçerli değil" };
     }
 
-    if (now > discount.endDate) {
-      return { isValid: false, error: "Bu kuponun süresi doldu" };
+    const now = new Date();
+    if (!voucherHasOwnWindow) {
+      if (now < discount.startDate) {
+        return { isValid: false, error: "Bu kupon henüz başlamadı" };
+      }
+
+      if (now > discount.endDate) {
+        return { isValid: false, error: "Bu kuponun süresi doldu" };
+      }
+    }
+
+    // Hedef kitle: kimlik gerektiren bir hedefte misafir kabul edilemez (kimin
+    // hedefte olduğu bilinemez → sessizce herkese açılırdı).
+    if (
+      discount.audience === DiscountAudience.membership_tiers ||
+      discount.audience === DiscountAudience.specific_buyers
+    ) {
+      if (!userId) {
+        return {
+          isValid: false,
+          error: "Bu kupon için giriş yapmanız gerekir",
+        };
+      }
+      const buyerTier =
+        discount.audience === DiscountAudience.membership_tiers
+          ? await this.resolveUserTier(userId)
+          : null;
+      const matches = audienceMatches({
+        audience: discount.audience,
+        target: discount.target ?? DiscountTarget.product_price,
+        tierTypes: (discount as any).targetTiers.map(
+          (row: { tierType: string }) => row.tierType,
+        ),
+        userIds: (discount as any).targetUsers.map(
+          (row: { userId: string }) => row.userId,
+        ),
+        buyerId: userId,
+        buyerTier,
+      });
+      if (!matches) {
+        return {
+          isValid: false,
+          error: "Bu kupon hesabınız için geçerli değil",
+        };
+      }
+    }
+
+    // Bütçe tavanı: bedel kuponunun maliyeti platformundur, tavan dolduysa kupon
+    // yeni sepetlere uygulanmaz.
+    const budgetRemaining =
+      discount.budgetLimit != null
+        ? Math.max(
+            0,
+            Number(discount.budgetLimit) - Number(discount.budgetSpent ?? 0),
+          )
+        : null;
+    if (discount.budgetStoppedAt || budgetRemaining === 0) {
+      return { isValid: false, error: "Bu kampanyanın bütçesi doldu" };
     }
 
     // Real usage is incremented only after successful payment. Active checkout
@@ -593,7 +872,8 @@ export class DiscountService {
         };
       }
       const userUsageCount = await this.prisma.discountUsage.count({
-        where: { discountId: discount.id, userId },
+        // İptal edilmiş (geri verilmiş) kullanım kotayı işgal etmez.
+        where: { discountId: discount.id, userId, revokedAt: null },
       });
       const userReservationCount = await this.prisma.couponReservation.count({
         where: {
@@ -683,14 +963,23 @@ export class DiscountService {
     // multiplied per eligible line and never exceeding the discountable amount (so a
     // multi-item cart can't drive the order total negative). maxDiscountAmount is the
     // final cap. Single source of truth for coupon math (see computeCouponDiscount).
-    const estimatedDiscount = this.computeCouponDiscount(
-      discount.type,
-      Number(discount.value),
-      eligibleSubtotal,
-      discount.maxDiscountAmount != null
-        ? Number(discount.maxDiscountAmount)
-        : null,
-    );
+    // Bedel hedefli kuponda ürün tabanına DOKUNULMAZ; tutar ancak komisyon/kargo
+    // hesaplandıktan sonra bilinir (fiyat hattı motoru uygular). Bu yüzden burada
+    // 0 döner ve hedef bilgisi taşınır.
+    // Hedefi yazılmamış (eski) kayıt ürün fiyatı kuponu sayılır — sessizce bedel
+    // kuponuna dönüşmemeli.
+    const couponTarget = discount.target ?? DiscountTarget.product_price;
+    const isFeeCoupon = couponTarget !== DiscountTarget.product_price;
+    const estimatedDiscount = isFeeCoupon
+      ? 0
+      : this.computeCouponDiscount(
+          discount.type,
+          Number(discount.value),
+          eligibleSubtotal,
+          discount.maxDiscountAmount != null
+            ? Number(discount.maxDiscountAmount)
+            : null,
+        );
 
     return {
       isValid: true,
@@ -705,12 +994,22 @@ export class DiscountService {
         estimatedDiscount,
         eligibleProductIds,
         platformFundedShare:
-          discount.fundedBy === DiscountFundedBy.platform
+          // Bedel kuponunun maliyeti tanımı gereği platformundur; ürün fiyatı
+          // kuponunda eski fonlama ekseni geçerlidir (eski kayıtlar için).
+          isFeeCoupon
             ? 1
-            : discount.fundedBy === DiscountFundedBy.shared
-              ? Number(discount.platformFundedRatio ?? 0)
-              : 0,
+            : discount.fundedBy === DiscountFundedBy.platform
+              ? 1
+              : discount.fundedBy === DiscountFundedBy.shared
+                ? Number(discount.platformFundedRatio ?? 0)
+                : 0,
         voucherCodeId,
+        target: couponTarget,
+        budgetRemaining,
+        maxDiscountAmount:
+          discount.maxDiscountAmount != null
+            ? Number(discount.maxDiscountAmount)
+            : null,
       },
     };
   }
@@ -737,6 +1036,19 @@ export class DiscountService {
       discount = maxDiscountAmount;
     }
     return discount;
+  }
+
+  /**
+   * Kullanıcının geçerli üyelik katmanı — üyelik hedefli kupon eşleşmesi için.
+   * Aboneliği aktif değilse katman yok sayılır.
+   */
+  async resolveUserTier(userId: string): Promise<string | null> {
+    const membership = await this.prisma.userMembership.findUnique({
+      where: { userId },
+      select: { status: true, tier: { select: { type: true } } },
+    });
+    if (!membership || membership.status !== "active") return null;
+    return membership.tier?.type ?? null;
   }
 
   /**
@@ -868,6 +1180,10 @@ export class DiscountService {
           expiresAt,
         },
       });
+
+      // Bütçe, rezerve edilen + tüketilen toplamıdır: ödeme ekranındaki sepet de
+      // kampanyanın parasını tutar, aksi halde tavan aşılabilirdi.
+      await this.feeDiscountBudget?.spendBudget([{ discountId, amount }], tx);
     };
 
     if (client) {
@@ -923,14 +1239,152 @@ export class DiscountService {
     }
   }
 
+  /**
+   * Kusursuz alıcıya kuponu GERİ VERİR.
+   *
+   * Kullanım kaydı silinmez, iptal işareti alır (denetim izi kalır) ve kotadan
+   * düşer. Kampanyanın toplam sayacı ile bütçesi geri açılır. Tek-kullanımlık kod
+   * yeniden kullanılabilir hale gelir; kampanya bu arada sona ermişse koda ÖZEL
+   * 30 günlük bir süre tanınır (kampanyanın tarihi herkes için değişmez).
+   * Paylaşımlı kodlu kampanyada süre bittiyse kullanıcıya tek-kullanımlık yeni
+   * bir kod üretilir.
+   */
+  async revokeUsageForOrders(
+    orderIds: string[],
+    reason: string,
+    client?: Prisma.TransactionClient,
+  ): Promise<{
+    revoked: number;
+    reissuedCodes: string[];
+    /**
+     * Bildirim için: kupon hakkı geri verilen kullanıcılar ve tekrar
+     * kullanabilecekleri kod. Çağıran, TRANSACTION COMMIT olduktan sonra
+     * `notifyCouponReturned` ile haber verir — tx içinde bildirim atılmaz.
+     */
+    restoredCoupons: RestoredCoupon[];
+  }> {
+    const empty = { revoked: 0, reissuedCodes: [], restoredCoupons: [] };
+    if (!orderIds.length) return empty;
+
+    const run = async (tx: Prisma.TransactionClient): Promise<typeof empty> => {
+      const usages = await tx.discountUsage.findMany({
+        where: { orderId: { in: orderIds }, revokedAt: null },
+        select: {
+          id: true,
+          discountId: true,
+          userId: true,
+          orderId: true,
+          amount: true,
+          discount: {
+            select: { id: true, code: true, endDate: true, isActive: true },
+          },
+        },
+      });
+      if (!usages.length) return empty;
+
+      const now = new Date();
+      const reissuedCodes: string[] = [];
+      const restoredCoupons: RestoredCoupon[] = [];
+
+      for (const usage of usages) {
+        const marked = await tx.discountUsage.updateMany({
+          where: { id: usage.id, revokedAt: null },
+          data: { revokedAt: now, revokeReason: reason },
+        });
+        if (marked.count === 0) continue;
+
+        // Toplam sayaç geri açılır (negatife düşmeden).
+        await tx.$executeRaw`
+          UPDATE discounts
+          SET used_count = GREATEST(used_count - 1, 0), updated_at = NOW()
+          WHERE id = ${usage.discountId}
+        `;
+        await this.feeDiscountBudget?.releaseBudget(
+          [{ discountId: usage.discountId, amount: Number(usage.amount) }],
+          tx,
+        );
+
+        const campaignOver =
+          !usage.discount.isActive || now > usage.discount.endDate;
+        const personalWindow = campaignOver
+          ? new Date(now.getTime() + COUPON_REISSUE_DAYS * 24 * 60 * 60 * 1000)
+          : null;
+
+        // Bu siparişte harcanmış tek-kullanımlık kod varsa onu geri aç.
+        const voucher = await tx.discountCode.findFirst({
+          where: { discountId: usage.discountId, orderId: usage.orderId },
+          select: { id: true, code: true },
+        });
+        if (voucher) {
+          await tx.discountCode.update({
+            where: { id: voucher.id },
+            data: {
+              isRedeemed: false,
+              redeemedById: null,
+              redeemedAt: null,
+              orderId: null,
+              ...(personalWindow ? { expiresAt: personalWindow } : {}),
+            },
+          });
+          reissuedCodes.push(voucher.code);
+          restoredCoupons.push({
+            userId: usage.userId,
+            code: voucher.code,
+            expiresAt: personalWindow,
+          });
+          continue;
+        }
+
+        // Paylaşımlı kodlu kampanya bitmişse hak, kişiye özel yeni bir kodla
+        // yaşatılır — aksi halde "geri verildi" dediğimiz hak kullanılamazdı.
+        if (campaignOver && personalWindow) {
+          const code = generateReferenceCode(REFERENCE_PREFIX.voucher);
+          await tx.discountCode.create({
+            data: {
+              discountId: usage.discountId,
+              code,
+              expiresAt: personalWindow,
+            },
+          });
+          reissuedCodes.push(code);
+          restoredCoupons.push({
+            userId: usage.userId,
+            code,
+            expiresAt: personalWindow,
+          });
+        } else if (usage.discount.code) {
+          // Kampanya hâlâ yürürlükte: kota geri açıldı, kullanıcı paylaşılan
+          // kodu yeniden kullanabilir.
+          restoredCoupons.push({
+            userId: usage.userId,
+            code: usage.discount.code,
+            expiresAt: usage.discount.endDate,
+          });
+        }
+      }
+
+      return { revoked: usages.length, reissuedCodes, restoredCoupons };
+    };
+
+    return client ? run(client) : this.prisma.$transaction(run);
+  }
+
   /** Release pending-payment reservations without changing real usage. */
   async releaseReservedUsageForOrders(
     orderIds: string[],
     client?: Prisma.TransactionClient,
   ): Promise<void> {
     if (!orderIds.length) return;
-    const run = (tx: Prisma.TransactionClient) =>
-      tx.couponReservation.updateMany({
+    const run = async (tx: Prisma.TransactionClient) => {
+      // Serbest bırakılan rezervasyonun tuttuğu bütçe kampanyaya geri döner.
+      const releasing = await tx.couponReservation.findMany({
+        where: {
+          orderId: { in: orderIds },
+          status: CouponReservationStatus.active,
+        },
+        select: { discountId: true, amount: true },
+      });
+      const result = await tx.couponReservation.updateMany({
         where: {
           orderId: { in: orderIds },
           status: CouponReservationStatus.active,
@@ -940,6 +1394,33 @@ export class DiscountService {
           releasedAt: new Date(),
         },
       });
+      await this.feeDiscountBudget?.releaseBudget(
+        releasing.map((row) => ({
+          discountId: row.discountId,
+          amount: Number(row.amount),
+        })),
+        tx,
+      );
+      // Kodsuz (otomatik) kampanyaların bütçesi sipariş OLUŞURKEN harcanır;
+      // ödenmeyen sipariş kapanırken buradan geri döner. Sipariş başına damga
+      // (feeDiscountBudgetReleasedAt) claim görevi görür: iki yol aynı siparişi
+      // aynı anda kapatsa bile bütçe bir kez iade edilir.
+      const withBreakdown = await tx.order.findMany({
+        where: { id: { in: orderIds }, feeDiscountBudgetReleasedAt: null },
+        select: { id: true, feeDiscountBreakdown: true },
+      });
+      for (const order of withBreakdown) {
+        const entries = automaticBudgetEntriesOf(order.feeDiscountBreakdown);
+        if (!entries.length) continue;
+        const claimed = await tx.order.updateMany({
+          where: { id: order.id, feeDiscountBudgetReleasedAt: null },
+          data: { feeDiscountBudgetReleasedAt: new Date() },
+        });
+        if (claimed.count === 0) continue;
+        await this.feeDiscountBudget?.releaseBudget(entries, tx);
+      }
+      return result;
+    };
     if (client) {
       await run(client);
     } else {
@@ -1007,7 +1488,7 @@ export class DiscountService {
       });
       if (perUser?.usageLimitPerUser) {
         const userUsage = await tx.discountUsage.count({
-          where: { discountId, userId },
+          where: { discountId, userId, revokedAt: null },
         });
         if (userUsage >= perUser.usageLimitPerUser) {
           throw new BadRequestException("Bu kuponu zaten kullandınız");
@@ -1159,25 +1640,57 @@ export class DiscountService {
     const result = new Map<string, number | null>();
     if (!items.length) return result;
 
-    const now = new Date();
-    const sellerIds = [
-      ...new Set(items.map((i) => i.sellerId).filter(Boolean)),
-    ];
-    const categoryIds = [
-      ...new Set(items.map((i) => i.categoryId).filter(Boolean)),
-    ];
-    const productIds = items.map((i) => i.productId);
+    // KODSUZ ürün-fiyatı kampanyası artık TANIMLANAMAZ (satıcı kampanyası kod
+    // ister; admin ürün fiyatına dokunamaz — cep kuralı). Vitrin fiyatını
+    // düşüren tek mekanizma ürünün kendi indirimli satış fiyatıdır
+    // (product-sale-window). Eski kodsuz kayıtlar bilinçli olarak YOK sayılır;
+    // adet koşullu türler (bogo/bulk_quantity) ise birim vitrin fiyatını değil
+    // sepetteki satır tutarını etkiler ve burada uygulanmaz.
+    for (const item of items) {
+      result.set(item.productId, null);
+    }
+    return result;
+  }
 
-    const discounts = await this.prisma.discount.findMany({
+  /**
+   * Sepet satırları için adet koşullu SATICI kampanyalarını (bogo /
+   * bulk_quantity) TEK sorguyla çözer. Satır bazlıdır (İ7): koşul o satırın
+   * adediyle değerlendirilir; aynı satıra uyan kampanyalardan en yüksek
+   * indirimi veren kazanır. Quote ve grup checkout AYNI metodu çağırır —
+   * önizleme ile tahsilat ayrışamaz.
+   */
+  async quantityDiscountsForLines(
+    lines: {
+      productId: string;
+      sellerId: string;
+      categoryId: string | null;
+      unitPrice: number;
+      quantity: number;
+    }[],
+  ): Promise<
+    Map<string, { discountId: string; name: string; amount: number }>
+  > {
+    const result = new Map<
+      string,
+      { discountId: string; name: string; amount: number }
+    >();
+    // İki türün de eşiği en az 2 adettir; tek adetlik satır sorguyu tetiklemez.
+    const multi = lines.filter((line) => line.quantity >= 2);
+    if (!multi.length) return result;
+
+    const now = new Date();
+    const sellerIds = [...new Set(multi.map((line) => line.sellerId))];
+    const productIds = multi.map((line) => line.productId);
+    const campaigns = await this.prisma.discount.findMany({
       where: {
         isActive: true,
         code: null,
+        target: DiscountTarget.product_price,
+        type: { in: [DiscountType.bogo, DiscountType.bulk_quantity] },
         startDate: { lte: now },
         endDate: { gte: now },
         OR: [
-          { scope: DiscountScope.global, sellerId: null },
           { scope: DiscountScope.seller, sellerId: { in: sellerIds } },
-          { scope: DiscountScope.category, categoryId: { in: categoryIds } },
           {
             scope: DiscountScope.product,
             targetProductIds: { hasSome: productIds },
@@ -1186,38 +1699,138 @@ export class DiscountService {
       },
       orderBy: { priority: "asc" },
     });
+    if (!campaigns.length) return result;
 
-    for (const item of items) {
-      const { productId, sellerId, categoryId, currentDisplayPrice } = item;
-      const product = { id: productId, sellerId, categoryId };
-      let bestPrice: number | null = null;
-      for (const d of discounts) {
-        if (!this.isProductEligibleForDiscount(product, d)) continue;
-
-        let effectivePrice: number;
-        if (d.type === "percentage") {
-          const discountAmount = currentDisplayPrice * (Number(d.value) / 100);
-          const capped =
-            d.maxDiscountAmount != null
-              ? Math.min(discountAmount, Number(d.maxDiscountAmount))
-              : discountAmount;
-          effectivePrice = Math.max(0, currentDisplayPrice - capped);
-        } else {
-          effectivePrice = Math.max(
-            0,
-            currentDisplayPrice -
-              Math.min(Number(d.value), currentDisplayPrice),
-          );
-        }
-        if (effectivePrice < currentDisplayPrice) {
-          if (bestPrice == null || effectivePrice < bestPrice) {
-            bestPrice = effectivePrice;
-          }
-        }
+    for (const line of multi) {
+      const eligible = campaigns.filter(
+        (campaign) =>
+          // Satıcı kampanyası yalnız KENDİ ürününe iner (cep kuralı).
+          campaign.sellerId === line.sellerId &&
+          this.isProductEligibleForDiscount(
+            {
+              id: line.productId,
+              sellerId: line.sellerId,
+              categoryId: line.categoryId ?? "",
+            },
+            campaign,
+          ),
+      );
+      const winner = bestQuantityCampaignDiscount(
+        eligible,
+        line.unitPrice,
+        line.quantity,
+      );
+      if (winner) {
+        result.set(line.productId, {
+          discountId: (winner.campaign as { id: string }).id,
+          name: winner.campaign.name,
+          amount: winner.amount,
+        });
       }
-      result.set(productId, bestPrice);
     }
     return result;
+  }
+
+  /**
+   * Takas hizmet bedeli kampanyaları (İ25): kabul anında her katılımcının sabit
+   * ücretine uygulanır. Kodsuz-otomatiktir; kitle eşleşmesi katılımcı bazında
+   * yapılır (katılımcı bu bedelin "alıcısıdır"). En yüksek indirimi veren
+   * kampanya kazanır; tutar bedeli ve kalan bütçeyi aşamaz.
+   */
+  async resolveTradeFeeDiscounts(
+    parties: { userId: string; feeAmount: number }[],
+  ): Promise<
+    Map<string, { discountId: string; name: string; amount: number }>
+  > {
+    const result = new Map<
+      string,
+      { discountId: string; name: string; amount: number }
+    >();
+    const eligibleParties = parties.filter((party) => party.feeAmount > 0);
+    if (!eligibleParties.length) return result;
+
+    const now = new Date();
+    const campaigns = await this.prisma.discount.findMany({
+      where: {
+        isActive: true,
+        code: null,
+        target: DiscountTarget.trade_service_fee,
+        startDate: { lte: now },
+        endDate: { gte: now },
+        budgetStoppedAt: null,
+      },
+      orderBy: { priority: "asc" },
+      include: {
+        targetTiers: { select: { tierType: true } },
+        targetUsers: { select: { userId: true } },
+      },
+    });
+    if (!campaigns.length) return result;
+
+    for (const party of eligibleParties) {
+      const tier = await this.resolveUserTier(party.userId);
+      let winner: { discountId: string; name: string; amount: number } | null =
+        null;
+      for (const campaign of campaigns) {
+        const matches = audienceMatches({
+          audience: campaign.audience,
+          target: DiscountTarget.trade_service_fee,
+          tierTypes: campaign.targetTiers.map((row) => row.tierType),
+          userIds: campaign.targetUsers.map((row) => row.userId),
+          buyerId: party.userId,
+          buyerTier: tier,
+        });
+        if (!matches) continue;
+
+        let amount =
+          campaign.type === DiscountType.percentage
+            ? party.feeAmount * (Number(campaign.value) / 100)
+            : Math.min(Number(campaign.value), party.feeAmount);
+        if (
+          campaign.maxDiscountAmount != null &&
+          amount > Number(campaign.maxDiscountAmount)
+        ) {
+          amount = Number(campaign.maxDiscountAmount);
+        }
+        const budgetRemaining =
+          campaign.budgetLimit != null
+            ? Math.max(
+                0,
+                Number(campaign.budgetLimit) -
+                  Number(campaign.budgetSpent ?? 0),
+              )
+            : null;
+        if (budgetRemaining != null && amount > budgetRemaining) {
+          amount = budgetRemaining;
+        }
+        amount =
+          Math.round(
+            (Math.min(amount, party.feeAmount) + Number.EPSILON) * 100,
+          ) / 100;
+        if (amount <= 0) continue;
+        if (!winner || amount > winner.amount) {
+          winner = { discountId: campaign.id, name: campaign.name, amount };
+        }
+      }
+      if (winner) result.set(party.userId, winner);
+    }
+    return result;
+  }
+
+  /** Takas kampanya bütçesi: kabulde harcanır (satır başına). */
+  async spendTradeFeeBudget(
+    entries: { discountId: string; amount: number }[],
+    client?: Prisma.TransactionClient,
+  ): Promise<void> {
+    await this.feeDiscountBudget?.spendBudget(entries, client);
+  }
+
+  /** Takas kampanya bütçesi: bedel dahil TAM iadede geri döner. */
+  async releaseTradeFeeBudget(
+    entries: { discountId: string; amount: number }[],
+    client?: Prisma.TransactionClient,
+  ): Promise<void> {
+    await this.feeDiscountBudget?.releaseBudget(entries, client);
   }
 
   /**
@@ -1230,6 +1843,13 @@ export class DiscountService {
       where: {
         isActive: true,
         code: null, // Only auto-applied
+        // YALNIZ ürün fiyatı kampanyaları: bedel kampanyası vitrin fiyatını
+        // DÜŞÜRMEZ (komisyonu/kargoyu indirir) — buraya karışırsa etiket yalan söyler.
+        target: DiscountTarget.product_price,
+        // Kodsuz yüzde/sabit fiyat kampanyaları KALDIRILDI (eski kayıtlar yok
+        // sayılır); "kampanyalı ürün" filtresi yalnız adet koşullu satıcı
+        // kampanyalarını (bogo / bulk_quantity) tanır.
+        type: { in: [DiscountType.bogo, DiscountType.bulk_quantity] },
         startDate: { lte: now },
         endDate: { gte: now },
       },
@@ -1276,6 +1896,9 @@ export class DiscountService {
       where: {
         isActive: true,
         code: null, // Only auto-applied campaigns
+        // YALNIZ ürün fiyatı kampanyaları: bedel kampanyası vitrin fiyatını
+        // DÜŞÜRMEZ (komisyonu/kargoyu indirir) — buraya karışırsa etiket yalan söyler.
+        target: DiscountTarget.product_price,
         startDate: { lte: now },
         endDate: { gte: now },
         scope: { in: [DiscountScope.global, DiscountScope.category] },
@@ -1353,6 +1976,10 @@ export class DiscountService {
 
   // Helper methods
 
+  /**
+   * Kapsam kuralı tek kaynaktan (`discount-scope.ts`) okunur: kupon doğrulaması,
+   * vitrin fiyatı ve bedel kampanyası çözümü aynı yanıtı verir.
+   */
   private isProductEligibleForDiscount(
     product: { id: string; categoryId: string; sellerId: string },
     discount: {
@@ -1362,29 +1989,7 @@ export class DiscountService {
       targetProductIds: string[];
     },
   ): boolean {
-    switch (discount.scope) {
-      case DiscountScope.global:
-        return (
-          discount.sellerId === null || discount.sellerId === product.sellerId
-        );
-
-      case DiscountScope.category:
-        return product.categoryId === discount.categoryId;
-
-      case DiscountScope.product:
-        // Sadece seçili ürünler: boş liste = hiçbir ürüne uygulanmaz
-        if (!discount.targetProductIds?.length) return false;
-        return discount.targetProductIds.includes(product.id);
-
-      case DiscountScope.seller:
-        // Tüm mağaza: sadece bu satıcının ürünleri
-        return (
-          discount.sellerId != null && product.sellerId === discount.sellerId
-        );
-
-      default:
-        return false;
-    }
+    return isProductInDiscountScope(product, discount);
   }
 
   private mapToResponse(discount: any): DiscountResponseDto {
@@ -1436,6 +2041,14 @@ export class DiscountService {
       remainingUsage: discount.usageLimitTotal
         ? discount.usageLimitTotal - discount.usedCount
         : undefined,
+      target: discount.target,
+      audience: discount.audience,
+      targetTierTypes: discount.targetTiers?.map((row: any) => row.tierType),
+      targetUserIds: discount.targetUsers?.map((row: any) => row.userId),
+      budgetLimit:
+        discount.budgetLimit != null ? Number(discount.budgetLimit) : undefined,
+      budgetSpent: Number(discount.budgetSpent ?? 0),
+      budgetStoppedAt: discount.budgetStoppedAt ?? undefined,
     };
   }
 }

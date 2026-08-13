@@ -6,7 +6,7 @@ import {
   PaymentHoldStatus,
   OrderStatus,
   OfferStatus,
-  ShipmentStatus,
+  RefundRequestStatus,
 } from "@prisma/client";
 import {
   getProductStatusFromQuantity,
@@ -22,21 +22,16 @@ import { EventService } from "../events";
 import { PaymentCommonService } from "./payment-common.service";
 import { PaymentFulfillmentService } from "./payment-fulfillment.service";
 import { DiscountService } from "../discount/discount.service";
+import { isShipmentHandedToCarrier } from "../shipping/shipment-handover";
+import { ACTIVE_REFUND_REQUEST_STATUSES } from "../refund/refund-active-statuses";
+import {
+  PUBLIC_NAME_SELECT,
+  publicName,
+} from "../../common/helpers/public-identity";
 
-// SEAM-B1: Paket Sürat'ta HAREKET ettiyse "satıcı göndermedi" DEĞİLDİR. Bu
-// statüler poller tarafından gerçek kargo hareketiyle set edilir — böyle bir
-// siparişi süre-doldu diye iptal+iade edersek alıcı hem malı hem parayı alır.
-// `pending`/`label_created` HARİÇ: yalnız barkod/etiket var ama kargoya verilmemiş
-// olabilir (immediate-barcode her ödemede etiket üretir) — onlar gerçek "göndermedi".
-const SHIPMENT_IN_MOTION_STATUSES: ShipmentStatus[] = [
-  ShipmentStatus.picked_up,
-  ShipmentStatus.in_transit,
-  ShipmentStatus.at_delivery_branch,
-  ShipmentStatus.out_for_delivery,
-  ShipmentStatus.delivered,
-  ShipmentStatus.return_in_progress,
-  ShipmentStatus.returned,
-];
+// SEAM-B1: Paket Sürat'ta HAREKET ettiyse "satıcı göndermedi" DEĞİLDİR — böyle
+// bir siparişi süre-doldu diye iptal+iade edersek alıcı hem malı hem parayı
+// alır. Tanım artık iptal kapılarıyla ORTAK: shipment-handover.ts.
 
 /**
  * Ödeme/sipariş süre-dolumu mutabakat süpürmeleri (cron). PaymentReconciliationService
@@ -102,6 +97,7 @@ export class PaymentExpiryReconciliationService {
       buyerId: string;
       orderId: string;
       productTitle: string;
+      fromOffer: boolean;
     }[] = [];
     for (const order of expired) {
       try {
@@ -248,6 +244,9 @@ export class PaymentExpiryReconciliationService {
           buyerId: order.buyerId,
           orderId: order.id,
           productTitle: order.product?.title ?? "Ürün",
+          // Teklif siparişinde teklif `payment_expired` olur ve alıcı siparişi
+          // yeniden açabilir; bildirim metni bu hakkı söylemek zorunda.
+          fromOffer: Boolean(order.offerId),
         });
         this.logger.log(`Expired unpaid order ${order.orderNumber} (24h TTL)`);
       } catch (err: any) {
@@ -259,7 +258,12 @@ export class PaymentExpiryReconciliationService {
 
     for (const d of dispatched) {
       await this.notificationService
-        .notifyOrderPaymentExpired(d.buyerId, d.orderId, d.productTitle)
+        .notifyOrderPaymentExpired(
+          d.buyerId,
+          d.orderId,
+          d.productTitle,
+          d.fromOffer,
+        )
         .catch((err) =>
           this.logger.warn(
             `order-expired notify failed for ${d.buyerId}: ${err.message}`,
@@ -293,7 +297,7 @@ export class PaymentExpiryReconciliationService {
         preparingWarningSentAt: null,
       },
       include: {
-        seller: { select: { id: true, email: true, displayName: true } },
+        seller: { select: { id: true, email: true, ...PUBLIC_NAME_SELECT } },
         product: { select: { id: true, title: true } },
       },
     });
@@ -347,8 +351,8 @@ export class PaymentExpiryReconciliationService {
         preparingDeadline: { lt: now },
       },
       include: {
-        buyer: { select: { id: true, email: true, displayName: true } },
-        seller: { select: { id: true, email: true, displayName: true } },
+        buyer: { select: { id: true, email: true, ...PUBLIC_NAME_SELECT } },
+        seller: { select: { id: true, email: true, ...PUBLIC_NAME_SELECT } },
         product: { select: { id: true, title: true, quantity: true } },
       },
     });
@@ -357,6 +361,8 @@ export class PaymentExpiryReconciliationService {
     for (const order of expiredOrders) {
       try {
         let skippedInMotion = false;
+        // Kupon iadesi bildirimi tx İÇİNDE atılmaz; commit sonrası gönderilir.
+        let restoredCoupons: { userId: string; code: string }[] = [];
         await this.prisma.$transaction(async (tx) => {
           // Lock the order row to prevent concurrent modifications (e.g., seller shipping at the same time)
           await tx.$queryRaw`SELECT id FROM orders WHERE id = ${order.id} FOR UPDATE`;
@@ -378,20 +384,21 @@ export class PaymentExpiryReconciliationService {
             where: { orderId: order.id },
             select: { status: true, shippedAt: true },
           });
-          if (
-            shipment &&
-            (SHIPMENT_IN_MOTION_STATUSES.includes(shipment.status) ||
-              shipment.shippedAt !== null)
-          ) {
+          if (isShipmentHandedToCarrier(shipment)) {
             skippedInMotion = true;
             return;
           }
 
-          // Cancel order
+          // Cancel order — KARGO ÖNCESİ iptal olduğu için cancellationType
+          // "iptal" yazılır: iade bildirimi bu sınıflandırmayla alıcıya
+          // ORDER_CANCELLED, SATICIYA ORDER_CANCELLED_SELLER + iptal e-postası
+          // gönderir. Eskiden tip yazılmadığından satıcıya iptalin kendisi hiç
+          // bildirilmiyordu (yalnız "para iade edildi" çerçevesi gidiyordu).
           await tx.order.update({
             where: { id: order.id },
             data: {
               status: OrderStatus.cancelled,
+              cancellationType: "iptal",
               cancelReason:
                 "Satıcı belirlenen süre içinde kargoya vermediği için otomatik iptal edildi",
               version: { increment: 1 },
@@ -402,6 +409,36 @@ export class PaymentExpiryReconciliationService {
           await tx.paymentHold.updateMany({
             where: { orderId: order.id, status: PaymentHoldStatus.held },
             data: { status: PaymentHoldStatus.cancelled },
+          });
+
+          // Kusur satıcıda: alıcının kupon hakkı yanmaz, geri verilir.
+          const revoked = await this.discountService
+            ?.revokeUsageForOrders([order.id], "cancel:seller_no_ship", tx)
+            .catch((error) => {
+              this.logger.warn(`kupon iadesi başarısız: ${error}`);
+              return null;
+            });
+          restoredCoupons = revoked?.restoredCoupons ?? [];
+
+          // İncelemede bekleyen alıcı iptal talebi varsa onu bu iptal DEVRALIR.
+          // Sonuç para açısından zaten talebin isteyeceğinden iyidir (satıcı
+          // kargolamadığı için kesintisiz TAM iade), ama talep kapatılmazsa
+          // aktif kalıyor: admin sonradan onaylamayı denediğinde kümülatif iade
+          // tavanına takılıp pending_review'a geri düşüyor ve sipariş sonsuza
+          // dek "açık iade" görünüyordu (payout guard'ları da bu satıra bakar).
+          const supersededAt = new Date();
+          await tx.refundRequest.updateMany({
+            where: {
+              orderId: order.id,
+              status: { in: ACTIVE_REFUND_REQUEST_STATUSES },
+            },
+            data: {
+              status: RefundRequestStatus.cancelled,
+              decidedAt: supersededAt,
+              decidedBy: "system",
+              sellerResponse:
+                "Satıcı süresinde kargolamadığı için sipariş otomatik iptal edildi ve tam iade yapıldı; talep bu iptalle kapatıldı.",
+            },
           });
 
           // Ledger: Senaryo A — komisyon waived (Faz 3B.7).
@@ -464,6 +501,20 @@ export class PaymentExpiryReconciliationService {
           this.logger.warn(
             `notify seller-no-ship failed for ${order.id}: ${notifyErr?.message}`,
           );
+        }
+
+        // Kupon geri verildiyse haber ver — commit sonrası olduğumuz için doğru an.
+        for (const coupon of restoredCoupons) {
+          try {
+            await this.notificationService.notifyCouponReturned(
+              coupon.userId,
+              coupon.code,
+            );
+          } catch (notifyErr: any) {
+            this.logger.warn(
+              `notify coupon-returned failed for ${order.id}: ${notifyErr?.message}`,
+            );
+          }
         }
 
         // Invalidate product cache
@@ -529,7 +580,7 @@ export class PaymentExpiryReconciliationService {
       include: {
         order: {
           include: {
-            buyer: { select: { id: true, email: true, displayName: true } },
+            buyer: { select: { id: true, email: true, ...PUBLIC_NAME_SELECT } },
           },
         },
         checkoutGroup: {
@@ -628,8 +679,7 @@ export class PaymentExpiryReconciliationService {
               orderNumber: payment.order.orderNumber,
               buyerId: payment.order.buyerId,
               buyerEmail: payment.order.buyer.email,
-              buyerName:
-                payment.order.buyer.displayName || payment.order.buyer.email,
+              buyerName: publicName(payment.order.buyer),
               amount: Number(payment.amount),
               provider: payment.provider,
               failureReason: `Ödeme ${timeoutMinutes} dakika içinde tamamlanmadığı için otomatik olarak iptal edildi`,

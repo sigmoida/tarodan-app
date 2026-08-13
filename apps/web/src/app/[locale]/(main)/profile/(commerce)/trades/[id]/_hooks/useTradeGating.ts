@@ -83,6 +83,21 @@ export function useTradeGating(
     cancellableStatuses.has(trade.status) &&
     !canCancel;
 
+  // İtiraz yalnız ürünler depodan çıktıktan sonraki pencerede açılabilir
+  // (backend guard'ıyla aynı liste). Payload itiraz varlığını göstermediği için
+  // "zaten itiraz var" durumu API hatası olarak toast'a düşer.
+  const disputableStatuses = new Set([
+    "both_shipped",
+    "initiator_received",
+    "receiver_received",
+    "shipping_to_recipients",
+  ]);
+  const canDispute =
+    !!user &&
+    !!trade &&
+    (isInitiator || isReceiver) &&
+    disputableStatuses.has(trade.status);
+
   return {
     isInitiator,
     isReceiver,
@@ -90,6 +105,7 @@ export function useTradeGating(
     canReject,
     canCounter,
     canCancel,
+    canDispute,
     showCancelDisabled,
     cashPaymentPending,
     isCashPayer,

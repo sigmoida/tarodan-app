@@ -13,6 +13,7 @@ import {
   isSuratReturnCompleted,
 } from "./surat-status.mapper";
 import { canTransitionShipmentStatus } from "../shipping/shipment-state-machine";
+import { SHIPPABLE_ORDER_STATUSES } from "../order/order-state-machine";
 import { SuratTrackingClient } from "./surat-tracking.client";
 
 /**
@@ -290,7 +291,9 @@ export class OrderTrackingSyncService {
         const orderCas = await tx.order.updateMany({
           where: {
             id: shipment.orderId,
-            status: { in: [OrderStatus.paid, OrderStatus.preparing] },
+            // Tek kaynak: order-state-machine (satıcı ve admin yolları da aynı
+            // listeye uyar) — kapanmış sipariş `shipped`'e diriltilemez.
+            status: { in: [...SHIPPABLE_ORDER_STATUSES] },
           },
           data: {
             status: OrderStatus.shipped,
@@ -337,11 +340,22 @@ export class OrderTrackingSyncService {
         const notificationService = this.moduleRef.get(NotificationService, {
           strict: false,
         });
-        await notificationService?.notifyOrderShipped(
-          shipment.order.buyerId,
-          shipment.orderId,
-          gonderi.KargoTakipNo,
-        );
+        // Koli başına TEK bildirim (kardeş sipariş satırları sessiz kalır).
+        const { PaymentService: PaymentSvc } =
+          await import("../payment/payment.service");
+        const paymentSvc = this.moduleRef.get(PaymentSvc, { strict: false });
+        const claimed =
+          (await paymentSvc?.claimOrderAnnouncement?.("shipped", {
+            id: shipment.orderId,
+            packageId: shipment.packageId,
+          })) ?? true;
+        if (claimed) {
+          await notificationService?.notifyOrderShipped(
+            shipment.order.buyerId,
+            shipment.orderId,
+            gonderi.KargoTakipNo,
+          );
+        }
       } catch (e: any) {
         this.logger.warn(
           `notify order-shipped failed (poll) for ${shipment.orderId}: ${e?.message}`,
@@ -356,6 +370,23 @@ export class OrderTrackingSyncService {
       confirmationDeadline: Date | null;
       buyerId: string | null;
     } | null;
+    // Teslim duyurusu (alıcıya bildirim + e-posta) — 48h bayrağından BAĞIMSIZ.
+    // Teslim, iade hakkının ve satıcı ödeme saatinin başladığı andır; sessiz
+    // geçerse kullanıcı süreçlerin başladığını hiç öğrenmez.
+    if (isDelivered && dr?.acted) {
+      try {
+        const { PaymentService } = await import("../payment/payment.service");
+        const paymentService = this.moduleRef.get(PaymentService, {
+          strict: false,
+        });
+        await paymentService?.announceOrderDelivered?.(shipment.orderId);
+      } catch (e: any) {
+        this.logger.warn(
+          `announce delivered failed (poll) for ${shipment.orderId}: ${e?.message}`,
+        );
+      }
+    }
+
     if (
       isDelivered &&
       dr?.acted &&

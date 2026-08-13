@@ -8,6 +8,14 @@ import {
   saleCapableSellerWhere,
 } from "../membership/membership.util";
 import { publicUserRatingWhere } from "../../common/helpers/public-rating";
+import {
+  PUBLIC_IDENTITY_SELECT,
+  publicIdentityFields,
+} from "../../common/helpers/public-identity";
+import {
+  LEGACY_USERNAME_PREFIX,
+  normalizeUsername,
+} from "../auth/username.util";
 import { catalogProductWhere } from "../product/helpers/catalog-product-where";
 
 /**
@@ -117,13 +125,7 @@ export class UserDiscoveryService {
       },
       include: {
         user: {
-          select: {
-            id: true,
-            displayName: true,
-            avatarUrl: true,
-            bio: true,
-            isVerified: true,
-          },
+          select: { ...PUBLIC_IDENTITY_SELECT, bio: true },
         },
         _count: {
           select: { items: true, likes: true },
@@ -176,7 +178,7 @@ export class UserDiscoveryService {
           itemCount: collection._count.items,
           user: {
             id: collection.user.id,
-            displayName: collection.user.displayName,
+            ...publicIdentityFields(collection.user),
             avatarUrl: await this.common.resolveAvatarUrl(
               collection.user.avatarUrl,
             ),
@@ -324,13 +326,7 @@ export class UserDiscoveryService {
       where: { id: collectionId },
       include: {
         user: {
-          select: {
-            id: true,
-            displayName: true,
-            avatarUrl: true,
-            bio: true,
-            isVerified: true,
-          },
+          select: { ...PUBLIC_IDENTITY_SELECT, bio: true },
         },
         items: { select: { product: { select: { status: true } } } },
         _count: { select: { items: true, likes: true } },
@@ -386,7 +382,7 @@ export class UserDiscoveryService {
       score,
       user: {
         id: collection.user.id,
-        displayName: collection.user.displayName,
+        ...publicIdentityFields(collection.user),
         avatarUrl: await this.common.resolveAvatarUrl(
           collection.user.avatarUrl,
         ),
@@ -690,7 +686,7 @@ export class UserDiscoveryService {
 
     return {
       id: user.id,
-      displayName: user.displayName,
+      ...publicIdentityFields(user),
       companyName: user.companyName,
       avatarUrl: await this.common.resolveAvatarUrl(user.avatarUrl),
       bio: user.bio,
@@ -818,7 +814,7 @@ export class UserDiscoveryService {
 
         return {
           id: seller.id,
-          displayName: seller.displayName,
+          ...publicIdentityFields(seller),
           avatarUrl: resolvedAvatar,
           bio: seller.bio,
           isVerified: seller.isVerified,
@@ -837,8 +833,11 @@ export class UserDiscoveryService {
   }
 
   /**
-   * İsimle satıcı arama (autocomplete). Yalnızca aktif ürünü olan, banlı/silinmemiş
-   * satıcıları döndürür — profili herkese açık olmayanları sızdırmaz.
+   * Satıcı arama (autocomplete). Arama HERKESE AÇIK kimlik üzerinden yapılır:
+   * kullanıcı adı ve firma adı. Gerçek ad (`displayName`) yalnızca kullanıcı
+   * adı seçmemiş eski hesaplarda görünür olduğundan onlarda hâlâ aranabilir —
+   * kullanıcı adını seçmiş bir üye artık gerçek adıyla bulunamaz.
+   * Yalnızca aktif ürünü olan, banlı/silinmemiş satıcıları döndürür.
    */
   async searchSellers(query: string, limit: number = 8) {
     const q = (query || "").trim();
@@ -855,15 +854,20 @@ export class UserDiscoveryService {
         products: {
           some: { ...catalogProductWhere(), status: "active" },
         },
-        displayName: { contains: q, mode: "insensitive" },
+        OR: [
+          { username: { contains: normalizeUsername(q), mode: "insensitive" } },
+          { companyName: { contains: q, mode: "insensitive" } },
+          {
+            // Kullanıcı adı seçmemiş hesapta herkese açık ad = gerçek ad.
+            username: { startsWith: LEGACY_USERNAME_PREFIX },
+            displayName: { contains: q, mode: "insensitive" },
+          },
+        ],
       },
       take: Math.min(20, Math.max(1, Number(limit) || 8)),
       orderBy: { products: { _count: "desc" } },
       select: {
-        id: true,
-        displayName: true,
-        avatarUrl: true,
-        isVerified: true,
+        ...PUBLIC_IDENTITY_SELECT,
         _count: {
           select: {
             products: {
@@ -877,7 +881,7 @@ export class UserDiscoveryService {
     return Promise.all(
       sellers.map(async (s) => ({
         id: s.id,
-        displayName: s.displayName,
+        ...publicIdentityFields(s),
         avatarUrl: await this.common.resolveAvatarUrl(s.avatarUrl),
         isVerified: s.isVerified,
         totalListings: s._count.products,

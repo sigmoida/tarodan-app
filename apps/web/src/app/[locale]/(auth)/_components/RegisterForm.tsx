@@ -16,6 +16,7 @@ import {
 } from "@tarodan/ui/form";
 import { registerSchema, type RegisterValues } from "../_lib/auth";
 import { GoogleSignInButton } from "./GoogleSignInButton";
+import { AppleSignInButton } from "./AppleSignInButton";
 import { useRegister } from "../_hooks/useRegister";
 import { AuthCard } from "./AuthCard";
 import { PasswordChecklist } from "./PasswordChecklist";
@@ -172,7 +173,11 @@ export function RegisterForm() {
         />
 
         <div className="grid grid-cols-2 gap-4">
-          <FormPhone name="phone" label={t("auth.phone")} />
+          <FormPhone
+            name="phone"
+            label={t("auth.phone")}
+            legacyMessage={t("validation.phoneLegacyNotice")}
+          />
 
           <FormDatePicker
             name="birthDate"
@@ -243,6 +248,7 @@ export function RegisterForm() {
         </Button>
 
         <GoogleSignInButton onSuccess={() => router.push("/")} />
+        <AppleSignInButton onSuccess={() => router.push("/")} />
       </Form>
     </AuthCard>
   );

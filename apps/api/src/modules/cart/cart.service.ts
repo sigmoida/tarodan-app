@@ -23,8 +23,10 @@ import {
   ProductKind,
   ProductStatus,
   DiscountScope,
+  DiscountTarget,
   Prisma,
 } from "@prisma/client";
+import { allocateCouponAcrossLines } from "../discount/fee-discount.engine";
 import {
   getAvailableQuantity,
   canAddRequestedQuantityToCart,
@@ -37,6 +39,10 @@ import {
 } from "../shipping/shipping-tariff.helper";
 import { i18nMessage } from "../i18n";
 import { canSellFromMembership } from "../membership/membership.util";
+import {
+  PUBLIC_NAME_SELECT,
+  publicName,
+} from "../../common/helpers/public-identity";
 
 // Cart expiry time: 24 hours
 const CART_EXPIRY_HOURS = 24;
@@ -430,7 +436,7 @@ export class CartService {
   private saleEligibilitySellerSelect() {
     return {
       id: true,
-      displayName: true,
+      ...PUBLIC_NAME_SELECT,
       businessStatus: true,
       companyName: true,
       taxId: true,
@@ -568,7 +574,7 @@ export class CartService {
         productTitle: product.title,
         productImage: resolvedImage,
         sellerId: product.sellerId,
-        sellerName: product.seller?.displayName || "Satıcı",
+        sellerName: publicName(product.seller),
         quantity: item.quantity,
         originalPrice,
         salePrice: hasDiscount ? effectivePrice : undefined,
@@ -612,9 +618,10 @@ export class CartService {
     // - couponDiscountTotal: additional coupon discount on top of current prices
     // - campaignDiscountTotal: (currently 0, campaigns reflected in effectivePrice)
     const totalDiscount = couponDiscountTotal + campaignDiscountTotal;
-    // İndirim tavanı YOK: checkout (tahsil edilen) hiçbir tavan uygulamıyor, bu
-    // yüzden sepet önizlemesi de uygulamaz → önizleme = tahsilat. Toplam yalnızca
-    // grandTotal'da 0'a taban yapılır (Math.max(0, ...)).
+    // İndirim tavanı checkout ile AYNI kaynaktan: kupon tutarı
+    // applyCouponDiscount içinde allocateCouponAcrossLines'tan (satır başına
+    // %50 tavan) geçer → önizleme = tahsilat. Toplam yalnızca grandTotal'da
+    // 0'a taban yapılır (Math.max(0, ...)).
 
     // Checkout ile aynı paket kuralı: aynı satıcının ürünleri tek paket, paket desisi
     // ürün desisi × adet toplamıdır. Böylece sepet özeti ile sipariş oluşturma aynı
@@ -640,30 +647,10 @@ export class CartService {
       });
       sellerPackages.set(item.sellerId, current);
     }
-    const affectedProductIds = new Set(
-      appliedDiscounts.flatMap((discount) => discount.affectedProductIds ?? []),
-    );
-    const eligibleLines = availableItems.filter((item) =>
-      affectedProductIds.has(item.productId),
-    );
-    const eligibleTotal = eligibleLines.reduce(
-      (sum, item) => sum + item.lineTotal,
-      0,
-    );
-    let allocatedCoupon = 0;
-    eligibleLines.forEach((item, index) => {
-      const packageEntry = sellerPackages.get(item.sellerId);
-      if (!packageEntry || eligibleTotal <= 0) return;
-      const lineCoupon =
-        index === eligibleLines.length - 1
-          ? Math.round((couponDiscountTotal - allocatedCoupon) * 100) / 100
-          : Math.round(
-              ((couponDiscountTotal * item.lineTotal) / eligibleTotal) * 100,
-            ) / 100;
-      allocatedCoupon += lineCoupon;
-      packageEntry.subtotal = Math.max(0, packageEntry.subtotal - lineCoupon);
-    });
-
+    // Ücretsiz kargo eşiği KUPON ÖNCESİ paket tutarından değerlendirilir —
+    // quote/checkout ile aynı kural (İ14): kupon kullanmak kazanılmış ücretsiz
+    // kargoyu geri almaz. Eskiden kupon paket alt-toplamından düşülüp eşiğe
+    // öyle bakılıyordu; sepet ekranı kargolu, tahsilat kargosuz gösteriyordu.
     let shippingCost = 0;
     let amountToFreeShipping = 0;
     try {
@@ -722,6 +709,14 @@ export class CartService {
     return true;
   }
 
+  /**
+   * Sepet kuponu — otoritatif kaynak checkout ile AYNI: DiscountService
+   * .validateCoupon (voucher çözümü, iadeyle geri verilen hakkı sayan kullanım
+   * limiti, kapsam/kitle/hedef kuralları) + allocateCouponAcrossLines (%50
+   * tavan). Eskiden burada paralel bir kupon matematiği vardı: voucher kodları
+   * "geçersiz" görünüyor, revoke edilmiş kullanım "zaten kullandınız"
+   * sayılıyor ve bedel-hedefli kupon ürün tabanından iner gibi gösteriliyordu.
+   */
   private async applyCouponDiscount(
     code: string,
     items: CartItemResponseDto[],
@@ -733,126 +728,63 @@ export class CartService {
     couponIsStackable?: boolean;
   }> {
     try {
-      const discount = await this.prisma.discount.findUnique({
-        where: { code: code.toUpperCase() },
-      });
-
-      if (!discount || !discount.isActive) {
-        return { discountAmount: 0, warning: "Kupon artık geçerli değil" };
-      }
-
-      const now = new Date();
-      if (now < discount.startDate || now > discount.endDate) {
-        return { discountAmount: 0, warning: "Kuponun süresi doldu" };
-      }
-
-      // Check usage limits
-      const canUse = await this.discountService.checkUsageLimit(
-        discount.id,
+      const validation = await this.discountService.validateCoupon(
+        {
+          code,
+          cartItems: items
+            .filter((item) => item.isAvailable)
+            .map((item) => ({
+              productId: item.productId,
+              quantity: item.quantity,
+            })),
+        },
         userId,
       );
-      if (!canUse) {
-        return { discountAmount: 0, warning: "Bu kuponu zaten kullandınız" };
-      }
-
-      // Category scope needs each product's categoryId — fetch it once so the
-      // eligibility check below matches the authoritative checkout path
-      // (DiscountService.isProductEligibleForDiscount). Previously the category
-      // branch ignored the product's category entirely and behaved like global.
-      const categoryByProduct = new Map<string, string | null>();
-      if (discount.scope === DiscountScope.category) {
-        const prods = await this.prisma.product.findMany({
-          where: { id: { in: items.map((i) => i.productId) } },
-          select: { id: true, categoryId: true },
-        });
-        for (const p of prods) categoryByProduct.set(p.id, p.categoryId);
-      }
-
-      // Calculate discount based on scope
-      let eligibleAmount = 0;
-      const affectedProductIds: string[] = [];
-
-      for (const item of items) {
-        if (!item.isAvailable) continue;
-
-        let isEligible = false;
-
-        switch (discount.scope) {
-          case DiscountScope.global:
-            isEligible =
-              discount.sellerId === null || discount.sellerId === item.sellerId;
-            break;
-          case DiscountScope.seller:
-            isEligible = discount.sellerId === item.sellerId;
-            break;
-          case DiscountScope.product:
-            isEligible = discount.targetProductIds.includes(item.productId);
-            break;
-          case DiscountScope.category:
-            isEligible =
-              discount.categoryId != null &&
-              categoryByProduct.get(item.productId) === discount.categoryId;
-            break;
-        }
-
-        if (isEligible) {
-          // Kupon BAZ fiyat üzerinden hesaplanır (kampanyalı/efektif fiyat değil)
-          // → checkout'taki validateCoupon ile aynı taban (product.price * adet).
-          eligibleAmount += item.originalPrice * item.quantity;
-          affectedProductIds.push(item.productId);
-        }
-      }
-
-      if (eligibleAmount === 0) {
+      if (!validation.isValid || !validation.discount) {
         return {
           discountAmount: 0,
-          warning: "Bu kupon sepetinizdeki ürünlere uygulanamaz",
+          warning: validation.error ?? "Kupon uygulanamadı",
         };
       }
+      const coupon = validation.discount;
 
-      // Check minimum cart value
-      if (
-        discount.minCartValue &&
-        eligibleAmount < Number(discount.minCartValue)
-      ) {
-        return {
-          discountAmount: 0,
-          warning: `Minimum sepet tutarı: ${Number(discount.minCartValue).toFixed(2)} TL`,
-        };
-      }
+      // validateCoupon isStackable döndürmez; kampanya birlikteliği kararı için
+      // yalnız bu bayrak okunur.
+      const stackRow = await this.prisma.discount.findUnique({
+        where: { id: coupon.id },
+        select: { isStackable: true },
+      });
 
-      // Calculate discount amount
+      // Bedel hedefli kuponun tutarı ancak komisyon/kargo hesaplanınca bilinir;
+      // sepette 0 görünür (CouponBox 0 tutarı gizler), quote/checkout gerçek
+      // tutarı uygular. Ürün fiyatı kuponu ise checkout'la aynı dağıtım +
+      // tavandan geçer.
+      const isFeeCoupon = coupon.target !== DiscountTarget.product_price;
       let discountAmount = 0;
-      if (discount.type === "percentage") {
-        discountAmount = eligibleAmount * (Number(discount.value) / 100);
-      } else {
-        discountAmount = Number(discount.value);
+      if (!isFeeCoupon) {
+        const eligibleSet = new Set(coupon.eligibleProductIds);
+        const eligibleLines = items.filter(
+          (item) => item.isAvailable && eligibleSet.has(item.productId),
+        );
+        discountAmount = allocateCouponAcrossLines(
+          eligibleLines.map((item) => item.lineTotal),
+          coupon.estimatedDiscount,
+        ).total;
       }
-
-      // Apply max discount cap
-      if (
-        discount.maxDiscountAmount &&
-        discountAmount > Number(discount.maxDiscountAmount)
-      ) {
-        discountAmount = Number(discount.maxDiscountAmount);
-      }
-
-      // Don't exceed eligible amount
-      discountAmount = Math.min(discountAmount, eligibleAmount);
 
       return {
         discountAmount,
         appliedDiscount: {
-          discountId: discount.id,
-          discountName: discount.name,
-          discountCode: discount.code || undefined,
-          type: discount.type,
-          value: Number(discount.value),
-          scope: discount.scope,
+          discountId: coupon.id,
+          discountName: coupon.name,
+          discountCode: coupon.code || undefined,
+          type: coupon.type,
+          value: coupon.value,
+          scope: coupon.scope,
           appliedAmount: discountAmount,
-          affectedProductIds,
+          affectedProductIds: coupon.eligibleProductIds,
         },
-        couponIsStackable: discount.isStackable,
+        couponIsStackable: stackRow?.isStackable ?? true,
       };
     } catch (error) {
       this.logger.error(`Error applying coupon: ${error}`);

@@ -7,6 +7,12 @@ import {
   Matches,
 } from "class-validator";
 import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
+import { IsTrPhone } from "../../../common/validators/tr-phone";
+import {
+  USERNAME_MAX_LENGTH,
+  USERNAME_MIN_LENGTH,
+  USERNAME_PATTERN,
+} from "../username.util";
 
 export class BusinessRegisterDto {
   @ApiProperty({ example: "Ayşe Yılmaz" })
@@ -43,12 +49,12 @@ export class BusinessRegisterDto {
   kepAddress?: string;
 
   @ApiProperty({ example: "+905551234567" })
-  @Matches(/^\+90[0-9]{10}$/)
+  @IsTrPhone()
   phone: string;
 
   @ApiPropertyOptional({ example: "+905559876543" })
   @IsOptional()
-  @Matches(/^\+90[0-9]{10}$/)
+  @IsTrPhone()
   contactPhone?: string;
 }
 
@@ -59,9 +65,9 @@ export class CorporateInvitationDto {
 
   @ApiProperty({ example: "tarodan.kurumsal" })
   @IsString()
-  @MinLength(3)
-  @MaxLength(30)
-  @Matches(/^[a-z0-9](?:[a-z0-9._]*[a-z0-9])?$/)
+  @MinLength(USERNAME_MIN_LENGTH)
+  @MaxLength(USERNAME_MAX_LENGTH)
+  @Matches(USERNAME_PATTERN)
   username: string;
 
   @ApiProperty()

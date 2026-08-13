@@ -7,7 +7,7 @@ import {
   Min,
   Max,
   MaxLength,
-} from 'class-validator';
+} from "class-validator";
 
 export class CreateUserRatingDto {
   @IsUUID()
@@ -73,7 +73,11 @@ export class UserRatingResponseDto {
   createdAt: Date;
   giver?: {
     id: string;
+    /** Herkese açık ad (firma → kullanıcı adı → isim). */
+    publicName: string;
+    /** Uyumluluk takma adı: publicName ile aynı değer. */
     displayName: string;
+    username: string | null;
     avatarUrl?: string;
   };
 }
@@ -94,7 +98,11 @@ export class ProductRatingResponseDto {
   createdAt: Date;
   user?: {
     id: string;
+    /** Herkese açık ad (firma → kullanıcı adı → isim). */
+    publicName: string;
+    /** Uyumluluk takma adı: publicName ile aynı değer. */
     displayName: string;
+    username: string | null;
     avatarUrl?: string;
   };
 }

@@ -6,7 +6,7 @@
  * AI servisi kapalı/erişilemezse ürün bugünkü gibi `pending` kalır (graceful).
  */
 import { Processor, Process, OnQueueFailed } from "@nestjs/bull";
-import { Logger } from "@nestjs/common";
+import { Logger, Optional } from "@nestjs/common";
 import { Job } from "bull";
 import { ProductStatus } from "@prisma/client";
 import { PrismaService } from "../prisma";
@@ -15,6 +15,9 @@ import { ModerationAiClient } from "../modules/moderation/moderation-ai.client";
 import { SearchService } from "../modules/search/search.service";
 import { CacheService } from "../modules/cache/cache.service";
 import { notifyWebRevalidate } from "../common/revalidate";
+import { NotificationService } from "../modules/notification/notification.service";
+import { NotificationType } from "../modules/notification/dto";
+import { CommissionRuleGuardService } from "../modules/commission/commission-rule-guard.service";
 import { QUEUE_NAMES } from "./constants";
 
 export interface ProductModerationJob {
@@ -37,6 +40,13 @@ export class ModerationWorker {
     private readonly ai: ModerationAiClient,
     private readonly search: SearchService,
     private readonly cache: CacheService,
+    // Oto-onayda satıcıya "ilanınız yayında" bildirimi (admin onayıyla aynı).
+    @Optional() private readonly notificationService?: NotificationService,
+    // Onay guard'ı admin onayıyla AYNI: kategori+fiyat için aktif komisyon
+    // kuralı yoksa oto-onay da ilanı yayına ALAMAZ (create anındaki denetim
+    // yeterli değil — kural onay anına kadar silinmiş olabilir).
+    @Optional()
+    private readonly commissionGuard?: CommissionRuleGuardService,
   ) {}
 
   @Process("product-image")
@@ -122,13 +132,72 @@ export class ModerationWorker {
 
     // Temiz + ilgili -> OTO-ONAY (yalnızca hâlâ pending ise; admin kararını ezme)
     if (status === "passed") {
+      // Admin onayıyla AYNI guard: kategori+fiyat için aktif komisyon kuralı
+      // yoksa ilan yayına giremez — create anındaki denetim onay anına kadar
+      // kural silindiyse yetmez. Guard geçmezse ilan pending kalır (admin
+      // kuyruğu); AI kararı yukarıda zaten günlüğe yazıldı.
+      if (this.commissionGuard) {
+        try {
+          const forGuard = await this.prisma.product.findUnique({
+            where: { id: productId },
+            select: { sellerId: true, categoryId: true, price: true },
+          });
+          if (forGuard) {
+            await this.commissionGuard.assertListingRuleExists({
+              sellerId: forGuard.sellerId,
+              categoryId: forGuard.categoryId,
+              amount: Number(forGuard.price),
+            });
+          }
+        } catch (err: any) {
+          this.logger.warn(
+            `Ürün ${productId} oto-onay komisyon guard'ına takıldı; admin kuyruğunda kalıyor: ${err?.message}`,
+          );
+          return {
+            status: "review",
+            reason: "commission_rule_missing",
+            maxNsfw,
+            minRelevance,
+            checked,
+          };
+        }
+      }
       const res = await this.prisma.product.updateMany({
         where: { id: productId, status: ProductStatus.pending },
-        data: { status: ProductStatus.active },
+        // publishedAt: yaşam süresi yayın anından sayılır (yenileme = taze pencere).
+        data: {
+          status: ProductStatus.active,
+          publishedAt: new Date(),
+          rejectionReason: null,
+        },
       });
       if (res.count > 0) {
         await this.refreshProductVisibility(productId);
         this.logger.log(`Ürün ${productId} AI ile oto-onaylandı (active)`);
+        // Satıcıya "ilanınız yayında" — admin onay yoluyla aynı bildirim.
+        // Back-in-stock yayını da admin onayıyla paritedir: yeniden satışa
+        // açılan ilan oto-onaydan geçerse istek listesi bekleyenler de duysun.
+        try {
+          const approved = await this.prisma.product.findUnique({
+            where: { id: productId },
+            select: { sellerId: true, title: true },
+          });
+          if (approved) {
+            await this.notificationService?.createInAppNotification(
+              approved.sellerId,
+              NotificationType.PRODUCT_APPROVED,
+              { productId, productTitle: approved.title },
+            );
+            await this.notificationService?.broadcastBackInStock(
+              productId,
+              approved.title,
+            );
+          }
+        } catch (err: any) {
+          this.logger.warn(
+            `PRODUCT_APPROVED (oto-onay) bildirimi başarısız ${productId}: ${err?.message}`,
+          );
+        }
       }
     } else {
       if (job.data.directApproval) {

@@ -34,7 +34,10 @@ describe("critical admin audit durability", () => {
     "admin-payout.service.ts",
     "admin-commission.service.ts",
     "admin-tax.service.ts",
-    "admin-membership.service.ts",
+    // Katman güncelleme çekirdeği: iki admin rotası da (admin-membership +
+    // membership.service) bu tek dosyaya delege eder; zorunlu denetim yazımı
+    // artık burada yaşar.
+    "../membership/membership-tier-update.service.ts",
   ])("uses required audit writes in %s", (filename) => {
     const source = readFileSync(resolve(__dirname, filename), "utf8");
     expect(source).toContain("createRequiredAuditLog");

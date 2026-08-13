@@ -5,6 +5,8 @@ import {
 } from "@prisma/client";
 import {
   canSellFromMembership,
+  effectiveMembershipTierType,
+  hasUsableRecurringCard,
   isCorporateSellingSuspended,
   isPremiumEntitled,
   saleCapableSellerWhere,
@@ -128,6 +130,106 @@ describe("isPremiumEntitled", () => {
         taxId: null,
       }),
     ).toBe(false);
+  });
+});
+
+/**
+ * Efektif katman türetimi — boost paket hedeflemesi ve alıcı-tier kampanyaları
+ * bu tek fonksiyona bağlı. Yerel türetimler (yalnız status / status+dönem)
+ * yanlıştı: pasif tier ve KYC'siz business hâlâ hak veriyordu.
+ */
+describe("effectiveMembershipTierType", () => {
+  const future = new Date(Date.now() + 10 * 86_400_000);
+  const past = new Date(Date.now() - 86_400_000);
+
+  it("süresi dolan ücretli üye → free", () => {
+    expect(
+      effectiveMembershipTierType({
+        status: SubscriptionStatus.active,
+        currentPeriodEnd: past,
+        tier: { type: MembershipTierType.premium, isActive: true },
+      }),
+    ).toBe(MembershipTierType.free);
+  });
+
+  it("iptal edilmiş ama dönemi süren üye katmanını korur", () => {
+    expect(
+      effectiveMembershipTierType({
+        status: SubscriptionStatus.cancelled,
+        currentPeriodEnd: future,
+        tier: { type: MembershipTierType.premium, isActive: true },
+      }),
+    ).toBe(MembershipTierType.premium);
+  });
+
+  it("pasifleştirilmiş tier → free", () => {
+    expect(
+      effectiveMembershipTierType({
+        status: SubscriptionStatus.active,
+        currentPeriodEnd: future,
+        tier: { type: MembershipTierType.premium, isActive: false },
+      }),
+    ).toBe(MembershipTierType.free);
+  });
+
+  it("business + KYC onayı geri alınmış → free", () => {
+    const membership = {
+      status: SubscriptionStatus.active,
+      currentPeriodEnd: future,
+      tier: { type: MembershipTierType.business, isActive: true },
+    };
+    expect(
+      effectiveMembershipTierType(membership, {
+        businessStatus: BusinessStatus.rejected,
+        companyName: "Acme A.S.",
+        taxId: "1234567890",
+      }),
+    ).toBe(MembershipTierType.free);
+    expect(
+      effectiveMembershipTierType(membership, {
+        businessStatus: BusinessStatus.approved,
+        companyName: "Acme A.S.",
+        taxId: "1234567890",
+      }),
+    ).toBe(MembershipTierType.business);
+  });
+
+  it("üyelik yok / free tier → free", () => {
+    expect(effectiveMembershipTierType(null)).toBe(MembershipTierType.free);
+    expect(
+      effectiveMembershipTierType({
+        status: SubscriptionStatus.active,
+        currentPeriodEnd: future,
+        tier: { type: MembershipTierType.free, isActive: true },
+      }),
+    ).toBe(MembershipTierType.free);
+  });
+});
+
+/**
+ * MIT (kullanıcısız) çekim kartı: aktif + PayTR + CVV istemeyen. toggleAutoRenew,
+ * fulfillment D1 ve planlı geçiş D2 aynı sorguyu paylaşır.
+ */
+describe("hasUsableRecurringCard", () => {
+  it("uygun kart varsa true, yoksa false; filtre CVV'siz aktif PayTR kartıdır", async () => {
+    const findFirst = jest.fn().mockResolvedValue({ id: "card-1" });
+    await expect(
+      hasUsableRecurringCard({ savedCard: { findFirst } } as any, "user-1"),
+    ).resolves.toBe(true);
+    expect(findFirst).toHaveBeenCalledWith({
+      where: {
+        userId: "user-1",
+        provider: "paytr",
+        status: "active",
+        requireCvv: false,
+      },
+      select: { id: true },
+    });
+
+    findFirst.mockResolvedValue(null);
+    await expect(
+      hasUsableRecurringCard({ savedCard: { findFirst } } as any, "user-1"),
+    ).resolves.toBe(false);
   });
 });
 

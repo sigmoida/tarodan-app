@@ -9,6 +9,7 @@ import { getTranslations } from "next-intl/server";
 import type { FeaturedBusiness, FeaturedCollector } from "../lib/types";
 import { getImageUrl } from "../lib/helpers";
 import HomeAvatar from "./HomeAvatar";
+import { publicNameOf } from "@/lib/public-name";
 
 export default async function Spotlights({
   featuredCollector,
@@ -36,13 +37,15 @@ export default async function Spotlights({
               <>
                 <div className="flex items-start gap-4 mb-4">
                   <HomeAvatar
-                    name={featuredCollector.user?.displayName}
+                    name={publicNameOf(featuredCollector.user)}
                     avatarUrl={featuredCollector.user?.avatarUrl}
                   />
                   <div className="min-w-0">
                     <h3 className="text-sm font-bold text-heading flex items-center gap-1.5 mb-0.5">
-                      {featuredCollector.user?.displayName ||
-                        t("home.collector")}
+                      {publicNameOf(
+                        featuredCollector.user,
+                        t("home.collector"),
+                      )}
                       {featuredCollector.user?.isVerified && (
                         <CheckBadgeIcon className="w-4 h-4 text-success-500" />
                       )}
@@ -127,14 +130,16 @@ export default async function Spotlights({
               <>
                 <div className="flex items-start gap-4 mb-4">
                   <HomeAvatar
-                    name={featuredBusiness.displayName}
+                    name={publicNameOf(featuredBusiness)}
                     avatarUrl={featuredBusiness.avatarUrl}
                     className="border-2 border-border-subtle"
                   />
                   <div className="min-w-0">
                     <h3 className="text-sm font-bold text-heading flex items-center gap-1.5 mb-0.5">
-                      {featuredBusiness.displayName ||
-                        featuredBusiness.companyName}
+                      {publicNameOf(
+                        featuredBusiness,
+                        featuredBusiness.companyName,
+                      )}
                       {featuredBusiness.isVerified && (
                         <CheckBadgeIcon className="w-4 h-4 text-success-500" />
                       )}

@@ -98,6 +98,61 @@ describe("ProductBoostService — ad-package pricing", () => {
     await expect(resolve(7, 500)).rejects.toBeInstanceOf(BadRequestException);
   });
 
+  describe("audience tier resolution (effectiveMembershipTierType)", () => {
+    const future = new Date(Date.now() + 10 * 86_400_000);
+    const past = new Date(Date.now() - 86_400_000);
+    const noKyc = { businessStatus: null, companyName: null, taxId: null };
+
+    /** resolvePackagePrice'ın adPackage.findFirst'e geçirdiği hedef tierType. */
+    const resolvedTierType = async () => {
+      await resolve(7, 500);
+      const where = prisma.adPackage.findFirst.mock.calls[0][0].where;
+      return where.OR[1].targetTiers.some.tierType;
+    };
+
+    it("KYC'si geri alınmış business üye hedeflemede free sayılır", async () => {
+      // Eski yerel türetim yalnız status+dönem kontrol ediyordu: KYC'siz
+      // business üye business-hedefli paketleri hâlâ açabiliyordu.
+      prisma.userMembership.findUnique.mockResolvedValue({
+        status: "active",
+        currentPeriodEnd: future,
+        tier: { type: "business", isActive: true },
+        user: noKyc,
+      });
+      expect(await resolvedTierType()).toBe("free");
+    });
+
+    it("süresi dolmuş premium üye free sayılır", async () => {
+      prisma.userMembership.findUnique.mockResolvedValue({
+        status: "active",
+        currentPeriodEnd: past,
+        tier: { type: "premium", isActive: true },
+        user: noKyc,
+      });
+      expect(await resolvedTierType()).toBe("free");
+    });
+
+    it("pasifleştirilmiş tier free sayılır", async () => {
+      prisma.userMembership.findUnique.mockResolvedValue({
+        status: "active",
+        currentPeriodEnd: future,
+        tier: { type: "premium", isActive: false },
+        user: noKyc,
+      });
+      expect(await resolvedTierType()).toBe("free");
+    });
+
+    it("iptal edilmiş ama dönemi süren premium üye katmanını korur", async () => {
+      prisma.userMembership.findUnique.mockResolvedValue({
+        status: "cancelled",
+        currentPeriodEnd: future,
+        tier: { type: "premium", isActive: true },
+        user: noKyc,
+      });
+      expect(await resolvedTierType()).toBe("premium");
+    });
+  });
+
   describe("audience targeting", () => {
     const where = () =>
       (service as any).eligibleAudienceWhere("user-1", "premium");

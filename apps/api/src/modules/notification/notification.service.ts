@@ -113,6 +113,10 @@ export class NotificationService {
     return this.commerce.notifyOrderShipped(buyerId, orderId, trackingNumber);
   }
 
+  async notifyOrderDelivered(buyerId: string, orderId: string) {
+    return this.commerce.notifyOrderDelivered(buyerId, orderId);
+  }
+
   async notifyOrderDeliveredConfirm(
     buyerId: string,
     orderId: string,
@@ -136,6 +140,11 @@ export class NotificationService {
 
   async notifyOrderManuallyConfirmed(sellerId: string, orderId: string) {
     return this.commerce.notifyOrderManuallyConfirmed(sellerId, orderId);
+  }
+
+  /** Kupon hakkı geri verildi — commit SONRASI çağrılır. */
+  async notifyCouponReturned(userId: string, code: string) {
+    return this.commerce.notifyCouponReturned(userId, code);
   }
 
   /** `audience` ZORUNLU: aynı bildirim iki tarafa da gidiyor. */
@@ -169,8 +178,43 @@ export class NotificationService {
     buyerId: string,
     productId: string,
     amount: number,
+    orderId?: string,
+    productTitle?: string,
+    offerId?: string,
   ) {
-    return this.commerce.notifyOfferAccepted(buyerId, productId, amount);
+    return this.commerce.notifyOfferAccepted(
+      buyerId,
+      productId,
+      amount,
+      orderId,
+      productTitle,
+      offerId,
+    );
+  }
+
+  async notifyOfferCounterAccepted(
+    sellerId: string,
+    productId: string,
+    amount: number,
+    orderId?: string,
+    productTitle?: string,
+  ) {
+    return this.commerce.notifyOfferCounterAccepted(
+      sellerId,
+      productId,
+      amount,
+      orderId,
+      productTitle,
+    );
+  }
+
+  async notifyOfferExpired(params: {
+    buyerId: string;
+    sellerId: string;
+    productId: string;
+    productTitle: string;
+  }) {
+    return this.commerce.notifyOfferExpired(params);
   }
 
   async notifyOrderCancelledOutOfStock(
@@ -201,6 +245,11 @@ export class NotificationService {
     );
   }
 
+  /** İlan silindiği için kapanan teklif — stok bitişinden ayrı, doğru metin. */
+  async notifyOfferCancelledListingRemoved(buyerId: string, productId: string) {
+    return this.commerce.notifyOfferCancelledListingRemoved(buyerId, productId);
+  }
+
   async notifyReservationReleased(
     buyerId: string,
     orderId: string,
@@ -217,11 +266,13 @@ export class NotificationService {
     buyerId: string,
     orderId: string,
     productTitle: string,
+    fromOffer = false,
   ) {
     return this.commerce.notifyOrderPaymentExpired(
       buyerId,
       orderId,
       productTitle,
+      fromOffer,
     );
   }
 

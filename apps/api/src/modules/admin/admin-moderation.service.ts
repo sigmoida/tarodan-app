@@ -8,6 +8,7 @@ import { PrismaService } from "../../prisma";
 import { StorageService } from "../storage/storage.service";
 import { ModerationAiClient } from "../moderation/moderation-ai.client";
 import { AdminAuditService } from "./admin-audit.service";
+import { AdminProductService } from "./admin-product.service";
 import { ProductStatus, Prisma, type ModerationEvent } from "@prisma/client";
 import { catalogProductWhere } from "../product/helpers/catalog-product-where";
 import {
@@ -28,6 +29,8 @@ export class AdminModerationService {
     private readonly prisma: PrismaService,
     private readonly audit: AdminAuditService,
     private readonly moderationAi: ModerationAiClient,
+    // Ürün onay/reddi TEK kanonik yoldan (guard + cache/ES + bildirim) geçer.
+    private readonly adminProduct: AdminProductService,
     @Optional()
     private readonly storageService: StorageService,
   ) {}
@@ -491,27 +494,13 @@ export class AdminModerationService {
   ) {
     switch (type) {
       case "product":
-        const product = await this.prisma.product.findUnique({
-          where: { id: itemId },
+        // TEK kanonik onay yolu: AdminProductService.approveProduct. Buradaki
+        // eski doğrudan update statü/komisyon guard'sızdı, cache/ES/ISR
+        // tazelemiyor ve bildirim göndermiyordu — buradan onaylanan ürün
+        // vitrinde gecikiyor, kapıları atlıyordu.
+        await this.adminProduct.approveProduct(adminId, itemId, {
+          note: notes,
         });
-        if (!product) throw new NotFoundException("Ürün bulunamadı");
-
-        await this.prisma.product.update({
-          where: { id: itemId },
-          data: { status: ProductStatus.active },
-        });
-
-        await this.audit.createAuditLog(
-          adminId,
-          "moderation_approve",
-          "Product",
-          itemId,
-          product,
-          {
-            status: "active",
-            notes,
-          },
-        );
         break;
 
       case "message":
@@ -576,28 +565,11 @@ export class AdminModerationService {
   ) {
     switch (type) {
       case "product":
-        const product = await this.prisma.product.findUnique({
-          where: { id: itemId },
+        // TEK kanonik red yolu: AdminProductService.rejectProduct (gerekçe
+        // kalıcı yazılır, satıcıya bildirim gider, cache/ES tazelenir).
+        await this.adminProduct.rejectProduct(adminId, itemId, {
+          reason: notes ? `${reason} — ${notes}` : reason,
         });
-        if (!product) throw new NotFoundException("Ürün bulunamadı");
-
-        await this.prisma.product.update({
-          where: { id: itemId },
-          data: { status: ProductStatus.rejected },
-        });
-
-        await this.audit.createAuditLog(
-          adminId,
-          "moderation_reject",
-          "Product",
-          itemId,
-          product,
-          {
-            status: "rejected",
-            reason,
-            notes,
-          },
-        );
         break;
 
       case "message":

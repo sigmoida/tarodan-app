@@ -18,6 +18,10 @@ import {
   WishlistItemResponseDto,
 } from "./dto";
 import { catalogProductWhere } from "../product/helpers/catalog-product-where";
+import {
+  PUBLIC_NAME_SELECT,
+  publicName,
+} from "../../common/helpers/public-identity";
 
 @Injectable()
 export class WishlistService {
@@ -64,7 +68,7 @@ export class WishlistService {
         product: {
           include: {
             images: { take: 1 },
-            seller: { select: { id: true, displayName: true } },
+            seller: { select: { id: true, ...PUBLIC_NAME_SELECT } },
           },
         },
       },
@@ -106,7 +110,7 @@ export class WishlistService {
       where: { id: dto.productId, ...catalogProductWhere() },
       include: {
         images: { take: 1 },
-        seller: { select: { id: true, displayName: true } },
+        seller: { select: { id: true, ...PUBLIC_NAME_SELECT } },
       },
     });
 
@@ -135,7 +139,7 @@ export class WishlistService {
         product: {
           include: {
             images: { take: 1 },
-            seller: { select: { id: true, displayName: true } },
+            seller: { select: { id: true, ...PUBLIC_NAME_SELECT } },
           },
         },
       },
@@ -157,7 +161,7 @@ export class WishlistService {
           product: {
             include: {
               images: { take: 1 },
-              seller: { select: { id: true, displayName: true } },
+              seller: { select: { id: true, ...PUBLIC_NAME_SELECT } },
             },
           },
         },
@@ -176,7 +180,7 @@ export class WishlistService {
     try {
       const user = await this.prisma.user.findUnique({
         where: { id: userId },
-        select: { displayName: true },
+        select: PUBLIC_NAME_SELECT,
       });
 
       await this.notificationService.createInAppNotification(
@@ -185,7 +189,7 @@ export class WishlistService {
         {
           productId: product.id,
           productTitle: product.title,
-          userName: user?.displayName || "Bir kullanıcı",
+          userName: publicName(user),
         },
       );
     } catch (error) {
@@ -326,7 +330,7 @@ export class WishlistService {
       productCondition: product.condition,
       productStatus: product.status,
       sellerId: product.seller.id,
-      sellerName: product.seller.displayName,
+      sellerName: publicName(product.seller),
       addedAt: item.addedAt,
     };
   }

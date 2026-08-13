@@ -16,6 +16,8 @@ describe("PaymentExpiryReconciliationService.handleExpiredPreparingOrders — SE
       },
       shipment: { findUnique: jest.fn().mockResolvedValue(shipment) },
       paymentHold: { updateMany: jest.fn().mockResolvedValue({ count: 1 }) },
+      // Süre aşımı iptali, incelemede bekleyen alıcı talebini de devralır.
+      refundRequest: { updateMany: jest.fn().mockResolvedValue({ count: 0 }) },
       product: { update: jest.fn().mockResolvedValue({}) },
     };
     const prisma = {
@@ -105,6 +107,25 @@ describe("PaymentExpiryReconciliationService.handleExpiredPreparingOrders — SE
     expect(mockTx.product.update).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.objectContaining({ quantity: { increment: 3 } }),
+      }),
+    );
+  });
+
+  it("incelemede bekleyen alıcı iptal talebini DEVRALIR (sahipsiz kalmaz)", async () => {
+    // Sonuç para açısından zaten talebin isteyeceğinden iyidir (satıcı
+    // kargolamadı → kesintisiz tam iade); talep kapatılmazsa aktif kalıp
+    // payout guard'larını kilitliyor ve admin onayında iade tavanına takılıyordu.
+    const { service, mockTx } = makeService(order(), null);
+
+    await service.handleExpiredPreparingOrders();
+
+    expect(mockTx.refundRequest.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({ orderId: "o1" }),
+        data: expect.objectContaining({
+          status: "cancelled",
+          decidedBy: "system",
+        }),
       }),
     );
   });

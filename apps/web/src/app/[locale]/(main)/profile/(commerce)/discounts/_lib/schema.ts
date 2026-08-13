@@ -11,8 +11,11 @@ export const discountSchema = z
     code: z.string(),
     name: z.string().min(1, "İndirim adı gerekli"),
     description: z.string(),
-    type: z.enum(["percentage", "fixed_amount"]),
+    type: z.enum(["percentage", "fixed_amount", "bogo", "bulk_quantity"]),
     value: z.number().min(0, "Geçerli bir değer girin"),
+    buyQuantity: z.string(),
+    getQuantity: z.string(),
+    minQuantity: z.string(),
     scope: z.enum(["product", "seller"]),
     targetProductIds: z.array(z.string()),
     minCartValue: z.string(),
@@ -27,6 +30,25 @@ export const discountSchema = z
   .refine((d) => d.scope !== "product" || d.targetProductIds.length > 0, {
     message: "Lütfen en az bir ürün seçin",
     path: ["targetProductIds"],
-  });
+  })
+  .refine((d) => d.type !== "bogo" || parseInt(d.buyQuantity) >= 1, {
+    message: "'Al' adedi en az 1 olmalı",
+    path: ["buyQuantity"],
+  })
+  .refine((d) => d.type !== "bogo" || parseInt(d.getQuantity) >= 1, {
+    message: "'Bedava' adedi en az 1 olmalı",
+    path: ["getQuantity"],
+  })
+  .refine((d) => d.type !== "bulk_quantity" || parseInt(d.minQuantity) >= 2, {
+    message: "En az adet 2 veya üzeri olmalı",
+    path: ["minQuantity"],
+  })
+  .refine(
+    (d) => d.type !== "bulk_quantity" || (d.value > 0 && d.value <= 100),
+    {
+      message: "İndirim yüzdesi 1-100 arası olmalı",
+      path: ["value"],
+    },
+  );
 
 export type DiscountFormValues = z.infer<typeof discountSchema>;

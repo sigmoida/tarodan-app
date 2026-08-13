@@ -13,7 +13,16 @@ const RETENTION_DAYS = {
   error: 30,
   security: 180,
   email: 90,
+  // Bildirim satırları (zil + e-posta/push teslimat izleri) süresiz birikiyordu:
+  // her sipariş/teklif/takas olayı satır yazıyor ama hiçbir şey silmiyordu.
+  // 180 günden eski bildirim zilde de aranmaz; env ile ayarlanabilir.
+  notification: 180,
 } as const;
+
+/** Bildirim saklama süresi env ile ezilebilir (gün). */
+const notificationRetentionDays = (): number =>
+  Number(process.env.NOTIFICATION_LOG_RETENTION_DAYS) ||
+  RETENTION_DAYS.notification;
 
 export type LogPurgeCounts = Record<keyof typeof RETENTION_DAYS, number>;
 
@@ -29,7 +38,7 @@ export class LogRetentionService {
   constructor(private readonly prisma: PrismaService) {}
 
   async purgeExpiredLogs(): Promise<LogPurgeCounts> {
-    const [error, security, email] = await Promise.all([
+    const [error, security, email, notification] = await Promise.all([
       this.purge("error", () =>
         this.prisma.errorLog.deleteMany({
           where: { createdAt: { lt: this.cutoff(RETENTION_DAYS.error) } },
@@ -53,9 +62,19 @@ export class LogRetentionService {
           where: { createdAt: { lt: this.cutoff(RETENTION_DAYS.email) } },
         }),
       ),
+      // TÜM kanallar silinir (in_app dahil): 180 günden eski zil bildirimi
+      // kullanıcı için de arşiv değeri taşımaz, teslimat izi de denetim izi
+      // değildir (o audit_logs'ta).
+      this.purge("notification", () =>
+        this.prisma.notificationLog.deleteMany({
+          where: {
+            createdAt: { lt: this.cutoff(notificationRetentionDays()) },
+          },
+        }),
+      ),
     ]);
 
-    return { error, security, email };
+    return { error, security, email, notification };
   }
 
   private cutoff(days: number): Date {

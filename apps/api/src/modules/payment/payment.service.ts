@@ -120,25 +120,34 @@ export class PaymentService {
     return this.paymentRefund.processRefund(orderId, refundAmount, opts);
   }
 
-  async refundTradeCashPaymentIfCompleted(tradeId: string): Promise<{
+  async refundTradeCashPaymentIfCompleted(
+    tradeId: string,
+    opts?: { payerId?: string },
+  ): Promise<{
     refunded: boolean;
     paymentId?: string;
     skippedReason?: string;
   }> {
-    return this.paymentRefund.refundTradeCashPaymentIfCompleted(tradeId);
+    return this.paymentRefund.refundTradeCashPaymentIfCompleted(tradeId, opts);
   }
 
-  async refundTradeCashTracked(tradeId: string): Promise<{
+  async refundTradeCashTracked(
+    tradeId: string,
+    opts?: { payerId?: string },
+  ): Promise<{
     refunded: boolean;
     failed: boolean;
     skippedReason?: string;
     reason?: string;
   }> {
-    return this.paymentRefund.refundTradeCashTracked(tradeId);
+    return this.paymentRefund.refundTradeCashTracked(tradeId, opts);
   }
 
-  async releasePayment(orderId: string) {
-    return this.paymentRefund.releasePayment(orderId);
+  async releasePayment(
+    orderId: string,
+    opts?: { ignoreReleaseDate?: boolean },
+  ) {
+    return this.paymentRefund.releasePayment(orderId, opts);
   }
 
   async scheduleHoldReleaseOnDelivery(
@@ -168,6 +177,22 @@ export class PaymentService {
     buyerId: string | null;
   }> {
     return this.paymentRefund.handleOrderDelivered(orderId, deliveredAt, tx);
+  }
+
+  /**
+   * Koli başına tek duyuru hakkı (kargoya verildi / teslim edildi). İlk sipariş
+   * satırı hakkı alır, kardeşleri sessiz kalır.
+   */
+  async claimOrderAnnouncement(
+    kind: "shipped" | "delivered",
+    order: { id: string; packageId: string | null },
+  ): Promise<boolean> {
+    return this.paymentRefund.claimPackageAnnouncement(kind, order);
+  }
+
+  /** Teslim duyurusu (post-commit): alıcıya bildirim + e-posta, koli başına tek. */
+  async announceOrderDelivered(orderId: string): Promise<void> {
+    return this.paymentRefund.announceOrderDelivered(orderId);
   }
 
   async releaseHoldsDue(): Promise<{

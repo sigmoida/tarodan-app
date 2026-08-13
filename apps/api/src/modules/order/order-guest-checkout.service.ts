@@ -4,12 +4,14 @@ import {
   BadRequestException,
   ConflictException,
   Logger,
+  Optional,
 } from "@nestjs/common";
 import { createHash, randomInt, timingSafeEqual } from "crypto";
 import { ConfigService } from "@nestjs/config";
 import { PrismaService } from "../../prisma";
 import { buyerTotalOf } from "./order-total.helper";
 import { chargedProductBaseOf } from "./order-charged-base.helper";
+import { paymentWindowEnd } from "../payment/payment.constants";
 import { resolveSalePrice } from "../product/helpers/product-sale-window";
 import { i18nMessage } from "../i18n";
 import { CacheService } from "../cache/cache.service";
@@ -32,12 +34,15 @@ import { DiscountService } from "../discount";
 import { OrderPricingService } from "./order-pricing.service";
 import { OrderCommonService } from "./order-common.service";
 import { OrderCheckoutCommonService } from "./order-checkout-common.service";
+import { OrderFeeDiscountService } from "./order-fee-discount.service";
+import { remainingDiscountAllowanceFor } from "../discount/fee-discount.engine";
 import { splitShippingByBuyerShare } from "../shipping/shipping-tariff.helper";
 import { OrderCheckoutGroupService } from "./order-checkout-group.service";
 import {
   REFERENCE_PREFIX,
   reprefixReference,
 } from "../../common/helpers/code-prefixes";
+import { PUBLIC_NAME_SELECT } from "../../common/helpers/public-identity";
 
 /**
  * Misafir checkout + e-posta OTP alt sistemi: sendGuestCheckoutVerificationCode,
@@ -60,6 +65,8 @@ export class OrderGuestCheckoutService {
     private readonly orderCommon: OrderCommonService,
     private readonly checkoutCommon: OrderCheckoutCommonService,
     private readonly group: OrderCheckoutGroupService,
+    @Optional()
+    private readonly feeDiscounts?: OrderFeeDiscountService,
   ) {}
 
   /**
@@ -236,7 +243,7 @@ export class OrderGuestCheckoutService {
         where: { id: dto.productId },
         include: {
           images: { take: 1, orderBy: { sortOrder: "asc" } },
-          seller: { select: { id: true, email: true, displayName: true } },
+          seller: { select: { id: true, email: true, ...PUBLIC_NAME_SELECT } },
         },
       });
 
@@ -365,7 +372,7 @@ export class OrderGuestCheckoutService {
       // Calculate commission with category-based matching (3.3)
       // Commission is calculated on product price, not including shipping
       const pinnedRuleSetId = commissionRuleSet.id;
-      const commissionResult = await this.orderPricing.calculateCommission(
+      const rawCommissionResult = await this.orderPricing.calculateCommission(
         finalPrice,
         product.sellerId,
         product.categoryId,
@@ -378,14 +385,43 @@ export class OrderGuestCheckoutService {
       // bölüşüm. Alıcı yalnız kendi payını öder; kalanı satıcı üstlenir.
       const {
         fullShipping,
-        buyer: buyerShippingAmount,
-        seller: sellerShippingAmount,
+        buyer: rawBuyerShippingAmount,
+        seller: rawSellerShippingAmount,
       } = this.orderPricing.resolveShippingDecision({
         tariff: shippingTariff.tariff,
         subtotal: finalPrice,
         billableDesi: product.shippingDesi,
-        lineShares: [commissionResult.shippingBuyerShares],
+        lineShares: [rawCommissionResult.shippingBuyerShares],
       });
+
+      // Misafirde kimlik yoktur: yalnız herkese açık kampanyalar uygulanır
+      // (üyelik ve kişiye özel hedefler kimlik gerektirir → eşleşmez).
+      const feeDiscounted = (await this.feeDiscounts?.apply({
+        context: {
+          productId: product.id,
+          categoryId: product.categoryId,
+          sellerId: product.sellerId,
+          buyerId: null,
+          buyerTier: null,
+        },
+        commission: rawCommissionResult,
+        buyerShippingAmount: rawBuyerShippingAmount,
+        sellerShippingAmount: rawSellerShippingAmount,
+        // Misafirde kupon yoktur; tavanın tamamı bedel kampanyalarına açık.
+        remainingAllowance: remainingDiscountAllowanceFor({
+          lineBase: finalPrice,
+        }),
+      })) ?? {
+        commission: rawCommissionResult,
+        buyerShippingAmount: rawBuyerShippingAmount,
+        sellerShippingAmount: rawSellerShippingAmount,
+        applied: [],
+        buyerTotal: 0,
+        sellerTotal: 0,
+      };
+      const commissionResult = feeDiscounted.commission;
+      const buyerShippingAmount = feeDiscounted.buyerShippingAmount;
+      const sellerShippingAmount = feeDiscounted.sellerShippingAmount;
       const shippingCost = buyerShippingAmount; // buyer-charged shipping
       // Vergiler: ürün KDV'si (politikayla kapalı), hizmet KDV'si (iki taraf) ve stopaj.
       const {
@@ -558,8 +594,13 @@ export class OrderGuestCheckoutService {
             sellerServiceTaxAmount: guestSellerServiceTax,
             totalAmount,
           }),
+          buyerFeeDiscountAmount: feeDiscounted.buyerTotal,
+          sellerFeeDiscountAmount: feeDiscounted.sellerTotal,
+          feeDiscountBreakdown: feeDiscounted.applied.length
+            ? (feeDiscounted.applied as unknown as Prisma.InputJsonValue)
+            : undefined,
           status: OrderStatus.pending_payment,
-          paymentExpiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
+          paymentExpiresAt: paymentWindowEnd(),
           shippingAddress: guestShippingJson as Prisma.InputJsonValue,
         },
         include: {
@@ -571,7 +612,7 @@ export class OrderGuestCheckoutService {
           buyer: {
             select: {
               id: true,
-              displayName: true,
+              ...PUBLIC_NAME_SELECT,
               isVerified: true,
               avatarUrl: true,
             },
@@ -579,7 +620,7 @@ export class OrderGuestCheckoutService {
           seller: {
             select: {
               id: true,
-              displayName: true,
+              ...PUBLIC_NAME_SELECT,
               isVerified: true,
               avatarUrl: true,
             },
@@ -595,6 +636,9 @@ export class OrderGuestCheckoutService {
         finalPrice,
         commissionResult,
       );
+
+      // Kodsuz kampanyaların bütçesi sipariş oluşurken harcanır.
+      await this.feeDiscounts?.spendBudgets(feeDiscounted.applied, tx);
 
       // Adet bazlı rezervasyon: 1 adet rezerve et (invalidation yok — cron halledecek).
       // Bulgu F: yalnız DIRECT-BUY'da (offerId yok) create'de rezerve et. Teklif

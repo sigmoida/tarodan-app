@@ -33,17 +33,14 @@ export {
 } from "./components/QuantityStepper";
 export { PhoneInput, type PhoneInputProps } from "./components/PhoneInput";
 export {
-  countryCodes,
-  DEFAULT_COUNTRY_CODE,
   formatPhoneNumber,
-  getFullPhoneNumber,
-  hasCountryCodePrefix,
-  normalizePhoneForPayload,
-  getPhoneMaxLength,
-  getPhonePlaceholder,
   splitPhone,
   combinePhone,
-  type CountryCode,
+  TR_DIAL_CODE,
+  TR_PHONE_E164,
+  TR_MOBILE_NATIONAL,
+  TR_PHONE_MASK_LENGTH,
+  TR_PHONE_PLACEHOLDER,
 } from "./lib/phone";
 export { SearchInput, type SearchInputProps } from "./components/SearchInput";
 export { Textarea, type TextareaProps } from "./components/Textarea";
@@ -214,6 +211,9 @@ export {
   taxScopeConfig,
   membershipTierConfig,
   refundReasonConfig,
+  BUYER_SELECTABLE_REFUND_REASONS,
+  orderCancellationReasonConfig,
+  BUYER_SELECTABLE_CANCELLATION_REASONS,
   shipmentStatusConfig,
   notificationChannelConfig,
   deliveryStatusConfig,
@@ -233,6 +233,9 @@ export {
   type StatusConfig,
   type BadgeVariant,
 } from "./lib/status-configs";
+
+// Client policy constants (backend is the source of truth — see @tarodan/shared)
+export { REFUND_COOLING_OFF_DAYS, ESCROW_RELEASE_DAYS } from "@tarodan/shared";
 
 // Utilities
 export { cn } from "./lib/utils";

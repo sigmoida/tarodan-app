@@ -5,10 +5,12 @@ import {
   BadRequestException,
   ConflictException,
   Logger,
+  Optional,
 } from "@nestjs/common";
 import { PrismaService } from "../../prisma";
 import { buyerTotalOf } from "./order-total.helper";
 import { chargedProductBaseOf } from "./order-charged-base.helper";
+import { paymentWindowEnd } from "../payment/payment.constants";
 import { resolveSalePrice } from "../product/helpers/product-sale-window";
 import { i18nMessage } from "../i18n";
 import { CreateOrderDto, DirectBuyDto, CheckoutDto } from "./dto";
@@ -21,19 +23,28 @@ import {
 } from "@prisma/client";
 import { getAvailableQuantity } from "../product/helpers/product-availability.helper";
 import { EventService } from "../events";
-import { NotificationService } from "../notification/notification.service";
-import { NotificationType } from "../notification/dto";
 import { DiscountService } from "../discount";
 import { SuratCargoService } from "../surat-cargo/surat-cargo.service";
 import { OrderPricingService } from "./order-pricing.service";
 import { OrderCommonService } from "./order-common.service";
 import { OrderCheckoutCommonService } from "./order-checkout-common.service";
+import { OrderFeeDiscountService } from "./order-fee-discount.service";
+import type { FeeDiscountCandidate } from "../discount/fee-discount.engine";
+import {
+  allocateCouponAcrossLines,
+  remainingDiscountAllowanceFor,
+} from "../discount/fee-discount.engine";
 import { splitShippingByBuyerShare } from "../shipping/shipping-tariff.helper";
 import { OrderCheckoutGroupService } from "./order-checkout-group.service";
 import {
   REFERENCE_PREFIX,
   reprefixReference,
 } from "../../common/helpers/code-prefixes";
+import {
+  PUBLIC_NAME_SELECT,
+  PublicIdentityInput,
+  publicName,
+} from "../../common/helpers/public-identity";
 
 /**
  * Grup dışı satın alma akışları: Hızlı Al (createDirectOrder), teklif→sipariş (create)
@@ -48,13 +59,14 @@ export class OrderCheckoutDirectService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly eventService: EventService,
-    private readonly notificationService: NotificationService,
     private readonly discountService: DiscountService,
     private readonly suratCargoService: SuratCargoService,
     private readonly orderPricing: OrderPricingService,
     private readonly orderCommon: OrderCommonService,
     private readonly checkoutCommon: OrderCheckoutCommonService,
     private readonly group: OrderCheckoutGroupService,
+    @Optional()
+    private readonly feeDiscounts?: OrderFeeDiscountService,
   ) {}
 
   /**
@@ -119,7 +131,7 @@ export class OrderCheckoutDirectService {
         where: { id: dto.productId },
         include: {
           seller: {
-            select: { id: true, displayName: true },
+            select: { id: true, ...PUBLIC_NAME_SELECT },
           },
         },
       });
@@ -338,6 +350,7 @@ export class OrderCheckoutDirectService {
       // F2.4: kupon indiriminin platform payı [0,1].
       let couponPlatformFundedShare = 0;
 
+      let couponFeeCandidate: FeeDiscountCandidate | null = null;
       if (dto.couponCode) {
         const validation = await this.discountService.validateCoupon(
           {
@@ -348,11 +361,19 @@ export class OrderCheckoutDirectService {
         );
 
         if (validation.isValid && validation.discount) {
-          couponDiscount = validation.discount.estimatedDiscount;
+          // %50 tavan TEK kaynaktan (quote/grup ile birebir): tek satırlık
+          // siparişte kupon, ürün tabanının yarısını aşamaz.
+          couponDiscount = allocateCouponAcrossLines(
+            [productPrice],
+            validation.discount.estimatedDiscount,
+          ).total;
           appliedCouponCode = dto.couponCode.toUpperCase();
           appliedDiscountId = validation.discount.id;
           appliedVoucherCodeId = validation.discount.voucherCodeId;
           couponPlatformFundedShare = validation.discount.platformFundedShare;
+          // Bedel hedefli kupon ürün tabanına dokunmaz; motora aday geçer.
+          couponFeeCandidate =
+            this.feeDiscounts?.couponCandidate(validation.discount) ?? null;
         } else if (!validation.isValid) {
           throw new BadRequestException(
             validation.error || i18nMessage("server.order.invalidCouponCode"),
@@ -373,7 +394,7 @@ export class OrderCheckoutDirectService {
 
       // Calculate commission with category-based matching (3.3)
       // Commission is calculated on discounted product price, not including shipping
-      const commissionResult = await this.orderPricing.calculateCommission(
+      const rawCommissionResult = await this.orderPricing.calculateCommission(
         discountedPrice,
         product.sellerId,
         product.categoryId,
@@ -386,14 +407,45 @@ export class OrderCheckoutDirectService {
       // alıcı/satıcı bölüşümü. Alıcı yalnız kendi payını öder; kalanı satıcı üstlenir.
       const {
         fullShipping,
-        buyer: buyerShippingAmount,
-        seller: sellerShippingAmount,
+        buyer: rawBuyerShippingAmount,
+        seller: rawSellerShippingAmount,
       } = this.orderPricing.resolveShippingDecision({
         tariff: shippingTariff.tariff,
         subtotal: discountedPrice,
         billableDesi: product.shippingDesi,
-        lineShares: [commissionResult.shippingBuyerShares],
+        lineShares: [rawCommissionResult.shippingBuyerShares],
+        // Ücretsiz kargo eşiği kupon ÖNCESİ fiyattan denetlenir (İ14).
+        thresholdSubtotal: productPrice,
       });
+
+      // Platformun bedel kampanyaları: KDV'den ÖNCE uygulanır (bedel inince
+      // matrahı da iner) ve kesinti kalemlerinin kendisine yazılır.
+      const feeDiscounted = (await this.feeDiscounts?.apply({
+        context: {
+          productId: product.id,
+          categoryId: product.categoryId,
+          sellerId: product.sellerId,
+          buyerId,
+        },
+        commission: rawCommissionResult,
+        buyerShippingAmount: rawBuyerShippingAmount,
+        sellerShippingAmount: rawSellerShippingAmount,
+        remainingAllowance: remainingDiscountAllowanceFor({
+          lineBase: productPrice,
+          couponDiscount,
+        }),
+        couponCandidates: couponFeeCandidate ? [couponFeeCandidate] : [],
+      })) ?? {
+        commission: rawCommissionResult,
+        buyerShippingAmount: rawBuyerShippingAmount,
+        sellerShippingAmount: rawSellerShippingAmount,
+        applied: [],
+        buyerTotal: 0,
+        sellerTotal: 0,
+      };
+      const commissionResult = feeDiscounted.commission;
+      const buyerShippingAmount = feeDiscounted.buyerShippingAmount;
+      const sellerShippingAmount = feeDiscounted.sellerShippingAmount;
       const shippingCost = buyerShippingAmount; // buyer-charged shipping
       // Vergiler: ürün KDV'si (politikayla kapalı), hizmet KDV'si (iki taraf) ve stopaj.
       const {
@@ -509,7 +561,7 @@ export class OrderCheckoutDirectService {
           sellerShippingAmount,
         },
       });
-      const paymentExpiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
+      const paymentExpiresAt = paymentWindowEnd();
 
       // Create order with discount info
       const order = await tx.order.create({
@@ -550,6 +602,11 @@ export class OrderCheckoutDirectService {
           sellerPlatformFeeAmount: commissionResult.sellerPlatformFeeAmount,
           buyerShippingAmount,
           sellerShippingAmount,
+          buyerFeeDiscountAmount: feeDiscounted.buyerTotal,
+          sellerFeeDiscountAmount: feeDiscounted.sellerTotal,
+          feeDiscountBreakdown: feeDiscounted.applied.length
+            ? (feeDiscounted.applied as unknown as Prisma.InputJsonValue)
+            : undefined,
           financialSnapshot: this.checkoutCommon.buildFinancialSnapshot({
             pricingHash: dto.expectedPricingHash,
             productId: dto.productId,
@@ -588,10 +645,10 @@ export class OrderCheckoutDirectService {
             },
           },
           buyer: {
-            select: { id: true, email: true, displayName: true },
+            select: { id: true, email: true, ...PUBLIC_NAME_SELECT },
           },
           seller: {
-            select: { id: true, email: true, displayName: true },
+            select: { id: true, email: true, ...PUBLIC_NAME_SELECT },
           },
         },
       });
@@ -612,15 +669,26 @@ export class OrderCheckoutDirectService {
         commissionResult,
       );
 
+      // Kodsuz (otomatik) kampanyaların bütçesi sipariş oluşurken harcanır;
+      // ödenmeyen sipariş kapanırken releaseReservedUsageForOrders geri verir.
+      await this.feeDiscounts?.spendBudgets(feeDiscounted.applied, tx);
+
       // Hold coupon capacity while payment is pending. This does NOT increment
       // usedCount or create DiscountUsage; successful payment converts it to real
       // usage atomically in PaymentFulfillmentService.
-      if (appliedDiscountId && couponDiscount > 0) {
+      // Bedel hedefli kuponda ürün tabanı düşmez; kotayı ve bütçeyi tutan tutar,
+      // bedellerden verilen indirimdir.
+      const reservedCouponAmount = couponFeeCandidate
+        ? feeDiscounted.applied
+            .filter((line) => line.discountId === appliedDiscountId)
+            .reduce((sum, line) => sum + line.amount, 0)
+        : couponDiscount;
+      if (appliedDiscountId && reservedCouponAmount > 0) {
         await this.discountService.reserveUsage(
           appliedDiscountId,
           buyerId,
           order.id,
-          couponDiscount,
+          reservedCouponAmount,
           appliedVoucherCodeId,
           paymentExpiresAt,
           tx,
@@ -635,8 +703,8 @@ export class OrderCheckoutDirectService {
       try {
         const createdOrder = order as typeof order & {
           product: { title: string };
-          buyer: { email: string; displayName: string | null };
-          seller: { email: string | null; displayName: string | null };
+          buyer: { email: string } & PublicIdentityInput;
+          seller: { email: string | null } & PublicIdentityInput;
         };
         await this.eventService.emitOrderCreated({
           orderId: createdOrder.id,
@@ -647,9 +715,9 @@ export class OrderCheckoutDirectService {
           productTitle: createdOrder.product.title,
           totalAmount,
           buyerEmail: createdOrder.buyer.email,
-          buyerName: createdOrder.buyer.displayName || createdOrder.buyer.email,
+          buyerName: publicName(createdOrder.buyer),
           sellerEmail: createdOrder.seller.email || "",
-          sellerName: createdOrder.seller.displayName || "Satıcı",
+          sellerName: publicName(createdOrder.seller),
         });
         this.logger.log(
           `order.created event emitted for order ${createdOrder.orderNumber}`,
@@ -909,6 +977,14 @@ export class OrderCheckoutDirectService {
           sellerPlatformFeeAmount: commissionResult.sellerPlatformFeeAmount,
           buyerShippingAmount: offerBuyerShippingAmount,
           sellerShippingAmount: offerSellerShippingAmount,
+          // Bedel indirimleri kesinti kolonlarına zaten işlenmiş durumda; bu üç
+          // alan rapor, iade denetimi ve bütçe iadesi içindir (teklif kabul
+          // yolundaki create ile aynı — eksikti).
+          buyerFeeDiscountAmount: offerPricing.buyerFeeDiscountAmount ?? 0,
+          sellerFeeDiscountAmount: offerPricing.sellerFeeDiscountAmount ?? 0,
+          feeDiscountBreakdown: offerPricing.feeDiscounts?.length
+            ? (offerPricing.feeDiscounts as unknown as Prisma.InputJsonValue)
+            : undefined,
           financialSnapshot: this.checkoutCommon.buildFinancialSnapshot({
             pricingHash: offerPricingHash,
             productId: offer.productId,
@@ -931,7 +1007,7 @@ export class OrderCheckoutDirectService {
             totalAmount,
           }),
           status: OrderStatus.pending_payment,
-          paymentExpiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
+          paymentExpiresAt: paymentWindowEnd(),
           shippingAddressId: dto.shippingAddressId,
           shippingAddress: offerShippingJson as
             Prisma.InputJsonValue | undefined,
@@ -945,7 +1021,7 @@ export class OrderCheckoutDirectService {
           buyer: {
             select: {
               id: true,
-              displayName: true,
+              ...PUBLIC_NAME_SELECT,
               isVerified: true,
               avatarUrl: true,
             },
@@ -953,7 +1029,7 @@ export class OrderCheckoutDirectService {
           seller: {
             select: {
               id: true,
-              displayName: true,
+              ...PUBLIC_NAME_SELECT,
               isVerified: true,
               avatarUrl: true,
             },
@@ -970,6 +1046,12 @@ export class OrderCheckoutDirectService {
         commissionResult,
       );
 
+      // Kodsuz kampanyaların bütçesi sipariş oluşurken harcanır.
+      await this.feeDiscounts?.spendBudgets(
+        offerPricing.feeDiscounts ?? null,
+        tx,
+      );
+
       // Rezervasyon teklif kabul edildiğinde (offer.service accept) yapıldı; burada tekrar yapmıyoruz.
 
       // Store productId for cache invalidation
@@ -981,61 +1063,12 @@ export class OrderCheckoutDirectService {
     // Invalidate product cache after successful transaction
     if (productIdForCache) {
       await this.orderCommon.invalidateProductCaches(productIdForCache);
-
-      // Send notifications about product sold
-      await this.sendProductSoldNotifications(
-        productIdForCache,
-        result.seller?.id,
-      );
     }
+
+    // NOT: WISHLIST_SOLD burada GÖNDERİLMEZ. Bu akış siparişi pending_payment
+    // ile oluşturur; ödeme hiç tamamlanmayabilir. "Satıldı" haberi ödeme
+    // başarıyla sonuçlanınca PaymentFulfillmentService'ten (post-commit) çıkar.
 
     return result;
-  }
-
-  /**
-   * Send notifications when product is sold
-   */
-  private async sendProductSoldNotifications(
-    productId: string,
-    sellerId?: string,
-  ): Promise<void> {
-    try {
-      // Get product details
-      const product = await this.prisma.product.findUnique({
-        where: { id: productId },
-        select: { id: true, title: true, sellerId: true },
-      });
-
-      if (!product) return;
-
-      const actualSellerId = sellerId || product.sellerId;
-
-      // NOTE: We intentionally do NOT notify the seller here. This runs at order creation
-      // (status pending_payment) — e.g. when a buyer turns an accepted offer into an order —
-      // before payment is confirmed and the order may still be abandoned. The seller is
-      // notified only after payment succeeds, via the order.paid event ("Yeni Sipariş" email + push).
-
-      // Notify users who have this product in wishlist
-      const wishlistEntries = await this.prisma.wishlistItem.findMany({
-        where: { productId },
-        include: { wishlist: { select: { userId: true } } },
-      });
-
-      for (const entry of wishlistEntries) {
-        const userId = entry.wishlist.userId;
-        if (userId !== actualSellerId) {
-          await this.notificationService.createInAppNotification(
-            userId,
-            NotificationType.WISHLIST_SOLD,
-            {
-              productId: product.id,
-              productTitle: product.title,
-            },
-          );
-        }
-      }
-    } catch (error) {
-      this.logger.warn("Failed to send product sold notifications:", error);
-    }
   }
 }

@@ -25,6 +25,10 @@ import {
   MessageListResponseDto,
   PendingMessagesResponseDto,
 } from "./dto";
+import {
+  PUBLIC_NAME_SELECT,
+  publicName,
+} from "../../common/helpers/public-identity";
 
 // Daily message limit - now read from platform settings (default: 50)
 
@@ -235,8 +239,8 @@ export class MessagingService {
         flaggedReason: filterResult.flaggedReason,
       },
       include: {
-        sender: { select: { id: true, displayName: true } },
-        receiver: { select: { id: true, displayName: true } },
+        sender: { select: { id: true, ...PUBLIC_NAME_SELECT } },
+        receiver: { select: { id: true, ...PUBLIC_NAME_SELECT } },
       },
     });
 
@@ -285,7 +289,7 @@ export class MessagingService {
           NotificationType.NEW_MESSAGE,
           {
             threadId,
-            senderName: message.sender?.displayName || "Bir kullanıcı",
+            senderName: publicName(message.sender),
             messagePreview,
           },
         );
@@ -323,8 +327,8 @@ export class MessagingService {
               status: { in: [MessageStatus.sent, MessageStatus.approved] },
             },
             include: {
-              sender: { select: { id: true, displayName: true } },
-              receiver: { select: { id: true, displayName: true } },
+              sender: { select: { id: true, ...PUBLIC_NAME_SELECT } },
+              receiver: { select: { id: true, ...PUBLIC_NAME_SELECT } },
             },
           },
         },
@@ -342,11 +346,11 @@ export class MessagingService {
           await Promise.all([
             this.prisma.user.findUnique({
               where: { id: thread.participant1Id },
-              select: { id: true, displayName: true, avatarUrl: true },
+              select: { id: true, ...PUBLIC_NAME_SELECT, avatarUrl: true },
             }),
             this.prisma.user.findUnique({
               where: { id: thread.participant2Id },
-              select: { id: true, displayName: true, avatarUrl: true },
+              select: { id: true, ...PUBLIC_NAME_SELECT, avatarUrl: true },
             }),
             thread.productId
               ? this.prisma.product.findUnique({
@@ -369,12 +373,12 @@ export class MessagingService {
         return {
           id: thread.id,
           participant1Id: thread.participant1Id,
-          participant1Name: participant1?.displayName || "",
+          participant1Name: publicName(participant1),
           participant1AvatarUrl: await this.resolveAvatarUrl(
             participant1?.avatarUrl,
           ),
           participant2Id: thread.participant2Id,
-          participant2Name: participant2?.displayName || "",
+          participant2Name: publicName(participant2),
           participant2AvatarUrl: await this.resolveAvatarUrl(
             participant2?.avatarUrl,
           ),
@@ -440,11 +444,11 @@ export class MessagingService {
       await Promise.all([
         this.prisma.user.findUnique({
           where: { id: thread.participant1Id },
-          select: { id: true, displayName: true, avatarUrl: true },
+          select: { id: true, ...PUBLIC_NAME_SELECT, avatarUrl: true },
         }),
         this.prisma.user.findUnique({
           where: { id: thread.participant2Id },
-          select: { id: true, displayName: true, avatarUrl: true },
+          select: { id: true, ...PUBLIC_NAME_SELECT, avatarUrl: true },
         }),
         thread.productId
           ? this.prisma.product.findUnique({
@@ -456,8 +460,8 @@ export class MessagingService {
           where: { threadId },
           orderBy: { createdAt: "desc" },
           include: {
-            sender: { select: { id: true, displayName: true } },
-            receiver: { select: { id: true, displayName: true } },
+            sender: { select: { id: true, ...PUBLIC_NAME_SELECT } },
+            receiver: { select: { id: true, ...PUBLIC_NAME_SELECT } },
           },
         }),
         this.prisma.message.count({
@@ -473,12 +477,12 @@ export class MessagingService {
     return {
       id: thread.id,
       participant1Id: thread.participant1Id,
-      participant1Name: participant1?.displayName || "",
+      participant1Name: publicName(participant1),
       participant1AvatarUrl: await this.resolveAvatarUrl(
         participant1?.avatarUrl,
       ),
       participant2Id: thread.participant2Id,
-      participant2Name: participant2?.displayName || "",
+      participant2Name: publicName(participant2),
       participant2AvatarUrl: await this.resolveAvatarUrl(
         participant2?.avatarUrl,
       ),
@@ -528,8 +532,8 @@ export class MessagingService {
       this.prisma.message.findMany({
         where,
         include: {
-          sender: { select: { id: true, displayName: true } },
-          receiver: { select: { id: true, displayName: true } },
+          sender: { select: { id: true, ...PUBLIC_NAME_SELECT } },
+          receiver: { select: { id: true, ...PUBLIC_NAME_SELECT } },
         },
         orderBy: { createdAt: "desc" },
         skip: (page - 1) * pageSize,
@@ -581,8 +585,8 @@ export class MessagingService {
       this.prisma.message.findMany({
         where,
         include: {
-          sender: { select: { id: true, displayName: true } },
-          receiver: { select: { id: true, displayName: true } },
+          sender: { select: { id: true, ...PUBLIC_NAME_SELECT } },
+          receiver: { select: { id: true, ...PUBLIC_NAME_SELECT } },
         },
         orderBy: { createdAt: "asc" },
         skip: (page - 1) * pageSize,
@@ -596,9 +600,9 @@ export class MessagingService {
         id: m.id,
         threadId: m.threadId,
         senderId: m.senderId,
-        senderName: (m as any).sender?.displayName || "",
+        senderName: publicName((m as any).sender),
         receiverId: m.receiverId,
-        receiverName: (m as any).receiver?.displayName || "",
+        receiverName: publicName((m as any).receiver),
         originalContent: m.content,
         flaggedReason: m.flaggedReason || "Bilinmeyen",
         createdAt: m.createdAt,
@@ -620,8 +624,8 @@ export class MessagingService {
     const message = await this.prisma.message.findUnique({
       where: { id: messageId },
       include: {
-        sender: { select: { id: true, displayName: true } },
-        receiver: { select: { id: true, displayName: true } },
+        sender: { select: { id: true, ...PUBLIC_NAME_SELECT } },
+        receiver: { select: { id: true, ...PUBLIC_NAME_SELECT } },
       },
     });
 
@@ -644,8 +648,8 @@ export class MessagingService {
         reviewedAt: new Date(),
       },
       include: {
-        sender: { select: { id: true, displayName: true } },
-        receiver: { select: { id: true, displayName: true } },
+        sender: { select: { id: true, ...PUBLIC_NAME_SELECT } },
+        receiver: { select: { id: true, ...PUBLIC_NAME_SELECT } },
       },
     });
 
@@ -668,9 +672,9 @@ export class MessagingService {
       id: message.id,
       threadId: message.threadId,
       senderId: message.senderId,
-      senderName: message.sender?.displayName || "",
+      senderName: publicName(message.sender),
       receiverId: message.receiverId,
-      receiverName: message.receiver?.displayName || "",
+      receiverName: publicName(message.receiver),
       content,
       status: message.status,
       flaggedReason: message.flaggedReason || undefined,

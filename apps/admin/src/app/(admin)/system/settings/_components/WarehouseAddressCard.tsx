@@ -3,7 +3,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { useTranslations } from "next-intl";
 import { Button } from "@tarodan/ui";
-import { Form, FormInput, useZodForm } from "@tarodan/ui/form";
+import { Form, FormInput, FormPhone, useZodForm } from "@tarodan/ui/form";
 import { adminApi } from "@/lib/api";
 import { adminKeys } from "@/lib/query/keys";
 import { useAdminMutation } from "@/hooks/useAdminMutation";
@@ -69,10 +69,10 @@ export function WarehouseAddressCard() {
             name="fullName"
             label={t("admin.settings.warehouse.fields.fullName")}
           />
-          <FormInput
+          <FormPhone
             name="phone"
             label={t("admin.settings.warehouse.fields.phone")}
-            placeholder="+90…"
+            legacyMessage={t("validation.phoneLegacyNotice")}
           />
           <FormInput
             name="city"

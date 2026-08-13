@@ -1,6 +1,7 @@
 export * from "./client";
 export * from "./auth";
 export * from "./products";
+export * from "./advertisements";
 export * from "./catalog";
 export * from "./collections";
 export * from "./trades";

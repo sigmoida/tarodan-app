@@ -5,6 +5,7 @@ import { PrismaService } from "../../prisma";
 import { Prisma, ShipmentStatus, OrderStatus } from "@prisma/client";
 import { CronStepFailuresError } from "../../monitoring/cron-step-runner";
 import { OrderShipmentProvisioner } from "./order-shipment-provisioner.service";
+import { notifyUser } from "./surat-tracking-support";
 
 /** Kargo kodu (barkod) retry job istatistiği — yüzey başına. */
 export interface BarcodeRetryStat {
@@ -275,7 +276,7 @@ export class BarcodeRetryService {
     };
     const orphanOrders = await this.prisma.order.findMany({
       where: orphanWhere,
-      select: { id: true, orderNumber: true },
+      select: { id: true, orderNumber: true, sellerId: true },
       take: BarcodeRetryService.RETRY_BATCH,
     });
 
@@ -322,6 +323,17 @@ export class BarcodeRetryService {
             this.logger.log(
               `Retry OK: shipment ${res} and registered with carrier for order ${o.orderNumber}`,
             );
+            // Ekran "kargo kodu oluşturuluyor, hazır olunca bildireceğiz" diye
+            // söz veriyor — kod dolduğunda sözü burada tutuyoruz.
+            if (persisted.providerTrackingId) {
+              await notifyUser(
+                this.moduleRef,
+                this.logger,
+                o.sellerId,
+                "CARGO_CODE_READY",
+                { orderId: o.id, reference: o.orderNumber },
+              );
+            }
           } else {
             failed++;
             this.logger.warn(
@@ -364,6 +376,17 @@ export class BarcodeRetryService {
           this.logger.log(
             `Retry OK: order registered shipment=${s.id} oid=${s.trackingNumber} code=${barcode.kargoTakipNo ?? "pending-carrier-acceptance"}`,
           );
+          // Kod gerçekten dolduysa gönderene haber ver (T2'nin vaadi). Taşıyıcı
+          // kabulü hâlâ beklemedeyse kod yok demektir; bildirim gönderilmez.
+          if (barcode.kargoTakipNo && s.order?.sellerId) {
+            await notifyUser(
+              this.moduleRef,
+              this.logger,
+              s.order.sellerId,
+              "CARGO_CODE_READY",
+              { orderId: s.orderId, reference: s.order.orderNumber },
+            );
+          }
         } else {
           failed++;
           await this.recordRetryFailure("order", s.id);

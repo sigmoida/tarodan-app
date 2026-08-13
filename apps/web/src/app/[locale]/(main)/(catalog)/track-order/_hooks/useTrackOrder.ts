@@ -32,6 +32,9 @@ export function useTrackOrder(locale: string) {
   const searchParams = useSearchParams();
   const [error, setError] = useState("");
   const [autoFetched, setAutoFetched] = useState(false);
+  // Son BAŞARILI aramanın kimliği — iptal akışı (sipariş no + e-posta ile aynı
+  // doğrulama) ve iptal sonrası tazeleme bu değerlerle çalışır.
+  const [lastValues, setLastValues] = useState<TrackOrderValues | null>(null);
 
   // Global onError sets the inline message (both the URL auto path and the form).
   const track = useMutation({
@@ -58,6 +61,11 @@ export function useTrackOrder(locale: string) {
   ) => {
     setError("");
     track.mutate(values, {
+      onSuccess: () =>
+        setLastValues({
+          orderNumber: values.orderNumber.trim(),
+          email: values.email.trim().toLowerCase(),
+        }),
       onError: opts?.toastOnError
         ? (err: any) =>
             toast.error(err.response?.data?.message || t("order.orderNotFound"))
@@ -86,9 +94,16 @@ export function useTrackOrder(locale: string) {
     error,
     getOrderStatusLabel,
     lookup,
+    /** Doğrulanmış sipariş no + e-posta (iptal akışı bu kimliği kullanır). */
+    lastValues,
+    /** İptal sonrası takip verisini aynı kimlikle tazeler. */
+    refresh: () => {
+      if (lastValues) lookup(lastValues);
+    },
     reset: () => {
       track.reset();
       setError("");
+      setLastValues(null);
     },
     /** Prefill values from the URL (so `useZodForm` seeds them). */
     initialValues: {

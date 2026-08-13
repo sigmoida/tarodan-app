@@ -44,6 +44,15 @@ export function normalizeTierData(raw: unknown): TierData {
 
   const num = (v: unknown) => (v == null ? undefined : Number(v));
 
+  // Rozet TÜM ücretli katmanların oranından türetilir; oranlar ayrışırsa EN
+  // DÜŞÜK gösterilir — rozet hiçbir kartta olandan fazlasını vaat edemez.
+  // (Eskiden yalnız premium'un oranı okunuyordu.)
+  const discountPcts = [
+    pct(num(basic?.monthlyPrice), num(basic?.yearlyPrice)),
+    pct(num(premium?.monthlyPrice), num(premium?.yearlyPrice)),
+    pct(num(business?.monthlyPrice), num(business?.yearlyPrice)),
+  ].filter((v): v is number => typeof v === "number" && v > 0);
+
   const limits: ListingLimits = {
     free_listing_limit: free?.maxTotalListings,
     basic_listing_limit: basic?.maxTotalListings,
@@ -58,7 +67,6 @@ export function normalizeTierData(raw: unknown): TierData {
     maxImagesPerListing: row?.maxImagesPerListing,
     canTrade: row?.canTrade,
     canCreateCollections: row?.canCreateCollections,
-    isAdFree: row?.isAdFree,
   });
   const capabilities: Record<TierId, TierCapabilities> = {
     free: caps(free),
@@ -74,8 +82,9 @@ export function normalizeTierData(raw: unknown): TierData {
     premium_yearly_price: num(premium?.yearlyPrice),
     business_monthly_price: num(business?.monthlyPrice),
     business_yearly_price: num(business?.yearlyPrice),
-    yearly_discount_percentage:
-      pct(num(premium?.monthlyPrice), num(premium?.yearlyPrice)) ?? 20,
+    yearly_discount_percentage: discountPcts.length
+      ? Math.min(...discountPcts)
+      : 20,
   };
 
   return { prices, limits, capabilities };
@@ -85,7 +94,7 @@ export function normalizeTierData(raw: unknown): TierData {
  * Canonical plan-card features for a tier, derived ENTIRELY from the admin-driven
  * tier row (DB MembershipTier). The SINGLE source both the membership page and the
  * checkout page use, so the two never contradict and an admin toggle (limits /
- * images / canTrade / canCreateCollections / isAdFree) is reflected everywhere.
+ * images / canTrade / canCreateCollections) is reflected everywhere.
  * No hardcoded capability copy — the earlier drift (200 vs unlimited listings,
  * 10 vs 15 images, differing trade/collection flags) came from duplicating these.
  */
@@ -115,25 +124,19 @@ export function buildTierFeatures(
       text: t("collection.collections"),
       included: !!caps.canCreateCollections,
     },
-    { text: t("membership.noAds"), included: !!caps.isAdFree },
+    // "Reklamsız" avantajı DEVRE DIŞI: banner'lar herkese gösterilir, hiçbir
+    // katman bu vaadi veremez.
   ];
 }
-
-/** Static marketing extras that are NOT membership entitlements (no DTO field). */
-const TIER_EXTRAS: Partial<Record<TierId, (t: TFn) => TierFeature[]>> = {
-  business: (t) => [
-    { text: `24/7 ${t("membership.prioritySupport")}`, included: true },
-    { text: "API", included: true },
-  ],
-};
 
 /** Build all four display tiers from the normalized (admin-driven) tier data. */
 export function buildTiers(data: TierData, t: TFn): Tier[] {
   const { prices, capabilities } = data;
-  const featuresFor = (id: TierId): TierFeature[] => [
-    ...buildTierFeatures(capabilities[id], id, t),
-    ...(TIER_EXTRAS[id]?.(t) ?? []),
-  ];
+  // Kartlar YALNIZ katman satırından (DB MembershipTier) beslenir. Eski
+  // TIER_EXTRAS sabitleri ("24/7 öncelikli destek", "API") ne katman
+  // tablosunda ne dokümanlarda karşılığı olan vaatlerdi — kaldırıldı.
+  const featuresFor = (id: TierId): TierFeature[] =>
+    buildTierFeatures(capabilities[id], id, t);
   return [
     {
       id: "free",
@@ -171,18 +174,35 @@ export function buildTiers(data: TierData, t: TFn): Tier[] {
 }
 
 /**
- * Which tiers to show: business accounts (or a current business membership) see
- * only the business plan; everyone else sees free/basic/premium.
+ * Which tiers to show. Girişsiz ziyaretçi DÖRT paketi de görür — kurumsal
+ * teklif herkese görünür olmalı. Girişli bireysel hesap business'ı görmez.
+ * Kurumsal-izli hesap (davet aktivasyonundan itibaren `businessStatus` dolu)
+ * ya da mevcut business üyeliği olan YALNIZ business'ı görür.
  */
 export function visibleTiers(
   all: Tier[],
-  opts: { isBusinessAccount: boolean; currentTier: string | null },
+  opts: {
+    isAuthenticated: boolean;
+    isBusinessTrack: boolean;
+    currentTier: string | null;
+  },
 ): Tier[] {
-  const isBusiness = opts.isBusinessAccount || opts.currentTier === "business";
-  return isBusiness
-    ? all.filter((tier) => tier.id === "business")
-    : all.filter((tier) => tier.id !== "business");
+  const businessTrack = opts.isBusinessTrack || opts.currentTier === "business";
+  if (businessTrack) return all.filter((tier) => tier.id === "business");
+  if (!opts.isAuthenticated) return all;
+  return all.filter((tier) => tier.id !== "business");
 }
+
+/**
+ * DB'deki gerçek yıllık fiyat kolonu — kart, checkout'un tahsil ettiğiyle aynı
+ * sayıyı göstermeli. (Eskiden yalnız premium/business gerçek fiyatı okuyordu;
+ * basic karta oran hesabı düşüyor ve checkout'tan ayrışabiliyordu.)
+ */
+const YEARLY_PRICE_KEY: Partial<Record<TierId, keyof TierPrices>> = {
+  basic: "basic_yearly_price",
+  premium: "premium_yearly_price",
+  business: "business_yearly_price",
+};
 
 /** The price to display for a tier at the selected billing period. */
 export function displayPrice(
@@ -191,10 +211,9 @@ export function displayPrice(
   prices: TierPrices,
 ): number {
   if (period !== "yearly" || tier.price === 0) return tier.price;
-  if (tier.id === "premium" && prices.premium_yearly_price)
-    return prices.premium_yearly_price;
-  if (tier.id === "business" && prices.business_yearly_price)
-    return prices.business_yearly_price;
+  const key = YEARLY_PRICE_KEY[tier.id];
+  const yearly = key ? prices[key] : undefined;
+  if (typeof yearly === "number" && yearly > 0) return yearly;
   const discount = prices.yearly_discount_percentage ?? 20;
   return Math.round(tier.price * 12 * (1 - discount / 100) * 100) / 100;
 }

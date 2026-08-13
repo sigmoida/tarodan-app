@@ -2,6 +2,18 @@ import { BadRequestException } from "@nestjs/common";
 import { i18nMessage } from "../../i18n";
 
 /**
+ * İlan başına MUTLAK görsel tavanı — üyelik katmanından bağımsız üst sınır.
+ *
+ * TEK kaynak: create DTO'su (@ArrayMaxSize), upload endpoint'i (FilesInterceptor)
+ * ve admin katman DTO'ları (maxImagesPerListing @Max) hep bu sabiti kullanır.
+ * Eskiden üç yerde ayrı hardcode'du (15/15/20): admin bir katmana 20 görsel hakkı
+ * tanıyabiliyor, ürün DTO'su ise 16. görseli kafa karıştıran bir mesajla
+ * reddediyordu. Gerçek (katmana bağlı) limit runtime'da doğrulanır
+ * (assertValidProductImages); bu sabit yalnız tavandır.
+ */
+export const MAX_PRODUCT_IMAGES = 15;
+
+/**
  * İlan görseli anahtarlarının doğrulanması — create ve update için TEK kural.
  *
  * `cardKey`/`detailKey` istemciden gelir ve doğrudan veritabanına yazılır.

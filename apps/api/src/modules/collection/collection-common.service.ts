@@ -2,6 +2,7 @@ import { Injectable, Logger } from "@nestjs/common";
 import { StorageService } from "../storage/storage.service";
 import { CollectionResponseDto, CollectionItemResponseDto } from "./dto";
 import { ProductKind } from "@prisma/client";
+import { publicName } from "../../common/helpers/public-identity";
 
 /**
  * CollectionCommonService — koleksiyon alt servislerinin paylaştığı DTO/eşleme
@@ -52,7 +53,7 @@ export class CollectionCommonService {
     return {
       id: collection.id,
       userId: collection.userId,
-      userName: collection.user?.displayName || "",
+      userName: publicName(collection.user),
       categoryId: collection.categoryId ?? undefined,
       category: collection.category
         ? {

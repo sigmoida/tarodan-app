@@ -5,6 +5,7 @@
 import { SectionCard, SellerChip } from "@/components/ui";
 import { useTranslations } from "next-intl";
 import type { OrderDetail } from "../_lib/types";
+import { publicNameOf } from "@/lib/public-name";
 
 /** Karşı taraf kartı: alıcı görünümünde satıcı, satıcı görünümünde alıcı. */
 export default function PartyCard({ order }: { order: OrderDetail }) {
@@ -15,7 +16,7 @@ export default function PartyCard({ order }: { order: OrderDetail }) {
     <SectionCard title={order.isBuyer ? t("product.seller") : t("order.buyer")}>
       <SellerChip
         id={party.id}
-        displayName={party.displayName}
+        displayName={publicNameOf(party)}
         avatarUrl={party.avatarUrl}
         className="-mx-2"
       />

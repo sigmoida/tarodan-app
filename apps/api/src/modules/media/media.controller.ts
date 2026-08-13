@@ -21,6 +21,7 @@ import { MembershipService } from "../membership/membership.service";
 import { StorageService, isPublicBucket } from "../storage/storage.service";
 import { MediaAccessService } from "../storage/media-access.service";
 import { ModerationAiClient } from "../moderation/moderation-ai.client";
+import { MAX_PRODUCT_IMAGES } from "../product/helpers/product-image-keys";
 import { resolveUploadTarget } from "./upload-target";
 
 @Controller("media")
@@ -129,7 +130,11 @@ export class MediaController {
   }
 
   @Post("upload/product")
-  @UseInterceptors(FilesInterceptor("images", 15, UPLOAD_MULTER_OPTIONS))
+  // Mutlak tavan tek kaynaktan (MAX_PRODUCT_IMAGES); katmana bağlı gerçek
+  // limit aşağıda üyelikten okunur.
+  @UseInterceptors(
+    FilesInterceptor("images", MAX_PRODUCT_IMAGES, UPLOAD_MULTER_OPTIONS),
+  )
   async uploadProductImages(
     @Request() req: any,
     @UploadedFiles() files: Express.Multer.File[],

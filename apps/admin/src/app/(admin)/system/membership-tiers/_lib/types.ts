@@ -16,7 +16,8 @@ export interface MembershipTier {
   canCreateCollections: boolean;
   canTrade: boolean;
   isAdFree: boolean;
-  featuredListingSlots: number;
+  /** DEVRE DIŞI: öne çıkarmayı ücretli paketler devraldı; API artık dönmüyor. */
+  featuredListingSlots?: number;
   isActive: boolean;
   sortOrder: number;
   userCount: number;

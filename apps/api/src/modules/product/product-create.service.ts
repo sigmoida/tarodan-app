@@ -24,6 +24,7 @@ import {
   productPriceLimitViolation,
 } from "./helpers/product-price-limits";
 import { ProductCommonService } from "./product-common.service";
+import { PUBLIC_IDENTITY_SELECT } from "../../common/helpers/public-identity";
 import { ProductRankingService } from "./product-ranking.service";
 import { ProductStatsService } from "./product-stats.service";
 import { productShippingTierData } from "./helpers/product-shipping-tier.helper";
@@ -336,12 +337,7 @@ export class ProductCreateService {
         include: {
           images: { orderBy: { sortOrder: "asc" } },
           seller: {
-            select: {
-              id: true,
-              displayName: true,
-              isVerified: true,
-              sellerType: true,
-            },
+            select: PUBLIC_IDENTITY_SELECT,
           },
           category: {
             select: {
@@ -388,13 +384,7 @@ export class ProductCreateService {
         include: {
           images: { orderBy: { sortOrder: "asc" } },
           seller: {
-            select: {
-              id: true,
-              displayName: true,
-              isVerified: true,
-              sellerType: true,
-              avatarUrl: true,
-            },
+            select: PUBLIC_IDENTITY_SELECT,
           },
           category: { select: { id: true, name: true, slug: true } },
           brand: { select: { id: true, name: true, slug: true } },

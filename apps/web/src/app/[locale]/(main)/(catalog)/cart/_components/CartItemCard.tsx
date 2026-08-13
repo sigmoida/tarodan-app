@@ -65,7 +65,7 @@ export default function CartItemCard({ item }: { item: CartLineItem }) {
           </h3>
         </Link>
         <p className="text-sm text-muted mt-1">
-          {t("product.seller")}: @{item.sellerName}
+          {t("product.seller")}: {item.sellerName}
         </p>
         <div className="mt-2">
           {hasDiscount && (

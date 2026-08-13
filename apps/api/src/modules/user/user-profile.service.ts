@@ -36,6 +36,10 @@ import {
 } from "./dto";
 import { UserCommonService } from "./user-common.service";
 import { isUsernameAllowed, normalizeUsername } from "../auth/username.util";
+import {
+  PUBLIC_IDENTITY_SELECT,
+  toPublicIdentity,
+} from "../../common/helpers/public-identity";
 import { catalogProductWhere } from "../product/helpers/catalog-product-where";
 
 /**
@@ -175,8 +179,7 @@ export class UserProfileService {
       maxImagesPerListing: effectiveTier.maxImagesPerListing,
       canCreateCollections: effectiveTier.canCreateCollections,
       canTrade: effectiveTier.canTrade,
-      isAdFree: effectiveTier.isAdFree,
-      featuredListingSlots: effectiveTier.featuredListingSlots,
+      // featuredListingSlots kaldırıldı: ücretli öne çıkarma paketleri devraldı.
     };
     const membershipInfo = user.membership
       ? {
@@ -469,6 +472,14 @@ export class UserProfileService {
       where: { id: userId },
       data: {
         notificationSettings: merged as unknown as Prisma.InputJsonValue,
+        // marketingEmails düğmesi pazarlama e-postalarının kullanıcıya görünen
+        // TEK anahtarıdır; gerçek gönderim kapıları ise User.acceptsMarketingEmails
+        // kolonunu okur (bülten aboneliği, fiyat-düşüş e-postası, üyelik teklif
+        // e-postası). Senkronlanmazsa düğmeyi kapatan kullanıcı pazarlama
+        // e-postası almaya devam eder.
+        ...(patch.marketingEmails !== undefined
+          ? { acceptsMarketingEmails: patch.marketingEmails }
+          : {}),
       },
     });
 
@@ -782,18 +793,13 @@ export class UserProfileService {
     // başkası bakarken yalnızca herkese görünür/biten kayıtlar sayılır.
     const isOwner = !!viewerId && viewerId === userId;
 
+    // adminCode (B/K kodu) İÇ referanstır: herkese açık profilde yeri yok.
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
       select: {
-        id: true,
-        adminCode: true,
-        username: true,
-        displayName: true,
-        avatarUrl: true,
+        ...PUBLIC_IDENTITY_SELECT,
         bio: true,
-        isVerified: true,
         isSeller: true,
-        sellerType: true,
         createdAt: true,
       },
     });
@@ -896,7 +902,7 @@ export class UserProfileService {
     const trustVisible = isPremium;
 
     return {
-      ...user,
+      ...toPublicIdentity(user),
       avatarUrl: resolvedAvatarUrl,
       followersCount,
       isPremium,

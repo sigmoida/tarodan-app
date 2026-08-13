@@ -37,6 +37,9 @@ function fromDiscount(d: Discount): DiscountFormData {
     description: d.description || "",
     type: d.type,
     value: d.value,
+    buyQuantity: d.buyQuantity?.toString() || "",
+    getQuantity: d.getQuantity?.toString() || "",
+    minQuantity: d.minQuantity?.toString() || "",
     scope: d.scope === "product" ? "product" : "seller",
     targetProductIds: d.targetProductIds || [],
     minCartValue: d.minCartValue?.toString() || "",
@@ -117,34 +120,75 @@ export default function DiscountFormModal({
         <FormSelect name="type" label="İndirim Türü *">
           <option value="percentage">Yüzde (%)</option>
           <option value="fixed_amount">Sabit Tutar (TL)</option>
+          <option value="bogo">Al X, Y Bedava (otomatik)</option>
+          <option value="bulk_quantity">Çoklu Alım İndirimi (otomatik)</option>
         </FormSelect>
-        <Input
-          label="Değer *"
-          type="number"
-          min="0"
-          max={type === "percentage" ? 100 : 10000}
-          step={type === "percentage" ? 1 : 0.01}
-          placeholder={type === "percentage" ? "10" : "100"}
-          value={value}
-          onChange={(e) =>
-            setValue("value", parseFloat(e.target.value) || 0, {
-              shouldValidate: true,
-            })
-          }
-          error={formState.errors.value?.message as string | undefined}
-        />
+        {type !== "bogo" && (
+          <Input
+            label={
+              type === "bulk_quantity" ? "İndirim Yüzdesi (%) *" : "Değer *"
+            }
+            type="number"
+            min="0"
+            max={type === "fixed_amount" ? 10000 : 100}
+            step={type === "fixed_amount" ? 0.01 : 1}
+            placeholder="10"
+            value={value}
+            onChange={(e) =>
+              setValue("value", parseFloat(e.target.value) || 0, {
+                shouldValidate: true,
+              })
+            }
+            error={formState.errors.value?.message as string | undefined}
+          />
+        )}
       </div>
+
+      {type === "bogo" && (
+        <div className="grid grid-cols-2 gap-4">
+          <FormInput
+            name="buyQuantity"
+            label="Kaç adet alınca? *"
+            type="number"
+            min="1"
+            placeholder="Örn: 2 (3 al 2 öde için 2)"
+          />
+          <FormInput
+            name="getQuantity"
+            label="Kaç adet bedava? *"
+            type="number"
+            min="1"
+            placeholder="Örn: 1"
+          />
+        </div>
+      )}
+      {type === "bulk_quantity" && (
+        <FormInput
+          name="minQuantity"
+          label="En az kaç adet? *"
+          type="number"
+          min="2"
+          placeholder="Örn: 3 (aynı üründen 3 adet)"
+        />
+      )}
 
       <div className="grid grid-cols-2 gap-4">
         <FormSelect name="scope" label="Kapsam">
           <option value="seller">Tüm Mağaza</option>
           <option value="product">Seçili Ürünler</option>
         </FormSelect>
-        <FormInput
-          name="code"
-          label="İndirim Kodu (opsiyonel)"
-          placeholder="Boşsa otomatik"
-        />
+        {type === "bogo" || type === "bulk_quantity" ? (
+          <p className="self-end rounded-lg bg-surface p-3 text-xs text-muted">
+            Adet koşullu kampanya kod istemez: sepette koşul sağlanınca
+            kendiliğinden uygulanır.
+          </p>
+        ) : (
+          <FormInput
+            name="code"
+            label="İndirim Kodu (opsiyonel)"
+            placeholder="Boşsa otomatik"
+          />
+        )}
       </div>
 
       {scope === "product" && (

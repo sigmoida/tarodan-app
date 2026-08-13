@@ -47,12 +47,27 @@ export function useSellerProducts(enabled: boolean) {
 }
 
 function buildPayload(form: DiscountFormData) {
+  const isQuantityType = form.type === "bogo" || form.type === "bulk_quantity";
   return {
-    code: form.code.trim() || undefined,
+    // Adet koşullu kampanya KODSUZ-otomatiktir: sepette kendiliğinden uygulanır.
+    code: isQuantityType ? undefined : form.code.trim() || undefined,
     name: form.name,
     description: form.description || undefined,
     type: form.type,
-    value: form.value,
+    // bogo'da değer kullanılmaz; bedava adet buy/get'ten gelir.
+    value: form.type === "bogo" ? 0 : form.value,
+    buyQuantity:
+      form.type === "bogo"
+        ? parseInt(form.buyQuantity) || undefined
+        : undefined,
+    getQuantity:
+      form.type === "bogo"
+        ? parseInt(form.getQuantity) || undefined
+        : undefined,
+    minQuantity:
+      form.type === "bulk_quantity"
+        ? parseInt(form.minQuantity) || undefined
+        : undefined,
     scope: form.scope,
     targetProductIds: form.scope === "product" ? form.targetProductIds : [],
     minCartValue: form.minCartValue ? parseFloat(form.minCartValue) : undefined,

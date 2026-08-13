@@ -14,6 +14,7 @@ import {
 import { safeDecrementReserved } from "../product/helpers/product-availability.helper";
 import { EventService } from "../events";
 import { NotificationService } from "../notification/notification.service";
+import { NotificationType } from "../notification/dto";
 import { PaymentCommonService } from "./payment-common.service";
 import { PaymentRefundService } from "./payment-refund.service";
 import { FulfillmentNotifier } from "./fulfillment-notifier.service";
@@ -28,6 +29,11 @@ import {
   OUTBOX_REVENUE_INVOICE_ISSUE,
 } from "../outbox/outbox.types";
 import { isTradeFullyPaid } from "../trade/trade-payment-rows.helper";
+import { addDaysSkippingSundays } from "../../common/helpers/preparing-deadline";
+import {
+  PUBLIC_NAME_SELECT,
+  publicName,
+} from "../../common/helpers/public-identity";
 
 /**
  * PayTR bildiriminden/durum-sorgudan çıkarılan ödeme-yöntemi verisi. Gözlemlenebilirlik:
@@ -244,8 +250,12 @@ export class PaymentFulfillmentService {
         this.configService.get("PREPARING_DEADLINE_DAYS") || "3",
         10,
       );
-      const preparingDeadline = new Date();
-      preparingDeadline.setDate(preparingDeadline.getDate() + preparingDays);
+      // Pazar hariç sayılır: kargo pazar çalışmaz, cuma ödemesinin süresi
+      // fiilen kısalmasın (bkz. addDaysSkippingSundays).
+      const preparingDeadline = addDaysSkippingSundays(
+        new Date(),
+        preparingDays,
+      );
 
       await tx.order.update({
         where: { id: payment.orderId },
@@ -471,6 +481,17 @@ export class PaymentFulfillmentService {
         payment,
         transactionId,
       });
+      // İstek listesi "satıldı" bildirimi ödeme BAŞARISINDA çıkar: sipariş
+      // oluşturma anında (pending_payment) gönderilince ödeme hiç
+      // tamamlanmasa da takipçilere "satıldı" deniyordu. Post-commit,
+      // fire-and-forget — hata fulfillment'ı bozmaz (notifyBoostActivated
+      // kalıbı). Sanal (üyelik/boost) siparişler bu bloğa hiç girmez.
+      void this.notifyWishlistSold(
+        resultOrder.productId,
+        resultOrder.product?.title ?? "",
+        resultOrder.sellerId,
+        resultOrder.buyerId,
+      );
     }
 
     // Tarodan gelir e-Arşivi (sanal hizmet): üyelik → üyeye, boost → satıcıya.
@@ -481,12 +502,115 @@ export class PaymentFulfillmentService {
         resultOrder.id,
         transactionId,
       );
+      // Üyeye "üyeliğiniz yükseltildi" bildirimi — post-commit, hata
+      // aktivasyonu bozmaz (BOOST_ACTIVATED ile aynı kalıp).
+      void this.notifyMembershipUpgraded(resultOrder.id, resultOrder.buyerId);
     }
     if (isBoostOrder) {
       this.virtualOrder.issueBoostInvoice(resultOrder.id);
+      // Satın alana "öne çıkarma aktif" bildirimi — post-commit, hata
+      // aktivasyonu bozmaz. (Eskiden hiçbir aktivasyon bildirimi yoktu.)
+      void this.notifyBoostActivated(resultOrder.id, resultOrder.buyerId);
     }
 
     return true;
+  }
+
+  /** Boost aktivasyon bildirimi: gerçek ürünün başlığı ProductBoost'tan gelir. */
+  private async notifyBoostActivated(
+    orderId: string,
+    buyerId: string,
+  ): Promise<void> {
+    try {
+      const boost = await this.prisma.productBoost.findUnique({
+        where: { orderId },
+        select: {
+          productId: true,
+          product: { select: { title: true } },
+        },
+      });
+      if (!boost) return;
+      await this.notificationService?.createInAppNotification(
+        buyerId,
+        NotificationType.BOOST_ACTIVATED,
+        {
+          productId: boost.productId,
+          productTitle: boost.product?.title ?? "",
+        },
+      );
+    } catch (err: any) {
+      this.logger.warn(
+        `BOOST_ACTIVATED bildirimi başarısız (${orderId}): ${err?.message}`,
+      );
+    }
+  }
+
+  /**
+   * Üyelik aktivasyon bildirimi: paket adı ödeme niyetinin hedef tier'ından
+   * gelir (canlı satır sonradan değişebilir); intent'siz eski siparişte
+   * aktivasyon canlı satırı ödenen tier'a çevirdiği için oradan okunur.
+   */
+  private async notifyMembershipUpgraded(
+    orderId: string,
+    buyerId: string,
+  ): Promise<void> {
+    try {
+      const intent = await this.prisma.membershipPayment.findUnique({
+        where: { orderId },
+        select: { targetTier: { select: { name: true } } },
+      });
+      const tierName =
+        intent?.targetTier?.name ??
+        (
+          await this.prisma.userMembership.findUnique({
+            where: { userId: buyerId },
+            select: { tier: { select: { name: true } } },
+          })
+        )?.tier?.name;
+      if (!tierName) return;
+      await this.notificationService?.createInAppNotification(
+        buyerId,
+        NotificationType.MEMBERSHIP_UPGRADED,
+        { tierName },
+      );
+    } catch (err: any) {
+      this.logger.warn(
+        `MEMBERSHIP_UPGRADED bildirimi başarısız (${orderId}): ${err?.message}`,
+      );
+    }
+  }
+
+  /**
+   * İstek listesi takipçilerine "takip ettiğiniz ürün satıldı" bildirimi.
+   * Ödeme başarısında (post-commit) çağrılır — pending_payment aşamasında
+   * gönderilmez, çünkü ödenmemiş sipariş terk edilebilir. Satıcı (kendi ürünü)
+   * ve alıcı (ürünü zaten satın alan kişi) bildirim almaz. Asla throw etmez.
+   */
+  private async notifyWishlistSold(
+    productId: string,
+    productTitle: string,
+    sellerId: string,
+    buyerId: string,
+  ): Promise<void> {
+    try {
+      const wishlistEntries = await this.prisma.wishlistItem.findMany({
+        where: { productId },
+        include: { wishlist: { select: { userId: true } } },
+      });
+      for (const entry of wishlistEntries) {
+        const userId = entry.wishlist.userId;
+        if (userId === sellerId || userId === buyerId) continue;
+        await this.notificationService?.createInAppNotification(
+          userId,
+          NotificationType.WISHLIST_SOLD,
+          { productId, productTitle },
+        );
+      }
+    } catch (err: any) {
+      this.logger.warn(
+        `WISHLIST_SOLD bildirimi başarısız (${productId}): ${err?.message}`,
+      );
+    }
   }
 
   /**
@@ -547,8 +671,11 @@ export class PaymentFulfillmentService {
           this.configService.get("PREPARING_DEADLINE_DAYS") || "3",
           10,
         );
-        const preparingDeadline = new Date();
-        preparingDeadline.setDate(preparingDeadline.getDate() + preparingDays);
+        // Pazar hariç sayılır (bkz. addDaysSkippingSundays).
+        const preparingDeadline = addDaysSkippingSundays(
+          new Date(),
+          preparingDays,
+        );
 
         // 1. geçiş: TÜM canlı siparişler preparing — stockout kaskadından önce
         for (const order of aliveOrders) {
@@ -715,7 +842,7 @@ export class PaymentFulfillmentService {
           : firstOrder.buyer.email;
         const groupBuyerName = groupIsGuest
           ? firstAddr?.guestName || firstAddr?.fullName || "Misafir Müşteri"
-          : firstOrder.buyer.displayName || firstOrder.buyer.email;
+          : publicName(firstOrder.buyer);
         const group = await this.prisma.checkoutGroup.findUnique({
           where: { id: payment.checkoutGroupId },
           select: { groupNumber: true },
@@ -728,7 +855,7 @@ export class PaymentFulfillmentService {
           { sellerName: string; shippingCost: number }
         >();
         for (const o of result.fulfilledOrders) {
-          const sellerName = o.seller.displayName || o.seller.email || "Satıcı";
+          const sellerName = publicName(o.seller);
           const cost = Number(o.shippingCost ?? 0);
           const existing = shippingBySeller.get(o.sellerId);
           if (existing) {
@@ -798,6 +925,21 @@ export class PaymentFulfillmentService {
         skipBuyer: true,
         transactionId,
       });
+    }
+
+    // İstek listesi "satıldı" bildirimi: tekil yolla aynı — ödeme başarısında,
+    // ürün başına TEK kez (aynı ürün grupta birden çok siparişte olsa bile).
+    // Post-commit fire-and-forget; hata grup işlemeyi bozmaz.
+    const wishlistNotifiedProducts = new Set<string>();
+    for (const order of result.fulfilledOrders) {
+      if (wishlistNotifiedProducts.has(order.productId)) continue;
+      wishlistNotifiedProducts.add(order.productId);
+      void this.notifyWishlistSold(
+        order.productId,
+        order.product?.title ?? "",
+        order.sellerId,
+        order.buyerId,
+      );
     }
 
     this.logger.log(
@@ -1007,7 +1149,7 @@ export class PaymentFulfillmentService {
       const groupOrders = await this.prisma.order.findMany({
         where: { checkoutGroupId: payment.checkoutGroupId },
         include: {
-          buyer: { select: { id: true, email: true, displayName: true } },
+          buyer: { select: { id: true, email: true, ...PUBLIC_NAME_SELECT } },
         },
       });
 
@@ -1025,7 +1167,7 @@ export class PaymentFulfillmentService {
             orderNumber: order.orderNumber,
             buyerId: order.buyerId,
             buyerEmail: order.buyer.email,
-            buyerName: order.buyer.displayName || order.buyer.email,
+            buyerName: publicName(order.buyer),
             amount: Number(order.totalAmount),
             provider: payment.provider,
             failureReason: reason,
@@ -1094,7 +1236,7 @@ export class PaymentFulfillmentService {
         const order = await this.prisma.order.findUnique({
           where: { id: payment.orderId },
           include: {
-            buyer: { select: { id: true, email: true, displayName: true } },
+            buyer: { select: { id: true, email: true, ...PUBLIC_NAME_SELECT } },
           },
         });
 
@@ -1105,7 +1247,7 @@ export class PaymentFulfillmentService {
             orderNumber: order.orderNumber,
             buyerId: order.buyerId,
             buyerEmail: order.buyer.email,
-            buyerName: order.buyer.displayName || order.buyer.email,
+            buyerName: publicName(order.buyer),
             amount: Number(payment.amount),
             provider: payment.provider,
             failureReason: reason,

@@ -178,6 +178,7 @@ describe("CartService.calculateCart — unavailable items", () => {
   const mockDiscountFindUnique = jest.fn();
   const mockGetEffectiveDisplayPrice = jest.fn();
   const mockCheckUsageLimit = jest.fn();
+  const mockValidateCoupon = jest.fn();
   const mockPrisma = {
     cart: {
       findUnique: mockCartFindUnique,
@@ -189,6 +190,7 @@ describe("CartService.calculateCart — unavailable items", () => {
   const mockDiscountService = {
     getEffectiveDisplayPrice: mockGetEffectiveDisplayPrice,
     checkUsageLimit: mockCheckUsageLimit,
+    validateCoupon: mockValidateCoupon,
   } as unknown as DiscountService;
 
   const makeCartItem = (
@@ -308,23 +310,25 @@ describe("CartService.calculateCart — unavailable items", () => {
     expect(result.shippingCost).toBe(29.99);
   });
 
-  it("calculates coupon (base price, no cap) and shipping from available items only", async () => {
-    mockDiscountFindUnique.mockResolvedValue({
-      id: "discount-1",
-      name: "Sabit indirim",
-      code: "SAVE500",
-      isActive: true,
-      startDate: new Date("2020-01-01"),
-      endDate: new Date("2100-01-01"),
-      scope: "global",
-      sellerId: null,
-      targetProductIds: [],
-      minCartValue: null,
-      type: "fixed",
-      value: 500,
-      maxDiscountAmount: null,
-      isStackable: true,
+  it("kuponu otoritatif validateCoupon'dan alır, %50 tavanla kırpar; kargo/eşik kupon ÖNCESİ tutardan", async () => {
+    // Sepet kuponu artık checkout ile AYNI kaynaktan geçer: validateCoupon
+    // (voucher/limit/kapsam) + allocateCouponAcrossLines (%50 satır tavanı).
+    // 100 TL'lik uygun satıra 100 TL'lik kupon tahmini → 50 TL'ye kırpılır.
+    mockValidateCoupon.mockResolvedValue({
+      isValid: true,
+      discount: {
+        id: "discount-1",
+        name: "Sabit indirim",
+        code: "SAVE500",
+        type: "fixed",
+        value: 500,
+        scope: "global",
+        estimatedDiscount: 100,
+        eligibleProductIds: ["product-available"],
+        target: "product_price",
+      },
     });
+    mockDiscountFindUnique.mockResolvedValue({ isStackable: true });
 
     const result = await calculateCart(
       [
@@ -341,14 +345,54 @@ describe("CartService.calculateCart — unavailable items", () => {
     expect(result.items).toHaveLength(2);
     expect(result.itemCount).toBe(1);
     expect(result.subtotal).toBe(100);
-    // Fixed 500 coupon clamps to the eligible base amount (100); no 50% cap now.
-    expect(result.couponDiscountTotal).toBe(100);
-    expect(result.totalDiscount).toBe(100);
+    expect(mockValidateCoupon).toHaveBeenCalledWith(
+      {
+        code: "SAVE500",
+        cartItems: [{ productId: "product-available", quantity: 1 }],
+      },
+      "buyer-1",
+    );
+    // %50 tavan: 100 TL tabanda kupon en çok 50 TL iner (checkout ile birebir).
+    expect(result.couponDiscountTotal).toBe(50);
+    expect(result.totalDiscount).toBe(50);
+    // Eşik/kargo kupon ÖNCESİ tutardan: kupon kargo hesabını değiştirmez ve
+    // ücretsiz kargoya kalan tutarı da büyütmez (500 eşik − 100 paket = 400).
     expect(result.shippingCost).toBe(29.99);
-    expect(result.amountToFreeShipping).toBe(500);
-    expect(result.grandTotal).toBeCloseTo(29.99, 2);
+    expect(result.amountToFreeShipping).toBe(400);
+    expect(result.grandTotal).toBeCloseTo(79.99, 2);
     expect(result.appliedDiscounts[0].affectedProductIds).toEqual([
       "product-available",
     ]);
+  });
+
+  it("bedel hedefli kupon sepette ürün tabanını DÜŞÜRMEZ (tutar checkout'ta uygulanır)", async () => {
+    mockValidateCoupon.mockResolvedValue({
+      isValid: true,
+      discount: {
+        id: "discount-fee",
+        name: "Komisyonsuz alışveriş",
+        code: "KOMISYONSUZ",
+        type: "percentage",
+        value: 100,
+        scope: "global",
+        estimatedDiscount: 0,
+        eligibleProductIds: ["product-available"],
+        target: "buyer_commission",
+      },
+    });
+    mockDiscountFindUnique.mockResolvedValue({ isStackable: true });
+
+    const result = await calculateCart(
+      [makeCartItem("available")],
+      "KOMISYONSUZ",
+    );
+
+    // Kupon geçerli görünür ama ürün tabanından hiçbir şey inmez.
+    expect(result.couponDiscountTotal).toBe(0);
+    expect(result.appliedDiscounts[0]).toMatchObject({
+      discountId: "discount-fee",
+      appliedAmount: 0,
+    });
+    expect(result.grandTotal).toBeCloseTo(129.99, 2);
   });
 });

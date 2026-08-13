@@ -16,14 +16,21 @@ import { NotificationService } from "../notification/notification.service";
 import { NotificationType } from "../notification/dto";
 import { SmtpProvider } from "../mail/smtp.provider";
 import { UpdateProductDto } from "./dto";
-import { ProductStatus, Prisma } from "@prisma/client";
+import { OfferStatus, ProductStatus, Prisma } from "@prisma/client";
 import { renderManagedEmailTemplate } from "../../common/helpers/email-template-renderer";
 import { ProductCommonService } from "./product-common.service";
+import { PUBLIC_IDENTITY_SELECT } from "../../common/helpers/public-identity";
 import { ProductRankingService } from "./product-ranking.service";
 import { MembershipService } from "../membership/membership.service";
 import { productShippingTierData } from "./helpers/product-shipping-tier.helper";
 import { isCorporateSellingSuspended } from "../membership/membership.util";
 import { CommissionRuleGuardService } from "../commission/commission-rule-guard.service";
+import { ModerationAiClient } from "../moderation/moderation-ai.client";
+import { OFFER_CANCEL_REASON } from "../trade/trade-cancel-reasons";
+import {
+  loadProductPriceLimits,
+  productPriceLimitViolation,
+} from "./helpers/product-price-limits";
 
 /**
  * ProductUpdateService — ilan güncelleme + silme (soft delete). Optimistic lock,
@@ -46,6 +53,8 @@ export class ProductUpdateService {
     private readonly ranking: ProductRankingService,
     private readonly membershipService: MembershipService,
     private readonly commissionGuard: CommissionRuleGuardService,
+    // Düzenleme, oluşturma ile aynı içerik kapılarından geçer (L2).
+    private readonly moderationAi: ModerationAiClient,
   ) {}
 
   /**
@@ -152,6 +161,21 @@ export class ProductUpdateService {
             i18nMessage("server.product.setQuantityToReopen"),
           );
         }
+        // İlan limiti yeniden satışa açarken de geçerli: limit pending+active+
+        // reserved sayar, sold/inactive SAYILMAZ — kontrolsüz reaktivasyon,
+        // limiti aşmanın arka kapısıydı (create ile AYNI kaynak: canCreateListing).
+        // Zaten sayılan (aktif) ilanın normal düzenlemesi bu daldan geçmez.
+        const canReopen =
+          await this.membershipService.canCreateListing(sellerId);
+        if (!canReopen.allowed) {
+          const limits = await this.membershipService.getUserLimits(sellerId);
+          throw new ForbiddenException(
+            i18nMessage("server.product.listingLimitReached", {
+              tierName: limits.tierName,
+              maxListings: limits.maxTotalListings,
+            }),
+          );
+        }
         await this.commissionGuard.assertListingRuleExists({
           sellerId,
           categoryId: product.categoryId,
@@ -239,6 +263,58 @@ export class ProductUpdateService {
     // Satıcı kendi ilanını DOĞRUDAN aktifleştiremez (aktivasyon isteği pending'e
     // gider); yalnızca pasife alabilir. Geçersiz/izinsiz statü istekleri sessizce
     // yok sayılır (mevcut statü korunur) — böylece düzenleme akışı kırılmaz.
+
+    // Düzenleme, oluşturma ile AYNI içerik kapılarından geçer — onaylı ilanın
+    // metni sonradan serbestçe değiştirilebiliyordu (moderasyonsuz düzenleme).
+    // İlan pending'e DÜŞÜRÜLMEZ; yalnız uygunsuz içerik anında engellenir.
+    if (dto.title !== undefined && dto.title !== product.title) {
+      await this.moderationAi.assertTextClean(dto.title, {
+        entityType: "product",
+        userId: sellerId,
+        field: "title",
+        label: "ürün başlığı",
+      });
+    }
+    if (
+      dto.description !== undefined &&
+      dto.description !== product.description
+    ) {
+      await this.moderationAi.assertTextClean(dto.description ?? "", {
+        entityType: "product",
+        userId: sellerId,
+        field: "description",
+        label: "ürün açıklaması",
+      });
+    }
+
+    // Platform min/max fiyat limiti düzenlemede de geçerli — onaylı ilan
+    // sonradan limit dışı fiyata çekilemesin (create ile aynı kaynak).
+    if (dto.price !== undefined || dto.salePrice != null) {
+      const priceLimits = await loadProductPriceLimits(this.prisma);
+      for (const candidate of [
+        dto.price !== undefined ? Number(dto.price) : null,
+        dto.salePrice != null && Number(dto.salePrice) > 0
+          ? Number(dto.salePrice)
+          : null,
+      ]) {
+        if (candidate == null) continue;
+        const violation = productPriceLimitViolation(candidate, priceLimits);
+        if (violation?.type === "minimum") {
+          throw new BadRequestException(
+            i18nMessage("server.product.priceBelowMinimum", {
+              minPrice: violation.limit,
+            }),
+          );
+        }
+        if (violation?.type === "maximum") {
+          throw new BadRequestException(
+            i18nMessage("server.product.priceAboveMaximum", {
+              maxPrice: violation.limit,
+            }),
+          );
+        }
+      }
+    }
 
     // Check membership for trade feature
     let canEnableTrade = false;
@@ -478,12 +554,7 @@ export class ProductUpdateService {
           include: {
             images: { orderBy: { sortOrder: "asc" } },
             seller: {
-              select: {
-                id: true,
-                displayName: true,
-                isVerified: true,
-                sellerType: true,
-              },
+              select: PUBLIC_IDENTITY_SELECT,
             },
             category: {
               select: {
@@ -626,13 +697,7 @@ export class ProductUpdateService {
               include: {
                 images: { orderBy: { sortOrder: "asc" } },
                 seller: {
-                  select: {
-                    id: true,
-                    displayName: true,
-                    isVerified: true,
-                    sellerType: true,
-                    avatarUrl: true,
-                  },
+                  select: PUBLIC_IDENTITY_SELECT,
                 },
                 category: { select: { id: true, name: true, slug: true } },
                 brand: {
@@ -761,10 +826,13 @@ export class ProductUpdateService {
           );
         }
 
-        // 2. Send email (only for users who accept marketing emails)
+        // 2. Send email (only for users who accept marketing emails).
+        // Yalnız fiyat DÜŞÜŞÜNDE: in-app bacağıyla aynı guard. Eskiden e-posta
+        // her yönlü değişimde gidiyordu — istek listesindeki kullanıcı fiyat
+        // ARTIŞINDA da "fiyat değişti" e-postası alıyordu.
         try {
           const acceptsMarketingEmails = user.acceptsMarketingEmails === true;
-          if (acceptsMarketingEmails) {
+          if (isPriceDrop && acceptsMarketingEmails) {
             const frontendUrl =
               process.env.FRONTEND_URL || "https://tarodan.com.tr";
             const templateData = {
@@ -851,11 +919,44 @@ export class ProductUpdateService {
       data: { status: ProductStatus.deleted },
     });
 
+    // Bekleyen teklifler ANINDA gerekçeyle kapatılır — eskiden açık kalıp
+    // cron'la sessizce expire oluyordu; alıcı ilan kalktığını öğrenmiyordu.
+    // (Kabul zaten guard'lı; buradaki iş açık pazarlıkların temiz kapanışı.)
+    try {
+      const openOffers = await this.prisma.offer.findMany({
+        where: { productId: id, status: OfferStatus.pending },
+        select: { id: true, buyerId: true },
+      });
+      if (openOffers.length) {
+        await this.prisma.offer.updateMany({
+          where: { id: { in: openOffers.map((o) => o.id) } },
+          data: {
+            status: OfferStatus.cancelled,
+            cancelReason: OFFER_CANCEL_REASON.listingDeleted,
+          },
+        });
+        for (const offer of openOffers) {
+          // Doğru gerekçeyle bildir: ilan SİLİNDİ (stok bitmedi). Eskiden
+          // OUT_OF_STOCK şablonu gidiyor, alıcı "ürün satıldığı için iptal
+          // edildi" okuyordu.
+          await this.notificationService
+            .notifyOfferCancelledListingRemoved(offer.buyerId, id)
+            .catch((err: any) =>
+              this.logger.warn(
+                `offer-cancelled bildirimi başarısız (${offer.id}): ${err?.message}`,
+              ),
+            );
+        }
+      }
+    } catch (err: any) {
+      this.logger.warn(
+        `silinen ilanın teklifleri kapatılamadı (${id}): ${err?.message}`,
+      );
+    }
+
     // Invalidate cache
     await this.cache.del(`products:detail:${id}`);
     await this.cache.delPattern("products:list:*");
-    // Invalidate user's membership limits cache to refresh listing counts
-    await this.cache.del(`membership:limits:${sellerId}`);
     await this.cache.del(`membership:${sellerId}`);
 
     // Arama index'inden kaldır: "Kaldırıldı" durumu listelenemez. Aksi halde

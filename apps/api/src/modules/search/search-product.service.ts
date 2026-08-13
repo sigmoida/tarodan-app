@@ -21,6 +21,10 @@ import {
   SearchOptions,
   SearchResponse,
 } from "./search-common.service";
+import {
+  PUBLIC_NAME_SELECT,
+  publicName,
+} from "../../common/helpers/public-identity";
 
 /**
  * Ürün arama + indeksleme alt servisi (search.service.ts'ten birebir taşındı):
@@ -312,6 +316,10 @@ export class SearchProductService {
             ]
           : [
               { relevanceScore: "desc" },
+              // Sorgusuz ES gezinmesinde (ör. indirim rayı) de LIFO korunur:
+              // aynı relevanceScore'daki boost'lular en-son-alan-önde sıralanır.
+              // PG browse ile aynı kural — indirim rayında LIFO uygulanmıyordu.
+              { boostedAt: { order: "desc", missing: "_last" } },
               { viewCount: "desc" },
               { createdAt: "desc" },
             ];
@@ -482,7 +490,7 @@ export class SearchProductService {
       carModelId: product.carModelId || undefined,
       carModelName: product.carModel?.name || undefined,
       sellerId: product.sellerId,
-      sellerName: product.seller?.displayName,
+      sellerName: publicName(product.seller),
       imageUrl: product.images?.[0]?.cardKey
         ? this.storageService.getPublicAssetUrl(product.images[0].cardKey)
         : undefined,
@@ -554,7 +562,7 @@ export class SearchProductService {
     seller: {
       select: {
         id: true,
-        displayName: true,
+        ...PUBLIC_NAME_SELECT,
         // Takas yetkisi ÜYELİKTEN gelir; ürünün bayrağı yalnız niyettir.
         // Dokümana denormalize edilir çünkü ES üyelik tablosunu göremez.
         businessStatus: true,
@@ -810,7 +818,7 @@ export class SearchProductService {
           category: { select: { name: true } },
           brand: { select: { name: true } },
           manufacturer: { select: { name: true } },
-          seller: { select: { displayName: true } },
+          seller: { select: PUBLIC_NAME_SELECT },
           images: { take: 1, select: { cardKey: true } },
         },
         orderBy,
@@ -836,7 +844,7 @@ export class SearchProductService {
           brandName: (p as any).brand?.name || undefined,
           manufacturerId: p.manufacturerId || undefined,
           manufacturerName: (p as any).manufacturer?.name || undefined,
-          sellerName: p.seller.displayName,
+          sellerName: publicName(p.seller),
           imageUrl: p.images[0]?.cardKey
             ? this.storageService.getPublicAssetUrl(p.images[0].cardKey)
             : undefined,

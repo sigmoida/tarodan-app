@@ -19,6 +19,7 @@ import {
 import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
 import { Transform, Type } from "class-transformer";
 import { ProductCondition, ShippingPackageTierCode } from "@prisma/client";
+import { MAX_PRODUCT_IMAGES } from "../helpers/product-image-keys";
 
 export class ImageVariantDto {
   @IsString()
@@ -87,7 +88,12 @@ export class CreateProductDto {
   @ValidateNested({ each: true })
   @Type(() => ImageVariantDto)
   @ArrayMinSize(3, { message: "En az 3 resim yüklenmelidir" })
-  @ArrayMaxSize(10, { message: "En fazla 10 resim yüklenebilir" })
+  // Mutlak üst sınır = MAX_PRODUCT_IMAGES (tek kaynak; upload endpoint'i ve
+  // admin katman DTO'ları da aynı sabiti kullanır). Gerçek limit KULLANICININ
+  // katmanından runtime'da doğrulanır (assertValidProductImages).
+  @ArrayMaxSize(MAX_PRODUCT_IMAGES, {
+    message: `En fazla ${MAX_PRODUCT_IMAGES} resim yüklenebilir`,
+  })
   images: Array<{ cardKey: string; detailKey: string }>;
 
   @ApiPropertyOptional({

@@ -9,6 +9,8 @@ export interface Listing {
   isOnSale?: boolean;
   discountPercent?: number | null;
   status: string;
+  /** Moderasyon reddi gerekçesi — yalnız rejected'ta dolu, kartta gösterilir. */
+  rejectionReason?: string | null;
   isBoosted?: boolean;
   boostedUntil?: string | null;
   images?: Array<{ url: string } | string>;

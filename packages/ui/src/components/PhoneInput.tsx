@@ -4,20 +4,15 @@
 
 import React from "react";
 import { Input } from "./Input";
-import { Select } from "./Select";
+import { TR_DIAL_CODE } from "@tarodan/types";
 import {
-  countryCodes,
-  DEFAULT_COUNTRY_CODE,
   formatPhoneNumber,
-  getPhoneMaxLength,
-  getPhonePlaceholder,
+  TR_PHONE_MASK_LENGTH,
+  TR_PHONE_PLACEHOLDER,
 } from "../lib/phone";
 import { cn } from "../lib/utils";
 
 export interface PhoneInputProps {
-  /** Country code, e.g. "+90". */
-  countryCode: string;
-  onCountryCodeChange: (code: string) => void;
   /** Local (national) number, e.g. "5XX XXX XX XX". */
   phone: string;
   onPhoneChange: (phone: string) => void;
@@ -37,16 +32,16 @@ export interface PhoneInputProps {
 }
 
 /**
- * Country-code `Select` + phone `Input` combo — the single shared phone control
- * (formatting, maxLength and placeholder are managed by country). Built on the
- * shared `Input`/`Select` so it inherits the design system; a single bordered
- * wrapper carries the focus ring so the two controls read as one field. For
+ * The shared phone control: a fixed `+90` prefix and the national number.
+ *
+ * Tarodan ships to Turkey only, so the dial code is displayed rather than
+ * chosen — a picker would promise destinations the rest of the stack cannot
+ * serve. The formatter drops anything that cannot begin a Turkish mobile, so the
+ * field is incapable of holding a value the submit step would reject. For
  * react-hook-form use `FormPhone` from `@tarodan/ui/form`, which stores one
  * combined "+90…" value and drives this control.
  */
 export const PhoneInput: React.FC<PhoneInputProps> = ({
-  countryCode = DEFAULT_COUNTRY_CODE,
-  onCountryCodeChange,
   phone,
   onPhoneChange,
   label,
@@ -80,7 +75,7 @@ export const PhoneInput: React.FC<PhoneInputProps> = ({
       cursor -= 1;
     }
 
-    const formatted = formatPhoneNumber(raw, countryCode);
+    const formatted = formatPhoneNumber(raw);
     onPhoneChange(formatted);
 
     // Rewriting the controlled value jumps the caret to the end; move it back to
@@ -109,31 +104,21 @@ export const PhoneInput: React.FC<PhoneInputProps> = ({
         className,
       )}
     >
-      <Select
-        value={countryCode}
-        onChange={(e) => onCountryCodeChange(e.target.value)}
-        disabled={disabled}
-        aria-label="Ülke kodu"
-        className="w-auto shrink-0 cursor-pointer gap-1 border-0 bg-transparent pl-3 pr-2 font-medium focus:ring-0 focus:ring-offset-0 disabled:opacity-100"
-      >
-        {countryCodes.map((cc) => (
-          <option key={cc.code} value={cc.code}>
-            {cc.code} {cc.country}
-          </option>
-        ))}
-      </Select>
+      <span className="shrink-0 select-none pl-3 pr-2 text-sm font-medium text-body">
+        {TR_DIAL_CODE}
+      </span>
       <div className="h-5 w-px shrink-0 bg-border" aria-hidden />
       <Input
         ref={inputRef}
         id={inputId}
         name={name}
         type="tel"
-        inputMode="tel"
+        inputMode="numeric"
         autoComplete="tel-national"
         value={phone}
         onChange={handleChange}
-        placeholder={placeholder ?? getPhonePlaceholder(countryCode)}
-        maxLength={getPhoneMaxLength(countryCode)}
+        placeholder={placeholder ?? TR_PHONE_PLACEHOLDER}
+        maxLength={TR_PHONE_MASK_LENGTH}
         required={required}
         disabled={disabled}
         className="min-w-0 flex-1 border-0 bg-transparent focus:ring-0 focus:ring-offset-0 disabled:opacity-100"

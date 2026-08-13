@@ -58,6 +58,23 @@ export async function googleLoginAction(code: string): Promise<WebLoginResult> {
   return { status: "ok", user };
 }
 
+export async function appleLoginAction(
+  identityToken: string,
+  fullName?: string,
+): Promise<WebLoginResult> {
+  const result = await authLogic.appleLogin({ identityToken, fullName });
+  if (result.status === "error") {
+    return {
+      status: "error",
+      reason: result.reason,
+      message: reasonMessage(result.reason, result.serverMessage),
+    };
+  }
+  if (result.status === "2fa") return { status: "2fa" };
+  const user = await getSession();
+  return { status: "ok", user };
+}
+
 export async function logoutAction(): Promise<void> {
   await authLogic.logout();
 }

@@ -21,6 +21,8 @@ export interface AuthEndpoints {
   forgotPassword: string;
   /** POST — exchange a Google id_token for app tokens. Optional (web only). */
   google?: string;
+  /** POST — exchange an Apple identity token for app tokens. Optional (web only). */
+  apple?: string;
 }
 
 export interface AuthConfig {

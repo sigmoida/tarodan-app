@@ -41,20 +41,30 @@ export class AdminTradeService {
     return this.query.getTradeById(tradeId);
   }
 
-  async resolveTrade(
-    adminId: string,
-    tradeId: string,
-    dto: { resolution: string; note?: string },
-  ) {
-    return this.resolution.resolveTrade(adminId, tradeId, dto);
-  }
-
   async markWarehouseReceived(
     adminId: string,
     tradeId: string,
     shipmentId: string,
   ) {
     return this.warehouse.markWarehouseReceived(adminId, tradeId, shipmentId);
+  }
+
+  async markOutboundDelivered(
+    adminId: string,
+    tradeId: string,
+    shipmentId: string,
+    note?: string,
+  ) {
+    return this.warehouse.markOutboundDelivered(
+      adminId,
+      tradeId,
+      shipmentId,
+      note,
+    );
+  }
+
+  async startWarehouseReview(adminId: string, tradeId: string) {
+    return this.warehouse.startWarehouseReview(adminId, tradeId);
   }
 
   async approveWarehouseTrade(

@@ -15,6 +15,7 @@ import { useTranslations } from "next-intl";
 import UserAvatar from "@/components/UserAvatar";
 import { MetricCard } from "@/components/ui";
 import type { Seller } from "../_lib/types";
+import { publicNameOf } from "@/lib/public-name";
 
 interface SellerHeaderProps {
   seller: Seller;
@@ -53,7 +54,7 @@ export default function SellerHeader({
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div className="flex items-center gap-4">
           <UserAvatar
-            displayName={seller.displayName}
+            displayName={publicNameOf(seller)}
             avatarUrl={seller.avatarUrl}
             size="lg"
             ring
@@ -62,7 +63,7 @@ export default function SellerHeader({
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2">
               <h1 className="truncate text-xl font-bold text-heading">
-                {seller.displayName}
+                {publicNameOf(seller)}
               </h1>
               {seller.isPremium && (
                 <Badge variant="primary" size="sm">

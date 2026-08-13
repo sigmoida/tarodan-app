@@ -36,6 +36,24 @@ export interface OrderSummaryAmounts {
   shippingAmount: number;
   serviceFeeAmount: number;
   total: number;
+  /**
+   * Platformun bu sepette size verdiği bedel indirimleri. Ürün/kargo/hizmet
+   * satırları zaten indirimli tutarı gösterir; bu satırlar kazancın KAYNAĞINI
+   * söyler, yoksa indirim görünmeden erirdi.
+   */
+  feeDiscounts?: Array<{
+    target: string;
+    name: string;
+    code: string | null;
+    amount: number;
+  }>;
+  feeDiscountTotal?: number;
+  /**
+   * Adet kampanyası (bogo/bulk) kazancı. Ürün satırı zaten indirimli tutarı
+   * gösterir; bu satır "2 al 1 öde" kazancının kaynağını söyler — yoksa
+   * indirim etiketsiz erirdi.
+   */
+  quantityDiscount?: number;
 }
 
 function Line({ label, value }: { label: string; value: string }) {
@@ -69,6 +87,15 @@ export default function OrderSummaryLines({
         value={amount(amounts?.productAmount)}
       />
 
+      {(amounts?.quantityDiscount ?? 0) > 0 && (
+        <div className="flex justify-between text-success-600">
+          <span>{t("checkout.quantityCampaignDiscount")}</span>
+          <span className="font-medium">
+            −{fmtTL(amounts!.quantityDiscount!)} TL
+          </span>
+        </div>
+      )}
+
       {children}
 
       <Line
@@ -80,6 +107,21 @@ export default function OrderSummaryLines({
         value={amount(amounts?.serviceFeeAmount)}
       />
 
+      {/* Kampanya satırları: hangi bedelden ne kadar indiği, kimin verdiğiyle
+          birlikte. Tutar zaten yukarıdaki satırlardan düşülmüştür. */}
+      {(amounts?.feeDiscounts ?? []).map((discount) => (
+        <div
+          key={`${discount.target}:${discount.name}`}
+          className="flex justify-between text-success-600"
+        >
+          <span>
+            {discount.name}
+            {discount.code ? ` (${discount.code})` : ""}
+          </span>
+          <span className="font-medium">−{fmtTL(discount.amount)} TL</span>
+        </div>
+      ))}
+
       <hr />
 
       <div className="flex justify-between text-lg">
@@ -88,6 +130,15 @@ export default function OrderSummaryLines({
           {amount(amounts?.total)}
         </span>
       </div>
+
+      {(amounts?.feeDiscountTotal ?? 0) > 0 && (
+        <div className="flex justify-between text-sm text-success-600">
+          <span className="font-medium">{t("checkout.campaignSavings")}</span>
+          <span className="font-semibold">
+            {fmtTL(amounts!.feeDiscountTotal!)} TL
+          </span>
+        </div>
+      )}
     </div>
   );
 }

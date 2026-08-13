@@ -5,6 +5,7 @@ import {
   ForbiddenException,
   GoneException,
   Logger,
+  Optional,
 } from "@nestjs/common";
 import { PrismaService } from "../../prisma";
 import { MembershipService } from "../membership/membership.service";
@@ -25,6 +26,11 @@ import {
   getProductStatusFromQuantity,
   getReservedAwareStatus,
 } from "../product/helpers/product-status.helper";
+import {
+  computeTradeConfirmationDeadline,
+  computeTradeHoldReleaseAt,
+  startTradeConfirmationWindowIfDelivered,
+} from "../../common/helpers/trade-escrow";
 import { ACTIVE_TRADE_STATUSES, TRADE_PRICING_V2 } from "./trade.constants";
 import { TRADE_VALID_TRANSITIONS } from "./trade.state-machine";
 import { TradeQuoteService } from "./trade-quote.service";
@@ -35,6 +41,7 @@ import { ProductLockService } from "../product/product-lock.service";
 import { TradeShipmentService } from "./trade-shipment.service";
 import { TradeCommonService } from "./trade-common.service";
 import { TradeQueryService } from "./trade-query.service";
+import { DiscountService } from "../discount/discount.service";
 import {
   CreateTradeDto,
   AcceptTradeDto,
@@ -55,6 +62,10 @@ import {
 } from "../../common/helpers/generate-reference";
 import { calculateServiceTax } from "../order/order-service-tax.helper";
 import { OrderTaxPolicyService } from "../order/order-tax-policy.service";
+import {
+  PUBLIC_NAME_SELECT,
+  publicName,
+} from "../../common/helpers/public-identity";
 
 /**
  * Takas yaşam döngüsü metodları (create/accept/reject/counter/cancel/ship/
@@ -77,6 +88,8 @@ export class TradeLifecycleService {
     private readonly tradeCommon: TradeCommonService,
     private readonly tradeQuery: TradeQueryService,
     private readonly tradeQuote: TradeQuoteService,
+    // Takas hizmet bedeli kampanyası (İ25) — yoksa takas indirimsiz akar.
+    @Optional() private readonly discountService?: DiscountService,
   ) {}
 
   // ==========================================================================
@@ -270,8 +283,8 @@ export class TradeLifecycleService {
           pricingVersion: TRADE_PRICING_V2,
         },
         include: {
-          initiator: { select: { id: true, displayName: true } },
-          receiver: { select: { id: true, displayName: true } },
+          initiator: { select: { id: true, ...PUBLIC_NAME_SELECT } },
+          receiver: { select: { id: true, ...PUBLIC_NAME_SELECT } },
         },
       });
 
@@ -306,7 +319,7 @@ export class TradeLifecycleService {
     try {
       const initiator = await this.prisma.user.findUnique({
         where: { id: initiatorId },
-        select: { displayName: true },
+        select: PUBLIC_NAME_SELECT,
       });
 
       await this.notificationService.createInAppNotification(
@@ -314,7 +327,7 @@ export class TradeLifecycleService {
         NotificationType.TRADE_RECEIVED,
         {
           tradeId: trade.id,
-          initiatorName: initiator?.displayName || "Bir kullanıcı",
+          initiatorName: publicName(initiator),
         },
       );
     } catch (error) {
@@ -339,6 +352,25 @@ export class TradeLifecycleService {
       throw new BadRequestException(
         i18nMessage("server.trade.membershipExpiredForAccept"),
       );
+    }
+
+    // Taahhüt: yetki teklif VE kabul anında İKİ taraf için de denetlenir.
+    // Teklif verenin üyeliği bu arada düşmüşse (gece süpürmesi bekleyen
+    // teklifleri henüz iptal etmemişse) kabul takası başlatmamalı — aksi
+    // halde takas hakkı olmayan tarafla escrow'lu süreç açılır.
+    const tradeParties = await this.prisma.trade.findUnique({
+      where: { id: tradeId },
+      select: { initiatorId: true },
+    });
+    if (tradeParties) {
+      const initiatorCanTrade = await this.membershipService.canCreateTrade(
+        tradeParties.initiatorId,
+      );
+      if (!initiatorCanTrade.allowed) {
+        throw new BadRequestException(
+          i18nMessage("server.trade.counterpartyMembershipExpired"),
+        );
+      }
     }
 
     // Get deadline settings (read-only, safe outside tx)
@@ -519,9 +551,40 @@ export class TradeLifecycleService {
         // Ekranların gösterdiği teklif ile tahsil edilen tutar aynı kaynaktan
         // gelir, bu yüzden ayrışamaz.
         if (quote) {
+          // İ25: takas hizmet bedeli kampanyası kabul anında çözülür ve fiyat
+          // snapshot'ıyla birlikte dondurulur; bütçesi de burada harcanır.
+          // Kampanya çözülemezse takas indirimsiz akar; ticaret durmaz.
+          let feeDiscounts = new Map<
+            string,
+            { discountId: string; name: string; amount: number }
+          >();
+          try {
+            feeDiscounts =
+              (await this.discountService?.resolveTradeFeeDiscounts([
+                {
+                  userId: quote.initiator.userId,
+                  feeAmount: quote.initiator.serviceFee,
+                },
+                {
+                  userId: quote.receiver.userId,
+                  feeAmount: quote.receiver.serviceFee,
+                },
+              ])) ?? feeDiscounts;
+          } catch (error) {
+            this.logger.warn(
+              `takas hizmet bedeli kampanyası çözülemedi (${tradeId}): ${error}`,
+            );
+          }
           await tx.tradeCashPayment.createMany({
-            data: buildTradeCashPaymentRows(tradeId, quote),
+            data: buildTradeCashPaymentRows(tradeId, quote, feeDiscounts),
           });
+          const budgetEntries = [...feeDiscounts.values()].map((won) => ({
+            discountId: won.discountId,
+            amount: won.amount,
+          }));
+          if (budgetEntries.length) {
+            await this.discountService?.spendTradeFeeBudget(budgetEntries, tx);
+          }
         }
       } else if (trade.cashAmount && trade.cashPayerId) {
         // v1 (LEGACY): yalnız farkı ödeyen taraftan, farkın yüzdesi kadar
@@ -961,7 +1024,7 @@ export class TradeLifecycleService {
     try {
       const counterOfferer = await this.prisma.user.findUnique({
         where: { id: originalReceiverId },
-        select: { displayName: true },
+        select: PUBLIC_NAME_SELECT,
       });
 
       await this.notificationService.createInAppNotification(
@@ -969,7 +1032,7 @@ export class TradeLifecycleService {
         NotificationType.TRADE_COUNTER,
         {
           tradeId,
-          counterOffererName: counterOfferer?.displayName || "Bir kullanıcı",
+          counterOffererName: publicName(counterOfferer),
         },
       );
     } catch (error) {
@@ -1082,6 +1145,17 @@ export class TradeLifecycleService {
           version: { increment: 1 },
         },
       });
+
+      // KUSUR: vazgeçen taraf iptali başlattı; KARŞI taraf üstüne düşeni
+      // yapmıştı. Onun ödemesi hizmet bedeli ve kargo dahil TAM iade edilir
+      // (bkz. trade-refund-policy). Karar satıra yazılır — iade sağlayıcıda
+      // patlarsa retry cron'u da aynı tutarı hesaplar.
+      const otherPartyId =
+        trade.initiatorId === userId ? trade.receiverId : trade.initiatorId;
+      await tx.tradeCashPayment.updateMany({
+        where: { tradeId, payerId: otherPartyId },
+        data: { fullRefundEntitled: true },
+      });
     });
 
     if (!alreadyCancelled) {
@@ -1102,118 +1176,28 @@ export class TradeLifecycleService {
   }
 
   // ==========================================================================
-  // SHIP TRADE (One party ships their items)
+  // SHIP TRADE (DEPRECATED — legacy eşler-arası akışın kargo ucu)
+  //
+  // Depo-escrow akışında hiçbir takas `accepted` durumunda kalmaz: kabul
+  // doğrudan `awaiting_payment` ya da `shipping_to_warehouse` üretir ve iki
+  // `to_warehouse` gönderisi sistem tarafından oluşturulur. Bu uç yalnız
+  // legacy satırlar için ulaşılabilirdi; onlar da kargolama son tarihinde
+  // otomatik iptal ediliyor. Açık bırakmak, `leg`/`recipientType` alanları
+  // olmadan TradeShipment üreten canlı bir yol demekti — depo akışının
+  // varsaydığı veri şeklini bozabilirdi. `ship-to-warehouse` ile aynı şekilde
+  // 410 Gone döner.
   // ==========================================================================
   async shipTrade(
     tradeId: string,
     userId: string,
-    dto: ShipTradeDto,
+    _dto: ShipTradeDto,
   ): Promise<TradeResponseDto> {
-    // Üyelik kapısı KASITLI olarak kaldırıldı: takas, kabul edildiği (accepted)
-    // anda her iki tarafın da premium üyeliği vardı (acceptTrade/counterTrade
-    // kapıları bunu garanti eder). Üyelik kabul SONRASI sona erse bile, dönem
-    // içinde başlamış takasın kargo/teslim akışı sıkıntısız tamamlanabilmelidir.
-    // Aksi halde "kabul ettim ama kargolayamıyorum" çıkmazı oluşurdu.
-    const address = await this.prisma.address.findFirst({
-      where: { id: dto.fromAddressId, userId },
-    });
-    if (!address) {
-      throw new NotFoundException(i18nMessage("server.trade.addressNotFound"));
-    }
-
-    await this.prisma.$transaction(async (tx) => {
-      const trade = await this.getTradeWithLock(tradeId, tx);
-
-      const isInitiator = trade.initiatorId === userId;
-      const isReceiver = trade.receiverId === userId;
-
-      if (!isInitiator && !isReceiver) {
-        throw new ForbiddenException(
-          i18nMessage("server.trade.notAuthorizedForAction"),
-        );
-      }
-
-      const canShipStatuses: TradeStatus[] = [
-        TradeStatus.accepted,
-        TradeStatus.initiator_shipped,
-        TradeStatus.receiver_shipped,
-      ];
-
-      if (!canShipStatuses.includes(trade.status)) {
-        throw new BadRequestException(
-          i18nMessage("server.trade.cannotShipInStatus", {
-            status: trade.status,
-          }),
-        );
-      }
-
-      const existingShipment = await tx.tradeShipment.findFirst({
-        where: { tradeId, shipperId: userId },
-      });
-      if (existingShipment) {
-        throw new BadRequestException(
-          i18nMessage("server.trade.alreadyShipped"),
-        );
-      }
-
-      let newStatus: TradeStatus;
-      if (trade.status === TradeStatus.accepted) {
-        newStatus = isInitiator
-          ? TradeStatus.initiator_shipped
-          : TradeStatus.receiver_shipped;
-      } else if (
-        (trade.status === TradeStatus.initiator_shipped && isReceiver) ||
-        (trade.status === TradeStatus.receiver_shipped && isInitiator)
-      ) {
-        newStatus = TradeStatus.both_shipped;
-      } else {
-        throw new BadRequestException(
-          i18nMessage("server.trade.invalidShipmentStatus"),
-        );
-      }
-
-      const trackingNumber = generateReferenceCode(
-        REFERENCE_PREFIX.shipmentFallback,
-      );
-
-      let confirmationDeadline: Date | null = null;
-      if (newStatus === TradeStatus.both_shipped) {
-        const confirmationDaysSetting = await tx.platformSetting.findUnique({
-          where: { settingKey: "trade_confirmation_deadline_days" },
-        });
-        const confirmationDays = parseInt(
-          confirmationDaysSetting?.settingValue ?? "3",
-        );
-        const now = new Date();
-        confirmationDeadline = new Date(now);
-        confirmationDeadline.setDate(
-          confirmationDeadline.getDate() + confirmationDays,
-        );
-      }
-
-      await tx.tradeShipment.create({
-        data: {
-          tradeId,
-          shipperId: userId,
-          fromAddressId: dto.fromAddressId,
-          carrier: "surat",
-          trackingNumber,
-          status: ShipmentStatus.label_created,
-          shippedAt: new Date(),
-        },
-      });
-
-      await tx.trade.update({
-        where: { id: tradeId, version: trade.version },
-        data: {
-          status: newStatus,
-          confirmationDeadline,
-          version: { increment: 1 },
-        },
-      });
-    });
-
-    return this.tradeQuery.getTradeById(tradeId, userId);
+    this.logger.warn(
+      `Deprecated shipTrade called by user=${userId} trade=${tradeId}; safe-trade flow creates both inbound shipments automatically`,
+    );
+    throw new GoneException(
+      i18nMessage("server.trade.shipToWarehouseDeprecated"),
+    );
   }
 
   // ==========================================================================
@@ -1306,14 +1290,13 @@ export class TradeLifecycleService {
         );
       }
 
-      if (
-        trade.confirmationDeadline &&
-        new Date() > trade.confirmationDeadline
-      ) {
-        throw new BadRequestException(
-          i18nMessage("server.trade.confirmationDeadlinePassed"),
-        );
-      }
+      // Süre dolduysa onay REDDEDİLMEZ. Pencere geçtiğinde takas zaten
+      // otomatik tamamlanacaktır (autoConfirmExpiredReceipts, 5 dk'da bir);
+      // aradaki boşlukta "onayla" diyen kullanıcıya hata göstermek, sonucu
+      // değiştirmeyen bir engeldi. Süre dolduktan sonra onay, cron'un yapacağı
+      // işi kullanıcının kendi eliyle yapmasıdır — para akışı aynıdır.
+      // Legacy (depo dışı) akışta pencere kargoya verilişten sayıldığı için
+      // eski katı kural orada da gereksizdi.
 
       let newStatus: TradeStatus;
       if (trade.status === TradeStatus.shipping_to_recipients) {
@@ -1349,7 +1332,10 @@ export class TradeLifecycleService {
         where: { id: shipment.id },
         data: {
           status: ShipmentStatus.delivered,
-          deliveredAt: new Date(),
+          // Onay penceresi bacakların max(deliveredAt)'inden hesaplandığı için
+          // taşıyıcının yazdığı GERÇEK teslim tarihi kullanıcı onayı anıyla
+          // EZİLMEZ — ezmek pencereyi (ve escrow release'ini) geç kaydırırdı.
+          ...(shipment.deliveredAt ? {} : { deliveredAt: new Date() }),
           confirmedAt: new Date(),
         },
       });
@@ -1418,19 +1404,18 @@ export class TradeLifecycleService {
           where: { tradeId },
         });
         if (cashPayment && cashPayment.status === PaymentStatus.completed) {
-          // Safe-trade escrow: don't release immediately. Set hold for 7 days.
-          const holdDaysSetting = await tx.platformSetting.findUnique({
-            where: { settingKey: "payment_hold_days" },
-          });
-          const holdDays = parseInt(holdDaysSetting?.settingValue ?? "7");
-          const holdReleaseAt = new Date();
-          holdReleaseAt.setDate(holdReleaseAt.getDate() + holdDays);
-
+          // Safe-trade escrow: nakit hemen açılmaz, hold penceresi kadar
+          // beklenir (süre ayardan — trade-escrow helper'ı tek kaynak).
           await tx.tradeCashPayment.updateMany({
             where: { tradeId },
-            data: { holdReleaseAt },
+            data: { holdReleaseAt: await computeTradeHoldReleaseAt(tx) },
           });
         }
+      } else if (trade.status === TradeStatus.shipping_to_recipients) {
+        // Bu bacak teslim/onay aldı ama karşı bacak henüz kapanmadı. Diğer koli
+        // Sürat takibinde çoktan teslim edilmiş olabilir: iki bacak da teslimse
+        // onay/itiraz penceresini ŞİMDİ başlat (idempotent).
+        await startTradeConfirmationWindowIfDelivered(tx, tradeId);
       }
     });
 
@@ -1513,41 +1498,33 @@ export class TradeLifecycleService {
     adminId: string,
     dto: ResolveTradeDisputeDto,
   ): Promise<TradeResponseDto> {
-    // Resolution → terminal status mapping. compensate_* resolutions cancel
-    // the trade (so refund + stock release happen) and additionally flag the
-    // user owed manual compensation. The admin settles the compensation out
-    // of band; the flag tells ops it's still pending.
-    let newStatus: TradeStatus;
-    let compensationUserIdResolver:
+    // İtiraz yalnız 2. kargo sonrası açılabildiği için hiçbir çözüm takası
+    // geri saramaz: ürünler sahiplerinde kalır ve takas TAMAMLANIR.
+    // compensate_* mağdur tarafın KENDİ ödemesini iade eder (kargo hariç —
+    // trade-refund-policy matrisi) ve ek tazminatı ops'a işaretler; admin
+    // tazminatı out-of-band kapatır (CompensationPanel).
+    const compensationUserIdResolver:
       ((trade: { initiatorId: string; receiverId: string }) => string) | null =
-      null;
+      dto.resolution === "compensate_initiator"
+        ? (t) => t.initiatorId
+        : dto.resolution === "compensate_receiver"
+          ? (t) => t.receiverId
+          : null;
 
-    if (dto.resolution === "complete_trade") {
-      newStatus = TradeStatus.completed;
-    } else if (dto.resolution === "cancel_trade") {
-      newStatus = TradeStatus.cancelled;
-    } else if (dto.resolution === "compensate_initiator") {
-      newStatus = TradeStatus.cancelled;
-      compensationUserIdResolver = (t) => t.initiatorId;
-    } else if (dto.resolution === "compensate_receiver") {
-      newStatus = TradeStatus.cancelled;
-      compensationUserIdResolver = (t) => t.receiverId;
-    } else {
-      newStatus = TradeStatus.completed;
-    }
+    const compensateBoth = dto.resolution === "compensate_both";
 
     let resolvedTradeInitiatorId: string;
 
-    if (newStatus === TradeStatus.cancelled) {
-      // MONEY-M5: İade + Sürat iptalinden ÖNCE trade'in GERÇEKTEN `disputed` olduğunu
-      // doğrula. Eskiden iade/iptal tx doğrulamasından ÖNCE yapılıyordu → trade disputed
-      // DEĞİLSE (zaten çözülmüş / yanlış statü) tx guard'ı sonradan patlıyor ama PARA
-      // ÇOKTAN İADE edilmiş oluyordu. Bu pre-check read-only; aşağıdaki tx'in kilitli
-      // guard'ı atomik garantiyi korumaya devam eder (refundTradeCashTracked'in kendi
-      // completed/released/refunded guard'ları da ikinci katman).
+    if (compensationUserIdResolver || compensateBoth) {
+      // MONEY-M5: İadeden ÖNCE trade'in GERÇEKTEN `disputed` olduğunu doğrula.
+      // Eskiden iade tx doğrulamasından ÖNCE yapılıyordu → trade disputed
+      // DEĞİLSE (zaten çözülmüş / yanlış statü) tx guard'ı sonradan patlıyor
+      // ama PARA ÇOKTAN İADE edilmiş oluyordu. Bu pre-check read-only;
+      // aşağıdaki tx'in kilitli guard'ı atomik garantiyi korumaya devam eder
+      // (refundTradeCashTracked'in kendi guard'ları da ikinci katman).
       const current = await this.prisma.trade.findUnique({
         where: { id: tradeId },
-        select: { status: true },
+        select: { status: true, initiatorId: true, receiverId: true },
       });
       if (!current || current.status !== TradeStatus.disputed) {
         throw new BadRequestException(
@@ -1555,9 +1532,31 @@ export class TradeLifecycleService {
         );
       }
       // MONEY-H2: iade FAILURE-TRACKING ile (marker + retry cron).
-      await this.paymentService.refundTradeCashTracked(tradeId);
-      // Cancel any active Sürat shipments (from_warehouse legs after admin approval)
-      await this.tradeShipment.cancelSuratShipmentsForTrade(tradeId);
+      // compensate_X: yalnız mağdur tarafın ödeme satırı iade edilir (nakit
+      // fark; hizmet bedeli/kargo kesilir) — karşı tarafın satırı escrow
+      // takvimiyle serbest kalır. compensate_both (iki taraf da mağdur, ör.
+      // her iki depo-çıkış kolisi de kayıp): İKİ satır da TAM iade edilir —
+      // müşteri taahhüdü "hizmet bedeli ve kargo dahil" olduğu için satırlar
+      // iadeden önce fullRefundEntitled ile damgalanır; retry cron'u da aynı
+      // tutarı hesaplar. Trade hâlâ disputed olduğu için kapsamsız çağrı
+      // serbesttir.
+      if (compensateBoth) {
+        await this.prisma.tradeCashPayment.updateMany({
+          where: {
+            tradeId,
+            status: PaymentStatus.completed,
+            releasedAt: null,
+            refundedAt: null,
+          },
+          data: { fullRefundEntitled: true },
+        });
+      }
+      await this.paymentService.refundTradeCashTracked(
+        tradeId,
+        compensateBoth
+          ? undefined
+          : { payerId: compensationUserIdResolver!(current) },
+      );
     }
 
     await this.prisma.$transaction(async (tx) => {
@@ -1597,13 +1596,8 @@ export class TradeLifecycleService {
       await tx.trade.update({
         where: { id: tradeId, version: trade.version },
         data: {
-          status: newStatus,
-          completedAt: newStatus === TradeStatus.completed ? new Date() : null,
-          cancelledAt: newStatus === TradeStatus.cancelled ? new Date() : null,
-          cancelReason:
-            newStatus === TradeStatus.cancelled
-              ? `İtiraz çözümü: ${dto.resolution}`
-              : null,
+          status: TradeStatus.completed,
+          completedAt: new Date(),
           ...(compensationUserId
             ? {
                 compensationPendingUserId: compensationUserId,
@@ -1623,52 +1617,64 @@ export class TradeLifecycleService {
         );
       }
 
-      if (newStatus === TradeStatus.completed) {
-        // Takas tamamlandı: quantity-- + reservedQuantity--
-        // #2 (LOST-UPDATE FIX): okumadan ÖNCE ürünleri FOR UPDATE ile (id-sıralı) kilitle →
-        // eşzamanlı satış/takas düşümü stale mutlak-set yazamaz; deadlock önlenir.
-        const lockIds = [...new Set(allItems.map((i) => i.productId))].sort();
-        for (const pid of lockIds) {
-          await tx.$queryRaw`SELECT id FROM products WHERE id = ${pid} FOR UPDATE`;
+      // Takas tamamlandı: quantity-- + reservedQuantity--
+      // #2 (LOST-UPDATE FIX): okumadan ÖNCE ürünleri FOR UPDATE ile (id-sıralı) kilitle →
+      // eşzamanlı satış/takas düşümü stale mutlak-set yazamaz; deadlock önlenir.
+      const lockIds = [...new Set(allItems.map((i) => i.productId))].sort();
+      for (const pid of lockIds) {
+        await tx.$queryRaw`SELECT id FROM products WHERE id = ${pid} FOR UPDATE`;
+      }
+      const products = await tx.product.findMany({
+        where: { id: { in: allItems.map((i) => i.productId) } },
+      });
+      for (const product of products) {
+        const tradedQty = qtyByProduct.get(product.id) ?? 1;
+        let newQuantity: number | null;
+        if (product.quantity !== null && product.quantity > 0) {
+          newQuantity = Math.max(0, product.quantity - tradedQty);
+        } else if (product.quantity === null) {
+          newQuantity = null;
+        } else {
+          newQuantity = 0;
         }
-        const products = await tx.product.findMany({
-          where: { id: { in: allItems.map((i) => i.productId) } },
+        const updateData: any = {
+          status: getProductStatusFromQuantity(newQuantity),
+          reservedQuantity: safeDecrementReserved(
+            product.reservedQuantity,
+            tradedQty,
+          ),
+        };
+        if (product.quantity !== null && product.quantity > 0) {
+          updateData.quantity = newQuantity;
+        }
+        await tx.product.update({
+          where: { id: product.id },
+          data: updateData,
         });
-        for (const product of products) {
-          const tradedQty = qtyByProduct.get(product.id) ?? 1;
-          let newQuantity: number | null;
-          if (product.quantity !== null && product.quantity > 0) {
-            newQuantity = Math.max(0, product.quantity - tradedQty);
-          } else if (product.quantity === null) {
-            newQuantity = null;
-          } else {
-            newQuantity = 0;
-          }
-          const updateData: any = {
-            status: getProductStatusFromQuantity(newQuantity),
-            reservedQuantity: safeDecrementReserved(
-              product.reservedQuantity,
-              tradedQty,
-            ),
-          };
-          if (product.quantity !== null && product.quantity > 0) {
-            updateData.quantity = newQuantity;
-          }
-          await tx.product.update({
-            where: { id: product.id },
-            data: updateData,
-          });
-        }
-      } else if (newStatus === TradeStatus.cancelled) {
-        // İptal: kabul anında yapılan rezervasyonu geri al
-        // #4: DEADLOCK-güvenli SIRALI FOR UPDATE + clamp'li release (bkz. releaseReservation).
-        for (const productId of [...qtyByProduct.keys()].sort()) {
-          await this.productLockService.releaseReservation(
-            tx,
-            productId,
-            qtyByProduct.get(productId)!,
-          );
-        }
+      }
+
+      // Escrow: itiraz çözümü confirmReceipt'ten geçmediği için holdReleaseAt
+      // burada damgalanır; damgalanmazsa release cron'u satırları hiç serbest
+      // bırakmaz ve payout'lar sonsuza dek askıda kalır. Tazmin edilen tarafın
+      // satırı DIŞARIDA tutulur: iadesi başarıldıysa refundedAt zaten dışlar,
+      // başarısız olduysa retry cron'u tamamlayana kadar released edilmemelidir.
+      // Bu damga aynı zamanda completed-takas iade guard'ının niyet işaretidir:
+      // damgasız satır = hâlâ iade borcu olan satır (payment-refund.service).
+      // compensate_both'ta HİÇBİR satır damgalanmaz — ikisi de iade borcudur.
+      if (!compensateBoth) {
+        const holdReleaseAt = await computeTradeHoldReleaseAt(tx);
+        await tx.tradeCashPayment.updateMany({
+          where: {
+            tradeId,
+            status: PaymentStatus.completed,
+            releasedAt: null,
+            refundedAt: null,
+            ...(compensationUserId
+              ? { payerId: { not: compensationUserId } }
+              : {}),
+          },
+          data: { holdReleaseAt },
+        });
       }
     });
 

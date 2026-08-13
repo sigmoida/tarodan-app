@@ -3,6 +3,7 @@ import {
   IsEnum,
   IsOptional,
   IsNumber,
+  IsInt,
   IsBoolean,
   Min,
   Max,
@@ -12,6 +13,7 @@ import {
 } from "class-validator";
 import { Type } from "class-transformer";
 import { MembershipTierType, SubscriptionStatus } from "@prisma/client";
+import { MAX_PRODUCT_IMAGES } from "../../product/helpers/product-image-keys";
 
 export class SubscribeDto {
   @IsEnum(MembershipTierType)
@@ -27,6 +29,14 @@ export class ToggleAutoRenewDto {
   autoRenew: boolean;
 }
 
+/**
+ * Katman güncelleme gövdesi — HER İKİ admin rotasının TEK DTO'su
+ * (PATCH /membership/admin/tiers/:type ve PATCH /admin/membership-tiers/:id;
+ * admin modülü bu sınıfı re-export eder). Eskiden iki ayrı kopya farklı
+ * kurallar uyguluyordu (görsel tavanı 20'ye karşı sınırsız, fiyat tavanı
+ * bir yolda yok vb.). Alan doğrulaması burada, iş kuralları
+ * MembershipTierUpdateService'te — ikisi de tek kaynak.
+ */
 export class UpdateMembershipTierDto {
   @IsOptional()
   @IsString()
@@ -53,23 +63,29 @@ export class UpdateMembershipTierDto {
   @Max(12000000)
   yearlyPrice?: number;
 
+  // 0 geçerli bir yapılandırmadır: "ücretsiz slotu olmayan katman". Eski
+  // @Min(1) bunu DTO seviyesinde yasaklıyordu (diğer rota 0'a izin veriyordu).
   @IsOptional()
   @Type(() => Number)
-  @IsNumber()
-  @Min(1)
+  @IsInt()
+  @Min(0)
   maxFreeListings?: number;
 
+  // -1 = SINIRSIZ (admin UI, web üyelik sayfası ve servis doğrulaması bu
+  // sözleşmeyi paylaşır). Aralığın geri kalanını (-1 ya da >= 1) servis denetler.
   @IsOptional()
   @Type(() => Number)
-  @IsNumber()
+  @IsInt()
   @Min(-1)
   maxTotalListings?: number;
 
+  // Tavan = ürün DTO'sunun mutlak sınırı: admin, create-product'ın kafa
+  // karıştıran bir mesajla reddedeceği bir katman limiti YAPILANDIRAMAZ.
   @IsOptional()
   @Type(() => Number)
-  @IsNumber()
+  @IsInt()
   @Min(1)
-  @Max(20)
+  @Max(MAX_PRODUCT_IMAGES)
   maxImagesPerListing?: number;
 
   @IsOptional()
@@ -84,13 +100,17 @@ export class UpdateMembershipTierDto {
   @IsBoolean()
   isAdFree?: boolean;
 
+  // featuredListingSlots + commissionDiscount BİLEREK düzenlenemez: ilki ücretli
+  // öne çıkarma paketlerine devredildi, ikincisi komisyon motoru tarafından hiç
+  // okunmadı. DB kolonları (deprecated) duruyor ama admin yanıltıcı değer yazamaz.
+
   @IsOptional()
   @IsBoolean()
   isActive?: boolean;
 
   @IsOptional()
   @Type(() => Number)
-  @IsNumber()
+  @IsInt()
   @Min(0)
   @Max(10000)
   sortOrder?: number;
@@ -127,10 +147,11 @@ export class CreateMembershipTierDto {
   @Min(1)
   maxTotalListings: number;
 
+  // Tavan güncelleme DTO'suyla AYNI kaynaktan (bkz. UpdateMembershipTierDto).
   @Type(() => Number)
   @IsNumber()
   @Min(1)
-  @Max(20)
+  @Max(MAX_PRODUCT_IMAGES)
   maxImagesPerListing: number;
 
   @IsBoolean()
@@ -139,13 +160,30 @@ export class CreateMembershipTierDto {
   @IsBoolean()
   canTrade: boolean;
 
-  @IsBoolean()
-  isAdFree: boolean;
+  /**
+   * Yükseltme/düşürme yönü katmanların sortOrder karşılaştırmasından çıkar —
+   * alan yük taşır. Ayarlanamadığında yeni katman 0'a (free ile aynı sıraya)
+   * düşüyor ve yön hesabı bozuluyordu.
+   */
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  @Max(10000)
+  sortOrder?: number;
+
+  /**
+   * DEVRE DIŞI: banner'lar herkese gösterilir. Kolon geriye uyum için duruyor;
+   * yeni yanıtlarda doldurulmaz ve hiçbir yerde okunmaz.
+   */
+  isAdFree?: boolean;
 
   @Type(() => Number)
   @IsNumber()
   @Min(0)
-  featuredListingSlots: number;
+  @IsOptional()
+  /** DEVRE DIŞI: öne çıkarmayı ücretli paketler devraldı; değer yazılsa da okunmaz. */
+  featuredListingSlots?: number;
 }
 
 export class MembershipTierResponseDto {
@@ -160,8 +198,13 @@ export class MembershipTierResponseDto {
   maxImagesPerListing: number;
   canCreateCollections: boolean;
   canTrade: boolean;
-  isAdFree: boolean;
-  featuredListingSlots: number;
+  /**
+   * DEVRE DIŞI: banner'lar herkese gösterilir. Kolon geriye uyum için duruyor;
+   * yeni yanıtlarda doldurulmaz ve hiçbir yerde okunmaz.
+   */
+  isAdFree?: boolean;
+  /** DEVRE DIŞI (isAdFree gibi): yeni yanıtlarda doldurulmaz, hiçbir yerde okunmaz. */
+  featuredListingSlots?: number;
   isActive: boolean;
 }
 
@@ -192,10 +235,12 @@ export class UserMembershipResponseDto {
   // Computed usage stats
   usedFreeListings: number;
   usedTotalListings: number;
-  usedFeaturedSlots: number;
+  /** DEVRE DIŞI: hep 0'dı; yeni yanıtlarda doldurulmaz. */
+  usedFeaturedSlots?: number;
   remainingFreeListings: number;
   remainingTotalListings: number;
-  remainingFeaturedSlots: number;
+  /** DEVRE DIŞI: yeni yanıtlarda doldurulmaz. */
+  remainingFeaturedSlots?: number;
 }
 
 export class MembershipLimitsDto {
@@ -203,13 +248,18 @@ export class MembershipLimitsDto {
   canUseFreeSlot: boolean;
   canTrade: boolean;
   canCreateCollection: boolean;
-  isAdFree: boolean;
+  /**
+   * DEVRE DIŞI: banner'lar herkese gösterilir. Alan geriye uyum için duruyor;
+   * yeni yanıtlarda doldurulmaz ve hiçbir yerde okunmaz.
+   */
+  isAdFree?: boolean;
   maxImages: number;
   maxFreeListings: number; // Total max free listings for tier
   maxTotalListings: number; // Total max listings for tier
   remainingFreeListings: number;
   remainingTotalListings: number;
-  remainingFeaturedSlots: number;
+  /** DEVRE DIŞI: yeni yanıtlarda doldurulmaz. */
+  remainingFeaturedSlots?: number;
   tierName: string;
   tierType: MembershipTierType;
 }

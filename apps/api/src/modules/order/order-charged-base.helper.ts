@@ -25,6 +25,8 @@ export interface ChargedProductBaseInput {
   quantity?: number | null;
   /** Bu satıra düşen kupon indirimi. */
   couponDiscount?: number | null;
+  /** Adet koşullu satıcı kampanyasının (bogo/bulk_quantity) satır indirimi. */
+  quantityDiscount?: number | null;
 }
 
 const num = (value: number | null | undefined): number =>
@@ -32,8 +34,11 @@ const num = (value: number | null | undefined): number =>
 
 export function chargedProductBaseOf(input: ChargedProductBaseInput): number {
   const quantity = num(input.quantity ?? 1);
-  const line = num(input.unitPrice) * quantity - num(input.couponDiscount);
-  // Kupon bedeli aşarsa taban 0'dır — negatif tahsilat yazılamaz. Yuvarlama,
+  const line =
+    num(input.unitPrice) * quantity -
+    num(input.quantityDiscount) -
+    num(input.couponDiscount);
+  // İndirimler bedeli aşarsa taban 0'dır — negatif tahsilat yazılamaz. Yuvarlama,
   // ham çarpımın kayan nokta artığını (0.1 × 3) kuruşa toplar.
   return Math.max(0, Math.round((line + Number.EPSILON) * 100) / 100);
 }

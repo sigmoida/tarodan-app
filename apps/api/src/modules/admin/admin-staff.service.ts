@@ -7,6 +7,7 @@ import {
 } from "@nestjs/common";
 import * as bcrypt from "bcrypt";
 import { PrismaService } from "../../prisma";
+import { allocateUsernameFromEmail } from "../auth/username.util";
 import { AdminAuditService } from "./admin-audit.service";
 import { PaymentService } from "../payment/payment.service";
 import { SearchService } from "../search/search.service";
@@ -280,10 +281,13 @@ export class AdminStaffService {
       if (!dto.password) tempPassword = rawPassword;
       const passwordHash = await bcrypt.hash(rawPassword, 12);
       const displayName = dto.displayName?.trim() || email.split("@")[0];
+      // Davetle açılan hesapta da kullanıcı adı sorulmaz; e-postadan türetilir.
+      const username = await allocateUsernameFromEmail(this.prisma, email);
       user = await this.prisma.user.create({
         data: {
           email,
           passwordHash,
+          username,
           displayName,
           isEmailVerified: true,
           isVerified: true,

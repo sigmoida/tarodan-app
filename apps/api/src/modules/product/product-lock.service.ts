@@ -20,6 +20,7 @@ import {
 import { getReservedAwareStatus } from "./helpers/product-status.helper";
 import { NotificationService } from "../notification/notification.service";
 import { DiscountService } from "../discount/discount.service";
+import { TRADE_CANCEL_REASON } from "../trade/trade-cancel-reasons";
 
 type PrismaTx = Prisma.TransactionClient;
 
@@ -237,7 +238,7 @@ export class ProductLockService {
       where: { id: { in: offersToReject.map((o) => o.id) } },
       data: {
         status: OfferStatus.cancelled,
-        cancelReason: "Stok tükendiği için otomatik iptal edildi",
+        cancelReason: TRADE_CANCEL_REASON.stockDepleted,
       },
     });
 
@@ -294,7 +295,7 @@ export class ProductLockService {
       where: { id: { in: tradeIds } },
       data: {
         status: TradeStatus.cancelled,
-        cancelReason: "Stok tükendiği için otomatik iptal edildi",
+        cancelReason: TRADE_CANCEL_REASON.stockDepleted,
         cancelledAt: new Date(),
       },
     });

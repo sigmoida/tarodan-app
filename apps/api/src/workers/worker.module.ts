@@ -21,6 +21,7 @@ import { SearchModule } from "../modules/search/search.module";
 import { SuratCargoModule } from "../modules/surat-cargo/surat-cargo.module";
 import { NotificationModule } from "../modules/notification/notification.module";
 import { ModerationModule } from "../modules/moderation/moderation.module";
+import { CommissionModule } from "../modules/commission/commission.module";
 import { QUEUE_NAMES } from "./constants";
 
 @Module({
@@ -32,6 +33,9 @@ import { QUEUE_NAMES } from "./constants";
     SuratCargoModule,
     NotificationModule,
     ModerationModule,
+    // Oto-onay, admin onayıyla AYNI komisyon guard'ını uygular (İlan-Teknik
+    // invaryant 3): kural silinmişse ilan yayına giremez.
+    CommissionModule,
     // Faz 7.2: Bull KÖK bağlantısı (forRootAsync) BullRootModule'e taşındı — bu modül
     // gated (PROCESS_ROLE=web'de yüklenmez); bağlantı her rolde gerekli olduğundan ayrı.
     // Burada yalnız kuyruk kayıtları + processor'lar (job tüketicileri) kalır.

@@ -8,8 +8,12 @@ export const discountsApi = {
     code?: string;
     name: string;
     description?: string;
-    type: "percentage" | "fixed_amount";
+    type: "percentage" | "fixed_amount" | "bogo" | "bulk_quantity";
     value: number;
+    /** Adet koşullu kampanyalar: bogo → buy/get, bulk_quantity → minQuantity. */
+    buyQuantity?: number;
+    getQuantity?: number;
+    minQuantity?: number;
     scope: "global" | "category" | "product" | "seller";
     categoryId?: string;
     targetProductIds?: string[];

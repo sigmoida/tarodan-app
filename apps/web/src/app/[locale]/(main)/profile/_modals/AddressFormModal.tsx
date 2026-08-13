@@ -10,6 +10,7 @@ import {
   FormModal,
   useZodForm,
 } from "@tarodan/ui/form";
+import { useTranslations } from "next-intl";
 import CityDistrictSelector from "@/components/CityDistrictSelector";
 import { useFormModalLabels } from "@/hooks/useFormModalLabels";
 import { addressSchema, type AddressValues } from "../_lib/schemas";
@@ -39,6 +40,7 @@ export default function AddressFormModal({
   onClose,
   address,
 }: AddressFormModalProps) {
+  const t = useTranslations();
   const save = useSaveAddress();
   const modalLabels = useFormModalLabels();
   const form = useZodForm(addressSchema, { defaultValues: EMPTY });
@@ -74,7 +76,11 @@ export default function AddressFormModal({
           label="Ad Soyad"
           placeholder="Adınız Soyadınız"
         />
-        <FormPhone name="phone" label="Telefon" />
+        <FormPhone
+          name="phone"
+          label="Telefon"
+          legacyMessage={t("validation.phoneLegacyNotice")}
+        />
       </div>
 
       <div>

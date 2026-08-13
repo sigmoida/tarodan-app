@@ -3,14 +3,31 @@ import { TradeStatus } from "@prisma/client";
 // Ürünü "aktif takasta" sayan statüler — hem teklif oluşturma validasyonu
 // (trade.service.createTrade) hem de /products/my?tradeEligible=true filtresi
 // (product.service.findSellerProducts) tek kaynaktan bunu kullanır.
+//
+// Depo-escrow statüleri BURAYA DAHİLDİR: liste yalnız legacy statülerden
+// oluşurken, ödemesi alınmış ya da fiziksel olarak depoya gitmiş bir ürün
+// "aktif takasta değil" sayılıyordu. Tek adetli üründe `reserved` statüsü
+// kazara koruyordu; çok adetli veya sınırsız stoklu üründe aynı ürün ikinci
+// bir takasa teklif edilebiliyordu. Terminal statüler (completed / cancelled /
+// rejected) listede yoktur: onlarda rezervasyon çözülmüştür.
 export const ACTIVE_TRADE_STATUSES: TradeStatus[] = [
   TradeStatus.pending,
   TradeStatus.accepted,
+  // Legacy eşler-arası akış
   TradeStatus.initiator_shipped,
   TradeStatus.receiver_shipped,
   TradeStatus.both_shipped,
   TradeStatus.initiator_received,
   TradeStatus.receiver_received,
+  // Depo-escrow akışı — ürün ödeme/kargo/depo/çıkış zincirinde
+  TradeStatus.awaiting_payment,
+  TradeStatus.shipping_to_warehouse,
+  TradeStatus.at_warehouse,
+  TradeStatus.admin_reviewing,
+  TradeStatus.shipping_to_recipients,
+  // Dönüş yolundaki ürün de serbest değildir (rezervasyon markReturnDelivered'da çözülür)
+  TradeStatus.returning,
+  TradeStatus.disputed,
 ];
 
 /**

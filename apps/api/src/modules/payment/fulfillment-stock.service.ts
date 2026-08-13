@@ -1,5 +1,5 @@
 import { Injectable, Logger } from "@nestjs/common";
-import { Prisma } from "@prisma/client";
+import { Prisma, ProductStatus } from "@prisma/client";
 import {
   getProductStatusFromQuantity,
   getReservedAwareStatus,
@@ -94,7 +94,14 @@ export class FulfillmentStockService {
         ? Math.max(0, product.quantity - orderQty)
         : null;
     const updateData: any = {
-      status: getProductStatusFromQuantity(newQuantity),
+      // SATIŞLA biten stok `sold` olur — "satıldı" ekranlarda ve dokümanlarda
+      // vaat edilen statüydü ama hiçbir yol yazmıyordu (stok 0 → inactive'e
+      // düşüyordu ve "pasife alındı / süresi doldu" ile ayırt edilemiyordu).
+      // Takas/kayıp gibi satış olmayan düşümler inactive kalmaya devam eder.
+      status:
+        newQuantity === 0
+          ? ProductStatus.sold
+          : getProductStatusFromQuantity(newQuantity),
       reservedQuantity: safeDecrementReserved(
         product.reservedQuantity,
         orderQty,

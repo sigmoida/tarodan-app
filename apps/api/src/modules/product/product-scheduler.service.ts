@@ -4,7 +4,12 @@ import { Queue } from "bull";
 import { registerRepeatableCron } from "../../monitoring/bull-cron.helper";
 import { QUEUE_NAMES } from "../../workers/constants";
 import { PrismaService } from "../../prisma";
-import { ProductStatus, MembershipTierType } from "@prisma/client";
+import {
+  Prisma,
+  ProductKind,
+  ProductStatus,
+  MembershipTierType,
+} from "@prisma/client";
 import { computeQualityScore } from "./helpers/quality-score";
 import { computeRelevanceScore } from "./helpers/relevance-score";
 import { NotificationService } from "../notification/notification.service";
@@ -32,8 +37,12 @@ export class ProductSchedulerService implements OnModuleInit {
     recentLike: 10, // Bonus for likes in last 7 days
   };
 
-  // Listing expiration settings
-  private readonly LISTING_EXPIRY_DAYS = 60; // Listings expire after 60 days
+  // İlan yaşam süresi (gün) — env'den; süre publishedAt'ten (yoksa createdAt)
+  // sayılır ve HER onayda tazelenir (yenileme = yeniden onay → taze pencere).
+  private readonly LISTING_EXPIRY_DAYS = (() => {
+    const parsed = Number(process.env.LISTING_TTL_DAYS);
+    return Number.isFinite(parsed) && parsed > 0 ? Math.floor(parsed) : 60;
+  })();
 
   constructor(
     private readonly prisma: PrismaService,
@@ -67,6 +76,12 @@ export class ProductSchedulerService implements OnModuleInit {
       this.scheduledQueue,
       "send-expiration-warnings",
       "0 10 * * *",
+      this.logger,
+    );
+    await registerRepeatableCron(
+      this.scheduledQueue,
+      "pending-moderation-digest",
+      "0 9 * * *",
       this.logger,
     );
   }
@@ -286,9 +301,15 @@ export class ProductSchedulerService implements OnModuleInit {
     try {
       const now = new Date();
 
-      // rankTier=2 ama boostedUntil süresi dolmuş ürünler
+      // Süresi dolmuş boost izleri: filtre rankTier'a DEĞİL boost alanlarına
+      // bakar. Eskiden yalnız rankTier=2 taranıyordu; gece mutabakatı rankTier'ı
+      // indirmiş ama boostedAt'i temizlememişse ürün SÜRESİZ olarak LIFO
+      // sıralamasının tepesinde kalıyordu (stale boostedAt asla süpürülmüyordu).
       const expiredProducts = await this.prisma.product.findMany({
-        where: { rankTier: 2, boostedUntil: { lt: now } },
+        where: {
+          boostedAt: { not: null },
+          boostedUntil: { lt: now },
+        },
         select: {
           id: true,
           sellerId: true,
@@ -391,7 +412,10 @@ export class ProductSchedulerService implements OnModuleInit {
             },
           });
         }
-        if (b.autoRenew && b.product && premiumSet.has(b.product.sellerId)) {
+        // Süre dolumu HER satın alana bildirilir — eskiden yalnız autoRenew
+        // açık + premium satıcı haber alıyordu; normal alıcı boost'unun
+        // bittiğini hiçbir kanaldan öğrenmiyordu.
+        if (b.product) {
           await this.notificationService
             .createInAppNotification(b.userId, NotificationType.BOOST_EXPIRED, {
               productTitle: b.product.title,
@@ -412,14 +436,27 @@ export class ProductSchedulerService implements OnModuleInit {
         where: { status: "pending", createdAt: { lt: oneDayAgo } },
         data: { status: "failed" },
       });
+
+      // ── SİSTEM DURAKLAT/SÜRDÜR (B4) ─────────────────────────────────────
+      // Yayında olmayan ürünün boost'u görünmezken akmasın: satın alınan süre
+      // duraklatılır, ürün yayına dönünce kalan süreyle sürer. Tek yerden
+      // (bu 15 dk'lık cron) yürür — süre dolumu, satış, pasife alma, red,
+      // askı ve TÜM gelecekteki yollar otomatik kapsanır (en çok 15 dk sarkma).
+      // Admin'in ELLE duraklattığı boost (pausedBySystem=false) otomatik
+      // sürdürülmez.
+      const paused = await this.pauseBoostsOfDelistedProducts(now);
+      const resumed = await this.resumeSystemPausedBoosts(now);
+
       log(
-        `${expiredProducts.length} ürün boost düşürüldü · ${expiringBoosts.length} boost sona erdi`,
+        `${expiredProducts.length} ürün boost düşürüldü · ${expiringBoosts.length} boost sona erdi · ${paused} duraklatıldı · ${resumed} sürdürüldü`,
       );
       return {
         summary: `${expiredProducts.length} boost düşürüldü · ${expiringBoosts.length} sona erdi`,
         stats: {
           downgraded: expiredProducts.length,
           expired: expiringBoosts.length,
+          systemPaused: paused,
+          systemResumed: resumed,
         },
       };
     } catch (error: any) {
@@ -430,6 +467,121 @@ export class ProductSchedulerService implements OnModuleInit {
       // "başarılı" görünür ve hata yalnız log satırında kalır).
       throw error;
     }
+  }
+
+  /**
+   * Yayında OLMAYAN ürünlerin süresi akan boost'larını sistem duraklatmasına
+   * alır (kalan süre saklanır) ve ürünün boost kolonlarını temizler.
+   */
+  private async pauseBoostsOfDelistedProducts(now: Date): Promise<number> {
+    const rows = await this.prisma.productBoost.findMany({
+      where: {
+        status: "active",
+        endsAt: { gt: now },
+        product: { status: { not: ProductStatus.active } },
+      },
+      select: { id: true, productId: true, endsAt: true },
+    });
+    if (!rows.length) return 0;
+
+    for (const row of rows) {
+      await this.prisma.productBoost.update({
+        where: { id: row.id },
+        data: {
+          status: "paused",
+          pausedAt: now,
+          pausedBySystem: true,
+          pausedRemainingSeconds: Math.max(
+            1,
+            Math.ceil((row.endsAt.getTime() - now.getTime()) / 1000),
+          ),
+        },
+      });
+    }
+    const productIds = [...new Set(rows.map((row) => row.productId))];
+    await this.prisma.product.updateMany({
+      where: { id: { in: productIds } },
+      data: { boostedUntil: null, boostedAt: null, homeShowcaseUntil: null },
+    });
+    this.logger.log(
+      `Sistem duraklatması: ${rows.length} boost (${productIds.length} yayın dışı ürün)`,
+    );
+    return rows.length;
+  }
+
+  /**
+   * Ürünü yeniden YAYINA dönen sistem-duraklatmalı boost'ları kalan süreyle
+   * sürdürür ve ürünün boost kolonlarını yeniden kurar. Yalnız
+   * `pausedBySystem` olanlar — admin'in elle duraklattığı boost'a dokunulmaz.
+   */
+  private async resumeSystemPausedBoosts(now: Date): Promise<number> {
+    const rows = await this.prisma.productBoost.findMany({
+      where: {
+        status: "paused",
+        pausedBySystem: true,
+        product: { status: ProductStatus.active },
+      },
+      orderBy: { purchasedAt: "asc" },
+      select: {
+        id: true,
+        productId: true,
+        showcaseOnHome: true,
+        pausedRemainingSeconds: true,
+        product: { select: { qualityScore: true, popularityScore: true } },
+      },
+    });
+    if (!rows.length) return 0;
+
+    const byProduct = new Map<string, typeof rows>();
+    for (const row of rows) {
+      byProduct.set(row.productId, [
+        ...(byProduct.get(row.productId) ?? []),
+        row,
+      ]);
+    }
+    for (const [productId, productRows] of byProduct) {
+      // Kalan süreler satın alma sırasıyla arka arkaya dizilir (stacking).
+      let base = now;
+      let showcaseBase = now;
+      let showcaseEnd: Date | null = null;
+      for (const row of productRows) {
+        const remainingMs = (row.pausedRemainingSeconds ?? 0) * 1000;
+        const endsAt = new Date(base.getTime() + remainingMs);
+        base = endsAt;
+        if (row.showcaseOnHome) {
+          showcaseEnd = new Date(showcaseBase.getTime() + remainingMs);
+          showcaseBase = showcaseEnd;
+        }
+        await this.prisma.productBoost.update({
+          where: { id: row.id },
+          data: {
+            status: "active",
+            endsAt,
+            pausedAt: null,
+            pausedBySystem: false,
+            pausedRemainingSeconds: null,
+          },
+        });
+      }
+      await this.prisma.product.update({
+        where: { id: productId },
+        data: {
+          boostedUntil: base,
+          boostedAt: now,
+          homeShowcaseUntil: showcaseEnd,
+          rankTier: 2,
+          relevanceScore: computeRelevanceScore({
+            rankTier: 2,
+            qualityScore: productRows[0].product?.qualityScore ?? 0,
+            popularityScore: productRows[0].product?.popularityScore,
+          }),
+        },
+      });
+    }
+    this.logger.log(
+      `Sistem sürdürmesi: ${rows.length} boost (${byProduct.size} yayına dönen ürün)`,
+    );
+    return rows.length;
   }
 
   /**
@@ -445,14 +597,24 @@ export class ProductSchedulerService implements OnModuleInit {
       const expiryDate = new Date();
       expiryDate.setDate(expiryDate.getDate() - this.LISTING_EXPIRY_DAYS);
 
+      // Süre YAYIN anından sayılır (publishedAt; eski kayıtlarda createdAt).
+      // Yalnız gerçek ilanlar: membership/boost sanal ürünleri (kind != listing)
+      // yaşam süresine tabi değildir — eskiden onlar da 60 günde kapanıp
+      // platform hesabına "ilanınız sona erdi" e-postası tetikliyordu.
+      const expiryWhere: Prisma.ProductWhereInput = {
+        status: ProductStatus.active,
+        kind: ProductKind.listing,
+        OR: [
+          { publishedAt: { lt: expiryDate } },
+          { publishedAt: null, createdAt: { lt: expiryDate } },
+        ],
+      };
+
       // Bu turda dolacak ilanları, satıcıya "ilanınız sona erdi" e-postası
       // gönderebilmek için updateMany'den ÖNCE topla (updateMany etkilenen
       // satırları döndürmez). Aynı where ile güncellendiği için tutarlı.
       const toExpire = await this.prisma.product.findMany({
-        where: {
-          status: ProductStatus.active,
-          createdAt: { lt: expiryDate },
-        },
+        where: expiryWhere,
         select: {
           id: true,
           title: true,
@@ -462,10 +624,7 @@ export class ProductSchedulerService implements OnModuleInit {
 
       // Find and update expired listings
       const result = await this.prisma.product.updateMany({
-        where: {
-          status: ProductStatus.active,
-          createdAt: { lt: expiryDate },
-        },
+        where: expiryWhere,
         data: {
           status: ProductStatus.inactive,
         },
@@ -518,6 +677,60 @@ export class ProductSchedulerService implements OnModuleInit {
       // "başarılı" görünür ve hata yalnız log satırında kalır).
       throw error;
     }
+  }
+
+  /**
+   * Moderasyonda 48 saatten uzun bekleyen ilanlar için adminlere GÜNLÜK özet.
+   * `pending` süresizdir (yalnız active süre dolumuna tabidir); kuyruk sessizce
+   * yığılıyordu, kimse haber almıyordu. Cron günde bir koştuğu için ayrıca
+   * dedupe gerekmez. Gerçek iş — Bull processor 'pending-moderation-digest'.
+   */
+  async runPendingModerationDigest(log: (msg: string) => void = () => {}) {
+    const threshold = new Date(Date.now() - 48 * 60 * 60 * 1000);
+    const staleCount = await this.prisma.product.count({
+      where: {
+        status: ProductStatus.pending,
+        kind: ProductKind.listing,
+        createdAt: { lt: threshold },
+      },
+    });
+    if (staleCount === 0) {
+      log("48 saatten eski bekleyen ilan yok");
+      return { summary: "0 bekleyen ilan", stats: { stale: 0 } };
+    }
+
+    const admins = await this.prisma.adminUser.findMany({
+      where: { isActive: true },
+      select: { userId: true },
+    });
+    const adminBaseUrl =
+      process.env.ADMIN_URL?.replace(/\/$/, "") ||
+      (process.env.NODE_ENV === "production"
+        ? "https://admin.tarodan.com.tr"
+        : "http://localhost:3002");
+    for (const admin of admins) {
+      try {
+        await this.notificationService.createInAppNotification(
+          admin.userId,
+          NotificationType.MODERATION_QUEUE_STALE,
+          {
+            count: staleCount,
+            adminLink: `${adminBaseUrl}/catalog/products?status=pending`,
+          },
+        );
+      } catch (err: any) {
+        this.logger.warn(
+          `pending-moderation-digest bildirimi başarısız (${admin.userId}): ${err?.message}`,
+        );
+      }
+    }
+    log(
+      `${staleCount} bekleyen ilan için ${admins.length} admin bilgilendirildi`,
+    );
+    return {
+      summary: `${staleCount} bekleyen ilan (48s+)`,
+      stats: { stale: staleCount, admins: admins.length },
+    };
   }
 
   /**
@@ -579,7 +792,12 @@ export class ProductSchedulerService implements OnModuleInit {
       const expiringListings = await this.prisma.product.findMany({
         where: {
           status: ProductStatus.active,
-          createdAt: { gte: bandStart, lt: bandEnd },
+          kind: ProductKind.listing,
+          // Süre yayın anından sayılır (publishedAt; eski kayıtta createdAt).
+          OR: [
+            { publishedAt: { gte: bandStart, lt: bandEnd } },
+            { publishedAt: null, createdAt: { gte: bandStart, lt: bandEnd } },
+          ],
         },
         select: {
           id: true,

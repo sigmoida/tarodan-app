@@ -58,8 +58,9 @@ export interface Listing {
   sellerId?: string;
   seller?: {
     id: string;
+    publicName?: string;
     displayName?: string;
-    username?: string;
+    username?: string | null;
     avatarUrl?: string;
     rating?: number;
     listings_count?: number;

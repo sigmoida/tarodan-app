@@ -7,9 +7,10 @@
  * sub-services (commerce/account) and the NotificationService facade delegate
  * to this single engine.
  */
-import { Injectable, Logger } from "@nestjs/common";
+import { Injectable, Logger, NotFoundException } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { PrismaService } from "../../prisma";
+import { i18nMessage } from "../i18n";
 import {
   SendNotificationDto,
   NotificationType,
@@ -620,18 +621,23 @@ export class NotificationDispatchService {
   }
 
   /**
-   * Mark notification as read
+   * Zil bildirimi okundu işareti.
+   *
+   * `channel: "in_app"` filtresi ŞART: aynı tabloda e-posta/push/sms teslimat
+   * izleme satırları da duruyor (logNotification) ve id'si bilinen böyle bir
+   * satır da "read" yapılabiliyordu — teslimat kaydının statüsü bozuluyordu.
+   * Eşleşme yoksa başarı da DÖNÜLMEZ: istemci olmayan (ya da başkasının)
+   * kaydı okundu sanmasın diye 404 atılır.
    */
   async markAsRead(notificationId: string, userId: string): Promise<boolean> {
-    try {
-      await this.prisma.notificationLog.updateMany({
-        where: { id: notificationId, userId },
-        data: { status: "read" },
-      });
-      return true;
-    } catch (error) {
-      return false;
+    const { count } = await this.prisma.notificationLog.updateMany({
+      where: { id: notificationId, userId, channel: "in_app" },
+      data: { status: "read" },
+    });
+    if (count === 0) {
+      throw new NotFoundException(i18nMessage("server.common.recordNotFound"));
     }
+    return true;
   }
 
   /**

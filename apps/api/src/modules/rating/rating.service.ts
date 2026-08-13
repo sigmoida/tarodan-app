@@ -25,6 +25,11 @@ import {
   publicProductRatingWhere,
   publicUserRatingWhere,
 } from "../../common/helpers/public-rating";
+import {
+  PUBLIC_NAME_SELECT,
+  publicIdentityFields,
+  publicName,
+} from "../../common/helpers/public-identity";
 
 @Injectable()
 export class RatingService {
@@ -208,8 +213,10 @@ export class RatingService {
           status: RatingStatus.approved,
         },
         include: {
-          giver: { select: { id: true, displayName: true, avatarUrl: true } },
-          receiver: { select: { id: true, displayName: true } },
+          giver: {
+            select: { id: true, ...PUBLIC_NAME_SELECT, avatarUrl: true },
+          },
+          receiver: { select: { id: true, ...PUBLIC_NAME_SELECT } },
         },
       });
     } catch (e) {
@@ -236,7 +243,7 @@ export class RatingService {
         dto.receiverId,
         NotificationType.REVIEW_RECEIVED,
         {
-          reviewerName: rating.giver?.displayName || "Bir kullanıcı",
+          reviewerName: publicName(rating.giver),
           score: dto.score,
           orderId: dto.orderId,
           tradeId: dto.tradeId,
@@ -246,8 +253,8 @@ export class RatingService {
         dto.receiverId,
         "review-received-seller",
         {
-          sellerName: rating.receiver?.displayName || "",
-          reviewerName: rating.giver?.displayName || "Bir kullanıcı",
+          sellerName: publicName(rating.receiver),
+          reviewerName: publicName(rating.giver),
           rating: dto.score,
           comment: dto.comment || undefined,
         },
@@ -338,7 +345,7 @@ export class RatingService {
         },
         include: {
           product: { select: { id: true, title: true } },
-          user: { select: { id: true, displayName: true } },
+          user: { select: { id: true, ...PUBLIC_NAME_SELECT } },
         },
       });
     } catch (e) {
@@ -421,8 +428,10 @@ export class RatingService {
           score: true,
           comment: true,
           createdAt: true,
-          giver: { select: { id: true, displayName: true, avatarUrl: true } },
-          receiver: { select: { id: true, displayName: true } },
+          giver: {
+            select: { id: true, ...PUBLIC_NAME_SELECT, avatarUrl: true },
+          },
+          receiver: { select: { id: true, ...PUBLIC_NAME_SELECT } },
         },
         orderBy: { createdAt: "desc" },
         skip: (safePage - 1) * safePageSize,
@@ -501,7 +510,9 @@ export class RatingService {
         where,
         include: {
           product: { select: { id: true, title: true } },
-          user: { select: { id: true, displayName: true, avatarUrl: true } },
+          user: {
+            select: { id: true, ...PUBLIC_NAME_SELECT, avatarUrl: true },
+          },
         },
         orderBy,
         skip: (safePage - 1) * safePageSize,
@@ -601,7 +612,7 @@ export class RatingService {
       data: { helpfulCount: { increment: 1 } },
       include: {
         product: { select: { id: true, title: true } },
-        user: { select: { id: true, displayName: true } },
+        user: { select: { id: true, ...PUBLIC_NAME_SELECT } },
       },
     });
 
@@ -618,9 +629,9 @@ export class RatingService {
     return {
       id: rating.id,
       giverId: rating.giverId,
-      giverName: rating.giver?.displayName || "",
+      giverName: publicName(rating.giver),
       receiverId: rating.receiverId,
-      receiverName: rating.receiver?.displayName || "",
+      receiverName: publicName(rating.receiver),
       orderId: rating.orderId || undefined,
       tradeId: rating.tradeId || undefined,
       score: rating.score,
@@ -629,7 +640,7 @@ export class RatingService {
       giver: rating.giver
         ? {
             id: rating.giver.id,
-            displayName: rating.giver.displayName || "",
+            ...publicIdentityFields(rating.giver),
             avatarUrl:
               resolvedGiverAvatar ?? rating.giver.avatarUrl ?? undefined,
           }
@@ -646,7 +657,7 @@ export class RatingService {
       productId: rating.productId,
       productTitle: rating.product?.title || "",
       userId: rating.userId,
-      userName: rating.user?.displayName || "",
+      userName: publicName(rating.user),
       orderId: rating.orderId,
       score: rating.score,
       title: rating.title || undefined,
@@ -658,7 +669,7 @@ export class RatingService {
       user: rating.user
         ? {
             id: rating.user.id,
-            displayName: rating.user.displayName || "",
+            ...publicIdentityFields(rating.user),
             avatarUrl: resolvedAvatarUrl ?? rating.user.avatarUrl ?? undefined,
           }
         : undefined,

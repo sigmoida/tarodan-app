@@ -37,6 +37,12 @@ export interface Product {
   salePrice?: number | null;
   saleStartDate?: string | null;
   saleEndDate?: string | null;
+  /**
+   * Bu ürün için geçerli, herkese açık BEDEL kampanyalarının adları
+   * ("Komisyonsuz alışveriş" gibi). Fiyatı değiştirmedikleri için vitrinde
+   * yalnız rozet olarak görünürler.
+   */
+  feeCampaigns?: string[];
   discountPercent?: number | null;
   isOnSale?: boolean;
   isBoosted?: boolean;
@@ -62,8 +68,11 @@ export interface Product {
   likeCount?: number;
   seller?: {
     id: string | number;
+    /** Herkese açık ad (API çözer): firma adı → kullanıcı adı → isim. */
+    publicName?: string;
+    /** Uyumluluk takma adı — publicName ile aynı değer. */
     displayName?: string;
-    username?: string;
+    username?: string | null;
     rating?: number;
   };
   attributes?: ProductAttributeEntry[];

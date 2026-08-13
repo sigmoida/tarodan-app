@@ -2,7 +2,14 @@
 
 import { useState } from "react";
 import { useTranslations } from "next-intl";
-import { Alert, Button, Select, Textarea } from "@tarodan/ui";
+import {
+  Alert,
+  Button,
+  Select,
+  Textarea,
+  refundReasonConfig,
+  enumLabel,
+} from "@tarodan/ui";
 import { fmtTry } from "@/lib/format";
 import {
   InformationCircleIcon,
@@ -18,19 +25,9 @@ import {
 import type { RefundDecisionPreview } from "../types";
 import { extractErrorMessage } from "@/lib/error";
 
-const REFUND_REASONS = [
-  "delivery_delayed",
-  "changed_mind",
-  "damaged",
-  "wrong_item",
-  "not_as_described",
-  "missing_parts",
-  "counterfeit",
-  "defective",
-  "buyer_damaged",
-  "lost_in_transit",
-  "other",
-];
+// Tek doğru kaynak: @tarodan/shared refundReasonConfig (11 enum değeri).
+// Elle kopyalanan liste sessizce kayıyordu.
+const REFUND_REASONS = Object.keys(refundReasonConfig);
 
 const VARIANT_ICON: Record<GuidanceVariant, React.ReactNode> = {
   info: <InformationCircleIcon className="h-6 w-6" />,
@@ -51,6 +48,10 @@ export interface RefundNextActionPanelProps {
   canForceFinalize: boolean;
   finalizing: boolean;
   onFinalize: () => void;
+  /** O3: satıcı inceleme penceresinde itiraz — 24s otomatik finalize durur. */
+  canDispute: boolean;
+  disputing: boolean;
+  onDispute: (note: string) => void;
   reviewing: boolean;
   onPreview: (decision: {
     resolvedReason: string;
@@ -80,6 +81,9 @@ export function RefundNextActionPanel({
   canForceFinalize,
   finalizing,
   onFinalize,
+  canDispute,
+  disputing,
+  onDispute,
   reviewing,
   onPreview,
   onApprove,
@@ -88,6 +92,8 @@ export function RefundNextActionPanel({
   const t = useTranslations();
   const guidance = guidanceForStatus(t, status);
   const [reviewNote, setReviewNote] = useState("");
+  const [disputeOpen, setDisputeOpen] = useState(false);
+  const [disputeNote, setDisputeNote] = useState("");
   const [resolvedReason, setResolvedReason] = useState(reason);
   const carrierHasPackage =
     shipmentStatus != null &&
@@ -147,16 +153,63 @@ export function RefundNextActionPanel({
             </p>
           )}
 
-          {canForceFinalize && (
-            <Button
-              variant="primary"
-              onClick={onFinalize}
-              isLoading={finalizing}
-              disabled={finalizing}
-            >
-              <BanknotesIcon className="mr-1.5 h-5 w-5" />
-              {t("admin.operations.refundRequests.forceFinalizeButton")}
-            </Button>
+          {(canForceFinalize || canDispute) && (
+            <div className="flex flex-wrap items-start gap-2">
+              {canForceFinalize && (
+                <Button
+                  variant="primary"
+                  onClick={onFinalize}
+                  isLoading={finalizing}
+                  disabled={finalizing}
+                >
+                  <BanknotesIcon className="mr-1.5 h-5 w-5" />
+                  {t("admin.operations.refundRequests.forceFinalizeButton")}
+                </Button>
+              )}
+              {canDispute && !disputeOpen && (
+                <Button
+                  variant="secondary"
+                  onClick={() => setDisputeOpen(true)}
+                  disabled={disputing || finalizing}
+                >
+                  <ExclamationTriangleIcon className="mr-1.5 h-5 w-5" />
+                  {t("admin.operations.refundRequests.disputeButton")}
+                </Button>
+              )}
+            </div>
+          )}
+
+          {canDispute && disputeOpen && (
+            <div className="space-y-2 rounded-lg border border-warning-200 bg-surface-elevated p-3">
+              <Textarea
+                value={disputeNote}
+                placeholder={t(
+                  "admin.operations.refundRequests.disputeNotePlaceholder",
+                )}
+                onChange={(event) =>
+                  setDisputeNote(event.target.value.slice(0, 500))
+                }
+                rows={2}
+                maxLength={500}
+              />
+              <div className="flex gap-2">
+                <Button
+                  variant="danger"
+                  onClick={() => onDispute(disputeNote.trim())}
+                  isLoading={disputing}
+                  disabled={disputing || disputeNote.trim().length < 10}
+                >
+                  {t("admin.operations.refundRequests.disputeConfirm")}
+                </Button>
+                <Button
+                  variant="secondary"
+                  onClick={() => setDisputeOpen(false)}
+                  disabled={disputing}
+                >
+                  {t("common.cancel")}
+                </Button>
+              </div>
+            </div>
           )}
 
           {(status === "pending_review" || requiresV2Decision) && (
@@ -182,7 +235,7 @@ export function RefundNextActionPanel({
                       }}
                       options={REFUND_REASONS.map((value) => ({
                         value,
-                        label: value,
+                        label: enumLabel(refundReasonConfig, value),
                       }))}
                     />
                     <Select

@@ -32,8 +32,18 @@ export interface Offer {
     /** Paket boyutu — net tahmin ürünün kendi kargo kademesiyle yapılır. */
     shippingPackageTier?: string | null;
   };
-  buyer?: { id: string; displayName: string; avatarUrl?: string };
-  seller?: { id: string; displayName: string; avatarUrl?: string };
+  buyer?: {
+    id: string;
+    publicName?: string;
+    displayName: string;
+    avatarUrl?: string;
+  };
+  seller?: {
+    id: string;
+    publicName?: string;
+    displayName: string;
+    avatarUrl?: string;
+  };
 }
 
 const PAID_ORDER_STATUSES = [

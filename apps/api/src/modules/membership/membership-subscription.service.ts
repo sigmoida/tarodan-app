@@ -31,7 +31,9 @@ import { MembershipPaymentInitResponseDto } from "./dto/membership-payment.dto";
 import { PaymentProviderRegistry } from "../payment-providers/payment-provider.registry";
 import { ConfigService } from "@nestjs/config";
 import { MembershipCommonService } from "./membership-common.service";
-import { isPremiumEntitled } from "./membership.util";
+import { hasUsableRecurringCard, isPremiumEntitled } from "./membership.util";
+import { NotificationService } from "../notification/notification.service";
+import { NotificationType } from "../notification/dto";
 import { i18nMessage } from "../i18n";
 import { PaymentProviderEventService } from "../payment/payment-provider-event.service";
 import { createHash } from "node:crypto";
@@ -43,6 +45,13 @@ import {
   OUTBOX_SAVED_CARD_PROVIDER_DELETE,
   type SavedCardProviderDeletePayload,
 } from "../outbox/outbox.types";
+
+/**
+ * Oto-yenileme cron'u SAATLİK çalışır; çekim dönem DOLMADAN yapılmalı ki üyelik
+ * kesintisiz sürsün. Pencere bir cron periyodunu kapsar: dönem sonuna <= 1 saat
+ * kalan üyelikler bu turda çekilir, yeni dönem eski dönem sonuna EKLENİR (D3).
+ */
+export const RENEWAL_WINDOW_MS = 60 * 60 * 1000;
 
 /**
  * MembershipSubscriptionService — abonelik yaşam döngüsü + PayTR/ödeme tarafı:
@@ -69,6 +78,10 @@ export class MembershipSubscriptionService {
     @Optional()
     @InjectQueue(QUEUE_NAMES.SEARCH)
     private readonly searchQueue?: Queue,
+    // Süresi dolup free'ye düşen üyeye in-app+push bildirim. Best-effort;
+    // @Optional — mevcut spec harness'ları konumsal kurar.
+    @Optional()
+    private readonly notifications?: NotificationService,
   ) {}
 
   // ==========================================================================
@@ -111,9 +124,13 @@ export class MembershipSubscriptionService {
           i18nMessage("server.membership.businessTierRequiresCompany"),
         );
       }
-    } else if (isApprovedCorporate) {
+    } else if (commissionIdentity?.businessStatus != null) {
+      // Kurumsal İZLİ hesap (pending/rejected dahil) bireysel katman ALAMAZ —
+      // eskiden yalnız ONAYLI kurumsal kilitliydi; onay bekleyen hesap web
+      // guard'ını atlayıp doğrudan API'den Premium satın alabiliyordu.
+      // "Kurumsal satıcının katmanı daima İş'tir" (Üyelik Katmanları §10).
       throw new ForbiddenException(
-        i18nMessage("server.membership.businessTierRequiresCompany"),
+        i18nMessage("server.membership.corporateMustUseBusinessTier"),
       );
     }
 
@@ -199,6 +216,23 @@ export class MembershipSubscriptionService {
       }
 
       if (direction === "downgrade") {
+        // D2: ücretli hedefe planlı geçiş dönem sonunda OTOMATİK çekim demektir.
+        // Recurring kapalıysa ya da kullanılabilir kayıtlı kart yoksa plan hiçbir
+        // zaman uygulanamaz ve üye sessizce free'ye düşer — bu yüzden plan hiç
+        // yazılmaz; kullanıcı dönem sonunda istediği paketi yeniden satın alır.
+        // Free hedef çekim gerektirmez, her zaman planlanabilir.
+        if (dto.tierType !== MembershipTierType.free) {
+          const recurringEnabled =
+            this.configService.get("PAYTR_RECURRING_ENABLED") === "true";
+          if (
+            !recurringEnabled ||
+            !(await hasUsableRecurringCard(this.prisma, userId))
+          ) {
+            throw new BadRequestException(
+              i18nMessage("server.membership.scheduledChangeRequiresCard"),
+            );
+          }
+        }
         await this.prisma.userMembership.update({
           where: { userId },
           data: {
@@ -710,15 +744,6 @@ export class MembershipSubscriptionService {
             businessStatus: true,
             companyName: true,
             taxId: true,
-            savedCards: {
-              where: {
-                provider: "paytr",
-                status: SavedCardStatus.active,
-                requireCvv: false,
-              },
-              select: { id: true },
-              take: 1,
-            },
           },
         },
       },
@@ -734,7 +759,8 @@ export class MembershipSubscriptionService {
           "Otomatik yenileme yalnız geçerli ücretli üyelikte açılabilir",
         );
       }
-      if (membership.user.savedCards.length === 0) {
+      // Fulfillment (D1) ve planlı geçiş (D2) ile aynı tanım: paylaşılan helper.
+      if (!(await hasUsableRecurringCard(this.prisma, userId))) {
         throw new BadRequestException(
           "Otomatik yenileme için CVV gerektirmeyen kayıtlı kart bulunamadı",
         );
@@ -783,7 +809,9 @@ export class MembershipSubscriptionService {
       where: {
         autoRenew: true,
         status: SubscriptionStatus.active,
-        currentPeriodEnd: { lte: now },
+        // D3: çekim süre DOLMADAN yapılır — saatlik cron'un bir sonraki turuna
+        // kalmasın diye dönem sonuna <= 1 saat kalanlar da bu tura girer.
+        currentPeriodEnd: { lte: new Date(now.getTime() + RENEWAL_WINDOW_MS) },
         tier: {
           type: { not: MembershipTierType.free },
           isActive: true,
@@ -876,7 +904,15 @@ export class MembershipSubscriptionService {
         );
         if (!(price > 0)) continue;
 
-        const newStart = now;
+        // D3: yeni dönem ÇEKİM ANINDAN değil, eski dönem SONUNDAN başlar
+        // (append) — erken çekim gün çalmaz, gecikmiş çekim gün hediye etmez.
+        // 24 saatten bayat satırda eski uca eklemek dönemi geçmişe kurardı;
+        // onlarda taban now'dur.
+        const appendFloor = now.getTime() - 24 * 60 * 60 * 1000;
+        const newStart =
+          m.currentPeriodEnd.getTime() > appendFloor
+            ? new Date(m.currentPeriodEnd)
+            : now;
         const newEnd = new Date(newStart);
         if (isYearly) newEnd.setFullYear(newEnd.getFullYear() + 1);
         else newEnd.setMonth(newEnd.getMonth() + 1);
@@ -889,7 +925,14 @@ export class MembershipSubscriptionService {
             targetTierId: effectiveTier.id,
             billingPeriod,
             status: PaymentStatus.failed,
-            createdAt: { gte: m.currentPeriodEnd },
+            // Sayaç bu yenileme döngüsünün TÜM denemelerini görmeli: pencere
+            // dönem sonundan 1 saat önce açıldığı için erken denemeler de
+            // dahil — yalnız `gte: currentPeriodEnd` olsaydı erken başarısız
+            // deneme sayılmaz, aynı attemptNumber'ın idempotencyKey çakışması
+            // (P2002) dunning'i kalıcı kilitlerdi.
+            createdAt: {
+              gte: new Date(m.currentPeriodEnd.getTime() - RENEWAL_WINDOW_MS),
+            },
           },
         });
         if (failedAttempts >= 3) {
@@ -1269,6 +1312,8 @@ export class MembershipSubscriptionService {
           },
         },
       },
+      // Bildirim kaybedilen paketin adını söyler (free'ye düşmeden önceki tier).
+      include: { tier: { select: { name: true } } },
     });
 
     // Downgrade to free tier
@@ -1301,6 +1346,20 @@ export class MembershipSubscriptionService {
           },
         });
         downgradeCount++;
+
+        // Üye free'ye düştü — in-app+push bildirim. Best-effort: bildirim
+        // hatası düşürmeyi geri almaz, sweep'i de durdurmaz.
+        await this.notifications
+          ?.createInAppNotification(
+            membership.userId,
+            NotificationType.MEMBERSHIP_EXPIRED,
+            { tierName: membership.tier.name },
+          )
+          .catch((err: any) =>
+            this.logger.warn(
+              `MEMBERSHIP_EXPIRED bildirimi başarısız (user ${membership.userId}): ${err?.message}`,
+            ),
+          );
 
         // Üyelik sona erince, bu kullanıcının AÇTIĞI bekleyen (pending) takas
         // teklifleri otomatik iptal edilir: artık takas hakkı olmadığı için karşı

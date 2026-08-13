@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { createTranslator } from "next-intl";
 import { getMessages, resolveLocale } from "@tarodan/i18n";
+import { trPhone, trPhoneOptional } from "@tarodan/ui/form";
 
 /**
  * Auth form schemas — the single source of truth for validation AND types.
@@ -138,7 +139,7 @@ export const registerSchema = (locale: Locale) => {
         .trim()
         .min(1, t("common.fillAllFields"))
         .email(t("validation.invalidEmail")),
-      phone: z.string().optional(),
+      phone: trPhoneOptional(t("validation.trPhoneOnly")),
       birthDate: z.string().min(1, t("validation.birthDateRequired")),
       password: z
         .string()
@@ -187,7 +188,7 @@ export const businessRegisterSchema = (locale: Locale) => {
         .trim()
         .min(1, t("auth.fillRequiredFields"))
         .email(t("validation.invalidEmail")),
-      phone: z.string().trim().min(1, t("auth.fillRequiredFields")),
+      phone: trPhone(t("validation.trPhoneOnly")),
       agreeTerms: z.boolean(),
     })
     .refine((d) => d.agreeTerms === true, {

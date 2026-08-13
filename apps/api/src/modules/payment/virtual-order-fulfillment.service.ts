@@ -17,7 +17,10 @@ import {
   RELEVANCE_PREMIUM_BONUS,
 } from "../product/helpers/relevance-score";
 import { ElogoInvoicingService } from "../elogo";
-import { isPremiumEntitled } from "../membership/membership.util";
+import {
+  hasUsableRecurringCard,
+  isPremiumEntitled,
+} from "../membership/membership.util";
 import { OutboxService } from "../outbox/outbox.service";
 import { OUTBOX_REVENUE_INVOICE_ISSUE } from "../outbox/outbox.types";
 
@@ -168,12 +171,16 @@ export class VirtualOrderFulfillmentService {
         };
       }
 
+      // D1: autoRenew yalnız kullanıcısız çekilebilir kayıtlı kart varsa açılır.
+      // Kartsız üyeye "yenilenecek" vaadi vermek dönem sonunda sessiz düşüş
+      // demekti; kartsızlar hatırlatma e-postası + yeniden satın alma akışına düşer.
+      const autoRenew = await hasUsableRecurringCard(tx, payment.order.buyerId);
       await tx.userMembership.update({
         where: { userId: payment.order.buyerId },
         data: {
           status: SubscriptionStatus.active,
           cancelledAt: null,
-          autoRenew: true,
+          autoRenew,
           ...tierPatch,
         },
       });
@@ -306,6 +313,7 @@ export class VirtualOrderFulfillmentService {
       where: { id: boost.productId },
       select: {
         boostedUntil: true,
+        homeShowcaseUntil: true,
         qualityScore: true,
         popularityScore: true,
         viewCount: true,
@@ -319,6 +327,18 @@ export class VirtualOrderFulfillmentService {
         : nowTs;
     const endsAt = new Date(
       base.getTime() + boost.durationDays * 24 * 60 * 60 * 1000,
+    );
+    // Vitrin penceresi AYRI izlenir: Vitrin paketi yalnız KENDİ süresi kadar
+    // vitrin verir (varsa kalan vitrin süresinin üstüne eklenir). Eskiden
+    // homeShowcaseUntil = endsAt yazılıyordu — 30 gün kalan ekonomik boost'un
+    // üstüne 3 günlük Vitrin alan ilan 33 gün vitrinde kalıyordu (hediye süre).
+    const showcaseBase =
+      boostedProduct?.homeShowcaseUntil &&
+      boostedProduct.homeShowcaseUntil > nowTs
+        ? boostedProduct.homeShowcaseUntil
+        : nowTs;
+    const showcaseEndsAt = new Date(
+      showcaseBase.getTime() + boost.durationDays * 24 * 60 * 60 * 1000,
     );
     await tx.productBoost.update({
       where: { id: boost.id },
@@ -338,8 +358,9 @@ export class VirtualOrderFulfillmentService {
         boostedUntil: endsAt,
         // LIFO ordering key (most-recently purchased first) for search + home.
         boostedAt: nowTs,
-        // A Vitrin (showcaseOnHome) package also lights up the home showcase.
-        ...(boost.showcaseOnHome ? { homeShowcaseUntil: endsAt } : {}),
+        // A Vitrin (showcaseOnHome) package also lights up the home showcase —
+        // yalnız kendi süresi kadar (karışık stack'te hediye süre yok).
+        ...(boost.showcaseOnHome ? { homeShowcaseUntil: showcaseEndsAt } : {}),
         rankTier: 2,
         relevanceScore: computeRelevanceScore({
           rankTier: 2,

@@ -5,6 +5,7 @@
 import OrderReviewModal from "@/components/reviews/OrderReviewModal";
 import { useSubmitReview } from "../_hooks/useOrders";
 import { getOrderPrimary, getOrderProductId, type Order } from "../_lib/types";
+import { publicNameOf } from "@/lib/public-name";
 
 interface ReviewModalProps {
   order: Order | null;
@@ -30,7 +31,7 @@ export default function ReviewModal({ order, onClose }: ReviewModalProps) {
           ? { title: primary.product.title, imageUrl: primary.image }
           : undefined
       }
-      sellerName={order?.seller?.displayName}
+      sellerName={publicNameOf(order?.seller)}
       isSubmitting={submitReview.isPending}
       onSubmit={(v) => {
         if (!order || !productId) return;

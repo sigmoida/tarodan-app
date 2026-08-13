@@ -6,7 +6,7 @@ import { useRef, type Dispatch, type SetStateAction } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import toast from "react-hot-toast";
 import { ordersApi, paymentsApi } from "@/lib/api";
-import { getFullPhoneNumber, normalizePhoneForPayload } from "@/lib/phone";
+import { combinePhone } from "@/lib/phone";
 import { useTranslations } from "next-intl";
 import type { ResolvedPayment } from "@/hooks/useCardPayment";
 import type { Address, CheckoutItem } from "../_lib/types";
@@ -33,11 +33,8 @@ export function useCheckoutSubmit({
   guestPhone,
   guestName,
   guestEmailVerificationCode,
-  newAddressPhoneCountryCode,
-  guestPhoneCountryCode,
   billingSameAsShipping,
   newBillingAddress,
-  billingAddressPhoneCountryCode,
   selectedBillingAddressId,
   setIsLoading,
   router,
@@ -63,11 +60,8 @@ export function useCheckoutSubmit({
   guestPhone: string;
   guestName: string;
   guestEmailVerificationCode: string;
-  newAddressPhoneCountryCode: string;
-  guestPhoneCountryCode: string;
   billingSameAsShipping: boolean;
   newBillingAddress: Omit<Address, "id">;
-  billingAddressPhoneCountryCode: string;
   selectedBillingAddressId: string | null;
   setIsLoading: Dispatch<SetStateAction<boolean>>;
   router: { push: (href: string) => void };
@@ -161,9 +155,11 @@ export function useCheckoutSubmit({
           return null;
         }
 
-        const addressPhone = selectedAddress.phone || user?.phone;
+        // Saved rows predate the Turkey-only rule, so normalize here too rather
+        // than trusting what is stored.
+        const addressPhone = combinePhone(selectedAddress.phone || user?.phone);
         if (!addressPhone) {
-          toast.error("Teslimat adresi için telefon numarası gereklidir");
+          toast.error(t("validation.trPhoneOnly"));
           setIsLoading(false);
           return null;
         }
@@ -230,13 +226,15 @@ export function useCheckoutSubmit({
           return null;
         }
 
-        const formattedAddressPhone = getFullPhoneNumber(
-          addressPhone,
-          newAddressPhoneCountryCode,
-        );
+        const formattedAddressPhone = combinePhone(addressPhone);
+        if (!formattedAddressPhone) {
+          toast.error(t("validation.trPhoneOnly"));
+          setIsLoading(false);
+          return null;
+        }
         const formattedContactPhone = isAuthenticated
           ? user?.phone || formattedAddressPhone
-          : getFullPhoneNumber(phone || guestPhone, guestPhoneCountryCode);
+          : combinePhone(phone || guestPhone) || formattedAddressPhone;
 
         shippingAddress = {
           fullName: newAddress.fullName,
@@ -349,10 +347,7 @@ export function useCheckoutSubmit({
             ) {
               payload.billingAddress = {
                 fullName: newBillingAddress.fullName.trim(),
-                phone: normalizePhoneForPayload(
-                  newBillingAddress.phone,
-                  billingAddressPhoneCountryCode,
-                ),
+                phone: combinePhone(newBillingAddress.phone),
                 city: newBillingAddress.city.trim(),
                 district: newBillingAddress.district.trim(),
                 address: newBillingAddress.address.trim(),
@@ -396,10 +391,7 @@ export function useCheckoutSubmit({
                   throw new Error("Teslimat adresi için açık adres gereklidir");
                 payload.shippingAddress = {
                   fullName: addr.fullName.trim(),
-                  phone: normalizePhoneForPayload(
-                    addr.phone,
-                    newAddressPhoneCountryCode,
-                  ),
+                  phone: combinePhone(addr.phone),
                   city: addr.city.trim(),
                   district: addr.district.trim(),
                   address: addr.address.trim(),
@@ -414,14 +406,8 @@ export function useCheckoutSubmit({
 
             orderResponse = await ordersApi.checkout(payload);
           } else {
-            const formattedContactPhone = normalizePhoneForPayload(
-              contactPhone,
-              guestPhoneCountryCode,
-            );
-            const formattedAddrPhone = normalizePhoneForPayload(
-              shippingAddress?.phone,
-              newAddressPhoneCountryCode,
-            );
+            const formattedContactPhone = combinePhone(contactPhone);
+            const formattedAddrPhone = combinePhone(shippingAddress?.phone);
 
             const guestPayload: {
               items: Array<{ productId: string; quantity: number }>;
@@ -478,10 +464,7 @@ export function useCheckoutSubmit({
             ) {
               guestPayload.billingAddress = {
                 fullName: newBillingAddress.fullName.trim(),
-                phone: normalizePhoneForPayload(
-                  newBillingAddress.phone,
-                  billingAddressPhoneCountryCode,
-                ),
+                phone: combinePhone(newBillingAddress.phone),
                 city: newBillingAddress.city.trim(),
                 district: newBillingAddress.district.trim(),
                 address: newBillingAddress.address.trim(),

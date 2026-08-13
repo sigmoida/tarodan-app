@@ -5,7 +5,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Button } from "@tarodan/ui";
 import { api } from "@/lib/api";
-import { useAuthStore } from "@/stores/authStore";
 import { useTranslations } from "next-intl";
 import { Container } from "../Container";
 
@@ -23,39 +22,15 @@ interface TopAd {
 
 /**
  * Owns the top-ads state: fetches active header ads for the current device,
- * records one impression per ad, tracks image-load failures, and derives whether
- * ads should show at all (the ad-free perk comes from the admin tier setting via
- * `/membership/me/limits`, never a hardcoded tier name).
+ * records one impression per ad and tracks image-load failures. Banner'lar
+ * HERKESE gösterilir: "reklamsız üyelik" avantajı devre dışıdır ve hiçbir
+ * üyelik katmanı afişleri gizleyemez.
  */
 function useTopAds() {
-  const { isAuthenticated, user } = useAuthStore();
   const [topAds, setTopAds] = useState<TopAd[]>([]);
   const recordedImpressions = useRef<Set<string>>(new Set());
   const [adImageError, setAdImageError] = useState<Set<string>>(new Set());
   const [isMobile, setIsMobile] = useState(false);
-  const [isAdFree, setIsAdFree] = useState(false);
-
-  // Ads show to everyone except members whose tier grants the ad-free perk.
-  const shouldShowAd = isAuthenticated ? !isAdFree : true;
-
-  useEffect(() => {
-    if (!isAuthenticated) {
-      setIsAdFree(false);
-      return;
-    }
-    let cancelled = false;
-    api
-      .get<{ isAdFree?: boolean }>("/membership/me/limits")
-      .then((res) => {
-        if (!cancelled) setIsAdFree(!!res.data?.isAdFree);
-      })
-      .catch(() => {
-        if (!cancelled) setIsAdFree(false);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [isAuthenticated, user?.membershipTier]);
 
   useEffect(() => {
     const checkMobile = () => setIsMobile(window.innerWidth < 768);
@@ -65,7 +40,6 @@ function useTopAds() {
   }, []);
 
   useEffect(() => {
-    if (!shouldShowAd) return;
     const deviceType = isMobile ? "mobile" : "desktop";
     api
       .get<TopAd[]>("/ads/active", {
@@ -80,7 +54,7 @@ function useTopAds() {
           console.error("Failed to fetch ads:", err);
         setTopAds([]);
       });
-  }, [shouldShowAd, isMobile]);
+  }, [isMobile]);
 
   // One impression per ad while the bar is shown.
   useEffect(() => {
@@ -101,7 +75,6 @@ function useTopAds() {
     setAdImageError((prev) => new Set(prev).add(adId));
 
   return {
-    shouldShowAd,
     topAds,
     adImageError,
     handleAdClick,
@@ -117,15 +90,10 @@ function useTopAds() {
  */
 export default function TopAdsBar() {
   const t = useTranslations();
-  const {
-    shouldShowAd,
-    topAds,
-    adImageError,
-    handleAdClick,
-    handleAdImageError,
-  } = useTopAds();
+  const { topAds, adImageError, handleAdClick, handleAdImageError } =
+    useTopAds();
 
-  if (!shouldShowAd || topAds.length === 0) return null;
+  if (topAds.length === 0) return null;
 
   return (
     <div

@@ -6,6 +6,7 @@ import { BullModule } from "@nestjs/bull";
 import { PrismaModule } from "../../prisma";
 import { QUEUE_NAMES } from "../../workers/constants";
 import { PaymentModule } from "../payment/payment.module";
+import { DiscountModule } from "../discount";
 import { SuratCargoModule } from "../surat-cargo/surat-cargo.module";
 import { NotificationModule } from "../notification/notification.module";
 import { StorageModule } from "../storage/storage.module";
@@ -24,6 +25,8 @@ import { scheduledProcessors } from "../../workers/scheduled-processors";
     StorageModule,
     ShippingTariffModule,
     PaymentModule,
+    // Kusursuz alıcıya kupon iadesi için (indirim-teknik §6).
+    DiscountModule,
     NotificationModule,
     BullModule.registerQueue({ name: QUEUE_NAMES.SCHEDULED }),
     JwtModule.registerAsync({

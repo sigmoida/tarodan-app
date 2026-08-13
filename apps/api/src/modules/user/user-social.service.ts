@@ -11,6 +11,12 @@ import { UserCommonService } from "./user-common.service";
 import { i18nMessage } from "../i18n";
 import { randomUUID } from "crypto";
 import { catalogProductWhere } from "../product/helpers/catalog-product-where";
+import {
+  PUBLIC_IDENTITY_SELECT,
+  PUBLIC_NAME_SELECT,
+  publicName,
+  toPublicIdentity,
+} from "../../common/helpers/public-identity";
 
 // In-memory storage for user blocks until schema is updated
 interface UserBlock {
@@ -107,7 +113,7 @@ export class UserSocialService {
     try {
       const follower = await this.prisma.user.findUnique({
         where: { id: currentUserId },
-        select: { displayName: true },
+        select: PUBLIC_NAME_SELECT,
       });
 
       await this.notificationService.createInAppNotification(
@@ -115,14 +121,14 @@ export class UserSocialService {
         NotificationType.NEW_FOLLOWER,
         {
           followerId: currentUserId,
-          followerName: follower?.displayName || "Bir kullanıcı",
+          followerName: publicName(follower),
         },
       );
       await this.notificationService.sendTemplateEmailToUser(
         targetUserId,
         "new-follower",
         {
-          followerName: follower?.displayName || "Bir kullanıcı",
+          followerName: publicName(follower),
           followerId: currentUserId,
         },
       );
@@ -179,9 +185,7 @@ export class UserSocialService {
       include: {
         following: {
           select: {
-            id: true,
-            displayName: true,
-            avatarUrl: true,
+            ...PUBLIC_IDENTITY_SELECT,
             bio: true,
             _count: {
               select: {
@@ -231,7 +235,7 @@ export class UserSocialService {
     // Check if blocked user exists
     const blockedUser = await this.prisma.user.findUnique({
       where: { id: blockedId },
-      select: { id: true, displayName: true },
+      select: { id: true, ...PUBLIC_NAME_SELECT },
     });
 
     if (!blockedUser) {
@@ -262,7 +266,7 @@ export class UserSocialService {
     // #224: mesaj artık UserController.blockUser() tarafından locale'e göre
     // kuruluyor (server.user.userBlocked, {displayName} parametreli) — servis
     // burada sabit metin döndürmüyor.
-    return { success: true, blockedDisplayName: blockedUser.displayName };
+    return { success: true, blockedDisplayName: publicName(blockedUser) };
   }
 
   /**
@@ -307,15 +311,11 @@ export class UserSocialService {
 
     const blockedUsers = await this.prisma.user.findMany({
       where: { id: { in: blockedUserIds } },
-      select: {
-        id: true,
-        displayName: true,
-        avatarUrl: true,
-      },
+      select: PUBLIC_IDENTITY_SELECT,
     });
 
     return blockedUsers.map((user) => ({
-      ...user,
+      ...toPublicIdentity(user),
       blockedAt: blocks.find((b) => b.blockedId === user.id)?.createdAt,
     }));
   }

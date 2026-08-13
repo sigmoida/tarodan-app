@@ -20,6 +20,10 @@ import { PrismaService } from "../../prisma";
 import { resolveCorsOrigins } from "../../config/cors-origins";
 import { JwtPayload } from "../auth/interfaces";
 import { SecurityService } from "../security/security.service";
+import {
+  PUBLIC_NAME_SELECT,
+  publicName,
+} from "../../common/helpers/public-identity";
 
 interface AuthenticatedSocket extends Socket {
   userId?: string;
@@ -27,7 +31,8 @@ interface AuthenticatedSocket extends Socket {
   user?: {
     id: string;
     email: string;
-    displayName: string;
+    /** Karşı tarafa yayınlanan ad (firma → kullanıcı adı → isim). */
+    publicName: string;
     role?: string;
     isAdmin: boolean;
   };
@@ -88,7 +93,7 @@ export class TarodanWebSocketGateway
         select: {
           id: true,
           email: true,
-          displayName: true,
+          ...PUBLIC_NAME_SELECT,
           isBanned: true,
           deletedAt: true,
           adminUser: {
@@ -125,7 +130,7 @@ export class TarodanWebSocketGateway
       client.user = {
         id: user.id,
         email: user.email,
-        displayName: user.displayName,
+        publicName: publicName(user),
         role: isActiveAdmin ? user.adminUser?.role : undefined,
         isAdmin: isActiveAdmin,
       };
@@ -238,7 +243,7 @@ export class TarodanWebSocketGateway
     client.to(`thread:${data.threadId}`).emit("typing:started", {
       threadId: data.threadId,
       userId: client.userId,
-      displayName: client.user?.displayName,
+      displayName: client.user?.publicName,
     });
   }
 

@@ -72,6 +72,7 @@ export class AdminFinanceService {
       pspFees,
       tradeFees,
       serviceVatRate,
+      boostOrders,
     ] = await Promise.all([
       // Tahsilat (dönem): tamamlanan ödemelerin brüt toplamı = ciro. Platform
       // geliri DEĞİLDİR — o ledger'dan gelir (aşağıda).
@@ -161,6 +162,18 @@ export class AdminFinanceService {
         _sum: { tradeFeeAmount: true },
       }),
       this.serviceVatRate(),
+      // ÖNE ÇIKARMA (boost) geliri (dönem): BST- sanal siparişleri komisyon
+      // defterinde görünmez — buradan gelmezse boost cirosu hiçbir finans
+      // raporunda toplanmıyordu (yalnız satır listesi + eLogo faturaları).
+      this.prisma.order.aggregate({
+        where: {
+          orderNumber: { startsWith: "BST-" },
+          status: OrderStatus.completed,
+          createdAt,
+        },
+        _sum: { totalAmount: true },
+        _count: { id: true },
+      }),
     ]);
 
     const round2 = (n: number) => Math.round(n * 100) / 100;
@@ -186,6 +199,11 @@ export class AdminFinanceService {
         tradeFeeRevenueNet: tradeFeeNet,
         /** Taraflardan tahsil edilen ücret (KDV dahil). */
         tradeFeeCollected: round2(tradeFeeGross),
+        /** Öne çıkarma (boost) satışları — tahsil edilen brüt (KDV dahil). */
+        boostRevenueCollected: round2(
+          Number(boostOrders._sum.totalAmount ?? 0),
+        ),
+        boostRevenueCount: boostOrders._count.id,
         pspFeeTotal,
         platformNetAfterPsp: round2(revenueNet - pspFeeTotal),
       },

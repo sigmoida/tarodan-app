@@ -2,6 +2,8 @@ import { Injectable, Logger } from "@nestjs/common";
 import { ModuleRef } from "@nestjs/core";
 import { PrismaService } from "../../prisma";
 import { ShipmentStatus, TradeStatus, PaymentStatus } from "@prisma/client";
+import { NotificationService } from "../notification/notification.service";
+import { NotificationType } from "../notification/dto";
 import { ElogoInvoicingService } from "../elogo/elogo-invoicing.service";
 import type { SuratTakipGonderi } from "./surat-cargo.types";
 import {
@@ -10,12 +12,15 @@ import {
 } from "./surat-status.mapper";
 import { canTransitionShipmentStatus } from "../shipping/shipment-state-machine";
 import { TRADE_VALID_TRANSITIONS } from "../trade/trade.state-machine";
+import { startTradeConfirmationWindowIfDelivered } from "../../common/helpers/trade-escrow";
+import { finalizeReturningTradeIfResolved } from "../../common/helpers/trade-return-finalize";
 import { SuratTrackingClient } from "./surat-tracking.client";
 
 /**
  * TradeTrackingSyncService (Faz 11.3a): takas bacaklarının (TradeShipment) Sürat
  * takip senkronizasyonu — durum çekme, TradeShipmentEvent üretimi, depoya-varış
- * kilidi ve iki bacak teslim olunca at_warehouse geçişi.
+ * kilidi, iki giriş bacağı teslim olunca at_warehouse geçişi ve iki ÇIKIŞ
+ * bacağı teslim olunca escrow onay penceresinin başlatılması.
  */
 @Injectable()
 export class TradeTrackingSyncService {
@@ -144,7 +149,17 @@ export class TradeTrackingSyncService {
       return "ignored";
     }
 
-    await this.syncTradeShipmentEvents(tradeShipment.id, gonderi);
+    // Best-effort hareket geçmişi: CAS'li durum yazımı yukarıda commit oldu;
+    // delivered'a geçen bacak bir daha pollanmayacağı için buradaki bir hata
+    // aşağıdaki tek seferlik geçiş yan etkilerini (at_warehouse / onay
+    // penceresi) sonsuza dek atlatmamalı.
+    try {
+      await this.syncTradeShipmentEvents(tradeShipment.id, gonderi);
+    } catch (err: any) {
+      this.logger.error(
+        `TradeShipment ${tradeShipment.id}: hareket senkronu başarısız (durum yazıldı, devam): ${err?.message}`,
+      );
+    }
 
     if (firstPhysicalHandoff) {
       const recipientId =
@@ -184,6 +199,77 @@ export class TradeTrackingSyncService {
       // semantik) — sonra iki bacak da teslimse at_warehouse'a geçir.
       await this.maybeLockTradeCancelOnArrival(tradeShipment.tradeId);
       await this.maybeTransitionTradeToAtWarehouse(tradeShipment.tradeId);
+    }
+
+    // Çıkış bacağı (depo → kullanıcı) teslim edildi: İKİ koli de teslim
+    // olduysa onay/itiraz penceresini başlat. Escrow saati buradan işler —
+    // kargoya veriliş anından değil, teslimattan.
+    //
+    // try/catch ŞART: delivered CAS'i yukarıda çoktan commit oldu ve delivered
+    // bacak bir daha POLLANMAZ (syncAllActiveTradeShipments terminal durumları
+    // eler). Buradaki geçici bir hata fırlarsa pencere hiç kurulmadan kalırdı.
+    // Loglayıp yutuyoruz; kalıcı ağ = reconciliation cron'daki
+    // startPendingTradeConfirmationWindows taraması, pencereyi kalıcı
+    // deliveredAt değerlerinden kurar.
+    if (isDelivered && tradeShipment.leg === "from_warehouse") {
+      try {
+        const startedAt = await startTradeConfirmationWindowIfDelivered(
+          this.prisma,
+          tradeShipment.tradeId,
+        );
+        if (startedAt) {
+          this.logger.log(
+            `Trade ${tradeShipment.tradeId}: tüm çıkış kolileri teslim edildi, ` +
+              `onay penceresi ${startedAt.toISOString()} tarihine kuruldu`,
+          );
+        }
+      } catch (err: any) {
+        this.logger.error(
+          `Trade ${tradeShipment.tradeId}: onay penceresi kurulamadı (sweep telafi eder): ${err?.message}`,
+        );
+      }
+    }
+
+    // İade bacağı (depo → asıl sahip) teslim edildi: var olan iade bacaklarının
+    // TAMAMI çözüldüyse takası kapat (rezervasyonlar çözülür, takas cancelled).
+    // Bu tetik olmadan poll teslimi yazıyor ama takas returning'de KALICI
+    // takılıyordu: delivered bacak bir daha pollanmaz, admin mark-return-
+    // delivered ise bacağı "zaten teslim edilmiş" bulurdu. try/catch ŞART
+    // (yukarıdaki pencere kurulumuyla aynı gerekçe); kalıcı hata halinde admin
+    // mark-return-delivered onarım yolu aynı çekirdeği yeniden çalıştırır.
+    if (isDelivered && tradeShipment.leg === "return") {
+      try {
+        const finalize = await this.prisma.$transaction(async (tx) => {
+          await tx.$queryRaw`SELECT id FROM trades WHERE id = ${tradeShipment.tradeId} FOR UPDATE`;
+          return finalizeReturningTradeIfResolved(tx, tradeShipment.tradeId);
+        });
+        if (finalize.finalized) {
+          this.logger.log(
+            `Trade ${tradeShipment.tradeId}: tüm iade bacakları çözüldü, takas kapatıldı (poll)`,
+          );
+          if (finalize.initiatorId && finalize.receiverId) {
+            try {
+              const { EventService } = await import("../events/event.service");
+              const eventService = this.moduleRef.get(EventService, {
+                strict: false,
+              });
+              await eventService?.emitTradeReturnCompleted({
+                tradeId: tradeShipment.tradeId,
+                initiatorId: finalize.initiatorId,
+                receiverId: finalize.receiverId,
+              });
+            } catch (e: any) {
+              this.logger.warn(
+                `emit trade.return-completed failed (poll) for ${tradeShipment.tradeId}: ${e?.message}`,
+              );
+            }
+          }
+        }
+      } catch (err: any) {
+        this.logger.error(
+          `Trade ${tradeShipment.tradeId}: iade kapanışı yapılamadı (admin mark-return-delivered onarır): ${err?.message}`,
+        );
+      }
     }
 
     this.logger.log(
@@ -426,6 +512,41 @@ export class TradeTrackingSyncService {
     // v2'de taraf başına bir satır vardır → HER tamamlanmış satır kendi faturasını doğurur.
     // Post-commit, non-blocking, idempotent (cut() type+sourceId tekil).
     if (!transitioned) return;
+
+    // Taraflara "ürünler depoda" bildirimi (admin manuel yolu ile aynı mesaj).
+    // moduleRef ile lazy çözülür: bu servis bildirim modülüne statik bağımlı
+    // olmasın (fatura tetiği ile aynı desen). Best-effort.
+    try {
+      const parties = await this.prisma.trade.findUnique({
+        where: { id: tradeId },
+        select: { initiatorId: true, receiverId: true },
+      });
+      if (parties) {
+        const notifications = this.moduleRef.get(NotificationService, {
+          strict: false,
+        });
+        for (const userId of [parties.initiatorId, parties.receiverId]) {
+          await notifications
+            .createInAppNotification(
+              userId,
+              NotificationType.TRADE_AT_WAREHOUSE,
+              {
+                tradeId,
+              },
+            )
+            .catch((e: any) =>
+              this.logger.warn(
+                `TRADE_AT_WAREHOUSE notify failed trade=${tradeId} user=${userId}: ${e?.message}`,
+              ),
+            );
+        }
+      }
+    } catch (e: any) {
+      this.logger.warn(
+        `TRADE_AT_WAREHOUSE notify skipped for trade ${tradeId}: ${e?.message}`,
+      );
+    }
+
     try {
       const tcps = await this.prisma.tradeCashPayment.findMany({
         where: { tradeId, status: PaymentStatus.completed },

@@ -1,4 +1,4 @@
-import { resolveSalePrice } from "./product-sale-window";
+import { boostTierBasePrice, resolveSalePrice } from "./product-sale-window";
 
 /**
  * İndirim penceresi TAHSİLATI da bağlar.
@@ -82,5 +82,24 @@ describe("indirim penceresi", () => {
       resolveSalePrice({ price: 70, oldPrice: 100, saleEndDate: "bozuk" }, now)
         .isOnSale,
     ).toBe(true);
+  });
+});
+
+/**
+ * Boost kademe tabanı LİSTE fiyatıdır — resolveSalePrice'tan bilinçli bağımsız.
+ * İndirim penceresi açıkken bile kademe indirim ÖNCESİ fiyattan eşleşir:
+ * satıcı indirim açarak daha ucuz boost kademesine kayamaz.
+ */
+describe("boostTierBasePrice", () => {
+  it("indirimli üründe liste (oldPrice) fiyatını döner — pencere açık olsa bile", () => {
+    expect(boostTierBasePrice({ price: 1920, oldPrice: 2400 })).toBe(2400);
+  });
+
+  it("indirimsiz üründe price zaten liste fiyatıdır", () => {
+    expect(boostTierBasePrice({ price: 2400, oldPrice: null })).toBe(2400);
+  });
+
+  it("bozuk veri (oldPrice <= price) liste fiyatı sayılmaz", () => {
+    expect(boostTierBasePrice({ price: 2400, oldPrice: 1000 })).toBe(2400);
   });
 });

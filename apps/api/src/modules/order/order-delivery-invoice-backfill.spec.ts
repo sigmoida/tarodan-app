@@ -33,6 +33,8 @@ describe("OrderSchedulerService.runProcessDeliveredOrders — invoice candidate 
       { issueTradeCashFeeInvoice: jest.fn() } as any,
       // Satıcı ürün faturası taraması bu senaryonun konusu değil.
       { remindMissing: async () => ({ missing: 0, reminded: 0 }) } as any,
+      { createInAppNotification: jest.fn() } as any,
+      { get: jest.fn(), set: jest.fn() } as any,
       {} as any,
     );
     return { service, prisma };

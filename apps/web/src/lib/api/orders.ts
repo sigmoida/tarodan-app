@@ -175,6 +175,13 @@ export const ordersApi = {
   ) => api.patch(`/orders/${id}/shipping-address`, data),
   trackGuest: (data: { orderNumber: string; email: string }) =>
     api.post("/orders/guest/track", data),
+  /** Misafir iptali (kargo öncesi): takip ucuyla aynı doğrulama, üye iptaliyle aynı komut. */
+  cancelGuest: (data: {
+    orderNumber: string;
+    email: string;
+    reasonCode?: OrderCancellationReason;
+    reason?: string;
+  }) => api.post("/orders/guest/cancel", data),
   /** Checkout quote (pricing breakdown). Use for order summary; same logic as order create. */
   getQuote: (data: {
     items: Array<{ productId: string; quantity?: number }>;
@@ -229,7 +236,6 @@ export const refundsApi = {
     },
   ) => api.post(`/orders/${orderId}/refund-requests`, body),
   myRequests: () => api.get("/refund-requests/me"),
-  sellerRequests: () => api.get("/refund-requests/seller"),
   getById: (id: string) => api.get(`/refund-requests/${id}`),
   cancel: (id: string) => api.post(`/refund-requests/${id}/cancel`),
 };

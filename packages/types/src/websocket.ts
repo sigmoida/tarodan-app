@@ -42,23 +42,24 @@ export interface NotificationNewEvent {
 export interface TypingEvent {
   threadId: string;
   userId: string;
+  /** Herkese açık ad (bkz. PublicIdentity) — gerçek ad değil. */
   displayName?: string;
 }
 
 export interface ServerToClientEvents {
-  'message:new': (payload: MessageNewEvent) => void;
-  'thread:updated': (payload: ThreadUpdatedEvent) => void;
-  'message:read': (payload: MessageReadEvent) => void;
-  'notification:new': (payload: NotificationNewEvent) => void;
-  'typing:started': (payload: TypingEvent) => void;
-  'typing:stopped': (payload: TypingEvent) => void;
+  "message:new": (payload: MessageNewEvent) => void;
+  "thread:updated": (payload: ThreadUpdatedEvent) => void;
+  "message:read": (payload: MessageReadEvent) => void;
+  "notification:new": (payload: NotificationNewEvent) => void;
+  "typing:started": (payload: TypingEvent) => void;
+  "typing:stopped": (payload: TypingEvent) => void;
   connected: (payload: { userId: string }) => void;
   error: (payload: { message: string }) => void;
 }
 
 export interface ClientToServerEvents {
-  'join:thread': (data: { threadId: string }) => void;
-  'leave:thread': (data: { threadId: string }) => void;
-  'typing:start': (data: { threadId: string }) => void;
-  'typing:stop': (data: { threadId: string }) => void;
+  "join:thread": (data: { threadId: string }) => void;
+  "leave:thread": (data: { threadId: string }) => void;
+  "typing:start": (data: { threadId: string }) => void;
+  "typing:stop": (data: { threadId: string }) => void;
 }

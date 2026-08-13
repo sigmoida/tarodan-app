@@ -51,10 +51,6 @@ import { Public } from "../auth/decorators/public.decorator";
 import { AdminRole } from "@prisma/client";
 import { ForceCompleteOrderDto, ExtendConfirmationDto } from "../order/dto";
 import {
-  OverrideRefundPolicyDto,
-  SetReturnShippingPayerDto,
-} from "../refund/dto";
-import {
   CreateCommissionRuleDto,
   UpdateCommissionRuleDto,
   CommissionRuleResponseDto,
@@ -142,19 +138,10 @@ export class AdminTradeController {
     return this.adminService.getTradeById(id);
   }
 
-  @Post("trades/:id/resolve")
-  @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
-  @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: "Resolve trade dispute or cancel trade" })
-  @ApiParam({ name: "id", description: "Trade ID" })
-  @ApiResponse({ status: HttpStatus.OK, description: "Trade resolved" })
-  async resolveTrade(
-    @Param("id") id: string,
-    @CurrentUser("id") adminId: string,
-    @Body() body: { resolution: string; note?: string },
-  ) {
-    return this.adminService.resolveTrade(adminId, id, body);
-  }
+  // NOT: Eski POST trades/:id/resolve ucu KALDIRILDI. İadesiz iptal ediyor,
+  // reservedQuantity düşmeden ürünleri aktifliyor ve durum makinesi tanımıyordu;
+  // hiçbir istemci de kullanmıyordu. İtiraz çözümü: POST /trades/:id/resolve-dispute,
+  // takılı takas: force-cancel-stuck, depo reddi: reject.
 
   // -------- Safe-trade (warehouse escrow) admin actions --------
 
@@ -181,6 +168,54 @@ export class AdminTradeController {
       id,
       body.shipmentId,
     );
+  }
+
+  @Post("trades/:id/mark-outbound-delivered")
+  @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary:
+      "Mark an outgoing (from_warehouse) shipment as delivered to its recipient",
+    description:
+      "Ops fallback when the carrier never reports delivery. Once both outbound legs are delivered the escrow confirmation window starts from that moment.",
+  })
+  @ApiParam({ name: "id", description: "Trade ID" })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description:
+      "Shipment marked delivered; confirmation window started when both legs are delivered",
+  })
+  async markOutboundDelivered(
+    @Param("id") id: string,
+    @CurrentUser("id") adminId: string,
+    @Body() body: MarkShipmentDto,
+  ) {
+    return this.adminService.markOutboundDelivered(
+      adminId,
+      id,
+      body.shipmentId,
+      body.note,
+    );
+  }
+
+  @Post("trades/:id/start-review")
+  @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary:
+      "Take a warehouse-arrived trade into inspection (at_warehouse -> admin_reviewing)",
+  })
+  @ApiParam({ name: "id", description: "Trade ID" })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description:
+      "Trade moved to admin_reviewing; reviewer recorded in audit log",
+  })
+  async startWarehouseReview(
+    @Param("id") id: string,
+    @CurrentUser("id") adminId: string,
+  ) {
+    return this.adminService.startWarehouseReview(adminId, id);
   }
 
   @Post("trades/:id/approve")

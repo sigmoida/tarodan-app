@@ -94,22 +94,30 @@ describe("refund financial policy v2", () => {
     },
   );
 
-  it("charges a seller-fault partial return the complete original package only once", () => {
-    const first = calculateRefundFinancialsV2({
+  it("defers outbound shipping to the line-completing refund and settles the package once", () => {
+    // K7: kısmi iade gidiş kargosuna DOKUNMAZ — koli kalan teslim adetlere
+    // hizmet etmiştir (v1'deki tazmin ilkesiyle aynı).
+    const partial = calculateRefundFinancialsV2({
       ...base,
       faultParty: "seller",
       orderQuantity: 2,
       refundQuantity: 1,
     });
-    const second = calculateRefundFinancialsV2({
-      ...base,
-      faultParty: "seller",
-      orderQuantity: 2,
-      refundQuantity: 1,
-      outboundAlreadySettled: true,
-    });
+    expect(
+      partial.components.some((c) => c.componentCode === "outbound_shipping"),
+    ).toBe(false);
+    expect(partial.outboundSettlementRequired).toBe(false);
 
-    expect(first.components).toEqual(
+    // Satırı (önceki iadelerle birlikte) TAMAMLAYAN talep, kargo bileşenlerini
+    // tam koli üzerinden tek seferde üretir.
+    const completing = calculateRefundFinancialsV2({
+      ...base,
+      faultParty: "seller",
+      orderQuantity: 2,
+      refundQuantity: 1,
+      completesLine: true,
+    });
+    expect(completing.components).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
           componentCode: "outbound_shipping",
@@ -125,15 +133,107 @@ describe("refund financial policy v2", () => {
         }),
       ]),
     );
-    expect(first.outboundSettlementRequired).toBe(true);
+    expect(completing.outboundSettlementRequired).toBe(true);
+
+    // Koli mutabakatı tek seferliktir: mutabakat düştükten sonra tekrar üretilmez.
+    const afterSettled = calculateRefundFinancialsV2({
+      ...base,
+      faultParty: "seller",
+      orderQuantity: 2,
+      refundQuantity: 1,
+      completesLine: true,
+      outboundAlreadySettled: true,
+    });
     expect(
-      second.components.some(
+      afterSettled.components.some(
         (c) =>
           c.componentCode === "outbound_shipping" &&
           c.treatment === "seller_charge",
       ),
     ).toBe(false);
-    expect(second.outboundSettlementRequired).toBe(false);
+    expect(afterSettled.outboundSettlementRequired).toBe(false);
+  });
+
+  describe("paket kargosu PAKET başına bir kez iade edilir", () => {
+    // Aynı satıcıdan iki satırlık sepet = TEK koli, TEK kargo bedeli. Satır
+    // tamamlansa bile kardeş satır hâlâ gidiyorsa kargo iade edilmez; yoksa
+    // her satır iptalinde aynı koli bedeli yeniden iade edilirdi.
+    const outbound = (result: ReturnType<typeof calculateRefundFinancialsV2>) =>
+      result.components.filter((c) => c.componentCode === "outbound_shipping");
+
+    it("kardeş satır hâlâ gidiyorsa gidiş kargosu ÜRETİLMEZ (kargo öncesi iptal)", () => {
+      const result = calculateRefundFinancialsV2({
+        ...base,
+        faultParty: "buyer",
+        hasShipped: false,
+        completesLine: true,
+        closesPackageShipping: false,
+      });
+
+      expect(outbound(result)).toHaveLength(0);
+      expect(result.outboundSettlementRequired).toBe(false);
+    });
+
+    it("paketi KAPATAN iptal kargoyu bir kez iade eder ve mutabakat ister", () => {
+      const result = calculateRefundFinancialsV2({
+        ...base,
+        faultParty: "buyer",
+        hasShipped: false,
+        completesLine: true,
+        closesPackageShipping: true,
+      });
+
+      expect(outbound(result)).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ treatment: "buyer_refund", netAmount: 60 }),
+          expect.objectContaining({
+            treatment: "seller_refund",
+            netAmount: 40,
+          }),
+        ]),
+      );
+      // Kargo öncesi yolda da TEK SEFERLİK koli mutabakatı yazılır — eskiden
+      // yazılmadığı için ikinci iptal kargoyu yeniden iade ettirebiliyordu.
+      expect(result.outboundSettlementRequired).toBe(true);
+    });
+
+    it("mutabakat düşmüşse ikinci iptal kargoyu TEKRAR iade etmez", () => {
+      const result = calculateRefundFinancialsV2({
+        ...base,
+        faultParty: "buyer",
+        hasShipped: false,
+        completesLine: true,
+        closesPackageShipping: true,
+        outboundAlreadySettled: true,
+      });
+
+      expect(outbound(result)).toHaveLength(0);
+      expect(result.outboundSettlementRequired).toBe(false);
+    });
+
+    it("kargolanmış pakette de kardeş satır varsa gidiş kargosu üretilmez", () => {
+      const result = calculateRefundFinancialsV2({
+        ...base,
+        faultParty: "seller",
+        hasShipped: true,
+        completesLine: true,
+        closesPackageShipping: false,
+      });
+
+      expect(outbound(result)).toHaveLength(0);
+      expect(result.outboundSettlementRequired).toBe(false);
+    });
+
+    it("paket alanı verilmezse davranış completesLine ile aynıdır (tek satırlık sipariş)", () => {
+      const result = calculateRefundFinancialsV2({
+        ...base,
+        faultParty: "buyer",
+        hasShipped: false,
+        completesLine: true,
+      });
+
+      expect(outbound(result).length).toBeGreaterThan(0);
+    });
   });
 
   it.each([0, 10, 20])(

@@ -6,6 +6,7 @@ export interface FollowedUser {
   createdAt: string;
   following: {
     id: string;
+    publicName?: string;
     displayName: string;
     avatarUrl?: string;
     bio?: string;

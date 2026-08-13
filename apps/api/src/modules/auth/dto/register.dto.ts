@@ -13,6 +13,12 @@ import {
   ValidationArguments,
 } from "class-validator";
 import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
+import { IsTrPhone } from "../../../common/validators/tr-phone";
+import {
+  USERNAME_MAX_LENGTH,
+  USERNAME_MIN_LENGTH,
+  USERNAME_PATTERN,
+} from "../username.util";
 
 // Custom validator for 18+ age check
 @ValidatorConstraint({ name: "isAdult", async: false })
@@ -47,9 +53,13 @@ export class RegisterDto {
       "Immutable public username (3-30 chars, lowercase letters, numbers, dot or underscore)",
   })
   @IsString()
-  @MinLength(3, { message: "Kullanıcı adı en az 3 karakter olmalıdır" })
-  @MaxLength(30, { message: "Kullanıcı adı en fazla 30 karakter olabilir" })
-  @Matches(/^[a-z0-9](?:[a-z0-9._]*[a-z0-9])?$/, {
+  @MinLength(USERNAME_MIN_LENGTH, {
+    message: "Kullanıcı adı en az 3 karakter olmalıdır",
+  })
+  @MaxLength(USERNAME_MAX_LENGTH, {
+    message: "Kullanıcı adı en fazla 30 karakter olabilir",
+  })
+  @Matches(USERNAME_PATTERN, {
     message: "Kullanıcı adı küçük harf, rakam, nokta veya alt çizgi içerebilir",
   })
   username: string;
@@ -67,6 +77,7 @@ export class RegisterDto {
   })
   @IsOptional()
   @IsString()
+  @IsTrPhone()
   phone?: string;
 
   @ApiProperty({

@@ -21,6 +21,7 @@ import {
 } from "../membership/membership.util";
 import { getFreeTierCanTrade } from "../membership/free-tier-trade.helper";
 import { ProductCommonService } from "./product-common.service";
+import { PUBLIC_IDENTITY_SELECT } from "../../common/helpers/public-identity";
 import { buildProductEditProjection } from "./product-edit-projection";
 
 /**
@@ -178,13 +179,7 @@ export class ProductQueryService {
       include: {
         images: { orderBy: { sortOrder: "asc" }, take: 1 },
         seller: {
-          select: {
-            id: true,
-            displayName: true,
-            isVerified: true,
-            sellerType: true,
-            avatarUrl: true,
-          },
+          select: PUBLIC_IDENTITY_SELECT,
         },
         category: { select: { id: true, name: true, slug: true } },
         brand: { select: { id: true, name: true, slug: true, logo: true } },
@@ -287,13 +282,7 @@ export class ProductQueryService {
       include: {
         images: { orderBy: { sortOrder: "asc" }, take: 1 },
         seller: {
-          select: {
-            id: true,
-            displayName: true,
-            avatarUrl: true,
-            isVerified: true,
-            sellerType: true,
-          },
+          select: PUBLIC_IDENTITY_SELECT,
         },
         category: { select: { id: true, name: true, slug: true } },
         brand: { select: { id: true, name: true, slug: true, logo: true } },
@@ -502,13 +491,7 @@ export class ProductQueryService {
     const productInclude = {
       images: { orderBy: { sortOrder: "asc" as const }, take: 1 },
       seller: {
-        select: {
-          id: true,
-          displayName: true,
-          isVerified: true,
-          sellerType: true,
-          avatarUrl: true,
-        },
+        select: PUBLIC_IDENTITY_SELECT,
       },
       category: { select: { id: true, name: true, slug: true } },
       brand: { select: { id: true, name: true, slug: true, logo: true } },
@@ -610,13 +593,7 @@ export class ProductQueryService {
           include: {
             images: { orderBy: { sortOrder: "asc" } },
             seller: {
-              select: {
-                id: true,
-                displayName: true,
-                avatarUrl: true,
-                isVerified: true,
-                sellerType: true,
-              },
+              select: PUBLIC_IDENTITY_SELECT,
             },
             category: {
               select: {
@@ -689,13 +666,7 @@ export class ProductQueryService {
       include: {
         images: { orderBy: { sortOrder: "asc" } },
         seller: {
-          select: {
-            id: true,
-            displayName: true,
-            avatarUrl: true,
-            isVerified: true,
-            sellerType: true,
-          },
+          select: PUBLIC_IDENTITY_SELECT,
         },
         category: {
           select: {
@@ -786,12 +757,7 @@ export class ProductQueryService {
       include: {
         images: { orderBy: { sortOrder: "asc" }, take: 1 },
         seller: {
-          select: {
-            id: true,
-            displayName: true,
-            isVerified: true,
-            sellerType: true,
-          },
+          select: PUBLIC_IDENTITY_SELECT,
         },
         category: { select: { id: true, name: true, slug: true } },
         brand: { select: { id: true, name: true, slug: true, logo: true } },
@@ -819,13 +785,7 @@ export class ProductQueryService {
       include: {
         images: { orderBy: { sortOrder: "asc" } },
         seller: {
-          select: {
-            id: true,
-            displayName: true,
-            avatarUrl: true,
-            isVerified: true,
-            sellerType: true,
-          },
+          select: PUBLIC_IDENTITY_SELECT,
         },
         category: {
           select: {

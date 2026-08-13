@@ -335,9 +335,10 @@ export class AdminRefundService {
     if (rr.refundedAt) {
       throw new BadRequestException("Bu iade zaten tamamlanmış");
     }
-    if (rr.status !== "return_delivered") {
+    // O3: disputed da finalize edilebilir — admin itirazı alıcı lehine kapatır.
+    if (rr.status !== "return_delivered" && rr.status !== "disputed") {
       throw new BadRequestException(
-        `Talep durumu '${rr.status}' force-finalize için uygun değil. Beklenen: return_delivered`,
+        `Talep durumu '${rr.status}' force-finalize için uygun değil. Beklenen: return_delivered veya disputed`,
       );
     }
     const result = await this.refundService.finalizeRefundForReturnedShipment(
@@ -352,6 +353,40 @@ export class AdminRefundService {
       { newStatus: result.status, providerRefundId: result.providerRefundId },
     );
     return { success: true, refundRequestId: rr.id, status: result.status };
+  }
+
+  /**
+   * O3: Satıcı inceleme penceresinde (return_in_transit/return_delivered)
+   * itiraz — 24 saatlik otomatik finalize durur. Çözüm: force-finalize
+   * (alıcıya iade) veya close (iadesiz kapatma).
+   */
+  async markRefundDisputed(
+    adminId: string,
+    refundRequestId: string,
+    note: string,
+  ) {
+    const before = await this.prisma.refundRequest.findUnique({
+      where: { id: refundRequestId },
+      select: { status: true },
+    });
+    const result = await this.refundService.adminMarkRefundDisputed(
+      refundRequestId,
+      adminId,
+      note,
+    );
+    await this.audit.createRequiredAuditLog(
+      adminId,
+      "refund_marked_disputed",
+      "RefundRequest",
+      refundRequestId,
+      { previousStatus: before?.status ?? null },
+      { newStatus: result?.status ?? "disputed", note },
+    );
+    return {
+      success: true,
+      refundRequestId,
+      status: result?.status ?? "disputed",
+    };
   }
 
   /**
@@ -482,6 +517,11 @@ export class AdminRefundService {
       TradeStatus.returning,
       TradeStatus.cancelled,
       TradeStatus.disputed,
+      // compensate_* itiraz çözümleri takası COMPLETED bırakır; başarısız
+      // tazminat iadesi de marker yazar ve buradan yeniden denenebilmelidir.
+      // Completed takasta kapsamsız iade güvenlidir: satır bazlı niyet filtresi
+      // (holdReleaseAt=null) yalnız hâlâ iade borcu olan satırları iade eder.
+      TradeStatus.completed,
     ];
     if (!eligibleStatuses.includes(trade.status)) {
       throw new BadRequestException(

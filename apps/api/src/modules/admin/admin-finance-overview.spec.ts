@@ -39,7 +39,13 @@ describe("AdminFinanceService.getFinanceOverview", () => {
           },
         }),
       },
-      order: { count: jest.fn().mockResolvedValue(4) }, // faturasız teslimat
+      order: {
+        count: jest.fn().mockResolvedValue(4), // faturasız teslimat
+        // Boost (BST-) ciro toplamı — bu spec'in konusu değil, 0 döner.
+        aggregate: jest
+          .fn()
+          .mockResolvedValue({ _sum: { totalAmount: 0 }, _count: { id: 0 } }),
+      },
       elogoInvoice: { count: jest.fn().mockResolvedValue(1) }, // tükenen
       // Dönemin GERÇEK PSP kesintisi: defterdeki psp_fee debit toplamı
       // (PayTR ekstresinden eşleştirilip yazılır) — tahmini oran DEĞİL.
@@ -87,6 +93,9 @@ describe("AdminFinanceService.getFinanceOverview", () => {
       // Ledger formülü (400−50)+(120−20)=450 + takas ücreti matrahı 100.
       platformRevenueNet: 550,
       tradeFeeRevenueNet: 100,
+      // Boost cirosu bu fixture'da 0 (BST- siparişi yok).
+      boostRevenueCollected: 0,
+      boostRevenueCount: 0,
       tradeFeeCollected: 120,
       // PSP kesintisi gelirin İÇİNDEN çıkar: hak ediş 550 − 30.
       pspFeeTotal: 30,

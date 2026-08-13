@@ -10,6 +10,7 @@ import TopCollections from "../sections/TopCollections";
 import TradeRail from "../sections/TradeRail";
 import TrustBadges from "../sections/TrustBadges";
 import HomeOnboardingTour from "./HomeOnboardingTour";
+import BannerSlot from "@/components/marketing/BannerSlot";
 
 export default function HomeContent({
   data,
@@ -31,6 +32,9 @@ export default function HomeContent({
     <PageShell>
       <HomeOnboardingTour hasProducts={hasProducts} />
       <HeroSlider />
+      {/* Admin'in tanımladığı afişler ve platform kampanya duyuruları. Yuva
+          boşsa hiçbir şey çizilmez. */}
+      <BannerSlot position="header" className="mt-4 space-y-3" />
       <BrandsMarquee items={data.marqueeItems} />
       <FeaturedRail items={data.featured} />
       <OnSaleRail items={data.discounted} />
@@ -41,6 +45,7 @@ export default function HomeContent({
         featuredCollector={featuredCollector}
         featuredBusiness={data.featuredBusiness}
       />
+      <BannerSlot position="footer" className="mt-8 space-y-3" />
       <TrustBadges locale={locale} />
     </PageShell>
   );

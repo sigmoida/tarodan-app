@@ -9,6 +9,7 @@ export interface Settings {
   tradePaymentHours: number;
   tradeShippingDays: number;
   tradeConfirmationDays: number;
+  tradeHoldDays: number;
   minProductPrice: number;
   maxProductPrice: number;
   maxMessageLength: number;
@@ -61,6 +62,11 @@ const FIELD_DEFS: Record<SettingsTab, FieldMeta[]> = {
       key: "tradeConfirmationDays",
       backendKey: "trade_confirmation_deadline_days",
     },
+    // Yalnız TAKAS escrow'unu etkiler (satış escrow'u teslim + iade penceresi +
+    // grace'tir, env'den gelir) — bu yüzden Takas sekmesinde durur. min 1:
+    // 0 gün, hold'u tamamlanma anında çökertip parayı beklemesiz açardı
+    // (backend resolveTradeEscrowDays de <1 değeri varsayılana düşürür).
+    { key: "tradeHoldDays", backendKey: "payment_hold_days", min: 1 },
   ],
   message: [
     { key: "maxMessageLength", backendKey: "max_message_length", min: 1 },
@@ -98,6 +104,10 @@ const FIELD_LABEL_KEYS = {
   tradeConfirmationDays: {
     label: "admin.settings.fields.tradeConfirmationDays.label",
     helper: "admin.settings.fields.tradeConfirmationDays.helper",
+  },
+  tradeHoldDays: {
+    label: "admin.settings.fields.tradeHoldDays.label",
+    helper: "admin.settings.fields.tradeHoldDays.helper",
   },
   maxMessageLength: {
     label: "admin.settings.fields.maxMessageLength.label",
@@ -149,6 +159,7 @@ const DEFAULTS: Settings = {
   tradePaymentHours: 48,
   tradeShippingDays: 7,
   tradeConfirmationDays: 3,
+  tradeHoldDays: 3,
   minProductPrice: 10,
   maxProductPrice: 100000,
   maxMessageLength: 1000,

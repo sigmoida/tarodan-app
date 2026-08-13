@@ -49,7 +49,7 @@ export default function RecentSalesSection({ sales }: { sales: RecentSale[] }) {
                 {sale.productTitle}
               </p>
               <p className="text-xs text-muted">
-                @{sale.buyerName} · {formatDate(sale.soldAt)}
+                {sale.buyerName} · {formatDate(sale.soldAt)}
               </p>
             </div>
             <span className="whitespace-nowrap text-sm font-bold text-success-600">

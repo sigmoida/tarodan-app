@@ -10,6 +10,7 @@ import {
 } from "class-validator";
 import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
 import { Type, Transform } from "class-transformer";
+import { IsTrPhone } from "../../../common/validators/tr-phone";
 
 class ShippingAddressDto {
   @IsString()
@@ -17,7 +18,7 @@ class ShippingAddressDto {
   fullName: string;
 
   @IsString()
-  @IsNotEmpty()
+  @IsTrPhone()
   phone: string;
 
   @IsString()

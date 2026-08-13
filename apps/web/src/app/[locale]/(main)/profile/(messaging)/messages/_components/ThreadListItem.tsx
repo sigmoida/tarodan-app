@@ -4,6 +4,7 @@ import { Badge } from "@tarodan/ui";
 import UserAvatar from "@/components/UserAvatar";
 import { useLocale, useTranslations } from "next-intl";
 import { getThreadPreview, type MessageThread } from "../_lib/messages";
+import { publicNameOf } from "@/lib/public-name";
 
 export default function ThreadListItem({
   thread,
@@ -33,7 +34,7 @@ export default function ThreadListItem({
       <div className="flex items-center gap-3 w-full min-w-0">
         <div className="relative flex-shrink-0">
           <UserAvatar
-            displayName={thread.otherUser?.displayName}
+            displayName={publicNameOf(thread.otherUser)}
             avatarUrl={thread.otherUser?.avatarUrl}
             size="sm"
             className="!w-11 !h-11"
@@ -45,7 +46,7 @@ export default function ThreadListItem({
         <div className="flex-1 min-w-0">
           <div className="flex items-center justify-between gap-2">
             <span className="font-medium text-heading truncate text-sm">
-              {thread.otherUser?.displayName || t("common.user")}
+              {publicNameOf(thread.otherUser, t("common.user"))}
             </span>
             {thread.unreadCount > 0 && (
               <Badge

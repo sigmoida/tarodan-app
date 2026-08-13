@@ -19,7 +19,7 @@ export async function generateMetadata({
   return {
     title: "Üyelik Planları · Tarodan",
     description:
-      "Tarodan üyelik planları: ilan limitleri, takas, koleksiyonlar, reklamsız deneyim ve öne çıkan ilanlar. Size uygun planı seçin.",
+      "Tarodan üyelik planları: ilan limitleri, takas, koleksiyonlar ve öne çıkan ilanlar. Size uygun planı seçin.",
     alternates: localizedCanonical(locale, "/membership"),
     openGraph: {
       title: "Üyelik Planları · Tarodan",

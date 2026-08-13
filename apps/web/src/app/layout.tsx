@@ -1,6 +1,7 @@
 /** @format */
 
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
+import { surface } from "@tarodan/design-tokens";
 import { ALLOW_INDEXING } from "@/lib/seo";
 
 export const metadata: Metadata = {
@@ -44,6 +45,21 @@ export const metadata: Metadata = {
   icons: {
     icon: "/tarodan-favicon.png",
   },
+};
+
+/**
+ * `only light` tells the browser the site ships a single, light-only theme, which
+ * is the documented opt-out from Android's algorithmic force-dark (Chrome's Auto
+ * Dark Theme, Samsung Internet, MIUI). Without it those browsers repaint our
+ * surfaces dark and invert text while leaving photos and brand colours alone —
+ * the "the site looks like dark mode on my phone" reports. The moment a real dark
+ * theme exists, this becomes `light dark`. `globals.css` declares the same thing
+ * in CSS so the root `not-found.tsx` shell (which renders above the locale
+ * layout, with its own `<html>`) is covered too.
+ */
+export const viewport: Viewport = {
+  colorScheme: "only light",
+  themeColor: surface.DEFAULT,
 };
 
 /**

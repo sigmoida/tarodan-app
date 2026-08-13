@@ -225,21 +225,10 @@ export default function PaymentSection({
                 </div>
                 <PhoneInput
                   label={`${t("address.phone")} *`}
-                  countryCode={splitPhone(newAddress.phone).countryCode}
-                  onCountryCodeChange={(code) =>
-                    setNewAddress((a) => ({
-                      ...a,
-                      phone: combinePhone(code, splitPhone(a.phone).national),
-                    }))
-                  }
                   phone={splitPhone(newAddress.phone).national}
                   onPhoneChange={(nat) =>
-                    setNewAddress((a) => ({
-                      ...a,
-                      phone: combinePhone(splitPhone(a.phone).countryCode, nat),
-                    }))
+                    setNewAddress((a) => ({ ...a, phone: combinePhone(nat) }))
                   }
-                  placeholder="5XX XXX XX XX"
                 />
               </div>
               <CityDistrictSelector

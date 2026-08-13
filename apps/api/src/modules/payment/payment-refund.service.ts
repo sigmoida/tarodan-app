@@ -22,6 +22,8 @@ import { PaymentProviderRegistry } from "../payment-providers/payment-provider.r
 import { PaymentProvider } from "./dto";
 import { EventService } from "../events";
 import { NotificationService } from "../notification/notification.service";
+import { CacheService } from "../cache/cache.service";
+import { DiscountService } from "../discount/discount.service";
 import { NotificationType } from "../notification/dto/notification.dto";
 import { CommissionLedgerService } from "../commission/commission-ledger.service";
 import { ElogoInvoicingService } from "../elogo";
@@ -31,13 +33,16 @@ import { OutboxService } from "../outbox/outbox.service";
 import {
   OUTBOX_SHIPMENT_CANCEL,
   OUTBOX_INVOICE_REFUND_REVERSE,
-  OUTBOX_INVOICE_TRADE_CASH_REFUND_REVERSE,
   OUTBOX_ORDER_REVENUE_INVOICE,
   type InvoiceRefundReversePayload,
   type OrderRevenueInvoicePayload,
 } from "../outbox/outbox.types";
 import { LedgerService } from "../ledger/ledger.service";
-import { MONEY_EPSILON } from "./payment.constants";
+import {
+  MONEY_EPSILON,
+  PAYMENT_CONFIG_KEYS,
+  resolvePaymentConfigNumber,
+} from "./payment.constants";
 import { i18nMessage } from "../i18n";
 import {
   ProviderRefundOutcomeUnknownException,
@@ -45,12 +50,16 @@ import {
   RefundPendingReconciliationException,
 } from "../payment-providers/refund-errors";
 import { tradePaymentRefundableAmountFor } from "../trade/trade-refund-policy";
+import {
+  PUBLIC_NAME_SELECT,
+  publicName,
+} from "../../common/helpers/public-identity";
 
 /**
  * İade / escrow serbest bırakma metodları — PaymentService'ten birebir taşındı
  * (facade-delege deseni). PaymentService aynı imzalarla buraya delege eder.
- * scheduleHoldReleaseOnDelivery hold penceresi hesabı için holdDays/returnWindowDays/
- * payoutGraceDays alanlarını KENDİ constructor'ında bayt-bayt aynı mantıkla yeniden üretir.
+ * scheduleHoldReleaseOnDelivery'nin pencere değerleri (returnWindowDays/payoutGraceDays)
+ * PAYMENT_CONFIG_KEYS'ten okunur — varsayılanlar orada tek kaynaktır.
  */
 /**
  * 11.4c — Kısmi iade ORANI (TEK otorite): hold tüketimi ve ledger pro-rate AYNI formülü
@@ -121,7 +130,6 @@ const OPEN_REFUND_STATUSES: RefundRequestStatus[] = [
 @Injectable()
 export class PaymentRefundService {
   private readonly logger = new Logger(PaymentRefundService.name);
-  private readonly holdDays: number;
   // Escrow yeni model: satıcıya ödeme TESLİMDEN sonra serbest bırakılır.
   // İade TALEP penceresi = teslim + returnWindowDays (14). Satıcı payout uygunluğu
   // = teslim + returnWindowDays + payoutGraceDays. Grace, iade penceresi kapandıktan
@@ -150,18 +158,22 @@ export class PaymentRefundService {
     // @Optional + best-effort — defter hatası iadeyi BOZMAZ; reconciliation açığı yakalar.
     @Optional()
     private readonly ledger?: LedgerService,
+    // Koli başına TEK bildirim için tekilleştirme anahtarı tutar. @Optional:
+    // birim testleri cache sağlamak zorunda kalmasın — yoksa duyuru yapılır
+    // (eksik bildirimdense fazlası yeğdir).
+    @Optional()
+    private readonly cache?: CacheService,
+    // İ25: bedel dahil TAM iadede takas kampanya bütçesi geri döner.
+    @Optional()
+    private readonly discountService?: DiscountService,
   ) {
-    this.holdDays = parseInt(
-      this.configService.get("PAYMENT_HOLD_DAYS") || "7",
-      10,
+    this.returnWindowDays = resolvePaymentConfigNumber(
+      this.configService,
+      PAYMENT_CONFIG_KEYS.RETURN_WINDOW_DAYS,
     );
-    this.returnWindowDays = parseInt(
-      this.configService.get("RETURN_WINDOW_DAYS") || "14",
-      10,
-    );
-    this.payoutGraceDays = parseInt(
-      this.configService.get("PAYOUT_GRACE_DAYS") || "1",
-      10,
+    this.payoutGraceDays = resolvePaymentConfigNumber(
+      this.configService,
+      PAYMENT_CONFIG_KEYS.PAYOUT_GRACE_DAYS,
     );
   }
 
@@ -412,8 +424,8 @@ export class PaymentRefundService {
       const order = await this.prisma.order.findUnique({
         where: { id: orderId },
         include: {
-          buyer: { select: { id: true, email: true, displayName: true } },
-          seller: { select: { id: true, email: true, displayName: true } },
+          buyer: { select: { id: true, email: true, ...PUBLIC_NAME_SELECT } },
+          seller: { select: { id: true, email: true, ...PUBLIC_NAME_SELECT } },
         },
       });
       // refund.service akışı kendi REFUND_COMPLETED (push+mail) bildirimini gönderiyor;
@@ -443,10 +455,10 @@ export class PaymentRefundService {
             orderNumber: order.orderNumber,
             buyerId: order.buyerId,
             buyerEmail: order.buyer.email,
-            buyerName: order.buyer.displayName || order.buyer.email,
+            buyerName: publicName(order.buyer),
             sellerId: order.sellerId,
             sellerEmail: order.seller.email,
-            sellerName: order.seller.displayName || order.seller.email,
+            sellerName: publicName(order.seller),
             refundAmount: amountToRefund,
             totalAmount: Number(payment.amount),
             provider: payment.provider,
@@ -1332,15 +1344,35 @@ export class PaymentRefundService {
    * v1 takaslarda tek satır vardır ve kargo kalemi 0 olduğundan davranış
    * değişmez (tam iade).
    */
-  async refundTradeCashPaymentIfCompleted(tradeId: string): Promise<{
+  async refundTradeCashPaymentIfCompleted(
+    tradeId: string,
+    opts?: { payerId?: string },
+  ): Promise<{
     refunded: boolean;
     paymentId?: string;
     skippedReason?: string;
   }> {
+    // COMPLETED takas guard'ı — SATIR bazlı niyet filtresi. İtiraz çözümü
+    // takası tamamlarken release EDİLECEK satırları holdReleaseAt ile damgalar;
+    // dolayısıyla completed bir takasta hâlâ iade borcu olan satırlar tam
+    // olarak damgasız (holdReleaseAt=null) kalanlardır. Kapsamsız bir çağrı
+    // (manuel iade, retry cron, reconciliation süpürmesi) completed takasta
+    // yalnız bu satırları iade eder: normal tamamlanmış takasta (confirmReceipt
+    // her satırı damgalar) güvenli no-op'tur, karşı tarafın escrow'u asla
+    // yanlışlıkla iade edilmez. Açık payerId kapsamı ise bilinçli admin
+    // niyetidir ve damga filtresine takılmaz.
+    const tradeRow = await this.prisma.trade.findUnique({
+      where: { id: tradeId },
+      select: { status: true },
+    });
+    const restrictToUnstamped =
+      tradeRow?.status === TradeStatus.completed && !opts?.payerId;
     const payments = await this.prisma.payment.findMany({
       where: {
         tradeCashPayment: {
           tradeId,
+          ...(opts?.payerId ? { payerId: opts.payerId } : {}),
+          ...(restrictToUnstamped ? { holdReleaseAt: null } : {}),
           // Escrow: sadece bırakılmamış ve daha önce iade edilmemiş olanlar
           releasedAt: null,
           refundedAt: null,
@@ -1369,18 +1401,29 @@ export class PaymentRefundService {
           refundedAt: payment.tradeCashPayment?.refundedAt,
           totalAmount: payment.tradeCashPayment?.totalAmount ?? payment.amount,
           shippingAmount: payment.tradeCashPayment?.shippingAmount ?? 0,
+          tradeFeeAmount: payment.tradeCashPayment?.tradeFeeAmount ?? 0,
+          commissionAmount: payment.tradeCashPayment?.commission ?? 0,
+          commissionTaxAmount:
+            payment.tradeCashPayment?.commissionTaxAmount ?? 0,
+          // Kusursuz taraf kararı iptali yazan yolda verilip satıra kaydedilir;
+          // retry cron'u da aynı tutarı hesaplasın diye buradan okunur.
+          fullRefundEntitled: payment.tradeCashPayment?.fullRefundEntitled,
         },
         { handedToCargo },
       );
       if (amount <= 0) {
-        // Ödenenin tamamı kargoya gitmiş (iade edilecek bakiye yok).
-        skippedReason = "shipping_not_refundable";
+        // Hizmet bedeli (+ kargoya verildiyse kargo) düşülünce iade edilecek
+        // bakiye kalmadı.
+        skippedReason = "nothing_refundable_after_fees";
         continue;
       }
       const result = await this.refundOneTradeCashPayment(
         payment,
         tradeId,
         amount,
+        // Kargo bedeli yalnız hiç kargolanmamış iptalde iadeye dahildir; defter
+        // ters kaydı da aynı sinyali kullanır.
+        { shippingRefunded: !handedToCargo },
       );
       if (result.refunded) {
         refundedPaymentId = refundedPaymentId ?? result.paymentId;
@@ -1420,6 +1463,7 @@ export class PaymentRefundService {
     payment: any,
     tradeId: string,
     amount: number,
+    opts?: { shippingRefunded?: boolean },
   ): Promise<{
     refunded: boolean;
     paymentId?: string;
@@ -1645,13 +1689,31 @@ export class PaymentRefundService {
               where: { id: payment.tradeCashPaymentId },
               data: { status: PaymentStatus.refunded, refundedAt: new Date() },
             });
-            // Faz 5.3 (outbox): eLogo takas-iade ters kaydını iade persist'iyle ATOMİK
-            // sıraya al (post-commit anlık tetik hızlı-yol kalır; handler idempotent).
-            await this.outbox?.enqueue(tx, {
-              type: OUTBOX_INVOICE_TRADE_CASH_REFUND_REVERSE,
-              payload: { tradeCashPaymentId: payment.tradeCashPaymentId },
-              dedupeKey: `${OUTBOX_INVOICE_TRADE_CASH_REFUND_REVERSE}:${payment.tradeCashPaymentId}`,
-            });
+            // NOT: eLogo ters kaydı artık SIRAYA ALINMAZ. Hizmet bedeli hiçbir
+            // iptalde iade edilmediği için platformun hizmet/komisyon e-Arşivi
+            // geçerli kalır; iade edilen kısım (kargo/nakit fark) faturalanan
+            // hizmet bedeli değildir. (Kuyruktaki eski mesajlar için handler
+            // korunur.)
+            // İ25: kusursuz tarafın TAM iadesi bedeli de kapsar → bedele
+            // verilmiş kampanya indirimi hiç "maliyet" olmadı; bütçesi geri
+            // döner. refundedAt geçişi tek seferlik olduğundan çift dönüş yok.
+            const tcp = payment.tradeCashPayment;
+            const feeDiscount = Number(tcp?.tradeFeeDiscountAmount ?? 0);
+            if (
+              tcp?.fullRefundEntitled &&
+              tcp?.tradeFeeCampaignId &&
+              feeDiscount > 0
+            ) {
+              await this.discountService?.releaseTradeFeeBudget(
+                [
+                  {
+                    discountId: tcp.tradeFeeCampaignId,
+                    amount: feeDiscount,
+                  },
+                ],
+                tx,
+              );
+            }
           }
           await tx.refundAttempt.update({
             where: { id: currentAttempt.id },
@@ -1699,11 +1761,10 @@ export class PaymentRefundService {
           recipientId: tcp?.recipientId,
           refundAmount: amount,
           escrowReversal: Math.min(netAmount, amount),
-          // İade tutarı kargoyu kapsıyorsa (tam iade) kargo da geri alınır.
-          shippingReversal:
-            amount >= Number(tcp?.totalAmount ?? 0) - 0.005
-              ? shippingAmount
-              : 0,
+          // Kargo ters kaydı, kargonun iadeye dahil olduğu sinyaline bağlıdır
+          // (hiç kargolanmamış iptal). Eski "amount == total" kıyası, hizmet
+          // bedeli artık hiç iade edilmediği için hiçbir zaman tutmazdı.
+          shippingReversal: opts?.shippingRefunded ? shippingAmount : 0,
         });
       } catch (e: any) {
         this.logger.warn(
@@ -1712,14 +1773,9 @@ export class PaymentRefundService {
       }
     }
 
-    // Takas komisyon e-Arşivini iptal et / iade faturası kes (post-commit, non-blocking).
-    if (payment.tradeCashPaymentId) {
-      void this.elogoInvoicing
-        .handleTradeCashRefund(payment.tradeCashPaymentId)
-        .catch((e) =>
-          this.logger.warn(`eLogo takas iade tetik hatası: ${e?.message}`),
-        );
-    }
+    // NOT: eLogo hizmet/komisyon e-Arşivi burada TERSLENMEZ — hizmet bedeli
+    // hiçbir iptalde iade edilmediği için fatura geçerli kalır (yalnız
+    // kargo/nakit fark iade edilir ve bunlar faturalanan hizmet bedeli değildir).
     return { refunded: true, paymentId: payment.id };
   }
 
@@ -1734,14 +1790,20 @@ export class PaymentRefundService {
    * commit edilmiştir; iade hatası iptali geri almaz (`rejectWarehouseTrade` ile
    * aynı felsefe). Çağıran, kullanıcıya sahte bir 500 döndürmek yerine sonucu okur.
    */
-  async refundTradeCashTracked(tradeId: string): Promise<{
+  async refundTradeCashTracked(
+    tradeId: string,
+    opts?: { payerId?: string },
+  ): Promise<{
     refunded: boolean;
     failed: boolean;
     skippedReason?: string;
     reason?: string;
   }> {
     try {
-      const result = await this.refundTradeCashPaymentIfCompleted(tradeId);
+      const result = await this.refundTradeCashPaymentIfCompleted(
+        tradeId,
+        opts,
+      );
       // Başarı (veya "iade edilecek tamamlanmış ödeme yok" no-op) → varsa eski
       // hata marker'ını temizle. Best-effort; iade zaten yapıldı.
       await this.prisma.trade
@@ -1752,13 +1814,23 @@ export class PaymentRefundService {
         .catch(() => {});
       if (result.refunded) {
         try {
-          const cashPayment = await this.prisma.tradeCashPayment.findFirst({
-            where: { tradeId },
-            select: { payerId: true },
-          });
+          // Bildirim GERÇEKTEN iade edilen tarafa gitmeli: kapsam verildiyse o
+          // taraf, yoksa iade edilen ödeme satırının sahibi. Kapsamsız
+          // findFirst, v2'nin iki-satırlı modelinde yanlış tarafa "iadeniz
+          // tamamlandı" bildirimi atabiliyordu.
+          const cashPayerId =
+            opts?.payerId ??
+            (result.paymentId
+              ? ((
+                  await this.prisma.tradeCashPayment.findFirst({
+                    where: { tradeId, payment: { id: result.paymentId } },
+                    select: { payerId: true },
+                  })
+                )?.payerId ?? null)
+              : null);
           await this.eventService.emitTradeRefundCompleted({
             tradeId,
-            cashPayerId: cashPayment?.payerId ?? null,
+            cashPayerId,
           });
         } catch (emitErr) {
           this.logger.error(
@@ -1792,13 +1864,22 @@ export class PaymentRefundService {
           ),
         );
       try {
-        const cashPayment = await this.prisma.tradeCashPayment.findFirst({
-          where: { tradeId },
-          select: { payerId: true },
-        });
+        // Kapsamlı iadede hata bildirimi o tarafa; kapsamsızda tek ödeme
+        // satırı varsa (v1) sahibi bellidir, iki satırlı v2'de taraf
+        // belirsizdir → null (yanlış tarafa "iade başarısız" bildirmektense
+        // kimseye kişisel bildirim atmamak doğrudur; admin marker'ı görür).
+        let cashPayerId: string | null = opts?.payerId ?? null;
+        if (!cashPayerId) {
+          const rows = await this.prisma.tradeCashPayment.findMany({
+            where: { tradeId },
+            select: { payerId: true },
+            take: 2,
+          });
+          cashPayerId = rows.length === 1 ? rows[0].payerId : null;
+        }
         await this.eventService.emitTradeRefundFailed({
           tradeId,
-          cashPayerId: cashPayment?.payerId ?? null,
+          cashPayerId,
           reason,
         });
       } catch (emitErr) {
@@ -1811,15 +1892,25 @@ export class PaymentRefundService {
   }
 
   /**
-   * Release held payment to seller
-   * Called when order is completed
+   * Release held payment to seller (admin manuel release yolu).
+   *
+   * `ignoreReleaseDate` (erken bırakma): yalnız TARİH şartını esnetir — sipariş
+   * yine teslim edilmiş/payout-uygun olmalı, açık iade olmamalı ve hold donuk
+   * olmamalı. Yani admin iade penceresi dolmadan parayı bilinçli olarak erken
+   * bırakabilir ama teslim edilmemiş ya da iadesi süren siparişte bırakamaz.
    */
-  async releasePayment(orderId: string) {
+  async releasePayment(
+    orderId: string,
+    opts?: { ignoreReleaseDate?: boolean },
+  ) {
     // H4: açık iade ile DONDURULMUŞ (frozenByRefundId dolu) bir hold ASLA serbest
     // bırakılamaz — aksi halde admin manuel release, açık iadeyle birlikte çift
     // kayba yol açar (satıcıya öde + alıcıya iade). releaseHoldsDue/releasePaymentIfHeld
     // ile aynı invaryant. Hem okuma hem güncelleme frozenByRefundId:null ile sınırlı.
     const now = new Date();
+    const releaseDateFilter = opts?.ignoreReleaseDate
+      ? {}
+      : { releaseAt: { lte: now } };
     const order = await this.prisma.order.findUnique({
       where: { id: orderId },
       select: {
@@ -1846,7 +1937,7 @@ export class PaymentRefundService {
         orderId,
         status: PaymentHoldStatus.held,
         frozenByRefundId: null,
-        releaseAt: { lte: now },
+        ...releaseDateFilter,
       },
     });
 
@@ -1863,7 +1954,7 @@ export class PaymentRefundService {
         id: hold.id,
         status: PaymentHoldStatus.held,
         frozenByRefundId: null,
-        releaseAt: { lte: now },
+        ...releaseDateFilter,
       },
       data: {
         status: PaymentHoldStatus.released,
@@ -1934,6 +2025,87 @@ export class PaymentRefundService {
    * Bildirim ÇAĞIRANDA kalır (metod acted + use48h + confirmationDeadline + buyerId döner)
    * ki teslim I/O'su alıcı bildirim çağrısını beklemesin ve mevcut çağıran davranışı korunsun.
    */
+  /**
+   * TESLİM DUYURUSU — post-commit, `handleOrderDelivered` acted=true döndüğünde
+   * çağrılır (poller, webhook, admin: hangisi teslimi ilk yazdıysa yalnız o).
+   *
+   * Teslim, alıcı için sürecin en kritik anıdır: 14 günlük iade hakkı ve satıcı
+   * ödemesinin saati o an başlar. Buna rağmen 48 saatlik onay penceresi bayrağı
+   * KAPALIYKEN (varsayılan) hiçbir bildirim gitmiyordu — `emitOrderDelivered` ve
+   * `ORDER_DELIVERED` şablonu tanımlı ama çağrısız duruyordu. Sessiz teslim,
+   * "kargom geldi mi, iade sürem başladı mı" bileti demektir.
+   *
+   * KOLİ BAŞINA TEK: bir koli birden çok sipariş satırı taşır (Shipment satırı
+   * sipariş başına). Paket kimliğiyle tekilleştirilir, aksi halde tek koli için
+   * kalem sayısı kadar bildirim gider.
+   */
+  async announceOrderDelivered(orderId: string): Promise<void> {
+    const order = await this.prisma.order.findUnique({
+      where: { id: orderId },
+      select: {
+        id: true,
+        orderNumber: true,
+        buyerId: true,
+        packageId: true,
+        buyer: { select: { email: true, ...PUBLIC_NAME_SELECT } },
+        seller: { select: { email: true, ...PUBLIC_NAME_SELECT } },
+      },
+    });
+    if (!order?.buyerId) return;
+
+    if (!(await this.claimPackageAnnouncement("delivered", order))) return;
+
+    try {
+      await this.notificationService.notifyOrderDelivered(
+        order.buyerId,
+        order.id,
+      );
+    } catch (e: any) {
+      this.logger.warn(
+        `notifyOrderDelivered failed for ${orderId}: ${e?.message}`,
+      );
+    }
+
+    try {
+      await this.eventService.emitOrderDelivered({
+        orderId: order.id,
+        orderNumber: order.orderNumber,
+        buyerEmail: order.buyer?.email ?? "",
+        sellerEmail: order.seller?.email ?? "",
+        buyerName: publicName(order.buyer),
+        sellerName: publicName(order.seller),
+      });
+    } catch (e: any) {
+      this.logger.warn(
+        `emitOrderDelivered failed for ${orderId}: ${e?.message}`,
+      );
+    }
+  }
+
+  /**
+   * Koli başına tek duyuru hakkı. Aynı koliye ait ilk sipariş satırı hakkı alır,
+   * kardeşleri sessiz kalır. Paketsiz (eski/manuel) siparişte sipariş kimliğiyle
+   * çalışır — davranış değişmez. Cache yoksa duyuru yapılır: eksik bildirimdense
+   * fazlası yeğdir.
+   */
+  async claimPackageAnnouncement(
+    kind: "shipped" | "delivered",
+    order: { id: string; packageId: string | null },
+  ): Promise<boolean> {
+    if (!this.cache) return true;
+    const scope = order.packageId
+      ? `pkg:${order.packageId}`
+      : `ord:${order.id}`;
+    const key = `notif:order-${kind}:${scope}`;
+    try {
+      if (await this.cache.get(key)) return false;
+      await this.cache.set(key, 1, { ttl: 7 * 24 * 3600 });
+    } catch {
+      return true;
+    }
+    return true;
+  }
+
   async handleOrderDelivered(
     orderId: string,
     deliveredAt: Date,

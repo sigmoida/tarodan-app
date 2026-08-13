@@ -18,19 +18,29 @@ describe("OrderSchedulerService — invoice staleness alarms", () => {
       reminded: 0,
     },
   ) => {
+    const stuckRows = Array.from(
+      { length: counts.stuckShipped },
+      (_, index) => ({
+        id: `order-${index}`,
+        orderNumber: `ORD-${index}`,
+        sellerId: "seller-1",
+        shipment: { shippedAt: new Date("2026-07-01T00:00:00.000Z") },
+      }),
+    );
     const prisma = {
       order: {
-        findMany: jest.fn().mockResolvedValue([]),
-        count: jest
+        // Takılı kargolar artık SAYI değil satır olarak çekilir (alarm sipariş
+        // numaralarını içerir + admin bildirimi gönderilir).
+        findMany: jest
           .fn()
           .mockImplementation(({ where }: any) =>
             Promise.resolve(
-              where?.status === OrderStatus.shipped
-                ? counts.stuckShipped
-                : counts.uninvoiced,
+              where?.status === OrderStatus.shipped ? stuckRows : [],
             ),
           ),
+        count: jest.fn().mockResolvedValue(counts.uninvoiced),
       },
+      adminUser: { findMany: jest.fn().mockResolvedValue([]) },
       elogoInvoice: { findMany: jest.fn().mockResolvedValue([]) },
       tradeCashPayment: { findMany: jest.fn().mockResolvedValue([]) },
     };
@@ -44,6 +54,8 @@ describe("OrderSchedulerService — invoice staleness alarms", () => {
       { get: () => undefined } as any,
       { issueTradeCashFeeInvoice: jest.fn() } as any,
       { remindMissing: async () => sellerInvoices } as any,
+      { createInAppNotification: jest.fn() } as any,
+      { get: jest.fn(), set: jest.fn() } as any,
       {} as any,
     );
     (service as any).logger = logger;
@@ -59,9 +71,12 @@ describe("OrderSchedulerService — invoice staleness alarms", () => {
     const result = await service.reportInvoiceStaleness();
 
     expect(result.stuckShipped).toBe(3);
+    // Alarm eyleme dönük olmalı: sipariş numaraları görünmeli (eskiden yalnız
+    // sayı vardı, admin hangi siparişi kurtaracağını bilemiyordu).
     expect(logger.error).toHaveBeenCalledWith(
       expect.stringContaining("ORDERS_STUCK_SHIPPED"),
     );
+    expect(logger.error).toHaveBeenCalledWith(expect.stringContaining("ORD-0"));
   });
 
   it("teslim edilip yasal süre içinde faturalanamayan siparişler alarm verir", async () => {

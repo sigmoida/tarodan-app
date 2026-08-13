@@ -181,37 +181,6 @@ export class AdminService {
     );
   }
 
-  // ---------- RefundRequest policy override (Faz 4B.1) ----------
-
-  async overrideRefundPolicy(
-    refundRequestId: string,
-    adminId: string,
-    payload: {
-      refundProductAmount?: boolean;
-      refundShippingFee?: boolean;
-      refundBuyerFee?: boolean;
-      refundSellerCommission?: boolean;
-    },
-  ) {
-    return this.refundService.overrideRefundPolicy(
-      refundRequestId,
-      adminId,
-      payload,
-    );
-  }
-
-  async setReturnShippingPayer(
-    refundRequestId: string,
-    adminId: string,
-    payer: "buyer" | "seller" | "platform",
-  ) {
-    return this.refundService.setReturnShippingPayer(
-      refundRequestId,
-      adminId,
-      payer,
-    );
-  }
-
   async approveRefundRequest(
     adminId: string,
     refundRequestId: string,
@@ -820,12 +789,27 @@ export class AdminService {
     return this.payoutService.getPayoutsExport(query);
   }
 
-  async releasePayout(adminId: string, orderId: string, reason?: string) {
-    return this.payoutService.releasePayout(adminId, orderId, reason);
+  async releasePayout(
+    adminId: string,
+    orderId: string,
+    reason?: string,
+    force = false,
+  ) {
+    return this.payoutService.releasePayout(adminId, orderId, reason, force);
   }
 
-  async releaseTradePaymentHold(adminId: string, tradeId: string) {
-    return this.payoutService.releaseTradePaymentHold(adminId, tradeId);
+  async releaseTradePaymentHold(
+    adminId: string,
+    tradeId: string,
+    reason?: string,
+    force = false,
+  ) {
+    return this.payoutService.releaseTradePaymentHold(
+      adminId,
+      tradeId,
+      reason,
+      force,
+    );
   }
 
   async retryPayoutTransfer(adminId: string, transferId: string) {
@@ -851,14 +835,6 @@ export class AdminService {
     return this.tradeService.getTradeById(tradeId);
   }
 
-  async resolveTrade(
-    adminId: string,
-    tradeId: string,
-    dto: { resolution: string; note?: string },
-  ) {
-    return this.tradeService.resolveTrade(adminId, tradeId, dto);
-  }
-
   async markWarehouseReceived(
     adminId: string,
     tradeId: string,
@@ -869,6 +845,24 @@ export class AdminService {
       tradeId,
       shipmentId,
     );
+  }
+
+  async markOutboundDelivered(
+    adminId: string,
+    tradeId: string,
+    shipmentId: string,
+    note?: string,
+  ) {
+    return this.tradeService.markOutboundDelivered(
+      adminId,
+      tradeId,
+      shipmentId,
+      note,
+    );
+  }
+
+  async startWarehouseReview(adminId: string, tradeId: string) {
+    return this.tradeService.startWarehouseReview(adminId, tradeId);
   }
 
   async approveWarehouseTrade(
@@ -930,6 +924,18 @@ export class AdminService {
     return this.adminRefundService.forceFinalizeRefund(
       adminId,
       refundRequestId,
+    );
+  }
+
+  async markRefundDisputed(
+    adminId: string,
+    refundRequestId: string,
+    note: string,
+  ) {
+    return this.adminRefundService.markRefundDisputed(
+      adminId,
+      refundRequestId,
+      note,
     );
   }
 

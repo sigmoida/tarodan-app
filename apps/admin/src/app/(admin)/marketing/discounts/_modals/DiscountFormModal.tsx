@@ -7,6 +7,7 @@ import {
   FormSelect,
   FormTextarea,
   FormCheckbox,
+  FormSearchableMultiSelect,
   useZodForm,
 } from "@tarodan/ui/form";
 import { adminApi } from "@/lib/api";
@@ -14,8 +15,11 @@ import { useAdminMutation } from "@/hooks/useAdminMutation";
 import { useCategories } from "@/hooks/useCategories";
 import { discountSchema, type DiscountFormValues } from "../_lib/schema";
 import {
+  audienceFormOptions,
   discountTypeOptions,
+  membershipTierOptions,
   scopeFormOptions,
+  targetFormOptions,
   type Discount,
 } from "../_lib/types";
 import { useTranslations } from "next-intl";
@@ -36,6 +40,11 @@ function toDefaults(d?: Discount): DiscountFormValues {
       value: "10",
       scope: "global",
       categoryId: "",
+      target: "buyer_commission",
+      audience: "everyone",
+      targetTierTypes: [],
+      targetUserIds: "",
+      budgetLimit: "",
       minCartValue: "",
       minQuantity: "",
       buyQuantity: "",
@@ -58,13 +67,25 @@ function toDefaults(d?: Discount): DiscountFormValues {
     value: String(d.value),
     scope: d.scope === "category" ? "category" : "global",
     categoryId: d.categoryId ?? "",
+    // Ürün fiyatı kampanyaları satıcıya aittir ve bu formdan düzenlenmez;
+    // eski bir kayıt açılırsa varsayılan bedel kalemine düşer.
+    target:
+      d.target && d.target !== "product_price" ? d.target : "buyer_commission",
+    audience: d.audience ?? "everyone",
+    targetTierTypes: (d.targetTierTypes ?? []).map((value) => ({
+      value,
+      label: value,
+    })),
+    targetUserIds: (d.targetUserIds ?? []).join(", "),
+    budgetLimit: d.budgetLimit?.toString() ?? "",
     minCartValue: d.minCartValue?.toString() ?? "",
     minQuantity: d.minQuantity?.toString() ?? "",
     buyQuantity: d.buyQuantity?.toString() ?? "",
     getQuantity: d.getQuantity?.toString() ?? "",
     maxDiscountAmount: d.maxDiscountAmount?.toString() ?? "",
     usageLimitTotal: d.usageLimitTotal?.toString() ?? "",
-    usageLimitPerUser: d.usageLimitPerUser.toString(),
+    // null = limitsiz; formda 0 olarak temsil edilir (API sözleşmesi: 0 = limitsiz).
+    usageLimitPerUser: (d.usageLimitPerUser ?? 0).toString(),
     isStackable: d.isStackable,
     isActive: d.isActive,
     isFlashSale: d.isFlashSale,
@@ -93,13 +114,32 @@ function toPayload(v: DiscountFormValues) {
     usageLimitTotal: v.usageLimitTotal
       ? parseInt(v.usageLimitTotal)
       : undefined,
-    usageLimitPerUser: parseInt(v.usageLimitPerUser) || 1,
+    // 0 = kişi-başı limitsiz (yalnız 'herkes' kitlesinde; misafirler ancak
+    // limitsiz kodu kullanabilir). Boş bırakılırsa varsayılan 1.
+    usageLimitPerUser:
+      v.usageLimitPerUser.trim() === ""
+        ? 1
+        : parseInt(v.usageLimitPerUser) || 0,
     isStackable: v.isStackable,
     priority: 0,
     isActive: v.isActive,
     isFlashSale: v.isFlashSale,
     startDate: new Date(v.startDate).toISOString(),
     endDate: new Date(v.endDate + "T23:59:59").toISOString(),
+    target: v.target,
+    audience: v.audience,
+    targetTierTypes:
+      v.audience === "membership_tiers"
+        ? v.targetTierTypes.map((option) => option.value)
+        : [],
+    targetUserIds:
+      v.audience === "specific_buyers" || v.audience === "specific_sellers"
+        ? v.targetUserIds
+            .split(",")
+            .map((id) => id.trim())
+            .filter(Boolean)
+        : [],
+    budgetLimit: v.budgetLimit ? parseFloat(v.budgetLimit) : undefined,
   };
 }
 
@@ -122,6 +162,7 @@ export function DiscountFormModal({
 
   const type = form.watch("type");
   const scope = form.watch("scope");
+  const audience = form.watch("audience");
 
   const save = useAdminMutation(
     (v: DiscountFormValues) =>
@@ -171,6 +212,49 @@ export function DiscountFormModal({
           className="font-mono uppercase"
           helperText={t("admin.marketing.discounts.codeHelper")}
         />
+      </div>
+
+      {/* Cep kuralı: platform yalnız kendi bedellerini indirebilir. Ürün fiyatı
+          satıcının malıdır ve bu formda seçenek olarak bile yer almaz. */}
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <FormSelect
+          name="target"
+          label={t("admin.marketing.discounts.targetLabel")}
+          options={targetFormOptions(t)}
+          helperText={t("admin.marketing.discounts.targetHelper")}
+        />
+        <FormInput
+          name="budgetLimit"
+          type="number"
+          min="0"
+          step="0.01"
+          label={t("admin.marketing.discounts.budgetLimit")}
+          helperText={t("admin.marketing.discounts.budgetHelper")}
+        />
+      </div>
+
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <FormSelect
+          name="audience"
+          label={t("admin.marketing.discounts.audienceLabel")}
+          options={audienceFormOptions(t)}
+          helperText={t("admin.marketing.discounts.audienceHelper")}
+        />
+        {audience === "membership_tiers" && (
+          <FormSearchableMultiSelect
+            name="targetTierTypes"
+            label={t("admin.marketing.discounts.targetTiers")}
+            options={membershipTierOptions(t)}
+          />
+        )}
+        {(audience === "specific_buyers" ||
+          audience === "specific_sellers") && (
+          <FormInput
+            name="targetUserIds"
+            label={t("admin.marketing.discounts.targetUsers")}
+            helperText={t("admin.marketing.discounts.targetUsersHelper")}
+          />
+        )}
       </div>
 
       <FormTextarea
@@ -294,9 +378,9 @@ export function DiscountFormModal({
         <FormInput
           name="usageLimitPerUser"
           type="number"
-          min="1"
+          min="0"
           label={t("admin.marketing.discounts.perUserLimit")}
-          placeholder="1"
+          placeholder={t("admin.marketing.discounts.perUserLimitPlaceholder")}
         />
       </div>
 

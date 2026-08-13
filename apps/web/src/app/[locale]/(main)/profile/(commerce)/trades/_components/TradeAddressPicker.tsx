@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { MapPinIcon, PlusIcon } from "@heroicons/react/24/outline";
 import toast from "react-hot-toast";
+import { useTranslations } from "next-intl";
 import {
   Button,
   Input,
@@ -35,6 +36,7 @@ export default function TradeAddressPicker({
   onChange,
   label,
 }: TradeAddressPickerProps) {
+  const t = useTranslations();
   const { addresses, isLoading } = useAddresses(true);
   const saveAddress = useSaveAddress();
 
@@ -90,9 +92,9 @@ export default function TradeAddressPicker({
 
   const handleAdd = async () => {
     if (!form.fullName.trim()) return toast.error("Ad soyad girin");
-    // +905XXXXXXXXX → 12 hane (90 + 10). Kayıtlı adres formuyla aynı doğrulama.
-    if (form.phone.replace(/\D/g, "").length < 12)
-      return toast.error("Geçerli telefon girin");
+    // combinePhone boş dönerse numara geçerli bir TR cep numarası değil.
+    if (!combinePhone(form.phone))
+      return toast.error(t("validation.trPhoneOnly"));
     if (!form.city) return toast.error("İl seçin");
     if (!form.district) return toast.error("İlçe seçin");
     if (form.address.trim().length < 10)
@@ -180,24 +182,13 @@ export default function TradeAddressPicker({
             value={form.fullName}
             onChange={(e) => setForm({ ...form, fullName: e.target.value })}
           />
-          {/* Telefon — ortak PhoneInput (ülke kodu + formatlı numara). Tek kaynak
-              form.phone'daki tam değer ("+90"+haneler); splitPhone/combinePhone. */}
+          {/* Telefon — ortak PhoneInput. Tek kaynak form.phone'daki tam değer
+              ("+90"+haneler); splitPhone/combinePhone ile dönüştürülür. */}
           <PhoneInput
-            countryCode={splitPhone(form.phone).countryCode}
-            onCountryCodeChange={(code) =>
-              setForm({
-                ...form,
-                phone: combinePhone(code, splitPhone(form.phone).national),
-              })
-            }
             phone={splitPhone(form.phone).national}
             onPhoneChange={(nat) =>
-              setForm({
-                ...form,
-                phone: combinePhone(splitPhone(form.phone).countryCode, nat),
-              })
+              setForm({ ...form, phone: combinePhone(nat) })
             }
-            placeholder="5XX XXX XX XX"
           />
           <CityDistrictSelector
             city={form.city}

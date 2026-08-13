@@ -253,6 +253,9 @@
     "signInToAccount": "Hesabınıza giriş yapın",
     "continueWithGoogle": "Google ile devam et",
     "googleSignInFailed": "Google girişi başarısız.",
+    "continueWithApple": "Apple ile devam et",
+    "appleSignInFailed": "Apple ile giriş başarısız",
+    "appleScriptFailed": "Apple girişi yüklenemedi",
     "emailNotRegistered": "Bu e-posta adresi kayıtlı değil.",
     "useDifferentEmail": "Farklı e-posta kullan",
     "googleOnlyAccount": "Bu hesap Google ile oluşturulmuş. Google ile giriş yapın ya da bir şifre belirleyin.",
@@ -651,7 +654,8 @@
     "shippingFee": "Kargo ücreti",
     "sellerEarning": "Hak edişiniz",
     "packageFeeLabel": "Paket ücreti",
-    "sampleDimensionsLabel": "Örnek ölçü (en × boy × yükseklik)"
+    "sampleDimensionsLabel": "Örnek ölçü (en × boy × yükseklik)",
+    "rejectionReason": "Red gerekçesi"
   },
   "cart": {
     "myCart": "Sepetim",
@@ -809,7 +813,15 @@
     "distanceSalesRequired": "Devam etmek için mesafeli satış sözleşmesini onaylayın",
     "buyNowNotice": "Yalnız seçtiğiniz ürün ödenecek; sepetinizdeki diğer ürünler yerinde kalır.",
     "noItemsSelected": "Ödenecek ürün seçilmedi. Sepetinize dönüp ürün seçin.",
-    "cardSection": "Kart Bilgileri"
+    "cardSection": "Kart Bilgileri",
+    "feeDiscountLine": "{name}",
+    "campaignSavings": "Toplam kazancınız",
+    "quantityCampaignDiscount": "Adet kampanyası indirimi",
+    "feeDiscountTargets": {
+      "buyer_commission": "Komisyon indirimi",
+      "buyer_service_fee": "Hizmet bedeli indirimi",
+      "buyer_shipping": "Kargo indirimi"
+    }
   },
   "order": {
     "myOrders": "Siparişlerim",
@@ -1024,7 +1036,18 @@
     "cancelGroupTitle": "Sepeti İptal Et",
     "cancelGroupAllNotice": "Bu işlem sepetteki {count} siparişin tamamını iptal eder; yapılan ödeme tek seferde iade edilir. Kısmi iptal yoktur.",
     "cartSiblings": "Bu sepette başka siparişler de var:",
-    "refundReasonDeliveryDelayed": "Teslimat gecikti"
+    "refundReasonDeliveryDelayed": "Teslimat gecikti",
+    "bulkRefundTitle": "Toplu İade",
+    "bulkRefundIntro": "Bu sepette iade edilebilecek birden fazla ürün var. Ürünleri seçip tek seferde iade talebi oluşturabilirsiniz.",
+    "bulkRefundCta": "Ürünleri Seçerek İade Et",
+    "bulkRefundSelectLabel": "İade edilecek ürünler",
+    "bulkRefundSelectAtLeastOne": "En az bir ürün seçin",
+    "bulkRefundAllSuccess": "{count} iade talebi oluşturuldu",
+    "bulkRefundPartialFail": "{succeeded} iade talebi oluşturuldu, {failed} talep başarısız oldu",
+    "bulkRefundLineCreated": "İade talebi oluşturuldu",
+    "bulkRefundLineFailed": "Talep oluşturulamadı",
+    "sellerCampaignAdvantage": "Kampanya avantajınız",
+    "buyerCampaignSaving": "Kampanya indiriminiz"
   },
   "trade": {
     "myTrades": "Takaslarım",
@@ -1105,6 +1128,7 @@
       "reasonShipmentLost": "Kargo kayboldu / ulaşmadı",
       "reasonShipmentDamaged": "Ürün hasarlı geldi",
       "reasonWrongItem": "Beklediğim ürün gelmedi",
+      "reasonNotAsDescribed": "Ürün açıklamayla uyuşmuyor",
       "reasonOther": "Diğer",
       "descriptionLabel": "Açıklama",
       "descriptionPlaceholder": "Sorunu detaylandırın (kargo tarihi, fotoğraf gönderebilirim, vb.)",
@@ -1260,7 +1284,7 @@
     "paymentRefunded": "İade edildi",
     "waitingCounterpartyPayment": "Ödemeniz alındı. Karşı tarafın ödemesi bekleniyor.",
     "bothMustPay": "Ürünler, iki ödeme de tamamlanmadan kargoya verilmez.",
-    "shippingNotRefundable": "Ürünler kargoya verildikten sonra iptal edilirse kargo bedeli iade edilmez.",
+    "shippingNotRefundable": "Hizmet bedeli, güvenli takas hizmetinin karşılığı olduğu için iptalde iade edilmez. Ürünler kargoya verildikten sonra iptal edilirse kargo bedeli de iade edilmez.",
     "costPreviewTitle": "Bu teklifin maliyeti",
     "costPreviewYou": "Siz ödersiniz",
     "costPreviewThem": "Karşı taraf öder",
@@ -1298,6 +1322,16 @@
     "statusCounterOffered": "Karşı Teklif Yapıldı",
     "waitingBuyerCounter": "Alıcının karşı teklifinizi yanıtlaması bekleniyor.",
     "acceptCounter": "Karşı Teklifi Kabul Et",
+    "acceptConfirmTitle": "Teklifi kabul et",
+    "acceptConfirmDesc": "Bu teklifi kabul etmek istediğinizden emin misiniz? Kabul edilen teklif için sipariş oluşturulur.",
+    "acceptConfirmDescSeller": "Teklifi kabul ederseniz teklif fiyatıyla bir sipariş oluşur ve alıcının 24 saatlik ödeme süresi başlar. Kabul, ürünü kilitlemez: diğer teklifler açık kalır ve ürünü ilk ödeyen alır.",
+    "acceptConfirmDescBuyer": "Karşı teklifi kabul ederseniz teklif fiyatıyla sipariş oluşur ve 24 saat içinde ödemeniz gerekir. Ürün, ödeme adımında rezerve edilir; aynı ürünü başka bir alıcı önce öderse siparişiniz karşılanamaz.",
+    "firstToPayWinsBuyer": "Ürün henüz size ayrılmadı. Aynı ürün için başka kabul edilmiş teklifler olabilir; ürünü ilk ödeyen alır.",
+    "firstToPayWinsSeller": "Alıcının 24 saatlik ödeme süresi var. Ürün ödeme tamamlandığında rezerve edilir; o ana kadar diğer teklifler açık kalır.",
+    "rejectConfirmTitle": "Teklifi reddet",
+    "rejectConfirmDesc": "Bu teklifi reddetmek istediğinizden emin misiniz? Bu işlem geri alınamaz.",
+    "cancelConfirmTitle": "Teklifi iptal et",
+    "cancelConfirmDesc": "Bu teklifi iptal etmek istediğinizden emin misiniz? Bu işlem geri alınamaz.",
     "lowerOffer": "Daha Düşük Teklif",
     "viewOrder": "Siparişi Görüntüle",
     "listingPriceLabel": "İlan Fiyatı",
@@ -1380,6 +1414,7 @@
     "membershipChanged": "Üyeliğiniz başarıyla değiştirildi!",
     "membershipDowngraded": "Üyeliğiniz başarıyla değiştirildi!",
     "planAlreadyActive": "Bu plan zaten aktif",
+    "businessRequiresApproval": "İş üyeliği yalnız onaylı kurumsal hesaplar içindir. Şirket başvurunuz onaylandığında satın alabilirsiniz.",
     "loginToContinue": "Devam etmek için giriş yapın",
     "acceptTerms": "Lütfen kullanım koşullarını kabul edin",
     "fillCardInfo": "Lütfen tüm kart bilgilerini doldurun",
@@ -1848,6 +1883,8 @@
     "passwordMin8": "Şifre en az 8 karakter olmalıdır",
     "passwordMatch": "Şifreler eşleşmiyor",
     "invalidPhone": "Geçerli bir telefon numarası girin",
+    "trPhoneOnly": "Geçerli bir Türkiye cep numarası girin (5XX XXX XX XX)",
+    "phoneLegacyNotice": "Kayıtlı numaranız geçerli bir Türkiye cep numarası değil. Lütfen güncel numaranızı girin.",
     "minLength": "En az {min} karakter olmalıdır",
     "maxLength": "En fazla {max} karakter olabilir",
     "minValue": "En az {min} olmalıdır",
@@ -3564,6 +3601,7 @@
         "fiveHundredExample": "Örn: 500",
         "totalUsageLimit": "Toplam Kullanım Limiti",
         "perUserLimit": "Kullanıcı Başı Limit",
+        "perUserLimitPlaceholder": "0 = limitsiz (misafirler yalnız limitsiz kodu kullanabilir)",
         "unlimited": "Sınırsız",
         "startDate": "Başlangıç Tarihi",
         "endDate": "Bitiş Tarihi",
@@ -3592,7 +3630,12 @@
           "nameRequired": "İndirim adı gerekli",
           "valueRequired": "Değer gerekli",
           "startDateRequired": "Başlangıç tarihi gerekli",
-          "endDateRequired": "Bitiş tarihi gerekli"
+          "endDateRequired": "Bitiş tarihi gerekli",
+          "budgetRequired": "Bedel indirimi için bütçe tavanı girin",
+          "tiersRequired": "En az bir üyelik katmanı seçin",
+          "usersRequired": "En az bir kullanıcı kimliği girin",
+          "sellerAudienceRequired": "Satıcı bedeli yalnız satıcı kitlesine hedeflenebilir",
+          "buyerAudienceRequired": "Alıcının ödediği kalem satıcı kitlesine hedeflenemez"
         },
         "codes": {
           "title": "Voucher Kodu Üret",
@@ -3605,7 +3648,38 @@
           "generateFailed": "Kod üretilemedi",
           "rowGenerate": "Kod Üret",
           "rowExport": "Kodları İndir (CSV)"
-        }
+        },
+        "targetLabel": "İndirilecek Kalem",
+        "targetHelper": "Ürün fiyatı satıcıya aittir; platform yalnız kendi bedellerinden indirim yapabilir.",
+        "target": {
+          "product_price": "Ürün fiyatı (satıcıya ait)",
+          "buyer_commission": "Alıcı komisyonu",
+          "buyer_service_fee": "Alıcı koruma hizmet bedeli",
+          "buyer_shipping": "Alıcı kargo payı",
+          "seller_commission": "Satıcı komisyonu",
+          "seller_platform_fee": "Satıcı platform hizmet bedeli",
+          "seller_shipping": "Satıcı kargo payı",
+          "trade_service_fee": "Takas Hizmet Bedeli"
+        },
+        "audienceLabel": "Hedef Kitle",
+        "audienceHelper": "Kalem kimin cebine bakıyorsa kitle o tarafta değerlendirilir.",
+        "audience": {
+          "everyone": "Herkes",
+          "membership_tiers": "Üyelik tipi",
+          "specific_buyers": "Belirli alıcılar",
+          "specific_sellers": "Belirli satıcılar",
+          "all_buyers": "Tüm alıcılar",
+          "all_sellers": "Tüm satıcılar"
+        },
+        "targetTiers": "Hedef üyelik katmanları",
+        "targetUsers": "Hedef kullanıcı kimlikleri",
+        "targetUsersHelper": "Virgülle ayırarak kullanıcı kimliklerini girin.",
+        "budgetLimit": "Bütçe Tavanı (TL)",
+        "budgetHelper": "Bedel indirimlerinde zorunludur: tavan dolduğunda kampanya kendiliğinden durur.",
+        "budgetUsage": "Bütçe",
+        "budgetStopped": "Bütçe doldu",
+        "platformCost": "Platforma maliyeti",
+        "budgetRemaining": "Kalan bütçe"
       },
       "emailTemplates": {
         "title": "E-posta Şablonları",
@@ -4461,7 +4535,10 @@
         "adjustmentStatus": {
           "open": "Açık",
           "settled": "Kapandı"
-        }
+        },
+        "releaseEarly": "Erken Serbest Bırak",
+        "earlyReleaseHint": "İade penceresi dolmadan bilinçli erken bırakma — gerekçe istenir.",
+        "earlyReleaseWarning": "İade penceresi henüz kapanmadı: bu ödemeyi ERKEN serbest bırakıyorsunuz. İşlem geri alınamaz; sonrasında açılan bir iadede tahsilat satıcıdan yapılmak zorunda kalır. Teslim edilmemiş ya da iadesi süren siparişte sistem yine reddeder."
       },
       "tax": {
         "title": "Vergi Ayarları",
@@ -4800,7 +4877,10 @@
         "legFromWarehouse": "Depodan Alıcılara Gönderiler",
         "legReturns": "İade Gönderileri",
         "markWarehouseArrived": "Depoya Ulaştı",
-        "recipientsWillConfirm": "Bilgi: Alıcılar teslim aldıklarında kendi tarafından onaylayacak.",
+        "markOutboundDelivered": "Teslim Edildi İşaretle",
+        "confirmOutboundDelivered": "Bu kolinin alıcıya fiziksel olarak teslim edildiğini doğruluyor musunuz? İki koli de teslim işaretlendiğinde onay/itiraz penceresi başlar ve süre sonunda takas otomatik tamamlanır.",
+        "outboundDeliveredMsg": "Koli teslim edildi olarak işaretlendi",
+        "recipientsWillConfirm": "Bilgi: Alıcılar teslim aldıklarında kendi tarafından onaylayacak. Onay/itiraz penceresi, iki koli de teslim edildiğinde başlar; taşıyıcı teslimi raporlamazsa aşağıdan elle işaretleyin.",
         "markLost": "Kayıp İşaretle",
         "reject": "Reddet",
         "warehouseReceivedMsg": "Gönderi depoya ulaştı olarak işaretlendi",
@@ -4830,9 +4910,9 @@
         "resolveTitle": "Takas Çözümle",
         "resolution": "Çözüm",
         "resolveComplete": "Takası Tamamla",
-        "resolveCancel": "Takası İptal Et (iade tetiklenir)",
-        "compensateInitiator": "Teklif Verene Tazminat (iptal + iade + tazminat işareti)",
-        "compensateReceiver": "Teklif Alana Tazminat (iptal + iade + tazminat işareti)",
+        "compensateInitiator": "Teklif Verene Tazminat (ödemesi iade edilir + tazminat işareti)",
+        "compensateReceiver": "Teklif Alana Tazminat (ödemesi iade edilir + tazminat işareti)",
+        "compensateBoth": "İki Tarafa da Tazminat (iki ödemeyi de iade eder — ör. iki koli de kayıp)",
         "resolutionNoteLabel": "Çözüm Notu (en az 10 karakter)",
         "resolutionPlaceholder": "Çözüm gerekçesini özetleyin (kargo kayıp, hasar, vs.)",
         "resolvedMsg": "Takas çözümlendi",
@@ -4897,7 +4977,25 @@
           "paymentStatus": "Ödeme durumu",
           "equalTrade": "Eşit takas — nakit fark yok.",
           "paymentsTitle": "Taraf ödemeleri"
-        }
+        },
+        "escrowPanelTitle": "Takas Escrow — Nakit Fark",
+        "escrowPanelBodyDue": "Hold süresi doldu ({date}); nakit fark bir sonraki otomatik turda açılacak. Gecikmişse buradan elle serbest bırakabilirsiniz.",
+        "escrowPanelBodyEarly": "Nakit fark {date} tarihinde otomatik serbest bırakılacak. Gerekirse süreyi beklemeden erken bırakabilirsiniz; işlem geri alınamaz ve iade borcu taşıyan satırlara dokunulmaz.",
+        "escrowReleaseTitle": "Serbest Bırak",
+        "escrowReleaseEarlyTitle": "Erken Serbest Bırak",
+        "escrowReleaseReasonLabel": "Gerekçe",
+        "escrowReleaseReasonPlaceholder": "Örn. iki taraf da teslimatı ve ürünleri teyit etti",
+        "escrowReleaseConfirm": "Serbest Bırak",
+        "escrowReleasedMsg": "Takas nakit ödemesi serbest bırakıldı",
+        "startReview": "Kontrole al",
+        "reviewInProgress": "Takas kontrol altında: ürünleri inceleyip onaylayın ya da reddedin.",
+        "reviewStartedMsg": "Takas kontrole alındı",
+        "faultySide": "Uygunsuz ürün hangi tarafta?",
+        "faultySideHint": "Seçiniz",
+        "faultySideInitiator": "Teklifi başlatan tarafın ürünü",
+        "faultySideReceiver": "Teklifi alan tarafın ürünü",
+        "faultySideBoth": "Her iki tarafın ürünü",
+        "faultySideNeither": "Ürün kaynaklı değil (operasyonel red)"
       },
       "refundRequests": {
         "title": "İade Takibi",
@@ -4912,8 +5010,6 @@
         "reviewNotePlaceholder": "İnceleme sonucunu ve gerekçesini yazın",
         "approveButton": "Talebi Onayla",
         "rejectButton": "Talebi Reddet",
-        "policyUpdated": "İade politikası güncellendi",
-        "payerUpdated": "İade kargo tarafı güncellendi",
         "policyCode": "Finansal politika",
         "returnDesi": "İade desisi",
         "returnFee": "İade kargo bedeli",
@@ -5029,6 +5125,10 @@
           "gross": "Brüt"
         },
         "forceFinalizeButton": "Para İadesini Tamamla",
+        "disputeButton": "İtiraz İşaretle",
+        "disputeNotePlaceholder": "İtiraz gerekçesi (en az 10 karakter) — ör. satıcı ürünün hasarlı döndüğünü bildirdi",
+        "disputeConfirm": "İtirazı Kaydet",
+        "disputeMarked": "İade itiraz olarak işaretlendi; otomatik tamamlama durduruldu",
         "counterfeitTitle": "Sahte / taklit ürün şikayeti",
         "counterfeitBody": "Bu talep sahte ürün gerekçesiyle açıldı. İade onaylandıktan sonra satıcı için yaptırım değerlendirin (uyarı, geçici askı veya fesih) ve satıcının diğer ürünleri için risk incelemesi yapın.",
         "policyTitle": "İade Politikası",
@@ -5541,6 +5641,10 @@
         "tradeConfirmationDays": {
           "label": "Onay Süresi (Gün)",
           "helper": "Teslim sonrası onay süresi"
+        },
+        "tradeHoldDays": {
+          "label": "Takas Escrow Bekletme (Gün)",
+          "helper": "Takas tamamlandıktan sonra nakit farkın karşı tarafa açılması için beklenen süre. Satış escrow'unu etkilemez."
         },
         "maxMessageLength": {
           "label": "Maksimum Mesaj Uzunluğu",
@@ -6370,10 +6474,12 @@
       },
       "refunds": {
         "status": {
+          "pendingReview": "İnceleme Bekliyor",
           "waitForDelivery": "Ürün Teslimi Bekleniyor",
           "returnShipmentOpen": "İade Kargosu Hazır",
           "returnInTransit": "İade Yolda",
-          "returnDelivered": "İade Ulaştı (Para Bekleniyor)"
+          "returnDelivered": "İade Ulaştı (Para Bekleniyor)",
+          "disputed": "İtirazlı"
         }
       },
       "errors": {
@@ -6585,13 +6691,29 @@
         "title": "Karşı Teklif Reddedildi",
         "message": "{productTitle} için alıcı karşı teklifinizi kabul etmedi."
       },
+      "offerCounterAccepted": {
+        "title": "Karşı Teklifiniz Kabul Edildi",
+        "message": "{productTitle} için alıcı {amount} TL karşı teklifinizi kabul etti. Ödeme yapması için 24 saati var."
+      },
       "offerExpired": {
         "title": "Teklifin Süresi Doldu",
         "message": "{productTitle} için teklifinizin süresi doldu."
       },
+      "offerExpiredSeller": {
+        "title": "Teklif Yanıtsız Kapandı",
+        "message": "{productTitle} için gelen teklifin süresi yanıt verilmeden doldu."
+      },
+      "offerPaymentExpired": {
+        "title": "Ödeme Süresi Doldu",
+        "message": "{productTitle} için 24 saatlik ödeme süreniz doldu ve sipariş kapandı. Ürün hâlâ uygunsa siparişi yeniden açıp ödeyebilirsiniz."
+      },
       "offerCancelledOutOfStock": {
         "title": "Teklifiniz iptal edildi: ürün stokta kalmadı",
         "message": "{productTitle} adlı ürün için verdiğiniz teklif, ürün satıldığı için iptal edildi."
+      },
+      "offerCancelledListingRemoved": {
+        "title": "Teklifiniz iptal edildi: ilan yayından kaldırıldı",
+        "message": "{productTitle} adlı ürün için verdiğiniz teklif, satıcı ilanı yayından kaldırdığı için iptal edildi."
       },
       "productApproved": {
         "title": "İlanınız Yayında! 🎉",
@@ -6727,7 +6849,11 @@
       },
       "boostExpired": {
         "title": "🚀 Öne çıkarma süresi doldu",
-        "message": "\"{productTitle}\" ilanının öne çıkarması bitti. Otomatik yenileme açıktı — tek tıkla yeniden öne çıkar."
+        "message": "\"{productTitle}\" ilanının öne çıkarması sona erdi. Dilerseniz ilanınızı yeniden öne çıkarabilirsiniz."
+      },
+      "boostActivated": {
+        "title": "🚀 Öne Çıkarma Aktif",
+        "message": "\"{productTitle}\" ilanınızın öne çıkarması başladı. İlanınız listelerin üst sırasında gösteriliyor."
       },
       "tradeAutoCancelled": {
         "title": "Takas Otomatik İptal Edildi",
@@ -6736,6 +6862,10 @@
       "tradeStuckAtWarehouse": {
         "title": "Sıkışmış Takas — Yönetim Gerekli",
         "message": "{tradeNumber} takası depoya ulaştı fakat süresi doldu; elle force-cancel-stuck gerekiyor."
+      },
+      "tradeOutboundDeliveryMissing": {
+        "title": "Takas Kolisi Teslim Edilmedi — Yönetim Gerekli",
+        "message": "{tradeNumber} takasının çıkış kolileri için taşıyıcıdan teslim bilgisi gelmedi; onay penceresi başlamadı ve takas otomatik tamamlanmayacak."
       },
       "tradeAddressRequired": {
         "title": "Adres Gerekli — Takas Kargosu",
@@ -6748,6 +6878,10 @@
       "cargoMovementMissing": {
         "title": "Kargonuzda Hareket Görünmüyor",
         "message": "{reference} siparişi için kargoyu verdiğinizi işaretlediniz ancak Sürat kayıtlarında paket görünmüyor. Paketi henüz teslim etmediyseniz lütfen en kısa sürede şubeye götürün; aksi hâlde sipariş iptal edilebilir."
+      },
+      "orderStuckInTransit": {
+        "title": "Kargoda Takılı Sipariş — Yönetim Gerekli",
+        "message": "{orderNumber} siparişi uzun süredir kargoda ve taşıyıcıdan teslim bilgisi gelmedi; teslim işlenmediği için satıcı ödemesi askıda."
       },
       "offerAutoRejected": {
         "title": "Teklifiniz Kapatıldı",
@@ -6772,6 +6906,18 @@
       "refundCompleted": {
         "title": "İadeniz Tamamlandı",
         "message": "{refundNumber} numaralı iadeniz hesabınıza yansıtıldı."
+      },
+      "couponReturned": {
+        "title": "Kuponunuz Geri Verildi",
+        "message": "İptal/iade sizin kusurunuz olmadığı için {code} kodlu kupon hakkınız geri verildi. Kodu yeni bir siparişte kullanabilirsiniz."
+      },
+      "campaignBudgetExhausted": {
+        "title": "Kampanya Bütçesi Doldu",
+        "message": "\"{name}\" kampanyasının bütçesi doldu ve kampanya otomatik durduruldu. Bütçeyi artırabilir veya kampanyayı kapalı bırakabilirsiniz."
+      },
+      "moderationQueueStale": {
+        "title": "Bekleyen İlanlar Birikti",
+        "message": "{count} ilan 48 saatten uzun süredir moderasyon onayı bekliyor. Kuyruğu inceleyin."
       },
       "refundRequestReceived": {
         "title": "İade Talebiniz Alındı",
@@ -6816,6 +6962,14 @@
       "sellerApplicationRejected": {
         "title": "Kurumsal Başvurunuz Reddedildi",
         "message": "Kurumsal hesap başvurunuz reddedildi.{reason}"
+      },
+      "tradeAtWarehouse": {
+        "title": "Ürünler depomuzda",
+        "message": "Takasın iki ürünü de Tarodan deposuna ulaştı. Uzman kontrolünden sonra ürünler yeni sahiplerine gönderilecek."
+      },
+      "orderShipmentDelayed": {
+        "title": "Kargonuz beklenenden uzun sürüyor",
+        "message": "Kargonuzda bir süredir hareket görünmüyor. Ekibimiz taşıyıcıyla durumu takip ediyor; sizin bir işlem yapmanıza gerek yok."
       }
     },
     "auth": {
@@ -6937,6 +7091,7 @@
       "invalidShipmentStatus": "Geçersiz gönderim durumu",
       "itemAlreadyInActiveTrade": "Teklif ettiğiniz ürünlerden biri zaten aktif bir takas teklifinde. Önce mevcut takası iptal edin veya sonuçlanmasını bekleyin.",
       "membershipExpiredForAccept": "Üyeliğinizin süresi dolmuş görünüyor. Trade kabul etmek için Temel veya üstü üyeliğinizi yenileyin.",
+      "counterpartyMembershipExpired": "Teklifi veren tarafın üyeliği artık takasa uygun değil; teklif kabul edilemez.",
       "membershipRequiredForCounter": "Karşı teklif göndermek için Temel veya üstü üyelik gereklidir. Üyeliğinizi yenileyin.",
       "receiverCannotTrade": "Karşı tarafın üyeliği takasa uygun değil; bu ilan için şu anda takas teklifi gönderilemiyor.",
       "noShipmentToConfirm": "Onaylanacak gönderim bulunamadı",
@@ -7200,6 +7355,7 @@
       "alreadyOnThisPlan": "Zaten bu plandasınız",
       "businessTierRequiresCompany": "Business üyelik sadece şirket hesapları için geçerlidir",
       "categoryNotFound": "Kategori bulunamadı",
+      "corporateMustUseBusinessTier": "Onaylı kurumsal hesaplar yalnız İş üyeliğini kullanabilir.",
       "freeTierCannotCancel": "Ücretsiz üyelik iptal edilemez",
       "freeTierNoPaymentNeeded": "Ücretsiz üyelik için ödeme gerekmez",
       "freeTierNotFound": "Ücretsiz üyelik tipi bulunamadı",
@@ -7210,6 +7366,7 @@
       "platformSellerNotFound": "Platform seller bulunamadı",
       "premiumFeatureOnly": "Bu özellik premium ve üzeri üyelikler içindir",
       "savedCardNotFound": "Kayıtlı kart bulunamadı",
+      "scheduledChangeRequiresCard": "Planlı geçiş için tekrarlı ödeme ve kayıtlı kart gerekir. Dönem sonunda dilediğiniz paketi yeniden satın alabilirsiniz.",
       "tierAlreadyExists": "Üyelik tipi zaten mevcut: {type}",
       "tierNoPaymentNeeded": "Bu üyelik seviyesi için ödeme gerekmez",
       "tierNotActive": "Bu üyelik tipi aktif değil",
@@ -7222,7 +7379,8 @@
       "tariffNotFound": "Kargo tarifesi bulunamadı",
       "tariffNotEditable": "Yalnızca taslak tarifeler düzenlenebilir",
       "tariffArchived": "Arşivlenmiş tarife tekrar aktive edilemez",
-      "tariffNegativeAmount": "Tarife tutarları negatif olamaz"
+      "tariffNegativeAmount": "Tarife tutarları negatif olamaz",
+      "invalidRecipientPhone": "Gönderi oluşturulamadı: alıcı telefonu geçerli bir Türkiye cep numarası değil"
     },
     "commission": {
       "noRuleConfigured": "Komisyon yapılandırması eksik olduğundan sipariş şu anda oluşturulamıyor. Lütfen daha sonra tekrar deneyin.",

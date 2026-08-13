@@ -3,9 +3,9 @@ import {
   OnModuleInit,
   OnModuleDestroy,
   Logger,
-} from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
-import Redis from 'ioredis';
+} from "@nestjs/common";
+import { ConfigService } from "@nestjs/config";
+import Redis from "ioredis";
 
 export interface CacheOptions {
   ttl?: number; // Time to live in seconds
@@ -23,19 +23,19 @@ export class CacheService implements OnModuleInit, OnModuleDestroy {
 
   async onModuleInit() {
     const redisUrl = this.configService.get(
-      'REDIS_URL',
-      'redis://localhost:6379',
+      "REDIS_URL",
+      "redis://localhost:6379",
     );
 
     this.client = new Redis(redisUrl);
     this.subscriber = new Redis(redisUrl);
 
-    this.client.on('connect', () => {
-      this.logger.log('Connected to Redis');
+    this.client.on("connect", () => {
+      this.logger.log("Connected to Redis");
     });
 
-    this.client.on('error', () => {
-      this.logger.error('Redis error');
+    this.client.on("error", () => {
+      this.logger.error("Redis error");
     });
   }
 
@@ -53,7 +53,7 @@ export class CacheService implements OnModuleInit, OnModuleDestroy {
       if (value === null) return null;
       return JSON.parse(value) as T;
     } catch (error) {
-      this.logger.warn('Cache get error');
+      this.logger.warn("Cache get error");
       return null;
     }
   }
@@ -67,7 +67,7 @@ export class CacheService implements OnModuleInit, OnModuleDestroy {
       const serialized = JSON.stringify(value);
       await this.client.setex(key, ttl, serialized);
     } catch (error) {
-      this.logger.warn('Cache set error');
+      this.logger.warn("Cache set error");
     }
   }
 
@@ -78,7 +78,7 @@ export class CacheService implements OnModuleInit, OnModuleDestroy {
     try {
       await this.client.del(key);
     } catch (error) {
-      this.logger.warn('Cache delete error');
+      this.logger.warn("Cache delete error");
     }
   }
 
@@ -91,7 +91,7 @@ export class CacheService implements OnModuleInit, OnModuleDestroy {
       if (keys.length === 0) return 0;
       return await this.client.del(...keys);
     } catch (error) {
-      this.logger.warn('Cache delete pattern error');
+      this.logger.warn("Cache delete pattern error");
       return 0;
     }
   }
@@ -103,7 +103,7 @@ export class CacheService implements OnModuleInit, OnModuleDestroy {
     try {
       return (await this.client.exists(key)) === 1;
     } catch (error) {
-      this.logger.warn('Cache exists error');
+      this.logger.warn("Cache exists error");
       return false;
     }
   }
@@ -115,7 +115,7 @@ export class CacheService implements OnModuleInit, OnModuleDestroy {
     try {
       return (await this.client.expire(key, seconds)) === 1;
     } catch (error) {
-      this.logger.warn('Cache expire error');
+      this.logger.warn("Cache expire error");
       return false;
     }
   }
@@ -127,7 +127,7 @@ export class CacheService implements OnModuleInit, OnModuleDestroy {
     try {
       return await this.client.ttl(key);
     } catch (error) {
-      this.logger.warn('Cache ttl error');
+      this.logger.warn("Cache ttl error");
       return -2;
     }
   }
@@ -139,7 +139,7 @@ export class CacheService implements OnModuleInit, OnModuleDestroy {
     try {
       return await this.client.incr(key);
     } catch (error) {
-      this.logger.warn('Cache incr error');
+      this.logger.warn("Cache incr error");
       return 0;
     }
   }
@@ -239,7 +239,7 @@ export class CacheService implements OnModuleInit, OnModuleDestroy {
     try {
       await this.client.rpush(queueName, JSON.stringify(data));
     } catch (error) {
-      this.logger.warn('Queue push error');
+      this.logger.warn("Queue push error");
     }
   }
 
@@ -252,7 +252,7 @@ export class CacheService implements OnModuleInit, OnModuleDestroy {
       if (!data) return null;
       return JSON.parse(data) as T;
     } catch (error) {
-      this.logger.warn('Queue pop error');
+      this.logger.warn("Queue pop error");
       return null;
     }
   }
@@ -264,7 +264,7 @@ export class CacheService implements OnModuleInit, OnModuleDestroy {
     try {
       return await this.client.llen(queueName);
     } catch (error) {
-      this.logger.warn('Queue length error');
+      this.logger.warn("Queue length error");
       return 0;
     }
   }
@@ -280,7 +280,7 @@ export class CacheService implements OnModuleInit, OnModuleDestroy {
     try {
       await this.client.publish(channel, JSON.stringify(message));
     } catch (error) {
-      this.logger.warn('Publish error');
+      this.logger.warn("Publish error");
     }
   }
 
@@ -292,7 +292,7 @@ export class CacheService implements OnModuleInit, OnModuleDestroy {
     callback: (message: any) => void,
   ): Promise<void> {
     await this.subscriber.subscribe(channel);
-    this.subscriber.on('message', (ch: string, message: string) => {
+    this.subscriber.on("message", (ch: string, message: string) => {
       if (ch === channel) {
         try {
           callback(JSON.parse(message));
@@ -325,15 +325,11 @@ export class CacheService implements OnModuleInit, OnModuleDestroy {
    * Generate category cache key
    */
   categoryKey(categoryId?: string): string {
-    return categoryId ? `category:${categoryId}` : 'categories:all';
+    return categoryId ? `category:${categoryId}` : "categories:all";
   }
 
-  /**
-   * Generate membership limits cache key
-   */
-  membershipLimitsKey(userId: string): string {
-    return `membership:limits:${userId}`;
-  }
+  // NOT: membership:limits:<userId> anahtarı kaldırıldı — hiçbir yerde
+  // yazılmıyor/okunmuyordu (yalnız ölü delete çağrıları vardı).
 
   /**
    * Invalidate user-related caches
@@ -347,7 +343,7 @@ export class CacheService implements OnModuleInit, OnModuleDestroy {
    */
   async invalidateProductCache(productId: string): Promise<void> {
     await this.del(this.productKey(productId));
-    await this.delPattern('search:*');
+    await this.delPattern("search:*");
   }
 
   // ==========================================================================
@@ -360,19 +356,19 @@ export class CacheService implements OnModuleInit, OnModuleDestroy {
   async getInfo(): Promise<Record<string, any>> {
     try {
       const info = await this.client.info();
-      const lines = info.split('\n');
+      const lines = info.split("\n");
       const result: Record<string, any> = {};
 
       for (const line of lines) {
-        if (line.includes(':')) {
-          const [key, value] = line.split(':');
+        if (line.includes(":")) {
+          const [key, value] = line.split(":");
           result[key.trim()] = value.trim();
         }
       }
 
       return result;
     } catch (error) {
-      this.logger.warn('Redis info error');
+      this.logger.warn("Redis info error");
       return {};
     }
   }
@@ -383,8 +379,8 @@ export class CacheService implements OnModuleInit, OnModuleDestroy {
   async getMemoryUsage(): Promise<{ used: number; peak: number }> {
     const info = await this.getInfo();
     return {
-      used: parseInt(info.used_memory || '0'),
-      peak: parseInt(info.used_memory_peak || '0'),
+      used: parseInt(info.used_memory || "0"),
+      peak: parseInt(info.used_memory_peak || "0"),
     };
   }
 }
