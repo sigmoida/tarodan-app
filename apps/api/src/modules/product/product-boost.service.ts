@@ -12,11 +12,15 @@ import {
   ProductKind,
   ProductStatus,
   OrderStatus,
+  MembershipTierType,
   Prisma,
 } from "@prisma/client";
 import { REFERENCE_PREFIX } from "../../common/helpers/code-prefixes";
 import { generateUniqueReference } from "../../common/helpers/generate-reference";
-import { isPremiumEntitled } from "../membership/membership.util";
+import {
+  effectiveMembershipTierType,
+  isPremiumEntitled,
+} from "../membership/membership.util";
 import { PaymentService } from "../payment/payment.service";
 import { PaymentProvider } from "../payment/dto";
 import { BOOST_DURATIONS, BoostPricingOption } from "./dto/boost.dto";
@@ -99,9 +103,37 @@ export class ProductBoostService {
     return Number(tier.campaignPrice);
   }
 
+  /**
+   * Alıcının EFEKTİF üyelik katmanı — paket hedeflemesi GEÇERLİ üyelik ister.
+   * Tek doğruluk kaynağı `effectiveMembershipTierType`: durum + dönem sonu +
+   * tier.isActive + business için KYC şartı; hak yoksa "free". (Eskiden burada
+   * yalnız status+dönem türetiliyordu: KYC'si iptal edilmiş business üye veya
+   * pasifleştirilmiş tier hâlâ hedefli paketleri açabiliyordu.)
+   */
+  private async resolveAudienceTierType(
+    userId: string,
+  ): Promise<MembershipTierType> {
+    const membership = await this.prisma.userMembership.findUnique({
+      where: { userId },
+      select: {
+        status: true,
+        currentPeriodEnd: true,
+        tier: { select: { type: true, isActive: true } },
+        user: {
+          select: {
+            businessStatus: true,
+            companyName: true,
+            taxId: true,
+          },
+        },
+      },
+    });
+    return effectiveMembershipTierType(membership, membership?.user);
+  }
+
   private eligibleAudienceWhere(
     userId: string,
-    tierType: "free" | "basic" | "premium" | "business",
+    tierType: MembershipTierType,
   ): Prisma.AdPackageWhereInput {
     return {
       OR: [
@@ -132,22 +164,7 @@ export class ProductBoostService {
     productPrice: number,
     userId: string,
   ): Promise<{ price: number; packageName: string; showcaseOnHome: boolean }> {
-    // Üyelik hedeflemesi GEÇERLİ üyelik ister: süresi bitmiş/iptal-dolmuş üye
-    // premium-hedefli paketleri satın alamaz (status + dönem sonu kontrolü).
-    const membership = await this.prisma.userMembership.findUnique({
-      where: { userId },
-      select: {
-        status: true,
-        currentPeriodEnd: true,
-        tier: { select: { type: true } },
-      },
-    });
-    const membershipValid =
-      membership != null &&
-      ["active", "cancelled"].includes(membership.status) &&
-      membership.currentPeriodEnd != null &&
-      membership.currentPeriodEnd > new Date();
-    const tierType = membershipValid ? membership.tier.type : "free";
+    const tierType = await this.resolveAudienceTierType(userId);
     const pkg = await this.prisma.adPackage.findFirst({
       where: {
         id: packageId,
@@ -196,22 +213,7 @@ export class ProductBoostService {
     }
     const productPrice = Number(product.price);
     const enabled = await this.isBoostEnabled();
-    // Üyelik hedeflemesi GEÇERLİ üyelik ister: süresi bitmiş/iptal-dolmuş üye
-    // premium-hedefli paketleri satın alamaz (status + dönem sonu kontrolü).
-    const membership = await this.prisma.userMembership.findUnique({
-      where: { userId },
-      select: {
-        status: true,
-        currentPeriodEnd: true,
-        tier: { select: { type: true } },
-      },
-    });
-    const membershipValid =
-      membership != null &&
-      ["active", "cancelled"].includes(membership.status) &&
-      membership.currentPeriodEnd != null &&
-      membership.currentPeriodEnd > new Date();
-    const tierType = membershipValid ? membership.tier.type : "free";
+    const tierType = await this.resolveAudienceTierType(userId);
 
     const packages = await this.prisma.adPackage.findMany({
       where: {

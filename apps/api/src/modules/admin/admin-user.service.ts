@@ -578,6 +578,10 @@ export class AdminUserService {
       data: {
         status: SubscriptionStatus.cancelled,
         cancelledAt: new Date(),
+        // Kullanıcı tarafındaki iptalle parite: iptal edilen üyelik dönem
+        // sonunda ÇEKİLMEMELİ. Açık kalsaydı runAutoRenewals kartı çekip
+        // admin iptalini sessizce geri alırdı.
+        autoRenew: false,
       },
       include: { tier: true },
     });

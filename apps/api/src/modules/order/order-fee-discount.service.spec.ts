@@ -179,3 +179,59 @@ describe("OrderFeeDiscountService.apply", () => {
     );
   });
 });
+
+/**
+ * Alıcı katmanı = efektif üyelik katmanı (tek kaynak: effectiveMembershipTierType).
+ * Eski `status === "active"` kontrolü süresi dolmuşa tier indirimi veriyor,
+ * iptal-dönem-içi üyeyi ise dışarıda bırakıyordu.
+ */
+describe("OrderFeeDiscountService.resolveBuyerTier", () => {
+  const future = new Date(Date.now() + 10 * 86_400_000);
+  const past = new Date(Date.now() - 86_400_000);
+  const noKyc = { businessStatus: null, companyName: null, taxId: null };
+
+  const serviceWith = (membership: unknown) => {
+    const prisma = {
+      userMembership: {
+        findUnique: jest.fn().mockResolvedValue(membership),
+      },
+    };
+    return new OrderFeeDiscountService(undefined as any, prisma as any);
+  };
+
+  it("misafirde null döner (üyelik hedefli kampanya uygulanmaz)", async () => {
+    const service = serviceWith(null);
+    await expect(service.resolveBuyerTier(null)).resolves.toBeNull();
+    await expect(service.resolveBuyerTier(undefined)).resolves.toBeNull();
+  });
+
+  it("süresi dolmuş üye free sayılır (tier indirimi almaz)", async () => {
+    const service = serviceWith({
+      status: "active",
+      currentPeriodEnd: past,
+      tier: { type: "premium", isActive: true },
+      user: noKyc,
+    });
+    await expect(service.resolveBuyerTier("buyer-1")).resolves.toBe("free");
+  });
+
+  it("iptal edilmiş ama dönemi süren üye katman avantajını korur", async () => {
+    const service = serviceWith({
+      status: "cancelled",
+      currentPeriodEnd: future,
+      tier: { type: "premium", isActive: true },
+      user: noKyc,
+    });
+    await expect(service.resolveBuyerTier("buyer-1")).resolves.toBe("premium");
+  });
+
+  it("KYC'si olmayan business üye free sayılır", async () => {
+    const service = serviceWith({
+      status: "active",
+      currentPeriodEnd: future,
+      tier: { type: "business", isActive: true },
+      user: noKyc,
+    });
+    await expect(service.resolveBuyerTier("buyer-1")).resolves.toBe("free");
+  });
+});

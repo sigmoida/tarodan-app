@@ -4,13 +4,15 @@
  * - Monthly premium offer emails to free users
  * - Membership expiration reminders
  */
-import { Injectable, Logger, OnModuleInit } from "@nestjs/common";
+import { Injectable, Logger, OnModuleInit, Optional } from "@nestjs/common";
 import { registerRepeatableCron } from "../../monitoring/bull-cron.helper";
 import { QUEUE_NAMES } from "../../workers/constants";
 import { PrismaService } from "../../prisma";
 import { InjectQueue } from "@nestjs/bull";
 import { Queue } from "bull";
 import { MembershipService } from "./membership.service";
+import { NotificationService } from "../notification/notification.service";
+import { NotificationType } from "../notification/dto";
 
 @Injectable()
 export class MembershipSchedulerService implements OnModuleInit {
@@ -21,6 +23,10 @@ export class MembershipSchedulerService implements OnModuleInit {
     @InjectQueue("email") private readonly emailQueue: Queue,
     @InjectQueue(QUEUE_NAMES.SCHEDULED) private readonly scheduledQueue: Queue,
     private readonly membershipService: MembershipService,
+    // Hatırlatma e-postasının yanında in-app+push bildirimi. Best-effort;
+    // @Optional — mevcut spec harness'ları konumsal kurar.
+    @Optional()
+    private readonly notifications?: NotificationService,
   ) {}
 
   async onModuleInit(): Promise<void> {
@@ -164,13 +170,15 @@ export class MembershipSchedulerService implements OnModuleInit {
             userName: user.displayName,
             productCount: user._count.products,
             orderCount: user._count.buyerOrders,
+            // Yalnız GERÇEK üyelik ayrıcalıkları vaat edilir (üyelik katmanı
+            // tablosundaki alanlar). "Reklamsız deneyim" ve "öne çıkan ilan
+            // hakkı" üründen kaldırıldı; e-postada vaat etmek yanıltıcıydı.
             benefits: [
-              "Sınırsız ilan yayınlama",
-              "Takas özelliği",
-              "Digital Garage oluşturma",
-              "Öne çıkan ilan hakkı",
-              "Reklamsız deneyim",
-              "Düşük komisyon oranları",
+              "Takas yapabilme",
+              "Koleksiyon oluşturma",
+              "İlan başına daha fazla görsel",
+              "Daha yüksek ilan limiti",
+              "İlanlarınız standart ilanların önünde sıralanır",
             ],
             ctaUrl: `${process.env.FRONTEND_URL || "https://tarodan.com.tr"}/membership`,
             ctaText: "Premium Üye Ol",
@@ -221,7 +229,9 @@ export class MembershipSchedulerService implements OnModuleInit {
       // Find memberships expiring in 7 days
       const expiringIn7Days = await this.prisma.userMembership.findMany({
         where: {
-          status: "active",
+          // cancelled da dahil: iptal "dönem sonuna kadar hak sürer" demek —
+          // erişimini kaybetmek üzere olan kitle tam olarak onlar.
+          status: { in: ["active", "cancelled"] },
           currentPeriodEnd: {
             gte: new Date(sevenDaysFromNow.setHours(0, 0, 0, 0)),
             lt: new Date(sevenDaysFromNow.setHours(23, 59, 59, 999)),
@@ -240,7 +250,8 @@ export class MembershipSchedulerService implements OnModuleInit {
       // Find memberships expiring tomorrow
       const expiringTomorrow = await this.prisma.userMembership.findMany({
         where: {
-          status: "active",
+          // cancelled da dahil (7 günlük hatırlatma ile aynı gerekçe).
+          status: { in: ["active", "cancelled"] },
           currentPeriodEnd: {
             gte: new Date(oneDayFromNow.setHours(0, 0, 0, 0)),
             lt: new Date(oneDayFromNow.setHours(23, 59, 59, 999)),
@@ -265,44 +276,12 @@ export class MembershipSchedulerService implements OnModuleInit {
 
       // Send 7-day reminders
       for (const membership of expiringIn7Days) {
-        await this.emailQueue.add("send-template", {
-          to: membership.user.email,
-          subject: `${membership.tier.name} Üyeliğiniz 7 Gün İçinde Sona Eriyor`,
-          template: "membership-expiring",
-          templateData: {
-            userName: membership.user.displayName,
-            tierName: membership.tier.name,
-            expirationDate:
-              membership.currentPeriodEnd.toLocaleDateString("tr-TR"),
-            daysRemaining: 7,
-            renewUrl: `${process.env.FRONTEND_URL || "https://tarodan.com.tr"}/membership/renew`,
-            autoRenew: membership.autoRenew,
-            renewNote: membership.autoRenew
-              ? "Otomatik yenileme açık: üyeliğin bitince hatırlatma göndereceğiz, tek tıkla yenileyebilirsin."
-              : "Üyeliğini kaybetmemek için yenilemeyi unutma.",
-          },
-        });
+        await this.sendExpirationReminder(membership, 7);
       }
 
       // Send 1-day reminders (more urgent)
       for (const membership of expiringTomorrow) {
-        await this.emailQueue.add("send-template", {
-          to: membership.user.email,
-          subject: `${membership.tier.name} Üyeliğiniz Yarın Sona Eriyor`,
-          template: "membership-expiring-urgent",
-          templateData: {
-            userName: membership.user.displayName,
-            tierName: membership.tier.name,
-            expirationDate:
-              membership.currentPeriodEnd.toLocaleDateString("tr-TR"),
-            daysRemaining: 1,
-            renewUrl: `${process.env.FRONTEND_URL || "https://tarodan.com.tr"}/membership/renew`,
-            autoRenew: membership.autoRenew,
-            renewNote: membership.autoRenew
-              ? "Otomatik yenileme açık: üyeliğin bitince hatırlatma göndereceğiz, tek tıkla yenileyebilirsin."
-              : "Üyeliğini kaybetmemek için yenilemeyi unutma.",
-          },
-        });
+        await this.sendExpirationReminder(membership, 1);
       }
 
       log(
@@ -328,6 +307,57 @@ export class MembershipSchedulerService implements OnModuleInit {
       // "başarılı" görünür ve hata yalnız log satırında kalır).
       throw error;
     }
+  }
+
+  /**
+   * Tek hatırlatma: e-posta + in-app/push birlikte. 7-gün ve 1-gün turları
+   * yalnız şablon/aciliyet farkıyla aynı içeriği üretir — tek noktadan.
+   */
+  private async sendExpirationReminder(
+    membership: {
+      autoRenew: boolean;
+      currentPeriodEnd: Date;
+      user: { id: string; email: string; displayName: string | null };
+      tier: { name: string; type: string };
+    },
+    daysRemaining: 7 | 1,
+  ): Promise<void> {
+    await this.emailQueue.add("send-template", {
+      to: membership.user.email,
+      subject:
+        daysRemaining === 7
+          ? `${membership.tier.name} Üyeliğiniz 7 Gün İçinde Sona Eriyor`
+          : `${membership.tier.name} Üyeliğiniz Yarın Sona Eriyor`,
+      template:
+        daysRemaining === 7
+          ? "membership-expiring"
+          : "membership-expiring-urgent",
+      templateData: {
+        userName: membership.user.displayName,
+        tierName: membership.tier.name,
+        expirationDate: membership.currentPeriodEnd.toLocaleDateString("tr-TR"),
+        daysRemaining,
+        // /membership/renew diye bir sayfa yok; yenileme üyelik sayfasından yapılır.
+        renewUrl: `${process.env.FRONTEND_URL || "https://tarodan.com.tr"}/membership`,
+        autoRenew: membership.autoRenew,
+        renewNote: membership.autoRenew
+          ? "Otomatik yenileme açık: üyeliğin bitince hatırlatma göndereceğiz, tek tıkla yenileyebilirsin."
+          : "Üyeliğini kaybetmemek için yenilemeyi unutma.",
+      },
+    });
+    // Zil + push: e-postayı görmeyen kullanıcı için. Best-effort — bildirim
+    // hatası hatırlatma turunu durdurmaz.
+    await this.notifications
+      ?.createInAppNotification(
+        membership.user.id,
+        NotificationType.MEMBERSHIP_EXPIRING,
+        { tierName: membership.tier.name, daysLeft: daysRemaining },
+      )
+      .catch((err: any) =>
+        this.logger.warn(
+          `MEMBERSHIP_EXPIRING bildirimi başarısız (user ${membership.user.id}): ${err?.message}`,
+        ),
+      );
   }
 
   /**

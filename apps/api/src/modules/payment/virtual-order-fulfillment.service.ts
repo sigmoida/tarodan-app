@@ -17,7 +17,10 @@ import {
   RELEVANCE_PREMIUM_BONUS,
 } from "../product/helpers/relevance-score";
 import { ElogoInvoicingService } from "../elogo";
-import { isPremiumEntitled } from "../membership/membership.util";
+import {
+  hasUsableRecurringCard,
+  isPremiumEntitled,
+} from "../membership/membership.util";
 import { OutboxService } from "../outbox/outbox.service";
 import { OUTBOX_REVENUE_INVOICE_ISSUE } from "../outbox/outbox.types";
 
@@ -168,12 +171,16 @@ export class VirtualOrderFulfillmentService {
         };
       }
 
+      // D1: autoRenew yalnız kullanıcısız çekilebilir kayıtlı kart varsa açılır.
+      // Kartsız üyeye "yenilenecek" vaadi vermek dönem sonunda sessiz düşüş
+      // demekti; kartsızlar hatırlatma e-postası + yeniden satın alma akışına düşer.
+      const autoRenew = await hasUsableRecurringCard(tx, payment.order.buyerId);
       await tx.userMembership.update({
         where: { userId: payment.order.buyerId },
         data: {
           status: SubscriptionStatus.active,
           cancelledAt: null,
-          autoRenew: true,
+          autoRenew,
           ...tierPatch,
         },
       });

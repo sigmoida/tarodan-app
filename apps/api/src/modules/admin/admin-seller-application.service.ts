@@ -1,5 +1,6 @@
 import {
   Injectable,
+  Logger,
   NotFoundException,
   BadRequestException,
 } from "@nestjs/common";
@@ -7,6 +8,7 @@ import * as crypto from "crypto";
 import { PrismaService } from "../../prisma";
 import { EventService } from "../events/event.service";
 import { NotificationService } from "../notification/notification.service";
+import { NotificationType } from "../notification/dto";
 import { AdminAuditService } from "./admin-audit.service";
 import { StorageService } from "../storage/storage.service";
 import { RatingStatus, SellerApplicationQueryDto } from "./dto";
@@ -29,6 +31,8 @@ import { outboundPackageShipping } from "../shipping/shipping-tariff.helper";
  */
 @Injectable()
 export class AdminSellerApplicationService {
+  private readonly logger = new Logger(AdminSellerApplicationService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly eventService: EventService,
@@ -284,6 +288,23 @@ export class AdminSellerApplicationService {
         reason: reason.trim(),
       },
     );
+    // In-app+push yalnız hesap yaratılmış başvuruda: submitted aşamasındaki
+    // reddin henüz bildirilecek kullanıcısı yok. Best-effort — post-commit,
+    // bildirim hatası reddi geri almaz.
+    if (application.userId) {
+      try {
+        await this.notificationService.createInAppNotification(
+          application.userId,
+          NotificationType.SELLER_APPLICATION_REJECTED,
+          // Şablon "...reddedildi.{reason}" — gerekçe ayrı cümle olarak eklenir.
+          { reason: ` ${reason.trim()}` },
+        );
+      } catch (err: any) {
+        this.logger.warn(
+          `SELLER_APPLICATION_REJECTED bildirimi başarısız (${applicationId}): ${err?.message}`,
+        );
+      }
+    }
     return { success: true };
   }
 
@@ -467,6 +488,18 @@ export class AdminSellerApplicationService {
         companyName: application.companyTitle,
       },
     );
+    // Başvurana in-app+push: hesap satışa açıldı. Best-effort — post-commit,
+    // bildirim hatası onayı geri almaz.
+    try {
+      await this.notificationService.createInAppNotification(
+        application.user.id,
+        NotificationType.SELLER_APPLICATION_APPROVED,
+      );
+    } catch (err: any) {
+      this.logger.warn(
+        `SELLER_APPLICATION_APPROVED bildirimi başarısız (${applicationId}): ${err?.message}`,
+      );
+    }
     return { success: true, status: "approved" };
   }
 

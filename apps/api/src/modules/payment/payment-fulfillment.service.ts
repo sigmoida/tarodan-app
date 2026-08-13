@@ -481,6 +481,17 @@ export class PaymentFulfillmentService {
         payment,
         transactionId,
       });
+      // İstek listesi "satıldı" bildirimi ödeme BAŞARISINDA çıkar: sipariş
+      // oluşturma anında (pending_payment) gönderilince ödeme hiç
+      // tamamlanmasa da takipçilere "satıldı" deniyordu. Post-commit,
+      // fire-and-forget — hata fulfillment'ı bozmaz (notifyBoostActivated
+      // kalıbı). Sanal (üyelik/boost) siparişler bu bloğa hiç girmez.
+      void this.notifyWishlistSold(
+        resultOrder.productId,
+        resultOrder.product?.title ?? "",
+        resultOrder.sellerId,
+        resultOrder.buyerId,
+      );
     }
 
     // Tarodan gelir e-Arşivi (sanal hizmet): üyelik → üyeye, boost → satıcıya.
@@ -491,6 +502,9 @@ export class PaymentFulfillmentService {
         resultOrder.id,
         transactionId,
       );
+      // Üyeye "üyeliğiniz yükseltildi" bildirimi — post-commit, hata
+      // aktivasyonu bozmaz (BOOST_ACTIVATED ile aynı kalıp).
+      void this.notifyMembershipUpgraded(resultOrder.id, resultOrder.buyerId);
     }
     if (isBoostOrder) {
       this.virtualOrder.issueBoostInvoice(resultOrder.id);
@@ -527,6 +541,74 @@ export class PaymentFulfillmentService {
     } catch (err: any) {
       this.logger.warn(
         `BOOST_ACTIVATED bildirimi başarısız (${orderId}): ${err?.message}`,
+      );
+    }
+  }
+
+  /**
+   * Üyelik aktivasyon bildirimi: paket adı ödeme niyetinin hedef tier'ından
+   * gelir (canlı satır sonradan değişebilir); intent'siz eski siparişte
+   * aktivasyon canlı satırı ödenen tier'a çevirdiği için oradan okunur.
+   */
+  private async notifyMembershipUpgraded(
+    orderId: string,
+    buyerId: string,
+  ): Promise<void> {
+    try {
+      const intent = await this.prisma.membershipPayment.findUnique({
+        where: { orderId },
+        select: { targetTier: { select: { name: true } } },
+      });
+      const tierName =
+        intent?.targetTier?.name ??
+        (
+          await this.prisma.userMembership.findUnique({
+            where: { userId: buyerId },
+            select: { tier: { select: { name: true } } },
+          })
+        )?.tier?.name;
+      if (!tierName) return;
+      await this.notificationService?.createInAppNotification(
+        buyerId,
+        NotificationType.MEMBERSHIP_UPGRADED,
+        { tierName },
+      );
+    } catch (err: any) {
+      this.logger.warn(
+        `MEMBERSHIP_UPGRADED bildirimi başarısız (${orderId}): ${err?.message}`,
+      );
+    }
+  }
+
+  /**
+   * İstek listesi takipçilerine "takip ettiğiniz ürün satıldı" bildirimi.
+   * Ödeme başarısında (post-commit) çağrılır — pending_payment aşamasında
+   * gönderilmez, çünkü ödenmemiş sipariş terk edilebilir. Satıcı (kendi ürünü)
+   * ve alıcı (ürünü zaten satın alan kişi) bildirim almaz. Asla throw etmez.
+   */
+  private async notifyWishlistSold(
+    productId: string,
+    productTitle: string,
+    sellerId: string,
+    buyerId: string,
+  ): Promise<void> {
+    try {
+      const wishlistEntries = await this.prisma.wishlistItem.findMany({
+        where: { productId },
+        include: { wishlist: { select: { userId: true } } },
+      });
+      for (const entry of wishlistEntries) {
+        const userId = entry.wishlist.userId;
+        if (userId === sellerId || userId === buyerId) continue;
+        await this.notificationService?.createInAppNotification(
+          userId,
+          NotificationType.WISHLIST_SOLD,
+          { productId, productTitle },
+        );
+      }
+    } catch (err: any) {
+      this.logger.warn(
+        `WISHLIST_SOLD bildirimi başarısız (${productId}): ${err?.message}`,
       );
     }
   }
@@ -843,6 +925,21 @@ export class PaymentFulfillmentService {
         skipBuyer: true,
         transactionId,
       });
+    }
+
+    // İstek listesi "satıldı" bildirimi: tekil yolla aynı — ödeme başarısında,
+    // ürün başına TEK kez (aynı ürün grupta birden çok siparişte olsa bile).
+    // Post-commit fire-and-forget; hata grup işlemeyi bozmaz.
+    const wishlistNotifiedProducts = new Set<string>();
+    for (const order of result.fulfilledOrders) {
+      if (wishlistNotifiedProducts.has(order.productId)) continue;
+      wishlistNotifiedProducts.add(order.productId);
+      void this.notifyWishlistSold(
+        order.productId,
+        order.product?.title ?? "",
+        order.sellerId,
+        order.buyerId,
+      );
     }
 
     this.logger.log(

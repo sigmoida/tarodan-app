@@ -9,6 +9,8 @@ describe("VirtualOrderFulfillmentService", () => {
   const makeTx = () => ({
     userMembership: { findUnique: jest.fn(), update: jest.fn() },
     membershipTier: { findUnique: jest.fn() },
+    // D1: autoRenew kararı kullanılabilir kayıtlı karta bakar (tx üzerinden).
+    savedCard: { findFirst: jest.fn().mockResolvedValue(null) },
     product: {
       updateMany: jest.fn(),
       findUnique: jest.fn(),
@@ -74,6 +76,8 @@ describe("VirtualOrderFulfillmentService", () => {
       tx.userMembership.findUnique.mockResolvedValue(membership("premium"));
       tx.membershipPayment.findUnique.mockResolvedValue(intent("premium"));
       tx.membershipPayment.updateMany.mockResolvedValue({ count: 1 });
+      // D1: kullanılabilir kayıtlı kart var → autoRenew açılır.
+      tx.savedCard.findFirst.mockResolvedValue({ id: "card-1" });
       const svc = new VirtualOrderFulfillmentService({} as any, {} as any);
 
       await svc.applyMembershipInTx(tx, payment, "txn-9");
@@ -109,6 +113,31 @@ describe("VirtualOrderFulfillmentService", () => {
       expect(tx.order.update).toHaveBeenCalledWith({
         where: { id: "ord-1" },
         data: { status: OrderStatus.completed, preparingDeadline: null },
+      });
+    });
+
+    it("D1: kullanılabilir kayıtlı kart YOKSA autoRenew açılmaz", async () => {
+      const tx = makeTx() as any;
+      tx.userMembership.findUnique.mockResolvedValue(membership("premium"));
+      tx.membershipPayment.findUnique.mockResolvedValue(intent("premium"));
+      tx.membershipPayment.updateMany.mockResolvedValue({ count: 1 });
+      // makeTx varsayılanı: savedCard.findFirst → null (kart yok)
+      const svc = new VirtualOrderFulfillmentService({} as any, {} as any);
+
+      await svc.applyMembershipInTx(tx, payment, "txn-9");
+
+      expect(tx.savedCard.findFirst).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            userId: "buyer-1",
+            provider: "paytr",
+            requireCvv: false,
+          }),
+        }),
+      );
+      expect(tx.userMembership.update).toHaveBeenCalledWith({
+        where: { userId: "buyer-1" },
+        data: expect.objectContaining({ autoRenew: false }),
       });
     });
 

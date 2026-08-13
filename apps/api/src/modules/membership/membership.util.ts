@@ -2,6 +2,7 @@ import {
   BusinessStatus,
   SubscriptionStatus,
   MembershipTierType,
+  SavedCardStatus,
   Prisma,
 } from "@prisma/client";
 
@@ -81,6 +82,29 @@ export function effectiveMembershipTierType(
   }
 
   return MembershipTierType.free;
+}
+
+/**
+ * Kullanıcısız (MIT) tekrarlı çekimde kullanılabilir kayıtlı kart var mı?
+ * PayTR CAPI'de yalnız aktif ve CVV istemeyen kart kullanıcı etkileşimi olmadan
+ * çekilebilir. toggleAutoRenew, üyelik fulfillment'ının autoRenew kararı (D1) ve
+ * planlı ücretli geçiş kapısı (D2) aynı tanımı paylaşır — tek doğruluk kaynağı.
+ * Transaction içinden çağrılabilsin diye client parametre alır.
+ */
+export async function hasUsableRecurringCard(
+  client: Pick<Prisma.TransactionClient, "savedCard">,
+  userId: string,
+): Promise<boolean> {
+  const card = await client.savedCard.findFirst({
+    where: {
+      userId,
+      provider: "paytr",
+      status: SavedCardStatus.active,
+      requireCvv: false,
+    },
+    select: { id: true },
+  });
+  return card != null;
 }
 
 /**

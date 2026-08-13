@@ -6,7 +6,7 @@ import {
   SavedCardStatus,
   SubscriptionStatus,
 } from "@prisma/client";
-import { ForbiddenException } from "@nestjs/common";
+import { BadRequestException, ForbiddenException } from "@nestjs/common";
 import { PaymentProvider } from "../payment/dto";
 import { MembershipSubscriptionService } from "./membership-subscription.service";
 import { OUTBOX_SAVED_CARD_PROVIDER_DELETE } from "../outbox/outbox.types";
@@ -121,6 +121,9 @@ describe("MembershipSubscriptionService", () => {
       completeRecurringMembershipPayment: jest.fn(),
       failRecurringMembershipPayment: jest.fn(),
     };
+    const notifications = {
+      createInAppNotification: jest.fn().mockResolvedValue(true),
+    };
     const service = new MembershipSubscriptionService(
       prisma as any,
       paymentService as any,
@@ -130,6 +133,8 @@ describe("MembershipSubscriptionService", () => {
       providerEvents as any,
       outbox as any,
       virtualOrder as any,
+      undefined, // searchQueue
+      notifications as any,
     );
     return {
       service,
@@ -142,6 +147,7 @@ describe("MembershipSubscriptionService", () => {
       providerEvents,
       outbox,
       virtualOrder,
+      notifications,
     };
   };
 
@@ -226,6 +232,134 @@ describe("MembershipSubscriptionService", () => {
     ).rejects.toBeInstanceOf(ForbiddenException);
     expect(paymentService.initiatePayment).not.toHaveBeenCalled();
     expect(prisma.userMembership.update).not.toHaveBeenCalled();
+  });
+
+  it("onaylı kurumsal hesap Business dışı paket isterse yön-özel mesaj alır", async () => {
+    const { service, prisma, paymentService } = makeService();
+    prisma.membershipTier.findUnique.mockResolvedValue(
+      tier(MembershipTierType.premium),
+    );
+    prisma.user.findUnique.mockResolvedValue({
+      businessStatus: BusinessStatus.approved,
+      companyName: "Acme A.S.",
+      taxId: "1234567890",
+    });
+
+    const err = await service
+      .subscribe("user-1", {
+        tierType: MembershipTierType.premium,
+        billingPeriod: "monthly",
+      })
+      .catch((e) => e);
+
+    expect(err).toBeInstanceOf(ForbiddenException);
+    // "Business şirketlere özel" mesajı bu yönü açıklamaz — ayrı anahtar.
+    expect(err.getResponse()).toMatchObject({
+      i18nKey: "server.membership.corporateMustUseBusinessTier",
+    });
+    expect(paymentService.initiatePayment).not.toHaveBeenCalled();
+  });
+
+  describe("D2 — planlı (dönem sonu) geçiş kapısı", () => {
+    const individual = {
+      businessStatus: null,
+      companyName: null,
+      taxId: null,
+    };
+
+    const setupDowngrade = (
+      target: ReturnType<typeof tier>,
+      harness: ReturnType<typeof makeService>,
+    ) => {
+      harness.prisma.membershipTier.findUnique.mockResolvedValue(target);
+      harness.prisma.user.findUnique.mockResolvedValue(individual);
+      harness.prisma.userMembership.findUnique.mockResolvedValue(
+        membership(tier(MembershipTierType.premium), { user: individual }),
+      );
+    };
+
+    it("ücretli hedef: recurring kapalıysa plan yazılmaz, yeniden-satın-al mesajı döner", async () => {
+      const harness = makeService();
+      setupDowngrade(tier(MembershipTierType.basic), harness);
+      // config.get default'u undefined → PAYTR_RECURRING_ENABLED kapalı.
+
+      const err = await harness.service
+        .subscribe("user-1", {
+          tierType: MembershipTierType.basic,
+          billingPeriod: "monthly",
+        })
+        .catch((e) => e);
+
+      expect(err).toBeInstanceOf(BadRequestException);
+      expect(err.getResponse()).toMatchObject({
+        i18nKey: "server.membership.scheduledChangeRequiresCard",
+      });
+      expect(harness.prisma.userMembership.update).not.toHaveBeenCalled();
+    });
+
+    it("ücretli hedef: flag açık ama kullanılabilir kart yoksa yine reddedilir", async () => {
+      const harness = makeService();
+      setupDowngrade(tier(MembershipTierType.basic), harness);
+      harness.config.get.mockImplementation((key: string) =>
+        key === "PAYTR_RECURRING_ENABLED" ? "true" : undefined,
+      );
+      harness.prisma.savedCard.findFirst.mockResolvedValue(null);
+
+      const err = await harness.service
+        .subscribe("user-1", {
+          tierType: MembershipTierType.basic,
+          billingPeriod: "monthly",
+        })
+        .catch((e) => e);
+
+      expect(err).toBeInstanceOf(BadRequestException);
+      expect(err.getResponse()).toMatchObject({
+        i18nKey: "server.membership.scheduledChangeRequiresCard",
+      });
+      expect(harness.prisma.userMembership.update).not.toHaveBeenCalled();
+    });
+
+    it("ücretli hedef: flag + kullanılabilir kart varsa plan yazılır", async () => {
+      const harness = makeService();
+      setupDowngrade(tier(MembershipTierType.basic), harness);
+      harness.config.get.mockImplementation((key: string) =>
+        key === "PAYTR_RECURRING_ENABLED" ? "true" : undefined,
+      );
+      harness.prisma.savedCard.findFirst.mockResolvedValue({ id: "card-1" });
+
+      await harness.service.subscribe("user-1", {
+        tierType: MembershipTierType.basic,
+        billingPeriod: "monthly",
+      });
+
+      expect(harness.prisma.userMembership.update).toHaveBeenCalledWith({
+        where: { userId: "user-1" },
+        data: expect.objectContaining({
+          scheduledTierType: MembershipTierType.basic,
+          scheduledBillingPeriod: "monthly",
+          autoRenew: true,
+        }),
+      });
+    });
+
+    it("free hedef: kartsız/flag'siz de her zaman planlanabilir", async () => {
+      const harness = makeService();
+      setupDowngrade(tier(MembershipTierType.free), harness);
+
+      await harness.service.subscribe("user-1", {
+        tierType: MembershipTierType.free,
+        billingPeriod: "monthly",
+      });
+
+      expect(harness.prisma.savedCard.findFirst).not.toHaveBeenCalled();
+      expect(harness.prisma.userMembership.update).toHaveBeenCalledWith({
+        where: { userId: "user-1" },
+        data: expect.objectContaining({
+          scheduledTierType: MembershipTierType.free,
+          autoRenew: false,
+        }),
+      });
+    });
   });
 
   it("keeps the paid entitlement unchanged while opening an upgrade intent", async () => {
@@ -503,5 +637,153 @@ describe("MembershipSubscriptionService", () => {
         status: "failed",
       }),
     );
+  });
+
+  describe("D3 — süre dolmadan çekim + dönem ekleme (append)", () => {
+    const renewalHarness = (currentPeriodEnd: Date) => {
+      const harness = makeService();
+      const periodStart = new Date(
+        currentPeriodEnd.getTime() - 30 * 24 * 60 * 60 * 1000,
+      );
+      const current = membership(tier(MembershipTierType.premium), {
+        autoRenew: true,
+        currentPeriodStart: periodStart,
+        currentPeriodEnd,
+        user: {
+          id: "user-1",
+          displayName: "Test User",
+          email: "user@example.com",
+          phone: "+905551112233",
+          businessStatus: BusinessStatus.approved,
+          companyName: "Acme A.S.",
+          taxId: "1234567890",
+          savedCards: [
+            {
+              id: "card-1",
+              utoken: "utoken",
+              ctoken: "ctoken",
+              last4: "4242",
+              mandateIp: "127.0.0.1",
+            },
+          ],
+        },
+      });
+      harness.config.get.mockImplementation((key: string) =>
+        key === "PAYTR_RECURRING_ENABLED" ? "true" : undefined,
+      );
+      harness.prisma.userMembership.findMany.mockResolvedValue([current]);
+      harness.prisma.membershipPayment.create.mockResolvedValue({
+        id: "renewal-1",
+      });
+      harness.provider.chargeRecurring.mockResolvedValue({
+        status: "success",
+        raw: { status: "success" },
+      });
+      harness.virtualOrder.completeRecurringMembershipPayment.mockResolvedValue(
+        true,
+      );
+      return harness;
+    };
+
+    it("seçim penceresi dönem sonuna 1 saat kalanları da kapsar", async () => {
+      const oldEnd = new Date(Date.now() + 30 * 60 * 1000);
+      const { service, prisma } = renewalHarness(oldEnd);
+      const before = Date.now();
+
+      await service.runAutoRenewals();
+
+      const where = prisma.userMembership.findMany.mock.calls[0][0].where;
+      const lte: Date = where.currentPeriodEnd.lte;
+      // now + 1 saat (çağrı süresi toleransıyla)
+      expect(lte.getTime()).toBeGreaterThanOrEqual(before + 59 * 60 * 1000);
+      expect(lte.getTime()).toBeLessThanOrEqual(Date.now() + 61 * 60 * 1000);
+    });
+
+    it("süre dolmadan çekimde yeni dönem ESKİ dönem sonundan başlar", async () => {
+      const oldEnd = new Date(Date.now() + 30 * 60 * 1000);
+      const harness = renewalHarness(oldEnd);
+
+      const result = await harness.service.runAutoRenewals();
+
+      expect(result.renewed).toBe(1);
+      const data =
+        harness.prisma.membershipPayment.create.mock.calls[0][0].data;
+      expect(data.periodStart).toEqual(oldEnd);
+      const expectedEnd = new Date(oldEnd);
+      expectedEnd.setMonth(expectedEnd.getMonth() + 1);
+      expect(data.periodEnd).toEqual(expectedEnd);
+    });
+
+    it("2 gündür süresi geçmiş (bayat) satırda yeni dönem now'dan başlar", async () => {
+      const oldEnd = new Date(Date.now() - 2 * 24 * 60 * 60 * 1000);
+      const harness = renewalHarness(oldEnd);
+      const before = Date.now();
+
+      const result = await harness.service.runAutoRenewals();
+
+      expect(result.renewed).toBe(1);
+      const data =
+        harness.prisma.membershipPayment.create.mock.calls[0][0].data;
+      const start: Date = data.periodStart;
+      // Eski uca eklemek dönemi geçmişe kurardı; taban çekim anıdır.
+      expect(start.getTime()).toBeGreaterThanOrEqual(before);
+      expect(start.getTime()).toBeLessThanOrEqual(Date.now());
+      const expectedEnd = new Date(start);
+      expectedEnd.setMonth(expectedEnd.getMonth() + 1);
+      expect(data.periodEnd).toEqual(expectedEnd);
+    });
+  });
+
+  describe("checkExpiredMemberships", () => {
+    it("free'ye düşen üyeye MEMBERSHIP_EXPIRED bildirimi gönderir", async () => {
+      const { service, prisma, notifications } = makeService();
+      prisma.userMembership.findMany.mockResolvedValue([
+        {
+          id: "membership-1",
+          userId: "user-1",
+          tier: { name: "Premium Üyelik" },
+        },
+      ]);
+      prisma.membershipTier.findUnique.mockResolvedValue({
+        id: "free-tier",
+        type: MembershipTierType.free,
+        // canTrade=true → pending takas iptali dalına girilmez (o dal ayrı test edilir).
+        canTrade: true,
+      });
+      prisma.userMembership.update.mockResolvedValue({});
+
+      const count = await service.checkExpiredMemberships();
+
+      expect(count).toBe(1);
+      expect(prisma.userMembership.update).toHaveBeenCalledWith({
+        where: { id: "membership-1" },
+        data: expect.objectContaining({
+          tierId: "free-tier",
+          autoRenew: false,
+        }),
+      });
+      expect(notifications.createInAppNotification).toHaveBeenCalledWith(
+        "user-1",
+        "membership_expired",
+        { tierName: "Premium Üyelik" },
+      );
+    });
+
+    it("bildirim hatası düşürmeyi geri almaz", async () => {
+      const { service, prisma, notifications } = makeService();
+      prisma.userMembership.findMany.mockResolvedValue([
+        { id: "membership-1", userId: "user-1", tier: { name: "Premium" } },
+      ]);
+      prisma.membershipTier.findUnique.mockResolvedValue({
+        id: "free-tier",
+        canTrade: true,
+      });
+      prisma.userMembership.update.mockResolvedValue({});
+      notifications.createInAppNotification.mockRejectedValue(
+        new Error("push down"),
+      );
+
+      await expect(service.checkExpiredMemberships()).resolves.toBe(1);
+    });
   });
 });

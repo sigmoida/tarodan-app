@@ -1,6 +1,7 @@
 import { Injectable, Logger, Optional } from "@nestjs/common";
 import { DiscountTarget } from "@prisma/client";
 import { PrismaService } from "../../prisma";
+import { effectiveMembershipTierType } from "../membership/membership.util";
 import { FeeDiscountResolver } from "../discount/fee-discount.resolver";
 import {
   applyFeeDiscounts,
@@ -68,16 +69,32 @@ export class OrderFeeDiscountService {
   /**
    * Alıcının geçerli üyelik katmanı — üyelik hedefli kampanyalar için. Misafirde
    * (kimlik yok) null döner ve üyelik hedefli kampanya uygulanmaz.
+   *
+   * Tek doğruluk kaynağı `effectiveMembershipTierType`: hakkı geçerli olmayan
+   * (süresi dolmuş, tier'ı pasif, KYC'siz business) alıcı "free" sayılır;
+   * iptal edilmiş ama dönemi süren üye tier avantajını dönem sonuna kadar korur.
+   * (Eski `status === "active"` kontrolü süresi dolmuşa tier indirimi veriyor,
+   * iptal-dönem-içi üyeyi ise haksız yere dışarıda bırakıyordu.)
    */
   async resolveBuyerTier(buyerId?: string | null): Promise<string | null> {
     if (!buyerId || !this.prisma) return null;
     try {
       const membership = await this.prisma.userMembership.findUnique({
         where: { userId: buyerId },
-        select: { status: true, tier: { select: { type: true } } },
+        select: {
+          status: true,
+          currentPeriodEnd: true,
+          tier: { select: { type: true, isActive: true } },
+          user: {
+            select: {
+              businessStatus: true,
+              companyName: true,
+              taxId: true,
+            },
+          },
+        },
       });
-      if (!membership || membership.status !== "active") return null;
-      return membership.tier?.type ?? null;
+      return effectiveMembershipTierType(membership, membership?.user);
     } catch (error) {
       this.logger.warn(`alıcı üyelik katmanı okunamadı: ${error}`);
       return null;
