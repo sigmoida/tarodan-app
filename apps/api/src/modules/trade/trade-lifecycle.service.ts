@@ -354,6 +354,25 @@ export class TradeLifecycleService {
       );
     }
 
+    // Taahhüt: yetki teklif VE kabul anında İKİ taraf için de denetlenir.
+    // Teklif verenin üyeliği bu arada düşmüşse (gece süpürmesi bekleyen
+    // teklifleri henüz iptal etmemişse) kabul takası başlatmamalı — aksi
+    // halde takas hakkı olmayan tarafla escrow'lu süreç açılır.
+    const tradeParties = await this.prisma.trade.findUnique({
+      where: { id: tradeId },
+      select: { initiatorId: true },
+    });
+    if (tradeParties) {
+      const initiatorCanTrade = await this.membershipService.canCreateTrade(
+        tradeParties.initiatorId,
+      );
+      if (!initiatorCanTrade.allowed) {
+        throw new BadRequestException(
+          i18nMessage("server.trade.counterpartyMembershipExpired"),
+        );
+      }
+    }
+
     // Get deadline settings (read-only, safe outside tx)
     const paymentHoursSetting = await this.prisma.platformSetting.findUnique({
       where: { settingKey: "trade_payment_deadline_hours" },
