@@ -24,6 +24,7 @@ export const webAuthConfig: AuthConfig = {
     logout: "/auth/logout",
     forgotPassword: "/auth/forgot-password",
     google: "/auth/google",
+    apple: "/auth/apple",
   },
   ttls: {
     accessMaxAge: 60 * 15, // 15 min — matches the user JWT access TTL

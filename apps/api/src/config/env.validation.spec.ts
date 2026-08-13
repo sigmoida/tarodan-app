@@ -41,6 +41,10 @@ describe("validateEnv", () => {
     SURAT_KARGO_TEST_MODE: "false",
     SURAT_KARGO_CARI_KODU: "cargo-account",
     SURAT_KARGO_SIFRE: "cargo-password",
+    GOOGLE_CLIENT_ID_WEB: "google-client-id.apps.googleusercontent.com",
+    GOOGLE_CLIENT_SECRET: "google-client-secret",
+    APPLE_CLIENT_ID: "com.tarodan.app",
+    APPLE_SERVICES_ID: "com.tarodan.web",
     NETGSM_USERCODE: "netgsm-user",
     NETGSM_PASSWORD: "netgsm-password",
     NETGSM_MSGHEADER: "TARODAN",
@@ -166,6 +170,16 @@ describe("validateEnv", () => {
         SURAT_KARGO_SIFRE: "s",
       }),
     ).toThrow(/SURAT_KARGO_TEST_MODE/);
+  });
+
+  // Sosyal giriş yapılandırması eksikse buton canlıda görünüp tıklanınca
+  // patlıyor; hatanın açılışta çıkması gerekir.
+  it("throws in production when social sign-in configuration is missing", () => {
+    expect(() =>
+      validateEnv(
+        without(prodBase, "GOOGLE_CLIENT_SECRET", "APPLE_SERVICES_ID"),
+      ),
+    ).toThrow(/GOOGLE_CLIENT_SECRET|APPLE_SERVICES_ID/);
   });
 
   // NetGSM eksikse sağlayıcı mock'a düşüp "gönderildi" döner: kullanıcı kod

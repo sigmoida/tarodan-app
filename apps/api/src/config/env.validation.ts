@@ -89,6 +89,15 @@ const envSchema = z
     SURAT_CARGO_MAX_RETRIES: z.string().optional(),
     SURAT_CARGO_RETRY_BASE_MS: z.string().optional(),
 
+    // Social sign-in. Required in production: the web Google flow is
+    // authorization-code (the secret is what exchanges it) and the web Apple
+    // flow mints tokens for the Services ID, which must be in the audience.
+    // Without them the buttons render and fail on click.
+    GOOGLE_CLIENT_ID_WEB: z.string().optional(),
+    GOOGLE_CLIENT_SECRET: z.string().optional(),
+    APPLE_CLIENT_ID: z.string().optional(),
+    APPLE_SERVICES_ID: z.string().optional(),
+
     // NetGSM — phone-verification OTP. Required in production: without the
     // credentials the provider falls back to a mock that logs the code and
     // returns success, so the user sees "code sent" and no SMS ever arrives.
@@ -414,6 +423,25 @@ const envSchema = z
             message: `${key} is required in production when SURAT_CARGO_ENABLED is set`,
           });
         }
+      }
+    }
+
+    // Sosyal giriş: butonlar canlıda görünüyorsa arkalarındaki yapılandırma da
+    // tam olmalı. Google web akışı authorization-code — kod değişimi
+    // GOOGLE_CLIENT_SECRET olmadan yapılamaz. Apple web akışında token'ın
+    // audience'ı Services ID'dir; native APPLE_CLIENT_ID tek başına yetmez.
+    for (const key of [
+      "GOOGLE_CLIENT_ID_WEB",
+      "GOOGLE_CLIENT_SECRET",
+      "APPLE_CLIENT_ID",
+      "APPLE_SERVICES_ID",
+    ] as const) {
+      if (!env[key]?.trim()) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: [key],
+          message: `${key} is required in production (social sign-in fails on click without it)`,
+        });
       }
     }
 

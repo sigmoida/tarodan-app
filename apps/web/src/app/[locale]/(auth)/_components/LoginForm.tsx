@@ -9,6 +9,7 @@ import { Form, FormInput, FormError, useZodForm } from "@tarodan/ui/form";
 import { useLocale, useTranslations } from "next-intl";
 import { AuthCard } from "./AuthCard";
 import { GoogleSignInButton } from "./GoogleSignInButton";
+import { AppleSignInButton } from "./AppleSignInButton";
 import {
   emailStepSchema,
   passwordStepSchema,
@@ -97,10 +98,11 @@ export function LoginForm() {
         </>
       }
     >
-      {/* 1. adım — e-posta + Google */}
+      {/* 1. adım — e-posta + sosyal giriş */}
       {flow.step === "identify" && (
         <div className="space-y-4">
           <GoogleSignInButton onSuccess={flow.redirectAfterGoogle} />
+          <AppleSignInButton onSuccess={flow.redirectAfterGoogle} />
           <OrDivider label={t("auth.or")} />
           <Form form={emailForm} onSubmit={onIdentify} className="space-y-4">
             <FormInput
@@ -220,6 +222,8 @@ export function LoginForm() {
             changeLabel={t("auth.useDifferentEmail")}
           />
           <p className="text-sm text-body">{t("auth.googleOnlyAccount")}</p>
+          {/* Bu dal "hesap Google ile oluşturulmuş, şifresi yok" durumuna özel
+              bir yönlendirme — Apple burada anlamsız olur, bilinçli olarak yok. */}
           <GoogleSignInButton onSuccess={flow.redirectAfterGoogle} />
           <Button
             type="button"
