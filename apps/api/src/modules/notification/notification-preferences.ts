@@ -15,20 +15,20 @@
  *  - in-app (zil) için ayrı master yok: kategori kapalı değilse her zaman düşer.
  *  - ALWAYS_SEND tipleri (güvenlik/hesap/sistem) tercihten bağımsız gider.
  */
-import { NotificationType } from './dto/notification.dto';
+import { NotificationType } from "./dto/notification.dto";
 import {
   NotificationSettings,
   DEFAULT_NOTIFICATION_SETTINGS,
-} from '../user/dto/notification-settings.dto';
+} from "../user/dto/notification-settings.dto";
 
-export type DeliveryChannel = 'push' | 'email' | 'sms' | 'in_app';
+export type DeliveryChannel = "push" | "email" | "sms" | "in_app";
 
 export type PreferenceCategory =
-  | 'orderUpdates'
-  | 'messageAlerts'
-  | 'priceDropAlerts'
-  | 'newListingAlerts'
-  | 'marketingEmails';
+  | "orderUpdates"
+  | "messageAlerts"
+  | "priceDropAlerts"
+  | "newListingAlerts"
+  | "marketingEmails";
 
 /**
  * Tercihten bağımsız her zaman gönderilen tipler (güvenlik/hesap/sistem).
@@ -42,7 +42,23 @@ const ALWAYS_SEND = new Set<string>([
   NotificationType.SYSTEM_ANNOUNCEMENT,
   NotificationType.SELLER_APPLICATION_APPROVED,
   NotificationType.SELLER_APPLICATION_REJECTED,
-  'admin_broadcast',
+  "admin_broadcast",
+]);
+
+/**
+ * Admin OPERASYON alarmları: önek eşlemesinden açıkça muaftır. Bunlar tüketici
+ * bildirimi değil operasyon sinyalidir — orderUpdates'i kapatmış bir admin
+ * "escrow takıldı / depo takıldı / iade incelemesi bekliyor" alarmlarını
+ * kişisel tercihle SUSTURAMAMALIDIR (yalnız kanal master anahtarları etkiler).
+ * CAMPAIGN_BUDGET_EXHAUSTED ve MODERATION_QUEUE_STALE önek yakalamadığı için
+ * zaten muaftı; buradaki dört tip order/trade/refund önekleriyle
+ * orderUpdates'e düşüyordu.
+ */
+const ADMIN_ALARM_TYPES = new Set<string>([
+  NotificationType.ORDER_STUCK_IN_TRANSIT,
+  NotificationType.TRADE_STUCK_AT_WAREHOUSE,
+  NotificationType.TRADE_OUTBOUND_DELIVERY_MISSING,
+  NotificationType.REFUND_REVIEW_REQUIRED_ADMIN,
 ]);
 
 /**
@@ -51,34 +67,36 @@ const ALWAYS_SEND = new Set<string>([
  * kategori toggle'ına tabi DEĞİL — yalnız kanal master anahtarına tabidir.
  */
 export function categoryForType(type: string): PreferenceCategory | null {
-  if (type === NotificationType.NEW_MESSAGE) return 'messageAlerts';
+  if (ADMIN_ALARM_TYPES.has(type)) return null;
+
+  if (type === NotificationType.NEW_MESSAGE) return "messageAlerts";
 
   if (
     type === NotificationType.PRICE_DROP ||
     type === NotificationType.BACK_IN_STOCK ||
-    type.startsWith('wishlist')
+    type.startsWith("wishlist")
   ) {
-    return 'priceDropAlerts';
+    return "priceDropAlerts";
   }
 
-  if (type === NotificationType.SELLER_NEW_LISTING) return 'newListingAlerts';
+  if (type === NotificationType.SELLER_NEW_LISTING) return "newListingAlerts";
 
   if (
     type === NotificationType.PROMOTION ||
     type === NotificationType.SPECIAL_OFFER
   ) {
-    return 'marketingEmails';
+    return "marketingEmails";
   }
 
   // Ticaret akışı: sipariş / teklif / takas / iade / ödeme
   if (
-    type.startsWith('order') ||
-    type.startsWith('offer') ||
-    type.startsWith('trade') ||
-    type.startsWith('refund') ||
-    type.startsWith('payment')
+    type.startsWith("order") ||
+    type.startsWith("offer") ||
+    type.startsWith("trade") ||
+    type.startsWith("refund") ||
+    type.startsWith("payment")
   ) {
-    return 'orderUpdates';
+    return "orderUpdates";
   }
 
   return null;
@@ -107,13 +125,13 @@ export function shouldDeliver(
   if (category && settings[category] === false) return false;
 
   switch (channel) {
-    case 'push':
+    case "push":
       return settings.pushNotifications !== false;
-    case 'email':
+    case "email":
       return settings.emailNotifications !== false;
-    case 'sms':
+    case "sms":
       return settings.smsNotifications !== false;
-    case 'in_app':
+    case "in_app":
     default:
       return true;
   }
