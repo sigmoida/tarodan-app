@@ -1410,6 +1410,7 @@
     "membershipChanged": "Üyeliğiniz başarıyla değiştirildi!",
     "membershipDowngraded": "Üyeliğiniz başarıyla değiştirildi!",
     "planAlreadyActive": "Bu plan zaten aktif",
+    "businessRequiresApproval": "İş üyeliği yalnız onaylı kurumsal hesaplar içindir. Şirket başvurunuz onaylandığında satın alabilirsiniz.",
     "loginToContinue": "Devam etmek için giriş yapın",
     "acceptTerms": "Lütfen kullanım koşullarını kabul edin",
     "fillCardInfo": "Lütfen tüm kart bilgilerini doldurun",

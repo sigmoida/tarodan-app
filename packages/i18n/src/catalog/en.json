@@ -1410,6 +1410,7 @@
     "membershipChanged": "Your membership was changed successfully!",
     "membershipDowngraded": "Your membership was changed successfully!",
     "planAlreadyActive": "This plan is already active",
+    "businessRequiresApproval": "The Business plan is available to approved corporate accounts only. You can purchase it once your company application is approved.",
     "loginToContinue": "Please sign in to continue",
     "acceptTerms": "Please accept the terms of service",
     "fillCardInfo": "Please fill in all card information",

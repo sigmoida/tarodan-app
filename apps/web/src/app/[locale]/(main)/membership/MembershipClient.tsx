@@ -30,7 +30,18 @@ export default function MembershipClient() {
   const { membership } = useMyMembership(isAuthenticated);
   const actions = useMembershipActions();
 
-  const isBusinessAccount = !!(user && user.companyName && user.taxId);
+  // Kurumsal iz: davet aktivasyonundan itibaren businessStatus dolu gelir.
+  // Satın alma yetkisi ise API ile birebir aynı — YALNIZ nihai onaylı kurumsal
+  // (approved + companyName + taxId) business alabilir. Eski `companyName &&
+  // taxId` kontrolü taxId nihai onaya kadar boş kaldığından hem onaysızları
+  // dışarıda bırakıyor hem de API'nin approved şartından ayrışıyordu.
+  const isBusinessTrack = user?.businessStatus != null;
+  const isBusinessAccount = !!(
+    user &&
+    user.businessStatus === "approved" &&
+    user.companyName &&
+    user.taxId
+  );
 
   const {
     selectedPeriod,
@@ -50,8 +61,9 @@ export default function MembershipClient() {
 
   const allTiers = useMemo(() => buildTiers(tierData, t), [tierData, t]);
   const tiers = useMemo(
-    () => visibleTiers(allTiers, { isBusinessAccount, currentTier }),
-    [allTiers, isBusinessAccount, currentTier],
+    () =>
+      visibleTiers(allTiers, { isAuthenticated, isBusinessTrack, currentTier }),
+    [allTiers, isAuthenticated, isBusinessTrack, currentTier],
   );
   const showRequiredBanner =
     isRequired && isBusinessAccount && currentTier !== "business";

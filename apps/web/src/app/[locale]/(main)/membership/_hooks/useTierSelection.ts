@@ -113,6 +113,13 @@ export function useTierSelection({
       toast(t("membership.planAlreadyActive"));
       return;
     }
+    // Business paketi yalnız NİHAİ onaylı kurumsal satın alabilir (API'nin 403
+    // kuralıyla aynı). Girişli ama onaysız kullanıcı (deep-link ya da onay
+    // bekleyen kurumsal) checkout'ta duvara çarpmasın, nedenini burada duysun.
+    if (tierId === "business" && isAuthenticated && !isBusinessAccount) {
+      toast.error(t("membership.businessRequiresApproval"));
+      return;
+    }
     // Paralı üyelikten free'ye geçiş = iptal (dönem sonuna kadar aktif, iade yok).
     if (tierId === "free") {
       if (currentTier && currentTier !== "free") onDowngradeToFree();

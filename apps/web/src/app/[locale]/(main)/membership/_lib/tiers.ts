@@ -44,6 +44,15 @@ export function normalizeTierData(raw: unknown): TierData {
 
   const num = (v: unknown) => (v == null ? undefined : Number(v));
 
+  // Rozet TÜM ücretli katmanların oranından türetilir; oranlar ayrışırsa EN
+  // DÜŞÜK gösterilir — rozet hiçbir kartta olandan fazlasını vaat edemez.
+  // (Eskiden yalnız premium'un oranı okunuyordu.)
+  const discountPcts = [
+    pct(num(basic?.monthlyPrice), num(basic?.yearlyPrice)),
+    pct(num(premium?.monthlyPrice), num(premium?.yearlyPrice)),
+    pct(num(business?.monthlyPrice), num(business?.yearlyPrice)),
+  ].filter((v): v is number => typeof v === "number" && v > 0);
+
   const limits: ListingLimits = {
     free_listing_limit: free?.maxTotalListings,
     basic_listing_limit: basic?.maxTotalListings,
@@ -73,8 +82,9 @@ export function normalizeTierData(raw: unknown): TierData {
     premium_yearly_price: num(premium?.yearlyPrice),
     business_monthly_price: num(business?.monthlyPrice),
     business_yearly_price: num(business?.yearlyPrice),
-    yearly_discount_percentage:
-      pct(num(premium?.monthlyPrice), num(premium?.yearlyPrice)) ?? 20,
+    yearly_discount_percentage: discountPcts.length
+      ? Math.min(...discountPcts)
+      : 20,
   };
 
   return { prices, limits, capabilities };
@@ -171,18 +181,35 @@ export function buildTiers(data: TierData, t: TFn): Tier[] {
 }
 
 /**
- * Which tiers to show: business accounts (or a current business membership) see
- * only the business plan; everyone else sees free/basic/premium.
+ * Which tiers to show. Girişsiz ziyaretçi DÖRT paketi de görür — kurumsal
+ * teklif herkese görünür olmalı. Girişli bireysel hesap business'ı görmez.
+ * Kurumsal-izli hesap (davet aktivasyonundan itibaren `businessStatus` dolu)
+ * ya da mevcut business üyeliği olan YALNIZ business'ı görür.
  */
 export function visibleTiers(
   all: Tier[],
-  opts: { isBusinessAccount: boolean; currentTier: string | null },
+  opts: {
+    isAuthenticated: boolean;
+    isBusinessTrack: boolean;
+    currentTier: string | null;
+  },
 ): Tier[] {
-  const isBusiness = opts.isBusinessAccount || opts.currentTier === "business";
-  return isBusiness
-    ? all.filter((tier) => tier.id === "business")
-    : all.filter((tier) => tier.id !== "business");
+  const businessTrack = opts.isBusinessTrack || opts.currentTier === "business";
+  if (businessTrack) return all.filter((tier) => tier.id === "business");
+  if (!opts.isAuthenticated) return all;
+  return all.filter((tier) => tier.id !== "business");
 }
+
+/**
+ * DB'deki gerçek yıllık fiyat kolonu — kart, checkout'un tahsil ettiğiyle aynı
+ * sayıyı göstermeli. (Eskiden yalnız premium/business gerçek fiyatı okuyordu;
+ * basic karta oran hesabı düşüyor ve checkout'tan ayrışabiliyordu.)
+ */
+const YEARLY_PRICE_KEY: Partial<Record<TierId, keyof TierPrices>> = {
+  basic: "basic_yearly_price",
+  premium: "premium_yearly_price",
+  business: "business_yearly_price",
+};
 
 /** The price to display for a tier at the selected billing period. */
 export function displayPrice(
@@ -191,10 +218,9 @@ export function displayPrice(
   prices: TierPrices,
 ): number {
   if (period !== "yearly" || tier.price === 0) return tier.price;
-  if (tier.id === "premium" && prices.premium_yearly_price)
-    return prices.premium_yearly_price;
-  if (tier.id === "business" && prices.business_yearly_price)
-    return prices.business_yearly_price;
+  const key = YEARLY_PRICE_KEY[tier.id];
+  const yearly = key ? prices[key] : undefined;
+  if (typeof yearly === "number" && yearly > 0) return yearly;
   const discount = prices.yearly_discount_percentage ?? 20;
   return Math.round(tier.price * 12 * (1 - discount / 100) * 100) / 100;
 }

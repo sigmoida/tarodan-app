@@ -16,12 +16,21 @@ export default function BusinessMembershipGuard({
   useEffect(() => {
     if (!isAuthenticated || !user) return;
 
-    const isBusinessAccount = !!(user.companyName && user.taxId);
-    if (!isBusinessAccount) return;
+    // Kurumsal iz businessStatus'tan okunur. Eski kapı companyName+taxId
+    // istiyordu; taxId NİHAİ onaya kadar boş kaldığından pending/rejected
+    // dalları hiç çalışmıyordu (ekranlar fiilen ölüydü). businessStatus'suz
+    // hesaplar (bireysel + eski self-declare kalıntısı) kapının dışındadır.
+    if (!user.businessStatus) return;
 
-    // Pending: sadece /business-pending ve /contact'a izin ver
+    // Pending: başvuru tamamlama akışı (şirket bilgileri + belgeler) açık
+    // kalmalı — kalanı durum ekranına yönlenir.
     if (user.businessStatus === "pending") {
-      const allowedPaths = ["/business-pending", "/contact"];
+      const allowedPaths = [
+        "/business-pending",
+        "/profile/business",
+        "/seller/documents",
+        "/contact",
+      ];
       if (!allowedPaths.some((p) => pathname.startsWith(p))) {
         router.replace("/business-pending");
       }
@@ -36,12 +45,6 @@ export default function BusinessMembershipGuard({
       }
       return;
     }
-
-    // Üyelik zorunluluğu YALNIZ onaylı kurumsal hesaba uygulanır. businessStatus
-    // yokken companyName+taxId dolu bir hesap (eski self-declare kalıntısı) bu
-    // dala düşerse /membership döngüsüne kilitleniyordu: Business tier satın
-    // alması da onaysız olduğu için 403 ile reddediliyordu.
-    if (user.businessStatus !== "approved") return;
 
     // Approved ama business üyeliği yoksa üyelik sayfasına yönlendir
     const isBusinessTier = user.membershipTier === "business";
