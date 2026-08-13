@@ -2490,21 +2490,22 @@ export class RefundService {
   private classifyOrderPhase(order: {
     status: OrderStatus;
     deliveredAt?: Date | null;
-    shipment: { status: ShipmentStatus; deliveredAt: Date | null } | null;
+    shipment: {
+      status: ShipmentStatus;
+      deliveredAt: Date | null;
+      shippedAt?: Date | null;
+    } | null;
   }): "paid" | "preparing" | "in_cooling_off" | "past_cooling_off" | "unknown" {
     if (
       order.status === OrderStatus.paid ||
       order.status === OrderStatus.preparing
     ) {
-      // Sürat hasn't actually picked up if shipment is still pending, or if a
-      // previous attempt was cancelled / failed. In those cases we can still
-      // do an instant refund (no in-flight cargo to chase).
-      const stillNotShipped =
-        !order.shipment ||
-        order.shipment.status === ShipmentStatus.pending ||
-        order.shipment.status === ShipmentStatus.label_created ||
-        order.shipment.status === ShipmentStatus.cancelled ||
-        order.shipment.status === ShipmentStatus.failed;
+      // Devir tanımı TEK KAYNAK (shipment-handover): hareket eden durum VEYA
+      // shippedAt mührü. Yalnız statü listesine bakmak, Sürat bilinmeyen bir
+      // durum kodu döndürüp poller shippedAt yazdığında koli fiilen yoldayken
+      // "anında iade"yi (ürün + kargo dahil) kabul ettiriyordu — iptal
+      // kapılarıyla aynı tanım kullanılır.
+      const stillNotShipped = !isShipmentHandedToCarrier(order.shipment);
       return stillNotShipped ? "preparing" : "in_cooling_off";
     }
     if (order.status === OrderStatus.shipped) {
@@ -2758,33 +2759,66 @@ export class RefundService {
 
     let created;
     try {
-      created = await this.prisma.refundRequest.create({
-        data: {
-          refundNumber,
-          orderId: order.id,
-          requesterId,
-          reason: dto.reason,
-          description: dto.description ?? null,
-          evidencePhotoUrls: dto.evidencePhotoUrls ?? [],
-          amount,
-          refundQuantity,
-          status: policy.requiresAdminReview
-            ? RefundRequestStatus.pending_review
-            : RefundRequestStatus.approved,
-          ...this.refundFinancialData(policy, financial),
-          ...(policy.requiresAdminReview && this.refundPolicyV2Enabled()
-            ? {
-                policyVersion: 2,
-                financialReviewRequired: true,
-                financialPolicySnapshot: {
-                  version: 2,
-                  provisional: true,
-                  claimReason: dto.reason,
-                  legacyProvisionalCalculation: financial.snapshot,
-                } as unknown as Prisma.InputJsonValue,
-              }
-            : {}),
-        },
+      /**
+       * İptal yoluyla (createCancellationRefund) AYNI yarış kilidi: talep,
+       * sipariş satırı FOR UPDATE kilitliyken ve faz TX İÇİNDE yeniden
+       * doğrulanarak yazılır. Eskiden uygunluk yalnız preflight'ta kontrol
+       * ediliyor, talep kilitsiz yazılıyordu — satıcının "kargoya verdim"
+       * isteği tam bu aralıkta commit olursa kargolanmış sipariş için ürün +
+       * kargo dahil anında iade üretiliyordu ("hem iptal hem kargolandı"
+       * invaryantının bu uçtaki karşılığı).
+       */
+      created = await this.prisma.$transaction(async (tx) => {
+        await tx.$queryRaw`SELECT id FROM orders WHERE id = ${order.id} FOR UPDATE`;
+        const fresh = await tx.order.findUnique({
+          where: { id: order.id },
+          select: {
+            status: true,
+            shipment: { select: { status: true, shippedAt: true } },
+          },
+        });
+        if (
+          !fresh ||
+          (fresh.status !== OrderStatus.paid &&
+            fresh.status !== OrderStatus.preparing)
+        ) {
+          throw new BadRequestException(
+            i18nMessage("server.refund.orderStatusNotEligible"),
+          );
+        }
+        if (isShipmentHandedToCarrier(fresh.shipment)) {
+          throw new BadRequestException(
+            "Kargoya teslim edilmiş sipariş için anında iade yapılamaz; teslimattan sonra iade talebi oluşturun",
+          );
+        }
+        return tx.refundRequest.create({
+          data: {
+            refundNumber,
+            orderId: order.id,
+            requesterId,
+            reason: dto.reason,
+            description: dto.description ?? null,
+            evidencePhotoUrls: dto.evidencePhotoUrls ?? [],
+            amount,
+            refundQuantity,
+            status: policy.requiresAdminReview
+              ? RefundRequestStatus.pending_review
+              : RefundRequestStatus.approved,
+            ...this.refundFinancialData(policy, financial),
+            ...(policy.requiresAdminReview && this.refundPolicyV2Enabled()
+              ? {
+                  policyVersion: 2,
+                  financialReviewRequired: true,
+                  financialPolicySnapshot: {
+                    version: 2,
+                    provisional: true,
+                    claimReason: dto.reason,
+                    legacyProvisionalCalculation: financial.snapshot,
+                  } as unknown as Prisma.InputJsonValue,
+                }
+              : {}),
+          },
+        });
       });
     } catch (error) {
       if (this.isDuplicateActiveRefund(error)) {

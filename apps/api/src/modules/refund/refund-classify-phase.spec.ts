@@ -80,4 +80,33 @@ describe("RefundService.classifyOrderPhase", () => {
       }),
     ).toBe("preparing");
   });
+
+  it("shippedAt mühürlü koli (statü pending kalsa bile) anında iadeye kapalıdır → in_cooling_off", () => {
+    // Sürat bilinmeyen durum kodu döndürdüğünde poller statüyü değiştirmeden
+    // shippedAt yazar; devir tanımı iptal kapılarıyla AYNI tek kaynaktan okunur.
+    expect(
+      classify({
+        status: OrderStatus.preparing,
+        deliveredAt: null,
+        shipment: {
+          status: ShipmentStatus.pending,
+          deliveredAt: null,
+          shippedAt: daysAgo(1),
+        },
+      }),
+    ).toBe("in_cooling_off");
+  });
+
+  it("hareket eden koli (in_transit) anında iadeye kapalıdır → in_cooling_off", () => {
+    expect(
+      classify({
+        status: OrderStatus.preparing,
+        deliveredAt: null,
+        shipment: {
+          status: ShipmentStatus.in_transit,
+          deliveredAt: null,
+        },
+      }),
+    ).toBe("in_cooling_off");
+  });
 });
