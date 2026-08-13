@@ -41,6 +41,9 @@ describe("validateEnv", () => {
     SURAT_KARGO_TEST_MODE: "false",
     SURAT_KARGO_CARI_KODU: "cargo-account",
     SURAT_KARGO_SIFRE: "cargo-password",
+    NETGSM_USERCODE: "netgsm-user",
+    NETGSM_PASSWORD: "netgsm-password",
+    NETGSM_MSGHEADER: "TARODAN",
     ELOGO_ENABLED: "true",
     ELOGO_SOAP_MODE: "live",
     ELOGO_SOAP_URL: "https://elogo.test/PostBoxService.svc",
@@ -163,6 +166,21 @@ describe("validateEnv", () => {
         SURAT_KARGO_SIFRE: "s",
       }),
     ).toThrow(/SURAT_KARGO_TEST_MODE/);
+  });
+
+  // NetGSM eksikse sağlayıcı mock'a düşüp "gönderildi" döner: kullanıcı kod
+  // bekler, SMS hiç gelmez. Sessiz kayıp yerine açılışta patlaması gerekir.
+  it("throws in production when the NetGSM OTP credentials are missing", () => {
+    expect(() =>
+      validateEnv(
+        without(
+          prodBase,
+          "NETGSM_USERCODE",
+          "NETGSM_PASSWORD",
+          "NETGSM_MSGHEADER",
+        ),
+      ),
+    ).toThrow(/NETGSM_USERCODE|NETGSM_PASSWORD|NETGSM_MSGHEADER/);
   });
 
   it("throws when cargo enabled in prod but credentials missing", () => {

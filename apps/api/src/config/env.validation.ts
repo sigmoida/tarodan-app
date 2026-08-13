@@ -89,6 +89,14 @@ const envSchema = z
     SURAT_CARGO_MAX_RETRIES: z.string().optional(),
     SURAT_CARGO_RETRY_BASE_MS: z.string().optional(),
 
+    // NetGSM — phone-verification OTP. Required in production: without the
+    // credentials the provider falls back to a mock that logs the code and
+    // returns success, so the user sees "code sent" and no SMS ever arrives.
+    NETGSM_USERCODE: z.string().optional(),
+    NETGSM_PASSWORD: z.string().optional(),
+    NETGSM_MSGHEADER: z.string().optional(),
+    NETGSM_BASE_URL: z.string().optional(),
+
     // eLogo — when enabled in production it must use the live SOAP client.
     ELOGO_ENABLED: z.string().optional(),
     ELOGO_SOAP_MODE: z.string().optional(),
@@ -406,6 +414,23 @@ const envSchema = z
             message: `${key} is required in production when SURAT_CARGO_ENABLED is set`,
           });
         }
+      }
+    }
+
+    // NetGSM OTP: bu üçü eksikse sağlayıcı mock'a düşer, kodu log'a yazar ve
+    // BAŞARILI döner. Kullanıcı "kod gönderildi" görür, SMS hiç gelmez ve telefon
+    // doğrulaması canlıda sessizce ölür — bu yüzden production'da zorunlu.
+    for (const key of [
+      "NETGSM_USERCODE",
+      "NETGSM_PASSWORD",
+      "NETGSM_MSGHEADER",
+    ] as const) {
+      if (!env[key]?.trim()) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: [key],
+          message: `${key} is required in production (otherwise OTP SMS silently mocks)`,
+        });
       }
     }
 
