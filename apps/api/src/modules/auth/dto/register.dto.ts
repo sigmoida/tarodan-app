@@ -13,6 +13,7 @@ import {
   ValidationArguments,
 } from "class-validator";
 import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
+import { IsTrPhone } from "../../../common/validators/tr-phone";
 import {
   USERNAME_MAX_LENGTH,
   USERNAME_MIN_LENGTH,
@@ -76,6 +77,7 @@ export class RegisterDto {
   })
   @IsOptional()
   @IsString()
+  @IsTrPhone()
   phone?: string;
 
   @ApiProperty({

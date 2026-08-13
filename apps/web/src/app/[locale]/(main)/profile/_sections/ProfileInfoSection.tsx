@@ -119,6 +119,7 @@ function EmailChangeModal({
 
 /** Personal (+ business) info — independent query, RHF+zod form, own save button. */
 export default function ProfileInfoSection() {
+  const t = useTranslations();
   const { isAuthenticated, user } = useAuthStore();
   const { profile, isLoading } = useProfileInfo(isAuthenticated);
   const updateProfile = useUpdateProfile();
@@ -200,7 +201,11 @@ export default function ProfileInfoSection() {
           </div>
 
           <div className="grid gap-4 md:grid-cols-2">
-            <FormPhone name="phone" label="Telefon" />
+            <FormPhone
+              name="phone"
+              label="Telefon"
+              legacyMessage={t("validation.phoneLegacyNotice")}
+            />
             <FormDatePicker name="birthDate" label="Doğum Tarihi" />
           </div>
           <FormTextarea

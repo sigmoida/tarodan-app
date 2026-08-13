@@ -78,8 +78,9 @@ COPY --from=builder --chown=nestjs:nodejs /app/node_modules ./node_modules
 # MODULE_NOT_FOUND. Drop the built packages in as REAL dirs where node looks
 # from /app/dist. Their own deps (e.g. i18n -> intl-messageformat) are hoisted
 # into the root node_modules above, so they resolve upward from here.
-# (@tarodan/types is type-only today — tsc emits no require() for it — but it is
-# copied too so a future runtime import doesn't reintroduce this failure.)
+# (@tarodan/types now carries runtime values too — the TR phone rules behind
+# IsTrPhone — so dist really does require() it. Its COPY is load-bearing, not
+# precautionary: removing it breaks boot with MODULE_NOT_FOUND.)
 COPY --from=builder --chown=nestjs:nodejs /app/packages/i18n ./node_modules/@tarodan/i18n
 COPY --from=builder --chown=nestjs:nodejs /app/packages/logger ./node_modules/@tarodan/logger
 COPY --from=builder --chown=nestjs:nodejs /app/packages/types ./node_modules/@tarodan/types

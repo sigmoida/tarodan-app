@@ -16,6 +16,7 @@ import {
 } from "class-validator";
 import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
 import { Type, Transform } from "class-transformer";
+import { IsTrPhone } from "../../../common/validators/tr-phone";
 
 export class CheckoutAddressDto {
   @IsString()
@@ -23,7 +24,7 @@ export class CheckoutAddressDto {
   fullName: string;
 
   @IsString()
-  @IsNotEmpty()
+  @IsTrPhone()
   phone: string;
 
   @IsString()
@@ -176,7 +177,7 @@ export class GuestCheckoutGroupDto extends CheckoutDto {
 
   @ApiProperty({ example: "+905551234567" })
   @IsString()
-  @IsNotEmpty()
+  @IsTrPhone()
   phone: string;
 
   @ApiProperty({ description: "Misafir ad soyad" })

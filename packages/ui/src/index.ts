@@ -33,17 +33,14 @@ export {
 } from "./components/QuantityStepper";
 export { PhoneInput, type PhoneInputProps } from "./components/PhoneInput";
 export {
-  countryCodes,
-  DEFAULT_COUNTRY_CODE,
   formatPhoneNumber,
-  getFullPhoneNumber,
-  hasCountryCodePrefix,
-  normalizePhoneForPayload,
-  getPhoneMaxLength,
-  getPhonePlaceholder,
   splitPhone,
   combinePhone,
-  type CountryCode,
+  TR_DIAL_CODE,
+  TR_PHONE_E164,
+  TR_MOBILE_NATIONAL,
+  TR_PHONE_MASK_LENGTH,
+  TR_PHONE_PLACEHOLDER,
 } from "./lib/phone";
 export { SearchInput, type SearchInputProps } from "./components/SearchInput";
 export { Textarea, type TextareaProps } from "./components/Textarea";

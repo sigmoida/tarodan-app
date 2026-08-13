@@ -4,13 +4,14 @@ import {
   IsBoolean,
   MinLength,
   MaxLength,
-} from 'class-validator';
-import { ApiProperty, ApiPropertyOptional, PartialType } from '@nestjs/swagger';
+} from "class-validator";
+import { ApiProperty, ApiPropertyOptional, PartialType } from "@nestjs/swagger";
+import { IsTrPhone } from "../../../common/validators/tr-phone";
 
 export class CreateAddressDto {
   @ApiPropertyOptional({
-    example: 'Ev',
-    description: 'Address title/label',
+    example: "Ev",
+    description: "Address title/label",
   })
   @IsOptional()
   @IsString()
@@ -18,53 +19,52 @@ export class CreateAddressDto {
   title?: string;
 
   @ApiProperty({
-    example: 'Ahmet Yılmaz',
-    description: 'Full name for delivery',
+    example: "Ahmet Yılmaz",
+    description: "Full name for delivery",
   })
   @IsString()
-  @MinLength(2, { message: 'Ad soyad en az 2 karakter olmalıdır' })
+  @MinLength(2, { message: "Ad soyad en az 2 karakter olmalıdır" })
   @MaxLength(100)
   fullName: string;
 
   @ApiProperty({
-    example: '+905551234567',
-    description: 'Phone number for delivery',
+    example: "+905551234567",
+    description: "Phone number for delivery",
   })
   @IsString()
-  @MinLength(10, { message: 'Telefon numarası en az 10 karakter olmalıdır' })
-  @MaxLength(20)
+  @IsTrPhone()
   phone: string;
 
   @ApiProperty({
-    example: 'İstanbul',
-    description: 'City name',
+    example: "İstanbul",
+    description: "City name",
   })
   @IsString()
-  @MinLength(2, { message: 'Şehir en az 2 karakter olmalıdır' })
+  @MinLength(2, { message: "Şehir en az 2 karakter olmalıdır" })
   @MaxLength(50)
   city: string;
 
   @ApiProperty({
-    example: 'Kadıköy',
-    description: 'District name',
+    example: "Kadıköy",
+    description: "District name",
   })
   @IsString()
-  @MinLength(2, { message: 'İlçe en az 2 karakter olmalıdır' })
+  @MinLength(2, { message: "İlçe en az 2 karakter olmalıdır" })
   @MaxLength(50)
   district: string;
 
   @ApiProperty({
-    example: 'Caferağa Mah. Moda Cad. No:123 D:4',
-    description: 'Full address',
+    example: "Caferağa Mah. Moda Cad. No:123 D:4",
+    description: "Full address",
   })
   @IsString()
-  @MinLength(10, { message: 'Adres en az 10 karakter olmalıdır' })
+  @MinLength(10, { message: "Adres en az 10 karakter olmalıdır" })
   @MaxLength(500)
   address: string;
 
   @ApiPropertyOptional({
-    example: '34710',
-    description: 'Postal/ZIP code',
+    example: "34710",
+    description: "Postal/ZIP code",
   })
   @IsOptional()
   @IsString()
@@ -73,7 +73,7 @@ export class CreateAddressDto {
 
   @ApiPropertyOptional({
     example: true,
-    description: 'Set as default address',
+    description: "Set as default address",
   })
   @IsOptional()
   @IsBoolean()

@@ -1,6 +1,7 @@
 /** @format */
 
 import { z } from "zod";
+import { trPhone } from "@tarodan/ui/form";
 
 /**
  * Checkout validation — single source of truth for which fields gate each step.
@@ -14,6 +15,10 @@ import { z } from "zod";
 type Locale = string;
 const tr = (locale: Locale) => locale !== "en";
 const req = (locale: Locale) => (tr(locale) ? "Zorunlu alan" : "Required");
+const phoneMsg = (locale: Locale) =>
+  tr(locale)
+    ? "Geçerli bir Türkiye cep numarası girin (5XX XXX XX XX)"
+    : "Enter a valid Turkish mobile number (5XX XXX XX XX)";
 
 /** Shipping address without phone — the guest shipping requirement. */
 export const shippingAddressSchema = (locale: Locale) =>
@@ -27,7 +32,7 @@ export const shippingAddressSchema = (locale: Locale) =>
 /** Shipping address WITH phone — the authenticated manual-address requirement. */
 export const shippingAddressWithPhoneSchema = (locale: Locale) =>
   shippingAddressSchema(locale).extend({
-    phone: z.string().trim().min(1, req(locale)),
+    phone: trPhone(phoneMsg(locale)),
   });
 
 /** Billing address when it differs from shipping — fullName + city + address. */
@@ -47,7 +52,7 @@ export const guestContactSchema = (locale: Locale) =>
       .trim()
       .min(1, req(locale))
       .email(tr(locale) ? "Geçerli bir e-posta girin" : "Enter a valid email"),
-    guestPhone: z.string().trim().min(1, req(locale)),
+    guestPhone: trPhone(phoneMsg(locale)),
   });
 
 /** Full-address form used when saving a new address (title required too). */

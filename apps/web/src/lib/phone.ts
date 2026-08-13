@@ -1,18 +1,15 @@
 /**
  * Phone utilities — re-exported from the shared `@tarodan/ui` single source.
- * Kept as `@/lib/phone` so existing importers don't churn; the country-code list,
- * formatters and the `PhoneInput` / `FormPhone` components all live in the package.
+ * Kept as `@/lib/phone` so existing importers don't churn; the formatters and the
+ * `PhoneInput` / `FormPhone` components all live in the package, and the rules
+ * themselves in `@tarodan/types`.
  */
 export {
-  countryCodes,
-  DEFAULT_COUNTRY_CODE,
   formatPhoneNumber,
-  getFullPhoneNumber,
-  hasCountryCodePrefix,
-  normalizePhoneForPayload,
-  getPhoneMaxLength,
-  getPhonePlaceholder,
   splitPhone,
   combinePhone,
-  type CountryCode,
+  TR_DIAL_CODE,
+  TR_PHONE_E164,
+  TR_MOBILE_NATIONAL,
+  TR_PHONE_PLACEHOLDER,
 } from "@tarodan/ui";

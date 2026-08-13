@@ -1,141 +1,82 @@
 /**
- * Phone utilities — country-code list + phone formatting helpers. The single
- * source of truth for the shared `PhoneInput` / `FormPhone`; apps re-export from
- * here instead of keeping local copies.
+ * Phone helpers for the shared `PhoneInput` / `FormPhone` controls.
+ *
+ * Turkey-only by design — see `@tarodan/types`'s `phone.ts` for why. The dial
+ * code is fixed at `+90`, so these helpers take only the national part and there
+ * is no country-code parameter to get the wrong way round.
  */
 
-export interface CountryCode {
-  code: string;
-  country: string;
-  name: string;
-}
+import {
+  TR_DIAL_CODE,
+  TR_MOBILE_NATIONAL,
+  TR_PHONE_E164,
+} from "@tarodan/types";
 
-export const countryCodes: CountryCode[] = [
-  { code: "+90", country: "TR", name: "Türkiye" },
-  { code: "+1", country: "US", name: "ABD/Kanada" },
-  { code: "+44", country: "GB", name: "İngiltere" },
-  { code: "+49", country: "DE", name: "Almanya" },
-  { code: "+33", country: "FR", name: "Fransa" },
-  { code: "+39", country: "IT", name: "İtalya" },
-  { code: "+34", country: "ES", name: "İspanya" },
-  { code: "+31", country: "NL", name: "Hollanda" },
-  { code: "+32", country: "BE", name: "Belçika" },
-  { code: "+41", country: "CH", name: "İsviçre" },
-  { code: "+43", country: "AT", name: "Avusturya" },
-  { code: "+46", country: "SE", name: "İsveç" },
-  { code: "+47", country: "NO", name: "Norveç" },
-  { code: "+45", country: "DK", name: "Danimarka" },
-  { code: "+358", country: "FI", name: "Finlandiya" },
-  { code: "+7", country: "RU", name: "Rusya" },
-  { code: "+971", country: "AE", name: "BAE" },
-  { code: "+966", country: "SA", name: "Suudi Arabistan" },
-  { code: "+20", country: "EG", name: "Mısır" },
-  { code: "+81", country: "JP", name: "Japonya" },
-  { code: "+86", country: "CN", name: "Çin" },
-  { code: "+82", country: "KR", name: "Güney Kore" },
-  { code: "+61", country: "AU", name: "Avustralya" },
-  { code: "+64", country: "NZ", name: "Yeni Zelanda" },
-];
+export { TR_DIAL_CODE, TR_PHONE_E164, TR_MOBILE_NATIONAL };
 
-export const DEFAULT_COUNTRY_CODE = "+90";
+/** Visible mask width: "5XX XXX XX XX". */
+export const TR_PHONE_MASK_LENGTH = 13;
+
+/** Placeholder for the national part. */
+export const TR_PHONE_PLACEHOLDER = "5XX XXX XX XX";
 
 /**
- * Formats TR numbers as XXX XXX XX XX; for other countries just strips
- * non-digits. For TR the leading "90" (autofill: +90 5XX…) and "0" (habit:
- * 05XX…) prefixes are normalized away.
+ * Formats the national part as `5XX XXX XX XX`.
+ *
+ * Anything the user could plausibly paste — `+90 532…`, `0532…`, `90532…` — is
+ * reduced to the same 10 digits first. Digits that cannot begin a Turkish mobile
+ * number are dropped rather than displayed, so the field can never hold a value
+ * the submit step would have to reject.
  */
-export function formatPhoneNumber(
-  value: string,
-  countryCode: string = DEFAULT_COUNTRY_CODE,
-): string {
+export function formatPhoneNumber(value: string): string {
   let digits = value.replace(/\D/g, "");
 
-  if (countryCode === DEFAULT_COUNTRY_CODE) {
-    if (digits.startsWith("90") && digits.length > 10) digits = digits.slice(2);
-    if (digits.startsWith("0")) digits = digits.slice(1);
-    const limited = digits.slice(0, 10);
-    if (limited.length <= 3) return limited;
-    if (limited.length <= 6)
-      return `${limited.slice(0, 3)} ${limited.slice(3)}`;
-    if (limited.length <= 8)
-      return `${limited.slice(0, 3)} ${limited.slice(3, 6)} ${limited.slice(6)}`;
-    return `${limited.slice(0, 3)} ${limited.slice(3, 6)} ${limited.slice(6, 8)} ${limited.slice(8)}`;
-  }
+  if (digits.startsWith("90") && digits.length > 10) digits = digits.slice(2);
+  if (digits.startsWith("0")) digits = digits.slice(1);
+  // A Turkish mobile always starts with 5; reject the rest as it is typed.
+  if (digits && !digits.startsWith("5")) return "";
 
-  return digits;
-}
-
-/** Prepends the country code (no double prefix). */
-export function getFullPhoneNumber(phone: string, countryCode: string): string {
-  const cleanPhone = phone.replace(/\s/g, "");
-  if (cleanPhone.startsWith(countryCode)) return cleanPhone;
-  return countryCode + cleanPhone;
-}
-
-/** Does the phone already carry one of the known country-code prefixes? */
-export function hasCountryCodePrefix(phone: string): boolean {
-  const clean = phone.replace(/\s/g, "");
-  return countryCodes.some((cc) => clean.startsWith(cc.code));
+  const limited = digits.slice(0, 10);
+  if (limited.length <= 3) return limited;
+  if (limited.length <= 6) return `${limited.slice(0, 3)} ${limited.slice(3)}`;
+  if (limited.length <= 8)
+    return `${limited.slice(0, 3)} ${limited.slice(3, 6)} ${limited.slice(6)}`;
+  return `${limited.slice(0, 3)} ${limited.slice(3, 6)} ${limited.slice(6, 8)} ${limited.slice(8)}`;
 }
 
 /**
- * Normalizes a phone for a payload: strips spaces; returns as-is if it already
- * has a country code, otherwise prefixes the given one.
+ * Any accepted spelling of a Turkish mobile → the stored value (`+905XXXXXXXXX`),
+ * or `""` when it isn't one.
+ *
+ * Takes the national part a user typed as well as an already-stored `+90…` value,
+ * because saved addresses round-trip through here too. Returning `""` rather than
+ * a bare dial code keeps optional fields serializing to empty, and gives callers
+ * a single falsy check to gate submission on.
  */
-export function normalizePhoneForPayload(
-  phone: string | undefined,
-  countryCode: string,
-): string {
-  const clean = (phone ?? "").replace(/\s/g, "");
-  if (!clean) return "";
-  return hasCountryCodePrefix(clean)
-    ? clean
-    : getFullPhoneNumber(clean, countryCode);
+export function combinePhone(value: string | undefined | null): string {
+  const digits = formatPhoneNumber(value ?? "").replace(/\D/g, "");
+  if (!TR_MOBILE_NATIONAL.test(digits)) return "";
+  return `${TR_DIAL_CODE}${digits}`;
 }
 
 /**
- * TR → 17, others → 20. TR visible value is at most 13 chars ("5XX XXX XX XX")
- * but maxLength stays loose so an autofilled "+90 5XX XXX XX XX" reaches the
- * formatter without the browser clipping it.
+ * Stored value → the display-formatted national part.
+ *
+ * `isLegacy` marks a stored number that predates this rule (registration used to
+ * accept any string, so foreign numbers exist in the database). Those cannot be
+ * rendered in a Turkish mask, so the field opens empty and the caller shows a
+ * "please re-enter" notice — the stored value is left alone until the user
+ * actually supplies a new one.
  */
-export function getPhoneMaxLength(countryCode: string): number {
-  return countryCode === DEFAULT_COUNTRY_CODE ? 17 : 20;
-}
-
-/** Typical placeholder for the country code. */
-export function getPhonePlaceholder(
-  countryCode: string,
-  fallback = "Telefon",
-): string {
-  return countryCode === DEFAULT_COUNTRY_CODE ? "5XX XXX XX XX" : fallback;
-}
-
-/**
- * Splits a stored full number ("+905321234567") into its country code and the
- * display-formatted national part. Used by `FormPhone` to hydrate a single
- * combined field back into the two-control `PhoneInput`. Longest dial-code
- * prefix wins; unknown/empty defaults to the TR code with an empty national.
- */
-export function splitPhone(full: string | undefined): {
-  countryCode: string;
+export function splitPhone(full: string | undefined | null): {
   national: string;
+  isLegacy: boolean;
 } {
   const clean = (full ?? "").replace(/\s/g, "");
-  if (!clean) return { countryCode: DEFAULT_COUNTRY_CODE, national: "" };
-  const match = [...countryCodes]
-    .sort((a, b) => b.code.length - a.code.length)
-    .find((cc) => clean.startsWith(cc.code));
-  const countryCode = match?.code ?? DEFAULT_COUNTRY_CODE;
-  const rest = match ? clean.slice(countryCode.length) : clean;
-  return { countryCode, national: formatPhoneNumber(rest, countryCode) };
-}
-
-/**
- * Combines a country code + national input into the normalized stored value
- * ("+90" + digits, no spaces), or "" when the national part has no digits (so
- * optional fields serialize to empty rather than a bare country code).
- */
-export function combinePhone(countryCode: string, national: string): string {
-  const digits = national.replace(/\D/g, "");
-  return digits ? `${countryCode}${digits}` : "";
+  if (!clean) return { national: "", isLegacy: false };
+  if (!TR_PHONE_E164.test(clean)) return { national: "", isLegacy: true };
+  return {
+    national: formatPhoneNumber(clean.slice(TR_DIAL_CODE.length)),
+    isLegacy: false,
+  };
 }

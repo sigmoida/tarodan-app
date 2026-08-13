@@ -1880,6 +1880,8 @@
     "passwordMin8": "Şifre en az 8 karakter olmalıdır",
     "passwordMatch": "Şifreler eşleşmiyor",
     "invalidPhone": "Geçerli bir telefon numarası girin",
+    "trPhoneOnly": "Geçerli bir Türkiye cep numarası girin (5XX XXX XX XX)",
+    "phoneLegacyNotice": "Kayıtlı numaranız geçerli bir Türkiye cep numarası değil. Lütfen güncel numaranızı girin.",
     "minLength": "En az {min} karakter olmalıdır",
     "maxLength": "En fazla {max} karakter olabilir",
     "minValue": "En az {min} olmalıdır",
@@ -7374,7 +7376,8 @@
       "tariffNotFound": "Kargo tarifesi bulunamadı",
       "tariffNotEditable": "Yalnızca taslak tarifeler düzenlenebilir",
       "tariffArchived": "Arşivlenmiş tarife tekrar aktive edilemez",
-      "tariffNegativeAmount": "Tarife tutarları negatif olamaz"
+      "tariffNegativeAmount": "Tarife tutarları negatif olamaz",
+      "invalidRecipientPhone": "Gönderi oluşturulamadı: alıcı telefonu geçerli bir Türkiye cep numarası değil"
     },
     "commission": {
       "noRuleConfigured": "Komisyon yapılandırması eksik olduğundan sipariş şu anda oluşturulamıyor. Lütfen daha sonra tekrar deneyin.",

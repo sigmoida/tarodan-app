@@ -48,3 +48,4 @@ export {
   type ConfirmOptions,
 } from "./components/ConfirmProvider";
 export { useZodForm } from "./lib/use-zod-form";
+export { trPhone, trPhoneOptional } from "./lib/phone-schema";

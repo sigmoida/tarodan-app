@@ -11,6 +11,7 @@ import {
 } from "class-validator";
 import { ApiPropertyOptional } from "@nestjs/swagger";
 import { locales, type Locale } from "@tarodan/i18n";
+import { IsTrPhone } from "../../../common/validators/tr-phone";
 
 export class UpdateProfileDto {
   @ApiPropertyOptional({
@@ -31,9 +32,7 @@ export class UpdateProfileDto {
   @ValidateIf(
     (o, value) => value !== null && value !== undefined && value !== "",
   )
-  @Matches(/^\+90[0-9]{10}$/, {
-    message: "Geçerli bir Türkiye telefon numarası giriniz (+905XXXXXXXXX)",
-  })
+  @IsTrPhone()
   phone?: string;
 
   @ApiPropertyOptional({

@@ -7,7 +7,7 @@ import toast from "react-hot-toast";
 import { useMutation, type QueryClient } from "@tanstack/react-query";
 import { addressesApi } from "@/lib/api";
 import { queryKeys } from "@/lib/query/keys";
-import { getFullPhoneNumber } from "@/lib/phone";
+import { combinePhone, splitPhone } from "@/lib/phone";
 import { useLocale, useTranslations } from "next-intl";
 import type { Locale } from "@tarodan/i18n";
 import { savedAddressSchema } from "../_lib/schema";
@@ -53,8 +53,6 @@ export function useCheckoutAddressForm({
   // New address form
   const [newAddress, setNewAddress] =
     useState<Omit<Address, "id">>(EMPTY_ADDRESS);
-  const [newAddressPhoneCountryCode, setNewAddressPhoneCountryCode] =
-    useState("+90");
 
   // Billing address: same as shipping (default) or different
   const [billingSameAsShipping, setBillingSameAsShipping] = useState(true);
@@ -63,16 +61,16 @@ export function useCheckoutAddressForm({
   >(null);
   const [newBillingAddress, setNewBillingAddress] =
     useState<Omit<Address, "id">>(EMPTY_ADDRESS);
-  const [billingAddressPhoneCountryCode, setBillingAddressPhoneCountryCode] =
-    useState("+90");
 
-  // Pre-populate new address form with user's profile info
+  // Pre-populate new address form with user's profile info. The form field holds
+  // the national part (what `PhoneInput` edits), so the stored "+90…" value is
+  // split rather than pasted in whole.
   useEffect(() => {
     if (isAuthenticated && user) {
       setNewAddress((prev) => ({
         ...prev,
         fullName: prev.fullName || user.displayName || "",
-        phone: prev.phone || user.phone || "",
+        phone: prev.phone || splitPhone(user.phone).national,
       }));
     }
   }, [isAuthenticated, user]);
@@ -159,11 +157,11 @@ export function useCheckoutAddressForm({
       return;
     }
 
-    // Format phone number with country code
-    const formattedPhone = getFullPhoneNumber(
-      newAddress.phone,
-      newAddressPhoneCountryCode,
-    );
+    const formattedPhone = combinePhone(newAddress.phone);
+    if (!formattedPhone) {
+      toast.error(t("validation.trPhoneOnly"));
+      return;
+    }
 
     addAddressMutation.mutate({
       title: (newAddress.title ?? "").trim(),
@@ -180,16 +178,12 @@ export function useCheckoutAddressForm({
   return {
     newAddress,
     setNewAddress,
-    newAddressPhoneCountryCode,
-    setNewAddressPhoneCountryCode,
     billingSameAsShipping,
     setBillingSameAsShipping,
     selectedBillingAddressId,
     setSelectedBillingAddressId,
     newBillingAddress,
     setNewBillingAddress,
-    billingAddressPhoneCountryCode,
-    setBillingAddressPhoneCountryCode,
     invalidateAddresses,
     handleAddAddress,
   };

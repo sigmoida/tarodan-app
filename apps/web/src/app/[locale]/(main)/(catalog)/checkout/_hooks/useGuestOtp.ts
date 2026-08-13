@@ -12,8 +12,7 @@ import type { CheckoutItem } from "../_lib/types";
 type Translate = ReturnType<typeof useTranslations<never>>;
 
 /**
- * Guest checkout contact + email OTP slice. Owns the guest name/email/phone and
- * country-code fields, the verification-code state, the modal open/focus state,
+ * Guest checkout contact + email OTP slice. Owns the guest name/email/phone fields, the verification-code state, the modal open/focus state,
  * and the send/confirm flow (including the "email already registered → bounce to
  * login" 409 path). Extracted verbatim from the checkout context: payloads,
  * toasts, redirects, and effect deps are unchanged.
@@ -34,7 +33,6 @@ export function useGuestOtp({
   const [guestEmail, setGuestEmail] = useState("");
   const [guestPhone, setGuestPhone] = useState("");
   const [guestName, setGuestName] = useState("");
-  const [guestPhoneCountryCode, setGuestPhoneCountryCode] = useState("+90");
   const [guestEmailVerificationCode, setGuestEmailVerificationCode] =
     useState("");
   const [guestOtpSentForEmail, setGuestOtpSentForEmail] = useState<
@@ -141,8 +139,6 @@ export function useGuestOtp({
     setGuestEmail,
     guestPhone,
     setGuestPhone,
-    guestPhoneCountryCode,
-    setGuestPhoneCountryCode,
     guestEmailVerificationCode,
     setGuestEmailVerificationCode,
     guestOtpSending,

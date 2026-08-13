@@ -7,7 +7,7 @@ import { ChevronRightIcon, PlusIcon } from "@heroicons/react/24/outline";
 import { Button, Input, Radio, Textarea } from "@tarodan/ui";
 import { SectionCard } from "@/components/ui";
 import CityDistrictSelector from "@/components/CityDistrictSelector";
-import { PhoneInput } from "@tarodan/ui";
+import { PhoneInput, TR_PHONE_PLACEHOLDER } from "@tarodan/ui";
 import { useCheckout } from "../_context/CheckoutContext";
 
 export default function AddressStep() {
@@ -21,24 +21,18 @@ export default function AddressStep() {
     setShowAddressForm,
     newAddress,
     setNewAddress,
-    newAddressPhoneCountryCode,
-    setNewAddressPhoneCountryCode,
     billingSameAsShipping,
     setBillingSameAsShipping,
     selectedBillingAddressId,
     setSelectedBillingAddressId,
     newBillingAddress,
     setNewBillingAddress,
-    billingAddressPhoneCountryCode,
-    setBillingAddressPhoneCountryCode,
     guestName,
     setGuestName,
     guestEmail,
     setGuestEmail,
     guestPhone,
     setGuestPhone,
-    guestPhoneCountryCode,
-    setGuestPhoneCountryCode,
     handleAddAddress,
   } = useCheckout();
 
@@ -102,8 +96,6 @@ export default function AddressStep() {
                   className="rounded-[4px]"
                 />
                 <PhoneInput
-                  countryCode={newAddressPhoneCountryCode}
-                  onCountryCodeChange={setNewAddressPhoneCountryCode}
                   phone={newAddress.phone}
                   onPhoneChange={(phone) =>
                     setNewAddress({ ...newAddress, phone })
@@ -181,13 +173,9 @@ export default function AddressStep() {
           </div>
 
           <PhoneInput
-            countryCode={guestPhoneCountryCode}
-            onCountryCodeChange={setGuestPhoneCountryCode}
             phone={guestPhone}
             onPhoneChange={setGuestPhone}
-            placeholder={
-              guestPhoneCountryCode === "+90" ? "5XX XXX XX XX *" : "Telefon *"
-            }
+            placeholder={`${TR_PHONE_PLACEHOLDER} *`}
             required
           />
 
@@ -214,8 +202,6 @@ export default function AddressStep() {
               className="rounded-[4px]"
             />
             <PhoneInput
-              countryCode={newAddressPhoneCountryCode}
-              onCountryCodeChange={setNewAddressPhoneCountryCode}
               phone={newAddress.phone}
               onPhoneChange={(phone) => setNewAddress({ ...newAddress, phone })}
             />
@@ -294,8 +280,6 @@ export default function AddressStep() {
                 className="rounded-[4px]"
               />
               <PhoneInput
-                countryCode={billingAddressPhoneCountryCode}
-                onCountryCodeChange={setBillingAddressPhoneCountryCode}
                 phone={newBillingAddress.phone}
                 onPhoneChange={(phone) =>
                   setNewBillingAddress((prev) => ({ ...prev, phone }))

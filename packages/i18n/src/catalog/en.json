@@ -1880,6 +1880,8 @@
     "passwordMin8": "Password must be at least 8 characters",
     "passwordMatch": "Passwords do not match",
     "invalidPhone": "Please enter a valid phone number",
+    "trPhoneOnly": "Enter a valid Turkish mobile number (5XX XXX XX XX)",
+    "phoneLegacyNotice": "Your saved number is not a valid Turkish mobile number. Please enter a current one.",
     "minLength": "Must be at least {min} characters",
     "maxLength": "Must be at most {max} characters",
     "minValue": "Must be at least {min}",
@@ -7374,7 +7376,8 @@
       "tariffNotFound": "Shipping tariff not found",
       "tariffNotEditable": "Only draft tariffs can be edited",
       "tariffArchived": "An archived tariff cannot be reactivated",
-      "tariffNegativeAmount": "Tariff amounts cannot be negative"
+      "tariffNegativeAmount": "Tariff amounts cannot be negative",
+      "invalidRecipientPhone": "Shipment could not be created: the recipient phone is not a valid Turkish mobile number"
     },
     "commission": {
       "noRuleConfigured": "The order cannot be created right now because commission configuration is missing. Please try again later.",

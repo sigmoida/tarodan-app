@@ -13,15 +13,24 @@ export interface FormPhoneProps {
   required?: boolean;
   disabled?: boolean;
   helperText?: string;
+  /**
+   * Shown instead of `helperText` when the stored value predates the Turkey-only
+   * rule and cannot be displayed in the mask. Pass a translated string; without
+   * it the field just opens empty.
+   */
+  legacyMessage?: string;
   className?: string;
 }
 
 /**
  * RHF-connected phone field. The form stores a single normalized string
- * ("+90" + national digits, no spaces, or "" when empty); this bridges it to the
- * two-control `PhoneInput` via a `Controller` — splitting the stored value into
- * country code + national on display and recombining on change. The country-code
- * dropdown lives in local state so switching it while typing recombines cleanly.
+ * ("+905XXXXXXXXX", or "" when empty); this bridges it to `PhoneInput`, which
+ * edits only the national part.
+ *
+ * A stored value that isn't a Turkish mobile (registration accepted any string
+ * before this rule) opens the field empty with `legacyMessage` shown. The form
+ * value is left untouched until the user types a new number, so submitting an
+ * otherwise-unchanged form cannot silently wipe the old one.
  */
 export function FormPhone({
   name,
@@ -30,6 +39,7 @@ export function FormPhone({
   required,
   disabled,
   helperText,
+  legacyMessage,
   className,
 }: FormPhoneProps) {
   const { control, formState } = useFormContext();
@@ -40,25 +50,19 @@ export function FormPhone({
       control={control}
       name={name}
       render={({ field }) => {
-        const { countryCode, national } = splitPhone(field.value as string);
+        const { national, isLegacy } = splitPhone(field.value as string);
         return (
           <PhoneInput
             name={name}
             label={label}
             error={error}
-            helperText={helperText}
+            helperText={isLegacy ? legacyMessage : helperText}
             placeholder={placeholder}
             required={required}
             disabled={disabled}
             className={className}
-            countryCode={countryCode}
             phone={national}
-            onCountryCodeChange={(code) =>
-              field.onChange(combinePhone(code, national))
-            }
-            onPhoneChange={(next) =>
-              field.onChange(combinePhone(countryCode, next))
-            }
+            onPhoneChange={(next) => field.onChange(combinePhone(next))}
           />
         );
       }}

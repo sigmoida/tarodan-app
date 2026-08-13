@@ -172,7 +172,11 @@ export function RegisterForm() {
         />
 
         <div className="grid grid-cols-2 gap-4">
-          <FormPhone name="phone" label={t("auth.phone")} />
+          <FormPhone
+            name="phone"
+            label={t("auth.phone")}
+            legacyMessage={t("validation.phoneLegacyNotice")}
+          />
 
           <FormDatePicker
             name="birthDate"
