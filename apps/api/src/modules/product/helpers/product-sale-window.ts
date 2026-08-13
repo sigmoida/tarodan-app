@@ -65,3 +65,23 @@ export function resolveSalePrice(
     ? { price, oldPrice: previous, isOnSale: true }
     : { price, oldPrice: null, isOnSale: false };
 }
+
+/**
+ * Boost (Öne Çıkarma) kademe eşleşmesinin taban fiyatı — İNDİRİM ÖNCESİ liste
+ * fiyatı. Bilinçli karar: kademe, geçici indirimle oynamayan istikrarlı fiyata
+ * bağlanır; satıcı indirim açarak daha ucuz kademeye kayamaz. A + oldPrice
+ * modelinde indirim kaydedildiği anda `price` indirimli değeri taşıdığından
+ * liste fiyatı `oldPrice`'tadır; indirim yoksa `price` zaten liste fiyatıdır.
+ * (`resolveSalePrice` ile karıştırma: o, TAHSİLATIN tek kaynağıdır ve pencere
+ * kurallarını uygular — boost kademesi bilerek ondan bağımsızdır.)
+ */
+export function boostTierBasePrice(product: {
+  price: unknown;
+  oldPrice?: unknown;
+}): number {
+  const listPrice = product.oldPrice != null ? num(product.oldPrice) : null;
+  const current = num(product.price);
+  // Bozuk veri koruması: çizili fiyat satış fiyatından küçükse liste fiyatı
+  // olarak anlamlı değildir (resolveSalePrice ile aynı kural).
+  return listPrice != null && listPrice > current ? listPrice : current;
+}

@@ -17,6 +17,7 @@ import {
 } from "@prisma/client";
 import { REFERENCE_PREFIX } from "../../common/helpers/code-prefixes";
 import { generateUniqueReference } from "../../common/helpers/generate-reference";
+import { boostTierBasePrice } from "./helpers/product-sale-window";
 import {
   effectiveMembershipTierType,
   isPremiumEntitled,
@@ -206,12 +207,12 @@ export class ProductBoostService {
   async getBoostOptions(productId: string, userId: string) {
     const product = await this.prisma.product.findFirst({
       where: { id: productId, kind: ProductKind.listing },
-      select: { id: true, price: true },
+      select: { id: true, price: true, oldPrice: true },
     });
     if (!product) {
       throw new NotFoundException(i18nMessage("server.product.notFound"));
     }
-    const productPrice = Number(product.price);
+    const productPrice = boostTierBasePrice(product);
     const enabled = await this.isBoostEnabled();
     const tierType = await this.resolveAudienceTierType(userId);
 
@@ -293,6 +294,7 @@ export class ProductBoostService {
         title: true,
         categoryId: true,
         price: true,
+        oldPrice: true,
       },
     });
     if (!product) {
@@ -315,7 +317,7 @@ export class ProductBoostService {
       const resolved = await this.resolvePackagePrice(
         packageId,
         durationDays,
-        Number(product.price),
+        boostTierBasePrice(product),
         userId,
       );
       price = resolved.price;
