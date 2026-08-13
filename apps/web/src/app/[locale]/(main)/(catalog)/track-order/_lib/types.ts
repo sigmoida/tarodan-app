@@ -18,6 +18,8 @@ export interface GuestOrderDetail {
     cargoCode?: string | null;
     trackingUrl: string | null;
     status: string;
+    /** Devir mührü — iptal önkoşulu üye ekranıyla aynı tanımı okur. */
+    shippedAt?: string | null;
     estimatedDelivery?: string | null;
   } | null;
   createdAt: string;

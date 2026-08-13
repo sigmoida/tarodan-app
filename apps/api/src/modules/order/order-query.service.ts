@@ -267,6 +267,9 @@ export class OrderQueryService {
                 ? `https://www.suratkargo.com.tr/KargoTakip/?kargotakipno=${encodeURIComponent(order.shipment.providerTrackingId)}`
                 : order.shipment.trackingUrl,
             status: order.shipment.status,
+            // İptal önkoşulu devir tanımını (hareket eden durum VEYA shippedAt)
+            // üye ekranıyla aynı kaynaktan okusun diye mühür de döner.
+            shippedAt: order.shipment.shippedAt,
             estimatedDelivery: order.shipment.estimatedDelivery,
           }
         : null,

@@ -13,9 +13,14 @@ import { ButtonLink } from "@/components/ui/ButtonLink";
 import { PageShell } from "@/components/layout/PageShell";
 import { PageHeader } from "@/components/layout/PageHeader";
 import SectionCard from "@/components/ui/SectionCard";
+import { useState } from "react";
 import { useTrackOrder } from "./_hooks/useTrackOrder";
 import { trackOrderSchema } from "./_lib/schema";
 import { formatTL } from "@/lib/format";
+import GuestCancelModal from "./_components/GuestCancelModal";
+// İptal önkoşulu üye ekranıyla TEK kaynaktan: statü + devir tanımı
+// (hareket eden kargo durumu VEYA shippedAt mührü) — kopya liste yok.
+import { isOrderCancellable } from "../../profile/(commerce)/orders/_lib/types";
 
 /** Etiket + değer satırı — kargo ve adres bloklarında tekrar eden desen. */
 function Row({
@@ -43,12 +48,26 @@ export default function TrackOrderClient() {
     error,
     getOrderStatusLabel,
     lookup,
+    lastValues,
+    refresh,
     reset,
     initialValues,
   } = useTrackOrder(locale);
   const form = useZodForm(trackOrderSchema(locale), {
     defaultValues: initialValues,
   });
+  const [cancelOpen, setCancelOpen] = useState(false);
+
+  // Müşteri dokümanı sözü: misafir, kargoya verilene kadar takip ekranından
+  // iptal edebilir. Önkoşul üye ekranıyla aynı tek kaynaktan; sunucu yine
+  // kendi kilidiyle doğrular.
+  const cancellable =
+    !!order &&
+    !!lastValues &&
+    isOrderCancellable({
+      status: order.status,
+      shipment: order.shipment ?? null,
+    });
 
   const statusLabel = order ? getOrderStatusLabel(order.status) : null;
   const shipAddr = order?.shippingAddress as Record<string, string> | undefined;
@@ -303,6 +322,15 @@ export default function TrackOrderClient() {
           )}
 
           <div className="flex flex-wrap gap-3">
+            {cancellable && (
+              <Button
+                variant="danger"
+                type="button"
+                onClick={() => setCancelOpen(true)}
+              >
+                {t("order.cancelOrder")}
+              </Button>
+            )}
             <Button
               variant="secondary"
               type="button"
@@ -317,6 +345,19 @@ export default function TrackOrderClient() {
               {t("cart.continueShopping")}
             </ButtonLink>
           </div>
+
+          <GuestCancelModal
+            target={
+              cancelOpen && lastValues
+                ? {
+                    orderNumber: order.orderNumber,
+                    email: lastValues.email,
+                  }
+                : null
+            }
+            onClose={() => setCancelOpen(false)}
+            onCancelled={refresh}
+          />
         </>
       )}
     </PageShell>
