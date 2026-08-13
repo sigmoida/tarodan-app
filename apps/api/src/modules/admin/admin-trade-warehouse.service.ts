@@ -427,7 +427,19 @@ export class AdminTradeWarehouseService {
         }
         // Durum makinesi guard'ı (çıkış bacağındaki #86 ile aynı kural): iptal
         // edilmiş / dönüşe çıkmış bir bacak buradan delivered'a ZORLANAMAZ.
+        // TEK istisna GEÇ GELEN KOLİ kaydıdır (Depo El Kitabı §7): takas
+        // kapanmışken (iptal/tamamlandı) yerelde cancelled bacağın fiziksel
+        // teslim alınışı yine kayda geçirilebilmeli — "işaretle, sistem takası
+        // diriltmez". Statü DEĞİŞMEZ (cancelled kalır, durum makinesi
+        // çiğnenmez); yalnız deliveredAt mühürlenir. Kapalı takas dirilmez:
+        // aşağıdaki tüm geçişler tradeStillOpen guard'ına tabidir.
+        const tradeClosed =
+          trade.status === TradeStatus.cancelled ||
+          trade.status === TradeStatus.completed;
+        const lateArrivalRecord =
+          tradeClosed && shipment.status === ShipmentStatus.cancelled;
         if (
+          !lateArrivalRecord &&
           !canTransitionShipmentStatus(
             shipment.status as ShipmentStatus,
             ShipmentStatus.delivered,
@@ -441,10 +453,12 @@ export class AdminTradeWarehouseService {
         const now = new Date();
         const updatedShipment = await tx.tradeShipment.update({
           where: { id: shipmentId },
-          data: {
-            status: ShipmentStatus.delivered,
-            deliveredAt: now,
-          },
+          data: lateArrivalRecord
+            ? { deliveredAt: now }
+            : {
+                status: ShipmentStatus.delivered,
+                deliveredAt: now,
+              },
         });
 
         // Check if both to_warehouse shipments are now delivered
