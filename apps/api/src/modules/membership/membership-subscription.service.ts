@@ -124,9 +124,11 @@ export class MembershipSubscriptionService {
           i18nMessage("server.membership.businessTierRequiresCompany"),
         );
       }
-    } else if (isApprovedCorporate) {
-      // Ters yön ayrı mesaj ister: "Business şirketlere özel" cevabı onaylı
-      // kurumsal hesaba "neden Premium alamıyorum"u açıklamaz.
+    } else if (commissionIdentity?.businessStatus != null) {
+      // Kurumsal İZLİ hesap (pending/rejected dahil) bireysel katman ALAMAZ —
+      // eskiden yalnız ONAYLI kurumsal kilitliydi; onay bekleyen hesap web
+      // guard'ını atlayıp doğrudan API'den Premium satın alabiliyordu.
+      // "Kurumsal satıcının katmanı daima İş'tir" (Üyelik Katmanları §10).
       throw new ForbiddenException(
         i18nMessage("server.membership.corporateMustUseBusinessTier"),
       );
