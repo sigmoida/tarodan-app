@@ -813,6 +813,7 @@
     "cardSection": "Card details",
     "feeDiscountLine": "{name}",
     "campaignSavings": "Your total savings",
+    "quantityCampaignDiscount": "Quantity campaign discount",
     "feeDiscountTargets": {
       "buyer_commission": "Commission discount",
       "buyer_service_fee": "Service fee discount",
@@ -6705,6 +6706,10 @@
         "title": "Your offer was cancelled: product out of stock",
         "message": "Your offer for {productTitle} was cancelled because the product was sold."
       },
+      "offerCancelledListingRemoved": {
+        "title": "Your offer was cancelled: listing removed",
+        "message": "Your offer for {productTitle} was cancelled because the seller removed the listing."
+      },
       "productApproved": {
         "title": "Your Listing Is Live! 🎉",
         "message": "Your listing {productTitle} has been approved and published."
@@ -7081,6 +7086,7 @@
       "invalidShipmentStatus": "Invalid shipment status",
       "itemAlreadyInActiveTrade": "One of the products you offered is already part of an active trade. Cancel the existing trade first or wait for it to be resolved.",
       "membershipExpiredForAccept": "Your membership appears to have expired. Renew your Basic or higher membership to accept a trade.",
+      "counterpartyMembershipExpired": "The offering party's membership no longer allows trades; the offer cannot be accepted.",
       "membershipRequiredForCounter": "A Basic or higher membership is required to send a counter-offer. Please renew your membership.",
       "receiverCannotTrade": "The other party's membership does not allow trading; a trade offer cannot be sent for this listing right now.",
       "noShipmentToConfirm": "No shipment found to confirm",

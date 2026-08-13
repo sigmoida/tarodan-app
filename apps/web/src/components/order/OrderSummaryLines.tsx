@@ -48,6 +48,12 @@ export interface OrderSummaryAmounts {
     amount: number;
   }>;
   feeDiscountTotal?: number;
+  /**
+   * Adet kampanyası (bogo/bulk) kazancı. Ürün satırı zaten indirimli tutarı
+   * gösterir; bu satır "2 al 1 öde" kazancının kaynağını söyler — yoksa
+   * indirim etiketsiz erirdi.
+   */
+  quantityDiscount?: number;
 }
 
 function Line({ label, value }: { label: string; value: string }) {
@@ -80,6 +86,15 @@ export default function OrderSummaryLines({
         label={t("checkout.productFee")}
         value={amount(amounts?.productAmount)}
       />
+
+      {(amounts?.quantityDiscount ?? 0) > 0 && (
+        <div className="flex justify-between text-success-600">
+          <span>{t("checkout.quantityCampaignDiscount")}</span>
+          <span className="font-medium">
+            −{fmtTL(amounts!.quantityDiscount!)} TL
+          </span>
+        </div>
+      )}
 
       {children}
 

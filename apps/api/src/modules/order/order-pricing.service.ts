@@ -868,6 +868,10 @@ export class OrderPricingService {
             amount,
           })),
         feeDiscountTotal: sumFeeDiscounts(appliedFeeDiscounts, "buyer"),
+        // Adet kampanyası (bogo/bulk) kazancı: ürün satırı zaten indirimli
+        // tutarı gösterir; bu alan kazancın KAYNAĞINI söyler — yoksa "2 al
+        // 1 öde" indirimi etiketsiz eriyordu (İ3/İ7 vaadi).
+        quantityDiscount: Math.round(quantityDiscountTotal * 100) / 100,
         productAmount:
           Math.round(
             (itemsSubtotal - quantityDiscountTotal - couponDiscountTotal) * 100,

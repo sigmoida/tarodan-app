@@ -813,6 +813,7 @@
     "cardSection": "Kart Bilgileri",
     "feeDiscountLine": "{name}",
     "campaignSavings": "Toplam kazancınız",
+    "quantityCampaignDiscount": "Adet kampanyası indirimi",
     "feeDiscountTargets": {
       "buyer_commission": "Komisyon indirimi",
       "buyer_service_fee": "Hizmet bedeli indirimi",
@@ -6705,6 +6706,10 @@
         "title": "Teklifiniz iptal edildi: ürün stokta kalmadı",
         "message": "{productTitle} adlı ürün için verdiğiniz teklif, ürün satıldığı için iptal edildi."
       },
+      "offerCancelledListingRemoved": {
+        "title": "Teklifiniz iptal edildi: ilan yayından kaldırıldı",
+        "message": "{productTitle} adlı ürün için verdiğiniz teklif, satıcı ilanı yayından kaldırdığı için iptal edildi."
+      },
       "productApproved": {
         "title": "İlanınız Yayında! 🎉",
         "message": "{productTitle} ilanınız onaylandı ve yayına alındı."
@@ -7081,6 +7086,7 @@
       "invalidShipmentStatus": "Geçersiz gönderim durumu",
       "itemAlreadyInActiveTrade": "Teklif ettiğiniz ürünlerden biri zaten aktif bir takas teklifinde. Önce mevcut takası iptal edin veya sonuçlanmasını bekleyin.",
       "membershipExpiredForAccept": "Üyeliğinizin süresi dolmuş görünüyor. Trade kabul etmek için Temel veya üstü üyeliğinizi yenileyin.",
+      "counterpartyMembershipExpired": "Teklifi veren tarafın üyeliği artık takasa uygun değil; teklif kabul edilemez.",
       "membershipRequiredForCounter": "Karşı teklif göndermek için Temel veya üstü üyelik gereklidir. Üyeliğinizi yenileyin.",
       "receiverCannotTrade": "Karşı tarafın üyeliği takasa uygun değil; bu ilan için şu anda takas teklifi gönderilemiyor.",
       "noShipmentToConfirm": "Onaylanacak gönderim bulunamadı",
