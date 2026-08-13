@@ -936,13 +936,11 @@ export class ProductUpdateService {
           },
         });
         for (const offer of openOffers) {
+          // Doğru gerekçeyle bildir: ilan SİLİNDİ (stok bitmedi). Eskiden
+          // OUT_OF_STOCK şablonu gidiyor, alıcı "ürün satıldığı için iptal
+          // edildi" okuyordu.
           await this.notificationService
-            .notifyOfferCancelledOutOfStock(
-              offer.buyerId,
-              id,
-              product.title,
-              product.categoryId ?? null,
-            )
+            .notifyOfferCancelledListingRemoved(offer.buyerId, id)
             .catch((err: any) =>
               this.logger.warn(
                 `offer-cancelled bildirimi başarısız (${offer.id}): ${err?.message}`,

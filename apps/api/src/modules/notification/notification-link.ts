@@ -176,6 +176,7 @@ export const NOTIFICATION_LINKS: Record<
   [NotificationType.OFFER_EXPIRED]: LISTING,
   [NotificationType.OFFER_EXPIRED_SELLER]: LISTING,
   [NotificationType.OFFER_CANCELLED_OUT_OF_STOCK]: UNAVAILABLE,
+  [NotificationType.OFFER_CANCELLED_LISTING_REMOVED]: UNAVAILABLE,
 
   // ── Ürün / ilan ──────────────────────────────────────────────────────────
   [NotificationType.PRODUCT_APPROVED]: LISTING,

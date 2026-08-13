@@ -350,6 +350,21 @@ export class NotificationCommerceService {
     });
   }
 
+  /**
+   * İlan satıcı tarafından silinince kapanan teklif — stok bitişinden AYRI
+   * metin: eskiden OUT_OF_STOCK şablonu gidiyor, alıcı "ürün satıldığı için
+   * iptal edildi" okuyordu (ilan silinmişken).
+   */
+  async notifyOfferCancelledListingRemoved(buyerId: string, productId: string) {
+    const data = await this.buildStockoutData(productId);
+    return this.dispatch.send({
+      userId: buyerId,
+      type: NotificationType.OFFER_CANCELLED_LISTING_REMOVED,
+      channels: [NotificationChannel.IN_APP, NotificationChannel.PUSH],
+      data,
+    });
+  }
+
   async notifyReservationReleased(
     buyerId: string,
     orderId: string,

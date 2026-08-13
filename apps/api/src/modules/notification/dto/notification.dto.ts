@@ -43,6 +43,8 @@ export enum NotificationType {
   OFFER_EXPIRED_SELLER = "offer_expired_seller",
   OFFER_PAYMENT_EXPIRED = "offer_payment_expired",
   OFFER_CANCELLED_OUT_OF_STOCK = "offer_cancelled_out_of_stock",
+  /** İlan satıcı tarafından silindiği için teklif kapandı (stok bitişi DEĞİL). */
+  OFFER_CANCELLED_LISTING_REMOVED = "offer_cancelled_listing_removed",
 
   // Product notifications
   PRODUCT_APPROVED = "product_approved",

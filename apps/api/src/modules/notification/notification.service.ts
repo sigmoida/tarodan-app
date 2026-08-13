@@ -245,6 +245,11 @@ export class NotificationService {
     );
   }
 
+  /** İlan silindiği için kapanan teklif — stok bitişinden ayrı, doğru metin. */
+  async notifyOfferCancelledListingRemoved(buyerId: string, productId: string) {
+    return this.commerce.notifyOfferCancelledListingRemoved(buyerId, productId);
+  }
+
   async notifyReservationReleased(
     buyerId: string,
     orderId: string,
