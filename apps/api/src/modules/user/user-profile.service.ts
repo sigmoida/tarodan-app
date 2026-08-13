@@ -472,6 +472,14 @@ export class UserProfileService {
       where: { id: userId },
       data: {
         notificationSettings: merged as unknown as Prisma.InputJsonValue,
+        // marketingEmails düğmesi pazarlama e-postalarının kullanıcıya görünen
+        // TEK anahtarıdır; gerçek gönderim kapıları ise User.acceptsMarketingEmails
+        // kolonunu okur (bülten aboneliği, fiyat-düşüş e-postası, üyelik teklif
+        // e-postası). Senkronlanmazsa düğmeyi kapatan kullanıcı pazarlama
+        // e-postası almaya devam eder.
+        ...(patch.marketingEmails !== undefined
+          ? { acceptsMarketingEmails: patch.marketingEmails }
+          : {}),
       },
     });
 

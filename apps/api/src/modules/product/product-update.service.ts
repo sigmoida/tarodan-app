@@ -826,10 +826,13 @@ export class ProductUpdateService {
           );
         }
 
-        // 2. Send email (only for users who accept marketing emails)
+        // 2. Send email (only for users who accept marketing emails).
+        // Yalnız fiyat DÜŞÜŞÜNDE: in-app bacağıyla aynı guard. Eskiden e-posta
+        // her yönlü değişimde gidiyordu — istek listesindeki kullanıcı fiyat
+        // ARTIŞINDA da "fiyat değişti" e-postası alıyordu.
         try {
           const acceptsMarketingEmails = user.acceptsMarketingEmails === true;
-          if (acceptsMarketingEmails) {
+          if (isPriceDrop && acceptsMarketingEmails) {
             const frontendUrl =
               process.env.FRONTEND_URL || "https://tarodan.com.tr";
             const templateData = {

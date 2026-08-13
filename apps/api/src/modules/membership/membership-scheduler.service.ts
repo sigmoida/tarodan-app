@@ -117,6 +117,9 @@ export class MembershipSchedulerService implements OnModuleInit {
         where: {
           isBanned: false,
           isEmailVerified: true,
+          // Pazarlama e-postasıdır: izin ŞARTTIR. Yorumdaki 3. madde WHERE'de
+          // eksikti — teklif e-postası izne bakılmadan kuyruklanıyordu.
+          acceptsMarketingEmails: true,
           // No active premium membership
           AND: [
             {
