@@ -1513,10 +1513,25 @@ export class TradeLifecycleService {
         );
       }
       // MONEY-H2: iade FAILURE-TRACKING ile (marker + retry cron).
-      // compensate_X: yalnız mağdur tarafın ödeme satırı iade edilir — karşı
-      // tarafın satırı escrow takvimiyle serbest kalır. compensate_both (iki
-      // taraf da mağdur, ör. her iki depo-çıkış kolisi de kayıp): İKİ satır da
-      // iade edilir; trade hâlâ disputed olduğu için kapsamsız çağrı serbesttir.
+      // compensate_X: yalnız mağdur tarafın ödeme satırı iade edilir (nakit
+      // fark; hizmet bedeli/kargo kesilir) — karşı tarafın satırı escrow
+      // takvimiyle serbest kalır. compensate_both (iki taraf da mağdur, ör.
+      // her iki depo-çıkış kolisi de kayıp): İKİ satır da TAM iade edilir —
+      // müşteri taahhüdü "hizmet bedeli ve kargo dahil" olduğu için satırlar
+      // iadeden önce fullRefundEntitled ile damgalanır; retry cron'u da aynı
+      // tutarı hesaplar. Trade hâlâ disputed olduğu için kapsamsız çağrı
+      // serbesttir.
+      if (compensateBoth) {
+        await this.prisma.tradeCashPayment.updateMany({
+          where: {
+            tradeId,
+            status: PaymentStatus.completed,
+            releasedAt: null,
+            refundedAt: null,
+          },
+          data: { fullRefundEntitled: true },
+        });
+      }
       await this.paymentService.refundTradeCashTracked(
         tradeId,
         compensateBoth
