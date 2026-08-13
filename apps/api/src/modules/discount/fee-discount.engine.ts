@@ -92,6 +92,52 @@ export function remainingDiscountAllowanceFor(input: {
   return Math.max(0, round2(cap - used));
 }
 
+/**
+ * Kuponun uygun satırlara dağıtımı + toplam-indirim tavanı — quote, grup ve
+ * tekil checkout'un TEK kaynağı (ayrışırlarsa önizleme ≠ tahsilat olur).
+ *
+ * Dağıtım oransal, yuvarlama artığı son satıra (mevcut davranış). Ardından
+ * TAVAN: kupon (satıcı kuponu dahil — koda bağlanan her indirim "kupon"dur)
+ * satır başına, tabanın MAX_TOTAL_DISCOUNT_PERCENT'ini aşamaz; kırpılan pay
+ * başka satıra AKTARILMAZ ("artan indirim başka kaleme taşınmaz" kuralının
+ * kupon karşılığı). Bedel kampanyaları kalan payı ayrıca tüketir
+ * (remainingDiscountAllowanceFor) — böylece kupon + platform bedel
+ * kampanyaları birlikte tavanı aşamaz. Taban = satıcı indirimleri (ilan
+ * indirimi VE adet kampanyası) SONRASI satır tutarıdır.
+ */
+export function allocateCouponAcrossLines(
+  /** Satır tabanları: satıcı indirimleri sonrası tutar (fiyat×adet − adet kampanyası). */
+  lineBases: number[],
+  totalCoupon: number,
+): { amounts: number[]; total: number } {
+  const bases = lineBases.map((base) => Math.max(0, base));
+  const baseSum = round2(bases.reduce((sum, base) => sum + base, 0));
+  if (baseSum <= 0 || totalCoupon <= 0) {
+    return { amounts: bases.map(() => 0), total: 0 };
+  }
+
+  const amounts: number[] = [];
+  let allocated = 0;
+  bases.forEach((base, idx) => {
+    if (idx === bases.length - 1) {
+      amounts.push(round2(totalCoupon - allocated));
+    } else {
+      const share = round2((totalCoupon * base) / baseSum);
+      amounts.push(share);
+      allocated = round2(allocated + share);
+    }
+  });
+
+  let total = 0;
+  const clipped = amounts.map((amount, idx) => {
+    const cap = round2(bases[idx] * (MAX_TOTAL_DISCOUNT_PERCENT / 100));
+    const value = Math.min(Math.max(0, amount), cap);
+    total = round2(total + value);
+    return value;
+  });
+  return { amounts: clipped, total };
+}
+
 export const isFeeTarget = (target: DiscountTarget): target is FeeTarget =>
   (FEE_TARGETS as readonly DiscountTarget[]).includes(target);
 

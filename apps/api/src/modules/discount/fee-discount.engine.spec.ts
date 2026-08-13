@@ -1,5 +1,6 @@
 import { DiscountTarget, DiscountType } from "@prisma/client";
 import {
+  allocateCouponAcrossLines,
   applyFeeDiscounts,
   automaticBudgetEntriesOf,
   isBuyerFeeTarget,
@@ -320,5 +321,52 @@ describe("hedef kalem sınıflandırması", () => {
   it("alıcı ve satıcı kalemleri ayrışır", () => {
     expect(isBuyerFeeTarget(DiscountTarget.buyer_shipping)).toBe(true);
     expect(isBuyerFeeTarget(DiscountTarget.seller_shipping)).toBe(false);
+  });
+});
+
+describe("allocateCouponAcrossLines (kupon dağıtımı + tavan)", () => {
+  it("oransal dağıtır, yuvarlama artığını son satıra yazar", () => {
+    const { amounts, total } = allocateCouponAcrossLines([1000, 500], 150);
+    expect(amounts).toEqual([100, 50]);
+    expect(total).toBe(150);
+  });
+
+  it("kupon satır tabanının %50'sini aşamaz — %60'lık kupon %50'ye kırpılır", () => {
+    // 1000 TL tabanda 600 TL (=%60) kupon: tavan 500 TL'ye kırpar.
+    const { amounts, total } = allocateCouponAcrossLines([1000], 600);
+    expect(amounts).toEqual([500]);
+    expect(total).toBe(500);
+  });
+
+  it("kırpılan pay başka satıra AKTARILMAZ; her satır kendi tavanına takılır", () => {
+    // İki satır: 100 TL ve 1000 TL taban; 600 TL kupon oransal 54.55/545.45
+    // dağıtılır. İlk satır 50'ye (tavan), ikinci satır 500'e (tavan) kırpılır;
+    // kırpılan paylar satırlar arasında taşınmaz.
+    const { amounts, total } = allocateCouponAcrossLines([100, 1000], 600);
+    expect(amounts).toEqual([50, 500]);
+    expect(total).toBe(550);
+  });
+
+  it("taban satıcı indirimleri SONRASI tutardır (adet kampanyalı satır küçük taban)", () => {
+    // Satır tabanı 800 (1000 − 200 adet kampanyası): tavan 400.
+    const { total } = allocateCouponAcrossLines([800], 500);
+    expect(total).toBe(400);
+  });
+
+  it("taban 0/negatifken hiç dağıtmaz", () => {
+    expect(allocateCouponAcrossLines([0, -5], 100)).toEqual({
+      amounts: [0, 0],
+      total: 0,
+    });
+    expect(allocateCouponAcrossLines([], 100)).toEqual({
+      amounts: [],
+      total: 0,
+    });
+  });
+
+  it("tavanın altındaki kupon aynen geçer (mevcut davranış korunur)", () => {
+    const { amounts, total } = allocateCouponAcrossLines([1000, 500], 100);
+    expect(amounts).toEqual([66.67, 33.33]);
+    expect(total).toBe(100);
   });
 });

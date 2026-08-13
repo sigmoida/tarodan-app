@@ -52,7 +52,10 @@ import type {
   AppliedFeeDiscount,
   FeeDiscountCandidate,
 } from "../discount/fee-discount.engine";
-import { remainingDiscountAllowanceFor } from "../discount/fee-discount.engine";
+import {
+  allocateCouponAcrossLines,
+  remainingDiscountAllowanceFor,
+} from "../discount/fee-discount.engine";
 import {
   summarizeFeeDiscounts,
   sumFeeDiscounts,
@@ -558,25 +561,19 @@ export class OrderPricingService {
         const eligibleLines = lines.filter((l) =>
           eligibleIds.has(l.product.id),
         );
-        const eligiblePriceSum = eligibleLines.reduce(
-          (s, l) => s + l.lineSubtotal,
-          0,
+        // Dağıtım + %50 tavan TEK kaynaktan (create yolları ile birebir):
+        // kupon satır başına, satıcı indirimleri sonrası tabanın yüzde
+        // MAX_TOTAL_DISCOUNT_PERCENT'ini aşamaz.
+        const allocation = allocateCouponAcrossLines(
+          eligibleLines.map((l) =>
+            Math.max(0, l.lineSubtotal - l.quantityDiscount),
+          ),
+          total,
         );
-        if (eligiblePriceSum > 0) {
-          let allocated = 0;
-          eligibleLines.forEach((l, idx) => {
-            if (idx === eligibleLines.length - 1) {
-              l.couponDiscount = Math.round((total - allocated) * 100) / 100;
-            } else {
-              l.couponDiscount =
-                Math.round(
-                  ((total * l.lineSubtotal) / eligiblePriceSum) * 100,
-                ) / 100;
-              allocated += l.couponDiscount;
-            }
-          });
-          couponDiscountTotal = total;
-        }
+        eligibleLines.forEach((l, idx) => {
+          l.couponDiscount = allocation.amounts[idx];
+        });
+        couponDiscountTotal = allocation.total;
       }
     }
 

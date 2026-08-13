@@ -30,7 +30,10 @@ import { OrderCommonService } from "./order-common.service";
 import { OrderCheckoutCommonService } from "./order-checkout-common.service";
 import { OrderFeeDiscountService } from "./order-fee-discount.service";
 import type { FeeDiscountCandidate } from "../discount/fee-discount.engine";
-import { remainingDiscountAllowanceFor } from "../discount/fee-discount.engine";
+import {
+  allocateCouponAcrossLines,
+  remainingDiscountAllowanceFor,
+} from "../discount/fee-discount.engine";
 import { splitShippingByBuyerShare } from "../shipping/shipping-tariff.helper";
 import { OrderCheckoutGroupService } from "./order-checkout-group.service";
 import {
@@ -358,7 +361,12 @@ export class OrderCheckoutDirectService {
         );
 
         if (validation.isValid && validation.discount) {
-          couponDiscount = validation.discount.estimatedDiscount;
+          // %50 tavan TEK kaynaktan (quote/grup ile birebir): tek satırlık
+          // siparişte kupon, ürün tabanının yarısını aşamaz.
+          couponDiscount = allocateCouponAcrossLines(
+            [productPrice],
+            validation.discount.estimatedDiscount,
+          ).total;
           appliedCouponCode = dto.couponCode.toUpperCase();
           appliedDiscountId = validation.discount.id;
           appliedVoucherCodeId = validation.discount.voucherCodeId;

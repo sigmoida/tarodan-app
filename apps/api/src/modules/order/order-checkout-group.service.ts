@@ -38,7 +38,10 @@ import type {
   AppliedFeeDiscount,
   FeeDiscountCandidate,
 } from "../discount/fee-discount.engine";
-import { remainingDiscountAllowanceFor } from "../discount/fee-discount.engine";
+import {
+  allocateCouponAcrossLines,
+  remainingDiscountAllowanceFor,
+} from "../discount/fee-discount.engine";
 import { distanceSalesConsent } from "./distance-sales-contract";
 import {
   calculatePackageDesi,
@@ -526,34 +529,24 @@ export class OrderCheckoutGroupService {
               // Kupon YALNIZ uygun (scope) satırlara, satır toplamı oranında
               // dağıtılır — uygun olmayan satıcı/kategori satırları indirim payı
               // ALMAZ (aksi halde kapsamlı bir kupon başka satıcıların payout
-              // tabanını düşürürdü). Son uygun satıra yuvarlama artığı yazılır.
+              // tabanını düşürürdü). Dağıtım + %50 tavan TEK kaynaktan (quote
+              // ile birebir): kupon satır başına, satıcı indirimleri sonrası
+              // tabanın yüzde MAX_TOTAL_DISCOUNT_PERCENT'ini aşamaz.
               const eligibleIds = new Set(
                 validation.discount.eligibleProductIds,
               );
               const eligibleLines = pricing.filter((p) =>
                 eligibleIds.has(p.productId),
               );
-              const eligiblePriceSum = eligibleLines.reduce(
-                (sum, p) => sum + p.productPrice * p.quantity,
-                0,
+              const allocation = allocateCouponAcrossLines(
+                eligibleLines.map((p) =>
+                  Math.max(0, p.productPrice * p.quantity - p.quantityDiscount),
+                ),
+                totalCoupon,
               );
-              if (eligiblePriceSum > 0) {
-                let allocated = 0;
-                eligibleLines.forEach((p, idx) => {
-                  if (idx === eligibleLines.length - 1) {
-                    p.couponDiscount =
-                      Math.round((totalCoupon - allocated) * 100) / 100;
-                  } else {
-                    p.couponDiscount =
-                      Math.round(
-                        ((totalCoupon * p.productPrice * p.quantity) /
-                          eligiblePriceSum) *
-                          100,
-                      ) / 100;
-                    allocated += p.couponDiscount;
-                  }
-                });
-              }
+              eligibleLines.forEach((p, idx) => {
+                p.couponDiscount = allocation.amounts[idx];
+              });
             }
           }
 
