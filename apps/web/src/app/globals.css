@@ -4,6 +4,11 @@
 @tailwind utilities;
 
 :root {
+  /* Light-only site: opts out of Android's algorithmic force-dark (Chrome Auto
+     Dark Theme, Samsung Internet, MIUI), which otherwise repaints our surfaces
+     dark. Mirrors the `viewport` export in app/layout.tsx and also covers the
+     root not-found.tsx shell. Becomes `light dark` if a dark theme ever ships. */
+  color-scheme: only light;
   --primary: theme('colors.primary.500');
   --primary-dark: theme('colors.primary.600');
   --accent-green: theme('colors.success.500');

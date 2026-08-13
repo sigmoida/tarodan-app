@@ -1,13 +1,13 @@
 /** @format */
 
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Noto_Sans } from "next/font/google";
 import "./globals.css";
 import { Toaster } from "react-hot-toast";
 import { NextIntlClientProvider } from "next-intl";
 import { getLocale, getMessages, getTranslations } from "next-intl/server";
 import { APP_NAME } from "@/lib/navigation";
-import { zIndex } from "@tarodan/design-tokens";
+import { surface, zIndex } from "@tarodan/design-tokens";
 
 const notoSans = Noto_Sans({
   subsets: ["latin", "latin-ext"],
@@ -28,6 +28,19 @@ export async function generateMetadata(): Promise<Metadata> {
     icons: { icon: "/tarodan-favicon.png" },
   };
 }
+
+/**
+ * `only light` tells the browser the panel ships a single, light-only theme,
+ * which is the documented opt-out from Android's algorithmic force-dark (Chrome's
+ * Auto Dark Theme, Samsung Internet, MIUI). Without it those browsers repaint our
+ * surfaces dark and invert text. `globals.css` declares the same thing in CSS as
+ * a belt-and-braces fallback. The moment a real dark theme exists, this becomes
+ * `light dark`.
+ */
+export const viewport: Viewport = {
+  colorScheme: "only light",
+  themeColor: surface.DEFAULT,
+};
 
 /**
  * Root layout. Async so it can resolve the request locale (from the NEXT_LOCALE

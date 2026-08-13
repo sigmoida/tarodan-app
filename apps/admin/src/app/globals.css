@@ -7,6 +7,10 @@
     /* Reserve the scrollbar gutter so the bar appearing on scroll doesn't shift
        the layout (and the fixed topbar). No-op on overlay-scrollbar systems. */
     scrollbar-gutter: stable;
+    /* Light-only panel: opts out of Android's algorithmic force-dark (Chrome Auto
+       Dark Theme, Samsung Internet, MIUI). Mirrors the `viewport` export in
+       layout.tsx. Becomes `light dark` if a dark theme ever ships. */
+    color-scheme: only light;
   }
   body {
     @apply bg-surface text-heading;
