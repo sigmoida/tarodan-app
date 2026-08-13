@@ -284,6 +284,7 @@ export class AdvertisementService {
         this.logger.warn("Ad dimensions not IAB compliant");
       }
     }
+    await this.assertDiscountExists(dto.discountId);
 
     const ad = await this.adRepo.create({
       data: {
@@ -300,6 +301,10 @@ export class AdvertisementService {
         isActive: dto.isActive ?? true,
         startDate: dto.startDate ? new Date(dto.startDate) : null,
         endDate: dto.endDate ? new Date(dto.endDate) : null,
+        // Kampanya bağı: şeritteki kupon kodu + flaş geri sayım ve "kampanya
+        // bitince afiş düşer" süzmesi bu kolondan okunur. Alan DTO'da vardı
+        // ama persist edilmiyordu — bağ hiç kurulamıyordu.
+        discountId: dto.discountId || null,
       },
     });
     return this.toResponse(ad);
@@ -326,6 +331,10 @@ export class AdvertisementService {
       }
     }
 
+    if (dto.discountId) {
+      await this.assertDiscountExists(dto.discountId);
+    }
+
     const ad = await (this.prisma as PrismaWithAd).advertisement.update({
       where: { id },
       data: {
@@ -342,9 +351,25 @@ export class AdvertisementService {
         isActive: dto.isActive,
         startDate: dto.startDate != null ? new Date(dto.startDate) : undefined,
         endDate: dto.endDate != null ? new Date(dto.endDate) : undefined,
+        // undefined = dokunma; boş dize = bağı kaldır (SetNull).
+        discountId:
+          dto.discountId === undefined ? undefined : dto.discountId || null,
       },
     });
     return this.toResponse(ad);
+  }
+
+  /** Kampanya bağı doğrulaması: var olmayan kampanyaya bağlanan afiş, süzme
+   *  tarafında sessizce görünmez olurdu — tanım anında net hata ver. */
+  private async assertDiscountExists(discountId?: string | null) {
+    if (!discountId) return;
+    const discount = await this.prisma.discount.findUnique({
+      where: { id: discountId },
+      select: { id: true },
+    });
+    if (!discount) {
+      throw new NotFoundException("Bağlanacak kampanya bulunamadı");
+    }
   }
 
   /**
@@ -396,6 +421,7 @@ export class AdvertisementService {
       isActive: ad.isActive,
       startDate: ad.startDate,
       endDate: ad.endDate,
+      discountId: ad.discountId ?? null,
       clickCount: ad.clickCount,
       impressionCount: ad.impressionCount,
       ctr: parseFloat(ctr),
