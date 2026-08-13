@@ -212,8 +212,11 @@ export class MembershipController {
     @Param("type", new ParseEnumPipe(MembershipTierType))
     type: MembershipTierType,
     @Body() dto: UpdateMembershipTierDto,
+    // Audit log admin'in user id'siyle yazılır (AdminJwtStrategy req.user.id'ye
+    // bunu koyar); eskiden bu rota hiç audit yazmıyordu.
+    @Request() req: any,
   ): Promise<MembershipTierResponseDto> {
-    return this.membershipService.updateTier(type, dto);
+    return this.membershipService.updateTier(type, dto, req.user.id);
   }
 
   /**

@@ -1406,8 +1406,6 @@ export class AuthService {
       await Promise.all([
         // Clear any stale user cache and refresh
         this.cacheService.del(this.cacheService.userKey(userId)),
-        // Clear user's membership limits cache to refresh on login
-        this.cacheService.del(this.cacheService.membershipLimitsKey(userId)),
         // Clear user's cart cache if exists
         this.cacheService.del(`cart:${userId}`),
         // Clear user's recently viewed cache if exists

@@ -20,6 +20,7 @@ import { Request } from "express";
 import { MembershipPaymentInitResponseDto } from "./dto/membership-payment.dto";
 import { MembershipCommonService } from "./membership-common.service";
 import { MembershipSubscriptionService } from "./membership-subscription.service";
+import { MembershipTierUpdateService } from "./membership-tier-update.service";
 import { i18nMessage } from "../i18n";
 
 /**
@@ -38,6 +39,7 @@ export class MembershipService {
     private readonly prisma: PrismaService,
     private readonly common: MembershipCommonService,
     private readonly subscription: MembershipSubscriptionService,
+    private readonly tierUpdate: MembershipTierUpdateService,
   ) {}
 
   // ==========================================================================
@@ -214,6 +216,10 @@ export class MembershipService {
         canTrade: dto.canTrade,
         isAdFree: dto.isAdFree,
         featuredListingSlots: dto.featuredListingSlots,
+        // sortOrder yük taşır: yükseltme/düşürme yönü katmanların sortOrder
+        // karşılaştırmasından çıkar. Yazılmadığında yeni katman 0'a (free ile
+        // aynı sıraya) düşüyordu.
+        sortOrder: dto.sortOrder,
         // commissionDiscount BİLEREK yazılmıyor: komisyon avantajı yalnız
         // komisyon kurallarının üyelik ekseninden (PREMIUM/BUSINESS) gelir;
         // bu kolon motor tarafından hiç okunmaz (DB varsayılanı 0 kalır).
@@ -225,94 +231,21 @@ export class MembershipService {
   }
 
   // ==========================================================================
-  // ADMIN: UPDATE TIER
+  // ADMIN: UPDATE TIER (delegate → MembershipTierUpdateService)
   // ==========================================================================
   async updateTier(
     tierType: MembershipTierType,
     dto: UpdateMembershipTierDto,
+    adminId: string,
   ): Promise<MembershipTierResponseDto> {
-    const tier = await this.prisma.membershipTier.findUnique({
-      where: { type: tierType },
-    });
-
-    if (!tier) {
-      throw new NotFoundException(
-        i18nMessage("server.membership.tierNotFound", { type: tierType }),
-      );
-    }
-
-    if (!Object.values(dto).some((value) => value !== undefined)) {
-      throw new BadRequestException("En az bir alan güncellenmelidir");
-    }
-    if (
-      dto.maxTotalListings !== undefined &&
-      dto.maxTotalListings !== -1 &&
-      dto.maxTotalListings < 1
-    ) {
-      throw new BadRequestException(
-        "Toplam ilan limiti -1 veya en az 1 olmalıdır",
-      );
-    }
-    if (tier.type === MembershipTierType.free) {
-      if (dto.isActive === false) {
-        throw new BadRequestException(
-          "Ücretsiz üyelik seviyesi pasif yapılamaz",
-        );
-      }
-      if (
-        (dto.monthlyPrice !== undefined && dto.monthlyPrice !== 0) ||
-        (dto.yearlyPrice !== undefined && dto.yearlyPrice !== 0)
-      ) {
-        throw new BadRequestException(
-          "Ücretsiz üyelik fiyatları sıfır olmalıdır",
-        );
-      }
-    } else if (
-      (dto.monthlyPrice !== undefined && dto.monthlyPrice <= 0) ||
-      (dto.yearlyPrice !== undefined && dto.yearlyPrice <= 0)
-    ) {
-      throw new BadRequestException(
-        "Ücretli üyelik fiyatları sıfırdan büyük olmalıdır",
-      );
-    }
-
-    const updatedTier = await this.prisma.$transaction(async (tx) => {
-      const updated = await tx.membershipTier.update({
-        where: { type: tierType },
-        data: {
-          name: dto.name,
-          description: dto.description,
-          monthlyPrice: dto.monthlyPrice,
-          yearlyPrice: dto.yearlyPrice,
-          maxFreeListings: dto.maxFreeListings,
-          maxTotalListings: dto.maxTotalListings,
-          maxImagesPerListing: dto.maxImagesPerListing,
-          canCreateCollections: dto.canCreateCollections,
-          canTrade: dto.canTrade,
-          isAdFree: dto.isAdFree,
-          isActive: dto.isActive,
-          sortOrder: dto.sortOrder,
-        },
-      });
-
-      if (
-        tier.type !== MembershipTierType.free &&
-        dto.monthlyPrice !== undefined
-      ) {
-        await tx.platformSetting.upsert({
-          where: { settingKey: `${tier.type}_monthly_price` },
-          update: { settingValue: String(dto.monthlyPrice) },
-          create: {
-            settingKey: `${tier.type}_monthly_price`,
-            settingValue: String(dto.monthlyPrice),
-            settingType: "number",
-            description: `${tier.name} monthly membership price`,
-          },
-        });
-      }
-
-      return updated;
-    });
+    // Doğrulama + yazma + audit + free-canTrade cache düşürme TEK çekirdekte:
+    // /admin/membership-tiers/:id rotası da aynı çekirdekten geçer, kurallar
+    // ayrışamaz (adminId audit log için zorunlu).
+    const updatedTier = await this.tierUpdate.updateTier(
+      adminId,
+      { type: tierType },
+      dto,
+    );
 
     return this.common.mapTierToDto(updatedTier);
   }

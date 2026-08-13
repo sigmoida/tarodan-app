@@ -161,6 +161,21 @@ export class ProductUpdateService {
             i18nMessage("server.product.setQuantityToReopen"),
           );
         }
+        // İlan limiti yeniden satışa açarken de geçerli: limit pending+active+
+        // reserved sayar, sold/inactive SAYILMAZ — kontrolsüz reaktivasyon,
+        // limiti aşmanın arka kapısıydı (create ile AYNI kaynak: canCreateListing).
+        // Zaten sayılan (aktif) ilanın normal düzenlemesi bu daldan geçmez.
+        const canReopen =
+          await this.membershipService.canCreateListing(sellerId);
+        if (!canReopen.allowed) {
+          const limits = await this.membershipService.getUserLimits(sellerId);
+          throw new ForbiddenException(
+            i18nMessage("server.product.listingLimitReached", {
+              tierName: limits.tierName,
+              maxListings: limits.maxTotalListings,
+            }),
+          );
+        }
         await this.commissionGuard.assertListingRuleExists({
           sellerId,
           categoryId: product.categoryId,
@@ -941,8 +956,6 @@ export class ProductUpdateService {
     // Invalidate cache
     await this.cache.del(`products:detail:${id}`);
     await this.cache.delPattern("products:list:*");
-    // Invalidate user's membership limits cache to refresh listing counts
-    await this.cache.del(`membership:limits:${sellerId}`);
     await this.cache.del(`membership:${sellerId}`);
 
     // Arama index'inden kaldır: "Kaldırıldı" durumu listelenemez. Aksi halde

@@ -69,6 +69,7 @@ describe("MembershipService.getAllTiers — limitler yalnız katman satırından
       prisma,
       common,
       {} as MembershipSubscriptionService,
+      {} as any, // tierUpdate — bu spec katman LİSTELEME davranışını test eder
     );
     return { service, platformSettingFindUnique };
   };

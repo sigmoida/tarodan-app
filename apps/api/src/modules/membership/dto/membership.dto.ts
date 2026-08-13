@@ -3,6 +3,7 @@ import {
   IsEnum,
   IsOptional,
   IsNumber,
+  IsInt,
   IsBoolean,
   Min,
   Max,
@@ -12,6 +13,7 @@ import {
 } from "class-validator";
 import { Type } from "class-transformer";
 import { MembershipTierType, SubscriptionStatus } from "@prisma/client";
+import { MAX_PRODUCT_IMAGES } from "../../product/helpers/product-image-keys";
 
 export class SubscribeDto {
   @IsEnum(MembershipTierType)
@@ -27,6 +29,14 @@ export class ToggleAutoRenewDto {
   autoRenew: boolean;
 }
 
+/**
+ * Katman güncelleme gövdesi — HER İKİ admin rotasının TEK DTO'su
+ * (PATCH /membership/admin/tiers/:type ve PATCH /admin/membership-tiers/:id;
+ * admin modülü bu sınıfı re-export eder). Eskiden iki ayrı kopya farklı
+ * kurallar uyguluyordu (görsel tavanı 20'ye karşı sınırsız, fiyat tavanı
+ * bir yolda yok vb.). Alan doğrulaması burada, iş kuralları
+ * MembershipTierUpdateService'te — ikisi de tek kaynak.
+ */
 export class UpdateMembershipTierDto {
   @IsOptional()
   @IsString()
@@ -53,23 +63,29 @@ export class UpdateMembershipTierDto {
   @Max(12000000)
   yearlyPrice?: number;
 
+  // 0 geçerli bir yapılandırmadır: "ücretsiz slotu olmayan katman". Eski
+  // @Min(1) bunu DTO seviyesinde yasaklıyordu (diğer rota 0'a izin veriyordu).
   @IsOptional()
   @Type(() => Number)
-  @IsNumber()
-  @Min(1)
+  @IsInt()
+  @Min(0)
   maxFreeListings?: number;
 
+  // -1 = SINIRSIZ (admin UI, web üyelik sayfası ve servis doğrulaması bu
+  // sözleşmeyi paylaşır). Aralığın geri kalanını (-1 ya da >= 1) servis denetler.
   @IsOptional()
   @Type(() => Number)
-  @IsNumber()
+  @IsInt()
   @Min(-1)
   maxTotalListings?: number;
 
+  // Tavan = ürün DTO'sunun mutlak sınırı: admin, create-product'ın kafa
+  // karıştıran bir mesajla reddedeceği bir katman limiti YAPILANDIRAMAZ.
   @IsOptional()
   @Type(() => Number)
-  @IsNumber()
+  @IsInt()
   @Min(1)
-  @Max(20)
+  @Max(MAX_PRODUCT_IMAGES)
   maxImagesPerListing?: number;
 
   @IsOptional()
@@ -84,13 +100,17 @@ export class UpdateMembershipTierDto {
   @IsBoolean()
   isAdFree?: boolean;
 
+  // featuredListingSlots + commissionDiscount BİLEREK düzenlenemez: ilki ücretli
+  // öne çıkarma paketlerine devredildi, ikincisi komisyon motoru tarafından hiç
+  // okunmadı. DB kolonları (deprecated) duruyor ama admin yanıltıcı değer yazamaz.
+
   @IsOptional()
   @IsBoolean()
   isActive?: boolean;
 
   @IsOptional()
   @Type(() => Number)
-  @IsNumber()
+  @IsInt()
   @Min(0)
   @Max(10000)
   sortOrder?: number;
@@ -127,10 +147,11 @@ export class CreateMembershipTierDto {
   @Min(1)
   maxTotalListings: number;
 
+  // Tavan güncelleme DTO'suyla AYNI kaynaktan (bkz. UpdateMembershipTierDto).
   @Type(() => Number)
   @IsNumber()
   @Min(1)
-  @Max(20)
+  @Max(MAX_PRODUCT_IMAGES)
   maxImagesPerListing: number;
 
   @IsBoolean()
@@ -138,6 +159,18 @@ export class CreateMembershipTierDto {
 
   @IsBoolean()
   canTrade: boolean;
+
+  /**
+   * Yükseltme/düşürme yönü katmanların sortOrder karşılaştırmasından çıkar —
+   * alan yük taşır. Ayarlanamadığında yeni katman 0'a (free ile aynı sıraya)
+   * düşüyor ve yön hesabı bozuluyordu.
+   */
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  @Max(10000)
+  sortOrder?: number;
 
   /**
    * DEVRE DIŞI: banner'lar herkese gösterilir. Kolon geriye uyum için duruyor;
