@@ -22,10 +22,7 @@ import { REFERENCE_PREFIX } from "../../common/helpers/code-prefixes";
 import { generateReferenceCode } from "../../common/helpers/generate-reference";
 import { CarrierCancellationService } from "../surat-cargo/carrier-cancellation.service";
 import { TRADE_CANCEL_REASON } from "../trade/trade-cancel-reasons";
-import {
-  allReturnLegsDelivered,
-  allReturnLegsResolved,
-} from "../../common/helpers/trade-return-finalize";
+import { finalizeReturningTradeIfResolved } from "../../common/helpers/trade-return-finalize";
 
 /**
  * Takas çözüm & iade/iptal yaşam döngüsü (resolveTrade, markReturnDelivered,
@@ -87,79 +84,34 @@ export class AdminTradeResolutionService {
         if (shipment.leg !== "return") {
           throw new BadRequestException("Bu gönderim bir iade gönderimi değil");
         }
-        if (shipment.deliveredAt) {
-          throw new BadRequestException(
-            "Bu iade gönderimi zaten teslim edildi olarak işaretlenmiş",
-          );
-        }
 
         const now = new Date();
-        const updatedShipment = await tx.tradeShipment.update({
-          where: { id: shipmentId },
-          data: {
-            status: ShipmentStatus.delivered,
-            deliveredAt: now,
-            confirmedAt: now,
-          },
-        });
-
-        // Check if all return shipments are delivered
-        const returnShipments = await tx.tradeShipment.findMany({
-          where: { tradeId, leg: "return" },
-          select: { id: true, deliveredAt: true },
-        });
-        const allDelivered = allReturnLegsDelivered(returnShipments);
-
-        let finalStatus: TradeStatus = trade.status;
-        if (allDelivered && trade.status !== TradeStatus.cancelled) {
-          // Release reservations and reactivate products
-          const items = await tx.tradeItem.findMany({
-            where: { tradeId },
-            select: { productId: true, quantity: true },
-          });
-
-          const byProduct = new Map<string, number>();
-          for (const item of items) {
-            byProduct.set(
-              item.productId,
-              (byProduct.get(item.productId) ?? 0) + item.quantity,
-            );
-          }
-
-          for (const [productId, qty] of byProduct) {
-            await tx.$queryRaw`SELECT id FROM products WHERE id = ${productId} FOR UPDATE`;
-            const prod = await tx.product.findUnique({
-              where: { id: productId },
-              select: { reservedQuantity: true },
+        // Zaten teslim edilmiş bacakta hata FIRLATMAK, poll'un teslimi yazıp
+        // finalizasyonda takıldığı takası admin'in de kurtaramamasına yol
+        // açıyordu: tarihi ötelemeden yalnız kapanışı onar (mark-outbound-
+        // delivered ile aynı onarım semantiği).
+        const updatedShipment = shipment.deliveredAt
+          ? shipment
+          : await tx.tradeShipment.update({
+              where: { id: shipmentId },
+              data: {
+                status: ShipmentStatus.delivered,
+                deliveredAt: now,
+                confirmedAt: now,
+              },
             });
-            if (prod) {
-              const newReserved = safeDecrementReserved(
-                prod.reservedQuantity,
-                qty,
-              );
-              await tx.product.update({
-                where: { id: productId },
-                data: {
-                  reservedQuantity: newReserved,
-                  status:
-                    newReserved > 0
-                      ? ProductStatus.reserved
-                      : ProductStatus.active,
-                },
-              });
-            }
-          }
 
-          await tx.trade.update({
-            where: { id: tradeId },
-            data: {
-              status: TradeStatus.cancelled,
-              cancelledAt: now,
-              updatedAt: now,
-            },
-          });
-          finalStatus = TradeStatus.cancelled;
-        }
+        // Kapanış şartı ve kapanışın kendisi tek kaynaktan: teslim YA DA kayıp
+        // çözülmüş sayılır — yalnız teslimleri saymak, "önce kayıp sonra
+        // teslim" sıralamasında takası sonsuza dek returning'de bırakıyordu.
+        const finalize = await finalizeReturningTradeIfResolved(
+          tx,
+          tradeId,
+          now,
+        );
+        const finalStatus: TradeStatus = finalize.finalized
+          ? TradeStatus.cancelled
+          : trade.status;
 
         await this.audit.createAuditLog(
           adminId,
@@ -169,28 +121,26 @@ export class AdminTradeResolutionService {
           shipment,
           {
             ...updatedShipment,
-            allDelivered,
+            allDelivered: finalize.allResolved,
             tradeStatus: finalStatus,
           },
         );
-
-        const parties = await tx.trade.findUnique({
-          where: { id: tradeId },
-          select: { initiatorId: true, receiverId: true },
-        });
 
         return {
           success: true,
           tradeId,
           shipmentId,
           status: finalStatus,
-          allDelivered,
-          initiatorId: parties!.initiatorId,
-          receiverId: parties!.receiverId,
+          allDelivered: finalize.allResolved,
+          // Bildirim yalnız kapanışın GERÇEKLEŞTİĞİ çağrıda gitsin — zaten
+          // cancelled bir takasta onarım no-op'u yeniden duyuru üretmesin.
+          finalized: finalize.finalized,
+          initiatorId: finalize.initiatorId ?? "",
+          receiverId: finalize.receiverId ?? "",
         };
       })
       .then(async (res) => {
-        if (res.allDelivered && res.status === TradeStatus.cancelled) {
+        if (res.finalized) {
           try {
             await this.eventService.emitTradeReturnCompleted({
               tradeId: res.tradeId,
@@ -601,104 +551,20 @@ export class AdminTradeResolutionService {
           },
         });
 
-        // If every return shipment has been resolved (delivered or lost),
-        // finalize the trade the same way markReturnDelivered would: release
-        // reservations, reactivate products, and cancel the trade.
-        const returnShipments = await tx.tradeShipment.findMany({
-          where: { tradeId, leg: "return" },
-          select: { id: true, deliveredAt: true, lostAt: true },
-        });
-        const allResolved = allReturnLegsResolved(returnShipments);
+        // Kapanış tek kaynaktan (markReturnDelivered ve Sürat poll'u ile aynı
+        // çekirdek): tüm iade bacakları çözüldüyse rezervasyonları çözer, kayıp
+        // bacaktaki ürünleri stoktan düşer ve takası cancelled yapar.
+        const finalize = await finalizeReturningTradeIfResolved(
+          tx,
+          tradeId,
+          now,
+        );
+        const allResolved = finalize.allResolved;
+        const finalStatus: TradeStatus = finalize.finalized
+          ? TradeStatus.cancelled
+          : trade.status;
 
-        let finalStatus: TradeStatus = trade.status;
-        if (allResolved && trade.status !== TradeStatus.cancelled) {
-          const items = await tx.tradeItem.findMany({
-            where: { tradeId },
-            select: { productId: true, quantity: true, side: true },
-          });
-          // Kayıp bacaktaki ürünler sahibine HİÇ ulaşmadı: rezervasyonu
-          // çözmekle kalmayıp stoktan da düşülür — aksi halde fiziksel olarak
-          // kaybolmuş ürün ilan olarak yeniden satışa çıkardı. Gidiş
-          // bacağındaki kayıp koli çözümü (autoResolveLostParcelTrades) da
-          // aynı kuralı uygular; iki yol arasında fark olmamalı.
-          const lostShipments = await tx.tradeShipment.findMany({
-            where: { tradeId, leg: "return", lostAt: { not: null } },
-            select: { recipientUserId: true },
-          });
-          const lostOwnerIds = new Set(
-            lostShipments
-              .map((s) => s.recipientUserId)
-              .filter((id): id is string => id !== null),
-          );
-          const ownerOf = (side: string) =>
-            side === "initiator" ? trade.initiatorId : trade.receiverId;
-
-          const byProduct = new Map<string, { qty: number; lost: boolean }>();
-          for (const item of items) {
-            const prev = byProduct.get(item.productId);
-            const lost = lostOwnerIds.has(ownerOf(item.side));
-            byProduct.set(item.productId, {
-              qty: (prev?.qty ?? 0) + item.quantity,
-              lost: (prev?.lost ?? false) || lost,
-            });
-          }
-          for (const [productId, { qty, lost }] of byProduct) {
-            await tx.$queryRaw`SELECT id FROM products WHERE id = ${productId} FOR UPDATE`;
-            const prod = await tx.product.findUnique({
-              where: { id: productId },
-              select: { reservedQuantity: true, quantity: true },
-            });
-            if (prod) {
-              const newReserved = safeDecrementReserved(
-                prod.reservedQuantity,
-                qty,
-              );
-              if (lost) {
-                const newQuantity =
-                  prod.quantity === null
-                    ? null
-                    : Math.max(0, prod.quantity - qty);
-                await tx.product.update({
-                  where: { id: productId },
-                  data: {
-                    reservedQuantity: newReserved,
-                    ...(prod.quantity === null
-                      ? {}
-                      : { quantity: newQuantity }),
-                    status: getProductStatusFromQuantity(newQuantity),
-                  },
-                });
-              } else {
-                await tx.product.update({
-                  where: { id: productId },
-                  data: {
-                    reservedQuantity: newReserved,
-                    status:
-                      newReserved > 0
-                        ? ProductStatus.reserved
-                        : ProductStatus.active,
-                  },
-                });
-              }
-            }
-          }
-
-          await tx.trade.update({
-            where: { id: tradeId },
-            data: {
-              status: TradeStatus.cancelled,
-              cancelledAt: now,
-              updatedAt: now,
-              ...(compensationUserId
-                ? {
-                    compensationPendingUserId: compensationUserId,
-                    compensationResolvedAt: null,
-                  }
-                : {}),
-            },
-          });
-          finalStatus = TradeStatus.cancelled;
-        } else if (compensationUserId) {
+        if (compensationUserId) {
           await tx.trade.update({
             where: { id: tradeId },
             data: {

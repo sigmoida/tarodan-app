@@ -13,6 +13,7 @@ import {
 import { canTransitionShipmentStatus } from "../shipping/shipment-state-machine";
 import { TRADE_VALID_TRANSITIONS } from "../trade/trade.state-machine";
 import { startTradeConfirmationWindowIfDelivered } from "../../common/helpers/trade-escrow";
+import { finalizeReturningTradeIfResolved } from "../../common/helpers/trade-return-finalize";
 import { SuratTrackingClient } from "./surat-tracking.client";
 
 /**
@@ -225,6 +226,48 @@ export class TradeTrackingSyncService {
       } catch (err: any) {
         this.logger.error(
           `Trade ${tradeShipment.tradeId}: onay penceresi kurulamadı (sweep telafi eder): ${err?.message}`,
+        );
+      }
+    }
+
+    // İade bacağı (depo → asıl sahip) teslim edildi: var olan iade bacaklarının
+    // TAMAMI çözüldüyse takası kapat (rezervasyonlar çözülür, takas cancelled).
+    // Bu tetik olmadan poll teslimi yazıyor ama takas returning'de KALICI
+    // takılıyordu: delivered bacak bir daha pollanmaz, admin mark-return-
+    // delivered ise bacağı "zaten teslim edilmiş" bulurdu. try/catch ŞART
+    // (yukarıdaki pencere kurulumuyla aynı gerekçe); kalıcı hata halinde admin
+    // mark-return-delivered onarım yolu aynı çekirdeği yeniden çalıştırır.
+    if (isDelivered && tradeShipment.leg === "return") {
+      try {
+        const finalize = await this.prisma.$transaction(async (tx) => {
+          await tx.$queryRaw`SELECT id FROM trades WHERE id = ${tradeShipment.tradeId} FOR UPDATE`;
+          return finalizeReturningTradeIfResolved(tx, tradeShipment.tradeId);
+        });
+        if (finalize.finalized) {
+          this.logger.log(
+            `Trade ${tradeShipment.tradeId}: tüm iade bacakları çözüldü, takas kapatıldı (poll)`,
+          );
+          if (finalize.initiatorId && finalize.receiverId) {
+            try {
+              const { EventService } = await import("../events/event.service");
+              const eventService = this.moduleRef.get(EventService, {
+                strict: false,
+              });
+              await eventService?.emitTradeReturnCompleted({
+                tradeId: tradeShipment.tradeId,
+                initiatorId: finalize.initiatorId,
+                receiverId: finalize.receiverId,
+              });
+            } catch (e: any) {
+              this.logger.warn(
+                `emit trade.return-completed failed (poll) for ${tradeShipment.tradeId}: ${e?.message}`,
+              );
+            }
+          }
+        }
+      } catch (err: any) {
+        this.logger.error(
+          `Trade ${tradeShipment.tradeId}: iade kapanışı yapılamadı (admin mark-return-delivered onarır): ${err?.message}`,
         );
       }
     }
