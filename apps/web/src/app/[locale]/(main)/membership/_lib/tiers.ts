@@ -129,21 +129,14 @@ export function buildTierFeatures(
   ];
 }
 
-/** Static marketing extras that are NOT membership entitlements (no DTO field). */
-const TIER_EXTRAS: Partial<Record<TierId, (t: TFn) => TierFeature[]>> = {
-  business: (t) => [
-    { text: `24/7 ${t("membership.prioritySupport")}`, included: true },
-    { text: "API", included: true },
-  ],
-};
-
 /** Build all four display tiers from the normalized (admin-driven) tier data. */
 export function buildTiers(data: TierData, t: TFn): Tier[] {
   const { prices, capabilities } = data;
-  const featuresFor = (id: TierId): TierFeature[] => [
-    ...buildTierFeatures(capabilities[id], id, t),
-    ...(TIER_EXTRAS[id]?.(t) ?? []),
-  ];
+  // Kartlar YALNIZ katman satırından (DB MembershipTier) beslenir. Eski
+  // TIER_EXTRAS sabitleri ("24/7 öncelikli destek", "API") ne katman
+  // tablosunda ne dokümanlarda karşılığı olan vaatlerdi — kaldırıldı.
+  const featuresFor = (id: TierId): TierFeature[] =>
+    buildTierFeatures(capabilities[id], id, t);
   return [
     {
       id: "free",
