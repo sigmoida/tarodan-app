@@ -12,7 +12,13 @@ import {
 import { cn } from "../lib/utils";
 import { useAnchoredPopover } from "../hooks/useAnchoredPopover";
 
-/** `w-72` in px — kept in sync with the popover panel's width class below. */
+/**
+ * The popover panel's actual rendered width — applied as an inline style
+ * below (not a `w-72` Tailwind class) so this constant is the single source
+ * feeding both the visual width AND useAnchoredPopover's viewport-clamping
+ * math. A separate class here previously had to be kept in sync by comment
+ * alone, which is exactly the kind of thing that silently drifts.
+ */
 const POPOVER_WIDTH = 288;
 
 export interface DatePickerProps {
@@ -243,8 +249,12 @@ export function DatePicker({
           createPortal(
             <div
               ref={popoverRef}
-              style={{ top: popoverPos.top, left: popoverPos.left }}
-              className="fixed z-popover w-72 rounded-lg border border-border bg-surface-elevated p-3 shadow-lg"
+              style={{
+                top: popoverPos.top,
+                left: popoverPos.left,
+                width: POPOVER_WIDTH,
+              }}
+              className="fixed z-popover rounded-lg border border-border bg-surface-elevated p-3 shadow-lg"
             >
               <div className="mb-2 flex items-center justify-between gap-2">
                 <div className="flex min-w-0 items-center gap-1">
