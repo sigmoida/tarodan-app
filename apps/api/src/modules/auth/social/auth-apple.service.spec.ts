@@ -3,6 +3,7 @@ import { Test } from "@nestjs/testing";
 import { JwtService } from "@nestjs/jwt";
 import { ConfigService } from "@nestjs/config";
 import { AuthService } from "../auth.service";
+import { AuthTokenService } from "../auth-token.service";
 import { GoogleAuthService } from "./google-auth.service";
 import { AppleAuthService } from "./apple-auth.service";
 import { PrismaService } from "../../../prisma";
@@ -46,6 +47,7 @@ describe("AuthService.loginWithApple", () => {
     const moduleRef = await Test.createTestingModule({
       providers: [
         AuthService,
+        AuthTokenService,
         { provide: PrismaService, useValue: prisma },
         {
           provide: JwtService,

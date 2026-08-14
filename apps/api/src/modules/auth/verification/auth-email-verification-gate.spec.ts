@@ -1,5 +1,6 @@
 import { UnauthorizedException } from "@nestjs/common";
 import { AuthService } from "../auth.service";
+import { AuthTokenService } from "../auth-token.service";
 
 /**
  * HIGH: `register` doğrulanmamış kullanıcıya çalışan access + refresh token
@@ -51,23 +52,28 @@ describe("AuthService — email verification gates the session", () => {
       },
       ...overrides,
     };
+    const jwt = {
+      signAsync: jest.fn().mockResolvedValue("token"),
+      sign: () => "token",
+    } as any;
+    const config = { get: () => undefined } as any;
+    const security = {} as any;
+    const tokens = new AuthTokenService(prisma as any, jwt, config, security);
     const service = new AuthService(
       prisma as any,
-      {
-        signAsync: jest.fn().mockResolvedValue("token"),
-        sign: () => "token",
-      } as any,
-      { get: () => undefined } as any,
+      jwt,
+      config,
       { sendVerificationEmail: jest.fn(), sendWelcomeEmail: jest.fn() } as any,
       {} as any,
       {} as any,
       {} as any,
       {} as any,
-      {} as any,
+      security,
       { syncUserConsent: jest.fn() } as any,
+      tokens,
       {} as any,
     );
-    return { service, prisma };
+    return { service, prisma, tokens };
   };
 
   it("refreshTokens doğrulanmamış hesapta reddeder (7 günlük pencere kapanır)", async () => {
@@ -79,16 +85,16 @@ describe("AuthService — email verification gates the session", () => {
   });
 
   it("refreshTokens doğrulanmış hesapta çalışır", async () => {
-    const { service, prisma } = makeService();
+    const { service, prisma, tokens } = makeService();
     prisma.user.findUnique.mockResolvedValue({
       ...baseUser,
       isEmailVerified: true,
     });
     jest
-      .spyOn(service as any, "assertAndRotateRefreshToken")
+      .spyOn(tokens as any, "assertAndRotateRefreshToken")
       .mockResolvedValue({ userId: "u1" } as never);
     jest
-      .spyOn(service as any, "generateTokens")
+      .spyOn(tokens as any, "generateTokens")
       .mockResolvedValue({ accessToken: "a", refreshToken: "r" } as never);
 
     await expect(

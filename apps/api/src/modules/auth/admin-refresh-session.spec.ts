@@ -1,5 +1,6 @@
 import { UnauthorizedException } from "@nestjs/common";
 import { AuthService } from "./auth.service";
+import { AuthTokenService } from "./auth-token.service";
 
 /**
  * Admin refresh, taşıdığı AdminSession token'ını DOĞRULAMADAN yeni token
@@ -41,13 +42,21 @@ function makeService(sessionValid: boolean) {
       .fn()
       .mockResolvedValue(sessionValid ? "au1" : null),
   };
+  const jwt = {
+    signAsync: jest.fn().mockResolvedValue("token"),
+    sign: () => "token",
+  } as any;
+  const config = { get: () => undefined, getOrThrow: () => "secret" } as any;
+  const tokens = new AuthTokenService(
+    prisma as any,
+    jwt,
+    config,
+    securityService as any,
+  );
   const service = new AuthService(
     prisma as any,
-    {
-      signAsync: jest.fn().mockResolvedValue("token"),
-      sign: () => "token",
-    } as any,
-    { get: () => undefined, getOrThrow: () => "secret" } as any,
+    jwt,
+    config,
     { sendVerificationEmail: jest.fn(), sendWelcomeEmail: jest.fn() } as any,
     {} as any,
     {} as any,
@@ -55,10 +64,11 @@ function makeService(sessionValid: boolean) {
     {} as any,
     securityService as any,
     { syncUserConsent: jest.fn() } as any,
+    tokens,
     {} as any,
   );
   jest
-    .spyOn(service as any, "persistRefreshToken")
+    .spyOn(tokens as any, "persistRefreshToken")
     .mockResolvedValue(undefined as never);
   return { service, securityService };
 }

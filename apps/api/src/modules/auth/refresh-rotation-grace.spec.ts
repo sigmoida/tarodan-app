@@ -1,5 +1,6 @@
 import { UnauthorizedException } from "@nestjs/common";
 import { AuthService } from "./auth.service";
+import { AuthTokenService } from "./auth-token.service";
 
 /**
  * Rotasyon yarışı düzeltmesi: refresh token tek kullanımlık (rotation) ama
@@ -42,24 +43,29 @@ function makeService(tokenRow: Record<string, unknown> | null) {
       create: jest.fn().mockResolvedValue({}),
     },
   };
+  const jwt = {
+    signAsync: jest.fn().mockResolvedValue("token"),
+    sign: () => "token",
+  } as any;
+  const config = { get: () => undefined } as any;
+  const security = {} as any;
+  const tokens = new AuthTokenService(prisma as any, jwt, config, security);
   const service = new AuthService(
     prisma as any,
-    {
-      signAsync: jest.fn().mockResolvedValue("token"),
-      sign: () => "token",
-    } as any,
-    { get: () => undefined } as any,
+    jwt,
+    config,
     { sendVerificationEmail: jest.fn(), sendWelcomeEmail: jest.fn() } as any,
     {} as any,
     {} as any,
     {} as any,
     {} as any,
-    {} as any,
+    security,
     { syncUserConsent: jest.fn() } as any,
+    tokens,
     {} as any,
   );
   jest
-    .spyOn(service as any, "generateTokens")
+    .spyOn(tokens as any, "generateTokens")
     .mockResolvedValue({ accessToken: "a2", refreshToken: "r2" } as never);
   return { service, prisma };
 }
