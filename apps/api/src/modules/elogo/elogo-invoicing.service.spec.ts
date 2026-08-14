@@ -3,6 +3,7 @@ import { ElogoInvoicingService } from "./elogo-invoicing.service";
 import { ElogoDocumentService } from "./elogo-document.service";
 import { ElogoDeliveryService } from "./elogo-delivery.service";
 import { ElogoIssuingService } from "./elogo-issuing.service";
+import { ElogoReversalService } from "./elogo-reversal.service";
 import { ElogoService } from "./elogo.service";
 
 function fakeConfig(values: Record<string, string> = {}): ConfigService {
@@ -221,28 +222,24 @@ describe("ElogoInvoicingService", () => {
       users: { s1: { displayName: "Satıcı X", taxId: null } },
     });
     const elogo = makeElogo();
+    // Tek zincir, PAYLAŞILAN örnekler: kesim ve ters kayıt aynı belge ve
+    // gönderim nesnelerini kullanmalı, yoksa casuslar ve vergi/ledger
+    // ayarları çalışmayan bir kopyada kalır.
+    const elogoClient = elogo;
+    const documents = new ElogoDocumentService(
+      prisma,
+      elogoClient,
+      fakeConfig(),
+    );
+    const delivery = new ElogoDeliveryService(prisma, elogoClient, documents);
     const svc = new ElogoInvoicingService(
       prisma,
-      elogo,
+      elogoClient,
       {} as any, // queries
-      new ElogoDocumentService(prisma, elogo, fakeConfig()),
-      // Kesim GÖNDERIM servisinde — gerçek örnek geçilir ki bu spec'in
-      // fatura iddiaları koda kadar insin.
-      new ElogoDeliveryService(
-        prisma,
-        elogo,
-        new ElogoDocumentService(prisma, elogo, fakeConfig()),
-      ),
-      // Kesme zinciri gerçek: issue* → cut.
-      new ElogoIssuingService(
-        prisma,
-        new ElogoDocumentService(prisma, elogo, fakeConfig()),
-        new ElogoDeliveryService(
-          prisma,
-          elogo,
-          new ElogoDocumentService(prisma, elogo, fakeConfig()),
-        ),
-      ),
+      documents,
+      delivery,
+      new ElogoIssuingService(prisma, documents, delivery),
+      new ElogoReversalService(prisma, elogoClient, documents, delivery),
     );
 
     await svc.issueCommissionInvoice("o1");
@@ -275,28 +272,24 @@ describe("ElogoInvoicingService", () => {
       },
     });
     const elogo = makeElogo();
+    // Tek zincir, PAYLAŞILAN örnekler: kesim ve ters kayıt aynı belge ve
+    // gönderim nesnelerini kullanmalı, yoksa casuslar ve vergi/ledger
+    // ayarları çalışmayan bir kopyada kalır.
+    const elogoClient = elogo;
+    const documents = new ElogoDocumentService(
+      prisma,
+      elogoClient,
+      fakeConfig(),
+    );
+    const delivery = new ElogoDeliveryService(prisma, elogoClient, documents);
     const svc = new ElogoInvoicingService(
       prisma,
-      elogo,
+      elogoClient,
       {} as any, // queries
-      new ElogoDocumentService(prisma, elogo, fakeConfig()),
-      // Kesim GÖNDERIM servisinde — gerçek örnek geçilir ki bu spec'in
-      // fatura iddiaları koda kadar insin.
-      new ElogoDeliveryService(
-        prisma,
-        elogo,
-        new ElogoDocumentService(prisma, elogo, fakeConfig()),
-      ),
-      // Kesme zinciri gerçek: issue* → cut.
-      new ElogoIssuingService(
-        prisma,
-        new ElogoDocumentService(prisma, elogo, fakeConfig()),
-        new ElogoDeliveryService(
-          prisma,
-          elogo,
-          new ElogoDocumentService(prisma, elogo, fakeConfig()),
-        ),
-      ),
+      documents,
+      delivery,
+      new ElogoIssuingService(prisma, documents, delivery),
+      new ElogoReversalService(prisma, elogoClient, documents, delivery),
     );
     await svc.issueCommissionInvoice("o1");
     const xml = (elogo.sendDocument as jest.Mock).mock.calls[0][0].ublXml;
@@ -313,28 +306,24 @@ describe("ElogoInvoicingService", () => {
       users: { s1: { displayName: "Satıcı X", taxId: null } },
     });
     const elogo = makeElogo();
+    // Tek zincir, PAYLAŞILAN örnekler: kesim ve ters kayıt aynı belge ve
+    // gönderim nesnelerini kullanmalı, yoksa casuslar ve vergi/ledger
+    // ayarları çalışmayan bir kopyada kalır.
+    const elogoClient = elogo;
+    const documents = new ElogoDocumentService(
+      prisma,
+      elogoClient,
+      fakeConfig(),
+    );
+    const delivery = new ElogoDeliveryService(prisma, elogoClient, documents);
     const svc = new ElogoInvoicingService(
       prisma,
-      elogo,
+      elogoClient,
       {} as any, // queries
-      new ElogoDocumentService(prisma, elogo, fakeConfig()),
-      // Kesim GÖNDERIM servisinde — gerçek örnek geçilir ki bu spec'in
-      // fatura iddiaları koda kadar insin.
-      new ElogoDeliveryService(
-        prisma,
-        elogo,
-        new ElogoDocumentService(prisma, elogo, fakeConfig()),
-      ),
-      // Kesme zinciri gerçek: issue* → cut.
-      new ElogoIssuingService(
-        prisma,
-        new ElogoDocumentService(prisma, elogo, fakeConfig()),
-        new ElogoDeliveryService(
-          prisma,
-          elogo,
-          new ElogoDocumentService(prisma, elogo, fakeConfig()),
-        ),
-      ),
+      documents,
+      delivery,
+      new ElogoIssuingService(prisma, documents, delivery),
+      new ElogoReversalService(prisma, elogoClient, documents, delivery),
     );
     await svc.issueCommissionInvoice("o1");
     const xml = (elogo.sendDocument as jest.Mock).mock.calls[0][0].ublXml;
@@ -354,28 +343,24 @@ describe("ElogoInvoicingService", () => {
       status: "sent",
     });
     const elogo = makeElogo();
+    // Tek zincir, PAYLAŞILAN örnekler: kesim ve ters kayıt aynı belge ve
+    // gönderim nesnelerini kullanmalı, yoksa casuslar ve vergi/ledger
+    // ayarları çalışmayan bir kopyada kalır.
+    const elogoClient = elogo;
+    const documents = new ElogoDocumentService(
+      prisma,
+      elogoClient,
+      fakeConfig(),
+    );
+    const delivery = new ElogoDeliveryService(prisma, elogoClient, documents);
     const svc = new ElogoInvoicingService(
       prisma,
-      elogo,
+      elogoClient,
       {} as any, // queries
-      new ElogoDocumentService(prisma, elogo, fakeConfig()),
-      // Kesim GÖNDERIM servisinde — gerçek örnek geçilir ki bu spec'in
-      // fatura iddiaları koda kadar insin.
-      new ElogoDeliveryService(
-        prisma,
-        elogo,
-        new ElogoDocumentService(prisma, elogo, fakeConfig()),
-      ),
-      // Kesme zinciri gerçek: issue* → cut.
-      new ElogoIssuingService(
-        prisma,
-        new ElogoDocumentService(prisma, elogo, fakeConfig()),
-        new ElogoDeliveryService(
-          prisma,
-          elogo,
-          new ElogoDocumentService(prisma, elogo, fakeConfig()),
-        ),
-      ),
+      documents,
+      delivery,
+      new ElogoIssuingService(prisma, documents, delivery),
+      new ElogoReversalService(prisma, elogoClient, documents, delivery),
     );
 
     await svc.issueCommissionInvoice("o1");
@@ -389,28 +374,24 @@ describe("ElogoInvoicingService", () => {
       users: { b1: { displayName: "Alıcı" } },
     });
     const elogo = makeElogo();
+    // Tek zincir, PAYLAŞILAN örnekler: kesim ve ters kayıt aynı belge ve
+    // gönderim nesnelerini kullanmalı, yoksa casuslar ve vergi/ledger
+    // ayarları çalışmayan bir kopyada kalır.
+    const elogoClient = elogo;
+    const documents = new ElogoDocumentService(
+      prisma,
+      elogoClient,
+      fakeConfig(),
+    );
+    const delivery = new ElogoDeliveryService(prisma, elogoClient, documents);
     const svc = new ElogoInvoicingService(
       prisma,
-      elogo,
+      elogoClient,
       {} as any, // queries
-      new ElogoDocumentService(prisma, elogo, fakeConfig()),
-      // Kesim GÖNDERIM servisinde — gerçek örnek geçilir ki bu spec'in
-      // fatura iddiaları koda kadar insin.
-      new ElogoDeliveryService(
-        prisma,
-        elogo,
-        new ElogoDocumentService(prisma, elogo, fakeConfig()),
-      ),
-      // Kesme zinciri gerçek: issue* → cut.
-      new ElogoIssuingService(
-        prisma,
-        new ElogoDocumentService(prisma, elogo, fakeConfig()),
-        new ElogoDeliveryService(
-          prisma,
-          elogo,
-          new ElogoDocumentService(prisma, elogo, fakeConfig()),
-        ),
-      ),
+      documents,
+      delivery,
+      new ElogoIssuingService(prisma, documents, delivery),
+      new ElogoReversalService(prisma, elogoClient, documents, delivery),
     );
 
     await svc.issueServiceFeeInvoice("o1");
@@ -436,28 +417,24 @@ describe("ElogoInvoicingService", () => {
         eInvoicePkAlias: "urn:mail:pk",
       })),
     });
+    // Tek zincir, PAYLAŞILAN örnekler: kesim ve ters kayıt aynı belge ve
+    // gönderim nesnelerini kullanmalı, yoksa casuslar ve vergi/ledger
+    // ayarları çalışmayan bir kopyada kalır.
+    const elogoClient = elogo;
+    const documents = new ElogoDocumentService(
+      prisma,
+      elogoClient,
+      fakeConfig(),
+    );
+    const delivery = new ElogoDeliveryService(prisma, elogoClient, documents);
     const svc = new ElogoInvoicingService(
       prisma,
-      elogo,
+      elogoClient,
       {} as any, // queries
-      new ElogoDocumentService(prisma, elogo, fakeConfig()),
-      // Kesim GÖNDERIM servisinde — gerçek örnek geçilir ki bu spec'in
-      // fatura iddiaları koda kadar insin.
-      new ElogoDeliveryService(
-        prisma,
-        elogo,
-        new ElogoDocumentService(prisma, elogo, fakeConfig()),
-      ),
-      // Kesme zinciri gerçek: issue* → cut.
-      new ElogoIssuingService(
-        prisma,
-        new ElogoDocumentService(prisma, elogo, fakeConfig()),
-        new ElogoDeliveryService(
-          prisma,
-          elogo,
-          new ElogoDocumentService(prisma, elogo, fakeConfig()),
-        ),
-      ),
+      documents,
+      delivery,
+      new ElogoIssuingService(prisma, documents, delivery),
+      new ElogoReversalService(prisma, elogoClient, documents, delivery),
     );
 
     await svc.issueCommissionInvoice("o1");
@@ -478,28 +455,24 @@ describe("ElogoInvoicingService", () => {
       users: { s1: { displayName: "Satıcı X", taxId: null } },
     });
     const elogo = makeElogo();
+    // Tek zincir, PAYLAŞILAN örnekler: kesim ve ters kayıt aynı belge ve
+    // gönderim nesnelerini kullanmalı, yoksa casuslar ve vergi/ledger
+    // ayarları çalışmayan bir kopyada kalır.
+    const elogoClient = elogo;
+    const documents = new ElogoDocumentService(
+      prisma,
+      elogoClient,
+      fakeConfig(),
+    );
+    const delivery = new ElogoDeliveryService(prisma, elogoClient, documents);
     const svc = new ElogoInvoicingService(
       prisma,
-      elogo,
+      elogoClient,
       {} as any, // queries
-      new ElogoDocumentService(prisma, elogo, fakeConfig()),
-      // Kesim GÖNDERIM servisinde — gerçek örnek geçilir ki bu spec'in
-      // fatura iddiaları koda kadar insin.
-      new ElogoDeliveryService(
-        prisma,
-        elogo,
-        new ElogoDocumentService(prisma, elogo, fakeConfig()),
-      ),
-      // Kesme zinciri gerçek: issue* → cut.
-      new ElogoIssuingService(
-        prisma,
-        new ElogoDocumentService(prisma, elogo, fakeConfig()),
-        new ElogoDeliveryService(
-          prisma,
-          elogo,
-          new ElogoDocumentService(prisma, elogo, fakeConfig()),
-        ),
-      ),
+      documents,
+      delivery,
+      new ElogoIssuingService(prisma, documents, delivery),
+      new ElogoReversalService(prisma, elogoClient, documents, delivery),
     );
 
     await svc.issueCommissionInvoice("o1");
@@ -515,28 +488,24 @@ describe("ElogoInvoicingService", () => {
       users: { s1: { displayName: "Satıcı X", taxId: null } },
     });
     const elogo = makeElogo();
+    // Tek zincir, PAYLAŞILAN örnekler: kesim ve ters kayıt aynı belge ve
+    // gönderim nesnelerini kullanmalı, yoksa casuslar ve vergi/ledger
+    // ayarları çalışmayan bir kopyada kalır.
+    const elogoClient = elogo;
+    const documents = new ElogoDocumentService(
+      prisma,
+      elogoClient,
+      fakeConfig(),
+    );
+    const delivery = new ElogoDeliveryService(prisma, elogoClient, documents);
     const svc = new ElogoInvoicingService(
       prisma,
-      elogo,
+      elogoClient,
       {} as any, // queries
-      new ElogoDocumentService(prisma, elogo, fakeConfig()),
-      // Kesim GÖNDERIM servisinde — gerçek örnek geçilir ki bu spec'in
-      // fatura iddiaları koda kadar insin.
-      new ElogoDeliveryService(
-        prisma,
-        elogo,
-        new ElogoDocumentService(prisma, elogo, fakeConfig()),
-      ),
-      // Kesme zinciri gerçek: issue* → cut.
-      new ElogoIssuingService(
-        prisma,
-        new ElogoDocumentService(prisma, elogo, fakeConfig()),
-        new ElogoDeliveryService(
-          prisma,
-          elogo,
-          new ElogoDocumentService(prisma, elogo, fakeConfig()),
-        ),
-      ),
+      documents,
+      delivery,
+      new ElogoIssuingService(prisma, documents, delivery),
+      new ElogoReversalService(prisma, elogoClient, documents, delivery),
     );
 
     await svc.issueCommissionInvoice("o1");
@@ -550,28 +519,24 @@ describe("ElogoInvoicingService", () => {
       users: { u1: { displayName: "Üye", taxId: null } },
     });
     const elogo = makeElogo();
+    // Tek zincir, PAYLAŞILAN örnekler: kesim ve ters kayıt aynı belge ve
+    // gönderim nesnelerini kullanmalı, yoksa casuslar ve vergi/ledger
+    // ayarları çalışmayan bir kopyada kalır.
+    const elogoClient = elogo;
+    const documents = new ElogoDocumentService(
+      prisma,
+      elogoClient,
+      fakeConfig(),
+    );
+    const delivery = new ElogoDeliveryService(prisma, elogoClient, documents);
     const svc = new ElogoInvoicingService(
       prisma,
-      elogo,
+      elogoClient,
       {} as any, // queries
-      new ElogoDocumentService(prisma, elogo, fakeConfig()),
-      // Kesim GÖNDERIM servisinde — gerçek örnek geçilir ki bu spec'in
-      // fatura iddiaları koda kadar insin.
-      new ElogoDeliveryService(
-        prisma,
-        elogo,
-        new ElogoDocumentService(prisma, elogo, fakeConfig()),
-      ),
-      // Kesme zinciri gerçek: issue* → cut.
-      new ElogoIssuingService(
-        prisma,
-        new ElogoDocumentService(prisma, elogo, fakeConfig()),
-        new ElogoDeliveryService(
-          prisma,
-          elogo,
-          new ElogoDocumentService(prisma, elogo, fakeConfig()),
-        ),
-      ),
+      documents,
+      delivery,
+      new ElogoIssuingService(prisma, documents, delivery),
+      new ElogoReversalService(prisma, elogoClient, documents, delivery),
     );
 
     await svc.issueMembershipInvoice("mp1");
@@ -593,28 +558,24 @@ describe("ElogoInvoicingService", () => {
       issuedAt: new Date(),
     });
     const elogo = makeElogo({ refundStrategy: jest.fn(() => "CANCEL") });
+    // Tek zincir, PAYLAŞILAN örnekler: kesim ve ters kayıt aynı belge ve
+    // gönderim nesnelerini kullanmalı, yoksa casuslar ve vergi/ledger
+    // ayarları çalışmayan bir kopyada kalır.
+    const elogoClient = elogo;
+    const documents = new ElogoDocumentService(
+      prisma,
+      elogoClient,
+      fakeConfig(),
+    );
+    const delivery = new ElogoDeliveryService(prisma, elogoClient, documents);
     const svc = new ElogoInvoicingService(
       prisma,
-      elogo,
+      elogoClient,
       {} as any, // queries
-      new ElogoDocumentService(prisma, elogo, fakeConfig()),
-      // Kesim GÖNDERIM servisinde — gerçek örnek geçilir ki bu spec'in
-      // fatura iddiaları koda kadar insin.
-      new ElogoDeliveryService(
-        prisma,
-        elogo,
-        new ElogoDocumentService(prisma, elogo, fakeConfig()),
-      ),
-      // Kesme zinciri gerçek: issue* → cut.
-      new ElogoIssuingService(
-        prisma,
-        new ElogoDocumentService(prisma, elogo, fakeConfig()),
-        new ElogoDeliveryService(
-          prisma,
-          elogo,
-          new ElogoDocumentService(prisma, elogo, fakeConfig()),
-        ),
-      ),
+      documents,
+      delivery,
+      new ElogoIssuingService(prisma, documents, delivery),
+      new ElogoReversalService(prisma, elogoClient, documents, delivery),
     );
 
     await svc.handleOrderRefund("o1");
@@ -667,28 +628,24 @@ describe("ElogoInvoicingService", () => {
       updatedAt: issuedAt,
     });
     const elogo = makeElogo({ refundStrategy: jest.fn(() => "CANCEL") });
+    // Tek zincir, PAYLAŞILAN örnekler: kesim ve ters kayıt aynı belge ve
+    // gönderim nesnelerini kullanmalı, yoksa casuslar ve vergi/ledger
+    // ayarları çalışmayan bir kopyada kalır.
+    const elogoClient = elogo;
+    const documents = new ElogoDocumentService(
+      prisma,
+      elogoClient,
+      fakeConfig(),
+    );
+    const delivery = new ElogoDeliveryService(prisma, elogoClient, documents);
     const svc = new ElogoInvoicingService(
       prisma,
-      elogo,
+      elogoClient,
       {} as any, // queries
-      new ElogoDocumentService(prisma, elogo, fakeConfig()),
-      // Kesim GÖNDERIM servisinde — gerçek örnek geçilir ki bu spec'in
-      // fatura iddiaları koda kadar insin.
-      new ElogoDeliveryService(
-        prisma,
-        elogo,
-        new ElogoDocumentService(prisma, elogo, fakeConfig()),
-      ),
-      // Kesme zinciri gerçek: issue* → cut.
-      new ElogoIssuingService(
-        prisma,
-        new ElogoDocumentService(prisma, elogo, fakeConfig()),
-        new ElogoDeliveryService(
-          prisma,
-          elogo,
-          new ElogoDocumentService(prisma, elogo, fakeConfig()),
-        ),
-      ),
+      documents,
+      delivery,
+      new ElogoIssuingService(prisma, documents, delivery),
+      new ElogoReversalService(prisma, elogoClient, documents, delivery),
     );
     const adjustment = {
       orderId: "o1",
@@ -748,28 +705,24 @@ describe("ElogoInvoicingService", () => {
       createdAt: new Date("2026-07-18T10:00:00Z"),
       updatedAt: new Date("2026-07-18T10:00:00Z"),
     });
+    // Tek zincir, PAYLAŞILAN örnekler: kesim ve ters kayıt aynı belge ve
+    // gönderim nesnelerini kullanmalı, yoksa casuslar ve vergi/ledger
+    // ayarları çalışmayan bir kopyada kalır.
+    const elogoClient = makeElogo();
+    const documents = new ElogoDocumentService(
+      prisma,
+      elogoClient,
+      fakeConfig(),
+    );
+    const delivery = new ElogoDeliveryService(prisma, elogoClient, documents);
     const svc = new ElogoInvoicingService(
       prisma,
-      makeElogo(),
+      elogoClient,
       {} as any, // queries
-      new ElogoDocumentService(prisma, makeElogo(), fakeConfig()),
-      // Kesim GÖNDERIM servisinde — gerçek örnek geçilir ki bu spec'in
-      // fatura iddiaları koda kadar insin.
-      new ElogoDeliveryService(
-        prisma,
-        makeElogo(),
-        new ElogoDocumentService(prisma, makeElogo(), fakeConfig()),
-      ),
-      // Kesme zinciri gerçek: issue* → cut.
-      new ElogoIssuingService(
-        prisma,
-        new ElogoDocumentService(prisma, makeElogo(), fakeConfig()),
-        new ElogoDeliveryService(
-          prisma,
-          makeElogo(),
-          new ElogoDocumentService(prisma, makeElogo(), fakeConfig()),
-        ),
-      ),
+      documents,
+      delivery,
+      new ElogoIssuingService(prisma, documents, delivery),
+      new ElogoReversalService(prisma, elogoClient, documents, delivery),
     );
 
     await svc.handleOrderRefund("o1", {
@@ -790,28 +743,24 @@ describe("ElogoInvoicingService", () => {
       users: { p1: { displayName: "Ödeyen", taxId: null } },
     });
     const elogo = makeElogo();
+    // Tek zincir, PAYLAŞILAN örnekler: kesim ve ters kayıt aynı belge ve
+    // gönderim nesnelerini kullanmalı, yoksa casuslar ve vergi/ledger
+    // ayarları çalışmayan bir kopyada kalır.
+    const elogoClient = elogo;
+    const documents = new ElogoDocumentService(
+      prisma,
+      elogoClient,
+      fakeConfig(),
+    );
+    const delivery = new ElogoDeliveryService(prisma, elogoClient, documents);
     const svc = new ElogoInvoicingService(
       prisma,
-      elogo,
+      elogoClient,
       {} as any, // queries
-      new ElogoDocumentService(prisma, elogo, fakeConfig()),
-      // Kesim GÖNDERIM servisinde — gerçek örnek geçilir ki bu spec'in
-      // fatura iddiaları koda kadar insin.
-      new ElogoDeliveryService(
-        prisma,
-        elogo,
-        new ElogoDocumentService(prisma, elogo, fakeConfig()),
-      ),
-      // Kesme zinciri gerçek: issue* → cut.
-      new ElogoIssuingService(
-        prisma,
-        new ElogoDocumentService(prisma, elogo, fakeConfig()),
-        new ElogoDeliveryService(
-          prisma,
-          elogo,
-          new ElogoDocumentService(prisma, elogo, fakeConfig()),
-        ),
-      ),
+      documents,
+      delivery,
+      new ElogoIssuingService(prisma, documents, delivery),
+      new ElogoReversalService(prisma, elogoClient, documents, delivery),
     );
 
     await svc.issueTradeCashFeeInvoice("tcp1");
@@ -829,28 +778,24 @@ describe("ElogoInvoicingService", () => {
       users: { p1: { displayName: "Ödeyen", taxId: null } },
     });
     const elogo = makeElogo();
+    // Tek zincir, PAYLAŞILAN örnekler: kesim ve ters kayıt aynı belge ve
+    // gönderim nesnelerini kullanmalı, yoksa casuslar ve vergi/ledger
+    // ayarları çalışmayan bir kopyada kalır.
+    const elogoClient = elogo;
+    const documents = new ElogoDocumentService(
+      prisma,
+      elogoClient,
+      fakeConfig(),
+    );
+    const delivery = new ElogoDeliveryService(prisma, elogoClient, documents);
     const svc = new ElogoInvoicingService(
       prisma,
-      elogo,
+      elogoClient,
       {} as any, // queries
-      new ElogoDocumentService(prisma, elogo, fakeConfig()),
-      // Kesim GÖNDERIM servisinde — gerçek örnek geçilir ki bu spec'in
-      // fatura iddiaları koda kadar insin.
-      new ElogoDeliveryService(
-        prisma,
-        elogo,
-        new ElogoDocumentService(prisma, elogo, fakeConfig()),
-      ),
-      // Kesme zinciri gerçek: issue* → cut.
-      new ElogoIssuingService(
-        prisma,
-        new ElogoDocumentService(prisma, elogo, fakeConfig()),
-        new ElogoDeliveryService(
-          prisma,
-          elogo,
-          new ElogoDocumentService(prisma, elogo, fakeConfig()),
-        ),
-      ),
+      documents,
+      delivery,
+      new ElogoIssuingService(prisma, documents, delivery),
+      new ElogoReversalService(prisma, elogoClient, documents, delivery),
     );
 
     await svc.issueTradeCashFeeInvoice("tcp1");
@@ -866,28 +811,24 @@ describe("ElogoInvoicingService", () => {
       users: { p1: { displayName: "Ödeyen", taxId: null } },
     });
     const elogo = makeElogo();
+    // Tek zincir, PAYLAŞILAN örnekler: kesim ve ters kayıt aynı belge ve
+    // gönderim nesnelerini kullanmalı, yoksa casuslar ve vergi/ledger
+    // ayarları çalışmayan bir kopyada kalır.
+    const elogoClient = elogo;
+    const documents = new ElogoDocumentService(
+      prisma,
+      elogoClient,
+      fakeConfig(),
+    );
+    const delivery = new ElogoDeliveryService(prisma, elogoClient, documents);
     const svc = new ElogoInvoicingService(
       prisma,
-      elogo,
+      elogoClient,
       {} as any, // queries
-      new ElogoDocumentService(prisma, elogo, fakeConfig()),
-      // Kesim GÖNDERIM servisinde — gerçek örnek geçilir ki bu spec'in
-      // fatura iddiaları koda kadar insin.
-      new ElogoDeliveryService(
-        prisma,
-        elogo,
-        new ElogoDocumentService(prisma, elogo, fakeConfig()),
-      ),
-      // Kesme zinciri gerçek: issue* → cut.
-      new ElogoIssuingService(
-        prisma,
-        new ElogoDocumentService(prisma, elogo, fakeConfig()),
-        new ElogoDeliveryService(
-          prisma,
-          elogo,
-          new ElogoDocumentService(prisma, elogo, fakeConfig()),
-        ),
-      ),
+      documents,
+      delivery,
+      new ElogoIssuingService(prisma, documents, delivery),
+      new ElogoReversalService(prisma, elogoClient, documents, delivery),
     );
 
     await svc.issueTradeCashFeeInvoice("tcp1");
@@ -908,28 +849,24 @@ describe("ElogoInvoicingService", () => {
       issuedAt: new Date(),
     });
     const elogo = makeElogo({ refundStrategy: jest.fn(() => "CANCEL") });
+    // Tek zincir, PAYLAŞILAN örnekler: kesim ve ters kayıt aynı belge ve
+    // gönderim nesnelerini kullanmalı, yoksa casuslar ve vergi/ledger
+    // ayarları çalışmayan bir kopyada kalır.
+    const elogoClient = elogo;
+    const documents = new ElogoDocumentService(
+      prisma,
+      elogoClient,
+      fakeConfig(),
+    );
+    const delivery = new ElogoDeliveryService(prisma, elogoClient, documents);
     const svc = new ElogoInvoicingService(
       prisma,
-      elogo,
+      elogoClient,
       {} as any, // queries
-      new ElogoDocumentService(prisma, elogo, fakeConfig()),
-      // Kesim GÖNDERIM servisinde — gerçek örnek geçilir ki bu spec'in
-      // fatura iddiaları koda kadar insin.
-      new ElogoDeliveryService(
-        prisma,
-        elogo,
-        new ElogoDocumentService(prisma, elogo, fakeConfig()),
-      ),
-      // Kesme zinciri gerçek: issue* → cut.
-      new ElogoIssuingService(
-        prisma,
-        new ElogoDocumentService(prisma, elogo, fakeConfig()),
-        new ElogoDeliveryService(
-          prisma,
-          elogo,
-          new ElogoDocumentService(prisma, elogo, fakeConfig()),
-        ),
-      ),
+      documents,
+      delivery,
+      new ElogoIssuingService(prisma, documents, delivery),
+      new ElogoReversalService(prisma, elogoClient, documents, delivery),
     );
 
     await svc.handleTradeCashRefund("tcp2");
@@ -951,28 +888,24 @@ describe("ElogoInvoicingService", () => {
       issuedAt: new Date(),
     });
     const elogo = makeElogo({ refundStrategy: jest.fn(() => "CANCEL") });
+    // Tek zincir, PAYLAŞILAN örnekler: kesim ve ters kayıt aynı belge ve
+    // gönderim nesnelerini kullanmalı, yoksa casuslar ve vergi/ledger
+    // ayarları çalışmayan bir kopyada kalır.
+    const elogoClient = elogo;
+    const documents = new ElogoDocumentService(
+      prisma,
+      elogoClient,
+      fakeConfig(),
+    );
+    const delivery = new ElogoDeliveryService(prisma, elogoClient, documents);
     const svc = new ElogoInvoicingService(
       prisma,
-      elogo,
+      elogoClient,
       {} as any, // queries
-      new ElogoDocumentService(prisma, elogo, fakeConfig()),
-      // Kesim GÖNDERIM servisinde — gerçek örnek geçilir ki bu spec'in
-      // fatura iddiaları koda kadar insin.
-      new ElogoDeliveryService(
-        prisma,
-        elogo,
-        new ElogoDocumentService(prisma, elogo, fakeConfig()),
-      ),
-      // Kesme zinciri gerçek: issue* → cut.
-      new ElogoIssuingService(
-        prisma,
-        new ElogoDocumentService(prisma, elogo, fakeConfig()),
-        new ElogoDeliveryService(
-          prisma,
-          elogo,
-          new ElogoDocumentService(prisma, elogo, fakeConfig()),
-        ),
-      ),
+      documents,
+      delivery,
+      new ElogoIssuingService(prisma, documents, delivery),
+      new ElogoReversalService(prisma, elogoClient, documents, delivery),
     );
 
     await svc.handleTradeCashRefund("tcp1");
@@ -994,28 +927,24 @@ describe("ElogoInvoicingService", () => {
       issuedAt: new Date(),
     });
     const elogo = makeElogo({ refundStrategy: jest.fn(() => "CANCEL") });
+    // Tek zincir, PAYLAŞILAN örnekler: kesim ve ters kayıt aynı belge ve
+    // gönderim nesnelerini kullanmalı, yoksa casuslar ve vergi/ledger
+    // ayarları çalışmayan bir kopyada kalır.
+    const elogoClient = elogo;
+    const documents = new ElogoDocumentService(
+      prisma,
+      elogoClient,
+      fakeConfig(),
+    );
+    const delivery = new ElogoDeliveryService(prisma, elogoClient, documents);
     const svc = new ElogoInvoicingService(
       prisma,
-      elogo,
+      elogoClient,
       {} as any, // queries
-      new ElogoDocumentService(prisma, elogo, fakeConfig()),
-      // Kesim GÖNDERIM servisinde — gerçek örnek geçilir ki bu spec'in
-      // fatura iddiaları koda kadar insin.
-      new ElogoDeliveryService(
-        prisma,
-        elogo,
-        new ElogoDocumentService(prisma, elogo, fakeConfig()),
-      ),
-      // Kesme zinciri gerçek: issue* → cut.
-      new ElogoIssuingService(
-        prisma,
-        new ElogoDocumentService(prisma, elogo, fakeConfig()),
-        new ElogoDeliveryService(
-          prisma,
-          elogo,
-          new ElogoDocumentService(prisma, elogo, fakeConfig()),
-        ),
-      ),
+      documents,
+      delivery,
+      new ElogoIssuingService(prisma, documents, delivery),
+      new ElogoReversalService(prisma, elogoClient, documents, delivery),
     );
 
     await svc.handleOrderRefund("o1");
@@ -1051,28 +980,24 @@ describe("ElogoInvoicingService", () => {
     const elogo = makeElogo({
       refundStrategy: jest.fn(() => "RETURN_INVOICE"),
     });
+    // Tek zincir, PAYLAŞILAN örnekler: kesim ve ters kayıt aynı belge ve
+    // gönderim nesnelerini kullanmalı, yoksa casuslar ve vergi/ledger
+    // ayarları çalışmayan bir kopyada kalır.
+    const elogoClient = elogo;
+    const documents = new ElogoDocumentService(
+      prisma,
+      elogoClient,
+      fakeConfig(),
+    );
+    const delivery = new ElogoDeliveryService(prisma, elogoClient, documents);
     const svc = new ElogoInvoicingService(
       prisma,
-      elogo,
+      elogoClient,
       {} as any, // queries
-      new ElogoDocumentService(prisma, elogo, fakeConfig()),
-      // Kesim GÖNDERIM servisinde — gerçek örnek geçilir ki bu spec'in
-      // fatura iddiaları koda kadar insin.
-      new ElogoDeliveryService(
-        prisma,
-        elogo,
-        new ElogoDocumentService(prisma, elogo, fakeConfig()),
-      ),
-      // Kesme zinciri gerçek: issue* → cut.
-      new ElogoIssuingService(
-        prisma,
-        new ElogoDocumentService(prisma, elogo, fakeConfig()),
-        new ElogoDeliveryService(
-          prisma,
-          elogo,
-          new ElogoDocumentService(prisma, elogo, fakeConfig()),
-        ),
-      ),
+      documents,
+      delivery,
+      new ElogoIssuingService(prisma, documents, delivery),
+      new ElogoReversalService(prisma, elogoClient, documents, delivery),
     );
 
     await svc.handleOrderRefund("o1");
@@ -1100,28 +1025,24 @@ describe("ElogoInvoicingService", () => {
       },
     });
     const elogo = makeElogo();
+    // Tek zincir, PAYLAŞILAN örnekler: kesim ve ters kayıt aynı belge ve
+    // gönderim nesnelerini kullanmalı, yoksa casuslar ve vergi/ledger
+    // ayarları çalışmayan bir kopyada kalır.
+    const elogoClient = elogo;
+    const documents = new ElogoDocumentService(
+      prisma,
+      elogoClient,
+      fakeConfig(),
+    );
+    const delivery = new ElogoDeliveryService(prisma, elogoClient, documents);
     const svc = new ElogoInvoicingService(
       prisma,
-      elogo,
+      elogoClient,
       {} as any, // queries
-      new ElogoDocumentService(prisma, elogo, fakeConfig()),
-      // Kesim GÖNDERIM servisinde — gerçek örnek geçilir ki bu spec'in
-      // fatura iddiaları koda kadar insin.
-      new ElogoDeliveryService(
-        prisma,
-        elogo,
-        new ElogoDocumentService(prisma, elogo, fakeConfig()),
-      ),
-      // Kesme zinciri gerçek: issue* → cut.
-      new ElogoIssuingService(
-        prisma,
-        new ElogoDocumentService(prisma, elogo, fakeConfig()),
-        new ElogoDeliveryService(
-          prisma,
-          elogo,
-          new ElogoDocumentService(prisma, elogo, fakeConfig()),
-        ),
-      ),
+      documents,
+      delivery,
+      new ElogoIssuingService(prisma, documents, delivery),
+      new ElogoReversalService(prisma, elogoClient, documents, delivery),
     );
 
     await svc.issueCommissionInvoice("o1"); // platform satıcı → komisyon kesilmez
@@ -1162,28 +1083,24 @@ describe("ElogoInvoicingService", () => {
       },
     });
     const elogo = makeElogo();
+    // Tek zincir, PAYLAŞILAN örnekler: kesim ve ters kayıt aynı belge ve
+    // gönderim nesnelerini kullanmalı, yoksa casuslar ve vergi/ledger
+    // ayarları çalışmayan bir kopyada kalır.
+    const elogoClient = elogo;
+    const documents = new ElogoDocumentService(
+      prisma,
+      elogoClient,
+      fakeConfig(),
+    );
+    const delivery = new ElogoDeliveryService(prisma, elogoClient, documents);
     const svc = new ElogoInvoicingService(
       prisma,
-      elogo,
+      elogoClient,
       {} as any, // queries
-      new ElogoDocumentService(prisma, elogo, fakeConfig()),
-      // Kesim GÖNDERIM servisinde — gerçek örnek geçilir ki bu spec'in
-      // fatura iddiaları koda kadar insin.
-      new ElogoDeliveryService(
-        prisma,
-        elogo,
-        new ElogoDocumentService(prisma, elogo, fakeConfig()),
-      ),
-      // Kesme zinciri gerçek: issue* → cut.
-      new ElogoIssuingService(
-        prisma,
-        new ElogoDocumentService(prisma, elogo, fakeConfig()),
-        new ElogoDeliveryService(
-          prisma,
-          elogo,
-          new ElogoDocumentService(prisma, elogo, fakeConfig()),
-        ),
-      ),
+      documents,
+      delivery,
+      new ElogoIssuingService(prisma, documents, delivery),
+      new ElogoReversalService(prisma, elogoClient, documents, delivery),
     );
 
     await svc.issuePlatformSaleInvoice("o1");
@@ -1215,28 +1132,24 @@ describe("ElogoInvoicingService", () => {
       users: { s1: { displayName: "X" } },
     });
     const elogo = makeElogo({ isEnabled: jest.fn(() => false) });
+    // Tek zincir, PAYLAŞILAN örnekler: kesim ve ters kayıt aynı belge ve
+    // gönderim nesnelerini kullanmalı, yoksa casuslar ve vergi/ledger
+    // ayarları çalışmayan bir kopyada kalır.
+    const elogoClient = elogo;
+    const documents = new ElogoDocumentService(
+      prisma,
+      elogoClient,
+      fakeConfig(),
+    );
+    const delivery = new ElogoDeliveryService(prisma, elogoClient, documents);
     const svc = new ElogoInvoicingService(
       prisma,
-      elogo,
+      elogoClient,
       {} as any, // queries
-      new ElogoDocumentService(prisma, elogo, fakeConfig()),
-      // Kesim GÖNDERIM servisinde — gerçek örnek geçilir ki bu spec'in
-      // fatura iddiaları koda kadar insin.
-      new ElogoDeliveryService(
-        prisma,
-        elogo,
-        new ElogoDocumentService(prisma, elogo, fakeConfig()),
-      ),
-      // Kesme zinciri gerçek: issue* → cut.
-      new ElogoIssuingService(
-        prisma,
-        new ElogoDocumentService(prisma, elogo, fakeConfig()),
-        new ElogoDeliveryService(
-          prisma,
-          elogo,
-          new ElogoDocumentService(prisma, elogo, fakeConfig()),
-        ),
-      ),
+      documents,
+      delivery,
+      new ElogoIssuingService(prisma, documents, delivery),
+      new ElogoReversalService(prisma, elogoClient, documents, delivery),
     );
 
     await svc.issueCommissionInvoice("o1");
@@ -1253,28 +1166,24 @@ describe("ElogoInvoicingService", () => {
     });
     const enabled = jest.fn().mockReturnValueOnce(false).mockReturnValue(true);
     const elogo = makeElogo({ isEnabled: enabled });
+    // Tek zincir, PAYLAŞILAN örnekler: kesim ve ters kayıt aynı belge ve
+    // gönderim nesnelerini kullanmalı, yoksa casuslar ve vergi/ledger
+    // ayarları çalışmayan bir kopyada kalır.
+    const elogoClient = elogo;
+    const documents = new ElogoDocumentService(
+      prisma,
+      elogoClient,
+      fakeConfig(),
+    );
+    const delivery = new ElogoDeliveryService(prisma, elogoClient, documents);
     const svc = new ElogoInvoicingService(
       prisma,
-      elogo,
+      elogoClient,
       {} as any, // queries
-      new ElogoDocumentService(prisma, elogo, fakeConfig()),
-      // Kesim GÖNDERIM servisinde — gerçek örnek geçilir ki bu spec'in
-      // fatura iddiaları koda kadar insin.
-      new ElogoDeliveryService(
-        prisma,
-        elogo,
-        new ElogoDocumentService(prisma, elogo, fakeConfig()),
-      ),
-      // Kesme zinciri gerçek: issue* → cut.
-      new ElogoIssuingService(
-        prisma,
-        new ElogoDocumentService(prisma, elogo, fakeConfig()),
-        new ElogoDeliveryService(
-          prisma,
-          elogo,
-          new ElogoDocumentService(prisma, elogo, fakeConfig()),
-        ),
-      ),
+      documents,
+      delivery,
+      new ElogoIssuingService(prisma, documents, delivery),
+      new ElogoReversalService(prisma, elogoClient, documents, delivery),
     );
 
     await svc.issueCommissionInvoice("o1");
@@ -1301,28 +1210,24 @@ describe("ElogoInvoicingService", () => {
     });
     const enabled = jest.fn().mockReturnValueOnce(false).mockReturnValue(true);
     const elogo = makeElogo({ isEnabled: enabled });
+    // Tek zincir, PAYLAŞILAN örnekler: kesim ve ters kayıt aynı belge ve
+    // gönderim nesnelerini kullanmalı, yoksa casuslar ve vergi/ledger
+    // ayarları çalışmayan bir kopyada kalır.
+    const elogoClient = elogo;
+    const documents = new ElogoDocumentService(
+      prisma,
+      elogoClient,
+      fakeConfig(),
+    );
+    const delivery = new ElogoDeliveryService(prisma, elogoClient, documents);
     const svc = new ElogoInvoicingService(
       prisma,
-      elogo,
+      elogoClient,
       {} as any, // queries
-      new ElogoDocumentService(prisma, elogo, fakeConfig()),
-      // Kesim GÖNDERIM servisinde — gerçek örnek geçilir ki bu spec'in
-      // fatura iddiaları koda kadar insin.
-      new ElogoDeliveryService(
-        prisma,
-        elogo,
-        new ElogoDocumentService(prisma, elogo, fakeConfig()),
-      ),
-      // Kesme zinciri gerçek: issue* → cut.
-      new ElogoIssuingService(
-        prisma,
-        new ElogoDocumentService(prisma, elogo, fakeConfig()),
-        new ElogoDeliveryService(
-          prisma,
-          elogo,
-          new ElogoDocumentService(prisma, elogo, fakeConfig()),
-        ),
-      ),
+      documents,
+      delivery,
+      new ElogoIssuingService(prisma, documents, delivery),
+      new ElogoReversalService(prisma, elogoClient, documents, delivery),
     );
 
     await svc.issueCommissionInvoice("o1");
@@ -1348,28 +1253,24 @@ describe("ElogoInvoicingService", () => {
         description: "accepted",
       }),
     });
+    // Tek zincir, PAYLAŞILAN örnekler: kesim ve ters kayıt aynı belge ve
+    // gönderim nesnelerini kullanmalı, yoksa casuslar ve vergi/ledger
+    // ayarları çalışmayan bir kopyada kalır.
+    const elogoClient = elogo;
+    const documents = new ElogoDocumentService(
+      prisma,
+      elogoClient,
+      fakeConfig(),
+    );
+    const delivery = new ElogoDeliveryService(prisma, elogoClient, documents);
     const svc = new ElogoInvoicingService(
       prisma,
-      elogo,
+      elogoClient,
       {} as any, // queries
-      new ElogoDocumentService(prisma, elogo, fakeConfig()),
-      // Kesim GÖNDERIM servisinde — gerçek örnek geçilir ki bu spec'in
-      // fatura iddiaları koda kadar insin.
-      new ElogoDeliveryService(
-        prisma,
-        elogo,
-        new ElogoDocumentService(prisma, elogo, fakeConfig()),
-      ),
-      // Kesme zinciri gerçek: issue* → cut.
-      new ElogoIssuingService(
-        prisma,
-        new ElogoDocumentService(prisma, elogo, fakeConfig()),
-        new ElogoDeliveryService(
-          prisma,
-          elogo,
-          new ElogoDocumentService(prisma, elogo, fakeConfig()),
-        ),
-      ),
+      documents,
+      delivery,
+      new ElogoIssuingService(prisma, documents, delivery),
+      new ElogoReversalService(prisma, elogoClient, documents, delivery),
     );
 
     await svc.issueCommissionInvoice("o1");

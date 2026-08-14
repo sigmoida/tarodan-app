@@ -216,6 +216,7 @@ describe("fatura KDV oranının kaynağı", () => {
       // Kesme zinciri gerçek: issue* → cut → documents. Stub geçmek
       // bu spec'in fatura iddialarını boşa düşürürdü.
       new ElogoIssuingService(prisma as any, documents, delivery),
+      {} as any, // reversals — bu spec kesim oranlarını sürüyor
     );
 
     await svc.issueCommissionInvoice("pkg1");
@@ -263,6 +264,7 @@ describe("fatura KDV oranının kaynağı", () => {
       // Kesme zinciri gerçek: issue* → cut → documents. Stub geçmek
       // bu spec'in fatura iddialarını boşa düşürürdü.
       new ElogoIssuingService(prisma as any, documents, delivery),
+      {} as any, // reversals — bu spec kesim oranlarını sürüyor
     );
 
     await svc.issueServiceFeeInvoice("pkg1");
@@ -320,6 +322,7 @@ describe("fatura KDV oranının kaynağı", () => {
       // Kesme zinciri gerçek: issue* → cut → documents. Stub geçmek
       // bu spec'in fatura iddialarını boşa düşürürdü.
       new ElogoIssuingService(prisma as any, documents, delivery),
+      {} as any, // reversals — bu spec kesim oranlarını sürüyor
     );
 
     await svc.issuePlatformSaleInvoice("o1");
@@ -365,6 +368,7 @@ describe("fatura KDV oranının kaynağı", () => {
       // Kesme zinciri gerçek: issue* → cut → documents. Stub geçmek
       // bu spec'in fatura iddialarını boşa düşürürdü.
       new ElogoIssuingService(prisma as any, documents, delivery),
+      {} as any, // reversals — bu spec kesim oranlarını sürüyor
     );
 
     await svc.issueCommissionInvoice("pkg1");
