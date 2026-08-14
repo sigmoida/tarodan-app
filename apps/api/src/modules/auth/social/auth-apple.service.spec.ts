@@ -4,6 +4,7 @@ import { JwtService } from "@nestjs/jwt";
 import { ConfigService } from "@nestjs/config";
 import { AuthService } from "../auth.service";
 import { AuthTokenService } from "../auth-token.service";
+import { AuthRegistrationService } from "../auth-registration.service";
 import { GoogleAuthService } from "./google-auth.service";
 import { AppleAuthService } from "./apple-auth.service";
 import { PrismaService } from "../../../prisma";
@@ -48,6 +49,7 @@ describe("AuthService.loginWithApple", () => {
       providers: [
         AuthService,
         AuthTokenService,
+        AuthRegistrationService,
         { provide: PrismaService, useValue: prisma },
         {
           provide: JwtService,

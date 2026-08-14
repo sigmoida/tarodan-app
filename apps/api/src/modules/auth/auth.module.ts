@@ -4,6 +4,7 @@ import { PassportModule } from "@nestjs/passport";
 import { ConfigModule, ConfigService } from "@nestjs/config";
 import { AuthService } from "./auth.service";
 import { AuthTokenService } from "./auth-token.service";
+import { AuthRegistrationService } from "./auth-registration.service";
 import { AuthController } from "./auth.controller";
 import { AdminAuthController } from "./admin-auth.controller";
 import {
@@ -48,6 +49,7 @@ import { MarketingModule } from "../marketing/marketing.module";
   providers: [
     AuthService,
     AuthTokenService,
+    AuthRegistrationService,
     GoogleAuthService,
     AppleAuthService,
     JwtStrategy,

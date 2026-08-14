@@ -5,6 +5,7 @@ import { ConfigService } from "@nestjs/config";
 import { UnauthorizedException } from "@nestjs/common";
 import { AuthService } from "../auth.service";
 import { AuthTokenService } from "../auth-token.service";
+import { AuthRegistrationService } from "../auth-registration.service";
 import { GoogleAuthService } from "./google-auth.service";
 import { AppleAuthService } from "./apple-auth.service";
 import { PrismaService } from "../../../prisma";
@@ -51,6 +52,7 @@ describe("AuthService.loginWithGoogle", () => {
       providers: [
         AuthService,
         AuthTokenService,
+        AuthRegistrationService,
         { provide: PrismaService, useValue: prisma },
         {
           provide: JwtService,

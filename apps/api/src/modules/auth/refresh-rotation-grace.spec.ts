@@ -62,6 +62,7 @@ function makeService(tokenRow: Record<string, unknown> | null) {
     security,
     { syncUserConsent: jest.fn() } as any,
     tokens,
+    {} as any, // registration — bu suite kayıt yolunu sürmüyor
     {} as any,
   );
   jest

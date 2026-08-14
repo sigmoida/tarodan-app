@@ -65,6 +65,7 @@ function makeService(sessionValid: boolean) {
     securityService as any,
     { syncUserConsent: jest.fn() } as any,
     tokens,
+    {} as any, // registration — bu suite kayıt yolunu sürmüyor
     {} as any,
   );
   jest
