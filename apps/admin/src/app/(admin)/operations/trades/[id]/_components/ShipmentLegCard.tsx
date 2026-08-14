@@ -5,6 +5,7 @@ import { Button, cn, enumLabel, shipmentStatusConfig } from "@tarodan/ui";
 import { CheckCircleIcon, XCircleIcon } from "@heroicons/react/24/outline";
 import { useTranslations } from "next-intl";
 import { SectionCard } from "@/components/detail/SectionCard";
+import { fmtDateTime } from "@/lib/format";
 import {
   ShipmentProducts,
   type ShipmentProductInfo,
@@ -131,14 +132,14 @@ export function ShipmentLegCard({
                   {s.shippedAt && (
                     <p className="text-xs text-muted">
                       {t("admin.operations.trades.shippedAt", {
-                        date: new Date(s.shippedAt).toLocaleString("tr-TR"),
+                        date: fmtDateTime(s.shippedAt),
                       })}
                     </p>
                   )}
                   {s.deliveredAt && (
                     <p className="text-xs text-success-700">
                       {t("admin.operations.trades.deliveredAt", {
-                        date: new Date(s.deliveredAt).toLocaleString("tr-TR"),
+                        date: fmtDateTime(s.deliveredAt),
                       })}
                     </p>
                   )}

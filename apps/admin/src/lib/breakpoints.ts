@@ -10,3 +10,12 @@ export const LG_MEDIA_QUERY = `(min-width: ${LG_BREAKPOINT_PX}px)`;
 /** Tailwind's `sm` breakpoint (also unmodified in tailwind.config.ts). */
 export const SM_BREAKPOINT_PX = 640;
 export const SM_MEDIA_QUERY = `(min-width: ${SM_BREAKPOINT_PX}px)`;
+
+/**
+ * True on devices with no real hover capability (touchscreens). Gates
+ * touch-only interaction patterns (e.g. tap-to-reveal) so they don't also
+ * swallow mouse clicks on hover-capable devices, which already have the
+ * native hover affordance and expect a click to do its normal thing
+ * (navigate, etc).
+ */
+export const NO_HOVER_MEDIA_QUERY = "(hover: none)";

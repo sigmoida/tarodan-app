@@ -6,6 +6,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useTranslations } from "next-intl";
 import toast from "react-hot-toast";
 import { adminApi } from "@/lib/api";
+import { adminKeys } from "@/lib/query/keys";
 import type { CommissionRule } from "../_lib/types";
 
 /**
@@ -36,7 +37,7 @@ export function CommissionRuleDeepLink({
   const { data, isError } = useQuery({
     // Sipariş ve takas bağlantıları tarihsel kural kimliğini taşır. Güncel
     // DRAFT/ACTIVE listesini çözmek bu kimliği yanlış sete yönlendirebilir.
-    queryKey: ["commission-rules", "detail", ruleId],
+    queryKey: adminKeys.detail("commission-rules", ruleId!),
     queryFn: () => adminApi.getCommissionRule(ruleId!).then((res) => res.data),
     enabled: !!ruleId,
     retry: false,

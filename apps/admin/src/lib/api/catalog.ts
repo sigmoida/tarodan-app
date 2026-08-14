@@ -112,10 +112,15 @@ export const catalogApi = {
   updateManufacturer: (id: string, data: any) =>
     api.patch(`/admin/manufacturers/${id}`, data),
   deleteManufacturer: (id: string) => api.delete(`/admin/manufacturers/${id}`),
-  /** Single media upload used by all image fields (FormImageUpload). Returns { url, key }. */
-  uploadMedia: (file: File) => {
+  /**
+   * Single media upload used by all image fields (FormImageUpload). Returns
+   * { url, key }. `purpose` picks the storage folder server-side — "ads"
+   * (default) or "manufacturers"; omit only for ad banners.
+   */
+  uploadMedia: (file: File, purpose?: "manufacturers") => {
     const formData = new FormData();
     formData.append("file", file);
+    if (purpose) formData.append("purpose", purpose);
     return api.post<{ url: string; key: string }>(
       "/admin/media/upload",
       formData,

@@ -7,6 +7,7 @@ import {
 } from "@tarodan/ui";
 import { useTranslations } from "next-intl";
 import { col, type RowActionItem } from "@/components/table";
+import { fmtDate, fmtDateTime } from "@/lib/format";
 import type { User } from "./types";
 
 type T = ReturnType<typeof useTranslations<never>>;
@@ -99,11 +100,7 @@ export function userColumns(t: T, rowMenu: (u: User) => RowActionItem[]) {
               : "text-body";
         return (
           <span className={`whitespace-nowrap tabular-nums ${tone}`}>
-            {end.toLocaleDateString("tr-TR", {
-              day: "2-digit",
-              month: "2-digit",
-              year: "numeric",
-            })}
+            {fmtDate(end)}
             {daysLeft >= 0 && daysLeft <= 7 && (
               <span className="ml-1 text-xs">
                 ({t("admin.users.membershipDaysLeft", { count: daysLeft })})
@@ -138,13 +135,7 @@ export function userColumns(t: T, rowMenu: (u: User) => RowActionItem[]) {
       t("admin.users.lastLogin"),
       (u) =>
         u.lastLoginAt
-          ? new Date(u.lastLoginAt).toLocaleString("tr-TR", {
-              day: "2-digit",
-              month: "2-digit",
-              year: "numeric",
-              hour: "2-digit",
-              minute: "2-digit",
-            })
+          ? fmtDateTime(u.lastLoginAt)
           : t("admin.users.neverLoggedIn"),
       { minWidth: 180, sortKey: "lastLoginAt", sortType: "date" },
     ),

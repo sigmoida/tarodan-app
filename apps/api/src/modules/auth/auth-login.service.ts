@@ -13,6 +13,7 @@ import { StorageService } from "../storage/storage.service";
 import { SecurityService } from "../security/security.service";
 import { AuthTokenService } from "./auth-token.service";
 import { resolveAvatarUrl } from "./utils/avatar-url.util";
+import { DUMMY_BCRYPT_HASH } from "./utils/timing-pad";
 import { i18nMessage } from "../i18n";
 import { errorMessage, errorStack } from "../../common/helpers/error-message";
 
@@ -60,6 +61,9 @@ export class AuthLoginService {
       });
 
       if (!user) {
+        // Dummy compare so this path takes the same time as a real
+        // wrong-password rejection (timing-based email enumeration).
+        await bcrypt.compare(dto.password, DUMMY_BCRYPT_HASH);
         // Log failed login attempt - user not found
         await this.logSecurityEvent("failed_login", "medium", {
           email: dto.email,
@@ -72,6 +76,8 @@ export class AuthLoginService {
 
       // Silinmiş (anonimleştirilmiş) hesap: kaynakta reddet, token üretme.
       if (user.deletedAt) {
+        // Same timing-safety reasoning as the "user not found" branch above.
+        await bcrypt.compare(dto.password, DUMMY_BCRYPT_HASH);
         await this.logSecurityEvent("failed_login", "medium", {
           email: dto.email,
           userId: user.id,
@@ -84,6 +90,8 @@ export class AuthLoginService {
 
       // Guard: OAuth-only accounts have no passwordHash — avoid bcrypt throwing on null
       if (!user.passwordHash) {
+        // Same timing-safety reasoning as the "user not found" branch above.
+        await bcrypt.compare(dto.password, DUMMY_BCRYPT_HASH);
         await this.logSecurityEvent("failed_login", "medium", {
           email: dto.email,
           userId: user.id,
@@ -254,16 +262,23 @@ export class AuthLoginService {
     });
 
     if (!user || !user.adminUser) {
+      // Dummy compare so this path takes the same time as a real
+      // wrong-password rejection (timing-based email enumeration).
+      await bcrypt.compare(dto.password, DUMMY_BCRYPT_HASH);
       this.logger.warn("Admin login failed: user not found or no admin user");
       throw new UnauthorizedException(
         i18nMessage("server.auth.invalidCredentials"),
       );
     }
 
-    const isPasswordValid =
-      !!user.passwordHash &&
-      (await bcrypt.compare(dto.password, user.passwordHash));
-    if (!isPasswordValid) {
+    // Always run bcrypt (dummy hash when there's no real passwordHash) so
+    // this branch takes the same time regardless of account state —
+    // matching the "user not found" dummy compare above.
+    const isPasswordValid = await bcrypt.compare(
+      dto.password,
+      user.passwordHash ?? DUMMY_BCRYPT_HASH,
+    );
+    if (!user.passwordHash || !isPasswordValid) {
       this.logger.warn("Admin login failed: invalid password");
       throw new UnauthorizedException(
         i18nMessage("server.auth.invalidCredentials"),

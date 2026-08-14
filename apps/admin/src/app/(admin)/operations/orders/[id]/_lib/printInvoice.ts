@@ -2,7 +2,7 @@ import toast from "react-hot-toast";
 import type { useTranslations } from "next-intl";
 import { colors as dsColors } from "@tarodan/ui";
 import { adminApi } from "@/lib/api";
-import { fmtTry } from "@/lib/format";
+import { fmtDate, fmtTry } from "@/lib/format";
 
 type T = ReturnType<typeof useTranslations<never>>;
 
@@ -64,7 +64,7 @@ export async function printOrderInvoice(orderId: string, t: T): Promise<void> {
         <div class="header">
           <h1>${escapeHtml(t("admin.operations.orders.invoice.heading"))}</h1>
           <p>${escapeHtml(t("admin.operations.orders.invoice.number", { number: invoiceData.invoiceNumber }))}</p>
-          <p>${escapeHtml(t("admin.operations.orders.invoice.date", { date: new Date(invoiceData.orderDate).toLocaleDateString("tr-TR") }))}</p>
+          <p>${escapeHtml(t("admin.operations.orders.invoice.date", { date: fmtDate(invoiceData.orderDate) ?? "" }))}</p>
         </div>
         <div class="info-grid">
           <div class="info-box">

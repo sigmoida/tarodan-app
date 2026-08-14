@@ -8,6 +8,7 @@ import {
   sentryRelease,
   sentryTracesSampleRate,
 } from "./sentry.release";
+import { scrubEvent } from "./sentry.scrub";
 
 Sentry.init({
   dsn: process.env.SENTRY_DSN || process.env.NEXT_PUBLIC_SENTRY_DSN,
@@ -20,4 +21,5 @@ Sentry.init({
     },
   },
   enabled: !!(process.env.SENTRY_DSN || process.env.NEXT_PUBLIC_SENTRY_DSN),
+  beforeSend: scrubEvent,
 });

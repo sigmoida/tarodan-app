@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment, useContext, type ReactNode } from "react";
+import { Fragment, useContext, useMemo, type ReactNode } from "react";
 import dynamic from "next/dynamic";
 import { useTranslations } from "next-intl";
 import {
@@ -26,21 +26,15 @@ import {
   TableHead,
   TableCell,
 } from "@tarodan/ui";
-import {
-  type CellAlign,
-  type SetSort,
-  type SortState,
-} from "@/components/table/meta";
+import { type SetSort, type SortState } from "@/components/table/meta";
 import { SortableHeader } from "@/components/table/SortableHeader";
+import {
+  computeColumnLayout,
+  SELECTABLE_COLUMN_WIDTH,
+} from "@/components/table/columnLayout";
 import { ResourceListContext } from "@/context/ResourceListContext";
 
 export type { ColumnDef };
-
-const ALIGN_CLASS: Record<CellAlign, string> = {
-  left: "text-left",
-  right: "text-right",
-  center: "text-center",
-};
 
 export interface DataTableProps<T> {
   columns: ColumnDef<T, any>[];
@@ -126,41 +120,14 @@ export function DataTable<T>({
     rowIds.every((id) => selectedIds.includes(id));
   const colSpan = columns.length + (selectable ? 1 : 0);
 
-  // Sizing system is opt-in: when columns come from the `col.*` factory (carry
-  // meta), fixed-layout + colgroup + alignment kick in. Without meta (legacy raw
-  // ColumnDef consumers) the table keeps its old behavior unchanged.
-  const hasSizing = columns.some(
-    (c) =>
-      c.meta &&
-      (c.meta.minWidth != null || c.meta.grow != null || c.meta.align != null),
+  // `columns` is a module-level static array per the `col.*` factory
+  // convention, so this only actually needs to recompute when it or
+  // `selectable` change — not on every unrelated re-render (search-box
+  // keystrokes, row hover/selection, the isRefetching dim/undim).
+  const { hasSizing, tableMinWidth, widthOf, alignOf } = useMemo(
+    () => computeColumnLayout(columns, selectable),
+    [columns, selectable],
   );
-  // Width basis: fixed columns stay at minWidth, flexible columns share remaining
-  // space in proportion to minWidth. Below the total minimum the wrapper scrolls.
-  const colMin = (c: (typeof columns)[number]) => c.meta?.minWidth ?? 140;
-  // Flexible columns get 20% headroom above their configured minWidth for the
-  // *floor* calc below — on desktop the proportional bonus space normally keeps
-  // columns well above minWidth, so authors size it tight; once the viewport is
-  // narrow enough to be scrolling, columns land exactly on that floor with zero
-  // slack and short text gets truncated for no reason. The headroom only shifts
-  // where the floor sits — flexWidthOf's calc ratio (desktop width) is
-  // unaffected, since the same factor cancels out of every column's share.
-  const FLEX_SLACK = 1.2;
-  const flexMin = (c: (typeof columns)[number]) => colMin(c) * FLEX_SLACK;
-  const fixedWidth =
-    (selectable ? 44 : 0) +
-    columns.reduce((sum, c) => sum + (c.meta?.fixed ? colMin(c) : 0), 0);
-  const flexibleWidth = columns.reduce(
-    (sum, c) => sum + (c.meta?.fixed ? 0 : flexMin(c)),
-    0,
-  );
-  const tableMinWidth = hasSizing ? fixedWidth + flexibleWidth : 0;
-  const widthOf = (c: (typeof columns)[number]) => {
-    if (c.meta?.fixed || flexibleWidth === 0) return `${colMin(c)}px`;
-    const share = flexMin(c) / flexibleWidth;
-    return `calc((100% - ${fixedWidth}px) * ${share})`;
-  };
-  const alignOf = (align?: CellAlign) =>
-    align ? ALIGN_CLASS[align] : undefined;
 
   // Initial load (no data yet) shows a full spinner; on search/filter refetch the
   // existing rows are kept and slightly dimmed (keepPreviousData behavior).
@@ -177,7 +144,9 @@ export function DataTable<T>({
         >
           {hasSizing && (
             <colgroup>
-              {selectable && <col style={{ width: "44px" }} />}
+              {selectable && (
+                <col style={{ width: `${SELECTABLE_COLUMN_WIDTH}px` }} />
+              )}
               {columns.map((c, i) => (
                 <col key={c.id ?? i} style={{ width: widthOf(c) }} />
               ))}
@@ -186,8 +155,10 @@ export function DataTable<T>({
           <TableHeader>
             {table.getHeaderGroups().map((hg) => (
               <TableRow key={hg.id}>
+                {/* w-11 = 44px, matching SELECTABLE_COLUMN_WIDTH — see
+                    columnLayout.ts for why this can't be the same constant. */}
                 {selectable && (
-                  <TableHead className="w-10">
+                  <TableHead className="w-11">
                     <Checkbox
                       checked={!!allSelected}
                       onChange={() => onToggleAll?.(rowIds)}

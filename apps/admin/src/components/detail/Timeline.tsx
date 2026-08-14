@@ -1,6 +1,7 @@
 "use client";
 
 import { useTranslations } from "next-intl";
+import { fmtDateTime } from "@/lib/format";
 import { SectionCard } from "./SectionCard";
 
 export interface TimelineEntry {
@@ -30,9 +31,7 @@ export function Timeline({
         {visible.map((item, i) => (
           <li key={i}>
             <p className="text-sm font-medium text-heading">{item.label}</p>
-            <p className="text-xs text-muted">
-              {new Date(item.at as string).toLocaleString("tr-TR")}
-            </p>
+            <p className="text-xs text-muted">{fmtDateTime(item.at)}</p>
           </li>
         ))}
       </ol>

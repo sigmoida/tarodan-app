@@ -19,7 +19,7 @@ import { useTranslations } from "next-intl";
 import { adminApi } from "@/lib/api";
 import { adminKeys } from "@/lib/query/keys";
 import { extractList } from "@/lib/extract";
-import { fmtTry } from "@/lib/format";
+import { fmtDateTime, fmtTry } from "@/lib/format";
 import { useSession } from "@/context/SessionContext";
 import { useAdminMutation } from "@/hooks/useAdminMutation";
 import { SectionCard } from "@/components/detail/SectionCard";
@@ -166,7 +166,7 @@ export function ReconciliationTab() {
                       {attempt.failureReason ?? "-"}
                     </td>
                     <td className="px-3 py-3">
-                      {new Date(attempt.updatedAt).toLocaleString()}
+                      {fmtDateTime(attempt.updatedAt)}
                     </td>
                     <td className="px-3 py-3 text-right">
                       {canResolve && (

@@ -42,6 +42,8 @@ export interface FormModalProps<T extends FieldValues> {
   closeOnBackdrop?: boolean;
   /** Customize the dirty-form warning, or set false to disable it. */
   discardConfirmation?: ConfirmOptions | false;
+  /** Danger styling for the submit button (destructive confirmations, e.g. refund/cancel). */
+  destructive?: boolean;
   children: ReactNode;
 }
 
@@ -70,6 +72,7 @@ export function FormModal<T extends FieldValues>({
   modalClassName,
   closeOnBackdrop,
   discardConfirmation = defaultDiscardConfirmation,
+  destructive,
   children,
 }: FormModalProps<T>) {
   const pending = isSubmitting ?? form.formState.isSubmitting;
@@ -112,6 +115,7 @@ export function FormModal<T extends FieldValues>({
           cancelLabel={cancelLabel}
           confirmLabel={submitLabel}
           isLoading={pending}
+          destructive={destructive}
         />
       }
     >

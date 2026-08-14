@@ -2,6 +2,7 @@
 
 import { useSuspenseQuery } from "@tanstack/react-query";
 import { adminApi } from "@/lib/api";
+import { adminKeys } from "@/lib/query/keys";
 import {
   type AnalyticsData,
   type DateRange,
@@ -124,7 +125,7 @@ async function fetchAnalytics(dateRange: DateRange): Promise<AnalyticsData> {
 /** Loads + normalizes all analytics reports for the selected range (TanStack Query). */
 export function useAnalytics(dateRange: DateRange) {
   const query = useSuspenseQuery({
-    queryKey: ["analytics", dateRange],
+    queryKey: adminKeys.list("analytics", dateRange),
     queryFn: () => fetchAnalytics(dateRange),
   });
   return query.data;

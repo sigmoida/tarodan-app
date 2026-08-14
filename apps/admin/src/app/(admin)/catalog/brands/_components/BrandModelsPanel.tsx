@@ -11,6 +11,7 @@ import {
   TruckIcon,
 } from "@heroicons/react/24/outline";
 import { adminApi } from "@/lib/api";
+import { adminKeys } from "@/lib/query/keys";
 import { useConfirm } from "@/provider/ConfirmProvider";
 import { useAdminMutation } from "@/hooks/useAdminMutation";
 import { StatusToggle } from "@/components/ActiveBadge";
@@ -26,7 +27,7 @@ export function BrandModelsPanel({ brand }: { brand: Brand }) {
   const [modal, setModal] = useState<{ model?: CarModel } | null>(null);
 
   const { data: models = [], isLoading } = useQuery<CarModel[]>({
-    queryKey: ["car-models", "brand", brand.id],
+    queryKey: adminKeys.list("car-models", { brandId: brand.id }),
     queryFn: async () =>
       (await adminApi.getCarModels({ brandId: brand.id, limit: 100 })).data
         ?.data ?? [],

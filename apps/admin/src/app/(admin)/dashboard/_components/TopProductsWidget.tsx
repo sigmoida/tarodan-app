@@ -4,7 +4,7 @@ import { useTranslations } from "next-intl";
 import { ChevronRightIcon } from "@heroicons/react/24/outline";
 import { Button, EmptyState } from "@tarodan/ui";
 import { SectionCard } from "@/components/detail/SectionCard";
-import { fmtTry } from "@/lib/format";
+import { fmtNumber, fmtTry } from "@/lib/format";
 import { type TopProduct } from "../_lib/types";
 
 /**
@@ -59,7 +59,7 @@ export function TopProductsWidget({ products }: { products: TopProduct[] }) {
                 {fmtTry(p.price)}
               </span>
               <span className="whitespace-nowrap text-xs text-muted tabular-nums">
-                {p.viewCount.toLocaleString("tr-TR")}{" "}
+                {fmtNumber(p.viewCount)}{" "}
                 {t("admin.dashboard.topProducts.columns.views").toLowerCase()}
               </span>
             </Link>

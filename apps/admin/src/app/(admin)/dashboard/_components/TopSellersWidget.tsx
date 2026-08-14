@@ -4,6 +4,7 @@ import { useTranslations } from "next-intl";
 import { ChevronRightIcon } from "@heroicons/react/24/outline";
 import { Button, EmptyState } from "@tarodan/ui";
 import { SectionCard } from "@/components/detail/SectionCard";
+import { fmtNumber } from "@/lib/format";
 import { type TopSeller } from "../_lib/types";
 
 /**
@@ -55,19 +56,19 @@ export function TopSellersWidget({ sellers }: { sellers: TopSeller[] }) {
                   {s.displayName}
                 </p>
                 <p className="truncate text-xs text-muted">
-                  {s.productCount.toLocaleString("tr-TR")}{" "}
+                  {fmtNumber(s.productCount)}{" "}
                   {t(
                     "admin.dashboard.topSellers.columns.products",
                   ).toLowerCase()}
                   {" · "}
-                  {s.activeListings.toLocaleString("tr-TR")}{" "}
+                  {fmtNumber(s.activeListings)}{" "}
                   {t(
                     "admin.dashboard.topSellers.columns.activeListings",
                   ).toLowerCase()}
                 </p>
               </div>
               <span className="whitespace-nowrap text-sm font-semibold text-heading tabular-nums">
-                {s.storeViewCount.toLocaleString("tr-TR")}
+                {fmtNumber(s.storeViewCount)}
               </span>
             </Link>
           ))

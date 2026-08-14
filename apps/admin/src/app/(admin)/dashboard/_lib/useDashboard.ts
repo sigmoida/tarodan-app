@@ -3,6 +3,7 @@
 import { useSuspenseQuery } from "@tanstack/react-query";
 import { useTranslations } from "next-intl";
 import { adminApi } from "@/lib/api";
+import { adminKeys } from "@/lib/query/keys";
 import {
   type DashboardData,
   type DashboardStats,
@@ -202,7 +203,7 @@ async function fetchDashboard(t: T): Promise<DashboardData> {
 export function useDashboard() {
   const t = useTranslations();
   const query = useSuspenseQuery({
-    queryKey: ["dashboard"],
+    queryKey: adminKeys.all("dashboard"),
     queryFn: () => fetchDashboard(t),
   });
   return query.data;

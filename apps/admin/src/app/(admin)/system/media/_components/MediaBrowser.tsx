@@ -82,23 +82,19 @@ export function MediaBrowser() {
         >
           {t("admin.system.media.up")}
         </Button>
-        <button
-          type="button"
-          className="text-primary-600 hover:underline"
-          onClick={() => setPrefix("")}
-        >
+        <Button type="button" variant="link" onClick={() => setPrefix("")}>
           {t("admin.system.media.root")}
-        </button>
+        </Button>
         {crumbs.map((part, i) => (
           <span key={`${part}-${i}`} className="flex items-center gap-2">
             <span className="text-subtle">/</span>
-            <button
+            <Button
               type="button"
-              className="text-primary-600 hover:underline"
+              variant="link"
               onClick={() => setPrefix(`${crumbs.slice(0, i + 1).join("/")}/`)}
             >
               {part}
-            </button>
+            </Button>
           </span>
         ))}
       </div>
@@ -112,15 +108,18 @@ export function MediaBrowser() {
           {(data?.folders.length ?? 0) > 0 && (
             <div className="grid gap-2 sm:grid-cols-3 lg:grid-cols-5">
               {data?.folders.map((folder) => (
-                <button
+                <Button
                   key={folder.prefix}
                   type="button"
+                  variant="outline"
                   onClick={() => enterFolder(folder.prefix)}
-                  className="flex items-center gap-2 rounded-lg border border-border bg-surface px-3 py-2 text-left text-sm hover:border-primary-300"
+                  leftIcon={
+                    <FolderIcon className="h-5 w-5 shrink-0 text-warning-500" />
+                  }
+                  className="h-auto w-full justify-start bg-surface px-3 py-2 text-sm font-normal hover:border-primary-300"
                 >
-                  <FolderIcon className="h-5 w-5 shrink-0 text-warning-500" />
                   <span className="truncate font-medium">{folder.name}</span>
-                </button>
+                </Button>
               ))}
             </div>
           )}

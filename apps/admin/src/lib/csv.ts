@@ -4,7 +4,7 @@ import type { ColumnDef } from "@tanstack/react-table";
 const BOM = "﻿";
 
 /** CSV-escape a value: quote when it contains a comma, quote or newline. */
-function csvCell(v: string | number | null | undefined): string {
+export function csvCell(v: string | number | null | undefined): string {
   if (v == null) return "";
   const s = String(v);
   return /[",\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;

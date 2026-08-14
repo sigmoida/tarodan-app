@@ -207,17 +207,29 @@ export class AdminAdvertisementController {
   @Post("media/upload")
   @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
   @UseInterceptors(FileInterceptor("file", UPLOAD_MULTER_OPTIONS))
-  @ApiOperation({ summary: "Upload image (e.g. for ad banner)" })
+  @ApiOperation({
+    summary: "Upload an admin-managed image (ad banner or manufacturer logo)",
+  })
   @ApiResponse({
     status: HttpStatus.CREATED,
     description: "Returns { url, key }",
   })
-  async uploadMedia(@UploadedFile() file: Express.Multer.File) {
+  async uploadMedia(
+    @UploadedFile() file: Express.Multer.File,
+    @Body("purpose") purpose?: string,
+  ) {
     if (!file) {
       throw new BadRequestException(i18nMessage("server.admin.fileMissing"));
     }
+    // Tek admin yükleme ucu birden çok özelliğe hizmet eder (reklam
+    // banner'ları, üretici logoları); hedef klasör çağrının amacına göre
+    // seçilir, aksi halde her şey "ads" altına düşer.
+    const target =
+      purpose === "manufacturers"
+        ? { bucket: "brands" as const, folder: "manufacturers" }
+        : { bucket: "products" as const, folder: "ads" };
     return this.mediaService.upload(file, {
-      folder: "ads",
+      ...target,
       allowedTypes: ["image/jpeg", "image/png", "image/webp"],
       maxSize: 5 * 1024 * 1024, // 5MB
     });

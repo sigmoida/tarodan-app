@@ -1,6 +1,8 @@
 import { CheckCircleIcon } from "@heroicons/react/24/outline";
 import { useTranslations } from "next-intl";
 import { Badge } from "@tarodan/ui";
+import { MaskedValue } from "@/components/MaskedValue";
+import { fmtDate, fmtDateTime } from "@/lib/format";
 import { SectionCard } from "@/components/detail/SectionCard";
 import { type UserDetail } from "../types";
 
@@ -51,14 +53,12 @@ export function UserInfoSection({ user }: { user: UserDetail }) {
           {user.phone && <Verified ok={user.isPhoneVerified} />}
         </Item>
         <Item label={t("admin.users.registeredAt")}>
-          <p className="text-heading">
-            {new Date(user.createdAt).toLocaleDateString("tr-TR")}
-          </p>
+          <p className="text-heading">{fmtDate(user.createdAt)}</p>
         </Item>
         <Item label={t("admin.users.lastLogin")}>
           <p className="text-heading">
             {user.lastLoginAt
-              ? new Date(user.lastLoginAt).toLocaleString("tr-TR")
+              ? fmtDateTime(user.lastLoginAt)
               : t("admin.users.neverLoggedIn")}
           </p>
         </Item>
@@ -121,15 +121,11 @@ export function UserInfoSection({ user }: { user: UserDetail }) {
                   </p>
                 </Item>
                 <Item label={t("admin.users.detail.ibanLabel")}>
-                  <p className="break-all font-mono text-heading">
-                    {user.bankAccount.iban}
-                  </p>
+                  <MaskedValue value={user.bankAccount.iban} />
                 </Item>
                 {user.bankAccount.tcKimlikNo && (
                   <Item label={t("admin.users.detail.tcKimlikNoLabel")}>
-                    <p className="font-mono text-heading">
-                      {user.bankAccount.tcKimlikNo}
-                    </p>
+                    <MaskedValue value={user.bankAccount.tcKimlikNo} />
                   </Item>
                 )}
                 {user.bankAccount.taxId && (
@@ -142,9 +138,7 @@ export function UserInfoSection({ user }: { user: UserDetail }) {
                 {user.bankAccount.verifiedAt && (
                   <Item label={t("admin.users.detail.verifiedAtLabel")}>
                     <p className="text-heading">
-                      {new Date(user.bankAccount.verifiedAt).toLocaleString(
-                        "tr-TR",
-                      )}
+                      {fmtDateTime(user.bankAccount.verifiedAt)}
                     </p>
                   </Item>
                 )}
@@ -170,7 +164,7 @@ export function UserInfoSection({ user }: { user: UserDetail }) {
             {user.bannedAt && (
               <p className="mt-2 text-sm text-danger-600">
                 {t("admin.users.detail.banDateLabel")}{" "}
-                {new Date(user.bannedAt).toLocaleString("tr-TR")}
+                {fmtDateTime(user.bannedAt)}
               </p>
             )}
           </div>

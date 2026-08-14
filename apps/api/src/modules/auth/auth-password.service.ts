@@ -1,9 +1,10 @@
-import { Injectable, BadRequestException } from "@nestjs/common";
+import { Injectable, Logger, BadRequestException } from "@nestjs/common";
 import * as bcrypt from "bcrypt";
 import * as crypto from "crypto";
 import { PrismaService } from "../../prisma";
 import { NotificationService } from "../notification/notification.service";
 import { i18nMessage } from "../i18n";
+import { DUMMY_BCRYPT_HASH } from "./utils/timing-pad";
 
 /**
  * Şifre sıfırlama: tek kullanımlık token'ın üretimi, gönderimi ve tüketimi.
@@ -17,6 +18,8 @@ import { i18nMessage } from "../i18n";
  */
 @Injectable()
 export class AuthPasswordService {
+  private readonly logger = new Logger(AuthPasswordService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly notificationService: NotificationService,
@@ -38,6 +41,16 @@ export class AuthPasswordService {
     // #224: yanıt mesajı AuthController.forgotPassword() tarafından locale'e göre
     // kuruluyor (server.auth.passwordResetLinkSent) — kullanıcı bulunsun bulunmasın aynı.
     if (!user) {
+      // Dummy bcrypt compare (same technique as login()/adminLogin()) so a
+      // "no such account" response takes roughly the same time as the real
+      // path's deleteMany+create+email-send below — the response body is
+      // already identical either way (#224), but without this the latency gap
+      // alone enumerates registered emails. A DB read against the
+      // non-existent key doesn't work here: it's cheap regardless (userId
+      // isn't even indexed on this table), and a matching dummy WRITE isn't
+      // possible — PasswordResetToken.userId has a real FK constraint, so
+      // there's no id we could insert against.
+      await bcrypt.compare(email, DUMMY_BCRYPT_HASH);
       return;
     }
 
@@ -63,8 +76,15 @@ export class AuthPasswordService {
       },
     });
 
-    // Send email with reset link using NotificationService
-    await this.notificationService.sendPasswordResetEmail(user.id, resetToken);
+    // Don't await email delivery — the network round-trip to the email
+    // provider is by far the dominant, most variable cost on this path;
+    // awaiting it would leak account existence through response timing far
+    // more than the DB work above does.
+    void this.notificationService
+      .sendPasswordResetEmail(user.id, resetToken)
+      .catch((error) =>
+        this.logger.error(`Failed to send password reset email: ${error}`),
+      );
   }
 
   /**

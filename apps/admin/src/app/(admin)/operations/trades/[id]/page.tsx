@@ -5,6 +5,7 @@ import { useParams } from "next/navigation";
 import { Button, StatusBadge, tradeStatusConfig } from "@tarodan/ui";
 import { useTranslations } from "next-intl";
 import { adminApi } from "@/lib/api";
+import { fmtDateTime } from "@/lib/format";
 import { useConfirm } from "@/provider/ConfirmProvider";
 import { useAdminMutation } from "@/hooks/useAdminMutation";
 import { DetailPage } from "@/components/detail/DetailPage";
@@ -125,7 +126,7 @@ export default function TradeDetailPage() {
       )}
       subtitle={(trade) =>
         t("admin.operations.trades.createdAtLabel", {
-          date: new Date(trade.createdAt).toLocaleString("tr-TR"),
+          date: fmtDateTime(trade.createdAt),
         })
       }
       badge={(trade) => (

@@ -9,7 +9,7 @@ import {
 import { useTranslations } from "next-intl";
 import { MetricCard } from "@/components/MetricCard";
 import { SectionCard } from "@/components/detail/SectionCard";
-import { fmtTry } from "@/lib/format";
+import { fmtNumber, fmtTry } from "@/lib/format";
 
 export function TradesTab({ report }: { report: any }) {
   const t = useTranslations();
@@ -25,19 +25,19 @@ export function TradesTab({ report }: { report: any }) {
           icon={ArrowsRightLeftIcon}
           tone="info"
           label={t("admin.analytics.trades.totalTrades")}
-          value={report.totalTrades?.toLocaleString() ?? 0}
+          value={fmtNumber(report.totalTrades) ?? "—"}
         />
         <MetricCard
           icon={ChartBarIcon}
           tone="success"
           label={t("admin.analytics.trades.completed")}
-          value={report.completedTrades?.toLocaleString() ?? 0}
+          value={fmtNumber(report.completedTrades) ?? "—"}
         />
         <MetricCard
           icon={CalendarIcon}
           tone="warning"
           label={t("admin.analytics.trades.pending")}
-          value={report.pendingTrades?.toLocaleString() ?? 0}
+          value={fmtNumber(report.pendingTrades) ?? "—"}
         />
         <MetricCard
           icon={CurrencyDollarIcon}

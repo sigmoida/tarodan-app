@@ -633,7 +633,7 @@ export interface Crumb {
 }
 
 /** Turn a URL segment into a readable leaf label; ids collapse to the "Detail" word. */
-function humanizeSegment(segment: string, t: T): string {
+export function humanizeSegment(segment: string, t: T): string {
   if (/^\d+$/.test(segment) || /^[0-9a-f]{8}-[0-9a-f]{4}/i.test(segment))
     return t("admin.nav.detailSuffix");
   return segment

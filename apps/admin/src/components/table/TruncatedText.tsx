@@ -1,14 +1,15 @@
 "use client";
 
 import {
-  useEffect,
   useLayoutEffect,
-  useRef,
   useState,
   type ReactNode,
   type SyntheticEvent,
 } from "react";
 import { createPortal } from "react-dom";
+import { useAnchoredPopover } from "@tarodan/ui/hooks";
+import { useMediaQuery } from "@/hooks/useMediaQuery";
+import { NO_HOVER_MEDIA_QUERY } from "@/lib/breakpoints";
 import { cn } from "@/lib/utils";
 
 const POPOVER_MAX_WIDTH = 280;
@@ -23,7 +24,10 @@ const VIEWPORT_MARGIN = 12;
  * unreadable there. Tapping a clipped value opens a small portaled popover
  * with the full text instead — this stops the tap from also triggering a
  * row click / link navigation, since reading the value is the deliberate
- * action here, not navigating away.
+ * action here, not navigating away. That interception is scoped to
+ * no-hover (touch) devices only — hover-capable devices already get the
+ * value via the native `title` tooltip, so a click there must behave like
+ * a normal click (e.g. still navigate a wrapping `Link`).
  */
 export function TruncatedText({
   children,
@@ -32,12 +36,24 @@ export function TruncatedText({
   children: ReactNode;
   className?: string;
 }) {
-  const ref = useRef<HTMLSpanElement>(null);
-  const popoverRef = useRef<HTMLDivElement>(null);
+  const isTouch = useMediaQuery(NO_HOVER_MEDIA_QUERY);
   const [truncated, setTruncated] = useState(false);
-  const [open, setOpen] = useState(false);
-  const [pos, setPos] = useState<{ top: number; left: number } | null>(null);
   const title = typeof children === "string" ? children : undefined;
+
+  const {
+    open,
+    toggle,
+    triggerRef: ref,
+    popoverRef,
+    pos,
+  } = useAnchoredPopover<HTMLSpanElement>({
+    offsetY: 6,
+    width: POPOVER_MAX_WIDTH,
+    viewportMargin: VIEWPORT_MARGIN,
+    // Re-measuring a small text popover on every scroll tick isn't worth
+    // it — just close it, matching the previous behavior here.
+    onViewportChange: "close",
+  });
 
   useLayoutEffect(() => {
     const el = ref.current;
@@ -47,54 +63,19 @@ export function TruncatedText({
     const ro = new ResizeObserver(check);
     ro.observe(el);
     return () => ro.disconnect();
-  }, [children]);
-
-  useEffect(() => {
-    if (!open) return;
-    const close = () => setOpen(false);
-    const onDown = (e: MouseEvent) => {
-      const target = e.target as Node;
-      if (ref.current?.contains(target) || popoverRef.current?.contains(target))
-        return;
-      close();
-    };
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") close();
-    };
-    document.addEventListener("mousedown", onDown);
-    document.addEventListener("keydown", onKey);
-    window.addEventListener("resize", close);
-    window.addEventListener("scroll", close, true);
-    return () => {
-      document.removeEventListener("mousedown", onDown);
-      document.removeEventListener("keydown", onKey);
-      window.removeEventListener("resize", close);
-      window.removeEventListener("scroll", close, true);
-    };
-  }, [open]);
+  }, [children, ref]);
 
   const reveal = (e: SyntheticEvent) => {
     if (!truncated || !title) return;
     e.stopPropagation();
     e.preventDefault();
-    if (open) {
-      setOpen(false);
-      return;
-    }
-    const rect = ref.current?.getBoundingClientRect();
-    if (rect) {
-      setPos({
-        top: rect.bottom + 6,
-        left: Math.max(
-          VIEWPORT_MARGIN,
-          Math.min(
-            rect.left,
-            window.innerWidth - POPOVER_MAX_WIDTH - VIEWPORT_MARGIN,
-          ),
-        ),
-      });
-    }
-    setOpen(true);
+    toggle();
+  };
+
+  // Only intercept the click on touch — hover-capable devices must let it
+  // through to whatever the cell wraps (Link nav, row click, …).
+  const onClick = (e: SyntheticEvent) => {
+    if (isTouch) reveal(e);
   };
 
   return (
@@ -109,7 +90,13 @@ export function TruncatedText({
         title={truncated && title ? title : undefined}
         role={truncated ? "button" : undefined}
         tabIndex={truncated ? 0 : undefined}
-        onClick={reveal}
+        onClick={onClick}
+        // Deliberately NOT gated by `isTouch` like onClick: a keyboard-only
+        // user can't hover either, regardless of the device's primary
+        // pointer capability, so they need this escape hatch always. It
+        // doesn't fight a wrapping Link's own Enter-to-navigate — that's a
+        // separate DOM node with its own tab stop and focus target, so a
+        // real navigation reachable via keyboard is never blocked here.
         onKeyDown={(e) => {
           if (e.key === "Enter" || e.key === " ") reveal(e);
         }}

@@ -1,10 +1,13 @@
 "use client";
 
-import { useState } from "react";
-import { Modal, ModalFooter, Textarea } from "@tarodan/ui";
+import { FormModal, FormTextarea, useZodForm } from "@tarodan/ui/form";
 import { adminApi } from "@/lib/api";
 import { useAdminMutation } from "@/hooks/useAdminMutation";
 import { useTranslations } from "next-intl";
+import {
+  forceCancelPaymentSchema,
+  type ForceCancelPaymentValues,
+} from "../_lib/schema";
 
 export function ForceCancelPaymentModal({
   paymentId,
@@ -14,10 +17,13 @@ export function ForceCancelPaymentModal({
   onClose: () => void;
 }) {
   const t = useTranslations();
-  const [reason, setReason] = useState("");
+  const form = useZodForm(forceCancelPaymentSchema(t), {
+    defaultValues: { reason: "" },
+  });
 
   const cancel = useAdminMutation(
-    () => adminApi.forceCancelPayment(paymentId, reason),
+    (v: ForceCancelPaymentValues) =>
+      adminApi.forceCancelPayment(paymentId, v.reason),
     {
       invalidates: ["payments"],
       successMessage: t("admin.finance.payments.forceCancelSuccess"),
@@ -26,35 +32,26 @@ export function ForceCancelPaymentModal({
   );
 
   return (
-    <Modal
-      isOpen
+    <FormModal
+      open
       onClose={onClose}
       title={t("admin.finance.payments.forceCancel")}
       size="md"
-      closeButtonDisabled={cancel.isPending}
-      footer={
-        <ModalFooter
-          onCancel={onClose}
-          onConfirm={() => cancel.mutate()}
-          confirmLabel={t("admin.finance.payments.forceCancelConfirm")}
-          destructive
-          isLoading={cancel.isPending}
-          disabled={!reason.trim()}
-        />
-      }
+      form={form}
+      onSubmit={(v) => cancel.mutate(v)}
+      isSubmitting={cancel.isPending}
+      submitLabel={t("admin.finance.payments.forceCancelConfirm")}
+      destructive
     >
-      <div className="space-y-4">
-        <p className="text-muted">
-          {t("admin.finance.payments.forceCancelDescription")}
-        </p>
-        <Textarea
-          label={t("admin.finance.payments.cancelReasonRequired")}
-          value={reason}
-          onChange={(e) => setReason(e.target.value)}
-          rows={3}
-          placeholder={t("admin.finance.payments.cancelReasonPlaceholder")}
-        />
-      </div>
-    </Modal>
+      <p className="text-muted">
+        {t("admin.finance.payments.forceCancelDescription")}
+      </p>
+      <FormTextarea
+        name="reason"
+        label={t("admin.finance.payments.cancelReasonRequired")}
+        rows={3}
+        placeholder={t("admin.finance.payments.cancelReasonPlaceholder")}
+      />
+    </FormModal>
   );
 }

@@ -4,6 +4,7 @@ import { Button } from "@tarodan/ui";
 import { BanknotesIcon } from "@heroicons/react/24/outline";
 import { useTranslations } from "next-intl";
 import { adminApi } from "@/lib/api";
+import { fmtDateTime } from "@/lib/format";
 import { useSession } from "@/context/SessionContext";
 import { usePrompt } from "@/provider/PromptProvider";
 import { useAdminMutation } from "@/hooks/useAdminMutation";
@@ -76,10 +77,10 @@ export function EscrowReleasePanel({ trade }: { trade: TradeDetail }) {
             <p className="mt-1 text-sm text-info-800">
               {early
                 ? t("admin.operations.trades.escrowPanelBodyEarly", {
-                    date: holdReleaseAt.toLocaleString("tr-TR"),
+                    date: fmtDateTime(holdReleaseAt),
                   })
                 : t("admin.operations.trades.escrowPanelBodyDue", {
-                    date: holdReleaseAt.toLocaleString("tr-TR"),
+                    date: fmtDateTime(holdReleaseAt),
                   })}
             </p>
           </div>
