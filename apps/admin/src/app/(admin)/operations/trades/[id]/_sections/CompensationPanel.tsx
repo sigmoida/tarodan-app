@@ -49,7 +49,7 @@ export function CompensationPanel({ trade }: { trade: TradeDetail }) {
 
   return (
     <div className="rounded-xl border-2 border-warning-400 bg-warning-50 p-4 shadow-sm">
-      <div className="flex items-start justify-between gap-4">
+      <div className="flex flex-col items-start gap-4 sm:flex-row sm:justify-between">
         <div className="flex items-start gap-3">
           <ExclamationTriangleIcon className="h-7 w-7 flex-shrink-0 text-warning-700" />
           <div>
@@ -65,7 +65,7 @@ export function CompensationPanel({ trade }: { trade: TradeDetail }) {
           variant="primary"
           onClick={handle}
           isLoading={resolve.isPending}
-          className="flex-shrink-0"
+          className="sm:flex-shrink-0"
         >
           {t("admin.operations.trades.compensationClosed")}
         </Button>

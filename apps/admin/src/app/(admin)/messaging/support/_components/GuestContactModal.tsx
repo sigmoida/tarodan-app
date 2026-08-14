@@ -16,7 +16,7 @@ export function GuestContactModal({
   return (
     <Modal isOpen onClose={onClose} title={contact.subject} size="lg">
       <div className="space-y-4">
-        <div className="grid grid-cols-2 gap-4 text-sm">
+        <div className="grid grid-cols-1 gap-4 text-sm sm:grid-cols-2">
           <div className="min-w-0">
             <p className="text-muted">
               {t("admin.messaging.support.fullName")}

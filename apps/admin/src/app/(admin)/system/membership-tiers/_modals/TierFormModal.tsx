@@ -68,7 +68,7 @@ export function TierFormModal({
       submitLabel={t("common.update")}
       size="2xl"
     >
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <FormInput
           name="name"
           label={t("admin.tiers.field.name")}
@@ -90,7 +90,7 @@ export function TierFormModal({
       />
 
       {!isFree && (
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <FormInput
             name="monthlyPrice"
             label={t("admin.tiers.field.monthlyPrice")}
@@ -120,7 +120,7 @@ export function TierFormModal({
         </div>
       )}
 
-      <div className="grid grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
         <FormInput
           name="maxFreeListings"
           label={t("admin.tiers.field.maxFreeListings")}

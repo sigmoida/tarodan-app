@@ -263,7 +263,7 @@ function MetricPanel({
     <div className="rounded-lg border border-border bg-surface p-4">
       <h3 className="text-sm font-semibold text-heading">{title}</h3>
       {values ? (
-        <dl className="mt-4 grid grid-cols-3 gap-3">
+        <dl className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
           <Metric
             label={labels.views}
             value={values.views}

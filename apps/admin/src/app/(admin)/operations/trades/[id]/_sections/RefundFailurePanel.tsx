@@ -44,7 +44,7 @@ export function RefundFailurePanel({ trade }: { trade: TradeDetail }) {
 
   return (
     <div className="rounded-xl border-2 border-danger-400 bg-danger-50 p-6 shadow-sm">
-      <div className="flex items-start justify-between gap-4">
+      <div className="flex flex-col items-start gap-4 sm:flex-row sm:justify-between">
         <div className="flex items-start gap-3">
           <ExclamationTriangleIcon className="h-8 w-8 flex-shrink-0 text-danger-600" />
           <div>
@@ -67,7 +67,7 @@ export function RefundFailurePanel({ trade }: { trade: TradeDetail }) {
           variant="danger"
           onClick={handle}
           isLoading={retry.isPending}
-          className="flex-shrink-0"
+          className="sm:flex-shrink-0"
         >
           <ArrowUturnLeftIcon className="mr-1 h-5 w-5" />
           {t("admin.operations.trades.retryRefund")}
