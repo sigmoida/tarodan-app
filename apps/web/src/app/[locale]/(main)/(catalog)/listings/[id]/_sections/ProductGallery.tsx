@@ -7,8 +7,11 @@ import {
   ChevronLeftIcon,
   ChevronRightIcon,
 } from "@heroicons/react/24/outline";
+import { useCallback, useEffect, useRef } from "react";
 import { Badge, Button } from "@tarodan/ui";
 import OptimizedImage from "@/components/OptimizedImage";
+import { useSwipe } from "@/hooks/useSwipe";
+import { IMAGE_SIZES } from "@/lib/imageSizes";
 import { PLACEHOLDER } from "../_lib/images";
 import { useListingDetail } from "../_context/ListingDetailContext";
 
@@ -68,22 +71,63 @@ export default function ProductGallery() {
     open360View,
   } = useListingDetail();
 
+  // İleri/geri tek yerde: eskiden aynı "başa/sona sar" hesabı iki düğmenin
+  // içinde ayrı ayrı duruyordu, şimdi kaydırma jesti de aynı ikisini çağırıyor.
+  const total = images.length;
+  const goNext = useCallback(() => {
+    setActiveImageIndex(
+      activeImageIndex < total - 1 ? activeImageIndex + 1 : 0,
+    );
+  }, [activeImageIndex, total, setActiveImageIndex]);
+  const goPrev = useCallback(() => {
+    setActiveImageIndex(
+      activeImageIndex > 0 ? activeImageIndex - 1 : total - 1,
+    );
+  }, [activeImageIndex, total, setActiveImageIndex]);
+
+  const { swipeHandlers, consumeSwipeClick } = useSwipe({
+    onSwipeLeft: goNext,
+    onSwipeRight: goPrev,
+  });
+
+  // Kaydırarak ilerleyince küçük görsel şeridi yerinde kalıyordu: aktif görselin
+  // karesi görünür alanın dışına çıkıyor, kullanıcı kaçıncı görselde olduğunu
+  // kaybediyordu. `nearest` en az kaydırmayı yapar — sayfayı dikey oynatmaz.
+  const thumbRefs = useRef<(HTMLButtonElement | null)[]>([]);
+  useEffect(() => {
+    thumbRefs.current[activeImageIndex]?.scrollIntoView({
+      inline: "nearest",
+      block: "nearest",
+    });
+  }, [activeImageIndex]);
+
   if (!listing) return null;
 
   return (
     <div className="relative">
       {/* Main image + hover magnifier */}
+      {/*
+        `touch-pan-y`: dikey sayfa kaydırması tarayıcıda kalsın, yatay hareketi
+        biz yorumlayalım. `onClick` büyütme ekranını açtığı için kaydırmanın
+        ardından gelen tıklama `consumeSwipeClick` ile yutulur — yoksa görseli
+        değiştirmek isteyen kullanıcı büyütme ekranında buluyordu kendini.
+      */}
       <div
         ref={setImageContainerRef}
-        className="relative aspect-square bg-surface-elevated rounded overflow-visible shadow-sm cursor-zoom-in"
-        onClick={() => openLightbox(activeImageIndex)}
+        className="relative aspect-square touch-pan-y bg-surface-elevated rounded overflow-visible shadow-sm cursor-zoom-in"
+        onClick={() => {
+          if (consumeSwipeClick()) return;
+          openLightbox(activeImageIndex);
+        }}
         onMouseMove={handleMagnifierMouseMove}
         onMouseLeave={handleMagnifierMouseLeave}
+        {...swipeHandlers}
       >
         <OptimizedImage
           src={images[activeImageIndex]}
           alt={listing.title}
           fill
+          sizes={IMAGE_SIZES.productHero}
           className="object-cover rounded"
           fallbackSrc={PLACEHOLDER}
           logContext={{ listingId: listing.id, page: "listing-detail-main" }}
@@ -128,11 +172,7 @@ export default function ProductGallery() {
               onMouseEnter={() => setShowMagnifier(false)}
               onClick={(e) => {
                 e.stopPropagation();
-                setActiveImageIndex(
-                  activeImageIndex > 0
-                    ? activeImageIndex - 1
-                    : images.length - 1,
-                );
+                goPrev();
               }}
             />
             <GalleryNavButton
@@ -141,11 +181,7 @@ export default function ProductGallery() {
               onMouseEnter={() => setShowMagnifier(false)}
               onClick={(e) => {
                 e.stopPropagation();
-                setActiveImageIndex(
-                  activeImageIndex < images.length - 1
-                    ? activeImageIndex + 1
-                    : 0,
-                );
+                goNext();
               }}
             />
           </>
@@ -194,6 +230,9 @@ export default function ProductGallery() {
           <Button
             variant="secondary"
             key={index}
+            ref={(node) => {
+              thumbRefs.current[index] = node;
+            }}
             onClick={() => {
               setActiveImageIndex(index);
               openLightbox(index);
@@ -208,6 +247,7 @@ export default function ProductGallery() {
               src={img}
               alt=""
               fill
+              sizes="80px"
               className="object-cover"
               logContext={{ page: "listing-detail-thumb" }}
             />
