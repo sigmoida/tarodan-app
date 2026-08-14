@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment, useContext, type ReactNode } from "react";
+import { Fragment, useContext, useMemo, type ReactNode } from "react";
 import dynamic from "next/dynamic";
 import { useTranslations } from "next-intl";
 import {
@@ -117,9 +117,13 @@ export function DataTable<T>({
     rowIds.every((id) => selectedIds.includes(id));
   const colSpan = columns.length + (selectable ? 1 : 0);
 
-  const { hasSizing, tableMinWidth, widthOf, alignOf } = computeColumnLayout(
-    columns,
-    selectable,
+  // `columns` is a module-level static array per the `col.*` factory
+  // convention, so this only actually needs to recompute when it or
+  // `selectable` change — not on every unrelated re-render (search-box
+  // keystrokes, row hover/selection, the isRefetching dim/undim).
+  const { hasSizing, tableMinWidth, widthOf, alignOf } = useMemo(
+    () => computeColumnLayout(columns, selectable),
+    [columns, selectable],
   );
 
   // Initial load (no data yet) shows a full spinner; on search/filter refetch the
