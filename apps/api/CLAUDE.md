@@ -39,13 +39,13 @@ A module folder is a table of contents. Once it passes **~10 flat files** it
 stops being one, so it gets subfolders — and only from this vocabulary, so
 every module reads the same way:
 
-| Folder      | What belongs in it                                                                                     |
-| ----------- | ------------------------------------------------------------------------------------------------------ |
-| `dto/`      | class-validator input DTOs and response DTOs                                                           |
-| `helpers/`  | anything with no DI: `*.helper.ts`, `*.constants.ts`, `*-policy.ts`, `*.state-machine.ts`, type files  |
-| `jobs/`     | `*.scheduler.ts`, `*.processor.ts`, `*.listener.ts` — everything that runs under `PROCESS_ROLE=worker` |
-| `<slice>/`  | services sharing one responsibility: `checkout/`, `pricing/`, `refund/`, `reconciliation/`, `clients/` |
-| module root | `<domain>.module.ts`, `<domain>.controller.ts`, the facade `<domain>.service.ts`, `index.ts`           |
+| Folder      | What belongs in it                                                                                      |
+| ----------- | ------------------------------------------------------------------------------------------------------- |
+| `dto/`      | class-validator input DTOs and response DTOs                                                            |
+| `helpers/`  | anything with no DI: `*.helper.ts`, `*.constants.ts`, `*-policy.ts`, `*.state-machine.ts`, type files   |
+| `jobs/`     | `*.scheduler.ts` and `*.processor.ts` — scheduled and queued work, gated to `PROCESS_ROLE=worker` (§11) |
+| `<slice>/`  | services sharing one responsibility: `checkout/`, `pricing/`, `refund/`, `reconciliation/`, `clients/`  |
+| module root | `<domain>.module.ts`, `<domain>.controller.ts`, the facade `<domain>.service.ts`, `index.ts`            |
 
 The test: opening the folder shows **at most ~8 entries**, and each one says
 what it is without opening it. `auth/` (dto, decorators, guards, strategies,
@@ -57,6 +57,10 @@ analytics, ops, jobs) are the worked examples.
 - A slice is named after the **responsibility**, never after the technical kind.
   There is no `services/` folder: it would tell a reader nothing they didn't
   already know.
+- `*.listener.ts` files go **with their slice, not in `jobs/`**. All three in
+  the codebase are registered unconditionally and fire wherever the event is
+  emitted — including the web role — so filing them as background work would
+  say something untrue about when they run.
 - Contract specs that walk the tree (`scheduled-processor-role`,
   `cron-catalog.contract`) recurse on purpose. Keep them depth-agnostic — a
   spec that reads one level deep silently stops covering anything you move.

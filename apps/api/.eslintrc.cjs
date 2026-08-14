@@ -29,7 +29,7 @@ module.exports = {
           // its default and minimum. Nothing about it is payment-specific, so
           // it belongs under src/config/; moving it changes an export other
           // modules import, which is its own change.
-          "src/modules/payment/payment.constants.ts",
+          "src/modules/payment/helpers/payment.constants.ts",
         ],
         // Keys not yet behind an accessor. This list only shrinks: take a key
         // off it when you give it one, and never add to it.

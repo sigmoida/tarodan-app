@@ -8,13 +8,13 @@ import { PaymentQueryService } from "./payment-query.service";
 import {
   PaymentRefundService,
   type ProcessRefundOptions,
-} from "./payment-refund.service";
-import { PaymentReconciliationService } from "./payment-reconciliation.service";
-import { PaymentInitiationService } from "./payment-initiation.service";
-import { PaymentCallbackService } from "./payment-callback.service";
-import { PaymentFulfillmentService } from "./payment-fulfillment.service";
-import { PaymentLifecycleService } from "./payment-lifecycle.service";
-import type { PaymentAccessContext } from "./payment-lifecycle.service";
+} from "./refund/payment-refund.service";
+import { PaymentReconciliationService } from "./reconciliation/payment-reconciliation.service";
+import { PaymentInitiationService } from "./checkout/payment-initiation.service";
+import { PaymentCallbackService } from "./checkout/payment-callback.service";
+import { PaymentFulfillmentService } from "./fulfillment/payment-fulfillment.service";
+import { PaymentLifecycleService } from "./checkout/payment-lifecycle.service";
+import type { PaymentAccessContext } from "./checkout/payment-lifecycle.service";
 
 @Injectable()
 export class PaymentService {

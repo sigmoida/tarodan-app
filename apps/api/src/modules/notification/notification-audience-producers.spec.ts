@@ -2,7 +2,7 @@ import { NotificationType } from "./dto";
 import { resolveWebNotificationLink } from "./notification-link";
 import { NotificationCommerceService } from "./notification-commerce.service";
 import { EventService } from "../events/event.service";
-import { PaymentExpiryReconciliationService } from "../payment/payment-expiry-reconciliation.service";
+import { PaymentExpiryReconciliationService } from "../payment/reconciliation/payment-expiry-reconciliation.service";
 import { OrderStatus } from "@prisma/client";
 
 /**

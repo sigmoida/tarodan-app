@@ -5,8 +5,8 @@ import {
   OrderStatus,
 } from "@prisma/client";
 import { PrismaService } from "../../src/prisma";
-import { PaymentRefundService } from "../../src/modules/payment/payment-refund.service";
-import { PaymentRefundAttemptService } from "../../src/modules/payment/payment-refund-attempt.service";
+import { PaymentRefundService } from "../../src/modules/payment/refund/payment-refund.service";
+import { PaymentRefundAttemptService } from "../../src/modules/payment/refund/payment-refund-attempt.service";
 import {
   truncateAll,
   getPrisma,

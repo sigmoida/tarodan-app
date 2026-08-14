@@ -37,7 +37,7 @@ import { NotificationType } from "../notification/dto";
 import { i18nMessage } from "../i18n";
 import { PaymentProviderEventService } from "../payment/payment-provider-event.service";
 import { createHash } from "node:crypto";
-import { VirtualOrderFulfillmentService } from "../payment/virtual-order-fulfillment.service";
+import { VirtualOrderFulfillmentService } from "../payment/fulfillment/virtual-order-fulfillment.service";
 import { REFERENCE_PREFIX } from "../../common/helpers/code-prefixes";
 import { generateUniqueReference } from "../../common/helpers/generate-reference";
 import { OutboxService } from "../outbox/outbox.service";

@@ -11,7 +11,7 @@ import { ElogoInvoicingService } from "../elogo/elogo-invoicing.service";
 import {
   PAYMENT_CONFIG_KEYS,
   resolvePaymentConfigNumber,
-} from "../payment/payment.constants";
+} from "../payment/helpers/payment.constants";
 import { SellerInvoiceService } from "./seller-invoice.service";
 import { NotificationService } from "../notification/notification.service";
 import { NotificationType } from "../notification/dto";

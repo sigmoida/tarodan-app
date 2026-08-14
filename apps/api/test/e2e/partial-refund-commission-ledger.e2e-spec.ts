@@ -7,8 +7,8 @@ import {
 } from "@prisma/client";
 import { PrismaService } from "../../src/prisma";
 import { CommissionLedgerService } from "../../src/modules/commission/commission-ledger.service";
-import { PaymentRefundService } from "../../src/modules/payment/payment-refund.service";
-import { PaymentRefundAttemptService } from "../../src/modules/payment/payment-refund-attempt.service";
+import { PaymentRefundService } from "../../src/modules/payment/refund/payment-refund.service";
+import { PaymentRefundAttemptService } from "../../src/modules/payment/refund/payment-refund-attempt.service";
 import { ElogoInvoicingService } from "../../src/modules/elogo/elogo-invoicing.service";
 import {
   truncateAll,

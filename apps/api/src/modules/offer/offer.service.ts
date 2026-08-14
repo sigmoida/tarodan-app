@@ -24,7 +24,7 @@ import { NotificationType } from "../notification/dto";
 import { OrderService } from "../order/order.service";
 import { OrderCheckoutCommonService } from "../order/order-checkout-common.service";
 import { OrderFeeDiscountService } from "../order/order-fee-discount.service";
-import { paymentWindowEnd } from "../payment/payment.constants";
+import { paymentWindowEnd } from "../payment/helpers/payment.constants";
 import { ProductLockService } from "../product/product-lock.service";
 import { getAvailableQuantity } from "../product/helpers/product-availability.helper";
 import { resolveSalePrice } from "../product/helpers/product-sale-window";

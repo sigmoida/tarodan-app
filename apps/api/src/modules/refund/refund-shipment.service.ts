@@ -15,7 +15,7 @@ import { PrismaService } from "../../prisma";
 import {
   PAYMENT_CONFIG_KEYS,
   envConfigNumber,
-} from "../payment/payment.constants";
+} from "../payment/helpers/payment.constants";
 import { PaymentService } from "../payment/payment.service";
 import {
   CARGO_PROVIDER,

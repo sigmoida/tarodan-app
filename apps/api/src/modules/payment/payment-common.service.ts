@@ -1,7 +1,7 @@
 import { Injectable, Logger } from "@nestjs/common";
 import { PrismaService } from "../../prisma";
 import { PaymentStatus, OrderStatus } from "@prisma/client";
-import { asPaymentMetadata } from "./payment-metadata.types";
+import { asPaymentMetadata } from "./helpers/payment-metadata.types";
 import { CarrierCancellationService } from "../surat-cargo/carrier-cancellation.service";
 import { canTransitionShipmentStatus } from "../shipping/shipment-state-machine";
 

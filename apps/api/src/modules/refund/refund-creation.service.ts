@@ -20,7 +20,7 @@ import { RefundPendingReconciliationException } from "../payment-providers/refun
 import {
   PAYMENT_CONFIG_KEYS,
   envConfigNumber,
-} from "../payment/payment.constants";
+} from "../payment/helpers/payment.constants";
 import { isShipmentHandedToCarrier } from "../shipping/shipment-handover";
 import { ACTIVE_REFUND_REQUEST_STATUSES } from "./refund-active-statuses";
 import { generateUniqueReference } from "../../common/helpers/generate-reference";

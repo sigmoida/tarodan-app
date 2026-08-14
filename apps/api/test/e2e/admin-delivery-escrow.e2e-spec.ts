@@ -1,6 +1,6 @@
 import { Prisma, OrderStatus, PaymentHoldStatus } from "@prisma/client";
 import { PrismaService } from "../../src/prisma";
-import { PaymentHoldReleaseService } from "../../src/modules/payment/payment-hold-release.service";
+import { PaymentHoldReleaseService } from "../../src/modules/payment/refund/payment-hold-release.service";
 import { AdminAnalyticsOrderService } from "../../src/modules/admin/analytics/admin-analytics-order.service";
 import {
   truncateAll,

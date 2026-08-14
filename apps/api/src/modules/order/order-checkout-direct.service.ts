@@ -10,7 +10,7 @@ import {
 import { PrismaService } from "../../prisma";
 import { buyerTotalOf } from "./order-total.helper";
 import { chargedProductBaseOf } from "./order-charged-base.helper";
-import { paymentWindowEnd } from "../payment/payment.constants";
+import { paymentWindowEnd } from "../payment/helpers/payment.constants";
 import { resolveSalePrice } from "../product/helpers/product-sale-window";
 import { i18nMessage } from "../i18n";
 import { CreateOrderDto, DirectBuyDto, CheckoutDto } from "./dto";
