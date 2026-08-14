@@ -15,6 +15,7 @@
     "bootstrap:prod:admin": "node dist-seed/prisma/bootstrap-production-admin.js",
     "reset:prod:runtime": "node dist-seed/maintenance/reset-production-runtime.js",
     "verify:prod:launch": "node dist-seed/maintenance/verify-production-launch.js",
+    "seed:prod:colors": "node dist-seed/maintenance/seed-color-attributes.js",
     "backfill:prod:colors": "node dist-seed/maintenance/backfill-product-colors.js",
     "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
     "start": "nest start",
