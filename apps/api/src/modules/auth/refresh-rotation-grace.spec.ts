@@ -64,6 +64,7 @@ function makeService(tokenRow: Record<string, unknown> | null) {
     tokens,
     {} as any, // registration — bu suite kayıt yolunu sürmüyor
     {} as any, // passwords — bu suite şifre yolunu sürmüyor
+    {} as any, // socialLogins — bu suite sosyal girişi sürmüyor
     {} as any,
   );
   jest

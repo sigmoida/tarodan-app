@@ -8,6 +8,7 @@ import { AuthService } from "./auth.service";
 import { AuthTokenService } from "./auth-token.service";
 import { AuthRegistrationService } from "./auth-registration.service";
 import { AuthPasswordService } from "./auth-password.service";
+import { SocialLoginService } from "./social/social-login.service";
 import { GoogleAuthService } from "./social/google-auth.service";
 import { AppleAuthService } from "./social/apple-auth.service";
 import { PrismaService } from "../../prisma";
@@ -34,6 +35,7 @@ describe("AuthService.login - password login edge cases", () => {
         AuthTokenService,
         AuthRegistrationService,
         AuthPasswordService,
+        SocialLoginService,
         { provide: PrismaService, useValue: prisma },
         {
           provide: JwtService,

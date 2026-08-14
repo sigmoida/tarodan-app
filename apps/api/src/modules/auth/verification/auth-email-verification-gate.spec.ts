@@ -73,6 +73,7 @@ describe("AuthService — email verification gates the session", () => {
       tokens,
       {} as any, // registration — bu suite kayıt yolunu sürmüyor
       {} as any, // passwords — bu suite şifre yolunu sürmüyor
+      {} as any, // socialLogins — bu suite sosyal girişi sürmüyor
       {} as any,
     );
     return { service, prisma, tokens };

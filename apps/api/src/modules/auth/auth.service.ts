@@ -32,6 +32,8 @@ import { NewsletterService } from "../marketing/newsletter.service";
 import { AuthTokenService } from "./auth-token.service";
 import { AuthRegistrationService } from "./auth-registration.service";
 import { AuthPasswordService } from "./auth-password.service";
+import { SocialLoginService } from "./social/social-login.service";
+import { resolveAvatarUrl } from "./utils/avatar-url.util";
 import { GoogleAuthService } from "./social/google-auth.service";
 import { AppleAuthService } from "./social/apple-auth.service";
 import { PaymentService } from "../payment/payment.service";
@@ -63,6 +65,7 @@ export class AuthService {
     private readonly tokens: AuthTokenService,
     private readonly registration: AuthRegistrationService,
     private readonly passwords: AuthPasswordService,
+    private readonly socialLogins: SocialLoginService,
     private readonly moduleRef: ModuleRef,
   ) {}
 
@@ -112,26 +115,6 @@ export class AuthService {
 
   activateCorporateInvitation(dto: CorporateInvitationDto) {
     return this.registration.activateCorporateInvitation(dto);
-  }
-
-  private async resolveAvatarUrl(
-    avatarUrl: string | null | undefined,
-  ): Promise<string | null> {
-    if (!avatarUrl) return null;
-    if (avatarUrl.startsWith("http://") || avatarUrl.startsWith("https://"))
-      return avatarUrl;
-    if (this.storageService) {
-      try {
-        return await this.storageService.getPresignedDownloadUrl(
-          "avatars",
-          avatarUrl,
-          86400,
-        );
-      } catch {
-        return null;
-      }
-    }
-    return null;
   }
 
   /**
@@ -282,7 +265,10 @@ export class AuthService {
         }
       }
 
-      const resolvedAvatarUrl = await this.resolveAvatarUrl(user.avatarUrl);
+      const resolvedAvatarUrl = await resolveAvatarUrl(
+        this.storageService,
+        user.avatarUrl,
+      );
 
       return {
         user: {
@@ -491,9 +477,6 @@ export class AuthService {
     }
   }
 
-  /**
-   * Verilen userId için AuthResponseDto üretir (login response ile aynı şekil).
-   */
   // ────────────────────────── şifre sıfırlama ──────────────────────────
   // Controller bu servisi adresliyor; gövde AuthPasswordService'te.
 
@@ -503,81 +486,6 @@ export class AuthService {
 
   resetPassword(token: string, newPassword: string): Promise<void> {
     return this.passwords.resetPassword(token, newPassword);
-  }
-
-  private async buildUserAuthResponse(
-    userId: string,
-  ): Promise<AuthResponseDto> {
-    const user = await this.prisma.user.findUnique({
-      where: { id: userId },
-      include: {
-        membership: { include: { tier: true } },
-        twoFactorSecret: { select: { isEnabled: true } },
-      },
-    });
-    if (!user) {
-      throw new UnauthorizedException(i18nMessage("server.auth.userNotFound"));
-    }
-    // Silinmiş/banlı satıra token verme: aksi halde login "başarılı" olur ama
-    // ilk korumalı istekte guard reddeder → kafa karıştırıcı "askıya alındı" ekranı.
-    if (user.deletedAt) {
-      throw new UnauthorizedException(
-        i18nMessage("server.auth.accountDeleted"),
-      );
-    }
-    if (user.isBanned) {
-      throw new UnauthorizedException(
-        i18nMessage("server.auth.accountSuspended"),
-      );
-    }
-    if (user.twoFactorSecret?.isEnabled) {
-      throw new UnauthorizedException({
-        message:
-          "İki faktörlü doğrulama etkin hesaplar sağlayıcı girişi yerine şifre ile giriş yapmalıdır",
-        errorCode: "TWO_FACTOR_PASSWORD_REQUIRED",
-      });
-    }
-
-    const tokens = await this.tokens.generateTokens(
-      user.id,
-      user.email,
-      user.isSeller,
-    );
-
-    let membershipData = undefined;
-    if (user.membership && user.membership.tier) {
-      const tier = user.membership.tier;
-      if (tier?.type && tier?.name) {
-        membershipData = {
-          tier: { type: String(tier.type), name: String(tier.name) },
-          expiresAt: user.membership.currentPeriodEnd
-            ? new Date(user.membership.currentPeriodEnd).toISOString()
-            : undefined,
-        };
-      }
-    }
-
-    const resolvedAvatarUrl = await this.resolveAvatarUrl(user.avatarUrl);
-
-    return {
-      user: {
-        id: user.id,
-        adminCode: user.adminCode,
-        username: user.username,
-        usernameClaimed: user.usernameClaimedAt != null,
-        email: user.email,
-        phone: user.phone ?? undefined,
-        displayName: user.displayName,
-        avatarUrl: resolvedAvatarUrl,
-        isVerified: user.isVerified,
-        isPhoneVerified: user.isPhoneVerified,
-        isSeller: user.isSeller,
-        sellerType: user.sellerType ?? undefined,
-        createdAt: user.createdAt,
-        membership: membershipData,
-      },
-      tokens,
-    };
   }
 
   private async verifyLoginSecondFactor(
@@ -622,168 +530,19 @@ export class AuthService {
   }
 
   /**
-   * Google id_token ile giriş: doğrula → OAuthAccount bul → email ile oto-bağla
-   * → yoksa yeni kullanıcı. Mevcut JWT akışını kullanır.
-   */
-  async loginWithGoogle(
-    input: string | { idToken?: string; code?: string },
-  ): Promise<AuthResponseDto> {
-    // Geriye uyumlu: mobil/native doğrudan id_token string'i gönderir; web
-    // { code } gönderir (backend Google ile takas eder → id_token).
-    const opts = typeof input === "string" ? { idToken: input } : input;
-    const idToken = opts.code
-      ? await this.googleAuthService.exchangeCodeForIdToken(opts.code)
-      : opts.idToken;
-    if (!idToken) {
-      throw new UnauthorizedException(
-        i18nMessage("server.auth.googleSessionInvalid"),
-      );
-    }
-    const profile = await this.googleAuthService.verifyIdToken(idToken);
-
-    // 1) Mevcut OAuthAccount?
-    const existing = await this.prisma.oAuthAccount.findUnique({
-      where: {
-        provider_providerUserId: {
-          provider: "google",
-          providerUserId: profile.sub,
-        },
-      },
-    });
-    if (existing) {
-      return this.buildUserAuthResponse(existing.userId);
-    }
-
-    // 2) Aynı e-postalı kullanıcı? → oto-bağla
-    //    Silinmiş (anonimleştirilmiş) satıra ASLA bağlanma; o satırın email'i zaten
-    //    deleted_<id>@deleted.local'a çevrildiği için normalde eşleşmez, ama eski
-    //    bozuk silme kalıntılarına karşı deletedAt:null ile savunma yapıyoruz.
-    const byEmail = await this.prisma.user.findFirst({
-      where: { email: profile.email, deletedAt: null },
-    });
-    if (byEmail) {
-      await this.prisma.oAuthAccount.create({
-        data: {
-          provider: "google",
-          providerUserId: profile.sub,
-          email: profile.email,
-          userId: byEmail.id,
-        },
-      });
-      // Google e-postayı zaten doğruladı (email_verified === true zorunlu). Hesap
-      // henüz doğrulanmamışsa artık doğrulanmış say — böylece normal parola girişi
-      // de açılır ve Google-login'in bypass ettiği e-posta doğrulama kapısıyla
-      // tutarlı hale gelir.
-      if (!byEmail.isEmailVerified) {
-        await this.prisma.user.update({
-          where: { id: byEmail.id },
-          data: { isEmailVerified: true },
-        });
-      }
-      return this.buildUserAuthResponse(byEmail.id);
-    }
-
-    // 3) Yeni kullanıcı. Sosyal girişte kullanıcı adı SORULMAZ; e-postadan
-    //    türetilir (bkz. allocateUsernameFromEmail). `usernameClaimedAt` boş
-    //    kalır: adı kullanıcı seçmediği için bir kereliğine değiştirebilir.
-    const displayName = profile.name?.trim() || profile.email.split("@")[0];
-    const username = await allocateUsernameFromEmail(
-      this.prisma,
-      profile.email,
-    );
-    const created = await this.prisma.user.create({
-      data: {
-        email: profile.email,
-        passwordHash: null,
-        username,
-        displayName,
-        avatarUrl: profile.picture ?? null,
-        isEmailVerified: true,
-        isSeller: false,
-      },
-    });
-    await this.prisma.oAuthAccount.create({
-      data: {
-        provider: "google",
-        providerUserId: profile.sub,
-        email: profile.email,
-        userId: created.id,
-      },
-    });
-    return this.buildUserAuthResponse(created.id);
-  }
-
-  /**
-   * Apple identity token ile giriş: doğrula → OAuthAccount bul → email ile oto-bağla
-   * → yoksa yeni kullanıcı. Relay email olduğu gibi kaydedilir; kimlik anahtarı sub.
-   * fullName yalnız ilk yetkilendirmede (yeni kullanıcı) gelir.
-   */
-  async loginWithApple(
-    identityToken: string,
-    fullName?: string,
-  ): Promise<AuthResponseDto> {
-    const profile =
-      await this.appleAuthService.verifyIdentityToken(identityToken);
-
-    // 1) Mevcut OAuthAccount?
-    const existing = await this.prisma.oAuthAccount.findUnique({
-      where: {
-        provider_providerUserId: {
-          provider: "apple",
-          providerUserId: profile.sub,
-        },
-      },
-    });
-    if (existing) {
-      return this.buildUserAuthResponse(existing.userId);
-    }
-
-    // 2) Aynı e-postalı (silinmemiş) kullanıcı? → oto-bağla.
-    const byEmail = await this.prisma.user.findFirst({
-      where: { email: profile.email, deletedAt: null },
-    });
-    if (byEmail) {
-      await this.prisma.oAuthAccount.create({
-        data: {
-          provider: "apple",
-          providerUserId: profile.sub,
-          email: profile.email,
-          userId: byEmail.id,
-        },
-      });
-      return this.buildUserAuthResponse(byEmail.id);
-    }
-
-    // 3) Yeni kullanıcı (Google ile aynı kural: kullanıcı adı e-postadan türer)
-    const displayName = fullName?.trim() || profile.email.split("@")[0];
-    const username = await allocateUsernameFromEmail(
-      this.prisma,
-      profile.email,
-    );
-    const created = await this.prisma.user.create({
-      data: {
-        email: profile.email,
-        passwordHash: null,
-        username,
-        displayName,
-        isEmailVerified: true,
-        isSeller: false,
-      },
-    });
-    await this.prisma.oAuthAccount.create({
-      data: {
-        provider: "apple",
-        providerUserId: profile.sub,
-        email: profile.email,
-        userId: created.id,
-      },
-    });
-    return this.buildUserAuthResponse(created.id);
-  }
-
-  /**
    * Log security events for monitoring and compliance
    */
+  // ────────────────────────── sosyal giriş ──────────────────────────
+  // Controller bu servisi adresliyor; gövde SocialLoginService'te.
+
+  loginWithGoogle(...args: Parameters<SocialLoginService["loginWithGoogle"]>) {
+    return this.socialLogins.loginWithGoogle(...args);
+  }
+
+  loginWithApple(...args: Parameters<SocialLoginService["loginWithApple"]>) {
+    return this.socialLogins.loginWithApple(...args);
+  }
+
   private async logSecurityEvent(
     eventType: string,
     severity: "low" | "medium" | "high" | "critical",
