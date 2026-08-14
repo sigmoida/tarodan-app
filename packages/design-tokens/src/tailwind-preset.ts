@@ -67,13 +67,17 @@ const safeAreaPlugin = plugin(({ addUtilities }) => {
       paddingRight: "env(safe-area-inset-right)",
     },
     /**
-     * Sayfa kenar boşluğu: normalde 1rem (`px-4` ile aynı değer), ama yatay
-     * çentik bundan genişse onun kadar. `Container` bunu kullanır, böylece
-     * yatay kullanımda metin çentiğin altına girmez.
+     * Sayfa kenar boşluğu. İki işi birden yapar:
+     *
+     * 1. Ekranla birlikte ölçeklenir — `clamp` telefonda 1rem verir, ekran
+     *    büyüdükçe 2rem'e kadar açılır. Sabit 1rem, geniş ekranda içeriği
+     *    kenara yapışık bırakıyordu.
+     * 2. Yatay çentik bu değerden genişse onun kadar olur, böylece yatay
+     *    kullanımda metin çentiğin altına girmez.
      */
     ".px-gutter": {
-      paddingLeft: "max(1rem, env(safe-area-inset-left))",
-      paddingRight: "max(1rem, env(safe-area-inset-right))",
+      paddingLeft: "max(clamp(1rem, 2vw, 2rem), env(safe-area-inset-left))",
+      paddingRight: "max(clamp(1rem, 2vw, 2rem), env(safe-area-inset-right))",
     },
   });
 });

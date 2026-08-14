@@ -91,7 +91,7 @@ export default function ProfileListingsPage() {
       />
 
       <Tabs value={activeFilter} onValueChange={setActiveFilter}>
-        <TabsList className="flex w-full flex-wrap">
+        <TabsList className="w-full">
           {FILTER_TABS.map((tab) => (
             <TabsTrigger key={tab.value} value={tab.value} className="gap-1.5">
               {tab.label}

@@ -12,10 +12,12 @@ import type { ReactNode } from "react";
  * Server Components like `(main)/layout.tsx` without dragging client components
  * into the server module graph.
  *
- * Yatay boşluk `px-4` değil `px-gutter`: aynı 1rem'i verir, ama belge
- * `viewport-fit=cover` ile yayınlandığı için (bkz. `app/layout.tsx`) yatay
- * kullanımda çentik 1rem'den genişse boşluk ona büyür. Çağıran taraf kendi
- * `px-*` sınıfını GEÇMEMELİ — o korumayı iptal eder.
+ * Yatay boşluk `px-4` değil `px-gutter` (tanımı: `@tarodan/design-tokens`
+ * ön ayarı). İki iş yapar: ekranla birlikte ölçeklenir — telefonda 1rem, geniş
+ * ekranda 2rem'e kadar — ve belge `viewport-fit=cover` ile yayınlandığı için
+ * (bkz. `app/layout.tsx`) yatay kullanımda çentik bu değerden genişse boşluk
+ * ona büyür. Çağıran taraf kendi `px-*` sınıfını GEÇMEMELİ — ikisini de iptal
+ * eder.
  */
 export function Container({
   className,

@@ -48,9 +48,12 @@ export interface DatePickerProps {
   "aria-label"?: string;
 }
 
+// Tetikleyici bir `button`, yani odakta iOS yakınlaştırmasını tetiklemez; ama
+// form satırında `Input`/`Select` ile yan yana durduğu için aynı ölçeği alır —
+// aksi hâlde mobilde tek başına küçük kalıyordu.
 const sizeClasses = {
-  sm: "h-8 text-sm",
-  md: "h-10 text-sm",
+  sm: `h-8 ${CONTROL_TEXT}`,
+  md: `h-10 ${CONTROL_TEXT}`,
   lg: "h-12 text-base",
 };
 const sizePadX = { sm: "px-2.5", md: "px-3", lg: "px-4" };

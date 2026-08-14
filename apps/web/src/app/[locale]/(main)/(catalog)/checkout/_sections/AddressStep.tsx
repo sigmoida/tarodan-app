@@ -85,7 +85,7 @@ export default function AddressStep() {
                 }
                 className="rounded-[4px]"
               />
-              <div className="grid sm:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <Input
                   type="text"
                   placeholder={t("checkout.fullName")}
@@ -153,7 +153,7 @@ export default function AddressStep() {
             </p>
           </div>
 
-          <div className="grid sm:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <Input
               type="text"
               placeholder={t("checkout.guestName") + " *"}
@@ -191,7 +191,7 @@ export default function AddressStep() {
             }
             className="rounded-[4px]"
           />
-          <div className="grid sm:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <Input
               type="text"
               placeholder={t("checkout.fullName") + " *"}
@@ -266,7 +266,7 @@ export default function AddressStep() {
             <p className="text-sm text-muted">
               {t("checkout.enterBillingAddress")}
             </p>
-            <div className="grid sm:grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <Input
                 type="text"
                 placeholder={t("checkout.fullName") + " *"}

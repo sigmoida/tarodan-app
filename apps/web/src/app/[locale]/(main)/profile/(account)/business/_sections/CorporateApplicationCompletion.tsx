@@ -161,7 +161,7 @@ export default function CorporateApplicationCompletion({
 
       {tab === "details" && (
         <form
-          className="grid gap-4 sm:grid-cols-2"
+          className="grid grid-cols-1 gap-4 sm:grid-cols-2"
           onSubmit={(event) => {
             event.preventDefault();
             save.mutate();
@@ -228,7 +228,7 @@ export default function CorporateApplicationCompletion({
                 </div>
                 <CheckCircleIcon className="h-5 w-5 text-success-600" />
               </div>
-              <div className="grid gap-2 sm:grid-cols-2">
+              <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                 {(["front", "back"] as const).map((side) => {
                   const type = `${item.identityType === "tckn" ? "identity" : "passport"}_${side}`;
                   const document = item.documents?.find(
@@ -306,7 +306,7 @@ export default function CorporateApplicationCompletion({
             </div>
           ))}
           <form
-            className="grid gap-3 sm:grid-cols-3"
+            className="grid grid-cols-1 gap-3 sm:grid-cols-3"
             onSubmit={(event) => {
               event.preventDefault();
               addStakeholder.mutate();

@@ -82,16 +82,17 @@ function ListingDetailLayout({
   if (isLoading) {
     return (
       <PageShell className="py-8">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="animate-pulse">
-            <div className="grid lg:grid-cols-2 gap-8">
-              <div className="aspect-square bg-border-subtle rounded" />
-              <div className="space-y-4">
-                <div className="h-8 bg-border-subtle rounded w-3/4" />
-                <div className="h-6 bg-border-subtle rounded w-1/2" />
-                <div className="h-10 bg-border-subtle rounded w-1/3" />
-                <div className="h-32 bg-border-subtle rounded" />
-              </div>
+        {/* Kendi genişlik/boşluk kabını KURMAZ: sayfa zaten `Container` içinde.
+            İskelet 1280px'e sıkışırken yüklenen içerik 1536px'e açılıyordu —
+            geniş ekranda yükleme biter bitmez düzen zıplıyordu. */}
+        <div className="animate-pulse">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            <div className="aspect-square bg-border-subtle rounded" />
+            <div className="space-y-4">
+              <div className="h-8 bg-border-subtle rounded w-3/4" />
+              <div className="h-6 bg-border-subtle rounded w-1/2" />
+              <div className="h-10 bg-border-subtle rounded w-1/3" />
+              <div className="h-32 bg-border-subtle rounded" />
             </div>
           </div>
         </div>
@@ -112,7 +113,7 @@ function ListingDetailLayout({
       <PageHeader breadcrumb={<ProductBreadcrumbs />} />
 
       {/* Top: gallery (left) + primary info (right) */}
-      <div className="grid lg:grid-cols-2 gap-8">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
         <div>
           <ProductGallery />
         </div>

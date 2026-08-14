@@ -156,9 +156,15 @@ export default function CartClient() {
         description={`${lineCount} ${t("collection.items")}`}
       />
 
-      <div className="grid lg:grid-cols-3 gap-8">
+      {/* `grid-cols-1` açıkça: sütun tanımsız ızgara tek sütununu `auto`
+          genişlikte kurup içerikle birlikte büyüyor ve kabı taşırıyor. */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        {/* `min-w-0`: ızgara hücresi de varsayılan olarak içeriğinin altına
+            inemiyor (`min-width:auto`), o yüzden ürün satırındaki adet kutusu ve
+            fiyat sütunu telefonda hücreyi 473px'e kadar genişletip sayfayı
+            taşırıyordu. Boş sepette görünmüyordu — dolu sepet gerekiyor. */}
         <div
-          className="lg:col-span-2 space-y-4"
+          className="lg:col-span-2 min-w-0 space-y-4"
           data-testid="cart-products-column"
         >
           <Checkbox

@@ -30,7 +30,10 @@ export default function ProductReviews() {
       title={t("product.productReviews")}
       action={
         reviewStats ? (
-          <div className="flex items-center gap-2">
+          // `flex-wrap`: beş yıldız + puan + "(N değerlendirme)" 320px'de 294px
+          // tutuyor ve `SectionCard` başlık aksiyonunu `flex-shrink-0` ile
+          // sardığı için küçülemiyordu — sayfa 3px yatay kayıyordu.
+          <div className="flex flex-wrap items-center gap-2">
             <div className="flex items-center">
               {[1, 2, 3, 4, 5].map((star) => (
                 <StarIcon

@@ -70,7 +70,7 @@ export default function AddressFormModal({
     >
       <FormInput name="title" label="Adres Başlığı" placeholder="Ev, İş, vb." />
 
-      <div className="grid gap-4 md:grid-cols-2">
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
         <FormInput
           name="fullName"
           label="Ad Soyad"

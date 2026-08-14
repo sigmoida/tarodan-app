@@ -26,7 +26,7 @@ export default async function Spotlights({
 
   return (
     <section>
-      <div className="grid gap-4 md:grid-cols-2">
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
         {/* Collector of the Week */}
         {showCollector && (
           <SectionCard

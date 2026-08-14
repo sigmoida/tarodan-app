@@ -79,7 +79,7 @@ export default function MembershipCheckoutClient() {
         description="Güvenli ödeme ile üyeliğinizi yükseltin"
       />
 
-      <div className="grid lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Payment */}
         <form onSubmit={handleSubmit} className="lg:col-span-2 space-y-4">
           <SectionCard title="Güvenli Ödeme" className="p-6">

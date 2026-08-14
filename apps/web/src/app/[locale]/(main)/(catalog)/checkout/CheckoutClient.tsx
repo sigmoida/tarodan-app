@@ -40,8 +40,16 @@ function CheckoutLayout() {
     <>
       <PageShell>
         <Container className="pt-4">
-          <div className="grid gap-8 lg:grid-cols-3">
-            <div className="space-y-6 lg:col-span-2">
+          {/* `grid-cols-1` AÇIKÇA yazılıyor: sütun tanımı olmayan bir ızgara tek
+              sütununu `auto` genişlikte kurar, yani içerik sütunu büyütür ve kap
+              taşar. Tailwind'in `grid-cols-*` yardımcıları `minmax(0, 1fr)`
+              ürettiği için sütun kabına sıkışır — hücreye `min-w-0` vermek tek
+              başına yetmiyordu, sorun hücrede değil sütun boyutlandırmasındaydı. */}
+          <div className="grid grid-cols-1 gap-8 lg:grid-cols-3">
+            {/* `min-w-0`: sipariş kalemi satırları (ad + fiyat) hücreyi
+                telefonda 579px'e genişletiyordu; ızgara hücresi varsayılan
+                `min-width:auto` ile içeriğinin altına inemez. */}
+            <div className="min-w-0 space-y-6 lg:col-span-2">
               <OrderItemsCard />
               <AddressStep />
               <PaymentSection />

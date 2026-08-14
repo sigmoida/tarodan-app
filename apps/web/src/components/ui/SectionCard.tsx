@@ -65,7 +65,12 @@ export default function SectionCard({
             )}
             {badge}
           </div>
-          {action && <div className="flex-shrink-0">{action}</div>}
+          {/* `flex-shrink-0` DEĞİL `min-w-0`: aksiyon alanı yalnız düğme
+              taşımıyor — ürün değerlendirmelerinde beş yıldız + puan + sayaç
+              geliyor ve 320px'de 294px tutuyor. Küçülmeyi yasaklamak o bloğu
+              kartın dışına taşırıyordu. Başlık satırı zaten `flex-wrap`, yani
+              sığmayan aksiyon ezilmek yerine alt satıra iner. */}
+          {action && <div className="min-w-0">{action}</div>}
         </div>
       )}
       {bodyClassName ? (
