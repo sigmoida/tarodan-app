@@ -25,19 +25,19 @@ export function TradesTab({ report }: { report: any }) {
           icon={ArrowsRightLeftIcon}
           tone="info"
           label={t("admin.analytics.trades.totalTrades")}
-          value={fmtNumber(report.totalTrades) ?? 0}
+          value={fmtNumber(report.totalTrades) ?? "—"}
         />
         <MetricCard
           icon={ChartBarIcon}
           tone="success"
           label={t("admin.analytics.trades.completed")}
-          value={fmtNumber(report.completedTrades) ?? 0}
+          value={fmtNumber(report.completedTrades) ?? "—"}
         />
         <MetricCard
           icon={CalendarIcon}
           tone="warning"
           label={t("admin.analytics.trades.pending")}
-          value={fmtNumber(report.pendingTrades) ?? 0}
+          value={fmtNumber(report.pendingTrades) ?? "—"}
         />
         <MetricCard
           icon={CurrencyDollarIcon}

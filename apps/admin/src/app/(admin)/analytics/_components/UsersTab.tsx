@@ -36,25 +36,25 @@ export function UsersTab({ report }: { report: any }) {
           icon={UsersIcon}
           tone="info"
           label={t("admin.analytics.users.totalUsers")}
-          value={fmtNumber(report.totalUsers) ?? 0}
+          value={fmtNumber(report.totalUsers) ?? "—"}
         />
         <MetricCard
           icon={ArrowTrendingUpIcon}
           tone="success"
           label={t("admin.analytics.users.newUsers")}
-          value={fmtNumber(report.newUsers) ?? 0}
+          value={fmtNumber(report.newUsers) ?? "—"}
         />
         <MetricCard
           icon={ChartBarIcon}
           tone="primary"
           label={t("admin.analytics.users.activeUsers")}
-          value={fmtNumber(report.activeUsers) ?? 0}
+          value={fmtNumber(report.activeUsers) ?? "—"}
         />
         <MetricCard
           icon={ShoppingBagIcon}
           tone="primary"
           label={t("admin.analytics.users.sellers")}
-          value={fmtNumber(report.sellerCount) ?? 0}
+          value={fmtNumber(report.sellerCount) ?? "—"}
         />
       </div>
 

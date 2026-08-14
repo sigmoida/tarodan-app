@@ -52,7 +52,7 @@ export function SalesTab({ report }: { report: any }) {
           icon={ShoppingBagIcon}
           tone="info"
           label={t("admin.analytics.sales.totalOrders")}
-          value={fmtNumber(report.totalOrders) ?? 0}
+          value={fmtNumber(report.totalOrders) ?? "—"}
         />
         <MetricCard
           icon={CurrencyDollarIcon}

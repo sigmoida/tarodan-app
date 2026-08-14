@@ -45,19 +45,19 @@ export function ProductsTab({ report }: { report: any }) {
           icon={ShoppingBagIcon}
           tone="info"
           label={t("admin.analytics.products.totalProducts")}
-          value={fmtNumber(report.totalProducts) ?? 0}
+          value={fmtNumber(report.totalProducts) ?? "—"}
         />
         <MetricCard
           icon={ChartBarIcon}
           tone="success"
           label={t("admin.analytics.products.activeProducts")}
-          value={fmtNumber(report.activeProducts) ?? 0}
+          value={fmtNumber(report.activeProducts) ?? "—"}
         />
         <MetricCard
           icon={CalendarIcon}
           tone="warning"
           label={t("admin.analytics.products.pendingApproval")}
-          value={fmtNumber(report.pendingProducts) ?? 0}
+          value={fmtNumber(report.pendingProducts) ?? "—"}
         />
         <MetricCard
           icon={CurrencyDollarIcon}
