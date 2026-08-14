@@ -33,44 +33,66 @@ describe("module providers cover their own injectables", () => {
     .map((e) => join(MODULES_DIR, e.name));
 
   /**
-   * `providers: [...]` içindeki sınıf adları. Diziyi parantez sayarak okur:
-   * regex ile ilk `]`'e kadar almak, factory nesnesi (`useValue: [...]`) ya da
-   * tek satırlık dizi olan modüllerde listeyi yanlış keser ve var olan bir
-   * kaydı yok sayar.
+   * `source[open]`'daki açma parantezinin/köşeli parantezin eşleşen kapanışına
+   * kadar olan gövde. Regex ile ilk kapanışa kadar okumak, iç içe geçmiş bir
+   * factory nesnesinde (`useValue: [...]`) ya da parametre dekoratöründe
+   * (`@Inject(TOKEN)`) listeyi yanlış yerden keser.
    */
-  function registeredProviders(moduleSource: string): Set<string> {
-    const start = moduleSource.indexOf("providers:");
-    if (start === -1) return new Set();
-    const open = moduleSource.indexOf("[", start);
-    if (open === -1) return new Set();
+  function balancedSlice(source: string, open: number): string {
     let depth = 0;
-    let end = open;
-    for (let i = open; i < moduleSource.length; i++) {
-      const c = moduleSource[i];
+    for (let i = open; i < source.length; i++) {
+      const c = source[i];
       if (c === "[" || c === "{" || c === "(") depth++;
       else if (c === "]" || c === "}" || c === ")") {
         depth--;
-        if (depth === 0) {
-          end = i;
-          break;
-        }
+        if (depth === 0) return source.slice(open + 1, i);
       }
     }
-    return new Set(
-      moduleSource
-        .slice(open + 1, end)
-        .split(/[,\n]/)
-        .map((t) => t.trim())
-        .filter((t) => /^[A-Z][A-Za-z0-9_]*$/.test(t)),
-    );
+    return "";
   }
 
-  /** Sınıfın constructor parametrelerindeki tip adları. */
-  function injectedTypes(source: string): string[] {
-    const ctor = source.match(/\n\s*constructor\(([\s\S]*?)\n\s*\)\s*\{/);
-    if (!ctor) return [];
-    return [...ctor[1].matchAll(/:\s*([A-Z][A-Za-z0-9_]*)/g)].map((m) => m[1]);
+  /**
+   * `providers: [...]` içindeki sınıf adları. Bir dosyadaki TÜM `providers:`
+   * geçişleri toplanır — tek dosyada birden fazla `@Module` tanımlıysa yalnız
+   * ilkine bakmak, ikinci modülün kayıtlarını yok sayıp sahte ihlal üretir.
+   */
+  function registeredProviders(moduleSource: string): Set<string> {
+    const names = new Set<string>();
+    for (const m of moduleSource.matchAll(/providers:\s*\[/g)) {
+      const open = moduleSource.indexOf("[", m.index ?? 0);
+      if (open === -1) continue;
+      for (const token of balancedSlice(moduleSource, open).split(/[,\n]/)) {
+        const name = token.trim();
+        if (/^[A-Z][A-Za-z0-9_]*$/.test(name)) names.add(name);
+      }
+    }
+    return names;
   }
+
+  /**
+   * Sınıfın constructor parametrelerindeki tip adları.
+   *
+   * Parametre listesi parantez sayılarak okunur, satır sonuna göre DEĞİL:
+   * `constructor(private readonly x: Foo) {}` tek satırdır ve satır sonu arayan
+   * bir kalıp onu sessizce atlar. Kaçırılan her constructor bu sözleşmenin
+   * kapsamından düşer — nöbetçinin yakalaması gereken tam olarak o durumdur.
+   */
+  function injectedTypes(source: string): string[] {
+    const ctor = source.match(/\n\s*constructor\s*\(/);
+    if (!ctor || ctor.index === undefined) return [];
+    const open = source.indexOf("(", ctor.index);
+    if (open === -1) return [];
+    return [
+      ...balancedSlice(source, open).matchAll(/:\s*([A-Z][A-Za-z0-9_]*)/g),
+    ].map((m) => m[1]);
+  }
+
+  /**
+   * Taramanın gerçekten bir şey ölçtüğünü kanıtlayan sayaçlar. Kalıplardan biri
+   * eşleşmeyi bırakırsa (biçimlendirici sürümü, yeni bir yazım) ihlal listesi
+   * boşalır ve sözleşme sessizce hiçbir şey doğrulamayan yeşil bir teste döner.
+   */
+  const scan = { injectables: 0, registered: 0, injectedLocalDeps: 0 };
 
   const cases = moduleDirs.flatMap((dir) => {
     const moduleFiles = filesUnder(dir, ".module.ts");
@@ -95,19 +117,33 @@ describe("module providers cover their own injectables", () => {
       }
     }
 
+    scan.injectables += localInjectables.size;
+
     return [...localInjectables]
       .filter(([name]) => provided.has(name))
-      .flatMap(([name, file]) =>
-        injectedTypes(readFileSync(file, "utf8"))
-          .filter((dep) => localInjectables.has(dep) && !provided.has(dep))
+      .flatMap(([name, file]) => {
+        scan.registered += 1;
+        const localDeps = injectedTypes(readFileSync(file, "utf8")).filter(
+          (dep) => localInjectables.has(dep),
+        );
+        scan.injectedLocalDeps += localDeps.length;
+        return localDeps
+          .filter((dep) => !provided.has(dep))
           .map(
             (dep) => [dir.slice(MODULES_DIR.length + 1), name, dep] as const,
-          ),
-      );
+          );
+      });
   });
 
-  it("tarama kendini doğrular: modüller ve enjekte edilebilirler bulundu", () => {
+  it("tarama kendini doğrular: modüller, sağlayıcılar ve constructor'lar okundu", () => {
     expect(moduleDirs.length).toBeGreaterThan(20);
+    expect(scan.injectables).toBeGreaterThan(100);
+    // Bulunan @Injectable'ların çoğu providers listesinde görünmeli; bu oran
+    // çökerse okunan şey providers listesi değildir.
+    expect(scan.registered).toBeGreaterThan(scan.injectables / 2);
+    // En az bu kadar "aynı modülden servis enjekte ediliyor" bağı var; sıfıra
+    // düşerse constructor kalıbı artık eşleşmiyor demektir.
+    expect(scan.injectedLocalDeps).toBeGreaterThan(50);
   });
 
   it("kayıtlı hiçbir sağlayıcı, aynı modülün kaydetmediği bir servisi enjekte etmez", () => {
