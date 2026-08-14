@@ -40,7 +40,7 @@ export default function SecuritySettingsPage() {
 
   if (isLoading && !setupData) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-surface">
+      <div className="flex min-h-dvh items-center justify-center bg-surface">
         <Spinner size="xl" />
       </div>
     );

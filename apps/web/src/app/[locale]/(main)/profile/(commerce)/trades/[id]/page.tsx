@@ -76,7 +76,7 @@ export default function TradeDetailPage() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-surface py-8">
+      <div className="min-h-dvh bg-surface py-8">
         <div className="max-w-4xl mx-auto px-4">
           <div className="animate-pulse space-y-6">
             <div className="h-8 bg-border-subtle rounded w-1/3" />
@@ -91,7 +91,7 @@ export default function TradeDetailPage() {
 
   if (!trade) {
     return (
-      <div className="min-h-screen bg-surface py-8">
+      <div className="min-h-dvh bg-surface py-8">
         <div className="max-w-4xl mx-auto px-4">
           <div className="card p-6 text-center">
             <p className="text-muted">Takas bulunamadı</p>

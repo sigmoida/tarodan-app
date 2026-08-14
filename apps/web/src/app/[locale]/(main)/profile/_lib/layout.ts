@@ -7,8 +7,12 @@
  * `100vh-6rem` ile `100vh-8rem`; altları 32px kaymış hizalanıyordu.
  *
  * Hesap: yapışkan başlık 64px (`lg:h-16`) + ana kolonun üst boşluğu 16px
- * (`py-4`) = 80px üstten; altta da aynı 16px nefes payı → `100vh - 6rem`.
+ * (`py-4`) = 80px üstten; altta da aynı 16px nefes payı → `100dvh - 6rem`.
  * `PROFILE_STICKY_TOP` da bu 80px'in karşılığıdır, birlikte değişmeleri gerekir.
+ *
+ * Birim `vh` değil `dvh`: mobil tarayıcıda `100vh`, adres çubuğu görünürken bile
+ * ONUN ALTINI da sayar. Mesajlaşma gibi tam boy panellerde bu, yazma alanının
+ * ekranın dışında kalması demekti — `dvh` gerçekten görünen yüksekliği verir.
  *
  * Sınıf adları TAM metin olarak yazılmalı: Tailwind kaynak dosyaları düz metin
  * tarar, parçalardan birleştirilen bir sınıf üretilmez.
@@ -18,7 +22,7 @@
 export const PROFILE_STICKY_TOP = "lg:top-20";
 
 /** Kenar çubuğu: içerik kısaysa kısalır, uzunsa bu sınırda kendi içinde kayar. */
-export const PROFILE_PANE_MAX_HEIGHT = "lg:max-h-[calc(100vh-6rem)]";
+export const PROFILE_PANE_MAX_HEIGHT = "lg:max-h-[calc(100dvh-6rem)]";
 
 /** Tam boy sayfa panelleri: her zaman kullanılabilir yüksekliğin tamamı. */
-export const PROFILE_PANE_HEIGHT = "h-[calc(100vh-6rem)]";
+export const PROFILE_PANE_HEIGHT = "h-[calc(100dvh-6rem)]";

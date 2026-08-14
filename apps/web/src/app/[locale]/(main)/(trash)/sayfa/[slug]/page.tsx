@@ -56,7 +56,7 @@ export default async function StaticPageRoute({ params }: Props) {
   if (!page) notFound();
 
   return (
-    <div className="min-h-screen bg-surface">
+    <div className="min-h-dvh bg-surface">
       <div className="max-w-4xl mx-auto px-4 py-12">
         <nav className="mb-8 text-sm text-muted">
           <Link href="/" className="hover:text-primary-600">

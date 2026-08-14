@@ -19,7 +19,7 @@ export default function MessagesPage() {
   // Avoid hydration mismatch: render same placeholder until mounted and auth resolved.
   if (!ready) {
     return (
-      <div className="min-h-screen bg-surface text-heading flex flex-col">
+      <div className="min-h-dvh bg-surface text-heading flex flex-col">
         <div className="flex-1 flex items-center justify-center">
           <div className="animate-pulse text-muted text-sm">
             {t("common.loading")}
