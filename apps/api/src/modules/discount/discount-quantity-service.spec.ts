@@ -2,6 +2,7 @@ import { DiscountScope, DiscountTarget, DiscountType } from "@prisma/client";
 import { DiscountService } from "./discount.service";
 import { DiscountUsageService } from "./discount-usage.service";
 import { DiscountCrudService } from "./discount-crud.service";
+import { DiscountPricingService } from "./discount-pricing.service";
 
 /**
  * Adet koşullu satıcı kampanyalarının servis katmanı: tek sorguyla çözüm,
@@ -38,6 +39,7 @@ describe("DiscountService quantity campaigns", () => {
       search,
       new DiscountUsageService(prisma),
       new DiscountCrudService(prisma, cache, search),
+      new DiscountPricingService(prisma),
     );
   }
 
@@ -85,6 +87,7 @@ describe("DiscountService quantity campaigns", () => {
       search,
       new DiscountUsageService(prisma),
       new DiscountCrudService(prisma, cache, search),
+      new DiscountPricingService(prisma),
     );
     const result = await service.quantityDiscountsForLines([
       {

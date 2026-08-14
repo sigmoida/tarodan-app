@@ -7,6 +7,7 @@ import {
 import { DiscountService } from "./discount.service";
 import { DiscountUsageService } from "./discount-usage.service";
 import { DiscountCrudService } from "./discount-crud.service";
+import { DiscountPricingService } from "./discount-pricing.service";
 
 /**
  * Kupon tarafındaki üç yeni kural:
@@ -86,6 +87,7 @@ describe("validateCoupon — hedef kitle, bütçe ve hedef kalem", () => {
       search,
       new DiscountUsageService(prisma),
       new DiscountCrudService(prisma, cache, search),
+      new DiscountPricingService(prisma),
     );
   };
 

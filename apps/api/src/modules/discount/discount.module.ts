@@ -3,6 +3,7 @@ import { DiscountController } from "./discount.controller";
 import { DiscountService } from "./discount.service";
 import { DiscountUsageService } from "./discount-usage.service";
 import { DiscountCrudService } from "./discount-crud.service";
+import { DiscountPricingService } from "./discount-pricing.service";
 import { FeeDiscountResolver } from "./engine/fee-discount.resolver";
 import { PrismaModule } from "../../prisma";
 import { SearchModule } from "../search/search.module";
@@ -14,6 +15,7 @@ import { SearchModule } from "../search/search.module";
     DiscountService,
     DiscountUsageService,
     DiscountCrudService,
+    DiscountPricingService,
     FeeDiscountResolver,
   ],
   exports: [DiscountService, FeeDiscountResolver],

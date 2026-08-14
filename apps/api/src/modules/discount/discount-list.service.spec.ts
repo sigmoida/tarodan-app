@@ -3,6 +3,7 @@
 import { DiscountService } from "./discount.service";
 import { DiscountUsageService } from "./discount-usage.service";
 import { DiscountCrudService } from "./discount-crud.service";
+import { DiscountPricingService } from "./discount-pricing.service";
 
 describe("DiscountService admin list contract", () => {
   it("composes full-content search with the selected column sort", async () => {
@@ -22,6 +23,7 @@ describe("DiscountService admin list contract", () => {
       search,
       new DiscountUsageService(prisma as any),
       new DiscountCrudService(prisma as any, cache, search),
+      new DiscountPricingService(prisma as any),
     );
 
     await service.findAll(
