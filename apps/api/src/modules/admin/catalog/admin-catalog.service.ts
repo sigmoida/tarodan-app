@@ -10,7 +10,8 @@ import { PrismaService } from "../../../prisma";
 import { StorageService } from "../../storage/storage.service";
 import { CacheService } from "../../cache/cache.service";
 import { AdminAuditService } from "../ops/admin-audit.service";
-import { generateSlug } from "./admin-slug.util";
+import { carModelSlug, generateSlug } from "../../../common/helpers/slug";
+import { BRANDS_CACHE_PATTERN } from "../../brand/brand-cache";
 import {
   fulltextAttributeGroupSearch,
   fulltextAttributeSearch,
@@ -54,6 +55,15 @@ export class AdminCatalogService {
 
   private async invalidateCategoriesCache(): Promise<void> {
     await this.cache.del(CATEGORIES_CACHE_KEY);
+  }
+
+  /**
+   * `BrandService` marka listesini 1 saat, marka detayını 30 dk cache'liyor.
+   * Bu temizlik olmadan admin'den eklenen/güncellenen marka mağazada bir saate
+   * kadar görünmez — araç modeli tarafında zaten yapılan şeyin markadaki eşi.
+   */
+  private async invalidateBrandCache(): Promise<void> {
+    await this.cache.delPattern(BRANDS_CACHE_PATTERN);
   }
 
   // AdminService'teki leaf yardımcı ile birebir aynı (bilinçli kopya; facade'da
@@ -476,13 +486,7 @@ export class AdminCatalogService {
       isActive?: boolean;
     },
   ) {
-    // Generate slug from name
-    const slug = dto.name
-      .toLowerCase()
-      .replace(/[^a-z0-9\s-]/g, "")
-      .replace(/\s+/g, "-")
-      .replace(/-+/g, "-")
-      .trim();
+    const slug = generateSlug(dto.name);
 
     // Check if brand with same name or slug exists
     const existing = await this.prisma.brand.findFirst({
@@ -519,6 +523,8 @@ export class AdminCatalogService {
       brand,
     );
 
+    await this.invalidateBrandCache();
+
     this.logger.log(
       `Brand created: ${brand.name} (${brand.id}) by admin ${adminId}`,
     );
@@ -554,12 +560,7 @@ export class AdminCatalogService {
     // If name is being changed, check for duplicates and update slug
     let slug = existing.slug;
     if (dto.name && dto.name !== existing.name) {
-      slug = dto.name
-        .toLowerCase()
-        .replace(/[^a-z0-9\s-]/g, "")
-        .replace(/\s+/g, "-")
-        .replace(/-+/g, "-")
-        .trim();
+      slug = generateSlug(dto.name);
 
       const duplicate = await this.prisma.brand.findFirst({
         where: {
@@ -597,6 +598,8 @@ export class AdminCatalogService {
       existing,
       updated,
     );
+
+    await this.invalidateBrandCache();
 
     this.logger.log(
       `Brand updated: ${updated.name} (${updated.id}) by admin ${adminId}`,
@@ -645,6 +648,8 @@ export class AdminCatalogService {
       existing,
       null,
     );
+
+    await this.invalidateBrandCache();
 
     this.logger.log(
       `Brand deleted: ${existing.name} (${existing.id}) by admin ${adminId}`,
@@ -702,12 +707,7 @@ export class AdminCatalogService {
       isActive?: boolean;
     },
   ) {
-    const slug = dto.name
-      .toLowerCase()
-      .replace(/[^a-z0-9\s-]/g, "")
-      .replace(/\s+/g, "-")
-      .replace(/-+/g, "-")
-      .trim();
+    const slug = generateSlug(dto.name);
 
     const existing = await this.prisma.manufacturer.findFirst({
       where: {
@@ -765,12 +765,7 @@ export class AdminCatalogService {
 
     let slug = existing.slug;
     if (dto.name && dto.name !== existing.name) {
-      slug = dto.name
-        .toLowerCase()
-        .replace(/[^a-z0-9\s-]/g, "")
-        .replace(/\s+/g, "-")
-        .replace(/-+/g, "-")
-        .trim();
+      slug = generateSlug(dto.name);
       const duplicate = await this.prisma.manufacturer.findFirst({
         where: {
           OR: [{ name: { equals: dto.name, mode: "insensitive" } }, { slug }],
@@ -873,14 +868,7 @@ export class AdminCatalogService {
     if (!brand)
       throw new NotFoundException(i18nMessage("server.brand.notFound"));
 
-    const slug =
-      dto.slug ||
-      `${brand.slug}-${dto.name}`
-        .toLowerCase()
-        .replace(/[^a-z0-9\s-]/g, "")
-        .replace(/\s+/g, "-")
-        .replace(/-+/g, "-")
-        .trim();
+    const slug = dto.slug || carModelSlug(brand.slug, dto.name);
 
     const existing = await this.prisma.carModel.findFirst({
       where: {
@@ -943,12 +931,7 @@ export class AdminCatalogService {
     let slug = existing.slug;
     if (dto.slug) slug = dto.slug;
     else if (dto.name && dto.name !== existing.name) {
-      slug = `${existing.brand.slug}-${dto.name}`
-        .toLowerCase()
-        .replace(/[^a-z0-9\s-]/g, "")
-        .replace(/\s+/g, "-")
-        .replace(/-+/g, "-")
-        .trim();
+      slug = carModelSlug(existing.brand.slug, dto.name);
     }
 
     if (slug !== existing.slug) {

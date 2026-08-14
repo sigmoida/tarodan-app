@@ -117,6 +117,11 @@ export {
 } from "./components/ConfirmProvider";
 export { EmptyState, type EmptyStateProps } from "./components/EmptyState";
 export {
+  FileDropzone,
+  type FileDropzoneProps,
+  type FileDropzoneLabels,
+} from "./components/FileDropzone";
+export {
   ThumbnailStack,
   type ThumbnailStackProps,
 } from "./components/ThumbnailStack";

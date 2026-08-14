@@ -1,4 +1,9 @@
 import { api } from "./client";
+import type {
+  CatalogImportResource,
+  CatalogImportResult,
+  CatalogImportSchema,
+} from "./catalog-import.types";
 
 type CatalogListParams = {
   page?: number;
@@ -69,6 +74,29 @@ export const catalogApi = {
         }
       },
     });
+  },
+
+  /**
+   * Katalog toplu içe aktarma (marka / üretici / araç modeli).
+   *
+   * Yollar bilinçli olarak kaynak adıyla başlar: API tarafındaki izin matrisi
+   * `/admin/` sonrasındaki ilk segmentten çözülüyor, ortak bir `/admin/catalog/…`
+   * öneki moderator ve admin rollerine 403 verirdi.
+   */
+  getCatalogImportSchema: (resource: CatalogImportResource) =>
+    api.get<CatalogImportSchema>(`/admin/${resource}/import-schema`),
+  downloadCatalogImportTemplate: (resource: CatalogImportResource) =>
+    api.get(`/admin/${resource}/import-template`, { responseType: "blob" }),
+  bulkImportCatalog: (resource: CatalogImportResource, workbook: File) => {
+    const formData = new FormData();
+    formData.append("workbook", workbook);
+    // İstemcinin varsayılan Content-Type'ı JSON; override edilmezse multipart
+    // gövde sessizce bozulur (ürün içe aktarmasıyla aynı tuzak).
+    return api.post<CatalogImportResult>(
+      `/admin/${resource}/bulk-import`,
+      formData,
+      { headers: { "Content-Type": "multipart/form-data" } },
+    );
   },
 
   // Reviews

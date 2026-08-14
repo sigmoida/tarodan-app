@@ -5,13 +5,14 @@
 import { useCallback, useMemo, useState } from "react";
 import { useTranslations } from "next-intl";
 import { Button } from "@tarodan/ui";
-import { PlusIcon } from "@heroicons/react/24/outline";
+import { ArrowUpTrayIcon, PlusIcon } from "@heroicons/react/24/outline";
 import { adminApi } from "@/lib/api";
 import { AdminPage } from "@/components/page/AdminPage";
 import { PageHeader } from "@/components/AdminList";
 import { ResourceList } from "@/components/list";
 import { useConfirm } from "@/provider/ConfirmProvider";
 import { useAdminMutation } from "@/hooks/useAdminMutation";
+import { CatalogImportModal } from "@/components/catalog/CatalogImportModal";
 import type { CarModel } from "./_lib/types";
 import { carModelColumns } from "./_lib/columns";
 import { CarModelFilters } from "./_components/CarModelFilters";
@@ -21,6 +22,7 @@ export default function CarModelsPage() {
   const t = useTranslations();
   const confirm = useConfirm();
   const [modal, setModal] = useState<{ model?: CarModel } | null>(null);
+  const [importOpen, setImportOpen] = useState(false);
 
   const del = useAdminMutation((id: string) => adminApi.deleteCarModel(id), {
     invalidates: ["car-models", "brands"],
@@ -68,6 +70,13 @@ export default function CarModelsPage() {
         description={t("admin.catalog.carModels.subtitle")}
       >
         <Button
+          variant="outline"
+          leftIcon={<ArrowUpTrayIcon className="h-5 w-5" />}
+          onClick={() => setImportOpen(true)}
+        >
+          {t("admin.catalog.import.button")}
+        </Button>
+        <Button
           variant="primary"
           leftIcon={<PlusIcon className="h-5 w-5" />}
           onClick={() => setModal({})}
@@ -93,6 +102,14 @@ export default function CarModelsPage() {
         />
         <ResourceList.Pagination />
       </ResourceList>
+
+      {importOpen && (
+        <CatalogImportModal
+          resource="car-models"
+          open
+          onClose={() => setImportOpen(false)}
+        />
+      )}
 
       {modal && (
         <CarModelFormModal

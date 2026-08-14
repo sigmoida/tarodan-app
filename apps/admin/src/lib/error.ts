@@ -19,6 +19,27 @@ export function extractErrorMessage(error: unknown, fallback: string): string {
   return fallback;
 }
 
+/**
+ * Toplu içe aktarma uçlarının satır bazlı hata listesini çıkarır.
+ *
+ * Sunucu `BadRequestException({ code, message, errors })` gövdesi döner; bu
+ * gövde NestJS'in exception filtresinden geçerken sarmalanabildiği için üç
+ * olası yol da denenir. Liste yoksa tek satırlık genel mesaja düşülür.
+ */
+export function extractImportErrors(
+  error: unknown,
+  fallback: string,
+): string[] {
+  const body = (error as { response?: { data?: any } })?.response?.data;
+  const candidates = [
+    body?.errors,
+    body?.message?.errors,
+    body?.message?.details?.errors,
+  ];
+  const errors = candidates.find(Array.isArray) as unknown[] | undefined;
+  return errors ? errors.map(String) : [extractErrorMessage(error, fallback)];
+}
+
 export function isNotFoundError(error: unknown): boolean {
   return (
     (error as { response?: { status?: number } })?.response?.status === 404

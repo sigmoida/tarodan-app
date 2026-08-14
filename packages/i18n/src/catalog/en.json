@@ -122,7 +122,13 @@
     "uploading": "Uploading",
     "replace": "Replace",
     "language": "Language",
-    "deleting": "Deleting"
+    "deleting": "Deleting",
+    "fileDropzone": {
+      "active": "Drop the file here",
+      "select": "Choose File",
+      "replace": "Replace File",
+      "remove": "Remove"
+    }
   },
   "nav": {
     "home": "Home",
@@ -3543,6 +3549,70 @@
         "bulkImportFileTooLarge": "{name} is too large. Each file can be at most {size}.",
         "bulkImportTooManyImages": "You can select at most {max} images.",
         "bulkImportTotalTooLarge": "The selected files cannot exceed {size} in total."
+      },
+      "import": {
+        "button": "Import from Excel",
+        "title": {
+          "brands": "Bulk Add Brands from Excel",
+          "manufacturers": "Bulk Add Manufacturers from Excel",
+          "car-models": "Bulk Add Car Models from Excel"
+        },
+        "description": "Download the template, fill it in and upload it here. If a single row is invalid, no records are created.",
+        "structureTitle": "Expected file structure",
+        "structureHelp": "Data must live on the '{sheet}' sheet. A single file can hold up to {rows} rows.",
+        "downloadTemplate": "Download Template",
+        "templateFailed": "Template could not be downloaded",
+        "columnName": "Column",
+        "columnRequired": "Status",
+        "columnDescription": "Description",
+        "columnExample": "Example",
+        "required": "Required",
+        "optional": "Optional",
+        "dropzoneIdle": "Drag the completed Excel file here",
+        "dropzoneHint": "Only .xlsx • Max {size}",
+        "submit": "Import",
+        "processing": "Importing…",
+        "failed": "Import failed",
+        "invalidFileType": "\"{name}\" is not an Excel (.xlsx) file",
+        "fileTooLarge": "\"{name}\" is too large. Maximum {size}.",
+        "validationTitle": "Nothing was imported",
+        "validationHelp": "Fix the rows below and upload the file again. No records were created.",
+        "successTitle": "Import completed",
+        "created": {
+          "brands": "{count} brands added",
+          "manufacturers": "{count} manufacturers added",
+          "car-models": "{count} car models added"
+        },
+        "andMore": "… and {count} more",
+        "columns": {
+          "brands": {
+            "ad": "Brand name",
+            "aciklama": "Short description",
+            "web_sitesi": "Brand website",
+            "ulke": "Country of origin",
+            "kurulus_yili": "Year founded",
+            "sira": "Sort order (lower comes first)",
+            "aktif": "Visible in the store (empty means Yes)"
+          },
+          "manufacturers": {
+            "ad": "Manufacturer name",
+            "aciklama": "Short description",
+            "web_sitesi": "Manufacturer website",
+            "ulke": "Country of origin",
+            "kurulus_yili": "Year founded",
+            "sira": "Sort order (lower comes first)",
+            "aktif": "Visible in the store (empty means Yes)"
+          },
+          "carModels": {
+            "marka": "Parent brand (name, slug or id)",
+            "ad": "Model name",
+            "aciklama": "Short description",
+            "baslangic_yili": "Production start year",
+            "bitis_yili": "Production end year",
+            "sira": "Sort order (lower comes first)",
+            "aktif": "Visible in the store (empty means Yes)"
+          }
+        }
       }
     },
     "marketing": {
@@ -3600,7 +3670,8 @@
           "failed": "Upload failed",
           "dropHint": "Drag and drop the image or",
           "chooseFile": "Choose File",
-          "urlPlaceholder": "or paste an image URL"
+          "urlPlaceholder": "or paste an image URL",
+          "hint": "JPG, PNG, WebP • Max 2 MB"
         },
         "validation": {
           "titleRequired": "Title is required"
@@ -7763,7 +7834,15 @@
         "cannotRemoveSelf": "You cannot remove your own admin access",
         "lastSuperAdminUndeletable": "The last super admin in the system cannot be removed"
       },
-      "warehouseAddressMissing": "The warehouse address is not configured. Define the `warehouse_address_id` platform setting."
+      "warehouseAddressMissing": "The warehouse address is not configured. Define the `warehouse_address_id` platform setting.",
+      "catalogImport": {
+        "noDataRows": "Sheet '{sheet}' has no data rows. Fill in the template and upload it again.",
+        "tooManyRows": "At most {max} rows can be imported at once (the file has {count}).",
+        "fileMissing": "No Excel file was uploaded.",
+        "onlyXlsx": "Only .xlsx Excel files can be uploaded.",
+        "fileTooLarge": "The file may be at most {max} MB.",
+        "missingColumns": "Missing Excel columns: {columns}. Download the sample file again."
+      }
     },
     "advertisement": {
       "notFound": "Advertisement not found",
