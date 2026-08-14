@@ -208,10 +208,21 @@ code shares a process with HTTP.
 
 ## 14. Type discipline & tests
 
-**Type reality:** this app still compiles with `strictNullChecks` and
-`noImplicitAny` off, and a strict migration is in progress (§15). Write all
-new code as if strict were on: handle `null | undefined` explicitly at Prisma
-boundaries, no new `any` (type the shape or use `unknown` + narrowing).
+**`strict` is on**, with `strictPropertyInitialization` the single deliberate
+exception (class-validator DTOs and Prisma entities are populated by decorators
+and the ORM). So the compiler already enforces what the schema declares: every
+nullable column and every `findUnique` result is handled at the boundary.
+
+Two things it cannot do for you:
+
+- **`any` voids it locally.** An `any` value satisfies every null check
+  silently, and 943 remain in source. Don't add one — type the shape, or take
+  `unknown` and narrow. Removing the existing ones is its own phase.
+- **A non-null assertion is a claim, not a check.** If `!` is the only way
+  through, the guarantee is missing somewhere: capture the narrowed value in a
+  local (narrowing does not survive into a closure), give the guard a type
+  predicate so it crosses a function boundary, or state the nullability in the
+  signature.
 
 **Test culture is the backbone — keep it:**
 
@@ -230,8 +241,8 @@ boundaries, no new `any` (type the shape or use `unknown` + narrowing).
 
 These are approved, behavior-preserving cleanups. **In any file you touch:**
 
-1. **Strict nulls** — remove the file's `@ts-strict-ignore` (once the strict
-   plugin lands) or at minimum leave the code you wrote null-safe.
+1. **Explicit `any`** — replace the ones in the file you're editing with a real
+   type or `unknown` + narrowing (943 left in source, ~1900 more in specs).
 2. **i18n exceptions** — convert hardcoded Turkish exception strings to
    `i18nMessage` keys (catalog text identical to the old string). ESLint warns
    on these (`@tarodan/no-hardcoded-exception-message`, 617 left); the rule
