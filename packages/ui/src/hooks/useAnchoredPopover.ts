@@ -104,13 +104,28 @@ export function useAnchoredPopover<
 
   useEffect(() => {
     if (!open) return;
-    const handler =
+    const run =
       onViewportChange === "close" ? () => setOpen(false) : updatePosition;
+
+    // rAF-throttled: a momentum scroll can fire this dozens of times per
+    // second, and `run` does a getBoundingClientRect() (forces layout) plus
+    // a state update — collapse any events landing within the same frame
+    // into a single call instead of doing that work per raw event.
+    let frame: number | null = null;
+    const handler = () => {
+      if (frame != null) return;
+      frame = requestAnimationFrame(() => {
+        frame = null;
+        run();
+      });
+    };
+
     window.addEventListener("resize", handler);
     window.addEventListener("scroll", handler, true);
     return () => {
       window.removeEventListener("resize", handler);
       window.removeEventListener("scroll", handler, true);
+      if (frame != null) cancelAnimationFrame(frame);
     };
   }, [open, onViewportChange, updatePosition]);
 
