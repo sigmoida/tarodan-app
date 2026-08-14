@@ -4388,6 +4388,7 @@
         "totalPaymentAmount": "Toplam ödeme tutarı",
         "refundAmountLabel": "İade Tutarı (boş bırakırsanız tam iade)",
         "refundAmountPlaceholder": "İade tutarı (opsiyonel)",
+        "refundAmountInvalid": "İade tutarı 0'dan büyük ve en fazla {max} olmalıdır",
         "refundReasonLabel": "İade Nedeni (opsiyonel)",
         "refundReasonPlaceholder": "İade nedeni",
         "refundConfirm": "İade Et",

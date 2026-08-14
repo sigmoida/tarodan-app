@@ -4388,6 +4388,7 @@
         "totalPaymentAmount": "Total payment amount",
         "refundAmountLabel": "Refund Amount (leave empty for a full refund)",
         "refundAmountPlaceholder": "Refund amount (optional)",
+        "refundAmountInvalid": "Refund amount must be greater than 0 and at most {max}",
         "refundReasonLabel": "Refund Reason (optional)",
         "refundReasonPlaceholder": "Refund reason",
         "refundConfirm": "Refund",
