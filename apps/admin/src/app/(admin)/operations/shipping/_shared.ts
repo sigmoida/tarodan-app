@@ -4,6 +4,7 @@
 // canonical labels/variants; it was removed.
 
 import { useTranslations } from "next-intl";
+import { fmtDate } from "@/lib/format";
 
 type T = ReturnType<typeof useTranslations<never>>;
 
@@ -78,11 +79,10 @@ export function formatRelative(t: T, iso: string): string {
   if (hr < 24) return t("admin.operations.shipping.time.hoursAgo", { hr });
   const day = Math.floor(hr / 24);
   if (day < 30) return t("admin.operations.shipping.time.daysAgo", { day });
-  return d.toLocaleDateString("tr-TR");
+  return fmtDate(d) ?? "—";
 }
 
 /** ISO date as tr-TR short date; "—" if empty/null */
 export function formatDate(iso?: string | null): string {
-  if (!iso) return "—";
-  return new Date(iso).toLocaleDateString("tr-TR");
+  return fmtDate(iso) ?? "—";
 }

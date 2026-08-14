@@ -1,16 +1,17 @@
-'use client';
+"use client";
 
-import { Line } from 'react-chartjs-2';
+import { Line } from "react-chartjs-2";
 import {
   UsersIcon,
   ArrowTrendingUpIcon,
   ChartBarIcon,
   ShoppingBagIcon,
-} from '@heroicons/react/24/outline';
-import { useTranslations } from 'next-intl';
-import { MetricCard } from '@/components/MetricCard';
-import { SectionCard } from '@/components/detail/SectionCard';
-import { chartPalette, chartOptions } from '../_lib/charts';
+} from "@heroicons/react/24/outline";
+import { useTranslations } from "next-intl";
+import { MetricCard } from "@/components/MetricCard";
+import { SectionCard } from "@/components/detail/SectionCard";
+import { fmtNumber } from "@/lib/format";
+import { chartPalette, chartOptions } from "../_lib/charts";
 
 export function UsersTab({ report }: { report: any }) {
   const t = useTranslations();
@@ -18,7 +19,7 @@ export function UsersTab({ report }: { report: any }) {
     labels: report.userGrowth?.map((d: any) => d.month) || [],
     datasets: [
       {
-        label: t('admin.analytics.users.newUsers'),
+        label: t("admin.analytics.users.newUsers"),
         data: report.userGrowth?.map((d: any) => d.users) || [],
         borderColor: chartPalette.info,
         backgroundColor: chartPalette.infoLight,
@@ -34,30 +35,30 @@ export function UsersTab({ report }: { report: any }) {
         <MetricCard
           icon={UsersIcon}
           tone="info"
-          label={t('admin.analytics.users.totalUsers')}
-          value={report.totalUsers?.toLocaleString() ?? 0}
+          label={t("admin.analytics.users.totalUsers")}
+          value={fmtNumber(report.totalUsers) ?? 0}
         />
         <MetricCard
           icon={ArrowTrendingUpIcon}
           tone="success"
-          label={t('admin.analytics.users.newUsers')}
-          value={report.newUsers?.toLocaleString() ?? 0}
+          label={t("admin.analytics.users.newUsers")}
+          value={fmtNumber(report.newUsers) ?? 0}
         />
         <MetricCard
           icon={ChartBarIcon}
           tone="primary"
-          label={t('admin.analytics.users.activeUsers')}
-          value={report.activeUsers?.toLocaleString() ?? 0}
+          label={t("admin.analytics.users.activeUsers")}
+          value={fmtNumber(report.activeUsers) ?? 0}
         />
         <MetricCard
           icon={ShoppingBagIcon}
           tone="primary"
-          label={t('admin.analytics.users.sellers')}
-          value={report.sellerCount?.toLocaleString() ?? 0}
+          label={t("admin.analytics.users.sellers")}
+          value={fmtNumber(report.sellerCount) ?? 0}
         />
       </div>
 
-      <SectionCard title={t('admin.analytics.users.growthTitle')}>
+      <SectionCard title={t("admin.analytics.users.growthTitle")}>
         <div className="h-80">
           <Line data={userGrowthData} options={chartOptions} />
         </div>

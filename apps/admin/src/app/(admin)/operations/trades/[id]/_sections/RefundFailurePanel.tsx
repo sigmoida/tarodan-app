@@ -8,6 +8,7 @@ import {
 } from "@heroicons/react/24/outline";
 import { useTranslations } from "next-intl";
 import { adminApi } from "@/lib/api";
+import { fmtDateTime } from "@/lib/format";
 import { useConfirm } from "@/provider/ConfirmProvider";
 import { useAdminMutation } from "@/hooks/useAdminMutation";
 import type { TradeDetail } from "../types";
@@ -57,7 +58,7 @@ export function RefundFailurePanel({ trade }: { trade: TradeDetail }) {
             {trade.refundFailureAt && (
               <p className="mt-1 text-xs text-danger-700">
                 {t("admin.operations.trades.lastError", {
-                  date: new Date(trade.refundFailureAt).toLocaleString("tr-TR"),
+                  date: fmtDateTime(trade.refundFailureAt),
                 })}
               </p>
             )}

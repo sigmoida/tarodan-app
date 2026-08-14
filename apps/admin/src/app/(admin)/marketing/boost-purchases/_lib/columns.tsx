@@ -1,5 +1,6 @@
 import { Badge } from "@tarodan/ui";
 import { col } from "@/components/table";
+import { fmtDate } from "@/lib/format";
 import { type BoostPurchase, purchaseStatusConfig } from "./types";
 import type { useTranslations } from "next-intl";
 import Link from "next/link";
@@ -92,11 +93,7 @@ export function purchaseColumns(t: T) {
 
 function fmt(iso: string | null): string {
   if (!iso) return "—";
-  return new Date(iso).toLocaleDateString("tr-TR", {
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-  });
+  return fmtDate(iso) ?? "—";
 }
 
 function PeriodCell({

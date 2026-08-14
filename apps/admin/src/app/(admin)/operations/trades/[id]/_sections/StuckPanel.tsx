@@ -3,6 +3,7 @@
 import { Button } from "@tarodan/ui";
 import { ClockIcon } from "@heroicons/react/24/outline";
 import { useTranslations } from "next-intl";
+import { fmtDateTime } from "@/lib/format";
 import type { TradeDetail } from "../types";
 
 /** Stuck partial-arrival panel — the button opens the force-cancel modal. */
@@ -29,11 +30,7 @@ export function StuckPanel({
             </h2>
             <p className="mt-1 text-sm text-warning-800">
               {t("admin.operations.trades.stuckBody", {
-                date: trade.firstWarehouseArrivalAt
-                  ? new Date(trade.firstWarehouseArrivalAt).toLocaleString(
-                      "tr-TR",
-                    )
-                  : "",
+                date: fmtDateTime(trade.firstWarehouseArrivalAt) ?? "",
               })}
             </p>
           </div>

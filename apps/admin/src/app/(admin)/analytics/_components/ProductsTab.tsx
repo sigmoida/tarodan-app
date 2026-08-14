@@ -12,7 +12,7 @@ import { MetricCard } from "@/components/MetricCard";
 import { SectionCard } from "@/components/detail/SectionCard";
 import { useMediaQuery } from "@/hooks/useMediaQuery";
 import { SM_MEDIA_QUERY } from "@/lib/breakpoints";
-import { fmtTry } from "@/lib/format";
+import { fmtNumber, fmtTry } from "@/lib/format";
 import { chartPalette } from "../_lib/charts";
 
 export function ProductsTab({ report }: { report: any }) {
@@ -45,19 +45,19 @@ export function ProductsTab({ report }: { report: any }) {
           icon={ShoppingBagIcon}
           tone="info"
           label={t("admin.analytics.products.totalProducts")}
-          value={report.totalProducts?.toLocaleString() ?? 0}
+          value={fmtNumber(report.totalProducts) ?? 0}
         />
         <MetricCard
           icon={ChartBarIcon}
           tone="success"
           label={t("admin.analytics.products.activeProducts")}
-          value={report.activeProducts?.toLocaleString() ?? 0}
+          value={fmtNumber(report.activeProducts) ?? 0}
         />
         <MetricCard
           icon={CalendarIcon}
           tone="warning"
           label={t("admin.analytics.products.pendingApproval")}
-          value={report.pendingProducts?.toLocaleString() ?? 0}
+          value={fmtNumber(report.pendingProducts) ?? 0}
         />
         <MetricCard
           icon={CurrencyDollarIcon}

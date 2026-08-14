@@ -1,6 +1,7 @@
 "use client";
 
 import { useTranslations } from "next-intl";
+import { fmtNumber } from "@/lib/format";
 import type { MetricPeriods } from "../_lib/types";
 
 /**
@@ -9,7 +10,7 @@ import type { MetricPeriods } from "../_lib/types";
  */
 export function PeriodBreakdown({
   periods,
-  format = (n: number) => n.toLocaleString(),
+  format = (n: number) => fmtNumber(n) ?? String(n),
 }: {
   periods: MetricPeriods;
   format?: (n: number) => string;

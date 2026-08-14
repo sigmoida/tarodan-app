@@ -1,6 +1,7 @@
 import { orderStatusConfig, tradeStatusConfig } from "@tarodan/ui";
 import type { StatusConfig } from "@tarodan/ui";
 import { useTranslations } from "next-intl";
+import { fmtDate } from "@/lib/format";
 
 type T = ReturnType<typeof useTranslations<never>>;
 
@@ -157,5 +158,5 @@ export function formatRelativeDate(dateString: string, t: T) {
     return t("admin.dashboard.relativeTime.hoursAgo", {
       count: Math.floor(diffMins / 60),
     });
-  return date.toLocaleDateString("tr-TR");
+  return fmtDate(date) ?? dateString;
 }

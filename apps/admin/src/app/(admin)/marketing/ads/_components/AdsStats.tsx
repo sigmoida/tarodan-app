@@ -9,6 +9,7 @@ import {
 } from "@heroicons/react/24/outline";
 import { adminApi } from "@/lib/api";
 import { adminKeys } from "@/lib/query/keys";
+import { fmtNumber } from "@/lib/format";
 import { MetricCard } from "@/components/MetricCard";
 import { QueryErrorCard } from "@/components/page/QueryErrorCard";
 import { type Ad } from "../_lib/types";
@@ -69,14 +70,14 @@ export function AdsStats() {
         icon={CursorArrowRaysIcon}
         tone="primary"
         label={t("admin.marketing.ads.totalClicks")}
-        value={s.clicks.toLocaleString()}
+        value={fmtNumber(s.clicks)}
         loading={isLoading}
       />
       <MetricCard
         icon={EyeIcon}
         tone="success"
         label={t("admin.marketing.ads.impressions")}
-        value={s.impressions.toLocaleString()}
+        value={fmtNumber(s.impressions)}
         loading={isLoading}
       />
       <MetricCard

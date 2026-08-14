@@ -12,7 +12,7 @@ import { SectionCard } from "@/components/detail/SectionCard";
 import { AdminTabs } from "@/components/AdminTabs";
 import { ModerationEventsPanel } from "@/components/ModerationEventsPanel";
 import { getProductEffectivePrice } from "@/lib/product-price";
-import { fmtTry } from "@/lib/format";
+import { fmtDate, fmtTry } from "@/lib/format";
 import {
   type UserDetail,
   type UserRatingItem,
@@ -47,9 +47,7 @@ function RatingCard({
     <div className="rounded-lg bg-surface-alt p-4">
       <div className="mb-2 flex items-center justify-between">
         <Stars score={rating.score} />
-        <span className="text-sm text-muted">
-          {new Date(rating.createdAt).toLocaleDateString("tr-TR")}
-        </span>
+        <span className="text-sm text-muted">{fmtDate(rating.createdAt)}</span>
       </div>
       {rating.comment && <p className="text-muted">{rating.comment}</p>}
       <p className="mt-2 text-sm text-muted">
@@ -153,7 +151,7 @@ export function UserActivityTabs({
                     {fmtTry(order.totalAmount)}
                   </p>
                   <p className="text-xs text-muted">
-                    {new Date(order.createdAt).toLocaleDateString("tr-TR")}
+                    {fmtDate(order.createdAt)}
                   </p>
                 </div>
               </div>
@@ -203,7 +201,7 @@ export function UserActivityTabs({
                       config={userStatusConfig}
                     />
                     <span className="text-sm text-muted">
-                      {new Date(product.createdAt).toLocaleDateString("tr-TR")}
+                      {fmtDate(product.createdAt)}
                     </span>
                   </div>
                 </div>
@@ -253,7 +251,7 @@ export function UserActivityTabs({
                     />
                   </div>
                   <span className="text-sm text-muted">
-                    {new Date(trade.createdAt).toLocaleDateString("tr-TR")}
+                    {fmtDate(trade.createdAt)}
                   </span>
                 </div>
                 <div className="text-sm text-muted">
