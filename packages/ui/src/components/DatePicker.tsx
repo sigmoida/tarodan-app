@@ -9,6 +9,7 @@ import {
   ChevronRightIcon,
 } from "@heroicons/react/24/outline";
 import { cn } from "../lib/utils";
+import { CONTROL_TEXT } from "../lib/form-control";
 
 export interface DatePickerProps {
   /** ISO date string `yyyy-mm-dd` (the native `<input type="date">` value). */
@@ -242,8 +243,11 @@ export function DatePicker({
           />
         </button>
 
+        {/* Panel dar ekranda görünür alanı aşmasın: 288px'i hedefler ama
+            viewport'tan taşacaksa daralır (ay/yıl seçicileri mobilde 16px
+            olduğu için satır daha geniş). */}
         {open && (
-          <div className="absolute left-0 top-full z-50 mt-2 w-72 rounded-lg border border-border bg-surface-elevated p-3 shadow-lg">
+          <div className="absolute left-0 top-full z-50 mt-2 w-[min(18rem,calc(100vw-2rem))] rounded-lg border border-border bg-surface-elevated p-3 shadow-lg">
             <div className="mb-2 flex items-center justify-between gap-2">
               <div className="flex min-w-0 items-center gap-1">
                 <select
@@ -252,7 +256,10 @@ export function DatePicker({
                     setView((v) => ({ ...v, m: +e.target.value }))
                   }
                   aria-label="Month"
-                  className="min-w-0 cursor-pointer rounded-md border border-border bg-surface-elevated py-1 pl-1.5 pr-1 text-sm font-semibold capitalize text-heading focus:outline-none focus:ring-1 focus:ring-primary-500"
+                  className={cn(
+                    "min-w-0 cursor-pointer rounded-md border border-border bg-surface-elevated py-1 pl-1.5 pr-1 font-semibold capitalize text-heading focus:outline-none focus:ring-1 focus:ring-primary-500",
+                    CONTROL_TEXT,
+                  )}
                 >
                   {monthNames.map((mLabel, m) => (
                     <option key={m} value={m}>
@@ -266,7 +273,10 @@ export function DatePicker({
                     setView((v) => ({ ...v, y: +e.target.value }))
                   }
                   aria-label="Year"
-                  className="cursor-pointer rounded-md border border-border bg-surface-elevated py-1 pl-1.5 pr-1 text-sm font-semibold text-heading focus:outline-none focus:ring-1 focus:ring-primary-500"
+                  className={cn(
+                    "cursor-pointer rounded-md border border-border bg-surface-elevated py-1 pl-1.5 pr-1 font-semibold text-heading focus:outline-none focus:ring-1 focus:ring-primary-500",
+                    CONTROL_TEXT,
+                  )}
                 >
                   {(yearOptions.includes(view.y)
                     ? yearOptions

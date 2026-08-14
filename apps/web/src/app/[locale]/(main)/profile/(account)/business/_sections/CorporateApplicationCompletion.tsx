@@ -10,7 +10,15 @@ import {
   ExclamationTriangleIcon,
   UserPlusIcon,
 } from "@heroicons/react/24/outline";
-import { Badge, Button, Input, Tabs, TabsList, TabsTrigger } from "@tarodan/ui";
+import {
+  Badge,
+  Button,
+  Input,
+  Select,
+  Tabs,
+  TabsList,
+  TabsTrigger,
+} from "@tarodan/ui";
 import { useTranslations } from "next-intl";
 import toast from "react-hot-toast";
 import {
@@ -317,23 +325,21 @@ export default function CorporateApplicationCompletion({
               disabled={locked}
               required
             />
-            <label className="text-sm font-medium text-heading">
-              {t("fields.identityType")}
-              <select
-                className="mt-1 h-10 w-full border border-border bg-surface px-3"
-                value={stakeholder.identityType}
-                onChange={(event) =>
-                  setStakeholder((current) => ({
-                    ...current,
-                    identityType: event.target.value as "tckn" | "passport",
-                  }))
-                }
-                disabled={locked}
-              >
-                <option value="tckn">{t("identity.nationalId")}</option>
-                <option value="passport">{t("identity.passport")}</option>
-              </select>
-            </label>
+            <Select
+              label={t("fields.identityType")}
+              value={stakeholder.identityType}
+              onChange={(event) =>
+                setStakeholder((current) => ({
+                  ...current,
+                  identityType: event.target.value as "tckn" | "passport",
+                }))
+              }
+              disabled={locked}
+              options={[
+                { value: "tckn", label: t("identity.nationalId") },
+                { value: "passport", label: t("identity.passport") },
+              ]}
+            />
             <Input
               label={t("fields.identityNumber")}
               placeholder={t("placeholders.identityNumber")}

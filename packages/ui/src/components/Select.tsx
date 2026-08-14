@@ -5,6 +5,7 @@
 import React from "react";
 import * as RadixSelect from "@radix-ui/react-select";
 import { cn } from "../lib/utils";
+import { CONTROL_TEXT } from "../lib/form-control";
 
 export interface SelectOption {
   value: string;
@@ -37,8 +38,8 @@ const toRadix = (v?: string) => (v === "" ? EMPTY : v);
 const fromRadix = (v: string) => (v === EMPTY ? "" : v);
 
 const sizeClasses = {
-  sm: "h-8 px-2.5 text-sm",
-  md: "h-10 px-3 text-sm",
+  sm: `h-8 px-2.5 ${CONTROL_TEXT}`,
+  md: `h-10 px-3 ${CONTROL_TEXT}`,
   lg: "h-12 px-4 text-base",
 };
 
