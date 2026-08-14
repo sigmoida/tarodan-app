@@ -3,7 +3,7 @@
 import * as React from "react";
 import { Controller, useFormContext } from "react-hook-form";
 import { PhoneInput } from "../PhoneInput";
-import { combinePhone, splitPhone } from "../../lib/phone";
+import { splitPhone, toStoredPhone } from "../../lib/phone";
 
 export interface FormPhoneProps {
   /** Field name in the form schema. Stores one combined value ("+90" + digits). */
@@ -25,7 +25,9 @@ export interface FormPhoneProps {
 /**
  * RHF-connected phone field. The form stores a single normalized string
  * ("+905XXXXXXXXX", or "" when empty); this bridges it to `PhoneInput`, which
- * edits only the national part.
+ * edits only the national part. While typing, the stored value holds the digits
+ * entered so far ("+90532") — completeness is the schema's job (`trPhone`), not
+ * the field's, or the control could never accept the first keystroke.
  *
  * A stored value that isn't a Turkish mobile (registration accepted any string
  * before this rule) opens the field empty with `legacyMessage` shown. The form
@@ -62,7 +64,7 @@ export function FormPhone({
             disabled={disabled}
             className={className}
             phone={national}
-            onPhoneChange={(next) => field.onChange(combinePhone(next))}
+            onPhoneChange={(next) => field.onChange(toStoredPhone(next))}
           />
         );
       }}

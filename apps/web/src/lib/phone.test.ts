@@ -1,5 +1,10 @@
 import { describe, it, expect } from "vitest";
-import { formatPhoneNumber, combinePhone, splitPhone } from "@/lib/phone";
+import {
+  formatPhoneNumber,
+  combinePhone,
+  splitPhone,
+  toStoredPhone,
+} from "@/lib/phone";
 
 /**
  * The phone helpers had no tests, which is how a swapped-argument call
@@ -85,8 +90,41 @@ describe("splitPhone", () => {
     });
   });
 
+  it("renders a half-typed value instead of calling it legacy", () => {
+    // A controlled PhoneInput reads its value back through here after every
+    // keystroke; treating "+90530" as legacy blanked the field, so the user
+    // could not type at all.
+    expect(splitPhone("+90530")).toEqual({
+      national: "530",
+      isLegacy: false,
+    });
+    expect(splitPhone("+90")).toEqual({ national: "", isLegacy: false });
+    expect(splitPhone("+90212")).toEqual({ national: "", isLegacy: true });
+  });
+
   it("round-trips with combinePhone", () => {
     const stored = "+905300665841";
     expect(combinePhone(splitPhone(stored).national)).toBe(stored);
+  });
+});
+
+describe("toStoredPhone", () => {
+  it("keeps what has been typed so far", () => {
+    expect(toStoredPhone("5")).toBe("+905");
+    expect(toStoredPhone("530 066")).toBe("+90530066");
+  });
+
+  it("matches combinePhone once the number is complete", () => {
+    expect(toStoredPhone("530 066 58 41")).toBe(combinePhone("530 066 58 41"));
+  });
+
+  it("stores nothing when there are no digits to keep", () => {
+    expect(toStoredPhone("")).toBe("");
+    // Not a Turkish mobile prefix — the formatter drops it.
+    expect(toStoredPhone("212")).toBe("");
+  });
+
+  it("survives a round trip through the field", () => {
+    expect(splitPhone(toStoredPhone("530 0")).national).toBe("530 0");
   });
 });

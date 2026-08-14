@@ -18,6 +18,7 @@ import {
   PhoneInput,
   splitPhone,
   combinePhone,
+  toStoredPhone,
 } from "@tarodan/ui";
 import CityDistrictSelector from "@/components/CityDistrictSelector";
 import { formatTL } from "@/lib/format";
@@ -227,7 +228,7 @@ export default function PaymentSection({
                   label={`${t("address.phone")} *`}
                   phone={splitPhone(newAddress.phone).national}
                   onPhoneChange={(nat) =>
-                    setNewAddress((a) => ({ ...a, phone: combinePhone(nat) }))
+                    setNewAddress((a) => ({ ...a, phone: toStoredPhone(nat) }))
                   }
                 />
               </div>
@@ -306,7 +307,7 @@ export default function PaymentSection({
               (!showNewAddressForm && !selectedAddressId) ||
               (showNewAddressForm &&
                 (!newAddress.fullName ||
-                  !newAddress.phone ||
+                  !combinePhone(newAddress.phone) ||
                   !newAddress.city ||
                   !newAddress.district ||
                   !newAddress.address))

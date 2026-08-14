@@ -11,6 +11,7 @@ import {
   PhoneInput,
   splitPhone,
   combinePhone,
+  toStoredPhone,
 } from "@tarodan/ui";
 import CityDistrictSelector from "@/components/CityDistrictSelector";
 import { useAddresses, useSaveAddress } from "../../../_hooks/useAddresses";
@@ -107,7 +108,7 @@ export default function TradeAddressPicker({
         values: {
           title: "Takas Adresi",
           fullName: form.fullName.trim(),
-          phone: form.phone.trim(),
+          phone: combinePhone(form.phone),
           city: form.city,
           district: form.district,
           address: form.address.trim(),
@@ -187,7 +188,7 @@ export default function TradeAddressPicker({
           <PhoneInput
             phone={splitPhone(form.phone).national}
             onPhoneChange={(nat) =>
-              setForm({ ...form, phone: combinePhone(nat) })
+              setForm({ ...form, phone: toStoredPhone(nat) })
             }
           />
           <CityDistrictSelector

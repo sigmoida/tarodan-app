@@ -45,6 +45,20 @@ export function formatPhoneNumber(value: string): string {
 }
 
 /**
+ * National part → the value a form keeps in state while it is being typed.
+ *
+ * `combinePhone` is the *validator* — it returns "" for anything short of a
+ * complete number, so a form that stored its result could never hold a half-typed
+ * one, and a controlled `PhoneInput` fed from that state would refuse every
+ * keystroke. This keeps whatever digits exist (`"+90532"`), leaving completeness
+ * to the schema, and returns "" only when there is nothing to store.
+ */
+export function toStoredPhone(value: string | undefined | null): string {
+  const digits = formatPhoneNumber(value ?? "").replace(/\D/g, "");
+  return digits ? `${TR_DIAL_CODE}${digits}` : "";
+}
+
+/**
  * Any accepted spelling of a Turkish mobile → the stored value (`+905XXXXXXXXX`),
  * or `""` when it isn't one.
  *
@@ -67,6 +81,10 @@ export function combinePhone(value: string | undefined | null): string {
  * rendered in a Turkish mask, so the field opens empty and the caller shows a
  * "please re-enter" notice — the stored value is left alone until the user
  * actually supplies a new one.
+ *
+ * A `+90` value that is merely incomplete (`"+90532"`, what `toStoredPhone` keeps
+ * mid-typing) is not legacy — it renders as far as it goes, so the field stays
+ * editable keystroke by keystroke.
  */
 export function splitPhone(full: string | undefined | null): {
   national: string;
@@ -74,9 +92,10 @@ export function splitPhone(full: string | undefined | null): {
 } {
   const clean = (full ?? "").replace(/\s/g, "");
   if (!clean) return { national: "", isLegacy: false };
-  if (!TR_PHONE_E164.test(clean)) return { national: "", isLegacy: true };
-  return {
-    national: formatPhoneNumber(clean.slice(TR_DIAL_CODE.length)),
-    isLegacy: false,
-  };
+  if (!clean.startsWith(TR_DIAL_CODE)) return { national: "", isLegacy: true };
+  const national = clean.slice(TR_DIAL_CODE.length);
+  // Complete number, or a prefix of one still being typed.
+  if (TR_PHONE_E164.test(clean) || /^(5\d{0,9})?$/.test(national))
+    return { national: formatPhoneNumber(national), isLegacy: false };
+  return { national: "", isLegacy: true };
 }

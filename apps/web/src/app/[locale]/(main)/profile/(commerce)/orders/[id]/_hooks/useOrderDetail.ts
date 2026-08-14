@@ -13,6 +13,7 @@ import {
   mediaApi,
 } from "@/lib/api";
 import { queryKeys } from "@/lib/query/keys";
+import { combinePhone } from "@/lib/phone";
 import { useTranslations } from "next-intl";
 import { useWebItem, useWebList } from "@/hooks/useWebResource";
 import { useWebMutation } from "@/hooks/useWebMutation";
@@ -277,9 +278,13 @@ export function useSetAddressAndPay(orderId: string) {
       };
 
       if (showNewAddressForm) {
+        // The form keeps the number as typed ("+90532…"); only a complete
+        // Turkish mobile survives `combinePhone`, so it also stands in for the
+        // "phone is filled" check.
+        const phone = combinePhone(newAddress.phone);
         if (
           !newAddress.fullName ||
-          !newAddress.phone ||
+          !phone ||
           !newAddress.city ||
           !newAddress.district ||
           !newAddress.address
@@ -289,7 +294,7 @@ export function useSetAddressAndPay(orderId: string) {
         }
         addrPayload = {
           fullName: newAddress.fullName,
-          phone: newAddress.phone,
+          phone,
           city: newAddress.city,
           district: newAddress.district,
           address: newAddress.address,
