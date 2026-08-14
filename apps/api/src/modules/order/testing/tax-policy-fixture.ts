@@ -1,4 +1,4 @@
-import { OrderTaxPolicyService } from "../order-tax-policy.service";
+import { OrderTaxPolicyService } from "../pricing/order-tax-policy.service";
 
 /**
  * Testlerde kullanılacak vergi politikası — kendi prisma sahtesini taşır, böylece

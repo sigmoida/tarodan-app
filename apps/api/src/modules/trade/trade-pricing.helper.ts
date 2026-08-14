@@ -6,7 +6,7 @@ import {
 import {
   findMatchingCommissionRule,
   type CommissionRuleMatchable,
-} from "../order/order-commission.helper";
+} from "../order/helpers/order-commission.helper";
 
 /** Takas yalnız kademeleri kullanır: ücretsiz-kargo eşiği takasta uygulanmaz. */
 type TradeTariff = Pick<OutboundTariffLike, "packageTiers">;

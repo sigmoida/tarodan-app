@@ -13,7 +13,7 @@ import {
   isSuratReturnCompleted,
 } from "./surat-status.mapper";
 import { canTransitionShipmentStatus } from "../shipping/shipment-state-machine";
-import { SHIPPABLE_ORDER_STATUSES } from "../order/order-state-machine";
+import { SHIPPABLE_ORDER_STATUSES } from "../order/helpers/order-state-machine";
 import { SuratTrackingClient } from "./surat-tracking.client";
 
 /**

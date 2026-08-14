@@ -61,7 +61,7 @@ import {
   SEED_SHIPPING_TIERS,
 } from "./seed-demo-config";
 import { SEED_COMMISSION_RULE_SET_IDS } from "./seed-ids";
-import { findMatchingCommissionRule } from "../src/modules/order/order-commission.helper";
+import { findMatchingCommissionRule } from "../src/modules/order/helpers/order-commission.helper";
 const prisma = new PrismaClient();
 
 // Initialize StorageService for seed script

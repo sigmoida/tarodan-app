@@ -11,7 +11,7 @@ import {
   CommissionRuleMatchError,
   roundCommissionMatchAmount,
   validateStrictCommissionCoverage,
-} from "../../order/order-commission.helper";
+} from "../../order/helpers/order-commission.helper";
 import { AdminAuditService } from "../ops/admin-audit.service";
 import {
   CreateCommissionRuleDto,

@@ -3,7 +3,7 @@ import { PrismaService } from "../../src/prisma";
 import { OrderService } from "../../src/modules/order/order.service";
 import { OrderLifecycleService } from "../../src/modules/order/order-lifecycle.service";
 import { CommissionLedgerService } from "../../src/modules/commission/commission-ledger.service";
-import { OrderSchedulerService } from "../../src/modules/order/order-scheduler.service";
+import { OrderSchedulerService } from "../../src/modules/order/jobs/order-scheduler.service";
 import {
   truncateAll,
   getPrisma,

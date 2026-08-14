@@ -60,8 +60,8 @@ import {
   generateReferenceCode,
   generateUniqueReference,
 } from "../../common/helpers/generate-reference";
-import { calculateServiceTax } from "../order/order-service-tax.helper";
-import { OrderTaxPolicyService } from "../order/order-tax-policy.service";
+import { calculateServiceTax } from "../order/helpers/order-service-tax.helper";
+import { OrderTaxPolicyService } from "../order/pricing/order-tax-policy.service";
 import {
   PUBLIC_NAME_SELECT,
   publicName,

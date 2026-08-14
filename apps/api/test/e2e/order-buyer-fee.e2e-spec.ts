@@ -1,6 +1,6 @@
 import { PrismaService } from "../../src/prisma";
 import { OrderService } from "../../src/modules/order/order.service";
-import { OrderPricingService } from "../../src/modules/order/order-pricing.service";
+import { OrderPricingService } from "../../src/modules/order/pricing/order-pricing.service";
 import {
   disconnectPrisma,
   getPrisma,

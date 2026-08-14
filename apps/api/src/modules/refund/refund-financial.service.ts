@@ -31,7 +31,7 @@ import {
   resolvePackageTier,
   shippingAmountForDesi,
 } from "../shipping/shipping-tariff.helper";
-import { storedProductBaseOf } from "../order/order-charged-base.helper";
+import { storedProductBaseOf } from "../order/helpers/order-charged-base.helper";
 import { readInvoiceLineItems } from "../elogo/invoice-lines";
 import {
   calculateRefundFinancials,

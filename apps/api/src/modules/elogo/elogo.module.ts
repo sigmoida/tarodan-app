@@ -9,7 +9,7 @@ import { ElogoScheduledProcessor } from "./elogo-scheduled.processor";
 import { ElogoInvoiceController } from "./elogo-invoice.controller";
 import { StorageModule } from "../storage/storage.module";
 import { TaxModule } from "../tax/tax.module";
-import { OrderTaxPolicyService } from "../order/order-tax-policy.service";
+import { OrderTaxPolicyService } from "../order/pricing/order-tax-policy.service";
 import { MailModule } from "../mail/mail.module";
 import {
   ElogoSoapClient,

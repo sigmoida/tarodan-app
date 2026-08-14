@@ -55,7 +55,7 @@ import { randomUUID } from "crypto";
 // taze kurarız — pattern order-48h-window.e2e-spec.ts'ten alındı. OrderService +
 // PrismaService gerçek DI konteynerinden (ctx.module) çözülür (yeniden yazılmaz).
 import { OrderService } from "../../../src/modules/order/order.service";
-import { OrderSchedulerService } from "../../../src/modules/order/order-scheduler.service";
+import { OrderSchedulerService } from "../../../src/modules/order/jobs/order-scheduler.service";
 import { PrismaService } from "../../../src/prisma";
 
 describe("09 — Sipariş Yaşam Döngüsü (ORD)", () => {

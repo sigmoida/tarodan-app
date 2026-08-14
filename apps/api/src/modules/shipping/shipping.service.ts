@@ -16,7 +16,7 @@ import {
   ShippingProvider,
 } from "./dto";
 import { canTransitionShipmentStatus } from "./shipment-state-machine";
-import { SHIPPABLE_ORDER_STATUSES } from "../order/order-state-machine";
+import { SHIPPABLE_ORDER_STATUSES } from "../order/helpers/order-state-machine";
 import { ACTIVE_REFUND_REQUEST_STATUSES } from "../refund/refund-active-statuses";
 import { ShippingTariffService } from "./shipping-tariff.service";
 import {

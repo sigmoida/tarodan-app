@@ -23,7 +23,7 @@ import {
   CommissionRuleMatchError,
   CommissionSellerConfigurationError,
   resolveCommissionSellerType,
-} from "../order/order-commission.helper";
+} from "../order/helpers/order-commission.helper";
 import { effectiveMembershipTierType } from "../membership/membership.util";
 
 /**

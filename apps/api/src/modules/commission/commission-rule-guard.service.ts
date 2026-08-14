@@ -13,7 +13,7 @@ import {
   findMatchingCommissionRule,
   resolveCommissionSellerType,
   roundCommissionMatchAmount,
-} from "../order/order-commission.helper";
+} from "../order/helpers/order-commission.helper";
 
 export interface ListingCommissionGuardInput {
   sellerId: string;

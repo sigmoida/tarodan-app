@@ -25,7 +25,7 @@ import { NotificationType, NotificationChannel } from "../notification/dto";
 import { TaxService } from "../tax";
 import { renderManagedEmailTemplate } from "../../common/helpers/email-template-renderer";
 import { InvoicePdfService, InvoiceData } from "./invoice-pdf.service";
-import { storedProductBaseOf } from "../order/order-charged-base.helper";
+import { storedProductBaseOf } from "../order/helpers/order-charged-base.helper";
 import { frontendUrlForEnvironment } from "../../config/app-urls";
 import { i18nMessage } from "../i18n";
 

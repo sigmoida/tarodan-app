@@ -19,10 +19,10 @@ import { generateReferenceCode } from "../src/common/helpers/generate-reference"
 import {
   calculateCommissionFromRules,
   resolveCommissionSellerType,
-} from "../src/modules/order/order-commission.helper";
-import { calculateServiceTax } from "../src/modules/order/order-service-tax.helper";
-import { buyerTotalOf } from "../src/modules/order/order-total.helper";
-import { sellerNetAmountOf } from "../src/modules/order/order-net.helper";
+} from "../src/modules/order/helpers/order-commission.helper";
+import { calculateServiceTax } from "../src/modules/order/helpers/order-service-tax.helper";
+import { buyerTotalOf } from "../src/modules/order/helpers/order-total.helper";
+import { sellerNetAmountOf } from "../src/modules/order/helpers/order-net.helper";
 import { effectiveMembershipTierType } from "../src/modules/membership/membership.util";
 import {
   calculatePackageDesi,

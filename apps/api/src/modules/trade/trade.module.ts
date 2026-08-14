@@ -23,7 +23,7 @@ import { ProductModule } from "../product/product.module";
 import { EventModule } from "../events";
 import { SuratCargoModule } from "../surat-cargo/surat-cargo.module";
 import { scheduledProcessors } from "../../workers/scheduled-processors";
-import { OrderTaxPolicyService } from "../order/order-tax-policy.service";
+import { OrderTaxPolicyService } from "../order/pricing/order-tax-policy.service";
 import { DiscountModule } from "../discount/discount.module";
 
 @Module({

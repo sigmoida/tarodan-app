@@ -4,8 +4,8 @@ import { CacheService } from "../cache/cache.service";
 import { isPublicStorageKey, StorageService } from "../storage/storage.service";
 import { OrderStatus, OfferStatus } from "@prisma/client";
 import { getAvailableQuantity } from "../product/helpers/product-availability.helper";
-import { sellerNetAmountOf } from "./order-net.helper";
-import { storedProductBaseOf } from "./order-charged-base.helper";
+import { sellerNetAmountOf } from "./helpers/order-net.helper";
+import { storedProductBaseOf } from "./helpers/order-charged-base.helper";
 import { publicIdentityFields } from "../../common/helpers/public-identity";
 
 /**

@@ -21,7 +21,7 @@ import { SHIPPING_PACKAGE_TIER_ORDER } from "../shipping/shipping-package-tier";
 import { AdminTradeCommonService } from "../admin/trade/admin-trade-common.service";
 import { getProcessRole } from "../../process-role";
 import { WORKER_HEARTBEAT_KEY } from "./worker-heartbeat.service";
-import { validateStrictCommissionCoverage } from "../order/order-commission.helper";
+import { validateStrictCommissionCoverage } from "../order/helpers/order-commission.helper";
 import { QUEUE_NAMES } from "../../workers/constants";
 import { CRON_CATALOG } from "../../workers/cron-catalog";
 import { isProduction } from "../../config/environment";

@@ -41,7 +41,7 @@ import {
   readInvoiceLineItems,
   type InvoiceLineItem,
 } from "./invoice-lines";
-import { OrderTaxPolicyService } from "../order/order-tax-policy.service";
+import { OrderTaxPolicyService } from "../order/pricing/order-tax-policy.service";
 import type { InvoiceRefundReversePayload } from "../outbox/outbox.types";
 import { renderManagedEmailTemplate } from "../../common/helpers/email-template-renderer";
 import { frontendUrl as resolveFrontendUrl } from "../../config/app-urls";

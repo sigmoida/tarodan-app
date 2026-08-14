@@ -12,7 +12,7 @@ import {
 import { PrismaService } from "../../../prisma";
 import { ledgerNetRevenue } from "../../commission/ledger-net";
 import { ELOGO_MAX_SEND_ATTEMPTS } from "../../elogo/elogo-retry-policy";
-import { OrderTaxPolicyService } from "../../order/order-tax-policy.service";
+import { OrderTaxPolicyService } from "../../order/pricing/order-tax-policy.service";
 
 /**
  * Finans ÖZETİ — admin'in "para nerede?" sorusuna tek bakışta cevap.

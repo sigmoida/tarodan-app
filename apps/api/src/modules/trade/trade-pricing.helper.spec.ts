@@ -1,5 +1,5 @@
 import { CommissionSellerType } from "@prisma/client";
-import { CommissionRuleMatchError } from "../order/order-commission.helper";
+import { CommissionRuleMatchError } from "../order/helpers/order-commission.helper";
 import {
   buildTradePricing,
   TRADE_SHIPPING_LEGS,
