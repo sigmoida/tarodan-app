@@ -8,6 +8,7 @@ import { PaymentCommonService } from "./payment-common.service";
 import { PaymentRefundService } from "./payment-refund.service";
 import { PaymentHoldReleaseService } from "./payment-hold-release.service";
 import { PaymentRefundAttemptService } from "./payment-refund-attempt.service";
+import { PaymentTradeRefundService } from "./payment-trade-refund.service";
 import { PaymentReconciliationService } from "./payment-reconciliation.service";
 import { ReservationReconciliationService } from "./reservation-reconciliation.service";
 import { PaymentExpiryReconciliationService } from "./payment-expiry-reconciliation.service";
@@ -139,6 +140,7 @@ describe("PaymentService trade cash refund idempotency", () => {
         PaymentRefundService,
         PaymentHoldReleaseService,
         PaymentRefundAttemptService,
+        PaymentTradeRefundService,
         PaymentReconciliationService,
         ReservationReconciliationService,
         PaymentExpiryReconciliationService,

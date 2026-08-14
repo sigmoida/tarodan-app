@@ -208,6 +208,7 @@ describe("PaymentRefundService.processRefund — MONEY-H3/H4 partial refund", ()
       { record: jest.fn().mockResolvedValue(undefined) } as any, // providerEvents
       {} as any, // holdRelease
       new PaymentRefundAttemptService(prisma as any), // attempts
+      {} as any, // tradeRefunds — bu spec yalnız SİPARİŞ iadesini sürüyor
       undefined, // outbox
       opts.ledger as any, // Faz 6.2 ledger (@Optional)
     );

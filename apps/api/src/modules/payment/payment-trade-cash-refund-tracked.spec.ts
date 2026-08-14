@@ -1,4 +1,4 @@
-import { PaymentRefundService } from "./payment-refund.service";
+import { PaymentTradeRefundService } from "./payment-trade-refund.service";
 import { PaymentRefundAttemptService } from "./payment-refund-attempt.service";
 
 /**
@@ -6,7 +6,7 @@ import { PaymentRefundAttemptService } from "./payment-refund-attempt.service";
  * Başarısızlıkta trade.refundFailureReason marker'ı yazılır (admin retryTradeRefund +
  * retryFailedTradeRefunds cron'u toparlar); ASLA throw etmez. Başarıda marker temizlenir.
  */
-describe("PaymentRefundService.refundTradeCashTracked — MONEY-H2 failure tracking", () => {
+describe("PaymentTradeRefundService.refundTradeCashTracked — MONEY-H2 failure tracking", () => {
   const TRADE_ID = "trade-1";
 
   const makeService = () => {
@@ -25,17 +25,12 @@ describe("PaymentRefundService.refundTradeCashTracked — MONEY-H2 failure track
       emitTradeRefundFailed: jest.fn().mockResolvedValue(undefined),
     };
     const configService = { get: jest.fn().mockReturnValue(undefined) };
-    const service = new PaymentRefundService(
+    const service = new PaymentTradeRefundService(
       prisma as any,
       configService as any,
       {} as any, // paymentProviders
       eventService as any,
-      {} as any, // notificationService
-      {} as any, // commissionLedger
-      {} as any, // elogoInvoicing
-      {} as any, // paymentCommon
       { record: jest.fn() } as any, // providerEvents
-      {} as any, // holdRelease
       new PaymentRefundAttemptService(prisma as any), // attempts
     );
     return { service, prisma, eventService };
