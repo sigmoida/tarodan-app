@@ -62,10 +62,23 @@ describe("RefundService.openReturnShipment pre-advice", () => {
       {} as any,
       {} as any,
       {} as any,
+      {
+        appendHistory: jest.fn(),
+        safeNotify: jest.fn(),
+        notifyRefundRequestOpened: jest.fn(),
+        sendRefundEmail: jest.fn(),
+        toProductImageUrls: jest.fn().mockReturnValue([]),
+      } as any,
     );
-    jest.spyOn(service as any, "appendHistory").mockResolvedValue(undefined);
-    jest.spyOn(service as any, "safeNotify").mockResolvedValue(undefined);
-    jest.spyOn(service as any, "sendRefundEmail").mockResolvedValue(undefined);
+    jest
+      .spyOn((service as any).notifications, "appendHistory")
+      .mockResolvedValue(undefined);
+    jest
+      .spyOn((service as any).notifications, "safeNotify")
+      .mockResolvedValue(undefined);
+    jest
+      .spyOn((service as any).notifications, "sendRefundEmail")
+      .mockResolvedValue(undefined);
 
     await expect(service.openReturnShipment("refund-1")).resolves.toBe(updated);
 

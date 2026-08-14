@@ -11,6 +11,7 @@ import { BadRequestException } from "@nestjs/common";
 import { RefundService } from "./refund.service";
 import { flatPackageTiers } from "../shipping/testing/tariff-fixture";
 import { NotificationType } from "../notification/dto/notification.dto";
+import { RefundNotificationService } from "./refund-notification.service";
 
 describe("RefundService policy integration", () => {
   const baseOrder = {
@@ -149,6 +150,11 @@ describe("RefundService policy integration", () => {
       {} as any,
       notification as any,
       {} as any,
+      new RefundNotificationService(
+        prisma as any,
+        notification as any,
+        {} as any,
+      ) as any,
       shippingTariff as any,
     );
     return { service, prisma, payment, notification, createdRows };
@@ -334,7 +340,9 @@ describe("RefundService policy integration", () => {
 
   it("finalizes quarantined finances without regressing an in-transit return", async () => {
     const { service, createdRows } = makeService();
-    jest.spyOn(service as any, "appendHistory").mockResolvedValue(undefined);
+    jest
+      .spyOn((service as any).notifications, "appendHistory")
+      .mockResolvedValue(undefined);
     createdRows.push({
       id: "refund-1",
       refundNumber: "RFD-1",

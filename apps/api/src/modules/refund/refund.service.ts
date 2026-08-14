@@ -76,6 +76,7 @@ import {
 } from "../../common/helpers/public-identity";
 import { adminUrl } from "../../config/app-urls";
 import { platformWarehouseAddress } from "../../config/warehouse";
+import { RefundNotificationService } from "./refund-notification.service";
 
 /**
  * Cayma (iade talep) penceresi — satıcı payout takvimiyle AYNI kaynaktan gelir
@@ -121,6 +122,7 @@ export class RefundService {
     private readonly suratTrackingService: SuratTrackingService,
     private readonly notificationService: NotificationService,
     private readonly storageService: StorageService,
+    private readonly notifications: RefundNotificationService,
     @Optional()
     private readonly shippingTariffService?: ShippingTariffService,
     @Optional()
@@ -203,194 +205,6 @@ export class RefundService {
       );
     }
     return Number(order.taxAmount ?? 0);
-  }
-
-  /**
-   * Refund yanıtlarında ürün resimlerini ham ProductImage kaydı yerine
-   * herkesin doğrudan <img src> olarak kullanabileceği public URL dizisine
-   * çevirir. Web/mobil/admin tüm iade ekranları bu şekli bekliyor.
-   */
-  private toProductImageUrls(images: unknown): string[] {
-    if (!Array.isArray(images)) return [];
-    return images
-      .map((img: any) =>
-        img?.cardKey ? this.storageService.getPublicAssetUrl(img.cardKey) : "",
-      )
-      .filter(Boolean);
-  }
-
-  /**
-   * İade yanıtı iki tarafa da açıktır (alıcı ↔ satıcı): kullanıcı satırları
-   * herkese açık kimliğe indirgenir, ürün görselleri public URL'e çevrilir.
-   */
-  private withResolvedImages<T extends Record<string, any>>(rr: T): T {
-    const product = rr?.order?.product;
-    if (product?.images) {
-      product.images = this.toProductImageUrls(product.images);
-    }
-    if (rr?.order?.buyer) rr.order.buyer = toPublicIdentity(rr.order.buyer);
-    if (rr?.order?.seller) rr.order.seller = toPublicIdentity(rr.order.seller);
-    if (rr?.requester) (rr as any).requester = toPublicIdentity(rr.requester);
-    return rr;
-  }
-
-  /**
-   * Append a transition entry to RefundRequest.metadata.history. Used as a
-   * lightweight audit trail for buyer/seller actions (AuditLog requires an
-   * AdminUser FK and isn't applicable here).
-   */
-  private async appendHistory(
-    refundRequestId: string,
-    entry: { action: string; by: string; details?: Record<string, any> },
-  ): Promise<void> {
-    const current = await this.prisma.refundRequest.findUnique({
-      where: { id: refundRequestId },
-      select: { metadata: true },
-    });
-    const meta = (current?.metadata as Record<string, any>) || {};
-    const history = Array.isArray(meta.history) ? meta.history : [];
-    history.push({ ...entry, at: new Date().toISOString() });
-    await this.prisma.refundRequest.update({
-      where: { id: refundRequestId },
-      data: { metadata: { ...meta, history } },
-    });
-  }
-
-  /**
-   * Best-effort notification dispatch — failures are logged, never thrown.
-   * createInAppNotification artık in_app + canlı websocket + PUSH'u birlikte
-   * yapıyor (notification.service), o yüzden burada tek çağrı yeterli.
-   * Email ayrı: markalı şablonlar için sendRefundEmail kullanılır.
-   */
-  private async safeNotify(
-    userId: string,
-    type: NotificationType,
-    data?: Record<string, any>,
-  ): Promise<void> {
-    try {
-      await this.notificationService.createInAppNotification(
-        userId,
-        type,
-        data,
-      );
-    } catch (err: any) {
-      this.logger.error(
-        `Notification ${type} → ${userId} failed: ${err?.message}`,
-      );
-    }
-  }
-
-  /**
-   * Yeni ve kalıcı bir iade talebini satıcıya bildirir. Yönetici incelemesi
-   * gerekiyorsa yalnız iade kararı verebilen aktif admin/super-admin hesaplarına
-   * ayrıca operasyon uyarısı gönderir. Bildirim arızaları ticaret akışını bozmaz.
-   */
-  private async notifyRefundRequestOpened(input: {
-    refundRequestId: string;
-    refundNumber: string;
-    orderId: string;
-    sellerId: string;
-    reason: string;
-    requiresAdminReview: boolean;
-  }): Promise<void> {
-    await this.safeNotify(
-      input.sellerId,
-      NotificationType.REFUND_REQUEST_RECEIVED_SELLER,
-      {
-        refundNumber: input.refundNumber,
-        orderId: input.orderId,
-      },
-    );
-    await this.sendRefundEmail(
-      input.refundRequestId,
-      "seller",
-      "refund-requested-seller",
-      { refundNumber: input.refundNumber, refundReason: input.reason },
-    );
-
-    if (!input.requiresAdminReview) return;
-
-    try {
-      const admins = await this.prisma.adminUser.findMany({
-        where: {
-          isActive: true,
-          role: { in: [AdminRole.super_admin, AdminRole.admin] },
-        },
-        select: { userId: true },
-      });
-      const adminBaseUrl = adminUrl();
-      const adminLink = `${adminBaseUrl}/operations/refund-requests/${encodeURIComponent(input.refundRequestId)}`;
-
-      for (const admin of admins) {
-        await this.safeNotify(
-          admin.userId,
-          NotificationType.REFUND_REVIEW_REQUIRED_ADMIN,
-          {
-            refundRequestId: input.refundRequestId,
-            refundNumber: input.refundNumber,
-            orderId: input.orderId,
-            adminLink,
-          },
-        );
-      }
-    } catch (error: any) {
-      this.logger.error(
-        `Refund review admin notifications failed for ${input.refundNumber}: ${error?.message}`,
-      );
-    }
-  }
-
-  /**
-   * İade akışı e-postaları. refundRequestId'den order/ürün/taraf bilgilerini
-   * tazeden çeker ve ilgili tarafa (alıcı veya satıcı) markalı şablonu gönderir.
-   * Asla throw etmez; in-app bildirimlerin yanında çalışır.
-   */
-  private async sendRefundEmail(
-    refundRequestId: string,
-    recipient: "buyer" | "seller",
-    templateKey: string,
-    extra?: Record<string, any>,
-  ): Promise<void> {
-    try {
-      const rr = await this.prisma.refundRequest.findUnique({
-        where: { id: refundRequestId },
-        select: {
-          amount: true,
-          orderId: true,
-          requesterId: true,
-          order: {
-            select: {
-              orderNumber: true,
-              sellerId: true,
-              buyer: { select: PUBLIC_NAME_SELECT },
-              seller: { select: PUBLIC_NAME_SELECT },
-              product: { select: { title: true } },
-            },
-          },
-        },
-      });
-      if (!rr) return;
-      const recipientId =
-        recipient === "buyer" ? rr.requesterId : rr.order?.sellerId;
-      if (!recipientId) return;
-      await this.notificationService.sendTemplateEmailToUser(
-        recipientId,
-        templateKey,
-        {
-          buyerName: publicName(rr.order?.buyer),
-          sellerName: publicName(rr.order?.seller),
-          orderNumber: rr.order?.orderNumber,
-          orderId: rr.orderId,
-          productTitle: rr.order?.product?.title ?? "",
-          refundAmount: Number(rr.amount),
-          ...extra,
-        },
-      );
-    } catch (err: any) {
-      this.logger.error(
-        `Refund email ${templateKey} failed for ${refundRequestId}: ${err?.message}`,
-      );
-    }
   }
 
   async createRefundRequest(
@@ -691,12 +505,12 @@ export class RefundService {
     });
 
     if (policy.requiresAdminReview) {
-      await this.appendHistory(created.id, {
+      await this.notifications.appendHistory(created.id, {
         action: "cancellation_pending_admin_review",
         by: requesterId,
         details: { reasonCode, policyCode: policy.policyCode },
       });
-      await this.notifyRefundRequestOpened({
+      await this.notifications.notifyRefundRequestOpened({
         refundRequestId: created.id,
         refundNumber,
         orderId: order.id,
@@ -773,7 +587,7 @@ export class RefundService {
       where: { id: order.id },
       data: { cancellationType: "iptal" },
     });
-    await this.appendHistory(created.id, {
+    await this.notifications.appendHistory(created.id, {
       action: "cancellation_refunded",
       by: "system",
       details: { reasonCode },
@@ -808,12 +622,12 @@ export class RefundService {
     });
     // İade iptal edildi → hold kilidini kaldır, normal escrow akışına dönsün.
     await this.unfreezeHoldForRefund(rr.order.id);
-    await this.appendHistory(refundRequestId, {
+    await this.notifications.appendHistory(refundRequestId, {
       action: "cancelled_by_buyer",
       by: requesterId,
       details: { previousStatus: rr.status },
     });
-    await this.safeNotify(
+    await this.notifications.safeNotify(
       rr.order.sellerId,
       NotificationType.REFUND_CANCELLED,
       {
@@ -1502,7 +1316,7 @@ export class RefundService {
       if (lifecyclePreservingFinancialReview) {
         // The parcel may already be with the carrier. Only the immutable money
         // decision is finalized; status, custody and hold timing stay intact.
-        await this.appendHistory(refundRequestId, {
+        await this.notifications.appendHistory(refundRequestId, {
           action: "financial_review_finalized",
           by: adminId,
           details: { note: note?.trim() || null },
@@ -1589,7 +1403,7 @@ export class RefundService {
         where: { id: rr.orderId },
         data: { cancellationType: "iptal" },
       });
-      await this.appendHistory(rr.id, {
+      await this.notifications.appendHistory(rr.id, {
         action: "approved_and_refunded_by_admin",
         by: adminId,
         details: { note: note?.trim() || null },
@@ -1606,15 +1420,19 @@ export class RefundService {
         sellerResponse: note?.trim() || null,
       },
     });
-    await this.appendHistory(rr.id, {
+    await this.notifications.appendHistory(rr.id, {
       action: "approved_by_admin",
       by: adminId,
       details: { note: note?.trim() || null },
     });
-    await this.safeNotify(rr.requesterId, NotificationType.REFUND_APPROVED, {
-      refundNumber: rr.refundNumber,
-      orderId: rr.orderId,
-    });
+    await this.notifications.safeNotify(
+      rr.requesterId,
+      NotificationType.REFUND_APPROVED,
+      {
+        refundNumber: rr.refundNumber,
+        orderId: rr.orderId,
+      },
+    );
 
     if (
       rr.order.status === OrderStatus.delivered ||
@@ -1663,7 +1481,7 @@ export class RefundService {
       },
     });
     await this.unfreezeHoldForRefund(rr.order.id);
-    await this.appendHistory(rr.id, {
+    await this.notifications.appendHistory(rr.id, {
       action: "rejected_by_admin",
       by: adminId,
       details: { reason: reason.trim() },
@@ -1707,17 +1525,21 @@ export class RefundService {
     });
     // Hold kilidini kaldır → satıcıya normal escrow akışında ödeme.
     await this.unfreezeHoldForRefund(rr.order.id);
-    await this.appendHistory(refundRequestId, {
+    await this.notifications.appendHistory(refundRequestId, {
       action: "closed_by_admin",
       by: adminId,
       details: { previousStatus: rr.status, reason: reason ?? null },
     });
-    await this.safeNotify(rr.requesterId, NotificationType.REFUND_CANCELLED, {
-      refundNumber: rr.refundNumber,
-      orderId: rr.order.id,
-      // Admin kapattı → talebin sahibi olan ALICIYA gider.
-      audience: "buyer",
-    });
+    await this.notifications.safeNotify(
+      rr.requesterId,
+      NotificationType.REFUND_CANCELLED,
+      {
+        refundNumber: rr.refundNumber,
+        orderId: rr.order.id,
+        // Admin kapattı → talebin sahibi olan ALICIYA gider.
+        audience: "buyer",
+      },
+    );
     return updated;
   }
 
@@ -1763,7 +1585,7 @@ export class RefundService {
         i18nMessage("server.refund.advancedElsewhere"),
       );
     }
-    await this.appendHistory(refundRequestId, {
+    await this.notifications.appendHistory(refundRequestId, {
       action: "marked_disputed",
       by: adminId,
       details: { previousStatus: rr.status, note: note.trim() },
@@ -1798,7 +1620,7 @@ export class RefundService {
     if (!isAdmin && rr.requesterId !== userId && rr.order.sellerId !== userId) {
       throw new ForbiddenException(i18nMessage("server.refund.viewForbidden"));
     }
-    return this.withResolvedImages(rr);
+    return this.notifications.withResolvedImages(rr);
   }
 
   async listForBuyer(userId: string) {
@@ -1816,7 +1638,7 @@ export class RefundService {
         },
       },
     });
-    return rows.map((rr) => this.withResolvedImages(rr));
+    return rows.map((rr) => this.notifications.withResolvedImages(rr));
   }
 
   async listForSeller(userId: string) {
@@ -1835,7 +1657,7 @@ export class RefundService {
         requester: { select: { id: true, ...PUBLIC_NAME_SELECT } },
       },
     });
-    return rows.map((rr) => this.withResolvedImages(rr));
+    return rows.map((rr) => this.notifications.withResolvedImages(rr));
   }
 
   async openReturnShipment(refundRequestId: string) {
@@ -1906,12 +1728,12 @@ export class RefundService {
           returnCreatedAt: new Date(),
         },
       });
-      await this.appendHistory(rr.id, {
+      await this.notifications.appendHistory(rr.id, {
         action: "return_opened",
         by: "system",
         details: { provider: "manual", trackingNumber: rr.refundNumber },
       });
-      await this.safeNotify(
+      await this.notifications.safeNotify(
         rr.requesterId,
         NotificationType.REFUND_RETURN_OPENED,
         {
@@ -1920,9 +1742,14 @@ export class RefundService {
           trackingNumber: rr.refundNumber,
         },
       );
-      await this.sendRefundEmail(rr.id, "buyer", "refund-return-label-buyer", {
-        returnTrackingNumber: rr.refundNumber,
-      });
+      await this.notifications.sendRefundEmail(
+        rr.id,
+        "buyer",
+        "refund-return-label-buyer",
+        {
+          returnTrackingNumber: rr.refundNumber,
+        },
+      );
       return updated;
     }
 
@@ -1964,12 +1791,12 @@ export class RefundService {
         returnCreatedAt: new Date(),
       },
     });
-    await this.appendHistory(rr.id, {
+    await this.notifications.appendHistory(rr.id, {
       action: "return_opened",
       by: "system",
       details: { provider: "surat", trackingNumber: rr.refundNumber },
     });
-    await this.safeNotify(
+    await this.notifications.safeNotify(
       rr.requesterId,
       NotificationType.REFUND_RETURN_OPENED,
       {
@@ -1978,10 +1805,15 @@ export class RefundService {
         trackingNumber: rr.refundNumber,
       },
     );
-    await this.sendRefundEmail(rr.id, "buyer", "refund-return-label-buyer", {
-      returnTrackingNumber: rr.refundNumber,
-      cargoCompany: "Sürat Kargo",
-    });
+    await this.notifications.sendRefundEmail(
+      rr.id,
+      "buyer",
+      "refund-return-label-buyer",
+      {
+        returnTrackingNumber: rr.refundNumber,
+        cargoCompany: "Sürat Kargo",
+      },
+    );
     return updated;
   }
 
@@ -2104,19 +1936,27 @@ export class RefundService {
         data: { cancellationType: "iade" },
       })
       .catch(() => undefined);
-    await this.appendHistory(rr.id, {
+    await this.notifications.appendHistory(rr.id, {
       action: "refund_completed",
       by: "system",
       details: { providerRefundId: refundResult?.providerRefundId ?? null },
     });
-    await this.safeNotify(rr.requesterId, NotificationType.REFUND_COMPLETED, {
-      refundNumber: rr.refundNumber,
-      orderId: rr.orderId,
-    });
+    await this.notifications.safeNotify(
+      rr.requesterId,
+      NotificationType.REFUND_COMPLETED,
+      {
+        refundNumber: rr.refundNumber,
+        orderId: rr.orderId,
+      },
+    );
     // "Para iadeniz tamamlandı" maili eksikti (sadece zile düşüyordu) — eklendi.
-    await this.sendRefundEmail(rr.id, "buyer", "refund-completed");
+    await this.notifications.sendRefundEmail(
+      rr.id,
+      "buyer",
+      "refund-completed",
+    );
     // Satıcı tarafı: iade tamamlandı bildirimi + mail.
-    await this.safeNotify(
+    await this.notifications.safeNotify(
       rr.order.sellerId,
       NotificationType.REFUND_COMPLETED_SELLER,
       {
@@ -2124,7 +1964,11 @@ export class RefundService {
         orderId: rr.orderId,
       },
     );
-    await this.sendRefundEmail(rr.id, "seller", "refund-completed-seller");
+    await this.notifications.sendRefundEmail(
+      rr.id,
+      "seller",
+      "refund-completed-seller",
+    );
     return updated;
   }
 
@@ -2235,7 +2079,7 @@ export class RefundService {
         });
         // Hold kilidini kaldır → normal escrow akışına dönsün.
         await this.unfreezeHoldForRefund(rr.order.id);
-        await this.appendHistory(rr.id, {
+        await this.notifications.appendHistory(rr.id, {
           action: "return_dropoff_expired",
           by: "system",
           details: { days, carrierCancellationRequired: true },
@@ -2243,7 +2087,7 @@ export class RefundService {
         this.logger.warn(
           `Refund ${rr.refundNumber} locally expired; carrier cancellation task=${cancellationTask.id}`,
         );
-        await this.safeNotify(
+        await this.notifications.safeNotify(
           rr.requesterId,
           NotificationType.REFUND_CANCELLED,
           {
@@ -2316,12 +2160,12 @@ export class RefundService {
           },
         });
         await this.unfreezeHoldForRefund(rr.order.id);
-        await this.appendHistory(rr.id, {
+        await this.notifications.appendHistory(rr.id, {
           action: "wait_for_delivery_expired",
           by: "system",
           details: { days },
         });
-        await this.safeNotify(
+        await this.notifications.safeNotify(
           rr.requesterId,
           NotificationType.REFUND_CANCELLED,
           {
@@ -2425,18 +2269,18 @@ export class RefundService {
         update.status === ShipmentStatus.picked_up ||
         update.status === ShipmentStatus.return_in_progress)
     ) {
-      await this.safeNotify(
+      await this.notifications.safeNotify(
         updated.requesterId,
         NotificationType.REFUND_RETURN_IN_TRANSIT,
         notifData,
       );
-      await this.safeNotify(
+      await this.notifications.safeNotify(
         updated.order.sellerId,
         NotificationType.REFUND_RETURN_SHIPPED_SELLER,
         notifData,
       );
       // Satıcıya bir kez markalı mail: ürün kendisine geliyor.
-      await this.sendRefundEmail(
+      await this.notifications.sendRefundEmail(
         updated.id,
         "seller",
         "refund-return-incoming-seller",
@@ -2450,12 +2294,12 @@ export class RefundService {
       (update.status === ShipmentStatus.delivered ||
         update.status === ShipmentStatus.returned)
     ) {
-      await this.safeNotify(
+      await this.notifications.safeNotify(
         updated.requesterId,
         NotificationType.REFUND_RETURN_DELIVERED_BUYER,
         notifData,
       );
-      await this.safeNotify(
+      await this.notifications.safeNotify(
         updated.order.sellerId,
         NotificationType.REFUND_RETURN_DELIVERED_SELLER,
         notifData,
@@ -2849,12 +2693,12 @@ export class RefundService {
 
     if (policy.requiresAdminReview) {
       await this.freezeHoldForRefund(order.id, created.id);
-      await this.appendHistory(created.id, {
+      await this.notifications.appendHistory(created.id, {
         action: "pending_admin_review",
         by: requesterId,
         details: { policyCode: policy.policyCode },
       });
-      await this.notifyRefundRequestOpened({
+      await this.notifications.notifyRefundRequestOpened({
         refundRequestId: created.id,
         refundNumber,
         orderId: order.id,
@@ -2953,18 +2797,26 @@ export class RefundService {
 
     // Anında iade önceden TAMAMEN sessizdi — alıcı para iadesini hiç öğrenmiyordu.
     // in_app + push (safeNotify) + markalı mail.
-    await this.safeNotify(requesterId, NotificationType.REFUND_COMPLETED, {
-      refundNumber,
-      orderId: order.id,
-    });
-    await this.sendRefundEmail(created.id, "buyer", "refund-completed");
+    await this.notifications.safeNotify(
+      requesterId,
+      NotificationType.REFUND_COMPLETED,
+      {
+        refundNumber,
+        orderId: order.id,
+      },
+    );
+    await this.notifications.sendRefundEmail(
+      created.id,
+      "buyer",
+      "refund-completed",
+    );
     // Satıcı tarafı: iade tamamlandı bildirimi + mail.
     const sellerRow = await this.prisma.order.findUnique({
       where: { id: order.id },
       select: { sellerId: true },
     });
     if (sellerRow?.sellerId) {
-      await this.safeNotify(
+      await this.notifications.safeNotify(
         sellerRow.sellerId,
         NotificationType.REFUND_COMPLETED_SELLER,
         {
@@ -2973,7 +2825,11 @@ export class RefundService {
         },
       );
     }
-    await this.sendRefundEmail(created.id, "seller", "refund-completed-seller");
+    await this.notifications.sendRefundEmail(
+      created.id,
+      "seller",
+      "refund-completed-seller",
+    );
 
     return updated;
   }
@@ -3074,7 +2930,7 @@ export class RefundService {
 
     // İade açıldı → satıcı hold'unu kilitle (payout bu iade kapanana kadar bloke).
     await this.freezeHoldForRefund(order.id, created.id);
-    await this.notifyRefundRequestOpened({
+    await this.notifications.notifyRefundRequestOpened({
       refundRequestId: created.id,
       refundNumber,
       orderId: order.id,
@@ -3084,7 +2940,7 @@ export class RefundService {
     });
 
     if (requiresReview) {
-      await this.appendHistory(created.id, {
+      await this.notifications.appendHistory(created.id, {
         action: "pending_admin_review",
         by: requesterId,
         details: {
@@ -3097,11 +2953,19 @@ export class RefundService {
 
     // 14 gün cayma hakkı → otomatik onay. Alıcıya talebinin onaylandığını bildir
     // (önceden talep anında hiç bildirim yoktu). in_app + push + mail.
-    await this.safeNotify(requesterId, NotificationType.REFUND_APPROVED, {
-      refundNumber,
-      orderId: order.id,
-    });
-    await this.sendRefundEmail(created.id, "buyer", "refund-approved-buyer");
+    await this.notifications.safeNotify(
+      requesterId,
+      NotificationType.REFUND_APPROVED,
+      {
+        refundNumber,
+        orderId: order.id,
+      },
+    );
+    await this.notifications.sendRefundEmail(
+      created.id,
+      "buyer",
+      "refund-approved-buyer",
+    );
 
     // Ürün alıcıya ulaşmışsa (delivered/awaiting_buyer_confirmation/completed)
     // iade kargosunu hemen aç; aksi hâlde cron teslimatta açar.

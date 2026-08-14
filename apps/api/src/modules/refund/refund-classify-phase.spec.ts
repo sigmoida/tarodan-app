@@ -21,6 +21,13 @@ describe("RefundService.classifyOrderPhase", () => {
     {} as any,
     {} as any,
     {} as any,
+    {
+      appendHistory: jest.fn(),
+      safeNotify: jest.fn(),
+      notifyRefundRequestOpened: jest.fn(),
+      sendRefundEmail: jest.fn(),
+      toProductImageUrls: jest.fn().mockReturnValue([]),
+    } as any,
   );
 
   const classify = (order: any): string =>

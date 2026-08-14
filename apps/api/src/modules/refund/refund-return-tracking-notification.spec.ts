@@ -29,12 +29,19 @@ describe("RefundService.applyReturnTrackingUpdate notifications", () => {
       {} as any,
       {} as any,
       {} as any,
+      {
+        appendHistory: jest.fn(),
+        safeNotify: jest.fn(),
+        notifyRefundRequestOpened: jest.fn(),
+        sendRefundEmail: jest.fn(),
+        toProductImageUrls: jest.fn().mockReturnValue([]),
+      } as any,
     );
     const safeNotify = jest
-      .spyOn(service as any, "safeNotify")
+      .spyOn((service as any).notifications, "safeNotify")
       .mockResolvedValue(undefined);
     const sendRefundEmail = jest
-      .spyOn(service as any, "sendRefundEmail")
+      .spyOn((service as any).notifications, "sendRefundEmail")
       .mockResolvedValue(undefined);
     return { service, prisma, safeNotify, sendRefundEmail };
   };

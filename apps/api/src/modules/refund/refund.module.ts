@@ -13,6 +13,7 @@ import { StorageModule } from "../storage/storage.module";
 import { ShippingTariffModule } from "../shipping/shipping-tariff.module";
 import { RefundController } from "./refund.controller";
 import { RefundService } from "./refund.service";
+import { RefundNotificationService } from "./refund-notification.service";
 import { RefundSchedulerService } from "./refund-scheduler.service";
 import { RefundScheduledProcessor } from "./refund-scheduled.processor";
 import { scheduledProcessors } from "../../workers/scheduled-processors";
@@ -41,6 +42,7 @@ import { scheduledProcessors } from "../../workers/scheduled-processors";
   controllers: [RefundController],
   providers: [
     RefundService,
+    RefundNotificationService,
     RefundSchedulerService,
     ...scheduledProcessors(RefundScheduledProcessor),
   ],

@@ -39,6 +39,13 @@ describe("RefundService.finalizeRefundForReturnedShipment — MONEY-M1 CAS claim
       {} as any,
       {} as any,
       {} as any,
+      {
+        appendHistory: jest.fn(),
+        safeNotify: jest.fn(),
+        notifyRefundRequestOpened: jest.fn(),
+        sendRefundEmail: jest.fn(),
+        toProductImageUrls: jest.fn().mockReturnValue([]),
+      } as any,
     );
     return { service, prisma, paymentService };
   };
