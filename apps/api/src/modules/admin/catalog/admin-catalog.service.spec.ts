@@ -388,9 +388,12 @@ describe("AdminCatalogService slug üretimi ve marka cache'i", () => {
       _count: { products: 3, carModels: 0 },
     });
 
-    await expect(service.deleteBrand("admin-1", "b1")).rejects.toThrow(
-      "silinemez",
-    );
+    await expect(service.deleteBrand("admin-1", "b1")).rejects.toMatchObject({
+      response: {
+        i18nKey: "server.admin.catalog.brandInUse",
+        i18nParams: { products: 3, models: 0 },
+      },
+    });
     expect(prisma.brand.delete).not.toHaveBeenCalled();
     expect(cache.delPattern).not.toHaveBeenCalled();
   });

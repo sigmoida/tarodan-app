@@ -123,9 +123,11 @@ describe("CatalogImportService", () => {
         mimetype: "text/csv",
       });
 
-      await expect(service.import("admin-1", "brands", file)).rejects.toThrow(
-        "Yalnızca .xlsx",
-      );
+      await expect(
+        service.import("admin-1", "brands", file),
+      ).rejects.toMatchObject({
+        response: { i18nKey: "server.admin.catalogImport.onlyXlsx" },
+      });
     });
 
     it("MIME türü boş ya da octet-stream olan .xlsx dosyasını kabul eder", async () => {
@@ -162,9 +164,14 @@ describe("CatalogImportService", () => {
         ["Hot Wheels"],
       ]);
 
-      await expect(service.import("admin-1", "brands", file)).rejects.toThrow(
-        "'Markalar' sayfası",
-      );
+      await expect(
+        service.import("admin-1", "brands", file),
+      ).rejects.toMatchObject({
+        response: {
+          i18nKey: "server.admin.bulkImport.sheetMissing",
+          i18nParams: { sheet: "Markalar" },
+        },
+      });
     });
 
     it("eksik sütunları tek hatada bildirir", async () => {
@@ -174,9 +181,11 @@ describe("CatalogImportService", () => {
         [["Hot Wheels"]],
       );
 
-      await expect(service.import("admin-1", "brands", file)).rejects.toThrow(
-        /Excel sütunları eksik/,
-      );
+      await expect(
+        service.import("admin-1", "brands", file),
+      ).rejects.toMatchObject({
+        response: { i18nKey: "server.admin.catalogImport.missingColumns" },
+      });
     });
 
     it("formül içeren dosyayı reddeder", async () => {
@@ -184,17 +193,24 @@ describe("CatalogImportService", () => {
       // kişinin gördüğünden farklı bir değer içe aktarılabilirdi.
       const file = await brandFile([["Hot Wheels"]], { formula: true });
 
-      await expect(service.import("admin-1", "brands", file)).rejects.toThrow(
-        "Formül içeren Excel",
-      );
+      await expect(
+        service.import("admin-1", "brands", file),
+      ).rejects.toMatchObject({
+        response: { i18nKey: "server.admin.bulkImport.formulaNotAllowed" },
+      });
     });
 
     it("veri satırı yoksa hata verir", async () => {
       const file = await brandFile([]);
 
-      await expect(service.import("admin-1", "brands", file)).rejects.toThrow(
-        "veri satırı yok",
-      );
+      await expect(
+        service.import("admin-1", "brands", file),
+      ).rejects.toMatchObject({
+        response: {
+          i18nKey: "server.admin.catalogImport.noDataRows",
+          i18nParams: { sheet: "Markalar" },
+        },
+      });
     });
 
     it("satır sınırını aşan dosyayı reddeder", async () => {
@@ -204,9 +220,14 @@ describe("CatalogImportService", () => {
       );
       const file = await brandFile(rows);
 
-      await expect(service.import("admin-1", "brands", file)).rejects.toThrow(
-        `en fazla ${CATALOG_IMPORT_LIMITS.maxRows} satır`,
-      );
+      await expect(
+        service.import("admin-1", "brands", file),
+      ).rejects.toMatchObject({
+        response: {
+          i18nKey: "server.admin.catalogImport.tooManyRows",
+          i18nParams: { max: CATALOG_IMPORT_LIMITS.maxRows },
+        },
+      });
     });
   });
 
