@@ -20,7 +20,7 @@ export default function RootNotFound() {
   return (
     <html lang="tr">
       <body className={notoSans.className}>
-        <main className="flex min-h-screen flex-col items-center justify-center gap-4 bg-surface px-6 text-center">
+        <main className="flex min-h-dvh flex-col items-center justify-center gap-4 bg-surface px-6 text-center">
           <p className="text-7xl font-bold text-primary-600">404</p>
           <h1 className="text-2xl font-semibold text-heading">
             Sayfa bulunamadı

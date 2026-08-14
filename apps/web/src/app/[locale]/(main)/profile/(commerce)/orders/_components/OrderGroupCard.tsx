@@ -57,6 +57,7 @@ function OrderLine({
             src={image || PLACEHOLDER}
             alt={product?.title ?? ""}
             fill
+            sizes="56px"
             className="object-cover"
             fallbackSrc={PLACEHOLDER}
             logContext={{ orderId: order.id, page: "orders-line" }}

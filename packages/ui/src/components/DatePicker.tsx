@@ -17,8 +17,14 @@ import {
   ChevronRightIcon,
 } from "@heroicons/react/24/outline";
 import { cn } from "../lib/utils";
+import { CONTROL_TEXT } from "../lib/form-control";
 
-/** `w-72` in px — kept in sync with the popover panel's width class below. */
+/**
+ * Panelin HEDEF genişliği (px). Yatay konum bununla viewport'a clamp'lenir.
+ * Panel dar ekranda `min(18rem, 100vw-2rem)` ile daralır; o durumda clamp
+ * zaten sol kenara (VIEWPORT_MARGIN) oturur ve panel sağda da aynı boşluğu
+ * bırakır — iki kural birbirini tamamlar.
+ */
 const POPOVER_WIDTH = 288;
 const VIEWPORT_MARGIN = 16;
 
@@ -304,7 +310,7 @@ export function DatePicker({
             <div
               ref={popoverRef}
               style={{ top: popoverPos.top, left: popoverPos.left }}
-              className="fixed z-popover w-72 rounded-lg border border-border bg-surface-elevated p-3 shadow-lg"
+              className="fixed z-popover w-[min(18rem,calc(100vw-2rem))] rounded-lg border border-border bg-surface-elevated p-3 shadow-lg"
             >
               <div className="mb-2 flex items-center justify-between gap-2">
                 <div className="flex min-w-0 items-center gap-1">
@@ -314,7 +320,10 @@ export function DatePicker({
                       setView((v) => ({ ...v, m: +e.target.value }))
                     }
                     aria-label="Month"
-                    className="min-w-0 cursor-pointer rounded-md border border-border bg-surface-elevated py-1 pl-1.5 pr-1 text-sm font-semibold capitalize text-heading focus:outline-none focus:ring-1 focus:ring-primary-500"
+                    className={cn(
+                      "min-w-0 cursor-pointer rounded-md border border-border bg-surface-elevated py-1 pl-1.5 pr-1 font-semibold capitalize text-heading focus:outline-none focus:ring-1 focus:ring-primary-500",
+                      CONTROL_TEXT,
+                    )}
                   >
                     {monthNames.map((mLabel, m) => (
                       <option key={m} value={m}>
@@ -328,7 +337,10 @@ export function DatePicker({
                       setView((v) => ({ ...v, y: +e.target.value }))
                     }
                     aria-label="Year"
-                    className="cursor-pointer rounded-md border border-border bg-surface-elevated py-1 pl-1.5 pr-1 text-sm font-semibold text-heading focus:outline-none focus:ring-1 focus:ring-primary-500"
+                    className={cn(
+                      "cursor-pointer rounded-md border border-border bg-surface-elevated py-1 pl-1.5 pr-1 font-semibold text-heading focus:outline-none focus:ring-1 focus:ring-primary-500",
+                      CONTROL_TEXT,
+                    )}
                   >
                     {(yearOptions.includes(view.y)
                       ? yearOptions

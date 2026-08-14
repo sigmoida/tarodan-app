@@ -55,6 +55,7 @@ export default function MembershipSummary() {
                   src={photo}
                   alt="Profil"
                   fill
+                  sizes="64px"
                   className="object-cover"
                   logContext={{ page: "profile-overview-avatar" }}
                 />

@@ -172,7 +172,7 @@ export function RegisterForm() {
           autoComplete="email"
         />
 
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 gap-4 xs:grid-cols-2">
           <FormPhone
             name="phone"
             label={t("auth.phone")}
@@ -186,7 +186,7 @@ export function RegisterForm() {
           />
         </div>
 
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 gap-4 xs:grid-cols-2">
           <FormInput
             name="password"
             type="password"

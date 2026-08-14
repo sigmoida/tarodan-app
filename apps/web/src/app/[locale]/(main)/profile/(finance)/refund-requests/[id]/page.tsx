@@ -36,7 +36,7 @@ export default function RefundRequestDetailPage() {
 
   if (!ready || !refund) {
     return (
-      <div className="flex min-h-screen items-center justify-center">
+      <div className="flex min-h-dvh items-center justify-center">
         <Spinner />
       </div>
     );

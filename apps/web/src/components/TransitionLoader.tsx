@@ -23,7 +23,7 @@ export function TransitionLoader({
       className={
         overlay
           ? "fixed inset-0 z-[100] flex items-center justify-center bg-surface"
-          : "flex min-h-screen items-center justify-center bg-surface"
+          : "flex min-h-dvh items-center justify-center bg-surface"
       }
     >
       <div className="flex flex-col items-center gap-4">

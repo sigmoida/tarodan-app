@@ -60,6 +60,16 @@ export const metadata: Metadata = {
 export const viewport: Viewport = {
   colorScheme: "only light",
   themeColor: surface.DEFAULT,
+  /**
+   * `cover`, belgeyi çentikli ekranlarda kenardan kenara yayar — başlığın turuncu
+   * zemini ve sayfa yüzeyi artık yanlarda beyaz şerit bırakmıyor. Karşılığında
+   * sistem şeritlerinden (durum çubuğu, ana ekran çizgisi, yatayda çentik)
+   * kaçınma sorumluluğu sayfaya geçer: `env(safe-area-inset-*)` ancak bu ayar
+   * açıkken sıfırdan farklı döner. Kaçınmayı `@tarodan/design-tokens`'ın
+   * `px-gutter` / `pb-safe` yardımcıları yapar; `Container` ve ekrana sabitlenen
+   * her katman (çekmece, çerez bandı, bildirim) onları kullanır.
+   */
+  viewportFit: "cover",
 };
 
 /**

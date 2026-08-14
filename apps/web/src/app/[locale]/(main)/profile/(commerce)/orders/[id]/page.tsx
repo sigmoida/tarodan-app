@@ -76,7 +76,7 @@ export default function OrderGroupDetailPage() {
 
   if (!ready || loading) {
     return (
-      <div className="min-h-screen bg-surface flex items-center justify-center">
+      <div className="min-h-dvh bg-surface flex items-center justify-center">
         <Spinner size="xl" />
       </div>
     );
@@ -84,7 +84,7 @@ export default function OrderGroupDetailPage() {
 
   if (!group || group.orders.length === 0) {
     return (
-      <div className="min-h-screen bg-surface flex items-center justify-center">
+      <div className="min-h-dvh bg-surface flex items-center justify-center">
         <p className="text-muted">{t("order.orderNotFound")}</p>
       </div>
     );

@@ -107,7 +107,7 @@ export default function LikedCollectionsClient() {
 
   if (!mounted || !isAuthenticated) {
     return (
-      <div className="min-h-screen bg-surface text-heading flex flex-col">
+      <div className="min-h-dvh bg-surface text-heading flex flex-col">
         <div className="flex-1 flex items-center justify-center py-24">
           <div className="animate-pulse text-muted text-sm">
             {t("common.loading")}
@@ -118,7 +118,7 @@ export default function LikedCollectionsClient() {
   }
 
   return (
-    <div className="min-h-screen bg-surface">
+    <div className="min-h-dvh bg-surface">
       {/* Page Header */}
       <div className="bg-surface-elevated border-b border-border">
         <div className="mx-auto px-6 sm:px-8 lg:px-12 xl:px-16 py-5">
