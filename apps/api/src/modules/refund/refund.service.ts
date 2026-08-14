@@ -160,7 +160,9 @@ export class RefundService {
     status: OrderStatus;
     taxAmount: Prisma.Decimal;
     productGrossAmount: number;
-    sellerType: SellerType;
+    // Nullable on the user, and only ever compared against `platform` here — a
+    // seller with no type takes the same branch any non-platform seller does.
+    sellerType: SellerType | null;
   }): Promise<number> {
     if (order.sellerType !== SellerType.platform) {
       return Number(order.taxAmount ?? 0);
@@ -705,7 +707,10 @@ export class RefundService {
       return created;
     }
 
-    let refundResult: { providerRefundId?: string };
+    // `processRefund` resolves to null when the attempt was already finalized —
+    // an idempotent no-op, not a failure — so the variable has to be able to
+    // hold that, and readers fall back the same way a missing provider id does.
+    let refundResult: { providerRefundId?: string } | null;
     try {
       refundResult = await this.paymentService.processRefund(
         order.id,
@@ -761,7 +766,7 @@ export class RefundService {
         decidedBy: "system",
         decidedAt: new Date(),
         refundedAt: new Date(),
-        providerRefundId: refundResult.providerRefundId ?? null,
+        providerRefundId: refundResult?.providerRefundId ?? null,
       },
     });
     await this.prisma.order.update({
@@ -1577,7 +1582,7 @@ export class RefundService {
           decidedAt: new Date(),
           sellerResponse: note?.trim() || null,
           refundedAt: new Date(),
-          providerRefundId: refundResult.providerRefundId ?? null,
+          providerRefundId: refundResult?.providerRefundId ?? null,
         },
       });
       await this.prisma.order.update({
@@ -2021,7 +2026,10 @@ export class RefundService {
       );
     }
 
-    let refundResult: { providerRefundId: string };
+    // `processRefund` resolves to null when the attempt was already finalized —
+    // an idempotent no-op, not a failure — so the variable has to be able to
+    // hold that, and readers fall back the same way a missing provider id does.
+    let refundResult: { providerRefundId?: string } | null;
     try {
       refundResult = await this.paymentService.processRefund(
         rr.orderId,
@@ -2079,7 +2087,7 @@ export class RefundService {
     const updated = await this.prisma.refundRequest.update({
       where: { id: rr.id },
       data: {
-        providerRefundId: refundResult.providerRefundId,
+        providerRefundId: refundResult?.providerRefundId ?? null,
         returnDeliveredAt: rr.returnDeliveredAt ?? new Date(),
       },
     });
@@ -2095,7 +2103,7 @@ export class RefundService {
     await this.appendHistory(rr.id, {
       action: "refund_completed",
       by: "system",
-      details: { providerRefundId: refundResult.providerRefundId },
+      details: { providerRefundId: refundResult?.providerRefundId ?? null },
     });
     await this.safeNotify(rr.requesterId, NotificationType.REFUND_COMPLETED, {
       refundNumber: rr.refundNumber,
@@ -2858,7 +2866,10 @@ export class RefundService {
     // escrow release cron'u holdu satıcıya bırakabilirdi.
     await this.freezeHoldForRefund(order.id, created.id);
 
-    let refundResult: { providerRefundId: string };
+    // `processRefund` resolves to null when the attempt was already finalized —
+    // an idempotent no-op, not a failure — so the variable has to be able to
+    // hold that, and readers fall back the same way a missing provider id does.
+    let refundResult: { providerRefundId?: string } | null;
     try {
       refundResult = await this.paymentService.processRefund(
         order.id,
@@ -2932,7 +2943,7 @@ export class RefundService {
       data: {
         status: RefundRequestStatus.refunded,
         refundedAt: new Date(),
-        providerRefundId: refundResult.providerRefundId,
+        providerRefundId: refundResult?.providerRefundId ?? null,
       },
     });
 

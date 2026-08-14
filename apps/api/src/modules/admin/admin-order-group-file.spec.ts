@@ -199,6 +199,8 @@ describe("AdminAnalyticsOrderService.getOrderGroupFile", () => {
     // Paketler satıcı başına; kargo kırılımı OrderPackage'tan
     expect(file.packages).toHaveLength(2);
     const pkgA = file.packages.find((p: any) => p.packageId === "pkg-A");
+    if (!pkgA?.seller || !pkgA.shipment)
+      throw new Error("pkg-A missing seller or shipment in the group file");
     expect(pkgA.seller.email).toBe("a@x.com");
     expect(pkgA.shipping.fullShippingAmount).toBe(40);
     expect(pkgA.shipping.buyerShippingAmount).toBe(30);
@@ -221,6 +223,7 @@ describe("AdminAnalyticsOrderService.getOrderGroupFile", () => {
 
     // Diğer paketin siparişinde hold yok → escrow null
     const pkgB = file.packages.find((p: any) => p.packageId === "pkg-B");
+    if (!pkgB) throw new Error("pkg-B missing from the group file");
     expect(pkgB.orders[0].escrow).toBeNull();
   });
 

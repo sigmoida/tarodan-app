@@ -21,7 +21,7 @@ function makePrisma(seed: any = {}) {
   const invoices: any[] = [];
   let seq = 0;
   let idCounter = 0;
-  const store = {
+  const store: any = {
     seq: () => seq,
     invoices,
     elogoInvoice: {
@@ -456,7 +456,9 @@ describe("ElogoInvoicingService", () => {
     await svc.handleOrderRefund("o1", adjustment);
 
     expect(elogo.cancelEArchiveInvoice).not.toHaveBeenCalled();
-    const returns = prisma.invoices.filter((i) => i.type === "return_invoice");
+    const returns = prisma.invoices.filter(
+      (i: any) => i.type === "return_invoice",
+    );
     expect(returns).toHaveLength(1);
     expect(returns[0].sourceId).toBe("i1:ra1");
     // 25 matrah + %20 KDV (komisyon matrah bazlı)
@@ -653,9 +655,11 @@ describe("ElogoInvoicingService", () => {
     const svc = new ElogoInvoicingService(prisma, elogo, fakeConfig());
 
     await svc.handleOrderRefund("o1");
-    const returns = prisma.invoices.filter((i) => i.type === "return_invoice");
+    const returns = prisma.invoices.filter(
+      (i: any) => i.type === "return_invoice",
+    );
     expect(returns).toHaveLength(2); // çakışma yok: sourceId = orijinal fatura id
-    expect(returns.map((r) => r.sourceId).sort()).toEqual(["c1", "s1"]);
+    expect(returns.map((r: any) => r.sourceId).sort()).toEqual(["c1", "s1"]);
   });
 
   it("platform satışı: komisyon ATLANIR, alıcıya platform_sale e-Arşivi kesilir", async () => {

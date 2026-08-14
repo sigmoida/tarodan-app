@@ -116,7 +116,7 @@ describe("AdminPspReconciliationService.getReconciliationSummary", () => {
     const result = await service.getReconciliationSummary(7);
     const day = result.days.find((d: any) => d.date === "2026-07-31");
 
-    expect(day).toBeDefined();
+    if (!day) throw new Error("expected day not present in the summary");
     expect(day.paytr).toMatchObject({
       salesCount: 2,
       salesTotal: 150,
@@ -193,6 +193,7 @@ describe("AdminPspReconciliationService.getReconciliationSummary", () => {
 
     const result = await service.getReconciliationSummary(7);
     const day = result.days.find((d: any) => d.date === "2026-07-31");
+    if (!day) throw new Error("expected day not present in the summary");
 
     expect(day.missingInPaytr).toBe(0);
     expect(day.paytrCovered).toBe(false);

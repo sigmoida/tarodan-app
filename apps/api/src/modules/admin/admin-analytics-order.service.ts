@@ -703,6 +703,10 @@ export class AdminAnalyticsOrderService {
       };
     }
 
+    // The delivery result travels out through the transaction's return value
+    // rather than a variable assigned inside the callback: TypeScript cannot see
+    // an assignment made in a nested function, so afterwards it still believed
+    // the variable held its `null` initializer.
     let deliveryResult: Awaited<
       ReturnType<PaymentService["handleOrderDelivered"]>
     > | null = null;
@@ -731,10 +735,13 @@ export class AdminAnalyticsOrderService {
         fresh.status === OrderStatus.paid &&
         newStatus === OrderStatus.preparing
       ) {
-        return tx.order.update({
-          where: { id: fresh.id, version: fresh.version },
-          data: { status: OrderStatus.preparing, version: { increment: 1 } },
-        });
+        return {
+          order: await tx.order.update({
+            where: { id: fresh.id, version: fresh.version },
+            data: { status: OrderStatus.preparing, version: { increment: 1 } },
+          }),
+          deliveryResult,
+        };
       }
 
       if (!fresh.shipment) {
@@ -796,8 +803,13 @@ export class AdminAnalyticsOrderService {
           "Sipariş teslim durumu eşzamanlı olarak değişti",
         );
       }
-      return tx.order.findUniqueOrThrow({ where: { id: orderId } });
+      return {
+        order: await tx.order.findUniqueOrThrow({ where: { id: orderId } }),
+        deliveryResult,
+      };
     });
+    deliveryResult = updated.deliveryResult;
+    const updatedOrder = updated.order;
 
     // Admin elle teslim işaretlediğinde de alıcı bildirimi + e-posta gider:
     // taşıyıcı raporlamadığı için elle işaretlenen teslimat, kullanıcı açısından
@@ -819,7 +831,7 @@ export class AdminAnalyticsOrderService {
       orderId,
       order,
       {
-        ...updated,
+        ...updatedOrder,
         notes: dto.notes,
       },
     );
@@ -858,7 +870,7 @@ export class AdminAnalyticsOrderService {
       success: true,
       orderId,
       previousStatus: order.status,
-      newStatus: updated.status,
+      newStatus: updatedOrder.status,
       notes: dto.notes,
     };
   }

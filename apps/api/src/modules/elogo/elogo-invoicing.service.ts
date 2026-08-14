@@ -1516,6 +1516,11 @@ export class ElogoInvoicingService {
       return;
     }
 
+    // Captured after the guard: the narrowing above does not reach the XML
+    // builder closure below, which is why one of its uses carried a non-null
+    // assertion instead.
+    const ettn = inv.ettn;
+
     const net = Number(inv.netAmount);
     const rate = Number(inv.vatRate);
     const isReturn = inv.type === "return_invoice";
@@ -1618,7 +1623,7 @@ export class ElogoInvoicingService {
         profileId: isEInvoice ? "TEMELFATURA" : "EARSIVFATURA",
         invoiceTypeCode: isReturn ? "IADE" : "SATIS",
         id: invoiceNumber,
-        uuid: inv.ettn,
+        uuid: ettn,
         issueDate: this.ymd(issueMoment),
         issueTime: this.hms(issueMoment),
         currency: "TRY",
@@ -1643,7 +1648,7 @@ export class ElogoInvoicingService {
       void this.deliverPdf(
         {
           id: inv.id,
-          ettn: inv.ettn!,
+          ettn,
           invoiceNumber,
           type: inv.type,
           total,
