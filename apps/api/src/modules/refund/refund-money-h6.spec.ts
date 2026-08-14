@@ -3,6 +3,8 @@ import { RefundRequestStatus } from "@prisma/client";
 import { RefundNotificationService } from "./refund-notification.service";
 import { RefundFinancialService } from "./refund-financial.service";
 import { RefundShipmentService } from "./refund-shipment.service";
+import { RefundCreationService } from "./refund-creation.service";
+import { RefundDecisionService } from "./refund-decision.service";
 
 /**
  * MONEY-H6: donuk hold terminal kaçışı.
@@ -46,17 +48,27 @@ describe("RefundService — MONEY-H6 frozen-hold terminal escape", () => {
       notifications as any,
       financials as any,
     );
-    const service = new RefundService(
-      prisma as any, // prisma
-      {} as any, // paymentService
-      {} as any, // cargoProvider
-      {} as any, // carrierCancellationService
-      {} as any, // suratTrackingService
-      notificationService as any, // notificationService
-      {} as any, // storageService
+    const creation = new RefundCreationService(
+      prisma as any,
+      {} as any,
       notifications as any,
       financials as any,
       shipments as any,
+    );
+    const decisions = new RefundDecisionService(
+      prisma as any,
+      {} as any,
+      notifications as any,
+      financials as any,
+      shipments as any,
+    );
+    const service = new RefundService(
+      prisma as any,
+      notifications as any,
+      financials as any,
+      shipments as any,
+      creation as any,
+      decisions as any,
     );
     return { service, prisma };
   };

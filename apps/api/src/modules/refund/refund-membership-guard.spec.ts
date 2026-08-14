@@ -2,6 +2,8 @@ import { BadRequestException, ForbiddenException } from "@nestjs/common";
 import { RefundService } from "./refund.service";
 import { RefundFinancialService } from "./refund-financial.service";
 import { RefundShipmentService } from "./refund-shipment.service";
+import { RefundCreationService } from "./refund-creation.service";
+import { RefundDecisionService } from "./refund-decision.service";
 
 /**
  * Üyelik/dijital siparişler ("MEM-" sipariş no, platform satıcısı) genel iade akışına
@@ -32,17 +34,27 @@ describe("RefundService.createRefundRequest — üyelik siparişi guard", () => 
       notifications as any,
       financials as any,
     );
-    return new RefundService(
+    const creation = new RefundCreationService(
       prisma as any,
-      {} as any,
-      {} as any,
-      {} as any,
-      {} as any,
-      {} as any,
       {} as any,
       notifications as any,
       financials as any,
       shipments as any,
+    );
+    const decisions = new RefundDecisionService(
+      prisma as any,
+      {} as any,
+      notifications as any,
+      financials as any,
+      shipments as any,
+    );
+    return new RefundService(
+      prisma as any,
+      notifications as any,
+      financials as any,
+      shipments as any,
+      creation as any,
+      decisions as any,
     );
   };
 

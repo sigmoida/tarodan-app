@@ -16,6 +16,8 @@ import { RefundService } from "./refund.service";
 import { RefundNotificationService } from "./refund-notification.service";
 import { RefundFinancialService } from "./refund-financial.service";
 import { RefundShipmentService } from "./refund-shipment.service";
+import { RefundCreationService } from "./refund-creation.service";
+import { RefundDecisionService } from "./refund-decision.service";
 import { RefundSchedulerService } from "./refund-scheduler.service";
 import { RefundScheduledProcessor } from "./refund-scheduled.processor";
 import { scheduledProcessors } from "../../workers/scheduled-processors";
@@ -47,6 +49,8 @@ import { scheduledProcessors } from "../../workers/scheduled-processors";
     RefundNotificationService,
     RefundFinancialService,
     RefundShipmentService,
+    RefundCreationService,
+    RefundDecisionService,
     RefundSchedulerService,
     ...scheduledProcessors(RefundScheduledProcessor),
   ],

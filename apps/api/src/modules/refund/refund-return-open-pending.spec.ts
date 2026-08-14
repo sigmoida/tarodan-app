@@ -2,6 +2,8 @@ import { RefundRequestStatus, ShipmentStatus } from "@prisma/client";
 import { RefundService } from "./refund.service";
 import { RefundFinancialService } from "./refund-financial.service";
 import { RefundShipmentService } from "./refund-shipment.service";
+import { RefundCreationService } from "./refund-creation.service";
+import { RefundDecisionService } from "./refund-decision.service";
 
 describe("RefundService.openReturnShipment pre-advice", () => {
   it("opens the return with its reference while the real Sürat code is pending", async () => {
@@ -75,17 +77,27 @@ describe("RefundService.openReturnShipment pre-advice", () => {
       notifications as any,
       financials as any,
     );
-    const service = new RefundService(
+    const creation = new RefundCreationService(
       prisma as any,
-      {} as any,
-      cargo as any,
-      {} as any,
-      {} as any,
-      {} as any,
       {} as any,
       notifications as any,
       financials as any,
       shipments as any,
+    );
+    const decisions = new RefundDecisionService(
+      prisma as any,
+      {} as any,
+      notifications as any,
+      financials as any,
+      shipments as any,
+    );
+    const service = new RefundService(
+      prisma as any,
+      notifications as any,
+      financials as any,
+      shipments as any,
+      creation as any,
+      decisions as any,
     );
     jest
       .spyOn((service as any).notifications, "appendHistory")

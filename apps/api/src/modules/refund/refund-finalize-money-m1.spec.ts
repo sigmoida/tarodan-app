@@ -1,6 +1,8 @@
 import { RefundService } from "./refund.service";
 import { RefundFinancialService } from "./refund-financial.service";
 import { RefundShipmentService } from "./refund-shipment.service";
+import { RefundCreationService } from "./refund-creation.service";
+import { RefundDecisionService } from "./refund-decision.service";
 import { RefundRequestStatus } from "@prisma/client";
 
 /**
@@ -52,17 +54,27 @@ describe("RefundService.finalizeRefundForReturnedShipment — MONEY-M1 CAS claim
       notifications as any,
       financials as any,
     );
-    const service = new RefundService(
+    const creation = new RefundCreationService(
       prisma as any,
       paymentService as any,
-      {} as any,
-      {} as any,
-      {} as any,
-      {} as any,
-      {} as any,
       notifications as any,
       financials as any,
       shipments as any,
+    );
+    const decisions = new RefundDecisionService(
+      prisma as any,
+      paymentService as any,
+      notifications as any,
+      financials as any,
+      shipments as any,
+    );
+    const service = new RefundService(
+      prisma as any,
+      notifications as any,
+      financials as any,
+      shipments as any,
+      creation as any,
+      decisions as any,
     );
     return { service, prisma, paymentService };
   };
