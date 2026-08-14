@@ -1,7 +1,7 @@
 import { ConfigService } from "@nestjs/config";
 import { ElogoInvoicingService } from "../elogo-invoicing.service";
 import { ElogoDocumentService } from "../elogo-document.service";
-import { ElogoQueryService } from "../elogo-query.service";
+import { ElogoDeliveryService } from "../elogo-delivery.service";
 import { ElogoService } from "../elogo.service";
 import { VAT_SOURCE_BY_TYPE } from "./invoice-vat-rate";
 
@@ -191,19 +191,22 @@ describe("fatura KDV oranının kaynağı", () => {
         },
       },
     });
+    // KDV kaynağı BELGE servisinin işi ve kesim (cut) GÖNDERIM servisinde:
+    // ikisi AYNI belge örneğini paylaşmalı, yoksa cut vergi politikası
+    // olmayan bir kopyadan okuyup env oranına düşer.
+    const documents = new ElogoDocumentService(
+      prisma as any,
+      makeElogo(),
+      fakeConfig({ ELOGO_VAT_RATE: "20" }),
+      makeTaxService({}, 20),
+      makeTaxPolicy({ serviceVatRate: 18 }),
+    );
     const svc = new ElogoInvoicingService(
       prisma as any,
       makeElogo(),
-      {} as any, // queries
-      // KDV kaynağı artık BELGE servisinin işi — gerçek örnek geçilir ki
-      // bu spec'in oran iddiaları koda kadar insin.
-      new ElogoDocumentService(
-        prisma as any,
-        makeElogo(),
-        fakeConfig({ ELOGO_VAT_RATE: "20" }),
-        makeTaxService({}, 20),
-        makeTaxPolicy({ serviceVatRate: 18 }),
-      ),
+      {} as any, // queries,
+      documents,
+      new ElogoDeliveryService(prisma as any, makeElogo(), documents),
     );
 
     await svc.issueCommissionInvoice("pkg1");
@@ -227,19 +230,22 @@ describe("fatura KDV oranının kaynağı", () => {
         },
       },
     });
+    // KDV kaynağı BELGE servisinin işi ve kesim (cut) GÖNDERIM servisinde:
+    // ikisi AYNI belge örneğini paylaşmalı, yoksa cut vergi politikası
+    // olmayan bir kopyadan okuyup env oranına düşer.
+    const documents = new ElogoDocumentService(
+      prisma as any,
+      makeElogo(),
+      fakeConfig(),
+      makeTaxService({}, 20),
+      makeTaxPolicy({ serviceVatEnabled: false }),
+    );
     const svc = new ElogoInvoicingService(
       prisma as any,
       makeElogo(),
-      {} as any, // queries
-      // KDV kaynağı artık BELGE servisinin işi — gerçek örnek geçilir ki
-      // bu spec'in oran iddiaları koda kadar insin.
-      new ElogoDocumentService(
-        prisma as any,
-        makeElogo(),
-        fakeConfig(),
-        makeTaxService({}, 20),
-        makeTaxPolicy({ serviceVatEnabled: false }),
-      ),
+      {} as any, // queries,
+      documents,
+      new ElogoDeliveryService(prisma as any, makeElogo(), documents),
     );
 
     await svc.issueServiceFeeInvoice("pkg1");
@@ -273,19 +279,22 @@ describe("fatura KDV oranının kaynağı", () => {
         ? { sellerType: "platform" }
         : { displayName: "Alıcı", email: "b@example.com", taxId: null },
     );
+    // KDV kaynağı BELGE servisinin işi ve kesim (cut) GÖNDERIM servisinde:
+    // ikisi AYNI belge örneğini paylaşmalı, yoksa cut vergi politikası
+    // olmayan bir kopyadan okuyup env oranına düşer.
+    const documents = new ElogoDocumentService(
+      prisma as any,
+      makeElogo(),
+      fakeConfig(),
+      makeTaxService({ "cat-kitap": 10 }, 20),
+      makeTaxPolicy(),
+    );
     const svc = new ElogoInvoicingService(
       prisma as any,
       makeElogo(),
-      {} as any, // queries
-      // KDV kaynağı artık BELGE servisinin işi — gerçek örnek geçilir ki
-      // bu spec'in oran iddiaları koda kadar insin.
-      new ElogoDocumentService(
-        prisma as any,
-        makeElogo(),
-        fakeConfig(),
-        makeTaxService({ "cat-kitap": 10 }, 20),
-        makeTaxPolicy(),
-      ),
+      {} as any, // queries,
+      documents,
+      new ElogoDeliveryService(prisma as any, makeElogo(), documents),
     );
 
     await svc.issuePlatformSaleInvoice("o1");
@@ -309,15 +318,20 @@ describe("fatura KDV oranının kaynağı", () => {
         },
       },
     });
+    // KDV kaynağı BELGE servisinin işi ve kesim (cut) GÖNDERIM servisinde:
+    // ikisi AYNI belge örneğini paylaşmalı, yoksa cut vergi politikası
+    // olmayan bir kopyadan okuyup env oranına düşer.
+    const documents = new ElogoDocumentService(
+      prisma as any,
+      makeElogo(),
+      fakeConfig({ ELOGO_VAT_RATE: "20" }),
+    );
     const svc = new ElogoInvoicingService(
       prisma as any,
       makeElogo(),
-      {} as any, // queries
-      new ElogoDocumentService(
-        prisma as any,
-        makeElogo(),
-        fakeConfig({ ELOGO_VAT_RATE: "20" }),
-      ),
+      {} as any, // queries,
+      documents,
+      new ElogoDeliveryService(prisma as any, makeElogo(), documents),
     );
 
     await svc.issueCommissionInvoice("pkg1");

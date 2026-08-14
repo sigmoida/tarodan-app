@@ -1,4 +1,4 @@
-import { ElogoInvoicingService } from "../elogo-invoicing.service";
+import { ElogoDeliveryService } from "../elogo-delivery.service";
 import {
   ELOGO_MAX_SEND_ATTEMPTS,
   isTransientElogoFailure,
@@ -54,13 +54,13 @@ describe("ElogoInvoicingService — exhausted invoice recovery", () => {
         }),
       },
     };
-    const service = new ElogoInvoicingService(
+    // Gönderim bütçesi ve deneme sayacı ElogoDeliveryService'in işi; spec de
+    // onu doğrudan kurar (facade üzerinden gitmek casusu delege nesnenin
+    // DIŞINDA bırakırdı).
+    const service = new ElogoDeliveryService(
       prisma as any,
       { isEnabled: () => true } as any,
-      { get: () => undefined } as any,
-      {} as any,
-      {} as any,
-      {} as any,
+      {} as any, // documents
     );
     const logger = { error: jest.fn(), warn: jest.fn(), log: jest.fn() };
     (service as any).logger = logger;

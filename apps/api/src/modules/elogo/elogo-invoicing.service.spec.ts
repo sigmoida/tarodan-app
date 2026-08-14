@@ -1,6 +1,7 @@
 import { ConfigService } from "@nestjs/config";
 import { ElogoInvoicingService } from "./elogo-invoicing.service";
 import { ElogoDocumentService } from "./elogo-document.service";
+import { ElogoDeliveryService } from "./elogo-delivery.service";
 import { ElogoService } from "./elogo.service";
 
 function fakeConfig(values: Record<string, string> = {}): ConfigService {
@@ -224,6 +225,13 @@ describe("ElogoInvoicingService", () => {
       elogo,
       {} as any, // queries
       new ElogoDocumentService(prisma, elogo, fakeConfig()),
+      // Kesim GÖNDERIM servisinde — gerçek örnek geçilir ki bu spec'in
+      // fatura iddiaları koda kadar insin.
+      new ElogoDeliveryService(
+        prisma,
+        elogo,
+        new ElogoDocumentService(prisma, elogo, fakeConfig()),
+      ),
     );
 
     await svc.issueCommissionInvoice("o1");
@@ -261,6 +269,13 @@ describe("ElogoInvoicingService", () => {
       elogo,
       {} as any, // queries
       new ElogoDocumentService(prisma, elogo, fakeConfig()),
+      // Kesim GÖNDERIM servisinde — gerçek örnek geçilir ki bu spec'in
+      // fatura iddiaları koda kadar insin.
+      new ElogoDeliveryService(
+        prisma,
+        elogo,
+        new ElogoDocumentService(prisma, elogo, fakeConfig()),
+      ),
     );
     await svc.issueCommissionInvoice("o1");
     const xml = (elogo.sendDocument as jest.Mock).mock.calls[0][0].ublXml;
@@ -282,6 +297,13 @@ describe("ElogoInvoicingService", () => {
       elogo,
       {} as any, // queries
       new ElogoDocumentService(prisma, elogo, fakeConfig()),
+      // Kesim GÖNDERIM servisinde — gerçek örnek geçilir ki bu spec'in
+      // fatura iddiaları koda kadar insin.
+      new ElogoDeliveryService(
+        prisma,
+        elogo,
+        new ElogoDocumentService(prisma, elogo, fakeConfig()),
+      ),
     );
     await svc.issueCommissionInvoice("o1");
     const xml = (elogo.sendDocument as jest.Mock).mock.calls[0][0].ublXml;
@@ -306,6 +328,13 @@ describe("ElogoInvoicingService", () => {
       elogo,
       {} as any, // queries
       new ElogoDocumentService(prisma, elogo, fakeConfig()),
+      // Kesim GÖNDERIM servisinde — gerçek örnek geçilir ki bu spec'in
+      // fatura iddiaları koda kadar insin.
+      new ElogoDeliveryService(
+        prisma,
+        elogo,
+        new ElogoDocumentService(prisma, elogo, fakeConfig()),
+      ),
     );
 
     await svc.issueCommissionInvoice("o1");
@@ -324,6 +353,13 @@ describe("ElogoInvoicingService", () => {
       elogo,
       {} as any, // queries
       new ElogoDocumentService(prisma, elogo, fakeConfig()),
+      // Kesim GÖNDERIM servisinde — gerçek örnek geçilir ki bu spec'in
+      // fatura iddiaları koda kadar insin.
+      new ElogoDeliveryService(
+        prisma,
+        elogo,
+        new ElogoDocumentService(prisma, elogo, fakeConfig()),
+      ),
     );
 
     await svc.issueServiceFeeInvoice("o1");
@@ -354,6 +390,13 @@ describe("ElogoInvoicingService", () => {
       elogo,
       {} as any, // queries
       new ElogoDocumentService(prisma, elogo, fakeConfig()),
+      // Kesim GÖNDERIM servisinde — gerçek örnek geçilir ki bu spec'in
+      // fatura iddiaları koda kadar insin.
+      new ElogoDeliveryService(
+        prisma,
+        elogo,
+        new ElogoDocumentService(prisma, elogo, fakeConfig()),
+      ),
     );
 
     await svc.issueCommissionInvoice("o1");
@@ -379,6 +422,13 @@ describe("ElogoInvoicingService", () => {
       elogo,
       {} as any, // queries
       new ElogoDocumentService(prisma, elogo, fakeConfig()),
+      // Kesim GÖNDERIM servisinde — gerçek örnek geçilir ki bu spec'in
+      // fatura iddiaları koda kadar insin.
+      new ElogoDeliveryService(
+        prisma,
+        elogo,
+        new ElogoDocumentService(prisma, elogo, fakeConfig()),
+      ),
     );
 
     await svc.issueCommissionInvoice("o1");
@@ -399,6 +449,13 @@ describe("ElogoInvoicingService", () => {
       elogo,
       {} as any, // queries
       new ElogoDocumentService(prisma, elogo, fakeConfig()),
+      // Kesim GÖNDERIM servisinde — gerçek örnek geçilir ki bu spec'in
+      // fatura iddiaları koda kadar insin.
+      new ElogoDeliveryService(
+        prisma,
+        elogo,
+        new ElogoDocumentService(prisma, elogo, fakeConfig()),
+      ),
     );
 
     await svc.issueCommissionInvoice("o1");
@@ -417,6 +474,13 @@ describe("ElogoInvoicingService", () => {
       elogo,
       {} as any, // queries
       new ElogoDocumentService(prisma, elogo, fakeConfig()),
+      // Kesim GÖNDERIM servisinde — gerçek örnek geçilir ki bu spec'in
+      // fatura iddiaları koda kadar insin.
+      new ElogoDeliveryService(
+        prisma,
+        elogo,
+        new ElogoDocumentService(prisma, elogo, fakeConfig()),
+      ),
     );
 
     await svc.issueMembershipInvoice("mp1");
@@ -443,6 +507,13 @@ describe("ElogoInvoicingService", () => {
       elogo,
       {} as any, // queries
       new ElogoDocumentService(prisma, elogo, fakeConfig()),
+      // Kesim GÖNDERIM servisinde — gerçek örnek geçilir ki bu spec'in
+      // fatura iddiaları koda kadar insin.
+      new ElogoDeliveryService(
+        prisma,
+        elogo,
+        new ElogoDocumentService(prisma, elogo, fakeConfig()),
+      ),
     );
 
     await svc.handleOrderRefund("o1");
@@ -500,6 +571,13 @@ describe("ElogoInvoicingService", () => {
       elogo,
       {} as any, // queries
       new ElogoDocumentService(prisma, elogo, fakeConfig()),
+      // Kesim GÖNDERIM servisinde — gerçek örnek geçilir ki bu spec'in
+      // fatura iddiaları koda kadar insin.
+      new ElogoDeliveryService(
+        prisma,
+        elogo,
+        new ElogoDocumentService(prisma, elogo, fakeConfig()),
+      ),
     );
     const adjustment = {
       orderId: "o1",
@@ -564,6 +642,13 @@ describe("ElogoInvoicingService", () => {
       makeElogo(),
       {} as any, // queries
       new ElogoDocumentService(prisma, makeElogo(), fakeConfig()),
+      // Kesim GÖNDERIM servisinde — gerçek örnek geçilir ki bu spec'in
+      // fatura iddiaları koda kadar insin.
+      new ElogoDeliveryService(
+        prisma,
+        makeElogo(),
+        new ElogoDocumentService(prisma, makeElogo(), fakeConfig()),
+      ),
     );
 
     await svc.handleOrderRefund("o1", {
@@ -589,6 +674,13 @@ describe("ElogoInvoicingService", () => {
       elogo,
       {} as any, // queries
       new ElogoDocumentService(prisma, elogo, fakeConfig()),
+      // Kesim GÖNDERIM servisinde — gerçek örnek geçilir ki bu spec'in
+      // fatura iddiaları koda kadar insin.
+      new ElogoDeliveryService(
+        prisma,
+        elogo,
+        new ElogoDocumentService(prisma, elogo, fakeConfig()),
+      ),
     );
 
     await svc.issueTradeCashFeeInvoice("tcp1");
@@ -611,6 +703,13 @@ describe("ElogoInvoicingService", () => {
       elogo,
       {} as any, // queries
       new ElogoDocumentService(prisma, elogo, fakeConfig()),
+      // Kesim GÖNDERIM servisinde — gerçek örnek geçilir ki bu spec'in
+      // fatura iddiaları koda kadar insin.
+      new ElogoDeliveryService(
+        prisma,
+        elogo,
+        new ElogoDocumentService(prisma, elogo, fakeConfig()),
+      ),
     );
 
     await svc.issueTradeCashFeeInvoice("tcp1");
@@ -631,6 +730,13 @@ describe("ElogoInvoicingService", () => {
       elogo,
       {} as any, // queries
       new ElogoDocumentService(prisma, elogo, fakeConfig()),
+      // Kesim GÖNDERIM servisinde — gerçek örnek geçilir ki bu spec'in
+      // fatura iddiaları koda kadar insin.
+      new ElogoDeliveryService(
+        prisma,
+        elogo,
+        new ElogoDocumentService(prisma, elogo, fakeConfig()),
+      ),
     );
 
     await svc.issueTradeCashFeeInvoice("tcp1");
@@ -656,6 +762,13 @@ describe("ElogoInvoicingService", () => {
       elogo,
       {} as any, // queries
       new ElogoDocumentService(prisma, elogo, fakeConfig()),
+      // Kesim GÖNDERIM servisinde — gerçek örnek geçilir ki bu spec'in
+      // fatura iddiaları koda kadar insin.
+      new ElogoDeliveryService(
+        prisma,
+        elogo,
+        new ElogoDocumentService(prisma, elogo, fakeConfig()),
+      ),
     );
 
     await svc.handleTradeCashRefund("tcp2");
@@ -682,6 +795,13 @@ describe("ElogoInvoicingService", () => {
       elogo,
       {} as any, // queries
       new ElogoDocumentService(prisma, elogo, fakeConfig()),
+      // Kesim GÖNDERIM servisinde — gerçek örnek geçilir ki bu spec'in
+      // fatura iddiaları koda kadar insin.
+      new ElogoDeliveryService(
+        prisma,
+        elogo,
+        new ElogoDocumentService(prisma, elogo, fakeConfig()),
+      ),
     );
 
     await svc.handleTradeCashRefund("tcp1");
@@ -708,6 +828,13 @@ describe("ElogoInvoicingService", () => {
       elogo,
       {} as any, // queries
       new ElogoDocumentService(prisma, elogo, fakeConfig()),
+      // Kesim GÖNDERIM servisinde — gerçek örnek geçilir ki bu spec'in
+      // fatura iddiaları koda kadar insin.
+      new ElogoDeliveryService(
+        prisma,
+        elogo,
+        new ElogoDocumentService(prisma, elogo, fakeConfig()),
+      ),
     );
 
     await svc.handleOrderRefund("o1");
@@ -748,6 +875,13 @@ describe("ElogoInvoicingService", () => {
       elogo,
       {} as any, // queries
       new ElogoDocumentService(prisma, elogo, fakeConfig()),
+      // Kesim GÖNDERIM servisinde — gerçek örnek geçilir ki bu spec'in
+      // fatura iddiaları koda kadar insin.
+      new ElogoDeliveryService(
+        prisma,
+        elogo,
+        new ElogoDocumentService(prisma, elogo, fakeConfig()),
+      ),
     );
 
     await svc.handleOrderRefund("o1");
@@ -780,6 +914,13 @@ describe("ElogoInvoicingService", () => {
       elogo,
       {} as any, // queries
       new ElogoDocumentService(prisma, elogo, fakeConfig()),
+      // Kesim GÖNDERIM servisinde — gerçek örnek geçilir ki bu spec'in
+      // fatura iddiaları koda kadar insin.
+      new ElogoDeliveryService(
+        prisma,
+        elogo,
+        new ElogoDocumentService(prisma, elogo, fakeConfig()),
+      ),
     );
 
     await svc.issueCommissionInvoice("o1"); // platform satıcı → komisyon kesilmez
@@ -825,6 +966,13 @@ describe("ElogoInvoicingService", () => {
       elogo,
       {} as any, // queries
       new ElogoDocumentService(prisma, elogo, fakeConfig()),
+      // Kesim GÖNDERIM servisinde — gerçek örnek geçilir ki bu spec'in
+      // fatura iddiaları koda kadar insin.
+      new ElogoDeliveryService(
+        prisma,
+        elogo,
+        new ElogoDocumentService(prisma, elogo, fakeConfig()),
+      ),
     );
 
     await svc.issuePlatformSaleInvoice("o1");
@@ -861,6 +1009,13 @@ describe("ElogoInvoicingService", () => {
       elogo,
       {} as any, // queries
       new ElogoDocumentService(prisma, elogo, fakeConfig()),
+      // Kesim GÖNDERIM servisinde — gerçek örnek geçilir ki bu spec'in
+      // fatura iddiaları koda kadar insin.
+      new ElogoDeliveryService(
+        prisma,
+        elogo,
+        new ElogoDocumentService(prisma, elogo, fakeConfig()),
+      ),
     );
 
     await svc.issueCommissionInvoice("o1");
@@ -882,6 +1037,13 @@ describe("ElogoInvoicingService", () => {
       elogo,
       {} as any, // queries
       new ElogoDocumentService(prisma, elogo, fakeConfig()),
+      // Kesim GÖNDERIM servisinde — gerçek örnek geçilir ki bu spec'in
+      // fatura iddiaları koda kadar insin.
+      new ElogoDeliveryService(
+        prisma,
+        elogo,
+        new ElogoDocumentService(prisma, elogo, fakeConfig()),
+      ),
     );
 
     await svc.issueCommissionInvoice("o1");
@@ -913,6 +1075,13 @@ describe("ElogoInvoicingService", () => {
       elogo,
       {} as any, // queries
       new ElogoDocumentService(prisma, elogo, fakeConfig()),
+      // Kesim GÖNDERIM servisinde — gerçek örnek geçilir ki bu spec'in
+      // fatura iddiaları koda kadar insin.
+      new ElogoDeliveryService(
+        prisma,
+        elogo,
+        new ElogoDocumentService(prisma, elogo, fakeConfig()),
+      ),
     );
 
     await svc.issueCommissionInvoice("o1");
@@ -943,6 +1112,13 @@ describe("ElogoInvoicingService", () => {
       elogo,
       {} as any, // queries
       new ElogoDocumentService(prisma, elogo, fakeConfig()),
+      // Kesim GÖNDERIM servisinde — gerçek örnek geçilir ki bu spec'in
+      // fatura iddiaları koda kadar insin.
+      new ElogoDeliveryService(
+        prisma,
+        elogo,
+        new ElogoDocumentService(prisma, elogo, fakeConfig()),
+      ),
     );
 
     await svc.issueCommissionInvoice("o1");

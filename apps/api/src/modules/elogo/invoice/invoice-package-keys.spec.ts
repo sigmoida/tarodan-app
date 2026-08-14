@@ -1,6 +1,7 @@
 import { ConfigService } from "@nestjs/config";
 import { ElogoInvoicingService } from "../elogo-invoicing.service";
 import { ElogoDocumentService } from "../elogo-document.service";
+import { ElogoDeliveryService } from "../elogo-delivery.service";
 import { ElogoQueryService } from "../elogo-query.service";
 import { ElogoService } from "../elogo.service";
 
@@ -239,6 +240,13 @@ describe("paket anahtarlı fatura tüketicileri", () => {
       elogo,
       new ElogoQueryService(prisma as any, elogo) as any,
       new ElogoDocumentService(prisma as any, elogo, fakeConfig()),
+      // Kesim artık GÖNDERIM servisinde (cut); gerçek örnek geçilir ki
+      // bu spec'in fatura iddiaları koda kadar insin.
+      new ElogoDeliveryService(
+        prisma as any,
+        elogo,
+        new ElogoDocumentService(prisma as any, elogo, fakeConfig()),
+      ),
     );
 
     await svc.handleOrderRefund(
@@ -265,6 +273,13 @@ describe("paket anahtarlı fatura tüketicileri", () => {
       elogo,
       new ElogoQueryService(prisma as any, elogo) as any,
       new ElogoDocumentService(prisma as any, elogo, fakeConfig()),
+      // Kesim artık GÖNDERIM servisinde (cut); gerçek örnek geçilir ki
+      // bu spec'in fatura iddiaları koda kadar insin.
+      new ElogoDeliveryService(
+        prisma as any,
+        elogo,
+        new ElogoDocumentService(prisma as any, elogo, fakeConfig()),
+      ),
     );
 
     await svc.handleOrderRefund(
@@ -288,6 +303,13 @@ describe("paket anahtarlı fatura tüketicileri", () => {
       elogo,
       new ElogoQueryService(prisma as any, elogo) as any,
       new ElogoDocumentService(prisma as any, elogo, fakeConfig()),
+      // Kesim artık GÖNDERIM servisinde (cut); gerçek örnek geçilir ki
+      // bu spec'in fatura iddiaları koda kadar insin.
+      new ElogoDeliveryService(
+        prisma as any,
+        elogo,
+        new ElogoDocumentService(prisma as any, elogo, fakeConfig()),
+      ),
     );
 
     await svc.handleOrderRefund(
@@ -314,6 +336,13 @@ describe("paket anahtarlı fatura tüketicileri", () => {
       elogo,
       new ElogoQueryService(prisma as any, elogo) as any,
       new ElogoDocumentService(prisma as any, elogo, fakeConfig()),
+      // Kesim artık GÖNDERIM servisinde (cut); gerçek örnek geçilir ki
+      // bu spec'in fatura iddiaları koda kadar insin.
+      new ElogoDeliveryService(
+        prisma as any,
+        elogo,
+        new ElogoDocumentService(prisma as any, elogo, fakeConfig()),
+      ),
     );
 
     await svc.handleOrderRefund(
@@ -354,6 +383,13 @@ describe("paket anahtarlı fatura tüketicileri", () => {
       makeElogo(),
       new ElogoQueryService(prisma as any, makeElogo()) as any,
       new ElogoDocumentService(prisma as any, makeElogo(), fakeConfig()),
+      // Kesim artık GÖNDERIM servisinde (cut); gerçek örnek geçilir ki
+      // bu spec'in fatura iddiaları koda kadar insin.
+      new ElogoDeliveryService(
+        prisma as any,
+        makeElogo(),
+        new ElogoDocumentService(prisma as any, makeElogo(), fakeConfig()),
+      ),
     );
 
     await svc.handleOrderRefund(
@@ -375,6 +411,13 @@ describe("paket anahtarlı fatura tüketicileri", () => {
       makeElogo(),
       new ElogoQueryService(prisma as any, makeElogo()) as any,
       new ElogoDocumentService(prisma as any, makeElogo(), fakeConfig()),
+      // Kesim artık GÖNDERIM servisinde (cut); gerçek örnek geçilir ki
+      // bu spec'in fatura iddiaları koda kadar insin.
+      new ElogoDeliveryService(
+        prisma as any,
+        makeElogo(),
+        new ElogoDocumentService(prisma as any, makeElogo(), fakeConfig()),
+      ),
     );
 
     const found = await svc.findOrderInvoiceForUser("o1", "b1");
@@ -391,6 +434,13 @@ describe("paket anahtarlı fatura tüketicileri", () => {
       makeElogo(),
       new ElogoQueryService(prisma as any, makeElogo()) as any,
       new ElogoDocumentService(prisma as any, makeElogo(), fakeConfig()),
+      // Kesim artık GÖNDERIM servisinde (cut); gerçek örnek geçilir ki
+      // bu spec'in fatura iddiaları koda kadar insin.
+      new ElogoDeliveryService(
+        prisma as any,
+        makeElogo(),
+        new ElogoDocumentService(prisma as any, makeElogo(), fakeConfig()),
+      ),
     );
 
     const found = await svc.findOrderInvoiceForUser("o2", "s1");
@@ -405,6 +455,13 @@ describe("paket anahtarlı fatura tüketicileri", () => {
       makeElogo(),
       new ElogoQueryService(prisma as any, makeElogo()) as any,
       new ElogoDocumentService(prisma as any, makeElogo(), fakeConfig()),
+      // Kesim artık GÖNDERIM servisinde (cut); gerçek örnek geçilir ki
+      // bu spec'in fatura iddiaları koda kadar insin.
+      new ElogoDeliveryService(
+        prisma as any,
+        makeElogo(),
+        new ElogoDocumentService(prisma as any, makeElogo(), fakeConfig()),
+      ),
     );
 
     expect(await svc.findOrderInvoiceForUser("o1", "someone-else")).toBeNull();
@@ -437,6 +494,13 @@ describe("iade faturası alıcı snapshot'ı", () => {
       makeElogo(),
       new ElogoQueryService(prisma as any, makeElogo()) as any,
       new ElogoDocumentService(prisma as any, makeElogo(), fakeConfig()),
+      // Kesim artık GÖNDERIM servisinde (cut); gerçek örnek geçilir ki
+      // bu spec'in fatura iddiaları koda kadar insin.
+      new ElogoDeliveryService(
+        prisma as any,
+        makeElogo(),
+        new ElogoDocumentService(prisma as any, makeElogo(), fakeConfig()),
+      ),
     );
 
     await svc.handleOrderRefund(
@@ -460,6 +524,13 @@ describe("iade faturası alıcı snapshot'ı", () => {
       elogo,
       new ElogoQueryService(prisma as any, elogo) as any,
       new ElogoDocumentService(prisma as any, elogo, fakeConfig()),
+      // Kesim artık GÖNDERIM servisinde (cut); gerçek örnek geçilir ki
+      // bu spec'in fatura iddiaları koda kadar insin.
+      new ElogoDeliveryService(
+        prisma as any,
+        elogo,
+        new ElogoDocumentService(prisma as any, elogo, fakeConfig()),
+      ),
     );
 
     await svc.handleOrderRefund(
@@ -480,6 +551,13 @@ describe("iade faturası alıcı snapshot'ı", () => {
       makeElogo(),
       new ElogoQueryService(prisma as any, makeElogo()) as any,
       new ElogoDocumentService(prisma as any, makeElogo(), fakeConfig()),
+      // Kesim artık GÖNDERIM servisinde (cut); gerçek örnek geçilir ki
+      // bu spec'in fatura iddiaları koda kadar insin.
+      new ElogoDeliveryService(
+        prisma as any,
+        makeElogo(),
+        new ElogoDocumentService(prisma as any, makeElogo(), fakeConfig()),
+      ),
     );
 
     await svc.handleOrderRefund(
