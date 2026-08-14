@@ -61,8 +61,7 @@ import { ElogoModule } from "./modules/elogo";
 // Marketing Email System
 import { MarketingModule } from "./modules/marketing/marketing.module";
 
-// GAP-L02 & GAP-L03 - GraphQL & i18n Support
-import { GraphQLAppModule } from "./modules/graphql";
+// GAP-L03 - i18n Support
 import { I18nModule } from "./modules/i18n";
 
 // Background Workers (BullMQ)
@@ -212,8 +211,6 @@ import { AllExceptionsFilter } from "./common/filters/all-exceptions.filter";
     ElogoModule, // eLogo e-Belge (e-Arşiv / e-Fatura) entegrasyonu
     MarketingModule, // Marketing Email Scheduler (weekly newsletter, monthly promotions)
 
-    // GAP-L02 & GAP-L03 - GraphQL & i18n
-    // GraphQLAppModule,   // GAP-L02: GraphQL API Support - Temporarily disabled
     I18nModule, // GAP-L03: Multi-language Support
 
     // Bull KÖK bağlantısı (Redis) — Faz 7.2: KOŞULSUZ yüklenir (gated WorkerModule'den
