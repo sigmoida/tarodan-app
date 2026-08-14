@@ -1,6 +1,7 @@
 import { BadRequestException, ForbiddenException } from "@nestjs/common";
 import { RefundService } from "./refund.service";
 import { RefundFinancialService } from "./refund-financial.service";
+import { RefundShipmentService } from "./refund-shipment.service";
 
 /**
  * Üyelik/dijital siparişler ("MEM-" sipariş no, platform satıcısı) genel iade akışına
@@ -12,6 +13,25 @@ describe("RefundService.createRefundRequest — üyelik siparişi guard", () => 
     const prisma = {
       order: { findUnique: jest.fn().mockResolvedValue(order) },
     };
+    const notifications = {
+      appendHistory: jest.fn(),
+      safeNotify: jest.fn(),
+      notifyRefundRequestOpened: jest.fn(),
+      sendRefundEmail: jest.fn(),
+      toProductImageUrls: jest.fn().mockReturnValue([]),
+    } as any;
+    const financials = new RefundFinancialService(prisma as any, {} as any);
+    // Kargo bacağı gerçek servisle kurulur ve AYNI notifications/financials
+    // nesnelerini paylaşır — testlerin casusları bu nesnelere bakıyor.
+    const shipments = new RefundShipmentService(
+      prisma as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      notifications as any,
+      financials as any,
+    );
     return new RefundService(
       prisma as any,
       {} as any,
@@ -20,14 +40,9 @@ describe("RefundService.createRefundRequest — üyelik siparişi guard", () => 
       {} as any,
       {} as any,
       {} as any,
-      {
-        appendHistory: jest.fn(),
-        safeNotify: jest.fn(),
-        notifyRefundRequestOpened: jest.fn(),
-        sendRefundEmail: jest.fn(),
-        toProductImageUrls: jest.fn().mockReturnValue([]),
-      } as any,
-      new RefundFinancialService(prisma as any, {} as any) as any,
+      notifications as any,
+      financials as any,
+      shipments as any,
     );
   };
 

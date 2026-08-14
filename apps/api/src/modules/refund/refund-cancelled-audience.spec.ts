@@ -3,6 +3,7 @@ import { NotificationType } from "../notification/dto/notification.dto";
 import { resolveWebNotificationLink } from "../notification/notification-link";
 import { RefundService } from "./refund.service";
 import { RefundFinancialService } from "./refund-financial.service";
+import { RefundShipmentService } from "./refund-shipment.service";
 
 /**
  * REFUND_CANCELLED iki YÖNE gider ve hedef ekran audience'tan seçilir.
@@ -28,6 +29,25 @@ describe("RefundService — REFUND_CANCELLED hedef kitlesi", () => {
         update: jest.fn().mockResolvedValue({ ...rr }),
       },
     };
+    const notifications = {
+      appendHistory: jest.fn(),
+      safeNotify: jest.fn(),
+      notifyRefundRequestOpened: jest.fn(),
+      sendRefundEmail: jest.fn(),
+      toProductImageUrls: jest.fn().mockReturnValue([]),
+    } as any;
+    const financials = new RefundFinancialService(prisma as any, {} as any);
+    // Kargo bacağı gerçek servisle kurulur ve AYNI notifications/financials
+    // nesnelerini paylaşır — testlerin casusları bu nesnelere bakıyor.
+    const shipments = new RefundShipmentService(
+      prisma as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      notifications as any,
+      financials as any,
+    );
     const service = new RefundService(
       prisma as any,
       {} as any,
@@ -36,14 +56,9 @@ describe("RefundService — REFUND_CANCELLED hedef kitlesi", () => {
       {} as any,
       {} as any,
       {} as any,
-      {
-        appendHistory: jest.fn(),
-        safeNotify: jest.fn(),
-        notifyRefundRequestOpened: jest.fn(),
-        sendRefundEmail: jest.fn(),
-        toProductImageUrls: jest.fn().mockReturnValue([]),
-      } as any,
-      new RefundFinancialService(prisma as any, {} as any) as any,
+      notifications as any,
+      financials as any,
+      shipments as any,
     );
     jest
       .spyOn((service as any).financials, "unfreezeHoldForRefund")

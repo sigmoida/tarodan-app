@@ -13,6 +13,7 @@ import { flatPackageTiers } from "../shipping/testing/tariff-fixture";
 import { NotificationType } from "../notification/dto/notification.dto";
 import { RefundNotificationService } from "./refund-notification.service";
 import { RefundFinancialService } from "./refund-financial.service";
+import { RefundShipmentService } from "./refund-shipment.service";
 
 describe("RefundService policy integration", () => {
   const baseOrder = {
@@ -143,6 +144,18 @@ describe("RefundService policy integration", () => {
       createInAppNotification: jest.fn().mockResolvedValue(undefined),
       sendTemplateEmailToUser: jest.fn().mockResolvedValue(undefined),
     };
+    const notifications = new RefundNotificationService(
+      prisma as any,
+      notification as any,
+      {} as any,
+    );
+    // Gerçek finansal servis: bu spec iade matematiğini uçtan uca doğrular,
+    // stub geçmek testin konusunu ortadan kaldırırdı.
+    const financials = new RefundFinancialService(
+      prisma as any,
+      notification as any,
+      shippingTariff as any,
+    );
     const service = new RefundService(
       prisma as any,
       payment as any,
@@ -151,17 +164,16 @@ describe("RefundService policy integration", () => {
       {} as any,
       notification as any,
       {} as any,
-      new RefundNotificationService(
+      notifications as any,
+      financials as any,
+      new RefundShipmentService(
         prisma as any,
-        notification as any,
+        payment as any,
         {} as any,
-      ) as any,
-      // Gerçek finansal servis: bu spec iade matematiğini uçtan uca doğrular,
-      // stub geçmek testin konusunu ortadan kaldırırdı.
-      new RefundFinancialService(
-        prisma as any,
-        notification as any,
-        shippingTariff as any,
+        {} as any,
+        {} as any,
+        notifications as any,
+        financials as any,
       ) as any,
       shippingTariff as any,
     );

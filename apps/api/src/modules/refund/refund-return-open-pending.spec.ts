@@ -1,6 +1,7 @@
 import { RefundRequestStatus, ShipmentStatus } from "@prisma/client";
 import { RefundService } from "./refund.service";
 import { RefundFinancialService } from "./refund-financial.service";
+import { RefundShipmentService } from "./refund-shipment.service";
 
 describe("RefundService.openReturnShipment pre-advice", () => {
   it("opens the return with its reference while the real Sürat code is pending", async () => {
@@ -55,6 +56,25 @@ describe("RefundService.openReturnShipment pre-advice", () => {
         providerMessage: "registered_pending_carrier_acceptance",
       }),
     };
+    const notifications = {
+      appendHistory: jest.fn(),
+      safeNotify: jest.fn(),
+      notifyRefundRequestOpened: jest.fn(),
+      sendRefundEmail: jest.fn(),
+      toProductImageUrls: jest.fn().mockReturnValue([]),
+    } as any;
+    const financials = new RefundFinancialService(prisma as any, {} as any);
+    // Kargo bacağı gerçek servisle kurulur ve AYNI notifications/financials
+    // nesnelerini paylaşır — testlerin casusları bu nesnelere bakıyor.
+    const shipments = new RefundShipmentService(
+      prisma as any,
+      {} as any,
+      cargo as any,
+      {} as any,
+      {} as any,
+      notifications as any,
+      financials as any,
+    );
     const service = new RefundService(
       prisma as any,
       {} as any,
@@ -63,14 +83,9 @@ describe("RefundService.openReturnShipment pre-advice", () => {
       {} as any,
       {} as any,
       {} as any,
-      {
-        appendHistory: jest.fn(),
-        safeNotify: jest.fn(),
-        notifyRefundRequestOpened: jest.fn(),
-        sendRefundEmail: jest.fn(),
-        toProductImageUrls: jest.fn().mockReturnValue([]),
-      } as any,
-      new RefundFinancialService(prisma as any, {} as any) as any,
+      notifications as any,
+      financials as any,
+      shipments as any,
     );
     jest
       .spyOn((service as any).notifications, "appendHistory")

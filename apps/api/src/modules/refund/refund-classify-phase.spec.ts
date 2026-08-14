@@ -1,6 +1,7 @@
 import { OrderStatus, ShipmentStatus } from "@prisma/client";
 import { RefundService } from "./refund.service";
 import { RefundFinancialService } from "./refund-financial.service";
+import { RefundShipmentService } from "./refund-shipment.service";
 
 /**
  * classifyOrderPhase, siparişin yaşam evresine göre iade türünü belirler.
@@ -14,6 +15,25 @@ import { RefundFinancialService } from "./refund-financial.service";
  * güncellemesinde set edilmez. Bu yüzden order.deliveredAt birincil kaynaktır.
  */
 describe("RefundService.classifyOrderPhase", () => {
+  const notifications = {
+    appendHistory: jest.fn(),
+    safeNotify: jest.fn(),
+    notifyRefundRequestOpened: jest.fn(),
+    sendRefundEmail: jest.fn(),
+    toProductImageUrls: jest.fn().mockReturnValue([]),
+  } as any;
+  const financials = new RefundFinancialService({} as any, {} as any);
+  // Kargo bacağı gerçek servisle kurulur ve AYNI notifications/financials
+  // nesnelerini paylaşır — testlerin casusları bu nesnelere bakıyor.
+  const shipments = new RefundShipmentService(
+    {} as any,
+    {} as any,
+    {} as any,
+    {} as any,
+    {} as any,
+    notifications as any,
+    financials as any,
+  );
   const service = new RefundService(
     {} as any,
     {} as any,
@@ -22,14 +42,9 @@ describe("RefundService.classifyOrderPhase", () => {
     {} as any,
     {} as any,
     {} as any,
-    {
-      appendHistory: jest.fn(),
-      safeNotify: jest.fn(),
-      notifyRefundRequestOpened: jest.fn(),
-      sendRefundEmail: jest.fn(),
-      toProductImageUrls: jest.fn().mockReturnValue([]),
-    } as any,
-    new RefundFinancialService({} as any, {} as any) as any,
+    notifications as any,
+    financials as any,
+    shipments as any,
   );
 
   const classify = (order: any): string =>
