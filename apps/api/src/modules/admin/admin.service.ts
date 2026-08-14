@@ -1755,7 +1755,7 @@ export class AdminService {
       groupId: string;
       value: string;
       displayValue?: string;
-      color?: string;
+      color?: string | null;
       sortOrder?: number;
       isActive?: boolean;
     },
@@ -1769,7 +1769,7 @@ export class AdminService {
     dto: {
       value?: string;
       displayValue?: string;
-      color?: string;
+      color?: string | null;
       sortOrder?: number;
       isActive?: boolean;
     },

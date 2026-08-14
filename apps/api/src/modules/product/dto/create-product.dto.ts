@@ -14,12 +14,14 @@ import {
   ArrayMaxSize,
   ArrayMinSize,
   ValidateNested,
+  ValidateIf,
   IsDateString,
 } from "class-validator";
 import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
 import { Transform, Type } from "class-transformer";
 import { ProductCondition, ShippingPackageTierCode } from "@prisma/client";
 import { MAX_PRODUCT_IMAGES } from "../helpers/product-image-keys";
+import { MAX_PRODUCT_COLORS } from "../../../common/helpers/attribute-groups";
 
 export class ImageVariantDto {
   @IsString()
@@ -165,12 +167,36 @@ export class CreateProductDto {
   @MaxLength(100, { message: "Model kodu en fazla 100 karakter olabilir" })
   modelCode?: string;
 
-  @ApiProperty({ example: "Kırmızı", description: "Product color" })
+  @ApiPropertyOptional({
+    example: ["red", "black"],
+    description:
+      'Renk attribute slug\'ları (global "color" grubu). Web formunun gönderdiği ' +
+      "alan budur; sunucu hem ProductAttribute bağını kurar hem `color` " +
+      "kolonuna renklerin adını yazar.",
+  })
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  @ArrayMinSize(1, { message: "En az bir renk seçiniz" })
+  @ArrayMaxSize(MAX_PRODUCT_COLORS, {
+    message: `En fazla ${MAX_PRODUCT_COLORS} renk seçebilirsiniz`,
+  })
+  colors?: string[];
+
+  /**
+   * Serbest metin renk — `colors` gönderilmediğinde zorunludur.
+   *
+   * Renk kataloğa taşındı, ama eski istemciler (mobil) ve Excel toplu yükleme
+   * hâlâ düz metin gönderiyor: ikisinden biri gelmeliydi, bu yüzden zorunluluk
+   * koşullu.
+   */
+  @ApiPropertyOptional({ example: "Kırmızı", description: "Product color" })
   @Transform(({ value }) => (typeof value === "string" ? value.trim() : value))
+  @ValidateIf((dto: CreateProductDto) => !dto.colors?.length)
   @IsString()
   @MinLength(1, { message: "Renk zorunludur" })
   @MaxLength(80, { message: "Renk en fazla 80 karakter olabilir" })
-  color: string;
+  color?: string;
 
   @ApiProperty({
     example: true,

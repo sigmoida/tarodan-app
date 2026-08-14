@@ -96,6 +96,9 @@ export interface EditListingFormData {
   brandId: string;
   carModelId: string;
   modelCode: string;
+  /** Katalogdan seçilen renk slug'ları (global "color" grubu). */
+  colors: string[];
+  /** Katalog boşken kullanılan serbest metin yedeği. */
   color: string;
   scale: string;
   material: string;

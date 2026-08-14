@@ -31,6 +31,7 @@ import {
   assertValidCategoryParent,
   CATEGORIES_CACHE_KEY,
 } from "../category/category-integrity.helper";
+import { SCALE_GROUP_SLUG } from "../../common/helpers/attribute-groups";
 
 /**
  * Katalog taksonomisi admin operasyonları (kategori, marka, üretici, araç
@@ -1238,7 +1239,7 @@ export class AdminCatalogService {
       groupId: string;
       value: string;
       displayValue?: string;
-      color?: string;
+      color?: string | null;
       sortOrder?: number;
       isActive?: boolean;
     },
@@ -1254,7 +1255,7 @@ export class AdminCatalogService {
 
     // Scale group: use same slug normalization as product.service linkProductAttributes
     const slug =
-      group.slug === "scale"
+      group.slug === SCALE_GROUP_SLUG
         ? dto.value.replace(/\s/g, "").replace(/[:\/]/g, "").toLowerCase() ||
           generateSlug(dto.value)
         : generateSlug(dto.value);
@@ -1274,7 +1275,7 @@ export class AdminCatalogService {
         value: dto.value,
         slug,
         displayValue: dto.displayValue?.trim() || null,
-        color: dto.color,
+        color: dto.color || null,
         sortOrder: dto.sortOrder ?? 0,
         isActive: dto.isActive ?? true,
       },
@@ -1304,7 +1305,7 @@ export class AdminCatalogService {
     dto: {
       value?: string;
       displayValue?: string;
-      color?: string;
+      color?: string | null;
       sortOrder?: number;
       isActive?: boolean;
     },
@@ -1324,14 +1325,16 @@ export class AdminCatalogService {
         where: { id: existing.groupId },
       });
       updateData.slug =
-        group?.slug === "scale"
+        group?.slug === SCALE_GROUP_SLUG
           ? dto.value.replace(/\s/g, "").replace(/[:\/]/g, "").toLowerCase() ||
             generateSlug(dto.value)
           : generateSlug(dto.value);
     }
     if (dto.displayValue !== undefined)
       updateData.displayValue = dto.displayValue?.trim() || null;
-    if (dto.color !== undefined) updateData.color = dto.color;
+    // Boş dize/null = rengi temizle. Eskiden yalnız atama vardı: modal boş
+    // gönderdiğinde alan aynen kalıyor, bir kez verilen hex geri alınamıyordu.
+    if (dto.color !== undefined) updateData.color = dto.color || null;
     if (dto.sortOrder !== undefined) updateData.sortOrder = dto.sortOrder;
     if (dto.isActive !== undefined) updateData.isActive = dto.isActive;
 

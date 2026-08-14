@@ -3,6 +3,7 @@
 import { z } from "zod";
 import { createTranslator } from "next-intl";
 import { getMessages, resolveLocale } from "@tarodan/i18n";
+import { MAX_LISTING_COLORS } from "./constants";
 
 /**
  * Shared building blocks for the new/edit listing form schemas. Numeric fields
@@ -46,7 +47,13 @@ export function baseListingFields(msg: ListingFieldMessages) {
     brandId: z.string().min(1, msg.required),
     carModelId: z.string(),
     modelCode: z.string().trim().max(100),
-    color: z.string().trim().min(1, msg.required).max(80),
+    /**
+     * Renk artık katalogdan seçilir (global "color" attribute grubu).
+     * `color` yalnız katalog boşken devreye giren serbest metin yedeğidir;
+     * zorunluluk `colorsRefine` ile ikisinden birine bakılarak uygulanır.
+     */
+    colors: z.array(z.string()).max(MAX_LISTING_COLORS),
+    color: z.string().trim().max(80),
     scale: z.string().min(1, msg.required),
     material: z.string().min(1, msg.required),
     manufacturerId: z.string().min(1, msg.required),
@@ -68,6 +75,21 @@ export function baseListingFields(msg: ListingFieldMessages) {
       .string()
       .min(1, msg.required)
       .refine((v) => !isNaN(Number(v)) && Number(v) >= 1, msg.validPrice),
+  };
+}
+
+/**
+ * superRefine: renk zorunludur — katalogdan en az bir seçim ya da (katalog boşsa)
+ * serbest metin. Hata her iki alanda da gösterilir; alan hangisiyse orası kızarır.
+ */
+export function colorsRefine(requiredMsg: string) {
+  return (val: { colors: string[]; color: string }, ctx: z.RefinementCtx) => {
+    if (val.colors.length > 0 || val.color.trim()) return;
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["colors"],
+      message: requiredMsg,
+    });
   };
 }
 
@@ -99,6 +121,7 @@ export const emptyBaseListingValues = {
   brandId: "",
   carModelId: "",
   modelCode: "",
+  colors: [] as string[],
   color: "",
   scale: "",
   material: "",

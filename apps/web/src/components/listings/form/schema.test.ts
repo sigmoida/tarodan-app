@@ -1,17 +1,18 @@
 import { z } from "zod";
 import { describe, expect, it } from "vitest";
-import { baseListingFields } from "./schema";
+import { baseListingFields, colorsRefine } from "./schema";
 
 describe("listing form catalog details", () => {
-  const schema = z.object(
-    baseListingFields({
-      required: "required",
-      validPrice: "invalid price",
-      setSize: "invalid set size",
-      photo: "photo required",
-      descriptionLength: "invalid description",
-    }),
-  );
+  const messages = {
+    required: "required",
+    validPrice: "invalid price",
+    setSize: "invalid set size",
+    photo: "photo required",
+    descriptionLength: "invalid description",
+  };
+  const schema = z
+    .object(baseListingFields(messages))
+    .superRefine(colorsRefine(messages.required));
 
   const validValues = {
     title: "Hot Wheels Porsche 911",
@@ -21,7 +22,8 @@ describe("listing form catalog details", () => {
     brandId: "brand-1",
     carModelId: "",
     modelCode: "",
-    color: "Kırmızı",
+    colors: ["red"],
+    color: "",
     scale: "1:64",
     material: "diecast",
     manufacturerId: "manufacturer-1",
@@ -37,6 +39,26 @@ describe("listing form catalog details", () => {
 
   it("accepts an empty catalog model and manufacturer model code", () => {
     expect(schema.safeParse(validValues).success).toBe(true);
+  });
+
+  it("requires a color: catalog selection or the free-text fallback", () => {
+    expect(
+      schema.safeParse({ ...validValues, colors: [], color: "" }).success,
+    ).toBe(false);
+    // Katalog boş kurulumda serbest metin yeterlidir.
+    expect(
+      schema.safeParse({ ...validValues, colors: [], color: "Kırmızı" })
+        .success,
+    ).toBe(true);
+  });
+
+  it("caps the number of selected colors", () => {
+    const result = schema.safeParse({
+      ...validValues,
+      colors: ["red", "blue", "black", "white"],
+    });
+
+    expect(result.success).toBe(false);
   });
 
   it("still limits the optional model code to 100 characters", () => {

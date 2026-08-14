@@ -38,6 +38,13 @@ import { randomUUID } from "crypto";
 import { StorageService } from "../src/modules/storage/storage.service";
 import { PrismaService } from "../src/prisma";
 import { SEED_AVATAR_BY_EMAIL } from "../src/common/seed-media-mapping";
+import {
+  COLOR_CATALOG,
+  COLOR_GROUP_SLUG,
+  MATERIAL_GROUP_SLUG,
+  SCALE_GROUP_SLUG,
+  matchColorSlug,
+} from "../src/common/helpers/attribute-groups";
 import { EMAIL_TEMPLATE_DEFINITIONS } from "../src/common/email/email-template-registry";
 import { normalizeSeedCommerce } from "./seed-commerce";
 import {
@@ -877,6 +884,20 @@ async function main() {
     },
   });
 
+  // Renk, ölçek/malzeme ile aynı hattadır: ilan formu listeden seçtirir, filtre
+  // bu grup üzerinden çalışır. Değerler tek kaynaktan (COLOR_CATALOG) gelir.
+  const colorGroup = await prisma.attributeGroup.upsert({
+    where: { slug: COLOR_GROUP_SLUG },
+    update: {},
+    create: {
+      name: "Renk",
+      slug: COLOR_GROUP_SLUG,
+      description: "İlanın rengi (satıcı listeden seçer)",
+      isRequired: true,
+      sortOrder: 3,
+    },
+  });
+
   const vehicleTypeGroup = await prisma.attributeGroup.upsert({
     where: { slug: "vehicle_type" },
     update: {},
@@ -885,7 +906,7 @@ async function main() {
       slug: "vehicle_type",
       description: "Ürünün temsil ettiği araç kategorisi",
       isRequired: false,
-      sortOrder: 3,
+      sortOrder: 4,
     },
   });
 
@@ -938,6 +959,23 @@ async function main() {
     });
   }
 
+  const colorAttrs: Record<string, any> = {};
+  for (let i = 0; i < COLOR_CATALOG.length; i++) {
+    const entry = COLOR_CATALOG[i];
+    colorAttrs[entry.slug] = await prisma.attribute.upsert({
+      where: { groupId_slug: { groupId: colorGroup.id, slug: entry.slug } },
+      update: {},
+      create: {
+        groupId: colorGroup.id,
+        value: entry.name,
+        slug: entry.slug,
+        displayValue: entry.name,
+        color: entry.hex ?? null,
+        sortOrder: i,
+      },
+    });
+  }
+
   const vehicleTypeValues = [
     { value: "car", display: "Araba" },
     { value: "motorcycle", display: "Motosiklet" },
@@ -969,7 +1007,7 @@ async function main() {
   }
 
   console.log(
-    `✅ Created attribute groups (${scaleValues.length} scales, ${materialValues.length} materials, ${vehicleTypeValues.length} vehicle types)`,
+    `✅ Created attribute groups (${scaleValues.length} scales, ${materialValues.length} materials, ${COLOR_CATALOG.length} colors, ${vehicleTypeValues.length} vehicle types)`,
   );
 
   console.log("Seeding Hot Wheels-specific attribute groups...");
@@ -7842,14 +7880,19 @@ async function main() {
   });
   const fallbackScale = scaleAttrs["1:64"];
   const fallbackMaterial = materialAttrs.diecast;
-  const seedColors = [
-    "Kırmızı",
-    "Mavi",
-    "Siyah",
-    "Beyaz",
-    "Gümüş",
-    "Çok Renkli",
+  // Renk artık katalogdan gelir: `products.color` görünen adı taşır (arama
+  // metni ve eski ekranlar için), asıl kayıt ise ProductAttribute bağıdır.
+  const seedColorSlugs = [
+    "red",
+    "blue",
+    "black",
+    "white",
+    "silver",
+    "multicolor",
   ];
+  const seedColorEntries = seedColorSlugs.map((slug) =>
+    COLOR_CATALOG.find((entry) => entry.slug === slug)!,
+  );
 
   for (let index = 0; index < allSeedProducts.length; index += 1) {
     const product = allSeedProducts[index];
@@ -7867,6 +7910,15 @@ async function main() {
       brands[index % brands.length]?.id;
     const resolvedManufacturerId =
       product.manufacturerId ?? manufacturers[index % manufacturers.length]?.id;
+    // Kayıtta serbest metin renk varsa katalogla eşleştirilir; yoksa sırayla
+    // dağıtılır ki her ürünün hem kolonu hem attribute bağı dolu olsun.
+    const existingColorSlug = product.color
+      ? matchColorSlug(product.color)
+      : null;
+    const seedColorEntry =
+      (existingColorSlug &&
+        COLOR_CATALOG.find((entry) => entry.slug === existingColorSlug)) ||
+      seedColorEntries[index % seedColorEntries.length];
     const description = (
       product.description ??
       `${product.title} koleksiyon ürünü için ayrıntılı ürün açıklaması.`
@@ -7886,7 +7938,7 @@ async function main() {
         manufacturerId: resolvedManufacturerId,
         modelCode:
           product.modelCode ?? `SEED-${String(index + 1).padStart(4, "0")}`,
-        color: product.color ?? seedColors[index % seedColors.length],
+        color: seedColorEntry.name,
         isBoxed:
           product.isBoxed ??
           (product.condition === ProductCondition.new || index % 3 !== 0),
@@ -7903,7 +7955,15 @@ async function main() {
         (assignment) => assignment.attribute.group.slug,
       ),
     );
-    if (!groupSlugs.has("scale") && fallbackScale) {
+    if (!groupSlugs.has(COLOR_GROUP_SLUG) && colorAttrs[seedColorEntry.slug]) {
+      await prisma.productAttribute.create({
+        data: {
+          productId: product.id,
+          attributeId: colorAttrs[seedColorEntry.slug].id,
+        },
+      });
+    }
+    if (!groupSlugs.has(SCALE_GROUP_SLUG) && fallbackScale) {
       await prisma.productAttribute.create({
         data: {
           productId: product.id,
@@ -7911,7 +7971,7 @@ async function main() {
         },
       });
     }
-    if (!groupSlugs.has("material") && fallbackMaterial) {
+    if (!groupSlugs.has(MATERIAL_GROUP_SLUG) && fallbackMaterial) {
       await prisma.productAttribute.create({
         data: {
           productId: product.id,

@@ -1,5 +1,10 @@
 import { Injectable, Logger } from "@nestjs/common";
 import { PrismaService } from "../../prisma";
+import {
+  SCALE_GROUP_SLUG,
+  MATERIAL_GROUP_SLUG,
+  COLOR_GROUP_SLUG,
+} from "../../common/helpers/attribute-groups";
 
 /**
  * ProductFilterService — dinamik filtre/öznitelik metadatası (kategori/marka/ölçek/
@@ -37,7 +42,7 @@ export class ProductFilterService {
     const scaleAttrs = await this.prisma.attribute.findMany({
       where: {
         isActive: true,
-        group: { slug: "scale", isActive: true },
+        group: { slug: SCALE_GROUP_SLUG, isActive: true },
       },
       select: { value: true, slug: true, displayValue: true },
       orderBy: { sortOrder: "asc" },
@@ -63,7 +68,7 @@ export class ProductFilterService {
     const materialAttrs = await this.prisma.attribute.findMany({
       where: {
         isActive: true,
-        group: { slug: "material", isActive: true },
+        group: { slug: MATERIAL_GROUP_SLUG, isActive: true },
       },
       select: { slug: true, displayValue: true, value: true },
       orderBy: { sortOrder: "asc" },
@@ -71,6 +76,22 @@ export class ProductFilterService {
     const materials = materialAttrs.map((a) => ({
       slug: a.slug,
       label: a.displayValue || a.value,
+    }));
+
+    // 4b. Colors (from Attribute group "color" - Renk). İlan formu ve filtre
+    //     sidebar'ı aynı listeden beslenir; hex swatch için `color` da döner.
+    const colorAttrs = await this.prisma.attribute.findMany({
+      where: {
+        isActive: true,
+        group: { slug: COLOR_GROUP_SLUG, isActive: true },
+      },
+      select: { slug: true, displayValue: true, value: true, color: true },
+      orderBy: { sortOrder: "asc" },
+    });
+    const colors = colorAttrs.map((a) => ({
+      slug: a.slug,
+      label: a.displayValue || a.value,
+      color: a.color,
     }));
 
     // 5. Car models (id, name, slug, brandId – for filter dropdown, brand-specific)
@@ -118,6 +139,7 @@ export class ProductFilterService {
       })),
       scales,
       manufacturers,
+      colors,
       materials:
         materials.length > 0
           ? materials

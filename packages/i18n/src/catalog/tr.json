@@ -581,6 +581,8 @@
     "modelCodePlaceholder": "Örn. HKG72",
     "colorRequired": "Renk *",
     "colorPlaceholder": "Örn. Kırmızı",
+    "colorMaxHint": "en fazla {max} renk",
+    "colorLegacyHint": "Kayıtlı renk: {value} — listeden seçim yapın.",
     "scaleRequired": "Ölçek *",
     "materialRequired": "Malzeme *",
     "manufacturerRequired": "Üretici *",

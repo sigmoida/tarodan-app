@@ -76,6 +76,14 @@ const edit = (over: Partial<ListingEditPayload> = {}): ListingEditPayload => ({
       manufacturerSlug: null,
     },
     {
+      groupSlug: "color",
+      groupName: "Renk",
+      slug: "red",
+      value: "Kırmızı",
+      displayValue: "Kırmızı",
+      manufacturerSlug: null,
+    },
+    {
       groupSlug: "hw-segment",
       groupName: "Seri",
       slug: "mainline",
@@ -99,6 +107,7 @@ describe("buildListingFormData", () => {
       brandId: "brand1",
       carModelId: "model1",
       modelCode: "MC-1",
+      colors: ["red"],
       color: "Kırmızı",
       scale: "1:64",
       material: "diecast",
@@ -114,6 +123,34 @@ describe("buildListingFormData", () => {
       status: "active",
       customAttributes: { "hw-segment": ["mainline"] },
     });
+  });
+
+  it("renk seçimlerini global renk grubundan toplar", () => {
+    const { newFormData } = buildListingFormData(
+      edit({
+        attributes: [
+          {
+            groupSlug: "color",
+            groupName: "Renk",
+            slug: "black",
+            value: "Siyah",
+            displayValue: "Siyah",
+            manufacturerSlug: null,
+          },
+          {
+            groupSlug: "color",
+            groupName: "Renk",
+            slug: "red",
+            value: "Kırmızı",
+            displayValue: "Kırmızı",
+            manufacturerSlug: null,
+          },
+        ],
+      }),
+    );
+    expect(newFormData.colors).toEqual(["black", "red"]);
+    // Renk global bir gruptur; üretici bölümüne sızmamalı.
+    expect(newFormData.customAttributes).toEqual({});
   });
 
   it("üreticiye özel nitelikleri gruplarına göre doldurur", () => {

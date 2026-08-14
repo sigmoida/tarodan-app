@@ -87,6 +87,9 @@ export class ProductQueryService {
       manufacturerId,
       scale,
       material: materialSlug,
+      // Renk filtresi sonucu değiştirir; anahtara girmezse iki farklı renk
+      // seçimi aynı sayfayı paylaşırdı.
+      color: query.color,
       tradeOnly,
       discountOnly,
       // Boost filters change the result set (home Vitrin rail vs a plain browse)

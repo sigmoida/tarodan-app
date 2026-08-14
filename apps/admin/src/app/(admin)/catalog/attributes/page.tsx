@@ -178,7 +178,7 @@ function AttributesPageContent() {
                       className="flex items-center justify-between gap-3 rounded-lg bg-surface-alt p-3"
                     >
                       <div className="flex min-w-0 items-center gap-2">
-                        {selectedGroup.manufacturerSlug && a.color && (
+                        {a.color && (
                           <span
                             className="h-4 w-4 flex-shrink-0 rounded-full"
                             style={{ backgroundColor: a.color }}
@@ -229,7 +229,6 @@ function AttributesPageContent() {
           onClose={() => setAttrModal(null)}
           attribute={attrModal.attribute}
           groupId={selectedGroup.id}
-          showColor={!!selectedGroup.manufacturerSlug}
         />
       )}
     </>

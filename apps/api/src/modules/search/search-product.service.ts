@@ -25,6 +25,10 @@ import {
   PUBLIC_NAME_SELECT,
   publicName,
 } from "../../common/helpers/public-identity";
+import {
+  SCALE_GROUP_SLUG,
+  MATERIAL_GROUP_SLUG,
+} from "../../common/helpers/attribute-groups";
 
 /**
  * Ürün arama + indeksleme alt servisi (search.service.ts'ten birebir taşındı):
@@ -460,10 +464,10 @@ export class SearchProductService {
     freeTierCanTrade: boolean,
   ): Record<string, any> {
     const scaleAttr = product.productAttributes?.find(
-      (pa: any) => pa.attribute?.group?.slug === "scale",
+      (pa: any) => pa.attribute?.group?.slug === SCALE_GROUP_SLUG,
     );
     const materialAttr = product.productAttributes?.find(
-      (pa: any) => pa.attribute?.group?.slug === "material",
+      (pa: any) => pa.attribute?.group?.slug === MATERIAL_GROUP_SLUG,
     );
     const vehicleTypeAttr = product.productAttributes?.find(
       (pa: any) => pa.attribute?.group?.slug === "vehicle_type",

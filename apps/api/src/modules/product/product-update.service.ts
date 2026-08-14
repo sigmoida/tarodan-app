@@ -20,6 +20,12 @@ import { OfferStatus, ProductStatus, Prisma } from "@prisma/client";
 import { renderManagedEmailTemplate } from "../../common/helpers/email-template-renderer";
 import { ProductCommonService } from "./product-common.service";
 import { PUBLIC_IDENTITY_SELECT } from "../../common/helpers/public-identity";
+import {
+  COLOR_GROUP_SLUG,
+  MATERIAL_GROUP_SLUG,
+  SCALE_GROUP_SLUG,
+  colorColumnValue,
+} from "../../common/helpers/attribute-groups";
 import { ProductRankingService } from "./product-ranking.service";
 import { MembershipService } from "../membership/membership.service";
 import { productShippingTierData } from "./helpers/product-shipping-tier.helper";
@@ -421,12 +427,34 @@ export class ProductUpdateService {
       }
     }
 
+    // Katalog seçimleri güncelleme yazılmadan çözülür: geçersiz bir renk yarım
+    // güncelleme bırakmadan 400 döner ve denormalize `color` kolonu ürünün
+    // kendi yazmasında tazelenir (ayrı bir UPDATE gerekmez).
+    const attributesChanged =
+      dto.scale !== undefined ||
+      dto.attributeIds !== undefined ||
+      dto.material !== undefined ||
+      dto.colors !== undefined ||
+      dto.attributes !== undefined;
+    const resolvedAttributes = attributesChanged
+      ? await this.common.resolveProductAttributes({
+          scale: dto.scale,
+          material: dto.material,
+          colors: dto.colors,
+          attributeIds: dto.attributeIds,
+          attributeSlugs: dto.attributes,
+        })
+      : null;
+
     const updateData: Prisma.ProductUpdateInput = {
       title: dto.title,
       description: dto.description,
       modelCode:
         dto.modelCode !== undefined ? dto.modelCode?.trim() || null : undefined,
-      color: dto.color?.trim(),
+      color:
+        dto.colors !== undefined
+          ? colorColumnValue(resolvedAttributes.colorLabels, dto.color)
+          : dto.color?.trim(),
       isBoxed: dto.isBoxed,
       ...(effectivePrice !== undefined ? { price: effectivePrice } : {}),
       condition: dto.condition,
@@ -588,22 +616,28 @@ export class ProductUpdateService {
         });
       });
 
-      if (
-        dto.scale !== undefined ||
-        dto.attributeIds !== undefined ||
-        dto.material !== undefined ||
-        dto.attributes !== undefined
-      ) {
-        const scaleMaterialAttrIds = await this.prisma.attribute
-          .findMany({
-            where: { group: { slug: { in: ["scale", "material"] } } },
-            select: { id: true },
-          })
-          .then((a) => a.map((x) => x.id));
-        if (scaleMaterialAttrIds.length > 0) {
-          await this.prisma.productAttribute.deleteMany({
-            where: { productId: id, attributeId: { in: scaleMaterialAttrIds } },
-          });
+      if (attributesChanged) {
+        // Sıfırlama ALAN BAZLIDIR: yalnız payload'da gelen alanın grubu
+        // temizlenir. Eskiden ölçek/malzeme birlikte siliniyordu; renk de o
+        // listeye eklenseydi tek bir ölçek güncellemesi ilanın rengini
+        // düşürürdü.
+        const groupsToReset = [
+          ...(dto.scale !== undefined ? [SCALE_GROUP_SLUG] : []),
+          ...(dto.material !== undefined ? [MATERIAL_GROUP_SLUG] : []),
+          ...(dto.colors !== undefined ? [COLOR_GROUP_SLUG] : []),
+        ];
+        if (groupsToReset.length > 0) {
+          const groupAttrIds = await this.prisma.attribute
+            .findMany({
+              where: { group: { slug: { in: groupsToReset } } },
+              select: { id: true },
+            })
+            .then((a) => a.map((x) => x.id));
+          if (groupAttrIds.length > 0) {
+            await this.prisma.productAttribute.deleteMany({
+              where: { productId: id, attributeId: { in: groupAttrIds } },
+            });
+          }
         }
         // Also clear any prior manufacturer-scoped attribute selections so the user can
         // replace them via the update payload (matches POST create semantics).
@@ -620,13 +654,7 @@ export class ProductUpdateService {
             });
           }
         }
-        await this.common.linkProductAttributes(
-          id,
-          dto.scale,
-          dto.attributeIds,
-          dto.material,
-          dto.attributes,
-        );
+        await this.common.attachProductAttributes(id, resolvedAttributes.ids);
       }
 
       // İlan Kalite Skoru + rankTier yeniden hesapla (foto/açıklama değişmiş olabilir)

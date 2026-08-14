@@ -4,9 +4,40 @@ import type { ReactNode } from "react";
 import { Link } from "@/i18n/navigation";
 import SectionCard from "@/components/ui/SectionCard";
 import { formatCondition } from "@/lib/format";
+import {
+  COLOR_GROUP_SLUG,
+  COLOR_LABEL_SEPARATOR,
+  MATERIAL_GROUP_SLUG,
+  SCALE_GROUP_SLUG,
+} from "@/components/listings/form/constants";
 import type { Listing } from "../_lib/types";
 
 type Translator = (key: any) => string;
+
+/**
+ * "Detaylar" kartında zaten kendi satırı olan gruplar — teknik listede ikinci
+ * kez görünmemeleri için buradan elenir. Her grup hem slug'ı hem GÖRÜNEN adıyla
+ * yazılır: `groupSlug` API'nin yeni alanı, ad ise onu döndürmeyen eski/önbellekli
+ * yanıtlar için yedek.
+ */
+const DERIVED_GROUPS = [
+  { slug: SCALE_GROUP_SLUG, name: "Ölçek" },
+  { slug: MATERIAL_GROUP_SLUG, name: "Malzeme" },
+  { slug: COLOR_GROUP_SLUG, name: "Renk" },
+] as const;
+
+type ListingAttribute = NonNullable<Listing["attributes"]>[number];
+
+/** Tek bir gruba ait nitelikler (slug önce, ad yedek). */
+function attributesInGroup(
+  listing: Listing,
+  slug: string,
+  name: string,
+): ListingAttribute[] {
+  return (listing.attributes ?? []).filter(
+    (a) => a.groupSlug === slug || a.group === name,
+  );
+}
 
 /**
  * One label→value row inside the Details / Technical-details cards. Rendered as a
@@ -50,6 +81,18 @@ export default function ProductSpecs({
       (a) => a.group === "material" || a.group === "Malzeme",
     )?.value ||
     "—";
+  /**
+   * Renk aynı mantıkla türetilir: `products.color` denormalize kolonu boşsa
+   * (backfill görmemiş eski ilan) nitelikler üzerinden okunur. Türetim burada
+   * yapılmasa, aşağıda renk grubunu teknik listeden düşürmek o ilanlarda rengi
+   * tamamen görünmez kılardı.
+   */
+  const colorValue =
+    listing.color ||
+    attributesInGroup(listing, COLOR_GROUP_SLUG, "Renk")
+      .map((a) => a.value)
+      .join(COLOR_LABEL_SEPARATOR) ||
+    null;
   const hasQuantity =
     (listing.availableQuantity !== undefined &&
       listing.availableQuantity !== null) ||
@@ -119,13 +162,15 @@ export default function ProductSpecs({
   const technicalAttrs =
     listing.attributes?.filter(
       (a) =>
-        a.group !== "scale" && a.group !== "material" && a.group !== "Malzeme",
+        !DERIVED_GROUPS.some(
+          (g) => a.groupSlug === g.slug || a.group === g.name,
+        ),
     ) ?? [];
   const hasTechnical =
     technicalAttrs.length > 0 ||
     Boolean(listing.carModel) ||
     Boolean(listing.modelCode) ||
-    Boolean(listing.color) ||
+    Boolean(colorValue) ||
     listing.isBoxed != null;
 
   return (
@@ -157,8 +202,8 @@ export default function ProductSpecs({
                 value={listing.modelCode}
               />
             )}
-            {listing.color && (
-              <DetailRow label={t("product.color")} value={listing.color} />
+            {colorValue && (
+              <DetailRow label={t("product.color")} value={colorValue} />
             )}
             {listing.isBoxed != null && (
               <DetailRow

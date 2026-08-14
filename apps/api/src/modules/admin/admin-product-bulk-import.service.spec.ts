@@ -20,6 +20,7 @@ const IDS = {
   manufacturer: "12d1dad5-8eba-4620-913e-d13217524ffc",
   scale: "eb773ddd-163b-43fd-b896-d229b9f53d47",
   material: "a8751828-14fc-41c6-ae58-30ad7e7382b1",
+  color: "6a3f0a0e-2d0e-4a1e-9a4e-9c8f6bd0c111",
   batch: "944aa269-fb61-4dfe-96ce-e4af4ff5ba45",
 };
 
@@ -199,6 +200,13 @@ describe("AdminProductBulkImportService", () => {
             displayValue: "Diecast",
             group: { slug: "material" },
           },
+          {
+            id: IDS.color,
+            slug: "purple",
+            value: "Mor",
+            displayValue: "Mor",
+            group: { slug: "color" },
+          },
         ]),
       },
       platformSetting: { findUnique: jest.fn().mockResolvedValue(null) },
@@ -235,9 +243,10 @@ describe("AdminProductBulkImportService", () => {
     };
     const moderationQueue = { add: jest.fn().mockResolvedValue(undefined) };
     const common = {
-      resolveProductAttributeIds: jest
-        .fn()
-        .mockResolvedValue([IDS.scale, IDS.material]),
+      resolveProductAttributes: jest.fn().mockResolvedValue({
+        ids: [IDS.scale, IDS.material, IDS.color],
+        colorLabels: ["Mor"],
+      }),
     };
     const ranking = {
       recomputeProductRanking: jest.fn().mockResolvedValue(undefined),
@@ -314,11 +323,14 @@ describe("AdminProductBulkImportService", () => {
     expect(media.uploadProductImageVariants).toHaveBeenCalledTimes(3);
     expect(moderationAi.assertTextClean).toHaveBeenCalledTimes(2);
     expect(moderationAi.assertImageClean).toHaveBeenCalledTimes(3);
-    expect(common.resolveProductAttributeIds).toHaveBeenCalledWith(
-      "1:64",
-      undefined,
-      "diecast",
-      [],
+    // Excel'in serbest metin "renk" kolonu katalog seçeneğine çözülür.
+    expect(common.resolveProductAttributes).toHaveBeenCalledWith(
+      {
+        scale: "1:64",
+        material: "diecast",
+        colors: ["purple"],
+        attributeSlugs: [],
+      },
       { rejectUnknown: true },
     );
     expect(ranking.recomputeProductRanking).toHaveBeenCalledTimes(1);

@@ -90,7 +90,13 @@ describe("ProductCreateService required listing details", () => {
     },
   };
   const common = {
-    linkProductAttributes: jest.fn().mockResolvedValue(undefined),
+    resolveProductAttributes: jest
+      .fn()
+      .mockResolvedValue({
+        ids: ["attr-scale", "attr-material"],
+        colorLabels: [],
+      }),
+    attachProductAttributes: jest.fn().mockResolvedValue(undefined),
     formatProductResponse: jest.fn().mockImplementation((product) => product),
   };
   const commissionGuard = {
@@ -152,13 +158,17 @@ describe("ProductCreateService required listing details", () => {
         }),
       }),
     );
-    expect(common.linkProductAttributes).toHaveBeenCalledWith(
-      "product-1",
-      "1:64",
-      undefined,
-      "diecast",
-      undefined,
-    );
+    expect(common.resolveProductAttributes).toHaveBeenCalledWith({
+      scale: "1:64",
+      material: "diecast",
+      colors: undefined,
+      attributeIds: undefined,
+      attributeSlugs: undefined,
+    });
+    expect(common.attachProductAttributes).toHaveBeenCalledWith("product-1", [
+      "attr-scale",
+      "attr-material",
+    ]);
   });
 
   it("requires coverage for both the normal and discounted listing prices", async () => {

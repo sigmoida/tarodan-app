@@ -25,6 +25,7 @@ import {
 } from "./helpers/product-price-limits";
 import { ProductCommonService } from "./product-common.service";
 import { PUBLIC_IDENTITY_SELECT } from "../../common/helpers/public-identity";
+import { colorColumnValue } from "../../common/helpers/attribute-groups";
 import { ProductRankingService } from "./product-ranking.service";
 import { ProductStatsService } from "./product-stats.service";
 import { productShippingTierData } from "./helpers/product-shipping-tier.helper";
@@ -295,6 +296,19 @@ export class ProductCreateService {
       });
     }
 
+    // Katalog seçimleri ÜRÜN YAZILMADAN önce çözülür: renk denormalize kolona
+    // da yazıldığı için etiketler create anında lazım, ayrıca geçersiz bir
+    // seçim yarım kalmış ilan bırakmadan 400 döner.
+    const attributeSelection = {
+      scale: dto.scale,
+      material: dto.material,
+      colors: dto.colors,
+      attributeIds: dto.attributeIds,
+      attributeSlugs: dto.attributes,
+    };
+    const resolvedAttributes =
+      await this.common.resolveProductAttributes(attributeSelection);
+
     try {
       const product = await this.prisma.product.create({
         data: {
@@ -321,7 +335,9 @@ export class ProductCreateService {
           carModelId,
           manufacturerId,
           modelCode: dto.modelCode?.trim() || null,
-          color: dto.color.trim(),
+          // Kolon, seçilen renklerin adını taşır (arama metni ve eski ekranlar
+          // buradan besleniyor); seçim yoksa eski istemcinin serbest metni.
+          color: colorColumnValue(resolvedAttributes.colorLabels, dto.color),
           isBoxed: dto.isBoxed,
           releaseDate,
           images: dto.images?.length
@@ -349,13 +365,10 @@ export class ProductCreateService {
         },
       });
 
-      // Link scale and material (attributes) so they show on detail and in filters
-      await this.common.linkProductAttributes(
+      // Link scale, material and colors (attributes) so they show on detail and in filters
+      await this.common.attachProductAttributes(
         product.id,
-        dto.scale,
-        dto.attributeIds,
-        dto.material,
-        dto.attributes,
+        resolvedAttributes.ids,
       );
 
       // İlan Kalite Skoru + rankTier hesapla (best-effort; sıralama bozulmasın)

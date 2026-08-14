@@ -11,6 +11,7 @@ import { useLocale, useTranslations } from "next-intl";
 import { formatCondition } from "@/lib/format";
 import ProductLayoutSelector from "./ProductLayoutSelector";
 import { useListings } from "../_context/ListingsContext";
+import { useListingFiltersQuery } from "../_hooks/useListingFiltersQuery";
 
 /**
  * The page-header controls (rendered in the shared `PageHeader`'s actions slot):
@@ -103,6 +104,12 @@ export function ActiveFilterChips() {
     handleFiltersChange,
     clearFilters,
   } = useListings();
+  /**
+   * Renk çipinin etiketi katalogdan gelir — URL'de yalnız slug taşınır.
+   * Kenar çubuğuyla AYNI sorgu anahtarı kullanıldığı için ek istek olmaz; erken
+   * `return null`'dan önce çağrılır (hook sırası koşula bağlanamaz).
+   */
+  const colorOptions = useListingFiltersQuery().data?.colors;
 
   if (activeFilterCount === 0) return null;
 
@@ -163,6 +170,21 @@ export function ActiveFilterChips() {
         if (k === "carModel") updates.carModelId = "";
         handleFiltersChange(updates);
       },
+    });
+  }
+
+  // Renk çoklu seçimdir: her renk KENDİ çipini alır, böylece kullanıcı diğer
+  // seçimlerini kaybetmeden tek rengi kaldırabilir.
+  for (const slug of filters.colors ?? []) {
+    chips.push({
+      key: `color:${slug}`,
+      label:
+        colorOptions?.find((option) => option.slug === slug)?.label ?? slug,
+      onRemove: () =>
+        handleFiltersChange({
+          ...filters,
+          colors: (filters.colors ?? []).filter((s) => s !== slug),
+        }),
     });
   }
 

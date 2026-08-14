@@ -77,3 +77,29 @@ describe("buildProductWhere – stok/görünürlük filtresi", () => {
     );
   });
 });
+
+/**
+ * Renk filtresi: ilan birden fazla renk taşıyabildiği için seçimler arasında
+ * OR uygulanır ("kırmızı VEYA siyah"). AND olsaydı iki renk seçen kullanıcı
+ * her zaman boş sonuç görürdü.
+ */
+describe("buildProductWhere – renk filtresi", () => {
+  const colorClause = (color?: string) => {
+    const and = (buildProductWhere({ color }).AND ?? []) as any[];
+    return and.find((condition) => condition.productAttributes)
+      ?.productAttributes?.some?.attribute;
+  };
+
+  it("seçilen renkleri color grubunda OR olarak arar", () => {
+    expect(colorClause("red,black")).toEqual({
+      isActive: true,
+      group: { slug: "color", isActive: true },
+      slug: { in: ["red", "black"] },
+    });
+  });
+
+  it("boş/eksik değerlerde koşul üretmez", () => {
+    expect(colorClause(undefined)).toBeUndefined();
+    expect(colorClause(" , ")).toBeUndefined();
+  });
+});

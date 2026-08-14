@@ -581,6 +581,8 @@
     "modelCodePlaceholder": "e.g. HKG72",
     "colorRequired": "Color *",
     "colorPlaceholder": "e.g. Red",
+    "colorMaxHint": "up to {max} colors",
+    "colorLegacyHint": "Saved color: {value} — pick from the list.",
     "scaleRequired": "Scale *",
     "materialRequired": "Material *",
     "manufacturerRequired": "Manufacturer *",

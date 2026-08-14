@@ -130,11 +130,11 @@ export class CreateAttributeDto {
 
   @ApiPropertyOptional({
     example: "#FF0000",
-    description: "For color attributes",
+    description: "Swatch hex kodu; null gönderilirse renk temizlenir.",
   })
   @IsOptional()
   @IsHexColor()
-  color?: string;
+  color?: string | null;
 
   @ApiPropertyOptional({ example: 0 })
   @IsOptional()
@@ -160,10 +160,13 @@ export class UpdateAttributeDto {
   @IsString()
   displayValue?: string;
 
-  @ApiPropertyOptional({ example: "#00FF00" })
+  @ApiPropertyOptional({
+    example: "#00FF00",
+    description: "Swatch hex kodu; null gönderilirse renk temizlenir.",
+  })
   @IsOptional()
   @IsHexColor()
-  color?: string;
+  color?: string | null;
 
   @ApiPropertyOptional({ example: 1 })
   @IsOptional()

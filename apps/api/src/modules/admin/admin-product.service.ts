@@ -27,6 +27,10 @@ import { NotificationType } from "../notification/dto/notification.dto";
 import { dateRangeWhere, paginate, resolveOrderBy } from "../../common/list";
 import { catalogProductWhere } from "../product/helpers/catalog-product-where";
 import { CommissionRuleGuardService } from "../commission/commission-rule-guard.service";
+import {
+  SCALE_GROUP_SLUG,
+  MATERIAL_GROUP_SLUG,
+} from "../../common/helpers/attribute-groups";
 
 /**
  * Ürün yönetimi + admin ürün silme/geri yükleme — AdminService'in
@@ -303,8 +307,8 @@ export class AdminProductService {
 
     return {
       ...product,
-      scale: attributeValue("scale"),
-      material: attributeValue("material"),
+      scale: attributeValue(SCALE_GROUP_SLUG),
+      material: attributeValue(MATERIAL_GROUP_SLUG),
       images: imagesWithPresignedUrls,
       price: Number(product.price),
       originalPrice:

@@ -139,6 +139,7 @@ function useListingsValue(): ListingsContextValue {
     if (f.carModelId) params.set("carModelId", f.carModelId);
     if (f.scale) params.set("scale", f.scale);
     if (f.material) params.set("material", f.material);
+    if (f.colors?.length) params.set("color", f.colors.join(","));
     if (f.condition) params.set("condition", f.condition);
     if (f.minPrice) params.set("minPrice", f.minPrice);
     if (f.maxPrice) params.set("maxPrice", f.maxPrice);
@@ -294,6 +295,7 @@ function useListingsValue(): ListingsContextValue {
       categoryId: "",
       manufacturer: "",
       manufacturerId: "",
+      colors: [],
       customAttributes: {},
     });
     setCurrentPage(1);
@@ -332,6 +334,9 @@ function useListingsValue(): ListingsContextValue {
             count += 1;
             counted.add("price");
           }
+        } else if (k === "colors") {
+          // Seçilen renk sayısı kadar değil, tek filtre olarak sayılır.
+          if (Array.isArray(v) && v.length > 0) count += 1;
         } else if (k === "customAttributes") {
           // Count each non-empty custom attribute group (e.g. each Hot Wheels attribute filter).
           if (v && typeof v === "object") {

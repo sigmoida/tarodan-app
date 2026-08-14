@@ -23,6 +23,11 @@ import * as path from "path";
 import { isUUID, validate } from "class-validator";
 import { plainToInstance } from "class-transformer";
 import { PrismaService } from "../../prisma";
+import {
+  COLOR_GROUP_SLUG,
+  colorColumnValue,
+  resolveColorsFromText,
+} from "../../common/helpers/attribute-groups";
 import { notifyWebRevalidate } from "../../common/revalidate";
 import { CacheService } from "../cache/cache.service";
 import { CommissionRuleGuardService } from "../commission/commission-rule-guard.service";
@@ -827,6 +832,17 @@ export class AdminProductBulkImportService {
         loadProductPriceLimits(this.prisma),
       ]);
 
+    // Excel'deki "renk" kolonu serbest metin; katalogla eşleşenler ilanın renk
+    // seçimine dönüşür (filtre toplu yüklenen ürünleri de kapsasın),
+    // eşleşmeyenler eskiden olduğu gibi düz metin kalır.
+    const colorOptions = (
+      await this.prisma.attribute.findMany({
+        where: { isActive: true, group: { slug: COLOR_GROUP_SLUG } },
+        select: { slug: true, value: true, displayValue: true },
+        orderBy: { sortOrder: "asc" },
+      })
+    ).map((row) => ({ slug: row.slug, label: row.displayValue || row.value }));
+
     const uploadedNames = new Set(
       imageFiles.map((image) => this.normalizeFilename(image.originalname)),
     );
@@ -916,13 +932,20 @@ export class AdminProductBulkImportService {
 
         const scale = this.text(get("olcek"));
         const material = this.text(get("malzeme"));
-        const attributeIds = await this.common.resolveProductAttributeIds(
-          scale,
-          undefined,
-          material,
-          this.csv(this.text(get("ek_ozellikler"))),
+        const colorText = this.text(get("renk"));
+        const resolvedColors = colorText
+          ? resolveColorsFromText(colorText, colorOptions)
+          : { slugs: [], labels: [], unmatched: [] };
+        const resolvedAttributes = await this.common.resolveProductAttributes(
+          {
+            scale,
+            material,
+            colors: resolvedColors.slugs,
+            attributeSlugs: this.csv(this.text(get("ek_ozellikler"))),
+          },
           { rejectUnknown: true },
         );
+        const attributeIds = resolvedAttributes.ids;
         const isSet = this.boolean(get("set_urun"), false);
         const dto = plainToInstance(CreateProductDto, {
           title: this.text(get("baslik")),
@@ -944,7 +967,7 @@ export class AdminProductBulkImportService {
           carModelId: carModel?.id,
           manufacturerId: manufacturer.id,
           modelCode: this.text(get("model_kodu")) || undefined,
-          color: this.text(get("renk")),
+          color: colorColumnValue(resolvedColors.labels, colorText),
           isBoxed: this.boolean(get("kutulu")),
           quantity: this.number(get("stok"), "stok"),
           shippingPackageTier: this.shippingTier(get("kargo_paketi")),

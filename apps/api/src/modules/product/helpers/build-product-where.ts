@@ -1,6 +1,11 @@
 import { Prisma, ProductStatus } from "@prisma/client";
 import { saleCapableSellerWhere } from "../../membership/membership.util";
 import { catalogProductWhere } from "./catalog-product-where";
+import {
+  SCALE_GROUP_SLUG,
+  MATERIAL_GROUP_SLUG,
+  COLOR_GROUP_SLUG,
+} from "../../../common/helpers/attribute-groups";
 
 /**
  * Shared interface for product filter params.
@@ -23,6 +28,8 @@ export interface ProductFilterParams {
   brand?: string;
   scale?: string;
   material?: string;
+  /** Virgülle ayrık renk slug'ları (global "color" grubu); aralarında OR. */
+  color?: string;
   manufacturer?: string;
   manufacturerId?: string;
   carModelId?: string;
@@ -87,6 +94,7 @@ export function buildProductWhere(
     brand,
     scale,
     material,
+    color,
     manufacturer,
     manufacturerId,
     carModelId,
@@ -200,7 +208,7 @@ export function buildProductWhere(
         some: {
           attribute: {
             isActive: true,
-            group: { slug: "scale", isActive: true },
+            group: { slug: SCALE_GROUP_SLUG, isActive: true },
             OR: [
               { value: scaleTrim },
               { displayValue: scaleTrim },
@@ -220,12 +228,35 @@ export function buildProductWhere(
         some: {
           attribute: {
             isActive: true,
-            group: { slug: "material", isActive: true },
+            group: { slug: MATERIAL_GROUP_SLUG, isActive: true },
             slug: material,
           },
         },
       },
     });
+  }
+
+  // Color: match via attribute group "color". Birden fazla renk seçilirse
+  // aralarında OR uygulanır ("kırmızı VEYA siyah"), çünkü bir ilan tek bir
+  // rengin tamamını değil, seçilen renklerden birini taşıyor olabilir.
+  if (color) {
+    const colorSlugs = color
+      .split(",")
+      .map((slug) => slug.trim())
+      .filter(Boolean);
+    if (colorSlugs.length) {
+      andConditions.push({
+        productAttributes: {
+          some: {
+            attribute: {
+              isActive: true,
+              group: { slug: COLOR_GROUP_SLUG, isActive: true },
+              slug: { in: colorSlugs },
+            },
+          },
+        },
+      });
+    }
   }
 
   // Manufacturer-scoped attribute filter — group-aware (preferred).
