@@ -16,11 +16,11 @@ import { EventService } from "../../events/event.service";
 import {
   CARGO_PROVIDER,
   type CargoProvider,
-} from "../../surat-cargo/cargo-provider";
+} from "../../surat-cargo/helpers/cargo-provider";
 import { AdminTradeCommonService } from "./admin-trade-common.service";
 import { REFERENCE_PREFIX } from "../../../common/helpers/code-prefixes";
 import { generateReferenceCode } from "../../../common/helpers/generate-reference";
-import { CarrierCancellationService } from "../../surat-cargo/carrier-cancellation.service";
+import { CarrierCancellationService } from "../../surat-cargo/sync/carrier-cancellation.service";
 import { TRADE_CANCEL_REASON } from "../../trade/helpers/trade-cancel-reasons";
 import { finalizeReturningTradeIfResolved } from "../../../common/helpers/trade-return-finalize";
 import { i18nMessage } from "../../i18n";

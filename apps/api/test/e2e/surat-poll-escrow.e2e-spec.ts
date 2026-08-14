@@ -3,8 +3,8 @@ import { PrismaService } from "../../src/prisma";
 import { PaymentHoldReleaseService } from "../../src/modules/payment/refund/payment-hold-release.service";
 import { PaymentService } from "../../src/modules/payment/payment.service";
 import { NotificationService } from "../../src/modules/notification/notification.service";
-import { OrderTrackingSyncService } from "../../src/modules/surat-cargo/order-tracking-sync.service";
-import { SuratTrackingClient } from "../../src/modules/surat-cargo/surat-tracking.client";
+import { OrderTrackingSyncService } from "../../src/modules/surat-cargo/sync/order-tracking-sync.service";
+import { SuratTrackingClient } from "../../src/modules/surat-cargo/clients/surat-tracking.client";
 import {
   truncateAll,
   getPrisma,

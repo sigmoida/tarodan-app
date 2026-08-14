@@ -17,7 +17,7 @@ import { EventService } from "../../events/event.service";
 import {
   CARGO_PROVIDER,
   type CargoProvider,
-} from "../../surat-cargo/cargo-provider";
+} from "../../surat-cargo/helpers/cargo-provider";
 import { AdminTradeCommonService } from "./admin-trade-common.service";
 import { startTradeConfirmationWindowIfDelivered } from "../../../common/helpers/trade-escrow";
 import { TRADE_VALID_TRANSITIONS } from "../../trade/helpers/trade.state-machine";

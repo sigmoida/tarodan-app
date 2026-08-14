@@ -20,9 +20,9 @@ import { PaymentService } from "../payment/payment.service";
 import {
   CARGO_PROVIDER,
   type CargoProvider,
-} from "../surat-cargo/cargo-provider";
-import { CarrierCancellationService } from "../surat-cargo/carrier-cancellation.service";
-import { SuratTrackingService } from "../surat-cargo/surat-tracking.service";
+} from "../surat-cargo/helpers/cargo-provider";
+import { CarrierCancellationService } from "../surat-cargo/sync/carrier-cancellation.service";
+import { SuratTrackingService } from "../surat-cargo/sync/surat-tracking.service";
 import { canTransitionShipmentStatus } from "../shipping/shipment-state-machine";
 import { NotificationType } from "../notification/dto/notification.dto";
 import { i18nMessage } from "../i18n";

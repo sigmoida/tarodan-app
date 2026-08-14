@@ -11,12 +11,12 @@ import {
   CARGO_PROVIDER,
   type CargoProvider,
   type CargoShipmentRequest,
-} from "../../surat-cargo/cargo-provider";
+} from "../../surat-cargo/helpers/cargo-provider";
 import { i18nMessage } from "../../i18n";
 import { CacheService } from "../../cache/cache.service";
 import { NotificationService } from "../../notification/notification.service";
 import { NotificationType } from "../../notification/dto";
-import { CarrierCancellationService } from "../../surat-cargo/carrier-cancellation.service";
+import { CarrierCancellationService } from "../../surat-cargo/sync/carrier-cancellation.service";
 import { platformWarehouseAddress } from "../../../config/warehouse";
 
 type CargoShipmentDetails = Omit<

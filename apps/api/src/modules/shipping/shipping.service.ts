@@ -29,7 +29,7 @@ import {
   ShippingPackageTierCode,
 } from "@prisma/client";
 import { billableDesiForTier } from "./shipping-package-tier";
-import { OrderShipmentProvisioner } from "../surat-cargo/order-shipment-provisioner.service";
+import { OrderShipmentProvisioner } from "../surat-cargo/sync/order-shipment-provisioner.service";
 import { i18nMessage } from "../i18n";
 
 @Injectable()

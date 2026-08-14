@@ -32,7 +32,7 @@ import {
   shippingAmountForDesi,
 } from "../shipping/shipping-tariff.helper";
 import { storedProductBaseOf } from "../order/helpers/order-charged-base.helper";
-import { readInvoiceLineItems } from "../elogo/invoice-lines";
+import { readInvoiceLineItems } from "../elogo/invoice/invoice-lines";
 import {
   calculateRefundFinancials,
   RefundFinancialResult,

@@ -6,7 +6,7 @@ import {
   shippingAmountForDesi,
   ShippingPackageTiersNotConfiguredError,
 } from "./shipping-tariff.helper";
-import { buildStandardGonderiPayload } from "../surat-cargo/surat-address.util";
+import { buildStandardGonderiPayload } from "../surat-cargo/mappers/surat-address.util";
 
 /**
  * Kargo fiyatı artık desi satırlarından değil, satıcının ilanda seçtiği PAKET

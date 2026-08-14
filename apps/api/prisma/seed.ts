@@ -49,7 +49,7 @@ import { publicProductRatingWhere } from "../src/common/helpers/public-rating";
 import {
   formatElogoInvoiceNumber,
   highestSequenceValue,
-} from "../src/modules/elogo/elogo-document-number";
+} from "../src/modules/elogo/invoice/elogo-document-number";
 import {
   billableDesiForTier,
   tierCodeForDesi,

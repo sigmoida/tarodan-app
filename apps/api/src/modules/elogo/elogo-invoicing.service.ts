@@ -11,36 +11,36 @@ import { PrismaService } from "../../prisma";
 import {
   ELOGO_MAX_SEND_ATTEMPTS,
   isTransientElogoFailure,
-} from "./elogo-retry-policy";
+} from "./helpers/elogo-retry-policy";
 import {
   resolveGuestInvoiceRecipient,
   type GuestInvoiceRecipient,
-} from "./elogo-guest-recipient";
+} from "./invoice/elogo-guest-recipient";
 import { ElogoService } from "./elogo.service";
 import { TaxService } from "../tax/tax.service";
 import { StorageService } from "../storage/storage.service";
 import { SmtpProvider } from "../mail/smtp.provider";
 import { buildInvoiceXml, type UblParty } from "./ubl/ubl-invoice.builder";
-import type { ElogoDocumentType } from "./elogo.types";
+import type { ElogoDocumentType } from "./helpers/elogo.types";
 import {
   Prisma,
   type ElogoInvoice,
   type ElogoInvoiceType,
 } from "@prisma/client";
-import { invoiceAmountsFor } from "./invoice-amounts";
+import { invoiceAmountsFor } from "./invoice/invoice-amounts";
 import {
   invoiceIssueDate,
   invoiceIssueTime,
   invoiceIssueYear,
-} from "./invoice-datetime";
-import { VAT_SOURCE_BY_TYPE } from "./invoice-vat-rate";
-import { formatElogoInvoiceNumber } from "./elogo-document-number";
+} from "./invoice/invoice-datetime";
+import { VAT_SOURCE_BY_TYPE } from "./invoice/invoice-vat-rate";
+import { formatElogoInvoiceNumber } from "./invoice/elogo-document-number";
 import {
   buildPlatformSaleLines,
   invoiceTotalsFromLines,
   readInvoiceLineItems,
   type InvoiceLineItem,
-} from "./invoice-lines";
+} from "./invoice/invoice-lines";
 import { OrderTaxPolicyService } from "../order/pricing/order-tax-policy.service";
 import type { InvoiceRefundReversePayload } from "../outbox/outbox.types";
 import { renderManagedEmailTemplate } from "../../common/helpers/email-template-renderer";

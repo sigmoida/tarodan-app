@@ -17,9 +17,9 @@ import {
   resolveOrderBy,
 } from "../../../common/list";
 import { SuratCargoService } from "../../surat-cargo/surat-cargo.service";
-import { SuratTrackingService } from "../../surat-cargo/surat-tracking.service";
-import { buildStandardGonderiPayload } from "../../surat-cargo/surat-address.util";
-import { requestCarrierCancellationTask } from "../../surat-cargo/carrier-cancellation-task";
+import { SuratTrackingService } from "../../surat-cargo/sync/surat-tracking.service";
+import { buildStandardGonderiPayload } from "../../surat-cargo/mappers/surat-address.util";
+import { requestCarrierCancellationTask } from "../../surat-cargo/sync/carrier-cancellation-task";
 import { StorageService } from "../../storage/storage.service";
 import { i18nMessage } from "../../i18n";
 

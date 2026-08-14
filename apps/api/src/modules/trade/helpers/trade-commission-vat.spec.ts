@@ -1,5 +1,5 @@
 import { calculateServiceTax } from "../../order/helpers/order-service-tax.helper";
-import { AMOUNT_BASIS_BY_TYPE } from "../../elogo/invoice-amounts";
+import { AMOUNT_BASIS_BY_TYPE } from "../../elogo/invoice/invoice-amounts";
 
 /**
  * Takas aracılık komisyonu da platformun verdiği bir HİZMETTİR — siparişteki

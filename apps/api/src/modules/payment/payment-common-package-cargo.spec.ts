@@ -1,7 +1,7 @@
 import { PaymentCommonService } from "./payment-common.service";
 import { OrderStatus } from "@prisma/client";
-import { OrderShipmentProvisioner } from "../surat-cargo/order-shipment-provisioner.service";
-import { CarrierCancellationService } from "../surat-cargo/carrier-cancellation.service";
+import { OrderShipmentProvisioner } from "../surat-cargo/sync/order-shipment-provisioner.service";
+import { CarrierCancellationService } from "../surat-cargo/sync/carrier-cancellation.service";
 
 /**
  * Faz 2 (a): Satıcı paketi başına TEK Sürat gönderisi. Paketin order'ları tek barkodu/

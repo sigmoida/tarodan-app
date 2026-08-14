@@ -7,7 +7,7 @@ import { PayTRService } from "../../src/modules/payment-providers/paytr.service"
 import { StorageService } from "../../src/modules/storage/storage.service";
 import { MockPayTRService } from "../mocks/paytr.mock";
 import { SURAT_CARRIER_CLIENT } from "../../src/modules/surat-cargo/surat-cargo.service";
-import { StubSuratSoapClient } from "../../src/modules/surat-cargo/surat-soap.client";
+import { StubSuratSoapClient } from "../../src/modules/surat-cargo/clients/surat-soap.client";
 import { TradeShipmentService } from "../../src/modules/trade/lifecycle/trade-shipment.service";
 import { FulfillmentFinalizer } from "../../src/modules/payment/fulfillment/fulfillment-finalizer.service";
 import {

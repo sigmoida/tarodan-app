@@ -9,7 +9,7 @@ import type {
   ElogoSession,
   ElogoSoapCallOptions,
   ElogoUserCheckResult,
-} from "./elogo.types";
+} from "./helpers/elogo.types";
 
 /**
  * eLogo PostBoxService (SOAP) soyutlaması.

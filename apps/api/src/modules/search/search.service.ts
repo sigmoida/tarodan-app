@@ -4,10 +4,10 @@ import {
   SearchOptions,
   SearchResponse,
 } from "./search-common.service";
-import { SearchProductService } from "./search-product.service";
-import { SearchAutocompleteService } from "./search-autocomplete.service";
-import { SearchCollectionService } from "./search-collection.service";
-import { SearchSyncService } from "./search-sync.service";
+import { SearchProductService } from "./query/search-product.service";
+import { SearchAutocompleteService } from "./query/search-autocomplete.service";
+import { SearchCollectionService } from "./query/search-collection.service";
+import { SearchSyncService } from "./indexing/search-sync.service";
 
 // Geriye dönük uyumluluk: arama tip sözleşmeleri artık search-common.service'te
 // yaşıyor; mevcut tüketiciler (search.controller vb.) bu modülden import

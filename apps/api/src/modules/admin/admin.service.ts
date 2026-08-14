@@ -96,7 +96,7 @@ import {
 } from "@prisma/client";
 import { RefundService } from "../refund/refund.service";
 import { OrderService } from "../order/order.service";
-import { SuratTrackingService } from "../surat-cargo/surat-tracking.service";
+import { SuratTrackingService } from "../surat-cargo/sync/surat-tracking.service";
 
 @Injectable()
 export class AdminService {

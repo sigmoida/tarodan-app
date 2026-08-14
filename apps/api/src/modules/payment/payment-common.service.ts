@@ -2,7 +2,7 @@ import { Injectable, Logger } from "@nestjs/common";
 import { PrismaService } from "../../prisma";
 import { PaymentStatus, OrderStatus } from "@prisma/client";
 import { asPaymentMetadata } from "./helpers/payment-metadata.types";
-import { CarrierCancellationService } from "../surat-cargo/carrier-cancellation.service";
+import { CarrierCancellationService } from "../surat-cargo/sync/carrier-cancellation.service";
 import { canTransitionShipmentStatus } from "../shipping/shipment-state-machine";
 
 export interface ShipmentCancellationResult {

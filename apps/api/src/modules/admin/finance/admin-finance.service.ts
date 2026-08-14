@@ -11,7 +11,7 @@ import {
 } from "@prisma/client";
 import { PrismaService } from "../../../prisma";
 import { ledgerNetRevenue } from "../../commission/ledger-net";
-import { ELOGO_MAX_SEND_ATTEMPTS } from "../../elogo/elogo-retry-policy";
+import { ELOGO_MAX_SEND_ATTEMPTS } from "../../elogo/helpers/elogo-retry-policy";
 import { OrderTaxPolicyService } from "../../order/pricing/order-tax-policy.service";
 
 /**

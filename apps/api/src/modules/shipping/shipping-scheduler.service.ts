@@ -3,7 +3,7 @@ import { InjectQueue } from "@nestjs/bull";
 import { Queue } from "bull";
 import { registerRepeatableCron } from "../../monitoring/bull-cron.helper";
 import { QUEUE_NAMES } from "../../workers/constants";
-import { SuratTrackingService } from "../surat-cargo/surat-tracking.service";
+import { SuratTrackingService } from "../surat-cargo/sync/surat-tracking.service";
 import { CronStepFailuresError } from "../../monitoring/cron-step-runner";
 
 @Injectable()

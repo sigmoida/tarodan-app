@@ -3,7 +3,7 @@ import { LedgerEventType, OrderStatus } from "@prisma/client";
 import { PrismaService } from "../../../prisma";
 import { EventService } from "../../events";
 import { LedgerService } from "../../ledger/ledger.service";
-import { OrderShipmentProvisioner } from "../../surat-cargo/order-shipment-provisioner.service";
+import { OrderShipmentProvisioner } from "../../surat-cargo/sync/order-shipment-provisioner.service";
 import {
   PUBLIC_NAME_SELECT,
   publicName,

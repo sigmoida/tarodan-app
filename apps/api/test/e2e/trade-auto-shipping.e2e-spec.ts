@@ -14,7 +14,7 @@ import {
 import { createUser, authHeader } from "../factories/user.factory";
 import { createProduct } from "../factories/product.factory";
 import { createAddress } from "../factories/address.factory";
-import { TradeTrackingSyncService } from "../../src/modules/surat-cargo/trade-tracking-sync.service";
+import { TradeTrackingSyncService } from "../../src/modules/surat-cargo/sync/trade-tracking-sync.service";
 import { signCallback } from "../mocks/paytr.mock";
 
 /**
