@@ -116,7 +116,7 @@ export default function DiscountFormModal({
         placeholder="İndirim açıklaması..."
       />
 
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 gap-4 xs:grid-cols-2">
         <FormSelect name="type" label="İndirim Türü *">
           <option value="percentage">Yüzde (%)</option>
           <option value="fixed_amount">Sabit Tutar (TL)</option>
@@ -145,7 +145,7 @@ export default function DiscountFormModal({
       </div>
 
       {type === "bogo" && (
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 gap-4 xs:grid-cols-2">
           <FormInput
             name="buyQuantity"
             label="Kaç adet alınca? *"
@@ -172,7 +172,7 @@ export default function DiscountFormModal({
         />
       )}
 
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 gap-4 xs:grid-cols-2">
         <FormSelect name="scope" label="Kapsam">
           <option value="seller">Tüm Mağaza</option>
           <option value="product">Seçili Ürünler</option>
@@ -262,7 +262,7 @@ export default function DiscountFormModal({
         </div>
       )}
 
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 gap-4 xs:grid-cols-2">
         <FormInput
           name="minCartValue"
           label="Min. Sepet Tutarı (TL)"
@@ -281,7 +281,7 @@ export default function DiscountFormModal({
         />
       </div>
 
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 gap-4 xs:grid-cols-2">
         <FormInput
           name="usageLimitTotal"
           label="Toplam Kullanım Limiti"
@@ -298,7 +298,7 @@ export default function DiscountFormModal({
         />
       </div>
 
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 gap-4 xs:grid-cols-2">
         <FormDatePicker name="startDate" label="Başlangıç Tarihi *" />
         <FormDatePicker name="endDate" label="Bitiş Tarihi *" />
       </div>

@@ -74,7 +74,7 @@ export default function NewCardFields({
         )}
       />
 
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-1 gap-3 xs:grid-cols-2">
         <Controller
           control={control}
           name="expiry"
