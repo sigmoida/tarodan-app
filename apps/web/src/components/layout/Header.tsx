@@ -13,6 +13,7 @@ import {
   ArrowsRightLeftIcon,
 } from "@heroicons/react/24/outline";
 import { Button } from "@tarodan/ui";
+import { CountBadge } from "@/components/ui";
 import NotificationBell from "@/components/notifications/NotificationBell";
 import { withChunkErrorLogging } from "@/lib/withChunkErrorLogging";
 import { useLocale, useTranslations } from "next-intl";
@@ -153,13 +154,7 @@ export default function Header() {
                       >
                         <Link href="/profile/messages">
                           <ChatBubbleLeftRightIcon className="w-6 h-6" />
-                          {unreadMessageCount > 0 && (
-                            <span className="absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] px-1 flex items-center justify-center bg-danger-500 text-inverted text-2xs font-semibold rounded-full">
-                              {unreadMessageCount > 99
-                                ? "99+"
-                                : unreadMessageCount}
-                            </span>
-                          )}
+                          <CountBadge count={unreadMessageCount} />
                         </Link>
                       </Button>
 
@@ -179,12 +174,11 @@ export default function Header() {
                   className="relative h-9 w-9 rounded-md"
                 >
                   <Link href="/cart" data-tour="cart">
-                    <ShoppingCartIcon className="w-5 h-5" />
-                    {cartCount > 0 && (
-                      <span className="absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] px-1 bg-surface-elevated text-primary-500 text-xs rounded-full flex items-center justify-center font-semibold">
-                        {cartCount > 9 ? "9+" : cartCount}
-                      </span>
-                    )}
+                    {/* 24px: yalnız-ikon düğmelerin ölçüsü (mesaj, bildirim,
+                        hamburger). 20px yazı YANINDAKİ ikonlara ait — "İlan
+                        Ver" ve hesap menüsü tetikleyicisi gibi. */}
+                    <ShoppingCartIcon className="w-6 h-6" />
+                    <CountBadge count={cartCount} />
                   </Link>
                 </Button>
 

@@ -7,6 +7,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { BellIcon, XMarkIcon } from "@heroicons/react/24/outline";
 import { BellIcon as BellSolidIcon } from "@heroicons/react/24/solid";
 import { Button, Spinner } from "@tarodan/ui";
+import { CountBadge } from "@/components/ui";
 import { api } from "@/lib/api";
 import { queryKeys } from "@/lib/query/keys";
 import { useAuthStore } from "@/stores/authStore";
@@ -176,11 +177,7 @@ export default function NotificationBell() {
         ) : (
           <BellIcon className="w-6 h-6" />
         )}
-        {unreadCount > 0 && (
-          <span className="absolute -top-0.5 -right-0.5 flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-danger-500 px-1 text-2xs font-semibold text-inverted">
-            {unreadCount > 99 ? "99+" : unreadCount}
-          </span>
-        )}
+        <CountBadge count={unreadCount} />
       </Button>
 
       {/* Dropdown */}

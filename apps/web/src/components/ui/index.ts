@@ -70,6 +70,7 @@ export type { SectionCardProps } from "./SectionCard";
 export { default as ImagePreviewGrid } from "./ImagePreviewGrid";
 export type { ImagePreviewGridProps } from "./ImagePreviewGrid";
 export { EmptyStateCard } from "./EmptyStateCard";
+export { default as CountBadge } from "./CountBadge";
 export { default as ProductCard } from "./ProductCard";
 export { default as MetricCard } from "./MetricCard";
 export { default as SkeletonCard } from "./SkeletonCard";
