@@ -234,6 +234,7 @@ describe("Partial-refund commission ledger pro-rating (#88) [P0]", () => {
       {} as any, // queries — bu spec yalnız ters kayıt hattını sürüyor
       documents,
       delivery,
+      {} as any, // issuing — bu spec ters kayıt hattını sürüyor
     );
     const cutSpy = jest
       .spyOn(delivery as any, "cut")

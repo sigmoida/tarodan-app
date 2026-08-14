@@ -2,6 +2,7 @@ import { ConfigService } from "@nestjs/config";
 import { ElogoInvoicingService } from "./elogo-invoicing.service";
 import { ElogoDocumentService } from "./elogo-document.service";
 import { ElogoDeliveryService } from "./elogo-delivery.service";
+import { ElogoIssuingService } from "./elogo-issuing.service";
 import { ElogoService } from "./elogo.service";
 
 function fakeConfig(values: Record<string, string> = {}): ConfigService {
@@ -232,6 +233,16 @@ describe("ElogoInvoicingService", () => {
         elogo,
         new ElogoDocumentService(prisma, elogo, fakeConfig()),
       ),
+      // Kesme zinciri gerçek: issue* → cut.
+      new ElogoIssuingService(
+        prisma,
+        new ElogoDocumentService(prisma, elogo, fakeConfig()),
+        new ElogoDeliveryService(
+          prisma,
+          elogo,
+          new ElogoDocumentService(prisma, elogo, fakeConfig()),
+        ),
+      ),
     );
 
     await svc.issueCommissionInvoice("o1");
@@ -276,6 +287,16 @@ describe("ElogoInvoicingService", () => {
         elogo,
         new ElogoDocumentService(prisma, elogo, fakeConfig()),
       ),
+      // Kesme zinciri gerçek: issue* → cut.
+      new ElogoIssuingService(
+        prisma,
+        new ElogoDocumentService(prisma, elogo, fakeConfig()),
+        new ElogoDeliveryService(
+          prisma,
+          elogo,
+          new ElogoDocumentService(prisma, elogo, fakeConfig()),
+        ),
+      ),
     );
     await svc.issueCommissionInvoice("o1");
     const xml = (elogo.sendDocument as jest.Mock).mock.calls[0][0].ublXml;
@@ -303,6 +324,16 @@ describe("ElogoInvoicingService", () => {
         prisma,
         elogo,
         new ElogoDocumentService(prisma, elogo, fakeConfig()),
+      ),
+      // Kesme zinciri gerçek: issue* → cut.
+      new ElogoIssuingService(
+        prisma,
+        new ElogoDocumentService(prisma, elogo, fakeConfig()),
+        new ElogoDeliveryService(
+          prisma,
+          elogo,
+          new ElogoDocumentService(prisma, elogo, fakeConfig()),
+        ),
       ),
     );
     await svc.issueCommissionInvoice("o1");
@@ -335,6 +366,16 @@ describe("ElogoInvoicingService", () => {
         elogo,
         new ElogoDocumentService(prisma, elogo, fakeConfig()),
       ),
+      // Kesme zinciri gerçek: issue* → cut.
+      new ElogoIssuingService(
+        prisma,
+        new ElogoDocumentService(prisma, elogo, fakeConfig()),
+        new ElogoDeliveryService(
+          prisma,
+          elogo,
+          new ElogoDocumentService(prisma, elogo, fakeConfig()),
+        ),
+      ),
     );
 
     await svc.issueCommissionInvoice("o1");
@@ -359,6 +400,16 @@ describe("ElogoInvoicingService", () => {
         prisma,
         elogo,
         new ElogoDocumentService(prisma, elogo, fakeConfig()),
+      ),
+      // Kesme zinciri gerçek: issue* → cut.
+      new ElogoIssuingService(
+        prisma,
+        new ElogoDocumentService(prisma, elogo, fakeConfig()),
+        new ElogoDeliveryService(
+          prisma,
+          elogo,
+          new ElogoDocumentService(prisma, elogo, fakeConfig()),
+        ),
       ),
     );
 
@@ -397,6 +448,16 @@ describe("ElogoInvoicingService", () => {
         elogo,
         new ElogoDocumentService(prisma, elogo, fakeConfig()),
       ),
+      // Kesme zinciri gerçek: issue* → cut.
+      new ElogoIssuingService(
+        prisma,
+        new ElogoDocumentService(prisma, elogo, fakeConfig()),
+        new ElogoDeliveryService(
+          prisma,
+          elogo,
+          new ElogoDocumentService(prisma, elogo, fakeConfig()),
+        ),
+      ),
     );
 
     await svc.issueCommissionInvoice("o1");
@@ -429,6 +490,16 @@ describe("ElogoInvoicingService", () => {
         elogo,
         new ElogoDocumentService(prisma, elogo, fakeConfig()),
       ),
+      // Kesme zinciri gerçek: issue* → cut.
+      new ElogoIssuingService(
+        prisma,
+        new ElogoDocumentService(prisma, elogo, fakeConfig()),
+        new ElogoDeliveryService(
+          prisma,
+          elogo,
+          new ElogoDocumentService(prisma, elogo, fakeConfig()),
+        ),
+      ),
     );
 
     await svc.issueCommissionInvoice("o1");
@@ -456,6 +527,16 @@ describe("ElogoInvoicingService", () => {
         elogo,
         new ElogoDocumentService(prisma, elogo, fakeConfig()),
       ),
+      // Kesme zinciri gerçek: issue* → cut.
+      new ElogoIssuingService(
+        prisma,
+        new ElogoDocumentService(prisma, elogo, fakeConfig()),
+        new ElogoDeliveryService(
+          prisma,
+          elogo,
+          new ElogoDocumentService(prisma, elogo, fakeConfig()),
+        ),
+      ),
     );
 
     await svc.issueCommissionInvoice("o1");
@@ -480,6 +561,16 @@ describe("ElogoInvoicingService", () => {
         prisma,
         elogo,
         new ElogoDocumentService(prisma, elogo, fakeConfig()),
+      ),
+      // Kesme zinciri gerçek: issue* → cut.
+      new ElogoIssuingService(
+        prisma,
+        new ElogoDocumentService(prisma, elogo, fakeConfig()),
+        new ElogoDeliveryService(
+          prisma,
+          elogo,
+          new ElogoDocumentService(prisma, elogo, fakeConfig()),
+        ),
       ),
     );
 
@@ -513,6 +604,16 @@ describe("ElogoInvoicingService", () => {
         prisma,
         elogo,
         new ElogoDocumentService(prisma, elogo, fakeConfig()),
+      ),
+      // Kesme zinciri gerçek: issue* → cut.
+      new ElogoIssuingService(
+        prisma,
+        new ElogoDocumentService(prisma, elogo, fakeConfig()),
+        new ElogoDeliveryService(
+          prisma,
+          elogo,
+          new ElogoDocumentService(prisma, elogo, fakeConfig()),
+        ),
       ),
     );
 
@@ -577,6 +678,16 @@ describe("ElogoInvoicingService", () => {
         prisma,
         elogo,
         new ElogoDocumentService(prisma, elogo, fakeConfig()),
+      ),
+      // Kesme zinciri gerçek: issue* → cut.
+      new ElogoIssuingService(
+        prisma,
+        new ElogoDocumentService(prisma, elogo, fakeConfig()),
+        new ElogoDeliveryService(
+          prisma,
+          elogo,
+          new ElogoDocumentService(prisma, elogo, fakeConfig()),
+        ),
       ),
     );
     const adjustment = {
@@ -649,6 +760,16 @@ describe("ElogoInvoicingService", () => {
         makeElogo(),
         new ElogoDocumentService(prisma, makeElogo(), fakeConfig()),
       ),
+      // Kesme zinciri gerçek: issue* → cut.
+      new ElogoIssuingService(
+        prisma,
+        new ElogoDocumentService(prisma, makeElogo(), fakeConfig()),
+        new ElogoDeliveryService(
+          prisma,
+          makeElogo(),
+          new ElogoDocumentService(prisma, makeElogo(), fakeConfig()),
+        ),
+      ),
     );
 
     await svc.handleOrderRefund("o1", {
@@ -681,6 +802,16 @@ describe("ElogoInvoicingService", () => {
         elogo,
         new ElogoDocumentService(prisma, elogo, fakeConfig()),
       ),
+      // Kesme zinciri gerçek: issue* → cut.
+      new ElogoIssuingService(
+        prisma,
+        new ElogoDocumentService(prisma, elogo, fakeConfig()),
+        new ElogoDeliveryService(
+          prisma,
+          elogo,
+          new ElogoDocumentService(prisma, elogo, fakeConfig()),
+        ),
+      ),
     );
 
     await svc.issueTradeCashFeeInvoice("tcp1");
@@ -710,6 +841,16 @@ describe("ElogoInvoicingService", () => {
         elogo,
         new ElogoDocumentService(prisma, elogo, fakeConfig()),
       ),
+      // Kesme zinciri gerçek: issue* → cut.
+      new ElogoIssuingService(
+        prisma,
+        new ElogoDocumentService(prisma, elogo, fakeConfig()),
+        new ElogoDeliveryService(
+          prisma,
+          elogo,
+          new ElogoDocumentService(prisma, elogo, fakeConfig()),
+        ),
+      ),
     );
 
     await svc.issueTradeCashFeeInvoice("tcp1");
@@ -736,6 +877,16 @@ describe("ElogoInvoicingService", () => {
         prisma,
         elogo,
         new ElogoDocumentService(prisma, elogo, fakeConfig()),
+      ),
+      // Kesme zinciri gerçek: issue* → cut.
+      new ElogoIssuingService(
+        prisma,
+        new ElogoDocumentService(prisma, elogo, fakeConfig()),
+        new ElogoDeliveryService(
+          prisma,
+          elogo,
+          new ElogoDocumentService(prisma, elogo, fakeConfig()),
+        ),
       ),
     );
 
@@ -768,6 +919,16 @@ describe("ElogoInvoicingService", () => {
         prisma,
         elogo,
         new ElogoDocumentService(prisma, elogo, fakeConfig()),
+      ),
+      // Kesme zinciri gerçek: issue* → cut.
+      new ElogoIssuingService(
+        prisma,
+        new ElogoDocumentService(prisma, elogo, fakeConfig()),
+        new ElogoDeliveryService(
+          prisma,
+          elogo,
+          new ElogoDocumentService(prisma, elogo, fakeConfig()),
+        ),
       ),
     );
 
@@ -802,6 +963,16 @@ describe("ElogoInvoicingService", () => {
         elogo,
         new ElogoDocumentService(prisma, elogo, fakeConfig()),
       ),
+      // Kesme zinciri gerçek: issue* → cut.
+      new ElogoIssuingService(
+        prisma,
+        new ElogoDocumentService(prisma, elogo, fakeConfig()),
+        new ElogoDeliveryService(
+          prisma,
+          elogo,
+          new ElogoDocumentService(prisma, elogo, fakeConfig()),
+        ),
+      ),
     );
 
     await svc.handleTradeCashRefund("tcp1");
@@ -834,6 +1005,16 @@ describe("ElogoInvoicingService", () => {
         prisma,
         elogo,
         new ElogoDocumentService(prisma, elogo, fakeConfig()),
+      ),
+      // Kesme zinciri gerçek: issue* → cut.
+      new ElogoIssuingService(
+        prisma,
+        new ElogoDocumentService(prisma, elogo, fakeConfig()),
+        new ElogoDeliveryService(
+          prisma,
+          elogo,
+          new ElogoDocumentService(prisma, elogo, fakeConfig()),
+        ),
       ),
     );
 
@@ -882,6 +1063,16 @@ describe("ElogoInvoicingService", () => {
         elogo,
         new ElogoDocumentService(prisma, elogo, fakeConfig()),
       ),
+      // Kesme zinciri gerçek: issue* → cut.
+      new ElogoIssuingService(
+        prisma,
+        new ElogoDocumentService(prisma, elogo, fakeConfig()),
+        new ElogoDeliveryService(
+          prisma,
+          elogo,
+          new ElogoDocumentService(prisma, elogo, fakeConfig()),
+        ),
+      ),
     );
 
     await svc.handleOrderRefund("o1");
@@ -920,6 +1111,16 @@ describe("ElogoInvoicingService", () => {
         prisma,
         elogo,
         new ElogoDocumentService(prisma, elogo, fakeConfig()),
+      ),
+      // Kesme zinciri gerçek: issue* → cut.
+      new ElogoIssuingService(
+        prisma,
+        new ElogoDocumentService(prisma, elogo, fakeConfig()),
+        new ElogoDeliveryService(
+          prisma,
+          elogo,
+          new ElogoDocumentService(prisma, elogo, fakeConfig()),
+        ),
       ),
     );
 
@@ -973,6 +1174,16 @@ describe("ElogoInvoicingService", () => {
         elogo,
         new ElogoDocumentService(prisma, elogo, fakeConfig()),
       ),
+      // Kesme zinciri gerçek: issue* → cut.
+      new ElogoIssuingService(
+        prisma,
+        new ElogoDocumentService(prisma, elogo, fakeConfig()),
+        new ElogoDeliveryService(
+          prisma,
+          elogo,
+          new ElogoDocumentService(prisma, elogo, fakeConfig()),
+        ),
+      ),
     );
 
     await svc.issuePlatformSaleInvoice("o1");
@@ -1016,6 +1227,16 @@ describe("ElogoInvoicingService", () => {
         elogo,
         new ElogoDocumentService(prisma, elogo, fakeConfig()),
       ),
+      // Kesme zinciri gerçek: issue* → cut.
+      new ElogoIssuingService(
+        prisma,
+        new ElogoDocumentService(prisma, elogo, fakeConfig()),
+        new ElogoDeliveryService(
+          prisma,
+          elogo,
+          new ElogoDocumentService(prisma, elogo, fakeConfig()),
+        ),
+      ),
     );
 
     await svc.issueCommissionInvoice("o1");
@@ -1043,6 +1264,16 @@ describe("ElogoInvoicingService", () => {
         prisma,
         elogo,
         new ElogoDocumentService(prisma, elogo, fakeConfig()),
+      ),
+      // Kesme zinciri gerçek: issue* → cut.
+      new ElogoIssuingService(
+        prisma,
+        new ElogoDocumentService(prisma, elogo, fakeConfig()),
+        new ElogoDeliveryService(
+          prisma,
+          elogo,
+          new ElogoDocumentService(prisma, elogo, fakeConfig()),
+        ),
       ),
     );
 
@@ -1082,6 +1313,16 @@ describe("ElogoInvoicingService", () => {
         elogo,
         new ElogoDocumentService(prisma, elogo, fakeConfig()),
       ),
+      // Kesme zinciri gerçek: issue* → cut.
+      new ElogoIssuingService(
+        prisma,
+        new ElogoDocumentService(prisma, elogo, fakeConfig()),
+        new ElogoDeliveryService(
+          prisma,
+          elogo,
+          new ElogoDocumentService(prisma, elogo, fakeConfig()),
+        ),
+      ),
     );
 
     await svc.issueCommissionInvoice("o1");
@@ -1118,6 +1359,16 @@ describe("ElogoInvoicingService", () => {
         prisma,
         elogo,
         new ElogoDocumentService(prisma, elogo, fakeConfig()),
+      ),
+      // Kesme zinciri gerçek: issue* → cut.
+      new ElogoIssuingService(
+        prisma,
+        new ElogoDocumentService(prisma, elogo, fakeConfig()),
+        new ElogoDeliveryService(
+          prisma,
+          elogo,
+          new ElogoDocumentService(prisma, elogo, fakeConfig()),
+        ),
       ),
     );
 

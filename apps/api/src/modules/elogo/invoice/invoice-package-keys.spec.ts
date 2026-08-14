@@ -2,6 +2,7 @@ import { ConfigService } from "@nestjs/config";
 import { ElogoInvoicingService } from "../elogo-invoicing.service";
 import { ElogoDocumentService } from "../elogo-document.service";
 import { ElogoDeliveryService } from "../elogo-delivery.service";
+import { ElogoIssuingService } from "../elogo-issuing.service";
 import { ElogoQueryService } from "../elogo-query.service";
 import { ElogoService } from "../elogo.service";
 
@@ -247,6 +248,17 @@ describe("paket anahtarlı fatura tüketicileri", () => {
         elogo,
         new ElogoDocumentService(prisma as any, elogo, fakeConfig()),
       ),
+      // Kesme zinciri gerçek olmalı: issue* → cut. Stub, bu spec'in
+      // fatura iddialarını sessizce boşa düşürürdü.
+      new ElogoIssuingService(
+        prisma as any,
+        new ElogoDocumentService(prisma as any, makeElogo(), fakeConfig()),
+        new ElogoDeliveryService(
+          prisma as any,
+          makeElogo(),
+          new ElogoDocumentService(prisma as any, makeElogo(), fakeConfig()),
+        ),
+      ),
     );
 
     await svc.handleOrderRefund(
@@ -280,6 +292,17 @@ describe("paket anahtarlı fatura tüketicileri", () => {
         elogo,
         new ElogoDocumentService(prisma as any, elogo, fakeConfig()),
       ),
+      // Kesme zinciri gerçek olmalı: issue* → cut. Stub, bu spec'in
+      // fatura iddialarını sessizce boşa düşürürdü.
+      new ElogoIssuingService(
+        prisma as any,
+        new ElogoDocumentService(prisma as any, makeElogo(), fakeConfig()),
+        new ElogoDeliveryService(
+          prisma as any,
+          makeElogo(),
+          new ElogoDocumentService(prisma as any, makeElogo(), fakeConfig()),
+        ),
+      ),
     );
 
     await svc.handleOrderRefund(
@@ -309,6 +332,17 @@ describe("paket anahtarlı fatura tüketicileri", () => {
         prisma as any,
         elogo,
         new ElogoDocumentService(prisma as any, elogo, fakeConfig()),
+      ),
+      // Kesme zinciri gerçek olmalı: issue* → cut. Stub, bu spec'in
+      // fatura iddialarını sessizce boşa düşürürdü.
+      new ElogoIssuingService(
+        prisma as any,
+        new ElogoDocumentService(prisma as any, makeElogo(), fakeConfig()),
+        new ElogoDeliveryService(
+          prisma as any,
+          makeElogo(),
+          new ElogoDocumentService(prisma as any, makeElogo(), fakeConfig()),
+        ),
       ),
     );
 
@@ -342,6 +376,17 @@ describe("paket anahtarlı fatura tüketicileri", () => {
         prisma as any,
         elogo,
         new ElogoDocumentService(prisma as any, elogo, fakeConfig()),
+      ),
+      // Kesme zinciri gerçek olmalı: issue* → cut. Stub, bu spec'in
+      // fatura iddialarını sessizce boşa düşürürdü.
+      new ElogoIssuingService(
+        prisma as any,
+        new ElogoDocumentService(prisma as any, makeElogo(), fakeConfig()),
+        new ElogoDeliveryService(
+          prisma as any,
+          makeElogo(),
+          new ElogoDocumentService(prisma as any, makeElogo(), fakeConfig()),
+        ),
       ),
     );
 
@@ -390,6 +435,17 @@ describe("paket anahtarlı fatura tüketicileri", () => {
         makeElogo(),
         new ElogoDocumentService(prisma as any, makeElogo(), fakeConfig()),
       ),
+      // Kesme zinciri gerçek olmalı: issue* → cut. Stub, bu spec'in
+      // fatura iddialarını sessizce boşa düşürürdü.
+      new ElogoIssuingService(
+        prisma as any,
+        new ElogoDocumentService(prisma as any, makeElogo(), fakeConfig()),
+        new ElogoDeliveryService(
+          prisma as any,
+          makeElogo(),
+          new ElogoDocumentService(prisma as any, makeElogo(), fakeConfig()),
+        ),
+      ),
     );
 
     await svc.handleOrderRefund(
@@ -418,6 +474,17 @@ describe("paket anahtarlı fatura tüketicileri", () => {
         makeElogo(),
         new ElogoDocumentService(prisma as any, makeElogo(), fakeConfig()),
       ),
+      // Kesme zinciri gerçek olmalı: issue* → cut. Stub, bu spec'in
+      // fatura iddialarını sessizce boşa düşürürdü.
+      new ElogoIssuingService(
+        prisma as any,
+        new ElogoDocumentService(prisma as any, makeElogo(), fakeConfig()),
+        new ElogoDeliveryService(
+          prisma as any,
+          makeElogo(),
+          new ElogoDocumentService(prisma as any, makeElogo(), fakeConfig()),
+        ),
+      ),
     );
 
     const found = await svc.findOrderInvoiceForUser("o1", "b1");
@@ -441,6 +508,17 @@ describe("paket anahtarlı fatura tüketicileri", () => {
         makeElogo(),
         new ElogoDocumentService(prisma as any, makeElogo(), fakeConfig()),
       ),
+      // Kesme zinciri gerçek olmalı: issue* → cut. Stub, bu spec'in
+      // fatura iddialarını sessizce boşa düşürürdü.
+      new ElogoIssuingService(
+        prisma as any,
+        new ElogoDocumentService(prisma as any, makeElogo(), fakeConfig()),
+        new ElogoDeliveryService(
+          prisma as any,
+          makeElogo(),
+          new ElogoDocumentService(prisma as any, makeElogo(), fakeConfig()),
+        ),
+      ),
     );
 
     const found = await svc.findOrderInvoiceForUser("o2", "s1");
@@ -461,6 +539,17 @@ describe("paket anahtarlı fatura tüketicileri", () => {
         prisma as any,
         makeElogo(),
         new ElogoDocumentService(prisma as any, makeElogo(), fakeConfig()),
+      ),
+      // Kesme zinciri gerçek olmalı: issue* → cut. Stub, bu spec'in
+      // fatura iddialarını sessizce boşa düşürürdü.
+      new ElogoIssuingService(
+        prisma as any,
+        new ElogoDocumentService(prisma as any, makeElogo(), fakeConfig()),
+        new ElogoDeliveryService(
+          prisma as any,
+          makeElogo(),
+          new ElogoDocumentService(prisma as any, makeElogo(), fakeConfig()),
+        ),
       ),
     );
 
@@ -501,6 +590,17 @@ describe("iade faturası alıcı snapshot'ı", () => {
         makeElogo(),
         new ElogoDocumentService(prisma as any, makeElogo(), fakeConfig()),
       ),
+      // Kesme zinciri gerçek olmalı: issue* → cut. Stub, bu spec'in
+      // fatura iddialarını sessizce boşa düşürürdü.
+      new ElogoIssuingService(
+        prisma as any,
+        new ElogoDocumentService(prisma as any, makeElogo(), fakeConfig()),
+        new ElogoDeliveryService(
+          prisma as any,
+          makeElogo(),
+          new ElogoDocumentService(prisma as any, makeElogo(), fakeConfig()),
+        ),
+      ),
     );
 
     await svc.handleOrderRefund(
@@ -531,6 +631,17 @@ describe("iade faturası alıcı snapshot'ı", () => {
         elogo,
         new ElogoDocumentService(prisma as any, elogo, fakeConfig()),
       ),
+      // Kesme zinciri gerçek olmalı: issue* → cut. Stub, bu spec'in
+      // fatura iddialarını sessizce boşa düşürürdü.
+      new ElogoIssuingService(
+        prisma as any,
+        new ElogoDocumentService(prisma as any, makeElogo(), fakeConfig()),
+        new ElogoDeliveryService(
+          prisma as any,
+          makeElogo(),
+          new ElogoDocumentService(prisma as any, makeElogo(), fakeConfig()),
+        ),
+      ),
     );
 
     await svc.handleOrderRefund(
@@ -557,6 +668,17 @@ describe("iade faturası alıcı snapshot'ı", () => {
         prisma as any,
         makeElogo(),
         new ElogoDocumentService(prisma as any, makeElogo(), fakeConfig()),
+      ),
+      // Kesme zinciri gerçek olmalı: issue* → cut. Stub, bu spec'in
+      // fatura iddialarını sessizce boşa düşürürdü.
+      new ElogoIssuingService(
+        prisma as any,
+        new ElogoDocumentService(prisma as any, makeElogo(), fakeConfig()),
+        new ElogoDeliveryService(
+          prisma as any,
+          makeElogo(),
+          new ElogoDocumentService(prisma as any, makeElogo(), fakeConfig()),
+        ),
       ),
     );
 

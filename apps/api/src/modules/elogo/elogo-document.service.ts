@@ -266,4 +266,91 @@ export class ElogoDocumentService {
       })
       .catch(() => null);
   }
+
+  /**
+   * Komisyon/hizmet bedeli faturasının ledger toplamları — hem iade ÖNCESİ brüt
+   * matrah hem iade DÜŞÜLMÜŞ net matrah.
+   *
+   * `sourceId` normalde PAKET id'sidir; paket anahtarına geçilmeden önce kesilmiş
+   * kayıtlarda SİPARİŞ id'si olabilir. İki nesil de buradan çözülür, böylece
+   * çağıranlar anahtarın hangi nesil olduğunu bilmek zorunda kalmaz.
+   */
+  async resolveFeeLedgerTotals(sourceId: string): Promise<{
+    sellerCommission: number;
+    netSellerCommission: number;
+    buyerFee: number;
+    netBuyerFee: number;
+  } | null> {
+    const pkg = await this.prisma.orderPackage
+      .findUnique({
+        where: { id: sourceId },
+        select: { orders: { select: { id: true } } },
+      })
+      .catch(() => null);
+    const orderIds = pkg?.orders.length
+      ? pkg.orders.map((o) => o.id)
+      : [sourceId];
+
+    const ledgers = await this.prisma.commissionLedger.findMany({
+      where: { orderId: { in: orderIds } },
+      select: {
+        sellerCommission: true,
+        refundedSellerCommission: true,
+        buyerFee: true,
+        refundedBuyerFee: true,
+        componentBreakdownComplete: true,
+        buyerCommissionAmount: true,
+        buyerPlatformFeeAmount: true,
+        sellerCommissionAmount: true,
+        sellerPlatformFeeAmount: true,
+        refundedBuyerCommissionAmount: true,
+        refundedBuyerPlatformFeeAmount: true,
+        refundedSellerCommissionAmount: true,
+        refundedSellerPlatformFeeAmount: true,
+      },
+    });
+    if (ledgers.length === 0) return null;
+
+    const sum = (values: number[]) =>
+      Math.round(values.reduce((a, b) => a + b, 0) * 100) / 100;
+
+    return {
+      sellerCommission: sum(
+        ledgers.map((l) =>
+          l.componentBreakdownComplete
+            ? Number(l.sellerCommissionAmount) +
+              Number(l.sellerPlatformFeeAmount)
+            : Number(l.sellerCommission),
+        ),
+      ),
+      netSellerCommission: sum(
+        ledgers.map((l) =>
+          l.componentBreakdownComplete
+            ? Number(l.sellerCommissionAmount) +
+              Number(l.sellerPlatformFeeAmount) -
+              Number(l.refundedSellerCommissionAmount) -
+              Number(l.refundedSellerPlatformFeeAmount)
+            : Number(l.sellerCommission) -
+              Number(l.refundedSellerCommission ?? 0),
+        ),
+      ),
+      buyerFee: sum(
+        ledgers.map((l) =>
+          l.componentBreakdownComplete
+            ? Number(l.buyerCommissionAmount) + Number(l.buyerPlatformFeeAmount)
+            : Number(l.buyerFee),
+        ),
+      ),
+      netBuyerFee: sum(
+        ledgers.map((l) =>
+          l.componentBreakdownComplete
+            ? Number(l.buyerCommissionAmount) +
+              Number(l.buyerPlatformFeeAmount) -
+              Number(l.refundedBuyerCommissionAmount) -
+              Number(l.refundedBuyerPlatformFeeAmount)
+            : Number(l.buyerFee) - Number(l.refundedBuyerFee ?? 0),
+        ),
+      ),
+    };
+  }
 }
