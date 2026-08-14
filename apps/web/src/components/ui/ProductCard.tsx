@@ -20,6 +20,7 @@ import {
 } from "@/lib/productPrice";
 import type { Product, ProductImage } from "@/types/product";
 import { formatTL } from "@/lib/format";
+import { IMAGE_SIZES } from "@/lib/imageSizes";
 
 /**
  * The single product/listing card for the whole marketplace (grid + list). It is
@@ -164,12 +165,19 @@ export default function ProductCard({
     return (
       <div className="relative">
         <CardLink href={linkHref} onClick={trackClick}>
-          <div className="bg-surface-elevated rounded-lg border border-border hover:border-primary-300 hover:shadow-sm transition-all flex items-center gap-4 p-3">
-            <div className="relative w-28 h-28 sm:w-32 sm:h-32 flex-shrink-0 bg-surface-alt rounded-lg overflow-hidden">
+          {/*
+            Dar ekranda satır sarar: `xs` altında fiyat bloğu `w-full` ile kendi
+            satırına iner. Üç sütun yan yana kaldığında (112px görsel + sarmayan
+            fiyat) başlığa 25px kalıyordu — kart okunamaz hâle geliyordu. Görsel
+            ve yazı ölçüleri de aynı gerekçeyle kademeli.
+          */}
+          <div className="bg-surface-elevated rounded-lg border border-border hover:border-primary-300 hover:shadow-sm transition-all flex flex-wrap items-center gap-3 p-3 sm:gap-4">
+            <div className="relative w-20 h-20 xs:w-28 xs:h-28 sm:w-32 sm:h-32 flex-shrink-0 bg-surface-alt rounded-lg overflow-hidden">
               <OptimizedImage
                 src={imageUrl}
                 alt={product.title}
                 fill
+                sizes="(min-width: 640px) 128px, (min-width: 400px) 112px, 80px"
                 className={`object-cover${outOfStock ? " opacity-50" : ""}`}
                 fallbackSrc={PRODUCT_PLACEHOLDER}
                 logContext={{ listingId: product.id, page: "product-card" }}
@@ -185,11 +193,11 @@ export default function ProductCard({
               )}
             </div>
             <div className="flex-1 min-w-0">
-              <h3 className="font-semibold text-heading line-clamp-2 text-xl sm:text-2xl leading-tight">
+              <h3 className="font-semibold text-heading line-clamp-2 text-base xs:text-xl sm:text-2xl leading-tight">
                 {product.title}
               </h3>
               {showMeta && (
-                <div className="flex items-center gap-4 mt-2 text-sm sm:text-base text-subtle">
+                <div className="flex items-center gap-3 mt-2 text-xs xs:text-sm sm:text-base text-subtle xs:gap-4">
                   <span className="flex items-center gap-1">
                     <EyeIcon className="w-4 h-4 text-primary-500" />
                     {product.viewCount ?? 0}
@@ -207,17 +215,22 @@ export default function ProductCard({
                 </p>
               )}
             </div>
-            <div className="ml-4 flex flex-col items-end text-right flex-shrink-0">
+            {/*
+              `xs` altında tam genişlikte, sağa yaslı TEK satır (eski fiyat ·
+              fiyat · indirim rozeti yan yana); `xs` üstünde eski hâli — sağda
+              dikey sütun. Tek render, iki düzen.
+            */}
+            <div className="flex w-full flex-shrink-0 flex-row items-baseline justify-end gap-2 text-right xs:ml-4 xs:w-auto xs:flex-col xs:items-end xs:gap-0">
               {onSale && (
                 <span className="text-sm text-subtle line-through">
                   {fmtTL(originalPrice)}
                 </span>
               )}
-              <p className="text-xl sm:text-2xl font-bold text-primary-600 whitespace-nowrap">
+              <p className="text-lg xs:text-xl sm:text-2xl font-bold text-primary-600 whitespace-nowrap">
                 {fmtTL(effectivePrice)}
               </p>
               {onSale && (
-                <ProductBadge variant="sale" className="mt-1">
+                <ProductBadge variant="sale" className="xs:mt-1">
                   %{product.discountPercent ?? 0}
                 </ProductBadge>
               )}
@@ -244,6 +257,7 @@ export default function ProductCard({
             src={imageUrl}
             alt={product.title}
             fill
+            sizes={IMAGE_SIZES.productGrid}
             className={`object-cover group-hover:scale-[1.03] transition-transform duration-300${outOfStock ? " opacity-50" : ""}`}
             fallbackSrc={PRODUCT_PLACEHOLDER}
             logContext={{ listingId: product.id, page: "product-card" }}
