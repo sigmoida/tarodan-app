@@ -2,7 +2,8 @@
 
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useTranslations } from "next-intl";
 import type { UseFormReturn } from "react-hook-form";
 import toast from "react-hot-toast";
 import { mediaApi } from "@/lib/api";
@@ -14,6 +15,8 @@ import {
 import {
   acceptFiles,
   imageSubmitBlocker,
+  MAX_IMAGE_BYTES,
+  MIN_IMAGE_BYTES,
   hasPendingUploads,
   itemFromExisting,
   itemFromFile,
@@ -43,36 +46,58 @@ interface UseListingImageUploadParams {
   upload?: UploadPort;
 }
 
-/** Üretim portu: tek dosya, ilerleme ve iptal destekli. */
-const defaultUpload: UploadPort = async (file, { signal, onProgress }) => {
-  const response = await mediaApi.uploadProductImage(file, {
-    signal,
-    onProgress,
-  });
-  const [result] = response.data ?? [];
-  if (!result?.cardKey || !result?.detailKey) {
-    throw new Error("Sunucu bu dosya için sonuç döndürmedi");
-  }
-  return { cardKey: result.cardKey, detailKey: result.detailKey };
-};
-
-const rejectionMessage = (rejected: RejectedFile[]): string => {
-  const byReason = {
-    type: rejected.filter((r) => r.reason === "type"),
-    size: rejected.filter((r) => r.reason === "size"),
-    duplicate: rejected.filter((r) => r.reason === "duplicate"),
-    limit: rejected.filter((r) => r.reason === "limit"),
+/**
+ * Üretim portu: tek dosya, ilerleme ve iptal destekli.
+ *
+ * Hata metni karoda AYNEN gösterildiği için çeviriciyi dışarıdan alır; sabit
+ * Türkçe bir mesaj `/en` kullanıcısına da Türkçe düşerdi.
+ */
+const createDefaultUpload =
+  (t: Translate): UploadPort =>
+  async (file, { signal, onProgress }) => {
+    const response = await mediaApi.uploadProductImage(file, {
+      signal,
+      onProgress,
+    });
+    const [result] = response.data ?? [];
+    if (!result?.cardKey || !result?.detailKey) {
+      throw new Error(t("product.imageUpload.noServerResult"));
+    }
+    return { cardKey: result.cardKey, detailKey: result.detailKey };
   };
-  const parts: string[] = [];
-  if (byReason.type.length)
-    parts.push(`${byReason.type.length} dosya desteklenmeyen biçimde`);
-  if (byReason.size.length)
-    parts.push(`${byReason.size.length} dosya 10 MB sınırının üstünde`);
-  if (byReason.duplicate.length)
-    parts.push(`${byReason.duplicate.length} dosya zaten eklenmiş`);
-  if (byReason.limit.length)
-    parts.push(`${byReason.limit.length} dosya kontenjana sığmadı`);
-  return `${parts.join(", ")} — eklenmedi`;
+
+/** Red gerekçesi → katalog anahtarı. Sıra, kullanıcıya okunacak sıradır. */
+const REJECTION_KEYS = [
+  ["type", "product.imageUpload.rejectedType"],
+  ["size", "product.imageUpload.rejectedSize"],
+  ["tooSmall", "product.imageUpload.rejectedTooSmall"],
+  ["duplicate", "product.imageUpload.rejectedDuplicate"],
+  ["limit", "product.imageUpload.rejectedLimit"],
+] as const;
+
+/**
+ * Genel (namespace'siz) çevirici. `ReturnType<typeof useTranslations>` TÜM
+ * namespace'lerin birleşimini verdiği için tam yollu anahtarları kabul etmiyor;
+ * `never` ile varsayılan (kök) namespace'e sabitlenir.
+ */
+type Translate = ReturnType<typeof useTranslations<never>>;
+
+const rejectionMessage = (t: Translate, rejected: RejectedFile[]): string => {
+  const parts = REJECTION_KEYS.flatMap(([reason, key]) => {
+    const count = rejected.filter((r) => r.reason === reason).length;
+    // Sınırlar metne gömülmez: sayılar kodda tek yerde tanımlı, katalog onları
+    // ICU parametresi olarak alır.
+    return count
+      ? [
+          t(key, {
+            count,
+            max: Math.round(MAX_IMAGE_BYTES / (1024 * 1024)),
+            min: Math.round(MIN_IMAGE_BYTES / 1024),
+          }),
+        ]
+      : [];
+  });
+  return t("product.imageUpload.rejectedSuffix", { reasons: parts.join(", ") });
 };
 
 /**
@@ -89,8 +114,15 @@ const rejectionMessage = (rejected: RejectedFile[]): string => {
 export function useListingImageUpload({
   form,
   maxImages,
-  upload = defaultUpload,
+  upload,
 }: UseListingImageUploadParams) {
+  const t = useTranslations();
+  // Varsayılan port çeviriciye bağlı olduğu için burada kurulur; testler kendi
+  // portlarını enjekte etmeye devam eder.
+  const activeUpload = useMemo(
+    () => upload ?? createDefaultUpload(t),
+    [t, upload],
+  );
   const [items, setItems] = useState<ListingImageItem[]>([]);
   /**
    * Kullanıcı görsellerde bir değişiklik yaptı mı?
@@ -155,8 +187,8 @@ export function useListingImageUpload({
 
   // Kuyruk bir KEZ kurulur: her render'da yeniden yaratılırsa aktif istekler
   // ve iptal denetleyicileri kaybolurdu.
-  const uploadRef = useRef(upload);
-  uploadRef.current = upload;
+  const uploadRef = useRef(activeUpload);
+  uploadRef.current = activeUpload;
   const queueRef = useRef<ReturnType<typeof createUploadQueue> | null>(null);
   if (!queueRef.current) {
     const applyEvent = (event: QueueEvent) => {
@@ -247,7 +279,7 @@ export function useListingImageUpload({
       const current = itemsRef.current;
       const { accepted, rejected } = acceptFiles(current, files, { maxImages });
 
-      if (rejected.length) toast.error(rejectionMessage(rejected));
+      if (rejected.length) toast.error(rejectionMessage(t, rejected));
       if (!accepted.length) return;
 
       const queued = accepted.map((file) =>
@@ -261,7 +293,7 @@ export function useListingImageUpload({
         })),
       );
     },
-    [commit, maxImages, queue],
+    [commit, maxImages, queue, t],
   );
 
   /** `<input type=file>` ve sürükle-bırak aynı yola girer. */
@@ -317,12 +349,28 @@ export function useListingImageUpload({
     [commit],
   );
 
+  /**
+   * Gönderim engeli + kullanıcıya gösterilecek metin. Saf model yalnız
+   * `reason` döndürür; metin TEK yerde, katalogdan burada eklenir.
+   */
+  const submitBlocker = useMemo(() => {
+    const blocker = imageSubmitBlocker(items);
+    if (!blocker) return null;
+    return {
+      reason: blocker.reason,
+      message:
+        blocker.reason === "pending"
+          ? t("product.imageUpload.blockerPending")
+          : t("product.imageUpload.blockerFailed"),
+    };
+  }, [items, t]);
+
   return {
     items,
     /** Kuyrukta/aktarımda kalem varken form gönderilmemeli. */
     uploadingImages: hasPendingUploads(items),
     /** Gönderim engeli — yoksa null. */
-    submitBlocker: imageSubmitBlocker(items),
+    submitBlocker,
     /**
      * Kullanıcı görsellerde değişiklik yaptı mı? Düzenleme formu refetch
      * korumasında `formState.isDirty` ile BİRLİKTE kullanmalı: bekleyen

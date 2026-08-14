@@ -296,6 +296,9 @@ export default function EditListingClient() {
         />
         <ImagesCard
           maxImages={limits?.maxImagesPerListing || 3}
+          // Düzenlemeye giren satıcı yönergeleri zaten ilanı açarken gördü;
+          // panel kapalı gelir, isteyen açar.
+          guidelinesDefaultOpen={false}
           items={imageItems}
           uploadingImages={uploadingImages}
           handleFileUpload={handleFileUpload}

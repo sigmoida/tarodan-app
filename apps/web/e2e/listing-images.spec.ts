@@ -11,16 +11,67 @@
  * seçimi, sürükle-bırak, klavyeyle taşıma ve sıranın veritabanına yazılıp
  * yeniden okunması.
  */
+import { deflateSync } from "node:zlib";
 import { expect, test, type Page } from "@playwright/test";
 import { login, USERS } from "./support/helpers";
 
-/** Tek renk dolu, geçerli bir PNG üretir (Sharp bunu kabul eder). */
+/**
+ * Geçerli bir PNG üretir (Sharp bunu kabul eder).
+ *
+ * 1×1 PNG ARTIK YETMEZ: istemci 1 KB altındaki dosyaları reddediyor ve 500
+ * pikselin altını "düşük çözünürlük" diye işaretliyor. Bu yüzden 512×512,
+ * gürültülü (kolay sıkışmayan) bir kare üretilir — hem sınırların üstünde hem
+ * gerçek bir ürün fotoğrafına yakın.
+ */
 function pngBuffer(): Buffer {
-  // 1x1 saydam PNG — boyut önemsiz, tip ve geçerlilik önemli.
-  return Buffer.from(
-    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==",
-    "base64",
+  const size = 512;
+  const raw = Buffer.alloc(size * size * 3);
+  let seed = 1;
+  for (let i = 0; i < raw.length; i += 1) {
+    seed = (seed * 1103515245 + 12345) % 2147483648;
+    raw[i] = seed % 256;
+  }
+
+  const crcTable = Array.from({ length: 256 }, (_, n) => {
+    let c = n;
+    for (let k = 0; k < 8; k += 1) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1;
+    return c >>> 0;
+  });
+  const crc32 = (buf: Buffer) => {
+    let c = 0xffffffff;
+    for (const byte of buf) c = crcTable[(c ^ byte) & 0xff] ^ (c >>> 8);
+    return (c ^ 0xffffffff) >>> 0;
+  };
+  const chunk = (type: string, data: Buffer) => {
+    const length = Buffer.alloc(4);
+    length.writeUInt32BE(data.length);
+    const body = Buffer.concat([Buffer.from(type, "ascii"), data]);
+    const crc = Buffer.alloc(4);
+    crc.writeUInt32BE(crc32(body));
+    return Buffer.concat([length, body, crc]);
+  };
+
+  const ihdr = Buffer.alloc(13);
+  ihdr.writeUInt32BE(size, 0);
+  ihdr.writeUInt32BE(size, 4);
+  ihdr[8] = 8; // bit derinliği
+  ihdr[9] = 2; // renk tipi: truecolor
+  // Her satır bir filtre baytıyla başlar (0 = None).
+  const scanlines = Buffer.concat(
+    Array.from({ length: size }, (_, row) =>
+      Buffer.concat([
+        Buffer.from([0]),
+        raw.subarray(row * size * 3, (row + 1) * size * 3),
+      ]),
+    ),
   );
+
+  return Buffer.concat([
+    Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
+    chunk("IHDR", ihdr),
+    chunk("IDAT", deflateSync(scanlines)),
+    chunk("IEND", Buffer.alloc(0)),
+  ]);
 }
 
 const tiles = (page: Page) => page.getByTestId("listing-image-tile");
@@ -93,10 +144,13 @@ test.describe("ilan görselleri", () => {
     const dropzone = page.getByTestId("listing-image-dropzone");
     await expect(dropzone).toBeVisible();
 
-    // DataTransfer ile gerçek bir drop olayı üretilir.
+    // DataTransfer ile gerçek bir drop olayı üretilir. Dosya 1 KB alt sınırının
+    // ÜSTÜNDE olmalı; aksi halde istemci daha listeye almadan reddeder.
     const dataTransfer = await page.evaluateHandle(() => {
       const transfer = new DataTransfer();
-      const file = new File(["x"], "surukle.png", { type: "image/png" });
+      const file = new File([new Uint8Array(4096)], "surukle.png", {
+        type: "image/png",
+      });
       transfer.items.add(file);
       return transfer;
     });

@@ -2,21 +2,29 @@
 
 "use client";
 
-import { useCallback, useRef, useState } from "react";
 import { useTranslations } from "next-intl";
 import { useFormContext } from "react-hook-form";
-import { PhotoIcon } from "@heroicons/react/24/outline";
-import { Input } from "@tarodan/ui";
-import { SectionCard, ImagePreviewGrid } from "@/components/ui";
 import {
-  ACCEPTED_IMAGE_TYPES,
-  MAX_IMAGE_BYTES,
-  occupiedSlots,
-  type ListingImageItem,
-} from "../listing-image-item";
+  ArrowPathIcon,
+  CheckCircleIcon,
+  ExclamationCircleIcon,
+} from "@heroicons/react/24/outline";
+import { Badge } from "@tarodan/ui";
+import { SectionCard, ImagePreviewGrid } from "@/components/ui";
+import { occupiedSlots, type ListingImageItem } from "../listing-image-item";
+import ImageGuidelines from "./ImageGuidelines";
+import ListingImageDropzone from "./ListingImageDropzone";
 
 interface ImagesCardProps {
   maxImages: number;
+  /**
+   * Yönerge paneli açık başlasın mı? Karar ÇAĞIRANINDIR, `items` bakılarak
+   * verilemez: düzenleme ekranında kart, kayıtlı görseller yerleştirilmeden
+   * (seed bir effect'te koşuyor) mount olur ve liste o anda daima boştur —
+   * Radix `defaultValue`'yu yalnız mount'ta okuduğu için panel her düzenlemede
+   * açık kalırdı. Yeni ilan → açık, düzenleme → kapalı.
+   */
+  guidelinesDefaultOpen?: boolean;
   /** Görseller — ekrandaki sırayla; tek durum kaynağı. */
   items: ListingImageItem[];
   uploadingImages: boolean;
@@ -27,17 +35,17 @@ interface ImagesCardProps {
   makeCover: (index: number) => void;
 }
 
-const megabytes = (bytes: number) => Math.round(bytes / (1024 * 1024));
-
 /**
- * "Görseller" — sürükle-bırak alanı + dosya bazlı ilerleme gösteren önizleme
- * ızgarası.
+ * "Fotoğraflar" kartı — kontenjan göstergesi, sürükle-bırak alanı, kapak
+ * görselini öne çıkaran önizleme ızgarası ve katlanır yönerge paneli.
  *
- * Masaüstünde dosyalar alana bırakılabilir; mobilde ve klavyeyle normal dosya
- * seçici çalışmaya devam eder (alan bir `<label>`, girdi gizli ama erişilebilir).
+ * Kart yalnız KOMPOZİSYON yapar: dosya girdisi + sürükleme durumu
+ * `ListingImageDropzone`ta, karo davranışı `ImagePreviewGrid`te, yükleme
+ * durumu `useListingImageUpload`ta.
  */
 export default function ImagesCard({
   maxImages,
+  guidelinesDefaultOpen = true,
   items,
   uploadingImages,
   handleFileUpload,
@@ -49,99 +57,93 @@ export default function ImagesCard({
   const { formState } = useFormContext();
   const imagesError = formState.errors.images?.message as string | undefined;
   const t = useTranslations();
-  const [dragActive, setDragActive] = useState(false);
-  /**
-   * `dragenter`/`dragleave` iç elemanlarda da tetiklenir; sayaç tutulmazsa alan
-   * kullanıcı içeride gezinirken sürekli yanıp sönerdi.
-   */
-  const dragDepth = useRef(0);
 
   // Kontenjan EKRANDAKİ kalemlerden sayılır; forma yalnız yüklenmişler yazılır.
   const usedSlots = occupiedSlots(items);
   const isFull = usedSlots >= maxImages;
-
-  const onDrop = useCallback(
-    (event: React.DragEvent<HTMLLabelElement>) => {
-      event.preventDefault();
-      dragDepth.current = 0;
-      setDragActive(false);
-      if (isFull) return;
-      handleFileUpload(event.dataTransfer?.files ?? null);
-    },
-    [handleFileUpload, isFull],
-  );
+  const fillPercent = Math.min(100, Math.round((usedSlots / maxImages) * 100));
 
   return (
-    <SectionCard title={t("product.images")}>
-      <p className="text-xs text-muted -mt-2 mb-4">
-        {t("product.upToImages", { count: maxImages })}
-      </p>
+    <SectionCard
+      title={t("product.images")}
+      badge={
+        <Badge variant={isFull ? "success" : "secondary"} size="sm">
+          {isFull
+            ? t("product.imageUpload.full")
+            : t("product.imageUpload.counter", {
+                used: usedSlots,
+                max: maxImages,
+              })}
+        </Badge>
+      }
+    >
       <div className="space-y-3">
-        {!isFull ? (
-          <label
-            onDragEnter={(event) => {
-              event.preventDefault();
-              dragDepth.current += 1;
-              setDragActive(true);
-            }}
-            onDragOver={(event) => event.preventDefault()}
-            onDragLeave={(event) => {
-              event.preventDefault();
-              dragDepth.current = Math.max(0, dragDepth.current - 1);
-              if (dragDepth.current === 0) setDragActive(false);
-            }}
-            onDrop={onDrop}
-            data-drag-active={dragActive || undefined}
-            data-testid="listing-image-dropzone"
-            className={`flex flex-col items-center justify-center gap-2 py-8 border-2 border-dashed rounded-xl cursor-pointer transition-colors ${
-              dragActive
-                ? "border-primary-500 bg-primary-50/60"
-                : "border-border hover:border-primary-400 hover:bg-primary-50/30"
-            }`}
-          >
-            <PhotoIcon className="w-8 h-8 text-subtle" />
-            <span className="text-sm text-muted font-medium">
-              {t("product.clickToUpload")}
-            </span>
-            <span className="text-xs text-subtle">
-              {usedSlots} / {maxImages} {t("product.uploaded")}
-            </span>
-            <span className="text-xs text-subtle">
-              JPEG, PNG, WebP, GIF · en fazla {megabytes(MAX_IMAGE_BYTES)} MB
-            </span>
-            <Input
-              type="file"
-              accept={ACCEPTED_IMAGE_TYPES.join(",")}
-              multiple
-              data-testid="listing-image-input"
-              onChange={(e) => {
-                handleFileUpload(e.target.files);
-                // Aynı dosya ikinci kez seçilebilsin diye girdi sıfırlanır.
-                e.target.value = "";
-              }}
-              className="hidden"
-            />
-          </label>
+        <div className="-mt-2 space-y-1.5">
+          <p className="text-xs text-muted">
+            {t("product.imageUpload.orderHint")}
+          </p>
+          {usedSlots > 0 && (
+            <div className="h-1.5 w-full overflow-hidden rounded-full bg-surface-alt">
+              <div
+                className={`h-full rounded-full transition-[width] duration-300 ${
+                  isFull ? "bg-success-500" : "bg-primary-500"
+                }`}
+                style={{ width: `${fillPercent}%` }}
+              />
+            </div>
+          )}
+        </div>
+
+        {items.length === 0 ? (
+          <ListingImageDropzone
+            variant="hero"
+            used={usedSlots}
+            max={maxImages}
+            onFiles={handleFileUpload}
+          />
         ) : (
-          <div className="py-4 border border-success-200 bg-success-50 rounded-xl text-success-700 text-sm text-center">
+          <ImagePreviewGrid
+            items={items}
+            onRemove={removeImage}
+            onRetry={retryImage}
+            onMove={moveImage}
+            onMakeCover={makeCover}
+            trailing={
+              isFull ? undefined : (
+                <ListingImageDropzone
+                  variant="tile"
+                  used={usedSlots}
+                  max={maxImages}
+                  onFiles={handleFileUpload}
+                />
+              )
+            }
+          />
+        )}
+
+        {isFull && (
+          <p className="flex items-center gap-1.5 text-xs text-success-700">
+            <CheckCircleIcon className="h-4 w-4 flex-none" />
             {t("product.maxImagesReached")}
-          </div>
+          </p>
         )}
         {imagesError && (
-          <p className="text-sm text-danger-600">{imagesError}</p>
+          <p className="flex items-center gap-1.5 text-sm text-danger-600">
+            <ExclamationCircleIcon className="h-4 w-4 flex-none" />
+            {imagesError}
+          </p>
         )}
         {uploadingImages && (
-          <p className="text-sm text-primary-600" role="status">
+          <p
+            className="flex items-center gap-1.5 text-sm text-primary-600"
+            role="status"
+          >
+            <ArrowPathIcon className="h-4 w-4 flex-none animate-spin" />
             {t("product.uploadingImages")}
           </p>
         )}
-        <ImagePreviewGrid
-          items={items}
-          onRemove={removeImage}
-          onRetry={retryImage}
-          onMove={moveImage}
-          onMakeCover={makeCover}
-        />
+
+        <ImageGuidelines defaultOpen={guidelinesDefaultOpen} />
       </div>
     </SectionCard>
   );
