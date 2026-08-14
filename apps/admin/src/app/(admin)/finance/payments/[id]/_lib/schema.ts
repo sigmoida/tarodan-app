@@ -1,17 +1,14 @@
 import { z } from "zod";
 import type { useTranslations } from "next-intl";
 import { fmtTry } from "@/lib/format";
+import { optionalReasonField, reasonField } from "@/lib/schemas/common";
 
 type T = ReturnType<typeof useTranslations<never>>;
 
 /** Force-cancel a stuck/failed payment — reason is required. */
 export const forceCancelPaymentSchema = (t: T) =>
   z.object({
-    reason: z
-      .string()
-      .trim()
-      .min(1, t("common.required"))
-      .max(500, t("admin.catalog.common.maxChars", { max: 500 })),
+    reason: reasonField(t),
   });
 export type ForceCancelPaymentValues = z.infer<
   ReturnType<typeof forceCancelPaymentSchema>
@@ -37,11 +34,7 @@ export const refundPaymentSchema = (t: T, maxAmount: number) =>
           max: fmtTry(maxAmount),
         }),
       ),
-    reason: z
-      .string()
-      .trim()
-      .max(500, t("admin.catalog.common.maxChars", { max: 500 }))
-      .optional(),
+    reason: optionalReasonField(t),
   });
 export type RefundPaymentValues = z.infer<
   ReturnType<typeof refundPaymentSchema>
