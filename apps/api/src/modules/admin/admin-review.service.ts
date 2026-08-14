@@ -125,13 +125,11 @@ export class AdminReviewService {
         },
       );
 
-    const [total, reviews] = await Promise.all([
-      this.prisma.productRating.count({ where }),
-      this.prisma.productRating.findMany({
+    const result = await paginate(
+      this.prisma.productRating,
+      {
         where,
         orderBy,
-        skip: (page - 1) * limit,
-        take: limit,
         include: {
           user: {
             select: {
@@ -143,10 +141,11 @@ export class AdminReviewService {
           },
           product: { select: { id: true, title: true, images: { take: 1 } } },
         },
-      }),
-    ]);
+      },
+      { page, limit },
+    );
 
-    const resolvedReviews = reviews.map((review: any) => ({
+    const resolvedReviews = result.data.map((review: any) => ({
       ...review,
       product: review.product
         ? {
@@ -162,15 +161,7 @@ export class AdminReviewService {
         : review.product,
     }));
 
-    return {
-      data: resolvedReviews,
-      meta: {
-        total,
-        page,
-        limit,
-        totalPages: Math.ceil(total / limit),
-      },
-    };
+    return { ...result, data: resolvedReviews };
   }
 
   /**

@@ -13,6 +13,7 @@ import {
   publicIdentityFields,
   toPublicIdentity,
 } from "../../common/helpers/public-identity";
+import { paginate } from "../../common/list";
 
 /**
  * Sipariş sorguları (liste, detay, grup görünümleri, misafir takibi, satıcı
@@ -348,51 +349,51 @@ export class OrderQueryService {
     // satın alımları kendi ekranlarında ve finans kayıtlarında kalır.
     where.product = { kind: ProductKind.listing };
 
-    const total = await this.prisma.order.count({ where });
-
-    const orders = await this.prisma.order.findMany({
-      where,
-      orderBy: { createdAt: "desc" },
-      skip: (page - 1) * limit,
-      take: limit,
-      include: {
-        product: {
-          include: {
-            images: { take: 1, orderBy: { sortOrder: "asc" } },
+    const result = await paginate(
+      this.prisma.order,
+      {
+        where,
+        orderBy: { createdAt: "desc" },
+        include: {
+          product: {
+            include: {
+              images: { take: 1, orderBy: { sortOrder: "asc" } },
+            },
           },
-        },
-        buyer: {
-          select: {
-            id: true,
-            ...PUBLIC_NAME_SELECT,
-            isVerified: true,
-            avatarUrl: true,
+          buyer: {
+            select: {
+              id: true,
+              ...PUBLIC_NAME_SELECT,
+              isVerified: true,
+              avatarUrl: true,
+            },
           },
-        },
-        seller: {
-          select: {
-            id: true,
-            ...PUBLIC_NAME_SELECT,
-            isVerified: true,
-            avatarUrl: true,
+          seller: {
+            select: {
+              id: true,
+              ...PUBLIC_NAME_SELECT,
+              isVerified: true,
+              avatarUrl: true,
+            },
           },
+          shipment: true,
+          // Liste yanıtında da aktif iade durumunu gösterebilmek için (detayla tutarlı):
+          // formatOrderResponse → pickActiveRefundRequest order.refundRequests'i okur;
+          // include edilmezse activeRefundRequest null kalır ve liste ham order.status
+          // (örn. "Teslim Edildi") gösterir. (Sadece okuma; başka davranış değişmez.)
+          refundRequests: {
+            orderBy: { createdAt: "desc" },
+          },
+          // Cati (checkout group) numarasi liste kartinin cati basliginda gosterilir.
+          checkoutGroup: { select: { groupNumber: true } },
+          package: { select: { packageNumber: true } },
         },
-        shipment: true,
-        // Liste yanıtında da aktif iade durumunu gösterebilmek için (detayla tutarlı):
-        // formatOrderResponse → pickActiveRefundRequest order.refundRequests'i okur;
-        // include edilmezse activeRefundRequest null kalır ve liste ham order.status
-        // (örn. "Teslim Edildi") gösterir. (Sadece okuma; başka davranış değişmez.)
-        refundRequests: {
-          orderBy: { createdAt: "desc" },
-        },
-        // Cati (checkout group) numarasi liste kartinin cati basliginda gosterilir.
-        checkoutGroup: { select: { groupNumber: true } },
-        package: { select: { packageNumber: true } },
       },
-    });
+      { page, limit },
+    );
 
     const formatted = await Promise.all(
-      orders.map((o) => this.orderCommon.formatOrderResponse(o, userId)),
+      result.data.map((o) => this.orderCommon.formatOrderResponse(o, userId)),
     );
 
     // Kullanıcı hem alıcı hem satıcı olabilir (test ortamı).
@@ -404,15 +405,7 @@ export class OrderQueryService {
       return o;
     });
 
-    return {
-      data,
-      meta: {
-        total,
-        page,
-        limit,
-        totalPages: Math.ceil(total / limit),
-      },
-    };
+    return { ...result, data };
   }
 
   /**

@@ -23,6 +23,7 @@ import { getFreeTierCanTrade } from "../membership/free-tier-trade.helper";
 import { ProductCommonService } from "./product-common.service";
 import { PUBLIC_IDENTITY_SELECT } from "../../common/helpers/public-identity";
 import { buildProductEditProjection } from "./product-edit-projection";
+import { paginate } from "../../common/list";
 
 /**
  * ProductQueryService — ürün okuma/listeleme (findAll ES/PG akışı, popüler, tekil
@@ -161,41 +162,40 @@ export class ProductQueryService {
       AND: [{ OR: this.inStockOrConditions() }],
       seller: saleCapableSellerWhere(),
     };
-    const total = await this.prisma.product.count({ where });
-    const products = await this.prisma.product.findMany({
-      where,
-      // Aktif boost'lar EN SON alınan önde (LIFO: boostedAt desc); boost bitince
-      // boostedAt temizlenir (scheduler) → null'lar relevanceScore'a düşer.
-      orderBy: [
-        { boostedAt: { sort: "desc", nulls: "last" } },
-        { relevanceScore: { sort: "desc", nulls: "last" } },
-        { viewCount: "desc" },
-        { likeCount: "desc" },
-        { createdAt: "desc" },
-        { id: "asc" },
-      ],
-      skip: (page - 1) * limit,
-      take: limit,
-      include: {
-        images: { orderBy: { sortOrder: "asc" }, take: 1 },
-        seller: {
-          select: PUBLIC_IDENTITY_SELECT,
-        },
-        category: { select: { id: true, name: true, slug: true } },
-        brand: { select: { id: true, name: true, slug: true, logo: true } },
-        manufacturer: { select: { id: true, name: true, slug: true } },
-        carModel: { include: { brand: { select: { slug: true } } } },
-        productAttributes: {
-          include: { attribute: { include: { group: true } } },
+    const result = await paginate(
+      this.prisma.product,
+      {
+        where,
+        // Aktif boost'lar EN SON alınan önde (LIFO: boostedAt desc); boost bitince
+        // boostedAt temizlenir (scheduler) → null'lar relevanceScore'a düşer.
+        orderBy: [
+          { boostedAt: { sort: "desc", nulls: "last" } },
+          { relevanceScore: { sort: "desc", nulls: "last" } },
+          { viewCount: "desc" },
+          { likeCount: "desc" },
+          { createdAt: "desc" },
+          { id: "asc" },
+        ],
+        include: {
+          images: { orderBy: { sortOrder: "asc" }, take: 1 },
+          seller: {
+            select: PUBLIC_IDENTITY_SELECT,
+          },
+          category: { select: { id: true, name: true, slug: true } },
+          brand: { select: { id: true, name: true, slug: true, logo: true } },
+          manufacturer: { select: { id: true, name: true, slug: true } },
+          carModel: { include: { brand: { select: { slug: true } } } },
+          productAttributes: {
+            include: { attribute: { include: { group: true } } },
+          },
         },
       },
-    });
-    const formattedProducts =
-      await this.common.formatProductResponseMany(products);
-    return {
-      data: formattedProducts,
-      meta: { total, page, limit, totalPages: Math.ceil(total / limit) },
-    };
+      { page, limit },
+    );
+    const formattedProducts = await this.common.formatProductResponseMany(
+      result.data,
+    );
+    return { ...result, data: formattedProducts };
   }
 
   /**
@@ -847,28 +847,29 @@ export class ProductQueryService {
         : {}),
     };
 
-    const total = await this.prisma.product.count({ where });
-
-    const products = await this.prisma.product.findMany({
-      where,
-      // Birincil sıralama: en yeni ilan en üstte (createdAt DESC). Satılabilir
-      // ilanların durumuna göre değil tarihe göre sıralanması istenir; satılan/
-      // pasif/reddedilen ilanlar aşağıdaki adımda en alta taşınır (yine en yeni
-      // önce). Öne çıkarma (boost) bu sorguya dahil değildir, dokunulmaz.
-      orderBy: [{ createdAt: "desc" }],
-      skip: (page - 1) * limit,
-      take: limit,
-      include: {
-        images: { orderBy: { sortOrder: "asc" }, take: 1 },
-        category: {
-          select: {
-            id: true,
-            name: true,
-            slug: true,
+    const result = await paginate(
+      this.prisma.product,
+      {
+        where,
+        // Birincil sıralama: en yeni ilan en üstte (createdAt DESC). Satılabilir
+        // ilanların durumuna göre değil tarihe göre sıralanması istenir; satılan/
+        // pasif/reddedilen ilanlar aşağıdaki adımda en alta taşınır (yine en yeni
+        // önce). Öne çıkarma (boost) bu sorguya dahil değildir, dokunulmaz.
+        orderBy: [{ createdAt: "desc" }],
+        include: {
+          images: { orderBy: { sortOrder: "asc" }, take: 1 },
+          category: {
+            select: {
+              id: true,
+              name: true,
+              slug: true,
+            },
           },
         },
       },
-    });
+      { page, limit },
+    );
+    const products = result.data;
 
     // Satılabilir ilanlar üstte, terminal durumdakiler (sold/inactive/rejected)
     // en altta — her iki grup da kendi içinde en yeni önce (kararlı sıralama,
@@ -886,14 +887,6 @@ export class ProductQueryService {
     const formattedProducts =
       await this.common.formatProductResponseMany(products);
 
-    return {
-      data: formattedProducts,
-      meta: {
-        total,
-        page,
-        limit,
-        totalPages: Math.ceil(total / limit),
-      },
-    };
+    return { ...result, data: formattedProducts };
   }
 }

@@ -10,6 +10,7 @@ import { AdminAuditService } from "./admin-audit.service";
 import { PaymentService } from "../payment/payment.service";
 import { AdminOrderQueryDto, ResolveDisputeDto } from "./dto";
 import { OrderStatus, Prisma, ProductKind } from "@prisma/client";
+import { paginate } from "../../common/list";
 
 /**
  * Sipariş yönetimi (liste, ihtilaflar, ihtilaf çözümü) — AdminService'in
@@ -479,9 +480,9 @@ export class AdminOrderService {
       }
     }
 
-    const [total, orders] = await Promise.all([
-      this.prisma.order.count({ where }),
-      this.prisma.order.findMany({
+    const result = await paginate(
+      this.prisma.order,
+      {
         where,
         include: {
           buyer: { select: { id: true, displayName: true, email: true } },
@@ -490,19 +491,18 @@ export class AdminOrderService {
           payment: { select: { id: true, status: true } },
         },
         orderBy: { createdAt: "desc" },
-        skip: (page - 1) * limit,
-        take: limit,
-      }),
-    ]);
+      },
+      { page, limit },
+    );
 
     return {
-      data: orders.map((o) => ({
+      ...result,
+      data: result.data.map((o) => ({
         ...o,
         buyer: this.resolveGuestBuyerForAdmin(o.buyer, o.shippingAddress),
         amount: Number(o.totalAmount),
         commissionAmount: Number(o.commissionAmount),
       })),
-      meta: { total, page, limit, totalPages: Math.ceil(total / limit) },
     };
   }
 

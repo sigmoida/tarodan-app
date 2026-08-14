@@ -17,6 +17,7 @@ import {
   UpdateAdPackageDto,
   AdPackageTierDto,
 } from "./dto/ad-package.dto";
+import { paginate } from "../../common/list";
 
 /**
  * Admin management of the dynamic ad/boost packages (Ekonomik / Vitrin / …) and
@@ -379,13 +380,11 @@ export class AdminAdPackageService {
       ];
     }
 
-    const [total, boosts] = await Promise.all([
-      this.prisma.productBoost.count({ where }),
-      this.prisma.productBoost.findMany({
+    const result = await paginate(
+      this.prisma.productBoost,
+      {
         where,
         orderBy: { createdAt: "desc" },
-        skip: (page - 1) * limit,
-        take: limit,
         include: {
           user: {
             select: {
@@ -409,17 +408,13 @@ export class AdminAdPackageService {
             },
           },
         },
-      }),
-    ]);
+      },
+      { page, limit },
+    );
 
     return {
-      data: boosts.map((boost) => this.serializePurchase(boost)),
-      meta: {
-        total,
-        page,
-        limit,
-        totalPages: Math.ceil(total / limit),
-      },
+      ...result,
+      data: result.data.map((boost) => this.serializePurchase(boost)),
     };
   }
 

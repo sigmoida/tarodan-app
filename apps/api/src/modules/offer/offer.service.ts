@@ -37,6 +37,7 @@ import {
   publicName,
   toPublicIdentity,
 } from "../../common/helpers/public-identity";
+import { paginate } from "../../common/list";
 
 @Injectable()
 export class OfferService {
@@ -1010,49 +1011,46 @@ export class OfferService {
       where.status = status;
     }
 
-    const total = await this.prisma.offer.count({ where });
-
-    const offers = await this.prisma.offer.findMany({
-      where,
-      orderBy: { createdAt: "desc" },
-      skip: (page - 1) * limit,
-      take: limit,
-      include: {
-        product: {
-          include: {
-            images: { take: 1, orderBy: { sortOrder: "asc" } },
+    const result = await paginate(
+      this.prisma.offer,
+      {
+        where,
+        orderBy: { createdAt: "desc" },
+        include: {
+          product: {
+            include: {
+              images: { take: 1, orderBy: { sortOrder: "asc" } },
+            },
           },
-        },
-        buyer: {
-          select: {
-            id: true,
-            ...PUBLIC_NAME_SELECT,
-            isVerified: true,
-            avatarUrl: true,
+          buyer: {
+            select: {
+              id: true,
+              ...PUBLIC_NAME_SELECT,
+              isVerified: true,
+              avatarUrl: true,
+            },
           },
-        },
-        seller: {
-          select: {
-            id: true,
-            ...PUBLIC_NAME_SELECT,
-            isVerified: true,
-            avatarUrl: true,
+          seller: {
+            select: {
+              id: true,
+              ...PUBLIC_NAME_SELECT,
+              isVerified: true,
+              avatarUrl: true,
+            },
           },
-        },
-        order: {
-          select: { id: true, status: true },
+          order: {
+            select: { id: true, status: true },
+          },
         },
       },
-    });
+      { page, limit },
+    );
 
     return {
-      data: await Promise.all(offers.map((o) => this.formatOfferResponse(o))),
-      meta: {
-        total,
-        page,
-        limit,
-        totalPages: Math.ceil(total / limit),
-      },
+      ...result,
+      data: await Promise.all(
+        result.data.map((o) => this.formatOfferResponse(o)),
+      ),
     };
   }
 
@@ -1138,50 +1136,47 @@ export class OfferService {
       where.status = status;
     }
 
-    const total = await this.prisma.offer.count({ where });
-
-    const offers = await this.prisma.offer.findMany({
-      where,
-      orderBy: { createdAt: "desc" },
-      skip: (page - 1) * limit,
-      take: limit,
-      include: {
-        product: {
-          include: {
-            images: { take: 1, orderBy: { sortOrder: "asc" } },
-            category: { select: { id: true } },
+    const result = await paginate(
+      this.prisma.offer,
+      {
+        where,
+        orderBy: { createdAt: "desc" },
+        include: {
+          product: {
+            include: {
+              images: { take: 1, orderBy: { sortOrder: "asc" } },
+              category: { select: { id: true } },
+            },
           },
-        },
-        buyer: {
-          select: {
-            id: true,
-            ...PUBLIC_NAME_SELECT,
-            isVerified: true,
-            avatarUrl: true,
+          buyer: {
+            select: {
+              id: true,
+              ...PUBLIC_NAME_SELECT,
+              isVerified: true,
+              avatarUrl: true,
+            },
           },
-        },
-        seller: {
-          select: {
-            id: true,
-            ...PUBLIC_NAME_SELECT,
-            isVerified: true,
-            avatarUrl: true,
+          seller: {
+            select: {
+              id: true,
+              ...PUBLIC_NAME_SELECT,
+              isVerified: true,
+              avatarUrl: true,
+            },
           },
-        },
-        order: {
-          select: { id: true, status: true },
+          order: {
+            select: { id: true, status: true },
+          },
         },
       },
-    });
+      { page, limit },
+    );
 
     return {
-      data: await Promise.all(offers.map((o) => this.formatOfferResponse(o))),
-      meta: {
-        total,
-        page,
-        limit,
-        totalPages: Math.ceil(total / limit),
-      },
+      ...result,
+      data: await Promise.all(
+        result.data.map((o) => this.formatOfferResponse(o)),
+      ),
     };
   }
 
