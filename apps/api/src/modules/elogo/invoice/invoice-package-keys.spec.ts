@@ -1,5 +1,6 @@
 import { ConfigService } from "@nestjs/config";
 import { ElogoInvoicingService } from "../elogo-invoicing.service";
+import { ElogoQueryService } from "../elogo-query.service";
 import { ElogoService } from "../elogo.service";
 
 /**
@@ -232,7 +233,12 @@ describe("paket anahtarlı fatura tüketicileri", () => {
     // 120 matrah + 24 KDV; o1'in payı 60 → yarısı iade edilir.
     prisma.invoices.push(sentPackageInvoice("commission", 144));
     const elogo = makeElogo();
-    const svc = new ElogoInvoicingService(prisma as any, elogo, fakeConfig());
+    const svc = new ElogoInvoicingService(
+      prisma as any,
+      elogo,
+      fakeConfig(),
+      new ElogoQueryService(prisma as any, elogo) as any,
+    );
 
     await svc.handleOrderRefund(
       "o1",
@@ -253,7 +259,12 @@ describe("paket anahtarlı fatura tüketicileri", () => {
     // 50 matrah + 10 KDV = 60; o1'in payı 25 → yarısı iade edilir.
     prisma.invoices.push(sentPackageInvoice("service_fee", 60));
     const elogo = makeElogo();
-    const svc = new ElogoInvoicingService(prisma as any, elogo, fakeConfig());
+    const svc = new ElogoInvoicingService(
+      prisma as any,
+      elogo,
+      fakeConfig(),
+      new ElogoQueryService(prisma as any, elogo) as any,
+    );
 
     await svc.handleOrderRefund(
       "o1",
@@ -271,7 +282,12 @@ describe("paket anahtarlı fatura tüketicileri", () => {
     const prisma = makePrisma();
     prisma.invoices.push(sentPackageInvoice("commission", 144));
     const elogo = makeElogo();
-    const svc = new ElogoInvoicingService(prisma as any, elogo, fakeConfig());
+    const svc = new ElogoInvoicingService(
+      prisma as any,
+      elogo,
+      fakeConfig(),
+      new ElogoQueryService(prisma as any, elogo) as any,
+    );
 
     await svc.handleOrderRefund(
       "o1",
@@ -292,7 +308,12 @@ describe("paket anahtarlı fatura tüketicileri", () => {
     legacy.sourceId = "o1"; // paket anahtarına geçilmeden önce kesilmiş kayıt
     prisma.invoices.push(legacy);
     const elogo = makeElogo();
-    const svc = new ElogoInvoicingService(prisma as any, elogo, fakeConfig());
+    const svc = new ElogoInvoicingService(
+      prisma as any,
+      elogo,
+      fakeConfig(),
+      new ElogoQueryService(prisma as any, elogo) as any,
+    );
 
     await svc.handleOrderRefund(
       "o1",
@@ -331,6 +352,7 @@ describe("paket anahtarlı fatura tüketicileri", () => {
       prisma as any,
       makeElogo(),
       fakeConfig(),
+      new ElogoQueryService(prisma as any, makeElogo()) as any,
     );
 
     await svc.handleOrderRefund(
@@ -351,6 +373,7 @@ describe("paket anahtarlı fatura tüketicileri", () => {
       prisma as any,
       makeElogo(),
       fakeConfig(),
+      new ElogoQueryService(prisma as any, makeElogo()) as any,
     );
 
     const found = await svc.findOrderInvoiceForUser("o1", "b1");
@@ -366,6 +389,7 @@ describe("paket anahtarlı fatura tüketicileri", () => {
       prisma as any,
       makeElogo(),
       fakeConfig(),
+      new ElogoQueryService(prisma as any, makeElogo()) as any,
     );
 
     const found = await svc.findOrderInvoiceForUser("o2", "s1");
@@ -379,6 +403,7 @@ describe("paket anahtarlı fatura tüketicileri", () => {
       prisma as any,
       makeElogo(),
       fakeConfig(),
+      new ElogoQueryService(prisma as any, makeElogo()) as any,
     );
 
     expect(await svc.findOrderInvoiceForUser("o1", "someone-else")).toBeNull();
@@ -410,6 +435,7 @@ describe("iade faturası alıcı snapshot'ı", () => {
       prisma as any,
       makeElogo(),
       fakeConfig(),
+      new ElogoQueryService(prisma as any, makeElogo()) as any,
     );
 
     await svc.handleOrderRefund(
@@ -428,7 +454,12 @@ describe("iade faturası alıcı snapshot'ı", () => {
     const prisma = makePrisma();
     prisma.invoices.push(guestInvoice());
     const elogo = makeElogo();
-    const svc = new ElogoInvoicingService(prisma as any, elogo, fakeConfig());
+    const svc = new ElogoInvoicingService(
+      prisma as any,
+      elogo,
+      fakeConfig(),
+      new ElogoQueryService(prisma as any, elogo) as any,
+    );
 
     await svc.handleOrderRefund(
       "o1",
@@ -447,6 +478,7 @@ describe("iade faturası alıcı snapshot'ı", () => {
       prisma as any,
       makeElogo(),
       fakeConfig(),
+      new ElogoQueryService(prisma as any, makeElogo()) as any,
     );
 
     await svc.handleOrderRefund(

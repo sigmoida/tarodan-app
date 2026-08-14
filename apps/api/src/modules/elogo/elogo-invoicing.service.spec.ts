@@ -218,7 +218,12 @@ describe("ElogoInvoicingService", () => {
       users: { s1: { displayName: "Satıcı X", taxId: null } },
     });
     const elogo = makeElogo();
-    const svc = new ElogoInvoicingService(prisma, elogo, fakeConfig());
+    const svc = new ElogoInvoicingService(
+      prisma,
+      elogo,
+      fakeConfig(),
+      {} as any, // queries — bu spec kesim hattını sürüyor
+    );
 
     await svc.issueCommissionInvoice("o1");
 
@@ -250,7 +255,12 @@ describe("ElogoInvoicingService", () => {
       },
     });
     const elogo = makeElogo();
-    const svc = new ElogoInvoicingService(prisma, elogo, fakeConfig());
+    const svc = new ElogoInvoicingService(
+      prisma,
+      elogo,
+      fakeConfig(),
+      {} as any, // queries — bu spec kesim hattını sürüyor
+    );
     await svc.issueCommissionInvoice("o1");
     const xml = (elogo.sendDocument as jest.Mock).mock.calls[0][0].ublXml;
     expect(xml).toContain("<cbc:CityName>Bursa</cbc:CityName>");
@@ -266,7 +276,12 @@ describe("ElogoInvoicingService", () => {
       users: { s1: { displayName: "Satıcı X", taxId: null } },
     });
     const elogo = makeElogo();
-    const svc = new ElogoInvoicingService(prisma, elogo, fakeConfig());
+    const svc = new ElogoInvoicingService(
+      prisma,
+      elogo,
+      fakeConfig(),
+      {} as any, // queries — bu spec kesim hattını sürüyor
+    );
     await svc.issueCommissionInvoice("o1");
     const xml = (elogo.sendDocument as jest.Mock).mock.calls[0][0].ublXml;
     expect(xml).toContain("<cbc:CityName>Belirtilmemiş</cbc:CityName>");
@@ -285,7 +300,12 @@ describe("ElogoInvoicingService", () => {
       status: "sent",
     });
     const elogo = makeElogo();
-    const svc = new ElogoInvoicingService(prisma, elogo, fakeConfig());
+    const svc = new ElogoInvoicingService(
+      prisma,
+      elogo,
+      fakeConfig(),
+      {} as any, // queries — bu spec kesim hattını sürüyor
+    );
 
     await svc.issueCommissionInvoice("o1");
     expect(elogo.sendDocument).not.toHaveBeenCalled();
@@ -298,7 +318,12 @@ describe("ElogoInvoicingService", () => {
       users: { b1: { displayName: "Alıcı" } },
     });
     const elogo = makeElogo();
-    const svc = new ElogoInvoicingService(prisma, elogo, fakeConfig());
+    const svc = new ElogoInvoicingService(
+      prisma,
+      elogo,
+      fakeConfig(),
+      {} as any, // queries — bu spec kesim hattını sürüyor
+    );
 
     await svc.issueServiceFeeInvoice("o1");
     expect(elogo.sendDocument).not.toHaveBeenCalled();
@@ -323,7 +348,12 @@ describe("ElogoInvoicingService", () => {
         eInvoicePkAlias: "urn:mail:pk",
       })),
     });
-    const svc = new ElogoInvoicingService(prisma, elogo, fakeConfig());
+    const svc = new ElogoInvoicingService(
+      prisma,
+      elogo,
+      fakeConfig(),
+      {} as any, // queries — bu spec kesim hattını sürüyor
+    );
 
     await svc.issueCommissionInvoice("o1");
 
@@ -343,7 +373,12 @@ describe("ElogoInvoicingService", () => {
       users: { s1: { displayName: "Satıcı X", taxId: null } },
     });
     const elogo = makeElogo();
-    const svc = new ElogoInvoicingService(prisma, elogo, fakeConfig());
+    const svc = new ElogoInvoicingService(
+      prisma,
+      elogo,
+      fakeConfig(),
+      {} as any, // queries — bu spec kesim hattını sürüyor
+    );
 
     await svc.issueCommissionInvoice("o1");
 
@@ -358,7 +393,12 @@ describe("ElogoInvoicingService", () => {
       users: { s1: { displayName: "Satıcı X", taxId: null } },
     });
     const elogo = makeElogo();
-    const svc = new ElogoInvoicingService(prisma, elogo, fakeConfig());
+    const svc = new ElogoInvoicingService(
+      prisma,
+      elogo,
+      fakeConfig(),
+      {} as any, // queries — bu spec kesim hattını sürüyor
+    );
 
     await svc.issueCommissionInvoice("o1");
 
@@ -371,7 +411,12 @@ describe("ElogoInvoicingService", () => {
       users: { u1: { displayName: "Üye", taxId: null } },
     });
     const elogo = makeElogo();
-    const svc = new ElogoInvoicingService(prisma, elogo, fakeConfig());
+    const svc = new ElogoInvoicingService(
+      prisma,
+      elogo,
+      fakeConfig(),
+      {} as any, // queries — bu spec kesim hattını sürüyor
+    );
 
     await svc.issueMembershipInvoice("mp1");
     expect(elogo.sendDocument).toHaveBeenCalledTimes(1);
@@ -392,7 +437,12 @@ describe("ElogoInvoicingService", () => {
       issuedAt: new Date(),
     });
     const elogo = makeElogo({ refundStrategy: jest.fn(() => "CANCEL") });
-    const svc = new ElogoInvoicingService(prisma, elogo, fakeConfig());
+    const svc = new ElogoInvoicingService(
+      prisma,
+      elogo,
+      fakeConfig(),
+      {} as any, // queries — bu spec kesim hattını sürüyor
+    );
 
     await svc.handleOrderRefund("o1");
     expect(elogo.cancelEArchiveInvoice).toHaveBeenCalledWith("ettn-1", "42");
@@ -444,7 +494,12 @@ describe("ElogoInvoicingService", () => {
       updatedAt: issuedAt,
     });
     const elogo = makeElogo({ refundStrategy: jest.fn(() => "CANCEL") });
-    const svc = new ElogoInvoicingService(prisma, elogo, fakeConfig());
+    const svc = new ElogoInvoicingService(
+      prisma,
+      elogo,
+      fakeConfig(),
+      {} as any, // queries — bu spec kesim hattını sürüyor
+    );
     const adjustment = {
       orderId: "o1",
       refundAttemptId: "ra1",
@@ -503,7 +558,12 @@ describe("ElogoInvoicingService", () => {
       createdAt: new Date("2026-07-18T10:00:00Z"),
       updatedAt: new Date("2026-07-18T10:00:00Z"),
     });
-    const svc = new ElogoInvoicingService(prisma, makeElogo(), fakeConfig());
+    const svc = new ElogoInvoicingService(
+      prisma,
+      makeElogo(),
+      fakeConfig(),
+      {} as any, // queries
+    );
 
     await svc.handleOrderRefund("o1", {
       orderId: "o1",
@@ -523,7 +583,12 @@ describe("ElogoInvoicingService", () => {
       users: { p1: { displayName: "Ödeyen", taxId: null } },
     });
     const elogo = makeElogo();
-    const svc = new ElogoInvoicingService(prisma, elogo, fakeConfig());
+    const svc = new ElogoInvoicingService(
+      prisma,
+      elogo,
+      fakeConfig(),
+      {} as any, // queries — bu spec kesim hattını sürüyor
+    );
 
     await svc.issueTradeCashFeeInvoice("tcp1");
     expect(elogo.sendDocument).toHaveBeenCalledTimes(1);
@@ -540,7 +605,12 @@ describe("ElogoInvoicingService", () => {
       users: { p1: { displayName: "Ödeyen", taxId: null } },
     });
     const elogo = makeElogo();
-    const svc = new ElogoInvoicingService(prisma, elogo, fakeConfig());
+    const svc = new ElogoInvoicingService(
+      prisma,
+      elogo,
+      fakeConfig(),
+      {} as any, // queries — bu spec kesim hattını sürüyor
+    );
 
     await svc.issueTradeCashFeeInvoice("tcp1");
     expect(prisma.invoices[0].type).toBe("trade_service_fee");
@@ -555,7 +625,12 @@ describe("ElogoInvoicingService", () => {
       users: { p1: { displayName: "Ödeyen", taxId: null } },
     });
     const elogo = makeElogo();
-    const svc = new ElogoInvoicingService(prisma, elogo, fakeConfig());
+    const svc = new ElogoInvoicingService(
+      prisma,
+      elogo,
+      fakeConfig(),
+      {} as any, // queries — bu spec kesim hattını sürüyor
+    );
 
     await svc.issueTradeCashFeeInvoice("tcp1");
     expect(elogo.sendDocument).not.toHaveBeenCalled();
@@ -575,7 +650,12 @@ describe("ElogoInvoicingService", () => {
       issuedAt: new Date(),
     });
     const elogo = makeElogo({ refundStrategy: jest.fn(() => "CANCEL") });
-    const svc = new ElogoInvoicingService(prisma, elogo, fakeConfig());
+    const svc = new ElogoInvoicingService(
+      prisma,
+      elogo,
+      fakeConfig(),
+      {} as any, // queries — bu spec kesim hattını sürüyor
+    );
 
     await svc.handleTradeCashRefund("tcp2");
     expect(elogo.cancelEArchiveInvoice).toHaveBeenCalledWith("te2", "10");
@@ -596,7 +676,12 @@ describe("ElogoInvoicingService", () => {
       issuedAt: new Date(),
     });
     const elogo = makeElogo({ refundStrategy: jest.fn(() => "CANCEL") });
-    const svc = new ElogoInvoicingService(prisma, elogo, fakeConfig());
+    const svc = new ElogoInvoicingService(
+      prisma,
+      elogo,
+      fakeConfig(),
+      {} as any, // queries — bu spec kesim hattını sürüyor
+    );
 
     await svc.handleTradeCashRefund("tcp1");
     expect(elogo.cancelEArchiveInvoice).toHaveBeenCalledWith("te1", "9");
@@ -617,7 +702,12 @@ describe("ElogoInvoicingService", () => {
       issuedAt: new Date(),
     });
     const elogo = makeElogo({ refundStrategy: jest.fn(() => "CANCEL") });
-    const svc = new ElogoInvoicingService(prisma, elogo, fakeConfig());
+    const svc = new ElogoInvoicingService(
+      prisma,
+      elogo,
+      fakeConfig(),
+      {} as any, // queries — bu spec kesim hattını sürüyor
+    );
 
     await svc.handleOrderRefund("o1");
     expect(elogo.cancelEArchiveInvoice).toHaveBeenCalledWith("e1", "1");
@@ -652,7 +742,12 @@ describe("ElogoInvoicingService", () => {
     const elogo = makeElogo({
       refundStrategy: jest.fn(() => "RETURN_INVOICE"),
     });
-    const svc = new ElogoInvoicingService(prisma, elogo, fakeConfig());
+    const svc = new ElogoInvoicingService(
+      prisma,
+      elogo,
+      fakeConfig(),
+      {} as any, // queries — bu spec kesim hattını sürüyor
+    );
 
     await svc.handleOrderRefund("o1");
     const returns = prisma.invoices.filter(
@@ -679,7 +774,12 @@ describe("ElogoInvoicingService", () => {
       },
     });
     const elogo = makeElogo();
-    const svc = new ElogoInvoicingService(prisma, elogo, fakeConfig());
+    const svc = new ElogoInvoicingService(
+      prisma,
+      elogo,
+      fakeConfig(),
+      {} as any, // queries — bu spec kesim hattını sürüyor
+    );
 
     await svc.issueCommissionInvoice("o1"); // platform satıcı → komisyon kesilmez
     expect(elogo.sendDocument).not.toHaveBeenCalled();
@@ -719,7 +819,12 @@ describe("ElogoInvoicingService", () => {
       },
     });
     const elogo = makeElogo();
-    const svc = new ElogoInvoicingService(prisma, elogo, fakeConfig());
+    const svc = new ElogoInvoicingService(
+      prisma,
+      elogo,
+      fakeConfig(),
+      {} as any, // queries — bu spec kesim hattını sürüyor
+    );
 
     await svc.issuePlatformSaleInvoice("o1");
 
@@ -750,7 +855,12 @@ describe("ElogoInvoicingService", () => {
       users: { s1: { displayName: "X" } },
     });
     const elogo = makeElogo({ isEnabled: jest.fn(() => false) });
-    const svc = new ElogoInvoicingService(prisma, elogo, fakeConfig());
+    const svc = new ElogoInvoicingService(
+      prisma,
+      elogo,
+      fakeConfig(),
+      {} as any, // queries — bu spec kesim hattını sürüyor
+    );
 
     await svc.issueCommissionInvoice("o1");
     expect(elogo.sendDocument).not.toHaveBeenCalled();
@@ -766,7 +876,12 @@ describe("ElogoInvoicingService", () => {
     });
     const enabled = jest.fn().mockReturnValueOnce(false).mockReturnValue(true);
     const elogo = makeElogo({ isEnabled: enabled });
-    const svc = new ElogoInvoicingService(prisma, elogo, fakeConfig());
+    const svc = new ElogoInvoicingService(
+      prisma,
+      elogo,
+      fakeConfig(),
+      {} as any, // queries — bu spec kesim hattını sürüyor
+    );
 
     await svc.issueCommissionInvoice("o1");
     const identity = {
@@ -792,7 +907,12 @@ describe("ElogoInvoicingService", () => {
     });
     const enabled = jest.fn().mockReturnValueOnce(false).mockReturnValue(true);
     const elogo = makeElogo({ isEnabled: enabled });
-    const svc = new ElogoInvoicingService(prisma, elogo, fakeConfig());
+    const svc = new ElogoInvoicingService(
+      prisma,
+      elogo,
+      fakeConfig(),
+      {} as any, // queries — bu spec kesim hattını sürüyor
+    );
 
     await svc.issueCommissionInvoice("o1");
     await Promise.all([svc.retryPendingInvoices(), svc.retryPendingInvoices()]);
@@ -817,7 +937,12 @@ describe("ElogoInvoicingService", () => {
         description: "accepted",
       }),
     });
-    const svc = new ElogoInvoicingService(prisma, elogo, fakeConfig());
+    const svc = new ElogoInvoicingService(
+      prisma,
+      elogo,
+      fakeConfig(),
+      {} as any, // queries — bu spec kesim hattını sürüyor
+    );
 
     await svc.issueCommissionInvoice("o1");
     Object.assign(prisma.invoices[0], {

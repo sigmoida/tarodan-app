@@ -1,5 +1,6 @@
 import { ConfigService } from "@nestjs/config";
 import { ElogoInvoicingService } from "../elogo-invoicing.service";
+import { ElogoQueryService } from "../elogo-query.service";
 import { ElogoService } from "../elogo.service";
 import { VAT_SOURCE_BY_TYPE } from "./invoice-vat-rate";
 
@@ -193,6 +194,7 @@ describe("fatura KDV oranının kaynağı", () => {
       prisma as any,
       makeElogo(),
       fakeConfig({ ELOGO_VAT_RATE: "20" }),
+      {} as any, // queries
       makeTaxService({}, 20),
       undefined,
       undefined,
@@ -224,6 +226,7 @@ describe("fatura KDV oranının kaynağı", () => {
       prisma as any,
       makeElogo(),
       fakeConfig(),
+      {} as any, // queries
       makeTaxService({}, 20),
       undefined,
       undefined,
@@ -265,6 +268,7 @@ describe("fatura KDV oranının kaynağı", () => {
       prisma as any,
       makeElogo(),
       fakeConfig(),
+      {} as any, // queries
       makeTaxService({ "cat-kitap": 10 }, 20),
       undefined,
       undefined,
@@ -296,6 +300,7 @@ describe("fatura KDV oranının kaynağı", () => {
       prisma as any,
       makeElogo(),
       fakeConfig({ ELOGO_VAT_RATE: "20" }),
+      new ElogoQueryService(prisma as any, makeElogo()) as any,
     );
 
     await svc.issueCommissionInvoice("pkg1");

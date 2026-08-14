@@ -219,6 +219,7 @@ describe("Partial-refund commission ledger pro-rating (#88) [P0]", () => {
       prisma,
       {} as any, // elogo client
       { get: () => "" } as any, // config
+      {} as any, // queries — bu spec yalnız ters kayıt hattını sürüyor
     );
     const cutSpy = jest.spyOn(elogo as any, "cut").mockResolvedValue(undefined);
 
