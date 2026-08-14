@@ -732,6 +732,8 @@ export class AuthService {
 
       // Silinmiş (anonimleştirilmiş) hesap: kaynakta reddet, token üretme.
       if (user.deletedAt) {
+        // Same timing-safety reasoning as the "user not found" branch above.
+        await bcrypt.compare(dto.password, DUMMY_BCRYPT_HASH);
         await this.logSecurityEvent("failed_login", "medium", {
           email: dto.email,
           userId: user.id,
@@ -744,6 +746,8 @@ export class AuthService {
 
       // Guard: OAuth-only accounts have no passwordHash — avoid bcrypt throwing on null
       if (!user.passwordHash) {
+        // Same timing-safety reasoning as the "user not found" branch above.
+        await bcrypt.compare(dto.password, DUMMY_BCRYPT_HASH);
         await this.logSecurityEvent("failed_login", "medium", {
           email: dto.email,
           userId: user.id,
@@ -923,10 +927,14 @@ export class AuthService {
       );
     }
 
-    const isPasswordValid =
-      !!user.passwordHash &&
-      (await bcrypt.compare(dto.password, user.passwordHash));
-    if (!isPasswordValid) {
+    // Always run bcrypt (dummy hash when there's no real passwordHash) so
+    // this branch takes the same time regardless of account state —
+    // matching the "user not found" dummy compare above.
+    const isPasswordValid = await bcrypt.compare(
+      dto.password,
+      user.passwordHash ?? DUMMY_BCRYPT_HASH,
+    );
+    if (!user.passwordHash || !isPasswordValid) {
       this.logger.warn("Admin login failed: invalid password");
       throw new UnauthorizedException(
         i18nMessage("server.auth.invalidCredentials"),
@@ -1451,6 +1459,11 @@ export class AuthService {
     // #224: yanıt mesajı AuthController.forgotPassword() tarafından locale'e göre
     // kuruluyor (server.auth.passwordResetLinkSent) — kullanıcı bulunsun bulunmasın aynı.
     if (!user) {
+      // Dummy DB round-trip so a "no such account" response takes roughly
+      // the same time as the real path's deleteMany+create below — the
+      // response body is already identical either way, but without this
+      // the latency gap alone enumerates registered emails.
+      await this.prisma.passwordResetToken.count({ where: { userId: email } });
       return;
     }
 
@@ -1476,8 +1489,15 @@ export class AuthService {
       },
     });
 
-    // Send email with reset link using NotificationService
-    await this.notificationService.sendPasswordResetEmail(user.id, resetToken);
+    // Don't await email delivery — the network round-trip to the email
+    // provider is by far the dominant, most variable cost on this path;
+    // awaiting it would leak account existence through response timing far
+    // more than the DB work above does.
+    void this.notificationService
+      .sendPasswordResetEmail(user.id, resetToken)
+      .catch((error) =>
+        this.logger.error(`Failed to send password reset email: ${error}`),
+      );
   }
 
   /**
