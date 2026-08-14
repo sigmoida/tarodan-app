@@ -9,6 +9,8 @@ import {
   type SyntheticEvent,
 } from "react";
 import { createPortal } from "react-dom";
+import { useMediaQuery } from "@/hooks/useMediaQuery";
+import { NO_HOVER_MEDIA_QUERY } from "@/lib/breakpoints";
 import { cn } from "@/lib/utils";
 
 const POPOVER_MAX_WIDTH = 280;
@@ -23,7 +25,10 @@ const VIEWPORT_MARGIN = 12;
  * unreadable there. Tapping a clipped value opens a small portaled popover
  * with the full text instead — this stops the tap from also triggering a
  * row click / link navigation, since reading the value is the deliberate
- * action here, not navigating away.
+ * action here, not navigating away. That interception is scoped to
+ * no-hover (touch) devices only — hover-capable devices already get the
+ * value via the native `title` tooltip, so a click there must behave like
+ * a normal click (e.g. still navigate a wrapping `Link`).
  */
 export function TruncatedText({
   children,
@@ -32,6 +37,7 @@ export function TruncatedText({
   children: ReactNode;
   className?: string;
 }) {
+  const isTouch = useMediaQuery(NO_HOVER_MEDIA_QUERY);
   const ref = useRef<HTMLSpanElement>(null);
   const popoverRef = useRef<HTMLDivElement>(null);
   const [truncated, setTruncated] = useState(false);
@@ -97,6 +103,12 @@ export function TruncatedText({
     setOpen(true);
   };
 
+  // Only intercept the click on touch — hover-capable devices must let it
+  // through to whatever the cell wraps (Link nav, row click, …).
+  const onClick = (e: SyntheticEvent) => {
+    if (isTouch) reveal(e);
+  };
+
   return (
     <>
       <span
@@ -109,7 +121,7 @@ export function TruncatedText({
         title={truncated && title ? title : undefined}
         role={truncated ? "button" : undefined}
         tabIndex={truncated ? 0 : undefined}
-        onClick={reveal}
+        onClick={onClick}
         onKeyDown={(e) => {
           if (e.key === "Enter" || e.key === " ") reveal(e);
         }}
