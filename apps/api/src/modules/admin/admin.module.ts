@@ -14,6 +14,9 @@ import { AdminMessagingController } from "./admin-messaging.controller";
 import { AdminSupportController } from "./admin-support.controller";
 import { AdminNotificationController } from "./admin-notification.controller";
 import { AdminCatalogController } from "./admin-catalog.controller";
+import { AdminCatalogImportController } from "./admin-catalog-import.controller";
+import { CatalogImportService } from "./catalog-import/catalog-import.service";
+import { CatalogImportTemplateService } from "./catalog-import/catalog-import-template.service";
 import { AdminTaxController } from "./admin-tax.controller";
 import { AdminCollectionController } from "./admin-collection.controller";
 import { AdminAdvertisementController } from "./admin-advertisement.controller";
@@ -150,6 +153,10 @@ import { scheduledProcessors } from "../../workers/scheduled-processors";
     AdminMessagingController,
     AdminSupportController,
     AdminNotificationController,
+    // İçe aktarma uçları katalog controller'ından ÖNCE: bugün çakışan bir
+    // `brands/:id` GET route'u yok, ama ileride eklenirse `brands/import-*`
+    // yollarını yutmasın (Nest kayıt sırasına göre eşler).
+    AdminCatalogImportController,
     AdminCatalogController,
     AdminTaxController,
     AdminCollectionController,
@@ -195,6 +202,8 @@ import { scheduledProcessors } from "../../workers/scheduled-processors";
     AdminTaxService,
     AdminMembershipService,
     AdminCatalogService,
+    CatalogImportService,
+    CatalogImportTemplateService,
     AdminCollectionService,
     AdminNotificationService,
     AdminLogsService,
