@@ -43,10 +43,29 @@ export interface ListingImagePayload {
 
 export interface RejectedFile {
   name: string;
-  reason: "type" | "size" | "duplicate" | "limit";
+  reason: "type" | "size" | "tooSmall" | "duplicate" | "limit";
 }
 
 export const MAX_IMAGE_BYTES = 10 * 1024 * 1024;
+
+/**
+ * Ürün fotoğrafı için alt sınır: boş/bozuk kayıtlar ve sürükle-bırakla gelen
+ * yer tutucular buradan dönüyor.
+ *
+ * DİKKAT — bu YALNIZCA istemci kuralıdır: sunucuda alt sınır yok
+ * (`media.service.ts` sadece 10 MB üst sınırına bakar), yani burada reddedilen
+ * bir dosya teknik olarak yüklenebilirdi. Sınır kalite için konuldu; 1 KB
+ * altında anlamlı bir ürün fotoğrafı pratikte bulunmuyor.
+ */
+export const MIN_IMAGE_BYTES = 1024;
+
+/**
+ * Önerilen en küçük kenar. Sunucu kart görselini 500×500 `cover` üretiyor
+ * (`media.service.ts`), altındaki her şey büyütülüp bulanıklaşıyor. ENGEL
+ * DEĞİL, uyarı: eski/küçük arşiv fotoğrafı olan satıcı ilan veremez hâle
+ * gelmemeli.
+ */
+export const MIN_RECOMMENDED_DIMENSION = 500;
 
 export const ACCEPTED_IMAGE_TYPES = [
   "image/jpeg",
@@ -130,28 +149,22 @@ export function hasPendingUploads(items: ListingImageItem[]): boolean {
 }
 
 /**
- * Form GÖNDERİLEBİLİR mi? Gönderilemiyorsa gerekçesi de döner.
+ * Form GÖNDERİLEBİLİR mi? Gönderilemiyorsa gerekçesi döner.
  *
  * Yalnız butonu kapatmak yetmez: Enter ile gönderim ve programatik çağrı da
  * aynı kapıdan geçmeli. Çözümlenmemiş görselle kaydedilen ilan, kullanıcının
  * ekranda gördüğünden EKSİK görselle yayınlanıyordu — forma yalnız `uploaded`
  * kalemler yazıldığı için sessizce düşüyorlardı.
+ *
+ * Burası SAF kalır; kullanıcıya gösterilecek metin çeviri kataloğundan
+ * `useListingImageUpload` içinde eklenir (tek kaynak: `product.imageUpload.*`).
  */
 export function imageSubmitBlocker(
   items: ListingImageItem[],
-): { reason: "pending" | "failed"; message: string } | null {
-  if (hasPendingUploads(items)) {
-    return {
-      reason: "pending",
-      message: "Görsel yüklemesi sürüyor, lütfen tamamlanmasını bekleyin.",
-    };
-  }
+): { reason: "pending" | "failed" } | null {
+  if (hasPendingUploads(items)) return { reason: "pending" };
   if (items.some((item) => item.status === "failed")) {
-    return {
-      reason: "failed",
-      message:
-        "Yüklenemeyen görsel var. Tekrar deneyin ya da o görseli kaldırın.",
-    };
+    return { reason: "failed" };
   }
   return null;
 }
@@ -187,10 +200,12 @@ export function acceptFiles(
   options: {
     maxImages: number;
     maxBytes?: number;
+    minBytes?: number;
     acceptedTypes?: string[];
   },
 ): { accepted: File[]; rejected: RejectedFile[] } {
   const maxBytes = options.maxBytes ?? MAX_IMAGE_BYTES;
+  const minBytes = options.minBytes ?? MIN_IMAGE_BYTES;
   const acceptedTypes = options.acceptedTypes ?? ACCEPTED_IMAGE_TYPES;
 
   const existingFingerprints = new Set(
@@ -210,6 +225,10 @@ export function acceptFiles(
     }
     if (file.size > maxBytes) {
       rejected.push({ name: file.name, reason: "size" });
+      continue;
+    }
+    if (file.size < minBytes) {
+      rejected.push({ name: file.name, reason: "tooSmall" });
       continue;
     }
     const fingerprint = fileFingerprint(file);
