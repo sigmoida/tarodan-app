@@ -2,6 +2,7 @@ import { BadRequestException } from "@nestjs/common";
 import { PayTRService } from "./paytr/paytr.service";
 import { PayTRCredentials } from "./paytr/paytr-credentials.service";
 import { PayTRReportService } from "./paytr/paytr-report.service";
+import { PayTRTransferService } from "./paytr/paytr-transfer.service";
 import { PaymentProviderRegistry } from "./payment-provider.registry";
 import { IPaymentProvider } from "./payment-provider.interface";
 
@@ -65,6 +66,7 @@ describe("PaymentProviderRegistry (#89)", () => {
   const paytr = new PayTRService(
     new PayTRCredentials(config),
     new PayTRReportService(new PayTRCredentials(config)),
+    new PayTRTransferService(new PayTRCredentials(config)),
     config,
   );
   const registry = new PaymentProviderRegistry(paytr);

@@ -3,6 +3,7 @@ import { ConfigService } from "@nestjs/config";
 import { PayTRService } from "./paytr.service";
 import { PayTRCredentials } from "./paytr-credentials.service";
 import { PayTRReportService } from "./paytr-report.service";
+import { PayTRTransferService } from "./paytr-transfer.service";
 
 /**
  * Durum-sorgu yanıtının İADE (`returns`) ve KESİNTİ (`kesinti_tutari`/`net_tutar`)
@@ -22,6 +23,7 @@ describe("PayTRService.queryPaymentStatus — returns + kesinti alanları", () =
       providers: [
         PayTRCredentials,
         PayTRReportService,
+        PayTRTransferService,
         PayTRService,
         {
           provide: ConfigService,

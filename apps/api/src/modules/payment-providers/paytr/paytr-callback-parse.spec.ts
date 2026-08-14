@@ -1,6 +1,7 @@
 import { PayTRService, PayTRCallbackData } from "./paytr.service";
 import { PayTRCredentials } from "./paytr-credentials.service";
 import { PayTRReportService } from "./paytr-report.service";
+import { PayTRTransferService } from "./paytr-transfer.service";
 
 /**
  * Gözlemlenebilirlik: PayTR Direkt API 2. adım (bildirim) dokümanı payment_type,
@@ -12,6 +13,7 @@ describe("PayTRService.parseCallback — rich field extraction", () => {
   const svc = new PayTRService(
     new PayTRCredentials(config),
     new PayTRReportService(new PayTRCredentials(config)),
+    new PayTRTransferService(new PayTRCredentials(config)),
     config,
   );
 

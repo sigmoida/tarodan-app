@@ -3,6 +3,7 @@ import { ConfigModule } from "@nestjs/config";
 import { PayTRService } from "./paytr/paytr.service";
 import { PayTRCredentials } from "./paytr/paytr-credentials.service";
 import { PayTRReportService } from "./paytr/paytr-report.service";
+import { PayTRTransferService } from "./paytr/paytr-transfer.service";
 import { PaymentProviderRegistry } from "./payment-provider.registry";
 
 @Module({
@@ -10,6 +11,7 @@ import { PaymentProviderRegistry } from "./payment-provider.registry";
   providers: [
     PayTRCredentials,
     PayTRReportService,
+    PayTRTransferService,
     PayTRService,
     PaymentProviderRegistry,
   ],

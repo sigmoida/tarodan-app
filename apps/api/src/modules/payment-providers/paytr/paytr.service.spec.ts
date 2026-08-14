@@ -3,6 +3,7 @@ import { ConfigService } from "@nestjs/config";
 import { PayTRService } from "./paytr.service";
 import { PayTRCredentials } from "./paytr-credentials.service";
 import { PayTRReportService } from "./paytr-report.service";
+import { PayTRTransferService } from "./paytr-transfer.service";
 
 describe("PayTRService", () => {
   let service: PayTRService;
@@ -13,6 +14,7 @@ describe("PayTRService", () => {
       providers: [
         PayTRCredentials,
         PayTRReportService,
+        PayTRTransferService,
         PayTRService,
         {
           provide: ConfigService,

@@ -4,6 +4,7 @@ import * as crypto from "crypto";
 import { PayTRService, PayTRBuyer } from "./paytr.service";
 import { PayTRCredentials } from "./paytr-credentials.service";
 import { PayTRReportService } from "./paytr-report.service";
+import { PayTRTransferService } from "./paytr-transfer.service";
 
 /**
  * PayTR Direkt API doküman uyumu:
@@ -35,6 +36,7 @@ describe("PayTRService — CAPI registered-card / BIN / installment (doc parity)
       providers: [
         PayTRCredentials,
         PayTRReportService,
+        PayTRTransferService,
         PayTRService,
         {
           provide: ConfigService,
