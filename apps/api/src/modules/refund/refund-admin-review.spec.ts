@@ -1,5 +1,6 @@
 import { RefundRequestStatus } from "@prisma/client";
 import { RefundService } from "./refund.service";
+import { RefundFinancialService } from "./refund-financial.service";
 
 describe("RefundService admin review", () => {
   const makeService = () => {
@@ -52,6 +53,7 @@ describe("RefundService admin review", () => {
         sendRefundEmail: jest.fn(),
         toProductImageUrls: jest.fn().mockReturnValue([]),
       } as any,
+      new RefundFinancialService(prisma as any, {} as any) as any,
     );
     jest
       .spyOn((service as any).notifications, "appendHistory")

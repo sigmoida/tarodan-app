@@ -1,6 +1,7 @@
 import { RefundRequestStatus, ShipmentStatus } from "@prisma/client";
 import { NotificationType } from "../notification/dto/notification.dto";
 import { RefundService } from "./refund.service";
+import { RefundFinancialService } from "./refund-financial.service";
 
 describe("RefundService.applyReturnTrackingUpdate notifications", () => {
   const makeService = (currentStatus: ShipmentStatus | null) => {
@@ -36,6 +37,7 @@ describe("RefundService.applyReturnTrackingUpdate notifications", () => {
         sendRefundEmail: jest.fn(),
         toProductImageUrls: jest.fn().mockReturnValue([]),
       } as any,
+      new RefundFinancialService(prisma as any, {} as any) as any,
     );
     const safeNotify = jest
       .spyOn((service as any).notifications, "safeNotify")

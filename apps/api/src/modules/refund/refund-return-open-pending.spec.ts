@@ -1,5 +1,6 @@
 import { RefundRequestStatus, ShipmentStatus } from "@prisma/client";
 import { RefundService } from "./refund.service";
+import { RefundFinancialService } from "./refund-financial.service";
 
 describe("RefundService.openReturnShipment pre-advice", () => {
   it("opens the return with its reference while the real Sürat code is pending", async () => {
@@ -69,6 +70,7 @@ describe("RefundService.openReturnShipment pre-advice", () => {
         sendRefundEmail: jest.fn(),
         toProductImageUrls: jest.fn().mockReturnValue([]),
       } as any,
+      new RefundFinancialService(prisma as any, {} as any) as any,
     );
     jest
       .spyOn((service as any).notifications, "appendHistory")

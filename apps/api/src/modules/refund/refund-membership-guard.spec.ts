@@ -1,5 +1,6 @@
 import { BadRequestException, ForbiddenException } from "@nestjs/common";
 import { RefundService } from "./refund.service";
+import { RefundFinancialService } from "./refund-financial.service";
 
 /**
  * Üyelik/dijital siparişler ("MEM-" sipariş no, platform satıcısı) genel iade akışına
@@ -26,6 +27,7 @@ describe("RefundService.createRefundRequest — üyelik siparişi guard", () => 
         sendRefundEmail: jest.fn(),
         toProductImageUrls: jest.fn().mockReturnValue([]),
       } as any,
+      new RefundFinancialService(prisma as any, {} as any) as any,
     );
   };
 

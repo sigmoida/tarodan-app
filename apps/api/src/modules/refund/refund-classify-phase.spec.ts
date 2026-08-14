@@ -1,5 +1,6 @@
 import { OrderStatus, ShipmentStatus } from "@prisma/client";
 import { RefundService } from "./refund.service";
+import { RefundFinancialService } from "./refund-financial.service";
 
 /**
  * classifyOrderPhase, siparişin yaşam evresine göre iade türünü belirler.
@@ -28,6 +29,7 @@ describe("RefundService.classifyOrderPhase", () => {
       sendRefundEmail: jest.fn(),
       toProductImageUrls: jest.fn().mockReturnValue([]),
     } as any,
+    new RefundFinancialService({} as any, {} as any) as any,
   );
 
   const classify = (order: any): string =>

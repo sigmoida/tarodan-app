@@ -1,4 +1,5 @@
 import { RefundService } from "./refund.service";
+import { RefundFinancialService } from "./refund-financial.service";
 import { RefundRequestStatus } from "@prisma/client";
 
 /**
@@ -46,6 +47,7 @@ describe("RefundService.finalizeRefundForReturnedShipment — MONEY-M1 CAS claim
         sendRefundEmail: jest.fn(),
         toProductImageUrls: jest.fn().mockReturnValue([]),
       } as any,
+      new RefundFinancialService(prisma as any, {} as any) as any,
     );
     return { service, prisma, paymentService };
   };

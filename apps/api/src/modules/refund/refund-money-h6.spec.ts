@@ -1,6 +1,7 @@
 import { RefundService } from "./refund.service";
 import { RefundRequestStatus } from "@prisma/client";
 import { RefundNotificationService } from "./refund-notification.service";
+import { RefundFinancialService } from "./refund-financial.service";
 
 /**
  * MONEY-H6: donuk hold terminal kaçışı.
@@ -37,6 +38,10 @@ describe("RefundService — MONEY-H6 frozen-hold terminal escape", () => {
         notificationService as any,
         {} as any,
       ) as any, // notifications
+      new RefundFinancialService(
+        prisma as any,
+        notificationService as any,
+      ) as any, // financials
     );
     return { service, prisma };
   };

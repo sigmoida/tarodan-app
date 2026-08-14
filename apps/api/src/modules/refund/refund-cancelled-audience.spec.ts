@@ -2,6 +2,7 @@ import { RefundRequestStatus } from "@prisma/client";
 import { NotificationType } from "../notification/dto/notification.dto";
 import { resolveWebNotificationLink } from "../notification/notification-link";
 import { RefundService } from "./refund.service";
+import { RefundFinancialService } from "./refund-financial.service";
 
 /**
  * REFUND_CANCELLED iki YÖNE gider ve hedef ekran audience'tan seçilir.
@@ -42,9 +43,10 @@ describe("RefundService — REFUND_CANCELLED hedef kitlesi", () => {
         sendRefundEmail: jest.fn(),
         toProductImageUrls: jest.fn().mockReturnValue([]),
       } as any,
+      new RefundFinancialService(prisma as any, {} as any) as any,
     );
     jest
-      .spyOn(service as any, "unfreezeHoldForRefund")
+      .spyOn((service as any).financials, "unfreezeHoldForRefund")
       .mockResolvedValue(undefined);
     jest
       .spyOn((service as any).notifications, "appendHistory")
