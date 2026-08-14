@@ -6,6 +6,7 @@ import { PaymentService } from "./payment.service";
 import { PaymentQueryService } from "./payment-query.service";
 import { PaymentCommonService } from "./payment-common.service";
 import { PaymentRefundService } from "./payment-refund.service";
+import { PaymentHoldReleaseService } from "./payment-hold-release.service";
 import { PaymentReconciliationService } from "./payment-reconciliation.service";
 import { ReservationReconciliationService } from "./reservation-reconciliation.service";
 import { PaymentExpiryReconciliationService } from "./payment-expiry-reconciliation.service";
@@ -186,6 +187,7 @@ describe("PaymentService group payment (checkout group)", () => {
         PaymentQueryService,
         PaymentCommonService,
         PaymentRefundService,
+        PaymentHoldReleaseService,
         PaymentReconciliationService,
         ReservationReconciliationService,
         PaymentExpiryReconciliationService,

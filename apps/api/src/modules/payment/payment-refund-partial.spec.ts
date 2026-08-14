@@ -205,6 +205,7 @@ describe("PaymentRefundService.processRefund — MONEY-H3/H4 partial refund", ()
       { handleOrderRefund: jest.fn().mockResolvedValue(undefined) } as any,
       paymentCommon as any,
       { record: jest.fn().mockResolvedValue(undefined) } as any, // providerEvents
+      {} as any, // holdRelease
       undefined, // outbox
       opts.ledger as any, // Faz 6.2 ledger (@Optional)
     );

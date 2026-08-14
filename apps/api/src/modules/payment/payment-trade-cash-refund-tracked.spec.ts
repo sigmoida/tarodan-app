@@ -34,6 +34,7 @@ describe("PaymentRefundService.refundTradeCashTracked — MONEY-H2 failure track
       {} as any, // elogoInvoicing
       {} as any, // paymentCommon
       { record: jest.fn() } as any, // providerEvents
+      {} as any, // holdRelease
     );
     return { service, prisma, eventService };
   };

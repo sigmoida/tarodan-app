@@ -1,4 +1,4 @@
-import { PaymentRefundService } from "./payment-refund.service";
+import { PaymentHoldReleaseService } from "./payment-hold-release.service";
 import { OrderStatus, PaymentHoldStatus } from "@prisma/client";
 
 /**
@@ -6,7 +6,7 @@ import { OrderStatus, PaymentHoldStatus } from "@prisma/client";
  * bir hold ancak (a) held + releaseAt geçmiş + frozenByRefundId null, (b) sipariş releasable
  * statüde (delivered/awaiting/completed), (c) AÇIK iade yoksa serbest bırakılır.
  */
-describe("PaymentRefundService.releaseHoldsDue — escrow release guards", () => {
+describe("PaymentHoldReleaseService.releaseHoldsDue — escrow release guards", () => {
   const makeService = (order: any) => {
     const prisma = {
       paymentHold: {
@@ -21,16 +21,11 @@ describe("PaymentRefundService.releaseHoldsDue — escrow release guards", () =>
       tradeCashPayment: { findMany: jest.fn().mockResolvedValue([]) },
     };
     const configService = { get: jest.fn().mockReturnValue(undefined) };
-    const service = new PaymentRefundService(
+    const service = new PaymentHoldReleaseService(
       prisma as any,
       configService as any,
-      {} as any, // paymentProviders
       {} as any, // eventService
       {} as any, // notificationService
-      {} as any, // commissionLedger
-      {} as any, // elogoInvoicing
-      {} as any, // paymentCommon
-      { record: jest.fn() } as any, // providerEvents
     );
     return { service, prisma };
   };

@@ -65,6 +65,7 @@ describe("Order refund idempotency (#85) [P0]", () => {
       } as any, // elogoInvoicing
       { cancelSuratShipmentIfExists: async () => {} } as any, // paymentCommon
       {} as any, // providerEvents
+      {} as any, // holdRelease
     );
   });
 

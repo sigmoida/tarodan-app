@@ -1,6 +1,6 @@
 import { Prisma, OrderStatus, PaymentHoldStatus } from "@prisma/client";
 import { PrismaService } from "../../src/prisma";
-import { PaymentRefundService } from "../../src/modules/payment/payment-refund.service";
+import { PaymentHoldReleaseService } from "../../src/modules/payment/payment-hold-release.service";
 import { AdminAnalyticsOrderService } from "../../src/modules/admin/admin-analytics-order.service";
 import {
   truncateAll,
@@ -31,16 +31,11 @@ describe("Admin updateOrderStatus → escrow release + confirmationDeadline", ()
 
   beforeAll(() => {
     prisma = getPrisma() as unknown as PrismaService;
-    const paymentRefund = new PaymentRefundService(
+    const paymentRefund = new PaymentHoldReleaseService(
       prisma,
       configStub as any,
-      {} as any,
-      {} as any,
-      {} as any,
-      {} as any,
-      {} as any,
-      {} as any,
-      {} as any, // providerEvents
+      {} as any, // eventService
+      {} as any, // notificationService
     );
     const paymentFacade = {
       scheduleHoldReleaseOnDelivery: (

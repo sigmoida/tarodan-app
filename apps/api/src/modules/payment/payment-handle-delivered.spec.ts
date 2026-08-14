@@ -1,4 +1,4 @@
-import { PaymentRefundService } from "./payment-refund.service";
+import { PaymentHoldReleaseService } from "./payment-hold-release.service";
 import { OrderStatus } from "@prisma/client";
 
 /**
@@ -7,7 +7,7 @@ import { OrderStatus } from "@prisma/client";
  * escrow release'ini planlar (scheduleHoldReleaseOnDelivery). CAS count===0 → no-op
  * (replay-safe: re-poll deliveredAt'i taşımaz, releaseAt kaymaz).
  */
-describe("PaymentRefundService.handleOrderDelivered — escrow trigger", () => {
+describe("PaymentHoldReleaseService.handleOrderDelivered — escrow trigger", () => {
   const makeService = (updatedCount: number) => {
     const prisma = {
       order: {
@@ -17,16 +17,11 @@ describe("PaymentRefundService.handleOrderDelivered — escrow trigger", () => {
       paymentHold: { updateMany: jest.fn().mockResolvedValue({ count: 1 }) },
     };
     const configService = { get: jest.fn().mockReturnValue(undefined) };
-    const service = new PaymentRefundService(
+    const service = new PaymentHoldReleaseService(
       prisma as any,
       configService as any,
-      {} as any,
-      {} as any,
-      {} as any,
-      {} as any,
-      {} as any,
-      {} as any,
-      { record: jest.fn() } as any, // providerEvents
+      {} as any, // eventService
+      {} as any, // notificationService
     );
     return { service, prisma };
   };
