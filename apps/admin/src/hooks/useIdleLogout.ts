@@ -18,7 +18,7 @@ const ACTIVITY_THROTTLE_MS = 5 * 1000;
 const LAST_ACTIVITY_KEY = "admin_last_activity";
 
 /**
- * Auto-logout + redirect to /login after 1 hour of inactivity.
+ * Auto-logout + redirect to /login after 30 minutes of inactivity.
  * lastActivity is shared via localStorage, so activity in one tab also refreshes
  * the others' timers and the session only closes when it's truly idle.
  */
