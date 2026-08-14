@@ -3,6 +3,7 @@ import { DiscountService } from "../discount.service";
 import { DiscountUsageService } from "../discount-usage.service";
 import { DiscountCrudService } from "../discount-crud.service";
 import { DiscountPricingService } from "../discount-pricing.service";
+import { DiscountCouponService } from "../discount-coupon.service";
 
 /**
  * Kupon fiyat tabanı: kodsuz ürün-fiyatı kampanyaları KALDIRILDI — vitrin
@@ -72,13 +73,15 @@ describe("DiscountService coupon pricing base", () => {
     } as any;
     const cache = { delPattern: jest.fn() } as any;
     const search = { syncProduct: jest.fn() } as any;
+    const pricing = new DiscountPricingService(prisma);
     return new DiscountService(
       prisma,
       cache,
       search,
       new DiscountUsageService(prisma),
       new DiscountCrudService(prisma, cache, search),
-      new DiscountPricingService(prisma),
+      pricing,
+      new DiscountCouponService(prisma, pricing),
     );
   }
 

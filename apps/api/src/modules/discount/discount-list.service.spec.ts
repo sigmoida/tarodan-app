@@ -4,6 +4,7 @@ import { DiscountService } from "./discount.service";
 import { DiscountUsageService } from "./discount-usage.service";
 import { DiscountCrudService } from "./discount-crud.service";
 import { DiscountPricingService } from "./discount-pricing.service";
+import { DiscountCouponService } from "./discount-coupon.service";
 
 describe("DiscountService admin list contract", () => {
   it("composes full-content search with the selected column sort", async () => {
@@ -17,13 +18,15 @@ describe("DiscountService admin list contract", () => {
     };
     const cache = {} as any;
     const search = { syncProduct: jest.fn() } as any;
+    const pricing = new DiscountPricingService(prisma as any);
     const service = new DiscountService(
       prisma as any,
       cache,
       search,
       new DiscountUsageService(prisma as any),
       new DiscountCrudService(prisma as any, cache, search),
-      new DiscountPricingService(prisma as any),
+      pricing,
+      new DiscountCouponService(prisma as any, pricing),
     );
 
     await service.findAll(
