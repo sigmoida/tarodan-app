@@ -21,6 +21,7 @@ import { PaymentService } from "../payment/payment.service";
 import { TradeShipmentService } from "./trade-shipment.service";
 import { TradeCommonService } from "./trade-common.service";
 import { TRADE_CANCEL_REASON } from "./trade-cancel-reasons";
+import { adminUrl } from "../../config/app-urls";
 
 /**
  * Zamanlanmış (cron) takas mutabakat işleri — TradeService'ten birebir taşındı.
@@ -50,12 +51,7 @@ export class TradeReconciliationService {
    * Diğer adminLink üreticileriyle (refund/product-scheduler) aynı kural.
    */
   private adminBaseUrl(): string {
-    return (
-      process.env.ADMIN_URL?.replace(/\/$/, "") ||
-      (process.env.NODE_ENV === "production"
-        ? "https://admin.tarodan.com.tr"
-        : "http://localhost:3002")
-    );
+    return adminUrl();
   }
 
   /**

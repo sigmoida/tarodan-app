@@ -10,6 +10,7 @@ import { NotificationType, NotificationChannel } from "./dto";
 import type { NotificationAudience } from "./notification-link";
 import { StorageService } from "../storage/storage.service";
 import { NotificationDispatchService } from "./notification-dispatch.service";
+import { frontendUrl as resolveFrontendUrl } from "../../config/app-urls";
 
 @Injectable()
 export class NotificationCommerceService {
@@ -557,8 +558,7 @@ export class NotificationCommerceService {
       data,
     });
     // "Stoğa geri geldi" e-postası — in-app/push'un yanında markalı mail.
-    const frontendUrl =
-      this.configService.get("FRONTEND_URL") || "https://tarodan.com.tr";
+    const frontendUrl = resolveFrontendUrl();
     await this.dispatch.sendTemplateEmailToUser(userId, "back-in-stock", {
       productTitle: data.productTitle,
       // Ürün detayının gerçek yolu `/listings/:id`; `/products/:id` 404'tü.
@@ -577,8 +577,7 @@ export class NotificationCommerceService {
       channels: [NotificationChannel.PUSH, NotificationChannel.IN_APP],
       data: { tradeId },
     });
-    const frontendUrl =
-      this.configService.get("FRONTEND_URL") || "https://tarodan.com.tr";
+    const frontendUrl = resolveFrontendUrl();
     const user = await this.prisma.user.findUnique({
       where: { id: receiverId },
       select: { displayName: true },
@@ -601,8 +600,7 @@ export class NotificationCommerceService {
       ],
       data: { tradeId },
     });
-    const frontendUrl =
-      this.configService.get("FRONTEND_URL") || "https://tarodan.com.tr";
+    const frontendUrl = resolveFrontendUrl();
     const user = await this.prisma.user.findUnique({
       where: { id: initiatorId },
       select: { displayName: true },
@@ -625,8 +623,7 @@ export class NotificationCommerceService {
       channels: [NotificationChannel.PUSH, NotificationChannel.IN_APP],
       data: { tradeId, trackingNumber },
     });
-    const frontendUrl =
-      this.configService.get("FRONTEND_URL") || "https://tarodan.com.tr";
+    const frontendUrl = resolveFrontendUrl();
     const user = await this.prisma.user.findUnique({
       where: { id: receiverId },
       select: { displayName: true },
@@ -646,8 +643,7 @@ export class NotificationCommerceService {
       channels: [NotificationChannel.PUSH, NotificationChannel.IN_APP],
       data: { tradeId },
     });
-    const frontendUrl =
-      this.configService.get("FRONTEND_URL") || "https://tarodan.com.tr";
+    const frontendUrl = resolveFrontendUrl();
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
       select: { displayName: true },

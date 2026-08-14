@@ -22,6 +22,10 @@ import {
 import { paginate } from "../../common/list";
 import { promoteUserCodeToCorporate } from "../../common/helpers/code-prefixes";
 import { outboundPackageShipping } from "../shipping/shipping-tariff.helper";
+import {
+  frontendUrl as resolveFrontendUrl,
+  CANONICAL_FRONTEND_URL,
+} from "../../config/app-urls";
 
 /**
  * Satıcı başvurusu admin operasyonları — AdminService'in SELLER APPLICATIONS
@@ -176,10 +180,9 @@ export class AdminSellerApplicationService {
       .update(invitationToken)
       .digest("hex");
     const invitationExpiresAt = new Date(Date.now() + 72 * 60 * 60 * 1000);
-    const frontendUrl =
-      process.env.FRONTEND_URL ||
-      process.env.APP_URL ||
-      "https://tarodan.com.tr";
+    const frontendUrl = resolveFrontendUrl(
+      process.env.APP_URL || CANONICAL_FRONTEND_URL,
+    );
     const invitationUrl = `${frontendUrl}/corporate/invite?token=${invitationToken}`;
 
     await this.prisma.corporateApplication.update({

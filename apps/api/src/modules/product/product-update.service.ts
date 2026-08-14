@@ -31,6 +31,7 @@ import {
   loadProductPriceLimits,
   productPriceLimitViolation,
 } from "./helpers/product-price-limits";
+import { frontendUrl as resolveFrontendUrl } from "../../config/app-urls";
 
 /**
  * ProductUpdateService — ilan güncelleme + silme (soft delete). Optimistic lock,
@@ -833,8 +834,7 @@ export class ProductUpdateService {
         try {
           const acceptsMarketingEmails = user.acceptsMarketingEmails === true;
           if (isPriceDrop && acceptsMarketingEmails) {
-            const frontendUrl =
-              process.env.FRONTEND_URL || "https://tarodan.com.tr";
+            const frontendUrl = resolveFrontendUrl();
             const templateData = {
               userName: user.displayName,
               productTitle,

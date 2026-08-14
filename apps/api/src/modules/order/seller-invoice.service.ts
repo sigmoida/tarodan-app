@@ -13,6 +13,7 @@ import { StorageService } from "../storage/storage.service";
 import { SmtpProvider } from "../mail/smtp.provider";
 import { renderManagedEmailTemplate } from "../../common/helpers/email-template-renderer";
 import { isBusinessMembershipEntitled } from "../membership/membership.util";
+import { frontendUrl as resolveFrontendUrl } from "../../config/app-urls";
 
 /**
  * Kurumsal (şirket) satıcının siparişe ELLE yüklediği ÜRÜN faturası (PDF).
@@ -171,10 +172,7 @@ export class SellerInvoiceService {
         orderNumber: order.orderNumber,
         productTitle: order.product?.title || "",
       };
-      const frontendUrl = this.config.get<string>(
-        "FRONTEND_URL",
-        "https://tarodan.com.tr",
-      );
+      const frontendUrl = resolveFrontendUrl();
       const dbTpl = await this.prisma.emailTemplate
         .findUnique({ where: { key: "seller-invoice" } })
         .catch(() => null);
@@ -293,10 +291,7 @@ export class SellerInvoiceService {
   }): Promise<boolean> {
     if (!order.seller?.email) return false;
     try {
-      const frontendUrl = this.config.get<string>(
-        "FRONTEND_URL",
-        "https://tarodan.com.tr",
-      );
+      const frontendUrl = resolveFrontendUrl();
       const dbTpl = await this.prisma.emailTemplate
         .findUnique({ where: { key: "seller-invoice-reminder" } })
         .catch(() => null);

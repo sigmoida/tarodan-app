@@ -74,6 +74,7 @@ import {
   publicName,
   toPublicIdentity,
 } from "../../common/helpers/public-identity";
+import { adminUrl } from "../../config/app-urls";
 
 /**
  * Cayma (iade talep) penceresi — satıcı payout takvimiyle AYNI kaynaktan gelir
@@ -314,11 +315,7 @@ export class RefundService {
         },
         select: { userId: true },
       });
-      const adminBaseUrl =
-        process.env.ADMIN_URL?.replace(/\/$/, "") ||
-        (process.env.NODE_ENV === "production"
-          ? "https://admin.tarodan.com.tr"
-          : "http://localhost:3002");
+      const adminBaseUrl = adminUrl();
       const adminLink = `${adminBaseUrl}/operations/refund-requests/${encodeURIComponent(input.refundRequestId)}`;
 
       for (const admin of admins) {

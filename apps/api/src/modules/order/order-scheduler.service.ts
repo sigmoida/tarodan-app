@@ -16,6 +16,7 @@ import { SellerInvoiceService } from "./seller-invoice.service";
 import { NotificationService } from "../notification/notification.service";
 import { NotificationType } from "../notification/dto";
 import { CacheService } from "../cache/cache.service";
+import { adminUrl } from "../../config/app-urls";
 
 const OPEN_REFUND_STATUSES = [
   "pending_review",
@@ -72,11 +73,7 @@ export class OrderSchedulerService implements OnModuleInit {
       });
       // Admin alarmı tüketici sitesine değil admin panelindeki sipariş
       // dosyasına gitmeli — diğer adminLink üreticileriyle aynı taban URL.
-      const adminBaseUrl =
-        process.env.ADMIN_URL?.replace(/\/$/, "") ||
-        (process.env.NODE_ENV === "production"
-          ? "https://admin.tarodan.com.tr"
-          : "http://localhost:3002");
+      const adminBaseUrl = adminUrl();
       for (const order of fresh) {
         for (const admin of admins) {
           try {

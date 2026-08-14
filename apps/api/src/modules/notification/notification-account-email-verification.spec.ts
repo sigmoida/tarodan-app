@@ -1,6 +1,21 @@
 import { NotificationAccountService } from "./notification-account.service";
 
 describe("NotificationAccountService.sendEmailVerification", () => {
+  // The storefront URL is resolved from the environment (ConfigModule copies
+  // parsed .env values into process.env at boot, so this is the same value the
+  // service reads in production). A mocked ConfigService no longer stands in
+  // for it, so the spec sets it where the accessor actually looks.
+  const originalFrontendUrl = process.env.FRONTEND_URL;
+
+  beforeEach(() => {
+    process.env.FRONTEND_URL = "https://tarodan.com.tr";
+  });
+
+  afterEach(() => {
+    if (originalFrontendUrl === undefined) delete process.env.FRONTEND_URL;
+    else process.env.FRONTEND_URL = originalFrontendUrl;
+  });
+
   it("uses the canonical DB template and the shared branded layout", async () => {
     const prisma = {
       user: {

@@ -24,6 +24,7 @@ import {
   UpdateEmailTemplateDto,
 } from "./dto";
 import { EventService } from "../events/event.service";
+import { frontendUrlForEnvironment } from "../../config/app-urls";
 
 /**
  * İçerik yönetimi admin operasyonları (statik sayfalar + e-posta şablonları) —
@@ -162,11 +163,7 @@ export class AdminContentService {
   // ==================== EMAIL TEMPLATES ====================
 
   private getEmailBrandOptions() {
-    const frontendUrl =
-      this.configService.get<string>("FRONTEND_URL") ||
-      (this.configService.get<string>("NODE_ENV") === "production"
-        ? "https://tarodan.com.tr"
-        : "http://localhost:3000");
+    const frontendUrl = frontendUrlForEnvironment();
     return {
       frontendUrl,
       logoUrl:

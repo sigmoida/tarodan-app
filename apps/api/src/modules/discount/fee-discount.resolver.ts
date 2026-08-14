@@ -6,6 +6,7 @@ import { audienceMatches } from "./discount-authorization";
 import { isProductInDiscountScope } from "./discount-scope";
 import { FEE_TARGETS } from "./fee-discount.engine";
 import type { FeeDiscountCandidate } from "./fee-discount.engine";
+import { adminUrl } from "../../config/app-urls";
 
 /**
  * "Bu satışta hangi bedel kampanyaları geçerli?" sorusunun tek yanıtlayıcısı.
@@ -215,11 +216,7 @@ export class FeeDiscountResolver {
       const { NotificationType } = await import("../notification/dto");
       const svc = this.moduleRef.get(NotificationService, { strict: false });
       if (!svc) return;
-      const adminBaseUrl =
-        process.env.ADMIN_URL?.replace(/\/$/, "") ||
-        (process.env.NODE_ENV === "production"
-          ? "https://admin.tarodan.com.tr"
-          : "http://localhost:3002");
+      const adminBaseUrl = adminUrl();
       const adminLink = `${adminBaseUrl}/marketing/discounts`;
       for (const admin of admins) {
         await svc.createInAppNotification(

@@ -44,6 +44,7 @@ import {
 import { OrderTaxPolicyService } from "../order/order-tax-policy.service";
 import type { InvoiceRefundReversePayload } from "../outbox/outbox.types";
 import { renderManagedEmailTemplate } from "../../common/helpers/email-template-renderer";
+import { frontendUrl as resolveFrontendUrl } from "../../config/app-urls";
 
 /**
  * Tarodan'ın KENDİ gelir e-belgelerini (komisyon, hizmet bedeli, üyelik, boost, iade)
@@ -1887,10 +1888,7 @@ export class ElogoInvoicingService {
           total: Number(inv.total),
           type: inv.type,
         };
-        const frontendUrl = this.config.get<string>(
-          "FRONTEND_URL",
-          "https://tarodan.com.tr",
-        );
+        const frontendUrl = resolveFrontendUrl();
         const dbTpl = await this.prisma.emailTemplate
           .findUnique({ where: { key: tplKey } })
           .catch(() => null);

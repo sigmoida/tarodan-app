@@ -27,6 +27,7 @@ import { TaxService } from "../tax";
 import { renderManagedEmailTemplate } from "../../common/helpers/email-template-renderer";
 import { InvoicePdfService, InvoiceData } from "./invoice-pdf.service";
 import { storedProductBaseOf } from "../order/order-charged-base.helper";
+import { frontendUrlForEnvironment } from "../../config/app-urls";
 
 @Injectable()
 export class InvoiceService {
@@ -341,11 +342,7 @@ export class InvoiceService {
       this.logger.log(
         `Invoice will be sent to buyer: ${buyerEmail} (isGuest: ${isGuestOrder})`,
       );
-      const frontendUrl =
-        this.configService.get("FRONTEND_URL") ||
-        (this.configService.get("NODE_ENV") === "production"
-          ? "https://tarodan.com.tr"
-          : "http://localhost:3000");
+      const frontendUrl = frontendUrlForEnvironment();
       // Guest: track-order (no login). Member: orders/[id] (login → redirect back to order)
       const buyerOrderUrl =
         isGuestOrder && (buyerEmail || order.buyer.email)

@@ -45,6 +45,10 @@ import {
   isLocale,
 } from "@tarodan/i18n";
 import { I18nService } from "../i18n/i18n.service";
+import {
+  frontendUrl as resolveFrontendUrl,
+  frontendUrlForEnvironment,
+} from "../../config/app-urls";
 
 @Injectable()
 export class NotificationDispatchService {
@@ -232,11 +236,7 @@ export class NotificationDispatchService {
     data?: Record<string, any>,
   ): Promise<boolean> {
     try {
-      const frontendUrl =
-        this.configService.get<string>("FRONTEND_URL") ||
-        (this.configService.get<string>("NODE_ENV") === "production"
-          ? "https://tarodan.com.tr"
-          : "http://localhost:3000");
+      const frontendUrl = frontendUrlForEnvironment();
       const safeSubject = escapeEmailHtml(subject);
       const safeBody = escapeEmailHtml(body).replace(/\n/g, "<br>");
       const result = await this.smtpProvider.sendEmail({
@@ -689,8 +689,7 @@ export class NotificationDispatchService {
     templateData: Record<string, any>,
   ): Promise<{ success: boolean; messageId?: string; error?: string }> {
     try {
-      const frontendUrl =
-        this.configService.get("FRONTEND_URL") || "https://tarodan.com.tr";
+      const frontendUrl = resolveFrontendUrl();
       // Placeholder takma adları: göndericiler farklı anahtar adları geçebiliyor
       // (ör. welcome 'name'/'verifyUrl' geçer ama DB şablonu {{displayName}}/{{frontendUrl}}
       // bekler). Eşdeğer anahtarları doldur ki ham {{...}} kalmasın. Mevcut değerler

@@ -13,6 +13,7 @@ import { Queue } from "bull";
 import { MembershipService } from "./membership.service";
 import { NotificationService } from "../notification/notification.service";
 import { NotificationType } from "../notification/dto";
+import { frontendUrl } from "../../config/app-urls";
 
 @Injectable()
 export class MembershipSchedulerService implements OnModuleInit {
@@ -183,7 +184,7 @@ export class MembershipSchedulerService implements OnModuleInit {
               "Daha yüksek ilan limiti",
               "İlanlarınız standart ilanların önünde sıralanır",
             ],
-            ctaUrl: `${process.env.FRONTEND_URL || "https://tarodan.com.tr"}/membership`,
+            ctaUrl: `${frontendUrl()}/membership`,
             ctaText: "Premium Üye Ol",
           },
         });
@@ -341,7 +342,7 @@ export class MembershipSchedulerService implements OnModuleInit {
         expirationDate: membership.currentPeriodEnd.toLocaleDateString("tr-TR"),
         daysRemaining,
         // /membership/renew diye bir sayfa yok; yenileme üyelik sayfasından yapılır.
-        renewUrl: `${process.env.FRONTEND_URL || "https://tarodan.com.tr"}/membership`,
+        renewUrl: `${frontendUrl()}/membership`,
         autoRenew: membership.autoRenew,
         renewNote: membership.autoRenew
           ? "Otomatik yenileme açık: üyeliğin bitince hatırlatma göndereceğiz, tek tıkla yenileyebilirsin."

@@ -13,6 +13,10 @@ import {
   wrapEmailTemplateLayout,
 } from "../../common/helpers/email-template-renderer";
 import { NotificationDispatchService } from "./notification-dispatch.service";
+import {
+  frontendUrl as resolveFrontendUrl,
+  LOCAL_FRONTEND_URL,
+} from "../../config/app-urls";
 
 @Injectable()
 export class NotificationAccountService {
@@ -34,8 +38,7 @@ export class NotificationAccountService {
       select: { email: true, displayName: true },
     });
     if (!user) return { success: false, error: "User not found" };
-    const frontendUrl =
-      this.configService.get("FRONTEND_URL") || "https://tarodan.com.tr";
+    const frontendUrl = resolveFrontendUrl();
     await this.dispatch.sendTemplateEmailToAddress(user.email, "welcome", {
       name: user.displayName || "",
       verifyUrl: `${frontendUrl}/listings`,
@@ -75,9 +78,7 @@ export class NotificationAccountService {
       <p><strong>Mesaj:</strong></p>
       <p style="white-space:pre-wrap">${escapeEmailHtml(data.message)}</p>
     `;
-    const frontendUrl =
-      this.configService.get<string>("FRONTEND_URL") ||
-      "https://tarodan.com.tr";
+    const frontendUrl = resolveFrontendUrl();
     const html = wrapEmailTemplateLayout(
       content,
       subject,
@@ -132,8 +133,7 @@ export class NotificationAccountService {
 
     if (!user) return { success: false, error: "User not found" };
 
-    const frontendUrl =
-      this.configService.get("FRONTEND_URL") || "http://localhost:3000";
+    const frontendUrl = resolveFrontendUrl(LOCAL_FRONTEND_URL);
     const resetUrl = `${frontendUrl}/reset-password?token=${resetToken}`;
     const displayName = user.displayName || "";
     // displayName: name'in takma adı — legacy admin şablonları {{displayName}} kullanıyor.
@@ -195,8 +195,7 @@ export class NotificationAccountService {
 
     if (!user) return { success: false, error: "User not found" };
 
-    const frontendUrl =
-      this.configService.get("FRONTEND_URL") || "http://localhost:3000";
+    const frontendUrl = resolveFrontendUrl(LOCAL_FRONTEND_URL);
     const verifyUrl = `${frontendUrl}/verify-email?token=${verificationToken}`;
     const displayName = user.displayName || "";
     const templateData = {

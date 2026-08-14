@@ -15,6 +15,10 @@ import { computeRelevanceScore } from "./helpers/relevance-score";
 import { NotificationService } from "../notification/notification.service";
 import { NotificationType } from "../notification/dto";
 import { publicUserRatingWhere } from "../../common/helpers/public-rating";
+import {
+  frontendUrl as resolveFrontendUrl,
+  adminUrl,
+} from "../../config/app-urls";
 
 /**
  * Product Scheduler Service
@@ -640,7 +644,7 @@ export class ProductSchedulerService implements OnModuleInit {
 
       // "İlanınız sona erdi" e-postaları (ilan başına, satıcıya). İlan 60 günü
       // doldurduğu ilk gün expire olup active'den çıktığı için mükerrer gitmez.
-      const frontendUrl = process.env.FRONTEND_URL || "https://tarodan.com.tr";
+      const frontendUrl = resolveFrontendUrl();
       for (const listing of toExpire) {
         try {
           await this.notificationService.sendTemplateEmailToUser(
@@ -703,11 +707,7 @@ export class ProductSchedulerService implements OnModuleInit {
       where: { isActive: true },
       select: { userId: true },
     });
-    const adminBaseUrl =
-      process.env.ADMIN_URL?.replace(/\/$/, "") ||
-      (process.env.NODE_ENV === "production"
-        ? "https://admin.tarodan.com.tr"
-        : "http://localhost:3002");
+    const adminBaseUrl = adminUrl();
     for (const admin of admins) {
       try {
         await this.notificationService.createInAppNotification(
@@ -822,7 +822,7 @@ export class ProductSchedulerService implements OnModuleInit {
       log(`${expiringListings.length} ilan 7 gün içinde sona eriyor`);
 
       // "İlanınızın süresi doluyor" e-postası (ilan başına, satıcıya).
-      const frontendUrl = process.env.FRONTEND_URL || "https://tarodan.com.tr";
+      const frontendUrl = resolveFrontendUrl();
       for (const listing of expiringListings) {
         const expirationDate = new Date(listing.createdAt);
         expirationDate.setDate(
