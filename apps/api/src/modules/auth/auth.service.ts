@@ -1459,11 +1459,16 @@ export class AuthService {
     // #224: yanıt mesajı AuthController.forgotPassword() tarafından locale'e göre
     // kuruluyor (server.auth.passwordResetLinkSent) — kullanıcı bulunsun bulunmasın aynı.
     if (!user) {
-      // Dummy DB round-trip so a "no such account" response takes roughly
-      // the same time as the real path's deleteMany+create below — the
-      // response body is already identical either way, but without this
-      // the latency gap alone enumerates registered emails.
-      await this.prisma.passwordResetToken.count({ where: { userId: email } });
+      // Dummy bcrypt compare (same technique as login()/adminLogin() above)
+      // so a "no such account" response takes roughly the same time as the
+      // real path's deleteMany+create+email-send below — the response body
+      // is already identical either way (#224), but without this the
+      // latency gap alone enumerates registered emails. A DB read against
+      // the non-existent key doesn't work here: it's cheap regardless
+      // (userId isn't even indexed on this table), and a matching dummy
+      // WRITE isn't possible — PasswordResetToken.userId has a real FK
+      // constraint, so there's no id we could insert against.
+      await bcrypt.compare(email, DUMMY_BCRYPT_HASH);
       return;
     }
 
