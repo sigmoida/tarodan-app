@@ -4,6 +4,17 @@ Guidance for building UI in `apps/admin`. Read this before adding routes,
 components, or hooks. These rules are enforced partly by ESLint
 (`@tarodan/eslint-config/next`) and partly by review.
 
+The bar is a codebase a new contributor can extend without reading all of it:
+one canonical way to do each recurring thing, one source of truth per fact, and
+patterns that hold at 100 admin sections as well as at 10. A new page should be
+assembled from the recipes below (`ResourceList`, `DetailPage`, `col.*`,
+`FormModal`) — inventing a second way to list, show or edit a resource is how a
+dashboard becomes unmaintainable, one reasonable-looking exception at a time.
+
+The component, token and DRY rules here are **identical to `apps/web`**; the
+difference is rendering (admin is fully client-side, web decides per route) and
+the shape of the data — admin is tables and CRUD, web is cards and storefront.
+
 ## 1. Base components come from `@tarodan/ui`
 
 Never rebuild a primitive that already exists in `@tarodan/ui` (Button, Input,
@@ -312,3 +323,44 @@ through the same `ResourceList` pipeline; server-paginated resources pass their
 
 The `(admin)/catalog/*` pages are the canonical CRUD examples (`categories` = the
 simplest, `products` = list+detail+tabs, `brands` = shared `CarModelFormModal`).
+
+---
+
+## 12. Copy & i18n
+
+User-facing strings come from the catalog in `@tarodan/i18n` via
+`useTranslations()` / `t()`. Literal Turkish is an **ESLint error** here
+(`@tarodan/no-hardcoded-turkish`), so it cannot ship — the Turkish strings in
+the examples below are shorthand for a catalog key, not a licence to inline one.
+
+- Add the key to the catalog first; a string used on two screens must not exist
+  twice under two names.
+- Dates, money and numbers go through `lib/format.ts` (`fmtTry` / `fmtNumber` /
+  `fmtDate` / `fmtDateTime`, all null-safe → `—`), never a per-component
+  `toLocaleString` with inline options.
+- Copy a shared primitive can't own is passed in by the caller that has the
+  `t()` (modal labels, confirm text, mutation `successMessage`) — that is why
+  `useAdminMutation` and the shared dialogs take copy as props.
+
+## 13. Verification
+
+Run these before calling a change done — all from the repo root:
+
+```bash
+pnpm --filter @tarodan/admin typecheck   # next typegen && tsc --noEmit
+pnpm --filter @tarodan/admin lint        # no raw primitives, no raw palette
+pnpm --filter @tarodan/admin test:api    # api export-name collision guard
+pnpm --filter @tarodan/admin build       # before shipping anything routing-related
+```
+
+Touching `@tarodan/ui` (or any package) means verifying the **consumers** too —
+`pnpm --filter @tarodan/web typecheck` at minimum; a shared component is not
+"done" when only one app compiles.
+
+Pure logic (mappers, formatters, permission/status derivations) gets a colocated
+`*.test.ts`. UI plumbing does not need a test for its own sake.
+
+Then check the screen itself: list pages paginate/filter through the URL and
+survive a reload, detail pages render their loading/error/empty states, and a
+write refreshes its list **without** a manual refetch (if it doesn't, the
+`invalidates` resource name is wrong).
