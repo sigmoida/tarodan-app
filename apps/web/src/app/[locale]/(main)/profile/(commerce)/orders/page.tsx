@@ -108,7 +108,7 @@ export default function OrdersPage() {
             setPage(1);
           }}
         >
-          <TabsList className="flex flex-wrap">
+          <TabsList>
             {roleTabs.map((tab) => (
               <TabsTrigger key={tab.value} value={tab.value}>
                 {tab.label}
@@ -123,7 +123,7 @@ export default function OrdersPage() {
             setPage(1);
           }}
         >
-          <TabsList className="flex flex-wrap">
+          <TabsList>
             {statusTabs.map((tab) => (
               <TabsTrigger key={tab.value} value={tab.value}>
                 {tab.label}

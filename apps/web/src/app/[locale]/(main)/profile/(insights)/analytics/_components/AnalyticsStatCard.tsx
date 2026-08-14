@@ -54,9 +54,15 @@ export default function AnalyticsStatCard({
           </Badge>
         )}
       </div>
-      <div className="flex items-end justify-between">
-        <div>
-          <p className="text-3xl font-bold text-heading">{value}</p>
+      {/* Uzun para değerleri ("84.214,46 TL") sol bloğu içerik genişliğinde
+          tutuyor, o da yanındaki sparkline'ı kartın dışına itiyordu. `min-w-0`
+          bloğun küçülmesine izin verir. Değer KISALTILMAZ — kartın var oluş
+          sebebi o sayı; sığmadığında yazı küçülür ve gerekirse satır atlar. */}
+      <div className="flex items-end justify-between gap-3">
+        <div className="min-w-0">
+          <p className="break-words text-2xl font-bold text-heading xs:text-3xl">
+            {value}
+          </p>
           <p className="mt-1 text-sm text-muted">{title}</p>
           {subtitle && <p className="mt-0.5 text-xs text-subtle">{subtitle}</p>}
         </div>

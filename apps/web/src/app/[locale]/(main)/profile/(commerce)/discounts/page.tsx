@@ -148,7 +148,7 @@ export default function ProfileDiscountsPage() {
         value={filter}
         onValueChange={(v) => setFilter(v as DiscountFilter)}
       >
-        <TabsList className="flex flex-wrap">
+        <TabsList>
           {FILTER_TABS.map((tab) => (
             <TabsTrigger key={tab.value} value={tab.value}>
               {tab.label}

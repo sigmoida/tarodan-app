@@ -65,7 +65,7 @@ export default function TradesPage() {
         value={statusFilter ?? "all"}
         onValueChange={(v) => setStatusFilter(v === "all" ? null : v)}
       >
-        <TabsList className="flex flex-wrap">
+        <TabsList>
           {filters.map(({ value, label, Icon }) => (
             <TabsTrigger key={value} value={value} className="gap-1.5">
               {Icon && <Icon className="w-4 h-4" />}

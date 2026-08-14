@@ -22,7 +22,12 @@ function ItemColumn({
   logPage: string;
 }) {
   return (
-    <div className="card p-6 flex-1">
+    // `min-w-0`: `lg`de iki kolon yan yana geliyor ve tam o kırılımda profil
+    // kenar çubuğu da açılıyor, yani ana sütun en dar hâlinde. `flex-1` tek
+    // başına küçülmeye izin vermediği için (varsayılan `min-width:auto`) satır
+    // 1024px'te taşıyordu — 320/768/1536'da kolonlar alt alta ya da bol alanda
+    // olduğu için sorun yalnız orada görünüyordu.
+    <div className="card p-6 flex-1 min-w-0">
       <h2 className="text-xl font-semibold mb-4">{heading}</h2>
       <div className="space-y-3 mb-4 max-h-[280px] overflow-y-auto">
         {items.map((item) => (
