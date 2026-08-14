@@ -4,6 +4,7 @@ import { DiscountUsageService } from "../discount-usage.service";
 import { DiscountCrudService } from "../discount-crud.service";
 import { DiscountPricingService } from "../discount-pricing.service";
 import { DiscountCouponService } from "../discount-coupon.service";
+import { DiscountTradeFeeService } from "../discount-trade-fee.service";
 
 /**
  * Kupon fiyat tabanı: kodsuz ürün-fiyatı kampanyaları KALDIRILDI — vitrin
@@ -76,12 +77,11 @@ describe("DiscountService coupon pricing base", () => {
     const pricing = new DiscountPricingService(prisma);
     return new DiscountService(
       prisma,
-      cache,
-      search,
       new DiscountUsageService(prisma),
       new DiscountCrudService(prisma, cache, search),
       pricing,
       new DiscountCouponService(prisma, pricing),
+      new DiscountTradeFeeService(prisma),
     );
   }
 

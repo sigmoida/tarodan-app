@@ -1,56 +1,12 @@
-import {
-  Injectable,
-  NotFoundException,
-  ForbiddenException,
-  BadRequestException,
-  Logger,
-  Optional,
-} from "@nestjs/common";
+import { Injectable } from "@nestjs/common";
 import { PrismaService } from "../../prisma";
-import { CacheService } from "../cache/cache.service";
-import { SearchService } from "../search/search.service";
-import { notifyWebRevalidate } from "../../common/helpers/revalidate";
-import { fulltextDiscountSearch } from "../../common/helpers/fulltext-search";
-import { resolveOrderBy } from "../../common/list";
-import { REFERENCE_PREFIX } from "../../common/helpers/code-prefixes";
-import { generateReferenceCode } from "../../common/helpers/generate-reference";
-import {
-  CreateDiscountDto,
-  UpdateDiscountDto,
-  DiscountQueryDto,
-  ValidateCouponDto,
-  DiscountResponseDto,
-  PaginatedDiscountsDto,
-  ValidationResultDto,
-  ActiveCampaignDto,
-} from "./dto";
-import {
-  DiscountScope,
-  DiscountType,
-  DiscountFundedBy,
-  DiscountTarget,
-  DiscountAudience,
-  CouponReservationStatus,
-  Prisma,
-} from "@prisma/client";
-import {
-  assertAudienceConsistent,
-  assertBudgetForTarget,
-  assertCodeAllowedForTarget,
-  assertSellerCampaignHasCode,
-  assertTargetAllowedForActor,
-  audienceMatches,
-} from "./helpers/discount-authorization";
-import { isProductInDiscountScope } from "./helpers/discount-scope";
-import { FeeDiscountResolver } from "./engine/fee-discount.resolver";
+import { ActiveCampaignDto, DiscountResponseDto } from "./dto";
 import { DiscountUsageService } from "./discount-usage.service";
 import { DiscountCrudService } from "./discount-crud.service";
 import { DiscountPricingService } from "./discount-pricing.service";
 import { DiscountCouponService } from "./discount-coupon.service";
+import { DiscountTradeFeeService } from "./discount-trade-fee.service";
 import { resolveUserTier } from "./helpers/user-tier";
-import { toDiscountResponse } from "./helpers/discount-response.mapper";
-import { bestQuantityCampaignDiscount } from "./helpers/quantity-campaign";
-import { i18nMessage } from "../i18n";
 
 /** Kusursuz iadede geri verilen kupon hakkı — commit SONRASI bildirim için. */
 export interface RestoredCoupon {
@@ -61,20 +17,21 @@ export interface RestoredCoupon {
   expiresAt: Date | null;
 }
 
+/**
+ * İndirim modülünün ön yüzü. Kendi işi yok — çağıranların bildiği imzaları
+ * koruyup gövdeyi tek işli servislere devreder: kayıt yönetimi (crud), kupon
+ * doğrulama (coupons), kampanya fiyatı (pricing), kullanım defteri (usage) ve
+ * takas bedeli kampanyaları (tradeFees).
+ */
 @Injectable()
 export class DiscountService {
-  private readonly logger = new Logger(DiscountService.name);
-
   constructor(
     private readonly prisma: PrismaService,
-    private readonly cache: CacheService,
-    private readonly searchService: SearchService,
     private readonly usage: DiscountUsageService,
     private readonly crud: DiscountCrudService,
     private readonly pricing: DiscountPricingService,
     private readonly coupons: DiscountCouponService,
-    @Optional()
-    private readonly feeDiscountBudget?: FeeDiscountResolver,
+    private readonly tradeFees: DiscountTradeFeeService,
   ) {}
 
   // ─────────────────────── kayıt yönetimi (CRUD) ───────────────────────
@@ -200,105 +157,25 @@ export class DiscountService {
     return this.pricing.getProductDiscounts(...args);
   }
 
-  /**
-   * Takas hizmet bedeli kampanyaları (İ25): kabul anında her katılımcının sabit
-   * ücretine uygulanır. Kodsuz-otomatiktir; kitle eşleşmesi katılımcı bazında
-   * yapılır (katılımcı bu bedelin "alıcısıdır"). En yüksek indirimi veren
-   * kampanya kazanır; tutar bedeli ve kalan bütçeyi aşamaz.
-   */
-  async resolveTradeFeeDiscounts(
-    parties: { userId: string; feeAmount: number }[],
-  ): Promise<
-    Map<string, { discountId: string; name: string; amount: number }>
-  > {
-    const result = new Map<
-      string,
-      { discountId: string; name: string; amount: number }
-    >();
-    const eligibleParties = parties.filter((party) => party.feeAmount > 0);
-    if (!eligibleParties.length) return result;
+  // ─────────────────── takas bedeli kampanyaları ───────────────────
+  // Takas kabulü ve iadesi bu servisi adresliyor; gövde
+  // DiscountTradeFeeService'te.
 
-    const now = new Date();
-    const campaigns = await this.prisma.discount.findMany({
-      where: {
-        isActive: true,
-        code: null,
-        target: DiscountTarget.trade_service_fee,
-        startDate: { lte: now },
-        endDate: { gte: now },
-        budgetStoppedAt: null,
-      },
-      orderBy: { priority: "asc" },
-      include: {
-        targetTiers: { select: { tierType: true } },
-        targetUsers: { select: { userId: true } },
-      },
-    });
-    if (!campaigns.length) return result;
-
-    for (const party of eligibleParties) {
-      const tier = await resolveUserTier(this.prisma, party.userId);
-      let winner: { discountId: string; name: string; amount: number } | null =
-        null;
-      for (const campaign of campaigns) {
-        const matches = audienceMatches({
-          audience: campaign.audience,
-          target: DiscountTarget.trade_service_fee,
-          tierTypes: campaign.targetTiers.map((row) => row.tierType),
-          userIds: campaign.targetUsers.map((row) => row.userId),
-          buyerId: party.userId,
-          buyerTier: tier,
-        });
-        if (!matches) continue;
-
-        let amount =
-          campaign.type === DiscountType.percentage
-            ? party.feeAmount * (Number(campaign.value) / 100)
-            : Math.min(Number(campaign.value), party.feeAmount);
-        if (
-          campaign.maxDiscountAmount != null &&
-          amount > Number(campaign.maxDiscountAmount)
-        ) {
-          amount = Number(campaign.maxDiscountAmount);
-        }
-        const budgetRemaining =
-          campaign.budgetLimit != null
-            ? Math.max(
-                0,
-                Number(campaign.budgetLimit) -
-                  Number(campaign.budgetSpent ?? 0),
-              )
-            : null;
-        if (budgetRemaining != null && amount > budgetRemaining) {
-          amount = budgetRemaining;
-        }
-        amount =
-          Math.round(
-            (Math.min(amount, party.feeAmount) + Number.EPSILON) * 100,
-          ) / 100;
-        if (amount <= 0) continue;
-        if (!winner || amount > winner.amount) {
-          winner = { discountId: campaign.id, name: campaign.name, amount };
-        }
-      }
-      if (winner) result.set(party.userId, winner);
-    }
-    return result;
+  resolveTradeFeeDiscounts(
+    ...args: Parameters<DiscountTradeFeeService["resolveTradeFeeDiscounts"]>
+  ) {
+    return this.tradeFees.resolveTradeFeeDiscounts(...args);
   }
 
-  /** Takas kampanya bütçesi: kabulde harcanır (satır başına). */
-  async spendTradeFeeBudget(
-    entries: { discountId: string; amount: number }[],
-    client?: Prisma.TransactionClient,
-  ): Promise<void> {
-    await this.feeDiscountBudget?.spendBudget(entries, client);
+  spendTradeFeeBudget(
+    ...args: Parameters<DiscountTradeFeeService["spendTradeFeeBudget"]>
+  ) {
+    return this.tradeFees.spendTradeFeeBudget(...args);
   }
 
-  /** Takas kampanya bütçesi: bedel dahil TAM iadede geri döner. */
-  async releaseTradeFeeBudget(
-    entries: { discountId: string; amount: number }[],
-    client?: Prisma.TransactionClient,
-  ): Promise<void> {
-    await this.feeDiscountBudget?.releaseBudget(entries, client);
+  releaseTradeFeeBudget(
+    ...args: Parameters<DiscountTradeFeeService["releaseTradeFeeBudget"]>
+  ) {
+    return this.tradeFees.releaseTradeFeeBudget(...args);
   }
 }
