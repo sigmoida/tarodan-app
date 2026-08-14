@@ -47,7 +47,7 @@ export default function PricingCard({
   const t = useTranslations();
   return (
     <SectionCard title={t("product.pricing")}>
-      <div className="grid md:grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <FormInput
           name="price"
           type="number"
@@ -133,7 +133,7 @@ function PackageSizePicker() {
           {t("product.packageSizeUnavailable")}
         </p>
       ) : (
-        <div className="grid gap-3 sm:grid-cols-3">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
           {tiers.map((tier) => (
             <PackageSizeOption
               key={tier.code}
