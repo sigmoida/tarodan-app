@@ -227,6 +227,11 @@ function buildPushStages(context, apps) {
         "@tarodan/admin",
         "test:api",
       ]),
+      commandStage("admin-unit", "Admin Unit", [
+        "--filter",
+        "@tarodan/admin",
+        "test",
+      ]),
       commandStage("admin-build", "Admin Build", [
         "--filter",
         "@tarodan/admin...",

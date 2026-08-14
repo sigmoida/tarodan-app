@@ -9,6 +9,8 @@
     "start": "next start -p 3002",
     "lint": "next lint",
     "typecheck": "next typegen && tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
     "test:api": "node scripts/check-api-collisions.mjs",
     "sync:brand": "node ../../scripts/sync-brand-assets.mjs public"
   },
@@ -57,6 +59,7 @@
     "postcss": "^8.5.26",
     "tailwindcss": "^3.3.6",
     "typescript": "^5.3.2",
+    "vitest": "^3.2.7",
     "exceljs": "^4.4.0"
   }
 }

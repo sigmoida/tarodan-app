@@ -1,10 +1,11 @@
 name: PR Checks
 
 # There is currently no CI gate on pull requests — this is the first one.
-# Deliberately scoped to typecheck + lint only: fast, needs no DB services
-# or repo secrets. The heavier `pnpm verify:ci` (unit tests, prod build,
-# dependency audit) already exists as a script but needs Postgres/Redis
-# services and DATABASE_URL configured as a follow-up before it can run here.
+# Deliberately scoped to typecheck + lint + admin's unit tests: all fast,
+# none need DB services or repo secrets. The heavier `pnpm verify:ci` (api
+# unit tests, prod build, dependency audit) already exists as a script but
+# needs Postgres/Redis services and DATABASE_URL configured as a follow-up
+# before it can run here.
 
 on:
   pull_request:
@@ -19,7 +20,7 @@ concurrency:
 
 jobs:
   verify:
-    name: Typecheck & Lint
+    name: Typecheck, Lint & Unit Tests
     runs-on: ubuntu-latest
     timeout-minutes: 20
     # next.config.js env validation requires these at build/typegen time even
@@ -44,3 +45,9 @@ jobs:
       # gate — tracked separately, not fixed here.
       - name: Lint
         run: pnpm exec turbo run lint --filter='!@tarodan/web'
+
+      # Only admin has a vitest suite wired up so far (see admin's
+      # vitest.config.ts) — apps/web has its own "test" script too but it
+      # isn't part of this gate yet, a separate follow-up.
+      - name: Unit tests
+        run: pnpm --filter @tarodan/admin test
