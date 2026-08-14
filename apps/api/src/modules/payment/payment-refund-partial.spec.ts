@@ -1,4 +1,5 @@
 import { PaymentRefundService } from "./payment-refund.service";
+import { PaymentRefundAttemptService } from "./payment-refund-attempt.service";
 import {
   PaymentStatus,
   RefundAttemptStatus,
@@ -206,6 +207,7 @@ describe("PaymentRefundService.processRefund — MONEY-H3/H4 partial refund", ()
       paymentCommon as any,
       { record: jest.fn().mockResolvedValue(undefined) } as any, // providerEvents
       {} as any, // holdRelease
+      new PaymentRefundAttemptService(prisma as any), // attempts
       undefined, // outbox
       opts.ledger as any, // Faz 6.2 ledger (@Optional)
     );

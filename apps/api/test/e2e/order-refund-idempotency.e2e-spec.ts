@@ -6,6 +6,7 @@ import {
 } from "@prisma/client";
 import { PrismaService } from "../../src/prisma";
 import { PaymentRefundService } from "../../src/modules/payment/payment-refund.service";
+import { PaymentRefundAttemptService } from "../../src/modules/payment/payment-refund-attempt.service";
 import {
   truncateAll,
   getPrisma,
@@ -66,6 +67,7 @@ describe("Order refund idempotency (#85) [P0]", () => {
       { cancelSuratShipmentIfExists: async () => {} } as any, // paymentCommon
       {} as any, // providerEvents
       {} as any, // holdRelease
+      new PaymentRefundAttemptService(prisma as any), // attempts
     );
   });
 

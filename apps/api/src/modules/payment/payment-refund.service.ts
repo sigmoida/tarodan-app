@@ -21,7 +21,6 @@ import { PaymentProviderRegistry } from "../payment-providers/payment-provider.r
 import { PaymentProvider } from "./dto";
 import { EventService } from "../events";
 import { NotificationService } from "../notification/notification.service";
-import { CacheService } from "../cache/cache.service";
 import { DiscountService } from "../discount/discount.service";
 import { NotificationType } from "../notification/dto/notification.dto";
 import { CommissionLedgerService } from "../commission/commission-ledger.service";
@@ -35,11 +34,7 @@ import {
   type InvoiceRefundReversePayload,
 } from "../outbox/outbox.types";
 import { LedgerService } from "../ledger/ledger.service";
-import {
-  MONEY_EPSILON,
-  PAYMENT_CONFIG_KEYS,
-  resolvePaymentConfigNumber,
-} from "./payment.constants";
+import { MONEY_EPSILON } from "./payment.constants";
 import { i18nMessage } from "../i18n";
 import {
   ProviderRefundOutcomeUnknownException,
@@ -53,6 +48,7 @@ import {
 } from "../../common/helpers/public-identity";
 import { isProduction } from "../../config/environment";
 import { PaymentHoldReleaseService } from "./payment-hold-release.service";
+import { PaymentRefundAttemptService } from "./payment-refund-attempt.service";
 
 /**
  * İade / escrow serbest bırakma metodları — PaymentService'ten birebir taşındı
@@ -113,13 +109,6 @@ export interface ProcessRefundOptions {
 @Injectable()
 export class PaymentRefundService {
   private readonly logger = new Logger(PaymentRefundService.name);
-  // Escrow yeni model: satıcıya ödeme TESLİMDEN sonra serbest bırakılır.
-  // İade TALEP penceresi = teslim + returnWindowDays (14). Satıcı payout uygunluğu
-  // = teslim + returnWindowDays + payoutGraceDays. Grace, iade penceresi kapandıktan
-  // SONRA payout'u başlatır → "14. günün son saniyesinde iade + payout çoktan gitti"
-  // çakışması imkânsız olur (payout, return cutoff'tan grace kadar SONRA uygundur).
-  private readonly returnWindowDays: number;
-  private readonly payoutGraceDays: number;
 
   constructor(
     private readonly prisma: PrismaService,
@@ -132,6 +121,7 @@ export class PaymentRefundService {
     private readonly paymentCommon: PaymentCommonService,
     private readonly providerEvents: PaymentProviderEventService,
     private readonly holdRelease: PaymentHoldReleaseService,
+    private readonly attempts: PaymentRefundAttemptService,
     // Faz 5: iade tx'iyle AYNI anda "Sürat iptali" outbox satırı yaz → çökmeye dayanıklı
     // backstop (post-commit anlık iptal hızlı-yol kalır; handler idempotent). @Optional:
     // prod'da global OutboxModule daima enjekte eder; birim testleri (mock tx) sağlamak
@@ -142,24 +132,10 @@ export class PaymentRefundService {
     // @Optional + best-effort — defter hatası iadeyi BOZMAZ; reconciliation açığı yakalar.
     @Optional()
     private readonly ledger?: LedgerService,
-    // Koli başına TEK bildirim için tekilleştirme anahtarı tutar. @Optional:
-    // birim testleri cache sağlamak zorunda kalmasın — yoksa duyuru yapılır
-    // (eksik bildirimdense fazlası yeğdir).
-    @Optional()
-    private readonly cache?: CacheService,
     // İ25: bedel dahil TAM iadede takas kampanya bütçesi geri döner.
     @Optional()
     private readonly discountService?: DiscountService,
-  ) {
-    this.returnWindowDays = resolvePaymentConfigNumber(
-      this.configService,
-      PAYMENT_CONFIG_KEYS.RETURN_WINDOW_DAYS,
-    );
-    this.payoutGraceDays = resolvePaymentConfigNumber(
-      this.configService,
-      PAYMENT_CONFIG_KEYS.PAYOUT_GRACE_DAYS,
-    );
-  }
+  ) {}
 
   // ───────────────────────────────────────────────────────────────────────────
   // Escrow serbest bırakma — PaymentHoldReleaseService'e delege edilir. İmzalar
@@ -203,235 +179,6 @@ export class PaymentRefundService {
 
   releasePaymentIfHeld(orderId: string): Promise<boolean> {
     return this.holdRelease.releasePaymentIfHeld(orderId);
-  }
-
-  private async claimRefundAttempt(
-    paymentId: string,
-    orderId: string,
-    amountToRefund: number,
-    refundCap: number,
-    isGroupPayment: boolean,
-    idempotencyKey: string,
-    provider: string,
-    providerReference: string,
-  ): Promise<{
-    action: "submit" | "finalize" | "done";
-    attempt: {
-      id: string;
-      status: RefundAttemptStatus;
-      providerRefundId: string | null;
-      providerResponse: Prisma.JsonValue | null;
-    };
-  }> {
-    return this.prisma.$transaction(async (tx) => {
-      await tx.$queryRaw`SELECT id FROM payments WHERE id = ${paymentId} FOR UPDATE`;
-      const fresh = await tx.payment.findUnique({
-        where: { id: paymentId },
-        select: { metadata: true },
-      });
-      const meta = (fresh?.metadata as Record<string, any>) || {};
-      const refundedOrders =
-        (meta.refundedOrders as Record<string, number>) || {};
-
-      if (isGroupPayment && refundedOrders[orderId]) {
-        throw new BadRequestException(
-          i18nMessage("server.payment.orderAlreadyRefunded"),
-        );
-      }
-      if (!isGroupPayment) {
-        const prior = Number(refundedOrders[orderId] || 0);
-        if (prior + amountToRefund > refundCap + MONEY_EPSILON) {
-          throw new BadRequestException(
-            i18nMessage("server.payment.refundAmountExceedsLimit", {
-              amountToRefund,
-              refundCap: Math.max(
-                Math.round((refundCap - prior) * 100) / 100,
-                0,
-              ),
-            }),
-          );
-        }
-      }
-
-      let attempt = await tx.refundAttempt.findUnique({
-        where: { idempotencyKey },
-      });
-      if (attempt) {
-        if (
-          attempt.paymentId !== paymentId ||
-          attempt.orderId !== orderId ||
-          Math.abs(Number(attempt.amount) - amountToRefund) > MONEY_EPSILON
-        ) {
-          throw new BadRequestException(
-            i18nMessage("server.payment.refundInitiationFailed"),
-          );
-        }
-        if (attempt.status === RefundAttemptStatus.finalized) {
-          return { action: "done" as const, attempt };
-        }
-        if (attempt.status === RefundAttemptStatus.succeeded) {
-          return { action: "finalize" as const, attempt };
-        }
-        if (
-          attempt.status === RefundAttemptStatus.submitting ||
-          attempt.status === RefundAttemptStatus.manual_review
-        ) {
-          throw new RefundPendingReconciliationException(
-            i18nMessage("server.payment.refundInitiationFailed"),
-          );
-        }
-        if (attempt.status === RefundAttemptStatus.failed) {
-          attempt = await tx.refundAttempt.update({
-            where: { id: attempt.id },
-            data: {
-              status: RefundAttemptStatus.prepared,
-              failureReason: null,
-              requestStartedAt: null,
-            },
-          });
-        }
-        return { action: "submit" as const, attempt };
-      }
-
-      const unresolved = await tx.refundAttempt.findFirst({
-        where: {
-          paymentId,
-          orderId,
-          status: {
-            in: [
-              RefundAttemptStatus.prepared,
-              RefundAttemptStatus.submitting,
-              RefundAttemptStatus.succeeded,
-              RefundAttemptStatus.manual_review,
-            ],
-          },
-        },
-      });
-      if (unresolved) {
-        throw new RefundPendingReconciliationException(
-          i18nMessage("server.payment.refundInitiationFailed"),
-        );
-      }
-
-      attempt = await tx.refundAttempt.create({
-        data: {
-          paymentId,
-          orderId,
-          idempotencyKey,
-          amount: amountToRefund,
-          provider,
-          providerReference,
-        },
-      });
-      return { action: "submit" as const, attempt };
-    });
-  }
-
-  private async startRefundSubmission(attemptId: string): Promise<void> {
-    const started = await this.prisma.refundAttempt.updateMany({
-      where: { id: attemptId, status: RefundAttemptStatus.prepared },
-      data: {
-        status: RefundAttemptStatus.submitting,
-        requestStartedAt: new Date(),
-      },
-    });
-    if (started.count !== 1) {
-      throw new RefundPendingReconciliationException(
-        i18nMessage("server.payment.refundInitiationFailed"),
-      );
-    }
-  }
-
-  private async claimTradeRefundAttempt(
-    paymentId: string,
-    tradeId: string,
-    amount: number,
-    provider: string,
-    providerReference: string,
-  ): Promise<{
-    action: "submit" | "finalize" | "done";
-    attempt: {
-      id: string;
-      status: RefundAttemptStatus;
-      providerRefundId: string | null;
-      providerResponse: Prisma.JsonValue | null;
-    };
-  }> {
-    const idempotencyKey = `trade-cash-refund:${paymentId}`;
-    return this.prisma.$transaction(async (tx) => {
-      await tx.$queryRaw`SELECT id FROM payments WHERE id = ${paymentId} FOR UPDATE`;
-      let attempt = await tx.refundAttempt.findUnique({
-        where: { idempotencyKey },
-      });
-      if (attempt) {
-        if (
-          attempt.paymentId !== paymentId ||
-          attempt.tradeId !== tradeId ||
-          Math.abs(Number(attempt.amount) - amount) > MONEY_EPSILON
-        ) {
-          throw new BadRequestException(
-            i18nMessage("server.payment.refundInitiationFailed"),
-          );
-        }
-        if (attempt.status === RefundAttemptStatus.finalized) {
-          return { action: "done" as const, attempt };
-        }
-        if (attempt.status === RefundAttemptStatus.succeeded) {
-          return { action: "finalize" as const, attempt };
-        }
-        if (
-          attempt.status === RefundAttemptStatus.submitting ||
-          attempt.status === RefundAttemptStatus.manual_review
-        ) {
-          throw new RefundPendingReconciliationException(
-            i18nMessage("server.payment.refundInitiationFailed"),
-          );
-        }
-        if (attempt.status === RefundAttemptStatus.failed) {
-          attempt = await tx.refundAttempt.update({
-            where: { id: attempt.id },
-            data: {
-              status: RefundAttemptStatus.prepared,
-              failureReason: null,
-              requestStartedAt: null,
-            },
-          });
-        }
-        return { action: "submit" as const, attempt };
-      }
-
-      const unresolved = await tx.refundAttempt.findFirst({
-        where: {
-          paymentId,
-          tradeId,
-          status: {
-            in: [
-              RefundAttemptStatus.prepared,
-              RefundAttemptStatus.submitting,
-              RefundAttemptStatus.succeeded,
-              RefundAttemptStatus.manual_review,
-            ],
-          },
-        },
-      });
-      if (unresolved) {
-        throw new RefundPendingReconciliationException(
-          i18nMessage("server.payment.refundInitiationFailed"),
-        );
-      }
-
-      attempt = await tx.refundAttempt.create({
-        data: {
-          paymentId,
-          tradeId,
-          idempotencyKey,
-          amount,
-          provider,
-          providerReference,
-        },
-      });
-      return { action: "submit" as const, attempt };
-    });
   }
 
   /**
@@ -669,7 +416,7 @@ export class PaymentRefundService {
         i18nMessage("server.payment.paytrRefundFailed"),
       );
     }
-    const refundAttempt = await this.claimRefundAttempt(
+    const refundAttempt = await this.attempts.claimRefundAttempt(
       payment.id,
       orderId,
       amountToRefund,
@@ -759,7 +506,7 @@ export class PaymentRefundService {
           recovered: true,
         };
       } else {
-        await this.startRefundSubmission(refundAttempt.attempt.id);
+        await this.attempts.startRefundSubmission(refundAttempt.attempt.id);
         if (isZeroCashSettlement) {
           refundResult = {
             status: "success",
@@ -1527,7 +1274,7 @@ export class PaymentRefundService {
         i18nMessage("server.payment.paytrRefundFailed"),
       );
     }
-    const refundAttempt = await this.claimTradeRefundAttempt(
+    const refundAttempt = await this.attempts.claimTradeRefundAttempt(
       payment.id,
       tradeId,
       amount,
@@ -1577,7 +1324,7 @@ export class PaymentRefundService {
       (refundAttempt.attempt.providerResponse as Record<string, unknown>) ||
       null;
     if (refundAttempt.action === "submit") {
-      await this.startRefundSubmission(refundAttempt.attempt.id);
+      await this.attempts.startRefundSubmission(refundAttempt.attempt.id);
       if (bypassEnabled) {
         this.logger.warn(
           `PAYMENT_BYPASS: PayTR trade refund atlandı tradeId=${tradeId} amount=${amount}`,

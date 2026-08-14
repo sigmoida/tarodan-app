@@ -9,6 +9,7 @@ import { PaymentQueryService } from "./payment-query.service";
 import { PaymentCommonService } from "./payment-common.service";
 import { PaymentRefundService } from "./payment-refund.service";
 import { PaymentHoldReleaseService } from "./payment-hold-release.service";
+import { PaymentRefundAttemptService } from "./payment-refund-attempt.service";
 import { PaymentReconciliationService } from "./payment-reconciliation.service";
 import { ReservationReconciliationService } from "./reservation-reconciliation.service";
 import { PaymentExpiryReconciliationService } from "./payment-expiry-reconciliation.service";
@@ -83,6 +84,7 @@ import { scheduledProcessors } from "../../workers/scheduled-processors";
     PaymentCommonService,
     PaymentRefundService,
     PaymentHoldReleaseService,
+    PaymentRefundAttemptService,
     PaymentReconciliationService,
     ReservationReconciliationService,
     PaymentExpiryReconciliationService,

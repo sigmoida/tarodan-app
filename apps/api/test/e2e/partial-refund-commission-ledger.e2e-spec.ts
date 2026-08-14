@@ -8,6 +8,7 @@ import {
 import { PrismaService } from "../../src/prisma";
 import { CommissionLedgerService } from "../../src/modules/commission/commission-ledger.service";
 import { PaymentRefundService } from "../../src/modules/payment/payment-refund.service";
+import { PaymentRefundAttemptService } from "../../src/modules/payment/payment-refund-attempt.service";
 import { ElogoInvoicingService } from "../../src/modules/elogo/elogo-invoicing.service";
 import {
   truncateAll,
@@ -190,6 +191,7 @@ describe("Partial-refund commission ledger pro-rating (#88) [P0]", () => {
       { cancelSuratShipmentIfExists: async () => {} } as any,
       {} as any, // providerEvents
       {} as any, // holdRelease
+      new PaymentRefundAttemptService(prisma as any), // attempts
     );
 
     // 100 üzerinden 50 kısmi iade → portion 0.5

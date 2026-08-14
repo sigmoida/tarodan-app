@@ -1,4 +1,5 @@
 import { PaymentRefundService } from "./payment-refund.service";
+import { PaymentRefundAttemptService } from "./payment-refund-attempt.service";
 
 /**
  * MONEY-H2: refundTradeCashTracked — takas nakit iadesini failure-tracking ile yapar.
@@ -35,6 +36,7 @@ describe("PaymentRefundService.refundTradeCashTracked — MONEY-H2 failure track
       {} as any, // paymentCommon
       { record: jest.fn() } as any, // providerEvents
       {} as any, // holdRelease
+      new PaymentRefundAttemptService(prisma as any), // attempts
     );
     return { service, prisma, eventService };
   };
