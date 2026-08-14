@@ -40,8 +40,9 @@ side effects in a hook.
 - Logic that is (or will be) shared across apps → a **package**, not here.
   Auth hooks are admin-only (mobile/web have their own), so they stay local.
 - Use React context only when state is genuinely shared across a subtree
-  (global auth already lives in the `authStore` zustand store — don't wrap it
-  in another context "just because").
+  (global auth is httpOnly-cookie + server-resolved, hydrated once into
+  `PermissionsContext` by the `(admin)` layout — don't wrap it in another
+  context "just because").
 
 ## 4. DRY — never duplicate
 
@@ -166,7 +167,11 @@ context (`useResourceList` / `useFilter`).
 
 `DetailPage` = back link + QueryBoundary + header (title/badge/actions) + children.
 Build the body from `SectionCard`, `PartyCard`, `Timeline`, `DataList`/`Field`.
-Pass header props as `item && …` so they only evaluate once loaded.
+Pass header props as `item && …` so they only evaluate once loaded. For
+sensitive personal fields (IBAN, TC Kimlik No, identity numbers) use
+`<MaskedValue value={…} />` (`components/MaskedValue.tsx`) instead of
+rendering them in the clear — hidden by default with a click-to-reveal
+toggle, doesn't leak the value's length.
 
 ```tsx
 const { item, isLoading, error, refetch } = useAdminItem<T>({ resource, id, fetcher });
@@ -260,13 +265,15 @@ are the canonical examples.
 
 Create/edit is a **self-contained modal component** per resource (never inline
 overlays on the page). Delete goes through the shared **`useConfirm`** provider
-(`components/ConfirmProvider`) + a `useAdminMutation` — no bespoke delete modal.
+(`provider/ConfirmProvider`) + a `useAdminMutation` — no bespoke delete modal.
 
-### Form layer (`@tarodan/ui/form` + `components/form/`)
+### Form layer (`@tarodan/ui/form`)
 
-- **`FormModal`** (`components/form/FormModal.tsx`) = design-system `Modal` + the
-  RHF `Form` + a standard Cancel/Submit footer. The resource modal owns the
-  `form` (from `useZodForm`) and the `useAdminMutation`; FormModal just frames them.
+- **`FormModal`** (lives in `packages/ui`, not locally) = design-system `Modal` +
+  the RHF `Form` + a standard Cancel/Submit footer, with an optional
+  `destructive` flag for danger-styled confirms (refund/force-cancel). The
+  resource modal owns the `form` (from `useZodForm`) and the
+  `useAdminMutation`; FormModal just frames them.
 - **RHF field wrappers** (`@tarodan/ui/form`): `FormInput`, `FormSelect`,
   `FormTextarea`, `FormCheckbox`, `FormImageUpload`. Each auto-wires value + error
   from context by `name` — never thread `register`/`error` by hand. `FormImageUpload`
