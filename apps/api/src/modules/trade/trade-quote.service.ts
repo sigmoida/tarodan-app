@@ -8,8 +8,8 @@ import {
   type MembershipTierType,
 } from "@prisma/client";
 import { PrismaService } from "../../prisma";
-import { ShippingTariffService } from "../shipping/shipping-tariff.service";
-import { ShippingPackageTiersNotConfiguredError } from "../shipping/shipping-tariff.helper";
+import { ShippingTariffService } from "../shipping/tariff/shipping-tariff.service";
+import { ShippingPackageTiersNotConfiguredError } from "../shipping/helpers/shipping-tariff.helper";
 import { i18nMessage } from "../i18n";
 import {
   buildTradePricing,
@@ -17,14 +17,14 @@ import {
   type TradePricing,
   type TradePricingItem,
   type TradeSide,
-} from "./trade-pricing.helper";
-import { TRADE_PRICING_V2 } from "./trade.constants";
+} from "./helpers/trade-pricing.helper";
+import { TRADE_PRICING_V2 } from "./helpers/trade.constants";
 import {
   CommissionRuleMatchError,
   CommissionSellerConfigurationError,
   resolveCommissionSellerType,
-} from "../order/order-commission.helper";
-import { effectiveMembershipTierType } from "../membership/membership.util";
+} from "../order/helpers/order-commission.helper";
+import { effectiveMembershipTierType } from "../membership/helpers/membership.util";
 
 /**
  * Takas ödeme teklifi (v2) — "bu takas taraflara kaça mal olacak?" sorusunun

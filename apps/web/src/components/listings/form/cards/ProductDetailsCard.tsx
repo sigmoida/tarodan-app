@@ -54,7 +54,7 @@ export default function ProductDetailsCard({
 
   return (
     <SectionCard title={t("product.productDetails")}>
-      <div className="grid md:grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <FormSelect
           name="categoryId"
           label={t("product.categoryRequired")}
@@ -72,7 +72,7 @@ export default function ProductDetailsCard({
         />
       </div>
 
-      <div className="grid md:grid-cols-2 gap-4 mt-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
         <Controller
           name="brandId"
           render={({ field }) => (

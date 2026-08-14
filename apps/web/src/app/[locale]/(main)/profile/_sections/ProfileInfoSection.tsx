@@ -200,7 +200,7 @@ export default function ProfileInfoSection() {
             </div>
           </div>
 
-          <div className="grid gap-4 md:grid-cols-2">
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
             <FormPhone
               name="phone"
               label="Telefon"
@@ -226,7 +226,7 @@ export default function ProfileInfoSection() {
                 label="Şirket / Ticari Unvan"
                 placeholder="ABC Ltd. Şti."
               />
-              <div className="grid gap-4 md:grid-cols-2">
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                 <FormInput
                   name="taxId"
                   label="Vergi Kimlik No"

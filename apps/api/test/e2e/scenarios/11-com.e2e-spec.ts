@@ -55,7 +55,7 @@ import { scenario } from "../../test-utils/scenario";
 import { signCallback } from "../../mocks/paytr.mock";
 import { PaymentService } from "../../../src/modules/payment/payment.service";
 import { PayoutService } from "../../../src/modules/payout/payout.service";
-import { PayoutSchedulerService } from "../../../src/modules/payout/payout-scheduler.service";
+import { PayoutSchedulerService } from "../../../src/modules/payout/jobs/payout-scheduler.service";
 import { OrderService } from "../../../src/modules/order/order.service";
 import { CommissionLedgerService } from "../../../src/modules/commission/commission-ledger.service";
 

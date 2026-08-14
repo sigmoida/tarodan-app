@@ -162,7 +162,7 @@ export default function SellerDocumentsPage() {
         title={t("seller.documents.title")}
         description={t("seller.documents.subtitle")}
       />
-      <div className="grid gap-6 lg:grid-cols-3">
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
         <div className="lg:col-span-2">
           <SectionCard title={t("seller.documents.documentsTitle")}>
             <p className="mb-4 text-sm text-muted">

@@ -20,7 +20,7 @@ import {
 import { createProduct } from "../factories/product.factory";
 import { createAddress } from "../factories/address.factory";
 import { signCallback } from "../mocks/paytr.mock";
-import { TradeSchedulerService } from "../../src/modules/trade/trade-scheduler.service";
+import { TradeSchedulerService } from "../../src/modules/trade/jobs/trade-scheduler.service";
 
 /**
  * Helper: poll until the trade's `to_warehouse` shipments materialise.

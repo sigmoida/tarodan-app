@@ -10,7 +10,15 @@ import {
   ExclamationTriangleIcon,
   UserPlusIcon,
 } from "@heroicons/react/24/outline";
-import { Badge, Button, Input, Tabs, TabsList, TabsTrigger } from "@tarodan/ui";
+import {
+  Badge,
+  Button,
+  Input,
+  Select,
+  Tabs,
+  TabsList,
+  TabsTrigger,
+} from "@tarodan/ui";
 import { useTranslations } from "next-intl";
 import toast from "react-hot-toast";
 import {
@@ -153,7 +161,7 @@ export default function CorporateApplicationCompletion({
 
       {tab === "details" && (
         <form
-          className="grid gap-4 sm:grid-cols-2"
+          className="grid grid-cols-1 gap-4 sm:grid-cols-2"
           onSubmit={(event) => {
             event.preventDefault();
             save.mutate();
@@ -220,7 +228,7 @@ export default function CorporateApplicationCompletion({
                 </div>
                 <CheckCircleIcon className="h-5 w-5 text-success-600" />
               </div>
-              <div className="grid gap-2 sm:grid-cols-2">
+              <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                 {(["front", "back"] as const).map((side) => {
                   const type = `${item.identityType === "tckn" ? "identity" : "passport"}_${side}`;
                   const document = item.documents?.find(
@@ -298,7 +306,7 @@ export default function CorporateApplicationCompletion({
             </div>
           ))}
           <form
-            className="grid gap-3 sm:grid-cols-3"
+            className="grid grid-cols-1 gap-3 sm:grid-cols-3"
             onSubmit={(event) => {
               event.preventDefault();
               addStakeholder.mutate();
@@ -317,23 +325,21 @@ export default function CorporateApplicationCompletion({
               disabled={locked}
               required
             />
-            <label className="text-sm font-medium text-heading">
-              {t("fields.identityType")}
-              <select
-                className="mt-1 h-10 w-full border border-border bg-surface px-3"
-                value={stakeholder.identityType}
-                onChange={(event) =>
-                  setStakeholder((current) => ({
-                    ...current,
-                    identityType: event.target.value as "tckn" | "passport",
-                  }))
-                }
-                disabled={locked}
-              >
-                <option value="tckn">{t("identity.nationalId")}</option>
-                <option value="passport">{t("identity.passport")}</option>
-              </select>
-            </label>
+            <Select
+              label={t("fields.identityType")}
+              value={stakeholder.identityType}
+              onChange={(event) =>
+                setStakeholder((current) => ({
+                  ...current,
+                  identityType: event.target.value as "tckn" | "passport",
+                }))
+              }
+              disabled={locked}
+              options={[
+                { value: "tckn", label: t("identity.nationalId") },
+                { value: "passport", label: t("identity.passport") },
+              ]}
+            />
             <Input
               label={t("fields.identityNumber")}
               placeholder={t("placeholders.identityNumber")}

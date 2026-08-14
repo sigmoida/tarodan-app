@@ -7,7 +7,7 @@ import type {
   PaytrStatementEntry,
   PaytrSettlementSummaryEntry,
   PaytrSettlementDetailEntry,
-} from "./paytr.service";
+} from "./paytr/paytr.service";
 
 /**
  * #89: the payment-provider contract. Money-path consumers depend on this

@@ -14,11 +14,12 @@ import { StorageService } from "../modules/storage/storage.service";
 import { ModerationAiClient } from "../modules/moderation/moderation-ai.client";
 import { SearchService } from "../modules/search/search.service";
 import { CacheService } from "../modules/cache/cache.service";
-import { notifyWebRevalidate } from "../common/revalidate";
+import { notifyWebRevalidate } from "../common/helpers/revalidate";
 import { NotificationService } from "../modules/notification/notification.service";
 import { NotificationType } from "../modules/notification/dto";
 import { CommissionRuleGuardService } from "../modules/commission/commission-rule-guard.service";
 import { QUEUE_NAMES } from "./constants";
+import { errorMessage } from "../common/helpers/error-message";
 
 export interface ProductModerationJob {
   productId: string;
@@ -224,7 +225,7 @@ export class ModerationWorker {
         .delPattern("products:list:*")
         .catch((error) =>
           this.logger.warn(
-            `Moderasyon cache temizliği başarısız (${productId}): ${error instanceof Error ? error.message : String(error)}`,
+            `Moderasyon cache temizliği başarısız (${productId}): ${errorMessage(error)}`,
           ),
         ),
     ]);

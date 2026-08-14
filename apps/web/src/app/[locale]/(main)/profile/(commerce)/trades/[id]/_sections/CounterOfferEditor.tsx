@@ -7,6 +7,7 @@ import {
 } from "@heroicons/react/24/outline";
 import { Button, Checkbox, Input, Radio, Spinner, Textarea } from "@tarodan/ui";
 import OptimizedImage from "@/components/OptimizedImage";
+import { IMAGE_SIZES } from "@/lib/imageSizes";
 import { getProductEffectivePrice } from "@/lib/productPrice";
 import { getProductImage } from "../_lib/types";
 import type { TradeDetailVM } from "../_hooks/useTradeDetail";
@@ -42,7 +43,7 @@ export default function CounterOfferEditor({ vm }: { vm: TradeDetailVM }) {
   } = vm;
 
   return (
-    <div className="min-h-screen bg-surface py-8">
+    <div className="min-h-dvh bg-surface py-8">
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* Header */}
         <div className="mb-6">
@@ -113,6 +114,7 @@ export default function CounterOfferEditor({ vm }: { vm: TradeDetailVM }) {
                                 src={getProductImage(product)}
                                 alt={product.title}
                                 fill
+                                sizes={IMAGE_SIZES.pickerGrid}
                                 className="object-cover"
                                 logContext={{
                                   productId: product.id,
@@ -193,6 +195,7 @@ export default function CounterOfferEditor({ vm }: { vm: TradeDetailVM }) {
                                 src={getProductImage(product)}
                                 alt={product.title}
                                 fill
+                                sizes={IMAGE_SIZES.pickerGrid}
                                 className="object-cover"
                                 logContext={{
                                   productId: product.id,

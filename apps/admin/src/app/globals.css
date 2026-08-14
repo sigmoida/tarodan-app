@@ -12,6 +12,13 @@
        layout.tsx. Becomes `light dark` if a dark theme ever ships. */
     color-scheme: only light;
   }
+  :root {
+    /* Tek kaynak: Sidebar genişliği ve Topbar yüksekliği buradan türer.
+       Sidebar.tsx / Topbar.tsx / AppShell.tsx üçü de bu değişkenleri okur —
+       aralarında sihirli sayı tekrarı yok, biri değişince hepsi senkron kalır. */
+    --admin-sidebar-w: 16rem;
+    --admin-topbar-h: 4rem;
+  }
   body {
     @apply bg-surface text-heading;
   }

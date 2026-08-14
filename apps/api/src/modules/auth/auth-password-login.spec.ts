@@ -5,8 +5,13 @@ import { ConfigService } from "@nestjs/config";
 import { UnauthorizedException } from "@nestjs/common";
 import * as bcrypt from "bcrypt";
 import { AuthService } from "./auth.service";
-import { GoogleAuthService } from "./google-auth.service";
-import { AppleAuthService } from "./apple-auth.service";
+import { AuthTokenService } from "./auth-token.service";
+import { AuthRegistrationService } from "./auth-registration.service";
+import { AuthPasswordService } from "./auth-password.service";
+import { AuthLoginService } from "./auth-login.service";
+import { SocialLoginService } from "./social/social-login.service";
+import { GoogleAuthService } from "./social/google-auth.service";
+import { AppleAuthService } from "./social/apple-auth.service";
 import { PrismaService } from "../../prisma";
 import { NotificationService } from "../notification/notification.service";
 import { CacheService } from "../cache/cache.service";
@@ -28,6 +33,11 @@ describe("AuthService.login - password login edge cases", () => {
     const moduleRef = await Test.createTestingModule({
       providers: [
         AuthService,
+        AuthTokenService,
+        AuthRegistrationService,
+        AuthPasswordService,
+        AuthLoginService,
+        SocialLoginService,
         { provide: PrismaService, useValue: prisma },
         {
           provide: JwtService,

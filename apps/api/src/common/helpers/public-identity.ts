@@ -1,5 +1,5 @@
 import { Prisma } from "@prisma/client";
-import { isLegacyUsername } from "../../modules/auth/username.util";
+import { isLegacyUsername } from "../../modules/auth/utils/username.util";
 
 /**
  * Herkese açık kimlik: bir üyenin BAŞKA üyelere nasıl göründüğü.

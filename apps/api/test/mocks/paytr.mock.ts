@@ -4,7 +4,7 @@ import type {
   PayTRBasketItem,
   PayTRCallbackData,
   PayTRStatusInquiryResult,
-} from "../../src/modules/payment-providers/paytr.service";
+} from "../../src/modules/payment-providers/paytr/paytr.service";
 
 /**
  * In-memory PayTR mock for E2E tests.
@@ -369,10 +369,9 @@ export class MockPayTRService {
       schema?: string;
     }>
   > {
-    return (this.storedCardsByUtoken.get(utoken) ?? []).map((c) => ({
-      requireCvv: false,
-      ...c,
-    }));
+    // No `requireCvv: false` default here: a stored card always carries the
+    // flag, so the spread overwrote it every time and the default never applied.
+    return (this.storedCardsByUtoken.get(utoken) ?? []).map((c) => ({ ...c }));
   }
 
   async capiDeleteCard(

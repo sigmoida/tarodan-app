@@ -4,7 +4,7 @@ import { useTranslations } from "next-intl";
 import { ChevronRightIcon } from "@heroicons/react/24/outline";
 import { Button, EmptyState } from "@tarodan/ui";
 import { SectionCard } from "@/components/detail/SectionCard";
-import { fmtTry } from "@/lib/format";
+import { fmtNumber, fmtTry } from "@/lib/format";
 import { type TopProduct } from "../_lib/types";
 
 /**
@@ -32,7 +32,7 @@ export function TopProductsWidget({ products }: { products: TopProduct[] }) {
             <Link
               key={p.id}
               href={`/catalog/products/${p.id}`}
-              className="-mx-2 flex items-center gap-3 rounded-lg px-2 py-2.5 hover:bg-surface-alt"
+              className="-mx-2 flex flex-wrap items-center gap-x-3 gap-y-1 rounded-lg px-2 py-2.5 hover:bg-surface-alt"
             >
               <div className="relative h-10 w-10 shrink-0 overflow-hidden rounded-md bg-surface-alt">
                 {p.thumbnail ? (
@@ -46,7 +46,10 @@ export function TopProductsWidget({ products }: { products: TopProduct[] }) {
                   />
                 ) : null}
               </div>
-              <div className="min-w-0 flex-1">
+              {/* min-w floor (not min-w-0) so this block stops shrinking once
+                  it's cramped, forcing price/views to wrap to their own line
+                  instead of squeezing the title to nothing. */}
+              <div className="min-w-[110px] flex-1">
                 <p className="truncate text-sm font-medium text-heading">
                   {p.title}
                 </p>
@@ -56,7 +59,7 @@ export function TopProductsWidget({ products }: { products: TopProduct[] }) {
                 {fmtTry(p.price)}
               </span>
               <span className="whitespace-nowrap text-xs text-muted tabular-nums">
-                {p.viewCount.toLocaleString("tr-TR")}{" "}
+                {fmtNumber(p.viewCount)}{" "}
                 {t("admin.dashboard.topProducts.columns.views").toLowerCase()}
               </span>
             </Link>

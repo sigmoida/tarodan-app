@@ -24,7 +24,7 @@ export default function AuthMinimalLayout({
       dayalı. Eskiden logo ve telif ortalanmıştı, form ise `max-w-md` içinde
       soldan başlıyordu — aynı ürünün iki auth çerçevesi farklı hizalanıyordu.
     */
-    <div className="flex min-h-screen flex-col bg-surface-elevated">
+    <div className="flex min-h-dvh flex-col bg-surface-elevated">
       <div className="mx-auto flex w-full max-w-md flex-1 flex-col px-6">
         <header className="py-6">
           <Link href="/" className="inline-flex items-center">

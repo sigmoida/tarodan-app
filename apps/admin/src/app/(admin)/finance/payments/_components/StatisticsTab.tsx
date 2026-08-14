@@ -20,6 +20,7 @@ import {
   ChartBarIcon,
 } from "@heroicons/react/24/outline";
 import { adminApi } from "@/lib/api";
+import { adminKeys } from "@/lib/query/keys";
 import { SectionCard } from "@/components/detail/SectionCard";
 import { MetricCard } from "@/components/MetricCard";
 import { fmtTry } from "@/lib/format";
@@ -88,7 +89,7 @@ export function StatisticsTab() {
   }>({ period: "monthly", startDate: "", endDate: "" });
 
   const { data, isLoading } = useQuery({
-    queryKey: ["payment-statistics", filters],
+    queryKey: adminKeys.list("payment-statistics", filters),
     queryFn: async () =>
       (
         await adminApi.getPaymentStatistics({

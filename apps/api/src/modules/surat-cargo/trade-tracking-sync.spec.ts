@@ -1,4 +1,4 @@
-import { TradeTrackingSyncService } from "./trade-tracking-sync.service";
+import { TradeTrackingSyncService } from "./sync/trade-tracking-sync.service";
 import { ShipmentStatus, TradeStatus } from "@prisma/client";
 
 /**

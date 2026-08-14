@@ -98,7 +98,7 @@ export function assertValidProductImages(
       // yazılmasına ve galeride çift görünmesine yol açıyordu.
       if (seen.has(key as string)) {
         throw new BadRequestException(
-          "Aynı görsel birden fazla kez gönderildi",
+          i18nMessage("server.product.duplicateImage"),
         );
       }
       seen.add(key as string);
@@ -109,7 +109,7 @@ export function assertValidProductImages(
         !isOwnedProductImageKey(key as string, options.userId)
       ) {
         throw new BadRequestException(
-          "Görsellerden biri bu hesaba ait bir yüklemeden gelmiyor. Lütfen görselleri yeniden yükleyin.",
+          i18nMessage("server.product.imageNotOwned"),
         );
       }
     }
@@ -118,14 +118,18 @@ export function assertValidProductImages(
 
 function assertKeyShape(key: unknown): asserts key is string {
   if (typeof key !== "string" || !key.trim()) {
-    throw new BadRequestException("Görsel anahtarı boş olamaz");
+    throw new BadRequestException(i18nMessage("server.product.imageKeyEmpty"));
   }
   // Dizin atlama ve beklenmedik karakterler: anahtar doğrudan depolama yoluna
   // giriyor, serbest bırakılamaz.
   if (key.includes("..") || !SAFE_KEY.test(key)) {
-    throw new BadRequestException("Görsel anahtarı geçersiz");
+    throw new BadRequestException(
+      i18nMessage("server.product.imageKeyInvalid"),
+    );
   }
   if (!key.includes(PRODUCT_IMAGE_PATH)) {
-    throw new BadRequestException("Görsel anahtarı ürün görseli yolunda değil");
+    throw new BadRequestException(
+      i18nMessage("server.product.imageKeyWrongPath"),
+    );
   }
 }

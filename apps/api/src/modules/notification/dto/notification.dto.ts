@@ -9,7 +9,7 @@ import {
   ValidatorConstraint,
   type ValidatorConstraintInterface,
 } from "class-validator";
-import { isSafeFreeLink } from "../notification-link-safety";
+import { isSafeFreeLink } from "../helpers/notification-link-safety";
 import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
 
 export enum NotificationType {

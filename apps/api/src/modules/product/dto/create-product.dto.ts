@@ -146,7 +146,7 @@ export class CreateProductDto {
   })
   @IsOptional()
   @IsUUID("4", { message: "Geçerli bir model ID giriniz" })
-  carModelId?: string;
+  carModelId?: string | null;
 
   @ApiProperty({
     example: "uuid-manufacturer-id",

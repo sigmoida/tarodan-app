@@ -3,6 +3,11 @@ import { JwtModule } from "@nestjs/jwt";
 import { PassportModule } from "@nestjs/passport";
 import { ConfigModule, ConfigService } from "@nestjs/config";
 import { AuthService } from "./auth.service";
+import { AuthTokenService } from "./auth-token.service";
+import { AuthRegistrationService } from "./auth-registration.service";
+import { AuthPasswordService } from "./auth-password.service";
+import { AuthLoginService } from "./auth-login.service";
+import { SocialLoginService } from "./social/social-login.service";
 import { AuthController } from "./auth.controller";
 import { AdminAuthController } from "./admin-auth.controller";
 import {
@@ -14,11 +19,11 @@ import { NotificationModule } from "../notification/notification.module";
 import { CacheModule } from "../cache/cache.module";
 import { StorageModule } from "../storage/storage.module";
 import { BannedUserGuard } from "./guards/banned-user.guard";
-import { GoogleAuthService } from "./google-auth.service";
-import { AppleAuthService } from "./apple-auth.service";
+import { GoogleAuthService } from "./social/google-auth.service";
+import { AppleAuthService } from "./social/apple-auth.service";
 import { RolesGuard } from "./guards/roles.guard";
-import { PhoneVerificationService } from "./phone-verification.service";
-import { EmailChangeService } from "./email-change.service";
+import { PhoneVerificationService } from "./verification/phone-verification.service";
+import { EmailChangeService } from "./verification/email-change.service";
 import { SecurityModule } from "../security/security.module";
 import { MarketingModule } from "../marketing/marketing.module";
 
@@ -46,6 +51,11 @@ import { MarketingModule } from "../marketing/marketing.module";
   controllers: [AuthController, AdminAuthController],
   providers: [
     AuthService,
+    AuthTokenService,
+    AuthRegistrationService,
+    AuthPasswordService,
+    AuthLoginService,
+    SocialLoginService,
     GoogleAuthService,
     AppleAuthService,
     JwtStrategy,

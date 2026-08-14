@@ -36,6 +36,7 @@ export {
   formatPhoneNumber,
   splitPhone,
   combinePhone,
+  toStoredPhone,
   TR_DIAL_CODE,
   TR_PHONE_E164,
   TR_MOBILE_NATIONAL,
@@ -239,4 +240,5 @@ export { REFUND_COOLING_OFF_DAYS, ESCROW_RELEASE_DAYS } from "@tarodan/shared";
 
 // Utilities
 export { cn } from "./lib/utils";
+export { CONTROL_TEXT } from "./lib/form-control";
 export { colors } from "@tarodan/design-tokens";

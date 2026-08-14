@@ -1,5 +1,8 @@
 import { BadRequestException } from "@nestjs/common";
-import { PayTRService } from "./paytr.service";
+import { PayTRService } from "./paytr/paytr.service";
+import { PayTRCredentials } from "./paytr/paytr-credentials.service";
+import { PayTRReportService } from "./paytr/paytr-report.service";
+import { PayTRTransferService } from "./paytr/paytr-transfer.service";
 import { PaymentProviderRegistry } from "./payment-provider.registry";
 import { IPaymentProvider } from "./payment-provider.interface";
 
@@ -60,7 +63,12 @@ class StubPaymentProvider implements IPaymentProvider {
 
 describe("PaymentProviderRegistry (#89)", () => {
   const config = { get: () => undefined } as any;
-  const paytr = new PayTRService(config);
+  const paytr = new PayTRService(
+    new PayTRCredentials(config),
+    new PayTRReportService(new PayTRCredentials(config)),
+    new PayTRTransferService(new PayTRCredentials(config)),
+    config,
+  );
   const registry = new PaymentProviderRegistry(paytr);
 
   it('PayTRService advertises the "paytr" key', () => {

@@ -41,7 +41,7 @@ import { createProduct } from "../../factories/product.factory";
 import { completePaymentByCallback } from "../../factories/flows";
 import { scenario } from "../../test-utils/scenario";
 import { MembershipService } from "../../../src/modules/membership/membership.service";
-import { MembershipSchedulerService } from "../../../src/modules/membership/membership-scheduler.service";
+import { MembershipSchedulerService } from "../../../src/modules/membership/jobs/membership-scheduler.service";
 import { OrderService } from "../../../src/modules/order/order.service";
 
 describe("03 — Üyelik & Premium (Gating) (MEM)", () => {

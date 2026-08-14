@@ -5,7 +5,7 @@ import { i18nMessage } from "../i18n";
 import {
   canSellFromMembership,
   effectiveMembershipTierType,
-} from "../membership/membership.util";
+} from "../membership/helpers/membership.util";
 import {
   CommissionRuleMatchError,
   CommissionSellerConfigurationError,
@@ -13,7 +13,7 @@ import {
   findMatchingCommissionRule,
   resolveCommissionSellerType,
   roundCommissionMatchAmount,
-} from "../order/order-commission.helper";
+} from "../order/helpers/order-commission.helper";
 
 export interface ListingCommissionGuardInput {
   sellerId: string;

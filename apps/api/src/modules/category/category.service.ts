@@ -6,7 +6,7 @@ import {
 import { PrismaService } from "../../prisma";
 import { CacheService } from "../cache/cache.service";
 import { Category } from "@prisma/client";
-import { saleCapableSellerWhere } from "../membership/membership.util";
+import { saleCapableSellerWhere } from "../membership/helpers/membership.util";
 import { catalogProductWhere } from "../product/helpers/catalog-product-where";
 import {
   assertCategoryHasPublishedCommissionCoverage,
@@ -14,6 +14,7 @@ import {
   assertValidCategoryParent,
   CATEGORIES_CACHE_KEY,
 } from "./category-integrity.helper";
+import { i18nMessage } from "../i18n";
 
 @Injectable()
 export class CategoryService {
@@ -107,7 +108,9 @@ export class CategoryService {
     });
 
     if (!category) {
-      throw new NotFoundException("Kategori bulunamadı");
+      throw new NotFoundException(
+        i18nMessage("server.membership.categoryNotFound"),
+      );
     }
 
     return {
@@ -150,7 +153,9 @@ export class CategoryService {
     });
 
     if (!category) {
-      throw new NotFoundException("Kategori bulunamadı");
+      throw new NotFoundException(
+        i18nMessage("server.membership.categoryNotFound"),
+      );
     }
 
     return {
@@ -190,7 +195,7 @@ export class CategoryService {
   async create(data: any): Promise<Category> {
     if (data.isActive === true) {
       throw new BadRequestException(
-        "Yeni kategori önce pasif oluşturulmalı, komisyon kuralları yayınlandıktan sonra aktifleştirilmelidir.",
+        i18nMessage("server.category.createInactiveFirst"),
       );
     }
     if (data.parentId) {
@@ -224,7 +229,9 @@ export class CategoryService {
     });
 
     if (!category) {
-      throw new NotFoundException("Kategori bulunamadı");
+      throw new NotFoundException(
+        i18nMessage("server.membership.categoryNotFound"),
+      );
     }
 
     const nextParentId =

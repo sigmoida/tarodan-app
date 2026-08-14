@@ -31,7 +31,7 @@ export function RecentOrders({ orders }: { orders: RecentOrder[] }) {
             <Link
               key={order.id}
               href={`/operations/orders/${order.id}`}
-              className="flex items-center justify-between border-b border-border py-3 transition-colors last:border-0 hover:bg-surface-alt"
+              className="flex flex-col gap-2 border-b border-border py-3 transition-colors last:border-0 hover:bg-surface-alt sm:flex-row sm:items-center sm:justify-between"
             >
               <div className="flex min-w-0 flex-1 items-center">
                 <div className="mr-3 flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary-100">
@@ -48,7 +48,7 @@ export function RecentOrders({ orders }: { orders: RecentOrder[] }) {
                   </p>
                 </div>
               </div>
-              <div className="ml-3 flex items-center gap-3">
+              <div className="flex items-center gap-3 sm:ml-3">
                 <span className="whitespace-nowrap text-sm font-semibold text-heading">
                   {fmtTry(order.amount)}
                 </span>

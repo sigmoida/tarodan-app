@@ -1,7 +1,11 @@
 import { RefundRequestStatus } from "@prisma/client";
 import { NotificationType } from "../notification/dto/notification.dto";
-import { resolveWebNotificationLink } from "../notification/notification-link";
+import { resolveWebNotificationLink } from "../notification/helpers/notification-link";
 import { RefundService } from "./refund.service";
+import { RefundFinancialService } from "./refund-financial.service";
+import { RefundShipmentService } from "./refund-shipment.service";
+import { RefundCreationService } from "./refund-creation.service";
+import { RefundDecisionService } from "./refund-decision.service";
 
 /**
  * REFUND_CANCELLED iki YÖNE gider ve hedef ekran audience'tan seçilir.
@@ -27,21 +31,55 @@ describe("RefundService — REFUND_CANCELLED hedef kitlesi", () => {
         update: jest.fn().mockResolvedValue({ ...rr }),
       },
     };
-    const service = new RefundService(
+    const notifications = {
+      appendHistory: jest.fn(),
+      safeNotify: jest.fn(),
+      notifyRefundRequestOpened: jest.fn(),
+      sendRefundEmail: jest.fn(),
+      toProductImageUrls: jest.fn().mockReturnValue([]),
+    } as any;
+    const financials = new RefundFinancialService(prisma as any, {} as any);
+    // Kargo bacağı gerçek servisle kurulur ve AYNI notifications/financials
+    // nesnelerini paylaşır — testlerin casusları bu nesnelere bakıyor.
+    const shipments = new RefundShipmentService(
       prisma as any,
       {} as any,
       {} as any,
       {} as any,
       {} as any,
+      notifications as any,
+      financials as any,
+    );
+    const creation = new RefundCreationService(
+      prisma as any,
       {} as any,
+      notifications as any,
+      financials as any,
+      shipments as any,
+    );
+    const decisions = new RefundDecisionService(
+      prisma as any,
       {} as any,
+      notifications as any,
+      financials as any,
+      shipments as any,
+    );
+    const service = new RefundService(
+      prisma as any,
+      notifications as any,
+      financials as any,
+      shipments as any,
+      creation as any,
+      decisions as any,
     );
     jest
-      .spyOn(service as any, "unfreezeHoldForRefund")
+      .spyOn((service as any).financials, "unfreezeHoldForRefund")
       .mockResolvedValue(undefined);
-    jest.spyOn(service as any, "appendHistory").mockResolvedValue(undefined);
+    jest
+      .spyOn((service as any).notifications, "appendHistory")
+      .mockResolvedValue(undefined);
     const safeNotify = jest
-      .spyOn(service as any, "safeNotify")
+      .spyOn((service as any).notifications, "safeNotify")
       .mockResolvedValue(undefined);
     return { service, safeNotify };
   };

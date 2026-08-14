@@ -22,7 +22,8 @@ import { StorageService, isPublicBucket } from "../storage/storage.service";
 import { MediaAccessService } from "../storage/media-access.service";
 import { ModerationAiClient } from "../moderation/moderation-ai.client";
 import { MAX_PRODUCT_IMAGES } from "../product/helpers/product-image-keys";
-import { resolveUploadTarget } from "./upload-target";
+import { resolveUploadTarget } from "./helpers/upload-target";
+import { i18nMessage } from "../i18n";
 
 @Controller("media")
 @UseGuards(JwtAuthGuard)
@@ -158,7 +159,7 @@ export class MediaController {
 
     if (files.length > maxImages) {
       throw new BadRequestException(
-        `En fazla ${maxImages} resim yükleyebilirsiniz`,
+        i18nMessage("server.media.tooManyImages", { max: maxImages }),
       );
     }
 
@@ -229,7 +230,7 @@ export class MediaController {
     const bucketFolder = key?.split("/")[1] ?? "";
     if (!isPublicBucket(bucketFolder)) {
       throw new BadRequestException(
-        "Bu içerik için herkese açık URL verilemez.",
+        i18nMessage("server.media.publicUrlNotAllowed"),
       );
     }
     return { url: this.storageService.getPublicAssetUrl(key) };

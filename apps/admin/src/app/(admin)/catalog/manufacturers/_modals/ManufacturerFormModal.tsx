@@ -99,7 +99,9 @@ export function ManufacturerFormModal({
       <FormImageUpload
         name="logo"
         label={t("admin.catalog.common.logo")}
-        upload={(file) => adminApi.uploadMedia(file).then((r) => r.data.url)}
+        upload={(file) =>
+          adminApi.uploadMedia(file, "manufacturers").then((r) => r.data.url)
+        }
       />
       <FormInput
         name="website"

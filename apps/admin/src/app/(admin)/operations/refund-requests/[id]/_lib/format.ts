@@ -1,9 +1,13 @@
-import { fmtTry as formatTry } from "@/lib/format";
+import {
+  fmtTry as formatTry,
+  fmtDateTime as formatDateTime,
+} from "@/lib/format";
 
 export function fmtTry(n: number | string): string {
   return formatTry(n) ?? "—";
 }
 
+/** Named `fmtDate` locally but actually date+time — kept for call-site compat. */
 export function fmtDate(d?: string | null): string {
-  return d ? new Date(d).toLocaleString("tr-TR") : "—";
+  return d ? (formatDateTime(d) ?? "—") : "—";
 }

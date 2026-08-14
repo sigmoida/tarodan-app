@@ -29,6 +29,7 @@ import {
   PUBLIC_NAME_SELECT,
   publicName,
 } from "../../common/helpers/public-identity";
+import { i18nMessage } from "../i18n";
 
 // Daily message limit - now read from platform settings (default: 50)
 
@@ -83,13 +84,15 @@ export class MessagingService {
 
     if (!recipientId) {
       throw new BadRequestException(
-        "Alıcı kullanıcı ID gereklidir (recipientId veya participantId)",
+        i18nMessage("server.messaging.recipientRequired"),
       );
     }
 
     // Cannot message yourself
     if (senderId === recipientId) {
-      throw new BadRequestException("Kendinize mesaj gönderemezsiniz");
+      throw new BadRequestException(
+        i18nMessage("server.messaging.selfMessage"),
+      );
     }
 
     // Verify recipient exists
@@ -98,7 +101,7 @@ export class MessagingService {
     });
 
     if (!recipient) {
-      throw new NotFoundException("Alıcı kullanıcı bulunamadı");
+      throw new NotFoundException(i18nMessage("server.trade.receiverNotFound"));
     }
 
     // Verify product if provided
@@ -108,7 +111,9 @@ export class MessagingService {
       });
 
       if (!product) {
-        throw new NotFoundException("Ürün bulunamadı");
+        throw new NotFoundException(
+          i18nMessage("server.offer.productNotFound"),
+        );
       }
     }
 
@@ -176,7 +181,10 @@ export class MessagingService {
 
     if (dto.content.length > maxLength) {
       throw new BadRequestException(
-        `Mesaj uzunluğu maksimum ${maxLength} karakter olabilir. Mevcut uzunluk: ${dto.content.length}`,
+        i18nMessage("server.messaging.messageTooLong", {
+          max: maxLength,
+          length: dto.content.length,
+        }),
       );
     }
 
@@ -192,14 +200,18 @@ export class MessagingService {
     });
 
     if (!thread) {
-      throw new NotFoundException("Mesaj konusu bulunamadı");
+      throw new NotFoundException(
+        i18nMessage("server.messaging.threadNotFound"),
+      );
     }
 
     if (
       thread.participant1Id !== senderId &&
       thread.participant2Id !== senderId
     ) {
-      throw new ForbiddenException("Bu konuya mesaj gönderme yetkiniz yok");
+      throw new ForbiddenException(
+        i18nMessage("server.messaging.sendForbidden"),
+      );
     }
 
     // Determine receiver
@@ -433,11 +445,15 @@ export class MessagingService {
     });
 
     if (!thread) {
-      throw new NotFoundException("Mesaj konusu bulunamadı");
+      throw new NotFoundException(
+        i18nMessage("server.messaging.threadNotFound"),
+      );
     }
 
     if (thread.participant1Id !== userId && thread.participant2Id !== userId) {
-      throw new ForbiddenException("Bu konuyu görüntüleme yetkiniz yok");
+      throw new ForbiddenException(
+        i18nMessage("server.messaging.viewForbidden"),
+      );
     }
 
     const [participant1, participant2, product, lastMessage, unreadCount] =
@@ -512,11 +528,15 @@ export class MessagingService {
     });
 
     if (!thread) {
-      throw new NotFoundException("Mesaj konusu bulunamadı");
+      throw new NotFoundException(
+        i18nMessage("server.messaging.threadNotFound"),
+      );
     }
 
     if (thread.participant1Id !== userId && thread.participant2Id !== userId) {
-      throw new ForbiddenException("Bu konuyu görüntüleme yetkiniz yok");
+      throw new ForbiddenException(
+        i18nMessage("server.messaging.viewForbidden"),
+      );
     }
 
     const where: Prisma.MessageWhereInput = {
@@ -630,7 +650,9 @@ export class MessagingService {
     });
 
     if (!message) {
-      throw new NotFoundException("Mesaj bulunamadı");
+      throw new NotFoundException(
+        i18nMessage("server.messaging.messageNotFound"),
+      );
     }
 
     if (message.status !== MessageStatus.pending_approval) {
@@ -714,7 +736,9 @@ export class MessagingService {
         `User ${userId} exceeded daily message limit (${messageCount}/${dailyLimit})`,
       );
       throw new BadRequestException(
-        `Günlük mesaj limitinize (${dailyLimit}) ulaştınız. Yarın tekrar deneyin.`,
+        i18nMessage("server.messaging.dailyLimitReached", {
+          limit: dailyLimit,
+        }),
       );
     }
   }

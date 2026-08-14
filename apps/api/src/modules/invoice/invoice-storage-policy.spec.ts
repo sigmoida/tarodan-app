@@ -57,7 +57,6 @@ describe("InvoiceService storage policy", () => {
     };
     const service = new InvoiceService(
       prisma as any,
-      {} as any,
       storage as any,
       {} as any,
       {} as any,

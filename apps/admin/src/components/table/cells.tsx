@@ -8,7 +8,7 @@ import {
   ClipboardIcon,
   CubeIcon,
 } from "@heroicons/react/24/outline";
-import { Avatar } from "@tarodan/ui";
+import { Avatar, IconButton } from "@tarodan/ui";
 import { cn } from "@/lib/utils";
 import { fmtDate, fmtDateTime, fmtNumber, fmtTry } from "@/lib/format";
 import { TruncatedText } from "./TruncatedText";
@@ -139,8 +139,7 @@ export function CellId({ value }: { value?: string | null }) {
       <span className="font-mono text-xs text-muted" title={value}>
         {short}
       </span>
-      <button
-        type="button"
+      <IconButton
         onClick={(e) => {
           e.stopPropagation();
           navigator.clipboard?.writeText(value);
@@ -148,14 +147,15 @@ export function CellId({ value }: { value?: string | null }) {
           setTimeout(() => setCopied(false), 1200);
         }}
         aria-label="Copy id"
-        className="shrink-0 text-subtle transition-colors hover:text-body"
+        variant="ghost"
+        className="-m-2 h-auto w-auto shrink-0 rounded p-2 text-subtle hover:text-body"
       >
         {copied ? (
           <CheckIcon className="h-3.5 w-3.5 text-success-600" />
         ) : (
           <ClipboardIcon className="h-3.5 w-3.5" />
         )}
-      </button>
+      </IconButton>
     </span>
   );
 }

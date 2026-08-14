@@ -7,9 +7,7 @@ import { usePathname } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { Drawer } from "@tarodan/ui";
 import { SidebarContent } from "./SidebarContent";
-
-/** Kenar çubuğunun göründüğü kırılma noktası — Tailwind `lg` ile aynı olmalı. */
-const DESKTOP_QUERY = "(min-width: 1024px)";
+import { LG_MEDIA_QUERY } from "@/lib/breakpoints";
 
 /**
  * Küçük ekran gezinme çekmecesi — mağaza tarafındaki `MobileDrawer` ile aynı
@@ -39,7 +37,7 @@ export function SidebarNavDrawer({
   // açık panel ve karartma katmanı kalır, sayfa tıklanamaz olurdu.
   useEffect(() => {
     if (typeof window === "undefined") return;
-    const media = window.matchMedia(DESKTOP_QUERY);
+    const media = window.matchMedia(LG_MEDIA_QUERY);
     const sync = () => {
       if (media.matches) onClose();
     };

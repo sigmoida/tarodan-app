@@ -37,7 +37,7 @@ export default function StatusScreen({
   children?: ReactNode;
 }) {
   return (
-    <main className="flex min-h-screen items-center justify-center bg-surface px-4 py-12">
+    <main className="flex min-h-dvh items-center justify-center bg-surface px-4 py-12">
       <div className="w-full max-w-md rounded-2xl border border-border bg-surface-elevated p-8 text-center shadow-sm">
         {logo ? (
           <div className="mx-auto mb-6 flex items-center justify-center">

@@ -11,6 +11,7 @@ import { ApiOperation, ApiResponse, ApiTags } from "@nestjs/swagger";
 import { Public } from "../auth/decorators/public.decorator";
 import { SiteAccessPinService } from "./site-access-pin.service";
 import { VerifySiteAccessDto } from "./dto/verify-site-access.dto";
+import { i18nMessage } from "../i18n";
 
 @ApiTags("site-access")
 @Controller("site-access")
@@ -32,7 +33,9 @@ export class SiteAccessController {
   async verify(@Body() dto: VerifySiteAccessDto) {
     const ok = await this.pinService.verifyAndConsume(dto.code);
     if (!ok) {
-      throw new UnauthorizedException("Geçersiz erişim kodu");
+      throw new UnauthorizedException(
+        i18nMessage("server.siteAccess.invalidCode"),
+      );
     }
     return { ok: true };
   }

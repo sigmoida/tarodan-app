@@ -102,7 +102,10 @@ export const Modal = React.forwardRef<HTMLDivElement, ModalProps>(
                 if (!closeOnBackdrop || dismissDisabled) event.preventDefault();
               }}
               className={cn(
-                "pointer-events-auto fixed left-1/2 top-1/2 z-modal flex max-h-[calc(100dvh-2rem)] w-[calc(100%-2rem)] -translate-x-1/2 -translate-y-1/2 flex-col overflow-hidden rounded-xl bg-surface-elevated shadow-elevated focus:outline-none",
+                // Genişlik, 1rem'lik kenar boşluğunun YANI SIRA yatay güvenli
+                // alanı da düşer: yatay kullanımda pencere ortalanmış olsa bile
+                // kenarı çentiğin altına girebiliyordu.
+                "pointer-events-auto fixed left-1/2 top-1/2 z-modal flex max-h-[calc(100dvh-2rem)] w-[calc(100%-2rem-env(safe-area-inset-left)-env(safe-area-inset-right))] -translate-x-1/2 -translate-y-1/2 flex-col overflow-hidden rounded-xl bg-surface-elevated shadow-elevated focus:outline-none",
                 maxWidth ?? modalSizeClasses[size],
                 className,
               )}

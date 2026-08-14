@@ -1,13 +1,13 @@
 import { Injectable, Logger, Optional } from "@nestjs/common";
 import { PrismaService } from "../../prisma";
 import { DiscountService } from "../discount/discount.service";
-import { FeeDiscountResolver } from "../discount/fee-discount.resolver";
+import { FeeDiscountResolver } from "../discount/engine/fee-discount.resolver";
 import { StorageService } from "../storage/storage.service";
 import {
   canTradeFromMembership,
   isPremiumEntitled,
-} from "../membership/membership.util";
-import { getFreeTierCanTrade } from "../membership/free-tier-trade.helper";
+} from "../membership/helpers/membership.util";
+import { getFreeTierCanTrade } from "../membership/helpers/free-tier-trade.helper";
 import { ProductStatus } from "@prisma/client";
 import { publicIdentityFields } from "../../common/helpers/public-identity";
 import { getAvailableQuantity } from "./helpers/product-availability.helper";
@@ -16,6 +16,7 @@ import {
   publicProductRatingWhere,
   publicUserRatingWhere,
 } from "../../common/helpers/public-rating";
+import { isDevelopment } from "../../config/environment";
 
 /**
  * ProductCommonService — ürün alt servislerinin paylaştığı yardımcılar (leaf; yalnız
@@ -615,7 +616,7 @@ export class ProductCommonService {
     if (unknown.length && options.rejectUnknown) {
       throw new Error(`aktif katalogda bulunamadı: ${unknown.join(", ")}`);
     }
-    if (unknown.length && process.env.NODE_ENV === "development") {
+    if (unknown.length && isDevelopment()) {
       this.logger.warn(
         `Unknown product attribute(s) ignored: ${unknown.join(", ")}`,
       );

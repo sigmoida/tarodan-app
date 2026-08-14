@@ -1,5 +1,10 @@
 import { RefundService } from "./refund.service";
 import { RefundRequestStatus } from "@prisma/client";
+import { RefundNotificationService } from "./refund-notification.service";
+import { RefundFinancialService } from "./refund-financial.service";
+import { RefundShipmentService } from "./refund-shipment.service";
+import { RefundCreationService } from "./refund-creation.service";
+import { RefundDecisionService } from "./refund-decision.service";
 
 /**
  * MONEY-H6: donuk hold terminal kaçışı.
@@ -23,14 +28,47 @@ describe("RefundService — MONEY-H6 frozen-hold terminal escape", () => {
     const notificationService = {
       createInAppNotification: jest.fn().mockResolvedValue(undefined),
     };
+    const notifications = new RefundNotificationService(
+      prisma as any,
+      notificationService as any,
+      {} as any,
+    );
+    const financials = new RefundFinancialService(
+      prisma as any,
+      notificationService as any,
+    );
+    // expireStaleWaitForDelivery kargo servisine taşındı; gerçek örnek geçilir ki
+    // spec'in hold-kilidi iddiası hâlâ prisma'ya kadar insin.
+    const shipments = new RefundShipmentService(
+      prisma as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      notifications as any,
+      financials as any,
+    );
+    const creation = new RefundCreationService(
+      prisma as any,
+      {} as any,
+      notifications as any,
+      financials as any,
+      shipments as any,
+    );
+    const decisions = new RefundDecisionService(
+      prisma as any,
+      {} as any,
+      notifications as any,
+      financials as any,
+      shipments as any,
+    );
     const service = new RefundService(
-      prisma as any, // prisma
-      {} as any, // paymentService
-      {} as any, // cargoProvider
-      {} as any, // carrierCancellationService
-      {} as any, // suratTrackingService
-      notificationService as any, // notificationService
-      {} as any, // storageService
+      prisma as any,
+      notifications as any,
+      financials as any,
+      shipments as any,
+      creation as any,
+      decisions as any,
     );
     return { service, prisma };
   };

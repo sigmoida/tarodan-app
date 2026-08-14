@@ -1,10 +1,10 @@
 import { Prisma, OrderStatus, PaymentHoldStatus } from "@prisma/client";
 import { PrismaService } from "../../src/prisma";
-import { PaymentRefundService } from "../../src/modules/payment/payment-refund.service";
+import { PaymentHoldReleaseService } from "../../src/modules/payment/refund/payment-hold-release.service";
 import { PaymentService } from "../../src/modules/payment/payment.service";
 import { NotificationService } from "../../src/modules/notification/notification.service";
-import { OrderTrackingSyncService } from "../../src/modules/surat-cargo/order-tracking-sync.service";
-import { SuratTrackingClient } from "../../src/modules/surat-cargo/surat-tracking.client";
+import { OrderTrackingSyncService } from "../../src/modules/surat-cargo/sync/order-tracking-sync.service";
+import { SuratTrackingClient } from "../../src/modules/surat-cargo/clients/surat-tracking.client";
 import {
   truncateAll,
   getPrisma,
@@ -17,13 +17,13 @@ import {
  * doğru referansla (trackingNumber = OzelKargoTakipNo) sorgular.
  *
  * NestJS app bootstrap edilmiyor (hızlı + ES/Docker bağımlılığı yok). SuratTrackingService
- * gerçek PaymentRefundService-destekli bir PaymentService facade ile ModuleRef üzerinden
+ * gerçek PaymentHoldReleaseService-destekli bir PaymentService facade ile ModuleRef üzerinden
  * beslenir; fetchTrackingInfo mock'lanıp Sürat "teslim" cevabı döndürülür ve sorgu
  * referansı yakalanır. [P0]
  */
 describe("Surat poll delivery → escrow release (#83/#84) [P0]", () => {
   let prisma: PrismaService;
-  let paymentRefund: PaymentRefundService;
+  let paymentRefund: PaymentHoldReleaseService;
   let surat: OrderTrackingSyncService;
   let suratClient: SuratTrackingClient;
   let capturedRefs: string[];
@@ -45,16 +45,11 @@ describe("Surat poll delivery → escrow release (#83/#84) [P0]", () => {
   beforeAll(() => {
     prisma = getPrisma() as unknown as PrismaService;
 
-    paymentRefund = new PaymentRefundService(
+    paymentRefund = new PaymentHoldReleaseService(
       prisma,
       configStub as any,
-      {} as any, // paytrService
       {} as any, // eventService
       {} as any, // notificationService
-      {} as any, // commissionLedger
-      {} as any, // elogoInvoicing
-      {} as any, // paymentCommon
-      {} as any, // providerEvents
     );
 
     // ModuleRef stub: poll PaymentService/NotificationService'i lazy resolve eder.

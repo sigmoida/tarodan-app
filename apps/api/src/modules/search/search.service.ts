@@ -4,10 +4,10 @@ import {
   SearchOptions,
   SearchResponse,
 } from "./search-common.service";
-import { SearchProductService } from "./search-product.service";
-import { SearchAutocompleteService } from "./search-autocomplete.service";
-import { SearchCollectionService } from "./search-collection.service";
-import { SearchSyncService } from "./search-sync.service";
+import { SearchProductService } from "./query/search-product.service";
+import { SearchAutocompleteService } from "./query/search-autocomplete.service";
+import { SearchCollectionService } from "./query/search-collection.service";
+import { SearchSyncService } from "./indexing/search-sync.service";
 
 // Geriye dönük uyumluluk: arama tip sözleşmeleri artık search-common.service'te
 // yaşıyor; mevcut tüketiciler (search.controller vb.) bu modülden import
@@ -18,6 +18,7 @@ export {
   SearchResponse,
   RichAutocompleteResult,
 } from "./search-common.service";
+import type { CronRunSummary } from "../../monitoring/cron-run.helper";
 
 /**
  * Facade: tüm public imzalar aynen korunur, iş mantığı alt servislerde
@@ -176,7 +177,9 @@ export class SearchService implements OnModuleInit {
   // (runHandlePeriodicSync/runHourlyReconcile) alt serviste yaşar; Bull processor
   // facade'i çağırır, facade de alt servise delege eder.
 
-  async runHandlePeriodicSync(log: (msg: string) => void = () => {}) {
+  async runHandlePeriodicSync(
+    log: (msg: string) => void = () => {},
+  ): Promise<CronRunSummary> {
     return this.sync.runHandlePeriodicSync(log);
   }
 

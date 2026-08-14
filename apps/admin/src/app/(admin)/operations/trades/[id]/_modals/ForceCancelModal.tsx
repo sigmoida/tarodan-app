@@ -1,11 +1,23 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import toast from "react-hot-toast";
 import { useTranslations } from "next-intl";
-import { Modal, ModalFooter, Textarea, Checkbox } from "@tarodan/ui";
+import {
+  FormModal,
+  FormTextarea,
+  FormCheckbox,
+  useZodForm,
+} from "@tarodan/ui/form";
 import { adminApi } from "@/lib/api";
 import { useAdminMutation } from "@/hooks/useAdminMutation";
+import {
+  forceCancelTradeSchema,
+  type ForceCancelTradeValues,
+} from "../_lib/schema";
+
+const RESET_VALUES: ForceCancelTradeValues = {
+  reason: "",
+  sendArrivedItemBack: true,
+};
 
 export function ForceCancelModal({
   open,
@@ -17,20 +29,15 @@ export function ForceCancelModal({
   tradeId: string;
 }) {
   const t = useTranslations();
-  const [reason, setReason] = useState("");
-  const [sendBack, setSendBack] = useState(true);
-  useEffect(() => {
-    if (open) {
-      setReason("");
-      setSendBack(true);
-    }
-  }, [open]);
+  const form = useZodForm(forceCancelTradeSchema(t), {
+    defaultValues: RESET_VALUES,
+  });
 
   const forceCancel = useAdminMutation(
-    () =>
+    (v: ForceCancelTradeValues) =>
       adminApi.forceCancelStuckTrade(tradeId, {
-        reason: reason.trim(),
-        sendArrivedItemBack: sendBack,
+        reason: v.reason.trim(),
+        sendArrivedItemBack: v.sendArrivedItemBack,
       }),
     {
       invalidates: ["trades"],
@@ -39,53 +46,31 @@ export function ForceCancelModal({
     },
   );
 
-  const submit = () => {
-    if (reason.trim().length < 10) {
-      toast.error(t("admin.operations.trades.cancelReasonMinLen"));
-      return;
-    }
-    forceCancel.mutate();
-  };
-
   return (
-    <Modal
-      isOpen={open}
-      onClose={() => !forceCancel.isPending && onClose()}
+    <FormModal
+      open={open}
+      onClose={onClose}
       title={t("admin.operations.trades.forceCancelTitle")}
-      closeButtonDisabled={forceCancel.isPending}
-      footer={
-        <ModalFooter
-          onCancel={onClose}
-          onConfirm={submit}
-          confirmLabel={t("admin.operations.trades.forceCancelTitle")}
-          destructive
-          isLoading={forceCancel.isPending}
-        />
-      }
+      form={form}
+      onSubmit={(v) => forceCancel.mutate(v)}
+      isSubmitting={forceCancel.isPending}
+      submitLabel={t("admin.operations.trades.forceCancelTitle")}
+      destructive
+      resetValues={RESET_VALUES}
     >
-      <div className="space-y-4">
-        <p className="text-sm text-body">
-          {t("admin.operations.trades.forceCancelBody")}
-        </p>
-        <div>
-          <label className="mb-2 block text-sm font-medium text-body">
-            {t("admin.operations.trades.cancelReasonLabel")}
-          </label>
-          <Textarea
-            value={reason}
-            onChange={(e) => setReason(e.target.value)}
-            rows={3}
-            placeholder={t("admin.operations.trades.forceCancelPlaceholder")}
-            disabled={forceCancel.isPending}
-          />
-        </div>
-        <Checkbox
-          checked={sendBack}
-          onChange={(e) => setSendBack(e.target.checked)}
-          disabled={forceCancel.isPending}
-          label={t("admin.operations.trades.sendBackLabel")}
-        />
-      </div>
-    </Modal>
+      <p className="text-sm text-body">
+        {t("admin.operations.trades.forceCancelBody")}
+      </p>
+      <FormTextarea
+        name="reason"
+        label={t("admin.operations.trades.cancelReasonLabel")}
+        rows={3}
+        placeholder={t("admin.operations.trades.forceCancelPlaceholder")}
+      />
+      <FormCheckbox
+        name="sendArrivedItemBack"
+        label={t("admin.operations.trades.sendBackLabel")}
+      />
+    </FormModal>
   );
 }

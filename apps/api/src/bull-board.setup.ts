@@ -6,6 +6,8 @@ import type { Request, Response, NextFunction } from "express";
 import { QUEUE_NAMES } from "./workers/constants";
 import { CronTrackerService } from "./monitoring/cron-tracker.service";
 import type { CronRunRecord } from "./monitoring/cron-tracker.service";
+import { isDevelopment } from "./config/environment";
+import { errorMessage } from "./common/helpers/error-message";
 
 const BASE_PATH = "/admin/queues";
 
@@ -53,9 +55,7 @@ function alignBullBoardBullCopy(logger: Logger): void {
   } catch (e) {
     // Hizalama başarısızsa mount denemesi yine de yapılır; en kötü ihtimalle
     // adapter düzeyinde yakalanır. Açılışı bloklamaz.
-    logger.warn(
-      `Bull Board: bull kopyası hizalanamadı: ${e instanceof Error ? e.message : String(e)}`,
-    );
+    logger.warn(`Bull Board: bull kopyası hizalanamadı: ${errorMessage(e)}`);
   }
 }
 
@@ -78,7 +78,7 @@ export function setupBullBoard(
   // queue dashboard is never exposed unless BULLBOARD_ENABLED=true. Local
   // development keeps it on for convenience (unless explicitly disabled). Not
   // driven by the negation of `production` anymore (#69).
-  const isLocalDev = process.env.NODE_ENV === "development";
+  const isLocalDev = isDevelopment();
   const flag = process.env.BULLBOARD_ENABLED;
 
   const enabled = flag === "true" || (isLocalDev && flag !== "false");
@@ -105,7 +105,7 @@ export function setupBullBoard(
           return queue ? new BullAdapter(queue) : null;
         } catch (e) {
           logger.warn(
-            `Bull Board: '${name}' kuyruğu çözülemedi: ${e instanceof Error ? e.message : String(e)}`,
+            `Bull Board: '${name}' kuyruğu çözülemedi: ${errorMessage(e)}`,
           );
           return null;
         }
@@ -154,7 +154,7 @@ export function setupBullBoard(
   } catch (err) {
     // İzleme aracı API'yi asla düşürmez.
     logger.error(
-      `Bull Board mount başarısız (non-fatal): ${err instanceof Error ? err.message : String(err)}`,
+      `Bull Board mount başarısız (non-fatal): ${errorMessage(err)}`,
     );
   }
 }

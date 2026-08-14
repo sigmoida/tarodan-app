@@ -98,7 +98,11 @@ export default async function TopCollections({
       viewAllHref="/collections"
       viewAllLabel={t("home.viewAll")}
     >
-      <div className="grid grid-cols-2 gap-4">
+      {/* Altı koleksiyon: telefonda iki sütun, geniş ekranda tek satır —
+          kırılım yokken 1536px'te iki dev kart olarak duruyordu. Basamaklar
+          `ProductRail` ile birebir aynı, yoksa tablet genişliğinde koleksiyonlar
+          üç, hemen üstündeki ürün rayı dört sütun gösteriyordu. */}
+      <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6">
         {items.slice(0, 6).map((collection) => (
           <CollectionCard
             key={collection.id}

@@ -29,7 +29,7 @@ export function ErrorDetail({ log }: { log: ErrorLog }) {
   const m = log.metadata;
   return (
     <div className="space-y-3 rounded-lg border border-border bg-surface-alt p-4 text-sm">
-      <div className="grid grid-cols-2 gap-x-6 gap-y-1 text-muted">
+      <div className="grid grid-cols-1 gap-x-6 gap-y-1 text-muted sm:grid-cols-2">
         {log.endpoint && <Field label="Endpoint" value={log.endpoint} mono />}
         {m?.status && (
           <Field
@@ -126,7 +126,7 @@ export function AuditDetail({ log }: { log: AuditLog }) {
   const t = useTranslations();
   return (
     <div className="space-y-3 rounded-lg border border-border bg-surface-alt p-4 text-sm">
-      <div className="grid grid-cols-2 gap-x-6 gap-y-1 text-muted">
+      <div className="grid grid-cols-1 gap-x-6 gap-y-1 text-muted sm:grid-cols-2">
         <Field label="Admin" value={log.admin?.email ?? log.adminUserId} />
         <Field
           label={t("admin.system.logs.action")}

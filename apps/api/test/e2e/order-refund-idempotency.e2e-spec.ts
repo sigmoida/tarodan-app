@@ -5,7 +5,8 @@ import {
   OrderStatus,
 } from "@prisma/client";
 import { PrismaService } from "../../src/prisma";
-import { PaymentRefundService } from "../../src/modules/payment/payment-refund.service";
+import { PaymentRefundService } from "../../src/modules/payment/refund/payment-refund.service";
+import { PaymentRefundAttemptService } from "../../src/modules/payment/refund/payment-refund-attempt.service";
 import {
   truncateAll,
   getPrisma,
@@ -65,6 +66,9 @@ describe("Order refund idempotency (#85) [P0]", () => {
       } as any, // elogoInvoicing
       { cancelSuratShipmentIfExists: async () => {} } as any, // paymentCommon
       {} as any, // providerEvents
+      {} as any, // holdRelease
+      new PaymentRefundAttemptService(prisma as any), // attempts
+      {} as any, // tradeRefunds
     );
   });
 

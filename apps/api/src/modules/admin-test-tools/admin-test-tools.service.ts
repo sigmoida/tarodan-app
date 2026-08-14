@@ -4,6 +4,8 @@ import type { Queue } from "bull";
 import { PrismaService } from "../../prisma";
 import { QUEUE_NAMES } from "../../workers/constants";
 import { CRON_CATALOG } from "../../workers/cron-catalog";
+import { nodeEnv } from "../../config/environment";
+import { i18nMessage } from "../i18n";
 
 /**
  * Admin "Test Araçları / Zaman Makinesi" arka uç mantığı.
@@ -50,7 +52,7 @@ export class AdminTestToolsService {
 
   // ─────────────────────────── Ortam ───────────────────────────
   getEnvironment(): { env: string; isProd: boolean } {
-    const env = process.env.NODE_ENV ?? "development";
+    const env = nodeEnv() ?? "development";
     return { env, isProd: env === "production" };
   }
 
@@ -292,7 +294,8 @@ export class AdminTestToolsService {
           where: { id },
           select: { boostedUntil: true, homeShowcaseUntil: true },
         });
-        if (!before) throw new BadRequestException("Ürün bulunamadı");
+        if (!before)
+          throw new BadRequestException(i18nMessage("server.product.notFound"));
         await this.prisma.product.update({
           where: { id },
           data: {
@@ -319,7 +322,10 @@ export class AdminTestToolsService {
           where: { id },
           select: { currentPeriodEnd: true },
         });
-        if (!before) throw new BadRequestException("Üyelik bulunamadı");
+        if (!before)
+          throw new BadRequestException(
+            i18nMessage("server.membership.notFound"),
+          );
         await this.prisma.userMembership.update({
           where: { id },
           data: { currentPeriodEnd: target },
@@ -337,7 +343,8 @@ export class AdminTestToolsService {
           where: { id },
           select: { createdAt: true },
         });
-        if (!before) throw new BadRequestException("İade talebi bulunamadı");
+        if (!before)
+          throw new BadRequestException(i18nMessage("server.refund.notFound"));
         await this.prisma.refundRequest.update({
           where: { id },
           data: { createdAt: target },
@@ -355,7 +362,10 @@ export class AdminTestToolsService {
           where: { id },
           select: { paymentExpiresAt: true },
         });
-        if (!before) throw new BadRequestException("Sipariş bulunamadı");
+        if (!before)
+          throw new BadRequestException(
+            i18nMessage("server.refund.orderNotFound"),
+          );
         await this.prisma.order.update({
           where: { id },
           data: { paymentExpiresAt: target },
@@ -373,7 +383,10 @@ export class AdminTestToolsService {
           where: { id },
           select: { expiresAt: true },
         });
-        if (!before) throw new BadRequestException("Teklif bulunamadı");
+        if (!before)
+          throw new BadRequestException(
+            i18nMessage("server.order.offerNotFound"),
+          );
         await this.prisma.offer.update({
           where: { id },
           data: { expiresAt: target },
@@ -396,7 +409,10 @@ export class AdminTestToolsService {
             shippingDeadline: true,
           },
         });
-        if (!before) throw new BadRequestException("Takas bulunamadı");
+        if (!before)
+          throw new BadRequestException(
+            i18nMessage("server.payment.tradeNotFound"),
+          );
         const field = tradeDeadlineField(before.status);
         await this.prisma.trade.update({
           where: { id },
@@ -415,7 +431,10 @@ export class AdminTestToolsService {
           where: { id },
           select: { releaseAt: true },
         });
-        if (!before) throw new BadRequestException("Hold bulunamadı");
+        if (!before)
+          throw new BadRequestException(
+            i18nMessage("server.admin.holdNotFound"),
+          );
         await this.prisma.paymentHold.update({
           where: { id },
           data: { releaseAt: target },
@@ -433,7 +452,10 @@ export class AdminTestToolsService {
           where: { id },
           select: { expiresAt: true },
         });
-        if (!before) throw new BadRequestException("Token bulunamadı");
+        if (!before)
+          throw new BadRequestException(
+            i18nMessage("server.admin.tokenNotFound"),
+          );
         await this.prisma.emailVerificationToken.update({
           where: { id },
           data: { expiresAt: target },
@@ -451,7 +473,10 @@ export class AdminTestToolsService {
           where: { id },
           select: { expiresAt: true },
         });
-        if (!before) throw new BadRequestException("Token bulunamadı");
+        if (!before)
+          throw new BadRequestException(
+            i18nMessage("server.admin.tokenNotFound"),
+          );
         await this.prisma.passwordResetToken.update({
           where: { id },
           data: { expiresAt: target },

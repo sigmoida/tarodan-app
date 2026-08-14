@@ -29,7 +29,10 @@ export default function CookieConsentBanner() {
         transition={{ duration: 0.2, ease: "easeOut" }}
         role="dialog"
         aria-label="Çerez tercihleri"
-        className="fixed inset-x-0 bottom-0 z-[9999] p-4"
+        // Boşluklar tek tek yazılıyor: alttaki 1rem'e ana ekran çizgisinin payı
+        // EKLENMELİ (`pb-safe` onu ezip yerine geçerdi), yanlarda ise `px-gutter`
+        // zaten "1rem, çentik daha genişse o kadar" demek.
+        className="fixed inset-x-0 bottom-0 z-[9999] px-gutter pt-4 pb-[calc(1rem+env(safe-area-inset-bottom))]"
       >
         <div className="mx-auto max-w-3xl rounded-2xl border border-border bg-surface-elevated p-5 shadow-lg">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">

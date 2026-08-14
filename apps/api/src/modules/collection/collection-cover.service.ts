@@ -13,6 +13,8 @@ import * as https from "https";
 import * as http from "http";
 import { configureSharpSafety } from "../../common/image/sharp-safety";
 import { PUBLIC_NAME_SELECT } from "../../common/helpers/public-identity";
+import { errorMessage } from "../../common/helpers/error-message";
+import { i18nMessage } from "../i18n";
 
 // Sharp is optional. Yükleme hatası sessizce yutulmasın (bkz. media.service —
 // staging'de sharp'sız imaj tek 400 ile teşhis edilemiyordu).
@@ -57,11 +59,13 @@ export class CollectionCoverService {
     });
 
     if (!collection) {
-      throw new NotFoundException("Koleksiyon bulunamadı");
+      throw new NotFoundException(i18nMessage("server.collection.notFound"));
     }
 
     if (collection.userId !== userId) {
-      throw new ForbiddenException("Bu koleksiyonu düzenleme yetkiniz yok");
+      throw new ForbiddenException(
+        i18nMessage("server.collection.editForbidden"),
+      );
     }
 
     const updated = await this.prisma.collection.update({
@@ -188,7 +192,7 @@ export class CollectionCoverService {
           return uploadResult.key;
         } catch (error) {
           this.logger.error(
-            `Failed to generate single cover image: ${error.message}`,
+            `Failed to generate single cover image: ${errorMessage(error)}`,
           );
           return null;
         }
@@ -204,7 +208,9 @@ export class CollectionCoverService {
             .toBuffer();
           imageBuffers.push(resized);
         } catch (error) {
-          this.logger.warn(`Failed to download image ${url}: ${error.message}`);
+          this.logger.warn(
+            `Failed to download image ${url}: ${errorMessage(error)}`,
+          );
         }
       }
 
@@ -257,7 +263,9 @@ export class CollectionCoverService {
 
       return uploadResult.key;
     } catch (error) {
-      this.logger.error(`Failed to generate cover image: ${error.message}`);
+      this.logger.error(
+        `Failed to generate cover image: ${errorMessage(error)}`,
+      );
       return null;
     }
   }
@@ -283,7 +291,7 @@ export class CollectionCoverService {
       );
     } catch (e: any) {
       this.logger.warn(
-        `Failed to resolve product image: ${imageUrl} - ${e.message}`,
+        `Failed to resolve product image: ${imageUrl} - ${errorMessage(e)}`,
       );
       return null;
     }

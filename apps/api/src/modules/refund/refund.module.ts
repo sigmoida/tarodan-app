@@ -10,11 +10,16 @@ import { DiscountModule } from "../discount";
 import { SuratCargoModule } from "../surat-cargo/surat-cargo.module";
 import { NotificationModule } from "../notification/notification.module";
 import { StorageModule } from "../storage/storage.module";
-import { ShippingTariffModule } from "../shipping/shipping-tariff.module";
+import { ShippingTariffModule } from "../shipping/tariff/shipping-tariff.module";
 import { RefundController } from "./refund.controller";
 import { RefundService } from "./refund.service";
-import { RefundSchedulerService } from "./refund-scheduler.service";
-import { RefundScheduledProcessor } from "./refund-scheduled.processor";
+import { RefundNotificationService } from "./refund-notification.service";
+import { RefundFinancialService } from "./refund-financial.service";
+import { RefundShipmentService } from "./refund-shipment.service";
+import { RefundCreationService } from "./refund-creation.service";
+import { RefundDecisionService } from "./refund-decision.service";
+import { RefundSchedulerService } from "./jobs/refund-scheduler.service";
+import { RefundScheduledProcessor } from "./jobs/refund-scheduled.processor";
 import { scheduledProcessors } from "../../workers/scheduled-processors";
 
 @Module({
@@ -41,6 +46,11 @@ import { scheduledProcessors } from "../../workers/scheduled-processors";
   controllers: [RefundController],
   providers: [
     RefundService,
+    RefundNotificationService,
+    RefundFinancialService,
+    RefundShipmentService,
+    RefundCreationService,
+    RefundDecisionService,
     RefundSchedulerService,
     ...scheduledProcessors(RefundScheduledProcessor),
   ],

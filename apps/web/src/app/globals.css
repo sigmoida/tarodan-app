@@ -28,6 +28,14 @@
 
 html {
   scroll-behavior: smooth;
+  /*
+   * Kenardan kenara uzanan bölümler (marka şeridi) `w-screen` + negatif kenar
+   * boşluğu ile kabından taşar; `100vw` dikey kaydırma çubuğunun genişliğini de
+   * saydığı için masaüstünde sayfa birkaç piksel yatay kaydırılabilir hâle
+   * geliyordu. `clip`, `hidden`den farklı olarak kaydırma kabı OLUŞTURMAZ —
+   * yani başlıktaki `position: sticky` çalışmaya devam eder.
+   */
+  overflow-x: clip;
 }
 
 body {
@@ -203,27 +211,6 @@ select option {
   box-shadow: 0 4px 12px -4px rgba(0, 0, 0, 0.1);
 }
 
-/* Slim Top Bar - Image Marquee (right to left infinite scroll) */
-@keyframes ad-marquee {
-  0% {
-    transform: translateX(0);
-  }
-  100% {
-    transform: translateX(-50%);
-  }
-}
-.ad-marquee-track {
-  animation: ad-marquee 28s linear infinite;
-}
-.ad-marquee-track:hover {
-  animation-play-state: paused;
-}
-@media (max-width: 767px) {
-  .ad-marquee-track {
-    animation-duration: 24s;
-  }
-}
-
 /* Brands marquee - sağdan sola sürekli kayma */
 @keyframes brands-marquee {
   0% { transform: translateX(0); }
@@ -234,4 +221,41 @@ select option {
 }
 .brands-marquee-track:hover {
   animation-play-state: paused;
+}
+
+/*
+ * Hareket azaltma tercihi (işletim sistemi ayarı).
+ *
+ * Sayfada durmadan dönen iki şerit var (üst reklam bandı ve marka şeridi) ve
+ * her ikisi de `infinite` — vestibüler duyarlılığı olan kullanıcılar için
+ * sayfayı okunamaz hâle getiren tam olarak bu tür bir hareket. Şeritler
+ * durduğunda içerik kaybolmaz: iki kopya yan yana dizildiği için ilk kopya
+ * zaten görünür durumda kalır.
+ *
+ * Genel kural, tek tek her animasyonu aramak yerine geçişleri de kapsıyor;
+ * `animation-iteration-count: 1` sonsuz döngüleri sonlandırır. Yumuşak kaydırma
+ * da tercihe uyar — `scroll-behavior: smooth` bu kullanıcılar için istenmeyen
+ * bir hareket kaynağı.
+ */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+
+  /*
+   * Yükleniyor göstergesi bu kuralın DIŞINDA kalır. Dönmeyi durdurmak
+   * "hareketi azaltmak" değil, geri bildirimi yok etmek olurdu: ödeme,
+   * yükleme ve form gönderiminde kullanıcı işlemin sürdüğünü yalnız buradan
+   * anlıyor. Hareket azaltma, bilgi taşıyan animasyonu kaldırmayı değil,
+   * dekoratif olanı kaldırmayı ister.
+   */
+  .animate-spin {
+    animation-duration: 1s !important;
+    animation-iteration-count: infinite !important;
+  }
 }

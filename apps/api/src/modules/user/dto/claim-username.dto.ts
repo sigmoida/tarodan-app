@@ -4,7 +4,7 @@ import {
   USERNAME_MAX_LENGTH,
   USERNAME_MIN_LENGTH,
   USERNAME_PATTERN,
-} from "../../auth/username.util";
+} from "../../auth/utils/username.util";
 
 export class ClaimUsernameDto {
   @ApiProperty({ example: "kaan.merakli" })

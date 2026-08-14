@@ -1,7 +1,28 @@
 {
+  // Üretimde çalıştırılabilir derlenmiş seed'ler. Çıktı yolları `seed:prod`,
+  // `seed:launch:prod`, `bootstrap:prod:admin`, `reset:prod:runtime` ve
+  // `verify:prod:launch` script'lerinin BEKLEDİĞİ yollardır — bozulursa
+  // konteyner boot'ta MODULE_NOT_FOUND ile crash-loop'a girer.
   "extends": "./tsconfig.json",
   "compilerOptions": {
     "outDir": "./dist-seed",
+
+    // ZORUNLU: rootDir sabitlenmezse tsc onu derlenen TÜM dosyaların ortak
+    // atasından çıkarır. Seed grafiğine apps/api DIŞINDAN tek bir dosya
+    // girdiğinde ortak kök monorepo köküne kayar ve çıktı sessizce
+    // `dist-seed/apps/api/prisma/...` olur — script'ler ise hâlâ
+    // `dist-seed/prisma/...` arar. Sabitlenince aynı durum derleme HATASI
+    // verir; sessiz yer değiştirme yerine gürültülü başarısızlık.
+    "rootDir": ".",
+
+    // @tarodan/* paketleri KAYNAKTAN değil, derlenmiş dist'lerinden çözülür
+    // (package.json main/types → ./dist; Dockerfile onları build:seed'den
+    // ÖNCE derler). Kök tsconfig'in `paths` eşlemesi onları packages/*/src'e
+    // yönlendirir; o eşleme burada geçerli olsaydı paket kaynağı da emit
+    // setine girip rootDir'i kırardı. Seed grafiği i18n'e StorageService
+    // üzerinden ulaşıyor, yani bu teorik bir ihtimal değil.
+    "paths": {},
+
     "declaration": false,
     "sourceMap": false,
     "incremental": false

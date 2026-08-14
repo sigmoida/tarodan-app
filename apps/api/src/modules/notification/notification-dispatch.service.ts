@@ -8,7 +8,6 @@
  * to this single engine.
  */
 import { Injectable, Logger, NotFoundException } from "@nestjs/common";
-import { ConfigService } from "@nestjs/config";
 import { PrismaService } from "../../prisma";
 import { i18nMessage } from "../i18n";
 import {
@@ -31,13 +30,13 @@ import {
   resolveSettings,
   shouldDeliver,
   DeliveryChannel,
-} from "./notification-preferences";
+} from "./helpers/notification-preferences";
 import { NotificationSettings } from "../user/dto/notification-settings.dto";
-import { NOTIFICATION_TEMPLATES } from "./notification-templates";
+import { NOTIFICATION_TEMPLATES } from "./helpers/notification-templates";
 import {
   normalizeLegacyNotificationLink,
   resolveWebNotificationLink,
-} from "./notification-link";
+} from "./helpers/notification-link";
 import {
   type Locale,
   type MessageValues,
@@ -45,6 +44,10 @@ import {
   isLocale,
 } from "@tarodan/i18n";
 import { I18nService } from "../i18n/i18n.service";
+import {
+  frontendUrl as resolveFrontendUrl,
+  frontendUrlForEnvironment,
+} from "../../config/app-urls";
 
 @Injectable()
 export class NotificationDispatchService {
@@ -52,7 +55,6 @@ export class NotificationDispatchService {
 
   constructor(
     private readonly prisma: PrismaService,
-    private readonly configService: ConfigService,
     private readonly expoPushProvider: ExpoPushProvider,
     private readonly smsProvider: SmsProvider,
     private readonly smtpProvider: SmtpProvider,
@@ -232,11 +234,7 @@ export class NotificationDispatchService {
     data?: Record<string, any>,
   ): Promise<boolean> {
     try {
-      const frontendUrl =
-        this.configService.get<string>("FRONTEND_URL") ||
-        (this.configService.get<string>("NODE_ENV") === "production"
-          ? "https://tarodan.com.tr"
-          : "http://localhost:3000");
+      const frontendUrl = frontendUrlForEnvironment();
       const safeSubject = escapeEmailHtml(subject);
       const safeBody = escapeEmailHtml(body).replace(/\n/g, "<br>");
       const result = await this.smtpProvider.sendEmail({
@@ -689,8 +687,7 @@ export class NotificationDispatchService {
     templateData: Record<string, any>,
   ): Promise<{ success: boolean; messageId?: string; error?: string }> {
     try {
-      const frontendUrl =
-        this.configService.get("FRONTEND_URL") || "https://tarodan.com.tr";
+      const frontendUrl = resolveFrontendUrl();
       // Placeholder takma adları: göndericiler farklı anahtar adları geçebiliyor
       // (ör. welcome 'name'/'verifyUrl' geçer ama DB şablonu {{displayName}}/{{frontendUrl}}
       // bekler). Eşdeğer anahtarları doldur ki ham {{...}} kalmasın. Mevcut değerler

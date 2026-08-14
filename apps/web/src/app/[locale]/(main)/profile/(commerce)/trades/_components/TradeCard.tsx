@@ -45,6 +45,7 @@ function ItemColumn({ label, items }: { label: string; items: TradeItem[] }) {
                 src={getItemImage(item)}
                 alt={item.productTitle}
                 fill
+                sizes="64px"
                 className="object-cover"
                 fallbackSrc="https://placehold.co/64x64/f3f4f6/9ca3af?text=Ürün"
                 logContext={{ itemId: item.id, page: "trades-list" }}
@@ -163,7 +164,10 @@ export default function TradeCard({
         </div>
       )}
 
-      <div className="mt-4 pt-4 border-t border-border-subtle flex items-center justify-between gap-3">
+      {/* `flex-wrap`: uzun tarih ("14 Ağustos 2026") ile sarmayan buton metni
+          dar telefonda yan yana sığmıyor ve satırı taşırıyordu. Sığmadığında
+          buton alt satıra iner. */}
+      <div className="mt-4 pt-4 border-t border-border-subtle flex flex-wrap items-center justify-between gap-3">
         <div className="text-sm text-muted">
           {new Date(trade.createdAt).toLocaleDateString("tr-TR", {
             year: "numeric",

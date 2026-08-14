@@ -25,7 +25,7 @@ import { createAddress } from "../factories/address.factory";
 import { signCallback } from "../mocks/paytr.mock";
 import { PaymentService } from "../../src/modules/payment/payment.service";
 import { PayoutService } from "../../src/modules/payout/payout.service";
-import { TradeSchedulerService } from "../../src/modules/trade/trade-scheduler.service";
+import { TradeSchedulerService } from "../../src/modules/trade/jobs/trade-scheduler.service";
 
 /**
  * Wait for the post-accept fire-and-forget inbound dispatch to settle.
@@ -1111,7 +1111,7 @@ describe("Escrow Edge Cases (E2E)", () => {
       // Run sync — should NOT try to sync the no-tracking shipment
       const {
         SuratTrackingService,
-      } = require("../../src/modules/surat-cargo/surat-tracking.service");
+      } = require("../../src/modules/surat-cargo/sync/surat-tracking.service");
       const tracking = ctx.app.get(SuratTrackingService);
       const result = await tracking.syncAllActiveShipments();
 

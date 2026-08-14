@@ -82,10 +82,26 @@ export default async function LocaleLayout({
           >
             {children}
             <DynamicCookieConsentBanner />
+            {/*
+              Bildirimler ekranın alt kenarına yapışır; `bottom` varsayılan 16px
+              yerine ana ekran çizgisinin payını da ekler, yoksa çentikli
+              telefonlarda son bildirim çizginin altında kalıyordu. `maxWidth`
+              artık sabit 360px değil: 360px'i hedefler ama dar telefonda
+              görünür alana (ve yatay çentiğe) göre daralır.
+            */}
             <Toaster
               position="bottom-right"
-              containerStyle={{ zIndex: zIndex.toast }}
-              toastOptions={{ style: { maxWidth: "360px" } }}
+              containerStyle={{
+                zIndex: zIndex.toast,
+                bottom: "calc(1rem + env(safe-area-inset-bottom))",
+                right: "calc(1rem + env(safe-area-inset-right))",
+              }}
+              toastOptions={{
+                style: {
+                  maxWidth:
+                    "min(360px, calc(100vw - 2rem - env(safe-area-inset-left) - env(safe-area-inset-right)))",
+                },
+              }}
             />
           </GoogleOAuthProvider>
         </NextIntlClientProvider>

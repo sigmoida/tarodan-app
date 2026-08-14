@@ -3,7 +3,7 @@ import { CartService } from "./cart.service";
 import { PrismaService } from "../../prisma";
 import { DiscountService } from "../discount/discount.service";
 import { StorageService } from "../storage/storage.service";
-import { ShippingTariffService } from "../shipping/shipping-tariff.service";
+import { ShippingTariffService } from "../shipping/tariff/shipping-tariff.service";
 import { ProductKind, ProductStatus } from "@prisma/client";
 import { flatPackageTiers } from "../shipping/testing/tariff-fixture";
 
@@ -167,7 +167,7 @@ describe("CartService.addItem — idempotent re-add", () => {
     await expect(
       service.addItem("user-1", { productId, quantity: 1 } as any),
     ).rejects.toMatchObject({
-      response: expect.objectContaining({ statusCode: 404 }),
+      response: { i18nKey: "server.product.notFound" },
     });
     expect(mockPrisma.cartItem.findUnique).not.toHaveBeenCalled();
   });

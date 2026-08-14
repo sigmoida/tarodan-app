@@ -22,21 +22,22 @@ import { EventService } from "../events";
 import { NotificationService } from "../notification/notification.service";
 import { NotificationType } from "../notification/dto";
 import { OrderService } from "../order/order.service";
-import { OrderCheckoutCommonService } from "../order/order-checkout-common.service";
-import { OrderFeeDiscountService } from "../order/order-fee-discount.service";
-import { paymentWindowEnd } from "../payment/payment.constants";
-import { ProductLockService } from "../product/product-lock.service";
+import { OrderCheckoutCommonService } from "../order/checkout/order-checkout-common.service";
+import { OrderFeeDiscountService } from "../order/pricing/order-fee-discount.service";
+import { paymentWindowEnd } from "../payment/helpers/payment.constants";
+import { ProductLockService } from "../product/lock/product-lock.service";
 import { getAvailableQuantity } from "../product/helpers/product-availability.helper";
 import { resolveSalePrice } from "../product/helpers/product-sale-window";
 import { generateUniqueReference } from "../../common/helpers/generate-reference";
 import { REFERENCE_PREFIX } from "../../common/helpers/code-prefixes";
 import { i18nMessage } from "../i18n";
-import { OFFER_CANCEL_REASON } from "../trade/trade-cancel-reasons";
+import { OFFER_CANCEL_REASON } from "../trade/helpers/trade-cancel-reasons";
 import {
   PUBLIC_NAME_SELECT,
   publicName,
   toPublicIdentity,
 } from "../../common/helpers/public-identity";
+import { paginate } from "../../common/list";
 
 @Injectable()
 export class OfferService {
@@ -1010,49 +1011,46 @@ export class OfferService {
       where.status = status;
     }
 
-    const total = await this.prisma.offer.count({ where });
-
-    const offers = await this.prisma.offer.findMany({
-      where,
-      orderBy: { createdAt: "desc" },
-      skip: (page - 1) * limit,
-      take: limit,
-      include: {
-        product: {
-          include: {
-            images: { take: 1, orderBy: { sortOrder: "asc" } },
+    const result = await paginate(
+      this.prisma.offer,
+      {
+        where,
+        orderBy: { createdAt: "desc" },
+        include: {
+          product: {
+            include: {
+              images: { take: 1, orderBy: { sortOrder: "asc" } },
+            },
           },
-        },
-        buyer: {
-          select: {
-            id: true,
-            ...PUBLIC_NAME_SELECT,
-            isVerified: true,
-            avatarUrl: true,
+          buyer: {
+            select: {
+              id: true,
+              ...PUBLIC_NAME_SELECT,
+              isVerified: true,
+              avatarUrl: true,
+            },
           },
-        },
-        seller: {
-          select: {
-            id: true,
-            ...PUBLIC_NAME_SELECT,
-            isVerified: true,
-            avatarUrl: true,
+          seller: {
+            select: {
+              id: true,
+              ...PUBLIC_NAME_SELECT,
+              isVerified: true,
+              avatarUrl: true,
+            },
           },
-        },
-        order: {
-          select: { id: true, status: true },
+          order: {
+            select: { id: true, status: true },
+          },
         },
       },
-    });
+      { page, limit },
+    );
 
     return {
-      data: await Promise.all(offers.map((o) => this.formatOfferResponse(o))),
-      meta: {
-        total,
-        page,
-        limit,
-        totalPages: Math.ceil(total / limit),
-      },
+      ...result,
+      data: await Promise.all(
+        result.data.map((o) => this.formatOfferResponse(o)),
+      ),
     };
   }
 
@@ -1138,50 +1136,47 @@ export class OfferService {
       where.status = status;
     }
 
-    const total = await this.prisma.offer.count({ where });
-
-    const offers = await this.prisma.offer.findMany({
-      where,
-      orderBy: { createdAt: "desc" },
-      skip: (page - 1) * limit,
-      take: limit,
-      include: {
-        product: {
-          include: {
-            images: { take: 1, orderBy: { sortOrder: "asc" } },
-            category: { select: { id: true } },
+    const result = await paginate(
+      this.prisma.offer,
+      {
+        where,
+        orderBy: { createdAt: "desc" },
+        include: {
+          product: {
+            include: {
+              images: { take: 1, orderBy: { sortOrder: "asc" } },
+              category: { select: { id: true } },
+            },
           },
-        },
-        buyer: {
-          select: {
-            id: true,
-            ...PUBLIC_NAME_SELECT,
-            isVerified: true,
-            avatarUrl: true,
+          buyer: {
+            select: {
+              id: true,
+              ...PUBLIC_NAME_SELECT,
+              isVerified: true,
+              avatarUrl: true,
+            },
           },
-        },
-        seller: {
-          select: {
-            id: true,
-            ...PUBLIC_NAME_SELECT,
-            isVerified: true,
-            avatarUrl: true,
+          seller: {
+            select: {
+              id: true,
+              ...PUBLIC_NAME_SELECT,
+              isVerified: true,
+              avatarUrl: true,
+            },
           },
-        },
-        order: {
-          select: { id: true, status: true },
+          order: {
+            select: { id: true, status: true },
+          },
         },
       },
-    });
+      { page, limit },
+    );
 
     return {
-      data: await Promise.all(offers.map((o) => this.formatOfferResponse(o))),
-      meta: {
-        total,
-        page,
-        limit,
-        totalPages: Math.ceil(total / limit),
-      },
+      ...result,
+      data: await Promise.all(
+        result.data.map((o) => this.formatOfferResponse(o)),
+      ),
     };
   }
 

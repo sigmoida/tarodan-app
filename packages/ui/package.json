@@ -8,6 +8,7 @@
     ".": "./src/index.ts",
     "./form": "./src/form.ts",
     "./utils": "./src/lib/utils.ts",
+    "./hooks": "./src/hooks/index.ts",
     "./logo": "./src/components/Logo.tsx",
     "./spinner": "./src/components/Spinner.tsx",
     "./alert": "./src/components/Alert.tsx"
@@ -40,7 +41,9 @@
     "@tarodan/eslint-config": "workspace:*",
     "@tarodan/tsconfig": "workspace:*",
     "@types/react": "^18.2.42",
+    "@types/react-dom": "^18.2.18",
     "react": "^18.2.0",
+    "react-dom": "^18.2.0",
     "react-hook-form": "^7.84.0",
     "typescript": "^5.3.2",
     "zod": "3.25.76"
@@ -48,6 +51,7 @@
   "peerDependencies": {
     "@hookform/resolvers": ">=3.3.0",
     "react": ">=18.0.0",
+    "react-dom": ">=18.0.0",
     "react-hook-form": ">=7.49.0",
     "zod": ">=3.22.0"
   }

@@ -8,7 +8,8 @@ import { PrismaService } from "../../prisma";
 import { Client } from "@elastic/elasticsearch";
 import { Prisma, ProductStatus } from "@prisma/client";
 import { catalogProductWhere } from "../product/helpers/catalog-product-where";
-import { saleCapableSellerWhere } from "../membership/membership.util";
+import { saleCapableSellerWhere } from "../membership/helpers/membership.util";
+import { errorMessage } from "../../common/helpers/error-message";
 
 export interface ProductSearchResult {
   id: string;
@@ -395,7 +396,7 @@ export class SearchCommonService implements OnModuleInit {
     } catch (error) {
       this.esAvailable = false;
       this.logger.warn(
-        `Elasticsearch index creation failed – app will use PostgreSQL fallback. Error: ${error instanceof Error ? error.message : String(error)}`,
+        `Elasticsearch index creation failed – app will use PostgreSQL fallback. Error: ${errorMessage(error)}`,
       );
     }
   }
@@ -520,7 +521,7 @@ export class SearchCommonService implements OnModuleInit {
       });
     } catch (error) {
       this.logger.warn(
-        `Collections index creation failed: ${error instanceof Error ? error.message : String(error)}`,
+        `Collections index creation failed: ${errorMessage(error)}`,
       );
     }
   }

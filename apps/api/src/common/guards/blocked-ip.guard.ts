@@ -6,6 +6,8 @@ import {
   Logger,
 } from "@nestjs/common";
 import { PrismaService } from "../../prisma";
+import { isTest } from "../../config/environment";
+import { i18nMessage } from "../../modules/i18n";
 
 /**
  * Admin'in engellediği IP'lerden gelen istekleri reddeder.
@@ -46,7 +48,9 @@ export class BlockedIpGuard implements CanActivate {
 
     const blocked = await this.loadBlockedIps();
     if (blocked.has(ip)) {
-      throw new ForbiddenException("Erişim engellendi");
+      throw new ForbiddenException(
+        i18nMessage("server.security.accessBlocked"),
+      );
     }
     return true;
   }
@@ -64,7 +68,7 @@ export class BlockedIpGuard implements CanActivate {
 
   private async loadBlockedIps(): Promise<Set<string>> {
     const now = Date.now();
-    const ttl = process.env.NODE_ENV === "test" ? 0 : CACHE_TTL_MS;
+    const ttl = isTest() ? 0 : CACHE_TTL_MS;
     if (this.cache && now - this.cache.at < ttl) return this.cache.ips;
 
     try {

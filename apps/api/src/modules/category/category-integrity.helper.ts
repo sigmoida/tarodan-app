@@ -1,6 +1,7 @@
 import { BadRequestException, NotFoundException } from "@nestjs/common";
 import { CommissionRuleSetStatus, CommissionSellerType } from "@prisma/client";
 import { PrismaService } from "../../prisma";
+import { i18nMessage } from "../i18n";
 
 export const CATEGORIES_CACHE_KEY = "categories:all";
 
@@ -46,7 +47,7 @@ export async function assertCategoryHasPublishedCommissionCoverage(
     });
   if (!complete) {
     throw new BadRequestException(
-      "Kategori aktifleştirilemez: aktif komisyon setinde FREE, BASIC, PREMIUM ve BUSINESS için 0 TL'den sonsuza kadar eksiksiz fiyat aralığı yayınlanmalıdır.",
+      i18nMessage("server.category.commissionCoverageIncomplete"),
     );
   }
 }
@@ -62,21 +63,27 @@ export async function assertValidCategoryParent(
 
   while (currentId) {
     if (visited.has(currentId)) {
-      throw new BadRequestException(
-        "Kategori kendi alt kategorisini üst kategori olarak seçemez",
-      );
+      throw new BadRequestException(i18nMessage("server.category.parentCycle"));
     }
     visited.add(currentId);
-    const parent = await prisma.category.findUnique({
+    // Annotated to break a circular inference: `currentId` is assigned from
+    // `parent.parentId` at the end of the loop, so typing one needs the other.
+    const parent: {
+      id: string;
+      parentId: string | null;
+      isActive: boolean;
+    } | null = await prisma.category.findUnique({
       where: { id: currentId },
       select: { id: true, parentId: true, isActive: true },
     });
     if (!parent) {
-      throw new NotFoundException("Üst kategori bulunamadı");
+      throw new NotFoundException(
+        i18nMessage("server.category.parentNotFound"),
+      );
     }
     if (requireActiveAncestors && !parent.isActive) {
       throw new BadRequestException(
-        "Kategori aktifleştirilemez: tüm üst kategoriler aktif olmalıdır.",
+        i18nMessage("server.category.ancestorsMustBeActive"),
       );
     }
     currentId = parent.parentId;
@@ -116,7 +123,7 @@ export async function assertNoActiveCategoryDescendants(
     )
   ) {
     throw new BadRequestException(
-      "Kategori pasife alınamaz: önce aktif alt kategorileri pasife alınmalıdır.",
+      i18nMessage("server.category.deactivateChildrenFirst"),
     );
   }
 }

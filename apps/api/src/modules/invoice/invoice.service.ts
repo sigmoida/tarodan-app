@@ -17,7 +17,6 @@ import {
   NotFoundException,
   ServiceUnavailableException,
 } from "@nestjs/common";
-import { ConfigService } from "@nestjs/config";
 import { PrismaService } from "../../prisma";
 import { StorageService } from "../storage/storage.service";
 import { NotificationService } from "../notification/notification.service";
@@ -26,7 +25,9 @@ import { NotificationType, NotificationChannel } from "../notification/dto";
 import { TaxService } from "../tax";
 import { renderManagedEmailTemplate } from "../../common/helpers/email-template-renderer";
 import { InvoicePdfService, InvoiceData } from "./invoice-pdf.service";
-import { storedProductBaseOf } from "../order/order-charged-base.helper";
+import { storedProductBaseOf } from "../order/helpers/order-charged-base.helper";
+import { frontendUrlForEnvironment } from "../../config/app-urls";
+import { i18nMessage } from "../i18n";
 
 @Injectable()
 export class InvoiceService {
@@ -34,7 +35,6 @@ export class InvoiceService {
 
   constructor(
     private readonly prisma: PrismaService,
-    private readonly configService: ConfigService,
     private readonly storageService: StorageService,
     private readonly notificationService: NotificationService,
     private readonly smtpProvider: SmtpProvider,
@@ -70,18 +70,16 @@ export class InvoiceService {
     });
 
     if (!order) {
-      throw new NotFoundException("Sipariş bulunamadı");
+      throw new NotFoundException(i18nMessage("server.order.notFound"));
     }
 
     if (!order.buyer || !order.seller) {
-      throw new BadRequestException("Sipariş alıcı veya satıcı bilgisi eksik");
+      throw new BadRequestException(i18nMessage("server.invoice.partyMissing"));
     }
 
     const pay = order.payment ?? (order as any).checkoutGroup?.payment ?? null;
     if (!pay || String(pay.status) !== "completed") {
-      throw new BadRequestException(
-        "Ödemesi tamamlanmamış sipariş için fatura oluşturulamaz.",
-      );
+      throw new BadRequestException(i18nMessage("server.invoice.orderNotPaid"));
     }
 
     // Generate invoice number
@@ -177,7 +175,7 @@ export class InvoiceService {
     // storage erişimini ayrıca kontrol eder; burada da çağrı fail-closed davranır.
     if (!this.storageService.isStorageAvailable()) {
       throw new ServiceUnavailableException(
-        "Fatura belge saklama servisi kullanılamıyor.",
+        i18nMessage("server.invoice.storageUnavailable"),
       );
     }
     const uploadResult = await this.storageService.uploadFile(pdfBuffer, {
@@ -283,11 +281,11 @@ export class InvoiceService {
       select: { buyerId: true, sellerId: true },
     });
     if (!order) {
-      throw new NotFoundException("Sipariş bulunamadı");
+      throw new NotFoundException(i18nMessage("server.order.notFound"));
     }
     if (order.buyerId !== requesterId && order.sellerId !== requesterId) {
       throw new ForbiddenException(
-        "Bu siparişin faturasını oluşturma yetkiniz yok",
+        i18nMessage("server.invoice.issueForbidden"),
       );
     }
     return this.generateForOrder(orderId);
@@ -341,11 +339,7 @@ export class InvoiceService {
       this.logger.log(
         `Invoice will be sent to buyer: ${buyerEmail} (isGuest: ${isGuestOrder})`,
       );
-      const frontendUrl =
-        this.configService.get("FRONTEND_URL") ||
-        (this.configService.get("NODE_ENV") === "production"
-          ? "https://tarodan.com.tr"
-          : "http://localhost:3000");
+      const frontendUrl = frontendUrlForEnvironment();
       // Guest: track-order (no login). Member: orders/[id] (login → redirect back to order)
       const buyerOrderUrl =
         isGuestOrder && (buyerEmail || order.buyer.email)
@@ -477,7 +471,7 @@ export class InvoiceService {
       });
 
       if (!order) {
-        throw new NotFoundException("Sipariş bulunamadı");
+        throw new NotFoundException(i18nMessage("server.order.notFound"));
       }
 
       const statusStr = order.status ? String(order.status) : "";
@@ -491,12 +485,12 @@ export class InvoiceService {
           order.checkoutGroup?.payment?.id === paymentId);
 
       if (!isBuyer && !isSeller && !isPaymentVerified) {
-        throw new NotFoundException("Fatura bulunamadı");
+        throw new NotFoundException(i18nMessage("server.invoice.notFound"));
       }
 
       if (skipStatuses.includes(statusStr)) {
         throw new BadRequestException(
-          "Ödenmemiş veya iptal edilmiş siparişler için fatura oluşturulamaz.",
+          i18nMessage("server.invoice.orderUnpaidOrCancelled"),
         );
       }
 
@@ -533,7 +527,7 @@ export class InvoiceService {
       }
 
       if (!invoice) {
-        throw new NotFoundException("Fatura bulunamadı");
+        throw new NotFoundException(i18nMessage("server.invoice.notFound"));
       }
     } else {
       // Check authorization: buyer, seller, or someone with a valid paymentId for this order
@@ -546,7 +540,7 @@ export class InvoiceService {
           invoice.order.checkoutGroup?.payment?.id === paymentId);
 
       if (!isBuyer && !isSeller && !isPaymentVerified) {
-        throw new NotFoundException("Fatura bulunamadı");
+        throw new NotFoundException(i18nMessage("server.invoice.notFound"));
       }
     }
 
@@ -609,7 +603,7 @@ export class InvoiceService {
     });
 
     if (!invoice) {
-      throw new NotFoundException("Fatura bulunamadı");
+      throw new NotFoundException(i18nMessage("server.invoice.notFound"));
     }
 
     // Check authorization: buyer, seller, or someone with a valid paymentId for this order
@@ -622,7 +616,7 @@ export class InvoiceService {
         invoice.order.checkoutGroup?.payment?.id === paymentId);
 
     if (!isBuyer && !isSeller && !isPaymentVerified) {
-      throw new NotFoundException("Fatura bulunamadı");
+      throw new NotFoundException(i18nMessage("server.invoice.notFound"));
     }
 
     // Parse shipping address (it's stored as JSON)
@@ -711,7 +705,7 @@ export class InvoiceService {
       `Rejected legacy refund receipt generation for order=${orderId} amount=${amount}`,
     );
     throw new BadRequestException(
-      "İade faturaları yalnız eLogo iade belgesi akışından oluşturulabilir.",
+      i18nMessage("server.invoice.returnViaElogoOnly"),
     );
   }
 }

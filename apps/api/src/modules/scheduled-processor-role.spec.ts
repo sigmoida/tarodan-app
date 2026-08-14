@@ -15,14 +15,30 @@ import { join } from "path";
 describe("scheduled queue processors are gated by PROCESS_ROLE", () => {
   const modulesDir = join(__dirname);
 
+  /**
+   * Modül içindeki KLASÖR DÜZENİNDEN bağımsız tarama. Bir processor'ın modül
+   * kökünde mi yoksa `jobs/` altında mı durduğu bu sözleşmeyi ilgilendirmez;
+   * tek seviye okumak, dosyayı bir alt klasöre taşıyan kişinin gate'i sessizce
+   * kaybetmesi demekti.
+   */
+  const filesUnder = (dir: string, suffix: string): string[] =>
+    readdirSync(dir, { withFileTypes: true }).flatMap((entry) =>
+      entry.isDirectory()
+        ? filesUnder(join(dir, entry.name), suffix)
+        : entry.name.endsWith(suffix)
+          ? [join(dir, entry.name)]
+          : [],
+    );
+
   const processorFiles = readdirSync(modulesDir, { withFileTypes: true })
     .filter((entry) => entry.isDirectory())
-    .flatMap((entry) => {
-      const dir = join(modulesDir, entry.name);
-      return readdirSync(dir)
-        .filter((file) => file.endsWith(".processor.ts"))
-        .map((file) => ({ module: entry.name, path: join(dir, file), file }));
-    })
+    .flatMap((entry) =>
+      filesUnder(join(modulesDir, entry.name), ".processor.ts").map((path) => ({
+        module: entry.name,
+        path,
+        file: path.slice(path.lastIndexOf("/") + 1),
+      })),
+    )
     .filter(({ path }) =>
       readFileSync(path, "utf8").includes("QUEUE_NAMES.SCHEDULED"),
     );
@@ -34,9 +50,9 @@ describe("scheduled queue processors are gated by PROCESS_ROLE", () => {
   it.each(processorFiles.map((p) => [p.module, p.file] as const))(
     "%s/%s koşullu olarak kaydedilir",
     (moduleName, file) => {
-      const dir = join(modulesDir, moduleName);
-      const moduleFiles = readdirSync(dir).filter((f) =>
-        f.endsWith(".module.ts"),
+      const moduleFiles = filesUnder(
+        join(modulesDir, moduleName),
+        ".module.ts",
       );
       const className = file
         .replace(/\.ts$/, "")
@@ -45,7 +61,7 @@ describe("scheduled queue processors are gated by PROCESS_ROLE", () => {
         .join("");
 
       const registrations = moduleFiles
-        .map((f) => readFileSync(join(dir, f), "utf8"))
+        .map((f) => readFileSync(f, "utf8"))
         .filter((content) => content.includes(className));
 
       expect(registrations.length).toBeGreaterThan(0);

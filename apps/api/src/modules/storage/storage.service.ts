@@ -4,6 +4,7 @@ import {
   InternalServerErrorException,
   OnModuleInit,
   Logger,
+  ServiceUnavailableException,
 } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { PrismaService } from "../../prisma";
@@ -20,6 +21,7 @@ import {
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import * as crypto from "crypto";
 import { fromBuffer as fileTypeFromBuffer } from "file-type";
+import { i18nMessage } from "../i18n";
 
 export interface UploadResult {
   key: string;
@@ -121,6 +123,21 @@ export function isPublicStorageKey(key: string): boolean {
 export class StorageService implements OnModuleInit {
   private readonly logger = new Logger(StorageService.name);
   private s3Client: S3Client | null = null;
+
+  /**
+   * The configured client. Null until credentials are present, and three call
+   * sites already asserted past that with `!` — so an unconfigured deployment
+   * failed with a TypeError deep inside an upload rather than saying what was
+   * wrong.
+   */
+  private client(): S3Client {
+    if (!this.s3Client) {
+      throw new ServiceUnavailableException(
+        "Storage is not configured (missing S3 credentials)",
+      );
+    }
+    return this.s3Client;
+  }
   private readonly baseBucket: string;
   private readonly envPrefix: string;
   private isS3Available = false;
@@ -231,18 +248,22 @@ export class StorageService implements OnModuleInit {
   ): Promise<UploadResult> {
     if (!this.isS3Available) {
       throw new BadRequestException(
-        "Dosya yükleme servisi şu anda kullanılamıyor. Lütfen daha sonra tekrar deneyin.",
+        i18nMessage("server.storage.uploadUnavailableRetry"),
       );
     }
 
     // Bucket tipini validate et
     if (!this.bucketFolders[options.bucket]) {
-      throw new BadRequestException(`Geçersiz bucket tipi: ${options.bucket}`);
+      throw new BadRequestException(
+        i18nMessage("server.storage.invalidBucketType", {
+          bucket: options.bucket,
+        }),
+      );
     }
 
     // Dosya boyutu kontrolü
     if (buffer.length > MAX_FILE_SIZE) {
-      throw new BadRequestException("Dosya boyutu çok büyük (max 10MB)");
+      throw new BadRequestException(i18nMessage("server.media.fileTooLarge"));
     }
 
     // Resim dosyaları için mime type kontrolü
@@ -252,13 +273,13 @@ export class StorageService implements OnModuleInit {
         !ALLOWED_IMAGE_TYPES.includes(options.mimeType)
       ) {
         throw new BadRequestException(
-          "Geçersiz dosya tipi. Sadece JPEG, PNG, WebP, GIF desteklenir.",
+          i18nMessage("server.storage.unsupportedType"),
         );
       }
       // The client Content-Type is spoofable — verify the real bytes (#71).
       const sniffed = await fileTypeFromBuffer(buffer);
       if (!sniffed || !ALLOWED_IMAGE_TYPES.includes(sniffed.mime)) {
-        throw new BadRequestException("Dosya içeriği geçerli bir resim değil.");
+        throw new BadRequestException(i18nMessage("server.storage.notAnImage"));
       }
     } else if (DOCUMENT_BUCKETS.includes(options.bucket)) {
       // documents/tickets previously skipped content validation entirely (#71).
@@ -268,7 +289,7 @@ export class StorageService implements OnModuleInit {
       const sniffed = await fileTypeFromBuffer(buffer);
       if (!sniffed || !ALLOWED_DOCUMENT_TYPES.includes(sniffed.mime)) {
         throw new BadRequestException(
-          "Dosya içeriği geçerli bir belge (PDF veya resim) değil.",
+          i18nMessage("server.storage.notADocument"),
         );
       }
     }
@@ -305,7 +326,7 @@ export class StorageService implements OnModuleInit {
       }
       const command = new PutObjectCommand(commandParams);
 
-      await this.s3Client.send(command);
+      await this.client().send(command);
 
       // Database'e kaydet (skipMediaFile=true ise atla - public product/collection assets)
       let mediaFileId: string | undefined;
@@ -339,7 +360,9 @@ export class StorageService implements OnModuleInit {
       };
     } catch (error: any) {
       this.logger.error(`❌ S3 upload error: ${error.message}`, error);
-      throw new InternalServerErrorException("Dosya yükleme başarısız");
+      throw new InternalServerErrorException(
+        i18nMessage("server.storage.uploadFailed"),
+      );
     }
   }
 
@@ -355,11 +378,15 @@ export class StorageService implements OnModuleInit {
   ): Promise<{ key: string }> {
     if (!this.isS3Available) {
       throw new BadRequestException(
-        "Dosya yükleme servisi şu anda kullanılamıyor. Lütfen daha sonra tekrar deneyin.",
+        i18nMessage("server.storage.uploadUnavailableRetry"),
       );
     }
     if (!this.bucketFolders[options.bucket]) {
-      throw new BadRequestException(`Geçersiz bucket tipi: ${options.bucket}`);
+      throw new BadRequestException(
+        i18nMessage("server.storage.invalidBucketType", {
+          bucket: options.bucket,
+        }),
+      );
     }
 
     const bucketFolder = this.bucketFolders[options.bucket];
@@ -368,7 +395,7 @@ export class StorageService implements OnModuleInit {
     const key = `${this.envPrefix}/${bucketFolder}/${customFolder}${filename}`;
 
     try {
-      await this.s3Client!.send(
+      await this.client().send(
         new CopyObjectCommand({
           Bucket: this.baseBucket,
           CopySource: encodeURIComponent(`${this.baseBucket}/${sourceKey}`),
@@ -381,7 +408,9 @@ export class StorageService implements OnModuleInit {
       this.logger.error(
         `❌ S3 copy error (${sourceKey} → ${key}): ${error.message}`,
       );
-      throw new InternalServerErrorException("Dosya kopyalama başarısız");
+      throw new InternalServerErrorException(
+        i18nMessage("server.storage.copyFailed"),
+      );
     }
   }
 
@@ -429,7 +458,7 @@ export class StorageService implements OnModuleInit {
       [];
     let continuationToken: string | undefined;
     do {
-      const page = await this.s3Client!.send(
+      const page = await this.client().send(
         new ListObjectsV2Command({
           Bucket: this.baseBucket,
           Prefix: fullPrefix,
@@ -469,7 +498,7 @@ export class StorageService implements OnModuleInit {
     const files: Array<{ key: string; size: number; lastModified: Date }> = [];
     let continuationToken: string | undefined;
     do {
-      const page = await this.s3Client!.send(
+      const page = await this.client().send(
         new ListObjectsV2Command({
           Bucket: this.baseBucket,
           Prefix: fullPrefix,
@@ -497,7 +526,7 @@ export class StorageService implements OnModuleInit {
   async deleteFileByKey(key: string): Promise<void> {
     await this.prisma.mediaFile.deleteMany({ where: { key } });
     if (!this.isS3Available) return;
-    await this.s3Client!.send(
+    await this.client().send(
       new DeleteObjectCommand({ Bucket: this.baseBucket, Key: key }),
     );
   }
@@ -522,7 +551,7 @@ export class StorageService implements OnModuleInit {
           Key: fullKey,
         });
 
-        await this.s3Client.send(command);
+        await this.client().send(command);
         this.logger.log(`✅ File deleted: ${fullKey}`);
       } catch (error: any) {
         this.logger.warn(`⚠️ S3 delete error: ${error.message}`);
@@ -567,14 +596,16 @@ export class StorageService implements OnModuleInit {
   ): Promise<string> {
     if (!this.isS3Available) {
       throw new BadRequestException(
-        "Dosya yükleme servisi şu anda kullanılamıyor.",
+        i18nMessage("server.storage.uploadUnavailable"),
       );
     }
 
     const bucketFolder =
       this.bucketFolders[bucket as keyof typeof this.bucketFolders];
     if (!bucketFolder) {
-      throw new BadRequestException(`Geçersiz bucket: ${bucket}`);
+      throw new BadRequestException(
+        i18nMessage("server.storage.invalidBucket", { bucket: bucket }),
+      );
     }
 
     // Key zaten full path içeriyorsa kullan, değilse oluştur
@@ -588,12 +619,14 @@ export class StorageService implements OnModuleInit {
         Key: fullKey,
       });
 
-      return await getSignedUrl(this.s3Client, command, {
+      return await getSignedUrl(this.client(), command, {
         expiresIn: expirySeconds,
       });
     } catch (error: any) {
       this.logger.error(`❌ Presigned upload URL error: ${error.message}`);
-      throw new InternalServerErrorException("Presigned URL oluşturulamadı");
+      throw new InternalServerErrorException(
+        i18nMessage("server.storage.presignFailed"),
+      );
     }
   }
 
@@ -608,7 +641,7 @@ export class StorageService implements OnModuleInit {
   ): Promise<string> {
     if (!this.isS3Available) {
       throw new BadRequestException(
-        "Dosya indirme servisi şu anda kullanılamıyor.",
+        i18nMessage("server.storage.downloadUnavailable"),
       );
     }
 
@@ -625,12 +658,14 @@ export class StorageService implements OnModuleInit {
         Key: fullKey,
       });
 
-      return await getSignedUrl(this.s3Client, command, {
+      return await getSignedUrl(this.client(), command, {
         expiresIn: expirySeconds,
       });
     } catch (error: any) {
       this.logger.error(`❌ Presigned download URL error: ${error.message}`);
-      throw new InternalServerErrorException("Presigned URL oluşturulamadı");
+      throw new InternalServerErrorException(
+        i18nMessage("server.storage.presignFailed"),
+      );
     }
   }
 

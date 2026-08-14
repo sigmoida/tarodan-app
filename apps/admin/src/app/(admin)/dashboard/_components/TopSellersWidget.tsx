@@ -4,6 +4,7 @@ import { useTranslations } from "next-intl";
 import { ChevronRightIcon } from "@heroicons/react/24/outline";
 import { Button, EmptyState } from "@tarodan/ui";
 import { SectionCard } from "@/components/detail/SectionCard";
+import { fmtNumber } from "@/lib/format";
 import { type TopSeller } from "../_lib/types";
 
 /**
@@ -31,7 +32,7 @@ export function TopSellersWidget({ sellers }: { sellers: TopSeller[] }) {
             <Link
               key={s.id}
               href={`/accounts/users/${s.id}`}
-              className="-mx-2 flex items-center gap-3 rounded-lg px-2 py-2.5 hover:bg-surface-alt"
+              className="-mx-2 flex flex-wrap items-center gap-x-3 gap-y-1 rounded-lg px-2 py-2.5 hover:bg-surface-alt"
             >
               <div className="relative h-10 w-10 shrink-0 overflow-hidden rounded-full bg-primary-100">
                 {s.avatarUrl ? (
@@ -49,24 +50,25 @@ export function TopSellersWidget({ sellers }: { sellers: TopSeller[] }) {
                   </div>
                 )}
               </div>
-              <div className="min-w-0 flex-1">
+              {/* min-w floor (not min-w-0), same reasoning as TopProductsWidget. */}
+              <div className="min-w-[110px] flex-1">
                 <p className="truncate text-sm font-medium text-heading">
                   {s.displayName}
                 </p>
                 <p className="truncate text-xs text-muted">
-                  {s.productCount.toLocaleString("tr-TR")}{" "}
+                  {fmtNumber(s.productCount)}{" "}
                   {t(
                     "admin.dashboard.topSellers.columns.products",
                   ).toLowerCase()}
                   {" · "}
-                  {s.activeListings.toLocaleString("tr-TR")}{" "}
+                  {fmtNumber(s.activeListings)}{" "}
                   {t(
                     "admin.dashboard.topSellers.columns.activeListings",
                   ).toLowerCase()}
                 </p>
               </div>
               <span className="whitespace-nowrap text-sm font-semibold text-heading tabular-nums">
-                {s.storeViewCount.toLocaleString("tr-TR")}
+                {fmtNumber(s.storeViewCount)}
               </span>
             </Link>
           ))

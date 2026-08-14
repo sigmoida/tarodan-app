@@ -41,7 +41,7 @@ interface AdminMutationContext {
 }
 
 /** Patch an entity wherever it appears in a cached API payload. */
-function patchCachedEntity(
+export function patchCachedEntity(
   value: unknown,
   id: string,
   patch: Record<string, unknown>,

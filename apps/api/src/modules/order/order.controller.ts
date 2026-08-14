@@ -25,7 +25,7 @@ import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
 import { Public } from "../auth/decorators/public.decorator";
 import { CurrentUser } from "../auth/decorators/current-user.decorator";
 import { ShippingPackageTierCode } from "@prisma/client";
-import { billableDesiForTier } from "../shipping/shipping-package-tier";
+import { billableDesiForTier } from "../shipping/helpers/shipping-package-tier";
 import {
   CreateOrderDto,
   OrderQueryDto,
@@ -96,7 +96,9 @@ export class OrderController {
         ? ShippingPackageTierCode.small
         : (packageTierCode as ShippingPackageTierCode);
     if (!Object.values(ShippingPackageTierCode).includes(tierCode)) {
-      throw new BadRequestException("Geçersiz kargo paket boyutu");
+      throw new BadRequestException(
+        i18nMessage("server.order.invalidPackageSize"),
+      );
     }
     const shippingDesi = billableDesiForTier(tierCode);
     return this.orderService.getCommissionPreview(

@@ -20,6 +20,7 @@ import {
 } from "./dto";
 import { Prisma } from "@prisma/client";
 import { dateRangeWhere, paginate, resolveOrderBy } from "../../common/list";
+import { i18nMessage } from "../i18n";
 
 @Injectable()
 export class UserReportService {
@@ -49,7 +50,7 @@ export class UserReportService {
 
     if (existingReport) {
       throw new BadRequestException(
-        "Bu içerik için zaten bekleyen bir raporunuz var",
+        i18nMessage("server.userReport.alreadyPending"),
       );
     }
 
@@ -165,7 +166,7 @@ export class UserReportService {
     });
 
     if (!report) {
-      throw new NotFoundException("Rapor bulunamadı");
+      throw new NotFoundException(i18nMessage("server.userReport.notFound"));
     }
 
     // Get target info based on type
@@ -199,7 +200,7 @@ export class UserReportService {
     });
 
     if (!report) {
-      throw new NotFoundException("Rapor bulunamadı");
+      throw new NotFoundException(i18nMessage("server.userReport.notFound"));
     }
 
     const isClosing =
@@ -272,32 +273,42 @@ export class UserReportService {
         const product = await this.prisma.product.findUnique({
           where: { id: targetId },
         });
-        if (!product) throw new NotFoundException("Ürün bulunamadı");
+        if (!product)
+          throw new NotFoundException(i18nMessage("server.product.notFound"));
         break;
 
       case ReportType.USER:
         const user = await this.prisma.user.findUnique({
           where: { id: targetId },
         });
-        if (!user) throw new NotFoundException("Kullanıcı bulunamadı");
+        if (!user)
+          throw new NotFoundException(i18nMessage("server.user.notFound"));
         break;
 
       case ReportType.COLLECTION:
         const collection = await this.prisma.collection.findUnique({
           where: { id: targetId },
         });
-        if (!collection) throw new NotFoundException("Koleksiyon bulunamadı");
+        if (!collection)
+          throw new NotFoundException(
+            i18nMessage("server.collection.notFound"),
+          );
         break;
 
       case ReportType.MESSAGE:
         const message = await this.prisma.message.findUnique({
           where: { id: targetId },
         });
-        if (!message) throw new NotFoundException("Mesaj bulunamadı");
+        if (!message)
+          throw new NotFoundException(
+            i18nMessage("server.messaging.messageNotFound"),
+          );
         break;
 
       default:
-        throw new BadRequestException("Geçersiz rapor tipi");
+        throw new BadRequestException(
+          i18nMessage("server.userReport.invalidType"),
+        );
     }
   }
 

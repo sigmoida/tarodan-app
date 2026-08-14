@@ -1,5 +1,5 @@
 import { OrderStatus, ShipmentStatus } from "@prisma/client";
-import { RefundService } from "./refund.service";
+import { RefundCreationService } from "./refund-creation.service";
 
 /**
  * classifyOrderPhase, siparişin yaşam evresine göre iade türünü belirler.
@@ -12,10 +12,10 @@ import { RefundService } from "./refund.service";
  * Ayrıca teslim tarihi order.deliveredAt'e yazılır; shipment.deliveredAt track
  * güncellemesinde set edilmez. Bu yüzden order.deliveredAt birincil kaynaktır.
  */
-describe("RefundService.classifyOrderPhase", () => {
-  const service = new RefundService(
-    {} as any,
-    {} as any,
+describe("RefundCreationService.classifyOrderPhase", () => {
+  // classifyOrderPhase saf bir karar fonksiyonudur: siparişin alanlarına bakar,
+  // hiçbir işbirlikçiye dokunmaz. Bu yüzden servis boş bağımlılıklarla kurulur.
+  const service = new RefundCreationService(
     {} as any,
     {} as any,
     {} as any,

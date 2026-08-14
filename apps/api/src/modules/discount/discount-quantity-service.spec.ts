@@ -1,5 +1,10 @@
 import { DiscountScope, DiscountTarget, DiscountType } from "@prisma/client";
 import { DiscountService } from "./discount.service";
+import { DiscountUsageService } from "./discount-usage.service";
+import { DiscountCrudService } from "./discount-crud.service";
+import { DiscountPricingService } from "./discount-pricing.service";
+import { DiscountCouponService } from "./discount-coupon.service";
+import { DiscountTradeFeeService } from "./discount-trade-fee.service";
 
 /**
  * Adet koşullu satıcı kampanyalarının servis katmanı: tek sorguyla çözüm,
@@ -28,10 +33,16 @@ describe("DiscountService quantity campaigns", () => {
         findMany: jest.fn().mockResolvedValue(campaigns),
       },
     } as any;
+    const cache = { delPattern: jest.fn() } as any;
+    const search = { syncProduct: jest.fn() } as any;
+    const pricing = new DiscountPricingService(prisma);
     return new DiscountService(
       prisma,
-      { delPattern: jest.fn() } as any,
-      { syncProduct: jest.fn() } as any,
+      new DiscountUsageService(prisma),
+      new DiscountCrudService(prisma, cache, search),
+      pricing,
+      new DiscountCouponService(prisma, pricing),
+      new DiscountTradeFeeService(prisma),
     );
   }
 
@@ -71,10 +82,16 @@ describe("DiscountService quantity campaigns", () => {
     const prisma = {
       discount: { findMany: jest.fn() },
     } as any;
+    const cache = { delPattern: jest.fn() } as any;
+    const search = { syncProduct: jest.fn() } as any;
+    const pricing = new DiscountPricingService(prisma);
     const service = new DiscountService(
       prisma,
-      { delPattern: jest.fn() } as any,
-      { syncProduct: jest.fn() } as any,
+      new DiscountUsageService(prisma),
+      new DiscountCrudService(prisma, cache, search),
+      pricing,
+      new DiscountCouponService(prisma, pricing),
+      new DiscountTradeFeeService(prisma),
     );
     const result = await service.quantityDiscountsForLines([
       {
@@ -105,7 +122,9 @@ describe("DiscountService quantity campaigns", () => {
           "seller-1",
           false,
         ),
-      ).rejects.toThrow("buyQuantity ve getQuantity");
+      ).rejects.toMatchObject({
+        response: { i18nKey: "server.discount.buyXGetYMinimum" },
+      });
     });
 
     it("bulk_quantity için minQuantity en az 2 olmalıdır", async () => {
@@ -120,7 +139,9 @@ describe("DiscountService quantity campaigns", () => {
           "seller-1",
           false,
         ),
-      ).rejects.toThrow("minQuantity en az 2");
+      ).rejects.toMatchObject({
+        response: { i18nKey: "server.discount.minQuantityAtLeastTwo" },
+      });
     });
 
     it("adet koşullu kampanya bedel kalemine tanımlanamaz", async () => {
@@ -137,7 +158,9 @@ describe("DiscountService quantity campaigns", () => {
           null,
           true,
         ),
-      ).rejects.toThrow("yalnız ürün fiyatına");
+      ).rejects.toMatchObject({
+        response: { i18nKey: "server.discount.quantityCampaignProductOnly" },
+      });
     });
   });
 });

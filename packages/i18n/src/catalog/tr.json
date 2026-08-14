@@ -4388,6 +4388,7 @@
         "totalPaymentAmount": "Toplam ödeme tutarı",
         "refundAmountLabel": "İade Tutarı (boş bırakırsanız tam iade)",
         "refundAmountPlaceholder": "İade tutarı (opsiyonel)",
+        "refundAmountInvalid": "İade tutarı 0'dan büyük ve en fazla {max} olmalıdır",
         "refundReasonLabel": "İade Nedeni (opsiyonel)",
         "refundReasonPlaceholder": "İade nedeni",
         "refundConfirm": "İade Et",
@@ -7038,7 +7039,15 @@
       "userNotFound": "Kullanıcı bulunamadı",
       "verificationCodeExpired": "Kodun süresi doldu. Yeni kod isteyin.",
       "verificationEmailResent": "Doğrulama emaili tekrar gönderildi",
-      "wrongVerificationCode": "Kod hatalı"
+      "wrongVerificationCode": "Kod hatalı",
+      "usernameTaken": "Bu kullanıcı adı kullanılıyor",
+      "accountAlreadyUsed": "Bu hesap bilgileri daha önce kullanılmış",
+      "usernameFormat": "Kullanıcı adı 3-30 karakter olmalı; küçük harf, rakam, nokta veya alt çizgi içermelidir",
+      "applicationAlreadyOpen": "Bu e-posta veya telefonla açık bir başvuru var.",
+      "invitationInvalid": "Davet bağlantısı geçersiz veya süresi dolmuş.",
+      "usernameInvalid": "Geçersiz kullanıcı adı.",
+      "usernameAlreadyTaken": "Bu kullanıcı adı daha önce alınmış.",
+      "sessionNotCreated": "Oturum güvenli şekilde oluşturulamadı"
     },
     "offer": {
       "alreadyInStatus": "Bu teklif zaten {status} durumunda",
@@ -7182,7 +7191,10 @@
       "updateForbidden": "Bu siparişi güncelleme yetkiniz yok",
       "viewForbidden": "Bu siparişi görüntüleme yetkiniz yok",
       "groupAlreadyCancelled": "Bu sepetin tüm siparişleri zaten iptal edilmiş.",
-      "groupCancelBlockedShipped": "Sepetteki en az bir sipariş kargoya verildi — sepet iptali kapalı. Teslimat sonrası iade talebi oluşturabilirsiniz."
+      "groupCancelBlockedShipped": "Sepetteki en az bir sipariş kargoya verildi — sepet iptali kapalı. Teslimat sonrası iade talebi oluşturabilirsiniz.",
+      "cancelReasonRequired": "Ödenmiş sipariş iptalinde neden kodu zorunludur",
+      "cancelAfterHandover": "Kargoya teslim edilmiş sipariş iptal edilemez; iade talebi oluşturun",
+      "invalidPackageSize": "Geçersiz kargo paket boyutu"
     },
     "payment": {
       "cancelPaymentForbidden": "Bu ödemeyi iptal etme yetkiniz yok",
@@ -7252,7 +7264,13 @@
       "unexpectedResponse": "PayTR beklenmeyen yanıt döndü; kart bilgilerinizi kontrol edin.",
       "unknownProvider": "Bilinmeyen ödeme sağlayıcı: {provider}",
       "viewPaymentForbidden": "Bu ödemeyi görüntüleme yetkiniz yok",
-      "viewStatusForbidden": "Bu ödeme durumunu görüntüleme yetkiniz yok"
+      "viewStatusForbidden": "Bu ödeme durumunu görüntüleme yetkiniz yok",
+      "cardDataNotAccepted": "Kart bilgileri uygulama API'sine gönderilemez.",
+      "paytrPlatformTransferFailed": "PayTR platform transfer başarısız: {reason}",
+      "paytrReportEmptyResponse": "PayTR rapor geçersiz/boş yanıt ({url})",
+      "paytrReportRequestFailed": "PayTR rapor isteği başarısız: {reason}",
+      "paytrReturnedTransferQueryFailed": "PayTR geri dönen transfer sorgusu başarısız: {reason}",
+      "paytrSendFromAccountFailed": "PayTR hesaptan gönder başarısız: {reason}"
     },
     "product": {
       "alreadyLiked": "Bu ürünü zaten beğendiniz",
@@ -7301,7 +7319,13 @@
       "userIdNotFound": "Kullanıcı kimliği bulunamadı",
       "userNotFound": "Kullanıcı bulunamadı",
       "viewForbidden": "Bu ürünü görüntüleme yetkiniz yok",
-      "boostPackageNotFound": "Seçilen paket bulunamadı veya aktif değil"
+      "boostPackageNotFound": "Seçilen paket bulunamadı veya aktif değil",
+      "duplicateImage": "Aynı görsel birden fazla kez gönderildi",
+      "imageNotOwned": "Görsellerden biri bu hesaba ait bir yüklemeden gelmiyor. Lütfen görselleri yeniden yükleyin.",
+      "imageKeyEmpty": "Görsel anahtarı boş olamaz",
+      "imageKeyInvalid": "Görsel anahtarı geçersiz",
+      "imageKeyWrongPath": "Görsel anahtarı ürün görseli yolunda değil",
+      "createFailed": "İlan oluşturulamadı: {reason}"
     },
     "refund": {
       "alreadyActive": "Bu sipariş için zaten aktif bir iade talebi var",
@@ -7317,7 +7341,26 @@
       "orderNotFound": "Sipariş bulunamadı",
       "orderNotPaidYet": "Bu sipariş henüz ödenmemiş, iade yerine siparişi iptal etmelisiniz",
       "orderStatusNotEligible": "Bu sipariş durumunda iade talebi oluşturulamaz",
-      "viewForbidden": "Bu talebi görüntüleme yetkiniz yok"
+      "viewForbidden": "Bu talebi görüntüleme yetkiniz yok",
+      "vatSnapshotMissing": "Platform satış faturasının ürün KDV snapshot'ı bulunamadı; finansal inceleme gerekli",
+      "evidenceRequired": "Bu iade nedeni için en az bir kanıt görseli zorunludur",
+      "cancelPaidPreShipmentOnly": "Yalnız ödenmiş ve kargo öncesindeki siparişler iptal edilebilir",
+      "orderStatusChanged": "Sipariş durumu az önce değişti; iptal edilemedi",
+      "previewStateInvalid": "Yalnız inceleme veya finansal mutabakat bekleyen iadeler için karar önizlenebilir",
+      "policyAlreadyFinal": "İade finansal politikası zaten kesinleşmiş",
+      "tariffServiceUnavailable": "İade kargo tarifesi servisi kullanılamıyor",
+      "previewStale": "İade hesabı veya tarife değişti; yeni karar önizlemesi alın",
+      "decisionRaceLost": "İade kararı başka bir işlem tarafından kesinleştirildi",
+      "approvePendingOnly": "Yalnız inceleme bekleyen iade talepleri onaylanabilir",
+      "v2DecisionRequired": "V2 iade finansal kararı kesinleşmeden onaylanamaz",
+      "rejectReasonRequired": "İade reddi için açıklama zorunludur",
+      "rejectPendingOnly": "Yalnız inceleme bekleyen iade talepleri reddedilebilir",
+      "appealReasonTooShort": "İtiraz işareti için en az 10 karakterlik gerekçe zorunludur",
+      "advancedElsewhere": "İade bu sırada başka bir akış tarafından ilerletildi; sayfayı yenileyin",
+      "shipmentApprovedOnly": "İade kargosu yalnız onaylanmış bir talep için oluşturulabilir",
+      "financialReviewPending": "Finansal inceleme tamamlanmadan para iadesi kesinleştirilemez",
+      "instantAfterHandover": "Kargoya teslim edilmiş sipariş için anında iade yapılamaz; teslimattan sonra iade talebi oluşturun",
+      "suratShipmentFailed": "Sürat iade kargosu açılamadı: {reason}"
     },
     "user": {
       "accountDeleted": "Hesabınız başarıyla silindi",
@@ -7348,7 +7391,21 @@
       "unfollowed": "Takip bırakıldı",
       "userBlocked": "{displayName} engellendi",
       "userUnblocked": "Engel kaldırıldı",
-      "unknownOnboardingTour": "Bilinmeyen tanıtım turu"
+      "unknownOnboardingTour": "Bilinmeyen tanıtım turu",
+      "corporateApplicantsOnly": "Yalnızca kurumsal satıcı başvurusu yapan kullanıcılar belge yükleyebilir",
+      "applicationLocked": "Başvuru bu aşamada belge değişikliğine açık değil",
+      "invalidDocumentType": "Geçersiz belge tipi",
+      "documentFormats": "Yalnızca PDF, JPEG, PNG veya WebP",
+      "stakeholderRequired": "Kimlik veya pasaport belgesi için şirket sahibi/ortağı seçilmelidir",
+      "stakeholderNotFound": "Şirket sahibi/ortağı bulunamadı",
+      "documentTypeMismatch": "Belge tipi, seçilen kişinin kimlik türüyle eşleşmiyor",
+      "corporateApplicationNotFound": "Kurumsal başvuru bulunamadı",
+      "documentNotFound": "Belge bulunamadı",
+      "appealRejectedOnly": "Yalnız reddedilen veya revizyon istenen belgeye itiraz edilebilir",
+      "documentsIncomplete": "Zorunlu belgeler ile her şirket sahibi/ortağının kimlik veya pasaport ön-arka yüzleri tamamlanmalıdır",
+      "usernameFormat": "Kullanıcı adı 3-30 karakter olmalı; yalnızca küçük harf, rakam, nokta ve alt çizgi içerebilir.",
+      "usernameAlreadySet": "Kullanıcı adı daha önce belirlenmiş.",
+      "companyFieldsMissing": "Eksik şirket bilgileri: {fields}"
     },
     "membership": {
       "alreadyCancelled": "Üyelik zaten iptal edilmiş",
@@ -7371,7 +7428,20 @@
       "tierNoPaymentNeeded": "Bu üyelik seviyesi için ödeme gerekmez",
       "tierNotActive": "Bu üyelik tipi aktif değil",
       "tierNotFound": "Üyelik tipi bulunamadı: {type}",
-      "userIdNotFound": "Kullanıcı kimliği bulunamadı"
+      "userIdNotFound": "Kullanıcı kimliği bulunamadı",
+      "invalidBillingPeriod": "Geçersiz üyelik faturalama dönemi",
+      "pendingPaymentExists": "Başka bir paket veya dönem için bekleyen üyelik ödemesi bulunuyor",
+      "intentSnapshotMismatch": "Üyelik ödeme niyeti sipariş snapshot'ı ile uyuşmuyor",
+      "intentNotFound": "Bekleyen bir üyelik ödeme niyeti bulunamadı",
+      "intentNotCreated": "Üyelik ödeme niyeti oluşturulamadı",
+      "autoRenewPaidOnly": "Otomatik yenileme yalnız geçerli ücretli üyelikte açılabilir",
+      "autoRenewCardRequired": "Otomatik yenileme için CVV gerektirmeyen kayıtlı kart bulunamadı",
+      "noFieldsToUpdate": "En az bir alan güncellenmelidir",
+      "listingLimitRange": "Toplam ilan limiti -1 veya en az 1 olmalıdır",
+      "freeTierCannotDeactivate": "Ücretsiz üyelik seviyesi pasif yapılamaz",
+      "freeTierPriceZero": "Ücretsiz üyelik fiyatları sıfır olmalıdır",
+      "paidTierPricePositive": "Ücretli üyelik fiyatları sıfırdan büyük olmalıdır",
+      "imageLimitRange": "İlan başına görsel limiti 1 ile {max} arasında olmalıdır"
     },
     "shipping": {
       "noActiveTariff": "Aktif kargo tarifesi bulunamadı ({provider})",
@@ -7380,12 +7450,442 @@
       "tariffNotEditable": "Yalnızca taslak tarifeler düzenlenebilir",
       "tariffArchived": "Arşivlenmiş tarife tekrar aktive edilemez",
       "tariffNegativeAmount": "Tarife tutarları negatif olamaz",
-      "invalidRecipientPhone": "Gönderi oluşturulamadı: alıcı telefonu geçerli bir Türkiye cep numarası değil"
+      "invalidRecipientPhone": "Gönderi oluşturulamadı: alıcı telefonu geçerli bir Türkiye cep numarası değil",
+      "unsupportedProvider": "Desteklenmeyen kargo sağlayıcısı",
+      "createForbidden": "Bu sipariş için kargo oluşturamazsınız",
+      "orderNotPreparing": "Sipariş hazırlanma durumunda değil",
+      "alreadyCreated": "Bu sipariş için zaten kargo oluşturulmuş",
+      "createFailed": "Kargo kaydı oluşturulamadı",
+      "notFound": "Kargo bulunamadı",
+      "updateForbidden": "Bu kargoyu güncelleme yetkiniz yok",
+      "updateStateInvalid": "Kargo bu durumda güncellenemez (teslim edilmiş, iade veya iptal).",
+      "orderNotShippable": "Bu sipariş kargoya verilebilir durumda değil (iptal edilmiş, iade sürecinde veya çoktan kargolanmış).",
+      "openRefundRequest": "Bu sipariş için açık bir iptal/iade talebi var; talep sonuçlanmadan kargoya veremezsiniz.",
+      "statusChanged": "Kargo durumu az önce güncellendi; sayfayı yenileyip tekrar deneyin.",
+      "orderStatusChanged": "Sipariş durumu az önce değişti (iptal/iade edilmiş olabilir); sayfayı yenileyip tekrar deneyin.",
+      "viewForbidden": "Bu kargoyu görüntüleme yetkiniz yok",
+      "viewOrderShipmentForbidden": "Bu siparişin kargosunu görüntüleme yetkiniz yok",
+      "orderShipmentNotFound": "Bu sipariş için kargo bulunamadı"
     },
     "commission": {
       "noRuleConfigured": "Komisyon yapılandırması eksik olduğundan sipariş şu anda oluşturulamıyor. Lütfen daha sonra tekrar deneyin.",
       "sellerSalesSuspended": "Satıcının kurumsal üyeliği geçerli olmadığı için bu ürün şu anda satın alınamıyor.",
       "pricingChanged": "Komisyon koşulları güncellendi. Lütfen sepeti yenileyip yeni tutarı onaylayın."
+    },
+    "admin": {
+      "holdNotFound": "Hold bulunamadı",
+      "tokenNotFound": "Token bulunamadı",
+      "shipmentToDeliveredForbidden": "Kargo {status} durumundan teslim edildi durumuna geçirilemez",
+      "order": {
+        "shipmentMissingForDelivery": "Teslim geçişi için siparişe bağlı kargo kaydı bulunamadı",
+        "shipmentStatusChanged": "Kargo durumu az önce değişti; sayfayı yenileyip tekrar deneyin",
+        "deliveryRaceLost": "Sipariş teslim durumu eşzamanlı olarak değişti",
+        "statusChanged": "Sipariş durumu az önce değişti; sayfayı yenileyip tekrar deneyin",
+        "couponPendingPaymentOnly": "Kupon yalnızca ödemesi beklenen siparişlerde değiştirilebilir",
+        "couponNotFound": "Kupon kodu bulunamadı",
+        "couponInactive": "Bu kupon aktif değil",
+        "couponNotStarted": "Bu kupon henüz başlamadı",
+        "couponExpired": "Bu kuponun süresi doldu",
+        "couponLimitReached": "Bu kupon kullanım limitine ulaştı",
+        "tariffSnapshotMissing": "Siparişte doğrulanabilir kargo tarife snapshot'ı bulunmuyor",
+        "tariffUnverifiable": "Siparişin kargo tarifesi artık doğrulanamıyor",
+        "couponChangesShipping": "Kupon kargo ücretini değiştiriyor; sipariş yeni checkout ile oluşturulmalı",
+        "shipmentToDeliveredForbidden": "Kargo {status} durumundan teslim edildi durumuna geçirilemez",
+        "shipmentToInTransitForbidden": "Kargo {status} durumundan yolda durumuna geçirilemez"
+      },
+      "user": {
+        "notBanned": "Kullanıcı zaten banlı değil",
+        "alreadyBanned": "Kullanıcı zaten banlı"
+      },
+      "catalog": {
+        "categoryHasProducts": "Bu kategoride ürünler bulunmaktadır. Önce ürünleri başka kategoriye taşıyın.",
+        "categoryHasChildren": "Bu kategorinin alt kategorileri bulunmaktadır. Önce alt kategorileri silin.",
+        "manufacturerExists": "Bu isimde bir üretici zaten mevcut",
+        "attributeGroupNotFound": "Özellik grubu bulunamadı",
+        "attributeGroupExists": "Bu isimde bir özellik grubu zaten mevcut",
+        "attributeValueExists": "Bu değer bu grupta zaten mevcut",
+        "attributeNotFound": "Özellik değeri bulunamadı",
+        "brandInUse": "Bu marka silinemez: {products} ürün ve {models} araç modeli ile ilişkili.",
+        "attributeGroupInUse": "Bu grupta {count} özellik değeri var. Önce değerleri silin.",
+        "attributeInUse": "Bu özellik {count} üründe kullanılıyor. Önce ürünlerden kaldırın."
+      },
+      "bulkImport": {
+        "idempotencyKeyRequired": "Toplu yükleme için geçerli bir Idempotency-Key gönderilmelidir.",
+        "sellerRequired": "Kurumsal satıcı seçilmelidir.",
+        "excelRequired": "Excel dosyası yüklenmelidir.",
+        "imagesRequired": "Ürün görselleri yüklenmelidir.",
+        "xlsxOnly": "Yalnızca .xlsx Excel dosyası yüklenebilir.",
+        "sellerNotFound": "Satıcı bulunamadı.",
+        "businessSellersOnly": "Toplu ürün yükleme yalnızca satış yetkisi açık BUSINESS kurumsal satıcılar için kullanılabilir.",
+        "batchNotFound": "Toplu yükleme işlemi bulunamadı.",
+        "batchKeyInUse": "Toplu yükleme işlem kimliği başka bir işlem tarafından kullanılıyor.",
+        "batchKeyMismatch": "Aynı işlem kimliği farklı dosya veya satıcı için kullanılamaz.",
+        "resultUnreadable": "Tamamlanan toplu yükleme işleminin sonucu okunamadı.",
+        "excelUnreadable": "Excel dosyası okunamadı veya bozuk.",
+        "noRows": "Excel dosyasında ürün satırı bulunamadı.",
+        "invalidImageName": "Geçersiz görsel dosya adı.",
+        "listingQuotaExceeded": "Satıcının yalnızca {remaining} ilan hakkı kaldı; dosyada {rows} ürün var.",
+        "tooManyImagesForRow": "{reference} için {count} görsel var; satıcının ürün başına limiti {max}.",
+        "imageMissing": "{reference}: '{image}' adlı görsel yüklenmedi.",
+        "sheetMissing": "Excel dosyasında '{sheet}' sayfası bulunmalıdır.",
+        "tooManySheetRows": "Urunler sayfası başlık dahil en fazla {max} satır içerebilir. Şablonun altına eklenen boş veya biçimlendirilmiş satırları da silin.",
+        "formulaNotAllowed": "Formül içeren Excel kabul edilmez ({sheet}!{cell}).",
+        "headersMissing": "Excel sütunları eksik: {headers}. Örnek dosyayı yeniden indirin.",
+        "maxRows": "Tek yüklemede en fazla {max} ürün eklenebilir.",
+        "duplicateImageName": "Aynı isimde birden fazla görsel yüklendi: {name}"
+      },
+      "refund": {
+        "decisionFieldsTogether": "resolvedReason, faultParty ve calculationToken birlikte gönderilmelidir",
+        "previewRequired": "V2 iade onayı için önce karar önizlemesi alınmalıdır",
+        "quarantined": "Bu kayıt mevcut finansal yan etkiler nedeniyle karantinadadır; otomatik onaylanamaz",
+        "reviewNotesRequired": "Finansal inceleme kaydı için PayTR, satıcı düzeltmesi ve fatura mutabakat notu zorunludur",
+        "alreadyCompleted": "Bu iade zaten tamamlanmış",
+        "forceFinalizeStateInvalid": "Talep durumu '{status}' force-finalize için uygun değil. Beklenen: return_delivered veya disputed"
+      },
+      "trade": {
+        "noOpenCompensation": "Bu takasta açık tazminat işareti yok",
+        "compensationClosed": "Tazminat zaten kapatılmış",
+        "compensationNoteRequired": "Tazminat kapatma için açıklama/dekont (note) zorunludur",
+        "noRefundableCashPayment": "İade edilebilecek tamamlanmış bir nakit ödeme yok",
+        "noRefundFailure": "Bu takasta kayıtlı bir iade hatası yok; yeniden deneme gerekmiyor",
+        "shipmentNotFound": "Gönderim bulunamadı",
+        "notInboundShipment": "Bu gönderim depoya gelen bir gönderim değil",
+        "alreadyReceived": "Bu gönderim zaten teslim alındı olarak işaretlenmiş",
+        "notOutboundShipment": "Bu gönderim depodan çıkan bir gönderim değil",
+        "initiatorAddressMissing": "Takası başlatan kullanıcının kayıtlı adresi yok",
+        "receiverAddressMissing": "Takası alan kullanıcının kayıtlı adresi yok",
+        "refundRetryStateInvalid": "Takas durumu '{status}' iade yeniden denemesi için uygun değil",
+        "suratReturnRejected": "Sürat iade kargo siparişi reddedildi: {reason}",
+        "suratApprovalRejected": "Sürat kargo onay siparişi reddedildi: {reason}",
+        "receiveStateInvalid": "Gönderim durumu '{status}' — teslim alındı olarak işaretlenemez",
+        "outboundDeliverStateInvalid": "Takas durumu '{status}' — yalnız 'shipping_to_recipients' takasta çıkış kolisi teslim işaretlenebilir",
+        "deliverStateInvalid": "Gönderim durumu '{status}' — teslim edildi olarak işaretlenemez",
+        "reviewStateInvalid": "Takas durumu '{status}' — kontrole yalnız 'at_warehouse' takas alınabilir",
+        "approveStateInvalid": "Takas durumu '{status}' onay için uygun değil. Beklenen: at_warehouse veya admin_reviewing.",
+        "rejectStateInvalid": "Takas durumu '{status}' reddetme için uygun değil. Beklenen: at_warehouse veya admin_reviewing.",
+        "notReturnShipment": "Bu gönderim bir iade gönderimi değil",
+        "cancelReasonTooShort": "İptal gerekçesi en az 10 karakter olmalıdır",
+        "nothingArrived": "Hiçbir ürün depoya ulaşmamış; bu endpoint sadece kısmen ulaşmış takaslar için.",
+        "forceCancelStateInvalid": "Hem ulaşmış hem de yolda olan bir kargo bulunamadı; force-cancel için durum uygun değil.",
+        "lostReasonTooShort": "Kayıp gerekçesi en az 10 karakter olmalıdır",
+        "lostReturnOnly": "Sadece iade gönderileri kayıp olarak işaretlenebilir",
+        "deliveredNotLost": "Bu gönderim zaten teslim edildi; kayıp işaretlenemez",
+        "alreadyLost": "Bu gönderim zaten kayıp işaretli",
+        "compensationUserNotParty": "Tazminat kullanıcısı bu takasın taraflarından biri olmalı",
+        "refundFailed": "Takas iadesi başarısız: {reason} (retry cron devreye girer)",
+        "refundSkipped": "Takas iadesi yapılamadı: {reason}",
+        "cashHoldReleaseStateInvalid": "Takas durumu '{status}' — yalnız 'completed' takasta nakit hold serbest bırakılabilir",
+        "forceCancelTradeStateInvalid": "Takas durumu '{status}' force-cancel için uygun değil. Beklenen: shipping_to_warehouse."
+      },
+      "sellerApplication": {
+        "notFound": "Başvuru bulunamadı",
+        "alreadyApproved": "Bu başvuru zaten onaylanmış",
+        "alreadyRejected": "Bu başvuru zaten reddedilmiş",
+        "invalidDocumentDecision": "Geçersiz belge kararı",
+        "decisionNoteRequired": "Red veya revizyon açıklaması zorunludur",
+        "documentNotFound": "Belge bulunamadı",
+        "activatedAccountNotFound": "Aktifleştirilmiş kurumsal hesap bulunamadı",
+        "notSubmittedForReview": "Başvuru henüz nihai incelemeye gönderilmemiş",
+        "documentsNotApproved": "Tüm güncel belgeler onaylanmadan hesap aktifleştirilemez"
+      },
+      "review": {
+        "notFound": "Kullanıcı yorumu bulunamadı"
+      },
+      "tax": {
+        "regionNotFound": "Vergi bölgesi bulunamadı",
+        "regionHasRates": "Bu bölgede vergi oranları tanımlı. Önce oranları silin.",
+        "rateNotFound": "Vergi oranı bulunamadı",
+        "rateHasRules": "Bu orana bağlı vergi kuralları var. Önce kuralları silin veya güncelleyin.",
+        "rateRegionMismatch": "Vergi oranı bu bölgeye ait değil.",
+        "categoryIdRequired": "Kategori kuralı için categoryId gerekli.",
+        "ruleNotFound": "Vergi kuralı bulunamadı",
+        "rateRange": "Oran 0 ile 100 arasında olmalı",
+        "exemptionNotFound": "KDV istisnası bulunamadı"
+      },
+      "adPackage": {
+        "tierRequired": "Üyelik katmanı hedeflemesinde en az bir katman seçilmelidir",
+        "userRequired": "Kullanıcı hedeflemesinde en az bir kullanıcı seçilmelidir",
+        "targetRequired": "Katman veya kullanıcı hedeflemesinde en az bir hedef seçilmelidir",
+        "notFound": "Paket bulunamadı",
+        "purchaseNotFound": "Paket satın alımı bulunamadı",
+        "pauseActiveOnly": "Yalnızca süresi devam eden aktif paket duraklatılabilir",
+        "resumePausedOnly": "Yalnızca duraklatılmış paket devam ettirilebilir",
+        "extendActiveOrPausedOnly": "Yalnızca aktif veya duraklatılmış paketin süresi uzatılabilir",
+        "extensionRange": "Uzatma süresi 1-365 gün olmalıdır"
+      },
+      "fileMissing": "Dosya gönderilmedi",
+      "commission": {
+        "draftRequired": "Önce aktif setten bir komisyon taslağı oluşturun.",
+        "publishedImmutable": "Yayınlanmış komisyon setleri değiştirilemez; yeni bir taslak oluşturun.",
+        "maxAboveMin": "Fiyat üst sınırı alt sınırdan büyük olmalıdır. Üst sınır aralığa dahil değildir.",
+        "capBelowFloor": "Ücret tavanı ilgili ücret tabanından küçük olamaz.",
+        "zeroRateWithBounds": "Oran %0 iken pozitif ücret tabanı veya tavanı tanımlanamaz.",
+        "duplicatePackageTier": "Aynı kargo paket boyutu bir kuralda birden fazla kez tanımlanamaz.",
+        "rangeOverlap": "Bu kategori ve satıcı tipi için fiyat aralığı mevcut bir taslak kuralla çakışıyor.",
+        "ruleNotFound": "Komisyon kuralı bulunamadı",
+        "rangeOverlapOnEdit": "Bu değişiklik fiyat aralığını başka bir taslak kuralla çakıştırıyor.",
+        "setNotFound": "Komisyon seti bulunamadı",
+        "publishDraftOnly": "Yalnız taslak set yayınlanabilir."
+      },
+      "page": {
+        "notFound": "Sayfa bulunamadı",
+        "slugInUse": "Bu slug zaten kullanılıyor"
+      },
+      "content": {
+        "invalidTemplateKey": "Geçersiz şablon anahtarı",
+        "unsafeTemplateHtml": "E-posta şablonu çalıştırılabilir veya güvensiz HTML içeremez"
+      },
+      "security": {
+        "logNotFound": "Güvenlik kaydı bulunamadı",
+        "alreadyResolved": "Bu sorun zaten çözümlendi"
+      },
+      "media": {
+        "invalidFolder": "Geçersiz klasör yolu"
+      },
+      "moderation": {
+        "aiDisabled": "AI moderasyon kapalı",
+        "aiUnreachable": "AI servisine erişilemedi",
+        "invalidType": "Geçersiz moderasyon türü",
+        "reviewNotFound": "Değerlendirme bulunamadı"
+      },
+      "notification": {
+        "targetUserNotFound": "Hedef kullanıcı bulunamadı",
+        "sendFailed": "Bildirim gönderilemedi",
+        "scheduleInFuture": "Zamanlama tarihi gelecekte olmalıdır",
+        "scheduledNotFound": "Zamanlanmış bildirim bulunamadı"
+      },
+      "payment": {
+        "partialAmountRequired": "Kısmi iade için geçerli bir iade tutarı gerekir",
+        "refundCompletedOnly": "Sadece tamamlanmış ödemeler iade edilebilir",
+        "groupRefundNotHere": "Grup (sepet) ödemesi manuel iadesi buradan yapılamaz — ilgili siparişleri sipariş bazında iade edin.",
+        "invalidRefundAmount": "İade tutarı geçersiz",
+        "refundAttemptNotFound": "İade denemesi bulunamadı",
+        "resolveManualReviewOnly": "Yalnız manuel inceleme bekleyen iade denemeleri çözülebilir",
+        "cancelCompleted": "Tamamlanmış ödemeler iptal edilemez, iade yapın",
+        "escrowReasonRequired": "Escrow serbest bırakma için sebep (reason) zorunludur"
+      },
+      "payout": {
+        "transferNotFound": "Payout transfer bulunamadı",
+        "retryStateInvalid": "Transfer durumu '{status}' tekrar denenebilir değil"
+      },
+      "product": {
+        "approvePendingOnly": "Sadece bekleyen ürünler onaylanabilir",
+        "selectionRequired": "En az bir ürün seçilmelidir",
+        "soldNotDeletable": "Satılmış ürünler silinemez",
+        "reservedNotDeletable": "Rezerve edilmiş ürünler silinemez",
+        "withActiveOrderNotDeletable": "Aktif siparişi olan ürünler silinemez",
+        "boostedNotHardDeletable": "Öne çıkarma kaydı olan ürün kalıcı silinemez; pasife alın (soft delete)",
+        "restoreRemovedOnly": "Yalnızca kaldırılmış ürünler geri yüklenebilir"
+      },
+      "membership": {
+        "monthlyPriceRange": "Üyelik aylık fiyatı 0 ile 1.000.000 arasında olmalıdır",
+        "yearlyDiscountRange": "Yıllık indirim oranı 0 ile 90 arasında olmalıdır",
+        "tierInactive": "Bu üyelik kademesi aktif değil",
+        "businessRequiresKyc": "Business üyelik yalnız KYC onaylı şirket hesabına atanabilir",
+        "kycRequiresBusiness": "KYC onaylı şirket hesabına yalnız Business üyelik atanabilir",
+        "tierTypeNotFound": "Üyelik tipi bulunamadı: {type}"
+      },
+      "platformSellerMissing": "Platform satıcı hesabı bulunamadı. Önce üretim referans seed'i (seed-production) çalıştırılmalı.",
+      "resolutionNoteRequired": "Çözüm notu zorunludur",
+      "carrierCancellation": {
+        "notFound": "Taşıyıcı iptal görevi bulunamadı",
+        "alreadySettled": "Taşıyıcı iptal görevi zaten sonuçlandırılmış"
+      },
+      "siteAccess": {
+        "codeNotFound": "Erişim kodu bulunamadı",
+        "codeHasNoEmail": "Bu erişim kodunun e-posta adresi yok; önce e-posta ekleyin."
+      },
+      "staff": {
+        "roleAssignSuperAdminOnly": "Rol atama yetkisi yalnızca süper adminde (yönetici izni kapalı)",
+        "superAdminOnly": "Süper admin rolüyle ilgili işlemi yalnızca süper admin yapabilir",
+        "notFound": "Admin kaydı bulunamadı",
+        "lastSuperAdminImmutable": "Sistemdeki son süper admin değiştirilemez",
+        "cannotRemoveSelf": "Kendi admin yetkinizi kaldıramazsınız",
+        "lastSuperAdminUndeletable": "Sistemdeki son süper admin kaldırılamaz"
+      },
+      "warehouseAddressMissing": "Depo adresi yapılandırılmamış. Lütfen `warehouse_address_id` platform ayarını tanımlayın."
+    },
+    "advertisement": {
+      "notFound": "Reklam bulunamadı",
+      "campaignNotFound": "Bağlanacak kampanya bulunamadı"
+    },
+    "brand": {
+      "notFound": "Marka bulunamadı"
+    },
+    "carModel": {
+      "notFound": "Model bulunamadı"
+    },
+    "cart": {
+      "productNotPurchasable": "Bu ürün şu an satışa uygun değil",
+      "itemNotFound": "Ürün sepette bulunamadı",
+      "empty": "Sepetiniz boş",
+      "maxQuantityPerOrder": "Bu üründen maksimum {max} adet alabilirsiniz"
+    },
+    "category": {
+      "commissionCoverageIncomplete": "Kategori aktifleştirilemez: aktif komisyon setinde FREE, BASIC, PREMIUM ve BUSINESS için 0 TL'den sonsuza kadar eksiksiz fiyat aralığı yayınlanmalıdır.",
+      "parentCycle": "Kategori kendi alt kategorisini üst kategori olarak seçemez",
+      "parentNotFound": "Üst kategori bulunamadı",
+      "ancestorsMustBeActive": "Kategori aktifleştirilemez: tüm üst kategoriler aktif olmalıdır.",
+      "deactivateChildrenFirst": "Kategori pasife alınamaz: önce aktif alt kategorileri pasife alınmalıdır.",
+      "createInactiveFirst": "Yeni kategori önce pasif oluşturulmalı, komisyon kuralları yayınlandıktan sonra aktifleştirilmelidir."
+    },
+    "elogo": {
+      "archiveInvoiceNotFound": "e-Arşiv faturası bulunamadı",
+      "invoicePdfUnavailable": "Fatura PDF alınamadı"
+    },
+    "manufacturer": {
+      "notFound": "Üretici bulunamadı",
+      "notFoundBySlug": "Üretici bulunamadı: {slug}"
+    },
+    "marketing": {
+      "selectOnePreference": "En az bir e-posta tercihi seçmelisiniz.",
+      "subscriptionLinkInvalid": "Geçersiz veya kullanılmış abonelik linki."
+    },
+    "media": {
+      "publicUrlNotAllowed": "Bu içerik için herkese açık URL verilemez.",
+      "fileNotFound": "Dosya bulunamadı",
+      "unsupportedTypeWithGif": "Geçersiz dosya tipi. Sadece JPEG, PNG, WebP ve GIF desteklenir.",
+      "fileTooLarge": "Dosya boyutu çok büyük (max 10MB)",
+      "unsupportedType": "Geçersiz dosya tipi. Sadece JPEG, PNG ve WebP desteklenir.",
+      "tooManyImages": "En fazla {max} resim yükleyebilirsiniz",
+      "invalidUploadTarget": "Geçersiz yükleme hedefi: {folder}. İzinli hedefler: messages, reviews, collections",
+      "actionForbidden": "Bu işlem için yetkiniz yok.",
+      "fileMissing": "Dosya bulunamadı.",
+      "fileForbidden": "Bu dosya üzerinde yetkiniz yok."
+    },
+    "search": {
+      "reindexFailed": "Reindex başarısız"
+    },
+    "siteAccess": {
+      "invalidCode": "Geçersiz erişim kodu"
+    },
+    "support": {
+      "messageNotSent": "Mesajınız gönderilemedi. Lütfen daha sonra tekrar deneyin.",
+      "ticketNotFound": "Destek talebi bulunamadı",
+      "ticketClosed": "Kapatılmış taleplere mesaj eklenemez",
+      "rateLimited": "Çok fazla istek gönderdiniz. Lütfen {minutes} dakika sonra tekrar deneyin."
+    },
+    "userReport": {
+      "alreadyPending": "Bu içerik için zaten bekleyen bir raporunuz var",
+      "notFound": "Rapor bulunamadı",
+      "invalidType": "Geçersiz rapor tipi"
+    },
+    "collection": {
+      "notFound": "Koleksiyon bulunamadı",
+      "editForbidden": "Bu koleksiyonu düzenleme yetkiniz yok",
+      "isPrivate": "Bu koleksiyon özel",
+      "productOrCustomRequired": "Ürün ID veya custom ürün bilgileri gerekli",
+      "itemAlreadyAdded": "Ürün zaten koleksiyonda",
+      "customNameRequired": "Custom ürün için isim zorunludur",
+      "itemNotFound": "Koleksiyon öğesi bulunamadı",
+      "likeOwn": "Kendi koleksiyonunuzu beğenemezsiniz",
+      "authRequired": "Kullanıcı kimlik doğrulaması gerekli",
+      "imageUploadFailed": "Resim yükleme başarısız"
+    },
+    "messaging": {
+      "messageNotFound": "Mesaj bulunamadı",
+      "recipientRequired": "Alıcı kullanıcı ID gereklidir (recipientId veya participantId)",
+      "selfMessage": "Kendinize mesaj gönderemezsiniz",
+      "threadNotFound": "Mesaj konusu bulunamadı",
+      "sendForbidden": "Bu konuya mesaj gönderme yetkiniz yok",
+      "viewForbidden": "Bu konuyu görüntüleme yetkiniz yok",
+      "messageTooLong": "Mesaj uzunluğu maksimum {max} karakter olabilir. Mevcut uzunluk: {length}",
+      "dailyLimitReached": "Günlük mesaj limitinize ({limit}) ulaştınız. Yarın tekrar deneyin."
+    },
+    "wishlist": {
+      "ownProduct": "Kendi ürününüzü istek listesine ekleyemezsiniz",
+      "notFound": "İstek listesi bulunamadı",
+      "itemNotFound": "Ürün istek listenizde değil"
+    },
+    "dev": {
+      "userMissing": "Kullanıcı yok: {email}"
+    },
+    "moderation": {
+      "contentRejected": "Girdiğiniz {field} uygun değildir ({reason}). Lütfen düzenleyin.",
+      "imageRejected": "Yüklediğiniz resim uygun değildir. Lütfen uygun bir görsel seçin."
+    },
+    "discount": {
+      "platformCannotDiscountProduct": "Platform ürün fiyatına indirim uygulayamaz; ürün fiyatı satıcıya aittir",
+      "feeDiscountPlatformOnly": "Komisyon, hizmet bedeli ve kargo indirimlerini yalnız platform tanımlayabilir",
+      "sellerFeeNoCoupon": "Satıcı tarafındaki bedel indirimleri kupon koduna bağlanamaz; hedef kitleyle otomatik tanımlanır",
+      "tradeFeeNoCoupon": "Takas hizmet bedeli kampanyası kupon koduna bağlanamaz; otomatik uygulanır",
+      "feeBudgetRequired": "Bedel indirimleri için TL bütçe tavanı zorunludur",
+      "tierRequired": "En az bir üyelik katmanı seçilmelidir",
+      "userRequired": "En az bir kullanıcı seçilmelidir",
+      "tierAudienceOnly": "Üyelik katmanı yalnız 'membership_tiers' hedef kitlesinde seçilebilir",
+      "userListAudienceOnly": "Kullanıcı listesi yalnız kişiye özel hedef kitlelerde verilebilir",
+      "sellerFeeBuyerAudience": "Satıcı tarafındaki bir bedel alıcı kitlesine hedeflenemez",
+      "buyerItemSellerAudience": "Alıcının ödediği bir kalem satıcı kitlesine hedeflenemez",
+      "codelessStoreCampaignRemoved": "Kodsuz mağaza kampanyası kaldırıldı: fiyat indirimi için ilanınızı güncelleyin ya da kupon kodu tanımlayın",
+      "sellerRequired": "İndirim tanımlamak için satıcı olmanız gerekir",
+      "quantityCampaignProductOnly": "Adet koşullu kampanya yalnız ürün fiyatına tanımlanabilir",
+      "buyXGetYMinimum": "'Al X, Y bedava' kampanyası için buyQuantity ve getQuantity en az 1 olmalıdır",
+      "minQuantityAtLeastTwo": "Adet koşullu indirim için minQuantity en az 2 olmalıdır",
+      "quantityPercentRange": "Adet koşullu indirimin değeri 1-100 arası yüzde olmalıdır",
+      "unlimitedPerUserEveryoneOnly": "Kişi başı limitsiz kod yalnız 'herkes' kitlesinde tanımlanabilir",
+      "sellerNoGlobal": "Satıcılar global indirim oluşturamazlar",
+      "sellerNoCategory": "Satıcılar kategori indirimi oluşturamazlar",
+      "selectedProductsRequired": "Seçili ürünler kapsamı için en az bir ürün seçmelisiniz",
+      "codeInUse": "Bu kupon kodu zaten kullanılıyor",
+      "notFound": "İndirim bulunamadı",
+      "editForbidden": "Bu indirimi düzenleme yetkiniz yok",
+      "viewForbidden": "Bu indirimi görüntüleme yetkiniz yok",
+      "reservationExists": "Sipariş için kupon rezervasyonu zaten var",
+      "couponNotFound": "Kupon bulunamadı",
+      "couponLimitReached": "Bu kupon kullanım limitine ulaştı",
+      "couponAlreadyUsed": "Bu kuponu zaten kullandınız",
+      "couponCodeSpent": "Bu kupon kodu daha önce kullanıldı",
+      "codeCountRange": "Kod adedi 1 ile 10000 arasında olmalı"
+    },
+    "rating": {
+      "rateSelf": "Kendinizi puanlayamazsınız",
+      "orderOrTradeRequired": "Sipariş veya takas ID gerekli",
+      "membershipOrder": "Üyelik siparişleri için değerlendirme yapılamaz",
+      "deliveredOnly": "Sadece teslim edilmiş siparişler puanlanabilir",
+      "orderForbidden": "Bu siparişi puanlama yetkiniz yok",
+      "invalidRecipient": "Geçersiz alıcı",
+      "orderAlreadyRated": "Bu sipariş için zaten puan verdiniz",
+      "completedTradesOnly": "Sadece tamamlanmış takaslar puanlanabilir",
+      "tradeForbidden": "Bu takası puanlama yetkiniz yok",
+      "tradeAlreadyRated": "Bu takas için zaten puan verdiniz",
+      "alreadyRated": "Bu sipariş/takas için zaten puan verdiniz",
+      "buyerOnly": "Sadece alıcı ürünü puanlayabilir",
+      "productMismatch": "Siparişteki ürün eşleşmiyor",
+      "productAlreadyRated": "Bu sipariş için zaten ürün puanı verdiniz",
+      "reviewNotFound": "Yorum bulunamadı"
+    },
+    "invoice": {
+      "paymentCapabilityInvalid": "Geçersiz ödeme erişim yetkisi",
+      "partyMissing": "Sipariş alıcı veya satıcı bilgisi eksik",
+      "orderNotPaid": "Ödemesi tamamlanmamış sipariş için fatura oluşturulamaz.",
+      "storageUnavailable": "Fatura belge saklama servisi kullanılamıyor.",
+      "issueForbidden": "Bu siparişin faturasını oluşturma yetkiniz yok",
+      "notFound": "Fatura bulunamadı",
+      "orderUnpaidOrCancelled": "Ödenmemiş veya iptal edilmiş siparişler için fatura oluşturulamaz.",
+      "returnViaElogoOnly": "İade faturaları yalnız eLogo iade belgesi akışından oluşturulabilir."
+    },
+    "security": {
+      "passwordRequiredFor2fa": "İki faktörlü doğrulama için önce bir hesap şifresi belirlemelisiniz",
+      "twoFactorNotSetUp": "2FA kurulumu yapılmamış",
+      "invalidCode": "Geçersiz doğrulama kodu",
+      "twoFactorDisabled": "2FA etkin değil",
+      "tokenAlreadyUsed": "Bu token zaten kullanılmış",
+      "currentPasswordWrong": "Mevcut şifre yanlış",
+      "invalidToken": "Geçersiz doğrulama tokeni",
+      "accessBlocked": "Erişim engellendi"
+    },
+    "storage": {
+      "uploadUnavailableRetry": "Dosya yükleme servisi şu anda kullanılamıyor. Lütfen daha sonra tekrar deneyin.",
+      "unsupportedType": "Geçersiz dosya tipi. Sadece JPEG, PNG, WebP, GIF desteklenir.",
+      "notAnImage": "Dosya içeriği geçerli bir resim değil.",
+      "notADocument": "Dosya içeriği geçerli bir belge (PDF veya resim) değil.",
+      "uploadFailed": "Dosya yükleme başarısız",
+      "copyFailed": "Dosya kopyalama başarısız",
+      "uploadUnavailable": "Dosya yükleme servisi şu anda kullanılamıyor.",
+      "presignFailed": "Presigned URL oluşturulamadı",
+      "downloadUnavailable": "Dosya indirme servisi şu anda kullanılamıyor.",
+      "invalidBucketType": "Geçersiz bucket tipi: {bucket}",
+      "invalidBucket": "Geçersiz bucket: {bucket}"
     }
   }
 }

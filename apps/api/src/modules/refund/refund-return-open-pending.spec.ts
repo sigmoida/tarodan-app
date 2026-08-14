@@ -1,5 +1,9 @@
 import { RefundRequestStatus, ShipmentStatus } from "@prisma/client";
 import { RefundService } from "./refund.service";
+import { RefundFinancialService } from "./refund-financial.service";
+import { RefundShipmentService } from "./refund-shipment.service";
+import { RefundCreationService } from "./refund-creation.service";
+import { RefundDecisionService } from "./refund-decision.service";
 
 describe("RefundService.openReturnShipment pre-advice", () => {
   it("opens the return with its reference while the real Sürat code is pending", async () => {
@@ -54,18 +58,56 @@ describe("RefundService.openReturnShipment pre-advice", () => {
         providerMessage: "registered_pending_carrier_acceptance",
       }),
     };
-    const service = new RefundService(
+    const notifications = {
+      appendHistory: jest.fn(),
+      safeNotify: jest.fn(),
+      notifyRefundRequestOpened: jest.fn(),
+      sendRefundEmail: jest.fn(),
+      toProductImageUrls: jest.fn().mockReturnValue([]),
+    } as any;
+    const financials = new RefundFinancialService(prisma as any, {} as any);
+    // Kargo bacağı gerçek servisle kurulur ve AYNI notifications/financials
+    // nesnelerini paylaşır — testlerin casusları bu nesnelere bakıyor.
+    const shipments = new RefundShipmentService(
       prisma as any,
       {} as any,
       cargo as any,
       {} as any,
       {} as any,
-      {} as any,
-      {} as any,
+      notifications as any,
+      financials as any,
     );
-    jest.spyOn(service as any, "appendHistory").mockResolvedValue(undefined);
-    jest.spyOn(service as any, "safeNotify").mockResolvedValue(undefined);
-    jest.spyOn(service as any, "sendRefundEmail").mockResolvedValue(undefined);
+    const creation = new RefundCreationService(
+      prisma as any,
+      {} as any,
+      notifications as any,
+      financials as any,
+      shipments as any,
+    );
+    const decisions = new RefundDecisionService(
+      prisma as any,
+      {} as any,
+      notifications as any,
+      financials as any,
+      shipments as any,
+    );
+    const service = new RefundService(
+      prisma as any,
+      notifications as any,
+      financials as any,
+      shipments as any,
+      creation as any,
+      decisions as any,
+    );
+    jest
+      .spyOn((service as any).notifications, "appendHistory")
+      .mockResolvedValue(undefined);
+    jest
+      .spyOn((service as any).notifications, "safeNotify")
+      .mockResolvedValue(undefined);
+    jest
+      .spyOn((service as any).notifications, "sendRefundEmail")
+      .mockResolvedValue(undefined);
 
     await expect(service.openReturnShipment("refund-1")).resolves.toBe(updated);
 

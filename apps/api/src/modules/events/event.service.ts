@@ -212,7 +212,9 @@ export interface PaymentRefundedPayload {
   refundAmount: number;
   totalAmount: number;
   provider: string;
-  providerRefundId: string;
+  // The provider's own id is not always known yet: a refund is recorded
+  // locally first and reconciled with the provider afterwards.
+  providerRefundId?: string;
 }
 
 export interface AdminBroadcastPayload {

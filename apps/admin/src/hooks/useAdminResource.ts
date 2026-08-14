@@ -116,7 +116,7 @@ export interface UseAdminResourceResult<T> {
 
 // ─── Helper: extract data and total from the backend response ──────────────
 
-function extractData<T>(
+export function extractData<T>(
   responseData: any,
   queryKey: string,
 ): { rows: T[]; total: number } {

@@ -29,7 +29,7 @@ import { PrismaClient } from "@prisma/client";
 import {
   legacyKeyToNewKey,
   rewriteLegacyUrlsInText,
-} from "../src/modules/media/media-folder-migration";
+} from "../src/modules/media/helpers/media-folder-migration";
 
 const APPLY = process.argv.includes("--apply");
 const prisma = new PrismaClient();

@@ -7,6 +7,7 @@ import {
 import { randomBytes } from "crypto";
 import { PrismaService } from "../../prisma";
 import { NewsletterSubscribeDto } from "./dto/newsletter-subscribe.dto";
+import { i18nMessage } from "../i18n";
 
 /** Haftalık bülten / aylık promosyon gönderimlerinin alıcı kaydı. */
 export interface NewsletterRecipient {
@@ -54,7 +55,9 @@ export class NewsletterService {
     // İkisi de kapalıysa hiçbir şey almayan bir abonelik oluşurdu; kullanıcı da
     // "abone oldunuz" mesajını görüp mail beklerdi.
     if (!newsletter && !promotions) {
-      throw new BadRequestException("En az bir e-posta tercihi seçmelisiniz.");
+      throw new BadRequestException(
+        i18nMessage("server.marketing.selectOnePreference"),
+      );
     }
 
     const existing = await this.prisma.newsletterSubscriber.findUnique({
@@ -196,7 +199,9 @@ export class NewsletterService {
       where: { unsubscribeToken: token },
     });
     if (!subscriber) {
-      throw new NotFoundException("Geçersiz veya kullanılmış abonelik linki.");
+      throw new NotFoundException(
+        i18nMessage("server.marketing.subscriptionLinkInvalid"),
+      );
     }
     if (subscriber.unsubscribedAt) {
       return { message: "Bu e-posta zaten abonelikten çıkarılmış." };

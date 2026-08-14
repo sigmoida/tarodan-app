@@ -19,6 +19,7 @@ import {
   type NewsletterRecipient,
 } from "./newsletter.service";
 import { catalogProductWhere } from "../product/helpers/catalog-product-where";
+import { frontendUrl } from "../../config/app-urls";
 
 /** Tek turda kaç alıcı çekileceği — bellekte tutulan sayfa boyutu. */
 const RECIPIENT_PAGE_SIZE = 200;
@@ -36,10 +37,7 @@ export class MarketingSchedulerService implements OnModuleInit {
   ) {}
 
   private get baseUrl(): string {
-    return (process.env.FRONTEND_URL || "https://tarodan.com.tr").replace(
-      /\/+$/,
-      "",
-    );
+    return frontendUrl().replace(/\/+$/, "");
   }
 
   /**

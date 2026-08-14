@@ -17,7 +17,7 @@ import {
 import { PaymentCommonService } from "./payment-common.service";
 import { ElogoInvoicingService } from "../elogo";
 import { PrismaService } from "../../prisma";
-import { FulfillmentFinalizer } from "./fulfillment-finalizer.service";
+import { FulfillmentFinalizer } from "./fulfillment/fulfillment-finalizer.service";
 import { PaymentStatus } from "@prisma/client";
 
 /**

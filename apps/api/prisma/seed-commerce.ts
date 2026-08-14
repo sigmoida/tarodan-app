@@ -19,19 +19,19 @@ import { generateReferenceCode } from "../src/common/helpers/generate-reference"
 import {
   calculateCommissionFromRules,
   resolveCommissionSellerType,
-} from "../src/modules/order/order-commission.helper";
-import { calculateServiceTax } from "../src/modules/order/order-service-tax.helper";
-import { buyerTotalOf } from "../src/modules/order/order-total.helper";
-import { sellerNetAmountOf } from "../src/modules/order/order-net.helper";
-import { effectiveMembershipTierType } from "../src/modules/membership/membership.util";
+} from "../src/modules/order/helpers/order-commission.helper";
+import { calculateServiceTax } from "../src/modules/order/helpers/order-service-tax.helper";
+import { buyerTotalOf } from "../src/modules/order/helpers/order-total.helper";
+import { sellerNetAmountOf } from "../src/modules/order/helpers/order-net.helper";
+import { effectiveMembershipTierType } from "../src/modules/membership/helpers/membership.util";
 import {
   calculatePackageDesi,
   resolvePackageShippingDecision,
-} from "../src/modules/shipping/shipping-tariff.helper";
+} from "../src/modules/shipping/helpers/shipping-tariff.helper";
 import {
   calculateRefundFinancials,
   resolveReturnPolicy,
-} from "../src/modules/refund/refund-financial-policy";
+} from "../src/modules/refund/helpers/refund-financial-policy";
 
 const money = (value: number): number =>
   Math.round((Number.isFinite(value) ? value : 0) * 100) / 100;

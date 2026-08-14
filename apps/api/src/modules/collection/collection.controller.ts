@@ -32,6 +32,8 @@ import {
   CollectionItemResponseDto,
 } from "./dto";
 import { Public } from "../auth/decorators/public.decorator";
+import { errorStack } from "../../common/helpers/error-message";
+import { i18nMessage } from "../i18n";
 
 @Controller("collections")
 export class CollectionController {
@@ -67,12 +69,7 @@ export class CollectionController {
     @Query("pageSize") pageSize?: number,
     @Query("sortBy")
     sortBy?:
-      | "popular"
-      | "recent"
-      | "name"
-      | "items"
-      | "items_asc"
-      | "items_desc",
+      "popular" | "recent" | "name" | "items" | "items_asc" | "items_desc",
     @Query("search") search?: string,
     @Query("categoryId") categoryId?: string,
     @Query("category") category?: string,
@@ -197,7 +194,9 @@ export class CollectionController {
     @Request() req: any,
   ): Promise<{ liked: boolean; likeCount: number }> {
     if (!req.user || !req.user.id) {
-      throw new BadRequestException("Kullanıcı kimlik doğrulaması gerekli");
+      throw new BadRequestException(
+        i18nMessage("server.collection.authRequired"),
+      );
     }
     try {
       return await this.collectionService.likeCollection(idOrSlug, req.user.id);
@@ -219,7 +218,9 @@ export class CollectionController {
     @Request() req: any,
   ): Promise<{ liked: boolean; likeCount: number }> {
     if (!req.user || !req.user.id) {
-      throw new BadRequestException("Kullanıcı kimlik doğrulaması gerekli");
+      throw new BadRequestException(
+        i18nMessage("server.collection.authRequired"),
+      );
     }
     try {
       return await this.collectionService.unlikeCollection(
@@ -316,11 +317,10 @@ export class CollectionController {
           3600 * 24 * 7, // 7 days
         );
       } catch (error) {
-        this.logger.error(
-          "Collection cover upload failed",
-          error instanceof Error ? error.stack : String(error),
+        this.logger.error("Collection cover upload failed", errorStack(error));
+        throw new BadRequestException(
+          i18nMessage("server.collection.imageUploadFailed"),
         );
-        throw new BadRequestException("Resim yükleme başarısız");
       }
     }
 

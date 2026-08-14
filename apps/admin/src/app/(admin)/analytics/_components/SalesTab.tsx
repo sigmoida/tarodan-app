@@ -10,7 +10,7 @@ import {
 import { useTranslations } from "next-intl";
 import { MetricCard } from "@/components/MetricCard";
 import { SectionCard } from "@/components/detail/SectionCard";
-import { fmtTry } from "@/lib/format";
+import { fmtNumber, fmtTry } from "@/lib/format";
 import { chartPalette, chartOptions } from "../_lib/charts";
 import { getOrderStatusLabels } from "../_lib/types";
 
@@ -52,7 +52,7 @@ export function SalesTab({ report }: { report: any }) {
           icon={ShoppingBagIcon}
           tone="info"
           label={t("admin.analytics.sales.totalOrders")}
-          value={report.totalOrders?.toLocaleString() ?? 0}
+          value={fmtNumber(report.totalOrders) ?? "—"}
         />
         <MetricCard
           icon={CurrencyDollarIcon}

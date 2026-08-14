@@ -1,13 +1,13 @@
 import { ConfigService } from "@nestjs/config";
 import { Test, TestingModule } from "@nestjs/testing";
 import { OrderService } from "./order.service";
-import { OrderPricingService } from "./order-pricing.service";
-import { ShippingTariffService } from "../shipping/shipping-tariff.service";
-import { OrderCheckoutService } from "./order-checkout.service";
-import { OrderCheckoutCommonService } from "./order-checkout-common.service";
-import { OrderCheckoutDirectService } from "./order-checkout-direct.service";
-import { OrderCheckoutGroupService } from "./order-checkout-group.service";
-import { OrderGuestCheckoutService } from "./order-guest-checkout.service";
+import { OrderPricingService } from "./pricing/order-pricing.service";
+import { ShippingTariffService } from "../shipping/tariff/shipping-tariff.service";
+import { OrderCheckoutService } from "./checkout/order-checkout.service";
+import { OrderCheckoutCommonService } from "./checkout/order-checkout-common.service";
+import { OrderCheckoutDirectService } from "./checkout/order-checkout-direct.service";
+import { OrderCheckoutGroupService } from "./checkout/order-checkout-group.service";
+import { OrderGuestCheckoutService } from "./checkout/order-guest-checkout.service";
 import { OrderCommonService } from "./order-common.service";
 import { OrderQueryService } from "./order-query.service";
 import { OrderLifecycleService } from "./order-lifecycle.service";
@@ -17,14 +17,14 @@ import { EventService } from "../events";
 import { NotificationService } from "../notification/notification.service";
 import { DiscountService } from "../discount/discount.service";
 import { SuratCargoService } from "../surat-cargo/surat-cargo.service";
-import { ProductLockService } from "../product/product-lock.service";
+import { ProductLockService } from "../product/lock/product-lock.service";
 import { CommissionLedgerService } from "../commission/commission-ledger.service";
 import { TaxService } from "../tax/tax.service";
 import { ElogoInvoicingService } from "../elogo";
 import { RefundService } from "../refund/refund.service";
 import { OrderStatus, ProductStatus } from "@prisma/client";
 import { flatPackageTiers } from "../shipping/testing/tariff-fixture";
-import { OrderTaxPolicyService } from "./order-tax-policy.service";
+import { OrderTaxPolicyService } from "./pricing/order-tax-policy.service";
 
 // Active shipping tariff stub (29.99 / free over 500) so the real OrderPricingService
 // resolves without a DB. Kademeler zorunlu: önizleme de checkout gibi kademe

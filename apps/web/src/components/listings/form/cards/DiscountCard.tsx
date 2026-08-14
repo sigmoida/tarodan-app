@@ -82,7 +82,7 @@ export default function DiscountCard({
               {t("product.quickDiscountHint")}
             </p>
 
-            <div className="grid md:grid-cols-2 gap-4 mb-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
               <div>
                 <label className="block text-xs font-medium text-body mb-1">
                   Orijinal Fiyat (₺)
@@ -111,7 +111,7 @@ export default function DiscountCard({
               </div>
             </div>
 
-            <div className="grid md:grid-cols-2 gap-4 mb-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
               <div>
                 <label className="block text-xs font-medium text-body mb-1">
                   {t("product.discountStart")}

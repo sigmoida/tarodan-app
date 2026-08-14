@@ -1,6 +1,6 @@
-'use client';
+"use client";
 
-import { Spinner } from '@tarodan/ui';
+import { Spinner } from "@tarodan/ui";
 
 /**
  * Centered loading state. Used inline (`py-16`) or full-screen (`fullScreen`,
@@ -14,8 +14,8 @@ export function PageLoading({ fullScreen = false }: { fullScreen?: boolean }) {
     <div
       className={
         fullScreen
-          ? 'flex min-h-screen items-center justify-center bg-surface'
-          : 'flex items-center justify-center py-16'
+          ? "flex min-h-dvh items-center justify-center bg-surface"
+          : "flex items-center justify-center py-16"
       }
     >
       <Spinner size="xl" />

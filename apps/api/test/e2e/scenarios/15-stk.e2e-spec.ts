@@ -1796,6 +1796,8 @@ describe("15 — Stok Bütünlüğü & Rezervasyon (STK)", () => {
     const refund = await paymentSvc().processRefund(order!.id, unitTotal, {
       refundQuantity: 1,
     });
+    if (!refund)
+      throw new Error("processRefund reported an already-finalized attempt");
     expect(refund.refundAmount).toBeCloseTo(unitTotal, 1);
 
     p = await readProduct(product.id);

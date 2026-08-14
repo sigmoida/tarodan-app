@@ -22,7 +22,7 @@ export function SectionCard({
   bodyClassName?: string;
 }) {
   return (
-    <Card variant="bordered" className={cn("p-6 shadow-sm", className)}>
+    <Card variant="bordered" className={cn("p-4 shadow-sm sm:p-6", className)}>
       {(title || actions) && (
         <div className="mb-4 flex items-center justify-between gap-3">
           {title && (

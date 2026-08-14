@@ -101,7 +101,7 @@ export default function TopAdsBar() {
       role="region"
       aria-label={t("product.sponsoredRegion")}
     >
-      <Container className="px-4">
+      <Container>
         <div className="flex h-9 items-center gap-3">
           <span className="flex-shrink-0 text-2xs font-medium uppercase tracking-wider text-subtle">
             {t("product.sponsored")}

@@ -68,6 +68,7 @@ export default function Product360Modal() {
             src={images[view360Index]}
             alt={`${listing.title} - ${view360Index + 1}`}
             fill
+            sizes="(min-width: 896px) 896px, 100vw"
             className="object-contain"
             fallbackSrc={PLACEHOLDER}
             logContext={{ listingId: listing.id, page: "listing-detail-360" }}

@@ -15,12 +15,12 @@ import { PrismaService } from "../prisma";
 import {
   resolveSettings,
   shouldDeliver,
-} from "../modules/notification/notification-preferences";
+} from "../modules/notification/helpers/notification-preferences";
 import { NotificationType } from "../modules/notification/dto";
 import {
   isKnownNotificationType,
   resolveWebNotificationLink,
-} from "../modules/notification/notification-link";
+} from "../modules/notification/helpers/notification-link";
 
 export interface PushJobData {
   userId: string;

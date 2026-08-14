@@ -10,7 +10,7 @@
 import { PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
 import { readFile } from "fs/promises";
 import { join, extname } from "path";
-import { SEED_BRAND_LOGO_FILES } from "../src/common/seed-media-mapping";
+import { SEED_BRAND_LOGO_FILES } from "../src/common/helpers/seed-media-mapping";
 
 const BUCKET = process.env.S3_BUCKET || "amzn-tarodan";
 const LOGOLAR_DIR = join(__dirname, "../../web/public/photos/logolar");

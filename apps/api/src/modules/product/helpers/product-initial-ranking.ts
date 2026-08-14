@@ -1,8 +1,8 @@
 import type {
   BusinessEntitlementOwner,
   PremiumCheckMembership,
-} from "../../membership/membership.util";
-import { isPremiumEntitled } from "../../membership/membership.util";
+} from "../../membership/helpers/membership.util";
+import { isPremiumEntitled } from "../../membership/helpers/membership.util";
 import { computeRelevanceScore } from "./relevance-score";
 
 export const FRESH_PRODUCT_POPULARITY_BASELINE = 10;

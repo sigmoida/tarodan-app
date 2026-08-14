@@ -72,7 +72,9 @@ export default function ManufacturerDetailClient() {
 
   return (
     <PageShell className="pb-24 pt-8">
-      <div className="container mx-auto px-4 max-w-7xl">
+      {/* `Container` sayfanın genişliğini ve yatay boşluğunu zaten veriyor;
+          buradaki ikinci kap onu 1280px'e daraltıp boşluğu ikiye katlıyordu. */}
+      <div>
         <PageHeader
           backHref="/manufacturers"
           backLabel={t("brands.backToAll") || "Tüm Üreticiler"}

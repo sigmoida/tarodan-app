@@ -457,9 +457,9 @@ describe("MembershipSubscriptionService", () => {
         undefined,
         { tier: business as any, billingPeriod: "monthly" },
       ),
-    ).rejects.toThrow(
-      "Başka bir paket veya dönem için bekleyen üyelik ödemesi bulunuyor",
-    );
+    ).rejects.toMatchObject({
+      response: { i18nKey: "server.membership.pendingPaymentExists" },
+    });
     expect(paymentService.initiatePayment).not.toHaveBeenCalled();
   });
 
@@ -575,8 +575,8 @@ describe("MembershipSubscriptionService", () => {
       }),
     );
 
-    await expect(service.toggleAutoRenew("user-1", true)).rejects.toThrow(
-      "Otomatik yenileme yalnız geçerli ücretli üyelikte açılabilir",
+    await expect(service.toggleAutoRenew("user-1", true)).rejects.toMatchObject(
+      { response: { i18nKey: "server.membership.autoRenewPaidOnly" } },
     );
     expect(prisma.userMembership.update).not.toHaveBeenCalled();
   });

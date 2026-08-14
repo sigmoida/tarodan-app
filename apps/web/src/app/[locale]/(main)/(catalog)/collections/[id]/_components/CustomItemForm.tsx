@@ -106,7 +106,7 @@ export default function CustomItemForm({
         placeholder={t("product.descriptionPlaceholder")}
         rows={2}
       />
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-1 gap-3 xs:grid-cols-2">
         <Controller
           name="brand"
           control={form.control}
@@ -140,7 +140,7 @@ export default function CustomItemForm({
           options={models.map((m) => ({ value: m.name, label: m.name }))}
         />
       </div>
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-1 gap-3 xs:grid-cols-2">
         <FormInput
           name="year"
           type="number"
@@ -156,7 +156,7 @@ export default function CustomItemForm({
           options={filters.scales.map((s) => ({ value: s, label: s }))}
         />
       </div>
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-1 gap-3 xs:grid-cols-2">
         <FormSelect
           name="manufacturer"
           label={t("product.manufacturer")}

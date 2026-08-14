@@ -16,6 +16,7 @@ import {
 } from "@heroicons/react/24/outline";
 import { Badge, Button, Spinner } from "@tarodan/ui";
 import { useTranslations } from "next-intl";
+import { MaskedValue } from "@/components/MaskedValue";
 import { adminApi } from "@/lib/api";
 import { adminKeys } from "@/lib/query/keys";
 import { useAdminMutation } from "@/hooks/useAdminMutation";
@@ -395,11 +396,17 @@ export function ApplicationDetail({ app }: { app: Application }) {
                   <p className="font-medium text-heading">
                     {stakeholder.fullName}
                   </p>
-                  <p className="text-xs text-muted">
+                  <p className="flex items-center gap-1 text-xs text-muted">
                     {stakeholder.identityType.toUpperCase()}
-                    {stakeholder.identityNumber
-                      ? ` · ${stakeholder.identityNumber}`
-                      : ""}
+                    {stakeholder.identityNumber && (
+                      <>
+                        {" · "}
+                        <MaskedValue
+                          value={stakeholder.identityNumber}
+                          className="text-xs"
+                        />
+                      </>
+                    )}
                   </p>
                 </div>
               ))
@@ -408,10 +415,14 @@ export function ApplicationDetail({ app }: { app: Application }) {
               label={t("admin.accounts.sellerApplications.accountHolder")}
               value={data.bankAccountHolder}
             />
-            <Field
-              label={t("admin.accounts.sellerApplications.iban")}
-              value={data.iban}
-            />
+            {data.iban && (
+              <div>
+                <span className="block text-xs text-muted">
+                  {t("admin.accounts.sellerApplications.iban")}
+                </span>
+                <MaskedValue value={data.iban} className="font-medium" />
+              </div>
+            )}
           </div>
         </section>
       </div>

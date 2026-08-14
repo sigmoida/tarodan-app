@@ -61,7 +61,7 @@ export default function AuthHeroLayout({
   const heroLeft = hero.side === "left";
 
   return (
-    <div className="flex min-h-screen">
+    <div className="flex min-h-dvh">
       {/* Form column */}
       <div
         className={`flex flex-1 flex-col bg-surface-elevated ${
@@ -100,21 +100,28 @@ export default function AuthHeroLayout({
       {/*
         Auth-flow hero panel (lg+), side driven by config.
 
-        `lg:h-screen` + yapışkan konum: panel esnek satırın yüksekliğini takip
+        `lg:h-dvh` + yapışkan konum: panel esnek satırın yüksekliğini takip
         ETMEZ. Aksi halde uzun formlar (kurumsal başvuru) satırı büyütüyor ve
         görsel bireysel sekmede bir boyda, kurumsal sekmede bambaşka bir boyda
         görünüyordu. `self-start` şart — esnek öğe varsayılan olarak gerilir ve
         gerilmiş bir öğede `sticky` çalışmaz.
       */}
       <div
-        className={`relative hidden flex-1 overflow-hidden lg:sticky lg:top-0 lg:flex lg:h-screen lg:self-start ${
+        className={`relative hidden flex-1 overflow-hidden lg:sticky lg:top-0 lg:flex lg:h-dvh lg:self-start ${
           heroLeft ? "lg:order-1" : "lg:order-2"
         }`}
       >
+        {/*
+          Panel `lg` altında `hidden` — ama CSS ile gizlenen bir görsel yine de
+          indirilir. `sizes`'ın ikinci dalı bu yüzden `1px`: telefonda tarayıcı
+          srcset'in en küçük varyantını seçer, masaüstünde panelin gerçek payı
+          olan yarım ekranı.
+        */}
         <Image
           src={hero.image}
           alt="Diecast model araba koleksiyonu"
           fill
+          sizes="(min-width: 1024px) 50vw, 1px"
           className="object-cover"
           priority
         />

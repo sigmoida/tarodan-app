@@ -2,11 +2,11 @@ import { BadRequestException, NotFoundException } from "@nestjs/common";
 import { MembershipTierType } from "@prisma/client";
 import { MembershipTierUpdateService } from "./membership-tier-update.service";
 import { MembershipService } from "./membership.service";
-import { AdminMembershipService } from "../admin/admin-membership.service";
+import { AdminMembershipService } from "../admin/finance/admin-membership.service";
 import { MAX_PRODUCT_IMAGES } from "../product/helpers/product-image-keys";
-import { invalidateFreeTierCanTradeCache } from "./free-tier-trade.helper";
+import { invalidateFreeTierCanTradeCache } from "./helpers/free-tier-trade.helper";
 
-jest.mock("./free-tier-trade.helper", () => ({
+jest.mock("./helpers/free-tier-trade.helper", () => ({
   invalidateFreeTierCanTradeCache: jest.fn(),
 }));
 

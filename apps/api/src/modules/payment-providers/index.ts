@@ -1,2 +1,2 @@
-export * from './payment-providers.module';
-export * from './paytr.service';
+export * from "./payment-providers.module";
+export * from "./paytr/paytr.service";

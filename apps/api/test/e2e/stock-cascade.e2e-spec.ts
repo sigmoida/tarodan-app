@@ -1,20 +1,20 @@
-import * as request from 'supertest';
-import { OfferStatus, OrderStatus } from '@prisma/client';
-import { createE2ETestApp, E2ETestApp } from '../test-utils/create-app';
+import * as request from "supertest";
+import { OfferStatus, OrderStatus } from "@prisma/client";
+import { createE2ETestApp, E2ETestApp } from "../test-utils/create-app";
 import {
   truncateAll,
   getPrisma,
   seedBaseline,
   disconnectPrisma,
-} from '../test-utils/db';
-import { createUser, authHeader } from '../factories/user.factory';
-import { createProduct } from '../factories/product.factory';
-import { createAddress } from '../factories/address.factory';
-import { createOfferRow } from '../factories/offer.factory';
-import { signCallback } from '../mocks/paytr.mock';
-import { ProductLockService } from '../../src/modules/product/product-lock.service';
+} from "../test-utils/db";
+import { createUser, authHeader } from "../factories/user.factory";
+import { createProduct } from "../factories/product.factory";
+import { createAddress } from "../factories/address.factory";
+import { createOfferRow } from "../factories/offer.factory";
+import { signCallback } from "../mocks/paytr.mock";
+import { ProductLockService } from "../../src/modules/product/lock/product-lock.service";
 
-describe('Stock Cascade (E2E)', () => {
+describe("Stock Cascade (E2E)", () => {
   let ctx: E2ETestApp;
   let baseline: { categoryId: string; brandId: string; manufacturerId: string };
 
@@ -33,7 +33,7 @@ describe('Stock Cascade (E2E)', () => {
     ctx.paytr.reset();
   });
 
-  it('Buy Now success on the last unit cancels another open accepted offer + its order, leaving reservedQuantity at 0', async () => {
+  it("Buy Now success on the last unit cancels another open accepted offer + its order, leaving reservedQuantity at 0", async () => {
     const seller = await createUser(ctx.module, { isSeller: true });
     const fastBuyer = await createUser(ctx.module);
     const slowBuyer = await createUser(ctx.module);
@@ -73,43 +73,49 @@ describe('Stock Cascade (E2E)', () => {
 
     // fastBuyer races and completes Buy Now end-to-end.
     const buyRes = await request(ctx.app.getHttpServer())
-      .post('/api/orders/buy')
+      .post("/api/orders/buy")
       .set(authHeader(fastBuyer))
       .send({ productId: product.id, shippingAddressId: fastAddr.id })
       .expect(201);
     await request(ctx.app.getHttpServer())
-      .post('/api/payments/initiate')
+      .post("/api/payments/initiate")
       .set(authHeader(fastBuyer))
-      .send({ orderId: buyRes.body.orderId, provider: 'paytr' })
+      .send({ orderId: buyRes.body.orderId, provider: "paytr" })
       .expect(201);
     const fastPayment = await prisma.payment.findFirst({
       where: { orderId: buyRes.body.orderId },
     });
     await request(ctx.app.getHttpServer())
-      .post('/api/payments/callback/paytr')
+      .post("/api/payments/callback/paytr")
       .send(
         signCallback({
           merchantOid: fastPayment!.providerConversationId!,
-          status: 'success',
+          status: "success",
           totalAmount: Math.round(Number(fastPayment!.amount) * 100),
         }),
       )
       .expect(200);
 
     // Stock fully drained AND cascade fired in the same transaction.
-    const productAfter = await prisma.product.findUnique({ where: { id: product.id } });
+    const productAfter = await prisma.product.findUnique({
+      where: { id: product.id },
+    });
     expect(productAfter?.quantity).toBe(0);
     // CRITICAL: must not go negative. Without the Task 2 helper fix this is -1.
     expect(productAfter?.reservedQuantity).toBe(0);
 
-    const offerAfter = await prisma.offer.findUnique({ where: { id: offer.id } });
+    const offerAfter = await prisma.offer.findUnique({
+      where: { id: offer.id },
+    });
     expect(offerAfter?.status).toBe(OfferStatus.cancelled);
 
-    const slowOrderAfter = await prisma.order.findUnique({ where: { id: slowOrder.id } });
+    const slowOrderAfter = await prisma.order.findUnique({
+      where: { id: slowOrder.id },
+    });
     expect(slowOrderAfter?.status).toBe(OrderStatus.cancelled);
   });
 
-  it('sweepOutOfStockProducts cancels lingering accepted offers as a safety net', async () => {
+  it("sweepOutOfStockProducts cancels lingering accepted offers as a safety net", async () => {
     const seller = await createUser(ctx.module, { isSeller: true });
     const buyer = await createUser(ctx.module);
     const product = await createProduct({
@@ -138,7 +144,9 @@ describe('Stock Cascade (E2E)', () => {
     const lock = ctx.app.get(ProductLockService);
     await lock.sweepOutOfStockProducts();
 
-    const offerAfter = await prisma.offer.findUnique({ where: { id: offer.id } });
+    const offerAfter = await prisma.offer.findUnique({
+      where: { id: offer.id },
+    });
     expect(offerAfter?.status).toBe(OfferStatus.cancelled);
   });
 });

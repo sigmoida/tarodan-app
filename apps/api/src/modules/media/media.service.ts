@@ -19,6 +19,7 @@ import {
   configureSharpSafety,
   isBlockedSharpMimeType,
 } from "../../common/image/sharp-safety";
+import { i18nMessage } from "../i18n";
 
 // Sharp is optional - image resizing will be skipped if not available.
 // Yükleme hatası SESSİZCE yutulmasın: staging'de imaj sharp'sız çıktığında tek
@@ -97,7 +98,7 @@ export class MediaService {
       select: { key: true, bucket: true },
     });
     if (!file || file.bucket !== "messages") {
-      throw new NotFoundException("Dosya bulunamadı");
+      throw new NotFoundException(i18nMessage("server.media.fileNotFound"));
     }
     return this.storageService.getPresignedDownloadUrl(
       "messages",
@@ -378,11 +379,11 @@ export class MediaService {
       isBlockedSharpMimeType(file.mimetype)
     ) {
       throw new BadRequestException(
-        "Geçersiz dosya tipi. Sadece JPEG, PNG, WebP ve GIF desteklenir.",
+        i18nMessage("server.media.unsupportedTypeWithGif"),
       );
     }
     if (file.size > 10 * 1024 * 1024) {
-      throw new BadRequestException("Dosya boyutu çok büyük (max 10MB)");
+      throw new BadRequestException(i18nMessage("server.media.fileTooLarge"));
     }
 
     const baseId = uuidv4();
@@ -448,11 +449,11 @@ export class MediaService {
       isBlockedSharpMimeType(file.mimetype)
     ) {
       throw new BadRequestException(
-        "Geçersiz dosya tipi. Sadece JPEG, PNG ve WebP desteklenir.",
+        i18nMessage("server.media.unsupportedType"),
       );
     }
     if (file.size > 10 * 1024 * 1024) {
-      throw new BadRequestException("Dosya boyutu çok büyük (max 10MB)");
+      throw new BadRequestException(i18nMessage("server.media.fileTooLarge"));
     }
 
     const buffer = await sharp(file.buffer)

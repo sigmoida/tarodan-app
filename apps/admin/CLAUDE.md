@@ -4,6 +4,17 @@ Guidance for building UI in `apps/admin`. Read this before adding routes,
 components, or hooks. These rules are enforced partly by ESLint
 (`@tarodan/eslint-config/next`) and partly by review.
 
+The bar is a codebase a new contributor can extend without reading all of it:
+one canonical way to do each recurring thing, one source of truth per fact, and
+patterns that hold at 100 admin sections as well as at 10. A new page should be
+assembled from the recipes below (`ResourceList`, `DetailPage`, `col.*`,
+`FormModal`) — inventing a second way to list, show or edit a resource is how a
+dashboard becomes unmaintainable, one reasonable-looking exception at a time.
+
+The component, token and DRY rules here are **identical to `apps/web`**; the
+difference is rendering (admin is fully client-side, web decides per route) and
+the shape of the data — admin is tables and CRUD, web is cards and storefront.
+
 ## 1. Base components come from `@tarodan/ui`
 
 Never rebuild a primitive that already exists in `@tarodan/ui` (Button, Input,
@@ -40,8 +51,9 @@ side effects in a hook.
 - Logic that is (or will be) shared across apps → a **package**, not here.
   Auth hooks are admin-only (mobile/web have their own), so they stay local.
 - Use React context only when state is genuinely shared across a subtree
-  (global auth already lives in the `authStore` zustand store — don't wrap it
-  in another context "just because").
+  (global auth is httpOnly-cookie + server-resolved, hydrated once into
+  `PermissionsContext` by the `(admin)` layout — don't wrap it in another
+  context "just because").
 
 ## 4. DRY — never duplicate
 
@@ -166,7 +178,11 @@ context (`useResourceList` / `useFilter`).
 
 `DetailPage` = back link + QueryBoundary + header (title/badge/actions) + children.
 Build the body from `SectionCard`, `PartyCard`, `Timeline`, `DataList`/`Field`.
-Pass header props as `item && …` so they only evaluate once loaded.
+Pass header props as `item && …` so they only evaluate once loaded. For
+sensitive personal fields (IBAN, TC Kimlik No, identity numbers) use
+`<MaskedValue value={…} />` (`components/MaskedValue.tsx`) instead of
+rendering them in the clear — hidden by default with a click-to-reveal
+toggle, doesn't leak the value's length.
 
 ```tsx
 const { item, isLoading, error, refetch } = useAdminItem<T>({ resource, id, fetcher });
@@ -260,13 +276,15 @@ are the canonical examples.
 
 Create/edit is a **self-contained modal component** per resource (never inline
 overlays on the page). Delete goes through the shared **`useConfirm`** provider
-(`components/ConfirmProvider`) + a `useAdminMutation` — no bespoke delete modal.
+(`provider/ConfirmProvider`) + a `useAdminMutation` — no bespoke delete modal.
 
-### Form layer (`@tarodan/ui/form` + `components/form/`)
+### Form layer (`@tarodan/ui/form`)
 
-- **`FormModal`** (`components/form/FormModal.tsx`) = design-system `Modal` + the
-  RHF `Form` + a standard Cancel/Submit footer. The resource modal owns the
-  `form` (from `useZodForm`) and the `useAdminMutation`; FormModal just frames them.
+- **`FormModal`** (lives in `packages/ui`, not locally) = design-system `Modal` +
+  the RHF `Form` + a standard Cancel/Submit footer, with an optional
+  `destructive` flag for danger-styled confirms (refund/force-cancel). The
+  resource modal owns the `form` (from `useZodForm`) and the
+  `useAdminMutation`; FormModal just frames them.
 - **RHF field wrappers** (`@tarodan/ui/form`): `FormInput`, `FormSelect`,
   `FormTextarea`, `FormCheckbox`, `FormImageUpload`. Each auto-wires value + error
   from context by `name` — never thread `register`/`error` by hand. `FormImageUpload`
@@ -312,3 +330,44 @@ through the same `ResourceList` pipeline; server-paginated resources pass their
 
 The `(admin)/catalog/*` pages are the canonical CRUD examples (`categories` = the
 simplest, `products` = list+detail+tabs, `brands` = shared `CarModelFormModal`).
+
+---
+
+## 12. Copy & i18n
+
+User-facing strings come from the catalog in `@tarodan/i18n` via
+`useTranslations()` / `t()`. Literal Turkish is an **ESLint error** here
+(`@tarodan/no-hardcoded-turkish`), so it cannot ship — the Turkish strings in
+the examples below are shorthand for a catalog key, not a licence to inline one.
+
+- Add the key to the catalog first; a string used on two screens must not exist
+  twice under two names.
+- Dates, money and numbers go through `lib/format.ts` (`fmtTry` / `fmtNumber` /
+  `fmtDate` / `fmtDateTime`, all null-safe → `—`), never a per-component
+  `toLocaleString` with inline options.
+- Copy a shared primitive can't own is passed in by the caller that has the
+  `t()` (modal labels, confirm text, mutation `successMessage`) — that is why
+  `useAdminMutation` and the shared dialogs take copy as props.
+
+## 13. Verification
+
+Run these before calling a change done — all from the repo root:
+
+```bash
+pnpm --filter @tarodan/admin typecheck   # next typegen && tsc --noEmit
+pnpm --filter @tarodan/admin lint        # no raw primitives, no raw palette
+pnpm --filter @tarodan/admin test:api    # api export-name collision guard
+pnpm --filter @tarodan/admin build       # before shipping anything routing-related
+```
+
+Touching `@tarodan/ui` (or any package) means verifying the **consumers** too —
+`pnpm --filter @tarodan/web typecheck` at minimum; a shared component is not
+"done" when only one app compiles.
+
+Pure logic (mappers, formatters, permission/status derivations) gets a colocated
+`*.test.ts`. UI plumbing does not need a test for its own sake.
+
+Then check the screen itself: list pages paginate/filter through the URL and
+survive a reload, detail pages render their loading/error/empty states, and a
+write refreshes its list **without** a manual refetch (if it doesn't, the
+`invalidates` resource name is wrong).

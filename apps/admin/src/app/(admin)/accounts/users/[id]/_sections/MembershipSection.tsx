@@ -13,6 +13,7 @@ import {
   subscriptionStatusConfig,
 } from "@tarodan/ui";
 import { adminApi } from "@/lib/api";
+import { fmtDate } from "@/lib/format";
 import { SectionCard } from "@/components/detail/SectionCard";
 import { DataList, Field } from "@/components/detail/DataList";
 import { useConfirm } from "@/provider/ConfirmProvider";
@@ -70,12 +71,12 @@ export function MembershipSection({
           </Field>
           {membership.startDate && (
             <Field label={t("admin.users.detail.startDateLabel")}>
-              {new Date(membership.startDate).toLocaleDateString("tr-TR")}
+              {fmtDate(membership.startDate)}
             </Field>
           )}
           {membership.endDate && (
             <Field label={t("admin.users.detail.endDateLabel")}>
-              {new Date(membership.endDate).toLocaleDateString("tr-TR")}
+              {fmtDate(membership.endDate)}
             </Field>
           )}
           {membership.tier.type !== "free" && (
@@ -87,7 +88,7 @@ export function MembershipSection({
           )}
           {membership.cancelledAt && (
             <Field label={t("admin.users.detail.cancelledAtLabel")}>
-              {new Date(membership.cancelledAt).toLocaleDateString("tr-TR")}
+              {fmtDate(membership.cancelledAt)}
             </Field>
           )}
           {membership.scheduledTierType && (

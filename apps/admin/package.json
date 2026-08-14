@@ -9,6 +9,8 @@
     "start": "next start -p 3002",
     "lint": "next lint",
     "typecheck": "next typegen && tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
     "test:api": "node scripts/check-api-collisions.mjs",
     "sync:brand": "node ../../scripts/sync-brand-assets.mjs public"
   },
@@ -42,8 +44,7 @@
     "react-hot-toast": "^2.4.1",
     "tailwind-merge": "^2.6.1",
     "tailwindcss-animate": "^1.0.7",
-    "zod": "3.25.76",
-    "zustand": "4.5.7"
+    "zod": "3.25.76"
   },
   "devDependencies": {
     "@tarodan/eslint-config": "workspace:*",
@@ -58,6 +59,7 @@
     "postcss": "^8.5.26",
     "tailwindcss": "^3.3.6",
     "typescript": "^5.3.2",
+    "vitest": "^3.2.7",
     "exceljs": "^4.4.0"
   }
 }

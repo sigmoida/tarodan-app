@@ -14,7 +14,7 @@ export default function SitemapClient() {
       title={t("utility.sitemap.title")}
       description={t("utility.sitemap.subtitle")}
     >
-      <div className="grid gap-4 sm:grid-cols-2">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         {SITEMAP_SECTIONS.map((section) => (
           <SectionCard
             key={section.titleKey}

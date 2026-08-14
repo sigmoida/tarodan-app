@@ -1,5 +1,6 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
-import { PrismaService } from '../../prisma';
+import { Injectable, NotFoundException } from "@nestjs/common";
+import { PrismaService } from "../../prisma";
+import { i18nMessage } from "../i18n";
 
 @Injectable()
 export class PagesService {
@@ -10,7 +11,7 @@ export class PagesService {
     const pages = await this.prisma.staticPage.findMany({
       where: { isPublished: true },
       select: { slug: true, updatedAt: true },
-      orderBy: { sortOrder: 'asc' },
+      orderBy: { sortOrder: "asc" },
     });
     return pages;
   }
@@ -19,7 +20,8 @@ export class PagesService {
     const page = await this.prisma.staticPage.findFirst({
       where: { slug, isPublished: true },
     });
-    if (!page) throw new NotFoundException('Sayfa bulunamadı');
+    if (!page)
+      throw new NotFoundException(i18nMessage("server.admin.page.notFound"));
     return {
       id: page.id,
       slug: page.slug,

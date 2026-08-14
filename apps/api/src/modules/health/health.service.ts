@@ -17,13 +17,15 @@ import { ConfigService } from "@nestjs/config";
 import { PrismaService } from "../../prisma";
 import { CacheService } from "../cache/cache.service";
 import { CommissionRuleSetStatus, MembershipTierType } from "@prisma/client";
-import { SHIPPING_PACKAGE_TIER_ORDER } from "../shipping/shipping-package-tier";
-import { AdminTradeCommonService } from "../admin/admin-trade-common.service";
+import { SHIPPING_PACKAGE_TIER_ORDER } from "../shipping/helpers/shipping-package-tier";
+import { AdminTradeCommonService } from "../admin/trade/admin-trade-common.service";
 import { getProcessRole } from "../../process-role";
 import { WORKER_HEARTBEAT_KEY } from "./worker-heartbeat.service";
-import { validateStrictCommissionCoverage } from "../order/order-commission.helper";
+import { validateStrictCommissionCoverage } from "../order/helpers/order-commission.helper";
 import { QUEUE_NAMES } from "../../workers/constants";
 import { CRON_CATALOG } from "../../workers/cron-catalog";
+import { isProduction } from "../../config/environment";
+import { errorMessage } from "../../common/helpers/error-message";
 
 /**
  * Bu sayıda DLQ (`dead`) outbox satırı biriktiğinde instance hazır-değil sayılır:
@@ -165,7 +167,7 @@ export class HealthService {
   }
 
   private async checkWorker(): Promise<boolean> {
-    if (process.env.NODE_ENV !== "production") return true;
+    if (!isProduction()) return true;
     if (!this.scheduledQueue) return false;
 
     try {
@@ -211,7 +213,7 @@ export class HealthService {
    * Hazır-DEĞİL yalnızca kurtarılamayan birikme (DLQ eşiği) için verilir.
    */
   private async checkOutbox(): Promise<boolean> {
-    if (process.env.NODE_ENV !== "production") return true;
+    if (!isProduction()) return true;
 
     try {
       const staleProcessingBefore = new Date(Date.now() - 5 * 60_000);
@@ -244,7 +246,7 @@ export class HealthService {
   }
 
   private async checkBusinessConfig(): Promise<boolean> {
-    if (process.env.NODE_ENV !== "production") return true;
+    if (!isProduction()) return true;
 
     try {
       const [
@@ -380,7 +382,7 @@ export class HealthService {
       return {
         status: "unhealthy",
         latency: Date.now() - start,
-        message: `PostgreSQL connection failed: ${error.message}`,
+        message: `PostgreSQL connection failed: ${errorMessage(error)}`,
       };
     }
   }
@@ -427,7 +429,7 @@ export class HealthService {
       return {
         status: "unhealthy",
         latency: Date.now() - start,
-        message: `Redis connection failed: ${error.message}`,
+        message: `Redis connection failed: ${errorMessage(error)}`,
       };
     }
   }
@@ -502,7 +504,7 @@ export class HealthService {
       return {
         status: "unhealthy",
         latency: Date.now() - start,
-        message: `Elasticsearch connection failed: ${error.message}`,
+        message: `Elasticsearch connection failed: ${errorMessage(error)}`,
       };
     }
   }

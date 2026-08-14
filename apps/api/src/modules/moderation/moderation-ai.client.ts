@@ -1,6 +1,7 @@
-import { BadRequestException, Injectable, Logger } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
-import { PrismaService } from '../../prisma';
+import { BadRequestException, Injectable, Logger } from "@nestjs/common";
+import { ConfigService } from "@nestjs/config";
+import { PrismaService } from "../../prisma";
+import { i18nMessage } from "../i18n";
 
 /**
  * Bir AI denetiminin hangi varlığa ait olduğunu tarif eden bağlam.
@@ -21,7 +22,7 @@ export interface ImageModerationResult {
   relevanceScore: number;
   nsfwScore: number;
   topLabels: Array<{ label: string; score: number; vehicle: boolean }>;
-  decision: 'pass' | 'review' | 'flag';
+  decision: "pass" | "review" | "flag";
   reason: string;
 }
 
@@ -29,7 +30,7 @@ export interface TextModerationResult {
   scores: Record<string, number>;
   maxScore: number;
   toxic: boolean;
-  decision: 'pass' | 'flag';
+  decision: "pass" | "flag";
   reason: string | null;
 }
 
@@ -51,12 +52,12 @@ export class ModerationAiClient {
     private readonly prisma: PrismaService,
   ) {
     this.baseUrl = this.config
-      .get<string>('AI_MODERATION_URL', 'http://localhost:8000')
-      .replace(/\/$/, '');
+      .get<string>("AI_MODERATION_URL", "http://localhost:8000")
+      .replace(/\/$/, "");
     this.enabled =
-      this.config.get<string>('AI_MODERATION_ENABLED', 'false') === 'true';
+      this.config.get<string>("AI_MODERATION_ENABLED", "false") === "true";
     this.timeoutMs = Number(
-      this.config.get<string>('AI_MODERATION_TIMEOUT_MS', '20000'),
+      this.config.get<string>("AI_MODERATION_TIMEOUT_MS", "20000"),
     );
   }
 
@@ -72,8 +73,8 @@ export class ModerationAiClient {
 
   hasProfanity(text: string): boolean {
     return (
-      this.profanityStrong.test(text || '') ||
-      this.profanityExact.test(text || '')
+      this.profanityStrong.test(text || "") ||
+      this.profanityExact.test(text || "")
     );
   }
 
@@ -83,10 +84,10 @@ export class ModerationAiClient {
   ): Promise<{ clean: boolean; reason: string | null }> {
     if (!text) return { clean: true, reason: null };
     if (this.hasProfanity(text)) {
-      return { clean: false, reason: 'küfür/uygunsuz dil' };
+      return { clean: false, reason: "küfür/uygunsuz dil" };
     }
     const ai = await this.moderateText(text);
-    if (ai?.toxic) return { clean: false, reason: 'uygunsuz içerik' };
+    if (ai?.toxic) return { clean: false, reason: "uygunsuz içerik" };
     return { clean: true, reason: null };
   }
 
@@ -102,32 +103,36 @@ export class ModerationAiClient {
     },
     ctx?: ModerationContext,
   ): Promise<void> {
-    if (!this.enabled || !file?.buffer || !file.mimetype?.startsWith('image/')) {
+    if (
+      !this.enabled ||
+      !file?.buffer ||
+      !file.mimetype?.startsWith("image/")
+    ) {
       return;
     }
-    const dataUri = `data:${file.mimetype};base64,${file.buffer.toString('base64')}`;
+    const dataUri = `data:${file.mimetype};base64,${file.buffer.toString("base64")}`;
     const verdict = await this.moderateImage(dataUri);
-    if (verdict?.decision === 'flag') {
+    if (verdict?.decision === "flag") {
       if (ctx) {
         await this.recordEvent({
           ...ctx,
-          kind: 'image',
-          decision: 'blocked',
+          kind: "image",
+          decision: "blocked",
           relevanceScore: verdict.relevanceScore,
           nsfwScore: verdict.nsfwScore,
           labels: verdict.topLabels,
-          reason: verdict.reason || 'nsfw',
+          reason: verdict.reason || "nsfw",
         });
       }
       throw new BadRequestException(
-        'Yüklediğiniz resim uygun değildir. Lütfen uygun bir görsel seçin.',
+        i18nMessage("server.moderation.imageRejected"),
       );
     }
     // Temiz/inceleme sonuçlarını da kaydet (admin "AI Denetim" > "Temiz" filtresi için)
     if (verdict && ctx) {
       await this.recordEvent({
         ...ctx,
-        kind: 'image',
+        kind: "image",
         decision: verdict.decision, // 'pass' | 'review'
         relevanceScore: verdict.relevanceScore,
         nsfwScore: verdict.nsfwScore,
@@ -154,13 +159,16 @@ export class ModerationAiClient {
           entityId: ctx.entityId,
           userId: ctx.userId,
           field: ctx.field,
-          kind: 'text',
-          decision: 'blocked',
+          kind: "text",
+          decision: "blocked",
           reason: check.reason,
         });
       }
       throw new BadRequestException(
-        `Girdiğiniz ${ctx?.label ?? 'içerik'} uygun değildir (${check.reason}). Lütfen düzenleyin.`,
+        i18nMessage("server.moderation.contentRejected", {
+          field: ctx?.label ?? "içerik",
+          reason: check.reason,
+        }),
       );
     }
   }
@@ -173,9 +181,9 @@ export class ModerationAiClient {
     entityType: string;
     entityId?: string | null;
     userId?: string | null;
-    kind: 'image' | 'text';
+    kind: "image" | "text";
     field?: string | null;
-    decision: 'pass' | 'review' | 'flag' | 'blocked';
+    decision: "pass" | "review" | "flag" | "blocked";
     relevanceScore?: number | null;
     nsfwScore?: number | null;
     labels?: unknown;
@@ -209,8 +217,8 @@ export class ModerationAiClient {
     const timer = setTimeout(() => controller.abort(), this.timeoutMs);
     try {
       const res = await fetch(`${this.baseUrl}${path}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
         signal: controller.signal,
       });
@@ -236,12 +244,12 @@ export class ModerationAiClient {
     const body = /^data:/i.test(imageUrlOrBase64)
       ? { imageBase64: imageUrlOrBase64 }
       : { imageUrl: imageUrlOrBase64 };
-    return this.post<ImageModerationResult>('/moderate/image', body);
+    return this.post<ImageModerationResult>("/moderate/image", body);
   }
 
   /** Metni denetle. Erişilemezse null. */
   async moderateText(text: string): Promise<TextModerationResult | null> {
-    return this.post<TextModerationResult>('/moderate/text', { text });
+    return this.post<TextModerationResult>("/moderate/text", { text });
   }
 
   /** Aktif eşikleri oku (admin paneli için). */
@@ -273,6 +281,6 @@ export class ModerationAiClient {
     relevanceThreshold?: number;
     nsfwThreshold?: number;
   }): Promise<{ relevanceThreshold: number; nsfwThreshold: number } | null> {
-    return this.post('/config', cfg);
+    return this.post("/config", cfg);
   }
 }

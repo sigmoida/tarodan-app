@@ -1,0 +1,61 @@
+name: PR Checks
+
+# There is currently no CI gate on pull requests — this is the first one.
+# Deliberately scoped to typecheck + lint + admin's unit tests: all fast,
+# none need DB services or repo secrets. The heavier `pnpm verify:ci` (api
+# unit tests, prod build, dependency audit) already exists as a script but
+# needs Postgres/Redis services and DATABASE_URL configured as a follow-up
+# before it can run here.
+
+on:
+  pull_request:
+    branches: [development, master]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pr-checks-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    name: Typecheck, Lint & Unit Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    # next.config.js env validation requires these at build/typegen time even
+    # though nothing here ever calls the API — plain public placeholder URLs,
+    # not secrets.
+    env:
+      NODE_ENV: production
+      NEXT_PUBLIC_API_URL: https://api.tarodan.example
+      NEXT_PUBLIC_APP_URL: https://admin.tarodan.example
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: ./.github/actions/setup-workspace
+
+      - name: Typecheck
+        run: pnpm typecheck
+
+      # @tarodan/web is excluded: a pre-existing ESLint parsing error in
+      # apps/web/src/lib/userExperiencePolicy.d.mts (ambient .d.mts export
+      # syntax the lint parser mis-handles) currently makes `next lint` exit
+      # non-zero there regardless of what a PR changes. Unrelated to this
+      # gate — tracked separately, not fixed here.
+      - name: Lint
+        run: pnpm exec turbo run lint --filter='!@tarodan/web'
+
+      # Both apps' vitest suites. Web's ran nowhere until now — not here and
+      # not in the pre-push gate — so its specs, including the regression that
+      # pins the phone field's editing behaviour, were decorative. Web's
+      # "test" script also runs the node:test scripts under apps/web/scripts.
+      #
+      # NODE_ENV is overridden back to "test" for this step alone. The job sets
+      # it to "production" for Next's typegen, and under that value the bundler
+      # resolves react to its production build, where `act()` throws outright —
+      # every component spec in web fails before asserting anything.
+      - name: Unit tests
+        env:
+          NODE_ENV: test
+        run: pnpm --filter @tarodan/admin --filter @tarodan/web test

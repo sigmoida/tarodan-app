@@ -1,4 +1,8 @@
 import { RefundService } from "./refund.service";
+import { RefundFinancialService } from "./refund-financial.service";
+import { RefundShipmentService } from "./refund-shipment.service";
+import { RefundCreationService } from "./refund-creation.service";
+import { RefundDecisionService } from "./refund-decision.service";
 import { RefundRequestStatus } from "@prisma/client";
 
 /**
@@ -31,14 +35,46 @@ describe("RefundService.finalizeRefundForReturnedShipment — MONEY-M1 CAS claim
     const paymentService = {
       processRefund: jest.fn(processImpl),
     };
-    const service = new RefundService(
+    const notifications = {
+      appendHistory: jest.fn(),
+      safeNotify: jest.fn(),
+      notifyRefundRequestOpened: jest.fn(),
+      sendRefundEmail: jest.fn(),
+      toProductImageUrls: jest.fn().mockReturnValue([]),
+    } as any;
+    const financials = new RefundFinancialService(prisma as any, {} as any);
+    // Kargo bacağı gerçek servisle kurulur ve AYNI notifications/financials
+    // nesnelerini paylaşır — testlerin casusları bu nesnelere bakıyor.
+    const shipments = new RefundShipmentService(
       prisma as any,
       paymentService as any,
       {} as any,
       {} as any,
       {} as any,
-      {} as any,
-      {} as any,
+      notifications as any,
+      financials as any,
+    );
+    const creation = new RefundCreationService(
+      prisma as any,
+      paymentService as any,
+      notifications as any,
+      financials as any,
+      shipments as any,
+    );
+    const decisions = new RefundDecisionService(
+      prisma as any,
+      paymentService as any,
+      notifications as any,
+      financials as any,
+      shipments as any,
+    );
+    const service = new RefundService(
+      prisma as any,
+      notifications as any,
+      financials as any,
+      shipments as any,
+      creation as any,
+      decisions as any,
     );
     return { service, prisma, paymentService };
   };

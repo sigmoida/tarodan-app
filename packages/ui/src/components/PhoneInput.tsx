@@ -5,11 +5,7 @@
 import React from "react";
 import { Input } from "./Input";
 import { TR_DIAL_CODE } from "@tarodan/types";
-import {
-  formatPhoneNumber,
-  TR_PHONE_MASK_LENGTH,
-  TR_PHONE_PLACEHOLDER,
-} from "../lib/phone";
+import { formatPhoneNumber, TR_PHONE_PLACEHOLDER } from "../lib/phone";
 import { cn } from "../lib/utils";
 
 export interface PhoneInputProps {
@@ -76,7 +72,31 @@ export const PhoneInput: React.FC<PhoneInputProps> = ({
     }
 
     const formatted = formatPhoneNumber(raw);
-    onPhoneChange(formatted);
+
+    // `formatPhoneNumber` answers "is this a Turkish mobile so far?" with a
+    // formatted string or "", and "" is the honest answer for a value like
+    // "9532…". Writing that answer back into a field the user is EDITING is
+    // not: it discards the nine digits already there because of one keystroke
+    // that could not be the first. So an edit that cannot be a phone number is
+    // rejected rather than applied.
+    //
+    // Clearing genuinely (select-all + delete, backspacing to nothing) still
+    // works: those leave no digits behind, so the formatter and the field agree
+    // the value is empty.
+    const next =
+      !formatted && phone && digitsOf(raw).length > 0 ? phone : formatted;
+
+    if (next === phone) {
+      // Nothing changed, so React has no reason to re-render — and the
+      // character the user typed would sit in the DOM unmatched by the
+      // controlled value. Put the text back and leave the caret where it was.
+      e.target.value = phone;
+      const at = Math.max(0, cursor - 1);
+      e.target.setSelectionRange(at, at);
+      return;
+    }
+
+    onPhoneChange(next);
 
     // Rewriting the controlled value jumps the caret to the end; move it back to
     // the equivalent position after the edited digit (mid-string editing).
@@ -118,7 +138,13 @@ export const PhoneInput: React.FC<PhoneInputProps> = ({
         value={phone}
         onChange={handleChange}
         placeholder={placeholder ?? TR_PHONE_PLACEHOLDER}
-        maxLength={TR_PHONE_MASK_LENGTH}
+        // No `maxLength`: a complete number fills the mask exactly, and the
+        // browser's own cap then swallows every keystroke — including one meant
+        // to correct a digit in the middle — so the field read as broken until
+        // you deleted something. `formatPhoneNumber` already caps the value at
+        // ten digits, which lets an inserted digit push the last one out the
+        // way a mask should, and `handleChange` restores the text when an edit
+        // changes nothing.
         required={required}
         disabled={disabled}
         className="min-w-0 flex-1 border-0 bg-transparent focus:ring-0 focus:ring-offset-0 disabled:opacity-100"

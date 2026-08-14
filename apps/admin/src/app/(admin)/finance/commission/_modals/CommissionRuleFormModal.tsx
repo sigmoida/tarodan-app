@@ -54,7 +54,7 @@ function RateBlock({
   return (
     <div className="space-y-3 rounded-lg border border-border p-4">
       <h3 className="text-sm font-medium text-heading">{title}</h3>
-      <div className="grid grid-cols-3 gap-3">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
         <FormInput
           name={rateName}
           label={t("admin.finance.commission.ratePercent")}
@@ -332,7 +332,7 @@ export function CommissionRuleFormModal({
         <p className="mb-3 text-xs text-muted">
           {t("admin.finance.commission.amountRangeStrictHint")}
         </p>
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <FormInput
             name="minAmount"
             label={t("admin.finance.commission.minAmountLabel")}
@@ -387,7 +387,7 @@ export function CommissionRuleFormModal({
             {t("admin.finance.commission.tradeFeesHelper")}
           </p>
         </div>
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <FormInput
             name="tradeFeeSellerAmount"
             label={t("admin.finance.commission.tradeFeeSeller")}

@@ -20,8 +20,8 @@ import {
 } from "@nestjs/swagger";
 import { type Locale } from "@tarodan/i18n";
 import { AuthService } from "./auth.service";
-import { PhoneVerificationService } from "./phone-verification.service";
-import { EmailChangeService } from "./email-change.service";
+import { PhoneVerificationService } from "./verification/phone-verification.service";
+import { EmailChangeService } from "./verification/email-change.service";
 import { I18nService, ReqLocale } from "../i18n";
 import {
   RegisterDto,

@@ -37,7 +37,7 @@ import * as bcrypt from "bcrypt";
 import { randomUUID } from "crypto";
 import { StorageService } from "../src/modules/storage/storage.service";
 import { PrismaService } from "../src/prisma";
-import { SEED_AVATAR_BY_EMAIL } from "../src/common/seed-media-mapping";
+import { SEED_AVATAR_BY_EMAIL } from "../src/common/helpers/seed-media-mapping";
 import { EMAIL_TEMPLATE_DEFINITIONS } from "../src/common/email/email-template-registry";
 import { normalizeSeedCommerce } from "./seed-commerce";
 import {
@@ -49,11 +49,11 @@ import { publicProductRatingWhere } from "../src/common/helpers/public-rating";
 import {
   formatElogoInvoiceNumber,
   highestSequenceValue,
-} from "../src/modules/elogo/elogo-document-number";
+} from "../src/modules/elogo/invoice/elogo-document-number";
 import {
   billableDesiForTier,
   tierCodeForDesi,
-} from "../src/modules/shipping/shipping-package-tier";
+} from "../src/modules/shipping/helpers/shipping-package-tier";
 import {
   SEED_COMMISSION_PROFILES,
   SEED_COMMISSION_PRICE_BANDS,
@@ -61,7 +61,7 @@ import {
   SEED_SHIPPING_TIERS,
 } from "./seed-demo-config";
 import { SEED_COMMISSION_RULE_SET_IDS } from "./seed-ids";
-import { findMatchingCommissionRule } from "../src/modules/order/order-commission.helper";
+import { findMatchingCommissionRule } from "../src/modules/order/helpers/order-commission.helper";
 const prisma = new PrismaClient();
 
 // Initialize StorageService for seed script
@@ -1099,7 +1099,9 @@ async function main() {
       publishedBy: "seed",
     },
   });
-  const commissionRules = [];
+  const commissionRules: Awaited<
+    ReturnType<typeof prisma.commissionRule.upsert>
+  >[] = [];
   for (const category of categories) {
     for (const profile of SEED_COMMISSION_PROFILES) {
       const id = `local-rule-${category.id}-${profile.key}`;

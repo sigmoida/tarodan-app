@@ -11,6 +11,11 @@ import { BadRequestException } from "@nestjs/common";
 import { RefundService } from "./refund.service";
 import { flatPackageTiers } from "../shipping/testing/tariff-fixture";
 import { NotificationType } from "../notification/dto/notification.dto";
+import { RefundNotificationService } from "./refund-notification.service";
+import { RefundFinancialService } from "./refund-financial.service";
+import { RefundShipmentService } from "./refund-shipment.service";
+import { RefundCreationService } from "./refund-creation.service";
+import { RefundDecisionService } from "./refund-decision.service";
 
 describe("RefundService policy integration", () => {
   const baseOrder = {
@@ -141,15 +146,48 @@ describe("RefundService policy integration", () => {
       createInAppNotification: jest.fn().mockResolvedValue(undefined),
       sendTemplateEmailToUser: jest.fn().mockResolvedValue(undefined),
     };
-    const service = new RefundService(
+    const notifications = new RefundNotificationService(
+      prisma as any,
+      notification as any,
+      {} as any,
+    );
+    // Gerçek finansal servis: bu spec iade matematiğini uçtan uca doğrular,
+    // stub geçmek testin konusunu ortadan kaldırırdı.
+    const financials = new RefundFinancialService(
+      prisma as any,
+      notification as any,
+      shippingTariff as any,
+    );
+    const shipments = new RefundShipmentService(
       prisma as any,
       payment as any,
       {} as any,
       {} as any,
       {} as any,
-      notification as any,
-      {} as any,
-      shippingTariff as any,
+      notifications as any,
+      financials as any,
+    );
+    const creation = new RefundCreationService(
+      prisma as any,
+      payment as any,
+      notifications as any,
+      financials as any,
+      shipments as any,
+    );
+    const decisions = new RefundDecisionService(
+      prisma as any,
+      payment as any,
+      notifications as any,
+      financials as any,
+      shipments as any,
+    );
+    const service = new RefundService(
+      prisma as any,
+      notifications as any,
+      financials as any,
+      shipments as any,
+      creation as any,
+      decisions as any,
     );
     return { service, prisma, payment, notification, createdRows };
   };
@@ -334,7 +372,9 @@ describe("RefundService policy integration", () => {
 
   it("finalizes quarantined finances without regressing an in-transit return", async () => {
     const { service, createdRows } = makeService();
-    jest.spyOn(service as any, "appendHistory").mockResolvedValue(undefined);
+    jest
+      .spyOn((service as any).notifications, "appendHistory")
+      .mockResolvedValue(undefined);
     createdRows.push({
       id: "refund-1",
       refundNumber: "RFD-1",

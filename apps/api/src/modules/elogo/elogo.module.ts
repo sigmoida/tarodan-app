@@ -4,12 +4,17 @@ import { BullModule } from "@nestjs/bull";
 import { QUEUE_NAMES } from "../../workers/constants";
 import { ElogoService, ELOGO_SOAP_CLIENT } from "./elogo.service";
 import { ElogoInvoicingService } from "./elogo-invoicing.service";
-import { ElogoSchedulerService } from "./elogo-scheduler.service";
-import { ElogoScheduledProcessor } from "./elogo-scheduled.processor";
+import { ElogoQueryService } from "./elogo-query.service";
+import { ElogoDocumentService } from "./elogo-document.service";
+import { ElogoDeliveryService } from "./elogo-delivery.service";
+import { ElogoIssuingService } from "./elogo-issuing.service";
+import { ElogoReversalService } from "./elogo-reversal.service";
+import { ElogoSchedulerService } from "./jobs/elogo-scheduler.service";
+import { ElogoScheduledProcessor } from "./jobs/elogo-scheduled.processor";
 import { ElogoInvoiceController } from "./elogo-invoice.controller";
 import { StorageModule } from "../storage/storage.module";
 import { TaxModule } from "../tax/tax.module";
-import { OrderTaxPolicyService } from "../order/order-tax-policy.service";
+import { OrderTaxPolicyService } from "../order/pricing/order-tax-policy.service";
 import { MailModule } from "../mail/mail.module";
 import {
   ElogoSoapClient,
@@ -47,6 +52,11 @@ import { scheduledProcessors } from "../../workers/scheduled-processors";
     },
     ElogoService,
     ElogoInvoicingService,
+    ElogoQueryService,
+    ElogoDocumentService,
+    ElogoDeliveryService,
+    ElogoIssuingService,
+    ElogoReversalService,
     ElogoSchedulerService,
     // Hizmet KDV'sinin TEK kaynağı `PlatformSetting` satırlarıdır; checkout da
     // aynı servisi okur. OrderModule'ü import etmek döngü yaratacağı için

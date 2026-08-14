@@ -9,16 +9,17 @@ import type {
   SuratTechnicalCode,
   SuratBarcodeResult,
   SuratBarcodeSuccess,
-} from "./surat-cargo.types";
-import { SuratCarrierClient } from "./surat-soap.client";
-import { SuratTrackingClient } from "./surat-tracking.client";
-import { withSuratTechnicalRetries } from "./surat-technical-retry";
+} from "./helpers/surat-cargo.types";
+import { SuratCarrierClient } from "./clients/surat-soap.client";
+import { SuratTrackingClient } from "./clients/surat-tracking.client";
+import { withSuratTechnicalRetries } from "./clients/surat-technical-retry";
 import type {
   CargoProvider,
   CargoShipmentRequest,
   CargoShipmentResult,
-} from "./cargo-provider";
-import { buildStandardGonderiPayload } from "./surat-address.util";
+} from "./helpers/cargo-provider";
+import { buildStandardGonderiPayload } from "./mappers/surat-address.util";
+import { errorMessage } from "../../common/helpers/error-message";
 
 export const SURAT_CARRIER_CLIENT = Symbol("SURAT_CARRIER_CLIENT");
 
@@ -196,7 +197,7 @@ export class SuratCargoService implements CargoProvider {
         correlationId,
         idempotencyKey,
         code,
-        err: e instanceof Error ? e.message : String(e),
+        err: errorMessage(e),
       });
       return {
         ok: false,

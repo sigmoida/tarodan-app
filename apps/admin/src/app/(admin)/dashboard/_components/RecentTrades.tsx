@@ -61,7 +61,7 @@ export function RecentTrades({ trades }: { trades: RecentTrade[] }) {
             return (
               <div
                 key={trade.id}
-                className="flex items-center justify-between border-b border-border py-3 last:border-0"
+                className="flex flex-col gap-2 border-b border-border py-3 last:border-0 sm:flex-row sm:items-center sm:justify-between"
               >
                 <div className="flex min-w-0 flex-1 items-center">
                   <div className="mr-3 flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-success-500/20">
@@ -78,7 +78,7 @@ export function RecentTrades({ trades }: { trades: RecentTrade[] }) {
                     </p>
                   </div>
                 </div>
-                <div className="ml-3 flex items-center gap-3">
+                <div className="flex items-center gap-3 sm:ml-3">
                   <StatusBadge
                     status={trade.status}
                     config={dashboardTradeStatusConfig(t)}

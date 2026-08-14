@@ -1,5 +1,6 @@
 import { Request, Response } from "express";
 import { randomBytes } from "crypto";
+import { isProduction } from "../../../config/environment";
 
 /**
  * httpOnly cookie tabanlı auth.
@@ -68,9 +69,7 @@ function baseCookieOptions() {
   // Honor an explicit COOKIE_SECURE=true independent of NODE_ENV, so a prod
   // deploy that forgets NODE_ENV=production still ships Secure session cookies
   // instead of transmitting tokens over plaintext HTTP.
-  const secure =
-    process.env.NODE_ENV === "production" ||
-    process.env.COOKIE_SECURE === "true";
+  const secure = isProduction() || process.env.COOKIE_SECURE === "true";
   const domain = process.env.COOKIE_DOMAIN || undefined;
   return {
     httpOnly: true as const,

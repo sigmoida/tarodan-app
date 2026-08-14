@@ -30,8 +30,11 @@ export default function CartItemCard({ item }: { item: CartLineItem }) {
     (!item.isAvailable ? t("product.productNoLongerAvailable") : null);
 
   return (
+    // `flex-wrap`: 320px'te kutu + 112px görsel + adet/fiyat sütunu yan yana
+    // sığmıyor (43px taşıyordu). Sığmadığında adet/fiyat bloğu kendi satırına
+    // iner — `ProductCard`'ın liste görünümüyle aynı davranış.
     <SectionCard
-      className={`p-4 flex gap-4 ${!item.isAvailable ? "!bg-surface-alt" : ""}`}
+      className={`p-4 flex flex-wrap gap-4 ${!item.isAvailable ? "!bg-surface-alt" : ""}`}
     >
       {/* Satın alınamayan satırda kutu YOK: seçilemeyen bir kutuyu göstermek
           "neden işaretlenmiyor" sorusu doğuruyor; rozet zaten sebebi söylüyor. */}
@@ -94,7 +97,7 @@ export default function CartItemCard({ item }: { item: CartLineItem }) {
       </div>
       {/* Adet stepper + sil ikonu kartın sağında birlikte; satır toplamı altında.
           Stok-duyarlı adet: + `maxQuantity`'de kilitlenir. */}
-      <div className="flex flex-shrink-0 flex-col items-end gap-2 self-center">
+      <div className="flex w-full flex-shrink-0 flex-col items-end gap-2 self-center xs:w-auto">
         <div className="flex items-center gap-2">
           {item.isAvailable && (
             <QuantityStepper

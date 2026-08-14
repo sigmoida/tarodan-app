@@ -2,9 +2,9 @@ import { Injectable, Optional } from "@nestjs/common";
 import { PrismaService } from "../../prisma";
 import { CacheService } from "../cache/cache.service";
 import { StorageService } from "../storage/storage.service";
-import { computeTradeCanCancel } from "./trade.state-machine";
+import { computeTradeCanCancel } from "./helpers/trade.state-machine";
 import { TradeResponseDto } from "./dto";
-import { primaryCashPayment } from "./trade.constants";
+import { primaryCashPayment } from "./helpers/trade.constants";
 import { publicName } from "../../common/helpers/public-identity";
 
 /**

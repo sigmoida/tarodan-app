@@ -7,13 +7,13 @@ import {
   Optional,
 } from "@nestjs/common";
 import { PrismaService } from "../../prisma";
-import { isShipmentHandedToCarrier } from "../shipping/shipment-handover";
+import { isShipmentHandedToCarrier } from "../shipping/helpers/shipment-handover";
 import { i18nMessage } from "../i18n";
 import { CacheService } from "../cache/cache.service";
 import { CancelOrderDto, GuestOrderCancelDto } from "./dto";
 import { OrderStatus, OfferStatus, RefundRequestStatus } from "@prisma/client";
 import { getAvailableQuantity } from "../product/helpers/product-availability.helper";
-import { ProductLockService } from "../product/product-lock.service";
+import { ProductLockService } from "../product/lock/product-lock.service";
 import { NotificationService } from "../notification/notification.service";
 import { CommissionLedgerService } from "../commission/commission-ledger.service";
 import { ElogoInvoicingService } from "../elogo";
@@ -22,7 +22,7 @@ import { OrderQueryService } from "./order-query.service";
 import { DiscountService } from "../discount/discount.service";
 import { RefundService } from "../refund/refund.service";
 import { PUBLIC_NAME_SELECT } from "../../common/helpers/public-identity";
-import { paymentWindowEnd } from "../payment/payment.constants";
+import { paymentWindowEnd } from "../payment/helpers/payment.constants";
 
 /**
  * Sipariş yaşam döngüsü (adres güncelleme, durum geçişleri, tamamlama/onay,
@@ -456,14 +456,14 @@ export class OrderLifecycleService {
     ) {
       if (!dto?.reasonCode) {
         throw new BadRequestException(
-          "Ödenmiş sipariş iptalinde neden kodu zorunludur",
+          i18nMessage("server.order.cancelReasonRequired"),
         );
       }
       // Ön kontrol (net hata mesajı için); bağlayıcı doğrulama
       // createCancellationRefund içinde sipariş satırı KİLİTLİYKEN yapılır.
       if (isShipmentHandedToCarrier(preflight.shipment)) {
         throw new BadRequestException(
-          "Kargoya teslim edilmiş sipariş iptal edilemez; iade talebi oluşturun",
+          i18nMessage("server.order.cancelAfterHandover"),
         );
       }
       if (!this.refundService) {

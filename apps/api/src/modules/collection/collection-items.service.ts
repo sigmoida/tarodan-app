@@ -14,6 +14,7 @@ import {
 } from "./dto";
 import { CollectionCommonService } from "./collection-common.service";
 import { catalogProductWhere } from "../product/helpers/catalog-product-where";
+import { i18nMessage } from "../i18n";
 
 /**
  * CollectionItemsService — koleksiyon öğesi işlemleri: addItemToCollection,
@@ -43,7 +44,7 @@ export class CollectionItemsService {
     });
 
     if (!collection) {
-      throw new NotFoundException("Koleksiyon bulunamadı");
+      throw new NotFoundException(i18nMessage("server.collection.notFound"));
     }
 
     if (collection.userId !== userId) {
@@ -53,7 +54,7 @@ export class CollectionItemsService {
     // Validate: either productId or customTitle must be provided
     if (!dto.productId && !dto.customTitle) {
       throw new BadRequestException(
-        "Ürün ID veya custom ürün bilgileri gerekli",
+        i18nMessage("server.collection.productOrCustomRequired"),
       );
     }
 
@@ -66,7 +67,9 @@ export class CollectionItemsService {
       });
 
       if (!product) {
-        throw new NotFoundException("Ürün bulunamadı");
+        throw new NotFoundException(
+          i18nMessage("server.offer.productNotFound"),
+        );
       }
 
       // Check if already in collection
@@ -80,7 +83,9 @@ export class CollectionItemsService {
       });
 
       if (existing) {
-        throw new BadRequestException("Ürün zaten koleksiyonda");
+        throw new BadRequestException(
+          i18nMessage("server.collection.itemAlreadyAdded"),
+        );
       }
 
       // Get max sort order
@@ -111,7 +116,9 @@ export class CollectionItemsService {
           e instanceof Prisma.PrismaClientKnownRequestError &&
           e.code === "P2002"
         ) {
-          throw new BadRequestException("Ürün zaten koleksiyonda");
+          throw new BadRequestException(
+            i18nMessage("server.collection.itemAlreadyAdded"),
+          );
         }
         throw e;
       }
@@ -122,7 +129,9 @@ export class CollectionItemsService {
     // Custom product logic
     // Validate customTitle is required for custom products
     if (!dto.customTitle || dto.customTitle.trim().length === 0) {
-      throw new BadRequestException("Custom ürün için isim zorunludur");
+      throw new BadRequestException(
+        i18nMessage("server.collection.customNameRequired"),
+      );
     }
 
     // Get max sort order
@@ -165,7 +174,7 @@ export class CollectionItemsService {
     });
 
     if (!collection) {
-      throw new NotFoundException("Koleksiyon bulunamadı");
+      throw new NotFoundException(i18nMessage("server.collection.notFound"));
     }
 
     if (collection.userId !== userId) {
@@ -177,7 +186,9 @@ export class CollectionItemsService {
     });
 
     if (!item) {
-      throw new NotFoundException("Koleksiyon öğesi bulunamadı");
+      throw new NotFoundException(
+        i18nMessage("server.collection.itemNotFound"),
+      );
     }
 
     await this.prisma.collectionItem.delete({
@@ -198,11 +209,13 @@ export class CollectionItemsService {
     });
 
     if (!collection) {
-      throw new NotFoundException("Koleksiyon bulunamadı");
+      throw new NotFoundException(i18nMessage("server.collection.notFound"));
     }
 
     if (collection.userId !== userId) {
-      throw new ForbiddenException("Bu koleksiyonu düzenleme yetkiniz yok");
+      throw new ForbiddenException(
+        i18nMessage("server.collection.editForbidden"),
+      );
     }
 
     await this.prisma.$transaction(

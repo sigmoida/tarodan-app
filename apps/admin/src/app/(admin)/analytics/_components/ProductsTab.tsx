@@ -10,11 +10,16 @@ import {
 import { useTranslations } from "next-intl";
 import { MetricCard } from "@/components/MetricCard";
 import { SectionCard } from "@/components/detail/SectionCard";
-import { fmtTry } from "@/lib/format";
+import { useMediaQuery } from "@/hooks/useMediaQuery";
+import { SM_MEDIA_QUERY } from "@/lib/breakpoints";
+import { fmtNumber, fmtTry } from "@/lib/format";
 import { chartPalette } from "../_lib/charts";
 
 export function ProductsTab({ report }: { report: any }) {
   const t = useTranslations();
+  // Below `sm` a right-side legend leaves no room for the doughnut itself;
+  // switch to a bottom legend there, matching CategoryChart's pattern.
+  const isNarrow = !useMediaQuery(SM_MEDIA_QUERY);
   const categoryChartData = {
     labels: report.categoryDistribution?.map((d: any) => d.name) || [],
     datasets: [
@@ -40,19 +45,19 @@ export function ProductsTab({ report }: { report: any }) {
           icon={ShoppingBagIcon}
           tone="info"
           label={t("admin.analytics.products.totalProducts")}
-          value={report.totalProducts?.toLocaleString() ?? 0}
+          value={fmtNumber(report.totalProducts) ?? "—"}
         />
         <MetricCard
           icon={ChartBarIcon}
           tone="success"
           label={t("admin.analytics.products.activeProducts")}
-          value={report.activeProducts?.toLocaleString() ?? 0}
+          value={fmtNumber(report.activeProducts) ?? "—"}
         />
         <MetricCard
           icon={CalendarIcon}
           tone="warning"
           label={t("admin.analytics.products.pendingApproval")}
-          value={report.pendingProducts?.toLocaleString() ?? 0}
+          value={fmtNumber(report.pendingProducts) ?? "—"}
         />
         <MetricCard
           icon={CurrencyDollarIcon}
@@ -74,7 +79,7 @@ export function ProductsTab({ report }: { report: any }) {
                 maintainAspectRatio: false,
                 plugins: {
                   legend: {
-                    position: "right",
+                    position: isNarrow ? "bottom" : "right",
                     labels: { color: chartPalette.subtle },
                   },
                 },
@@ -86,9 +91,14 @@ export function ProductsTab({ report }: { report: any }) {
         <SectionCard title={t("admin.analytics.products.byCategoryTitle")}>
           <div className="space-y-4">
             {report.categoryDistribution?.map((cat: any) => (
-              <div key={cat.name} className="flex items-center justify-between">
-                <span className="text-heading">{cat.name}</span>
-                <div className="flex items-center gap-3">
+              <div
+                key={cat.name}
+                className="flex items-center justify-between gap-3"
+              >
+                <span className="min-w-0 flex-1 truncate text-heading">
+                  {cat.name}
+                </span>
+                <div className="flex shrink-0 items-center gap-3">
                   <div className="h-2 w-32 rounded-full bg-surface-alt">
                     <div
                       className="h-2 rounded-full bg-primary-500"

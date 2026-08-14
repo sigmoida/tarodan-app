@@ -4,6 +4,7 @@ import { useParams } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { Badge } from "@tarodan/ui";
 import { adminApi } from "@/lib/api";
+import { fmtDateTime } from "@/lib/format";
 import { DetailPage } from "@/components/detail/DetailPage";
 import { PartyCard } from "@/components/detail/PartyCard";
 import type { OrderGroupFile } from "./_lib/fileTypes";
@@ -33,7 +34,7 @@ export default function OrderGroupFilePage() {
           number: file.group.groupNumber,
         })
       }
-      subtitle={(file) => new Date(file.group.createdAt).toLocaleString()}
+      subtitle={(file) => fmtDateTime(file.group.createdAt)}
       badge={(file) =>
         file.group.itemCount > 1 ? (
           <Badge variant="outline">

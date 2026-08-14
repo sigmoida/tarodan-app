@@ -14,7 +14,9 @@ export default function MiniChart({
   const range = max - min || 1;
 
   return (
-    <div className="flex h-8 items-end gap-0.5">
+    // `shrink-0`: sabit genişlikte çubuklardan oluşuyor, esnek satırda
+    // ezilmemeli — yanındaki metin bloğu küçülür, bu değil.
+    <div className="flex h-8 shrink-0 items-end gap-0.5">
       {data.slice(-7).map((value, i) => (
         <div
           key={i}

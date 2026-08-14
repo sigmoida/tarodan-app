@@ -192,6 +192,16 @@ function buildPushStages(context, apps) {
         "@tarodan/api...",
         "build",
       ]),
+      // Ayrı bir tsconfig, ayrı bir çıktı ağacı: `nest build` bunu KAPSAMAZ.
+      // Üretim boot'u derlenmiş seed'leri sabit yollardan çağırdığı için
+      // (seed:prod, bootstrap:prod:admin, …) buradaki bir kayma konteyneri
+      // MODULE_NOT_FOUND ile crash-loop'a sokar — ve bunu ancak deploy'da
+      // görürüz. Birkaç saniyelik derleme, o turu buraya çeker.
+      commandStage("api-seed-build", "API Seed Build", [
+        "--filter",
+        "@tarodan/api...",
+        "build:seed",
+      ]),
     );
   }
 
@@ -206,6 +216,11 @@ function buildPushStages(context, apps) {
         "--filter",
         "@tarodan/web",
         "test:api",
+      ]),
+      commandStage("web-unit", "Web Unit", [
+        "--filter",
+        "@tarodan/web",
+        "test",
       ]),
       commandStage("web-build", "Web Build", [
         "--filter",
@@ -227,6 +242,11 @@ function buildPushStages(context, apps) {
         "@tarodan/admin",
         "test:api",
       ]),
+      commandStage("admin-unit", "Admin Unit", [
+        "--filter",
+        "@tarodan/admin",
+        "test",
+      ]),
       commandStage("admin-build", "Admin Build", [
         "--filter",
         "@tarodan/admin...",
@@ -241,6 +261,16 @@ function buildPushStages(context, apps) {
 function buildCiStages(context) {
   return [
     commandStage("typecheck", "Workspace Typecheck", ["typecheck"]),
+    // @tarodan/web excluded: pre-existing ESLint parsing error in
+    // apps/web/src/lib/userExperiencePolicy.d.mts, unrelated to any given
+    // change — same exclusion as .github/workflows/pr-checks.yml.
+    commandStage("lint", "Workspace Lint", [
+      "exec",
+      "turbo",
+      "run",
+      "lint",
+      "--filter=!@tarodan/web",
+    ]),
     jestStage(context, "api-unit", "API Unit", []),
     commandStage("build", "Production Build", ["build"]),
     commandStage("audit", "Dependency Audit", ["audit:prod"]),

@@ -9,6 +9,7 @@ import {
   sentryRelease,
   sentryTracesSampleRate,
 } from "./sentry.release";
+import { scrubEvent } from "./sentry.scrub";
 
 Sentry.init({
   dsn: process.env.NEXT_PUBLIC_SENTRY_DSN,
@@ -36,12 +37,5 @@ Sentry.init({
 
   enabled: !!process.env.NEXT_PUBLIC_SENTRY_DSN,
 
-  beforeSend(event) {
-    if (event.request?.data) {
-      const data = event.request.data as Record<string, unknown>;
-      if (data.password) data.password = "[REDACTED]";
-      if (data.token) data.token = "[REDACTED]";
-    }
-    return event;
-  },
+  beforeSend: scrubEvent,
 });

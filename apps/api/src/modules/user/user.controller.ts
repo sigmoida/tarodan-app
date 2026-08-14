@@ -35,6 +35,7 @@ import {
   CompleteTourDto,
   ClaimUsernameDto,
 } from "./dto";
+import { errorMessage } from "../../common/helpers/error-message";
 
 @ApiTags("users")
 @Controller("users")
@@ -619,7 +620,7 @@ export class UserController {
       const limitNum = limit ? parseInt(limit, 10) : 20;
       return await this.userService.getTopCollections(limitNum);
     } catch (err) {
-      this.logger.warn(`getTopCollections failed: ${err?.message || err}`);
+      this.logger.warn(`getTopCollections failed: ${errorMessage(err)}`);
       return [];
     }
   }
@@ -657,7 +658,7 @@ export class UserController {
     try {
       return await this.userService.getFeaturedCollector();
     } catch (err) {
-      this.logger.warn(`getFeaturedCollector failed: ${err?.message || err}`);
+      this.logger.warn(`getFeaturedCollector failed: ${errorMessage(err)}`);
       return null;
     }
   }
@@ -694,7 +695,7 @@ export class UserController {
     try {
       return await this.userService.getFeaturedBusiness();
     } catch (err) {
-      this.logger.warn(`getFeaturedBusiness failed: ${err?.message || err}`);
+      this.logger.warn(`getFeaturedBusiness failed: ${errorMessage(err)}`);
       return null;
     }
   }

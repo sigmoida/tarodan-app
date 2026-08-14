@@ -8,6 +8,7 @@ export {
   formatPhoneNumber,
   splitPhone,
   combinePhone,
+  toStoredPhone,
   TR_DIAL_CODE,
   TR_PHONE_E164,
   TR_MOBILE_NATIONAL,

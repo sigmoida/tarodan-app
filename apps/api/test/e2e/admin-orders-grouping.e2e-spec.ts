@@ -1,6 +1,6 @@
 import { Prisma, OrderStatus } from "@prisma/client";
 import { PrismaService } from "../../src/prisma";
-import { AdminOrderService } from "../../src/modules/admin/admin-order.service";
+import { AdminOrderService } from "../../src/modules/admin/orders/admin-order.service";
 import {
   truncateAll,
   getPrisma,

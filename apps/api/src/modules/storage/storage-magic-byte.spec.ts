@@ -37,7 +37,9 @@ describe("StorageService — upload magic-byte validation", () => {
         bucket: "products",
         mimeType: "application/pdf",
       } as any),
-    ).rejects.toThrow(/Geçersiz dosya tipi/);
+    ).rejects.toMatchObject({
+      response: { i18nKey: "server.storage.unsupportedType" },
+    });
   });
 
   it("passes magic-byte validation for a real PNG (fails later at the S3 step, not the sniff)", async () => {
@@ -75,7 +77,9 @@ describe("StorageService — upload magic-byte validation", () => {
         mimeType: "application/pdf",
         filename: "evil.pdf",
       } as any),
-    ).rejects.toThrow(/geçerli bir belge/);
+    ).rejects.toMatchObject({
+      response: { i18nKey: "server.storage.notADocument" },
+    });
   });
 
   it("passes magic-byte validation for a real PDF in the documents bucket", async () => {
@@ -93,6 +97,8 @@ describe("StorageService — upload magic-byte validation", () => {
         mimeType: "application/pdf",
         filename: "invoice.pdf",
       } as any),
-    ).rejects.not.toThrow(/geçerli bir belge/);
+    ).rejects.not.toMatchObject({
+      response: { i18nKey: "server.storage.notADocument" },
+    });
   });
 });

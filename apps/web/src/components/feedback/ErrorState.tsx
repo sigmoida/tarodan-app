@@ -31,7 +31,7 @@ export default function ErrorState({
   return (
     <div
       className={`flex flex-col items-center justify-center gap-3 px-6 text-center ${
-        fullScreen ? "min-h-screen bg-surface" : "py-20"
+        fullScreen ? "min-h-dvh bg-surface" : "py-20"
       }`}
     >
       <p className="text-6xl font-bold text-danger-500">500</p>

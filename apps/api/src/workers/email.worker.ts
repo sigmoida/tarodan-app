@@ -23,6 +23,7 @@ import {
   extractEmailTemplateVariables,
   renderStoredEmailTemplate,
 } from "../common/helpers/email-template-renderer";
+import { frontendUrlForEnvironment } from "../config/app-urls";
 
 export interface EmailJobData {
   to: string;
@@ -121,11 +122,7 @@ export class EmailWorker {
       throw new Error("Template name is required");
     }
 
-    const frontendUrl =
-      this.configService.get<string>("FRONTEND_URL") ||
-      (this.configService.get("NODE_ENV") === "production"
-        ? "https://tarodan.com.tr"
-        : "http://localhost:3000");
+    const frontendUrl = frontendUrlForEnvironment();
     const brand = {
       frontendUrl,
       logoUrl:

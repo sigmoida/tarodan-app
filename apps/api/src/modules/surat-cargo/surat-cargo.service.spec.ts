@@ -2,19 +2,19 @@ import { Test, TestingModule } from "@nestjs/testing";
 import { ConfigService } from "@nestjs/config";
 import { SuratCargoService, SURAT_CARRIER_CLIENT } from "./surat-cargo.service";
 import { CacheService } from "../cache/cache.service";
-import { SuratTrackingClient } from "./surat-tracking.client";
+import { SuratTrackingClient } from "./clients/surat-tracking.client";
 import type {
   SuratBusinessFailure,
   SuratGonderiPayload,
   SuratTechnicalFailure,
-} from "./surat-cargo.types";
+} from "./helpers/surat-cargo.types";
 import {
   SuratKargoTuru,
   SuratOdemeTipi,
   SuratTasimaSekli,
   SuratTeslimSekli,
   SuratGonderiSekli,
-} from "./surat-cargo.types";
+} from "./helpers/surat-cargo.types";
 
 const basePayload: SuratGonderiPayload = {
   KisiKurum: "Ali Veli",

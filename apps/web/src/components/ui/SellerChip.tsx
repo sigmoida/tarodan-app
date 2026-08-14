@@ -39,7 +39,10 @@ export function SellerChip({
   return (
     <Link
       href={`/seller/${id}`}
-      className={`group/seller flex items-center gap-3 rounded-lg px-2 py-2 transition-colors hover:bg-surface ${className}`.trim()}
+      // `min-w-0`: içteki ad zaten `truncate`, ama kök bağlantı esnek bir satırın
+      // çocuğu olduğunda varsayılan `min-width:auto` onu içerik genişliğinin
+      // altına indirmiyordu — kısaltma hiç devreye girmeden satır taşıyordu.
+      className={`group/seller flex min-w-0 items-center gap-3 rounded-lg px-2 py-2 transition-colors hover:bg-surface ${className}`.trim()}
     >
       <UserAvatar
         displayName={displayName}

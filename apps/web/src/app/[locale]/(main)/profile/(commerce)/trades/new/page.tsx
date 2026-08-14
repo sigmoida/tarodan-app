@@ -147,6 +147,7 @@ function NewTradeContent() {
                 src={getTradeProductImage(target)}
                 alt={target.title}
                 fill
+                sizes="200px"
                 className="object-cover"
                 logContext={{ productId: target.id, page: "trades-new-target" }}
               />

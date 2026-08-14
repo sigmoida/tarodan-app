@@ -13,8 +13,8 @@ import { SidebarContent } from "./SidebarContent";
  */
 export function Sidebar() {
   return (
-    <aside className="fixed inset-y-0 left-0 z-navigation hidden w-64 flex-col bg-surface-elevated shadow-soft lg:flex">
-      <div className="flex h-16 items-center bg-primary-500 px-4">
+    <aside className="fixed inset-y-0 left-0 z-navigation hidden w-[var(--admin-sidebar-w)] flex-col bg-surface-elevated shadow-soft lg:flex">
+      <div className="flex h-[var(--admin-topbar-h)] items-center bg-primary-500 px-4">
         <Link
           href="/dashboard"
           scroll={false}

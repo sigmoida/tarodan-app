@@ -20,7 +20,7 @@ export default function OrdersTrackRedirectPage() {
   }, [router, searchParams]);
 
   return (
-    <div className="min-h-screen bg-surface flex items-center justify-center">
+    <div className="min-h-dvh bg-surface flex items-center justify-center">
       <p className="text-muted">{t("profile.boost.redirecting")}</p>
     </div>
   );
