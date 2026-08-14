@@ -67,7 +67,13 @@ export async function assertValidCategoryParent(
       );
     }
     visited.add(currentId);
-    const parent = await prisma.category.findUnique({
+    // Annotated to break a circular inference: `currentId` is assigned from
+    // `parent.parentId` at the end of the loop, so typing one needs the other.
+    const parent: {
+      id: string;
+      parentId: string | null;
+      isActive: boolean;
+    } | null = await prisma.category.findUnique({
       where: { id: currentId },
       select: { id: true, parentId: true, isActive: true },
     });

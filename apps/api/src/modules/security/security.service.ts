@@ -383,7 +383,13 @@ export class SecurityService {
       throw new NotFoundException("Kullanıcı bulunamadı");
     }
 
-    const isValid = await bcrypt.compare(currentPassword, user.passwordHash);
+    // A social sign-in account has no password hash, and bcrypt rejects a null
+    // digest — so this used to fail with a 500 instead of an answer. Treated as
+    // a failed verification: the same response a wrong password gets, which
+    // also avoids disclosing that the account has no password at all.
+    const isValid =
+      !!user.passwordHash &&
+      (await bcrypt.compare(currentPassword, user.passwordHash));
     if (!isValid) {
       throw new UnauthorizedException("Mevcut şifre yanlış");
     }

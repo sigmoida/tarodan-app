@@ -4,6 +4,7 @@ import {
   InternalServerErrorException,
   OnModuleInit,
   Logger,
+  ServiceUnavailableException,
 } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { PrismaService } from "../../prisma";
@@ -121,6 +122,21 @@ export function isPublicStorageKey(key: string): boolean {
 export class StorageService implements OnModuleInit {
   private readonly logger = new Logger(StorageService.name);
   private s3Client: S3Client | null = null;
+
+  /**
+   * The configured client. Null until credentials are present, and three call
+   * sites already asserted past that with `!` — so an unconfigured deployment
+   * failed with a TypeError deep inside an upload rather than saying what was
+   * wrong.
+   */
+  private client(): S3Client {
+    if (!this.s3Client) {
+      throw new ServiceUnavailableException(
+        "Storage is not configured (missing S3 credentials)",
+      );
+    }
+    return this.s3Client;
+  }
   private readonly baseBucket: string;
   private readonly envPrefix: string;
   private isS3Available = false;
@@ -305,7 +321,7 @@ export class StorageService implements OnModuleInit {
       }
       const command = new PutObjectCommand(commandParams);
 
-      await this.s3Client.send(command);
+      await this.client().send(command);
 
       // Database'e kaydet (skipMediaFile=true ise atla - public product/collection assets)
       let mediaFileId: string | undefined;
@@ -368,7 +384,7 @@ export class StorageService implements OnModuleInit {
     const key = `${this.envPrefix}/${bucketFolder}/${customFolder}${filename}`;
 
     try {
-      await this.s3Client!.send(
+      await this.client().send(
         new CopyObjectCommand({
           Bucket: this.baseBucket,
           CopySource: encodeURIComponent(`${this.baseBucket}/${sourceKey}`),
@@ -429,7 +445,7 @@ export class StorageService implements OnModuleInit {
       [];
     let continuationToken: string | undefined;
     do {
-      const page = await this.s3Client!.send(
+      const page = await this.client().send(
         new ListObjectsV2Command({
           Bucket: this.baseBucket,
           Prefix: fullPrefix,
@@ -469,7 +485,7 @@ export class StorageService implements OnModuleInit {
     const files: Array<{ key: string; size: number; lastModified: Date }> = [];
     let continuationToken: string | undefined;
     do {
-      const page = await this.s3Client!.send(
+      const page = await this.client().send(
         new ListObjectsV2Command({
           Bucket: this.baseBucket,
           Prefix: fullPrefix,
@@ -497,7 +513,7 @@ export class StorageService implements OnModuleInit {
   async deleteFileByKey(key: string): Promise<void> {
     await this.prisma.mediaFile.deleteMany({ where: { key } });
     if (!this.isS3Available) return;
-    await this.s3Client!.send(
+    await this.client().send(
       new DeleteObjectCommand({ Bucket: this.baseBucket, Key: key }),
     );
   }
@@ -522,7 +538,7 @@ export class StorageService implements OnModuleInit {
           Key: fullKey,
         });
 
-        await this.s3Client.send(command);
+        await this.client().send(command);
         this.logger.log(`✅ File deleted: ${fullKey}`);
       } catch (error: any) {
         this.logger.warn(`⚠️ S3 delete error: ${error.message}`);
@@ -588,7 +604,7 @@ export class StorageService implements OnModuleInit {
         Key: fullKey,
       });
 
-      return await getSignedUrl(this.s3Client, command, {
+      return await getSignedUrl(this.client(), command, {
         expiresIn: expirySeconds,
       });
     } catch (error: any) {
@@ -625,7 +641,7 @@ export class StorageService implements OnModuleInit {
         Key: fullKey,
       });
 
-      return await getSignedUrl(this.s3Client, command, {
+      return await getSignedUrl(this.client(), command, {
         expiresIn: expirySeconds,
       });
     } catch (error: any) {

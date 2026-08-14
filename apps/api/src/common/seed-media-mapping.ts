@@ -11,9 +11,11 @@ const escapeRegExp = (value: string): string =>
  * yanlışlıkla demo görseli bağlanmasını önler.
  */
 export function resolveSeedProductAssetBase(
-  productSlug: string,
+  // Nullable on the product: a listing without a slug has nothing to match.
+  productSlug: string | null,
   availableBases: readonly string[],
 ): string | null {
+  if (!productSlug) return null;
   const bases = [...availableBases].sort((a, b) => b.length - a.length);
 
   for (const base of bases) {

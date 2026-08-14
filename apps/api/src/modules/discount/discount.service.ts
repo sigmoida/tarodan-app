@@ -1263,7 +1263,13 @@ export class DiscountService {
      */
     restoredCoupons: RestoredCoupon[];
   }> {
-    const empty = { revoked: 0, reissuedCodes: [], restoredCoupons: [] };
+    // Typed: the empty arrays would otherwise infer as `never[]`, and since
+    // this constant is returned first it would define the whole result shape.
+    const empty: {
+      revoked: number;
+      reissuedCodes: string[];
+      restoredCoupons: RestoredCoupon[];
+    } = { revoked: 0, reissuedCodes: [], restoredCoupons: [] };
     if (!orderIds.length) return empty;
 
     const run = async (tx: Prisma.TransactionClient): Promise<typeof empty> => {

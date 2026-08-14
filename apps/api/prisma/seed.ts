@@ -1099,7 +1099,9 @@ async function main() {
       publishedBy: "seed",
     },
   });
-  const commissionRules = [];
+  const commissionRules: Awaited<
+    ReturnType<typeof prisma.commissionRule.upsert>
+  >[] = [];
   for (const category of categories) {
     for (const profile of SEED_COMMISSION_PROFILES) {
       const id = `local-rule-${category.id}-${profile.key}`;

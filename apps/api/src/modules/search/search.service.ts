@@ -18,6 +18,7 @@ export {
   SearchResponse,
   RichAutocompleteResult,
 } from "./search-common.service";
+import type { CronRunSummary } from "../../monitoring/cron-run.helper";
 
 /**
  * Facade: tüm public imzalar aynen korunur, iş mantığı alt servislerde
@@ -176,7 +177,9 @@ export class SearchService implements OnModuleInit {
   // (runHandlePeriodicSync/runHourlyReconcile) alt serviste yaşar; Bull processor
   // facade'i çağırır, facade de alt servise delege eder.
 
-  async runHandlePeriodicSync(log: (msg: string) => void = () => {}) {
+  async runHandlePeriodicSync(
+    log: (msg: string) => void = () => {},
+  ): Promise<CronRunSummary> {
     return this.sync.runHandlePeriodicSync(log);
   }
 

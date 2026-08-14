@@ -19,6 +19,7 @@ import {
   frontendUrl as resolveFrontendUrl,
   adminUrl,
 } from "../../config/app-urls";
+import type { CronRunSummary } from "../../monitoring/cron-run.helper";
 
 /**
  * Product Scheduler Service
@@ -489,6 +490,9 @@ export class ProductSchedulerService implements OnModuleInit {
     if (!rows.length) return 0;
 
     for (const row of rows) {
+      // Unreachable: the query above filters `endsAt: { gt: now }`. The column
+      // is nullable, so the compiler cannot see that from here.
+      if (!row.endsAt) continue;
       await this.prisma.productBoost.update({
         where: { id: row.id },
         data: {
@@ -689,7 +693,9 @@ export class ProductSchedulerService implements OnModuleInit {
    * yığılıyordu, kimse haber almıyordu. Cron günde bir koştuğu için ayrıca
    * dedupe gerekmez. Gerçek iş — Bull processor 'pending-moderation-digest'.
    */
-  async runPendingModerationDigest(log: (msg: string) => void = () => {}) {
+  async runPendingModerationDigest(
+    log: (msg: string) => void = () => {},
+  ): Promise<CronRunSummary> {
     const threshold = new Date(Date.now() - 48 * 60 * 60 * 1000);
     const staleCount = await this.prisma.product.count({
       where: {

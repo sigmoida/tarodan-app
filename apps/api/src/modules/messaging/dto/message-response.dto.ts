@@ -1,4 +1,4 @@
-import { MessageStatus } from '@prisma/client';
+import { MessageStatus } from "@prisma/client";
 
 export class MessageResponseDto {
   id: string;
@@ -18,13 +18,13 @@ export class MessageThreadResponseDto {
   id: string;
   participant1Id: string;
   participant1Name: string;
-  participant1AvatarUrl?: string;
+  participant1AvatarUrl?: string | null;
   participant2Id: string;
   participant2Name: string;
-  participant2AvatarUrl?: string;
+  participant2AvatarUrl?: string | null;
   productId?: string;
   productTitle?: string;
-  productImage?: string;
+  productImage?: string | null;
   lastMessage?: MessageResponseDto;
   unreadCount: number;
   lastMessageAt: Date;

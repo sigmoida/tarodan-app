@@ -12,14 +12,21 @@
     "outDir": "./dist",
     "incremental": true,
     "skipLibCheck": true,
-    "strictNullChecks": false,
-    "noImplicitAny": false,
-    "strictBindCallApply": true,
+    // Strict, with one deliberate exception below. The compiler now proves that
+    // every nullable column and every `findUnique` result is handled, which is
+    // the guarantee this service needs most: the schema has always declared
+    // what may be null, and until now nothing enforced it.
+    "strict": true,
+    // OFF on purpose, and the only strict flag that is: class-validator DTOs
+    // and Prisma entities declare fields that decorators and the ORM assign at
+    // runtime, so this rule fires ~890 times on code that is correct. Marking
+    // each one `!` would be a blanket assertion, not a safety gain — the same
+    // trade-off Nest's own project template makes.
+    "strictPropertyInitialization": false,
     // A `catch` binding is `unknown`: `throw` accepts any value, so a driver or
     // SDK can reject with a string or a plain object. Narrow with the
     // `errorMessage` / `errorStack` helpers in common/helpers.
     "useUnknownInCatchVariables": true,
-    "noImplicitThis": true,
     "forceConsistentCasingInFileNames": true,
     "noFallthroughCasesInSwitch": true,
     "paths": {

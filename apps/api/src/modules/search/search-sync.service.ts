@@ -2,6 +2,7 @@ import { Injectable, Logger } from "@nestjs/common";
 import { PrismaService } from "../../prisma";
 import { SearchCommonService } from "./search-common.service";
 import { SearchProductService } from "./search-product.service";
+import type { CronRunSummary } from "../../monitoring/cron-run.helper";
 
 /**
  * Periyodik ES↔DB senkron alt servisi: runHandlePeriodicSync + runHourlyReconcile
@@ -23,7 +24,9 @@ export class SearchSyncService {
   // ──────────────────────────── Periodic Sync ────────────────────────────
 
   /** Gerçek iş — Bull processor 'search-periodic-sync' buradan çağırır. */
-  async runHandlePeriodicSync(log: (msg: string) => void = () => {}) {
+  async runHandlePeriodicSync(
+    log: (msg: string) => void = () => {},
+  ): Promise<CronRunSummary> {
     if (!this.common.isAvailable()) {
       log("Elasticsearch erişilemez, atlandı");
       return { summary: "ES erişilemez, atlandı", stats: { skipped: 1 } };

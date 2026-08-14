@@ -369,10 +369,9 @@ export class MockPayTRService {
       schema?: string;
     }>
   > {
-    return (this.storedCardsByUtoken.get(utoken) ?? []).map((c) => ({
-      requireCvv: false,
-      ...c,
-    }));
+    // No `requireCvv: false` default here: a stored card always carries the
+    // flag, so the spread overwrote it every time and the default never applied.
+    return (this.storedCardsByUtoken.get(utoken) ?? []).map((c) => ({ ...c }));
   }
 
   async capiDeleteCard(
