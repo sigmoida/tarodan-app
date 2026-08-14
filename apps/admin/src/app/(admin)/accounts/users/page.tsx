@@ -14,13 +14,11 @@ import {
   type User,
   mapUsers,
   getUserTabs,
-  getUserFilterOptions,
-  getMembershipTierFilterOptions,
-  getMembershipLifecycleOptions,
   userFilterParams,
   membershipTierParams,
   membershipLifecycleParams,
 } from "./_lib/types";
+import { userFilterFields } from "./_lib/filters";
 import { UsersSummary } from "./_components/UsersSummary";
 import { UsersTable } from "./_components/UsersTable";
 
@@ -62,33 +60,9 @@ export default function UsersPage() {
           }}
           getRowId={(u) => u.id}
           syncUrl
-          initialFilters={{
-            filter: "all",
-            membershipTier: "all",
-            lifecycle: "all",
-            startDate: "",
-            endDate: "",
-          }}
+          filters={userFilterFields(t)}
         >
-          <ResourceList.Toolbar>
-            <ResourceList.Search />
-            <ResourceList.FilterSelect
-              name="filter"
-              options={getUserFilterOptions(t)}
-              className="min-w-0 overflow-hidden whitespace-nowrap sm:w-48 [&>span:first-child]:min-w-0 [&>span:first-child]:truncate"
-            />
-            <ResourceList.FilterSelect
-              name="membershipTier"
-              options={getMembershipTierFilterOptions(t)}
-              className="min-w-0 overflow-hidden whitespace-nowrap sm:w-44 [&>span:first-child]:min-w-0 [&>span:first-child]:truncate"
-            />
-            <ResourceList.FilterSelect
-              name="lifecycle"
-              options={getMembershipLifecycleOptions(t)}
-              className="min-w-0 overflow-hidden whitespace-nowrap sm:w-52 [&>span:first-child]:min-w-0 [&>span:first-child]:truncate"
-            />
-            <ResourceList.DateRange />
-          </ResourceList.Toolbar>
+          <ResourceList.Toolbar />
           <UsersTable />
           <ResourceList.Pagination />
         </ResourceList>

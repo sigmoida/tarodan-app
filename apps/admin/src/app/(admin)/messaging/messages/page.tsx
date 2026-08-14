@@ -6,12 +6,8 @@ import { adminApi } from "@/lib/api";
 import { AdminPage } from "@/components/page/AdminPage";
 import { PageHeader } from "@/components/AdminList";
 import { ResourceList } from "@/components/list";
-import {
-  type Message,
-  mapMessage,
-  mapFilterToApiStatus,
-  messageFilterOptions,
-} from "./_lib/types";
+import { type Message, mapMessage, mapFilterToApiStatus } from "./_lib/types";
+import { messageFilterFields } from "./_lib/filters";
 import { MessagesSummary } from "./_components/MessagesSummary";
 import { MessagesTable } from "./_components/MessagesTable";
 import { useTranslations } from "next-intl";
@@ -45,17 +41,9 @@ export default function MessagesPage() {
         }}
         getRowId={(m) => m.id}
         syncUrl
-        initialFilters={{ status: "pending", fromDate: "", toDate: "" }}
+        filters={messageFilterFields(t)}
       >
-        <ResourceList.Toolbar>
-          <ResourceList.Search />
-          <ResourceList.FilterSelect
-            name="status"
-            options={messageFilterOptions(t)}
-            className="sm:w-48"
-          />
-          <ResourceList.DateRange fromName="fromDate" toName="toDate" />
-        </ResourceList.Toolbar>
+        <ResourceList.Toolbar />
         <MessagesTable />
         <ResourceList.Pagination />
       </ResourceList>

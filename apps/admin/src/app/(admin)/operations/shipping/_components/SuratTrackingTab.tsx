@@ -3,7 +3,7 @@
 import { useTranslations } from "next-intl";
 import { adminApi } from "@/lib/api";
 import { ResourceList } from "@/components/list";
-import { statusOptions } from "../_shared";
+import { suratFilterFields } from "../_lib/filters";
 import { SuratTestConsole } from "./SuratTestConsole";
 import { SuratShipmentsTable } from "./SuratShipmentsTable";
 
@@ -25,17 +25,10 @@ export function SuratTrackingTab() {
         resource="surat-shipments"
         fetcher={(p) => adminApi.getShipments({ ...p, carrierId: "surat" })}
         getRowId={(r: any) => r.id}
-        initialFilters={{ status: "all" }}
+        filters={suratFilterFields(t)}
         syncUrl
       >
-        <ResourceList.Toolbar>
-          <ResourceList.Search />
-          <ResourceList.FilterSelect
-            name="status"
-            options={statusOptions(t)}
-            className="sm:w-56"
-          />
-        </ResourceList.Toolbar>
+        <ResourceList.Toolbar />
         <SuratShipmentsTable />
         <ResourceList.Pagination />
       </ResourceList>

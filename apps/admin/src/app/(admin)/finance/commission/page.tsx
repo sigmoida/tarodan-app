@@ -399,9 +399,7 @@ export default function CommissionPage() {
       />
       <CommissionSummary />
       <RuleResolver key={selectedSet.id} ruleSet={selectedSet} />
-      <ResourceList.Toolbar>
-        <ResourceList.Search />
-      </ResourceList.Toolbar>
+      <ResourceList.Toolbar />
       <CommissionRuleDeepLink onOpen={openRule} />
       <AdminTabs tabs={tabs} value={selectedTab} onChange={onTabChange} />
       <CommissionRulesContent

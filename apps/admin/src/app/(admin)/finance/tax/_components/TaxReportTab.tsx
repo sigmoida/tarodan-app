@@ -120,9 +120,7 @@ export function TaxReportTab() {
       initialFilters={INITIAL_FILTERS}
     >
       <TaxReportControls />
-      <ResourceList.Toolbar>
-        <ResourceList.Search />
-      </ResourceList.Toolbar>
+      <ResourceList.Toolbar />
       <TaxReportSummary />
       <SectionCard title={t("admin.finance.tax.taxByPeriod")}>
         <ResourceList.Table<TaxReportRow>

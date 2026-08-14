@@ -25,22 +25,9 @@ import {
   buildAuditColumns,
 } from "./_lib/columns";
 import { statCards } from "./_lib/stats";
-import { LogsFilters } from "./_components/LogsFilters";
+import { logFilterFields, AUDIT_HIDDEN_FILTERS } from "./_lib/filters";
 import { ErrorDetail, AuditDetail } from "./_components/LogDetails";
 import { useTranslations } from "next-intl";
-
-const FILTERS: Record<LogTab, Record<string, string>> = {
-  errors: { severity: "all" },
-  security: { severity: "all", resolved: "all" },
-  emails: { status: "all", template: "all" },
-  audit: {
-    action: "",
-    entityType: "",
-    adminId: "",
-    fromDate: "",
-    toDate: "",
-  },
-};
 
 function LogsStats({ tab }: { tab: LogTab }) {
   const t = useTranslations();
@@ -59,17 +46,6 @@ function LogsStats({ tab }: { tab: LogTab }) {
         />
       ))}
     </div>
-  );
-}
-
-function LogsToolbar({ tab }: { tab: LogTab }) {
-  const t = useTranslations();
-  const { filters, setFilter } = useResourceList();
-  return (
-    <ResourceList.Toolbar>
-      <ResourceList.Search placeholder={searchPlaceholders(t)[tab]} />
-      <LogsFilters tab={tab} filters={filters} setFilter={setFilter} />
-    </ResourceList.Toolbar>
   );
 }
 
@@ -225,7 +201,8 @@ export default function LogsPage() {
       getRowId={(row) => row.id}
       limit={20}
       syncUrl
-      initialFilters={FILTERS[tab]}
+      filters={logFilterFields(t, tab)}
+      initialFilters={tab === "audit" ? AUDIT_HIDDEN_FILTERS : undefined}
     >
       <ResourceList.Header
         title={t("admin.system.logs.title")}
@@ -239,7 +216,7 @@ export default function LogsPage() {
         {tabMeta.description}
       </p>
       <LogsStats tab={tab} />
-      <LogsToolbar tab={tab} />
+      <ResourceList.Toolbar searchPlaceholder={searchPlaceholders(t)[tab]} />
       <LogsTable tab={tab} />
       <ResourceList.Pagination />
     </ResourceList>

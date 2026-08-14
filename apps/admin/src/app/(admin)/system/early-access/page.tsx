@@ -21,7 +21,8 @@ import { type RowActionItem } from "@/components/table";
 import { useConfirm } from "@/provider/ConfirmProvider";
 import { useAdminMutation } from "@/hooks/useAdminMutation";
 import { pinColumns } from "./_lib/columns";
-import { pinStatusFilterOptions, type SiteAccessPin } from "./_lib/types";
+import { type SiteAccessPin } from "./_lib/types";
+import { earlyAccessFilterFields } from "./_lib/filters";
 import { PinFormModal } from "./_modals/PinFormModal";
 
 export default function EarlyAccessPage() {
@@ -129,17 +130,11 @@ export default function EarlyAccessPage() {
         fetcher={(params) => adminApi.getSiteAccessPins(params)}
         getRowId={(p) => p.id}
         syncUrl
-        initialFilters={{ status: "all" }}
+        filters={earlyAccessFilterFields(t)}
       >
-        <ResourceList.Toolbar>
-          <ResourceList.Search
-            placeholder={t("admin.earlyAccess.searchPlaceholder")}
-          />
-          <ResourceList.FilterSelect
-            name="status"
-            options={pinStatusFilterOptions(t)}
-          />
-        </ResourceList.Toolbar>
+        <ResourceList.Toolbar
+          searchPlaceholder={t("admin.earlyAccess.searchPlaceholder")}
+        />
         <ResourceList.Table
           columns={columns}
           emptyText={t("admin.earlyAccess.empty")}

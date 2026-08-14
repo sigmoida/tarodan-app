@@ -6,8 +6,9 @@ import { PageHeader } from "@/components/AdminList";
 import { ResourceList } from "@/components/list";
 import { useTranslations } from "next-intl";
 import { usePackages } from "../ad-packages/_lib/usePackages";
-import { type BoostPurchase, statusFilterOptions } from "./_lib/types";
+import { type BoostPurchase } from "./_lib/types";
 import { purchaseColumns } from "./_lib/columns";
+import { boostPurchaseFilterFields } from "./_lib/filters";
 
 export default function BoostPurchasesPage() {
   const t = useTranslations();
@@ -47,23 +48,13 @@ export default function BoostPurchasesPage() {
         getRowId={(p) => p.id}
         limit={20}
         syncUrl
-        initialFilters={{ packageId: "all", status: "all" }}
+        filters={boostPurchaseFilterFields(t, packageOptions)}
       >
-        <ResourceList.Toolbar>
-          <ResourceList.Search
-            placeholder={t("admin.marketing.boostPurchases.searchPlaceholder")}
-          />
-          <ResourceList.FilterSelect
-            name="packageId"
-            options={packageOptions}
-            className="sm:w-48"
-          />
-          <ResourceList.FilterSelect
-            name="status"
-            options={statusFilterOptions(t)}
-            className="sm:w-44"
-          />
-        </ResourceList.Toolbar>
+        <ResourceList.Toolbar
+          searchPlaceholder={t(
+            "admin.marketing.boostPurchases.searchPlaceholder",
+          )}
+        />
         <ResourceList.Table
           columns={purchaseColumns(t)}
           emptyText={t("admin.marketing.boostPurchases.empty")}

@@ -15,12 +15,14 @@ import { useAdminMutation } from "@/hooks/useAdminMutation";
 import { CatalogImportModal } from "@/components/catalog/CatalogImportModal";
 import type { CarModel } from "./_lib/types";
 import { carModelColumns } from "./_lib/columns";
-import { CarModelFilters } from "./_components/CarModelFilters";
+import { carModelFilterFields } from "./_lib/filters";
+import { useBrandOptions, toSelectOptions } from "@/hooks/useBrandOptions";
 import { CarModelFormModal } from "./_modals/CarModelFormModal";
 
 export default function CarModelsPage() {
   const t = useTranslations();
   const confirm = useConfirm();
+  const brands = useBrandOptions();
   const [modal, setModal] = useState<{ model?: CarModel } | null>(null);
   const [importOpen, setImportOpen] = useState(false);
 
@@ -90,12 +92,12 @@ export default function CarModelsPage() {
         fetcher={(params) => adminApi.getCarModels(params)}
         getRowId={(m) => m.id}
         syncUrl
-        initialFilters={{ brandId: "" }}
+        filters={carModelFilterFields(
+          t,
+          toSelectOptions(brands, t("admin.catalog.carModels.allBrandsFilter")),
+        )}
       >
-        <ResourceList.Toolbar>
-          <ResourceList.Search />
-          <CarModelFilters />
-        </ResourceList.Toolbar>
+        <ResourceList.Toolbar />
         <ResourceList.Table
           columns={columns}
           emptyText={t("admin.catalog.carModels.emptyForBrand")}

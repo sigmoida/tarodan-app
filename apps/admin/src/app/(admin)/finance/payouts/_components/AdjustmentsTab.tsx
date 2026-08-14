@@ -5,10 +5,8 @@
 import { adminApi } from "@/lib/api";
 import { ResourceList } from "@/components/list";
 import { adjustmentColumns } from "../_lib/columns";
-import {
-  type PayoutAdjustmentRow,
-  adjustmentStatusFilterOptions,
-} from "../_lib/types";
+import { type PayoutAdjustmentRow } from "../_lib/types";
+import { payoutAdjustmentFilterFields } from "../_lib/filters";
 import { useTranslations } from "next-intl";
 
 /**
@@ -40,16 +38,9 @@ export function AdjustmentsTab() {
       }
       getRowId={(r) => r.id}
       syncUrl
-      initialFilters={{ status: "all" }}
+      filters={payoutAdjustmentFilterFields(t)}
     >
-      <ResourceList.Toolbar>
-        <ResourceList.Search />
-        <ResourceList.FilterSelect
-          name="status"
-          options={adjustmentStatusFilterOptions(t)}
-          className="sm:w-40"
-        />
-      </ResourceList.Toolbar>
+      <ResourceList.Toolbar />
       <ResourceList.Table
         columns={adjustmentColumns(t)}
         emptyText={t("admin.finance.payouts.empty")}

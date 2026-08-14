@@ -6,10 +6,8 @@ import { adminApi } from "@/lib/api";
 import { ResourceList } from "@/components/list";
 import { useAdminMutation } from "@/hooks/useAdminMutation";
 import { transferColumns } from "../_lib/columns";
-import {
-  type PayoutTransferRow,
-  transferStatusFilterOptions,
-} from "../_lib/types";
+import { type PayoutTransferRow } from "../_lib/types";
+import { payoutTransferFilterFields } from "../_lib/filters";
 import { useTranslations } from "next-intl";
 
 /**
@@ -52,17 +50,9 @@ export function TransfersTab() {
       }
       getRowId={(r) => r.id}
       syncUrl
-      initialFilters={{ status: "all", dateFrom: "", dateTo: "" }}
+      filters={payoutTransferFilterFields(t)}
     >
-      <ResourceList.Toolbar>
-        <ResourceList.Search />
-        <ResourceList.FilterSelect
-          name="status"
-          options={transferStatusFilterOptions(t)}
-          className="sm:w-44"
-        />
-        <ResourceList.DateRange fromName="dateFrom" toName="dateTo" />
-      </ResourceList.Toolbar>
+      <ResourceList.Toolbar />
       <ResourceList.Table
         columns={transferColumns(
           (r) => retry.mutate(r.id),

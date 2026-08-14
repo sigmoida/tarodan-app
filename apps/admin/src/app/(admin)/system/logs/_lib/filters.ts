@@ -1,13 +1,8 @@
-/** @format */
+import { statusField } from "@/components/list/filters/fields";
+import type { FilterField, TranslateFn } from "@/components/list/filters/types";
+import { type LogTab, actionLabels, entityLabels } from "./types";
 
-"use client";
-
-import { Select } from "@tarodan/ui";
-import { type LogTab, actionLabels, entityLabels } from "../_lib/types";
-import { useTranslations } from "next-intl";
-import { cn } from "@/lib/utils";
-
-const buildOptions = (t: ReturnType<typeof useTranslations<never>>) => ({
+const buildOptions = (t: TranslateFn) => ({
   // Interceptor yalnız `error` (5xx) ve `warning` (4xx) üretir; `critical`/`low`
   // hiç yazılmadığı için seçenek olarak sunulmaz. (Güvenlik sekmesi dört
   // seviyeyi de gerçekten yazar, o liste dokunulmadan kalır.)
@@ -73,55 +68,62 @@ const buildOptions = (t: ReturnType<typeof useTranslations<never>>) => ({
   ],
 });
 
-export function LogsFilters({
-  tab,
-  filters,
-  setFilter,
-}: {
-  tab: LogTab;
-  filters: Record<string, string>;
-  setFilter: (name: string, value: string) => void;
-}) {
-  const t = useTranslations();
+/**
+ * Each log tab filters on its own fields. The page remounts the list on tab
+ * change (`key={tab}`), so the schema is read fresh per tab.
+ *
+ * The audit tab's `adminId` / `fromDate` / `toDate` params have no control and
+ * stay in the page's `initialFilters`.
+ */
+export const logFilterFields = (t: TranslateFn, tab: LogTab): FilterField[] => {
   const options = buildOptions(t);
-  const sel = (
-    name: string,
-    options: { value: string; label: string }[],
-    fallback: string,
-    className: string,
-  ) => (
-    <Select
-      value={filters[name] ?? fallback}
-      onChange={(e) => setFilter(name, e.target.value)}
-      options={options}
-      className={cn(
-        "min-w-32 max-w-56 shrink overflow-hidden whitespace-nowrap",
-        "[&>span:first-child]:min-w-0 [&>span:first-child]:truncate",
-        className,
-      )}
-    />
-  );
+  const severity = (list: { value: string; label: string }[]): FilterField => ({
+    type: "select",
+    name: "severity",
+    label: t("admin.shared.filterDialog.labels.severity"),
+    options: list,
+  });
 
-  if (tab === "errors")
-    return sel("severity", options.errorSeverity, "all", "sm:w-48");
+  if (tab === "errors") return [severity(options.errorSeverity)];
   if (tab === "security")
-    return (
-      <>
-        {sel("severity", options.securitySeverity, "all", "sm:w-48")}
-        {sel("resolved", options.resolved, "all", "sm:w-44")}
-      </>
-    );
+    return [
+      severity(options.securitySeverity),
+      {
+        type: "select",
+        name: "resolved",
+        label: t("admin.shared.filterDialog.labels.resolved"),
+        options: options.resolved,
+      },
+    ];
   if (tab === "emails")
-    return (
-      <>
-        {sel("status", options.emailStatus, "all", "sm:w-48")}
-        {sel("template", options.emailTemplate, "all", "sm:w-48")}
-      </>
-    );
-  return (
-    <>
-      {sel("action", options.auditAction, "", "sm:w-52")}
-      {sel("entityType", options.auditEntity, "", "sm:w-44")}
-    </>
-  );
-}
+    return [
+      statusField(t, options.emailStatus),
+      {
+        type: "select",
+        name: "template",
+        label: t("admin.shared.filterDialog.labels.template"),
+        options: options.emailTemplate,
+      },
+    ];
+  return [
+    {
+      type: "select",
+      name: "action",
+      label: t("admin.shared.filterDialog.labels.action"),
+      options: options.auditAction,
+    },
+    {
+      type: "select",
+      name: "entityType",
+      label: t("admin.shared.filterDialog.labels.entityType"),
+      options: options.auditEntity,
+    },
+  ];
+};
+
+/** Params the audit tab accepts but offers no control for (deep links). */
+export const AUDIT_HIDDEN_FILTERS: Record<string, string> = {
+  adminId: "",
+  fromDate: "",
+  toDate: "",
+};

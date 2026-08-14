@@ -6,6 +6,7 @@ import { adminApi } from "@/lib/api";
 import { AdminPage } from "@/components/page/AdminPage";
 import { PageHeader } from "@/components/AdminList";
 import { ResourceList } from "@/components/list";
+import { dateRangeField } from "@/components/list/filters/fields";
 import { type Refund, refundColumns } from "./_lib/columns";
 import { refundRowMenu } from "./_lib/rowActions";
 
@@ -34,12 +35,9 @@ export default function RefundsPage() {
         }
         getRowId={(r) => r.id}
         syncUrl
-        initialFilters={{ startDate: "", endDate: "" }}
+        filters={[dateRangeField(t)]}
       >
-        <ResourceList.Toolbar>
-          <ResourceList.Search />
-          <ResourceList.DateRange />
-        </ResourceList.Toolbar>
+        <ResourceList.Toolbar />
         <ResourceList.Table
           columns={refundColumns(
             t,

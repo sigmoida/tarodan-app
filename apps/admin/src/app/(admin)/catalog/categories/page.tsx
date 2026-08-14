@@ -14,6 +14,7 @@ import { useConfirm } from "@/provider/ConfirmProvider";
 import { useAdminMutation } from "@/hooks/useAdminMutation";
 import type { Category } from "./_lib/types";
 import { categoryColumns } from "./_lib/columns";
+import { categoryFilterFields } from "./_lib/filters";
 import { CategoryFormModal } from "./_modals/CategoryFormModal";
 
 export default function CategoriesPage() {
@@ -67,12 +68,9 @@ export default function CategoriesPage() {
         fetcher={(params) => adminApi.getCategories(params)}
         getRowId={(c) => c.id}
         syncUrl
-        initialFilters={{ startDate: "", endDate: "" }}
+        filters={categoryFilterFields(t)}
       >
-        <ResourceList.Toolbar>
-          <ResourceList.Search />
-          <ResourceList.DateRange />
-        </ResourceList.Toolbar>
+        <ResourceList.Toolbar />
         <ResourceList.Table
           columns={columns}
           emptyText={t("admin.catalog.categories.empty")}

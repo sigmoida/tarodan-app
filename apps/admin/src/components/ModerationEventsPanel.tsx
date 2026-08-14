@@ -305,7 +305,14 @@ export function ModerationEventsPanel({
       }
       getRowId={(r) => r.id}
       syncUrl
-      initialFilters={{ decision: "" }}
+      filters={[
+        {
+          type: "select",
+          name: "decision",
+          label: t("admin.shared.moderation.result"),
+          options: decisionOptions(t),
+        },
+      ]}
     >
       {chrome && (
         <ResourceList.Header
@@ -316,14 +323,7 @@ export function ModerationEventsPanel({
           onTabChange={onTabChange}
         />
       )}
-      <ResourceList.Toolbar>
-        <ResourceList.Search />
-        <ResourceList.FilterSelect
-          name="decision"
-          options={decisionOptions(t)}
-          className="sm:w-56"
-        />
-      </ResourceList.Toolbar>
+      <ResourceList.Toolbar />
       <ResourceList.Table
         columns={columns}
         emptyText={t("admin.shared.moderation.empty")}

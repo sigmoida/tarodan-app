@@ -26,9 +26,7 @@ export default function SellerPerformancePage() {
         syncUrl
       >
         <SellerPerformanceSummary />
-        <ResourceList.Toolbar>
-          <ResourceList.Search />
-        </ResourceList.Toolbar>
+        <ResourceList.Toolbar />
         <ResourceList.Table
           columns={sellerColumns(t)}
           emptyText={t("admin.accounts.sellerPerformance.empty")}
