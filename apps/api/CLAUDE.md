@@ -233,15 +233,37 @@ These are approved, behavior-preserving cleanups. **In any file you touch:**
 1. **Strict nulls** — remove the file's `@ts-strict-ignore` (once the strict
    plugin lands) or at minimum leave the code you wrote null-safe.
 2. **i18n exceptions** — convert hardcoded Turkish exception strings to
-   `i18nMessage` keys (catalog text identical to the old string).
+   `i18nMessage` keys (catalog text identical to the old string). ESLint warns
+   on these (`@tarodan/no-hardcoded-exception-message`, ~650 left); the rule
+   becomes an error when the count reaches zero.
 3. **List infra** — replace hand-rolled `skip`/`take`/`orderBy` with
    `common/list` helpers when semantics are identical.
 4. **Admin writes** — route admin write paths through the domain service; if
    the domain method doesn't exist, extract the shared core first.
-5. **Env reads** — replace direct `process.env` with validated config.
+5. **Env reads** — read config through a `src/config/` accessor.
+   `@tarodan/no-raw-process-env` is already an **error**: everything not on its
+   allow list has an accessor, so a new raw read is a regression. Giving an
+   allow-listed key an accessor means taking it off that list — the list only
+   shrinks.
 
 Never mix these cleanups into a feature commit — separate `refactor(api):`
 commits, each leaving the suite green.
+
+### Known, undecided
+
+Not migrations — open questions that need a decision before anyone "fixes" them
+in passing, because each one changes behavior:
+
+- **Undeclared env keys are silently dropped.** `ConfigModule` validates env
+  through a zod schema that strips unknown keys, and only the survivors are
+  written back to `process.env`. A key that lives in an `.env` file but is not
+  in `config/env.validation.ts` never arrives — the inline fallback wins
+  instead. Several keys are in this state today (`TARODAN_WAREHOUSE_*`,
+  `WEB_REVALIDATE_URL`, `REVALIDATE_SECRET`, `CARGO_*`, `LOG_LEVEL`, …); they
+  work only where injected as real environment variables. Declaring them makes
+  their configured values start taking effect.
+- **PayTR's return URLs have no fallback** — if `FRONTEND_URL` is unset they
+  render as `undefined/payment/success`. Payment-critical, so left as-is.
 
 ## 16. Verification
 
