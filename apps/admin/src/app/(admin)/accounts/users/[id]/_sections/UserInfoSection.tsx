@@ -39,7 +39,7 @@ export function UserInfoSection({ user }: { user: UserDetail }) {
   const t = useTranslations();
   return (
     <SectionCard title={t("admin.users.detail.infoTitle")}>
-      <div className="grid grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
         <Item label={t("admin.users.detail.emailLabel")}>
           <p className="font-medium text-heading">{user.email}</p>
           <Verified ok={user.isEmailVerified} />
@@ -63,7 +63,10 @@ export function UserInfoSection({ user }: { user: UserDetail }) {
           </p>
         </Item>
         {user.bio && (
-          <Item label={t("admin.users.detail.bioLabel")} className="col-span-2">
+          <Item
+            label={t("admin.users.detail.bioLabel")}
+            className="sm:col-span-2"
+          >
             <p className="text-heading">{user.bio}</p>
           </Item>
         )}
@@ -74,7 +77,7 @@ export function UserInfoSection({ user }: { user: UserDetail }) {
           <h3 className="mb-3 text-sm font-semibold text-heading">
             {t("admin.users.detail.sellerInfoTitle")}
           </h3>
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <Item label={t("admin.users.detail.sellerTypeLabel")}>
               <p className="text-heading">
                 {user.sellerType === "individual"
@@ -111,7 +114,7 @@ export function UserInfoSection({ user }: { user: UserDetail }) {
               )}
             </div>
             {user.bankAccount ? (
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <Item label={t("admin.users.detail.accountHolderLabel")}>
                   <p className="text-heading">
                     {user.bankAccount.accountHolder}

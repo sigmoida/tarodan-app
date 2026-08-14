@@ -31,7 +31,7 @@ export function TopSellersWidget({ sellers }: { sellers: TopSeller[] }) {
             <Link
               key={s.id}
               href={`/accounts/users/${s.id}`}
-              className="-mx-2 flex items-center gap-3 rounded-lg px-2 py-2.5 hover:bg-surface-alt"
+              className="-mx-2 flex flex-wrap items-center gap-x-3 gap-y-1 rounded-lg px-2 py-2.5 hover:bg-surface-alt"
             >
               <div className="relative h-10 w-10 shrink-0 overflow-hidden rounded-full bg-primary-100">
                 {s.avatarUrl ? (
@@ -49,7 +49,8 @@ export function TopSellersWidget({ sellers }: { sellers: TopSeller[] }) {
                   </div>
                 )}
               </div>
-              <div className="min-w-0 flex-1">
+              {/* min-w floor (not min-w-0), same reasoning as TopProductsWidget. */}
+              <div className="min-w-[110px] flex-1">
                 <p className="truncate text-sm font-medium text-heading">
                   {s.displayName}
                 </p>

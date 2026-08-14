@@ -51,7 +51,7 @@ export function TierRowsEditor() {
             key={field.id}
             className="rounded-lg border border-border bg-surface-alt/40 p-3"
           >
-            <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
               <FormInput
                 name={`tiers.${index}.durationDays`}
                 type="number"

@@ -21,11 +21,13 @@ export function PeriodBreakdown({
     { label: t("admin.dashboard.period.lastMonth"), value: periods.lastMonth },
   ];
   return (
-    <div className="mt-2 grid w-full grid-cols-3 gap-2 text-xs">
+    <div className="mt-2 grid w-full grid-cols-3 gap-1.5 text-xs">
       {rows.map((r) => (
-        <div key={r.label} className="flex flex-col">
-          <span className="text-muted">{r.label}</span>
-          <span className="font-semibold text-heading">{format(r.value)}</span>
+        <div key={r.label} className="flex min-w-0 flex-col">
+          <span className="truncate text-muted">{r.label}</span>
+          <span className="truncate font-semibold tabular-nums text-heading">
+            {format(r.value)}
+          </span>
         </div>
       ))}
     </div>

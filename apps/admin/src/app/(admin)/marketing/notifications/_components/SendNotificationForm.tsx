@@ -227,7 +227,7 @@ export function SendNotificationForm({
               title={t("admin.marketing.notifications.deliveryChannel")}
               bodyClassName="space-y-4"
             >
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 {channels.map((channel) => (
                   <Tile
                     key={channel.key}
@@ -250,7 +250,7 @@ export function SendNotificationForm({
               title={t("admin.marketing.notifications.audience")}
               bodyClassName="space-y-4"
             >
-              <div className="grid grid-cols-3 gap-3">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
                 {targets.map((target) => (
                   <Tile
                     key={target.key}
@@ -275,7 +275,7 @@ export function SendNotificationForm({
               {values.targetType === "user_ids" && <UserPicker />}
 
               {values.targetType === "segment" && (
-                <div className="grid grid-cols-2 gap-4 rounded-xl border border-border bg-surface-alt p-4">
+                <div className="grid grid-cols-1 gap-4 rounded-xl border border-border bg-surface-alt p-4 sm:grid-cols-2">
                   <FormSelect
                     name="isSeller"
                     label={t("admin.marketing.notifications.sellerStatus")}

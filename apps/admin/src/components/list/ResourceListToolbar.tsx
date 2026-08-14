@@ -42,12 +42,7 @@ export function ResourceListToolbar({
   };
 
   return (
-    <div
-      className={cn(
-        "flex min-w-0 flex-nowrap items-start gap-3 overflow-x-auto pb-1",
-        className,
-      )}
-    >
+    <div className={cn("flex min-w-0 flex-wrap items-start gap-3", className)}>
       {children}
       <Button
         variant="outline"

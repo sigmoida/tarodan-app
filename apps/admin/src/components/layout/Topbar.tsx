@@ -18,7 +18,7 @@ import { AdminProfileMenu } from "./AdminProfileMenu";
 export function Topbar({ onOpenSidebar }: { onOpenSidebar: () => void }) {
   const t = useTranslations();
   return (
-    <header className="fixed inset-x-0 top-0 z-30 h-16 gap-3 border-b border-primary-600 bg-primary-500 px-4 shadow-sm lg:left-64 flex items-center justify-between">
+    <header className="fixed inset-x-0 top-0 z-navigation h-[var(--admin-topbar-h)] gap-3 border-b border-primary-600 bg-primary-500 px-4 shadow-sm lg:left-[var(--admin-sidebar-w)] flex items-center justify-between">
       <div className="flex min-w-0 items-center gap-2 sm:gap-3">
         <Button
           variant="nav"
@@ -45,12 +45,12 @@ export function Topbar({ onOpenSidebar }: { onOpenSidebar: () => void }) {
           />
         </Link>
 
-        <div className="hidden min-w-0 sm:flex">
+        <div className="min-w-0">
           <Breadcrumbs />
         </div>
       </div>
 
-      <div className="flex items-center gap-3">
+      <div className="flex min-w-0 shrink-0 items-center gap-3">
         <AdminProfileMenu />
       </div>
     </header>

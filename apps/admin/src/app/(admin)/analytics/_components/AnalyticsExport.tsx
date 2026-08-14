@@ -40,15 +40,21 @@ export function AnalyticsExport({
         variant="outline"
         leftIcon={<ArrowDownTrayIcon className="h-5 w-5" />}
         onClick={onCsv}
+        aria-label={t("admin.analytics.export.csv")}
       >
-        {t("admin.analytics.export.csv")}
+        <span className="hidden sm:inline">
+          {t("admin.analytics.export.csv")}
+        </span>
       </Button>
       <Button
         variant="primary"
         leftIcon={<ArrowDownTrayIcon className="h-5 w-5" />}
         onClick={onJson}
+        aria-label={t("admin.analytics.export.json")}
       >
-        {t("admin.analytics.export.json")}
+        <span className="hidden sm:inline">
+          {t("admin.analytics.export.json")}
+        </span>
       </Button>
     </>
   );

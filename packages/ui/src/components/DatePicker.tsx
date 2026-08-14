@@ -2,13 +2,25 @@
 
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
+import { createPortal } from "react-dom";
 import {
   CalendarDaysIcon,
   ChevronLeftIcon,
   ChevronRightIcon,
 } from "@heroicons/react/24/outline";
 import { cn } from "../lib/utils";
+
+/** `w-72` in px — kept in sync with the popover panel's width class below. */
+const POPOVER_WIDTH = 288;
+const VIEWPORT_MARGIN = 16;
 
 export interface DatePickerProps {
   /** ISO date string `yyyy-mm-dd` (the native `<input type="date">` value). */
@@ -72,7 +84,12 @@ export function DatePicker({
   ...aria
 }: DatePickerProps) {
   const [open, setOpen] = useState(false);
-  const containerRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const popoverRef = useRef<HTMLDivElement>(null);
+  const [popoverPos, setPopoverPos] = useState<{
+    top: number;
+    left: number;
+  } | null>(null);
   const selected = parseISO(value);
 
   const today = useMemo(() => {
@@ -103,14 +120,19 @@ export function DatePicker({
     if (p) setView({ y: p.y, m: p.m });
   }, [value]);
 
+  // Popover is portaled to <body> (see below) so it can escape any clipping/
+  // scrolling ancestor (e.g. a toolbar with overflow-x-auto). Outside-click
+  // detection has to check both the trigger AND the portaled panel.
   useEffect(() => {
     if (!open) return;
     const onDown = (e: MouseEvent) => {
+      const target = e.target as Node;
       if (
-        containerRef.current &&
-        !containerRef.current.contains(e.target as Node)
+        triggerRef.current?.contains(target) ||
+        popoverRef.current?.contains(target)
       )
-        setOpen(false);
+        return;
+      setOpen(false);
     };
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") setOpen(false);
@@ -122,6 +144,39 @@ export function DatePicker({
       document.removeEventListener("keydown", onKey);
     };
   }, [open]);
+
+  const updatePosition = useCallback(() => {
+    const rect = triggerRef.current?.getBoundingClientRect();
+    if (!rect) return;
+    setPopoverPos({
+      top: rect.bottom + 8,
+      left: Math.max(
+        VIEWPORT_MARGIN,
+        Math.min(
+          rect.left,
+          window.innerWidth - POPOVER_WIDTH - VIEWPORT_MARGIN,
+        ),
+      ),
+    });
+  }, []);
+
+  // Position against the trigger's viewport rect (fixed positioning), and
+  // keep it in sync while open — the trigger can move under an ancestor
+  // scroll (e.g. the toolbar itself) or a viewport resize.
+  useLayoutEffect(() => {
+    if (!open) return;
+    updatePosition();
+  }, [open, updatePosition]);
+
+  useEffect(() => {
+    if (!open) return;
+    window.addEventListener("resize", updatePosition);
+    window.addEventListener("scroll", updatePosition, true);
+    return () => {
+      window.removeEventListener("resize", updatePosition);
+      window.removeEventListener("scroll", updatePosition, true);
+    };
+  }, [open, updatePosition]);
 
   const isDisabledDay = (y: number, m: number, d: number) => {
     const iso = toISO(y, m, d);
@@ -207,8 +262,9 @@ export function DatePicker({
           {label}
         </label>
       )}
-      <div ref={containerRef} className="relative">
+      <div>
         <button
+          ref={triggerRef}
           type="button"
           id={id}
           disabled={disabled}
@@ -242,146 +298,153 @@ export function DatePicker({
           />
         </button>
 
-        {open && (
-          <div className="absolute left-0 top-full z-50 mt-2 w-72 rounded-lg border border-border bg-surface-elevated p-3 shadow-lg">
-            <div className="mb-2 flex items-center justify-between gap-2">
-              <div className="flex min-w-0 items-center gap-1">
-                <select
-                  value={view.m}
-                  onChange={(e) =>
-                    setView((v) => ({ ...v, m: +e.target.value }))
-                  }
-                  aria-label="Month"
-                  className="min-w-0 cursor-pointer rounded-md border border-border bg-surface-elevated py-1 pl-1.5 pr-1 text-sm font-semibold capitalize text-heading focus:outline-none focus:ring-1 focus:ring-primary-500"
-                >
-                  {monthNames.map((mLabel, m) => (
-                    <option key={m} value={m}>
-                      {mLabel}
-                    </option>
-                  ))}
-                </select>
-                <select
-                  value={view.y}
-                  onChange={(e) =>
-                    setView((v) => ({ ...v, y: +e.target.value }))
-                  }
-                  aria-label="Year"
-                  className="cursor-pointer rounded-md border border-border bg-surface-elevated py-1 pl-1.5 pr-1 text-sm font-semibold text-heading focus:outline-none focus:ring-1 focus:ring-primary-500"
-                >
-                  {(yearOptions.includes(view.y)
-                    ? yearOptions
-                    : [view.y, ...yearOptions]
-                  ).map((y) => (
-                    <option key={y} value={y}>
-                      {y}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div className="flex items-center gap-1">
-                <button
-                  type="button"
-                  onClick={() =>
-                    setView((v) =>
-                      v.m === 0
-                        ? { y: v.y - 1, m: 11 }
-                        : { y: v.y, m: v.m - 1 },
-                    )
-                  }
-                  aria-label="Previous month"
-                  className="rounded-md p-1 text-muted hover:bg-surface-alt hover:text-heading"
-                >
-                  <ChevronLeftIcon className="h-4 w-4" />
-                </button>
-                <button
-                  type="button"
-                  onClick={() =>
-                    setView((v) =>
-                      v.m === 11
-                        ? { y: v.y + 1, m: 0 }
-                        : { y: v.y, m: v.m + 1 },
-                    )
-                  }
-                  aria-label="Next month"
-                  className="rounded-md p-1 text-muted hover:bg-surface-alt hover:text-heading"
-                >
-                  <ChevronRightIcon className="h-4 w-4" />
-                </button>
-              </div>
-            </div>
-
-            <div className="mb-1 grid grid-cols-7 gap-0.5">
-              {weekdayLabels.map((w, i) => (
-                <div
-                  key={i}
-                  className="py-1 text-center text-xs font-medium text-subtle"
-                >
-                  {w}
-                </div>
-              ))}
-            </div>
-
-            <div className="grid grid-cols-7 gap-0.5">
-              {cells.map((c, i) => {
-                const isSel =
-                  selected &&
-                  c.y === selected.y &&
-                  c.m === selected.m &&
-                  c.d === selected.d;
-                const isToday =
-                  c.y === today.y && c.m === today.m && c.d === today.d;
-                const dis = isDisabledDay(c.y, c.m, c.d);
-                return (
-                  <button
-                    key={i}
-                    type="button"
-                    disabled={dis}
-                    onClick={() => pick(c.y, c.m, c.d)}
-                    className={cn(
-                      "flex h-8 items-center justify-center rounded-md text-sm transition-colors",
-                      dis
-                        ? "cursor-not-allowed text-subtle opacity-40"
-                        : "hover:bg-surface-alt",
-                      c.outside ? "text-subtle" : "text-body",
-                      !isSel &&
-                        isToday &&
-                        "font-semibold text-primary-600 ring-1 ring-inset ring-primary-300",
-                      isSel &&
-                        "!bg-primary-500 !text-inverted hover:!bg-primary-600",
-                    )}
+        {open &&
+          popoverPos &&
+          createPortal(
+            <div
+              ref={popoverRef}
+              style={{ top: popoverPos.top, left: popoverPos.left }}
+              className="fixed z-popover w-72 rounded-lg border border-border bg-surface-elevated p-3 shadow-lg"
+            >
+              <div className="mb-2 flex items-center justify-between gap-2">
+                <div className="flex min-w-0 items-center gap-1">
+                  <select
+                    value={view.m}
+                    onChange={(e) =>
+                      setView((v) => ({ ...v, m: +e.target.value }))
+                    }
+                    aria-label="Month"
+                    className="min-w-0 cursor-pointer rounded-md border border-border bg-surface-elevated py-1 pl-1.5 pr-1 text-sm font-semibold capitalize text-heading focus:outline-none focus:ring-1 focus:ring-primary-500"
                   >
-                    {c.d}
+                    {monthNames.map((mLabel, m) => (
+                      <option key={m} value={m}>
+                        {mLabel}
+                      </option>
+                    ))}
+                  </select>
+                  <select
+                    value={view.y}
+                    onChange={(e) =>
+                      setView((v) => ({ ...v, y: +e.target.value }))
+                    }
+                    aria-label="Year"
+                    className="cursor-pointer rounded-md border border-border bg-surface-elevated py-1 pl-1.5 pr-1 text-sm font-semibold text-heading focus:outline-none focus:ring-1 focus:ring-primary-500"
+                  >
+                    {(yearOptions.includes(view.y)
+                      ? yearOptions
+                      : [view.y, ...yearOptions]
+                    ).map((y) => (
+                      <option key={y} value={y}>
+                        {y}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div className="flex items-center gap-1">
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setView((v) =>
+                        v.m === 0
+                          ? { y: v.y - 1, m: 11 }
+                          : { y: v.y, m: v.m - 1 },
+                      )
+                    }
+                    aria-label="Previous month"
+                    className="rounded-md p-1 text-muted hover:bg-surface-alt hover:text-heading"
+                  >
+                    <ChevronLeftIcon className="h-4 w-4" />
                   </button>
-                );
-              })}
-            </div>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setView((v) =>
+                        v.m === 11
+                          ? { y: v.y + 1, m: 0 }
+                          : { y: v.y, m: v.m + 1 },
+                      )
+                    }
+                    aria-label="Next month"
+                    className="rounded-md p-1 text-muted hover:bg-surface-alt hover:text-heading"
+                  >
+                    <ChevronRightIcon className="h-4 w-4" />
+                  </button>
+                </div>
+              </div>
 
-            <div className="mt-2 flex items-center justify-between border-t border-border-subtle pt-2 text-sm">
-              <button
-                type="button"
-                onClick={() => {
-                  onChange("");
-                  setOpen(false);
-                }}
-                className="font-medium text-muted hover:text-heading"
-              >
-                {clearLabel}
-              </button>
-              {!isDisabledDay(today.y, today.m, today.d) && (
+              <div className="mb-1 grid grid-cols-7 gap-0.5">
+                {weekdayLabels.map((w, i) => (
+                  <div
+                    key={i}
+                    className="py-1 text-center text-xs font-medium text-subtle"
+                  >
+                    {w}
+                  </div>
+                ))}
+              </div>
+
+              <div className="grid grid-cols-7 gap-0.5">
+                {cells.map((c, i) => {
+                  const isSel =
+                    selected &&
+                    c.y === selected.y &&
+                    c.m === selected.m &&
+                    c.d === selected.d;
+                  const isToday =
+                    c.y === today.y && c.m === today.m && c.d === today.d;
+                  const dis = isDisabledDay(c.y, c.m, c.d);
+                  return (
+                    <button
+                      key={i}
+                      type="button"
+                      disabled={dis}
+                      onClick={() => pick(c.y, c.m, c.d)}
+                      className={cn(
+                        "flex h-8 items-center justify-center rounded-md text-sm transition-colors",
+                        dis
+                          ? "cursor-not-allowed text-subtle opacity-40"
+                          : "hover:bg-surface-alt",
+                        c.outside ? "text-subtle" : "text-body",
+                        !isSel &&
+                          isToday &&
+                          "font-semibold text-primary-600 ring-1 ring-inset ring-primary-300",
+                        isSel &&
+                          "!bg-primary-500 !text-inverted hover:!bg-primary-600",
+                      )}
+                    >
+                      {c.d}
+                    </button>
+                  );
+                })}
+              </div>
+
+              <div className="mt-2 flex items-center justify-between border-t border-border-subtle pt-2 text-sm">
                 <button
                   type="button"
                   onClick={() => {
-                    setView({ y: today.y, m: today.m });
-                    pick(today.y, today.m, today.d);
+                    onChange("");
+                    setOpen(false);
                   }}
-                  className="font-medium text-primary-600 hover:text-primary-700"
+                  className="font-medium text-muted hover:text-heading"
                 >
-                  {todayLabel}
+                  {clearLabel}
                 </button>
-              )}
-            </div>
-          </div>
-        )}
+                {!isDisabledDay(today.y, today.m, today.d) && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setView({ y: today.y, m: today.m });
+                      pick(today.y, today.m, today.d);
+                    }}
+                    className="font-medium text-primary-600 hover:text-primary-700"
+                  >
+                    {todayLabel}
+                  </button>
+                )}
+              </div>
+            </div>,
+            document.body,
+          )}
       </div>
 
       {error ? (

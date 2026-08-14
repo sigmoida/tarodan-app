@@ -20,7 +20,7 @@ export function StuckPanel({
 
   return (
     <div className="rounded-xl border-2 border-warning-400 bg-warning-50 p-6 shadow-sm">
-      <div className="flex items-start justify-between gap-4">
+      <div className="flex flex-col items-start gap-4 sm:flex-row sm:justify-between">
         <div className="flex items-start gap-3">
           <ClockIcon className="h-8 w-8 flex-shrink-0 text-warning-700" />
           <div>
@@ -38,7 +38,11 @@ export function StuckPanel({
             </p>
           </div>
         </div>
-        <Button variant="danger" onClick={onResolve} className="flex-shrink-0">
+        <Button
+          variant="danger"
+          onClick={onResolve}
+          className="sm:flex-shrink-0"
+        >
           {t("admin.operations.trades.forceCancelTitle")}
         </Button>
       </div>

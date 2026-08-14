@@ -71,7 +71,7 @@ export function ProductInfoSection({ product }: { product: ProductDetail }) {
           {product.description}
         </p>
       </div>
-      <div className="grid grid-cols-2 gap-4 border-t border-border pt-3">
+      <div className="grid grid-cols-1 gap-4 border-t border-border pt-3 sm:grid-cols-2">
         <div>
           <span className="text-sm text-muted">{t("common.price")}</span>
           {isProductOnSaleDisplay(product) && (
@@ -87,7 +87,7 @@ export function ProductInfoSection({ product }: { product: ProductDetail }) {
           {enumLabel(productConditionConfig, product.condition)}
         </Row>
       </div>
-      <div className="grid grid-cols-2 gap-4 border-t border-border pt-3">
+      <div className="grid grid-cols-1 gap-4 border-t border-border pt-3 sm:grid-cols-2">
         <Row label={t("product.productCode")}>{product.productCode}</Row>
         <Row label={t("product.brand")}>
           {product.brand?.name ?? t("admin.catalog.products.notSpecified")}
@@ -119,7 +119,7 @@ export function ProductInfoSection({ product }: { product: ProductDetail }) {
               : t("product.unboxed")}
         </Row>
       </div>
-      <div className="grid grid-cols-2 gap-4 border-t border-border pt-3">
+      <div className="grid grid-cols-1 gap-4 border-t border-border pt-3 sm:grid-cols-2">
         <Row label={t("admin.catalog.products.viewCount")}>
           {product.viewCount || 0}
         </Row>

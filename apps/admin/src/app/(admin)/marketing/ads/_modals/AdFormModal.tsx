@@ -290,7 +290,7 @@ export function AdFormModal({
         label="Link URL"
         placeholder={t("admin.marketing.ads.linkUrlPlaceholder")}
       />
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <FormSelect
           name="position"
           label={t("admin.marketing.ads.positionLabel")}
@@ -308,7 +308,7 @@ export function AdFormModal({
         type="number"
         placeholder="0"
       />
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <FormDatePicker
           name="startDate"
           label={t("admin.marketing.ads.startDate")}

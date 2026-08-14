@@ -137,17 +137,26 @@ export function DataTable<T>({
   // Width basis: fixed columns stay at minWidth, flexible columns share remaining
   // space in proportion to minWidth. Below the total minimum the wrapper scrolls.
   const colMin = (c: (typeof columns)[number]) => c.meta?.minWidth ?? 140;
+  // Flexible columns get 20% headroom above their configured minWidth for the
+  // *floor* calc below — on desktop the proportional bonus space normally keeps
+  // columns well above minWidth, so authors size it tight; once the viewport is
+  // narrow enough to be scrolling, columns land exactly on that floor with zero
+  // slack and short text gets truncated for no reason. The headroom only shifts
+  // where the floor sits — flexWidthOf's calc ratio (desktop width) is
+  // unaffected, since the same factor cancels out of every column's share.
+  const FLEX_SLACK = 1.2;
+  const flexMin = (c: (typeof columns)[number]) => colMin(c) * FLEX_SLACK;
   const fixedWidth =
     (selectable ? 44 : 0) +
     columns.reduce((sum, c) => sum + (c.meta?.fixed ? colMin(c) : 0), 0);
   const flexibleWidth = columns.reduce(
-    (sum, c) => sum + (c.meta?.fixed ? 0 : colMin(c)),
+    (sum, c) => sum + (c.meta?.fixed ? 0 : flexMin(c)),
     0,
   );
   const tableMinWidth = hasSizing ? fixedWidth + flexibleWidth : 0;
   const widthOf = (c: (typeof columns)[number]) => {
     if (c.meta?.fixed || flexibleWidth === 0) return `${colMin(c)}px`;
-    const share = colMin(c) / flexibleWidth;
+    const share = flexMin(c) / flexibleWidth;
     return `calc((100% - ${fixedWidth}px) * ${share})`;
   };
   const alignOf = (align?: CellAlign) =>
@@ -160,7 +169,7 @@ export function DataTable<T>({
 
   return (
     <div className="overflow-hidden rounded-lg border border-border bg-surface-elevated shadow-sm">
-      <div className="overflow-x-auto">
+      <div className="overflow-x-auto overscroll-x-contain [-webkit-overflow-scrolling:touch]">
         <Table
           scrollable={false}
           className={hasSizing ? "table-fixed" : undefined}
