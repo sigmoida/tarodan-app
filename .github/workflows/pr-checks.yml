@@ -50,5 +50,12 @@ jobs:
       # not in the pre-push gate — so its specs, including the regression that
       # pins the phone field's editing behaviour, were decorative. Web's
       # "test" script also runs the node:test scripts under apps/web/scripts.
+      #
+      # NODE_ENV is overridden back to "test" for this step alone. The job sets
+      # it to "production" for Next's typegen, and under that value the bundler
+      # resolves react to its production build, where `act()` throws outright —
+      # every component spec in web fails before asserting anything.
       - name: Unit tests
+        env:
+          NODE_ENV: test
         run: pnpm --filter @tarodan/admin --filter @tarodan/web test
