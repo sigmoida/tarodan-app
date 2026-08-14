@@ -25,13 +25,13 @@ import { OrderService } from "../order/order.service";
 import { OrderCheckoutCommonService } from "../order/checkout/order-checkout-common.service";
 import { OrderFeeDiscountService } from "../order/pricing/order-fee-discount.service";
 import { paymentWindowEnd } from "../payment/helpers/payment.constants";
-import { ProductLockService } from "../product/product-lock.service";
+import { ProductLockService } from "../product/lock/product-lock.service";
 import { getAvailableQuantity } from "../product/helpers/product-availability.helper";
 import { resolveSalePrice } from "../product/helpers/product-sale-window";
 import { generateUniqueReference } from "../../common/helpers/generate-reference";
 import { REFERENCE_PREFIX } from "../../common/helpers/code-prefixes";
 import { i18nMessage } from "../i18n";
-import { OFFER_CANCEL_REASON } from "../trade/trade-cancel-reasons";
+import { OFFER_CANCEL_REASON } from "../trade/helpers/trade-cancel-reasons";
 import {
   PUBLIC_NAME_SELECT,
   publicName,

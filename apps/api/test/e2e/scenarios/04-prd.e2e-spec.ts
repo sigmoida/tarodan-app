@@ -54,7 +54,7 @@ import {
   authHeader,
 } from "../../factories/user.factory";
 import { scenario } from "../../test-utils/scenario";
-import { ProductSchedulerService } from "../../../src/modules/product/product-scheduler.service";
+import { ProductSchedulerService } from "../../../src/modules/product/jobs/product-scheduler.service";
 import { PrismaService } from "../../../src/prisma";
 
 describe("04 — Ürün/İlan & Katalog (PRD)", () => {

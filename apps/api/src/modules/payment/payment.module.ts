@@ -40,7 +40,7 @@ import { PaymentProvidersModule } from "../payment-providers";
 import { EventModule } from "../events";
 import { RawBodyMiddleware } from "./middleware/raw-body.middleware";
 import { InvoiceModule } from "../invoice/invoice.module";
-import { ProductLockModule } from "../product/product-lock.module";
+import { ProductLockModule } from "../product/lock/product-lock.module";
 import { NotificationModule } from "../notification/notification.module";
 import { PayoutModule } from "../payout/payout.module";
 import { SuratCargoModule } from "../surat-cargo/surat-cargo.module";

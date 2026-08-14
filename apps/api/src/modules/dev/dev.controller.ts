@@ -12,7 +12,7 @@ import { Public } from "../auth/decorators/public.decorator";
 import { PrismaService } from "../../prisma";
 import { CacheService } from "../cache/cache.service";
 import { PaymentService } from "../payment/payment.service";
-import { ProductLockService } from "../product/product-lock.service";
+import { ProductLockService } from "../product/lock/product-lock.service";
 import { TradeService } from "../trade/trade.service";
 import { MembershipService } from "../membership/membership.service";
 import { OfferSchedulerService } from "../offer/offer-scheduler.service";

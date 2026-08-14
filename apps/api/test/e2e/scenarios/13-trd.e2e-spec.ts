@@ -36,7 +36,7 @@ import { createProduct } from "../../factories/product.factory";
 import { createAddress } from "../../factories/address.factory";
 import { signCallback } from "../../mocks/paytr.mock";
 import { scenario } from "../../test-utils/scenario";
-import { TradeSchedulerService } from "../../../src/modules/trade/trade-scheduler.service";
+import { TradeSchedulerService } from "../../../src/modules/trade/jobs/trade-scheduler.service";
 
 describe("13 — Takas (TRD)", () => {
   let ctx: E2ETestApp;

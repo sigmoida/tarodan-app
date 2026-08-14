@@ -4,7 +4,7 @@ import {
   MAX_ONBOARDING_TOUR_VERSION,
   ONBOARDING_TOUR_KEYS,
   type OnboardingTourKey,
-} from "../user-preferences.constants";
+} from "../helpers/user-preferences.constants";
 
 /**
  * Bir tanıtım turunun tamamlandığını işaretler. Tur anahtarı ve sürümü ONBOARDING_TOURS

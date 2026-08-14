@@ -20,7 +20,7 @@ import { EventService } from "../../events/event.service";
 import { RefundService } from "../../refund/refund.service";
 import { ApproveRefundRequestDto, RefundRequestQueryDto } from "../dto";
 import { paginate, resolveOrderBy } from "../../../common/list";
-import { primaryCashPayment } from "../../trade/trade.constants";
+import { primaryCashPayment } from "../../trade/helpers/trade.constants";
 import { i18nMessage } from "../../i18n";
 
 /**

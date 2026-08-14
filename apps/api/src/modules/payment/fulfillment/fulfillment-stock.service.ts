@@ -5,7 +5,7 @@ import {
   getReservedAwareStatus,
 } from "../../product/helpers/product-status.helper";
 import { safeDecrementReserved } from "../../product/helpers/product-availability.helper";
-import { ProductLockService } from "../../product/product-lock.service";
+import { ProductLockService } from "../../product/lock/product-lock.service";
 import {
   StockoutCancelledOrder,
   StockoutCancelledOffer,

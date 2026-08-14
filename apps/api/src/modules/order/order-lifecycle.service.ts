@@ -13,7 +13,7 @@ import { CacheService } from "../cache/cache.service";
 import { CancelOrderDto, GuestOrderCancelDto } from "./dto";
 import { OrderStatus, OfferStatus, RefundRequestStatus } from "@prisma/client";
 import { getAvailableQuantity } from "../product/helpers/product-availability.helper";
-import { ProductLockService } from "../product/product-lock.service";
+import { ProductLockService } from "../product/lock/product-lock.service";
 import { NotificationService } from "../notification/notification.service";
 import { CommissionLedgerService } from "../commission/commission-ledger.service";
 import { ElogoInvoicingService } from "../elogo";

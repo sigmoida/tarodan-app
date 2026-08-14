@@ -17,8 +17,8 @@ import {
   type TradePricing,
   type TradePricingItem,
   type TradeSide,
-} from "./trade-pricing.helper";
-import { TRADE_PRICING_V2 } from "./trade.constants";
+} from "./helpers/trade-pricing.helper";
+import { TRADE_PRICING_V2 } from "./helpers/trade.constants";
 import {
   CommissionRuleMatchError,
   CommissionSellerConfigurationError,

@@ -29,7 +29,7 @@ import {
 import { Request } from "express";
 import { type Locale } from "@tarodan/i18n";
 import { ProductService } from "./product.service";
-import { ProductBoostService } from "./product-boost.service";
+import { ProductBoostService } from "./ranking/product-boost.service";
 import {
   CreateProductDto,
   UpdateProductDto,

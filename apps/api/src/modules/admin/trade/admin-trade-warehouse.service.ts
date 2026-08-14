@@ -20,7 +20,7 @@ import {
 } from "../../surat-cargo/cargo-provider";
 import { AdminTradeCommonService } from "./admin-trade-common.service";
 import { startTradeConfirmationWindowIfDelivered } from "../../../common/helpers/trade-escrow";
-import { TRADE_VALID_TRANSITIONS } from "../../trade/trade.state-machine";
+import { TRADE_VALID_TRANSITIONS } from "../../trade/helpers/trade.state-machine";
 import { canTransitionShipmentStatus } from "../../shipping/shipment-state-machine";
 import { REFERENCE_PREFIX } from "../../../common/helpers/code-prefixes";
 import { generateReferenceCode } from "../../../common/helpers/generate-reference";

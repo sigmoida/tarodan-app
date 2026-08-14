@@ -1,13 +1,13 @@
 import { Injectable, OnModuleInit, Logger } from "@nestjs/common";
 import { CacheService } from "../cache/cache.service";
 import { CreateProductDto, UpdateProductDto, ProductQueryDto } from "./dto";
-import { ProductCreateService } from "./product-create.service";
-import { ProductUpdateService } from "./product-update.service";
-import { ProductQueryService } from "./product-query.service";
-import { ProductFilterService } from "./product-filter.service";
-import { ProductRankingService } from "./product-ranking.service";
-import { ProductStatsService } from "./product-stats.service";
-import { ProductEngagementService } from "./product-engagement.service";
+import { ProductCreateService } from "./lifecycle/product-create.service";
+import { ProductUpdateService } from "./lifecycle/product-update.service";
+import { ProductQueryService } from "./query/product-query.service";
+import { ProductFilterService } from "./query/product-filter.service";
+import { ProductRankingService } from "./ranking/product-ranking.service";
+import { ProductStatsService } from "./ranking/product-stats.service";
+import { ProductEngagementService } from "./ranking/product-engagement.service";
 
 /**
  * ProductService (facade) — CORE servis; her public imza aynen korunur (controller

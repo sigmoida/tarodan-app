@@ -9,8 +9,8 @@ import {
   resolveOrderBy,
 } from "../../../common/list";
 import { TradeQuoteService } from "../../trade/trade-quote.service";
-import { TRADE_PRICING_V2 } from "../../trade/trade.constants";
-import { readTradeCommissionRuleSnapshot } from "../../trade/trade-commission-snapshot";
+import { TRADE_PRICING_V2 } from "../../trade/helpers/trade.constants";
+import { readTradeCommissionRuleSnapshot } from "../../trade/helpers/trade-commission-snapshot";
 import { i18nMessage } from "../../i18n";
 
 /**

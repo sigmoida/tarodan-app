@@ -18,7 +18,7 @@ import {
 } from "@prisma/client";
 import { PayTRBuyer } from "../../payment-providers/paytr.service";
 import { PaymentProviderRegistry } from "../../payment-providers/payment-provider.registry";
-import { ProductLockService } from "../../product/product-lock.service";
+import { ProductLockService } from "../../product/lock/product-lock.service";
 import { Request } from "express";
 import { PaymentCommonService } from "../payment-common.service";
 import { PaymentFulfillmentService } from "../fulfillment/payment-fulfillment.service";
@@ -28,7 +28,7 @@ import { i18nMessage } from "../../i18n";
 import {
   primaryCashPayment,
   TRADE_PRICING_V2,
-} from "../../trade/trade.constants";
+} from "../../trade/helpers/trade.constants";
 import { isProduction } from "../../../config/environment";
 
 @Injectable()

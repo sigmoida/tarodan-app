@@ -23,7 +23,7 @@ import {
   ProviderRefundRejectedException,
   RefundPendingReconciliationException,
 } from "../../payment-providers/refund-errors";
-import { tradePaymentRefundableAmountFor } from "../../trade/trade-refund-policy";
+import { tradePaymentRefundableAmountFor } from "../../trade/helpers/trade-refund-policy";
 import { isProduction } from "../../../config/environment";
 import { PaymentRefundAttemptService } from "./payment-refund-attempt.service";
 

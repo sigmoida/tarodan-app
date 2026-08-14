@@ -1,15 +1,15 @@
 import { Injectable, Logger } from "@nestjs/common";
 import { User } from "@prisma/client";
 import { NotificationSettings, UpdateNotificationSettingsDto } from "./dto";
-import { UserProfileService } from "./user-profile.service";
-import type { OnboardingTourKey } from "./user-preferences.constants";
-import { UserAddressService } from "./user-address.service";
-import { UserSocialService } from "./user-social.service";
-import { UserStatsService } from "./user-stats.service";
-import { UserAnalyticsService } from "./user-analytics.service";
-import { UserDiscoveryService } from "./user-discovery.service";
-import { UserBankService } from "./user-bank.service";
-import { UserEngagementService } from "./user-engagement.service";
+import { UserProfileService } from "./profile/user-profile.service";
+import type { OnboardingTourKey } from "./helpers/user-preferences.constants";
+import { UserAddressService } from "./profile/user-address.service";
+import { UserSocialService } from "./social/user-social.service";
+import { UserStatsService } from "./stats/user-stats.service";
+import { UserAnalyticsService } from "./stats/user-analytics.service";
+import { UserDiscoveryService } from "./social/user-discovery.service";
+import { UserBankService } from "./seller/user-bank.service";
+import { UserEngagementService } from "./stats/user-engagement.service";
 
 /**
  * UserService (facade) — her public imza aynen korunur. CORE servis; controller

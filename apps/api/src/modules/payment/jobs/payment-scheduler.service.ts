@@ -8,7 +8,7 @@ import {
 } from "../../../monitoring/cron-step-runner";
 import { QUEUE_NAMES } from "../../../workers/constants";
 import { PaymentService } from "../payment.service";
-import { ProductLockService } from "../../product/product-lock.service";
+import { ProductLockService } from "../../product/lock/product-lock.service";
 import { EventService } from "../../events/event.service";
 import { PaytrReportSyncService } from "../reconciliation/paytr-report-sync.service";
 import { PaytrReportMatchingService } from "../reconciliation/paytr-report-matching.service";

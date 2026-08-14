@@ -31,7 +31,7 @@ import { PaymentProviderRegistry } from "../../payment-providers/payment-provide
 import { EventService } from "../../events";
 import { InvoiceService } from "../../invoice/invoice.service";
 import { ElogoInvoicingService } from "../../elogo";
-import { ProductLockService } from "../../product/product-lock.service";
+import { ProductLockService } from "../../product/lock/product-lock.service";
 import { NotificationService } from "../../notification/notification.service";
 import { SuratCargoService } from "../../surat-cargo/surat-cargo.service";
 import { CARGO_PROVIDER } from "../../surat-cargo/cargo-provider";

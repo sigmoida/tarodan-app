@@ -25,7 +25,7 @@ import { createAddress } from "../factories/address.factory";
 import { signCallback } from "../mocks/paytr.mock";
 import { PaymentService } from "../../src/modules/payment/payment.service";
 import { PayoutService } from "../../src/modules/payout/payout.service";
-import { TradeSchedulerService } from "../../src/modules/trade/trade-scheduler.service";
+import { TradeSchedulerService } from "../../src/modules/trade/jobs/trade-scheduler.service";
 
 /**
  * Wait for the post-accept fire-and-forget inbound dispatch to settle.

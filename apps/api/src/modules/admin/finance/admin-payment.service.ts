@@ -27,7 +27,7 @@ import {
 } from "@prisma/client";
 import { PaymentService } from "../../payment/payment.service";
 import { paginate, resolveOrderBy } from "../../../common/list";
-import { tradePaymentRefundableAmountFor } from "../../trade/trade-refund-policy";
+import { tradePaymentRefundableAmountFor } from "../../trade/helpers/trade-refund-policy";
 import { i18nMessage } from "../../i18n";
 
 /**

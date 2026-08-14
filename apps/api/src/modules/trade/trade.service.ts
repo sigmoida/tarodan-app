@@ -2,11 +2,11 @@ import { Injectable } from "@nestjs/common";
 import {
   TRADE_VALID_TRANSITIONS,
   computeTradeCanCancel,
-} from "./trade.state-machine";
-import { TradeShipmentService } from "./trade-shipment.service";
+} from "./helpers/trade.state-machine";
+import { TradeShipmentService } from "./lifecycle/trade-shipment.service";
 import { TradeQueryService } from "./trade-query.service";
-import { TradeLifecycleService } from "./trade-lifecycle.service";
-import { TradeReconciliationService } from "./trade-reconciliation.service";
+import { TradeLifecycleService } from "./lifecycle/trade-lifecycle.service";
+import { TradeReconciliationService } from "./lifecycle/trade-reconciliation.service";
 import {
   CreateTradeDto,
   TradeQueryDto,
@@ -77,9 +77,7 @@ export class TradeService {
     return this.tradeQuery.listUserTrades(userId, query);
   }
 
-  async getTradeStatusCounts(
-    userId: string,
-  ): Promise<{
+  async getTradeStatusCounts(userId: string): Promise<{
     all: number;
     pending: number;
     shipping: number;

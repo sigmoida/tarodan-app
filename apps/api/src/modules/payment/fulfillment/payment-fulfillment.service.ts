@@ -28,7 +28,7 @@ import {
   OUTBOX_ORDER_FULFILLMENT,
   OUTBOX_REVENUE_INVOICE_ISSUE,
 } from "../../outbox/outbox.types";
-import { isTradeFullyPaid } from "../../trade/trade-payment-rows.helper";
+import { isTradeFullyPaid } from "../../trade/helpers/trade-payment-rows.helper";
 import { addDaysSkippingSundays } from "../../../common/helpers/preparing-deadline";
 import {
   PUBLIC_NAME_SELECT,

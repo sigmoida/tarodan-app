@@ -65,7 +65,7 @@ import { PaymentService } from "../../../src/modules/payment/payment.service";
 import { PayoutService } from "../../../src/modules/payout/payout.service";
 import { OrderService } from "../../../src/modules/order/order.service";
 import { OrderSchedulerService } from "../../../src/modules/order/jobs/order-scheduler.service";
-import { TradeSchedulerService } from "../../../src/modules/trade/trade-scheduler.service";
+import { TradeSchedulerService } from "../../../src/modules/trade/jobs/trade-scheduler.service";
 import { PrismaService } from "../../../src/prisma";
 
 const LONG = 60000;

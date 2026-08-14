@@ -466,7 +466,7 @@ export class BarcodeRetryService {
 
     if (inbound.length > 0) {
       const { TradeShipmentService } =
-        await import("../trade/trade-shipment.service");
+        await import("../trade/lifecycle/trade-shipment.service");
       const svc = this.moduleRef.get(TradeShipmentService, { strict: false });
       if (!svc) {
         this.logger.warn(
