@@ -46,8 +46,13 @@ The `order` module is the canonical shape: `order-pricing`,
   helper — never copied between the direct/group/guest variants of a flow.
 - Pure computation (pricing math, deadlines, state predicates) goes in plain
   helper files with colocated specs — trivially testable without Nest wiring.
-- The counter-examples this rule exists to prevent: `refund.service.ts` (3k+
-  lines) and friends. Don't extend them; extract from them (§15).
+- The `refund` module is the worked example of getting there: one 3167-line
+  service became five with a single job each — `refund-creation`,
+  `-financial`, `-shipment`, `-decision`, `-notification` — behind a 258-line
+  `refund.service.ts` that only delegates. Callers never changed, because the
+  facade keeps every signature they knew. Read that split before doing another.
+- The ones still waiting: `payment-refund` (2331), `elogo-invoicing` (2316),
+  `discount` (2086), `auth` (1835). Don't extend them; extract from them (§15).
 
 ## 3. Controllers are thin
 
