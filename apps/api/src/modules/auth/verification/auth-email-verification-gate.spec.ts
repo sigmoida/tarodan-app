@@ -59,23 +59,16 @@ describe("AuthService — email verification gates the session", () => {
     const config = { get: () => undefined } as any;
     const security = {} as any;
     const tokens = new AuthTokenService(prisma as any, jwt, config, security);
+    // Bu suite yalnız refresh'in e-posta doğrulama kapısını sürüyor.
     const service = new AuthService(
       prisma as any,
-      jwt,
-      config,
-      { sendVerificationEmail: jest.fn(), sendWelcomeEmail: jest.fn() } as any,
-      {} as any,
-      {} as any,
-      {} as any,
-      {} as any,
-      security,
-      { syncUserConsent: jest.fn() } as any,
       tokens,
-      {} as any, // registration — bu suite kayıt yolunu sürmüyor
-      {} as any, // passwords — bu suite şifre yolunu sürmüyor
-      {} as any, // socialLogins — bu suite sosyal girişi sürmüyor
-      {} as any,
+      {} as any, // registration
+      {} as any, // passwords
+      {} as any, // logins
+      {} as any, // socialLogins
     );
+
     return { service, prisma, tokens };
   };
 

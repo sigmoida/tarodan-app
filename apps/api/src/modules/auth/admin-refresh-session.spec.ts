@@ -53,23 +53,16 @@ function makeService(sessionValid: boolean) {
     config,
     securityService as any,
   );
+  // Bu suite yalnız admin refresh yolunu sürüyor; diğer slotlar boş.
   const service = new AuthService(
     prisma as any,
-    jwt,
-    config,
-    { sendVerificationEmail: jest.fn(), sendWelcomeEmail: jest.fn() } as any,
-    {} as any,
-    {} as any,
-    {} as any,
-    {} as any,
-    securityService as any,
-    { syncUserConsent: jest.fn() } as any,
     tokens,
-    {} as any, // registration — bu suite kayıt yolunu sürmüyor
-    {} as any, // passwords — bu suite şifre yolunu sürmüyor
-    {} as any, // socialLogins — bu suite sosyal girişi sürmüyor
-    {} as any,
+    {} as any, // registration
+    {} as any, // passwords
+    {} as any, // logins
+    {} as any, // socialLogins
   );
+
   jest
     .spyOn(tokens as any, "persistRefreshToken")
     .mockResolvedValue(undefined as never);

@@ -6,6 +6,7 @@ import { AuthService } from "./auth.service";
 import { AuthTokenService } from "./auth-token.service";
 import { AuthRegistrationService } from "./auth-registration.service";
 import { AuthPasswordService } from "./auth-password.service";
+import { AuthLoginService } from "./auth-login.service";
 import { SocialLoginService } from "./social/social-login.service";
 import { AuthController } from "./auth.controller";
 import { AdminAuthController } from "./admin-auth.controller";
@@ -53,6 +54,7 @@ import { MarketingModule } from "../marketing/marketing.module";
     AuthTokenService,
     AuthRegistrationService,
     AuthPasswordService,
+    AuthLoginService,
     SocialLoginService,
     GoogleAuthService,
     AppleAuthService,

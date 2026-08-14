@@ -7,6 +7,7 @@ import { AuthService } from "../auth.service";
 import { AuthTokenService } from "../auth-token.service";
 import { AuthRegistrationService } from "../auth-registration.service";
 import { AuthPasswordService } from "../auth-password.service";
+import { AuthLoginService } from "../auth-login.service";
 import { SocialLoginService } from "./social-login.service";
 import { GoogleAuthService } from "./google-auth.service";
 import { AppleAuthService } from "./apple-auth.service";
@@ -56,6 +57,7 @@ describe("AuthService.loginWithGoogle", () => {
         AuthTokenService,
         AuthRegistrationService,
         AuthPasswordService,
+        AuthLoginService,
         SocialLoginService,
         { provide: PrismaService, useValue: prisma },
         {
