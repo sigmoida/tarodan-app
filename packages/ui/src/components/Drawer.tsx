@@ -55,7 +55,12 @@ export const Drawer = React.forwardRef<HTMLDivElement, DrawerProps>(
       side = "left",
       title,
       ariaLabel,
-      widthClassName = "w-[min(20rem,calc(100vw-3rem))]",
+      // `100%` (viewport birimi DEĞİL): panel `fixed`, yani yüzdesi ilk içeren
+      // bloğa göre çözülür ve o blok dikey kaydırma çubuğunu içermez. `100vw`
+      // ise çubuğu da sayar, dolayısıyla dar pencerede panel görünür alandan
+      // taşardı. (`dvw` bunu çözmez — dinamik birimler kaydırma çubuğuyla değil,
+      // mobil tarayıcı arayüzünün açılıp kapanmasıyla ilgilidir.)
+      widthClassName = "w-[min(20rem,calc(100%-3rem))]",
       closeLabel = "Kapat",
       footer,
       bodyClassName,
