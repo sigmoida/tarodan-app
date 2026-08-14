@@ -15,6 +15,7 @@ import {
   PUBLIC_NAME_SELECT,
   publicName,
 } from "../../common/helpers/public-identity";
+import { i18nMessage } from "../i18n";
 
 // "Görünür" item filtresi: custom item'lar + ürünü active/sold olan item'lar.
 // mapCollectionToDto'daki filtreyle birebir aynı semantik — liste ve detay
@@ -137,7 +138,9 @@ export class CollectionSocialService {
           !collection.isPublic &&
           collection.userId !== userId
         ) {
-          throw new ForbiddenException("Bu koleksiyon özel");
+          throw new ForbiddenException(
+            i18nMessage("server.collection.isPrivate"),
+          );
         }
       }
     } catch (error) {
@@ -145,17 +148,17 @@ export class CollectionSocialService {
         throw error;
       }
       this.logger.error("likeCollection: error finding collection");
-      throw new NotFoundException("Koleksiyon bulunamadı");
+      throw new NotFoundException(i18nMessage("server.collection.notFound"));
     }
 
     if (!collection || !collection.id) {
       this.logger.warn("likeCollection: collection not found");
-      throw new NotFoundException("Koleksiyon bulunamadı");
+      throw new NotFoundException(i18nMessage("server.collection.notFound"));
     }
 
     // Prevent users from liking their own collections
     if (collection.userId === userId) {
-      throw new BadRequestException("Kendi koleksiyonunuzu beğenemezsiniz");
+      throw new BadRequestException(i18nMessage("server.collection.likeOwn"));
     }
 
     // Check if user already liked this collection
@@ -291,7 +294,7 @@ export class CollectionSocialService {
     }
 
     if (!collection) {
-      throw new NotFoundException("Koleksiyon bulunamadı");
+      throw new NotFoundException(i18nMessage("server.collection.notFound"));
     }
 
     // Find and delete the like

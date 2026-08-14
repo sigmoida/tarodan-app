@@ -105,7 +105,9 @@ describe("DiscountService quantity campaigns", () => {
           "seller-1",
           false,
         ),
-      ).rejects.toThrow("buyQuantity ve getQuantity");
+      ).rejects.toMatchObject({
+        response: { i18nKey: "server.discount.buyXGetYMinimum" },
+      });
     });
 
     it("bulk_quantity için minQuantity en az 2 olmalıdır", async () => {
@@ -120,7 +122,9 @@ describe("DiscountService quantity campaigns", () => {
           "seller-1",
           false,
         ),
-      ).rejects.toThrow("minQuantity en az 2");
+      ).rejects.toMatchObject({
+        response: { i18nKey: "server.discount.minQuantityAtLeastTwo" },
+      });
     });
 
     it("adet koşullu kampanya bedel kalemine tanımlanamaz", async () => {
@@ -137,7 +141,9 @@ describe("DiscountService quantity campaigns", () => {
           null,
           true,
         ),
-      ).rejects.toThrow("yalnız ürün fiyatına");
+      ).rejects.toMatchObject({
+        response: { i18nKey: "server.discount.quantityCampaignProductOnly" },
+      });
     });
   });
 });

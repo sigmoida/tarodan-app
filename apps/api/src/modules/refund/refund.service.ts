@@ -199,7 +199,7 @@ export class RefundService {
     const documentShouldExist = invoicedStatuses.includes(order.status);
     if (documentShouldExist) {
       throw new BadRequestException(
-        "Platform satış faturasının ürün KDV snapshot'ı bulunamadı; finansal inceleme gerekli",
+        i18nMessage("server.refund.vatSnapshotMissing"),
       );
     }
     return Number(order.taxAmount ?? 0);
@@ -490,7 +490,7 @@ export class RefundService {
       (!dto.evidencePhotoUrls || dto.evidencePhotoUrls.length === 0)
     ) {
       throw new BadRequestException(
-        "Bu iade nedeni için en az bir kanıt görseli zorunludur",
+        i18nMessage("server.refund.evidenceRequired"),
       );
     }
 
@@ -557,7 +557,7 @@ export class RefundService {
       order.status !== OrderStatus.preparing
     ) {
       throw new BadRequestException(
-        "Yalnız ödenmiş ve kargo öncesindeki siparişler iptal edilebilir",
+        i18nMessage("server.refund.cancelPaidPreShipmentOnly"),
       );
     }
     // Devir tanımı TEK KAYNAK (shipment-handover): hareket eden durum VEYA
@@ -566,7 +566,7 @@ export class RefundService {
     // fiilen yoldayken iptal kabul ediliyordu.
     if (isShipmentHandedToCarrier(order.shipment)) {
       throw new BadRequestException(
-        "Kargoya teslim edilmiş sipariş iptal edilemez; iade talebi oluşturun",
+        i18nMessage("server.order.cancelAfterHandover"),
       );
     }
     const payment =
@@ -622,12 +622,12 @@ export class RefundService {
             fresh.status !== OrderStatus.preparing)
         ) {
           throw new BadRequestException(
-            "Sipariş durumu az önce değişti; iptal edilemedi",
+            i18nMessage("server.refund.orderStatusChanged"),
           );
         }
         if (isShipmentHandedToCarrier(fresh.shipment)) {
           throw new BadRequestException(
-            "Kargoya teslim edilmiş sipariş iptal edilemez; iade talebi oluşturun",
+            i18nMessage("server.order.cancelAfterHandover"),
           );
         }
         return tx.refundRequest.create({
@@ -877,15 +877,17 @@ export class RefundService {
       !rr.financialReviewRequired
     ) {
       throw new BadRequestException(
-        "Yalnız inceleme veya finansal mutabakat bekleyen iadeler için karar önizlenebilir",
+        i18nMessage("server.refund.previewStateInvalid"),
       );
     }
     if (rr.policyFinalizedAt) {
-      throw new ConflictException("İade finansal politikası zaten kesinleşmiş");
+      throw new ConflictException(
+        i18nMessage("server.refund.policyAlreadyFinal"),
+      );
     }
     if (!this.shippingTariffService) {
       throw new BadRequestException(
-        "İade kargo tarifesi servisi kullanılamıyor",
+        i18nMessage("server.refund.tariffServiceUnavailable"),
       );
     }
 
@@ -1173,9 +1175,7 @@ export class RefundService {
       options.allowNonReview === true,
     );
     if (preview.calculationToken !== decision.calculationToken) {
-      throw new ConflictException(
-        "İade hesabı veya tarife değişti; yeni karar önizlemesi alın",
-      );
+      throw new ConflictException(i18nMessage("server.refund.previewStale"));
     }
     const finalizedAt = new Date();
     const components = preview.financials.components;
@@ -1208,7 +1208,7 @@ export class RefundService {
         (options.requireFinancialReview && !current.financialReviewRequired)
       ) {
         throw new ConflictException(
-          "İade kararı başka bir işlem tarafından kesinleştirildi",
+          i18nMessage("server.refund.decisionRaceLost"),
         );
       }
 
@@ -1229,7 +1229,7 @@ export class RefundService {
       });
       if (claimed.count !== 1) {
         throw new ConflictException(
-          "İade kararı başka bir işlem tarafından kesinleştirildi",
+          i18nMessage("server.refund.decisionRaceLost"),
         );
       }
 
@@ -1531,12 +1531,12 @@ export class RefundService {
     if (!rr) throw new NotFoundException(i18nMessage("server.refund.notFound"));
     if (rr.status !== RefundRequestStatus.pending_review) {
       throw new BadRequestException(
-        "Yalnız inceleme bekleyen iade talepleri onaylanabilir",
+        i18nMessage("server.refund.approvePendingOnly"),
       );
     }
     if (rr.policyVersion >= 2 && !rr.policyFinalizedAt) {
       throw new BadRequestException(
-        "V2 iade finansal kararı kesinleşmeden onaylanamaz",
+        i18nMessage("server.refund.v2DecisionRequired"),
       );
     }
 
@@ -1638,7 +1638,9 @@ export class RefundService {
     reason: string,
   ) {
     if (!reason?.trim()) {
-      throw new BadRequestException("İade reddi için açıklama zorunludur");
+      throw new BadRequestException(
+        i18nMessage("server.refund.rejectReasonRequired"),
+      );
     }
     const rr = await this.prisma.refundRequest.findUnique({
       where: { id: refundRequestId },
@@ -1647,7 +1649,7 @@ export class RefundService {
     if (!rr) throw new NotFoundException(i18nMessage("server.refund.notFound"));
     if (rr.status !== RefundRequestStatus.pending_review) {
       throw new BadRequestException(
-        "Yalnız inceleme bekleyen iade talepleri reddedilebilir",
+        i18nMessage("server.refund.rejectPendingOnly"),
       );
     }
 
@@ -1733,7 +1735,7 @@ export class RefundService {
   ) {
     if (!note?.trim() || note.trim().length < 10) {
       throw new BadRequestException(
-        "İtiraz işareti için en az 10 karakterlik gerekçe zorunludur",
+        i18nMessage("server.refund.appealReasonTooShort"),
       );
     }
     const allowed: RefundRequestStatus[] = [
@@ -1758,7 +1760,7 @@ export class RefundService {
     });
     if (claimed.count === 0) {
       throw new ConflictException(
-        "İade bu sırada başka bir akış tarafından ilerletildi; sayfayı yenileyin",
+        i18nMessage("server.refund.advancedElsewhere"),
       );
     }
     await this.appendHistory(refundRequestId, {
@@ -1869,7 +1871,7 @@ export class RefundService {
       rr.status !== RefundRequestStatus.approved
     ) {
       throw new BadRequestException(
-        "İade kargosu yalnız onaylanmış bir talep için oluşturulabilir",
+        i18nMessage("server.refund.shipmentApprovedOnly"),
       );
     }
 
@@ -1943,7 +1945,9 @@ export class RefundService {
     if (!result.ok) {
       const r = result as any;
       const errMsg = r.kind === "business" ? r.message : `technical: ${r.code}`;
-      throw new BadRequestException(`Sürat iade kargosu açılamadı: ${errMsg}`);
+      throw new BadRequestException(
+        i18nMessage("server.refund.suratShipmentFailed", { reason: errMsg }),
+      );
     }
 
     const updated = await this.prisma.refundRequest.update({
@@ -1990,7 +1994,7 @@ export class RefundService {
     if (rr.status === RefundRequestStatus.refunded) return rr;
     if (rr.financialReviewRequired && !rr.policyFinalizedAt) {
       throw new BadRequestException(
-        "Finansal inceleme tamamlanmadan para iadesi kesinleştirilemez",
+        i18nMessage("server.refund.financialReviewPending"),
       );
     }
 
@@ -2794,7 +2798,7 @@ export class RefundService {
         }
         if (isShipmentHandedToCarrier(fresh.shipment)) {
           throw new BadRequestException(
-            "Kargoya teslim edilmiş sipariş için anında iade yapılamaz; teslimattan sonra iade talebi oluşturun",
+            i18nMessage("server.refund.instantAfterHandover"),
           );
         }
         return tx.refundRequest.create({

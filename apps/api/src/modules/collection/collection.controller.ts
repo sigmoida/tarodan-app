@@ -33,6 +33,7 @@ import {
 } from "./dto";
 import { Public } from "../auth/decorators/public.decorator";
 import { errorStack } from "../../common/helpers/error-message";
+import { i18nMessage } from "../i18n";
 
 @Controller("collections")
 export class CollectionController {
@@ -193,7 +194,9 @@ export class CollectionController {
     @Request() req: any,
   ): Promise<{ liked: boolean; likeCount: number }> {
     if (!req.user || !req.user.id) {
-      throw new BadRequestException("Kullanıcı kimlik doğrulaması gerekli");
+      throw new BadRequestException(
+        i18nMessage("server.collection.authRequired"),
+      );
     }
     try {
       return await this.collectionService.likeCollection(idOrSlug, req.user.id);
@@ -215,7 +218,9 @@ export class CollectionController {
     @Request() req: any,
   ): Promise<{ liked: boolean; likeCount: number }> {
     if (!req.user || !req.user.id) {
-      throw new BadRequestException("Kullanıcı kimlik doğrulaması gerekli");
+      throw new BadRequestException(
+        i18nMessage("server.collection.authRequired"),
+      );
     }
     try {
       return await this.collectionService.unlikeCollection(
@@ -313,7 +318,9 @@ export class CollectionController {
         );
       } catch (error) {
         this.logger.error("Collection cover upload failed", errorStack(error));
-        throw new BadRequestException("Resim yükleme başarısız");
+        throw new BadRequestException(
+          i18nMessage("server.collection.imageUploadFailed"),
+        );
       }
     }
 

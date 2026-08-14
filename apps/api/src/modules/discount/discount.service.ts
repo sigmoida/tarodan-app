@@ -45,6 +45,7 @@ import { isProductInDiscountScope } from "./discount-scope";
 import { FeeDiscountResolver } from "./fee-discount.resolver";
 import { automaticBudgetEntriesOf } from "./fee-discount.engine";
 import { bestQuantityCampaignDiscount } from "./quantity-campaign";
+import { i18nMessage } from "../i18n";
 
 /** Kusursuz iadede geri verilen kupon hakkı — commit SONRASI bildirim için. */
 export interface RestoredCoupon {
@@ -81,7 +82,7 @@ function assertQuantityTypeShape(input: {
   }
   if (input.target !== DiscountTarget.product_price) {
     throw new BadRequestException(
-      "Adet koşullu kampanya yalnız ürün fiyatına tanımlanabilir",
+      i18nMessage("server.discount.quantityCampaignProductOnly"),
     );
   }
   if (type === DiscountType.bogo) {
@@ -90,7 +91,7 @@ function assertQuantityTypeShape(input: {
       !(Number(input.getQuantity) >= 1)
     ) {
       throw new BadRequestException(
-        "'Al X, Y bedava' kampanyası için buyQuantity ve getQuantity en az 1 olmalıdır",
+        i18nMessage("server.discount.buyXGetYMinimum"),
       );
     }
     return;
@@ -99,13 +100,13 @@ function assertQuantityTypeShape(input: {
   // ilan fiyatının), değer 0-100 arası yüzde.
   if (!(Number(input.minQuantity) >= 2)) {
     throw new BadRequestException(
-      "Adet koşullu indirim için minQuantity en az 2 olmalıdır",
+      i18nMessage("server.discount.minQuantityAtLeastTwo"),
     );
   }
   const percent = Number(input.value);
   if (!(percent > 0) || percent > 100) {
     throw new BadRequestException(
-      "Adet koşullu indirimin değeri 1-100 arası yüzde olmalıdır",
+      i18nMessage("server.discount.quantityPercentRange"),
     );
   }
 }
@@ -193,18 +194,20 @@ export class DiscountService {
     // gerektiren kitlede ise limitsizlik kişi-başı denetimi anlamsız kılar.
     if (dto.usageLimitPerUser === 0 && audience !== DiscountAudience.everyone) {
       throw new BadRequestException(
-        "Kişi başı limitsiz kod yalnız 'herkes' kitlesinde tanımlanabilir",
+        i18nMessage("server.discount.unlimitedPerUserEveryoneOnly"),
       );
     }
 
     // Sellers can only create discounts for their own products
     if (!isAdmin && dto.scope === DiscountScope.global) {
-      throw new ForbiddenException("Satıcılar global indirim oluşturamazlar");
+      throw new ForbiddenException(
+        i18nMessage("server.discount.sellerNoGlobal"),
+      );
     }
 
     if (!isAdmin && dto.scope === DiscountScope.category) {
       throw new ForbiddenException(
-        "Satıcılar kategori indirimi oluşturamazlar",
+        i18nMessage("server.discount.sellerNoCategory"),
       );
     }
 
@@ -214,7 +217,9 @@ export class DiscountService {
         where: { id: dto.categoryId },
       });
       if (!category) {
-        throw new NotFoundException("Kategori bulunamadı");
+        throw new NotFoundException(
+          i18nMessage("server.product.categoryNotFound"),
+        );
       }
     }
 
@@ -222,7 +227,7 @@ export class DiscountService {
     if (dto.scope === DiscountScope.product) {
       if (!dto.targetProductIds?.length) {
         throw new BadRequestException(
-          "Seçili ürünler kapsamı için en az bir ürün seçmelisiniz",
+          i18nMessage("server.discount.selectedProductsRequired"),
         );
       }
       const products = await this.prisma.product.findMany({
@@ -251,7 +256,7 @@ export class DiscountService {
         where: { code: dto.code },
       });
       if (existing) {
-        throw new BadRequestException("Bu kupon kodu zaten kullanılıyor");
+        throw new BadRequestException(i18nMessage("server.discount.codeInUse"));
       }
     }
 
@@ -341,12 +346,14 @@ export class DiscountService {
     });
 
     if (!discount) {
-      throw new NotFoundException("İndirim bulunamadı");
+      throw new NotFoundException(i18nMessage("server.discount.notFound"));
     }
 
     // Sellers can only update their own discounts
     if (!isAdmin && discount.sellerId !== actorId) {
-      throw new ForbiddenException("Bu indirimi düzenleme yetkiniz yok");
+      throw new ForbiddenException(
+        i18nMessage("server.discount.editForbidden"),
+      );
     }
 
     // Cep kuralı düzenlemede de geçerlidir: hedef kalem değiştirilerek satıcı
@@ -418,7 +425,7 @@ export class DiscountService {
       nextAudience !== DiscountAudience.everyone
     ) {
       throw new BadRequestException(
-        "Kişi başı limitsiz kod yalnız 'herkes' kitlesinde tanımlanabilir",
+        i18nMessage("server.discount.unlimitedPerUserEveryoneOnly"),
       );
     }
 
@@ -428,7 +435,7 @@ export class DiscountService {
         where: { code: dto.code },
       });
       if (existing) {
-        throw new BadRequestException("Bu kupon kodu zaten kullanılıyor");
+        throw new BadRequestException(i18nMessage("server.discount.codeInUse"));
       }
     }
 
@@ -441,7 +448,7 @@ export class DiscountService {
           : (dto.targetProductIds ?? discount.targetProductIds ?? []);
       if (!newIds.length) {
         throw new BadRequestException(
-          "Seçili ürünler kapsamı için en az bir ürün seçmelisiniz",
+          i18nMessage("server.discount.selectedProductsRequired"),
         );
       }
     }
@@ -560,7 +567,7 @@ export class DiscountService {
     });
 
     if (!discount) {
-      throw new NotFoundException("İndirim bulunamadı");
+      throw new NotFoundException(i18nMessage("server.discount.notFound"));
     }
 
     // Sellers can only delete their own discounts
@@ -592,12 +599,14 @@ export class DiscountService {
     });
 
     if (!discount) {
-      throw new NotFoundException("İndirim bulunamadı");
+      throw new NotFoundException(i18nMessage("server.discount.notFound"));
     }
 
     // Sellers can only view their own discounts
     if (!isAdmin && discount.sellerId !== actorId) {
-      throw new ForbiddenException("Bu indirimi görüntüleme yetkiniz yok");
+      throw new ForbiddenException(
+        i18nMessage("server.discount.viewForbidden"),
+      );
     }
 
     return this.mapToResponse(discount);
@@ -1097,7 +1106,7 @@ export class DiscountService {
           return;
         }
         throw new BadRequestException(
-          "Sipariş için kupon rezervasyonu zaten var",
+          i18nMessage("server.discount.reservationExists"),
         );
       }
 
@@ -1123,7 +1132,9 @@ export class DiscountService {
         },
       });
       if (!discount) {
-        throw new BadRequestException("Kupon bulunamadı");
+        throw new BadRequestException(
+          i18nMessage("server.discount.couponNotFound"),
+        );
       }
 
       const activeWhere = {
@@ -1136,7 +1147,9 @@ export class DiscountService {
           where: activeWhere,
         });
         if (discount.usedCount + reserved >= discount.usageLimitTotal) {
-          throw new BadRequestException("Bu kupon kullanım limitine ulaştı");
+          throw new BadRequestException(
+            i18nMessage("server.discount.couponLimitReached"),
+          );
         }
       }
 
@@ -1148,7 +1161,9 @@ export class DiscountService {
           }),
         ]);
         if (usedByUser + reservedByUser >= discount.usageLimitPerUser) {
-          throw new BadRequestException("Bu kuponu zaten kullandınız");
+          throw new BadRequestException(
+            i18nMessage("server.discount.couponAlreadyUsed"),
+          );
         }
       }
 
@@ -1166,7 +1181,9 @@ export class DiscountService {
           },
         });
         if (!voucher || voucher.isRedeemed || reservedVoucher > 0) {
-          throw new BadRequestException("Bu kupon kodu daha önce kullanıldı");
+          throw new BadRequestException(
+            i18nMessage("server.discount.couponCodeSpent"),
+          );
         }
       }
 
@@ -1467,7 +1484,9 @@ export class DiscountService {
           },
         });
         if (claimed.count === 0) {
-          throw new BadRequestException("Bu kupon kodu daha önce kullanıldı");
+          throw new BadRequestException(
+            i18nMessage("server.discount.couponCodeSpent"),
+          );
         }
       }
       // Atomik toplam-limit koruması: usedCount artışı, limit dolmadıysa TEK
@@ -1481,7 +1500,9 @@ export class DiscountService {
           AND (usage_limit_total IS NULL OR used_count < usage_limit_total)
       `;
       if (updated === 0) {
-        throw new BadRequestException("Bu kupon kullanım limitine ulaştı");
+        throw new BadRequestException(
+          i18nMessage("server.discount.couponLimitReached"),
+        );
       }
       // Per-user limit (F4.5): the UPDATE above locked the discount row, so this
       // count-then-insert is serialized across concurrent redemptions of the SAME
@@ -1497,7 +1518,9 @@ export class DiscountService {
           where: { discountId, userId, revokedAt: null },
         });
         if (userUsage >= perUser.usageLimitPerUser) {
-          throw new BadRequestException("Bu kuponu zaten kullandınız");
+          throw new BadRequestException(
+            i18nMessage("server.discount.couponAlreadyUsed"),
+          );
         }
       }
       await tx.discountUsage.create({
@@ -1538,9 +1561,12 @@ export class DiscountService {
       where: { id: discountId },
       select: { id: true },
     });
-    if (!discount) throw new NotFoundException("İndirim bulunamadı");
+    if (!discount)
+      throw new NotFoundException(i18nMessage("server.discount.notFound"));
     if (count < 1 || count > 10000) {
-      throw new BadRequestException("Kod adedi 1 ile 10000 arasında olmalı");
+      throw new BadRequestException(
+        i18nMessage("server.discount.codeCountRange"),
+      );
     }
 
     const cleanPrefix = (prefix ?? "")

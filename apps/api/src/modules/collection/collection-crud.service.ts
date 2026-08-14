@@ -28,6 +28,7 @@ import {
   PUBLIC_NAME_SELECT,
   publicName,
 } from "../../common/helpers/public-identity";
+import { i18nMessage } from "../i18n";
 
 // "Görünür" item filtresi: custom item'lar + ürünü active/sold olan item'lar.
 // mapCollectionToDto'daki filtreyle birebir aynı semantik — liste ve detay
@@ -154,7 +155,7 @@ export class CollectionCrudService {
     });
 
     if (!basicCollection) {
-      throw new NotFoundException("Koleksiyon bulunamadı");
+      throw new NotFoundException(i18nMessage("server.collection.notFound"));
     }
 
     // Now get full collection with relations
@@ -182,7 +183,7 @@ export class CollectionCrudService {
     });
 
     if (!collection) {
-      throw new NotFoundException("Koleksiyon bulunamadı");
+      throw new NotFoundException(i18nMessage("server.collection.notFound"));
     }
 
     // Fetch images separately for each product
@@ -221,7 +222,7 @@ export class CollectionCrudService {
 
     // Private collection can only be seen by owner
     if (!collection.isPublic && collection.userId !== viewerId) {
-      throw new ForbiddenException("Bu koleksiyon özel");
+      throw new ForbiddenException(i18nMessage("server.collection.isPrivate"));
     }
 
     // Check if viewer has liked this collection
@@ -333,12 +334,12 @@ export class CollectionCrudService {
     }
 
     if (!collection) {
-      throw new NotFoundException("Koleksiyon bulunamadı");
+      throw new NotFoundException(i18nMessage("server.collection.notFound"));
     }
 
     // Private collection can only be seen by owner
     if (!collection.isPublic && collection.userId !== viewerId) {
-      throw new ForbiddenException("Bu koleksiyon özel");
+      throw new ForbiddenException(i18nMessage("server.collection.isPrivate"));
     }
 
     // Check if viewer has liked this collection
@@ -776,11 +777,13 @@ export class CollectionCrudService {
     });
 
     if (!collection) {
-      throw new NotFoundException("Koleksiyon bulunamadı");
+      throw new NotFoundException(i18nMessage("server.collection.notFound"));
     }
 
     if (collection.userId !== userId) {
-      throw new ForbiddenException("Bu koleksiyonu düzenleme yetkiniz yok");
+      throw new ForbiddenException(
+        i18nMessage("server.collection.editForbidden"),
+      );
     }
 
     // Değişen metin alanları denetimi
@@ -869,7 +872,7 @@ export class CollectionCrudService {
     });
 
     if (!collection) {
-      throw new NotFoundException("Koleksiyon bulunamadı");
+      throw new NotFoundException(i18nMessage("server.collection.notFound"));
     }
 
     if (collection.userId !== userId) {

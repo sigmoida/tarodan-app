@@ -7340,7 +7340,26 @@
       "orderNotFound": "Sipariş bulunamadı",
       "orderNotPaidYet": "Bu sipariş henüz ödenmemiş, iade yerine siparişi iptal etmelisiniz",
       "orderStatusNotEligible": "Bu sipariş durumunda iade talebi oluşturulamaz",
-      "viewForbidden": "Bu talebi görüntüleme yetkiniz yok"
+      "viewForbidden": "Bu talebi görüntüleme yetkiniz yok",
+      "vatSnapshotMissing": "Platform satış faturasının ürün KDV snapshot'ı bulunamadı; finansal inceleme gerekli",
+      "evidenceRequired": "Bu iade nedeni için en az bir kanıt görseli zorunludur",
+      "cancelPaidPreShipmentOnly": "Yalnız ödenmiş ve kargo öncesindeki siparişler iptal edilebilir",
+      "orderStatusChanged": "Sipariş durumu az önce değişti; iptal edilemedi",
+      "previewStateInvalid": "Yalnız inceleme veya finansal mutabakat bekleyen iadeler için karar önizlenebilir",
+      "policyAlreadyFinal": "İade finansal politikası zaten kesinleşmiş",
+      "tariffServiceUnavailable": "İade kargo tarifesi servisi kullanılamıyor",
+      "previewStale": "İade hesabı veya tarife değişti; yeni karar önizlemesi alın",
+      "decisionRaceLost": "İade kararı başka bir işlem tarafından kesinleştirildi",
+      "approvePendingOnly": "Yalnız inceleme bekleyen iade talepleri onaylanabilir",
+      "v2DecisionRequired": "V2 iade finansal kararı kesinleşmeden onaylanamaz",
+      "rejectReasonRequired": "İade reddi için açıklama zorunludur",
+      "rejectPendingOnly": "Yalnız inceleme bekleyen iade talepleri reddedilebilir",
+      "appealReasonTooShort": "İtiraz işareti için en az 10 karakterlik gerekçe zorunludur",
+      "advancedElsewhere": "İade bu sırada başka bir akış tarafından ilerletildi; sayfayı yenileyin",
+      "shipmentApprovedOnly": "İade kargosu yalnız onaylanmış bir talep için oluşturulabilir",
+      "financialReviewPending": "Finansal inceleme tamamlanmadan para iadesi kesinleştirilemez",
+      "instantAfterHandover": "Kargoya teslim edilmiş sipariş için anında iade yapılamaz; teslimattan sonra iade talebi oluşturun",
+      "suratShipmentFailed": "Sürat iade kargosu açılamadı: {reason}"
     },
     "user": {
       "accountDeleted": "Hesabınız başarıyla silindi",
@@ -7483,7 +7502,16 @@
       "invalidType": "Geçersiz rapor tipi"
     },
     "collection": {
-      "notFound": "Koleksiyon bulunamadı"
+      "notFound": "Koleksiyon bulunamadı",
+      "editForbidden": "Bu koleksiyonu düzenleme yetkiniz yok",
+      "isPrivate": "Bu koleksiyon özel",
+      "productOrCustomRequired": "Ürün ID veya custom ürün bilgileri gerekli",
+      "itemAlreadyAdded": "Ürün zaten koleksiyonda",
+      "customNameRequired": "Custom ürün için isim zorunludur",
+      "itemNotFound": "Koleksiyon öğesi bulunamadı",
+      "likeOwn": "Kendi koleksiyonunuzu beğenemezsiniz",
+      "authRequired": "Kullanıcı kimlik doğrulaması gerekli",
+      "imageUploadFailed": "Resim yükleme başarısız"
     },
     "messaging": {
       "messageNotFound": "Mesaj bulunamadı"
@@ -7498,6 +7526,56 @@
     },
     "moderation": {
       "contentRejected": "Girdiğiniz {field} uygun değildir ({reason}). Lütfen düzenleyin."
+    },
+    "discount": {
+      "platformCannotDiscountProduct": "Platform ürün fiyatına indirim uygulayamaz; ürün fiyatı satıcıya aittir",
+      "feeDiscountPlatformOnly": "Komisyon, hizmet bedeli ve kargo indirimlerini yalnız platform tanımlayabilir",
+      "sellerFeeNoCoupon": "Satıcı tarafındaki bedel indirimleri kupon koduna bağlanamaz; hedef kitleyle otomatik tanımlanır",
+      "tradeFeeNoCoupon": "Takas hizmet bedeli kampanyası kupon koduna bağlanamaz; otomatik uygulanır",
+      "feeBudgetRequired": "Bedel indirimleri için TL bütçe tavanı zorunludur",
+      "tierRequired": "En az bir üyelik katmanı seçilmelidir",
+      "userRequired": "En az bir kullanıcı seçilmelidir",
+      "tierAudienceOnly": "Üyelik katmanı yalnız 'membership_tiers' hedef kitlesinde seçilebilir",
+      "userListAudienceOnly": "Kullanıcı listesi yalnız kişiye özel hedef kitlelerde verilebilir",
+      "sellerFeeBuyerAudience": "Satıcı tarafındaki bir bedel alıcı kitlesine hedeflenemez",
+      "buyerItemSellerAudience": "Alıcının ödediği bir kalem satıcı kitlesine hedeflenemez",
+      "codelessStoreCampaignRemoved": "Kodsuz mağaza kampanyası kaldırıldı: fiyat indirimi için ilanınızı güncelleyin ya da kupon kodu tanımlayın",
+      "sellerRequired": "İndirim tanımlamak için satıcı olmanız gerekir",
+      "quantityCampaignProductOnly": "Adet koşullu kampanya yalnız ürün fiyatına tanımlanabilir",
+      "buyXGetYMinimum": "'Al X, Y bedava' kampanyası için buyQuantity ve getQuantity en az 1 olmalıdır",
+      "minQuantityAtLeastTwo": "Adet koşullu indirim için minQuantity en az 2 olmalıdır",
+      "quantityPercentRange": "Adet koşullu indirimin değeri 1-100 arası yüzde olmalıdır",
+      "unlimitedPerUserEveryoneOnly": "Kişi başı limitsiz kod yalnız 'herkes' kitlesinde tanımlanabilir",
+      "sellerNoGlobal": "Satıcılar global indirim oluşturamazlar",
+      "sellerNoCategory": "Satıcılar kategori indirimi oluşturamazlar",
+      "selectedProductsRequired": "Seçili ürünler kapsamı için en az bir ürün seçmelisiniz",
+      "codeInUse": "Bu kupon kodu zaten kullanılıyor",
+      "notFound": "İndirim bulunamadı",
+      "editForbidden": "Bu indirimi düzenleme yetkiniz yok",
+      "viewForbidden": "Bu indirimi görüntüleme yetkiniz yok",
+      "reservationExists": "Sipariş için kupon rezervasyonu zaten var",
+      "couponNotFound": "Kupon bulunamadı",
+      "couponLimitReached": "Bu kupon kullanım limitine ulaştı",
+      "couponAlreadyUsed": "Bu kuponu zaten kullandınız",
+      "couponCodeSpent": "Bu kupon kodu daha önce kullanıldı",
+      "codeCountRange": "Kod adedi 1 ile 10000 arasında olmalı"
+    },
+    "rating": {
+      "rateSelf": "Kendinizi puanlayamazsınız",
+      "orderOrTradeRequired": "Sipariş veya takas ID gerekli",
+      "membershipOrder": "Üyelik siparişleri için değerlendirme yapılamaz",
+      "deliveredOnly": "Sadece teslim edilmiş siparişler puanlanabilir",
+      "orderForbidden": "Bu siparişi puanlama yetkiniz yok",
+      "invalidRecipient": "Geçersiz alıcı",
+      "orderAlreadyRated": "Bu sipariş için zaten puan verdiniz",
+      "completedTradesOnly": "Sadece tamamlanmış takaslar puanlanabilir",
+      "tradeForbidden": "Bu takası puanlama yetkiniz yok",
+      "tradeAlreadyRated": "Bu takas için zaten puan verdiniz",
+      "alreadyRated": "Bu sipariş/takas için zaten puan verdiniz",
+      "buyerOnly": "Sadece alıcı ürünü puanlayabilir",
+      "productMismatch": "Siparişteki ürün eşleşmiyor",
+      "productAlreadyRated": "Bu sipariş için zaten ürün puanı verdiniz",
+      "reviewNotFound": "Yorum bulunamadı"
     }
   }
 }

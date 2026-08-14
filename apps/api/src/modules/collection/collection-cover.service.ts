@@ -14,6 +14,7 @@ import * as http from "http";
 import { configureSharpSafety } from "../../common/image/sharp-safety";
 import { PUBLIC_NAME_SELECT } from "../../common/helpers/public-identity";
 import { errorMessage } from "../../common/helpers/error-message";
+import { i18nMessage } from "../i18n";
 
 // Sharp is optional. Yükleme hatası sessizce yutulmasın (bkz. media.service —
 // staging'de sharp'sız imaj tek 400 ile teşhis edilemiyordu).
@@ -58,11 +59,13 @@ export class CollectionCoverService {
     });
 
     if (!collection) {
-      throw new NotFoundException("Koleksiyon bulunamadı");
+      throw new NotFoundException(i18nMessage("server.collection.notFound"));
     }
 
     if (collection.userId !== userId) {
-      throw new ForbiddenException("Bu koleksiyonu düzenleme yetkiniz yok");
+      throw new ForbiddenException(
+        i18nMessage("server.collection.editForbidden"),
+      );
     }
 
     const updated = await this.prisma.collection.update({

@@ -7340,7 +7340,26 @@
       "orderNotFound": "Order not found",
       "orderNotPaidYet": "This order has not been paid yet; you should cancel the order instead of requesting a refund",
       "orderStatusNotEligible": "A refund request cannot be created while the order is in this status",
-      "viewForbidden": "You do not have permission to view this request"
+      "viewForbidden": "You do not have permission to view this request",
+      "vatSnapshotMissing": "The product VAT snapshot of the platform sale invoice is missing; financial review is required",
+      "evidenceRequired": "At least one evidence image is required for this refund reason",
+      "cancelPaidPreShipmentOnly": "Only paid orders that have not shipped yet can be cancelled",
+      "orderStatusChanged": "The order status just changed; it could not be cancelled",
+      "previewStateInvalid": "A decision can only be previewed for refunds awaiting review or financial reconciliation",
+      "policyAlreadyFinal": "The refund's financial policy is already final",
+      "tariffServiceUnavailable": "The return shipping tariff service is unavailable",
+      "previewStale": "The refund calculation or tariff changed; take a fresh decision preview",
+      "decisionRaceLost": "The refund decision was finalized by another operation",
+      "approvePendingOnly": "Only refund requests awaiting review can be approved",
+      "v2DecisionRequired": "A v2 refund cannot be approved before its financial decision is final",
+      "rejectReasonRequired": "A reason is required to reject a refund",
+      "rejectPendingOnly": "Only refund requests awaiting review can be rejected",
+      "appealReasonTooShort": "An appeal must give a reason of at least 10 characters",
+      "advancedElsewhere": "The refund was advanced by another flow in the meantime; refresh the page",
+      "shipmentApprovedOnly": "A return shipment can only be created for an approved request",
+      "financialReviewPending": "The refund cannot be settled before the financial review is complete",
+      "instantAfterHandover": "An order already handed to the carrier cannot be refunded instantly; open a refund request after delivery",
+      "suratShipmentFailed": "The Sürat return shipment could not be opened: {reason}"
     },
     "user": {
       "accountDeleted": "Your account has been successfully deleted",
@@ -7483,7 +7502,16 @@
       "invalidType": "Invalid report type"
     },
     "collection": {
-      "notFound": "Collection not found"
+      "notFound": "Collection not found",
+      "editForbidden": "You are not allowed to edit this collection",
+      "isPrivate": "This collection is private",
+      "productOrCustomRequired": "A product ID or custom product details are required",
+      "itemAlreadyAdded": "The product is already in the collection",
+      "customNameRequired": "A name is required for a custom product",
+      "itemNotFound": "Collection item not found",
+      "likeOwn": "You cannot like your own collection",
+      "authRequired": "Authentication is required",
+      "imageUploadFailed": "Image upload failed"
     },
     "messaging": {
       "messageNotFound": "Message not found"
@@ -7498,6 +7526,56 @@
     },
     "moderation": {
       "contentRejected": "The {field} you entered is not acceptable ({reason}). Please edit it."
+    },
+    "discount": {
+      "platformCannotDiscountProduct": "The platform cannot discount a product's price; the price belongs to the seller",
+      "feeDiscountPlatformOnly": "Only the platform can define commission, service-fee and shipping discounts",
+      "sellerFeeNoCoupon": "Seller-side fee discounts cannot be attached to a coupon code; they apply automatically to their audience",
+      "tradeFeeNoCoupon": "A trade service-fee campaign cannot be attached to a coupon code; it applies automatically",
+      "feeBudgetRequired": "A TL budget cap is required for fee discounts",
+      "tierRequired": "Select at least one membership tier",
+      "userRequired": "Select at least one user",
+      "tierAudienceOnly": "A membership tier can only be chosen for the 'membership_tiers' audience",
+      "userListAudienceOnly": "A user list can only be supplied for a person-specific audience",
+      "sellerFeeBuyerAudience": "A seller-side fee cannot be targeted at a buyer audience",
+      "buyerItemSellerAudience": "An item the buyer pays for cannot be targeted at a seller audience",
+      "codelessStoreCampaignRemoved": "Codeless store campaigns have been removed: update your listing for a price cut, or define a coupon code",
+      "sellerRequired": "You must be a seller to define a discount",
+      "quantityCampaignProductOnly": "A quantity-based campaign can only apply to a product's price",
+      "buyXGetYMinimum": "buyQuantity and getQuantity must be at least 1 for a 'buy X get Y' campaign",
+      "minQuantityAtLeastTwo": "minQuantity must be at least 2 for a quantity-based discount",
+      "quantityPercentRange": "A quantity-based discount must be a percentage between 1 and 100",
+      "unlimitedPerUserEveryoneOnly": "A code with no per-person limit can only be defined for the 'everyone' audience",
+      "sellerNoGlobal": "Sellers cannot create a global discount",
+      "sellerNoCategory": "Sellers cannot create a category discount",
+      "selectedProductsRequired": "Select at least one product for the selected-products scope",
+      "codeInUse": "This coupon code is already in use",
+      "notFound": "Discount not found",
+      "editForbidden": "You are not allowed to edit this discount",
+      "viewForbidden": "You are not allowed to view this discount",
+      "reservationExists": "A coupon reservation already exists for this order",
+      "couponNotFound": "Coupon not found",
+      "couponLimitReached": "This coupon has reached its usage limit",
+      "couponAlreadyUsed": "You have already used this coupon",
+      "couponCodeSpent": "This coupon code has already been used",
+      "codeCountRange": "The number of codes must be between 1 and 10000"
+    },
+    "rating": {
+      "rateSelf": "You cannot rate yourself",
+      "orderOrTradeRequired": "An order or trade ID is required",
+      "membershipOrder": "Membership orders cannot be reviewed",
+      "deliveredOnly": "Only delivered orders can be rated",
+      "orderForbidden": "You are not allowed to rate this order",
+      "invalidRecipient": "Invalid recipient",
+      "orderAlreadyRated": "You have already rated this order",
+      "completedTradesOnly": "Only completed trades can be rated",
+      "tradeForbidden": "You are not allowed to rate this trade",
+      "tradeAlreadyRated": "You have already rated this trade",
+      "alreadyRated": "You have already rated this order or trade",
+      "buyerOnly": "Only the buyer can rate the product",
+      "productMismatch": "The product does not match the one in the order",
+      "productAlreadyRated": "You have already rated the product for this order",
+      "reviewNotFound": "Review not found"
     }
   }
 }

@@ -1,6 +1,7 @@
 import { BadRequestException, ForbiddenException } from "@nestjs/common";
 import { DiscountAudience, DiscountTarget, DiscountType } from "@prisma/client";
 import { isBuyerFeeTarget, isFeeTarget } from "./fee-discount.engine";
+import { i18nMessage } from "../i18n";
 
 /**
  * "Cep kuralı"nın TEK kaynağı: kim neyi indirebilir.
@@ -18,14 +19,14 @@ export function assertTargetAllowedForActor(
   if (target === DiscountTarget.product_price) {
     if (isAdmin) {
       throw new ForbiddenException(
-        "Platform ürün fiyatına indirim uygulayamaz; ürün fiyatı satıcıya aittir",
+        i18nMessage("server.discount.platformCannotDiscountProduct"),
       );
     }
     return;
   }
   if (!isAdmin) {
     throw new ForbiddenException(
-      "Komisyon, hizmet bedeli ve kargo indirimlerini yalnız platform tanımlayabilir",
+      i18nMessage("server.discount.feeDiscountPlatformOnly"),
     );
   }
 }
@@ -42,14 +43,14 @@ export function assertCodeAllowedForTarget(
   if (!hasCode) return;
   if (isFeeTarget(target) && !isBuyerFeeTarget(target)) {
     throw new BadRequestException(
-      "Satıcı tarafındaki bedel indirimleri kupon koduna bağlanamaz; hedef kitleyle otomatik tanımlanır",
+      i18nMessage("server.discount.sellerFeeNoCoupon"),
     );
   }
   // Takas akışında kod girilecek bir ekran yoktur: kampanya kabul anında
   // kendiliğinden uygulanır (İ25).
   if (target === DiscountTarget.trade_service_fee) {
     throw new BadRequestException(
-      "Takas hizmet bedeli kampanyası kupon koduna bağlanamaz; otomatik uygulanır",
+      i18nMessage("server.discount.tradeFeeNoCoupon"),
     );
   }
 }
@@ -68,7 +69,7 @@ export function assertBudgetForTarget(
   }
   if (budgetLimit == null || budgetLimit <= 0) {
     throw new BadRequestException(
-      "Bedel indirimleri için TL bütçe tavanı zorunludur",
+      i18nMessage("server.discount.feeBudgetRequired"),
     );
   }
 }
@@ -87,18 +88,18 @@ export function assertAudienceConsistent(input: AudienceInput): void {
   const users = input.userIds ?? [];
 
   if (audience === DiscountAudience.membership_tiers && tiers.length === 0) {
-    throw new BadRequestException("En az bir üyelik katmanı seçilmelidir");
+    throw new BadRequestException(i18nMessage("server.discount.tierRequired"));
   }
   if (
     (audience === DiscountAudience.specific_buyers ||
       audience === DiscountAudience.specific_sellers) &&
     users.length === 0
   ) {
-    throw new BadRequestException("En az bir kullanıcı seçilmelidir");
+    throw new BadRequestException(i18nMessage("server.discount.userRequired"));
   }
   if (audience !== DiscountAudience.membership_tiers && tiers.length > 0) {
     throw new BadRequestException(
-      "Üyelik katmanı yalnız 'membership_tiers' hedef kitlesinde seçilebilir",
+      i18nMessage("server.discount.tierAudienceOnly"),
     );
   }
   if (
@@ -107,7 +108,7 @@ export function assertAudienceConsistent(input: AudienceInput): void {
     users.length > 0
   ) {
     throw new BadRequestException(
-      "Kullanıcı listesi yalnız kişiye özel hedef kitlelerde verilebilir",
+      i18nMessage("server.discount.userListAudienceOnly"),
     );
   }
 
@@ -120,7 +121,7 @@ export function assertAudienceConsistent(input: AudienceInput): void {
       audience === DiscountAudience.specific_buyers
     ) {
       throw new BadRequestException(
-        "Satıcı tarafındaki bir bedel alıcı kitlesine hedeflenemez",
+        i18nMessage("server.discount.sellerFeeBuyerAudience"),
       );
     }
   } else if (
@@ -129,7 +130,7 @@ export function assertAudienceConsistent(input: AudienceInput): void {
   ) {
     // Ürün fiyatı ve alıcı bedelleri: satıcı kitlesi hedeflemesi anlamsızdır.
     throw new BadRequestException(
-      "Alıcının ödediği bir kalem satıcı kitlesine hedeflenemez",
+      i18nMessage("server.discount.buyerItemSellerAudience"),
     );
   }
 }
@@ -196,7 +197,7 @@ export function assertSellerCampaignHasCode(
   }
   if (!hasCode) {
     throw new BadRequestException(
-      "Kodsuz mağaza kampanyası kaldırıldı: fiyat indirimi için ilanınızı güncelleyin ya da kupon kodu tanımlayın",
+      i18nMessage("server.discount.codelessStoreCampaignRemoved"),
     );
   }
 }

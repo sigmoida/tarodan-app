@@ -34,6 +34,7 @@ import {
   ValidationResultDto,
   ActiveCampaignDto,
 } from "./dto";
+import { i18nMessage } from "../i18n";
 
 @ApiTags("discounts")
 @Controller("discounts")
@@ -73,7 +74,7 @@ export class DiscountController {
     // okunuyor ama hiç kullanılmıyordu: ürünü olmayan herkes kayıt açabiliyordu).
     if (!isSeller) {
       throw new ForbiddenException(
-        "İndirim tanımlamak için satıcı olmanız gerekir",
+        i18nMessage("server.discount.sellerRequired"),
       );
     }
     return this.discountService.create(dto, userId, false);

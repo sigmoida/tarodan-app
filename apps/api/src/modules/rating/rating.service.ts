@@ -30,6 +30,7 @@ import {
   publicIdentityFields,
   publicName,
 } from "../../common/helpers/public-identity";
+import { i18nMessage } from "../i18n";
 
 @Injectable()
 export class RatingService {
@@ -84,7 +85,7 @@ export class RatingService {
   ): Promise<UserRatingResponseDto> {
     // Cannot rate yourself
     if (giverId === dto.receiverId) {
-      throw new BadRequestException("Kendinizi puanlayamazsınız");
+      throw new BadRequestException(i18nMessage("server.rating.rateSelf"));
     }
 
     // Verify receiver exists
@@ -93,12 +94,14 @@ export class RatingService {
     });
 
     if (!receiver) {
-      throw new NotFoundException("Kullanıcı bulunamadı");
+      throw new NotFoundException(i18nMessage("server.auth.userNotFound"));
     }
 
     // Must have either orderId or tradeId
     if (!dto.orderId && !dto.tradeId) {
-      throw new BadRequestException("Sipariş veya takas ID gerekli");
+      throw new BadRequestException(
+        i18nMessage("server.rating.orderOrTradeRequired"),
+      );
     }
 
     // Yorum metni denetimi (küfür/uygunsuz) — event log'a yaz
@@ -115,13 +118,13 @@ export class RatingService {
       });
 
       if (!order) {
-        throw new NotFoundException("Sipariş bulunamadı");
+        throw new NotFoundException(i18nMessage("server.order.notFound"));
       }
 
       // Üyelik/dijital siparişler (sanal ürün + platform satıcısı) puanlanamaz
       if (order.orderNumber?.startsWith("MEM-")) {
         throw new BadRequestException(
-          "Üyelik siparişleri için değerlendirme yapılamaz",
+          i18nMessage("server.rating.membershipOrder"),
         );
       }
 
@@ -132,13 +135,15 @@ export class RatingService {
       ];
       if (!allowedStatuses.includes(order.status)) {
         throw new BadRequestException(
-          "Sadece teslim edilmiş siparişler puanlanabilir",
+          i18nMessage("server.rating.deliveredOnly"),
         );
       }
 
       // Giver must be buyer or seller
       if (order.buyerId !== giverId && order.sellerId !== giverId) {
-        throw new ForbiddenException("Bu siparişi puanlama yetkiniz yok");
+        throw new ForbiddenException(
+          i18nMessage("server.rating.orderForbidden"),
+        );
       }
 
       // Receiver must be the other party
@@ -146,7 +151,9 @@ export class RatingService {
         (order.buyerId === giverId && order.sellerId !== dto.receiverId) ||
         (order.sellerId === giverId && order.buyerId !== dto.receiverId)
       ) {
-        throw new BadRequestException("Geçersiz alıcı");
+        throw new BadRequestException(
+          i18nMessage("server.rating.invalidRecipient"),
+        );
       }
 
       // Check if already rated
@@ -155,7 +162,9 @@ export class RatingService {
       });
 
       if (existingRating) {
-        throw new BadRequestException("Bu sipariş için zaten puan verdiniz");
+        throw new BadRequestException(
+          i18nMessage("server.rating.orderAlreadyRated"),
+        );
       }
     }
 
@@ -165,18 +174,20 @@ export class RatingService {
       });
 
       if (!trade) {
-        throw new NotFoundException("Takas bulunamadı");
+        throw new NotFoundException(i18nMessage("server.trade.notFound"));
       }
 
       if (trade.status !== TradeStatus.completed) {
         throw new BadRequestException(
-          "Sadece tamamlanmış takaslar puanlanabilir",
+          i18nMessage("server.rating.completedTradesOnly"),
         );
       }
 
       // Giver must be initiator or receiver
       if (trade.initiatorId !== giverId && trade.receiverId !== giverId) {
-        throw new ForbiddenException("Bu takası puanlama yetkiniz yok");
+        throw new ForbiddenException(
+          i18nMessage("server.rating.tradeForbidden"),
+        );
       }
 
       // Receiver must be the other party
@@ -185,7 +196,9 @@ export class RatingService {
           trade.receiverId !== dto.receiverId) ||
         (trade.receiverId === giverId && trade.initiatorId !== dto.receiverId)
       ) {
-        throw new BadRequestException("Geçersiz alıcı");
+        throw new BadRequestException(
+          i18nMessage("server.rating.invalidRecipient"),
+        );
       }
 
       // Check if already rated
@@ -194,7 +207,9 @@ export class RatingService {
       });
 
       if (existingRating) {
-        throw new BadRequestException("Bu takas için zaten puan verdiniz");
+        throw new BadRequestException(
+          i18nMessage("server.rating.tradeAlreadyRated"),
+        );
       }
     }
 
@@ -226,9 +241,7 @@ export class RatingService {
         e instanceof Prisma.PrismaClientKnownRequestError &&
         e.code === "P2002"
       ) {
-        throw new ConflictException(
-          "Bu sipariş/takas için zaten puan verdiniz",
-        );
+        throw new ConflictException(i18nMessage("server.rating.alreadyRated"));
       }
       throw e;
     }
@@ -281,22 +294,24 @@ export class RatingService {
     });
 
     if (!order) {
-      throw new NotFoundException("Sipariş bulunamadı");
+      throw new NotFoundException(i18nMessage("server.order.notFound"));
     }
 
     // Üyelik/dijital siparişler (sanal ürün + platform satıcısı) puanlanamaz
     if (order.orderNumber?.startsWith("MEM-")) {
       throw new BadRequestException(
-        "Üyelik siparişleri için değerlendirme yapılamaz",
+        i18nMessage("server.rating.membershipOrder"),
       );
     }
 
     if (order.buyerId !== userId) {
-      throw new ForbiddenException("Sadece alıcı ürünü puanlayabilir");
+      throw new ForbiddenException(i18nMessage("server.rating.buyerOnly"));
     }
 
     if (order.productId !== dto.productId) {
-      throw new BadRequestException("Siparişteki ürün eşleşmiyor");
+      throw new BadRequestException(
+        i18nMessage("server.rating.productMismatch"),
+      );
     }
 
     // Yorum metni denetimi (başlık + yorum, küfür/uygunsuz) — event log'a yaz
@@ -312,9 +327,7 @@ export class RatingService {
       OrderStatus.delivered,
     ];
     if (!allowedStatuses.includes(order.status)) {
-      throw new BadRequestException(
-        "Sadece teslim edilmiş siparişler puanlanabilir",
-      );
+      throw new BadRequestException(i18nMessage("server.rating.deliveredOnly"));
     }
 
     // Check if already rated
@@ -324,7 +337,7 @@ export class RatingService {
 
     if (existingRating) {
       throw new BadRequestException(
-        "Bu sipariş için zaten ürün puanı verdiniz",
+        i18nMessage("server.rating.productAlreadyRated"),
       );
     }
 
@@ -355,7 +368,7 @@ export class RatingService {
         e.code === "P2002"
       ) {
         throw new ConflictException(
-          "Bu sipariş için zaten ürün puanı verdiniz",
+          i18nMessage("server.rating.productAlreadyRated"),
         );
       }
       throw e;
@@ -605,7 +618,7 @@ export class RatingService {
       select: { status: true },
     });
     if (!existing || existing.status !== RatingStatus.approved) {
-      throw new NotFoundException("Yorum bulunamadı");
+      throw new NotFoundException(i18nMessage("server.rating.reviewNotFound"));
     }
     const rating = await this.prisma.productRating.update({
       where: { id: ratingId, status: RatingStatus.approved },
