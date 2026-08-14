@@ -33,6 +33,34 @@ what they test.
   direct — they are read-models. **Writes must go through the domain service.**
   Don't add new direct-write bypasses; when you touch one, migrate it (§15).
 
+### Folder layout inside a module
+
+A module folder is a table of contents. Once it passes **~10 flat files** it
+stops being one, so it gets subfolders — and only from this vocabulary, so
+every module reads the same way:
+
+| Folder      | What belongs in it                                                                                     |
+| ----------- | ------------------------------------------------------------------------------------------------------ |
+| `dto/`      | class-validator input DTOs and response DTOs                                                           |
+| `helpers/`  | anything with no DI: `*.helper.ts`, `*.constants.ts`, `*-policy.ts`, `*.state-machine.ts`, type files  |
+| `jobs/`     | `*.scheduler.ts`, `*.processor.ts`, `*.listener.ts` — everything that runs under `PROCESS_ROLE=worker` |
+| `<slice>/`  | services sharing one responsibility: `checkout/`, `pricing/`, `refund/`, `reconciliation/`, `clients/` |
+| module root | `<domain>.module.ts`, `<domain>.controller.ts`, the facade `<domain>.service.ts`, `index.ts`           |
+
+The test: opening the folder shows **at most ~8 entries**, and each one says
+what it is without opening it. `auth/` (dto, decorators, guards, strategies,
+interfaces, utils) and `admin/` (catalog, users, orders, trade, finance,
+analytics, ops, jobs) are the worked examples.
+
+- Moving a file is not a rename. Keep the filename — including its `admin-`
+  prefix — so `git mv` stays traceable and the file still matches its class.
+- A slice is named after the **responsibility**, never after the technical kind.
+  There is no `services/` folder: it would tell a reader nothing they didn't
+  already know.
+- Contract specs that walk the tree (`scheduled-processor-role`,
+  `cron-catalog.contract`) recurse on purpose. Keep them depth-agnostic — a
+  spec that reads one level deep silently stops covering anything you move.
+
 ## 2. Services stay single-purpose — split before they grow
 
 The `order` module is the canonical shape: `order-pricing`,
