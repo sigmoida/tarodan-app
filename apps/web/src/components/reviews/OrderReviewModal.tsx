@@ -154,6 +154,7 @@ export default function OrderReviewModal({
                   src={product.imageUrl || PRODUCT_PLACEHOLDER}
                   alt={product.title}
                   fill
+                  sizes="48px"
                   className="object-cover"
                   fallbackSrc={PRODUCT_PLACEHOLDER}
                 />

@@ -6,6 +6,7 @@ import { ChevronRightIcon } from "@heroicons/react/24/outline";
 import { Checkbox } from "@tarodan/ui";
 import { ButtonLink } from "@/components/ui";
 import OptimizedImage from "@/components/OptimizedImage";
+import { IMAGE_SIZES } from "@/lib/imageSizes";
 import { getProductEffectivePrice } from "@/lib/productPrice";
 import { formatTL } from "@/lib/format";
 import { getTradeProductImage, type TradeProduct } from "../_lib/types";
@@ -62,6 +63,7 @@ export default function TradeProductPicker({
                   src={getTradeProductImage(product)}
                   alt={product.title}
                   fill
+                  sizes={IMAGE_SIZES.pickerGrid}
                   className="object-cover"
                   logContext={{
                     productId: product.id,

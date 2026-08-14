@@ -12,7 +12,17 @@ const DEFAULT_PLACEHOLDER =
     `<svg xmlns="http://www.w3.org/2000/svg" width="400" height="400" viewBox="0 0 400 400"><rect fill="${dsColors.surface.alt}" width="400" height="400"/><text fill="${dsColors.text.muted}" x="50%" y="50%" dominant-baseline="middle" text-anchor="middle" font-family="sans-serif" font-size="18">Image</text></svg>`,
   );
 
-/** Default sizes for fill images: responsive grid (e.g. 3 cols desktop, 2 tablet, 1 mobile) */
+/**
+ * `fill` görselleri için SON ÇARE `sizes` değeri.
+ *
+ * Bu bir varsayılan değil, ağ hatası önleyicidir: `sizes` verilmemiş bir `fill`
+ * görselinde Next uyarı basar ve tarayıcı en büyük varyantı indirir. Buradaki
+ * değer "telefonda tam ekran" varsayar — iki sütunlu bir ızgarada bu, gerekenin
+ * iki katı çözünürlük demektir.
+ *
+ * Bu yüzden her çağrı KENDİ `sizes`'ını vermeli; tekrarlanan ızgara düzenleri
+ * için hazır değerler `@/lib/imageSizes`'ta.
+ */
 const DEFAULT_FILL_SIZES =
   "(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw";
 

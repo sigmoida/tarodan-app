@@ -198,6 +198,7 @@ export default function OfferCard({
               src={src}
               alt={offer.product.title}
               fill
+              sizes="(min-width: 768px) 192px, 100vw"
               className="object-cover transition-transform duration-300 group-hover:scale-[1.03]"
               fallbackSrc="https://placehold.co/400x400/f3f4f6/9ca3af?text=Ürün"
               logContext={{ productId: offer.product.id, page: "offers" }}

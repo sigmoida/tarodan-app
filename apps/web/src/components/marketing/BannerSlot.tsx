@@ -73,6 +73,7 @@ function BannerItem({ ad }: { ad: Advertisement }) {
             src={ad.imageUrl}
             alt={ad.altText || ad.title}
             fill
+            sizes="100vw"
             className="object-cover"
             logContext={{ page: "banner", adId: ad.id }}
           />

@@ -45,6 +45,7 @@ export default function CollectionHeaderCard() {
               src={collection.coverImageUrl}
               alt={collection.name}
               fill
+              sizes="(min-width: 768px) 192px, (min-width: 640px) 176px, 128px"
               className="object-cover"
               fallbackSrc="https://placehold.co/400x400/f3f4f6/9ca3af?text=Koleksiyon"
               logContext={{

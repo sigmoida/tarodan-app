@@ -18,6 +18,7 @@ import {
 import { StarIcon } from "@heroicons/react/24/solid";
 import { Badge, Button } from "@tarodan/ui";
 import OptimizedImage from "@/components/OptimizedImage";
+import { IMAGE_SIZES } from "@/lib/imageSizes";
 import { ButtonLink } from "@/components/ui/ButtonLink";
 import { useTranslations } from "next-intl";
 import {
@@ -71,6 +72,7 @@ export default function ListingCard({
           src={getListingImage(listing)}
           alt={listing.title}
           fill
+          sizes={IMAGE_SIZES.productGrid}
           className="object-cover transition-transform duration-300 group-hover:scale-[1.03]"
           fallbackSrc="https://placehold.co/200x200/f3f4f6/9ca3af?text=Ürün"
           logContext={{ listingId: listing.id, page: "profile-listings" }}

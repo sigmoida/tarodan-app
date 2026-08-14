@@ -45,6 +45,7 @@ function ItemColumn({ label, items }: { label: string; items: TradeItem[] }) {
                 src={getItemImage(item)}
                 alt={item.productTitle}
                 fill
+                sizes="64px"
                 className="object-cover"
                 fallbackSrc="https://placehold.co/64x64/f3f4f6/9ca3af?text=Ürün"
                 logContext={{ itemId: item.id, page: "trades-list" }}

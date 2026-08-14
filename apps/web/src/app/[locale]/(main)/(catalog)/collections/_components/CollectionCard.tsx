@@ -8,6 +8,7 @@ import { EyeIcon } from "@heroicons/react/24/outline";
 import { HeartIcon } from "@heroicons/react/24/solid";
 import { useTranslations } from "next-intl";
 import OptimizedImage from "@/components/OptimizedImage";
+import { IMAGE_SIZES } from "@/lib/imageSizes";
 import CollectionVisibilityBadge from "./CollectionVisibilityBadge";
 import { publicNameOf } from "@/lib/public-name";
 
@@ -60,6 +61,7 @@ export default function CollectionCard({
               src={collection.coverImageUrl}
               alt={collection.name}
               fill
+              sizes={IMAGE_SIZES.collectionGrid}
               className="object-cover transition-transform duration-300 group-hover:scale-[1.03]"
               fallbackSrc="https://placehold.co/400x400/f3f4f6/9ca3af?text=Koleksiyon"
               logContext={{ collectionId: collection.id, page: "collections" }}
