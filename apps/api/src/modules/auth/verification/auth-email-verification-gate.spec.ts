@@ -72,6 +72,7 @@ describe("AuthService — email verification gates the session", () => {
       { syncUserConsent: jest.fn() } as any,
       tokens,
       {} as any, // registration — bu suite kayıt yolunu sürmüyor
+      {} as any, // passwords — bu suite şifre yolunu sürmüyor
       {} as any,
     );
     return { service, prisma, tokens };

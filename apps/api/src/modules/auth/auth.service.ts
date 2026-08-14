@@ -31,6 +31,7 @@ import { StorageService } from "../storage/storage.service";
 import { NewsletterService } from "../marketing/newsletter.service";
 import { AuthTokenService } from "./auth-token.service";
 import { AuthRegistrationService } from "./auth-registration.service";
+import { AuthPasswordService } from "./auth-password.service";
 import { GoogleAuthService } from "./social/google-auth.service";
 import { AppleAuthService } from "./social/apple-auth.service";
 import { PaymentService } from "../payment/payment.service";
@@ -61,6 +62,7 @@ export class AuthService {
     private readonly newsletterService: NewsletterService,
     private readonly tokens: AuthTokenService,
     private readonly registration: AuthRegistrationService,
+    private readonly passwords: AuthPasswordService,
     private readonly moduleRef: ModuleRef,
   ) {}
 
@@ -490,119 +492,19 @@ export class AuthService {
   }
 
   /**
-   * Request password reset
-   * POST /auth/forgot-password
-   */
-  async requestPasswordReset(email: string): Promise<void> {
-    // Silinmiş (anonimleştirilmiş) ya da banlı hesaba reset linki gönderme:
-    // findUnique yerine deletedAt:null + banlı filtresi. Yanıt her durumda aynı
-    // (enumeration'a karşı) — sadece link üretimini/gönderimini atlarız.
-    const user = await this.prisma.user.findFirst({
-      where: { email, deletedAt: null, isBanned: false },
-    });
-
-    // Don't reveal if user exists for security
-    // #224: yanıt mesajı AuthController.forgotPassword() tarafından locale'e göre
-    // kuruluyor (server.auth.passwordResetLinkSent) — kullanıcı bulunsun bulunmasın aynı.
-    if (!user) {
-      return;
-    }
-
-    // Generate reset token
-    const resetToken = crypto.randomBytes(32).toString("hex");
-    const hashedToken = crypto
-      .createHash("sha256")
-      .update(resetToken)
-      .digest("hex");
-    const expiresAt = new Date(Date.now() + 3600000); // 1 hour
-
-    // Delete existing tokens for this user
-    await this.prisma.passwordResetToken.deleteMany({
-      where: { userId: user.id },
-    });
-
-    // Create new token
-    await this.prisma.passwordResetToken.create({
-      data: {
-        userId: user.id,
-        token: hashedToken,
-        expiresAt,
-      },
-    });
-
-    // Send email with reset link using NotificationService
-    await this.notificationService.sendPasswordResetEmail(user.id, resetToken);
-  }
-
-  /**
-   * Reset password with token
-   * POST /auth/reset-password
-   */
-  async resetPassword(token: string, newPassword: string): Promise<void> {
-    // Hash the token to compare
-    const hashedToken = crypto.createHash("sha256").update(token).digest("hex");
-
-    // Find token
-    const resetToken = await this.prisma.passwordResetToken.findUnique({
-      where: { token: hashedToken },
-      include: { user: true },
-    });
-
-    if (!resetToken) {
-      throw new BadRequestException(
-        i18nMessage("server.auth.resetTokenInvalidOrExpired"),
-      );
-    }
-
-    if (resetToken.usedAt) {
-      throw new BadRequestException(
-        i18nMessage("server.auth.resetTokenAlreadyUsed"),
-      );
-    }
-
-    if (resetToken.expiresAt < new Date()) {
-      throw new BadRequestException(
-        i18nMessage("server.auth.resetTokenExpired"),
-      );
-    }
-
-    // Silinmiş/banlı hesap için token geçerli olsa bile parola set etme.
-    if (resetToken.user.deletedAt || resetToken.user.isBanned) {
-      throw new BadRequestException(
-        i18nMessage("server.auth.resetTokenInvalidOrExpired"),
-      );
-    }
-
-    // Hash new password
-    const passwordHash = await bcrypt.hash(newPassword, 12);
-
-    // Update user password
-    await this.prisma.user.update({
-      where: { id: resetToken.userId },
-      data: { passwordHash },
-    });
-
-    // Mark token as used
-    await this.prisma.passwordResetToken.update({
-      where: { id: resetToken.id },
-      data: { usedAt: new Date() },
-    });
-
-    // Parola değişti → mevcut tüm refresh token'ları (session'ları) iptal et.
-    // Bir hesap kurtarma/ele geçirme savunmasının parçasıysa, eski oturumlar
-    // (ör. saldırgan) anında düşer; kullanıcı yeniden giriş yapar.
-    await this.prisma.refreshToken.updateMany({
-      where: { userId: resetToken.userId, revokedAt: null },
-      data: { revokedAt: new Date() },
-    });
-
-    // #224: başarı mesajı AuthController.resetPassword() tarafından locale'e göre
-    // kuruluyor (server.auth.passwordResetSuccess).
-  }
-
-  /**
    * Verilen userId için AuthResponseDto üretir (login response ile aynı şekil).
    */
+  // ────────────────────────── şifre sıfırlama ──────────────────────────
+  // Controller bu servisi adresliyor; gövde AuthPasswordService'te.
+
+  requestPasswordReset(email: string): Promise<void> {
+    return this.passwords.requestPasswordReset(email);
+  }
+
+  resetPassword(token: string, newPassword: string): Promise<void> {
+    return this.passwords.resetPassword(token, newPassword);
+  }
+
   private async buildUserAuthResponse(
     userId: string,
   ): Promise<AuthResponseDto> {

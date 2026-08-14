@@ -5,6 +5,7 @@ import { ConfigModule, ConfigService } from "@nestjs/config";
 import { AuthService } from "./auth.service";
 import { AuthTokenService } from "./auth-token.service";
 import { AuthRegistrationService } from "./auth-registration.service";
+import { AuthPasswordService } from "./auth-password.service";
 import { AuthController } from "./auth.controller";
 import { AdminAuthController } from "./admin-auth.controller";
 import {
@@ -50,6 +51,7 @@ import { MarketingModule } from "../marketing/marketing.module";
     AuthService,
     AuthTokenService,
     AuthRegistrationService,
+    AuthPasswordService,
     GoogleAuthService,
     AppleAuthService,
     JwtStrategy,
