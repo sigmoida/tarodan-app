@@ -11,6 +11,7 @@ import {
   fulltextCollectionSearch,
   fulltextUserDisplayNameSearch,
 } from "../../common/helpers/fulltext-search";
+import { generateSlug } from "../../common/helpers/slug";
 import {
   CreateCollectionDto,
   UpdateCollectionDto,
@@ -98,7 +99,7 @@ export class CollectionCrudService {
     }
 
     // Generate slug from name
-    const slug = this.generateSlug(dto.name);
+    const slug = generateSlug(dto.name);
 
     // Check if slug already exists for user
     const existing = await this.prisma.collection.findUnique({
@@ -808,7 +809,7 @@ export class CollectionCrudService {
 
     let newSlug = collection.slug;
     if (dto.name && dto.name !== collection.name) {
-      newSlug = this.generateSlug(dto.name);
+      newSlug = generateSlug(dto.name);
 
       // Check if new slug already exists
       const existing = await this.prisma.collection.findFirst({
@@ -879,15 +880,5 @@ export class CollectionCrudService {
     await this.prisma.collection.delete({
       where: { id: collectionId },
     });
-  }
-
-  // ==========================================================================
-  // HELPER METHODS
-  // ==========================================================================
-  private generateSlug(name: string): string {
-    return name
-      .toLowerCase()
-      .replace(/[^a-z0-9çğıöşü]+/g, "-")
-      .replace(/^-|-$/g, "");
   }
 }

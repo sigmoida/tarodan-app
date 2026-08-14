@@ -2,6 +2,7 @@ import { Injectable, NotFoundException } from "@nestjs/common";
 import { PrismaService } from "../../prisma";
 import { CacheService } from "../cache/cache.service";
 import { StorageService } from "../storage/storage.service";
+import { BRANDS_ALL_CACHE_KEY, brandSlugCacheKey } from "./brand-cache";
 import { resolveBrandLogoUrl } from "./brand-logo-url";
 import { saleCapableSellerWhere } from "../membership/membership.util";
 import { catalogProductWhere } from "../product/helpers/catalog-product-where";
@@ -25,7 +26,7 @@ export class BrandService {
    * Get all active brands with product counts
    */
   async findAll() {
-    const cacheKey = "brands:all";
+    const cacheKey = BRANDS_ALL_CACHE_KEY;
 
     return this.cache.getOrSet(
       cacheKey,
@@ -67,7 +68,7 @@ export class BrandService {
    * Get brand by slug with product count
    */
   async findBySlug(slug: string) {
-    const cacheKey = `brands:slug:${slug}`;
+    const cacheKey = brandSlugCacheKey(slug);
 
     return this.cache.getOrSet(
       cacheKey,
