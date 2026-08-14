@@ -8,6 +8,7 @@
     ".": "./src/index.ts",
     "./form": "./src/form.ts",
     "./utils": "./src/lib/utils.ts",
+    "./hooks": "./src/hooks/index.ts",
     "./logo": "./src/components/Logo.tsx",
     "./spinner": "./src/components/Spinner.tsx",
     "./alert": "./src/components/Alert.tsx"

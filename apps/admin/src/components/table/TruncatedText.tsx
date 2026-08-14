@@ -1,14 +1,13 @@
 "use client";
 
 import {
-  useEffect,
   useLayoutEffect,
-  useRef,
   useState,
   type ReactNode,
   type SyntheticEvent,
 } from "react";
 import { createPortal } from "react-dom";
+import { useAnchoredPopover } from "@tarodan/ui/hooks";
 import { useMediaQuery } from "@/hooks/useMediaQuery";
 import { NO_HOVER_MEDIA_QUERY } from "@/lib/breakpoints";
 import { cn } from "@/lib/utils";
@@ -38,12 +37,23 @@ export function TruncatedText({
   className?: string;
 }) {
   const isTouch = useMediaQuery(NO_HOVER_MEDIA_QUERY);
-  const ref = useRef<HTMLSpanElement>(null);
-  const popoverRef = useRef<HTMLDivElement>(null);
   const [truncated, setTruncated] = useState(false);
-  const [open, setOpen] = useState(false);
-  const [pos, setPos] = useState<{ top: number; left: number } | null>(null);
   const title = typeof children === "string" ? children : undefined;
+
+  const {
+    open,
+    toggle,
+    triggerRef: ref,
+    popoverRef,
+    pos,
+  } = useAnchoredPopover<HTMLSpanElement>({
+    offsetY: 6,
+    width: POPOVER_MAX_WIDTH,
+    viewportMargin: VIEWPORT_MARGIN,
+    // Re-measuring a small text popover on every scroll tick isn't worth
+    // it — just close it, matching the previous behavior here.
+    onViewportChange: "close",
+  });
 
   useLayoutEffect(() => {
     const el = ref.current;
@@ -53,54 +63,13 @@ export function TruncatedText({
     const ro = new ResizeObserver(check);
     ro.observe(el);
     return () => ro.disconnect();
-  }, [children]);
-
-  useEffect(() => {
-    if (!open) return;
-    const close = () => setOpen(false);
-    const onDown = (e: MouseEvent) => {
-      const target = e.target as Node;
-      if (ref.current?.contains(target) || popoverRef.current?.contains(target))
-        return;
-      close();
-    };
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") close();
-    };
-    document.addEventListener("mousedown", onDown);
-    document.addEventListener("keydown", onKey);
-    window.addEventListener("resize", close);
-    window.addEventListener("scroll", close, true);
-    return () => {
-      document.removeEventListener("mousedown", onDown);
-      document.removeEventListener("keydown", onKey);
-      window.removeEventListener("resize", close);
-      window.removeEventListener("scroll", close, true);
-    };
-  }, [open]);
+  }, [children, ref]);
 
   const reveal = (e: SyntheticEvent) => {
     if (!truncated || !title) return;
     e.stopPropagation();
     e.preventDefault();
-    if (open) {
-      setOpen(false);
-      return;
-    }
-    const rect = ref.current?.getBoundingClientRect();
-    if (rect) {
-      setPos({
-        top: rect.bottom + 6,
-        left: Math.max(
-          VIEWPORT_MARGIN,
-          Math.min(
-            rect.left,
-            window.innerWidth - POPOVER_MAX_WIDTH - VIEWPORT_MARGIN,
-          ),
-        ),
-      });
-    }
-    setOpen(true);
+    toggle();
   };
 
   // Only intercept the click on touch — hover-capable devices must let it

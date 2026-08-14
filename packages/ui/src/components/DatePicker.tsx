@@ -2,14 +2,7 @@
 
 "use client";
 
-import {
-  useCallback,
-  useEffect,
-  useLayoutEffect,
-  useMemo,
-  useRef,
-  useState,
-} from "react";
+import { useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import {
   CalendarDaysIcon,
@@ -17,10 +10,10 @@ import {
   ChevronRightIcon,
 } from "@heroicons/react/24/outline";
 import { cn } from "../lib/utils";
+import { useAnchoredPopover } from "../hooks/useAnchoredPopover";
 
 /** `w-72` in px — kept in sync with the popover panel's width class below. */
 const POPOVER_WIDTH = 288;
-const VIEWPORT_MARGIN = 16;
 
 export interface DatePickerProps {
   /** ISO date string `yyyy-mm-dd` (the native `<input type="date">` value). */
@@ -83,13 +76,18 @@ export function DatePicker({
   clearLabel = "Temizle",
   ...aria
 }: DatePickerProps) {
-  const [open, setOpen] = useState(false);
-  const triggerRef = useRef<HTMLButtonElement>(null);
-  const popoverRef = useRef<HTMLDivElement>(null);
-  const [popoverPos, setPopoverPos] = useState<{
-    top: number;
-    left: number;
-  } | null>(null);
+  const {
+    open,
+    toggle,
+    close,
+    triggerRef,
+    popoverRef,
+    pos: popoverPos,
+  } = useAnchoredPopover<HTMLButtonElement>({
+    offsetY: 8,
+    width: POPOVER_WIDTH,
+    viewportMargin: 16,
+  });
   const selected = parseISO(value);
 
   const today = useMemo(() => {
@@ -119,64 +117,6 @@ export function DatePicker({
     const p = parseISO(value);
     if (p) setView({ y: p.y, m: p.m });
   }, [value]);
-
-  // Popover is portaled to <body> (see below) so it can escape any clipping/
-  // scrolling ancestor (e.g. a toolbar with overflow-x-auto). Outside-click
-  // detection has to check both the trigger AND the portaled panel.
-  useEffect(() => {
-    if (!open) return;
-    const onDown = (e: MouseEvent) => {
-      const target = e.target as Node;
-      if (
-        triggerRef.current?.contains(target) ||
-        popoverRef.current?.contains(target)
-      )
-        return;
-      setOpen(false);
-    };
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setOpen(false);
-    };
-    document.addEventListener("mousedown", onDown);
-    document.addEventListener("keydown", onKey);
-    return () => {
-      document.removeEventListener("mousedown", onDown);
-      document.removeEventListener("keydown", onKey);
-    };
-  }, [open]);
-
-  const updatePosition = useCallback(() => {
-    const rect = triggerRef.current?.getBoundingClientRect();
-    if (!rect) return;
-    setPopoverPos({
-      top: rect.bottom + 8,
-      left: Math.max(
-        VIEWPORT_MARGIN,
-        Math.min(
-          rect.left,
-          window.innerWidth - POPOVER_WIDTH - VIEWPORT_MARGIN,
-        ),
-      ),
-    });
-  }, []);
-
-  // Position against the trigger's viewport rect (fixed positioning), and
-  // keep it in sync while open — the trigger can move under an ancestor
-  // scroll (e.g. the toolbar itself) or a viewport resize.
-  useLayoutEffect(() => {
-    if (!open) return;
-    updatePosition();
-  }, [open, updatePosition]);
-
-  useEffect(() => {
-    if (!open) return;
-    window.addEventListener("resize", updatePosition);
-    window.addEventListener("scroll", updatePosition, true);
-    return () => {
-      window.removeEventListener("resize", updatePosition);
-      window.removeEventListener("scroll", updatePosition, true);
-    };
-  }, [open, updatePosition]);
 
   const isDisabledDay = (y: number, m: number, d: number) => {
     const iso = toISO(y, m, d);
@@ -249,7 +189,7 @@ export function DatePicker({
   const pick = (y: number, m: number, d: number) => {
     if (isDisabledDay(y, m, d)) return;
     onChange(toISO(y, m, d));
-    setOpen(false);
+    close();
   };
 
   return (
@@ -268,7 +208,7 @@ export function DatePicker({
           type="button"
           id={id}
           disabled={disabled}
-          onClick={() => setOpen((o) => !o)}
+          onClick={toggle}
           aria-haspopup="dialog"
           aria-expanded={open}
           aria-label={aria["aria-label"] ?? label}
@@ -423,7 +363,7 @@ export function DatePicker({
                   type="button"
                   onClick={() => {
                     onChange("");
-                    setOpen(false);
+                    close();
                   }}
                   className="font-medium text-muted hover:text-heading"
                 >
