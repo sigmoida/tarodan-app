@@ -498,7 +498,7 @@ export class BarcodeRetryService {
 
     if (returns.length > 0) {
       const { AdminTradeWarehouseService } =
-        await import("../admin/admin-trade-warehouse.service");
+        await import("../admin/trade/admin-trade-warehouse.service");
       const warehouseSvc = this.moduleRef.get(AdminTradeWarehouseService, {
         strict: false,
       });

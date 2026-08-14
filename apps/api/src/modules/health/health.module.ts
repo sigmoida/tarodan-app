@@ -9,7 +9,7 @@ import { HealthService } from "./health.service";
 import { PrismaModule } from "../../prisma";
 import { WorkerHeartbeatService } from "./worker-heartbeat.service";
 import { AuthModule } from "../auth";
-import { AdminTradeCommonService } from "../admin/admin-trade-common.service";
+import { AdminTradeCommonService } from "../admin/trade/admin-trade-common.service";
 import { BullModule } from "@nestjs/bull";
 import { QUEUE_NAMES } from "../../workers/constants";
 

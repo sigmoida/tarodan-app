@@ -5,7 +5,7 @@ import {
 } from "@nestjs/common";
 import { MembershipTier, MembershipTierType } from "@prisma/client";
 import { PrismaService } from "../../prisma";
-import { AdminAuditService } from "../admin/admin-audit.service";
+import { AdminAuditService } from "../admin/ops/admin-audit.service";
 import { i18nMessage } from "../i18n";
 import { MAX_PRODUCT_IMAGES } from "../product/helpers/product-image-keys";
 import { invalidateFreeTierCanTradeCache } from "./free-tier-trade.helper";

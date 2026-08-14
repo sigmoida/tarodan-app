@@ -18,7 +18,7 @@ import { PrismaService } from "../../prisma";
 import { CacheService } from "../cache/cache.service";
 import { CommissionRuleSetStatus, MembershipTierType } from "@prisma/client";
 import { SHIPPING_PACKAGE_TIER_ORDER } from "../shipping/shipping-package-tier";
-import { AdminTradeCommonService } from "../admin/admin-trade-common.service";
+import { AdminTradeCommonService } from "../admin/trade/admin-trade-common.service";
 import { getProcessRole } from "../../process-role";
 import { WORKER_HEARTBEAT_KEY } from "./worker-heartbeat.service";
 import { validateStrictCommissionCoverage } from "../order/order-commission.helper";

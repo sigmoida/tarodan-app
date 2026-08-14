@@ -1,5 +1,5 @@
 import { TradeStatus } from "@prisma/client";
-import { AdminTradeWarehouseService } from "../admin/admin-trade-warehouse.service";
+import { AdminTradeWarehouseService } from "../admin/trade/admin-trade-warehouse.service";
 import { refundableAmountFor } from "./trade-refund-policy";
 
 /**
@@ -51,13 +51,11 @@ describe("kusursuz taraf işaretlemesi", () => {
         {
           $transaction: jest.fn((cb: any) => cb(tx)),
           trade: {
-            findUnique: jest
-              .fn()
-              .mockResolvedValue({
-                id: "trade-1",
-                status: TradeStatus.at_warehouse,
-                shipments: [],
-              }),
+            findUnique: jest.fn().mockResolvedValue({
+              id: "trade-1",
+              status: TradeStatus.at_warehouse,
+              shipments: [],
+            }),
           },
           user: { findUnique: jest.fn().mockResolvedValue({}) },
           tradeShipment: { update: jest.fn() },
