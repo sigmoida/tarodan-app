@@ -1,4 +1,3 @@
-import { ConfigService } from "@nestjs/config";
 import { OrderStatus } from "@prisma/client";
 import { SellerInvoiceService } from "./seller-invoice.service";
 
@@ -13,12 +12,6 @@ import { SellerInvoiceService } from "./seller-invoice.service";
  *    ORDERS_DELIVERED_UNINVOICED alarmının satıcı tarafındaki karşılığı),
  *  - satıcıya sipariş başına TEK hatırlatma gönderir.
  */
-
-function fakeConfig(): ConfigService {
-  return {
-    get: (_k: string, d?: string) => d,
-  } as unknown as ConfigService;
-}
 
 function makePrisma(orders: any[]) {
   const store: any = {
@@ -84,12 +77,7 @@ const NOW = new Date("2026-08-04T00:00:00.000Z");
 describe("SellerInvoiceService.remindMissing", () => {
   it("faturasız kalan kurumsal siparişleri sayar", async () => {
     const prisma = makePrisma([deliveredOrder("o1"), deliveredOrder("o2")]);
-    const svc = new SellerInvoiceService(
-      prisma as any,
-      {} as any,
-      makeSmtp(),
-      fakeConfig(),
-    );
+    const svc = new SellerInvoiceService(prisma as any, {} as any, makeSmtp());
 
     const result = await svc.remindMissing({ deadlineDays: 7, now: NOW });
     expect(result.missing).toBe(2);
@@ -98,12 +86,7 @@ describe("SellerInvoiceService.remindMissing", () => {
   it("satıcıya hatırlatma gönderir ve siparişi işaretler", async () => {
     const prisma = makePrisma([deliveredOrder("o1")]);
     const smtp = makeSmtp();
-    const svc = new SellerInvoiceService(
-      prisma as any,
-      {} as any,
-      smtp,
-      fakeConfig(),
-    );
+    const svc = new SellerInvoiceService(prisma as any, {} as any, smtp);
 
     const result = await svc.remindMissing({ deadlineDays: 7, now: NOW });
 
@@ -118,12 +101,7 @@ describe("SellerInvoiceService.remindMissing", () => {
       deliveredOrder("o1", { sellerInvoiceReminderAt: new Date() }),
     ]);
     const smtp = makeSmtp();
-    const svc = new SellerInvoiceService(
-      prisma as any,
-      {} as any,
-      smtp,
-      fakeConfig(),
-    );
+    const svc = new SellerInvoiceService(prisma as any, {} as any, smtp);
 
     const result = await svc.remindMissing({ deadlineDays: 7, now: NOW });
 
@@ -137,12 +115,7 @@ describe("SellerInvoiceService.remindMissing", () => {
     const prisma = makePrisma([
       deliveredOrder("o1", { sellerUploadedInvoice: { id: "inv1" } }),
     ]);
-    const svc = new SellerInvoiceService(
-      prisma as any,
-      {} as any,
-      makeSmtp(),
-      fakeConfig(),
-    );
+    const svc = new SellerInvoiceService(prisma as any, {} as any, makeSmtp());
 
     expect(await svc.remindMissing({ deadlineDays: 7, now: NOW })).toEqual({
       missing: 0,
@@ -163,12 +136,7 @@ describe("SellerInvoiceService.remindMissing", () => {
         },
       }),
     ]);
-    const svc = new SellerInvoiceService(
-      prisma as any,
-      {} as any,
-      makeSmtp(),
-      fakeConfig(),
-    );
+    const svc = new SellerInvoiceService(prisma as any, {} as any, makeSmtp());
 
     expect(
       (await svc.remindMissing({ deadlineDays: 7, now: NOW })).missing,
@@ -181,12 +149,7 @@ describe("SellerInvoiceService.remindMissing", () => {
         deliveredAt: new Date("2026-08-03T00:00:00.000Z"), // 1 gün önce
       }),
     ]);
-    const svc = new SellerInvoiceService(
-      prisma as any,
-      {} as any,
-      makeSmtp(),
-      fakeConfig(),
-    );
+    const svc = new SellerInvoiceService(prisma as any, {} as any, makeSmtp());
 
     expect(
       (await svc.remindMissing({ deadlineDays: 7, now: NOW })).missing,
@@ -200,12 +163,7 @@ describe("SellerInvoiceService.remindMissing", () => {
         throw new Error("smtp down");
       }),
     } as any;
-    const svc = new SellerInvoiceService(
-      prisma as any,
-      {} as any,
-      smtp,
-      fakeConfig(),
-    );
+    const svc = new SellerInvoiceService(prisma as any, {} as any, smtp);
 
     const result = await svc.remindMissing({ deadlineDays: 7, now: NOW });
 
@@ -228,12 +186,7 @@ describe("SellerInvoiceService.remindMissing", () => {
       deliveredOrder("o2"),
     ]);
     const smtp = makeSmtp();
-    const svc = new SellerInvoiceService(
-      prisma as any,
-      {} as any,
-      smtp,
-      fakeConfig(),
-    );
+    const svc = new SellerInvoiceService(prisma as any, {} as any, smtp);
 
     const result = await svc.remindMissing({ deadlineDays: 7, now: NOW });
     expect(result.missing).toBe(2);
@@ -264,12 +217,7 @@ describe("SellerInvoiceService.getForOrder — satıcı fatura keser mi", () => 
         findUnique: jest.fn(async () => ({ ...seller, membership: null })),
       },
     };
-    return new SellerInvoiceService(
-      prisma as any,
-      {} as any,
-      makeSmtp(),
-      fakeConfig(),
-    );
+    return new SellerInvoiceService(prisma as any, {} as any, makeSmtp());
   };
 
   it("kurumsal satıcıda fatura beklenir", async () => {

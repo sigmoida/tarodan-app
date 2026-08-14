@@ -81,7 +81,6 @@ describe("PushWorker — teklif bildirimi mükerrer filtresi", () => {
       { send } as never,
       {} as never,
       {} as never,
-      {} as never,
     );
 
     await commerce.notifyOfferAccepted(

@@ -27,7 +27,6 @@ describe("bildirim üreticileri hedef kitleyi taşır", () => {
         { send } as never,
         {} as never,
         {} as never,
-        {} as never,
       );
       return { send, service };
     };

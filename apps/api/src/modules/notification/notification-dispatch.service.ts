@@ -8,7 +8,6 @@
  * to this single engine.
  */
 import { Injectable, Logger, NotFoundException } from "@nestjs/common";
-import { ConfigService } from "@nestjs/config";
 import { PrismaService } from "../../prisma";
 import { i18nMessage } from "../i18n";
 import {
@@ -56,7 +55,6 @@ export class NotificationDispatchService {
 
   constructor(
     private readonly prisma: PrismaService,
-    private readonly configService: ConfigService,
     private readonly expoPushProvider: ExpoPushProvider,
     private readonly smsProvider: SmsProvider,
     private readonly smtpProvider: SmtpProvider,

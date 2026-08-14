@@ -75,6 +75,7 @@ import {
   toPublicIdentity,
 } from "../../common/helpers/public-identity";
 import { adminUrl } from "../../config/app-urls";
+import { platformWarehouseAddress } from "../../config/warehouse";
 
 /**
  * Cayma (iade talep) penceresi — satıcı payout takvimiyle AYNI kaynaktan gelir
@@ -3129,19 +3130,11 @@ export class RefundService {
 
   /**
    * Satıcının kayıtlı adresi olmadığında iade kargosunun gideceği Tarodan deposu
-   * adresi. Takas akışıyla (trade.service) aynı env kaynağını kullanır; env yoksa
+   * adresi — takas akışıyla TEK kaynaktan (config/warehouse) gelir; env yoksa
    * mantıklı varsayılanlara düşer (asla null dönmez) → adressiz satıcı iadeyi bloke etmez.
    */
   private warehouseReturnAddress() {
-    return {
-      fullName: process.env.TARODAN_WAREHOUSE_NAME?.trim() || "Tarodan Depo",
-      address:
-        process.env.TARODAN_WAREHOUSE_ADDRESS?.trim() ||
-        "Tarodan Merkez Depo Adresi",
-      city: process.env.TARODAN_WAREHOUSE_CITY?.trim() || "Istanbul",
-      district: process.env.TARODAN_WAREHOUSE_DISTRICT?.trim() || "Maltepe",
-      phone: process.env.TARODAN_WAREHOUSE_PHONE?.trim() || "05000000000",
-    };
+    return platformWarehouseAddress();
   }
 
   // NOT (M4): iade barkodu için ayrı bir retry yüzeyi YOK — bilinçli.

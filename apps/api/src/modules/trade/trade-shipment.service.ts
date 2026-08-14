@@ -17,6 +17,7 @@ import { CacheService } from "../cache/cache.service";
 import { NotificationService } from "../notification/notification.service";
 import { NotificationType } from "../notification/dto";
 import { CarrierCancellationService } from "../surat-cargo/carrier-cancellation.service";
+import { platformWarehouseAddress } from "../../config/warehouse";
 
 type CargoShipmentDetails = Omit<
   CargoShipmentRequest,
@@ -463,20 +464,15 @@ export class TradeShipmentService {
     if (!fromAddress) return null;
 
     // Sürat payload fields below describe the destination (alıcı). For inbound
-    // legs, destination is the Tarodan warehouse. We pull warehouse contact
-    // info from env so non-cash trades & cash trades alike share the same
-    // source. Defaults match Tarodan HQ (override via env).
-    const warehouseName =
-      process.env.TARODAN_WAREHOUSE_NAME?.trim() || "Tarodan Depo";
-    const warehouseAddress =
-      process.env.TARODAN_WAREHOUSE_ADDRESS?.trim() ||
-      "Tarodan Merkez Depo Adresi";
-    const warehouseCity =
-      process.env.TARODAN_WAREHOUSE_CITY?.trim() || "Istanbul";
-    const warehouseDistrict =
-      process.env.TARODAN_WAREHOUSE_DISTRICT?.trim() || "Maltepe";
-    const warehousePhone =
-      process.env.TARODAN_WAREHOUSE_PHONE?.trim() || "05000000000";
+    // legs, destination is the Tarodan warehouse — one source shared with the
+    // refund return leg (config/warehouse), so the two can never drift apart.
+    const {
+      fullName: warehouseName,
+      address: warehouseAddress,
+      city: warehouseCity,
+      district: warehouseDistrict,
+      phone: warehousePhone,
+    } = platformWarehouseAddress();
 
     const senderLabel =
       fromAddress.fullName ||

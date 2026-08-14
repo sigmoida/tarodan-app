@@ -4,7 +4,6 @@
  * and delegates delivery to the shared NotificationDispatchService engine.
  */
 import { Injectable, Logger } from "@nestjs/common";
-import { ConfigService } from "@nestjs/config";
 import { PrismaService } from "../../prisma";
 import { NotificationType, NotificationChannel } from "./dto";
 import type { NotificationAudience } from "./notification-link";
@@ -19,7 +18,6 @@ export class NotificationCommerceService {
   constructor(
     private readonly dispatch: NotificationDispatchService,
     private readonly prisma: PrismaService,
-    private readonly configService: ConfigService,
     private readonly storageService: StorageService,
   ) {}
 

@@ -5,7 +5,6 @@ import {
   ForbiddenException,
   NotFoundException,
 } from "@nestjs/common";
-import { ConfigService } from "@nestjs/config";
 import { BusinessStatus, OrderStatus, Prisma } from "@prisma/client";
 import { PrismaService } from "../../prisma";
 import { i18nMessage } from "../i18n";
@@ -38,7 +37,6 @@ export class SellerInvoiceService {
     private readonly prisma: PrismaService,
     private readonly storage: StorageService,
     private readonly smtp: SmtpProvider,
-    private readonly config: ConfigService,
   ) {}
 
   /** Yalnız efektif Business üyeliği ve onaylı şirket kimliği fatura yükleyebilir. */

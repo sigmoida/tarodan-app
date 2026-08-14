@@ -17,7 +17,6 @@ import {
   NotFoundException,
   ServiceUnavailableException,
 } from "@nestjs/common";
-import { ConfigService } from "@nestjs/config";
 import { PrismaService } from "../../prisma";
 import { StorageService } from "../storage/storage.service";
 import { NotificationService } from "../notification/notification.service";
@@ -35,7 +34,6 @@ export class InvoiceService {
 
   constructor(
     private readonly prisma: PrismaService,
-    private readonly configService: ConfigService,
     private readonly storageService: StorageService,
     private readonly notificationService: NotificationService,
     private readonly smtpProvider: SmtpProvider,
