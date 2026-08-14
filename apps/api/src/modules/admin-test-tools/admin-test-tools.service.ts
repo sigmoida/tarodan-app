@@ -4,6 +4,7 @@ import type { Queue } from "bull";
 import { PrismaService } from "../../prisma";
 import { QUEUE_NAMES } from "../../workers/constants";
 import { CRON_CATALOG } from "../../workers/cron-catalog";
+import { nodeEnv } from "../../config/environment";
 
 /**
  * Admin "Test Araçları / Zaman Makinesi" arka uç mantığı.
@@ -50,7 +51,7 @@ export class AdminTestToolsService {
 
   // ─────────────────────────── Ortam ───────────────────────────
   getEnvironment(): { env: string; isProd: boolean } {
-    const env = process.env.NODE_ENV ?? "development";
+    const env = nodeEnv() ?? "development";
     return { env, isProd: env === "production" };
   }
 

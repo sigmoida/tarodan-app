@@ -24,6 +24,7 @@ import { WORKER_HEARTBEAT_KEY } from "./worker-heartbeat.service";
 import { validateStrictCommissionCoverage } from "../order/order-commission.helper";
 import { QUEUE_NAMES } from "../../workers/constants";
 import { CRON_CATALOG } from "../../workers/cron-catalog";
+import { isProduction } from "../../config/environment";
 
 /**
  * Bu sayıda DLQ (`dead`) outbox satırı biriktiğinde instance hazır-değil sayılır:
@@ -165,7 +166,7 @@ export class HealthService {
   }
 
   private async checkWorker(): Promise<boolean> {
-    if (process.env.NODE_ENV !== "production") return true;
+    if (!isProduction()) return true;
     if (!this.scheduledQueue) return false;
 
     try {
@@ -211,7 +212,7 @@ export class HealthService {
    * Hazır-DEĞİL yalnızca kurtarılamayan birikme (DLQ eşiği) için verilir.
    */
   private async checkOutbox(): Promise<boolean> {
-    if (process.env.NODE_ENV !== "production") return true;
+    if (!isProduction()) return true;
 
     try {
       const staleProcessingBefore = new Date(Date.now() - 5 * 60_000);
@@ -244,7 +245,7 @@ export class HealthService {
   }
 
   private async checkBusinessConfig(): Promise<boolean> {
-    if (process.env.NODE_ENV !== "production") return true;
+    if (!isProduction()) return true;
 
     try {
       const [

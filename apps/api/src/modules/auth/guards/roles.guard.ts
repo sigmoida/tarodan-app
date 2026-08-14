@@ -16,6 +16,7 @@ import {
   migrateLegacyPermissions,
 } from "../../admin/dto/role-permissions.dto";
 import { i18nMessage } from "../../i18n";
+import { isTest } from "../../../config/environment";
 
 // ── URL → izin anahtarı eşleşmesi ──────────────────────────────────────────
 //
@@ -240,7 +241,7 @@ export class RolesGuard implements CanActivate {
     // Testte cache'i devre dışı bırak: e2e suite'lerinde izin matrisi test-içi
     // değiştirilir (grantAdminPermissions) ve 60s cache testler arası sızarak
     // yük altında bayat kalabiliyor → deterministik davranış için her çağrıda taze oku.
-    const ttl = process.env.NODE_ENV === "test" ? 0 : CACHE_TTL_MS;
+    const ttl = isTest() ? 0 : CACHE_TTL_MS;
     if (this.cache && now - this.cache.at < ttl) {
       return this.cache.data;
     }

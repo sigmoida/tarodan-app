@@ -16,6 +16,7 @@ import {
   publicProductRatingWhere,
   publicUserRatingWhere,
 } from "../../common/helpers/public-rating";
+import { isDevelopment } from "../../config/environment";
 
 /**
  * ProductCommonService — ürün alt servislerinin paylaştığı yardımcılar (leaf; yalnız
@@ -615,7 +616,7 @@ export class ProductCommonService {
     if (unknown.length && options.rejectUnknown) {
       throw new Error(`aktif katalogda bulunamadı: ${unknown.join(", ")}`);
     }
-    if (unknown.length && process.env.NODE_ENV === "development") {
+    if (unknown.length && isDevelopment()) {
       this.logger.warn(
         `Unknown product attribute(s) ignored: ${unknown.join(", ")}`,
       );

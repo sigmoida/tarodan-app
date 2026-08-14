@@ -26,6 +26,7 @@ import { PaymentLifecycleService } from "./payment-lifecycle.service";
 import { PaymentProviderEventService } from "./payment-provider-event.service";
 import { i18nMessage } from "../i18n";
 import { primaryCashPayment, TRADE_PRICING_V2 } from "../trade/trade.constants";
+import { isProduction } from "../../config/environment";
 
 @Injectable()
 export class PaymentInitiationService {
@@ -1474,7 +1475,7 @@ export class PaymentInitiationService {
     // SEC-H1: Bypass ASLA production'da çalışmaz — PAYMENT_BYPASS yanlışlıkla "true"
     // olsa bile. Bir config hatasının prod'da PARASIZ ödeme tamamlamasını engelleyen
     // SERT güvenlik ağı (endpoint ayrıca JWT auth + ownership ister).
-    if (process.env.NODE_ENV === "production") {
+    if (isProduction()) {
       throw new ForbiddenException("Payment bypass is disabled in production");
     }
     const bypassEnabled = this.configService.get("PAYMENT_BYPASS") === "true";

@@ -22,9 +22,10 @@ import { Queue } from "bull";
 import { QUEUE_NAMES } from "../../workers/constants";
 import { NotificationDispatchService } from "../notification/notification-dispatch.service";
 import { isKnownNotificationType } from "../notification/notification-link";
+import { isTest, nodeEnv } from "../../config/environment";
 
 function assertTestEnv(): void {
-  if (process.env.NODE_ENV !== "test") {
+  if (!isTest()) {
     throw new NotFoundException();
   }
 }
@@ -376,7 +377,7 @@ export class DevController {
       const d: any[] = await this.prisma.$queryRawUnsafe(
         `SELECT current_database() AS db, (SELECT count(*)::int FROM information_schema.tables WHERE table_name='_seed_products') AS hasseed`,
       );
-      dbInfo = `db=${d?.[0]?.db} hasseed=${d?.[0]?.hasseed} tdb=${(process.env.TEST_DATABASE_URL || "NONE").slice(-22)} ne=${process.env.NODE_ENV} pid=${process.pid}`;
+      dbInfo = `db=${d?.[0]?.db} hasseed=${d?.[0]?.hasseed} tdb=${(process.env.TEST_DATABASE_URL || "NONE").slice(-22)} ne=${nodeEnv()} pid=${process.pid}`;
     } catch (e) {
       dbInfo = "ERR:" + (e as Error).message.slice(0, 40);
     }

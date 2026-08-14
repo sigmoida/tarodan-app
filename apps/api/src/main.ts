@@ -11,6 +11,7 @@ import { requestIdMiddleware } from "./common/context/request-context";
 import { AppNestLogger } from "./common/logging/nest-logger";
 import { getProcessRole } from "./process-role";
 import { resolveCorsOrigins } from "./config/cors-origins";
+import { isProduction, isDevelopment } from "./config/environment";
 
 /**
  * Hard guard: PAYMENT_BYPASS allows completing payments without going through
@@ -19,9 +20,8 @@ import { resolveCorsOrigins } from "./config/cors-origins";
  * silently leak free orders/memberships.
  */
 function assertPaymentBypassNotInProduction(logger: Logger): void {
-  const isProduction = process.env.NODE_ENV === "production";
   const bypassEnabled = process.env.PAYMENT_BYPASS === "true";
-  if (isProduction && bypassEnabled) {
+  if (isProduction() && bypassEnabled) {
     logger.error(
       "FATAL: PAYMENT_BYPASS=true cannot be set when NODE_ENV=production. " +
         "This would let clients complete payments without provider charge. " +
@@ -114,8 +114,7 @@ async function bootstrap() {
     // stays on for local development only (#69 — no longer driven by the
     // negation of `production`).
     const swaggerEnabled =
-      process.env.NODE_ENV === "development" ||
-      process.env.ENABLE_SWAGGER === "true";
+      isDevelopment() || process.env.ENABLE_SWAGGER === "true";
     if (swaggerEnabled) {
       const config = new DocumentBuilder()
         .setTitle("Tarodan API")

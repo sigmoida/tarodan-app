@@ -31,6 +31,7 @@ import { productShippingTierData } from "./helpers/product-shipping-tier.helper"
 import { resolveCreateSalePricing } from "./helpers/product-sale-pricing";
 import { sellerAutoEnableData } from "./helpers/seller-auto-enable.helper";
 import { CommissionRuleGuardService } from "../commission/commission-rule-guard.service";
+import { isDevelopment } from "../../config/environment";
 
 /**
  * ProductCreateService — ilan oluşturma. Üyelik ilan/görsel limiti, AI görsel+metin
@@ -423,7 +424,7 @@ export class ProductCreateService {
         "Product create failed",
         err?.stack || err?.message || err,
       );
-      if (process.env.NODE_ENV === "development" && err?.message) {
+      if (isDevelopment() && err?.message) {
         throw new InternalServerErrorException(
           `İlan oluşturulamadı: ${err.message}`,
         );

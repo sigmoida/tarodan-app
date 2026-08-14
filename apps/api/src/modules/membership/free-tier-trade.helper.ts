@@ -1,5 +1,6 @@
 import { MembershipTierType } from "@prisma/client";
 import { PrismaService } from "../../prisma";
+import { isTest } from "../../config/environment";
 
 /**
  * Ücretsiz katmanın `canTrade` bayrağı — takas yetkisi türetmesinin tek dış
@@ -18,7 +19,7 @@ export async function getFreeTierCanTrade(
 ): Promise<boolean> {
   const now = Date.now();
   // Testlerde katman satırı test içinde değiştirilebiliyor → cache'i atla.
-  const ttl = process.env.NODE_ENV === "test" ? 0 : CACHE_TTL_MS;
+  const ttl = isTest() ? 0 : CACHE_TTL_MS;
   if (cached && now - cached.at < ttl) return cached.value;
 
   const freeTier = await prisma.membershipTier.findUnique({

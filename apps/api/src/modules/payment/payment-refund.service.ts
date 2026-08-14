@@ -54,6 +54,7 @@ import {
   PUBLIC_NAME_SELECT,
   publicName,
 } from "../../common/helpers/public-identity";
+import { isProduction } from "../../config/environment";
 
 /**
  * İade / escrow serbest bırakma metodları — PaymentService'ten birebir taşındı
@@ -740,7 +741,7 @@ export class PaymentRefundService {
           };
         } else {
           const bypassEnabled =
-            process.env.NODE_ENV !== "production" &&
+            !isProduction() &&
             this.configService.get("PAYMENT_BYPASS") === "true";
           if (bypassEnabled) {
             this.logger.warn(
@@ -1544,8 +1545,7 @@ export class PaymentRefundService {
     }
 
     const bypassEnabled =
-      process.env.NODE_ENV !== "production" &&
-      this.configService.get("PAYMENT_BYPASS") === "true";
+      !isProduction() && this.configService.get("PAYMENT_BYPASS") === "true";
     let refundResult =
       (refundAttempt.attempt.providerResponse as Record<string, unknown>) ||
       null;

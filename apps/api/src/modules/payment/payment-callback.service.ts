@@ -12,6 +12,7 @@ import { PaymentReconciliationService } from "./payment-reconciliation.service";
 import { PaymentProviderEventService } from "./payment-provider-event.service";
 import { CacheService } from "../cache/cache.service";
 import { VirtualOrderFulfillmentService } from "./virtual-order-fulfillment.service";
+import { nodeEnv } from "../../config/environment";
 
 @Injectable()
 export class PaymentCallbackService {
@@ -413,7 +414,7 @@ export class PaymentCallbackService {
     // sıfır gelirle tamamlayabilirdi.
     if (
       isRejectableTestModeSuccess({
-        nodeEnv: process.env.NODE_ENV,
+        nodeEnv: nodeEnv(),
         status: dto.status,
         testMode: parsed.testMode,
       })

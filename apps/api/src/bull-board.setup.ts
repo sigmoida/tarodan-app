@@ -6,6 +6,7 @@ import type { Request, Response, NextFunction } from "express";
 import { QUEUE_NAMES } from "./workers/constants";
 import { CronTrackerService } from "./monitoring/cron-tracker.service";
 import type { CronRunRecord } from "./monitoring/cron-tracker.service";
+import { isDevelopment } from "./config/environment";
 
 const BASE_PATH = "/admin/queues";
 
@@ -78,7 +79,7 @@ export function setupBullBoard(
   // queue dashboard is never exposed unless BULLBOARD_ENABLED=true. Local
   // development keeps it on for convenience (unless explicitly disabled). Not
   // driven by the negation of `production` anymore (#69).
-  const isLocalDev = process.env.NODE_ENV === "development";
+  const isLocalDev = isDevelopment();
   const flag = process.env.BULLBOARD_ENABLED;
 
   const enabled = flag === "true" || (isLocalDev && flag !== "false");

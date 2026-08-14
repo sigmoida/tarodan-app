@@ -44,6 +44,7 @@ import {
   RetryPaymentResponseDto,
   DirectPaymentDto,
 } from "./dto";
+import { isProduction } from "../../config/environment";
 
 @ApiTags("payments")
 @Controller("payments")
@@ -172,8 +173,7 @@ export class PaymentController {
       // SEC-H1: bypass yalnız non-production'da GERÇEKTEN çalışır; prod'da her zaman
       // false raporla — hem yanıltıcı bir "true" sızdırma hem de UI'ı yanlış yönlendirme.
       bypassEnabled:
-        this.configService.get("PAYMENT_BYPASS") === "true" &&
-        process.env.NODE_ENV !== "production",
+        this.configService.get("PAYMENT_BYPASS") === "true" && !isProduction(),
       // Kart saklama ve kullanıcı-mevcut kayıtlı kart ödemeleri, kullanıcı
       // etkileşimi olmayan Non3D recurring çekimden ayrı yetkilerdir.
       cardStorageEnabled:

@@ -109,6 +109,7 @@ import { ErrorLogInterceptor } from "./common/interceptors/error-log.interceptor
 import { BlockedIpGuard } from "./common/guards/blocked-ip.guard";
 import { StripSensitiveFieldsInterceptor } from "./common/interceptors/strip-sensitive-fields.interceptor";
 import { AllExceptionsFilter } from "./common/filters/all-exceptions.filter";
+import { isTest } from "./config/environment";
 
 @Module({
   imports: [
@@ -125,10 +126,7 @@ import { AllExceptionsFilter } from "./common/filters/all-exceptions.filter";
       // dahil edilmez — ConfigModule last-wins ile .env, tarodan'ı ezip API'yi YANLIŞ DB'ye
       // bağlıyordu (snapshot'lar tarodan_test'te → reset patlıyor → flaky 403). Eksikler
       // spawned process.env'den (runner/webServer DATABASE_URL=tarodan_test) gelir.
-      envFilePath:
-        process.env.NODE_ENV === "test"
-          ? [".env.test"]
-          : [".env.local", ".env"],
+      envFilePath: isTest() ? [".env.test"] : [".env.local", ".env"],
       validate: validateEnv,
     }),
 
@@ -139,9 +137,7 @@ import { AllExceptionsFilter } from "./common/filters/all-exceptions.filter";
       // direct-form's 10/min would otherwise bleed across unrelated tests
       // and 429 the later ones. Rate-limit logic itself is not exercised by
       // these functional tests. Production/dev are unaffected.
-      skipIf: () =>
-        process.env.NODE_ENV === "test" &&
-        process.env.TEST_THROTTLING_ENABLED !== "true",
+      skipIf: () => isTest() && process.env.TEST_THROTTLING_ENABLED !== "true",
       throttlers: [
         {
           ttl: 60000, // 1 minute
@@ -257,7 +253,7 @@ import { AllExceptionsFilter } from "./common/filters/all-exceptions.filter";
     PagesModule,
     SiteAccessModule,
     // Dev/test hook'ları — yalnız NODE_ENV=test'te yüklenir
-    ...(process.env.NODE_ENV === "test" ? [DevModule] : []),
+    ...(isTest() ? [DevModule] : []),
   ],
   controllers: [],
   providers: [
