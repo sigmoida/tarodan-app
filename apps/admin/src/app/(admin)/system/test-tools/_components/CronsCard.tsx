@@ -4,6 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Button } from "@tarodan/ui";
 import toast from "react-hot-toast";
 import { adminApi } from "@/lib/api";
+import { adminKeys } from "@/lib/query/keys";
 import { useAdminMutation } from "@/hooks/useAdminMutation";
 import { SectionCard } from "@/components/detail/SectionCard";
 import { QueryErrorCard } from "@/components/page/QueryErrorCard";
@@ -14,7 +15,7 @@ import { useTranslations } from "next-intl";
 export function CronsCard() {
   const t = useTranslations();
   const cronsQuery = useQuery<CronDef[]>({
-    queryKey: ["test-tools-crons"],
+    queryKey: adminKeys.all("test-tools-crons"),
     queryFn: async () => (await adminApi.get("/admin/test-tools/crons")).data,
   });
   const crons = cronsQuery.data ?? [];

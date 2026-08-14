@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
 import { CubeIcon, StarIcon } from "@heroicons/react/24/outline";
 import { adminApi } from "@/lib/api";
+import { adminKeys } from "@/lib/query/keys";
 import { AdminTabs } from "@/components/AdminTabs";
 import { ModerationEventsPanel } from "@/components/ModerationEventsPanel";
 import { useConfirm } from "@/provider/ConfirmProvider";
@@ -30,7 +31,7 @@ export function ProductDetailBody({ product }: { product: ProductDetail }) {
   const [rejectOpen, setRejectOpen] = useState(false);
 
   const { data: reviews = [] } = useQuery<Review[]>({
-    queryKey: ["product-reviews", product.id],
+    queryKey: adminKeys.detail("product-reviews", product.id),
     queryFn: async () =>
       (await adminApi.getReviews({ productId: product.id, limit: 50 })).data
         .data ?? [],
