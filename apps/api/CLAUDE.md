@@ -123,8 +123,10 @@ throw new BadRequestException(
 `AllExceptionsFilter` renders the key in the request's locale, keeps the
 `{ statusCode, message, error }` contract, exposes `i18nKey`, maps Prisma
 errors to clean 4xx, and sanitizes unhandled 5xx. Services never touch the
-locale. Hardcoded Turkish message strings are legacy under migration (§15) —
-never add a new one.
+locale. A literal message string is an **ESLint error**
+(`@tarodan/no-hardcoded-exception-message`): every exception in the codebase
+carries a key, and the catalog keeps `tr` and `en` in exact parity, so a new
+key needs both values.
 
 ## 8. Money
 
@@ -251,15 +253,11 @@ These are approved, behavior-preserving cleanups. **In any file you touch:**
 
 1. **Explicit `any`** — replace the ones in the file you're editing with a real
    type or `unknown` + narrowing (943 left in source, ~1900 more in specs).
-2. **i18n exceptions** — convert hardcoded Turkish exception strings to
-   `i18nMessage` keys (catalog text identical to the old string). ESLint warns
-   on these (`@tarodan/no-hardcoded-exception-message`, 617 left); the rule
-   becomes an error when the count reaches zero.
-3. **List infra** — replace hand-rolled `skip`/`take`/`orderBy` with
+2. **List infra** — replace hand-rolled `skip`/`take`/`orderBy` with
    `common/list` helpers when semantics are identical.
-4. **Admin writes** — route admin write paths through the domain service; if
+3. **Admin writes** — route admin write paths through the domain service; if
    the domain method doesn't exist, extract the shared core first.
-5. **Env reads** — read config through a `src/config/` accessor.
+4. **Env reads** — read config through a `src/config/` accessor.
    `@tarodan/no-raw-process-env` is already an **error**: everything not on its
    allow list has an accessor, so a new raw read is a regression. Giving an
    allow-listed key an accessor means taking it off that list — the list only

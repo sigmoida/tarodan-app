@@ -19,6 +19,7 @@ import {
   resolveOrderBy,
 } from "../../common/list";
 import { errorMessage, errorStack } from "../../common/helpers/error-message";
+import { i18nMessage } from "../i18n";
 
 /**
  * Bildirim admin operasyonları (geçmiş, toplu gönderim, zamanlama) —
@@ -193,7 +194,9 @@ export class AdminNotificationService {
       }
 
       if (targetUserIds.length === 0) {
-        throw new BadRequestException("Hedef kullanıcı bulunamadı");
+        throw new BadRequestException(
+          i18nMessage("server.admin.notification.targetUserNotFound"),
+        );
       }
 
       // Create notification logs - always include in_app for user visibility
@@ -304,7 +307,9 @@ export class AdminNotificationService {
         errorStack(error),
       );
       if (error instanceof BadRequestException) throw error;
-      throw new BadRequestException("Bildirim gönderilemedi");
+      throw new BadRequestException(
+        i18nMessage("server.admin.notification.sendFailed"),
+      );
     }
   }
 
@@ -325,7 +330,9 @@ export class AdminNotificationService {
   ) {
     const scheduledDate = new Date(dto.scheduledFor);
     if (scheduledDate <= new Date()) {
-      throw new BadRequestException("Zamanlama tarihi gelecekte olmalıdır");
+      throw new BadRequestException(
+        i18nMessage("server.admin.notification.scheduleInFuture"),
+      );
     }
 
     const scheduled = await this.prisma.scheduledNotification.create({
@@ -412,7 +419,9 @@ export class AdminNotificationService {
     });
 
     if (!existing) {
-      throw new NotFoundException("Zamanlanmış bildirim bulunamadı");
+      throw new NotFoundException(
+        i18nMessage("server.admin.notification.scheduledNotFound"),
+      );
     }
 
     if (existing.status !== "pending") {

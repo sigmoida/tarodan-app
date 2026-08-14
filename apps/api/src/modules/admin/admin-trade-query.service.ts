@@ -7,6 +7,7 @@ import { buildSearchWhere, paginate, resolveOrderBy } from "../../common/list";
 import { TradeQuoteService } from "../trade/trade-quote.service";
 import { TRADE_PRICING_V2 } from "../trade/trade.constants";
 import { readTradeCommissionRuleSnapshot } from "../trade/trade-commission-snapshot";
+import { i18nMessage } from "../i18n";
 
 /**
  * Takas yönetimi salt-okunur sorguları (admin liste/detay) — AdminTradeService'ten
@@ -319,7 +320,7 @@ export class AdminTradeQueryService {
     });
 
     if (!trade) {
-      throw new NotFoundException("Takas bulunamadı");
+      throw new NotFoundException(i18nMessage("server.trade.notFound"));
     }
 
     const paymentQuote =

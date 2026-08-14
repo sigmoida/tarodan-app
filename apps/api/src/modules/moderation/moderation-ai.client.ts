@@ -125,7 +125,7 @@ export class ModerationAiClient {
         });
       }
       throw new BadRequestException(
-        "Yüklediğiniz resim uygun değildir. Lütfen uygun bir görsel seçin.",
+        i18nMessage("server.moderation.imageRejected"),
       );
     }
     // Temiz/inceleme sonuçlarını da kaydet (admin "AI Denetim" > "Temiz" filtresi için)

@@ -18,6 +18,7 @@ import {
   paginateComputedRows,
   resolveOrderBy,
 } from "../../common/list";
+import { i18nMessage } from "../i18n";
 
 /**
  * Sistem log görünümleri admin operasyonları — AdminService'in ERROR LOGS /
@@ -203,11 +204,15 @@ export class AdminLogsService {
     });
 
     if (!existing) {
-      throw new NotFoundException("Güvenlik kaydı bulunamadı");
+      throw new NotFoundException(
+        i18nMessage("server.admin.security.logNotFound"),
+      );
     }
 
     if (existing.resolved) {
-      throw new BadRequestException("Bu sorun zaten çözümlendi");
+      throw new BadRequestException(
+        i18nMessage("server.admin.security.alreadyResolved"),
+      );
     }
 
     const updated = await this.prisma.securityLog.update({

@@ -3,6 +3,7 @@ import { PrismaService } from "../../prisma";
 import { AdminAuditService } from "./admin-audit.service";
 import { TicketStatus, TicketPriority, TicketCategory } from "@prisma/client";
 import { SupportService } from "../support/support.service";
+import { i18nMessage } from "../i18n";
 
 /**
  * Destek talebi admin operasyonları (liste/detay, güncelleme, yanıt) —
@@ -113,7 +114,7 @@ export class AdminSupportService {
     });
 
     if (!ticket) {
-      throw new NotFoundException("Destek talebi bulunamadı");
+      throw new NotFoundException(i18nMessage("server.support.ticketNotFound"));
     }
 
     const oldTicket = { ...ticket };
@@ -168,7 +169,7 @@ export class AdminSupportService {
     });
 
     if (!ticket) {
-      throw new NotFoundException("Destek talebi bulunamadı");
+      throw new NotFoundException(i18nMessage("server.support.ticketNotFound"));
     }
 
     // Use SupportService's addMessage with admin flag

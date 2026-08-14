@@ -25,6 +25,7 @@ import {
 } from "./dto";
 import { EventService } from "../events/event.service";
 import { frontendUrlForEnvironment } from "../../config/app-urls";
+import { i18nMessage } from "../i18n";
 
 /**
  * İçerik yönetimi admin operasyonları (statik sayfalar + e-posta şablonları) —
@@ -65,13 +66,15 @@ export class AdminContentService {
 
   async getPageById(id: string) {
     const page = await this.prisma.staticPage.findUnique({ where: { id } });
-    if (!page) throw new NotFoundException("Sayfa bulunamadı");
+    if (!page)
+      throw new NotFoundException(i18nMessage("server.admin.page.notFound"));
     return page;
   }
 
   async getPageBySlug(slug: string) {
     const page = await this.prisma.staticPage.findUnique({ where: { slug } });
-    if (!page) throw new NotFoundException("Sayfa bulunamadı");
+    if (!page)
+      throw new NotFoundException(i18nMessage("server.admin.page.notFound"));
     return page;
   }
 
@@ -79,7 +82,8 @@ export class AdminContentService {
     const existing = await this.prisma.staticPage.findUnique({
       where: { slug: dto.slug },
     });
-    if (existing) throw new BadRequestException("Bu slug zaten kullanılıyor");
+    if (existing)
+      throw new BadRequestException(i18nMessage("server.admin.page.slugInUse"));
     const page = await this.prisma.staticPage.create({
       data: {
         slug: dto.slug.trim().toLowerCase().replace(/\s+/g, "-"),
@@ -105,13 +109,16 @@ export class AdminContentService {
 
   async updatePage(adminId: string, id: string, dto: UpdateStaticPageDto) {
     const existing = await this.prisma.staticPage.findUnique({ where: { id } });
-    if (!existing) throw new NotFoundException("Sayfa bulunamadı");
+    if (!existing)
+      throw new NotFoundException(i18nMessage("server.admin.page.notFound"));
     if (dto.slug && dto.slug !== existing.slug) {
       const duplicate = await this.prisma.staticPage.findUnique({
         where: { slug: dto.slug },
       });
       if (duplicate)
-        throw new BadRequestException("Bu slug zaten kullanılıyor");
+        throw new BadRequestException(
+          i18nMessage("server.admin.page.slugInUse"),
+        );
     }
     const page = await this.prisma.staticPage.update({
       where: { id },
@@ -147,7 +154,8 @@ export class AdminContentService {
 
   async deletePage(adminId: string, id: string) {
     const page = await this.prisma.staticPage.findUnique({ where: { id } });
-    if (!page) throw new NotFoundException("Sayfa bulunamadı");
+    if (!page)
+      throw new NotFoundException(i18nMessage("server.admin.page.notFound"));
     await this.prisma.staticPage.delete({ where: { id } });
     await this.audit.createAuditLog(
       adminId,
@@ -177,7 +185,10 @@ export class AdminContentService {
 
   private getEmailTemplateMeta(key: string) {
     const meta = EMAIL_TEMPLATE_DEFINITION_BY_KEY.get(key);
-    if (!meta) throw new NotFoundException("Geçersiz şablon anahtarı");
+    if (!meta)
+      throw new NotFoundException(
+        i18nMessage("server.admin.content.invalidTemplateKey"),
+      );
     return meta;
   }
 
@@ -186,7 +197,7 @@ export class AdminContentService {
       /<(?:script|iframe|object|embed|form|input|button|meta|link)\b|\son\w+\s*=|(?:href|src)\s*=\s*["']?\s*(?:javascript|data:text\/html):/i;
     if (unsafePattern.test(bodyHtml)) {
       throw new BadRequestException(
-        "E-posta şablonu çalıştırılabilir veya güvensiz HTML içeremez",
+        i18nMessage("server.admin.content.unsafeTemplateHtml"),
       );
     }
   }

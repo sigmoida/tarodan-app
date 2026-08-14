@@ -6,6 +6,7 @@ import { AdminAuditService } from "./admin-audit.service";
 import { generateSlug } from "./admin-slug.util";
 import { resolveOrderBy } from "../../common/list";
 import { Prisma } from "@prisma/client";
+import { i18nMessage } from "../i18n";
 
 /**
  * Koleksiyon admin operasyonları — AdminService'in COLLECTION MANAGEMENT
@@ -208,7 +209,7 @@ export class AdminCollectionService {
     });
 
     if (!collection) {
-      throw new NotFoundException("Koleksiyon bulunamadı");
+      throw new NotFoundException(i18nMessage("server.collection.notFound"));
     }
 
     return {
@@ -333,7 +334,7 @@ export class AdminCollectionService {
     });
 
     if (!existing) {
-      throw new NotFoundException("Koleksiyon bulunamadı");
+      throw new NotFoundException(i18nMessage("server.collection.notFound"));
     }
 
     const updateData: Prisma.CollectionUpdateInput = {};
@@ -388,7 +389,7 @@ export class AdminCollectionService {
     });
 
     if (!existing) {
-      throw new NotFoundException("Koleksiyon bulunamadı");
+      throw new NotFoundException(i18nMessage("server.collection.notFound"));
     }
 
     await this.prisma.collection.delete({
@@ -421,7 +422,7 @@ export class AdminCollectionService {
     });
 
     if (!collection) {
-      throw new NotFoundException("Koleksiyon bulunamadı");
+      throw new NotFoundException(i18nMessage("server.collection.notFound"));
     }
 
     // Get max sort order
@@ -484,7 +485,9 @@ export class AdminCollectionService {
     });
 
     if (!item) {
-      throw new NotFoundException("Koleksiyon öğesi bulunamadı");
+      throw new NotFoundException(
+        i18nMessage("server.collection.itemNotFound"),
+      );
     }
 
     await this.prisma.collectionItem.delete({
@@ -516,7 +519,7 @@ export class AdminCollectionService {
     });
 
     if (!existing) {
-      throw new NotFoundException("Koleksiyon bulunamadı");
+      throw new NotFoundException(i18nMessage("server.collection.notFound"));
     }
 
     const updated = await this.prisma.collection.update({
@@ -549,7 +552,7 @@ export class AdminCollectionService {
     });
 
     if (!existing) {
-      throw new NotFoundException("Koleksiyon bulunamadı");
+      throw new NotFoundException(i18nMessage("server.collection.notFound"));
     }
 
     const updated = await this.prisma.collection.update({

@@ -23,6 +23,7 @@ import { generateReferenceCode } from "../../common/helpers/generate-reference";
 import { CarrierCancellationService } from "../surat-cargo/carrier-cancellation.service";
 import { TRADE_CANCEL_REASON } from "../trade/trade-cancel-reasons";
 import { finalizeReturningTradeIfResolved } from "../../common/helpers/trade-return-finalize";
+import { i18nMessage } from "../i18n";
 
 /**
  * Takas çözüm & iade/iptal yaşam döngüsü (resolveTrade, markReturnDelivered,
@@ -72,17 +73,21 @@ export class AdminTradeResolutionService {
           select: { id: true, status: true },
         });
         if (!trade) {
-          throw new NotFoundException("Takas bulunamadı");
+          throw new NotFoundException(i18nMessage("server.trade.notFound"));
         }
 
         const shipment = await tx.tradeShipment.findUnique({
           where: { id: shipmentId },
         });
         if (!shipment || shipment.tradeId !== tradeId) {
-          throw new NotFoundException("Gönderim bulunamadı");
+          throw new NotFoundException(
+            i18nMessage("server.admin.trade.shipmentNotFound"),
+          );
         }
         if (shipment.leg !== "return") {
-          throw new BadRequestException("Bu gönderim bir iade gönderimi değil");
+          throw new BadRequestException(
+            i18nMessage("server.admin.trade.notReturnShipment"),
+          );
         }
 
         const now = new Date();
@@ -179,7 +184,7 @@ export class AdminTradeResolutionService {
     const reason = dto?.reason?.trim();
     if (!reason || reason.length < 10) {
       throw new BadRequestException(
-        "İptal gerekçesi en az 10 karakter olmalıdır",
+        i18nMessage("server.admin.trade.cancelReasonTooShort"),
       );
     }
     const sendArrivedItemBack = dto.sendArrivedItemBack !== false;
@@ -192,16 +197,18 @@ export class AdminTradeResolutionService {
         include: { cashPayments: true },
       });
       if (!trade) {
-        throw new NotFoundException("Takas bulunamadı");
+        throw new NotFoundException(i18nMessage("server.trade.notFound"));
       }
       if (trade.status !== TradeStatus.shipping_to_warehouse) {
         throw new BadRequestException(
-          `Takas durumu '${trade.status}' force-cancel için uygun değil. Beklenen: shipping_to_warehouse.`,
+          i18nMessage("server.admin.trade.forceCancelTradeStateInvalid", {
+            status: trade.status,
+          }),
         );
       }
       if (!trade.firstWarehouseArrivalAt) {
         throw new BadRequestException(
-          "Hiçbir ürün depoya ulaşmamış; bu endpoint sadece kısmen ulaşmış takaslar için.",
+          i18nMessage("server.admin.trade.nothingArrived"),
         );
       }
 
@@ -212,7 +219,7 @@ export class AdminTradeResolutionService {
       const stuck = toWarehouseShipments.find((s) => s.deliveredAt === null);
       if (!arrived || !stuck) {
         throw new BadRequestException(
-          "Hem ulaşmış hem de yolda olan bir kargo bulunamadı; force-cancel için durum uygun değil.",
+          i18nMessage("server.admin.trade.forceCancelStateInvalid"),
         );
       }
 
@@ -487,7 +494,7 @@ export class AdminTradeResolutionService {
     const reason = dto?.reason?.trim();
     if (!reason || reason.length < 10) {
       throw new BadRequestException(
-        "Kayıp gerekçesi en az 10 karakter olmalıdır",
+        i18nMessage("server.admin.trade.lostReasonTooShort"),
       );
     }
 
@@ -506,27 +513,31 @@ export class AdminTradeResolutionService {
           },
         });
         if (!trade) {
-          throw new NotFoundException("Takas bulunamadı");
+          throw new NotFoundException(i18nMessage("server.trade.notFound"));
         }
 
         const shipment = await tx.tradeShipment.findUnique({
           where: { id: dto.shipmentId },
         });
         if (!shipment || shipment.tradeId !== tradeId) {
-          throw new NotFoundException("Gönderim bulunamadı");
+          throw new NotFoundException(
+            i18nMessage("server.admin.trade.shipmentNotFound"),
+          );
         }
         if (shipment.leg !== "return") {
           throw new BadRequestException(
-            "Sadece iade gönderileri kayıp olarak işaretlenebilir",
+            i18nMessage("server.admin.trade.lostReturnOnly"),
           );
         }
         if (shipment.deliveredAt) {
           throw new BadRequestException(
-            "Bu gönderim zaten teslim edildi; kayıp işaretlenemez",
+            i18nMessage("server.admin.trade.deliveredNotLost"),
           );
         }
         if (shipment.lostAt) {
-          throw new BadRequestException("Bu gönderim zaten kayıp işaretli");
+          throw new BadRequestException(
+            i18nMessage("server.admin.trade.alreadyLost"),
+          );
         }
 
         const compensationUserId =
@@ -537,7 +548,7 @@ export class AdminTradeResolutionService {
           compensationUserId !== trade.receiverId
         ) {
           throw new BadRequestException(
-            "Tazminat kullanıcısı bu takasın taraflarından biri olmalı",
+            i18nMessage("server.admin.trade.compensationUserNotParty"),
           );
         }
 

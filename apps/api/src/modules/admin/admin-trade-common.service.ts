@@ -1,5 +1,6 @@
-import { Injectable, BadRequestException } from '@nestjs/common';
-import { Prisma } from '@prisma/client';
+import { Injectable, BadRequestException } from "@nestjs/common";
+import { Prisma } from "@prisma/client";
+import { i18nMessage } from "../i18n";
 
 /**
  * Takas yönetimi (safe-trade / depo escrow) için gruplar-arası paylaşılan
@@ -20,7 +21,7 @@ export class AdminTradeCommonService {
     tx: Prisma.TransactionClient,
   ): Promise<string> {
     const setting = await tx.platformSetting.findUnique({
-      where: { settingKey: 'warehouse_address_id' },
+      where: { settingKey: "warehouse_address_id" },
     });
     if (setting?.settingValue) {
       const addr = await tx.address.findUnique({
@@ -34,7 +35,7 @@ export class AdminTradeCommonService {
     const admin = await tx.adminUser.findFirst({
       where: { isActive: true },
       select: { userId: true },
-      orderBy: { createdAt: 'asc' },
+      orderBy: { createdAt: "asc" },
     });
     if (admin) {
       const fallback = await tx.address.findFirst({
@@ -45,7 +46,7 @@ export class AdminTradeCommonService {
     }
 
     throw new BadRequestException(
-      'Depo adresi yapılandırılmamış. Lütfen `warehouse_address_id` platform ayarını tanımlayın.',
+      i18nMessage("server.admin.warehouseAddressMissing"),
     );
   }
 }

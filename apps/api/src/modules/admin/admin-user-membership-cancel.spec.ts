@@ -55,7 +55,9 @@ describe("AdminUserService.adminCancelUserMembership", () => {
 
     await expect(
       service.adminCancelUserMembership("admin-1", "user-1"),
-    ).rejects.toThrow("Ücretsiz üyelik iptal edilemez");
+    ).rejects.toMatchObject({
+      response: { i18nKey: "server.membership.freeTierCannotCancel" },
+    });
     expect(prisma.userMembership.update).not.toHaveBeenCalled();
   });
 });

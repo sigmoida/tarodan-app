@@ -19,6 +19,7 @@ import {
   PreviewCommissionDto,
   UpdateCommissionRuleDto,
 } from "./dto";
+import { i18nMessage } from "../i18n";
 
 type DbClient = Prisma.TransactionClient | PrismaService;
 
@@ -215,12 +216,12 @@ export class AdminCommissionService {
         });
     if (!set) {
       throw new BadRequestException(
-        "Önce aktif setten bir komisyon taslağı oluşturun.",
+        i18nMessage("server.admin.commission.draftRequired"),
       );
     }
     if (set.status !== CommissionRuleSetStatus.DRAFT) {
       throw new BadRequestException(
-        "Yayınlanmış komisyon setleri değiştirilemez; yeni bir taslak oluşturun.",
+        i18nMessage("server.admin.commission.publishedImmutable"),
       );
     }
     return set;
@@ -245,7 +246,7 @@ export class AdminCommissionService {
   }) {
     if (input.maxAmount != null && input.maxAmount <= input.minAmount) {
       throw new BadRequestException(
-        "Fiyat üst sınırı alt sınırdan büyük olmalıdır. Üst sınır aralığa dahil değildir.",
+        i18nMessage("server.admin.commission.maxAboveMin"),
       );
     }
     const feePairs = [
@@ -260,7 +261,7 @@ export class AdminCommissionService {
       )
     ) {
       throw new BadRequestException(
-        "Ücret tavanı ilgili ücret tabanından küçük olamaz.",
+        i18nMessage("server.admin.commission.capBelowFloor"),
       );
     }
     const feeRatesAndBounds = [
@@ -294,7 +295,7 @@ export class AdminCommissionService {
       )
     ) {
       throw new BadRequestException(
-        "Oran %0 iken pozitif ücret tabanı veya tavanı tanımlanamaz.",
+        i18nMessage("server.admin.commission.zeroRateWithBounds"),
       );
     }
     const tierCodes = (input.shippingShares ?? []).map((share) =>
@@ -302,7 +303,7 @@ export class AdminCommissionService {
     );
     if (new Set(tierCodes).size !== tierCodes.length) {
       throw new BadRequestException(
-        "Aynı kargo paket boyutu bir kuralda birden fazla kez tanımlanamaz.",
+        i18nMessage("server.admin.commission.duplicatePackageTier"),
       );
     }
   }
@@ -368,7 +369,7 @@ export class AdminCommissionService {
     } catch (error) {
       if (this.isOverlapConstraint(error)) {
         throw new ConflictException(
-          "Bu kategori ve satıcı tipi için fiyat aralığı mevcut bir taslak kuralla çakışıyor.",
+          i18nMessage("server.admin.commission.rangeOverlap"),
         );
       }
       throw error;
@@ -384,7 +385,10 @@ export class AdminCommissionService {
       where: { id: ruleId },
       include: { ruleSet: true, shippingShares: true },
     });
-    if (!existing) throw new NotFoundException("Komisyon kuralı bulunamadı");
+    if (!existing)
+      throw new NotFoundException(
+        i18nMessage("server.admin.commission.ruleNotFound"),
+      );
     await this.requireDraftSet(existing.ruleSetId);
 
     const final = {
@@ -455,7 +459,7 @@ export class AdminCommissionService {
     } catch (error) {
       if (this.isOverlapConstraint(error)) {
         throw new ConflictException(
-          "Bu değişiklik fiyat aralığını başka bir taslak kuralla çakıştırıyor.",
+          i18nMessage("server.admin.commission.rangeOverlapOnEdit"),
         );
       }
       throw error;
@@ -467,7 +471,10 @@ export class AdminCommissionService {
       where: { id: ruleId },
       include: { ruleSet: true },
     });
-    if (!existing) throw new NotFoundException("Komisyon kuralı bulunamadı");
+    if (!existing)
+      throw new NotFoundException(
+        i18nMessage("server.admin.commission.ruleNotFound"),
+      );
     await this.requireDraftSet(existing.ruleSetId);
     await this.prisma.commissionRule.delete({ where: { id: ruleId } });
     await this.audit.createRequiredAuditLog(
@@ -507,7 +514,10 @@ export class AdminCommissionService {
     const set = await this.prisma.commissionRuleSet.findUnique({
       where: { id: ruleSetId },
     });
-    if (!set) throw new NotFoundException("Komisyon seti bulunamadı");
+    if (!set)
+      throw new NotFoundException(
+        i18nMessage("server.admin.commission.setNotFound"),
+      );
     return this.validateCoverage(this.prisma, ruleSetId);
   }
 
@@ -517,9 +527,14 @@ export class AdminCommissionService {
         const set = await tx.commissionRuleSet.findUnique({
           where: { id: ruleSetId },
         });
-        if (!set) throw new NotFoundException("Komisyon seti bulunamadı");
+        if (!set)
+          throw new NotFoundException(
+            i18nMessage("server.admin.commission.setNotFound"),
+          );
         if (set.status !== CommissionRuleSetStatus.DRAFT) {
-          throw new BadRequestException("Yalnız taslak set yayınlanabilir.");
+          throw new BadRequestException(
+            i18nMessage("server.admin.commission.publishDraftOnly"),
+          );
         }
 
         const validation = await this.validateCoverage(tx, ruleSetId);
@@ -567,7 +582,10 @@ export class AdminCommissionService {
       : await this.prisma.commissionRuleSet.findFirst({
           where: { status: CommissionRuleSetStatus.ACTIVE },
         });
-    if (!set) throw new BadRequestException("Komisyon seti bulunamadı");
+    if (!set)
+      throw new BadRequestException(
+        i18nMessage("server.admin.commission.setNotFound"),
+      );
     const matchAmount = roundCommissionMatchAmount(dto.amount);
     const rules = await this.prisma.commissionRule.findMany({
       where: {

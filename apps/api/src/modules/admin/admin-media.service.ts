@@ -1,6 +1,7 @@
 import { BadRequestException, Injectable } from "@nestjs/common";
 import { PrismaService } from "../../prisma";
 import { StorageService, isPublicStorageKey } from "../storage/storage.service";
+import { i18nMessage } from "../i18n";
 
 export interface AdminMediaFile {
   key: string;
@@ -36,7 +37,9 @@ export class AdminMediaService {
   async browse(prefix = ""): Promise<AdminMediaBrowseResult> {
     const clean = prefix.replace(/^\/+/, "");
     if (clean.includes("..")) {
-      throw new BadRequestException("Geçersiz klasör yolu");
+      throw new BadRequestException(
+        i18nMessage("server.admin.media.invalidFolder"),
+      );
     }
 
     const listing = await this.storage.listFolder(clean);

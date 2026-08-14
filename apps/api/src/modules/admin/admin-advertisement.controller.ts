@@ -51,6 +51,7 @@ import { AdminRoute } from "../auth/decorators/admin-route.decorator";
 import { Public } from "../auth/decorators/public.decorator";
 import { AdminRole } from "@prisma/client";
 import { ForceCompleteOrderDto, ExtendConfirmationDto } from "../order/dto";
+import { i18nMessage } from "../i18n";
 import {
   CreateCommissionRuleDto,
   UpdateCommissionRuleDto,
@@ -213,7 +214,7 @@ export class AdminAdvertisementController {
   })
   async uploadMedia(@UploadedFile() file: Express.Multer.File) {
     if (!file) {
-      throw new BadRequestException("Dosya gönderilmedi");
+      throw new BadRequestException(i18nMessage("server.admin.fileMissing"));
     }
     return this.mediaService.upload(file, {
       folder: "ads",

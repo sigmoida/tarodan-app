@@ -30,6 +30,7 @@ import {
 } from "@prisma/client";
 import { safeDecrementReserved } from "../product/helpers/product-availability.helper";
 import { randomInt } from "crypto";
+import { i18nMessage } from "../i18n";
 
 /**
  * Admin personel/rol yönetimi (+ banner aralığındaki banUser) — AdminService'in
@@ -210,23 +211,24 @@ export class AdminStaffService {
     ...involvedRoles: (AdminRole | undefined)[]
   ) {
     const acting = await this.resolveActingAdmin(actingUserId);
-    if (!acting) throw new ForbiddenException("Bu işlem için yetkiniz yok");
+    if (!acting)
+      throw new ForbiddenException(i18nMessage("server.auth.noPermission"));
     if (acting.role === AdminRole.super_admin) return; // süper admin her şeyi yapar
     if (acting.role === AdminRole.admin) {
       const { allowAdminAssign } = await this.getStaffSettings();
       if (!allowAdminAssign) {
         throw new ForbiddenException(
-          "Rol atama yetkisi yalnızca süper adminde (yönetici izni kapalı)",
+          i18nMessage("server.admin.staff.roleAssignSuperAdminOnly"),
         );
       }
       if (involvedRoles.includes(AdminRole.super_admin)) {
         throw new ForbiddenException(
-          "Süper admin rolüyle ilgili işlemi yalnızca süper admin yapabilir",
+          i18nMessage("server.admin.staff.superAdminOnly"),
         );
       }
       return;
     }
-    throw new ForbiddenException("Bu işlem için yetkiniz yok");
+    throw new ForbiddenException(i18nMessage("server.auth.noPermission"));
   }
 
   /**
@@ -343,7 +345,8 @@ export class AdminStaffService {
         },
       },
     });
-    if (!existing) throw new NotFoundException("Admin kaydı bulunamadı");
+    if (!existing)
+      throw new NotFoundException(i18nMessage("server.admin.staff.notFound"));
     await this.assertCanManage(actingUserId, existing.role, dto.role);
 
     // Son aktif süper admin'i düşürme/pasifleştirme engeli (sistemi yetkisiz bırakmamak için).
@@ -357,7 +360,7 @@ export class AdminStaffService {
       });
       if (activeSupers <= 1) {
         throw new BadRequestException(
-          "Sistemdeki son süper admin değiştirilemez",
+          i18nMessage("server.admin.staff.lastSuperAdminImmutable"),
         );
       }
     }
@@ -382,7 +385,8 @@ export class AdminStaffService {
   /** Admin yetkisini tamamen kaldır (AdminUser sil). */
   async removeAdminStaff(actingUserId: string, id: string) {
     const existing = await this.prisma.adminUser.findUnique({ where: { id } });
-    if (!existing) throw new NotFoundException("Admin kaydı bulunamadı");
+    if (!existing)
+      throw new NotFoundException(i18nMessage("server.admin.staff.notFound"));
     await this.assertCanManage(actingUserId, existing.role);
 
     const acting = await this.prisma.adminUser.findFirst({
@@ -390,7 +394,9 @@ export class AdminStaffService {
       select: { id: true },
     });
     if (acting?.id === id) {
-      throw new BadRequestException("Kendi admin yetkinizi kaldıramazsınız");
+      throw new BadRequestException(
+        i18nMessage("server.admin.staff.cannotRemoveSelf"),
+      );
     }
     if (existing.role === AdminRole.super_admin) {
       const activeSupers = await this.prisma.adminUser.count({
@@ -398,7 +404,7 @@ export class AdminStaffService {
       });
       if (activeSupers <= 1) {
         throw new BadRequestException(
-          "Sistemdeki son süper admin kaldırılamaz",
+          i18nMessage("server.admin.staff.lastSuperAdminUndeletable"),
         );
       }
     }
@@ -429,11 +435,13 @@ export class AdminStaffService {
     });
 
     if (!user) {
-      throw new NotFoundException("Kullanıcı bulunamadı");
+      throw new NotFoundException(i18nMessage("server.auth.userNotFound"));
     }
 
     if ((user as any).isBanned) {
-      throw new BadRequestException("Kullanıcı zaten banlı");
+      throw new BadRequestException(
+        i18nMessage("server.admin.user.alreadyBanned"),
+      );
     }
 
     const result = await this.prisma.$transaction(async (tx) => {

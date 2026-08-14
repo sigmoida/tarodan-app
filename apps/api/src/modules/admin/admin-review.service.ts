@@ -11,6 +11,7 @@ import { fulltextProductSearch } from "../product/helpers/fulltext-search";
 import { AdminUserRatingQueryDto, RatingQueryDto, RatingStatus } from "./dto";
 import { Prisma } from "@prisma/client";
 import { dateRangeWhere, paginate, resolveOrderBy } from "../../common/list";
+import { i18nMessage } from "../i18n";
 
 /**
  * Ürün yorumu ve satıcı puanı admin operasyonları — AdminService'in
@@ -177,7 +178,7 @@ export class AdminReviewService {
     });
 
     if (!review) {
-      throw new NotFoundException("Yorum bulunamadı");
+      throw new NotFoundException(i18nMessage("server.rating.reviewNotFound"));
     }
 
     // Cast to any to avoid TS error if prisma client is not generated

@@ -18,6 +18,7 @@ import {
   AdPackageTierDto,
 } from "./dto/ad-package.dto";
 import { paginate } from "../../common/list";
+import { i18nMessage } from "../i18n";
 
 /**
  * Admin management of the dynamic ad/boost packages (Ekonomik / Vitrin / …) and
@@ -41,7 +42,7 @@ export class AdminAdPackageService {
       tiers.length === 0
     ) {
       throw new BadRequestException(
-        "Üyelik katmanı hedeflemesinde en az bir katman seçilmelidir",
+        i18nMessage("server.admin.adPackage.tierRequired"),
       );
     }
     if (
@@ -49,7 +50,7 @@ export class AdminAdPackageService {
       users.length === 0
     ) {
       throw new BadRequestException(
-        "Kullanıcı hedeflemesinde en az bir kullanıcı seçilmelidir",
+        i18nMessage("server.admin.adPackage.userRequired"),
       );
     }
     if (
@@ -58,7 +59,7 @@ export class AdminAdPackageService {
       users.length === 0
     ) {
       throw new BadRequestException(
-        "Katman veya kullanıcı hedeflemesinde en az bir hedef seçilmelidir",
+        i18nMessage("server.admin.adPackage.targetRequired"),
       );
     }
 
@@ -278,7 +279,10 @@ export class AdminAdPackageService {
       where: { id },
       include: { targetTiers: true, targetUsers: true },
     });
-    if (!pkg) throw new NotFoundException("Paket bulunamadı");
+    if (!pkg)
+      throw new NotFoundException(
+        i18nMessage("server.admin.adPackage.notFound"),
+      );
 
     if (dto.slug && dto.slug !== pkg.slug) {
       const clash = await this.prisma.adPackage.findUnique({
@@ -352,7 +356,10 @@ export class AdminAdPackageService {
 
   async deletePackage(id: string) {
     const pkg = await this.prisma.adPackage.findUnique({ where: { id } });
-    if (!pkg) throw new NotFoundException("Paket bulunamadı");
+    if (!pkg)
+      throw new NotFoundException(
+        i18nMessage("server.admin.adPackage.notFound"),
+      );
     // Cascade deletes tiers; ProductBoost.packageId → SetNull (geçmiş korunur).
     await this.prisma.adPackage.delete({ where: { id } });
     return { success: true };
@@ -445,7 +452,10 @@ export class AdminAdPackageService {
         },
       },
     });
-    if (!boost) throw new NotFoundException("Paket satın alımı bulunamadı");
+    if (!boost)
+      throw new NotFoundException(
+        i18nMessage("server.admin.adPackage.purchaseNotFound"),
+      );
 
     const buyerBoosts = await this.prisma.productBoost.findMany({
       where: { userId: boost.userId, baselineViewCount: { not: null } },
@@ -476,7 +486,7 @@ export class AdminAdPackageService {
       boost.endsAt <= new Date()
     ) {
       throw new BadRequestException(
-        "Yalnızca süresi devam eden aktif paket duraklatılabilir",
+        i18nMessage("server.admin.adPackage.pauseActiveOnly"),
       );
     }
     const now = new Date();
@@ -499,7 +509,7 @@ export class AdminAdPackageService {
     const boost = await this.prisma.productBoost.findUnique({ where: { id } });
     if (!boost || boost.status !== BoostStatus.paused) {
       throw new BadRequestException(
-        "Yalnızca duraklatılmış paket devam ettirilebilir",
+        i18nMessage("server.admin.adPackage.resumePausedOnly"),
       );
     }
     const now = new Date();
@@ -539,11 +549,13 @@ export class AdminAdPackageService {
         boost.status !== BoostStatus.paused)
     ) {
       throw new BadRequestException(
-        "Yalnızca aktif veya duraklatılmış paketin süresi uzatılabilir",
+        i18nMessage("server.admin.adPackage.extendActiveOrPausedOnly"),
       );
     }
     if (days < 1 || days > 365) {
-      throw new BadRequestException("Uzatma süresi 1-365 gün olmalıdır");
+      throw new BadRequestException(
+        i18nMessage("server.admin.adPackage.extensionRange"),
+      );
     }
 
     if (boost.status === BoostStatus.paused) {

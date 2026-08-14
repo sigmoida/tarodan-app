@@ -4,6 +4,7 @@ import { AdminAuditService } from "./admin-audit.service";
 import { Prisma, MessageStatus } from "@prisma/client";
 import { AdminMessageQueryDto } from "./dto";
 import { paginate, resolveOrderBy } from "../../common/list";
+import { i18nMessage } from "../i18n";
 
 /**
  * Mesaj moderasyonu admin operasyonları (liste/detay, onay/ret/geri alma) —
@@ -125,7 +126,9 @@ export class AdminMessagingService {
     });
 
     if (!message) {
-      throw new NotFoundException("Mesaj bulunamadı");
+      throw new NotFoundException(
+        i18nMessage("server.messaging.messageNotFound"),
+      );
     }
 
     return message;
@@ -140,7 +143,9 @@ export class AdminMessagingService {
     });
 
     if (!message) {
-      throw new NotFoundException("Mesaj bulunamadı");
+      throw new NotFoundException(
+        i18nMessage("server.messaging.messageNotFound"),
+      );
     }
 
     await this.prisma.message.update({
@@ -170,7 +175,9 @@ export class AdminMessagingService {
     });
 
     if (!message) {
-      throw new NotFoundException("Mesaj bulunamadı");
+      throw new NotFoundException(
+        i18nMessage("server.messaging.messageNotFound"),
+      );
     }
 
     await this.prisma.message.update({
@@ -200,7 +207,9 @@ export class AdminMessagingService {
     });
 
     if (!message) {
-      throw new NotFoundException("Mesaj bulunamadı");
+      throw new NotFoundException(
+        i18nMessage("server.messaging.messageNotFound"),
+      );
     }
 
     await this.prisma.message.update({

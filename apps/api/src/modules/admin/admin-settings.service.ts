@@ -3,6 +3,7 @@ import { MembershipTierType, SellerType } from "@prisma/client";
 import { PrismaService } from "../../prisma";
 import { AdminAuditService } from "./admin-audit.service";
 import { UpdatePlatformSettingDto, UpdateWarehouseAddressDto } from "./dto";
+import { i18nMessage } from "../i18n";
 
 /**
  * Platform ayarları yönetimi — AdminService'in PLATFORM SETTINGS bölümünden
@@ -96,7 +97,7 @@ export class AdminSettingsService {
         numericValue > 1_000_000)
     ) {
       throw new BadRequestException(
-        "Üyelik aylık fiyatı 0 ile 1.000.000 arasında olmalıdır",
+        i18nMessage("server.admin.membership.monthlyPriceRange"),
       );
     }
     if (
@@ -104,7 +105,7 @@ export class AdminSettingsService {
       (!Number.isFinite(numericValue) || numericValue < 0 || numericValue > 90)
     ) {
       throw new BadRequestException(
-        "Yıllık indirim oranı 0 ile 90 arasında olmalıdır",
+        i18nMessage("server.admin.membership.yearlyDiscountRange"),
       );
     }
 
@@ -204,7 +205,7 @@ export class AdminSettingsService {
     });
     if (!platformUser) {
       throw new BadRequestException(
-        "Platform satıcı hesabı bulunamadı. Önce üretim referans seed'i (seed-production) çalıştırılmalı.",
+        i18nMessage("server.admin.platformSellerMissing"),
       );
     }
 

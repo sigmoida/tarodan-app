@@ -28,6 +28,7 @@ import { dateRangeWhere, paginate, resolveOrderBy } from "../../common/list";
 import { catalogProductWhere } from "../product/helpers/catalog-product-where";
 import { CommissionRuleGuardService } from "../commission/commission-rule-guard.service";
 import { errorMessage } from "../../common/helpers/error-message";
+import { i18nMessage } from "../i18n";
 
 /**
  * Ürün yönetimi + admin ürün silme/geri yükleme — AdminService'in
@@ -285,7 +286,7 @@ export class AdminProductService {
       },
     });
     if (!product) {
-      throw new NotFoundException("Ürün bulunamadı");
+      throw new NotFoundException(i18nMessage("server.offer.productNotFound"));
     }
 
     // Convert S3 keys to presigned URLs for all images
@@ -327,7 +328,7 @@ export class AdminProductService {
     });
 
     if (!product) {
-      throw new NotFoundException("Ürün bulunamadı");
+      throw new NotFoundException(i18nMessage("server.offer.productNotFound"));
     }
 
     const data: Prisma.ProductUpdateInput = {};
@@ -413,11 +414,13 @@ export class AdminProductService {
     });
 
     if (!product) {
-      throw new NotFoundException("Ürün bulunamadı");
+      throw new NotFoundException(i18nMessage("server.offer.productNotFound"));
     }
 
     if (product.status !== ProductStatus.pending) {
-      throw new BadRequestException("Sadece bekleyen ürünler onaylanabilir");
+      throw new BadRequestException(
+        i18nMessage("server.admin.product.approvePendingOnly"),
+      );
     }
 
     await this.commissionGuard.assertListingRuleExists({
@@ -504,7 +507,7 @@ export class AdminProductService {
     });
 
     if (!product) {
-      throw new NotFoundException("Ürün bulunamadı");
+      throw new NotFoundException(i18nMessage("server.offer.productNotFound"));
     }
 
     const updated = await this.prisma.product.update({
@@ -558,7 +561,9 @@ export class AdminProductService {
    */
   async bulkApproveProducts(adminId: string, ids: string[], note?: string) {
     if (!ids || ids.length === 0) {
-      throw new BadRequestException("En az bir ürün seçilmelidir");
+      throw new BadRequestException(
+        i18nMessage("server.admin.product.selectionRequired"),
+      );
     }
 
     // Kanonik yol invaryantı: onay hangi yüzeyden gelirse gelsin
@@ -597,7 +602,9 @@ export class AdminProductService {
    */
   async bulkRejectProducts(adminId: string, ids: string[], reason: string) {
     if (!ids || ids.length === 0) {
-      throw new BadRequestException("En az bir ürün seçilmelidir");
+      throw new BadRequestException(
+        i18nMessage("server.admin.product.selectionRequired"),
+      );
     }
 
     if (!reason || reason.trim() === "") {
@@ -665,22 +672,28 @@ export class AdminProductService {
     });
 
     if (!product) {
-      throw new NotFoundException("Ürün bulunamadı");
+      throw new NotFoundException(i18nMessage("server.offer.productNotFound"));
     }
 
     // Check if product is sold
     if (product.status === ProductStatus.sold) {
-      throw new BadRequestException("Satılmış ürünler silinemez");
+      throw new BadRequestException(
+        i18nMessage("server.admin.product.soldNotDeletable"),
+      );
     }
 
     // Check if product is reserved
     if (product.status === ProductStatus.reserved) {
-      throw new BadRequestException("Rezerve edilmiş ürünler silinemez");
+      throw new BadRequestException(
+        i18nMessage("server.admin.product.reservedNotDeletable"),
+      );
     }
 
     // Check if product has active orders
     if (product.orders.length > 0) {
-      throw new BadRequestException("Aktif siparişi olan ürünler silinemez");
+      throw new BadRequestException(
+        i18nMessage("server.admin.product.withActiveOrderNotDeletable"),
+      );
     }
 
     const oldProduct = { ...product };
@@ -699,7 +712,7 @@ export class AdminProductService {
       });
       if (boostCount > 0) {
         throw new BadRequestException(
-          "Öne çıkarma kaydı olan ürün kalıcı silinemez; pasife alın (soft delete)",
+          i18nMessage("server.admin.product.boostedNotHardDeletable"),
         );
       }
       // Hard delete - only if no offers and no orders
@@ -769,12 +782,12 @@ export class AdminProductService {
     });
 
     if (!product) {
-      throw new NotFoundException("Ürün bulunamadı");
+      throw new NotFoundException(i18nMessage("server.offer.productNotFound"));
     }
 
     if (product.status !== ProductStatus.deleted) {
       throw new BadRequestException(
-        "Yalnızca kaldırılmış ürünler geri yüklenebilir",
+        i18nMessage("server.admin.product.restoreRemovedOnly"),
       );
     }
 

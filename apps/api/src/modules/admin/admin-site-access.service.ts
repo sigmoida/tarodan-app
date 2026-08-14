@@ -14,6 +14,7 @@ import {
   SiteAccessPinQueryDto,
   UpdateSiteAccessPinDto,
 } from "./dto";
+import { i18nMessage } from "../i18n";
 
 export const SITE_ACCESS_INVITE_TEMPLATE = "site-access-invite";
 
@@ -92,7 +93,10 @@ export class AdminSiteAccessService {
     const existing = await this.prisma.siteAccessPin.findUnique({
       where: { id },
     });
-    if (!existing) throw new NotFoundException("Erişim kodu bulunamadı");
+    if (!existing)
+      throw new NotFoundException(
+        i18nMessage("server.admin.siteAccess.codeNotFound"),
+      );
 
     const updated = await this.prisma.siteAccessPin.update({
       where: { id },
@@ -125,7 +129,10 @@ export class AdminSiteAccessService {
     const existing = await this.prisma.siteAccessPin.findUnique({
       where: { id },
     });
-    if (!existing) throw new NotFoundException("Erişim kodu bulunamadı");
+    if (!existing)
+      throw new NotFoundException(
+        i18nMessage("server.admin.siteAccess.codeNotFound"),
+      );
 
     await this.prisma.siteAccessPin.delete({ where: { id } });
 
@@ -142,10 +149,13 @@ export class AdminSiteAccessService {
 
   async sendInvite(adminId: string, id: string) {
     const pin = await this.prisma.siteAccessPin.findUnique({ where: { id } });
-    if (!pin) throw new NotFoundException("Erişim kodu bulunamadı");
+    if (!pin)
+      throw new NotFoundException(
+        i18nMessage("server.admin.siteAccess.codeNotFound"),
+      );
     if (!pin.email) {
       throw new BadRequestException(
-        "Bu erişim kodunun e-posta adresi yok; önce e-posta ekleyin.",
+        i18nMessage("server.admin.siteAccess.codeHasNoEmail"),
       );
     }
 

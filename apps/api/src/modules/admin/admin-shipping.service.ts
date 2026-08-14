@@ -17,6 +17,7 @@ import { SuratTrackingService } from "../surat-cargo/surat-tracking.service";
 import { buildStandardGonderiPayload } from "../surat-cargo/surat-address.util";
 import { requestCarrierCancellationTask } from "../surat-cargo/carrier-cancellation-task";
 import { StorageService } from "../storage/storage.service";
+import { i18nMessage } from "../i18n";
 
 /**
  * Kargo görünümü admin operasyonları (salt-okunur) — AdminService'in
@@ -218,7 +219,9 @@ export class AdminShippingService {
   ) {
     const resolution = dto.resolution.trim();
     if (!resolution) {
-      throw new BadRequestException("Çözüm notu zorunludur");
+      throw new BadRequestException(
+        i18nMessage("server.admin.resolutionNoteRequired"),
+      );
     }
     const updated = await this.prisma.carrierCancellationTask.updateMany({
       where: { id: taskId, status: "pending" },
@@ -234,9 +237,11 @@ export class AdminShippingService {
         where: { id: taskId },
       });
       if (!exists)
-        throw new NotFoundException("Taşıyıcı iptal görevi bulunamadı");
+        throw new NotFoundException(
+          i18nMessage("server.admin.carrierCancellation.notFound"),
+        );
       throw new BadRequestException(
-        "Taşıyıcı iptal görevi zaten sonuçlandırılmış",
+        i18nMessage("server.admin.carrierCancellation.alreadySettled"),
       );
     }
     return this.prisma.carrierCancellationTask.findUnique({

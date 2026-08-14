@@ -7493,7 +7493,8 @@
         "shipmentToInTransitForbidden": "A shipment in the {status} state cannot be moved to in-transit"
       },
       "user": {
-        "notBanned": "The user is not banned"
+        "notBanned": "The user is not banned",
+        "alreadyBanned": "The user is already banned"
       },
       "catalog": {
         "categoryHasProducts": "This category still has products. Move them to another category first.",
@@ -7560,7 +7561,20 @@
         "deliverStateInvalid": "A shipment in the '{status}' state cannot be marked as delivered",
         "reviewStateInvalid": "Trade state is '{status}' — only an 'at_warehouse' trade can be taken into review",
         "approveStateInvalid": "A trade in the '{status}' state cannot be approved. Expected: at_warehouse or admin_reviewing.",
-        "rejectStateInvalid": "A trade in the '{status}' state cannot be rejected. Expected: at_warehouse or admin_reviewing."
+        "rejectStateInvalid": "A trade in the '{status}' state cannot be rejected. Expected: at_warehouse or admin_reviewing.",
+        "notReturnShipment": "This shipment is not a return shipment",
+        "cancelReasonTooShort": "The cancellation reason must be at least 10 characters",
+        "nothingArrived": "No item reached the warehouse; this endpoint is only for partially arrived trades.",
+        "forceCancelStateInvalid": "No pair of one arrived and one in-transit parcel was found; the state does not allow a force-cancel.",
+        "lostReasonTooShort": "The lost-parcel reason must be at least 10 characters",
+        "lostReturnOnly": "Only return shipments can be marked as lost",
+        "deliveredNotLost": "This shipment was already delivered; it cannot be marked as lost",
+        "alreadyLost": "This shipment is already marked as lost",
+        "compensationUserNotParty": "The compensated user must be one of the parties to this trade",
+        "refundFailed": "The trade refund failed: {reason} (the retry cron will take over)",
+        "refundSkipped": "The trade refund could not be made: {reason}",
+        "cashHoldReleaseStateInvalid": "Trade state is '{status}' — a cash hold can only be released on a 'completed' trade",
+        "forceCancelTradeStateInvalid": "A trade in the '{status}' state cannot be force-cancelled. Expected: shipping_to_warehouse."
       },
       "sellerApplication": {
         "notFound": "Application not found",
@@ -7586,7 +7600,109 @@
         "ruleNotFound": "Tax rule not found",
         "rateRange": "The rate must be between 0 and 100",
         "exemptionNotFound": "VAT exemption not found"
-      }
+      },
+      "adPackage": {
+        "tierRequired": "Select at least one tier when targeting membership tiers",
+        "userRequired": "Select at least one user when targeting users",
+        "targetRequired": "Select at least one target when targeting tiers or users",
+        "notFound": "Package not found",
+        "purchaseNotFound": "Package purchase not found",
+        "pauseActiveOnly": "Only an active package that is still running can be paused",
+        "resumePausedOnly": "Only a paused package can be resumed",
+        "extendActiveOrPausedOnly": "Only an active or paused package can be extended",
+        "extensionRange": "The extension must be between 1 and 365 days"
+      },
+      "fileMissing": "No file was sent",
+      "commission": {
+        "draftRequired": "Create a commission draft from the active set first.",
+        "publishedImmutable": "A published commission set cannot be changed; create a new draft.",
+        "maxAboveMin": "The upper price bound must be greater than the lower one. The upper bound is exclusive.",
+        "capBelowFloor": "A fee cap cannot be lower than its matching fee floor.",
+        "zeroRateWithBounds": "A positive fee floor or cap cannot be set while the rate is 0%.",
+        "duplicatePackageTier": "The same shipping package size cannot appear twice in one rule.",
+        "rangeOverlap": "The price range overlaps an existing draft rule for this category and seller type.",
+        "ruleNotFound": "Commission rule not found",
+        "rangeOverlapOnEdit": "This change would make the price range overlap another draft rule.",
+        "setNotFound": "Commission set not found",
+        "publishDraftOnly": "Only a draft set can be published."
+      },
+      "page": {
+        "notFound": "Page not found",
+        "slugInUse": "This slug is already in use"
+      },
+      "content": {
+        "invalidTemplateKey": "Invalid template key",
+        "unsafeTemplateHtml": "An e-mail template cannot contain executable or unsafe HTML"
+      },
+      "security": {
+        "logNotFound": "Security log entry not found",
+        "alreadyResolved": "This issue has already been resolved"
+      },
+      "media": {
+        "invalidFolder": "Invalid folder path"
+      },
+      "moderation": {
+        "aiDisabled": "AI moderation is disabled",
+        "aiUnreachable": "The AI service could not be reached",
+        "invalidType": "Invalid moderation type",
+        "reviewNotFound": "Review not found"
+      },
+      "notification": {
+        "targetUserNotFound": "Target user not found",
+        "sendFailed": "The notification could not be sent",
+        "scheduleInFuture": "The scheduled time must be in the future",
+        "scheduledNotFound": "Scheduled notification not found"
+      },
+      "payment": {
+        "partialAmountRequired": "A valid refund amount is required for a partial refund",
+        "refundCompletedOnly": "Only completed payments can be refunded",
+        "groupRefundNotHere": "A group (cart) payment cannot be refunded manually here — refund the individual orders instead.",
+        "invalidRefundAmount": "The refund amount is invalid",
+        "refundAttemptNotFound": "Refund attempt not found",
+        "resolveManualReviewOnly": "Only refund attempts awaiting manual review can be resolved",
+        "cancelCompleted": "A completed payment cannot be cancelled; issue a refund instead",
+        "escrowReasonRequired": "A reason is required to release escrow"
+      },
+      "payout": {
+        "transferNotFound": "Payout transfer not found",
+        "retryStateInvalid": "A transfer in the '{status}' state cannot be retried"
+      },
+      "product": {
+        "approvePendingOnly": "Only pending products can be approved",
+        "selectionRequired": "Select at least one product",
+        "soldNotDeletable": "Sold products cannot be deleted",
+        "reservedNotDeletable": "Reserved products cannot be deleted",
+        "withActiveOrderNotDeletable": "Products with an active order cannot be deleted",
+        "boostedNotHardDeletable": "A product with a boost record cannot be hard-deleted; deactivate it instead",
+        "restoreRemovedOnly": "Only removed products can be restored"
+      },
+      "membership": {
+        "monthlyPriceRange": "The monthly membership price must be between 0 and 1,000,000",
+        "yearlyDiscountRange": "The yearly discount rate must be between 0 and 90",
+        "tierInactive": "This membership tier is not active",
+        "businessRequiresKyc": "A Business membership can only be assigned to a KYC-approved company account",
+        "kycRequiresBusiness": "A KYC-approved company account can only be assigned a Business membership",
+        "tierTypeNotFound": "Membership type not found: {type}"
+      },
+      "platformSellerMissing": "The platform seller account was not found. Run the production reference seed (seed-production) first.",
+      "resolutionNoteRequired": "A resolution note is required",
+      "carrierCancellation": {
+        "notFound": "Carrier cancellation task not found",
+        "alreadySettled": "The carrier cancellation task has already been settled"
+      },
+      "siteAccess": {
+        "codeNotFound": "Access code not found",
+        "codeHasNoEmail": "This access code has no e-mail address; add one first."
+      },
+      "staff": {
+        "roleAssignSuperAdminOnly": "Only a super admin can assign roles (the manager permission is off)",
+        "superAdminOnly": "Only a super admin can act on the super-admin role",
+        "notFound": "Admin record not found",
+        "lastSuperAdminImmutable": "The last super admin in the system cannot be changed",
+        "cannotRemoveSelf": "You cannot remove your own admin access",
+        "lastSuperAdminUndeletable": "The last super admin in the system cannot be removed"
+      },
+      "warehouseAddressMissing": "The warehouse address is not configured. Define the `warehouse_address_id` platform setting."
     },
     "advertisement": {
       "notFound": "Advertisement not found",
@@ -7631,7 +7747,10 @@
       "fileTooLarge": "The file is too large (max 10MB)",
       "unsupportedType": "Unsupported file type. Only JPEG, PNG and WebP are supported.",
       "tooManyImages": "You can upload at most {max} images",
-      "invalidUploadTarget": "Invalid upload target: {folder}. Allowed targets: messages, reviews, collections"
+      "invalidUploadTarget": "Invalid upload target: {folder}. Allowed targets: messages, reviews, collections",
+      "actionForbidden": "You are not allowed to perform this action.",
+      "fileMissing": "File not found.",
+      "fileForbidden": "You are not allowed to access this file."
     },
     "search": {
       "reindexFailed": "Reindex failed"
@@ -7681,7 +7800,8 @@
       "userMissing": "No such user: {email}"
     },
     "moderation": {
-      "contentRejected": "The {field} you entered is not acceptable ({reason}). Please edit it."
+      "contentRejected": "The {field} you entered is not acceptable ({reason}). Please edit it.",
+      "imageRejected": "The image you uploaded is not acceptable. Please choose a suitable one."
     },
     "discount": {
       "platformCannotDiscountProduct": "The platform cannot discount a product's price; the price belongs to the seller",
@@ -7750,7 +7870,8 @@
       "twoFactorDisabled": "Two-factor authentication is not enabled",
       "tokenAlreadyUsed": "This token has already been used",
       "currentPasswordWrong": "The current password is incorrect",
-      "invalidToken": "Invalid verification token"
+      "invalidToken": "Invalid verification token",
+      "accessBlocked": "Access blocked"
     },
     "storage": {
       "uploadUnavailableRetry": "The file upload service is unavailable right now. Please try again later.",

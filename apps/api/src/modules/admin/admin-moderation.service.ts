@@ -17,6 +17,7 @@ import {
   paginateComputedRows,
   resolveOrderBy,
 } from "../../common/list";
+import { i18nMessage } from "../i18n";
 
 /**
  * Moderasyon kuyruğu + AI denetim araçları — AdminService'in
@@ -471,14 +472,18 @@ export class AdminModerationService {
   /** AI eşiklerini güncelle (canlı + kalıcı config.json). */
   async setAiConfig(relevanceThreshold?: number, nsfwThreshold?: number) {
     if (!this.moderationAi.isEnabled) {
-      throw new BadRequestException("AI moderasyon kapalı");
+      throw new BadRequestException(
+        i18nMessage("server.admin.moderation.aiDisabled"),
+      );
     }
     const cfg = await this.moderationAi.setConfig({
       relevanceThreshold,
       nsfwThreshold,
     });
     if (!cfg) {
-      throw new BadRequestException("AI servisine erişilemedi");
+      throw new BadRequestException(
+        i18nMessage("server.admin.moderation.aiUnreachable"),
+      );
     }
     return { enabled: true, ...cfg };
   }
@@ -507,7 +512,10 @@ export class AdminModerationService {
         const message = await this.prisma.message.findUnique({
           where: { id: itemId },
         });
-        if (!message) throw new NotFoundException("Mesaj bulunamadı");
+        if (!message)
+          throw new NotFoundException(
+            i18nMessage("server.messaging.messageNotFound"),
+          );
 
         await this.prisma.message.update({
           where: { id: itemId },
@@ -547,7 +555,9 @@ export class AdminModerationService {
         break;
 
       default:
-        throw new BadRequestException("Geçersiz moderasyon türü");
+        throw new BadRequestException(
+          i18nMessage("server.admin.moderation.invalidType"),
+        );
     }
 
     return { success: true, type, id: itemId, action: "approved" };
@@ -576,7 +586,10 @@ export class AdminModerationService {
         const messageToReject = await this.prisma.message.findUnique({
           where: { id: itemId },
         });
-        if (!messageToReject) throw new NotFoundException("Mesaj bulunamadı");
+        if (!messageToReject)
+          throw new NotFoundException(
+            i18nMessage("server.messaging.messageNotFound"),
+          );
 
         // Mark as rejected and hide content
         await this.prisma.message.update({
@@ -608,7 +621,10 @@ export class AdminModerationService {
         const review = await this.prisma.rating.findUnique({
           where: { id: itemId },
         });
-        if (!review) throw new NotFoundException("Değerlendirme bulunamadı");
+        if (!review)
+          throw new NotFoundException(
+            i18nMessage("server.admin.moderation.reviewNotFound"),
+          );
 
         // Delete the review
         await this.prisma.rating.delete({
@@ -630,7 +646,9 @@ export class AdminModerationService {
         break;
 
       default:
-        throw new BadRequestException("Geçersiz moderasyon türü");
+        throw new BadRequestException(
+          i18nMessage("server.admin.moderation.invalidType"),
+        );
     }
 
     return { success: true, type, id: itemId, action: "rejected", reason };

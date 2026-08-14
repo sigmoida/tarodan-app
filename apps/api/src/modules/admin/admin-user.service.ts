@@ -23,6 +23,7 @@ import {
   resolveOrderBy,
 } from "../../common/list";
 import { catalogProductWhere } from "../product/helpers/catalog-product-where";
+import { i18nMessage } from "../i18n";
 
 /**
  * Kullanıcı yönetimi + admin üyelik override'ları — AdminService'in
@@ -425,7 +426,7 @@ export class AdminUserService {
     });
 
     if (!user) {
-      throw new NotFoundException("Kullanıcı bulunamadı");
+      throw new NotFoundException(i18nMessage("server.auth.userNotFound"));
     }
 
     const u = user as typeof user & {
@@ -565,13 +566,17 @@ export class AdminUserService {
       include: { tier: true },
     });
     if (!membership) {
-      throw new NotFoundException("Üyelik bulunamadı");
+      throw new NotFoundException(i18nMessage("server.membership.notFound"));
     }
     if (membership.tier.type === MembershipTierType.free) {
-      throw new BadRequestException("Ücretsiz üyelik iptal edilemez");
+      throw new BadRequestException(
+        i18nMessage("server.membership.freeTierCannotCancel"),
+      );
     }
     if (membership.status === SubscriptionStatus.cancelled) {
-      throw new BadRequestException("Üyelik zaten iptal edilmiş");
+      throw new BadRequestException(
+        i18nMessage("server.membership.alreadyCancelled"),
+      );
     }
     const updated = await this.prisma.userMembership.update({
       where: { userId },
@@ -617,16 +622,22 @@ export class AdminUserService {
       },
     });
     if (!user) {
-      throw new NotFoundException("Kullanıcı bulunamadı");
+      throw new NotFoundException(i18nMessage("server.auth.userNotFound"));
     }
     const tier = await this.prisma.membershipTier.findUnique({
       where: { type: tierType },
     });
     if (!tier) {
-      throw new NotFoundException(`Üyelik tipi bulunamadı: ${tierType}`);
+      throw new NotFoundException(
+        i18nMessage("server.admin.membership.tierTypeNotFound", {
+          type: tierType,
+        }),
+      );
     }
     if (!tier.isActive) {
-      throw new BadRequestException("Bu üyelik kademesi aktif değil");
+      throw new BadRequestException(
+        i18nMessage("server.admin.membership.tierInactive"),
+      );
     }
     const isApprovedCorporate =
       user.businessStatus === "approved" &&
@@ -634,12 +645,12 @@ export class AdminUserService {
       !!user.taxId?.trim();
     if (tierType === MembershipTierType.business && !isApprovedCorporate) {
       throw new BadRequestException(
-        "Business üyelik yalnız KYC onaylı şirket hesabına atanabilir",
+        i18nMessage("server.admin.membership.businessRequiresKyc"),
       );
     }
     if (tierType !== MembershipTierType.business && isApprovedCorporate) {
       throw new BadRequestException(
-        "KYC onaylı şirket hesabına yalnız Business üyelik atanabilir",
+        i18nMessage("server.admin.membership.kycRequiresBusiness"),
       );
     }
 

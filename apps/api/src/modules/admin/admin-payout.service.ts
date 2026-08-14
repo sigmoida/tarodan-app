@@ -17,6 +17,7 @@ import { PaymentService } from "../payment/payment.service";
 import { paginate, resolveOrderBy } from "../../common/list";
 import { REFERENCE_PREFIX } from "../../common/helpers/code-prefixes";
 import { generateUniqueReference } from "../../common/helpers/generate-reference";
+import { i18nMessage } from "../i18n";
 
 /**
  * Satıcı ödemeleri (escrow özet/işlem/plan/CSV, manuel release, transfer retry) —
@@ -606,7 +607,7 @@ export class AdminPayoutService {
     // gerekçesiz tetikleme engellenir ve audit izine sebep yazılır.
     if (!reason || !reason.trim()) {
       throw new BadRequestException(
-        "Escrow serbest bırakma için sebep (reason) zorunludur",
+        i18nMessage("server.admin.payment.escrowReasonRequired"),
       );
     }
     await this.paymentService.releasePayment(orderId, {
@@ -654,7 +655,7 @@ export class AdminPayoutService {
   ) {
     if (!reason || !reason.trim()) {
       throw new BadRequestException(
-        "Escrow serbest bırakma için sebep (reason) zorunludur",
+        i18nMessage("server.admin.payment.escrowReasonRequired"),
       );
     }
 
@@ -668,7 +669,9 @@ export class AdminPayoutService {
     });
     if (!trade || trade.status !== TradeStatus.completed) {
       throw new BadRequestException(
-        `Takas durumu '${trade?.status ?? "bulunamadı"}' — yalnız 'completed' takasta nakit hold serbest bırakılabilir`,
+        i18nMessage("server.admin.trade.cashHoldReleaseStateInvalid", {
+          status: trade?.status ?? "bulunamadı",
+        }),
       );
     }
 
@@ -738,10 +741,15 @@ export class AdminPayoutService {
     const transfer = await this.prisma.payoutTransfer.findUnique({
       where: { id: transferId },
     });
-    if (!transfer) throw new NotFoundException("Payout transfer bulunamadı");
+    if (!transfer)
+      throw new NotFoundException(
+        i18nMessage("server.admin.payout.transferNotFound"),
+      );
     if (!["failed", "returned"].includes(transfer.status)) {
       throw new BadRequestException(
-        `Transfer durumu '${transfer.status}' tekrar denenebilir değil`,
+        i18nMessage("server.admin.payout.retryStateInvalid", {
+          status: transfer.status,
+        }),
       );
     }
 

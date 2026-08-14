@@ -8,10 +8,9 @@
 module.exports = {
   plugins: ["@tarodan"],
   rules: {
-    // 617 exception messages are still hardcoded Turkish; a warning keeps them
-    // visible without failing the build, and becomes an error once they are
-    // converted to catalog keys.
-    "@tarodan/no-hardcoded-exception-message": "warn",
+    // The migration is complete: every exception carries a catalog key, so a
+    // literal Turkish message is now a regression rather than legacy.
+    "@tarodan/no-hardcoded-exception-message": "error",
 
     // An error from day one: every key NOT on the allow list below already has
     // an accessor, so a new raw read is a regression, not legacy.

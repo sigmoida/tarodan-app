@@ -11,6 +11,7 @@ import { PaymentService } from "../payment/payment.service";
 import { AdminOrderQueryDto, ResolveDisputeDto } from "./dto";
 import { OrderStatus, Prisma, ProductKind } from "@prisma/client";
 import { paginate } from "../../common/list";
+import { i18nMessage } from "../i18n";
 
 /**
  * Sipariş yönetimi (liste, ihtilaflar, ihtilaf çözümü) — AdminService'in
@@ -519,7 +520,7 @@ export class AdminOrderService {
     });
 
     if (!order) {
-      throw new NotFoundException("Sipariş bulunamadı");
+      throw new NotFoundException(i18nMessage("server.order.notFound"));
     }
 
     // Refund resolutions MUST go through the canonical refund orchestrator (F3.2):
@@ -541,7 +542,7 @@ export class AdminOrderService {
       case "partial_refund":
         if (dto.refundAmount == null || dto.refundAmount <= 0) {
           throw new BadRequestException(
-            "Kısmi iade için geçerli bir iade tutarı gerekir",
+            i18nMessage("server.admin.payment.partialAmountRequired"),
           );
         }
         if (!this.paymentService) {

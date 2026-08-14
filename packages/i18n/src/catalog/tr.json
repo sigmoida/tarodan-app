@@ -7493,7 +7493,8 @@
         "shipmentToInTransitForbidden": "Kargo {status} durumundan yolda durumuna geçirilemez"
       },
       "user": {
-        "notBanned": "Kullanıcı zaten banlı değil"
+        "notBanned": "Kullanıcı zaten banlı değil",
+        "alreadyBanned": "Kullanıcı zaten banlı"
       },
       "catalog": {
         "categoryHasProducts": "Bu kategoride ürünler bulunmaktadır. Önce ürünleri başka kategoriye taşıyın.",
@@ -7560,7 +7561,20 @@
         "deliverStateInvalid": "Gönderim durumu '{status}' — teslim edildi olarak işaretlenemez",
         "reviewStateInvalid": "Takas durumu '{status}' — kontrole yalnız 'at_warehouse' takas alınabilir",
         "approveStateInvalid": "Takas durumu '{status}' onay için uygun değil. Beklenen: at_warehouse veya admin_reviewing.",
-        "rejectStateInvalid": "Takas durumu '{status}' reddetme için uygun değil. Beklenen: at_warehouse veya admin_reviewing."
+        "rejectStateInvalid": "Takas durumu '{status}' reddetme için uygun değil. Beklenen: at_warehouse veya admin_reviewing.",
+        "notReturnShipment": "Bu gönderim bir iade gönderimi değil",
+        "cancelReasonTooShort": "İptal gerekçesi en az 10 karakter olmalıdır",
+        "nothingArrived": "Hiçbir ürün depoya ulaşmamış; bu endpoint sadece kısmen ulaşmış takaslar için.",
+        "forceCancelStateInvalid": "Hem ulaşmış hem de yolda olan bir kargo bulunamadı; force-cancel için durum uygun değil.",
+        "lostReasonTooShort": "Kayıp gerekçesi en az 10 karakter olmalıdır",
+        "lostReturnOnly": "Sadece iade gönderileri kayıp olarak işaretlenebilir",
+        "deliveredNotLost": "Bu gönderim zaten teslim edildi; kayıp işaretlenemez",
+        "alreadyLost": "Bu gönderim zaten kayıp işaretli",
+        "compensationUserNotParty": "Tazminat kullanıcısı bu takasın taraflarından biri olmalı",
+        "refundFailed": "Takas iadesi başarısız: {reason} (retry cron devreye girer)",
+        "refundSkipped": "Takas iadesi yapılamadı: {reason}",
+        "cashHoldReleaseStateInvalid": "Takas durumu '{status}' — yalnız 'completed' takasta nakit hold serbest bırakılabilir",
+        "forceCancelTradeStateInvalid": "Takas durumu '{status}' force-cancel için uygun değil. Beklenen: shipping_to_warehouse."
       },
       "sellerApplication": {
         "notFound": "Başvuru bulunamadı",
@@ -7586,7 +7600,109 @@
         "ruleNotFound": "Vergi kuralı bulunamadı",
         "rateRange": "Oran 0 ile 100 arasında olmalı",
         "exemptionNotFound": "KDV istisnası bulunamadı"
-      }
+      },
+      "adPackage": {
+        "tierRequired": "Üyelik katmanı hedeflemesinde en az bir katman seçilmelidir",
+        "userRequired": "Kullanıcı hedeflemesinde en az bir kullanıcı seçilmelidir",
+        "targetRequired": "Katman veya kullanıcı hedeflemesinde en az bir hedef seçilmelidir",
+        "notFound": "Paket bulunamadı",
+        "purchaseNotFound": "Paket satın alımı bulunamadı",
+        "pauseActiveOnly": "Yalnızca süresi devam eden aktif paket duraklatılabilir",
+        "resumePausedOnly": "Yalnızca duraklatılmış paket devam ettirilebilir",
+        "extendActiveOrPausedOnly": "Yalnızca aktif veya duraklatılmış paketin süresi uzatılabilir",
+        "extensionRange": "Uzatma süresi 1-365 gün olmalıdır"
+      },
+      "fileMissing": "Dosya gönderilmedi",
+      "commission": {
+        "draftRequired": "Önce aktif setten bir komisyon taslağı oluşturun.",
+        "publishedImmutable": "Yayınlanmış komisyon setleri değiştirilemez; yeni bir taslak oluşturun.",
+        "maxAboveMin": "Fiyat üst sınırı alt sınırdan büyük olmalıdır. Üst sınır aralığa dahil değildir.",
+        "capBelowFloor": "Ücret tavanı ilgili ücret tabanından küçük olamaz.",
+        "zeroRateWithBounds": "Oran %0 iken pozitif ücret tabanı veya tavanı tanımlanamaz.",
+        "duplicatePackageTier": "Aynı kargo paket boyutu bir kuralda birden fazla kez tanımlanamaz.",
+        "rangeOverlap": "Bu kategori ve satıcı tipi için fiyat aralığı mevcut bir taslak kuralla çakışıyor.",
+        "ruleNotFound": "Komisyon kuralı bulunamadı",
+        "rangeOverlapOnEdit": "Bu değişiklik fiyat aralığını başka bir taslak kuralla çakıştırıyor.",
+        "setNotFound": "Komisyon seti bulunamadı",
+        "publishDraftOnly": "Yalnız taslak set yayınlanabilir."
+      },
+      "page": {
+        "notFound": "Sayfa bulunamadı",
+        "slugInUse": "Bu slug zaten kullanılıyor"
+      },
+      "content": {
+        "invalidTemplateKey": "Geçersiz şablon anahtarı",
+        "unsafeTemplateHtml": "E-posta şablonu çalıştırılabilir veya güvensiz HTML içeremez"
+      },
+      "security": {
+        "logNotFound": "Güvenlik kaydı bulunamadı",
+        "alreadyResolved": "Bu sorun zaten çözümlendi"
+      },
+      "media": {
+        "invalidFolder": "Geçersiz klasör yolu"
+      },
+      "moderation": {
+        "aiDisabled": "AI moderasyon kapalı",
+        "aiUnreachable": "AI servisine erişilemedi",
+        "invalidType": "Geçersiz moderasyon türü",
+        "reviewNotFound": "Değerlendirme bulunamadı"
+      },
+      "notification": {
+        "targetUserNotFound": "Hedef kullanıcı bulunamadı",
+        "sendFailed": "Bildirim gönderilemedi",
+        "scheduleInFuture": "Zamanlama tarihi gelecekte olmalıdır",
+        "scheduledNotFound": "Zamanlanmış bildirim bulunamadı"
+      },
+      "payment": {
+        "partialAmountRequired": "Kısmi iade için geçerli bir iade tutarı gerekir",
+        "refundCompletedOnly": "Sadece tamamlanmış ödemeler iade edilebilir",
+        "groupRefundNotHere": "Grup (sepet) ödemesi manuel iadesi buradan yapılamaz — ilgili siparişleri sipariş bazında iade edin.",
+        "invalidRefundAmount": "İade tutarı geçersiz",
+        "refundAttemptNotFound": "İade denemesi bulunamadı",
+        "resolveManualReviewOnly": "Yalnız manuel inceleme bekleyen iade denemeleri çözülebilir",
+        "cancelCompleted": "Tamamlanmış ödemeler iptal edilemez, iade yapın",
+        "escrowReasonRequired": "Escrow serbest bırakma için sebep (reason) zorunludur"
+      },
+      "payout": {
+        "transferNotFound": "Payout transfer bulunamadı",
+        "retryStateInvalid": "Transfer durumu '{status}' tekrar denenebilir değil"
+      },
+      "product": {
+        "approvePendingOnly": "Sadece bekleyen ürünler onaylanabilir",
+        "selectionRequired": "En az bir ürün seçilmelidir",
+        "soldNotDeletable": "Satılmış ürünler silinemez",
+        "reservedNotDeletable": "Rezerve edilmiş ürünler silinemez",
+        "withActiveOrderNotDeletable": "Aktif siparişi olan ürünler silinemez",
+        "boostedNotHardDeletable": "Öne çıkarma kaydı olan ürün kalıcı silinemez; pasife alın (soft delete)",
+        "restoreRemovedOnly": "Yalnızca kaldırılmış ürünler geri yüklenebilir"
+      },
+      "membership": {
+        "monthlyPriceRange": "Üyelik aylık fiyatı 0 ile 1.000.000 arasında olmalıdır",
+        "yearlyDiscountRange": "Yıllık indirim oranı 0 ile 90 arasında olmalıdır",
+        "tierInactive": "Bu üyelik kademesi aktif değil",
+        "businessRequiresKyc": "Business üyelik yalnız KYC onaylı şirket hesabına atanabilir",
+        "kycRequiresBusiness": "KYC onaylı şirket hesabına yalnız Business üyelik atanabilir",
+        "tierTypeNotFound": "Üyelik tipi bulunamadı: {type}"
+      },
+      "platformSellerMissing": "Platform satıcı hesabı bulunamadı. Önce üretim referans seed'i (seed-production) çalıştırılmalı.",
+      "resolutionNoteRequired": "Çözüm notu zorunludur",
+      "carrierCancellation": {
+        "notFound": "Taşıyıcı iptal görevi bulunamadı",
+        "alreadySettled": "Taşıyıcı iptal görevi zaten sonuçlandırılmış"
+      },
+      "siteAccess": {
+        "codeNotFound": "Erişim kodu bulunamadı",
+        "codeHasNoEmail": "Bu erişim kodunun e-posta adresi yok; önce e-posta ekleyin."
+      },
+      "staff": {
+        "roleAssignSuperAdminOnly": "Rol atama yetkisi yalnızca süper adminde (yönetici izni kapalı)",
+        "superAdminOnly": "Süper admin rolüyle ilgili işlemi yalnızca süper admin yapabilir",
+        "notFound": "Admin kaydı bulunamadı",
+        "lastSuperAdminImmutable": "Sistemdeki son süper admin değiştirilemez",
+        "cannotRemoveSelf": "Kendi admin yetkinizi kaldıramazsınız",
+        "lastSuperAdminUndeletable": "Sistemdeki son süper admin kaldırılamaz"
+      },
+      "warehouseAddressMissing": "Depo adresi yapılandırılmamış. Lütfen `warehouse_address_id` platform ayarını tanımlayın."
     },
     "advertisement": {
       "notFound": "Reklam bulunamadı",
@@ -7631,7 +7747,10 @@
       "fileTooLarge": "Dosya boyutu çok büyük (max 10MB)",
       "unsupportedType": "Geçersiz dosya tipi. Sadece JPEG, PNG ve WebP desteklenir.",
       "tooManyImages": "En fazla {max} resim yükleyebilirsiniz",
-      "invalidUploadTarget": "Geçersiz yükleme hedefi: {folder}. İzinli hedefler: messages, reviews, collections"
+      "invalidUploadTarget": "Geçersiz yükleme hedefi: {folder}. İzinli hedefler: messages, reviews, collections",
+      "actionForbidden": "Bu işlem için yetkiniz yok.",
+      "fileMissing": "Dosya bulunamadı.",
+      "fileForbidden": "Bu dosya üzerinde yetkiniz yok."
     },
     "search": {
       "reindexFailed": "Reindex başarısız"
@@ -7681,7 +7800,8 @@
       "userMissing": "Kullanıcı yok: {email}"
     },
     "moderation": {
-      "contentRejected": "Girdiğiniz {field} uygun değildir ({reason}). Lütfen düzenleyin."
+      "contentRejected": "Girdiğiniz {field} uygun değildir ({reason}). Lütfen düzenleyin.",
+      "imageRejected": "Yüklediğiniz resim uygun değildir. Lütfen uygun bir görsel seçin."
     },
     "discount": {
       "platformCannotDiscountProduct": "Platform ürün fiyatına indirim uygulayamaz; ürün fiyatı satıcıya aittir",
@@ -7750,7 +7870,8 @@
       "twoFactorDisabled": "2FA etkin değil",
       "tokenAlreadyUsed": "Bu token zaten kullanılmış",
       "currentPasswordWrong": "Mevcut şifre yanlış",
-      "invalidToken": "Geçersiz doğrulama tokeni"
+      "invalidToken": "Geçersiz doğrulama tokeni",
+      "accessBlocked": "Erişim engellendi"
     },
     "storage": {
       "uploadUnavailableRetry": "Dosya yükleme servisi şu anda kullanılamıyor. Lütfen daha sonra tekrar deneyin.",

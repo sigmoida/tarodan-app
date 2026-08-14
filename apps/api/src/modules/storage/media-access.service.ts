@@ -2,9 +2,10 @@ import {
   Injectable,
   ForbiddenException,
   NotFoundException,
-} from '@nestjs/common';
-import { PrismaService } from '../../prisma';
-import { RequestUser } from '../auth/interfaces/jwt-payload.interface';
+} from "@nestjs/common";
+import { PrismaService } from "../../prisma";
+import { RequestUser } from "../auth/interfaces/jwt-payload.interface";
+import { i18nMessage } from "../i18n";
 
 /**
  * Dosya (mediaFile) için nesne-seviyesi yetkilendirme — TEK KAYNAK.
@@ -31,7 +32,7 @@ export class MediaAccessService {
     user: RequestUser | undefined,
   ): Promise<{ bucket: string; key: string }> {
     if (!user?.id) {
-      throw new ForbiddenException('Bu işlem için yetkiniz yok.');
+      throw new ForbiddenException(i18nMessage("server.media.actionForbidden"));
     }
 
     const file = await this.prisma.mediaFile.findUnique({
@@ -40,11 +41,11 @@ export class MediaAccessService {
     });
 
     if (!file) {
-      throw new NotFoundException('Dosya bulunamadı.');
+      throw new NotFoundException(i18nMessage("server.media.fileMissing"));
     }
 
     if (!user.isAdmin && (!file.uploaderId || file.uploaderId !== user.id)) {
-      throw new ForbiddenException('Bu dosya üzerinde yetkiniz yok.');
+      throw new ForbiddenException(i18nMessage("server.media.fileForbidden"));
     }
 
     return { bucket: file.bucket, key: file.key };

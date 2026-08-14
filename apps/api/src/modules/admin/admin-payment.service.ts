@@ -28,6 +28,7 @@ import {
 import { PaymentService } from "../payment/payment.service";
 import { paginate, resolveOrderBy } from "../../common/list";
 import { tradePaymentRefundableAmountFor } from "../trade/trade-refund-policy";
+import { i18nMessage } from "../i18n";
 
 /**
  * Ödeme yönetimi (liste, detay, istatistik, manuel iade, zorla iptal) —
@@ -428,7 +429,9 @@ export class AdminPaymentService {
     });
 
     if (!payment) {
-      throw new NotFoundException("Ödeme bulunamadı");
+      throw new NotFoundException(
+        i18nMessage("server.payment.paymentNotFound"),
+      );
     }
 
     const group: any = (payment as any).checkoutGroup;
@@ -822,12 +825,14 @@ export class AdminPaymentService {
     });
 
     if (!payment) {
-      throw new NotFoundException("Ödeme bulunamadı");
+      throw new NotFoundException(
+        i18nMessage("server.payment.paymentNotFound"),
+      );
     }
 
     if (payment.status !== PaymentStatus.completed) {
       throw new BadRequestException(
-        "Sadece tamamlanmış ödemeler iade edilebilir",
+        i18nMessage("server.admin.payment.refundCompletedOnly"),
       );
     }
 
@@ -923,14 +928,18 @@ export class AdminPaymentService {
         );
         if (res.failed) {
           throw new BadRequestException(
-            `Takas iadesi başarısız: ${res.reason ?? "bilinmeyen hata"} (retry cron devreye girer)`,
+            i18nMessage("server.admin.trade.refundFailed", {
+              reason: res.reason ?? "bilinmeyen hata",
+            }),
           );
         }
         if (!res.refunded) {
           // failed değil ama iade de yapılmadı (ör. uygun satır kalmadı) —
           // başarı toast'ı yerine net hata dön.
           throw new BadRequestException(
-            `Takas iadesi yapılamadı: ${res.skippedReason ?? "iade edilebilir satır yok"}`,
+            i18nMessage("server.admin.trade.refundSkipped", {
+              reason: res.skippedReason ?? "iade edilebilir satır yok",
+            }),
           );
         }
         return {
@@ -944,13 +953,15 @@ export class AdminPaymentService {
       // Grup (sepet) ödemesi: manuel tam-iade buradan yapılamaz (hangi sipariş
       // belirsiz) — admin ilgili siparişleri sipariş bazında iade etmeli.
       throw new BadRequestException(
-        "Grup (sepet) ödemesi manuel iadesi buradan yapılamaz — ilgili siparişleri sipariş bazında iade edin.",
+        i18nMessage("server.admin.payment.groupRefundNotHere"),
       );
     }
 
     const refundAmount = amount ?? Number(payment.amount);
     if (!Number.isFinite(refundAmount) || refundAmount <= 0) {
-      throw new BadRequestException("İade tutarı geçersiz");
+      throw new BadRequestException(
+        i18nMessage("server.admin.payment.invalidRefundAmount"),
+      );
     }
 
     // Process refund via PaymentService
@@ -1013,13 +1024,16 @@ export class AdminPaymentService {
       const attempt = await tx.refundAttempt.findUnique({
         where: { id: attemptId },
       });
-      if (!attempt) throw new NotFoundException("İade denemesi bulunamadı");
+      if (!attempt)
+        throw new NotFoundException(
+          i18nMessage("server.admin.payment.refundAttemptNotFound"),
+        );
       if (
         attempt.status !== RefundAttemptStatus.manual_review &&
         attempt.status !== RefundAttemptStatus.submitting
       ) {
         throw new BadRequestException(
-          "Yalnız manuel inceleme bekleyen iade denemeleri çözülebilir",
+          i18nMessage("server.admin.payment.resolveManualReviewOnly"),
         );
       }
 
@@ -1162,12 +1176,14 @@ export class AdminPaymentService {
     });
 
     if (!payment) {
-      throw new NotFoundException("Ödeme bulunamadı");
+      throw new NotFoundException(
+        i18nMessage("server.payment.paymentNotFound"),
+      );
     }
 
     if (payment.status === PaymentStatus.completed) {
       throw new BadRequestException(
-        "Tamamlanmış ödemeler iptal edilemez, iade yapın",
+        i18nMessage("server.admin.payment.cancelCompleted"),
       );
     }
 
