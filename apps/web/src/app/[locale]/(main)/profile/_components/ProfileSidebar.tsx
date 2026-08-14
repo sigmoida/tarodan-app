@@ -22,6 +22,7 @@ import {
   ChartPieIcon,
   ChatBubbleLeftRightIcon,
   BellIcon,
+  LifebuoyIcon,
   BuildingStorefrontIcon,
   ShieldCheckIcon,
   ArrowRightOnRectangleIcon,
@@ -186,6 +187,14 @@ export default function ProfileSidebar({
           icon: BellIcon,
           label: t("nav.notifications"),
           href: "/profile/notifications",
+        },
+        // Destek `/profile` ALTINDA DEĞİL: talep ekranı profil dışında,
+        // kendi route grubunda yaşıyor. Bağlantı yine de buraya ait — kullanıcı
+        // için destek de bir iletişim kanalı.
+        {
+          icon: LifebuoyIcon,
+          label: t("nav.support"),
+          href: "/support",
         },
       ],
     },

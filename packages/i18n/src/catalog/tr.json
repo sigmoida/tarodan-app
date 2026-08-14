@@ -167,7 +167,8 @@
     "loginForTrades": "Takas İşlemleri İçin Giriş Yapın",
     "vehicleTypes": "Araç Türleri",
     "manufacturers": "Üreticiler",
-    "allManufacturers": "Tüm Üreticiler"
+    "allManufacturers": "Tüm Üreticiler",
+    "support": "Destek"
   },
   "auth": {
     "loginTitle": "Giriş Yap",

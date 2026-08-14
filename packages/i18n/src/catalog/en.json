@@ -167,7 +167,8 @@
     "loginForTrades": "Sign In for Trade Operations",
     "vehicleTypes": "Vehicle Types",
     "manufacturers": "Manufacturers",
-    "allManufacturers": "All Manufacturers"
+    "allManufacturers": "All Manufacturers",
+    "support": "Support"
   },
   "auth": {
     "loginTitle": "Login",
