@@ -16,7 +16,7 @@ export function ResourceListDateRange({
   const [from, setFrom] = useFilter(fromName);
   const [to, setTo] = useFilter(toName);
   return (
-    <div className="flex shrink-0 gap-3">
+    <div className="flex flex-wrap gap-3">
       <DatePicker
         value={from}
         onChange={(v) => setFrom(v)}
