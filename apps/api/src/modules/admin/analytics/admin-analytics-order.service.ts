@@ -11,7 +11,7 @@ import { AdminAuditService } from "../ops/admin-audit.service";
 import { isAdminOrderTransitionAllowed } from "../../order/helpers/order-state-machine";
 import { AddOrderTrackingDto, UpdateOrderStatusDto } from "../dto";
 import { OrderStatus, ProductStatus, ShipmentStatus } from "@prisma/client";
-import { canTransitionShipmentStatus } from "../../shipping/shipment-state-machine";
+import { canTransitionShipmentStatus } from "../../shipping/helpers/shipment-state-machine";
 import { SearchService } from "../../search/search.service";
 import { CacheService } from "../../cache/cache.service";
 import { AdminAnalyticsCommonService } from "./admin-analytics-common.service";

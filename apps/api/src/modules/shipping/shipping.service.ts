@@ -15,20 +15,20 @@ import {
   UpdateTrackingDto,
   ShippingProvider,
 } from "./dto";
-import { canTransitionShipmentStatus } from "./shipment-state-machine";
+import { canTransitionShipmentStatus } from "./helpers/shipment-state-machine";
 import { SHIPPABLE_ORDER_STATUSES } from "../order/helpers/order-state-machine";
-import { ACTIVE_REFUND_REQUEST_STATUSES } from "../refund/refund-active-statuses";
-import { ShippingTariffService } from "./shipping-tariff.service";
+import { ACTIVE_REFUND_REQUEST_STATUSES } from "../refund/helpers/refund-active-statuses";
+import { ShippingTariffService } from "./tariff/shipping-tariff.service";
 import {
   shippingAmountForDesi,
   ShippingPackageTiersNotConfiguredError,
-} from "./shipping-tariff.helper";
+} from "./helpers/shipping-tariff.helper";
 import {
   ShipmentStatus,
   OrderStatus,
   ShippingPackageTierCode,
 } from "@prisma/client";
-import { billableDesiForTier } from "./shipping-package-tier";
+import { billableDesiForTier } from "./helpers/shipping-package-tier";
 import { OrderShipmentProvisioner } from "../surat-cargo/sync/order-shipment-provisioner.service";
 import { i18nMessage } from "../i18n";
 

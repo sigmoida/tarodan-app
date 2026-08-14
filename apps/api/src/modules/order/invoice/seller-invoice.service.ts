@@ -11,7 +11,7 @@ import { i18nMessage } from "../../i18n";
 import { StorageService } from "../../storage/storage.service";
 import { SmtpProvider } from "../../mail/smtp.provider";
 import { renderManagedEmailTemplate } from "../../../common/helpers/email-template-renderer";
-import { isBusinessMembershipEntitled } from "../../membership/membership.util";
+import { isBusinessMembershipEntitled } from "../../membership/helpers/membership.util";
 import { frontendUrl as resolveFrontendUrl } from "../../../config/app-urls";
 
 /**

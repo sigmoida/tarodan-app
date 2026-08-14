@@ -29,7 +29,7 @@ import { ProductModule } from "../product/product.module";
 import { CommissionModule } from "../commission/commission.module";
 import { TaxModule } from "../tax/tax.module";
 import { ElogoModule } from "../elogo";
-import { ShippingTariffModule } from "../shipping/shipping-tariff.module";
+import { ShippingTariffModule } from "../shipping/tariff/shipping-tariff.module";
 import { RefundModule } from "../refund/refund.module";
 import { scheduledProcessors } from "../../workers/scheduled-processors";
 

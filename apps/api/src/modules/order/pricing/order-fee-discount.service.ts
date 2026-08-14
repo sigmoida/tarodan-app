@@ -1,16 +1,16 @@
 import { Injectable, Logger, Optional } from "@nestjs/common";
 import { DiscountTarget } from "@prisma/client";
 import { PrismaService } from "../../../prisma";
-import { effectiveMembershipTierType } from "../../membership/membership.util";
-import { FeeDiscountResolver } from "../../discount/fee-discount.resolver";
+import { effectiveMembershipTierType } from "../../membership/helpers/membership.util";
+import { FeeDiscountResolver } from "../../discount/engine/fee-discount.resolver";
 import {
   applyFeeDiscounts,
   automaticBudgetEntriesOf,
-} from "../../discount/fee-discount.engine";
+} from "../../discount/engine/fee-discount.engine";
 import type {
   AppliedFeeDiscount,
   FeeDiscountCandidate,
-} from "../../discount/fee-discount.engine";
+} from "../../discount/engine/fee-discount.engine";
 import type { CommissionResult } from "./order-pricing.service";
 
 /**

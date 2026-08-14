@@ -1,6 +1,6 @@
 import { RefundRequestStatus } from "@prisma/client";
 import { NotificationType } from "../notification/dto/notification.dto";
-import { resolveWebNotificationLink } from "../notification/notification-link";
+import { resolveWebNotificationLink } from "../notification/helpers/notification-link";
 import { RefundService } from "./refund.service";
 import { RefundFinancialService } from "./refund-financial.service";
 import { RefundShipmentService } from "./refund-shipment.service";

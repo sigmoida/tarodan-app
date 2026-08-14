@@ -1,13 +1,13 @@
 import { Injectable, Logger, Optional } from "@nestjs/common";
 import { PrismaService } from "../../prisma";
 import { DiscountService } from "../discount/discount.service";
-import { FeeDiscountResolver } from "../discount/fee-discount.resolver";
+import { FeeDiscountResolver } from "../discount/engine/fee-discount.resolver";
 import { StorageService } from "../storage/storage.service";
 import {
   canTradeFromMembership,
   isPremiumEntitled,
-} from "../membership/membership.util";
-import { getFreeTierCanTrade } from "../membership/free-tier-trade.helper";
+} from "../membership/helpers/membership.util";
+import { getFreeTierCanTrade } from "../membership/helpers/free-tier-trade.helper";
 import { ProductStatus } from "@prisma/client";
 import { publicIdentityFields } from "../../common/helpers/public-identity";
 import { getAvailableQuantity } from "./helpers/product-availability.helper";

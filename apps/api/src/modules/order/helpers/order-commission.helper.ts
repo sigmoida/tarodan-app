@@ -5,7 +5,7 @@ import {
   SellerType,
   ShippingPackageTierCode,
 } from "@prisma/client";
-import type { ShippingBuyerShareByTier } from "../../shipping/shipping-tariff.helper";
+import type { ShippingBuyerShareByTier } from "../../shipping/helpers/shipping-tariff.helper";
 
 type CommissionNumericValue = number | string | { toString(): string };
 

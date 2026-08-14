@@ -3,7 +3,7 @@ import { CartService } from "./cart.service";
 import { PrismaService } from "../../prisma";
 import { DiscountService } from "../discount/discount.service";
 import { StorageService } from "../storage/storage.service";
-import { ShippingTariffService } from "../shipping/shipping-tariff.service";
+import { ShippingTariffService } from "../shipping/tariff/shipping-tariff.service";
 import { ProductKind, ProductStatus } from "@prisma/client";
 import { flatPackageTiers } from "../shipping/testing/tariff-fixture";
 

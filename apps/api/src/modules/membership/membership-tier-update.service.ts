@@ -8,7 +8,7 @@ import { PrismaService } from "../../prisma";
 import { AdminAuditService } from "../admin/ops/admin-audit.service";
 import { i18nMessage } from "../i18n";
 import { MAX_PRODUCT_IMAGES } from "../product/helpers/product-image-keys";
-import { invalidateFreeTierCanTradeCache } from "./free-tier-trade.helper";
+import { invalidateFreeTierCanTradeCache } from "./helpers/free-tier-trade.helper";
 
 /**
  * Katman güncelleme gövdesi — alan doğrulaması DTO'da (UpdateMembershipTierDto),

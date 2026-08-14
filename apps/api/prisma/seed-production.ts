@@ -22,7 +22,7 @@ import {
 } from "@prisma/client";
 import * as bcrypt from "bcrypt";
 import { randomUUID } from "crypto";
-import { SHIPPING_PACKAGE_TIER_DEFAULTS } from "../src/modules/shipping/shipping-package-tier";
+import { SHIPPING_PACKAGE_TIER_DEFAULTS } from "../src/modules/shipping/helpers/shipping-package-tier";
 import { PRODUCTION_REFERENCE_IDS } from "./seed-ids";
 
 const prisma = new PrismaClient();

@@ -1,6 +1,6 @@
 import { Injectable, Logger } from "@nestjs/common";
 import { PrismaService } from "../../../prisma";
-import { isPremiumEntitled } from "../../membership/membership.util";
+import { isPremiumEntitled } from "../../membership/helpers/membership.util";
 import { computeQualityScore } from "../helpers/quality-score";
 import { computeRelevanceScore } from "../helpers/relevance-score";
 import { publicUserRatingWhere } from "../../../common/helpers/public-rating";

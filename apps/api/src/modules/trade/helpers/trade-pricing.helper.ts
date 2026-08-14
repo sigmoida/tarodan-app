@@ -2,7 +2,7 @@ import {
   calculatePackageDesi,
   resolvePackageTier,
   type OutboundTariffLike,
-} from "../../shipping/shipping-tariff.helper";
+} from "../../shipping/helpers/shipping-tariff.helper";
 import {
   findMatchingCommissionRule,
   type CommissionRuleMatchable,

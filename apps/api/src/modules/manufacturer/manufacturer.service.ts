@@ -1,7 +1,7 @@
 import { Injectable, NotFoundException, Logger } from "@nestjs/common";
 import { PrismaService } from "../../prisma";
 import { isPublicStorageKey, StorageService } from "../storage/storage.service";
-import { saleCapableSellerWhere } from "../membership/membership.util";
+import { saleCapableSellerWhere } from "../membership/helpers/membership.util";
 import { catalogProductWhere } from "../product/helpers/catalog-product-where";
 import { i18nMessage } from "../i18n";
 

@@ -8,7 +8,7 @@ import {
   resolvePackageShippingBuyerShare,
   resolvePackageShippingDecision,
   splitShippingByBuyerShare,
-} from "../../shipping/shipping-tariff.helper";
+} from "../../shipping/helpers/shipping-tariff.helper";
 import {
   flatPackageTiers,
   packageTiers,

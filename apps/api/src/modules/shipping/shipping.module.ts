@@ -3,14 +3,14 @@ import { ConfigModule } from "@nestjs/config";
 import { BullModule } from "@nestjs/bull";
 import { ShippingController } from "./shipping.controller";
 import { ShippingService } from "./shipping.service";
-import { ShippingSchedulerService } from "./shipping-scheduler.service";
-import { ShippingScheduledProcessor } from "./shipping-scheduled.processor";
+import { ShippingSchedulerService } from "./jobs/shipping-scheduler.service";
+import { ShippingScheduledProcessor } from "./jobs/shipping-scheduled.processor";
 import { QUEUE_NAMES } from "../../workers/constants";
 import { PrismaModule } from "../../prisma";
 import { PaymentModule } from "../payment/payment.module";
 import { SuratCargoModule } from "../surat-cargo/surat-cargo.module";
 import { NotificationModule } from "../notification/notification.module";
-import { ShippingTariffModule } from "./shipping-tariff.module";
+import { ShippingTariffModule } from "./tariff/shipping-tariff.module";
 import { scheduledProcessors } from "../../workers/scheduled-processors";
 
 @Module({

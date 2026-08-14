@@ -23,7 +23,7 @@ import {
   effectiveMembershipTierType,
   isPremiumEntitled,
   saleCapableSellerWhere,
-} from "../../membership/membership.util";
+} from "../../membership/helpers/membership.util";
 import { i18nMessage } from "../../i18n";
 import {
   ONBOARDING_TOURS,

@@ -97,7 +97,7 @@ import { RefundModule } from "../refund/refund.module";
 import { NotificationModule } from "../notification/notification.module";
 import { OrderModule } from "../order/order.module";
 import { ElogoModule } from "../elogo/elogo.module";
-import { ShippingTariffModule } from "../shipping/shipping-tariff.module";
+import { ShippingTariffModule } from "../shipping/tariff/shipping-tariff.module";
 import { TradeModule } from "../trade/trade.module";
 import { CommissionModule } from "../commission/commission.module";
 import { MembershipModule } from "../membership/membership.module";

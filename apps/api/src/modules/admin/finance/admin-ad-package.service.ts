@@ -10,7 +10,7 @@ import {
   Prisma,
 } from "@prisma/client";
 import { PrismaService } from "../../../prisma";
-import { isPremiumEntitled } from "../../membership/membership.util";
+import { isPremiumEntitled } from "../../membership/helpers/membership.util";
 import { computeRelevanceScore } from "../../product/helpers/relevance-score";
 import {
   CreateAdPackageDto,

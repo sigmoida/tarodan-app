@@ -6,7 +6,7 @@ import {
 import { PrismaService } from "../../prisma";
 import { CacheService } from "../cache/cache.service";
 import { Category } from "@prisma/client";
-import { saleCapableSellerWhere } from "../membership/membership.util";
+import { saleCapableSellerWhere } from "../membership/helpers/membership.util";
 import { catalogProductWhere } from "../product/helpers/catalog-product-where";
 import {
   assertCategoryHasPublishedCommissionCoverage,

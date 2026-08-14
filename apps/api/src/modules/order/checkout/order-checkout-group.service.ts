@@ -37,16 +37,16 @@ import { OrderFeeDiscountService } from "../pricing/order-fee-discount.service";
 import type {
   AppliedFeeDiscount,
   FeeDiscountCandidate,
-} from "../../discount/fee-discount.engine";
+} from "../../discount/engine/fee-discount.engine";
 import {
   allocateCouponAcrossLines,
   remainingDiscountAllowanceFor,
-} from "../../discount/fee-discount.engine";
+} from "../../discount/engine/fee-discount.engine";
 import { distanceSalesConsent } from "../helpers/distance-sales-contract";
 import {
   calculatePackageDesi,
   type ShippingBuyerShareByTier,
-} from "../../shipping/shipping-tariff.helper";
+} from "../../shipping/helpers/shipping-tariff.helper";
 import {
   PUBLIC_NAME_SELECT,
   publicName,

@@ -12,8 +12,8 @@ import {
   canSellFromMembership,
   canTradeFromMembership,
   tradeCapableSellerWhere,
-} from "../../membership/membership.util";
-import { getFreeTierCanTrade } from "../../membership/free-tier-trade.helper";
+} from "../../membership/helpers/membership.util";
+import { getFreeTierCanTrade } from "../../membership/helpers/free-tier-trade.helper";
 import { tradeOnlyEsFilters } from "../helpers/trade-only-es-filter";
 import { saleCapableEsFilters } from "../helpers/sale-capable-es-filter";
 import {

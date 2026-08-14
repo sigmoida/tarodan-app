@@ -29,8 +29,8 @@ import { TaxService } from "../../tax/tax.service";
 import {
   canSellFromMembership,
   effectiveMembershipTierType,
-} from "../../membership/membership.util";
-import { ShippingTariffService } from "../../shipping/shipping-tariff.service";
+} from "../../membership/helpers/membership.util";
+import { ShippingTariffService } from "../../shipping/tariff/shipping-tariff.service";
 import {
   calculatePackageDesi,
   outboundPackageShipping,
@@ -38,8 +38,8 @@ import {
   ShippingPackageTiersNotConfiguredError,
   type OutboundTariffLike,
   type ShippingBuyerShareByTier,
-} from "../../shipping/shipping-tariff.helper";
-import { billableDesiForTier } from "../../shipping/shipping-package-tier";
+} from "../../shipping/helpers/shipping-tariff.helper";
+import { billableDesiForTier } from "../../shipping/helpers/shipping-package-tier";
 import { DiscountService } from "../../discount/discount.service";
 import { createHash } from "crypto";
 import { calculateServiceTax } from "../helpers/order-service-tax.helper";
@@ -51,15 +51,15 @@ import { OrderFeeDiscountService } from "./order-fee-discount.service";
 import type {
   AppliedFeeDiscount,
   FeeDiscountCandidate,
-} from "../../discount/fee-discount.engine";
+} from "../../discount/engine/fee-discount.engine";
 import {
   allocateCouponAcrossLines,
   remainingDiscountAllowanceFor,
-} from "../../discount/fee-discount.engine";
+} from "../../discount/engine/fee-discount.engine";
 import {
   summarizeFeeDiscounts,
   sumFeeDiscounts,
-} from "../../discount/fee-discount-summary";
+} from "../../discount/helpers/fee-discount-summary";
 
 /**
  * Commission calculation result interface

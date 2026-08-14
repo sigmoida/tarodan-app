@@ -10,7 +10,7 @@ import { PrismaService } from "../../../prisma";
 import { assertValidProductImages } from "../helpers/product-image-keys";
 import { CacheService } from "../../cache/cache.service";
 import { MembershipService } from "../../membership/membership.service";
-import { isCorporateSellingSuspended } from "../../membership/membership.util";
+import { isCorporateSellingSuspended } from "../../membership/helpers/membership.util";
 import { StorageService } from "../../storage/storage.service";
 import { InjectQueue } from "@nestjs/bull";
 import { Queue } from "bull";

@@ -6,7 +6,7 @@ import { TradeShipmentService } from "./lifecycle/trade-shipment.service";
 import { TradeCommonService } from "./trade-common.service";
 import { TradeQueryService } from "./trade-query.service";
 import { TradeQuoteService } from "./trade-quote.service";
-import { ShippingTariffModule } from "../shipping/shipping-tariff.module";
+import { ShippingTariffModule } from "../shipping/tariff/shipping-tariff.module";
 import { TradeLifecycleService } from "./lifecycle/trade-lifecycle.service";
 import { TradeReconciliationService } from "./lifecycle/trade-reconciliation.service";
 import { TradeSchedulerService } from "./jobs/trade-scheduler.service";

@@ -3,7 +3,7 @@ import { PrismaService } from "../../prisma";
 import { CacheService } from "../cache/cache.service";
 import { StorageService } from "../storage/storage.service";
 import { resolveBrandLogoUrl } from "./brand-logo-url";
-import { saleCapableSellerWhere } from "../membership/membership.util";
+import { saleCapableSellerWhere } from "../membership/helpers/membership.util";
 import { catalogProductWhere } from "../product/helpers/catalog-product-where";
 import { i18nMessage } from "../i18n";
 

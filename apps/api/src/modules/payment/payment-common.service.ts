@@ -3,7 +3,7 @@ import { PrismaService } from "../../prisma";
 import { PaymentStatus, OrderStatus } from "@prisma/client";
 import { asPaymentMetadata } from "./helpers/payment-metadata.types";
 import { CarrierCancellationService } from "../surat-cargo/sync/carrier-cancellation.service";
-import { canTransitionShipmentStatus } from "../shipping/shipment-state-machine";
+import { canTransitionShipmentStatus } from "../shipping/helpers/shipment-state-machine";
 
 export interface ShipmentCancellationResult {
   ok: boolean;

@@ -2,7 +2,7 @@ import { ConfigService } from "@nestjs/config";
 import { Test, TestingModule } from "@nestjs/testing";
 import { OrderService } from "./order.service";
 import { OrderPricingService } from "./pricing/order-pricing.service";
-import { ShippingTariffService } from "../shipping/shipping-tariff.service";
+import { ShippingTariffService } from "../shipping/tariff/shipping-tariff.service";
 import { OrderCheckoutService } from "./checkout/order-checkout.service";
 import { OrderCheckoutCommonService } from "./checkout/order-checkout-common.service";
 import { OrderCheckoutDirectService } from "./checkout/order-checkout-direct.service";

@@ -4,7 +4,7 @@ import { Test, TestingModule } from "@nestjs/testing";
 import { createHash } from "crypto";
 import { OrderService } from "../order.service";
 import { OrderPricingService } from "../pricing/order-pricing.service";
-import { ShippingTariffService } from "../../shipping/shipping-tariff.service";
+import { ShippingTariffService } from "../../shipping/tariff/shipping-tariff.service";
 import { OrderCheckoutService } from "./order-checkout.service";
 import { OrderCheckoutCommonService } from "./order-checkout-common.service";
 import { OrderCheckoutDirectService } from "./order-checkout-direct.service";

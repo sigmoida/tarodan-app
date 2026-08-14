@@ -26,19 +26,19 @@ import {
   DiscountTarget,
   Prisma,
 } from "@prisma/client";
-import { allocateCouponAcrossLines } from "../discount/fee-discount.engine";
+import { allocateCouponAcrossLines } from "../discount/engine/fee-discount.engine";
 import {
   getAvailableQuantity,
   canAddRequestedQuantityToCart,
 } from "../product/helpers/product-availability.helper";
-import { ShippingTariffService } from "../shipping/shipping-tariff.service";
+import { ShippingTariffService } from "../shipping/tariff/shipping-tariff.service";
 import {
   calculatePackageDesi,
   outboundPackageShipping,
   ShippingPackageTiersNotConfiguredError,
-} from "../shipping/shipping-tariff.helper";
+} from "../shipping/helpers/shipping-tariff.helper";
 import { i18nMessage } from "../i18n";
-import { canSellFromMembership } from "../membership/membership.util";
+import { canSellFromMembership } from "../membership/helpers/membership.util";
 import {
   PUBLIC_NAME_SELECT,
   publicName,

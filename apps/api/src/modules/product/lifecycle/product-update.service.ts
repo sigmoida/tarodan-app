@@ -23,7 +23,7 @@ import { PUBLIC_IDENTITY_SELECT } from "../../../common/helpers/public-identity"
 import { ProductRankingService } from "../ranking/product-ranking.service";
 import { MembershipService } from "../../membership/membership.service";
 import { productShippingTierData } from "../helpers/product-shipping-tier.helper";
-import { isCorporateSellingSuspended } from "../../membership/membership.util";
+import { isCorporateSellingSuspended } from "../../membership/helpers/membership.util";
 import { CommissionRuleGuardService } from "../../commission/commission-rule-guard.service";
 import { ModerationAiClient } from "../../moderation/moderation-ai.client";
 import { OFFER_CANCEL_REASON } from "../../trade/helpers/trade-cancel-reasons";

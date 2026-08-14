@@ -1,5 +1,5 @@
 import { ShippingPackageTierCode } from "@prisma/client";
-import type { PackageTierLike } from "../shipping-tariff.helper";
+import type { PackageTierLike } from "../helpers/shipping-tariff.helper";
 
 /**
  * Test tarifeleri için kademe iskeleti — TEK kaynak, böylece kademe sözleşmesi

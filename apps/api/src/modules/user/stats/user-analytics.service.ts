@@ -12,7 +12,7 @@ import { UserCommonService } from "../user-common.service";
 import {
   isBusinessMembershipEntitled,
   isPremiumEntitled,
-} from "../../membership/membership.util";
+} from "../../membership/helpers/membership.util";
 import { i18nMessage } from "../../i18n";
 import {
   PUBLIC_NAME_SELECT,

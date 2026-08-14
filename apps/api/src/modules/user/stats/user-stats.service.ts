@@ -7,7 +7,7 @@ import { publicUserRatingWhere } from "../../../common/helpers/public-rating";
 import {
   effectiveMembershipTierType,
   isBusinessMembershipEntitled,
-} from "../../membership/membership.util";
+} from "../../membership/helpers/membership.util";
 
 /**
  * UserStatsService — özet istatistikler: isBusinessAccount,

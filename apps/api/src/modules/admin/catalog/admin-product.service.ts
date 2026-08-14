@@ -11,7 +11,7 @@ import { notifyWebRevalidate } from "../../../common/revalidate";
 import { AdminAuditService } from "../ops/admin-audit.service";
 import { fulltextProductSearch } from "../../product/helpers/fulltext-search";
 import { getProductStatusFromQuantity } from "../../product/helpers/product-status.helper";
-import { billableDesiForTier } from "../../shipping/shipping-package-tier";
+import { billableDesiForTier } from "../../shipping/helpers/shipping-package-tier";
 import {
   AdminProductQueryDto,
   UpdateProductDto,

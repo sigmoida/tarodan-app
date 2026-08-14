@@ -35,8 +35,8 @@ import { OrderPricingService } from "../pricing/order-pricing.service";
 import { OrderCommonService } from "../order-common.service";
 import { OrderCheckoutCommonService } from "./order-checkout-common.service";
 import { OrderFeeDiscountService } from "../pricing/order-fee-discount.service";
-import { remainingDiscountAllowanceFor } from "../../discount/fee-discount.engine";
-import { splitShippingByBuyerShare } from "../../shipping/shipping-tariff.helper";
+import { remainingDiscountAllowanceFor } from "../../discount/engine/fee-discount.engine";
+import { splitShippingByBuyerShare } from "../../shipping/helpers/shipping-tariff.helper";
 import { OrderCheckoutGroupService } from "./order-checkout-group.service";
 import {
   REFERENCE_PREFIX,

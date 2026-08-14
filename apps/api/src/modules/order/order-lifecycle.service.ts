@@ -7,7 +7,7 @@ import {
   Optional,
 } from "@nestjs/common";
 import { PrismaService } from "../../prisma";
-import { isShipmentHandedToCarrier } from "../shipping/shipment-handover";
+import { isShipmentHandedToCarrier } from "../shipping/helpers/shipment-handover";
 import { i18nMessage } from "../i18n";
 import { CacheService } from "../cache/cache.service";
 import { CancelOrderDto, GuestOrderCancelDto } from "./dto";

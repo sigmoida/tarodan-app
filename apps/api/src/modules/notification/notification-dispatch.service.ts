@@ -30,13 +30,13 @@ import {
   resolveSettings,
   shouldDeliver,
   DeliveryChannel,
-} from "./notification-preferences";
+} from "./helpers/notification-preferences";
 import { NotificationSettings } from "../user/dto/notification-settings.dto";
-import { NOTIFICATION_TEMPLATES } from "./notification-templates";
+import { NOTIFICATION_TEMPLATES } from "./helpers/notification-templates";
 import {
   normalizeLegacyNotificationLink,
   resolveWebNotificationLink,
-} from "./notification-link";
+} from "./helpers/notification-link";
 import {
   type Locale,
   type MessageValues,

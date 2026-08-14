@@ -6,7 +6,7 @@ import {
 } from "@nestjs/common";
 import { PrismaService } from "../../../prisma";
 import { EventService } from "../../events/event.service";
-import { isSafeFreeLink } from "../../notification/notification-link-safety";
+import { isSafeFreeLink } from "../../notification/helpers/notification-link-safety";
 import { AdminAuditService } from "./admin-audit.service";
 import { Prisma, type NotificationLog } from "@prisma/client";
 import {

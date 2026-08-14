@@ -12,7 +12,7 @@ import { PaymentService } from "../payment/payment.service";
 import { PaymentProvider } from "../payment/dto";
 import { i18nMessage } from "../i18n";
 import { catalogProductWhere } from "../product/helpers/catalog-product-where";
-import { isPremiumEntitled } from "./membership.util";
+import { isPremiumEntitled } from "./helpers/membership.util";
 
 /**
  * MembershipCommonService — üyelik alt-servislerinin paylaştığı çekirdek okuma/

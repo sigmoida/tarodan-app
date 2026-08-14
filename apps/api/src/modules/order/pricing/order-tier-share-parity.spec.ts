@@ -1,5 +1,5 @@
 import { ShippingPackageTierCode } from "@prisma/client";
-import { resolvePackageShippingDecision } from "../../shipping/shipping-tariff.helper";
+import { resolvePackageShippingDecision } from "../../shipping/helpers/shipping-tariff.helper";
 import { packageTiers } from "../../shipping/testing/tariff-fixture";
 
 /**

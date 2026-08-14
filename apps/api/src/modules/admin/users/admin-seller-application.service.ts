@@ -21,7 +21,7 @@ import {
 } from "@prisma/client";
 import { paginate } from "../../../common/list";
 import { promoteUserCodeToCorporate } from "../../../common/helpers/code-prefixes";
-import { outboundPackageShipping } from "../../shipping/shipping-tariff.helper";
+import { outboundPackageShipping } from "../../shipping/helpers/shipping-tariff.helper";
 import {
   frontendUrl as resolveFrontendUrl,
   CANONICAL_FRONTEND_URL,

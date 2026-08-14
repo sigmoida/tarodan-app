@@ -6,7 +6,7 @@
 import { Injectable, Logger } from "@nestjs/common";
 import { PrismaService } from "../../prisma";
 import { NotificationType, NotificationChannel } from "./dto";
-import type { NotificationAudience } from "./notification-link";
+import type { NotificationAudience } from "./helpers/notification-link";
 import { StorageService } from "../storage/storage.service";
 import { NotificationDispatchService } from "./notification-dispatch.service";
 import { frontendUrl as resolveFrontendUrl } from "../../config/app-urls";

@@ -1,7 +1,7 @@
 import { Module } from "@nestjs/common";
 import { DiscountController } from "./discount.controller";
 import { DiscountService } from "./discount.service";
-import { FeeDiscountResolver } from "./fee-discount.resolver";
+import { FeeDiscountResolver } from "./engine/fee-discount.resolver";
 import { PrismaModule } from "../../prisma";
 import { SearchModule } from "../search/search.module";
 

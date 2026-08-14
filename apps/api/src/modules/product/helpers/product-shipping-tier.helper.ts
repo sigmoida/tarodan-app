@@ -1,5 +1,5 @@
 import { ShippingPackageTierCode } from "@prisma/client";
-import { billableDesiForTier } from "../../shipping/shipping-package-tier";
+import { billableDesiForTier } from "../../shipping/helpers/shipping-package-tier";
 
 /**
  * Ürünün kargo alanlarının TEK kaynağı: satıcının seçtiği paket boyutu ve ondan

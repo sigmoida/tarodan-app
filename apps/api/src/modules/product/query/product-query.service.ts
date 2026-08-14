@@ -18,8 +18,8 @@ import { ACTIVE_TRADE_STATUSES } from "../../trade/helpers/trade.constants";
 import {
   saleCapableSellerWhere,
   tradeCapableSellerWhere,
-} from "../../membership/membership.util";
-import { getFreeTierCanTrade } from "../../membership/free-tier-trade.helper";
+} from "../../membership/helpers/membership.util";
+import { getFreeTierCanTrade } from "../../membership/helpers/free-tier-trade.helper";
 import { ProductCommonService } from "../product-common.service";
 import { PUBLIC_IDENTITY_SELECT } from "../../../common/helpers/public-identity";
 import { buildProductEditProjection } from "../helpers/product-edit-projection";

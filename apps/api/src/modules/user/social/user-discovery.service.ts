@@ -6,7 +6,7 @@ import { UserCommonService } from "../user-common.service";
 import {
   isBusinessMembershipEntitled,
   saleCapableSellerWhere,
-} from "../../membership/membership.util";
+} from "../../membership/helpers/membership.util";
 import { publicUserRatingWhere } from "../../../common/helpers/public-rating";
 import {
   PUBLIC_IDENTITY_SELECT,

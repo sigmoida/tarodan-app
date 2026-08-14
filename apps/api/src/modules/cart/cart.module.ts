@@ -4,7 +4,7 @@ import { CartService } from "./cart.service";
 import { PrismaModule } from "../../prisma";
 import { DiscountModule } from "../discount";
 import { StorageModule } from "../storage/storage.module";
-import { ShippingTariffModule } from "../shipping/shipping-tariff.module";
+import { ShippingTariffModule } from "../shipping/tariff/shipping-tariff.module";
 
 @Module({
   imports: [PrismaModule, DiscountModule, StorageModule, ShippingTariffModule],

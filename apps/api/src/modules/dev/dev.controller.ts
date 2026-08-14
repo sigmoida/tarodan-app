@@ -16,12 +16,12 @@ import { ProductLockService } from "../product/lock/product-lock.service";
 import { TradeService } from "../trade/trade.service";
 import { MembershipService } from "../membership/membership.service";
 import { OfferSchedulerService } from "../offer/offer-scheduler.service";
-import { MembershipSchedulerService } from "../membership/membership-scheduler.service";
+import { MembershipSchedulerService } from "../membership/jobs/membership-scheduler.service";
 import { InjectQueue } from "@nestjs/bull";
 import { Queue } from "bull";
 import { QUEUE_NAMES } from "../../workers/constants";
 import { NotificationDispatchService } from "../notification/notification-dispatch.service";
-import { isKnownNotificationType } from "../notification/notification-link";
+import { isKnownNotificationType } from "../notification/helpers/notification-link";
 import { isTest, nodeEnv } from "../../config/environment";
 import { i18nMessage } from "../i18n";
 

@@ -1,5 +1,5 @@
 import { Injectable } from "@nestjs/common";
-import { ShippingTariffService } from "../../shipping/shipping-tariff.service";
+import { ShippingTariffService } from "../../shipping/tariff/shipping-tariff.service";
 import { AdminAuditService } from "../ops/admin-audit.service";
 import {
   CreateShippingTariffDto,

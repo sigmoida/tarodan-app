@@ -21,8 +21,8 @@ import {
   PAYMENT_CONFIG_KEYS,
   envConfigNumber,
 } from "../payment/helpers/payment.constants";
-import { isShipmentHandedToCarrier } from "../shipping/shipment-handover";
-import { ACTIVE_REFUND_REQUEST_STATUSES } from "./refund-active-statuses";
+import { isShipmentHandedToCarrier } from "../shipping/helpers/shipment-handover";
+import { ACTIVE_REFUND_REQUEST_STATUSES } from "./helpers/refund-active-statuses";
 import { generateUniqueReference } from "../../common/helpers/generate-reference";
 import { REFERENCE_PREFIX } from "../../common/helpers/code-prefixes";
 import { CreateRefundRequestDto } from "./dto/create-refund-request.dto";
@@ -31,7 +31,7 @@ import { i18nMessage } from "../i18n";
 import {
   resolveCancellationPolicy,
   resolveReturnPolicy,
-} from "./refund-financial-policy";
+} from "./helpers/refund-financial-policy";
 import { RefundNotificationService } from "./refund-notification.service";
 import { RefundFinancialService } from "./refund-financial.service";
 import { RefundShipmentService } from "./refund-shipment.service";

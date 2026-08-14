@@ -10,7 +10,7 @@ import { AdminAuditService } from "../ops/admin-audit.service";
 import { InjectQueue } from "@nestjs/bull";
 import { Queue } from "bull";
 import { QUEUE_NAMES } from "../../../workers/constants";
-import { enqueueSellerListingReindex } from "../../membership/seller-listing-reindex";
+import { enqueueSellerListingReindex } from "../../membership/helpers/seller-listing-reindex";
 import { fulltextUserSearch } from "../../../common/helpers/fulltext-search";
 import { AdminUserQueryDto } from "../dto";
 import { Prisma, MembershipTierType, SubscriptionStatus } from "@prisma/client";

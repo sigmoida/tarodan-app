@@ -9,7 +9,7 @@ import {
 import { InjectQueue } from "@nestjs/bull";
 import { Queue } from "bull";
 import { QUEUE_NAMES } from "../../workers/constants";
-import { enqueueSellerListingReindex } from "./seller-listing-reindex";
+import { enqueueSellerListingReindex } from "./helpers/seller-listing-reindex";
 import { PrismaService } from "../../prisma";
 import {
   MembershipTierType,
@@ -31,7 +31,10 @@ import { MembershipPaymentInitResponseDto } from "./dto/membership-payment.dto";
 import { PaymentProviderRegistry } from "../payment-providers/payment-provider.registry";
 import { ConfigService } from "@nestjs/config";
 import { MembershipCommonService } from "./membership-common.service";
-import { hasUsableRecurringCard, isPremiumEntitled } from "./membership.util";
+import {
+  hasUsableRecurringCard,
+  isPremiumEntitled,
+} from "./helpers/membership.util";
 import { NotificationService } from "../notification/notification.service";
 import { NotificationType } from "../notification/dto";
 import { i18nMessage } from "../i18n";

@@ -1,6 +1,6 @@
 import { TradeReconciliationService } from "./trade-reconciliation.service";
 import { NotificationType } from "../../notification/dto";
-import { resolveWebNotificationLink } from "../../notification/notification-link";
+import { resolveWebNotificationLink } from "../../notification/helpers/notification-link";
 
 /**
  * Takas admin alarmlarının hedefi.

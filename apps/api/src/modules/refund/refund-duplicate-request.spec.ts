@@ -1,4 +1,4 @@
-import { ACTIVE_REFUND_REQUEST_STATUSES } from "./refund-active-statuses";
+import { ACTIVE_REFUND_REQUEST_STATUSES } from "./helpers/refund-active-statuses";
 
 /**
  * HIGH: "zaten aktif talep var" kontrolü read-then-create biçimindeydi ve

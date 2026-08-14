@@ -1,7 +1,7 @@
 import { Injectable, Logger } from "@nestjs/common";
 import { PrismaService } from "../../../prisma";
 import { ProductKind, ProductStatus } from "@prisma/client";
-import { saleCapableSellerWhere } from "../../membership/membership.util";
+import { saleCapableSellerWhere } from "../../membership/helpers/membership.util";
 import { saleCapableEsFilters } from "../helpers/sale-capable-es-filter";
 import { StorageService } from "../../storage/storage.service";
 import { resolveBrandLogoUrl } from "../../brand/brand-logo-url";

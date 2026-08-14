@@ -10,7 +10,7 @@ import { Optional } from "@nestjs/common";
 import { InjectQueue } from "@nestjs/bull";
 import { Queue } from "bull";
 import { QUEUE_NAMES } from "../../../workers/constants";
-import { enqueueSellerListingReindex } from "../../membership/seller-listing-reindex";
+import { enqueueSellerListingReindex } from "../../membership/helpers/seller-listing-reindex";
 import { PrismaService } from "../../../prisma";
 import {
   computeRelevanceScore,
@@ -20,7 +20,7 @@ import { ElogoInvoicingService } from "../../elogo";
 import {
   hasUsableRecurringCard,
   isPremiumEntitled,
-} from "../../membership/membership.util";
+} from "../../membership/helpers/membership.util";
 import { OutboxService } from "../../outbox/outbox.service";
 import { OUTBOX_REVENUE_INVOICE_ISSUE } from "../../outbox/outbox.types";
 

@@ -53,7 +53,7 @@ import {
 import {
   billableDesiForTier,
   tierCodeForDesi,
-} from "../src/modules/shipping/shipping-package-tier";
+} from "../src/modules/shipping/helpers/shipping-package-tier";
 import {
   SEED_COMMISSION_PROFILES,
   SEED_COMMISSION_PRICE_BANDS,

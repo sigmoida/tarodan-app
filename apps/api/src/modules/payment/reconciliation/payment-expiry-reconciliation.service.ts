@@ -22,8 +22,8 @@ import { EventService } from "../../events";
 import { PaymentCommonService } from "../payment-common.service";
 import { PaymentFulfillmentService } from "../fulfillment/payment-fulfillment.service";
 import { DiscountService } from "../../discount/discount.service";
-import { isShipmentHandedToCarrier } from "../../shipping/shipment-handover";
-import { ACTIVE_REFUND_REQUEST_STATUSES } from "../../refund/refund-active-statuses";
+import { isShipmentHandedToCarrier } from "../../shipping/helpers/shipment-handover";
+import { ACTIVE_REFUND_REQUEST_STATUSES } from "../../refund/helpers/refund-active-statuses";
 import {
   PUBLIC_NAME_SELECT,
   publicName,

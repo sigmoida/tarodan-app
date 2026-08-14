@@ -23,7 +23,7 @@ import {
 } from "../surat-cargo/helpers/cargo-provider";
 import { CarrierCancellationService } from "../surat-cargo/sync/carrier-cancellation.service";
 import { SuratTrackingService } from "../surat-cargo/sync/surat-tracking.service";
-import { canTransitionShipmentStatus } from "../shipping/shipment-state-machine";
+import { canTransitionShipmentStatus } from "../shipping/helpers/shipment-state-machine";
 import { NotificationType } from "../notification/dto/notification.dto";
 import { i18nMessage } from "../i18n";
 import { platformWarehouseAddress } from "../../config/warehouse";

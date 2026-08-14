@@ -19,7 +19,7 @@ import {
 import { NotificationDispatchService } from "./notification-dispatch.service";
 import { NotificationCommerceService } from "./notification-commerce.service";
 import { NotificationAccountService } from "./notification-account.service";
-import type { NotificationAudience } from "./notification-link";
+import type { NotificationAudience } from "./helpers/notification-link";
 
 @Injectable()
 export class NotificationService {

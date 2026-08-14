@@ -1,6 +1,6 @@
 import { OrderCheckoutCommonService } from "../checkout/order-checkout-common.service";
 import { OrderTaxPolicyService } from "./order-tax-policy.service";
-import { resolvePackageShippingDecision } from "../../shipping/shipping-tariff.helper";
+import { resolvePackageShippingDecision } from "../../shipping/helpers/shipping-tariff.helper";
 import { flatPackageTiers } from "../../shipping/testing/tariff-fixture";
 
 /**

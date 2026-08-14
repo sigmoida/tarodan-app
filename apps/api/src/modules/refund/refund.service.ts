@@ -9,7 +9,7 @@ import { PrismaService } from "../../prisma";
 import { CreateRefundRequestDto } from "./dto/create-refund-request.dto";
 import { NotificationType } from "../notification/dto/notification.dto";
 import { i18nMessage } from "../i18n";
-import { type RefundFaultPartyV2 } from "./refund-financial-policy-v2";
+import { type RefundFaultPartyV2 } from "./helpers/refund-financial-policy-v2";
 import { PUBLIC_NAME_SELECT } from "../../common/helpers/public-identity";
 import { RefundNotificationService } from "./refund-notification.service";
 import { RefundFinancialService } from "./refund-financial.service";

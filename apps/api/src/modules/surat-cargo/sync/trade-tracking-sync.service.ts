@@ -10,7 +10,7 @@ import {
   mapSuratStatusToShipmentStatus,
   isSuratDelivered,
 } from "../mappers/surat-status.mapper";
-import { canTransitionShipmentStatus } from "../../shipping/shipment-state-machine";
+import { canTransitionShipmentStatus } from "../../shipping/helpers/shipment-state-machine";
 import { TRADE_VALID_TRANSITIONS } from "../../trade/helpers/trade.state-machine";
 import { startTradeConfirmationWindowIfDelivered } from "../../../common/helpers/trade-escrow";
 import { finalizeReturningTradeIfResolved } from "../../../common/helpers/trade-return-finalize";

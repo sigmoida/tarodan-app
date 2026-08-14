@@ -40,11 +40,11 @@ import {
   assertSellerCampaignHasCode,
   assertTargetAllowedForActor,
   audienceMatches,
-} from "./discount-authorization";
-import { isProductInDiscountScope } from "./discount-scope";
-import { FeeDiscountResolver } from "./fee-discount.resolver";
-import { automaticBudgetEntriesOf } from "./fee-discount.engine";
-import { bestQuantityCampaignDiscount } from "./quantity-campaign";
+} from "./helpers/discount-authorization";
+import { isProductInDiscountScope } from "./helpers/discount-scope";
+import { FeeDiscountResolver } from "./engine/fee-discount.resolver";
+import { automaticBudgetEntriesOf } from "./engine/fee-discount.engine";
+import { bestQuantityCampaignDiscount } from "./helpers/quantity-campaign";
 import { i18nMessage } from "../i18n";
 
 /** Kusursuz iadede geri verilen kupon hakkı — commit SONRASI bildirim için. */

@@ -8,7 +8,7 @@ import { PrismaService } from "../../prisma";
 import { Client } from "@elastic/elasticsearch";
 import { Prisma, ProductStatus } from "@prisma/client";
 import { catalogProductWhere } from "../product/helpers/catalog-product-where";
-import { saleCapableSellerWhere } from "../membership/membership.util";
+import { saleCapableSellerWhere } from "../membership/helpers/membership.util";
 import { errorMessage } from "../../common/helpers/error-message";
 
 export interface ProductSearchResult {

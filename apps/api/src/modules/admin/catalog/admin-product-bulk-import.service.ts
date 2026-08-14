@@ -30,7 +30,7 @@ import { MembershipService } from "../../membership/membership.service";
 import {
   canSellFromMembership,
   saleCapableSellerWhere,
-} from "../../membership/membership.util";
+} from "../../membership/helpers/membership.util";
 import { MediaService } from "../../media/media.service";
 import { ModerationAiClient } from "../../moderation/moderation-ai.client";
 import { CreateProductDto } from "../../product/dto";

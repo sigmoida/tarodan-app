@@ -1,5 +1,5 @@
 import { Prisma, ProductStatus } from "@prisma/client";
-import { saleCapableSellerWhere } from "../../membership/membership.util";
+import { saleCapableSellerWhere } from "../../membership/helpers/membership.util";
 import { catalogProductWhere } from "./catalog-product-where";
 
 /**

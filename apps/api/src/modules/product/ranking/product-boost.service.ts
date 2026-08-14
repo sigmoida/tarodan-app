@@ -21,7 +21,7 @@ import { boostTierBasePrice } from "../helpers/product-sale-window";
 import {
   effectiveMembershipTierType,
   isPremiumEntitled,
-} from "../../membership/membership.util";
+} from "../../membership/helpers/membership.util";
 import { PaymentService } from "../../payment/payment.service";
 import { PaymentProvider } from "../../payment/dto";
 import { BOOST_DURATIONS, BoostPricingOption } from "../dto/boost.dto";

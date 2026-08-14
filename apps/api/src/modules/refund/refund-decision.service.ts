@@ -10,7 +10,7 @@ import { PrismaService } from "../../prisma";
 import { PaymentService } from "../payment/payment.service";
 import { NotificationType } from "../notification/dto/notification.dto";
 import { i18nMessage } from "../i18n";
-import { type RefundFaultPartyV2 } from "./refund-financial-policy-v2";
+import { type RefundFaultPartyV2 } from "./helpers/refund-financial-policy-v2";
 import { RefundNotificationService } from "./refund-notification.service";
 import { RefundFinancialService } from "./refund-financial.service";
 import { RefundShipmentService } from "./refund-shipment.service";
