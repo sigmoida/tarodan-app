@@ -67,8 +67,10 @@ export default function Footer() {
     },
   ];
 
+  // `pb-safe`: sayfanın son satırı olduğu için altı, çentikli telefonlardaki
+  // ana ekran çizgisinin altında kalabiliyordu.
   return (
-    <footer className="bg-surface-elevated border-t border-border">
+    <footer className="bg-surface-elevated border-t border-border pb-safe">
       <Container className="pt-16">
         {/* Brand + app download */}
         <div className="mb-12 flex flex-col gap-8 sm:flex-row sm:items-start sm:justify-between">

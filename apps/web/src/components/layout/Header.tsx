@@ -211,7 +211,7 @@ export default function Header() {
         */}
         {showCategoryBar && (
           <div className="relative z-40 hidden border-b border-primary-200 bg-surface lg:block">
-            <Container className="px-4">
+            <Container>
               <CategoryNav />
             </Container>
           </div>

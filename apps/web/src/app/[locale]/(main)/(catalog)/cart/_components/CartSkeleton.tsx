@@ -7,7 +7,7 @@ import { SectionCard } from "@/components/ui";
 export default function CartSkeleton() {
   return (
     <PageShell>
-      <Container className="px-4 py-5">
+      <Container className="py-5">
         <div className="animate-pulse space-y-4">
           {[...Array(3)].map((_, i) => (
             <SectionCard key={i} className="p-4 flex gap-4">

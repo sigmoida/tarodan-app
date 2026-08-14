@@ -28,9 +28,14 @@ export interface DrawerProps {
   children?: React.ReactNode;
 }
 
+/**
+ * Panel yapıştığı kenarda ekranın en ucuna kadar gider; o kenar çentikliyse
+ * (yatay kullanım) içerik çentiğin altında kalırdı — bu yüzden yalnız o kenara
+ * güvenli alan payı eklenir, karşı kenara değil.
+ */
 const sideClasses: Record<DrawerSide, string> = {
-  left: "left-0 animate-slide-in-left",
-  right: "right-0 animate-slide-in-right",
+  left: "left-0 pl-safe animate-slide-in-left",
+  right: "right-0 pr-safe animate-slide-in-right",
 };
 
 /**
@@ -71,7 +76,9 @@ export const Drawer = React.forwardRef<HTMLDivElement, DrawerProps>(
           <DialogPrimitive.Content
             ref={ref}
             className={cn(
-              "pointer-events-auto fixed inset-y-0 z-modal flex h-full flex-col bg-surface-elevated shadow-elevated focus:outline-none",
+              // `pt-safe`/`pb-safe`: panel tam boy olduğu için başlığı durum
+              // çubuğunun, alt kısmı da ana ekran çizgisinin altından çıkarır.
+              "pointer-events-auto fixed inset-y-0 z-modal flex h-full flex-col bg-surface-elevated pb-safe pt-safe shadow-elevated focus:outline-none",
               sideClasses[side],
               widthClassName,
               className,
