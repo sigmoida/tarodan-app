@@ -164,9 +164,6 @@ importers:
       zod:
         specifier: 3.25.76
         version: 3.25.76
-      zustand:
-        specifier: 4.5.7
-        version: 4.5.7(@types/react@18.3.31)(react@18.3.1)
     devDependencies:
       '@tarodan/eslint-config':
         specifier: workspace:*
