@@ -1,6 +1,7 @@
 import { DiscountScope, DiscountTarget, DiscountType } from "@prisma/client";
 import { DiscountService } from "./discount.service";
 import { DiscountUsageService } from "./discount-usage.service";
+import { DiscountCrudService } from "./discount-crud.service";
 
 /**
  * Adet koşullu satıcı kampanyalarının servis katmanı: tek sorguyla çözüm,
@@ -29,11 +30,14 @@ describe("DiscountService quantity campaigns", () => {
         findMany: jest.fn().mockResolvedValue(campaigns),
       },
     } as any;
+    const cache = { delPattern: jest.fn() } as any;
+    const search = { syncProduct: jest.fn() } as any;
     return new DiscountService(
       prisma,
-      { delPattern: jest.fn() } as any,
-      { syncProduct: jest.fn() } as any,
+      cache,
+      search,
       new DiscountUsageService(prisma),
+      new DiscountCrudService(prisma, cache, search),
     );
   }
 
@@ -73,11 +77,14 @@ describe("DiscountService quantity campaigns", () => {
     const prisma = {
       discount: { findMany: jest.fn() },
     } as any;
+    const cache = { delPattern: jest.fn() } as any;
+    const search = { syncProduct: jest.fn() } as any;
     const service = new DiscountService(
       prisma,
-      { delPattern: jest.fn() } as any,
-      { syncProduct: jest.fn() } as any,
+      cache,
+      search,
       new DiscountUsageService(prisma),
+      new DiscountCrudService(prisma, cache, search),
     );
     const result = await service.quantityDiscountsForLines([
       {

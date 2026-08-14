@@ -2,6 +2,7 @@
 
 import { DiscountService } from "./discount.service";
 import { DiscountUsageService } from "./discount-usage.service";
+import { DiscountCrudService } from "./discount-crud.service";
 
 describe("DiscountService admin list contract", () => {
   it("composes full-content search with the selected column sort", async () => {
@@ -13,11 +14,14 @@ describe("DiscountService admin list contract", () => {
       discount,
       $queryRawUnsafe: jest.fn().mockResolvedValue([]),
     };
+    const cache = {} as any;
+    const search = { syncProduct: jest.fn() } as any;
     const service = new DiscountService(
       prisma as any,
-      {} as any, // cache
-      { syncProduct: jest.fn() } as any, // searchService
+      cache,
+      search,
       new DiscountUsageService(prisma as any),
+      new DiscountCrudService(prisma as any, cache, search),
     );
 
     await service.findAll(

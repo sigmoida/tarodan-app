@@ -6,6 +6,7 @@ import {
 } from "@prisma/client";
 import { DiscountService } from "./discount.service";
 import { DiscountUsageService } from "./discount-usage.service";
+import { DiscountCrudService } from "./discount-crud.service";
 
 /**
  * Kupon tarafındaki üç yeni kural:
@@ -77,11 +78,14 @@ describe("validateCoupon — hedef kitle, bütçe ve hedef kalem", () => {
           ),
       },
     } as any;
+    const cache = { delPattern: jest.fn() } as any;
+    const search = { syncProduct: jest.fn() } as any;
     return new DiscountService(
       prisma,
-      { delPattern: jest.fn() } as any,
-      { syncProduct: jest.fn() } as any,
+      cache,
+      search,
       new DiscountUsageService(prisma),
+      new DiscountCrudService(prisma, cache, search),
     );
   };
 
