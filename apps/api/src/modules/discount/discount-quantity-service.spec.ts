@@ -1,5 +1,6 @@
 import { DiscountScope, DiscountTarget, DiscountType } from "@prisma/client";
 import { DiscountService } from "./discount.service";
+import { DiscountUsageService } from "./discount-usage.service";
 
 /**
  * Adet koşullu satıcı kampanyalarının servis katmanı: tek sorguyla çözüm,
@@ -32,6 +33,7 @@ describe("DiscountService quantity campaigns", () => {
       prisma,
       { delPattern: jest.fn() } as any,
       { syncProduct: jest.fn() } as any,
+      new DiscountUsageService(prisma),
     );
   }
 
@@ -75,6 +77,7 @@ describe("DiscountService quantity campaigns", () => {
       prisma,
       { delPattern: jest.fn() } as any,
       { syncProduct: jest.fn() } as any,
+      new DiscountUsageService(prisma),
     );
     const result = await service.quantityDiscountsForLines([
       {

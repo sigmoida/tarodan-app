@@ -1,5 +1,6 @@
 import { DiscountScope, DiscountType } from "@prisma/client";
 import { DiscountService } from "../discount.service";
+import { DiscountUsageService } from "../discount-usage.service";
 
 /**
  * Kupon fiyat tabanı: kodsuz ürün-fiyatı kampanyaları KALDIRILDI — vitrin
@@ -71,6 +72,7 @@ describe("DiscountService coupon pricing base", () => {
       prisma,
       { delPattern: jest.fn() } as any,
       { syncProduct: jest.fn() } as any,
+      new DiscountUsageService(prisma),
     );
   }
 

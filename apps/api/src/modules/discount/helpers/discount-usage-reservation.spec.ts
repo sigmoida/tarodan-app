@@ -1,6 +1,6 @@
-import { DiscountService } from "../discount.service";
+import { DiscountUsageService } from "../discount-usage.service";
 
-describe("DiscountService coupon usage lifecycle", () => {
+describe("DiscountUsageService coupon usage lifecycle", () => {
   const expiresAt = new Date("2026-07-30T00:00:00.000Z");
 
   function makeService(txOverrides: Record<string, unknown> = {}) {
@@ -44,11 +44,9 @@ describe("DiscountService coupon usage lifecycle", () => {
       ),
     } as any;
     return {
-      service: new DiscountService(
-        prisma,
-        { delPattern: jest.fn() } as any,
-        { syncProduct: jest.fn() } as any,
-      ),
+      // Kupon kullanım defteri DiscountUsageService'in işi; spec de onu
+      // doğrudan kurar (facade üzerinden gitmek sadece delege ölçerdi).
+      service: new DiscountUsageService(prisma),
       tx,
     };
   }

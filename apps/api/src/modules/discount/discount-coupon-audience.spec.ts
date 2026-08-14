@@ -5,6 +5,7 @@ import {
   DiscountType,
 } from "@prisma/client";
 import { DiscountService } from "./discount.service";
+import { DiscountUsageService } from "./discount-usage.service";
 
 /**
  * Kupon tarafındaki üç yeni kural:
@@ -80,6 +81,7 @@ describe("validateCoupon — hedef kitle, bütçe ve hedef kalem", () => {
       prisma,
       { delPattern: jest.fn() } as any,
       { syncProduct: jest.fn() } as any,
+      new DiscountUsageService(prisma),
     );
   };
 
