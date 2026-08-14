@@ -24,16 +24,16 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const { open, openSidebar, closeSidebar } = useSidebar();
 
   return (
-    <div className="min-h-screen bg-surface">
+    <div className="min-h-dvh bg-surface">
       {/* Karartma katmanı artık elle çizilmiyor — `Drawer` (Radix) kendi
           overlay'ini, odak tuzağını ve kaydırma kilidini getiriyor. */}
       <Sidebar />
       <SidebarNavDrawer open={open} onClose={closeSidebar} />
 
-      {/* pt-16 clears the fixed h-16 Topbar (which is out of flow). */}
-      <div className="min-w-0 pt-16 lg:pl-64">
+      {/* pt-[--admin-topbar-h] clears the fixed Topbar (which is out of flow). */}
+      <div className="min-w-0 pt-[var(--admin-topbar-h)] lg:pl-[var(--admin-sidebar-w)]">
         <Topbar onOpenSidebar={openSidebar} />
-        <main className="min-w-0 p-6">
+        <main className="min-w-0 p-4 sm:p-6">
           {isRouteAllowed ? children : <ForbiddenScreen />}
         </main>
       </div>

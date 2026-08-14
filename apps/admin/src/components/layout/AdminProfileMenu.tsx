@@ -45,7 +45,7 @@ export function AdminProfileMenu() {
           variant="nav"
           size="sm"
           aria-label={t("admin.shared.profileMenu.ariaLabel")}
-          className="gap-1"
+          className="min-w-0 gap-1"
         >
           <UserCircleIcon className="h-5 w-5" />
           <span className="hidden max-w-[10rem] truncate sm:inline">
