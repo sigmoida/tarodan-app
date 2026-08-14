@@ -52,6 +52,16 @@ type EntityUserPrefix =
  */
 const REFRESH_ROTATION_GRACE_MS = 60 * 1000;
 
+/**
+ * A valid bcrypt hash of an arbitrary fixed string, compared against on the
+ * "user not found" login path so it takes the same ~bcrypt-compare time as a
+ * real wrong-password rejection — without this, "no such user" returns
+ * near-instantly while "wrong password" takes the full bcrypt compare,
+ * letting an attacker enumerate registered emails by response time alone.
+ */
+const DUMMY_BCRYPT_HASH =
+  "$2b$10$QSpFWY/fQ/6ryufwK.uXDewqz1TIfVpj1w.Ik4Qf6YoOKI1jKIAg2";
+
 @Injectable()
 export class AuthService {
   private readonly logger = new Logger(AuthService.name);
@@ -707,6 +717,9 @@ export class AuthService {
       });
 
       if (!user) {
+        // Dummy compare so this path takes the same time as a real
+        // wrong-password rejection (timing-based email enumeration).
+        await bcrypt.compare(dto.password, DUMMY_BCRYPT_HASH);
         // Log failed login attempt - user not found
         await this.logSecurityEvent("failed_login", "medium", {
           email: dto.email,
@@ -901,6 +914,9 @@ export class AuthService {
     });
 
     if (!user || !user.adminUser) {
+      // Dummy compare so this path takes the same time as a real
+      // wrong-password rejection (timing-based email enumeration).
+      await bcrypt.compare(dto.password, DUMMY_BCRYPT_HASH);
       this.logger.warn("Admin login failed: user not found or no admin user");
       throw new UnauthorizedException(
         i18nMessage("server.auth.invalidCredentials"),
