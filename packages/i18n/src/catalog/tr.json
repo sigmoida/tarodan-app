@@ -122,7 +122,13 @@
     "uploading": "Yükleniyor",
     "replace": "Değiştir",
     "language": "Dil",
-    "deleting": "Siliniyor"
+    "deleting": "Siliniyor",
+    "fileDropzone": {
+      "active": "Dosyayı buraya bırakın",
+      "select": "Dosya Seç",
+      "replace": "Dosyayı Değiştir",
+      "remove": "Kaldır"
+    }
   },
   "nav": {
     "home": "Ana Sayfa",
@@ -3484,6 +3490,70 @@
         "bulkImportFileTooLarge": "{name} dosyası çok büyük. Tek dosya en fazla {size} olabilir.",
         "bulkImportTooManyImages": "En fazla {max} görsel seçebilirsiniz.",
         "bulkImportTotalTooLarge": "Seçilen dosyaların toplam boyutu {size} sınırını aşamaz."
+      },
+      "import": {
+        "button": "Excel ile İçe Aktar",
+        "title": {
+          "brands": "Excel ile Toplu Marka Ekle",
+          "manufacturers": "Excel ile Toplu Üretici Ekle",
+          "car-models": "Excel ile Toplu Araç Modeli Ekle"
+        },
+        "description": "Örnek şablonu indirin, doldurun ve buraya yükleyin. Bir satır bile hatalıysa hiçbir kayıt oluşturulmaz.",
+        "structureTitle": "Örnek dosya yapısı",
+        "structureHelp": "Veriler '{sheet}' sayfasına yazılmalı. Tek dosyada en fazla {rows} satır aktarılabilir.",
+        "downloadTemplate": "Şablonu İndir",
+        "templateFailed": "Şablon indirilemedi",
+        "columnName": "Sütun",
+        "columnRequired": "Durum",
+        "columnDescription": "Açıklama",
+        "columnExample": "Örnek",
+        "required": "Zorunlu",
+        "optional": "İsteğe bağlı",
+        "dropzoneIdle": "Doldurduğunuz Excel dosyasını buraya sürükleyin",
+        "dropzoneHint": "Yalnızca .xlsx • En fazla {size}",
+        "submit": "İçe Aktar",
+        "processing": "İçe aktarılıyor…",
+        "failed": "İçe aktarma başarısız",
+        "invalidFileType": "\"{name}\" bir Excel (.xlsx) dosyası değil",
+        "fileTooLarge": "\"{name}\" çok büyük. En fazla {size} olabilir.",
+        "validationTitle": "İçe aktarma yapılmadı",
+        "validationHelp": "Aşağıdaki satırları düzeltip dosyayı yeniden yükleyin. Hiçbir kayıt oluşturulmadı.",
+        "successTitle": "İçe aktarma tamamlandı",
+        "created": {
+          "brands": "{count} marka eklendi",
+          "manufacturers": "{count} üretici eklendi",
+          "car-models": "{count} araç modeli eklendi"
+        },
+        "andMore": "… ve {count} tane daha",
+        "columns": {
+          "brands": {
+            "ad": "Marka adı",
+            "aciklama": "Kısa tanıtım metni",
+            "web_sitesi": "Markanın web adresi",
+            "ulke": "Menşe ülke",
+            "kurulus_yili": "Kuruluş yılı",
+            "sira": "Listelerdeki sıralama (küçük olan önce)",
+            "aktif": "Mağazada görünsün mü (boşsa Evet)"
+          },
+          "manufacturers": {
+            "ad": "Üretici adı",
+            "aciklama": "Kısa tanıtım metni",
+            "web_sitesi": "Üreticinin web adresi",
+            "ulke": "Menşe ülke",
+            "kurulus_yili": "Kuruluş yılı",
+            "sira": "Listelerdeki sıralama (küçük olan önce)",
+            "aktif": "Mağazada görünsün mü (boşsa Evet)"
+          },
+          "carModels": {
+            "marka": "Bağlı olduğu marka (ad, slug veya kimlik)",
+            "ad": "Model adı",
+            "aciklama": "Kısa tanıtım metni",
+            "baslangic_yili": "Üretime başlanan yıl",
+            "bitis_yili": "Üretimin bittiği yıl",
+            "sira": "Listelerdeki sıralama (küçük olan önce)",
+            "aktif": "Mağazada görünsün mü (boşsa Evet)"
+          }
+        }
       }
     },
     "marketing": {
@@ -3541,7 +3611,8 @@
           "failed": "Yükleme başarısız",
           "dropHint": "Görseli sürükleyip bırakın veya",
           "chooseFile": "Dosya Seç",
-          "urlPlaceholder": "veya görsel URL'si yapıştırın"
+          "urlPlaceholder": "veya görsel URL'si yapıştırın",
+          "hint": "JPG, PNG, WebP • En fazla 2 MB"
         },
         "validation": {
           "titleRequired": "Başlık gerekli"
