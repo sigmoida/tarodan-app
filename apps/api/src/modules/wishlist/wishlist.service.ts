@@ -23,6 +23,7 @@ import {
   publicName,
 } from "../../common/helpers/public-identity";
 import { errorMessage } from "../../common/helpers/error-message";
+import { i18nMessage } from "../i18n";
 
 @Injectable()
 export class WishlistService {
@@ -116,14 +117,12 @@ export class WishlistService {
     });
 
     if (!product) {
-      throw new NotFoundException("Ürün bulunamadı");
+      throw new NotFoundException(i18nMessage("server.product.notFound"));
     }
 
     // Cannot add own product to wishlist
     if (product.sellerId === userId) {
-      throw new BadRequestException(
-        "Kendi ürününüzü istek listesine ekleyemezsiniz",
-      );
+      throw new BadRequestException(i18nMessage("server.wishlist.ownProduct"));
     }
 
     const wishlist = await this.getOrCreateWishlist(userId);
@@ -209,7 +208,7 @@ export class WishlistService {
     });
 
     if (!wishlist) {
-      throw new NotFoundException("İstek listesi bulunamadı");
+      throw new NotFoundException(i18nMessage("server.wishlist.notFound"));
     }
 
     const item = await this.prisma.wishlistItem.findUnique({
@@ -222,7 +221,7 @@ export class WishlistService {
     });
 
     if (!item) {
-      throw new NotFoundException("Ürün istek listenizde değil");
+      throw new NotFoundException(i18nMessage("server.wishlist.itemNotFound"));
     }
 
     // Use transaction to delete wishlist item and decrement like count

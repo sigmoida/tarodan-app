@@ -45,6 +45,7 @@ import { OrderTaxPolicyService } from "../order/order-tax-policy.service";
 import type { InvoiceRefundReversePayload } from "../outbox/outbox.types";
 import { renderManagedEmailTemplate } from "../../common/helpers/email-template-renderer";
 import { frontendUrl as resolveFrontendUrl } from "../../config/app-urls";
+import { i18nMessage } from "../i18n";
 
 /**
  * Tarodan'ın KENDİ gelir e-belgelerini (komisyon, hizmet bedeli, üyelik, boost, iade)
@@ -1281,7 +1282,9 @@ export class ElogoInvoicingService {
       select: { id: true, ettn: true, invoiceNumber: true, pdfUrl: true },
     });
     if (!inv?.ettn || !inv.invoiceNumber)
-      throw new NotFoundException("e-Arşiv faturası bulunamadı");
+      throw new NotFoundException(
+        i18nMessage("server.elogo.archiveInvoiceNotFound"),
+      );
 
     let key = inv.pdfUrl;
     const storageOk = !!this.storage?.isStorageAvailable?.();
@@ -1324,7 +1327,10 @@ export class ElogoInvoicingService {
     const buffer = await this.elogo
       .getEArchiveInvoicePdf(inv.ettn)
       .catch(() => null);
-    if (!buffer) throw new NotFoundException("Fatura PDF alınamadı");
+    if (!buffer)
+      throw new NotFoundException(
+        i18nMessage("server.elogo.invoicePdfUnavailable"),
+      );
     return { buffer, invoiceNumber: inv.invoiceNumber };
   }
 

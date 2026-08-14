@@ -73,9 +73,13 @@ describe("CategoryService", () => {
     const cache = { del: jest.fn() };
     const service = new CategoryService(prisma as any, cache as any);
 
-    await expect(service.update("child", { isActive: true })).rejects.toThrow(
-      "tüm üst kategoriler aktif olmalıdır",
-    );
+    // Asserted on the catalog key, not the rendered text: the key is the stable
+    // contract, the wording is content that can be reworded per locale.
+    await expect(
+      service.update("child", { isActive: true }),
+    ).rejects.toMatchObject({
+      response: { i18nKey: "server.category.ancestorsMustBeActive" },
+    });
     expect(prisma.category.update).not.toHaveBeenCalled();
   });
 });

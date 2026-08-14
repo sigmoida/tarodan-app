@@ -112,7 +112,7 @@ export class AuthService {
         Array.isArray(rawTarget) ? rawTarget.join(",") : String(rawTarget ?? "")
       ).toLowerCase();
       if (target.includes("username")) {
-        throw new ConflictException("Bu kullanıcı adı kullanılıyor");
+        throw new ConflictException(i18nMessage("server.auth.usernameTaken"));
       }
       if (target.includes("phone")) {
         throw new ConflictException(
@@ -124,7 +124,9 @@ export class AuthService {
           i18nMessage("server.auth.emailAlreadyRegistered"),
         );
       }
-      throw new ConflictException("Bu hesap bilgileri daha önce kullanılmış");
+      throw new ConflictException(
+        i18nMessage("server.auth.accountAlreadyUsed"),
+      );
     }
     throw error;
   }
@@ -146,12 +148,10 @@ export class AuthService {
   async register(dto: RegisterDto): Promise<RegisterResponseDto> {
     const username = normalizeUsername(dto.username);
     if (!isUsernameAllowed(username)) {
-      throw new BadRequestException(
-        "Kullanıcı adı 3-30 karakter olmalı; küçük harf, rakam, nokta veya alt çizgi içermelidir",
-      );
+      throw new BadRequestException(i18nMessage("server.auth.usernameFormat"));
     }
     if (!(await this.isUsernameAvailable(username))) {
-      throw new ConflictException("Bu kullanıcı adı kullanılıyor");
+      throw new ConflictException(i18nMessage("server.auth.usernameTaken"));
     }
 
     // Check if email already exists
@@ -514,7 +514,7 @@ export class AuthService {
     });
     if (openApplication) {
       throw new ConflictException(
-        "Bu e-posta veya telefonla açık bir başvuru var.",
+        i18nMessage("server.auth.applicationAlreadyOpen"),
       );
     }
 
@@ -564,7 +564,7 @@ export class AuthService {
       application.invitationExpiresAt <= new Date()
     ) {
       throw new BadRequestException(
-        "Davet bağlantısı geçersiz veya süresi dolmuş.",
+        i18nMessage("server.auth.invitationInvalid"),
       );
     }
     return {
@@ -581,7 +581,7 @@ export class AuthService {
       .digest("hex");
     const username = normalizeUsername(dto.username);
     if (!isUsernameAllowed(username)) {
-      throw new BadRequestException("Geçersiz kullanıcı adı.");
+      throw new BadRequestException(i18nMessage("server.auth.usernameInvalid"));
     }
 
     const application = await this.prisma.corporateApplication.findUnique({
@@ -594,7 +594,7 @@ export class AuthService {
       application.invitationExpiresAt <= new Date()
     ) {
       throw new BadRequestException(
-        "Davet bağlantısı geçersiz veya süresi dolmuş.",
+        i18nMessage("server.auth.invitationInvalid"),
       );
     }
     const usernameExists = await this.prisma.user.findUnique({
@@ -602,7 +602,9 @@ export class AuthService {
       select: { id: true },
     });
     if (usernameExists) {
-      throw new ConflictException("Bu kullanıcı adı daha önce alınmış.");
+      throw new ConflictException(
+        i18nMessage("server.auth.usernameAlreadyTaken"),
+      );
     }
 
     const [passwordHash, adminCode] = await Promise.all([
@@ -1298,7 +1300,7 @@ export class AuthService {
         `Refresh token persist edilemedi: ${errorMessage(error)}`,
       );
       throw new ServiceUnavailableException(
-        "Oturum güvenli şekilde oluşturulamadı",
+        i18nMessage("server.auth.sessionNotCreated"),
       );
     }
   }

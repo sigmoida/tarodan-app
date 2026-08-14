@@ -149,7 +149,7 @@ export class PaymentController {
       )) {
         if (PaymentController.RAW_CARD_FIELDS.has(key.toLowerCase())) {
           throw new BadRequestException(
-            "Kart bilgileri uygulama API'sine gönderilemez.",
+            i18nMessage("server.payment.cardDataNotAccepted"),
           );
         }
         stack.push(nested);

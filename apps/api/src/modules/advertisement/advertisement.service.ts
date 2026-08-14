@@ -12,6 +12,7 @@ import {
   IAB_STANDARD_SIZES,
 } from "./dto/create-advertisement.dto";
 import { UpdateAdvertisementDto } from "./dto/update-advertisement.dto";
+import { i18nMessage } from "../i18n";
 
 /** Prisma client may not have Advertisement until after prisma generate + migration. */
 type PrismaWithAd = PrismaService & {
@@ -166,7 +167,8 @@ export class AdvertisementService {
    */
   async recordClick(id: string) {
     const ad = await this.adRepo.findUnique({ where: { id } });
-    if (!ad) throw new NotFoundException("Reklam bulunamadı");
+    if (!ad)
+      throw new NotFoundException(i18nMessage("server.advertisement.notFound"));
     await (this.prisma as PrismaWithAd).advertisement.update({
       where: { id },
       data: { clickCount: { increment: 1 } },
@@ -179,7 +181,8 @@ export class AdvertisementService {
    */
   async recordImpression(id: string) {
     const ad = await this.adRepo.findUnique({ where: { id } });
-    if (!ad) throw new NotFoundException("Reklam bulunamadı");
+    if (!ad)
+      throw new NotFoundException(i18nMessage("server.advertisement.notFound"));
     await (this.prisma as PrismaWithAd).advertisement.update({
       where: { id },
       data: { impressionCount: { increment: 1 } },
@@ -269,7 +272,8 @@ export class AdvertisementService {
    */
   async findOne(id: string) {
     const ad = await this.adRepo.findUnique({ where: { id } });
-    if (!ad) throw new NotFoundException("Reklam bulunamadı");
+    if (!ad)
+      throw new NotFoundException(i18nMessage("server.advertisement.notFound"));
     return this.toResponse(ad);
   }
 
@@ -315,7 +319,8 @@ export class AdvertisementService {
    */
   async update(id: string, dto: UpdateAdvertisementDto) {
     const existing = await this.adRepo.findUnique({ where: { id } });
-    if (!existing) throw new NotFoundException("Reklam bulunamadı");
+    if (!existing)
+      throw new NotFoundException(i18nMessage("server.advertisement.notFound"));
 
     // Check IAB compliance if dimensions changed
     const newWidth = dto.width ?? existing.width;
@@ -368,7 +373,9 @@ export class AdvertisementService {
       select: { id: true },
     });
     if (!discount) {
-      throw new NotFoundException("Bağlanacak kampanya bulunamadı");
+      throw new NotFoundException(
+        i18nMessage("server.advertisement.campaignNotFound"),
+      );
     }
   }
 
@@ -377,7 +384,8 @@ export class AdvertisementService {
    */
   async remove(id: string) {
     const existing = await this.adRepo.findUnique({ where: { id } });
-    if (!existing) throw new NotFoundException("Reklam bulunamadı");
+    if (!existing)
+      throw new NotFoundException(i18nMessage("server.advertisement.notFound"));
     await (this.prisma as PrismaWithAd).advertisement.delete({ where: { id } });
     return { success: true };
   }

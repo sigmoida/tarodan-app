@@ -58,7 +58,9 @@ describe("PaymentController card data boundary", () => {
           },
         } as never,
       ),
-    ).rejects.toThrow("Kart bilgileri uygulama API'sine gönderilemez.");
+    ).rejects.toMatchObject({
+      response: { i18nKey: "server.payment.cardDataNotAccepted" },
+    });
     expect(paymentService.prepareDirectPayment).not.toHaveBeenCalled();
   });
 });

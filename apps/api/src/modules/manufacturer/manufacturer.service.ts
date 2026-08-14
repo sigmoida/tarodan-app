@@ -3,6 +3,7 @@ import { PrismaService } from "../../prisma";
 import { isPublicStorageKey, StorageService } from "../storage/storage.service";
 import { saleCapableSellerWhere } from "../membership/membership.util";
 import { catalogProductWhere } from "../product/helpers/catalog-product-where";
+import { i18nMessage } from "../i18n";
 
 @Injectable()
 export class ManufacturerService {
@@ -96,7 +97,9 @@ export class ManufacturerService {
       },
     });
     if (!manufacturer) {
-      throw new NotFoundException(`Üretici bulunamadı: ${slug}`);
+      throw new NotFoundException(
+        i18nMessage("server.manufacturer.notFoundBySlug", { slug: slug }),
+      );
     }
     return {
       ...manufacturer,
@@ -131,7 +134,7 @@ export class ManufacturerService {
       },
     });
     if (!manufacturer) {
-      throw new NotFoundException(`Üretici bulunamadı`);
+      throw new NotFoundException(i18nMessage("server.manufacturer.notFound"));
     }
     return {
       ...manufacturer,

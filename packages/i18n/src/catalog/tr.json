@@ -7038,7 +7038,15 @@
       "userNotFound": "Kullanıcı bulunamadı",
       "verificationCodeExpired": "Kodun süresi doldu. Yeni kod isteyin.",
       "verificationEmailResent": "Doğrulama emaili tekrar gönderildi",
-      "wrongVerificationCode": "Kod hatalı"
+      "wrongVerificationCode": "Kod hatalı",
+      "usernameTaken": "Bu kullanıcı adı kullanılıyor",
+      "accountAlreadyUsed": "Bu hesap bilgileri daha önce kullanılmış",
+      "usernameFormat": "Kullanıcı adı 3-30 karakter olmalı; küçük harf, rakam, nokta veya alt çizgi içermelidir",
+      "applicationAlreadyOpen": "Bu e-posta veya telefonla açık bir başvuru var.",
+      "invitationInvalid": "Davet bağlantısı geçersiz veya süresi dolmuş.",
+      "usernameInvalid": "Geçersiz kullanıcı adı.",
+      "usernameAlreadyTaken": "Bu kullanıcı adı daha önce alınmış.",
+      "sessionNotCreated": "Oturum güvenli şekilde oluşturulamadı"
     },
     "offer": {
       "alreadyInStatus": "Bu teklif zaten {status} durumunda",
@@ -7182,7 +7190,10 @@
       "updateForbidden": "Bu siparişi güncelleme yetkiniz yok",
       "viewForbidden": "Bu siparişi görüntüleme yetkiniz yok",
       "groupAlreadyCancelled": "Bu sepetin tüm siparişleri zaten iptal edilmiş.",
-      "groupCancelBlockedShipped": "Sepetteki en az bir sipariş kargoya verildi — sepet iptali kapalı. Teslimat sonrası iade talebi oluşturabilirsiniz."
+      "groupCancelBlockedShipped": "Sepetteki en az bir sipariş kargoya verildi — sepet iptali kapalı. Teslimat sonrası iade talebi oluşturabilirsiniz.",
+      "cancelReasonRequired": "Ödenmiş sipariş iptalinde neden kodu zorunludur",
+      "cancelAfterHandover": "Kargoya teslim edilmiş sipariş iptal edilemez; iade talebi oluşturun",
+      "invalidPackageSize": "Geçersiz kargo paket boyutu"
     },
     "payment": {
       "cancelPaymentForbidden": "Bu ödemeyi iptal etme yetkiniz yok",
@@ -7252,7 +7263,13 @@
       "unexpectedResponse": "PayTR beklenmeyen yanıt döndü; kart bilgilerinizi kontrol edin.",
       "unknownProvider": "Bilinmeyen ödeme sağlayıcı: {provider}",
       "viewPaymentForbidden": "Bu ödemeyi görüntüleme yetkiniz yok",
-      "viewStatusForbidden": "Bu ödeme durumunu görüntüleme yetkiniz yok"
+      "viewStatusForbidden": "Bu ödeme durumunu görüntüleme yetkiniz yok",
+      "cardDataNotAccepted": "Kart bilgileri uygulama API'sine gönderilemez.",
+      "paytrPlatformTransferFailed": "PayTR platform transfer başarısız: {reason}",
+      "paytrReportEmptyResponse": "PayTR rapor geçersiz/boş yanıt ({url})",
+      "paytrReportRequestFailed": "PayTR rapor isteği başarısız: {reason}",
+      "paytrReturnedTransferQueryFailed": "PayTR geri dönen transfer sorgusu başarısız: {reason}",
+      "paytrSendFromAccountFailed": "PayTR hesaptan gönder başarısız: {reason}"
     },
     "product": {
       "alreadyLiked": "Bu ürünü zaten beğendiniz",
@@ -7301,7 +7318,13 @@
       "userIdNotFound": "Kullanıcı kimliği bulunamadı",
       "userNotFound": "Kullanıcı bulunamadı",
       "viewForbidden": "Bu ürünü görüntüleme yetkiniz yok",
-      "boostPackageNotFound": "Seçilen paket bulunamadı veya aktif değil"
+      "boostPackageNotFound": "Seçilen paket bulunamadı veya aktif değil",
+      "duplicateImage": "Aynı görsel birden fazla kez gönderildi",
+      "imageNotOwned": "Görsellerden biri bu hesaba ait bir yüklemeden gelmiyor. Lütfen görselleri yeniden yükleyin.",
+      "imageKeyEmpty": "Görsel anahtarı boş olamaz",
+      "imageKeyInvalid": "Görsel anahtarı geçersiz",
+      "imageKeyWrongPath": "Görsel anahtarı ürün görseli yolunda değil",
+      "createFailed": "İlan oluşturulamadı: {reason}"
     },
     "refund": {
       "alreadyActive": "Bu sipariş için zaten aktif bir iade talebi var",
@@ -7380,12 +7403,101 @@
       "tariffNotEditable": "Yalnızca taslak tarifeler düzenlenebilir",
       "tariffArchived": "Arşivlenmiş tarife tekrar aktive edilemez",
       "tariffNegativeAmount": "Tarife tutarları negatif olamaz",
-      "invalidRecipientPhone": "Gönderi oluşturulamadı: alıcı telefonu geçerli bir Türkiye cep numarası değil"
+      "invalidRecipientPhone": "Gönderi oluşturulamadı: alıcı telefonu geçerli bir Türkiye cep numarası değil",
+      "unsupportedProvider": "Desteklenmeyen kargo sağlayıcısı",
+      "createForbidden": "Bu sipariş için kargo oluşturamazsınız",
+      "orderNotPreparing": "Sipariş hazırlanma durumunda değil",
+      "alreadyCreated": "Bu sipariş için zaten kargo oluşturulmuş",
+      "createFailed": "Kargo kaydı oluşturulamadı"
     },
     "commission": {
       "noRuleConfigured": "Komisyon yapılandırması eksik olduğundan sipariş şu anda oluşturulamıyor. Lütfen daha sonra tekrar deneyin.",
       "sellerSalesSuspended": "Satıcının kurumsal üyeliği geçerli olmadığı için bu ürün şu anda satın alınamıyor.",
       "pricingChanged": "Komisyon koşulları güncellendi. Lütfen sepeti yenileyip yeni tutarı onaylayın."
+    },
+    "admin": {
+      "holdNotFound": "Hold bulunamadı",
+      "tokenNotFound": "Token bulunamadı",
+      "shipmentToDeliveredForbidden": "Kargo {status} durumundan teslim edildi durumuna geçirilemez"
+    },
+    "advertisement": {
+      "notFound": "Reklam bulunamadı",
+      "campaignNotFound": "Bağlanacak kampanya bulunamadı"
+    },
+    "brand": {
+      "notFound": "Marka bulunamadı"
+    },
+    "carModel": {
+      "notFound": "Model bulunamadı"
+    },
+    "cart": {
+      "productNotPurchasable": "Bu ürün şu an satışa uygun değil",
+      "itemNotFound": "Ürün sepette bulunamadı",
+      "empty": "Sepetiniz boş",
+      "maxQuantityPerOrder": "Bu üründen maksimum {max} adet alabilirsiniz"
+    },
+    "category": {
+      "commissionCoverageIncomplete": "Kategori aktifleştirilemez: aktif komisyon setinde FREE, BASIC, PREMIUM ve BUSINESS için 0 TL'den sonsuza kadar eksiksiz fiyat aralığı yayınlanmalıdır.",
+      "parentCycle": "Kategori kendi alt kategorisini üst kategori olarak seçemez",
+      "parentNotFound": "Üst kategori bulunamadı",
+      "ancestorsMustBeActive": "Kategori aktifleştirilemez: tüm üst kategoriler aktif olmalıdır.",
+      "deactivateChildrenFirst": "Kategori pasife alınamaz: önce aktif alt kategorileri pasife alınmalıdır.",
+      "createInactiveFirst": "Yeni kategori önce pasif oluşturulmalı, komisyon kuralları yayınlandıktan sonra aktifleştirilmelidir."
+    },
+    "elogo": {
+      "archiveInvoiceNotFound": "e-Arşiv faturası bulunamadı",
+      "invoicePdfUnavailable": "Fatura PDF alınamadı"
+    },
+    "manufacturer": {
+      "notFound": "Üretici bulunamadı",
+      "notFoundBySlug": "Üretici bulunamadı: {slug}"
+    },
+    "marketing": {
+      "selectOnePreference": "En az bir e-posta tercihi seçmelisiniz.",
+      "subscriptionLinkInvalid": "Geçersiz veya kullanılmış abonelik linki."
+    },
+    "media": {
+      "publicUrlNotAllowed": "Bu içerik için herkese açık URL verilemez.",
+      "fileNotFound": "Dosya bulunamadı",
+      "unsupportedTypeWithGif": "Geçersiz dosya tipi. Sadece JPEG, PNG, WebP ve GIF desteklenir.",
+      "fileTooLarge": "Dosya boyutu çok büyük (max 10MB)",
+      "unsupportedType": "Geçersiz dosya tipi. Sadece JPEG, PNG ve WebP desteklenir.",
+      "tooManyImages": "En fazla {max} resim yükleyebilirsiniz",
+      "invalidUploadTarget": "Geçersiz yükleme hedefi: {folder}. İzinli hedefler: messages, reviews, collections"
+    },
+    "search": {
+      "reindexFailed": "Reindex başarısız"
+    },
+    "siteAccess": {
+      "invalidCode": "Geçersiz erişim kodu"
+    },
+    "support": {
+      "messageNotSent": "Mesajınız gönderilemedi. Lütfen daha sonra tekrar deneyin.",
+      "ticketNotFound": "Destek talebi bulunamadı",
+      "ticketClosed": "Kapatılmış taleplere mesaj eklenemez",
+      "rateLimited": "Çok fazla istek gönderdiniz. Lütfen {minutes} dakika sonra tekrar deneyin."
+    },
+    "userReport": {
+      "alreadyPending": "Bu içerik için zaten bekleyen bir raporunuz var",
+      "notFound": "Rapor bulunamadı",
+      "invalidType": "Geçersiz rapor tipi"
+    },
+    "collection": {
+      "notFound": "Koleksiyon bulunamadı"
+    },
+    "messaging": {
+      "messageNotFound": "Mesaj bulunamadı"
+    },
+    "wishlist": {
+      "ownProduct": "Kendi ürününüzü istek listesine ekleyemezsiniz",
+      "notFound": "İstek listesi bulunamadı",
+      "itemNotFound": "Ürün istek listenizde değil"
+    },
+    "dev": {
+      "userMissing": "Kullanıcı yok: {email}"
+    },
+    "moderation": {
+      "contentRejected": "Girdiğiniz {field} uygun değildir ({reason}). Lütfen düzenleyin."
     }
   }
 }

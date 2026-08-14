@@ -5,6 +5,7 @@ import { StorageService } from "../storage/storage.service";
 import { resolveBrandLogoUrl } from "./brand-logo-url";
 import { saleCapableSellerWhere } from "../membership/membership.util";
 import { catalogProductWhere } from "../product/helpers/catalog-product-where";
+import { i18nMessage } from "../i18n";
 
 @Injectable()
 export class BrandService {
@@ -90,7 +91,7 @@ export class BrandService {
         });
 
         if (!brand) {
-          throw new NotFoundException("Marka bulunamadı");
+          throw new NotFoundException(i18nMessage("server.brand.notFound"));
         }
 
         return {
@@ -131,7 +132,7 @@ export class BrandService {
     });
 
     if (!brand) {
-      throw new NotFoundException("Marka bulunamadı");
+      throw new NotFoundException(i18nMessage("server.brand.notFound"));
     }
 
     return {

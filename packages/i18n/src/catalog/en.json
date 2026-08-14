@@ -7038,7 +7038,15 @@
       "userNotFound": "User not found",
       "verificationCodeExpired": "Code has expired. Please request a new one.",
       "verificationEmailResent": "Verification email resent",
-      "wrongVerificationCode": "Incorrect code"
+      "wrongVerificationCode": "Incorrect code",
+      "usernameTaken": "This username is taken",
+      "accountAlreadyUsed": "These account details have already been used",
+      "usernameFormat": "A username must be 3-30 characters and contain only lowercase letters, digits, dots or underscores",
+      "applicationAlreadyOpen": "There is already an open application for this e-mail or phone number.",
+      "invitationInvalid": "The invitation link is invalid or has expired.",
+      "usernameInvalid": "Invalid username.",
+      "usernameAlreadyTaken": "This username has already been taken.",
+      "sessionNotCreated": "The session could not be created securely"
     },
     "offer": {
       "alreadyInStatus": "This offer is already in {status} status",
@@ -7182,7 +7190,10 @@
       "updateForbidden": "You are not authorized to update this order",
       "viewForbidden": "You are not authorized to view this order",
       "groupAlreadyCancelled": "All orders in this cart are already cancelled.",
-      "groupCancelBlockedShipped": "At least one order in this cart has been handed to the carrier — cart cancellation is closed. You can request a refund after delivery."
+      "groupCancelBlockedShipped": "At least one order in this cart has been handed to the carrier — cart cancellation is closed. You can request a refund after delivery.",
+      "cancelReasonRequired": "A reason code is required to cancel a paid order",
+      "cancelAfterHandover": "An order already handed to the carrier cannot be cancelled; open a refund request instead",
+      "invalidPackageSize": "Invalid shipping package size"
     },
     "payment": {
       "cancelPaymentForbidden": "You do not have permission to cancel this payment",
@@ -7252,7 +7263,13 @@
       "unexpectedResponse": "PayTR returned an unexpected response; please check your card details.",
       "unknownProvider": "Unknown payment provider: {provider}",
       "viewPaymentForbidden": "You do not have permission to view this payment",
-      "viewStatusForbidden": "You do not have permission to view this payment status"
+      "viewStatusForbidden": "You do not have permission to view this payment status",
+      "cardDataNotAccepted": "Card details cannot be sent to the application API.",
+      "paytrPlatformTransferFailed": "PayTR platform transfer failed: {reason}",
+      "paytrReportEmptyResponse": "PayTR report returned an invalid or empty response ({url})",
+      "paytrReportRequestFailed": "PayTR report request failed: {reason}",
+      "paytrReturnedTransferQueryFailed": "PayTR returned-transfer query failed: {reason}",
+      "paytrSendFromAccountFailed": "PayTR send-from-account failed: {reason}"
     },
     "product": {
       "alreadyLiked": "You have already liked this product",
@@ -7301,7 +7318,13 @@
       "userIdNotFound": "User ID not found",
       "userNotFound": "User not found",
       "viewForbidden": "You do not have permission to view this product",
-      "boostPackageNotFound": "The selected package was not found or is inactive"
+      "boostPackageNotFound": "The selected package was not found or is inactive",
+      "duplicateImage": "The same image was submitted more than once",
+      "imageNotOwned": "One of the images does not come from an upload belonging to this account. Please upload the images again.",
+      "imageKeyEmpty": "The image key cannot be empty",
+      "imageKeyInvalid": "The image key is invalid",
+      "imageKeyWrongPath": "The image key is not on the product-image path",
+      "createFailed": "The listing could not be created: {reason}"
     },
     "refund": {
       "alreadyActive": "There is already an active refund request for this order",
@@ -7380,12 +7403,101 @@
       "tariffNotEditable": "Only draft tariffs can be edited",
       "tariffArchived": "An archived tariff cannot be reactivated",
       "tariffNegativeAmount": "Tariff amounts cannot be negative",
-      "invalidRecipientPhone": "Shipment could not be created: the recipient phone is not a valid Turkish mobile number"
+      "invalidRecipientPhone": "Shipment could not be created: the recipient phone is not a valid Turkish mobile number",
+      "unsupportedProvider": "Unsupported shipping provider",
+      "createForbidden": "You cannot create a shipment for this order",
+      "orderNotPreparing": "The order is not in the preparing state",
+      "alreadyCreated": "A shipment has already been created for this order",
+      "createFailed": "The shipment record could not be created"
     },
     "commission": {
       "noRuleConfigured": "The order cannot be created right now because commission configuration is missing. Please try again later.",
       "sellerSalesSuspended": "This product cannot be purchased because the seller's corporate membership is not active.",
       "pricingChanged": "Commission terms have changed. Please refresh your cart and confirm the new amount."
+    },
+    "admin": {
+      "holdNotFound": "Hold not found",
+      "tokenNotFound": "Token not found",
+      "shipmentToDeliveredForbidden": "A shipment in the {status} state cannot be moved to delivered"
+    },
+    "advertisement": {
+      "notFound": "Advertisement not found",
+      "campaignNotFound": "The campaign to link was not found"
+    },
+    "brand": {
+      "notFound": "Brand not found"
+    },
+    "carModel": {
+      "notFound": "Model not found"
+    },
+    "cart": {
+      "productNotPurchasable": "This product is not available for purchase right now",
+      "itemNotFound": "The product was not found in your cart",
+      "empty": "Your cart is empty",
+      "maxQuantityPerOrder": "You can buy at most {max} of this product"
+    },
+    "category": {
+      "commissionCoverageIncomplete": "The category cannot be activated: the active commission set must publish an unbroken price range from 0 TL to infinity for FREE, BASIC, PREMIUM and BUSINESS.",
+      "parentCycle": "A category cannot take one of its own subcategories as its parent",
+      "parentNotFound": "Parent category not found",
+      "ancestorsMustBeActive": "The category cannot be activated: every parent category must be active.",
+      "deactivateChildrenFirst": "The category cannot be deactivated: deactivate its active subcategories first.",
+      "createInactiveFirst": "A new category must be created inactive and activated once its commission rules are published."
+    },
+    "elogo": {
+      "archiveInvoiceNotFound": "e-Archive invoice not found",
+      "invoicePdfUnavailable": "The invoice PDF could not be retrieved"
+    },
+    "manufacturer": {
+      "notFound": "Manufacturer not found",
+      "notFoundBySlug": "Manufacturer not found: {slug}"
+    },
+    "marketing": {
+      "selectOnePreference": "Select at least one e-mail preference.",
+      "subscriptionLinkInvalid": "The subscription link is invalid or has already been used."
+    },
+    "media": {
+      "publicUrlNotAllowed": "A public URL cannot be issued for this content.",
+      "fileNotFound": "File not found",
+      "unsupportedTypeWithGif": "Unsupported file type. Only JPEG, PNG, WebP and GIF are supported.",
+      "fileTooLarge": "The file is too large (max 10MB)",
+      "unsupportedType": "Unsupported file type. Only JPEG, PNG and WebP are supported.",
+      "tooManyImages": "You can upload at most {max} images",
+      "invalidUploadTarget": "Invalid upload target: {folder}. Allowed targets: messages, reviews, collections"
+    },
+    "search": {
+      "reindexFailed": "Reindex failed"
+    },
+    "siteAccess": {
+      "invalidCode": "Invalid access code"
+    },
+    "support": {
+      "messageNotSent": "Your message could not be sent. Please try again later.",
+      "ticketNotFound": "Support ticket not found",
+      "ticketClosed": "Messages cannot be added to a closed ticket",
+      "rateLimited": "You have sent too many requests. Please try again in {minutes} minutes."
+    },
+    "userReport": {
+      "alreadyPending": "You already have a pending report for this content",
+      "notFound": "Report not found",
+      "invalidType": "Invalid report type"
+    },
+    "collection": {
+      "notFound": "Collection not found"
+    },
+    "messaging": {
+      "messageNotFound": "Message not found"
+    },
+    "wishlist": {
+      "ownProduct": "You cannot add your own product to a wishlist",
+      "notFound": "Wishlist not found",
+      "itemNotFound": "The product is not in your wishlist"
+    },
+    "dev": {
+      "userMissing": "No such user: {email}"
+    },
+    "moderation": {
+      "contentRejected": "The {field} you entered is not acceptable ({reason}). Please edit it."
     }
   }
 }

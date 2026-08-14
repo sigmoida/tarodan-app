@@ -32,6 +32,7 @@ import {
   generateReferenceCode,
   generateUniqueReference,
 } from "../../common/helpers/generate-reference";
+import { i18nMessage } from "../i18n";
 
 /**
  * #291: sortable fields for the cache-backed guest-contacts list and their sort
@@ -98,7 +99,7 @@ export class SupportService {
         (rateLimit.resetAt.getTime() - Date.now()) / 60000,
       );
       throw new BadRequestException(
-        `Çok fazla istek gönderdiniz. Lütfen ${waitMinutes} dakika sonra tekrar deneyin.`,
+        i18nMessage("server.support.rateLimited", { minutes: waitMinutes }),
       );
     }
 
@@ -164,7 +165,7 @@ export class SupportService {
     } catch (error) {
       this.logger.error("Guest contact form error:", error);
       throw new BadRequestException(
-        "Mesajınız gönderilemedi. Lütfen daha sonra tekrar deneyin.",
+        i18nMessage("server.support.messageNotSent"),
       );
     }
   }
@@ -340,12 +341,12 @@ export class SupportService {
     });
 
     if (!ticket) {
-      throw new NotFoundException("Destek talebi bulunamadı");
+      throw new NotFoundException(i18nMessage("server.support.ticketNotFound"));
     }
 
     // Only creator or admin can view
     if (!isAdmin && ticket.creatorId !== userId) {
-      throw new ForbiddenException("Bu talebi görüntüleme yetkiniz yok");
+      throw new ForbiddenException(i18nMessage("server.refund.viewForbidden"));
     }
 
     return this.mapTicketToDto(ticket);
@@ -406,7 +407,7 @@ export class SupportService {
     });
 
     if (!ticket) {
-      throw new NotFoundException("Destek talebi bulunamadı");
+      throw new NotFoundException(i18nMessage("server.support.ticketNotFound"));
     }
 
     // Only creator or admin can add messages
@@ -416,7 +417,7 @@ export class SupportService {
 
     // Closed tickets cannot receive messages
     if (ticket.status === TicketStatus.closed) {
-      throw new BadRequestException("Kapatılmış taleplere mesaj eklenemez");
+      throw new BadRequestException(i18nMessage("server.support.ticketClosed"));
     }
 
     // Create message
@@ -518,7 +519,7 @@ export class SupportService {
     });
 
     if (!ticket) {
-      throw new NotFoundException("Destek talebi bulunamadı");
+      throw new NotFoundException(i18nMessage("server.support.ticketNotFound"));
     }
 
     const updateData: Prisma.SupportTicketUpdateInput = {
@@ -566,7 +567,7 @@ export class SupportService {
     });
 
     if (!ticket) {
-      throw new NotFoundException("Destek talebi bulunamadı");
+      throw new NotFoundException(i18nMessage("server.support.ticketNotFound"));
     }
 
     await this.prisma.supportTicket.update({
@@ -589,7 +590,7 @@ export class SupportService {
     });
 
     if (!ticket) {
-      throw new NotFoundException("Destek talebi bulunamadı");
+      throw new NotFoundException(i18nMessage("server.support.ticketNotFound"));
     }
 
     await this.prisma.supportTicket.update({

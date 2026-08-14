@@ -456,14 +456,14 @@ export class OrderLifecycleService {
     ) {
       if (!dto?.reasonCode) {
         throw new BadRequestException(
-          "Ödenmiş sipariş iptalinde neden kodu zorunludur",
+          i18nMessage("server.order.cancelReasonRequired"),
         );
       }
       // Ön kontrol (net hata mesajı için); bağlayıcı doğrulama
       // createCancellationRefund içinde sipariş satırı KİLİTLİYKEN yapılır.
       if (isShipmentHandedToCarrier(preflight.shipment)) {
         throw new BadRequestException(
-          "Kargoya teslim edilmiş sipariş iptal edilemez; iade talebi oluşturun",
+          i18nMessage("server.order.cancelAfterHandover"),
         );
       }
       if (!this.refundService) {

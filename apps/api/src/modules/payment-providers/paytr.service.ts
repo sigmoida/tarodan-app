@@ -1187,7 +1187,9 @@ export class PayTRService implements IPaymentProvider {
         `Platform transfer failed for ${params.transId}: ${error.message}`,
       );
       throw new BadRequestException(
-        `PayTR platform transfer başarısız: ${error.message}`,
+        i18nMessage("server.payment.paytrPlatformTransferFailed", {
+          reason: error.message,
+        }),
       );
     }
   }
@@ -1229,7 +1231,7 @@ export class PayTRService implements IPaymentProvider {
       const data = this.parsePaytrJson<Record<string, unknown>>(rawText);
       if (!data) {
         throw new BadRequestException(
-          `PayTR rapor geçersiz/boş yanıt (${url})`,
+          i18nMessage("server.payment.paytrReportEmptyResponse", { url: url }),
         );
       }
       const status = String(data.status ?? "");
@@ -1247,7 +1249,9 @@ export class PayTRService implements IPaymentProvider {
         `PayTR rapor isteği başarısız (${url}): ${error?.message}`,
       );
       throw new BadRequestException(
-        `PayTR rapor isteği başarısız: ${error?.message}`,
+        i18nMessage("server.payment.paytrReportRequestFailed", {
+          reason: error?.message,
+        }),
       );
     }
   }
@@ -1440,7 +1444,9 @@ export class PayTRService implements IPaymentProvider {
     } catch (error: any) {
       this.logger.error(`Get returned transfers failed: ${error.message}`);
       throw new BadRequestException(
-        `PayTR geri dönen transfer sorgusu başarısız: ${error.message}`,
+        i18nMessage("server.payment.paytrReturnedTransferQueryFailed", {
+          reason: error.message,
+        }),
       );
     }
   }
@@ -1487,7 +1493,9 @@ export class PayTRService implements IPaymentProvider {
     } catch (error: any) {
       this.logger.error(`Resend returned transfers failed: ${error.message}`);
       throw new BadRequestException(
-        `PayTR hesaptan gönder başarısız: ${error.message}`,
+        i18nMessage("server.payment.paytrSendFromAccountFailed", {
+          reason: error.message,
+        }),
       );
     }
   }

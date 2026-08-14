@@ -13,6 +13,7 @@ import {
   type CargoProvider,
   type CargoShipmentFailure,
 } from "./cargo-provider";
+import { i18nMessage } from "../i18n";
 
 export type OrderShipmentProvisionResult =
   "created" | "revived" | "exists" | "skipped";
@@ -299,7 +300,9 @@ export class OrderShipmentProvisioner {
   /** Seller endpoint'inin de fulfillment ile aynı kanonik oluşturma yolunu kullanması. */
   async createForSeller(sellerId: string, orderId: string, provider: string) {
     if (provider !== "surat") {
-      throw new BadRequestException("Desteklenmeyen kargo sağlayıcısı");
+      throw new BadRequestException(
+        i18nMessage("server.shipping.unsupportedProvider"),
+      );
     }
     const order = await this.prisma.order.findUnique({
       where: { id: orderId },
@@ -309,20 +312,29 @@ export class OrderShipmentProvisioner {
         shipment: { select: { id: true } },
       },
     });
-    if (!order) throw new NotFoundException("Sipariş bulunamadı");
+    if (!order)
+      throw new NotFoundException(i18nMessage("server.refund.orderNotFound"));
     if (order.sellerId !== sellerId) {
-      throw new ForbiddenException("Bu sipariş için kargo oluşturamazsınız");
+      throw new ForbiddenException(
+        i18nMessage("server.shipping.createForbidden"),
+      );
     }
     if (order.status !== OrderStatus.preparing) {
-      throw new BadRequestException("Sipariş hazırlanma durumunda değil");
+      throw new BadRequestException(
+        i18nMessage("server.shipping.orderNotPreparing"),
+      );
     }
     if (order.shipment) {
-      throw new BadRequestException("Bu sipariş için zaten kargo oluşturulmuş");
+      throw new BadRequestException(
+        i18nMessage("server.shipping.alreadyCreated"),
+      );
     }
 
     const result = await this.ensure(orderId);
     if (result !== "created") {
-      throw new BadRequestException("Kargo kaydı oluşturulamadı");
+      throw new BadRequestException(
+        i18nMessage("server.shipping.createFailed"),
+      );
     }
     return this.prisma.shipment.findUniqueOrThrow({
       where: { orderId },

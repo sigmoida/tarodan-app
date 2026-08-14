@@ -26,6 +26,7 @@ import {
   publicName,
 } from "../../common/helpers/public-identity";
 import { errorMessage } from "../../common/helpers/error-message";
+import { i18nMessage } from "../i18n";
 
 /**
  * Ürün arama + indeksleme alt servisi (search.service.ts'ten birebir taşındı):
@@ -721,7 +722,9 @@ export class SearchProductService {
         where: { indexName: this.common.productsIndex },
         data: { status: "error" },
       });
-      throw new InternalServerErrorException("Reindex başarısız");
+      throw new InternalServerErrorException(
+        i18nMessage("server.search.reindexFailed"),
+      );
     }
   }
 

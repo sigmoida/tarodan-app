@@ -426,7 +426,7 @@ export class ProductCreateService {
       );
       if (isDevelopment() && err?.message) {
         throw new InternalServerErrorException(
-          `İlan oluşturulamadı: ${err.message}`,
+          i18nMessage("server.product.createFailed", { reason: err.message }),
         );
       }
       throw new InternalServerErrorException(

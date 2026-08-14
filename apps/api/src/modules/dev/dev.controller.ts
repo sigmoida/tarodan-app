@@ -23,6 +23,7 @@ import { QUEUE_NAMES } from "../../workers/constants";
 import { NotificationDispatchService } from "../notification/notification-dispatch.service";
 import { isKnownNotificationType } from "../notification/notification-link";
 import { isTest, nodeEnv } from "../../config/environment";
+import { i18nMessage } from "../i18n";
 
 function assertTestEnv(): void {
   if (!isTest()) {
@@ -197,7 +198,10 @@ export class DevController {
       where: { email: body.email },
       select: { id: true },
     });
-    if (!user) throw new NotFoundException(`Kullanıcı yok: ${body.email}`);
+    if (!user)
+      throw new NotFoundException(
+        i18nMessage("server.dev.userMissing", { email: body.email }),
+      );
 
     if (body.clear) {
       // Yalnız zil/bildirim merkezinin okuduğu kanal; e-posta/SMS logu durur.

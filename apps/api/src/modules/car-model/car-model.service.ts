@@ -2,6 +2,7 @@ import { Injectable, NotFoundException } from "@nestjs/common";
 import { PrismaService } from "../../prisma";
 import { CacheService } from "../cache/cache.service";
 import { catalogProductWhere } from "../product/helpers/catalog-product-where";
+import { i18nMessage } from "../i18n";
 
 @Injectable()
 export class CarModelService {
@@ -101,7 +102,7 @@ export class CarModelService {
         });
 
         if (!model) {
-          throw new NotFoundException("Model bulunamadı");
+          throw new NotFoundException(i18nMessage("server.carModel.notFound"));
         }
 
         return {

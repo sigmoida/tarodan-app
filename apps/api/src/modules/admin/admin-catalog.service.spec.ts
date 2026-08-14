@@ -203,7 +203,9 @@ describe("AdminCatalogService list sorting", () => {
 
     await expect(
       service.updateCategory("admin-1", "child", { isActive: true }),
-    ).rejects.toThrow("tüm üst kategoriler aktif olmalıdır");
+    ).rejects.toMatchObject({
+      response: { i18nKey: "server.category.ancestorsMustBeActive" },
+    });
     expect(prisma.category.update).not.toHaveBeenCalled();
     expect(cache.del).not.toHaveBeenCalled();
   });
@@ -223,7 +225,9 @@ describe("AdminCatalogService list sorting", () => {
 
     await expect(
       service.updateCategory("admin-1", "root", { isActive: false }),
-    ).rejects.toThrow("önce aktif alt kategorileri pasife alınmalıdır");
+    ).rejects.toMatchObject({
+      response: { i18nKey: "server.category.deactivateChildrenFirst" },
+    });
     expect(prisma.category.update).not.toHaveBeenCalled();
   });
 

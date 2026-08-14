@@ -1,4 +1,5 @@
 import { BadRequestException } from "@nestjs/common";
+import { i18nMessage } from "../i18n";
 
 /**
  * Faz 0 — Yükleme hedefi SÖZLEŞMESİ (tek kaynak).
@@ -39,7 +40,7 @@ export function resolveUploadTarget(
       return { bucket: "products", folder: "uploads", private: false };
     default:
       throw new BadRequestException(
-        `Geçersiz yükleme hedefi: ${folder}. İzinli hedefler: messages, reviews, collections`,
+        i18nMessage("server.media.invalidUploadTarget", { folder: folder }),
       );
   }
 }

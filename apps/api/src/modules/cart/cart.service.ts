@@ -142,15 +142,17 @@ export class CartService {
     });
 
     if (!product) {
-      throw new NotFoundException("Ürün bulunamadı");
+      throw new NotFoundException(i18nMessage("server.product.notFound"));
     }
 
     if (product.kind !== ProductKind.listing) {
-      throw new NotFoundException("Ürün bulunamadı");
+      throw new NotFoundException(i18nMessage("server.product.notFound"));
     }
 
     if (product.status !== ProductStatus.active) {
-      throw new BadRequestException("Bu ürün şu an satışa uygun değil");
+      throw new BadRequestException(
+        i18nMessage("server.cart.productNotPurchasable"),
+      );
     }
 
     if (!canSellFromMembership(product.seller?.membership, product.seller)) {
@@ -164,7 +166,9 @@ export class CartService {
 
     // Check if user is trying to buy their own product
     if (product.sellerId === userId) {
-      throw new BadRequestException("Kendi ürününüzü satın alamazsınız");
+      throw new BadRequestException(
+        i18nMessage("server.order.cannotBuyOwnProduct"),
+      );
     }
 
     // Sepet: fiziksel stok üst sınırı kontrolü
@@ -215,7 +219,9 @@ export class CartService {
         (dto.quantity || 1) > product.maxQuantityPerOrder
       ) {
         throw new BadRequestException(
-          `Bu üründen maksimum ${product.maxQuantityPerOrder} adet alabilirsiniz`,
+          i18nMessage("server.cart.maxQuantityPerOrder", {
+            max: product.maxQuantityPerOrder,
+          }),
         );
       }
 
@@ -256,7 +262,7 @@ export class CartService {
     });
 
     if (!item) {
-      throw new NotFoundException("Ürün sepette bulunamadı");
+      throw new NotFoundException(i18nMessage("server.cart.itemNotFound"));
     }
 
     if (dto.quantity === 0) {
@@ -279,7 +285,9 @@ export class CartService {
         dto.quantity > item.product.maxQuantityPerOrder
       ) {
         throw new BadRequestException(
-          `Bu üründen maksimum ${item.product.maxQuantityPerOrder} adet alabilirsiniz`,
+          i18nMessage("server.cart.maxQuantityPerOrder", {
+            max: item.product.maxQuantityPerOrder,
+          }),
         );
       }
 
@@ -313,7 +321,7 @@ export class CartService {
     });
 
     if (!item) {
-      throw new NotFoundException("Ürün sepette bulunamadı");
+      throw new NotFoundException(i18nMessage("server.cart.itemNotFound"));
     }
 
     await this.prisma.cartItem.delete({ where: { id: item.id } });
@@ -343,7 +351,7 @@ export class CartService {
     });
 
     if (!cartWithItems?.items.length) {
-      throw new BadRequestException("Sepetiniz boş");
+      throw new BadRequestException(i18nMessage("server.cart.empty"));
     }
 
     // Validate coupon

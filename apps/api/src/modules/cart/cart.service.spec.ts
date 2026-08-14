@@ -167,7 +167,7 @@ describe("CartService.addItem — idempotent re-add", () => {
     await expect(
       service.addItem("user-1", { productId, quantity: 1 } as any),
     ).rejects.toMatchObject({
-      response: expect.objectContaining({ statusCode: 404 }),
+      response: { i18nKey: "server.product.notFound" },
     });
     expect(mockPrisma.cartItem.findUnique).not.toHaveBeenCalled();
   });

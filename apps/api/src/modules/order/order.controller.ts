@@ -96,7 +96,9 @@ export class OrderController {
         ? ShippingPackageTierCode.small
         : (packageTierCode as ShippingPackageTierCode);
     if (!Object.values(ShippingPackageTierCode).includes(tierCode)) {
-      throw new BadRequestException("Geçersiz kargo paket boyutu");
+      throw new BadRequestException(
+        i18nMessage("server.order.invalidPackageSize"),
+      );
     }
     const shippingDesi = billableDesiForTier(tierCode);
     return this.orderService.getCommissionPreview(
