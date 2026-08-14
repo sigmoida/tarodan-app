@@ -35,7 +35,10 @@ import {
   UpdateNotificationSettingsDto,
 } from "../dto";
 import { UserCommonService } from "../user-common.service";
-import { isUsernameAllowed, normalizeUsername } from "../../auth/username.util";
+import {
+  isUsernameAllowed,
+  normalizeUsername,
+} from "../../auth/utils/username.util";
 import {
   PUBLIC_IDENTITY_SELECT,
   toPublicIdentity,

@@ -4,7 +4,7 @@ import type {
   PayTRBasketItem,
   PayTRCallbackData,
   PayTRStatusInquiryResult,
-} from "../../src/modules/payment-providers/paytr.service";
+} from "../../src/modules/payment-providers/paytr/paytr.service";
 
 /**
  * In-memory PayTR mock for E2E tests.

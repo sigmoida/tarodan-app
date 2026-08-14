@@ -1,4 +1,5 @@
 import { readdirSync, readFileSync, statSync } from "fs";
+import { apiAppRoot } from "./app-root";
 import { join } from "path";
 
 /**
@@ -33,7 +34,7 @@ function collectSeedFiles(dir: string): string[] {
 
 describe("seed media audit", () => {
   it("seed files contain no external image services or repo static paths", () => {
-    const prismaDir = join(__dirname, "../../prisma");
+    const prismaDir = join(apiAppRoot(), "prisma");
     const files = collectSeedFiles(prismaDir).filter((f) =>
       /seed[^/]*\.ts$|seed-edge/.test(f),
     );

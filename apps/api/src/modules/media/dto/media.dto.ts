@@ -1,4 +1,10 @@
-import { IsOptional, IsString, IsNumber, IsBoolean, IsArray } from 'class-validator';
+import {
+  IsOptional,
+  IsString,
+  IsNumber,
+  IsBoolean,
+  IsArray,
+} from "class-validator";
 
 export class UploadOptionsDto {
   @IsOptional()
@@ -33,7 +39,7 @@ export class ResizeOptionsDto {
 
   @IsOptional()
   @IsString()
-  fit?: 'cover' | 'contain' | 'fill' | 'inside' | 'outside';
+  fit?: "cover" | "contain" | "fill" | "inside" | "outside";
 }
 
 export class UploadResultDto {

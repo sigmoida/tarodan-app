@@ -7,7 +7,7 @@ import {
 } from "@nestjs/common";
 import { PrismaService } from "../../../prisma";
 import { StorageService } from "../../storage/storage.service";
-import { notifyWebRevalidate } from "../../../common/revalidate";
+import { notifyWebRevalidate } from "../../../common/helpers/revalidate";
 import { AdminAuditService } from "../ops/admin-audit.service";
 import { fulltextProductSearch } from "../../product/helpers/fulltext-search";
 import { getProductStatusFromQuantity } from "../../product/helpers/product-status.helper";

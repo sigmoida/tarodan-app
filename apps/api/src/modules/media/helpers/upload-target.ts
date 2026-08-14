@@ -1,5 +1,5 @@
 import { BadRequestException } from "@nestjs/common";
-import { i18nMessage } from "../i18n";
+import { i18nMessage } from "../../i18n";
 
 /**
  * Faz 0 — Yükleme hedefi SÖZLEŞMESİ (tek kaynak).

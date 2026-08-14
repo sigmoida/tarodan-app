@@ -12,7 +12,7 @@ import {
   USERNAME_MAX_LENGTH,
   USERNAME_MIN_LENGTH,
   USERNAME_PATTERN,
-} from "../username.util";
+} from "../utils/username.util";
 
 export class BusinessRegisterDto {
   @ApiProperty({ example: "Ayşe Yılmaz" })

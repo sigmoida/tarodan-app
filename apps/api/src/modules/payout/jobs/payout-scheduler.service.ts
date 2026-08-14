@@ -1,9 +1,9 @@
 import { Injectable, Logger, OnModuleInit } from "@nestjs/common";
 import { InjectQueue } from "@nestjs/bull";
 import { Queue } from "bull";
-import { registerRepeatableCron } from "../../monitoring/bull-cron.helper";
-import { QUEUE_NAMES } from "../../workers/constants";
-import { PayoutService } from "./payout.service";
+import { registerRepeatableCron } from "../../../monitoring/bull-cron.helper";
+import { QUEUE_NAMES } from "../../../workers/constants";
+import { PayoutService } from "../payout.service";
 
 @Injectable()
 export class PayoutSchedulerService implements OnModuleInit {

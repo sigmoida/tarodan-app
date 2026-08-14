@@ -35,9 +35,11 @@ what they test.
 
 ### Folder layout inside a module
 
-A module folder is a table of contents. Once it passes **~10 flat files** it
-stops being one, so it gets subfolders — and only from this vocabulary, so
-every module reads the same way:
+A module folder is a table of contents. Once it passes **~10 flat source
+files** it stops being one, so it gets subfolders — and only from this
+vocabulary, so every module reads the same way. Count source files, not
+colocated specs: a `*.spec.ts` sitting beside its subject is what §1 asks for,
+so it is never the thing to move.
 
 | Folder      | What belongs in it                                                                                      |
 | ----------- | ------------------------------------------------------------------------------------------------------- |
@@ -61,6 +63,14 @@ analytics, ops, jobs) are the worked examples.
   the codebase are registered unconditionally and fire wherever the event is
   emitted — including the web role — so filing them as background work would
   say something untrue about when they run.
+- A folder that is still crowded after this is usually a §2 problem wearing a
+  §1 costume. `payout/` keeps twelve specs at its root because they all test
+  one 1635-line `payout.service.ts`; inventing slices to file them would hide
+  that. Split the service and the specs follow it.
+- Specs that read files **outside the TypeScript module graph** (a migration's
+  SQL, an admin component's source) must anchor with
+  `common/helpers/app-root.ts`, never by counting `../` from `__dirname`.
+  Those are data paths, so no import rewrite will fix them when the spec moves.
 - Contract specs that walk the tree (`scheduled-processor-role`,
   `cron-catalog.contract`) recurse on purpose. Keep them depth-agnostic — a
   spec that reads one level deep silently stops covering anything you move.

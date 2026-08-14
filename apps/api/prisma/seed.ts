@@ -37,7 +37,7 @@ import * as bcrypt from "bcrypt";
 import { randomUUID } from "crypto";
 import { StorageService } from "../src/modules/storage/storage.service";
 import { PrismaService } from "../src/prisma";
-import { SEED_AVATAR_BY_EMAIL } from "../src/common/seed-media-mapping";
+import { SEED_AVATAR_BY_EMAIL } from "../src/common/helpers/seed-media-mapping";
 import { EMAIL_TEMPLATE_DEFINITIONS } from "../src/common/email/email-template-registry";
 import { normalizeSeedCommerce } from "./seed-commerce";
 import {

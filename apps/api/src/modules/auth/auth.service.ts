@@ -29,8 +29,8 @@ import { NotificationService } from "../notification/notification.service";
 import { CacheService } from "../cache/cache.service";
 import { StorageService } from "../storage/storage.service";
 import { NewsletterService } from "../marketing/newsletter.service";
-import { GoogleAuthService } from "./google-auth.service";
-import { AppleAuthService } from "./apple-auth.service";
+import { GoogleAuthService } from "./social/google-auth.service";
+import { AppleAuthService } from "./social/apple-auth.service";
 import { PaymentService } from "../payment/payment.service";
 import { i18nMessage } from "../i18n";
 import { SecurityService } from "../security/security.service";
@@ -38,7 +38,7 @@ import {
   allocateUsernameFromEmail,
   isUsernameAllowed,
   normalizeUsername,
-} from "./username.util";
+} from "./utils/username.util";
 import { ENTITY_PREFIX } from "../../common/helpers/code-prefixes";
 import { errorMessage, errorStack } from "../../common/helpers/error-message";
 

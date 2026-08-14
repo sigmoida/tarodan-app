@@ -14,11 +14,11 @@ import { NotificationModule } from "../notification/notification.module";
 import { CacheModule } from "../cache/cache.module";
 import { StorageModule } from "../storage/storage.module";
 import { BannedUserGuard } from "./guards/banned-user.guard";
-import { GoogleAuthService } from "./google-auth.service";
-import { AppleAuthService } from "./apple-auth.service";
+import { GoogleAuthService } from "./social/google-auth.service";
+import { AppleAuthService } from "./social/apple-auth.service";
 import { RolesGuard } from "./guards/roles.guard";
-import { PhoneVerificationService } from "./phone-verification.service";
-import { EmailChangeService } from "./email-change.service";
+import { PhoneVerificationService } from "./verification/phone-verification.service";
+import { EmailChangeService } from "./verification/email-change.service";
 import { SecurityModule } from "../security/security.module";
 import { MarketingModule } from "../marketing/marketing.module";
 

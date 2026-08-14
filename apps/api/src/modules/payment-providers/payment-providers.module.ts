@@ -1,6 +1,6 @@
 import { Module } from "@nestjs/common";
 import { ConfigModule } from "@nestjs/config";
-import { PayTRService } from "./paytr.service";
+import { PayTRService } from "./paytr/paytr.service";
 import { PaymentProviderRegistry } from "./payment-provider.registry";
 
 @Module({

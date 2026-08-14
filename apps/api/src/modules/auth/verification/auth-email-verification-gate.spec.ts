@@ -1,5 +1,5 @@
 import { UnauthorizedException } from "@nestjs/common";
-import { AuthService } from "./auth.service";
+import { AuthService } from "../auth.service";
 
 /**
  * HIGH: `register` doğrulanmamış kullanıcıya çalışan access + refresh token

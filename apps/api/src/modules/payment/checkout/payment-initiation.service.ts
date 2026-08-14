@@ -16,7 +16,7 @@ import {
   SavedCardStatus,
   Prisma,
 } from "@prisma/client";
-import { PayTRBuyer } from "../../payment-providers/paytr.service";
+import { PayTRBuyer } from "../../payment-providers/paytr/paytr.service";
 import { PaymentProviderRegistry } from "../../payment-providers/payment-provider.registry";
 import { ProductLockService } from "../../product/lock/product-lock.service";
 import { Request } from "express";

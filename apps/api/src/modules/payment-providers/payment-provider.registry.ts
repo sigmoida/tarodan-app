@@ -1,5 +1,5 @@
 import { BadRequestException, Injectable } from "@nestjs/common";
-import { PayTRService } from "./paytr.service";
+import { PayTRService } from "./paytr/paytr.service";
 import {
   IPaymentProvider,
   PAYMENT_PROVIDER_PAYTR,

@@ -1,6 +1,6 @@
 import { Injectable, Logger } from "@nestjs/common";
-import { PrismaService } from "../../prisma";
-import { StorageService } from "../storage/storage.service";
+import { PrismaService } from "../../../prisma";
+import { StorageService } from "../../storage/storage.service";
 
 /** Temp nesnesi bu süreden gençken ASLA silinmez (ilan taslağı hâlâ tamamlanabilir). */
 const TEMP_MIN_AGE_DAYS = 7;

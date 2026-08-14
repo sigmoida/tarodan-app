@@ -8,7 +8,7 @@ import {
 import * as ExcelJS from "exceljs";
 import { AdminProductBulkImportService } from "./admin-product-bulk-import.service";
 
-jest.mock("../../../common/revalidate", () => ({
+jest.mock("../../../common/helpers/revalidate", () => ({
   notifyWebRevalidate: jest.fn().mockResolvedValue(undefined),
 }));
 

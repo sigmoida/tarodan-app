@@ -7,7 +7,7 @@ import {
 } from "@nestjs/common";
 import * as bcrypt from "bcrypt";
 import { PrismaService } from "../../../prisma";
-import { allocateUsernameFromEmail } from "../../auth/username.util";
+import { allocateUsernameFromEmail } from "../../auth/utils/username.util";
 import { AdminAuditService } from "../ops/admin-audit.service";
 import { PaymentService } from "../../payment/payment.service";
 import { SearchService } from "../../search/search.service";

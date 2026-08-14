@@ -1,4 +1,5 @@
 import { readFileSync } from "fs";
+import { apiAppRoot } from "./app-root";
 import { join } from "path";
 
 /**
@@ -13,7 +14,7 @@ import { join } from "path";
  * Bu test bir kod incelemesi kuralını makineye devreder: kimse "sadece şu
  * profilleri yeniden kullanayım" diye o bağı geri kuramaz.
  */
-const PRISMA_DIR = join(__dirname, "..", "..", "prisma");
+const PRISMA_DIR = join(apiAppRoot(), "prisma");
 const read = (file: string) => readFileSync(join(PRISMA_DIR, file), "utf8");
 
 /** Yalnız gerçek modül belirteçleri — yorumdaki dosya adları sayılmaz. */

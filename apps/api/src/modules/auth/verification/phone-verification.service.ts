@@ -5,9 +5,9 @@ import {
   Logger,
 } from "@nestjs/common";
 import * as crypto from "crypto";
-import { PrismaService } from "../../prisma";
-import { NetGsmProvider } from "../notification/providers/netgsm.provider";
-import { i18nMessage } from "../i18n";
+import { PrismaService } from "../../../prisma";
+import { NetGsmProvider } from "../../notification/providers/netgsm.provider";
+import { i18nMessage } from "../../i18n";
 
 @Injectable()
 export class PhoneVerificationService {

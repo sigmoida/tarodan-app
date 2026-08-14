@@ -1,8 +1,8 @@
-import { Process, Processor } from '@nestjs/bull';
-import { Job } from 'bull';
-import { QUEUE_NAMES } from '../../workers/constants';
-import { runTrackedJob } from '../../monitoring/cron-run.helper';
-import { PayoutSchedulerService } from './payout-scheduler.service';
+import { Process, Processor } from "@nestjs/bull";
+import { Job } from "bull";
+import { QUEUE_NAMES } from "../../../workers/constants";
+import { runTrackedJob } from "../../../monitoring/cron-run.helper";
+import { PayoutSchedulerService } from "./payout-scheduler.service";
 
 /**
  * 'scheduled' kuyruğundaki payout cron işleri:
@@ -12,16 +12,16 @@ import { PayoutSchedulerService } from './payout-scheduler.service';
 export class PayoutScheduledProcessor {
   constructor(private readonly scheduler: PayoutSchedulerService) {}
 
-  @Process('payout-check-returned')
+  @Process("payout-check-returned")
   async handleCheckReturned(job: Job) {
-    return runTrackedJob(job, 'payout-check-returned', (log) =>
+    return runTrackedJob(job, "payout-check-returned", (log) =>
       this.scheduler.runCheckReturnedTransfers(log),
     );
   }
 
-  @Process('payout-process')
+  @Process("payout-process")
   async handleProcess(job: Job) {
-    return runTrackedJob(job, 'payout-process', (log) =>
+    return runTrackedJob(job, "payout-process", (log) =>
       this.scheduler.runProcessPayouts(log),
     );
   }

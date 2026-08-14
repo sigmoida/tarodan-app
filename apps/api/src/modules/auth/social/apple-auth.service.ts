@@ -1,7 +1,7 @@
 import { Injectable, UnauthorizedException, Logger } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import appleSignin from "apple-signin-auth";
-import { i18nMessage } from "../i18n";
+import { i18nMessage } from "../../i18n";
 
 export interface AppleProfile {
   sub: string;

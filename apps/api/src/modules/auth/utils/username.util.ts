@@ -1,5 +1,5 @@
 import { randomInt } from "crypto";
-import type { PrismaService } from "../../prisma";
+import type { PrismaService } from "../../../prisma";
 
 /**
  * Kullanıcı adı kurallarının TEK kaynağı. Desen ve uzunluk sınırları buradan

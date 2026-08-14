@@ -1,7 +1,7 @@
 import { Injectable, Logger, Optional } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { PrismaService } from "../../../prisma";
-import type { PayTRStatusInquirySuccess } from "../../payment-providers/paytr.service";
+import type { PayTRStatusInquirySuccess } from "../../payment-providers/paytr/paytr.service";
 import { PaymentProviderEventService } from "../payment-provider-event.service";
 import { PaymentStatus, OrderStatus } from "@prisma/client";
 import { CacheService } from "../../cache/cache.service";

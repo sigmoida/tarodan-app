@@ -3,7 +3,7 @@ import { NestExpressApplication } from "@nestjs/platform-express";
 import { Test, TestingModule } from "@nestjs/testing";
 import { json, urlencoded } from "express";
 import { AppModule } from "../../src/app.module";
-import { PayTRService } from "../../src/modules/payment-providers/paytr.service";
+import { PayTRService } from "../../src/modules/payment-providers/paytr/paytr.service";
 import { StorageService } from "../../src/modules/storage/storage.service";
 import { MockPayTRService } from "../mocks/paytr.mock";
 import { SURAT_CARRIER_CLIENT } from "../../src/modules/surat-cargo/surat-cargo.service";

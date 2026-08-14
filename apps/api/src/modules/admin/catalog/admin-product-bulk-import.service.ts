@@ -23,7 +23,7 @@ import * as path from "path";
 import { isUUID, validate } from "class-validator";
 import { plainToInstance } from "class-transformer";
 import { PrismaService } from "../../../prisma";
-import { notifyWebRevalidate } from "../../../common/revalidate";
+import { notifyWebRevalidate } from "../../../common/helpers/revalidate";
 import { CacheService } from "../../cache/cache.service";
 import { CommissionRuleGuardService } from "../../commission/commission-rule-guard.service";
 import { MembershipService } from "../../membership/membership.service";

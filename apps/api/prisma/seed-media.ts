@@ -10,7 +10,7 @@ import {
   resolveSeedProductAssetBase,
   seedCollectionAssetKey,
   SEED_AVATAR_BY_EMAIL,
-} from "../src/common/seed-media-mapping";
+} from "../src/common/helpers/seed-media-mapping";
 
 const prisma = new PrismaClient();
 const SEED_ASSETS_PREFIX = process.env.SEED_ASSETS_PREFIX || "seed-assets";

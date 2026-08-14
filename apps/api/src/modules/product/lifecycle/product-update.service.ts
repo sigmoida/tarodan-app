@@ -11,7 +11,7 @@ import { PrismaService } from "../../../prisma";
 import { assertValidProductImages } from "../helpers/product-image-keys";
 import { CacheService } from "../../cache/cache.service";
 import { SearchService } from "../../search/search.service";
-import { notifyWebRevalidate } from "../../../common/revalidate";
+import { notifyWebRevalidate } from "../../../common/helpers/revalidate";
 import { NotificationService } from "../../notification/notification.service";
 import { NotificationType } from "../../notification/dto";
 import { SmtpProvider } from "../../mail/smtp.provider";

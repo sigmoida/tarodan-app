@@ -2,9 +2,9 @@ import { Process, Processor } from "@nestjs/bull";
 import { Injectable, Logger, OnModuleInit } from "@nestjs/common";
 import { InjectQueue } from "@nestjs/bull";
 import { Job, Queue } from "bull";
-import { QUEUE_NAMES } from "../../workers/constants";
-import { runTrackedJob } from "../../monitoring/cron-run.helper";
-import { registerRepeatableCron } from "../../monitoring/bull-cron.helper";
+import { QUEUE_NAMES } from "../../../workers/constants";
+import { runTrackedJob } from "../../../monitoring/cron-run.helper";
+import { registerRepeatableCron } from "../../../monitoring/bull-cron.helper";
 import { MediaCleanupService } from "./media-cleanup.service";
 
 /** Cron KAYDI — her rolde koşar (repeatable kayıt idempotenttir, zamanlama senkron kalır). */

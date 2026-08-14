@@ -4,8 +4,8 @@ import {
   SEED_COMMISSION_PRICE_BANDS,
   SEED_CATEGORY_DEFINITIONS,
   SEED_SHIPPING_TIERS,
-} from "../../prisma/seed-demo-config";
-import { SEED_COMMISSION_RULE_SET_IDS } from "../../prisma/seed-ids";
+} from "../../../prisma/seed-demo-config";
+import { SEED_COMMISSION_RULE_SET_IDS } from "../../../prisma/seed-ids";
 import { isUUID } from "class-validator";
 
 describe("comprehensive seed pricing config", () => {

@@ -5,9 +5,9 @@ import {
   NotFoundException,
 } from "@nestjs/common";
 import * as crypto from "crypto";
-import { PrismaService } from "../../prisma";
-import { NotificationService } from "../notification/notification.service";
-import { i18nMessage } from "../i18n";
+import { PrismaService } from "../../../prisma";
+import { NotificationService } from "../../notification/notification.service";
+import { i18nMessage } from "../../i18n";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 

@@ -10,7 +10,7 @@ import { ConfigService } from "@nestjs/config";
 import { PrismaService } from "../../../prisma";
 import { PaymentStatus, OrderStatus, ProductStatus } from "@prisma/client";
 import { PaymentProviderRegistry } from "../../payment-providers/payment-provider.registry";
-import type { PayTRStatusInquirySuccess } from "../../payment-providers/paytr.service";
+import type { PayTRStatusInquirySuccess } from "../../payment-providers/paytr/paytr.service";
 import { EventService } from "../../events";
 import { Request } from "express";
 import { PaymentCommonService } from "../payment-common.service";

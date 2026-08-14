@@ -15,7 +15,7 @@ import {
 import {
   LEGACY_USERNAME_PREFIX,
   normalizeUsername,
-} from "../../auth/username.util";
+} from "../../auth/utils/username.util";
 import { catalogProductWhere } from "../../product/helpers/catalog-product-where";
 
 /**

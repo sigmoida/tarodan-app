@@ -22,7 +22,7 @@ import { StorageService, isPublicBucket } from "../storage/storage.service";
 import { MediaAccessService } from "../storage/media-access.service";
 import { ModerationAiClient } from "../moderation/moderation-ai.client";
 import { MAX_PRODUCT_IMAGES } from "../product/helpers/product-image-keys";
-import { resolveUploadTarget } from "./upload-target";
+import { resolveUploadTarget } from "./helpers/upload-target";
 import { i18nMessage } from "../i18n";
 
 @Controller("media")

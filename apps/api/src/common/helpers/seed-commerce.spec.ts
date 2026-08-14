@@ -1,4 +1,4 @@
-import { buildSeedOrderFinancialState } from "../../prisma/seed-commerce";
+import { buildSeedOrderFinancialState } from "../../../prisma/seed-commerce";
 
 describe("seed commerce normalization", () => {
   it("backfills legacy shipping, commission, and financial snapshots", () => {
