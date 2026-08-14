@@ -7,6 +7,11 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { FormProvider, useForm } from "react-hook-form";
 import { FormPhone } from "@tarodan/ui/form";
 
+// React'e test ortamında olduğumuzu bildirir; olmadan her `act` uyarı basıyor.
+(
+  globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }
+).IS_REACT_ACT_ENVIRONMENT = true;
+
 /**
  * The shared phone control, driven the way the profile form drives it.
  *

@@ -217,6 +217,11 @@ function buildPushStages(context, apps) {
         "@tarodan/web",
         "test:api",
       ]),
+      commandStage("web-unit", "Web Unit", [
+        "--filter",
+        "@tarodan/web",
+        "test",
+      ]),
       commandStage("web-build", "Web Build", [
         "--filter",
         "@tarodan/web...",

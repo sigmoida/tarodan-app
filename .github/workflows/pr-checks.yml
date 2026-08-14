@@ -46,8 +46,9 @@ jobs:
       - name: Lint
         run: pnpm exec turbo run lint --filter='!@tarodan/web'
 
-      # Only admin has a vitest suite wired up so far (see admin's
-      # vitest.config.ts) — apps/web has its own "test" script too but it
-      # isn't part of this gate yet, a separate follow-up.
+      # Both apps' vitest suites. Web's ran nowhere until now — not here and
+      # not in the pre-push gate — so its specs, including the regression that
+      # pins the phone field's editing behaviour, were decorative. Web's
+      # "test" script also runs the node:test scripts under apps/web/scripts.
       - name: Unit tests
-        run: pnpm --filter @tarodan/admin test
+        run: pnpm --filter @tarodan/admin --filter @tarodan/web test
