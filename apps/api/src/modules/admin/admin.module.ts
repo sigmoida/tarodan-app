@@ -22,6 +22,9 @@ import { AdminLogsController } from "./analytics/admin-logs.controller";
 import { AdminReviewController } from "./ops/admin-review.controller";
 import { AdminSellerApplicationController } from "./users/admin-seller-application.controller";
 import { AdminAdPackageController } from "./finance/admin-ad-package.controller";
+import { AdminCatalogImportController } from "./catalog/admin-catalog-import.controller";
+import { CatalogImportService } from "./catalog/catalog-import/catalog-import.service";
+import { CatalogImportTemplateService } from "./catalog/catalog-import/catalog-import-template.service";
 import { AdminService } from "./admin.service";
 import { AdminPspReconciliationService } from "./finance/admin-psp-reconciliation.service";
 import { AdminMediaService } from "./catalog/admin-media.service";
@@ -150,6 +153,10 @@ import { scheduledProcessors } from "../../workers/scheduled-processors";
     AdminMessagingController,
     AdminSupportController,
     AdminNotificationController,
+    // İçe aktarma uçları katalog controller'ından ÖNCE: bugün çakışan bir
+    // `brands/:id` GET route'u yok, ama ileride eklenirse `brands/import-*`
+    // yollarını yutmasın (Nest kayıt sırasına göre eşler).
+    AdminCatalogImportController,
     AdminCatalogController,
     AdminTaxController,
     AdminCollectionController,
@@ -195,6 +202,8 @@ import { scheduledProcessors } from "../../workers/scheduled-processors";
     AdminTaxService,
     AdminMembershipService,
     AdminCatalogService,
+    CatalogImportService,
+    CatalogImportTemplateService,
     AdminCollectionService,
     AdminNotificationService,
     AdminLogsService,

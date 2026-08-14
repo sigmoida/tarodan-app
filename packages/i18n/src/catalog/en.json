@@ -122,7 +122,13 @@
     "uploading": "Uploading",
     "replace": "Replace",
     "language": "Language",
-    "deleting": "Deleting"
+    "deleting": "Deleting",
+    "fileDropzone": {
+      "active": "Drop the file here",
+      "select": "Choose File",
+      "replace": "Replace File",
+      "remove": "Remove"
+    }
   },
   "nav": {
     "home": "Home",
@@ -161,7 +167,8 @@
     "loginForTrades": "Sign In for Trade Operations",
     "vehicleTypes": "Vehicle Types",
     "manufacturers": "Manufacturers",
-    "allManufacturers": "All Manufacturers"
+    "allManufacturers": "All Manufacturers",
+    "support": "Support"
   },
   "auth": {
     "loginTitle": "Login",
@@ -581,6 +588,8 @@
     "modelCodePlaceholder": "e.g. HKG72",
     "colorRequired": "Color *",
     "colorPlaceholder": "e.g. Red",
+    "colorMaxHint": "up to {max} colors",
+    "colorLegacyHint": "Saved color: {value} — pick from the list.",
     "scaleRequired": "Scale *",
     "materialRequired": "Material *",
     "manufacturerRequired": "Manufacturer *",
@@ -629,6 +638,63 @@
     "conditionPoor": "Poor",
     "statusDeleted": "Removed",
     "upToImages": "Up to {count} images",
+    "imageUpload": {
+      "counter": "{used}/{max}",
+      "slotsLeft": "You can add {count} more image(s)",
+      "full": "All slots used",
+      "orderHint": "The first image is the cover — drag to reorder.",
+      "heroTitle": "Drag your images here",
+      "heroSubtitle": "or click to pick them from your device",
+      "dropHere": "Drop to add",
+      "browse": "Choose files",
+      "formats": "JPEG · PNG · WebP · GIF",
+      "maxSize": "≤ {size} MB",
+      "minDimension": "≥ {size}×{size} px",
+      "addMore": "Add",
+      "cover": "Cover",
+      "imageAlt": "Image {index}",
+      "removeImage": "Remove image {index}",
+      "makeCoverImage": "Make image {index} the cover",
+      "reorderImage": "Reorder image {index}",
+      "queued": "Queued",
+      "processing": "Processing",
+      "uploadingPercent": "Uploading {progress}%",
+      "uploadProgressLabel": "Image {index} uploading",
+      "failed": "Upload failed",
+      "noServerResult": "The server returned no result for this file",
+      "retry": "Try again",
+      "lowResolution": "Low resolution",
+      "lowResolutionHint": "Images below {size}×{size} pixels may look blurry on the listing page.",
+      "dragStarted": "Moving {id}",
+      "dragOver": "Over position {id}",
+      "dragEnded": "Dropped at position {id}",
+      "dragCancelled": "Move cancelled",
+      "rejectedType": "{count} file(s) in an unsupported format",
+      "rejectedSize": "{count} file(s) over the {max} MB limit",
+      "rejectedTooSmall": "{count} file(s) smaller than {min} KB",
+      "rejectedDuplicate": "{count} file(s) already added",
+      "rejectedLimit": "{count} file(s) did not fit your quota",
+      "rejectedSuffix": "{reasons} — not added",
+      "blockerPending": "Images are still uploading, please wait until they finish.",
+      "blockerFailed": "Some images failed to upload. Retry them or remove them.",
+      "guideTitle": "Image rules and tips",
+      "checksTitle": "Check these before uploading",
+      "checkFormatTitle": "Check the file format",
+      "checkFormatText": "Your image must be a JPEG, JPG, PNG, WebP or GIF file.",
+      "checkSizeTitle": "Check the file size",
+      "checkSizeText": "File size must be at least {min} KB and at most {max} MB.",
+      "checkResolutionTitle": "Check the resolution",
+      "checkResolutionText": "At least {size}×{size} pixels is recommended; smaller images look blurry on the listing page.",
+      "rulesTitle": "Image requirements",
+      "ruleClarityTitle": "Product clarity",
+      "ruleClarityText": "The product must be fully in focus and fill most of the frame.",
+      "ruleVariantTitle": "Correct variant",
+      "ruleVariantText": "Show only the variant you are selling (colour / model / scale).",
+      "ruleBackgroundTitle": "Background",
+      "ruleBackgroundText": "Prefer a plain, light-coloured and well-lit background.",
+      "ruleCoverTitle": "Cover and supporting images",
+      "ruleCoverText": "The cover should show the product straight on and uncluttered; keep other angles, measurements and packaging for the supporting images."
+    },
     "boostedBadge": "Featured",
     "boostListing": "Feature",
     "extendBoost": "Extend",
@@ -3484,6 +3550,70 @@
         "bulkImportFileTooLarge": "{name} is too large. Each file can be at most {size}.",
         "bulkImportTooManyImages": "You can select at most {max} images.",
         "bulkImportTotalTooLarge": "The selected files cannot exceed {size} in total."
+      },
+      "import": {
+        "button": "Import from Excel",
+        "title": {
+          "brands": "Bulk Add Brands from Excel",
+          "manufacturers": "Bulk Add Manufacturers from Excel",
+          "car-models": "Bulk Add Car Models from Excel"
+        },
+        "description": "Download the template, fill it in and upload it here. If a single row is invalid, no records are created.",
+        "structureTitle": "Expected file structure",
+        "structureHelp": "Data must live on the '{sheet}' sheet. A single file can hold up to {rows} rows.",
+        "downloadTemplate": "Download Template",
+        "templateFailed": "Template could not be downloaded",
+        "columnName": "Column",
+        "columnRequired": "Status",
+        "columnDescription": "Description",
+        "columnExample": "Example",
+        "required": "Required",
+        "optional": "Optional",
+        "dropzoneIdle": "Drag the completed Excel file here",
+        "dropzoneHint": "Only .xlsx • Max {size}",
+        "submit": "Import",
+        "processing": "Importing…",
+        "failed": "Import failed",
+        "invalidFileType": "\"{name}\" is not an Excel (.xlsx) file",
+        "fileTooLarge": "\"{name}\" is too large. Maximum {size}.",
+        "validationTitle": "Nothing was imported",
+        "validationHelp": "Fix the rows below and upload the file again. No records were created.",
+        "successTitle": "Import completed",
+        "created": {
+          "brands": "{count} brands added",
+          "manufacturers": "{count} manufacturers added",
+          "car-models": "{count} car models added"
+        },
+        "andMore": "… and {count} more",
+        "columns": {
+          "brands": {
+            "ad": "Brand name",
+            "aciklama": "Short description",
+            "web_sitesi": "Brand website",
+            "ulke": "Country of origin",
+            "kurulus_yili": "Year founded",
+            "sira": "Sort order (lower comes first)",
+            "aktif": "Visible in the store (empty means Yes)"
+          },
+          "manufacturers": {
+            "ad": "Manufacturer name",
+            "aciklama": "Short description",
+            "web_sitesi": "Manufacturer website",
+            "ulke": "Country of origin",
+            "kurulus_yili": "Year founded",
+            "sira": "Sort order (lower comes first)",
+            "aktif": "Visible in the store (empty means Yes)"
+          },
+          "carModels": {
+            "marka": "Parent brand (name, slug or id)",
+            "ad": "Model name",
+            "aciklama": "Short description",
+            "baslangic_yili": "Production start year",
+            "bitis_yili": "Production end year",
+            "sira": "Sort order (lower comes first)",
+            "aktif": "Visible in the store (empty means Yes)"
+          }
+        }
       }
     },
     "marketing": {
@@ -3541,7 +3671,8 @@
           "failed": "Upload failed",
           "dropHint": "Drag and drop the image or",
           "chooseFile": "Choose File",
-          "urlPlaceholder": "or paste an image URL"
+          "urlPlaceholder": "or paste an image URL",
+          "hint": "JPG, PNG, WebP • Max 2 MB"
         },
         "validation": {
           "titleRequired": "Title is required"
@@ -6544,6 +6675,37 @@
       "filterToolbar": {
         "placeholder": "Search..."
       },
+      "filterDialog": {
+        "title": "Filters",
+        "open": "Filter",
+        "activeCount": "{count} filters applied",
+        "labels": {
+          "dateRange": "Date range",
+          "visibility": "Visibility",
+          "featured": "Featured",
+          "brand": "Brand",
+          "carModel": "Model",
+          "type": "Type",
+          "priority": "Priority",
+          "channel": "Channel",
+          "provider": "Provider",
+          "documentType": "Document type",
+          "position": "Position",
+          "device": "Device",
+          "scope": "Scope",
+          "active": "Active",
+          "membershipTier": "Membership tier",
+          "lifecycle": "Membership status",
+          "userType": "User type",
+          "package": "Package",
+          "severity": "Severity",
+          "resolved": "Resolution",
+          "template": "Template",
+          "action": "Action",
+          "entityType": "Entity type",
+          "shipmentLeg": "Shipment leg"
+        }
+      },
       "bulkActionBar": {
         "selectedCount": "{count} selected",
         "clearSelection": "Clear selection"
@@ -7325,7 +7487,8 @@
       "imageKeyEmpty": "The image key cannot be empty",
       "imageKeyInvalid": "The image key is invalid",
       "imageKeyWrongPath": "The image key is not on the product-image path",
-      "createFailed": "The listing could not be created: {reason}"
+      "createFailed": "The listing could not be created: {reason}",
+      "invalidColors": "Invalid colour selection: {colors}"
     },
     "refund": {
       "alreadyActive": "There is already an active refund request for this order",
@@ -7703,7 +7866,15 @@
         "cannotRemoveSelf": "You cannot remove your own admin access",
         "lastSuperAdminUndeletable": "The last super admin in the system cannot be removed"
       },
-      "warehouseAddressMissing": "The warehouse address is not configured. Define the `warehouse_address_id` platform setting."
+      "warehouseAddressMissing": "The warehouse address is not configured. Define the `warehouse_address_id` platform setting.",
+      "catalogImport": {
+        "noDataRows": "Sheet '{sheet}' has no data rows. Fill in the template and upload it again.",
+        "tooManyRows": "At most {max} rows can be imported at once (the file has {count}).",
+        "fileMissing": "No Excel file was uploaded.",
+        "onlyXlsx": "Only .xlsx Excel files can be uploaded.",
+        "fileTooLarge": "The file may be at most {max} MB.",
+        "missingColumns": "Missing Excel columns: {columns}. Download the sample file again."
+      }
     },
     "advertisement": {
       "notFound": "Advertisement not found",

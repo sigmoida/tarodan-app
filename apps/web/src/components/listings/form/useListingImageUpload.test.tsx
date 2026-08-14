@@ -5,6 +5,8 @@ import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { useForm } from "react-hook-form";
+import { NextIntlClientProvider } from "next-intl";
+import { getMessages } from "@tarodan/i18n";
 import { useListingImageUpload } from "./useListingImageUpload";
 import type { UploadPort } from "./listing-upload-queue";
 
@@ -35,7 +37,14 @@ function renderHook<T>(useHookFn: () => T) {
 
   act(() => {
     root = createRoot(container);
-    root.render(<Probe />);
+    // Hook kullanıcıya gösterilen metinleri katalogdan okur; sağlayıcı olmadan
+    // `useTranslations` patlar. Gerçek `tr` kataloğu kullanılır ki anahtar
+    // yanlışları testte de görünsün.
+    root.render(
+      <NextIntlClientProvider locale="tr" messages={getMessages("tr")}>
+        <Probe />
+      </NextIntlClientProvider>,
+    );
   });
 
   return {
@@ -48,8 +57,9 @@ function renderHook<T>(useHookFn: () => T) {
   };
 }
 
+/** 1 KB alt sınırının üstünde, geçerli tipte sahte dosya. */
 const fakeFile = (name: string): File => {
-  const file = new File(["x"], name, { type: "image/png" });
+  const file = new File([new Uint8Array(2048)], name, { type: "image/png" });
   Object.defineProperty(file, "lastModified", { value: 1 });
   return file;
 };

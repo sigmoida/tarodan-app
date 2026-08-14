@@ -14,13 +14,9 @@ import { PageHeader } from "@/components/AdminList";
 import { AdminTabs } from "@/components/AdminTabs";
 import { useTabParam } from "@/hooks/useTabParam";
 import { ResourceList } from "@/components/list";
-import {
-  type Payment,
-  mapPayments,
-  paymentStatusFilterOptions,
-  providerFilterOptions,
-} from "./_lib/types";
+import { type Payment, mapPayments } from "./_lib/types";
 import { paymentColumns } from "./_lib/columns";
+import { paymentFilterFields } from "./_lib/filters";
 import { paymentRowMenu } from "./_lib/rowActions";
 import { StatisticsTab } from "./_components/StatisticsTab";
 import { ReconciliationTab } from "./_components/ReconciliationTab";
@@ -83,27 +79,9 @@ export default function PaymentsPage() {
           }
           getRowId={(p) => p.id}
           syncUrl
-          initialFilters={{
-            status: "all",
-            provider: "all",
-            startDate: "",
-            endDate: "",
-          }}
+          filters={paymentFilterFields(t)}
         >
-          <ResourceList.Toolbar>
-            <ResourceList.Search />
-            <ResourceList.FilterSelect
-              name="status"
-              options={paymentStatusFilterOptions(t)}
-              className="sm:w-44"
-            />
-            <ResourceList.FilterSelect
-              name="provider"
-              options={providerFilterOptions(t)}
-              className="sm:w-36"
-            />
-            <ResourceList.DateRange />
-          </ResourceList.Toolbar>
+          <ResourceList.Toolbar />
           <ResourceList.Table
             columns={paymentColumns(
               paymentRowMenu(

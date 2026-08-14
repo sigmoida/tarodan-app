@@ -5,27 +5,25 @@
 import { useCallback, useMemo, useState } from "react";
 import { useTranslations } from "next-intl";
 import { Button } from "@tarodan/ui";
-import { PlusIcon } from "@heroicons/react/24/outline";
+import { ArrowUpTrayIcon, PlusIcon } from "@heroicons/react/24/outline";
 import { adminApi } from "@/lib/api";
 import { AdminPage } from "@/components/page/AdminPage";
 import { PageHeader } from "@/components/AdminList";
 import { ResourceList } from "@/components/list";
 import { useConfirm } from "@/provider/ConfirmProvider";
 import { useAdminMutation } from "@/hooks/useAdminMutation";
+import { CatalogImportModal } from "@/components/catalog/CatalogImportModal";
 import type { Brand } from "./_lib/types";
 import { brandColumns } from "./_lib/columns";
+import { brandFilterFields } from "./_lib/filters";
 import { BrandModelsPanel } from "./_components/BrandModelsPanel";
 import { BrandFormModal } from "./_modals/BrandFormModal";
 
 export default function BrandsPage() {
   const t = useTranslations();
-  const STATUS_OPTIONS = [
-    { value: "all", label: t("admin.catalog.brands.allBrands") },
-    { value: "active", label: t("common.active") },
-    { value: "inactive", label: t("common.inactive") },
-  ];
   const confirm = useConfirm();
   const [modal, setModal] = useState<{ brand?: Brand } | null>(null);
+  const [importOpen, setImportOpen] = useState(false);
   const [expandedId, setExpandedId] = useState<string | null>(null);
 
   const del = useAdminMutation((id: string) => adminApi.deleteBrand(id), {
@@ -77,6 +75,13 @@ export default function BrandsPage() {
         description={t("admin.catalog.brands.subtitle")}
       >
         <Button
+          variant="outline"
+          leftIcon={<ArrowUpTrayIcon className="h-5 w-5" />}
+          onClick={() => setImportOpen(true)}
+        >
+          {t("admin.catalog.import.button")}
+        </Button>
+        <Button
           variant="primary"
           leftIcon={<PlusIcon className="h-5 w-5" />}
           onClick={() => setModal({})}
@@ -90,16 +95,9 @@ export default function BrandsPage() {
         fetcher={(params) => adminApi.getBrands(params)}
         getRowId={(b) => b.id}
         syncUrl
-        initialFilters={{ status: "all" }}
+        filters={brandFilterFields(t)}
       >
-        <ResourceList.Toolbar>
-          <ResourceList.Search />
-          <ResourceList.FilterSelect
-            name="status"
-            options={STATUS_OPTIONS}
-            className="sm:w-40"
-          />
-        </ResourceList.Toolbar>
+        <ResourceList.Toolbar />
         <ResourceList.Table
           columns={columns}
           emptyText={t("admin.catalog.brands.empty")}
@@ -108,6 +106,14 @@ export default function BrandsPage() {
         />
         <ResourceList.Pagination />
       </ResourceList>
+
+      {importOpen && (
+        <CatalogImportModal
+          resource="brands"
+          open
+          onClose={() => setImportOpen(false)}
+        />
+      )}
 
       {modal && (
         <BrandFormModal

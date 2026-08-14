@@ -23,7 +23,28 @@ import * as path from "path";
 import { isUUID, validate } from "class-validator";
 import { plainToInstance } from "class-transformer";
 import { PrismaService } from "../../../prisma";
+import {
+  COLOR_GROUP_SLUG,
+  colorColumnValue,
+  resolveColorsFromText,
+} from "../../../common/helpers/attribute-groups";
 import { notifyWebRevalidate } from "../../../common/helpers/revalidate";
+import {
+  assertNoFormulas,
+  cellText,
+  collectDataRowNumbers,
+  csvList,
+  loadImportSheet,
+  normalizeFilename,
+  normalizeHeader,
+  optionalDate,
+  optionalNumber,
+  parseBoolean,
+  readHeaderMap,
+  requiredNumber,
+  resolveRef,
+  type CatalogRef,
+} from "../../../common/helpers/excel-import";
 import { CacheService } from "../../cache/cache.service";
 import { CommissionRuleGuardService } from "../../commission/commission-rule-guard.service";
 import { MembershipService } from "../../membership/membership.service";
@@ -80,8 +101,6 @@ const REQUIRED_HEADERS = [
   "kargo_paketi",
   ...IMAGE_COLUMNS.slice(0, 3),
 ] as const;
-
-type CatalogRef = { id: string; name: string; slug: string };
 
 interface ParsedImportRow {
   rowNumber: number;
@@ -367,7 +386,7 @@ export class AdminProductBulkImportService {
         async (row) => {
           const variants: Array<{ cardKey: string; detailKey: string }> = [];
           for (const imageName of row.imageNames) {
-            const file = imageByName.get(this.normalizeFilename(imageName));
+            const file = imageByName.get(normalizeFilename(imageName));
             if (!file) {
               throw new BadRequestException(
                 i18nMessage("server.admin.bulkImport.imageMissing", {
@@ -740,17 +759,17 @@ export class AdminProductBulkImportService {
     const hash = createHash("sha256");
     hash.update(sellerId);
     hash.update("\0workbook\0");
-    hash.update(this.normalizeFilename(workbook.originalname));
+    hash.update(normalizeFilename(workbook.originalname));
     hash.update("\0");
     hash.update(workbook.buffer);
     for (const image of [...images].sort((a, b) =>
-      this.normalizeFilename(a.originalname).localeCompare(
-        this.normalizeFilename(b.originalname),
+      normalizeFilename(a.originalname).localeCompare(
+        normalizeFilename(b.originalname),
         "tr",
       ),
     )) {
       hash.update("\0image\0");
-      hash.update(this.normalizeFilename(image.originalname));
+      hash.update(normalizeFilename(image.originalname));
       hash.update("\0");
       hash.update(image.buffer);
     }
@@ -762,23 +781,7 @@ export class AdminProductBulkImportService {
     sellerId: string,
     imageFiles: Express.Multer.File[],
   ): Promise<ParsedImportRow[]> {
-    const workbook = new ExcelJS.Workbook();
-    try {
-      await workbook.xlsx.load(file.buffer as unknown as ExcelJS.Buffer);
-    } catch {
-      throw new BadRequestException(
-        i18nMessage("server.admin.bulkImport.excelUnreadable"),
-      );
-    }
-
-    const sheet = workbook.getWorksheet(PRODUCT_SHEET);
-    if (!sheet) {
-      throw new BadRequestException(
-        i18nMessage("server.admin.bulkImport.sheetMissing", {
-          sheet: PRODUCT_SHEET,
-        }),
-      );
-    }
+    const sheet = await loadImportSheet(file.buffer, PRODUCT_SHEET);
 
     if (sheet.rowCount > PRODUCT_BULK_IMPORT_LIMITS.maxRows + 1) {
       throw new BadRequestException(
@@ -788,30 +791,9 @@ export class AdminProductBulkImportService {
       );
     }
 
-    for (let rowNumber = 1; rowNumber <= sheet.rowCount; rowNumber += 1) {
-      const row = sheet.getRow(rowNumber);
-      row.eachCell({ includeEmpty: false }, (cell) => {
-        const value = cell.value;
-        if (
-          value &&
-          typeof value === "object" &&
-          ("formula" in value || "sharedFormula" in value)
-        ) {
-          throw new BadRequestException(
-            i18nMessage("server.admin.bulkImport.formulaNotAllowed", {
-              sheet: PRODUCT_SHEET,
-              cell: cell.address,
-            }),
-          );
-        }
-      });
-    }
+    assertNoFormulas(sheet, PRODUCT_SHEET);
 
-    const headers = new Map<string, number>();
-    sheet.getRow(1).eachCell({ includeEmpty: false }, (cell, column) => {
-      const header = this.normalizeHeader(cell.text);
-      if (header) headers.set(header, column);
-    });
+    const headers = readHeaderMap(sheet);
     const missingHeaders = REQUIRED_HEADERS.filter(
       (header) => !headers.has(header),
     );
@@ -823,14 +805,7 @@ export class AdminProductBulkImportService {
       );
     }
 
-    const dataRowNumbers: number[] = [];
-    for (let rowNumber = 2; rowNumber <= sheet.rowCount; rowNumber += 1) {
-      const row = sheet.getRow(rowNumber);
-      const values = Array.isArray(row.values) ? row.values : [];
-      if (values.some((value) => value != null && String(value).trim())) {
-        dataRowNumbers.push(rowNumber);
-      }
-    }
+    const dataRowNumbers = collectDataRowNumbers(sheet);
     if (!dataRowNumbers.length) {
       throw new BadRequestException(
         i18nMessage("server.admin.bulkImport.noRows"),
@@ -865,8 +840,19 @@ export class AdminProductBulkImportService {
         loadProductPriceLimits(this.prisma),
       ]);
 
+    // Excel'deki "renk" kolonu serbest metin; katalogla eşleşenler ilanın renk
+    // seçimine dönüşür (filtre toplu yüklenen ürünleri de kapsasın),
+    // eşleşmeyenler eskiden olduğu gibi düz metin kalır.
+    const colorOptions = (
+      await this.prisma.attribute.findMany({
+        where: { isActive: true, group: { slug: COLOR_GROUP_SLUG } },
+        select: { slug: true, value: true, displayValue: true },
+        orderBy: { sortOrder: "asc" },
+      })
+    ).map((row) => ({ slug: row.slug, label: row.displayValue || row.value }));
+
     const uploadedNames = new Set(
-      imageFiles.map((image) => this.normalizeFilename(image.originalname)),
+      imageFiles.map((image) => normalizeFilename(image.originalname)),
     );
     const usedRefs = new Set<string>();
     const usedImages = new Set<string>();
@@ -879,7 +865,7 @@ export class AdminProductBulkImportService {
           const column = headers.get(header);
           return column ? sheet.getRow(rowNumber).getCell(column).value : null;
         };
-        const reference = this.text(get("urun_ref"));
+        const reference = cellText(get("urun_ref"));
         if (!reference) throw new Error("urun_ref zorunludur");
         const normalizedRef = reference.toLocaleLowerCase("tr-TR");
         if (usedRefs.has(normalizedRef)) {
@@ -887,27 +873,27 @@ export class AdminProductBulkImportService {
         }
         usedRefs.add(normalizedRef);
 
-        const category = this.resolveRef(
+        const category = resolveRef(
           categories,
-          this.text(get("kategori")),
+          cellText(get("kategori")),
           "kategori",
         );
-        const brand = this.resolveRef(brands, this.text(get("marka")), "marka");
-        const modelValue = this.text(get("arac_modeli"));
+        const brand = resolveRef(brands, cellText(get("marka")), "marka");
+        const modelValue = cellText(get("arac_modeli"));
         const carModel = modelValue
-          ? this.resolveRef(
+          ? resolveRef(
               models.filter((model) => model.brandId === brand.id),
               modelValue,
               "araç modeli",
             )
           : null;
-        const manufacturer = this.resolveRef(
+        const manufacturer = resolveRef(
           manufacturers,
-          this.text(get("uretici")),
+          cellText(get("uretici")),
           "üretici",
         );
         const imageNames = IMAGE_COLUMNS.map((header) =>
-          this.text(get(header)),
+          cellText(get(header)),
         ).filter(Boolean);
         if (
           imageNames.length < PRODUCT_BULK_IMPORT_LIMITS.minImagesPerProduct
@@ -915,7 +901,7 @@ export class AdminProductBulkImportService {
           throw new Error("en az 3 görsel dosya adı girilmelidir");
         }
         for (const imageName of imageNames) {
-          const normalized = this.normalizeFilename(imageName);
+          const normalized = normalizeFilename(imageName);
           if (!uploadedNames.has(normalized)) {
             throw new Error(`görsel yüklenmedi: ${imageName}`);
           }
@@ -927,7 +913,7 @@ export class AdminProductBulkImportService {
           usedImages.add(normalized);
         }
 
-        const price = this.number(get("fiyat"), "fiyat");
+        const price = requiredNumber(get("fiyat"), "fiyat");
         const priceViolation = productPriceLimitViolation(price, priceLimits);
         if (priceViolation?.type === "minimum") {
           throw new Error(
@@ -939,32 +925,39 @@ export class AdminProductBulkImportService {
             `fiyat platform üst sınırı olan ${priceViolation.limit} TL'den yüksek`,
           );
         }
-        const salePrice = this.optionalNumber(get("indirimli_fiyat"));
+        const salePrice = optionalNumber(get("indirimli_fiyat"));
         if (salePrice != null && (salePrice <= 0 || salePrice >= price)) {
           throw new Error(
             "indirimli_fiyat sıfırdan büyük ve fiyat alanından küçük olmalıdır",
           );
         }
         const originalPrice = salePrice != null ? price : null;
-        const saleStartDate = this.optionalDate(get("indirim_baslangic"));
-        const saleEndDate = this.optionalDate(get("indirim_bitis"));
+        const saleStartDate = optionalDate(get("indirim_baslangic"));
+        const saleEndDate = optionalDate(get("indirim_bitis"));
         if (saleStartDate && saleEndDate && saleEndDate <= saleStartDate) {
           throw new Error("indirim bitiş tarihi başlangıçtan sonra olmalıdır");
         }
 
-        const scale = this.text(get("olcek"));
-        const material = this.text(get("malzeme"));
-        const attributeIds = await this.common.resolveProductAttributeIds(
-          scale,
-          undefined,
-          material,
-          this.csv(this.text(get("ek_ozellikler"))),
+        const scale = cellText(get("olcek"));
+        const material = cellText(get("malzeme"));
+        const colorText = cellText(get("renk"));
+        const resolvedColors = colorText
+          ? resolveColorsFromText(colorText, colorOptions)
+          : { slugs: [], labels: [], unmatched: [] };
+        const resolvedAttributes = await this.common.resolveProductAttributes(
+          {
+            scale,
+            material,
+            colors: resolvedColors.slugs,
+            attributeSlugs: csvList(cellText(get("ek_ozellikler"))),
+          },
           { rejectUnknown: true },
         );
-        const isSet = this.boolean(get("set_urun"), false);
+        const attributeIds = resolvedAttributes.ids;
+        const isSet = parseBoolean(get("set_urun"), false);
         const dto = plainToInstance(CreateProductDto, {
-          title: this.text(get("baslik")),
-          description: this.text(get("aciklama")),
+          title: cellText(get("baslik")),
+          description: cellText(get("aciklama")),
           price,
           categoryId: category.id,
           condition: this.condition(get("durum")),
@@ -973,23 +966,23 @@ export class AdminProductBulkImportService {
             detailKey: name,
           })),
           isTradeEnabled: false,
-          isPreorder: this.boolean(get("on_siparis"), false),
+          isPreorder: parseBoolean(get("on_siparis"), false),
           isSet,
           bundleSize: isSet
-            ? this.number(get("set_parca_sayisi"), "set_parca_sayisi")
+            ? requiredNumber(get("set_parca_sayisi"), "set_parca_sayisi")
             : undefined,
           brandId: brand.id,
           carModelId: carModel?.id,
           manufacturerId: manufacturer.id,
-          modelCode: this.text(get("model_kodu")) || undefined,
-          color: this.text(get("renk")),
-          isBoxed: this.boolean(get("kutulu")),
-          quantity: this.number(get("stok"), "stok"),
+          modelCode: cellText(get("model_kodu")) || undefined,
+          color: colorColumnValue(resolvedColors.labels, colorText),
+          isBoxed: parseBoolean(get("kutulu")),
+          quantity: requiredNumber(get("stok"), "stok"),
           shippingPackageTier: this.shippingTier(get("kargo_paketi")),
           scale,
           material,
-          year: this.optionalNumber(get("yil")),
-          attributes: this.csv(this.text(get("ek_ozellikler"))),
+          year: optionalNumber(get("yil")),
+          attributes: csvList(cellText(get("ek_ozellikler"))),
           originalPrice,
           salePrice,
           saleStartDate: saleStartDate?.toISOString(),
@@ -1047,7 +1040,7 @@ export class AdminProductBulkImportService {
   private indexUploadedImages(files: Express.Multer.File[]) {
     const map = new Map<string, Express.Multer.File>();
     for (const file of files) {
-      const key = this.normalizeFilename(file.originalname);
+      const key = normalizeFilename(file.originalname);
       if (!key)
         throw new BadRequestException(
           i18nMessage("server.admin.bulkImport.invalidImageName"),
@@ -1064,104 +1057,8 @@ export class AdminProductBulkImportService {
     return map;
   }
 
-  private resolveRef<T extends CatalogRef>(
-    items: T[],
-    input: string,
-    label: string,
-  ): T {
-    const normalized = input.trim().toLocaleLowerCase("tr-TR");
-    const match = items.find(
-      (item) =>
-        item.id.toLocaleLowerCase("tr-TR") === normalized ||
-        item.name.trim().toLocaleLowerCase("tr-TR") === normalized ||
-        item.slug.trim().toLocaleLowerCase("tr-TR") === normalized,
-    );
-    if (!match)
-      throw new Error(`${label} bulunamadı veya pasif: ${input || "(boş)"}`);
-    return match;
-  }
-
-  private normalizeHeader(value: string) {
-    return value.trim().toLocaleLowerCase("tr-TR").replace(/\s+/g, "_");
-  }
-
-  private normalizeFilename(value: string) {
-    return path
-      .basename(value.replace(/\\/g, "/"))
-      .normalize("NFC")
-      .trim()
-      .toLocaleLowerCase("tr-TR");
-  }
-
-  private text(value: ExcelJS.CellValue | undefined | null): string {
-    if (value == null) return "";
-    if (value instanceof Date) return value.toISOString();
-    if (typeof value === "object") {
-      if ("text" in value) return String(value.text ?? "").trim();
-      if ("richText" in value)
-        return value.richText
-          .map((item) => item.text)
-          .join("")
-          .trim();
-    }
-    return String(value).trim();
-  }
-
-  private number(value: ExcelJS.CellValue | undefined | null, label: string) {
-    const parsed = this.optionalNumber(value);
-    if (parsed == null)
-      throw new Error(`${label} zorunlu ve sayısal olmalıdır`);
-    return parsed;
-  }
-
-  private optionalNumber(value: ExcelJS.CellValue | undefined | null) {
-    if (value == null || this.text(value) === "") return undefined;
-    if (typeof value === "number") {
-      if (Number.isFinite(value)) return value;
-      throw new Error(`geçersiz sayısal değer: ${this.text(value)}`);
-    }
-    let text = this.text(value).replace(/\s/g, "").replace(/₺|TL/gi, "");
-    if (text.includes(",") && text.includes(".")) {
-      text =
-        text.lastIndexOf(",") > text.lastIndexOf(".")
-          ? text.replace(/\./g, "").replace(",", ".")
-          : text.replace(/,/g, "");
-    } else if (text.includes(",")) {
-      text = text.replace(",", ".");
-    }
-    const parsed = Number(text);
-    if (!Number.isFinite(parsed)) {
-      throw new Error(`geçersiz sayısal değer: ${this.text(value)}`);
-    }
-    return parsed;
-  }
-
-  private optionalDate(value: ExcelJS.CellValue | undefined | null) {
-    if (value == null || this.text(value) === "") return undefined;
-    const date = value instanceof Date ? value : new Date(this.text(value));
-    if (Number.isNaN(date.getTime()))
-      throw new Error(`geçersiz tarih: ${this.text(value)}`);
-    return date;
-  }
-
-  private boolean(
-    value: ExcelJS.CellValue | undefined | null,
-    defaultValue?: boolean,
-  ) {
-    if (value == null || this.text(value) === "") {
-      if (defaultValue != null) return defaultValue;
-      throw new Error("evet/hayır alanı zorunludur");
-    }
-    if (typeof value === "boolean") return value;
-    const normalized = this.text(value).toLocaleLowerCase("tr-TR");
-    if (["evet", "true", "1", "yes"].includes(normalized)) return true;
-    if (["hayır", "hayir", "false", "0", "no"].includes(normalized))
-      return false;
-    throw new Error(`geçersiz evet/hayır değeri: ${this.text(value)}`);
-  }
-
   private condition(value: ExcelJS.CellValue | undefined | null) {
-    const normalized = this.text(value).toLocaleLowerCase("tr-TR");
+    const normalized = cellText(value).toLocaleLowerCase("tr-TR");
     const map: Record<string, ProductCondition> = {
       new: ProductCondition.new,
       yeni: ProductCondition.new,
@@ -1176,12 +1073,12 @@ export class AdminProductBulkImportService {
       orta: ProductCondition.fair,
     };
     const condition = map[normalized];
-    if (!condition) throw new Error(`geçersiz durum: ${this.text(value)}`);
+    if (!condition) throw new Error(`geçersiz durum: ${cellText(value)}`);
     return condition;
   }
 
   private shippingTier(value: ExcelJS.CellValue | undefined | null) {
-    const normalized = this.text(value).toLocaleLowerCase("tr-TR");
+    const normalized = cellText(value).toLocaleLowerCase("tr-TR");
     const map: Record<string, ShippingPackageTierCode> = {
       small: ShippingPackageTierCode.small,
       küçük: ShippingPackageTierCode.small,
@@ -1193,15 +1090,8 @@ export class AdminProductBulkImportService {
       buyuk: ShippingPackageTierCode.large,
     };
     const tier = map[normalized];
-    if (!tier) throw new Error(`geçersiz kargo paketi: ${this.text(value)}`);
+    if (!tier) throw new Error(`geçersiz kargo paketi: ${cellText(value)}`);
     return tier;
-  }
-
-  private csv(value: string) {
-    return value
-      .split(",")
-      .map((part) => part.trim())
-      .filter(Boolean);
   }
 
   private errorMessage(error: unknown): string {

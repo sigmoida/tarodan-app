@@ -6,27 +6,23 @@ import {
   FormCheckbox,
   useZodForm,
 } from "@tarodan/ui/form";
-import { colors } from "@tarodan/ui";
+import { Button } from "@tarodan/ui";
 import { useTranslations } from "next-intl";
 import { adminApi } from "@/lib/api";
 import { useAdminMutation } from "@/hooks/useAdminMutation";
 import { attributeSchema, type AttributeFormValues } from "../_lib/schema";
 import type { Attribute } from "../_lib/types";
 
-const DEFAULT_COLOR = colors.primary[500];
-
 export function AttributeFormModal({
   open,
   onClose,
   attribute,
   groupId,
-  showColor,
 }: {
   open: boolean;
   onClose: () => void;
   attribute?: Attribute;
   groupId: string;
-  showColor?: boolean;
 }) {
   const t = useTranslations();
   const isEdit = Boolean(attribute);
@@ -35,25 +31,27 @@ export function AttributeFormModal({
       ? {
           value: attribute.value,
           displayValue: attribute.displayValue ?? "",
-          color: attribute.color ?? (showColor ? DEFAULT_COLOR : ""),
+          color: attribute.color ?? "",
           sortOrder: String(attribute.sortOrder ?? 0),
           isActive: attribute.isActive,
         }
       : {
           value: "",
           displayValue: "",
-          color: showColor ? DEFAULT_COLOR : "",
+          color: "",
           sortOrder: "0",
           isActive: true,
         },
   });
+  const color = form.watch("color");
 
   const save = useAdminMutation(
     (v: AttributeFormValues) => {
       const payload = {
         value: v.value,
         displayValue: v.displayValue || undefined,
-        color: showColor ? v.color || undefined : undefined,
+        // null = rengi temizle; undefined gönderilseydi mevcut hex kalırdı.
+        color: v.color || null,
         sortOrder: v.sortOrder ? parseInt(v.sortOrder, 10) : 0,
         isActive: v.isActive,
       };
@@ -95,16 +93,27 @@ export function AttributeFormModal({
         placeholder={t("admin.catalog.attributes.displayValuePlaceholder")}
       />
       <div className="flex gap-4">
-        {showColor && (
-          <div>
-            <FormInput
-              name="color"
-              label={t("admin.catalog.attributes.color")}
-              type="color"
-              className="h-10 w-14 p-1"
-            />
-          </div>
-        )}
+        {/* Renk her grupta girilebilir: global "Renk" grubu da swatch taşıyor,
+            eskiden alan yalnız üreticiye özel gruplarda açıktı. */}
+        <div>
+          <FormInput
+            name="color"
+            label={t("admin.catalog.attributes.color")}
+            type="color"
+            className="h-10 w-14 p-1"
+          />
+          {color ? (
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="mt-1"
+              onClick={() => form.setValue("color", "", { shouldDirty: true })}
+            >
+              {t("common.clear")}
+            </Button>
+          ) : null}
+        </div>
         <div className="flex-1">
           <FormInput
             name="sortOrder"

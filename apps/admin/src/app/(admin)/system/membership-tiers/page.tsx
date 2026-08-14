@@ -57,9 +57,7 @@ function MembershipTiersContent() {
         description={t("admin.tiers.page.description")}
       />
 
-      <ResourceList.Toolbar>
-        <ResourceList.Search />
-      </ResourceList.Toolbar>
+      <ResourceList.Toolbar />
 
       {yearlyDiscountError && (
         <Alert variant="warning">

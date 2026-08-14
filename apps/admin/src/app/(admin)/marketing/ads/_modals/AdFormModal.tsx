@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState, useCallback } from "react";
+import { useState, useCallback } from "react";
 import { useFormContext } from "react-hook-form";
 import {
   FormModal,
@@ -10,9 +10,8 @@ import {
   FormCheckbox,
   useZodForm,
 } from "@tarodan/ui/form";
-import { Button, Input, Spinner } from "@tarodan/ui";
+import { Button, FileDropzone, Input } from "@tarodan/ui";
 import {
-  CloudArrowUpIcon,
   CheckCircleIcon,
   ExclamationTriangleIcon,
 } from "@heroicons/react/24/outline";
@@ -34,6 +33,8 @@ import {
   isIabSize,
 } from "../_lib/types";
 
+const AD_IMAGE_MAX_BYTES = 2 * 1024 * 1024;
+
 /** Drag-drop upload + dimension detection + IAB presets, bound to the RHF form. */
 function AdImageField() {
   const t = useTranslations();
@@ -42,8 +43,6 @@ function AdImageField() {
   const width = watch("width");
   const height = watch("height");
   const [uploading, setUploading] = useState(false);
-  const [dragActive, setDragActive] = useState(false);
-  const fileRef = useRef<HTMLInputElement>(null);
 
   const setDims = useCallback(
     (w: number, h: number) => {
@@ -63,14 +62,6 @@ function AdImageField() {
   );
 
   const upload = async (file: File) => {
-    if (!["image/jpeg", "image/png", "image/webp"].includes(file.type)) {
-      toast.error(t("admin.marketing.ads.upload.formats"));
-      return;
-    }
-    if (file.size > 2 * 1024 * 1024) {
-      toast.error(t("admin.marketing.ads.upload.maxSize"));
-      return;
-    }
     setUploading(true);
     try {
       const res = await adminApi.uploadMedia(file);
@@ -89,20 +80,6 @@ function AdImageField() {
     }
   };
 
-  const onDrag = (e: React.DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    if (e.type === "dragenter" || e.type === "dragover") setDragActive(true);
-    else if (e.type === "dragleave") setDragActive(false);
-  };
-  const onDrop = (e: React.DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setDragActive(false);
-    const f = e.dataTransfer.files?.[0];
-    if (f) upload(f);
-  };
-
   const compliant = isIabSize(width, height);
 
   return (
@@ -110,88 +87,76 @@ function AdImageField() {
       <span className="block text-sm text-muted">
         {t("admin.marketing.ads.image")}
       </span>
-      <div
-        className={`rounded-lg border-2 border-dashed p-6 text-center transition-colors ${
-          dragActive ? "border-primary-500 bg-primary-50" : "border-border"
-        }`}
-        onDragEnter={onDrag}
-        onDragLeave={onDrag}
-        onDragOver={onDrag}
-        onDrop={onDrop}
-      >
-        {uploading ? (
-          <div className="text-muted">
-            <Spinner size="lg" className="mx-auto mb-2" />
-            {t("common.loading")}
-          </div>
-        ) : imageUrl ? (
-          <div className="space-y-3">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src={imageUrl}
-              alt={t("admin.marketing.ads.preview")}
-              className="mx-auto max-h-48 rounded object-contain"
-            />
-            <div className="flex items-center justify-center gap-2 text-sm">
-              {width && height ? (
-                <span className="text-muted">
-                  {width} x {height} px
+      {imageUrl ? (
+        <div className="space-y-3 rounded-lg border border-border p-4 text-center">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={imageUrl}
+            alt={t("admin.marketing.ads.preview")}
+            className="mx-auto max-h-48 rounded object-contain"
+          />
+          <div className="flex items-center justify-center gap-2 text-sm">
+            {width && height ? (
+              <span className="text-muted">
+                {width} x {height} px
+              </span>
+            ) : null}
+            {width && height ? (
+              compliant ? (
+                <span className="flex items-center gap-1 text-success-700">
+                  <CheckCircleIcon className="h-4 w-4" />{" "}
+                  {t("admin.marketing.ads.iabCompliant")}
                 </span>
-              ) : null}
-              {width && height ? (
-                compliant ? (
-                  <span className="flex items-center gap-1 text-success-700">
-                    <CheckCircleIcon className="h-4 w-4" />{" "}
-                    {t("admin.marketing.ads.iabCompliant")}
-                  </span>
-                ) : (
-                  <span className="flex items-center gap-1 text-warning-700">
-                    <ExclamationTriangleIcon className="h-4 w-4" /> Non-IAB
-                  </span>
-                )
-              ) : null}
-            </div>
-            <Button
-              variant="danger"
-              size="sm"
-              type="button"
-              onClick={() => {
-                setValue("imageUrl", "", { shouldDirty: true });
-                setDims(0, 0);
-              }}
-            >
-              {t("admin.marketing.ads.removeImage")}
-            </Button>
+              ) : (
+                <span className="flex items-center gap-1 text-warning-700">
+                  <ExclamationTriangleIcon className="h-4 w-4" /> Non-IAB
+                </span>
+              )
+            ) : null}
           </div>
-        ) : (
-          <div>
-            <CloudArrowUpIcon className="mx-auto mb-2 h-10 w-10 text-muted" />
-            <p className="mb-2 text-muted">
-              {t("admin.marketing.ads.upload.dropHint")}
-            </p>
-            <input
-              ref={fileRef}
-              type="file"
-              accept="image/jpeg,image/png,image/webp"
-              className="hidden"
-              onChange={(e) => {
-                const f = e.target.files?.[0];
-                if (f) upload(f);
-                e.target.value = "";
-              }}
-            />
-            <Button
-              variant="primary"
-              size="sm"
-              type="button"
-              onClick={() => fileRef.current?.click()}
-            >
-              {t("admin.marketing.ads.upload.chooseFile")}
-            </Button>
-            <p className="mt-2 text-xs text-muted">JPG, PNG, WebP • Max 2MB</p>
-          </div>
-        )}
-      </div>
+          <Button
+            variant="danger"
+            size="sm"
+            type="button"
+            onClick={() => {
+              setValue("imageUrl", "", { shouldDirty: true });
+              setDims(0, 0);
+            }}
+          >
+            {t("admin.marketing.ads.removeImage")}
+          </Button>
+        </div>
+      ) : null}
+
+      {/*
+        Seçilen dosya anında yüklenip URL'e dönüştüğü için alan bekleyen bir
+        dosya tutmaz: `value` daima null, önizleme yukarıda ayrı gösterilir.
+      */}
+      <FileDropzone
+        accept="image/jpeg,image/png,image/webp"
+        maxBytes={AD_IMAGE_MAX_BYTES}
+        value={null}
+        busy={uploading}
+        onChange={(file) => {
+          if (file) void upload(file);
+        }}
+        onReject={(_file, reason) =>
+          toast.error(
+            reason === "size"
+              ? t("admin.marketing.ads.upload.maxSize")
+              : t("admin.marketing.ads.upload.formats"),
+          )
+        }
+        labels={{
+          idle: t("admin.marketing.ads.upload.dropHint"),
+          active: t("common.fileDropzone.active"),
+          select: t("admin.marketing.ads.upload.chooseFile"),
+          replace: t("admin.marketing.ads.upload.chooseFile"),
+          remove: t("common.fileDropzone.remove"),
+          busy: t("common.loading"),
+          hint: t("admin.marketing.ads.upload.hint"),
+        }}
+      />
 
       <Input
         type="url"

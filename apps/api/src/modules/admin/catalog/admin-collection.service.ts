@@ -3,7 +3,7 @@ import { PrismaService } from "../../../prisma";
 import { StorageService } from "../../storage/storage.service";
 import { CacheService } from "../../cache/cache.service";
 import { AdminAuditService } from "../ops/admin-audit.service";
-import { generateSlug } from "./admin-slug.util";
+import { generateSlug } from "../../../common/helpers/slug";
 import { resolveOrderBy } from "../../../common/list";
 import { Prisma } from "@prisma/client";
 import { i18nMessage } from "../../i18n";

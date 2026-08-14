@@ -6,6 +6,7 @@ import {
 import { PrismaService } from "../../prisma";
 import { CacheService } from "../cache/cache.service";
 import { Category } from "@prisma/client";
+import { generateSlug } from "../../common/helpers/slug";
 import { saleCapableSellerWhere } from "../membership/helpers/membership.util";
 import { catalogProductWhere } from "../product/helpers/catalog-product-where";
 import {
@@ -206,7 +207,7 @@ export class CategoryService {
         false,
       );
     }
-    const slug = await this.uniqueSlug(this.generateSlug(data.name));
+    const slug = await this.uniqueSlug(generateSlug(data.name));
 
     const category = await this.prisma.category.create({
       data: {
@@ -257,7 +258,7 @@ export class CategoryService {
 
     let slug = category.slug;
     if (data.name && data.name !== category.name) {
-      slug = await this.uniqueSlug(this.generateSlug(data.name), id);
+      slug = await this.uniqueSlug(generateSlug(data.name), id);
     }
 
     const updated = await this.prisma.category.update({
@@ -320,30 +321,5 @@ export class CategoryService {
       if (!existing || existing.id === excludeId) return candidate;
       candidate = `${base}-${counter}`;
     }
-  }
-
-  private generateSlug(text: string): string {
-    const trMap: Record<string, string> = {
-      ç: "c",
-      ğ: "g",
-      ı: "i",
-      ö: "o",
-      ş: "s",
-      ü: "u",
-      Ç: "c",
-      Ğ: "g",
-      İ: "i",
-      Ö: "o",
-      Ş: "s",
-      Ü: "u",
-    };
-
-    return text
-      .split("")
-      .map((char) => trMap[char] || char)
-      .join("")
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, "-")
-      .replace(/(^-|-$)+/g, "");
   }
 }

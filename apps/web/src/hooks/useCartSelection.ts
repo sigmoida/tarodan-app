@@ -2,7 +2,7 @@
 
 "use client";
 
-import { useCallback, useMemo } from "react";
+import { useCallback, useEffect, useMemo } from "react";
 import { useCartStore } from "@/stores/cartStore";
 
 /**
@@ -24,11 +24,28 @@ export function useCartSelection<T extends SelectableLine>(lines: T[]) {
   const excludedProductIds = useCartStore((s) => s.excludedProductIds);
   const toggleProductSelected = useCartStore((s) => s.toggleProductSelected);
   const setProductsSelected = useCartStore((s) => s.setProductsSelected);
+  const pruneExcludedProductIds = useCartStore(
+    (s) => s.pruneExcludedProductIds,
+  );
 
   const selectableIds = useMemo(
     () => lines.filter((l) => l.isAvailable !== false).map((l) => l.productId),
     [lines],
   );
+
+  /**
+   * Sepet her okunduğunda dışlama listesi sepetin İÇERİĞİNE indirgenir; aksi
+   * halde çıkarılan ürünün kimliği kalıcı depoda süresiz kalır ve aynı ürün
+   * yeniden eklendiğinde seçilmemiş gelir.
+   *
+   * Boş listede budama YAPILMAZ: sepet sorgusu çözülmeden önceki ilk render da
+   * boştur ve o anda budamak, kullanıcının gerçek seçimini silerdi.
+   */
+  const presentIds = useMemo(() => lines.map((l) => l.productId), [lines]);
+  useEffect(() => {
+    if (presentIds.length === 0) return;
+    pruneExcludedProductIds(presentIds);
+  }, [presentIds, pruneExcludedProductIds]);
 
   const isSelected = useCallback(
     (productId: string) => !excludedProductIds.includes(productId),

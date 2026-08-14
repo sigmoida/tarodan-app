@@ -5,11 +5,8 @@
 import { adminApi } from "@/lib/api";
 import { ResourceList } from "@/components/list";
 import { historyColumns } from "../_lib/columns";
-import {
-  type NotificationLog,
-  channelFilterOptions,
-  deliveryFilterOptions,
-} from "../_lib/types";
+import { type NotificationLog } from "../_lib/types";
+import { notificationHistoryFilterFields } from "../_lib/filters";
 import { useTranslations } from "next-intl";
 
 export function HistoryTab() {
@@ -30,21 +27,9 @@ export function HistoryTab() {
       }
       getRowId={(n) => n.id}
       syncUrl
-      initialFilters={{ channel: "all", status: "all" }}
+      filters={notificationHistoryFilterFields(t)}
     >
-      <ResourceList.Toolbar>
-        <ResourceList.Search />
-        <ResourceList.FilterSelect
-          name="channel"
-          options={channelFilterOptions(t)}
-          className="sm:w-44"
-        />
-        <ResourceList.FilterSelect
-          name="status"
-          options={deliveryFilterOptions(t)}
-          className="sm:w-44"
-        />
-      </ResourceList.Toolbar>
+      <ResourceList.Toolbar />
       <ResourceList.Table
         columns={historyColumns(t)}
         emptyText={t("admin.marketing.notifications.emptyHistory")}

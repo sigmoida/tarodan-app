@@ -122,7 +122,13 @@
     "uploading": "Yükleniyor",
     "replace": "Değiştir",
     "language": "Dil",
-    "deleting": "Siliniyor"
+    "deleting": "Siliniyor",
+    "fileDropzone": {
+      "active": "Dosyayı buraya bırakın",
+      "select": "Dosya Seç",
+      "replace": "Dosyayı Değiştir",
+      "remove": "Kaldır"
+    }
   },
   "nav": {
     "home": "Ana Sayfa",
@@ -161,7 +167,8 @@
     "loginForTrades": "Takas İşlemleri İçin Giriş Yapın",
     "vehicleTypes": "Araç Türleri",
     "manufacturers": "Üreticiler",
-    "allManufacturers": "Tüm Üreticiler"
+    "allManufacturers": "Tüm Üreticiler",
+    "support": "Destek"
   },
   "auth": {
     "loginTitle": "Giriş Yap",
@@ -581,6 +588,8 @@
     "modelCodePlaceholder": "Örn. HKG72",
     "colorRequired": "Renk *",
     "colorPlaceholder": "Örn. Kırmızı",
+    "colorMaxHint": "en fazla {max} renk",
+    "colorLegacyHint": "Kayıtlı renk: {value} — listeden seçim yapın.",
     "scaleRequired": "Ölçek *",
     "materialRequired": "Malzeme *",
     "manufacturerRequired": "Üretici *",
@@ -629,6 +638,63 @@
     "conditionPoor": "Kötü",
     "statusDeleted": "Kaldırıldı",
     "upToImages": "En fazla {count} görsel",
+    "imageUpload": {
+      "counter": "{used}/{max}",
+      "slotsLeft": "{count} görsel daha ekleyebilirsiniz",
+      "full": "Kontenjan doldu",
+      "orderHint": "İlk görsel kapak olur — sürükleyerek sırayı değiştirebilirsiniz.",
+      "heroTitle": "Görselleri buraya sürükleyin",
+      "heroSubtitle": "veya cihazınızdan seçmek için tıklayın",
+      "dropHere": "Bırakın, ekleyelim",
+      "browse": "Dosya seç",
+      "formats": "JPEG · PNG · WebP · GIF",
+      "maxSize": "≤ {size} MB",
+      "minDimension": "≥ {size}×{size} px",
+      "addMore": "Ekle",
+      "cover": "Kapak",
+      "imageAlt": "Görsel {index}",
+      "removeImage": "{index}. görseli kaldır",
+      "makeCoverImage": "{index}. görseli kapak yap",
+      "reorderImage": "{index}. görselin sırasını değiştir",
+      "queued": "Sırada",
+      "processing": "İşleniyor",
+      "uploadingPercent": "Yükleniyor %{progress}",
+      "uploadProgressLabel": "{index}. görsel yükleniyor",
+      "failed": "Yüklenemedi",
+      "noServerResult": "Sunucu bu dosya için sonuç döndürmedi",
+      "retry": "Tekrar dene",
+      "lowResolution": "Düşük çözünürlük",
+      "lowResolutionHint": "{size}×{size} pikselin altındaki görseller ilan sayfasında bulanık görünebilir.",
+      "dragStarted": "{id} taşınıyor",
+      "dragOver": "{id} konumunun üzerinde",
+      "dragEnded": "{id} konumuna bırakıldı",
+      "dragCancelled": "Taşıma iptal edildi",
+      "rejectedType": "{count} dosya desteklenmeyen biçimde",
+      "rejectedSize": "{count} dosya {max} MB sınırının üstünde",
+      "rejectedTooSmall": "{count} dosya {min} KB'den küçük",
+      "rejectedDuplicate": "{count} dosya zaten eklenmiş",
+      "rejectedLimit": "{count} dosya kontenjana sığmadı",
+      "rejectedSuffix": "{reasons} — eklenmedi",
+      "blockerPending": "Görsel yüklemesi sürüyor, lütfen tamamlanmasını bekleyin.",
+      "blockerFailed": "Yüklenemeyen görsel var. Tekrar deneyin ya da o görseli kaldırın.",
+      "guideTitle": "Görsel kuralları ve ipuçları",
+      "checksTitle": "Yüklemeden önce şunları kontrol edin",
+      "checkFormatTitle": "Dosya formatını kontrol edin",
+      "checkFormatText": "Görseliniz JPEG, JPG, PNG, WebP veya GIF formatında olmalıdır.",
+      "checkSizeTitle": "Dosya boyutunu kontrol edin",
+      "checkSizeText": "Dosya boyutu en az {min} KB, en fazla {max} MB olmalıdır.",
+      "checkResolutionTitle": "Çözünürlüğü kontrol edin",
+      "checkResolutionText": "En az {size}×{size} piksel önerilir; daha küçük görseller ilan sayfasında bulanık görünür.",
+      "rulesTitle": "Görsel gereksinimleri",
+      "ruleClarityTitle": "Ürün netliği",
+      "ruleClarityText": "Ürün tamamen net görünmeli ve karenin büyük bölümünü kaplamalıdır.",
+      "ruleVariantTitle": "Doğru varyant",
+      "ruleVariantText": "Yalnızca satışa çıkardığınız varyantı (renk / model / ölçek) gösterin.",
+      "ruleBackgroundTitle": "Arka plan",
+      "ruleBackgroundText": "Düz, açık renkli ve iyi aydınlatılmış bir arka plan tercih edin.",
+      "ruleCoverTitle": "Ana ve yardımcı görseller",
+      "ruleCoverText": "Kapak görseli ürünü düz açıdan sade göstersin; farklı açı, ölçü ve kutu fotoğrafları yardımcı görsellerde yer alsın."
+    },
     "boostedBadge": "Öne Çıkan",
     "boostListing": "Öne Çıkar",
     "extendBoost": "Süre Ekle",
@@ -3484,6 +3550,70 @@
         "bulkImportFileTooLarge": "{name} dosyası çok büyük. Tek dosya en fazla {size} olabilir.",
         "bulkImportTooManyImages": "En fazla {max} görsel seçebilirsiniz.",
         "bulkImportTotalTooLarge": "Seçilen dosyaların toplam boyutu {size} sınırını aşamaz."
+      },
+      "import": {
+        "button": "Excel ile İçe Aktar",
+        "title": {
+          "brands": "Excel ile Toplu Marka Ekle",
+          "manufacturers": "Excel ile Toplu Üretici Ekle",
+          "car-models": "Excel ile Toplu Araç Modeli Ekle"
+        },
+        "description": "Örnek şablonu indirin, doldurun ve buraya yükleyin. Bir satır bile hatalıysa hiçbir kayıt oluşturulmaz.",
+        "structureTitle": "Örnek dosya yapısı",
+        "structureHelp": "Veriler '{sheet}' sayfasına yazılmalı. Tek dosyada en fazla {rows} satır aktarılabilir.",
+        "downloadTemplate": "Şablonu İndir",
+        "templateFailed": "Şablon indirilemedi",
+        "columnName": "Sütun",
+        "columnRequired": "Durum",
+        "columnDescription": "Açıklama",
+        "columnExample": "Örnek",
+        "required": "Zorunlu",
+        "optional": "İsteğe bağlı",
+        "dropzoneIdle": "Doldurduğunuz Excel dosyasını buraya sürükleyin",
+        "dropzoneHint": "Yalnızca .xlsx • En fazla {size}",
+        "submit": "İçe Aktar",
+        "processing": "İçe aktarılıyor…",
+        "failed": "İçe aktarma başarısız",
+        "invalidFileType": "\"{name}\" bir Excel (.xlsx) dosyası değil",
+        "fileTooLarge": "\"{name}\" çok büyük. En fazla {size} olabilir.",
+        "validationTitle": "İçe aktarma yapılmadı",
+        "validationHelp": "Aşağıdaki satırları düzeltip dosyayı yeniden yükleyin. Hiçbir kayıt oluşturulmadı.",
+        "successTitle": "İçe aktarma tamamlandı",
+        "created": {
+          "brands": "{count} marka eklendi",
+          "manufacturers": "{count} üretici eklendi",
+          "car-models": "{count} araç modeli eklendi"
+        },
+        "andMore": "… ve {count} tane daha",
+        "columns": {
+          "brands": {
+            "ad": "Marka adı",
+            "aciklama": "Kısa tanıtım metni",
+            "web_sitesi": "Markanın web adresi",
+            "ulke": "Menşe ülke",
+            "kurulus_yili": "Kuruluş yılı",
+            "sira": "Listelerdeki sıralama (küçük olan önce)",
+            "aktif": "Mağazada görünsün mü (boşsa Evet)"
+          },
+          "manufacturers": {
+            "ad": "Üretici adı",
+            "aciklama": "Kısa tanıtım metni",
+            "web_sitesi": "Üreticinin web adresi",
+            "ulke": "Menşe ülke",
+            "kurulus_yili": "Kuruluş yılı",
+            "sira": "Listelerdeki sıralama (küçük olan önce)",
+            "aktif": "Mağazada görünsün mü (boşsa Evet)"
+          },
+          "carModels": {
+            "marka": "Bağlı olduğu marka (ad, slug veya kimlik)",
+            "ad": "Model adı",
+            "aciklama": "Kısa tanıtım metni",
+            "baslangic_yili": "Üretime başlanan yıl",
+            "bitis_yili": "Üretimin bittiği yıl",
+            "sira": "Listelerdeki sıralama (küçük olan önce)",
+            "aktif": "Mağazada görünsün mü (boşsa Evet)"
+          }
+        }
       }
     },
     "marketing": {
@@ -3541,7 +3671,8 @@
           "failed": "Yükleme başarısız",
           "dropHint": "Görseli sürükleyip bırakın veya",
           "chooseFile": "Dosya Seç",
-          "urlPlaceholder": "veya görsel URL'si yapıştırın"
+          "urlPlaceholder": "veya görsel URL'si yapıştırın",
+          "hint": "JPG, PNG, WebP • En fazla 2 MB"
         },
         "validation": {
           "titleRequired": "Başlık gerekli"
@@ -6544,6 +6675,37 @@
       "filterToolbar": {
         "placeholder": "Ara"
       },
+      "filterDialog": {
+        "title": "Filtreler",
+        "open": "Filtrele",
+        "activeCount": "{count} filtre uygulandı",
+        "labels": {
+          "dateRange": "Tarih aralığı",
+          "visibility": "Görünürlük",
+          "featured": "Öne çıkan",
+          "brand": "Marka",
+          "carModel": "Model",
+          "type": "Tür",
+          "priority": "Öncelik",
+          "channel": "Kanal",
+          "provider": "Sağlayıcı",
+          "documentType": "Belge türü",
+          "position": "Konum",
+          "device": "Cihaz",
+          "scope": "Kapsam",
+          "active": "Aktiflik",
+          "membershipTier": "Üyelik katmanı",
+          "lifecycle": "Üyelik durumu",
+          "userType": "Kullanıcı türü",
+          "package": "Paket",
+          "severity": "Önem düzeyi",
+          "resolved": "Çözüm durumu",
+          "template": "Şablon",
+          "action": "İşlem",
+          "entityType": "Varlık türü",
+          "shipmentLeg": "Gönderi yönü"
+        }
+      },
       "bulkActionBar": {
         "selectedCount": "{count} seçili",
         "clearSelection": "Seçimi temizle"
@@ -7325,7 +7487,8 @@
       "imageKeyEmpty": "Görsel anahtarı boş olamaz",
       "imageKeyInvalid": "Görsel anahtarı geçersiz",
       "imageKeyWrongPath": "Görsel anahtarı ürün görseli yolunda değil",
-      "createFailed": "İlan oluşturulamadı: {reason}"
+      "createFailed": "İlan oluşturulamadı: {reason}",
+      "invalidColors": "Geçersiz renk seçimi: {colors}"
     },
     "refund": {
       "alreadyActive": "Bu sipariş için zaten aktif bir iade talebi var",
@@ -7703,7 +7866,15 @@
         "cannotRemoveSelf": "Kendi admin yetkinizi kaldıramazsınız",
         "lastSuperAdminUndeletable": "Sistemdeki son süper admin kaldırılamaz"
       },
-      "warehouseAddressMissing": "Depo adresi yapılandırılmamış. Lütfen `warehouse_address_id` platform ayarını tanımlayın."
+      "warehouseAddressMissing": "Depo adresi yapılandırılmamış. Lütfen `warehouse_address_id` platform ayarını tanımlayın.",
+      "catalogImport": {
+        "noDataRows": "'{sheet}' sayfasında veri satırı yok. Şablonu doldurup yeniden yükleyin.",
+        "tooManyRows": "Tek seferde en fazla {max} satır aktarılabilir (dosyada {count} satır var).",
+        "fileMissing": "Excel dosyası yüklenmedi.",
+        "onlyXlsx": "Yalnızca .xlsx uzantılı Excel dosyası yüklenebilir.",
+        "fileTooLarge": "Dosya en fazla {max} MB olabilir.",
+        "missingColumns": "Excel sütunları eksik: {columns}. Örnek dosyayı yeniden indirin."
+      }
     },
     "advertisement": {
       "notFound": "Reklam bulunamadı",

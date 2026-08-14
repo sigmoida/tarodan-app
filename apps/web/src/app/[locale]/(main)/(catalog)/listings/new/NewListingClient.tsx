@@ -41,6 +41,7 @@ function NewListingLayout() {
     modelsLoading,
     scaleList,
     materialList,
+    colorList,
     manufacturerList,
     yearOptions,
     commissionPreview,
@@ -100,6 +101,7 @@ function NewListingLayout() {
               modelsLoading={modelsLoading}
               scaleList={scaleList}
               materialList={materialList}
+              colorList={colorList}
               manufacturerList={manufacturerList}
               yearOptions={yearOptions}
             />

@@ -90,9 +90,8 @@ export function ApplicationsList({ status }: { status: string }) {
       syncUrl
       initialFilters={{ status }}
     >
-      <ResourceList.Toolbar>
-        <ResourceList.Search />
-      </ResourceList.Toolbar>
+      {/* `status` comes from the tab bar, so this list has no filter dialog. */}
+      <ResourceList.Toolbar />
       <ResourceList.Table
         columns={columns}
         emptyText={t("admin.accounts.sellerApplications.empty")}

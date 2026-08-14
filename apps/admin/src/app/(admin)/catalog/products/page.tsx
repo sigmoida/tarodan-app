@@ -15,7 +15,8 @@ import { ResourceList } from "@/components/list";
 import { useTabParam } from "@/hooks/useTabParam";
 import { type Product, getProductTabs } from "./_lib/types";
 import { ProductsCountText } from "./_components/ProductsCountText";
-import { ProductFilters } from "./_components/ProductFilters";
+import { productFilterFields } from "./_lib/filters";
+import { useBrandOptions, useCarModelOptions } from "@/hooks/useBrandOptions";
 import { ProductsTable } from "./_components/ProductsTable";
 import { ProductBulkImportModal } from "./_components/ProductBulkImportModal";
 
@@ -23,6 +24,8 @@ export default function ProductsPage() {
   const t = useTranslations();
   const [tab, setTab] = useTabParam("list");
   const [bulkImportOpen, setBulkImportOpen] = useState(false);
+  const brands = useBrandOptions();
+  const models = useCarModelOptions();
 
   return (
     <AdminPage>
@@ -48,22 +51,13 @@ export default function ProductsPage() {
           fetcher={(params) => adminApi.getProducts(params)}
           getRowId={(p) => p.id}
           syncUrl
-          initialFilters={{
-            status: "all",
-            sellerId: "",
-            brandId: "",
-            carModelId: "",
-            startDate: "",
-            endDate: "",
-          }}
+          filters={productFilterFields(t, brands, models)}
+          // `sellerId` has no control — it arrives as a deep link from a seller.
+          initialFilters={{ sellerId: "" }}
         >
-          <ResourceList.Toolbar>
-            <ResourceList.Search
-              placeholder={t("admin.catalog.products.searchPlaceholder")}
-            />
-            <ProductFilters />
-            <ResourceList.DateRange />
-          </ResourceList.Toolbar>
+          <ResourceList.Toolbar
+            searchPlaceholder={t("admin.catalog.products.searchPlaceholder")}
+          />
           <ProductsTable />
           <ResourceList.Pagination />
         </ResourceList>

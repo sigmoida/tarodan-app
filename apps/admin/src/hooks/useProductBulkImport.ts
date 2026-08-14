@@ -6,7 +6,7 @@ import { useTranslations } from "next-intl";
 import { adminApi } from "@/lib/api";
 import { adminKeys } from "@/lib/query/keys";
 import { useAdminMutation } from "@/hooks/useAdminMutation";
-import { extractErrorMessage } from "@/lib/error";
+import { extractImportErrors } from "@/lib/error";
 
 export interface EligibleProductImportSeller {
   id: string;
@@ -56,17 +56,6 @@ const FALLBACK_LIMITS: ProductImportLimits = {
   maxFileBytes: 10 * 1024 * 1024,
   maxImages: 250,
 };
-
-function importErrors(error: unknown, fallback: string): string[] {
-  const body = (error as any)?.response?.data;
-  const candidates = [
-    body?.errors,
-    body?.message?.errors,
-    body?.message?.details?.errors,
-  ];
-  const errors = candidates.find(Array.isArray);
-  return errors ? errors.map(String) : [extractErrorMessage(error, fallback)];
-}
 
 /**
  * Durum sorgusunun üst sınırı. Sunucu yarıda kalan kayıtları 30 dk sonra
@@ -227,7 +216,10 @@ export function useProductBulkImport(open: boolean, onClose: () => void) {
             } satisfies ProductImportPendingResult;
           }
           setServerErrors(
-            importErrors(error, t("admin.catalog.products.bulkImportFailed")),
+            extractImportErrors(
+              error,
+              t("admin.catalog.products.bulkImportFailed"),
+            ),
           );
           throw error;
         }),

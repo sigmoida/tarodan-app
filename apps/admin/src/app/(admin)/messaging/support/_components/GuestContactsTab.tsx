@@ -24,9 +24,7 @@ export function GuestContactsTab() {
         getRowId={(g) => g.referenceNumber}
         syncUrl
       >
-        <ResourceList.Toolbar>
-          <ResourceList.Search />
-        </ResourceList.Toolbar>
+        <ResourceList.Toolbar />
         <ResourceList.Table
           columns={guestColumns(guestRowMenu(setSelected, t), t)}
           emptyText={t("admin.messaging.support.guestNotFound")}

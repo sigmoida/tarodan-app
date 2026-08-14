@@ -4,11 +4,9 @@ import { useTranslations } from "next-intl";
 import { AdminPage } from "@/components/page/AdminPage";
 import { PageHeader } from "@/components/AdminList";
 import { ResourceList } from "@/components/list";
-import {
-  fetchRefundRequests,
-  refundStatusOptions,
-} from "@/lib/refund-request-query";
+import { fetchRefundRequests } from "@/lib/refund-request-query";
 import { type RefundRequestRow, refundRequestColumns } from "./_lib/columns";
+import { refundRequestFilterFields } from "./_lib/filters";
 
 export default function RefundRequestsPage() {
   const t = useTranslations();
@@ -24,17 +22,9 @@ export default function RefundRequestsPage() {
         fetcher={fetchRefundRequests}
         getRowId={(rr) => rr.id}
         syncUrl
-        initialFilters={{ status: "all", from: "", to: "" }}
+        filters={refundRequestFilterFields(t)}
       >
-        <ResourceList.Toolbar>
-          <ResourceList.Search />
-          <ResourceList.FilterSelect
-            name="status"
-            options={refundStatusOptions(t)}
-            className="sm:w-56"
-          />
-          <ResourceList.DateRange fromName="from" toName="to" />
-        </ResourceList.Toolbar>
+        <ResourceList.Toolbar />
         <ResourceList.Table
           columns={refundRequestColumns(t)}
           emptyText={t("admin.operations.refundRequests.emptyFiltered")}

@@ -224,9 +224,7 @@ export function WithholdingTab() {
         initialFilters={INITIAL_FILTERS}
       >
         <WithholdingControls />
-        <ResourceList.Toolbar>
-          <ResourceList.Search />
-        </ResourceList.Toolbar>
+        <ResourceList.Toolbar />
         <WithholdingSummary />
         <WithholdingTable />
         <ResourceList.Pagination />

@@ -1,4 +1,9 @@
-import { Injectable, Logger, Optional } from "@nestjs/common";
+import {
+  BadRequestException,
+  Injectable,
+  Logger,
+  Optional,
+} from "@nestjs/common";
 import { PrismaService } from "../../prisma";
 import { DiscountService } from "../discount/discount.service";
 import { FeeDiscountResolver } from "../discount/engine/fee-discount.resolver";
@@ -17,6 +22,29 @@ import {
   publicUserRatingWhere,
 } from "../../common/helpers/public-rating";
 import { isDevelopment } from "../../config/environment";
+import { i18nMessage } from "../i18n";
+import {
+  SCALE_GROUP_SLUG,
+  MATERIAL_GROUP_SLUG,
+  COLOR_GROUP_SLUG,
+} from "../../common/helpers/attribute-groups";
+
+/** Bir ilanın seçtiği tüm katalog değerleri (ölçek/malzeme/renk/serbest slug). */
+export interface ProductAttributeSelection {
+  scale?: string;
+  material?: string;
+  /** Global "color" grubundaki attribute slug'ları. */
+  colors?: string[];
+  attributeIds?: string[];
+  attributeSlugs?: string[];
+}
+
+export interface ResolvedProductAttributes {
+  /** Bağlanacak Attribute id'leri (tekrarsız). */
+  ids: string[];
+  /** Bağlanan renklerin görünen adları — `products.color` kolonu için. */
+  colorLabels: string[];
+}
 
 /**
  * ProductCommonService — ürün alt servislerinin paylaştığı yardımcılar (leaf; yalnız
@@ -477,7 +505,7 @@ export class ProductCommonService {
         }));
       const scaleFromGroup = this.getAttributeValueByGroup(
         productAttributes,
-        "scale",
+        SCALE_GROUP_SLUG,
         "Ölçek",
       );
       const scaleFromAttrs = attributes.find(
@@ -488,7 +516,7 @@ export class ProductCommonService {
         scale: scaleFromGroup || scaleFromAttrs,
         material: this.getAttributeValueByGroup(
           productAttributes,
-          "material",
+          MATERIAL_GROUP_SLUG,
           "Malzeme",
         ),
       };
@@ -522,7 +550,7 @@ export class ProductCommonService {
     // Normalize scale slug to value format for dropdown match (e.g. "164" -> "1:64", "118" -> "1:18").
     // Only runs when both displayValue and value are falsy (null/undefined/empty).
     if (
-      groupSlug === "scale" &&
+      groupSlug === SCALE_GROUP_SLUG &&
       pa?.attribute?.slug &&
       /^\d+$/.test(pa.attribute.slug)
     ) {
@@ -536,15 +564,24 @@ export class ProductCommonService {
   /**
    * Resolve every product attribute through the same canonical lookup used by
    * both regular listing creation and admin bulk import.
+   *
+   * Renkler ayrı dönülür: `products.color` kolonu görünen adları denormalize
+   * tutuyor (arama metni ve eski ekranlar oradan besleniyor), bu yüzden çağıran
+   * taraf bağladığı renklerin etiketine ihtiyaç duyar.
    */
-  async resolveProductAttributeIds(
-    scale?: string,
-    attributeIds?: string[],
-    materialSlug?: string,
-    attributeSlugs?: string[],
+  async resolveProductAttributes(
+    selection: ProductAttributeSelection,
     options: { rejectUnknown?: boolean } = {},
-  ): Promise<string[]> {
+  ): Promise<ResolvedProductAttributes> {
+    const {
+      scale,
+      material: materialSlug,
+      colors,
+      attributeIds,
+      attributeSlugs,
+    } = selection;
     const toLink: string[] = [];
+    const colorLabels: string[] = [];
     const unknown: string[] = [];
 
     if (scale?.trim()) {
@@ -553,7 +590,7 @@ export class ProductCommonService {
       const scaleSlugAlt = scaleTrim.replace(":", "-");
       const scaleAttr = await this.prisma.attribute.findFirst({
         where: {
-          group: { slug: "scale", isActive: true },
+          group: { slug: SCALE_GROUP_SLUG, isActive: true },
           isActive: true,
           OR: [
             { slug: { equals: scaleNorm, mode: "insensitive" } },
@@ -573,7 +610,7 @@ export class ProductCommonService {
       const material = materialSlug.trim();
       const materialAttr = await this.prisma.attribute.findFirst({
         where: {
-          group: { slug: "material", isActive: true },
+          group: { slug: MATERIAL_GROUP_SLUG, isActive: true },
           isActive: true,
           OR: [
             { slug: { equals: material, mode: "insensitive" } },
@@ -585,6 +622,43 @@ export class ProductCommonService {
       });
       if (materialAttr) toLink.push(materialAttr.id);
       else unknown.push(`malzeme '${material}'`);
+    }
+
+    // Renk sessizce düşürülmez: satıcı seçtiği rengin kaybolduğunu ancak ilan
+    // yayımlandıktan sonra görürdü. Bilinmeyen slug doğrudan 400 döner.
+    const requestedColors = colors?.map((slug) => slug.trim()).filter(Boolean);
+    if (requestedColors?.length) {
+      const resolved = await this.prisma.attribute.findMany({
+        where: {
+          isActive: true,
+          group: { slug: COLOR_GROUP_SLUG, isActive: true },
+          OR: requestedColors.map((slug) => ({
+            slug: { equals: slug, mode: "insensitive" as const },
+          })),
+        },
+        select: { id: true, slug: true, value: true, displayValue: true },
+      });
+      const bySlug = new Map(
+        resolved.map((item) => [item.slug.toLocaleLowerCase("tr-TR"), item]),
+      );
+      const missing: string[] = [];
+      for (const slug of requestedColors) {
+        const match = bySlug.get(slug.toLocaleLowerCase("tr-TR"));
+        if (!match) {
+          missing.push(slug);
+          continue;
+        }
+        if (toLink.includes(match.id)) continue;
+        toLink.push(match.id);
+        colorLabels.push(match.displayValue || match.value);
+      }
+      if (missing.length) {
+        throw new BadRequestException(
+          i18nMessage("server.product.invalidColors", {
+            colors: missing.join(", "),
+          }),
+        );
+      }
     }
 
     if (attributeIds?.length) toLink.push(...attributeIds);
@@ -622,30 +696,28 @@ export class ProductCommonService {
       );
     }
 
-    return [...new Set(toLink)];
+    return { ids: [...new Set(toLink)], colorLabels };
   }
 
   /**
-   * Link scale (1:64), material (slug), attributeIds, and attribute slugs to product via ProductAttribute.
+   * Link scale (1:64), material (slug), colors, attributeIds, and attribute slugs
+   * to product via ProductAttribute.
    * attributeSlugs: opaque list of Attribute.slug values from any group (used for Hot Wheels extras
    * like 'mainline', 'treasure-hunt', 'red'). Slugs are resolved server-side to attribute IDs.
-   * Unknown slugs are silently dropped (logged in dev).
+   * Unknown slugs are silently dropped (logged in dev) — renk bunun istisnasıdır.
    */
   async linkProductAttributes(
     productId: string,
-    scale?: string,
-    attributeIds?: string[],
-    materialSlug?: string,
-    attributeSlugs?: string[],
-  ) {
-    const toLink = await this.resolveProductAttributeIds(
-      scale,
-      attributeIds,
-      materialSlug,
-      attributeSlugs,
-    );
+    selection: ProductAttributeSelection,
+  ): Promise<ResolvedProductAttributes> {
+    const resolved = await this.resolveProductAttributes(selection);
+    await this.attachProductAttributes(productId, resolved.ids);
+    return resolved;
+  }
 
-    for (const attributeId of toLink) {
+  /** Çözülmüş attribute id'lerini ürüne bağlar (tekrar bağlamak zararsızdır). */
+  async attachProductAttributes(productId: string, attributeIds: string[]) {
+    for (const attributeId of attributeIds) {
       await this.prisma.productAttribute.upsert({
         where: { productId_attributeId: { productId, attributeId } },
         create: { productId, attributeId },

@@ -55,6 +55,38 @@ export const getYearOptions = (): number[] => {
 
 export const FALLBACK_SCALES = ["1:18", "1:24", "1:43", "1:64", "1:87"];
 
+/**
+ * İlan başına en fazla renk. Sunucudaki `MAX_PRODUCT_COLORS` ile aynı olmalı —
+ * fazlası API'de 400 döner.
+ */
+export const MAX_LISTING_COLORS = 3;
+
+/**
+ * Global (üreticiden bağımsız) attribute gruplarının slug'ları — sunucudaki
+ * `common/helpers/attribute-groups.ts` ile aynı olmalı; kayıttaki nitelikler
+ * bunlarla kendi alanlarına ayrıştırılır.
+ *
+ * Grubun ADI ("Ölçek", "Renk") değil slug'ı kullanılır: ad kataloğa bağlıdır,
+ * slug değildir.
+ */
+export const SCALE_GROUP_SLUG = "scale";
+export const MATERIAL_GROUP_SLUG = "material";
+export const COLOR_GROUP_SLUG = "color";
+
+/**
+ * Birden çok rengin tek satırda birleştirilme ayracı — sunucudaki
+ * `COLOR_LABEL_SEPARATOR` ile aynı olmalı ki `products.color` kolonundan gelen
+ * metin ile istemcide türetilen metin birbirinin aynısı olsun.
+ */
+export const COLOR_LABEL_SEPARATOR = ", ";
+
+/** Renk seçeneği: katalogdaki "color" attribute grubundan gelir. */
+export interface ColorOption {
+  slug: string;
+  label: string;
+  color?: string | null;
+}
+
 export const FALLBACK_MATERIALS = [
   { slug: "diecast", label: "Diecast (Metal)" },
   { slug: "resin", label: "Resin (Reçine)" },

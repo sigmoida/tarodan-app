@@ -37,6 +37,15 @@ interface CartStoreState {
   /** Toplu seç/kaldır (ör. "tümünü seç" kutusu). */
   setProductsSelected: (productIds: string[], selected: boolean) => void;
   /**
+   * Sepette artık bulunmayan kimliklerin dışlamasını düşürür.
+   *
+   * Liste kalıcı olduğu için budanmadan büyüyordu: kullanıcı bir ürünün
+   * seçimini kaldırıp ardından onu sepetten çıkarınca kimlik listede kalıyor,
+   * AYNI ürün sonra tekrar eklendiğinde seçilmemiş geliyordu — yani yukarıdaki
+   * "yeni eklenen ürün seçili gelir" kuralının tam tersi.
+   */
+  pruneExcludedProductIds: (presentProductIds: string[]) => void;
+  /**
    * "Hemen Al" kapsamı. Kalıcı seçimi BOZMADAN tek ürünle ödemeye geçmeyi
    * sağlar: kullanıcı vazgeçip sepete dönerse eski seçimi olduğu gibi durur.
    * Kalıcıdır — ödeme sayfası yenilendiğinde kapsam kaybolup sepetin tamamı
@@ -80,6 +89,15 @@ export const useCartStore = create<CartStoreState>()(
             ? excluded.filter((id) => !productIds.includes(id))
             : [...new Set([...excluded, ...productIds])],
         });
+      },
+
+      pruneExcludedProductIds: (presentProductIds) => {
+        const excluded = get().excludedProductIds;
+        const present = new Set(presentProductIds);
+        const next = excluded.filter((id) => present.has(id));
+        // Uzunluk aynıysa yeni dizi YAZILMAZ: her yazma store'a abone her
+        // bileşeni yeniden render eder ve bu, sepet her yüklendiğinde çağrılır.
+        if (next.length !== excluded.length) set({ excludedProductIds: next });
       },
 
       setBuyNowProductId: (productId) => set({ buyNowProductId: productId }),

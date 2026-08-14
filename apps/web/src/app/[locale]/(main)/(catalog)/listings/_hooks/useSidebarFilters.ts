@@ -8,6 +8,7 @@ import { categoriesApi, manufacturersApi, listingsApi } from "@/lib/api";
 import { SCALE_FALLBACK } from "@/lib/constants";
 import { matchesSearch } from "@tarodan/ui";
 import type { Filters } from "../_lib/params";
+import { useListingFiltersQuery } from "./useListingFiltersQuery";
 
 interface Category {
   id: string;
@@ -27,18 +28,6 @@ interface CustomAttributeGroup {
   name: string;
   manufacturerSlug: string | null;
   attributes: Array<{ slug: string; label: string; color?: string | null }>;
-}
-
-interface FiltersData {
-  scales?: string[];
-  materials?: Array<{ slug: string; label: string }>;
-  brands?: Array<string | { id: string; name: string; slug: string }>;
-  carModels?: Array<{
-    id: string;
-    name: string;
-    slug: string;
-    brandId: string;
-  }>;
 }
 
 const STALE = 60 * 60 * 1000;
@@ -132,13 +121,10 @@ export function useSidebarFilters({
     [manufacturersQuery.data],
   );
 
-  const filtersQuery = useQuery({
-    queryKey: queryKeys.listings.filters(),
-    queryFn: async () => (await listingsApi.getFilters()).data as FiltersData,
-    staleTime: STALE,
-  });
+  const filtersQuery = useListingFiltersQuery();
   const scaleList = filtersQuery.data?.scales ?? [];
   const materialList = filtersQuery.data?.materials ?? [];
+  const colorList = filtersQuery.data?.colors ?? [];
   const carModelList = filtersQuery.data?.carModels ?? [];
   const brandList = useMemo(
     () =>
@@ -247,6 +233,18 @@ export function useSidebarFilters({
     onFilterChange({
       ...filters,
       material: filters.material === materialSlug ? "" : materialSlug,
+    });
+  };
+
+  // Renk çoklu seçim: aynı gruptaki renkler arasında OR uygulanır, bu yüzden
+  // seçim tek değer değil liste olarak taşınır.
+  const toggleColor = (colorSlug: string) => {
+    const current = filters.colors ?? [];
+    onFilterChange({
+      ...filters,
+      colors: current.includes(colorSlug)
+        ? current.filter((slug) => slug !== colorSlug)
+        : [...current, colorSlug],
     });
   };
 
@@ -368,6 +366,7 @@ export function useSidebarFilters({
     modelsForBrand,
     filteredScales,
     filteredMaterials,
+    colorList,
     displayManufacturers,
     customAttrGroups,
     CONDITIONS,
@@ -377,6 +376,7 @@ export function useSidebarFilters({
     handleCarModelChange,
     handleScaleChange,
     handleMaterialChange,
+    toggleColor,
     handleManufacturerChange,
     toggleCustomAttribute,
     handleConditionChange,

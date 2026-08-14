@@ -5,7 +5,7 @@
 import { useTranslations } from "next-intl";
 import { adminApi } from "@/lib/api";
 import { ResourceList } from "@/components/list";
-import { statusOptions } from "./_lib/orders";
+import { orderFilterFields } from "./_lib/filters";
 import { OrdersSummary } from "./_components/OrdersSummary";
 import { OrdersTable } from "./_components/OrdersTable";
 
@@ -17,27 +17,15 @@ export default function OrdersPage() {
       fetcher={(p) => adminApi.getOrders(p)}
       getRowId={(o: any) => o.id}
       syncUrl
-      initialFilters={{
-        status: "all",
-        userId: "",
-        productId: "",
-        fromDate: "",
-        toDate: "",
-      }}
+      filters={orderFilterFields(t)}
+      // No controls of their own — deep links from user/product detail pages.
+      initialFilters={{ userId: "", productId: "" }}
     >
       <ResourceList.Header
         title={t("admin.operations.orders.title")}
         description={<OrdersSummary />}
       />
-      <ResourceList.Toolbar>
-        <ResourceList.Search />
-        <ResourceList.FilterSelect
-          name="status"
-          options={statusOptions}
-          className="sm:w-48"
-        />
-        <ResourceList.DateRange fromName="fromDate" toName="toDate" />
-      </ResourceList.Toolbar>
+      <ResourceList.Toolbar />
       <OrdersTable />
       <ResourceList.Pagination />
     </ResourceList>

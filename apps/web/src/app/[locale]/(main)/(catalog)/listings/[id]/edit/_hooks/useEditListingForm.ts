@@ -216,7 +216,12 @@ export function useEditListingForm({
       brandId: values.brandId || undefined,
       carModelId: values.carModelId || null,
       modelCode: values.modelCode.trim() || null,
-      color: values.color,
+      // Renk seçimi gönderildiğinde sunucu önceki renk bağlarını temizleyip
+      // bunları yazar ve `color` kolonunu adlardan tazeler. Katalog boşsa
+      // (serbest metin yedeği) eski alan gider.
+      ...(values.colors.length > 0
+        ? { colors: values.colors }
+        : { color: values.color }),
       scale: values.scale || undefined,
       material: values.material || undefined,
       manufacturerId: values.manufacturerId || undefined,

@@ -15,9 +15,7 @@ export function ScheduleTab() {
       getRowId={(s) => s.id}
       syncUrl
     >
-      <ResourceList.Toolbar>
-        <ResourceList.Search />
-      </ResourceList.Toolbar>
+      <ResourceList.Toolbar />
       <ResourceList.Table
         columns={scheduleColumns(t)}
         emptyText={t("admin.finance.payouts.noUpcomingPayments")}

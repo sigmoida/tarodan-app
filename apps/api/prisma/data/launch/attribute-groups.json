@@ -30,5 +30,166 @@
         "isActive": true
       }
     ]
+  },
+  {
+    "name": "Renk",
+    "slug": "color",
+    "isRequired": true,
+    "sortOrder": 2,
+    "isActive": true,
+    "values": [
+      {
+        "value": "Kırmızı",
+        "slug": "red",
+        "displayValue": "Kırmızı",
+        "color": "#DC2626",
+        "sortOrder": 0,
+        "isActive": true
+      },
+      {
+        "value": "Mavi",
+        "slug": "blue",
+        "displayValue": "Mavi",
+        "color": "#2563EB",
+        "sortOrder": 1,
+        "isActive": true
+      },
+      {
+        "value": "Siyah",
+        "slug": "black",
+        "displayValue": "Siyah",
+        "color": "#000000",
+        "sortOrder": 2,
+        "isActive": true
+      },
+      {
+        "value": "Beyaz",
+        "slug": "white",
+        "displayValue": "Beyaz",
+        "color": "#FFFFFF",
+        "sortOrder": 3,
+        "isActive": true
+      },
+      {
+        "value": "Gri",
+        "slug": "gray",
+        "displayValue": "Gri",
+        "color": "#6B7280",
+        "sortOrder": 4,
+        "isActive": true
+      },
+      {
+        "value": "Gümüş",
+        "slug": "silver",
+        "displayValue": "Gümüş",
+        "color": "#C0C0C0",
+        "sortOrder": 5,
+        "isActive": true
+      },
+      {
+        "value": "Altın",
+        "slug": "gold",
+        "displayValue": "Altın",
+        "color": "#D4AF37",
+        "sortOrder": 6,
+        "isActive": true
+      },
+      {
+        "value": "Sarı",
+        "slug": "yellow",
+        "displayValue": "Sarı",
+        "color": "#FACC15",
+        "sortOrder": 7,
+        "isActive": true
+      },
+      {
+        "value": "Turuncu",
+        "slug": "orange",
+        "displayValue": "Turuncu",
+        "color": "#F97316",
+        "sortOrder": 8,
+        "isActive": true
+      },
+      {
+        "value": "Yeşil",
+        "slug": "green",
+        "displayValue": "Yeşil",
+        "color": "#16A34A",
+        "sortOrder": 9,
+        "isActive": true
+      },
+      {
+        "value": "Mor",
+        "slug": "purple",
+        "displayValue": "Mor",
+        "color": "#7C3AED",
+        "sortOrder": 10,
+        "isActive": true
+      },
+      {
+        "value": "Pembe",
+        "slug": "pink",
+        "displayValue": "Pembe",
+        "color": "#EC4899",
+        "sortOrder": 11,
+        "isActive": true
+      },
+      {
+        "value": "Kahverengi",
+        "slug": "brown",
+        "displayValue": "Kahverengi",
+        "color": "#92400E",
+        "sortOrder": 12,
+        "isActive": true
+      },
+      {
+        "value": "Bej",
+        "slug": "beige",
+        "displayValue": "Bej",
+        "color": "#E8DCC4",
+        "sortOrder": 13,
+        "isActive": true
+      },
+      {
+        "value": "Bordo",
+        "slug": "maroon",
+        "displayValue": "Bordo",
+        "color": "#7F1D1D",
+        "sortOrder": 14,
+        "isActive": true
+      },
+      {
+        "value": "Lacivert",
+        "slug": "navy",
+        "displayValue": "Lacivert",
+        "color": "#1E3A8A",
+        "sortOrder": 15,
+        "isActive": true
+      },
+      {
+        "value": "Turkuaz",
+        "slug": "turquoise",
+        "displayValue": "Turkuaz",
+        "color": "#14B8A6",
+        "sortOrder": 16,
+        "isActive": true
+      },
+      {
+        "value": "Krom",
+        "slug": "chrome",
+        "displayValue": "Krom",
+        "color": "#C0C0C0",
+        "sortOrder": 17,
+        "isActive": true
+      },
+      {
+        "value": "Çok Renkli",
+        "slug": "multicolor",
+        "displayValue": "Çok Renkli",
+        "color": null,
+        "sortOrder": 18,
+        "isActive": true
+      }
+    ]
   }
 ]

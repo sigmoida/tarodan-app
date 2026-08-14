@@ -17,9 +17,10 @@ import {
   type ListingImageItem,
 } from "./listing-image-item";
 
+/** Varsayılan boyut, geçerli bir görsel için alt sınırın (1 KB) üstündedir. */
 const fakeFile = (
   name: string,
-  { type = "image/jpeg", size = 1000, lastModified = 1 } = {},
+  { type = "image/jpeg", size = 4096, lastModified = 1 } = {},
 ): File => ({ name, type, size, lastModified }) as unknown as File;
 
 const objectUrl = (file: File) => `blob:${file.name}`;
@@ -111,6 +112,33 @@ describe("ilan görseli durum modeli", () => {
       );
 
       expect(rejected).toEqual([{ name: "big.jpg", reason: "size" }]);
+    });
+
+    /**
+     * 1 KB altı bir dosya ürün fotoğrafı olamaz (boş/bozuk kayıt, yer tutucu).
+     * Sunucu da reddederdi ama kullanıcı bunu ancak yükleme bittikten sonra
+     * görürdü.
+     */
+    it("1 KB altını gerekçesiyle reddeder", () => {
+      const { accepted, rejected } = acceptFiles(
+        [],
+        [fakeFile("bos.jpg", { size: 512 })],
+        { maxImages: 5 },
+      );
+
+      expect(accepted).toHaveLength(0);
+      expect(rejected).toEqual([{ name: "bos.jpg", reason: "tooSmall" }]);
+    });
+
+    it("çok küçük dosya kontenjan harcamaz", () => {
+      const { accepted, rejected } = acceptFiles(
+        [],
+        [fakeFile("bos.jpg", { size: 10 }), fakeFile("iyi.jpg")],
+        { maxImages: 1 },
+      );
+
+      expect(accepted.map((f) => f.name)).toEqual(["iyi.jpg"]);
+      expect(rejected).toEqual([{ name: "bos.jpg", reason: "tooSmall" }]);
     });
 
     it("aynı dosyayı ikinci kez eklemez", () => {
@@ -255,8 +283,9 @@ describe("ilan görseli durum modeli", () => {
         { ...uploaded("b"), status: "uploading" },
       ]);
 
+      // Kullanıcıya gösterilecek metin BURADA değil: saf model yalnız gerekçe
+      // döndürür, çeviri `useListingImageUpload` içinde eklenir.
       expect(blocker?.reason).toBe("pending");
-      expect(blocker?.message).toMatch(/bekleyin/i);
     });
 
     it("sırada bekleyen kalem de engeller", () => {
@@ -279,7 +308,6 @@ describe("ilan görseli durum modeli", () => {
       ]);
 
       expect(blocker?.reason).toBe("failed");
-      expect(blocker?.message).toMatch(/kaldırın|tekrar/i);
     });
 
     it("hepsi yüklendiyse engel yoktur", () => {

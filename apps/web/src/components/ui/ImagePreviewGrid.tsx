@@ -2,6 +2,8 @@
 
 "use client";
 
+import { useState, type ReactNode } from "react";
+import { useTranslations } from "next-intl";
 import {
   DndContext,
   KeyboardSensor,
@@ -22,12 +24,15 @@ import { CSS } from "@dnd-kit/utilities";
 import {
   ArrowPathIcon,
   Bars3Icon,
+  ExclamationTriangleIcon,
   StarIcon,
   XMarkIcon,
 } from "@heroicons/react/24/outline";
+import { StarIcon as StarSolidIcon } from "@heroicons/react/24/solid";
 import { Button, IconButton } from "@tarodan/ui";
 import {
   coverIndexOf,
+  MIN_RECOMMENDED_DIMENSION,
   type ListingImageItem,
 } from "@/components/listings/form/listing-image-item";
 
@@ -42,6 +47,12 @@ export interface ImagePreviewGridProps {
   onMove?: (from: number, to: number) => void;
   /** Kalemi kapak yap (listenin başına al). */
   onMakeCover?: (index: number) => void;
+  /**
+   * Izgaranın SONUNA eklenen hücre — tipik olarak "+ Ekle" kutucuğu. Sortable
+   * DEĞİLDİR: sıralamaya giren yalnız `items`tir, böylece ızgara ekleme
+   * mekanizmasından habersiz kalır.
+   */
+  trailing?: ReactNode;
   className?: string;
 }
 
@@ -57,7 +68,8 @@ const FALLBACK = "https://placehold.co/200x200/f3f4f6/9ca3af?text=Resim";
  *
  * Kapak görseli için ayrı bir alan YOKTUR: listenin ilk kalemi kapaktır ve sıra
  * zaten `sortOrder` ile saklanır. İkinci bir kaynak tutmak, ikisinin ayrışması
- * demekti.
+ * demekti. Kapak karosu 2×2 gösterilir — hangi görselin ilanda görüneceği
+ * rozete bakmadan anlaşılsın.
  */
 export default function ImagePreviewGrid({
   items,
@@ -65,8 +77,10 @@ export default function ImagePreviewGrid({
   onRetry,
   onMove,
   onMakeCover,
+  trailing,
   className = "",
 }: ImagePreviewGridProps) {
+  const t = useTranslations();
   // Pointer sensörü fare ve DOKUNMAYI birlikte karşılar; klavye sensörü ok
   // tuşlarıyla taşımayı sağlar (native HTML5 drag ikisini de vermiyordu).
   const sensors = useSensors(
@@ -76,7 +90,7 @@ export default function ImagePreviewGrid({
     }),
   );
 
-  if (items.length === 0) return null;
+  if (items.length === 0 && !trailing) return null;
 
   const handleDragEnd = (event: DragEndEvent) => {
     const { active, over } = event;
@@ -86,8 +100,12 @@ export default function ImagePreviewGrid({
     if (from >= 0 && to >= 0) onMove(from, to);
   };
 
+  /** Ekran okuyucuya `clientId` değil, kullanıcının gördüğü sıra numarası. */
+  const positionOf = (id?: string | number) =>
+    items.findIndex((item) => item.clientId === id) + 1;
+
   const grid =
-    `grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-3 ${className}`.trim();
+    `grid grid-cols-3 gap-2 sm:grid-cols-4 sm:gap-3 md:grid-cols-6 ${className}`.trim();
 
   // Kapak listenin ilk YÜKLENMİŞ kalemidir; hata almış bir görsel kapak
   // etiketi almaz (forma zaten yazılmıyor).
@@ -99,6 +117,9 @@ export default function ImagePreviewGrid({
       item={item}
       index={index}
       isCover={index === coverIndex}
+      /** Büyük karo yalnız listenin BAŞINDAKİ kapak için — aradaki bir kalem
+          büyütülseydi ızgara sırası okunamaz hâle gelirdi. */
+      featured={index === coverIndex && index === 0}
       sortable={!!onMove}
       onRemove={onRemove}
       onRetry={onRetry}
@@ -106,7 +127,14 @@ export default function ImagePreviewGrid({
     />
   ));
 
-  if (!onMove) return <div className={grid}>{tiles}</div>;
+  if (!onMove) {
+    return (
+      <div className={grid}>
+        {tiles}
+        {trailing}
+      </div>
+    );
+  }
 
   return (
     <DndContext
@@ -116,12 +144,17 @@ export default function ImagePreviewGrid({
       onDragEnd={handleDragEnd}
       accessibility={{
         announcements: {
-          onDragStart: ({ active }) => `${active.id} taşınıyor`,
+          onDragStart: ({ active }) =>
+            t("product.imageUpload.dragStarted", { id: positionOf(active.id) }),
           onDragOver: ({ over }) =>
-            over ? `${over.id} konumunun üzerinde` : "",
+            over
+              ? t("product.imageUpload.dragOver", { id: positionOf(over.id) })
+              : "",
           onDragEnd: ({ over }) =>
-            over ? `${over.id} konumuna bırakıldı` : "Taşıma iptal edildi",
-          onDragCancel: () => "Taşıma iptal edildi",
+            over
+              ? t("product.imageUpload.dragEnded", { id: positionOf(over.id) })
+              : t("product.imageUpload.dragCancelled"),
+          onDragCancel: () => t("product.imageUpload.dragCancelled"),
         },
       }}
     >
@@ -129,7 +162,10 @@ export default function ImagePreviewGrid({
         items={items.map((item) => item.clientId)}
         strategy={rectSortingStrategy}
       >
-        <div className={grid}>{tiles}</div>
+        <div className={grid}>
+          {tiles}
+          {trailing}
+        </div>
       </SortableContext>
     </DndContext>
   );
@@ -139,6 +175,7 @@ function SortableTile({
   item,
   index,
   isCover,
+  featured,
   sortable,
   onRemove,
   onRetry,
@@ -147,11 +184,13 @@ function SortableTile({
   item: ListingImageItem;
   index: number;
   isCover: boolean;
+  featured: boolean;
   sortable: boolean;
   onRemove: (clientId: string) => void;
   onRetry?: (clientId: string) => void;
   onMakeCover?: (index: number) => void;
 }) {
+  const t = useTranslations();
   const {
     attributes,
     listeners,
@@ -161,10 +200,24 @@ function SortableTile({
     isDragging,
   } = useSortable({ id: item.clientId, disabled: !sortable });
 
+  /**
+   * Düşük çözünürlük UYARISI — engel değil. Ayrı bir çözüm adımı gerekmez:
+   * karodaki `<img>` önizlemeyi zaten yüklüyor, gerçek boyut `onLoad` içinde
+   * okunuyor. Yalnız YENİ seçilen dosyalar için: kayıtlı görsellerin önizlemesi
+   * sunucunun 500×500 kart türevi, o zaten sınırın üstünde.
+   */
+  const [lowResolution, setLowResolution] = useState(false);
+
   const isBusy =
     item.status === "queued" ||
     item.status === "uploading" ||
     item.status === "processing";
+
+  const label = { index: index + 1 };
+  /** Dokunmatikte hover yok: ikonlar mobilde AÇIK, masaüstünde hover ile. */
+  const revealOnHover =
+    "opacity-100 transition-opacity md:opacity-0 md:group-hover:opacity-100 md:group-focus-within:opacity-100";
+
   return (
     <div
       ref={setNodeRef}
@@ -172,26 +225,42 @@ function SortableTile({
       data-testid="listing-image-tile"
       data-status={item.status}
       data-cover={isCover || undefined}
-      className={`group relative aspect-square overflow-hidden rounded-lg border bg-surface ${
-        item.status === "failed" ? "border-danger-300" : "border-border"
+      className={`group relative aspect-square overflow-hidden rounded-xl bg-surface ring-1 ${
+        featured ? "col-span-2 row-span-2" : ""
+      } ${
+        item.status === "failed" ? "ring-danger-300" : "ring-border"
       } ${isDragging ? "z-10 opacity-80 ring-2 ring-primary-400" : ""}`}
     >
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
         src={item.previewUrl}
-        alt={`Görsel ${index + 1}`}
+        alt={t("product.imageUpload.imageAlt", label)}
         className={`h-full w-full object-cover ${isBusy ? "opacity-60" : ""}`}
+        onLoad={(e) => {
+          if (!item.file) return;
+          const img = e.currentTarget;
+          setLowResolution(
+            img.naturalWidth > 0 &&
+              (img.naturalWidth < MIN_RECOMMENDED_DIMENSION ||
+                img.naturalHeight < MIN_RECOMMENDED_DIMENSION),
+          );
+        }}
         onError={(e) => {
           (e.target as HTMLImageElement).src = FALLBACK;
         }}
       />
 
+      {/* Rozetler görselin üstünde okunabilsin diye üstte ve altta yumuşak
+          bir karartma; düz metin açık fotoğrafta kayboluyordu. */}
+      <div className="pointer-events-none absolute inset-x-0 top-0 h-10 bg-gradient-to-b from-heading/30 to-transparent" />
+
       {isCover ? (
         <span
           data-testid="listing-image-cover-badge"
-          className="absolute left-1.5 top-1.5 rounded-full bg-primary-600 px-1.5 py-0.5 text-[10px] font-medium text-inverted shadow-sm"
+          className="absolute left-1.5 top-1.5 inline-flex items-center gap-1 rounded-full bg-primary-600 px-2 py-0.5 text-[10px] font-semibold text-inverted shadow-sm"
         >
-          Kapak
+          <StarSolidIcon className="h-3 w-3" />
+          {t("product.imageUpload.cover")}
         </span>
       ) : (
         <span className="absolute left-1.5 top-1.5 rounded-full bg-surface-elevated/90 px-1.5 py-0.5 text-[10px] font-medium text-muted ring-1 ring-border">
@@ -199,12 +268,31 @@ function SortableTile({
         </span>
       )}
 
+      {/* Rozet sağ ÜSTTE, kaldır düğmesinin solunda durur: karonun alt şeridi
+          tutamak, kapak yap düğmesi ve ilerleme çubuğu tarafından kullanılıyor,
+          oraya konan uyarı dokunmatikte kalıcı olarak örtülü kalıyordu. */}
+      {lowResolution && !isBusy && item.status !== "failed" && (
+        <span
+          title={t("product.imageUpload.lowResolutionHint", {
+            size: MIN_RECOMMENDED_DIMENSION,
+          })}
+          className="absolute right-9 top-1.5 inline-flex items-center gap-1 rounded-full bg-warning-100 px-1.5 py-0.5 text-[10px] font-medium text-warning-800 shadow-sm"
+        >
+          <ExclamationTriangleIcon className="h-3 w-3 flex-none" />
+          {/* Dar karoda metin sığmaz; ikon görünür kalır, metni yalnız büyük
+              kapak karosu ve ekran okuyucular alır. */}
+          <span className={featured ? "" : "sr-only"}>
+            {t("product.imageUpload.lowResolution")}
+          </span>
+        </span>
+      )}
+
       {sortable && (
         <IconButton
           variant="ghost"
           size="xs"
-          aria-label={`Görsel ${index + 1} sırasını değiştir`}
-          className="absolute bottom-1.5 left-1.5 cursor-grab touch-none rounded-full bg-surface-elevated/90 text-muted shadow-sm ring-1 ring-border backdrop-blur-sm active:cursor-grabbing"
+          aria-label={t("product.imageUpload.reorderImage", label)}
+          className={`absolute bottom-1.5 left-1.5 cursor-grab touch-none rounded-full bg-surface-elevated/90 text-muted shadow-sm ring-1 ring-border backdrop-blur-sm active:cursor-grabbing ${revealOnHover}`}
           {...attributes}
           {...listeners}
         >
@@ -217,8 +305,8 @@ function SortableTile({
           variant="ghost"
           size="xs"
           onClick={() => onMakeCover(index)}
-          aria-label={`Görsel ${index + 1} kapak yap`}
-          className="absolute bottom-1.5 right-1.5 rounded-full bg-surface-elevated/90 text-muted shadow-sm ring-1 ring-border backdrop-blur-sm hover:bg-primary-500 hover:text-inverted opacity-0 transition-opacity focus-visible:opacity-100 group-hover:opacity-100"
+          aria-label={t("product.imageUpload.makeCoverImage", label)}
+          className={`absolute bottom-1.5 right-1.5 rounded-full bg-surface-elevated/90 text-muted shadow-sm ring-1 ring-border backdrop-blur-sm hover:bg-primary-500 hover:text-inverted ${revealOnHover}`}
         >
           <StarIcon className="h-4 w-4" />
         </IconButton>
@@ -231,10 +319,12 @@ function SortableTile({
         <div className="absolute inset-x-0 bottom-0 bg-surface-elevated/90 px-1.5 py-1 backdrop-blur-sm">
           <p className="text-[10px] font-medium text-body">
             {item.status === "processing"
-              ? "İşleniyor"
+              ? t("product.imageUpload.processing")
               : item.status === "queued"
-                ? "Sırada"
-                : `Yükleniyor %${item.progress}`}
+                ? t("product.imageUpload.queued")
+                : t("product.imageUpload.uploadingPercent", {
+                    progress: item.progress,
+                  })}
           </p>
           <div
             className="mt-0.5 h-1 w-full overflow-hidden rounded-full bg-surface-alt"
@@ -242,7 +332,7 @@ function SortableTile({
             aria-valuenow={item.progress}
             aria-valuemin={0}
             aria-valuemax={100}
-            aria-label={`Görsel ${index + 1} yükleniyor`}
+            aria-label={t("product.imageUpload.uploadProgressLabel", label)}
           >
             <div
               className={`h-full bg-primary-500 transition-[width] ${
@@ -257,7 +347,7 @@ function SortableTile({
       {item.status === "failed" && (
         <div className="absolute inset-0 flex flex-col items-center justify-center gap-1 bg-danger-50/90 p-1 text-center">
           <p className="text-[10px] leading-tight text-danger-700">
-            {item.error ?? "Yüklenemedi"}
+            {item.error ?? t("product.imageUpload.failed")}
           </p>
           {onRetry && (
             <Button
@@ -267,7 +357,7 @@ function SortableTile({
               className="px-2 py-0.5 text-[10px]"
             >
               <ArrowPathIcon className="mr-1 h-3 w-3" />
-              Tekrar dene
+              {t("product.imageUpload.retry")}
             </Button>
           )}
         </div>
@@ -277,8 +367,8 @@ function SortableTile({
         variant="ghost"
         size="xs"
         onClick={() => onRemove(item.clientId)}
-        aria-label={`Görsel ${index + 1} kaldır`}
-        className="absolute right-1.5 top-1.5 rounded-full bg-surface-elevated/90 text-muted shadow-sm ring-1 ring-border backdrop-blur-sm hover:bg-danger-500 hover:text-inverted opacity-0 transition-opacity focus-visible:opacity-100 group-hover:opacity-100"
+        aria-label={t("product.imageUpload.removeImage", label)}
+        className={`absolute right-1.5 top-1.5 rounded-full bg-surface-elevated/90 text-muted shadow-sm ring-1 ring-border backdrop-blur-sm hover:bg-danger-500 hover:text-inverted ${revealOnHover}`}
       >
         <XMarkIcon className="h-4 w-4" />
       </IconButton>

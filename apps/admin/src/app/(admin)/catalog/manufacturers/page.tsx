@@ -5,13 +5,14 @@
 import { useCallback, useMemo, useState } from "react";
 import { useTranslations } from "next-intl";
 import { Button } from "@tarodan/ui";
-import { PlusIcon } from "@heroicons/react/24/outline";
+import { ArrowUpTrayIcon, PlusIcon } from "@heroicons/react/24/outline";
 import { adminApi } from "@/lib/api";
 import { AdminPage } from "@/components/page/AdminPage";
 import { PageHeader } from "@/components/AdminList";
 import { ResourceList } from "@/components/list";
 import { useConfirm } from "@/provider/ConfirmProvider";
 import { useAdminMutation } from "@/hooks/useAdminMutation";
+import { CatalogImportModal } from "@/components/catalog/CatalogImportModal";
 import type { Manufacturer } from "./_lib/types";
 import { manufacturerColumns } from "./_lib/columns";
 import { ManufacturerFormModal } from "./_modals/ManufacturerFormModal";
@@ -22,6 +23,7 @@ export default function ManufacturersPage() {
   const [modal, setModal] = useState<{ manufacturer?: Manufacturer } | null>(
     null,
   );
+  const [importOpen, setImportOpen] = useState(false);
 
   const del = useAdminMutation(
     (id: string) => adminApi.deleteManufacturer(id),
@@ -73,6 +75,13 @@ export default function ManufacturersPage() {
         description={t("admin.catalog.manufacturers.subtitle")}
       >
         <Button
+          variant="outline"
+          leftIcon={<ArrowUpTrayIcon className="h-5 w-5" />}
+          onClick={() => setImportOpen(true)}
+        >
+          {t("admin.catalog.import.button")}
+        </Button>
+        <Button
           variant="primary"
           leftIcon={<PlusIcon className="h-5 w-5" />}
           onClick={() => setModal({})}
@@ -87,15 +96,21 @@ export default function ManufacturersPage() {
         getRowId={(m) => m.id}
         syncUrl
       >
-        <ResourceList.Toolbar>
-          <ResourceList.Search />
-        </ResourceList.Toolbar>
+        <ResourceList.Toolbar />
         <ResourceList.Table
           columns={columns}
           emptyText={t("admin.catalog.manufacturers.empty")}
         />
         <ResourceList.Pagination />
       </ResourceList>
+
+      {importOpen && (
+        <CatalogImportModal
+          resource="manufacturers"
+          open
+          onClose={() => setImportOpen(false)}
+        />
+      )}
 
       {modal && (
         <ManufacturerFormModal

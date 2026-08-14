@@ -3,7 +3,7 @@
 import { useTranslations } from "next-intl";
 import { adminApi } from "@/lib/api";
 import { ResourceList } from "@/components/list";
-import { statusOptions } from "../_shared";
+import { orderShipmentFilterFields } from "../_lib/filters";
 import { OrderShipmentsTable } from "./OrderShipmentsTable";
 import type { OrderShipmentRow } from "../_lib/types";
 
@@ -15,16 +15,9 @@ export function OrderShipmentsTab() {
       fetcher={(p) => adminApi.getShipments(p)}
       getRowId={(r) => r.id}
       syncUrl
-      initialFilters={{ status: "all" }}
+      filters={orderShipmentFilterFields(t)}
     >
-      <ResourceList.Toolbar>
-        <ResourceList.Search />
-        <ResourceList.FilterSelect
-          name="status"
-          options={statusOptions(t)}
-          className="sm:w-56"
-        />
-      </ResourceList.Toolbar>
+      <ResourceList.Toolbar />
       <OrderShipmentsTable />
       <ResourceList.Pagination />
     </ResourceList>
