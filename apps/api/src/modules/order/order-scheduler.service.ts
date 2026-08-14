@@ -17,6 +17,7 @@ import { NotificationService } from "../notification/notification.service";
 import { NotificationType } from "../notification/dto";
 import { CacheService } from "../cache/cache.service";
 import { adminUrl } from "../../config/app-urls";
+import type { CronRunSummary } from "../../monitoring/cron-run.helper";
 
 const OPEN_REFUND_STATUSES = [
   "pending_review",
@@ -145,7 +146,9 @@ export class OrderSchedulerService implements OnModuleInit {
    * Feature flag korumalı: FEATURE_48H_CONFIRMATION_WINDOW=true gerekli.
    * Gerçek iş — Bull processor 'order-auto-complete' buradan çağırır.
    */
-  async runAutoCompleteConfirmedOrders(log: (msg: string) => void = () => {}) {
+  async runAutoCompleteConfirmedOrders(
+    log: (msg: string) => void = () => {},
+  ): Promise<CronRunSummary> {
     if (
       this.configService.get<string>("FEATURE_48H_CONFIRMATION_WINDOW") !==
       "true"
@@ -328,7 +331,9 @@ export class OrderSchedulerService implements OnModuleInit {
     };
   }
 
-  async runProcessDeliveredOrders(log: (msg: string) => void = () => {}) {
+  async runProcessDeliveredOrders(
+    log: (msg: string) => void = () => {},
+  ): Promise<CronRunSummary> {
     // 1) Faturası kesilmemiş teslim EDİLMİŞ veya TAMAMLANMIŞ siparişler → teslim faturalarını kes.
     // NOT: deliveredAt bazı teslim yollarında NULL kalabiliyor + sipariş hızla `completed`'e
     // geçebiliyor → deliveredAt şartı VE sadece-delivered filtresi bu siparişleri kaçırıyordu.

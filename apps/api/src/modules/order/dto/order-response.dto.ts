@@ -53,8 +53,13 @@ export class OrderProductDto {
   @ApiProperty({ example: "Vintage Star Wars Figure" })
   title: string;
 
-  @ApiPropertyOptional({ example: "https://storage.example.com/image.jpg" })
-  imageUrl?: string;
+  // A product need not have an image, and the query returns null rather than
+  // omitting the field — so that is what this contract carries.
+  @ApiPropertyOptional({
+    example: "https://storage.example.com/image.jpg",
+    nullable: true,
+  })
+  imageUrl?: string | null;
 
   @ApiProperty({ example: "active" })
   status: string;

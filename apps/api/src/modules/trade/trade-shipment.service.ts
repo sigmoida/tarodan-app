@@ -295,6 +295,11 @@ export class TradeShipmentService {
             },
           });
 
+          // tradeNumber zaten "TKS-..." önekini taşır; ikinci bir önek eklenmez.
+          const ozelKargoTakipNo = `${trade.tradeNumber}-WH-${side.suffix}`
+            .replace(/[^a-zA-Z0-9-]/g, "")
+            .slice(0, 50);
+
           if (row) {
             // Eski/yarım kalmış satır adres içermiyorsa şimdi doldur.
             if (!row.fromAddressId) {
@@ -303,11 +308,17 @@ export class TradeShipmentService {
                 data: { fromAddressId: side.address.id },
               });
             }
+            // Aynı onarım takip numarası için de gerekir: kolon nullable, ve
+            // numarası olmayan bir satır Sürat'a referanssız gönderiliyordu.
+            // Kod deterministik olduğu için backfill create yoluyla birebir aynı
+            // değeri üretir (idempotent).
+            if (!row.trackingNumber) {
+              row = await tx.tradeShipment.update({
+                where: { id: row.id },
+                data: { trackingNumber: ozelKargoTakipNo },
+              });
+            }
           } else {
-            // tradeNumber zaten "TKS-..." önekini taşır; ikinci bir önek eklenmez.
-            const ozelKargoTakipNo = `${trade.tradeNumber}-WH-${side.suffix}`
-              .replace(/[^a-zA-Z0-9-]/g, "")
-              .slice(0, 50);
             row = await tx.tradeShipment.create({
               data: {
                 tradeId: trade.id,
@@ -323,16 +334,20 @@ export class TradeShipmentService {
             });
           }
 
+          // A row that already carried a number keeps it — an older row may
+          // predate the current naming — and one repaired above dispatches the
+          // value just persisted for it.
+          const trackingNumber = row.trackingNumber ?? ozelKargoTakipNo;
           const payload = this.buildSuratPayloadForInboundLeg(
             side.user,
             side.address,
-            row.trackingNumber,
+            trackingNumber,
             trade.tradeNumber,
           );
 
           dispatched.push({
             shipmentId: row.id,
-            ozelKargoTakipNo: row.trackingNumber,
+            ozelKargoTakipNo: trackingNumber,
             payload,
           });
         }

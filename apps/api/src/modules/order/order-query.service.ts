@@ -819,7 +819,11 @@ export class OrderQueryService {
           );
         }),
       )
-    ).filter(Boolean);
+    )
+      // A predicate rather than `filter(Boolean)`: both drop the same rows at
+      // runtime, but only this one tells the compiler they are gone, so callers
+      // are not left re-checking every field of a row that cannot be null.
+      .filter((row): row is NonNullable<typeof row> => row !== null);
 
     return {
       data,

@@ -117,6 +117,9 @@ describe("TradeQuoteService.quoteForTrade", () => {
     const { service } = makeService();
 
     const quote = await service.quoteForTrade("trade-1");
+    // v2 fixture: a null here means the service stopped quoting v2 trades,
+    // which the assertions below would otherwise report as a null-dereference.
+    if (!quote) throw new Error("quoteForTrade returned null for a v2 trade");
 
     expect(quote).toMatchObject({
       commissionRuleSet: { id: "set-1", version: 1 },
@@ -147,6 +150,9 @@ describe("TradeQuoteService.quoteForTrade", () => {
     );
 
     const quote = await service.quoteForTrade("trade-1");
+    // v2 fixture: a null here means the service stopped quoting v2 trades,
+    // which the assertions below would otherwise report as a null-dereference.
+    if (!quote) throw new Error("quoteForTrade returned null for a v2 trade");
 
     expect(quote.receiver.cashDifference).toBe(200);
     expect(quote.receiver.total).toBe(295);
@@ -205,6 +211,9 @@ describe("TradeQuoteService.quoteForTrade", () => {
     );
 
     const quote = await service.quoteForTrade("trade-1");
+    // v2 fixture: a null here means the service stopped quoting v2 trades,
+    // which the assertions below would otherwise report as a null-dereference.
+    if (!quote) throw new Error("quoteForTrade returned null for a v2 trade");
 
     expect(quote.initiator.shipping).toBe(100); // 6 desi → orta (50) × 2
     expect(quote.receiver.shipping).toBe(60); // 1 desi → küçük (30) × 2
