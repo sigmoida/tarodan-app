@@ -192,6 +192,16 @@ function buildPushStages(context, apps) {
         "@tarodan/api...",
         "build",
       ]),
+      // Ayrı bir tsconfig, ayrı bir çıktı ağacı: `nest build` bunu KAPSAMAZ.
+      // Üretim boot'u derlenmiş seed'leri sabit yollardan çağırdığı için
+      // (seed:prod, bootstrap:prod:admin, …) buradaki bir kayma konteyneri
+      // MODULE_NOT_FOUND ile crash-loop'a sokar — ve bunu ancak deploy'da
+      // görürüz. Birkaç saniyelik derleme, o turu buraya çeker.
+      commandStage("api-seed-build", "API Seed Build", [
+        "--filter",
+        "@tarodan/api...",
+        "build:seed",
+      ]),
     );
   }
 
