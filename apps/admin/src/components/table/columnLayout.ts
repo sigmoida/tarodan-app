@@ -7,6 +7,14 @@ const ALIGN_CLASS: Record<CellAlign, string> = {
   center: "text-center",
 };
 
+/**
+ * Width (px) of the selectable/checkbox column. `DataTable` also applies
+ * this to the `<colgroup>`'s `<col>` for that column; its `<TableHead>`
+ * uses the equivalent Tailwind class (`w-11` = 44px) since a static
+ * utility class can't read a JS constant — keep the two in sync by hand.
+ */
+export const SELECTABLE_COLUMN_WIDTH = 44;
+
 export interface ColumnLayout<T> {
   /**
    * Sizing is opt-in: true when columns come from the `col.*` factory (carry
@@ -49,7 +57,7 @@ export function computeColumnLayout<T>(
   const FLEX_SLACK = 1.2;
   const flexMin = (c: ColumnDef<T, any>) => colMin(c) * FLEX_SLACK;
   const fixedWidth =
-    (selectable ? 44 : 0) +
+    (selectable ? SELECTABLE_COLUMN_WIDTH : 0) +
     columns.reduce((sum, c) => sum + (c.meta?.fixed ? colMin(c) : 0), 0);
   const flexibleWidth = columns.reduce(
     (sum, c) => sum + (c.meta?.fixed ? 0 : flexMin(c)),

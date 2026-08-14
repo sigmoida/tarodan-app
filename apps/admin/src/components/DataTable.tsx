@@ -28,7 +28,10 @@ import {
 } from "@tarodan/ui";
 import { type SetSort, type SortState } from "@/components/table/meta";
 import { SortableHeader } from "@/components/table/SortableHeader";
-import { computeColumnLayout } from "@/components/table/columnLayout";
+import {
+  computeColumnLayout,
+  SELECTABLE_COLUMN_WIDTH,
+} from "@/components/table/columnLayout";
 import { ResourceListContext } from "@/context/ResourceListContext";
 
 export type { ColumnDef };
@@ -141,7 +144,9 @@ export function DataTable<T>({
         >
           {hasSizing && (
             <colgroup>
-              {selectable && <col style={{ width: "44px" }} />}
+              {selectable && (
+                <col style={{ width: `${SELECTABLE_COLUMN_WIDTH}px` }} />
+              )}
               {columns.map((c, i) => (
                 <col key={c.id ?? i} style={{ width: widthOf(c) }} />
               ))}
@@ -150,8 +155,10 @@ export function DataTable<T>({
           <TableHeader>
             {table.getHeaderGroups().map((hg) => (
               <TableRow key={hg.id}>
+                {/* w-11 = 44px, matching SELECTABLE_COLUMN_WIDTH — see
+                    columnLayout.ts for why this can't be the same constant. */}
                 {selectable && (
-                  <TableHead className="w-10">
+                  <TableHead className="w-11">
                     <Checkbox
                       checked={!!allSelected}
                       onChange={() => onToggleAll?.(rowIds)}
