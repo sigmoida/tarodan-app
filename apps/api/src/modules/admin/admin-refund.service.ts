@@ -21,6 +21,7 @@ import { RefundService } from "../refund/refund.service";
 import { ApproveRefundRequestDto, RefundRequestQueryDto } from "./dto";
 import { paginate, resolveOrderBy } from "../../common/list";
 import { primaryCashPayment } from "../trade/trade.constants";
+import { i18nMessage } from "../i18n";
 
 /**
  * İade talepleri admin operasyonları (liste/detay, force-finalize) +
@@ -192,7 +193,7 @@ export class AdminRefundService {
         },
       },
     });
-    if (!rr) throw new NotFoundException("İade talebi bulunamadı");
+    if (!rr) throw new NotFoundException(i18nMessage("server.refund.notFound"));
     const product = (rr as any)?.order?.product;
     if (product) {
       product.images = (product.images ?? [])
@@ -217,7 +218,8 @@ export class AdminRefundService {
         financialReviewRequired: true,
       },
     });
-    if (!before) throw new NotFoundException("İade talebi bulunamadı");
+    if (!before)
+      throw new NotFoundException(i18nMessage("server.refund.notFound"));
     const decisionFields = [
       dto.resolvedReason,
       dto.faultParty,
@@ -229,7 +231,7 @@ export class AdminRefundService {
     );
     if (hasAnyDecisionField && !hasCompleteDecision) {
       throw new BadRequestException(
-        "resolvedReason, faultParty ve calculationToken birlikte gönderilmelidir",
+        i18nMessage("server.admin.refund.decisionFieldsTogether"),
       );
     }
     if (
@@ -238,7 +240,7 @@ export class AdminRefundService {
       !hasCompleteDecision
     ) {
       throw new BadRequestException(
-        "V2 iade onayı için önce karar önizlemesi alınmalıdır",
+        i18nMessage("server.admin.refund.previewRequired"),
       );
     }
     if (
@@ -247,12 +249,12 @@ export class AdminRefundService {
       !hasCompleteDecision
     ) {
       throw new BadRequestException(
-        "Bu kayıt mevcut finansal yan etkiler nedeniyle karantinadadır; otomatik onaylanamaz",
+        i18nMessage("server.admin.refund.quarantined"),
       );
     }
     if (before.financialReviewRequired && !dto.note?.trim()) {
       throw new BadRequestException(
-        "Finansal inceleme kaydı için PayTR, satıcı düzeltmesi ve fatura mutabakat notu zorunludur",
+        i18nMessage("server.admin.refund.reviewNotesRequired"),
       );
     }
     const result = await this.refundService.adminApproveRefundRequest(
@@ -304,7 +306,8 @@ export class AdminRefundService {
       where: { id: refundRequestId },
       select: { status: true, policyCode: true },
     });
-    if (!before) throw new NotFoundException("İade talebi bulunamadı");
+    if (!before)
+      throw new NotFoundException(i18nMessage("server.refund.notFound"));
     const result = await this.refundService.adminRejectRefundRequest(
       refundRequestId,
       adminId,
@@ -331,14 +334,18 @@ export class AdminRefundService {
       where: { id: refundRequestId },
       select: { id: true, status: true, refundedAt: true },
     });
-    if (!rr) throw new NotFoundException("İade talebi bulunamadı");
+    if (!rr) throw new NotFoundException(i18nMessage("server.refund.notFound"));
     if (rr.refundedAt) {
-      throw new BadRequestException("Bu iade zaten tamamlanmış");
+      throw new BadRequestException(
+        i18nMessage("server.admin.refund.alreadyCompleted"),
+      );
     }
     // O3: disputed da finalize edilebilir — admin itirazı alıcı lehine kapatır.
     if (rr.status !== "return_delivered" && rr.status !== "disputed") {
       throw new BadRequestException(
-        `Talep durumu '${rr.status}' force-finalize için uygun değil. Beklenen: return_delivered veya disputed`,
+        i18nMessage("server.admin.refund.forceFinalizeStateInvalid", {
+          status: rr.status,
+        }),
       );
     }
     const result = await this.refundService.finalizeRefundForReturnedShipment(
@@ -438,13 +445,17 @@ export class AdminRefundService {
       },
     });
     if (!trade) {
-      throw new NotFoundException("Takas bulunamadı");
+      throw new NotFoundException(i18nMessage("server.trade.notFound"));
     }
     if (!trade.compensationPendingUserId) {
-      throw new BadRequestException("Bu takasta açık tazminat işareti yok");
+      throw new BadRequestException(
+        i18nMessage("server.admin.trade.noOpenCompensation"),
+      );
     }
     if (trade.compensationResolvedAt) {
-      throw new BadRequestException("Tazminat zaten kapatılmış");
+      throw new BadRequestException(
+        i18nMessage("server.admin.trade.compensationClosed"),
+      );
     }
 
     // O13: Gerçek tazminat ödemesi bu akışın DIŞINDA (manuel) yapılır; bu metot yalnız
@@ -452,7 +463,7 @@ export class AdminRefundService {
     // — audit izine yazılır.
     if (!note || !note.trim()) {
       throw new BadRequestException(
-        "Tazminat kapatma için açıklama/dekont (note) zorunludur",
+        i18nMessage("server.admin.trade.compensationNoteRequired"),
       );
     }
 
@@ -494,7 +505,7 @@ export class AdminRefundService {
       },
     });
     if (!trade) {
-      throw new NotFoundException("Takas bulunamadı");
+      throw new NotFoundException(i18nMessage("server.trade.notFound"));
     }
 
     // v2'de taraf başına satır var; HERHANGİ biri tahsil edilmişse iade denenebilir.
@@ -505,7 +516,7 @@ export class AdminRefundService {
     );
     if (completedPayments.length === 0) {
       throw new BadRequestException(
-        "İade edilebilecek tamamlanmış bir nakit ödeme yok",
+        i18nMessage("server.admin.trade.noRefundableCashPayment"),
       );
     }
     // Bildirim hedefi: fark taşıyan satırın sahibi (v1 davranışıyla aynı), o
@@ -525,13 +536,15 @@ export class AdminRefundService {
     ];
     if (!eligibleStatuses.includes(trade.status)) {
       throw new BadRequestException(
-        `Takas durumu '${trade.status}' iade yeniden denemesi için uygun değil`,
+        i18nMessage("server.admin.trade.refundRetryStateInvalid", {
+          status: trade.status,
+        }),
       );
     }
 
     if (!trade.refundFailureReason) {
       throw new BadRequestException(
-        "Bu takasta kayıtlı bir iade hatası yok; yeniden deneme gerekmiyor",
+        i18nMessage("server.admin.trade.noRefundFailure"),
       );
     }
 

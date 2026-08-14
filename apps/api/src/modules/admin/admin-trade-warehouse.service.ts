@@ -24,6 +24,7 @@ import { TRADE_VALID_TRANSITIONS } from "../trade/trade.state-machine";
 import { canTransitionShipmentStatus } from "../shipping/shipment-state-machine";
 import { REFERENCE_PREFIX } from "../../common/helpers/code-prefixes";
 import { generateReferenceCode } from "../../common/helpers/generate-reference";
+import { i18nMessage } from "../i18n";
 
 /**
  * Safe-trade (depo escrow) admin akışının depo-tarafı: depo teslim alma
@@ -114,7 +115,9 @@ export class AdminTradeWarehouseService {
       const r = result as any;
       const errMsg = r.kind === "business" ? r.message : `technical: ${r.code}`;
       throw new BadRequestException(
-        `Sürat iade kargo siparişi reddedildi: ${errMsg}`,
+        i18nMessage("server.admin.trade.suratReturnRejected", {
+          reason: errMsg,
+        }),
       );
     }
     return {
@@ -168,7 +171,9 @@ export class AdminTradeWarehouseService {
       const r = result as any;
       const errMsg = r.kind === "business" ? r.message : `technical: ${r.code}`;
       throw new BadRequestException(
-        `Sürat kargo onay siparişi reddedildi: ${errMsg}`,
+        i18nMessage("server.admin.trade.suratApprovalRejected", {
+          reason: errMsg,
+        }),
       );
     }
     return {
@@ -406,23 +411,25 @@ export class AdminTradeWarehouseService {
           },
         });
         if (!trade) {
-          throw new NotFoundException("Takas bulunamadı");
+          throw new NotFoundException(i18nMessage("server.trade.notFound"));
         }
 
         const shipment = await tx.tradeShipment.findUnique({
           where: { id: shipmentId },
         });
         if (!shipment || shipment.tradeId !== tradeId) {
-          throw new NotFoundException("Gönderim bulunamadı");
+          throw new NotFoundException(
+            i18nMessage("server.admin.trade.shipmentNotFound"),
+          );
         }
         if (shipment.leg !== "to_warehouse") {
           throw new BadRequestException(
-            "Bu gönderim depoya gelen bir gönderim değil",
+            i18nMessage("server.admin.trade.notInboundShipment"),
           );
         }
         if (shipment.deliveredAt) {
           throw new BadRequestException(
-            "Bu gönderim zaten teslim alındı olarak işaretlenmiş",
+            i18nMessage("server.admin.trade.alreadyReceived"),
           );
         }
         // Durum makinesi guard'ı (çıkış bacağındaki #86 ile aynı kural): iptal
@@ -446,7 +453,9 @@ export class AdminTradeWarehouseService {
           )
         ) {
           throw new BadRequestException(
-            `Gönderim durumu '${shipment.status}' — teslim alındı olarak işaretlenemez`,
+            i18nMessage("server.admin.trade.receiveStateInvalid", {
+              status: shipment.status,
+            }),
           );
         }
 
@@ -592,11 +601,13 @@ export class AdminTradeWarehouseService {
         select: { id: true, status: true },
       });
       if (!trade) {
-        throw new NotFoundException("Takas bulunamadı");
+        throw new NotFoundException(i18nMessage("server.trade.notFound"));
       }
       if (trade.status !== TradeStatus.shipping_to_recipients) {
         throw new BadRequestException(
-          `Takas durumu '${trade.status}' — yalnız 'shipping_to_recipients' takasta çıkış kolisi teslim işaretlenebilir`,
+          i18nMessage("server.admin.trade.outboundDeliverStateInvalid", {
+            status: trade.status,
+          }),
         );
       }
 
@@ -604,11 +615,13 @@ export class AdminTradeWarehouseService {
         where: { id: shipmentId },
       });
       if (!shipment || shipment.tradeId !== tradeId) {
-        throw new NotFoundException("Gönderim bulunamadı");
+        throw new NotFoundException(
+          i18nMessage("server.admin.trade.shipmentNotFound"),
+        );
       }
       if (shipment.leg !== "from_warehouse") {
         throw new BadRequestException(
-          "Bu gönderim depodan çıkan bir gönderim değil",
+          i18nMessage("server.admin.trade.notOutboundShipment"),
         );
       }
 
@@ -625,7 +638,9 @@ export class AdminTradeWarehouseService {
           )
         ) {
           throw new BadRequestException(
-            `Gönderim durumu '${shipment.status}' — teslim edildi olarak işaretlenemez`,
+            i18nMessage("server.admin.trade.deliverStateInvalid", {
+              status: shipment.status,
+            }),
           );
         }
         updatedShipment = await tx.tradeShipment.update({
@@ -707,14 +722,16 @@ export class AdminTradeWarehouseService {
         select: { id: true, status: true },
       });
       if (!trade) {
-        throw new NotFoundException("Takas bulunamadı");
+        throw new NotFoundException(i18nMessage("server.trade.notFound"));
       }
       if (trade.status === TradeStatus.admin_reviewing) {
         return { success: true, tradeId, status: trade.status, already: true };
       }
       if (trade.status !== TradeStatus.at_warehouse) {
         throw new BadRequestException(
-          `Takas durumu '${trade.status}' — kontrole yalnız 'at_warehouse' takas alınabilir`,
+          i18nMessage("server.admin.trade.reviewStateInvalid", {
+            status: trade.status,
+          }),
         );
       }
 
@@ -761,7 +778,7 @@ export class AdminTradeWarehouseService {
       },
     });
     if (!already) {
-      throw new NotFoundException("Takas bulunamadı");
+      throw new NotFoundException(i18nMessage("server.trade.notFound"));
     }
     if (
       already.status === TradeStatus.shipping_to_recipients &&
@@ -803,7 +820,7 @@ export class AdminTradeWarehouseService {
         },
       });
       if (!trade) {
-        throw new NotFoundException("Takas bulunamadı");
+        throw new NotFoundException(i18nMessage("server.trade.notFound"));
       }
 
       if (
@@ -811,7 +828,9 @@ export class AdminTradeWarehouseService {
         trade.status !== TradeStatus.admin_reviewing
       ) {
         throw new BadRequestException(
-          `Takas durumu '${trade.status}' onay için uygun değil. Beklenen: at_warehouse veya admin_reviewing.`,
+          i18nMessage("server.admin.trade.approveStateInvalid", {
+            status: trade.status,
+          }),
         );
       }
 
@@ -830,12 +849,12 @@ export class AdminTradeWarehouseService {
 
       if (!initiatorAddress) {
         throw new BadRequestException(
-          "Takası başlatan kullanıcının kayıtlı adresi yok",
+          i18nMessage("server.admin.trade.initiatorAddressMissing"),
         );
       }
       if (!receiverAddress) {
         throw new BadRequestException(
-          "Takası alan kullanıcının kayıtlı adresi yok",
+          i18nMessage("server.admin.trade.receiverAddressMissing"),
         );
       }
 
@@ -1014,7 +1033,7 @@ export class AdminTradeWarehouseService {
       },
     });
     if (!existing) {
-      throw new NotFoundException("Takas bulunamadı");
+      throw new NotFoundException(i18nMessage("server.trade.notFound"));
     }
     if (
       existing.status === TradeStatus.returning &&
@@ -1061,7 +1080,7 @@ export class AdminTradeWarehouseService {
         },
       });
       if (!trade) {
-        throw new NotFoundException("Takas bulunamadı");
+        throw new NotFoundException(i18nMessage("server.trade.notFound"));
       }
 
       if (
@@ -1069,7 +1088,9 @@ export class AdminTradeWarehouseService {
         trade.status !== TradeStatus.admin_reviewing
       ) {
         throw new BadRequestException(
-          `Takas durumu '${trade.status}' reddetme için uygun değil. Beklenen: at_warehouse veya admin_reviewing.`,
+          i18nMessage("server.admin.trade.rejectStateInvalid", {
+            status: trade.status,
+          }),
         );
       }
 
@@ -1087,12 +1108,12 @@ export class AdminTradeWarehouseService {
       ]);
       if (!initiatorAddress) {
         throw new BadRequestException(
-          "Takası başlatan kullanıcının kayıtlı adresi yok",
+          i18nMessage("server.admin.trade.initiatorAddressMissing"),
         );
       }
       if (!receiverAddress) {
         throw new BadRequestException(
-          "Takası alan kullanıcının kayıtlı adresi yok",
+          i18nMessage("server.admin.trade.receiverAddressMissing"),
         );
       }
 

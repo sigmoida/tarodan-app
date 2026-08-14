@@ -94,7 +94,7 @@ export class AdminAnalyticsOrderService {
     });
 
     if (!order) {
-      throw new NotFoundException("Sipariş bulunamadı");
+      throw new NotFoundException(i18nMessage("server.order.notFound"));
     }
 
     const totalAmount = Number(order.totalAmount);
@@ -201,7 +201,7 @@ export class AdminAnalyticsOrderService {
       select: { id: true, checkoutGroupId: true },
     });
     if (!anchor) {
-      throw new NotFoundException("Sipariş bulunamadı");
+      throw new NotFoundException(i18nMessage("server.order.notFound"));
     }
 
     const orderInclude = {
@@ -679,7 +679,7 @@ export class AdminAnalyticsOrderService {
     });
 
     if (!order) {
-      throw new NotFoundException("Sipariş bulunamadı");
+      throw new NotFoundException(i18nMessage("server.order.notFound"));
     }
 
     const newStatus = dto.status;
@@ -721,7 +721,8 @@ export class AdminAnalyticsOrderService {
         where: { id: orderId },
         include: { shipment: true },
       });
-      if (!fresh) throw new NotFoundException("Sipariş bulunamadı");
+      if (!fresh)
+        throw new NotFoundException(i18nMessage("server.order.notFound"));
       if (!isAdminOrderTransitionAllowed(fresh.status, newStatus)) {
         throw new BadRequestException(
           i18nMessage("server.order.statusTransitionNotAllowed", {
@@ -746,7 +747,7 @@ export class AdminAnalyticsOrderService {
 
       if (!fresh.shipment) {
         throw new BadRequestException(
-          "Teslim geçişi için siparişe bağlı kargo kaydı bulunamadı",
+          i18nMessage("server.admin.order.shipmentMissingForDelivery"),
         );
       }
       if (
@@ -756,7 +757,9 @@ export class AdminAnalyticsOrderService {
         )
       ) {
         throw new BadRequestException(
-          `Kargo ${fresh.shipment.status} durumundan teslim edildi durumuna geçirilemez`,
+          i18nMessage("server.admin.order.shipmentToDeliveredForbidden", {
+            status: fresh.shipment.status,
+          }),
         );
       }
       if (!this.paymentService) {
@@ -778,7 +781,7 @@ export class AdminAnalyticsOrderService {
       });
       if (shipmentUpdated.count !== 1) {
         throw new BadRequestException(
-          "Kargo durumu az önce değişti; sayfayı yenileyip tekrar deneyin",
+          i18nMessage("server.admin.order.shipmentStatusChanged"),
         );
       }
       if (fresh.shipment.status !== ShipmentStatus.delivered) {
@@ -800,7 +803,7 @@ export class AdminAnalyticsOrderService {
       );
       if (!deliveryResult.acted) {
         throw new BadRequestException(
-          "Sipariş teslim durumu eşzamanlı olarak değişti",
+          i18nMessage("server.admin.order.deliveryRaceLost"),
         );
       }
       return {
@@ -889,7 +892,7 @@ export class AdminAnalyticsOrderService {
     });
 
     if (!order) {
-      throw new NotFoundException("Sipariş bulunamadı");
+      throw new NotFoundException(i18nMessage("server.order.notFound"));
     }
 
     if (order.status !== OrderStatus.preparing) {
@@ -913,10 +916,11 @@ export class AdminAnalyticsOrderService {
         where: { id: orderId },
         include: { shipment: true },
       });
-      if (!fresh) throw new NotFoundException("Sipariş bulunamadı");
+      if (!fresh)
+        throw new NotFoundException(i18nMessage("server.order.notFound"));
       if (fresh.status !== OrderStatus.preparing) {
         throw new BadRequestException(
-          "Sipariş durumu az önce değişti; sayfayı yenileyip tekrar deneyin",
+          i18nMessage("server.admin.order.statusChanged"),
         );
       }
 
@@ -929,7 +933,9 @@ export class AdminAnalyticsOrderService {
           )
         ) {
           throw new BadRequestException(
-            `Kargo ${fresh.shipment.status} durumundan yolda durumuna geçirilemez`,
+            i18nMessage("server.admin.order.shipmentToInTransitForbidden", {
+              status: fresh.shipment.status,
+            }),
           );
         }
         const changed = await tx.shipment.updateMany({
@@ -948,7 +954,7 @@ export class AdminAnalyticsOrderService {
         });
         if (changed.count !== 1) {
           throw new BadRequestException(
-            "Kargo durumu az önce değişti; sayfayı yenileyip tekrar deneyin",
+            i18nMessage("server.admin.order.shipmentStatusChanged"),
           );
         }
         updatedShipment = await tx.shipment.findUniqueOrThrow({
@@ -1034,7 +1040,7 @@ export class AdminAnalyticsOrderService {
     });
 
     if (!order) {
-      throw new NotFoundException("Sipariş bulunamadı");
+      throw new NotFoundException(i18nMessage("server.order.notFound"));
     }
 
     const statusLabels: Record<string, string> = {
@@ -1116,7 +1122,7 @@ export class AdminAnalyticsOrderService {
     });
 
     if (!order) {
-      throw new NotFoundException("Sipariş bulunamadı");
+      throw new NotFoundException(i18nMessage("server.order.notFound"));
     }
 
     const shippingAddress = order.shippingAddress as any;
@@ -1177,11 +1183,11 @@ export class AdminAnalyticsOrderService {
     });
 
     if (!user) {
-      throw new NotFoundException("Kullanıcı bulunamadı");
+      throw new NotFoundException(i18nMessage("server.auth.userNotFound"));
     }
 
     if (!(user as any).isBanned) {
-      throw new BadRequestException("Kullanıcı zaten banlı değil");
+      throw new BadRequestException(i18nMessage("server.admin.user.notBanned"));
     }
 
     const result = await this.prisma.$transaction(async (tx) => {

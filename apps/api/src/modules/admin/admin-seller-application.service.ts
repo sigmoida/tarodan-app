@@ -26,6 +26,7 @@ import {
   frontendUrl as resolveFrontendUrl,
   CANONICAL_FRONTEND_URL,
 } from "../../config/app-urls";
+import { i18nMessage } from "../i18n";
 
 /**
  * Satıcı başvurusu admin operasyonları — AdminService'in SELLER APPLICATIONS
@@ -71,7 +72,9 @@ export class AdminSellerApplicationService {
       },
     });
     if (!application) {
-      throw new NotFoundException("Başvuru bulunamadı");
+      throw new NotFoundException(
+        i18nMessage("server.admin.sellerApplication.notFound"),
+      );
     }
 
     const documents = await Promise.all(
@@ -170,9 +173,14 @@ export class AdminSellerApplicationService {
     const application = await this.prisma.corporateApplication.findUnique({
       where: { id: applicationId },
     });
-    if (!application) throw new NotFoundException("Başvuru bulunamadı");
+    if (!application)
+      throw new NotFoundException(
+        i18nMessage("server.admin.sellerApplication.notFound"),
+      );
     if (application.status !== "submitted")
-      throw new BadRequestException("Bu başvuru zaten onaylanmış");
+      throw new BadRequestException(
+        i18nMessage("server.admin.sellerApplication.alreadyApproved"),
+      );
 
     const invitationToken = crypto.randomBytes(32).toString("hex");
     const invitationTokenHash = crypto
@@ -238,9 +246,14 @@ export class AdminSellerApplicationService {
     const application = await this.prisma.corporateApplication.findUnique({
       where: { id: applicationId },
     });
-    if (!application) throw new NotFoundException("Başvuru bulunamadı");
+    if (!application)
+      throw new NotFoundException(
+        i18nMessage("server.admin.sellerApplication.notFound"),
+      );
     if (application.status === "rejected")
-      throw new BadRequestException("Bu başvuru zaten reddedilmiş");
+      throw new BadRequestException(
+        i18nMessage("server.admin.sellerApplication.alreadyRejected"),
+      );
 
     await this.prisma.$transaction([
       this.prisma.corporateApplication.update({
@@ -319,10 +332,14 @@ export class AdminSellerApplicationService {
     note?: string,
   ) {
     if (!["approved", "rejected", "revision_requested"].includes(status)) {
-      throw new BadRequestException("Geçersiz belge kararı");
+      throw new BadRequestException(
+        i18nMessage("server.admin.sellerApplication.invalidDocumentDecision"),
+      );
     }
     if (status !== "approved" && !note?.trim()) {
-      throw new BadRequestException("Red veya revizyon açıklaması zorunludur");
+      throw new BadRequestException(
+        i18nMessage("server.admin.sellerApplication.decisionNoteRequired"),
+      );
     }
     const document = await this.prisma.sellerDocument.findFirst({
       where: {
@@ -333,7 +350,7 @@ export class AdminSellerApplicationService {
       include: { application: true },
     });
     if (!document?.application) {
-      throw new NotFoundException("Belge bulunamadı");
+      throw new NotFoundException(i18nMessage("server.user.documentNotFound"));
     }
 
     await this.prisma.$transaction([
@@ -389,11 +406,13 @@ export class AdminSellerApplicationService {
       },
     });
     if (!application?.user) {
-      throw new NotFoundException("Aktifleştirilmiş kurumsal hesap bulunamadı");
+      throw new NotFoundException(
+        i18nMessage("server.admin.sellerApplication.activatedAccountNotFound"),
+      );
     }
     if (application.status !== "under_review") {
       throw new BadRequestException(
-        "Başvuru henüz nihai incelemeye gönderilmemiş",
+        i18nMessage("server.admin.sellerApplication.notSubmittedForReview"),
       );
     }
     const unresolved = application.documents.filter(
@@ -438,7 +457,7 @@ export class AdminSellerApplicationService {
       stakeholdersWithoutApprovedIdentity.length
     ) {
       throw new BadRequestException(
-        "Tüm güncel belgeler onaylanmadan hesap aktifleştirilemez",
+        i18nMessage("server.admin.sellerApplication.documentsNotApproved"),
       );
     }
 
@@ -517,7 +536,8 @@ export class AdminSellerApplicationService {
     const rating = await this.prisma.rating.findUnique({
       where: { id: ratingId },
     });
-    if (!rating) throw new NotFoundException("Kullanıcı yorumu bulunamadı");
+    if (!rating)
+      throw new NotFoundException(i18nMessage("server.admin.review.notFound"));
     const previous = { ...rating };
     await this.prisma.rating.update({
       where: { id: ratingId },
@@ -563,7 +583,8 @@ export class AdminSellerApplicationService {
       },
     });
 
-    if (!order) throw new NotFoundException("Sipariş bulunamadı");
+    if (!order)
+      throw new NotFoundException(i18nMessage("server.order.notFound"));
 
     // Admin kupon değişikliği YALNIZ ödemesi beklenen siparişte yapılabilir (F4.6):
     // ödenmiş siparişte totalAmount + Payment zaten tahsil edildiğinden metadata'yı
@@ -571,7 +592,7 @@ export class AdminSellerApplicationService {
     // gösterilen indirim). Ödenmiş siparişte iade/ayarlama akışı kullanılmalıdır.
     if (order.status !== OrderStatus.pending_payment) {
       throw new BadRequestException(
-        "Kupon yalnızca ödemesi beklenen siparişlerde değiştirilebilir",
+        i18nMessage("server.admin.order.couponPendingPaymentOnly"),
       );
     }
 
@@ -599,19 +620,30 @@ export class AdminSellerApplicationService {
       const discount = await this.prisma.discount.findUnique({
         where: { code: code.toUpperCase() },
       });
-      if (!discount) throw new BadRequestException("Kupon kodu bulunamadı");
+      if (!discount)
+        throw new BadRequestException(
+          i18nMessage("server.admin.order.couponNotFound"),
+        );
       if (!discount.isActive)
-        throw new BadRequestException("Bu kupon aktif değil");
+        throw new BadRequestException(
+          i18nMessage("server.admin.order.couponInactive"),
+        );
       const now = new Date();
       if (now < discount.startDate)
-        throw new BadRequestException("Bu kupon henüz başlamadı");
+        throw new BadRequestException(
+          i18nMessage("server.admin.order.couponNotStarted"),
+        );
       if (now > discount.endDate)
-        throw new BadRequestException("Bu kuponun süresi doldu");
+        throw new BadRequestException(
+          i18nMessage("server.admin.order.couponExpired"),
+        );
       if (
         discount.usageLimitTotal &&
         discount.usedCount >= discount.usageLimitTotal
       ) {
-        throw new BadRequestException("Bu kupon kullanım limitine ulaştı");
+        throw new BadRequestException(
+          i18nMessage("server.discount.couponLimitReached"),
+        );
       }
 
       // Kupon payı: satır toplamına (fiyat × adet) capli — birim fiyata değil (adet
@@ -642,7 +674,7 @@ export class AdminSellerApplicationService {
     // sözleşmesi sunulması gerekir.
     if (!order.package?.shippingTariffId) {
       throw new BadRequestException(
-        "Siparişte doğrulanabilir kargo tarife snapshot'ı bulunmuyor",
+        i18nMessage("server.admin.order.tariffSnapshotMissing"),
       );
     }
     const shippingTariff = await this.prisma.shippingTariff.findUnique({
@@ -651,7 +683,7 @@ export class AdminSellerApplicationService {
     });
     if (!shippingTariff) {
       throw new BadRequestException(
-        "Siparişin kargo tarifesi artık doğrulanamıyor",
+        i18nMessage("server.admin.order.tariffUnverifiable"),
       );
     }
     const packageSubtotalAfterCoupon = order.package.orders.reduce(
@@ -690,7 +722,7 @@ export class AdminSellerApplicationService {
       ) > 0.001
     ) {
       throw new BadRequestException(
-        "Kupon kargo ücretini değiştiriyor; sipariş yeni checkout ile oluşturulmalı",
+        i18nMessage("server.admin.order.couponChangesShipping"),
       );
     }
 

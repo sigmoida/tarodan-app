@@ -52,6 +52,7 @@ import {
   PRODUCT_BULK_IMPORT_PUBLIC_LIMITS,
   PRODUCT_BULK_IMPORT_STALE_MINUTES,
 } from "./admin-product-bulk-import.constants";
+import { i18nMessage } from "../i18n";
 
 const STALE_BATCH_MESSAGE =
   "Yükleme yarıda kaldı (sunucu yeniden başlatılmış olabilir). Hiçbir ürün oluşturulmadı; dosyayı yeniden yükleyin.";
@@ -220,17 +221,23 @@ export class AdminProductBulkImportService {
   ): Promise<ProductBulkImportResponse> {
     if (!isUUID(batchId, "4")) {
       throw new BadRequestException(
-        "Toplu yükleme için geçerli bir Idempotency-Key gönderilmelidir.",
+        i18nMessage("server.admin.bulkImport.idempotencyKeyRequired"),
       );
     }
     if (!sellerId?.trim()) {
-      throw new BadRequestException("Kurumsal satıcı seçilmelidir.");
+      throw new BadRequestException(
+        i18nMessage("server.admin.bulkImport.sellerRequired"),
+      );
     }
     if (!workbookFile) {
-      throw new BadRequestException("Excel dosyası yüklenmelidir.");
+      throw new BadRequestException(
+        i18nMessage("server.admin.bulkImport.excelRequired"),
+      );
     }
     if (!imageFiles?.length) {
-      throw new BadRequestException("Ürün görselleri yüklenmelidir.");
+      throw new BadRequestException(
+        i18nMessage("server.admin.bulkImport.imagesRequired"),
+      );
     }
     if (
       workbookFile.mimetype !==
@@ -238,7 +245,7 @@ export class AdminProductBulkImportService {
       !workbookFile.originalname.toLocaleLowerCase("tr-TR").endsWith(".xlsx")
     ) {
       throw new BadRequestException(
-        "Yalnızca .xlsx Excel dosyası yüklenebilir.",
+        i18nMessage("server.admin.bulkImport.xlsxOnly"),
       );
     }
 
@@ -262,7 +269,10 @@ export class AdminProductBulkImportService {
       },
     });
 
-    if (!seller) throw new NotFoundException("Satıcı bulunamadı.");
+    if (!seller)
+      throw new NotFoundException(
+        i18nMessage("server.admin.bulkImport.sellerNotFound"),
+      );
     if (
       !seller.isSeller ||
       seller.isBanned ||
@@ -271,7 +281,7 @@ export class AdminProductBulkImportService {
       !canSellFromMembership(seller.membership, seller)
     ) {
       throw new ConflictException(
-        "Toplu ürün yükleme yalnızca satış yetkisi açık BUSINESS kurumsal satıcılar için kullanılabilir.",
+        i18nMessage("server.admin.bulkImport.businessSellersOnly"),
       );
     }
 
@@ -293,7 +303,10 @@ export class AdminProductBulkImportService {
       rows.length > limits.remainingTotalListings
     ) {
       throw new ConflictException(
-        `Satıcının yalnızca ${limits.remainingTotalListings} ilan hakkı kaldı; dosyada ${rows.length} ürün var.`,
+        i18nMessage("server.admin.bulkImport.listingQuotaExceeded", {
+          remaining: limits.remainingTotalListings,
+          rows: rows.length,
+        }),
       );
     }
     const tooManyImages = rows.find(
@@ -301,7 +314,11 @@ export class AdminProductBulkImportService {
     );
     if (tooManyImages) {
       throw new ConflictException(
-        `${tooManyImages.reference} için ${tooManyImages.imageNames.length} görsel var; satıcının ürün başına limiti ${limits.maxImages}.`,
+        i18nMessage("server.admin.bulkImport.tooManyImagesForRow", {
+          reference: tooManyImages.reference,
+          count: tooManyImages.imageNames.length,
+          max: limits.maxImages,
+        }),
       );
     }
 
@@ -353,7 +370,10 @@ export class AdminProductBulkImportService {
             const file = imageByName.get(this.normalizeFilename(imageName));
             if (!file) {
               throw new BadRequestException(
-                `${row.reference}: '${imageName}' adlı görsel yüklenmedi.`,
+                i18nMessage("server.admin.bulkImport.imageMissing", {
+                  reference: row.reference,
+                  image: imageName,
+                }),
               );
             }
             await this.moderationAi.assertImageClean(file, {
@@ -567,7 +587,10 @@ export class AdminProductBulkImportService {
     const batch = await this.prisma.productImportBatch.findFirst({
       where: { id: batchId, adminId },
     });
-    if (!batch) throw new NotFoundException("Toplu yükleme işlemi bulunamadı.");
+    if (!batch)
+      throw new NotFoundException(
+        i18nMessage("server.admin.bulkImport.batchNotFound"),
+      );
     // İşi yürüten süreç ölmüşse satır sonsuza dek `processing` kalır ve istemci
     // sonsuza dek sorgular. Okuma anında da yaşlandır: cron'u beklemeden kapanır.
     if (
@@ -654,7 +677,7 @@ export class AdminProductBulkImportService {
       });
       if (!existing) {
         throw new ConflictException(
-          "Toplu yükleme işlem kimliği başka bir işlem tarafından kullanılıyor.",
+          i18nMessage("server.admin.bulkImport.batchKeyInUse"),
         );
       }
       if (
@@ -663,7 +686,7 @@ export class AdminProductBulkImportService {
         existing.requestFingerprint !== data.requestFingerprint
       ) {
         throw new ConflictException(
-          "Aynı işlem kimliği farklı dosya veya satıcı için kullanılamaz.",
+          i18nMessage("server.admin.bulkImport.batchKeyMismatch"),
         );
       }
       return existing;
@@ -685,7 +708,7 @@ export class AdminProductBulkImportService {
         return batch.result as unknown as ProductBulkImportResult;
       }
       throw new ConflictException(
-        "Tamamlanan toplu yükleme işleminin sonucu okunamadı.",
+        i18nMessage("server.admin.bulkImport.resultUnreadable"),
       );
     }
     return {
@@ -743,19 +766,25 @@ export class AdminProductBulkImportService {
     try {
       await workbook.xlsx.load(file.buffer as unknown as ExcelJS.Buffer);
     } catch {
-      throw new BadRequestException("Excel dosyası okunamadı veya bozuk.");
+      throw new BadRequestException(
+        i18nMessage("server.admin.bulkImport.excelUnreadable"),
+      );
     }
 
     const sheet = workbook.getWorksheet(PRODUCT_SHEET);
     if (!sheet) {
       throw new BadRequestException(
-        `Excel dosyasında '${PRODUCT_SHEET}' sayfası bulunmalıdır.`,
+        i18nMessage("server.admin.bulkImport.sheetMissing", {
+          sheet: PRODUCT_SHEET,
+        }),
       );
     }
 
     if (sheet.rowCount > PRODUCT_BULK_IMPORT_LIMITS.maxRows + 1) {
       throw new BadRequestException(
-        `Urunler sayfası başlık dahil en fazla ${PRODUCT_BULK_IMPORT_LIMITS.maxRows + 1} satır içerebilir. Şablonun altına eklenen boş veya biçimlendirilmiş satırları da silin.`,
+        i18nMessage("server.admin.bulkImport.tooManySheetRows", {
+          max: PRODUCT_BULK_IMPORT_LIMITS.maxRows + 1,
+        }),
       );
     }
 
@@ -769,7 +798,10 @@ export class AdminProductBulkImportService {
           ("formula" in value || "sharedFormula" in value)
         ) {
           throw new BadRequestException(
-            `Formül içeren Excel kabul edilmez (${PRODUCT_SHEET}!${cell.address}).`,
+            i18nMessage("server.admin.bulkImport.formulaNotAllowed", {
+              sheet: PRODUCT_SHEET,
+              cell: cell.address,
+            }),
           );
         }
       });
@@ -785,7 +817,9 @@ export class AdminProductBulkImportService {
     );
     if (missingHeaders.length) {
       throw new BadRequestException(
-        `Excel sütunları eksik: ${missingHeaders.join(", ")}. Örnek dosyayı yeniden indirin.`,
+        i18nMessage("server.admin.bulkImport.headersMissing", {
+          headers: missingHeaders.join(", "),
+        }),
       );
     }
 
@@ -798,11 +832,15 @@ export class AdminProductBulkImportService {
       }
     }
     if (!dataRowNumbers.length) {
-      throw new BadRequestException("Excel dosyasında ürün satırı bulunamadı.");
+      throw new BadRequestException(
+        i18nMessage("server.admin.bulkImport.noRows"),
+      );
     }
     if (dataRowNumbers.length > PRODUCT_BULK_IMPORT_LIMITS.maxRows) {
       throw new BadRequestException(
-        `Tek yüklemede en fazla ${PRODUCT_BULK_IMPORT_LIMITS.maxRows} ürün eklenebilir.`,
+        i18nMessage("server.admin.bulkImport.maxRows", {
+          max: PRODUCT_BULK_IMPORT_LIMITS.maxRows,
+        }),
       );
     }
 
@@ -1010,10 +1048,15 @@ export class AdminProductBulkImportService {
     const map = new Map<string, Express.Multer.File>();
     for (const file of files) {
       const key = this.normalizeFilename(file.originalname);
-      if (!key) throw new BadRequestException("Geçersiz görsel dosya adı.");
+      if (!key)
+        throw new BadRequestException(
+          i18nMessage("server.admin.bulkImport.invalidImageName"),
+        );
       if (map.has(key)) {
         throw new BadRequestException(
-          `Aynı isimde birden fazla görsel yüklendi: ${file.originalname}`,
+          i18nMessage("server.admin.bulkImport.duplicateImageName", {
+            name: file.originalname,
+          }),
         );
       }
       map.set(key, file);

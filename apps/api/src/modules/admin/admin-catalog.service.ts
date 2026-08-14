@@ -31,6 +31,7 @@ import {
   assertValidCategoryParent,
   CATEGORIES_CACHE_KEY,
 } from "../category/category-integrity.helper";
+import { i18nMessage } from "../i18n";
 
 /**
  * Katalog taksonomisi admin operasyonları (kategori, marka, üretici, araç
@@ -200,7 +201,7 @@ export class AdminCatalogService {
   ) {
     if (dto.isActive === true) {
       throw new BadRequestException(
-        "Yeni kategori önce pasif oluşturulmalı, komisyon kuralları yayınlandıktan sonra aktifleştirilmelidir.",
+        i18nMessage("server.category.createInactiveFirst"),
       );
     }
     // Check if parent exists
@@ -210,7 +211,9 @@ export class AdminCatalogService {
       });
 
       if (!parent) {
-        throw new NotFoundException("Üst kategori bulunamadı");
+        throw new NotFoundException(
+          i18nMessage("server.category.parentNotFound"),
+        );
       }
     }
 
@@ -279,7 +282,9 @@ export class AdminCatalogService {
     });
 
     if (!category) {
-      throw new NotFoundException("Kategori bulunamadı");
+      throw new NotFoundException(
+        i18nMessage("server.product.categoryNotFound"),
+      );
     }
 
     const nextParentId =
@@ -372,20 +377,22 @@ export class AdminCatalogService {
     });
 
     if (!category) {
-      throw new NotFoundException("Kategori bulunamadı");
+      throw new NotFoundException(
+        i18nMessage("server.product.categoryNotFound"),
+      );
     }
 
     // Check if category has products
     if (category._count.products > 0) {
       throw new BadRequestException(
-        "Bu kategoride ürünler bulunmaktadır. Önce ürünleri başka kategoriye taşıyın.",
+        i18nMessage("server.admin.catalog.categoryHasProducts"),
       );
     }
 
     // Check if category has children
     if (category.children.length > 0) {
       throw new BadRequestException(
-        "Bu kategorinin alt kategorileri bulunmaktadır. Önce alt kategorileri silin.",
+        i18nMessage("server.admin.catalog.categoryHasChildren"),
       );
     }
 
@@ -540,7 +547,7 @@ export class AdminCatalogService {
     });
 
     if (!existing) {
-      throw new NotFoundException("Marka bulunamadı");
+      throw new NotFoundException(i18nMessage("server.brand.notFound"));
     }
 
     // If name is being changed, check for duplicates and update slug
@@ -609,7 +616,7 @@ export class AdminCatalogService {
     });
 
     if (!existing) {
-      throw new NotFoundException("Marka bulunamadı");
+      throw new NotFoundException(i18nMessage("server.brand.notFound"));
     }
 
     const { products: productCount, carModels: carModelCount } = (
@@ -617,7 +624,10 @@ export class AdminCatalogService {
     )._count;
     if (productCount > 0 || carModelCount > 0) {
       throw new ConflictException(
-        `Bu marka silinemez: ${productCount} ürün ve ${carModelCount} araç modeli ile ilişkili.`,
+        i18nMessage("server.admin.catalog.brandInUse", {
+          products: productCount,
+          models: carModelCount,
+        }),
       );
     }
 
@@ -704,7 +714,9 @@ export class AdminCatalogService {
       },
     });
     if (existing)
-      throw new BadRequestException("Bu isimde bir üretici zaten mevcut");
+      throw new BadRequestException(
+        i18nMessage("server.admin.catalog.manufacturerExists"),
+      );
 
     const manufacturer = await this.prisma.manufacturer.create({
       data: {
@@ -747,7 +759,8 @@ export class AdminCatalogService {
     const existing = await this.prisma.manufacturer.findUnique({
       where: { id },
     });
-    if (!existing) throw new NotFoundException("Üretici bulunamadı");
+    if (!existing)
+      throw new NotFoundException(i18nMessage("server.manufacturer.notFound"));
 
     let slug = existing.slug;
     if (dto.name && dto.name !== existing.name) {
@@ -764,7 +777,9 @@ export class AdminCatalogService {
         },
       });
       if (duplicate)
-        throw new BadRequestException("Bu isimde bir üretici zaten mevcut");
+        throw new BadRequestException(
+          i18nMessage("server.admin.catalog.manufacturerExists"),
+        );
     }
 
     const updated = await this.prisma.manufacturer.update({
@@ -796,7 +811,8 @@ export class AdminCatalogService {
     const existing = await this.prisma.manufacturer.findUnique({
       where: { id },
     });
-    if (!existing) throw new NotFoundException("Üretici bulunamadı");
+    if (!existing)
+      throw new NotFoundException(i18nMessage("server.manufacturer.notFound"));
     await this.prisma.manufacturer.delete({ where: { id } });
     await this.audit.createAuditLog(
       adminId,
@@ -853,7 +869,8 @@ export class AdminCatalogService {
     const brand = await this.prisma.brand.findUnique({
       where: { id: dto.brandId },
     });
-    if (!brand) throw new NotFoundException("Marka bulunamadı");
+    if (!brand)
+      throw new NotFoundException(i18nMessage("server.brand.notFound"));
 
     const slug =
       dto.slug ||
@@ -919,7 +936,8 @@ export class AdminCatalogService {
       where: { id },
       include: { brand: true },
     });
-    if (!existing) throw new NotFoundException("Model bulunamadı");
+    if (!existing)
+      throw new NotFoundException(i18nMessage("server.carModel.notFound"));
 
     let slug = existing.slug;
     if (dto.slug) slug = dto.slug;
@@ -965,7 +983,8 @@ export class AdminCatalogService {
 
   async deleteCarModel(adminId: string, id: string) {
     const existing = await this.prisma.carModel.findUnique({ where: { id } });
-    if (!existing) throw new NotFoundException("Model bulunamadı");
+    if (!existing)
+      throw new NotFoundException(i18nMessage("server.carModel.notFound"));
     await this.prisma.carModel.delete({ where: { id } });
     await this.audit.createAuditLog(
       adminId,
@@ -1041,7 +1060,9 @@ export class AdminCatalogService {
     });
 
     if (!group) {
-      throw new NotFoundException("Özellik grubu bulunamadı");
+      throw new NotFoundException(
+        i18nMessage("server.admin.catalog.attributeGroupNotFound"),
+      );
     }
 
     return {
@@ -1074,7 +1095,9 @@ export class AdminCatalogService {
     });
 
     if (existing) {
-      throw new BadRequestException("Bu isimde bir özellik grubu zaten mevcut");
+      throw new BadRequestException(
+        i18nMessage("server.admin.catalog.attributeGroupExists"),
+      );
     }
 
     const group = await this.prisma.attributeGroup.create({
@@ -1119,7 +1142,9 @@ export class AdminCatalogService {
     });
 
     if (!existing) {
-      throw new NotFoundException("Özellik grubu bulunamadı");
+      throw new NotFoundException(
+        i18nMessage("server.admin.catalog.attributeGroupNotFound"),
+      );
     }
 
     const updateData: Prisma.AttributeGroupUpdateInput = {};
@@ -1160,12 +1185,16 @@ export class AdminCatalogService {
     });
 
     if (!existing) {
-      throw new NotFoundException("Özellik grubu bulunamadı");
+      throw new NotFoundException(
+        i18nMessage("server.admin.catalog.attributeGroupNotFound"),
+      );
     }
 
     if (existing._count.attributes > 0) {
       throw new BadRequestException(
-        `Bu grupta ${existing._count.attributes} özellik değeri var. Önce değerleri silin.`,
+        i18nMessage("server.admin.catalog.attributeGroupInUse", {
+          count: existing._count.attributes,
+        }),
       );
     }
 
@@ -1249,7 +1278,9 @@ export class AdminCatalogService {
     });
 
     if (!group) {
-      throw new NotFoundException("Özellik grubu bulunamadı");
+      throw new NotFoundException(
+        i18nMessage("server.admin.catalog.attributeGroupNotFound"),
+      );
     }
 
     // Scale group: use same slug normalization as product.service linkProductAttributes
@@ -1265,7 +1296,9 @@ export class AdminCatalogService {
     });
 
     if (existing) {
-      throw new BadRequestException("Bu değer bu grupta zaten mevcut");
+      throw new BadRequestException(
+        i18nMessage("server.admin.catalog.attributeValueExists"),
+      );
     }
 
     const attribute = await this.prisma.attribute.create({
@@ -1314,7 +1347,9 @@ export class AdminCatalogService {
     });
 
     if (!existing) {
-      throw new NotFoundException("Özellik değeri bulunamadı");
+      throw new NotFoundException(
+        i18nMessage("server.admin.catalog.attributeNotFound"),
+      );
     }
 
     const updateData: Prisma.AttributeUpdateInput = {};
@@ -1366,12 +1401,16 @@ export class AdminCatalogService {
     });
 
     if (!existing) {
-      throw new NotFoundException("Özellik değeri bulunamadı");
+      throw new NotFoundException(
+        i18nMessage("server.admin.catalog.attributeNotFound"),
+      );
     }
 
     if (existing._count.productAttributes > 0) {
       throw new BadRequestException(
-        `Bu özellik ${existing._count.productAttributes} üründe kullanılıyor. Önce ürünlerden kaldırın.`,
+        i18nMessage("server.admin.catalog.attributeInUse", {
+          count: existing._count.productAttributes,
+        }),
       );
     }
 

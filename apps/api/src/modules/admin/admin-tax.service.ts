@@ -13,6 +13,7 @@ import {
   paginateComputedRows,
   resolveOrderBy,
 } from "../../common/list";
+import { i18nMessage } from "../i18n";
 
 /**
  * Vergi ayarları admin operasyonları (bölgeler, oranlar, kurallar, raporlama) —
@@ -134,7 +135,10 @@ export class AdminTaxService {
     const existing = await this.taxPrisma.taxRegion.findUnique({
       where: { id },
     });
-    if (!existing) throw new NotFoundException("Vergi bölgesi bulunamadı");
+    if (!existing)
+      throw new NotFoundException(
+        i18nMessage("server.admin.tax.regionNotFound"),
+      );
     if (dto.isDefault) {
       await this.taxPrisma.taxRegion.updateMany({ data: { isDefault: false } });
     }
@@ -173,10 +177,13 @@ export class AdminTaxService {
       where: { id },
       include: { _count: { select: { taxRates: true } } },
     });
-    if (!region) throw new NotFoundException("Vergi bölgesi bulunamadı");
+    if (!region)
+      throw new NotFoundException(
+        i18nMessage("server.admin.tax.regionNotFound"),
+      );
     if (region._count.taxRates > 0) {
       throw new BadRequestException(
-        "Bu bölgede vergi oranları tanımlı. Önce oranları silin.",
+        i18nMessage("server.admin.tax.regionHasRates"),
       );
     }
     await this.taxPrisma.taxRule.deleteMany({ where: { taxRegionId: id } });
@@ -269,7 +276,10 @@ export class AdminTaxService {
       const region = await this.taxPrisma.taxRegion.findUnique({
         where: { id: taxRegionId },
       });
-      if (!region) throw new NotFoundException("Vergi bölgesi bulunamadı");
+      if (!region)
+        throw new NotFoundException(
+          i18nMessage("server.admin.tax.regionNotFound"),
+        );
     } else {
       taxRegionId = await this.resolveDefaultTaxRegionId();
     }
@@ -320,7 +330,8 @@ export class AdminTaxService {
         "Tax models not available. Run: npx prisma generate (in apps/api)",
       );
     const existing = await this.taxPrisma.taxRate.findUnique({ where: { id } });
-    if (!existing) throw new NotFoundException("Vergi oranı bulunamadı");
+    if (!existing)
+      throw new NotFoundException(i18nMessage("server.admin.tax.rateNotFound"));
     if (dto.isDefault != null && dto.isDefault) {
       await this.taxPrisma.taxRate.updateMany({
         where: { taxRegionId: existing.taxRegionId },
@@ -363,10 +374,11 @@ export class AdminTaxService {
       where: { id },
       include: { _count: { select: { taxRules: true } } },
     });
-    if (!rate) throw new NotFoundException("Vergi oranı bulunamadı");
+    if (!rate)
+      throw new NotFoundException(i18nMessage("server.admin.tax.rateNotFound"));
     if (rate._count.taxRules > 0) {
       throw new BadRequestException(
-        "Bu orana bağlı vergi kuralları var. Önce kuralları silin veya güncelleyin.",
+        i18nMessage("server.admin.tax.rateHasRules"),
       );
     }
     await this.taxPrisma.taxRate.delete({ where: { id } });
@@ -434,14 +446,19 @@ export class AdminTaxService {
     const rate = await this.taxPrisma.taxRate.findUnique({
       where: { id: dto.taxRateId },
     });
-    if (!rate) throw new NotFoundException("Vergi oranı bulunamadı");
+    if (!rate)
+      throw new NotFoundException(i18nMessage("server.admin.tax.rateNotFound"));
     // Bölge verilmezse kuralın bölgesi = oranın bölgesi (TR-only sadeleştirme).
     const taxRegionId = dto.taxRegionId ?? rate.taxRegionId;
     if (rate.taxRegionId !== taxRegionId) {
-      throw new BadRequestException("Vergi oranı bu bölgeye ait değil.");
+      throw new BadRequestException(
+        i18nMessage("server.admin.tax.rateRegionMismatch"),
+      );
     }
     if (dto.scope === "category" && !dto.categoryId) {
-      throw new BadRequestException("Kategori kuralı için categoryId gerekli.");
+      throw new BadRequestException(
+        i18nMessage("server.admin.tax.categoryIdRequired"),
+      );
     }
     const rule = await this.taxPrisma.taxRule.create({
       data: {
@@ -480,7 +497,8 @@ export class AdminTaxService {
         "Tax models not available. Run: npx prisma generate (in apps/api)",
       );
     const existing = await this.taxPrisma.taxRule.findUnique({ where: { id } });
-    if (!existing) throw new NotFoundException("Vergi kuralı bulunamadı");
+    if (!existing)
+      throw new NotFoundException(i18nMessage("server.admin.tax.ruleNotFound"));
     const rate = await this.taxPrisma.taxRule.update({
       where: { id },
       data: {
@@ -512,7 +530,8 @@ export class AdminTaxService {
         "Tax models not available. Run: npx prisma generate (in apps/api)",
       );
     const rule = await this.taxPrisma.taxRule.findUnique({ where: { id } });
-    if (!rule) throw new NotFoundException("Vergi kuralı bulunamadı");
+    if (!rule)
+      throw new NotFoundException(i18nMessage("server.admin.tax.ruleNotFound"));
     await this.taxPrisma.taxRule.delete({ where: { id } });
     await this.audit.createRequiredAuditLog(
       adminId,
@@ -711,7 +730,7 @@ export class AdminTaxService {
         "Tax models not available. Run: npx prisma generate (in apps/api)",
       );
     if (!(ratePercent >= 0 && ratePercent <= 100)) {
-      throw new BadRequestException("Oran 0 ile 100 arasında olmalı");
+      throw new BadRequestException(i18nMessage("server.admin.tax.rateRange"));
     }
     const regionId = await this.resolveDefaultTaxRegionId();
     const rate = await this.findOrCreateVatRate(regionId, ratePercent);
@@ -762,12 +781,15 @@ export class AdminTaxService {
         "Tax models not available. Run: npx prisma generate (in apps/api)",
       );
     if (!(ratePercent >= 0 && ratePercent <= 100)) {
-      throw new BadRequestException("Oran 0 ile 100 arasında olmalı");
+      throw new BadRequestException(i18nMessage("server.admin.tax.rateRange"));
     }
     const category = await this.prisma.category.findUnique({
       where: { id: categoryId },
     });
-    if (!category) throw new NotFoundException("Kategori bulunamadı");
+    if (!category)
+      throw new NotFoundException(
+        i18nMessage("server.product.categoryNotFound"),
+      );
     const regionId = await this.resolveDefaultTaxRegionId();
     const rate = await this.findOrCreateVatRate(regionId, ratePercent);
     const existing = await this.taxPrisma.taxRule.findFirst({
@@ -812,7 +834,9 @@ export class AdminTaxService {
       where: { id: ruleId },
     });
     if (!rule || rule.scope !== "category")
-      throw new NotFoundException("KDV istisnası bulunamadı");
+      throw new NotFoundException(
+        i18nMessage("server.admin.tax.exemptionNotFound"),
+      );
     await this.taxPrisma.taxRule.delete({ where: { id: ruleId } });
     await this.audit.createRequiredAuditLog(
       adminId,
@@ -841,7 +865,7 @@ export class AdminTaxService {
     rate: number,
   ): Promise<{ rate: number }> {
     if (!(rate >= 0 && rate <= 100)) {
-      throw new BadRequestException("Oran 0 ile 100 arasında olmalı");
+      throw new BadRequestException(i18nMessage("server.admin.tax.rateRange"));
     }
     await this.prisma.platformSetting.upsert({
       where: { settingKey: "withholding_tax_rate" },
@@ -1222,7 +1246,8 @@ export class AdminTaxService {
       where: { id },
       select: { pdfKey: true, fileName: true },
     });
-    if (!inv) throw new NotFoundException("Fatura bulunamadı");
+    if (!inv)
+      throw new NotFoundException(i18nMessage("server.invoice.notFound"));
     const url = await this.storageService.getPresignedDownloadUrl(
       "documents",
       inv.pdfKey,
