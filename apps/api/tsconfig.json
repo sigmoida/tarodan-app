@@ -15,6 +15,11 @@
     "strictNullChecks": false,
     "noImplicitAny": false,
     "strictBindCallApply": true,
+    // A `catch` binding is `unknown`: `throw` accepts any value, so a driver or
+    // SDK can reject with a string or a plain object. Narrow with the
+    // `errorMessage` / `errorStack` helpers in common/helpers.
+    "useUnknownInCatchVariables": true,
+    "noImplicitThis": true,
     "forceConsistentCasingInFileNames": true,
     "noFallthroughCasesInSwitch": true,
     "paths": {

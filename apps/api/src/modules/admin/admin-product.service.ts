@@ -27,6 +27,7 @@ import { NotificationType } from "../notification/dto/notification.dto";
 import { dateRangeWhere, paginate, resolveOrderBy } from "../../common/list";
 import { catalogProductWhere } from "../product/helpers/catalog-product-where";
 import { CommissionRuleGuardService } from "../commission/commission-rule-guard.service";
+import { errorMessage } from "../../common/helpers/error-message";
 
 /**
  * Ürün yönetimi + admin ürün silme/geri yükleme — AdminService'in
@@ -571,7 +572,11 @@ export class AdminProductService {
         await this.approveProduct(adminId, productId, { note });
         results.push({ id: productId, success: true });
       } catch (error) {
-        results.push({ id: productId, success: false, error: error.message });
+        results.push({
+          id: productId,
+          success: false,
+          error: errorMessage(error),
+        });
       }
     }
 
@@ -605,7 +610,11 @@ export class AdminProductService {
         await this.rejectProduct(adminId, productId, { reason });
         results.push({ id: productId, success: true });
       } catch (error) {
-        results.push({ id: productId, success: false, error: error.message });
+        results.push({
+          id: productId,
+          success: false,
+          error: errorMessage(error),
+        });
       }
     }
 

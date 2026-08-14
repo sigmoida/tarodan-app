@@ -24,6 +24,7 @@ import {
   PUBLIC_NAME_SELECT,
   publicName,
 } from "../../common/helpers/public-identity";
+import { errorMessage } from "../../common/helpers/error-message";
 
 interface AuthenticatedSocket extends Socket {
   userId?: string;
@@ -151,7 +152,7 @@ export class TarodanWebSocketGateway
       client.emit("connected", { userId: client.userId });
     } catch (error) {
       this.logger.error(
-        `Authentication failed for client ${client.id}: ${error.message}`,
+        `Authentication failed for client ${client.id}: ${errorMessage(error)}`,
       );
       client.emit("error", { message: "Invalid authentication token" });
       client.disconnect();

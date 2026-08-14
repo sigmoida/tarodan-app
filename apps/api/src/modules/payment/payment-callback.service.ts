@@ -13,6 +13,7 @@ import { PaymentProviderEventService } from "./payment-provider-event.service";
 import { CacheService } from "../cache/cache.service";
 import { VirtualOrderFulfillmentService } from "./virtual-order-fulfillment.service";
 import { nodeEnv } from "../../config/environment";
+import { errorMessage } from "../../common/helpers/error-message";
 
 @Injectable()
 export class PaymentCallbackService {
@@ -467,7 +468,7 @@ export class PaymentCallbackService {
           );
         } catch (error: unknown) {
           this.logger.error(
-            `SavedCard senkron hatası (oid=${dto.merchant_oid}): ${error instanceof Error ? error.message : String(error)}`,
+            `SavedCard senkron hatası (oid=${dto.merchant_oid}): ${errorMessage(error)}`,
           );
         }
       }

@@ -18,6 +18,7 @@ import {
   paginateComputedRows,
   resolveOrderBy,
 } from "../../common/list";
+import { errorMessage, errorStack } from "../../common/helpers/error-message";
 
 /**
  * Bildirim admin operasyonları (geçmiş, toplu gönderim, zamanlama) —
@@ -299,8 +300,8 @@ export class AdminNotificationService {
       };
     } catch (error) {
       this.logger.error(
-        `Failed to send notification: ${error.message}`,
-        error.stack,
+        `Failed to send notification: ${errorMessage(error)}`,
+        errorStack(error),
       );
       if (error instanceof BadRequestException) throw error;
       throw new BadRequestException("Bildirim gönderilemedi");

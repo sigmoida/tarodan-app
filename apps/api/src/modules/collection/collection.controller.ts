@@ -32,6 +32,7 @@ import {
   CollectionItemResponseDto,
 } from "./dto";
 import { Public } from "../auth/decorators/public.decorator";
+import { errorStack } from "../../common/helpers/error-message";
 
 @Controller("collections")
 export class CollectionController {
@@ -67,12 +68,7 @@ export class CollectionController {
     @Query("pageSize") pageSize?: number,
     @Query("sortBy")
     sortBy?:
-      | "popular"
-      | "recent"
-      | "name"
-      | "items"
-      | "items_asc"
-      | "items_desc",
+      "popular" | "recent" | "name" | "items" | "items_asc" | "items_desc",
     @Query("search") search?: string,
     @Query("categoryId") categoryId?: string,
     @Query("category") category?: string,
@@ -316,10 +312,7 @@ export class CollectionController {
           3600 * 24 * 7, // 7 days
         );
       } catch (error) {
-        this.logger.error(
-          "Collection cover upload failed",
-          error instanceof Error ? error.stack : String(error),
-        );
+        this.logger.error("Collection cover upload failed", errorStack(error));
         throw new BadRequestException("Resim yükleme başarısız");
       }
     }

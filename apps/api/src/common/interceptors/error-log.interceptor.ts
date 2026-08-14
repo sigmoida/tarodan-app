@@ -9,6 +9,7 @@ import { Observable, throwError } from "rxjs";
 import { catchError } from "rxjs/operators";
 import { PrismaService } from "../../prisma/prisma.service";
 import { getRequestId } from "../context/request-context";
+import { errorMessage } from "../helpers/error-message";
 
 const SENSITIVE_BODY_KEYS = new Set([
   "password",
@@ -124,7 +125,9 @@ export class ErrorLogInterceptor implements NestInterceptor {
         },
       });
     } catch (logError) {
-      this.logger.error(`Failed to log error to database: ${logError.message}`);
+      this.logger.error(
+        `Failed to log error to database: ${errorMessage(logError)}`,
+      );
     }
   }
 }

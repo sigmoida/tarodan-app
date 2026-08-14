@@ -635,7 +635,7 @@ export class OrderCheckoutGroupService {
           const lineCommissions: Array<{
             discountedPrice: number;
             commission: Awaited<
-              ReturnType<typeof this.orderPricing.calculateCommission>
+              ReturnType<OrderPricingService["calculateCommission"]>
             >;
           }> = [];
           const sellerShareLines = new Map<

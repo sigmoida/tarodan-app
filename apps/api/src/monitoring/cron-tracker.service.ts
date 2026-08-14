@@ -1,6 +1,7 @@
 import { Injectable, Logger, OnModuleInit } from "@nestjs/common";
 import * as Sentry from "@sentry/node";
 import { setCronTracker } from "./cron-tracker.holder";
+import { errorMessage } from "../common/helpers/error-message";
 
 export type CronStatus = "idle" | "running" | "success" | "failed";
 
@@ -100,7 +101,7 @@ export class CronTrackerService implements OnModuleInit {
       rec.lastDurationMs = Date.now() - start;
       if (status === "failed") {
         rec.failures += 1;
-        rec.lastError = error instanceof Error ? error.message : String(error);
+        rec.lastError = errorMessage(error);
       } else {
         rec.lastError = null;
       }

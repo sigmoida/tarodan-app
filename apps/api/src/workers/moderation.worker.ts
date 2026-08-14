@@ -19,6 +19,7 @@ import { NotificationService } from "../modules/notification/notification.servic
 import { NotificationType } from "../modules/notification/dto";
 import { CommissionRuleGuardService } from "../modules/commission/commission-rule-guard.service";
 import { QUEUE_NAMES } from "./constants";
+import { errorMessage } from "../common/helpers/error-message";
 
 export interface ProductModerationJob {
   productId: string;
@@ -224,7 +225,7 @@ export class ModerationWorker {
         .delPattern("products:list:*")
         .catch((error) =>
           this.logger.warn(
-            `Moderasyon cache temizliği başarısız (${productId}): ${error instanceof Error ? error.message : String(error)}`,
+            `Moderasyon cache temizliği başarısız (${productId}): ${errorMessage(error)}`,
           ),
         ),
     ]);

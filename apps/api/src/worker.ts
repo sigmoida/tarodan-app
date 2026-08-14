@@ -13,6 +13,7 @@ import {
   resolveSentryEnvironment,
   resolveSentryRelease,
 } from "./modules/sentry/sentry-event";
+import { errorStack } from "./common/helpers/error-message";
 
 /**
  * Initialize Sentry for the worker process (#71). The worker runs as a separate
@@ -48,10 +49,7 @@ async function bootstrap() {
   // Surface otherwise-silent crashes to Sentry before the process dies.
   process.on("unhandledRejection", (reason) => {
     if (sentryEnabled) Sentry.captureException(reason);
-    logger.error(
-      "Unhandled promise rejection in worker",
-      reason instanceof Error ? reason.stack : String(reason),
-    );
+    logger.error("Unhandled promise rejection in worker", errorStack(reason));
   });
   process.on("uncaughtException", (err) => {
     if (sentryEnabled) Sentry.captureException(err);

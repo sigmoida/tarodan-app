@@ -19,6 +19,7 @@ import type {
   CargoShipmentResult,
 } from "./cargo-provider";
 import { buildStandardGonderiPayload } from "./surat-address.util";
+import { errorMessage } from "../../common/helpers/error-message";
 
 export const SURAT_CARRIER_CLIENT = Symbol("SURAT_CARRIER_CLIENT");
 
@@ -196,7 +197,7 @@ export class SuratCargoService implements CargoProvider {
         correlationId,
         idempotencyKey,
         code,
-        err: e instanceof Error ? e.message : String(e),
+        err: errorMessage(e),
       });
       return {
         ok: false,

@@ -10,6 +10,7 @@ import {
   PUBLIC_NAME_SELECT,
   publicName,
 } from "../../common/helpers/public-identity";
+import { errorMessage } from "../../common/helpers/error-message";
 
 /**
  * Koleksiyon indeksleme + arama alt servisi (search.service.ts'ten birebir
@@ -350,10 +351,7 @@ export class SearchCollectionService {
         }
       }
     } catch (err) {
-      this.logger.warn(
-        "syncCollectionsIndexIfEmpty failed",
-        err instanceof Error ? err.message : String(err),
-      );
+      this.logger.warn("syncCollectionsIndexIfEmpty failed", errorMessage(err));
     }
   }
 }

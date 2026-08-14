@@ -22,6 +22,7 @@ import {
   PUBLIC_NAME_SELECT,
   publicName,
 } from "../../common/helpers/public-identity";
+import { errorMessage } from "../../common/helpers/error-message";
 
 @Injectable()
 export class WishlistService {
@@ -84,7 +85,7 @@ export class WishlistService {
         mappedItems.push(dto);
       } catch (err) {
         this.logger.warn(
-          `mapItemToDto failed for item ${item.id}: ${err?.message || err}`,
+          `mapItemToDto failed for item ${item.id}: ${errorMessage(err)}`,
         );
       }
     }

@@ -12,6 +12,7 @@ import { AppNestLogger } from "./common/logging/nest-logger";
 import { getProcessRole } from "./process-role";
 import { resolveCorsOrigins } from "./config/cors-origins";
 import { isProduction, isDevelopment } from "./config/environment";
+import { errorStack } from "./common/helpers/error-message";
 
 /**
  * Hard guard: PAYMENT_BYPASS allows completing payments without going through
@@ -155,10 +156,7 @@ async function bootstrap() {
         logger.log("Graceful shutdown complete");
         process.exit(0);
       } catch (err) {
-        logger.error(
-          "Error during graceful shutdown",
-          err instanceof Error ? err.stack : String(err),
-        );
+        logger.error("Error during graceful shutdown", errorStack(err));
         process.exit(1);
       }
     };

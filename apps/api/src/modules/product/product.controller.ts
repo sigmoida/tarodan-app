@@ -41,6 +41,7 @@ import {
 import { PaymentProvider } from "../payment/dto";
 import { JwtAuthGuard, Public, CurrentUser } from "../auth";
 import { I18nService, ReqLocale, i18nMessage } from "../i18n";
+import { errorStack } from "../../common/helpers/error-message";
 
 @ApiTags("products")
 @Controller("products")
@@ -71,10 +72,7 @@ export class ProductController {
     try {
       return await this.productService.findAll(query);
     } catch (err) {
-      this.logger.error(
-        "findAll failed",
-        err instanceof Error ? err.stack : String(err),
-      );
+      this.logger.error("findAll failed", errorStack(err));
       return {
         data: [],
         meta: {
@@ -285,10 +283,7 @@ export class ProductController {
       ) {
         throw error;
       }
-      this.logger.error(
-        "getMyListingStats failed",
-        error instanceof Error ? error.stack : String(error),
-      );
+      this.logger.error("getMyListingStats failed", errorStack(error));
       throw new BadRequestException(
         i18nMessage("server.product.listingStatsFailed"),
       );

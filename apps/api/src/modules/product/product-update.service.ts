@@ -715,7 +715,12 @@ export class ProductUpdateService {
 
       return await this.common.formatProductResponse(toReturn ?? updated);
     } catch (error) {
-      if (error.code === "P2025") {
+      // P2025 = "record to update not found": another writer removed or moved
+      // the row between the read and this write.
+      if (
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === "P2025"
+      ) {
         throw new ConflictException(
           i18nMessage("server.product.updateConflict"),
         );

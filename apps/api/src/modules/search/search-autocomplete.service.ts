@@ -14,6 +14,7 @@ import {
   fulltextAttributeSearch,
 } from "../../common/helpers/fulltext-search";
 import { SearchCommonService } from "./search-common.service";
+import { errorMessage } from "../../common/helpers/error-message";
 
 /**
  * Otomatik tamamlama alt servisi (search.service.ts'ten birebir taşındı):
@@ -282,7 +283,7 @@ export class SearchAutocompleteService {
         }));
       } catch (err) {
         this.logger.warn(
-          `Autocomplete products ES failed, using Prisma fallback: ${err instanceof Error ? err.message : String(err)}`,
+          `Autocomplete products ES failed, using Prisma fallback: ${errorMessage(err)}`,
         );
       }
     }

@@ -25,6 +25,7 @@ import { validateStrictCommissionCoverage } from "../order/order-commission.help
 import { QUEUE_NAMES } from "../../workers/constants";
 import { CRON_CATALOG } from "../../workers/cron-catalog";
 import { isProduction } from "../../config/environment";
+import { errorMessage } from "../../common/helpers/error-message";
 
 /**
  * Bu sayıda DLQ (`dead`) outbox satırı biriktiğinde instance hazır-değil sayılır:
@@ -381,7 +382,7 @@ export class HealthService {
       return {
         status: "unhealthy",
         latency: Date.now() - start,
-        message: `PostgreSQL connection failed: ${error.message}`,
+        message: `PostgreSQL connection failed: ${errorMessage(error)}`,
       };
     }
   }
@@ -428,7 +429,7 @@ export class HealthService {
       return {
         status: "unhealthy",
         latency: Date.now() - start,
-        message: `Redis connection failed: ${error.message}`,
+        message: `Redis connection failed: ${errorMessage(error)}`,
       };
     }
   }
@@ -503,7 +504,7 @@ export class HealthService {
       return {
         status: "unhealthy",
         latency: Date.now() - start,
-        message: `Elasticsearch connection failed: ${error.message}`,
+        message: `Elasticsearch connection failed: ${errorMessage(error)}`,
       };
     }
   }

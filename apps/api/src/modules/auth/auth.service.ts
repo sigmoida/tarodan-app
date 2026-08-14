@@ -40,6 +40,7 @@ import {
   normalizeUsername,
 } from "./username.util";
 import { ENTITY_PREFIX } from "../../common/helpers/code-prefixes";
+import { errorMessage, errorStack } from "../../common/helpers/error-message";
 
 /** Hesap tipi öneki — yalnızca bireysel (B) veya kurumsal (K). */
 type EntityUserPrefix =
@@ -301,7 +302,7 @@ export class AuthService {
     } catch (error) {
       // Don't fail registration if linking guest orders fails
       this.logger.error(
-        `Failed to link guest orders for ${user.email}: ${error.message}`,
+        `Failed to link guest orders for ${user.email}: ${errorMessage(error)}`,
       );
     }
 
@@ -314,7 +315,7 @@ export class AuthService {
         await this.notificationService.sendWelcomeEmail(user.id);
       } catch (error) {
         this.logger.error(
-          `Failed to send welcome email to ${user.email}: ${error.message}`,
+          `Failed to send welcome email to ${user.email}: ${errorMessage(error)}`,
         );
       }
     }
@@ -861,10 +862,7 @@ export class AuthService {
       ) {
         throw error;
       }
-      this.logger.error(
-        "Login failed",
-        error instanceof Error ? error.stack : String(error),
-      );
+      this.logger.error("Login failed", errorStack(error));
       throw new BadRequestException(i18nMessage("server.auth.loginFailed"));
     }
   }
@@ -1204,9 +1202,7 @@ export class AuthService {
       if (error instanceof ServiceUnavailableException) {
         throw error;
       }
-      throw new Error(
-        `Failed to generate tokens: ${error instanceof Error ? error.message : String(error)}`,
-      );
+      throw new Error(`Failed to generate tokens: ${errorMessage(error)}`);
     }
   }
 
@@ -1299,7 +1295,7 @@ export class AuthService {
       });
     } catch (error) {
       this.logger.error(
-        `Refresh token persist edilemedi: ${error instanceof Error ? error.message : String(error)}`,
+        `Refresh token persist edilemedi: ${errorMessage(error)}`,
       );
       throw new ServiceUnavailableException(
         "Oturum güvenli şekilde oluşturulamadı",
@@ -1831,7 +1827,7 @@ export class AuthService {
       });
     } catch (error) {
       // Don't let logging failures affect the main flow
-      this.logger.warn(`Failed to log security event: ${error.message}`);
+      this.logger.warn(`Failed to log security event: ${errorMessage(error)}`);
     }
   }
 }

@@ -18,6 +18,7 @@ import { getRequestId } from "../context/request-context";
 import { I18nService } from "../../modules/i18n/i18n.service";
 import { isLocalizedMessage } from "../../modules/i18n/localized-message";
 import { resolveRequestLocale } from "../../modules/i18n/locale.util";
+import { errorStack } from "../helpers/error-message";
 
 /**
  * Global exception filter (issue #70, i18n: #224).
@@ -96,7 +97,7 @@ export class AllExceptionsFilter implements ExceptionFilter {
       // 5xx: keep the full cause server-side, send nothing internal to the client.
       this.logger.error(
         `${request?.method} ${request?.url} -> ${status}`,
-        exception instanceof Error ? exception.stack : String(exception),
+        errorStack(exception),
       );
     }
 

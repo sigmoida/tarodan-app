@@ -25,6 +25,7 @@ import {
   PUBLIC_NAME_SELECT,
   publicName,
 } from "../../common/helpers/public-identity";
+import { errorMessage } from "../../common/helpers/error-message";
 
 /**
  * Ürün arama + indeksleme alt servisi (search.service.ts'ten birebir taşındı):
@@ -83,10 +84,7 @@ export class SearchProductService {
         );
       }
     } catch (err) {
-      this.logger.warn(
-        "syncIndexIfEmpty failed",
-        err instanceof Error ? err.message : String(err),
-      );
+      this.logger.warn("syncIndexIfEmpty failed", errorMessage(err));
     }
   }
 
@@ -652,7 +650,7 @@ export class SearchProductService {
       }
     } catch (error) {
       this.logger.warn(
-        `syncProduct failed for ${productId}: ${error instanceof Error ? error.message : String(error)}`,
+        `syncProduct failed for ${productId}: ${errorMessage(error)}`,
       );
     }
   }

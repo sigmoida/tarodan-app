@@ -8,6 +8,7 @@ import {
 import { PrismaClient } from "@prisma/client";
 import { EventEmitter2 } from "@nestjs/event-emitter";
 import { isProduction, isTest } from "../config/environment";
+import { errorMessage } from "../common/helpers/error-message";
 
 const WATCHED_WRITE_ACTIONS = ["create", "update", "upsert", "delete"];
 
@@ -120,7 +121,7 @@ export class PrismaService
         }
       } catch (err) {
         this.logger.warn(
-          `Search sync event emission failed: ${err instanceof Error ? err.message : String(err)}`,
+          `Search sync event emission failed: ${errorMessage(err)}`,
         );
       }
 
