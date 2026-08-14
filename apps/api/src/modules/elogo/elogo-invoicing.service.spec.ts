@@ -1,5 +1,6 @@
 import { ConfigService } from "@nestjs/config";
 import { ElogoInvoicingService } from "./elogo-invoicing.service";
+import { ElogoDocumentService } from "./elogo-document.service";
 import { ElogoService } from "./elogo.service";
 
 function fakeConfig(values: Record<string, string> = {}): ConfigService {
@@ -221,8 +222,8 @@ describe("ElogoInvoicingService", () => {
     const svc = new ElogoInvoicingService(
       prisma,
       elogo,
-      fakeConfig(),
-      {} as any, // queries — bu spec kesim hattını sürüyor
+      {} as any, // queries
+      new ElogoDocumentService(prisma, elogo, fakeConfig()),
     );
 
     await svc.issueCommissionInvoice("o1");
@@ -258,8 +259,8 @@ describe("ElogoInvoicingService", () => {
     const svc = new ElogoInvoicingService(
       prisma,
       elogo,
-      fakeConfig(),
-      {} as any, // queries — bu spec kesim hattını sürüyor
+      {} as any, // queries
+      new ElogoDocumentService(prisma, elogo, fakeConfig()),
     );
     await svc.issueCommissionInvoice("o1");
     const xml = (elogo.sendDocument as jest.Mock).mock.calls[0][0].ublXml;
@@ -279,8 +280,8 @@ describe("ElogoInvoicingService", () => {
     const svc = new ElogoInvoicingService(
       prisma,
       elogo,
-      fakeConfig(),
-      {} as any, // queries — bu spec kesim hattını sürüyor
+      {} as any, // queries
+      new ElogoDocumentService(prisma, elogo, fakeConfig()),
     );
     await svc.issueCommissionInvoice("o1");
     const xml = (elogo.sendDocument as jest.Mock).mock.calls[0][0].ublXml;
@@ -303,8 +304,8 @@ describe("ElogoInvoicingService", () => {
     const svc = new ElogoInvoicingService(
       prisma,
       elogo,
-      fakeConfig(),
-      {} as any, // queries — bu spec kesim hattını sürüyor
+      {} as any, // queries
+      new ElogoDocumentService(prisma, elogo, fakeConfig()),
     );
 
     await svc.issueCommissionInvoice("o1");
@@ -321,8 +322,8 @@ describe("ElogoInvoicingService", () => {
     const svc = new ElogoInvoicingService(
       prisma,
       elogo,
-      fakeConfig(),
-      {} as any, // queries — bu spec kesim hattını sürüyor
+      {} as any, // queries
+      new ElogoDocumentService(prisma, elogo, fakeConfig()),
     );
 
     await svc.issueServiceFeeInvoice("o1");
@@ -351,8 +352,8 @@ describe("ElogoInvoicingService", () => {
     const svc = new ElogoInvoicingService(
       prisma,
       elogo,
-      fakeConfig(),
-      {} as any, // queries — bu spec kesim hattını sürüyor
+      {} as any, // queries
+      new ElogoDocumentService(prisma, elogo, fakeConfig()),
     );
 
     await svc.issueCommissionInvoice("o1");
@@ -376,8 +377,8 @@ describe("ElogoInvoicingService", () => {
     const svc = new ElogoInvoicingService(
       prisma,
       elogo,
-      fakeConfig(),
-      {} as any, // queries — bu spec kesim hattını sürüyor
+      {} as any, // queries
+      new ElogoDocumentService(prisma, elogo, fakeConfig()),
     );
 
     await svc.issueCommissionInvoice("o1");
@@ -396,8 +397,8 @@ describe("ElogoInvoicingService", () => {
     const svc = new ElogoInvoicingService(
       prisma,
       elogo,
-      fakeConfig(),
-      {} as any, // queries — bu spec kesim hattını sürüyor
+      {} as any, // queries
+      new ElogoDocumentService(prisma, elogo, fakeConfig()),
     );
 
     await svc.issueCommissionInvoice("o1");
@@ -414,8 +415,8 @@ describe("ElogoInvoicingService", () => {
     const svc = new ElogoInvoicingService(
       prisma,
       elogo,
-      fakeConfig(),
-      {} as any, // queries — bu spec kesim hattını sürüyor
+      {} as any, // queries
+      new ElogoDocumentService(prisma, elogo, fakeConfig()),
     );
 
     await svc.issueMembershipInvoice("mp1");
@@ -440,8 +441,8 @@ describe("ElogoInvoicingService", () => {
     const svc = new ElogoInvoicingService(
       prisma,
       elogo,
-      fakeConfig(),
-      {} as any, // queries — bu spec kesim hattını sürüyor
+      {} as any, // queries
+      new ElogoDocumentService(prisma, elogo, fakeConfig()),
     );
 
     await svc.handleOrderRefund("o1");
@@ -497,8 +498,8 @@ describe("ElogoInvoicingService", () => {
     const svc = new ElogoInvoicingService(
       prisma,
       elogo,
-      fakeConfig(),
-      {} as any, // queries — bu spec kesim hattını sürüyor
+      {} as any, // queries
+      new ElogoDocumentService(prisma, elogo, fakeConfig()),
     );
     const adjustment = {
       orderId: "o1",
@@ -561,8 +562,8 @@ describe("ElogoInvoicingService", () => {
     const svc = new ElogoInvoicingService(
       prisma,
       makeElogo(),
-      fakeConfig(),
       {} as any, // queries
+      new ElogoDocumentService(prisma, makeElogo(), fakeConfig()),
     );
 
     await svc.handleOrderRefund("o1", {
@@ -586,8 +587,8 @@ describe("ElogoInvoicingService", () => {
     const svc = new ElogoInvoicingService(
       prisma,
       elogo,
-      fakeConfig(),
-      {} as any, // queries — bu spec kesim hattını sürüyor
+      {} as any, // queries
+      new ElogoDocumentService(prisma, elogo, fakeConfig()),
     );
 
     await svc.issueTradeCashFeeInvoice("tcp1");
@@ -608,8 +609,8 @@ describe("ElogoInvoicingService", () => {
     const svc = new ElogoInvoicingService(
       prisma,
       elogo,
-      fakeConfig(),
-      {} as any, // queries — bu spec kesim hattını sürüyor
+      {} as any, // queries
+      new ElogoDocumentService(prisma, elogo, fakeConfig()),
     );
 
     await svc.issueTradeCashFeeInvoice("tcp1");
@@ -628,8 +629,8 @@ describe("ElogoInvoicingService", () => {
     const svc = new ElogoInvoicingService(
       prisma,
       elogo,
-      fakeConfig(),
-      {} as any, // queries — bu spec kesim hattını sürüyor
+      {} as any, // queries
+      new ElogoDocumentService(prisma, elogo, fakeConfig()),
     );
 
     await svc.issueTradeCashFeeInvoice("tcp1");
@@ -653,8 +654,8 @@ describe("ElogoInvoicingService", () => {
     const svc = new ElogoInvoicingService(
       prisma,
       elogo,
-      fakeConfig(),
-      {} as any, // queries — bu spec kesim hattını sürüyor
+      {} as any, // queries
+      new ElogoDocumentService(prisma, elogo, fakeConfig()),
     );
 
     await svc.handleTradeCashRefund("tcp2");
@@ -679,8 +680,8 @@ describe("ElogoInvoicingService", () => {
     const svc = new ElogoInvoicingService(
       prisma,
       elogo,
-      fakeConfig(),
-      {} as any, // queries — bu spec kesim hattını sürüyor
+      {} as any, // queries
+      new ElogoDocumentService(prisma, elogo, fakeConfig()),
     );
 
     await svc.handleTradeCashRefund("tcp1");
@@ -705,8 +706,8 @@ describe("ElogoInvoicingService", () => {
     const svc = new ElogoInvoicingService(
       prisma,
       elogo,
-      fakeConfig(),
-      {} as any, // queries — bu spec kesim hattını sürüyor
+      {} as any, // queries
+      new ElogoDocumentService(prisma, elogo, fakeConfig()),
     );
 
     await svc.handleOrderRefund("o1");
@@ -745,8 +746,8 @@ describe("ElogoInvoicingService", () => {
     const svc = new ElogoInvoicingService(
       prisma,
       elogo,
-      fakeConfig(),
-      {} as any, // queries — bu spec kesim hattını sürüyor
+      {} as any, // queries
+      new ElogoDocumentService(prisma, elogo, fakeConfig()),
     );
 
     await svc.handleOrderRefund("o1");
@@ -777,8 +778,8 @@ describe("ElogoInvoicingService", () => {
     const svc = new ElogoInvoicingService(
       prisma,
       elogo,
-      fakeConfig(),
-      {} as any, // queries — bu spec kesim hattını sürüyor
+      {} as any, // queries
+      new ElogoDocumentService(prisma, elogo, fakeConfig()),
     );
 
     await svc.issueCommissionInvoice("o1"); // platform satıcı → komisyon kesilmez
@@ -822,8 +823,8 @@ describe("ElogoInvoicingService", () => {
     const svc = new ElogoInvoicingService(
       prisma,
       elogo,
-      fakeConfig(),
-      {} as any, // queries — bu spec kesim hattını sürüyor
+      {} as any, // queries
+      new ElogoDocumentService(prisma, elogo, fakeConfig()),
     );
 
     await svc.issuePlatformSaleInvoice("o1");
@@ -858,8 +859,8 @@ describe("ElogoInvoicingService", () => {
     const svc = new ElogoInvoicingService(
       prisma,
       elogo,
-      fakeConfig(),
-      {} as any, // queries — bu spec kesim hattını sürüyor
+      {} as any, // queries
+      new ElogoDocumentService(prisma, elogo, fakeConfig()),
     );
 
     await svc.issueCommissionInvoice("o1");
@@ -879,8 +880,8 @@ describe("ElogoInvoicingService", () => {
     const svc = new ElogoInvoicingService(
       prisma,
       elogo,
-      fakeConfig(),
-      {} as any, // queries — bu spec kesim hattını sürüyor
+      {} as any, // queries
+      new ElogoDocumentService(prisma, elogo, fakeConfig()),
     );
 
     await svc.issueCommissionInvoice("o1");
@@ -910,8 +911,8 @@ describe("ElogoInvoicingService", () => {
     const svc = new ElogoInvoicingService(
       prisma,
       elogo,
-      fakeConfig(),
-      {} as any, // queries — bu spec kesim hattını sürüyor
+      {} as any, // queries
+      new ElogoDocumentService(prisma, elogo, fakeConfig()),
     );
 
     await svc.issueCommissionInvoice("o1");
@@ -940,8 +941,8 @@ describe("ElogoInvoicingService", () => {
     const svc = new ElogoInvoicingService(
       prisma,
       elogo,
-      fakeConfig(),
-      {} as any, // queries — bu spec kesim hattını sürüyor
+      {} as any, // queries
+      new ElogoDocumentService(prisma, elogo, fakeConfig()),
     );
 
     await svc.issueCommissionInvoice("o1");

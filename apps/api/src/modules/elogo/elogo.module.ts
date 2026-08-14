@@ -5,6 +5,7 @@ import { QUEUE_NAMES } from "../../workers/constants";
 import { ElogoService, ELOGO_SOAP_CLIENT } from "./elogo.service";
 import { ElogoInvoicingService } from "./elogo-invoicing.service";
 import { ElogoQueryService } from "./elogo-query.service";
+import { ElogoDocumentService } from "./elogo-document.service";
 import { ElogoSchedulerService } from "./jobs/elogo-scheduler.service";
 import { ElogoScheduledProcessor } from "./jobs/elogo-scheduled.processor";
 import { ElogoInvoiceController } from "./elogo-invoice.controller";
@@ -49,6 +50,7 @@ import { scheduledProcessors } from "../../workers/scheduled-processors";
     ElogoService,
     ElogoInvoicingService,
     ElogoQueryService,
+    ElogoDocumentService,
     ElogoSchedulerService,
     // Hizmet KDV'sinin TEK kaynağı `PlatformSetting` satırlarıdır; checkout da
     // aynı servisi okur. OrderModule'ü import etmek döngü yaratacağı için

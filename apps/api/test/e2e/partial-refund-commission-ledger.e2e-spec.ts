@@ -10,6 +10,7 @@ import { CommissionLedgerService } from "../../src/modules/commission/commission
 import { PaymentRefundService } from "../../src/modules/payment/refund/payment-refund.service";
 import { PaymentRefundAttemptService } from "../../src/modules/payment/refund/payment-refund-attempt.service";
 import { ElogoInvoicingService } from "../../src/modules/elogo/elogo-invoicing.service";
+import { ElogoDocumentService } from "../../src/modules/elogo/elogo-document.service";
 import {
   truncateAll,
   getPrisma,
@@ -218,8 +219,8 @@ describe("Partial-refund commission ledger pro-rating (#88) [P0]", () => {
     const elogo = new ElogoInvoicingService(
       prisma,
       {} as any, // elogo client
-      { get: () => "" } as any, // config
       {} as any, // queries — bu spec yalnız ters kayıt hattını sürüyor
+      new ElogoDocumentService(prisma, {} as any, { get: () => "" } as any),
     );
     const cutSpy = jest.spyOn(elogo as any, "cut").mockResolvedValue(undefined);
 

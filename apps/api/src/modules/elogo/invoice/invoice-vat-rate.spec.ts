@@ -1,5 +1,6 @@
 import { ConfigService } from "@nestjs/config";
 import { ElogoInvoicingService } from "../elogo-invoicing.service";
+import { ElogoDocumentService } from "../elogo-document.service";
 import { ElogoQueryService } from "../elogo-query.service";
 import { ElogoService } from "../elogo.service";
 import { VAT_SOURCE_BY_TYPE } from "./invoice-vat-rate";
@@ -193,12 +194,16 @@ describe("fatura KDV oranının kaynağı", () => {
     const svc = new ElogoInvoicingService(
       prisma as any,
       makeElogo(),
-      fakeConfig({ ELOGO_VAT_RATE: "20" }),
       {} as any, // queries
-      makeTaxService({}, 20),
-      undefined,
-      undefined,
-      makeTaxPolicy({ serviceVatRate: 18 }),
+      // KDV kaynağı artık BELGE servisinin işi — gerçek örnek geçilir ki
+      // bu spec'in oran iddiaları koda kadar insin.
+      new ElogoDocumentService(
+        prisma as any,
+        makeElogo(),
+        fakeConfig({ ELOGO_VAT_RATE: "20" }),
+        makeTaxService({}, 20),
+        makeTaxPolicy({ serviceVatRate: 18 }),
+      ),
     );
 
     await svc.issueCommissionInvoice("pkg1");
@@ -225,12 +230,16 @@ describe("fatura KDV oranının kaynağı", () => {
     const svc = new ElogoInvoicingService(
       prisma as any,
       makeElogo(),
-      fakeConfig(),
       {} as any, // queries
-      makeTaxService({}, 20),
-      undefined,
-      undefined,
-      makeTaxPolicy({ serviceVatEnabled: false }),
+      // KDV kaynağı artık BELGE servisinin işi — gerçek örnek geçilir ki
+      // bu spec'in oran iddiaları koda kadar insin.
+      new ElogoDocumentService(
+        prisma as any,
+        makeElogo(),
+        fakeConfig(),
+        makeTaxService({}, 20),
+        makeTaxPolicy({ serviceVatEnabled: false }),
+      ),
     );
 
     await svc.issueServiceFeeInvoice("pkg1");
@@ -267,12 +276,16 @@ describe("fatura KDV oranının kaynağı", () => {
     const svc = new ElogoInvoicingService(
       prisma as any,
       makeElogo(),
-      fakeConfig(),
       {} as any, // queries
-      makeTaxService({ "cat-kitap": 10 }, 20),
-      undefined,
-      undefined,
-      makeTaxPolicy(),
+      // KDV kaynağı artık BELGE servisinin işi — gerçek örnek geçilir ki
+      // bu spec'in oran iddiaları koda kadar insin.
+      new ElogoDocumentService(
+        prisma as any,
+        makeElogo(),
+        fakeConfig(),
+        makeTaxService({ "cat-kitap": 10 }, 20),
+        makeTaxPolicy(),
+      ),
     );
 
     await svc.issuePlatformSaleInvoice("o1");
@@ -299,8 +312,12 @@ describe("fatura KDV oranının kaynağı", () => {
     const svc = new ElogoInvoicingService(
       prisma as any,
       makeElogo(),
-      fakeConfig({ ELOGO_VAT_RATE: "20" }),
-      new ElogoQueryService(prisma as any, makeElogo()) as any,
+      {} as any, // queries
+      new ElogoDocumentService(
+        prisma as any,
+        makeElogo(),
+        fakeConfig({ ELOGO_VAT_RATE: "20" }),
+      ),
     );
 
     await svc.issueCommissionInvoice("pkg1");

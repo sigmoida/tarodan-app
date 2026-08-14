@@ -1,5 +1,4 @@
 import { Injectable, Logger, Optional } from "@nestjs/common";
-import { ConfigService } from "@nestjs/config";
 import { randomUUID } from "crypto";
 import { OrderStatus } from "@prisma/client";
 import { PrismaService } from "../../prisma";
@@ -13,32 +12,20 @@ import {
 } from "./invoice/elogo-guest-recipient";
 import { ElogoService } from "./elogo.service";
 import { ElogoQueryService } from "./elogo-query.service";
+import { ElogoDocumentService } from "./elogo-document.service";
 import { LINE_DESCRIPTION } from "./invoice/invoice-line-description";
-import { TaxService } from "../tax/tax.service";
 import { StorageService } from "../storage/storage.service";
 import { SmtpProvider } from "../mail/smtp.provider";
-import { buildInvoiceXml, type UblParty } from "./ubl/ubl-invoice.builder";
+import { buildInvoiceXml } from "./ubl/ubl-invoice.builder";
 import type { ElogoDocumentType } from "./helpers/elogo.types";
-import {
-  Prisma,
-  type ElogoInvoice,
-  type ElogoInvoiceType,
-} from "@prisma/client";
-import { invoiceAmountsFor } from "./invoice/invoice-amounts";
-import {
-  invoiceIssueDate,
-  invoiceIssueTime,
-  invoiceIssueYear,
-} from "./invoice/invoice-datetime";
-import { VAT_SOURCE_BY_TYPE } from "./invoice/invoice-vat-rate";
-import { formatElogoInvoiceNumber } from "./invoice/elogo-document-number";
+import { Prisma, type ElogoInvoice } from "@prisma/client";
+import { invoiceIssueYear } from "./invoice/invoice-datetime";
 import {
   buildPlatformSaleLines,
   invoiceTotalsFromLines,
   readInvoiceLineItems,
   type InvoiceLineItem,
 } from "./invoice/invoice-lines";
-import { OrderTaxPolicyService } from "../order/pricing/order-tax-policy.service";
 import type { InvoiceRefundReversePayload } from "../outbox/outbox.types";
 import { renderManagedEmailTemplate } from "../../common/helpers/email-template-renderer";
 import { frontendUrl as resolveFrontendUrl } from "../../config/app-urls";
@@ -90,248 +77,11 @@ export class ElogoInvoicingService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly elogo: ElogoService,
-    private readonly config: ConfigService,
     private readonly queries: ElogoQueryService,
-    @Optional() private readonly taxService?: TaxService,
+    private readonly documents: ElogoDocumentService,
     @Optional() private readonly storage?: StorageService,
     @Optional() private readonly smtp?: SmtpProvider,
-    /**
-     * Hizmet KDV'sinin TEK kaynağı — checkout tahsilatı da bunu okur. Fatura
-     * ayrı bir kaynaktan okuduğu sürece tahsilat ile beyan ayrışabiliyordu.
-     */
-    @Optional() private readonly taxPolicy?: OrderTaxPolicyService,
   ) {}
-
-  // ───────────────────────── config ─────────────────────────
-  private cfg(key: string, def = ""): string {
-    return (this.config.get<string>(key) ?? def).trim();
-  }
-  private get vatRate(): number {
-    return Number(this.cfg("ELOGO_VAT_RATE", "20")) || 20;
-  }
-  /**
-   * Kesim anındaki KDV oranı. Kaynağı faturanın TÜRÜ belirler — bkz.
-   * `invoice-vat-rate.ts`:
-   *
-   *  - hizmet bedelleri → checkout'un okuduğu `service_vat_rate` ayarı (kapalıysa 0)
-   *  - platform ürün satışı → ürünün KATEGORİ oranı
-   *  - diğerleri → bölgenin varsayılan oranı, yoksa `ELOGO_VAT_RATE`
-   *
-   * Kayıt snapshot'ı (`ElogoInvoice.vatRate`) sonraki retry/iade adımlarında aynen
-   * kullanılır; oran sonradan değişse bile kesilmiş belge etkilenmez.
-   */
-  private async resolveVatRate(
-    type: ElogoInvoiceType,
-    categoryId?: string | null,
-  ): Promise<number> {
-    const source = VAT_SOURCE_BY_TYPE[type] ?? "standard";
-
-    if (source === "service" && this.taxPolicy) {
-      try {
-        const policy = await this.taxPolicy.resolve();
-        // KDV kapalıysa oran 0'dır; env'e DÜŞÜLMEZ, aksi halde tahsil edilmeyen
-        // bir KDV faturaya yazılırdı.
-        return this.taxPolicy.effectiveServiceVatRate(policy);
-      } catch {
-        // ayar okunamadı — aşağıdaki genel çözüme düş
-      }
-    }
-
-    try {
-      const resolved = await this.taxService?.resolveTaxRate(
-        "TR",
-        null,
-        source === "category" ? (categoryId ?? null) : null,
-      );
-      if (resolved && resolved.rate > 0) return resolved.rate;
-    } catch {
-      // config çözülemedi — env fallback
-    }
-    return this.vatRate;
-  }
-  private get prefix(): string {
-    return this.cfg("ELOGO_INVOICE_PREFIX", "TRD");
-  }
-  private get xsltUuid(): string | undefined {
-    return this.cfg("ELOGO_INVOICE_XSLT_UUID") || undefined;
-  }
-  private supplierParty(): UblParty {
-    return {
-      vknTckn: this.cfg("ELOGO_COMPANY_VKN", this.cfg("ELOGO_WS_USERNAME", "")),
-      title: this.cfg("ELOGO_COMPANY_TITLE", "TARODAN"),
-      taxOffice: this.cfg("ELOGO_COMPANY_TAXOFFICE") || undefined,
-      city: this.cfg("ELOGO_COMPANY_CITY") || undefined,
-      district: this.cfg("ELOGO_COMPANY_DISTRICT") || undefined,
-      streetAddress: this.cfg("ELOGO_COMPANY_ADDRESS") || undefined,
-      email: this.cfg("ELOGO_COMPANY_EMAIL") || undefined,
-    };
-  }
-
-  // ───────────────────────── helpers ─────────────────────────
-  private round2(n: number): number {
-    return Math.round((n + Number.EPSILON) * 100) / 100;
-  }
-  /**
-   * Tutarın KDV yönü faturanın TÜRÜNDEN gelir, ortamdan değil — komisyon/hizmet
-   * bedeli matrahtır (KDV eklenir), tüketici fiyatları brüttür (KDV ayrıştırılır).
-   * Kural ve gerekçesi: `invoice-amounts.ts`.
-   */
-  private invoiceAmounts(
-    type: ElogoInvoiceType,
-    amount: number,
-    vatRate: number,
-  ): { net: number; tax: number; total: number } {
-    return invoiceAmountsFor(type, amount, vatRate);
-  }
-  /**
-   * Belge tarihi/saati/numara yılı TEK takvimden okunur (Türkiye) — bkz.
-   * `invoice-datetime.ts`. Süreç saat diliminden bağımsızdır.
-   */
-  private ymd(d: Date): string {
-    return invoiceIssueDate(d);
-  }
-  private hms(d: Date): string {
-    return invoiceIssueTime(d);
-  }
-
-  /** Gap-free belge numarası: PREFIX + yıl + 9 hane (ElogoDocSequence atomik artırım). */
-  private async allocateInvoiceNumber(year: number): Promise<string> {
-    return this.prisma.$transaction((tx) =>
-      this.allocateInvoiceNumberInTransaction(tx, year),
-    );
-  }
-
-  private async allocateInvoiceNumberInTransaction(
-    tx: Prisma.TransactionClient,
-    year: number,
-  ): Promise<string> {
-    const prefix = this.prefix;
-    const row = await tx.elogoDocSequence.upsert({
-      where: { prefix_year: { prefix, year } },
-      create: { prefix, year, lastValue: 1 },
-      update: { lastValue: { increment: 1 } },
-    });
-    return formatElogoInvoiceNumber(prefix, year, row.lastValue);
-  }
-
-  /** Alıcı (User) → UBL party + belge tipi (e-Fatura mükellefse EINVOICE). */
-  private async resolveRecipient(
-    userId: string,
-    /**
-     * Misafir siparişinin gerçek alıcı bilgisi. Tüm misafir checkout'ları tek
-     * sistem kullanıcısını paylaştığı için kullanıcı kaydından okumak faturayı
-     * "GUEST_SYSTEM" adına ve sistem e-postasına kesiyordu — nihai tüketici yolu
-     * bile gerçek adı gerektirir ve müşteri zorunlu e-Arşiv kopyasını almıyordu.
-     */
-    guestOverride?: GuestInvoiceRecipient | null,
-  ): Promise<{
-    vknTckn: string;
-    name: string;
-    email?: string | null;
-    address?: GuestInvoiceRecipient["address"];
-    party: UblParty;
-    documentType: ElogoDocumentType;
-    alias?: string;
-  }> {
-    const user = await this.prisma.user.findUnique({
-      where: { id: userId },
-      select: {
-        displayName: true,
-        companyName: true,
-        taxId: true,
-        email: true,
-      },
-    });
-    const digits = (user?.taxId || "").replace(/\D/g, "");
-    const hasRealTaxId = digits.length === 10 || digits.length === 11;
-    const vknTckn = hasRealTaxId ? digits : "11111111111"; // bilinmeyen nihai tüketici (GİB)
-    const name =
-      guestOverride?.name ||
-      user?.companyName ||
-      user?.displayName ||
-      "Müşteri";
-    const email = guestOverride?.email ?? user?.email;
-
-    let documentType: ElogoDocumentType = "EARCHIVE";
-    let alias: string | undefined;
-    if (hasRealTaxId) {
-      const chk = await this.elogo.checkUser(vknTckn).catch(() => null);
-      if (chk?.isEInvoiceUser) {
-        documentType = "EINVOICE";
-        alias = chk.eInvoicePkAlias;
-      }
-    }
-    return {
-      vknTckn,
-      name,
-      email,
-      address: guestOverride?.address,
-      party: this.buildParty(
-        vknTckn,
-        name,
-        email,
-        guestOverride?.address
-          ? {
-              city: guestOverride.address.city,
-              district: guestOverride.address.district,
-              address: guestOverride.address.street,
-            }
-          : null,
-      ),
-      documentType,
-      alias,
-    };
-  }
-
-  private buildParty(
-    vknTckn: string,
-    name: string,
-    email?: string | null,
-    addr?: {
-      city?: string | null;
-      district?: string | null;
-      address?: string | null;
-    } | null,
-  ): UblParty {
-    // GİB UBL-TR: PostalAddress'te CitySubdivisionName + CityName gerekli (yalnız Country → şema hatası).
-    const common = {
-      vknTckn,
-      email: email || undefined,
-      city: addr?.city || "Belirtilmemiş",
-      district: addr?.district || "Belirtilmemiş",
-      streetAddress: addr?.address || undefined,
-    };
-    if (vknTckn.length === 10) {
-      return { ...common, title: name };
-    }
-    // GİB gerçek kişi: cac:Person/cbc:FirstName VE cbc:FamilyName ikisi de zorunlu.
-    // Biri boş kalırsa eLogo "ad-soyad bulunmalıdır" ile reddeder; bu yüzden asla boş bırakma.
-    const parts = name.trim().split(/\s+/).filter(Boolean);
-    if (parts.length > 1) {
-      const lastName = parts.pop()!;
-      return { ...common, firstName: parts.join(" "), lastName };
-    }
-    const single = parts[0];
-    return single
-      ? { ...common, firstName: single, lastName: single }
-      : { ...common, firstName: "Nihai", lastName: "Tüketici" };
-  }
-
-  /** Alıcının varsayılan adresini çek (UBL PostalAddress için). */
-  private async fetchAddress(userId?: string | null): Promise<{
-    city: string | null;
-    district: string | null;
-    address: string | null;
-  } | null> {
-    if (!userId) return null;
-    return this.prisma.address
-      .findFirst({
-        where: { userId },
-        orderBy: { isDefault: "desc" },
-        select: { city: true, district: true, address: true },
-      })
-      .catch(() => null);
-  }
 
   // ───────────────────────── public API (tetikleyiciler çağırır) ─────────────────────────
 
@@ -668,8 +418,8 @@ export class ElogoInvoicingService {
 
     const categoryId = order.product?.categoryId ?? null;
     const [productVatRate, serviceVatRate] = await Promise.all([
-      this.resolveVatRate("platform_sale", categoryId),
-      this.resolveVatRate("service_fee"),
+      this.documents.resolveVatRate("platform_sale", categoryId),
+      this.documents.resolveVatRate("service_fee"),
     ]);
     // Kısmi iadede tüm kalemler aynı oranda küçülür; belge her zaman gerçekte
     // elde kalan tutarı gösterir.
@@ -998,7 +748,7 @@ export class ElogoInvoicingService {
       return;
     }
     const rate = Number(inv.vatRate);
-    const amounts = this.invoiceAmounts(inv.type, gross, rate);
+    const amounts = this.documents.invoiceAmounts(inv.type, gross, rate);
     await this.prisma.elogoInvoice.update({
       where: { id: inv.id },
       data: {
@@ -1211,7 +961,7 @@ export class ElogoInvoicingService {
         return;
       }
 
-      const recipient = await this.resolveRecipient(
+      const recipient = await this.documents.resolveRecipient(
         recipientUserId,
         guestRecipient,
       );
@@ -1219,10 +969,10 @@ export class ElogoInvoicingService {
       // Kalem listesi varsa belge ÇOK ORANLI olabilir; toplamlar satırlardan
       // gelir ve `vatRate` yalnız geriye-uyumluluk için (tek oranlı özet) tutulur.
       const hasLines = !!lineItems?.length;
-      const vatRate = await this.resolveVatRate(type, categoryId);
+      const vatRate = await this.documents.resolveVatRate(type, categoryId);
       const amounts = hasLines
         ? invoiceTotalsFromLines(lineItems!)
-        : this.invoiceAmounts(type, grossAmount, vatRate);
+        : this.documents.invoiceAmounts(type, grossAmount, vatRate);
 
       // Sequence artışı ve unique(type,sourceId) aynı SERIALIZABLE transaction'da:
       // yarışın kaybedeni numara tüketmez; kazanan kayıt tek ETTN ile gönderilir.
@@ -1232,10 +982,11 @@ export class ElogoInvoicingService {
             where: { type_sourceId: { type, sourceId } },
           });
           if (raced) return raced;
-          const invoiceNumber = await this.allocateInvoiceNumberInTransaction(
-            tx,
-            invoiceIssueYear(now),
-          );
+          const invoiceNumber =
+            await this.documents.allocateInvoiceNumberInTransaction(
+              tx,
+              invoiceIssueYear(now),
+            );
           return tx.elogoInvoice.create({
             data: {
               type,
@@ -1433,7 +1184,7 @@ export class ElogoInvoicingService {
             })
             .catch(() => null)
         : Promise.resolve(null),
-      this.fetchAddress(inv.recipientUserId),
+      this.documents.fetchAddress(inv.recipientUserId),
     ]);
     const snapshotAddress =
       inv.recipientCity || inv.recipientDistrict || inv.recipientStreet
@@ -1443,7 +1194,7 @@ export class ElogoInvoicingService {
             address: inv.recipientStreet,
           }
         : null;
-    const party = this.buildParty(
+    const party = this.documents.buildParty(
       inv.recipientVknTckn,
       inv.recipientName || "Müşteri",
       // Snapshot önce: misafir siparişlerinde kullanıcı kaydı paylaşılan sistem
@@ -1458,7 +1209,9 @@ export class ElogoInvoicingService {
     if (isReturn && inv.billingReference) {
       billingRef = {
         invoiceId: inv.billingReference,
-        issueDate: this.ymd(inv.billingReferenceIssueDate ?? issueMoment),
+        issueDate: this.documents.ymd(
+          inv.billingReferenceIssueDate ?? issueMoment,
+        ),
       };
     }
 
@@ -1472,13 +1225,13 @@ export class ElogoInvoicingService {
         invoiceTypeCode: isReturn ? "IADE" : "SATIS",
         id: invoiceNumber,
         uuid: ettn,
-        issueDate: this.ymd(issueMoment),
-        issueTime: this.hms(issueMoment),
+        issueDate: this.documents.ymd(issueMoment),
+        issueTime: this.documents.hms(issueMoment),
         currency: "TRY",
         // Gönderim şekli yalnız e-Arşiv'de gerekli (e-Fatura'da AdditionalDocumentReference yok).
         sendType: isEInvoice ? undefined : "ELEKTRONIK",
         note: desc,
-        supplier: this.supplierParty(),
+        supplier: this.documents.supplierParty(),
         customer: party,
         lines: snapshotLines.length
           ? snapshotLines.map((l) => ({
@@ -1574,7 +1327,9 @@ export class ElogoInvoicingService {
           ublXml: xml,
           signed: false,
           ...(alias ? { alias } : {}),
-          ...(this.xsltUuid ? { xsltUuid: this.xsltUuid } : {}),
+          ...(this.documents.xsltUuid
+            ? { xsltUuid: this.documents.xsltUuid }
+            : {}),
         });
 
         if (res.success) {
@@ -1605,7 +1360,7 @@ export class ElogoInvoicingService {
         if (attempt < 11 && this.isDuplicateNumberError(res.description)) {
           const skip = attempt + 1;
           for (let s = 0; s < skip; s++) {
-            currentNumber = await this.allocateInvoiceNumber(
+            currentNumber = await this.documents.allocateInvoiceNumber(
               invoiceIssueYear(issueMoment),
             );
           }
@@ -1839,7 +1594,7 @@ export class ElogoInvoicingService {
           quantity,
           net,
           unitPrice: net / quantity,
-          vatRate: net > 0 ? this.round2((tax / net) * 100) : 0,
+          vatRate: net > 0 ? this.documents.round2((tax / net) * 100) : 0,
         };
       });
   }
@@ -1859,10 +1614,10 @@ export class ElogoInvoicingService {
       },
       select: { total: true },
     });
-    const alreadyReversed = this.round2(
+    const alreadyReversed = this.documents.round2(
       priorReturns.reduce((sum, row) => sum + Number(row.total), 0),
     );
-    const remaining = this.round2(
+    const remaining = this.documents.round2(
       Math.max(0, Number(inv.total) - alreadyReversed),
     );
     if (remaining <= 0.009) return;
@@ -1978,7 +1733,7 @@ export class ElogoInvoicingService {
         : 1;
     const componentLines = rawComponentLines.map((line) => ({
       ...line,
-      net: this.round2(line.net * componentScale),
+      net: this.documents.round2(line.net * componentScale),
       unitPrice: (line.net * componentScale) / line.quantity,
     }));
     const componentTotals = componentLines.length
@@ -1990,7 +1745,7 @@ export class ElogoInvoicingService {
         ? remaining
         : Math.min(
             remaining,
-            this.round2(baseGross * invoiceAdjustment.refundRatio),
+            this.documents.round2(baseGross * invoiceAdjustment.refundRatio),
           );
     if (returnTotal <= 0.009) return;
     const originalTotal = Number(inv.total);
@@ -1998,7 +1753,7 @@ export class ElogoInvoicingService {
       originalTotal > 0 ? Number(inv.netAmount) / originalTotal : 0;
     const returnNet = componentTotals
       ? Math.min(componentTotals.net, returnTotal)
-      : this.round2(returnTotal * netRatio);
+      : this.documents.round2(returnTotal * netRatio);
 
     const now = new Date();
     const record = await this.prisma.$transaction(
@@ -2012,7 +1767,7 @@ export class ElogoInvoicingService {
           },
         });
         if (raced) return raced;
-        const number = await this.allocateInvoiceNumberInTransaction(
+        const number = await this.documents.allocateInvoiceNumberInTransaction(
           tx,
           invoiceIssueYear(now),
         );
@@ -2035,7 +1790,7 @@ export class ElogoInvoicingService {
             invoiceNumber: number,
             ettn: randomUUID(),
             netAmount: returnNet,
-            taxAmount: this.round2(returnTotal - returnNet),
+            taxAmount: this.documents.round2(returnTotal - returnNet),
             total: returnTotal,
             originalTotal: returnTotal,
             vatRate: inv.vatRate,
@@ -2104,8 +1859,11 @@ export class ElogoInvoicingService {
       if (totals) {
         const sourceAmount =
           inv.type === "commission" ? totals.sellerCommission : totals.buyerFee;
-        return this.invoiceAmounts(inv.type, sourceAmount, Number(inv.vatRate))
-          .total;
+        return this.documents.invoiceAmounts(
+          inv.type,
+          sourceAmount,
+          Number(inv.vatRate),
+        ).total;
       }
     }
     if (inv.type === "platform_sale" || inv.type === "membership") {
@@ -2116,7 +1874,7 @@ export class ElogoInvoicingService {
         })
         .catch(() => null);
       if (order) {
-        return this.invoiceAmounts(
+        return this.documents.invoiceAmounts(
           inv.type,
           Number(order.totalAmount),
           Number(inv.vatRate),
@@ -2130,7 +1888,7 @@ export class ElogoInvoicingService {
           })
           .catch(() => null);
         if (membershipPayment) {
-          return this.invoiceAmounts(
+          return this.documents.invoiceAmounts(
             inv.type,
             Number(membershipPayment.amount),
             Number(inv.vatRate),
@@ -2146,7 +1904,7 @@ export class ElogoInvoicingService {
         })
         .catch(() => null);
       if (boost) {
-        return this.invoiceAmounts(
+        return this.documents.invoiceAmounts(
           inv.type,
           Number(boost.price),
           Number(inv.vatRate),
