@@ -91,6 +91,12 @@ export function TruncatedText({
         role={truncated ? "button" : undefined}
         tabIndex={truncated ? 0 : undefined}
         onClick={onClick}
+        // Deliberately NOT gated by `isTouch` like onClick: a keyboard-only
+        // user can't hover either, regardless of the device's primary
+        // pointer capability, so they need this escape hatch always. It
+        // doesn't fight a wrapping Link's own Enter-to-navigate — that's a
+        // separate DOM node with its own tab stop and focus target, so a
+        // real navigation reachable via keyboard is never blocked here.
         onKeyDown={(e) => {
           if (e.key === "Enter" || e.key === " ") reveal(e);
         }}
