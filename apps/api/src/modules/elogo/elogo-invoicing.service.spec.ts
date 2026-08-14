@@ -233,10 +233,7 @@ describe("ElogoInvoicingService", () => {
     );
     const delivery = new ElogoDeliveryService(prisma, elogoClient, documents);
     const svc = new ElogoInvoicingService(
-      prisma,
-      elogoClient,
       {} as any, // queries
-      documents,
       delivery,
       new ElogoIssuingService(prisma, documents, delivery),
       new ElogoReversalService(prisma, elogoClient, documents, delivery),
@@ -283,10 +280,7 @@ describe("ElogoInvoicingService", () => {
     );
     const delivery = new ElogoDeliveryService(prisma, elogoClient, documents);
     const svc = new ElogoInvoicingService(
-      prisma,
-      elogoClient,
       {} as any, // queries
-      documents,
       delivery,
       new ElogoIssuingService(prisma, documents, delivery),
       new ElogoReversalService(prisma, elogoClient, documents, delivery),
@@ -317,10 +311,7 @@ describe("ElogoInvoicingService", () => {
     );
     const delivery = new ElogoDeliveryService(prisma, elogoClient, documents);
     const svc = new ElogoInvoicingService(
-      prisma,
-      elogoClient,
       {} as any, // queries
-      documents,
       delivery,
       new ElogoIssuingService(prisma, documents, delivery),
       new ElogoReversalService(prisma, elogoClient, documents, delivery),
@@ -354,10 +345,7 @@ describe("ElogoInvoicingService", () => {
     );
     const delivery = new ElogoDeliveryService(prisma, elogoClient, documents);
     const svc = new ElogoInvoicingService(
-      prisma,
-      elogoClient,
       {} as any, // queries
-      documents,
       delivery,
       new ElogoIssuingService(prisma, documents, delivery),
       new ElogoReversalService(prisma, elogoClient, documents, delivery),
@@ -385,10 +373,7 @@ describe("ElogoInvoicingService", () => {
     );
     const delivery = new ElogoDeliveryService(prisma, elogoClient, documents);
     const svc = new ElogoInvoicingService(
-      prisma,
-      elogoClient,
       {} as any, // queries
-      documents,
       delivery,
       new ElogoIssuingService(prisma, documents, delivery),
       new ElogoReversalService(prisma, elogoClient, documents, delivery),
@@ -428,10 +413,7 @@ describe("ElogoInvoicingService", () => {
     );
     const delivery = new ElogoDeliveryService(prisma, elogoClient, documents);
     const svc = new ElogoInvoicingService(
-      prisma,
-      elogoClient,
       {} as any, // queries
-      documents,
       delivery,
       new ElogoIssuingService(prisma, documents, delivery),
       new ElogoReversalService(prisma, elogoClient, documents, delivery),
@@ -466,10 +448,7 @@ describe("ElogoInvoicingService", () => {
     );
     const delivery = new ElogoDeliveryService(prisma, elogoClient, documents);
     const svc = new ElogoInvoicingService(
-      prisma,
-      elogoClient,
       {} as any, // queries
-      documents,
       delivery,
       new ElogoIssuingService(prisma, documents, delivery),
       new ElogoReversalService(prisma, elogoClient, documents, delivery),
@@ -499,10 +478,7 @@ describe("ElogoInvoicingService", () => {
     );
     const delivery = new ElogoDeliveryService(prisma, elogoClient, documents);
     const svc = new ElogoInvoicingService(
-      prisma,
-      elogoClient,
       {} as any, // queries
-      documents,
       delivery,
       new ElogoIssuingService(prisma, documents, delivery),
       new ElogoReversalService(prisma, elogoClient, documents, delivery),
@@ -530,10 +506,7 @@ describe("ElogoInvoicingService", () => {
     );
     const delivery = new ElogoDeliveryService(prisma, elogoClient, documents);
     const svc = new ElogoInvoicingService(
-      prisma,
-      elogoClient,
       {} as any, // queries
-      documents,
       delivery,
       new ElogoIssuingService(prisma, documents, delivery),
       new ElogoReversalService(prisma, elogoClient, documents, delivery),
@@ -569,10 +542,7 @@ describe("ElogoInvoicingService", () => {
     );
     const delivery = new ElogoDeliveryService(prisma, elogoClient, documents);
     const svc = new ElogoInvoicingService(
-      prisma,
-      elogoClient,
       {} as any, // queries
-      documents,
       delivery,
       new ElogoIssuingService(prisma, documents, delivery),
       new ElogoReversalService(prisma, elogoClient, documents, delivery),
@@ -639,10 +609,7 @@ describe("ElogoInvoicingService", () => {
     );
     const delivery = new ElogoDeliveryService(prisma, elogoClient, documents);
     const svc = new ElogoInvoicingService(
-      prisma,
-      elogoClient,
       {} as any, // queries
-      documents,
       delivery,
       new ElogoIssuingService(prisma, documents, delivery),
       new ElogoReversalService(prisma, elogoClient, documents, delivery),
@@ -716,10 +683,7 @@ describe("ElogoInvoicingService", () => {
     );
     const delivery = new ElogoDeliveryService(prisma, elogoClient, documents);
     const svc = new ElogoInvoicingService(
-      prisma,
-      elogoClient,
       {} as any, // queries
-      documents,
       delivery,
       new ElogoIssuingService(prisma, documents, delivery),
       new ElogoReversalService(prisma, elogoClient, documents, delivery),
@@ -754,10 +718,7 @@ describe("ElogoInvoicingService", () => {
     );
     const delivery = new ElogoDeliveryService(prisma, elogoClient, documents);
     const svc = new ElogoInvoicingService(
-      prisma,
-      elogoClient,
       {} as any, // queries
-      documents,
       delivery,
       new ElogoIssuingService(prisma, documents, delivery),
       new ElogoReversalService(prisma, elogoClient, documents, delivery),
@@ -789,10 +750,7 @@ describe("ElogoInvoicingService", () => {
     );
     const delivery = new ElogoDeliveryService(prisma, elogoClient, documents);
     const svc = new ElogoInvoicingService(
-      prisma,
-      elogoClient,
       {} as any, // queries
-      documents,
       delivery,
       new ElogoIssuingService(prisma, documents, delivery),
       new ElogoReversalService(prisma, elogoClient, documents, delivery),
@@ -822,10 +780,7 @@ describe("ElogoInvoicingService", () => {
     );
     const delivery = new ElogoDeliveryService(prisma, elogoClient, documents);
     const svc = new ElogoInvoicingService(
-      prisma,
-      elogoClient,
       {} as any, // queries
-      documents,
       delivery,
       new ElogoIssuingService(prisma, documents, delivery),
       new ElogoReversalService(prisma, elogoClient, documents, delivery),
@@ -860,10 +815,7 @@ describe("ElogoInvoicingService", () => {
     );
     const delivery = new ElogoDeliveryService(prisma, elogoClient, documents);
     const svc = new ElogoInvoicingService(
-      prisma,
-      elogoClient,
       {} as any, // queries
-      documents,
       delivery,
       new ElogoIssuingService(prisma, documents, delivery),
       new ElogoReversalService(prisma, elogoClient, documents, delivery),
@@ -899,10 +851,7 @@ describe("ElogoInvoicingService", () => {
     );
     const delivery = new ElogoDeliveryService(prisma, elogoClient, documents);
     const svc = new ElogoInvoicingService(
-      prisma,
-      elogoClient,
       {} as any, // queries
-      documents,
       delivery,
       new ElogoIssuingService(prisma, documents, delivery),
       new ElogoReversalService(prisma, elogoClient, documents, delivery),
@@ -938,10 +887,7 @@ describe("ElogoInvoicingService", () => {
     );
     const delivery = new ElogoDeliveryService(prisma, elogoClient, documents);
     const svc = new ElogoInvoicingService(
-      prisma,
-      elogoClient,
       {} as any, // queries
-      documents,
       delivery,
       new ElogoIssuingService(prisma, documents, delivery),
       new ElogoReversalService(prisma, elogoClient, documents, delivery),
@@ -991,10 +937,7 @@ describe("ElogoInvoicingService", () => {
     );
     const delivery = new ElogoDeliveryService(prisma, elogoClient, documents);
     const svc = new ElogoInvoicingService(
-      prisma,
-      elogoClient,
       {} as any, // queries
-      documents,
       delivery,
       new ElogoIssuingService(prisma, documents, delivery),
       new ElogoReversalService(prisma, elogoClient, documents, delivery),
@@ -1036,10 +979,7 @@ describe("ElogoInvoicingService", () => {
     );
     const delivery = new ElogoDeliveryService(prisma, elogoClient, documents);
     const svc = new ElogoInvoicingService(
-      prisma,
-      elogoClient,
       {} as any, // queries
-      documents,
       delivery,
       new ElogoIssuingService(prisma, documents, delivery),
       new ElogoReversalService(prisma, elogoClient, documents, delivery),
@@ -1094,10 +1034,7 @@ describe("ElogoInvoicingService", () => {
     );
     const delivery = new ElogoDeliveryService(prisma, elogoClient, documents);
     const svc = new ElogoInvoicingService(
-      prisma,
-      elogoClient,
       {} as any, // queries
-      documents,
       delivery,
       new ElogoIssuingService(prisma, documents, delivery),
       new ElogoReversalService(prisma, elogoClient, documents, delivery),
@@ -1143,10 +1080,7 @@ describe("ElogoInvoicingService", () => {
     );
     const delivery = new ElogoDeliveryService(prisma, elogoClient, documents);
     const svc = new ElogoInvoicingService(
-      prisma,
-      elogoClient,
       {} as any, // queries
-      documents,
       delivery,
       new ElogoIssuingService(prisma, documents, delivery),
       new ElogoReversalService(prisma, elogoClient, documents, delivery),
@@ -1177,10 +1111,7 @@ describe("ElogoInvoicingService", () => {
     );
     const delivery = new ElogoDeliveryService(prisma, elogoClient, documents);
     const svc = new ElogoInvoicingService(
-      prisma,
-      elogoClient,
       {} as any, // queries
-      documents,
       delivery,
       new ElogoIssuingService(prisma, documents, delivery),
       new ElogoReversalService(prisma, elogoClient, documents, delivery),
@@ -1221,10 +1152,7 @@ describe("ElogoInvoicingService", () => {
     );
     const delivery = new ElogoDeliveryService(prisma, elogoClient, documents);
     const svc = new ElogoInvoicingService(
-      prisma,
-      elogoClient,
       {} as any, // queries
-      documents,
       delivery,
       new ElogoIssuingService(prisma, documents, delivery),
       new ElogoReversalService(prisma, elogoClient, documents, delivery),
@@ -1264,10 +1192,7 @@ describe("ElogoInvoicingService", () => {
     );
     const delivery = new ElogoDeliveryService(prisma, elogoClient, documents);
     const svc = new ElogoInvoicingService(
-      prisma,
-      elogoClient,
       {} as any, // queries
-      documents,
       delivery,
       new ElogoIssuingService(prisma, documents, delivery),
       new ElogoReversalService(prisma, elogoClient, documents, delivery),

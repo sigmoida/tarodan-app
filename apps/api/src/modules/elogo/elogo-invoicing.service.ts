@@ -1,15 +1,9 @@
-import { Injectable, Logger, Optional } from "@nestjs/common";
-import { PrismaService } from "../../prisma";
-import {} from "./helpers/elogo-retry-policy";
+import { Injectable } from "@nestjs/common";
 import { type GuestInvoiceRecipient } from "./invoice/elogo-guest-recipient";
-import { ElogoService } from "./elogo.service";
 import { ElogoQueryService } from "./elogo-query.service";
-import { ElogoDocumentService } from "./elogo-document.service";
 import { ElogoDeliveryService } from "./elogo-delivery.service";
 import { ElogoIssuingService } from "./elogo-issuing.service";
 import { ElogoReversalService } from "./elogo-reversal.service";
-import { StorageService } from "../storage/storage.service";
-import { SmtpProvider } from "../mail/smtp.provider";
 import { type InvoiceLineItem } from "./invoice/invoice-lines";
 
 /**
@@ -46,18 +40,11 @@ export interface CutOptions {
 
 @Injectable()
 export class ElogoInvoicingService {
-  private readonly logger = new Logger(ElogoInvoicingService.name);
-
   constructor(
-    private readonly prisma: PrismaService,
-    private readonly elogo: ElogoService,
     private readonly queries: ElogoQueryService,
-    private readonly documents: ElogoDocumentService,
     private readonly delivery: ElogoDeliveryService,
     private readonly issuing: ElogoIssuingService,
     private readonly reversals: ElogoReversalService,
-    @Optional() private readonly storage?: StorageService,
-    @Optional() private readonly smtp?: SmtpProvider,
   ) {}
 
   // ───────────────────────── public API (tetikleyiciler çağırır) ─────────────────────────

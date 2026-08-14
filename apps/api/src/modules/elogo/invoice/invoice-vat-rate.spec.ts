@@ -208,10 +208,7 @@ describe("fatura KDV oranının kaynağı", () => {
       documents,
     );
     const svc = new ElogoInvoicingService(
-      prisma as any,
-      makeElogo(),
-      {} as any, // queries,
-      documents,
+      {} as any, // queries
       delivery,
       // Kesme zinciri gerçek: issue* → cut → documents. Stub geçmek
       // bu spec'in fatura iddialarını boşa düşürürdü.
@@ -256,10 +253,7 @@ describe("fatura KDV oranının kaynağı", () => {
       documents,
     );
     const svc = new ElogoInvoicingService(
-      prisma as any,
-      makeElogo(),
-      {} as any, // queries,
-      documents,
+      {} as any, // queries
       delivery,
       // Kesme zinciri gerçek: issue* → cut → documents. Stub geçmek
       // bu spec'in fatura iddialarını boşa düşürürdü.
@@ -314,10 +308,7 @@ describe("fatura KDV oranının kaynağı", () => {
       documents,
     );
     const svc = new ElogoInvoicingService(
-      prisma as any,
-      makeElogo(),
-      {} as any, // queries,
-      documents,
+      {} as any, // queries
       delivery,
       // Kesme zinciri gerçek: issue* → cut → documents. Stub geçmek
       // bu spec'in fatura iddialarını boşa düşürürdü.
@@ -360,10 +351,7 @@ describe("fatura KDV oranının kaynağı", () => {
       documents,
     );
     const svc = new ElogoInvoicingService(
-      prisma as any,
-      makeElogo(),
-      {} as any, // queries,
-      documents,
+      {} as any, // queries
       delivery,
       // Kesme zinciri gerçek: issue* → cut → documents. Stub geçmek
       // bu spec'in fatura iddialarını boşa düşürürdü.

@@ -251,10 +251,7 @@ describe("paket anahtarlı fatura tüketicileri", () => {
       documents,
     );
     const svc = new ElogoInvoicingService(
-      prisma as any,
-      elogoClient,
       new ElogoQueryService(prisma as any, elogoClient) as any,
-      documents,
       delivery,
       new ElogoIssuingService(prisma as any, documents, delivery),
       new ElogoReversalService(prisma as any, elogoClient, documents, delivery),
@@ -293,10 +290,7 @@ describe("paket anahtarlı fatura tüketicileri", () => {
       documents,
     );
     const svc = new ElogoInvoicingService(
-      prisma as any,
-      elogoClient,
       new ElogoQueryService(prisma as any, elogoClient) as any,
-      documents,
       delivery,
       new ElogoIssuingService(prisma as any, documents, delivery),
       new ElogoReversalService(prisma as any, elogoClient, documents, delivery),
@@ -332,10 +326,7 @@ describe("paket anahtarlı fatura tüketicileri", () => {
       documents,
     );
     const svc = new ElogoInvoicingService(
-      prisma as any,
-      elogoClient,
       new ElogoQueryService(prisma as any, elogoClient) as any,
-      documents,
       delivery,
       new ElogoIssuingService(prisma as any, documents, delivery),
       new ElogoReversalService(prisma as any, elogoClient, documents, delivery),
@@ -374,10 +365,7 @@ describe("paket anahtarlı fatura tüketicileri", () => {
       documents,
     );
     const svc = new ElogoInvoicingService(
-      prisma as any,
-      elogoClient,
       new ElogoQueryService(prisma as any, elogoClient) as any,
-      documents,
       delivery,
       new ElogoIssuingService(prisma as any, documents, delivery),
       new ElogoReversalService(prisma as any, elogoClient, documents, delivery),
@@ -430,10 +418,7 @@ describe("paket anahtarlı fatura tüketicileri", () => {
       documents,
     );
     const svc = new ElogoInvoicingService(
-      prisma as any,
-      elogoClient,
       new ElogoQueryService(prisma as any, elogoClient) as any,
-      documents,
       delivery,
       new ElogoIssuingService(prisma as any, documents, delivery),
       new ElogoReversalService(prisma as any, elogoClient, documents, delivery),
@@ -467,10 +452,7 @@ describe("paket anahtarlı fatura tüketicileri", () => {
       documents,
     );
     const svc = new ElogoInvoicingService(
-      prisma as any,
-      elogoClient,
       new ElogoQueryService(prisma as any, elogoClient) as any,
-      documents,
       delivery,
       new ElogoIssuingService(prisma as any, documents, delivery),
       new ElogoReversalService(prisma as any, elogoClient, documents, delivery),
@@ -499,10 +481,7 @@ describe("paket anahtarlı fatura tüketicileri", () => {
       documents,
     );
     const svc = new ElogoInvoicingService(
-      prisma as any,
-      elogoClient,
       new ElogoQueryService(prisma as any, elogoClient) as any,
-      documents,
       delivery,
       new ElogoIssuingService(prisma as any, documents, delivery),
       new ElogoReversalService(prisma as any, elogoClient, documents, delivery),
@@ -529,10 +508,7 @@ describe("paket anahtarlı fatura tüketicileri", () => {
       documents,
     );
     const svc = new ElogoInvoicingService(
-      prisma as any,
-      elogoClient,
       new ElogoQueryService(prisma as any, elogoClient) as any,
-      documents,
       delivery,
       new ElogoIssuingService(prisma as any, documents, delivery),
       new ElogoReversalService(prisma as any, elogoClient, documents, delivery),
@@ -577,10 +553,7 @@ describe("iade faturası alıcı snapshot'ı", () => {
       documents,
     );
     const svc = new ElogoInvoicingService(
-      prisma as any,
-      elogoClient,
       new ElogoQueryService(prisma as any, elogoClient) as any,
-      documents,
       delivery,
       new ElogoIssuingService(prisma as any, documents, delivery),
       new ElogoReversalService(prisma as any, elogoClient, documents, delivery),
@@ -616,10 +589,7 @@ describe("iade faturası alıcı snapshot'ı", () => {
       documents,
     );
     const svc = new ElogoInvoicingService(
-      prisma as any,
-      elogoClient,
       new ElogoQueryService(prisma as any, elogoClient) as any,
-      documents,
       delivery,
       new ElogoIssuingService(prisma as any, documents, delivery),
       new ElogoReversalService(prisma as any, elogoClient, documents, delivery),
@@ -652,10 +622,7 @@ describe("iade faturası alıcı snapshot'ı", () => {
       documents,
     );
     const svc = new ElogoInvoicingService(
-      prisma as any,
-      elogoClient,
       new ElogoQueryService(prisma as any, elogoClient) as any,
-      documents,
       delivery,
       new ElogoIssuingService(prisma as any, documents, delivery),
       new ElogoReversalService(prisma as any, elogoClient, documents, delivery),

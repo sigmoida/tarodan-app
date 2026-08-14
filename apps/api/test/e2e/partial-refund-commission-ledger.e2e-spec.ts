@@ -230,10 +230,7 @@ describe("Partial-refund commission ledger pro-rating (#88) [P0]", () => {
       documents,
     );
     const elogo = new ElogoInvoicingService(
-      prisma,
-      {} as any, // elogo client
       {} as any, // queries
-      documents,
       delivery,
       // Bu spec KESİM yolunu sürüyor (issueCommissionInvoice), o yüzden gerçek
       // kesme servisi — ve casusun izlediği AYNI delivery örneği.
