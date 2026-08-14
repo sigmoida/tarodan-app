@@ -1,6 +1,7 @@
 import { CheckCircleIcon } from "@heroicons/react/24/outline";
 import { useTranslations } from "next-intl";
 import { Badge } from "@tarodan/ui";
+import { MaskedValue } from "@/components/MaskedValue";
 import { SectionCard } from "@/components/detail/SectionCard";
 import { type UserDetail } from "../types";
 
@@ -121,15 +122,11 @@ export function UserInfoSection({ user }: { user: UserDetail }) {
                   </p>
                 </Item>
                 <Item label={t("admin.users.detail.ibanLabel")}>
-                  <p className="break-all font-mono text-heading">
-                    {user.bankAccount.iban}
-                  </p>
+                  <MaskedValue value={user.bankAccount.iban} />
                 </Item>
                 {user.bankAccount.tcKimlikNo && (
                   <Item label={t("admin.users.detail.tcKimlikNoLabel")}>
-                    <p className="font-mono text-heading">
-                      {user.bankAccount.tcKimlikNo}
-                    </p>
+                    <MaskedValue value={user.bankAccount.tcKimlikNo} />
                   </Item>
                 )}
                 {user.bankAccount.taxId && (
