@@ -1,13 +1,26 @@
 /**
- * The platform's own warehouse address — the destination of every inbound
- * parcel we ask a user to send us.
+ * The platform warehouse address as literal text, for the carrier payloads that
+ * need a recipient written out: a trade's inbound leg (both parcels come to us
+ * before either goes out) and a refund's return leg. Each flow had its own copy
+ * of these five env reads and their defaults, kept in step by hand — the refund
+ * copy's comment even said it must match the trade one — so a parcel could be
+ * addressed one way and the other flow's parcel another.
  *
- * Two flows need it: a trade's inbound leg (both parcels come to us before
- * either goes out) and a refund's return leg. Each had its own copy of the five
- * env reads and their defaults, kept in step by hand — the refund copy's
- * comment even said it must match the trade one. Two definitions of one
- * address is a mismatch waiting for the first time only one of them is updated,
- * and the failure mode is a parcel shipped to the wrong place.
+ * ⚠ This is NOT the only warehouse address in the system. Outbound and return
+ * shipments take an Address *row* instead, resolved by
+ * `AdminTradeCommonService.resolveWarehouseAddressId` from the
+ * `warehouse_address_id` platform setting (editable in admin Settings, checked
+ * by `HealthService`). The two are unrelated at runtime: moving the warehouse
+ * in admin Settings leaves the env copy — and therefore inbound trade legs and
+ * refund returns — pointing at the old address, with the health check still
+ * green. Unifying them means deciding which one wins and reworking the callers
+ * that need text rather than an id, so it is a deliberate change, not a
+ * refactor.
+ *
+ * Note also that `TARODAN_WAREHOUSE_*` is not declared in
+ * `config/env.validation.ts`, and ConfigModule drops undeclared keys read from
+ * an `.env` file — so these only take effect where they are injected as real
+ * environment variables (see CLAUDE.md §15, "Known, undecided").
  *
  * Defaults are deliberately non-null: an unset env must not block a return or a
  * trade, so the address falls back to head office rather than failing.

@@ -234,7 +234,7 @@ These are approved, behavior-preserving cleanups. **In any file you touch:**
    plugin lands) or at minimum leave the code you wrote null-safe.
 2. **i18n exceptions** — convert hardcoded Turkish exception strings to
    `i18nMessage` keys (catalog text identical to the old string). ESLint warns
-   on these (`@tarodan/no-hardcoded-exception-message`, ~650 left); the rule
+   on these (`@tarodan/no-hardcoded-exception-message`, 617 left); the rule
    becomes an error when the count reaches zero.
 3. **List infra** — replace hand-rolled `skip`/`take`/`orderBy` with
    `common/list` helpers when semantics are identical.
@@ -264,6 +264,13 @@ in passing, because each one changes behavior:
   their configured values start taking effect.
 - **PayTR's return URLs have no fallback** — if `FRONTEND_URL` is unset they
   render as `undefined/payment/success`. Payment-critical, so left as-is.
+- **The warehouse address exists twice, by different mechanisms.** Inbound trade
+  legs and refund returns write it out as text from `config/warehouse.ts`
+  (env); outbound and return shipments take an Address row resolved from the
+  `warehouse_address_id` platform setting (admin Settings, health-checked).
+  Moving the warehouse in admin leaves the env copy stale while the health check
+  stays green. Unifying them means picking a winner and reworking the callers
+  that need text rather than an id.
 
 ## 16. Verification
 

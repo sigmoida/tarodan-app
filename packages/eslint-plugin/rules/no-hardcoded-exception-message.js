@@ -15,11 +15,19 @@
  * handed to an exception constructor, which is where the localization contract
  * actually lives. Turkish in a log line or a comment is not user-facing copy
  * and is left alone.
+ *
+ * `Error` subclasses are deliberately NOT matched. Plain `new Error(...)` and
+ * the domain signals that extend it (`CommissionRuleMatchError`,
+ * `ShippingPackageTiersNotConfiguredError`, …) never reach a client: they are
+ * caught internally and rethrown as a real `*Exception` carrying an
+ * `i18nMessage` key, with the original text going only to the logger. Flagging
+ * them would ask for a translation of something nobody reads, and would put a
+ * floor under the count this rule is meant to drive to zero.
  */
 "use strict";
 
 const TURKISH_CHARS = /[çğıöşüÇĞİÖŞÜ]/;
-const EXCEPTION_NAME = /(?:Exception|Error)$/;
+const EXCEPTION_NAME = /Exception$/;
 
 module.exports = {
   meta: {

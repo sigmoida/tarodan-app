@@ -8,7 +8,7 @@
 module.exports = {
   plugins: ["@tarodan"],
   rules: {
-    // 373 exception messages are still hardcoded Turkish; a warning keeps them
+    // 617 exception messages are still hardcoded Turkish; a warning keeps them
     // visible without failing the build, and becomes an error once they are
     // converted to catalog keys.
     "@tarodan/no-hardcoded-exception-message": "warn",
