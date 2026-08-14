@@ -45,9 +45,10 @@ export function CategoryChart({
                 legend: {
                   position: "bottom",
                   labels: {
-                    padding: 12,
-                    boxWidth: 14,
-                    font: { size: 12 },
+                    padding: 8,
+                    boxWidth: 10,
+                    boxHeight: 10,
+                    font: { size: 11 },
                   },
                 },
               },

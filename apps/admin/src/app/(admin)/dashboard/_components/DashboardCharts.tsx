@@ -46,6 +46,7 @@ export function DashboardCharts({
 
   const commonOptions = {
     responsive: true,
+    maintainAspectRatio: false,
     plugins: { legend: { display: false } },
     scales: {
       x: {
@@ -63,7 +64,9 @@ export function DashboardCharts({
     <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
       <SectionCard title={t("admin.dashboard.charts.sales30dTitle")}>
         {hasSales ? (
-          <Line data={salesChartData} options={commonOptions} />
+          <div className="h-72">
+            <Line data={salesChartData} options={commonOptions} />
+          </div>
         ) : (
           <EmptyState
             size="compact"
@@ -73,19 +76,21 @@ export function DashboardCharts({
       </SectionCard>
       <SectionCard title={t("admin.dashboard.charts.dailyOrdersTitle")}>
         {hasOrders ? (
-          <Bar
-            data={ordersChartData}
-            options={{
-              ...commonOptions,
-              scales: {
-                ...commonOptions.scales,
-                x: {
-                  grid: { display: false },
-                  ticks: { color: chartPalette.subtle },
+          <div className="h-72">
+            <Bar
+              data={ordersChartData}
+              options={{
+                ...commonOptions,
+                scales: {
+                  ...commonOptions.scales,
+                  x: {
+                    grid: { display: false },
+                    ticks: { color: chartPalette.subtle },
+                  },
                 },
-              },
-            }}
-          />
+              }}
+            />
+          </div>
         ) : (
           <EmptyState
             size="compact"
