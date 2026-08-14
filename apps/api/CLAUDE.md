@@ -98,8 +98,16 @@ infrastructure: `paginate`, `resolveOrderBy` (DMMF-driven and type-aware — it
 is what keeps a sort on a `Json`/`String[]` column from becoming an HTTP 500,
 see #402), `buildSearchWhere`, `AdminListQueryDto`, `date-range`.
 
-Hand-rolled paging still exists in older services; migrate it when you touch
-it (§15) — but only where behavior is provably identical (limit clamps!).
+`paginate` is not only a `skip`/`take` helper: it fixes the defaults (page 1,
+limit 20), the cap (`ADMIN_LIST_MAX_LIMIT`, 500) **and the response envelope**
+(`{ data, meta: { total, page, limit, totalPages } }`). So a migration is only
+behavior-preserving when the call site already agrees on all three. Check
+before you move one — an endpoint defaulting to 50, or returning `items`
+instead of `data`, changes what its clients receive.
+
+Sixteen hand-rolled sites remain for exactly that reason (see "Known,
+undecided" in §15). Migrate one when you touch it **and** it matches; otherwise
+leave it and say why.
 
 ## 7. Errors are semantic and localized
 
@@ -273,6 +281,12 @@ in passing, because each one changes behavior:
   `WEB_REVALIDATE_URL`, `REVALIDATE_SECRET`, `CARGO_*`, `LOG_LEVEL`, …); they
   work only where injected as real environment variables. Declaring them makes
   their configured values start taking effect.
+- **List responses come in six shapes.** `{data, meta{}}` is the `paginate`
+  envelope and the most common, but the API also returns a flat
+  `{data, total, page, limit, totalPages}`, `{items, …}`, `{results, …}`,
+  `{threads, …}` and bare `{data}`. Every client has to handle whichever shape
+  its endpoint happens to use. Converging them is an API change with a
+  migration for web, admin and mobile — worth doing, but as its own decision.
 - **PayTR's return URLs have no fallback** — if `FRONTEND_URL` is unset they
   render as `undefined/payment/success`. Payment-critical, so left as-is.
 - **The warehouse address exists twice, by different mechanisms.** Inbound trade
