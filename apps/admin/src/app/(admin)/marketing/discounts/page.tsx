@@ -7,11 +7,8 @@ import { adminApi } from "@/lib/api";
 import { AdminPage } from "@/components/page/AdminPage";
 import { PageHeader } from "@/components/AdminList";
 import { ResourceList } from "@/components/list";
-import {
-  type Discount,
-  scopeFilterOptions,
-  activeFilterOptions,
-} from "./_lib/types";
+import { type Discount } from "./_lib/types";
+import { discountFilterFields } from "./_lib/filters";
 import { DiscountsStats } from "./_components/DiscountsStats";
 import { DiscountsTable } from "./_components/DiscountsTable";
 import { DiscountFormModal } from "./_modals/DiscountFormModal";
@@ -84,23 +81,11 @@ export default function DiscountsPage() {
         getRowId={(d) => d.id}
         limit={20}
         syncUrl
-        initialFilters={{ scope: "all", isActive: "all" }}
+        filters={discountFilterFields(t)}
       >
-        <ResourceList.Toolbar>
-          <ResourceList.Search
-            placeholder={t("admin.marketing.discounts.searchPlaceholder")}
-          />
-          <ResourceList.FilterSelect
-            name="scope"
-            options={scopeFilterOptions(t)}
-            className="sm:w-44"
-          />
-          <ResourceList.FilterSelect
-            name="isActive"
-            options={activeFilterOptions(t)}
-            className="sm:w-40"
-          />
-        </ResourceList.Toolbar>
+        <ResourceList.Toolbar
+          searchPlaceholder={t("admin.marketing.discounts.searchPlaceholder")}
+        />
         <DiscountsTable
           onEdit={(discount) => setModal({ discount })}
           onGenerateCodes={(discount) => setCodesFor(discount)}

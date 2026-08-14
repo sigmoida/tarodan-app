@@ -10,12 +10,8 @@ import { AdminPage } from "@/components/page/AdminPage";
 import { PageHeader } from "@/components/AdminList";
 import { ResourceList } from "@/components/list";
 import { clientListFetcher } from "@/lib/query/client-list";
-import {
-  type Ad,
-  FILTER_ALL,
-  positionFilterOptions,
-  deviceFilterOptions,
-} from "./_lib/types";
+import { type Ad } from "./_lib/types";
+import { adFilterFields } from "./_lib/filters";
 import { AdsStats } from "./_components/AdsStats";
 import { AdsTable } from "./_components/AdsTable";
 import { AdFormModal } from "./_modals/AdFormModal";
@@ -60,21 +56,9 @@ export default function AdsPage() {
         )}
         getRowId={(a) => a.id}
         syncUrl
-        initialFilters={{ position: FILTER_ALL, device: FILTER_ALL }}
+        filters={adFilterFields(t)}
       >
-        <ResourceList.Toolbar>
-          <ResourceList.Search />
-          <ResourceList.FilterSelect
-            name="position"
-            options={positionFilterOptions(t)}
-            className="sm:w-44"
-          />
-          <ResourceList.FilterSelect
-            name="device"
-            options={deviceFilterOptions(t)}
-            className="sm:w-40"
-          />
-        </ResourceList.Toolbar>
+        <ResourceList.Toolbar />
         <AdsTable onEdit={(ad) => setModal({ ad })} />
         <ResourceList.Pagination />
       </ResourceList>

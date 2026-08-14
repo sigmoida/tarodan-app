@@ -6,6 +6,7 @@ import { adminApi } from "@/lib/api";
 import { ResourceList } from "@/components/list";
 import { sellerColumns } from "../_lib/columns";
 import { type SellerInvoice, mapSellerInvoices } from "../_lib/types";
+import { sellerInvoiceFilterFields } from "../_lib/filters";
 import { useTranslations } from "next-intl";
 
 export function SellerInvoicesTab() {
@@ -26,12 +27,9 @@ export function SellerInvoicesTab() {
       }
       getRowId={(s) => s.id}
       syncUrl
-      initialFilters={{ startDate: "", endDate: "" }}
+      filters={sellerInvoiceFilterFields(t)}
     >
-      <ResourceList.Toolbar>
-        <ResourceList.Search />
-        <ResourceList.DateRange />
-      </ResourceList.Toolbar>
+      <ResourceList.Toolbar />
       <ResourceList.Table
         columns={sellerColumns(t)}
         emptyText={t("admin.finance.invoices.empty")}

@@ -6543,6 +6543,37 @@
       "filterToolbar": {
         "placeholder": "Ara"
       },
+      "filterDialog": {
+        "title": "Filtreler",
+        "open": "Filtrele",
+        "activeCount": "{count} filtre uygulandı",
+        "labels": {
+          "dateRange": "Tarih aralığı",
+          "visibility": "Görünürlük",
+          "featured": "Öne çıkan",
+          "brand": "Marka",
+          "carModel": "Model",
+          "type": "Tür",
+          "priority": "Öncelik",
+          "channel": "Kanal",
+          "provider": "Sağlayıcı",
+          "documentType": "Belge türü",
+          "position": "Konum",
+          "device": "Cihaz",
+          "scope": "Kapsam",
+          "active": "Aktiflik",
+          "membershipTier": "Üyelik katmanı",
+          "lifecycle": "Üyelik durumu",
+          "userType": "Kullanıcı türü",
+          "package": "Paket",
+          "severity": "Önem düzeyi",
+          "resolved": "Çözüm durumu",
+          "template": "Şablon",
+          "action": "İşlem",
+          "entityType": "Varlık türü",
+          "shipmentLeg": "Gönderi yönü"
+        }
+      },
       "bulkActionBar": {
         "selectedCount": "{count} seçili",
         "clearSelection": "Seçimi temizle"

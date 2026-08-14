@@ -7,12 +7,9 @@ import { adminApi } from "@/lib/api";
 import { AdminPage } from "@/components/page/AdminPage";
 import { PageHeader } from "@/components/AdminList";
 import { ResourceList } from "@/components/list";
-import {
-  type Report,
-  reportStatusOptions,
-  reportTypeOptions,
-} from "./_lib/types";
+import { type Report } from "./_lib/types";
 import { reportColumns } from "./_lib/columns";
+import { reportFilterFields } from "./_lib/filters";
 
 export default function ReportsPage() {
   const t = useTranslations();
@@ -27,27 +24,9 @@ export default function ReportsPage() {
         fetcher={(params) => adminApi.getUserReports(params)}
         getRowId={(r) => r.id}
         syncUrl
-        initialFilters={{
-          status: "all",
-          type: "all",
-          startDate: "",
-          endDate: "",
-        }}
+        filters={reportFilterFields(t)}
       >
-        <ResourceList.Toolbar>
-          <ResourceList.Search />
-          <ResourceList.FilterSelect
-            name="type"
-            options={reportTypeOptions(t)}
-            className="sm:w-44"
-          />
-          <ResourceList.FilterSelect
-            name="status"
-            options={reportStatusOptions(t)}
-            className="sm:w-44"
-          />
-          <ResourceList.DateRange />
-        </ResourceList.Toolbar>
+        <ResourceList.Toolbar />
         <ResourceList.Table
           columns={reportColumns({ t })}
           emptyText={t("admin.reports.empty")}

@@ -9,6 +9,7 @@ import { col, type RowActionItem } from "@/components/table";
 import { useAdminMutation } from "@/hooks/useAdminMutation";
 import { usePrompt } from "@/provider/PromptProvider";
 import type { CarrierCancellationTaskRow } from "../_lib/types";
+import { carrierCancellationFilterFields } from "../_lib/filters";
 
 const statusVariant = {
   pending: "warning",
@@ -146,37 +147,10 @@ export function CarrierCancellationsTab() {
         resource="carrier-cancellation-tasks"
         fetcher={(params) => adminApi.getCarrierCancellationTasks(params)}
         getRowId={(row) => row.id}
-        initialFilters={{ status: "pending" }}
+        filters={carrierCancellationFilterFields(t)}
         syncUrl
       >
-        <ResourceList.Toolbar>
-          <ResourceList.Search />
-          <ResourceList.FilterSelect
-            name="status"
-            options={[
-              { value: "all", label: t("common.all") },
-              {
-                value: "pending",
-                label: t(
-                  "admin.operations.shipping.cancellations.status.pending",
-                ),
-              },
-              {
-                value: "resolved",
-                label: t(
-                  "admin.operations.shipping.cancellations.status.resolved",
-                ),
-              },
-              {
-                value: "dismissed",
-                label: t(
-                  "admin.operations.shipping.cancellations.status.dismissed",
-                ),
-              },
-            ]}
-            className="sm:w-56"
-          />
-        </ResourceList.Toolbar>
+        <ResourceList.Toolbar />
         <CarrierCancellationTasksTable />
         <ResourceList.Pagination />
       </ResourceList>

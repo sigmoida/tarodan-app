@@ -4,8 +4,9 @@
 
 import { adminApi } from "@/lib/api";
 import { ResourceList } from "@/components/list";
-import { type UserRating, reviewStatusOptions } from "../_lib/types";
+import { type UserRating } from "../_lib/types";
 import { sellerReviewColumns } from "../_lib/columns";
+import { reviewFilterFields } from "../_lib/filters";
 import { useReviewAction } from "./useReviewAction";
 import { useTranslations } from "next-intl";
 
@@ -29,17 +30,9 @@ export function SellerReviewsTab() {
       fetcher={(p) => adminApi.getUserRatings(p)}
       getRowId={(r) => r.id}
       syncUrl
-      initialFilters={{ status: "all", startDate: "", endDate: "" }}
+      filters={reviewFilterFields(t)}
     >
-      <ResourceList.Toolbar>
-        <ResourceList.Search />
-        <ResourceList.FilterSelect
-          name="status"
-          options={reviewStatusOptions(t)}
-          className="sm:w-48"
-        />
-        <ResourceList.DateRange />
-      </ResourceList.Toolbar>
+      <ResourceList.Toolbar />
       <ResourceList.Table
         columns={columns}
         emptyText={t("admin.accounts.reviews.sellerEmpty")}

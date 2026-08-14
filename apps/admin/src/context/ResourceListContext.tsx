@@ -7,6 +7,7 @@ import {
   type MutableRefObject,
 } from "react";
 import type { UseAdminResourceResult } from "@/hooks/useAdminResource";
+import type { FilterField } from "@/components/list/filters/types";
 
 // ── Row selection ────────────────────────────────────────────────────────────
 export interface SelectionState {
@@ -41,6 +42,8 @@ export function useSelection(selectable = false): SelectionState {
 export interface ResourceListContextValue<T> extends UseAdminResourceResult<T> {
   getRowId: (row: T) => string;
   selection: SelectionState;
+  /** The list's filter schema — the toolbar builds its dialog from this. */
+  filterFields: readonly FilterField[];
   /** The rendered table registers its columns here so the toolbar can offer a
    * CSV export without every page wiring one. */
   exportRef: MutableRefObject<any[]>;
@@ -60,10 +63,4 @@ export function useResourceList<T = any>(): ResourceListContextValue<T> {
   if (!ctx)
     throw new Error("useResourceList must be used within <ResourceList>");
   return ctx;
-}
-
-/** `[value, setValue]` bound to a single filter — for building custom filter controls. */
-export function useFilter(name: string): [string, (value: string) => void] {
-  const { filters, setFilter } = useResourceList();
-  return [filters[name] ?? "", (value) => setFilter(name, value)];
 }

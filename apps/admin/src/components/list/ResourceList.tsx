@@ -10,6 +10,11 @@ import {
   ResourceListContext,
   useSelection,
 } from "@/context/ResourceListContext";
+import { filterDefaults } from "@/components/list/filters/schema";
+import type { FilterField } from "@/components/list/filters/types";
+
+/** Stable identity so the default doesn't churn the context value each render. */
+const EMPTY_FIELDS: readonly FilterField[] = [];
 
 export interface ResourceListProps<T> {
   /** Resource name — the query key and the invalidation target. */
@@ -18,6 +23,17 @@ export interface ResourceListProps<T> {
   getRowId: (row: T) => string;
   limit?: number;
   syncUrl?: boolean;
+  /**
+   * The list's filter schema. The toolbar renders it as a dialog, and the
+   * defaults it declares become part of `initialFilters` — so a filter can
+   * never exist in the UI without its URL param being registered.
+   */
+  filters?: readonly FilterField[];
+  /**
+   * Filter keys with NO control of their own — deep-link-only params such as
+   * orders' `userId`/`productId` or products' `sellerId`. Merged over (and so
+   * able to override) the schema defaults.
+   */
   initialFilters?: Record<string, string>;
   debounceMs?: number;
   /** #101: full-load (client-list) kaynakları için staleTime (ms) — mount'ta tekrar indirmeyi keser. */
@@ -79,19 +95,25 @@ function ResourceListInner<T>({
   getRowId,
   limit,
   syncUrl,
+  filters = EMPTY_FIELDS,
   initialFilters,
   debounceMs,
   staleTime,
   selectable = false,
   children,
 }: ResourceListProps<T>) {
+  // The schema's defaults ARE the filter baseline. They are handed to the hook,
+  // which latches them at mount; everything downstream then reads the latched
+  // copy (`data.baseFilters`) rather than this per-render derivation, so the
+  // badge, the dialog's reset and the URL's clean-value test cannot drift apart
+  // if a schema's options arrive asynchronously.
   const data = useAdminResource<T>({
     queryKey: resource,
     fetcher,
     staleTime,
     limit,
     syncUrl,
-    initialFilters,
+    initialFilters: { ...filterDefaults(filters), ...initialFilters },
     debounceMs,
   });
   const selection = useSelection(selectable);
@@ -103,6 +125,7 @@ function ResourceListInner<T>({
       value={{
         ...data,
         getRowId,
+        filterFields: filters,
         selection,
         exportRef,
         exportRowsRef,

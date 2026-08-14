@@ -4,13 +4,8 @@ import { adminApi } from "@/lib/api";
 import { ResourceList } from "@/components/list";
 import { useAdminMutation } from "@/hooks/useAdminMutation";
 import { elogoColumns } from "../_lib/columns";
-import {
-  type Invoice,
-  mapInvoices,
-  typeFilterOptions,
-  statusFilterOptions,
-  documentTypeFilterOptions,
-} from "../_lib/types";
+import { type Invoice, mapInvoices } from "../_lib/types";
+import { elogoInvoiceFilterFields } from "../_lib/filters";
 import { useTranslations } from "next-intl";
 
 export function ElogoInvoicesTab() {
@@ -35,35 +30,11 @@ export function ElogoInvoicesTab() {
       }
       getRowId={(i) => i.id}
       syncUrl
-      initialFilters={{
-        type: "all",
-        status: "all",
-        documentType: "all",
-        startDate: "",
-        endDate: "",
-      }}
+      filters={elogoInvoiceFilterFields(t)}
     >
-      <ResourceList.Toolbar>
-        <ResourceList.Search
-          placeholder={t("admin.finance.invoices.searchPlaceholder")}
-        />
-        <ResourceList.FilterSelect
-          name="type"
-          options={typeFilterOptions(t)}
-          className="sm:w-44"
-        />
-        <ResourceList.FilterSelect
-          name="status"
-          options={statusFilterOptions(t)}
-          className="sm:w-40"
-        />
-        <ResourceList.FilterSelect
-          name="documentType"
-          options={documentTypeFilterOptions(t)}
-          className="sm:w-36"
-        />
-        <ResourceList.DateRange />
-      </ResourceList.Toolbar>
+      <ResourceList.Toolbar
+        searchPlaceholder={t("admin.finance.invoices.searchPlaceholder")}
+      />
       <ResourceList.Table
         columns={elogoColumns(
           t,

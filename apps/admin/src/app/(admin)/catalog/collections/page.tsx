@@ -17,6 +17,7 @@ import { useTabParam } from "@/hooks/useTabParam";
 import { useAdminMutation } from "@/hooks/useAdminMutation";
 import type { Collection } from "./_lib/types";
 import { collectionColumns } from "./_lib/columns";
+import { collectionFilterFields } from "./_lib/filters";
 import { CollectionFormModal } from "./_modals/CollectionFormModal";
 
 export default function CollectionsPage() {
@@ -28,16 +29,6 @@ export default function CollectionsPage() {
   const COLLECTION_TABS = [
     { key: "list", label: t("admin.catalog.collections.title") },
     { key: "ai", label: t("admin.catalog.common.aiModeration") },
-  ];
-
-  const PUBLIC_OPTIONS = [
-    { value: "all", label: t("admin.catalog.collections.allVisibility") },
-    { value: "true", label: t("admin.catalog.collections.visible") },
-    { value: "false", label: t("admin.catalog.collections.hidden") },
-  ];
-  const FEATURED_OPTIONS = [
-    { value: "all", label: t("common.all") },
-    { value: "true", label: t("admin.catalog.collections.featured") },
   ];
 
   const del = useAdminMutation((id: string) => adminApi.deleteCollection(id), {
@@ -122,24 +113,9 @@ export default function CollectionsPage() {
           }
           getRowId={(c) => c.id}
           syncUrl
-          initialFilters={{
-            isPublic: "all",
-            isFeatured: "all",
-          }}
+          filters={collectionFilterFields(t)}
         >
-          <ResourceList.Toolbar>
-            <ResourceList.Search />
-            <ResourceList.FilterSelect
-              name="isPublic"
-              options={PUBLIC_OPTIONS}
-              className="sm:w-44"
-            />
-            <ResourceList.FilterSelect
-              name="isFeatured"
-              options={FEATURED_OPTIONS}
-              className="sm:w-40"
-            />
-          </ResourceList.Toolbar>
+          <ResourceList.Toolbar />
           <ResourceList.Table
             columns={columns}
             emptyText={t("admin.catalog.collections.empty")}

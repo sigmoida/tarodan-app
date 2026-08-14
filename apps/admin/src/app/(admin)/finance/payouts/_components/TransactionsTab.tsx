@@ -6,10 +6,8 @@ import { useState } from "react";
 import { adminApi } from "@/lib/api";
 import { ResourceList } from "@/components/list";
 import { transactionColumns } from "../_lib/columns";
-import {
-  type PayoutTransaction,
-  payoutStatusFilterOptions,
-} from "../_lib/types";
+import { type PayoutTransaction } from "../_lib/types";
+import { payoutTransactionFilterFields } from "../_lib/filters";
 import { useTranslations } from "next-intl";
 import { useSession } from "@/context/SessionContext";
 import { ReleasePayoutModal } from "./ReleasePayoutModal";
@@ -46,17 +44,9 @@ export function TransactionsTab() {
       }
       getRowId={(t) => t.id}
       syncUrl
-      initialFilters={{ status: "all", dateFrom: "", dateTo: "" }}
+      filters={payoutTransactionFilterFields(t)}
     >
-      <ResourceList.Toolbar>
-        <ResourceList.Search />
-        <ResourceList.FilterSelect
-          name="status"
-          options={payoutStatusFilterOptions(t)}
-          className="sm:w-44"
-        />
-        <ResourceList.DateRange fromName="dateFrom" toName="dateTo" />
-      </ResourceList.Toolbar>
+      <ResourceList.Toolbar />
       <ResourceList.Table
         columns={columns}
         emptyText={t("admin.finance.payouts.empty")}

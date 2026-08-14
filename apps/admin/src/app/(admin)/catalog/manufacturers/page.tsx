@@ -87,9 +87,7 @@ export default function ManufacturersPage() {
         getRowId={(m) => m.id}
         syncUrl
       >
-        <ResourceList.Toolbar>
-          <ResourceList.Search />
-        </ResourceList.Toolbar>
+        <ResourceList.Toolbar />
         <ResourceList.Table
           columns={columns}
           emptyText={t("admin.catalog.manufacturers.empty")}

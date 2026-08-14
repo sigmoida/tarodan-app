@@ -6543,6 +6543,37 @@
       "filterToolbar": {
         "placeholder": "Search..."
       },
+      "filterDialog": {
+        "title": "Filters",
+        "open": "Filter",
+        "activeCount": "{count} filters applied",
+        "labels": {
+          "dateRange": "Date range",
+          "visibility": "Visibility",
+          "featured": "Featured",
+          "brand": "Brand",
+          "carModel": "Model",
+          "type": "Type",
+          "priority": "Priority",
+          "channel": "Channel",
+          "provider": "Provider",
+          "documentType": "Document type",
+          "position": "Position",
+          "device": "Device",
+          "scope": "Scope",
+          "active": "Active",
+          "membershipTier": "Membership tier",
+          "lifecycle": "Membership status",
+          "userType": "User type",
+          "package": "Package",
+          "severity": "Severity",
+          "resolved": "Resolution",
+          "template": "Template",
+          "action": "Action",
+          "entityType": "Entity type",
+          "shipmentLeg": "Shipment leg"
+        }
+      },
       "bulkActionBar": {
         "selectedCount": "{count} selected",
         "clearSelection": "Clear selection"

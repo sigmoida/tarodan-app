@@ -2,11 +2,9 @@
 
 import { useTranslations } from "next-intl";
 import { ResourceList } from "@/components/list";
-import {
-  fetchRefundRequests,
-  refundStatusOptions,
-} from "@/lib/refund-request-query";
+import { fetchRefundRequests } from "@/lib/refund-request-query";
 import { returnShipmentColumns } from "../_lib/columns";
+import { returnShipmentFilterFields } from "../_lib/filters";
 import type { ReturnShipmentRow } from "../_lib/types";
 
 export function ReturnShipmentsTab() {
@@ -17,17 +15,9 @@ export function ReturnShipmentsTab() {
       fetcher={fetchRefundRequests}
       getRowId={(r) => r.id}
       syncUrl
-      initialFilters={{ status: "all", from: "", to: "" }}
+      filters={returnShipmentFilterFields(t)}
     >
-      <ResourceList.Toolbar>
-        <ResourceList.Search />
-        <ResourceList.FilterSelect
-          name="status"
-          options={refundStatusOptions(t)}
-          className="sm:w-56"
-        />
-        <ResourceList.DateRange fromName="from" toName="to" />
-      </ResourceList.Toolbar>
+      <ResourceList.Toolbar />
       <ResourceList.Table
         columns={returnShipmentColumns(t)}
         emptyText={t("admin.operations.shipping.returns.empty")}

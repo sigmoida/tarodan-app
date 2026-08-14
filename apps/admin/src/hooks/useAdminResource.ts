@@ -86,6 +86,20 @@ export interface UseAdminResourceResult<T> {
   filters: Record<string, string>;
   /** Updates a single filter key and resets the page */
   setFilter: (key: string, value: string) => void;
+  /**
+   * Commits several filter keys at once — one state update, one URL write, one
+   * refetch. The filter dialog's "Uygula" needs this: calling `setFilter` per
+   * key in the same tick would have each call overwrite the previous one, since
+   * they all derive `next` from the same captured `filters`.
+   */
+  setFilters: (patch: Record<string, string>) => void;
+  /**
+   * The `initialFilters` this list actually runs on, latched at mount. Every
+   * "is this filter active?" and "what does clearing mean?" question must be
+   * answered against THIS object rather than a re-derived one, or the badge and
+   * the URL's clean-value test can disagree.
+   */
+  baseFilters: Record<string, string>;
   /** Active sort ({ sortBy?, sortOrder, sortType? }); empty sortBy = unsorted. */
   sort: SortState;
   /** Toggle sort on a column (asc → desc → off) and reset the page to 1. */
@@ -191,6 +205,15 @@ export function useAdminResource<T>({
     searchParamsRef.current = searchParams;
   }, [searchParams]);
 
+  // `initialFilters` reaches us as a fresh object literal on every render — and
+  // now often as one derived from a schema array — so depending on it directly
+  // rebuilds `syncToUrl` and re-runs the URL-restore effect for nothing. It is
+  // per-mount config: lists whose filter set changes with the tab already
+  // remount via `key=` (system/logs, accounts/seller-applications). Latch the
+  // first value and use that everywhere below.
+  const initialFiltersRef = useRef(initialFilters);
+  const baseFilters = initialFiltersRef.current;
+
   // ── Read initial values from the URL (syncUrl) ────────────────────────────
   const getInitialPage = () => {
     if (!syncUrl) return 1;
@@ -208,9 +231,9 @@ export function useAdminResource<T>({
     return normalizePageSize(s, limit);
   };
   const getInitialFilters = () => {
-    if (!syncUrl) return { ...initialFilters };
-    const merged = { ...initialFilters };
-    Object.keys(initialFilters).forEach((key) => {
+    if (!syncUrl) return { ...baseFilters };
+    const merged = { ...baseFilters };
+    Object.keys(baseFilters).forEach((key) => {
       const urlVal = searchParams.get(key);
       if (urlVal !== null) merged[key] = urlVal;
     });
@@ -264,14 +287,14 @@ export function useAdminResource<T>({
       params.delete("dir");
       params.delete("sortType");
       params.delete("size");
-      Object.keys(initialFilters).forEach((key) => params.delete(key));
+      Object.keys(baseFilters).forEach((key) => params.delete(key));
       if (p > 1) params.set("page", String(p));
       if (q) params.set("q", q);
       // Only write the size when it differs from the default (clean URL).
       if (size !== limit) params.set("size", String(size));
       Object.entries(f).forEach(([key, val]) => {
         // Don't write the initialFilters default value to the URL (clean URL)
-        if (val && val !== (initialFilters[key] ?? "")) params.set(key, val);
+        if (val && val !== (baseFilters[key] ?? "")) params.set(key, val);
       });
       // Sort: write the key when active; the default asc direction stays implicit.
       if (s.sortBy) {
@@ -283,7 +306,7 @@ export function useAdminResource<T>({
       const newUrl = qs ? `${pathname}?${qs}` : pathname;
       router.replace(newUrl, { scroll: false });
     },
-    [syncUrl, pathname, router, initialFilters, limit],
+    [syncUrl, pathname, router, baseFilters, limit],
   );
 
   // Catch external URL changes (e.g. when the user presses the back button).
@@ -298,8 +321,8 @@ export function useAdminResource<T>({
     const urlPage = parseInt(searchParams.get("page") ?? "1", 10);
     const urlSize = parseInt(searchParams.get("size") ?? "", 10);
     const urlQ = searchParams.get("q") ?? "";
-    const newFilters = { ...initialFilters };
-    Object.keys(initialFilters).forEach((key) => {
+    const newFilters = { ...baseFilters };
+    Object.keys(baseFilters).forEach((key) => {
       const v = searchParams.get(key);
       if (v !== null) newFilters[key] = v;
     });
@@ -321,7 +344,7 @@ export function useAdminResource<T>({
       setFiltersState(newFilters);
       setSortState(urlSort);
     });
-  }, [searchParams, syncUrl, initialFilters, limit]);
+  }, [searchParams, syncUrl, baseFilters, limit]);
 
   // ── Helper setters ──────────────────────────────────────────────────────────
   const setPage = useCallback(
@@ -345,9 +368,11 @@ export function useAdminResource<T>({
     [committedSearch, filters, sort, limit, syncToUrl],
   );
 
-  const setFilter = useCallback(
-    (key: string, value: string) => {
-      const next = { ...filters, [key]: value };
+  // Commits a whole patch in ONE state update + ONE URL write, so the filter
+  // dialog can apply every field it changed at once.
+  const setFilters = useCallback(
+    (patch: Record<string, string>) => {
+      const next = { ...filters, ...patch };
       startTransition(() => {
         setFiltersState(next);
         setPageState(1);
@@ -355,6 +380,11 @@ export function useAdminResource<T>({
       syncToUrl(1, committedSearch, next, sort, pageSize);
     },
     [filters, committedSearch, sort, pageSize, syncToUrl],
+  );
+
+  const setFilter = useCallback(
+    (key: string, value: string) => setFilters({ [key]: value }),
+    [setFilters],
   );
 
   // ── Sort: single-column toggle asc → desc → off; resets the page to 1 ────────
@@ -504,7 +534,7 @@ export function useAdminResource<T>({
       // The page always resets to 1
       params.delete("page");
       if (resetFilters) {
-        Object.keys(initialFilters).forEach((k) => params.delete(k));
+        Object.keys(baseFilters).forEach((k) => params.delete(k));
       }
       if (resetSearch) {
         params.delete("q");
@@ -516,13 +546,13 @@ export function useAdminResource<T>({
       }
       startTransition(() => {
         setPageState(1);
-        if (resetFilters) setFiltersState({ ...initialFilters });
+        if (resetFilters) setFiltersState({ ...baseFilters });
         if (resetSearch) setCommittedSearch("");
       });
       const qs = params.toString();
       router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
     },
-    [syncUrl, pathname, router, initialFilters],
+    [syncUrl, pathname, router, baseFilters],
   );
 
   // ── Data extraction (suspense → data is always defined) ────────────────────
@@ -542,6 +572,8 @@ export function useAdminResource<T>({
     onSearchSubmit,
     filters,
     setFilter,
+    setFilters,
+    baseFilters,
     sort,
     setSort,
     // Dim the table during a transition (filter/search/page) or a background refetch.
