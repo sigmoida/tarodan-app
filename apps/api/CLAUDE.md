@@ -96,8 +96,16 @@ The `order` module is the canonical shape: `order-pricing`,
 - `payment` went the same way: hold release, the refund-attempt ledger and
   trade cash refunds are their own services, so `payment-refund.service.ts`
   (2331 → 1126) now does one job — refunding an order.
-- The ones still waiting: `elogo-invoicing` (2316), `discount` (2086),
-  `auth` (1835). Don't extend them; extract from them (§15).
+- `elogo-invoicing` (2316 → 156), `discount` (2086 → 181) and `auth`
+  (1835 → 162) followed, each landing on the same shape: a facade that only
+  delegates, behind it services named after the responsibility
+  (`discount-crud` / `-coupon` / `-pricing` / `-usage` / `-trade-fee`;
+  `auth-token` / `-registration` / `-login` / `-password` +
+  `social/social-login`).
+- The one still waiting: `trade-lifecycle` (1715). Splitting it is an open
+  question, not a queued task — its methods are steps of one state machine,
+  so slicing by responsibility may cut across the machine rather than along
+  it. Decide before extracting.
 
 ## 3. Controllers are thin
 
