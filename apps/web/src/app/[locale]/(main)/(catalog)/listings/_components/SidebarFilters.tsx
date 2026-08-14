@@ -56,6 +56,7 @@ export default function SidebarFilters({
     modelsForBrand,
     filteredScales,
     filteredMaterials,
+    colorList,
     displayManufacturers,
     customAttrGroups,
     CONDITIONS,
@@ -64,6 +65,7 @@ export default function SidebarFilters({
     handleCarModelChange,
     handleScaleChange,
     handleMaterialChange,
+    toggleColor,
     handleManufacturerChange,
     toggleCustomAttribute,
     handleConditionChange,
@@ -275,6 +277,48 @@ export default function SidebarFilters({
             )}
           </AccordionContent>
         </AccordionItem>
+
+        {/* Renk — katalogdaki global "color" grubu; çoklu seçim (OR). */}
+        {colorList.length > 0 && (
+          <AccordionItem value="color">
+            <AccordionTrigger>
+              <span className="flex items-center">
+                {t("product.color")}
+                {(filters.colors?.length ?? 0) > 0 && (
+                  <Badge variant="primary" size="sm" className="ml-2">
+                    {filters.colors.length}
+                  </Badge>
+                )}
+              </span>
+            </AccordionTrigger>
+            <AccordionContent>
+              <div className="space-y-1">
+                {colorList.map((option) => {
+                  const isSelected = (filters.colors ?? []).includes(
+                    option.slug,
+                  );
+                  return (
+                    <label key={option.slug} className={rowClass(isSelected)}>
+                      <Checkbox
+                        checked={isSelected}
+                        onChange={() => toggleColor(option.slug)}
+                        className="w-4 h-4"
+                      />
+                      {option.color && (
+                        <span
+                          className="w-3 h-3 rounded-full border border-border-subtle flex-shrink-0"
+                          style={{ backgroundColor: option.color }}
+                          aria-hidden="true"
+                        />
+                      )}
+                      <span className="text-sm">{option.label}</span>
+                    </label>
+                  );
+                })}
+              </div>
+            </AccordionContent>
+          </AccordionItem>
+        )}
 
         {/* Üretici */}
         <AccordionItem value="manufacturer">

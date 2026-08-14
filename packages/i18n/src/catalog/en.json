@@ -581,6 +581,8 @@
     "modelCodePlaceholder": "e.g. HKG72",
     "colorRequired": "Color *",
     "colorPlaceholder": "e.g. Red",
+    "colorMaxHint": "up to {max} colors",
+    "colorLegacyHint": "Saved color: {value} — pick from the list.",
     "scaleRequired": "Scale *",
     "materialRequired": "Material *",
     "manufacturerRequired": "Manufacturer *",
@@ -7382,7 +7384,8 @@
       "imageKeyEmpty": "The image key cannot be empty",
       "imageKeyInvalid": "The image key is invalid",
       "imageKeyWrongPath": "The image key is not on the product-image path",
-      "createFailed": "The listing could not be created: {reason}"
+      "createFailed": "The listing could not be created: {reason}",
+      "invalidColors": "Invalid colour selection: {colors}"
     },
     "refund": {
       "alreadyActive": "There is already an active refund request for this order",

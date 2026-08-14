@@ -4,6 +4,7 @@ import { z } from "zod";
 import {
   baseListingFields,
   bundleSizeRefine,
+  colorsRefine,
   emptyBaseListingValues,
   listingFieldMessages,
   listingImageSchema,
@@ -21,7 +22,8 @@ export const newListingSchema = (locale: string) => {
       images: z.array(listingImageSchema).min(3, msg.photo),
       customAttributes: z.record(z.string(), z.array(z.string())),
     })
-    .superRefine(bundleSizeRefine(msg.setSize));
+    .superRefine(bundleSizeRefine(msg.setSize))
+    .superRefine(colorsRefine(msg.required));
 };
 
 export type NewListingValues = z.infer<ReturnType<typeof newListingSchema>>;

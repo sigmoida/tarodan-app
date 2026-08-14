@@ -15,6 +15,10 @@ import {
 } from "../../../common/helpers/fulltext-search";
 import { SearchCommonService } from "../search-common.service";
 import { errorMessage } from "../../../common/helpers/error-message";
+import {
+  SCALE_GROUP_SLUG,
+  MATERIAL_GROUP_SLUG,
+} from "../../../common/helpers/attribute-groups";
 
 /**
  * Otomatik tamamlama alt servisi (search.service.ts'ten birebir taşındı):
@@ -478,7 +482,7 @@ export class SearchAutocompleteService {
       where: {
         id: { in: ids },
         isActive: true,
-        group: { slug: "scale", isActive: true },
+        group: { slug: SCALE_GROUP_SLUG, isActive: true },
       },
       select: { value: true, displayValue: true },
     });
@@ -500,7 +504,7 @@ export class SearchAutocompleteService {
       where: {
         id: { in: ids },
         isActive: true,
-        group: { slug: "material", isActive: true },
+        group: { slug: MATERIAL_GROUP_SLUG, isActive: true },
       },
       select: { slug: true, value: true, displayValue: true },
     });

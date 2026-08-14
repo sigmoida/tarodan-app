@@ -72,6 +72,7 @@ export default function EditListingClient() {
     brandsLoading,
     scales: scaleList,
     materials: materialList,
+    colors: colorList,
     manufacturers: manufacturerList,
   } = useListingFilters(catalogEnabled);
   const manufacturerId = form.watch("manufacturerId");
@@ -267,6 +268,8 @@ export default function EditListingClient() {
           modelsLoading={modelsLoading && modelOptions.length === 0}
           scaleList={scaleList}
           materialList={materialList}
+          colorList={colorList}
+          legacyColor={record?.color ?? null}
           manufacturerList={manufacturerOptions}
           yearOptions={getYearOptions()}
         />

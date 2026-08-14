@@ -37,6 +37,8 @@ export interface Filters {
   carModel: string;
   scale: string;
   material: string;
+  /** Seçili renk slug'ları — URL'de `?color=red,black` olarak taşınır. */
+  colors: string[];
   condition: string;
   minPrice: string;
   maxPrice: string;
@@ -100,6 +102,10 @@ export function parseListingsFilters(sp: URLSearchParams): Filters {
     carModel: sp.get("carModel") || "",
     scale: sp.get("scale") || "",
     material: sp.get("material") || "",
+    colors: (sp.get("color") || "")
+      .split(",")
+      .map((slug) => slug.trim())
+      .filter(Boolean),
     condition: sp.get("condition") || "",
     minPrice: sp.get("minPrice") || "",
     maxPrice: sp.get("maxPrice") || "",
@@ -157,6 +163,7 @@ export function buildListApiParams(
   if (filters.carModelId) p.carModelId = filters.carModelId;
   if (filters.scale) p.scale = filters.scale;
   if (filters.material) p.material = filters.material;
+  if (filters.colors?.length) p.color = filters.colors.join(",");
   if (filters.manufacturerId) p.manufacturerId = filters.manufacturerId;
   else if (filters.manufacturer) p.manufacturer = filters.manufacturer;
   if (filters.tradeOnly) p.tradeOnly = true;

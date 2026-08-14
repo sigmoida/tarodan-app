@@ -103,6 +103,8 @@ import {
   AdminCarModelQueryDto,
   AdminAttributeGroupQueryDto,
   AdminAttributeQueryDto,
+  CreateAttributeDto,
+  UpdateAttributeDto,
 } from "../dto";
 
 @ApiTags("admin")
@@ -489,15 +491,7 @@ export class AdminCatalogController {
   @ApiResponse({ status: HttpStatus.CREATED, description: "Attribute created" })
   async createAttribute(
     @CurrentUser("id") adminId: string,
-    @Body()
-    body: {
-      groupId: string;
-      value: string;
-      displayValue?: string;
-      color?: string;
-      sortOrder?: number;
-      isActive?: boolean;
-    },
+    @Body() body: CreateAttributeDto,
   ) {
     return this.adminService.createAttribute(adminId, body);
   }
@@ -510,14 +504,7 @@ export class AdminCatalogController {
   async updateAttribute(
     @Param("id") id: string,
     @CurrentUser("id") adminId: string,
-    @Body()
-    body: {
-      value?: string;
-      displayValue?: string;
-      color?: string;
-      sortOrder?: number;
-      isActive?: boolean;
-    },
+    @Body() body: UpdateAttributeDto,
   ) {
     return this.adminService.updateAttribute(adminId, id, body);
   }

@@ -80,7 +80,10 @@ export interface Listing {
     name: string;
     label: string;
     value: string;
+    /** Grubun GÖRÜNEN adı ("Ölçek", "Malzeme", "Renk"). */
     group: string;
+    /** Grubun slug'ı ("scale", "material", "color") — dile bağlı değildir. */
+    groupSlug?: string;
   }>;
   carModel?: {
     id: string;

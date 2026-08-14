@@ -581,6 +581,8 @@
     "modelCodePlaceholder": "Örn. HKG72",
     "colorRequired": "Renk *",
     "colorPlaceholder": "Örn. Kırmızı",
+    "colorMaxHint": "en fazla {max} renk",
+    "colorLegacyHint": "Kayıtlı renk: {value} — listeden seçim yapın.",
     "scaleRequired": "Ölçek *",
     "materialRequired": "Malzeme *",
     "manufacturerRequired": "Üretici *",
@@ -7382,7 +7384,8 @@
       "imageKeyEmpty": "Görsel anahtarı boş olamaz",
       "imageKeyInvalid": "Görsel anahtarı geçersiz",
       "imageKeyWrongPath": "Görsel anahtarı ürün görseli yolunda değil",
-      "createFailed": "İlan oluşturulamadı: {reason}"
+      "createFailed": "İlan oluşturulamadı: {reason}",
+      "invalidColors": "Geçersiz renk seçimi: {colors}"
     },
     "refund": {
       "alreadyActive": "Bu sipariş için zaten aktif bir iade talebi var",

@@ -1,6 +1,7 @@
 /** @format */
 
 import type { SaleData } from "@/components/listings/form";
+import { COLOR_GROUP_SLUG } from "@/components/listings/form/constants";
 import type {
   EditListingFormData,
   ListingEditAttribute,
@@ -52,6 +53,20 @@ function customAttributesOf(
   return grouped;
 }
 
+/**
+ * İlanın renk seçimleri — global "color" grubundaki nitelikler.
+ *
+ * `customAttributesOf` yalnız ÜRETİCİYE bağlı grupları alır, bu yüzden renk
+ * oraya sızmaz; kendi alanı olarak burada toplanır.
+ */
+function colorSlugsOf(
+  attributes: ListingEditAttribute[] | undefined,
+): string[] {
+  return (attributes ?? [])
+    .filter((attribute) => attribute.groupSlug === COLOR_GROUP_SLUG)
+    .map((attribute) => attribute.slug);
+}
+
 const SHIPPING_TIERS = ["small", "medium", "large"] as const;
 type ShippingTier = (typeof SHIPPING_TIERS)[number];
 
@@ -83,6 +98,7 @@ export function buildListingFormData(edit: ListingEditPayload): {
     brandId: text(edit.brandId),
     carModelId: text(edit.carModelId),
     modelCode: text(edit.modelCode),
+    colors: colorSlugsOf(edit.attributes),
     color: text(edit.color),
     // Ölçek seçeneğinin `value`su GÖRÜNEN metindir, malzeme seçeneğininki SLUG.
     scale: text(scale?.displayValue || scale?.value),

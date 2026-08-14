@@ -11,6 +11,7 @@ import {
   type Brand,
   type Category,
   type CarModel,
+  type ColorOption,
   type Ref,
 } from "./constants";
 
@@ -57,6 +58,7 @@ export function useListingFilters(enabled = true) {
   const query = useWebList<{
     scales: string[];
     materials: Array<{ slug: string; label: string }>;
+    colors: ColorOption[];
     brands: Brand[];
     manufacturers: Ref[];
   }>({
@@ -64,6 +66,7 @@ export function useListingFilters(enabled = true) {
     fetcher: async () => {
       let scales: string[] = [];
       let materials: Array<{ slug: string; label: string }> = [];
+      let colors: ColorOption[] = [];
       let brands: Brand[] = [];
       let manufacturers: Ref[] = [];
       try {
@@ -71,11 +74,13 @@ export function useListingFilters(enabled = true) {
         const d = res.data as {
           scales?: string[];
           materials?: Array<{ slug: string; label: string }>;
+          colors?: ColorOption[];
           brands?: Ref[];
           manufacturers?: Ref[];
         };
         scales = d.scales ?? [];
         materials = d.materials ?? [];
+        colors = d.colors ?? [];
         brands = (d.brands ?? []) as Brand[];
         manufacturers = d.manufacturers ?? [];
       } catch {
@@ -91,7 +96,7 @@ export function useListingFilters(enabled = true) {
           brands = [];
         }
       }
-      return { scales, materials, brands, manufacturers };
+      return { scales, materials, colors, brands, manufacturers };
     },
     enabled,
     query: { staleTime: 5 * 60 * 1000 },
@@ -99,6 +104,7 @@ export function useListingFilters(enabled = true) {
   return {
     scales: query.data?.scales ?? [],
     materials: query.data?.materials ?? [],
+    colors: query.data?.colors ?? [],
     brands: query.data?.brands ?? [],
     manufacturers: query.data?.manufacturers ?? [],
     brandsLoading: query.isPending && enabled,

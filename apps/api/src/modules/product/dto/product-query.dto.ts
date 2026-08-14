@@ -91,6 +91,16 @@ export class ProductQueryDto {
   material?: string;
 
   @ApiPropertyOptional({
+    example: "red,black",
+    description:
+      'Filter by color (global "color" group). Virgülle ayrık slug listesi; ' +
+      "aralarında OR uygulanır (kırmızı VEYA siyah olan ilanlar).",
+  })
+  @IsOptional()
+  @IsString()
+  color?: string;
+
+  @ApiPropertyOptional({
     example: "treasure-hunt,mainline,red",
     description:
       "DEPRECATED: flat slug list — AND-combined across all slugs. Use `attrGroups` for " +

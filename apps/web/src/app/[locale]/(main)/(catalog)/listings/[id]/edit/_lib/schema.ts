@@ -4,6 +4,7 @@ import { z } from "zod";
 import {
   baseListingFields,
   bundleSizeRefine,
+  colorsRefine,
   emptyBaseListingValues,
   listingFieldMessages,
   listingImageSchema,
@@ -24,7 +25,8 @@ export const editListingSchema = z
     // Üreticiye özel nitelikler — yeni ilan formunda da var.
     customAttributes: z.record(z.string(), z.array(z.string())),
   })
-  .superRefine(bundleSizeRefine(msg.setSize));
+  .superRefine(bundleSizeRefine(msg.setSize))
+  .superRefine(colorsRefine(msg.required));
 
 export type EditListingValues = z.infer<typeof editListingSchema>;
 

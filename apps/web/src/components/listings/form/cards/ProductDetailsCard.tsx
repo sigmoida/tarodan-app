@@ -13,8 +13,10 @@ import {
   type Brand,
   type CarModel,
   type Category,
+  type ColorOption,
   type Ref,
 } from "../constants";
+import ColorSelectField from "./ColorSelectField";
 
 interface ProductDetailsCardProps {
   locale: string;
@@ -26,6 +28,9 @@ interface ProductDetailsCardProps {
   modelsLoading: boolean;
   scaleList: string[];
   materialList: Array<{ slug: string; label: string }>;
+  colorList: ColorOption[];
+  /** Katalogla eşleşmeyen eski serbest metin renk (yalnız düzenlemede). */
+  legacyColor?: string | null;
   manufacturerList: Ref[];
   yearOptions: number[];
 }
@@ -42,6 +47,8 @@ export default function ProductDetailsCard({
   modelsLoading,
   scaleList,
   materialList,
+  colorList,
+  legacyColor,
   manufacturerList,
   yearOptions,
 }: ProductDetailsCardProps) {
@@ -115,12 +122,7 @@ export default function ProductDetailsCard({
           maxLength={100}
         />
 
-        <FormInput
-          name="color"
-          label={t("product.colorRequired")}
-          placeholder={t("product.colorPlaceholder")}
-          maxLength={80}
-        />
+        <ColorSelectField colorList={colorList} legacyColor={legacyColor} />
 
         <FormSelect
           name="scale"

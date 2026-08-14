@@ -38,6 +38,11 @@ import {
   PRODUCTION_REFERENCE_IDS,
   SEED_COMMISSION_RULE_SET_IDS,
 } from "./seed-ids";
+import {
+  COLOR_GROUP_SLUG,
+  COLOR_LABEL_SEPARATOR,
+  resolveColorsFromText,
+} from "../src/common/helpers/attribute-groups";
 
 const prisma = new PrismaClient();
 
@@ -372,6 +377,8 @@ interface AttributeGroupData {
     value: string;
     slug: string;
     displayValue: string | null;
+    /** Renk grubunda swatch hex'i; diğer gruplarda yok. */
+    color?: string | null;
     sortOrder: number;
     isActive: boolean;
   }>;
@@ -495,6 +502,8 @@ async function seedCatalog(): Promise<void> {
       const valueData = {
         value: value.value,
         displayValue: value.displayValue,
+        // Renk grubu swatch için hex taşır; diğer gruplarda alan boştur.
+        color: value.color ?? null,
         sortOrder: value.sortOrder,
         isActive: value.isActive,
       };
@@ -805,6 +814,16 @@ async function seedProducts(sellerId: string): Promise<void> {
     ),
   );
 
+  // Renk, ilan verisinde serbest metindir ("Altın/Kahverengi"); katalogdaki
+  // renk seçenekleriyle eşleştirilip ProductAttribute olarak da bağlanır ki
+  // renk filtresi launch verisini kapsasın.
+  const colorOptions = (
+    await prisma.attribute.findMany({
+      where: { isActive: true, group: { slug: COLOR_GROUP_SLUG } },
+      select: { slug: true, value: true, displayValue: true },
+    })
+  ).map((row) => ({ slug: row.slug, label: row.displayValue || row.value }));
+
   const need = <T>(map: Map<string, T>, slug: string, what: string): T => {
     const value = map.get(slug);
     if (value === undefined) {
@@ -817,6 +836,9 @@ async function seedProducts(sellerId: string): Promise<void> {
 
   for (const item of products) {
     const slug = slugify(item.title);
+    const resolvedColors = item.color
+      ? resolveColorsFromText(item.color, colorOptions)
+      : { slugs: [], labels: [], unmatched: [] };
     const data = {
       sellerId,
       categoryId: need(categoryIds, item.categorySlug, "category"),
@@ -836,7 +858,12 @@ async function seedProducts(sellerId: string): Promise<void> {
       status: item.status,
       isTradeEnabled: item.isTradeEnabled,
       modelCode: item.modelCode,
-      color: item.color,
+      // Tümü eşleştiyse kanonik adlar yazılır; eşleşmeyen varsa özgün metin
+      // korunur (bilgi kaybolmasın).
+      color:
+        resolvedColors.labels.length && !resolvedColors.unmatched.length
+          ? resolvedColors.labels.join(COLOR_LABEL_SEPARATOR)
+          : item.color,
       isBoxed: item.isBoxed,
       isPreorder: item.isPreorder,
       isSet: item.isSet,
@@ -856,9 +883,12 @@ async function seedProducts(sellerId: string): Promise<void> {
     await prisma.productAttribute.deleteMany({
       where: { productId: product.id },
     });
-    if (item.attributeSlugs.length > 0) {
+    const productAttributeSlugs = [
+      ...new Set([...item.attributeSlugs, ...resolvedColors.slugs]),
+    ];
+    if (productAttributeSlugs.length > 0) {
       await prisma.productAttribute.createMany({
-        data: item.attributeSlugs.map((attributeSlug) => ({
+        data: productAttributeSlugs.map((attributeSlug) => ({
           productId: product.id,
           attributeId: need(attributeIds, attributeSlug, "attribute"),
         })),

@@ -223,7 +223,7 @@ export const catalogApi = {
     groupId: string;
     value: string;
     displayValue?: string;
-    color?: string;
+    color?: string | null;
     sortOrder?: number;
     isActive?: boolean;
   }) => api.post("/admin/attributes", data),
@@ -232,7 +232,7 @@ export const catalogApi = {
     data: {
       value?: string;
       displayValue?: string;
-      color?: string;
+      color?: string | null;
       sortOrder?: number;
       isActive?: boolean;
     },

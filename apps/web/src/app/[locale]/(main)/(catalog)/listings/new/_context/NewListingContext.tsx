@@ -104,6 +104,7 @@ function useNewListingValue() {
   const {
     scales: scaleList,
     materials: materialList,
+    colors: colorList,
     brands,
     manufacturers: manufacturerList,
     brandsLoading,
@@ -208,7 +209,10 @@ function useNewListingValue() {
         brandId: values.brandId || undefined,
         carModelId: values.carModelId || undefined,
         modelCode: values.modelCode.trim() || undefined,
-        color: values.color,
+        // Katalogdan seçim varsa slug'lar gider; katalog boş kurulumda eski
+        // serbest metin alanı devrede kalır (sunucu ikisini de kabul eder).
+        colors: values.colors.length > 0 ? values.colors : undefined,
+        color: values.colors.length > 0 ? undefined : values.color,
         scale: values.scale || undefined,
         material: values.material || undefined,
         manufacturerId: values.manufacturerId || undefined,
@@ -268,6 +272,7 @@ function useNewListingValue() {
     flatCategories,
     scaleList,
     materialList,
+    colorList,
     brands,
     brandsLoading,
     models,
