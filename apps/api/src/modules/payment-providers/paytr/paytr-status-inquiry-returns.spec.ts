@@ -1,6 +1,7 @@
 import { Test, TestingModule } from "@nestjs/testing";
 import { ConfigService } from "@nestjs/config";
 import { PayTRService } from "./paytr.service";
+import { PayTRCredentials } from "./paytr-credentials.service";
 
 /**
  * Durum-sorgu yanıtının İADE (`returns`) ve KESİNTİ (`kesinti_tutari`/`net_tutar`)
@@ -18,6 +19,7 @@ describe("PayTRService.queryPaymentStatus — returns + kesinti alanları", () =
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
+        PayTRCredentials,
         PayTRService,
         {
           provide: ConfigService,

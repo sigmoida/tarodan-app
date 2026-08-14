@@ -163,12 +163,8 @@ export interface PaytrSettlementDetailEntry {
   raw: Record<string, unknown>;
 }
 
-/** PAYTR_TEST_MODE: true / 1 / yes → test */
-export function parsePaytrTestMode(raw: string | undefined): boolean {
-  if (raw === undefined || raw === "") return true;
-  const v = String(raw).trim().toLowerCase();
-  return v === "1" || v === "true" || v === "yes";
-}
+export { parsePaytrTestMode } from "./paytr-test-mode.util";
+import { PayTRCredentials } from "./paytr-credentials.service";
 
 // =============================================================================
 // PAYTR SERVICE
@@ -179,70 +175,40 @@ export class PayTRService implements IPaymentProvider {
   /** #89: provider key used by PaymentProviderRegistry (matches Payment.provider). */
   readonly key = PAYMENT_PROVIDER_PAYTR;
   private readonly logger = new Logger(PayTRService.name);
-  private readonly merchantId: string;
-  private readonly merchantKey: string;
-  private readonly merchantSalt: string;
-  private readonly baseUrl: string;
-  private readonly testMode: boolean;
 
-  constructor(private readonly configService: ConfigService) {
-    this.merchantId = (
-      this.configService.get("PAYTR_MERCHANT_ID", "") || ""
-    ).trim();
-    this.merchantKey = (
-      this.configService.get("PAYTR_MERCHANT_KEY", "") || ""
-    ).trim();
-    this.merchantSalt = (
-      this.configService.get("PAYTR_MERCHANT_SALT", "") || ""
-    ).trim();
-    this.baseUrl = "https://www.paytr.com/odeme";
-    this.testMode = parsePaytrTestMode(
-      this.configService.get("PAYTR_TEST_MODE"),
-    );
+  constructor(
+    private readonly paytr: PayTRCredentials,
+    /**
+     * PayTR kimlikleri PayTRCredentials'ta; bu yalnız `FRONTEND_URL` içindir.
+     * Bilinçli olarak `config/app-urls`'e taşınmadı: oradaki erişimci bir
+     * fallback uygular ve bu, ödeme dönüş URL'lerinin davranışını değiştirir
+     * (CLAUDE.md §15 "Known, undecided").
+     */
+    private readonly configService: ConfigService,
+  ) {}
 
-    const customCallback = (
-      this.configService.get("PAYTR_CALLBACK_URL", "") || ""
-    ).trim();
-    const apiUrl = (
-      this.configService.get("API_URL", "http://localhost:3001") || ""
-    ).replace(/\/$/, "");
-    const effectiveCallback =
-      customCallback || `${apiUrl}/api/payments/callback/paytr`;
-    this.logger.log(
-      `PayTR callback (panel Bildirim URL): ${effectiveCallback}`,
-    );
-    if (effectiveCallback.includes("localhost")) {
-      this.logger.warn(
-        "PayTR genelde localhost bildirim kabul etmez; ngrok ve PAYTR_CALLBACK_URL kullanın, panelde aynı URL tanımlı olsun.",
-      );
-    }
-
-    if (!this.merchantId || !this.merchantKey || !this.merchantSalt) {
-      this.logger.warn("⚠️ PayTR API credentials not configured");
-    } else {
-      this.logger.log(`PayTR test mode: ${this.testMode ? "ON" : "OFF"}`);
-    }
+  // Kimlik, imza ve yanıt okuma PayTRCredentials'ta yaşar; buradaki kısayollar
+  // yalnız çağrı yerlerini okunur tutar (davranış aynı).
+  private get merchantId() {
+    return this.paytr.merchantId;
   }
-
-  // O1: Tüm PayTR fetch'lerine uygulama-seviyesi HTTP timeout. Aksi halde PayTR
-  // yanıt vermezse istek undici varsayılan ~300s'ye kadar askıda kalıp kullanıcı
-  // isteğini bloke eder. (Retry, çift-submit riski nedeniyle bilinçli eklenmedi.)
-  private readonly httpTimeoutMs = parseInt(
-    this.configService.get("PAYTR_HTTP_TIMEOUT_MS") || "20000",
-    10,
-  );
-
-  /**
-   * O2: PayTR yanıtını güvenli parse et. PayTR boş veya HTML (WAF/hata sayfası)
-   * dönerse ham JSON.parse SyntaxError fırlatır; bunun yerine null döner.
-   */
+  private get merchantKey() {
+    return this.paytr.merchantKey;
+  }
+  private get merchantSalt() {
+    return this.paytr.merchantSalt;
+  }
+  private get baseUrl() {
+    return this.paytr.baseUrl;
+  }
+  private get testMode() {
+    return this.paytr.testMode;
+  }
+  private get httpTimeoutMs() {
+    return this.paytr.httpTimeoutMs;
+  }
   private parsePaytrJson<T = any>(rawText: string): T | null {
-    if (!rawText?.trim()) return null;
-    try {
-      return JSON.parse(rawText) as T;
-    } catch {
-      return null;
-    }
+    return this.paytr.parsePaytrJson<T>(rawText);
   }
 
   // ==========================================================================
@@ -1104,14 +1070,8 @@ export class PayTRService implements IPaymentProvider {
   // HELPER METHODS
   // ==========================================================================
 
-  /**
-   * Generate HMAC-SHA256 hash in Base64 (refund, bin-detail; not iFrame get-token)
-   */
   private generateHash(data: string): string {
-    return crypto
-      .createHmac("sha256", this.merchantKey)
-      .update(data)
-      .digest("base64");
+    return this.paytr.generateHash(data);
   }
 
   // ==========================================================================

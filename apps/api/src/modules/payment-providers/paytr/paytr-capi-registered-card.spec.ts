@@ -2,6 +2,7 @@ import { Test, TestingModule } from "@nestjs/testing";
 import { ConfigService } from "@nestjs/config";
 import * as crypto from "crypto";
 import { PayTRService, PayTRBuyer } from "./paytr.service";
+import { PayTRCredentials } from "./paytr-credentials.service";
 
 /**
  * PayTR Direkt API doküman uyumu:
@@ -31,6 +32,7 @@ describe("PayTRService — CAPI registered-card / BIN / installment (doc parity)
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
+        PayTRCredentials,
         PayTRService,
         {
           provide: ConfigService,

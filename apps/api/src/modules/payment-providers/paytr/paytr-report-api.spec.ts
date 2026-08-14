@@ -2,6 +2,7 @@ import { Test, TestingModule } from "@nestjs/testing";
 import { ConfigService } from "@nestjs/config";
 import * as crypto from "crypto";
 import { PayTRService } from "./paytr.service";
+import { PayTRCredentials } from "./paytr-credentials.service";
 
 /**
  * PayTR rapor uçları (PSP mutabakat katmanının veri kaynakları):
@@ -25,6 +26,7 @@ describe("PayTRService — rapor uçları", () => {
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
+        PayTRCredentials,
         PayTRService,
         {
           provide: ConfigService,

@@ -1,6 +1,7 @@
 import { Test, TestingModule } from "@nestjs/testing";
 import { ConfigService } from "@nestjs/config";
 import { PayTRService } from "./paytr.service";
+import { PayTRCredentials } from "./paytr-credentials.service";
 
 describe("PayTRService", () => {
   let service: PayTRService;
@@ -9,6 +10,7 @@ describe("PayTRService", () => {
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
+        PayTRCredentials,
         PayTRService,
         {
           provide: ConfigService,
