@@ -1,5 +1,6 @@
 import { PayTRService, PayTRCallbackData } from "./paytr.service";
 import { PayTRCredentials } from "./paytr-credentials.service";
+import { PayTRReportService } from "./paytr-report.service";
 
 /**
  * Gözlemlenebilirlik: PayTR Direkt API 2. adım (bildirim) dokümanı payment_type,
@@ -8,7 +9,11 @@ import { PayTRCredentials } from "./paytr-credentials.service";
  */
 describe("PayTRService.parseCallback — rich field extraction", () => {
   const config = { get: () => "" } as any;
-  const svc = new PayTRService(new PayTRCredentials(config), config);
+  const svc = new PayTRService(
+    new PayTRCredentials(config),
+    new PayTRReportService(new PayTRCredentials(config)),
+    config,
+  );
 
   const base: PayTRCallbackData = {
     merchant_oid: "ORD1T123456",

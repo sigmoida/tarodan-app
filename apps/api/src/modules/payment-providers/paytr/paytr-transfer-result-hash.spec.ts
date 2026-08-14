@@ -3,6 +3,7 @@ import { Test, TestingModule } from "@nestjs/testing";
 import { ConfigService } from "@nestjs/config";
 import { PayTRService } from "./paytr.service";
 import { PayTRCredentials } from "./paytr-credentials.service";
+import { PayTRReportService } from "./paytr-report.service";
 
 /**
  * 2. aşama (platform transfer sonucu) callback hash doğrulaması.
@@ -24,6 +25,7 @@ describe("PayTRService.verifyTransferCallback", () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         PayTRCredentials,
+        PayTRReportService,
         PayTRService,
         {
           provide: ConfigService,
