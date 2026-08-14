@@ -148,7 +148,7 @@ export function CellId({ value }: { value?: string | null }) {
           setTimeout(() => setCopied(false), 1200);
         }}
         aria-label="Copy id"
-        className="shrink-0 text-subtle transition-colors hover:text-body"
+        className="-m-2 shrink-0 rounded p-2 text-subtle transition-colors hover:bg-surface-alt hover:text-body"
       >
         {copied ? (
           <CheckIcon className="h-3.5 w-3.5 text-success-600" />
