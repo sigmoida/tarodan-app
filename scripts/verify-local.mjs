@@ -241,6 +241,16 @@ function buildPushStages(context, apps) {
 function buildCiStages(context) {
   return [
     commandStage("typecheck", "Workspace Typecheck", ["typecheck"]),
+    // @tarodan/web excluded: pre-existing ESLint parsing error in
+    // apps/web/src/lib/userExperiencePolicy.d.mts, unrelated to any given
+    // change — same exclusion as .github/workflows/pr-checks.yml.
+    commandStage("lint", "Workspace Lint", [
+      "exec",
+      "turbo",
+      "run",
+      "lint",
+      "--filter=!@tarodan/web",
+    ]),
     jestStage(context, "api-unit", "API Unit", []),
     commandStage("build", "Production Build", ["build"]),
     commandStage("audit", "Dependency Audit", ["audit:prod"]),
