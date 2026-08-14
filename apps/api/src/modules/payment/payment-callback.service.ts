@@ -15,6 +15,32 @@ import { VirtualOrderFulfillmentService } from "./virtual-order-fulfillment.serv
 import { nodeEnv } from "../../config/environment";
 import { errorMessage } from "../../common/helpers/error-message";
 
+/**
+ * A callback whose four protocol-required fields are present.
+ *
+ * `PayTRCallbackDto` declares every field optional on purpose: PayTR retries
+ * until we answer literal "OK", so rejecting a malformed body with a 4xx would
+ * strand the buyer on the secure page. Validation therefore happens in the
+ * service — and this type carries the result of it, so a handler that runs
+ * after the check states that requirement in its signature instead of trusting
+ * a caller it cannot see.
+ */
+type VerifiedPayTRCallback = PayTRCallbackDto & {
+  merchant_oid: string;
+  status: string;
+  total_amount: string;
+  hash: string;
+};
+
+/** Are the four fields the protocol requires all present? */
+function hasRequiredPaytrFields(
+  dto: PayTRCallbackDto,
+): dto is VerifiedPayTRCallback {
+  return Boolean(
+    dto.merchant_oid && dto.status && dto.total_amount && dto.hash,
+  );
+}
+
 @Injectable()
 export class PaymentCallbackService {
   private readonly logger = new Logger(PaymentCallbackService.name);
@@ -129,7 +155,7 @@ export class PaymentCallbackService {
    * Returns OK so PayTR stops retrying; logs errors for ops.
    */
   private async handlePayTRCallbackHashMismatch(
-    dto: PayTRCallbackDto,
+    dto: VerifiedPayTRCallback,
   ): Promise<string> {
     const payment = await this.findPaymentForPaytrCallback(dto.merchant_oid);
     const recurringPayment = payment
@@ -290,7 +316,7 @@ export class PaymentCallbackService {
 
     // PayTR keeps retrying unless we reply with literal "OK". Always return
     // "OK" — even on bad/missing payloads — and just log the issue.
-    if (!dto.merchant_oid || !dto.status || !dto.total_amount || !dto.hash) {
+    if (!hasRequiredPaytrFields(dto)) {
       this.logger.warn(
         `PayTR callback missing required fields: merchant_oid=${dto.merchant_oid} status=${dto.status} total_amount=${dto.total_amount} hash=${dto.hash ? "present" : "missing"}`,
       );

@@ -171,7 +171,10 @@ export class PaymentCommonService {
   async logPaymentAction(
     action: string,
     paymentId: string,
-    orderId?: string,
+    // A payment need not have an order — trade cash payments and group
+    // payments carry none — and callers pass `payment.orderId` straight
+    // through, so null is a value this records rather than one it rejects.
+    orderId?: string | null,
     adminUserId?: string,
     oldStatus?: PaymentStatus,
     newStatus?: PaymentStatus,

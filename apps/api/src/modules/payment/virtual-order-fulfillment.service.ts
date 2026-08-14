@@ -384,7 +384,11 @@ export class VirtualOrderFulfillmentService {
     transactionId: string,
     providerResponse?: unknown,
   ): Promise<boolean> {
-    if (!this.outbox) {
+    // Captured in a local: narrowing `this.outbox` does not survive into the
+    // transaction closure below, since a property could in principle change
+    // between the check and the callback running.
+    const outbox = this.outbox;
+    if (!outbox) {
       throw new Error("Outbox service is unavailable");
     }
     const result = await this.prisma.$transaction(async (tx) => {
@@ -487,7 +491,7 @@ export class VirtualOrderFulfillmentService {
           });
         }
       }
-      await this.outbox.enqueue(tx, {
+      await outbox.enqueue(tx, {
         type: OUTBOX_REVENUE_INVOICE_ISSUE,
         payload: {
           membershipPaymentId: attempt.id,

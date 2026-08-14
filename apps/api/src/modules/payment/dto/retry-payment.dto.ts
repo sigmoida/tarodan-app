@@ -1,25 +1,25 @@
-import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
 
 export class RetryPaymentResponseDto {
   @ApiProperty({ example: true })
   success: boolean;
 
-  @ApiProperty({ example: 'uuid-payment-id' })
+  @ApiProperty({ example: "uuid-payment-id" })
   paymentId: string;
 
-  @ApiProperty({ example: 'uuid-new-payment-id' })
+  @ApiProperty({ example: "uuid-new-payment-id" })
   newPaymentId: string;
 
-  @ApiPropertyOptional({ example: 'uuid-order-id' })
-  orderId?: string;
+  @ApiPropertyOptional({ example: "uuid-order-id", nullable: true })
+  orderId?: string | null;
 
-  @ApiPropertyOptional({ example: 'https://paytr.com/...' })
+  @ApiPropertyOptional({ example: "https://paytr.com/..." })
   paymentUrl?: string;
 
-  @ApiPropertyOptional({ example: '<script>...</script>' })
+  @ApiPropertyOptional({ example: "<script>...</script>" })
   paymentHtml?: string;
 
-  @ApiProperty({ example: 'paytr' })
+  @ApiProperty({ example: "paytr" })
   provider: string;
 
   @ApiProperty({ example: 300 })

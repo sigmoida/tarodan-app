@@ -651,10 +651,10 @@ export class PaymentExpiryReconciliationService {
           // Order has been cancelled (or 24h passed): release stock + cleanup.
           if (payment.order) {
             await this.paymentFulfillment.releaseProductForFailedPayment(
-              payment.orderId,
+              payment.order.id,
             );
             await this.paymentCommon.cancelSuratShipmentIfExists(
-              payment.orderId,
+              payment.order.id,
               payment.order.orderNumber,
             );
           } else {
@@ -675,7 +675,7 @@ export class PaymentExpiryReconciliationService {
           try {
             await this.eventService.emitPaymentFailed({
               paymentId: payment.id,
-              orderId: payment.orderId,
+              orderId: payment.order.id,
               orderNumber: payment.order.orderNumber,
               buyerId: payment.order.buyerId,
               buyerEmail: payment.order.buyer.email,

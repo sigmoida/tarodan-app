@@ -238,8 +238,11 @@ export class PaymentFulfillmentService {
         this.logger.warn(
           `Payment ${payment.id} succeeded but order ${payment.orderId} (${currentOrder.orderNumber}) already cancelled. Auto-refund required.`,
         );
+        // `as const` keeps this `true` rather than widening to `boolean`, so the
+        // transaction's return union stays discriminated and the branch below
+        // that reads `result.order` is provably the other shape.
         return {
-          autoRefundRequired: true,
+          autoRefundRequired: true as const,
           orderId: payment.orderId,
           paymentId: payment.id,
         };
@@ -394,8 +397,8 @@ export class PaymentFulfillmentService {
 
     // Handle auto-refund: payment succeeded but order was already cancelled (race with cron)
     if ("autoRefundRequired" in result && result.autoRefundRequired) {
-      const refundOrderId = (result as any).orderId;
-      const refundPaymentId = (result as any).paymentId;
+      const refundOrderId = result.orderId;
+      const refundPaymentId = result.paymentId;
       this.logger.warn(
         `Auto-refunding payment ${refundPaymentId} — order ${refundOrderId} was already cancelled`,
       );

@@ -7,7 +7,7 @@ describe("PaymentController card data boundary", () => {
   it("exposes form preparation instead of the legacy card proxy", () => {
     const prototype = PaymentController.prototype as unknown as Record<
       string,
-      unknown
+      object
     >;
     const routes = Object.getOwnPropertyNames(prototype)
       .filter((name) => name !== "constructor")

@@ -374,18 +374,19 @@ export class PaymentQueryService {
     const holds = await this.prisma.paymentHold.findMany({
       where: { sellerId },
       orderBy: { createdAt: "desc" },
-      include: {
-        payment: {
-          include: {
-            order: {
-              include: {
-                product: { select: { id: true, title: true } },
-              },
-            },
-          },
-        },
-      },
     });
+
+    // The product is read from the hold's OWN order, not from its payment's.
+    // A hold always has an `orderId` (non-nullable), but the payment behind it
+    // does not: a group checkout pays for several sellers with one payment
+    // whose `orderId` is null. Reaching the product through `payment.order`
+    // therefore returned null for every hold created by a multi-seller cart —
+    // the normal path — and this method failed on it.
+    const orders = await this.prisma.order.findMany({
+      where: { id: { in: holds.map((h) => h.orderId) } },
+      select: { id: true, product: { select: { id: true, title: true } } },
+    });
+    const productByOrderId = new Map(orders.map((o) => [o.id, o.product]));
 
     return holds.map((h) => ({
       id: h.id,
@@ -395,7 +396,7 @@ export class PaymentQueryService {
       status: h.status,
       releaseAt: h.releaseAt ?? undefined,
       releasedAt: h.releasedAt ?? undefined,
-      product: h.payment.order.product,
+      product: productByOrderId.get(h.orderId),
       createdAt: h.createdAt,
     }));
   }

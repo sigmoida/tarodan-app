@@ -1,57 +1,57 @@
-import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
 
 export class PaymentResponseDto {
-  @ApiProperty({ example: 'uuid' })
+  @ApiProperty({ example: "uuid" })
   id: string;
 
-  @ApiProperty({ example: 'uuid-order-id' })
-  orderId: string;
+  @ApiPropertyOptional({ example: "uuid-order-id", nullable: true })
+  orderId: string | null;
 
   @ApiProperty({ example: 250.0 })
   amount: number;
 
-  @ApiProperty({ example: 'TRY' })
+  @ApiProperty({ example: "TRY" })
   currency: string;
 
-  @ApiProperty({ example: 'paytr' })
+  @ApiProperty({ example: "paytr" })
   provider: string;
 
-  @ApiProperty({ example: 'pending' })
+  @ApiProperty({ example: "pending" })
   status: string;
 
-  @ApiPropertyOptional({ example: 'txn_123456789' })
+  @ApiPropertyOptional({ example: "txn_123456789" })
   providerTransactionId?: string | null; // Alias for providerPaymentId or providerConversationId
 
-  @ApiProperty({ example: '2024-01-15T10:30:00.000Z' })
+  @ApiProperty({ example: "2024-01-15T10:30:00.000Z" })
   createdAt: Date;
 
-  @ApiProperty({ example: '2024-01-15T10:30:00.000Z' })
+  @ApiProperty({ example: "2024-01-15T10:30:00.000Z" })
   updatedAt: Date;
 }
 
 export class PaymentInitResponseDto {
-  @ApiProperty({ example: 'uuid' })
+  @ApiProperty({ example: "uuid" })
   paymentId: string;
 
-  @ApiPropertyOptional({ example: 'uuid-order-id' })
+  @ApiPropertyOptional({ example: "uuid-order-id" })
   orderId?: string;
 
   @ApiPropertyOptional({ example: 340.64 })
   amount?: number;
 
-  @ApiPropertyOptional({ example: 'https://paytr.com/...' })
+  @ApiPropertyOptional({ example: "https://paytr.com/..." })
   paymentUrl?: string;
 
-  @ApiPropertyOptional({ example: '<script>...</script>' })
+  @ApiPropertyOptional({ example: "<script>...</script>" })
   paymentHtml?: string;
 
-  @ApiPropertyOptional({ example: 'PGh0bWw...' })
+  @ApiPropertyOptional({ example: "PGh0bWw..." })
   htmlContent?: string;
 
   @ApiPropertyOptional({ example: true })
   isBase64?: boolean;
 
-  @ApiProperty({ example: 'paytr' })
+  @ApiProperty({ example: "paytr" })
   provider: string;
 
   @ApiProperty({ example: 300 })
@@ -62,30 +62,30 @@ export class PaymentInitResponseDto {
 
   @ApiProperty({
     description:
-      'Short-lived bearer capability scoped to this payment. Send it in X-Payment-Capability on public payment endpoints.',
+      "Short-lived bearer capability scoped to this payment. Send it in X-Payment-Capability on public payment endpoints.",
   })
   paymentAccessToken: string;
 }
 
 export class PaymentHoldResponseDto {
-  @ApiProperty({ example: 'uuid' })
+  @ApiProperty({ example: "uuid" })
   id: string;
 
-  @ApiProperty({ example: 'uuid-order-id' })
+  @ApiProperty({ example: "uuid-order-id" })
   orderId: string;
 
-  @ApiProperty({ example: 'uuid-seller-id' })
+  @ApiProperty({ example: "uuid-seller-id" })
   sellerId: string;
 
   @ApiProperty({ example: 237.5 })
   amount: number;
 
-  @ApiProperty({ example: 'held' })
+  @ApiProperty({ example: "held" })
   status: string;
 
-  @ApiPropertyOptional({ example: '2024-01-22T10:30:00.000Z' })
+  @ApiPropertyOptional({ example: "2024-01-22T10:30:00.000Z" })
   releaseAt?: Date;
 
-  @ApiProperty({ example: '2024-01-15T10:30:00.000Z' })
+  @ApiProperty({ example: "2024-01-15T10:30:00.000Z" })
   createdAt: Date;
 }

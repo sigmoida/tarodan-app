@@ -274,6 +274,17 @@ export class PaymentLifecycleService {
       };
     }
 
+    // A payment with neither an order nor a checkout group is a trade cash
+    // payment (created with only `tradeCashPaymentId`). Ownership here is
+    // derived from the order or the group, so there is nothing to check it
+    // against — the same conclusion the group branch above reaches when it
+    // cannot establish ownership. Until this guard, such a payment reached the
+    // line below and failed with a TypeError.
+    if (!payment.order) {
+      throw new ForbiddenException(
+        i18nMessage("server.payment.cancelPaymentForbidden"),
+      );
+    }
     // Verify user owns the order
     if (payment.order.buyerId !== userId && payment.order.sellerId !== userId) {
       throw new ForbiddenException(
@@ -309,7 +320,7 @@ export class PaymentLifecycleService {
 
     // Siparişi iptal et ve ürünü tekrar satışa aç
     await this.paymentFulfillment.releaseProductForFailedPayment(
-      payment.orderId,
+      payment.order.id,
     );
 
     this.logger.log(`Payment ${paymentId} cancelled by user ${userId}`);
@@ -332,7 +343,7 @@ export class PaymentLifecycleService {
     try {
       await this.eventService.emitPaymentFailed({
         paymentId: payment.id,
-        orderId: payment.orderId,
+        orderId: payment.order.id,
         orderNumber: payment.order.orderNumber,
         buyerId: payment.order.buyerId,
         buyerEmail: payment.order.buyer.email,
