@@ -150,7 +150,9 @@ export class MembershipTierUpdateService {
     dto: MembershipTierUpdateInput,
   ): void {
     if (!Object.values(dto).some((value) => value !== undefined)) {
-      throw new BadRequestException("En az bir alan güncellenmelidir");
+      throw new BadRequestException(
+        i18nMessage("server.membership.noFieldsToUpdate"),
+      );
     }
     if (
       dto.maxTotalListings !== undefined &&
@@ -158,7 +160,7 @@ export class MembershipTierUpdateService {
       dto.maxTotalListings < 1
     ) {
       throw new BadRequestException(
-        "Toplam ilan limiti -1 veya en az 1 olmalıdır",
+        i18nMessage("server.membership.listingLimitRange"),
       );
     }
     // Katman limiti ürün DTO'sunun mutlak tavanını AŞAMAZ; aşarsa satıcı,
@@ -169,7 +171,9 @@ export class MembershipTierUpdateService {
         dto.maxImagesPerListing > MAX_PRODUCT_IMAGES)
     ) {
       throw new BadRequestException(
-        `İlan başına görsel limiti 1 ile ${MAX_PRODUCT_IMAGES} arasında olmalıdır`,
+        i18nMessage("server.membership.imageLimitRange", {
+          max: MAX_PRODUCT_IMAGES,
+        }),
       );
     }
     if (tier.type === MembershipTierType.free) {
@@ -177,7 +181,7 @@ export class MembershipTierUpdateService {
       // tanımsız kalır; fiyatlanırsa "ücretsiz" sözleşmesi bozulur.
       if (dto.isActive === false) {
         throw new BadRequestException(
-          "Ücretsiz üyelik seviyesi pasif yapılamaz",
+          i18nMessage("server.membership.freeTierCannotDeactivate"),
         );
       }
       if (
@@ -185,7 +189,7 @@ export class MembershipTierUpdateService {
         (dto.yearlyPrice !== undefined && dto.yearlyPrice !== 0)
       ) {
         throw new BadRequestException(
-          "Ücretsiz üyelik fiyatları sıfır olmalıdır",
+          i18nMessage("server.membership.freeTierPriceZero"),
         );
       }
     } else if (
@@ -193,7 +197,7 @@ export class MembershipTierUpdateService {
       (dto.yearlyPrice !== undefined && dto.yearlyPrice <= 0)
     ) {
       throw new BadRequestException(
-        "Ücretli üyelik fiyatları sıfırdan büyük olmalıdır",
+        i18nMessage("server.membership.paidTierPricePositive"),
       );
     }
   }

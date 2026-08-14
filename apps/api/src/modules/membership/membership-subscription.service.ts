@@ -397,7 +397,9 @@ export class MembershipSubscriptionService {
       requestedBillingPeriod !== "monthly" &&
       requestedBillingPeriod !== "yearly"
     ) {
-      throw new BadRequestException("Geçersiz üyelik faturalama dönemi");
+      throw new BadRequestException(
+        i18nMessage("server.membership.invalidBillingPeriod"),
+      );
     }
 
     // An intent owns an immutable tier + billing-period + amount snapshot. Retrying
@@ -422,7 +424,7 @@ export class MembershipSubscriptionService {
           intent.billingPeriod !== requestedBillingPeriod)
       ) {
         throw new BadRequestException(
-          "Başka bir paket veya dönem için bekleyen üyelik ödemesi bulunuyor",
+          i18nMessage("server.membership.pendingPaymentExists"),
         );
       }
       if (
@@ -430,7 +432,7 @@ export class MembershipSubscriptionService {
         Number(intent.order.totalAmount) !== Number(intent.amount)
       ) {
         throw new BadRequestException(
-          "Üyelik ödeme niyeti sipariş snapshot'ı ile uyuşmuyor",
+          i18nMessage("server.membership.intentSnapshotMismatch"),
         );
       }
       const paymentResult = await this.paymentService.initiatePayment(
@@ -451,7 +453,7 @@ export class MembershipSubscriptionService {
 
     if (!override && membership.status !== SubscriptionStatus.past_due) {
       throw new BadRequestException(
-        "Bekleyen bir üyelik ödeme niyeti bulunamadı",
+        i18nMessage("server.membership.intentNotFound"),
       );
     }
 
@@ -626,14 +628,16 @@ export class MembershipSubscriptionService {
     }
 
     if (!intent?.order || !intent.targetTier) {
-      throw new BadRequestException("Üyelik ödeme niyeti oluşturulamadı");
+      throw new BadRequestException(
+        i18nMessage("server.membership.intentNotCreated"),
+      );
     }
     if (
       intent.targetTierId !== targetTier.id ||
       intent.billingPeriod !== billingPeriod
     ) {
       throw new BadRequestException(
-        "Başka bir paket veya dönem için bekleyen üyelik ödemesi bulunuyor",
+        i18nMessage("server.membership.pendingPaymentExists"),
       );
     }
 
@@ -756,13 +760,13 @@ export class MembershipSubscriptionService {
     if (autoRenew) {
       if (!isPremiumEntitled(membership, membership.user)) {
         throw new BadRequestException(
-          "Otomatik yenileme yalnız geçerli ücretli üyelikte açılabilir",
+          i18nMessage("server.membership.autoRenewPaidOnly"),
         );
       }
       // Fulfillment (D1) ve planlı geçiş (D2) ile aynı tanım: paylaşılan helper.
       if (!(await hasUsableRecurringCard(this.prisma, userId))) {
         throw new BadRequestException(
-          "Otomatik yenileme için CVV gerektirmeyen kayıtlı kart bulunamadı",
+          i18nMessage("server.membership.autoRenewCardRequired"),
         );
       }
     }

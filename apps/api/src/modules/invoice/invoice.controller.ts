@@ -25,6 +25,7 @@ import { Request, Response } from "express";
 import { InvoiceService } from "./invoice.service";
 import { JwtAuthGuard } from "../auth/guards";
 import { CurrentUser, Public } from "../auth/decorators";
+import { i18nMessage } from "../i18n";
 
 @ApiTags("invoices")
 @Controller("invoices")
@@ -58,7 +59,9 @@ export class InvoiceController {
 
   private assertPaymentCapability(req: Request, paymentId: string): void {
     if (!this.hasPaymentCapability(req, paymentId)) {
-      throw new ForbiddenException("Geçersiz ödeme erişim yetkisi");
+      throw new ForbiddenException(
+        i18nMessage("server.invoice.paymentCapabilityInvalid"),
+      );
     }
   }
 

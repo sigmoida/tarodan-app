@@ -30,6 +30,7 @@ import {
 } from "@prisma/client";
 import { billableDesiForTier } from "./shipping-package-tier";
 import { OrderShipmentProvisioner } from "../surat-cargo/order-shipment-provisioner.service";
+import { i18nMessage } from "../i18n";
 
 @Injectable()
 export class ShippingService {
@@ -138,7 +139,7 @@ export class ShippingService {
     ]);
 
     if (!fromAddress || !toAddress) {
-      throw new NotFoundException("Adres bulunamadı");
+      throw new NotFoundException(i18nMessage("server.trade.addressNotFound"));
     }
 
     // Calculate rates for each provider
@@ -254,11 +255,13 @@ export class ShippingService {
     });
 
     if (!shipment) {
-      throw new NotFoundException("Kargo bulunamadı");
+      throw new NotFoundException(i18nMessage("server.shipping.notFound"));
     }
 
     if (shipment.order.sellerId !== sellerId) {
-      throw new ForbiddenException("Bu kargoyu güncelleme yetkiniz yok");
+      throw new ForbiddenException(
+        i18nMessage("server.shipping.updateForbidden"),
+      );
     }
 
     // #86: guard the manual "mark picked up" against illegal regressions — a
@@ -268,7 +271,7 @@ export class ShippingService {
       !canTransitionShipmentStatus(shipment.status, ShipmentStatus.picked_up)
     ) {
       throw new BadRequestException(
-        "Kargo bu durumda güncellenemez (teslim edilmiş, iade veya iptal).",
+        i18nMessage("server.shipping.updateStateInvalid"),
       );
     }
 
@@ -281,7 +284,7 @@ export class ShippingService {
     // güncellemedir; buradaki ön kontrol yalnız net hata mesajı içindir.
     if (!SHIPPABLE_ORDER_STATUSES.includes(shipment.order.status)) {
       throw new BadRequestException(
-        "Bu sipariş kargoya verilebilir durumda değil (iptal edilmiş, iade sürecinde veya çoktan kargolanmış).",
+        i18nMessage("server.shipping.orderNotShippable"),
       );
     }
 
@@ -324,7 +327,7 @@ export class ShippingService {
       });
       if (activeRefund) {
         throw new BadRequestException(
-          "Bu sipariş için açık bir iptal/iade talebi var; talep sonuçlanmadan kargoya veremezsiniz.",
+          i18nMessage("server.shipping.openRefundRequest"),
         );
       }
 
@@ -336,7 +339,7 @@ export class ShippingService {
       });
       if (cas.count === 0) {
         throw new BadRequestException(
-          "Kargo durumu az önce güncellendi; sayfayı yenileyip tekrar deneyin.",
+          i18nMessage("server.shipping.statusChanged"),
         );
       }
       const updatedShipment = await tx.shipment.findUniqueOrThrow({
@@ -372,7 +375,7 @@ export class ShippingService {
       });
       if (orderShipped.count === 0) {
         throw new BadRequestException(
-          "Sipariş durumu az önce değişti (iptal/iade edilmiş olabilir); sayfayı yenileyip tekrar deneyin.",
+          i18nMessage("server.shipping.orderStatusChanged"),
         );
       }
 
@@ -559,7 +562,7 @@ export class ShippingService {
     });
 
     if (!shipment) {
-      throw new NotFoundException("Kargo bulunamadı");
+      throw new NotFoundException(i18nMessage("server.shipping.notFound"));
     }
 
     // Only buyer or seller can view
@@ -567,7 +570,9 @@ export class ShippingService {
       shipment.order.buyerId !== userId &&
       shipment.order.sellerId !== userId
     ) {
-      throw new ForbiddenException("Bu kargoyu görüntüleme yetkiniz yok");
+      throw new ForbiddenException(
+        i18nMessage("server.shipping.viewForbidden"),
+      );
     }
 
     return this.formatShipmentResponse(shipment);
@@ -582,12 +587,12 @@ export class ShippingService {
     });
 
     if (!order) {
-      throw new NotFoundException("Sipariş bulunamadı");
+      throw new NotFoundException(i18nMessage("server.order.notFound"));
     }
 
     if (order.buyerId !== userId && order.sellerId !== userId) {
       throw new ForbiddenException(
-        "Bu siparişin kargosunu görüntüleme yetkiniz yok",
+        i18nMessage("server.shipping.viewOrderShipmentForbidden"),
       );
     }
 
@@ -601,7 +606,9 @@ export class ShippingService {
     });
 
     if (!shipment) {
-      throw new NotFoundException("Bu sipariş için kargo bulunamadı");
+      throw new NotFoundException(
+        i18nMessage("server.shipping.orderShipmentNotFound"),
+      );
     }
 
     return this.formatShipmentResponse(shipment);

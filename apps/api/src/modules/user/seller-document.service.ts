@@ -11,6 +11,7 @@ import {
   CreateCorporateStakeholderDto,
   UpdateCorporateApplicationDto,
 } from "./dto";
+import { i18nMessage } from "../i18n";
 
 /** All corporate-seller document slots, in display order. */
 export const SELLER_DOCUMENT_TYPES: SellerDocumentType[] = [
@@ -55,12 +56,12 @@ export class SellerDocumentService {
     });
     if (!application) {
       throw new ForbiddenException(
-        "Yalnızca kurumsal satıcı başvurusu yapan kullanıcılar belge yükleyebilir",
+        i18nMessage("server.user.corporateApplicantsOnly"),
       );
     }
     if (!["completing", "under_review"].includes(application.status)) {
       throw new ForbiddenException(
-        "Başvuru bu aşamada belge değişikliğine açık değil",
+        i18nMessage("server.user.applicationLocked"),
       );
     }
     return application;
@@ -73,11 +74,13 @@ export class SellerDocumentService {
     file: Express.Multer.File | undefined,
   ) {
     if (!SELLER_DOCUMENT_TYPES.includes(documentType)) {
-      throw new BadRequestException("Geçersiz belge tipi");
+      throw new BadRequestException(
+        i18nMessage("server.user.invalidDocumentType"),
+      );
     }
     if (!file) throw new BadRequestException("Dosya gerekli");
     if (!ALLOWED_MIME.includes(file.mimetype)) {
-      throw new BadRequestException("Yalnızca PDF, JPEG, PNG veya WebP");
+      throw new BadRequestException(i18nMessage("server.user.documentFormats"));
     }
     if (file.size > MAX_SIZE) {
       throw new BadRequestException("Dosya en fazla 10MB olabilir");
@@ -96,7 +99,7 @@ export class SellerDocumentService {
     if (isIdentityDocument) {
       if (!stakeholderId) {
         throw new BadRequestException(
-          "Kimlik veya pasaport belgesi için şirket sahibi/ortağı seçilmelidir",
+          i18nMessage("server.user.stakeholderRequired"),
         );
       }
       stakeholder = await this.prisma.corporateStakeholder.findFirst({
@@ -104,13 +107,15 @@ export class SellerDocumentService {
         select: { id: true, identityType: true },
       });
       if (!stakeholder) {
-        throw new BadRequestException("Şirket sahibi/ortağı bulunamadı");
+        throw new BadRequestException(
+          i18nMessage("server.user.stakeholderNotFound"),
+        );
       }
       const expectedPrefix =
         stakeholder.identityType === "tckn" ? "identity_" : "passport_";
       if (!documentType.startsWith(expectedPrefix)) {
         throw new BadRequestException(
-          "Belge tipi, seçilen kişinin kimlik türüyle eşleşmiyor",
+          i18nMessage("server.user.documentTypeMismatch"),
         );
       }
     }
@@ -219,7 +224,9 @@ export class SellerDocumentService {
       },
     });
     if (!application) {
-      throw new BadRequestException("Kurumsal başvuru bulunamadı");
+      throw new BadRequestException(
+        i18nMessage("server.user.corporateApplicationNotFound"),
+      );
     }
     return application;
   }
@@ -260,10 +267,13 @@ export class SellerDocumentService {
     const document = await this.prisma.sellerDocument.findFirst({
       where: { id: documentId, userId, isCurrent: true },
     });
-    if (!document) throw new BadRequestException("Belge bulunamadı");
+    if (!document)
+      throw new BadRequestException(
+        i18nMessage("server.user.documentNotFound"),
+      );
     if (!["rejected", "revision_requested"].includes(document.status)) {
       throw new BadRequestException(
-        "Yalnız reddedilen veya revizyon istenen belgeye itiraz edilebilir",
+        i18nMessage("server.user.appealRejectedOnly"),
       );
     }
     await this.prisma.$transaction([
@@ -300,7 +310,9 @@ export class SellerDocumentService {
     ].filter((field) => !application[field as keyof typeof application]);
     if (missingFields.length) {
       throw new BadRequestException(
-        `Eksik şirket bilgileri: ${missingFields.join(", ")}`,
+        i18nMessage("server.user.companyFieldsMissing", {
+          fields: missingFields.join(", "),
+        }),
       );
     }
 
@@ -340,7 +352,7 @@ export class SellerDocumentService {
       stakeholdersWithoutIdentity.length
     ) {
       throw new BadRequestException(
-        "Zorunlu belgeler ile her şirket sahibi/ortağının kimlik veya pasaport ön-arka yüzleri tamamlanmalıdır",
+        i18nMessage("server.user.documentsIncomplete"),
       );
     }
 

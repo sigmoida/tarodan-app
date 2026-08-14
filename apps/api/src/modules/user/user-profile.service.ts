@@ -358,9 +358,7 @@ export class UserProfileService {
   async claimUsername(userId: string, requestedUsername: string) {
     const username = normalizeUsername(requestedUsername);
     if (!isUsernameAllowed(username)) {
-      throw new BadRequestException(
-        "Kullanıcı adı 3-30 karakter olmalı; yalnızca küçük harf, rakam, nokta ve alt çizgi içerebilir.",
-      );
+      throw new BadRequestException(i18nMessage("server.user.usernameFormat"));
     }
 
     const user = await this.prisma.user.findUnique({
@@ -371,7 +369,9 @@ export class UserProfileService {
       throw new NotFoundException(i18nMessage("server.user.notFound"));
     }
     if (user.usernameClaimedAt) {
-      throw new ConflictException("Kullanıcı adı daha önce belirlenmiş.");
+      throw new ConflictException(
+        i18nMessage("server.user.usernameAlreadySet"),
+      );
     }
 
     try {
@@ -380,14 +380,18 @@ export class UserProfileService {
         data: { username, usernameClaimedAt: new Date() },
       });
       if (result.count !== 1) {
-        throw new ConflictException("Kullanıcı adı daha önce belirlenmiş.");
+        throw new ConflictException(
+          i18nMessage("server.user.usernameAlreadySet"),
+        );
       }
     } catch (error) {
       if (
         error instanceof Prisma.PrismaClientKnownRequestError &&
         error.code === "P2002"
       ) {
-        throw new ConflictException("Bu kullanıcı adı daha önce alınmış.");
+        throw new ConflictException(
+          i18nMessage("server.auth.usernameAlreadyTaken"),
+        );
       }
       throw error;
     }

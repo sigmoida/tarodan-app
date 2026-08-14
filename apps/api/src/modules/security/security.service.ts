@@ -20,6 +20,7 @@ import {
   AdminSessionListDto,
 } from "./dto";
 import { generateTotpSecret, verifyTotpCode } from "./totp.util";
+import { i18nMessage } from "../i18n";
 
 @Injectable()
 export class SecurityService {
@@ -62,7 +63,7 @@ export class SecurityService {
     });
     if (!user?.passwordHash) {
       throw new BadRequestException(
-        "İki faktörlü doğrulama için önce bir hesap şifresi belirlemelisiniz",
+        i18nMessage("server.security.passwordRequiredFor2fa"),
       );
     }
 
@@ -121,14 +122,18 @@ export class SecurityService {
     });
 
     if (!twoFactor) {
-      throw new BadRequestException("2FA kurulumu yapılmamış");
+      throw new BadRequestException(
+        i18nMessage("server.security.twoFactorNotSetUp"),
+      );
     }
 
     const secret = this.decryptSecret(twoFactor.secret);
     const isValid = this.verifyTOTP(secret, code);
 
     if (!isValid) {
-      throw new UnauthorizedException("Geçersiz doğrulama kodu");
+      throw new UnauthorizedException(
+        i18nMessage("server.security.invalidCode"),
+      );
     }
 
     // Enable 2FA
@@ -160,14 +165,18 @@ export class SecurityService {
     });
 
     if (!twoFactor || !twoFactor.isEnabled) {
-      throw new BadRequestException("2FA etkin değil");
+      throw new BadRequestException(
+        i18nMessage("server.security.twoFactorDisabled"),
+      );
     }
 
     const secret = this.decryptSecret(twoFactor.secret);
     const isValid = this.verifyTOTP(secret, code);
 
     if (!isValid) {
-      throw new UnauthorizedException("Geçersiz doğrulama kodu");
+      throw new UnauthorizedException(
+        i18nMessage("server.security.invalidCode"),
+      );
     }
 
     await this.prisma.twoFactorSecret.update({
@@ -259,14 +268,18 @@ export class SecurityService {
     });
 
     if (!twoFactor || !twoFactor.isEnabled) {
-      throw new BadRequestException("2FA etkin değil");
+      throw new BadRequestException(
+        i18nMessage("server.security.twoFactorDisabled"),
+      );
     }
 
     const secret = this.decryptSecret(twoFactor.secret);
     const isValid = this.verifyTOTP(secret, code);
 
     if (!isValid) {
-      throw new UnauthorizedException("Geçersiz doğrulama kodu");
+      throw new UnauthorizedException(
+        i18nMessage("server.security.invalidCode"),
+      );
     }
 
     const newBackupCodes = this.generateBackupCodes();
@@ -336,15 +349,21 @@ export class SecurityService {
     });
 
     if (!resetToken) {
-      throw new BadRequestException("Geçersiz veya süresi dolmuş token");
+      throw new BadRequestException(
+        i18nMessage("server.auth.resetTokenInvalidOrExpired"),
+      );
     }
 
     if (resetToken.usedAt) {
-      throw new BadRequestException("Bu token zaten kullanılmış");
+      throw new BadRequestException(
+        i18nMessage("server.security.tokenAlreadyUsed"),
+      );
     }
 
     if (resetToken.expiresAt < new Date()) {
-      throw new BadRequestException("Token süresi dolmuş");
+      throw new BadRequestException(
+        i18nMessage("server.auth.resetTokenExpired"),
+      );
     }
 
     // Update password
@@ -380,7 +399,7 @@ export class SecurityService {
     });
 
     if (!user) {
-      throw new NotFoundException("Kullanıcı bulunamadı");
+      throw new NotFoundException(i18nMessage("server.auth.userNotFound"));
     }
 
     // A social sign-in account has no password hash, and bcrypt rejects a null
@@ -391,7 +410,9 @@ export class SecurityService {
       !!user.passwordHash &&
       (await bcrypt.compare(currentPassword, user.passwordHash));
     if (!isValid) {
-      throw new UnauthorizedException("Mevcut şifre yanlış");
+      throw new UnauthorizedException(
+        i18nMessage("server.security.currentPasswordWrong"),
+      );
     }
 
     const passwordHash = await bcrypt.hash(newPassword, 12);
@@ -414,7 +435,7 @@ export class SecurityService {
     });
 
     if (!user) {
-      throw new NotFoundException("Kullanıcı bulunamadı");
+      throw new NotFoundException(i18nMessage("server.auth.userNotFound"));
     }
 
     const targetEmail = email || user.email;
@@ -454,15 +475,21 @@ export class SecurityService {
       });
 
     if (!verificationToken) {
-      throw new BadRequestException("Geçersiz doğrulama tokeni");
+      throw new BadRequestException(
+        i18nMessage("server.security.invalidToken"),
+      );
     }
 
     if (verificationToken.usedAt) {
-      throw new BadRequestException("Bu token zaten kullanılmış");
+      throw new BadRequestException(
+        i18nMessage("server.security.tokenAlreadyUsed"),
+      );
     }
 
     if (verificationToken.expiresAt < new Date()) {
-      throw new BadRequestException("Token süresi dolmuş");
+      throw new BadRequestException(
+        i18nMessage("server.auth.resetTokenExpired"),
+      );
     }
 
     // Update user
@@ -492,7 +519,7 @@ export class SecurityService {
     });
 
     if (!user) {
-      throw new NotFoundException("Kullanıcı bulunamadı");
+      throw new NotFoundException(i18nMessage("server.auth.userNotFound"));
     }
 
     const pendingToken = await this.prisma.emailVerificationToken.findFirst({

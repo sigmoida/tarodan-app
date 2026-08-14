@@ -7390,7 +7390,21 @@
       "unfollowed": "Unfollowed",
       "userBlocked": "{displayName} has been blocked",
       "userUnblocked": "Block removed",
-      "unknownOnboardingTour": "Unknown onboarding tour"
+      "unknownOnboardingTour": "Unknown onboarding tour",
+      "corporateApplicantsOnly": "Only users with a corporate seller application can upload documents",
+      "applicationLocked": "The application is not open to document changes at this stage",
+      "invalidDocumentType": "Invalid document type",
+      "documentFormats": "Only PDF, JPEG, PNG or WebP",
+      "stakeholderRequired": "Select the company owner or partner for an ID or passport document",
+      "stakeholderNotFound": "Company owner or partner not found",
+      "documentTypeMismatch": "The document type does not match the selected person's identity type",
+      "corporateApplicationNotFound": "Corporate application not found",
+      "documentNotFound": "Document not found",
+      "appealRejectedOnly": "Only a rejected document, or one sent back for revision, can be appealed",
+      "documentsIncomplete": "The required documents, plus the front and back of every owner's or partner's ID or passport, must be complete",
+      "usernameFormat": "A username must be 3-30 characters and may contain only lowercase letters, digits, dots and underscores.",
+      "usernameAlreadySet": "The username has already been set.",
+      "companyFieldsMissing": "Missing company details: {fields}"
     },
     "membership": {
       "alreadyCancelled": "Membership has already been cancelled",
@@ -7413,7 +7427,20 @@
       "tierNoPaymentNeeded": "No payment is required for this membership tier",
       "tierNotActive": "This membership tier is not active",
       "tierNotFound": "Membership tier not found: {type}",
-      "userIdNotFound": "User ID not found"
+      "userIdNotFound": "User ID not found",
+      "invalidBillingPeriod": "Invalid membership billing period",
+      "pendingPaymentExists": "There is a pending membership payment for another plan or period",
+      "intentSnapshotMismatch": "The membership payment intent does not match the order snapshot",
+      "intentNotFound": "No pending membership payment intent was found",
+      "intentNotCreated": "The membership payment intent could not be created",
+      "autoRenewPaidOnly": "Auto-renewal can only be enabled on an active paid membership",
+      "autoRenewCardRequired": "Auto-renewal needs a saved card that does not require a CVV",
+      "noFieldsToUpdate": "At least one field must be updated",
+      "listingLimitRange": "The total listing limit must be -1 or at least 1",
+      "freeTierCannotDeactivate": "The free membership tier cannot be deactivated",
+      "freeTierPriceZero": "A free membership tier must be priced at zero",
+      "paidTierPricePositive": "A paid membership tier must be priced above zero",
+      "imageLimitRange": "The per-listing image limit must be between 1 and {max}"
     },
     "shipping": {
       "noActiveTariff": "No active shipping tariff found ({provider})",
@@ -7427,7 +7454,17 @@
       "createForbidden": "You cannot create a shipment for this order",
       "orderNotPreparing": "The order is not in the preparing state",
       "alreadyCreated": "A shipment has already been created for this order",
-      "createFailed": "The shipment record could not be created"
+      "createFailed": "The shipment record could not be created",
+      "notFound": "Shipment not found",
+      "updateForbidden": "You are not allowed to update this shipment",
+      "updateStateInvalid": "A shipment in this state cannot be updated (delivered, returned or cancelled).",
+      "orderNotShippable": "This order cannot be shipped (cancelled, in a refund process, or already shipped).",
+      "openRefundRequest": "There is an open cancellation or refund request for this order; you cannot ship it until that is resolved.",
+      "statusChanged": "The shipment status just changed; refresh the page and try again.",
+      "orderStatusChanged": "The order status just changed (it may have been cancelled or refunded); refresh the page and try again.",
+      "viewForbidden": "You are not allowed to view this shipment",
+      "viewOrderShipmentForbidden": "You are not allowed to view this order's shipment",
+      "orderShipmentNotFound": "No shipment was found for this order"
     },
     "commission": {
       "noRuleConfigured": "The order cannot be created right now because commission configuration is missing. Please try again later.",
@@ -7514,7 +7551,14 @@
       "imageUploadFailed": "Image upload failed"
     },
     "messaging": {
-      "messageNotFound": "Message not found"
+      "messageNotFound": "Message not found",
+      "recipientRequired": "A recipient user ID is required (recipientId or participantId)",
+      "selfMessage": "You cannot send a message to yourself",
+      "threadNotFound": "Message thread not found",
+      "sendForbidden": "You are not allowed to send messages in this thread",
+      "viewForbidden": "You are not allowed to view this thread",
+      "messageTooLong": "A message can be at most {max} characters. Current length: {length}",
+      "dailyLimitReached": "You have reached your daily message limit ({limit}). Try again tomorrow."
     },
     "wishlist": {
       "ownProduct": "You cannot add your own product to a wishlist",
@@ -7576,6 +7620,38 @@
       "productMismatch": "The product does not match the one in the order",
       "productAlreadyRated": "You have already rated the product for this order",
       "reviewNotFound": "Review not found"
+    },
+    "invoice": {
+      "paymentCapabilityInvalid": "Invalid payment access capability",
+      "partyMissing": "The order is missing its buyer or seller details",
+      "orderNotPaid": "An invoice cannot be issued for an order that has not been paid.",
+      "storageUnavailable": "The invoice document storage service is unavailable.",
+      "issueForbidden": "You are not allowed to issue an invoice for this order",
+      "notFound": "Invoice not found",
+      "orderUnpaidOrCancelled": "An invoice cannot be issued for an unpaid or cancelled order.",
+      "returnViaElogoOnly": "Return invoices can only be issued through the eLogo return-document flow."
+    },
+    "security": {
+      "passwordRequiredFor2fa": "Set an account password before enabling two-factor authentication",
+      "twoFactorNotSetUp": "Two-factor authentication has not been set up",
+      "invalidCode": "Invalid verification code",
+      "twoFactorDisabled": "Two-factor authentication is not enabled",
+      "tokenAlreadyUsed": "This token has already been used",
+      "currentPasswordWrong": "The current password is incorrect",
+      "invalidToken": "Invalid verification token"
+    },
+    "storage": {
+      "uploadUnavailableRetry": "The file upload service is unavailable right now. Please try again later.",
+      "unsupportedType": "Unsupported file type. Only JPEG, PNG, WebP and GIF are supported.",
+      "notAnImage": "The file content is not a valid image.",
+      "notADocument": "The file content is not a valid document (PDF or image).",
+      "uploadFailed": "File upload failed",
+      "copyFailed": "File copy failed",
+      "uploadUnavailable": "The file upload service is unavailable right now.",
+      "presignFailed": "The presigned URL could not be created",
+      "downloadUnavailable": "The file download service is unavailable right now.",
+      "invalidBucketType": "Invalid bucket type: {bucket}",
+      "invalidBucket": "Invalid bucket: {bucket}"
     }
   }
 }

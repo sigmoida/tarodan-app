@@ -7390,7 +7390,21 @@
       "unfollowed": "Takip bırakıldı",
       "userBlocked": "{displayName} engellendi",
       "userUnblocked": "Engel kaldırıldı",
-      "unknownOnboardingTour": "Bilinmeyen tanıtım turu"
+      "unknownOnboardingTour": "Bilinmeyen tanıtım turu",
+      "corporateApplicantsOnly": "Yalnızca kurumsal satıcı başvurusu yapan kullanıcılar belge yükleyebilir",
+      "applicationLocked": "Başvuru bu aşamada belge değişikliğine açık değil",
+      "invalidDocumentType": "Geçersiz belge tipi",
+      "documentFormats": "Yalnızca PDF, JPEG, PNG veya WebP",
+      "stakeholderRequired": "Kimlik veya pasaport belgesi için şirket sahibi/ortağı seçilmelidir",
+      "stakeholderNotFound": "Şirket sahibi/ortağı bulunamadı",
+      "documentTypeMismatch": "Belge tipi, seçilen kişinin kimlik türüyle eşleşmiyor",
+      "corporateApplicationNotFound": "Kurumsal başvuru bulunamadı",
+      "documentNotFound": "Belge bulunamadı",
+      "appealRejectedOnly": "Yalnız reddedilen veya revizyon istenen belgeye itiraz edilebilir",
+      "documentsIncomplete": "Zorunlu belgeler ile her şirket sahibi/ortağının kimlik veya pasaport ön-arka yüzleri tamamlanmalıdır",
+      "usernameFormat": "Kullanıcı adı 3-30 karakter olmalı; yalnızca küçük harf, rakam, nokta ve alt çizgi içerebilir.",
+      "usernameAlreadySet": "Kullanıcı adı daha önce belirlenmiş.",
+      "companyFieldsMissing": "Eksik şirket bilgileri: {fields}"
     },
     "membership": {
       "alreadyCancelled": "Üyelik zaten iptal edilmiş",
@@ -7413,7 +7427,20 @@
       "tierNoPaymentNeeded": "Bu üyelik seviyesi için ödeme gerekmez",
       "tierNotActive": "Bu üyelik tipi aktif değil",
       "tierNotFound": "Üyelik tipi bulunamadı: {type}",
-      "userIdNotFound": "Kullanıcı kimliği bulunamadı"
+      "userIdNotFound": "Kullanıcı kimliği bulunamadı",
+      "invalidBillingPeriod": "Geçersiz üyelik faturalama dönemi",
+      "pendingPaymentExists": "Başka bir paket veya dönem için bekleyen üyelik ödemesi bulunuyor",
+      "intentSnapshotMismatch": "Üyelik ödeme niyeti sipariş snapshot'ı ile uyuşmuyor",
+      "intentNotFound": "Bekleyen bir üyelik ödeme niyeti bulunamadı",
+      "intentNotCreated": "Üyelik ödeme niyeti oluşturulamadı",
+      "autoRenewPaidOnly": "Otomatik yenileme yalnız geçerli ücretli üyelikte açılabilir",
+      "autoRenewCardRequired": "Otomatik yenileme için CVV gerektirmeyen kayıtlı kart bulunamadı",
+      "noFieldsToUpdate": "En az bir alan güncellenmelidir",
+      "listingLimitRange": "Toplam ilan limiti -1 veya en az 1 olmalıdır",
+      "freeTierCannotDeactivate": "Ücretsiz üyelik seviyesi pasif yapılamaz",
+      "freeTierPriceZero": "Ücretsiz üyelik fiyatları sıfır olmalıdır",
+      "paidTierPricePositive": "Ücretli üyelik fiyatları sıfırdan büyük olmalıdır",
+      "imageLimitRange": "İlan başına görsel limiti 1 ile {max} arasında olmalıdır"
     },
     "shipping": {
       "noActiveTariff": "Aktif kargo tarifesi bulunamadı ({provider})",
@@ -7427,7 +7454,17 @@
       "createForbidden": "Bu sipariş için kargo oluşturamazsınız",
       "orderNotPreparing": "Sipariş hazırlanma durumunda değil",
       "alreadyCreated": "Bu sipariş için zaten kargo oluşturulmuş",
-      "createFailed": "Kargo kaydı oluşturulamadı"
+      "createFailed": "Kargo kaydı oluşturulamadı",
+      "notFound": "Kargo bulunamadı",
+      "updateForbidden": "Bu kargoyu güncelleme yetkiniz yok",
+      "updateStateInvalid": "Kargo bu durumda güncellenemez (teslim edilmiş, iade veya iptal).",
+      "orderNotShippable": "Bu sipariş kargoya verilebilir durumda değil (iptal edilmiş, iade sürecinde veya çoktan kargolanmış).",
+      "openRefundRequest": "Bu sipariş için açık bir iptal/iade talebi var; talep sonuçlanmadan kargoya veremezsiniz.",
+      "statusChanged": "Kargo durumu az önce güncellendi; sayfayı yenileyip tekrar deneyin.",
+      "orderStatusChanged": "Sipariş durumu az önce değişti (iptal/iade edilmiş olabilir); sayfayı yenileyip tekrar deneyin.",
+      "viewForbidden": "Bu kargoyu görüntüleme yetkiniz yok",
+      "viewOrderShipmentForbidden": "Bu siparişin kargosunu görüntüleme yetkiniz yok",
+      "orderShipmentNotFound": "Bu sipariş için kargo bulunamadı"
     },
     "commission": {
       "noRuleConfigured": "Komisyon yapılandırması eksik olduğundan sipariş şu anda oluşturulamıyor. Lütfen daha sonra tekrar deneyin.",
@@ -7514,7 +7551,14 @@
       "imageUploadFailed": "Resim yükleme başarısız"
     },
     "messaging": {
-      "messageNotFound": "Mesaj bulunamadı"
+      "messageNotFound": "Mesaj bulunamadı",
+      "recipientRequired": "Alıcı kullanıcı ID gereklidir (recipientId veya participantId)",
+      "selfMessage": "Kendinize mesaj gönderemezsiniz",
+      "threadNotFound": "Mesaj konusu bulunamadı",
+      "sendForbidden": "Bu konuya mesaj gönderme yetkiniz yok",
+      "viewForbidden": "Bu konuyu görüntüleme yetkiniz yok",
+      "messageTooLong": "Mesaj uzunluğu maksimum {max} karakter olabilir. Mevcut uzunluk: {length}",
+      "dailyLimitReached": "Günlük mesaj limitinize ({limit}) ulaştınız. Yarın tekrar deneyin."
     },
     "wishlist": {
       "ownProduct": "Kendi ürününüzü istek listesine ekleyemezsiniz",
@@ -7576,6 +7620,38 @@
       "productMismatch": "Siparişteki ürün eşleşmiyor",
       "productAlreadyRated": "Bu sipariş için zaten ürün puanı verdiniz",
       "reviewNotFound": "Yorum bulunamadı"
+    },
+    "invoice": {
+      "paymentCapabilityInvalid": "Geçersiz ödeme erişim yetkisi",
+      "partyMissing": "Sipariş alıcı veya satıcı bilgisi eksik",
+      "orderNotPaid": "Ödemesi tamamlanmamış sipariş için fatura oluşturulamaz.",
+      "storageUnavailable": "Fatura belge saklama servisi kullanılamıyor.",
+      "issueForbidden": "Bu siparişin faturasını oluşturma yetkiniz yok",
+      "notFound": "Fatura bulunamadı",
+      "orderUnpaidOrCancelled": "Ödenmemiş veya iptal edilmiş siparişler için fatura oluşturulamaz.",
+      "returnViaElogoOnly": "İade faturaları yalnız eLogo iade belgesi akışından oluşturulabilir."
+    },
+    "security": {
+      "passwordRequiredFor2fa": "İki faktörlü doğrulama için önce bir hesap şifresi belirlemelisiniz",
+      "twoFactorNotSetUp": "2FA kurulumu yapılmamış",
+      "invalidCode": "Geçersiz doğrulama kodu",
+      "twoFactorDisabled": "2FA etkin değil",
+      "tokenAlreadyUsed": "Bu token zaten kullanılmış",
+      "currentPasswordWrong": "Mevcut şifre yanlış",
+      "invalidToken": "Geçersiz doğrulama tokeni"
+    },
+    "storage": {
+      "uploadUnavailableRetry": "Dosya yükleme servisi şu anda kullanılamıyor. Lütfen daha sonra tekrar deneyin.",
+      "unsupportedType": "Geçersiz dosya tipi. Sadece JPEG, PNG, WebP, GIF desteklenir.",
+      "notAnImage": "Dosya içeriği geçerli bir resim değil.",
+      "notADocument": "Dosya içeriği geçerli bir belge (PDF veya resim) değil.",
+      "uploadFailed": "Dosya yükleme başarısız",
+      "copyFailed": "Dosya kopyalama başarısız",
+      "uploadUnavailable": "Dosya yükleme servisi şu anda kullanılamıyor.",
+      "presignFailed": "Presigned URL oluşturulamadı",
+      "downloadUnavailable": "Dosya indirme servisi şu anda kullanılamıyor.",
+      "invalidBucketType": "Geçersiz bucket tipi: {bucket}",
+      "invalidBucket": "Geçersiz bucket: {bucket}"
     }
   }
 }
