@@ -51,8 +51,11 @@ The `order` module is the canonical shape: `order-pricing`,
   `-financial`, `-shipment`, `-decision`, `-notification` — behind a 258-line
   `refund.service.ts` that only delegates. Callers never changed, because the
   facade keeps every signature they knew. Read that split before doing another.
-- The ones still waiting: `payment-refund` (2331), `elogo-invoicing` (2316),
-  `discount` (2086), `auth` (1835). Don't extend them; extract from them (§15).
+- `payment` went the same way: hold release, the refund-attempt ledger and
+  trade cash refunds are their own services, so `payment-refund.service.ts`
+  (2331 → 1126) now does one job — refunding an order.
+- The ones still waiting: `elogo-invoicing` (2316), `discount` (2086),
+  `auth` (1835). Don't extend them; extract from them (§15).
 
 ## 3. Controllers are thin
 
