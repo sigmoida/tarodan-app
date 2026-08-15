@@ -7,10 +7,12 @@ import { PageShell } from "@/components/layout/PageShell";
 import { PageHeader } from "@/components/layout/PageHeader";
 import SectionCard from "@/components/ui/SectionCard";
 import { formatDate, formatDateTime } from "@/lib/format";
-import { STATUS_CONFIG, categoryLabel } from "../../_lib/data";
+import { ticketStatusStyles, categoryLabel } from "../../_lib/data";
 import { useTicketDetail } from "../_hooks/useTicketDetail";
+import { useTranslations } from "next-intl";
 
 export default function TicketDetailClient() {
+  const t = useTranslations();
   const { ticket, loading, form, onSubmit, isSending } = useTicketDetail();
 
   if (loading) {
@@ -22,7 +24,8 @@ export default function TicketDetailClient() {
   }
   if (!ticket) return null;
 
-  const status = STATUS_CONFIG[ticket.status] || STATUS_CONFIG.open;
+  const status =
+    ticketStatusStyles(t)[ticket.status] || ticketStatusStyles(t).open;
   const isClosed = ticket.status === "closed";
   const replyValue = form.watch("reply") ?? "";
 
@@ -30,9 +33,9 @@ export default function TicketDetailClient() {
     <PageShell className="pb-16">
       <PageHeader
         backHref="/support"
-        backLabel="Destek Merkezi"
+        backLabel={t("page.support.ticketdetailclient.destekMerkezi")}
         title={ticket.subject}
-        description={`${ticket.ticketNumber ? `#${ticket.ticketNumber} · ` : ""}${categoryLabel(ticket.category)} · ${formatDate(ticket.createdAt)}`}
+        description={`${ticket.ticketNumber ? `#${ticket.ticketNumber} · ` : ""}${categoryLabel(ticket.category, t)} · ${formatDate(ticket.createdAt)}`}
         actions={
           <span
             className={`whitespace-nowrap rounded-full px-3 py-1 text-xs font-medium ${status.className}`}
@@ -42,7 +45,7 @@ export default function TicketDetailClient() {
         }
       />
 
-      <SectionCard title="Mesajlar">
+      <SectionCard title={t("page.support.ticketdetailclient.mesajlar")}>
         <div className="space-y-4">
           {ticket.messages
             ?.filter((m) => !m.isInternal)
@@ -62,12 +65,15 @@ export default function TicketDetailClient() {
                   >
                     <div className="mb-1 flex items-center justify-between gap-3">
                       <span
-                        className={`text-xs font-medium ${mine ? "text-inverted/90" : "text-heading"}`}
+                        className={`text-xs font-medium ${mine ? t("page.support.ticketdetailclient.textInverted90") : "text-heading"}`}
                       >
-                        {mine ? "Siz" : message.senderName || "Destek Ekibi"}
+                        {mine
+                          ? t("page.support.ticketdetailclient.siz")
+                          : message.senderName ||
+                            t("page.support.ticketdetailclient.destekEkibi")}
                       </span>
                       <span
-                        className={`text-2xs ${mine ? "text-inverted/70" : "text-muted"}`}
+                        className={`text-2xs ${mine ? t("page.support.ticketdetailclient.textInverted70") : "text-muted"}`}
                       >
                         {formatDateTime(message.createdAt)}
                       </span>
@@ -84,17 +90,18 @@ export default function TicketDetailClient() {
 
       {isClosed ? (
         <SectionCard className="text-center text-muted">
-          Bu talep kapatılmıştır. Yeni bir sorun için destek talebi
-          oluşturabilirsiniz.
+          {t(
+            "page.support.ticketdetailclient.buTalepKapatilmistirYeniBirSorun",
+          )}
         </SectionCard>
       ) : (
         <SectionCard>
           <Form form={form} onSubmit={onSubmit} className="space-y-4">
             <FormTextarea
               name="reply"
-              label="Yanıtınız"
+              label={t("support.yourReply")}
               rows={4}
-              placeholder="Mesajınızı yazın..."
+              placeholder={t("support.replyPlaceholder")}
               maxLength={2000}
             />
             <div className="flex justify-end">
@@ -104,7 +111,7 @@ export default function TicketDetailClient() {
                 disabled={isSending || !replyValue.trim()}
                 leftIcon={<PaperAirplaneIcon className="h-5 w-5" />}
               >
-                Gönder
+                {t("page.support.ticketdetailclient.gonder")}
               </Button>
             </div>
           </Form>

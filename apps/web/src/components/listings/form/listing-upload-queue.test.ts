@@ -287,7 +287,7 @@ describe("yükleme hata mesajı", () => {
     ).toBe("ilk");
   });
 
-  it("mesaj yoksa genel metne düşer", () => {
-    expect(uploadErrorMessage(new Error("network"))).toBe("Resim yüklenemedi");
+  it("mesaj yoksa null döner — genel metni gösterim tarafı katalogdan okur", () => {
+    expect(uploadErrorMessage(new Error("network"))).toBeNull();
   });
 });

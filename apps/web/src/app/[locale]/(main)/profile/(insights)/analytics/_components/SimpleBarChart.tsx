@@ -1,6 +1,7 @@
 /** @format */
 
 import type { DailyPoint } from "../_lib/types";
+import { useTranslations } from "next-intl";
 
 /**
  * Daily-views bar chart with hover tooltips.
@@ -10,8 +11,12 @@ import type { DailyPoint } from "../_lib/types";
  * kaydırılabilir yapıyordu. Kırpma yalnız etiket bandına uygulanıyor — kırpmayı
  * grafiğin tamamına vermek, çubuğun üstünde açılan ve bir sütundan çok daha
  * geniş olan ipucu balonunu da kesiyordu (ilk ve son çubukta yarısı gidiyordu).
+ *
+ * SENKRON ve client hook kullanır: bunu render eden `analytics/page.tsx` bir
+ * client component ve client bir bileşen `async` çocuk render edemez.
  */
 export default function SimpleBarChart({ data }: { data: DailyPoint[] }) {
+  const t = useTranslations();
   const maxViews = Math.max(...data.map((d) => d.views), 1);
 
   return (
@@ -32,7 +37,7 @@ export default function SimpleBarChart({ data }: { data: DailyPoint[] }) {
               büyütüyordu. Görünmeyen bir öğe düzeni etkilememeli.
             */}
             <div className="absolute -top-8 left-1/2 hidden -translate-x-1/2 whitespace-nowrap rounded bg-heading px-2 py-1 text-xs text-inverted group-hover:block">
-              {item.views} görüntüleme
+              {t("profile.analytics.viewsCount", { count: item.views })}
             </div>
           </div>
         ))}

@@ -1,5 +1,7 @@
 /** @format */
 
+import type { Translate } from "@/types/i18n";
+
 export type NavDropdown = "categories" | "scales";
 
 export interface NavBarItem {
@@ -8,28 +10,23 @@ export interface NavBarItem {
   dropdown?: NavDropdown;
 }
 
-export const CATEGORY_BAR_ITEMS: Record<"tr" | "en", NavBarItem[]> = {
-  tr: [
-    { label: "Tüm İlanlar", href: "/listings" },
-    { label: "Yeni Gelenler", href: "/listings?sortBy=created_desc" },
-    { label: "Çok Satanlar", href: "/listings?sortBy=view_count_desc" },
-    { label: "İndirimler", href: "/listings?discountOnly=true" },
-    { label: "Koleksiyonlar", href: "/collections" },
-    { label: "Üreticiler", href: "/manufacturers" },
-    { label: "Kategoriler", dropdown: "categories" },
-    { label: "Ölçek", dropdown: "scales" },
-  ],
-  en: [
-    { label: "All Listings", href: "/listings" },
-    { label: "New Arrivals", href: "/listings?sortBy=created_desc" },
-    { label: "Best Sellers", href: "/listings?sortBy=view_count_desc" },
-    { label: "On Sale", href: "/listings?discountOnly=true" },
-    { label: "Collections", href: "/collections" },
-    { label: "Manufacturers", href: "/manufacturers" },
-    { label: "Categories", dropdown: "categories" },
-    { label: "Scale", dropdown: "scales" },
-  ],
-};
+/**
+ * Katalog gezinme çubuğu — etiketler paylaşılan katalogdan gelir, bu yüzden yeni
+ * bir dil eklemek burada değişiklik gerektirmez (eskiden liste locale başına elle
+ * yazılıyordu ve üçüncü dil sessizce eksik kalırdı).
+ */
+export function categoryBarItems(t: Translate): NavBarItem[] {
+  return [
+    { label: t("nav.allListings"), href: "/listings" },
+    { label: t("nav.newArrivals"), href: "/listings?sortBy=created_desc" },
+    { label: t("nav.bestSellers"), href: "/listings?sortBy=view_count_desc" },
+    { label: t("nav.onSale"), href: "/listings?discountOnly=true" },
+    { label: t("nav.collections"), href: "/collections" },
+    { label: t("nav.manufacturers"), href: "/manufacturers" },
+    { label: t("nav.categories"), dropdown: "categories" },
+    { label: t("nav.scale"), dropdown: "scales" },
+  ];
+}
 
 export interface ManufacturerRef {
   id: string;

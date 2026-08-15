@@ -1,5 +1,10 @@
-import { activeToggleAction, editDeleteActions, type RowActionItem } from '@/components/table';
-import type { CarModel } from './types';
+import {
+  activeToggleAction,
+  editDeleteActions,
+  type RowActionItem,
+} from "@/components/table";
+import type { CarModel } from "./types";
+import type { Translate } from "@/lib/statusLabels";
 
 export interface CarModelRowActions {
   onEdit: (m: CarModel) => void;
@@ -10,9 +15,12 @@ export interface CarModelRowActions {
 }
 
 /** ⋮ row-menu items for a car model. */
-export function carModelRowMenu({ onEdit, onDelete, onToggle, busyId }: CarModelRowActions) {
+export function carModelRowMenu(
+  { onEdit, onDelete, onToggle, busyId }: CarModelRowActions,
+  t: Translate,
+) {
   return (m: CarModel): RowActionItem[] => [
-    activeToggleAction(m.isActive, () => onToggle(m), busyId === m.id),
-    ...editDeleteActions(m, { onEdit, onDelete }),
+    activeToggleAction(m.isActive, () => onToggle(m), t, busyId === m.id),
+    ...editDeleteActions(m, { onEdit, onDelete }, t),
   ];
 }

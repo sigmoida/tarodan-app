@@ -2,6 +2,7 @@
 
 import type { LegalPart } from "@/components/legal/LegalDocument";
 import { PLATFORM_ENTITY } from "@/lib/legal/platform-entity";
+import type { Translate } from "@/types/i18n";
 
 /**
  * KVKK Aydınlatma Metni (6698 sayılı Kanun m.10) — metnin tek kaynağı.
@@ -12,74 +13,90 @@ import { PLATFORM_ENTITY } from "@/lib/legal/platform-entity";
  * Çerezlere ilişkin ayrıntılı metin ayrı bir sayfada (Çerez Politikası) yayımlanır;
  * burada yalnızca çerez verilerinin hangi kategoride işlendiği belirtilir.
  */
-export const PRIVACY_PARTS: LegalPart[] = [
+export const privacyParts = (t: Translate): LegalPart[] => [
   {
-    title: "Kişisel Verilerin Korunmasına İlişkin Aydınlatma Metni",
-    intro:
-      "İşbu Aydınlatma Metni, 6698 sayılı Kişisel Verilerin Korunması Kanunu'nun 10. maddesi uyarınca, Platform üzerinden işlenen kişisel veriler hakkında ilgili kişileri bilgilendirmek amacıyla hazırlanmıştır.",
+    title: t("legal.privacy.kisiselVerilerinKorunmasinaIliskinAydinlatmaMetni"),
+    intro: t("legal.privacy.isbuAydinlatmaMetni6698SayiliKisisel"),
     sections: [
       {
         number: "1",
-        heading: "Veri Sorumlusu",
+        heading: t("legal.privacy.veriSorumlusu"),
         blocks: [
           {
             type: "p",
-            text: `${PLATFORM_ENTITY.legalName} (“Şirket”), ${PLATFORM_ENTITY.address} adresinde mukim olup ${PLATFORM_ENTITY.website} web sitesi ve/veya mobil uygulaması Tarodan (“Platform”) vasıtasıyla işlenen kişisel veriler bakımından 6698 sayılı KVKK uyarınca veri sorumlusudur.`,
+            text: t("legal.privacy.legalnameSirketAddressAdresindeMukimOlup", {
+              legalName: PLATFORM_ENTITY.legalName,
+              address: PLATFORM_ENTITY.address,
+              website: PLATFORM_ENTITY.website,
+            }),
           },
           {
             type: "fields",
             items: [
-              { label: "Unvan", value: PLATFORM_ENTITY.legalName },
-              { label: "Adres", value: PLATFORM_ENTITY.address },
-              { label: "E-posta", value: PLATFORM_ENTITY.email },
-              { label: "KEP", value: PLATFORM_ENTITY.kep },
+              {
+                label: t("legal.privacy.unvan"),
+                value: PLATFORM_ENTITY.legalName,
+              },
+              {
+                label: t("legal.privacy.adres"),
+                value: PLATFORM_ENTITY.address,
+              },
+              {
+                label: t("legal.privacy.ePosta"),
+                value: PLATFORM_ENTITY.email,
+              },
+              { label: t("legal.privacy.kep"), value: PLATFORM_ENTITY.kep },
             ],
           },
         ],
       },
       {
         number: "2",
-        heading: "Kişisel Veri Nedir?",
+        heading: t("legal.privacy.kisiselVeriNedir"),
         blocks: [
           {
             type: "p",
-            text: "Kişisel veri; kimliği belirli veya belirlenebilir gerçek kişiye ilişkin her türlü bilgidir.",
+            text: t(
+              "legal.privacy.kisiselVeriKimligiBelirliVeyaBelirlenebilir",
+            ),
           },
         ],
       },
       {
         number: "3",
-        heading: "İlgili Kişi Grupları ve İşlenen Veri Kategorileri",
+        heading: t("legal.privacy.ilgiliKisiGruplariVeIslenenVeri"),
         blocks: [
           {
             type: "groups",
             groups: [
               {
-                title: "A) Ziyaretçi",
+                title: t("legal.privacy.aZiyaretci"),
                 items: [
-                  "İşlem güvenliği: IP, log, çerez kayıtları, cihaz bilgileri",
-                  "Pazarlama (rıza varsa): reklam / segmentasyon çerez verileri",
+                  t("legal.privacy.islemGuvenligiIpLogCerezKayitlari"),
+                  t("legal.privacy.pazarlamaRizaVarsaReklamSegmentasyonCerez"),
                 ],
               },
               {
-                title: "B) Üye / Alıcı",
+                title: t("legal.privacy.bUyeAlici"),
                 items: [
-                  "Kimlik: ad-soyad, kullanıcı adı, TCKN",
-                  "İletişim: e-posta, telefon, adres",
-                  "Müşteri işlem: sipariş, ödeme, fatura, teslimat, iade, destek kayıtları",
-                  "İşlem güvenliği: IP, log, giriş kayıtları, çerez",
-                  "Hukuki işlem: uyuşmazlık / başvuru kayıtları",
-                  "İşitsel kayıt: çağrı merkezi varsa ses kaydı",
+                  t("legal.privacy.kimlikAdSoyadKullaniciAdiTckn"),
+                  t("legal.privacy.iletisimEPostaTelefonAdres"),
+                  t("legal.privacy.musteriIslemSiparisOdemeFaturaTeslimat"),
+                  t("legal.privacy.islemGuvenligiIpLogGirisKayitlari"),
+                  t("legal.privacy.hukukiIslemUyusmazlikBasvuruKayitlari"),
+                  t("legal.privacy.isitselKayitCagriMerkeziVarsaSes"),
                 ],
               },
               {
-                title: "C) Üye / Satıcı (bireysel veya ticari)",
+                title: t("legal.privacy.cUyeSaticiBireyselVeyaTicari"),
                 items: [
-                  "Kimlik / Yetkili: ad-soyad, kimlik doğrulama verileri; tüzel kişilerde temsilci bilgileri",
-                  "Finans: IBAN, hakediş / komisyon / mahsup raporları",
-                  "Müşteri işlem: ürün listeleme, sipariş, iade / şikâyet, performans metrikleri",
-                  "Hukuki işlem: sözleşme ihlali / uyuşmazlık kayıtları",
-                  "İşlem güvenliği: IP, log, panel erişim kayıtları",
+                  t("legal.privacy.kimlikYetkiliAdSoyadKimlikDogrulama"),
+                  t("legal.privacy.finansIbanHakedisKomisyonMahsupRaporlari"),
+                  t("legal.privacy.musteriIslemUrunListelemeSiparisIade"),
+                  t(
+                    "legal.privacy.hukukiIslemSozlesmeIhlaliUyusmazlikKayitlari",
+                  ),
+                  t("legal.privacy.islemGuvenligiIpLogPanelErisim"),
                 ],
               },
             ],
@@ -88,27 +105,37 @@ export const PRIVACY_PARTS: LegalPart[] = [
       },
       {
         number: "4",
-        heading: "Kişisel Verilerin İşlenme Amaçları",
+        heading: t("legal.privacy.kisiselVerilerinIslenmeAmaclari"),
         blocks: [
           {
             type: "p",
-            text: "Kişisel veriler başta aşağıdaki amaçlarla işlenir:",
+            text: t(
+              "legal.privacy.kisiselVerilerBastaAsagidakiAmaclarlaIslenir",
+            ),
           },
           {
             type: "list",
             items: [
-              { text: "Üyelik kaydı ve hesap yönetimi" },
+              { text: t("legal.privacy.uyelikKaydiVeHesapYonetimi") },
               {
-                text: "Mesafeli satış süreçlerinin yürütülmesi (sipariş, ödeme, teslimat, iade)",
+                text: t(
+                  "legal.privacy.mesafeliSatisSureclerininYurutulmesiSiparisOdeme",
+                ),
               },
-              { text: "Müşteri destek / şikâyet yönetimi" },
-              { text: "Bilgi güvenliği ve suistimal / fraud önleme" },
+              { text: t("legal.privacy.musteriDestekSikayetYonetimi") },
+              { text: t("legal.privacy.bilgiGuvenligiVeSuistimalFraudOnleme") },
               {
-                text: "Hukuki yükümlülüklerin yerine getirilmesi ve uyuşmazlıkların yönetimi",
+                text: t(
+                  "legal.privacy.hukukiYukumluluklerinYerineGetirilmesiVeUyusmazliklarin",
+                ),
               },
-              { text: "Finans / muhasebe, faturalandırma ve raporlama" },
               {
-                text: "Açık rıza varsa pazarlama, kampanya ve kişiselleştirme faaliyetleri",
+                text: t(
+                  "legal.privacy.finansMuhasebeFaturalandirmaVeRaporlama",
+                ),
+              },
+              {
+                text: t("legal.privacy.acikRizaVarsaPazarlamaKampanyaVe"),
               },
             ],
           },
@@ -116,65 +143,83 @@ export const PRIVACY_PARTS: LegalPart[] = [
       },
       {
         number: "5",
-        heading: "Toplama Yöntemi ve Hukuki Sebep",
+        heading: t("legal.privacy.toplamaYontemiVeHukukiSebep"),
         blocks: [
           {
             type: "p",
-            text: "Veriler; Platform üzerinden elektronik ortamda otomatik yollarla, çağrı merkezi üzerinden, kargo/ödeme hizmet sağlayıcıları üzerinden ve gerektiğinde yetkili kamu kurumlarından elde edilebilir.",
+            text: t(
+              "legal.privacy.verilerPlatformUzerindenElektronikOrtamdaOtomatik",
+            ),
           },
           {
             type: "p",
-            text: "Hukuki sebepler, somut işleme faaliyetine göre değişmek üzere; sözleşmenin kurulması/ifası için gerekli olması, hukuki yükümlülük, hakkın tesisi-kullanılması-korunması, meşru menfaat ve açık rızadır.",
+            text: t("legal.privacy.hukukiSebeplerSomutIslemeFaaliyetineGore"),
           },
         ],
       },
       {
         number: "6",
-        heading: "Kişisel Verilerin Aktarımı (Yurt İçi / Yurt Dışı)",
+        heading: t("legal.privacy.kisiselVerilerinAktarimiYurtIciYurt"),
         blocks: [
           {
             type: "p",
-            text: "Kişisel veriler; işleme amaçlarıyla sınırlı olarak ve gerekli güvenlik tedbirleri alınarak aşağıdaki taraflara aktarılabilir:",
+            text: t(
+              "legal.privacy.kisiselVerilerIslemeAmaclariylaSinirliOlarak",
+            ),
           },
           {
             type: "list",
             items: [
-              { text: "Ödeme hizmet sağlayıcılarına ve bankalara" },
-              { text: "Kargo / lojistik firmalarına" },
               {
-                text: "Bilgi teknolojileri altyapı sağlayıcılarına (hosting, e-posta, SMS, çağrı merkezi)",
+                text: t("legal.privacy.odemeHizmetSaglayicilarinaVeBankalara"),
               },
-              { text: "Hukuk, denetim ve mali müşavirlik danışmanlarına" },
-              { text: "Yetkili kamu kurum ve kuruluşlarına" },
+              { text: t("legal.privacy.kargoLojistikFirmalarina") },
+              {
+                text: t(
+                  "legal.privacy.bilgiTeknolojileriAltyapiSaglayicilarinaHostingE",
+                ),
+              },
+              {
+                text: t(
+                  "legal.privacy.hukukDenetimVeMaliMusavirlikDanismanlarina",
+                ),
+              },
+              { text: t("legal.privacy.yetkiliKamuKurumVeKuruluslarina") },
             ],
           },
           {
             type: "p",
-            text: "Yurt dışına aktarım söz konusu ise; KVKK'nın ilgili hükümleri uyarınca uygun güvence mekanizmaları uygulanır.",
+            text: t("legal.privacy.yurtDisinaAktarimSozKonusuIse"),
           },
         ],
       },
       {
         number: "7",
-        heading: "İlgili Kişinin Hakları (KVKK m.11)",
+        heading: t("legal.privacy.ilgiliKisininHaklariKvkkM11"),
         blocks: [
           {
             type: "p",
-            text: "İlgili kişiler; kişisel verilerinin işlenip işlenmediğini öğrenme, bilgi talep etme, düzeltme, silme/yok etme, itiraz ve zararın giderilmesini talep etme gibi haklara sahiptir.",
+            text: t(
+              "legal.privacy.ilgiliKisilerKisiselVerilerininIslenipIslenmedigini",
+            ),
           },
         ],
       },
       {
         number: "8",
-        heading: "Başvuru Yöntemi",
+        heading: t("legal.privacy.basvuruYontemi"),
         blocks: [
           {
             type: "p",
-            text: `KVKK kapsamındaki talepler; ${PLATFORM_ENTITY.kep}, ${PLATFORM_ENTITY.email} veya ${PLATFORM_ENTITY.address} üzerinden “KVKK İlgili Kişi Başvurusu” konu başlığıyla iletilebilir.`,
+            text: t("legal.privacy.kvkkKapsamindakiTaleplerKepEmailVeya", {
+              kep: PLATFORM_ENTITY.kep,
+              email: PLATFORM_ENTITY.email,
+              address: PLATFORM_ENTITY.address,
+            }),
           },
           {
             type: "note",
-            text: "Başvurular en geç 30 gün içinde sonuçlandırılır.",
+            text: t("legal.privacy.basvurularEnGec30GunIcinde"),
           },
         ],
       },

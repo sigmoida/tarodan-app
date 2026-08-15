@@ -85,7 +85,7 @@ export default function DiscountCard({
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
               <div>
                 <label className="block text-xs font-medium text-body mb-1">
-                  Orijinal Fiyat (₺)
+                  {t("product.originalPriceTry")}
                 </label>
                 <Input
                   type="number"

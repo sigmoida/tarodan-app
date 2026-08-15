@@ -12,6 +12,7 @@ import {
   type RecentSale,
   type UserStats,
 } from "../_lib/types";
+import { useTranslations } from "next-intl";
 
 const RESOURCE = "profile-statistics";
 const RECENT_SALES_RESOURCE = "profile-recent-sales";
@@ -21,6 +22,7 @@ const RECENT_SALES_RESOURCE = "profile-recent-sales";
  * a 5-endpoint client-side aggregation. Replaces the page's manual fetch loop.
  */
 export function useStatistics(enabled: boolean) {
+  const t = useTranslations();
   const user = useAuthStore((s) => s.user);
   const query = useWebList<UserStats>({
     resource: RESOURCE,
@@ -63,6 +65,7 @@ export function useStatistics(enabled: boolean) {
 
 /** The seller's 10 most recent sales. */
 export function useRecentSales(enabled: boolean) {
+  const t = useTranslations();
   const userId = useAuthStore((s) => s.user?.id);
   const query = useWebList<RecentSale[]>({
     resource: RECENT_SALES_RESOURCE,
@@ -71,7 +74,7 @@ export function useRecentSales(enabled: boolean) {
         .get("/orders", { params: { role: "seller", limit: 10 } })
         .catch(() => null);
       const orders = res?.data?.data || res?.data?.orders || [];
-      return mapRecentSales(orders, userId);
+      return mapRecentSales(t, orders, userId);
     },
     enabled,
     query: { meta: { page: "profile-recent-sales" } },

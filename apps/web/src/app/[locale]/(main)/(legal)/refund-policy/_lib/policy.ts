@@ -1,4 +1,5 @@
 /** @format */
+import type { Translate } from "@/types/i18n";
 
 /**
  * İade ve iptal koşulları — kurumsal metnin tek kaynağı.
@@ -23,138 +24,154 @@ export interface PolicyEntry {
   note?: string;
 }
 
-export const RETURN_POLICY: PolicyEntry[] = [
+export const returnPolicy = (t: Translate): PolicyEntry[] => [
   {
-    q: "Hangi koşullarda iade talebi oluşturulabilir?",
-    a: "Koleksiyonunuza eklediğiniz model aracın ilandaki tanımlara uymaması, belirtilmeyen bir kusur barındırması veya kargo sürecinde zarar görmesi durumunda yasal süreler içinde iade talebi oluşturabilirsiniz. Aşağıdaki haklı gerekçelerle iade sürecini güvenle başlatabilirsiniz:",
+    q: t("legal.refundPolicy.hangiKosullardaIadeTalebiOlusturulabilir"),
+    a: t(
+      "legal.refundPolicy.koleksiyonunuzaEklediginizModelAracinIlandakiTanimlara",
+    ),
     bullets: [
-      { text: "Ürünün tanıma ve görsele uymaması" },
-      { text: "İlanda belirtilmemiş kusur veya hasar bulunması" },
-      { text: "Eksik ürün veya parça gönderilmesi" },
-      { text: "Sahte ürün veya parça tespiti" },
-      { text: "Çalışmayan veya arızalı ürün çıkması" },
-      { text: "Alıcının cayma hakkını kullanarak “Vazgeçtim” demesi" },
-      { text: "Kullanıcı kaynaklı hasar durumları" },
+      { text: t("legal.refundPolicy.urununTanimaVeGorseleUymamasi") },
+      {
+        text: t(
+          "legal.refundPolicy.ilandaBelirtilmemisKusurVeyaHasarBulunmasi",
+        ),
+      },
+      { text: t("legal.refundPolicy.eksikUrunVeyaParcaGonderilmesi") },
+      { text: t("legal.refundPolicy.sahteUrunVeyaParcaTespiti") },
+      { text: t("legal.refundPolicy.calismayanVeyaArizaliUrunCikmasi") },
+      {
+        text: t(
+          "legal.refundPolicy.alicininCaymaHakkiniKullanarakVazgectimDemesi",
+        ),
+      },
+      { text: t("legal.refundPolicy.kullaniciKaynakliHasarDurumlari") },
     ],
   },
   {
-    q: "Ne zaman iade talebi oluşturabilirim?",
-    a: "Kargonuzu teslim aldığınız andan itibaren, yasal mevzuat ve platform kuralları çerçevesinde belirlenen 14 günlük süre içinde sistem üzerinden kolayca iade talebi oluşturabilirsiniz. Göz bebeğinizi kutusundan çıkarıp inceledikten sonra herhangi bir uyumsuzluk fark ederseniz vakit kaybetmeden talep açabilirsiniz.",
+    q: t("legal.refundPolicy.neZamanIadeTalebiOlusturabilirim"),
+    a: t("legal.refundPolicy.kargonuzuTeslimAldiginizAndanItibarenYasal"),
   },
   {
-    q: "İade talebi nasıl oluşturulur?",
-    a: "Tarodan uygulamasını açarak Hesabım → Siparişlerim adımlarını izleyin. İlgili siparişin detayına girdikten sonra “İade Talebi Oluştur” butonuna tıklayın. Karşınıza çıkan listeden iade nedeninizi seçip, sorunu net bir şekilde gösteren güncel fotoğrafları sisteme yükleyerek talebinizi tek tıkla gönderebilirsiniz.",
+    q: t("legal.refundPolicy.iadeTalebiNasilOlusturulur"),
+    a: t(
+      "legal.refundPolicy.tarodanUygulamasiniAcarakHesabimSiparislerimAdimlarini",
+    ),
   },
   {
-    q: "İade talebi nasıl değerlendirilir?",
-    a: "Oluşturduğunuz iade talebi ve belirttiğiniz gerekçe, Tarodan uzman destek ekibi ve depo kontrol mekanizmaları tarafından titizlikle incelenir. Gerekli görülmesi durumunda ürün merkez depomuza çağrılarak ilan bilgileriyle karşılaştırılır. Sürecin adil ve şeffaf yürütülmesi için hem alıcının hem de satıcının sunduğu kanıtlar değerlendirilerek nihai karar verilir.",
+    q: t("legal.refundPolicy.iadeTalebiNasilDegerlendirilir"),
+    a: t("legal.refundPolicy.olusturdugunuzIadeTalebiVeBelirttiginizGerekce"),
   },
   {
-    q: "İade talebi ne kadar sürede sonuçlanır?",
-    a: "İade talebiniz sisteme ulaştığı andan itibaren ekibimiz tarafından incelemeye alınır. Genellikle başvurular ve ürünün depoya ulaşarak kontrol edilmesi süreçleri dahil olmak üzere, talepleriniz en geç 3 ila 5 iş günü içinde sonuçlandırılır ve tarafınıza bilgilendirme yapılır.",
+    q: t("legal.refundPolicy.iadeTalebiNeKadarSuredeSonuclanir"),
+    a: t("legal.refundPolicy.iadeTalebinizSistemeUlastigiAndanItibaren"),
   },
   {
-    q: "İade talebi kabul edilen alıcı ne yapmalıdır?",
-    a: "İade talebiniz onaylandığında, sistem tarafından size iletilen anlaşmalı kargo iade kodunu not almalısınız. Modeli, orijinal kutusu ve tüm parçalarıyla birlikte özenle paketleyerek kargo şubesine teslim etmeniz ve iade takip numarasını sisteme girmeniz yeterlidir.",
+    q: t("legal.refundPolicy.iadeTalebiKabulEdilenAliciNe"),
+    a: t("legal.refundPolicy.iadeTalebinizOnaylandigindaSistemTarafindanSize"),
   },
   {
-    q: "İade gönderimi için ödeme yapmam gerekiyor mu?",
-    a: "İade kargo ücretinin kimin tarafından ödeneceği, iade nedeninize göre değişiklik gösterir:",
+    q: t("legal.refundPolicy.iadeGonderimiIcinOdemeYapmamGerekiyor"),
+    a: t("legal.refundPolicy.iadeKargoUcretininKiminTarafindanOdenecegi"),
     bullets: [
       {
-        label: "Tanıma uymayan, kusurlu, eksik, sahte veya arızalı ürün",
-        text: "iadelerinde kargo bedeli satıcı tarafından ödenir.",
+        label: t("legal.refundPolicy.tanimaUymayanKusurluEksikSahteVeya"),
+        text: t(
+          "legal.refundPolicy.iadelerindeKargoBedeliSaticiTarafindanOdenir",
+        ),
       },
       {
-        label: "“Vazgeçtim” veya kullanıcı kaynaklı hasar",
-        text: "durumlarında ise kargo gönderim ücreti alıcıya aittir.",
+        label: t("legal.refundPolicy.vazgectimVeyaKullaniciKaynakliHasar"),
+        text: t("legal.refundPolicy.durumlarindaIseKargoGonderimUcretiAliciya"),
       },
     ],
   },
   {
-    q: "İade edilen siparişin ücret iadesi ne zaman yapılır?",
-    a: "İade edilen ürün merkeze ulaştıktan ve uzman ekibimiz tarafından onaylandıktan sonra, ödemeniz Tarodan’ın güvenli havuzundan çözülerek bankanıza talimat verilir. Ücretin hesabınıza yansıma süresi, bankanızın süreçlerine bağlı olarak genellikle 1 ila 3 iş günü sürmektedir.",
+    q: t("legal.refundPolicy.iadeEdilenSiparisinUcretIadesiNe"),
+    a: t("legal.refundPolicy.iadeEdilenUrunMerkezeUlastiktanVe"),
   },
   {
-    q: "İade edilen tutar neden daha düşük?",
-    a: "İade onaylandığında yapılan kesintiler, iadenin sebebine ve platform operasyon süreçlerine dayanarak şu şekilde uygulanır:",
+    q: t("legal.refundPolicy.iadeEdilenTutarNedenDahaDusuk"),
+    a: t(
+      "legal.refundPolicy.iadeOnaylandigindaYapilanKesintilerIadeninSebebine",
+    ),
     bullets: [
       {
-        label: "Tanıma uymayan / kusurlu / eksik / sahte / arızalı ürünler",
-        text: "Bu haklı durumlarda kargo masrafını satıcı öder ve işlem sonucunda satıcıdan “Satıcı Platform Hizmet Bedeli” kesintisi yapılır.",
+        label: t("legal.refundPolicy.tanimaUymayanKusurluEksikSahteArizali"),
+        text: t("legal.refundPolicy.buHakliDurumlardaKargoMasrafiniSatici"),
       },
       {
-        label: "Kullanıcı kaynaklı hasar / “Vazgeçtim” durumları",
-        text: "Bu durumlarda iade kargo ücretini alıcı öder ve iade tutarından “Alıcı Koruma Hizmet Bedeli” kesilerek kalan tutar hesabınıza yansıtılır.",
+        label: t("legal.refundPolicy.kullaniciKaynakliHasarVazgectimDurumlari"),
+        text: t("legal.refundPolicy.buDurumlardaIadeKargoUcretiniAlici"),
       },
     ],
   },
 ];
 
-export const CANCELLATION_POLICY: PolicyEntry[] = [
+export const cancellationPolicy = (t: Translate): PolicyEntry[] => [
   {
-    q: "Hangi koşullarda iptal talebi oluşturulabilir?",
-    a: "Siparişinizi verdikten sonra, ürün henüz kargoya verilmeden veya teslimat sürecinde haklı gerekçelerle iptal talebi oluşturabilirsiniz. Tarodan platformunda geçerli olan iptal nedenlerimiz şunlardır:",
+    q: t("legal.refundPolicy.hangiKosullardaIptalTalebiOlusturulabilir"),
+    a: t("legal.refundPolicy.siparisiniziVerdiktenSonraUrunHenuzKargoya"),
     bullets: [
-      { text: "Teslimat tarihi gecikti" },
-      { text: "Yanlış ürün seçtim" },
-      { text: "Vazgeçtim" },
-      { text: "Yanlış kartla ödeme yaptım" },
-      { text: "Fiyat nedeniyle vazgeçtim" },
-      { text: "Adreste bulunamayacağım" },
+      { text: t("legal.refundPolicy.teslimatTarihiGecikti") },
+      { text: t("legal.refundPolicy.yanlisUrunSectim") },
+      { text: t("legal.refundPolicy.vazgectim") },
+      { text: t("legal.refundPolicy.yanlisKartlaOdemeYaptim") },
+      { text: t("legal.refundPolicy.fiyatNedeniyleVazgectim") },
+      { text: t("legal.refundPolicy.adresteBulunamayacagim") },
     ],
   },
   {
-    q: "Ne zaman iptal talebi oluşturabilirim?",
-    a: "Siparişinizi verdikten sonra, ürününüz henüz kargoya teslim edilmeden veya kargo sürecindeyken dilediğiniz an iptal talebi oluşturabilirsiniz. Ürününüz kargoya verilmeden yapılan iptallerde süreç çok daha hızlı ilerler.",
+    q: t("legal.refundPolicy.neZamanIptalTalebiOlusturabilirim"),
+    a: t("legal.refundPolicy.siparisiniziVerdiktenSonraUrununuzHenuzKargoya"),
   },
   {
-    q: "İptal talebi nasıl oluşturulur?",
-    a: "Tarodan uygulamasını açarak Hesabım → Siparişlerim adımlarını izleyebilirsiniz. İptal etmek istediğiniz siparişin detayına girdikten sonra ilgili iptal nedenini seçerek talebinizi anında sisteme iletebilirsiniz.",
+    q: t("legal.refundPolicy.iptalTalebiNasilOlusturulur"),
+    a: t(
+      "legal.refundPolicy.tarodanUygulamasiniAcarakHesabimSiparislerimAdimlarini2",
+    ),
   },
   {
-    q: "İptal talebi nasıl değerlendirilir?",
-    a: "Oluşturduğunuz iptal talebi, ürünün o anki lojistik durumuna (kargoya verilip verilmediğine) ve seçtiğiniz iptal nedenine göre sistem tarafından otomatik olarak veya Tarodan operasyon ekibimiz tarafından titizlikle incelenerek değerlendirilir.",
+    q: t("legal.refundPolicy.iptalTalebiNasilDegerlendirilir"),
+    a: t("legal.refundPolicy.olusturdugunuzIptalTalebiUrununOAnki"),
   },
   {
-    q: "İptal talebi ne kadar sürede sonuçlanır?",
-    a: "İptal talebiniz sisteme ulaştığı andan itibaren hızla işleme alınır. Ürün henüz kargoya verilmediyse talepleriniz anında veya en kısa sürede sonuçlandırılır; kargodaki ürünler için ise deponun veya kargo firmasının iade süreçlerine bağlı olarak süre değişiklik gösterebilir.",
+    q: t("legal.refundPolicy.iptalTalebiNeKadarSuredeSonuclanir"),
+    a: t("legal.refundPolicy.iptalTalebinizSistemeUlastigiAndanItibaren"),
   },
   {
-    q: "İptal talebi kabul edilen alıcı ne yapmalıdır?",
-    a: "Eğer iptal edilen ürün kargoya verilmişse ve elinize ulaşırsa, paketi açmadan size iletilen iade kargo koduyla birlikte anlaşmalı kargo şubesine teslim etmeniz gerekir. Ürün kargoya verilmeden iptal edildiyse alıcının ekstra bir işlem yapmasına gerek yoktur.",
+    q: t("legal.refundPolicy.iptalTalebiKabulEdilenAliciNe"),
+    a: t("legal.refundPolicy.egerIptalEdilenUrunKargoyaVerilmisse"),
   },
   {
-    q: "İptal gönderimi için ödeme yapmam gerekiyor mu?",
-    a: "İptal nedeninize ve ürünün durumuna göre kargo masrafı değişiklik gösterir:",
+    q: t("legal.refundPolicy.iptalGonderimiIcinOdemeYapmamGerekiyor"),
+    a: t("legal.refundPolicy.iptalNedeninizeVeUrununDurumunaGore"),
     bullets: [
       {
-        label: "Teslimat tarihi gecikti",
-        text: "Kargo ücretini satıcı öder.",
+        label: t("legal.refundPolicy.teslimatTarihiGecikti"),
+        text: t("legal.refundPolicy.kargoUcretiniSaticiOder"),
       },
       {
-        label:
-          "Yanlış ürün seçtim, vazgeçtim, yanlış kartla ödeme yaptım, fiyat nedeniyle vazgeçtim, adreste bulunamayacağım",
-        text: "Ürün kargoya verildiyse kargo ücretini alıcı öder; kargoya verilmediyse kargo gönderimi söz konusu değildir.",
+        label: t("legal.refundPolicy.yanlisUrunSectimVazgectimYanlisKartla"),
+        text: t("legal.refundPolicy.urunKargoyaVerildiyseKargoUcretiniAlici"),
       },
     ],
   },
   {
-    q: "İptal edilen siparişin ücret iadesi ne zaman yapılır?",
-    a: "İptal işleminiz onaylandığında veya kargodaki ürün merkeze ulaştığında, ödemeniz Tarodan’ın güvenli havuzundan çözülerek bankanıza iade talimatı verilir. Ücretin hesabınıza yansıma süresi bankanızın süreçlerine bağlı olarak genellikle 1 ila 3 iş günü sürmektedir.",
+    q: t("legal.refundPolicy.iptalEdilenSiparisinUcretIadesiNe"),
+    a: t("legal.refundPolicy.iptalIsleminizOnaylandigindaVeyaKargodakiUrun"),
   },
   {
-    q: "İptal edilen üründe tutar neden daha düşük?",
-    a: "İptal edilen siparişlerde tutarın bir kısmının kesilmesinin nedeni, seçtiğiniz iptal nedenine ve ürünün o anki durumuna dayanır:",
+    q: t("legal.refundPolicy.iptalEdilenUrundeTutarNedenDaha"),
+    a: t("legal.refundPolicy.iptalEdilenSiparislerdeTutarinBirKisminin"),
     bullets: [
       {
-        label: "Teslimat tarihi gecikti",
-        text: "Bu durumda tüm masraflar satıcıya aittir.",
+        label: t("legal.refundPolicy.teslimatTarihiGecikti"),
+        text: t("legal.refundPolicy.buDurumdaTumMasraflarSaticiyaAittir"),
       },
       {
-        label:
-          "Yanlış ürün seçtim, vazgeçtim, yanlış kartla ödeme yaptım, fiyat nedeniyle vazgeçtim, adreste bulunamayacağım",
-        text: "Ürün kargoya verildiyse kargo ücreti alıcıdan düşülür; kargoya verilmediyse işlemden yalnızca “Alıcı Koruma Hizmet Bedeli” kesilir ve kalan tutar hesabınıza yansıtılır.",
+        label: t("legal.refundPolicy.yanlisUrunSectimVazgectimYanlisKartla"),
+        text: t("legal.refundPolicy.urunKargoyaVerildiyseKargoUcretiAlicidan"),
       },
     ],
   },

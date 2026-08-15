@@ -29,6 +29,7 @@ import type {
  * mevcut invalidation'lar (iptal/iade/onay) bu sorguyu da tazelesin.
  */
 export function useOrderGroupQuery(orderId: string, enabled: boolean) {
+  const t = useTranslations();
   return useWebItem<import("../../_lib/types").ServerOrderGroup>({
     resource: "order",
     id: orderId,
@@ -36,7 +37,9 @@ export function useOrderGroupQuery(orderId: string, enabled: boolean) {
       const response = await api.get(`/orders/${id}/group`);
       const data = response.data?.data ?? response.data;
       if (!data || typeof data !== "object" || !Array.isArray(data.orders)) {
-        throw new Error("Invalid order group response");
+        throw new Error(
+          t("page.orders.useorderdetail.invalidOrderGroupResponse"),
+        );
       }
       return data;
     },
@@ -64,6 +67,7 @@ export function useConfirmDelivery() {
 
 /** The order itself — resource 'order' → detail key ['order', 'detail', orderId]. */
 export function useOrderQuery(orderId: string, enabled: boolean) {
+  const t = useTranslations();
   return useWebItem<OrderDetail>({
     resource: "order",
     id: orderId,
@@ -71,7 +75,7 @@ export function useOrderQuery(orderId: string, enabled: boolean) {
       const response = await api.get(`/orders/${id}`);
       const data = response.data?.data ?? response.data;
       if (!data || typeof data !== "object" || data.status === undefined) {
-        throw new Error("Invalid order response");
+        throw new Error(t("page.orders.useorderdetail.invalidOrderResponse"));
       }
       return data as OrderDetail;
     },
@@ -375,7 +379,14 @@ export function useSubmitReview(orderId: string) {
         const avgSellerScore = Math.round(
           (p.sellerCommunication + p.sellerShipping + p.sellerPackaging) / 3,
         );
-        const scoreBreakdown = `İletişim: ${p.sellerCommunication}/5, Kargo: ${p.sellerShipping}/5, Paketleme: ${p.sellerPackaging}/5`;
+        const scoreBreakdown = t(
+          "page.orders.useorderdetail.iletisimSellerCommunication5KargoSellerShipping5",
+          {
+            sellerCommunication: p.sellerCommunication,
+            sellerShipping: p.sellerShipping,
+            sellerPackaging: p.sellerPackaging,
+          },
+        );
         const fullComment = p.sellerReviewText
           ? `${p.sellerReviewText}\n\n${scoreBreakdown}`
           : scoreBreakdown;
@@ -393,7 +404,7 @@ export function useSubmitReview(orderId: string) {
     },
     onError: (error: any) => {
       if (process.env.NODE_ENV === "development")
-        console.error("Review submit error:", error);
+        console.error(t("page.orders.useorderdetail.reviewSubmitError"), error);
       toast.error(
         error?.response?.data?.message || t("common.operationFailed"),
       );
@@ -413,7 +424,11 @@ export function useDownloadElogoInvoice() {
       const res = await api.get(`/elogo/invoices/${invoiceId}/pdf`);
       const url = res.data?.url;
       if (!url) throw new Error("not-ready");
-      window.open(url, "_blank", "noopener,noreferrer");
+      window.open(
+        url,
+        t("page.orders.useorderdetail.blank"),
+        t("page.orders.useorderdetail.noopenerNoreferrer"),
+      );
     },
     onSuccess: () => {
       toast.success(t("order.invoiceOpened"));
@@ -468,7 +483,11 @@ export function useDownloadSellerInvoice(orderId: string) {
       const res = await api.get(`/orders/${orderId}/seller-invoice/download`);
       const url = res.data?.url;
       if (!url) throw new Error("not-found");
-      window.open(url, "_blank", "noopener,noreferrer");
+      window.open(
+        url,
+        t("page.orders.useorderdetail.blank"),
+        t("page.orders.useorderdetail.noopenerNoreferrer"),
+      );
     },
     onError: (err: any) => {
       if (err?.message === "not-found") {

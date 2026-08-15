@@ -9,21 +9,40 @@ import {
   RectangleStackIcon,
 } from "@heroicons/react/24/outline";
 import SectionCard from "@/components/ui/SectionCard";
+import type { Translate } from "@/types/i18n";
+import { getTranslations } from "next-intl/server";
 
 type Icon = ComponentType<SVGProps<SVGSVGElement>>;
 
-const LINKS: { href: string; label: string; icon: Icon }[] = [
-  { href: "/profile/listings", label: "İlanlarım", icon: TagIcon },
-  { href: "/profile/orders", label: "Siparişlerim", icon: ShoppingBagIcon },
-  { href: "/profile/trades", label: "Takaslarım", icon: ArrowsRightLeftIcon },
-  { href: "/collections", label: "Koleksiyonlarım", icon: RectangleStackIcon },
+const LINKS = (t: Translate): { href: string; label: string; icon: Icon }[] => [
+  {
+    href: "/profile/listings",
+    label: t("profile.statisticsLinks.ilanlarim"),
+    icon: TagIcon,
+  },
+  {
+    href: "/profile/orders",
+    label: t("profile.statisticsLinks.siparislerim"),
+    icon: ShoppingBagIcon,
+  },
+  {
+    href: "/profile/trades",
+    label: t("profile.statisticsLinks.takaslarim"),
+    icon: ArrowsRightLeftIcon,
+  },
+  {
+    href: "/collections",
+    label: t("profile.statisticsLinks.koleksiyonlarim"),
+    icon: RectangleStackIcon,
+  },
 ];
 
-export default function QuickLinksCard() {
+export default async function QuickLinksCard() {
+  const t = await getTranslations();
   return (
-    <SectionCard title="Hızlı Erişim">
+    <SectionCard title={t("profile.statisticsLinks.hizliErisim")}>
       <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
-        {LINKS.map(({ href, label, icon: Icon }) => (
+        {LINKS(t).map(({ href, label, icon: Icon }) => (
           <Link
             key={href}
             href={href}

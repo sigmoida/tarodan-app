@@ -4,7 +4,7 @@ import toast from "react-hot-toast";
 import { useTranslations } from "next-intl";
 import { Button, Toggle } from "@tarodan/ui";
 import { useCookieConsent } from "@/hooks/useCookieConsent";
-import { COOKIE_CATEGORIES } from "@/lib/cookieConsent";
+import { cookieCategories } from "@/lib/cookieConsent";
 
 export default function CookiePreferencesPanel({
   saveLabel,
@@ -25,7 +25,7 @@ export default function CookiePreferencesPanel({
   return (
     <>
       <div className="space-y-4">
-        {COOKIE_CATEGORIES.map((category) => (
+        {cookieCategories(t).map((category) => (
           <div
             key={category.id}
             className="overflow-hidden rounded-xl border border-border"
@@ -47,9 +47,11 @@ export default function CookiePreferencesPanel({
               <table className="w-full text-sm">
                 <thead>
                   <tr className="text-left text-muted">
-                    <th className="pb-2 font-medium">Çerez Adı</th>
-                    <th className="pb-2 font-medium">Amaç</th>
-                    <th className="pb-2 font-medium">Süre</th>
+                    <th className="pb-2 font-medium">
+                      {t("legal.cookieName")}
+                    </th>
+                    <th className="pb-2 font-medium">{t("legal.purpose")}</th>
+                    <th className="pb-2 font-medium">{t("legal.duration")}</th>
                   </tr>
                 </thead>
                 <tbody className="text-body">
@@ -62,7 +64,7 @@ export default function CookiePreferencesPanel({
                         {cookie.name}
                         {!cookie.active && (
                           <span className="ml-2 font-sans text-[10px] uppercase text-subtle">
-                            pasif
+                            {t("legal.cookies.inactiveTag")}
                           </span>
                         )}
                       </td>
@@ -78,9 +80,7 @@ export default function CookiePreferencesPanel({
       </div>
 
       <p className="mt-4 text-xs text-muted">
-        &quot;Pasif&quot; olarak işaretlenen üçüncü taraf çerezleri politika
-        kapsamında beyan edilmiştir; ilgili script&apos;ler yalnızca o
-        kategoriye rıza verildiğinde yüklenir.
+        {t("legal.cookies.inactiveNote")}
       </p>
 
       <div className="mt-6 flex flex-wrap gap-3">

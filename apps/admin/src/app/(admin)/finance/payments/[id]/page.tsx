@@ -28,6 +28,7 @@ import { RefundPaymentModal } from "./_modals/RefundPaymentModal";
 import { ForceCancelPaymentModal } from "./_modals/ForceCancelPaymentModal";
 import { TradePaymentSection } from "./_components/TradePaymentSection";
 import { useTranslations } from "next-intl";
+import { statusConfig } from "@/lib/statusLabels";
 
 export default function PaymentDetailPage() {
   const t = useTranslations();
@@ -107,7 +108,10 @@ export default function PaymentDetailPage() {
                     {p.currency}
                   </Field>
                   <Field label={t("admin.finance.payments.provider")}>
-                    {enumLabel(paymentProviderConfig, p.provider)}
+                    {enumLabel(
+                      statusConfig(paymentProviderConfig, t),
+                      p.provider,
+                    )}
                   </Field>
                   <Field label="Transaction ID">
                     <span className="font-mono text-xs">
@@ -175,7 +179,7 @@ export default function PaymentDetailPage() {
                         <div className="flex items-center gap-3">
                           <StatusBadge
                             status={o.status}
-                            config={orderStatusConfig}
+                            config={statusConfig(orderStatusConfig, t)}
                             size="sm"
                           />
                           {o.refundedTotal > 0 && (
@@ -212,7 +216,10 @@ export default function PaymentDetailPage() {
                         {p.order.product?.title ?? "—"}
                       </Field>
                       <Field label={t("admin.finance.payments.orderStatus")}>
-                        {enumLabel(orderStatusConfig, p.order.status)}
+                        {enumLabel(
+                          statusConfig(orderStatusConfig, t),
+                          p.order.status,
+                        )}
                       </Field>
                       <Field label={t("admin.finance.payments.totalAmount")}>
                         {fmtTry(p.order.totalAmount)}
@@ -306,7 +313,10 @@ export default function PaymentDetailPage() {
                           </Field>
                         )}
                         <Field label={t("common.status")}>
-                          {enumLabel(paymentHoldStatusConfig, hold.status)}
+                          {enumLabel(
+                            statusConfig(paymentHoldStatusConfig, t),
+                            hold.status,
+                          )}
                         </Field>
                         {hold.frozenByRefundId && (
                           <Field label={t("common.status")}>

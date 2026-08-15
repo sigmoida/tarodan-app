@@ -1,6 +1,7 @@
 /** @format */
 
 import { publicNameOf } from "@/lib/public-name";
+import { imagePlaceholder } from "@/lib/placeholder";
 
 export interface TradeItem {
   id: string;
@@ -40,7 +41,7 @@ export const cashPayerName = (trade: Trade): string | null => {
     : (trade.receiverName ?? publicNameOf(trade.receiver) ?? null);
 };
 
-const PLACEHOLDER = "https://placehold.co/120x120/f3f4f6/9ca3af?text=Ürün";
+const PLACEHOLDER = imagePlaceholder("120x120");
 
 export const getItemImage = (item: TradeItem): string =>
   item.productImages?.[0]?.cardUrl ??

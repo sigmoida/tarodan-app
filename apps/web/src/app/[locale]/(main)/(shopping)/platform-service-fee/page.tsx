@@ -5,6 +5,7 @@ import { Link } from "@/i18n/navigation";
 import { DocPage } from "@/components/layout/DocPage";
 import SectionCard from "@/components/ui/SectionCard";
 import { localizedCanonical } from "@/lib/seo";
+import { getTranslations } from "next-intl/server";
 
 export async function generateMetadata({
   params,
@@ -12,123 +13,162 @@ export async function generateMetadata({
   params: Promise<{ locale: string }>;
 }): Promise<Metadata> {
   const { locale } = await params;
+  const t = await getTranslations({ locale });
   return {
-    title: "Platform Hizmet Bedeli · Tarodan",
-    description:
-      "TARODAN Platform Hizmet Bedeli nedir, nasıl hesaplanır, nereye gider ve iade durumunda ne olur? Şeffaf ücretlendirme hakkında bilmeniz gerekenler.",
+    title: t("information.platformFee.platformHizmetBedeliTarodan"),
+    description: t(
+      "information.platformFee.tarodanPlatformHizmetBedeliNedirNasil",
+    ),
     alternates: localizedCanonical(locale, "/platform-service-fee"),
   };
 }
 
-export default function PlatformHizmetBedeliPage() {
+export default async function PlatformHizmetBedeliPage() {
+  const t = await getTranslations();
   return (
     <DocPage
-      title="Platform Hizmet Bedeli"
-      description="Son güncelleme: 2 Haziran 2026"
+      title={t("information.platformFee.platformHizmetBedeli")}
+      description={t("information.platformFee.sonGuncelleme2Haziran2026")}
     >
       <SectionCard>
         <div className="prose prose-gray max-w-none">
-          <h2>1. Nedir?</h2>
+          <h2>{t("information.platformFee.1Nedir")}</h2>
           <p>
-            Platform Hizmet Bedeli, TARODAN üzerinden yaptığınız her satın
-            almada ürün bedelinin <strong>%3'ü oranında</strong> alınan bir
-            hizmet ücretidir. Bu bedel, ödeme altyapısı, güvenli alışveriş
-            garantisi, uyuşmazlık çözümü ve platform üzerinde sunduğumuz diğer
-            hizmetler için kullanılır.
+            {t.rich(
+              "information.platformFee.platformHizmetBedeliTARODANUzerindenYaptiginiz",
+              {
+                b: (chunks) => <strong>{chunks}</strong>,
+              },
+            )}
           </p>
 
-          <h2>2. Hesaplama Yöntemi</h2>
+          <h2>{t("information.platformFee.2HesaplamaYontemi")}</h2>
           <ul>
             <li>
-              <strong>Baz tutar:</strong> Sadece ürün fiyatı (kargo bedeli ve
-              indirimler hariç).
+              {t.rich("information.platformFee.bBazTutarBSadeceUrun", {
+                b: (chunks) => <strong>{chunks}</strong>,
+              })}
             </li>
             <li>
-              <strong>Oran:</strong> Yürürlükteki oran %3'tür. Bu oran zaman
-              içinde değişebilir; değişiklikler bu sayfada duyurulur.
+              {t.rich("information.platformFee.bOranBYururluktekiOran3", {
+                b: (chunks) => <strong>{chunks}</strong>,
+              })}
             </li>
             <li>
-              <strong>KDV:</strong> Tutara KDV dahildir; ayrıca KDV eklenmez.
+              {t.rich("information.platformFee.bKDVBTutaraKDVDahildir", {
+                b: (chunks) => <strong>{chunks}</strong>,
+              })}
             </li>
           </ul>
 
           <p>
-            Örnek: 500 TL'lik bir ürün satın alırsanız Platform Hizmet Bedeli
-            <strong> 15 TL</strong> olur ve sepet toplamına dahil edilir.
+            {t.rich("information.platformFee.ornek500TLLikBirUrun", {
+              b: (chunks) => <strong>{chunks}</strong>,
+            })}
           </p>
 
-          <h2>3. Nereye Gider?</h2>
+          <h2>{t("information.platformFee.3NereyeGider")}</h2>
           <p>
-            Platform Hizmet Bedeli TARODAN'a gelir olarak kaydedilir ve
-            aşağıdaki maliyetlerin karşılanmasında kullanılır:
-          </p>
-          <ul>
-            <li>Ödeme sağlayıcısı (PayTR) işlem komisyonu</li>
-            <li>SSL sertifikası, güvenlik altyapısı, fraud önleme</li>
-            <li>Müşteri desteği ve uyuşmazlık çözümü</li>
-            <li>Platform geliştirme ve teknik bakım</li>
-          </ul>
-
-          <h2>4. İade Durumunda Ne Olur?</h2>
-          <p>
-            Platform Hizmet Bedeli'nin iade edilip edilmeyeceği iadenin
-            gerekçesine bağlıdır:
+            {t("information.platformFee.platformHizmetBedeliTARODANAGelir")}
           </p>
           <ul>
             <li>
-              <strong>Satıcı kaynaklı iade</strong> (hasarlı, eksik, yanlış
-              ürün, sahte vb.): Platform Hizmet Bedeli{" "}
-              <strong>tamamen iade edilir</strong>.
+              {t("information.platformFee.odemeSaglayicisiPayTRIslemKomisyonu")}
             </li>
             <li>
-              <strong>Satıcı göndermediği için iptal:</strong> Platform Hizmet
-              Bedeli tamamen iade edilir.
+              {t(
+                "information.platformFee.sslSertifikasiGuvenlikAltyapisiFraudOnleme",
+              )}
             </li>
             <li>
-              <strong>Alıcı fikir değişikliği (Senaryo D):</strong> Platform
-              Hizmet Bedeli <strong>iade edilmez</strong> — çünkü iadeye konu
-              olmayan hizmetler verilmiştir (ödeme işlem, güvenlik vs.).
+              {t("information.platformFee.musteriDestegiVeUyusmazlikCozumu")}
             </li>
             <li>
-              <strong>48 saat onay süreci dolduktan sonra:</strong> Sipariş
-              tamamlanmış sayılır, Platform Hizmet Bedeli kesinleşir.
+              {t("information.platformFee.platformGelistirmeVeTeknikBakim")}
             </li>
           </ul>
 
-          <h2>5. Şeffaflık</h2>
+          <h2>{t("information.platformFee.4IadeDurumundaNeOlur")}</h2>
           <p>
-            Sepet ve checkout sayfalarında Platform Hizmet Bedeli{" "}
-            <strong>ayrı bir satır</strong> olarak gösterilir. Ödemenizden önce
-            tutarı net olarak görebilirsiniz. Ek ücret veya gizli bedel
-            uygulanmaz.
+            {t("information.platformFee.platformHizmetBedeliNinIadeEdilip")}
+          </p>
+          <ul>
+            <li>
+              {t.rich("information.platformFee.bSaticiKaynakliIadeBHasarli", {
+                b: (chunks) => <strong>{chunks}</strong>,
+              })}
+            </li>
+            <li>
+              {t.rich("information.platformFee.bSaticiGondermedigiIcinIptalB", {
+                b: (chunks) => <strong>{chunks}</strong>,
+              })}
+            </li>
+            <li>
+              {t.rich(
+                "information.platformFee.bAliciFikirDegisikligiSenaryoD",
+                {
+                  b: (chunks) => <strong>{chunks}</strong>,
+                },
+              )}
+            </li>
+            <li>
+              {t.rich("information.platformFee.b48SaatOnaySureciDolduktan", {
+                b: (chunks) => <strong>{chunks}</strong>,
+              })}
+            </li>
+          </ul>
+
+          <h2>{t("information.platformFee.5Seffaflik")}</h2>
+          <p>
+            {t.rich(
+              "information.platformFee.sepetVeCheckoutSayfalarindaPlatformHizmet",
+              {
+                b: (chunks) => <strong>{chunks}</strong>,
+              },
+            )}
           </p>
 
-          <h2>6. Sorularınız İçin</h2>
+          <h2>{t("information.platformFee.6SorularinizIcin")}</h2>
           <p>
-            Platform Hizmet Bedeli hakkında daha fazla bilgi için{" "}
-            <Link href="/support" className="text-primary-600 underline">
-              Yardım &amp; Destek
-            </Link>{" "}
-            sayfasını ziyaret edebilir veya{" "}
-            <a
-              href="mailto:destek@tarodan.com.tr"
-              className="text-primary-600 underline"
-            >
-              destek@tarodan.com.tr
-            </a>{" "}
-            adresinden bize ulaşabilirsiniz.
+            {t.rich(
+              "information.platformFee.platformHizmetBedeliHakkindaDahaFazla",
+              {
+                link1: (chunks) => (
+                  <Link href="/support" className="text-primary-600 underline">
+                    {chunks}
+                  </Link>
+                ),
+                link2: (chunks) => (
+                  <a
+                    href="mailto:destek@tarodan.com.tr"
+                    className="text-primary-600 underline"
+                  >
+                    {chunks}
+                  </a>
+                ),
+              },
+            )}
           </p>
 
           <p className="text-sm text-muted mt-8">
-            Bu sayfa bilgilendirme amaçlıdır; bağlayıcı sözleşme şartları için{" "}
-            <Link href="/terms" className="text-primary-600 underline">
-              Kullanım Koşulları
-            </Link>{" "}
-            ve{" "}
-            <Link href="/refund-policy" className="text-primary-600 underline">
-              İade Politikası
-            </Link>{" "}
-            sayfalarımızı inceleyiniz.
+            {t.rich(
+              "information.platformFee.buSayfaBilgilendirmeAmaclidirBaglayiciSozlesme",
+              {
+                link1: (chunks) => (
+                  <Link href="/terms" className="text-primary-600 underline">
+                    {chunks}
+                  </Link>
+                ),
+                link2: (chunks) => (
+                  <Link
+                    href="/refund-policy"
+                    className="text-primary-600 underline"
+                  >
+                    {chunks}
+                  </Link>
+                ),
+              },
+            )}
           </p>
         </div>
       </SectionCard>

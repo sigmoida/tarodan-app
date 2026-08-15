@@ -1,51 +1,65 @@
 /** @format */
 
 import type { Metadata, Viewport } from "next";
+import { getTranslations } from "next-intl/server";
+import { defaultLocale } from "@tarodan/i18n";
 import { surface } from "@tarodan/design-tokens";
 import { ALLOW_INDEXING } from "@/lib/seo";
 
-export const metadata: Metadata = {
-  metadataBase: new URL(
-    process.env.NEXT_PUBLIC_APP_URL || "https://tarodan.com.tr",
-  ),
-  title: "Tarodan - Model Araba Pazarı",
-  description:
-    "Diecast model araba koleksiyoncuları için güvenli alış, satış ve takas platformu",
-  // Single indexing switch (#93): flip NEXT_PUBLIC_ALLOW_INDEXING at launch.
-  robots: ALLOW_INDEXING
-    ? { index: true, follow: true }
-    : {
-        index: false,
-        follow: false,
-        nocache: true,
-        googleBot: {
+/**
+ * App-wide metadata fallback. This layer sits ABOVE the `[locale]` segment, so
+ * there is no request locale to read here — the copy is resolved on the default
+ * locale. Every localized route overrides title/description itself, and
+ * `app/[locale]/layout` sets the per-locale `og:locale`.
+ */
+export async function generateMetadata(): Promise<Metadata> {
+  const t = await getTranslations({ locale: defaultLocale });
+  return {
+    metadataBase: new URL(
+      process.env.NEXT_PUBLIC_APP_URL || "https://tarodan.com.tr",
+    ),
+    title: t("page.app.layout.tarodanModelArabaPazari"),
+    description: t(
+      "page.app.layout.diecastModelArabaKoleksiyonculariIcinGuvenli",
+    ),
+    // Single indexing switch (#93): flip NEXT_PUBLIC_ALLOW_INDEXING at launch.
+    robots: ALLOW_INDEXING
+      ? { index: true, follow: true }
+      : {
           index: false,
           follow: false,
-          noimageindex: true,
-          "max-video-preview": -1,
-          "max-image-preview": "none",
-          "max-snippet": -1,
+          nocache: true,
+          googleBot: {
+            index: false,
+            follow: false,
+            noimageindex: true,
+            "max-video-preview": -1,
+            "max-image-preview": "none",
+            "max-snippet": -1,
+          },
         },
-      },
-  openGraph: {
-    type: "website",
-    locale: "tr_TR",
-    url: "https://tarodan.com.tr",
-    siteName: "Tarodan",
-    title: "Tarodan - Model Araba Pazarı",
-    description:
-      "Diecast model araba koleksiyoncuları için güvenli alış, satış ve takas platformu",
-  },
-  twitter: {
-    card: "summary_large_image",
-    title: "Tarodan - Model Araba Pazarı",
-    description:
-      "Diecast model araba koleksiyoncuları için güvenli alış, satış ve takas platformu",
-  },
-  icons: {
-    icon: "/tarodan-favicon.png",
-  },
-};
+    openGraph: {
+      type: "website",
+      locale: "tr_TR",
+      url: "https://tarodan.com.tr",
+      siteName: t("page.app.layout.tarodan"),
+      title: t("page.app.layout.tarodanModelArabaPazari"),
+      description: t(
+        "page.app.layout.diecastModelArabaKoleksiyonculariIcinGuvenli",
+      ),
+    },
+    twitter: {
+      card: "summary_large_image",
+      title: t("page.app.layout.tarodanModelArabaPazari"),
+      description: t(
+        "page.app.layout.diecastModelArabaKoleksiyonculariIcinGuvenli",
+      ),
+    },
+    icons: {
+      icon: "/tarodan-favicon.png",
+    },
+  };
+}
 
 /**
  * `only light` tells the browser the site ships a single, light-only theme, which

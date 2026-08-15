@@ -1,4 +1,5 @@
 import { createApiClient } from "@tarodan/api-client";
+import { defaultLocale, formatMessage, getMessages } from "@tarodan/i18n";
 import { expiredLoginHref } from "@/lib/auth-redirect";
 
 let isRedirectingToLogin = false;
@@ -36,9 +37,11 @@ export const api = createApiClient({
     }
 
     if (!error.response) {
-      error.message =
-        // eslint-disable-next-line @tarodan/no-hardcoded-turkish -- module-scope axios interceptor, no intl context; follow-up in #208
-        "Sunucuya bağlanılamadı. Lütfen internet bağlantınızı kontrol edin.";
+      // Modül düzeyindeki interceptor'ın React bağlamı yoktur; mesaj yine de
+      // katalogdan gelir — varsayılan dille, isteğin diliyle değil.
+      error.message = formatMessage(
+        getMessages(defaultLocale).server.common.connectionFailed,
+      );
     }
     return Promise.reject(error);
   },

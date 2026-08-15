@@ -1,6 +1,8 @@
 /** @format */
 
 import { Noto_Sans } from "next/font/google";
+import { getTranslations } from "next-intl/server";
+import { defaultLocale } from "@tarodan/i18n";
 import "./globals.css";
 
 const notoSans = Noto_Sans({
@@ -16,23 +18,24 @@ const notoSans = Noto_Sans({
  * inside the app hit `app/[locale]/not-found.tsx` instead (with full chrome and
  * translations).
  */
-export default function RootNotFound() {
+export default async function RootNotFound() {
+  const t = await getTranslations({ locale: defaultLocale });
   return (
-    <html lang="tr">
+    <html lang={defaultLocale}>
       <body className={notoSans.className}>
         <main className="flex min-h-dvh flex-col items-center justify-center gap-4 bg-surface px-6 text-center">
           <p className="text-7xl font-bold text-primary-600">404</p>
           <h1 className="text-2xl font-semibold text-heading">
-            Sayfa bulunamadı
+            {t("utility.notFound.title")}
           </h1>
           <p className="max-w-md text-muted">
-            Aradığınız sayfa taşınmış, silinmiş ya da hiç var olmamış olabilir.
+            {t("utility.notFound.description")}
           </p>
           <a
             href="/"
             className="mt-2 inline-flex items-center rounded-lg bg-primary-600 px-4 py-2 font-medium text-inverted transition-colors hover:bg-primary-700"
           >
-            Ana sayfaya dön
+            {t("error.goHomeShort")}
           </a>
         </main>
       </body>

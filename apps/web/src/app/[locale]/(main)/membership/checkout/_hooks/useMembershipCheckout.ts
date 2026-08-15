@@ -84,7 +84,7 @@ export function useMembershipCheckout() {
     () =>
       isPaidTier && tierRow
         ? {
-            name: TIER_NAMES[tier],
+            name: TIER_NAMES(t)[tier],
             price:
               period === "monthly"
                 ? Number(tierRow.monthlyPrice)
@@ -112,7 +112,9 @@ export function useMembershipCheckout() {
   useEffect(() => {
     if (tierInfo && tierInfo.price > 100000) {
       toast.error(
-        `Fiyat çok yüksek görünüyor (${tierInfo.price.toLocaleString("tr-TR")} TL). Lütfen admin panelinden membership fiyatlarını kontrol edin.`,
+        t("membership.checkoutHook.fiyatCokYuksekGorunuyorTRTL", {
+          TR: tierInfo.price.toLocaleString("tr-TR"),
+        }),
         { duration: 10000 },
       );
     }
@@ -120,13 +122,15 @@ export function useMembershipCheckout() {
 
   const changeSuccessMessage = () =>
     tierChangeKind(currentTier, tier) === "upgrade"
-      ? "Üyeliğiniz başarıyla yükseltildi!"
-      : "Üyeliğiniz başarıyla değiştirildi!";
+      ? t("membership.checkoutHook.uyeliginizBasariylaYukseltildi")
+      : t("membership.checkoutHook.uyeliginizBasariylaDegistirildi");
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!agreed) {
-      toast.error("Lütfen kullanım koşullarını kabul edin");
+      toast.error(
+        t("membership.checkoutHook.lutfenKullanimKosullariniKabulEdin"),
+      );
       return;
     }
     setIsProcessing(true);
@@ -182,10 +186,10 @@ export function useMembershipCheckout() {
       router.push(`/membership/success?tier=${tier}&kind=${kind}`);
     } catch (error: any) {
       if (process.env.NODE_ENV === "development")
-        console.error("Payment error:", error);
+        console.error(t("membership.checkoutHook.paymentError"), error);
       toast.error(
         error.response?.data?.message ||
-          "Ödeme işlemi başarısız oldu. Lütfen tekrar deneyin.",
+          t("membership.checkoutHook.odemeIslemiBasarisizOlduLutfenTekrar"),
       );
     } finally {
       setIsProcessing(false);

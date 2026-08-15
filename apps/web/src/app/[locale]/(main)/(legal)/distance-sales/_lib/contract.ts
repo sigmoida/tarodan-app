@@ -1,6 +1,7 @@
 /** @format */
 
 import type { LegalPart } from "@/components/legal/LegalDocument";
+import type { Translate } from "@/types/i18n";
 import { PLATFORM_ENTITY_FIELDS } from "@/lib/legal/platform-entity";
 
 /**
@@ -17,464 +18,550 @@ import { PLATFORM_ENTITY_FIELDS } from "@/lib/legal/platform-entity";
  * ekranında ve sipariş onay e-postasında yer alır.
  */
 
-const BUYER_FIELDS = [
-  { label: "Ad Soyad / Unvan" },
-  { label: "Teslimat Adresi" },
-  { label: "Telefon" },
-  { label: "E-posta" },
+const BUYER_FIELDS = (t: Translate) => [
+  { label: t("legal.distanceSales.adSoyadUnvan") },
+  { label: t("legal.distanceSales.teslimatAdresi") },
+  { label: t("legal.distanceSales.telefon") },
+  { label: t("legal.distanceSales.ePosta") },
 ];
 
-const SELLER_FIELDS = [
-  { label: "Unvan / Ad Soyad" },
-  { label: "MERSİS / Vergi No" },
-  { label: "Adres" },
-  { label: "Telefon / E-posta / KEP" },
+const SELLER_FIELDS = (t: Translate) => [
+  { label: t("legal.distanceSales.unvanAdSoyad") },
+  { label: t("legal.distanceSales.mersisVergiNo") },
+  { label: t("legal.distanceSales.adres") },
+  { label: t("legal.distanceSales.telefonEPostaKep") },
 ];
 
 /** A) ÖN BİLGİLENDİRME FORMU */
-const PRE_INFORMATION: LegalPart = {
-  title: "A) Ön Bilgilendirme Formu (Mesafeli Sözleşme Öncesi)",
-  intro:
-    "İşbu Ön Bilgilendirme Formu, https://tarodan.com.tr üzerinde verilen siparişe konu mesafeli sözleşme kurulmadan önce, tüketicinin bilgilendirilmesi amacıyla sunulmaktadır.",
+const PRE_INFORMATION = (t: Translate): LegalPart => ({
+  title: t("legal.distanceSales.aOnBilgilendirmeFormuMesafeliSozlesme"),
+  intro: t("legal.distanceSales.isbuOnBilgilendirmeFormuHttpsTarodan"),
   sections: [
     {
       number: "1",
-      heading: "Taraf Bilgileri (Satıcı – Alıcı – Platform'un Aracılık Rolü)",
+      heading: t("legal.distanceSales.tarafBilgileriSaticiAliciPlatformUn"),
       blocks: [
         {
           type: "fields",
-          intro: "Alıcı (Tüketici):",
-          items: BUYER_FIELDS,
+          intro: t("legal.distanceSales.aliciTuketici"),
+          items: BUYER_FIELDS(t),
         },
         {
           type: "fields",
-          intro: "Satıcı (Sözleşmenin Satıcı Tarafı):",
-          items: SELLER_FIELDS,
+          intro: t("legal.distanceSales.saticiSozlesmeninSaticiTarafi"),
+          items: SELLER_FIELDS(t),
         },
         {
           type: "fields",
-          intro: "Platform (Aracı Hizmet Sağlayıcı):",
-          items: PLATFORM_ENTITY_FIELDS,
+          intro: t("legal.distanceSales.platformAraciHizmetSaglayici"),
+          items: PLATFORM_ENTITY_FIELDS(t),
         },
         {
           type: "note",
-          text: "Bu sipariş kapsamındaki Mesafeli Satış Sözleşmesi kural olarak Satıcı ile Alıcı arasında kurulmaktadır. Platform, aracı hizmet sağlayıcı sıfatıyla siparişin alınması, ödeme altyapısının sağlanması, talep/şikâyetlerin iletilmesi, kayıtların tutulması ve mevzuattan doğan diğer yükümlülükler kapsamında sürece aracılık eder. Platform'un “satıcı” sıfatıyla satış yaptığı işlemler, ürün sayfasında ayrıca belirtilir.",
+          text: t(
+            "legal.distanceSales.buSiparisKapsamindakiMesafeliSatisSozlesmesi",
+          ),
         },
         {
           type: "p",
-          text: "Bu formun amacı; siparişi onaylamadan önce Alıcı'nın, siparişin onaylanması halinde ödeme yükümlülüğü altına gireceği hususu dahil olmak üzere tüm esaslı konularda açık ve anlaşılır şekilde bilgilendirilmesidir.",
+          text: t("legal.distanceSales.buFormunAmaciSiparisiOnaylamadanOnce"),
         },
       ],
     },
     {
       number: "2",
-      heading: "Sözleşme Konusu Mal/Hizmetin Temel Nitelikleri",
+      heading: t(
+        "legal.distanceSales.sozlesmeKonusuMalHizmetinTemelNitelikleri",
+      ),
       blocks: [
         {
           type: "fields",
-          intro:
-            "Aşağıdaki bilgiler siparişinize özeldir; sipariş özeti ekranında ve sipariş onay e-postanızda yer alır.",
+          intro: t(
+            "legal.distanceSales.asagidakiBilgilerSiparisinizeOzeldirSiparisOzeti",
+          ),
           items: [
-            { label: "Ürün / Hizmet Adı" },
-            { label: "Marka / Model" },
-            { label: "Kullanım Durumu (sıfır / ikinci el / outlet)" },
-            { label: "Renk, Beden, Ölçü vb. Özellikler" },
-            { label: "Adet" },
-            { label: "Temel özellikler ve ambalaj/içerik bilgisi" },
+            { label: t("legal.distanceSales.urunHizmetAdi") },
+            { label: t("legal.distanceSales.markaModel") },
+            {
+              label: t("legal.distanceSales.kullanimDurumuSifirIkinciElOutlet"),
+            },
+            { label: t("legal.distanceSales.renkBedenOlcuVbOzellikler") },
+            { label: t("legal.distanceSales.adet") },
+            {
+              label: t(
+                "legal.distanceSales.temelOzelliklerVeAmbalajIcerikBilgisi",
+              ),
+            },
           ],
         },
         {
           type: "p",
-          text: "Alıcı, ürünün temel niteliklerini ve görsellerini sipariş öncesinde incelediğini; ürünün elektronik ortamda sunulan açıklamalarının satın alma kararında esas olduğunu kabul eder. Satıcı, ilan/açıklamanın gerçeğe uygun olmasından sorumludur.",
+          text: t(
+            "legal.distanceSales.aliciUrununTemelNitelikleriniVeGorsellerini",
+          ),
         },
       ],
     },
     {
       number: "3",
-      heading: "Toplam Fiyat, Vergiler ve Ek Masraflar",
+      heading: t("legal.distanceSales.toplamFiyatVergilerVeEkMasraflar"),
       blocks: [
         {
           type: "fields",
-          intro:
-            "Ödenecek toplam tutarın kalemleri sipariş özeti ekranında ayrı ayrı gösterilir:",
+          intro: t(
+            "legal.distanceSales.odenecekToplamTutarinKalemleriSiparisOzeti",
+          ),
           items: [
-            { label: "Ürün Bedeli (KDV dahil)" },
-            { label: "Teslimat / Kargo Ücreti (ödeyecek taraf belirtilir)" },
-            { label: "Varsa Kapıda Ödeme / İşlem Ücreti" },
+            { label: t("legal.distanceSales.urunBedeliKdvDahil") },
             {
-              label:
-                "Varsa Platform Koruma Hizmet Bedeli / Aracı Hizmet Bedeli",
+              label: t(
+                "legal.distanceSales.teslimatKargoUcretiOdeyecekTarafBelirtilir",
+              ),
             },
-            { label: "Varsa İndirim / Kupon / Kampanya" },
-            { label: "Ödenecek Toplam Tutar" },
+            { label: t("legal.distanceSales.varsaKapidaOdemeIslemUcreti") },
+            {
+              label: t(
+                "legal.distanceSales.varsaPlatformKorumaHizmetBedeliAraci",
+              ),
+            },
+            { label: t("legal.distanceSales.varsaIndirimKuponKampanya") },
+            { label: t("legal.distanceSales.odenecekToplamTutar") },
           ],
         },
         {
           type: "note",
-          text: "Alıcı, “Siparişi Onayla / Ödemeyi Tamamla” butonuna basması halinde ödemekle yükümlü olacağı toplam tutarı gördüğünü ve bu tutarın ödeme yükümlülüğü doğuracağını kabul eder.",
+          text: t(
+            "legal.distanceSales.aliciSiparisiOnaylaOdemeyiTamamlaButonuna",
+          ),
         },
       ],
     },
     {
       number: "4",
-      heading: "Ödeme, Teslimat ve İfa Koşulları",
+      heading: t("legal.distanceSales.odemeTeslimatVeIfaKosullari"),
       blocks: [
         {
           type: "fields",
           items: [
-            { label: "Ödeme Yöntemi (kredi kartı, banka kartı, havale vb.)" },
-            { label: "Teslimat Adresi" },
-            { label: "Tahmini Teslim Süresi" },
             {
-              label:
-                "Teslimat organizasyonu (satıcı gönderir / entegrasyonlu kargo)",
+              label: t("legal.distanceSales.odemeYontemiKrediKartiBankaKarti"),
+            },
+            { label: t("legal.distanceSales.teslimatAdresi") },
+            { label: t("legal.distanceSales.tahminiTeslimSuresi") },
+            {
+              label: t(
+                "legal.distanceSales.teslimatOrganizasyonuSaticiGonderirEntegrasyonluKargo",
+              ),
             },
           ],
         },
         {
           type: "p",
-          text: "Satıcı, mevzuatta öngörülen azami süreler saklı kalmak üzere, siparişin alınmasını takiben taahhüt ettiği süre içerisinde edimini ifa etmekle yükümlüdür. Teslimat gecikmeleri, stok/tedarik, kargo operasyonu gibi hallerde Alıcı'ya bilgilendirme yapılır.",
+          text: t(
+            "legal.distanceSales.saticiMevzuattaOngorulenAzamiSurelerSakli",
+          ),
         },
         {
           type: "p",
-          text: "Siparişin kesinleşmesi, ödemenin tam ve eksiksiz yapılmasına bağlıdır. Ürünün Alıcı'ya veya Alıcı'nın gösterdiği üçüncü kişiye teslimi anında hasar ve ziya sorumluluğu Alıcı'ya geçer. Satıcı'nın, Alıcı'nın açık talimatı veya Platform'un operasyonel süreçleri dışında gerçekleştirdiği erken sevkiyat veya hatalı lojistik organizasyonundan doğan ek masraflardan bizzat Satıcı sorumludur.",
+          text: t(
+            "legal.distanceSales.siparisinKesinlesmesiOdemeninTamVeEksiksiz",
+          ),
         },
       ],
     },
     {
       number: "5",
-      heading: "Cayma Hakkı (14 Gün) – Kapsam, Süre ve Usul",
+      heading: t("legal.distanceSales.caymaHakki14GunKapsamSure"),
       blocks: [
         {
           type: "p",
-          text: "Alıcı, teslimden itibaren 14 (on dört) gün içinde herhangi bir gerekçe göstermeksizin ve cezai şart ödemeksizin cayma hakkına sahiptir. Cayma bildiriminin bu süre içinde Satıcı'ya ve/veya Platform üzerinden sağlanan cayma kanallarına yöneltilmesi yeterlidir.",
+          text: t("legal.distanceSales.aliciTeslimdenItibaren14OnDort"),
         },
         {
           type: "list",
           items: [
             {
-              text: "Alıcı, cayma bildirimini Hesabım → Siparişlerim → İade/Cayma menüsünden veya Satıcı'nın e-posta/KEP adresi üzerinden iletebilir.",
+              text: t(
+                "legal.distanceSales.aliciCaymaBildiriminiHesabimSiparislerimIade",
+              ),
             },
             {
-              text: "Alıcı'nın ürünü iade için göndermesi gereken usul ve iade adresi, iade talebi oluşturulduğunda Platform arayüzünde gösterilir.",
+              text: t("legal.distanceSales.aliciNinUrunuIadeIcinGondermesi"),
             },
             {
-              text: "Cayma halinde iade kargo bedelinin kim tarafından karşılanacağı ve iade yöntemleri ürün sayfasında ve iade akışında ayrıca belirtilir.",
+              text: t("legal.distanceSales.caymaHalindeIadeKargoBedelininKim"),
             },
           ],
         },
         {
           type: "p",
-          text: "Cayma hakkı istisnaları: hijyen/sağlık nedeniyle iadesi uygun olmayan ürünler, hızlı bozulan gıdalar, tüketicinin istekleri doğrultusunda kişiselleştirilmiş ürünler vb. mevzuatta yer alan istisnalar saklıdır. Siparişe konu ürün cayma kapsamı dışındaysa, ürün sayfasında ve sipariş öncesi ekranda ayrıca belirtilir.",
+          text: t(
+            "legal.distanceSales.caymaHakkiIstisnalariHijyenSaglikNedeniyle",
+          ),
         },
         {
           type: "note",
-          text: "Ticari alıcıların (tacirlerin) ve Satıcı'nın bireysel kullanıcı (C2C) olduğu işlemlerin 6502 sayılı Kanun kapsamında olmaması sebebiyle, bu işlemlerde 14 günlük yasal cayma hakkı uygulanmaz.",
+          text: t("legal.distanceSales.ticariAlicilarinTacirlerinVeSaticiNin"),
         },
       ],
     },
     {
       number: "6",
-      heading: "İade / Değişim – Ayıplı Mal ve Satıcı Sorumluluğu",
+      heading: t("legal.distanceSales.iadeDegisimAyipliMalVeSatici"),
       blocks: [
         {
           type: "p",
-          text: "Cayma hakkından bağımsız olarak; ürünün ayıplı çıkması, eksik/yanlış gönderilmesi, hasarlı teslim edilmesi halinde Alıcı'nın tüketici mevzuatından doğan hakları saklıdır. Bu taleplerin muhatabı öncelikle Satıcı'dır. Platform, aracı hizmet sağlayıcı olarak talep iletim ve takip sistemini açık tutar; kayıtları muhafaza eder.",
+          text: t(
+            "legal.distanceSales.caymaHakkindanBagimsizOlarakUrununAyipli",
+          ),
         },
         {
           type: "p",
-          text: "Alıcı'nın ayıp iddiasına ilişkin fotoğraf/video gibi delilleri Platform'a yüklemesi, inceleme ve uyuşmazlık yönetimi süreçlerinin sağlıklı yürütülmesine yardımcı olur.",
+          text: t("legal.distanceSales.aliciNinAyipIddiasinaIliskinFotograf"),
         },
       ],
     },
     {
       number: "7",
-      heading: "Şikâyet, Talep ve Uyuşmazlık Çözümü",
+      heading: t("legal.distanceSales.sikayetTalepVeUyusmazlikCozumu"),
       blocks: [
         {
           type: "list",
           items: [
             {
-              label: "Platform",
-              text: "Destek Merkezi üzerinden talep açarak, destek@tarodan.com.tr adresinden veya 0 232 433 41 42 numarasından.",
+              label: t("legal.distanceSales.platform"),
+              text: t(
+                "legal.distanceSales.destekMerkeziUzerindenTalepAcarakDestek",
+              ),
             },
             {
-              label: "Satıcı",
-              text: "Ürün ve sipariş sayfasında yer alan satıcı e-posta/telefon/KEP bilgileri üzerinden.",
+              label: t("legal.distanceSales.satici"),
+              text: t("legal.distanceSales.urunVeSiparisSayfasindaYerAlan"),
             },
           ],
         },
         {
           type: "p",
-          text: "Uyuşmazlıklarda tüketici; parasal sınırlar dahilinde Tüketici Hakem Heyeti'ne, diğer hallerde dava şartı arabuluculuk sonrası Tüketici Mahkemesi'ne başvurabilir.",
+          text: t(
+            "legal.distanceSales.uyusmazliklardaTuketiciParasalSinirlarDahilindeTuketici",
+          ),
         },
       ],
     },
     {
       number: "8",
-      heading: "Ön Bilgilendirme Onayı ve Kalıcı Veri Saklayıcısı",
+      heading: t("legal.distanceSales.onBilgilendirmeOnayiVeKaliciVeri"),
       blocks: [
         {
           type: "p",
-          text: "Alıcı, siparişi onaylamadan önce bu Ön Bilgilendirme'yi okuduğunu ve anladığını, sipariş onayının ödeme yükümlülüğü doğurduğunu kabul eder.",
+          text: t("legal.distanceSales.aliciSiparisiOnaylamadanOnceBuOn"),
         },
         {
           type: "p",
-          text: "Ön Bilgilendirme ve Mesafeli Satış Sözleşmesi'ne Hesabım → Siparişlerim alanından erişilebilir; ayrıca kayıtlı e-posta adresinize bağlantı olarak gönderilebilir.",
+          text: t(
+            "legal.distanceSales.onBilgilendirmeVeMesafeliSatisSozlesmesi",
+          ),
         },
         {
           type: "note",
-          text: "Onay kutucuğu metni: “Ön Bilgilendirme Formu'nu okudum, siparişi onayladığım takdirde ödeme yükümlülüğü altına gireceğimi anladım.”",
+          text: t("legal.distanceSales.onayKutucuguMetniOnBilgilendirmeFormu"),
         },
       ],
     },
   ],
-};
+});
 
 /** B) MESAFELİ SATIŞ SÖZLEŞMESİ */
-const SALES_CONTRACT: LegalPart = {
-  title: "B) Mesafeli Satış Sözleşmesi",
+const SALES_CONTRACT = (t: Translate): LegalPart => ({
+  title: t("legal.distanceSales.bMesafeliSatisSozlesmesi"),
   sections: [
     {
       number: "1",
-      heading: "Taraflar, Tanımlar ve Sözleşmenin Kurulması",
+      heading: t("legal.distanceSales.taraflarTanimlarVeSozlesmeninKurulmasi"),
       blocks: [
         {
           type: "p",
-          text: "İşbu Mesafeli Satış Sözleşmesi; TARODAN üzerinden siparişin Alıcı tarafından onaylanması ile elektronik ortamda kurulmuştur.",
+          text: t(
+            "legal.distanceSales.isbuMesafeliSatisSozlesmesiTarodanUzerinden",
+          ),
         },
-        { type: "fields", intro: "Alıcı (Tüketici):", items: BUYER_FIELDS },
-        { type: "fields", intro: "Satıcı:", items: SELLER_FIELDS },
         {
           type: "fields",
-          intro: "Platform (Aracı Hizmet Sağlayıcı):",
-          items: PLATFORM_ENTITY_FIELDS,
+          intro: t("legal.distanceSales.aliciTuketici"),
+          items: BUYER_FIELDS(t),
+        },
+        {
+          type: "fields",
+          intro: t("legal.distanceSales.satici2"),
+          items: SELLER_FIELDS(t),
+        },
+        {
+          type: "fields",
+          intro: t("legal.distanceSales.platformAraciHizmetSaglayici"),
+          items: PLATFORM_ENTITY_FIELDS(t),
         },
         {
           type: "p",
-          text: "Sözleşme'nin konusu; nitelikleri ve satış bedeli belirtilen ürün/hizmetin satışı ve teslimi/ifası ile Tarafların hak ve yükümlülüklerinin belirlenmesidir.",
+          text: t("legal.distanceSales.sozlesmeNinKonusuNitelikleriVeSatis"),
         },
         {
           type: "note",
-          text: "Platform, kural olarak bu Sözleşme'nin satıcı tarafı değildir; ancak TKHK ve ilgili mevzuat uyarınca, aracı hizmet sağlayıcı sıfatıyla belirli yükümlülüklere tabi olabilir ve tüketici taleplerinin iletilmesi/takibi için sistem sağlar. Ticari (B2B) işlemlerde Platform yalnızca aracı hizmet sağlayıcıdır.",
+          text: t("legal.distanceSales.platformKuralOlarakBuSozlesmeNin"),
         },
       ],
     },
     {
       number: "2",
-      heading: "Sözleşme Konusu Ürün/Hizmet Bilgileri",
+      heading: t("legal.distanceSales.sozlesmeKonusuUrunHizmetBilgileri"),
       blocks: [
         {
           type: "fields",
-          intro:
-            "Aşağıdaki bilgiler siparişinize özeldir ve sipariş özetinde gösterilir:",
+          intro: t(
+            "legal.distanceSales.asagidakiBilgilerSiparisinizeOzeldirVeSiparis",
+          ),
           items: [
-            { label: "Ürün / Hizmet" },
-            { label: "Adet" },
-            { label: "Birim Fiyat (KDV dahil)" },
-            { label: "Ara Toplam" },
-            { label: "Teslimat / Kargo (ödeyecek taraf belirtilir)" },
-            { label: "Varsa Hizmet Bedeli / Komisyon" },
-            { label: "İndirim / Kupon" },
-            { label: "Toplam" },
-            { label: "Teslimat Adresi" },
-            { label: "Fatura Bilgisi (ad/unvan, vergi bilgisi, adres)" },
+            { label: t("legal.distanceSales.urunHizmet") },
+            { label: t("legal.distanceSales.adet") },
+            { label: t("legal.distanceSales.birimFiyatKdvDahil") },
+            { label: t("legal.distanceSales.araToplam") },
+            {
+              label: t(
+                "legal.distanceSales.teslimatKargoOdeyecekTarafBelirtilir",
+              ),
+            },
+            { label: t("legal.distanceSales.varsaHizmetBedeliKomisyon") },
+            { label: t("legal.distanceSales.indirimKupon") },
+            { label: t("legal.distanceSales.toplam") },
+            { label: t("legal.distanceSales.teslimatAdresi") },
+            {
+              label: t("legal.distanceSales.faturaBilgisiAdUnvanVergiBilgisi"),
+            },
           ],
         },
       ],
     },
     {
       number: "3",
-      heading: "Ödeme, Teslimat ve İfa",
+      heading: t("legal.distanceSales.odemeTeslimatVeIfa"),
       blocks: [
         {
           type: "p",
-          text: "Ödeme yöntemi ve ödemenin ne zaman tahsil edileceği sipariş akışında gösterilir; kural olarak sipariş onayında tahsil edilir.",
+          text: t("legal.distanceSales.odemeYontemiVeOdemeninNeZaman"),
         },
         {
           type: "p",
-          text: "Satıcı, siparişin kendisine ulaştığı andan itibaren taahhüt ettiği süre içinde teslim/ifa yükümlülüğünü yerine getirecektir. Teslimatın imkânsızlaşması veya stok/tedarik sorunları halinde, Alıcı'ya gecikmeksizin bilgi verilir ve mevzuattan doğan haklar saklıdır.",
+          text: t(
+            "legal.distanceSales.saticiSiparisinKendisineUlastigiAndanItibaren",
+          ),
         },
         {
           type: "p",
-          text: "Teslim anında kargo paketi hasarlıysa Alıcı'nın tutanak düzenletmesi; ayıp/hasar iddialarının ispatında önemlidir. Bu, Alıcı'nın yasal haklarını ortadan kaldırmaz; yalnızca süreç yönetimini kolaylaştırır.",
+          text: t("legal.distanceSales.teslimAnindaKargoPaketiHasarliysaAlici"),
         },
       ],
     },
     {
       number: "4",
-      heading: "Cayma Hakkı ve Kullanımı (14 Gün)",
+      heading: t("legal.distanceSales.caymaHakkiVeKullanimi14Gun"),
       blocks: [
         {
           type: "p",
-          text: "Alıcı, ürünü teslim aldığı tarihten itibaren 14 gün içinde cayma hakkını kullanabilir. Cayma hakkının kullanılması için Platform'daki iade/cayma modülü üzerinden talep oluşturulması veya Satıcı'ya yazılı bildirim (e-posta/KEP) yapılması yeterlidir.",
+          text: t("legal.distanceSales.aliciUrunuTeslimAldigiTarihtenItibaren"),
         },
         {
           type: "list",
           items: [
             {
-              text: "İade edilecek ürün; kullanılmamış, tekrar satılabilirliğini yitirmemiş şekilde (ürünün niteliğine göre) iade edilmelidir.",
+              text: t(
+                "legal.distanceSales.iadeEdilecekUrunKullanilmamisTekrarSatilabilirligini",
+              ),
             },
             {
-              text: "İade sürecinde ürünün hangi kargo firmasıyla ve hangi kodla gönderileceği Platform arayüzünde gösterilir.",
+              text: t(
+                "legal.distanceSales.iadeSurecindeUrununHangiKargoFirmasiyla",
+              ),
             },
             {
-              text: "İade masraflarının kim tarafından karşılanacağına ilişkin kural ve istisnalar ürün sayfasında belirtilir.",
+              text: t(
+                "legal.distanceSales.iadeMasraflarininKimTarafindanKarsilanacaginaIliskin",
+              ),
             },
           ],
         },
         {
           type: "p",
-          text: "Cayma hakkı kapsamı dışında kalan ürün/hizmetler (mevzuattaki istisnalar) sipariş öncesinde ayrıca bildirilmektedir. Cayma kapsam dışıysa Alıcı bunu onaylar.",
+          text: t("legal.distanceSales.caymaHakkiKapsamiDisindaKalanUrun"),
         },
       ],
     },
     {
       number: "5",
-      heading: "Ayıplı Mal / Eksik – Yanlış Gönderim / Hasarlı Teslim",
+      heading: t("legal.distanceSales.ayipliMalEksikYanlisGonderimHasarli"),
       blocks: [
         {
           type: "p",
-          text: "Ürünün ayıplı çıkması, eksik/yanlış gönderilmesi veya hasarlı teslim edilmesi halinde Alıcı'nın tüketici mevzuatından doğan seçimlik hakları saklıdır. Bu kapsamda Satıcı, ürünün ayıpsız ve sözleşmeye uygun tesliminden sorumludur.",
+          text: t(
+            "legal.distanceSales.urununAyipliCikmasiEksikYanlisGonderilmesi",
+          ),
         },
         {
           type: "list",
           items: [
             {
-              text: "Platform, Alıcı'nın talebini Satıcı'ya iletmekle yükümlüdür.",
+              text: t("legal.distanceSales.platformAliciNinTalebiniSaticiYa"),
             },
-            { text: "Talep ve şikâyet kayıtlarını tutar." },
+            { text: t("legal.distanceSales.talepVeSikayetKayitlariniTutar") },
             {
-              text: "Tüketiciye süreç takibi sağlayan sistemi açık tutar.",
+              text: t(
+                "legal.distanceSales.tuketiciyeSurecTakibiSaglayanSistemiAcik",
+              ),
             },
           ],
         },
         {
           type: "p",
-          text: "Platform, tüketici mağduriyetini gidermek adına uyuşmazlık çözüm mekanizmasını işletir. Satıcı'nın iflası, konkordato ilan etmesi veya edimini ifa edememesi (mali acziyet) durumunda Platform, Satıcı'nın içerideki hakedişlerine (emanet havuzuna) bloke koyma ve bu tutarları doğrudan tüketiciye iade etme yetkisine sahiptir.",
+          text: t(
+            "legal.distanceSales.platformTuketiciMagduriyetiniGidermekAdinaUyusmazlik",
+          ),
         },
         {
           type: "p",
-          text: "Alıcı'nın ayıp iddiasına ilişkin delilleri (fotoğraf/video) sisteme yüklemesi istenir.",
+          text: t("legal.distanceSales.aliciNinAyipIddiasinaIliskinDelilleri"),
         },
       ],
     },
     {
       number: "6",
-      heading: "İletişim, Şikâyet ve Uyuşmazlıklar",
+      heading: t("legal.distanceSales.iletisimSikayetVeUyusmazliklar"),
       blocks: [
         {
           type: "p",
-          text: "Alıcı, Platform'un Destek Merkezi üzerinden veya ürün/sipariş sayfasında yer alan satıcı iletişim bilgileri üzerinden talebini iletebilir. Uyuşmazlık halinde Alıcı; Tüketici Hakem Heyeti'ne veya dava şartı arabuluculuk sonrası Tüketici Mahkemesi'ne başvurabilir. Yetki ve görev kuralları emredici hükümler gereği uygulanır.",
+          text: t("legal.distanceSales.aliciPlatformUnDestekMerkeziUzerinden"),
         },
         {
           type: "note",
-          text: "Aşağıdaki 6.1–6.7 maddeleri, Platform ile Satıcı arasındaki TİCARİ ilişkiyi düzenler. Tüketicilere cezai şart uygulanamaz.",
+          text: t("legal.distanceSales.asagidaki6167MaddeleriPlatform"),
         },
       ],
     },
     {
       number: "6.1",
-      heading: "Rücu, Mahsup ve Emanet Ödeme (Escrow)",
+      heading: t("legal.distanceSales.rucuMahsupVeEmanetOdemeEscrow"),
       blocks: [
         {
           type: "p",
-          text: "Platform, tüketicinin cayma hakkını kullanması, ayıplı mal iadesi veya bankalar nezdinde gerçekleşen ters ibraz (chargeback) işlemleri sonucunda ödemek zorunda kaldığı tüm tutarlar ile idari para cezalarını, Satıcı'nın onayını aramaksızın Satıcı'nın cari hesabına borç kaydetmeye ve hakedişlerinden tek taraflı mahsup etmeye tam yetkilidir.",
+          text: t(
+            "legal.distanceSales.platformTuketicininCaymaHakkiniKullanmasiAyipli",
+          ),
         },
       ],
     },
     {
       number: "6.2",
-      heading: "Delil Sözleşmesi",
+      heading: t("legal.distanceSales.delilSozlesmesi"),
       blocks: [
         {
           type: "p",
-          text: "Taraflar, aralarındaki uyuşmazlıklarda Platform'un veri tabanında tuttuğu elektronik kayıtların, logların, iade takip modülü verilerinin ve ticari defterlerinin HMK m.193 ve m.222 uyarınca münhasır ve kesin delil teşkil edeceğini kabul eder.",
+          text: t(
+            "legal.distanceSales.taraflarAralarindakiUyusmazliklardaPlatformUnVeri",
+          ),
         },
       ],
     },
     {
       number: "6.3",
-      heading: "Cezai Şart (Ticari Satıcılar İçin)",
+      heading: t("legal.distanceSales.cezaiSartTicariSaticilarIcin"),
       blocks: [
         {
           type: "p",
-          text: "Satıcı'nın sahte/yanıltıcı ürün göndermesi, platform dışına işlem yönlendirmesi, ispat yükünü yerine getirmemesi veya haksız iade reddi durumlarında, ilgili ürün bedelinin %20'si oranında cezai şartı Platform'a ödemeyi kabul eder. Tüketicilere cezai şart uygulanamaz.",
+          text: t("legal.distanceSales.saticiNinSahteYanilticiUrunGondermesi"),
         },
       ],
     },
     {
       number: "6.4",
-      heading: "Komisyon ve Hizmet Bedelleri",
+      heading: t("legal.distanceSales.komisyonVeHizmetBedelleri"),
       blocks: [
         {
           type: "p",
-          text: "Platform, piyasa koşullarını gözeterek komisyon oranlarında ve kargo/hizmet bedellerinde değişiklik yapma hakkını saklı tutar (7 gün önceden bildirim şartıyla). Bu bedeller Satıcı'ya fatura edilir ve cari hesaptan düşülür.",
+          text: t(
+            "legal.distanceSales.platformPiyasaKosullariniGozeterekKomisyonOranlarinda",
+          ),
         },
       ],
     },
     {
       number: "6.5",
-      heading: "Rekabet ve Fiyatlandırma",
+      heading: t("legal.distanceSales.rekabetVeFiyatlandirma"),
       blocks: [
         {
           type: "p",
-          text: "Platformun sunduğu otomatik fiyatlandırma araçları, satıcılar arası fiyat sabitleme (kartel) amacıyla kullanılamaz. Platform, kargo algoritmalarında tarafsızlık ilkesine uyar. Satıcılar, Platform'da satış yaparken objektif kalite standartlarına uymak zorundadır.",
+          text: t(
+            "legal.distanceSales.platformunSunduguOtomatikFiyatlandirmaAraclariSaticilar",
+          ),
         },
       ],
     },
     {
       number: "6.6",
-      heading: "İYS ve Veri Uyumu",
+      heading: t("legal.distanceSales.iysVeVeriUyumu"),
       blocks: [
         {
           type: "p",
-          text: "Satıcı, İleti Yönetim Sistemi (İYS) mevzuatına tam uyum sağlamakla yükümlüdür. Aksi halde Platform, Satıcı'nın faaliyetlerini askıya alabilir.",
+          text: t("legal.distanceSales.saticiIletiYonetimSistemiIysMevzuatina"),
         },
       ],
     },
     {
       number: "6.7",
-      heading: "Manevi Tazminat Sınırı",
+      heading: t("legal.distanceSales.maneviTazminatSiniri"),
       blocks: [
         {
           type: "p",
-          text: "Sözleşmenin ifa edilmemesi veya gecikmesi hallerinde, tüzel kişi/ticari taraflar birbirlerinden manevi tazminat talep edemez.",
+          text: t(
+            "legal.distanceSales.sozlesmeninIfaEdilmemesiVeyaGecikmesiHallerinde",
+          ),
         },
       ],
     },
     {
       number: "7",
-      heading: "Kişisel Veriler",
+      heading: t("legal.distanceSales.kisiselVeriler"),
       blocks: [
         {
           type: "p",
-          text: "Alıcı'nın kişisel verileri; üyelik/sipariş/teslimat/ödeme/iade süreçlerinin yürütülmesi ve mevzuattan doğan yükümlülüklerin yerine getirilmesi amacıyla işlenir. Detaylar Platform'daki KVKK Aydınlatma Metni'nde açıklanmıştır.",
+          text: t("legal.distanceSales.aliciNinKisiselVerileriUyelikSiparis"),
         },
         {
           type: "p",
-          text: "Satıcı; Alıcı verilerini yalnızca siparişin ifası/teslimat ve yasal yükümlülükler kapsamında kullanabilir; reklam/pazarlama gibi amaçlarla ayrıca kullanamaz.",
+          text: t(
+            "legal.distanceSales.saticiAliciVerileriniYalnizcaSiparisinIfasi",
+          ),
         },
       ],
     },
     {
       number: "8",
-      heading: "Yürürlük ve Erişim",
+      heading: t("legal.distanceSales.yururlukVeErisim"),
       blocks: [
         {
           type: "p",
-          text: "Bu Sözleşme, siparişin Alıcı tarafından elektronik ortamda onaylanması ile yürürlüğe girer. Sözleşme metnine Alıcı, Hesabım → Siparişlerim alanından erişebilir; ayrıca e-posta ile kendisine gönderilebilir.",
+          text: t(
+            "legal.distanceSales.buSozlesmeSiparisinAliciTarafindanElektronik",
+          ),
         },
         {
           type: "note",
-          text: "Onay kutucuğu metni: “Mesafeli Satış Sözleşmesi'ni okudum ve kabul ediyorum.”",
+          text: t(
+            "legal.distanceSales.onayKutucuguMetniMesafeliSatisSozlesmesi",
+          ),
         },
       ],
     },
   ],
-};
+});
 
-export const DISTANCE_SALES_PARTS: LegalPart[] = [
-  PRE_INFORMATION,
-  SALES_CONTRACT,
+export const distanceSalesParts = (t: Translate): LegalPart[] => [
+  PRE_INFORMATION(t),
+  SALES_CONTRACT(t),
 ];

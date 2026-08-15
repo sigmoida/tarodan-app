@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useTranslations } from "next-intl";
 import { ExclamationTriangleIcon } from "@heroicons/react/24/outline";
 import { Alert, Button, Input } from "@tarodan/ui";
 
@@ -19,6 +20,7 @@ export default function EnabledOptions({
   isDisabling: boolean;
   setError: (message: string) => void;
 }) {
+  const t = useTranslations();
   const [showRegen, setShowRegen] = useState(false);
   const [regenCode, setRegenCode] = useState("");
   const [showDisable, setShowDisable] = useState(false);
@@ -26,7 +28,7 @@ export default function EnabledOptions({
 
   const handleRegenerate = () => {
     if (regenCode.length !== 6) {
-      setError("Lütfen 6 haneli kodu girin");
+      setError(t("profile.twoFactor.enterSixDigits"));
       return;
     }
     regenerate(regenCode, {
@@ -39,7 +41,7 @@ export default function EnabledOptions({
 
   const handleDisable = () => {
     if (disableCode.length !== 6) {
-      setError("Lütfen 6 haneli kodu girin");
+      setError(t("profile.twoFactor.enterSixDigits"));
       return;
     }
     disable(disableCode, {
@@ -54,10 +56,11 @@ export default function EnabledOptions({
     <div className="space-y-4">
       {/* Backup codes */}
       <div className="rounded-xl bg-surface-elevated p-6 shadow-sm">
-        <h3 className="mb-2 text-lg font-medium text-heading">Yedek Kodlar</h3>
+        <h3 className="mb-2 text-lg font-medium text-heading">
+          {t("profile.twoFactor.backupCodesTitle")}
+        </h3>
         <p className="mb-4 text-sm text-muted">
-          Telefonunuza erişiminizi kaybederseniz yedek kodları kullanarak giriş
-          yapabilirsiniz.
+          {t("profile.twoFactor.backupCodesIntro")}
         </p>
         {!showRegen ? (
           <Button
@@ -67,13 +70,12 @@ export default function EnabledOptions({
             onClick={() => setShowRegen(true)}
             disabled={isRegenerating}
           >
-            Yeni Yedek Kodlar Oluştur
+            {t("profile.twoFactor.regenerate")}
           </Button>
         ) : (
           <div>
             <p className="mb-3 text-sm text-muted">
-              Onaylamak için doğrulama uygulamanızdaki 6 haneli kodu girin. Eski
-              yedek kodlarınız geçersiz olacaktır.
+              {t("profile.twoFactor.regenerateHint")}
             </p>
             <Input
               type="text"
@@ -81,7 +83,7 @@ export default function EnabledOptions({
               maxLength={6}
               value={regenCode}
               onChange={(e) => setRegenCode(e.target.value.replace(/\D/g, ""))}
-              placeholder="6 haneli kod"
+              placeholder={t("profile.twoFactor.sixDigitPlaceholder")}
               className="mb-4 text-center tracking-widest"
             />
             <div className="flex space-x-4">
@@ -94,7 +96,7 @@ export default function EnabledOptions({
                   setRegenCode("");
                 }}
               >
-                İptal
+                {t("common.cancel")}
               </Button>
               <Button
                 variant="primary"
@@ -103,7 +105,7 @@ export default function EnabledOptions({
                 onClick={handleRegenerate}
                 disabled={isRegenerating}
               >
-                {isRegenerating ? "Yükleniyor..." : "Oluştur"}
+                {isRegenerating ? t("common.loading") : t("common.create")}
               </Button>
             </div>
           </div>
@@ -113,10 +115,10 @@ export default function EnabledOptions({
       {/* Disable 2FA */}
       <div className="rounded-xl bg-surface-elevated p-6 shadow-sm">
         <h3 className="mb-2 text-lg font-medium text-heading">
-          2FA'yı Devre Dışı Bırak
+          {t("profile.twoFactor.disableTitle")}
         </h3>
         <p className="mb-4 text-sm text-muted">
-          2FA'yı devre dışı bırakmak hesabınızın güvenliğini azaltır.
+          {t("profile.twoFactor.disableIntro")}
         </p>
         {!showDisable ? (
           <Button
@@ -125,20 +127,19 @@ export default function EnabledOptions({
             className="w-full"
             onClick={() => setShowDisable(true)}
           >
-            2FA'yı Devre Dışı Bırak
+            {t("profile.twoFactor.disableTitle")}
           </Button>
         ) : (
           <div>
             <Alert
               variant="danger"
-              title="Dikkat"
+              title={t("profile.twoFactor.disableWarningTitle")}
               icon={
                 <ExclamationTriangleIcon className="h-5 w-5 text-danger-600" />
               }
               className="mb-4"
             >
-              Bu işlem geri alınamaz. Devam etmek için doğrulama uygulamanızdaki
-              6 haneli kodu girin.
+              {t("profile.twoFactor.disableWarning")}
             </Alert>
             <Input
               type="text"
@@ -148,7 +149,7 @@ export default function EnabledOptions({
               onChange={(e) =>
                 setDisableCode(e.target.value.replace(/\D/g, ""))
               }
-              placeholder="6 haneli kod"
+              placeholder={t("profile.twoFactor.sixDigitPlaceholder")}
               className="mb-4 text-center tracking-widest"
             />
             <div className="flex space-x-4">
@@ -161,7 +162,7 @@ export default function EnabledOptions({
                   setDisableCode("");
                 }}
               >
-                İptal
+                {t("common.cancel")}
               </Button>
               <Button
                 variant="danger"
@@ -170,7 +171,9 @@ export default function EnabledOptions({
                 onClick={handleDisable}
                 disabled={isDisabling}
               >
-                {isDisabling ? "İşleniyor..." : "Devre Dışı Bırak"}
+                {isDisabling
+                  ? t("checkout.processing")
+                  : t("profile.twoFactor.disableAction")}
               </Button>
             </div>
           </div>

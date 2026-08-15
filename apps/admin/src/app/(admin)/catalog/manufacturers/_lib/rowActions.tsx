@@ -1,5 +1,10 @@
-import { activeToggleAction, editDeleteActions, type RowActionItem } from '@/components/table';
-import type { Manufacturer } from './types';
+import {
+  activeToggleAction,
+  editDeleteActions,
+  type RowActionItem,
+} from "@/components/table";
+import type { Manufacturer } from "./types";
+import type { Translate } from "@/lib/statusLabels";
 
 export interface ManufacturerRowActions {
   onEdit: (m: Manufacturer) => void;
@@ -10,9 +15,12 @@ export interface ManufacturerRowActions {
 }
 
 /** ⋮ row-menu items for a manufacturer. */
-export function manufacturerRowMenu({ onEdit, onDelete, onToggle, busyId }: ManufacturerRowActions) {
+export function manufacturerRowMenu(
+  { onEdit, onDelete, onToggle, busyId }: ManufacturerRowActions,
+  t: Translate,
+) {
   return (m: Manufacturer): RowActionItem[] => [
-    activeToggleAction(m.isActive, () => onToggle(m), busyId === m.id),
-    ...editDeleteActions(m, { onEdit, onDelete }),
+    activeToggleAction(m.isActive, () => onToggle(m), t, busyId === m.id),
+    ...editDeleteActions(m, { onEdit, onDelete }, t),
   ];
 }

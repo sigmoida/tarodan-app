@@ -148,9 +148,9 @@ export function buildTiers(data: TierData, t: TFn): Tier[] {
     },
     {
       id: "basic",
-      name: "Temel",
+      name: t("page.membership.tiers.temel"),
       price: prices.basic_monthly_price ?? 49,
-      description: "Koleksiyoncular için başlangıç",
+      description: t("page.membership.tiers.koleksiyoncularIcinBaslangic"),
       popular: false,
       features: featuresFor("basic"),
     },

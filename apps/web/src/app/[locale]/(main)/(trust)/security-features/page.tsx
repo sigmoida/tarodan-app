@@ -3,6 +3,7 @@
 import type { Metadata } from "next";
 import { localizedCanonical } from "@/lib/seo";
 import SecurityFeaturesClient from "./_components/SecurityFeaturesClient";
+import { getTranslations } from "next-intl/server";
 
 export async function generateMetadata({
   params,
@@ -10,10 +11,12 @@ export async function generateMetadata({
   params: Promise<{ locale: string }>;
 }): Promise<Metadata> {
   const { locale } = await params;
+  const t = await getTranslations({ locale });
   return {
-    title: "Güvenlik ve Gizlilik · Tarodan",
-    description:
-      "Tarodan güvenlik önlemleri, alıcı koruması ve veri gizliliği uygulamaları ile alışverişinizi nasıl güvende tuttuğunu açıklar.",
+    title: t("page.securityFeatures.page.guvenlikVeGizlilikTarodan"),
+    description: t(
+      "page.securityFeatures.page.tarodanGuvenlikOnlemleriAliciKorumasiVe",
+    ),
     alternates: localizedCanonical(locale, "/security-features"),
   };
 }

@@ -6,6 +6,7 @@ import {
   type UseMutationOptions,
 } from "@tanstack/react-query";
 import toast from "react-hot-toast";
+import { useTranslations } from "next-intl";
 
 export interface UseWebMutationOptions<TData, TVars> {
   /**
@@ -50,11 +51,12 @@ export function useWebMutation<TData, TVars = void>(
   {
     invalidates = [],
     successMessage,
-    errorMessage = "İşlem başarısız",
+    errorMessage,
     onSuccess,
     mutation,
   }: UseWebMutationOptions<TData, TVars> = {},
 ) {
+  const t = useTranslations();
   const queryClient = useQueryClient();
 
   return useMutation<TData, unknown, TVars>({
@@ -68,7 +70,9 @@ export function useWebMutation<TData, TVars = void>(
       onSuccess?.(data, vars);
     },
     onError: (error) => {
-      toast.error(apiErrorMessage(error) ?? errorMessage);
+      toast.error(
+        apiErrorMessage(error) ?? errorMessage ?? t("common.operationFailed"),
+      );
     },
   });
 }

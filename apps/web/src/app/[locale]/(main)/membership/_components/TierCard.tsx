@@ -75,11 +75,13 @@ export default function TierCard({
       <div className="mt-5">
         <div className="flex items-baseline gap-1">
           <span className="text-3xl font-semibold text-heading">
-            {tier.price === 0 ? "Ücretsiz" : formatTL(price)}
+            {tier.price === 0
+              ? t("page.membership.tiercard.ucretsiz")
+              : formatTL(price)}
           </span>
           {tier.price > 0 && (
             <span className="text-sm text-muted">
-              /{period === "yearly" ? "yıl" : "ay"}
+              /{period === "yearly" ? t("page.membership.tiercard.yil") : "ay"}
             </span>
           )}
         </div>

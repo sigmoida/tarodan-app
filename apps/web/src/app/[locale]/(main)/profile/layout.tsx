@@ -3,7 +3,7 @@
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
 import { redirect } from "@/i18n/navigation";
-import { getLocale } from "next-intl/server";
+import { getLocale, getTranslations } from "next-intl/server";
 import { dehydrate, HydrationBoundary } from "@tanstack/react-query";
 import { getSession } from "@/lib/server/session";
 import { getServerQueryClient } from "@/lib/query/server";
@@ -43,10 +43,11 @@ export default async function ProfileLayout({
   // next/navigation's), so narrow it explicitly.
   const user = session!;
 
+  const t = await getTranslations();
   const queryClient = getServerQueryClient();
   queryClient.setQueryData(
     queryKeys.profile.overview(),
-    buildOverviewSeed(user),
+    buildOverviewSeed(user, t),
   );
   const seeded = queryClient
     .getQueryCache()

@@ -1,7 +1,9 @@
 /** @format */
 
 import { createTranslator } from "next-intl";
+import { offerStatusConfig } from "@tarodan/ui";
 import { getMessages, resolveLocale } from "@tarodan/i18n";
+import type { Translate } from "@/types/i18n";
 
 export type OfferTab = "received" | "sent";
 
@@ -73,12 +75,16 @@ export const calculateDiscount = (
     ? Math.round(((listingPrice - offerAmount) / listingPrice) * 100)
     : 0;
 
-export function getTimeRemaining(expiresAt: string): string | null {
+export function getTimeRemaining(
+  expiresAt: string,
+  t: Translate,
+): string | null {
   const diff = new Date(expiresAt).getTime() - Date.now();
   if (diff <= 0) return null;
   const hours = Math.floor(diff / (1000 * 60 * 60));
   const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
-  if (hours > 24) return `${Math.floor(hours / 24)} gün`;
+  if (hours > 24)
+    return t("page.offers.types.hoursGun", { hours: Math.floor(hours / 24) });
   return `${hours}s ${minutes}d`;
 }
 
@@ -103,19 +109,13 @@ export function formatTimeAgo(
   return t("time.ago.months", { count: months });
 }
 
-const OFFER_STATUS_EN: Record<string, string> = {
-  pending: "Pending",
-  accepted: "Accepted",
-  rejected: "Rejected",
-  countered: "Counter Offer",
-  cancelled: "Cancelled",
-  expired: "Expired",
-  payment_expired: "Payment Expired",
+/**
+ * Teklif durumunun okunabilir etiketi — paylaşılan `offerStatusConfig` katalog
+ * anahtarını taşır, metni katalog verir. Eskiden burada ayrı bir İngilizce
+ * harita duruyordu ve yeni bir durum eklendiğinde İngilizce arayüzde ham
+ * `snake_case` görünüyordu.
+ */
+export const offerStatusLabel = (status: string, t: Translate): string => {
+  const entry = offerStatusConfig[status];
+  return entry ? t(entry.labelKey) : status;
 };
-
-/** Localized status label. `trFallback` comes from the shared offerStatusConfig. */
-export const offerStatusLabel = (
-  status: string,
-  locale: string,
-  trFallback: string,
-): string => (locale === "en" ? OFFER_STATUS_EN[status] || status : trFallback);

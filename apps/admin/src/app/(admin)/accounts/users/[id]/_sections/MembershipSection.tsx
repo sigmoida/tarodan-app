@@ -23,6 +23,7 @@ import {
   getMembershipTierOptions,
   getBillingPeriodOptions,
 } from "../types";
+import { statusConfig } from "@/lib/statusLabels";
 
 export function MembershipSection({
   userId,
@@ -67,7 +68,10 @@ export function MembershipSection({
             {membership.tier.name}
           </Field>
           <Field label={t("common.status")}>
-            {enumLabel(subscriptionStatusConfig, membership.status)}
+            {enumLabel(
+              statusConfig(subscriptionStatusConfig, t),
+              membership.status,
+            )}
           </Field>
           {membership.startDate && (
             <Field label={t("admin.users.detail.startDateLabel")}>
@@ -94,7 +98,7 @@ export function MembershipSection({
           {membership.scheduledTierType && (
             <Field label={t("admin.users.detail.scheduledChangeLabel")}>
               {enumLabel(
-                membershipTierConfig,
+                statusConfig(membershipTierConfig, t),
                 membership.scheduledTierType,
                 membership.scheduledTierType,
               )}

@@ -3,10 +3,10 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
-import { useLocale } from "next-intl";
+import { useTranslations } from "next-intl";
 import { queryKeys } from "@/lib/query/keys";
 import { categoriesApi, manufacturersApi, listingsApi } from "@/lib/api";
-import { CATEGORY_BAR_ITEMS, type ManufacturerRef } from "../nav/config";
+import { categoryBarItems, type ManufacturerRef } from "../nav/config";
 
 interface Category {
   id: string;
@@ -23,7 +23,7 @@ const HOUR = 60 * 60 * 1000;
  * the previous per-mount `useEffect` fetches.
  */
 export function useNavCatalog() {
-  const locale = useLocale();
+  const t = useTranslations();
 
   const categoriesQuery = useQuery({
     queryKey: queryKeys.categories.all(),
@@ -62,7 +62,7 @@ export function useNavCatalog() {
   // masaüstü mega-menüsü ile mobil çekmece aynı listeyi tüketir. Katalog boşken
   // "Kategoriler" yalnızca iki başlıktan oluşan boş bir panel açıyor, "Ölçek"
   // ise hiçbir üründe bulunmayan sabit bir ölçek listesi gösteriyordu.
-  const navItems = CATEGORY_BAR_ITEMS[locale as "tr" | "en"].filter((item) => {
+  const navItems = categoryBarItems(t).filter((item) => {
     if (item.dropdown === "categories")
       return categories.length > 0 || manufacturers.length > 0;
     if (item.dropdown === "scales") return scales.length > 0;

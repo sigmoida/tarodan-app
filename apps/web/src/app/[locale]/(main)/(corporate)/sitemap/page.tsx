@@ -3,6 +3,7 @@
 import type { Metadata } from "next";
 import { localizedCanonical } from "@/lib/seo";
 import SitemapClient from "./_components/SitemapClient";
+import { getTranslations } from "next-intl/server";
 
 export async function generateMetadata({
   params,
@@ -10,10 +11,10 @@ export async function generateMetadata({
   params: Promise<{ locale: string }>;
 }): Promise<Metadata> {
   const { locale } = await params;
+  const t = await getTranslations({ locale });
   return {
-    title: "Site Haritası · Tarodan",
-    description:
-      "Tarodan'daki tüm bölümlere ve sayfalara tek yerden ulaşın: pazar yeri, hesap, destek ve yasal sayfalar.",
+    title: t("page.sitemap.page.siteHaritasiTarodan"),
+    description: t("page.sitemap.page.tarodanDakiTumBolumlereVeSayfalara"),
     alternates: localizedCanonical(locale, "/sitemap"),
   };
 }

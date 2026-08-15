@@ -75,6 +75,35 @@ declare module "i18next" {
 **api — @formatjs** — no augmentation; call `formatMessage(getMessages(locale)…)`
 with a `MessageKey`.
 
+## Bekleyen İngilizce çeviriler
+
+Web'in TÜM sabit metni katalogdadır (`apps/web` lint kuralı artık `error`), ancak
+~1.170 anahtarın İngilizce karşılığı henüz Türkçe kaynak metnin kopyasıdır. Bunlar
+bilinçli olarak böyle bırakıldı: çoğu bağlayıcı sözleşme metnidir ve İngilizce
+sürümü hukuk kontrolünden geçmeden yayımlanmamalı.
+
+Kalan borç (anahtar sayısına göre en büyük ad alanları):
+
+| Ad alanı                       | Anahtar | İçerik                                       |
+| ------------------------------ | ------- | -------------------------------------------- |
+| `legal.distanceSales`          | 103     | Ön bilgilendirme + mesafeli satış sözleşmesi |
+| `legal.terms`                  | 67      | Kullanım koşulları                           |
+| `legal.refundPolicy`           | 64      | İade/iptal politikası                        |
+| `legal.cookies`                | 61      | Çerez politikası + envanter                  |
+| `guides.content`               | 59      | Kullanım kılavuzları                         |
+| `faq.content`                  | 54      | Sıkça sorulan sorular                        |
+| `legal.privacy`                | 51      | KVKK aydınlatma metni                        |
+| `legal.sellerAgreement`        | 51      | Satıcı sözleşmeleri                          |
+| `information.shippingDelivery` | 40      | Kargo ve teslimat                            |
+| `support.content`              | 33      | Destek merkezi içeriği                       |
+
+Güncel listeyi üretmek için: tr/en değerleri birebir aynı OLAN ve Türkçe karakter
+içeren anahtarları karşılaştırın (`check-catalog.mjs` yalnız anahtar paritesine
+bakar, değerlere değil).
+
+Kısa arayüz etiketleri (durum rozetleri, butonlar, form alanları, hata mesajları)
+İngilizce'ye çevrilmiştir; borç yalnızca uzun metinlerdedir.
+
 ---
 
 # Katkı Rehberi
@@ -115,10 +144,15 @@ genel etiketse `common.*`'a ekle. Namespace haritası yukarıda.
 literal / template / JSX metnini işaretler (İngilizce, URL, class adı vb.
 yanlış-pozitif üretmez).
 
-- **admin:** `error` — migrate edilmemiş dilimler `.eslintrc.json`
-  override'ında kapalıdır; o dilimler migrate edilirken listeden çıkarın.
-- **web:** `warn` — kalan statik/yasal içerik temizlendikçe `error`'a
-  çekilecek. Veri dosyaları (il/ilçe listesi, marka verisi) kalıcı istisna.
+- **admin:** `error`, istisnasız (dilim override'ları kaldırıldı).
+- **web:** `error`. Kalıcı istisna yalnız veri dosyalarıdır (il/ilçe listesi,
+  marka ansiklopedisi) ve bunlar **basename** ile eşleştirilir
+  (`**/turkeyLocations.ts`, `**/brands-data.ts`): yol `[locale]` ve `(main)`
+  gibi glob'da anlamlı karakterler içerdiği için tam-yol deseni hiç eşleşmiyor,
+  istisna sessizce çalışmıyordu.
+- Kural yalnız `çğıöşüÇĞİÖŞÜ` görür; bu harfleri taşımayan Türkçe metni
+  (ör. "Toplam", "Fiyat:") yakalayamaz. İkinci bir tur için AST tabanlı
+  tarama gerekir.
 - Katalog dışında kalması MEŞRU metin için satır bazlı
   `// eslint-disable-next-line @tarodan/no-hardcoded-turkish -- <gerekçe>`
   kullanın — gerekçesiz disable PR review'da reddedilir.
@@ -148,11 +182,11 @@ tipini import eder. Yeni dil (örn. `de`) için:
 4. Dil seçicileri güncelle: admin `LocaleSwitcher` (endonim ekle), web locale
    routing (`[locale]` segmenti + middleware matcher) ve harici mobil
    repository'nin i18next resources'ı.
-5. Bilinen tr|en-bağımlı içerik yapıları (katalog DIŞI, yeni dilde giriş
-   ister): web `TrustBadges`, `CategoryNav`/`nav/config.ts`
-   (`CATEGORY_BAR_ITEMS`), `HeaderSearch` (`POPULAR_SEARCHES`),
-   `secure-swap/_lib/data.ts`; harici mobil istemcinin kendi `Locale` tipi de
-   `Record<Locale, ...>`'a genişletilmeli.
+5. Web'de tr|en-bağımlı içerik yapısı KALMADI — `nav/config.ts`,
+   `secure-swap/_lib/data.ts`, sipariş/takas/teklif durum etiketleri ve
+   `packages/shared/status-configs.ts` katalog anahtarlarına taşındı; yeni dil
+   için yalnız `de.json` doldurulur. Harici mobil istemcinin kendi `Locale`
+   tipi hâlâ `Record<Locale, ...>`'a genişletilmeli.
 6. E-posta/bildirim: `User.preferredLanguage` serbest string kolonudur, şema
    değişikliği gerekmez; `isLocale` yeni dili otomatik kabul eder.
 

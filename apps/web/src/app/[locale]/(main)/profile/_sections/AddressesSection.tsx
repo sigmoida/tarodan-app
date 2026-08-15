@@ -3,6 +3,7 @@
 "use client";
 
 import { useState } from "react";
+import { useTranslations } from "next-intl";
 import {
   PlusIcon,
   PencilIcon,
@@ -24,6 +25,7 @@ import AddressFormModal from "../_modals/AddressFormModal";
 const MAX_ADDRESSES = 10;
 
 export default function AddressesSection() {
+  const t = useTranslations();
   const { isAuthenticated } = useAuthStore();
   const confirm = useConfirm();
   const { addresses, isLoading } = useAddresses(isAuthenticated);
@@ -44,9 +46,9 @@ export default function AddressesSection() {
 
   const onDelete = async (id: string) => {
     const ok = await confirm({
-      title: "Adresi sil",
-      description: "Bu adresi silmek istediğinize emin misiniz?",
-      confirmLabel: "Sil",
+      title: t("address.deleteAddress"),
+      description: t("address.deleteConfirm"),
+      confirmLabel: t("common.delete"),
       destructive: true,
     });
     if (ok) removeAddress.mutate(id);
@@ -54,7 +56,7 @@ export default function AddressesSection() {
 
   return (
     <SectionCard
-      title="Adreslerim"
+      title={t("address.myAddresses")}
       badge={
         <Badge variant="secondary" size="sm">
           {addresses.length}/{MAX_ADDRESSES}
@@ -64,7 +66,7 @@ export default function AddressesSection() {
         addresses.length < MAX_ADDRESSES ? (
           <Button type="button" size="sm" onClick={openAdd} className="gap-1">
             <PlusIcon className="h-4 w-4" />
-            Yeni Adres
+            {t("address.newAddress")}
           </Button>
         ) : undefined
       }
@@ -77,9 +79,9 @@ export default function AddressesSection() {
         </div>
       ) : addresses.length === 0 ? (
         <div className="rounded-lg bg-surface py-10 text-center">
-          <p className="mb-4 text-muted">Henüz kayıtlı adresiniz yok</p>
+          <p className="mb-4 text-muted">{t("address.noAddresses")}</p>
           <Button type="button" onClick={openAdd}>
-            İlk Adresinizi Ekleyin
+            {t("address.addFirstAddress")}
           </Button>
         </div>
       ) : (
@@ -98,7 +100,7 @@ export default function AddressesSection() {
                   )}
                   {address.isDefault && (
                     <Badge variant="primary" size="sm">
-                      Varsayılan
+                      {t("address.default")}
                     </Badge>
                   )}
                 </div>
@@ -114,7 +116,7 @@ export default function AddressesSection() {
               <div className="flex flex-shrink-0 gap-1">
                 {!address.isDefault && (
                   <IconButton
-                    aria-label="Varsayılan yap"
+                    aria-label={t("address.makeDefault")}
                     variant="ghost"
                     size="sm"
                     onClick={() => setDefault.mutate(address.id)}
@@ -123,7 +125,7 @@ export default function AddressesSection() {
                   </IconButton>
                 )}
                 <IconButton
-                  aria-label="Düzenle"
+                  aria-label={t("common.edit")}
                   variant="ghost"
                   size="sm"
                   onClick={() => openEdit(address)}
@@ -131,7 +133,7 @@ export default function AddressesSection() {
                   <PencilIcon className="h-5 w-5" />
                 </IconButton>
                 <IconButton
-                  aria-label="Sil"
+                  aria-label={t("common.delete")}
                   variant="ghost"
                   size="sm"
                   onClick={() => onDelete(address.id)}

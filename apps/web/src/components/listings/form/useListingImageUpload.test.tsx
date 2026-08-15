@@ -14,6 +14,10 @@ vi.mock("react-hot-toast", () => ({
   default: { error: vi.fn(), success: vi.fn() },
 }));
 
+// `next-intl` BİLEREK mock'lanmıyor: koşucu gerçek `NextIntlClientProvider` ile
+// sarıyor (aşağıya bakın) ve modülü mock'lamak sağlayıcıyı da götürürdü.
+// Gerçek katalogla koşmak, var olmayan bir anahtarı testte de görünür kılar.
+
 // React'e test ortamında olduğumuzu bildirir; olmadan her `act` uyarı basıyor.
 (
   globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }

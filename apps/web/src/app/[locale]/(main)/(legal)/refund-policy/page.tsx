@@ -3,6 +3,7 @@
 import type { Metadata } from "next";
 import { localizedCanonical } from "@/lib/seo";
 import RefundPolicyClient from "./_components/RefundPolicyClient";
+import { getTranslations } from "next-intl/server";
 
 export async function generateMetadata({
   params,
@@ -10,10 +11,10 @@ export async function generateMetadata({
   params: Promise<{ locale: string }>;
 }): Promise<Metadata> {
   const { locale } = await params;
+  const t = await getTranslations({ locale });
   return {
-    title: "İade Politikası · Tarodan",
-    description:
-      "Tarodan iade ve iptal koşulları: talep oluşturma adımları, değerlendirme süreci, kargo ücretinin kime ait olduğu ve ücret iadesi süreleri.",
+    title: t("page.refundPolicy.page.iadePolitikasiTarodan"),
+    description: t("page.refundPolicy.page.tarodanIadeVeIptalKosullariTalep"),
     alternates: localizedCanonical(locale, "/refund-policy"),
   };
 }

@@ -24,6 +24,7 @@ import {
 } from "../_lib/refund-guidance";
 import type { RefundDecisionPreview } from "../types";
 import { extractErrorMessage } from "@/lib/error";
+import { statusConfig } from "@/lib/statusLabels";
 
 // Tek doğru kaynak: @tarodan/shared refundReasonConfig (11 enum değeri).
 // Elle kopyalanan liste sessizce kayıyordu.
@@ -235,7 +236,10 @@ export function RefundNextActionPanel({
                       }}
                       options={REFUND_REASONS.map((value) => ({
                         value,
-                        label: enumLabel(refundReasonConfig, value),
+                        label: enumLabel(
+                          statusConfig(refundReasonConfig, t),
+                          value,
+                        ),
                       }))}
                     />
                     <Select

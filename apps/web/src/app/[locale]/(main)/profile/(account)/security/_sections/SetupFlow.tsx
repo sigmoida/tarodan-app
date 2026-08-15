@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Image from "next/image";
+import { useTranslations } from "next-intl";
 import { ClipboardDocumentIcon } from "@heroicons/react/24/outline";
 import { Button, Input } from "@tarodan/ui";
 import type { SetupResponse } from "../_lib/types";
@@ -19,11 +20,12 @@ export default function SetupFlow({
   onCancel: () => void;
   setError: (message: string) => void;
 }) {
+  const t = useTranslations();
   const [code, setCode] = useState("");
 
   const handleVerify = () => {
     if (code.length !== 6) {
-      setError("Lütfen 6 haneli kodu girin");
+      setError(t("profile.twoFactor.enterSixDigits"));
       return;
     }
     verify(code);
@@ -31,7 +33,9 @@ export default function SetupFlow({
 
   return (
     <div className="rounded-xl bg-surface-elevated p-6 shadow-sm">
-      <h3 className="mb-4 text-lg font-medium text-heading">2FA Kurulumu</h3>
+      <h3 className="mb-4 text-lg font-medium text-heading">
+        {t("profile.twoFactor.setupTitle")}
+      </h3>
 
       {/* Step 1: Scan QR */}
       <div className="mb-6">
@@ -39,11 +43,12 @@ export default function SetupFlow({
           <span className="mr-2 flex h-6 w-6 items-center justify-center rounded-full bg-primary-500 text-sm font-medium text-inverted">
             1
           </span>
-          <span className="font-medium text-heading">QR Kodu Tarayın</span>
+          <span className="font-medium text-heading">
+            {t("profile.twoFactor.stepScanQr")}
+          </span>
         </div>
         <p className="mb-4 ml-8 text-sm text-muted">
-          Google Authenticator veya benzer bir uygulama ile aşağıdaki QR kodunu
-          tarayın.
+          {t("profile.twoFactor.scanHint")}
         </p>
         <div className="mb-4 flex justify-center">
           <div className="rounded-lg border-2 border-border bg-surface-elevated p-4">
@@ -60,14 +65,14 @@ export default function SetupFlow({
               />
             ) : (
               <div className="flex h-[200px] w-[200px] items-center justify-center bg-surface-alt text-subtle">
-                QR Kod Yüklenemedi
+                {t("profile.twoFactor.qrLoadFailed")}
               </div>
             )}
           </div>
         </div>
         <div className="ml-8">
           <p className="mb-2 text-sm text-muted">
-            QR kodu tarayamıyorsanız, bu kodu manuel olarak girin:
+            {t("profile.twoFactor.manualHint")}
           </p>
           <div className="flex items-center">
             <code className="flex-1 rounded bg-surface-alt px-3 py-2 font-mono text-sm">
@@ -77,7 +82,7 @@ export default function SetupFlow({
               variant="secondary"
               onClick={() => navigator.clipboard.writeText(setupData.secret)}
               className="ml-2"
-              title="Kopyala"
+              title={t("common.copy")}
             >
               <ClipboardDocumentIcon className="h-5 w-5" />
             </Button>
@@ -92,11 +97,11 @@ export default function SetupFlow({
             2
           </span>
           <span className="font-medium text-heading">
-            Doğrulama Kodunu Girin
+            {t("profile.twoFactor.stepEnterCode")}
           </span>
         </div>
         <p className="mb-4 ml-8 text-sm text-muted">
-          Uygulamanızda görünen 6 haneli kodu girin.
+          {t("profile.twoFactor.enterCodeHint")}
         </p>
         <div className="ml-8">
           <Input
@@ -114,7 +119,7 @@ export default function SetupFlow({
 
       <div className="flex gap-3">
         <Button variant="secondary" className="flex-1" onClick={onCancel}>
-          İptal
+          {t("common.cancel")}
         </Button>
         <Button
           variant="primary"
@@ -122,7 +127,9 @@ export default function SetupFlow({
           onClick={handleVerify}
           disabled={isVerifying || code.length !== 6}
         >
-          {isVerifying ? "Doğrulanıyor..." : "Doğrula ve Etkinleştir"}
+          {isVerifying
+            ? t("profile.twoFactor.verifying")
+            : t("profile.twoFactor.verifyAndEnable")}
         </Button>
       </div>
     </div>

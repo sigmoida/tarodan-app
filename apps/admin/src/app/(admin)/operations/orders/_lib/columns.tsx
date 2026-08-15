@@ -11,6 +11,7 @@ import { cancelReasonLabel, orderOriginLabel } from "@/lib/utils";
 import { fmtTry } from "@/lib/format";
 import { col, TruncatedText } from "@/components/table";
 import { type OrderGroupRow } from "./orders";
+import { statusConfig } from "@/lib/statusLabels";
 
 type T = ReturnType<typeof useTranslations<never>>;
 
@@ -95,17 +96,20 @@ export function orderColumns({ t, expandedId, toggleRow }: OrderColumnProps) {
             {o.activeRefundRequest ? (
               <Badge
                 status="refund_requested"
-                config={orderStatusConfig}
+                config={statusConfig(orderStatusConfig, t)}
                 label={t("admin.operations.orders.status.refundInProgress")}
               />
             ) : o.cancellationType === "iptal" ? (
               <Badge
                 status="cancelled"
-                config={orderStatusConfig}
+                config={statusConfig(orderStatusConfig, t)}
                 label={t("admin.operations.orders.status.cancelledConfirmed")}
               />
             ) : (
-              <Badge status={o.status} config={orderStatusConfig} />
+              <Badge
+                status={o.status}
+                config={statusConfig(orderStatusConfig, t)}
+              />
             )}
             {(o.status === "cancelled" || o.cancellationType === "iptal") &&
               cancelReasonLabel(o.cancelReason, t) && (
@@ -191,7 +195,10 @@ export function orderColumns({ t, expandedId, toggleRow }: OrderColumnProps) {
         o.itemCount > 1 || !o.shipmentStatus ? (
           <span className="text-subtle">—</span>
         ) : (
-          <Badge status={o.shipmentStatus} config={shipmentStatusConfig} />
+          <Badge
+            status={o.shipmentStatus}
+            config={statusConfig(shipmentStatusConfig, t)}
+          />
         ),
       { minWidth: 130 },
     ),

@@ -11,6 +11,7 @@ import OptimizedImage from "@/components/OptimizedImage";
 import { IMAGE_SIZES } from "@/lib/imageSizes";
 import CollectionVisibilityBadge from "./CollectionVisibilityBadge";
 import { publicNameOf } from "@/lib/public-name";
+import { imagePlaceholder } from "@/lib/placeholder";
 
 /** The fields the collection card needs — a superset of the public list, the
  *  liked-collections and the my-collections shapes, so any can be passed in. */
@@ -63,7 +64,7 @@ export default function CollectionCard({
               fill
               sizes={IMAGE_SIZES.collectionGrid}
               className="object-cover transition-transform duration-300 group-hover:scale-[1.03]"
-              fallbackSrc="https://placehold.co/400x400/f3f4f6/9ca3af?text=Koleksiyon"
+              fallbackSrc={imagePlaceholder("400x400")}
               logContext={{ collectionId: collection.id, page: "collections" }}
             />
           ) : (

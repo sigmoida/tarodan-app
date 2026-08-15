@@ -147,22 +147,22 @@ export interface ElogoInvoice {
   label?: string;
 }
 
-const orderStatusEnLabels: Record<string, string> = {
-  pending_payment: "Awaiting Payment",
-  paid: "Paid",
-  preparing: "Preparing",
-  shipped: "Shipped",
-  delivered: "Delivered",
-  completed: "Completed",
-  cancelled: "Cancelled",
-  refund_requested: "Refund Requested",
-  refunded: "Refunded",
+/**
+ * Sipariş durumunun okunabilir etiketi.
+ *
+ * Etiket TEK kaynaktan gelir: paylaşılan harita katalog anahtarını taşır, metni
+ * katalog verir. Eskiden burada elle yazılmış ayrı bir İngilizce harita vardı ve
+ * yeni bir durum eklendiğinde İngilizce arayüzde sessizce Türkçe kalıyordu.
+ */
+export const getOrderStatusLabel = (status: string, locale: string): string => {
+  const entry = orderStatusConfig[status];
+  if (!entry) return status;
+  const t = createTranslator({
+    locale,
+    messages: getMessages(resolveLocale(locale)),
+  });
+  return t(entry.labelKey);
 };
-
-export const getOrderStatusLabel = (status: string, locale: string): string =>
-  locale === "en"
-    ? orderStatusEnLabels[status] || status
-    : orderStatusConfig[status]?.label || status;
 
 // İptal kartında gösterilecek kullanıcı dostu açıklama. Backend stabil bir
 // cancelCategory döner; bilinmeyen/serbest-metin sebepler ham haliyle gösterilir.

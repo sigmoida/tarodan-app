@@ -70,6 +70,6 @@ export function manufacturerColumns(t: T, actions: ManufacturerRowActions) {
       (m) => <Badge active={m.isActive} />,
       { sortKey: "isActive" },
     ),
-    col.rowMenu<Manufacturer>(manufacturerRowMenu(actions)),
+    col.rowMenu<Manufacturer>(manufacturerRowMenu(actions, t)),
   ];
 }

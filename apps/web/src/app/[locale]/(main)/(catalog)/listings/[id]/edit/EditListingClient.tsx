@@ -190,7 +190,7 @@ export default function EditListingClient() {
       <div className="flex min-h-[60vh] items-center justify-center">
         <div className="text-center">
           <Spinner size="xl" className="mx-auto mb-4" />
-          <p className="text-muted">Yükleniyor...</p>
+          <p className="text-muted">{t("common.loading")}</p>
         </div>
       </div>
     );
@@ -207,11 +207,11 @@ export default function EditListingClient() {
           onClick={handleDeactivate}
           disabled={isLoading}
         >
-          İlanı Pasife Al
+          {t("product.deactivateListingFull")}
         </Button>
       ) : status === "pending" ? (
         <Button type="button" variant="secondary" disabled>
-          İnceleme Bekleniyor
+          {t("product.awaitingReview")}
         </Button>
       ) : (
         <Button
@@ -220,7 +220,7 @@ export default function EditListingClient() {
           onClick={handleActivate}
           disabled={isLoading}
         >
-          İncelemeye Gönder
+          {t("product.sendForReview")}
         </Button>
       )}
       <Button
@@ -229,7 +229,7 @@ export default function EditListingClient() {
         onClick={() => setShowDeleteModal(true)}
         disabled={isLoading}
       >
-        İlanı Sil
+        {t("product.deleteListing")}
       </Button>
     </>
   );
@@ -238,9 +238,9 @@ export default function EditListingClient() {
     <PageShell>
       <PageHeader
         backHref={`/listings/${id}`}
-        backLabel="İlana Dön"
-        title="İlanı Düzenle"
-        description="İlan bilgilerinizi güncelleyin."
+        backLabel={t("product.backToListing")}
+        title={t("product.editListing")}
+        description={t("product.editListingDescription")}
         actions={statusActions}
       />
 
@@ -319,7 +319,7 @@ export default function EditListingClient() {
             className="flex-1"
             onClick={() => router.back()}
           >
-            İptal
+            {t("common.cancel")}
           </Button>
           <Button
             type="submit"
@@ -328,7 +328,7 @@ export default function EditListingClient() {
             className="flex-1"
             disabled={isLoading || !!imageSubmitBlocker}
           >
-            {isLoading ? "Güncelleniyor..." : "Değişiklikleri Kaydet"}
+            {isLoading ? t("common.updating") : t("product.saveChanges")}
           </Button>
           {imageSubmitBlocker && (
             <p role="status" className="w-full text-sm text-danger-600">

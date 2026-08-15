@@ -18,6 +18,8 @@ import {
 } from "../_lib/types";
 import { TradeSwapBadge } from "./TradeSwapBadge";
 import { publicNameOf } from "@/lib/public-name";
+import { statusConfig } from "@/lib/statusLabels";
+import { imagePlaceholder } from "@/lib/placeholder";
 
 const fmt = (n: number) =>
   n.toLocaleString("tr-TR", {
@@ -47,7 +49,7 @@ function ItemColumn({ label, items }: { label: string; items: TradeItem[] }) {
                 fill
                 sizes="64px"
                 className="object-cover"
-                fallbackSrc="https://placehold.co/64x64/f3f4f6/9ca3af?text=Ürün"
+                fallbackSrc={imagePlaceholder("64x64")}
                 logContext={{ itemId: item.id, page: "trades-list" }}
               />
             </div>
@@ -120,7 +122,7 @@ export default function TradeCard({
         </div>
         <StatusBadge
           status={trade.status}
-          config={tradeStatusConfig}
+          config={statusConfig(tradeStatusConfig, t)}
           label={
             statusLabels[trade.status] ||
             formatTradeStatus(trade.status, locale)

@@ -30,6 +30,7 @@ import { RejectTradeModal } from "./_modals/RejectTradeModal";
 import { ResolveDisputeModal } from "./_modals/ResolveDisputeModal";
 import { MarkReturnLostModal } from "./_modals/MarkReturnLostModal";
 import { ForceCancelModal } from "./_modals/ForceCancelModal";
+import { statusConfig } from "@/lib/statusLabels";
 
 export default function TradeDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -130,7 +131,10 @@ export default function TradeDetailPage() {
         })
       }
       badge={(trade) => (
-        <StatusBadge status={trade.status} config={tradeStatusConfig} />
+        <StatusBadge
+          status={trade.status}
+          config={statusConfig(tradeStatusConfig, t)}
+        />
       )}
       actions={(trade) =>
         trade.status === "disputed" ? (

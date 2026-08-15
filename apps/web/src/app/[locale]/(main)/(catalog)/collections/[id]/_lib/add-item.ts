@@ -1,9 +1,13 @@
 /** @format */
 
 import { z } from "zod";
+import { imagePlaceholder } from "@/lib/placeholder";
 
-export const PRODUCT_PLACEHOLDER =
-  "https://placehold.co/80x80/374151/9ca3af?text=Ürün";
+export const PRODUCT_PLACEHOLDER = imagePlaceholder(
+  "80x80",
+  "374151",
+  "9ca3af",
+);
 
 /** Custom (non-listing) collection item — RHF/zod form. `year` stays a string
  *  (native input) and is coerced in the mutation; `imageUrl` holds the uploaded

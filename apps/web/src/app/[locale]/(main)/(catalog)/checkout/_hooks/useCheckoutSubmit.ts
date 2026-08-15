@@ -7,12 +7,10 @@ import { useQueryClient } from "@tanstack/react-query";
 import toast from "react-hot-toast";
 import { ordersApi, paymentsApi } from "@/lib/api";
 import { combinePhone } from "@/lib/phone";
-import { useTranslations } from "next-intl";
 import type { ResolvedPayment } from "@/hooks/useCardPayment";
 import type { Address, CheckoutItem } from "../_lib/types";
 import { queryKeys } from "@/lib/query/keys";
-
-type Translate = ReturnType<typeof useTranslations<never>>;
+import type { Translate } from "@/types/i18n";
 
 /**
  * Checkout submission slice: the per-cart idempotency key and `handleCheckout` —
@@ -380,15 +378,25 @@ export function useCheckoutSubmit({
                   : null);
               if (addr) {
                 if (!addr.fullName?.trim())
-                  throw new Error("Teslimat adresi için ad soyad gereklidir");
+                  throw new Error(
+                    t("checkout.submit.teslimatAdresiIcinAdSoyadGereklidir"),
+                  );
                 if (!addr.phone?.trim())
-                  throw new Error("Teslimat adresi için telefon gereklidir");
+                  throw new Error(
+                    t("checkout.submit.teslimatAdresiIcinTelefonGereklidir"),
+                  );
                 if (!addr.city?.trim())
-                  throw new Error("Teslimat adresi için şehir gereklidir");
+                  throw new Error(
+                    t("checkout.submit.teslimatAdresiIcinSehirGereklidir"),
+                  );
                 if (!addr.district?.trim())
-                  throw new Error("Teslimat adresi için ilçe gereklidir");
+                  throw new Error(
+                    t("checkout.submit.teslimatAdresiIcinIlceGereklidir"),
+                  );
                 if (!addr.address?.trim())
-                  throw new Error("Teslimat adresi için açık adres gereklidir");
+                  throw new Error(
+                    t("checkout.submit.teslimatAdresiIcinAcikAdresGereklidir"),
+                  );
                 payload.shippingAddress = {
                   fullName: addr.fullName.trim(),
                   phone: combinePhone(addr.phone),
@@ -486,7 +494,7 @@ export function useCheckoutSubmit({
             orderResponse = await ordersApi.checkoutGuest(guestPayload);
           }
         } catch (orderError: any) {
-          let errorMessage = "Sipariş oluşturulamadı";
+          let errorMessage = t("checkout.submit.siparisOlusturulamadi");
           if (orderError.response?.data) {
             const data = orderError.response.data;
             if (Array.isArray(data.message)) {
@@ -517,11 +525,11 @@ export function useCheckoutSubmit({
           }
 
           const stockoutKeywords = [
-            "satışta değil",
-            "stokta yok",
-            "stokta bulunmamaktadır",
-            "başkası tarafından",
-            "başka alıcıya satıldı",
+            t("checkout.submit.satistaDegil"),
+            t("checkout.submit.stoktaYok"),
+            t("checkout.submit.stoktaBulunmamaktadir"),
+            t("checkout.submit.baskasiTarafindan"),
+            t("checkout.submit.baskaAliciyaSatildi"),
           ];
           const isStockout =
             (orderError.response?.status === 400 ||
@@ -603,11 +611,11 @@ export function useCheckoutSubmit({
           } catch (paymentError: any) {
             const msg = paymentError.response?.data?.message ?? "";
             const stockoutKeywords = [
-              "satışta değil",
-              "stokta yok",
-              "stokta bulunmamaktadır",
-              "başkası tarafından",
-              "başka alıcıya satıldı",
+              t("checkout.submit.satistaDegil"),
+              t("checkout.submit.stoktaYok"),
+              t("checkout.submit.stoktaBulunmamaktadir"),
+              t("checkout.submit.baskasiTarafindan"),
+              t("checkout.submit.baskaAliciyaSatildi"),
             ];
             const isStockout =
               (paymentError.response?.status === 400 ||

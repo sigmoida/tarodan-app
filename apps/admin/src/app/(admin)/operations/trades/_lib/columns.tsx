@@ -4,6 +4,7 @@ import { useTranslations } from "next-intl";
 import { cancelReasonLabel } from "@/lib/utils";
 import { col, TruncatedText } from "@/components/table";
 import { type Trade, disputeConfig, cashPayer } from "./trades";
+import { statusConfig } from "@/lib/statusLabels";
 
 type T = ReturnType<typeof useTranslations<never>>;
 
@@ -39,7 +40,10 @@ export function tradeColumns(t: T) {
           />
         ) : (
           <div className="flex flex-col items-start gap-1">
-            <Badge status={r.status} config={tradeStatusConfig} />
+            <Badge
+              status={r.status}
+              config={statusConfig(tradeStatusConfig, t)}
+            />
             {r.status === "cancelled" &&
               cancelReasonLabel(r.cancelReason, t) && (
                 <span className="truncate text-xs text-muted">

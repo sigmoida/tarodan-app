@@ -4,6 +4,7 @@ import { getServerQueryClient } from "@/lib/query/server";
 import CollectionDetailClient from "./CollectionDetailClient";
 
 import { getServerApiOrigin } from "@/lib/api/origin";
+import { getTranslations } from "next-intl/server";
 
 const API_BASE = getServerApiOrigin();
 
@@ -30,14 +31,18 @@ async function getCollection(idOrSlug: string): Promise<any | null> {
 }
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
+  const t = await getTranslations();
   const { id } = await params;
   const collection = await getCollection(id);
-  if (!collection?.name) return { title: "Koleksiyon Bulunamadı | Tarodan" };
+  if (!collection?.name)
+    return { title: t("page.collections.page.koleksiyonBulunamadiTarodan") };
 
   const title = `${collection.name} | Tarodan`;
   const description =
     collection.description?.slice(0, 160) ||
-    `${collection.name} koleksiyonunu Tarodan'da keşfedin`;
+    t("page.collections.page.nameKoleksiyonunuTarodanDaKesfedin", {
+      name: collection.name,
+    });
   const image = collection.coverImageUrl || undefined;
 
   return {

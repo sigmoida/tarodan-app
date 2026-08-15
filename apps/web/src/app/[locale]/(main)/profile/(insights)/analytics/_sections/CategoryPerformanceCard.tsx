@@ -2,16 +2,18 @@
 
 import SectionCard from "@/components/ui/SectionCard";
 import type { CategoryStat } from "../_lib/types";
+import { getTranslations } from "next-intl/server";
 
-export default function CategoryPerformanceCard({
+export default async function CategoryPerformanceCard({
   categories,
 }: {
   categories: CategoryStat[];
 }) {
+  const t = await getTranslations();
   const maxViews = Math.max(...categories.map((c) => c.views), 1);
 
   return (
-    <SectionCard title="Kategori Performansı">
+    <SectionCard title={t("profile.analyticsCategory.kategoriPerformansi")}>
       <div className="space-y-4">
         {categories.map((cat, index) => (
           <div key={index}>
@@ -20,9 +22,13 @@ export default function CategoryPerformanceCard({
                 {cat.name}
               </span>
               <div className="flex items-center gap-3 text-sm text-muted">
-                <span>{cat.listings} ilan</span>
+                <span>
+                  {t("profile.analytics.listingsCount", {
+                    count: cat.listings,
+                  })}
+                </span>
                 <span className="font-medium text-success-600">
-                  {cat.sales} satış
+                  {t("profile.analytics.salesCount", { count: cat.sales })}
                 </span>
               </div>
             </div>
@@ -33,7 +39,9 @@ export default function CategoryPerformanceCard({
               />
             </div>
             <p className="mt-1 text-xs text-subtle">
-              {cat.views.toLocaleString("tr-TR")} görüntüleme
+              {t("profile.analytics.viewsCount", {
+                count: cat.views.toLocaleString(t("common.dateLocale")),
+              })}
             </p>
           </div>
         ))}

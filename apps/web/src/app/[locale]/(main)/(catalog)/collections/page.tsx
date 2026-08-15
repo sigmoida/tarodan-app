@@ -8,10 +8,14 @@ import {
 } from "./_lib/data";
 import { localizedCanonical, localizedPath } from "@/lib/seo";
 import CollectionsClient from "./CollectionsClient";
+import type { Translate } from "@/types/i18n";
+import { getTranslations } from "next-intl/server";
 
-const TITLE = "Koleksiyonlar | Tarodan";
-const DESCRIPTION =
-  "Diecast model araba koleksiyonlarını keşfedin. Kategoriye göre filtreleyin, popüler ve yeni koleksiyonları görüntüleyin, kendi koleksiyonunuzu oluşturun.";
+const TITLE = (t: Translate) => t("page.collections.page.koleksiyonlarTarodan");
+const DESCRIPTION = (t: Translate) =>
+  t(
+    "page.collections.page.diecastModelArabaKoleksiyonlariniKesfedinKategoriye",
+  );
 
 export async function generateMetadata({
   params,
@@ -19,20 +23,21 @@ export async function generateMetadata({
   params: Promise<{ locale: string }>;
 }): Promise<Metadata> {
   const { locale } = await params;
+  const t = await getTranslations({ locale });
   return {
-    title: TITLE,
-    description: DESCRIPTION,
+    title: TITLE(t),
+    description: DESCRIPTION(t),
     alternates: localizedCanonical(locale, "/collections"),
     openGraph: {
-      title: TITLE,
-      description: DESCRIPTION,
+      title: TITLE(t),
+      description: DESCRIPTION(t),
       type: "website",
       url: localizedPath(locale, "/collections"),
     },
     twitter: {
       card: "summary_large_image",
-      title: TITLE,
-      description: DESCRIPTION,
+      title: TITLE(t),
+      description: DESCRIPTION(t),
     },
   };
 }

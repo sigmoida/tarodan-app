@@ -123,7 +123,7 @@ export function createUploadQueue(options: {
         emit({
           clientId: item.clientId,
           status: "failed",
-          error: uploadErrorMessage(error),
+          error: uploadErrorMessage(error) ?? undefined,
         });
       }
     } finally {
@@ -163,12 +163,18 @@ export function createUploadQueue(options: {
   };
 }
 
-export function uploadErrorMessage(error: unknown): string {
+/**
+ * Sunucunun (isteğin dilinde ürettiği) hata mesajı — yoksa `null`.
+ *
+ * Genel yedek metni BURADA üretilmez: bu saf yardımcı katalogtan okuyamaz, o
+ * yüzden `null` döner ve gösterim tarafı kendi yerel metnine düşer.
+ */
+export function uploadErrorMessage(error: unknown): string | null {
   const response = (error as { response?: { data?: { message?: unknown } } })
     ?.response;
   const message = response?.data?.message;
   if (typeof message === "string" && message.trim()) return message;
   if (Array.isArray(message) && typeof message[0] === "string")
     return message[0];
-  return "Resim yüklenemedi";
+  return null;
 }

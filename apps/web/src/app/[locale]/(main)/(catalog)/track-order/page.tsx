@@ -5,13 +5,16 @@ import { Suspense } from "react";
 import { PageShell } from "@/components/layout/PageShell";
 import { Spinner } from "@tarodan/ui/spinner";
 import TrackOrderClient from "./TrackOrderClient";
+import { getTranslations } from "next-intl/server";
 
-export const metadata: Metadata = {
-  title: "Sipariş Takibi | Tarodan",
-  description:
-    "Sipariş numaranız ve e-posta adresinizle siparişinizi takip edin.",
-  robots: { index: false, follow: false },
-};
+export async function generateMetadata(): Promise<Metadata> {
+  const t = await getTranslations();
+  return {
+    title: t("page.trackOrder.page.siparisTakibiTarodan"),
+    description: t("page.trackOrder.page.siparisNumaranizVeEPostaAdresinizle"),
+    robots: { index: false, follow: false },
+  };
+}
 
 export default function TrackOrderPage() {
   return (

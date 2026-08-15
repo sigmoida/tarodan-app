@@ -5,6 +5,7 @@ import { useTranslations } from "next-intl";
 import { cancelReasonLabel } from "@/lib/utils";
 import { SectionCard } from "@/components/detail/SectionCard";
 import type { TradeDetail } from "../types";
+import { statusConfig } from "@/lib/statusLabels";
 
 /** Rejection/cancellation reason + admin notes + legacy dispute cards. */
 export function TradeInfoCards({ trade }: { trade: TradeDetail }) {
@@ -54,7 +55,7 @@ export function TradeInfoCards({ trade }: { trade: TradeDetail }) {
                 {t("admin.operations.trades.reason")}:
               </span>{" "}
               {enumLabel(
-                refundReasonConfig,
+                statusConfig(refundReasonConfig, t),
                 trade.dispute.reason,
                 trade.dispute.reason,
               )}

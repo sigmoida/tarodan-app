@@ -4,6 +4,7 @@ import { useTranslations } from "next-intl";
 import { fmtTry } from "@/lib/format";
 import { CellUser, TruncatedText } from "@/components/table";
 import type { OrderGroupRow, OrderLineItem } from "../_lib/orders";
+import { statusConfig } from "@/lib/statusLabels";
 
 /** One product line inside the expanded detail row. */
 function LineItem({ item }: { item: OrderLineItem }) {
@@ -60,11 +61,14 @@ function LineItem({ item }: { item: OrderLineItem }) {
       {item.cancellationType === "iptal" ? (
         <Badge
           status="cancelled"
-          config={orderStatusConfig}
+          config={statusConfig(orderStatusConfig, t)}
           label={t("admin.operations.orders.status.cancelledConfirmed")}
         />
       ) : (
-        <Badge status={item.status} config={orderStatusConfig} />
+        <Badge
+          status={item.status}
+          config={statusConfig(orderStatusConfig, t)}
+        />
       )}
       <span className="w-24 shrink-0 text-right text-sm font-medium tabular-nums text-body">
         {fmtTry(item.totalAmount)}

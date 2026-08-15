@@ -24,8 +24,10 @@ import OfferCard from "./_components/OfferCard";
 import CounterOfferModal from "./_modals/CounterOfferModal";
 import { MetricCard } from "@/components/ui";
 import { formatTL } from "@/lib/format";
+import { useTranslations } from "next-intl";
 
 function OffersPageContent() {
+  const t = useTranslations();
   const searchParams = useSearchParams();
   const { ready } = useRequireAuth();
 
@@ -92,33 +94,35 @@ function OffersPageContent() {
   return (
     <PageShell className="pb-16">
       <PageHeader
-        title="Tekliflerim"
-        description="Tekliflerinizi ve pazarlıklarınızı yönetin"
+        title={t("page.offers.page.tekliflerim")}
+        description={t(
+          "offer.listPage.teklifleriniziVePazarliklariniziYonetin",
+        )}
       />
 
       {/* Metrics — tab-independent */}
       <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
         <MetricCard
           icon={Squares2X2Icon}
-          label="Toplam Teklif"
+          label={t("offer.listPage.toplamTeklif")}
           value={metrics.total}
           accent="text-heading"
         />
         <MetricCard
           icon={ClockIcon}
-          label="Bekleyen"
+          label={t("page.offers.page.bekleyen")}
           value={metrics.pending}
           accent="text-warning-600"
         />
         <MetricCard
           icon={CheckCircleIcon}
-          label="Kabul Edilen"
+          label={t("offer.listPage.kabulEdilen")}
           value={metrics.accepted}
           accent="text-success-600"
         />
         <MetricCard
           icon={TagIcon}
-          label="Toplam Değer"
+          label={t("offer.listPage.toplamDeger")}
           value={formatTL(metrics.value)}
           accent="text-primary-600"
         />
@@ -128,11 +132,11 @@ function OffersPageContent() {
         <TabsList>
           <TabsTrigger value="received" className="gap-2">
             <InboxArrowDownIcon className="h-4 w-4" />
-            Gelen Teklifler
+            {t("offer.receivedOffers")}
           </TabsTrigger>
           <TabsTrigger value="sent" className="gap-2">
             <PaperAirplaneIcon className="h-4 w-4" />
-            Gönderilen Teklifler
+            {t("offer.sentOffers")}
           </TabsTrigger>
         </TabsList>
       </Tabs>
@@ -145,26 +149,28 @@ function OffersPageContent() {
         <div className="rounded-lg border border-border bg-surface-elevated py-16 text-center">
           <ExclamationCircleIcon className="mx-auto mb-4 h-16 w-16 text-danger-400" />
           <p className="mb-4 text-danger-500">
-            Teklifler yüklenirken bir hata oluştu
+            {t("offer.listPage.tekliflerYuklenirkenBirHataOlustu")}
           </p>
         </div>
       ) : offers.length === 0 ? (
         <EmptyStateCard
           title={
             activeTab === "received"
-              ? "Henüz gelen teklif yok"
-              : "Henüz gönderilen teklif yok"
+              ? t("offer.listPage.henuzGelenTeklifYok")
+              : t("offer.listPage.henuzGonderilenTeklifYok")
           }
           description={
             activeTab === "received"
-              ? "Alıcılar ilanlarınıza teklif verdiğinde burada görünecek."
-              : "İlanlara göz atın ve ilk teklifinizi yapın!"
+              ? t(
+                  "offer.listPage.alicilarIlanlarinizaTeklifVerdigindeBuradaGorunecek",
+                )
+              : t("offer.listPage.ilanlaraGozAtinVeIlkTeklifinizi")
           }
           action={
             <Button asChild className="gap-2">
               <Link href="/listings">
                 <TagIcon className="h-5 w-5" />
-                İlanlara Göz At
+                {t("offer.browseListings")}
               </Link>
             </Button>
           }

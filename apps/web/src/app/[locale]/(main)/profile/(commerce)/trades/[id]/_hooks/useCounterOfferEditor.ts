@@ -47,7 +47,8 @@ export function useCounterOfferEditor({
       cashAmount?: number;
       message?: string;
     }) => {
-      if (!trade) throw new Error("no trade");
+      if (!trade)
+        throw new Error(t("page.trades.usecounteroffereditor.noTrade"));
       return tradesApi.counter(trade.id, data);
     },
     onSuccess: async () => {
@@ -57,13 +58,18 @@ export function useCounterOfferEditor({
     },
     onError: (error: any) => {
       if (process.env.NODE_ENV === "development")
-        console.error("Failed to send counter offer:", error);
+        console.error(
+          t("page.trades.usecounteroffereditor.failedToSendCounterOffer"),
+          error,
+        );
       const errorMessage =
         error.response?.data?.message || t("trade.counterOfferFailed");
 
       // Handle specific error for identical counter-offer
       if (
-        errorMessage.includes("Önceki teklif ile aynı") ||
+        errorMessage.includes(
+          t("page.trades.usecounteroffereditor.oncekiTeklifIleAyni"),
+        ) ||
         errorMessage.includes("identical")
       ) {
         toast.error(t("trade.counterOfferIdentical"));
@@ -205,7 +211,10 @@ export function useCounterOfferEditor({
       setCounterMessage("");
     } catch (error: any) {
       if (process.env.NODE_ENV === "development")
-        console.error("Failed to load counter-offer data:", error);
+        console.error(
+          t("page.trades.usecounteroffereditor.failedToLoadCounterOfferData"),
+          error,
+        );
       toast.error(t("collection.productsLoadFailed"));
       setIsCounterMode(false);
     } finally {

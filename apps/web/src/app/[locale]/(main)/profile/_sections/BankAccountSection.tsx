@@ -3,6 +3,7 @@
 "use client";
 
 import { useEffect } from "react";
+import { useTranslations } from "next-intl";
 import { TrashIcon } from "@heroicons/react/24/outline";
 import { Badge, Button } from "@tarodan/ui";
 import { Form, FormInput, FormIban, useZodForm } from "@tarodan/ui/form";
@@ -25,13 +26,14 @@ const EMPTY: BankAccountValues = {
 
 /** Seller IBAN — independent query + upsert/delete, RHF+zod form. */
 export default function BankAccountSection() {
+  const t = useTranslations();
   const { isAuthenticated } = useAuthStore();
   const confirm = useConfirm();
   const { account } = useBankAccount(isAuthenticated);
   const save = useSaveBankAccount();
   const remove = useDeleteBankAccount();
 
-  const form = useZodForm(bankAccountSchema, { defaultValues: EMPTY });
+  const form = useZodForm(bankAccountSchema(t), { defaultValues: EMPTY });
 
   useEffect(() => {
     if (account) {
@@ -47,9 +49,9 @@ export default function BankAccountSection() {
 
   const onDelete = async () => {
     const ok = await confirm({
-      title: "Banka hesabını sil",
-      description: "Banka hesabınızı silmek istediğinize emin misiniz?",
-      confirmLabel: "Sil",
+      title: t("profile.bank.deleteTitle"),
+      description: t("profile.bank.deleteConfirm"),
+      confirmLabel: t("common.delete"),
       destructive: true,
     });
     if (ok) remove.mutate(undefined, { onSuccess: () => form.reset(EMPTY) });
@@ -57,11 +59,13 @@ export default function BankAccountSection() {
 
   return (
     <SectionCard
-      title="Banka Hesabı / IBAN"
+      title={t("profile.bank.title")}
       badge={
         account ? (
           <Badge variant={account.isVerified ? "success" : "warning"} size="sm">
-            {account.isVerified ? "Doğrulandı" : "Doğrulanmadı"}
+            {account.isVerified
+              ? t("profile.bank.verified")
+              : t("profile.bank.unverified")}
           </Badge>
         ) : undefined
       }
@@ -76,7 +80,7 @@ export default function BankAccountSection() {
               className="gap-1 text-danger-600 hover:bg-danger-50 hover:text-danger-600"
             >
               <TrashIcon className="h-4 w-4" />
-              Sil
+              {t("common.delete")}
             </Button>
           )}
           <Button
@@ -85,41 +89,38 @@ export default function BankAccountSection() {
             onClick={form.handleSubmit((v) => save.mutate(v))}
             isLoading={save.isPending}
           >
-            {account ? "Güncelle" : "Kaydet"}
+            {account ? t("common.update") : t("common.save")}
           </Button>
         </div>
       }
     >
-      <p className="mb-4 text-sm text-muted">
-        Satışlarınızdan elde ettiğiniz tutar bu IBAN&apos;a aktarılır.
-      </p>
+      <p className="mb-4 text-sm text-muted">{t("profile.bank.payoutNote")}</p>
       <Form form={form} onSubmit={(v) => save.mutate(v)} className="space-y-4">
         <FormInput
           name="accountHolder"
-          label="Hesap Sahibi"
-          placeholder="Ad Soyad / Firma Ünvanı"
+          label={t("profile.bank.accountHolder")}
+          placeholder={t("profile.bank.accountHolderPlaceholder")}
         />
         <FormIban name="iban" label="IBAN" className="font-mono" />
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
           <FormInput
             name="tcKimlikNo"
-            label="TC Kimlik No (opsiyonel)"
-            placeholder="11 rakam"
+            label={t("profile.bank.tcOptional")}
+            placeholder={t("profile.bank.tcPlaceholder")}
             inputMode="numeric"
             maxLength={11}
           />
           <FormInput
             name="taxId"
-            label="Vergi No (opsiyonel)"
-            placeholder="Kurumsal hesaplar için (10 rakam)"
+            label={t("profile.bank.taxIdOptional")}
+            placeholder={t("profile.bank.taxIdPlaceholder")}
             inputMode="numeric"
             maxLength={10}
           />
         </div>
         {account && (
           <p className="text-xs text-muted">
-            Bilgileri güncellerseniz hesabınız yeniden doğrulanana kadar
-            &quot;Doğrulanmadı&quot; durumuna döner.
+            {t("profile.bank.reverificationNote")}
           </p>
         )}
       </Form>

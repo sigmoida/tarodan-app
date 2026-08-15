@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "@/i18n/navigation";
 import toast from "react-hot-toast";
+import { useTranslations } from "next-intl";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useZodForm } from "@tarodan/ui/form";
 import { listingsApi, userApi } from "@/lib/api";
@@ -50,6 +51,7 @@ export function useEditListingForm({
   authLoading,
   isAuthenticated,
 }: UseEditListingFormParams) {
+  const t = useTranslations();
   const router = useRouter();
   const queryClient = useQueryClient();
 
@@ -69,7 +71,7 @@ export function useEditListingForm({
   useEffect(() => {
     if (authLoading) return;
     if (!isAuthenticated) {
-      toast.error("İlan düzenlemek için giriş yapmalısınız");
+      toast.error(t("product.loginRequiredToEdit"));
       router.push("/login");
     }
   }, [authLoading, isAuthenticated, router]);
@@ -108,7 +110,7 @@ export function useEditListingForm({
     if (!listingQuery.isError) return;
     toast.error(
       (listingQuery.error as any)?.response?.data?.message ||
-        "İlan yüklenemedi",
+        t("product.loadFailed"),
     );
     router.push("/profile/listings");
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -187,7 +189,7 @@ export function useEditListingForm({
       listingsApi.update(id, payload as any),
     onMutate: () => setIsLoading(true),
     onSuccess: () => {
-      toast.success("İlanınız güncellendi!");
+      toast.success(t("product.listingUpdated"));
       queryClient.invalidateQueries({ queryKey: queryKeys.product.detail(id) });
       queryClient.invalidateQueries({ queryKey: queryKeys.listings.all() });
       queryClient.invalidateQueries({
@@ -196,7 +198,7 @@ export function useEditListingForm({
       router.push(`/listings/${id}`);
     },
     onError: (error: any) =>
-      toast.error(error.response?.data?.message || "İlan güncellenemedi"),
+      toast.error(error.response?.data?.message || t("product.updateFailed")),
     onSettled: () => setIsLoading(false),
   });
 

@@ -3,12 +3,19 @@
 import { Badge } from "@tarodan/ui";
 import SectionCard from "@/components/ui/SectionCard";
 import { DIECAST_TIMELINE } from "../_lib/brands-data";
+import { getTranslations } from "next-intl/server";
 
-export default function DiecastTimeline() {
+export default async function DiecastTimeline() {
+  const t = await getTranslations();
   return (
-    <SectionCard title="Diecast Tarihi" headerClassName="mb-1">
+    <SectionCard
+      title={t("page.manufacturers.diecasttimeline.diecastTarihi")}
+      headerClassName="mb-1"
+    >
       <p className="text-sm text-muted mb-8">
-        Model araba dünyasını şekillendiren kilometre taşları
+        {t(
+          "page.manufacturers.diecasttimeline.modelArabaDunyasiniSekillendirenKilometreTaslari",
+        )}
       </p>
 
       <div className="relative">

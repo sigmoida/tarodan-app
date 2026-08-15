@@ -1,4 +1,5 @@
 /** @format */
+import { imagePlaceholder } from "@/lib/placeholder";
 
 export interface TradeProduct {
   id: string;
@@ -16,7 +17,7 @@ export interface TradeProduct {
   seller?: { id: string };
 }
 
-const PLACEHOLDER = "https://placehold.co/200x200/f3f4f6/9ca3af?text=Ürün";
+const PLACEHOLDER = imagePlaceholder("200x200");
 
 export const getTradeProductImage = (product: TradeProduct): string => {
   const first = product.images?.[0];

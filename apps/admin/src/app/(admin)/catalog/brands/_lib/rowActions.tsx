@@ -1,5 +1,10 @@
-import { activeToggleAction, editDeleteActions, type RowActionItem } from '@/components/table';
-import type { Brand } from './types';
+import {
+  activeToggleAction,
+  editDeleteActions,
+  type RowActionItem,
+} from "@/components/table";
+import type { Brand } from "./types";
+import type { Translate } from "@/lib/statusLabels";
 
 export interface BrandRowActions {
   onEdit: (b: Brand) => void;
@@ -13,9 +18,12 @@ export interface BrandRowActions {
 }
 
 /** ⋮ row-menu items for a brand. */
-export function brandRowMenu({ onEdit, onDelete, onToggle, busyId }: BrandRowActions) {
+export function brandRowMenu(
+  { onEdit, onDelete, onToggle, busyId }: BrandRowActions,
+  t: Translate,
+) {
   return (b: Brand): RowActionItem[] => [
-    activeToggleAction(b.isActive, () => onToggle(b), busyId === b.id),
-    ...editDeleteActions(b, { onEdit, onDelete }),
+    activeToggleAction(b.isActive, () => onToggle(b), t, busyId === b.id),
+    ...editDeleteActions(b, { onEdit, onDelete }, t),
   ];
 }

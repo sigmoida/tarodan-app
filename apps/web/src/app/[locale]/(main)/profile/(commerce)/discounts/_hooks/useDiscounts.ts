@@ -3,6 +3,7 @@
 "use client";
 
 import toast from "react-hot-toast";
+import { useTranslations } from "next-intl";
 import { discountsApi, userApi } from "@/lib/api";
 import { useWebList } from "@/hooks/useWebResource";
 import { useWebMutation } from "@/hooks/useWebMutation";
@@ -87,6 +88,7 @@ function buildPayload(form: DiscountFormData) {
 
 /** Create or update a discount (update when `id` is passed). */
 export function useSaveDiscount() {
+  const t = useTranslations();
   return useWebMutation(
     async ({ id, form }: { id: string | null; form: DiscountFormData }) => {
       const payload = buildPayload(form);
@@ -96,35 +98,39 @@ export function useSaveDiscount() {
     },
     {
       invalidates: [RESOURCE],
-      errorMessage: "İndirim kaydedilirken hata oluştu",
+      errorMessage: t("seller.discounts.saveFailed"),
       onSuccess: (wasUpdate) =>
         toast.success(
-          wasUpdate ? "İndirim güncellendi" : "İndirim oluşturuldu",
+          wasUpdate
+            ? t("seller.discounts.updated")
+            : t("seller.discounts.created"),
         ),
     },
   );
 }
 
 export function useDeleteDiscount() {
+  const t = useTranslations();
   return useWebMutation((id: string) => discountsApi.delete(id), {
     invalidates: [RESOURCE],
-    successMessage: "İndirim silindi",
-    errorMessage: "İndirim silinirken hata oluştu",
+    successMessage: t("seller.discounts.deleted"),
+    errorMessage: t("seller.discounts.deleteFailed"),
   });
 }
 
 export function useToggleDiscount() {
+  const t = useTranslations();
   return useWebMutation(
     (discount: Discount) =>
       discountsApi.update(discount.id, { isActive: !discount.isActive }),
     {
       invalidates: [RESOURCE],
-      errorMessage: "Durum güncellenirken hata oluştu",
+      errorMessage: t("seller.discounts.statusUpdateFailed"),
       onSuccess: (_res, discount) =>
         toast.success(
           discount.isActive
-            ? "İndirim devre dışı bırakıldı"
-            : "İndirim aktif edildi",
+            ? t("seller.discounts.disabled")
+            : t("seller.discounts.enabled"),
         ),
     },
   );

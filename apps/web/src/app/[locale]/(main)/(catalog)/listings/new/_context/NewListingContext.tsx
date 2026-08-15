@@ -182,7 +182,10 @@ function useNewListingValue() {
     }
     if (listingLimits && !listingLimits.canCreateListing) {
       toast.error(
-        `İlan limitinize ulaştınız (${listingLimits.currentCount}/${listingLimits.maxListings}). Üyeliğinizi yükselterek daha fazla ilan oluşturabilirsiniz.`,
+        t("product.listingLimitReached", {
+          current: listingLimits.currentCount,
+          max: listingLimits.maxListings,
+        }),
       );
       return;
     }

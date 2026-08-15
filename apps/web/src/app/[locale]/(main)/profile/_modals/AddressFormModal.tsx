@@ -43,7 +43,7 @@ export default function AddressFormModal({
   const t = useTranslations();
   const save = useSaveAddress();
   const modalLabels = useFormModalLabels();
-  const form = useZodForm(addressSchema, { defaultValues: EMPTY });
+  const form = useZodForm(addressSchema(t), { defaultValues: EMPTY });
   const { register, setValue, watch, formState } = form;
 
   // Custom-driven fields still need to live in the form state.
@@ -59,33 +59,37 @@ export default function AddressFormModal({
     <FormModal
       open={open}
       onClose={onClose}
-      title={address ? "Adresi Düzenle" : "Yeni Adres"}
+      title={address ? t("address.editAddress") : t("address.newAddress")}
       form={form}
       onSubmit={onSubmit}
       isSubmitting={save.isPending}
       resetValues={address ? { ...EMPTY, ...address } : EMPTY}
-      submitLabel={address ? "Güncelle" : "Kaydet"}
+      submitLabel={address ? t("common.update") : t("common.save")}
       size="lg"
       {...modalLabels}
     >
-      <FormInput name="title" label="Adres Başlığı" placeholder="Ev, İş, vb." />
+      <FormInput
+        name="title"
+        label={t("address.titleLabel")}
+        placeholder={t("address.titleLabelPlaceholder")}
+      />
 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
         <FormInput
           name="fullName"
-          label="Ad Soyad"
-          placeholder="Adınız Soyadınız"
+          label={t("address.fullName")}
+          placeholder={t("address.fullNamePlaceholderLong")}
         />
         <FormPhone
           name="phone"
-          label="Telefon"
+          label={t("address.phone")}
           legacyMessage={t("validation.phoneLegacyNotice")}
         />
       </div>
 
       <div>
         <label className="mb-1 block text-sm font-medium text-body">
-          İl / İlçe
+          {t("address.cityDistrict")}
         </label>
         <CityDistrictSelector
           city={city}
@@ -97,8 +101,8 @@ export default function AddressFormModal({
           onDistrictChange={(d) =>
             setValue("district", d, { shouldValidate: true })
           }
-          cityPlaceholder="Şehir seçiniz"
-          districtPlaceholder="İlçe seçiniz"
+          cityPlaceholder={t("common.selectCity")}
+          districtPlaceholder={t("common.selectDistrict")}
         />
         {(formState.errors.city || formState.errors.district) && (
           <p className="mt-1 text-xs text-danger-600">
@@ -112,16 +116,16 @@ export default function AddressFormModal({
 
       <FormTextarea
         name="address"
-        label="Adres"
-        placeholder="Mahalle, sokak, bina ve daire bilgileri"
+        label={t("address.address")}
+        placeholder={t("address.addressPlaceholderLong")}
         rows={3}
       />
       <FormInput
         name="zipCode"
-        label="Posta Kodu (opsiyonel)"
-        placeholder="Örn: 34000"
+        label={t("address.zipCodeOptional")}
+        placeholder={t("address.zipCodePlaceholder")}
       />
-      <FormCheckbox name="isDefault" label="Varsayılan adres olarak ayarla" />
+      <FormCheckbox name="isDefault" label={t("address.setDefault")} />
     </FormModal>
   );
 }

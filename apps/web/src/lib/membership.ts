@@ -1,6 +1,7 @@
 /** @format */
 
 import type { BadgeVariant } from "@tarodan/ui";
+import type { Translate } from "@/types/i18n";
 
 /**
  * Üyelik kademesinin arayüzdeki TEK karşılığı — ad, renk ve menü etiketi.
@@ -17,12 +18,14 @@ import type { BadgeVariant } from "@tarodan/ui";
  * bilgisinden okuyan hesap menüsü) devreye girer, o yüzden değerleri admin'deki
  * `membership_tiers.name` ile birebir aynı tutulmalıdır.
  */
-export const MEMBERSHIP_TIER_LABEL: Record<string, string> = {
-  free: "Ücretsiz Üyelik",
-  basic: "Temel Üyelik",
-  premium: "Premium Üyelik",
-  business: "İş Üyeliği",
-};
+export const MEMBERSHIP_TIER_LABEL = (
+  t: Translate,
+): Record<string, string> => ({
+  free: t("page.lib.membership.ucretsizUyelik"),
+  basic: t("page.lib.membership.temelUyelik"),
+  premium: t("page.lib.membership.premiumUyelik"),
+  business: t("page.lib.membership.isUyeligi"),
+});
 
 export const MEMBERSHIP_TIER_VARIANT: Record<string, BadgeVariant> = {
   business: "warning",
@@ -40,6 +43,8 @@ export function hasPaidMembership(tier?: string | null): boolean {
  * Gezinme menülerindeki üyelik satırının etiketi. Üyeliği olmayan kullanıcıya
  * "Üyeliğim" demek yanıltıcı: yönetecek bir üyeliği yok, satın alacak var.
  */
-export function membershipNavLabel(tier?: string | null): string {
-  return hasPaidMembership(tier) ? "Üyeliğim" : "Üye Ol";
+export function membershipNavLabel(t: Translate, tier?: string | null): string {
+  return hasPaidMembership(tier)
+    ? t("page.lib.membership.uyeligim")
+    : t("page.lib.membership.uyeOl");
 }

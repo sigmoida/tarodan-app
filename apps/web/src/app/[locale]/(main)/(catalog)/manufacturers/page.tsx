@@ -6,19 +6,25 @@ import { getServerQueryClient } from "@/lib/query/server";
 import { queryKeys } from "@/lib/query/keys";
 import { fetchManufacturersServer } from "./_lib/data";
 import ManufacturersClient from "./ManufacturersClient";
+import { getTranslations } from "next-intl/server";
 
-export const metadata: Metadata = {
-  title: "Üreticiler | Tarodan",
-  description:
-    "Dünyanın en prestijli diecast model araba üreticilerini keşfedin. Her markanın tarihini, özel serilerini ve popüler modellerini Tarodan'da inceleyin.",
-  openGraph: {
-    title: "Diecast Üreticiler Rehberi | Tarodan",
-    description:
-      "Hot Wheels, Matchbox, AUTOart, Minichamps ve daha fazlası — diecast üreticilerini keşfedin.",
-    type: "website",
-    url: "/manufacturers",
-  },
-};
+export async function generateMetadata(): Promise<Metadata> {
+  const t = await getTranslations();
+  return {
+    title: t("brands.manufacturersMeta.ureticilerTarodan"),
+    description: t(
+      "brands.manufacturersMeta.dunyaninEnPrestijliDiecastModelAraba",
+    ),
+    openGraph: {
+      title: t("brands.manufacturersMeta.diecastUreticilerRehberiTarodan"),
+      description: t(
+        "brands.manufacturersMeta.hotWheelsMatchboxAUTOartMinichampsVe",
+      ),
+      type: "website",
+      url: "/manufacturers",
+    },
+  };
+}
 
 export default async function ManufacturersPage() {
   // Seed the manufacturers list server-side so the guide ships in the first HTML

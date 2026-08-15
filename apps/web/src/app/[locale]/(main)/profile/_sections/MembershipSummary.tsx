@@ -3,6 +3,7 @@
 "use client";
 
 import { useRef, useState } from "react";
+import { useTranslations } from "next-intl";
 import {
   ShoppingBagIcon,
   TagIcon,
@@ -26,6 +27,7 @@ import { useUploadAvatar } from "../_hooks/useProfileInfo";
  * query via ProfileContext so it renders instantly alongside the sections below.
  */
 export default function MembershipSummary() {
+  const t = useTranslations();
   const { profile, wishlistCount } = useProfile();
   const uploadAvatar = useUploadAvatar();
   const fileRef = useRef<HTMLInputElement>(null);
@@ -53,7 +55,7 @@ export default function MembershipSummary() {
               <div className="h-16 w-16 overflow-hidden rounded-full ring-2 ring-primary-100">
                 <OptimizedImage
                   src={photo}
-                  alt="Profil"
+                  alt={t("profile.profile")}
                   fill
                   sizes="64px"
                   className="object-cover"
@@ -73,8 +75,8 @@ export default function MembershipSummary() {
               variant="secondary"
               onClick={() => fileRef.current?.click()}
               disabled={uploadAvatar.isPending}
-              title="Fotoğrafı değiştir"
-              aria-label="Fotoğrafı değiştir"
+              title={t("profile.changePhotoAction")}
+              aria-label={t("profile.changePhotoAction")}
               className="absolute -bottom-1 -right-1 h-7 w-7 rounded-full p-0 shadow-sm"
             >
               {uploadAvatar.isPending ? (
@@ -99,14 +101,17 @@ export default function MembershipSummary() {
               <MembershipBadge tier={tierType} name={tierName} />
               {profile?.isVerified && (
                 <Badge variant="success" size="sm">
-                  ✓ Onaylı
+                  ✓ {t("profile.verifiedBadge")}
                 </Badge>
               )}
             </div>
             <p className="truncate text-sm text-muted">{profile?.email}</p>
             {stats && stats.rating > 0 && (
               <p className="mt-0.5 text-xs text-subtle">
-                ★ {stats.rating.toFixed(1)} · {stats.reviewsCount} değerlendirme
+                {t("profile.ratingSummary", {
+                  rating: stats.rating.toFixed(1),
+                  count: stats.reviewsCount,
+                })}
               </p>
             )}
           </div>
@@ -118,32 +123,32 @@ export default function MembershipSummary() {
           size="sm"
           className="shrink-0"
         >
-          Üyeliği Yönet
+          {t("profile.manageMembership")}
         </ButtonLink>
       </div>
 
       <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-4">
         <MetricCard
           icon={ShoppingBagIcon}
-          label="İlan"
+          label={t("profile.metricListings")}
           value={stats?.productsCount ?? 0}
           accent="text-primary-600"
         />
         <MetricCard
           icon={TagIcon}
-          label="Sipariş"
+          label={t("profile.metricOrders")}
           value={stats?.ordersCount ?? 0}
           accent="text-primary-600"
         />
         <MetricCard
           icon={ArrowsRightLeftIcon}
-          label="Takas"
+          label={t("profile.metricTrades")}
           value={stats?.tradesCount ?? 0}
           accent="text-success-600"
         />
         <MetricCard
           icon={HeartIcon}
-          label="Favori"
+          label={t("profile.metricFavorites")}
           value={wishlistCount}
           accent="text-danger-600"
         />

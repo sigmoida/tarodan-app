@@ -1,6 +1,7 @@
-'use client';
+"use client";
 
-import { Spinner } from '@tarodan/ui';
+import { useTranslations } from "next-intl";
+import { Spinner } from "@tarodan/ui";
 
 /**
  * Shown while auth state is being resolved (e.g. checkAuth in progress).
@@ -10,11 +11,12 @@ import { Spinner } from '@tarodan/ui';
  * Only then check !isAuthenticated and redirect. See useRequireAuth in lib/useRequireAuth.ts.
  */
 export default function AuthLoadingScreen() {
+  const t = useTranslations();
   return (
     <div className="min-h-[60vh] flex items-center justify-center bg-surface">
       <div className="flex flex-col items-center gap-4">
         <Spinner size="lg" />
-        <p className="text-sm text-muted">Yükleniyor...</p>
+        <p className="text-sm text-muted">{t("common.loading")}</p>
       </div>
     </div>
   );

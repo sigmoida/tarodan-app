@@ -6,19 +6,25 @@ import { TagIcon } from "@heroicons/react/24/outline";
 import SectionCard from "@/components/ui/SectionCard";
 import { formatDate, formatTL } from "@/lib/format";
 import type { RecentSale } from "../_lib/types";
+import { getTranslations } from "next-intl/server";
 
-export default function RecentSalesSection({ sales }: { sales: RecentSale[] }) {
+export default async function RecentSalesSection({
+  sales,
+}: {
+  sales: RecentSale[];
+}) {
+  const t = await getTranslations();
   if (sales.length === 0) return null;
 
   return (
     <SectionCard
-      title="Son Satışlar"
+      title={t("page.statistics.recentsalessection.sonSatislar")}
       action={
         <Link
           href="/profile/orders"
           className="text-sm font-medium text-primary-500 hover:text-primary-600"
         >
-          Tümünü Gör
+          {t("page.statistics.recentsalessection.tumunuGor")}
         </Link>
       }
     >

@@ -36,6 +36,6 @@ export function carModelColumns(t: T, actions: CarModelRowActions) {
       (m) => <Badge active={m.isActive} />,
       { sortKey: "isActive" },
     ),
-    col.rowMenu<CarModel>(carModelRowMenu(actions)),
+    col.rowMenu<CarModel>(carModelRowMenu(actions, t)),
   ];
 }

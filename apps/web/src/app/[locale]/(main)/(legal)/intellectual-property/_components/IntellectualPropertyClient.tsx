@@ -15,92 +15,102 @@ export default function IntellectualPropertyClient() {
     >
       <SectionCard>
         <div className="prose prose-gray max-w-none">
-          <h2>1. Genel İlke</h2>
+          <h2>{t("legal.intellectualProperty.1GenelIlke")}</h2>
           <p>
-            TARODAN, üçüncü kişilerin telif hakkı, marka ve diğer fikri mülkiyet
-            haklarına saygı gösterilmesini bekler. Platformda yayınlanan
-            içeriklerin (metin, görsel, logo) hak sahibi izni veya yasal
-            kullanım hakkı ile paylaşılması gerekir. İhlal tespit edildiğinde
-            içerik kaldırılır ve tekrarlayan ihlallerde hesap işlemleri
-            yapılabilir.
+            {t(
+              "legal.intellectualProperty.tarodanUcuncuKisilerinTelifHakkiMarka",
+            )}
           </p>
 
-          <h2>2. Platformun Fikri Mülkiyeti</h2>
+          <h2>{t("legal.intellectualProperty.2PlatformunFikriMulkiyeti")}</h2>
           <p>
-            TARODAN adı, logosu, arayüz tasarımı, metinleri ve bu siteye ait
-            özgün içerikler TARODAN Teknoloji A.Ş. veya lisans verenlerine
-            aittir. İzinsiz kopyalama, dağıtma veya ticari kullanım yasaktır.
+            {t(
+              "legal.intellectualProperty.tarodanAdiLogosuArayuzTasarimiMetinleri",
+            )}
           </p>
 
-          <h2>3. Kullanıcı ve Satıcı İçerikleri</h2>
+          <h2>
+            {t("legal.intellectualProperty.3KullaniciVeSaticiIcerikleri")}
+          </h2>
           <p>
-            Kullanıcılar ve satıcılar, yükledikleri metin ve görsellerin
-            kullanım hakkına sahip olduklarını veya gerekli izinlere sahip
-            olduklarını kabul eder. Platforma yüklenen içerikler, hizmetin
-            sunulması (ilanların gösterilmesi, arama, pazarlama) amacıyla
-            işlenebilir ve sınırlı lisans kapsamında kullanılabilir.
+            {t(
+              "legal.intellectualProperty.kullanicilarVeSaticilarYukledikleriMetinVe",
+            )}
           </p>
 
-          <h2>4. Telif Hakkı İhlali Bildirimi (DMCA / Uyumlu Süreç)</h2>
+          <h2>
+            {t("legal.intellectualProperty.4TelifHakkiIhlaliBildirimiDMCA")}
+          </h2>
           <p>
-            Telif hakkı ihlali olduğunu düşündüğünüz bir içerik varsa, aşağıdaki
-            bilgilerle bize yazılı bildirim yapabilirsiniz. Bildirimde:
+            {t(
+              "legal.intellectualProperty.telifHakkiIhlaliOldugunuDusundugunuzBir",
+            )}
           </p>
           <ul>
             <li>
-              İhlal edildiğini iddia ettiğiniz eserin tanımı ve (varsa) orijinal
-              linki
+              {t(
+                "legal.intellectualProperty.ihlalEdildiginiIddiaEttiginizEserinTanimi",
+              )}
             </li>
             <li>
-              Platformdaki ihlal içeriğinin konumu (ilan sayfasındaki &quot;İlan
-              No&quot; — örn. U010001 — veya sayfa adresi)
-            </li>
-            <li>İletişim bilgileriniz (ad, e-posta, telefon)</li>
-            <li>
-              İçeriğin izniniz olmadan kullanıldığına dair iyi niyetli inanç
-              beyanı
+              {t(
+                "legal.intellectualProperty.platformdakiIhlalIcerigininKonumuIlanSayfasindaki",
+              )}
             </li>
             <li>
-              Beyanlarınızın doğruluğuna dair yanlış bilgi verme sorumluluğu
-              kabulü
+              {t(
+                "legal.intellectualProperty.iletisimBilgilerinizAdEPostaTelefon",
+              )}
+            </li>
+            <li>
+              {t(
+                "legal.intellectualProperty.iceriginIzninizOlmadanKullanildiginaDairIyi",
+              )}
+            </li>
+            <li>
+              {t(
+                "legal.intellectualProperty.beyanlarinizinDogrulugunaDairYanlisBilgiVerme",
+              )}
             </li>
           </ul>
           <p>
-            <strong>Bildirim adresi:</strong> legal@tarodan.com.tr (konu: Telif
-            Hakkı İhlali). Geçerli ve eksiksiz bildirimler değerlendirilir;
-            uygunsa içerik kaldırılır ve (yasalara uygun şekilde) karşı tarafa
-            bildirim yapılabilir.
+            {t.rich("legal.intellectualProperty.bBildirimAdresiBLegalTarodan", {
+              b: (chunks) => <strong>{chunks}</strong>,
+            })}
           </p>
 
-          <h2>5. Marka Kullanımı</h2>
+          <h2>{t("legal.intellectualProperty.5MarkaKullanimi")}</h2>
           <p>
-            Ürün ilanlarında marka isimleri, orijinal ürünü tanımlama amacıyla
-            makul ölçüde kullanılabilir. Ticari marka sahiplerinin haklarına
-            saygı gösterilmesi gerekir; taklit, yanıltıcı kullanım veya marka
-            ihlali kabul edilmez. Marka ihlali iddiaları için
-            legal@tarodan.com.tr adresine bildirim yapılabilir.
+            {t(
+              "legal.intellectualProperty.urunIlanlarindaMarkaIsimleriOrijinalUrunu",
+            )}
           </p>
 
-          <h2>6. Tekrarlayan İhlalciler</h2>
+          <h2>{t("legal.intellectualProperty.6TekrarlayanIhlalciler")}</h2>
           <p>
-            Geçerli ihlal bildirimleri sonrasında tekrarlayan ihlal yapan
-            kullanıcı hesapları askıya alınabilir veya sonlandırılabilir.
+            {t(
+              "legal.intellectualProperty.gecerliIhlalBildirimleriSonrasindaTekrarlayanIhlal",
+            )}
           </p>
 
-          <h2>7. İletişim</h2>
-          <p>Fikri mülkiyet ve ihlal bildirimleri: legal@tarodan.com.tr</p>
+          <h2>{t("legal.intellectualProperty.7Iletisim")}</h2>
+          <p>
+            {t(
+              "legal.intellectualProperty.fikriMulkiyetVeIhlalBildirimleriLegal",
+            )}
+          </p>
         </div>
       </SectionCard>
 
       <div className="flex flex-wrap gap-4">
         <Link href="/terms" className="text-primary-500 hover:underline">
-          Kullanım Şartları →
+          {t("legal.intellectualProperty.kullanimSartlari")}
         </Link>
         <Link
           href="/seller-agreement"
           className="text-primary-500 hover:underline"
         >
-          Satıcı Sözleşmesi →
+          {t("legal.intellectualProperty.saticiSozlesmesi")}
         </Link>
       </div>
     </DocPage>

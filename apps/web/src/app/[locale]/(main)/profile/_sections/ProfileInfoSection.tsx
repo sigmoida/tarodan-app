@@ -60,7 +60,7 @@ function EmailChangeModal({
     <Modal
       isOpen={open}
       onClose={onClose}
-      title="E-posta Değiştir"
+      title={t("profile.changeEmail")}
       size="md"
       closeLabel={t("common.close")}
       dismissDisabled={sendCode.isPending || verify.isPending}
@@ -76,7 +76,9 @@ function EmailChangeModal({
               : () => verify.mutate(code, { onSuccess: onClose })
           }
           cancelLabel={step === "enter" ? t("common.cancel") : t("common.back")}
-          confirmLabel={step === "enter" ? "Kod Gönder" : "Doğrula"}
+          confirmLabel={
+            step === "enter" ? t("profile.sendCode") : t("profile.verify")
+          }
           isLoading={sendCode.isPending || verify.isPending}
           disabled={step === "enter" ? !email.trim() : code.length !== 6}
         />
@@ -84,27 +86,26 @@ function EmailChangeModal({
     >
       {step === "enter" ? (
         <div className="space-y-4">
-          <p className="text-sm text-muted">
-            Yeni e-posta adresinize 6 haneli bir doğrulama kodu göndereceğiz.
-            Mevcut e-postanız kod doğrulanana kadar geçerli kalır.
-          </p>
+          <p className="text-sm text-muted">{t("profile.emailChangeIntro")}</p>
           <Input
-            label="Yeni e-posta"
+            label={t("profile.newEmail")}
             type="email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            placeholder="yeni@ornek.com"
+            placeholder={t("profile.newEmailPlaceholder")}
             autoComplete="email"
           />
         </div>
       ) : (
         <div className="space-y-4">
           <p className="text-sm text-muted">
-            <strong className="text-heading">{email}</strong> adresine
-            gönderilen 6 haneli kodu girin.
+            {t.rich("profile.enterCodeSentTo", {
+              email,
+              b: (chunks) => <strong className="text-heading">{chunks}</strong>,
+            })}
           </p>
           <Input
-            label="Doğrulama kodu"
+            label={t("profile.verificationCode")}
             value={code}
             onChange={(e) => setCode(e.target.value.replace(/\D/g, ""))}
             placeholder="123456"
@@ -128,7 +129,7 @@ export default function ProfileInfoSection() {
     (profile?.membershipTier ?? user?.membershipTier) === "business";
   const [emailModalOpen, setEmailModalOpen] = useState(false);
 
-  const form = useZodForm(profileInfoSchema, { defaultValues: EMPTY });
+  const form = useZodForm(profileInfoSchema(t), { defaultValues: EMPTY });
 
   useEffect(() => {
     if (!profile) return;
@@ -158,7 +159,7 @@ export default function ProfileInfoSection() {
 
   return (
     <SectionCard
-      title="Profil Bilgileri"
+      title={t("profile.profileInfo")}
       action={
         <Button
           type="button"
@@ -166,7 +167,7 @@ export default function ProfileInfoSection() {
           onClick={form.handleSubmit(onSubmit)}
           isLoading={updateProfile.isPending}
         >
-          Kaydet
+          {t("common.save")}
         </Button>
       }
     >
@@ -176,15 +177,15 @@ export default function ProfileInfoSection() {
         <Form form={form} onSubmit={onSubmit} className="space-y-4">
           <FormInput
             name="displayName"
-            label="Görünen İsim"
-            placeholder="Adınız"
+            label={t("profile.displayName")}
+            placeholder={t("profile.displayNamePlaceholder")}
           />
 
           <UsernameField />
 
           <div>
             <label className="mb-1.5 block text-sm font-medium text-heading">
-              E-posta
+              {t("common.email")}
             </label>
             <div className="flex items-center gap-2">
               <div className="flex h-10 flex-1 items-center truncate rounded-lg border border-border bg-surface px-3 text-sm text-muted">
@@ -195,7 +196,7 @@ export default function ProfileInfoSection() {
                 variant="outline"
                 onClick={() => setEmailModalOpen(true)}
               >
-                Değiştir
+                {t("profile.change")}
               </Button>
             </div>
           </div>
@@ -203,15 +204,15 @@ export default function ProfileInfoSection() {
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
             <FormPhone
               name="phone"
-              label="Telefon"
+              label={t("common.phone")}
               legacyMessage={t("validation.phoneLegacyNotice")}
             />
-            <FormDatePicker name="birthDate" label="Doğum Tarihi" />
+            <FormDatePicker name="birthDate" label={t("profile.birthDate")} />
           </div>
           <FormTextarea
             name="bio"
-            label="Hakkımda"
-            placeholder="Kendiniz hakkında birkaç şey yazın..."
+            label={t("profile.bio")}
+            placeholder={t("profile.bioPlaceholderDots")}
             rows={4}
             maxLength={500}
           />
@@ -219,23 +220,23 @@ export default function ProfileInfoSection() {
           {isBusiness && (
             <div className="space-y-4 rounded-lg border border-border-subtle bg-surface p-4">
               <p className="text-sm font-semibold text-heading">
-                İşletme Bilgileri
+                {t("profile.businessInfoTitle")}
               </p>
               <FormInput
                 name="companyName"
-                label="Şirket / Ticari Unvan"
-                placeholder="ABC Ltd. Şti."
+                label={t("profile.companyTitleLabel")}
+                placeholder={t("profile.companyTitlePlaceholder")}
               />
               <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                 <FormInput
                   name="taxId"
-                  label="Vergi Kimlik No"
-                  placeholder="1234567890"
+                  label={t("profile.taxIdLabel")}
+                  placeholder={t("profile.taxIdPlaceholder")}
                 />
                 <FormInput
                   name="taxOffice"
-                  label="Vergi Dairesi"
-                  placeholder="Kadıköy VD"
+                  label={t("profile.taxOffice")}
+                  placeholder={t("profile.taxOfficePlaceholderShort")}
                 />
               </div>
             </div>

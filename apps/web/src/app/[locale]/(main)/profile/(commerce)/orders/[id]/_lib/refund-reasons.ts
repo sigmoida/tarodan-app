@@ -23,8 +23,6 @@ export const buyerRefundReasonOptions = (
     const labelKey = refundReasonLabelKey[value];
     return {
       value: value as RefundReason,
-      label: labelKey
-        ? t(labelKey)
-        : (refundReasonConfig[value]?.label ?? value),
+      label: t(labelKey ?? refundReasonConfig[value].labelKey),
     };
   });

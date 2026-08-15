@@ -4,6 +4,7 @@ import { useRouter } from "@/i18n/navigation";
 import { useMutation } from "@tanstack/react-query";
 import type { UseFormReturn } from "react-hook-form";
 import toast from "react-hot-toast";
+import { useTranslations } from "next-intl";
 import { listingsApi, api } from "@/lib/api";
 import { useAuthStore } from "@/stores/authStore";
 import type { EditListingValues } from "../_lib/schema";
@@ -19,6 +20,7 @@ export function useListingLifecycle({
   form,
   setIsLoading,
 }: UseListingLifecycleParams) {
+  const t = useTranslations();
   const router = useRouter();
   const { refreshUserData } = useAuthStore();
 
@@ -44,20 +46,20 @@ export function useListingLifecycle({
     mutationFn: (qty: number) =>
       listingsApi.update(id, { status: "active", quantity: qty } as any),
     onSuccess: () => {
-      toast.success(
-        "İlanınız incelemeye gönderildi. Onaylandığında yeniden yayına girecek.",
-      );
+      toast.success(t("product.sentForReviewRepublish"));
       router.push("/profile/listings");
     },
     onError: (error: any) => {
-      toast.error(error.response?.data?.message || "Yeniden satışa açılamadı");
+      toast.error(
+        error.response?.data?.message || t("product.reactivateFailed"),
+      );
     },
   });
 
   const handleReactivate = () => {
     const qty = Number(reactivateQuantity);
     if (!qty || qty < 1) {
-      toast.error("Geçerli bir stok miktarı giriniz");
+      toast.error(t("product.invalidStockQuantity"));
       return;
     }
     reactivateMutation.mutate(qty);
@@ -70,10 +72,10 @@ export function useListingLifecycle({
     },
     onSuccess: () => {
       form.setValue("status", "inactive");
-      toast.success("İlan pasife alındı");
+      toast.success(t("product.listingDeactivated"));
     },
     onError: (error: any) => {
-      toast.error(error.response?.data?.message || "İşlem başarısız");
+      toast.error(error.response?.data?.message || t("common.operationFailed"));
     },
     onSettled: () => {
       setIsLoading(false);
@@ -90,12 +92,10 @@ export function useListingLifecycle({
     },
     onSuccess: () => {
       form.setValue("status", "pending");
-      toast.success(
-        "İlanınız incelemeye gönderildi. Onaylandığında yayına girecek.",
-      );
+      toast.success(t("product.sentForReview"));
     },
     onError: (error: any) => {
-      toast.error(error.response?.data?.message || "İşlem başarısız");
+      toast.error(error.response?.data?.message || t("common.operationFailed"));
     },
     onSettled: () => {
       setIsLoading(false);
@@ -110,7 +110,7 @@ export function useListingLifecycle({
       setIsLoading(true);
     },
     onSuccess: async () => {
-      toast.success("İlan silindi");
+      toast.success(t("product.listingRemoved"));
       // Refresh user data to update listing count
       await refreshUserData();
       // Small delay to ensure backend has processed the deletion
@@ -118,7 +118,7 @@ export function useListingLifecycle({
       router.push("/profile/listings");
     },
     onError: (error: any) => {
-      toast.error(error.response?.data?.message || "İlan silinemedi");
+      toast.error(error.response?.data?.message || t("product.deleteFailed"));
     },
     onSettled: () => {
       setIsLoading(false);
