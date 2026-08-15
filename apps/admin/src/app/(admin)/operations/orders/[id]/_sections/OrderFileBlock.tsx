@@ -31,6 +31,7 @@ import {
 } from "../_lib/fileTypes";
 import { StatusUpdateModal } from "../_modals/StatusUpdateModal";
 import { AddTrackingModal } from "../_modals/AddTrackingModal";
+import { statusConfig } from "@/lib/statusLabels";
 
 /**
  * Grup dosyasında TEK siparişin tam bölümü: statü + tarihler, ürün, tam finansal
@@ -204,7 +205,7 @@ export function OrderFileBlock({ entry }: { entry: OrderFileEntry }) {
           {entry.escrow && (
             <Badge
               status={entry.escrow.status}
-              config={paymentHoldStatusConfig}
+              config={statusConfig(paymentHoldStatusConfig, t)}
             />
           )}
         </div>
@@ -268,7 +269,7 @@ export function OrderFileBlock({ entry }: { entry: OrderFileEntry }) {
                   <span className="font-mono">{r.refundNumber}</span>
                   <StatusBadge
                     status={r.status}
-                    config={refundRequestStatusConfig}
+                    config={statusConfig(refundRequestStatusConfig, t)}
                     size="sm"
                   />
                   <span className="text-muted">

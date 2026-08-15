@@ -1,13 +1,11 @@
 /** @format */
 
 import type { Metadata } from "next";
+import { getTranslations } from "next-intl/server";
 import { localizedCanonical } from "@/lib/seo";
 import { DocPage } from "@/components/layout/DocPage";
 import SectionCard from "@/components/ui/SectionCard";
-import { FAQ_SECTIONS } from "./_lib/data";
-
-const DESCRIPTION =
-  "Tarodan sıkça sorulan sorular: sipariş oluşturma, ödeme ve güvenli havuz, kargo takibi, takas süreci, iade koşulları ve ilan öne çıkarma paketleri.";
+import { faqSections } from "./_lib/data";
 
 export async function generateMetadata({
   params,
@@ -15,21 +13,22 @@ export async function generateMetadata({
   params: Promise<{ locale: string }>;
 }): Promise<Metadata> {
   const { locale } = await params;
+  const t = await getTranslations({ locale });
+  const title = t("faq.metaTitle");
+  const description = t("faq.metaDescription");
   return {
-    title: "Sıkça Sorulan Sorular · Tarodan",
-    description: DESCRIPTION,
+    title,
+    description,
     alternates: localizedCanonical(locale, "/faq"),
-    openGraph: {
-      title: "Sıkça Sorulan Sorular · Tarodan",
-      description: DESCRIPTION,
-    },
+    openGraph: { title, description },
   };
 }
 
-export default function FAQPage() {
+export default async function FAQPage() {
+  const t = await getTranslations();
   return (
-    <DocPage title="Sıkça Sorulan Sorular">
-      {FAQ_SECTIONS.map((section) => (
+    <DocPage title={t("faq.title")}>
+      {faqSections(t).map((section) => (
         <div key={section.id} id={section.id} className="scroll-mt-24">
           <SectionCard title={section.title}>
             <div className="space-y-7">

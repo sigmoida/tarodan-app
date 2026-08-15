@@ -11,9 +11,9 @@ import { Button, Modal, ModalFooter } from "@tarodan/ui";
 import { Form, FormInput, FormTextarea, useZodForm } from "@tarodan/ui/form";
 import OptimizedImage from "@/components/OptimizedImage";
 import { useTranslations } from "next-intl";
+import { imagePlaceholder } from "@/lib/placeholder";
 
-const PRODUCT_PLACEHOLDER =
-  "https://placehold.co/96x96/f3f4f6/9ca3af?text=%F0%9F%9A%97";
+const PRODUCT_PLACEHOLDER = imagePlaceholder("96x96");
 
 export const orderReviewSchema = z.object({
   productScore: z.number().min(1).max(5),

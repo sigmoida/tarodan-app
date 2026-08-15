@@ -15,8 +15,10 @@ import {
 import ManufacturersToolbar from "./_components/ManufacturersToolbar";
 import ManufacturerCard from "./_components/ManufacturerCard";
 import DiecastTimeline from "./_components/DiecastTimeline";
+import { useTranslations } from "next-intl";
 
 function ManufacturersLayout() {
+  const t = useTranslations();
   const {
     isAuthenticated,
     searchQuery,
@@ -34,17 +36,25 @@ function ManufacturersLayout() {
   // bir şey yoksa satırı hiç çizme.
   const hasManufacturers = brands.length > 0;
   const stats = [
-    { value: brands.length.toString(), label: "Üretici" },
-    { value: countries.length.toString(), label: "Ülke" },
-    { value: "70+", label: "Yıllık Tarih" },
+    {
+      value: brands.length.toString(),
+      label: t("brands.manufacturersPage.uretici"),
+    },
+    {
+      value: countries.length.toString(),
+      label: t("brands.manufacturersPage.ulke"),
+    },
+    { value: "70+", label: t("brands.manufacturersPage.yillikTarih") },
     { value: `${totalProducts.toLocaleString("tr-TR")}+`, label: "Model" },
   ];
 
   return (
     <PageShell className="pb-20">
       <PageHeader
-        title="Diecast Üreticiler Rehberi"
-        description="Dünyanın en prestijli diecast model araba üreticilerini keşfedin — her markanın tarihini, özel serilerini ve popüler modellerini inceleyin."
+        title={t("brands.manufacturersPage.diecastUreticilerRehberi")}
+        description={t(
+          "brands.manufacturersPage.dunyaninEnPrestijliDiecastModelAraba",
+        )}
       />
 
       {/* Metric cards */}
@@ -76,17 +86,22 @@ function ManufacturersLayout() {
           */}
           <h3 className="mb-1 text-lg font-bold text-heading">
             {hasManufacturers
-              ? "Sonuç Bulunamadı"
-              : "Üretici Listesi Hazırlanıyor"}
+              ? t("brands.manufacturersPage.sonucBulunamadi")
+              : t("brands.manufacturersPage.ureticiListesiHazirlaniyor")}
           </h3>
           <p className="mb-4 text-sm text-muted">
             {hasManufacturers
-              ? `"${searchQuery}" aramasıyla eşleşen üretici yok.`
-              : "Üreticiler eklendikçe burada listelenecek."}
+              ? t(
+                  "brands.manufacturersPage.searchqueryAramasiylaEslesenUreticiYok",
+                  { searchQuery },
+                )
+              : t(
+                  "brands.manufacturersPage.ureticilerEklendikceBuradaListelenecek",
+                )}
           </p>
           {hasManufacturers && (
             <Button variant="secondary" onClick={clearFilters}>
-              Filtreleri Temizle
+              {t("brands.manufacturersPage.filtreleriTemizle")}
             </Button>
           )}
         </div>
@@ -112,18 +127,19 @@ function ManufacturersLayout() {
         <div className="relative overflow-hidden rounded-lg border border-primary-100 bg-primary-50 p-6 text-center sm:p-10">
           <div className="relative z-10">
             <h2 className="mb-3 text-2xl font-black text-heading sm:text-3xl">
-              Koleksiyonunuzu Başlatın
+              {t("brands.manufacturersPage.koleksiyonunuzuBaslatin")}
             </h2>
             <p className="mx-auto mb-6 max-w-lg text-sm text-muted sm:text-base">
-              Favori markalarınızdan binlerce diecast model arasından seçim
-              yapın. Hemen üye olun ve koleksiyonunuzu oluşturmaya başlayın.
+              {t(
+                "brands.manufacturersPage.favoriMarkalarinizdanBinlerceDiecastModelArasindan",
+              )}
             </p>
             <div className="flex items-center justify-center gap-3">
               <ButtonLink variant="primary" size="md" href="/listings">
-                İlanları Keşfet
+                {t("brands.manufacturersPage.ilanlariKesfet")}
               </ButtonLink>
               <ButtonLink variant="secondary" size="md" href="/register">
-                Üye Ol
+                {t("brands.manufacturersPage.uyeOl")}
               </ButtonLink>
             </div>
           </div>

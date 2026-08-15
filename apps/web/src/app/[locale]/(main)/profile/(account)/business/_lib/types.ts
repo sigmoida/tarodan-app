@@ -6,6 +6,7 @@ import {
   CubeIcon,
   RectangleStackIcon,
 } from "@heroicons/react/24/outline";
+import type { Translate } from "@/types/i18n";
 
 type Icon = ComponentType<SVGProps<SVGSVGElement>>;
 
@@ -58,12 +59,26 @@ export interface BusinessStats {
 
 export type BusinessTab = "overview" | "products" | "collections";
 
-export const BUSINESS_TABS: {
+export const BUSINESS_TABS = (
+  t: Translate,
+): {
   value: BusinessTab;
   label: string;
   icon: Icon;
-}[] = [
-  { value: "overview", label: "Genel Bakış", icon: ChartBarIcon },
-  { value: "products", label: "Ürünler", icon: CubeIcon },
-  { value: "collections", label: "Koleksiyonlar", icon: RectangleStackIcon },
+}[] => [
+  {
+    value: "overview",
+    label: t("page.business.types.genelBakis"),
+    icon: ChartBarIcon,
+  },
+  {
+    value: "products",
+    label: t("page.business.types.urunler"),
+    icon: CubeIcon,
+  },
+  {
+    value: "collections",
+    label: t("page.business.types.koleksiyonlar"),
+    icon: RectangleStackIcon,
+  },
 ];

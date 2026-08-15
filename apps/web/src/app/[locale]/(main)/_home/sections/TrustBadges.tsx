@@ -8,76 +8,79 @@ import {
   RectangleStackIcon,
   ArrowsRightLeftIcon,
 } from "@heroicons/react/24/outline";
+import type { Translate } from "@/types/i18n";
+import { getTranslations } from "next-intl/server";
 
-const TRUST_BADGES = {
+const TRUST_BADGES = (t: Translate) => ({
   tr: [
     {
-      label: "Güvenli Alışveriş",
-      description: "SSL sertifikalı güvenli ödeme",
+      label: t("page.sections.trustbadges.guvenliAlisveris"),
+      description: t("page.sections.trustbadges.sslSertifikaliGuvenliOdeme"),
       icon: ShieldCheckIcon,
     },
     {
-      label: "Ücretsiz Kargo",
-      description: "3.000 TL ve üzeri siparişlerde",
+      label: t("page.sections.trustbadges.ucretsizKargo"),
+      description: t("page.sections.trustbadges.3000TLVeUzeriSiparislerde"),
       icon: TruckIcon,
     },
     {
-      label: "İade İmkanı",
-      description: "14 gün koşulsuz iade",
+      label: t("page.sections.trustbadges.iadeImkani"),
+      description: t("page.sections.trustbadges.14GunKosulsuzIade"),
       icon: ArrowPathIcon,
     },
     {
-      label: "Taksit İmkanı",
-      description: "12 aya varan taksit",
+      label: t("page.sections.trustbadges.taksitImkani"),
+      description: t("page.sections.trustbadges.12AyaVaranTaksit"),
       icon: CreditCardIcon,
     },
     {
-      label: "Koleksiyon Sergile",
-      description: "Dijital garajını oluştur",
+      label: t("page.sections.trustbadges.koleksiyonSergile"),
+      description: t("page.sections.trustbadges.dijitalGarajiniOlustur"),
       icon: RectangleStackIcon,
     },
     {
-      label: "Güvenli Takas",
-      description: "Güvenli takas sistemi",
+      label: t("page.sections.trustbadges.guvenliTakas"),
+      description: t("page.sections.trustbadges.guvenliTakasSistemi"),
       icon: ArrowsRightLeftIcon,
     },
   ],
   en: [
     {
-      label: "Secure Shopping",
-      description: "SSL certified secure payment",
+      label: t("page.sections.trustbadges.secureShopping"),
+      description: t("page.sections.trustbadges.sslCertifiedSecurePayment"),
       icon: ShieldCheckIcon,
     },
     {
-      label: "Free Shipping",
-      description: "On orders over 3,000 TL",
+      label: t("page.sections.trustbadges.freeShipping"),
+      description: t("page.sections.trustbadges.onOrdersOver3000TL"),
       icon: TruckIcon,
     },
     {
-      label: "Easy Returns",
-      description: "14 days unconditional return",
+      label: t("page.sections.trustbadges.easyReturns"),
+      description: t("page.sections.trustbadges.14DaysUnconditionalReturn"),
       icon: ArrowPathIcon,
     },
     {
-      label: "Installments",
-      description: "Up to 12 month installments",
+      label: t("page.sections.trustbadges.installments"),
+      description: t("page.sections.trustbadges.upTo12MonthInstallments"),
       icon: CreditCardIcon,
     },
     {
-      label: "Display Collection",
-      description: "Create your digital garage",
+      label: t("page.sections.trustbadges.displayCollection"),
+      description: t("page.sections.trustbadges.createYourDigitalGarage"),
       icon: RectangleStackIcon,
     },
     {
-      label: "Safe Trading",
-      description: "Secure trading system",
+      label: t("page.sections.trustbadges.safeTrading"),
+      description: t("page.sections.trustbadges.secureTradingSystem"),
       icon: ArrowsRightLeftIcon,
     },
   ],
-};
+});
 
-export default function TrustBadges({ locale }: { locale: string }) {
-  const badges = TRUST_BADGES[locale as "tr" | "en"];
+export default async function TrustBadges({ locale }: { locale: string }) {
+  const t = await getTranslations();
+  const badges = TRUST_BADGES(t)[locale as "tr" | "en"];
 
   return (
     <section className=" bg-surface">

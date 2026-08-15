@@ -4,12 +4,14 @@ import { CheckBadgeIcon } from "@heroicons/react/24/solid";
 import { Badge } from "@tarodan/ui";
 import UserAvatar from "@/components/UserAvatar";
 import type { BusinessStats } from "../_lib/types";
+import { getTranslations } from "next-intl/server";
 
-export default function BusinessHeader({
+export default async function BusinessHeader({
   company,
 }: {
   company: BusinessStats["company"];
 }) {
+  const t = await getTranslations();
   return (
     <div className="flex items-center gap-4 rounded-lg border border-border bg-surface-elevated p-6">
       <UserAvatar
@@ -29,11 +31,13 @@ export default function BusinessHeader({
               size="sm"
               icon={<CheckBadgeIcon className="h-4 w-4" />}
             >
-              Onaylı
+              {t("page.business.businessheader.onayli")}
             </Badge>
           )}
         </div>
-        <p className="text-sm text-muted">İşletme hesabı</p>
+        <p className="text-sm text-muted">
+          {t("page.business.businessheader.isletmeHesabi")}
+        </p>
       </div>
     </div>
   );

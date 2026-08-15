@@ -9,6 +9,7 @@ import { PageShell } from "@/components/layout/PageShell";
 import AuthLoadingScreen from "@/components/AuthLoadingScreen";
 import { usePaymentStatus } from "../_hooks/usePaymentStatus";
 import PaymentReady from "./PaymentReady";
+import { useTranslations } from "next-intl";
 
 function Centered({ children }: { children: React.ReactNode }) {
   return (
@@ -24,6 +25,7 @@ function Centered({ children }: { children: React.ReactNode }) {
  * checkout ile aynı iskelet, sayfa başlığı yok.
  */
 export default function PaymentPageClient() {
+  const t = useTranslations();
   const router = useRouter();
   const {
     phase,
@@ -43,7 +45,9 @@ export default function PaymentPageClient() {
     return (
       <Centered>
         <Spinner size="xl" className="mx-auto mb-4" />
-        <p className="text-muted">Ödeme bilgileri yükleniyor...</p>
+        <p className="text-muted">
+          {t("page.payment.paymentpageclient.odemeBilgileriYukleniyor")}
+        </p>
       </Centered>
     );
   }
@@ -52,13 +56,17 @@ export default function PaymentPageClient() {
     return (
       <Centered>
         <XCircleIcon className="mx-auto mb-4 h-12 w-12 text-danger-500" />
-        <p className="mb-4 text-muted">Ödeme bulunamadı</p>
+        <p className="mb-4 text-muted">
+          {t("page.payment.paymentpageclient.odemeBulunamadi")}
+        </p>
         <Button
           onClick={() =>
             router.push(isMembershipPayment ? "/membership" : "/profile/orders")
           }
         >
-          {isMembershipPayment ? "Üyelik Sayfasına Dön" : "Siparişlerime Dön"}
+          {isMembershipPayment
+            ? t("page.payment.paymentpageclient.uyelikSayfasinaDon")
+            : t("page.payment.paymentpageclient.siparislerimeDon")}
         </Button>
       </Centered>
     );

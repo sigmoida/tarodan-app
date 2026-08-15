@@ -102,7 +102,8 @@ export interface OrderGroupRow {
 }
 
 /** Filter options derived from orderStatusConfig → exactly consistent with badges. */
-export const statusOptions = statusFilterOptions(orderStatusConfig);
+export const statusOptions = (t: T) =>
+  statusFilterOptions(orderStatusConfig, t);
 
 export function mapOrders(raw: any[], t: T): Order[] {
   return raw.map((o: any) => ({

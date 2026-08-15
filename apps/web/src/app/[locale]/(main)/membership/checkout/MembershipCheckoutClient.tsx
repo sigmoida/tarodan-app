@@ -11,6 +11,7 @@ import { PageHeader } from "@/components/layout/PageHeader";
 import AuthLoadingScreen from "@/components/AuthLoadingScreen";
 import { useMembershipCheckout } from "./_hooks/useMembershipCheckout";
 import CheckoutOrderSummary from "./_components/CheckoutOrderSummary";
+import { useTranslations } from "next-intl";
 
 function CenteredShell({ children }: { children: React.ReactNode }) {
   return (
@@ -21,6 +22,7 @@ function CenteredShell({ children }: { children: React.ReactNode }) {
 }
 
 export default function MembershipCheckoutClient() {
+  const t = useTranslations();
   const {
     period,
     required,
@@ -56,38 +58,48 @@ export default function MembershipCheckoutClient() {
     return (
       <CenteredShell>
         <div className="text-center">
-          <p className="text-muted mb-4">Geçersiz üyelik planı</p>
+          <p className="text-muted mb-4">
+            {t("membership.checkout.gecersizUyelikPlani")}
+          </p>
           <Link href={backHref} className="text-primary-500 hover:underline">
-            Planlara Dön
+            {t("membership.checkout.planlaraDon")}
           </Link>
         </div>
       </CenteredShell>
     );
   }
 
-  const priceLabel = tierInfo.price.toLocaleString("tr-TR", {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  });
+  const priceLabel = tierInfo.price.toLocaleString(
+    t("membership.checkout.trTR"),
+    {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    },
+  );
 
   return (
     <PageShell>
       <PageHeader
         backHref={backHref}
-        backLabel="Planlara Dön"
-        title="Üyelik Yükseltme"
-        description="Güvenli ödeme ile üyeliğinizi yükseltin"
+        backLabel={t("membership.checkout.planlaraDon")}
+        title={t("membership.checkout.uyelikYukseltme")}
+        description={t(
+          "membership.checkout.guvenliOdemeIleUyeliginiziYukseltin",
+        )}
       />
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Payment */}
         <form onSubmit={handleSubmit} className="lg:col-span-2 space-y-4">
-          <SectionCard title="Güvenli Ödeme" className="p-6">
+          <SectionCard
+            title={t("membership.checkout.guvenliOdeme")}
+            className="p-6"
+          >
             <div className="flex items-center gap-2 text-sm text-muted mb-4">
               <p>
-                Onayladıktan sonra güvenli ödeme sayfamızda kart bilgilerinizi
-                girip 3D Secure ile ödersiniz. Kart bilgileriniz saklanmaz;
-                PayTR altyapısıyla işlenir.
+                {t(
+                  "membership.checkout.onayladiktanSonraGuvenliOdemeSayfamizdaKart",
+                )}
               </p>
             </div>
 
@@ -98,22 +110,28 @@ export default function MembershipCheckoutClient() {
                 className="mt-0.5 h-5 w-5"
               />
               <span className="text-sm text-muted">
-                <Link
-                  href="/terms"
-                  className="text-primary-500 hover:underline"
-                >
-                  Kullanım koşullarını
-                </Link>{" "}
-                ve{" "}
-                <Link
-                  href="/privacy"
-                  className="text-primary-500 hover:underline"
-                >
-                  gizlilik politikasını
-                </Link>{" "}
-                okudum, kabul ediyorum. Üyeliğimin{" "}
-                {period === "yearly" ? "yıllık" : "aylık"} olarak otomatik
-                yenileneceğini anlıyorum.
+                {t.rich("membership.checkout.termsNotice", {
+                  period:
+                    period === "yearly"
+                      ? t("membership.checkout.yillik")
+                      : t("membership.checkout.aylik"),
+                  terms: (chunks) => (
+                    <Link
+                      href="/terms"
+                      className="text-primary-500 hover:underline"
+                    >
+                      {chunks}
+                    </Link>
+                  ),
+                  privacy: (chunks) => (
+                    <Link
+                      href="/privacy"
+                      className="text-primary-500 hover:underline"
+                    >
+                      {chunks}
+                    </Link>
+                  ),
+                })}
               </span>
             </label>
           </SectionCard>
@@ -131,19 +149,19 @@ export default function MembershipCheckoutClient() {
                   size="sm"
                   color="border-surface-elevated border-t-transparent"
                 />
-                İşleniyor...
+                {t("checkout.processing")}
               </>
             ) : (
               <>
                 <ShieldCheckIcon className="w-5 h-5" />
-                {priceLabel} TL Öde
+                {t("membership.checkout.payAmount", { amount: priceLabel })}
               </>
             )}
           </Button>
 
           <p className="text-center text-sm text-muted flex items-center justify-center gap-2">
             <ShieldCheckIcon className="w-4 h-4" />
-            256-bit SSL ile güvenli ödeme
+            {t("membership.checkout.sslNotice")}
           </p>
         </form>
 

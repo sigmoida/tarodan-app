@@ -7,6 +7,7 @@ import {
   MEMBERSHIP_TIER_LABEL,
   MEMBERSHIP_TIER_VARIANT,
 } from "@/lib/membership";
+import { useTranslations } from "next-intl";
 
 /**
  * Üyelik kademesi rozeti — kademenin göründüğü her yerde AYNI etiket.
@@ -24,9 +25,10 @@ export default function MembershipBadge({
   name?: string | null;
   className?: string;
 }) {
+  const t = useTranslations();
   const key = tier ?? "free";
-  const label =
-    name || MEMBERSHIP_TIER_LABEL[key] || MEMBERSHIP_TIER_LABEL.free;
+  const labels = MEMBERSHIP_TIER_LABEL(t);
+  const label = name || labels[key] || labels.free;
 
   return (
     <Badge

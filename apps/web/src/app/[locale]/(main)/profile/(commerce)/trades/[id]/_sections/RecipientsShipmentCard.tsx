@@ -42,7 +42,7 @@ export default function RecipientsShipmentCard({
           <p className="text-sm text-muted mb-1">{t("trade.shippedToYou")}</p>
           <p className="font-medium text-heading">
             {myFromWarehouseShipment.carrier === "surat"
-              ? "Sürat Kargo"
+              ? t("page.trades.recipientsshipmentcard.suratKargo")
               : myFromWarehouseShipment.carrier || "—"}
             {/* Şube kabulüne kadar gönderi referansı, sonra gerçek takip kodu. */}
             {(() => {
@@ -84,7 +84,7 @@ export default function RecipientsShipmentCard({
           </p>
           <p>
             {otherFromWarehouseShipment.carrier === "surat"
-              ? "Sürat Kargo"
+              ? t("page.trades.recipientsshipmentcard.suratKargo")
               : otherFromWarehouseShipment.carrier || "—"}
             {(() => {
               const code =

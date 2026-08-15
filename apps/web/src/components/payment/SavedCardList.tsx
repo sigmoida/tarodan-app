@@ -2,6 +2,7 @@
 
 "use client";
 
+import { useTranslations } from "next-intl";
 import { CreditCardIcon, CheckCircleIcon } from "@heroicons/react/24/outline";
 import { Radio, CvvInput } from "@tarodan/ui";
 import type { SavedCard } from "@/lib/api";
@@ -30,6 +31,7 @@ export default function SavedCardList({
   savedCvv,
   onSavedCvvChange,
 }: SavedCardListProps) {
+  const t = useTranslations();
   return (
     <>
       {cards.map((c) => {
@@ -71,7 +73,7 @@ export default function SavedCardList({
                   inputSize="sm"
                   value={savedCvv}
                   onValueChange={onSavedCvvChange}
-                  aria-label="Kayıtlı kart CVV"
+                  aria-label={t("checkout.savedCardCvv")}
                 />
               </div>
             ) : (

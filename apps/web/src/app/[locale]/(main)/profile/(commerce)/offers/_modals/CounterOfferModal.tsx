@@ -39,18 +39,24 @@ export default function CounterOfferModal({
   const submit = () => {
     const value = parseFloat(amount.replace(",", "."));
     if (Number.isNaN(value) || value <= 0) {
-      toast.error("Geçerli bir tutar girin");
+      toast.error(t("offer.counterModal.gecerliBirTutarGirin"));
       return;
     }
     if (mode === "buyer" && value >= base) {
       toast.error(
-        `Satıcının karşı teklifinden (${baseLabel}) düşük olmalıdır.`,
+        t(
+          "offer.counterModal.saticininKarsiTeklifindenBaseLabelDusukOlmalidir",
+          { baseLabel },
+        ),
       );
       return;
     }
     if (mode === "seller" && value <= base) {
       toast.error(
-        `Karşı teklifiniz alıcının teklifinden (${baseLabel}) yüksek olmalıdır.`,
+        t(
+          "offer.counterModal.karsiTeklifinizAlicininTeklifindenBaseLabelYuksek",
+          { baseLabel },
+        ),
       );
       return;
     }
@@ -64,7 +70,11 @@ export default function CounterOfferModal({
     <Modal
       isOpen={open}
       onClose={onClose}
-      title={mode === "buyer" ? "Daha Düşük Teklif" : "Karşı Teklif Gönder"}
+      title={
+        mode === "buyer"
+          ? t("offer.counterModal.dahaDusukTeklif")
+          : t("offer.counterModal.karsiTeklifGonder")
+      }
       size="md"
       closeLabel={t("common.close")}
       dismissDisabled={counter.isPending}
@@ -80,16 +90,18 @@ export default function CounterOfferModal({
       }
     >
       <p className="mb-4 text-sm text-muted">
-        {mode === "buyer" ? "Satıcının karşı teklifi:" : "Alıcının teklifi:"}{" "}
+        {mode === "buyer"
+          ? t("offer.counterModal.saticininKarsiTeklifi")
+          : t("offer.counterModal.alicininTeklifi")}{" "}
         <strong>{baseLabel}</strong>.{" "}
         {mode === "buyer"
-          ? "Bu tutarın altında, ilan fiyatının en az %50 kadarına uygun bir teklif girin."
-          : "Bu tutarın üstünde ve ilan fiyatının altında bir tutar girin (sunucu doğrular)."}
+          ? t("offer.counterModal.buTutarinAltindaIlanFiyatininEn")
+          : t("offer.counterModal.buTutarinUstundeVeIlanFiyatinin")}
       </p>
       <Input
         type="text"
         inputMode="decimal"
-        placeholder="Tutar (₺)"
+        placeholder={t("offer.counterModal.tutar")}
         value={amount}
         onChange={(e) => setAmount(e.target.value)}
       />

@@ -7,6 +7,7 @@ import { useAuthStore } from "@/stores/authStore";
 import { useWebList } from "@/hooks/useWebResource";
 import { useWebMutation } from "@/hooks/useWebMutation";
 import type { Listing } from "../_lib/types";
+import { useTranslations } from "next-intl";
 
 const RESOURCE = "profile-listings";
 /** The listing detail cache (queryKeys.product.detail → ["listing", id]). */
@@ -34,6 +35,7 @@ export function useMyListings(activeFilter: string, enabled: boolean) {
 
 /** Delete a listing — owns the toast + cache invalidation (the only way to mutate). */
 export function useDeleteListing() {
+  const t = useTranslations();
   return useWebMutation(
     async (listingId: string) => {
       await api.delete(`/products/${listingId}`);
@@ -41,8 +43,8 @@ export function useDeleteListing() {
     },
     {
       invalidates: [RESOURCE, LISTING_RESOURCE],
-      successMessage: "İlan silindi",
-      errorMessage: "İlan silinemedi",
+      successMessage: t("profile.myListings.ilanSilindi"),
+      errorMessage: t("profile.myListings.ilanSilinemedi"),
       onSuccess: () => {
         void useAuthStore.getState().refreshUserData?.();
       },
@@ -51,6 +53,7 @@ export function useDeleteListing() {
 }
 
 export function useDeactivateListing() {
+  const t = useTranslations();
   return useWebMutation(
     async (listingId: string) => {
       await listingsApi.update(listingId, { status: "inactive" } as any);
@@ -58,8 +61,8 @@ export function useDeactivateListing() {
     },
     {
       invalidates: [RESOURCE, LISTING_RESOURCE],
-      successMessage: "İlan pasife alındı",
-      errorMessage: "İlan pasife alınamadı",
+      successMessage: t("profile.myListings.ilanPasifeAlindi"),
+      errorMessage: t("profile.myListings.ilanPasifeAlinamadi"),
     },
   );
 }

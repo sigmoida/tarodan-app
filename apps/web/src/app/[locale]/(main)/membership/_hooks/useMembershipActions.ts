@@ -35,13 +35,13 @@ export function useMembershipActions() {
     },
     onError: (_e, _next, ctx) => {
       if (ctx?.prev !== undefined) queryClient.setQueryData(meKey, ctx.prev);
-      toast.error("İşlem başarısız");
+      toast.error(t("membership.actions.islemBasarisiz"));
     },
     onSuccess: (_r, next) => {
       toast.success(
         next
-          ? "Otomatik yenileme hatırlatması açık"
-          : "Otomatik yenileme hatırlatması kapalı",
+          ? t("membership.actions.otomatikYenilemeHatirlatmasiAcik")
+          : t("membership.actions.otomatikYenilemeHatirlatmasiKapali"),
       );
     },
     onSettled: invalidate,
@@ -54,7 +54,9 @@ export function useMembershipActions() {
       invalidate();
     },
     onError: (e: any) =>
-      toast.error(e?.response?.data?.message || "İşlem başarısız"),
+      toast.error(
+        e?.response?.data?.message || t("membership.actions.islemBasarisiz"),
+      ),
   });
 
   const cancel = useMutation({
@@ -64,7 +66,10 @@ export function useMembershipActions() {
       invalidate();
     },
     onError: (e: any) =>
-      toast.error(e?.response?.data?.message || "İptal işlemi başarısız"),
+      toast.error(
+        e?.response?.data?.message ||
+          t("membership.actions.iptalIslemiBasarisiz"),
+      ),
   });
 
   /** Confirm, then cancel (used by the cancel button and free-tier downgrade). */

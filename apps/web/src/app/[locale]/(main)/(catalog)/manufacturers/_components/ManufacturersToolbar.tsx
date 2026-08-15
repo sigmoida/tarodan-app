@@ -5,8 +5,10 @@
 import { MagnifyingGlassIcon } from "@heroicons/react/24/outline";
 import { Input, Select } from "@tarodan/ui";
 import { useManufacturers } from "../_context/ManufacturersContext";
+import { useTranslations } from "next-intl";
 
 export default function ManufacturersToolbar() {
+  const t = useTranslations();
   const {
     searchQuery,
     setSearchQuery,
@@ -24,7 +26,7 @@ export default function ManufacturersToolbar() {
           type="text"
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
-          placeholder="Üretici ara..."
+          placeholder={t("page.manufacturers.manufacturerstoolbar.ureticiAra")}
           className="w-full pl-9 pr-4 rounded"
         />
       </div>
@@ -35,7 +37,9 @@ export default function ManufacturersToolbar() {
         onChange={(e) => setSelectedCountry(e.target.value || null)}
         className="w-full sm:w-56"
       >
-        <option value="">Tüm ülkeler</option>
+        <option value="">
+          {t("page.manufacturers.manufacturerstoolbar.tumUlkeler")}
+        </option>
         {countries.map(([country, info]) => (
           <option key={country} value={country}>
             {info.flag} {country}

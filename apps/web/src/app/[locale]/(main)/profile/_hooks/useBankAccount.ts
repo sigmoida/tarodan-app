@@ -6,6 +6,7 @@ import { bankAccountApi } from "@/lib/api";
 import { useWebList } from "@/hooks/useWebResource";
 import { useWebMutation } from "@/hooks/useWebMutation";
 import type { BankAccountValues } from "../_lib/schemas";
+import { useTranslations } from "next-intl";
 
 export interface BankAccount {
   id: string;
@@ -32,6 +33,7 @@ export function useBankAccount(enabled: boolean) {
 }
 
 export function useSaveBankAccount() {
+  const t = useTranslations();
   return useWebMutation(
     async (values: BankAccountValues) => {
       await bankAccountApi.upsert({
@@ -44,16 +46,17 @@ export function useSaveBankAccount() {
     },
     {
       invalidates: [RESOURCE],
-      successMessage: "Banka hesabı kaydedildi",
-      errorMessage: "Kaydetme başarısız",
+      successMessage: t("profile.bankHooks.bankaHesabiKaydedildi"),
+      errorMessage: t("profile.bankHooks.kaydetmeBasarisiz"),
     },
   );
 }
 
 export function useDeleteBankAccount() {
+  const t = useTranslations();
   return useWebMutation(() => bankAccountApi.delete(), {
     invalidates: [RESOURCE],
-    successMessage: "Banka hesabı silindi",
-    errorMessage: "Silme başarısız",
+    successMessage: t("profile.bankHooks.bankaHesabiSilindi"),
+    errorMessage: t("profile.bankHooks.silmeBasarisiz"),
   });
 }

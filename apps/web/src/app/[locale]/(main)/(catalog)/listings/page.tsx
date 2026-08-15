@@ -11,10 +11,12 @@ import {
 import { fetchCategoryServer, fetchListingsServer } from "./_lib/data";
 import { localizedCanonical, localizedPath } from "@/lib/seo";
 import ListingsClient from "./ListingsClient";
+import type { Translate } from "@/types/i18n";
+import { getTranslations } from "next-intl/server";
 
-const TITLE = "Ürünler | Tarodan";
-const DESCRIPTION =
-  "Diecast model araba, koleksiyon ve model araç ilanlarını keşfedin. Markaya, ölçeğe, fiyata ve duruma göre filtreleyin; takas ve indirimli ürünleri bulun.";
+const TITLE = (t: Translate) => t("page.listings.page.urunlerTarodan");
+const DESCRIPTION = (t: Translate) =>
+  t("page.listings.page.diecastModelArabaKoleksiyonVeModel");
 
 export async function generateMetadata({
   params,
@@ -22,20 +24,21 @@ export async function generateMetadata({
   params: Promise<{ locale: string }>;
 }): Promise<Metadata> {
   const { locale } = await params;
+  const t = await getTranslations({ locale });
   return {
-    title: TITLE,
-    description: DESCRIPTION,
+    title: TITLE(t),
+    description: DESCRIPTION(t),
     alternates: localizedCanonical(locale, "/listings"),
     openGraph: {
-      title: TITLE,
-      description: DESCRIPTION,
+      title: TITLE(t),
+      description: DESCRIPTION(t),
       type: "website",
       url: localizedPath(locale, "/listings"),
     },
     twitter: {
       card: "summary_large_image",
-      title: TITLE,
-      description: DESCRIPTION,
+      title: TITLE(t),
+      description: DESCRIPTION(t),
     },
   };
 }
@@ -65,6 +68,7 @@ function toSearchParams(
 }
 
 export default async function ListingsPage({ searchParams }: Props) {
+  const t = await getTranslations();
   const sp = toSearchParams(await searchParams);
   const filters = parseListingsFilters(sp);
   const page = getListingsPage(sp);
@@ -76,7 +80,7 @@ export default async function ListingsPage({ searchParams }: Props) {
   // a slug we ALSO seed `['categoryBySlug', slug]` so the client reads its `.id`
   // synchronously on first render — that keeps resolvedCategoryId (and thus the
   // listings key) identical to the server seed, so there's no refetch flash.
-  const urlCategoryId = sp.get("categoryId") || "";
+  const urlCategoryId = sp.get(t("page.listings.page.categoryid")) || "";
   const categorySlug = filters.category;
   let resolvedCategoryId: string | undefined = urlCategoryId || undefined;
 

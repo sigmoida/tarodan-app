@@ -3,6 +3,7 @@
 "use client";
 
 import Notice from "../_components/Notice";
+import { useTranslations } from "next-intl";
 
 /**
  * Shown when a company account must buy the business plan before continuing.
@@ -12,11 +13,14 @@ import Notice from "../_components/Notice";
  * duruyor; okunması için ek görsel ağırlığa ihtiyacı yok.
  */
 export default function RequiredBusinessBanner() {
+  const t = useTranslations();
   return (
-    <Notice title="Business Üyelik Gerekli">
-      Şirket hesabınız için business üyelik almanız gerekmektedir. Üyeliğinizi
-      tamamlamadan başka sayfalara geçemezsiniz. Lütfen aşağıdaki business
-      üyelik planını seçip ödemeyi tamamlayın.
+    <Notice
+      title={t("page.membership.requiredbusinessbanner.businessUyelikGerekli")}
+    >
+      {t(
+        "page.membership.requiredbusinessbanner.sirketHesabinizIcinBusinessUyelikAlmaniz",
+      )}
     </Notice>
   );
 }

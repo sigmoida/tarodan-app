@@ -1,5 +1,5 @@
-import { type ReactNode } from 'react';
-import { cn } from '@tarodan/ui';
+import { type ReactNode } from "react";
+import { cn } from "@tarodan/ui";
 
 /** A responsive definition grid for `label: value` detail rows. */
 export function DataList({
@@ -14,8 +14,8 @@ export function DataList({
   return (
     <dl
       className={cn(
-        'grid gap-x-6 gap-y-3 text-sm',
-        columns === 2 ? 'grid-cols-1 sm:grid-cols-2' : 'grid-cols-1',
+        "grid gap-x-6 gap-y-3 text-sm",
+        columns === 2 ? "grid-cols-1 sm:grid-cols-2" : "grid-cols-1",
         className,
       )}
     >
@@ -25,7 +25,13 @@ export function DataList({
 }
 
 /** One `label: value` row. Value is right-aligned and emphasized. */
-export function Field({ label, children }: { label: ReactNode; children: ReactNode }) {
+export function Field({
+  label,
+  children,
+}: {
+  label: ReactNode;
+  children: ReactNode;
+}) {
   return (
     <div className="flex items-center justify-between gap-2">
       <dt className="text-muted">{label}</dt>

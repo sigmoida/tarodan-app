@@ -90,7 +90,7 @@ function NewTradeContent() {
       return toast.error(t("trade.selectAtLeastOne"));
     if (!target) return toast.error(t("trade.targetNotFound"));
     if (!addressId)
-      return toast.error("Lütfen bir teslimat adresi seçin veya ekleyin");
+      return toast.error(t("page.new.page.lutfenBirTeslimatAdresiSecinVeya"));
     const sellerId = getSellerId(target);
     if (!sellerId) return toast.error(t("trade.sellerNotFound"));
 
@@ -136,11 +136,14 @@ function NewTradeContent() {
         backHref={`/listings/${listingId}`}
         backLabel={t("common.back")}
         title={t("trade.createTrade")}
-        description="Takas etmek istediğiniz ürünleri seçin"
+        description={t("page.new.page.takasEtmekIstediginizUrunleriSecin")}
       />
 
       <div className="flex flex-col items-stretch gap-6 lg:flex-row">
-        <SectionCard title="İstediğiniz Ürün" className="flex-1">
+        <SectionCard
+          title={t("page.new.page.istediginizUrun")}
+          className="flex-1"
+        >
           <div className="flex flex-col items-center gap-4">
             <div className="relative aspect-square w-full max-w-[200px] overflow-hidden rounded-lg bg-surface-alt">
               <OptimizedImage
@@ -169,7 +172,10 @@ function NewTradeContent() {
           </div>
         </div>
 
-        <SectionCard title="Teklif Edeceğiniz Ürünler" className="flex-1">
+        <SectionCard
+          title={t("page.new.page.teklifEdeceginizUrunler")}
+          className="flex-1"
+        >
           <TradeProductPicker
             products={products}
             selectedIds={selectedIds}
@@ -182,7 +188,7 @@ function NewTradeContent() {
         title={`${t("trade.cashDifference")} (${t("common.optional")})`}
       >
         <p className="mb-4 text-sm text-muted">
-          Takas değerini dengelemek için nakit fark ekleyebilirsiniz.
+          {t("page.new.page.takasDegeriniDengelemekIcinNakitFark")}
         </p>
         <div className="space-y-4">
           <div className="relative max-w-xs">
@@ -202,7 +208,7 @@ function NewTradeContent() {
           {cash > 0 && (
             <div className="space-y-2">
               <p className="text-sm font-medium text-body">
-                Nakit farkı kim ödeyecek?
+                {t("page.new.page.nakitFarkiKimOdeyecek")}
               </p>
               <div className="flex gap-4">
                 <Radio
@@ -212,7 +218,7 @@ function NewTradeContent() {
                   onChange={(e) =>
                     setCashPayer(e.target.value as "me" | "them")
                   }
-                  label="Ben ödeyeceğim"
+                  label={t("page.new.page.benOdeyecegim")}
                 />
                 <Radio
                   name="cashPayer"
@@ -221,7 +227,7 @@ function NewTradeContent() {
                   onChange={(e) =>
                     setCashPayer(e.target.value as "me" | "them")
                   }
-                  label="Karşı taraf ödeyecek"
+                  label={t("page.new.page.karsiTarafOdeyecek")}
                 />
               </div>
             </div>
@@ -259,7 +265,7 @@ function NewTradeContent() {
         />
       </div>
 
-      <SectionCard title="Teslimat Adresiniz">
+      <SectionCard title={t("page.new.page.teslimatAdresiniz")}>
         <TradeAddressPicker onChange={setAddressId} />
       </SectionCard>
 

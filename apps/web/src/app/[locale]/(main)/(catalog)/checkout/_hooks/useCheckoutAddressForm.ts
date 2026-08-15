@@ -151,7 +151,7 @@ export function useCheckoutAddressForm({
   });
 
   const handleAddAddress = async () => {
-    const parsed = savedAddressSchema(locale).safeParse(newAddress);
+    const parsed = savedAddressSchema(t).safeParse(newAddress);
     if (!parsed.success) {
       toast.error(t("checkout.fillAllRequiredWithTitle"));
       return;

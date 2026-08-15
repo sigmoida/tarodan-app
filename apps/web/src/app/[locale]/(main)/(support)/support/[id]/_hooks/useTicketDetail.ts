@@ -9,6 +9,7 @@ import { useAuthStore } from "@/stores/authStore";
 import { supportApi } from "@/lib/api";
 import { useWebItem } from "@/hooks/useWebResource";
 import { useWebMutation } from "@/hooks/useWebMutation";
+import { useTranslations } from "next-intl";
 import { replySchema, type ReplyValues } from "../../_lib/schema";
 import type { TicketDetail } from "../../_lib/data";
 
@@ -16,6 +17,7 @@ const RESOURCE = "support-ticket";
 
 /** Support ticket detail — the ticket query + the reply RHF/zod form & mutation. */
 export function useTicketDetail() {
+  const t = useTranslations();
   const params = useParams();
   const router = useRouter();
   const ticketId = params.id as string;
@@ -38,7 +40,7 @@ export function useTicketDetail() {
     if (ticketQuery.isError) {
       toast.error(
         (ticketQuery.error as any)?.response?.data?.message ||
-          "Destek talebi yüklenemedi",
+          t("support.ticketLoadFailed"),
       );
       router.push("/support");
     }
@@ -52,7 +54,7 @@ export function useTicketDetail() {
       supportApi.addMessage(ticketId, { content: values.reply.trim() }),
     {
       invalidates: [RESOURCE],
-      errorMessage: "Mesaj gönderilemedi. Lütfen tekrar deneyin.",
+      errorMessage: t("support.messageSendFailed"),
       onSuccess: () => form.reset({ reply: "" }),
     },
   );

@@ -1,10 +1,11 @@
 /** @format */
 
+import { getTranslations } from "next-intl/server";
 import { DocPage } from "@/components/layout/DocPage";
 import SectionCard from "@/components/ui/SectionCard";
 import {
-  RETURN_POLICY,
-  CANCELLATION_POLICY,
+  returnPolicy,
+  cancellationPolicy,
   type PolicyEntry,
 } from "../_lib/policy";
 
@@ -41,23 +42,24 @@ function PolicyBlock({ entry }: { entry: PolicyEntry }) {
   );
 }
 
-export default function RefundPolicyClient() {
+export default async function RefundPolicyClient() {
+  const t = await getTranslations();
   return (
     <DocPage
-      title="İade Politikası"
-      description="İade ve iptal taleplerinin hangi koşullarda oluşturulduğu, nasıl değerlendirildiği ve ücret iadesinin nasıl işlediği."
+      title={t("legal.refundPolicyTitle")}
+      description={t("legal.refundPolicy.pageDescription")}
     >
-      <SectionCard title="İade Koşul ve Şartları">
+      <SectionCard title={t("legal.refundPolicy.returnSection")}>
         <div className="space-y-7">
-          {RETURN_POLICY.map((entry) => (
+          {returnPolicy(t).map((entry) => (
             <PolicyBlock key={entry.q} entry={entry} />
           ))}
         </div>
       </SectionCard>
 
-      <SectionCard title="İptal Koşul ve Şartları">
+      <SectionCard title={t("legal.refundPolicy.cancellationSection")}>
         <div className="space-y-7">
-          {CANCELLATION_POLICY.map((entry) => (
+          {cancellationPolicy(t).map((entry) => (
             <PolicyBlock key={entry.q} entry={entry} />
           ))}
         </div>

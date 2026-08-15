@@ -3,6 +3,7 @@
 import type { Metadata } from "next";
 import { localizedCanonical } from "@/lib/seo";
 import ContactClient from "./_components/ContactClient";
+import { getTranslations } from "next-intl/server";
 
 export async function generateMetadata({
   params,
@@ -10,10 +11,12 @@ export async function generateMetadata({
   params: Promise<{ locale: string }>;
 }): Promise<Metadata> {
   const { locale } = await params;
+  const t = await getTranslations({ locale });
   return {
-    title: "İletişim · Tarodan",
-    description:
-      "Tarodan ekibine ulaşın — sorularınız, önerileriniz ve destek talepleriniz için iletişim formu.",
+    title: t("page.contact.page.iletisimTarodan"),
+    description: t(
+      "page.contact.page.tarodanEkibineUlasinSorularinizOnerilerinizVe",
+    ),
     alternates: localizedCanonical(locale, "/contact"),
   };
 }

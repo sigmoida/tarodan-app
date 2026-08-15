@@ -2,6 +2,7 @@
 
 "use client";
 
+import { useTranslations } from "next-intl";
 import {
   EllipsisHorizontalIcon,
   PencilIcon,
@@ -23,7 +24,7 @@ import {
   DropdownMenuSeparator,
 } from "@tarodan/ui";
 import {
-  SCOPE_LABELS,
+  scopeLabels,
   discountStatusConfig,
   getDiscountStatus,
   formatDate,
@@ -43,6 +44,7 @@ export default function DiscountCard({
   onToggle,
   onDelete,
 }: DiscountCardProps) {
+  const t = useTranslations();
   return (
     <div className="rounded-lg border border-border bg-surface-elevated p-5">
       <div className="flex items-start justify-between gap-4">
@@ -53,7 +55,7 @@ export default function DiscountCard({
             </h3>
             <StatusBadge
               status={getDiscountStatus(discount)}
-              config={discountStatusConfig}
+              config={discountStatusConfig(t)}
               size="sm"
             />
           </div>
@@ -82,7 +84,7 @@ export default function DiscountCard({
             </Badge>
 
             <Badge variant="outline" size="sm">
-              {SCOPE_LABELS[discount.scope] || discount.scope}
+              {scopeLabels(t)[discount.scope] || discount.scope}
             </Badge>
 
             {discount.code ? (
@@ -90,17 +92,26 @@ export default function DiscountCard({
                 {discount.code}
               </Badge>
             ) : (
-              <span className="text-xs italic text-subtle">Otomatik kod</span>
+              <span className="text-xs italic text-subtle">
+                {t("seller.discounts.autoCode")}
+              </span>
             )}
 
             <span className="flex items-center gap-1 text-muted">
               <CalendarIcon className="h-4 w-4" />
-              {formatDate(discount.startDate)} – {formatDate(discount.endDate)}
+              {formatDate(discount.startDate, t("common.dateLocale"))} –{" "}
+              {formatDate(discount.endDate, t("common.dateLocale"))}
             </span>
 
             <span className="text-muted">
-              Kullanım: {discount.usedCount}
-              {discount.usageLimitTotal ? ` / ${discount.usageLimitTotal}` : ""}
+              {discount.usageLimitTotal
+                ? t("seller.discounts.usageCountOfLimit", {
+                    used: discount.usedCount,
+                    limit: discount.usageLimitTotal,
+                  })
+                : t("seller.discounts.usageCount", {
+                    used: discount.usedCount,
+                  })}
             </span>
           </div>
         </div>
@@ -108,7 +119,11 @@ export default function DiscountCard({
         {/* Actions — collapsed into a "…" menu */}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <IconButton aria-label="İşlemler" variant="ghost" size="sm">
+            <IconButton
+              aria-label={t("common.actions")}
+              variant="ghost"
+              size="sm"
+            >
               <EllipsisHorizontalIcon className="h-5 w-5" />
             </IconButton>
           </DropdownMenuTrigger>
@@ -117,23 +132,23 @@ export default function DiscountCard({
               {discount.isActive ? (
                 <>
                   <XMarkIcon className="mr-2 h-4 w-4" />
-                  Devre Dışı Bırak
+                  {t("seller.discounts.disable")}
                 </>
               ) : (
                 <>
                   <CheckIcon className="mr-2 h-4 w-4" />
-                  Aktif Et
+                  {t("seller.discounts.enable")}
                 </>
               )}
             </DropdownMenuItem>
             <DropdownMenuItem onSelect={() => onEdit(discount)}>
               <PencilIcon className="mr-2 h-4 w-4" />
-              Düzenle
+              {t("common.edit")}
             </DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem danger onSelect={() => onDelete(discount)}>
               <TrashIcon className="mr-2 h-4 w-4" />
-              Sil
+              {t("common.delete")}
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>

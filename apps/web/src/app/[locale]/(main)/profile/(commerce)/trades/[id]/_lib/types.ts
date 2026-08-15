@@ -4,6 +4,8 @@ import { tradeStatusConfig } from "@tarodan/ui";
 import { createTranslator } from "next-intl";
 import { getMessages, resolveLocale } from "@tarodan/i18n";
 import type { TradeItem } from "../../_lib/types";
+import type { Translate } from "@/types/i18n";
+import { imagePlaceholder } from "@/lib/placeholder";
 
 // Reuse the shared TradeItem shape from the list route.
 export type { TradeItem };
@@ -115,52 +117,22 @@ export interface Trade {
   firstWarehouseArrivalAt?: string | null;
 }
 
-export const tradeStatusEnLabels: Record<string, string> = {
-  pending: "Pending",
-  accepted: "Accepted",
-  rejected: "Rejected",
-  awaiting_payment: "Awaiting Payment",
-  shipping_to_warehouse: "Shipping to Warehouse",
-  at_warehouse: "At Tarodan Warehouse",
-  admin_reviewing: "Under Review",
-  shipping_to_recipients: "Shipping to Recipients",
-  returning: "Returning",
-  initiator_shipped: "Shipped",
-  receiver_shipped: "Shipped",
-  both_shipped: "Both Parties Shipped",
-  initiator_received: "Received",
-  receiver_received: "Received",
-  completed: "Completed",
-  cancelled: "Cancelled",
-  disputed: "Disputed",
+/**
+ * Takas durumunun okunabilir etiketi.
+ *
+ * Etiket TEK kaynaktan gelir: paylaşılan harita katalog anahtarını taşır, metni
+ * katalog verir. Eskiden burada elle yazılmış AYRI bir Türkçe ve bir İngilizce
+ * harita duruyordu; ikisi paylaşılan haritadan çoktan ayrışmıştı.
+ */
+export const getTradeStatusLabel = (s: string, locale: string): string => {
+  const entry = tradeStatusConfig[s];
+  if (!entry) return s;
+  const t = createTranslator({
+    locale,
+    messages: getMessages(resolveLocale(locale)),
+  });
+  return t(entry.labelKey);
 };
-
-export const tradeStatusTrLabels: Record<string, string> = {
-  pending: "Bekliyor",
-  accepted: "Kabul Edildi",
-  rejected: "Reddedildi",
-  awaiting_payment: "Ödeme Bekleniyor",
-  shipping_to_warehouse: "Depoya Gönderim",
-  at_warehouse: "Tarodan Deposunda",
-  admin_reviewing: "İnceleniyor",
-  shipping_to_recipients: "Alıcılara Gönderim",
-  returning: "İade Yolda",
-  initiator_shipped: "Gönderildi",
-  receiver_shipped: "Karşı Taraf Gönderdi",
-  both_shipped: "İki Taraf Gönderdi",
-  initiator_received: "Teslim Alındı",
-  receiver_received: "Karşı Taraf Teslim Aldı",
-  completed: "Tamamlandı",
-  cancelled: "İptal Edildi",
-  disputed: "İtiraz Açıldı",
-};
-
-/** Locale-aware status label — EN falls back to the label map, TR prefers the
- * shared `tradeStatusConfig` label. */
-export const getTradeStatusLabel = (s: string, locale: string): string =>
-  locale === "en"
-    ? tradeStatusEnLabels[s] || s
-    : tradeStatusConfig[s]?.label || tradeStatusTrLabels[s] || s;
 
 export const getTradeStatusMeta = (
   locale: string,
@@ -224,36 +196,35 @@ export const getTradeStatusMeta = (
   };
 };
 
-export const SHIPMENT_STATUS_CHIP: Record<
-  string,
-  { label: string; className: string; icon?: string }
-> = {
+export const SHIPMENT_STATUS_CHIP = (
+  t: Translate,
+): Record<string, { label: string; className: string; icon?: string }> => ({
   label_created: {
-    label: "Etiket Hazır",
+    label: t("page.trades.types.etiketHazir"),
     className: "bg-surface-muted text-muted border border-border-subtle",
   },
   pending: {
-    label: "Bekleniyor",
+    label: t("page.trades.types.bekleniyor"),
     className: "bg-surface-muted text-muted border border-border-subtle",
   },
   in_transit: {
-    label: "Yolda",
+    label: t("page.trades.types.yolda"),
     className: "bg-surface-alt text-body border border-border",
   },
   delivered: {
-    label: "Depoya Ulaştı",
+    label: t("page.trades.types.depoyaUlasti"),
     className: "bg-success-50 text-success-700 border border-success-200",
     icon: "✓",
   },
-};
+});
 
 /** Resolve a card image for a counter-offer product row (list-of-images shape). */
 export const getProductImage = (product: any): string => {
   if (!product.images || product.images.length === 0) {
-    return "https://placehold.co/200x200/f3f4f6/9ca3af?text=Ürün";
+    return imagePlaceholder("200x200");
   }
   const img = product.images[0];
   const url =
     typeof img === "string" ? img : (img.cardUrl ?? img.detailUrl ?? img.url);
-  return url || "https://placehold.co/200x200/f3f4f6/9ca3af?text=Ürün";
+  return url || imagePlaceholder("200x200");
 };

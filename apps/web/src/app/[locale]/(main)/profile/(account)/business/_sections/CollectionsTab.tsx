@@ -3,17 +3,21 @@
 import SectionCard from "@/components/ui/SectionCard";
 import CollectionRow from "../_components/CollectionRow";
 import type { CollectionStats } from "../_lib/types";
+import { getTranslations } from "next-intl/server";
 
-export default function CollectionsTab({
+export default async function CollectionsTab({
   collections,
 }: {
   collections: CollectionStats[];
 }) {
+  const t = await getTranslations();
   return (
-    <SectionCard title="En Popüler Koleksiyonlar">
+    <SectionCard
+      title={t("page.business.collectionstab.enPopulerKoleksiyonlar")}
+    >
       {collections.length === 0 ? (
         <p className="py-4 text-center text-muted">
-          Henüz koleksiyon istatistiği yok
+          {t("page.business.collectionstab.henuzKoleksiyonIstatistigiYok")}
         </p>
       ) : (
         <div className="space-y-3">

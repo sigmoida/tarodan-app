@@ -13,8 +13,10 @@ import { useQuery } from "@tanstack/react-query";
 import { queryKeys } from "@/lib/query/keys";
 import { useAuthStore } from "@/stores/authStore";
 import { fetchManufacturersClient, mergeManufacturers } from "../_lib/data";
+import { useTranslations } from "next-intl";
 
 function useManufacturersValue() {
+  const t = useTranslations();
   const { isAuthenticated } = useAuthStore();
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCountry, setSelectedCountry] = useState<string | null>(null);
@@ -44,7 +46,8 @@ function useManufacturersValue() {
   const countries = useMemo(() => {
     const map = new Map<string, { flag: string; count: number }>();
     brands.forEach((b) => {
-      const key = b.country || "Diğer";
+      const key =
+        b.country || t("page.manufacturers.manufacturerscontext.diger");
       const existing = map.get(key);
       if (existing) existing.count++;
       else map.set(key, { flag: b.countryFlag, count: 1 });
@@ -96,10 +99,13 @@ export function ManufacturersProvider({ children }: { children: ReactNode }) {
 }
 
 export function useManufacturers() {
+  const t = useTranslations();
   const ctx = useContext(ManufacturersContext);
   if (!ctx)
     throw new Error(
-      "useManufacturers must be used within a ManufacturersProvider",
+      t(
+        "page.manufacturers.manufacturerscontext.usemanufacturersMustBeUsedWithinA",
+      ),
     );
   return ctx;
 }

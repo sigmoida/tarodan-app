@@ -229,7 +229,7 @@ export default function AccountMenu({
                 className={MENU_LINK_CLASS}
               >
                 <SparklesIcon className="w-5 h-5" />
-                {membershipNavLabel(membershipTier)}
+                {membershipNavLabel(t, membershipTier)}
               </Link>
               <Link
                 href="/profile/listings"

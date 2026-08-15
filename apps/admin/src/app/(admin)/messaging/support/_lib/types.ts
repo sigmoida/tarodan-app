@@ -3,7 +3,7 @@ import {
   ticketPriorityConfig,
   ticketCategoryConfig,
 } from "@tarodan/ui";
-import { statusFilterOptions } from "@/lib/utils";
+import { resolvedFilterOptions } from "@/lib/utils";
 import type { StatusConfig } from "@tarodan/ui";
 import type { useTranslations } from "next-intl";
 
@@ -119,15 +119,15 @@ export const supportTicketCategoryConfig = (
 
 /** Toolbar filter options, derived from the shared ticket status configs. */
 export const ticketStatusOptions = (t: T) =>
-  statusFilterOptions(supportTicketStatusConfig(t), {
+  resolvedFilterOptions(supportTicketStatusConfig(t), {
     allLabel: t("admin.messaging.support.allStatuses"),
   });
 export const ticketPriorityOptions = (t: T) =>
-  statusFilterOptions(supportTicketPriorityConfig(t), {
+  resolvedFilterOptions(supportTicketPriorityConfig(t), {
     allLabel: t("admin.messaging.support.allPriorities"),
   });
 export const ticketCategoryOptions = (t: T) =>
-  statusFilterOptions(supportTicketCategoryConfig(t), {
+  resolvedFilterOptions(supportTicketCategoryConfig(t), {
     allLabel: t("admin.messaging.support.allCategories"),
   });
 

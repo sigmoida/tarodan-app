@@ -32,8 +32,10 @@ export default function PaymentMethodsPage() {
   return (
     <PageShell className="pb-16">
       <PageHeader
-        title="Kayıtlı Kartlarım"
-        description='Otomatik yenileme ve hızlı ödeme için kayıtlı kartların. Yeni kart, ödeme sırasında "kartımı kaydet" ile eklenir.'
+        title={t("profile.paymentMethods.kayitliKartlarim")}
+        description={t(
+          "profile.paymentMethods.otomatikYenilemeVeHizliOdemeIcin",
+        )}
       />
 
       {isLoading ? (
@@ -57,10 +59,13 @@ export default function PaymentMethodsPage() {
       ) : cards.length === 0 ? (
         <div className="rounded-lg border border-border bg-surface-elevated p-8 text-center">
           <CreditCardIcon className="mx-auto mb-3 h-12 w-12 text-muted" />
-          <p className="text-muted">Kayıtlı kartın yok.</p>
+          <p className="text-muted">
+            {t("profile.paymentMethods.kayitliKartinYok")}
+          </p>
           <p className="mt-1 text-sm text-muted">
-            Bir ödeme yaparken "kartımı kaydet" seçeneğini işaretleyerek kart
-            ekleyebilirsin.
+            {t(
+              "profile.paymentMethods.birOdemeYaparkenKartimiKaydetSecenegini",
+            )}
           </p>
         </div>
       ) : (
@@ -74,7 +79,9 @@ export default function PaymentMethodsPage() {
       <div className="flex items-center justify-center gap-2 text-xs text-muted">
         <ShieldCheckIcon className="h-4 w-4 text-success-500" />
         <span>
-          Kartların PayTR güvenli kasasında saklanır; numara/CVV bizde tutulmaz.
+          {t(
+            "profile.paymentMethods.kartlarinPayTRGuvenliKasasindaSaklanirNumara",
+          )}
         </span>
       </div>
 
@@ -82,14 +89,17 @@ export default function PaymentMethodsPage() {
         isOpen={!!toDelete}
         onClose={() => setToDelete(null)}
         onConfirm={confirmDelete}
-        title="Kartı sil"
+        title={t("profile.paymentMethods.kartiSil")}
         description={
           toDelete
-            ? `${toDelete.brand || "Kart"} •••• ${toDelete.last4} kartını silmek istediğine emin misin? Bu kartla otomatik yenileme yapılamaz hale gelir.`
+            ? t("profile.paymentMethods.kartLast4KartiniSilmekIstedigineEmin", {
+                Kart: toDelete.brand || "Kart",
+                last4: toDelete.last4,
+              })
             : ""
         }
         confirmLabel="Sil"
-        cancelLabel="Vazgeç"
+        cancelLabel={t("profile.paymentMethods.vazgec")}
         closeLabel={t("common.close")}
         isLoading={deleteCard.isPending}
         destructive

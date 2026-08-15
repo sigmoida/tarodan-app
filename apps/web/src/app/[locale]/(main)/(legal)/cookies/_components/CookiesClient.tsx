@@ -1,101 +1,118 @@
 import { getTranslations } from "next-intl/server";
 import { DocPage } from "@/components/layout/DocPage";
 import SectionCard from "@/components/ui/SectionCard";
+import type { Translate } from "@/types/i18n";
 import CookiePreferencesPanel from "./CookiePreferencesPanel";
 
 /** Saklama süreleri — 5651, KVKK, ETK, VUK ve TTK hükümlerinden. */
-const RETENTION = [
+const retentionRows = (t: Translate) => [
   {
-    type: "Trafik bilgileri ve erişim logları",
-    data: "IP adresi, bağlantı başlangıç/bitiş saatleri, kullanılan portlar, protokoller",
-    basis: "5651 sayılı İnternet Kanunu (yer sağlayıcı yükümlülüğü)",
-    period: "2 yıl",
+    type: t("legal.cookies.page.retentionTrafficType"),
+    data: t("legal.cookies.page.retentionTrafficData"),
+    basis: t("legal.cookies.page.retentionTrafficBasis"),
+    period: t("legal.cookies.page.retentionTrafficPeriod"),
   },
   {
-    type: "Finansal işlem ve sipariş logları",
-    data: "Ödeme hareketleri, sepet geçmişi, faturalar, cüzdan yükleme ve transfer dökümleri",
-    basis: "VUK madde 253 ve TTK",
-    period: "5 yıl (VUK) / 10 yıl (TTK)",
+    type: t("legal.cookies.page.retentionFinanceType"),
+    data: t("legal.cookies.page.retentionFinanceData"),
+    basis: t("legal.cookies.page.retentionFinanceBasis"),
+    period: t("legal.cookies.page.retentionFinancePeriod"),
   },
   {
-    type: "Ticari iletişim ve ileti onay logları",
-    data: "SMS, e-posta ve arama pazarlama onayları, ret tercihleri, İYS entegrasyon logları",
-    basis: "ETK ve Ticari İletişim Yönetmeliği",
-    period: "3 yıl (onay kalktıktan sonra)",
+    type: t("legal.cookies.page.retentionEtkType"),
+    data: t("legal.cookies.page.retentionEtkData"),
+    basis: t("legal.cookies.page.retentionEtkBasis"),
+    period: t("legal.cookies.page.retentionEtkPeriod"),
   },
   {
-    type: "Üyelik, ilan ve iletişim hareketleri",
-    data: "İlan verme, mesajlaşma geçmişi, favoriler, arama filtreleri, profil güncellemeleri",
-    basis: "6698 sayılı KVKK ve Borçlar Kanunu",
-    period: "Üyelik süresince + 10 yıl",
+    type: t("legal.cookies.page.retentionMembershipType"),
+    data: t("legal.cookies.page.retentionMembershipData"),
+    basis: t("legal.cookies.page.retentionMembershipBasis"),
+    period: t("legal.cookies.page.retentionMembershipPeriod"),
   },
   {
-    type: "Çerez rıza ve tercih logları",
-    data: "Banner üzerinde verdiğiniz kabul/ret tercihleri ve zaman damgası",
-    basis: "KVKK ispat yükümlülüğü",
-    period: "1 yıl",
+    type: t("legal.cookies.page.retentionConsentType"),
+    data: t("legal.cookies.page.retentionConsentData"),
+    basis: t("legal.cookies.page.retentionConsentBasis"),
+    period: t("legal.cookies.page.retentionConsentPeriod"),
   },
 ];
 
 /** Bireysel (C2C) ve kurumsal kullanıcılar için yasal kapsam farkları. */
-const USER_SCOPE = [
+const userScopeRows = (t: Translate) => [
   {
-    criterion: "KVKK / kişisel veri",
-    individual:
-      "Tam kapsam. KVKK koruması altındadır; açık rıza ve aydınlatma zorunludur.",
-    corporate:
-      "Kısmi kapsam. Tüzel kişiler muaftır; şahıs şirketlerinde yetkili kişi KVKK'ya tabidir.",
+    criterion: t("legal.cookies.page.scopeKvkkCriterion"),
+    individual: t("legal.cookies.page.scopeKvkkIndividual"),
+    corporate: t("legal.cookies.page.scopeKvkkCorporate"),
   },
   {
-    criterion: "Çerez ve rıza yönetimi",
-    individual:
-      "Kesin opt-in. Zorunlu olmayan tüm çerez ve pikseller için açık rıza şarttır.",
-    corporate:
-      "Standart banner kuralları geçerlidir. Kurumsal oturum çerezleri zorunlu sayılır.",
+    criterion: t("legal.cookies.page.scopeConsentCriterion"),
+    individual: t("legal.cookies.page.scopeConsentIndividual"),
+    corporate: t("legal.cookies.page.scopeConsentCorporate"),
   },
   {
-    criterion: "Ticari iletişim (ETK)",
-    individual:
-      "Önceden onay. Pazarlama iletileri için İYS onaylı açık rıza zorunludur.",
-    corporate:
-      "B2B istisna. Tacir ve esnafa yönelik iletilerde ETK istisnaları uygulanabilir (opt-out hakkı saklıdır).",
+    criterion: t("legal.cookies.page.scopeEtkCriterion"),
+    individual: t("legal.cookies.page.scopeEtkIndividual"),
+    corporate: t("legal.cookies.page.scopeEtkCorporate"),
   },
   {
-    criterion: "Sözleşme ve faturalandırma",
-    individual:
-      "Mesafeli satış. TKHK ve cayma hakları geçerlidir; e-arşiv fatura kesilir.",
-    corporate:
-      "TTK hükümleri geçerlidir; e-fatura ve kurumsal üyelik sözleşmesi bağlayıcıdır.",
+    criterion: t("legal.cookies.page.scopeContractCriterion"),
+    individual: t("legal.cookies.page.scopeContractIndividual"),
+    corporate: t("legal.cookies.page.scopeContractCorporate"),
   },
 ];
 
-const THIRD_PARTIES = [
+/** Sağlayıcı ADLARI markadır ve çevrilmez; yalnız kullanım amacı katalogdadır. */
+const thirdParties = (t: Translate) => [
   {
     name: "Google (Analytics, Tag Manager, Ads, YouTube)",
-    purpose: "Trafik analizi, gömülü video ve yeniden hedefleme",
+    purpose: t("legal.cookies.page.thirdPartyGooglePurpose"),
     href: "https://policies.google.com/privacy",
   },
   {
     name: "Yandex (Metrica, Direct)",
-    purpose: "Site içi tıklama/ısı haritası analizi ve reklam gösterimi",
+    purpose: t("legal.cookies.page.thirdPartyYandexPurpose"),
     href: "https://yandex.com/legal/confidential/",
   },
   {
     name: "Meta (Facebook / Instagram)",
-    purpose: "Yeniden pazarlama ve dönüşüm ölçümü",
+    purpose: t("legal.cookies.page.thirdPartyMetaPurpose"),
     href: "https://www.facebook.com/privacy/policy",
   },
   {
     name: "TikTok",
-    purpose: "Reklam dönüşüm ölçümü",
+    purpose: t("legal.cookies.page.thirdPartyTiktokPurpose"),
     href: "https://www.tiktok.com/legal/privacy-policy",
   },
   {
     name: "PayTR",
-    purpose: "Ödeme işlemleri ve dolandırıcılık önleme",
+    purpose: t("legal.cookies.page.thirdPartyPaytrPurpose"),
     href: "https://www.paytr.com/kvkk",
   },
 ];
+
+/** Tarayıcı adları markadır; yalnız bağlantı hedefleri değişebilir. */
+const BROWSER_GUIDES = [
+  {
+    name: "Google Chrome",
+    href: "https://support.google.com/chrome/answer/95647",
+  },
+  {
+    name: "Mozilla Firefox",
+    href: "https://support.mozilla.org/tr/kb/cerezleri-etkinlestirme-ve-devre-disi-birakma",
+  },
+  {
+    name: "Apple Safari",
+    href: "https://support.apple.com/tr-tr/guide/safari/sfri11471/mac",
+  },
+  {
+    name: "Microsoft Edge",
+    href: "https://support.microsoft.com/tr-tr/microsoft-edge",
+  },
+];
+
+const SUPPORT_EMAIL = "destek@tarodan.com.tr";
+const SUPPORT_PHONE = "0850 XXX XX XX";
 
 export default async function CookiesClient() {
   const t = await getTranslations();
@@ -103,57 +120,48 @@ export default async function CookiesClient() {
   return (
     <DocPage
       title={t("legal.cookiesTitle")}
-      description={`${t("legal.lastUpdated")}: 2 Ağustos 2026`}
+      description={`${t("legal.lastUpdated")}: ${t("legal.cookies.page.lastUpdatedValue")}`}
     >
-      <SectionCard title="1. Çerez Nedir?">
+      <SectionCard title={t("legal.cookies.page.s1Title")}>
         <div className="prose prose-gray max-w-none">
+          <p>{t("legal.cookies.page.s1p1")}</p>
           <p>
-            Çerezler, web siteleri tarafından cihazınıza yerleştirilen küçük
-            metin dosyalarıdır. Bu politika, çerezlerin yanı sıra tarayıcınızın
-            yerel depolama (localStorage) alanında sakladığımız verileri de
-            kapsar — mevzuat açısından ikisi de terminal ekipmanınıza erişim
-            sayılır.
+            {t.rich("legal.cookies.page.s1p2", {
+              b: (chunks) => <strong>{chunks}</strong>,
+            })}
           </p>
-          <p>
-            Süreye göre <strong>oturum çerezleri</strong> (tarayıcıyı
-            kapattığınızda silinir) ve <strong>kalıcı çerezler</strong>{" "}
-            (belirlenen süre boyunca kalır); kaynağa göre{" "}
-            <strong>birinci taraf</strong> (TARODAN) ve{" "}
-            <strong>üçüncü taraf</strong> (hizmet sağlayıcılarımız) çerezleri
-            olarak ayrılır.
-          </p>
-          <p>
-            Zorunlu çerezler dışındaki hiçbir çerez, siz açık rıza vermeden
-            çalıştırılmaz. Tercihinizi aşağıdaki panelden istediğiniz zaman
-            değiştirebilirsiniz; rızanızı geri çekmeniz, geri çekme anına kadar
-            gerçekleşen işlemleri etkilemez.
-          </p>
+          <p>{t("legal.cookies.page.s1p3")}</p>
         </div>
       </SectionCard>
 
-      <SectionCard title="2. Çerez Kategorileri ve Tercihleriniz">
+      <SectionCard title={t("legal.cookies.page.s2Title")}>
         <CookiePreferencesPanel
           saveLabel={t("legal.savePreferences")}
           acceptAllLabel={t("legal.acceptAll")}
         />
       </SectionCard>
 
-      <SectionCard title="3. Üçüncü Taraf Hizmet Sağlayıcılar">
+      <SectionCard title={t("legal.cookies.page.s3Title")}>
         <p className="mb-4 text-sm text-muted">
-          Aşağıdaki sağlayıcıların çerezleri yalnızca ilgili kategoriye rıza
-          verdiğinizde yüklenir. Her biri kendi gizlilik politikasına tabidir.
+          {t("legal.cookies.page.s3Intro")}
         </p>
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
               <tr className="text-left text-muted">
-                <th className="pb-2 font-medium">Sağlayıcı</th>
-                <th className="pb-2 font-medium">Kullanım Amacı</th>
-                <th className="pb-2 font-medium">Politika</th>
+                <th className="pb-2 font-medium">
+                  {t("legal.cookies.page.colProvider")}
+                </th>
+                <th className="pb-2 font-medium">
+                  {t("legal.cookies.page.colUsage")}
+                </th>
+                <th className="pb-2 font-medium">
+                  {t("legal.cookies.page.colPolicy")}
+                </th>
               </tr>
             </thead>
             <tbody className="text-body">
-              {THIRD_PARTIES.map((party) => (
+              {thirdParties(t).map((party) => (
                 <tr key={party.name} className="border-t border-border-subtle">
                   <td className="py-2 pr-4 font-medium">{party.name}</td>
                   <td className="py-2 pr-4">{party.purpose}</td>
@@ -164,7 +172,7 @@ export default async function CookiesClient() {
                       rel="noopener noreferrer"
                       className="text-primary-600 hover:underline"
                     >
-                      Görüntüle
+                      {t("legal.cookies.page.view")}
                     </a>
                   </td>
                 </tr>
@@ -174,22 +182,27 @@ export default async function CookiesClient() {
         </div>
       </SectionCard>
 
-      <SectionCard title="4. Bireysel ve Kurumsal Kullanıcı Farkları">
+      <SectionCard title={t("legal.cookies.page.s4Title")}>
         <p className="mb-4 text-sm text-muted">
-          Koleksiyoner (C2C) alıcılar ile mağaza sahibi ticari satıcılar farklı
-          yasal rejimlere tabidir.
+          {t("legal.cookies.page.s4Intro")}
         </p>
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
               <tr className="text-left text-muted">
-                <th className="pb-2 font-medium">Kriter</th>
-                <th className="pb-2 font-medium">Bireysel Kullanıcı</th>
-                <th className="pb-2 font-medium">Kurumsal Kullanıcı</th>
+                <th className="pb-2 font-medium">
+                  {t("legal.cookies.page.colCriterion")}
+                </th>
+                <th className="pb-2 font-medium">
+                  {t("legal.cookies.page.colIndividual")}
+                </th>
+                <th className="pb-2 font-medium">
+                  {t("legal.cookies.page.colCorporate")}
+                </th>
               </tr>
             </thead>
             <tbody className="text-body">
-              {USER_SCOPE.map((row) => (
+              {userScopeRows(t).map((row) => (
                 <tr
                   key={row.criterion}
                   className="border-t border-border-subtle"
@@ -206,23 +219,30 @@ export default async function CookiesClient() {
         </div>
       </SectionCard>
 
-      <SectionCard title="5. Loglama ve Yasal Saklama Süreleri">
+      <SectionCard title={t("legal.cookies.page.s5Title")}>
         <p className="mb-4 text-sm text-muted">
-          Çerezlerin ötesinde, platform üzerindeki hareketleriniz aşağıdaki
-          yasal dayanaklarla loglanır ve belirtilen süreler boyunca saklanır.
+          {t("legal.cookies.page.s5Intro")}
         </p>
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
               <tr className="text-left text-muted">
-                <th className="pb-2 font-medium">Log Türü</th>
-                <th className="pb-2 font-medium">Saklanan Veriler</th>
-                <th className="pb-2 font-medium">Yasal Dayanak</th>
-                <th className="pb-2 font-medium">Saklama Süresi</th>
+                <th className="pb-2 font-medium">
+                  {t("legal.cookies.page.colLogType")}
+                </th>
+                <th className="pb-2 font-medium">
+                  {t("legal.cookies.page.colStoredData")}
+                </th>
+                <th className="pb-2 font-medium">
+                  {t("legal.cookies.page.colLegalBasis")}
+                </th>
+                <th className="pb-2 font-medium">
+                  {t("legal.cookies.page.colRetention")}
+                </th>
               </tr>
             </thead>
             <tbody className="text-body">
-              {RETENTION.map((row) => (
+              {retentionRows(t).map((row) => (
                 <tr key={row.type} className="border-t border-border-subtle">
                   <td className="py-2 pr-4 align-top font-medium">
                     {row.type}
@@ -238,82 +258,41 @@ export default async function CookiesClient() {
           </table>
         </div>
         <p className="mt-4 rounded-lg border border-border bg-surface p-4 text-sm text-muted">
-          5651 kapsamındaki loglar, adli soruşturmalar açısından zaman damgası
-          (timestamp) ve bütünlük hash&apos;i ile birlikte üretilip saklanır.
-          KVKK kapsamındaki veriler ise işleme amacı sona erdiğinde periyodik
-          imha takvimine göre silinir veya anonimleştirilir.
+          {t("legal.cookies.page.s5Note")}
         </p>
       </SectionCard>
 
-      <SectionCard title="6. Çerezleri Tarayıcıdan Kontrol Etme">
+      <SectionCard title={t("legal.cookies.page.s6Title")}>
         <div className="prose prose-gray max-w-none">
-          <p>
-            Yukarıdaki panele ek olarak, tarayıcı ayarlarınızdan tüm çerezleri
-            engelleyebilir, yalnızca üçüncü taraf çerezleri engelleyebilir,
-            mevcut çerezleri silebilir veya her çerez yerleştirildiğinde uyarı
-            alabilirsiniz. Mobil cihazlarda bu ayarlar tarayıcı veya cihaz
-            ayarlarından yönetilir.
-          </p>
+          <p>{t("legal.cookies.page.s6p1")}</p>
           <ul>
-            <li>
-              <a
-                href="https://support.google.com/chrome/answer/95647"
-                target="_blank"
-                rel="noopener noreferrer"
-              >
-                Google Chrome
-              </a>
-            </li>
-            <li>
-              <a
-                href="https://support.mozilla.org/tr/kb/cerezleri-etkinlestirme-ve-devre-disi-birakma"
-                target="_blank"
-                rel="noopener noreferrer"
-              >
-                Mozilla Firefox
-              </a>
-            </li>
-            <li>
-              <a
-                href="https://support.apple.com/tr-tr/guide/safari/sfri11471/mac"
-                target="_blank"
-                rel="noopener noreferrer"
-              >
-                Apple Safari
-              </a>
-            </li>
-            <li>
-              <a
-                href="https://support.microsoft.com/tr-tr/microsoft-edge"
-                target="_blank"
-                rel="noopener noreferrer"
-              >
-                Microsoft Edge
-              </a>
-            </li>
+            {BROWSER_GUIDES.map((guide) => (
+              <li key={guide.name}>
+                <a href={guide.href} target="_blank" rel="noopener noreferrer">
+                  {guide.name}
+                </a>
+              </li>
+            ))}
           </ul>
         </div>
         <p className="mt-4 rounded-lg border border-warning-200 bg-warning-50 p-4 text-sm text-warning-800">
-          <strong>Önemli:</strong> Zorunlu çerezleri tarayıcınızdan
-          engellerseniz oturum açma, sepet ve ödeme gibi temel özellikler
-          çalışmayabilir.
+          {t.rich("legal.cookies.page.s6Warning", {
+            b: (chunks) => <strong>{chunks}</strong>,
+          })}
         </p>
       </SectionCard>
 
-      <SectionCard title="7. Haklarınız, Güncellemeler ve İletişim">
+      <SectionCard title={t("legal.cookies.page.s7Title")}>
         <div className="prose prose-gray max-w-none">
-          <p>
-            KVKK madde 11 uyarınca kişisel verilerinize erişme, düzeltilmesini
-            veya silinmesini isteme, işlemeye itiraz etme ve rızanızı geri çekme
-            haklarına sahipsiniz. Bu politikayı gerektiğinde güncelleriz; önemli
-            değişiklikler platformda duyurulur ve bu sayfada yayınlanır.
-          </p>
+          <p>{t("legal.cookies.page.s7p1")}</p>
           <ul>
             <li>
-              <strong>E-posta:</strong> destek@tarodan.com.tr
+              <strong>{t("legal.cookies.page.contactEmailLabel")}</strong>{" "}
+              {SUPPORT_EMAIL}
             </li>
             <li>
-              <strong>Telefon:</strong> 0850 XXX XX XX
+              <strong>{t("legal.cookies.page.contactPhoneLabel")}</strong>{" "}
+              {SUPPORT_PHONE}
             </li>
           </ul>
         </div>

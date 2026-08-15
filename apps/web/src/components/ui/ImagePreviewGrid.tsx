@@ -30,6 +30,7 @@ import {
 } from "@heroicons/react/24/outline";
 import { StarIcon as StarSolidIcon } from "@heroicons/react/24/solid";
 import { Button, IconButton } from "@tarodan/ui";
+import { imagePlaceholder } from "@/lib/placeholder";
 import {
   coverIndexOf,
   MIN_RECOMMENDED_DIMENSION,
@@ -56,7 +57,7 @@ export interface ImagePreviewGridProps {
   className?: string;
 }
 
-const FALLBACK = "https://placehold.co/200x200/f3f4f6/9ca3af?text=Resim";
+const FALLBACK = imagePlaceholder("200x200");
 
 /**
  * Yüklenen görsellerin ızgarası: her kalem KENDİ durumunu gösterir, sıra

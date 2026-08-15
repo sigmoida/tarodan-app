@@ -23,12 +23,12 @@ import { useLocale, useTranslations } from "next-intl";
 import { formatTL } from "@/lib/format";
 import {
   groupOrdersOf,
-  paymentStatusEnLabels,
   type GroupOrder,
   type Payment,
   type PaymentActionCb,
 } from "../_lib/types";
 import { publicNameOf } from "@/lib/public-name";
+import { statusConfig, statusLabel } from "@/lib/statusLabels";
 
 function Thumb({ src, alt }: { src?: string | null; alt: string }) {
   if (src) {
@@ -70,10 +70,13 @@ export default function PaymentCard({
   // the single "Detaylar" toggle reveals the items in place instead of navigating.
   const [open, setOpen] = useState(false);
 
-  const statusLabel =
-    locale === "en"
-      ? paymentStatusEnLabels[payment.status] || payment.status
-      : paymentStatusConfig[payment.status]?.label || payment.status;
+  // Etiket TEK kaynaktan gelir: paylaşılan harita katalog anahtarını taşır.
+  const label = statusLabel(
+    paymentStatusConfig,
+    payment.status,
+    t,
+    payment.status,
+  );
 
   // Per-item display-status label (backend already sends the display status key,
   // consistent with the orders list: refund_requested / refunded / cancelled / …).
@@ -203,8 +206,8 @@ export default function PaymentCard({
           </span>
           <StatusBadge
             status={payment.status}
-            config={paymentStatusConfig}
-            label={statusLabel}
+            config={statusConfig(paymentStatusConfig, t)}
+            label={label}
             size="sm"
           />
         </div>
@@ -313,7 +316,7 @@ export default function PaymentCard({
                 <div className="mt-1.5">
                   <StatusBadge
                     status={o.status}
-                    config={orderStatusConfig}
+                    config={statusConfig(orderStatusConfig, t)}
                     label={itemStatusLabel(o.status)}
                     size="sm"
                   />

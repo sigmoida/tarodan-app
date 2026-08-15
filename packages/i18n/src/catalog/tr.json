@@ -168,7 +168,13 @@
     "vehicleTypes": "Araç Türleri",
     "manufacturers": "Üreticiler",
     "allManufacturers": "Tüm Üreticiler",
-    "support": "Destek"
+    "support": "Destek",
+    "allListings": "Tüm İlanlar",
+    "newArrivals": "Yeni Gelenler",
+    "bestSellers": "Çok Satanlar",
+    "onSale": "İndirimler",
+    "categories": "Kategoriler",
+    "scale": "Ölçek"
   },
   "auth": {
     "loginTitle": "Giriş Yap",
@@ -338,7 +344,11 @@
     "heroRegisterTitle": "Koleksiyonun Başlasın",
     "heroRegisterSubtitle": "Ücretsiz katıl, ilk modelini bugün keşfet.",
     "heroDefaultTitle": "Koleksiyonun Kalbi Burada",
-    "heroDefaultSubtitle": "Binlerce diecast model, tek adres. Aradığını bul, koleksiyonunu büyüt."
+    "heroDefaultSubtitle": "Binlerce diecast model, tek adres. Aradığını bul, koleksiyonunu büyüt.",
+    "businessPendingEmailNotice": "Başvurunuz <b>{email}</b> adresi ile incelemede. Sonuç e-posta ile bildirilecek.",
+    "businessRejectedEmailNotice": "<b>{email}</b> adresiyle yapılan kurumsal başvurunuz reddedildi.",
+    "businessPendingDescription": "<b>{company}</b> adına yaptığınız başvuru onay sürecindedir. İnceleme tamamlandığında <b>{email}</b> adresinize bilgi gönderilecektir (genellikle 1–2 iş günü).",
+    "businessRejectedDescription": "<b>{company}</b> adına yaptığınız şirket hesabı başvurusu onaylanmadı. Red gerekçesi <b>{email}</b> adresinize e-posta ile gönderilmiştir."
   },
   "brands": {
     "title": "Markalar",
@@ -350,7 +360,50 @@
     "noProducts": "Bu markaya ait aktif ilan bulunamadı.",
     "backToAll": "Tüm Markalar",
     "website": "Web Sitesi",
-    "activeListings": "Aktif ilanlar"
+    "activeListings": "Aktif ilanlar",
+    "manufacturersPage": {
+      "uretici": "Üretici",
+      "ulke": "Ülke",
+      "yillikTarih": "Yıllık Tarih",
+      "diecastUreticilerRehberi": "Diecast Üreticiler Rehberi",
+      "dunyaninEnPrestijliDiecastModelAraba": "Dünyanın en prestijli diecast model araba üreticilerini keşfedin — her markanın tarihini, özel serilerini ve popüler modellerini inceleyin.",
+      "sonucBulunamadi": "Sonuç Bulunamadı",
+      "ureticiListesiHazirlaniyor": "Üretici Listesi Hazırlanıyor",
+      "searchqueryAramasiylaEslesenUreticiYok": "\"{searchQuery}\" aramasıyla eşleşen üretici yok.",
+      "ureticilerEklendikceBuradaListelenecek": "Üreticiler eklendikçe burada listelenecek.",
+      "filtreleriTemizle": "Filtreleri Temizle",
+      "koleksiyonunuzuBaslatin": "Koleksiyonunuzu Başlatın",
+      "favoriMarkalarinizdanBinlerceDiecastModelArasindan": "Favori markalarınızdan binlerce diecast model arasından seçim yapın. Hemen üye olun ve koleksiyonunuzu oluşturmaya başlayın.",
+      "ilanlariKesfet": "İlanları Keşfet",
+      "uyeOl": "Üye Ol"
+    },
+    "manufacturersMeta": {
+      "ureticilerTarodan": "Üreticiler | Tarodan",
+      "dunyaninEnPrestijliDiecastModelAraba": "Dünyanın en prestijli diecast model araba üreticilerini keşfedin. Her markanın tarihini, özel serilerini ve popüler modellerini Tarodan'da inceleyin.",
+      "diecastUreticilerRehberiTarodan": "Diecast Üreticiler Rehberi | Tarodan",
+      "hotWheelsMatchboxAUTOartMinichampsVe": "Hot Wheels, Matchbox, AUTOart, Minichamps ve daha fazlası — diecast üreticilerini keşfedin."
+    },
+    "manufacturerCard": {
+      "borderPrimary300ShadowMd": "border-primary-300 shadow-md",
+      "borderBorderHoverBorderPrimary200": "border-border hover:border-primary-200 hover:shadow-sm",
+      "kurulus": "Kuruluş:",
+      "aktifIlan": "Aktif İlan:",
+      "webSitesi": "Web Sitesi",
+      "allListingsOf": "Tüm {brand} ilanları"
+    },
+    "manufacturerDetail": {
+      "ureticiBulunamadi": "Üretici Bulunamadı",
+      "tumUreticilereDon": "Tüm Üreticilere Dön",
+      "tumUreticiler": "Tüm Üreticiler",
+      "aktifIlan": "Aktif İlan"
+    },
+    "manufacturerGrid": {
+      "tumIlanlar": "Tüm İlanlar",
+      "ilanBulunamadi": "İlan Bulunamadı",
+      "buUreticiyeAitHenuzBirIlan": "Bu üreticiye ait henüz bir ilan eklenmemiş.",
+      "ilanVerenIlkKisiOl": "İlan Veren İlk Kişi Ol",
+      "resultsShown": "{count} sonuç gösteriliyor"
+    }
   },
   "models": {
     "title": "Modeller",
@@ -721,7 +774,72 @@
     "sellerEarning": "Hak edişiniz",
     "packageFeeLabel": "Paket ücreti",
     "sampleDimensionsLabel": "Örnek ölçü (en × boy × yükseklik)",
-    "rejectionReason": "Red gerekçesi"
+    "rejectionReason": "Red gerekçesi",
+    "imageGrid": {
+      "alt": "Görsel {index}",
+      "cover": "Kapak",
+      "reorder": "Görsel {index} sırasını değiştir",
+      "makeCover": "Görsel {index} kapak yap",
+      "uploadingAria": "Görsel {index} yükleniyor",
+      "remove": "Görsel {index} kaldır",
+      "processing": "İşleniyor",
+      "queued": "Sırada",
+      "uploadingPercent": "Yükleniyor %{percent}",
+      "failed": "Yüklenemedi",
+      "dragStart": "{name} taşınıyor",
+      "dragOver": "{name} konumunun üzerinde",
+      "dragEnd": "{name} konumuna bırakıldı",
+      "dragCancel": "Taşıma iptal edildi",
+      "submitBlockerPending": "Görsel yüklemesi sürüyor, lütfen tamamlanmasını bekleyin.",
+      "submitBlockerFailed": "Yüklenemeyen görsel var. Tekrar deneyin ya da o görseli kaldırın.",
+      "uploadNoResult": "Sunucu bu dosya için sonuç döndürmedi",
+      "rejectedType": "{count} dosya desteklenmeyen biçimde",
+      "rejectedSize": "{count} dosya {limitMb} MB sınırının üstünde",
+      "rejectedDuplicate": "{count} dosya zaten eklenmiş",
+      "rejectedLimit": "{count} dosya kontenjana sığmadı",
+      "rejectedSuffix": "{reasons} — eklenmedi"
+    },
+    "materialResin": "Resin (Reçine)",
+    "listingLimitReached": "İlan limitinize ulaştınız ({current}/{max}). Üyeliğinizi yükselterek daha fazla ilan oluşturabilirsiniz.",
+    "loginRequiredToEdit": "İlan düzenlemek için giriş yapmalısınız",
+    "editListingDescription": "İlan bilgilerinizi güncelleyin.",
+    "backToListing": "İlana Dön",
+    "awaitingReview": "İnceleme Bekleniyor",
+    "sendForReview": "İncelemeye Gönder",
+    "sentForReviewRepublish": "İlanınız incelemeye gönderildi. Onaylandığında yeniden yayına girecek.",
+    "sentForReview": "İlanınız incelemeye gönderildi. Onaylandığında yayına girecek.",
+    "reactivateFailed": "Yeniden satışa açılamadı",
+    "invalidStockQuantity": "Geçerli bir stok miktarı giriniz",
+    "listingRemoved": "İlan silindi",
+    "soldOutTitle": "Bu ürün satılmış",
+    "outOfStockTitle": "Bu ürün stokta yok",
+    "submitForApproval": "Onaya Gönder",
+    "editMetaTitle": "İlanı Düzenle | Tarodan",
+    "deactivateListingFull": "İlanı Pasife Al",
+    "reactivateHint": "Yeniden satışa açmak için stok miktarı belirleyin. İlanınız onaya gönderilir; admin onayından sonra yeniden yayına girer.",
+    "reservedTitle": "Bu ürün rezerve edilmiş",
+    "reservedDescription": "Rezerve edilmiş ürünler düzenlenemez. Rezervasyon tamamlandıktan veya iptal edildikten sonra düzenleme yapabilirsiniz.",
+    "removedTitle": "Bu ürün kaldırıldı",
+    "removedDescription": "Bu ürün yönetici tarafından kaldırılmış ve yeniden açılamaz. Tekrar satmak için yeni bir ilan oluşturabilirsiniz.",
+    "unavailable": {
+      "bgSuccess100TextSuccess600": "bg-success-100 text-success-600",
+      "bgDanger100TextDanger600": "bg-danger-100 text-danger-600",
+      "iyiHaberUrunTekrarSatista": "İyi haber: ürün tekrar satışta!",
+      "titleTekrarStogaDustu": "\"{title}\" tekrar stoğa düştü.",
+      "beklediginizUrunTekrarSatista": "Beklediğiniz ürün tekrar satışta.",
+      "urunuGor": "Ürünü gör",
+      "buUrunArtikStoktaYok": "Bu ürün artık stokta yok",
+      "titleBaskaBirAliciTarafindanSatin": "\"{title}\" başka bir alıcı tarafından satın alındı.",
+      "uzgunuzBaktiginizUrunArtikSatistaDegil": "Üzgünüz, baktığınız ürün artık satışta değil.",
+      "benzerUrunler": "Benzer ürünler",
+      "buKategorideBaskaAktifUrunBulunamadi": "Bu kategoride başka aktif ürün bulunamadı.",
+      "browseAlternatives": "Aşağıda aynı kategoriden alternatif ürünleri inceleyebilirsiniz.",
+      "allCategoryProducts": "Tüm {category} ürünleri",
+      "categoryFallback": "kategori"
+    },
+    "newListing": "Yeni İlan",
+    "originalPriceTry": "Orijinal Fiyat (₺)",
+    "imageFormatsHint": "JPEG, PNG, WebP, GIF · en fazla {maxMb} MB"
   },
   "cart": {
     "myCart": "Sepetim",
@@ -887,7 +1005,29 @@
       "buyer_commission": "Komisyon indirimi",
       "buyer_service_fee": "Hizmet bedeli indirimi",
       "buyer_shipping": "Kargo indirimi"
-    }
+    },
+    "cardHolderPlaceholder": "Ad Soyad",
+    "saveCardPaytr": "Kartımı sonraki ödemeler için PayTR'da sakla",
+    "payWithSavedCard": "Kayıtlı Kart İle Öde",
+    "loadingCards": "Kartlar yükleniyor…",
+    "savedCardCvv": "Kayıtlı kart CVV",
+    "cvvTooltipTitle": "Güvenlik kodu (CVV)",
+    "cvvTooltipText": "Kartınızın arka yüzündeki son 3 rakam; Amex için kartınızın ön yüzündeki 4 rakam.",
+    "cvvRequiredForCard": "Bu kart için CVV girin",
+    "submit": {
+      "teslimatAdresiIcinAdSoyadGereklidir": "Teslimat adresi için ad soyad gereklidir",
+      "teslimatAdresiIcinTelefonGereklidir": "Teslimat adresi için telefon gereklidir",
+      "teslimatAdresiIcinSehirGereklidir": "Teslimat adresi için şehir gereklidir",
+      "teslimatAdresiIcinIlceGereklidir": "Teslimat adresi için ilçe gereklidir",
+      "teslimatAdresiIcinAcikAdresGereklidir": "Teslimat adresi için açık adres gereklidir",
+      "siparisOlusturulamadi": "Sipariş oluşturulamadı",
+      "satistaDegil": "satışta değil",
+      "stoktaYok": "stokta yok",
+      "stoktaBulunmamaktadir": "stokta bulunmamaktadır",
+      "baskasiTarafindan": "başkası tarafından",
+      "baskaAliciyaSatildi": "başka alıcıya satıldı"
+    },
+    "moreItems": "+{count} ürün daha"
   },
   "order": {
     "myOrders": "Siparişlerim",
@@ -1357,7 +1497,8 @@
     "costPreviewHint": "Tutarlar güncel kural ve kargo tarifesine göre hesaplanır; kabul anında sabitlenir.",
     "costPreviewFailed": "Maliyet önizlemesi alınamadı",
     "paymentsSummaryTitle": "Ödeme dökümü",
-    "commissionLine": "Aracılık komisyonu"
+    "commissionLine": "Aracılık komisyonu",
+    "tradeNumberLabel": "Takas No:"
   },
   "offer": {
     "makeOffer": "Teklif Ver",
@@ -1404,7 +1545,31 @@
     "offerer": "Teklif Veren",
     "timeLeft": "{time} kaldı",
     "offerAmountLabel": "Teklif Tutarı",
-    "estimatedNetLabel": "Tahmini net"
+    "estimatedNetLabel": "Tahmini net",
+    "counterModal": {
+      "gecerliBirTutarGirin": "Geçerli bir tutar girin",
+      "saticininKarsiTeklifindenBaseLabelDusukOlmalidir": "Satıcının karşı teklifinden ({baseLabel}) düşük olmalıdır.",
+      "karsiTeklifinizAlicininTeklifindenBaseLabelYuksek": "Karşı teklifiniz alıcının teklifinden ({baseLabel}) yüksek olmalıdır.",
+      "dahaDusukTeklif": "Daha Düşük Teklif",
+      "karsiTeklifGonder": "Karşı Teklif Gönder",
+      "saticininKarsiTeklifi": "Satıcının karşı teklifi:",
+      "alicininTeklifi": "Alıcının teklifi:",
+      "buTutarinAltindaIlanFiyatininEn": "Bu tutarın altında, ilan fiyatının en az %50 kadarına uygun bir teklif girin.",
+      "buTutarinUstundeVeIlanFiyatinin": "Bu tutarın üstünde ve ilan fiyatının altında bir tutar girin (sunucu doğrular).",
+      "tutar": "Tutar (₺)"
+    },
+    "listPage": {
+      "teklifleriniziVePazarliklariniziYonetin": "Tekliflerinizi ve pazarlıklarınızı yönetin",
+      "toplamTeklif": "Toplam Teklif",
+      "kabulEdilen": "Kabul Edilen",
+      "toplamDeger": "Toplam Değer",
+      "tekliflerYuklenirkenBirHataOlustu": "Teklifler yüklenirken bir hata oluştu",
+      "henuzGelenTeklifYok": "Henüz gelen teklif yok",
+      "henuzGonderilenTeklifYok": "Henüz gönderilen teklif yok",
+      "alicilarIlanlarinizaTeklifVerdigindeBuradaGorunecek": "Alıcılar ilanlarınıza teklif verdiğinde burada görünecek.",
+      "ilanlaraGozAtinVeIlkTeklifinizi": "İlanlara göz atın ve ilk teklifinizi yapın!"
+    },
+    "browseListings": "İlanlara Göz At"
   },
   "message": {
     "messages": "Mesajlar",
@@ -1486,7 +1651,106 @@
     "fillCardInfo": "Lütfen tüm kart bilgilerini doldurun",
     "invalidCardNumber": "Geçersiz kart numarası",
     "scheduledChangeCancelled": "Bekleyen değişiklik iptal edildi",
-    "cancelConfirmDesc": "Üyeliğinizi iptal etmek istediğinizden emin misiniz? Mevcut dönem sonuna kadar özelliklerinizi kullanmaya devam edebilirsiniz."
+    "cancelConfirmDesc": "Üyeliğinizi iptal etmek istediğinizden emin misiniz? Mevcut dönem sonuna kadar özelliklerinizi kullanmaya devam edebilirsiniz.",
+    "success": {
+      "ucretsiz": "Ücretsiz",
+      "temel": "Temel",
+      "premium": "Premium",
+      "is": "İş",
+      "takasTeklifleriGonderinVeAlin": "Takas teklifleri gönderin ve alın",
+      "koleksiyonlarOlusturunVePaylasin": "Koleksiyonlar oluşturun ve paylaşın",
+      "dahaFazlaIlanYayinlayin": "Daha fazla ilan yayınlayın",
+      "oncelikliDestekAlin": "Öncelikli destek alın",
+      "yillik": "yıllık",
+      "aylik": "aylık",
+      "planDegisikligiTalebinizAlindi": "Plan değişikliği talebiniz alındı",
+      "oTariheKadarMevcutUyelikAvantajlariniz": "O tarihe kadar mevcut üyelik avantajlarınız aynen devam eder; herhangi bir ödeme alınmaz. Dönem bitiş tarihinizi üyelik sayfanızdan görebilirsiniz.",
+      "uyelikSayfamaGit": "Üyelik Sayfama Git",
+      "profileGit": "Profile Git",
+      "uyeliginizBasariylaYukseltildi": "Üyeliğiniz başarıyla yükseltildi!",
+      "uyeliginizBasariylaDegistirildi": "Üyeliğiniz başarıyla değiştirildi!",
+      "tebrikler": "Tebrikler!",
+      "artikSunlariYapabilirsiniz": "Artık şunları yapabilirsiniz:",
+      "yeniIlanOlustur": "Yeni İlan Oluştur",
+      "koleksiyonOlustur": "Koleksiyon Oluştur",
+      "scheduledPeriodNotice": "Üyeliğiniz mevcut dönem sonunda <b>{period}</b> faturalamaya geçecek.",
+      "scheduledTierNotice": "Üyeliğiniz mevcut dönem sonunda <b>{tier}</b> planına geçecek."
+    },
+    "checkout": {
+      "gecersizUyelikPlani": "Geçersiz üyelik planı",
+      "planlaraDon": "Planlara Dön",
+      "trTR": "tr-TR",
+      "uyelikYukseltme": "Üyelik Yükseltme",
+      "guvenliOdemeIleUyeliginiziYukseltin": "Güvenli ödeme ile üyeliğinizi yükseltin",
+      "guvenliOdeme": "Güvenli Ödeme",
+      "onayladiktanSonraGuvenliOdemeSayfamizdaKart": "Onayladıktan sonra güvenli ödeme sayfamızda kart bilgilerinizi girip 3D Secure ile ödersiniz. Kart bilgileriniz saklanmaz; PayTR altyapısıyla işlenir.",
+      "kullanimKosullarini": "Kullanım koşullarını",
+      "gizlilikPolitikasini": "gizlilik politikasını",
+      "yillik": "yıllık",
+      "aylik": "aylık",
+      "autoRenewNotice": "<privacy>Gizlilik Politikası</privacy>'nı okudum, kabul ediyorum. Üyeliğimin {period} olarak otomatik yenileneceğini anlıyorum.",
+      "payAmount": "{amount} TL Öde",
+      "sslNotice": "256-bit SSL ile güvenli ödeme",
+      "termsNotice": "<terms>Kullanım Koşulları</terms>'nı ve <privacy>Gizlilik Politikası</privacy>'nı okudum, kabul ediyorum. Üyeliğimin {period} olarak otomatik yenileneceğini anlıyorum."
+    },
+    "banners": {
+      "temel": "Temel",
+      "premium": "Premium",
+      "is": "İş",
+      "trTR": "tr-TR",
+      "donemSonunaKadar": "Dönem sonuna kadar",
+      "donemSonunda": "dönem sonunda",
+      "ucretsiz": "Ücretsiz",
+      "yillik": "yıllık",
+      "aylik": "aylık",
+      "degisikligiIptalEt": "Değişikliği iptal et",
+      "cancelledUntil": "Üyeliğiniz iptal edildi. {until} premium özellikleriniz devam eder, ardından ücretsiz üyeliğe geçersiniz.",
+      "untilDate": "{date} tarihine kadar",
+      "scheduledTier": "Üyeliğiniz {when} <b>{tier}</b> planına geçecek. O tarihe kadar mevcut üyelik avantajlarınız devam eder.",
+      "scheduledPeriod": "Üyeliğiniz {when} <b>{period}</b> faturalamaya geçecek. O tarihe kadar mevcut üyelik avantajlarınız devam eder.",
+      "onDate": "{date} tarihinde"
+    },
+    "currentCard": {
+      "trTR": "tr-TR",
+      "mevcutUyelikBilgileri": "Mevcut Üyelik Bilgileri",
+      "uyelikBaslangicTarihi": "Üyelik Başlangıç Tarihi",
+      "gecerlilikBitisTarihi": "Geçerlilik Bitiş Tarihi",
+      "yenilenmeTarihi": "Yenilenme Tarihi",
+      "otomatikYenileme": "Otomatik Yenileme",
+      "etkinlestirildigindeUyeliginizDonemSonundaSectiginizPlana": "Etkinleştirildiğinde üyeliğiniz dönem sonunda seçtiğiniz plana göre kayıtlı kartınızdan otomatik yenilenir. Devre dışı bırakırsanız ücret tahsil edilmez.",
+      "otomatikYenileme2": "Otomatik yenileme",
+      "uyeligiIptalEt": "Üyeliği İptal Et",
+      "iptalEttiginizdeMevcutDonemSonunaKadar": "İptal ettiğinizde mevcut dönem sonuna kadar özelliklerinizi kullanmaya devam edersiniz; sonra ücretsiz plana geçilir. Ücret iadesi yapılmaz.",
+      "iptalEdiliyor": "İptal Ediliyor...",
+      "cancelledNotice": "Üyeliğiniz iptal edildi — {date} tarihine kadar tüm özellikleriniz aktif kalır. Sonrasında otomatik olarak ücretsiz plana geçilir."
+    },
+    "checkoutHook": {
+      "fiyatCokYuksekGorunuyorTRTL": "Fiyat çok yüksek görünüyor ({TR} TL). Lütfen admin panelinden membership fiyatlarını kontrol edin.",
+      "uyeliginizBasariylaYukseltildi": "Üyeliğiniz başarıyla yükseltildi!",
+      "uyeliginizBasariylaDegistirildi": "Üyeliğiniz başarıyla değiştirildi!",
+      "lutfenKullanimKosullariniKabulEdin": "Lütfen kullanım koşullarını kabul edin",
+      "paymentError": "Payment error:",
+      "odemeIslemiBasarisizOlduLutfenTekrar": "Ödeme işlemi başarısız oldu. Lütfen tekrar deneyin."
+    },
+    "actions": {
+      "islemBasarisiz": "İşlem başarısız",
+      "otomatikYenilemeHatirlatmasiAcik": "Otomatik yenileme hatırlatması açık",
+      "otomatikYenilemeHatirlatmasiKapali": "Otomatik yenileme hatırlatması kapalı",
+      "iptalIslemiBasarisiz": "İptal işlemi başarısız"
+    },
+    "page": {
+      "uyelikPlanlariTarodan": "Üyelik Planları · Tarodan",
+      "tarodanUyelikPlanlariIlanLimitleriTakas": "Tarodan üyelik planları: ilan limitleri, takas, koleksiyonlar ve öne çıkan ilanlar. Size uygun planı seçin.",
+      "sizeUygunTarodanUyelikPlaniniSecin": "Size uygun Tarodan üyelik planını seçin."
+    },
+    "orderSummary": {
+      "siparisOzeti": "Sipariş Özeti",
+      "yillikPlan": "Yıllık plan",
+      "aylikPlan": "Aylık plan",
+      "normalFiyat": "Normal fiyat",
+      "toplam": "Toplam",
+      "discountPercent": "İndirim (%{percent})"
+    }
   },
   "collection": {
     "share": "Paylaş",
@@ -1587,7 +1851,11 @@
     "collectionsCount": "{count} koleksiyon",
     "startBuildingToday": "Koleksiyonunuzu bugün oluşturmaya başlayın",
     "membershipRequired": "Üyelik Yükseltme Gerekli",
-    "membershipRequiredDesc": "Koleksiyon oluşturma özelliği Temel ve üzeri üyelikler için aktiftir."
+    "membershipRequiredDesc": "Koleksiyon oluşturma özelliği Temel ve üzeri üyelikler için aktiftir.",
+    "nameRequired": "İsim zorunlu",
+    "createFailed": "Koleksiyon oluşturulamadı",
+    "selectCategoryOptional": "Kategori seçin (isteğe bağlı)",
+    "itemCountShort": "{count} ürün"
   },
   "notification": {
     "notifications": "Bildirimler",
@@ -1763,6 +2031,286 @@
       "redirecting": "Yönlendiriliyor",
       "extendAndPay": "Süreyi Uzat ve Öde",
       "featureAndPay": "Öne Çıkar ve Öde"
+    },
+    "bank": {
+      "title": "Banka Hesabı / IBAN",
+      "deleteTitle": "Banka hesabını sil",
+      "deleteConfirm": "Banka hesabınızı silmek istediğinize emin misiniz?",
+      "verified": "Doğrulandı",
+      "unverified": "Doğrulanmadı",
+      "payoutNote": "Satışlarınızdan elde ettiğiniz tutar bu IBAN'a aktarılır.",
+      "accountHolder": "Hesap Sahibi",
+      "accountHolderPlaceholder": "Ad Soyad / Firma Ünvanı",
+      "tcOptional": "TC Kimlik No (opsiyonel)",
+      "tcPlaceholder": "11 rakam",
+      "taxIdOptional": "Vergi No (opsiyonel)",
+      "taxIdPlaceholder": "Kurumsal hesaplar için (10 rakam)",
+      "reverificationNote": "Bilgileri güncellerseniz hesabınız yeniden doğrulanana kadar \"Doğrulanmadı\" durumuna döner."
+    },
+    "profileInfo": "Profil Bilgileri",
+    "changeEmail": "E-posta Değiştir",
+    "change": "Değiştir",
+    "sendCode": "Kod Gönder",
+    "verify": "Doğrula",
+    "emailChangeIntro": "Yeni e-posta adresinize 6 haneli bir doğrulama kodu göndereceğiz. Mevcut e-postanız kod doğrulanana kadar geçerli kalır.",
+    "newEmail": "Yeni e-posta",
+    "newEmailPlaceholder": "yeni@ornek.com",
+    "enterCodeSentTo": "<b>{email}</b> adresine gönderilen 6 haneli kodu girin.",
+    "verificationCode": "Doğrulama kodu",
+    "displayNamePlaceholder": "Adınız",
+    "birthDate": "Doğum Tarihi",
+    "bioPlaceholderDots": "Kendiniz hakkında birkaç şey yazın...",
+    "businessInfoTitle": "İşletme Bilgileri",
+    "companyTitleLabel": "Şirket / Ticari Unvan",
+    "companyTitlePlaceholder": "ABC Ltd. Şti.",
+    "taxIdLabel": "Vergi Kimlik No",
+    "taxIdPlaceholder": "1234567890",
+    "taxOfficePlaceholderShort": "Kadıköy VD",
+    "security": {
+      "title": "Güvenlik",
+      "changePassword": "Şifreyi Değiştir",
+      "currentPassword": "Mevcut Şifre",
+      "newPasswordRepeat": "Yeni Şifre (Tekrar)",
+      "ruleMin8": "En az 8 karakter",
+      "ruleUppercase": "Büyük harf",
+      "ruleLowercase": "Küçük harf",
+      "ruleDigit": "Rakam",
+      "phoneVerification": "Telefon Doğrulama",
+      "phoneVerified": "Telefonunuz doğrulandı",
+      "phoneVerifyPrompt": "Telefonunuzu SMS ile doğrulayın",
+      "phoneNumber": "Telefon numarası",
+      "twoFactor": "İki Adımlı Doğrulama (2FA)",
+      "twoFactorOn": "Hesabınız TOTP ile korunuyor",
+      "twoFactorOff": "Uygulama tabanlı ek güvenlik katmanı ekleyin",
+      "manage": "Yönet",
+      "setUp": "Ayarla"
+    },
+    "changePhotoAction": "Fotoğrafı değiştir",
+    "verifiedBadge": "Onaylı",
+    "ratingSummary": "★ {rating} · {count} değerlendirme",
+    "manageMembership": "Üyeliği Yönet",
+    "metricListings": "İlan",
+    "metricOrders": "Sipariş",
+    "metricTrades": "Takas",
+    "metricFavorites": "Favori",
+    "twoFactor": {
+      "pageTitle": "Güvenlik Ayarları",
+      "pageDescription": "İki faktörlü kimlik doğrulama (2FA)",
+      "enable": "2FA'yı Etkinleştir",
+      "intro": "İki faktörlü kimlik doğrulama, hesabınıza giriş yaparken şifrenizin yanı sıra telefonunuzdaki bir uygulama tarafından oluşturulan bir kod girmenizi gerektirir.",
+      "requirementsTitle": "Gereksinimler:",
+      "requirementApp": "Google Authenticator veya benzer bir TOTP uygulaması",
+      "requirementPhone": "Akıllı telefon (iOS veya Android)",
+      "startSetup": "2FA Kurulumunu Başlat",
+      "whyTitle": "2FA Neden Önemli?",
+      "whyStolenPassword": "Şifreniz çalınsa bile hesabınız güvende kalır",
+      "whyPhishing": "Phishing saldırılarına karşı ek koruma sağlar",
+      "whyExtraLayer": "Hesap erişiminde ek bir doğrulama katmanı ekler",
+      "setupTitle": "2FA Kurulumu",
+      "stepScanQr": "QR Kodu Tarayın",
+      "scanHint": "Google Authenticator veya benzer bir uygulama ile aşağıdaki QR kodunu tarayın.",
+      "qrLoadFailed": "QR Kod Yüklenemedi",
+      "manualHint": "QR kodu tarayamıyorsanız, bu kodu manuel olarak girin:",
+      "stepEnterCode": "Doğrulama Kodunu Girin",
+      "enterCodeHint": "Uygulamanızda görünen 6 haneli kodu girin.",
+      "verifyAndEnable": "Doğrula ve Etkinleştir",
+      "verifying": "Doğrulanıyor...",
+      "enterSixDigits": "Lütfen 6 haneli kodu girin",
+      "sixDigitPlaceholder": "6 haneli kod",
+      "backupCodesTitle": "Yedek Kodlar",
+      "backupCodesIntro": "Telefonunuza erişiminizi kaybederseniz yedek kodları kullanarak giriş yapabilirsiniz.",
+      "regenerate": "Yeni Yedek Kodlar Oluştur",
+      "regenerateHint": "Onaylamak için doğrulama uygulamanızdaki 6 haneli kodu girin. Eski yedek kodlarınız geçersiz olacaktır.",
+      "disableTitle": "2FA'yı Devre Dışı Bırak",
+      "disableIntro": "2FA'yı devre dışı bırakmak hesabınızın güvenliğini azaltır.",
+      "disableWarningTitle": "Dikkat",
+      "disableWarning": "Bu işlem geri alınamaz. Devam etmek için doğrulama uygulamanızdaki 6 haneli kodu girin.",
+      "disableAction": "Devre Dışı Bırak",
+      "enabledTitle": "2FA Etkinleştirildi!",
+      "savedAck": "Tamam, Kaydettim",
+      "saveCodesHint": "Aşağıdaki yedek kodları güvenli bir yere kaydedin.",
+      "oneTimeWarning": "Bu kodlar sadece bir kez gösterilecek. Telefonunuza erişiminizi kaybederseniz hesabınıza giriş yapmak için bu kodlara ihtiyacınız olacak.",
+      "copyAllCodes": "Tüm Kodları Kopyala",
+      "setupFailed": "2FA kurulumu başlatılamadı",
+      "verifyFailed": "Doğrulama başarısız",
+      "disableFailed": "2FA devre dışı bırakılamadı",
+      "regenerateFailed": "Yedek kodlar oluşturulamadı"
+    },
+    "statistics": {
+      "daysGun": "{days} gün",
+      "istatistiklerim": "İstatistiklerim",
+      "hesapOzetiVePerformansVerileri": "Hesap özeti ve performans verileri",
+      "ilanlarim": "İlanlarım",
+      "satildi": "Satıldı",
+      "siparislerim": "Siparişlerim",
+      "takaslarim": "Takaslarım",
+      "basarili": "Başarılı",
+      "goruntuleme": "Görüntüleme",
+      "saticiPuani": "Satıcı Puanı",
+      "uyelikBaslangici": "Üyelik Başlangıcı",
+      "monthsAydirAramizdasiniz": "{months} aydır aramızdasınız",
+      "daysGundurAramizdasiniz": "{days} gündür aramızdasınız",
+      "membershipLabel": "Üyelik: {duration}",
+      "reviewCount": "{count} müşteri değerlendirmesi",
+      "detailedAnalysis": "Detaylı Analiz"
+    },
+    "statisticsLinks": {
+      "ilanlarim": "İlanlarım",
+      "siparislerim": "Siparişlerim",
+      "takaslarim": "Takaslarım",
+      "koleksiyonlarim": "Koleksiyonlarım",
+      "hizliErisim": "Hızlı Erişim"
+    },
+    "analytics": {
+      "performansAnalizi": "Performans Analizi",
+      "ilanlarinizinDetayliIstatistikleri": "İlanlarınızın detaylı istatistikleri",
+      "toplamGoruntuleme": "Toplam Görüntüleme",
+      "gunlukOrtAvgViewsPerListing": "Günlük ort. {avgViewsPerListing}",
+      "favoriyeEkleme": "Favoriye Ekleme",
+      "toplamSatis": "Toplam Satış",
+      "donusumOraniToFixed": "Dönüşüm oranı %{toFixed}",
+      "toplamGelir": "Toplam Gelir",
+      "aktifIlan": "Aktif İlan",
+      "ortSatisSuresiGun": "Ort. Satış Süresi (gün)",
+      "tekrarMusteri": "Tekrar Müşteri",
+      "bekleyenSiparis": "Bekleyen Sipariş",
+      "goruntulemeGrafigi": "Görüntüleme Grafiği",
+      "viewsCount": "{count} görüntüleme",
+      "listingsCount": "{count} ilan",
+      "salesCount": "{count} satış",
+      "trendDays": "Son {days} günlük trend"
+    },
+    "analyticsTypes": {
+      "goruntulendi": "görüntülendi",
+      "favorilereEklendi": "favorilere eklendi",
+      "satildi": "satıldı",
+      "hakkindaMesajGeldi": "hakkında mesaj geldi",
+      "icinTakasTeklifiGeldi": "için takas teklifi geldi",
+      "minutesDkOnce": "{minutes} dk önce",
+      "hoursSaatOnce": "{hours} saat önce",
+      "daysGunOnce": "{days} gün önce",
+      "7Gun": "7 Gün",
+      "30Gun": "30 Gün",
+      "90Gun": "90 Gün"
+    },
+    "analyticsUpsell": {
+      "detayliSatisTahminleri": "Detaylı satış tahminleri",
+      "rakipAnalizi": "Rakip analizi",
+      "pdfExcelRaporIndirme": "PDF/Excel rapor indirme",
+      "premiumAposAYukseltin": "Premium&apos;a Yükseltin",
+      "dahaDetayliAnalizlerGelismisGrafiklerVe": "Daha detaylı analizler, gelişmiş grafikler ve kişiselleştirilmiş öneriler için Premium üyeliğe geçin.",
+      "premiumAposAGec": "Premium&apos;a Geç"
+    },
+    "analyticsCategory": {
+      "kategoriPerformansi": "Kategori Performansı"
+    },
+    "listingsPage": {
+      "ilaniSil": "İlanı sil",
+      "buIlaniSilmekIstediginizeEminMisiniz": "Bu ilanı silmek istediğinize emin misiniz?",
+      "ilanlarim": "İlanlarım",
+      "tumIlanlariniTekYerdenYonetDuzenle": "Tüm ilanlarını tek yerden yönet, düzenle ve performanslarını takip et.",
+      "pendingcountIlaninizOnayBekliyor": "{pendingCount} ilanınız onay bekliyor",
+      "ilanlarAdminTarafindanOnaylandiktanSonraYayina": "İlanlar admin tarafından onaylandıktan sonra yayına alınacaktır.",
+      "buFiltreyeUygunIlanYok": "Bu filtreye uygun ilan yok",
+      "henuzIlaninizYok": "Henüz ilanınız yok",
+      "koleksiyonunuzdakiUrunleriSatisaCikarin": "Koleksiyonunuzdaki ürünleri satışa çıkarın",
+      "ilkIlaniniziOlusturun": "İlk İlanınızı Oluşturun"
+    },
+    "listingStatus": {
+      "onayBekliyor": "Onay Bekliyor",
+      "askiyaAlindi": "Askıya Alındı",
+      "satildi": "Satıldı",
+      "kaldirildi": "Kaldırıldı",
+      "tumu": "Tümü",
+      "onayBekleyen": "Onay Bekleyen",
+      "askiyaAlinan": "Askıya Alınan",
+      "satilan": "Satılan",
+      "kaldirilan": "Kaldırılan"
+    },
+    "myListings": {
+      "ilanSilindi": "İlan silindi",
+      "ilanSilinemedi": "İlan silinemedi",
+      "ilanPasifeAlindi": "İlan pasife alındı",
+      "ilanPasifeAlinamadi": "İlan pasife alınamadı"
+    },
+    "businessOverview": {
+      "toplamGoruntulenme": "Toplam Görüntülenme",
+      "toplamBegeni": "Toplam Beğeni",
+      "toplamSatis": "Toplam Satış",
+      "aktifUrun": "Aktif Ürün",
+      "toplamGelir": "Toplam Gelir",
+      "buHafta": "Bu Hafta",
+      "goruntulenme": "Görüntülenme",
+      "begeni": "Beğeni",
+      "koleksiyonIstatistikleri": "Koleksiyon İstatistikleri"
+    },
+    "businessError": {
+      "sirketAdi": "şirket adı",
+      "sirketAdi2": "Şirket adı",
+      "sirketAdiEkle": "Şirket Adı Ekle",
+      "uyeligimiYukselt": "Üyeliğimi Yükselt"
+    },
+    "paymentMethods": {
+      "kayitliKartlarim": "Kayıtlı Kartlarım",
+      "otomatikYenilemeVeHizliOdemeIcin": "Otomatik yenileme ve hızlı ödeme için kayıtlı kartların. Yeni kart, ödeme sırasında \"kartımı kaydet\" ile eklenir.",
+      "kayitliKartinYok": "Kayıtlı kartın yok.",
+      "birOdemeYaparkenKartimiKaydetSecenegini": "Bir ödeme yaparken \"kartımı kaydet\" seçeneğini işaretleyerek kart ekleyebilirsin.",
+      "kartlarinPayTRGuvenliKasasindaSaklanirNumara": "Kartların PayTR güvenli kasasında saklanır; numara/CVV bizde tutulmaz.",
+      "kartiSil": "Kartı sil",
+      "kartLast4KartiniSilmekIstedigineEmin": "{Kart} •••• {last4} kartını silmek istediğine emin misin? Bu kartla otomatik yenileme yapılamaz hale gelir.",
+      "vazgec": "Vazgeç"
+    },
+    "savedCard": {
+      "krediKarti": "Kredi kartı",
+      "bankaKarti": "Banka kartı",
+      "varsayilan": "Varsayılan",
+      "otoYenilemeyeUygun": "Oto-yenilemeye uygun",
+      "cvvGerektirir": "CVV gerektirir",
+      "kartiSil": "Kartı sil"
+    },
+    "followingPage": {
+      "takipEttiklerim": "Takip Ettiklerim",
+      "lengthSaticiTakipEdiliyor": "{length} satıcı takip ediliyor",
+      "henuzKimseyiTakipEtmiyorsunuz": "Henüz kimseyi takip etmiyorsunuz",
+      "saticilariTakipEderekYeniIlanlarindanHaberdar": "Satıcıları takip ederek yeni ilanlarından haberdar olun",
+      "ilanlariKesfet": "İlanları Keşfet"
+    },
+    "savedSearches": {
+      "failedToLoadSavedSearches": "Failed to load saved searches:",
+      "aramayiSil": "Aramayı sil",
+      "buAramayiSilmekIstediginizdenEminMisiniz": "Bu aramayı silmek istediğinizden emin misiniz?",
+      "aramaSilindi": "Arama silindi",
+      "bildirimlerAcildi": "Bildirimler açıldı",
+      "bildirimlerKapatildi": "Bildirimler kapatıldı"
+    },
+    "savedSearchCard": {
+      "tumIlanlar": "Tüm ilanlar",
+      "bildirimleriKapat": "Bildirimleri kapat",
+      "bildirimleriAc": "Bildirimleri aç"
+    },
+    "bankHooks": {
+      "bankaHesabiKaydedildi": "Banka hesabı kaydedildi",
+      "kaydetmeBasarisiz": "Kaydetme başarısız",
+      "bankaHesabiSilindi": "Banka hesabı silindi",
+      "silmeBasarisiz": "Silme başarısız"
+    },
+    "sidebar": {
+      "alisveris": "Alışveriş",
+      "indirimlerim": "İndirimlerim",
+      "finans": "Finans",
+      "odemelerim": "Ödemelerim",
+      "odemeYontemleri": "Ödeme Yöntemleri",
+      "iadeTalepleri": "İade Talepleri",
+      "koleksiyon": "Koleksiyon",
+      "takipEttiklerim": "Takip Ettiklerim",
+      "kayitliAramalar": "Kayıtlı Aramalar",
+      "analiz": "Analiz",
+      "istatistikler": "İstatistikler",
+      "analitik": "Analitik",
+      "iletisim": "İletişim",
+      "hesap": "Hesap",
+      "isletme": "İşletme",
+      "guvenlik": "Güvenlik"
     }
   },
   "review": {
@@ -1926,7 +2474,9 @@
     "savedEmptyTitle": "Kayıtlı Arama Yok",
     "savedEmptyDescription": "İlanları ararken sonuç sayfasındaki \"Bu aramayı kaydet\" butonuyla aramanı kaydet; buradan yönetip yeni sonuçlarda bildirim alabilirsin.",
     "countOfLimit": "{count} / {limit} arama",
-    "searchListings": "İlan Ara"
+    "searchListings": "İlan Ara",
+    "runThisSearch": "Bu Aramayı Çalıştır",
+    "priceLabel": "Fiyat:"
   },
   "error": {
     "pageNotFound": "Sayfa Bulunamadı",
@@ -1940,7 +2490,11 @@
     "serverError": "Sunucu Hatası",
     "serverErrorDesc": "Sunucuda bir sorun oluştu. Lütfen daha sonra tekrar deneyin.",
     "networkError": "Bağlantı Hatası",
-    "networkErrorDesc": "İnternet bağlantınızı kontrol edin."
+    "networkErrorDesc": "İnternet bağlantınızı kontrol edin.",
+    "errorCode": "Hata kodu",
+    "unexpectedRetryOrHome": "Beklenmeyen bir hata oluştu. Tekrar deneyebilir ya da ana sayfaya dönebilirsiniz.",
+    "appCrashed": "Uygulama beklenmeyen bir hatayla karşılaştı. Yeniden denemeyi deneyin.",
+    "goHomeShort": "Ana sayfaya dön"
   },
   "validation": {
     "required": "Bu alan zorunludur",
@@ -1970,7 +2524,38 @@
     "enterOrderNumber": "Sipariş numarası girin",
     "offerBelowPrice": "Teklif fiyattan düşük olmalı",
     "nameRequired": "Ad soyad gerekli",
-    "subjectRequired": "Konu gerekli"
+    "subjectRequired": "Konu gerekli",
+    "cardHolderRequired": "Kart üzerindeki ismi girin",
+    "cardNumberInvalid": "Geçerli bir kart numarası girin",
+    "cardExpiryInvalid": "Son kullanma tarihi geçersiz",
+    "cvvInvalid": "CVV geçersiz",
+    "displayNameMin2": "Görünen isim en az 2 karakter olmalı",
+    "fullNameRequired": "Ad soyad zorunludur",
+    "selectCity": "Şehir seçiniz",
+    "selectDistrict": "İlçe seçiniz",
+    "addressMin10": "Adres en az 10 karakter olmalı",
+    "accountHolderMin2": "Hesap sahibi en az 2 karakter olmalı",
+    "ibanInvalid": "Geçerli bir TR IBAN giriniz (TR + 24 rakam)",
+    "tcKimlik11": "TC Kimlik No 11 rakam olmalıdır",
+    "taxId10": "Vergi No 10 rakam olmalıdır",
+    "currentPasswordRequired": "Mevcut şifrenizi girin",
+    "min8Chars": "En az 8 karakter",
+    "passwordNeedsUppercase": "Bir büyük harf içermeli",
+    "passwordNeedsLowercase": "Bir küçük harf içermeli",
+    "passwordNeedsDigit": "Bir rakam içermeli",
+    "repeatNewPassword": "Yeni şifreyi tekrar girin",
+    "discountNameRequired": "İndirim adı gerekli",
+    "enterValidValue": "Geçerli bir değer girin",
+    "startDateRequired": "Başlangıç tarihi gerekli",
+    "endDateRequired": "Bitiş tarihi gerekli",
+    "selectAtLeastOneProduct": "Lütfen en az bir ürün seçin",
+    "buyQuantityMin1": "'Al' adedi en az 1 olmalı",
+    "getQuantityMin1": "'Bedava' adedi en az 1 olmalı",
+    "minQuantityMin2": "En az adet 2 veya üzeri olmalı",
+    "discountPercentRange": "İndirim yüzdesi 1-100 arası olmalı",
+    "selectCategory": "Lütfen bir kategori seçin",
+    "subjectMin5": "Konu en az 5 karakter olmalıdır",
+    "messageMin10": "Mesajınız en az 10 karakter olmalıdır"
   },
   "time": {
     "justNow": "Az önce",
@@ -2072,7 +2657,13 @@
     "loadingAddresses": "Adresler yükleniyor",
     "backToSaved": "Kayıtlı adreslere dön",
     "fullNamePlaceholder": "Ahmet Yılmaz",
-    "addressPlaceholder": "Mahalle, sokak, bina, kat"
+    "addressPlaceholder": "Mahalle, sokak, bina, kat",
+    "titleLabel": "Adres Başlığı",
+    "titleLabelPlaceholder": "Ev, İş, vb.",
+    "fullNamePlaceholderLong": "Adınız Soyadınız",
+    "addressPlaceholderLong": "Mahalle, sokak, bina ve daire bilgileri",
+    "zipCodeOptional": "Posta Kodu (opsiyonel)",
+    "zipCodePlaceholder": "Örn: 34000"
   },
   "contact": {
     "title": "İletişim",
@@ -2127,7 +2718,18 @@
     "loginHistory": "Giriş Geçmişi",
     "twoFactorTitle": "İki Faktörlü Kimlik Doğrulama",
     "twoFactorEnabledDesc": "Hesabınız 2FA ile korunuyor",
-    "twoFactorDisabledDesc": "Hesabınızı daha güvenli hale getirin"
+    "twoFactorDisabledDesc": "Hesabınızı daha güvenli hale getirin",
+    "notificationPreferences": "Bildirim Tercihleri",
+    "emailNotificationsDesc": "Önemli güncellemeler için e-posta al",
+    "pushNotificationsTitle": "Anlık Bildirimler",
+    "pushNotificationsDesc": "Tarayıcı bildirimleri al",
+    "orderUpdatesDesc": "Sipariş durumu değişikliklerinde bildirim al",
+    "messageAlerts": "Mesaj Uyarıları",
+    "messageAlertsDesc": "Yeni mesaj geldiğinde bildirim al",
+    "priceDropAlerts": "Fiyat Düşüşü Uyarıları",
+    "priceDropAlertsDesc": "Favori ürünlerde fiyat düşünce haber ver",
+    "marketingEmails": "Pazarlama E-postaları",
+    "marketingEmailsDesc": "Kampanya ve fırsatlardan haberdar ol"
   },
   "analytics": {
     "analytics": "Analitikler",
@@ -2289,6 +2891,76 @@
       "ibanVerified": "Doğrulandı",
       "ibanUnverified": "Doğrulanmadı",
       "pendingLink": "Belgeleri Yükle / Tamamla"
+    },
+    "discounts": {
+      "title": "İndirimlerim",
+      "description": "Ürünleriniz için indirim ve kampanya oluşturun",
+      "sellerOnly": "Bu sayfaya erişim için satıcı olmanız gerekiyor",
+      "deleteTitle": "İndirimi sil",
+      "deleteConfirm": "Bu indirimi silmek istediğinizden emin misiniz? Bu işlem geri alınamaz.",
+      "metricTotal": "Toplam İndirim",
+      "metricExpired": "Süresi Dolmuş",
+      "metricUsage": "Toplam Kullanım",
+      "emptyTitle": "Henüz indirim oluşturmadınız",
+      "createFirst": "İlk İndirimi Oluştur",
+      "filterExpired": "Süresi Dolmuş",
+      "scopeSeller": "Tüm Mağaza",
+      "scopeProduct": "Seçili Ürünler",
+      "statusExpired": "Süresi Doldu",
+      "statusUnknown": "Belirsiz",
+      "saveFailed": "İndirim kaydedilirken hata oluştu",
+      "updated": "İndirim güncellendi",
+      "created": "İndirim oluşturuldu",
+      "deleted": "İndirim silindi",
+      "deleteFailed": "İndirim silinirken hata oluştu",
+      "statusUpdateFailed": "Durum güncellenirken hata oluştu",
+      "disabled": "İndirim devre dışı bırakıldı",
+      "enabled": "İndirim aktif edildi",
+      "editTitle": "İndirimi Düzenle",
+      "createTitle": "Yeni İndirim Oluştur",
+      "nameLabel": "İndirim Adı *",
+      "namePlaceholder": "Örn: Yaz İndirimi",
+      "descriptionPlaceholder": "İndirim açıklaması...",
+      "typeLabel": "İndirim Türü *",
+      "typePercentage": "Yüzde (%)",
+      "typeFixed": "Sabit Tutar (TL)",
+      "typeBogo": "Al X, Y Bedava (otomatik)",
+      "typeBulk": "Çoklu Alım İndirimi (otomatik)",
+      "percentLabel": "İndirim Yüzdesi (%) *",
+      "valueLabel": "Değer *",
+      "buyQuantityLabel": "Kaç adet alınca? *",
+      "buyQuantityPlaceholder": "Örn: 2 (3 al 2 öde için 2)",
+      "getQuantityLabel": "Kaç adet bedava? *",
+      "getQuantityPlaceholder": "Örn: 1",
+      "minQuantityLabel": "En az kaç adet? *",
+      "minQuantityPlaceholder": "Örn: 3 (aynı üründen 3 adet)",
+      "scopeLabel": "Kapsam",
+      "autoCampaignNote": "Adet koşullu kampanya kod istemez: sepette koşul sağlanınca kendiliğinden uygulanır.",
+      "codeLabel": "İndirim Kodu (opsiyonel)",
+      "codePlaceholder": "Boşsa otomatik",
+      "selectProducts": "Ürün Seçin *",
+      "clearSelection": "Seçimi Kaldır",
+      "selectAll": "Hepsini Seç",
+      "noActiveProducts": "Aktif ürününüz bulunmuyor",
+      "selectedCount": "{count} ürün seçildi",
+      "minCartLabel": "Min. Sepet Tutarı (TL)",
+      "minCartPlaceholder": "Örn: 100",
+      "maxDiscountLabel": "Max. İndirim Tutarı (TL)",
+      "maxDiscountPlaceholder": "Örn: 500",
+      "usageLimitTotalLabel": "Toplam Kullanım Limiti",
+      "unlimited": "Sınırsız",
+      "usageLimitPerUserLabel": "Kullanıcı Başı Limit",
+      "startDateLabel": "Başlangıç Tarihi *",
+      "endDateLabel": "Bitiş Tarihi *",
+      "stackable": "Kombine edilebilir",
+      "autoCode": "Otomatik kod",
+      "usageCount": "Kullanım: {used}",
+      "usageCountOfLimit": "Kullanım: {used} / {limit}",
+      "disable": "Devre Dışı Bırak",
+      "enable": "Aktif Et",
+      "newDiscount": "Yeni İndirim",
+      "emptyFiltered": "Bu filtreye uygun indirim yok",
+      "emptyDescription": "Müşterilerinize özel indirimler ve kampanyalar oluşturun"
     }
   },
   "sellerDashboard": {
@@ -2349,7 +3021,76 @@
     "inProgress": "İşlemde",
     "resolved": "Çözüldü",
     "closed": "Kapatıldı",
-    "contactSupport": "Destek ile İletişime Geç"
+    "contactSupport": "Destek ile İletişime Geç",
+    "content": {
+      "siparisKargo": "Sipariş / Kargo",
+      "odeme": "Ödeme",
+      "hesap": "Hesap",
+      "ilanUrun": "İlan / Ürün",
+      "takas": "Takas",
+      "teknikSorun": "Teknik Sorun",
+      "diger": "Diğer",
+      "acik": "Açık",
+      "inceleniyor": "İnceleniyor",
+      "yanitinizBekleniyor": "Yanıtınız Bekleniyor",
+      "cozuldu": "Çözüldü",
+      "kapatildi": "Kapatıldı",
+      "baslangic": "Başlangıç",
+      "kullanimKilavuzu": "Kullanım Kılavuzu",
+      "sikcaSorulanSorular": "Sıkça Sorulan Sorular",
+      "uyeOlun": "Üye Olun",
+      "satinAlma": "Satın Alma",
+      "nasilAlisverisYapilir": "Nasıl Alışveriş Yapılır?",
+      "odemeYontemleri": "Ödeme Yöntemleri",
+      "iadeVeIptalKosullari": "İade ve İptal Koşulları",
+      "satisYapma": "Satış Yapma",
+      "ilanVermeRehberi": "İlan Verme Rehberi",
+      "komisyonVeHizmetBedelleri": "Komisyon ve Hizmet Bedelleri",
+      "uyelikPlanlari": "Üyelik Planları",
+      "guvenliTakas": "Güvenli Takas",
+      "takasNasilCalisir": "Takas Nasıl Çalışır?",
+      "takaslarim": "Takaslarım",
+      "kargoVeTeslimat": "Kargo ve Teslimat",
+      "kargoTakibi": "Kargo Takibi",
+      "hasarliUrunIade": "Hasarlı Ürün / İade",
+      "hesapVeGuvenlik": "Hesap ve Güvenlik",
+      "profilVeAdresler": "Profil ve Adresler",
+      "destekTalebiOlustur": "Destek Talebi Oluştur",
+      "gizlilikPolitikasi": "Gizlilik Politikası",
+      "ilkSatisimiNasilYaparim": "İlk satışımı nasıl yaparım?",
+      "urunlerimiNasilOnPlanaCikartirim": "Ürünlerimi nasıl ön plana çıkartırım?",
+      "takasTeklifiNasilGonderirim": "Takas teklifi nasıl gönderirim?",
+      "uyelikPlanlariArasindakiFarklarNelerdir": "Üyelik planları arasındaki farklar nelerdir?",
+      "siparisimiNasilTakipEderim": "Siparişimi nasıl takip ederim?",
+      "iadeVeIptalKosullariNelerdir": "İade ve iptal koşulları nelerdir?"
+    },
+    "metaTitle": "Yardım & Destek · Tarodan",
+    "metaDescription": "Tarodan yardım konuları, sıkça sorulan sorular ve destek talebi oluşturma: sipariş, ödeme, hesap, takas ve teknik konularda yardım alın.",
+    "pageTitle": "Yardım & Destek",
+    "pageDescription": "Önce hazır yanıtlara göz atın; çözemezseniz destek talebi oluşturun.",
+    "helpTopicsTitle": "Yardım Konuları",
+    "popularQuestions": "Popüler Sorular",
+    "loginToCreateTicket": "Destek talebi oluşturmak için giriş yapın",
+    "loginToCreateTicketDesc": "Siparişleriniz, ödemeleriniz veya hesabınızla ilgili talepler için giriş yapmanız gerekir. Üye değilseniz iletişim formunu da kullanabilirsiniz.",
+    "contactForm": "İletişim Formu",
+    "ticketSectionTitle": "Destek Talebi",
+    "newTicket": "Yeni Talep",
+    "subjectPlaceholder": "Örn: Siparişim kargoya verilmedi",
+    "yourMessage": "Mesajınız",
+    "messagePlaceholder": "Sorununuzu mümkün olduğunca ayrıntılı anlatın. Varsa sipariş numaranızı ekleyin.",
+    "submitTicket": "Talebi Gönder",
+    "giveUp": "Vazgeç",
+    "formHint": "Sorununuzu kategorisiyle birlikte iletin; ekibimiz genellikle 24 saat içinde yanıt verir.",
+    "myTickets": "Taleplerim",
+    "noTickets": "Henüz bir destek talebiniz yok.",
+    "emailHours": "Hafta içi 09.00–18.00 arasında e-posta ile de ulaşabilirsiniz.",
+    "yourReply": "Yanıtınız",
+    "replyPlaceholder": "Mesajınızı yazın...",
+    "ticketLoadFailed": "Destek talebi yüklenemedi",
+    "messageSendFailed": "Mesaj gönderilemedi. Lütfen tekrar deneyin.",
+    "orderIssueSubject": "Sipariş sorunu (#{ref})",
+    "ticketCreated": "Destek talebiniz oluşturuldu. En kısa sürede dönüş yapacağız.",
+    "ticketCreateFailed": "Talep oluşturulamadı. Lütfen tekrar deneyin."
   },
   "faq": {
     "title": "Sıkça Sorulan Sorular",
@@ -2367,7 +3108,66 @@
     "selling": "Satış Yapma",
     "trade": "Takas",
     "shipping": "Kargo ve Teslimat",
-    "account": "Hesap ve Güvenlik"
+    "account": "Hesap ve Güvenlik",
+    "content": {
+      "alisverisVeTakasRehberi": "Alışveriş ve Takas Rehberi",
+      "nasilSiparisOlusturabilirim": "Nasıl sipariş oluşturabilirim?",
+      "koleksiyonunuzaDahilEtmekIstediginizModelAraclari": "Koleksiyonunuza dahil etmek istediğiniz model araçları sepetinize ekleyerek alışverişe hemen başlayabilirsiniz. Sepetinize tıkladıktan sonra aktif indirimlerden yararlanabilir, varsa indirim kuponu kodunuzu ilgili alana girebilirsiniz.",
+      "odemeyeGecButonunaTikladiktanSonraTeslimat": "“Ödemeye geç” butonuna tıkladıktan sonra teslimat adresinizi kontrol edebilir; farklı bir adrese gönderim yapacaksanız yeni bir adres ekleyebilir veya mevcut bilgilerinizi güncelleyebilirsiniz. Ödeme adımında kart bilgilerinizi girdikten ve dilerseniz size uygun taksit seçeneğini seçtikten sonra “Alışverişi tamamla” butonuna basarak siparişinizi güvenle oluşturabilirsiniz.",
+      "takasIslemleriniNasilYapiyoruz": "Takas işlemlerini nasıl yapıyoruz?",
+      "heyecanVericiBirDigerDetayIse": "Heyecan verici bir diğer detay ise: koleksiyonlar arası takas da yapılabiliyor! Takas sürecinde her iki taraf da model araçlarını Tarodan deposuna gönderiyor. Uzman ekibimiz depoda gerekli kontrolleri sağlıyor; ürünler ilanla tamamen eşleşiyorsa takas işlemini güvenle başlatıyoruz. Eğer beklenmeyen kusurlu veya yanlış bir ürünle karşılaşırsak hemen taraflara bilgi veriyor, onayınızla süreci düzenliyor veya ürünleri güvenle sizlere iade ediyoruz. Böylece garaj değiştirmek tamamen güvence altında ilerliyor!",
+      "siparisiminVeyaTakasiminDurumunuNasilTakip": "Siparişimin veya takasımın durumunu nasıl takip edebilirim?",
+      "tarodanUygulamasiniActiktanSonraSiparislerinizIcin": "Tarodan uygulamasını açtıktan sonra siparişleriniz için Hesabım → Siparişlerim, takaslarınız için Hesabım → Takaslarım adımlarını izleyerek yeni göz bebeğinizin yolda olup olmadığını ya da takas sürecini anlık olarak takip edebilirsiniz.",
+      "tekSepetteBirdenFazlaModelAlabilir": "Tek sepette birden fazla model alabilir miyim?",
+      "evetSepetinizdekiTumGuzellikleriVeTakas": "Evet, sepetinizdeki tüm güzellikleri ve takas ürünlerini tek seferde ödeyerek kargoyla kapınıza gelmesini sağlayabilirsiniz.",
+      "odenecekTutariModelFiyatindanNedenDaha": "Ödenecek tutarı model fiyatından neden daha yüksek görüyorum?",
+      "sectiginizModelinFiyatiDisindaKargoGonderim": "Seçtiğiniz modelin fiyatı dışında; kargo gönderim kuralları, aktif kampanyalar veya paketleme/hizmet bedeli gibi detaylar sepet toplamına yansıyabilir. Ödeme adımına geçmeden önce tüm dökümü net bir şekilde görebilirsiniz.",
+      "odemeIslemleriNasilGerceklestirilir": "Ödeme işlemleri nasıl gerçekleştirilir?",
+      "odemeleriniziTarodaninGuvenliAltyapisiniKullanarakKredi": "Ödemelerinizi Tarodan’ın güvenli altyapısını kullanarak kredi veya banka kartınızla kolayca yapabilirsiniz. Havale veya EFT seçeneğimiz bulunmuyor.",
+      "gozumGibiBaktigimOdememGuvendeMi": "Gözüm gibi baktığım ödemem güvende mi?",
+      "kesinlikleSizModelinizeKavusupSipariseOnay": "Kesinlikle! Siz modelinize kavuşup siparişe onay verene kadar ödemeniz Tarodan’ın güvenli havuzunda titizlikle saklanır. Siz “Her şey yolunda” demeden hiçbir tutar karşı tarafa aktarılmaz.",
+      "kargoGonderimUcretiniKimOder": "Kargo gönderim ücretini kim öder?",
+      "kargoUcretiIlaniOlustururkenSaticininTercihine": "Kargo ücreti, ilanı oluştururken satıcının tercihine göre değişiklik gösterir. İlan detaylarında kargonun alıcıya mı ait olduğu yoksa satıcı tarafından mı karşılandığı net bir şekilde belirtilir. Alışveriş yapmadan önce bu detayı inceleyerek kargo maliyetini kolayca görebilirsiniz.",
+      "siparisimNeZamanKargolanir": "Siparişim ne zaman kargolanır?",
+      "saticinizModeliniziOzenlePaketleyipHazirladiktanSonra": "Satıcınız modelinizi özenle paketleyip hazırladıktan sonra, genellikle yasal ve platform kuralları gereği 3 iş günü içinde kargoya teslim eder. Garajınıza katılacak yeni parçanın yola çıkış tarihini satıcınızla mesajlaşarak da teyit edebilirsiniz.",
+      "kargomuNasilTakipEdebilirim": "Kargomu nasıl takip edebilirim?",
+      "modelinizKargoyaVerildiktenSonraSistemUzerinde": "Modeliniz kargoya verildikten sonra sistem üzerinde bir takip numarası oluşturulur. Tarodan uygulamasını açarak Hesabım → Siparişlerim veya Hesabım → Takaslarım adımlarını izleyebilir, kargonuzun adım adım garajınıza yaklaşmasını anlık olarak takip edebilirsiniz.",
+      "siparisNeZamanTamamlanir": "Sipariş ne zaman tamamlanır?",
+      "kargonuzKapiyaGeldiBittiSandinizDegil": "Kargonuz kapıya geldi, bitti sandınız değil mi? Aslında süreç, kargonuzu teslim alıp modeli inceledikten ve sistem üzerinden “Siparişi Onayla” butonuna bastıktan sonra resmi olarak tamamlanır. Göz bebeğinizin kutusundan sağ salim çıktığından emin olunca süreci tamamlayabilirsiniz.",
+      "odememSaticiyaNeZamanGecer": "Ödemem satıcıya ne zaman geçer?",
+      "sizKargonuzuTeslimAlipHerSey": "Siz kargonuzu teslim alıp “Her şey yolunda, siparişi onaylıyorum” diyene kadar ödemeniz Tarodan’ın güvenli havuzunda titizlikle saklanır. Onay butonuna bastığınız anda ödemeniz güvenle satıcının hesabına aktarılır.",
+      "neZamanIadeTalebiOlusturabilirim": "Ne zaman iade talebi oluşturabilirim?",
+      "beklenmeyenBirDurumlaKarsilastiginizdaVeyaUrun": "Beklenmeyen bir durumla karşılaştığınızda veya ürün ilanla uyuşmadığında, kargonuzu teslim aldığınız andan itibaren geçerli olan yasal süre 14 gün içinde iade talebi oluşturabilirsiniz. Tarodan ekibi ve güvenli altyapımız bu süreçte her iki tarafın da haklarını korumak için devrededir.",
+      "aliciHizmetBedeliVeSaticiKomisyonu": "Alıcı hizmet bedeli ve satıcı komisyonu nedir?",
+      "platformunGuvenliAltyapisiniOdemeHavuzuSistemini": "Platformun güvenli altyapısını, ödeme havuzu sistemini ve sunduğumuz tüm operasyonel kolaylıkları sürdürebilmek adına cüzi bir hizmet bedeli ve komisyon oranları uygulanmaktadır. Tüm bu kesintiler ve tutarlar, ödeme onay adımından önce şeffaf bir şekilde ekranınızda gösterilir; sürprizlerle karşılaşmazsınız.",
+      "populerKonular": "Popüler Konular",
+      "ilkSatisimiNasilYaparim": "İlk satışımı nasıl yaparım?",
+      "garajinizdaYeniSahipleriniBekleyenModelAraclar": "Garajınızda yeni sahiplerini bekleyen model araçlar için “İlan Ver” butonuna tıklayarak ilk adımınızı atabilirsiniz. Aracın markasını, modelini, ölçeğini ve kondisyonunu eksiksiz girip, farklı açılardan çekilmiş en az 3 net fotoğraf ekledikten sonra rekabetçi bir fiyat belirleyerek ilanınızı yayına alabilirsiniz. Satış gerçekleştikten sonra modeli özenle paketleyip kargoya vermeniz ve size iletilen kargo kodunu kargo şubesindeki yetkililerle paylaşmanız yeterlidir; ilk satışınız böylece başarıyla tamamlanır!",
+      "urunlerimiNasilOnPlanaCikartirim": "Ürünlerimi nasıl ön plana çıkartırım?",
+      "garajinizdakiModelAraclarinHakEttigiDegeri": "Garajınızdaki model araçların hak ettiği değeri görmesi ve hızla yeni sahibine ulaşması için İlanı Öne Çıkar seçeneğini kullanabilirsiniz. Ürününüzün fiyat aralığına ve vitrinde kalmasını istediğiniz süreye (7 gün veya 30 gün) göre dilediğiniz paketi seçerek ilanınızı öne çıkarabilir, koleksiyonerlerin dikkatini anında üzerinize çekebilirsiniz.",
+      "kisaSureliVeHizliBirIvme": "Kısa süreli ve hızlı bir ivme yakalamak isteyenler için 7 günlük paketler:",
+      "200999TlArasiUrunler": "200 – 999 TL arası ürünler",
+      "anaSayfaOneCikarilanlar150Tl": "Ana Sayfa Öne Çıkarılanlar 150 TL · Ana Sayfa Vitrin 350 TL",
+      "10005000TlArasi": "1.000 – 5.000 TL arası ürünler",
+      "anaSayfaOneCikarilanlar250Tl": "Ana Sayfa Öne Çıkarılanlar 250 TL · Ana Sayfa Vitrin 500 TL",
+      "5000TlVeUzeriNadide": "5.000 TL ve üzeri nadide parçalar",
+      "anaSayfaOneCikarilanlar500Tl": "Ana Sayfa Öne Çıkarılanlar 500 TL · Ana Sayfa Vitrin 1.000 TL",
+      "30GunlukOneCikarmaPaketleriNelerdir": "30 günlük öne çıkarma paketleri nelerdir?",
+      "modeliniziUzunSolukluBirVitrinDeneyimiyle": "Modelinizi uzun soluklu bir vitrin deneyimiyle sergilemek ve doğru koleksiyonere ulaşana kadar göz önünde tutmak istiyorsanız 30 günlük paketlerimiz tam size göre:",
+      "anaSayfaOneCikarilanlar550Tl": "Ana Sayfa Öne Çıkarılanlar 550 TL · Ana Sayfa Vitrin 1.200 TL",
+      "anaSayfaOneCikarilanlar750Tl": "Ana Sayfa Öne Çıkarılanlar 750 TL · Ana Sayfa Vitrin 1.900 TL yerine kampanyalı 1.750 TL",
+      "anaSayfaOneCikarilanlar1900": "Ana Sayfa Öne Çıkarılanlar 1.900 TL · Ana Sayfa Vitrin 3.750 TL",
+      "takasTeklifiNasilGonderirim": "Takas teklifi nasıl gönderirim?",
+      "urunListelerindeVeyaDetaySayfalarindaTakas": "Ürün listelerinde veya detay sayfalarında “Takas Açık” etiketini gördüğünüz model araçlara anında teklif iletebilirsiniz. İlgilendiğiniz modelin sayfasındaki “Takas Teklifi” butonuna tıklayarak kendi garajınızdan uygun bir ürün seçebilir ve teklifinizi karşı tarafa gönderebilirsiniz. Taraflar takas ürünü ve fiyatı noktasında anlaştıktan sonra ürünler kontrol için Tarodan deposuna gönderilir ve süreç güvenle başlar.",
+      "uyelikPlanlariArasindakiFarklarNelerdir": "Üyelik planları arasındaki farklar nelerdir?",
+      "tarodandaKoleksiyonunuzuSergilemekAlisverisYapmakVe": "Tarodan’da koleksiyonunuzu sergilemek, alışveriş yapmak ve takas sistemini kullanmak temel üyelik yapımızla tamamen sorunsuz bir şekilde ilerler. Farklı plan seçeneklerimiz; ilan öne çıkarma (roketleme) hakları, mağaza ayrıcalıkları ve gelişmiş sergileme özellikleri gibi detaylarda koleksiyonerlere esneklik sunar. İhtiyacınıza en uygun planı profilinizden inceleyerek seçebilirsiniz.",
+      "siparisimiNasilTakipEderim": "Siparişimi nasıl takip ederim?",
+      "yeniGozBebeginizinYolaCikisHeyecanini": "Yeni göz bebeğinizin yola çıkış heyecanını anlık olarak yaşayabilirsiniz! Tarodan uygulamasını açtıktan sonra siparişleriniz için Hesabım → Siparişlerim, takas işlemleriniz için ise Hesabım → Takaslarım adımlarını izleyerek kargonuzun nerede olduğunu ve adım adım size nasıl yaklaştığını canlı olarak takip edebilirsiniz.",
+      "iadeVeDegisimPolitikasiNedir": "İade ve değişim politikası nedir?",
+      "koleksiyonTutkunlugununNeKadarHassasBir": "Koleksiyon tutkunluğunun ne kadar hassas bir hobi olduğunu biliyoruz. Beklenmeyen bir kusurla karşılaştığınızda veya ürün ilan bilgileriyle uyuşmadığında, teslimat anından itibaren geçerli olan yasal süre 14 gün çerçevesinde iade veya değişim talebi oluşturabilirsiniz. Tarodan ekibi, güvenli altyapısı ve depo kontrolleri ile bu süreçte her iki tarafın da haklarını titizlikle korur."
+    },
+    "metaTitle": "Sıkça Sorulan Sorular · Tarodan",
+    "metaDescription": "Tarodan sıkça sorulan sorular: sipariş oluşturma, ödeme ve güvenli havuz, kargo takibi, takas süreci, iade koşulları ve ilan öne çıkarma paketleri."
   },
   "help": {
     "title": "Yardım Merkezi",
@@ -2407,7 +3207,75 @@
     "safetyTips": "Güvenli Alışveriş İpuçları",
     "stillHaveQuestions": "Hâlâ sorunuz mu var?",
     "faqLink": "Sıkça Sorulan Sorular",
-    "contactLink": "Bize Ulaşın"
+    "contactLink": "Bize Ulaşın",
+    "content": {
+      "baslangicRehberi": "Başlangıç Rehberi",
+      "uyeOlun": "Üye Olun",
+      "ePostaAdresinizVeSifrenizleHizlica": "E-posta adresiniz ve şifrenizle hızlıca kayıt olabilir ya da Google veya Facebook hesabınızla tek tıkla aramıza katılabilirsiniz.",
+      "profiliniziTamamlayin": "Profilinizi Tamamlayın",
+      "profilFotografiniziEkleyinHobinizdenKisacaBahseden": "Profil fotoğrafınızı ekleyin, hobinizden kısaca bahseden bir biyografi yazın ve iletişim bilgilerinizi güncelleyin. Eksiksiz profiller, platformdaki güvenilirliğinizi her zaman bir adım öne taşır.",
+      "adresEkleyin": "Adres Ekleyin",
+      "koleksiyonunuzaYeniParcalarEklemekVeyaTakas": "Koleksiyonunuza yeni parçalar eklemek veya takas süreçlerini başlatabilmek için sistemimize en az bir teslimat adresi tanımlayın.",
+      "kesfetmeyeBaslayin": "Keşfetmeye Başlayın",
+      "zenginKategorilerimiziInceleyinFavoriSaticilariniziTakibe": "Zengin kategorilerimizi inceleyin, favori satıcılarınızı takibe alın ve gözünüze kestirdiğiniz nadir modelleri favorilerinize kaydederek hemen keşfe başlayın.",
+      "alisverisRehberi": "Alışveriş Rehberi",
+      "modelArayin": "Model Arayın",
+      "aramaCubugunuKullanarakAradiginizMarkayiOzel": "Arama çubuğunu kullanarak aradığınız markayı, özel seriyi veya modeli yazın; gelişmiş filtrelerle aradığınız parçaya saniyeler içinde ulaşın.",
+      "detaylariInceleyin": "Detayları İnceleyin",
+      "modelinFotograflariniYakindanInceleyinSaticininAciklamalarin": "Modelin fotoğraflarını yakından inceleyin, satıcının açıklamalarına göz atın ve satıcı puanını kontrol edin. Aklınıza takılan en ufak bir soru olursa mesaj yoluyla satıcıyla kolayca iletişime geçin.",
+      "sepetinizeEkleyin": "Sepetinize Ekleyin",
+      "begendiginizModeliSepeteEkleButonunaTiklayarak": "Beğendiğiniz modeli “Sepete Ekle” butonuna tıklayarak sepetinize atın. Dilerseniz aynı satıcıya ait birden fazla modeli tek seferde sepetinizde toplayabilirsiniz.",
+      "odemeniziTamamlayin": "Ödemenizi Tamamlayın",
+      "teslimatAdresiniziSecinSizeUygunKargo": "Teslimat adresinizi seçin, size uygun kargo tercihini belirleyin ve güvenli ödeme adımıyla işleminizi sorunsuzca tamamlayın.",
+      "siparisiniziVeTakaslariniziTakipEdin": "Siparişinizi ve Takaslarınızı Takip Edin",
+      "siparislerimVeTakaslarimSayfasiniZiyaretEderek": "“Siparişlerim” ve “Takaslarım” sayfasını ziyaret ederek yeni modelinizin yola çıkış ve kargo sürecini anlık olarak takip edin.",
+      "satisRehberi": "Satış Rehberi",
+      "ilanVerin": "İlan Verin",
+      "anaSayfadaVeyaMenudeYerAlan": "Ana sayfada veya menüde yer alan “İlan Ver” butonuna tıklayarak hızlıca ilan oluşturma sayfasına geçiş yapın.",
+      "fotografEkleyin": "Fotoğraf Ekleyin",
+      "modeliniziEnIyiSekildeYansitanFarkli": "Modelinizi en iyi şekilde yansıtan, farklı açılardan ve net ışık altında çekilmiş en az 3 fotoğraf yükleyin; kaliteli görseller her zaman dikkat çeker ve satış şansınızı artırır.",
+      "detaylariGirin": "Detayları Girin",
+      "markaModelOlcekKondisyonVeAciklama": "Marka, model, ölçek, kondisyon ve açıklama bilgilerini eksiksiz şekilde doldurun. Paylaştığınız her detay, alıcı gözünde güvenilirliğinizi artırır.",
+      "fiyatBelirleyin": "Fiyat Belirleyin",
+      "piyasaArastirmasiYaparakRekabetciBirFiyat": "Piyasa araştırması yaparak rekabetçi bir fiyat belirleyin. Dilerseniz koleksiyonunuzu çeşitlendirmek için takas seçeneğini de aktif hale getirebilirsiniz.",
+      "ilaniniziYayinlayin": "İlanınızı Yayınlayın",
+      "ilaninizHizliBirOnaySurecindenGectikten": "İlanınız hızlı bir onay sürecinden geçtikten sonra (genellikle 24 saat içinde) vitrindeki yerini alır.",
+      "satisiTamamlayin": "Satışı Tamamlayın",
+      "satisGerceklestigindeModeliOzenlePaketleyinKargoya": "Satış gerçekleştiğinde modeli özenle paketleyin, kargoya teslim edin ve takip numarasını sisteme girerek süreci tamamlayın.",
+      "takasRehberi": "Takas Rehberi",
+      "takasaAcikUrunleriKesfedin": "Takasa Açık Ürünleri Keşfedin",
+      "urunListelerindeYerAlanTakasEtiketine": "Ürün listelerinde yer alan “Takas” etiketine dikkat edin. Beğendiğiniz bu modellere hemen takas teklifi gönderebilirsiniz.",
+      "teklifiniziGonderin": "Teklifinizi Gönderin",
+      "takasTeklifiButonunaTiklayinKendiGarajinizdan": "“Takas Teklifi” butonuna tıklayın, kendi garajınızdan veya ilanlarınızdan takas için uygun bir ürün seçerek teklifinizi iletin.",
+      "detaylariGorusun": "Detayları Görüşün",
+      "karsiTaraflaMesajlasarakTakasKosullariniDetaylandirin": "Karşı tarafla mesajlaşarak takas koşullarını detaylandırın. Eğer model değerleri arasında fark varsa, ek ödeme konusunda anlaşma sağlayın.",
+      "takasiOnaylayin": "Takası Onaylayın",
+      "herIkiTarafDaSartlariOnayladiginda": "Her iki taraf da şartları onayladığında takas resmi olarak kesinleşir.",
+      "guvenliGonderimSaglayin": "Güvenli Gönderim Sağlayın",
+      "urunleriniziGuvenlePaketleyerekKargoyaVerinTarodan": "Ürünlerinizi güvenle paketleyerek kargoya verin. Tarodan güvenli depo incelemesi için depomuza ulaşan ürünlerin kontrolleri tamamlandıktan sonra onayınızı verin ve kargo takip numaraları üzerinden modelinizin size ne zaman ulaşacağını sistemden takip edin.",
+      "fotografCekimRehberi": "Fotoğraf Çekim Rehberi",
+      "dogalIsikKullanin": "Doğal Işık Kullanın",
+      "cekimlerinizdeMutlakaDogalIsiktanYararlaninGunduz": "Çekimlerinizde mutlaka doğal ışıktan yararlanın; gündüz vakti pencere kenarında yapılan çekimler modelin detaylarını en net şekilde ortaya çıkarır. Flaş kullanmaktan kaçının.",
+      "sadeBirArkaPlanTercihEdin": "Sade Bir Arka Plan Tercih Edin",
+      "modelinDetaylarininOnPlanaCikmasiIcin": "Modelin detaylarının ön plana çıkması için sade ve tek renkli bir arka plan kullanın. Beyaz bir kağıt veya kumaş bu işlem için fazlasıyla yeterlidir.",
+      "farkliAcilardanCekimYapin": "Farklı Açılardan Çekim Yapın",
+      "modeliniziOnArkaYanVe45": "Modelinizi ön, arka, yan ve 45 derecelik açılardan fotoğraflayın. İnce detayları ve hatları net bir şekilde göstererek alıcıya eksiksiz bir sunum yapın.",
+      "kusurlariSeffafcaGosterin": "Kusurları Şeffafça Gösterin",
+      "modeldeCizikVeyaEksikParcaGibi": "Modelde çizik veya eksik parça gibi kusurlar varsa bunları yakından fotoğraflayın. Şeffaflık, koleksiyonerler arasında her zaman güven sağlar.",
+      "orijinalKutuyuUnutmayin": "Orijinal Kutuyu Unutmayın",
+      "modelinOrijinalKutusuVarsaMutlakaFotograflayin": "Modelin orijinal kutusu varsa mutlaka fotoğraflayın; kutulu ürünler koleksiyoncular için her zaman çok daha değerlidir.",
+      "kargoRehberi": "Kargo Rehberi",
+      "dogruKoruyucuMalzemeKullanin": "Doğru Koruyucu Malzeme Kullanın",
+      "modeliniziBaloncukluNaylonKopukVeyaGazete": "Modelinizi baloncuklu naylon, köpük veya gazete kağıdıyla sıkıca sarın; kutu içinde kesinlikle hareket etmemesini sağlayın.",
+      "uygunBoyuttaSaglamKutuSecin": "Uygun Boyutta Sağlam Kutu Seçin",
+      "urununEbatlarinaUygunDayanikliBirKarton": "Ürünün ebatlarına uygun, dayanıklı bir karton kutu tercih edin. Çok büyük kutular modelin taşıma sırasında darbe almasına yol açabilir.",
+      "ciftKatKorumaTercihEdin": "Çift Kat Koruma Tercih Edin",
+      "ozellikleKoleksiyonunuzdakiDegerliVeNadirParcalar": "Özellikle koleksiyonunuzdaki değerli ve nadir parçalar için iç içe iki kutu kullanarak ekstra güvenlik sağlayın.",
+      "netEtiketlemeYapin": "Net Etiketleme Yapın",
+      "gondericiVeAliciAdresBilgileriniOkunakli": "Gönderici ve alıcı adres bilgilerini okunaklı bir şekilde yazın; kutunun üzerine mutlaka “KIRILACAK EŞYA” uyarısı ekleyin.",
+      "kargoyaTeslimEdin": "Kargoya Teslim Edin",
+      "paketiniziKargoSubesineGoturerekSizeAtanan": "Paketinizi kargo şubesine götürerek size atanan kargo kodu ile şubeye teslim edin."
+    }
   },
   "legal": {
     "lastUpdated": "Son güncelleme",
@@ -2429,7 +3297,545 @@
     "purpose": "Amaç",
     "duration": "Süre",
     "important": "Önemli",
-    "dataProtectionOfficer": "Veri Koruma Görevlisi"
+    "dataProtectionOfficer": "Veri Koruma Görevlisi",
+    "cookiePreferences": "Çerez tercihleri",
+    "cookieBannerNotice": "Deneyiminizi geliştirmek ve trafiği analiz etmek için çerez kullanıyoruz. Ayrıntılar için <policy>Çerez Politikası</policy>.",
+    "rejectAll": "Sadece zorunlu",
+    "cookieSettings": "Ayarlar",
+    "alwaysActive": "Her zaman aktif",
+    "fieldStatedInOrder": "siparişinizde belirtilir",
+    "distanceSales": {
+      "adSoyadUnvan": "Ad Soyad / Unvan",
+      "teslimatAdresi": "Teslimat Adresi",
+      "telefon": "Telefon",
+      "ePosta": "E-posta",
+      "unvanAdSoyad": "Unvan / Ad Soyad",
+      "mersisVergiNo": "MERSİS / Vergi No",
+      "adres": "Adres",
+      "telefonEPostaKep": "Telefon / E-posta / KEP",
+      "aOnBilgilendirmeFormuMesafeliSozlesme": "A) Ön Bilgilendirme Formu (Mesafeli Sözleşme Öncesi)",
+      "isbuOnBilgilendirmeFormuHttpsTarodan": "İşbu Ön Bilgilendirme Formu, https://tarodan.com.tr üzerinde verilen siparişe konu mesafeli sözleşme kurulmadan önce, tüketicinin bilgilendirilmesi amacıyla sunulmaktadır.",
+      "tarafBilgileriSaticiAliciPlatformUn": "Taraf Bilgileri (Satıcı – Alıcı – Platform'un Aracılık Rolü)",
+      "aliciTuketici": "Alıcı (Tüketici):",
+      "saticiSozlesmeninSaticiTarafi": "Satıcı (Sözleşmenin Satıcı Tarafı):",
+      "platformAraciHizmetSaglayici": "Platform (Aracı Hizmet Sağlayıcı):",
+      "buSiparisKapsamindakiMesafeliSatisSozlesmesi": "Bu sipariş kapsamındaki Mesafeli Satış Sözleşmesi kural olarak Satıcı ile Alıcı arasında kurulmaktadır. Platform, aracı hizmet sağlayıcı sıfatıyla siparişin alınması, ödeme altyapısının sağlanması, talep/şikâyetlerin iletilmesi, kayıtların tutulması ve mevzuattan doğan diğer yükümlülükler kapsamında sürece aracılık eder. Platform'un “satıcı” sıfatıyla satış yaptığı işlemler, ürün sayfasında ayrıca belirtilir.",
+      "buFormunAmaciSiparisiOnaylamadanOnce": "Bu formun amacı; siparişi onaylamadan önce Alıcı'nın, siparişin onaylanması halinde ödeme yükümlülüğü altına gireceği hususu dahil olmak üzere tüm esaslı konularda açık ve anlaşılır şekilde bilgilendirilmesidir.",
+      "sozlesmeKonusuMalHizmetinTemelNitelikleri": "Sözleşme Konusu Mal/Hizmetin Temel Nitelikleri",
+      "asagidakiBilgilerSiparisinizeOzeldirSiparisOzeti": "Aşağıdaki bilgiler siparişinize özeldir; sipariş özeti ekranında ve sipariş onay e-postanızda yer alır.",
+      "urunHizmetAdi": "Ürün / Hizmet Adı",
+      "markaModel": "Marka / Model",
+      "kullanimDurumuSifirIkinciElOutlet": "Kullanım Durumu (sıfır / ikinci el / outlet)",
+      "renkBedenOlcuVbOzellikler": "Renk, Beden, Ölçü vb. Özellikler",
+      "adet": "Adet",
+      "temelOzelliklerVeAmbalajIcerikBilgisi": "Temel özellikler ve ambalaj/içerik bilgisi",
+      "aliciUrununTemelNitelikleriniVeGorsellerini": "Alıcı, ürünün temel niteliklerini ve görsellerini sipariş öncesinde incelediğini; ürünün elektronik ortamda sunulan açıklamalarının satın alma kararında esas olduğunu kabul eder. Satıcı, ilan/açıklamanın gerçeğe uygun olmasından sorumludur.",
+      "toplamFiyatVergilerVeEkMasraflar": "Toplam Fiyat, Vergiler ve Ek Masraflar",
+      "odenecekToplamTutarinKalemleriSiparisOzeti": "Ödenecek toplam tutarın kalemleri sipariş özeti ekranında ayrı ayrı gösterilir:",
+      "urunBedeliKdvDahil": "Ürün Bedeli (KDV dahil)",
+      "teslimatKargoUcretiOdeyecekTarafBelirtilir": "Teslimat / Kargo Ücreti (ödeyecek taraf belirtilir)",
+      "varsaKapidaOdemeIslemUcreti": "Varsa Kapıda Ödeme / İşlem Ücreti",
+      "varsaPlatformKorumaHizmetBedeliAraci": "Varsa Platform Koruma Hizmet Bedeli / Aracı Hizmet Bedeli",
+      "varsaIndirimKuponKampanya": "Varsa İndirim / Kupon / Kampanya",
+      "odenecekToplamTutar": "Ödenecek Toplam Tutar",
+      "aliciSiparisiOnaylaOdemeyiTamamlaButonuna": "Alıcı, “Siparişi Onayla / Ödemeyi Tamamla” butonuna basması halinde ödemekle yükümlü olacağı toplam tutarı gördüğünü ve bu tutarın ödeme yükümlülüğü doğuracağını kabul eder.",
+      "odemeTeslimatVeIfaKosullari": "Ödeme, Teslimat ve İfa Koşulları",
+      "odemeYontemiKrediKartiBankaKarti": "Ödeme Yöntemi (kredi kartı, banka kartı, havale vb.)",
+      "tahminiTeslimSuresi": "Tahmini Teslim Süresi",
+      "teslimatOrganizasyonuSaticiGonderirEntegrasyonluKargo": "Teslimat organizasyonu (satıcı gönderir / entegrasyonlu kargo)",
+      "saticiMevzuattaOngorulenAzamiSurelerSakli": "Satıcı, mevzuatta öngörülen azami süreler saklı kalmak üzere, siparişin alınmasını takiben taahhüt ettiği süre içerisinde edimini ifa etmekle yükümlüdür. Teslimat gecikmeleri, stok/tedarik, kargo operasyonu gibi hallerde Alıcı'ya bilgilendirme yapılır.",
+      "siparisinKesinlesmesiOdemeninTamVeEksiksiz": "Siparişin kesinleşmesi, ödemenin tam ve eksiksiz yapılmasına bağlıdır. Ürünün Alıcı'ya veya Alıcı'nın gösterdiği üçüncü kişiye teslimi anında hasar ve ziya sorumluluğu Alıcı'ya geçer. Satıcı'nın, Alıcı'nın açık talimatı veya Platform'un operasyonel süreçleri dışında gerçekleştirdiği erken sevkiyat veya hatalı lojistik organizasyonundan doğan ek masraflardan bizzat Satıcı sorumludur.",
+      "caymaHakki14GunKapsamSure": "Cayma Hakkı (14 Gün) – Kapsam, Süre ve Usul",
+      "aliciTeslimdenItibaren14OnDort": "Alıcı, teslimden itibaren 14 (on dört) gün içinde herhangi bir gerekçe göstermeksizin ve cezai şart ödemeksizin cayma hakkına sahiptir. Cayma bildiriminin bu süre içinde Satıcı'ya ve/veya Platform üzerinden sağlanan cayma kanallarına yöneltilmesi yeterlidir.",
+      "aliciCaymaBildiriminiHesabimSiparislerimIade": "Alıcı, cayma bildirimini Hesabım → Siparişlerim → İade/Cayma menüsünden veya Satıcı'nın e-posta/KEP adresi üzerinden iletebilir.",
+      "aliciNinUrunuIadeIcinGondermesi": "Alıcı'nın ürünü iade için göndermesi gereken usul ve iade adresi, iade talebi oluşturulduğunda Platform arayüzünde gösterilir.",
+      "caymaHalindeIadeKargoBedelininKim": "Cayma halinde iade kargo bedelinin kim tarafından karşılanacağı ve iade yöntemleri ürün sayfasında ve iade akışında ayrıca belirtilir.",
+      "caymaHakkiIstisnalariHijyenSaglikNedeniyle": "Cayma hakkı istisnaları: hijyen/sağlık nedeniyle iadesi uygun olmayan ürünler, hızlı bozulan gıdalar, tüketicinin istekleri doğrultusunda kişiselleştirilmiş ürünler vb. mevzuatta yer alan istisnalar saklıdır. Siparişe konu ürün cayma kapsamı dışındaysa, ürün sayfasında ve sipariş öncesi ekranda ayrıca belirtilir.",
+      "ticariAlicilarinTacirlerinVeSaticiNin": "Ticari alıcıların (tacirlerin) ve Satıcı'nın bireysel kullanıcı (C2C) olduğu işlemlerin 6502 sayılı Kanun kapsamında olmaması sebebiyle, bu işlemlerde 14 günlük yasal cayma hakkı uygulanmaz.",
+      "iadeDegisimAyipliMalVeSatici": "İade / Değişim – Ayıplı Mal ve Satıcı Sorumluluğu",
+      "caymaHakkindanBagimsizOlarakUrununAyipli": "Cayma hakkından bağımsız olarak; ürünün ayıplı çıkması, eksik/yanlış gönderilmesi, hasarlı teslim edilmesi halinde Alıcı'nın tüketici mevzuatından doğan hakları saklıdır. Bu taleplerin muhatabı öncelikle Satıcı'dır. Platform, aracı hizmet sağlayıcı olarak talep iletim ve takip sistemini açık tutar; kayıtları muhafaza eder.",
+      "aliciNinAyipIddiasinaIliskinFotograf": "Alıcı'nın ayıp iddiasına ilişkin fotoğraf/video gibi delilleri Platform'a yüklemesi, inceleme ve uyuşmazlık yönetimi süreçlerinin sağlıklı yürütülmesine yardımcı olur.",
+      "sikayetTalepVeUyusmazlikCozumu": "Şikâyet, Talep ve Uyuşmazlık Çözümü",
+      "platform": "Platform",
+      "destekMerkeziUzerindenTalepAcarakDestek": "Destek Merkezi üzerinden talep açarak, destek@tarodan.com.tr adresinden veya 0 232 433 41 42 numarasından.",
+      "satici": "Satıcı",
+      "urunVeSiparisSayfasindaYerAlan": "Ürün ve sipariş sayfasında yer alan satıcı e-posta/telefon/KEP bilgileri üzerinden.",
+      "uyusmazliklardaTuketiciParasalSinirlarDahilindeTuketici": "Uyuşmazlıklarda tüketici; parasal sınırlar dahilinde Tüketici Hakem Heyeti'ne, diğer hallerde dava şartı arabuluculuk sonrası Tüketici Mahkemesi'ne başvurabilir.",
+      "onBilgilendirmeOnayiVeKaliciVeri": "Ön Bilgilendirme Onayı ve Kalıcı Veri Saklayıcısı",
+      "aliciSiparisiOnaylamadanOnceBuOn": "Alıcı, siparişi onaylamadan önce bu Ön Bilgilendirme'yi okuduğunu ve anladığını, sipariş onayının ödeme yükümlülüğü doğurduğunu kabul eder.",
+      "onBilgilendirmeVeMesafeliSatisSozlesmesi": "Ön Bilgilendirme ve Mesafeli Satış Sözleşmesi'ne Hesabım → Siparişlerim alanından erişilebilir; ayrıca kayıtlı e-posta adresinize bağlantı olarak gönderilebilir.",
+      "onayKutucuguMetniOnBilgilendirmeFormu": "Onay kutucuğu metni: “Ön Bilgilendirme Formu'nu okudum, siparişi onayladığım takdirde ödeme yükümlülüğü altına gireceğimi anladım.”",
+      "bMesafeliSatisSozlesmesi": "B) Mesafeli Satış Sözleşmesi",
+      "taraflarTanimlarVeSozlesmeninKurulmasi": "Taraflar, Tanımlar ve Sözleşmenin Kurulması",
+      "isbuMesafeliSatisSozlesmesiTarodanUzerinden": "İşbu Mesafeli Satış Sözleşmesi; TARODAN üzerinden siparişin Alıcı tarafından onaylanması ile elektronik ortamda kurulmuştur.",
+      "satici2": "Satıcı:",
+      "sozlesmeNinKonusuNitelikleriVeSatis": "Sözleşme'nin konusu; nitelikleri ve satış bedeli belirtilen ürün/hizmetin satışı ve teslimi/ifası ile Tarafların hak ve yükümlülüklerinin belirlenmesidir.",
+      "platformKuralOlarakBuSozlesmeNin": "Platform, kural olarak bu Sözleşme'nin satıcı tarafı değildir; ancak TKHK ve ilgili mevzuat uyarınca, aracı hizmet sağlayıcı sıfatıyla belirli yükümlülüklere tabi olabilir ve tüketici taleplerinin iletilmesi/takibi için sistem sağlar. Ticari (B2B) işlemlerde Platform yalnızca aracı hizmet sağlayıcıdır.",
+      "sozlesmeKonusuUrunHizmetBilgileri": "Sözleşme Konusu Ürün/Hizmet Bilgileri",
+      "asagidakiBilgilerSiparisinizeOzeldirVeSiparis": "Aşağıdaki bilgiler siparişinize özeldir ve sipariş özetinde gösterilir:",
+      "urunHizmet": "Ürün / Hizmet",
+      "birimFiyatKdvDahil": "Birim Fiyat (KDV dahil)",
+      "araToplam": "Ara Toplam",
+      "teslimatKargoOdeyecekTarafBelirtilir": "Teslimat / Kargo (ödeyecek taraf belirtilir)",
+      "varsaHizmetBedeliKomisyon": "Varsa Hizmet Bedeli / Komisyon",
+      "indirimKupon": "İndirim / Kupon",
+      "toplam": "Toplam",
+      "faturaBilgisiAdUnvanVergiBilgisi": "Fatura Bilgisi (ad/unvan, vergi bilgisi, adres)",
+      "odemeTeslimatVeIfa": "Ödeme, Teslimat ve İfa",
+      "odemeYontemiVeOdemeninNeZaman": "Ödeme yöntemi ve ödemenin ne zaman tahsil edileceği sipariş akışında gösterilir; kural olarak sipariş onayında tahsil edilir.",
+      "saticiSiparisinKendisineUlastigiAndanItibaren": "Satıcı, siparişin kendisine ulaştığı andan itibaren taahhüt ettiği süre içinde teslim/ifa yükümlülüğünü yerine getirecektir. Teslimatın imkânsızlaşması veya stok/tedarik sorunları halinde, Alıcı'ya gecikmeksizin bilgi verilir ve mevzuattan doğan haklar saklıdır.",
+      "teslimAnindaKargoPaketiHasarliysaAlici": "Teslim anında kargo paketi hasarlıysa Alıcı'nın tutanak düzenletmesi; ayıp/hasar iddialarının ispatında önemlidir. Bu, Alıcı'nın yasal haklarını ortadan kaldırmaz; yalnızca süreç yönetimini kolaylaştırır.",
+      "caymaHakkiVeKullanimi14Gun": "Cayma Hakkı ve Kullanımı (14 Gün)",
+      "aliciUrunuTeslimAldigiTarihtenItibaren": "Alıcı, ürünü teslim aldığı tarihten itibaren 14 gün içinde cayma hakkını kullanabilir. Cayma hakkının kullanılması için Platform'daki iade/cayma modülü üzerinden talep oluşturulması veya Satıcı'ya yazılı bildirim (e-posta/KEP) yapılması yeterlidir.",
+      "iadeEdilecekUrunKullanilmamisTekrarSatilabilirligini": "İade edilecek ürün; kullanılmamış, tekrar satılabilirliğini yitirmemiş şekilde (ürünün niteliğine göre) iade edilmelidir.",
+      "iadeSurecindeUrununHangiKargoFirmasiyla": "İade sürecinde ürünün hangi kargo firmasıyla ve hangi kodla gönderileceği Platform arayüzünde gösterilir.",
+      "iadeMasraflarininKimTarafindanKarsilanacaginaIliskin": "İade masraflarının kim tarafından karşılanacağına ilişkin kural ve istisnalar ürün sayfasında belirtilir.",
+      "caymaHakkiKapsamiDisindaKalanUrun": "Cayma hakkı kapsamı dışında kalan ürün/hizmetler (mevzuattaki istisnalar) sipariş öncesinde ayrıca bildirilmektedir. Cayma kapsam dışıysa Alıcı bunu onaylar.",
+      "ayipliMalEksikYanlisGonderimHasarli": "Ayıplı Mal / Eksik – Yanlış Gönderim / Hasarlı Teslim",
+      "urununAyipliCikmasiEksikYanlisGonderilmesi": "Ürünün ayıplı çıkması, eksik/yanlış gönderilmesi veya hasarlı teslim edilmesi halinde Alıcı'nın tüketici mevzuatından doğan seçimlik hakları saklıdır. Bu kapsamda Satıcı, ürünün ayıpsız ve sözleşmeye uygun tesliminden sorumludur.",
+      "platformAliciNinTalebiniSaticiYa": "Platform, Alıcı'nın talebini Satıcı'ya iletmekle yükümlüdür.",
+      "talepVeSikayetKayitlariniTutar": "Talep ve şikâyet kayıtlarını tutar.",
+      "tuketiciyeSurecTakibiSaglayanSistemiAcik": "Tüketiciye süreç takibi sağlayan sistemi açık tutar.",
+      "platformTuketiciMagduriyetiniGidermekAdinaUyusmazlik": "Platform, tüketici mağduriyetini gidermek adına uyuşmazlık çözüm mekanizmasını işletir. Satıcı'nın iflası, konkordato ilan etmesi veya edimini ifa edememesi (mali acziyet) durumunda Platform, Satıcı'nın içerideki hakedişlerine (emanet havuzuna) bloke koyma ve bu tutarları doğrudan tüketiciye iade etme yetkisine sahiptir.",
+      "aliciNinAyipIddiasinaIliskinDelilleri": "Alıcı'nın ayıp iddiasına ilişkin delilleri (fotoğraf/video) sisteme yüklemesi istenir.",
+      "iletisimSikayetVeUyusmazliklar": "İletişim, Şikâyet ve Uyuşmazlıklar",
+      "aliciPlatformUnDestekMerkeziUzerinden": "Alıcı, Platform'un Destek Merkezi üzerinden veya ürün/sipariş sayfasında yer alan satıcı iletişim bilgileri üzerinden talebini iletebilir. Uyuşmazlık halinde Alıcı; Tüketici Hakem Heyeti'ne veya dava şartı arabuluculuk sonrası Tüketici Mahkemesi'ne başvurabilir. Yetki ve görev kuralları emredici hükümler gereği uygulanır.",
+      "asagidaki6167MaddeleriPlatform": "Aşağıdaki 6.1–6.7 maddeleri, Platform ile Satıcı arasındaki TİCARİ ilişkiyi düzenler. Tüketicilere cezai şart uygulanamaz.",
+      "rucuMahsupVeEmanetOdemeEscrow": "Rücu, Mahsup ve Emanet Ödeme (Escrow)",
+      "platformTuketicininCaymaHakkiniKullanmasiAyipli": "Platform, tüketicinin cayma hakkını kullanması, ayıplı mal iadesi veya bankalar nezdinde gerçekleşen ters ibraz (chargeback) işlemleri sonucunda ödemek zorunda kaldığı tüm tutarlar ile idari para cezalarını, Satıcı'nın onayını aramaksızın Satıcı'nın cari hesabına borç kaydetmeye ve hakedişlerinden tek taraflı mahsup etmeye tam yetkilidir.",
+      "delilSozlesmesi": "Delil Sözleşmesi",
+      "taraflarAralarindakiUyusmazliklardaPlatformUnVeri": "Taraflar, aralarındaki uyuşmazlıklarda Platform'un veri tabanında tuttuğu elektronik kayıtların, logların, iade takip modülü verilerinin ve ticari defterlerinin HMK m.193 ve m.222 uyarınca münhasır ve kesin delil teşkil edeceğini kabul eder.",
+      "cezaiSartTicariSaticilarIcin": "Cezai Şart (Ticari Satıcılar İçin)",
+      "saticiNinSahteYanilticiUrunGondermesi": "Satıcı'nın sahte/yanıltıcı ürün göndermesi, platform dışına işlem yönlendirmesi, ispat yükünü yerine getirmemesi veya haksız iade reddi durumlarında, ilgili ürün bedelinin %20'si oranında cezai şartı Platform'a ödemeyi kabul eder. Tüketicilere cezai şart uygulanamaz.",
+      "komisyonVeHizmetBedelleri": "Komisyon ve Hizmet Bedelleri",
+      "platformPiyasaKosullariniGozeterekKomisyonOranlarinda": "Platform, piyasa koşullarını gözeterek komisyon oranlarında ve kargo/hizmet bedellerinde değişiklik yapma hakkını saklı tutar (7 gün önceden bildirim şartıyla). Bu bedeller Satıcı'ya fatura edilir ve cari hesaptan düşülür.",
+      "rekabetVeFiyatlandirma": "Rekabet ve Fiyatlandırma",
+      "platformunSunduguOtomatikFiyatlandirmaAraclariSaticilar": "Platformun sunduğu otomatik fiyatlandırma araçları, satıcılar arası fiyat sabitleme (kartel) amacıyla kullanılamaz. Platform, kargo algoritmalarında tarafsızlık ilkesine uyar. Satıcılar, Platform'da satış yaparken objektif kalite standartlarına uymak zorundadır.",
+      "iysVeVeriUyumu": "İYS ve Veri Uyumu",
+      "saticiIletiYonetimSistemiIysMevzuatina": "Satıcı, İleti Yönetim Sistemi (İYS) mevzuatına tam uyum sağlamakla yükümlüdür. Aksi halde Platform, Satıcı'nın faaliyetlerini askıya alabilir.",
+      "maneviTazminatSiniri": "Manevi Tazminat Sınırı",
+      "sozlesmeninIfaEdilmemesiVeyaGecikmesiHallerinde": "Sözleşmenin ifa edilmemesi veya gecikmesi hallerinde, tüzel kişi/ticari taraflar birbirlerinden manevi tazminat talep edemez.",
+      "kisiselVeriler": "Kişisel Veriler",
+      "aliciNinKisiselVerileriUyelikSiparis": "Alıcı'nın kişisel verileri; üyelik/sipariş/teslimat/ödeme/iade süreçlerinin yürütülmesi ve mevzuattan doğan yükümlülüklerin yerine getirilmesi amacıyla işlenir. Detaylar Platform'daki KVKK Aydınlatma Metni'nde açıklanmıştır.",
+      "saticiAliciVerileriniYalnizcaSiparisinIfasi": "Satıcı; Alıcı verilerini yalnızca siparişin ifası/teslimat ve yasal yükümlülükler kapsamında kullanabilir; reklam/pazarlama gibi amaçlarla ayrıca kullanamaz.",
+      "yururlukVeErisim": "Yürürlük ve Erişim",
+      "buSozlesmeSiparisinAliciTarafindanElektronik": "Bu Sözleşme, siparişin Alıcı tarafından elektronik ortamda onaylanması ile yürürlüğe girer. Sözleşme metnine Alıcı, Hesabım → Siparişlerim alanından erişebilir; ayrıca e-posta ile kendisine gönderilebilir.",
+      "onayKutucuguMetniMesafeliSatisSozlesmesi": "Onay kutucuğu metni: “Mesafeli Satış Sözleşmesi'ni okudum ve kabul ediyorum.”",
+      "metaTitle": "Mesafeli Satış Sözleşmesi · Tarodan",
+      "metaDescription": "Tarodan ön bilgilendirme formu ve mesafeli satış sözleşmesi: taraflar, toplam bedel, teslimat, 14 günlük cayma hakkı, ayıplı mal ve uyuşmazlık çözümü.",
+      "pageDescription": "Ön Bilgilendirme Formu ve Mesafeli Satış Sözleşmesi (pazar yeri / aracı hizmet sağlayıcı modeli).",
+      "pageFooter": "Bu metin genel sözleşme metnidir. Siparişinize özel bilgiler (ürün, tutar, taraf ve teslimat bilgileri) sipariş özeti ekranında ve sipariş onay e-postanızda yer alır; sözleşmenin siparişinize işlenmiş haline Hesabım → Siparişlerim alanından erişebilirsiniz."
+    },
+    "terms": {
+      "tarodanPlatformKullanimKosullari": "Tarodan Platform Kullanım Koşulları",
+      "buKullanimKosullariTarodanInternetSitesi": "Bu Kullanım Koşulları, Tarodan internet sitesi ve uygulamalarını ziyaret eden veya üye olarak kullanan kişiler ile Platform işletmecisi arasındaki Platform kullanım ilişkisini düzenler. Bir satışın, üyeliğin, öne çıkarma hizmetinin veya takasın kendine özgü şartları ödeme ya da onay öncesinde ayrıca gösterilir.",
+      "platformIsletmecisi": "Platform İşletmecisi",
+      "brandMarkaliElektronikTicaretPazarYeri": "{brand} markalı elektronik ticaret pazar yeri {legalName} (“Tarodan” veya “Şirket”) tarafından işletilir.",
+      "kosullarinKabuluVeUygulanmasi": "Koşulların Kabulü ve Uygulanması",
+      "ziyaretciPlatformUKullandigindaUyeIse": "Ziyaretçi Platform'u kullandığında; üye ise kayıt sırasında veya ilgili işlemi onaylarken bu koşulları okuduğunu ve kendisine uygulanabildiği ölçüde kabul ettiğini beyan eder. Üyelik, satış, satın alma, takas, kampanya veya ücretli hizmet için ayrıca sunulan özel koşullar bu metni tamamlar. Özel koşullarla bu metin arasında çelişki bulunursa ilgili işleme daha özgü olan hüküm, emredici mevzuata aykırı olmamak kaydıyla uygulanır.",
+      "buKosullarTuketicininKanundanDoganCayma": "Bu koşullar tüketicinin kanundan doğan cayma, ayıplı mal, tazminat, başvuru ve diğer emredici haklarını ortadan kaldırmaz veya sınırlandırmaz.",
+      "uyelikVeHesapGuvenligi": "Üyelik ve Hesap Güvenliği",
+      "uyeHukukenBaglayiciIslemYapmaEhliyetine": "Üye, hukuken bağlayıcı işlem yapma ehliyetine sahip olmalı; bu ehliyete sahip değilse yasal temsilcisi aracılığıyla hareket etmelidir.",
+      "kayitVeDogrulamaSirasindaDogruGuncel": "Kayıt ve doğrulama sırasında doğru, güncel ve kendisine ait bilgiler vermek; değişiklikleri gecikmeden güncellemek üyenin sorumluluğundadır.",
+      "sifreDogrulamaKoduVeOturumBilgileri": "Şifre, doğrulama kodu ve oturum bilgileri üçüncü kişilerle paylaşılmamalıdır. Yetkisiz kullanım şüphesi derhâl Tarodan'a bildirilmelidir.",
+      "birKisininBaskasiAdinaHesapAcmasi": "Bir kişinin başkası adına hesap açması veya işlem yapması ancak geçerli temsil yetkisi varsa mümkündür. Kurumsal hesap kullanıcıları işletmeyi temsil etmeye yetkili olduklarını beyan eder.",
+      "pazarYeriModeliVeSozlesmeninTaraflari": "Pazar Yeri Modeli ve Sözleşmenin Tarafları",
+      "tarodanKuralOlarakAlicilarIleBagimsiz": "Tarodan, kural olarak alıcılar ile bağımsız satıcıları buluşturan aracı hizmet sağlayıcıdır. Ürün sayfasında satıcı olarak Şirket'in açıkça gösterildiği işlemler dışında satış sözleşmesi alıcı ile ilgili satıcı arasında kurulur. Tarodan; ilan, iletişim, teklif, ödeme, kargo, iade, uyuşmazlık ve hakediş süreçleri için teknik altyapı sağlar ve mevzuatın aracı hizmet sağlayıcıya yüklediği sorumlulukları yerine getirir.",
+      "saticiTarafindanGirilenUrununOzgunluguMulkiyeti": "Satıcı tarafından girilen ürünün özgünlüğü, mülkiyeti, açıklaması, durumu, ayıpları ve stok bilgileri satıcının beyanıdır. Tarodan'ın içerik kontrolü yapması, öne çıkarması veya işlem desteği vermesi satıcının hukuki sorumluluğunu devraldığı anlamına gelmez; Tarodan'ın kanundan doğan kendi sorumlulukları saklıdır.",
+      "ilanVermeVeSaticininYukumlulukleri": "İlan Verme ve Satıcının Yükümlülükleri",
+      "saticiYalnizcaMulkiyetindeBulunanVeyaSatis": "Satıcı yalnızca mülkiyetinde bulunan veya satış/takas yetkisine sahip olduğu, hukuka uygun ürünleri listeleyebilir.",
+      "baslikFotografMarkaOlcekKondisyonEksik": "Başlık, fotoğraf, marka, ölçek, kondisyon, eksik parça, onarım, hasar, fiyat, stok, kargo paketi ve diğer nitelikler doğru ve güncel olmalıdır.",
+      "sahteTaklitCalintiMevzuataAykiriUcuncu": "Sahte, taklit, çalıntı, mevzuata aykırı, üçüncü kişi hakkını ihlal eden veya güvenli olmayan ürünler listelenemez.",
+      "saticiTamamlananSiparisiBelirtilenSuredeGuvenli": "Satıcı, tamamlanan siparişi belirtilen sürede güvenli biçimde paketleyip kendisine verilen kargo koduyla teslim etmek ve satış sonrası yasal yükümlülüklerini yerine getirmek zorundadır.",
+      "ticariVeyaMeslekiAmaclaSatisYapan": "Ticari veya mesleki amaçla satış yapan satıcı; vergi, fatura, garanti, mesafeli sözleşme ve tüketici mevzuatından doğan yükümlülüklerinden kendisi sorumludur.",
+      "satinAlmaTeklifVeTakas": "Satın Alma, Teklif ve Takas",
+      "aliciIslemiOnaylamadanOnceUrunAciklamasini": "Alıcı, işlemi onaylamadan önce ürün açıklamasını, satıcı bilgisini, toplam bedeli, komisyon/hizmet bedelini, kargoyu, teslimat adresini ve uygulanabilir sözleşmeleri kontrol etmelidir. Sipariş, ödeme kuruluşunun işlemi onaylaması ve Platform'un sipariş kaydını oluşturmasıyla kesinleşir. Teklifin gönderilmesi tek başına satış doğurmaz; satıcının kabulü ve gerekli ödeme/onay adımları tamamlanmalıdır.",
+      "takastaHerTarafSunduguUrunlerBakimindan": "Takasta her taraf sunduğu ürünler bakımından satıcı, karşılığında alacağı ürünler bakımından alıcı gibi hareket eder. Ürün değer farkı, taraflara uygulanan komisyon, kargo bedeli ve varsa nakit farkı onaydan önce gösterilir. Takasa gönderilen ürünler kontrol noktasına ulaşmadan karşı tarafa yönlendirilmez; işlem durumu takas detayından izlenir.",
+      "fiyatlarKomisyonlarVeUcretliHizmetler": "Fiyatlar, Komisyonlar ve Ücretli Hizmetler",
+      "urunFiyatiSaticiTarafindanBelirlenirGecerli": "Ürün fiyatı satıcı tarafından belirlenir. Geçerli indirim veya kupon varsa komisyon kuralı, işlem anındaki indirimli ürün tutarı ile ürün kategorisi ve satıcı tipi üzerinden belirlenir.",
+      "aliciVeSaticiTarafindakiKomisyonHizmet": "Alıcı ve satıcı tarafındaki komisyon, hizmet, koruma ve takas ücretleri; ilgili işleme uygulanabilen kurala göre hesaplanır ve onaydan önce ayrı kalemler hâlinde gösterilir.",
+      "kargoUcretiIlandaSecilenPaketBoyutu": "Kargo ücreti, ilanda seçilen paket boyutu ve aktif kargo tarifesine göre komisyon kuralından bağımsız hesaplanır.",
+      "uyelikVeIlanOneCikarmaGibi": "Üyelik ve ilan öne çıkarma gibi sanal hizmetlerin kapsamı, süresi, fiyatı, yenilenme ve iptal koşulları satın alma ekranında gösterilir. Bu hizmetler katalog ürünü değildir ve genel ürün araması ile kullanıcının ilan listesinde gösterilmez.",
+      "onaylanmisBirIsleminKayitAltinaAlinan": "Onaylanmış bir işlemin kayıt altına alınan fiyatlama sürümü, sonradan yayımlanan yeni bir tarife veya komisyon kuralı nedeniyle sessizce değiştirilmez; fiyatlama geçersizleşmişse kullanıcıdan güncel özeti yeniden onaylaması istenir.",
+      "odemeHakedisVeIadeler": "Ödeme, Hakediş ve İadeler",
+      "odemelerPlatformUnEntegreOdemeKurulusu": "Ödemeler Platform'un entegre ödeme kuruluşu aracılığıyla alınır. Tarodan kart numarasını doğrudan saklamaz; kullanıcı kart kaydetmeyi açıkça seçerse kart bilgileri ödeme kuruluşunun güvenli altyapısında, Tarodan hesabıyla ilişkilendirilmiş bir belirteç üzerinden kullanılabilir. Kayıtlı kartlar hesap alanından yönetilebilir.",
+      "saticiHakedisiUrunBedeliGecerliKesinti": "Satıcı hakedişi; ürün bedeli, geçerli kesinti ve vergiler, kargo maliyeti, iade/uyuşmazlık durumu ve ödeme bekleme süresi dikkate alınarak işlem detayında gösterilir. İade, ters ibraz, sahtecilik incelemesi, yasal yükümlülük veya borç/mahsup bulunması hâlinde hakediş mevzuata ve işleme özel koşullara uygun olarak bekletilebilir veya mahsup edilebilir.",
+      "kargoTeslimatIadeVeUyusmazliklar": "Kargo, Teslimat, İade ve Uyuşmazlıklar",
+      "siparisVeTakasGonderileriKargoVe": "Sipariş ve takas gönderileri Kargo ve Teslimat Politikası'na göre yürütülür. Cayma, ayıplı ürün, eksik veya yanlış ürün talepleri İade Politikası, Mesafeli Satış Sözleşmesi ve uygulanabilir mevzuata göre değerlendirilir. Kullanıcı, uyuşmazlıkta istenen fotoğraf, video, taşıyıcı kaydı ve açıklamaları doğru ve zamanında sunmalıdır; bu yükümlülük emredici ispat kurallarını veya tüketici haklarını ortadan kaldırmaz.",
+      "kullaniciIcerikleriVeFikriHaklar": "Kullanıcı İçerikleri ve Fikrî Haklar",
+      "kullaniciPlatformAYukledigiFotografAciklama": "Kullanıcı, Platform'a yüklediği fotoğraf, açıklama, yorum, mesaj ve diğer içerikler üzerinde gerekli haklara sahip olmalıdır. İçeriğin mülkiyeti kullanıcıda kalır. Kullanıcı, içeriğin Platform'da barındırılması, teknik olarak çoğaltılması, boyutlandırılması, ilan ve arama sonuçlarında gösterilmesi ve hizmetin tanıtımı için gerekli ölçüde Tarodan'a dünya çapında, bedelsiz, devredilebilir olmayan ve alt hizmet sağlayıcılara teknik amaçla kullandırılabilir bir kullanım izni verir. İzin, içeriğin Platform'da tutulmasını gerektiren hukuki saklama yükümlülükleri dışında içerik kaldırıldığında sona erer.",
+      "tarodanMarkasiYazilimiTasarimiVeriTabani": "Tarodan markası, yazılımı, tasarımı, veri tabanı ve Platform tarafından üretilen içerikler üzerindeki haklar Şirket'e veya ilgili hak sahibine aittir. Bunlar yazılı izin olmadan kopyalanamaz, tersine mühendisliğe tabi tutulamaz veya ticari amaçla kullanılamaz.",
+      "yasaklananDavranislar": "Yasaklanan Davranışlar",
+      "dolandiricilikYanilticiBeyanSahteIslemFiyat": "Dolandırıcılık, yanıltıcı beyan, sahte işlem, fiyat veya değerlendirme manipülasyonu yapmak; başkasının hesabını ya da ödeme aracını izinsiz kullanmak.",
+      "taraflariPlatformDisiOdemeVeyaTeslimata": "Tarafları Platform dışı ödeme veya teslimata yönlendirerek güvenlik ve ücret mekanizmalarını kasıtlı biçimde aşmak.",
+      "hakaretTehditTacizNefretSoylemiKisisel": "Hakaret, tehdit, taciz, nefret söylemi, kişisel veri ifşası, istenmeyen ticari ileti veya hukuka aykırı içerik paylaşmak.",
+      "zararliYazilimOtomatikSaldiriYetkisizErisim": "Zararlı yazılım, otomatik saldırı, yetkisiz erişim, güvenlik testi, veri kazıma, aşırı trafik veya hizmetin işleyişini bozacak başka teknik faaliyette bulunmak.",
+      "fikriMulkiyetKisilikGizlilikVeyaTuketici": "Fikrî mülkiyet, kişilik, gizlilik veya tüketici hakları dâhil üçüncü kişi haklarını ihlal etmek.",
+      "icerikDenetimiVeHesapTedbirleri": "İçerik Denetimi ve Hesap Tedbirleri",
+      "tarodanBuKosullaraIslemeOzelKurallara": "Tarodan; bu koşullara, işleme özel kurallara veya mevzuata aykırı içerikleri inceleyebilir, görünürlüğünü sınırlayabilir ya da kaldırabilir. Dolandırıcılık, ödeme riski, sahte ürün, güvenlik ihlali, tekrarlanan kötüye kullanım veya yasal yükümlülük hâlinde ilan verme, satış, satın alma, ödeme, mesajlaşma ya da hesap erişimi geçici veya kalıcı olarak sınırlandırılabilir.",
+      "kanunenBildirimYapilmasininSakincaliOlduguAcil": "Kanunen bildirim yapılmasının sakıncalı olduğu, acil güvenlik tedbiri gereken veya incelemenin etkilenebileceği durumlar dışında kullanıcıya tedbirin temel nedeni ve mevcut itiraz/destek yolu bildirilir. Tedbir, devam eden sipariş, iade, hakediş, borç, kayıt saklama veya yasal sorumlulukları ortadan kaldırmaz.",
+      "hukukaAykiriIcerikVeHakIhlali": "Hukuka Aykırı İçerik ve Hak İhlali Bildirimleri",
+      "hukukaAykiriVeyaFikriMulkiyetHakkini": "Hukuka aykırı veya fikrî mülkiyet hakkını ihlal ettiği düşünülen ilan ve içerikler, ilgili içerik bağlantısı, hak sahipliğini ve ihlali açıklayan belgeler ile iletişim bilgileri eklenerek Tarodan'a bildirilebilir. Tarodan, başvuruyu yürürlükteki mevzuata göre değerlendirir; gerekli hâllerde içeriği erişimden kaldırır, ilgili kullanıcıdan açıklama ister ve yetkili mercilere bildirim yapar. Eksik veya kötü niyetli bildirimler işleme alınmayabilir; tarafların yetkili mercilere başvuru hakkı saklıdır.",
+      "kisiselVerilerCerezlerVeIletisim": "Kişisel Veriler, Çerezler ve İletişim",
+      "kisiselVerilerinIslenmesiGizlilikPolitikasiVe": "Kişisel verilerin işlenmesi Gizlilik Politikası ve KVKK Aydınlatma Metni'ne; çerezler Çerez Politikası'na tabidir. Sipariş, hesap güvenliği, ödeme, kargo, iade ve sözleşmenin ifası için gerekli bildirimler hizmet iletişimidir. Kampanya ve pazarlama iletileri ise uygulanabilir onay ve ret kurallarına göre gönderilir.",
+      "hizmetinIsleyisiVeDegisiklikler": "Hizmetin İşleyişi ve Değişiklikler",
+      "bakimGuvenlikMucbirSebepTasiyiciVeya": "Bakım, güvenlik, mücbir sebep, taşıyıcı veya ödeme kuruluşu kesintisi ve teknik arıza nedeniyle Platform'un bazı işlevleri geçici olarak kullanılamayabilir. Tarodan makul süre içinde hizmeti yeniden sağlamak ve etkilenmiş işlemleri korumak için gerekli önlemleri alır; mevzuattan doğan sorumluluklar saklıdır.",
+      "kosullarMevzuatIsModeliVeyaOzellik": "Koşullar mevzuat, iş modeli veya özellik değişiklikleri nedeniyle ileriye etkili olarak güncellenebilir. Kullanıcının hak veya yükümlülüklerini önemli ölçüde etkileyen değişiklikler yürürlüğe girmeden önce uygun bir kanaldan bildirilir. Değişiklikten önce kesinleşen işlemlere, aksi kullanıcı lehine veya kanunen zorunlu olmadıkça, işlem tarihinde kabul edilen koşullar uygulanır.",
+      "sorumlulugunSinirlari": "Sorumluluğun Sınırları",
+      "tarodanKendiKusuruVeyaKanundanDogan": "Tarodan, kendi kusuru veya kanundan doğan yükümlülüğü kapsamındaki zararlardan yürürlükteki mevzuata göre sorumludur. Şirket'in sorumluluğunu ağır kusur, kast, kişisel zarar, veri koruma, ödeme güvenliği veya tüketicinin emredici hakları bakımından kaldıran ya da mevzuata aykırı biçimde sınırlayan bir yorum yapılamaz.",
+      "kullanicininYanlisBilgiVermesiHesabiniGuvensiz": "Kullanıcının yanlış bilgi vermesi, hesabını güvensiz kullanması, Platform dışı işlem yapması veya üçüncü taraf hizmetlerinde Tarodan'a yüklenemeyen bir kesinti nedeniyle doğan sonuçlardan ilgili kullanıcı ya da hizmet sağlayıcı sorumlu olabilir. Bu durum Tarodan'ın olay bazında gerekli desteği ve kanuni yükümlülüklerini yerine getirmesine engel değildir.",
+      "uyeliginSonaErmesi": "Üyeliğin Sona Ermesi",
+      "uyeHesapAyarlariVeyaDestekKanali": "Üye, hesap ayarları veya destek kanalı üzerinden üyeliğinin kapatılmasını isteyebilir. Devam eden sipariş, takas, iade, hakediş, borç, uyuşmazlık ya da mevzuattan doğan kayıt saklama yükümlülüğü varsa hesap verileri ilgili süreç tamamlanana veya yasal süre dolana kadar gerekli ölçüde tutulabilir. Hesabın kapanması önceden doğmuş ödeme ve sorumlulukları ortadan kaldırmaz.",
+      "uygulanacakHukukVeUyusmazlikCozumu": "Uygulanacak Hukuk ve Uyuşmazlık Çözümü",
+      "buKosullaraTurkHukukuUygulanirTuketiciler": "Bu koşullara Türk hukuku uygulanır. Tüketiciler, yürürlükteki parasal sınırlar ve yetki kuralları çerçevesinde yerleşim yerlerindeki veya işlemin yapıldığı yerdeki Tüketici Hakem Heyetine ya da Tüketici Mahkemesine başvurabilir. Tüketici sıfatı bulunmayan taraflar bakımından kanunen yetkili mahkeme ve icra daireleri yetkilidir. Tarafların arabuluculuk ve diğer kanuni başvuru yolları saklıdır.",
+      "iletisimVeElektronikKayitlar": "İletişim ve Elektronik Kayıtlar",
+      "kosullarVeyaBirIslemHakkindakiSorular": "Koşullar veya bir işlem hakkındaki sorular {email} adresine, {kep} KEP adresine ya da Platform'daki destek kanalına iletilebilir. Sipariş, sözleşme, onay ve işlem kayıtları mevzuatta öngörülen süre boyunca erişilebilir ve güvenli biçimde saklanır. Platform kayıtları diğer hukuka uygun delillerle birlikte değerlendirilir; hiçbir hüküm kullanıcının kanuni delil ve ispat haklarını ortadan kaldırmaz.",
+      "metaTitle": "Kullanım Koşulları · Tarodan",
+      "metaDescription": "Tarodan üyelik, ilan, satış, satın alma, teklif, takas, ödeme, komisyon, içerik ve hesap kullanım koşulları.",
+      "pageDescription": "Tarodan pazar yerini ziyaret ederken, üyelik oluştururken, ilan verirken, satın alırken veya takas yaparken geçerli genel kurallar.",
+      "pageFooter": "Yürürlük ve son güncelleme: 5 Ağustos 2026. Bu metnin güncel sürümüne Platform üzerinden sürekli erişilebilir. İşleme özel olarak onaylanan sözleşmeler ve emredici mevzuat hükümleri saklıdır."
+    },
+    "refundPolicy": {
+      "hangiKosullardaIadeTalebiOlusturulabilir": "Hangi koşullarda iade talebi oluşturulabilir?",
+      "koleksiyonunuzaEklediginizModelAracinIlandakiTanimlara": "Koleksiyonunuza eklediğiniz model aracın ilandaki tanımlara uymaması, belirtilmeyen bir kusur barındırması veya kargo sürecinde zarar görmesi durumunda yasal süreler içinde iade talebi oluşturabilirsiniz. Aşağıdaki haklı gerekçelerle iade sürecini güvenle başlatabilirsiniz:",
+      "urununTanimaVeGorseleUymamasi": "Ürünün tanıma ve görsele uymaması",
+      "ilandaBelirtilmemisKusurVeyaHasarBulunmasi": "İlanda belirtilmemiş kusur veya hasar bulunması",
+      "eksikUrunVeyaParcaGonderilmesi": "Eksik ürün veya parça gönderilmesi",
+      "sahteUrunVeyaParcaTespiti": "Sahte ürün veya parça tespiti",
+      "calismayanVeyaArizaliUrunCikmasi": "Çalışmayan veya arızalı ürün çıkması",
+      "alicininCaymaHakkiniKullanarakVazgectimDemesi": "Alıcının cayma hakkını kullanarak “Vazgeçtim” demesi",
+      "kullaniciKaynakliHasarDurumlari": "Kullanıcı kaynaklı hasar durumları",
+      "neZamanIadeTalebiOlusturabilirim": "Ne zaman iade talebi oluşturabilirim?",
+      "kargonuzuTeslimAldiginizAndanItibarenYasal": "Kargonuzu teslim aldığınız andan itibaren, yasal mevzuat ve platform kuralları çerçevesinde belirlenen 14 günlük süre içinde sistem üzerinden kolayca iade talebi oluşturabilirsiniz. Göz bebeğinizi kutusundan çıkarıp inceledikten sonra herhangi bir uyumsuzluk fark ederseniz vakit kaybetmeden talep açabilirsiniz.",
+      "iadeTalebiNasilOlusturulur": "İade talebi nasıl oluşturulur?",
+      "tarodanUygulamasiniAcarakHesabimSiparislerimAdimlarini": "Tarodan uygulamasını açarak Hesabım → Siparişlerim adımlarını izleyin. İlgili siparişin detayına girdikten sonra “İade Talebi Oluştur” butonuna tıklayın. Karşınıza çıkan listeden iade nedeninizi seçip, sorunu net bir şekilde gösteren güncel fotoğrafları sisteme yükleyerek talebinizi tek tıkla gönderebilirsiniz.",
+      "iadeTalebiNasilDegerlendirilir": "İade talebi nasıl değerlendirilir?",
+      "olusturdugunuzIadeTalebiVeBelirttiginizGerekce": "Oluşturduğunuz iade talebi ve belirttiğiniz gerekçe, Tarodan uzman destek ekibi ve depo kontrol mekanizmaları tarafından titizlikle incelenir. Gerekli görülmesi durumunda ürün merkez depomuza çağrılarak ilan bilgileriyle karşılaştırılır. Sürecin adil ve şeffaf yürütülmesi için hem alıcının hem de satıcının sunduğu kanıtlar değerlendirilerek nihai karar verilir.",
+      "iadeTalebiNeKadarSuredeSonuclanir": "İade talebi ne kadar sürede sonuçlanır?",
+      "iadeTalebinizSistemeUlastigiAndanItibaren": "İade talebiniz sisteme ulaştığı andan itibaren ekibimiz tarafından incelemeye alınır. Genellikle başvurular ve ürünün depoya ulaşarak kontrol edilmesi süreçleri dahil olmak üzere, talepleriniz en geç 3 ila 5 iş günü içinde sonuçlandırılır ve tarafınıza bilgilendirme yapılır.",
+      "iadeTalebiKabulEdilenAliciNe": "İade talebi kabul edilen alıcı ne yapmalıdır?",
+      "iadeTalebinizOnaylandigindaSistemTarafindanSize": "İade talebiniz onaylandığında, sistem tarafından size iletilen anlaşmalı kargo iade kodunu not almalısınız. Modeli, orijinal kutusu ve tüm parçalarıyla birlikte özenle paketleyerek kargo şubesine teslim etmeniz ve iade takip numarasını sisteme girmeniz yeterlidir.",
+      "iadeGonderimiIcinOdemeYapmamGerekiyor": "İade gönderimi için ödeme yapmam gerekiyor mu?",
+      "iadeKargoUcretininKiminTarafindanOdenecegi": "İade kargo ücretinin kimin tarafından ödeneceği, iade nedeninize göre değişiklik gösterir:",
+      "tanimaUymayanKusurluEksikSahteVeya": "Tanıma uymayan, kusurlu, eksik, sahte veya arızalı ürün",
+      "iadelerindeKargoBedeliSaticiTarafindanOdenir": "iadelerinde kargo bedeli satıcı tarafından ödenir.",
+      "vazgectimVeyaKullaniciKaynakliHasar": "“Vazgeçtim” veya kullanıcı kaynaklı hasar",
+      "durumlarindaIseKargoGonderimUcretiAliciya": "durumlarında ise kargo gönderim ücreti alıcıya aittir.",
+      "iadeEdilenSiparisinUcretIadesiNe": "İade edilen siparişin ücret iadesi ne zaman yapılır?",
+      "iadeEdilenUrunMerkezeUlastiktanVe": "İade edilen ürün merkeze ulaştıktan ve uzman ekibimiz tarafından onaylandıktan sonra, ödemeniz Tarodan’ın güvenli havuzundan çözülerek bankanıza talimat verilir. Ücretin hesabınıza yansıma süresi, bankanızın süreçlerine bağlı olarak genellikle 1 ila 3 iş günü sürmektedir.",
+      "iadeEdilenTutarNedenDahaDusuk": "İade edilen tutar neden daha düşük?",
+      "iadeOnaylandigindaYapilanKesintilerIadeninSebebine": "İade onaylandığında yapılan kesintiler, iadenin sebebine ve platform operasyon süreçlerine dayanarak şu şekilde uygulanır:",
+      "tanimaUymayanKusurluEksikSahteArizali": "Tanıma uymayan / kusurlu / eksik / sahte / arızalı ürünler",
+      "buHakliDurumlardaKargoMasrafiniSatici": "Bu haklı durumlarda kargo masrafını satıcı öder ve işlem sonucunda satıcıdan “Satıcı Platform Hizmet Bedeli” kesintisi yapılır.",
+      "kullaniciKaynakliHasarVazgectimDurumlari": "Kullanıcı kaynaklı hasar / “Vazgeçtim” durumları",
+      "buDurumlardaIadeKargoUcretiniAlici": "Bu durumlarda iade kargo ücretini alıcı öder ve iade tutarından “Alıcı Koruma Hizmet Bedeli” kesilerek kalan tutar hesabınıza yansıtılır.",
+      "hangiKosullardaIptalTalebiOlusturulabilir": "Hangi koşullarda iptal talebi oluşturulabilir?",
+      "siparisiniziVerdiktenSonraUrunHenuzKargoya": "Siparişinizi verdikten sonra, ürün henüz kargoya verilmeden veya teslimat sürecinde haklı gerekçelerle iptal talebi oluşturabilirsiniz. Tarodan platformunda geçerli olan iptal nedenlerimiz şunlardır:",
+      "teslimatTarihiGecikti": "Teslimat tarihi gecikti",
+      "yanlisUrunSectim": "Yanlış ürün seçtim",
+      "vazgectim": "Vazgeçtim",
+      "yanlisKartlaOdemeYaptim": "Yanlış kartla ödeme yaptım",
+      "fiyatNedeniyleVazgectim": "Fiyat nedeniyle vazgeçtim",
+      "adresteBulunamayacagim": "Adreste bulunamayacağım",
+      "neZamanIptalTalebiOlusturabilirim": "Ne zaman iptal talebi oluşturabilirim?",
+      "siparisiniziVerdiktenSonraUrununuzHenuzKargoya": "Siparişinizi verdikten sonra, ürününüz henüz kargoya teslim edilmeden veya kargo sürecindeyken dilediğiniz an iptal talebi oluşturabilirsiniz. Ürününüz kargoya verilmeden yapılan iptallerde süreç çok daha hızlı ilerler.",
+      "iptalTalebiNasilOlusturulur": "İptal talebi nasıl oluşturulur?",
+      "tarodanUygulamasiniAcarakHesabimSiparislerimAdimlarini2": "Tarodan uygulamasını açarak Hesabım → Siparişlerim adımlarını izleyebilirsiniz. İptal etmek istediğiniz siparişin detayına girdikten sonra ilgili iptal nedenini seçerek talebinizi anında sisteme iletebilirsiniz.",
+      "iptalTalebiNasilDegerlendirilir": "İptal talebi nasıl değerlendirilir?",
+      "olusturdugunuzIptalTalebiUrununOAnki": "Oluşturduğunuz iptal talebi, ürünün o anki lojistik durumuna (kargoya verilip verilmediğine) ve seçtiğiniz iptal nedenine göre sistem tarafından otomatik olarak veya Tarodan operasyon ekibimiz tarafından titizlikle incelenerek değerlendirilir.",
+      "iptalTalebiNeKadarSuredeSonuclanir": "İptal talebi ne kadar sürede sonuçlanır?",
+      "iptalTalebinizSistemeUlastigiAndanItibaren": "İptal talebiniz sisteme ulaştığı andan itibaren hızla işleme alınır. Ürün henüz kargoya verilmediyse talepleriniz anında veya en kısa sürede sonuçlandırılır; kargodaki ürünler için ise deponun veya kargo firmasının iade süreçlerine bağlı olarak süre değişiklik gösterebilir.",
+      "iptalTalebiKabulEdilenAliciNe": "İptal talebi kabul edilen alıcı ne yapmalıdır?",
+      "egerIptalEdilenUrunKargoyaVerilmisse": "Eğer iptal edilen ürün kargoya verilmişse ve elinize ulaşırsa, paketi açmadan size iletilen iade kargo koduyla birlikte anlaşmalı kargo şubesine teslim etmeniz gerekir. Ürün kargoya verilmeden iptal edildiyse alıcının ekstra bir işlem yapmasına gerek yoktur.",
+      "iptalGonderimiIcinOdemeYapmamGerekiyor": "İptal gönderimi için ödeme yapmam gerekiyor mu?",
+      "iptalNedeninizeVeUrununDurumunaGore": "İptal nedeninize ve ürünün durumuna göre kargo masrafı değişiklik gösterir:",
+      "kargoUcretiniSaticiOder": "Kargo ücretini satıcı öder.",
+      "yanlisUrunSectimVazgectimYanlisKartla": "Yanlış ürün seçtim, vazgeçtim, yanlış kartla ödeme yaptım, fiyat nedeniyle vazgeçtim, adreste bulunamayacağım",
+      "urunKargoyaVerildiyseKargoUcretiniAlici": "Ürün kargoya verildiyse kargo ücretini alıcı öder; kargoya verilmediyse kargo gönderimi söz konusu değildir.",
+      "iptalEdilenSiparisinUcretIadesiNe": "İptal edilen siparişin ücret iadesi ne zaman yapılır?",
+      "iptalIsleminizOnaylandigindaVeyaKargodakiUrun": "İptal işleminiz onaylandığında veya kargodaki ürün merkeze ulaştığında, ödemeniz Tarodan’ın güvenli havuzundan çözülerek bankanıza iade talimatı verilir. Ücretin hesabınıza yansıma süresi bankanızın süreçlerine bağlı olarak genellikle 1 ila 3 iş günü sürmektedir.",
+      "iptalEdilenUrundeTutarNedenDaha": "İptal edilen üründe tutar neden daha düşük?",
+      "iptalEdilenSiparislerdeTutarinBirKisminin": "İptal edilen siparişlerde tutarın bir kısmının kesilmesinin nedeni, seçtiğiniz iptal nedenine ve ürünün o anki durumuna dayanır:",
+      "buDurumdaTumMasraflarSaticiyaAittir": "Bu durumda tüm masraflar satıcıya aittir.",
+      "urunKargoyaVerildiyseKargoUcretiAlicidan": "Ürün kargoya verildiyse kargo ücreti alıcıdan düşülür; kargoya verilmediyse işlemden yalnızca “Alıcı Koruma Hizmet Bedeli” kesilir ve kalan tutar hesabınıza yansıtılır.",
+      "pageDescription": "İade ve iptal taleplerinin hangi koşullarda oluşturulduğu, nasıl değerlendirildiği ve ücret iadesinin nasıl işlediği.",
+      "returnSection": "İade Koşul ve Şartları",
+      "cancellationSection": "İptal Koşul ve Şartları"
+    },
+    "privacy": {
+      "kisiselVerilerinKorunmasinaIliskinAydinlatmaMetni": "Kişisel Verilerin Korunmasına İlişkin Aydınlatma Metni",
+      "isbuAydinlatmaMetni6698SayiliKisisel": "İşbu Aydınlatma Metni, 6698 sayılı Kişisel Verilerin Korunması Kanunu'nun 10. maddesi uyarınca, Platform üzerinden işlenen kişisel veriler hakkında ilgili kişileri bilgilendirmek amacıyla hazırlanmıştır.",
+      "veriSorumlusu": "Veri Sorumlusu",
+      "legalnameSirketAddressAdresindeMukimOlup": "{legalName} (“Şirket”), {address} adresinde mukim olup {website} web sitesi ve/veya mobil uygulaması Tarodan (“Platform”) vasıtasıyla işlenen kişisel veriler bakımından 6698 sayılı KVKK uyarınca veri sorumlusudur.",
+      "unvan": "Unvan",
+      "adres": "Adres",
+      "ePosta": "E-posta",
+      "kep": "KEP",
+      "kisiselVeriNedir": "Kişisel Veri Nedir?",
+      "kisiselVeriKimligiBelirliVeyaBelirlenebilir": "Kişisel veri; kimliği belirli veya belirlenebilir gerçek kişiye ilişkin her türlü bilgidir.",
+      "ilgiliKisiGruplariVeIslenenVeri": "İlgili Kişi Grupları ve İşlenen Veri Kategorileri",
+      "aZiyaretci": "A) Ziyaretçi",
+      "islemGuvenligiIpLogCerezKayitlari": "İşlem güvenliği: IP, log, çerez kayıtları, cihaz bilgileri",
+      "pazarlamaRizaVarsaReklamSegmentasyonCerez": "Pazarlama (rıza varsa): reklam / segmentasyon çerez verileri",
+      "bUyeAlici": "B) Üye / Alıcı",
+      "kimlikAdSoyadKullaniciAdiTckn": "Kimlik: ad-soyad, kullanıcı adı, TCKN",
+      "iletisimEPostaTelefonAdres": "İletişim: e-posta, telefon, adres",
+      "musteriIslemSiparisOdemeFaturaTeslimat": "Müşteri işlem: sipariş, ödeme, fatura, teslimat, iade, destek kayıtları",
+      "islemGuvenligiIpLogGirisKayitlari": "İşlem güvenliği: IP, log, giriş kayıtları, çerez",
+      "hukukiIslemUyusmazlikBasvuruKayitlari": "Hukuki işlem: uyuşmazlık / başvuru kayıtları",
+      "isitselKayitCagriMerkeziVarsaSes": "İşitsel kayıt: çağrı merkezi varsa ses kaydı",
+      "cUyeSaticiBireyselVeyaTicari": "C) Üye / Satıcı (bireysel veya ticari)",
+      "kimlikYetkiliAdSoyadKimlikDogrulama": "Kimlik / Yetkili: ad-soyad, kimlik doğrulama verileri; tüzel kişilerde temsilci bilgileri",
+      "finansIbanHakedisKomisyonMahsupRaporlari": "Finans: IBAN, hakediş / komisyon / mahsup raporları",
+      "musteriIslemUrunListelemeSiparisIade": "Müşteri işlem: ürün listeleme, sipariş, iade / şikâyet, performans metrikleri",
+      "hukukiIslemSozlesmeIhlaliUyusmazlikKayitlari": "Hukuki işlem: sözleşme ihlali / uyuşmazlık kayıtları",
+      "islemGuvenligiIpLogPanelErisim": "İşlem güvenliği: IP, log, panel erişim kayıtları",
+      "kisiselVerilerinIslenmeAmaclari": "Kişisel Verilerin İşlenme Amaçları",
+      "kisiselVerilerBastaAsagidakiAmaclarlaIslenir": "Kişisel veriler başta aşağıdaki amaçlarla işlenir:",
+      "uyelikKaydiVeHesapYonetimi": "Üyelik kaydı ve hesap yönetimi",
+      "mesafeliSatisSureclerininYurutulmesiSiparisOdeme": "Mesafeli satış süreçlerinin yürütülmesi (sipariş, ödeme, teslimat, iade)",
+      "musteriDestekSikayetYonetimi": "Müşteri destek / şikâyet yönetimi",
+      "bilgiGuvenligiVeSuistimalFraudOnleme": "Bilgi güvenliği ve suistimal / fraud önleme",
+      "hukukiYukumluluklerinYerineGetirilmesiVeUyusmazliklarin": "Hukuki yükümlülüklerin yerine getirilmesi ve uyuşmazlıkların yönetimi",
+      "finansMuhasebeFaturalandirmaVeRaporlama": "Finans / muhasebe, faturalandırma ve raporlama",
+      "acikRizaVarsaPazarlamaKampanyaVe": "Açık rıza varsa pazarlama, kampanya ve kişiselleştirme faaliyetleri",
+      "toplamaYontemiVeHukukiSebep": "Toplama Yöntemi ve Hukuki Sebep",
+      "verilerPlatformUzerindenElektronikOrtamdaOtomatik": "Veriler; Platform üzerinden elektronik ortamda otomatik yollarla, çağrı merkezi üzerinden, kargo/ödeme hizmet sağlayıcıları üzerinden ve gerektiğinde yetkili kamu kurumlarından elde edilebilir.",
+      "hukukiSebeplerSomutIslemeFaaliyetineGore": "Hukuki sebepler, somut işleme faaliyetine göre değişmek üzere; sözleşmenin kurulması/ifası için gerekli olması, hukuki yükümlülük, hakkın tesisi-kullanılması-korunması, meşru menfaat ve açık rızadır.",
+      "kisiselVerilerinAktarimiYurtIciYurt": "Kişisel Verilerin Aktarımı (Yurt İçi / Yurt Dışı)",
+      "kisiselVerilerIslemeAmaclariylaSinirliOlarak": "Kişisel veriler; işleme amaçlarıyla sınırlı olarak ve gerekli güvenlik tedbirleri alınarak aşağıdaki taraflara aktarılabilir:",
+      "odemeHizmetSaglayicilarinaVeBankalara": "Ödeme hizmet sağlayıcılarına ve bankalara",
+      "kargoLojistikFirmalarina": "Kargo / lojistik firmalarına",
+      "bilgiTeknolojileriAltyapiSaglayicilarinaHostingE": "Bilgi teknolojileri altyapı sağlayıcılarına (hosting, e-posta, SMS, çağrı merkezi)",
+      "hukukDenetimVeMaliMusavirlikDanismanlarina": "Hukuk, denetim ve mali müşavirlik danışmanlarına",
+      "yetkiliKamuKurumVeKuruluslarina": "Yetkili kamu kurum ve kuruluşlarına",
+      "yurtDisinaAktarimSozKonusuIse": "Yurt dışına aktarım söz konusu ise; KVKK'nın ilgili hükümleri uyarınca uygun güvence mekanizmaları uygulanır.",
+      "ilgiliKisininHaklariKvkkM11": "İlgili Kişinin Hakları (KVKK m.11)",
+      "ilgiliKisilerKisiselVerilerininIslenipIslenmedigini": "İlgili kişiler; kişisel verilerinin işlenip işlenmediğini öğrenme, bilgi talep etme, düzeltme, silme/yok etme, itiraz ve zararın giderilmesini talep etme gibi haklara sahiptir.",
+      "basvuruYontemi": "Başvuru Yöntemi",
+      "kvkkKapsamindakiTaleplerKepEmailVeya": "KVKK kapsamındaki talepler; {kep}, {email} veya {address} üzerinden “KVKK İlgili Kişi Başvurusu” konu başlığıyla iletilebilir.",
+      "basvurularEnGec30GunIcinde": "Başvurular en geç 30 gün içinde sonuçlandırılır.",
+      "metaTitle": "Gizlilik Politikası · Tarodan",
+      "metaDescription": "Tarodan KVKK aydınlatma metni: veri sorumlusu, işlenen veri kategorileri, işleme amaçları, aktarım, ilgili kişinin hakları ve başvuru yöntemi.",
+      "pageDescription": "Kişisel verilerinizin hangi amaçlarla işlendiği, kimlere aktarıldığı ve haklarınızı nasıl kullanacağınız.",
+      "pageFooter": "Çerezler bakımından Çerez Politikası uygulanır. Bu metin, mevzuat ve uygulama değişikliklerine göre güncellenebilir; güncel metin Platform'da yayımlanır."
+    },
+    "sellerAgreement": {
+      "250Tl999Tl": "250 TL – 999 TL",
+      "50Tl": "50 TL",
+      "1000Tl9999Tl": "1.000 TL – 9.999 TL",
+      "10000Tl24999Tl": "10.000 TL – 24.999 TL",
+      "25000TlVeUstu": "25.000 TL ve üstü",
+      "takas": "Takas",
+      "100Tl": "100 TL",
+      "150Tl": "150 TL",
+      "tarodanPlatformundaBireyselOlarakModelArac": "Tarodan platformunda bireysel olarak model araç koleksiyonlarını sergilemek, satış yapmak ve takas işlemlerini gerçekleştirmek isteyen kullanıcılarımız için hazırlanan Bireysel Satıcı Sözleşmesi aşağıda yer almaktadır.",
+      "1TaraflarVeKapsam": "1. Taraflar ve Kapsam",
+      "isbuSozlesmeTarodanPlatformuPlatformIle": "İşbu sözleşme, Tarodan platformu (“Platform”) ile koleksiyonundaki model araçları (Hot Wheels, die-cast, ölçekli araçlar vb.) ticari bir işletme olmaksızın, kişisel koleksiyon amaçlı veya bireysel olarak satışa çıkaran Kullanıcı (“Bireysel Satıcı”) arasında akdedilmiştir.",
+      "2BireyselSaticiOnboardingVeHesap": "2. Bireysel Satıcı Onboarding ve Hesap Açılışı",
+      "bilgiVeBelgeTalebi": "Bilgi ve Belge Talebi",
+      "bireyselSaticilarPlatformaKayitOlurkenAd": "Bireysel satıcılar, platforma kayıt olurken ad-soyad, T.C. kimlik numarası, güncel iletişim bilgileri (e-posta, telefon) ve ödemelerin aktarılması için kendi adlarına kayıtlı geçerli IBAN/banka hesap bilgilerini eksiksiz olarak bildirmekle yükümlüdür.",
+      "dogrulama": "Doğrulama",
+      "tarodanGuvenlikVeYasalUyumlulukGeregi": "Tarodan, güvenlik ve yasal uyumluluk gereği bireysel satıcılardan ek kimlik doğrulaması talep etme hakkını saklı tutar.",
+      "3UrunListelemeKondisyonVeSeffaflik": "3. Ürün Listeleme, Kondisyon ve Şeffaflık",
+      "bireyselSaticiIlaniniActigiModelAracin": "Bireysel satıcı, ilanını açtığı model aracın markasını, modelini, ölçeğini ve kondisyonunu doğru ve eksiksiz olarak girmek zorundadır.",
+      "modeldeVeyaOrijinalKutusundaCizikKirik": "Modelde veya orijinal kutusunda çizik, kırık, eksik parça gibi herhangi bir kusur mevcutsa, bunlar ilanda açıkça belirtilmeli ve fotoğraflarla gösterilmelidir. Şeffaflık ilkesine aykırı hareketlerden doğan sorumluluk tamamen satıcıya aittir.",
+      "4PaketlemeVeKargoSurecleri": "4. Paketleme ve Kargo Süreçleri",
+      "saticiSatisiGerceklesenModeliBaloncukluNaylon": "Satıcı, satışı gerçekleşen modeli baloncuklu naylon, köpük ve sağlam karton kutu kullanarak kargo sürecinde zarar görmeyecek şekilde özenle paketlemekle yükümlüdür.",
+      "satisiYapilanUrunEnGec3": "Satışı yapılan ürün, en geç 3 iş günü içinde kargoya teslim edilmeli ve kargo takip numarası sistem üzerinden paylaşılmalıdır.",
+      "5GuvenliOdemeVeHavuzSistemi": "5. Güvenli Ödeme ve Havuz Sistemi",
+      "satisBedeliAliciUrunuTeslimAlip": "Satış bedeli, alıcı ürünü teslim alıp onay verene kadar 14 gün Tarodan’ın güvenli havuz hesabında muhafaza edilir.",
+      "havaleEftVeyaEldenOdemeGibi": "Havale, EFT veya elden ödeme gibi platform dışı ödeme yöntemleri kesinlikle yasaktır. Alıcı onayından sonra, komisyon ve hizmet bedelleri düşülerek net tutar satıcının hesabına aktarılır.",
+      "6TakasSurecleri": "6. Takas Süreçleri",
+      "takasAcikOlarakListelenenUrunlerdeTaraflar": "“Takas Açık” olarak listelenen ürünlerde taraflar anlaştıktan sonra araçlar Tarodan merkez deposuna gönderilir. Depo uzmanlarının yaptığı kontroller sonucunda onaylanan takas süreçleri resmi olarak tamamlanır.",
+      "7YaptirimlarVeAskiyaAlma": "7. Yaptırımlar ve Askıya Alma",
+      "gecikmeliKargolamaYanilticiIlanBilgileriVeya": "Gecikmeli kargolama, yanıltıcı ilan bilgileri veya platform dışı ödeme yönlendirmesi gibi riskli davranışlar tespit edildiğinde satıcının hesabı geçici olarak askıya alınabilir veya kalıcı olarak kapatılabilir.",
+      "8KomisyonHizmetBedelleriVeGuvenli": "8. Komisyon, Hizmet Bedelleri ve Güvenli Ödeme Havuzu",
+      "tumTahsilatlarTarodanGuvenliOdemeAltyapisi": "Tüm tahsilatlar Tarodan güvenli ödeme altyapısı üzerinden yapılır.",
+      "bireyselSatislarUzerindenKesilecekKomisyonOranlari": "Bireysel satışlar üzerinden kesilecek komisyon oranları, hizmet bedelleri ve hak ediş transfer takvimi, taraflar arasında akdedilen ticari koşullara ve mağaza anlaşmasına göre yürütülür. Ödemeler havuz sisteminden onay akışına bağlı olarak serbest bırakılır.",
+      "tarodanPlatformundaTicariUnvaniIleMagaza": "Tarodan platformunda ticari unvanı ile mağaza açarak model araç satışı gerçekleştiren profesyonel işletmeler için hazırlanan Kurumsal Satıcı Sözleşmesi aşağıda yer almaktadır.",
+      "isbuSozlesmeTarodanPlatformuPlatformIle2": "İşbu sözleşme, Tarodan platformu (“Platform”) ile platformda ticari faaliyet yürütmek amacıyla mağaza açan, vergi mükellefi tüzel veya gerçek kişi satıcı (“Kurumsal Satıcı”) arasında akdedilmiştir.",
+      "2KurumsalOnboardingDogrulamaVeBelge": "2. Kurumsal Onboarding, Doğrulama ve Belge Yükümlülüğü",
+      "kurumsalSaticilar6563SayiliKanunVe": "Kurumsal satıcılar, 6563 sayılı Kanun ve ilgili e-ticaret mevzuatına tam uyum sağlamak amacıyla platforma aşağıdaki bilgi ve belgeleri ibraz etmek zorundadır:",
+      "sirketVeVergiBilgileri": "Şirket ve Vergi Bilgileri",
+      "vergiLevhasiTicaretSicilGazetesiImza": "Vergi levhası, ticaret sicil gazetesi, imza sirküleri, unvan, vergi dairesi ve vergi numarası, faaliyet belgesi.",
+      "yasalIletisimBilgileri": "Yasal İletişim Bilgileri",
+      "kayitliElektronikPostaKepAdresiMersis": "Kayıtlı elektronik posta (KEP) adresi, MERSİS numarası, kurumsal telefon ve tebligat adresi.",
+      "finansalBilgiler": "Finansal Bilgiler",
+      "sirketUnvaninaTescilliResmiBankaHesap": "Şirket unvanına tescilli resmi banka hesap bilgileri (IBAN).",
+      "kurumsalSaticiSunduguBelgelerinDogrulugunuTaahhut": "Kurumsal satıcı, sunduğu belgelerin doğruluğunu taahhüt eder; bilgilerde meydana gelen değişiklikleri derhal platforma bildirmekle yükümlüdür.",
+      "3YasalVeTicariSorumluluklar": "3. Yasal ve Ticari Sorumluluklar",
+      "faturaVeVergiYukumlulugu": "Fatura ve Vergi Yükümlülüğü",
+      "kurumsalSaticiPlatformUzerindenGerceklestirdigiTum": "Kurumsal satıcı, platform üzerinden gerçekleştirdiği tüm satışlar için alıcı adına yasal fatura düzenlemek ve e-fatura/e-arşiv mevzuatına uymakla yükümlüdür. Vergi beyanı ve mali yükümlülüklerin tüm sorumluluğu kurumsal satıcıya aittir.",
+      "tuketiciHaklariVeGaranti": "Tüketici Hakları ve Garanti",
+      "6502SayiliTuketicininKorunmasiHakkindaKanun": "6502 sayılı Tüketicinin Korunması Hakkında Kanun hükümlerine uymak, cayma haklarını eksiksiz uygulamak ve ürünlerin orijinal/garantili olmasından kurumsal satıcı doğrudan sorumludur.",
+      "4IlanStokVeFiyatlandirmaStandartlari": "4. İlan, Stok ve Fiyatlandırma Standartları",
+      "kurumsalSaticilarStoklarindaYerAlanUrunleri": "Kurumsal satıcılar, stoklarında yer alan ürünleri güncel fiyat ve detay bilgileriyle listelemek zorundadır. Yanıltıcı stok veya fiyatlandırma politikaları uygulanamaz.",
+      "urunGorsellerindeTelifHaklarinaUygunProfesyonel": "Ürün görsellerinde telif haklarına uygun, profesyonel veya net ürün fotoğrafları kullanılmalıdır.",
+      "5PaketlemeLojistikVeOperasyonelSurecler": "5. Paketleme, Lojistik ve Operasyonel Süreçler",
+      "kurumsalSaticiYuksekHacimliSiparislerdeDahi": "Kurumsal satıcı, yüksek hacimli siparişlerde dahi koleksiyoner hassasiyetine uygun standartlarda paketleme yapmak ve siparişleri taahhüt edilen süreler (3 iş günü) içerisinde kargoya teslim etmekle yükümlüdür.",
+      "kargoTakipNumaralarininSistemeZamanindaGirilmesi": "Kargo takip numaralarının sisteme zamanında girilmesi zorunludur.",
+      "6KomisyonHizmetBedelleriVeGuvenli": "6. Komisyon, Hizmet Bedelleri ve Güvenli Ödeme Havuzu",
+      "kurumsalSatislarUzerindenKesilecekKomisyonOranlari": "Kurumsal satışlar üzerinden kesilecek komisyon oranları, hizmet bedelleri ve hak ediş transfer takvimi, taraflar arasında akdedilen ticari koşullara ve mağaza anlaşmasına göre yürütülür. Ödemeler havuz sisteminden onay akışına bağlı olarak serbest bırakılır.",
+      "7DenetimRiskYonetimiVeHesabin": "7. Denetim, Risk Yönetimi ve Hesabın Askıya Alınması",
+      "kurumsalSaticininSahteReplikaUrunSatmasi": "Kurumsal satıcının sahte/replika ürün satması, müşteri şikayetlerini sistematik olarak çözümsüz bırakması, mevzuata aykırı ticari faaliyetlerde bulunması veya platform dışı ödeme talep etmesi durumunda Tarodan, önceden ihtara gerek olmaksızın mağazayı geçici olarak askıya alma veya sözleşmeyi tek taraflı feshederek hesabı kalıcı olarak kapatma hakkına sahiptir.",
+      "pageTitle": "Satıcı Sözleşmeleri",
+      "pageDescription": "Tarodan platformunda satış yapan bireysel ve kurumsal satıcılar için geçerli üyelik ve satış sözleşmeleri.",
+      "individualSection": "Bireysel Satıcı Üyelik ve Satış Sözleşmesi",
+      "corporateSection": "Kurumsal Satıcı Üyelik ve Satış Sözleşmesi",
+      "feeAmount": "Tutar",
+      "feeSellerCommission": "Satıcı Komisyon",
+      "feeBuyerCommission": "Alıcı Komisyon",
+      "feeSellerShipping": "Satıcı Kargo",
+      "feeBuyerShipping": "Alıcı Kargo",
+      "feeSellerPlatformFee": "Satıcı Platform Hizmet Bedeli",
+      "feeBuyerProtection": "Alıcı Koruma Hizmeti"
+    },
+    "cookies": {
+      "necessaryDesc": "Oturum, güvenlik ve temel platform işlevleri için gereklidir. Kapatılamaz.",
+      "functionalDesc": "Dil, sepet ve görünüm tercihlerinizi hatırlar. Kapatırsanız bu tercihler her ziyarette sıfırlanır.",
+      "analyticsDesc": "Platformun nasıl kullanıldığını anlamamıza ve iyileştirmemize yardımcı olur. Kimliğinizi tespit etmek için kullanılmaz.",
+      "marketingDesc": "İlgi alanlarınıza uygun reklam gösterebilmek için reklam ortaklarıyla paylaşılır.",
+      "purpose": {
+        "sessionAuth": "Oturum kimlik doğrulaması (httpOnly)",
+        "apiSession": "API oturumu (httpOnly)",
+        "csrf": "Siteler arası istek sahteciliği (CSRF) koruması",
+        "authIndicator": "Oturumun açık olduğunu arayüze bildiren gösterge",
+        "consentRecord": "Çerez onayınızın ve tercihlerinizin saklanması (yasal ispat)",
+        "siteUnlock": "Bakım/erişim kilidi doğrulaması",
+        "userSnapshot": "Oturum açık kullanıcının profil bilgisinin arayüzde tutulması",
+        "languagePreference": "Dil tercihi",
+        "guestCart": "Misafir sepeti içeriği",
+        "recentSearches": "Son aramalarınız ve filtreleriniz",
+        "listingLayout": "Ürün listesi görünüm tercihi",
+        "savedSearches": "Kaydettiğiniz aramalar",
+        "dismissedBanners": "Kapattığınız duyuruların tekrar gösterilmemesi",
+        "youtubeEmbed": "İlan sayfalarına gömülü YouTube videolarının oynatımı",
+        "googleAnalytics": "Google Analytics — ziyaretçi ve oturum ayrımı",
+        "yandexMetrica": "Yandex.Metrica — trafik ve ısı haritası analizi",
+        "metaRemarketing": "Meta (Facebook/Instagram) yeniden pazarlama",
+        "tiktokPixel": "TikTok Pixel — dönüşüm ölçümü",
+        "googleAdsRetargeting": "Google Ads & YouTube yeniden hedefleme",
+        "yandexDirect": "Yandex Direct reklam gösterimi"
+      },
+      "duration": {
+        "min15Or7d": "15 dakika / 7 gün",
+        "d7": "7 gün",
+        "d10": "10 gün",
+        "y1": "1 yıl",
+        "persistentLocal": "Kalıcı (yerel depolama)",
+        "d179OrSession": "179 gün / Oturum",
+        "y2Or24h": "2 yıl / 24 saat",
+        "d90": "90 gün",
+        "m13": "13 ay",
+        "m1Or13": "1 ay / 13 ay"
+      },
+      "inactiveTag": "pasif",
+      "inactiveNote": "\"Pasif\" olarak işaretlenen üçüncü taraf çerezleri politika kapsamında beyan edilmiştir; ilgili script'ler yalnızca o kategoriye rıza verildiğinde yüklenir.",
+      "page": {
+        "lastUpdatedValue": "2 Ağustos 2026",
+        "s1Title": "1. Çerez Nedir?",
+        "s1p1": "Çerezler, web siteleri tarafından cihazınıza yerleştirilen küçük metin dosyalarıdır. Bu politika, çerezlerin yanı sıra tarayıcınızın yerel depolama (localStorage) alanında sakladığımız verileri de kapsar — mevzuat açısından ikisi de terminal ekipmanınıza erişim sayılır.",
+        "s1p2": "Süreye göre <b>oturum çerezleri</b> (tarayıcıyı kapattığınızda silinir) ve <b>kalıcı çerezler</b> (belirlenen süre boyunca kalır); kaynağa göre <b>birinci taraf</b> (TARODAN) ve <b>üçüncü taraf</b> (hizmet sağlayıcılarımız) çerezleri olarak ayrılır.",
+        "s1p3": "Zorunlu çerezler dışındaki hiçbir çerez, siz açık rıza vermeden çalıştırılmaz. Tercihinizi aşağıdaki panelden istediğiniz zaman değiştirebilirsiniz; rızanızı geri çekmeniz, geri çekme anına kadar gerçekleşen işlemleri etkilemez.",
+        "s2Title": "2. Çerez Kategorileri ve Tercihleriniz",
+        "s3Title": "3. Üçüncü Taraf Hizmet Sağlayıcılar",
+        "s3Intro": "Aşağıdaki sağlayıcıların çerezleri yalnızca ilgili kategoriye rıza verdiğinizde yüklenir. Her biri kendi gizlilik politikasına tabidir.",
+        "colProvider": "Sağlayıcı",
+        "colUsage": "Kullanım Amacı",
+        "colPolicy": "Politika",
+        "view": "Görüntüle",
+        "thirdPartyGooglePurpose": "Trafik analizi, gömülü video ve yeniden hedefleme",
+        "thirdPartyYandexPurpose": "Site içi tıklama/ısı haritası analizi ve reklam gösterimi",
+        "thirdPartyMetaPurpose": "Yeniden pazarlama ve dönüşüm ölçümü",
+        "thirdPartyTiktokPurpose": "Reklam dönüşüm ölçümü",
+        "thirdPartyPaytrPurpose": "Ödeme işlemleri ve dolandırıcılık önleme",
+        "s4Title": "4. Bireysel ve Kurumsal Kullanıcı Farkları",
+        "s4Intro": "Koleksiyoner (C2C) alıcılar ile mağaza sahibi ticari satıcılar farklı yasal rejimlere tabidir.",
+        "colCriterion": "Kriter",
+        "colIndividual": "Bireysel Kullanıcı",
+        "colCorporate": "Kurumsal Kullanıcı",
+        "scopeKvkkCriterion": "KVKK / kişisel veri",
+        "scopeKvkkIndividual": "Tam kapsam. KVKK koruması altındadır; açık rıza ve aydınlatma zorunludur.",
+        "scopeKvkkCorporate": "Kısmi kapsam. Tüzel kişiler muaftır; şahıs şirketlerinde yetkili kişi KVKK'ya tabidir.",
+        "scopeConsentCriterion": "Çerez ve rıza yönetimi",
+        "scopeConsentIndividual": "Kesin opt-in. Zorunlu olmayan tüm çerez ve pikseller için açık rıza şarttır.",
+        "scopeConsentCorporate": "Standart banner kuralları geçerlidir. Kurumsal oturum çerezleri zorunlu sayılır.",
+        "scopeEtkCriterion": "Ticari iletişim (ETK)",
+        "scopeEtkIndividual": "Önceden onay. Pazarlama iletileri için İYS onaylı açık rıza zorunludur.",
+        "scopeEtkCorporate": "B2B istisna. Tacir ve esnafa yönelik iletilerde ETK istisnaları uygulanabilir (opt-out hakkı saklıdır).",
+        "scopeContractCriterion": "Sözleşme ve faturalandırma",
+        "scopeContractIndividual": "Mesafeli satış. TKHK ve cayma hakları geçerlidir; e-arşiv fatura kesilir.",
+        "scopeContractCorporate": "TTK hükümleri geçerlidir; e-fatura ve kurumsal üyelik sözleşmesi bağlayıcıdır.",
+        "s5Title": "5. Loglama ve Yasal Saklama Süreleri",
+        "s5Intro": "Çerezlerin ötesinde, platform üzerindeki hareketleriniz aşağıdaki yasal dayanaklarla loglanır ve belirtilen süreler boyunca saklanır.",
+        "colLogType": "Log Türü",
+        "colStoredData": "Saklanan Veriler",
+        "colLegalBasis": "Yasal Dayanak",
+        "colRetention": "Saklama Süresi",
+        "s5Note": "5651 kapsamındaki loglar, adli soruşturmalar açısından zaman damgası (timestamp) ve bütünlük hash'i ile birlikte üretilip saklanır. KVKK kapsamındaki veriler ise işleme amacı sona erdiğinde periyodik imha takvimine göre silinir veya anonimleştirilir.",
+        "retentionTrafficType": "Trafik bilgileri ve erişim logları",
+        "retentionTrafficData": "IP adresi, bağlantı başlangıç/bitiş saatleri, kullanılan portlar, protokoller",
+        "retentionTrafficBasis": "5651 sayılı İnternet Kanunu (yer sağlayıcı yükümlülüğü)",
+        "retentionTrafficPeriod": "2 yıl",
+        "retentionFinanceType": "Finansal işlem ve sipariş logları",
+        "retentionFinanceData": "Ödeme hareketleri, sepet geçmişi, faturalar, cüzdan yükleme ve transfer dökümleri",
+        "retentionFinanceBasis": "VUK madde 253 ve TTK",
+        "retentionFinancePeriod": "5 yıl (VUK) / 10 yıl (TTK)",
+        "retentionEtkType": "Ticari iletişim ve ileti onay logları",
+        "retentionEtkData": "SMS, e-posta ve arama pazarlama onayları, ret tercihleri, İYS entegrasyon logları",
+        "retentionEtkBasis": "ETK ve Ticari İletişim Yönetmeliği",
+        "retentionEtkPeriod": "3 yıl (onay kalktıktan sonra)",
+        "retentionMembershipType": "Üyelik, ilan ve iletişim hareketleri",
+        "retentionMembershipData": "İlan verme, mesajlaşma geçmişi, favoriler, arama filtreleri, profil güncellemeleri",
+        "retentionMembershipBasis": "6698 sayılı KVKK ve Borçlar Kanunu",
+        "retentionMembershipPeriod": "Üyelik süresince + 10 yıl",
+        "retentionConsentType": "Çerez rıza ve tercih logları",
+        "retentionConsentData": "Banner üzerinde verdiğiniz kabul/ret tercihleri ve zaman damgası",
+        "retentionConsentBasis": "KVKK ispat yükümlülüğü",
+        "retentionConsentPeriod": "1 yıl",
+        "s6Title": "6. Çerezleri Tarayıcıdan Kontrol Etme",
+        "s6p1": "Yukarıdaki panele ek olarak, tarayıcı ayarlarınızdan tüm çerezleri engelleyebilir, yalnızca üçüncü taraf çerezleri engelleyebilir, mevcut çerezleri silebilir veya her çerez yerleştirildiğinde uyarı alabilirsiniz. Mobil cihazlarda bu ayarlar tarayıcı veya cihaz ayarlarından yönetilir.",
+        "s6Warning": "<b>Önemli:</b> Zorunlu çerezleri tarayıcınızdan engellerseniz oturum açma, sepet ve ödeme gibi temel özellikler çalışmayabilir.",
+        "s7Title": "7. Haklarınız, Güncellemeler ve İletişim",
+        "s7p1": "KVKK madde 11 uyarınca kişisel verilerinize erişme, düzeltilmesini veya silinmesini isteme, işlemeye itiraz etme ve rızanızı geri çekme haklarına sahipsiniz. Bu politikayı gerektiğinde güncelleriz; önemli değişiklikler platformda duyurulur ve bu sayfada yayınlanır.",
+        "contactEmailLabel": "E-posta:",
+        "contactPhoneLabel": "Telefon:"
+      }
+    },
+    "intellectualProperty": {
+      "1GenelIlke": "1. Genel İlke",
+      "tarodanUcuncuKisilerinTelifHakkiMarka": "TARODAN, üçüncü kişilerin telif hakkı, marka ve diğer fikri mülkiyet haklarına saygı gösterilmesini bekler. Platformda yayınlanan içeriklerin (metin, görsel, logo) hak sahibi izni veya yasal kullanım hakkı ile paylaşılması gerekir. İhlal tespit edildiğinde içerik kaldırılır ve tekrarlayan ihlallerde hesap işlemleri yapılabilir.",
+      "2PlatformunFikriMulkiyeti": "2. Platformun Fikri Mülkiyeti",
+      "tarodanAdiLogosuArayuzTasarimiMetinleri": "TARODAN adı, logosu, arayüz tasarımı, metinleri ve bu siteye ait özgün içerikler TARODAN Teknoloji A.Ş. veya lisans verenlerine aittir. İzinsiz kopyalama, dağıtma veya ticari kullanım yasaktır.",
+      "3KullaniciVeSaticiIcerikleri": "3. Kullanıcı ve Satıcı İçerikleri",
+      "kullanicilarVeSaticilarYukledikleriMetinVe": "Kullanıcılar ve satıcılar, yükledikleri metin ve görsellerin kullanım hakkına sahip olduklarını veya gerekli izinlere sahip olduklarını kabul eder. Platforma yüklenen içerikler, hizmetin sunulması (ilanların gösterilmesi, arama, pazarlama) amacıyla işlenebilir ve sınırlı lisans kapsamında kullanılabilir.",
+      "4TelifHakkiIhlaliBildirimiDMCA": "4. Telif Hakkı İhlali Bildirimi (DMCA / Uyumlu Süreç)",
+      "telifHakkiIhlaliOldugunuDusundugunuzBir": "Telif hakkı ihlali olduğunu düşündüğünüz bir içerik varsa, aşağıdaki bilgilerle bize yazılı bildirim yapabilirsiniz. Bildirimde:",
+      "ihlalEdildiginiIddiaEttiginizEserinTanimi": "İhlal edildiğini iddia ettiğiniz eserin tanımı ve (varsa) orijinal linki",
+      "platformdakiIhlalIcerigininKonumuIlanSayfasindaki": "Platformdaki ihlal içeriğinin konumu (ilan sayfasındaki &quot;İlan No&quot; — örn. U010001 — veya sayfa adresi)",
+      "iletisimBilgilerinizAdEPostaTelefon": "İletişim bilgileriniz (ad, e-posta, telefon)",
+      "iceriginIzninizOlmadanKullanildiginaDairIyi": "İçeriğin izniniz olmadan kullanıldığına dair iyi niyetli inanç beyanı",
+      "beyanlarinizinDogrulugunaDairYanlisBilgiVerme": "Beyanlarınızın doğruluğuna dair yanlış bilgi verme sorumluluğu kabulü",
+      "bBildirimAdresiBLegalTarodan": "<b>Bildirim adresi:</b>legal@tarodan.com.tr (konu: Telif Hakkı İhlali). Geçerli ve eksiksiz bildirimler değerlendirilir; uygunsa içerik kaldırılır ve (yasalara uygun şekilde) karşı tarafa bildirim yapılabilir.",
+      "5MarkaKullanimi": "5. Marka Kullanımı",
+      "urunIlanlarindaMarkaIsimleriOrijinalUrunu": "Ürün ilanlarında marka isimleri, orijinal ürünü tanımlama amacıyla makul ölçüde kullanılabilir. Ticari marka sahiplerinin haklarına saygı gösterilmesi gerekir; taklit, yanıltıcı kullanım veya marka ihlali kabul edilmez. Marka ihlali iddiaları için legal@tarodan.com.tr adresine bildirim yapılabilir.",
+      "6TekrarlayanIhlalciler": "6. Tekrarlayan İhlalciler",
+      "gecerliIhlalBildirimleriSonrasindaTekrarlayanIhlal": "Geçerli ihlal bildirimleri sonrasında tekrarlayan ihlal yapan kullanıcı hesapları askıya alınabilir veya sonlandırılabilir.",
+      "7Iletisim": "7. İletişim",
+      "fikriMulkiyetVeIhlalBildirimleriLegal": "Fikri mülkiyet ve ihlal bildirimleri: legal@tarodan.com.tr",
+      "kullanimSartlari": "Kullanım Şartları →",
+      "saticiSozlesmesi": "Satıcı Sözleşmesi →"
+    },
+    "entity": {
+      "legalName": "Unvan",
+      "brand": "Marka",
+      "taxRegistration": "Vergi / MERSİS No",
+      "address": "Adres",
+      "phone": "Telefon",
+      "email": "E-posta",
+      "kep": "KEP"
+    }
   },
   "information": {
     "about": {
@@ -2440,7 +3846,21 @@
       "valuesTitle": "Değerlerimiz",
       "story": "Tarodan, koleksiyoncular ve satıcılar için güvenli bir pazar yeri sunmak amacıyla kuruldu. Alıcı ve satıcıyı bir araya getiriyoruz.",
       "mission": "Misyonumuz, model araba tutkunlarına en iyi alışveriş ve takas deneyimini sunmaktır.",
-      "values": "Değerlerimiz: güvenilirlik, şeffaflık ve koleksiyonculuk kültürüne saygı."
+      "values": "Değerlerimiz: güvenilirlik, şeffaflık ve koleksiyonculuk kültürüne saygı.",
+      "herKoleksiyonunBirHikayesiVardirTarodanin": "Her koleksiyonun bir hikâyesi vardır. Tarodan’ın da öyle.",
+      "cocuklugumuzdaBaslayanArabaSevgisiZamanlaGercek": "Çocukluğumuzda başlayan araba sevgisi zamanla gerçek bir koleksiyon tutkusuna dönüştü. Yeni bir modeli bulmanın heyecanını, uzun zamandır aranan bir parçaya kavuşmanın mutluluğunu ve koleksiyonun her parçasının aslında bir anıyı temsil ettiğini çok iyi biliyoruz.",
+      "yillarBoyuncaBinlerceKoleksiyonerleAyniHeyecani": "Yıllar boyunca binlerce koleksiyonerle aynı heyecanı paylaştık. Ama bir eksik hep vardı.",
+      "alimSatimlarSosyalMedyaGruplarindaYapiliyor": "Alım satımlar sosyal medya gruplarında yapılıyor, güven tamamen kişilere bırakılıyor, koleksiyonlar kaybolup gidiyor ve koleksiyonerlere özel bir platform bir türlü oluşmuyordu.",
+      "bizDeKendiKendimizeSuSoruyu": "Biz de kendi kendimize şu soruyu sorduk:",
+      "nedenSadeceDiecastKoleksiyonerlerininKendiniEvinde": "“Neden sadece diecast koleksiyonerlerinin kendini evinde hissedeceği bir platform olmasın?”",
+      "isteTarodanTamDaBuSorunun": "İşte Tarodan tam da bu sorunun cevabı olarak doğdu.",
+      "buradaAmacSadeceModelArabaAlip": "Burada amaç sadece model araba alıp satmak değil; koleksiyonunu sergileyebileceğin, güvenle alışveriş yapabileceğin, takas yapabileceğin ve seninle aynı tutkuyu paylaşan insanlarla bir araya gelebileceğin gerçek bir koleksiyoner topluluğu oluşturmak.",
+      "tarodaniGelistirirkenHerDetayiKoleksiyonerGozuyle": "Tarodan’ı geliştirirken her detayı koleksiyoner gözüyle düşündük. Çünkü biz de yıllarca aynı yolları yürüdük, aynı sorunları yaşadık ve aynı heyecanı hissettik.",
+      "buYuzdenTarodanSadeceBirPazar": "Bu yüzden Tarodan, sadece bir pazar yeri değil…",
+      "diecastKoleksiyonerlerininDijitalGaraji": "Diecast koleksiyonerlerinin dijital garajı.",
+      "tarodanKoleksiyonunuSadeceSakladiginDegilYasattigin": "Tarodan, koleksiyonunu sadece sakladığın değil, yaşattığın yerdir. Çünkü her modelin bir hikâyesi vardır ve o hikâyeler paylaşılmayı hak eder.",
+      "metaTitle": "Hakkımızda · Tarodan",
+      "metaDescription": "Tarodan, diecast koleksiyonerlerinin dijital garajı: koleksiyonunu sergileyebileceğin, güvenle alışveriş ve takas yapabileceğin koleksiyoner topluluğu."
     },
     "shipping": {
       "title": "Kargo ve Teslimat",
@@ -2500,7 +3920,22 @@
       "note18": "Detaylı, vitrin klasik",
       "note24": "Yaygın, orta boy",
       "note43": "Koleksiyonda sık",
-      "note64": "Mini, Hot Wheels / Matchbox"
+      "note64": "Mini, Hot Wheels / Matchbox",
+      "kucukPaket": "Küçük Paket",
+      "201025Cm": "20 × 10 × 25 cm",
+      "ortaPaket": "Orta Paket",
+      "352045Cm": "35 × 20 × 45 cm",
+      "buyukPaket": "Büyük Paket",
+      "604070Cm": "60 × 40 × 70 cm",
+      "olcekRehberiTarodan": "Ölçek Rehberi · Tarodan",
+      "tarodanKargoPaketBoyutlariPaketUcretleri": "Tarodan kargo paket boyutları, paket ücretleri ve örnek ölçüleri.",
+      "olcekRehberi": "Ölçek Rehberi",
+      "ilaninizIcinDogruKargoPaketBoyutunu": "İlanınız için doğru kargo paket boyutunu belirlemenize yardımcı olacak bilgilendirme rehberi.",
+      "kargoPaketBoyutu": "Kargo paket boyutu",
+      "urununuzunSigacagiEnKucukPaketiSecin": "Ürününüzün sığacağı en küçük paketi seçin. Kargo bedeli bu seçime göre hesaplanır.",
+      "labelGorseli": "{label} görseli",
+      "paketUcreti": "Paket ücreti",
+      "ornekOlcuEnBoyYukseklik": "Örnek ölçü (en × boy × yükseklik)"
     },
     "authenticity": {
       "title": "Orijinallik Garantisi",
@@ -2522,7 +3957,19 @@
       "storage": "Saklama",
       "storageDesc": "Vitrin veya kapalı raf kullanın; uzun süre doğrudan ışığa maruz bırakmayın. Nem oranı düşük ortamlar tercih edilir.",
       "valuation": "Değerleme",
-      "valuationDesc": "Fiyatlar satıcı tarafından belirlenir. Benzer ilanları arayarak piyasa fiyatı hakkında fikir edinebilirsiniz."
+      "valuationDesc": "Fiyatlar satıcı tarafından belirlenir. Benzer ilanları arayarak piyasa fiyatı hakkında fikir edinebilirsiniz.",
+      "koleksiyonerRehberiTarodan": "Koleksiyoner Rehberi · Tarodan",
+      "koleksiyonunuzuTarodanDaSergilemePaylasmaTakas": "Koleksiyonunuzu Tarodan'da sergileme, paylaşma, takas etme ve satma rehberi.",
+      "koleksiyonerRehberi": "Koleksiyoner Rehberi",
+      "koleksiyonunuDunyayaAcDigerKoleksiyonerlerlePaylas": "Koleksiyonunu dünyaya aç, diğer koleksiyonerlerle paylaş ve yeni hikâyelere dönüştür.",
+      "koleksiyonum": "Koleksiyonum",
+      "koleksiyonunuDunyayaAc": "Koleksiyonunu Dünyaya Aç.",
+      "herModelinBirHikYesiHer": "Her modelin bir hikâyesi, her koleksiyonun bir tutkusu vardır. Yıllar içinde özenle bir araya getirdiğin parçalar artık sadece raflarında değil, Türkiye&apos;nin en büyük diecast koleksiyoner topluluğunda da yerini alsın.",
+      "koleksiyonumSanaKendiDijitalVitrininiOlusturma": "Koleksiyonum, sana kendi dijital vitrinini oluşturma imkânı sunar. Modellerini profesyonel görsellerle sergileyebilir, koleksiyonunun değerini diğer koleksiyonerlerle paylaşabilir ve profilini benzersiz bir koleksiyon galerisine dönüştürebilirsin.",
+      "birParcaniSadeceSergilemekIsteyebilirsinYa": "Bir parçanı sadece sergilemek isteyebilirsin. Ya da doğru koleksiyonerle buluşarak takas yapmak veya satışa sunmak isteyebilirsin. Karar tamamen senin.",
+      "koleksiyonunuKategorilereAyirEnDegerliParcalarini": "Koleksiyonunu kategorilere ayır, en değerli parçalarını öne çıkar, diğer koleksiyonerlere ilham ver ve koleksiyonculuk tutkunu binlerce kişiyle paylaş.",
+      "tarodanAposDaKoleksiyonlarSadeceSergilenmez": "Tarodan&apos;da koleksiyonlar sadece sergilenmez; keşfedilir, konuşulur, takas edilir ve yeni hikâyelere dönüşür.",
+      "sergilePaylasTakasEtSatKoleksiyonunu": "Sergile. Paylaş. Takas Et. Sat. Koleksiyonunu Büyüt."
     },
     "contactInfo": {
       "title": "İletişim Bilgileri",
@@ -2530,6 +3977,109 @@
       "address": "Adres",
       "emailValue": "destek@tarodan.com.tr",
       "addressValue": "İzmir/Türkiye"
+    },
+    "shippingDelivery": {
+      "kargoVeTeslimatPolitikasi": "Kargo ve Teslimat Politikası",
+      "buPolitikaTarodanUzerindenVerilenSiparislerde": "Bu politika, Tarodan üzerinden verilen siparişlerde ve gerçekleştirilen takaslarda ürünlerin hazırlanması, taşınması, teslimi ve takibi hakkında bilgi verir. Ödeme veya takas onayı öncesinde gösterilen işleme özel tutar, adres, paket ve teslimat bilgileri bu politikanın ayrılmaz parçasıdır.",
+      "kapsamVeTaraflarinRolu": "Kapsam ve Tarafların Rolü",
+      "tarodanUcuncuTarafAliciVeSaticilari": "Tarodan, üçüncü taraf alıcı ve satıcıları buluşturan bir elektronik ticaret pazar yeridir. Ürün sayfasında satıcı olarak Tarodan'ı işleten şirketin açıkça gösterildiği işlemler dışında ürünün hazırlanması, uygun biçimde paketlenmesi ve taşıyıcıya teslim edilmesi ilgili satıcının sorumluluğundadır. Tarodan; kargo kaydının oluşturulması, ücretin hesaplanması, durumların gösterilmesi ve destek süreçlerinin yürütülmesi için teknik aracılık sağlar.",
+      "platformIsletmecisiVeDestekKanallari": "Platform işletmecisi ve destek kanalları:",
+      "kargoUcretininHesaplanmasi": "Kargo Ücretinin Hesaplanması",
+      "paketBoyutu": "Paket boyutu",
+      "saticiIlaniOlustururkenUrununGonderimineUygun": "Satıcı ilanı oluştururken ürünün gönderimine uygun küçük, orta veya büyük paket boyutunu seçer.",
+      "aktifTarife": "Aktif tarife",
+      "kargoUcretiOdemeAnindaYururlukteOlan": "Kargo ücreti, ödeme anında yürürlükte olan kargo tarifesi ile seçilen paket boyutuna göre hesaplanır ve sipariş onayından önce alıcıya gösterilir.",
+      "birdenFazlaSatici": "Birden fazla satıcı",
+      "ayniOdemeIcindeFarkliSaticilardanUrun": "Aynı ödeme içinde farklı satıcılardan ürün bulunması hâlinde ürünler satıcı bazında ayrı paketlenebilir; her satıcı paketi için hesaplanan kargo tutarı ödeme özetinde gösterilir.",
+      "yanlisPaketBilgisi": "Yanlış paket bilgisi",
+      "saticiUrununGuvenliTasinmasinaVeGercek": "Satıcı, ürünün güvenli taşınmasına ve gerçek boyutuna uygun paket seçmekle yükümlüdür. Taşıyıcının tespit ettiği ölçü farklılıkları kayıt altına alınabilir ve ilgili kullanıcıya yansıtılabilecek sonuçlar işlem koşullarına göre değerlendirilir.",
+      "kargoIcinGecerliTutarOdemeVeya": "Kargo için geçerli tutar, ödeme veya takas onayı öncesinde ekranda gösterilen tutardır. Kampanya, tarife ve taşıyıcı değişiklikleri yeni işlemler için farklı bir tutar doğurabilir.",
+      "siparisinHazirlanmasiVeKargoyaVerilmesi": "Siparişin Hazırlanması ve Kargoya Verilmesi",
+      "odemeOnaylandigindaSaticiIcinSiparisDetayinda": "Ödeme onaylandığında satıcı için sipariş detayında kesin bir hazırlama son tarihi oluşturulur. Standart akışta bu süre ödeme onayından itibaren üç gündür; işlem ekranında gösterilen tarih ve saat esas alınır. Satıcı ürünü, ilan açıklamasındaki durumunu koruyacak ve taşıma sırasında zarar görmesini önleyecek şekilde paketleyerek kendisine oluşturulan kargo numarasıyla taşıyıcıya teslim eder.",
+      "hazirlamaSuresiDolduguHaldeTasiyiciKayitlarinda": "Hazırlama süresi dolduğu hâlde taşıyıcı kayıtlarında gönderinin fiilen hareket ettiği doğrulanamıyorsa sipariş otomatik olarak iptal ve ücret iadesi sürecine alınabilir. Gönderi taşıyıcıya teslim edilmiş ve taşıyıcı sisteminde hareket görmüşse yalnızca satıcının ekrandaki bildirimi eksik diye sipariş otomatik olarak iptal edilmez.",
+      "tasiyiciTakipVeTahminiTeslimSuresi": "Taşıyıcı, Takip ve Tahmini Teslim Süresi",
+      "tarodanInMevcutEntegreTasiyicisiSurat": "Tarodan'ın mevcut entegre taşıyıcısı Sürat Kargo'dur. Kargo kaydı oluşturulduğunda veya paket şubede kabul edildiğinde takip numarası sipariş detayında gösterilir. Taşıyıcı kabulünden sonraki standart teslimat tahmini 2–3 iş günüdür; bu süre taahhüt değil tahmindir.",
+      "teslimatSuresiAdresinBulunduguIlIlce": "Teslimat süresi; adresin bulunduğu il/ilçe, mobil bölge uygulaması, hafta sonu ve resmî tatiller, yoğunluk, hava ve yol koşulları gibi nedenlerle değişebilir.",
+      "adresVeIletisimBilgilerininDogruVe": "Adres ve iletişim bilgilerinin doğru ve eksiksiz girilmesi alıcının sorumluluğundadır. Adres değişikliği taşıyıcı kabulünden sonra her zaman mümkün olmayabilir.",
+      "takipEkranindakiTasiyiciVerisiGecikmeliGuncellenebilir": "Takip ekranındaki taşıyıcı verisi gecikmeli güncellenebilir. Uzun süre hareket görülmeyen, kayıp veya hasarlı gönderiler için Tarodan destek kanalı üzerinden inceleme açılabilir.",
+      "teslimatVeHasarKontrolu": "Teslimat ve Hasar Kontrolü",
+      "teslimatAliciyaVeyaAlicininBelirledigiUcuncu": "Teslimat, alıcıya veya alıcının belirlediği üçüncü kişiye yapılabilir. Alıcının sipariş edilen ürünle ilgisi bulunmayan başka bir taşıyıcıyı satıcının sunduğu seçeneklerden bağımsız olarak kendisinin seçtiği durumlar hariç olmak üzere, tüketici işlemlerinde ürünün kaybı veya zarar görmesi riski teslimata kadar satıcıya aittir.",
+      "paketTeslimAlinirkenDisAmbalajinVe": "Paket teslim alınırken dış ambalajın ve ürünün mümkün olduğu ölçüde kontrol edilmesi; belirgin ezilme, yırtılma, ıslanma veya eksiklik varsa taşıyıcı görevlisine tutanak düzenletilmesi ve fotoğrafla kayıt altına alınması incelemeyi hızlandırır. Tutanak bulunmaması, emredici mevzuattan doğan ayıplı mal veya diğer tüketici haklarını kendiliğinden ortadan kaldırmaz.",
+      "gecikmeImkansizlasmaVeUcretIadesi": "Gecikme, İmkânsızlaşma ve Ücret İadesi",
+      "tuketiciIslemlerindeSaticiAyricaDahaKisa": "Tüketici işlemlerinde satıcı, ayrıca daha kısa bir süre taahhüt edilmedikçe, siparişi mevzuatta öngörülen azami otuz günlük süre içinde yerine getirir. Ürünün tesliminin imkânsızlaştığı hâllerde tüketiciye mevzuatta öngörülen süre içinde bildirim yapılır ve tahsil edilen bedeller yasal sürede iade edilir. Ürünün yalnızca stokta bulunmaması tek başına ifanın imkânsızlaşması sayılmaz.",
+      "iptalVeyaIadeOnaylandigindaOdemeKullanilan": "İptal veya iade onaylandığında ödeme, kullanılan ödeme yöntemine ve ödeme kuruluşunun işleme süresine bağlı olarak ilgili hesaba yansır. Tarodan iade işleminin platformdaki durumunu sipariş detayında gösterir.",
+      "caymaVeIadeGonderileri": "Cayma ve İade Gönderileri",
+      "caymaHakkiVeAyipliUruneIliskin": "Cayma hakkı ve ayıplı ürüne ilişkin talepler, işlemin niteliğine ve tarafların sıfatına göre değerlendirilir. Tüketici işlemlerinde kanuni cayma süresi ve istisnaları saklıdır; ayrıntılar İade Politikası ile Mesafeli Satış Sözleşmesi'nde yer alır.",
+      "iadeTalebiKabulEdildigindeKullaniciSiparis": "İade talebi kabul edildiğinde kullanıcı, sipariş detayında oluşturulan iade kargo numarasını ve gönderim talimatını izlemelidir. Platformun gösterdiği anlaşmalı iade yönteminin kullanılması, gönderinin doğru siparişle eşleştirilmesini ve takip edilebilmesini sağlar. Tüketiciye iade masrafı yüklenip yüklenemeyeceği emredici mevzuata ve sipariş öncesi bilgilendirmeye göre belirlenir.",
+      "takasGonderileri": "Takas Gönderileri",
+      "takasKabulEdildigindeHerIkiTaraf": "Takas kabul edildiğinde her iki taraf kendi ürününü Tarodan'ın belirlediği kontrol noktasına gönderir. Ürünler ulaştığında işlem kaydı ve kontrol akışı tamamlanır; uygun bulunan ürünler karşı tarafa gönderilir. Böylece her takasta iki geliş ve iki dağıtım olmak üzere işlem durumuna göre birden fazla kargo hareketi oluşabilir.",
+      "herTarafinOdeyecegiTakasKargoUcreti": "Her tarafın ödeyeceği takas kargo ücreti, takasa konu ilanda seçilen paket boyutu ve onay anındaki aktif kargo tarifesi üzerinden hesaplanarak onaydan önce gösterilir.",
+      "takasKomisyonuIlgiliUrununKategoriIslem": "Takas komisyonu ilgili ürünün kategori, işlem tutarı ve satıcı tipi özelliklerine uyan komisyon kuralından; kargo ücreti ise komisyon kuralından bağımsız kargo tarifesinden hesaplanır.",
+      "kontroldeUyusmazlikIptalVeyaRetOlusmasi": "Kontrolde uyuşmazlık, iptal veya ret oluşması hâlinde ürünün sahibine geri gönderilmesi için dönüş kargosu oluşturulabilir. Kesin durum, ücret ve takip bilgileri takas detayında gösterilir.",
+      "destekVeOncelikSirasi": "Destek ve Öncelik Sırası",
+      "kargoKoduTakipGecikmeKayipHasar": "Kargo kodu, takip, gecikme, kayıp, hasar veya teslimat uyuşmazlığı için hesap içindeki ilgili sipariş ya da takas kaydı üzerinden destek talebi oluşturulabilir. İşleme özel ödeme özeti, sipariş/takas detayı ve taşıyıcı kayıtları; bu genel politikadaki bilgilerle birlikte değerlendirilir. Emredici tüketici mevzuatı her durumda saklıdır.",
+      "metaTitle": "Kargo ve Teslimat · Tarodan",
+      "metaDescription": "Tarodan sipariş ve takaslarında kargo ücretinin hesaplanması, hazırlama süresi, Sürat Kargo takibi, teslimat, hasar ve iade gönderileri.",
+      "pageTitle": "Kargo ve Teslimat",
+      "pageDescription": "Sipariş ve takas gönderilerinde ücret, hazırlama, taşıma, takip, teslimat ve iade süreci.",
+      "pageFooter": "Son güncelleme: 5 Ağustos 2026. Taşıyıcı, tarife veya operasyon akışı değiştiğinde bu politika güncellenir. İşleme özel sipariş/takas özeti ve emredici mevzuat hükümleri saklıdır."
+    },
+    "platformFee": {
+      "platformHizmetBedeliTarodan": "Platform Hizmet Bedeli · Tarodan",
+      "tarodanPlatformHizmetBedeliNedirNasil": "TARODAN Platform Hizmet Bedeli nedir, nasıl hesaplanır, nereye gider ve iade durumunda ne olur? Şeffaf ücretlendirme hakkında bilmeniz gerekenler.",
+      "platformHizmetBedeli": "Platform Hizmet Bedeli",
+      "sonGuncelleme2Haziran2026": "Son güncelleme: 2 Haziran 2026",
+      "1Nedir": "1. Nedir?",
+      "platformHizmetBedeliTARODANUzerindenYaptiginiz": "Platform Hizmet Bedeli, TARODAN üzerinden yaptığınız her satın almada ürün bedelinin <b>%3'ü oranında</b>alınan bir hizmet ücretidir. Bu bedel, ödeme altyapısı, güvenli alışveriş garantisi, uyuşmazlık çözümü ve platform üzerinde sunduğumuz diğer hizmetler için kullanılır.",
+      "2HesaplamaYontemi": "2. Hesaplama Yöntemi",
+      "bBazTutarBSadeceUrun": "<b>Baz tutar:</b>Sadece ürün fiyatı (kargo bedeli ve indirimler hariç).",
+      "bOranBYururluktekiOran3": "<b>Oran:</b>Yürürlükteki oran %3'tür. Bu oran zaman içinde değişebilir; değişiklikler bu sayfada duyurulur.",
+      "bKDVBTutaraKDVDahildir": "<b>KDV:</b>Tutara KDV dahildir; ayrıca KDV eklenmez.",
+      "ornek500TLLikBirUrun": "Örnek: 500 TL'lik bir ürün satın alırsanız Platform Hizmet Bedeli <b>15 TL</b>olur ve sepet toplamına dahil edilir.",
+      "3NereyeGider": "3. Nereye Gider?",
+      "platformHizmetBedeliTARODANAGelir": "Platform Hizmet Bedeli TARODAN'a gelir olarak kaydedilir ve aşağıdaki maliyetlerin karşılanmasında kullanılır:",
+      "odemeSaglayicisiPayTRIslemKomisyonu": "Ödeme sağlayıcısı (PayTR) işlem komisyonu",
+      "sslSertifikasiGuvenlikAltyapisiFraudOnleme": "SSL sertifikası, güvenlik altyapısı, fraud önleme",
+      "musteriDestegiVeUyusmazlikCozumu": "Müşteri desteği ve uyuşmazlık çözümü",
+      "platformGelistirmeVeTeknikBakim": "Platform geliştirme ve teknik bakım",
+      "4IadeDurumundaNeOlur": "4. İade Durumunda Ne Olur?",
+      "platformHizmetBedeliNinIadeEdilip": "Platform Hizmet Bedeli'nin iade edilip edilmeyeceği iadenin gerekçesine bağlıdır:",
+      "bSaticiKaynakliIadeBHasarli": "<b>Satıcı kaynaklı iade</b>(hasarlı, eksik, yanlış ürün, sahte vb.): Platform Hizmet Bedeli <b>tamamen iade edilir</b>.",
+      "bSaticiGondermedigiIcinIptalB": "<b>Satıcı göndermediği için iptal:</b>Platform Hizmet Bedeli tamamen iade edilir.",
+      "bAliciFikirDegisikligiSenaryoD": "<b>Alıcı fikir değişikliği (Senaryo D):</b>Platform Hizmet Bedeli <b>iade edilmez</b>— çünkü iadeye konu olmayan hizmetler verilmiştir (ödeme işlem, güvenlik vs.).",
+      "b48SaatOnaySureciDolduktan": "<b>48 saat onay süreci dolduktan sonra:</b>Sipariş tamamlanmış sayılır, Platform Hizmet Bedeli kesinleşir.",
+      "5Seffaflik": "5. Şeffaflık",
+      "sepetVeCheckoutSayfalarindaPlatformHizmet": "Sepet ve checkout sayfalarında Platform Hizmet Bedeli <b>ayrı bir satır</b>olarak gösterilir. Ödemenizden önce tutarı net olarak görebilirsiniz. Ek ücret veya gizli bedel uygulanmaz.",
+      "6SorularinizIcin": "6. Sorularınız İçin",
+      "platformHizmetBedeliHakkindaDahaFazla": "Platform Hizmet Bedeli hakkında daha fazla bilgi için <link1>Yardım &amp; Destek</link1> sayfasını ziyaret edebilir veya <link2>destek@tarodan.com.tr</link2> adresinden bize ulaşabilirsiniz.",
+      "buSayfaBilgilendirmeAmaclidirBaglayiciSozlesme": "Bu sayfa bilgilendirme amaçlıdır; bağlayıcı sözleşme şartları için <link1>Kullanım Koşulları</link1> ve <link2>İade Politikası</link2> sayfalarımızı inceleyiniz."
+    },
+    "buyerProtection": {
+      "1AliciKorumaNedir": "1. Alıcı Koruma Nedir?",
+      "tarodanAliciKorumaProgramiPlatformUzerinden": "TARODAN Alıcı Koruma programı, platform üzerinden yaptığınız alışverişlerde ürünün tanıma uygun gelmemesi, hiç gönderilmemesi veya ciddi anlaşmazlık durumlarında inceleme ve gerekirse para iadesi süreçlerini kapsar. Bu sayfa, haklarınızı ve başvuru sürecini özetler.",
+      "2Kapsam": "2. Kapsam",
+      "platformdaOdemeAlinanGuvenliOdemeIle": "Platformda ödeme alınan (güvenli ödeme ile tamamlanan) siparişler",
+      "urunHicKargolanmadiVeyaTakipBilgisi": "Ürün hiç kargolanmadı veya takip bilgisi verilmedi",
+      "urunAciklamayaCiddiSekildeAykiriYanlis": "Ürün açıklamaya ciddi şekilde aykırı (yanlış model, ölçek, ağır hasar)",
+      "sahteVeyaTaklitUrunIddiasi": "Sahte veya taklit ürün iddiası",
+      "caymaHakkiVeStandartIadeKosullari": "Cayma hakkı ve standart iade koşulları için <link1>İade Politikası</link1> ve <link2>İade ve İptal Koşulları</link2> sayfalarına bakınız.",
+      "3ParaIadesiParaIadeGarantisi": "3. Para İadesi / Para İade Garantisi",
+      "uygunKosullardaVeIncelemeSonucundaOdeme": "Uygun koşullarda ve inceleme sonucunda, ödeme satıcıya ulaşmadan önce iade edilebilir veya anlaşmazlık çözümüne göre alıcı lehine para iadesi yapılabilir. \"Para iade garantisi\" ifadesi, platformun belirlediği kurallar ve süreçler çerçevesinde sunulan korumayı ifade eder; her durumda otomatik iade anlamına gelmez.",
+      "4AnlasmazlikCozumu": "4. Anlaşmazlık Çözümü",
+      "bSaticiIleIletisimBOnce": "<b>Satıcı ile iletişim:</b>Önce sipariş/mesajlar üzerinden satıcıyla iletişime geçin.",
+      "bDestekTalebiBCozulemezseHesabim": "<b>Destek talebi:</b>Çözülemezse Hesabım → Siparişlerim → İlgili sipariş → \"Sorun bildir\" veya destek@tarodan.com.tr.",
+      "bIncelemeBDestekEkibimizTalebi": "<b>İnceleme:</b>Destek ekibimiz talebi ve (varsa) kanıtları inceler; gerekirse satıcıdan bilgi alır.",
+      "bKararVeUygulamaBSonuc": "<b>Karar ve uygulama:</b>Sonuç (iade, kısmi iade, red) size ve gerekirse satıcıya bildirilir; ödeme süreçleri buna göre işletilir.",
+      "sureBasvurularGenellikle510Is": "Süre: Başvurular genellikle 5–10 iş günü içinde incelenir; karmaşık durumlarda süre uzayabilir.",
+      "5SizinYapmanizGerekenler": "5. Sizin Yapmanız Gerekenler",
+      "siparisiVeVarsaHasarUyumsuzlukFotograflarini": "Siparişi ve varsa hasar/uyumsuzluk fotoğraflarını saklamak",
+      "kargoTakipBilgisiVeIletisimGecmisini": "Kargo takip bilgisi ve iletişim geçmişini paylaşmak",
+      "talepAciklamasiniNetVeDogruYazmak": "Talep açıklamasını net ve doğru yazmak",
+      "platformIletisimlerineZamanindaCevapVermek": "Platform iletişimlerine zamanında cevap vermek",
+      "6Sinirlamalar": "6. Sınırlamalar",
+      "aliciKorumaYasalTuketiciHaklarinizinYerine": "Alıcı koruma, yasal tüketici haklarınızın yerine geçmez; onlara ek olarak sunulur. Belirli kampanya veya satıcı koşulları farklı olabilir; yine de zorunlu yasal haklarınız saklıdır.",
+      "7Iletisim": "7. İletişim",
+      "destekTarodanComTrKonuAlici": "destek@tarodan.com.tr – konu: \"Alıcı Koruma – Sipariş No\""
     }
   },
   "utility": {
@@ -2576,6 +4126,10 @@
         "error": "Bir sorun oluştu. Lütfen tekrar deneyin.",
         "rateLimited": "Çok fazla hatalı deneme yapıldı. Lütfen 15 dakika sonra tekrar deneyin."
       }
+    },
+    "underRevision": {
+      "title": "Güncelleniyor",
+      "description": "Bu sayfanın içeriği yenilenmektedir. Kısa süre içinde tekrar yayında olacaktır."
     }
   },
   "marketing": {
@@ -2609,6 +4163,11 @@
       "unsubscribedToast": "Abonelikten çıkıldı",
       "subscriptionFailed": "Abonelik başarısız",
       "preferenceRequired": "En az bir e-posta tercihi seçin."
+    },
+    "platformFee": {
+      "ariaLabel": "Platform Hizmet Bedeli duyurusu",
+      "notice": "<b>Bilgi:</b> 2 Haziran 2026 itibarıyla TARODAN'da yapılan satın almalardan ürün bedelinin <b>%3'ü oranında</b> Platform Hizmet Bedeli alınmaya başlanmıştır. <link>Detaylı bilgi</link>.",
+      "dismiss": "Banner'ı kapat"
     }
   },
   "stockout": {
@@ -6726,7 +8285,14 @@
         "offer": "Teklif",
         "directSale": "Doğrudan Satış"
       },
-      "rateRange": "Oran {min} ile {max} arasında olmalı"
+      "rateRange": "Oran {min} ile {max} arasında olmalı",
+      "rowActions": {
+        "deactivate": "Pasifleştir",
+        "activate": "Aktifleştir"
+      },
+      "list": {
+        "totalLine": "Toplam {total} {unit}"
+      }
     },
     "auth": {
       "common": {
@@ -6767,7 +8333,8 @@
       "recordExists": "Kayıt zaten mevcut",
       "recordNotFound": "Kayıt bulunamadı",
       "relatedRecordsConflict": "İşlem ilişkili kayıtlar nedeniyle tamamlanamadı",
-      "internalError": "Sunucu hatası"
+      "internalError": "Sunucu hatası",
+      "connectionFailed": "Sunucuya bağlanılamadı. Lütfen internet bağlantınızı kontrol edin."
     },
     "notification": {
       "orderCreated": {
@@ -8057,6 +9624,949 @@
       "downloadUnavailable": "Dosya indirme servisi şu anda kullanılamıyor.",
       "invalidBucketType": "Geçersiz bucket tipi: {bucket}",
       "invalidBucket": "Geçersiz bucket: {bucket}"
+    }
+  },
+  "status": {
+    "order": {
+      "pending_payment": "Ödeme Bekleniyor",
+      "paid": "Ödendi",
+      "preparing": "Hazırlanıyor",
+      "shipped": "Kargoda",
+      "delivered": "Teslim Edildi",
+      "awaiting_buyer_confirmation": "Alıcı Onayı Bekleniyor",
+      "completed": "Tamamlandı",
+      "cancelled": "İptal Edildi",
+      "refund_requested": "İade Talep Edildi",
+      "refunded": "İade Edildi"
+    },
+    "trade": {
+      "pending": "Bekliyor",
+      "accepted": "Kabul Edildi",
+      "rejected": "Reddedildi",
+      "awaiting_payment": "Ödeme Bekleniyor",
+      "shipping_to_warehouse": "Depoya Gönderim",
+      "at_warehouse": "Tarodan Deposunda",
+      "admin_reviewing": "İnceleniyor",
+      "shipping_to_recipients": "Alıcılara Gönderim",
+      "returning": "İade Yolda",
+      "initiator_shipped": "Gönderildi",
+      "receiver_shipped": "Karşı Taraf Gönderdi",
+      "both_shipped": "İki Taraf Gönderdi",
+      "initiator_received": "Teslim Alındı",
+      "receiver_received": "Karşı Taraf Teslim Aldı",
+      "completed": "Tamamlandı",
+      "cancelled": "İptal Edildi",
+      "disputed": "İtiraz Açıldı"
+    },
+    "refundRequest": {
+      "pending_review": "İnceleniyor",
+      "approved": "Onaylandı",
+      "wait_for_delivery": "Ürün Teslimi Bekleniyor",
+      "return_shipment_open": "İade Kargosu Hazır",
+      "return_in_transit": "İade Yolda",
+      "return_delivered": "İade Ulaştı",
+      "refunded": "Para İade Edildi",
+      "rejected": "Reddedildi",
+      "disputed": "İtirazlı",
+      "cancelled": "İptal Edildi"
+    },
+    "offer": {
+      "pending": "Bekliyor",
+      "accepted": "Kabul Edildi",
+      "rejected": "Reddedildi",
+      "countered": "Karşı Teklif",
+      "expired": "Süresi Doldu",
+      "cancelled": "İptal Edildi",
+      "payment_expired": "Ödeme Süresi Doldu"
+    },
+    "payment": {
+      "pending": "Bekliyor",
+      "processing": "İşleniyor",
+      "completed": "Tamamlandı",
+      "failed": "Başarısız",
+      "refunded": "İade Edildi"
+    },
+    "product": {
+      "pending": "Onay Bekliyor",
+      "active": "Aktif",
+      "inactive": "Pasif",
+      "sold": "Satıldı",
+      "reserved": "Rezerve",
+      "rejected": "Reddedildi",
+      "deleted": "Kaldırıldı"
+    },
+    "productCondition": {
+      "new": "Yeni",
+      "like_new": "Yeni Gibi",
+      "very_good": "Çok İyi",
+      "good": "İyi",
+      "fair": "Orta"
+    },
+    "adminRole": {
+      "super_admin": "Süper Admin",
+      "admin": "Yönetici",
+      "moderator": "Moderatör"
+    },
+    "ticket": {
+      "open": "Açık",
+      "in_progress": "İşlemde",
+      "waiting_customer": "Müşteri Bekleniyor",
+      "resolved": "Çözüldü",
+      "closed": "Kapalı"
+    },
+    "taxScope": {
+      "default_rate": "Varsayılan oran",
+      "category": "Kategori",
+      "product": "Ürün"
+    },
+    "membershipTier": {
+      "free": "Ücretsiz",
+      "basic": "Basit",
+      "premium": "Premium",
+      "business": "İşletme"
+    },
+    "refundReason": {
+      "delivery_delayed": "Teslimat Gecikti",
+      "changed_mind": "Fikrimi Değiştirdim",
+      "damaged": "Hasarlı",
+      "wrong_item": "Yanlış Ürün",
+      "not_as_described": "Açıklamaya Uygun Değil",
+      "missing_parts": "Eksik Parçalar",
+      "counterfeit": "Sahte / Taklit",
+      "defective": "Arızalı / Kusurlu",
+      "buyer_damaged": "Alıcı Kaynaklı Hasar",
+      "lost_in_transit": "Kargoda Kayboldu",
+      "other": "Diğer"
+    },
+    "orderCancellationReason": {
+      "delivery_delayed": "Teslimat Gecikti",
+      "wrong_product_selected": "Yanlış Ürün Seçtim",
+      "changed_mind": "Fikrimi Değiştirdim",
+      "wrong_card": "Yanlış Kart Kullandım",
+      "price_changed_mind": "Fiyat Nedeniyle Vazgeçtim",
+      "unavailable_at_address": "Adreste Bulunamayacağım",
+      "other": "Diğer"
+    },
+    "shipment": {
+      "pending": "Beklemede",
+      "label_created": "Etiket Oluşturuldu",
+      "picked_up": "Teslim Alındı",
+      "in_transit": "Yolda",
+      "at_delivery_branch": "Teslimat Şubesinde",
+      "out_for_delivery": "Dağıtımda",
+      "delivered": "Teslim Edildi",
+      "failed": "Başarısız",
+      "return_in_progress": "İade İşlemde",
+      "returned": "İade Edildi",
+      "cancelled": "İptal Edildi"
+    },
+    "notificationChannel": {
+      "push": "Push Bildirimi",
+      "email": "E-posta",
+      "sms": "SMS",
+      "in_app": "Uygulama İçi"
+    },
+    "delivery": {
+      "pending": "Beklemede",
+      "scheduled": "Zamanlandı",
+      "sent": "Gönderildi",
+      "delivered": "Teslim Edildi",
+      "failed": "Başarısız",
+      "cancelled": "İptal Edildi"
+    },
+    "ticketCategory": {
+      "payment": "Ödeme",
+      "shipping": "Kargo",
+      "trade": "Takas",
+      "account": "Hesap",
+      "product": "Ürün",
+      "technical": "Teknik Destek",
+      "other": "Diğer"
+    },
+    "ticketPriority": {
+      "low": "Düşük",
+      "medium": "Orta",
+      "high": "Yüksek",
+      "urgent": "Acil"
+    },
+    "sellerType": {
+      "individual": "Bireysel",
+      "verified": "Onaylı Satıcı",
+      "platform": "Platform"
+    },
+    "paymentHold": {
+      "held": "Tutuluyor",
+      "released": "Serbest Bırakıldı",
+      "cancelled": "İptal Edildi"
+    },
+    "payout": {
+      "pending": "Beklemede",
+      "processing": "İşleniyor",
+      "completed": "Tamamlandı",
+      "failed": "Başarısız",
+      "returned": "Geri Döndü",
+      "retry_pending": "Yeniden Denenecek"
+    },
+    "subscription": {
+      "active": "Aktif",
+      "trialing": "Deneme",
+      "cancelled": "İptal Edildi",
+      "expired": "Süresi Doldu",
+      "past_due": "Vadesi Geçmiş"
+    },
+    "discountType": {
+      "percentage": "Yüzde İndirim",
+      "fixed_amount": "Sabit Tutar",
+      "bogo": "Al-Götür (BOGO)",
+      "bulk_quantity": "Toplu Adet"
+    },
+    "discountScope": {
+      "global": "Genel",
+      "category": "Kategori",
+      "product": "Ürün",
+      "seller": "Satıcı"
+    },
+    "messageStatus": {
+      "sent": "Gönderildi",
+      "pending_approval": "Onay Bekliyor",
+      "approved": "Onaylandı",
+      "rejected": "Reddedildi"
+    },
+    "severity": {
+      "critical": "Kritik",
+      "error": "Hata",
+      "warning": "Uyarı",
+      "info": "Bilgi",
+      "debug": "Hata Ayıklama"
+    },
+    "paymentProvider": {
+      "paytr": "PayTR",
+      "iyzico": "iyzico",
+      "stripe": "Stripe",
+      "manual": "Manuel"
+    },
+    "shipmentProvider": {
+      "surat": "Sürat Kargo"
+    }
+  },
+  "page": {
+    "login": {
+      "page": {
+        "girisYapTarodan": "Giriş Yap · Tarodan",
+        "tarodanHesabinizaGirisYapin": "Tarodan hesabınıza giriş yapın"
+      }
+    },
+    "business": {
+      "page": {
+        "sirketHesabiKaydiTarodan": "Şirket Hesabı Kaydı · Tarodan",
+        "tarodanSirketHesabiniziOlusturun": "Tarodan şirket hesabınızı oluşturun.",
+        "isletmePaneli": "İşletme Paneli",
+        "magazanizinPerformansIstatistikleri": "Mağazanızın performans istatistikleri"
+      },
+      "usebusinessstats": {
+        "buOzellikSadeceIsletmeHesaplariIcin": "Bu özellik sadece İşletme hesapları için geçerlidir.",
+        "istatistiklerYuklenirkenBirHataOlustu": "İstatistikler yüklenirken bir hata oluştu"
+      },
+      "types": {
+        "genelBakis": "Genel Bakış",
+        "urunler": "Ürünler",
+        "koleksiyonlar": "Koleksiyonlar"
+      },
+      "businessheader": {
+        "onayli": "Onaylı",
+        "isletmeHesabi": "İşletme hesabı"
+      },
+      "collectionstab": {
+        "enPopulerKoleksiyonlar": "En Popüler Koleksiyonlar",
+        "henuzKoleksiyonIstatistigiYok": "Henüz koleksiyon istatistiği yok"
+      },
+      "productstab": {
+        "henuzUrunIstatistigiYok": "Henüz ürün istatistiği yok",
+        "enCokGoruntulenenUrunler": "En Çok Görüntülenen Ürünler",
+        "enCokBegenilenUrunler": "En Çok Beğenilen Ürünler"
+      }
+    },
+    "register": {
+      "page": {
+        "kayitOlTarodan": "Kayıt Ol · Tarodan",
+        "tarodanKoleksiyonerToplulugunaUcretsizUyeOlun": "Tarodan koleksiyoner topluluğuna ücretsiz üye olun."
+      }
+    },
+    "forgotPassword": {
+      "page": {
+        "sifremiUnuttumTarodan": "Şifremi Unuttum · Tarodan",
+        "tarodanHesapSifreniziSifirlayin": "Tarodan hesap şifrenizi sıfırlayın"
+      }
+    },
+    "resetPassword": {
+      "page": {
+        "sifreSifirlaTarodan": "Şifre Sıfırla · Tarodan",
+        "yeniTarodanHesapSifreniziOlusturun": "Yeni Tarodan hesap şifrenizi oluşturun"
+      }
+    },
+    "verifyEmail": {
+      "page": {
+        "ePostaDogrulamaTarodan": "E-posta Doğrulama · Tarodan",
+        "tarodanHesabinizinEPostaAdresiniDogrulayin": "Tarodan hesabınızın e-posta adresini doğrulayın"
+      }
+    },
+    "cart": {
+      "page": {
+        "sepetimTarodan": "Sepetim | Tarodan",
+        "sepetinizdekiUrunleriGozdenGecirinVeGuvenle": "Sepetinizdeki ürünleri gözden geçirin ve güvenle ödemeye geçin."
+      }
+    },
+    "payment": {
+      "page": {
+        "odemeTarodan": "Ödeme | Tarodan",
+        "siparisiniziGuvenleTamamlayin": "Siparişinizi güvenle tamamlayın."
+      },
+      "amountsummarycard": {
+        "odenecekTutar": "Ödenecek tutar",
+        "tl": "TL",
+        "odemeBekleniyor": "Ödeme bekleniyor"
+      },
+      "paymentpageclient": {
+        "odemeBilgileriYukleniyor": "Ödeme bilgileri yükleniyor...",
+        "odemeBulunamadi": "Ödeme bulunamadı",
+        "uyelikSayfasinaDon": "Üyelik Sayfasına Dön",
+        "siparislerimeDon": "Siparişlerime Dön"
+      },
+      "paymentready": {
+        "odemeBilgisiBulunamadi": "Ödeme Bilgisi Bulunamadı",
+        "odemeHedefiYuklenemediLutfenTekrarDeneyin": "Ödeme hedefi yüklenemedi. Lütfen tekrar deneyin.",
+        "tekrarDene": "Tekrar Dene",
+        "isleniyor": "İşleniyor…",
+        "vazgecVeGeriDon": "Vazgeç ve geri dön",
+        "bYardimaMiIhtiyacinizVarB": "<b>Yardıma mı ihtiyacınız var?</b>Ödeme sırasında sorun yaşarsanız, lütfen <link2>destek ekibimiz</link2> ile iletişime geçin."
+      },
+      "usepaymentstatus": {
+        "guestTrue": "guest=true",
+        "odemeBasarili": "Ödeme başarılı",
+        "guestTrue2": "&guest=true",
+        "failedToFetchPayment": "Failed to fetch payment:",
+        "odemeBilgisiYuklenemedi": "Ödeme bilgisi yüklenemedi",
+        "odemeIptalEdildiUrunTekrarSatisa": "Ödeme iptal edildi, ürün tekrar satışa açıldı."
+      }
+    },
+    "checkout": {
+      "checkoutcontext": {
+        "buynow": "buyNow",
+        "sellerSALESSUSPENDED": "SELLER_SALES_SUSPENDED",
+        "productNOTACTIVE": "PRODUCT_NOT_ACTIVE",
+        "usecheckoutMustBeUsedWithinA": "useCheckout must be used within a CheckoutProvider"
+      },
+      "schema": {
+        "zorunluAlan": "Zorunlu alan",
+        "required": "Required",
+        "gecerliBirTurkiyeCepNumarasiGirin": "Geçerli bir Türkiye cep numarası girin (5XX XXX XX XX)",
+        "enterAValidTurkishMobileNumber": "Enter a valid Turkish mobile number (5XX XXX XX XX)",
+        "gecerliBirEPostaGirin": "Geçerli bir e-posta girin",
+        "enterAValidEmail": "Enter a valid email"
+      },
+      "tiers": {
+        "temelUyelik": "Temel Üyelik",
+        "premiumUyelik": "Premium Üyelik",
+        "isUyeligi": "İş Üyeliği"
+      },
+      "page": {
+        "uyelikYukseltmeTarodan": "Üyelik Yükseltme | Tarodan",
+        "uyeliginiziGuvenleYukseltin": "Üyeliğinizi güvenle yükseltin."
+      }
+    },
+    "collections": {
+      "usecollectionfilters": {
+        "diecastMetal": "Diecast (Metal)",
+        "resinRecine": "Resin (Reçine)",
+        "compositeKompozit": "Composite (Kompozit)",
+        "plasticPlastik": "Plastic (Plastik)"
+      },
+      "page": {
+        "koleksiyonBulunamadiTarodan": "Koleksiyon Bulunamadı | Tarodan",
+        "nameKoleksiyonunuTarodanDaKesfedin": "{name} koleksiyonunu Tarodan'da keşfedin",
+        "koleksiyonlarTarodan": "Koleksiyonlar | Tarodan",
+        "diecastModelArabaKoleksiyonlariniKesfedinKategoriye": "Diecast model araba koleksiyonlarını keşfedin. Kategoriye göre filtreleyin, popüler ve yeni koleksiyonları görüntüleyin, kendi koleksiyonunuzu oluşturun."
+      }
+    },
+    "edit": {
+      "page": {
+        "koleksiyonuDuzenleTarodan": "Koleksiyonu Düzenle | Tarodan",
+        "koleksiyonBilgileriniziGuncelleyin": "Koleksiyon bilgilerinizi güncelleyin."
+      }
+    },
+    "liked": {
+      "page": {
+        "begendigimKoleksiyonlarTarodan": "Beğendiğim Koleksiyonlar | Tarodan",
+        "begendiginizKoleksiyonlariGoruntuleyin": "Beğendiğiniz koleksiyonları görüntüleyin."
+      }
+    },
+    "listings": {
+      "productspecs": {
+        "olcek": "Ölçek",
+        "malzeme": "Malzeme",
+        "mdGridCols2": "md:grid-cols-2"
+      },
+      "page": {
+        "ilanBulunamadiTarodan": "İlan Bulunamadı | Tarodan",
+        "titleTarodanDaSatista": "{title} Tarodan'da satışta",
+        "urunlerTarodan": "Ürünler | Tarodan",
+        "diecastModelArabaKoleksiyonVeModel": "Diecast model araba, koleksiyon ve model araç ilanlarını keşfedin. Markaya, ölçeğe, fiyata ve duruma göre filtreleyin; takas ve indirimli ürünleri bulun.",
+        "categoryid": "categoryId",
+        "sil": "Sil"
+      },
+      "usesidebarfilters": {
+        "diecastMetal": "Diecast (Metal)",
+        "resinRecine": "Resin (Reçine)",
+        "compositeKompozit": "Composite (Kompozit)",
+        "plasticPlastik": "Plastic (Plastik)",
+        "hotWheels": "Hot Wheels",
+        "matchbox": "Matchbox",
+        "majorette": "Majorette",
+        "tomica": "Tomica",
+        "bburago": "Bburago",
+        "maisto": "Maisto",
+        "autoart": "AUTOart",
+        "minichamps": "Minichamps",
+        "kyosho": "Kyosho",
+        "cmc": "CMC",
+        "gtSpirit": "GT Spirit",
+        "almostReal": "Almost Real",
+        "spark": "Spark",
+        "schuco": "Schuco",
+        "norev": "Norev",
+        "oxfordDiecast": "Oxford Diecast",
+        "greenlight": "Greenlight",
+        "ertl": "ERTL"
+      },
+      "listingstoolbar": {
+        "aZ": "A-Z",
+        "zA": "Z-A",
+        "diecastMetal": "Diecast (Metal)",
+        "resinRecine": "Resin (Reçine)",
+        "composite": "Composite",
+        "plastic": "Plastic",
+        "carmodel": "carModel"
+      },
+      "boostmodal": {
+        "aktifOneCikarma": "Aktif Öne Çıkarma",
+        "hoverBgSurfaceAlt40": "hover:bg-surface-alt/40"
+      }
+    },
+    "new": {
+      "newlistingclient": {
+        "yeniIlanOlustur": "Yeni İlan Oluştur",
+        "urununuzuKoleksiyoncularlaBulusturun": "Ürününüzü koleksiyoncularla buluşturun"
+      },
+      "page": {
+        "ilanOlusturTarodan": "İlan Oluştur | Tarodan",
+        "yeniBirDiecastIlaniOlusturun": "Yeni bir diecast ilanı oluşturun.",
+        "lutfenBirTeslimatAdresiSecinVeya": "Lütfen bir teslimat adresi seçin veya ekleyin",
+        "takasEtmekIstediginizUrunleriSecin": "Takas etmek istediğiniz ürünleri seçin",
+        "istediginizUrun": "İstediğiniz Ürün",
+        "teklifEdeceginizUrunler": "Teklif Edeceğiniz Ürünler",
+        "takasDegeriniDengelemekIcinNakitFark": "Takas değerini dengelemek için nakit fark ekleyebilirsiniz.",
+        "nakitFarkiKimOdeyecek": "Nakit farkı kim ödeyecek?",
+        "benOdeyecegim": "Ben ödeyeceğim",
+        "karsiTarafOdeyecek": "Karşı taraf ödeyecek",
+        "teslimatAdresiniz": "Teslimat Adresiniz"
+      },
+      "listingbanners": {
+        "mevcutIlanCurrentCountSinirsiz": "Mevcut İlan: {currentCount} (Sınırsız)",
+        "ilanHakkiCurrentCountMaxListings": "İlan Hakkı: {currentCount} / {maxListings}",
+        "premiumAGec": "Premium'a Geç",
+        "ilanVermedenOnceBankaHesabiEklemelisiniz": "İlan vermeden önce banka hesabı eklemelisiniz",
+        "satislarinizdanEldeEdeceginizTutarinSizeAktarilabilmesi": "Satışlarınızdan elde edeceğiniz tutarın size aktarılabilmesi için IBAN bilgisi gereklidir.",
+        "ibanEkle": "IBAN Ekle"
+      },
+      "tradeproductpicker": {
+        "takasEdilebilirAktifIlaninizYok": "Takas edilebilir aktif ilanınız yok."
+      },
+      "tradesummary": {
+        "teklifOzeti": "Teklif Özeti",
+        "secilenUrunler": "Seçilen Ürünler:",
+        "urunToplamDegeri": "Ürün Toplam Değeri:",
+        "sizOdeyeceksiniz": "Siz ödeyeceksiniz",
+        "karsiTarafOdeyecek": "Karşı taraf ödeyecek",
+        "toplamTeklif": "Toplam Teklif:",
+        "istenenUrun": "İstenen Ürün:"
+      },
+      "usenewtrade": {
+        "takasOzelligi": "Takas özelliği",
+        "uyeliginizdeMevcutDegil": "üyeliğinizde mevcut değil",
+        "takasOzelligineSahipDegil": "takas özelliğine sahip değil"
+      }
+    },
+    "manufacturers": {
+      "page": {
+        "ureticiBulunamadiTarodan": "Üretici Bulunamadı | Tarodan",
+        "nameDiecastModelleriVeIlanlariTarodan": "{name} diecast modelleri ve ilanları Tarodan'da."
+      },
+      "diecasttimeline": {
+        "diecastTarihi": "Diecast Tarihi",
+        "modelArabaDunyasiniSekillendirenKilometreTaslari": "Model araba dünyasını şekillendiren kilometre taşları"
+      },
+      "manufacturerlistingspreview": {
+        "buUreticiyeAitAktifIlanYok": "Bu üreticiye ait aktif ilan yok."
+      },
+      "manufacturerstoolbar": {
+        "ureticiAra": "Üretici ara...",
+        "tumUlkeler": "Tüm ülkeler"
+      },
+      "manufacturerscontext": {
+        "diger": "Diğer",
+        "usemanufacturersMustBeUsedWithinA": "useManufacturers must be used within a ManufacturersProvider"
+      }
+    },
+    "trackOrder": {
+      "trackorderclient": {
+        "ordernumber": "orderNumber",
+        "ornORDK7X9M2QF3N": "örn. ORD-K7X9M2QF3N",
+        "siparisteKullandiginizEPosta": "siparişte kullandığınız e-posta",
+        "suratKargo": "Sürat Kargo"
+      },
+      "page": {
+        "siparisTakibiTarodan": "Sipariş Takibi | Tarodan",
+        "siparisNumaranizVeEPostaAdresinizle": "Sipariş numaranız ve e-posta adresinizle siparişinizi takip edin."
+      }
+    },
+    "contact": {
+      "page": {
+        "iletisimTarodan": "İletişim · Tarodan",
+        "tarodanEkibineUlasinSorularinizOnerilerinizVe": "Tarodan ekibine ulaşın — sorularınız, önerileriniz ve destek talepleriniz için iletişim formu."
+      }
+    },
+    "newsletter": {
+      "page": {
+        "bultenAboneligiTarodan": "Bülten Aboneliği · Tarodan",
+        "yeniIlanlarIndirimlerVeKoleksiyonHaberleri": "Yeni ilanlar, indirimler ve koleksiyon haberleri için Tarodan bültenine ücretsiz abone olun."
+      }
+    },
+    "unsubscribe": {
+      "page": {
+        "bultenAboneliginiIptalEtTarodan": "Bülten Aboneliğini İptal Et · Tarodan",
+        "tarodanBultenAboneliginiziBuradanIptalEdin": "Tarodan bülten aboneliğinizi buradan iptal edin."
+      }
+    },
+    "sitemap": {
+      "page": {
+        "siteHaritasiTarodan": "Site Haritası · Tarodan",
+        "tarodanDakiTumBolumlereVeSayfalara": "Tarodan'daki tüm bölümlere ve sayfalara tek yerden ulaşın: pazar yeri, hesap, destek ve yasal sayfalar."
+      }
+    },
+    "cookies": {
+      "page": {
+        "cerezPolitikasiTarodan": "Çerez Politikası · Tarodan",
+        "tarodanCerezPolitikasiHangiCerezleriNeden": "TARODAN çerez politikası: hangi çerezleri neden kullandığımız, çerez kategorileri ve tercihlerinizi nasıl yönetebileceğiniz."
+      }
+    },
+    "intellectualProperty": {
+      "page": {
+        "fikriMulkiyetTarodan": "Fikri Mülkiyet · Tarodan",
+        "tarodanFikriMulkiyetPolitikasiTelifHakki": "TARODAN fikri mülkiyet politikası: telif hakkı ve marka kullanımı, ihlal bildirimi süreci ve tekrarlayan ihlallere ilişkin kurallar."
+      }
+    },
+    "refundPolicy": {
+      "page": {
+        "iadePolitikasiTarodan": "İade Politikası · Tarodan",
+        "tarodanIadeVeIptalKosullariTalep": "Tarodan iade ve iptal koşulları: talep oluşturma adımları, değerlendirme süreci, kargo ücretinin kime ait olduğu ve ücret iadesi süreleri."
+      }
+    },
+    "sellerAgreement": {
+      "page": {
+        "saticiSozlesmeleriTarodan": "Satıcı Sözleşmeleri · Tarodan",
+        "tarodanBireyselVeKurumsalSaticiUyelik": "Tarodan bireysel ve kurumsal satıcı üyelik ve satış sözleşmeleri: onboarding, listeleme, kargo, güvenli ödeme havuzu, komisyon ve hizmet bedelleri."
+      }
+    },
+    "paymentOptions": {
+      "page": {
+        "odemeSecenekleriTarodan": "Ödeme Seçenekleri · Tarodan",
+        "tarodanUzerindeKabulEdilenOdemeYontemleri": "Tarodan üzerinde kabul edilen ödeme yöntemleri, güvenli ödeme altyapısı ve taksit seçenekleri hakkında bilgi alın."
+      }
+    },
+    "sell": {
+      "page": {
+        "buradaSatisYapinTarodan": "Burada Satış Yapın · Tarodan",
+        "modelArabaKoleksiyonunuzuTarodanUzerindeSatisa": "Model araba koleksiyonunuzu Tarodan üzerinde satışa çıkarın; güvenli ödeme ve geniş alıcı kitlesiyle buluşun."
+      }
+    },
+    "guides": {
+      "guidesclient": {
+        "odemeleriHerZamanPlatformUzerindenYapin": "Ödemeleri her zaman platform üzerinden yapın",
+        "supheliFiyatlaraDikkatEdin": "Şüpheli fiyatlara dikkat edin",
+        "saticiDegerlendirmeleriniKontrolEdin": "Satıcı değerlendirmelerini kontrol edin",
+        "kargoTakipNumarasiniMutlakaAlin": "Kargo takip numarasını mutlaka alın",
+        "teslimatSirasindaPaketiKontrolEdin": "Teslimat sırasında paketi kontrol edin",
+        "sorunOlursa24SaatIcindeBildirin": "Sorun olursa 24 saat içinde bildirin"
+      },
+      "page": {
+        "kullanimKilavuzlariTarodan": "Kullanım Kılavuzları · Tarodan",
+        "tarodanKullanimKilavuzlariUyelikAlisverisSatis": "TARODAN kullanım kılavuzları: üyelik, alışveriş, satış, takas, fotoğraf ve kargo süreçleri için adım adım rehberler."
+      }
+    },
+    "support": {
+      "ticketdetailclient": {
+        "destekMerkezi": "Destek Merkezi",
+        "mesajlar": "Mesajlar",
+        "textInverted90": "text-inverted/90",
+        "siz": "Siz",
+        "destekEkibi": "Destek Ekibi",
+        "textInverted70": "text-inverted/70",
+        "buTalepKapatilmistirYeniBirSorun": "Bu talep kapatılmıştır. Yeni bir sorun için destek talebi oluşturabilirsiniz.",
+        "gonder": "Gönder"
+      }
+    },
+    "sayfa": {
+      "page": {
+        "sayfaBulunamadi": "Sayfa Bulunamadı",
+        "anaSayfa": "Ana Sayfa"
+      }
+    },
+    "authenticity": {
+      "page": {
+        "orijinallikGarantisiTarodan": "Orijinallik Garantisi · Tarodan",
+        "tarodanDogrulamaSureciSahtecilikOnlemleriVe": "Tarodan doğrulama süreci, sahtecilik önlemleri ve doğrulanmış satıcı rozetleri ile güvenli alışverişi nasıl sağladığını açıklar."
+      }
+    },
+    "buyerProtection": {
+      "page": {
+        "aliciKorumaTarodan": "Alıcı Koruma · Tarodan",
+        "tarodanAliciKorumaProgramiKapsamPara": "TARODAN Alıcı Koruma programı; kapsam, para iadesi, anlaşmazlık çözümü ve haklarınızı özetler."
+      }
+    },
+    "secureSwap": {
+      "secureswapclient": {
+        "guvenliTakasSistemi": "Güvenli Takas Sistemi",
+        "koleksiyonlariniziDigerKoleksiyonerlerleGuvenleTakasEdin": "Koleksiyonlarınızı diğer koleksiyonerlerle güvenle takas edin. Sistemimiz her adımda iki tarafı da korur.",
+        "nasilCalisir": "Nasıl Çalışır?",
+        "adimI": "Adım {i}",
+        "guvenlikGarantileri": "Güvenlik Garantileri",
+        "sikcaSorulanSorular": "Sıkça Sorulan Sorular",
+        "takasaBaslamayaHazirMisiniz": "Takasa Başlamaya Hazır mısınız?",
+        "ilanlariInceleyinVeIlkTakasTeklifinizi": "İlanları inceleyin ve ilk takas teklifinizi bugün gönderin.",
+        "takasaBasla": "Takasa Başla",
+        "ilanlariIncele": "İlanları İncele"
+      },
+      "data": {
+        "takasTeklifiGonderin": "Takas Teklifi Gönderin",
+        "ilgilendiginizBirUruneTakasTeklifiGonderin": "İlgilendiğiniz bir ürüne takas teklifi gönderin. Karşı tarafa hangi ürünlerinizi teklif ettiğinizi belirtin.",
+        "karsilikliOnay": "Karşılıklı Onay",
+        "herIkiTarafDaTakasiOnayladiginda": "Her iki taraf da takası onayladığında süreç başlar. Mesajlaşarak detayları netleştirin.",
+        "guvenliKargo": "Güvenli Kargo",
+        "urunleriniziAnlasmaliKargoIleGonderinKargo": "Ürünlerinizi anlaşmalı kargo ile gönderin. Kargo takip numarası sistem üzerinden paylaşılır.",
+        "depoKontrolu": "Depo Kontrolü",
+        "urunleriTarodanDeposunaGonderinUzmanEkibimiz": "Ürünleri Tarodan deposuna gönderin. Uzman ekibimiz depoda gerekli kontrolleri sağlar; her iki tarafın da onayı sonrasında ürünleri yeni sahiplerine kargolar.",
+        "takasTamamlandi": "Takas Tamamlandı",
+        "herIkiTarafDaUrunuTeslim": "Her iki taraf da ürünü teslim aldığında takas tamamlanır. Karşılıklı değerlendirme yapılır.",
+        "dogrulanmisUyeler": "Doğrulanmış Üyeler",
+        "takasYapabilmekIcinEPostaDogrulamasi": "Takas yapabilmek için e-posta doğrulaması zorunludur.",
+        "kargoTakibi": "Kargo Takibi",
+        "tumKargolarSistemUzerindenTakipEdilir": "Tüm kargolar sistem üzerinden takip edilir.",
+        "anlasmazlikCozumu": "Anlaşmazlık Çözümü",
+        "sorunYasandigindaDestekEkibimizDevreyeGirer": "Sorun yaşandığında destek ekibimiz devreye girer.",
+        "degerlendirmeSistemi": "Değerlendirme Sistemi",
+        "herTakasSonrasiPuanlamaIleGuvenilir": "Her takas sonrası puanlama ile güvenilir kullanıcılar ön plana çıkar.",
+        "takasUcretsizMi": "Takas ücretsiz mi?",
+        "takasIslemlerindeUrununKomisyonKuralinaGore": "Takas işlemlerinde ürünün komisyon kuralına göre sabit bir takas hizmet bedeli alınır. Kargo ayrıca, ilanda seçilen paket boyutuna göre hesaplanır.",
+        "takasTeklifiNasilGonderilir": "Takas teklifi nasıl gönderilir?",
+        "ilgilendiginizUrununSayfasindaTakasTeklifiGonder": "İlgilendiğiniz ürünün sayfasında \"Takas Teklifi Gönder\" butonuna tıklayarak kendi ürünlerinizden birini seçin.",
+        "karsiTarafTeklifiReddederseNeOlur": "Karşı taraf teklifi reddederse ne olur?",
+        "hicbirYukumlulugunuzOlmazFarkliBirTeklif": "Hiçbir yükümlülüğünüz olmaz. Farklı bir teklif gönderebilir veya farklı ürünler arayabilirsiniz.",
+        "sorunYasarsamNeYapmaliyim": "Sorun yaşarsam ne yapmalıyım?",
+        "destekEkibimizleIletisimeGecinAnlasmazlikCozum": "Destek ekibimizle iletişime geçin. Anlaşmazlık çözüm sürecimiz her iki tarafı da koruma altına alır."
+      },
+      "page": {
+        "guvenliTakasSistemiTarodan": "Güvenli Takas Sistemi · Tarodan",
+        "koleksiyonlariniziDigerKoleksiyonerlerleGuvenleTakasEdin": "Koleksiyonlarınızı diğer koleksiyonerlerle güvenle takas edin. Nasıl çalıştığını, güvenlik garantilerini ve sıkça sorulan soruları öğrenin."
+      }
+    },
+    "securityFeatures": {
+      "page": {
+        "guvenlikVeGizlilikTarodan": "Güvenlik ve Gizlilik · Tarodan",
+        "tarodanGuvenlikOnlemleriAliciKorumasiVe": "Tarodan güvenlik önlemleri, alıcı koruması ve veri gizliliği uygulamaları ile alışverişinizi nasıl güvende tuttuğunu açıklar."
+      }
+    },
+    "sections": {
+      "homesection": {
+        "tumunuGor": "Tümünü gör"
+      },
+      "trustbadges": {
+        "guvenliAlisveris": "Güvenli Alışveriş",
+        "sslSertifikaliGuvenliOdeme": "SSL sertifikalı güvenli ödeme",
+        "ucretsizKargo": "Ücretsiz Kargo",
+        "3000TLVeUzeriSiparislerde": "3.000 TL ve üzeri siparişlerde",
+        "iadeImkani": "İade İmkanı",
+        "14GunKosulsuzIade": "14 gün koşulsuz iade",
+        "taksitImkani": "Taksit İmkanı",
+        "12AyaVaranTaksit": "12 aya varan taksit",
+        "koleksiyonSergile": "Koleksiyon Sergile",
+        "dijitalGarajiniOlustur": "Dijital garajını oluştur",
+        "guvenliTakas": "Güvenli Takas",
+        "guvenliTakasSistemi": "Güvenli takas sistemi",
+        "secureShopping": "Secure Shopping",
+        "sslCertifiedSecurePayment": "SSL certified secure payment",
+        "freeShipping": "Free Shipping",
+        "onOrdersOver3000TL": "On orders over 3,000 TL",
+        "easyReturns": "Easy Returns",
+        "14DaysUnconditionalReturn": "14 days unconditional return",
+        "installments": "Installments",
+        "upTo12MonthInstallments": "Up to 12 month installments",
+        "displayCollection": "Display Collection",
+        "createYourDigitalGarage": "Create your digital garage",
+        "safeTrading": "Safe Trading",
+        "secureTradingSystem": "Secure trading system"
+      }
+    },
+    "membership": {
+      "tiercard": {
+        "ucretsiz": "Ücretsiz",
+        "yil": "yıl"
+      },
+      "tiers": {
+        "temel": "Temel",
+        "koleksiyoncularIcinBaslangic": "Koleksiyoncular için başlangıç"
+      },
+      "requiredbusinessbanner": {
+        "businessUyelikGerekli": "Business Üyelik Gerekli",
+        "sirketHesabinizIcinBusinessUyelikAlmaniz": "Şirket hesabınız için business üyelik almanız gerekmektedir. Üyeliğinizi tamamlamadan başka sayfalara geçemezsiniz. Lütfen aşağıdaki business üyelik planını seçip ödemeyi tamamlayın."
+      }
+    },
+    "success": {
+      "page": {
+        "uyelikGuncellendiTarodan": "Üyelik Güncellendi | Tarodan"
+      }
+    },
+    "app": {
+      "page": {
+        "tarodanDiecastModelArabaPazari": "Tarodan - Diecast Model Araba Pazarı",
+        "diecastModelArabaKoleksiyonculariIcinGuvenli": "Diecast model araba koleksiyoncuları için güvenli alış, satış ve takas platformu. Öne çıkan ürünler, indirimler, takas vitrini ve popüler ilanları keşfedin.",
+        "productsList": "products:list"
+      },
+      "notFound": {
+        "sayfaBulunamadi": "Sayfa bulunamadı",
+        "aradiginizSayfaTasinmisSilinmisYaDa": "Aradığınız sayfa taşınmış, silinmiş ya da hiç var olmamış olabilir.",
+        "anaSayfayaDon": "Ana sayfaya dön"
+      },
+      "layout": {
+        "tarodanModelArabaPazari": "Tarodan - Model Araba Pazarı",
+        "diecastModelArabaKoleksiyonculariIcinGuvenli": "Diecast model araba koleksiyoncuları için güvenli alış, satış ve takas platformu",
+        "tarodan": "Tarodan"
+      }
+    },
+    "following": {
+      "followedsellercard": {
+        "takibiBirak": "Takibi Bırak"
+      },
+      "usefollowing": {
+        "takipBirakildi": "Takip bırakıldı",
+        "takipBirakilamadi": "Takip bırakılamadı"
+      }
+    },
+    "savedSearches": {
+      "savedsearchcard": {
+        "sil": "Sil"
+      }
+    },
+    "offers": {
+      "types": {
+        "hoursGun": "{hours} gün",
+        "pending": "Pending",
+        "accepted": "Accepted",
+        "rejected": "Rejected",
+        "counterOffer": "Counter Offer",
+        "cancelled": "Cancelled",
+        "expired": "Expired",
+        "paymentExpired": "Payment Expired"
+      },
+      "page": {
+        "tekliflerim": "Tekliflerim",
+        "bekleyen": "Bekleyen"
+      }
+    },
+    "orders": {
+      "useorderdetail": {
+        "invalidOrderGroupResponse": "Invalid order group response",
+        "invalidOrderResponse": "Invalid order response",
+        "iletisimSellerCommunication5KargoSellerShipping5": "İletişim: {sellerCommunication}/5, Kargo: {sellerShipping}/5, Paketleme: {sellerPackaging}/5",
+        "reviewSubmitError": "Review submit error:",
+        "blank": "_blank",
+        "noopenerNoreferrer": "noopener,noreferrer",
+        "contentType": "Content-Type",
+        "multipartFormData": "multipart/form-data"
+      },
+      "useorders": {
+        "blank": "_blank",
+        "noopenerNoreferrer": "noopener,noreferrer",
+        "iletisimSellerCommunication5KargoSellerShipping5": "İletişim: {sellerCommunication}/5, Kargo: {sellerShipping}/5, Paketleme: {sellerPackaging}/5"
+      }
+    },
+    "trades": {
+      "usecounteroffereditor": {
+        "noTrade": "no trade",
+        "failedToSendCounterOffer": "Failed to send counter offer:",
+        "oncekiTeklifIleAyni": "Önceki teklif ile aynı",
+        "failedToLoadCounterOfferData": "Failed to load counter-offer data:"
+      },
+      "types": {
+        "etiketHazir": "Etiket Hazır",
+        "bekleniyor": "Bekleniyor",
+        "yolda": "Yolda",
+        "depoyaUlasti": "Depoya Ulaştı"
+      },
+      "recipientsshipmentcard": {
+        "suratKargo": "Sürat Kargo"
+      },
+      "returnshipmentcard": {
+        "suratKargo": "Sürat Kargo"
+      },
+      "tradecountdown": {
+        "kalanSure": "Kalan süre",
+        "lutfenSureDolmadanIsleminiziTamamlayin": "Lütfen süre dolmadan işleminizi tamamlayın"
+      },
+      "tradeitemscomparison": {
+        "toplamDeger": "Toplam Değer",
+        "theirnameInUrunu": "{theirName}'in Ürünü",
+        "sizinTeklifiniz": "Sizin Teklifiniz"
+      },
+      "page": {
+        "takasBulunamadi": "Takas bulunamadı",
+        "takaslaraDon": "Takaslara Dön",
+        "takasDetayi": "Takas Detayı"
+      },
+      "tradeaddresspicker": {
+        "adSoyadGirin": "Ad soyad girin",
+        "ilSecin": "İl seçin",
+        "ilceSecin": "İlçe seçin",
+        "adresEnAz10KarakterOlmali": "Adres en az 10 karakter olmalı",
+        "takasAdresi": "Takas Adresi",
+        "varsayilan": "(Varsayılan)",
+        "yeniAdres": "Yeni Adres",
+        "adSoyad": "Ad Soyad",
+        "acikAdresMahalleCaddeNo": "Açık adres (mahalle, cadde, no...)",
+        "adresiKaydet": "Adresi Kaydet",
+        "vazgec": "Vazgeç",
+        "yeniAdresEkle": "Yeni adres ekle"
+      }
+    },
+    "analytics": {
+      "topproductscard": {
+        "aktif": "Aktif",
+        "satildi": "Satıldı",
+        "enPopulerIlanlar": "En Popüler İlanlar"
+      }
+    },
+    "statistics": {
+      "types": {
+        "urun": "Ürün",
+        "alici": "Alıcı"
+      },
+      "recentsalessection": {
+        "sonSatislar": "Son Satışlar",
+        "tumunuGor": "Tümünü Gör"
+      },
+      "page": {
+        "aktif": "Aktif",
+        "tamamlanan": "Tamamlanan",
+        "bekleyen": "Bekleyen",
+        "oran": "Oran",
+        "favori": "Favori",
+        "koleksiyon": "Koleksiyon",
+        "puan": "Puan"
+      }
+    },
+    "messages": {
+      "messagecomposer": {
+        "uyari": "Uyarı",
+        "enter": "Enter"
+      },
+      "messageticks": {
+        "textInverted60": "text-inverted/60",
+        "okundu": "Okundu",
+        "iletildi": "İletildi",
+        "currentcolor": "currentColor",
+        "m186717l55": "M18 6 7 17l-5-5",
+        "m22107575L13": "m22 10-7.5 7.5L13 16",
+        "m206917l55": "M20 6 9 17l-5-5"
+      }
+    },
+    "profile": {
+      "usesecurity": {
+        "sifreDegistirilemedi": "Şifre değiştirilemedi"
+      },
+      "tiers": {
+        "ucretsiz": "Ücretsiz",
+        "temel": "Temel",
+        "premium": "Premium",
+        "is": "İş"
+      },
+      "page": {
+        "profilimTarodan": "Profilim | Tarodan",
+        "hesabiniziIlanlariniziUyeliginiziVeAyarlariniziYonetin": "Hesabınızı, ilanlarınızı, üyeliğinizi ve ayarlarınızı yönetin."
+      }
+    },
+    "banned": {
+      "page": {
+        "hesabinizAskiyaAlindi": "Hesabınız Askıya Alındı",
+        "hesabinizKuralIhlaliNedeniyleBanlanmistirBunun": "Hesabınız kural ihlali nedeniyle banlanmıştır. Bunun bir hata olduğunu düşünüyorsanız destek ekibiyle iletişime geçebilirsiniz.",
+        "banSebebi": "Ban sebebi",
+        "destekEkibiyleIletisimeGec": "Destek Ekibiyle İletişime Geç",
+        "cikisYap": "Çıkış Yap"
+      }
+    },
+    "businessPending": {
+      "page": {
+        "ekibimizSirketBilgileriVeVergiKimlik": "Ekibimiz şirket bilgileri ve vergi kimlik numaranızı doğrular.",
+        "onaylandigindaHesabinizAktifOlurVeE": "Onaylandığında hesabınız aktif olur ve e-posta ile bilgilendirilirsiniz.",
+        "reddedilmesiDurumundaRedGerekcesiyleBirlikteE": "Reddedilmesi durumunda red gerekçesiyle birlikte e-posta alırsınız.",
+        "basvurunuzInceleniyor": "Başvurunuz İnceleniyor",
+        "onaySurecindeNelerOlur": "Onay sürecinde neler olur?",
+        "basvuruyuTamamlaBelgeleriYukle": "Başvuruyu Tamamla / Belgeleri Yükle",
+        "destekEkibiyleIletisimeGec": "Destek Ekibiyle İletişime Geç",
+        "cikisYap": "Çıkış Yap"
+      }
+    },
+    "businessRejected": {
+      "page": {
+        "basvurunuzReddedildi": "Başvurunuz Reddedildi",
+        "basvurunuzunHataliReddedildiginiVeyaEksikBilgi": "Başvurunuzun hatalı reddedildiğini veya eksik bilgi olduğunu düşünüyorsanız destek ekibiyle iletişime geçebilirsiniz.",
+        "destekEkibiyleIletisimeGec": "Destek Ekibiyle İletişime Geç",
+        "cikisYap": "Çıkış Yap"
+      }
+    },
+    "form": {
+      "constants": {
+        "diecastMetal": "Diecast (Metal)",
+        "resinRecine": "Resin (Reçine)",
+        "compositeKompozit": "Composite (Kompozit)",
+        "plasticPlastik": "Plastic (Plastik)"
+      }
+    },
+    "hooks": {
+      "usecart": {
+        "satici": "Satıcı",
+        "sepeteEklenirkenHataOlustu": "Sepete eklenirken hata oluştu",
+        "miktarGuncellenirkenHataOlustu": "Miktar güncellenirken hata oluştu"
+      },
+      "usewebmutation": {
+        "islemBasarisiz": "İşlem başarısız"
+      }
+    },
+    "lib": {
+      "membership": {
+        "ucretsizUyelik": "Ücretsiz Üyelik",
+        "temelUyelik": "Temel Üyelik",
+        "premiumUyelik": "Premium Üyelik",
+        "isUyeligi": "İş Üyeliği",
+        "uyeligim": "Üyeliğim",
+        "uyeOl": "Üye Ol"
+      }
+    },
+    "server": {
+      "authActions": {
+        "sunucuyaBaglanilamadi": "Sunucuya bağlanılamadı.",
+        "emailVerificationRequired": "Email verification required",
+        "ePostaVeyaSifreHatali": "E-posta veya şifre hatalı",
+        "girisBasarisiz": "Giriş başarısız"
+      }
     }
   }
 }

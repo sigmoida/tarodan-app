@@ -31,7 +31,7 @@ export function discountRowMenu(
   t: T,
 ) {
   return (d: Discount): RowActionItem[] => [
-    activeToggleAction(d.isActive, () => onToggle(d), busyId === d.id),
+    activeToggleAction(d.isActive, () => onToggle(d), t, busyId === d.id),
     {
       label: t("admin.marketing.discounts.codes.rowGenerate"),
       icon: TicketIcon,
@@ -42,6 +42,6 @@ export function discountRowMenu(
       icon: ArrowDownTrayIcon,
       onClick: () => onExportCodes(d),
     },
-    ...editDeleteActions(d, { onEdit, onDelete }),
+    ...editDeleteActions(d, { onEdit, onDelete }, t),
   ];
 }

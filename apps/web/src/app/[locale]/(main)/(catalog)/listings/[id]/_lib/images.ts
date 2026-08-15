@@ -1,9 +1,9 @@
 /** @format */
 
 import type { ProductImage } from "./types";
+import { imagePlaceholder } from "@/lib/placeholder";
 
-export const PLACEHOLDER =
-  "https://placehold.co/600x600/f3f4f6/9ca3af?text=Ürün";
+export const PLACEHOLDER = imagePlaceholder("600x600");
 
 /** Prefer the high-res detail URL (gallery / lightbox). */
 export function getDetailImageUrl(image: ProductImage | string): string {

@@ -2,6 +2,7 @@
 
 "use client";
 
+import { useTranslations } from "next-intl";
 import { Button, Checkbox, Input } from "@tarodan/ui";
 import {
   FormInput,
@@ -61,9 +62,10 @@ export default function DiscountFormModal({
   editing,
   products,
 }: DiscountFormModalProps) {
+  const t = useTranslations();
   const save = useSaveDiscount();
   const modalLabels = useFormModalLabels();
-  const form = useZodForm(discountSchema, {
+  const form = useZodForm(discountSchema(t), {
     defaultValues: emptyDiscountForm(),
   });
   const { register, setValue, watch, formState } = form;
@@ -95,38 +97,50 @@ export default function DiscountFormModal({
     <FormModal
       open={open}
       onClose={onClose}
-      title={editing ? "İndirimi Düzenle" : "Yeni İndirim Oluştur"}
+      title={
+        editing
+          ? t("seller.discounts.editTitle")
+          : t("seller.discounts.createTitle")
+      }
       form={form}
       onSubmit={onSubmit}
       isSubmitting={save.isPending}
       resetValues={editing ? fromDiscount(editing) : emptyDiscountForm()}
-      submitLabel={editing ? "Güncelle" : "Oluştur"}
+      submitLabel={editing ? t("common.update") : t("common.create")}
       size="2xl"
       {...modalLabels}
     >
       <FormInput
         name="name"
-        label="İndirim Adı *"
-        placeholder="Örn: Yaz İndirimi"
+        label={t("seller.discounts.nameLabel")}
+        placeholder={t("seller.discounts.namePlaceholder")}
       />
       <FormTextarea
         name="description"
-        label="Açıklama"
+        label={t("common.description")}
         rows={2}
-        placeholder="İndirim açıklaması..."
+        placeholder={t("seller.discounts.descriptionPlaceholder")}
       />
 
       <div className="grid grid-cols-1 gap-4 xs:grid-cols-2">
-        <FormSelect name="type" label="İndirim Türü *">
-          <option value="percentage">Yüzde (%)</option>
-          <option value="fixed_amount">Sabit Tutar (TL)</option>
-          <option value="bogo">Al X, Y Bedava (otomatik)</option>
-          <option value="bulk_quantity">Çoklu Alım İndirimi (otomatik)</option>
+        <FormSelect name="type" label={t("seller.discounts.typeLabel")}>
+          <option value="percentage">
+            {t("seller.discounts.typePercentage")}
+          </option>
+          <option value="fixed_amount">
+            {t("seller.discounts.typeFixed")}
+          </option>
+          <option value="bogo">{t("seller.discounts.typeBogo")}</option>
+          <option value="bulk_quantity">
+            {t("seller.discounts.typeBulk")}
+          </option>
         </FormSelect>
         {type !== "bogo" && (
           <Input
             label={
-              type === "bulk_quantity" ? "İndirim Yüzdesi (%) *" : "Değer *"
+              type === "bulk_quantity"
+                ? t("seller.discounts.percentLabel")
+                : t("seller.discounts.valueLabel")
             }
             type="number"
             min="0"
@@ -148,45 +162,44 @@ export default function DiscountFormModal({
         <div className="grid grid-cols-1 gap-4 xs:grid-cols-2">
           <FormInput
             name="buyQuantity"
-            label="Kaç adet alınca? *"
+            label={t("seller.discounts.buyQuantityLabel")}
             type="number"
             min="1"
-            placeholder="Örn: 2 (3 al 2 öde için 2)"
+            placeholder={t("seller.discounts.buyQuantityPlaceholder")}
           />
           <FormInput
             name="getQuantity"
-            label="Kaç adet bedava? *"
+            label={t("seller.discounts.getQuantityLabel")}
             type="number"
             min="1"
-            placeholder="Örn: 1"
+            placeholder={t("seller.discounts.getQuantityPlaceholder")}
           />
         </div>
       )}
       {type === "bulk_quantity" && (
         <FormInput
           name="minQuantity"
-          label="En az kaç adet? *"
+          label={t("seller.discounts.minQuantityLabel")}
           type="number"
           min="2"
-          placeholder="Örn: 3 (aynı üründen 3 adet)"
+          placeholder={t("seller.discounts.minQuantityPlaceholder")}
         />
       )}
 
       <div className="grid grid-cols-1 gap-4 xs:grid-cols-2">
-        <FormSelect name="scope" label="Kapsam">
-          <option value="seller">Tüm Mağaza</option>
-          <option value="product">Seçili Ürünler</option>
+        <FormSelect name="scope" label={t("seller.discounts.scopeLabel")}>
+          <option value="seller">{t("seller.discounts.scopeSeller")}</option>
+          <option value="product">{t("seller.discounts.scopeProduct")}</option>
         </FormSelect>
         {type === "bogo" || type === "bulk_quantity" ? (
           <p className="self-end rounded-lg bg-surface p-3 text-xs text-muted">
-            Adet koşullu kampanya kod istemez: sepette koşul sağlanınca
-            kendiliğinden uygulanır.
+            {t("seller.discounts.autoCampaignNote")}
           </p>
         ) : (
           <FormInput
             name="code"
-            label="İndirim Kodu (opsiyonel)"
-            placeholder="Boşsa otomatik"
+            label={t("seller.discounts.codeLabel")}
+            placeholder={t("seller.discounts.codePlaceholder")}
           />
         )}
       </div>
@@ -195,7 +208,7 @@ export default function DiscountFormModal({
         <div>
           <div className="mb-2 flex items-center justify-between">
             <label className="block text-sm font-medium text-body">
-              Ürün Seçin *
+              {t("seller.discounts.selectProducts")}
             </label>
             {products.length > 0 && (
               <Button
@@ -213,14 +226,14 @@ export default function DiscountFormModal({
                 }
               >
                 {targetProductIds.length === products.length
-                  ? "Seçimi Kaldır"
-                  : "Hepsini Seç"}
+                  ? t("seller.discounts.clearSelection")
+                  : t("seller.discounts.selectAll")}
               </Button>
             )}
           </div>
           {products.length === 0 ? (
             <p className="rounded-lg bg-surface p-4 text-sm text-muted">
-              Aktif ürününüz bulunmuyor
+              {t("seller.discounts.noActiveProducts")}
             </p>
           ) : (
             <div className="max-h-48 divide-y divide-border-subtle overflow-y-auto rounded-lg border border-border">
@@ -239,7 +252,7 @@ export default function DiscountFormModal({
                     </p>
                     <p className="text-xs text-muted">
                       {getProductEffectivePrice(product).toLocaleString(
-                        "tr-TR",
+                        t("common.dateLocale"),
                       )}{" "}
                       TL
                     </p>
@@ -255,7 +268,9 @@ export default function DiscountFormModal({
           ) : (
             targetProductIds.length > 0 && (
               <p className="mt-1 text-xs text-muted">
-                {targetProductIds.length} ürün seçildi
+                {t("seller.discounts.selectedCount", {
+                  count: targetProductIds.length,
+                })}
               </p>
             )
           )}
@@ -265,33 +280,33 @@ export default function DiscountFormModal({
       <div className="grid grid-cols-1 gap-4 xs:grid-cols-2">
         <FormInput
           name="minCartValue"
-          label="Min. Sepet Tutarı (TL)"
+          label={t("seller.discounts.minCartLabel")}
           type="number"
           min="0"
           step="0.01"
-          placeholder="Örn: 100"
+          placeholder={t("seller.discounts.minCartPlaceholder")}
         />
         <FormInput
           name="maxDiscountAmount"
-          label="Max. İndirim Tutarı (TL)"
+          label={t("seller.discounts.maxDiscountLabel")}
           type="number"
           min="0"
           step="0.01"
-          placeholder="Örn: 500"
+          placeholder={t("seller.discounts.maxDiscountPlaceholder")}
         />
       </div>
 
       <div className="grid grid-cols-1 gap-4 xs:grid-cols-2">
         <FormInput
           name="usageLimitTotal"
-          label="Toplam Kullanım Limiti"
+          label={t("seller.discounts.usageLimitTotalLabel")}
           type="number"
           min="1"
-          placeholder="Sınırsız"
+          placeholder={t("seller.discounts.unlimited")}
         />
         <FormInput
           name="usageLimitPerUser"
-          label="Kullanıcı Başı Limit"
+          label={t("seller.discounts.usageLimitPerUserLabel")}
           type="number"
           min="1"
           placeholder="1"
@@ -299,13 +314,22 @@ export default function DiscountFormModal({
       </div>
 
       <div className="grid grid-cols-1 gap-4 xs:grid-cols-2">
-        <FormDatePicker name="startDate" label="Başlangıç Tarihi *" />
-        <FormDatePicker name="endDate" label="Bitiş Tarihi *" />
+        <FormDatePicker
+          name="startDate"
+          label={t("seller.discounts.startDateLabel")}
+        />
+        <FormDatePicker
+          name="endDate"
+          label={t("seller.discounts.endDateLabel")}
+        />
       </div>
 
       <div className="flex items-center gap-6">
-        <FormCheckbox name="isStackable" label="Kombine edilebilir" />
-        <FormCheckbox name="isActive" label="Aktif" />
+        <FormCheckbox
+          name="isStackable"
+          label={t("seller.discounts.stackable")}
+        />
+        <FormCheckbox name="isActive" label={t("common.active")} />
       </div>
     </FormModal>
   );

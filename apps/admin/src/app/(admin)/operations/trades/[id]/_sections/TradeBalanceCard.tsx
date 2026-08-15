@@ -5,6 +5,7 @@ import { useTranslations } from "next-intl";
 import { SectionCard } from "@/components/detail/SectionCard";
 import { fmtTry } from "@/lib/format";
 import type { TradeCashPayment, TradeDetail, TradeItem } from "../types";
+import { statusConfig } from "@/lib/statusLabels";
 
 const itemsTotal = (items: TradeItem[]) =>
   items.reduce(
@@ -232,7 +233,7 @@ export function TradeBalanceCard({ trade }: { trade: TradeDetail }) {
                 <span className="text-right text-muted">
                   {initiatorCosts?.status
                     ? enumLabel(
-                        paymentStatusConfig,
+                        statusConfig(paymentStatusConfig, t),
                         initiatorCosts.status,
                         initiatorCosts.status,
                       )
@@ -242,7 +243,7 @@ export function TradeBalanceCard({ trade }: { trade: TradeDetail }) {
                 <span className="text-right text-muted">
                   {receiverCosts?.status
                     ? enumLabel(
-                        paymentStatusConfig,
+                        statusConfig(paymentStatusConfig, t),
                         receiverCosts.status,
                         receiverCosts.status,
                       )

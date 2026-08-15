@@ -2,8 +2,10 @@
 
 "use client";
 
+import { useTranslations } from "next-intl";
 import { listingsApi } from "@/lib/api";
 import { useWebList } from "@/hooks/useWebResource";
+import type { Translate } from "@/types/i18n";
 
 interface FilterOption {
   id: string;
@@ -23,11 +25,23 @@ interface FiltersData {
 }
 
 const FALLBACK_SCALES = ["1:18", "1:24", "1:43", "1:64", "1:87"];
-const FALLBACK_MATERIALS: MaterialOption[] = [
-  { slug: "diecast", label: "Diecast (Metal)" },
-  { slug: "resin", label: "Resin (Reçine)" },
-  { slug: "composite", label: "Composite (Kompozit)" },
-  { slug: "plastic", label: "Plastic (Plastik)" },
+const FALLBACK_MATERIALS = (t: Translate): MaterialOption[] => [
+  {
+    slug: "diecast",
+    label: t("page.collections.usecollectionfilters.diecastMetal"),
+  },
+  {
+    slug: "resin",
+    label: t("page.collections.usecollectionfilters.resinRecine"),
+  },
+  {
+    slug: "composite",
+    label: t("page.collections.usecollectionfilters.compositeKompozit"),
+  },
+  {
+    slug: "plastic",
+    label: t("page.collections.usecollectionfilters.plasticPlastik"),
+  },
 ];
 
 const RESOURCE = "collection-item-filters";
@@ -38,6 +52,7 @@ const RESOURCE = "collection-item-filters";
  * defaults when the request fails or a facet is empty.
  */
 export function useCollectionFilters(enabled: boolean) {
+  const t = useTranslations();
   const query = useWebList<Partial<FiltersData>>({
     resource: RESOURCE,
     fetcher: async () => {
@@ -53,6 +68,6 @@ export function useCollectionFilters(enabled: boolean) {
     scales: data?.scales?.length ? data.scales : FALLBACK_SCALES,
     brands: data?.brands ?? [],
     manufacturers: data?.manufacturers ?? [],
-    materials: data?.materials?.length ? data.materials : FALLBACK_MATERIALS,
+    materials: data?.materials?.length ? data.materials : FALLBACK_MATERIALS(t),
   };
 }

@@ -9,18 +9,7 @@ import { orderStatusConfig } from "@tarodan/ui";
 import { ordersApi } from "@/lib/api";
 import type { GuestOrderDetail } from "../_lib/types";
 import type { TrackOrderValues } from "../_lib/schema";
-
-const orderStatusEnLabels: Record<string, string> = {
-  pending_payment: "Awaiting Payment",
-  paid: "Paid",
-  preparing: "Preparing",
-  shipped: "Shipped",
-  delivered: "Delivered",
-  completed: "Completed",
-  cancelled: "Cancelled",
-  refund_requested: "Refund Requested",
-  refunded: "Refunded",
-};
+import { statusLabel } from "@/lib/statusLabels";
 
 /**
  * Guest order-tracking data logic — the `trackGuest` lookup (via `useMutation`),
@@ -83,10 +72,11 @@ export function useTrackOrder(locale: string) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams, autoFetched]);
 
+  // Etiket TEK kaynaktan gelir: paylaşılan harita anahtarı taşır, metni katalog
+  // verir. Eskiden burada elle yazılmış bir İngilizce harita vardı ve yeni bir
+  // sipariş durumu eklendiğinde sessizce Türkçe kalıyordu.
   const getOrderStatusLabel = (s: string) =>
-    locale === "en"
-      ? orderStatusEnLabels[s] || s
-      : orderStatusConfig[s]?.label || s;
+    statusLabel(orderStatusConfig, s, t, s);
 
   return {
     order: track.data ?? null,

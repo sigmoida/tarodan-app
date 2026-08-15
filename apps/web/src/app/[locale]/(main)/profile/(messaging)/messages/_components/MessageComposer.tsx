@@ -80,7 +80,7 @@ export default function MessageComposer({
           icon={
             <ExclamationTriangleIcon className="h-5 w-5 text-warning-600" />
           }
-          title="Uyarı"
+          title={t("page.messages.messagecomposer.uyari")}
           className="mb-3"
         >
           {contentWarning}
@@ -132,7 +132,10 @@ export default function MessageComposer({
           value={newMessage}
           onChange={(e) => onMessageChange(e.target.value)}
           onKeyDown={(e) => {
-            if (e.key === "Enter" && !e.shiftKey) {
+            if (
+              e.key === t("page.messages.messagecomposer.enter") &&
+              !e.shiftKey
+            ) {
               e.preventDefault();
               onSend();
             }

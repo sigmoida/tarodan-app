@@ -2,6 +2,7 @@
 
 import SectionCard from "@/components/ui/SectionCard";
 import { formatTL } from "@/lib/format";
+import { useTranslations } from "next-intl";
 import {
   ACTIVITY_CONFIG,
   FALLBACK_ACTIVITY,
@@ -14,11 +15,12 @@ export default function RecentActivityCard({
 }: {
   activity: Activity[];
 }) {
+  const t = useTranslations();
   return (
     <SectionCard title="Son Aktiviteler">
       <div className="max-h-[300px] space-y-3 overflow-y-auto">
         {activity.map((item, index) => {
-          const cfg = ACTIVITY_CONFIG[item.type] ?? FALLBACK_ACTIVITY;
+          const cfg = ACTIVITY_CONFIG(t)[item.type] ?? FALLBACK_ACTIVITY;
           const Icon = cfg.icon;
           return (
             <div
@@ -43,7 +45,7 @@ export default function RecentActivityCard({
                   <p className="text-xs text-muted">{item.userDisplayName}</p>
                 )}
                 <p className="mt-0.5 text-xs text-subtle">
-                  {formatTimeAgo(item.timestamp)}
+                  {formatTimeAgo(item.timestamp, t)}
                 </p>
               </div>
             </div>

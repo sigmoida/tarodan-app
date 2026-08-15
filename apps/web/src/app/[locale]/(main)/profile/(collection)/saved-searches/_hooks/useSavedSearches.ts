@@ -7,12 +7,14 @@ import { useRouter } from "@/i18n/navigation";
 import toast from "react-hot-toast";
 import { useConfirm } from "@/components/ConfirmProvider";
 import { STORAGE_KEY, type SavedSearch } from "../_lib/types";
+import { useTranslations } from "next-intl";
 
 /**
  * localStorage-backed saved searches: load on mount, delete (with confirm),
  * toggle notifications, and run a saved search by building the listings URL.
  */
 export function useSavedSearches(enabled: boolean) {
+  const t = useTranslations();
   const router = useRouter();
   const confirm = useConfirm();
   const [savedSearches, setSavedSearches] = useState<SavedSearch[]>([]);
@@ -25,7 +27,10 @@ export function useSavedSearches(enabled: boolean) {
       if (stored) setSavedSearches(JSON.parse(stored));
     } catch (error) {
       if (process.env.NODE_ENV === "development")
-        console.error("Failed to load saved searches:", error);
+        console.error(
+          t("profile.savedSearches.failedToLoadSavedSearches"),
+          error,
+        );
     } finally {
       setIsLoading(false);
     }
@@ -39,15 +44,17 @@ export function useSavedSearches(enabled: boolean) {
   const remove = async (id: string) => {
     if (
       !(await confirm({
-        title: "Aramayı sil",
-        description: "Bu aramayı silmek istediğinizden emin misiniz?",
+        title: t("profile.savedSearches.aramayiSil"),
+        description: t(
+          "profile.savedSearches.buAramayiSilmekIstediginizdenEminMisiniz",
+        ),
         confirmLabel: "Sil",
         destructive: true,
       }))
     )
       return;
     persist(savedSearches.filter((s) => s.id !== id));
-    toast.success("Arama silindi");
+    toast.success(t("profile.savedSearches.aramaSilindi"));
   };
 
   const toggleNotify = (id: string) => {
@@ -57,7 +64,9 @@ export function useSavedSearches(enabled: boolean) {
     persist(updated);
     const search = updated.find((s) => s.id === id);
     toast.success(
-      search?.notifyEnabled ? "Bildirimler açıldı" : "Bildirimler kapatıldı",
+      search?.notifyEnabled
+        ? t("profile.savedSearches.bildirimlerAcildi")
+        : t("profile.savedSearches.bildirimlerKapatildi"),
     );
   };
 

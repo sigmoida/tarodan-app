@@ -4,6 +4,7 @@
 
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useTranslations } from "next-intl";
 import api from "@/lib/api";
 import type { TwoFactorStatus, SetupResponse } from "../_lib/types";
 
@@ -11,12 +12,13 @@ const STATUS_KEY = ["2fa-status"];
 
 /**
  * Two-factor (TOTP) status query + the enable / verify / disable / regenerate
- * mutations. Each mutation clears the shared error banner on start, writes the
- * exact Turkish fallback on failure, and invalidates the status query so the
+ * mutations. Each mutation clears the shared error banner on start, falls back
+ * to the catalog message on failure, and invalidates the status query so the
  * enabled/disabled state refreshes. Setup + backup-code UI flow state lives here
  * too, keeping the page and sections thin.
  */
 export function use2FA() {
+  const t = useTranslations();
   const queryClient = useQueryClient();
   const [error, setError] = useState("");
   const [setupData, setSetupData] = useState<SetupResponse | null>(null);
@@ -38,7 +40,9 @@ export function use2FA() {
     onMutate: () => setError(""),
     onSuccess: (data) => setSetupData(data),
     onError: (e: any) =>
-      setError(e?.response?.data?.message || "2FA kurulumu başlatılamadı"),
+      setError(
+        e?.response?.data?.message || t("profile.twoFactor.setupFailed"),
+      ),
   });
 
   const verify = useMutation({
@@ -52,7 +56,9 @@ export function use2FA() {
       invalidateStatus();
     },
     onError: (e: any) =>
-      setError(e?.response?.data?.message || "Doğrulama başarısız"),
+      setError(
+        e?.response?.data?.message || t("profile.twoFactor.verifyFailed"),
+      ),
   });
 
   const disable = useMutation({
@@ -61,7 +67,9 @@ export function use2FA() {
     onMutate: () => setError(""),
     onSuccess: () => invalidateStatus(),
     onError: (e: any) =>
-      setError(e?.response?.data?.message || "2FA devre dışı bırakılamadı"),
+      setError(
+        e?.response?.data?.message || t("profile.twoFactor.disableFailed"),
+      ),
   });
 
   const regenerateBackupCodes = useMutation({
@@ -74,7 +82,9 @@ export function use2FA() {
       invalidateStatus();
     },
     onError: (e: any) =>
-      setError(e?.response?.data?.message || "Yedek kodlar oluşturulamadı"),
+      setError(
+        e?.response?.data?.message || t("profile.twoFactor.regenerateFailed"),
+      ),
   });
 
   const cancelSetup = () => setSetupData(null);

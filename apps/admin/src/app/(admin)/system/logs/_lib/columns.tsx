@@ -19,11 +19,12 @@ import {
   formatDate,
 } from "./types";
 import type { useTranslations } from "next-intl";
+import { statusConfig } from "@/lib/statusLabels";
 
 type T = ReturnType<typeof useTranslations<never>>;
 
-const severityPill = (s: string) => (
-  <Badge status={s} config={severityConfig} />
+const severityPill = (s: string, t: T) => (
+  <Badge status={s} config={statusConfig(severityConfig, t)} />
 );
 
 type Toggle = {
@@ -53,7 +54,7 @@ export function buildErrorColumns(toggle: Toggle, t: T) {
     expandCol<ErrorLog>(toggle, t),
     col.custom<ErrorLog>(
       t("admin.system.logs.level"),
-      (r) => severityPill(r.severity),
+      (r) => severityPill(r.severity, t),
       {
         minWidth: 90,
         sortKey: "severity",
@@ -116,7 +117,7 @@ export function buildSecurityColumns(
     ),
     col.custom<SecurityLog>(
       t("admin.system.logs.level"),
-      (r) => severityPill(r.severity),
+      (r) => severityPill(r.severity, t),
       {
         minWidth: 90,
         sortKey: "severity",

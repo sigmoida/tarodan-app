@@ -21,6 +21,7 @@ import { RefundReasonSection } from "./_sections/RefundReasonSection";
 import { ReturnShippingSection } from "./_sections/ReturnShippingSection";
 import { RefundHistorySection } from "./_sections/RefundHistorySection";
 import { RefundTechnicalDetails } from "./_sections/RefundTechnicalDetails";
+import { statusConfig } from "@/lib/statusLabels";
 
 export default function RefundRequestDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -90,7 +91,10 @@ export default function RefundRequestDetailPage() {
         })
       }
       badge={(rr) => (
-        <StatusBadge status={rr.status} config={refundRequestStatusConfig} />
+        <StatusBadge
+          status={rr.status}
+          config={statusConfig(refundRequestStatusConfig, t)}
+        />
       )}
     >
       {(rr) => {

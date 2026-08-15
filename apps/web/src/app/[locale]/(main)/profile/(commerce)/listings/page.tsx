@@ -31,8 +31,10 @@ import { useCommissionPreviews } from "../_hooks/useCommissionPreviews";
 import { FILTER_TABS } from "./_lib/status";
 import type { Listing } from "./_lib/types";
 import ListingCard from "./_components/ListingCard";
+import { useTranslations } from "next-intl";
 
 export default function ProfileListingsPage() {
+  const t = useTranslations();
   const confirm = useConfirm();
   const searchParams = useSearchParams();
   const { ready } = useRequireAuth();
@@ -61,9 +63,11 @@ export default function ProfileListingsPage() {
 
   const handleDelete = async (id: string) => {
     const ok = await confirm({
-      title: "İlanı sil",
-      description: "Bu ilanı silmek istediğinize emin misiniz?",
-      confirmLabel: "Sil",
+      title: t("profile.listingsPage.ilaniSil"),
+      description: t(
+        "profile.listingsPage.buIlaniSilmekIstediginizeEminMisiniz",
+      ),
+      confirmLabel: t("page.listings.page.sil"),
       destructive: true,
     });
     if (ok) deleteMutation.mutate(id);
@@ -80,19 +84,21 @@ export default function ProfileListingsPage() {
   return (
     <PageShell className="pb-16">
       <PageHeader
-        title="İlanlarım"
-        description="Tüm ilanlarını tek yerden yönet, düzenle ve performanslarını takip et."
+        title={t("profile.listingsPage.ilanlarim")}
+        description={t(
+          "profile.listingsPage.tumIlanlariniTekYerdenYonetDuzenle",
+        )}
         actions={
           <ButtonLink href="/listings/new" className="gap-2">
             <PlusIcon className="h-5 w-5" />
-            Yeni İlan
+            {t("product.newListing")}
           </ButtonLink>
         }
       />
 
       <Tabs value={activeFilter} onValueChange={setActiveFilter}>
         <TabsList className="w-full">
-          {FILTER_TABS.map((tab) => (
+          {FILTER_TABS(t).map((tab) => (
             <TabsTrigger key={tab.value} value={tab.value} className="gap-1.5">
               {tab.label}
               {tab.value === "pending" && pendingCount > 0 && (
@@ -114,9 +120,13 @@ export default function ProfileListingsPage() {
         <Alert
           variant="warning"
           icon={<ClockIcon className="h-5 w-5 text-warning-600" />}
-          title={`${pendingCount} ilanınız onay bekliyor`}
+          title={t("profile.listingsPage.pendingcountIlaninizOnayBekliyor", {
+            pendingCount,
+          })}
         >
-          İlanlar admin tarafından onaylandıktan sonra yayına alınacaktır.
+          {t(
+            "profile.listingsPage.ilanlarAdminTarafindanOnaylandiktanSonraYayina",
+          )}
         </Alert>
       )}
 
@@ -137,13 +147,15 @@ export default function ProfileListingsPage() {
         <EmptyStateCard
           title={
             activeFilter !== "all"
-              ? "Bu filtreye uygun ilan yok"
-              : "Henüz ilanınız yok"
+              ? t("profile.listingsPage.buFiltreyeUygunIlanYok")
+              : t("profile.listingsPage.henuzIlaninizYok")
           }
-          description="Koleksiyonunuzdaki ürünleri satışa çıkarın"
+          description={t(
+            "profile.listingsPage.koleksiyonunuzdakiUrunleriSatisaCikarin",
+          )}
           action={
             <ButtonLink href="/listings/new">
-              İlk İlanınızı Oluşturun
+              {t("profile.listingsPage.ilkIlaniniziOlusturun")}
             </ButtonLink>
           }
         />

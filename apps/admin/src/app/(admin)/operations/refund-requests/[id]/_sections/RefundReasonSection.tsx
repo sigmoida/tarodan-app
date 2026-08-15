@@ -11,6 +11,7 @@ import { SectionCard } from "@/components/detail/SectionCard";
 import type { RefundRequestDetail } from "../types";
 import { fmtTry } from "../_lib/format";
 import { Field } from "../_components/Field";
+import { statusConfig } from "@/lib/statusLabels";
 
 export function RefundReasonSection({ rr }: { rr: RefundRequestDetail }) {
   const t = useTranslations();
@@ -58,10 +59,16 @@ export function RefundReasonSection({ rr }: { rr: RefundRequestDetail }) {
 
       <div className="grid grid-cols-1 gap-x-6 gap-y-3 text-sm md:grid-cols-2">
         <Field label={t("admin.operations.refundRequests.refundReason")}>
-          <StatusBadge status={rr.reason} config={refundReasonConfig} />
+          <StatusBadge
+            status={rr.reason}
+            config={statusConfig(refundReasonConfig, t)}
+          />
         </Field>
         <Field label={t("admin.operations.refundRequests.orderStatus")}>
-          <StatusBadge status={rr.order.status} config={orderStatusConfig} />
+          <StatusBadge
+            status={rr.order.status}
+            config={statusConfig(orderStatusConfig, t)}
+          />
         </Field>
         <Field label={t("admin.operations.refundRequests.orderAmount")}>
           {fmtTry(rr.order.totalAmount)}

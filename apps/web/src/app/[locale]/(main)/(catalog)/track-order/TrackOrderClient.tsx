@@ -21,6 +21,7 @@ import GuestCancelModal from "./_components/GuestCancelModal";
 // İptal önkoşulu üye ekranıyla TEK kaynaktan: statü + devir tanımı
 // (hareket eden kargo durumu VEYA shippedAt mührü) — kopya liste yok.
 import { isOrderCancellable } from "../../profile/(commerce)/orders/_lib/types";
+import { statusConfig } from "@/lib/statusLabels";
 
 /** Etiket + değer satırı — kargo ve adres bloklarında tekrar eden desen. */
 function Row({
@@ -72,7 +73,9 @@ export default function TrackOrderClient() {
   const statusLabel = order ? getOrderStatusLabel(order.status) : null;
   const shipAddr = order?.shippingAddress as Record<string, string> | undefined;
   const looking =
-    loading && searchParams.get("orderNumber") && searchParams.get("email");
+    loading &&
+    searchParams.get(t("page.trackOrder.trackorderclient.ordernumber")) &&
+    searchParams.get("email");
 
   return (
     <PageShell className="pb-8">
@@ -101,13 +104,17 @@ export default function TrackOrderClient() {
                 <FormInput
                   name="orderNumber"
                   label={`${t("order.orderNumber")} *`}
-                  placeholder="örn. ORD-K7X9M2QF3N"
+                  placeholder={t(
+                    "page.trackOrder.trackorderclient.ornORDK7X9M2QF3N",
+                  )}
                 />
                 <FormInput
                   name="email"
                   type="email"
                   label={`${t("auth.emailAddress")} *`}
-                  placeholder="siparişte kullandığınız e-posta"
+                  placeholder={t(
+                    "page.trackOrder.trackorderclient.siparisteKullandiginizEPosta",
+                  )}
                 />
                 {error && <p className="text-sm text-danger-600">{error}</p>}
                 <Button
@@ -178,7 +185,7 @@ export default function TrackOrderClient() {
               </div>
               <StatusBadge
                 status={order.status}
-                config={orderStatusConfig}
+                config={statusConfig(orderStatusConfig, t)}
                 label={statusLabel!}
               />
             </div>
@@ -271,7 +278,7 @@ export default function TrackOrderClient() {
                     <div className="space-y-1.5">
                       <Row label={t("order.carrier")}>
                         {order.shipment.provider === "surat"
-                          ? "Sürat Kargo"
+                          ? t("page.trackOrder.trackorderclient.suratKargo")
                           : order.shipment.provider}
                       </Row>
                       <Row label={t("order.trackingNumber")}>

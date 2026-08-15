@@ -9,12 +9,18 @@ import SecuritySection from "./_sections/SecuritySection";
 import NotificationsSection from "./_sections/NotificationsSection";
 import DangerZoneSection from "./_sections/DangerZoneSection";
 import LanguagePreferenceSection from "./_sections/LanguagePreferenceSection";
+import { getTranslations } from "next-intl/server";
 
-export const metadata: Metadata = {
-  title: "Profilim | Tarodan",
-  description: "Hesabınızı, ilanlarınızı, üyeliğinizi ve ayarlarınızı yönetin.",
-  robots: { index: false, follow: false },
-};
+export async function generateMetadata(): Promise<Metadata> {
+  const t = await getTranslations();
+  return {
+    title: t("page.profile.page.profilimTarodan"),
+    description: t(
+      "page.profile.page.hesabiniziIlanlariniziUyeliginiziVeAyarlariniziYonetin",
+    ),
+    robots: { index: false, follow: false },
+  };
+}
 
 /**
  * Profile dashboard — a thin Server Component shell. Each section below is an

@@ -4,6 +4,7 @@ import type { Metadata } from "next";
 import { DocPage } from "@/components/layout/DocPage";
 import SectionCard from "@/components/ui/SectionCard";
 import { localizedCanonical } from "@/lib/seo";
+import { getTranslations } from "next-intl/server";
 
 export async function generateMetadata({
   params,
@@ -11,53 +12,55 @@ export async function generateMetadata({
   params: Promise<{ locale: string }>;
 }): Promise<Metadata> {
   const { locale } = await params;
+  const t = await getTranslations({ locale });
   return {
-    title: "Koleksiyoner Rehberi · Tarodan",
-    description:
-      "Koleksiyonunuzu Tarodan'da sergileme, paylaşma, takas etme ve satma rehberi.",
+    title: t("information.collectorsGuide.koleksiyonerRehberiTarodan"),
+    description: t(
+      "information.collectorsGuide.koleksiyonunuzuTarodanDaSergilemePaylasmaTakas",
+    ),
     alternates: localizedCanonical(locale, "/collectors-guide"),
   };
 }
 
-export default function CollectorsGuidePage() {
+export default async function CollectorsGuidePage() {
+  const t = await getTranslations();
   return (
     <DocPage
-      title="Koleksiyoner Rehberi"
-      description="Koleksiyonunu dünyaya aç, diğer koleksiyonerlerle paylaş ve yeni hikâyelere dönüştür."
+      title={t("information.collectorsGuide.koleksiyonerRehberi")}
+      description={t(
+        "information.collectorsGuide.koleksiyonunuDunyayaAcDigerKoleksiyonerlerlePaylas",
+      )}
     >
-      <SectionCard title="Koleksiyonum">
+      <SectionCard title={t("information.collectorsGuide.koleksiyonum")}>
         <div className="space-y-4 text-sm leading-relaxed text-body">
           <p className="text-base font-semibold text-heading">
-            Koleksiyonunu Dünyaya Aç.
+            {t("information.collectorsGuide.koleksiyonunuDunyayaAc")}
+          </p>
+          <p>{t("information.collectorsGuide.herModelinBirHikYesiHer")}</p>
+          <p>
+            {t(
+              "information.collectorsGuide.koleksiyonumSanaKendiDijitalVitrininiOlusturma",
+            )}
           </p>
           <p>
-            Her modelin bir hikâyesi, her koleksiyonun bir tutkusu vardır.
-            Yıllar içinde özenle bir araya getirdiğin parçalar artık sadece
-            raflarında değil, Türkiye&apos;nin en büyük diecast koleksiyoner
-            topluluğunda da yerini alsın.
+            {t(
+              "information.collectorsGuide.birParcaniSadeceSergilemekIsteyebilirsinYa",
+            )}
           </p>
           <p>
-            Koleksiyonum, sana kendi dijital vitrinini oluşturma imkânı sunar.
-            Modellerini profesyonel görsellerle sergileyebilir, koleksiyonunun
-            değerini diğer koleksiyonerlerle paylaşabilir ve profilini benzersiz
-            bir koleksiyon galerisine dönüştürebilirsin.
+            {t(
+              "information.collectorsGuide.koleksiyonunuKategorilereAyirEnDegerliParcalarini",
+            )}
           </p>
           <p>
-            Bir parçanı sadece sergilemek isteyebilirsin. Ya da doğru
-            koleksiyonerle buluşarak takas yapmak veya satışa sunmak
-            isteyebilirsin. Karar tamamen senin.
-          </p>
-          <p>
-            Koleksiyonunu kategorilere ayır, en değerli parçalarını öne çıkar,
-            diğer koleksiyonerlere ilham ver ve koleksiyonculuk tutkunu binlerce
-            kişiyle paylaş.
-          </p>
-          <p>
-            Tarodan&apos;da koleksiyonlar sadece sergilenmez; keşfedilir,
-            konuşulur, takas edilir ve yeni hikâyelere dönüşür.
+            {t(
+              "information.collectorsGuide.tarodanAposDaKoleksiyonlarSadeceSergilenmez",
+            )}
           </p>
           <p className="font-semibold text-heading">
-            Sergile. Paylaş. Takas Et. Sat. Koleksiyonunu Büyüt.
+            {t(
+              "information.collectorsGuide.sergilePaylasTakasEtSatKoleksiyonunu",
+            )}
           </p>
         </div>
       </SectionCard>

@@ -9,17 +9,22 @@ import {
   fetchManufacturerProductsServer,
 } from "../_lib/data";
 import ManufacturerDetailClient from "./ManufacturerDetailClient";
+import { getTranslations } from "next-intl/server";
 
 type Props = { params: Promise<{ slug: string }> };
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
+  const t = await getTranslations();
   const { slug } = await params;
   const brand = await fetchManufacturerBySlugServer(slug);
-  if (!brand?.name) return { title: "Üretici Bulunamadı | Tarodan" };
+  if (!brand?.name)
+    return { title: t("page.manufacturers.page.ureticiBulunamadiTarodan") };
 
   const description =
     brand.description?.slice(0, 160) ||
-    `${brand.name} diecast modelleri ve ilanları Tarodan'da.`;
+    t("page.manufacturers.page.nameDiecastModelleriVeIlanlariTarodan", {
+      name: brand.name,
+    });
 
   return {
     title: `${brand.name} | Tarodan`,

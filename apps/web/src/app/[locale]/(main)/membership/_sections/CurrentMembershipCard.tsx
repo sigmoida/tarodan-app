@@ -5,10 +5,11 @@
 import { Button, Toggle } from "@tarodan/ui";
 import Notice from "../_components/Notice";
 import type { MembershipDetails } from "../_lib/types";
+import { useTranslations } from "next-intl";
 
-function fmtDate(iso?: string) {
+function fmtDate(iso: string | undefined, locale: string) {
   return iso
-    ? new Date(iso).toLocaleDateString("tr-TR", {
+    ? new Date(iso).toLocaleDateString(locale, {
         year: "numeric",
         month: "long",
         day: "numeric",
@@ -38,27 +39,34 @@ export default function CurrentMembershipCard({
   onToggleAutoRenew,
   onCancel,
 }: Props) {
+  const t = useTranslations();
   const isCancelled = membership.status === "cancelled";
 
   return (
     <div className="rounded-lg border border-border bg-surface-elevated">
       <div className="border-b border-border-subtle px-6 py-4">
-        <h2 className="font-semibold text-heading">Mevcut Üyelik Bilgileri</h2>
+        <h2 className="font-semibold text-heading">
+          {t("membership.currentCard.mevcutUyelikBilgileri")}
+        </h2>
       </div>
 
       <dl className="grid grid-cols-1 gap-4 px-6 py-5 sm:grid-cols-2">
         <div>
-          <dt className="text-sm text-muted">Üyelik Başlangıç Tarihi</dt>
+          <dt className="text-sm text-muted">
+            {t("membership.currentCard.uyelikBaslangicTarihi")}
+          </dt>
           <dd className="mt-0.5 font-medium text-heading">
-            {fmtDate(membership.currentPeriodStart)}
+            {fmtDate(membership.currentPeriodStart, t("common.dateLocale"))}
           </dd>
         </div>
         <div>
           <dt className="text-sm text-muted">
-            {isCancelled ? "Geçerlilik Bitiş Tarihi" : "Yenilenme Tarihi"}
+            {isCancelled
+              ? t("membership.currentCard.gecerlilikBitisTarihi")
+              : t("membership.currentCard.yenilenmeTarihi")}
           </dt>
           <dd className="mt-0.5 font-medium text-heading">
-            {fmtDate(membership.currentPeriodEnd)}
+            {fmtDate(membership.currentPeriodEnd, t("common.dateLocale"))}
           </dd>
         </div>
       </dl>
@@ -67,19 +75,19 @@ export default function CurrentMembershipCard({
       <div className="flex items-start justify-between gap-4 border-t border-border-subtle px-6 py-5">
         <div>
           <h3 className="text-sm font-semibold text-heading">
-            Otomatik Yenileme
+            {t("membership.currentCard.otomatikYenileme")}
           </h3>
           <p className="mt-1 text-sm text-muted">
-            Etkinleştirildiğinde üyeliğiniz dönem sonunda seçtiğiniz plana göre
-            kayıtlı kartınızdan otomatik yenilenir. Devre dışı bırakırsanız
-            ücret tahsil edilmez.
+            {t(
+              "membership.currentCard.etkinlestirildigindeUyeliginizDonemSonundaSectiginizPlana",
+            )}
           </p>
         </div>
         <Toggle
           checked={!!membership.autoRenew}
           onChange={onToggleAutoRenew}
           disabled={autoRenewSaving}
-          label="Otomatik yenileme"
+          label={t("membership.currentCard.otomatikYenileme2")}
         />
       </div>
 
@@ -87,20 +95,23 @@ export default function CurrentMembershipCard({
       <div className="border-t border-border-subtle px-6 py-5">
         {isCancelled ? (
           <Notice>
-            Üyeliğiniz iptal edildi — {fmtDate(membership.currentPeriodEnd)}{" "}
-            tarihine kadar tüm özellikleriniz aktif kalır. Sonrasında otomatik
-            olarak ücretsiz plana geçilir.
+            {t("membership.currentCard.cancelledNotice", {
+              date: fmtDate(
+                membership.currentPeriodEnd,
+                t("common.dateLocale"),
+              ),
+            })}
           </Notice>
         ) : (
           <div className="flex items-start justify-between gap-4">
             <div>
               <h3 className="text-sm font-semibold text-heading">
-                Üyeliği İptal Et
+                {t("membership.currentCard.uyeligiIptalEt")}
               </h3>
               <p className="mt-1 text-sm text-muted">
-                İptal ettiğinizde mevcut dönem sonuna kadar özelliklerinizi
-                kullanmaya devam edersiniz; sonra ücretsiz plana geçilir. Ücret
-                iadesi yapılmaz.
+                {t(
+                  "membership.currentCard.iptalEttiginizdeMevcutDonemSonunaKadar",
+                )}
               </p>
             </div>
             <Button
@@ -109,7 +120,9 @@ export default function CurrentMembershipCard({
               disabled={cancelling}
               className="flex-shrink-0"
             >
-              {cancelling ? "İptal Ediliyor..." : "Üyeliği İptal Et"}
+              {cancelling
+                ? t("membership.currentCard.iptalEdiliyor")
+                : t("membership.currentCard.uyeligiIptalEt")}
             </Button>
           </div>
         )}

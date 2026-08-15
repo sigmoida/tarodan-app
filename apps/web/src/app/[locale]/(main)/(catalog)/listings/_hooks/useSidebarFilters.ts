@@ -9,6 +9,7 @@ import { SCALE_FALLBACK } from "@/lib/constants";
 import { matchesSearch } from "@tarodan/ui";
 import type { Filters } from "../_lib/params";
 import { useListingFiltersQuery } from "./useListingFiltersQuery";
+import type { Translate } from "@/types/i18n";
 
 interface Category {
   id: string;
@@ -32,33 +33,39 @@ interface CustomAttributeGroup {
 
 const STALE = 60 * 60 * 1000;
 
-const MATERIAL_FALLBACK = [
-  { slug: "diecast", label: "Diecast (Metal)" },
-  { slug: "resin", label: "Resin (Reçine)" },
-  { slug: "composite", label: "Composite (Kompozit)" },
-  { slug: "plastic", label: "Plastic (Plastik)" },
+const MATERIAL_FALLBACK = (t: Translate) => [
+  { slug: "diecast", label: t("page.listings.usesidebarfilters.diecastMetal") },
+  { slug: "resin", label: t("page.listings.usesidebarfilters.resinRecine") },
+  {
+    slug: "composite",
+    label: t("page.listings.usesidebarfilters.compositeKompozit"),
+  },
+  {
+    slug: "plastic",
+    label: t("page.listings.usesidebarfilters.plasticPlastik"),
+  },
 ];
 
 // Üreticiler - API'den yüklenecek, bu liste sadece fallback
-const MANUFACTURERS_FALLBACK = [
-  "Hot Wheels",
-  "Matchbox",
-  "Majorette",
-  "Tomica",
-  "Bburago",
-  "Maisto",
-  "AUTOart",
-  "Minichamps",
-  "Kyosho",
-  "CMC",
-  "GT Spirit",
-  "Almost Real",
-  "Spark",
-  "Schuco",
-  "Norev",
-  "Oxford Diecast",
-  "Greenlight",
-  "ERTL",
+const MANUFACTURERS_FALLBACK = (t: Translate) => [
+  t("page.listings.usesidebarfilters.hotWheels"),
+  t("page.listings.usesidebarfilters.matchbox"),
+  t("page.listings.usesidebarfilters.majorette"),
+  t("page.listings.usesidebarfilters.tomica"),
+  t("page.listings.usesidebarfilters.bburago"),
+  t("page.listings.usesidebarfilters.maisto"),
+  t("page.listings.usesidebarfilters.autoart"),
+  t("page.listings.usesidebarfilters.minichamps"),
+  t("page.listings.usesidebarfilters.kyosho"),
+  t("page.listings.usesidebarfilters.cmc"),
+  t("page.listings.usesidebarfilters.gtSpirit"),
+  t("page.listings.usesidebarfilters.almostReal"),
+  t("page.listings.usesidebarfilters.spark"),
+  t("page.listings.usesidebarfilters.schuco"),
+  t("page.listings.usesidebarfilters.norev"),
+  t("page.listings.usesidebarfilters.oxfordDiecast"),
+  t("page.listings.usesidebarfilters.greenlight"),
+  t("page.listings.usesidebarfilters.ertl"),
 ];
 
 export const BASE_SECTIONS = [
@@ -318,13 +325,13 @@ export function useSidebarFilters({
   const useFilterFallback = filtersQuery.isError;
 
   const displayManufacturers = useManufacturerFallback
-    ? MANUFACTURERS_FALLBACK.filter((m) =>
-        matchesSearch(m, manufacturerSearch),
-      ).map((name) => ({
-        id: "",
-        name,
-        slug: name.toLowerCase().replace(/\s+/g, "-"),
-      }))
+    ? MANUFACTURERS_FALLBACK(t)
+        .filter((m) => matchesSearch(m, manufacturerSearch))
+        .map((name) => ({
+          id: "",
+          name,
+          slug: name.toLowerCase().replace(/\s+/g, "-"),
+        }))
     : manufacturerList.filter((m) => matchesSearch(m.name, manufacturerSearch));
 
   const filteredCategories = categories.filter((c) =>
@@ -334,7 +341,9 @@ export function useSidebarFilters({
   const filteredScales = scaleOptions.filter((s) =>
     matchesSearch(s, scaleSearch),
   );
-  const materialOptions = useFilterFallback ? MATERIAL_FALLBACK : materialList;
+  const materialOptions = useFilterFallback
+    ? MATERIAL_FALLBACK(t)
+    : materialList;
   const filteredMaterials = materialOptions.filter((m) =>
     matchesSearch(m.label, materialSearch),
   );

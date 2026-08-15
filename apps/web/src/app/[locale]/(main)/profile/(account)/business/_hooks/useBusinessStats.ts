@@ -5,6 +5,7 @@
 import { api } from "@/lib/api";
 import { useWebList } from "@/hooks/useWebResource";
 import type { BusinessStats } from "../_lib/types";
+import { useTranslations } from "next-intl";
 
 const RESOURCE = "business-stats";
 
@@ -15,6 +16,7 @@ const RESOURCE = "business-stats";
  * manual fetch loop.
  */
 export function useBusinessStats(enabled: boolean) {
+  const t = useTranslations();
   const query = useWebList<BusinessStats>({
     resource: RESOURCE,
     fetcher: async () => {
@@ -26,10 +28,16 @@ export function useBusinessStats(enabled: boolean) {
           throw new Error(
             err.response?.data?.message ||
               err.response?.data?.error ||
-              "Bu özellik sadece İşletme hesapları için geçerlidir.",
+              t(
+                "page.business.usebusinessstats.buOzellikSadeceIsletmeHesaplariIcin",
+              ),
           );
         }
-        throw new Error("İstatistikler yüklenirken bir hata oluştu");
+        throw new Error(
+          t(
+            "page.business.usebusinessstats.istatistiklerYuklenirkenBirHataOlustu",
+          ),
+        );
       }
     },
     enabled,

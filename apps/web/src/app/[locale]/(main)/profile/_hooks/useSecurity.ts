@@ -35,7 +35,7 @@ export function useChangePassword() {
       });
     },
     {
-      errorMessage: "Şifre değiştirilemedi",
+      errorMessage: t("page.profile.usesecurity.sifreDegistirilemedi"),
       onSuccess: () => toast.success(t("settings.passwordChanged")),
     },
   );

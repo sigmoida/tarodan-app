@@ -9,6 +9,7 @@
  * Allows users to enable/disable TOTP-based two-factor authentication.
  */
 
+import { useTranslations } from "next-intl";
 import { Alert, Spinner } from "@tarodan/ui";
 import { XCircleIcon } from "@heroicons/react/24/outline";
 import { PageShell } from "@/components/layout/PageShell";
@@ -22,6 +23,7 @@ import EnabledOptions from "./_sections/EnabledOptions";
 import WhyItMatters from "./_sections/WhyItMatters";
 
 export default function SecuritySettingsPage() {
+  const t = useTranslations();
   const {
     status,
     isLoading,
@@ -49,8 +51,8 @@ export default function SecuritySettingsPage() {
   return (
     <PageShell className="pb-16">
       <PageHeader
-        title="Güvenlik Ayarları"
-        description="İki faktörlü kimlik doğrulama (2FA)"
+        title={t("profile.twoFactor.pageTitle")}
+        description={t("profile.twoFactor.pageDescription")}
       />
 
       {error && (

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useTranslations } from "next-intl";
 import { useZodForm } from "@tarodan/ui/form";
 import { useAuthStore } from "@/stores/authStore";
 import { supportApi } from "@/lib/api";
@@ -16,11 +17,12 @@ const RESOURCE = "support-tickets";
  * A `?orderId` in the URL (order → "report issue") prefills and opens the form.
  */
 export function useSupport() {
+  const t = useTranslations();
   const { isAuthenticated, isLoading: authLoading } = useAuthStore();
   const [showForm, setShowForm] = useState(false);
   const [orderId, setOrderId] = useState<string | undefined>();
 
-  const form = useZodForm(ticketSchema, {
+  const form = useZodForm(ticketSchema(t), {
     defaultValues: { category: "", subject: "", message: "" },
   });
 
@@ -32,7 +34,7 @@ export function useSupport() {
     setShowForm(true);
     form.reset({
       category: "shipping",
-      subject: `Sipariş sorunu (#${oid.slice(0, 8)})`,
+      subject: t("support.orderIssueSubject", { ref: oid.slice(0, 8) }),
       message: "",
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -59,9 +61,8 @@ export function useSupport() {
       }),
     {
       invalidates: [RESOURCE],
-      successMessage:
-        "Destek talebiniz oluşturuldu. En kısa sürede dönüş yapacağız.",
-      errorMessage: "Talep oluşturulamadı. Lütfen tekrar deneyin.",
+      successMessage: t("support.ticketCreated"),
+      errorMessage: t("support.ticketCreateFailed"),
       onSuccess: () => {
         form.reset({ category: "", subject: "", message: "" });
         setOrderId(undefined);

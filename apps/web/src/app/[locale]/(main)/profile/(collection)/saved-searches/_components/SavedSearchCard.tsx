@@ -10,6 +10,7 @@ import {
 import { Badge, Button, IconButton } from "@tarodan/ui";
 import { formatDate } from "@/lib/format";
 import type { SavedSearch } from "../_lib/types";
+import { useTranslations } from "next-intl";
 
 export default function SavedSearchCard({
   search,
@@ -22,6 +23,7 @@ export default function SavedSearchCard({
   onDelete: (id: string) => void;
   onRun: (search: SavedSearch) => void;
 }) {
+  const t = useTranslations();
   const filters = search.filters;
   const hasFilters = filters && Object.keys(filters).length > 0;
 
@@ -30,7 +32,8 @@ export default function SavedSearchCard({
       <div className="flex items-start justify-between">
         <div className="flex-1">
           <h3 className="mb-2 text-lg font-semibold text-heading">
-            &quot;{search.query || "Tüm ilanlar"}&quot;
+            &quot;{search.query || t("profile.savedSearchCard.tumIlanlar")}
+            &quot;
           </h3>
           {hasFilters && (
             <div className="mb-3 flex flex-wrap gap-2">
@@ -46,7 +49,8 @@ export default function SavedSearchCard({
               )}
               {(filters?.minPrice || filters?.maxPrice) && (
                 <Badge variant="secondary" size="sm">
-                  Fiyat: {filters.minPrice || 0}₺ - {filters.maxPrice || "∞"}₺
+                  {t("search.priceLabel")} {filters.minPrice || 0}₺ -{" "}
+                  {filters.maxPrice || "∞"}₺
                 </Badge>
               )}
               {filters?.condition && (
@@ -65,7 +69,9 @@ export default function SavedSearchCard({
           <IconButton
             variant={search.notifyEnabled ? "primary" : "ghost"}
             aria-label={
-              search.notifyEnabled ? "Bildirimleri kapat" : "Bildirimleri aç"
+              search.notifyEnabled
+                ? t("profile.savedSearchCard.bildirimleriKapat")
+                : t("profile.savedSearchCard.bildirimleriAc")
             }
             onClick={() => onToggleNotify(search.id)}
           >
@@ -73,7 +79,7 @@ export default function SavedSearchCard({
           </IconButton>
           <IconButton
             variant="danger"
-            aria-label="Sil"
+            aria-label={t("page.savedSearches.savedsearchcard.sil")}
             onClick={() => onDelete(search.id)}
           >
             <TrashIcon className="h-5 w-5" />
@@ -88,7 +94,7 @@ export default function SavedSearchCard({
           onClick={() => onRun(search)}
         >
           <MagnifyingGlassIcon className="h-5 w-5" />
-          Bu Aramayı Çalıştır
+          {t("search.runThisSearch")}
         </Button>
       </div>
     </div>

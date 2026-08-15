@@ -16,6 +16,7 @@ import {
 } from "@/lib/product-price";
 import { fmtTry } from "@/lib/format";
 import { aiCheckConfig, aiCheckKey, type Product } from "./types";
+import { statusConfig } from "@/lib/statusLabels";
 
 // eslint-disable-next-line @tarodan/no-hardcoded-turkish -- URL query payload, not display copy
 const PLACEHOLDER = "https://placehold.co/100x100/f3f4f6/666?text=Ürün";
@@ -95,7 +96,12 @@ export function productColumns(t: T) {
     ),
     col.badge<Product>(
       t("common.status"),
-      (p) => <Badge status={p.status} config={productStatusConfig} />,
+      (p) => (
+        <Badge
+          status={p.status}
+          config={statusConfig(productStatusConfig, t)}
+        />
+      ),
       { sortKey: "status", sortType: "text" },
     ),
     col.badge<Product>(
@@ -113,7 +119,7 @@ export function productColumns(t: T) {
     ),
     col.muted<Product>(
       t("admin.catalog.products.condition"),
-      (p) => enumLabel(productConditionConfig, p.condition),
+      (p) => enumLabel(statusConfig(productConditionConfig, t), p.condition),
       { sortKey: "condition", sortType: "text" },
     ),
     col.text<Product>(t("common.category"), (p) => p.category.name, {

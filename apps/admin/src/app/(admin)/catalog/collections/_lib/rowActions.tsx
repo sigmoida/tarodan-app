@@ -26,6 +26,6 @@ export function collectionRowMenu(
       onClick: () => onToggleVisibility(c),
       isLoading: busyId === c.id,
     },
-    ...editDeleteActions(c, { onEdit, onDelete }),
+    ...editDeleteActions(c, { onEdit, onDelete }, t),
   ];
 }

@@ -10,6 +10,7 @@ import { printOrderInvoice } from "../_lib/printInvoice";
 import { fmtTry } from "@/lib/format";
 import type { OrderFilePackage } from "../_lib/fileTypes";
 import { OrderFileBlock } from "./OrderFileBlock";
+import { statusConfig } from "@/lib/statusLabels";
 
 /**
  * Satıcı paketi TEK karttır: paket çatısı (satıcı, kargo kırılımı, gönderi) ve
@@ -88,7 +89,7 @@ export function PackageFileSection({
               <Stat label={t("admin.operations.orders.cargoStatus")}>
                 <Badge
                   status={pkg.shipment.status}
-                  config={shipmentStatusConfig}
+                  config={statusConfig(shipmentStatusConfig, t)}
                 />
               </Stat>
               <Stat label={t("admin.operations.common.trackingNumber")}>

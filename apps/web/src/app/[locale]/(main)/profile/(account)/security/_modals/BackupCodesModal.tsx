@@ -22,29 +22,29 @@ export default function BackupCodesModal({
     <Modal
       isOpen={isOpen && codes.length > 0}
       onClose={onClose}
-      title="2FA Etkinleştirildi!"
+      title={t("profile.twoFactor.enabledTitle")}
       size="md"
       closeLabel={t("common.close")}
-      footer={<Button onClick={onClose}>Tamam, Kaydettim</Button>}
+      footer={
+        <Button onClick={onClose}>{t("profile.twoFactor.savedAck")}</Button>
+      }
     >
       <div className="mb-4 text-center">
         <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-surface-alt">
           <CheckCircleIcon className="h-6 w-6 text-success-600" />
         </div>
         <p className="mt-1 text-sm text-muted">
-          Aşağıdaki yedek kodları güvenli bir yere kaydedin.
+          {t("profile.twoFactor.saveCodesHint")}
         </p>
       </div>
 
       <Alert
         variant="warning"
-        title="Önemli"
+        title={t("legal.important")}
         icon={<ExclamationTriangleIcon className="h-5 w-5 text-warning-600" />}
         className="mb-4"
       >
-        Bu kodlar sadece bir kez gösterilecek. Telefonunuza erişiminizi
-        kaybederseniz hesabınıza giriş yapmak için bu kodlara ihtiyacınız
-        olacak.
+        {t("profile.twoFactor.oneTimeWarning")}
       </Alert>
 
       <div className="mb-4 grid grid-cols-2 gap-2">
@@ -64,7 +64,7 @@ export default function BackupCodesModal({
         className="w-full"
         onClick={() => navigator.clipboard.writeText(codes.join("\n"))}
       >
-        Tüm Kodları Kopyala
+        {t("profile.twoFactor.copyAllCodes")}
       </Button>
     </Modal>
   );

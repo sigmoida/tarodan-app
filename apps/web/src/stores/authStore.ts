@@ -281,6 +281,17 @@ function getInitialAuthFromStorage(): Pick<
   };
 }
 
+/**
+ * 2FA akış işareti — MESAJI ekrana basılmaz, çağıran `error.code`'a bakar
+ * (bkz. useLogin). Store global bir zustand deposudur, React bağlamı yoktur;
+ * bu yüzden burada çeviri yapılmaz, gösterilecek metni arayüz katalogdan seçer.
+ */
+const twoFactorRequired = () => {
+  const error = new Error("TWO_FACTOR_REQUIRED") as Error & { code: string };
+  error.code = "2fa";
+  return error;
+};
+
 export const useAuthStore = create<AuthState>()(
   persist(
     (set, get) => {
@@ -313,13 +324,7 @@ export const useAuthStore = create<AuthState>()(
             error.code = result.reason;
             throw error;
           }
-          if (result.status === "2fa") {
-            const error = new Error("İki adımlı doğrulama gerekli") as Error & {
-              code: string;
-            };
-            error.code = "2fa";
-            throw error;
-          }
+          if (result.status === "2fa") throw twoFactorRequired();
           // loginAction (server) yazdı: web_at/web_rt + tarodan_authed. Client yazmaz.
           await get().checkAuth();
         },
@@ -333,8 +338,7 @@ export const useAuthStore = create<AuthState>()(
             error.code = result.reason;
             throw error;
           }
-          if (result.status === "2fa")
-            throw new Error("İki adımlı doğrulama gerekli");
+          if (result.status === "2fa") throw twoFactorRequired();
           await get().checkAuth();
         },
 
@@ -347,8 +351,7 @@ export const useAuthStore = create<AuthState>()(
             error.code = result.reason;
             throw error;
           }
-          if (result.status === "2fa")
-            throw new Error("İki adımlı doğrulama gerekli");
+          if (result.status === "2fa") throw twoFactorRequired();
           await get().checkAuth();
         },
 

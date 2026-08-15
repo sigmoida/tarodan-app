@@ -12,6 +12,7 @@ import { formatCondition } from "@/lib/format";
 import ProductLayoutSelector from "./ProductLayoutSelector";
 import { useListings } from "../_context/ListingsContext";
 import { useListingFiltersQuery } from "../_hooks/useListingFiltersQuery";
+import type { Translate } from "@/types/i18n";
 
 /**
  * The page-header controls (rendered in the shared `PageHeader`'s actions slot):
@@ -63,19 +64,23 @@ export default function ListingsControls() {
         <option value="price_asc">{t("product.sortPriceLow")}</option>
         <option value="price_desc">{t("product.sortPriceHigh")}</option>
         <option value="rating_desc">{t("product.sortHighestRating")}</option>
-        <option value="title_asc">A-Z</option>
-        <option value="title_desc">Z-A</option>
+        <option value="title_asc">
+          {t("page.listings.listingstoolbar.aZ")}
+        </option>
+        <option value="title_desc">
+          {t("page.listings.listingstoolbar.zA")}
+        </option>
       </Select>
     </div>
   );
 }
 
-const MATERIAL_LABELS: Record<string, string> = {
-  diecast: "Diecast (Metal)",
-  resin: "Resin (Reçine)",
-  composite: "Composite",
-  plastic: "Plastic",
-};
+const MATERIAL_LABELS = (t: Translate): Record<string, string> => ({
+  diecast: t("page.listings.listingstoolbar.diecastMetal"),
+  resin: t("page.listings.listingstoolbar.resinRecine"),
+  composite: t("page.listings.listingstoolbar.composite"),
+  plastic: t("page.listings.listingstoolbar.plastic"),
+});
 
 // Per-filter active tint for the removable Chip.
 const CHIP_TINT = {
@@ -141,7 +146,7 @@ export function ActiveFilterChips() {
   const valueFilters: Array<{ k: string; v?: string }> = [
     { k: "category", v: filtersForSidebar.category },
     { k: "brand", v: filters.brand },
-    { k: "carModel", v: filters.carModel },
+    { k: t("page.listings.listingstoolbar.carmodel"), v: filters.carModel },
     { k: "scale", v: filters.scale },
     { k: "material", v: filters.material },
     { k: "condition", v: filters.condition },
@@ -153,7 +158,7 @@ export function ActiveFilterChips() {
       k === "condition"
         ? formatCondition(v, locale)
         : k === "material"
-          ? MATERIAL_LABELS[v] || v
+          ? MATERIAL_LABELS(t)[v] || v
           : v;
     chips.push({
       key: k,
@@ -167,7 +172,8 @@ export function ActiveFilterChips() {
           updates.carModel = "";
         }
         if (k === "category") updates.categoryId = "";
-        if (k === "carModel") updates.carModelId = "";
+        if (k === t("page.listings.listingstoolbar.carmodel"))
+          updates.carModelId = "";
         handleFiltersChange(updates);
       },
     });

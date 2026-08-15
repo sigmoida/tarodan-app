@@ -1,6 +1,7 @@
 import type { WebUser } from "@/lib/auth.config";
 import { getTierDefault } from "./tiers";
 import type { PendingCounts, UserProfile } from "./types";
+import type { Translate } from "@/types/i18n";
 
 export interface ProfileOverviewSeed {
   profile: UserProfile;
@@ -14,7 +15,10 @@ export interface ProfileOverviewSeed {
  * aggregate's job; the layout marks this seed stale so the client refetches the
  * full 8-call aggregate once on mount to fill them.
  */
-export function buildOverviewSeed(user: WebUser): ProfileOverviewSeed {
+export function buildOverviewSeed(
+  user: WebUser,
+  t: Translate,
+): ProfileOverviewSeed {
   const tierType = user.membershipTier || "free";
   return {
     profile: {
@@ -30,7 +34,7 @@ export function buildOverviewSeed(user: WebUser): ProfileOverviewSeed {
       createdAt: new Date().toISOString(),
       membershipTier: tierType,
       membership: {
-        tier: getTierDefault(tierType),
+        tier: getTierDefault(t, tierType),
         status: "active",
         expiresAt: null,
       },

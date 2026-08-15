@@ -1,6 +1,7 @@
 import { enumLabel, refundReasonConfig } from "@tarodan/ui";
 import { useTranslations } from "next-intl";
 import { col, type RowActionItem } from "@/components/table";
+import { statusConfig } from "@/lib/statusLabels";
 
 type T = ReturnType<typeof useTranslations<never>>;
 
@@ -51,7 +52,9 @@ export function refundColumns(t: T, rowMenu: (r: Refund) => RowActionItem[]) {
       (r) => r.refundedSellerFee,
     ),
     col.text<Refund>(t("admin.operations.refundRequests.reason"), (r) =>
-      r.reason ? enumLabel(refundReasonConfig, r.reason, r.reason) : null,
+      r.reason
+        ? enumLabel(statusConfig(refundReasonConfig, t), r.reason, r.reason)
+        : null,
     ),
     col.user<Refund>(
       t("admin.operations.common.buyer"),

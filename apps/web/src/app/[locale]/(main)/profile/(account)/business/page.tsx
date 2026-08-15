@@ -17,8 +17,10 @@ import ProductsTab from "./_sections/ProductsTab";
 import CollectionsTab from "./_sections/CollectionsTab";
 import CorporateApplicationCompletion from "./_sections/CorporateApplicationCompletion";
 import { corporateApplicationApi, type CorporateApplication } from "@/lib/api";
+import { useTranslations } from "next-intl";
 
 export default function BusinessDashboardPage() {
+  const t = useTranslations();
   const { ready } = useRequireAuth();
   const router = useRouter();
   const { user } = useAuthStore();
@@ -75,8 +77,10 @@ export default function BusinessDashboardPage() {
   return (
     <PageShell className="pb-16">
       <PageHeader
-        title="İşletme Paneli"
-        description="Mağazanızın performans istatistikleri"
+        title={t("page.business.page.isletmePaneli")}
+        description={t(
+          "page.business.page.magazanizinPerformansIstatistikleri",
+        )}
       />
 
       {isLoading ? (
@@ -91,7 +95,7 @@ export default function BusinessDashboardPage() {
 
           <Tabs value={tab} onValueChange={(v) => setTab(v as BusinessTab)}>
             <TabsList>
-              {BUSINESS_TABS.map(({ value, label, icon: Icon }) => (
+              {BUSINESS_TABS(t).map(({ value, label, icon: Icon }) => (
                 <TabsTrigger key={value} value={value}>
                   <Icon className="mr-2 h-4 w-4" />
                   {label}

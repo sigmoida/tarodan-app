@@ -73,9 +73,10 @@ export default function CancelOrderModal({
 
   const reasonOptions = BUYER_SELECTABLE_CANCELLATION_REASONS.map((value) => ({
     value: value as OrderCancellationReason,
-    label: CANCELLATION_REASON_LABEL_KEY[value]
-      ? t(CANCELLATION_REASON_LABEL_KEY[value])
-      : (orderCancellationReasonConfig[value]?.label ?? value),
+    label: t(
+      CANCELLATION_REASON_LABEL_KEY[value] ??
+        orderCancellationReasonConfig[value].labelKey,
+    ),
   }));
 
   const submit = () => {

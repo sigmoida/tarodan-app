@@ -41,7 +41,7 @@ export function AdsTable({ onEdit }: { onEdit: (ad: Ad) => void }) {
     {
       onToggle: (ad) => toggle.mutate(ad),
       togglingId: toggle.isPending ? toggle.variables?.id : undefined,
-      rowMenu: adRowMenu({ onEdit, onDelete }),
+      rowMenu: adRowMenu({ onEdit, onDelete }, t),
     },
     t,
   );

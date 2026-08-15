@@ -61,16 +61,6 @@ export const EMPTY_FILTERS: PaymentFilterState = {
   endDate: "",
 };
 
-/** English status labels (the shared `paymentStatusConfig` carries the TR ones). */
-export const paymentStatusEnLabels: Record<string, string> = {
-  pending: "Pending",
-  processing: "Processing",
-  completed: "Completed",
-  failed: "Failed",
-  refunded: "Refunded",
-  cancelled: "Cancelled",
-};
-
 /** Card → page callback opening the cancel/retry confirm dialog. */
 export type PaymentActionCb = (
   type: "cancel" | "retry",

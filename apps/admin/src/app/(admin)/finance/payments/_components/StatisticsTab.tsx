@@ -25,6 +25,7 @@ import { SectionCard } from "@/components/detail/SectionCard";
 import { MetricCard } from "@/components/MetricCard";
 import { fmtTry } from "@/lib/format";
 import { useTranslations } from "next-intl";
+import { statusConfig } from "@/lib/statusLabels";
 
 interface PaymentStatistics {
   period: string;
@@ -187,7 +188,10 @@ export function StatisticsTab() {
               {data.byStatus.map((item) => (
                 <DistBar
                   key={item.status}
-                  label={enumLabel(paymentStatusConfig, item.status)}
+                  label={enumLabel(
+                    statusConfig(paymentStatusConfig, t),
+                    item.status,
+                  )}
                   count={item.count}
                   percentage={item.percentage}
                 />
@@ -201,7 +205,10 @@ export function StatisticsTab() {
               {data.byProvider.map((item) => (
                 <div key={item.provider}>
                   <DistBar
-                    label={enumLabel(paymentProviderConfig, item.provider)}
+                    label={enumLabel(
+                      statusConfig(paymentProviderConfig, t),
+                      item.provider,
+                    )}
                     count={item.count}
                     percentage={item.percentage}
                   />

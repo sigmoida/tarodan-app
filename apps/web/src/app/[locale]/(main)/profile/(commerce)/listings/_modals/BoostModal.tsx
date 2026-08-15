@@ -191,7 +191,7 @@ export default function BoostModal({
         <Alert
           variant="warning"
           icon={<ClockIcon className="h-5 w-5 text-warning-600" />}
-          title="Aktif Öne Çıkarma"
+          title={t("page.listings.boostmodal.aktifOneCikarma")}
           className="mb-4"
         >
           {t("profile.boost.activeBoostInfo", { days: remainingDays })}
@@ -246,7 +246,9 @@ export default function BoostModal({
                     <label
                       key={opt.durationDays}
                       className={`flex items-center justify-between px-3 py-3 cursor-pointer transition-colors ${
-                        active ? "bg-warning-50" : "hover:bg-surface-alt/40"
+                        active
+                          ? "bg-warning-50"
+                          : t("page.listings.boostmodal.hoverBgSurfaceAlt40")
                       }`}
                     >
                       <div className="flex items-center gap-3">

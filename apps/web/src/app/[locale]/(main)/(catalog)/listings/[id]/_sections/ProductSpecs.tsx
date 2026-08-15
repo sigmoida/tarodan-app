@@ -16,27 +16,27 @@ type Translator = (key: any) => string;
 
 /**
  * "Detaylar" kartında zaten kendi satırı olan gruplar — teknik listede ikinci
- * kez görünmemeleri için buradan elenir. Her grup hem slug'ı hem GÖRÜNEN adıyla
- * yazılır: `groupSlug` API'nin yeni alanı, ad ise onu döndürmeyen eski/önbellekli
- * yanıtlar için yedek.
+ * kez görünmemeleri için buradan elenir.
+ *
+ * Eşleşme YALNIZ slug ile: `group` grubun veritabanındaki Türkçe adıdır, yani
+ * ne katalogdan gelir ne de çevrilebilir — ada göre elemek hem sabit Türkçe
+ * metin gerektirirdi hem de /en yerelinde yanlış olurdu. API her nitelikte
+ * `groupSlug` döndürüyor (`product-common.service`).
  */
-const DERIVED_GROUPS = [
-  { slug: SCALE_GROUP_SLUG, name: "Ölçek" },
-  { slug: MATERIAL_GROUP_SLUG, name: "Malzeme" },
-  { slug: COLOR_GROUP_SLUG, name: "Renk" },
-] as const;
+const DERIVED_GROUP_SLUGS: string[] = [
+  SCALE_GROUP_SLUG,
+  MATERIAL_GROUP_SLUG,
+  COLOR_GROUP_SLUG,
+];
 
 type ListingAttribute = NonNullable<Listing["attributes"]>[number];
 
-/** Tek bir gruba ait nitelikler (slug önce, ad yedek). */
+/** Tek bir gruba ait nitelikler. */
 function attributesInGroup(
   listing: Listing,
   slug: string,
-  name: string,
 ): ListingAttribute[] {
-  return (listing.attributes ?? []).filter(
-    (a) => a.groupSlug === slug || a.group === name,
-  );
+  return (listing.attributes ?? []).filter((a) => a.groupSlug === slug);
 }
 
 /**
@@ -72,13 +72,17 @@ export default function ProductSpecs({
   const scaleValue =
     listing.scale ||
     listing.attributes?.find(
-      (a: any) => a.group === "Ölçek" || a.label === "Ölçek",
+      (a: any) =>
+        a.group === t("page.listings.productspecs.olcek") ||
+        a.label === t("page.listings.productspecs.olcek"),
     )?.value ||
     "—";
   const materialValue =
     listing.material ||
     listing.attributes?.find(
-      (a) => a.group === "material" || a.group === "Malzeme",
+      (a) =>
+        a.group === "material" ||
+        a.group === t("page.listings.productspecs.malzeme"),
     )?.value ||
     "—";
   /**
@@ -89,7 +93,7 @@ export default function ProductSpecs({
    */
   const colorValue =
     listing.color ||
-    attributesInGroup(listing, COLOR_GROUP_SLUG, "Renk")
+    attributesInGroup(listing, COLOR_GROUP_SLUG)
       .map((a) => a.value)
       .join(COLOR_LABEL_SEPARATOR) ||
     null;
@@ -161,10 +165,7 @@ export default function ProductSpecs({
 
   const technicalAttrs =
     listing.attributes?.filter(
-      (a) =>
-        !DERIVED_GROUPS.some(
-          (g) => a.groupSlug === g.slug || a.group === g.name,
-        ),
+      (a) => !DERIVED_GROUP_SLUGS.includes(a.groupSlug ?? ""),
     ) ?? [];
   const hasTechnical =
     technicalAttrs.length > 0 ||
@@ -175,7 +176,7 @@ export default function ProductSpecs({
 
   return (
     <div
-      className={`grid gap-6 ${hasTechnical ? "md:grid-cols-2" : "grid-cols-1"}`}
+      className={`grid gap-6 ${hasTechnical ? t("page.listings.productspecs.mdGridCols2") : "grid-cols-1"}`}
     >
       {/* Details — brand / scale / material / … row by row */}
       <SectionCard title={t("product.detailsSection")}>

@@ -13,6 +13,7 @@ import { SectionCard } from "@/components/detail/SectionCard";
 import { DataList, Field } from "@/components/detail/DataList";
 import { fmtDateTime, fmtTry } from "@/lib/format";
 import type { OrderGroupFile } from "../_lib/fileTypes";
+import { statusConfig } from "@/lib/statusLabels";
 
 /**
  * Grubun TEK ödemesi. Sepet ödemesinde tutar tüm sepeti kapsar — kart bunu
@@ -27,7 +28,7 @@ export function GroupPaymentCard({ file }: { file: OrderGroupFile }) {
     <SectionCard title={t("admin.operations.orders.paymentTitle")}>
       <DataList columns={1}>
         <Field label={t("common.status")}>
-          {enumLabel(paymentStatusConfig, payment.status)}
+          {enumLabel(statusConfig(paymentStatusConfig, t), payment.status)}
         </Field>
         <Field label={t("admin.operations.orders.file.chargedTotal")}>
           {fmtTry(payment.amount)}
@@ -48,7 +49,10 @@ export function GroupPaymentCard({ file }: { file: OrderGroupFile }) {
             </Field>
           )}
         <Field label={t("admin.operations.orders.provider")}>
-          {enumLabel(paymentProviderConfig, payment.provider ?? "")}
+          {enumLabel(
+            statusConfig(paymentProviderConfig, t),
+            payment.provider ?? "",
+          )}
         </Field>
         {payment.paidAt && (
           <Field label={t("common.date")}>{fmtDateTime(payment.paidAt)}</Field>

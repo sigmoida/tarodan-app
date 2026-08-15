@@ -12,6 +12,7 @@ import {
   CurrencyDollarIcon,
   ShieldCheckIcon,
 } from "@heroicons/react/24/outline";
+import type { Translate } from "@/types/i18n";
 
 type Icon = ComponentType<SVGProps<SVGSVGElement>>;
 
@@ -21,36 +22,52 @@ export interface TicketCategory {
   icon: Icon;
 }
 
-export const CATEGORIES: TicketCategory[] = [
-  { id: "shipping", label: "Sipariş / Kargo", icon: TruckIcon },
-  { id: "payment", label: "Ödeme", icon: CreditCardIcon },
-  { id: "account", label: "Hesap", icon: UserCircleIcon },
-  { id: "product", label: "İlan / Ürün", icon: TagIcon },
-  { id: "trade", label: "Takas", icon: ArrowsRightLeftIcon },
-  { id: "technical", label: "Teknik Sorun", icon: WrenchScrewdriverIcon },
-  { id: "other", label: "Diğer", icon: EllipsisHorizontalCircleIcon },
+export const ticketCategories = (t: Translate): TicketCategory[] => [
+  { id: "shipping", label: t("support.content.siparisKargo"), icon: TruckIcon },
+  { id: "payment", label: t("support.content.odeme"), icon: CreditCardIcon },
+  { id: "account", label: t("support.content.hesap"), icon: UserCircleIcon },
+  { id: "product", label: t("support.content.ilanUrun"), icon: TagIcon },
+  { id: "trade", label: t("support.content.takas"), icon: ArrowsRightLeftIcon },
+  {
+    id: "technical",
+    label: t("support.content.teknikSorun"),
+    icon: WrenchScrewdriverIcon,
+  },
+  {
+    id: "other",
+    label: t("support.content.diger"),
+    icon: EllipsisHorizontalCircleIcon,
+  },
 ];
 
-export const STATUS_CONFIG: Record<
-  string,
-  { label: string; className: string }
-> = {
-  open: { label: "Açık", className: "bg-info-100 text-info-800" },
+export const ticketStatusStyles = (
+  t: Translate,
+): Record<string, { label: string; className: string }> => ({
+  open: {
+    label: t("support.content.acik"),
+    className: "bg-info-100 text-info-800",
+  },
   in_progress: {
-    label: "İnceleniyor",
+    label: t("support.content.inceleniyor"),
     className: "bg-warning-100 text-warning-800",
   },
   waiting_customer: {
-    label: "Yanıtınız Bekleniyor",
+    label: t("support.content.yanitinizBekleniyor"),
     className: "bg-primary-100 text-primary-800",
   },
-  resolved: { label: "Çözüldü", className: "bg-success-100 text-success-800" },
-  closed: { label: "Kapatıldı", className: "bg-surface-alt text-muted" },
-};
+  resolved: {
+    label: t("support.content.cozuldu"),
+    className: "bg-success-100 text-success-800",
+  },
+  closed: {
+    label: t("support.content.kapatildi"),
+    className: "bg-surface-alt text-muted",
+  },
+});
 
 /** Human category label for a stored category id. */
-export function categoryLabel(id: string): string {
-  return CATEGORIES.find((c) => c.id === id)?.label ?? id;
+export function categoryLabel(id: string, t: Translate): string {
+  return ticketCategories(t).find((c) => c.id === id)?.label ?? id;
 }
 
 export interface Ticket {
@@ -94,68 +111,98 @@ export interface HelpTopic {
   links: { href: string; label: string }[];
 }
 
-export const HELP_TOPICS: HelpTopic[] = [
+export const helpTopics = (t: Translate): HelpTopic[] => [
   {
-    title: "Başlangıç",
+    title: t("support.content.baslangic"),
     icon: QuestionMarkCircleIcon,
     links: [
-      { href: "/guides", label: "Kullanım Kılavuzu" },
-      { href: "/faq", label: "Sıkça Sorulan Sorular" },
-      { href: "/register", label: "Üye Olun" },
+      { href: "/guides", label: t("support.content.kullanimKilavuzu") },
+      { href: "/faq", label: t("support.content.sikcaSorulanSorular") },
+      { href: "/register", label: t("support.content.uyeOlun") },
     ],
   },
   {
-    title: "Satın Alma",
+    title: t("support.content.satinAlma"),
     icon: ShoppingCartIcon,
     links: [
-      { href: "/faq#alisveris-takas", label: "Nasıl Alışveriş Yapılır?" },
-      { href: "/payment-options", label: "Ödeme Yöntemleri" },
-      { href: "/refund-policy", label: "İade ve İptal Koşulları" },
+      {
+        href: "/faq#alisveris-takas",
+        label: t("support.content.nasilAlisverisYapilir"),
+      },
+      { href: "/payment-options", label: t("support.content.odemeYontemleri") },
+      {
+        href: "/refund-policy",
+        label: t("support.content.iadeVeIptalKosullari"),
+      },
     ],
   },
   {
-    title: "Satış Yapma",
+    title: t("support.content.satisYapma"),
     icon: CurrencyDollarIcon,
     links: [
-      { href: "/guides#selling", label: "İlan Verme Rehberi" },
-      { href: "/faq#alisveris-takas", label: "Komisyon ve Hizmet Bedelleri" },
-      { href: "/membership", label: "Üyelik Planları" },
+      { href: "/guides#selling", label: t("support.content.ilanVermeRehberi") },
+      {
+        href: "/faq#alisveris-takas",
+        label: t("support.content.komisyonVeHizmetBedelleri"),
+      },
+      { href: "/membership", label: t("support.content.uyelikPlanlari") },
     ],
   },
   {
-    title: "Takas",
+    title: t("support.content.takas"),
     icon: ArrowsRightLeftIcon,
     links: [
-      { href: "/secure-swap", label: "Güvenli Takas" },
-      { href: "/faq#alisveris-takas", label: "Takas Nasıl Çalışır?" },
-      { href: "/profile/trades", label: "Takaslarım" },
+      { href: "/secure-swap", label: t("support.content.guvenliTakas") },
+      {
+        href: "/faq#alisveris-takas",
+        label: t("support.content.takasNasilCalisir"),
+      },
+      { href: "/profile/trades", label: t("support.content.takaslarim") },
     ],
   },
   {
-    title: "Kargo ve Teslimat",
+    title: t("support.content.kargoVeTeslimat"),
     icon: TruckIcon,
     links: [
-      { href: "/shipping-delivery", label: "Kargo ve Teslimat" },
-      { href: "/faq#alisveris-takas", label: "Kargo Takibi" },
-      { href: "/refund-policy", label: "Hasarlı Ürün / İade" },
+      {
+        href: "/shipping-delivery",
+        label: t("support.content.kargoVeTeslimat"),
+      },
+      { href: "/faq#alisveris-takas", label: t("support.content.kargoTakibi") },
+      { href: "/refund-policy", label: t("support.content.hasarliUrunIade") },
     ],
   },
   {
-    title: "Hesap ve Güvenlik",
+    title: t("support.content.hesapVeGuvenlik"),
     icon: ShieldCheckIcon,
     links: [
-      { href: "/profile", label: "Profil ve Adresler" },
-      { href: "/support", label: "Destek Talebi Oluştur" },
-      { href: "/privacy", label: "Gizlilik Politikası" },
+      { href: "/profile", label: t("support.content.profilVeAdresler") },
+      { href: "/support", label: t("support.content.destekTalebiOlustur") },
+      { href: "/privacy", label: t("support.content.gizlilikPolitikasi") },
     ],
   },
 ];
 
-export const POPULAR_TOPICS: { q: string; href: string }[] = [
-  { q: "İlk satışımı nasıl yaparım?", href: "/guides#selling" },
-  { q: "Ürünlerimi nasıl ön plana çıkartırım?", href: "/faq#populer-konular" },
-  { q: "Takas teklifi nasıl gönderirim?", href: "/faq#populer-konular" },
-  { q: "Üyelik planları arasındaki farklar nelerdir?", href: "/membership" },
-  { q: "Siparişimi nasıl takip ederim?", href: "/faq#populer-konular" },
-  { q: "İade ve iptal koşulları nelerdir?", href: "/refund-policy" },
+export const popularTopics = (t: Translate): { q: string; href: string }[] => [
+  { q: t("support.content.ilkSatisimiNasilYaparim"), href: "/guides#selling" },
+  {
+    q: t("support.content.urunlerimiNasilOnPlanaCikartirim"),
+    href: "/faq#populer-konular",
+  },
+  {
+    q: t("support.content.takasTeklifiNasilGonderirim"),
+    href: "/faq#populer-konular",
+  },
+  {
+    q: t("support.content.uyelikPlanlariArasindakiFarklarNelerdir"),
+    href: "/membership",
+  },
+  {
+    q: t("support.content.siparisimiNasilTakipEderim"),
+    href: "/faq#populer-konular",
+  },
+  {
+    q: t("support.content.iadeVeIptalKosullariNelerdir"),
+    href: "/refund-policy",
+  },
 ];

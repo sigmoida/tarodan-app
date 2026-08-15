@@ -8,6 +8,7 @@ import { col } from "@/components/table";
 import { scheduledRowMenu } from "./rowActions";
 import { type NotificationLog, type ScheduledNotification } from "./types";
 import type { useTranslations } from "next-intl";
+import { statusConfig } from "@/lib/statusLabels";
 
 type T = ReturnType<typeof useTranslations<never>>;
 
@@ -23,7 +24,7 @@ export const historyColumns = (t: T) => [
   ),
   col.muted<NotificationLog>(
     t("admin.marketing.notifications.channelLabel"),
-    (n) => enumLabel(notificationChannelConfig, n.channel),
+    (n) => enumLabel(statusConfig(notificationChannelConfig, t), n.channel),
     { sortKey: "channel", sortType: "text" },
   ),
   col.text<NotificationLog>(t("common.title"), "title", {
@@ -32,7 +33,9 @@ export const historyColumns = (t: T) => [
   }),
   col.badge<NotificationLog>(
     t("common.status"),
-    (n) => <Badge status={n.status} config={deliveryStatusConfig} />,
+    (n) => (
+      <Badge status={n.status} config={statusConfig(deliveryStatusConfig, t)} />
+    ),
     { sortKey: "status", sortType: "text" },
   ),
   col.date<NotificationLog>(t("common.date"), "createdAt"),
@@ -56,7 +59,12 @@ export function scheduledColumns(onCancel: (id: string) => void, t: T) {
     col.date<ScheduledNotification>(t("common.date"), "scheduledFor"),
     col.badge<ScheduledNotification>(
       t("common.status"),
-      (n) => <Badge status={n.status} config={deliveryStatusConfig} />,
+      (n) => (
+        <Badge
+          status={n.status}
+          config={statusConfig(deliveryStatusConfig, t)}
+        />
+      ),
       { sortKey: "status", sortType: "text" },
     ),
     col.rowMenu<ScheduledNotification>(scheduledRowMenu(onCancel, t)),

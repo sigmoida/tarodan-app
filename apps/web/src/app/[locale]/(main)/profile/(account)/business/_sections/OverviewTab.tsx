@@ -11,8 +11,10 @@ import SectionCard from "@/components/ui/SectionCard";
 import { MetricCard } from "@/components/ui";
 import { formatTL } from "@/lib/format";
 import type { BusinessStats } from "../_lib/types";
+import { getTranslations } from "next-intl/server";
 
-export default function OverviewTab({ stats }: { stats: BusinessStats }) {
+export default async function OverviewTab({ stats }: { stats: BusinessStats }) {
+  const t = await getTranslations();
   const { overview, weekly } = stats;
 
   return (
@@ -21,25 +23,25 @@ export default function OverviewTab({ stats }: { stats: BusinessStats }) {
       <div className="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-5">
         <MetricCard
           icon={EyeIcon}
-          label="Toplam Görüntülenme"
+          label={t("profile.businessOverview.toplamGoruntulenme")}
           value={overview.totalViews.toLocaleString("tr-TR")}
           accent="text-primary-600"
         />
         <MetricCard
           icon={HeartIcon}
-          label="Toplam Beğeni"
+          label={t("profile.businessOverview.toplamBegeni")}
           value={overview.totalLikes.toLocaleString("tr-TR")}
           accent="text-danger-600"
         />
         <MetricCard
           icon={ShoppingBagIcon}
-          label="Toplam Satış"
+          label={t("profile.businessOverview.toplamSatis")}
           value={overview.totalSales.toLocaleString("tr-TR")}
           accent="text-success-600"
         />
         <MetricCard
           icon={CubeIcon}
-          label="Aktif Ürün"
+          label={t("profile.businessOverview.aktifUrun")}
           value={overview.activeProducts.toLocaleString("tr-TR")}
           accent="text-primary-600"
         />
@@ -52,24 +54,24 @@ export default function OverviewTab({ stats }: { stats: BusinessStats }) {
       </div>
 
       {/* Revenue */}
-      <SectionCard title="Toplam Gelir">
+      <SectionCard title={t("profile.businessOverview.toplamGelir")}>
         <p className="text-4xl font-bold text-success-600">
           {formatTL(overview.totalRevenue)}
         </p>
       </SectionCard>
 
       {/* Weekly */}
-      <SectionCard title="Bu Hafta">
+      <SectionCard title={t("profile.businessOverview.buHafta")}>
         <div className="grid grid-cols-2 gap-4">
           <MetricCard
             icon={EyeIcon}
-            label="Görüntülenme"
+            label={t("profile.businessOverview.goruntulenme")}
             value={weekly.views.toLocaleString("tr-TR")}
             accent="text-primary-600"
           />
           <MetricCard
             icon={HeartIcon}
-            label="Beğeni"
+            label={t("profile.businessOverview.begeni")}
             value={weekly.likes.toLocaleString("tr-TR")}
             accent="text-danger-600"
           />
@@ -77,17 +79,19 @@ export default function OverviewTab({ stats }: { stats: BusinessStats }) {
       </SectionCard>
 
       {/* Collection stats */}
-      <SectionCard title="Koleksiyon İstatistikleri">
+      <SectionCard
+        title={t("profile.businessOverview.koleksiyonIstatistikleri")}
+      >
         <div className="grid grid-cols-2 gap-4">
           <MetricCard
             icon={EyeIcon}
-            label="Toplam Görüntülenme"
+            label={t("profile.businessOverview.toplamGoruntulenme")}
             value={overview.collectionViews.toLocaleString("tr-TR")}
             accent="text-primary-600"
           />
           <MetricCard
             icon={HeartIcon}
-            label="Toplam Beğeni"
+            label={t("profile.businessOverview.toplamBegeni")}
             value={overview.collectionLikes.toLocaleString("tr-TR")}
             accent="text-danger-600"
           />

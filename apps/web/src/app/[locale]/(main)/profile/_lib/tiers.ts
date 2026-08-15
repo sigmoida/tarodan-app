@@ -1,6 +1,7 @@
 /** @format */
 
 import type { MembershipTier } from "./types";
+import type { Translate } from "@/types/i18n";
 
 /**
  * The single source of truth for membership-tier fallbacks. The API's
@@ -9,10 +10,12 @@ import type { MembershipTier } from "./types";
  * render). Previously this object was duplicated three times across the profile
  * page with diverging values — keep it here only.
  */
-export const TIER_DEFAULTS: Record<string, MembershipTier> = {
+export const TIER_DEFAULTS = (
+  t: Translate,
+): Record<string, MembershipTier> => ({
   free: {
     type: "free",
-    name: "Ücretsiz",
+    name: t("page.profile.tiers.ucretsiz"),
     maxFreeListings: 5,
     maxTotalListings: 10,
     maxImagesPerListing: 3,
@@ -21,7 +24,7 @@ export const TIER_DEFAULTS: Record<string, MembershipTier> = {
   },
   basic: {
     type: "basic",
-    name: "Temel",
+    name: t("page.profile.tiers.temel"),
     maxFreeListings: 15,
     maxTotalListings: 50,
     maxImagesPerListing: 6,
@@ -30,7 +33,7 @@ export const TIER_DEFAULTS: Record<string, MembershipTier> = {
   },
   premium: {
     type: "premium",
-    name: "Premium",
+    name: t("page.profile.tiers.premium"),
     maxFreeListings: 50,
     maxTotalListings: 200,
     maxImagesPerListing: 10,
@@ -39,17 +42,17 @@ export const TIER_DEFAULTS: Record<string, MembershipTier> = {
   },
   business: {
     type: "business",
-    name: "İş",
+    name: t("page.profile.tiers.is"),
     maxFreeListings: 200,
     maxTotalListings: 1000,
     maxImagesPerListing: 15,
     canTrade: true,
     canCreateCollections: true,
   },
-};
+});
 
-export function getTierDefault(type?: string): MembershipTier {
-  return TIER_DEFAULTS[type || "free"] || TIER_DEFAULTS.free;
+export function getTierDefault(t: Translate, type?: string): MembershipTier {
+  return TIER_DEFAULTS(t)[type || "free"] || TIER_DEFAULTS(t).free;
 }
 
 /** Tailwind token classes per tier, used for accent chips/cards. */

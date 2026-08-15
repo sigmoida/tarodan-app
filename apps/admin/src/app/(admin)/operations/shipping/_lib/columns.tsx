@@ -16,6 +16,7 @@ import type {
   TradeShipmentRow,
   SuratShipmentRow,
 } from "./types";
+import { statusConfig } from "@/lib/statusLabels";
 
 type T = ReturnType<typeof useTranslations<never>>;
 
@@ -212,7 +213,7 @@ export const physicalShipmentColumns = ({
     (r) => (
       <Badge
         status={(r.status || "").toLowerCase()}
-        config={shipmentStatusConfig}
+        config={statusConfig(shipmentStatusConfig, t)}
       />
     ),
     { minWidth: 180, sortKey: "status", sortType: "text" },
@@ -261,7 +262,10 @@ export const returnShipmentColumns = (t: T) => [
     t("common.status"),
     (r) =>
       r.returnStatus ? (
-        <Badge status={r.returnStatus} config={shipmentStatusConfig} />
+        <Badge
+          status={r.returnStatus}
+          config={statusConfig(shipmentStatusConfig, t)}
+        />
       ) : (
         <Empty />
       ),
@@ -309,7 +313,9 @@ export const tradeShipmentColumns = (t: T) => [
   ),
   col.badge<TradeShipmentRow>(
     t("common.status"),
-    (r) => <Badge status={r.status} config={shipmentStatusConfig} />,
+    (r) => (
+      <Badge status={r.status} config={statusConfig(shipmentStatusConfig, t)} />
+    ),
     { sortKey: "status", sortType: "text" },
   ),
   col.user<TradeShipmentRow>(
@@ -416,7 +422,7 @@ export function suratShipmentColumns(
         <div className="flex flex-col gap-0.5">
           <Badge
             status={(r.status || "").toLowerCase()}
-            config={shipmentStatusConfig}
+            config={statusConfig(shipmentStatusConfig, t)}
           />
           {r.providerRawStatus ? (
             <span className="truncate text-xs text-muted">

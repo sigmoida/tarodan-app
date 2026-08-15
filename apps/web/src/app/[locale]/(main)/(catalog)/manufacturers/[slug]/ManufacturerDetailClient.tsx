@@ -58,13 +58,13 @@ export default function ManufacturerDetailClient() {
       <PageShell className="flex flex-col items-center justify-center p-4 text-center">
         <div className="text-9xl mb-4 opacity-10 font-black">404</div>
         <h2 className="text-3xl font-bold text-heading mb-2">
-          Üretici Bulunamadı
+          {t("brands.manufacturerDetail.ureticiBulunamadi")}
         </h2>
         <Link
           href="/manufacturers"
           className="mt-8 px-8 py-3 bg-heading text-inverted rounded-full font-bold hover:bg-primary-600 transition-all shadow-sm"
         >
-          Tüm Üreticilere Dön
+          {t("brands.manufacturerDetail.tumUreticilereDon")}
         </Link>
       </PageShell>
     );
@@ -77,11 +77,16 @@ export default function ManufacturerDetailClient() {
       <div>
         <PageHeader
           backHref="/manufacturers"
-          backLabel={t("brands.backToAll") || "Tüm Üreticiler"}
+          backLabel={
+            t("brands.backToAll") ||
+            t("brands.manufacturerDetail.tumUreticiler")
+          }
           title={brand.name}
           actions={
             <Badge variant="info" size="sm">
-              {brand.productCount} {t("brands.activeListings") || "Aktif İlan"}
+              {brand.productCount}{" "}
+              {t("brands.activeListings") ||
+                t("brands.manufacturerDetail.aktifIlan")}
             </Badge>
           }
         />

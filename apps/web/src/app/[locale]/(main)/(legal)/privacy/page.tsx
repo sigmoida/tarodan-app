@@ -1,9 +1,10 @@
 /** @format */
 
 import type { Metadata } from "next";
+import { getTranslations } from "next-intl/server";
 import { localizedCanonical } from "@/lib/seo";
 import { LegalDocument } from "@/components/legal/LegalDocument";
-import { PRIVACY_PARTS } from "./_lib/privacy";
+import { privacyParts } from "./_lib/privacy";
 
 export async function generateMetadata({
   params,
@@ -11,21 +12,22 @@ export async function generateMetadata({
   params: Promise<{ locale: string }>;
 }): Promise<Metadata> {
   const { locale } = await params;
+  const t = await getTranslations({ locale });
   return {
-    title: "Gizlilik Politikası · Tarodan",
-    description:
-      "Tarodan KVKK aydınlatma metni: veri sorumlusu, işlenen veri kategorileri, işleme amaçları, aktarım, ilgili kişinin hakları ve başvuru yöntemi.",
+    title: t("legal.privacy.metaTitle"),
+    description: t("legal.privacy.metaDescription"),
     alternates: localizedCanonical(locale, "/privacy"),
   };
 }
 
-export default function PrivacyPage() {
+export default async function PrivacyPage() {
+  const t = await getTranslations();
   return (
     <LegalDocument
-      title="Gizlilik Politikası"
-      description="Kişisel verilerinizin hangi amaçlarla işlendiği, kimlere aktarıldığı ve haklarınızı nasıl kullanacağınız."
-      parts={PRIVACY_PARTS}
-      footer="Çerezler bakımından Çerez Politikası uygulanır. Bu metin, mevzuat ve uygulama değişikliklerine göre güncellenebilir; güncel metin Platform'da yayımlanır."
+      title={t("legal.privacyTitle")}
+      description={t("legal.privacy.pageDescription")}
+      parts={privacyParts(t)}
+      footer={t("legal.privacy.pageFooter")}
     />
   );
 }

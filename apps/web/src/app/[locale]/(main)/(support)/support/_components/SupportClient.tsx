@@ -1,5 +1,6 @@
 "use client";
 
+import { useTranslations } from "next-intl";
 import { Link } from "@/i18n/navigation";
 import {
   EnvelopeIcon,
@@ -15,10 +16,10 @@ import { DocPage } from "@/components/layout/DocPage";
 import SectionCard from "@/components/ui/SectionCard";
 import { formatDate } from "@/lib/format";
 import {
-  CATEGORIES,
-  STATUS_CONFIG,
-  HELP_TOPICS,
-  POPULAR_TOPICS,
+  ticketCategories,
+  ticketStatusStyles,
+  helpTopics,
+  popularTopics,
   categoryLabel,
 } from "../_lib/data";
 import { useSupport } from "../_hooks/useSupport";
@@ -29,6 +30,7 @@ import { useSupport } from "../_hooks/useSupport";
  * /help sayfası yok; ikisi aynı kullanıcı yolculuğunun iki adımıydı.
  */
 export default function SupportClient() {
+  const t = useTranslations();
   const {
     isAuthenticated,
     authLoading,
@@ -46,26 +48,26 @@ export default function SupportClient() {
 
   return (
     <DocPage
-      title="Yardım & Destek"
-      description="Önce hazır yanıtlara göz atın; çözemezseniz destek talebi oluşturun."
+      title={t("support.pageTitle")}
+      description={t("support.pageDescription")}
       actions={
         <div className="flex flex-wrap gap-2">
           <ButtonLink variant="secondary" size="sm" href="/faq">
-            Sıkça Sorulan Sorular
+            {t("faq.title")}
           </ButtonLink>
           <ButtonLink variant="secondary" size="sm" href="/guides">
-            Kullanım Kılavuzları
+            {t("guides.title")}
           </ButtonLink>
           <ButtonLink variant="secondary" size="sm" href="/contact">
-            İletişim
+            {t("footer.contact")}
           </ButtonLink>
         </div>
       }
     >
       {/* Self-serve: topics + popular questions in one card, no colour blocks */}
-      <SectionCard title="Yardım Konuları">
+      <SectionCard title={t("support.helpTopicsTitle")}>
         <div className="grid gap-x-8 gap-y-6 sm:grid-cols-2 lg:grid-cols-3">
-          {HELP_TOPICS.map((topic) => (
+          {helpTopics(t).map((topic) => (
             <div key={topic.title}>
               <div className="mb-2 flex items-center gap-2">
                 <topic.icon className="h-5 w-5 text-muted" />
@@ -88,9 +90,9 @@ export default function SupportClient() {
         </div>
       </SectionCard>
 
-      <SectionCard title="Popüler Sorular">
+      <SectionCard title={t("support.popularQuestions")}>
         <ul className="divide-y divide-border-subtle">
-          {POPULAR_TOPICS.map((item) => (
+          {popularTopics(t).map((item) => (
             <li key={item.q}>
               <Link
                 href={item.href}
@@ -109,17 +111,17 @@ export default function SupportClient() {
         <SectionCard className="text-center">
           <LifebuoyIcon className="mx-auto mb-3 h-10 w-10 text-subtle" />
           <h2 className="mb-2 text-lg font-semibold text-heading">
-            Destek talebi oluşturmak için giriş yapın
+            {t("support.loginToCreateTicket")}
           </h2>
           <p className="mb-5 text-sm text-muted">
-            Siparişleriniz, ödemeleriniz veya hesabınızla ilgili talepler için
-            giriş yapmanız gerekir. Üye değilseniz iletişim formunu da
-            kullanabilirsiniz.
+            {t("support.loginToCreateTicketDesc")}
           </p>
           <div className="flex flex-wrap items-center justify-center gap-3">
-            <ButtonLink href="/login?redirect=/support">Giriş Yap</ButtonLink>
+            <ButtonLink href="/login?redirect=/support">
+              {t("common.login")}
+            </ButtonLink>
             <ButtonLink variant="secondary" href="/contact">
-              İletişim Formu
+              {t("support.contactForm")}
             </ButtonLink>
           </div>
         </SectionCard>
@@ -128,14 +130,14 @@ export default function SupportClient() {
       {isAuthenticated && (
         <>
           <SectionCard
-            title="Destek Talebi"
+            title={t("support.ticketSectionTitle")}
             action={
               !showForm ? (
                 <Button
                   onClick={() => setShowForm(true)}
                   leftIcon={<PlusIcon className="h-5 w-5" />}
                 >
-                  Yeni Talep
+                  {t("support.newTicket")}
                 </Button>
               ) : undefined
             }
@@ -144,10 +146,10 @@ export default function SupportClient() {
               <Form form={form} onSubmit={onSubmit} className="space-y-5">
                 <div>
                   <p className="mb-2 text-sm font-medium text-heading">
-                    Kategori
+                    {t("common.category")}
                   </p>
                   <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-                    {CATEGORIES.map((cat) => (
+                    {ticketCategories(t).map((cat) => (
                       <Button
                         key={cat.id}
                         type="button"
@@ -175,15 +177,15 @@ export default function SupportClient() {
 
                 <FormInput
                   name="subject"
-                  label="Konu"
-                  placeholder="Örn: Siparişim kargoya verilmedi"
+                  label={t("support.subject")}
+                  placeholder={t("support.subjectPlaceholder")}
                   maxLength={200}
                 />
                 <FormTextarea
                   name="message"
-                  label="Mesajınız"
+                  label={t("support.yourMessage")}
                   rows={5}
-                  placeholder="Sorununuzu mümkün olduğunca ayrıntılı anlatın. Varsa sipariş numaranızı ekleyin."
+                  placeholder={t("support.messagePlaceholder")}
                   maxLength={2000}
                 />
 
@@ -193,26 +195,23 @@ export default function SupportClient() {
                     isLoading={isSubmitting}
                     disabled={isSubmitting}
                   >
-                    Talebi Gönder
+                    {t("support.submitTicket")}
                   </Button>
                   <Button
                     type="button"
                     variant="outline"
                     onClick={() => setShowForm(false)}
                   >
-                    Vazgeç
+                    {t("support.giveUp")}
                   </Button>
                 </div>
               </Form>
             ) : (
-              <p className="text-sm text-muted">
-                Sorununuzu kategorisiyle birlikte iletin; ekibimiz genellikle 24
-                saat içinde yanıt verir.
-              </p>
+              <p className="text-sm text-muted">{t("support.formHint")}</p>
             )}
           </SectionCard>
 
-          <SectionCard title="Taleplerim">
+          <SectionCard title={t("support.myTickets")}>
             {ticketsLoading ? (
               <div className="space-y-3">
                 {[0, 1, 2].map((i) => (
@@ -225,13 +224,14 @@ export default function SupportClient() {
             ) : tickets.length === 0 ? (
               <div className="py-8 text-center">
                 <ClockIcon className="mx-auto mb-3 h-10 w-10 text-subtle" />
-                <p className="text-muted">Henüz bir destek talebiniz yok.</p>
+                <p className="text-muted">{t("support.noTickets")}</p>
               </div>
             ) : (
               <ul className="divide-y divide-border">
                 {tickets.map((ticket) => {
                   const status =
-                    STATUS_CONFIG[ticket.status] || STATUS_CONFIG.open;
+                    ticketStatusStyles(t)[ticket.status] ||
+                    ticketStatusStyles(t).open;
                   return (
                     <li key={ticket.id}>
                       <Link
@@ -243,7 +243,7 @@ export default function SupportClient() {
                             {ticket.subject}
                           </p>
                           <p className="text-sm text-muted">
-                            {categoryLabel(ticket.category)} ·{" "}
+                            {categoryLabel(ticket.category, t)} ·{" "}
                             {formatDate(ticket.createdAt)}
                           </p>
                         </div>
@@ -264,9 +264,7 @@ export default function SupportClient() {
       )}
 
       <SectionCard className="text-center">
-        <p className="mb-3 text-sm text-muted">
-          Hafta içi 09.00–18.00 arasında e-posta ile de ulaşabilirsiniz.
-        </p>
+        <p className="mb-3 text-sm text-muted">{t("support.emailHours")}</p>
         <a
           href="mailto:destek@tarodan.com.tr"
           className="inline-flex items-center gap-2 text-sm font-medium text-primary-600 hover:text-primary-700"

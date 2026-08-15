@@ -90,7 +90,7 @@ export function mapProducts(raw: any[], t: T): Product[] {
 
 /** Status filter options derived from productStatusConfig (badge-consistent). */
 export const getProductStatusOptions = (t: T) =>
-  statusFilterOptions(productStatusConfig, {
+  statusFilterOptions(productStatusConfig, t, {
     allLabel: t("admin.catalog.products.allProducts"),
   });
 

@@ -8,14 +8,17 @@ import { Button } from "@tarodan/ui";
 import { ButtonLink } from "@/components/ui/ButtonLink";
 import { useAuthStore } from "@/stores/authStore";
 import StatusScreen from "../_components/StatusScreen";
+import type { Translate } from "@/types/i18n";
+import { useTranslations } from "next-intl";
 
-const STEPS = [
-  "Ekibimiz şirket bilgileri ve vergi kimlik numaranızı doğrular.",
-  "Onaylandığında hesabınız aktif olur ve e-posta ile bilgilendirilirsiniz.",
-  "Reddedilmesi durumunda red gerekçesiyle birlikte e-posta alırsınız.",
+const STEPS = (t: Translate) => [
+  t("page.businessPending.page.ekibimizSirketBilgileriVeVergiKimlik"),
+  t("page.businessPending.page.onaylandigindaHesabinizAktifOlurVeE"),
+  t("page.businessPending.page.reddedilmesiDurumundaRedGerekcesiyleBirlikteE"),
 ];
 
 export default function BusinessPendingPage() {
+  const t = useTranslations();
   const router = useRouter();
   const { user, logout } = useAuthStore();
 
@@ -28,24 +31,21 @@ export default function BusinessPendingPage() {
     <StatusScreen
       icon={ClockIcon}
       tone="warning"
-      title="Başvurunuz İnceleniyor"
-      description={
-        <>
-          <span className="font-semibold text-heading">
-            {user?.companyName}
-          </span>{" "}
-          adına yaptığınız başvuru onay sürecindedir. İnceleme tamamlandığında{" "}
-          <span className="font-medium text-heading">{user?.email}</span>{" "}
-          adresinize bilgi gönderilecektir (genellikle 1–2 iş günü).
-        </>
-      }
+      title={t("page.businessPending.page.basvurunuzInceleniyor")}
+      description={t.rich("auth.businessPendingDescription", {
+        company: user?.companyName ?? "",
+        email: user?.email ?? "",
+        b: (chunks) => (
+          <span className="font-semibold text-heading">{chunks}</span>
+        ),
+      })}
     >
       <div className="mb-6 rounded-xl border border-warning-200 bg-warning-50 p-4 text-left">
         <p className="mb-2 text-sm font-semibold text-warning-700">
-          Onay sürecinde neler olur?
+          {t("page.businessPending.page.onaySurecindeNelerOlur")}
         </p>
         <ol className="space-y-1.5 text-sm text-warning-700 list-decimal list-inside">
-          {STEPS.map((step) => (
+          {STEPS(t).map((step) => (
             <li key={step}>{step}</li>
           ))}
         </ol>
@@ -55,13 +55,13 @@ export default function BusinessPendingPage() {
             altındaki kurumsal sayfada — /seller/documents yalnız belge alt
             kümesini gösteriyordu. */}
         <ButtonLink href="/profile/business" className="w-full">
-          Başvuruyu Tamamla / Belgeleri Yükle
+          {t("page.businessPending.page.basvuruyuTamamlaBelgeleriYukle")}
         </ButtonLink>
         <ButtonLink variant="secondary" href="/contact" className="w-full">
-          Destek Ekibiyle İletişime Geç
+          {t("page.businessPending.page.destekEkibiyleIletisimeGec")}
         </ButtonLink>
         <Button variant="secondary" onClick={handleLogout}>
-          Çıkış Yap
+          {t("page.businessPending.page.cikisYap")}
         </Button>
       </div>
     </StatusScreen>

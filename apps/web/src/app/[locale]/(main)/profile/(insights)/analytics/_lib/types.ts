@@ -9,6 +9,7 @@ import {
   BoltIcon,
 } from "@heroicons/react/24/outline";
 import { HeartIcon as HeartSolidIcon } from "@heroicons/react/24/solid";
+import type { Translate } from "@/types/i18n";
 
 export type AnalyticsPeriod = "7d" | "30d" | "90d";
 
@@ -110,36 +111,35 @@ export function emptyAnalytics(period: AnalyticsPeriod): AnalyticsData {
 
 type Icon = ComponentType<SVGProps<SVGSVGElement>>;
 
-export const ACTIVITY_CONFIG: Record<
-  ActivityType,
-  { icon: Icon; color: string; text: string }
-> = {
+export const ACTIVITY_CONFIG = (
+  t: Translate,
+): Record<ActivityType, { icon: Icon; color: string; text: string }> => ({
   view: {
     icon: EyeIcon,
     color: "bg-primary-100 text-primary-600",
-    text: "görüntülendi",
+    text: t("profile.analyticsTypes.goruntulendi"),
   },
   favorite: {
     icon: HeartSolidIcon,
     color: "bg-danger-100 text-danger-600",
-    text: "favorilere eklendi",
+    text: t("profile.analyticsTypes.favorilereEklendi"),
   },
   sale: {
     icon: ShoppingCartIcon,
     color: "bg-success-100 text-success-600",
-    text: "satıldı",
+    text: t("profile.analyticsTypes.satildi"),
   },
   message: {
     icon: DocumentTextIcon,
     color: "bg-primary-100 text-primary-600",
-    text: "hakkında mesaj geldi",
+    text: t("profile.analyticsTypes.hakkindaMesajGeldi"),
   },
   trade_offer: {
     icon: ArrowsRightLeftIcon,
     color: "bg-primary-100 text-primary-600",
-    text: "için takas teklifi geldi",
+    text: t("profile.analyticsTypes.icinTakasTeklifiGeldi"),
   },
-};
+});
 
 export const FALLBACK_ACTIVITY = {
   icon: BoltIcon,
@@ -147,18 +147,21 @@ export const FALLBACK_ACTIVITY = {
   text: "",
 };
 
-export function formatTimeAgo(timestamp: string): string {
+export function formatTimeAgo(timestamp: string, t: Translate): string {
   const diff = Date.now() - new Date(timestamp).getTime();
   const minutes = Math.floor(diff / 60000);
   const hours = Math.floor(diff / 3600000);
   const days = Math.floor(diff / 86400000);
-  if (minutes < 60) return `${minutes} dk önce`;
-  if (hours < 24) return `${hours} saat önce`;
-  return `${days} gün önce`;
+  if (minutes < 60)
+    return t("profile.analyticsTypes.minutesDkOnce", { minutes });
+  if (hours < 24) return t("profile.analyticsTypes.hoursSaatOnce", { hours });
+  return t("profile.analyticsTypes.daysGunOnce", { days });
 }
 
-export const PERIOD_TABS: { value: AnalyticsPeriod; label: string }[] = [
-  { value: "7d", label: "7 Gün" },
-  { value: "30d", label: "30 Gün" },
-  { value: "90d", label: "90 Gün" },
+export const PERIOD_TABS = (
+  t: Translate,
+): { value: AnalyticsPeriod; label: string }[] => [
+  { value: "7d", label: t("profile.analyticsTypes.7Gun") },
+  { value: "30d", label: t("profile.analyticsTypes.30Gun") },
+  { value: "90d", label: t("profile.analyticsTypes.90Gun") },
 ];

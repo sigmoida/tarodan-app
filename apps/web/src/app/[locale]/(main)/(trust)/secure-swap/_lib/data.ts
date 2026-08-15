@@ -8,8 +8,8 @@ import {
   ChatBubbleLeftRightIcon,
   ClipboardDocumentCheckIcon,
 } from "@heroicons/react/24/outline";
+import type { Translate } from "@/types/i18n";
 
-export type Lang = "tr" | "en";
 type Icon = ComponentType<SVGProps<SVGSVGElement>>;
 
 export interface TradeStep {
@@ -28,148 +28,80 @@ export interface TradeFaq {
   a: string;
 }
 
-export const STEPS: Record<Lang, TradeStep[]> = {
-  tr: [
-    {
-      icon: ChatBubbleLeftRightIcon,
-      title: "Takas Teklifi Gönderin",
-      description:
-        "İlgilendiğiniz bir ürüne takas teklifi gönderin. Karşı tarafa hangi ürünlerinizi teklif ettiğinizi belirtin.",
-    },
-    {
-      icon: ArrowsRightLeftIcon,
-      title: "Karşılıklı Onay",
-      description:
-        "Her iki taraf da takası onayladığında süreç başlar. Mesajlaşarak detayları netleştirin.",
-    },
-    {
-      icon: TruckIcon,
-      title: "Güvenli Kargo",
-      description:
-        "Ürünlerinizi anlaşmalı kargo ile gönderin. Kargo takip numarası sistem üzerinden paylaşılır.",
-    },
-    {
-      icon: ClipboardDocumentCheckIcon,
-      title: "Depo Kontrolü",
-      description:
-        "Ürünleri Tarodan deposuna gönderin. Uzman ekibimiz depoda gerekli kontrolleri sağlar; her iki tarafın da onayı sonrasında ürünleri yeni sahiplerine kargolar.",
-    },
-    {
-      icon: CheckCircleIcon,
-      title: "Takas Tamamlandı",
-      description:
-        "Her iki taraf da ürünü teslim aldığında takas tamamlanır. Karşılıklı değerlendirme yapılır.",
-    },
-  ],
-  en: [
-    {
-      icon: ChatBubbleLeftRightIcon,
-      title: "Send a Trade Offer",
-      description:
-        "Send a trade offer for a product you are interested in. Specify which of your products you are offering.",
-    },
-    {
-      icon: ArrowsRightLeftIcon,
-      title: "Mutual Approval",
-      description:
-        "The process begins when both parties approve the trade. Discuss details via messaging.",
-    },
-    {
-      icon: TruckIcon,
-      title: "Secure Shipping",
-      description:
-        "Ship your products via contracted courier. Tracking numbers are shared through the system.",
-    },
-    {
-      icon: ClipboardDocumentCheckIcon,
-      title: "Warehouse Inspection",
-      description:
-        "Send the items to the Tarodan warehouse. Our experts run the required checks there, and once both parties approve, the items are shipped to their new owners.",
-    },
-    {
-      icon: CheckCircleIcon,
-      title: "Trade Completed",
-      description:
-        "The trade is completed when both parties receive their items. Mutual reviews are exchanged.",
-    },
-  ],
-};
+export const STEPS = (t: Translate): TradeStep[] => [
+  {
+    icon: ChatBubbleLeftRightIcon,
+    title: t("page.secureSwap.data.takasTeklifiGonderin"),
+    description: t(
+      "page.secureSwap.data.ilgilendiginizBirUruneTakasTeklifiGonderin",
+    ),
+  },
+  {
+    icon: ArrowsRightLeftIcon,
+    title: t("page.secureSwap.data.karsilikliOnay"),
+    description: t("page.secureSwap.data.herIkiTarafDaTakasiOnayladiginda"),
+  },
+  {
+    icon: TruckIcon,
+    title: t("page.secureSwap.data.guvenliKargo"),
+    description: t(
+      "page.secureSwap.data.urunleriniziAnlasmaliKargoIleGonderinKargo",
+    ),
+  },
+  {
+    icon: ClipboardDocumentCheckIcon,
+    title: t("page.secureSwap.data.depoKontrolu"),
+    description: t(
+      "page.secureSwap.data.urunleriTarodanDeposunaGonderinUzmanEkibimiz",
+    ),
+  },
+  {
+    icon: CheckCircleIcon,
+    title: t("page.secureSwap.data.takasTamamlandi"),
+    description: t("page.secureSwap.data.herIkiTarafDaUrunuTeslim"),
+  },
+];
 
-export const GUARANTEES: Record<Lang, TradeGuarantee[]> = {
-  tr: [
-    {
-      title: "Doğrulanmış Üyeler",
-      description: "Takas yapabilmek için e-posta doğrulaması zorunludur.",
-    },
-    {
-      title: "Kargo Takibi",
-      description: "Tüm kargolar sistem üzerinden takip edilir.",
-    },
-    {
-      title: "Anlaşmazlık Çözümü",
-      description: "Sorun yaşandığında destek ekibimiz devreye girer.",
-    },
-    {
-      title: "Değerlendirme Sistemi",
-      description:
-        "Her takas sonrası puanlama ile güvenilir kullanıcılar ön plana çıkar.",
-    },
-  ],
-  en: [
-    {
-      title: "Verified Members",
-      description: "Email verification is required to make trades.",
-    },
-    {
-      title: "Shipment Tracking",
-      description: "All shipments are tracked through the system.",
-    },
-    {
-      title: "Dispute Resolution",
-      description: "Our support team steps in when issues arise.",
-    },
-    {
-      title: "Rating System",
-      description: "Post-trade ratings highlight reliable users.",
-    },
-  ],
-};
+export const GUARANTEES = (t: Translate): TradeGuarantee[] => [
+  {
+    title: t("page.secureSwap.data.dogrulanmisUyeler"),
+    description: t("page.secureSwap.data.takasYapabilmekIcinEPostaDogrulamasi"),
+  },
+  {
+    title: t("page.secureSwap.data.kargoTakibi"),
+    description: t(
+      "page.secureSwap.data.tumKargolarSistemUzerindenTakipEdilir",
+    ),
+  },
+  {
+    title: t("page.secureSwap.data.anlasmazlikCozumu"),
+    description: t(
+      "page.secureSwap.data.sorunYasandigindaDestekEkibimizDevreyeGirer",
+    ),
+  },
+  {
+    title: t("page.secureSwap.data.degerlendirmeSistemi"),
+    description: t("page.secureSwap.data.herTakasSonrasiPuanlamaIleGuvenilir"),
+  },
+];
 
-export const FAQ: Record<Lang, TradeFaq[]> = {
-  tr: [
-    {
-      q: "Takas ücretsiz mi?",
-      a: "Takas işlemlerinde ürünün komisyon kuralına göre sabit bir takas hizmet bedeli alınır. Kargo ayrıca, ilanda seçilen paket boyutuna göre hesaplanır.",
-    },
-    {
-      q: "Takas teklifi nasıl gönderilir?",
-      a: 'İlgilendiğiniz ürünün sayfasında "Takas Teklifi Gönder" butonuna tıklayarak kendi ürünlerinizden birini seçin.',
-    },
-    {
-      q: "Karşı taraf teklifi reddederse ne olur?",
-      a: "Hiçbir yükümlülüğünüz olmaz. Farklı bir teklif gönderebilir veya farklı ürünler arayabilirsiniz.",
-    },
-    {
-      q: "Sorun yaşarsam ne yapmalıyım?",
-      a: "Destek ekibimizle iletişime geçin. Anlaşmazlık çözüm sürecimiz her iki tarafı da koruma altına alır.",
-    },
-  ],
-  en: [
-    {
-      q: "Is trading free?",
-      a: "Trades have a flat service fee determined by the product's commission rule. Shipping is calculated separately from the package size selected for the listing.",
-    },
-    {
-      q: "How do I send a trade offer?",
-      a: 'Click "Send Trade Offer" on the product page you are interested in and select one of your products.',
-    },
-    {
-      q: "What if the other party rejects the offer?",
-      a: "You have no obligation. You can send a different offer or browse other products.",
-    },
-    {
-      q: "What should I do if there is a problem?",
-      a: "Contact our support team. Our dispute resolution process protects both parties.",
-    },
-  ],
-};
+export const FAQ = (t: Translate): TradeFaq[] => [
+  {
+    q: t("page.secureSwap.data.takasUcretsizMi"),
+    a: t("page.secureSwap.data.takasIslemlerindeUrununKomisyonKuralinaGore"),
+  },
+  {
+    q: t("page.secureSwap.data.takasTeklifiNasilGonderilir"),
+    a: t(
+      "page.secureSwap.data.ilgilendiginizUrununSayfasindaTakasTeklifiGonder",
+    ),
+  },
+  {
+    q: t("page.secureSwap.data.karsiTarafTeklifiReddederseNeOlur"),
+    a: t("page.secureSwap.data.hicbirYukumlulugunuzOlmazFarkliBirTeklif"),
+  },
+  {
+    q: t("page.secureSwap.data.sorunYasarsamNeYapmaliyim"),
+    a: t("page.secureSwap.data.destekEkibimizleIletisimeGecinAnlasmazlikCozum"),
+  },
+];

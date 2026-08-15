@@ -3,6 +3,7 @@
 import type { Metadata } from "next";
 import { localizedCanonical } from "@/lib/seo";
 import SecureSwapClient from "./_components/SecureSwapClient";
+import { getTranslations } from "next-intl/server";
 
 export async function generateMetadata({
   params,
@@ -10,19 +11,16 @@ export async function generateMetadata({
   params: Promise<{ locale: string }>;
 }): Promise<Metadata> {
   const { locale } = await params;
+  const t = await getTranslations({ locale });
   return {
-    title: "Güvenli Takas Sistemi · Tarodan",
-    description:
-      "Koleksiyonlarınızı diğer koleksiyonerlerle güvenle takas edin. Nasıl çalıştığını, güvenlik garantilerini ve sıkça sorulan soruları öğrenin.",
+    title: t("page.secureSwap.page.guvenliTakasSistemiTarodan"),
+    description: t(
+      "page.secureSwap.page.koleksiyonlariniziDigerKoleksiyonerlerleGuvenleTakasEdin",
+    ),
     alternates: localizedCanonical(locale, "/secure-swap"),
   };
 }
 
-export default async function SecureSwapPage({
-  params,
-}: {
-  params: Promise<{ locale: string }>;
-}) {
-  const { locale } = await params;
-  return <SecureSwapClient lang={locale === "en" ? "en" : "tr"} />;
+export default function SecureSwapPage() {
+  return <SecureSwapClient />;
 }

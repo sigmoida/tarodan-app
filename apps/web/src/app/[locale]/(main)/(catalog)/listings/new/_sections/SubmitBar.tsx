@@ -18,7 +18,7 @@ export default function SubmitBar() {
         className="flex-1"
         onClick={() => router.back()}
       >
-        İptal
+        {t("common.cancel")}
       </Button>
       <Button
         type="submit"

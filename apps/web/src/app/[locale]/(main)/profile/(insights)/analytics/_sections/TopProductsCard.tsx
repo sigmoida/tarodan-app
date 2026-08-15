@@ -7,6 +7,8 @@ import SectionCard from "@/components/ui/SectionCard";
 import { getProductEffectivePrice } from "@/lib/productPrice";
 import { formatTL } from "@/lib/format";
 import type { TopProduct } from "../_lib/types";
+import { getTranslations } from "next-intl/server";
+import type { Translate } from "@/types/i18n";
 
 const RANK_CLASS = [
   "bg-warning-400 text-inverted",
@@ -14,22 +16,34 @@ const RANK_CLASS = [
   "bg-warning-600 text-inverted",
 ];
 
-function statusBadge(status: string): { variant: BadgeVariant; label: string } {
-  if (status === "active") return { variant: "success", label: "Aktif" };
-  if (status === "sold") return { variant: "secondary", label: "Satıldı" };
+function statusBadge(
+  status: string,
+  t: Translate,
+): { variant: BadgeVariant; label: string } {
+  if (status === "active")
+    return {
+      variant: "success",
+      label: t("page.analytics.topproductscard.aktif"),
+    };
+  if (status === "sold")
+    return {
+      variant: "secondary",
+      label: t("page.analytics.topproductscard.satildi"),
+    };
   return { variant: "primary", label: status };
 }
 
-export default function TopProductsCard({
+export default async function TopProductsCard({
   products,
 }: {
   products: TopProduct[];
 }) {
+  const t = await getTranslations();
   return (
-    <SectionCard title="En Popüler İlanlar">
+    <SectionCard title={t("page.analytics.topproductscard.enPopulerIlanlar")}>
       <div className="space-y-3">
         {products.map((product, index) => {
-          const badge = statusBadge(product.status);
+          const badge = statusBadge(product.status, t);
           return (
             <Link
               key={product.id}

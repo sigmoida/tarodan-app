@@ -27,8 +27,10 @@ import StatSummaryCard from "./_components/StatSummaryCard";
 import FinancialCards from "./_sections/FinancialCards";
 import RecentSalesSection from "./_sections/RecentSalesSection";
 import QuickLinksCard from "./_sections/QuickLinksCard";
+import { useTranslations } from "next-intl";
 
 export default function StatisticsPage() {
+  const t = useTranslations();
   const { ready } = useRequireAuth();
 
   const { stats, isLoading } = useStatistics(ready);
@@ -45,7 +47,8 @@ export default function StatisticsPage() {
   }
 
   const { days, months } = membershipDuration(stats.memberSince);
-  const durationLabel = months > 0 ? `${months} ay` : `${days} gün`;
+  const durationLabel =
+    months > 0 ? `${months} ay` : t("profile.statistics.daysGun", { days });
   const ratePct =
     stats.tradesCount > 0
       ? `%${Math.round((stats.successfulTradesCount / stats.tradesCount) * 100)}`
@@ -54,15 +57,17 @@ export default function StatisticsPage() {
   return (
     <PageShell className="pb-16">
       <PageHeader
-        title="İstatistiklerim"
-        description="Hesap özeti ve performans verileri"
+        title={t("profile.statistics.istatistiklerim")}
+        description={t("profile.statistics.hesapOzetiVePerformansVerileri")}
         actions={
           <Badge
             variant="warning"
             size="md"
             icon={<TrophyIcon className="h-4 w-4" />}
           >
-            Üyelik: {durationLabel}
+            {t("profile.statistics.membershipLabel", {
+              duration: durationLabel,
+            })}
           </Badge>
         }
       />
@@ -70,36 +75,48 @@ export default function StatisticsPage() {
       {/* Headline stats */}
       <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
         <StatSummaryCard
-          title="İlanlarım"
+          title={t("profile.statistics.ilanlarim")}
           value={stats.productsCount}
           icon={TagIcon}
           accent="text-primary-600"
           extraInfo={[
-            { label: "Aktif", value: stats.activeProductsCount },
-            { label: "Satıldı", value: stats.soldProductsCount },
+            {
+              label: t("page.statistics.page.aktif"),
+              value: stats.activeProductsCount,
+            },
+            {
+              label: t("profile.statistics.satildi"),
+              value: stats.soldProductsCount,
+            },
           ]}
         />
         <StatSummaryCard
-          title="Siparişlerim"
+          title={t("profile.statistics.siparislerim")}
           value={stats.ordersCount}
           icon={ShoppingBagIcon}
           accent="text-success-600"
           extraInfo={[
-            { label: "Tamamlanan", value: stats.completedOrdersCount },
             {
-              label: "Bekleyen",
+              label: t("page.statistics.page.tamamlanan"),
+              value: stats.completedOrdersCount,
+            },
+            {
+              label: t("page.statistics.page.bekleyen"),
               value: stats.ordersCount - stats.completedOrdersCount,
             },
           ]}
         />
         <StatSummaryCard
-          title="Takaslarım"
+          title={t("profile.statistics.takaslarim")}
           value={stats.tradesCount}
           icon={ArrowsRightLeftIcon}
           accent="text-primary-600"
           extraInfo={[
-            { label: "Başarılı", value: stats.successfulTradesCount },
-            { label: "Oran", value: ratePct },
+            {
+              label: t("profile.statistics.basarili"),
+              value: stats.successfulTradesCount,
+            },
+            { label: t("page.statistics.page.oran"), value: ratePct },
           ]}
         />
       </div>
@@ -112,25 +129,25 @@ export default function StatisticsPage() {
       <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
         <MetricCard
           icon={EyeIcon}
-          label="Görüntüleme"
+          label={t("profile.statistics.goruntuleme")}
           value={stats.totalViews.toLocaleString("tr-TR")}
           accent="text-primary-600"
         />
         <MetricCard
           icon={HeartIcon}
-          label="Favori"
+          label={t("page.statistics.page.favori")}
           value={stats.totalFavorites.toLocaleString("tr-TR")}
           accent="text-danger-600"
         />
         <MetricCard
           icon={RectangleStackIcon}
-          label="Koleksiyon"
+          label={t("page.statistics.page.koleksiyon")}
           value={stats.collectionsCount}
           accent="text-primary-600"
         />
         <MetricCard
           icon={StarIcon}
-          label="Puan"
+          label={t("page.statistics.page.puan")}
           value={stats.rating > 0 ? stats.rating.toFixed(1) : "-"}
           accent="text-warning-600"
         />
@@ -138,10 +155,12 @@ export default function StatisticsPage() {
 
       {/* Seller rating */}
       {stats.rating > 0 && (
-        <SectionCard title="Satıcı Puanı">
+        <SectionCard title={t("profile.statistics.saticiPuani")}>
           <div className="flex items-center justify-between">
             <p className="text-sm text-muted">
-              {stats.reviewsCount} müşteri değerlendirmesi
+              {t("profile.statistics.reviewCount", {
+                count: stats.reviewsCount,
+              })}
             </p>
             <div className="flex items-center gap-2">
               <div className="flex">
@@ -174,7 +193,9 @@ export default function StatisticsPage() {
               <CalendarDaysIcon className="h-8 w-8 text-primary-500" />
             </div>
             <div>
-              <p className="text-sm text-muted">Üyelik Başlangıcı</p>
+              <p className="text-sm text-muted">
+                {t("profile.statistics.uyelikBaslangici")}
+              </p>
               <p className="text-xl font-semibold text-heading">
                 {new Date(stats.memberSince).toLocaleDateString("tr-TR", {
                   year: "numeric",
@@ -184,15 +205,15 @@ export default function StatisticsPage() {
               </p>
               <p className="mt-1 text-sm text-muted">
                 {months > 0
-                  ? `${months} aydır aramızdasınız`
-                  : `${days} gündür aramızdasınız`}
+                  ? t("profile.statistics.monthsAydirAramizdasiniz", { months })
+                  : t("profile.statistics.daysGundurAramizdasiniz", { days })}
               </p>
             </div>
           </div>
           <Button asChild className="gap-2">
             <Link href="/profile/analytics">
               <SparklesIcon className="h-5 w-5" />
-              Detaylı Analiz
+              {t("profile.statistics.detailedAnalysis")}
             </Link>
           </Button>
         </div>

@@ -3,6 +3,7 @@
 import type { Metadata } from "next";
 import { localizedCanonical } from "@/lib/seo";
 import PaymentOptionsClient from "./_components/PaymentOptionsClient";
+import { getTranslations } from "next-intl/server";
 
 export async function generateMetadata({
   params,
@@ -10,10 +11,12 @@ export async function generateMetadata({
   params: Promise<{ locale: string }>;
 }): Promise<Metadata> {
   const { locale } = await params;
+  const t = await getTranslations({ locale });
   return {
-    title: "Ödeme Seçenekleri · Tarodan",
-    description:
-      "Tarodan üzerinde kabul edilen ödeme yöntemleri, güvenli ödeme altyapısı ve taksit seçenekleri hakkında bilgi alın.",
+    title: t("page.paymentOptions.page.odemeSecenekleriTarodan"),
+    description: t(
+      "page.paymentOptions.page.tarodanUzerindeKabulEdilenOdemeYontemleri",
+    ),
     alternates: localizedCanonical(locale, "/payment-options"),
   };
 }

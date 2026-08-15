@@ -10,22 +10,25 @@ import { SectionCard } from "@/components/ui";
 import { PageShell } from "@/components/layout/PageShell";
 import { ButtonLink } from "@/components/ui/ButtonLink";
 import { useAuthStore } from "@/stores/authStore";
+import { useTranslations } from "next-intl";
+import type { Translate } from "@/types/i18n";
 
-const TIER_LABELS: Record<string, string> = {
-  free: "Ücretsiz",
-  basic: "Temel",
-  premium: "Premium",
-  business: "İş",
-};
+const TIER_LABELS = (t: Translate): Record<string, string> => ({
+  free: t("membership.success.ucretsiz"),
+  basic: t("membership.success.temel"),
+  premium: t("membership.success.premium"),
+  business: t("membership.success.is"),
+});
 
-const CAN_DO = [
-  "Takas teklifleri gönderin ve alın",
-  "Koleksiyonlar oluşturun ve paylaşın",
-  "Daha fazla ilan yayınlayın",
-  "Öncelikli destek alın",
+const CAN_DO = (t: Translate) => [
+  t("membership.success.takasTeklifleriGonderinVeAlin"),
+  t("membership.success.koleksiyonlarOlusturunVePaylasin"),
+  t("membership.success.dahaFazlaIlanYayinlayin"),
+  t("membership.success.oncelikliDestekAlin"),
 ];
 
 export default function MembershipSuccessClient() {
+  const t = useTranslations();
   const router = useRouter();
   const searchParams = useSearchParams();
   const { isAuthenticated, isLoading } = useAuthStore();
@@ -42,9 +45,12 @@ export default function MembershipSuccessClient() {
   const scheduled = searchParams.get("scheduled") === "1";
   const kind = searchParams.get("kind");
   const tier = searchParams.get("tier") || "";
-  const tierLabel = TIER_LABELS[tier] || "yeni";
+  const tierLabel = TIER_LABELS(t)[tier] || "yeni";
   const scheduledPeriod = searchParams.get("period");
-  const periodLabel = scheduledPeriod === "yearly" ? "yıllık" : "aylık";
+  const periodLabel =
+    scheduledPeriod === "yearly"
+      ? t("membership.success.yillik")
+      : t("membership.success.aylik");
 
   // Deferred downgrade: no payment, current plan lasts until period end.
   if (scheduled) {
@@ -53,36 +59,32 @@ export default function MembershipSuccessClient() {
         <SectionCard className="max-w-lg w-full p-8 md:p-10 text-center">
           <CheckCircleIcon className="mx-auto mb-6 h-14 w-14 text-warning-500" />
           <h1 className="mb-4 text-2xl md:text-3xl font-bold text-heading">
-            Plan değişikliği talebiniz alındı
+            {t("membership.success.planDegisikligiTalebinizAlindi")}
           </h1>
           <p className="mb-4 text-lg text-muted">
-            {scheduledPeriod ? (
-              <>
-                Üyeliğiniz mevcut dönem sonunda{" "}
-                <span className="font-semibold text-heading">
-                  {periodLabel}
-                </span>{" "}
-                faturalamaya geçecek.
-              </>
-            ) : (
-              <>
-                Üyeliğiniz mevcut dönem sonunda{" "}
-                <span className="font-semibold text-heading">{tierLabel}</span>{" "}
-                planına geçecek.
-              </>
-            )}
+            {scheduledPeriod
+              ? t.rich("membership.success.scheduledPeriodNotice", {
+                  period: periodLabel,
+                  b: (chunks) => (
+                    <span className="font-semibold text-heading">{chunks}</span>
+                  ),
+                })
+              : t.rich("membership.success.scheduledTierNotice", {
+                  tier: tierLabel,
+                  b: (chunks) => (
+                    <span className="font-semibold text-heading">{chunks}</span>
+                  ),
+                })}
           </p>
           <p className="mb-8 text-muted">
-            O tarihe kadar mevcut üyelik avantajlarınız aynen devam eder;
-            herhangi bir ödeme alınmaz. Dönem bitiş tarihinizi üyelik
-            sayfanızdan görebilirsiniz.
+            {t("membership.success.oTariheKadarMevcutUyelikAvantajlariniz")}
           </p>
           <div className="space-y-3">
             <ButtonLink variant="primary" href="/membership" className="w-full">
-              Üyelik Sayfama Git
+              {t("membership.success.uyelikSayfamaGit")}
             </ButtonLink>
             <ButtonLink variant="ghost" href="/profile" className="w-full">
-              Profile Git
+              {t("membership.success.profileGit")}
             </ButtonLink>
           </div>
         </SectionCard>
@@ -92,24 +94,24 @@ export default function MembershipSuccessClient() {
 
   const headline =
     kind === "upgrade"
-      ? "Üyeliğiniz başarıyla yükseltildi!"
-      : "Üyeliğiniz başarıyla değiştirildi!";
+      ? t("membership.success.uyeliginizBasariylaYukseltildi")
+      : t("membership.success.uyeliginizBasariylaDegistirildi");
 
   return (
     <PageShell className="flex items-center justify-center p-4">
       <SectionCard className="max-w-lg w-full p-8 md:p-10 text-center">
         <CheckCircleIcon className="mx-auto mb-6 h-14 w-14 text-success-500" />
         <h1 className="mb-3 text-2xl md:text-3xl font-bold text-heading">
-          Tebrikler!
+          {t("membership.success.tebrikler")}
         </h1>
         <p className="mb-8 text-lg text-muted">{headline}</p>
 
         <div className="mb-8 rounded-lg bg-surface p-6 text-left">
           <h2 className="mb-4 font-semibold text-heading">
-            Artık şunları yapabilirsiniz:
+            {t("membership.success.artikSunlariYapabilirsiniz")}
           </h2>
           <ul className="list-disc space-y-2 pl-5 text-muted marker:text-success-500">
-            {CAN_DO.map((item) => (
+            {CAN_DO(t).map((item) => (
               <li key={item}>{item}</li>
             ))}
           </ul>
@@ -117,17 +119,17 @@ export default function MembershipSuccessClient() {
 
         <div className="space-y-3">
           <ButtonLink variant="primary" href="/listings/new" className="w-full">
-            Yeni İlan Oluştur
+            {t("membership.success.yeniIlanOlustur")}
           </ButtonLink>
           <ButtonLink
             variant="secondary"
             href="/collections"
             className="w-full"
           >
-            Koleksiyon Oluştur
+            {t("membership.success.koleksiyonOlustur")}
           </ButtonLink>
           <ButtonLink variant="ghost" href="/profile" className="w-full">
-            Profile Git
+            {t("membership.success.profileGit")}
           </ButtonLink>
         </div>
       </SectionCard>

@@ -1,3 +1,6 @@
+"use client";
+
+import { useTranslations } from "next-intl";
 import { Button, Input } from "@tarodan/ui";
 
 interface StatusBannersProps {
@@ -15,21 +18,24 @@ export default function StatusBanners({
   reactivating,
   handleReactivate,
 }: StatusBannersProps) {
+  const t = useTranslations();
+
   return (
     <>
       {(status === "sold" || status === "inactive") && (
         <div className="mb-6 p-5 bg-warning-50 border border-warning-200 rounded-xl">
           <h2 className="text-lg font-semibold text-warning-800 mb-2">
-            {status === "sold" ? "Bu ürün satılmış" : "Bu ürün stokta yok"}
+            {status === "sold"
+              ? t("product.soldOutTitle")
+              : t("product.outOfStockTitle")}
           </h2>
           <p className="text-sm text-warning-700 mb-4">
-            Yeniden satışa açmak için stok miktarı belirleyin. İlanınız onaya
-            gönderilir; admin onayından sonra yeniden yayına girer.
+            {t("product.reactivateHint")}
           </p>
           <div className="flex items-end gap-3">
             <div>
               <label className="block text-sm font-medium text-warning-800 mb-1">
-                Stok Miktarı
+                {t("product.stockQuantity")}
               </label>
               <Input
                 type="number"
@@ -47,7 +53,9 @@ export default function StatusBanners({
               onClick={handleReactivate}
               disabled={reactivating}
             >
-              {reactivating ? "İşleniyor..." : "Onaya Gönder"}
+              {reactivating
+                ? t("checkout.processing")
+                : t("product.submitForApproval")}
             </Button>
           </div>
         </div>
@@ -56,11 +64,10 @@ export default function StatusBanners({
       {status === "reserved" && (
         <div className="mb-6 p-5 bg-info-50 border border-info-200 rounded-xl">
           <h2 className="text-lg font-semibold text-info-800 mb-2">
-            Bu ürün rezerve edilmiş
+            {t("product.reservedTitle")}
           </h2>
           <p className="text-sm text-info-700">
-            Rezerve edilmiş ürünler düzenlenemez. Rezervasyon tamamlandıktan
-            veya iptal edildikten sonra düzenleme yapabilirsiniz.
+            {t("product.reservedDescription")}
           </p>
         </div>
       )}
@@ -68,11 +75,10 @@ export default function StatusBanners({
       {status === "deleted" && (
         <div className="mb-6 p-5 bg-danger-50 border border-danger-200 rounded-xl">
           <h2 className="text-lg font-semibold text-danger-800 mb-2">
-            Bu ürün kaldırıldı
+            {t("product.removedTitle")}
           </h2>
           <p className="text-sm text-danger-700">
-            Bu ürün yönetici tarafından kaldırılmış ve yeniden açılamaz. Tekrar
-            satmak için yeni bir ilan oluşturabilirsiniz.
+            {t("product.removedDescription")}
           </p>
         </div>
       )}

@@ -62,12 +62,16 @@ export default function PaymentReady({
           <SectionCard className="text-center">
             <XCircleIcon className="mx-auto mb-4 h-14 w-14 text-danger-500" />
             <h2 className="mb-2 text-xl font-semibold">
-              Ödeme Bilgisi Bulunamadı
+              {t("page.payment.paymentready.odemeBilgisiBulunamadi")}
             </h2>
             <p className="mb-6 text-muted">
-              Ödeme hedefi yüklenemedi. Lütfen tekrar deneyin.
+              {t(
+                "page.payment.paymentready.odemeHedefiYuklenemediLutfenTekrarDeneyin",
+              )}
             </p>
-            <Button onClick={retry}>Tekrar Dene</Button>
+            <Button onClick={retry}>
+              {t("page.payment.paymentready.tekrarDene")}
+            </Button>
           </SectionCard>
         )}
       </div>
@@ -89,7 +93,9 @@ export default function PaymentReady({
                 size="lg"
                 className="w-full"
               >
-                {processing ? "İşleniyor…" : t("checkout.payNow")}
+                {processing
+                  ? t("page.payment.paymentready.isleniyor")
+                  : t("checkout.payNow")}
               </Button>
               <Button
                 variant="outline"
@@ -98,19 +104,21 @@ export default function PaymentReady({
                 isLoading={cancelling}
                 disabled={processing}
               >
-                Vazgeç ve geri dön
+                {t("page.payment.paymentready.vazgecVeGeriDon")}
               </Button>
             </div>
           )}
 
           <div className="rounded-xl border border-warning-200 bg-warning-50 p-4">
             <p className="text-sm text-warning-800">
-              <strong>Yardıma mı ihtiyacınız var?</strong> Ödeme sırasında sorun
-              yaşarsanız, lütfen{" "}
-              <Link href="/support" className="font-medium underline">
-                destek ekibimiz
-              </Link>{" "}
-              ile iletişime geçin.
+              {t.rich("page.payment.paymentready.bYardimaMiIhtiyacinizVarB", {
+                b: (chunks) => <strong>{chunks}</strong>,
+                link2: (chunks) => (
+                  <Link href="/support" className="font-medium underline">
+                    {chunks}
+                  </Link>
+                ),
+              })}
             </p>
           </div>
         </div>

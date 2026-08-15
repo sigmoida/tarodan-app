@@ -131,9 +131,9 @@ export const payoutStatusFilterOptions = (t: T) => [
  */
 export const transferStatusFilterOptions = (t: T) => [
   { value: "all", label: t("admin.finance.common.allStatuses") },
-  ...Object.entries(payoutStatusConfig).map(([value, cfg]) => ({
+  ...Object.entries(payoutStatusConfig).map(([value, entry]) => ({
     value,
-    label: cfg.label,
+    label: t(entry.labelKey),
   })),
 ];
 

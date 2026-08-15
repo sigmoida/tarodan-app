@@ -5,11 +5,13 @@
 import { CreditCardIcon, TrashIcon } from "@heroicons/react/24/outline";
 import { Badge, IconButton } from "@tarodan/ui";
 import type { SavedCard } from "@/lib/api";
+import type { Translate } from "@/types/i18n";
+import { useTranslations } from "next-intl";
 
-const CARD_TYPE_LABELS: Record<string, string> = {
-  credit: "Kredi kartı",
-  debit: "Banka kartı",
-};
+const CARD_TYPE_LABELS = (t: Translate): Record<string, string> => ({
+  credit: t("profile.savedCard.krediKarti"),
+  debit: t("profile.savedCard.bankaKarti"),
+});
 
 export default function SavedCardCard({
   card,
@@ -18,8 +20,9 @@ export default function SavedCardCard({
   card: SavedCard;
   onDelete: (card: SavedCard) => void;
 }) {
+  const t = useTranslations();
   const cardTypeLabel = card.cardType
-    ? (CARD_TYPE_LABELS[card.cardType] ?? null)
+    ? (CARD_TYPE_LABELS(t)[card.cardType] ?? null)
     : null;
   const meta = [card.bank, cardTypeLabel].filter(Boolean).join(" · ");
   return (
@@ -37,16 +40,16 @@ export default function SavedCardCard({
           )}
           {card.isDefault && (
             <Badge variant="primary" size="sm">
-              Varsayılan
+              {t("profile.savedCard.varsayilan")}
             </Badge>
           )}
           {card.autoRenewEligible ? (
             <Badge variant="success" size="sm">
-              Oto-yenilemeye uygun
+              {t("profile.savedCard.otoYenilemeyeUygun")}
             </Badge>
           ) : (
             <Badge variant="warning" size="sm">
-              CVV gerektirir
+              {t("profile.savedCard.cvvGerektirir")}
             </Badge>
           )}
           {card.businessCard && (
@@ -64,7 +67,7 @@ export default function SavedCardCard({
       </div>
       <IconButton
         variant="danger"
-        aria-label="Kartı sil"
+        aria-label={t("profile.savedCard.kartiSil")}
         onClick={() => onDelete(card)}
         className="flex-shrink-0"
       >

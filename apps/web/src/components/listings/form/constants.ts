@@ -4,6 +4,7 @@
 
 import { createTranslator } from "next-intl";
 import { getMessages, resolveLocale } from "@tarodan/i18n";
+import type { Translate } from "@/types/i18n";
 
 export interface Category {
   id: string;
@@ -87,11 +88,11 @@ export interface ColorOption {
   color?: string | null;
 }
 
-export const FALLBACK_MATERIALS = [
-  { slug: "diecast", label: "Diecast (Metal)" },
-  { slug: "resin", label: "Resin (Reçine)" },
-  { slug: "composite", label: "Composite (Kompozit)" },
-  { slug: "plastic", label: "Plastic (Plastik)" },
+export const FALLBACK_MATERIALS = (t: Translate) => [
+  { slug: "diecast", label: t("page.form.constants.diecastMetal") },
+  { slug: "resin", label: t("page.form.constants.resinRecine") },
+  { slug: "composite", label: t("page.form.constants.compositeKompozit") },
+  { slug: "plastic", label: t("page.form.constants.plasticPlastik") },
 ];
 
 // Brand/scale categories have their own dedicated fields, so they are dropped

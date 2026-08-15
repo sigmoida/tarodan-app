@@ -6,6 +6,7 @@ import { api } from "@/lib/api";
 import { useWebList } from "@/hooks/useWebResource";
 import { useWebMutation } from "@/hooks/useWebMutation";
 import type { FollowedUser } from "../_lib/types";
+import { useTranslations } from "next-intl";
 
 const RESOURCE = "profile-following";
 
@@ -27,12 +28,13 @@ export function useFollowing(enabled: boolean) {
 
 /** Unfollow a seller — owns toast + the follow/seller invalidations. */
 export function useUnfollow() {
+  const t = useTranslations();
   return useWebMutation(
     (userId: string) => api.delete(`/users/${userId}/follow`),
     {
       invalidates: [RESOURCE, "follow", "seller"],
-      successMessage: "Takip bırakıldı",
-      errorMessage: "Takip bırakılamadı",
+      successMessage: t("page.following.usefollowing.takipBirakildi"),
+      errorMessage: t("page.following.usefollowing.takipBirakilamadi"),
     },
   );
 }
