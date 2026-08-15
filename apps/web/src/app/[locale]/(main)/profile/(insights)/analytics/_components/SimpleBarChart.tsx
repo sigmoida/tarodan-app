@@ -1,9 +1,11 @@
 /** @format */
 
 import type { DailyPoint } from "../_lib/types";
+import { getTranslations } from "next-intl/server";
 
 /** Daily-views bar chart with hover tooltips. */
-export default function SimpleBarChart({ data }: { data: DailyPoint[] }) {
+export default async function SimpleBarChart({ data }: { data: DailyPoint[] }) {
+  const t = await getTranslations();
   const maxViews = Math.max(...data.map((d) => d.views), 1);
 
   return (
@@ -18,7 +20,7 @@ export default function SimpleBarChart({ data }: { data: DailyPoint[] }) {
             }}
           >
             <div className="absolute -top-8 left-1/2 -translate-x-1/2 whitespace-nowrap rounded bg-heading px-2 py-1 text-xs text-inverted opacity-0 transition-opacity group-hover:opacity-100">
-              {item.views} görüntüleme
+              {t("profile.analytics.viewsCount", { count: item.views })}
             </div>
           </div>
           <span className="w-8 origin-top-left -rotate-45 truncate text-2xs text-subtle">

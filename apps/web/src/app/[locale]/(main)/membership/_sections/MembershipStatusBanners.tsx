@@ -5,16 +5,18 @@
 import { Button } from "@tarodan/ui";
 import Notice from "../_components/Notice";
 import type { MembershipDetails } from "../_lib/types";
+import { useTranslations } from "next-intl";
+import type { Translate } from "@/types/i18n";
 
-const SCHEDULED_TIER_LABEL: Record<string, string> = {
-  basic: "Temel",
-  premium: "Premium",
-  business: "İş",
-};
+const SCHEDULED_TIER_LABEL = (t: Translate): Record<string, string> => ({
+  basic: t("membership.banners.temel"),
+  premium: t("membership.banners.premium"),
+  business: t("membership.banners.is"),
+});
 
-function fmtDate(iso?: string) {
+function fmtDate(iso: string | undefined, locale: string) {
   return iso
-    ? new Date(iso).toLocaleDateString("tr-TR", {
+    ? new Date(iso).toLocaleDateString(locale, {
         year: "numeric",
         month: "long",
         day: "numeric",
@@ -41,6 +43,7 @@ export default function MembershipStatusBanners({
   currentTier,
   onCancelScheduledChange,
 }: Props) {
+  const t = useTranslations();
   const isPaid = !!currentTier && currentTier !== "free";
   const isCancelled = membership.status === "cancelled";
 
@@ -48,11 +51,16 @@ export default function MembershipStatusBanners({
   if (isCancelled && isPaid) {
     return (
       <Notice>
-        Üyeliğiniz iptal edildi.{" "}
-        {membership.currentPeriodEnd
-          ? `${fmtDate(membership.currentPeriodEnd)} tarihine kadar`
-          : "Dönem sonuna kadar"}{" "}
-        premium özellikleriniz devam eder, ardından ücretsiz üyeliğe geçersiniz.
+        {t("membership.banners.cancelledUntil", {
+          until: membership.currentPeriodEnd
+            ? t("membership.banners.untilDate", {
+                date: fmtDate(
+                  membership.currentPeriodEnd,
+                  t("common.dateLocale"),
+                ),
+              })
+            : t("membership.banners.donemSonunaKadar"),
+        })}
       </Notice>
     );
   }
@@ -63,35 +71,39 @@ export default function MembershipStatusBanners({
     (membership.scheduledTierType || membership.scheduledBillingPeriod)
   ) {
     const dateStr = membership.currentPeriodEnd
-      ? `${fmtDate(membership.currentPeriodEnd)} tarihinde`
-      : "dönem sonunda";
+      ? t("membership.banners.onDate", {
+          date: fmtDate(membership.currentPeriodEnd, t("common.dateLocale")),
+        })
+      : t("membership.banners.donemSonunda");
     const isTierChange =
       !!membership.scheduledTierType &&
       membership.scheduledTierType !== currentTier;
     const tierLabel =
-      SCHEDULED_TIER_LABEL[membership.scheduledTierType ?? ""] ?? "Ücretsiz";
+      SCHEDULED_TIER_LABEL(t)[membership.scheduledTierType ?? ""] ??
+      t("membership.banners.ucretsiz");
     const periodLabel =
-      membership.scheduledBillingPeriod === "yearly" ? "yıllık" : "aylık";
+      membership.scheduledBillingPeriod === "yearly"
+        ? t("membership.banners.yillik")
+        : t("membership.banners.aylik");
     return (
       <Notice
         action={
           <Button variant="outline" size="sm" onClick={onCancelScheduledChange}>
-            Değişikliği iptal et
+            {t("membership.banners.degisikligiIptalEt")}
           </Button>
         }
       >
-        Üyeliğiniz {dateStr}{" "}
-        {isTierChange ? (
-          <>
-            <span className="font-semibold">{tierLabel}</span> planına geçecek.
-          </>
-        ) : (
-          <>
-            <span className="font-semibold">{periodLabel}</span> faturalamaya
-            geçecek.
-          </>
-        )}{" "}
-        O tarihe kadar mevcut üyelik avantajlarınız devam eder.
+        {isTierChange
+          ? t.rich("membership.banners.scheduledTier", {
+              when: dateStr,
+              tier: tierLabel,
+              b: (chunks) => <span className="font-semibold">{chunks}</span>,
+            })
+          : t.rich("membership.banners.scheduledPeriod", {
+              when: dateStr,
+              period: periodLabel,
+              b: (chunks) => <span className="font-semibold">{chunks}</span>,
+            })}
       </Notice>
     );
   }

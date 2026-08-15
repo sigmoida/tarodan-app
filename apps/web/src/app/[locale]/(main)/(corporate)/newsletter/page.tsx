@@ -3,6 +3,7 @@
 import type { Metadata } from "next";
 import { localizedCanonical } from "@/lib/seo";
 import NewsletterClient from "./_components/NewsletterClient";
+import { getTranslations } from "next-intl/server";
 
 export async function generateMetadata({
   params,
@@ -10,10 +11,12 @@ export async function generateMetadata({
   params: Promise<{ locale: string }>;
 }): Promise<Metadata> {
   const { locale } = await params;
+  const t = await getTranslations({ locale });
   return {
-    title: "Bülten Aboneliği · Tarodan",
-    description:
-      "Yeni ilanlar, indirimler ve koleksiyon haberleri için Tarodan bültenine ücretsiz abone olun.",
+    title: t("page.newsletter.page.bultenAboneligiTarodan"),
+    description: t(
+      "page.newsletter.page.yeniIlanlarIndirimlerVeKoleksiyonHaberleri",
+    ),
     alternates: localizedCanonical(locale, "/newsletter"),
   };
 }

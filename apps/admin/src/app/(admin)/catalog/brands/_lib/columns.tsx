@@ -71,6 +71,6 @@ export function brandColumns(t: T, actions: BrandRowActions) {
     col.badge<Brand>(t("common.status"), (b) => <Badge active={b.isActive} />, {
       sortKey: "isActive",
     }),
-    col.rowMenu<Brand>(brandRowMenu(actions)),
+    col.rowMenu<Brand>(brandRowMenu(actions, t)),
   ];
 }

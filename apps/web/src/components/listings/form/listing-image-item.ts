@@ -129,6 +129,14 @@ export function hasPendingUploads(items: ListingImageItem[]): boolean {
   );
 }
 
+export type ImageSubmitBlockerReason = "pending" | "failed";
+
+/** Engel gerekçesinin katalog anahtarı — mesajı çağıran render eder. */
+export const IMAGE_SUBMIT_BLOCKER_KEY = {
+  pending: "product.imageGrid.submitBlockerPending",
+  failed: "product.imageGrid.submitBlockerFailed",
+} as const;
+
 /**
  * Form GÖNDERİLEBİLİR mi? Gönderilemiyorsa gerekçesi de döner.
  *
@@ -136,22 +144,16 @@ export function hasPendingUploads(items: ListingImageItem[]): boolean {
  * aynı kapıdan geçmeli. Çözümlenmemiş görselle kaydedilen ilan, kullanıcının
  * ekranda gördüğünden EKSİK görselle yayınlanıyordu — forma yalnız `uploaded`
  * kalemler yazıldığı için sessizce düşüyorlardı.
+ *
+ * Metin DEĞİL gerekçe döner: bu saf yardımcı hook çağıramaz, mesajı katalogdan
+ * okuyan taraf onu gösteren bileşendir.
  */
 export function imageSubmitBlocker(
   items: ListingImageItem[],
-): { reason: "pending" | "failed"; message: string } | null {
-  if (hasPendingUploads(items)) {
-    return {
-      reason: "pending",
-      message: "Görsel yüklemesi sürüyor, lütfen tamamlanmasını bekleyin.",
-    };
-  }
+): { reason: ImageSubmitBlockerReason } | null {
+  if (hasPendingUploads(items)) return { reason: "pending" };
   if (items.some((item) => item.status === "failed")) {
-    return {
-      reason: "failed",
-      message:
-        "Yüklenemeyen görsel var. Tekrar deneyin ya da o görseli kaldırın.",
-    };
+    return { reason: "failed" };
   }
   return null;
 }

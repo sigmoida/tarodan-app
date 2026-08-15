@@ -1,6 +1,6 @@
 /** @format */
 
-import type { ReactNode } from 'react';
+import type { ReactNode } from "react";
 
 /**
  * The single "no data yet" card for the web app (profile area, seller profile,
@@ -11,24 +11,27 @@ import type { ReactNode } from 'react';
  * instead — this card is the plain, uniform default.
  */
 export function EmptyStateCard({
-	title,
-	description,
-	action,
-	className,
+  title,
+  description,
+  action,
+  className,
 }: {
-	title: string;
-	description?: ReactNode;
-	action?: ReactNode;
-	className?: string;
+  title: string;
+  description?: ReactNode;
+  action?: ReactNode;
+  className?: string;
 }) {
-	return (
-		<div
-			className={`rounded-lg border border-border bg-surface-elevated px-4 py-16 text-center ${
-				className ?? ''
-			}`}>
-			<h3 className='text-xl font-semibold text-heading'>{title}</h3>
-			{description && <p className='mx-auto mt-2 max-w-md text-muted'>{description}</p>}
-			{action && <div className='mt-6'>{action}</div>}
-		</div>
-	);
+  return (
+    <div
+      className={`rounded-lg border border-border bg-surface-elevated px-4 py-16 text-center ${
+        className ?? ""
+      }`}
+    >
+      <h3 className="text-xl font-semibold text-heading">{title}</h3>
+      {description && (
+        <p className="mx-auto mt-2 max-w-md text-muted">{description}</p>
+      )}
+      {action && <div className="mt-6">{action}</div>}
+    </div>
+  );
 }

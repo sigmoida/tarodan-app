@@ -36,6 +36,7 @@ import { useCheckoutAddresses } from "../_hooks/useCheckoutAddresses";
 import { useCheckoutAddressForm } from "../_hooks/useCheckoutAddressForm";
 import { useGuestOtp } from "../_hooks/useGuestOtp";
 import { useCheckoutSubmit } from "../_hooks/useCheckoutSubmit";
+import { imagePlaceholder } from "@/lib/placeholder";
 
 function useCheckoutValue() {
   const router = useRouter();
@@ -125,7 +126,8 @@ function useCheckoutValue() {
   // Ödenecek kapsam: "Hemen Al" ile gelindiyse yalnız o ürün, aksi halde
   // sepette SEÇİLİ satırlar. Sepetin tamamı değil — seçim dışı bırakılan ürün
   // sepette durur ama tahsil edilmez.
-  const buyNowRequested = searchParams.get("buyNow") === "true";
+  const buyNowRequested =
+    searchParams.get(t("page.checkout.checkoutcontext.buynow")) === "true";
   const { scopedLines, isBuyNow } = useCheckoutScope(
     cartLines,
     buyNowRequested,
@@ -144,8 +146,7 @@ function useCheckoutValue() {
         line.originalPrice != null && line.originalPrice > line.price
           ? line.originalPrice
           : undefined,
-      imageUrl:
-        line.imageUrl || "https://placehold.co/96x96/f3f4f6/9ca3af?text=Ürün",
+      imageUrl: line.imageUrl || imagePlaceholder("96x96"),
       seller: { id: line.sellerId, displayName: line.sellerName },
     }));
   // Quote her item'ı GERÇEK adediyle fiyatlar (adet değişince yeniden çeker) →
@@ -187,9 +188,9 @@ function useCheckoutValue() {
       (item) => item.productId === first.productId,
     );
     const message =
-      first.code === "SELLER_SALES_SUSPENDED"
+      first.code === t("page.checkout.checkoutcontext.sellerSALESSUSPENDED")
         ? t("server.commission.sellerSalesSuspended")
-        : first.code === "PRODUCT_NOT_ACTIVE"
+        : first.code === t("page.checkout.checkoutcontext.productNOTACTIVE")
           ? t("server.order.productNotActiveByTitle", {
               title: requested?.title ?? first.productId,
             })
@@ -382,16 +383,16 @@ function useCheckoutValue() {
   // ---- Step-1 validation (zod) ----
   const authAddressOk =
     !!selectedAddressId ||
-    isValid(shippingAddressWithPhoneSchema(locale), newAddress);
+    isValid(shippingAddressWithPhoneSchema(t), newAddress);
   const guestContactOk = !!(
     guestName?.trim() &&
     guestEmail?.trim() &&
     guestPhone?.trim()
   );
-  const guestAddressOk = isValid(shippingAddressSchema(locale), newAddress);
+  const guestAddressOk = isValid(shippingAddressSchema(t), newAddress);
   const billingOk =
     billingSameAsShipping ||
-    isValid(billingAddressSchema(locale), newBillingAddress);
+    isValid(billingAddressSchema(t), newBillingAddress);
   const addressStepValid = isAuthenticated
     ? authAddressOk && billingOk
     : guestContactOk && guestAddressOk && billingOk;
@@ -558,8 +559,11 @@ export function CheckoutProvider({ children }: { children: ReactNode }) {
 }
 
 export function useCheckout() {
+  const t = useTranslations();
   const ctx = useContext(CheckoutContext);
   if (!ctx)
-    throw new Error("useCheckout must be used within a CheckoutProvider");
+    throw new Error(
+      t("page.checkout.checkoutcontext.usecheckoutMustBeUsedWithinA"),
+    );
   return ctx;
 }

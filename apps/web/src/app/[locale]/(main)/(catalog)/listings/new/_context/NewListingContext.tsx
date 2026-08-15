@@ -34,6 +34,7 @@ import {
   useCommissionPreview,
 } from "@/components/listings/form/queries";
 import { useListingImageUpload } from "@/components/listings/form/useListingImageUpload";
+import { IMAGE_SUBMIT_BLOCKER_KEY } from "@/components/listings/form/listing-image-item";
 import {
   createEmptySaleData,
   saleDataToPayload,
@@ -176,12 +177,15 @@ function useNewListingValue() {
     // kapıdan geçer. Çözümlenmemiş görselle kaydedilen ilan, kullanıcının
     // ekranda gördüğünden eksik görselle yayınlanıyordu.
     if (imageSubmitBlocker) {
-      toast.error(imageSubmitBlocker.message);
+      toast.error(t(IMAGE_SUBMIT_BLOCKER_KEY[imageSubmitBlocker.reason]));
       return;
     }
     if (listingLimits && !listingLimits.canCreateListing) {
       toast.error(
-        `İlan limitinize ulaştınız (${listingLimits.currentCount}/${listingLimits.maxListings}). Üyeliğinizi yükselterek daha fazla ilan oluşturabilirsiniz.`,
+        t("product.listingLimitReached", {
+          current: listingLimits.currentCount,
+          max: listingLimits.maxListings,
+        }),
       );
       return;
     }

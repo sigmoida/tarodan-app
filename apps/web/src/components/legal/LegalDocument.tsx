@@ -1,5 +1,6 @@
 /** @format */
 
+import { getTranslations } from "next-intl/server";
 import { DocPage } from "@/components/layout/DocPage";
 import SectionCard from "@/components/ui/SectionCard";
 
@@ -44,7 +45,7 @@ export interface LegalPart {
   sections: LegalSection[];
 }
 
-function Block({ block }: { block: LegalBlock }) {
+async function Block({ block }: { block: LegalBlock }) {
   if (block.type === "p") {
     return <p className="text-sm leading-relaxed text-body">{block.text}</p>;
   }
@@ -102,6 +103,8 @@ function Block({ block }: { block: LegalBlock }) {
     );
   }
 
+  const t = await getTranslations();
+
   return (
     <div>
       {block.intro && (
@@ -114,7 +117,7 @@ function Block({ block }: { block: LegalBlock }) {
             {/* Değeri olmayan alan siparişe özeldir; metinde boş köşeli parantez
                 yerine ne zaman doldurulduğunu söyleyen bir ifade durur. */}
             <dd className={item.value ? "text-body" : "text-muted"}>
-              {item.value ?? "siparişinizde belirtilir"}
+              {item.value ?? t("legal.fieldStatedInOrder")}
             </dd>
           </div>
         ))}

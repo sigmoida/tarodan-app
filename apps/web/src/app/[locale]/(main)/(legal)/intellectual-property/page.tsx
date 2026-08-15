@@ -3,6 +3,7 @@
 import type { Metadata } from "next";
 import { localizedCanonical } from "@/lib/seo";
 import IntellectualPropertyClient from "./_components/IntellectualPropertyClient";
+import { getTranslations } from "next-intl/server";
 
 export async function generateMetadata({
   params,
@@ -10,10 +11,12 @@ export async function generateMetadata({
   params: Promise<{ locale: string }>;
 }): Promise<Metadata> {
   const { locale } = await params;
+  const t = await getTranslations({ locale });
   return {
-    title: "Fikri Mülkiyet · Tarodan",
-    description:
-      "TARODAN fikri mülkiyet politikası: telif hakkı ve marka kullanımı, ihlal bildirimi süreci ve tekrarlayan ihlallere ilişkin kurallar.",
+    title: t("page.intellectualProperty.page.fikriMulkiyetTarodan"),
+    description: t(
+      "page.intellectualProperty.page.tarodanFikriMulkiyetPolitikasiTelifHakki",
+    ),
     alternates: localizedCanonical(locale, "/intellectual-property"),
   };
 }

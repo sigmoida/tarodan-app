@@ -12,6 +12,9 @@
     "typecheck": "tsc --noEmit",
     "clean": "rm -rf dist .turbo"
   },
+  "dependencies": {
+    "@tarodan/i18n": "workspace:*"
+  },
   "devDependencies": {
     "@tarodan/eslint-config": "workspace:*",
     "@tarodan/tsconfig": "workspace:*",

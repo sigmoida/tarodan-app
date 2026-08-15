@@ -4,8 +4,22 @@
 
 import { api } from "@/lib/api";
 import { useWebList } from "@/hooks/useWebResource";
+import type { Translate } from "@/types/i18n";
+import { useTranslations } from "next-intl";
 
-const ISTANBUL = ["İstanbul", "istanbul", "ISTANBUL"];
+/**
+ * Şehir adı EŞLEŞME listesi — ekrana basılan metin değil, kullanıcının girdiği
+ * şehir adının yerel tarife için karşılaştırıldığı değerlerdir; bu yüzden
+ * katalogda değil burada durur.
+ */
+// eslint-disable-next-line @tarodan/no-hardcoded-turkish -- city-name match tokens, not display copy
+/**
+ * Şehir adı EŞLEŞME listesi — ekrana basılan metin değil, kullanıcının girdiği
+ * şehir adının yerel tarife için karşılaştırıldığı değerlerdir; bu yüzden
+ * katalogda değil burada durur.
+ */
+// eslint-disable-next-line @tarodan/no-hardcoded-turkish -- city-name match tokens, not display copy
+const ISTANBUL = ["İstanbul", "istanbul", "Istanbul"];
 
 /** Local fallback when the rates API has nothing (guests, or API failure). */
 function localRate(city: string): number {

@@ -3,6 +3,7 @@
 import type { Metadata } from "next";
 import { localizedCanonical } from "@/lib/seo";
 import GuidesClient from "./_components/GuidesClient";
+import { getTranslations } from "next-intl/server";
 
 export async function generateMetadata({
   params,
@@ -10,10 +11,12 @@ export async function generateMetadata({
   params: Promise<{ locale: string }>;
 }): Promise<Metadata> {
   const { locale } = await params;
+  const t = await getTranslations({ locale });
   return {
-    title: "Kullanım Kılavuzları · Tarodan",
-    description:
-      "TARODAN kullanım kılavuzları: üyelik, alışveriş, satış, takas, fotoğraf ve kargo süreçleri için adım adım rehberler.",
+    title: t("page.guides.page.kullanimKilavuzlariTarodan"),
+    description: t(
+      "page.guides.page.tarodanKullanimKilavuzlariUyelikAlisverisSatis",
+    ),
     alternates: localizedCanonical(locale, "/guides"),
   };
 }

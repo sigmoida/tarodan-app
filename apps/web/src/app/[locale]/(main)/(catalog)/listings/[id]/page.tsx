@@ -8,6 +8,7 @@ import ProductStaticInfo from "./_sections/ProductStaticInfo";
 import ProductStaticSpecs from "./_sections/ProductStaticSpecs";
 import type { Listing } from "./_lib/types";
 import { formatTL } from "@/lib/format";
+import { getTranslations } from "next-intl/server";
 
 const API_BASE = getServerApiOrigin();
 
@@ -45,15 +46,18 @@ async function fetchProduct(id: string): Promise<Listing | null> {
 }
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
+  const t = await getTranslations();
   const { id } = await params;
   const product = (await fetchProduct(id)) as ProductForMeta | null;
-  if (!product?.title) return { title: "İlan Bulunamadı | Tarodan" };
+  if (!product?.title)
+    return { title: t("page.listings.page.ilanBulunamadiTarodan") };
 
   const priceNum = Number(product.price);
   const priceText = Number.isFinite(priceNum) ? ` - ${formatTL(priceNum)}` : "";
   const title = `${product.title}${priceText} | Tarodan`;
   const description =
-    product.description?.slice(0, 160) || `${product.title} Tarodan'da satışta`;
+    product.description?.slice(0, 160) ||
+    t("page.listings.page.titleTarodanDaSatista", { title: product.title });
   const firstImage = product.images?.[0];
   const image = firstImage?.detailUrl || firstImage?.cardUrl || firstImage?.url;
 

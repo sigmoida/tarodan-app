@@ -7,6 +7,7 @@ import { queryKeys } from "@/lib/query/keys";
 import { localizedCanonical, localizedPath } from "@/lib/seo";
 import { getServerApiOrigin } from "@/lib/api/origin";
 import MembershipClient from "./MembershipClient";
+import { getTranslations } from "next-intl/server";
 
 const API_BASE = getServerApiOrigin();
 
@@ -16,14 +17,14 @@ export async function generateMetadata({
   params: Promise<{ locale: string }>;
 }): Promise<Metadata> {
   const { locale } = await params;
+  const t = await getTranslations({ locale });
   return {
-    title: "Üyelik Planları · Tarodan",
-    description:
-      "Tarodan üyelik planları: ilan limitleri, takas, koleksiyonlar ve öne çıkan ilanlar. Size uygun planı seçin.",
+    title: t("membership.page.uyelikPlanlariTarodan"),
+    description: t("membership.page.tarodanUyelikPlanlariIlanLimitleriTakas"),
     alternates: localizedCanonical(locale, "/membership"),
     openGraph: {
-      title: "Üyelik Planları · Tarodan",
-      description: "Size uygun Tarodan üyelik planını seçin.",
+      title: t("membership.page.uyelikPlanlariTarodan"),
+      description: t("membership.page.sizeUygunTarodanUyelikPlaniniSecin"),
       type: "website",
       url: localizedPath(locale, "/membership"),
     },

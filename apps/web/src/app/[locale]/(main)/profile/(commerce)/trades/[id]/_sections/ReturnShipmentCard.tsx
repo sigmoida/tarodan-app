@@ -29,7 +29,7 @@ export default function ReturnShipmentCard({
     >
       <p className="text-body">
         {myReturnShipment.carrier === "surat"
-          ? "Sürat Kargo"
+          ? t("page.trades.returnshipmentcard.suratKargo")
           : myReturnShipment.carrier || "—"}
         {/* Şube kabulüne kadar gönderi referansı, sonra gerçek takip kodu. */}
         {(() => {

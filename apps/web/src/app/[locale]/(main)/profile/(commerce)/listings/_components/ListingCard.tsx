@@ -32,6 +32,7 @@ import {
   type Listing,
 } from "../_lib/types";
 import { getListingActions, getListingStatus } from "../_lib/status";
+import { imagePlaceholder } from "@/lib/placeholder";
 
 const VIEWABLE = ["active", "sold"];
 
@@ -57,7 +58,7 @@ export default function ListingCard({
   onBoost,
 }: ListingCardProps) {
   const t = useTranslations();
-  const status = getListingStatus(listing.status);
+  const status = getListingStatus(listing.status, t);
   const StatusIcon = status.icon;
   const viewable = VIEWABLE.includes(listing.status);
   const onSale = isProductOnSaleDisplay(listing);
@@ -72,7 +73,7 @@ export default function ListingCard({
           alt={listing.title}
           fill
           className="object-cover transition-transform duration-300 group-hover:scale-[1.03]"
-          fallbackSrc="https://placehold.co/200x200/f3f4f6/9ca3af?text=Ürün"
+          fallbackSrc={imagePlaceholder("200x200")}
           logContext={{ listingId: listing.id, page: "profile-listings" }}
         />
         <div className="absolute left-2 top-2">

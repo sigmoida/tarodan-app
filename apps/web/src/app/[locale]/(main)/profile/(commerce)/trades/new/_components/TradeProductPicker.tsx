@@ -9,6 +9,7 @@ import OptimizedImage from "@/components/OptimizedImage";
 import { getProductEffectivePrice } from "@/lib/productPrice";
 import { formatTL } from "@/lib/format";
 import { getTradeProductImage, type TradeProduct } from "../_lib/types";
+import { useTranslations } from "next-intl";
 
 interface TradeProductPickerProps {
   products: TradeProduct[];
@@ -21,16 +22,19 @@ export default function TradeProductPicker({
   selectedIds,
   onToggle,
 }: TradeProductPickerProps) {
+  const t = useTranslations();
   if (products.length === 0) {
     return (
       <div className="py-8 text-center">
-        <p className="mb-4 text-muted">Takas edilebilir aktif ilanınız yok.</p>
+        <p className="mb-4 text-muted">
+          {t("page.new.tradeproductpicker.takasEdilebilirAktifIlaninizYok")}
+        </p>
         <ButtonLink
           variant="secondary"
           href="/profile/listings"
           className="gap-2"
         >
-          İlanlarıma Git
+          {t("trade.goToMyListings")}
           <ChevronRightIcon className="h-5 w-5" />
         </ButtonLink>
       </div>

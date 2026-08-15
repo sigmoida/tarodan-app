@@ -1,4 +1,5 @@
 /** @format */
+import type { Translate } from "@/types/i18n";
 
 /**
  * Satıcı sözleşmeleri — kurumsal metnin tek kaynağı.
@@ -33,222 +34,251 @@ export interface FeeRow {
   buyerProtectionFee: string;
 }
 
-export const FEE_TABLE: FeeRow[] = [
+export const feeTable = (t: Translate): FeeRow[] => [
   {
-    range: "250 TL – 999 TL",
+    range: t("legal.sellerAgreement.250Tl999Tl"),
     sellerCommission: "%6",
     buyerCommission: "%4",
-    sellerShipping: "50 TL",
-    buyerShipping: "50 TL",
+    sellerShipping: t("legal.sellerAgreement.50Tl"),
+    buyerShipping: t("legal.sellerAgreement.50Tl"),
     sellerServiceFee: "%5",
     buyerProtectionFee: "%5",
   },
   {
-    range: "1.000 TL – 9.999 TL",
+    range: t("legal.sellerAgreement.1000Tl9999Tl"),
     sellerCommission: "%6",
     buyerCommission: "%4",
-    sellerShipping: "50 TL",
-    buyerShipping: "50 TL",
+    sellerShipping: t("legal.sellerAgreement.50Tl"),
+    buyerShipping: t("legal.sellerAgreement.50Tl"),
     sellerServiceFee: "%5",
     buyerProtectionFee: "%6",
   },
   {
-    range: "10.000 TL – 24.999 TL",
+    range: t("legal.sellerAgreement.10000Tl24999Tl"),
     sellerCommission: "%6",
     buyerCommission: "%3",
-    sellerShipping: "50 TL",
-    buyerShipping: "50 TL",
+    sellerShipping: t("legal.sellerAgreement.50Tl"),
+    buyerShipping: t("legal.sellerAgreement.50Tl"),
     sellerServiceFee: "%5",
     buyerProtectionFee: "%4",
   },
   {
-    range: "25.000 TL ve üstü",
+    range: t("legal.sellerAgreement.25000TlVeUstu"),
     sellerCommission: "%3",
     buyerCommission: "%3",
-    sellerShipping: "50 TL",
-    buyerShipping: "50 TL",
+    sellerShipping: t("legal.sellerAgreement.50Tl"),
+    buyerShipping: t("legal.sellerAgreement.50Tl"),
     sellerServiceFee: "%3",
     buyerProtectionFee: "%3",
   },
   {
-    range: "Takas",
+    range: t("legal.sellerAgreement.takas"),
     sellerCommission: "—",
     buyerCommission: "—",
-    sellerShipping: "100 TL",
-    buyerShipping: "100 TL",
-    sellerServiceFee: "150 TL",
-    buyerProtectionFee: "150 TL",
+    sellerShipping: t("legal.sellerAgreement.100Tl"),
+    buyerShipping: t("legal.sellerAgreement.100Tl"),
+    sellerServiceFee: t("legal.sellerAgreement.150Tl"),
+    buyerProtectionFee: t("legal.sellerAgreement.150Tl"),
   },
 ];
 
-export const INDIVIDUAL_INTRO =
-  "Tarodan platformunda bireysel olarak model araç koleksiyonlarını sergilemek, satış yapmak ve takas işlemlerini gerçekleştirmek isteyen kullanıcılarımız için hazırlanan Bireysel Satıcı Sözleşmesi aşağıda yer almaktadır.";
+export const individualIntro = (t: Translate) =>
+  t("legal.sellerAgreement.tarodanPlatformundaBireyselOlarakModelArac");
 
-export const INDIVIDUAL_AGREEMENT: AgreementSection[] = [
+export const individualAgreement = (t: Translate): AgreementSection[] => [
   {
-    title: "1. Taraflar ve Kapsam",
-    intro:
-      "İşbu sözleşme, Tarodan platformu (“Platform”) ile koleksiyonundaki model araçları (Hot Wheels, die-cast, ölçekli araçlar vb.) ticari bir işletme olmaksızın, kişisel koleksiyon amaçlı veya bireysel olarak satışa çıkaran Kullanıcı (“Bireysel Satıcı”) arasında akdedilmiştir.",
+    title: t("legal.sellerAgreement.1TaraflarVeKapsam"),
+    intro: t("legal.sellerAgreement.isbuSozlesmeTarodanPlatformuPlatformIle"),
   },
   {
-    title: "2. Bireysel Satıcı Onboarding ve Hesap Açılışı",
+    title: t("legal.sellerAgreement.2BireyselSaticiOnboardingVeHesap"),
     clauses: [
       {
-        label: "Bilgi ve Belge Talebi",
-        text: "Bireysel satıcılar, platforma kayıt olurken ad-soyad, T.C. kimlik numarası, güncel iletişim bilgileri (e-posta, telefon) ve ödemelerin aktarılması için kendi adlarına kayıtlı geçerli IBAN/banka hesap bilgilerini eksiksiz olarak bildirmekle yükümlüdür.",
+        label: t("legal.sellerAgreement.bilgiVeBelgeTalebi"),
+        text: t(
+          "legal.sellerAgreement.bireyselSaticilarPlatformaKayitOlurkenAd",
+        ),
       },
       {
-        label: "Doğrulama",
-        text: "Tarodan, güvenlik ve yasal uyumluluk gereği bireysel satıcılardan ek kimlik doğrulaması talep etme hakkını saklı tutar.",
+        label: t("legal.sellerAgreement.dogrulama"),
+        text: t("legal.sellerAgreement.tarodanGuvenlikVeYasalUyumlulukGeregi"),
       },
     ],
   },
   {
-    title: "3. Ürün Listeleme, Kondisyon ve Şeffaflık",
+    title: t("legal.sellerAgreement.3UrunListelemeKondisyonVeSeffaflik"),
     clauses: [
       {
-        text: "Bireysel satıcı, ilanını açtığı model aracın markasını, modelini, ölçeğini ve kondisyonunu doğru ve eksiksiz olarak girmek zorundadır.",
+        text: t("legal.sellerAgreement.bireyselSaticiIlaniniActigiModelAracin"),
       },
       {
-        text: "Modelde veya orijinal kutusunda çizik, kırık, eksik parça gibi herhangi bir kusur mevcutsa, bunlar ilanda açıkça belirtilmeli ve fotoğraflarla gösterilmelidir. Şeffaflık ilkesine aykırı hareketlerden doğan sorumluluk tamamen satıcıya aittir.",
+        text: t("legal.sellerAgreement.modeldeVeyaOrijinalKutusundaCizikKirik"),
       },
     ],
   },
   {
-    title: "4. Paketleme ve Kargo Süreçleri",
+    title: t("legal.sellerAgreement.4PaketlemeVeKargoSurecleri"),
     clauses: [
       {
-        text: "Satıcı, satışı gerçekleşen modeli baloncuklu naylon, köpük ve sağlam karton kutu kullanarak kargo sürecinde zarar görmeyecek şekilde özenle paketlemekle yükümlüdür.",
+        text: t(
+          "legal.sellerAgreement.saticiSatisiGerceklesenModeliBaloncukluNaylon",
+        ),
       },
       {
-        text: "Satışı yapılan ürün, en geç 3 iş günü içinde kargoya teslim edilmeli ve kargo takip numarası sistem üzerinden paylaşılmalıdır.",
+        text: t("legal.sellerAgreement.satisiYapilanUrunEnGec3"),
       },
     ],
   },
   {
-    title: "5. Güvenli Ödeme ve Havuz Sistemi",
+    title: t("legal.sellerAgreement.5GuvenliOdemeVeHavuzSistemi"),
     clauses: [
       {
-        text: "Satış bedeli, alıcı ürünü teslim alıp onay verene kadar 14 gün Tarodan’ın güvenli havuz hesabında muhafaza edilir.",
+        text: t("legal.sellerAgreement.satisBedeliAliciUrunuTeslimAlip"),
       },
       {
-        text: "Havale, EFT veya elden ödeme gibi platform dışı ödeme yöntemleri kesinlikle yasaktır. Alıcı onayından sonra, komisyon ve hizmet bedelleri düşülerek net tutar satıcının hesabına aktarılır.",
+        text: t("legal.sellerAgreement.havaleEftVeyaEldenOdemeGibi"),
       },
     ],
   },
   {
-    title: "6. Takas Süreçleri",
+    title: t("legal.sellerAgreement.6TakasSurecleri"),
     clauses: [
       {
-        text: "“Takas Açık” olarak listelenen ürünlerde taraflar anlaştıktan sonra araçlar Tarodan merkez deposuna gönderilir. Depo uzmanlarının yaptığı kontroller sonucunda onaylanan takas süreçleri resmi olarak tamamlanır.",
+        text: t(
+          "legal.sellerAgreement.takasAcikOlarakListelenenUrunlerdeTaraflar",
+        ),
       },
     ],
   },
   {
-    title: "7. Yaptırımlar ve Askıya Alma",
+    title: t("legal.sellerAgreement.7YaptirimlarVeAskiyaAlma"),
     clauses: [
       {
-        text: "Gecikmeli kargolama, yanıltıcı ilan bilgileri veya platform dışı ödeme yönlendirmesi gibi riskli davranışlar tespit edildiğinde satıcının hesabı geçici olarak askıya alınabilir veya kalıcı olarak kapatılabilir.",
+        text: t(
+          "legal.sellerAgreement.gecikmeliKargolamaYanilticiIlanBilgileriVeya",
+        ),
       },
     ],
   },
   {
-    title: "8. Komisyon, Hizmet Bedelleri ve Güvenli Ödeme Havuzu",
+    title: t("legal.sellerAgreement.8KomisyonHizmetBedelleriVeGuvenli"),
     clauses: [
       {
-        text: "Tüm tahsilatlar Tarodan güvenli ödeme altyapısı üzerinden yapılır.",
+        text: t(
+          "legal.sellerAgreement.tumTahsilatlarTarodanGuvenliOdemeAltyapisi",
+        ),
       },
       {
-        text: "Bireysel satışlar üzerinden kesilecek komisyon oranları, hizmet bedelleri ve hak ediş transfer takvimi, taraflar arasında akdedilen ticari koşullara ve mağaza anlaşmasına göre yürütülür. Ödemeler havuz sisteminden onay akışına bağlı olarak serbest bırakılır.",
+        text: t(
+          "legal.sellerAgreement.bireyselSatislarUzerindenKesilecekKomisyonOranlari",
+        ),
       },
     ],
     showFeeTable: true,
   },
 ];
 
-export const CORPORATE_INTRO =
-  "Tarodan platformunda ticari unvanı ile mağaza açarak model araç satışı gerçekleştiren profesyonel işletmeler için hazırlanan Kurumsal Satıcı Sözleşmesi aşağıda yer almaktadır.";
+export const corporateIntro = (t: Translate) =>
+  t("legal.sellerAgreement.tarodanPlatformundaTicariUnvaniIleMagaza");
 
-export const CORPORATE_AGREEMENT: AgreementSection[] = [
+export const corporateAgreement = (t: Translate): AgreementSection[] => [
   {
-    title: "1. Taraflar ve Kapsam",
-    intro:
-      "İşbu sözleşme, Tarodan platformu (“Platform”) ile platformda ticari faaliyet yürütmek amacıyla mağaza açan, vergi mükellefi tüzel veya gerçek kişi satıcı (“Kurumsal Satıcı”) arasında akdedilmiştir.",
+    title: t("legal.sellerAgreement.1TaraflarVeKapsam"),
+    intro: t("legal.sellerAgreement.isbuSozlesmeTarodanPlatformuPlatformIle2"),
   },
   {
-    title: "2. Kurumsal Onboarding, Doğrulama ve Belge Yükümlülüğü",
-    intro:
-      "Kurumsal satıcılar, 6563 sayılı Kanun ve ilgili e-ticaret mevzuatına tam uyum sağlamak amacıyla platforma aşağıdaki bilgi ve belgeleri ibraz etmek zorundadır:",
+    title: t("legal.sellerAgreement.2KurumsalOnboardingDogrulamaVeBelge"),
+    intro: t("legal.sellerAgreement.kurumsalSaticilar6563SayiliKanunVe"),
     clauses: [
       {
-        label: "Şirket ve Vergi Bilgileri",
-        text: "Vergi levhası, ticaret sicil gazetesi, imza sirküleri, unvan, vergi dairesi ve vergi numarası, faaliyet belgesi.",
+        label: t("legal.sellerAgreement.sirketVeVergiBilgileri"),
+        text: t("legal.sellerAgreement.vergiLevhasiTicaretSicilGazetesiImza"),
       },
       {
-        label: "Yasal İletişim Bilgileri",
-        text: "Kayıtlı elektronik posta (KEP) adresi, MERSİS numarası, kurumsal telefon ve tebligat adresi.",
+        label: t("legal.sellerAgreement.yasalIletisimBilgileri"),
+        text: t("legal.sellerAgreement.kayitliElektronikPostaKepAdresiMersis"),
       },
       {
-        label: "Finansal Bilgiler",
-        text: "Şirket unvanına tescilli resmi banka hesap bilgileri (IBAN).",
+        label: t("legal.sellerAgreement.finansalBilgiler"),
+        text: t("legal.sellerAgreement.sirketUnvaninaTescilliResmiBankaHesap"),
       },
       {
-        text: "Kurumsal satıcı, sunduğu belgelerin doğruluğunu taahhüt eder; bilgilerde meydana gelen değişiklikleri derhal platforma bildirmekle yükümlüdür.",
+        text: t(
+          "legal.sellerAgreement.kurumsalSaticiSunduguBelgelerinDogrulugunuTaahhut",
+        ),
       },
     ],
   },
   {
-    title: "3. Yasal ve Ticari Sorumluluklar",
+    title: t("legal.sellerAgreement.3YasalVeTicariSorumluluklar"),
     clauses: [
       {
-        label: "Fatura ve Vergi Yükümlülüğü",
-        text: "Kurumsal satıcı, platform üzerinden gerçekleştirdiği tüm satışlar için alıcı adına yasal fatura düzenlemek ve e-fatura/e-arşiv mevzuatına uymakla yükümlüdür. Vergi beyanı ve mali yükümlülüklerin tüm sorumluluğu kurumsal satıcıya aittir.",
+        label: t("legal.sellerAgreement.faturaVeVergiYukumlulugu"),
+        text: t(
+          "legal.sellerAgreement.kurumsalSaticiPlatformUzerindenGerceklestirdigiTum",
+        ),
       },
       {
-        label: "Tüketici Hakları ve Garanti",
-        text: "6502 sayılı Tüketicinin Korunması Hakkında Kanun hükümlerine uymak, cayma haklarını eksiksiz uygulamak ve ürünlerin orijinal/garantili olmasından kurumsal satıcı doğrudan sorumludur.",
+        label: t("legal.sellerAgreement.tuketiciHaklariVeGaranti"),
+        text: t(
+          "legal.sellerAgreement.6502SayiliTuketicininKorunmasiHakkindaKanun",
+        ),
       },
     ],
   },
   {
-    title: "4. İlan, Stok ve Fiyatlandırma Standartları",
+    title: t("legal.sellerAgreement.4IlanStokVeFiyatlandirmaStandartlari"),
     clauses: [
       {
-        text: "Kurumsal satıcılar, stoklarında yer alan ürünleri güncel fiyat ve detay bilgileriyle listelemek zorundadır. Yanıltıcı stok veya fiyatlandırma politikaları uygulanamaz.",
+        text: t(
+          "legal.sellerAgreement.kurumsalSaticilarStoklarindaYerAlanUrunleri",
+        ),
       },
       {
-        text: "Ürün görsellerinde telif haklarına uygun, profesyonel veya net ürün fotoğrafları kullanılmalıdır.",
+        text: t(
+          "legal.sellerAgreement.urunGorsellerindeTelifHaklarinaUygunProfesyonel",
+        ),
       },
     ],
   },
   {
-    title: "5. Paketleme, Lojistik ve Operasyonel Süreçler",
+    title: t("legal.sellerAgreement.5PaketlemeLojistikVeOperasyonelSurecler"),
     clauses: [
       {
-        text: "Kurumsal satıcı, yüksek hacimli siparişlerde dahi koleksiyoner hassasiyetine uygun standartlarda paketleme yapmak ve siparişleri taahhüt edilen süreler (3 iş günü) içerisinde kargoya teslim etmekle yükümlüdür.",
+        text: t(
+          "legal.sellerAgreement.kurumsalSaticiYuksekHacimliSiparislerdeDahi",
+        ),
       },
       {
-        text: "Kargo takip numaralarının sisteme zamanında girilmesi zorunludur.",
+        text: t(
+          "legal.sellerAgreement.kargoTakipNumaralarininSistemeZamanindaGirilmesi",
+        ),
       },
     ],
   },
   {
-    title: "6. Komisyon, Hizmet Bedelleri ve Güvenli Ödeme Havuzu",
+    title: t("legal.sellerAgreement.6KomisyonHizmetBedelleriVeGuvenli"),
     clauses: [
       {
-        text: "Tüm tahsilatlar Tarodan güvenli ödeme altyapısı üzerinden yapılır.",
+        text: t(
+          "legal.sellerAgreement.tumTahsilatlarTarodanGuvenliOdemeAltyapisi",
+        ),
       },
       {
-        text: "Kurumsal satışlar üzerinden kesilecek komisyon oranları, hizmet bedelleri ve hak ediş transfer takvimi, taraflar arasında akdedilen ticari koşullara ve mağaza anlaşmasına göre yürütülür. Ödemeler havuz sisteminden onay akışına bağlı olarak serbest bırakılır.",
+        text: t(
+          "legal.sellerAgreement.kurumsalSatislarUzerindenKesilecekKomisyonOranlari",
+        ),
       },
     ],
     showFeeTable: true,
   },
   {
-    title: "7. Denetim, Risk Yönetimi ve Hesabın Askıya Alınması",
+    title: t("legal.sellerAgreement.7DenetimRiskYonetimiVeHesabin"),
     clauses: [
       {
-        text: "Kurumsal satıcının sahte/replika ürün satması, müşteri şikayetlerini sistematik olarak çözümsüz bırakması, mevzuata aykırı ticari faaliyetlerde bulunması veya platform dışı ödeme talep etmesi durumunda Tarodan, önceden ihtara gerek olmaksızın mağazayı geçici olarak askıya alma veya sözleşmeyi tek taraflı feshederek hesabı kalıcı olarak kapatma hakkına sahiptir.",
+        text: t(
+          "legal.sellerAgreement.kurumsalSaticininSahteReplikaUrunSatmasi",
+        ),
       },
     ],
   },

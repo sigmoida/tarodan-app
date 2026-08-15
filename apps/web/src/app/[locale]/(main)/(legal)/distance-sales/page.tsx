@@ -1,9 +1,10 @@
 /** @format */
 
 import type { Metadata } from "next";
+import { getTranslations } from "next-intl/server";
 import { localizedCanonical } from "@/lib/seo";
 import { LegalDocument } from "@/components/legal/LegalDocument";
-import { DISTANCE_SALES_PARTS } from "./_lib/contract";
+import { distanceSalesParts } from "./_lib/contract";
 
 export async function generateMetadata({
   params,
@@ -11,21 +12,22 @@ export async function generateMetadata({
   params: Promise<{ locale: string }>;
 }): Promise<Metadata> {
   const { locale } = await params;
+  const t = await getTranslations({ locale });
   return {
-    title: "Mesafeli Satış Sözleşmesi · Tarodan",
-    description:
-      "Tarodan ön bilgilendirme formu ve mesafeli satış sözleşmesi: taraflar, toplam bedel, teslimat, 14 günlük cayma hakkı, ayıplı mal ve uyuşmazlık çözümü.",
+    title: t("legal.distanceSales.metaTitle"),
+    description: t("legal.distanceSales.metaDescription"),
     alternates: localizedCanonical(locale, "/distance-sales"),
   };
 }
 
-export default function DistanceSalesPage() {
+export default async function DistanceSalesPage() {
+  const t = await getTranslations();
   return (
     <LegalDocument
-      title="Mesafeli Satış Sözleşmesi"
-      description="Ön Bilgilendirme Formu ve Mesafeli Satış Sözleşmesi (pazar yeri / aracı hizmet sağlayıcı modeli)."
-      parts={DISTANCE_SALES_PARTS}
-      footer="Bu metin genel sözleşme metnidir. Siparişinize özel bilgiler (ürün, tutar, taraf ve teslimat bilgileri) sipariş özeti ekranında ve sipariş onay e-postanızda yer alır; sözleşmenin siparişinize işlenmiş haline Hesabım → Siparişlerim alanından erişebilirsiniz."
+      title={t("legal.distanceSalesTitle")}
+      description={t("legal.distanceSales.pageDescription")}
+      parts={distanceSalesParts(t)}
+      footer={t("legal.distanceSales.pageFooter")}
     />
   );
 }

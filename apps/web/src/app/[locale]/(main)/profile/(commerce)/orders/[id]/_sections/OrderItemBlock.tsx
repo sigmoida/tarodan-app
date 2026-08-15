@@ -17,6 +17,7 @@ import ReviewSummary from "./ReviewSummary";
 import RefundActions from "./RefundActions";
 import OrderSummaryCard from "./OrderSummaryCard";
 import InvoicesSection from "./InvoicesSection";
+import { statusConfig } from "@/lib/statusLabels";
 
 export interface OrderItemBlockHandlers {
   onReview: (order: OrderDetail) => void;
@@ -68,7 +69,7 @@ export default function OrderItemBlock({
           <div className="flex items-center gap-3">
             <StatusBadge
               status={displayStatus}
-              config={orderStatusConfig}
+              config={statusConfig(orderStatusConfig, t)}
               label={statusLabel}
               size="sm"
             />

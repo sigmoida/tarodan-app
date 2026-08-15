@@ -3,6 +3,7 @@
 import type { Metadata } from "next";
 import { localizedCanonical } from "@/lib/seo";
 import SellClient from "./_components/SellClient";
+import { getTranslations } from "next-intl/server";
 
 export async function generateMetadata({
   params,
@@ -10,10 +11,12 @@ export async function generateMetadata({
   params: Promise<{ locale: string }>;
 }): Promise<Metadata> {
   const { locale } = await params;
+  const t = await getTranslations({ locale });
   return {
-    title: "Burada Satış Yapın · Tarodan",
-    description:
-      "Model araba koleksiyonunuzu Tarodan üzerinde satışa çıkarın; güvenli ödeme ve geniş alıcı kitlesiyle buluşun.",
+    title: t("page.sell.page.buradaSatisYapinTarodan"),
+    description: t(
+      "page.sell.page.modelArabaKoleksiyonunuzuTarodanUzerindeSatisa",
+    ),
     alternates: localizedCanonical(locale, "/sell"),
   };
 }

@@ -1,7 +1,7 @@
 import { getTranslations } from "next-intl/server";
 import { DocPage } from "@/components/layout/DocPage";
 import SectionCard from "@/components/ui/SectionCard";
-import { GUIDES } from "../_lib/guides";
+import { guideList } from "../_lib/guides";
 
 export default async function GuidesClient() {
   const t = await getTranslations();
@@ -11,7 +11,7 @@ export default async function GuidesClient() {
       {/* Kılavuz listesi — anchor'lar (#selling, #trade …) /support ve FAQ
 			    sayfalarından linkleniyor, o yüzden id + scroll-mt korunuyor. */}
       <nav className="flex flex-wrap gap-x-4 gap-y-2">
-        {GUIDES.map((guide) => (
+        {guideList(t).map((guide) => (
           <a
             key={guide.id}
             href={`#${guide.id}`}
@@ -22,7 +22,7 @@ export default async function GuidesClient() {
         ))}
       </nav>
 
-      {GUIDES.map((guide) => (
+      {guideList(t).map((guide) => (
         <div key={guide.id} id={guide.id} className="scroll-mt-24">
           <SectionCard title={guide.title}>
             <ol className="space-y-5">
@@ -47,12 +47,14 @@ export default async function GuidesClient() {
       <SectionCard title={t("guides.safetyTips")}>
         <ul className="space-y-2">
           {[
-            "Ödemeleri her zaman platform üzerinden yapın",
-            "Şüpheli fiyatlara dikkat edin",
-            "Satıcı değerlendirmelerini kontrol edin",
-            "Kargo takip numarasını mutlaka alın",
-            "Teslimat sırasında paketi kontrol edin",
-            "Sorun olursa 24 saat içinde bildirin",
+            t(
+              "page.guides.guidesclient.odemeleriHerZamanPlatformUzerindenYapin",
+            ),
+            t("page.guides.guidesclient.supheliFiyatlaraDikkatEdin"),
+            t("page.guides.guidesclient.saticiDegerlendirmeleriniKontrolEdin"),
+            t("page.guides.guidesclient.kargoTakipNumarasiniMutlakaAlin"),
+            t("page.guides.guidesclient.teslimatSirasindaPaketiKontrolEdin"),
+            t("page.guides.guidesclient.sorunOlursa24SaatIcindeBildirin"),
           ].map((tip) => (
             <li
               key={tip}

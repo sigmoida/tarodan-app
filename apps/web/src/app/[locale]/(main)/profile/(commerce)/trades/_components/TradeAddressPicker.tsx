@@ -91,21 +91,26 @@ export default function TradeAddressPicker({
   }, [addresses, select]);
 
   const handleAdd = async () => {
-    if (!form.fullName.trim()) return toast.error("Ad soyad girin");
+    if (!form.fullName.trim())
+      return toast.error(t("page.trades.tradeaddresspicker.adSoyadGirin"));
     // combinePhone boş dönerse numara geçerli bir TR cep numarası değil.
     if (!combinePhone(form.phone))
       return toast.error(t("validation.trPhoneOnly"));
-    if (!form.city) return toast.error("İl seçin");
-    if (!form.district) return toast.error("İlçe seçin");
+    if (!form.city)
+      return toast.error(t("page.trades.tradeaddresspicker.ilSecin"));
+    if (!form.district)
+      return toast.error(t("page.trades.tradeaddresspicker.ilceSecin"));
     if (form.address.trim().length < 10)
-      return toast.error("Adres en az 10 karakter olmalı");
+      return toast.error(
+        t("page.trades.tradeaddresspicker.adresEnAz10KarakterOlmali"),
+      );
 
     pendingIdsRef.current = new Set(addresses.map((a) => a.id));
     try {
       await saveAddress.mutateAsync({
         id: null,
         values: {
-          title: "Takas Adresi",
+          title: t("page.trades.tradeaddresspicker.takasAdresi"),
           fullName: form.fullName.trim(),
           phone: form.phone.trim(),
           city: form.city,
@@ -158,7 +163,7 @@ export default function TradeAddressPicker({
                   {a.fullName}
                   {a.isDefault && (
                     <span className="ml-2 text-xs text-primary-600">
-                      (Varsayılan)
+                      {t("page.trades.tradeaddresspicker.varsayilan")}
                     </span>
                   )}
                 </p>
@@ -175,10 +180,12 @@ export default function TradeAddressPicker({
       {/* Yeni adres formu */}
       {showForm ? (
         <div className="p-4 border border-border rounded-lg bg-surface space-y-3">
-          <p className="text-sm font-medium text-heading">Yeni Adres</p>
+          <p className="text-sm font-medium text-heading">
+            {t("page.trades.tradeaddresspicker.yeniAdres")}
+          </p>
           <Input
             type="text"
-            placeholder="Ad Soyad"
+            placeholder={t("page.trades.tradeaddresspicker.adSoyad")}
             value={form.fullName}
             onChange={(e) => setForm({ ...form, fullName: e.target.value })}
           />
@@ -202,7 +209,9 @@ export default function TradeAddressPicker({
           />
           <Textarea
             rows={2}
-            placeholder="Açık adres (mahalle, cadde, no...)"
+            placeholder={t(
+              "page.trades.tradeaddresspicker.acikAdresMahalleCaddeNo",
+            )}
             value={form.address}
             onChange={(e) => setForm({ ...form, address: e.target.value })}
           />
@@ -212,7 +221,7 @@ export default function TradeAddressPicker({
               isLoading={saveAddress.isPending}
               disabled={saveAddress.isPending}
             >
-              Adresi Kaydet
+              {t("page.trades.tradeaddresspicker.adresiKaydet")}
             </Button>
             {addresses.length > 0 && (
               <Button
@@ -220,7 +229,7 @@ export default function TradeAddressPicker({
                 onClick={() => setShowForm(false)}
                 disabled={saveAddress.isPending}
               >
-                Vazgeç
+                {t("page.trades.tradeaddresspicker.vazgec")}
               </Button>
             )}
           </div>
@@ -231,7 +240,7 @@ export default function TradeAddressPicker({
           onClick={() => setShowForm(true)}
           leftIcon={<PlusIcon className="w-4 h-4" />}
         >
-          Yeni adres ekle
+          {t("page.trades.tradeaddresspicker.yeniAdresEkle")}
         </Button>
       )}
     </div>

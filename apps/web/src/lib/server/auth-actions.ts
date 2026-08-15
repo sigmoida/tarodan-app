@@ -3,21 +3,28 @@
 import { type AuthErrorReason } from "@tarodan/auth";
 import { type WebUser } from "@/lib/auth.config";
 import { authLogic, getSession } from "./session";
+import type { Translate } from "@/types/i18n";
+import { getTranslations } from "next-intl/server";
 
 export type WebLoginResult =
   | { status: "ok"; user: WebUser | null }
   | { status: "2fa" }
   | { status: "error"; reason: AuthErrorReason; message: string };
 
-function reasonMessage(
+async function reasonMessage(
   reason: AuthErrorReason,
   serverMessage: string | undefined,
-): string {
-  if (reason === "connection") return "Sunucuya bağlanılamadı.";
+): Promise<string> {
+  const t = await getTranslations();
+  if (reason === "connection")
+    return t("page.server.authActions.sunucuyaBaglanilamadi");
   if (reason === "unverified")
-    return serverMessage || "Email verification required";
-  if (reason === "invalid") return "E-posta veya şifre hatalı";
-  return serverMessage || "Giriş başarısız";
+    return (
+      serverMessage || t("page.server.authActions.emailVerificationRequired")
+    );
+  if (reason === "invalid")
+    return t("page.server.authActions.ePostaVeyaSifreHatali");
+  return serverMessage || t("page.server.authActions.girisBasarisiz");
 }
 
 /**
@@ -36,7 +43,7 @@ export async function loginAction(input: {
     return {
       status: "error",
       reason: result.reason,
-      message: reasonMessage(result.reason, result.serverMessage),
+      message: await reasonMessage(result.reason, result.serverMessage),
     };
   }
   if (result.status === "2fa") return { status: "2fa" };
@@ -50,7 +57,7 @@ export async function googleLoginAction(code: string): Promise<WebLoginResult> {
     return {
       status: "error",
       reason: result.reason,
-      message: reasonMessage(result.reason, result.serverMessage),
+      message: await reasonMessage(result.reason, result.serverMessage),
     };
   }
   if (result.status === "2fa") return { status: "2fa" };
@@ -67,7 +74,7 @@ export async function appleLoginAction(
     return {
       status: "error",
       reason: result.reason,
-      message: reasonMessage(result.reason, result.serverMessage),
+      message: await reasonMessage(result.reason, result.serverMessage),
     };
   }
   if (result.status === "2fa") return { status: "2fa" };

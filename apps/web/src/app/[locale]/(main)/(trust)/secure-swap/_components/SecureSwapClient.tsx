@@ -5,21 +5,21 @@ import {
 } from "@heroicons/react/24/outline";
 import { DocPage } from "@/components/layout/DocPage";
 import SectionCard from "@/components/ui/SectionCard";
-import { STEPS, GUARANTEES, FAQ, type Lang } from "../_lib/data";
+import { STEPS, GUARANTEES, FAQ } from "../_lib/data";
+import { getTranslations } from "next-intl/server";
 
-export default function SecureSwapClient({ lang }: { lang: Lang }) {
+export default async function SecureSwapClient() {
+  const t = await getTranslations();
   return (
     <DocPage
-      title={lang === "en" ? "Secure Trade System" : "Güvenli Takas Sistemi"}
-      description={
-        lang === "en"
-          ? "Trade your collectibles with other collectors safely. Our system protects both parties at every step."
-          : "Koleksiyonlarınızı diğer koleksiyonerlerle güvenle takas edin. Sistemimiz her adımda iki tarafı da korur."
-      }
+      title={t("page.secureSwap.secureswapclient.guvenliTakasSistemi")}
+      description={t(
+        "page.secureSwap.secureswapclient.koleksiyonlariniziDigerKoleksiyonerlerleGuvenleTakasEdin",
+      )}
     >
-      <SectionCard title={lang === "en" ? "How It Works" : "Nasıl Çalışır?"}>
+      <SectionCard title={t("page.secureSwap.secureswapclient.nasilCalisir")}>
         <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-5">
-          {STEPS[lang].map((step, i) => (
+          {STEPS(t).map((step, i) => (
             <div
               key={i}
               className="relative rounded border border-border-subtle bg-surface p-5"
@@ -29,7 +29,7 @@ export default function SecureSwapClient({ lang }: { lang: Lang }) {
                   <step.icon className="h-5 w-5 text-primary-500" />
                 </div>
                 <span className="text-xs font-bold uppercase text-subtle">
-                  {lang === "en" ? `Step ${i + 1}` : `Adım ${i + 1}`}
+                  {t("page.secureSwap.secureswapclient.adimI", { i: i + 1 })}
                 </span>
               </div>
               <h3 className="mb-1.5 font-semibold text-heading">
@@ -44,10 +44,10 @@ export default function SecureSwapClient({ lang }: { lang: Lang }) {
       </SectionCard>
 
       <SectionCard
-        title={lang === "en" ? "Security Guarantees" : "Güvenlik Garantileri"}
+        title={t("page.secureSwap.secureswapclient.guvenlikGarantileri")}
       >
         <div className="grid gap-4 sm:grid-cols-2">
-          {GUARANTEES[lang].map((item, i) => (
+          {GUARANTEES(t).map((item, i) => (
             <div
               key={i}
               className="flex items-start gap-4 rounded border border-border-subtle bg-surface p-5"
@@ -65,12 +65,10 @@ export default function SecureSwapClient({ lang }: { lang: Lang }) {
       </SectionCard>
 
       <SectionCard
-        title={
-          lang === "en" ? "Frequently Asked Questions" : "Sıkça Sorulan Sorular"
-        }
+        title={t("page.secureSwap.secureswapclient.sikcaSorulanSorular")}
       >
         <div className="space-y-4">
-          {FAQ[lang].map((item, i) => (
+          {FAQ(t).map((item, i) => (
             <div
               key={i}
               className="rounded border border-border-subtle bg-surface p-5"
@@ -83,16 +81,14 @@ export default function SecureSwapClient({ lang }: { lang: Lang }) {
       </SectionCard>
 
       <SectionCard
-        title={
-          lang === "en"
-            ? "Ready to Start Trading?"
-            : "Takasa Başlamaya Hazır mısınız?"
-        }
+        title={t(
+          "page.secureSwap.secureswapclient.takasaBaslamayaHazirMisiniz",
+        )}
       >
         <p className="mb-8 text-muted">
-          {lang === "en"
-            ? "Browse listings and send your first trade offer today."
-            : "İlanları inceleyin ve ilk takas teklifinizi bugün gönderin."}
+          {t(
+            "page.secureSwap.secureswapclient.ilanlariInceleyinVeIlkTakasTeklifinizi",
+          )}
         </p>
         <div className="flex flex-col gap-3 sm:flex-row">
           <Link
@@ -100,13 +96,13 @@ export default function SecureSwapClient({ lang }: { lang: Lang }) {
             className="inline-flex items-center justify-center gap-2 rounded bg-primary-500 px-6 py-3 text-sm font-semibold text-inverted transition-colors hover:bg-primary-600"
           >
             <ArrowsRightLeftIcon className="h-5 w-5" />
-            {lang === "en" ? "Start Trading" : "Takasa Başla"}
+            {t("page.secureSwap.secureswapclient.takasaBasla")}
           </Link>
           <Link
             href="/listings"
             className="inline-flex items-center justify-center gap-2 rounded border border-border bg-surface-elevated px-6 py-3 text-sm font-semibold text-body transition-colors hover:border-border"
           >
-            {lang === "en" ? "Browse Listings" : "İlanları İncele"}
+            {t("page.secureSwap.secureswapclient.ilanlariIncele")}
           </Link>
         </div>
       </SectionCard>

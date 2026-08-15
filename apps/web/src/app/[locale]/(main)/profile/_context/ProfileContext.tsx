@@ -26,6 +26,8 @@ import {
 import { useUnreadMessageCount } from "@/hooks/useHeaderBadgeCounts";
 import { getTierDefault } from "../_lib/tiers";
 import type { PendingCounts, UserProfile } from "../_lib/types";
+import { useTranslations } from "next-intl";
+import type { Translate } from "@/types/i18n";
 
 interface ProfileOverview {
   profile: UserProfile;
@@ -33,7 +35,7 @@ interface ProfileOverview {
 }
 
 /** Map the client authStore user into a UserProfile for instant first paint. */
-function mapAuthUserToProfile(user: any): UserProfile {
+function mapAuthUserToProfile(user: any, t: Translate): UserProfile {
   const tierType = user.membershipTier || "free";
   return {
     id: user.id,
@@ -50,7 +52,7 @@ function mapAuthUserToProfile(user: any): UserProfile {
     createdAt: String(user.createdAt),
     membershipTier: tierType,
     membership: {
-      tier: getTierDefault(tierType),
+      tier: getTierDefault(t, tierType),
       status: "active",
       expiresAt: null,
     },
@@ -66,6 +68,7 @@ function mapAuthUserToProfile(user: any): UserProfile {
 }
 
 function useProfileValue() {
+  const t = useTranslations();
   const router = useRouter();
   const pathname = usePathname();
   const {
@@ -122,7 +125,7 @@ function useProfileValue() {
     staleTime: 5 * 60 * 1000,
     placeholderData: user
       ? {
-          profile: mapAuthUserToProfile(user),
+          profile: mapAuthUserToProfile(user, t),
           pendingCounts: { offers: 0, trades: 0 },
         }
       : undefined,
@@ -190,7 +193,7 @@ function useProfileValue() {
         base?.membershipTier ||
         user?.membershipTier ||
         "free";
-      const tierInfo = membershipFromApi?.tier || getTierDefault(tierType);
+      const tierInfo = membershipFromApi?.tier || getTierDefault(t, tierType);
 
       const profile: UserProfile = {
         ...base,
@@ -276,6 +279,7 @@ type ProfileValue = ReturnType<typeof useProfileValue>;
 const ProfileContext = createContext<ProfileValue | null>(null);
 
 export function ProfileProvider({ children }: { children: ReactNode }) {
+  const t = useTranslations();
   const value = useProfileValue();
   return (
     <ProfileContext.Provider value={value}>{children}</ProfileContext.Provider>

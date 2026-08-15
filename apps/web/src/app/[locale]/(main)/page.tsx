@@ -11,12 +11,15 @@ import type {
   FeaturedCollector,
   HomePageData,
 } from "./_home/lib/types";
+import type { Translate } from "@/types/i18n";
+import { getTranslations } from "next-intl/server";
 
 const API_BASE = getServerApiOrigin();
 
-const TITLE = "Tarodan - Diecast Model Araba Pazarı";
-const DESCRIPTION =
-  "Diecast model araba koleksiyoncuları için güvenli alış, satış ve takas platformu. Öne çıkan ürünler, indirimler, takas vitrini ve popüler ilanları keşfedin.";
+const TITLE = (t: Translate) =>
+  t("page.app.page.tarodanDiecastModelArabaPazari");
+const DESCRIPTION = (t: Translate) =>
+  t("page.app.page.diecastModelArabaKoleksiyonculariIcinGuvenli");
 
 export async function generateMetadata({
   params,
@@ -24,20 +27,21 @@ export async function generateMetadata({
   params: Promise<{ locale: string }>;
 }): Promise<Metadata> {
   const { locale } = await params;
+  const t = await getTranslations({ locale });
   return {
-    title: TITLE,
-    description: DESCRIPTION,
+    title: TITLE(t),
+    description: DESCRIPTION(t),
     alternates: localizedCanonical(locale, "/"),
     openGraph: {
-      title: TITLE,
-      description: DESCRIPTION,
+      title: TITLE(t),
+      description: DESCRIPTION(t),
       type: "website",
       url: localizedPath(locale, "/"),
     },
     twitter: {
       card: "summary_large_image",
-      title: TITLE,
-      description: DESCRIPTION,
+      title: TITLE(t),
+      description: DESCRIPTION(t),
     },
   };
 }
@@ -50,13 +54,14 @@ export async function generateMetadata({
 async function fetchProducts(
   params: Record<string, string | number | boolean>,
 ): Promise<Product[]> {
+  const t = await getTranslations();
   const qs = new URLSearchParams(
     Object.entries(params).map(([k, v]) => [k, String(v)]),
   ).toString();
   const res = await fetch(`${API_BASE}/api/products?${qs}`, {
     // `products:list` tag lets the backend on-demand revalidate every rail when a
     // product/discount changes (see app/api/revalidate); revalidate is the fallback.
-    next: { revalidate: 60, tags: ["products:list"] },
+    next: { revalidate: 60, tags: [t("page.app.page.productsList")] },
   });
   if (!res.ok) throw new Error(`products ${res.status}`);
   return unwrapList<Product>(await res.json());

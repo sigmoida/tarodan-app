@@ -1,158 +1,416 @@
+import type { MessageKey } from "@tarodan/i18n";
+
 import type { StatusVariant } from "./status-variant";
 
+/** Ekrana basılacak, dili çözülmüş durum etiketi. */
 export interface StatusConfig {
   label: string;
   variant: StatusVariant;
 }
 
 /**
+ * Ham durum tanımı: etiket YERİNE katalog anahtarı taşır.
+ *
+ * Etiketler bu pakette sabit metin olarak duramaz — web ve admin aynı haritayı
+ * kullanıyor ve metni ekrana basan taraf onlar. Paket i18n kütüphanesinden
+ * bağımsız kalsın diye burada yalnız ANAHTAR tutulur; çözüm
+ * {@link resolveStatusConfig} ile, uygulamanın kendi çeviricisiyle yapılır.
+ */
+export interface StatusConfigDef {
+  labelKey: MessageKey;
+  variant: StatusVariant;
+}
+
+export type StatusConfigDefMap = Record<string, StatusConfigDef>;
+
+/** Ham tanımı, verilen çeviriciyle ekrana basılabilir etiketlere çözer. */
+export function resolveStatusConfig(
+  def: StatusConfigDefMap,
+  translate: (key: MessageKey) => string,
+): Record<string, StatusConfig> {
+  const resolved: Record<string, StatusConfig> = {};
+  for (const [value, entry] of Object.entries(def)) {
+    resolved[value] = {
+      label: translate(entry.labelKey),
+      variant: entry.variant,
+    };
+  }
+  return resolved;
+}
+
+/**
  * Order status → Badge mapping
  * Used in: orders page, order detail, track-order, dashboard
  */
-export const orderStatusConfig: Record<string, StatusConfig> = {
-  pending_payment: { label: "Ödeme Bekleniyor", variant: "warning" },
-  paid: { label: "Ödendi", variant: "success" },
-  preparing: { label: "Hazırlanıyor", variant: "info" },
-  shipped: { label: "Kargoda", variant: "info" },
-  delivered: { label: "Teslim Edildi", variant: "success" },
-  awaiting_buyer_confirmation: {
-    label: "Alıcı Onayı Bekleniyor",
+export const orderStatusConfig: StatusConfigDefMap = {
+  pending_payment: {
+    labelKey: "status.order.pending_payment",
     variant: "warning",
   },
-  completed: { label: "Tamamlandı", variant: "success" },
-  cancelled: { label: "İptal Edildi", variant: "danger" },
-  refund_requested: { label: "İade Talep Edildi", variant: "warning" },
-  refunded: { label: "İade Edildi", variant: "secondary" },
+  paid: {
+    labelKey: "status.order.paid",
+    variant: "success",
+  },
+  preparing: {
+    labelKey: "status.order.preparing",
+    variant: "info",
+  },
+  shipped: {
+    labelKey: "status.order.shipped",
+    variant: "info",
+  },
+  delivered: {
+    labelKey: "status.order.delivered",
+    variant: "success",
+  },
+  awaiting_buyer_confirmation: {
+    labelKey: "status.order.awaiting_buyer_confirmation",
+    variant: "warning",
+  },
+  completed: {
+    labelKey: "status.order.completed",
+    variant: "success",
+  },
+  cancelled: {
+    labelKey: "status.order.cancelled",
+    variant: "danger",
+  },
+  refund_requested: {
+    labelKey: "status.order.refund_requested",
+    variant: "warning",
+  },
+  refunded: {
+    labelKey: "status.order.refunded",
+    variant: "secondary",
+  },
 };
 
 /**
  * Trade status → Badge mapping
  * Used in: trades page, trade detail, dashboard
  */
-export const tradeStatusConfig: Record<string, StatusConfig> = {
-  pending: { label: "Bekliyor", variant: "warning" },
-  accepted: { label: "Kabul Edildi", variant: "success" },
-  rejected: { label: "Reddedildi", variant: "danger" },
-  awaiting_payment: { label: "Ödeme Bekleniyor", variant: "warning" },
-  shipping_to_warehouse: { label: "Depoya Gönderim", variant: "info" },
-  at_warehouse: { label: "Tarodan Deposunda", variant: "info" },
-  admin_reviewing: { label: "İnceleniyor", variant: "info" },
-  shipping_to_recipients: { label: "Alıcılara Gönderim", variant: "info" },
-  returning: { label: "İade Yolda", variant: "warning" },
-  initiator_shipped: { label: "Gönderildi", variant: "info" },
-  receiver_shipped: { label: "Karşı Taraf Gönderdi", variant: "info" },
-  both_shipped: { label: "İki Taraf Gönderdi", variant: "info" },
-  initiator_received: { label: "Teslim Alındı", variant: "info" },
-  receiver_received: { label: "Karşı Taraf Teslim Aldı", variant: "info" },
-  completed: { label: "Tamamlandı", variant: "success" },
-  cancelled: { label: "İptal Edildi", variant: "danger" },
-  disputed: { label: "İtiraz Açıldı", variant: "destructive" },
+export const tradeStatusConfig: StatusConfigDefMap = {
+  pending: {
+    labelKey: "status.trade.pending",
+    variant: "warning",
+  },
+  accepted: {
+    labelKey: "status.trade.accepted",
+    variant: "success",
+  },
+  rejected: {
+    labelKey: "status.trade.rejected",
+    variant: "danger",
+  },
+  awaiting_payment: {
+    labelKey: "status.trade.awaiting_payment",
+    variant: "warning",
+  },
+  shipping_to_warehouse: {
+    labelKey: "status.trade.shipping_to_warehouse",
+    variant: "info",
+  },
+  at_warehouse: {
+    labelKey: "status.trade.at_warehouse",
+    variant: "info",
+  },
+  admin_reviewing: {
+    labelKey: "status.trade.admin_reviewing",
+    variant: "info",
+  },
+  shipping_to_recipients: {
+    labelKey: "status.trade.shipping_to_recipients",
+    variant: "info",
+  },
+  returning: {
+    labelKey: "status.trade.returning",
+    variant: "warning",
+  },
+  initiator_shipped: {
+    labelKey: "status.trade.initiator_shipped",
+    variant: "info",
+  },
+  receiver_shipped: {
+    labelKey: "status.trade.receiver_shipped",
+    variant: "info",
+  },
+  both_shipped: {
+    labelKey: "status.trade.both_shipped",
+    variant: "info",
+  },
+  initiator_received: {
+    labelKey: "status.trade.initiator_received",
+    variant: "info",
+  },
+  receiver_received: {
+    labelKey: "status.trade.receiver_received",
+    variant: "info",
+  },
+  completed: {
+    labelKey: "status.trade.completed",
+    variant: "success",
+  },
+  cancelled: {
+    labelKey: "status.trade.cancelled",
+    variant: "danger",
+  },
+  disputed: {
+    labelKey: "status.trade.disputed",
+    variant: "destructive",
+  },
 };
 
 /**
  * RefundRequest status → Badge mapping
  * Used in: admin refund-requests page, mobile order detail refund banner
  */
-export const refundRequestStatusConfig: Record<string, StatusConfig> = {
-  pending_review: { label: "İnceleniyor", variant: "warning" },
-  approved: { label: "Onaylandı", variant: "success" },
-  wait_for_delivery: { label: "Ürün Teslimi Bekleniyor", variant: "info" },
-  return_shipment_open: { label: "İade Kargosu Hazır", variant: "info" },
-  return_in_transit: { label: "İade Yolda", variant: "info" },
-  return_delivered: { label: "İade Ulaştı", variant: "info" },
-  refunded: { label: "Para İade Edildi", variant: "success" },
-  rejected: { label: "Reddedildi", variant: "danger" },
-  disputed: { label: "İtirazlı", variant: "destructive" },
-  cancelled: { label: "İptal Edildi", variant: "secondary" },
+export const refundRequestStatusConfig: StatusConfigDefMap = {
+  pending_review: {
+    labelKey: "status.refundRequest.pending_review",
+    variant: "warning",
+  },
+  approved: {
+    labelKey: "status.refundRequest.approved",
+    variant: "success",
+  },
+  wait_for_delivery: {
+    labelKey: "status.refundRequest.wait_for_delivery",
+    variant: "info",
+  },
+  return_shipment_open: {
+    labelKey: "status.refundRequest.return_shipment_open",
+    variant: "info",
+  },
+  return_in_transit: {
+    labelKey: "status.refundRequest.return_in_transit",
+    variant: "info",
+  },
+  return_delivered: {
+    labelKey: "status.refundRequest.return_delivered",
+    variant: "info",
+  },
+  refunded: {
+    labelKey: "status.refundRequest.refunded",
+    variant: "success",
+  },
+  rejected: {
+    labelKey: "status.refundRequest.rejected",
+    variant: "danger",
+  },
+  disputed: {
+    labelKey: "status.refundRequest.disputed",
+    variant: "destructive",
+  },
+  cancelled: {
+    labelKey: "status.refundRequest.cancelled",
+    variant: "secondary",
+  },
 };
 
 /**
  * Offer status → Badge mapping
  * Used in: offers page
  */
-export const offerStatusConfig: Record<string, StatusConfig> = {
-  pending: { label: "Bekliyor", variant: "warning" },
-  accepted: { label: "Kabul Edildi", variant: "success" },
-  rejected: { label: "Reddedildi", variant: "danger" },
-  countered: { label: "Karşı Teklif", variant: "info" },
-  expired: { label: "Süresi Doldu", variant: "secondary" },
-  cancelled: { label: "İptal Edildi", variant: "danger" },
-  payment_expired: { label: "Ödeme Süresi Doldu", variant: "warning" },
+export const offerStatusConfig: StatusConfigDefMap = {
+  pending: {
+    labelKey: "status.offer.pending",
+    variant: "warning",
+  },
+  accepted: {
+    labelKey: "status.offer.accepted",
+    variant: "success",
+  },
+  rejected: {
+    labelKey: "status.offer.rejected",
+    variant: "danger",
+  },
+  countered: {
+    labelKey: "status.offer.countered",
+    variant: "info",
+  },
+  expired: {
+    labelKey: "status.offer.expired",
+    variant: "secondary",
+  },
+  cancelled: {
+    labelKey: "status.offer.cancelled",
+    variant: "danger",
+  },
+  payment_expired: {
+    labelKey: "status.offer.payment_expired",
+    variant: "warning",
+  },
 };
 
 /**
  * Payment status → Badge mapping
  * Used in: payments page, payment detail
  */
-export const paymentStatusConfig: Record<string, StatusConfig> = {
-  pending: { label: "Bekliyor", variant: "warning" },
-  processing: { label: "İşleniyor", variant: "info" },
-  completed: { label: "Tamamlandı", variant: "success" },
-  failed: { label: "Başarısız", variant: "danger" },
-  refunded: { label: "İade Edildi", variant: "secondary" },
+export const paymentStatusConfig: StatusConfigDefMap = {
+  pending: {
+    labelKey: "status.payment.pending",
+    variant: "warning",
+  },
+  processing: {
+    labelKey: "status.payment.processing",
+    variant: "info",
+  },
+  completed: {
+    labelKey: "status.payment.completed",
+    variant: "success",
+  },
+  failed: {
+    labelKey: "status.payment.failed",
+    variant: "danger",
+  },
+  refunded: {
+    labelKey: "status.payment.refunded",
+    variant: "secondary",
+  },
 };
 
 /**
  * Product status → Badge mapping
  * Used in: admin products, profile listings
  */
-export const productStatusConfig: Record<string, StatusConfig> = {
-  pending: { label: "Onay Bekliyor", variant: "warning" },
-  active: { label: "Aktif", variant: "success" },
-  inactive: { label: "Pasif", variant: "secondary" },
-  sold: { label: "Satıldı", variant: "info" },
-  reserved: { label: "Rezerve", variant: "info" },
-  rejected: { label: "Reddedildi", variant: "danger" },
-  deleted: { label: "Kaldırıldı", variant: "danger" },
+export const productStatusConfig: StatusConfigDefMap = {
+  pending: {
+    labelKey: "status.product.pending",
+    variant: "warning",
+  },
+  active: {
+    labelKey: "status.product.active",
+    variant: "success",
+  },
+  inactive: {
+    labelKey: "status.product.inactive",
+    variant: "secondary",
+  },
+  sold: {
+    labelKey: "status.product.sold",
+    variant: "info",
+  },
+  reserved: {
+    labelKey: "status.product.reserved",
+    variant: "info",
+  },
+  rejected: {
+    labelKey: "status.product.rejected",
+    variant: "danger",
+  },
+  deleted: {
+    labelKey: "status.product.deleted",
+    variant: "danger",
+  },
 };
 
 /**
  * Product condition → label/Badge mapping (ProductCondition enum).
  * Şema değerleri: new, like_new, very_good, good, fair.
  */
-export const productConditionConfig: Record<string, StatusConfig> = {
-  new: { label: "Yeni", variant: "success" },
-  like_new: { label: "Yeni Gibi", variant: "info" },
-  very_good: { label: "Çok İyi", variant: "info" },
-  good: { label: "İyi", variant: "default" },
-  fair: { label: "Orta", variant: "warning" },
+export const productConditionConfig: StatusConfigDefMap = {
+  new: {
+    labelKey: "status.productCondition.new",
+    variant: "success",
+  },
+  like_new: {
+    labelKey: "status.productCondition.like_new",
+    variant: "info",
+  },
+  very_good: {
+    labelKey: "status.productCondition.very_good",
+    variant: "info",
+  },
+  good: {
+    labelKey: "status.productCondition.good",
+    variant: "default",
+  },
+  fair: {
+    labelKey: "status.productCondition.fair",
+    variant: "warning",
+  },
 };
 
 /**
  * Admin role → label/Badge mapping (AdminRole enum).
  */
-export const adminRoleConfig: Record<string, StatusConfig> = {
-  super_admin: { label: "Süper Admin", variant: "danger" },
-  admin: { label: "Yönetici", variant: "primary" },
-  moderator: { label: "Moderatör", variant: "info" },
+export const adminRoleConfig: StatusConfigDefMap = {
+  super_admin: {
+    labelKey: "status.adminRole.super_admin",
+    variant: "danger",
+  },
+  admin: {
+    labelKey: "status.adminRole.admin",
+    variant: "primary",
+  },
+  moderator: {
+    labelKey: "status.adminRole.moderator",
+    variant: "info",
+  },
 };
 
 /**
  * Support ticket status → label/Badge mapping (TicketStatus enum).
  */
-export const ticketStatusConfig: Record<string, StatusConfig> = {
-  open: { label: "Açık", variant: "warning" },
-  in_progress: { label: "İşlemde", variant: "info" },
-  waiting_customer: { label: "Müşteri Bekleniyor", variant: "warning" },
-  resolved: { label: "Çözüldü", variant: "success" },
-  closed: { label: "Kapalı", variant: "secondary" },
+export const ticketStatusConfig: StatusConfigDefMap = {
+  open: {
+    labelKey: "status.ticket.open",
+    variant: "warning",
+  },
+  in_progress: {
+    labelKey: "status.ticket.in_progress",
+    variant: "info",
+  },
+  waiting_customer: {
+    labelKey: "status.ticket.waiting_customer",
+    variant: "warning",
+  },
+  resolved: {
+    labelKey: "status.ticket.resolved",
+    variant: "success",
+  },
+  closed: {
+    labelKey: "status.ticket.closed",
+    variant: "secondary",
+  },
 };
 
 /**
  * Tax rule scope → label mapping (TaxRuleScope enum).
  */
-export const taxScopeConfig: Record<string, StatusConfig> = {
-  default_rate: { label: "Varsayılan oran", variant: "default" },
-  category: { label: "Kategori", variant: "info" },
-  product: { label: "Ürün", variant: "secondary" },
+export const taxScopeConfig: StatusConfigDefMap = {
+  default_rate: {
+    labelKey: "status.taxScope.default_rate",
+    variant: "default",
+  },
+  category: {
+    labelKey: "status.taxScope.category",
+    variant: "info",
+  },
+  product: {
+    labelKey: "status.taxScope.product",
+    variant: "secondary",
+  },
 };
 
 /** Üyelik paketi (MembershipTierType: free/basic/premium/business). */
-export const membershipTierConfig: Record<string, StatusConfig> = {
-  free: { label: "Ücretsiz", variant: "secondary" },
-  basic: { label: "Basit", variant: "info" },
-  premium: { label: "Premium", variant: "warning" },
-  business: { label: "İşletme", variant: "primary" },
+export const membershipTierConfig: StatusConfigDefMap = {
+  free: {
+    labelKey: "status.membershipTier.free",
+    variant: "secondary",
+  },
+  basic: {
+    labelKey: "status.membershipTier.basic",
+    variant: "info",
+  },
+  premium: {
+    labelKey: "status.membershipTier.premium",
+    variant: "warning",
+  },
+  business: {
+    labelKey: "status.membershipTier.business",
+    variant: "primary",
+  },
 };
 
 /**
@@ -162,18 +420,51 @@ export const membershipTierConfig: Record<string, StatusConfig> = {
  * seçebildiği delivery_delayed/defective/buyer_damaged admin tablolarında ham
  * snake_case görünüyordu).
  */
-export const refundReasonConfig: Record<string, StatusConfig> = {
-  delivery_delayed: { label: "Teslimat Gecikti", variant: "warning" },
-  changed_mind: { label: "Fikrimi Değiştirdim", variant: "secondary" },
-  damaged: { label: "Hasarlı", variant: "danger" },
-  wrong_item: { label: "Yanlış Ürün", variant: "warning" },
-  not_as_described: { label: "Açıklamaya Uygun Değil", variant: "warning" },
-  missing_parts: { label: "Eksik Parçalar", variant: "warning" },
-  counterfeit: { label: "Sahte / Taklit", variant: "danger" },
-  defective: { label: "Arızalı / Kusurlu", variant: "danger" },
-  buyer_damaged: { label: "Alıcı Kaynaklı Hasar", variant: "warning" },
-  lost_in_transit: { label: "Kargoda Kayboldu", variant: "danger" },
-  other: { label: "Diğer", variant: "default" },
+export const refundReasonConfig: StatusConfigDefMap = {
+  delivery_delayed: {
+    labelKey: "status.refundReason.delivery_delayed",
+    variant: "warning",
+  },
+  changed_mind: {
+    labelKey: "status.refundReason.changed_mind",
+    variant: "secondary",
+  },
+  damaged: {
+    labelKey: "status.refundReason.damaged",
+    variant: "danger",
+  },
+  wrong_item: {
+    labelKey: "status.refundReason.wrong_item",
+    variant: "warning",
+  },
+  not_as_described: {
+    labelKey: "status.refundReason.not_as_described",
+    variant: "warning",
+  },
+  missing_parts: {
+    labelKey: "status.refundReason.missing_parts",
+    variant: "warning",
+  },
+  counterfeit: {
+    labelKey: "status.refundReason.counterfeit",
+    variant: "danger",
+  },
+  defective: {
+    labelKey: "status.refundReason.defective",
+    variant: "danger",
+  },
+  buyer_damaged: {
+    labelKey: "status.refundReason.buyer_damaged",
+    variant: "warning",
+  },
+  lost_in_transit: {
+    labelKey: "status.refundReason.lost_in_transit",
+    variant: "danger",
+  },
+  other: {
+    labelKey: "status.refundReason.other",
+    variant: "default",
+  },
 };
 
 /**
@@ -186,20 +477,35 @@ export const BUYER_SELECTABLE_REFUND_REASONS = Object.keys(
 ).filter((reason) => reason !== "lost_in_transit" && reason !== "other");
 
 /** Sipariş iptal nedeni (OrderCancellationReason) — enum'un 7 değerinin tamamı. */
-export const orderCancellationReasonConfig: Record<string, StatusConfig> = {
-  delivery_delayed: { label: "Teslimat Gecikti", variant: "warning" },
-  wrong_product_selected: { label: "Yanlış Ürün Seçtim", variant: "secondary" },
-  changed_mind: { label: "Fikrimi Değiştirdim", variant: "secondary" },
-  wrong_card: { label: "Yanlış Kart Kullandım", variant: "secondary" },
+export const orderCancellationReasonConfig: StatusConfigDefMap = {
+  delivery_delayed: {
+    labelKey: "status.orderCancellationReason.delivery_delayed",
+    variant: "warning",
+  },
+  wrong_product_selected: {
+    labelKey: "status.orderCancellationReason.wrong_product_selected",
+    variant: "secondary",
+  },
+  changed_mind: {
+    labelKey: "status.orderCancellationReason.changed_mind",
+    variant: "secondary",
+  },
+  wrong_card: {
+    labelKey: "status.orderCancellationReason.wrong_card",
+    variant: "secondary",
+  },
   price_changed_mind: {
-    label: "Fiyat Nedeniyle Vazgeçtim",
+    labelKey: "status.orderCancellationReason.price_changed_mind",
     variant: "secondary",
   },
   unavailable_at_address: {
-    label: "Adreste Bulunamayacağım",
+    labelKey: "status.orderCancellationReason.unavailable_at_address",
     variant: "secondary",
   },
-  other: { label: "Diğer", variant: "default" },
+  other: {
+    labelKey: "status.orderCancellationReason.other",
+    variant: "default",
+  },
 };
 
 /**
@@ -212,134 +518,347 @@ export const BUYER_SELECTABLE_CANCELLATION_REASONS = Object.keys(
 ).filter((reason) => reason !== "other");
 
 /** Kargo/gönderi durumu (ShipmentStatus). */
-export const shipmentStatusConfig: Record<string, StatusConfig> = {
-  pending: { label: "Beklemede", variant: "warning" },
-  label_created: { label: "Etiket Oluşturuldu", variant: "info" },
-  picked_up: { label: "Teslim Alındı", variant: "info" },
-  in_transit: { label: "Yolda", variant: "info" },
-  at_delivery_branch: { label: "Teslimat Şubesinde", variant: "info" },
-  out_for_delivery: { label: "Dağıtımda", variant: "info" },
-  delivered: { label: "Teslim Edildi", variant: "success" },
-  failed: { label: "Başarısız", variant: "danger" },
-  return_in_progress: { label: "İade İşlemde", variant: "warning" },
-  returned: { label: "İade Edildi", variant: "secondary" },
-  cancelled: { label: "İptal Edildi", variant: "danger" },
+export const shipmentStatusConfig: StatusConfigDefMap = {
+  pending: {
+    labelKey: "status.shipment.pending",
+    variant: "warning",
+  },
+  label_created: {
+    labelKey: "status.shipment.label_created",
+    variant: "info",
+  },
+  picked_up: {
+    labelKey: "status.shipment.picked_up",
+    variant: "info",
+  },
+  in_transit: {
+    labelKey: "status.shipment.in_transit",
+    variant: "info",
+  },
+  at_delivery_branch: {
+    labelKey: "status.shipment.at_delivery_branch",
+    variant: "info",
+  },
+  out_for_delivery: {
+    labelKey: "status.shipment.out_for_delivery",
+    variant: "info",
+  },
+  delivered: {
+    labelKey: "status.shipment.delivered",
+    variant: "success",
+  },
+  failed: {
+    labelKey: "status.shipment.failed",
+    variant: "danger",
+  },
+  return_in_progress: {
+    labelKey: "status.shipment.return_in_progress",
+    variant: "warning",
+  },
+  returned: {
+    labelKey: "status.shipment.returned",
+    variant: "secondary",
+  },
+  cancelled: {
+    labelKey: "status.shipment.cancelled",
+    variant: "danger",
+  },
 };
 
 /** Bildirim kanalı (push/email/sms/in_app). */
-export const notificationChannelConfig: Record<string, StatusConfig> = {
-  push: { label: "Push Bildirimi", variant: "info" },
-  email: { label: "E-posta", variant: "info" },
-  sms: { label: "SMS", variant: "info" },
-  in_app: { label: "Uygulama İçi", variant: "info" },
+export const notificationChannelConfig: StatusConfigDefMap = {
+  push: {
+    labelKey: "status.notificationChannel.push",
+    variant: "info",
+  },
+  email: {
+    labelKey: "status.notificationChannel.email",
+    variant: "info",
+  },
+  sms: {
+    labelKey: "status.notificationChannel.sms",
+    variant: "info",
+  },
+  in_app: {
+    labelKey: "status.notificationChannel.in_app",
+    variant: "info",
+  },
 };
 
 /** Bildirim/gönderim teslim durumu. */
-export const deliveryStatusConfig: Record<string, StatusConfig> = {
-  pending: { label: "Beklemede", variant: "warning" },
-  scheduled: { label: "Zamanlandı", variant: "info" },
-  sent: { label: "Gönderildi", variant: "info" },
-  delivered: { label: "Teslim Edildi", variant: "success" },
-  failed: { label: "Başarısız", variant: "danger" },
-  cancelled: { label: "İptal Edildi", variant: "secondary" },
+export const deliveryStatusConfig: StatusConfigDefMap = {
+  pending: {
+    labelKey: "status.delivery.pending",
+    variant: "warning",
+  },
+  scheduled: {
+    labelKey: "status.delivery.scheduled",
+    variant: "info",
+  },
+  sent: {
+    labelKey: "status.delivery.sent",
+    variant: "info",
+  },
+  delivered: {
+    labelKey: "status.delivery.delivered",
+    variant: "success",
+  },
+  failed: {
+    labelKey: "status.delivery.failed",
+    variant: "danger",
+  },
+  cancelled: {
+    labelKey: "status.delivery.cancelled",
+    variant: "secondary",
+  },
 };
 
 /** Destek talebi kategorisi (TicketCategory). */
-export const ticketCategoryConfig: Record<string, StatusConfig> = {
-  payment: { label: "Ödeme", variant: "info" },
-  shipping: { label: "Kargo", variant: "info" },
-  trade: { label: "Takas", variant: "info" },
-  account: { label: "Hesap", variant: "info" },
-  product: { label: "Ürün", variant: "info" },
-  technical: { label: "Teknik Destek", variant: "info" },
-  other: { label: "Diğer", variant: "default" },
+export const ticketCategoryConfig: StatusConfigDefMap = {
+  payment: {
+    labelKey: "status.ticketCategory.payment",
+    variant: "info",
+  },
+  shipping: {
+    labelKey: "status.ticketCategory.shipping",
+    variant: "info",
+  },
+  trade: {
+    labelKey: "status.ticketCategory.trade",
+    variant: "info",
+  },
+  account: {
+    labelKey: "status.ticketCategory.account",
+    variant: "info",
+  },
+  product: {
+    labelKey: "status.ticketCategory.product",
+    variant: "info",
+  },
+  technical: {
+    labelKey: "status.ticketCategory.technical",
+    variant: "info",
+  },
+  other: {
+    labelKey: "status.ticketCategory.other",
+    variant: "default",
+  },
 };
 
 /** Destek talebi önceliği (TicketPriority). */
-export const ticketPriorityConfig: Record<string, StatusConfig> = {
-  low: { label: "Düşük", variant: "secondary" },
-  medium: { label: "Orta", variant: "info" },
-  high: { label: "Yüksek", variant: "warning" },
-  urgent: { label: "Acil", variant: "danger" },
+export const ticketPriorityConfig: StatusConfigDefMap = {
+  low: {
+    labelKey: "status.ticketPriority.low",
+    variant: "secondary",
+  },
+  medium: {
+    labelKey: "status.ticketPriority.medium",
+    variant: "info",
+  },
+  high: {
+    labelKey: "status.ticketPriority.high",
+    variant: "warning",
+  },
+  urgent: {
+    labelKey: "status.ticketPriority.urgent",
+    variant: "danger",
+  },
 };
 
 /** Satıcı/başvuru tipi (SellerType). */
-export const sellerTypeConfig: Record<string, StatusConfig> = {
-  individual: { label: "Bireysel", variant: "info" },
-  verified: { label: "Onaylı Satıcı", variant: "success" },
-  platform: { label: "Platform", variant: "primary" },
+export const sellerTypeConfig: StatusConfigDefMap = {
+  individual: {
+    labelKey: "status.sellerType.individual",
+    variant: "info",
+  },
+  verified: {
+    labelKey: "status.sellerType.verified",
+    variant: "success",
+  },
+  platform: {
+    labelKey: "status.sellerType.platform",
+    variant: "primary",
+  },
 };
 
 /** Ödeme bekletme (escrow) durumu (PaymentHoldStatus). */
-export const paymentHoldStatusConfig: Record<string, StatusConfig> = {
-  held: { label: "Tutuluyor", variant: "warning" },
-  released: { label: "Serbest Bırakıldı", variant: "success" },
-  cancelled: { label: "İptal Edildi", variant: "danger" },
+export const paymentHoldStatusConfig: StatusConfigDefMap = {
+  held: {
+    labelKey: "status.paymentHold.held",
+    variant: "warning",
+  },
+  released: {
+    labelKey: "status.paymentHold.released",
+    variant: "success",
+  },
+  cancelled: {
+    labelKey: "status.paymentHold.cancelled",
+    variant: "danger",
+  },
 };
 
 /** Satıcı ödeme aktarımı durumu (PayoutStatus). */
-export const payoutStatusConfig: Record<string, StatusConfig> = {
-  pending: { label: "Beklemede", variant: "warning" },
-  processing: { label: "İşleniyor", variant: "info" },
-  completed: { label: "Tamamlandı", variant: "success" },
-  failed: { label: "Başarısız", variant: "danger" },
-  returned: { label: "Geri Döndü", variant: "secondary" },
-  retry_pending: { label: "Yeniden Denenecek", variant: "warning" },
+export const payoutStatusConfig: StatusConfigDefMap = {
+  pending: {
+    labelKey: "status.payout.pending",
+    variant: "warning",
+  },
+  processing: {
+    labelKey: "status.payout.processing",
+    variant: "info",
+  },
+  completed: {
+    labelKey: "status.payout.completed",
+    variant: "success",
+  },
+  failed: {
+    labelKey: "status.payout.failed",
+    variant: "danger",
+  },
+  returned: {
+    labelKey: "status.payout.returned",
+    variant: "secondary",
+  },
+  retry_pending: {
+    labelKey: "status.payout.retry_pending",
+    variant: "warning",
+  },
 };
 
 /** Üyelik abonelik durumu (SubscriptionStatus). */
-export const subscriptionStatusConfig: Record<string, StatusConfig> = {
-  active: { label: "Aktif", variant: "success" },
-  trialing: { label: "Deneme", variant: "info" },
-  cancelled: { label: "İptal Edildi", variant: "secondary" },
-  expired: { label: "Süresi Doldu", variant: "danger" },
-  past_due: { label: "Vadesi Geçmiş", variant: "warning" },
+export const subscriptionStatusConfig: StatusConfigDefMap = {
+  active: {
+    labelKey: "status.subscription.active",
+    variant: "success",
+  },
+  trialing: {
+    labelKey: "status.subscription.trialing",
+    variant: "info",
+  },
+  cancelled: {
+    labelKey: "status.subscription.cancelled",
+    variant: "secondary",
+  },
+  expired: {
+    labelKey: "status.subscription.expired",
+    variant: "danger",
+  },
+  past_due: {
+    labelKey: "status.subscription.past_due",
+    variant: "warning",
+  },
 };
 
 /** İndirim tipi (DiscountType). */
-export const discountTypeConfig: Record<string, StatusConfig> = {
-  percentage: { label: "Yüzde İndirim", variant: "info" },
-  fixed_amount: { label: "Sabit Tutar", variant: "info" },
-  bogo: { label: "Al-Götür (BOGO)", variant: "info" },
-  bulk_quantity: { label: "Toplu Adet", variant: "info" },
+export const discountTypeConfig: StatusConfigDefMap = {
+  percentage: {
+    labelKey: "status.discountType.percentage",
+    variant: "info",
+  },
+  fixed_amount: {
+    labelKey: "status.discountType.fixed_amount",
+    variant: "info",
+  },
+  bogo: {
+    labelKey: "status.discountType.bogo",
+    variant: "info",
+  },
+  bulk_quantity: {
+    labelKey: "status.discountType.bulk_quantity",
+    variant: "info",
+  },
 };
 
 /** İndirim kapsamı (DiscountScope). */
-export const discountScopeConfig: Record<string, StatusConfig> = {
-  global: { label: "Genel", variant: "primary" },
-  category: { label: "Kategori", variant: "info" },
-  product: { label: "Ürün", variant: "secondary" },
-  seller: { label: "Satıcı", variant: "info" },
+export const discountScopeConfig: StatusConfigDefMap = {
+  global: {
+    labelKey: "status.discountScope.global",
+    variant: "primary",
+  },
+  category: {
+    labelKey: "status.discountScope.category",
+    variant: "info",
+  },
+  product: {
+    labelKey: "status.discountScope.product",
+    variant: "secondary",
+  },
+  seller: {
+    labelKey: "status.discountScope.seller",
+    variant: "info",
+  },
 };
 
 /** Mesaj durumu (MessageStatus). */
-export const messageStatusConfig: Record<string, StatusConfig> = {
-  sent: { label: "Gönderildi", variant: "success" },
-  pending_approval: { label: "Onay Bekliyor", variant: "warning" },
-  approved: { label: "Onaylandı", variant: "success" },
-  rejected: { label: "Reddedildi", variant: "danger" },
+export const messageStatusConfig: StatusConfigDefMap = {
+  sent: {
+    labelKey: "status.messageStatus.sent",
+    variant: "success",
+  },
+  pending_approval: {
+    labelKey: "status.messageStatus.pending_approval",
+    variant: "warning",
+  },
+  approved: {
+    labelKey: "status.messageStatus.approved",
+    variant: "success",
+  },
+  rejected: {
+    labelKey: "status.messageStatus.rejected",
+    variant: "danger",
+  },
 };
 
 /** Log önem derecesi (severity). */
-export const severityConfig: Record<string, StatusConfig> = {
-  critical: { label: "Kritik", variant: "destructive" },
-  error: { label: "Hata", variant: "danger" },
-  warning: { label: "Uyarı", variant: "warning" },
-  info: { label: "Bilgi", variant: "info" },
-  debug: { label: "Hata Ayıklama", variant: "secondary" },
+export const severityConfig: StatusConfigDefMap = {
+  critical: {
+    labelKey: "status.severity.critical",
+    variant: "destructive",
+  },
+  error: {
+    labelKey: "status.severity.error",
+    variant: "danger",
+  },
+  warning: {
+    labelKey: "status.severity.warning",
+    variant: "warning",
+  },
+  info: {
+    labelKey: "status.severity.info",
+    variant: "info",
+  },
+  debug: {
+    labelKey: "status.severity.debug",
+    variant: "secondary",
+  },
 };
 
 /** Ödeme sağlayıcı (markalı; sadece okunur biçim). */
-export const paymentProviderConfig: Record<string, StatusConfig> = {
-  paytr: { label: "PayTR", variant: "default" },
-  iyzico: { label: "iyzico", variant: "default" },
-  stripe: { label: "Stripe", variant: "default" },
-  manual: { label: "Manuel", variant: "secondary" },
+export const paymentProviderConfig: StatusConfigDefMap = {
+  paytr: {
+    labelKey: "status.paymentProvider.paytr",
+    variant: "default",
+  },
+  iyzico: {
+    labelKey: "status.paymentProvider.iyzico",
+    variant: "default",
+  },
+  stripe: {
+    labelKey: "status.paymentProvider.stripe",
+    variant: "default",
+  },
+  manual: {
+    labelKey: "status.paymentProvider.manual",
+    variant: "secondary",
+  },
 };
 
 /** Kargo sağlayıcı (markalı; sadece okunur biçim). */
-export const shipmentProviderConfig: Record<string, StatusConfig> = {
-  surat: { label: "Sürat Kargo", variant: "default" },
+export const shipmentProviderConfig: StatusConfigDefMap = {
+  surat: {
+    labelKey: "status.shipmentProvider.surat",
+    variant: "default",
+  },
 };
 
 /**

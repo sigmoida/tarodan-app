@@ -11,6 +11,7 @@ import { PencilIcon } from "@heroicons/react/24/outline";
 import { SectionCard } from "@/components/detail/SectionCard";
 import { fmtTry } from "@/lib/format";
 import { type MembershipTier, computedYearly } from "../_lib/types";
+import { statusConfig } from "@/lib/statusLabels";
 
 function Row({ label, value }: { label: string; value: React.ReactNode }) {
   return (
@@ -58,7 +59,7 @@ export function TierCard({
       bodyClassName="space-y-4"
     >
       <p className="-mt-2 text-sm text-muted">
-        {enumLabel(membershipTierConfig, tier.type)}
+        {enumLabel(statusConfig(membershipTierConfig, t), tier.type)}
       </p>
 
       {tier.description && (

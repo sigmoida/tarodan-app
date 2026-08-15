@@ -1,4 +1,5 @@
 /** @format */
+import type { Translate } from "@/types/i18n";
 
 export interface RecentSale {
   id: string;
@@ -121,15 +122,22 @@ export function emptyStats(user: any): UserStats {
   };
 }
 
-export function mapRecentSales(orders: any[], userId?: string): RecentSale[] {
+export function mapRecentSales(
+  t: Translate,
+  orders: any[],
+  userId?: string,
+): RecentSale[] {
   return orders
     .filter((o) => o.isSeller || o.sellerId === userId)
     .slice(0, 10)
     .map((o) => ({
       id: o.id,
-      productTitle: o.product?.title || o.items?.[0]?.product?.title || "Ürün",
+      productTitle:
+        o.product?.title ||
+        o.items?.[0]?.product?.title ||
+        t("page.statistics.types.urun"),
       productImage: o.product?.imageUrl || o.items?.[0]?.product?.imageUrl,
-      buyerName: o.buyer?.displayName || "Alıcı",
+      buyerName: o.buyer?.displayName || t("page.statistics.types.alici"),
       amount: parseFloat(o.totalAmount || o.amount || o.total || "0"),
       soldAt: o.createdAt,
       orderId: o.id,

@@ -16,15 +16,17 @@ export interface SetupResponse {
   backupCodes: string[];
 }
 
-/** What the user needs before enabling 2FA. */
-export const REQUIREMENTS: string[] = [
-  "Google Authenticator veya benzer bir TOTP uygulaması",
-  "Akıllı telefon (iOS veya Android)",
-];
+/**
+ * 2FA açmadan önce gerekenler / neden önemli — metin DEĞİL katalog ANAHTARLARI:
+ * bu liste modül düzeyinde sabittir ve orada hook çağrılamaz.
+ */
+export const REQUIREMENT_KEYS = [
+  "profile.twoFactor.requirementApp",
+  "profile.twoFactor.requirementPhone",
+] as const;
 
-/** Why enabling 2FA matters — shown in the info section. */
-export const WHY_2FA_MATTERS: string[] = [
-  "Şifreniz çalınsa bile hesabınız güvende kalır",
-  "Phishing saldırılarına karşı ek koruma sağlar",
-  "Hesap erişiminde ek bir doğrulama katmanı ekler",
-];
+export const WHY_2FA_MATTERS_KEYS = [
+  "profile.twoFactor.whyStolenPassword",
+  "profile.twoFactor.whyPhishing",
+  "profile.twoFactor.whyExtraLayer",
+] as const;

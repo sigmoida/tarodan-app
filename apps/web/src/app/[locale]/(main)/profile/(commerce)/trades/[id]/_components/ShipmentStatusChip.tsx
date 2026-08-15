@@ -1,14 +1,18 @@
+"use client";
+
 /** @format */
 
 import { SHIPMENT_STATUS_CHIP } from "../_lib/types";
+import { useTranslations } from "next-intl";
 
 export default function ShipmentStatusChip({
   status,
 }: {
   status?: string | null;
 }) {
-  const meta = (status && SHIPMENT_STATUS_CHIP[status]) || {
-    label: "Beklemede",
+  const t = useTranslations();
+  const meta = (status && SHIPMENT_STATUS_CHIP(t)[status]) || {
+    label: t("trade.shipmentStatus.fallback"),
     className: "bg-surface-muted text-muted border border-border-subtle",
   };
   return (

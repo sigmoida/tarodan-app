@@ -41,13 +41,17 @@ export default function ProductSpecs({
   const scaleValue =
     listing.scale ||
     listing.attributes?.find(
-      (a: any) => a.group === "Ölçek" || a.label === "Ölçek",
+      (a: any) =>
+        a.group === t("page.listings.productspecs.olcek") ||
+        a.label === t("page.listings.productspecs.olcek"),
     )?.value ||
     "—";
   const materialValue =
     listing.material ||
     listing.attributes?.find(
-      (a) => a.group === "material" || a.group === "Malzeme",
+      (a) =>
+        a.group === "material" ||
+        a.group === t("page.listings.productspecs.malzeme"),
     )?.value ||
     "—";
   const hasQuantity =
@@ -119,7 +123,9 @@ export default function ProductSpecs({
   const technicalAttrs =
     listing.attributes?.filter(
       (a) =>
-        a.group !== "scale" && a.group !== "material" && a.group !== "Malzeme",
+        a.group !== "scale" &&
+        a.group !== "material" &&
+        a.group !== t("page.listings.productspecs.malzeme"),
     ) ?? [];
   const hasTechnical =
     technicalAttrs.length > 0 ||
@@ -130,7 +136,7 @@ export default function ProductSpecs({
 
   return (
     <div
-      className={`grid gap-6 ${hasTechnical ? "md:grid-cols-2" : "grid-cols-1"}`}
+      className={`grid gap-6 ${hasTechnical ? t("page.listings.productspecs.mdGridCols2") : "grid-cols-1"}`}
     >
       {/* Details — brand / scale / material / … row by row */}
       <SectionCard title={t("product.detailsSection")}>

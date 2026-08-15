@@ -12,6 +12,11 @@ vi.mock("react-hot-toast", () => ({
   default: { error: vi.fn(), success: vi.fn() },
 }));
 
+// Hook mesajları katalogdan okur; testin konusu yükleme davranışı, metin değil.
+vi.mock("next-intl", () => ({
+  useTranslations: () => (key: string) => key,
+}));
+
 // React'e test ortamında olduğumuzu bildirir; olmadan her `act` uyarı basıyor.
 (
   globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }

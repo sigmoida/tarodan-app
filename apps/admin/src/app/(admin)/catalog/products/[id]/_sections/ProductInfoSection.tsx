@@ -24,6 +24,7 @@ import {
   type PackageTierCode,
   type ProductDetail,
 } from "../_lib/types";
+import { statusConfig } from "@/lib/statusLabels";
 
 function Row({
   label,
@@ -84,7 +85,10 @@ export function ProductInfoSection({ product }: { product: ProductDetail }) {
           </p>
         </div>
         <Row label={t("admin.catalog.products.condition")}>
-          {enumLabel(productConditionConfig, product.condition)}
+          {enumLabel(
+            statusConfig(productConditionConfig, t),
+            product.condition,
+          )}
         </Row>
       </div>
       <div className="grid grid-cols-2 gap-4 border-t border-border pt-3">

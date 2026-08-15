@@ -1,6 +1,7 @@
 /** @format */
 
 import type { StatusConfig } from "@tarodan/ui";
+import type { Translate } from "@/types/i18n";
 
 export interface Discount {
   id: string;
@@ -62,25 +63,30 @@ export interface DiscountFormData {
 
 export type DiscountFilter = "all" | "active" | "inactive" | "expired";
 
-export const FILTER_TABS: { value: DiscountFilter; label: string }[] = [
-  { value: "all", label: "Tümü" },
-  { value: "active", label: "Aktif" },
-  { value: "inactive", label: "Pasif" },
-  { value: "expired", label: "Süresi Dolmuş" },
+/** Etiketler katalogdan gelir; hepsi `t`-parametreli kurucudur. */
+export const filterTabs = (
+  t: Translate,
+): { value: DiscountFilter; label: string }[] => [
+  { value: "all", label: t("common.all") },
+  { value: "active", label: t("common.active") },
+  { value: "inactive", label: t("common.inactive") },
+  { value: "expired", label: t("seller.discounts.filterExpired") },
 ];
 
-export const SCOPE_LABELS: Record<string, string> = {
-  seller: "Tüm Mağaza",
-  product: "Seçili Ürünler",
-};
+export const scopeLabels = (t: Translate): Record<string, string> => ({
+  seller: t("seller.discounts.scopeSeller"),
+  product: t("seller.discounts.scopeProduct"),
+});
 
-export const discountStatusConfig: Record<string, StatusConfig> = {
-  inactive: { label: "Pasif", variant: "secondary" },
-  active: { label: "Aktif", variant: "success" },
-  pending: { label: "Bekliyor", variant: "warning" },
-  expired: { label: "Süresi Doldu", variant: "danger" },
-  unknown: { label: "Belirsiz", variant: "secondary" },
-};
+export const discountStatusConfig = (
+  t: Translate,
+): Record<string, StatusConfig> => ({
+  inactive: { label: t("common.inactive"), variant: "secondary" },
+  active: { label: t("common.active"), variant: "success" },
+  pending: { label: t("common.pending"), variant: "warning" },
+  expired: { label: t("seller.discounts.statusExpired"), variant: "danger" },
+  unknown: { label: t("seller.discounts.statusUnknown"), variant: "secondary" },
+});
 
 export function getDiscountStatus(discount: Discount): string {
   if (!discount.isActive) return "inactive";
@@ -108,8 +114,8 @@ export function matchesFilter(
   }
 }
 
-export const formatDate = (dateString: string): string =>
-  new Date(dateString).toLocaleDateString("tr-TR", {
+export const formatDate = (dateString: string, locale: string): string =>
+  new Date(dateString).toLocaleDateString(locale, {
     day: "2-digit",
     month: "2-digit",
     year: "numeric",

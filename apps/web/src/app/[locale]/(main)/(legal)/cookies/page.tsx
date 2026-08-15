@@ -3,6 +3,7 @@
 import type { Metadata } from "next";
 import { localizedCanonical } from "@/lib/seo";
 import CookiesClient from "./_components/CookiesClient";
+import { getTranslations } from "next-intl/server";
 
 export async function generateMetadata({
   params,
@@ -10,10 +11,12 @@ export async function generateMetadata({
   params: Promise<{ locale: string }>;
 }): Promise<Metadata> {
   const { locale } = await params;
+  const t = await getTranslations({ locale });
   return {
-    title: "Çerez Politikası · Tarodan",
-    description:
-      "TARODAN çerez politikası: hangi çerezleri neden kullandığımız, çerez kategorileri ve tercihlerinizi nasıl yönetebileceğiniz.",
+    title: t("page.cookies.page.cerezPolitikasiTarodan"),
+    description: t(
+      "page.cookies.page.tarodanCerezPolitikasiHangiCerezleriNeden",
+    ),
     alternates: localizedCanonical(locale, "/cookies"),
   };
 }

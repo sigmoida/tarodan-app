@@ -12,11 +12,17 @@ import SocialLinks from "@/components/ui/SocialLinks";
 import { Container } from "./Container";
 
 const LOCALES: readonly Locale[] = locales;
-const LOCALE_NAMES: Record<Locale, string> = { tr: "Türkçe", en: "English" };
 const LOCALE_FLAGS: Record<Locale, string> = { tr: "🇹🇷", en: "🇬🇧" };
 
 export default function Footer() {
   const t = useTranslations();
+
+  // Dil adları endonimdir (her dil kendi adıyla listelenir), bu yüzden aktif
+  // dilden bağımsız olarak katalogdan sabit anahtarlarla okunur.
+  const LOCALE_NAMES: Record<Locale, string> = {
+    tr: t("language.turkish"),
+    en: t("language.english"),
+  };
   const { currentLocale: locale, changeLanguage } = useLanguagePreference();
 
   // Footer columns mirror the route-group taxonomy (corporate / support / trust

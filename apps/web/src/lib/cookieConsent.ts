@@ -8,6 +8,8 @@
  * panelden yapılan kayıt banner'ın tercihini bozuyordu.
  */
 
+import type { Translate } from "@/types/i18n";
+
 export type CookieCategory =
   "necessary" | "functional" | "analytics" | "marketing";
 
@@ -56,156 +58,157 @@ export interface CookieCategoryInfo {
  * Platformda gerçekten yazılan çerez/yerel depolama envanteri. Üçüncü taraf
  * ölçümleme ve piksel çerezleri politika kapsamında beyan edilir; script'leri
  * yalnızca ilgili kategoriye rıza verildiğinde yüklenir.
+ *
+ * Çerez ADLARI teknik tanımlayıcıdır ve çevrilmez; görünen her metin katalogdan
+ * gelir, o yüzden envanter bir `t`-parametreli kurucudur (modül düzeyinde sabit
+ * olsaydı hook kuralını ihlal ederdi).
  */
-export const COOKIE_CATEGORIES: CookieCategoryInfo[] = [
-  {
-    id: "necessary",
-    name: "Zorunlu Çerezler",
-    description:
-      "Oturum, güvenlik ve temel platform işlevleri için gereklidir. Kapatılamaz.",
-    required: true,
-    cookies: [
-      {
-        name: "web_at / web_rt",
-        purpose: "Oturum kimlik doğrulaması (httpOnly)",
-        duration: "15 dakika / 7 gün",
-        active: true,
-      },
-      {
-        name: "access_token / refresh_token",
-        purpose: "API oturumu (httpOnly)",
-        duration: "15 dakika / 7 gün",
-        active: true,
-      },
-      {
-        name: "csrf_token",
-        purpose: "Siteler arası istek sahteciliği (CSRF) koruması",
-        duration: "7 gün",
-        active: true,
-      },
-      {
-        name: "tarodan_authed",
-        purpose: "Oturumun açık olduğunu arayüze bildiren gösterge",
-        duration: "7 gün",
-        active: true,
-      },
-      {
-        name: "cookie_consent / cookie_preferences",
-        purpose: "Çerez onayınızın ve tercihlerinizin saklanması (yasal ispat)",
-        duration: "1 yıl",
-        active: true,
-      },
-      {
-        name: "site_unlock",
-        purpose: "Bakım/erişim kilidi doğrulaması",
-        duration: "10 gün",
-        active: true,
-      },
-      {
-        name: "auth-storage / tarodan_user_snapshot",
-        purpose:
-          "Oturum açık kullanıcının profil bilgisinin arayüzde tutulması",
-        duration: "Kalıcı (yerel depolama)",
-        active: true,
-      },
-    ],
-  },
-  {
-    id: "functional",
-    name: "İşlevsel Çerezler",
-    description:
-      "Dil, sepet ve görünüm tercihlerinizi hatırlar. Kapatırsanız bu tercihler her ziyarette sıfırlanır.",
-    cookies: [
-      {
-        name: "NEXT_LOCALE",
-        purpose: "Dil tercihi",
-        duration: "1 yıl",
-        active: true,
-      },
-      {
-        name: "cart-storage",
-        purpose: "Misafir sepeti içeriği",
-        duration: "Kalıcı (yerel depolama)",
-        active: true,
-      },
-      {
-        name: "recent-searches",
-        purpose: "Son aramalarınız ve filtreleriniz",
-        duration: "Kalıcı (yerel depolama)",
-        active: true,
-      },
-      {
-        name: "listings-product-layout",
-        purpose: "Ürün listesi görünüm tercihi",
-        duration: "Kalıcı (yerel depolama)",
-        active: true,
-      },
-      {
-        name: "diecast_saved_searches",
-        purpose: "Kaydettiğiniz aramalar",
-        duration: "Kalıcı (yerel depolama)",
-        active: true,
-      },
-      {
-        name: "platform-fee-banner-dismissed",
-        purpose: "Kapattığınız duyuruların tekrar gösterilmemesi",
-        duration: "Kalıcı (yerel depolama)",
-        active: true,
-      },
-      {
-        name: "VISITOR_INFO1_LIVE / YSC",
-        purpose: "İlan sayfalarına gömülü YouTube videolarının oynatımı",
-        duration: "179 gün / Oturum",
-      },
-    ],
-  },
-  {
-    id: "analytics",
-    name: "Analitik Çerezler",
-    description:
-      "Platformun nasıl kullanıldığını anlamamıza ve iyileştirmemize yardımcı olur. Kimliğinizi tespit etmek için kullanılmaz.",
-    cookies: [
-      {
-        name: "_ga / _gid",
-        purpose: "Google Analytics — ziyaretçi ve oturum ayrımı",
-        duration: "2 yıl / 24 saat",
-      },
-      {
-        name: "_ym_uid / _ym_d",
-        purpose: "Yandex.Metrica — trafik ve ısı haritası analizi",
-        duration: "1 yıl",
-      },
-    ],
-  },
-  {
-    id: "marketing",
-    name: "Pazarlama Çerezleri",
-    description:
-      "İlgi alanlarınıza uygun reklam gösterebilmek için reklam ortaklarıyla paylaşılır.",
-    cookies: [
-      {
-        name: "_fbp",
-        purpose: "Meta (Facebook/Instagram) yeniden pazarlama",
-        duration: "90 gün",
-      },
-      {
-        name: "tt_web_id",
-        purpose: "TikTok Pixel — dönüşüm ölçümü",
-        duration: "13 ay",
-      },
-      {
-        name: "IDE / NID",
-        purpose: "Google Ads & YouTube yeniden hedefleme",
-        duration: "1 ay / 13 ay",
-      },
-      {
-        name: "yandexuid / ymex",
-        purpose: "Yandex Direct reklam gösterimi",
-        duration: "1 yıl",
-      },
-    ],
-  },
-];
+export function cookieCategories(t: Translate): CookieCategoryInfo[] {
+  return [
+    {
+      id: "necessary",
+      name: t("legal.necessaryCookies"),
+      description: t("legal.cookies.necessaryDesc"),
+      required: true,
+      cookies: [
+        {
+          name: "web_at / web_rt",
+          purpose: t("legal.cookies.purpose.sessionAuth"),
+          duration: t("legal.cookies.duration.min15Or7d"),
+          active: true,
+        },
+        {
+          name: "access_token / refresh_token",
+          purpose: t("legal.cookies.purpose.apiSession"),
+          duration: t("legal.cookies.duration.min15Or7d"),
+          active: true,
+        },
+        {
+          name: "csrf_token",
+          purpose: t("legal.cookies.purpose.csrf"),
+          duration: t("legal.cookies.duration.d7"),
+          active: true,
+        },
+        {
+          name: "tarodan_authed",
+          purpose: t("legal.cookies.purpose.authIndicator"),
+          duration: t("legal.cookies.duration.d7"),
+          active: true,
+        },
+        {
+          name: "cookie_consent / cookie_preferences",
+          purpose: t("legal.cookies.purpose.consentRecord"),
+          duration: t("legal.cookies.duration.y1"),
+          active: true,
+        },
+        {
+          name: "site_unlock",
+          purpose: t("legal.cookies.purpose.siteUnlock"),
+          duration: t("legal.cookies.duration.d10"),
+          active: true,
+        },
+        {
+          name: "auth-storage / tarodan_user_snapshot",
+          purpose: t("legal.cookies.purpose.userSnapshot"),
+          duration: t("legal.cookies.duration.persistentLocal"),
+          active: true,
+        },
+      ],
+    },
+    {
+      id: "functional",
+      name: t("legal.functionalCookies"),
+      description: t("legal.cookies.functionalDesc"),
+      cookies: [
+        {
+          name: "NEXT_LOCALE",
+          purpose: t("legal.cookies.purpose.languagePreference"),
+          duration: t("legal.cookies.duration.y1"),
+          active: true,
+        },
+        {
+          name: "cart-storage",
+          purpose: t("legal.cookies.purpose.guestCart"),
+          duration: t("legal.cookies.duration.persistentLocal"),
+          active: true,
+        },
+        {
+          name: "recent-searches",
+          purpose: t("legal.cookies.purpose.recentSearches"),
+          duration: t("legal.cookies.duration.persistentLocal"),
+          active: true,
+        },
+        {
+          name: "listings-product-layout",
+          purpose: t("legal.cookies.purpose.listingLayout"),
+          duration: t("legal.cookies.duration.persistentLocal"),
+          active: true,
+        },
+        {
+          name: "diecast_saved_searches",
+          purpose: t("legal.cookies.purpose.savedSearches"),
+          duration: t("legal.cookies.duration.persistentLocal"),
+          active: true,
+        },
+        {
+          name: "platform-fee-banner-dismissed",
+          purpose: t("legal.cookies.purpose.dismissedBanners"),
+          duration: t("legal.cookies.duration.persistentLocal"),
+          active: true,
+        },
+        {
+          name: "VISITOR_INFO1_LIVE / YSC",
+          purpose: t("legal.cookies.purpose.youtubeEmbed"),
+          duration: t("legal.cookies.duration.d179OrSession"),
+        },
+      ],
+    },
+    {
+      id: "analytics",
+      name: t("legal.analyticsCookies"),
+      description: t("legal.cookies.analyticsDesc"),
+      cookies: [
+        {
+          name: "_ga / _gid",
+          purpose: t("legal.cookies.purpose.googleAnalytics"),
+          duration: t("legal.cookies.duration.y2Or24h"),
+        },
+        {
+          name: "_ym_uid / _ym_d",
+          purpose: t("legal.cookies.purpose.yandexMetrica"),
+          duration: t("legal.cookies.duration.y1"),
+        },
+      ],
+    },
+    {
+      id: "marketing",
+      name: t("legal.marketingCookies"),
+      description: t("legal.cookies.marketingDesc"),
+      cookies: [
+        {
+          name: "_fbp",
+          purpose: t("legal.cookies.purpose.metaRemarketing"),
+          duration: t("legal.cookies.duration.d90"),
+        },
+        {
+          name: "tt_web_id",
+          purpose: t("legal.cookies.purpose.tiktokPixel"),
+          duration: t("legal.cookies.duration.m13"),
+        },
+        {
+          name: "IDE / NID",
+          purpose: t("legal.cookies.purpose.googleAdsRetargeting"),
+          duration: t("legal.cookies.duration.m1Or13"),
+        },
+        {
+          name: "yandexuid / ymex",
+          purpose: t("legal.cookies.purpose.yandexDirect"),
+          duration: t("legal.cookies.duration.y1"),
+        },
+      ],
+    },
+  ];
+}
 
 /** Rıza kalkınca silinecek üçüncü taraf çerezleri (kategoriye göre). */
 const PURGEABLE: Record<Exclude<CookieCategory, "necessary">, string[]> = {

@@ -8,6 +8,7 @@ import {
 import { useTranslations } from "next-intl";
 import { col, type RowActionItem } from "@/components/table";
 import type { User } from "./types";
+import { statusConfig } from "@/lib/statusLabels";
 
 type T = ReturnType<typeof useTranslations<never>>;
 
@@ -53,7 +54,7 @@ export function userColumns(t: T, rowMenu: (u: User) => RowActionItem[]) {
       (u) => {
         const tier = (u.membershipTier || "").toLowerCase();
         const label = enumLabel(
-          membershipTierConfig,
+          statusConfig(membershipTierConfig, t),
           tier,
           u.membershipTier || t("admin.users.membershipFree"),
         );
@@ -71,7 +72,7 @@ export function userColumns(t: T, rowMenu: (u: User) => RowActionItem[]) {
         u.membershipStatus && (u.membershipTier || "free") !== "free" ? (
           <StatusBadge
             status={u.membershipStatus}
-            config={subscriptionStatusConfig}
+            config={statusConfig(subscriptionStatusConfig, t)}
           />
         ) : (
           <Badge variant="default">{t("admin.users.membershipFree")}</Badge>

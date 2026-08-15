@@ -3,6 +3,7 @@
 import type { Metadata } from "next";
 import { localizedCanonical } from "@/lib/seo";
 import SellerAgreementClient from "./_components/SellerAgreementClient";
+import { getTranslations } from "next-intl/server";
 
 export async function generateMetadata({
   params,
@@ -10,10 +11,12 @@ export async function generateMetadata({
   params: Promise<{ locale: string }>;
 }): Promise<Metadata> {
   const { locale } = await params;
+  const t = await getTranslations({ locale });
   return {
-    title: "Satıcı Sözleşmeleri · Tarodan",
-    description:
-      "Tarodan bireysel ve kurumsal satıcı üyelik ve satış sözleşmeleri: onboarding, listeleme, kargo, güvenli ödeme havuzu, komisyon ve hizmet bedelleri.",
+    title: t("page.sellerAgreement.page.saticiSozlesmeleriTarodan"),
+    description: t(
+      "page.sellerAgreement.page.tarodanBireyselVeKurumsalSaticiUyelik",
+    ),
     alternates: localizedCanonical(locale, "/seller-agreement"),
   };
 }

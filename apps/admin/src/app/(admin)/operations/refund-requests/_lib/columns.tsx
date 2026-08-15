@@ -7,6 +7,7 @@ import {
   shipmentStatusConfig,
 } from "@tarodan/ui";
 import { col } from "@/components/table";
+import { statusConfig } from "@/lib/statusLabels";
 
 type T = ReturnType<typeof useTranslations<never>>;
 
@@ -91,7 +92,7 @@ export const refundRequestColumns = (t: T) => [
   ),
   col.text<RefundRequestRow>(
     t("admin.operations.refundRequests.reason"),
-    (r) => enumLabel(refundReasonConfig, r.reason, r.reason),
+    (r) => enumLabel(statusConfig(refundReasonConfig, t), r.reason, r.reason),
     {
       // Sebep etiketleri uzun ("Açıklamaya Uygun Değil") ve tam okunmalı.
       minWidth: 260,
@@ -102,12 +103,20 @@ export const refundRequestColumns = (t: T) => [
   ),
   col.badge<RefundRequestRow>(
     t("common.status"),
-    (r) => <Badge status={r.status} config={refundRequestStatusConfig} />,
+    (r) => (
+      <Badge
+        status={r.status}
+        config={statusConfig(refundRequestStatusConfig, t)}
+      />
+    ),
     { sortKey: "status", sortType: "text" },
   ),
   col.badge<RefundRequestRow>(t("admin.operations.common.cargoStatus"), (r) =>
     r.returnStatus ? (
-      <Badge status={r.returnStatus} config={shipmentStatusConfig} />
+      <Badge
+        status={r.returnStatus}
+        config={statusConfig(shipmentStatusConfig, t)}
+      />
     ) : (
       <span className="text-subtle">—</span>
     ),

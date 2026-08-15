@@ -40,6 +40,7 @@ import GroupCancelSection from "./_sections/GroupCancelSection";
 import BulkRefundSection from "./_sections/BulkRefundSection";
 import BulkRefundModal from "./_modals/BulkRefundModal";
 import { publicNameOf } from "@/lib/public-name";
+import { statusConfig } from "@/lib/statusLabels";
 
 /**
  * Sipariş GRUP ekranı — tek satın alım bile grup çatısı altında gösterilir.
@@ -139,7 +140,7 @@ export default function OrderGroupDetailPage() {
           single && singleStatus ? (
             <StatusBadge
               status={singleStatus}
-              config={orderStatusConfig}
+              config={statusConfig(orderStatusConfig, t)}
               label={
                 single.activeRefundRequest
                   ? t("order.refundInProgress")

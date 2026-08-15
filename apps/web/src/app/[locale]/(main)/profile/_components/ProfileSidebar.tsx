@@ -91,13 +91,13 @@ export default function ProfileSidebar({
           // Ödeme Yöntemleri de kart ikonu kullanıyordu; ayırt edilebilsin diye
           // üyeliğe kendi ikonu verildi.
           icon: SparklesIcon,
-          label: membershipNavLabel(profile?.membershipTier),
+          label: membershipNavLabel(t, profile?.membershipTier),
           href: "/profile/membership",
         },
       ],
     },
     {
-      title: "Alışveriş",
+      title: t("profile.sidebar.alisveris"),
       links: [
         {
           icon: ShoppingBagIcon,
@@ -117,27 +117,35 @@ export default function ProfileSidebar({
           href: "/profile/offers",
           badge: pendingCounts.offers,
         },
-        { icon: TicketIcon, label: "İndirimlerim", href: "/profile/discounts" },
+        {
+          icon: TicketIcon,
+          label: t("profile.sidebar.indirimlerim"),
+          href: "/profile/discounts",
+        },
       ],
     },
     {
-      title: "Finans",
+      title: t("profile.sidebar.finans"),
       links: [
-        { icon: BanknotesIcon, label: "Ödemelerim", href: "/profile/payments" },
+        {
+          icon: BanknotesIcon,
+          label: t("profile.sidebar.odemelerim"),
+          href: "/profile/payments",
+        },
         {
           icon: CreditCardIcon,
-          label: "Ödeme Yöntemleri",
+          label: t("profile.sidebar.odemeYontemleri"),
           href: "/profile/payment-methods",
         },
         {
           icon: ReceiptRefundIcon,
-          label: "İade Talepleri",
+          label: t("profile.sidebar.iadeTalepleri"),
           href: "/profile/refund-requests",
         },
       ],
     },
     {
-      title: "Koleksiyon",
+      title: t("profile.sidebar.koleksiyon"),
       links: [
         {
           icon: RectangleStackIcon,
@@ -152,29 +160,33 @@ export default function ProfileSidebar({
         },
         {
           icon: UserGroupIcon,
-          label: "Takip Ettiklerim",
+          label: t("profile.sidebar.takipEttiklerim"),
           href: "/profile/following",
         },
         {
           icon: BookmarkIcon,
-          label: "Kayıtlı Aramalar",
+          label: t("profile.sidebar.kayitliAramalar"),
           href: "/profile/saved-searches",
         },
       ],
     },
     {
-      title: "Analiz",
+      title: t("profile.sidebar.analiz"),
       links: [
         {
           icon: ChartBarIcon,
-          label: "İstatistikler",
+          label: t("profile.sidebar.istatistikler"),
           href: "/profile/statistics",
         },
-        { icon: ChartPieIcon, label: "Analitik", href: "/profile/analytics" },
+        {
+          icon: ChartPieIcon,
+          label: t("profile.sidebar.analitik"),
+          href: "/profile/analytics",
+        },
       ],
     },
     {
-      title: "İletişim",
+      title: t("profile.sidebar.iletisim"),
       links: [
         {
           icon: ChatBubbleLeftRightIcon,
@@ -195,11 +207,11 @@ export default function ProfileSidebar({
     ...(isCorporateAccount
       ? [
           {
-            title: "Hesap",
+            title: t("profile.sidebar.hesap"),
             links: [
               {
                 icon: BuildingStorefrontIcon,
-                label: "İşletme",
+                label: t("profile.sidebar.isletme"),
                 href: "/profile/business",
               },
             ],
@@ -208,7 +220,11 @@ export default function ProfileSidebar({
       : []),
     {
       links: [
-        { icon: ShieldCheckIcon, label: "Güvenlik", href: "/profile/security" },
+        {
+          icon: ShieldCheckIcon,
+          label: t("profile.sidebar.guvenlik"),
+          href: "/profile/security",
+        },
       ],
     },
   ];

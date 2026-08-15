@@ -44,13 +44,19 @@ export default function AmountSummaryCard({
     <SectionCard className="p-0" bodyClassName="">
       <div className="flex items-center justify-between gap-4 p-6 pb-4">
         <div>
-          <p className="text-sm text-muted">Ödenecek tutar</p>
+          <p className="text-sm text-muted">
+            {t("page.payment.amountsummarycard.odenecekTutar")}
+          </p>
           <p className="mt-1 text-3xl font-bold tracking-tight text-heading tabular-nums sm:text-4xl">
             {formatTL(amount)}{" "}
-            <span className="text-2xl font-semibold text-muted">TL</span>
+            <span className="text-2xl font-semibold text-muted">
+              {t("page.payment.amountsummarycard.tl")}
+            </span>
           </p>
         </div>
-        <Badge variant="warning">Ödeme bekleniyor</Badge>
+        <Badge variant="warning">
+          {t("page.payment.amountsummarycard.odemeBekleniyor")}
+        </Badge>
       </div>
       {lines.length > 0 && (
         <div className="space-y-1 border-t border-border px-6 py-4">

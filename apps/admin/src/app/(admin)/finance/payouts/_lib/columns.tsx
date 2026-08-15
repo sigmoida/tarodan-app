@@ -14,6 +14,7 @@ import {
   type PayoutAdjustmentRow,
 } from "./types";
 import type { useTranslations } from "next-intl";
+import { statusConfig } from "@/lib/statusLabels";
 
 type T = ReturnType<typeof useTranslations<never>>;
 
@@ -96,7 +97,12 @@ export function transactionColumns(
     ),
     col.badge<PayoutTransaction>(
       t("common.status"),
-      (row) => <Badge status={row.status} config={paymentHoldStatusConfig} />,
+      (row) => (
+        <Badge
+          status={row.status}
+          config={statusConfig(paymentHoldStatusConfig, t)}
+        />
+      ),
       { sortKey: "status", sortType: "text" },
     ),
     col.date<PayoutTransaction>(
@@ -199,7 +205,10 @@ export function transferColumns(
       t("common.status"),
       (r) => (
         <div className="min-w-0">
-          <Badge status={r.status} config={payoutStatusConfig} />
+          <Badge
+            status={r.status}
+            config={statusConfig(payoutStatusConfig, t)}
+          />
           {r.failureReason && (
             <p className="mt-1 truncate text-xs text-danger-600">
               {r.failureReason}

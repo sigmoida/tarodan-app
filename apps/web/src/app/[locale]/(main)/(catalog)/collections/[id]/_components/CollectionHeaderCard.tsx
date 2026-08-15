@@ -11,6 +11,7 @@ import OptimizedImage from "@/components/OptimizedImage";
 import UserAvatar from "@/components/UserAvatar";
 import { useCollectionDetail } from "../_context/CollectionDetailContext";
 import CollectionVisibilityBadge from "../../_components/CollectionVisibilityBadge";
+import { imagePlaceholder } from "@/lib/placeholder";
 
 /**
  * Koleksiyon başlığı — kapak, ad, sahip ve sayaçlar.
@@ -46,7 +47,7 @@ export default function CollectionHeaderCard() {
               alt={collection.name}
               fill
               className="object-cover"
-              fallbackSrc="https://placehold.co/400x400/f3f4f6/9ca3af?text=Koleksiyon"
+              fallbackSrc={imagePlaceholder("400x400")}
               logContext={{
                 collectionId: collection.id,
                 page: "collection-detail-cover",

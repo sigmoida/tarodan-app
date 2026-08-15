@@ -11,6 +11,7 @@ import {
 } from "@/components/detail/ShipmentProducts";
 import type { TradeShipment } from "../types";
 import { isShipmentDelivered } from "../_lib/trade";
+import { statusConfig } from "@/lib/statusLabels";
 
 export interface ShipmentLegCardProps {
   title: string;
@@ -125,7 +126,10 @@ export function ShipmentLegCard({
                       <span className="font-medium text-body">
                         {t("common.status")}:
                       </span>{" "}
-                      {enumLabel(shipmentStatusConfig, s.status)}
+                      {enumLabel(
+                        statusConfig(shipmentStatusConfig, t),
+                        s.status,
+                      )}
                     </p>
                   )}
                   {s.shippedAt && (

@@ -9,8 +9,10 @@ import {
   type TradeItem,
 } from "../../_lib/types";
 import { TradeSwapBadge } from "../../_components/TradeSwapBadge";
+import { getTranslations } from "next-intl/server";
+import { imagePlaceholder } from "@/lib/placeholder";
 
-function ItemColumn({
+async function ItemColumn({
   heading,
   items,
   tradeId,
@@ -21,6 +23,7 @@ function ItemColumn({
   tradeId: string;
   logPage: string;
 }) {
+  const t = await getTranslations();
   return (
     <div className="card p-6 flex-1">
       <h2 className="text-xl font-semibold mb-4">{heading}</h2>
@@ -38,7 +41,7 @@ function ItemColumn({
                 fill
                 className="object-cover"
                 sizes="64px"
-                fallbackSrc="https://placehold.co/64x64/f3f4f6/9ca3af?text=Ürün"
+                fallbackSrc={imagePlaceholder("64x64")}
                 logContext={{
                   tradeId,
                   itemId: item.id,
@@ -58,7 +61,9 @@ function ItemColumn({
         ))}
       </div>
       <div className="pt-4 border-t">
-        <p className="text-sm text-muted">Toplam Değer</p>
+        <p className="text-sm text-muted">
+          {t("page.trades.tradeitemscomparison.toplamDeger")}
+        </p>
         <p className="text-2xl font-bold text-heading">
           {formatTL(calculateTotalValue(items))}
         </p>
@@ -67,7 +72,7 @@ function ItemColumn({
   );
 }
 
-export default function TradeItemsComparison({
+export default async function TradeItemsComparison({
   theirItems,
   myItems,
   theirName,
@@ -78,11 +83,14 @@ export default function TradeItemsComparison({
   theirName: string;
   tradeId: string;
 }) {
+  const t = await getTranslations();
   return (
     <div className="flex flex-col lg:flex-row items-stretch gap-6 mb-6">
       {/* SOL - Karşı Tarafın Ürünü */}
       <ItemColumn
-        heading={`${theirName}'in Ürünü`}
+        heading={t("page.trades.tradeitemscomparison.theirnameInUrunu", {
+          theirName,
+        })}
         items={theirItems}
         tradeId={tradeId}
         logPage="trade-detail-their"
@@ -95,7 +103,7 @@ export default function TradeItemsComparison({
 
       {/* SAĞ - Benim Teklifim */}
       <ItemColumn
-        heading="Sizin Teklifiniz"
+        heading={t("page.trades.tradeitemscomparison.sizinTeklifiniz")}
         items={myItems}
         tradeId={tradeId}
         logPage="trade-detail-mine"

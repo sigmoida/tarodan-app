@@ -5,7 +5,9 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { UseFormReturn } from "react-hook-form";
 import toast from "react-hot-toast";
+import { useTranslations } from "next-intl";
 import { mediaApi } from "@/lib/api";
+import type { Translate } from "@/types/i18n";
 import {
   createUploadQueue,
   type QueueEvent,
@@ -15,6 +17,7 @@ import {
   acceptFiles,
   imageSubmitBlocker,
   hasPendingUploads,
+  MAX_IMAGE_BYTES,
   itemFromExisting,
   itemFromFile,
   makeCover as makeCoverAt,
@@ -44,35 +47,44 @@ interface UseListingImageUploadParams {
 }
 
 /** Üretim portu: tek dosya, ilerleme ve iptal destekli. */
-const defaultUpload: UploadPort = async (file, { signal, onProgress }) => {
-  const response = await mediaApi.uploadProductImage(file, {
-    signal,
-    onProgress,
-  });
-  const [result] = response.data ?? [];
-  if (!result?.cardKey || !result?.detailKey) {
-    throw new Error("Sunucu bu dosya için sonuç döndürmedi");
-  }
-  return { cardKey: result.cardKey, detailKey: result.detailKey };
-};
+const makeDefaultUpload =
+  (t: Translate): UploadPort =>
+  async (file, { signal, onProgress }) => {
+    const response = await mediaApi.uploadProductImage(file, {
+      signal,
+      onProgress,
+    });
+    const [result] = response.data ?? [];
+    if (!result?.cardKey || !result?.detailKey) {
+      throw new Error(t("product.imageGrid.uploadNoResult"));
+    }
+    return { cardKey: result.cardKey, detailKey: result.detailKey };
+  };
 
-const rejectionMessage = (rejected: RejectedFile[]): string => {
-  const byReason = {
-    type: rejected.filter((r) => r.reason === "type"),
-    size: rejected.filter((r) => r.reason === "size"),
-    duplicate: rejected.filter((r) => r.reason === "duplicate"),
-    limit: rejected.filter((r) => r.reason === "limit"),
+const rejectionMessage = (rejected: RejectedFile[], t: Translate): string => {
+  const counts = {
+    type: rejected.filter((r) => r.reason === "type").length,
+    size: rejected.filter((r) => r.reason === "size").length,
+    duplicate: rejected.filter((r) => r.reason === "duplicate").length,
+    limit: rejected.filter((r) => r.reason === "limit").length,
   };
   const parts: string[] = [];
-  if (byReason.type.length)
-    parts.push(`${byReason.type.length} dosya desteklenmeyen biçimde`);
-  if (byReason.size.length)
-    parts.push(`${byReason.size.length} dosya 10 MB sınırının üstünde`);
-  if (byReason.duplicate.length)
-    parts.push(`${byReason.duplicate.length} dosya zaten eklenmiş`);
-  if (byReason.limit.length)
-    parts.push(`${byReason.limit.length} dosya kontenjana sığmadı`);
-  return `${parts.join(", ")} — eklenmedi`;
+  if (counts.type)
+    parts.push(t("product.imageGrid.rejectedType", { count: counts.type }));
+  if (counts.size)
+    parts.push(
+      t("product.imageGrid.rejectedSize", {
+        count: counts.size,
+        limitMb: Math.round(MAX_IMAGE_BYTES / (1024 * 1024)),
+      }),
+    );
+  if (counts.duplicate)
+    parts.push(
+      t("product.imageGrid.rejectedDuplicate", { count: counts.duplicate }),
+    );
+  if (counts.limit)
+    parts.push(t("product.imageGrid.rejectedLimit", { count: counts.limit }));
+  return t("product.imageGrid.rejectedSuffix", { reasons: parts.join(", ") });
 };
 
 /**
@@ -89,8 +101,9 @@ const rejectionMessage = (rejected: RejectedFile[]): string => {
 export function useListingImageUpload({
   form,
   maxImages,
-  upload = defaultUpload,
+  upload,
 }: UseListingImageUploadParams) {
+  const t = useTranslations();
   const [items, setItems] = useState<ListingImageItem[]>([]);
   /**
    * Kullanıcı görsellerde bir değişiklik yaptı mı?
@@ -155,8 +168,8 @@ export function useListingImageUpload({
 
   // Kuyruk bir KEZ kurulur: her render'da yeniden yaratılırsa aktif istekler
   // ve iptal denetleyicileri kaybolurdu.
-  const uploadRef = useRef(upload);
-  uploadRef.current = upload;
+  const uploadRef = useRef<UploadPort>(upload ?? makeDefaultUpload(t));
+  uploadRef.current = upload ?? makeDefaultUpload(t);
   const queueRef = useRef<ReturnType<typeof createUploadQueue> | null>(null);
   if (!queueRef.current) {
     const applyEvent = (event: QueueEvent) => {
@@ -247,7 +260,7 @@ export function useListingImageUpload({
       const current = itemsRef.current;
       const { accepted, rejected } = acceptFiles(current, files, { maxImages });
 
-      if (rejected.length) toast.error(rejectionMessage(rejected));
+      if (rejected.length) toast.error(rejectionMessage(rejected, t));
       if (!accepted.length) return;
 
       const queued = accepted.map((file) =>
@@ -261,7 +274,7 @@ export function useListingImageUpload({
         })),
       );
     },
-    [commit, maxImages, queue],
+    [commit, maxImages, queue, t],
   );
 
   /** `<input type=file>` ve sürükle-bırak aynı yola girer. */

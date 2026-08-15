@@ -1,4 +1,5 @@
 /** @format */
+import type { Translate } from "@/types/i18n";
 
 export interface GuideStep {
   title: string;
@@ -12,190 +13,188 @@ export interface Guide {
   steps: GuideStep[];
 }
 
-export const GUIDES: Guide[] = [
+export const guideList = (t: Translate): Guide[] => [
   {
     id: "getting-started",
-    title: "Başlangıç Rehberi",
+    title: t("guides.content.baslangicRehberi"),
     steps: [
       {
-        title: "Üye Olun",
-        content:
-          "E-posta adresiniz ve şifrenizle hızlıca kayıt olabilir ya da Google veya Facebook hesabınızla tek tıkla aramıza katılabilirsiniz.",
+        title: t("guides.content.uyeOlun"),
+        content: t("guides.content.ePostaAdresinizVeSifrenizleHizlica"),
       },
       {
-        title: "Profilinizi Tamamlayın",
-        content:
-          "Profil fotoğrafınızı ekleyin, hobinizden kısaca bahseden bir biyografi yazın ve iletişim bilgilerinizi güncelleyin. Eksiksiz profiller, platformdaki güvenilirliğinizi her zaman bir adım öne taşır.",
+        title: t("guides.content.profiliniziTamamlayin"),
+        content: t(
+          "guides.content.profilFotografiniziEkleyinHobinizdenKisacaBahseden",
+        ),
       },
       {
-        title: "Adres Ekleyin",
-        content:
-          "Koleksiyonunuza yeni parçalar eklemek veya takas süreçlerini başlatabilmek için sistemimize en az bir teslimat adresi tanımlayın.",
+        title: t("guides.content.adresEkleyin"),
+        content: t(
+          "guides.content.koleksiyonunuzaYeniParcalarEklemekVeyaTakas",
+        ),
       },
       {
-        title: "Keşfetmeye Başlayın",
-        content:
-          "Zengin kategorilerimizi inceleyin, favori satıcılarınızı takibe alın ve gözünüze kestirdiğiniz nadir modelleri favorilerinize kaydederek hemen keşfe başlayın.",
+        title: t("guides.content.kesfetmeyeBaslayin"),
+        content: t(
+          "guides.content.zenginKategorilerimiziInceleyinFavoriSaticilariniziTakibe",
+        ),
       },
     ],
   },
   {
     id: "buying",
-    title: "Alışveriş Rehberi",
+    title: t("guides.content.alisverisRehberi"),
     steps: [
       {
-        title: "Model Arayın",
-        content:
-          "Arama çubuğunu kullanarak aradığınız markayı, özel seriyi veya modeli yazın; gelişmiş filtrelerle aradığınız parçaya saniyeler içinde ulaşın.",
+        title: t("guides.content.modelArayin"),
+        content: t(
+          "guides.content.aramaCubugunuKullanarakAradiginizMarkayiOzel",
+        ),
       },
       {
-        title: "Detayları İnceleyin",
-        content:
-          "Modelin fotoğraflarını yakından inceleyin, satıcının açıklamalarına göz atın ve satıcı puanını kontrol edin. Aklınıza takılan en ufak bir soru olursa mesaj yoluyla satıcıyla kolayca iletişime geçin.",
+        title: t("guides.content.detaylariInceleyin"),
+        content: t(
+          "guides.content.modelinFotograflariniYakindanInceleyinSaticininAciklamalarin",
+        ),
       },
       {
-        title: "Sepetinize Ekleyin",
-        content:
-          "Beğendiğiniz modeli “Sepete Ekle” butonuna tıklayarak sepetinize atın. Dilerseniz aynı satıcıya ait birden fazla modeli tek seferde sepetinizde toplayabilirsiniz.",
+        title: t("guides.content.sepetinizeEkleyin"),
+        content: t(
+          "guides.content.begendiginizModeliSepeteEkleButonunaTiklayarak",
+        ),
       },
       {
-        title: "Ödemenizi Tamamlayın",
-        content:
-          "Teslimat adresinizi seçin, size uygun kargo tercihini belirleyin ve güvenli ödeme adımıyla işleminizi sorunsuzca tamamlayın.",
+        title: t("guides.content.odemeniziTamamlayin"),
+        content: t("guides.content.teslimatAdresiniziSecinSizeUygunKargo"),
       },
       {
-        title: "Siparişinizi ve Takaslarınızı Takip Edin",
-        content:
-          "“Siparişlerim” ve “Takaslarım” sayfasını ziyaret ederek yeni modelinizin yola çıkış ve kargo sürecini anlık olarak takip edin.",
+        title: t("guides.content.siparisiniziVeTakaslariniziTakipEdin"),
+        content: t(
+          "guides.content.siparislerimVeTakaslarimSayfasiniZiyaretEderek",
+        ),
       },
     ],
   },
   {
     id: "selling",
-    title: "Satış Rehberi",
+    title: t("guides.content.satisRehberi"),
     steps: [
       {
-        title: "İlan Verin",
-        content:
-          "Ana sayfada veya menüde yer alan “İlan Ver” butonuna tıklayarak hızlıca ilan oluşturma sayfasına geçiş yapın.",
+        title: t("guides.content.ilanVerin"),
+        content: t("guides.content.anaSayfadaVeyaMenudeYerAlan"),
       },
       {
-        title: "Fotoğraf Ekleyin",
-        content:
-          "Modelinizi en iyi şekilde yansıtan, farklı açılardan ve net ışık altında çekilmiş en az 3 fotoğraf yükleyin; kaliteli görseller her zaman dikkat çeker ve satış şansınızı artırır.",
+        title: t("guides.content.fotografEkleyin"),
+        content: t("guides.content.modeliniziEnIyiSekildeYansitanFarkli"),
       },
       {
-        title: "Detayları Girin",
-        content:
-          "Marka, model, ölçek, kondisyon ve açıklama bilgilerini eksiksiz şekilde doldurun. Paylaştığınız her detay, alıcı gözünde güvenilirliğinizi artırır.",
+        title: t("guides.content.detaylariGirin"),
+        content: t("guides.content.markaModelOlcekKondisyonVeAciklama"),
       },
       {
-        title: "Fiyat Belirleyin",
-        content:
-          "Piyasa araştırması yaparak rekabetçi bir fiyat belirleyin. Dilerseniz koleksiyonunuzu çeşitlendirmek için takas seçeneğini de aktif hale getirebilirsiniz.",
+        title: t("guides.content.fiyatBelirleyin"),
+        content: t("guides.content.piyasaArastirmasiYaparakRekabetciBirFiyat"),
       },
       {
-        title: "İlanınızı Yayınlayın",
-        content:
-          "İlanınız hızlı bir onay sürecinden geçtikten sonra (genellikle 24 saat içinde) vitrindeki yerini alır.",
+        title: t("guides.content.ilaniniziYayinlayin"),
+        content: t("guides.content.ilaninizHizliBirOnaySurecindenGectikten"),
       },
       {
-        title: "Satışı Tamamlayın",
-        content:
-          "Satış gerçekleştiğinde modeli özenle paketleyin, kargoya teslim edin ve takip numarasını sisteme girerek süreci tamamlayın.",
+        title: t("guides.content.satisiTamamlayin"),
+        content: t(
+          "guides.content.satisGerceklestigindeModeliOzenlePaketleyinKargoya",
+        ),
       },
     ],
   },
   {
     id: "trade",
-    title: "Takas Rehberi",
+    title: t("guides.content.takasRehberi"),
     steps: [
       {
-        title: "Takasa Açık Ürünleri Keşfedin",
-        content:
-          "Ürün listelerinde yer alan “Takas” etiketine dikkat edin. Beğendiğiniz bu modellere hemen takas teklifi gönderebilirsiniz.",
+        title: t("guides.content.takasaAcikUrunleriKesfedin"),
+        content: t("guides.content.urunListelerindeYerAlanTakasEtiketine"),
       },
       {
-        title: "Teklifinizi Gönderin",
-        content:
-          "“Takas Teklifi” butonuna tıklayın, kendi garajınızdan veya ilanlarınızdan takas için uygun bir ürün seçerek teklifinizi iletin.",
+        title: t("guides.content.teklifiniziGonderin"),
+        content: t(
+          "guides.content.takasTeklifiButonunaTiklayinKendiGarajinizdan",
+        ),
       },
       {
-        title: "Detayları Görüşün",
-        content:
-          "Karşı tarafla mesajlaşarak takas koşullarını detaylandırın. Eğer model değerleri arasında fark varsa, ek ödeme konusunda anlaşma sağlayın.",
+        title: t("guides.content.detaylariGorusun"),
+        content: t(
+          "guides.content.karsiTaraflaMesajlasarakTakasKosullariniDetaylandirin",
+        ),
       },
       {
-        title: "Takası Onaylayın",
-        content:
-          "Her iki taraf da şartları onayladığında takas resmi olarak kesinleşir.",
+        title: t("guides.content.takasiOnaylayin"),
+        content: t("guides.content.herIkiTarafDaSartlariOnayladiginda"),
       },
       {
-        title: "Güvenli Gönderim Sağlayın",
-        content:
-          "Ürünlerinizi güvenle paketleyerek kargoya verin. Tarodan güvenli depo incelemesi için depomuza ulaşan ürünlerin kontrolleri tamamlandıktan sonra onayınızı verin ve kargo takip numaraları üzerinden modelinizin size ne zaman ulaşacağını sistemden takip edin.",
+        title: t("guides.content.guvenliGonderimSaglayin"),
+        content: t(
+          "guides.content.urunleriniziGuvenlePaketleyerekKargoyaVerinTarodan",
+        ),
       },
     ],
   },
   {
     id: "photography",
-    title: "Fotoğraf Çekim Rehberi",
+    title: t("guides.content.fotografCekimRehberi"),
     steps: [
       {
-        title: "Doğal Işık Kullanın",
-        content:
-          "Çekimlerinizde mutlaka doğal ışıktan yararlanın; gündüz vakti pencere kenarında yapılan çekimler modelin detaylarını en net şekilde ortaya çıkarır. Flaş kullanmaktan kaçının.",
+        title: t("guides.content.dogalIsikKullanin"),
+        content: t(
+          "guides.content.cekimlerinizdeMutlakaDogalIsiktanYararlaninGunduz",
+        ),
       },
       {
-        title: "Sade Bir Arka Plan Tercih Edin",
-        content:
-          "Modelin detaylarının ön plana çıkması için sade ve tek renkli bir arka plan kullanın. Beyaz bir kağıt veya kumaş bu işlem için fazlasıyla yeterlidir.",
+        title: t("guides.content.sadeBirArkaPlanTercihEdin"),
+        content: t("guides.content.modelinDetaylarininOnPlanaCikmasiIcin"),
       },
       {
-        title: "Farklı Açılardan Çekim Yapın",
-        content:
-          "Modelinizi ön, arka, yan ve 45 derecelik açılardan fotoğraflayın. İnce detayları ve hatları net bir şekilde göstererek alıcıya eksiksiz bir sunum yapın.",
+        title: t("guides.content.farkliAcilardanCekimYapin"),
+        content: t("guides.content.modeliniziOnArkaYanVe45"),
       },
       {
-        title: "Kusurları Şeffafça Gösterin",
-        content:
-          "Modelde çizik veya eksik parça gibi kusurlar varsa bunları yakından fotoğraflayın. Şeffaflık, koleksiyonerler arasında her zaman güven sağlar.",
+        title: t("guides.content.kusurlariSeffafcaGosterin"),
+        content: t("guides.content.modeldeCizikVeyaEksikParcaGibi"),
       },
       {
-        title: "Orijinal Kutuyu Unutmayın",
-        content:
-          "Modelin orijinal kutusu varsa mutlaka fotoğraflayın; kutulu ürünler koleksiyoncular için her zaman çok daha değerlidir.",
+        title: t("guides.content.orijinalKutuyuUnutmayin"),
+        content: t(
+          "guides.content.modelinOrijinalKutusuVarsaMutlakaFotograflayin",
+        ),
       },
     ],
   },
   {
     id: "shipping",
-    title: "Kargo Rehberi",
+    title: t("guides.content.kargoRehberi"),
     steps: [
       {
-        title: "Doğru Koruyucu Malzeme Kullanın",
-        content:
-          "Modelinizi baloncuklu naylon, köpük veya gazete kağıdıyla sıkıca sarın; kutu içinde kesinlikle hareket etmemesini sağlayın.",
+        title: t("guides.content.dogruKoruyucuMalzemeKullanin"),
+        content: t("guides.content.modeliniziBaloncukluNaylonKopukVeyaGazete"),
       },
       {
-        title: "Uygun Boyutta Sağlam Kutu Seçin",
-        content:
-          "Ürünün ebatlarına uygun, dayanıklı bir karton kutu tercih edin. Çok büyük kutular modelin taşıma sırasında darbe almasına yol açabilir.",
+        title: t("guides.content.uygunBoyuttaSaglamKutuSecin"),
+        content: t("guides.content.urununEbatlarinaUygunDayanikliBirKarton"),
       },
       {
-        title: "Çift Kat Koruma Tercih Edin",
-        content:
-          "Özellikle koleksiyonunuzdaki değerli ve nadir parçalar için iç içe iki kutu kullanarak ekstra güvenlik sağlayın.",
+        title: t("guides.content.ciftKatKorumaTercihEdin"),
+        content: t(
+          "guides.content.ozellikleKoleksiyonunuzdakiDegerliVeNadirParcalar",
+        ),
       },
       {
-        title: "Net Etiketleme Yapın",
-        content:
-          "Gönderici ve alıcı adres bilgilerini okunaklı bir şekilde yazın; kutunun üzerine mutlaka “KIRILACAK EŞYA” uyarısı ekleyin.",
+        title: t("guides.content.netEtiketlemeYapin"),
+        content: t("guides.content.gondericiVeAliciAdresBilgileriniOkunakli"),
       },
       {
-        title: "Kargoya Teslim Edin",
-        content:
-          "Paketinizi kargo şubesine götürerek size atanan kargo kodu ile şubeye teslim edin.",
+        title: t("guides.content.kargoyaTeslimEdin"),
+        content: t("guides.content.paketiniziKargoSubesineGoturerekSizeAtanan"),
       },
     ],
   },

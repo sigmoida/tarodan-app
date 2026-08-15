@@ -19,14 +19,26 @@ export function getProductEffectivePrice(p: ProductPriceFields): number {
 /** İndirimde mi (eski fiyat üstü çizili gösterilecek mi) */
 export function isProductOnSaleDisplay(p: ProductPriceFields): boolean {
   if (p.isOnSale === true) return true;
-  const old = p.oldPrice != null ? Number(p.oldPrice) : (p.originalPrice != null ? Number(p.originalPrice) : null);
+  const old =
+    p.oldPrice != null
+      ? Number(p.oldPrice)
+      : p.originalPrice != null
+        ? Number(p.originalPrice)
+        : null;
   const price = Number(p.price);
   return old != null && old > price;
 }
 
 /** Gösterilecek eski fiyat (üstü çizili) */
-export function getProductOriginalPriceForDisplay(p: ProductPriceFields): number {
-  const old = p.oldPrice != null ? Number(p.oldPrice) : (p.originalPrice != null ? Number(p.originalPrice) : null);
+export function getProductOriginalPriceForDisplay(
+  p: ProductPriceFields,
+): number {
+  const old =
+    p.oldPrice != null
+      ? Number(p.oldPrice)
+      : p.originalPrice != null
+        ? Number(p.originalPrice)
+        : null;
   return old ?? Number(p.price);
 }
 
@@ -52,7 +64,7 @@ export function isProductOutOfStock(p: {
   status?: string | null;
   availableQuantity?: number | null;
 }): boolean {
-  if (p.status != null && p.status !== 'active') return true;
+  if (p.status != null && p.status !== "active") return true;
   if (p.availableQuantity != null && p.availableQuantity <= 0) return true;
   return false;
 }

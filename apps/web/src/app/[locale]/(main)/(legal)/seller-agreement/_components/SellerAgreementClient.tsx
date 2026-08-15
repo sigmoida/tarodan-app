@@ -1,35 +1,49 @@
 /** @format */
 
+import { getTranslations } from "next-intl/server";
 import { DocPage } from "@/components/layout/DocPage";
+import type { Translate } from "@/types/i18n";
 import SectionCard from "@/components/ui/SectionCard";
 import {
-  FEE_TABLE,
-  INDIVIDUAL_INTRO,
-  INDIVIDUAL_AGREEMENT,
-  CORPORATE_INTRO,
-  CORPORATE_AGREEMENT,
+  feeTable,
+  individualIntro,
+  individualAgreement,
+  corporateIntro,
+  corporateAgreement,
   type AgreementSection,
 } from "../_lib/agreement";
 
-function FeeTable() {
+function FeeTable({ t }: { t: Translate }) {
   return (
     <div className="mt-4 overflow-x-auto">
       <table className="w-full text-sm">
         <thead>
           <tr className="text-left text-muted">
-            <th className="pb-2 pr-4 font-medium">Tutar</th>
-            <th className="pb-2 pr-4 font-medium">Satıcı Komisyon</th>
-            <th className="pb-2 pr-4 font-medium">Alıcı Komisyon</th>
-            <th className="pb-2 pr-4 font-medium">Satıcı Kargo</th>
-            <th className="pb-2 pr-4 font-medium">Alıcı Kargo</th>
             <th className="pb-2 pr-4 font-medium">
-              Satıcı Platform Hizmet Bedeli
+              {t("legal.sellerAgreement.feeAmount")}
             </th>
-            <th className="pb-2 font-medium">Alıcı Koruma Hizmeti</th>
+            <th className="pb-2 pr-4 font-medium">
+              {t("legal.sellerAgreement.feeSellerCommission")}
+            </th>
+            <th className="pb-2 pr-4 font-medium">
+              {t("legal.sellerAgreement.feeBuyerCommission")}
+            </th>
+            <th className="pb-2 pr-4 font-medium">
+              {t("legal.sellerAgreement.feeSellerShipping")}
+            </th>
+            <th className="pb-2 pr-4 font-medium">
+              {t("legal.sellerAgreement.feeBuyerShipping")}
+            </th>
+            <th className="pb-2 pr-4 font-medium">
+              {t("legal.sellerAgreement.feeSellerPlatformFee")}
+            </th>
+            <th className="pb-2 font-medium">
+              {t("legal.sellerAgreement.feeBuyerProtection")}
+            </th>
           </tr>
         </thead>
         <tbody className="text-body">
-          {FEE_TABLE.map((row) => (
+          {feeTable(t).map((row) => (
             <tr key={row.range} className="border-t border-border-subtle">
               <td className="py-2 pr-4 font-medium">{row.range}</td>
               <td className="py-2 pr-4 tabular-nums">{row.sellerCommission}</td>
@@ -46,7 +60,7 @@ function FeeTable() {
   );
 }
 
-function Section({ section }: { section: AgreementSection }) {
+function Section({ section, t }: { section: AgreementSection; t: Translate }) {
   return (
     <section>
       <h3 className="mb-2 font-semibold text-heading">{section.title}</h3>
@@ -71,35 +85,36 @@ function Section({ section }: { section: AgreementSection }) {
           ))}
         </ul>
       )}
-      {section.showFeeTable && <FeeTable />}
+      {section.showFeeTable && <FeeTable t={t} />}
     </section>
   );
 }
 
-export default function SellerAgreementClient() {
+export default async function SellerAgreementClient() {
+  const t = await getTranslations();
   return (
     <DocPage
-      title="Satıcı Sözleşmeleri"
-      description="Tarodan platformunda satış yapan bireysel ve kurumsal satıcılar için geçerli üyelik ve satış sözleşmeleri."
+      title={t("legal.sellerAgreement.pageTitle")}
+      description={t("legal.sellerAgreement.pageDescription")}
     >
-      <SectionCard title="Bireysel Satıcı Üyelik ve Satış Sözleşmesi">
+      <SectionCard title={t("legal.sellerAgreement.individualSection")}>
         <p className="mb-6 text-sm leading-relaxed text-muted">
-          {INDIVIDUAL_INTRO}
+          {individualIntro(t)}
         </p>
         <div className="space-y-7">
-          {INDIVIDUAL_AGREEMENT.map((section) => (
-            <Section key={section.title} section={section} />
+          {individualAgreement(t).map((section) => (
+            <Section key={section.title} section={section} t={t} />
           ))}
         </div>
       </SectionCard>
 
-      <SectionCard title="Kurumsal Satıcı Üyelik ve Satış Sözleşmesi">
+      <SectionCard title={t("legal.sellerAgreement.corporateSection")}>
         <p className="mb-6 text-sm leading-relaxed text-muted">
-          {CORPORATE_INTRO}
+          {corporateIntro(t)}
         </p>
         <div className="space-y-7">
-          {CORPORATE_AGREEMENT.map((section) => (
-            <Section key={section.title} section={section} />
+          {corporateAgreement(t).map((section) => (
+            <Section key={section.title} section={section} t={t} />
           ))}
         </div>
       </SectionCard>

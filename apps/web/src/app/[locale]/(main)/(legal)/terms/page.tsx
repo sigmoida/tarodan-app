@@ -1,9 +1,10 @@
 /** @format */
 
 import type { Metadata } from "next";
+import { getTranslations } from "next-intl/server";
 import { LegalDocument } from "@/components/legal/LegalDocument";
 import { localizedCanonical } from "@/lib/seo";
-import { TERMS_PARTS } from "./_lib/terms";
+import { termsParts } from "./_lib/terms";
 
 export async function generateMetadata({
   params,
@@ -11,21 +12,22 @@ export async function generateMetadata({
   params: Promise<{ locale: string }>;
 }): Promise<Metadata> {
   const { locale } = await params;
+  const t = await getTranslations({ locale });
   return {
-    title: "Kullanım Koşulları · Tarodan",
-    description:
-      "Tarodan üyelik, ilan, satış, satın alma, teklif, takas, ödeme, komisyon, içerik ve hesap kullanım koşulları.",
+    title: t("legal.terms.metaTitle"),
+    description: t("legal.terms.metaDescription"),
     alternates: localizedCanonical(locale, "/terms"),
   };
 }
 
-export default function TermsPage() {
+export default async function TermsPage() {
+  const t = await getTranslations();
   return (
     <LegalDocument
-      title="Kullanım Koşulları"
-      description="Tarodan pazar yerini ziyaret ederken, üyelik oluştururken, ilan verirken, satın alırken veya takas yaparken geçerli genel kurallar."
-      parts={TERMS_PARTS}
-      footer="Yürürlük ve son güncelleme: 5 Ağustos 2026. Bu metnin güncel sürümüne Platform üzerinden sürekli erişilebilir. İşleme özel olarak onaylanan sözleşmeler ve emredici mevzuat hükümleri saklıdır."
+      title={t("legal.termsTitle")}
+      description={t("legal.terms.pageDescription")}
+      parts={termsParts(t)}
+      footer={t("legal.terms.pageFooter")}
     />
   );
 }

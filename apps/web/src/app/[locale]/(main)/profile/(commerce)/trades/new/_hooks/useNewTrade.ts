@@ -77,9 +77,9 @@ export function useCreateTrade() {
         error?.message ||
         t("trade.sendFailed");
       if (
-        msg.includes("Takas özelliği") ||
-        msg.includes("üyeliğinizde mevcut değil") ||
-        msg.includes("takas özelliğine sahip değil")
+        msg.includes(t("page.new.usenewtrade.takasOzelligi")) ||
+        msg.includes(t("page.new.usenewtrade.uyeliginizdeMevcutDegil")) ||
+        msg.includes(t("page.new.usenewtrade.takasOzelligineSahipDegil"))
       ) {
         await refreshUserData();
       }

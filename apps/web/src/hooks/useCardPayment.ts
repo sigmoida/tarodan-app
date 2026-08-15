@@ -4,6 +4,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import toast from "react-hot-toast";
+import { useTranslations } from "next-intl";
 import { useZodForm } from "@tarodan/ui/form";
 import { CVV_REGEX } from "@tarodan/ui";
 import { paymentsApi, membershipApi, type SavedCard } from "@/lib/api";
@@ -45,7 +46,8 @@ export function useCardPayment({
   cardStorageEnabled,
   resolvePayment,
 }: UseCardPaymentArgs) {
-  const form = useZodForm(newCardSchema, { defaultValues: emptyNewCard });
+  const t = useTranslations();
+  const form = useZodForm(newCardSchema(t), { defaultValues: emptyNewCard });
 
   const [cards, setCards] = useState<SavedCard[]>([]);
   const [loadingCards, setLoadingCards] = useState(cardStorageEnabled);
@@ -105,7 +107,7 @@ export function useCardPayment({
       };
     } else {
       if (selectedCard?.requireCvv && !CVV_REGEX.test(savedCvv)) {
-        toast.error("Bu kart için CVV girin");
+        toast.error(t("checkout.cvvRequiredForCard"));
         return;
       }
       cardBody = { savedCardId: selected };
@@ -170,7 +172,7 @@ export function useCardPayment({
       document.body.appendChild(paytrForm);
       paytrForm.submit();
     } catch (e: any) {
-      toast.error(e?.response?.data?.message || "Ödeme başlatılamadı");
+      toast.error(e?.response?.data?.message || t("payment.startFailed"));
       setProcessing(false);
     }
   };

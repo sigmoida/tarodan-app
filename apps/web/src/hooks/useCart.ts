@@ -16,6 +16,7 @@ import {
 import { useAuthStore } from "@/stores/authStore";
 import { useCartStore } from "@/stores/cartStore";
 import { publicNameOf } from "@/lib/public-name";
+import { useTranslations } from "next-intl";
 
 // `useCart` is mounted by the header and may also be mounted by the current
 // page. Keep the login merge single-flight so those consumers cannot submit the
@@ -61,6 +62,7 @@ function cartErrorMessage(error: unknown, fallback: string): string {
  * same fields + methods the store exposed, so they read one unified cart.
  */
 export function useCart() {
+  const t = useTranslations();
   const queryClient = useQueryClient();
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
   const isAuthLoading = useAuthStore((s) => s.isLoading);
@@ -310,7 +312,10 @@ export function useCart() {
           id: product.sellerId || product.seller?.id || "",
           displayName:
             product.sellerName ||
-            publicNameOf(product.seller, product.seller?.name || "Satıcı"),
+            publicNameOf(
+              product.seller,
+              product.seller?.name || t("page.hooks.usecart.satici"),
+            ),
         },
       });
       // `addToOfflineCart` yeni satırı adet 1 ekler; ürün sayfasında adet>1
@@ -321,7 +326,12 @@ export function useCart() {
     try {
       await cartApi.addItem(productId, quantity);
     } catch (error) {
-      throw new Error(cartErrorMessage(error, "Sepete eklenirken hata oluştu"));
+      throw new Error(
+        cartErrorMessage(
+          error,
+          t("page.hooks.usecart.sepeteEklenirkenHataOlustu"),
+        ),
+      );
     }
     await invalidate();
   };
@@ -347,7 +357,10 @@ export function useCart() {
       await cartApi.updateItem(productId, quantity);
     } catch (error) {
       throw new Error(
-        cartErrorMessage(error, "Miktar güncellenirken hata oluştu"),
+        cartErrorMessage(
+          error,
+          t("page.hooks.usecart.miktarGuncellenirkenHataOlustu"),
+        ),
       );
     }
     await invalidate();

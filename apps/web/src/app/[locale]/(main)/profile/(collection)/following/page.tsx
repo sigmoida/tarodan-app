@@ -9,8 +9,10 @@ import AuthLoadingScreen from "@/components/AuthLoadingScreen";
 import { useRequireAuth } from "../../_hooks/useRequireAuth";
 import { useFollowing, useUnfollow } from "./_hooks/useFollowing";
 import FollowedSellerCard from "./_components/FollowedSellerCard";
+import { useTranslations } from "next-intl";
 
 export default function FollowingPage() {
+  const t = useTranslations();
   const { ready } = useRequireAuth();
 
   const { following, isLoading } = useFollowing(ready);
@@ -21,8 +23,10 @@ export default function FollowingPage() {
   return (
     <PageShell className="pb-16">
       <PageHeader
-        title="Takip Ettiklerim"
-        description={`${following.length} satıcı takip ediliyor`}
+        title={t("profile.followingPage.takipEttiklerim")}
+        description={t("profile.followingPage.lengthSaticiTakipEdiliyor", {
+          length: following.length,
+        })}
       />
 
       {isLoading ? (
@@ -31,11 +35,15 @@ export default function FollowingPage() {
         </div>
       ) : following.length === 0 ? (
         <EmptyStateCard
-          title="Henüz kimseyi takip etmiyorsunuz"
-          description="Satıcıları takip ederek yeni ilanlarından haberdar olun"
+          title={t("profile.followingPage.henuzKimseyiTakipEtmiyorsunuz")}
+          description={t(
+            "profile.followingPage.saticilariTakipEderekYeniIlanlarindanHaberdar",
+          )}
           action={
             <Button asChild>
-              <Link href="/listings">İlanları Keşfet</Link>
+              <Link href="/listings">
+                {t("profile.followingPage.ilanlariKesfet")}
+              </Link>
             </Button>
           }
         />

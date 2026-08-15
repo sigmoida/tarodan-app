@@ -25,11 +25,13 @@ import {
   StarIcon,
   XMarkIcon,
 } from "@heroicons/react/24/outline";
+import { useTranslations } from "next-intl";
 import { Button, IconButton } from "@tarodan/ui";
 import {
   coverIndexOf,
   type ListingImageItem,
 } from "@/components/listings/form/listing-image-item";
+import { imagePlaceholder } from "@/lib/placeholder";
 
 export interface ImagePreviewGridProps {
   /** Görseller — EKRANDAKİ sırayla. İlk kalem kapak görselidir. */
@@ -45,7 +47,7 @@ export interface ImagePreviewGridProps {
   className?: string;
 }
 
-const FALLBACK = "https://placehold.co/200x200/f3f4f6/9ca3af?text=Resim";
+const FALLBACK = imagePlaceholder("200x200");
 
 /**
  * Yüklenen görsellerin ızgarası: her kalem KENDİ durumunu gösterir, sıra
@@ -67,6 +69,8 @@ export default function ImagePreviewGrid({
   onMakeCover,
   className = "",
 }: ImagePreviewGridProps) {
+  const t = useTranslations();
+
   // Pointer sensörü fare ve DOKUNMAYI birlikte karşılar; klavye sensörü ok
   // tuşlarıyla taşımayı sağlar (native HTML5 drag ikisini de vermiyordu).
   const sensors = useSensors(
@@ -116,12 +120,17 @@ export default function ImagePreviewGrid({
       onDragEnd={handleDragEnd}
       accessibility={{
         announcements: {
-          onDragStart: ({ active }) => `${active.id} taşınıyor`,
+          onDragStart: ({ active }) =>
+            t("product.imageGrid.dragStart", { name: String(active.id) }),
           onDragOver: ({ over }) =>
-            over ? `${over.id} konumunun üzerinde` : "",
+            over
+              ? t("product.imageGrid.dragOver", { name: String(over.id) })
+              : "",
           onDragEnd: ({ over }) =>
-            over ? `${over.id} konumuna bırakıldı` : "Taşıma iptal edildi",
-          onDragCancel: () => "Taşıma iptal edildi",
+            over
+              ? t("product.imageGrid.dragEnd", { name: String(over.id) })
+              : t("product.imageGrid.dragCancel"),
+          onDragCancel: () => t("product.imageGrid.dragCancel"),
         },
       }}
     >
@@ -152,6 +161,7 @@ function SortableTile({
   onRetry?: (clientId: string) => void;
   onMakeCover?: (index: number) => void;
 }) {
+  const t = useTranslations();
   const {
     attributes,
     listeners,
@@ -179,7 +189,7 @@ function SortableTile({
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
         src={item.previewUrl}
-        alt={`Görsel ${index + 1}`}
+        alt={t("product.imageGrid.alt", { index: index + 1 })}
         className={`h-full w-full object-cover ${isBusy ? "opacity-60" : ""}`}
         onError={(e) => {
           (e.target as HTMLImageElement).src = FALLBACK;
@@ -191,7 +201,7 @@ function SortableTile({
           data-testid="listing-image-cover-badge"
           className="absolute left-1.5 top-1.5 rounded-full bg-primary-600 px-1.5 py-0.5 text-[10px] font-medium text-inverted shadow-sm"
         >
-          Kapak
+          {t("product.imageGrid.cover")}
         </span>
       ) : (
         <span className="absolute left-1.5 top-1.5 rounded-full bg-surface-elevated/90 px-1.5 py-0.5 text-[10px] font-medium text-muted ring-1 ring-border">
@@ -203,7 +213,7 @@ function SortableTile({
         <IconButton
           variant="ghost"
           size="xs"
-          aria-label={`Görsel ${index + 1} sırasını değiştir`}
+          aria-label={t("product.imageGrid.reorder", { index: index + 1 })}
           className="absolute bottom-1.5 left-1.5 cursor-grab touch-none rounded-full bg-surface-elevated/90 text-muted shadow-sm ring-1 ring-border backdrop-blur-sm active:cursor-grabbing"
           {...attributes}
           {...listeners}
@@ -217,7 +227,7 @@ function SortableTile({
           variant="ghost"
           size="xs"
           onClick={() => onMakeCover(index)}
-          aria-label={`Görsel ${index + 1} kapak yap`}
+          aria-label={t("product.imageGrid.makeCover", { index: index + 1 })}
           className="absolute bottom-1.5 right-1.5 rounded-full bg-surface-elevated/90 text-muted shadow-sm ring-1 ring-border backdrop-blur-sm hover:bg-primary-500 hover:text-inverted opacity-0 transition-opacity focus-visible:opacity-100 group-hover:opacity-100"
         >
           <StarIcon className="h-4 w-4" />
@@ -231,10 +241,12 @@ function SortableTile({
         <div className="absolute inset-x-0 bottom-0 bg-surface-elevated/90 px-1.5 py-1 backdrop-blur-sm">
           <p className="text-[10px] font-medium text-body">
             {item.status === "processing"
-              ? "İşleniyor"
+              ? t("product.imageGrid.processing")
               : item.status === "queued"
-                ? "Sırada"
-                : `Yükleniyor %${item.progress}`}
+                ? t("product.imageGrid.queued")
+                : t("product.imageGrid.uploadingPercent", {
+                    percent: item.progress,
+                  })}
           </p>
           <div
             className="mt-0.5 h-1 w-full overflow-hidden rounded-full bg-surface-alt"
@@ -242,7 +254,9 @@ function SortableTile({
             aria-valuenow={item.progress}
             aria-valuemin={0}
             aria-valuemax={100}
-            aria-label={`Görsel ${index + 1} yükleniyor`}
+            aria-label={t("product.imageGrid.uploadingAria", {
+              index: index + 1,
+            })}
           >
             <div
               className={`h-full bg-primary-500 transition-[width] ${
@@ -257,7 +271,7 @@ function SortableTile({
       {item.status === "failed" && (
         <div className="absolute inset-0 flex flex-col items-center justify-center gap-1 bg-danger-50/90 p-1 text-center">
           <p className="text-[10px] leading-tight text-danger-700">
-            {item.error ?? "Yüklenemedi"}
+            {item.error ?? t("product.imageGrid.failed")}
           </p>
           {onRetry && (
             <Button
@@ -267,7 +281,7 @@ function SortableTile({
               className="px-2 py-0.5 text-[10px]"
             >
               <ArrowPathIcon className="mr-1 h-3 w-3" />
-              Tekrar dene
+              {t("common.tryAgain")}
             </Button>
           )}
         </div>
@@ -277,7 +291,7 @@ function SortableTile({
         variant="ghost"
         size="xs"
         onClick={() => onRemove(item.clientId)}
-        aria-label={`Görsel ${index + 1} kaldır`}
+        aria-label={t("product.imageGrid.remove", { index: index + 1 })}
         className="absolute right-1.5 top-1.5 rounded-full bg-surface-elevated/90 text-muted shadow-sm ring-1 ring-border backdrop-blur-sm hover:bg-danger-500 hover:text-inverted opacity-0 transition-opacity focus-visible:opacity-100 group-hover:opacity-100"
       >
         <XMarkIcon className="h-4 w-4" />

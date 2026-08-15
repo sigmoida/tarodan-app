@@ -63,6 +63,6 @@ export function categoryColumns(t: T, actions: CategoryRowActions) {
         sortKey: "isActive",
       },
     ),
-    col.rowMenu<Category>(categoryRowMenu(actions)),
+    col.rowMenu<Category>(categoryRowMenu(actions, t)),
   ];
 }

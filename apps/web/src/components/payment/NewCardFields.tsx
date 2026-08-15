@@ -3,6 +3,7 @@
 "use client";
 
 import { useRef } from "react";
+import { useTranslations } from "next-intl";
 import { Controller, type UseFormReturn } from "react-hook-form";
 import { InformationCircleIcon } from "@heroicons/react/24/outline";
 import {
@@ -31,6 +32,7 @@ export default function NewCardFields({
   saveCard,
   onSaveCardChange,
 }: NewCardFieldsProps) {
+  const t = useTranslations();
   const { control, watch } = form;
   const expRef = useRef<HTMLInputElement>(null);
   const cvcRef = useRef<HTMLInputElement>(null);
@@ -44,8 +46,8 @@ export default function NewCardFields({
         name="holder"
         render={({ field, fieldState }) => (
           <Input
-            label="Kart üzerindeki isim"
-            placeholder="Ad Soyad"
+            label={t("checkout.cardHolder")}
+            placeholder={t("checkout.cardHolderPlaceholder")}
             autoComplete="cc-name"
             value={field.value}
             onChange={field.onChange}
@@ -59,7 +61,7 @@ export default function NewCardFields({
         name="number"
         render={({ field, fieldState }) => (
           <CardNumberInput
-            label="Kart numarası"
+            label={t("checkout.cardNumber")}
             value={field.value}
             error={fieldState.error?.message}
             rightAdornment={
@@ -81,7 +83,7 @@ export default function NewCardFields({
           render={({ field, fieldState }) => (
             <ExpiryDateInput
               ref={expRef}
-              label="Son kullanma tarihi"
+              label={t("checkout.expiryDate")}
               value={field.value}
               error={fieldState.error?.message}
               onValueChange={(d) => {
@@ -93,16 +95,15 @@ export default function NewCardFields({
         />
         <div className="w-full">
           <span className="mb-1.5 flex items-center gap-1 text-sm font-medium text-body">
-            CVV
+            {t("checkout.cvv")}
             <TooltipProvider>
               <Tooltip
                 content={
                   <span className="block max-w-[15rem]">
                     <strong className="mb-0.5 block">
-                      Güvenlik kodu (CVV)
+                      {t("checkout.cvvTooltipTitle")}
                     </strong>
-                    Kartınızın arka yüzündeki son 3 rakam; Amex için kartınızın
-                    ön yüzündeki 4 rakam.
+                    {t("checkout.cvvTooltipText")}
                   </span>
                 }
               >
@@ -118,7 +119,7 @@ export default function NewCardFields({
             render={({ field, fieldState }) => (
               <CvvInput
                 ref={cvcRef}
-                aria-label="CVV"
+                aria-label={t("checkout.cvv")}
                 value={field.value}
                 error={fieldState.error?.message}
                 onValueChange={field.onChange}
@@ -131,7 +132,7 @@ export default function NewCardFields({
       {cardStorageEnabled && (
         <div className="rounded-xl border border-border bg-surface p-3">
           <Checkbox
-            label="Kartımı sonraki ödemeler için PayTR'da sakla"
+            label={t("checkout.saveCardPaytr")}
             checked={saveCard}
             onChange={(e) => onSaveCardChange(e.target.checked)}
           />

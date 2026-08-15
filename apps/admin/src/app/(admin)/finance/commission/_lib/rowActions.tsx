@@ -1,23 +1,27 @@
 import { EyeIcon } from "@heroicons/react/24/outline";
 import { editDeleteActions, type RowActionItem } from "@/components/table";
 import type { CommissionRule } from "./types";
+import type { Translate } from "@/lib/statusLabels";
 
-export function commissionRowMenu({
-  editable,
-  viewLabel,
-  onView,
-  onEdit,
-  onDelete,
-}: {
-  editable: boolean;
-  viewLabel: string;
-  onView: (rule: CommissionRule) => void;
-  onEdit: (rule: CommissionRule) => void;
-  onDelete: (rule: CommissionRule) => void;
-}) {
+export function commissionRowMenu(
+  {
+    editable,
+    viewLabel,
+    onView,
+    onEdit,
+    onDelete,
+  }: {
+    editable: boolean;
+    viewLabel: string;
+    onView: (rule: CommissionRule) => void;
+    onEdit: (rule: CommissionRule) => void;
+    onDelete: (rule: CommissionRule) => void;
+  },
+  t: Translate,
+) {
   return (rule: CommissionRule): RowActionItem[] =>
     editable
-      ? editDeleteActions(rule, { onEdit, onDelete })
+      ? editDeleteActions(rule, { onEdit, onDelete }, t)
       : [
           {
             label: viewLabel,

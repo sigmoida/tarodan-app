@@ -1,13 +1,15 @@
 "use client";
 
 import { useState } from "react";
+import { useTranslations } from "next-intl";
 import { motion, AnimatePresence } from "framer-motion";
 import { Button, Toggle } from "@tarodan/ui";
 import { Link } from "@/i18n/navigation";
 import { useCookieConsent } from "@/hooks/useCookieConsent";
-import { COOKIE_CATEGORIES } from "@/lib/cookieConsent";
+import { cookieCategories } from "@/lib/cookieConsent";
 
 export default function CookieConsentBanner() {
+  const t = useTranslations();
   const {
     preferences,
     needsConsent,
@@ -20,6 +22,8 @@ export default function CookieConsentBanner() {
 
   if (!needsConsent) return null;
 
+  const categories = cookieCategories(t);
+
   return (
     <AnimatePresence>
       <motion.div
@@ -28,28 +32,29 @@ export default function CookieConsentBanner() {
         exit={{ y: 24, opacity: 0 }}
         transition={{ duration: 0.2, ease: "easeOut" }}
         role="dialog"
-        aria-label="Çerez tercihleri"
+        aria-label={t("legal.cookiePreferences")}
         className="fixed inset-x-0 bottom-0 z-[9999] p-4"
       >
         <div className="mx-auto max-w-3xl rounded-2xl border border-border bg-surface-elevated p-5 shadow-lg">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <p className="text-sm leading-relaxed text-muted">
-              Deneyiminizi geliştirmek ve trafiği analiz etmek için çerez
-              kullanıyoruz. Ayrıntılar için{" "}
-              <Link
-                href="/cookies"
-                className="text-primary-600 hover:underline"
-              >
-                Çerez Politikası
-              </Link>
-              .
+              {t.rich("legal.cookieBannerNotice", {
+                policy: (chunks) => (
+                  <Link
+                    href="/cookies"
+                    className="text-primary-600 hover:underline"
+                  >
+                    {chunks}
+                  </Link>
+                ),
+              })}
             </p>
             <div className="flex shrink-0 flex-wrap gap-2">
               <Button size="sm" onClick={acceptAll}>
-                Tümünü kabul et
+                {t("legal.acceptAll")}
               </Button>
               <Button variant="secondary" size="sm" onClick={rejectAll}>
-                Sadece zorunlu
+                {t("legal.rejectAll")}
               </Button>
               <Button
                 variant="ghost"
@@ -57,14 +62,14 @@ export default function CookieConsentBanner() {
                 onClick={() => setShowSettings((v) => !v)}
                 aria-expanded={showSettings}
               >
-                {showSettings ? "Kapat" : "Ayarlar"}
+                {showSettings ? t("common.close") : t("legal.cookieSettings")}
               </Button>
             </div>
           </div>
 
           {showSettings && (
             <div className="mt-4 space-y-1 border-t border-border pt-4">
-              {COOKIE_CATEGORIES.map((category) => (
+              {categories.map((category) => (
                 <div
                   key={category.id}
                   className="flex items-start justify-between gap-4 py-2"
@@ -74,7 +79,7 @@ export default function CookieConsentBanner() {
                       {category.name}
                       {category.required && (
                         <span className="ml-2 text-xs font-normal text-subtle">
-                          Her zaman aktif
+                          {t("legal.alwaysActive")}
                         </span>
                       )}
                     </p>
@@ -93,7 +98,7 @@ export default function CookieConsentBanner() {
               ))}
               <div className="pt-3">
                 <Button size="sm" onClick={savePreferences}>
-                  Tercihlerimi kaydet
+                  {t("legal.savePreferences")}
                 </Button>
               </div>
             </div>

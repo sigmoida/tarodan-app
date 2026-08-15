@@ -50,7 +50,8 @@ export default function ProductDetailsCard({
   const t = useTranslations();
 
   const scales = scaleList.length > 0 ? scaleList : FALLBACK_SCALES;
-  const materials = materialList.length > 0 ? materialList : FALLBACK_MATERIALS;
+  const materials =
+    materialList.length > 0 ? materialList : FALLBACK_MATERIALS(t);
 
   return (
     <SectionCard title={t("product.productDetails")}>

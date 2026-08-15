@@ -24,6 +24,7 @@ import TradeActionBar from "./_sections/TradeActionBar";
 import CounterOfferEditor from "./_sections/CounterOfferEditor";
 import RejectTradeModal from "./_modals/RejectTradeModal";
 import RaiseDisputeModal from "./_modals/RaiseDisputeModal";
+import { statusConfig } from "@/lib/statusLabels";
 
 export default function TradeDetailPage() {
   const vm = useTradeDetail();
@@ -94,9 +95,11 @@ export default function TradeDetailPage() {
       <div className="min-h-screen bg-surface py-8">
         <div className="max-w-4xl mx-auto px-4">
           <div className="card p-6 text-center">
-            <p className="text-muted">Takas bulunamadı</p>
+            <p className="text-muted">
+              {t("page.trades.page.takasBulunamadi")}
+            </p>
             <ButtonLink href="/profile/trades" className="mt-4 inline-block">
-              Takaslara Dön
+              {t("page.trades.page.takaslaraDon")}
             </ButtonLink>
           </div>
         </div>
@@ -122,10 +125,10 @@ export default function TradeDetailPage() {
     <PageShell className="pb-16">
       <PageHeader
         backHref="/profile/trades"
-        title="Takas Detayı"
+        title={t("page.trades.page.takasDetayi")}
         description={
           <span className="inline-flex items-center gap-2">
-            Takas No: {trade.tradeNumber}
+            {t("trade.tradeNumberLabel")} {trade.tradeNumber}
             {trade.version && trade.version > 1 && (
               <Badge variant="primary" size="sm">
                 {t("trade.counterOfferNumber", { number: trade.version - 1 })}
@@ -136,7 +139,7 @@ export default function TradeDetailPage() {
         actions={
           <StatusBadge
             status={trade.status}
-            config={tradeStatusConfig}
+            config={statusConfig(tradeStatusConfig, t)}
             label={getTradeStatusLabel(trade.status, locale)}
           />
         }

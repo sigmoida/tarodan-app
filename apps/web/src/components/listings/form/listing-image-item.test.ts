@@ -256,7 +256,6 @@ describe("ilan görseli durum modeli", () => {
       ]);
 
       expect(blocker?.reason).toBe("pending");
-      expect(blocker?.message).toMatch(/bekleyin/i);
     });
 
     it("sırada bekleyen kalem de engeller", () => {
@@ -279,7 +278,6 @@ describe("ilan görseli durum modeli", () => {
       ]);
 
       expect(blocker?.reason).toBe("failed");
-      expect(blocker?.message).toMatch(/kaldırın|tekrar/i);
     });
 
     it("hepsi yüklendiyse engel yoktur", () => {

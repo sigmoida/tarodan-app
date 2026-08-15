@@ -43,6 +43,8 @@ import {
   type OfferTab,
 } from "../_lib/types";
 import { publicNameOf } from "@/lib/public-name";
+import { statusConfig, statusLabel } from "@/lib/statusLabels";
+import { imagePlaceholder } from "@/lib/placeholder";
 
 interface OfferCardProps {
   offer: Offer;
@@ -73,16 +75,12 @@ export default function OfferCard({
   const listingPrice = getProductEffectivePrice(offer.product);
   const discount = calculateDiscount(offer.amount, listingPrice);
   const timeRemaining =
-    offer.status === "pending" ? getTimeRemaining(offer.expiresAt) : null;
+    offer.status === "pending" ? getTimeRemaining(offer.expiresAt, t) : null;
   const otherUser = activeTab === "received" ? offer.buyer : offer.seller;
   const paid = isOfferOrderPaid(offer);
-  const statusLabel = paid
+  const label = paid
     ? t("order.statusPaid")
-    : offerStatusLabel(
-        offer.status,
-        locale,
-        offerStatusConfig[offer.status]?.label || offer.status,
-      );
+    : offerStatusLabel(offer.status, t);
 
   const src = getOfferImage(offer);
   const isReceived = activeTab === "received";
@@ -199,7 +197,7 @@ export default function OfferCard({
               alt={offer.product.title}
               fill
               className="object-cover transition-transform duration-300 group-hover:scale-[1.03]"
-              fallbackSrc="https://placehold.co/400x400/f3f4f6/9ca3af?text=Ürün"
+              fallbackSrc={imagePlaceholder("400x400")}
               logContext={{ productId: offer.product.id, page: "offers" }}
             />
           ) : (
@@ -238,8 +236,8 @@ export default function OfferCard({
             <div className="flex flex-col items-end gap-1">
               <StatusBadge
                 status={offer.status}
-                config={offerStatusConfig}
-                label={statusLabel}
+                config={statusConfig(offerStatusConfig, t)}
+                label={label}
               />
               {/* Karşı teklif zinciri önceki turu `rejected` yapar; gerekçe
                   gösterilmezse geçmiş "reddedildi" rozetleriyle dolu görünür. */}

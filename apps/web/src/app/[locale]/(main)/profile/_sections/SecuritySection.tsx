@@ -38,12 +38,19 @@ const EMPTY: ChangePasswordValues = {
   confirmPassword: "",
 };
 
+/** Şifre kuralları — etiket katalogdan gelir, bu yüzden anahtar taşınır. */
 const RULES = [
-  { test: (p: string) => p.length >= 8, label: "En az 8 karakter" },
-  { test: (p: string) => /[A-Z]/.test(p), label: "Büyük harf" },
-  { test: (p: string) => /[a-z]/.test(p), label: "Küçük harf" },
-  { test: (p: string) => /\d/.test(p), label: "Rakam" },
-];
+  { test: (p: string) => p.length >= 8, key: "profile.security.ruleMin8" },
+  {
+    test: (p: string) => /[A-Z]/.test(p),
+    key: "profile.security.ruleUppercase",
+  },
+  {
+    test: (p: string) => /[a-z]/.test(p),
+    key: "profile.security.ruleLowercase",
+  },
+  { test: (p: string) => /\d/.test(p), key: "profile.security.ruleDigit" },
+] as const;
 
 function PhoneModal({ open, onClose }: { open: boolean; onClose: () => void }) {
   const t = useTranslations();
@@ -73,7 +80,7 @@ function PhoneModal({ open, onClose }: { open: boolean; onClose: () => void }) {
     <Modal
       isOpen={open}
       onClose={onClose}
-      title="Telefon Doğrulama"
+      title={t("profile.security.phoneVerification")}
       size="md"
       closeLabel={t("common.close")}
       dismissDisabled={sendCode.isPending || verify.isPending}
@@ -89,7 +96,9 @@ function PhoneModal({ open, onClose }: { open: boolean; onClose: () => void }) {
               : () => verify.mutate(code, { onSuccess: onClose })
           }
           cancelLabel={step === "enter" ? t("common.cancel") : t("common.back")}
-          confirmLabel={step === "enter" ? "Kod Gönder" : "Doğrula"}
+          confirmLabel={
+            step === "enter" ? t("profile.sendCode") : t("profile.verify")
+          }
           isLoading={sendCode.isPending || verify.isPending}
           disabled={step === "enter" ? !fullPhone : code.length !== 6}
         />
@@ -98,7 +107,7 @@ function PhoneModal({ open, onClose }: { open: boolean; onClose: () => void }) {
       {step === "enter" ? (
         <div className="space-y-4">
           <PhoneInput
-            label="Telefon numarası"
+            label={t("profile.security.phoneNumber")}
             phone={phone}
             onPhoneChange={(next) => {
               setPhone(next);
@@ -112,7 +121,7 @@ function PhoneModal({ open, onClose }: { open: boolean; onClose: () => void }) {
       ) : (
         <div className="space-y-4">
           <Input
-            label="Doğrulama kodu"
+            label={t("profile.verificationCode")}
             value={code}
             onChange={(e) => setCode(e.target.value)}
             placeholder="123456"
@@ -126,12 +135,13 @@ function PhoneModal({ open, onClose }: { open: boolean; onClose: () => void }) {
 
 /** Security: change password (RHF+zod) + SMS phone verification. */
 export default function SecuritySection() {
+  const t = useTranslations();
   const { user, isAuthenticated } = useAuthStore();
   const changePassword = useChangePassword();
   const { is2faEnabled } = use2faStatus(isAuthenticated);
   const [phoneOpen, setPhoneOpen] = useState(false);
 
-  const form = useZodForm(changePasswordSchema, { defaultValues: EMPTY });
+  const form = useZodForm(changePasswordSchema(t), { defaultValues: EMPTY });
   const newPassword = form.watch("newPassword") ?? "";
 
   const onSubmit = (values: ChangePasswordValues) =>
@@ -139,7 +149,7 @@ export default function SecuritySection() {
 
   return (
     <SectionCard
-      title="Güvenlik"
+      title={t("profile.security.title")}
       action={
         <Button
           type="button"
@@ -147,7 +157,7 @@ export default function SecuritySection() {
           onClick={form.handleSubmit(onSubmit)}
           isLoading={changePassword.isPending}
         >
-          Şifreyi Değiştir
+          {t("profile.security.changePassword")}
         </Button>
       }
     >
@@ -155,14 +165,14 @@ export default function SecuritySection() {
         <FormInput
           name="currentPassword"
           type="password"
-          label="Mevcut Şifre"
+          label={t("profile.security.currentPassword")}
           placeholder="••••••••"
           autoComplete="current-password"
         />
         <FormInput
           name="newPassword"
           type="password"
-          label="Yeni Şifre"
+          label={t("auth.newPassword")}
           placeholder="••••••••"
           autoComplete="new-password"
         />
@@ -171,14 +181,14 @@ export default function SecuritySection() {
             const met = r.test(newPassword);
             return (
               <span
-                key={r.label}
+                key={r.key}
                 className={`rounded-full px-2 py-0.5 text-xs ${
                   met
                     ? "bg-surface-alt text-success-700"
                     : "bg-surface-alt text-subtle"
                 }`}
               >
-                {met ? "✓" : "○"} {r.label}
+                {met ? "✓" : "○"} {t(r.key)}
               </span>
             );
           })}
@@ -186,7 +196,7 @@ export default function SecuritySection() {
         <FormInput
           name="confirmPassword"
           type="password"
-          label="Yeni Şifre (Tekrar)"
+          label={t("profile.security.newPasswordRepeat")}
           placeholder="••••••••"
           autoComplete="new-password"
         />
@@ -197,18 +207,18 @@ export default function SecuritySection() {
           <DevicePhoneMobileIcon className="h-5 w-5 text-primary-500" />
           <div>
             <p className="text-sm font-medium text-heading">
-              Telefon Doğrulama
+              {t("profile.security.phoneVerification")}
             </p>
             <p className="text-xs text-muted">
               {user?.isPhoneVerified
-                ? "Telefonunuz doğrulandı"
-                : "Telefonunuzu SMS ile doğrulayın"}
+                ? t("profile.security.phoneVerified")
+                : t("profile.security.phoneVerifyPrompt")}
             </p>
           </div>
         </div>
         {user?.isPhoneVerified ? (
           <Badge variant="success" size="sm">
-            Doğrulandı
+            {t("profile.bank.verified")}
           </Badge>
         ) : (
           <Button
@@ -217,7 +227,7 @@ export default function SecuritySection() {
             size="sm"
             onClick={() => setPhoneOpen(true)}
           >
-            Doğrula
+            {t("profile.verify")}
           </Button>
         )}
       </div>
@@ -227,24 +237,26 @@ export default function SecuritySection() {
           <ShieldCheckIcon className="h-5 w-5 text-primary-500" />
           <div>
             <p className="text-sm font-medium text-heading">
-              İki Adımlı Doğrulama (2FA)
+              {t("profile.security.twoFactor")}
             </p>
             <p className="text-xs text-muted">
               {is2faEnabled
-                ? "Hesabınız TOTP ile korunuyor"
-                : "Uygulama tabanlı ek güvenlik katmanı ekleyin"}
+                ? t("profile.security.twoFactorOn")
+                : t("profile.security.twoFactorOff")}
             </p>
           </div>
         </div>
         <div className="flex items-center gap-2">
           {is2faEnabled && (
             <Badge variant="success" size="sm">
-              Aktif
+              {t("common.active")}
             </Badge>
           )}
           <Button asChild variant="outline" size="sm">
             <Link href="/profile/security">
-              {is2faEnabled ? "Yönet" : "Ayarla"}
+              {is2faEnabled
+                ? t("profile.security.manage")
+                : t("profile.security.setUp")}
             </Link>
           </Button>
         </div>

@@ -4,6 +4,7 @@ import type { Metadata } from "next";
 import { PageContent } from "./PageContent";
 
 import { getServerApiOrigin } from "@/lib/api/origin";
+import { getTranslations } from "next-intl/server";
 
 const API_BASE = getServerApiOrigin();
 
@@ -36,9 +37,10 @@ async function getPage(slug: string): Promise<StaticPage | null> {
 type Props = { params: Promise<{ slug: string }> };
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
+  const t = await getTranslations();
   const { slug } = await params;
   const page = await getPage(slug);
-  if (!page) return { title: "Sayfa Bulunamadı" };
+  if (!page) return { title: t("page.sayfa.page.sayfaBulunamadi") };
   return {
     title: page.metaTitle || page.title,
     description: page.metaDescription || undefined,
@@ -51,6 +53,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 }
 
 export default async function StaticPageRoute({ params }: Props) {
+  const t = await getTranslations();
   const { slug } = await params;
   const page = await getPage(slug);
   if (!page) notFound();
@@ -60,7 +63,7 @@ export default async function StaticPageRoute({ params }: Props) {
       <div className="max-w-4xl mx-auto px-4 py-12">
         <nav className="mb-8 text-sm text-muted">
           <Link href="/" className="hover:text-primary-600">
-            Ana Sayfa
+            {t("page.sayfa.page.anaSayfa")}
           </Link>
           <span className="mx-2">/</span>
           <span className="text-heading">{page.title}</span>

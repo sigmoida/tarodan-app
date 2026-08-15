@@ -2,6 +2,7 @@
 
 "use client";
 
+import { useTranslations } from "next-intl";
 import { Button, Spinner } from "@tarodan/ui";
 import { SectionCard } from "@/components/ui";
 import type { useCardPayment } from "@/hooks/useCardPayment";
@@ -25,7 +26,7 @@ export type CardPaymentState = ReturnType<typeof useCardPayment>;
  */
 export default function CardPaymentSection({
   card,
-  title = "Kart Bilgileri",
+  title,
   children,
 }: {
   card: CardPaymentState;
@@ -33,6 +34,7 @@ export default function CardPaymentSection({
   /** Gönder düğmesi ve ekrana özel notlar. */
   children?: React.ReactNode;
 }) {
+  const t = useTranslations();
   const {
     form,
     cards,
@@ -51,7 +53,7 @@ export default function CardPaymentSection({
 
   return (
     <SectionCard
-      title={title}
+      title={title ?? t("checkout.cardSection")}
       action={
         loadingCards || !hasSavedCards ? undefined : usingNewCard ? (
           <Button
@@ -59,7 +61,7 @@ export default function CardPaymentSection({
             size="sm"
             onClick={() => setSelected(cards[0].id)}
           >
-            Kayıtlı Kart İle Öde
+            {t("checkout.payWithSavedCard")}
           </Button>
         ) : (
           <Button
@@ -67,14 +69,14 @@ export default function CardPaymentSection({
             size="sm"
             onClick={() => setSelected(NEW_CARD)}
           >
-            Kart Ekle
+            {t("payment.addCard")}
           </Button>
         )
       }
     >
       {loadingCards ? (
         <div className="flex items-center justify-center gap-2 py-8 text-muted">
-          <Spinner size="sm" /> Kartlar yükleniyor…
+          <Spinner size="sm" /> {t("checkout.loadingCards")}
         </div>
       ) : usingNewCard ? (
         <NewCardFields

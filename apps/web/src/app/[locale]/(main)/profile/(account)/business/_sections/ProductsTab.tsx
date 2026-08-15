@@ -3,17 +3,21 @@
 import SectionCard from "@/components/ui/SectionCard";
 import ProductRow from "../_components/ProductRow";
 import type { ProductStats } from "../_lib/types";
+import { getTranslations } from "next-intl/server";
 
-function ProductList({
+async function ProductList({
   products,
   metric,
 }: {
   products: ProductStats[];
   metric: "views" | "likes";
 }) {
+  const t = await getTranslations();
   if (products.length === 0) {
     return (
-      <p className="py-4 text-center text-muted">Henüz ürün istatistiği yok</p>
+      <p className="py-4 text-center text-muted">
+        {t("page.business.productstab.henuzUrunIstatistigiYok")}
+      </p>
     );
   }
   return (
@@ -30,18 +34,21 @@ function ProductList({
   );
 }
 
-export default function ProductsTab({
+export default async function ProductsTab({
   topProducts,
 }: {
   topProducts: { byViews: ProductStats[]; byLikes: ProductStats[] };
 }) {
+  const t = await getTranslations();
   return (
     <div className="space-y-6">
-      <SectionCard title="En Çok Görüntülenen Ürünler">
+      <SectionCard
+        title={t("page.business.productstab.enCokGoruntulenenUrunler")}
+      >
         <ProductList products={topProducts.byViews} metric="views" />
       </SectionCard>
 
-      <SectionCard title="En Çok Beğenilen Ürünler">
+      <SectionCard title={t("page.business.productstab.enCokBegenilenUrunler")}>
         <ProductList products={topProducts.byLikes} metric="likes" />
       </SectionCard>
     </div>

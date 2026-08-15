@@ -2,11 +2,13 @@
 
 import { Link } from "@/i18n/navigation";
 import { Button } from "@tarodan/ui";
+import type { Translate } from "@/types/i18n";
+import { getTranslations } from "next-intl/server";
 
-const PERKS = [
-  "Detaylı satış tahminleri",
-  "Rakip analizi",
-  "PDF/Excel rapor indirme",
+const PERKS = (t: Translate) => [
+  t("profile.analyticsUpsell.detayliSatisTahminleri"),
+  t("profile.analyticsUpsell.rakipAnalizi"),
+  t("profile.analyticsUpsell.pdfExcelRaporIndirme"),
 ];
 
 /**
@@ -16,26 +18,30 @@ const PERKS = [
  * turuncu gradient + ikonlarla duruyordu ve sayfadaki tek "reklam" gibi
  * görünüyordu. Aynı bilgi standart kart yüzeyinde, ikonsuz veriliyor.
  */
-export default function PremiumUpsell() {
+export default async function PremiumUpsell() {
+  const t = await getTranslations();
   return (
     <div className="rounded-lg border border-border bg-surface-elevated p-6">
       <div className="flex flex-col justify-between gap-5 lg:flex-row lg:items-center">
         <div className="max-w-xl">
           <h3 className="text-lg font-semibold text-heading">
-            Premium&apos;a Yükseltin
+            {t("profile.analyticsUpsell.premiumAposAYukseltin")}
           </h3>
           <p className="mt-1 text-sm text-muted">
-            Daha detaylı analizler, gelişmiş grafikler ve kişiselleştirilmiş
-            öneriler için Premium üyeliğe geçin.
+            {t(
+              "profile.analyticsUpsell.dahaDetayliAnalizlerGelismisGrafiklerVe",
+            )}
           </p>
           <ul className="mt-3 space-y-1 text-sm text-body">
-            {PERKS.map((perk) => (
+            {PERKS(t).map((perk) => (
               <li key={perk}>{perk}</li>
             ))}
           </ul>
         </div>
         <Button asChild variant="primary" className="whitespace-nowrap">
-          <Link href="/membership">Premium&apos;a Geç</Link>
+          <Link href="/membership">
+            {t("profile.analyticsUpsell.premiumAposAGec")}
+          </Link>
         </Button>
       </div>
     </div>

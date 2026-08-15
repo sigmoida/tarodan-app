@@ -73,8 +73,10 @@ function NewListingLayout() {
   return (
     <PageShell>
       <PageHeader
-        title="Yeni İlan Oluştur"
-        description="Ürününüzü koleksiyoncularla buluşturun"
+        title={t("page.new.newlistingclient.yeniIlanOlustur")}
+        description={t(
+          "page.new.newlistingclient.urununuzuKoleksiyoncularlaBulusturun",
+        )}
       />
 
       <LimitBanner />

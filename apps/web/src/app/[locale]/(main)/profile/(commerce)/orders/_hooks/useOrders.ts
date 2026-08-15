@@ -164,7 +164,11 @@ export function useInvoiceDownload() {
       const res = await api.get(`/elogo/invoices/${invoice.id}/pdf`);
       const url = res.data?.url;
       if (url) {
-        window.open(url, "_blank", "noopener,noreferrer");
+        window.open(
+          url,
+          t("page.orders.useorders.blank"),
+          t("page.orders.useorders.noopenerNoreferrer"),
+        );
         toast.success(t("order.invoiceOpened"));
       } else {
         toast.error(t("order.invoiceNotReady"));
@@ -222,7 +226,14 @@ export function useSubmitReview() {
         const avg = Math.round(
           (p.sellerCommunication + p.sellerShipping + p.sellerPackaging) / 3,
         );
-        const breakdown = `İletişim: ${p.sellerCommunication}/5, Kargo: ${p.sellerShipping}/5, Paketleme: ${p.sellerPackaging}/5`;
+        const breakdown = t(
+          "page.orders.useorders.iletisimSellerCommunication5KargoSellerShipping5",
+          {
+            sellerCommunication: p.sellerCommunication,
+            sellerShipping: p.sellerShipping,
+            sellerPackaging: p.sellerPackaging,
+          },
+        );
         await ratingsApi.createUserRating({
           receiverId: p.sellerId,
           orderId: p.order.id,

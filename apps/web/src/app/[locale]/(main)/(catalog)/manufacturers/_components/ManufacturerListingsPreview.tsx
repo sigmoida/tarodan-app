@@ -7,6 +7,7 @@ import { queryKeys } from "@/lib/query/keys";
 import { ProductCard } from "@/components/ui";
 import type { Product } from "@/types/product";
 import { fetchManufacturerPreviewClient } from "../_lib/data";
+import { useTranslations } from "next-intl";
 
 /** The 4-item active-listing teaser rendered inside an expanded accordion card. */
 export default function ManufacturerListingsPreview({
@@ -14,6 +15,7 @@ export default function ManufacturerListingsPreview({
 }: {
   manufacturerId: string;
 }) {
+  const t = useTranslations();
   const { data: listings = [], isLoading } = useQuery({
     queryKey: queryKeys.manufacturers.preview(manufacturerId),
     queryFn: () => fetchManufacturerPreviewClient(manufacturerId),
@@ -33,7 +35,9 @@ export default function ManufacturerListingsPreview({
   if (listings.length === 0) {
     return (
       <p className="text-sm text-muted py-2">
-        Bu üreticiye ait aktif ilan yok.
+        {t(
+          "page.manufacturers.manufacturerlistingspreview.buUreticiyeAitAktifIlanYok",
+        )}
       </p>
     );
   }

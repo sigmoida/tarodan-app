@@ -79,13 +79,16 @@ export function commissionColumns(
       { sortKey: "tradeFeeSellerAmount", sortType: "number" },
     ),
     col.rowMenu<CommissionRule>(
-      commissionRowMenu({
-        editable,
-        viewLabel: t("common.view"),
-        onView,
-        onEdit,
-        onDelete,
-      }),
+      commissionRowMenu(
+        {
+          editable,
+          viewLabel: t("common.view"),
+          onView,
+          onEdit,
+          onDelete,
+        },
+        t,
+      ),
     ),
   ];
 }

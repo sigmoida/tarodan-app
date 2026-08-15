@@ -1,20 +1,22 @@
 import { z } from "zod";
+import type { Translate } from "@/types/i18n";
 
-/** Create-ticket form (Turkish-only support surface — no locale factory). */
-export const ticketSchema = z.object({
-  category: z.string().min(1, "Lütfen bir kategori seçin"),
-  subject: z
-    .string()
-    .trim()
-    .min(5, "Konu en az 5 karakter olmalıdır")
-    .max(200, "Konu en fazla 200 karakter olabilir"),
-  message: z
-    .string()
-    .trim()
-    .min(10, "Mesajınız en az 10 karakter olmalıdır")
-    .max(2000, "Mesaj en fazla 2000 karakter olabilir"),
-});
-export type TicketValues = z.infer<typeof ticketSchema>;
+/** Create-ticket form. Messages come from the catalog, so this is a factory. */
+export const ticketSchema = (t: Translate) =>
+  z.object({
+    category: z.string().min(1, t("validation.selectCategory")),
+    subject: z
+      .string()
+      .trim()
+      .min(5, t("validation.subjectMin5"))
+      .max(200, t("validation.maxLength", { max: 200 })),
+    message: z
+      .string()
+      .trim()
+      .min(10, t("validation.messageMin10"))
+      .max(2000, t("validation.maxLength", { max: 2000 })),
+  });
+export type TicketValues = z.infer<ReturnType<typeof ticketSchema>>;
 
 /** Ticket reply form. */
 export const replySchema = z.object({

@@ -9,12 +9,14 @@ import { ButtonLink } from "@/components/ui/ButtonLink";
 import { useManufacturers } from "../_context/ManufacturersContext";
 import type { ManufacturerCard as ManufacturerCardData } from "../_lib/types";
 import ManufacturerListingsPreview from "./ManufacturerListingsPreview";
+import { useTranslations } from "next-intl";
 
 export default function ManufacturerCard({
   brand,
 }: {
   brand: ManufacturerCardData;
 }) {
+  const t = useTranslations();
   const { expandedBrand } = useManufacturers();
   const expanded = expandedBrand === brand.slug;
 
@@ -23,8 +25,8 @@ export default function ManufacturerCard({
       value={brand.slug}
       className={`overflow-hidden rounded-lg border bg-surface-elevated transition-all last:border-b ${
         expanded
-          ? "border-primary-300 shadow-md"
-          : "border-border hover:border-primary-200 hover:shadow-sm"
+          ? t("brands.manufacturerCard.borderPrimary300ShadowMd")
+          : t("brands.manufacturerCard.borderBorderHoverBorderPrimary200")
       }`}
     >
       {/* Header — always visible; the trigger renders its own chevron.
@@ -77,7 +79,9 @@ export default function ManufacturerCard({
             <div className="flex flex-wrap items-center gap-3">
               {(brand.founded > 0 || brand.country) && (
                 <div className="flex items-center gap-2 rounded bg-surface px-3 py-1.5 text-xs">
-                  <span className="font-bold text-heading">Kuruluş:</span>
+                  <span className="font-bold text-heading">
+                    {t("brands.manufacturerCard.kurulus")}
+                  </span>
                   <span className="text-muted">
                     {[brand.founded > 0 ? brand.founded : null, brand.country]
                       .filter(Boolean)
@@ -86,7 +90,9 @@ export default function ManufacturerCard({
                 </div>
               )}
               <div className="flex items-center gap-2 rounded bg-surface px-3 py-1.5 text-xs">
-                <span className="font-bold text-heading">Aktif İlan:</span>
+                <span className="font-bold text-heading">
+                  {t("brands.manufacturerCard.aktifIlan")}
+                </span>
                 <span className="font-semibold text-primary-600">
                   {brand.productCount ?? 0}
                 </span>
@@ -98,7 +104,9 @@ export default function ManufacturerCard({
                   rel="noopener noreferrer"
                   className="flex items-center gap-1.5 rounded bg-surface px-3 py-1.5 text-xs text-info-600 transition-colors hover:text-info-800"
                 >
-                  <span className="font-bold">Web Sitesi</span>
+                  <span className="font-bold">
+                    {t("brands.manufacturerCard.webSitesi")}
+                  </span>
                   <ChevronRightIcon className="h-3.5 w-3.5" />
                 </a>
               )}
@@ -109,7 +117,9 @@ export default function ManufacturerCard({
               href={`/listings?manufacturer=${encodeURIComponent(brand.name)}`}
               className="gap-1 text-primary-600 hover:text-primary-700"
             >
-              Tüm {brand.name} ilanları
+              {t("brands.manufacturerCard.allListingsOf", {
+                brand: brand.name,
+              })}
               <ChevronRightIcon className="h-3.5 w-3.5" />
             </ButtonLink>
           </div>

@@ -2,12 +2,16 @@
 
 import type { Metadata } from "next";
 import NewListingClient from "./NewListingClient";
+import { getTranslations } from "next-intl/server";
 
-export const metadata: Metadata = {
-  title: "İlan Oluştur | Tarodan",
-  description: "Yeni bir diecast ilanı oluşturun.",
-  robots: { index: false, follow: false },
-};
+export async function generateMetadata(): Promise<Metadata> {
+  const t = await getTranslations();
+  return {
+    title: t("page.new.page.ilanOlusturTarodan"),
+    description: t("page.new.page.yeniBirDiecastIlaniOlusturun"),
+    robots: { index: false, follow: false },
+  };
+}
 
 export default function NewListingPage() {
   return <NewListingClient />;

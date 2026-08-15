@@ -8,8 +8,10 @@ import { Spinner } from "@tarodan/ui";
 import { PageShell } from "@/components/layout/PageShell";
 import { SectionCard, ProductCard, ButtonLink } from "@/components/ui";
 import { useUnavailableProduct } from "../_hooks/useUnavailableProduct";
+import { useTranslations } from "next-intl";
 
 export default function ProductUnavailableClient() {
+  const t = useTranslations();
   const params = useParams<{ productId: string }>();
   const productId = params?.productId as string;
   const { product, similar, isLoading, isBackInStock } =
@@ -30,8 +32,8 @@ export default function ProductUnavailableClient() {
         <div
           className={`mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full ${
             isBackInStock
-              ? "bg-success-100 text-success-600"
-              : "bg-danger-100 text-danger-600"
+              ? t("product.unavailable.bgSuccess100TextSuccess600")
+              : t("product.unavailable.bgDanger100TextDanger600")
           }`}
         >
           {isBackInStock ? (
@@ -44,35 +46,45 @@ export default function ProductUnavailableClient() {
         {isBackInStock ? (
           <>
             <h1 className="mb-2 text-2xl font-bold text-heading sm:text-3xl">
-              İyi haber: ürün tekrar satışta!
+              {t("product.unavailable.iyiHaberUrunTekrarSatista")}
             </h1>
             <p className="mx-auto mb-6 max-w-xl text-muted">
               {product?.title
-                ? `"${product.title}" tekrar stoğa düştü.`
-                : "Beklediğiniz ürün tekrar satışta."}{" "}
+                ? t("product.unavailable.titleTekrarStogaDustu", {
+                    title: product.title,
+                  })
+                : t("product.unavailable.beklediginizUrunTekrarSatista")}{" "}
               Hemen incelemek ister misin?
             </p>
             <ButtonLink variant="primary" href={`/listings/${productId}`}>
-              Ürünü gör
+              {t("product.unavailable.urunuGor")}
             </ButtonLink>
           </>
         ) : (
           <>
             <h1 className="mb-2 text-2xl font-bold text-heading sm:text-3xl">
-              Bu ürün artık stokta yok
+              {t("product.unavailable.buUrunArtikStoktaYok")}
             </h1>
             <p className="mx-auto mb-6 max-w-xl text-muted">
               {product?.title
-                ? `"${product.title}" başka bir alıcı tarafından satın alındı.`
-                : "Üzgünüz, baktığınız ürün artık satışta değil."}{" "}
-              Aşağıda aynı kategoriden alternatif ürünleri inceleyebilirsiniz.
+                ? t("product.unavailable.titleBaskaBirAliciTarafindanSatin", {
+                    title: product.title,
+                  })
+                : t(
+                    "product.unavailable.uzgunuzBaktiginizUrunArtikSatistaDegil",
+                  )}{" "}
+              {t("product.unavailable.browseAlternatives")}
             </p>
             {product?.category?.slug && (
               <ButtonLink
                 variant="primary"
                 href={`/listings?category=${product.category.slug}`}
               >
-                Tüm {product.category.name ?? "kategori"} ürünleri
+                {t("product.unavailable.allCategoryProducts", {
+                  category:
+                    product.category.name ??
+                    t("product.unavailable.categoryFallback"),
+                })}
               </ButtonLink>
             )}
           </>
@@ -80,10 +92,10 @@ export default function ProductUnavailableClient() {
       </SectionCard>
 
       {/* Similar products */}
-      <SectionCard title="Benzer ürünler">
+      <SectionCard title={t("product.unavailable.benzerUrunler")}>
         {similar.length === 0 ? (
           <p className="text-muted">
-            Bu kategoride başka aktif ürün bulunamadı.
+            {t("product.unavailable.buKategorideBaskaAktifUrunBulunamadi")}
           </p>
         ) : (
           <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6">

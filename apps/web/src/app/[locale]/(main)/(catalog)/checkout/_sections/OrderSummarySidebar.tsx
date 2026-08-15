@@ -59,7 +59,7 @@ export default function OrderSummarySidebar() {
         ))}
         {checkoutItems.length > 3 && (
           <p className="text-sm text-muted">
-            +{checkoutItems.length - 3} ürün daha
+            {t("checkout.moreItems", { count: checkoutItems.length - 3 })}
           </p>
         )}
       </div>

@@ -2,6 +2,7 @@
 
 import Image, { ImageProps } from "next/image";
 import { useState, useCallback, useEffect } from "react";
+import { useTranslations } from "next-intl";
 import { colors as dsColors } from "@tarodan/ui";
 import { logger } from "@/lib/logger";
 
@@ -68,6 +69,8 @@ export default function OptimizedImage({
   sizes,
   ...props
 }: OptimizedImageProps) {
+  const t = useTranslations();
+
   // When using fill, Next.js requires "sizes" for optimal srcset. Apply default if missing.
   const effectiveSizes = props.fill && !sizes ? DEFAULT_FILL_SIZES : sizes;
 
@@ -75,7 +78,9 @@ export default function OptimizedImage({
   const replacePicsumWithPlaceholder = (s: string): string => {
     if (typeof s !== "string" || !s.includes("picsum.photos")) return s;
     const text =
-      alt && typeof alt === "string" ? alt.substring(0, 25).trim() : "Ürün";
+      alt && typeof alt === "string"
+        ? alt.substring(0, 25).trim()
+        : t("order.product");
     return `https://placehold.co/800x600?text=${encodeURIComponent(text)}`;
   };
   const srcReplaced =

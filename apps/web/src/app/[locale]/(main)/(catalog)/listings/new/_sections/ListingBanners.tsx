@@ -4,9 +4,11 @@
 
 import { ButtonLink } from "@/components/ui/ButtonLink";
 import { useNewListing } from "../_context/NewListingContext";
+import { useTranslations } from "next-intl";
 
 /** Listing-quota banner shown above the form. */
 export function LimitBanner() {
+  const t = useTranslations();
   const { limitsLoading, listingLimits } = useNewListing();
 
   if (limitsLoading) {
@@ -35,8 +37,13 @@ export function LimitBanner() {
         <div>
           <p className={`font-medium ${text}`}>
             {listingLimits.maxListings === -1
-              ? `Mevcut İlan: ${listingLimits.currentCount} (Sınırsız)`
-              : `İlan Hakkı: ${listingLimits.currentCount} / ${listingLimits.maxListings}`}
+              ? t("page.new.listingbanners.mevcutIlanCurrentCountSinirsiz", {
+                  currentCount: listingLimits.currentCount,
+                })
+              : t("page.new.listingbanners.ilanHakkiCurrentCountMaxListings", {
+                  currentCount: listingLimits.currentCount,
+                  maxListings: listingLimits.maxListings,
+                })}
           </p>
           {listingLimits.remainingListings !== -1 && (
             <p className="text-xs text-muted mt-0.5">
@@ -45,7 +52,9 @@ export function LimitBanner() {
           )}
         </div>
         {!listingLimits.canCreateListing && !listingLimits.isPremium && (
-          <ButtonLink href="/membership">Premium'a Geç</ButtonLink>
+          <ButtonLink href="/membership">
+            {t("page.new.listingbanners.premiumAGec")}
+          </ButtonLink>
         )}
       </div>
     </div>
@@ -54,19 +63,23 @@ export function LimitBanner() {
 
 /** IBAN gate — a listing can't be created before a bank account exists. */
 export function BankGate() {
+  const t = useTranslations();
   const { bankAccountLoading, hasBankAccount } = useNewListing();
   if (bankAccountLoading || hasBankAccount) return null;
 
   return (
     <div className="mb-5 p-4 rounded-lg border bg-danger-50 border-danger-200">
       <p className="font-medium text-danger-800 mb-1">
-        İlan vermeden önce banka hesabı eklemelisiniz
+        {t("page.new.listingbanners.ilanVermedenOnceBankaHesabiEklemelisiniz")}
       </p>
       <p className="text-sm text-danger-700 mb-3">
-        Satışlarınızdan elde edeceğiniz tutarın size aktarılabilmesi için IBAN
-        bilgisi gereklidir.
+        {t(
+          "page.new.listingbanners.satislarinizdanEldeEdeceginizTutarinSizeAktarilabilmesi",
+        )}
       </p>
-      <ButtonLink href="/profile">IBAN Ekle</ButtonLink>
+      <ButtonLink href="/profile">
+        {t("page.new.listingbanners.ibanEkle")}
+      </ButtonLink>
     </div>
   );
 }

@@ -12,6 +12,7 @@ import { SectionCard } from "@/components/detail/SectionCard";
 import type { RefundRequestDetail } from "../types";
 import { fmtDate, fmtTry } from "../_lib/format";
 import { Field } from "../_components/Field";
+import { statusConfig } from "@/lib/statusLabels";
 
 export function ReturnShippingSection({ rr }: { rr: RefundRequestDetail }) {
   const t = useTranslations();
@@ -22,7 +23,7 @@ export function ReturnShippingSection({ rr }: { rr: RefundRequestDetail }) {
     rr.returnProvider === "manual"
       ? t("admin.operations.refundRequests.manual")
       : enumLabel(
-          shipmentProviderConfig,
+          statusConfig(shipmentProviderConfig, t),
           rr.returnProvider ?? undefined,
           rr.returnProvider ?? "—",
         );
@@ -166,7 +167,7 @@ export function ReturnShippingSection({ rr }: { rr: RefundRequestDetail }) {
             {rr.returnStatus ? (
               <StatusBadge
                 status={rr.returnStatus}
-                config={shipmentStatusConfig}
+                config={statusConfig(shipmentStatusConfig, t)}
               />
             ) : (
               "—"

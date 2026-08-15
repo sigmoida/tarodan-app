@@ -21,10 +21,12 @@ export default function ManufacturerProductsGrid({
     <div>
       <div className="flex items-end justify-between mb-8 px-2">
         <h2 className="text-3xl font-bold text-heading tracking-tight">
-          Tüm İlanlar
+          {t("brands.manufacturerGrid.tumIlanlar")}
         </h2>
         <span className="text-subtle font-medium text-sm">
-          {products.length} sonuç gösteriliyor
+          {t("brands.manufacturerGrid.resultsShown", {
+            count: products.length,
+          })}
         </span>
       </div>
 
@@ -43,16 +45,17 @@ export default function ManufacturerProductsGrid({
             <ArchiveBoxIcon className="w-10 h-10 text-border-strong" />
           </div>
           <h3 className="text-2xl font-bold text-heading mb-3">
-            {t("brands.noProducts") || "İlan Bulunamadı"}
+            {t("brands.noProducts") ||
+              t("brands.manufacturerGrid.ilanBulunamadi")}
           </h3>
           <p className="text-muted max-w-md mx-auto mb-8">
-            Bu üreticiye ait henüz bir ilan eklenmemiş.
+            {t("brands.manufacturerGrid.buUreticiyeAitHenuzBirIlan")}
           </p>
           <Link
             href="/listings/new"
             className="inline-block px-10 py-4 bg-heading text-inverted rounded-full font-bold shadow-sm hover:bg-primary-600 transition-all"
           >
-            İlan Veren İlk Kişi Ol
+            {t("brands.manufacturerGrid.ilanVerenIlkKisiOl")}
           </Link>
         </div>
       ) : (

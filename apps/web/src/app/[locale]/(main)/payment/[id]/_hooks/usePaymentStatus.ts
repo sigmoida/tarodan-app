@@ -9,6 +9,7 @@ import toast from "react-hot-toast";
 import { paymentsApi } from "@/lib/api";
 import { useAuthStore } from "@/stores/authStore";
 import { hasAuthMarker } from "@/lib/authMarker";
+import { useTranslations } from "next-intl";
 
 type Phase = "auth-loading" | "loading" | "notfound" | "ready";
 
@@ -23,6 +24,7 @@ const urlHasGuest = () =>
  * cancel/retry actions. The page component stays presentational.
  */
 export function usePaymentStatus() {
+  const t = useTranslations();
   const params = useParams();
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -76,13 +78,13 @@ export function usePaymentStatus() {
         try {
           const bypassRes = await paymentsApi.bypassComplete(paymentId);
           if (bypassRes.data?.success) {
-            toast.success("Ödeme başarılı");
+            toast.success(t("page.payment.usepaymentstatus.odemeBasarili"));
             redirectingRef.current = true;
             const hasSession = isAuthenticated || hasLocalToken();
             router.push(
               isMembershipPayment
                 ? membershipSuccessUrl
-                : `/payment/success?paymentId=${paymentId}${!hasSession ? "&guest=true" : ""}`,
+                : `/payment/success?paymentId=${paymentId}${!hasSession ? t("page.payment.usepaymentstatus.guestTrue2") : ""}`,
             );
             return;
           }
@@ -92,8 +94,11 @@ export function usePaymentStatus() {
       }
     } catch (error: any) {
       if (process.env.NODE_ENV === "development")
-        console.error("Failed to fetch payment:", error);
-      toast.error("Ödeme bilgisi yüklenemedi");
+        console.error(
+          t("page.payment.usepaymentstatus.failedToFetchPayment"),
+          error,
+        );
+      toast.error(t("page.payment.usepaymentstatus.odemeBilgisiYuklenemedi"));
       redirectingRef.current = true;
       router.push(
         isGuestCheckout
@@ -146,7 +151,9 @@ export function usePaymentStatus() {
     try {
       if (hasSession) {
         await paymentsApi.cancel(paymentId);
-        toast.success("Ödeme iptal edildi, ürün tekrar satışa açıldı.");
+        toast.success(
+          t("page.payment.usepaymentstatus.odemeIptalEdildiUrunTekrarSatisa"),
+        );
       }
     } catch {
       /* silent: still navigate back */

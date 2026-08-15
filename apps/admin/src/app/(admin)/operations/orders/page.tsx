@@ -33,7 +33,7 @@ export default function OrdersPage() {
         <ResourceList.Search />
         <ResourceList.FilterSelect
           name="status"
-          options={statusOptions}
+          options={statusOptions(t)}
           className="sm:w-48"
         />
         <ResourceList.DateRange fromName="fromDate" toName="toDate" />

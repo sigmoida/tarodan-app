@@ -22,9 +22,10 @@ import {
 import { getDisplayStatus } from "../_lib/status";
 import OrderActions, { type OrderActionHandlers } from "./OrderActions";
 import { publicNameOf } from "@/lib/public-name";
+import { statusConfig } from "@/lib/statusLabels";
+import { imagePlaceholder } from "@/lib/placeholder";
 
-const PLACEHOLDER =
-  "https://placehold.co/128x128/f3f4f6/9ca3af?text=%F0%9F%9A%97";
+const PLACEHOLDER = imagePlaceholder("128x128");
 
 /**
  * One product line inside the umbrella: image + title + qty×price + per-item
@@ -90,7 +91,7 @@ function OrderLine({
         <div className="flex flex-shrink-0 flex-col items-end gap-1.5">
           <StatusBadge
             status={display.status}
-            config={orderStatusConfig}
+            config={statusConfig(orderStatusConfig, t)}
             label={display.label}
             size="sm"
           />

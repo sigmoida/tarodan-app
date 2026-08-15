@@ -1,6 +1,7 @@
 import { type ClassValue, clsx } from "clsx";
 import { twMerge } from "tailwind-merge";
 import { useTranslations } from "next-intl";
+import type { StatusConfig, StatusConfigDefMap } from "@tarodan/shared";
 import { fmtTry } from "@/lib/format";
 
 type T = ReturnType<typeof useTranslations<never>>;
@@ -86,33 +87,47 @@ export function orderOriginLabel(
 }
 
 /**
- * Derives { value, label } options for a list filter from a status config
- * (a StatusConfig map); prepends an "all" (Tümü) entry. Labels always come from
- * the config → filter options stay perfectly consistent with the badges.
+ * Derives { value, label } options for a list filter from a shared status map;
+ * prepends an "all" entry. Labels always come from the same map the badges use →
+ * filter options stay perfectly consistent with them.
  *
- * - If `keys` is omitted, ALL statuses in the config are listed (full enum coverage).
+ * - If `keys` is omitted, ALL statuses in the map are listed (full enum coverage).
  * - If `keys` is given, ONLY those statuses (in that order) are listed — the badge
- *   config stays complete, but this hides unnecessary/intermediate statuses from the
+ *   map stays complete, but this hides unnecessary/intermediate statuses from the
  *   filter (e.g. per-side intermediate statuses in trades).
  *
- * NOTE (#222): the `allLabel` default below is still hardcoded Turkish ('Tümü').
- * Translating it would mean requiring `t` here, which forces every caller —
- * including several out-of-scope operations/catalog pages — to pass one even
- * when they already override `allLabel` themselves. Left as-is; only
- * `cancelReasonLabel`/`orderOriginLabel` (this file's explicit #222 scope)
- * were converted. Flagged for a follow-up.
+ * `t` is required: the shared map carries catalog KEYS, not labels, and the
+ * default "all" label comes from the catalog too.
  */
 export function statusFilterOptions(
-  config: Record<string, { label: string }>,
+  def: StatusConfigDefMap,
+  t: T,
   opts: { keys?: string[]; allLabel?: string } = {},
 ): { value: string; label: string }[] {
-  // eslint-disable-next-line @tarodan/no-hardcoded-turkish -- default for out-of-slice callers (finance/marketing); dönüşecek onlarla birlikte
-  const { keys, allLabel = "Tümü" } = opts;
+  const { keys, allLabel = t("common.all") } = opts;
   const entries = keys
-    ? keys.map((k) => [k, config[k]] as const).filter(([, v]) => Boolean(v))
-    : (Object.entries(config) as [string, { label: string }][]);
+    ? keys.map((k) => [k, def[k]] as const).filter(([, v]) => Boolean(v))
+    : Object.entries(def);
   return [
     { value: "all", label: allLabel },
-    ...entries.map(([value, cfg]) => ({ value, label: cfg!.label })),
+    ...entries.map(([value, entry]) => ({ value, label: t(entry!.labelKey) })),
+  ];
+}
+
+/**
+ * Aynı işin ÇÖZÜLMÜŞ harita sürümü — sayfanın paylaşılan haritanın üstüne kendi
+ * etiketlerini yazdığı yerler için (ör. destek talebi kategorileri).
+ */
+export function resolvedFilterOptions(
+  config: Record<string, StatusConfig>,
+  opts: { keys?: string[]; allLabel: string },
+): { value: string; label: string }[] {
+  const { keys, allLabel } = opts;
+  const entries = keys
+    ? keys.map((k) => [k, config[k]] as const).filter(([, v]) => Boolean(v))
+    : Object.entries(config);
+  return [
+    { value: "all", label: allLabel },
+    ...entries.map(([value, entry]) => ({ value, label: entry!.label })),
   ];
 }

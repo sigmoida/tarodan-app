@@ -1,4 +1,5 @@
 /** @format */
+import { imagePlaceholder } from "@/lib/placeholder";
 
 export interface Listing {
   id: string;
@@ -25,7 +26,7 @@ export interface Listing {
 /** Estimated seller net — single source in the shared commission-preview hook. */
 export type { EstimatedNet } from "../../_hooks/useCommissionPreviews";
 
-const PLACEHOLDER = "https://placehold.co/200x200/f3f4f6/9ca3af?text=Ürün";
+const PLACEHOLDER = imagePlaceholder("200x200");
 
 export const getListingImage = (listing: Listing): string => {
   const first = listing.images?.[0];

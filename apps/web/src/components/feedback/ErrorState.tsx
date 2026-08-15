@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
+import { useTranslations } from "next-intl";
 import { Link } from "@/i18n/navigation";
 import { Button } from "@tarodan/ui";
 
@@ -15,8 +16,8 @@ export default function ErrorState({
   error,
   reset,
   fullScreen = false,
-  title = "Bir şeyler ters gitti",
-  description = "Beklenmeyen bir hata oluştu. Tekrar deneyebilir ya da ana sayfaya dönebilirsiniz.",
+  title,
+  description,
 }: {
   error?: Error & { digest?: string };
   reset?: () => void;
@@ -24,6 +25,8 @@ export default function ErrorState({
   title?: string;
   description?: string;
 }) {
+  const t = useTranslations();
+
   useEffect(() => {
     if (error && process.env.NODE_ENV === "development") console.error(error);
   }, [error]);
@@ -35,15 +38,21 @@ export default function ErrorState({
       }`}
     >
       <p className="text-6xl font-bold text-danger-500">500</p>
-      <h1 className="text-2xl font-semibold text-heading">{title}</h1>
-      <p className="max-w-md text-muted">{description}</p>
+      <h1 className="text-2xl font-semibold text-heading">
+        {title ?? t("error.somethingWrong")}
+      </h1>
+      <p className="max-w-md text-muted">
+        {description ?? t("error.unexpectedRetryOrHome")}
+      </p>
       {error?.digest && (
-        <p className="text-xs text-subtle">Hata kodu: {error.digest}</p>
+        <p className="text-xs text-subtle">
+          {t("error.errorCode")}: {error.digest}
+        </p>
       )}
       <div className="mt-2 flex flex-wrap items-center justify-center gap-3">
-        {reset && <Button onClick={reset}>Tekrar dene</Button>}
+        {reset && <Button onClick={reset}>{t("common.tryAgain")}</Button>}
         <Button asChild variant="outline">
-          <Link href="/">Ana sayfaya dön</Link>
+          <Link href="/">{t("error.goHomeShort")}</Link>
         </Button>
       </div>
     </div>

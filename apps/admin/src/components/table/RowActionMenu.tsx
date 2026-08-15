@@ -20,6 +20,7 @@ import {
   TrashIcon,
 } from "@heroicons/react/24/outline";
 import { Empty } from "./cells";
+import type { Translate } from "@/lib/statusLabels";
 
 export interface RowAction {
   label: string;
@@ -36,21 +37,20 @@ export interface RowAction {
 export type RowActionItem = RowAction | false | null | undefined;
 
 // activeToggleAction/editDeleteActions below are plain functions (not
-// components/hooks), called from ~10 out-of-scope `_lib/rowActions.tsx` files
-// across catalog/marketing/finance. Localizing their labels would require a
-// `t` param threaded through every one of those callers (and in turn their
-// own callers) — out of scope for #222 (admin's SHARED shell); left hardcoded
-// intentionally. See #222 PR notes.
+// components/hooks), so they take the translator as a parameter — every caller
+// is a `_lib/rowActions.tsx` builder that already receives `t`.
 
 /** Standard menu action that toggles active/inactive state in one click. */
 export function activeToggleAction(
   active: boolean,
   onToggle: () => void,
+  t: Translate,
   isLoading = false,
 ): RowAction {
   return {
-    // eslint-disable-next-line @tarodan/no-hardcoded-turkish -- callers live in unmigrated slices (finance/marketing); localize with them (#208)
-    label: active ? "Pasifleştir" : "Aktifleştir",
+    label: active
+      ? t("admin.shared.rowActions.deactivate")
+      : t("admin.shared.rowActions.activate"),
     icon: active ? XCircleIcon : CheckCircleIcon,
     onClick: onToggle,
     disabled: isLoading,
@@ -71,13 +71,12 @@ export function editDeleteActions<T>(
     deleteDisabled?: boolean;
     deleteLoading?: boolean;
   },
+  t: Translate,
 ): RowAction[] {
   return [
-    // eslint-disable-next-line @tarodan/no-hardcoded-turkish -- callers live in unmigrated slices (finance/marketing); localize with them (#208)
-    { label: "Düzenle", icon: PencilIcon, onClick: () => onEdit(row) },
+    { label: t("common.edit"), icon: PencilIcon, onClick: () => onEdit(row) },
     {
-      // eslint-disable-next-line @tarodan/no-hardcoded-turkish -- callers live in unmigrated slices (finance/marketing); localize with them (#208)
-      label: "Sil",
+      label: t("common.delete"),
       icon: TrashIcon,
       onClick: () => onDelete(row),
       destructive: true,

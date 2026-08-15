@@ -4,6 +4,7 @@
 
 import { Button } from "@tarodan/ui";
 import { useTranslations } from "next-intl";
+import { IMAGE_SUBMIT_BLOCKER_KEY } from "@/components/listings/form/listing-image-item";
 import { useNewListing } from "../_context/NewListingContext";
 
 export default function SubmitBar() {
@@ -18,7 +19,7 @@ export default function SubmitBar() {
         className="flex-1"
         onClick={() => router.back()}
       >
-        İptal
+        {t("common.cancel")}
       </Button>
       <Button
         type="submit"
@@ -30,7 +31,7 @@ export default function SubmitBar() {
       </Button>
       {imageSubmitBlocker && (
         <p role="status" className="w-full text-sm text-danger-600">
-          {imageSubmitBlocker.message}
+          {t(IMAGE_SUBMIT_BLOCKER_KEY[imageSubmitBlocker.reason])}
         </p>
       )}
     </div>

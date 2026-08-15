@@ -11,6 +11,7 @@ import {
   FireIcon,
 } from "@heroicons/react/24/outline";
 import toast from "react-hot-toast";
+import { useTranslations } from "next-intl";
 import { Button, Spinner, Tabs, TabsList, TabsTrigger } from "@tarodan/ui";
 import { PageShell } from "@/components/layout/PageShell";
 import { PageHeader } from "@/components/layout/PageHeader";
@@ -24,7 +25,7 @@ import {
   useToggleDiscount,
 } from "./_hooks/useDiscounts";
 import {
-  FILTER_TABS,
+  filterTabs,
   matchesFilter,
   type Discount,
   type DiscountFilter,
@@ -34,6 +35,7 @@ import DiscountFormModal from "./_modals/DiscountFormModal";
 import { MetricCard } from "@/components/ui";
 
 export default function ProfileDiscountsPage() {
+  const t = useTranslations();
   const router = useRouter();
   const confirm = useConfirm();
   const { ready } = useRequireAuth();
@@ -49,7 +51,7 @@ export default function ProfileDiscountsPage() {
   useEffect(() => {
     if (!ready) return;
     if (!user?.isSeller) {
-      toast.error("Bu sayfaya erişim için satıcı olmanız gerekiyor");
+      toast.error(t("seller.discounts.sellerOnly"));
       router.push("/profile");
     }
   }, [ready, user?.isSeller, router]);
@@ -86,10 +88,9 @@ export default function ProfileDiscountsPage() {
 
   const onDelete = async (discount: Discount) => {
     const ok = await confirm({
-      title: "İndirimi sil",
-      description:
-        "Bu indirimi silmek istediğinizden emin misiniz? Bu işlem geri alınamaz.",
-      confirmLabel: "Sil",
+      title: t("seller.discounts.deleteTitle"),
+      description: t("seller.discounts.deleteConfirm"),
+      confirmLabel: t("common.delete"),
       destructive: true,
     });
     if (ok) deleteDiscount.mutate(discount.id);
@@ -106,12 +107,12 @@ export default function ProfileDiscountsPage() {
   return (
     <PageShell className="pb-16">
       <PageHeader
-        title="İndirimlerim"
-        description="Ürünleriniz için indirim ve kampanya oluşturun"
+        title={t("seller.discounts.title")}
+        description={t("seller.discounts.description")}
         actions={
           <Button onClick={openCreate} className="gap-2">
             <PlusIcon className="h-5 w-5" />
-            Yeni İndirim
+            {t("seller.discounts.newDiscount")}
           </Button>
         }
       />
@@ -120,25 +121,25 @@ export default function ProfileDiscountsPage() {
       <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
         <MetricCard
           icon={ReceiptPercentIcon}
-          label="Toplam İndirim"
+          label={t("seller.discounts.metricTotal")}
           value={metrics.total}
           accent="text-heading"
         />
         <MetricCard
           icon={CheckCircleIcon}
-          label="Aktif"
+          label={t("common.active")}
           value={metrics.active}
           accent="text-success-600"
         />
         <MetricCard
           icon={ClockIcon}
-          label="Süresi Dolmuş"
+          label={t("seller.discounts.metricExpired")}
           value={metrics.expired}
           accent="text-danger-600"
         />
         <MetricCard
           icon={FireIcon}
-          label="Toplam Kullanım"
+          label={t("seller.discounts.metricUsage")}
           value={metrics.usage}
           accent="text-primary-600"
         />
@@ -149,7 +150,7 @@ export default function ProfileDiscountsPage() {
         onValueChange={(v) => setFilter(v as DiscountFilter)}
       >
         <TabsList className="flex flex-wrap">
-          {FILTER_TABS.map((tab) => (
+          {filterTabs(t).map((tab) => (
             <TabsTrigger key={tab.value} value={tab.value}>
               {tab.label}
             </TabsTrigger>
@@ -166,13 +167,15 @@ export default function ProfileDiscountsPage() {
           <TagIcon className="mx-auto mb-4 h-16 w-16 text-border-strong" />
           <h3 className="mb-2 text-xl font-semibold text-heading">
             {filter !== "all"
-              ? "Bu filtreye uygun indirim yok"
-              : "Henüz indirim oluşturmadınız"}
+              ? t("seller.discounts.emptyFiltered")
+              : t("seller.discounts.emptyTitle")}
           </h3>
           <p className="mb-6 text-muted">
-            Müşterilerinize özel indirimler ve kampanyalar oluşturun
+            {t("seller.discounts.emptyDescription")}
           </p>
-          <Button onClick={openCreate}>İlk İndirimi Oluştur</Button>
+          <Button onClick={openCreate}>
+            {t("seller.discounts.createFirst")}
+          </Button>
         </div>
       ) : (
         <div className="space-y-4">

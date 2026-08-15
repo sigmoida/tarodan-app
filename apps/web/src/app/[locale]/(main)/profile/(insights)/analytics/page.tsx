@@ -27,8 +27,10 @@ import TopProductsCard from "./_sections/TopProductsCard";
 import CategoryPerformanceCard from "./_sections/CategoryPerformanceCard";
 import PremiumUpsell from "./_sections/PremiumUpsell";
 import TipsSection from "./_sections/TipsSection";
+import { useTranslations } from "next-intl";
 
 export default function AnalyticsPage() {
+  const t = useTranslations();
   const { ready } = useRequireAuth();
   const user = useAuthStore((s) => s.user);
   const [period, setPeriod] = useState<AnalyticsPeriod>("30d");
@@ -54,8 +56,8 @@ export default function AnalyticsPage() {
   return (
     <PageShell className="pb-16">
       <PageHeader
-        title="Performans Analizi"
-        description="İlanlarınızın detaylı istatistikleri"
+        title={t("profile.analytics.performansAnalizi")}
+        description={t("profile.analytics.ilanlarinizinDetayliIstatistikleri")}
       />
 
       <Tabs
@@ -63,7 +65,7 @@ export default function AnalyticsPage() {
         onValueChange={(v) => setPeriod(v as AnalyticsPeriod)}
       >
         <TabsList>
-          {PERIOD_TABS.map((tab) => (
+          {PERIOD_TABS(t).map((tab) => (
             <TabsTrigger key={tab.value} value={tab.value}>
               {tab.label}
             </TabsTrigger>
@@ -82,17 +84,19 @@ export default function AnalyticsPage() {
           {/* Headline stats */}
           <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
             <AnalyticsStatCard
-              title="Toplam Görüntüleme"
+              title={t("profile.analytics.toplamGoruntuleme")}
               value={analytics.totalViews.toLocaleString("tr-TR")}
               change={analytics.viewsChange}
               icon={EyeIcon}
               accent="text-primary-600"
               chartData={analytics.dailyViews.map((d) => d.views)}
               chartColor="bg-primary-400"
-              subtitle={`Günlük ort. ${analytics.avgViewsPerListing}`}
+              subtitle={t("profile.analytics.gunlukOrtAvgViewsPerListing", {
+                avgViewsPerListing: analytics.avgViewsPerListing,
+              })}
             />
             <AnalyticsStatCard
-              title="Favoriye Ekleme"
+              title={t("profile.analytics.favoriyeEkleme")}
               value={analytics.totalFavorites.toLocaleString("tr-TR")}
               change={analytics.favoritesChange}
               icon={HeartIcon}
@@ -101,15 +105,17 @@ export default function AnalyticsPage() {
               chartColor="bg-danger-400"
             />
             <AnalyticsStatCard
-              title="Toplam Satış"
+              title={t("profile.analytics.toplamSatis")}
               value={analytics.totalSales}
               change={analytics.salesChange}
               icon={ShoppingCartIcon}
               accent="text-success-600"
-              subtitle={`Dönüşüm oranı %${analytics.conversionRate.toFixed(2)}`}
+              subtitle={t("profile.analytics.donusumOraniToFixed", {
+                toFixed: analytics.conversionRate.toFixed(2),
+              })}
             />
             <AnalyticsStatCard
-              title="Toplam Gelir"
+              title={t("profile.analytics.toplamGelir")}
               value={formatTL(analytics.totalRevenue)}
               change={analytics.revenueChange}
               icon={CurrencyDollarIcon}
@@ -121,25 +127,25 @@ export default function AnalyticsPage() {
           <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
             <MetricCard
               icon={TagIcon}
-              label="Aktif İlan"
+              label={t("profile.analytics.aktifIlan")}
               value={analytics.activeListings}
               accent="text-primary-600"
             />
             <MetricCard
               icon={ClockIcon}
-              label="Ort. Satış Süresi (gün)"
+              label={t("profile.analytics.ortSatisSuresiGun")}
               value={analytics.avgTimeToSell}
               accent="text-warning-600"
             />
             <MetricCard
               icon={UserGroupIcon}
-              label="Tekrar Müşteri"
+              label={t("profile.analytics.tekrarMusteri")}
               value={`%${analytics.repeatCustomerRate}`}
               accent="text-primary-600"
             />
             <MetricCard
               icon={ShoppingCartIcon}
-              label="Bekleyen Sipariş"
+              label={t("profile.analytics.bekleyenSiparis")}
               value={analytics.pendingOrders}
               accent="text-primary-600"
             />
@@ -148,9 +154,9 @@ export default function AnalyticsPage() {
           {/* Chart + activity */}
           <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
             <div className="lg:col-span-2">
-              <SectionCard title="Görüntüleme Grafiği">
+              <SectionCard title={t("profile.analytics.goruntulemeGrafigi")}>
                 <p className="mb-4 text-sm text-muted">
-                  Son {trendDays} günlük trend
+                  {t("profile.analytics.trendDays", { days: trendDays })}
                 </p>
                 <SimpleBarChart data={analytics.dailyViews} />
               </SectionCard>

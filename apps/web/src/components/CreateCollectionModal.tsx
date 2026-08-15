@@ -13,14 +13,16 @@ import {
 } from "@tarodan/ui/form";
 import { collectionsApi } from "@/lib/api";
 import { useFormModalLabels } from "@/hooks/useFormModalLabels";
+import type { Translate } from "@/types/i18n";
 
-const schema = z.object({
-  name: z.string().trim().min(1, "İsim zorunlu"),
-  description: z.string().trim().optional().or(z.literal("")),
-  categoryId: z.string().optional().or(z.literal("")),
-  isPublic: z.boolean(),
-});
-type CreateCollectionValues = z.infer<typeof schema>;
+const buildSchema = (t: Translate) =>
+  z.object({
+    name: z.string().trim().min(1, t("collection.nameRequired")),
+    description: z.string().trim().optional().or(z.literal("")),
+    categoryId: z.string().optional().or(z.literal("")),
+    isPublic: z.boolean(),
+  });
+type CreateCollectionValues = z.infer<ReturnType<typeof buildSchema>>;
 
 export default function CreateCollectionModal({
   onClose,
@@ -33,7 +35,7 @@ export default function CreateCollectionModal({
 }) {
   const t = useTranslations();
   const modalLabels = useFormModalLabels();
-  const form = useZodForm(schema, {
+  const form = useZodForm(buildSchema(t), {
     defaultValues: {
       name: "",
       description: "",
@@ -54,13 +56,13 @@ export default function CreateCollectionModal({
     } catch (error: any) {
       if (process.env.NODE_ENV === "development")
         console.error("Create collection error:", error);
-      const errorMessage =
-        error.response?.data?.message || "Koleksiyon oluşturulamadı";
-      toast.error(errorMessage);
-      if (
-        errorMessage.includes("üyeliğiniz") ||
-        errorMessage.includes("yetkiniz yok")
-      ) {
+      toast.error(
+        error.response?.data?.message || t("collection.createFailed"),
+      );
+      // Koleksiyon oluşturma izni üyelik katmanından gelir; API bunu 403 ile
+      // reddeder. Sunucu mesajının metnine bakmak yerine durum koduna bakıyoruz
+      // — mesaj artık isteğin dilinde döndüğü için metin eşleşmesi kırılırdı.
+      if (error.response?.status === 403) {
         setTimeout(() => {
           window.location.href = "/membership";
         }, 2000);
@@ -92,8 +94,8 @@ export default function CreateCollectionModal({
       />
       <FormSelect
         name="categoryId"
-        label="Kategori"
-        placeholder="Kategori seçin (isteğe bağlı)"
+        label={t("common.category")}
+        placeholder={t("collection.selectCategoryOptional")}
         options={flatCategories.map((c) => ({ value: c.id, label: c.name }))}
       />
       <FormCheckbox name="isPublic" label={t("collection.publicCollection")} />

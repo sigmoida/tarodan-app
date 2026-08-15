@@ -1,9 +1,10 @@
 /** @format */
 
 import type { Metadata } from "next";
+import { getTranslations } from "next-intl/server";
 import { LegalDocument } from "@/components/legal/LegalDocument";
 import { localizedCanonical } from "@/lib/seo";
-import { SHIPPING_DELIVERY_PARTS } from "./_lib/shipping-delivery";
+import { shippingDeliveryParts } from "./_lib/shipping-delivery";
 
 export async function generateMetadata({
   params,
@@ -11,21 +12,22 @@ export async function generateMetadata({
   params: Promise<{ locale: string }>;
 }): Promise<Metadata> {
   const { locale } = await params;
+  const t = await getTranslations({ locale });
   return {
-    title: "Kargo ve Teslimat · Tarodan",
-    description:
-      "Tarodan sipariş ve takaslarında kargo ücretinin hesaplanması, hazırlama süresi, Sürat Kargo takibi, teslimat, hasar ve iade gönderileri.",
+    title: t("information.shippingDelivery.metaTitle"),
+    description: t("information.shippingDelivery.metaDescription"),
     alternates: localizedCanonical(locale, "/shipping-delivery"),
   };
 }
 
-export default function ShippingDeliveryPage() {
+export default async function ShippingDeliveryPage() {
+  const t = await getTranslations();
   return (
     <LegalDocument
-      title="Kargo ve Teslimat"
-      description="Sipariş ve takas gönderilerinde ücret, hazırlama, taşıma, takip, teslimat ve iade süreci."
-      parts={SHIPPING_DELIVERY_PARTS}
-      footer="Son güncelleme: 5 Ağustos 2026. Taşıyıcı, tarife veya operasyon akışı değiştiğinde bu politika güncellenir. İşleme özel sipariş/takas özeti ve emredici mevzuat hükümleri saklıdır."
+      title={t("information.shippingDelivery.pageTitle")}
+      description={t("information.shippingDelivery.pageDescription")}
+      parts={shippingDeliveryParts(t)}
+      footer={t("information.shippingDelivery.pageFooter")}
     />
   );
 }

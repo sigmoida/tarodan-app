@@ -4,14 +4,16 @@ import { Link } from "@/i18n/navigation";
 import OptimizedImage from "@/components/OptimizedImage";
 import { BookOpenIcon, EyeIcon, HeartIcon } from "@heroicons/react/24/outline";
 import type { CollectionStats } from "../_lib/types";
+import { getTranslations } from "next-intl/server";
 
-export default function CollectionRow({
+export default async function CollectionRow({
   collection,
   index,
 }: {
   collection: CollectionStats;
   index: number;
 }) {
+  const t = await getTranslations();
   return (
     <Link
       href={`/collections/${collection.id}`}
@@ -39,7 +41,9 @@ export default function CollectionRow({
         <p className="truncate font-medium text-heading transition-colors group-hover:text-primary-600">
           {collection.name}
         </p>
-        <p className="text-sm text-muted">{collection.itemCount} ürün</p>
+        <p className="text-sm text-muted">
+          {t("collection.itemCountShort", { count: collection.itemCount })}
+        </p>
       </div>
       <div className="flex items-center gap-4 text-sm">
         <span className="flex items-center gap-1 text-primary-600">

@@ -107,7 +107,9 @@ export default function ImagesCard({
               {usedSlots} / {maxImages} {t("product.uploaded")}
             </span>
             <span className="text-xs text-subtle">
-              JPEG, PNG, WebP, GIF · en fazla {megabytes(MAX_IMAGE_BYTES)} MB
+              {t("product.imageFormatsHint", {
+                maxMb: megabytes(MAX_IMAGE_BYTES),
+              })}
             </span>
             <Input
               type="file"

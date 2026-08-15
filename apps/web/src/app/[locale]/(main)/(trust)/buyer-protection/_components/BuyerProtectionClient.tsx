@@ -14,96 +14,133 @@ export default async function BuyerProtectionClient() {
     >
       <SectionCard>
         <div className="prose prose-gray max-w-none">
-          <h2>1. Alıcı Koruma Nedir?</h2>
+          <h2>{t("information.buyerProtection.1AliciKorumaNedir")}</h2>
           <p>
-            TARODAN Alıcı Koruma programı, platform üzerinden yaptığınız
-            alışverişlerde ürünün tanıma uygun gelmemesi, hiç gönderilmemesi
-            veya ciddi anlaşmazlık durumlarında inceleme ve gerekirse para
-            iadesi süreçlerini kapsar. Bu sayfa, haklarınızı ve başvuru sürecini
-            özetler.
+            {t(
+              "information.buyerProtection.tarodanAliciKorumaProgramiPlatformUzerinden",
+            )}
           </p>
 
-          <h2>2. Kapsam</h2>
+          <h2>{t("information.buyerProtection.2Kapsam")}</h2>
           <ul>
             <li>
-              Platformda ödeme alınan (güvenli ödeme ile tamamlanan) siparişler
+              {t(
+                "information.buyerProtection.platformdaOdemeAlinanGuvenliOdemeIle",
+              )}
             </li>
-            <li>Ürün hiç kargolanmadı veya takip bilgisi verilmedi</li>
             <li>
-              Ürün açıklamaya ciddi şekilde aykırı (yanlış model, ölçek, ağır
-              hasar)
+              {t(
+                "information.buyerProtection.urunHicKargolanmadiVeyaTakipBilgisi",
+              )}
             </li>
-            <li>Sahte veya taklit ürün iddiası</li>
+            <li>
+              {t(
+                "information.buyerProtection.urunAciklamayaCiddiSekildeAykiriYanlis",
+              )}
+            </li>
+            <li>
+              {t("information.buyerProtection.sahteVeyaTaklitUrunIddiasi")}
+            </li>
           </ul>
           <p>
-            Cayma hakkı ve standart iade koşulları için{" "}
-            <Link
-              href="/refund-policy"
-              className="inline-flex items-center text-primary-500 hover:underline"
-            >
-              İade Politikası
-            </Link>{" "}
-            ve{" "}
-            <Link
-              href="/refund-policy"
-              className="inline-flex items-center text-primary-500 hover:underline"
-            >
-              İade ve İptal Koşulları
-            </Link>{" "}
-            sayfalarına bakınız.
+            {t.rich(
+              "information.buyerProtection.caymaHakkiVeStandartIadeKosullari",
+              {
+                link1: (chunks) => (
+                  <Link
+                    href="/refund-policy"
+                    className="inline-flex items-center text-primary-500 hover:underline"
+                  >
+                    {chunks}
+                  </Link>
+                ),
+                link2: (chunks) => (
+                  <Link
+                    href="/refund-policy"
+                    className="inline-flex items-center text-primary-500 hover:underline"
+                  >
+                    {chunks}
+                  </Link>
+                ),
+              },
+            )}
           </p>
 
-          <h2>3. Para İadesi / Para İade Garantisi</h2>
+          <h2>
+            {t("information.buyerProtection.3ParaIadesiParaIadeGarantisi")}
+          </h2>
           <p>
-            Uygun koşullarda ve inceleme sonucunda, ödeme satıcıya ulaşmadan
-            önce iade edilebilir veya anlaşmazlık çözümüne göre alıcı lehine
-            para iadesi yapılabilir. "Para iade garantisi" ifadesi, platformun
-            belirlediği kurallar ve süreçler çerçevesinde sunulan korumayı ifade
-            eder; her durumda otomatik iade anlamına gelmez.
+            {t(
+              "information.buyerProtection.uygunKosullardaVeIncelemeSonucundaOdeme",
+            )}
           </p>
 
-          <h2>4. Anlaşmazlık Çözümü</h2>
+          <h2>{t("information.buyerProtection.4AnlasmazlikCozumu")}</h2>
           <ol>
             <li>
-              <strong>Satıcı ile iletişim:</strong> Önce sipariş/mesajlar
-              üzerinden satıcıyla iletişime geçin.
+              {t.rich("information.buyerProtection.bSaticiIleIletisimBOnce", {
+                b: (chunks) => <strong>{chunks}</strong>,
+              })}
             </li>
             <li>
-              <strong>Destek talebi:</strong> Çözülemezse Hesabım → Siparişlerim
-              → İlgili sipariş → "Sorun bildir" veya destek@tarodan.com.tr.
+              {t.rich(
+                "information.buyerProtection.bDestekTalebiBCozulemezseHesabim",
+                {
+                  b: (chunks) => <strong>{chunks}</strong>,
+                },
+              )}
             </li>
             <li>
-              <strong>İnceleme:</strong> Destek ekibimiz talebi ve (varsa)
-              kanıtları inceler; gerekirse satıcıdan bilgi alır.
+              {t.rich(
+                "information.buyerProtection.bIncelemeBDestekEkibimizTalebi",
+                {
+                  b: (chunks) => <strong>{chunks}</strong>,
+                },
+              )}
             </li>
             <li>
-              <strong>Karar ve uygulama:</strong> Sonuç (iade, kısmi iade, red)
-              size ve gerekirse satıcıya bildirilir; ödeme süreçleri buna göre
-              işletilir.
+              {t.rich("information.buyerProtection.bKararVeUygulamaBSonuc", {
+                b: (chunks) => <strong>{chunks}</strong>,
+              })}
             </li>
           </ol>
           <p>
-            Süre: Başvurular genellikle 5–10 iş günü içinde incelenir; karmaşık
-            durumlarda süre uzayabilir.
+            {t("information.buyerProtection.sureBasvurularGenellikle510Is")}
           </p>
 
-          <h2>5. Sizin Yapmanız Gerekenler</h2>
+          <h2>{t("information.buyerProtection.5SizinYapmanizGerekenler")}</h2>
           <ul>
-            <li>Siparişi ve varsa hasar/uyumsuzluk fotoğraflarını saklamak</li>
-            <li>Kargo takip bilgisi ve iletişim geçmişini paylaşmak</li>
-            <li>Talep açıklamasını net ve doğru yazmak</li>
-            <li>Platform iletişimlerine zamanında cevap vermek</li>
+            <li>
+              {t(
+                "information.buyerProtection.siparisiVeVarsaHasarUyumsuzlukFotograflarini",
+              )}
+            </li>
+            <li>
+              {t(
+                "information.buyerProtection.kargoTakipBilgisiVeIletisimGecmisini",
+              )}
+            </li>
+            <li>
+              {t(
+                "information.buyerProtection.talepAciklamasiniNetVeDogruYazmak",
+              )}
+            </li>
+            <li>
+              {t(
+                "information.buyerProtection.platformIletisimlerineZamanindaCevapVermek",
+              )}
+            </li>
           </ul>
 
-          <h2>6. Sınırlamalar</h2>
+          <h2>{t("information.buyerProtection.6Sinirlamalar")}</h2>
           <p>
-            Alıcı koruma, yasal tüketici haklarınızın yerine geçmez; onlara ek
-            olarak sunulur. Belirli kampanya veya satıcı koşulları farklı
-            olabilir; yine de zorunlu yasal haklarınız saklıdır.
+            {t(
+              "information.buyerProtection.aliciKorumaYasalTuketiciHaklarinizinYerine",
+            )}
           </p>
 
-          <h2>7. İletişim</h2>
-          <p>destek@tarodan.com.tr – konu: "Alıcı Koruma – Sipariş No"</p>
+          <h2>{t("information.buyerProtection.7Iletisim")}</h2>
+          <p>{t("information.buyerProtection.destekTarodanComTrKonuAlici")}</p>
         </div>
 
         <div className="mt-8 flex flex-wrap gap-4">
@@ -111,21 +148,21 @@ export default async function BuyerProtectionClient() {
             href="/refund-policy"
             className="inline-flex items-center text-primary-500 hover:underline"
           >
-            İade Politikası
+            {t("legal.refundPolicyTitle")}
             <ChevronRightIcon className="ml-1 h-4 w-4" />
           </Link>
           <Link
             href="/refund-policy"
             className="inline-flex items-center text-primary-500 hover:underline"
           >
-            İade ve İptal Koşulları
+            {t("legal.refundPolicy.returnSection")}
             <ChevronRightIcon className="ml-1 h-4 w-4" />
           </Link>
           <Link
             href="/terms"
             className="inline-flex items-center text-primary-500 hover:underline"
           >
-            Kullanım Şartları
+            {t("legal.termsTitle")}
             <ChevronRightIcon className="ml-1 h-4 w-4" />
           </Link>
         </div>

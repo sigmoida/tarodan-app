@@ -8,8 +8,10 @@ import { Button } from "@tarodan/ui";
 import { ButtonLink } from "@/components/ui/ButtonLink";
 import { useAuthStore } from "@/stores/authStore";
 import StatusScreen from "../_components/StatusScreen";
+import { useTranslations } from "next-intl";
 
 export default function BusinessRejectedPage() {
+  const t = useTranslations();
   const router = useRouter();
   const { user, logout } = useAuthStore();
 
@@ -22,30 +24,28 @@ export default function BusinessRejectedPage() {
     <StatusScreen
       icon={XCircleIcon}
       tone="danger"
-      title="Başvurunuz Reddedildi"
-      description={
-        <>
-          <span className="font-semibold text-heading">
-            {user?.companyName}
-          </span>{" "}
-          adına yaptığınız şirket hesabı başvurusu onaylanmadı. Red gerekçesi{" "}
-          <span className="font-medium text-heading">{user?.email}</span>{" "}
-          adresinize e-posta ile gönderilmiştir.
-        </>
-      }
+      title={t("page.businessRejected.page.basvurunuzReddedildi")}
+      description={t.rich("auth.businessRejectedDescription", {
+        company: user?.companyName ?? "",
+        email: user?.email ?? "",
+        b: (chunks) => (
+          <span className="font-semibold text-heading">{chunks}</span>
+        ),
+      })}
     >
       <div className="mb-6 rounded-xl border border-danger-200 bg-danger-50 p-4 text-left">
         <p className="text-sm text-danger-700">
-          Başvurunuzun hatalı reddedildiğini veya eksik bilgi olduğunu
-          düşünüyorsanız destek ekibiyle iletişime geçebilirsiniz.
+          {t(
+            "page.businessRejected.page.basvurunuzunHataliReddedildiginiVeyaEksikBilgi",
+          )}
         </p>
       </div>
       <div className="flex flex-col gap-3">
         <ButtonLink href="/contact" className="w-full">
-          Destek Ekibiyle İletişime Geç
+          {t("page.businessRejected.page.destekEkibiyleIletisimeGec")}
         </ButtonLink>
         <Button variant="secondary" onClick={handleLogout}>
-          Çıkış Yap
+          {t("page.businessRejected.page.cikisYap")}
         </Button>
       </div>
     </StatusScreen>

@@ -43,9 +43,8 @@ const TRADE_FILTER_STATUSES = [
   "cancelled",
 ];
 
-export const statusOptions = statusFilterOptions(tradeStatusConfig, {
-  keys: TRADE_FILTER_STATUSES,
-});
+export const statusOptions = (t: T) =>
+  statusFilterOptions(tradeStatusConfig, t, { keys: TRADE_FILTER_STATUSES });
 
 export const disputeConfig = (t: T): Record<string, StatusConfig> => ({
   disputed_override: {
