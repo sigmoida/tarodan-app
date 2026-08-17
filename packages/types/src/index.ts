@@ -34,6 +34,12 @@ export * from "./admin";
 // Phone rules (shared by API validators, web schemas and the PhoneInput control)
 export * from "./phone";
 
+// Province plate codes (carrier payloads address parcels by code, not name)
+export * from "./province";
+
+// Full-name splitting (carrier payloads need given/family name separately)
+export * from "./person-name";
+
 // Common types
 export interface PaginationMeta {
   total: number;
