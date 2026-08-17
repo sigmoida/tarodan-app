@@ -251,6 +251,43 @@ describe("validateEnv", () => {
     ).not.toThrow();
   });
 
+  const cargoLive = {
+    ...cargoOn,
+    SURAT_SOAP_MODE: "rest",
+    SURAT_KARGO_TEST_MODE: "false",
+    SURAT_KARGO_CARI_KODU: "c",
+    SURAT_KARGO_SIFRE: "s",
+  };
+
+  it("rejects an unrecognised Surat create API version", () => {
+    // Sessizce v1'e düşerse pazaryeri gönderisi göndericisiz açılır.
+    expect(() =>
+      validateEnv({ ...cargoLive, SURAT_CREATE_API_VERSION: "v3" }),
+    ).toThrow(/SURAT_CREATE_API_VERSION/);
+  });
+
+  it("requires SURAT_FIRMA_ID when the v2 create contract is selected", () => {
+    expect(() =>
+      validateEnv({ ...cargoLive, SURAT_CREATE_API_VERSION: "v2" }),
+    ).toThrow(/SURAT_FIRMA_ID/);
+  });
+
+  it("passes with the v2 create contract and a FirmaId", () => {
+    expect(() =>
+      validateEnv({
+        ...cargoLive,
+        SURAT_CREATE_API_VERSION: "v2",
+        SURAT_FIRMA_ID: "77",
+      }),
+    ).not.toThrow();
+  });
+
+  it("does not ask for a FirmaId while still on the v1 contract", () => {
+    expect(() =>
+      validateEnv({ ...cargoLive, SURAT_CREATE_API_VERSION: "v1" }),
+    ).not.toThrow();
+  });
+
   it("rejects production when the required Surat integration is disabled", () => {
     expect(() =>
       validateEnv({ ...prodBase, SURAT_CARGO_ENABLED: "false" }),

@@ -88,6 +88,10 @@ const envSchema = z
     SURAT_TRACKING_TIMEOUT_MS: z.string().optional(),
     SURAT_CARGO_MAX_RETRIES: z.string().optional(),
     SURAT_CARGO_RETRY_BASE_MS: z.string().optional(),
+    // Hangi create sözleşmesi: 'v1' GonderiyiKargoyaGonder (gönderici alanı yok),
+    // 'v2' GonderiOlustur (gerçek gönderici). v2 seçiliyse FirmaId zorunludur.
+    SURAT_CREATE_API_VERSION: z.string().optional(),
+    SURAT_FIRMA_ID: z.string().optional(),
 
     // Social sign-in. Optional everywhere — a missing value breaks one button,
     // not the API, so it is surfaced by `socialSignInWarnings()` at startup
@@ -423,6 +427,30 @@ const envSchema = z
             code: z.ZodIssueCode.custom,
             path: [key],
             message: `${key} is required in production when SURAT_CARGO_ENABLED is set`,
+          });
+        }
+      }
+      const createApiVersion = (env.SURAT_CREATE_API_VERSION ?? "")
+        .trim()
+        .toLowerCase();
+      if (createApiVersion && !["v1", "v2"].includes(createApiVersion)) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["SURAT_CREATE_API_VERSION"],
+          message:
+            "SURAT_CREATE_API_VERSION must be 'v1' or 'v2' (an unrecognised value would silently fall back to v1, which cannot send a sender)",
+        });
+      }
+      // GonderiOlustur FirmaId olmadan her çağrıda reddeder; boot'ta yakala,
+      // her gönderide değil.
+      if (createApiVersion === "v2") {
+        const firmaId = Number((env.SURAT_FIRMA_ID ?? "").trim());
+        if (!Number.isInteger(firmaId) || firmaId <= 0) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: ["SURAT_FIRMA_ID"],
+            message:
+              "SURAT_FIRMA_ID must be a positive integer when SURAT_CREATE_API_VERSION is 'v2' (GonderiOlustur requires it)",
           });
         }
       }

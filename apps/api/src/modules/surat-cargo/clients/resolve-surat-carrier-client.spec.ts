@@ -1,5 +1,6 @@
 import { resolveSuratCarrierClient } from "../surat-cargo.module";
 import { RestSuratClient } from "./surat-rest.client";
+import { GonderiOlusturClient } from "./surat-gonderi-olustur.client";
 import { StubSuratSoapClient } from "./surat-soap.client";
 
 /**
@@ -70,4 +71,44 @@ describe("resolveSuratCarrierClient — stub fail-fast + mode seçimi", () => {
       );
     },
   );
+
+  describe("create sözleşmesi sürümü", () => {
+    const savedVersion = process.env.SURAT_CREATE_API_VERSION;
+    const restConfig = makeConfig({ SURAT_SOAP_MODE: "rest" });
+
+    afterEach(() => {
+      if (savedVersion === undefined)
+        delete process.env.SURAT_CREATE_API_VERSION;
+      else process.env.SURAT_CREATE_API_VERSION = savedVersion;
+    });
+
+    it("SURAT_CREATE_API_VERSION='v2' → GonderiOlusturClient (gerçek gönderici)", () => {
+      process.env.SURAT_CREATE_API_VERSION = "v2";
+      expect(resolveSuratCarrierClient(restConfig)).toBeInstanceOf(
+        GonderiOlusturClient,
+      );
+    });
+
+    it("varsayılan (unset) → v1 kalır; geçiş bilinçli olarak açılır", () => {
+      delete process.env.SURAT_CREATE_API_VERSION;
+      expect(resolveSuratCarrierClient(restConfig)).toBeInstanceOf(
+        RestSuratClient,
+      );
+    });
+
+    it("tanınmayan bir değer v1'e düşer — env doğrulaması bunu ayrıca reddeder", () => {
+      process.env.SURAT_CREATE_API_VERSION = "v3";
+      expect(resolveSuratCarrierClient(restConfig)).toBeInstanceOf(
+        RestSuratClient,
+      );
+    });
+
+    it("stub modunda sürüm seçimi devreye girmez", () => {
+      process.env.SURAT_CREATE_API_VERSION = "v2";
+      const config = makeConfig({ SURAT_SOAP_MODE: "stub" });
+      expect(resolveSuratCarrierClient(config)).toBeInstanceOf(
+        StubSuratSoapClient,
+      );
+    });
+  });
 });

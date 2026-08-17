@@ -17,14 +17,21 @@ import {
   SuratCarrierClient,
 } from "./clients/surat-soap.client";
 import { RestSuratClient } from "./clients/surat-rest.client";
+import { GonderiOlusturClient } from "./clients/surat-gonderi-olustur.client";
+import { suratCreateApiVersion } from "../../config/surat";
 import { OrderShipmentProvisioner } from "./sync/order-shipment-provisioner.service";
 import { CarrierCancellationService } from "./sync/carrier-cancellation.service";
 
 /**
  * SURAT_SOAP_MODE → taşıyıcı client seçimi (geriye dönük env adı korunuyor):
- *   'rest' → RestSuratClient (yalnız resmi GonderiyiKargoyaGonder)
+ *   'rest' → gerçek REST istemcisi (sürümü SURAT_CREATE_API_VERSION seçer)
  *   'stub' / boş → StubSuratSoapClient (yerel, ağ çağrısı yok)
  *   diğer değerler → reddedilir; sistem yalnız belgelenmiş REST sözleşmesini kullanır.
+ *
+ * SURAT_CREATE_API_VERSION → hangi create sözleşmesi:
+ *   'v1' (varsayılan) → GonderiyiKargoyaGonder — gönderici alanı YOK
+ *   'v2'              → GonderiOlustur — gerçek gönderici (pazaryeri)
+ * İki istemci yan yana yaşar; geri dönüş tek env değişikliğidir.
  *
  * Fail-fast: production'da kargo ENTEGRASYONU AÇIKken gerçek bir taşıyıcı modu
  * ZORUNLUDUR. Aksi halde stub sessizce devreye girer (sahte başarı + sahte takip
@@ -41,7 +48,7 @@ export function resolveSuratCarrierClient(
   if (mode === "live" || mode === "soap") {
     throw new Error(
       `FATAL: SURAT_SOAP_MODE='${mode}' artık desteklenmiyor. ` +
-        `Sürat entegrasyonu yalnız resmi REST GonderiyiKargoyaGonder ve ` +
+        `Sürat entegrasyonu yalnız resmi REST create ve ` +
         `KargoTakipHareketDetayi endpoint'lerini kullanır; 'rest' seçin.`,
     );
   }
@@ -59,7 +66,11 @@ export function resolveSuratCarrierClient(
     );
   }
 
-  if (mode === "rest") return new RestSuratClient(config);
+  if (mode === "rest") {
+    return suratCreateApiVersion() === "v2"
+      ? new GonderiOlusturClient(config)
+      : new RestSuratClient(config);
+  }
   return new StubSuratSoapClient(config);
 }
 
