@@ -1,4 +1,9 @@
-import { Inject, Injectable, Logger } from "@nestjs/common";
+import {
+  BadRequestException,
+  Inject,
+  Injectable,
+  Logger,
+} from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { CacheService } from "../cache/cache.service";
 import type {
@@ -182,6 +187,20 @@ export class SuratCargoService implements CargoProvider {
         timeoutMs,
       });
     } catch (e) {
+      // Eşleme hataları (çözülemeyen il ya da telefon) DETERMİNİSTİKTİR ve
+      // düzeltilebilir bir mesaj taşır. Payload üretimi istemcinin içine indiği
+      // için buradan geçiyorlar; teknik hataya çevirmek hem i18n mesajını
+      // yutar hem de barkod retry cron'unu hiç düzelmeyecek bir işi sonsuza
+      // kadar denemeye bırakır. Eskisi gibi çağırana kadar yükselsinler.
+      if (e instanceof BadRequestException) {
+        this.logger.warn({
+          msg: "Surat shipment payload could not be built",
+          correlationId,
+          idempotencyKey,
+          err: errorMessage(e),
+        });
+        throw e;
+      }
       const code = classifyCaughtError(e);
       this.logger.warn({
         msg: "Surat create call threw",

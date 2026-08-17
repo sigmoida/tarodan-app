@@ -116,8 +116,13 @@ export class WarehouseAddressService {
       orderBy: { createdAt: "asc" },
     });
     if (admin) {
+      // Sıralama ŞART: bu satır artık yalnız bir id değil, kargo payload'ındaki
+      // adres metnini de besliyor. Sırasız `findFirst`, birden çok adresi olan
+      // bir admin'de çağrıdan çağrıya farklı satır döndürebilir — aynı takasın
+      // iki çıkış bacağı iki farklı depo adresiyle açılırdı.
       const fallback = await db.address.findFirst({
         where: { userId: admin.userId },
+        orderBy: [{ isDefault: "desc" }, { createdAt: "asc" }],
         select,
       });
       if (fallback) return fallback;

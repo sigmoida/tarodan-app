@@ -42,11 +42,21 @@ const KIM_ODER = SuratKimOder.EntegrasyonFirmasiOder;
 const SINGLE_PARCEL_COUNT = 1;
 const DEFAULT_KG = 1;
 
-function buildParty(party: CargoParty): SuratGonderiOlusturParty {
+/** Hata mesajının hangi tarafı işaret ettiği — yanlış taraf yanlış yere baktırır. */
+type PartyRole = "sender" | "recipient";
+
+function buildParty(
+  party: CargoParty,
+  role: PartyRole,
+): SuratGonderiOlusturParty {
   const phone = normalizeSuratPhone(party.phone);
   if (!phone) {
     throw new BadRequestException(
-      i18nMessage("server.shipping.invalidRecipientPhone"),
+      i18nMessage(
+        role === "sender"
+          ? "server.shipping.invalidSenderPhone"
+          : "server.shipping.invalidRecipientPhone",
+      ),
     );
   }
 
@@ -62,9 +72,10 @@ function buildParty(party: CargoParty): SuratGonderiOlusturParty {
 
   return {
     // Sürat cari eşleştirmesi için alfanumerik bir değer bekliyor ve telefonu
-    // örnek olarak veriyor. Misafir siparişte `User` satırı yok, dolayısıyla
-    // uuid yazmak Sürat tarafında hiçbir şeye karşılık gelmezdi.
-    MusteriId: phone || party.email || "",
+    // örnek olarak veriyor. Telefon yukarıda garanti altına alındığı için
+    // e-posta'ya düşmeye gerek yok — misafir siparişte de normalize telefon var
+    // ve uuid yazmak Sürat tarafında hiçbir şeye karşılık gelmezdi.
+    MusteriId: phone,
     Adi: firstName,
     Soyadi: lastName,
     Telefon: phone,
@@ -100,8 +111,8 @@ export function buildGonderiOlusturData(
     Adet: SINGLE_PARCEL_COUNT,
     KimOder: KIM_ODER,
     SatisKodu: input.reference,
-    Gonderen: buildParty(input.sender),
-    Alici: buildParty(input.recipient),
+    Gonderen: buildParty(input.sender, "sender"),
+    Alici: buildParty(input.recipient, "recipient"),
     GonderiDurumu: SuratGonderiDurumu.Kullanilmadi,
     GonderiSekli: SuratGonderiOlusturSekli.Standart,
     IsKapidanTahsilat: false,

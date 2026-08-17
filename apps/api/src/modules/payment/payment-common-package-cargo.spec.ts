@@ -170,28 +170,55 @@ describe("PaymentCommonService — paket-konsolide Sürat kargo (Faz 2a)", () =>
     });
   });
 
-  it("OrderShipmentProvisioner: satıcının adresi yoksa gönderi AÇILMAZ ve satıcı bilgilendirilir", async () => {
-    const { provisioner, captured, cargo, notifications } = makeService({
+  describe("satıcının kayıtlı adresi yokken", () => {
+    const savedVersion = process.env.SURAT_CREATE_API_VERSION;
+    const addresslessSeller = {
       orderUnique: {
         orderNumber: "ORD-4",
         shippingAddress: validAddr,
         packageId: null,
         product: { title: "A", shippingDesi: 2 },
-        // Satıcının kayıtlı adresi yok → taşıyıcıya yazacak gönderici bilgisi yok.
         seller: { displayName: "Satıcı", email: "s@x.com", addresses: [] },
       },
+    };
+
+    afterEach(() => {
+      if (savedVersion === undefined)
+        delete process.env.SURAT_CREATE_API_VERSION;
+      else process.env.SURAT_CREATE_API_VERSION = savedVersion;
     });
 
-    // Fail-closed: uydurma bir çıkış adresiyle koli açmaktansa hiç açma. Satır
-    // pending+kodsuz kalır ve barkod retry cron'u adres eklenince tamamlar.
-    await expect(provisioner.createBarcode("o4")).resolves.toBeNull();
-    expect(cargo.createShipment).not.toHaveBeenCalled();
-    expect(captured.barcodeCall).toBeUndefined();
-    expect(notifications.createInAppNotification).toHaveBeenCalledWith(
-      "seller-1",
-      "seller_address_required",
-      expect.objectContaining({ orderNumber: "ORD-4" }),
-    );
+    it("v2'de gönderi AÇILMAZ ve satıcı bilgilendirilir", async () => {
+      process.env.SURAT_CREATE_API_VERSION = "v2";
+      const { provisioner, captured, cargo, notifications } =
+        makeService(addresslessSeller);
+
+      // Fail-closed: v2 göndericiyi zorunlu tutuyor; uydurma bir çıkış
+      // adresiyle koli açmaktansa hiç açma. Satır pending+kodsuz kalır ve
+      // barkod retry cron'u adres eklenince tamamlar.
+      await expect(provisioner.createBarcode("o4")).resolves.toBeNull();
+      expect(cargo.createShipment).not.toHaveBeenCalled();
+      expect(captured.barcodeCall).toBeUndefined();
+      expect(notifications.createInAppNotification).toHaveBeenCalledWith(
+        "seller-1",
+        "seller_address_required",
+        expect.objectContaining({ orderNumber: "ORD-4" }),
+      );
+    });
+
+    it("v1'de gönderi normal açılır — gönderici tele hiç çıkmıyor", async () => {
+      process.env.SURAT_CREATE_API_VERSION = "v1";
+      const { provisioner, captured, cargo, notifications } =
+        makeService(addresslessSeller);
+
+      // v1 sözleşmesinde gönderici alanı YOK. Aynı guard'ı burada uygulamak,
+      // bugün sorunsuz kargolanan siparişleri (adres tutmayan satıcılar) geçiş
+      // yapılmadan durdururdu.
+      await expect(provisioner.createBarcode("o4")).resolves.not.toBeNull();
+      expect(cargo.createShipment).toHaveBeenCalled();
+      expect(captured.barcodeCall.reference).toBeTruthy();
+      expect(notifications.createInAppNotification).not.toHaveBeenCalled();
+    });
   });
 
   it("OrderShipmentProvisioner: paket başına TEK gönderi (ortak ref + toplam adet + birleşik içerik)", async () => {

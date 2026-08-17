@@ -161,6 +161,21 @@ describe("buildGonderiOlusturData", () => {
         }),
       ).toThrow(BadRequestException);
     });
+
+    it("names the failing party, so nobody chases the wrong address", () => {
+      const senderFailure = (() => {
+        try {
+          buildGonderiOlusturData({
+            ...shipment,
+            sender: { ...shipment.sender, phone: "+447700900123" },
+          });
+        } catch (error) {
+          return error as { response?: { i18nKey?: string } };
+        }
+      })();
+
+      expect(JSON.stringify(senderFailure)).toContain("invalidSenderPhone");
+    });
   });
 
   describe("name splitting", () => {

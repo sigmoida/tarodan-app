@@ -288,6 +288,22 @@ describe("validateEnv", () => {
     ).not.toThrow();
   });
 
+  it("enforces the FirmaId requirement on staging too — that is where v2 is verified first", () => {
+    // OPERATIONS.md geçiş sırası staging'de v2 doğrulamayı söylüyor; kontrol
+    // yalnız production deployment'ta çalışsaydı orada eksik FirmaId ile boot
+    // eder ve her gönderi tek tek patlardı.
+    expect(() =>
+      validateEnv({
+        ...stagingBase,
+        SURAT_CARGO_ENABLED: "true",
+        SURAT_SOAP_MODE: "rest",
+        SURAT_KARGO_CARI_KODU: "c",
+        SURAT_KARGO_SIFRE: "s",
+        SURAT_CREATE_API_VERSION: "v2",
+      }),
+    ).toThrow(/SURAT_FIRMA_ID/);
+  });
+
   it("rejects production when the required Surat integration is disabled", () => {
     expect(() =>
       validateEnv({ ...prodBase, SURAT_CARGO_ENABLED: "false" }),

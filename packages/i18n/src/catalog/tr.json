@@ -9185,6 +9185,7 @@
       "tariffArchived": "Arşivlenmiş tarife tekrar aktive edilemez",
       "tariffNegativeAmount": "Tarife tutarları negatif olamaz",
       "invalidRecipientPhone": "Gönderi oluşturulamadı: alıcı telefonu geçerli bir Türkiye cep numarası değil",
+      "invalidSenderPhone": "Gönderi oluşturulamadı: gönderici telefonu geçerli bir Türkiye cep numarası değil",
       "unknownProvince": "Gönderi oluşturulamadı: \"{province}\" geçerli bir il değil, kargo il kodu belirlenemedi",
       "unsupportedProvider": "Desteklenmeyen kargo sağlayıcısı",
       "createForbidden": "Bu sipariş için kargo oluşturamazsınız",
