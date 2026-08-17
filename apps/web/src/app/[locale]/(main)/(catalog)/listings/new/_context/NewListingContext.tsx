@@ -123,6 +123,7 @@ function useNewListingValue() {
     commissionPreview,
     commissionPreviewLoading,
     commissionPreviewError,
+    commissionPreviewEnabled,
   } = useCommissionPreview(
     commissionPreviewPrice,
     categoryId,
@@ -291,6 +292,7 @@ function useNewListingValue() {
     commissionPreview,
     commissionPreviewLoading,
     commissionPreviewError,
+    commissionPreviewEnabled,
     hasBankAccount,
     bankAccountLoading,
     // actions

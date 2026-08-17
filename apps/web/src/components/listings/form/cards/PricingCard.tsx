@@ -15,19 +15,19 @@ import {
   sampleDimensionsLabel,
   type PackageTierCode,
 } from "../usePackageTiers";
-import type { PackageTierShipping } from "../queries";
+import type { CommissionPreview, PackageTierShipping } from "../queries";
 
 interface PricingCardProps {
   locale: string;
-  commissionPreview: {
-    sellerFeeAmount: number;
-    withholdingTaxAmount: number;
-    shippingAmount: number;
-    sellerNetAmount: number;
-    packageTierShipping: PackageTierShipping[];
-  } | null;
+  commissionPreview: CommissionPreview | null;
   commissionPreviewLoading: boolean;
   commissionPreviewError?: unknown;
+  /**
+   * Önizleme istenebilir durumda mı (fiyat + kategori girildi mi). "Henüz
+   * sormadık" ile "sunucu veremedi" ayrı durumlar; ikisine aynı mesajı
+   * göstermek, fiyatını girmiş satıcıya "fiyat gir" demek olur.
+   */
+  commissionPreviewEnabled: boolean;
   /** Stock-quantity placeholder + helper differ between new ("1") and edit ("unlimited"). */
   quantityPlaceholder: string;
   quantityHelper: string;
@@ -43,6 +43,7 @@ export default function PricingCard({
   commissionPreview,
   commissionPreviewLoading,
   commissionPreviewError,
+  commissionPreviewEnabled,
   quantityPlaceholder,
   quantityHelper,
 }: PricingCardProps) {
@@ -72,6 +73,7 @@ export default function PricingCard({
       <PackageSizePicker
         tierShipping={commissionPreview?.packageTierShipping ?? null}
         shippingLoading={commissionPreviewLoading}
+        missingInputs={!commissionPreviewEnabled}
       />
 
       {(commissionPreviewLoading ||
@@ -130,9 +132,12 @@ const TIER_IMAGE: Record<PackageTierCode, string> = {
 function PackageSizePicker({
   tierShipping,
   shippingLoading,
+  missingInputs,
 }: {
   tierShipping: PackageTierShipping[] | null;
   shippingLoading: boolean;
+  /** Fiyat/kategori henüz girilmedi — tutar hesaplanamaz, bu kullanıcının işi. */
+  missingInputs: boolean;
 }) {
   const t = useTranslations();
   const { setValue, watch } = useFormContext();
@@ -179,7 +184,11 @@ function PackageSizePicker({
               />
             ))}
           </div>
-          {!shippingLoading && !tierShipping?.length && (
+          {/* Yalnız EKSİK GİRDİ durumunda: sunucu hatasında (ör. aktif tarife
+              yok → 503) ya da sürüm uyuşmazlığında bu mesaj görünürse, alanları
+              doldurmuş satıcıya doldurmadığını söylemiş oluruz. Hata mesajını
+              aşağıdaki özet kutusu veriyor. */}
+          {missingInputs && (
             <p className="mt-2 text-xs text-muted">
               {t("product.packageFeeNeedsPriceAndCategory")}
             </p>
