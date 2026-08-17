@@ -4,6 +4,7 @@ import { RefundFinancialService } from "./refund-financial.service";
 import { RefundShipmentService } from "./refund-shipment.service";
 import { RefundCreationService } from "./refund-creation.service";
 import { RefundDecisionService } from "./refund-decision.service";
+import { warehouseAddressStub } from "../shipping/testing/warehouse-address-fixture";
 
 describe("RefundService.openReturnShipment pre-advice", () => {
   it("opens the return with its reference while the real Sürat code is pending", async () => {
@@ -76,6 +77,7 @@ describe("RefundService.openReturnShipment pre-advice", () => {
       {} as any,
       notifications as any,
       financials as any,
+      warehouseAddressStub() as any,
     );
     const creation = new RefundCreationService(
       prisma as any,

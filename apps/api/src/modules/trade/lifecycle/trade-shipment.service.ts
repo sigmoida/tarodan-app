@@ -17,7 +17,10 @@ import { CacheService } from "../../cache/cache.service";
 import { NotificationService } from "../../notification/notification.service";
 import { NotificationType } from "../../notification/dto";
 import { CarrierCancellationService } from "../../surat-cargo/sync/carrier-cancellation.service";
-import { platformWarehouseAddress } from "../../../config/warehouse";
+import {
+  WarehouseAddressService,
+  type ResolvedWarehouseAddress,
+} from "../../shipping/warehouse/warehouse-address.service";
 
 type CargoShipmentDetails = Omit<
   CargoShipmentRequest,
@@ -38,6 +41,7 @@ export class TradeShipmentService {
     private readonly prisma: PrismaService,
     private readonly cache: CacheService,
     private readonly notificationService: NotificationService,
+    private readonly warehouseAddress: WarehouseAddressService,
     @Optional()
     @Inject(CARGO_PROVIDER)
     private readonly cargo?: CargoProvider,
@@ -227,6 +231,8 @@ export class TradeShipmentService {
         trade.receiverId,
         trade.receiver.addresses[0],
       );
+      // Her iki bacağın ALICI'sı aynı depo → bir kez oku, tx dışında.
+      const warehouse = await this.warehouseAddress.resolve();
 
       type SideKey = "INI" | "REC";
       type Side = {
@@ -343,6 +349,7 @@ export class TradeShipmentService {
             side.address,
             trackingNumber,
             trade.tradeNumber,
+            warehouse,
           );
 
           dispatched.push({
@@ -463,6 +470,10 @@ export class TradeShipmentService {
    * `OzelKargoTakipNo`; Sürat picks up and routes to the warehouse. The
    * payload describes the SHIPMENT (recipient = warehouse), so we write the
    * warehouse address into KisiKurum/Adres/Il/Ilce/TelefonCep.
+   *
+   * `warehouse` is passed in rather than resolved here: the caller reads it once
+   * (outside its transaction, alongside the other address reads) and the builder
+   * stays synchronous.
    */
   private buildSuratPayloadForInboundLeg(
     user: { displayName: string | null; email: string },
@@ -475,19 +486,9 @@ export class TradeShipmentService {
     } | null,
     ozelKargoTakipNo: string,
     tradeNumber: string,
+    warehouse: ResolvedWarehouseAddress,
   ): CargoShipmentDetails | null {
     if (!fromAddress) return null;
-
-    // Sürat payload fields below describe the destination (alıcı). For inbound
-    // legs, destination is the Tarodan warehouse — one source shared with the
-    // refund return leg (config/warehouse), so the two can never drift apart.
-    const {
-      fullName: warehouseName,
-      address: warehouseAddress,
-      city: warehouseCity,
-      district: warehouseDistrict,
-      phone: warehousePhone,
-    } = platformWarehouseAddress();
 
     const senderLabel =
       fromAddress.fullName ||
@@ -495,16 +496,16 @@ export class TradeShipmentService {
       user?.email ||
       "Takas Gönderici";
 
-    // warehouseName zaten `?.trim() || "Tarodan Depo"` → daima boş olmayan trimli
-    // değer; builder'ın `KisiKurum.trim() || "Alıcı"` mantığı burada no-op olur.
+    // Depo adı daima boş olmayan trimli bir değerdir (ayar satırı ya da env
+    // varsayılanı) → builder'ın `KisiKurum.trim() || "Alıcı"` mantığı no-op olur.
     return {
       reference: ozelKargoTakipNo,
       recipient: {
-        name: warehouseName,
-        address: warehouseAddress,
-        city: warehouseCity,
-        district: warehouseDistrict,
-        phone: warehousePhone,
+        name: warehouse.fullName,
+        address: warehouse.address,
+        city: warehouse.city,
+        district: warehouse.district,
+        phone: warehouse.phone,
       },
       content: `Takas Inbound: ${tradeNumber} (Gönderen: ${senderLabel})`,
     };
@@ -551,6 +552,7 @@ export class TradeShipmentService {
       ship.fromAddress,
       ship.trackingNumber,
       ship.trade.tradeNumber,
+      await this.warehouseAddress.resolve(),
     );
     if (!payload) return false;
 

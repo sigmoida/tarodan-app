@@ -26,7 +26,7 @@ import { SuratTrackingService } from "../surat-cargo/sync/surat-tracking.service
 import { canTransitionShipmentStatus } from "../shipping/helpers/shipment-state-machine";
 import { NotificationType } from "../notification/dto/notification.dto";
 import { i18nMessage } from "../i18n";
-import { platformWarehouseAddress } from "../../config/warehouse";
+import { WarehouseAddressService } from "../shipping/warehouse/warehouse-address.service";
 import { RefundNotificationService } from "./refund-notification.service";
 import { RefundFinancialService } from "./refund-financial.service";
 
@@ -54,6 +54,7 @@ export class RefundShipmentService {
     private readonly suratTrackingService: SuratTrackingService,
     private readonly notifications: RefundNotificationService,
     private readonly financials: RefundFinancialService,
+    private readonly warehouseAddress: WarehouseAddressService,
   ) {}
 
   async openReturnShipment(refundRequestId: string) {
@@ -100,9 +101,10 @@ export class RefundShipmentService {
       rr.order.buyer.addresses[0];
     // Satıcı (iade teslim noktası): satıcının kayıtlı adresi; YOKSA Tarodan deposu
     // (çoğu satıcı/platform mağazası kayıtlı adres tutmaz → iade bloke olmasın/askıda
-    // kalmasın). Depo adresi env'den (varsayılanlarla) gelir, takas akışıyla aynı kaynak.
+    // kalmasın). Depo adresi takas akışıyla AYNI kaynaktan gelir
+    // (WarehouseAddressService) ve asla null dönmez.
     const sellerAddr =
-      rr.order.seller.addresses[0] ?? this.warehouseReturnAddress();
+      rr.order.seller.addresses[0] ?? (await this.warehouseAddress.resolve());
 
     // Yalnız alıcı adresi gerçekten bulunamazsa iade kargosu açılamaz.
     if (!buyerAddr) {
@@ -720,15 +722,6 @@ export class RefundShipmentService {
       district: String(j.district),
       phone: String(j.phone),
     };
-  }
-
-  /**
-   * Satıcının kayıtlı adresi olmadığında iade kargosunun gideceği Tarodan deposu
-   * adresi — takas akışıyla TEK kaynaktan (config/warehouse) gelir; env yoksa
-   * mantıklı varsayılanlara düşer (asla null dönmez) → adressiz satıcı iadeyi bloke etmez.
-   */
-  private warehouseReturnAddress() {
-    return platformWarehouseAddress();
   }
 
   // NOT (M4): iade barkodu için ayrı bir retry yüzeyi YOK — bilinçli.

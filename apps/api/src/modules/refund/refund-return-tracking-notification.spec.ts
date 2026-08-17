@@ -5,6 +5,7 @@ import { RefundFinancialService } from "./refund-financial.service";
 import { RefundShipmentService } from "./refund-shipment.service";
 import { RefundCreationService } from "./refund-creation.service";
 import { RefundDecisionService } from "./refund-decision.service";
+import { warehouseAddressStub } from "../shipping/testing/warehouse-address-fixture";
 
 describe("RefundService.applyReturnTrackingUpdate notifications", () => {
   const makeService = (currentStatus: ShipmentStatus | null) => {
@@ -43,6 +44,7 @@ describe("RefundService.applyReturnTrackingUpdate notifications", () => {
       {} as any,
       notifications as any,
       financials as any,
+      warehouseAddressStub() as any,
     );
     const creation = new RefundCreationService(
       prisma as any,

@@ -6,16 +6,19 @@
  * copy's comment even said it must match the trade one — so a parcel could be
  * addressed one way and the other flow's parcel another.
  *
- * ⚠ This is NOT the only warehouse address in the system. Outbound and return
- * shipments take an Address *row* instead, resolved by
- * `AdminTradeCommonService.resolveWarehouseAddressId` from the
- * `warehouse_address_id` platform setting (editable in admin Settings, checked
- * by `HealthService`). The two are unrelated at runtime: moving the warehouse
- * in admin Settings leaves the env copy — and therefore inbound trade legs and
- * refund returns — pointing at the old address, with the health check still
- * green. Unifying them means deciding which one wins and reworking the callers
- * that need text rather than an id, so it is a deliberate change, not a
- * refactor.
+ * ⚠ Do not call this directly — go through `WarehouseAddressService`.
+ *
+ * This used to be one of two independent warehouse addresses: inbound trade legs
+ * and refund returns wrote out this env text, while outbound and return
+ * shipments resolved an Address *row* from the `warehouse_address_id` platform
+ * setting. Moving the warehouse in admin Settings left this copy stale with the
+ * health check still green. Carrier payloads now carry the sender as well as the
+ * recipient, so both copies would have gone on the wire — the same warehouse,
+ * spelled two ways, on the two legs of one trade.
+ *
+ * `WarehouseAddressService` is now the single resolver and the setting row wins;
+ * these values are its last-resort fallback, which is why the defaults below
+ * stay non-null.
  *
  * Note also that `TARODAN_WAREHOUSE_*` is not declared in
  * `config/env.validation.ts`, and ConfigModule drops undeclared keys read from

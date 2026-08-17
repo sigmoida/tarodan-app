@@ -5,6 +5,7 @@ import { RefundFinancialService } from "./refund-financial.service";
 import { RefundShipmentService } from "./refund-shipment.service";
 import { RefundCreationService } from "./refund-creation.service";
 import { RefundDecisionService } from "./refund-decision.service";
+import { warehouseAddressStub } from "../shipping/testing/warehouse-address-fixture";
 
 /**
  * MONEY-H6: donuk hold terminal kaçışı.
@@ -47,6 +48,7 @@ describe("RefundService — MONEY-H6 frozen-hold terminal escape", () => {
       {} as any,
       notifications as any,
       financials as any,
+      warehouseAddressStub() as any,
     );
     const creation = new RefundCreationService(
       prisma as any,

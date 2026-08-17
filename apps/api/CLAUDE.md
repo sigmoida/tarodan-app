@@ -345,13 +345,12 @@ in passing, because each one changes behavior:
   migration for web, admin and mobile — worth doing, but as its own decision.
 - **PayTR's return URLs have no fallback** — if `FRONTEND_URL` is unset they
   render as `undefined/payment/success`. Payment-critical, so left as-is.
-- **The warehouse address exists twice, by different mechanisms.** Inbound trade
-  legs and refund returns write it out as text from `config/warehouse.ts`
-  (env); outbound and return shipments take an Address row resolved from the
-  `warehouse_address_id` platform setting (admin Settings, health-checked).
-  Moving the warehouse in admin leaves the env copy stale while the health check
-  stays green. Unifying them means picking a winner and reworking the callers
-  that need text rather than an id.
+
+Recently resolved, so don't reopen it: the warehouse address used to exist twice
+by two mechanisms (env text vs. the `warehouse_address_id` row), and moving the
+warehouse in admin left the env copy stale. `WarehouseAddressService`
+(`modules/shipping/warehouse/`) is now the single resolver — the row wins and
+`config/warehouse.ts` is its fallback. Don't add a second reader.
 
 ## 16. Verification
 

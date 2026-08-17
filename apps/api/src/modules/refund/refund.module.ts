@@ -11,6 +11,7 @@ import { SuratCargoModule } from "../surat-cargo/surat-cargo.module";
 import { NotificationModule } from "../notification/notification.module";
 import { StorageModule } from "../storage/storage.module";
 import { ShippingTariffModule } from "../shipping/tariff/shipping-tariff.module";
+import { WarehouseAddressModule } from "../shipping/warehouse/warehouse-address.module";
 import { RefundController } from "./refund.controller";
 import { RefundService } from "./refund.service";
 import { RefundNotificationService } from "./refund-notification.service";
@@ -29,6 +30,8 @@ import { scheduledProcessors } from "../../workers/scheduled-processors";
     SuratCargoModule,
     StorageModule,
     ShippingTariffModule,
+    // Satıcı adresi yokken iade kolisinin gittiği depo adresi (leaf modül).
+    WarehouseAddressModule,
     PaymentModule,
     // Kusursuz alıcıya kupon iadesi için (indirim-teknik §6).
     DiscountModule,

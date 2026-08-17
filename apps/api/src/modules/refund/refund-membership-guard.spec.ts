@@ -4,6 +4,7 @@ import { RefundFinancialService } from "./refund-financial.service";
 import { RefundShipmentService } from "./refund-shipment.service";
 import { RefundCreationService } from "./refund-creation.service";
 import { RefundDecisionService } from "./refund-decision.service";
+import { warehouseAddressStub } from "../shipping/testing/warehouse-address-fixture";
 
 /**
  * Üyelik/dijital siparişler ("MEM-" sipariş no, platform satıcısı) genel iade akışına
@@ -33,6 +34,7 @@ describe("RefundService.createRefundRequest — üyelik siparişi guard", () => 
       {} as any,
       notifications as any,
       financials as any,
+      warehouseAddressStub() as any,
     );
     const creation = new RefundCreationService(
       prisma as any,
