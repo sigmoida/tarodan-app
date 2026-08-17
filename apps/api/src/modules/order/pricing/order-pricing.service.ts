@@ -39,7 +39,10 @@ import {
   type OutboundTariffLike,
   type ShippingBuyerShareByTier,
 } from "../../shipping/helpers/shipping-tariff.helper";
-import { billableDesiForTier } from "../../shipping/helpers/shipping-package-tier";
+import {
+  billableDesiForTier,
+  SHIPPING_PACKAGE_TIER_ORDER,
+} from "../../shipping/helpers/shipping-package-tier";
 import { DiscountService } from "../../discount/discount.service";
 import { createHash } from "crypto";
 import { calculateServiceTax } from "../helpers/order-service-tax.helper";
@@ -997,6 +1000,23 @@ export class OrderPricingService {
     shippingDesi: number;
     /** Desiden çözülen paket boyutu — UI "Orta Paket" gibi gösterebilir. */
     packageTier: ShippingPackageTierCode;
+    /**
+     * Her paket boyutu için SATICIYA düşen kargo payı.
+     *
+     * İlan formu üç boyutu yan yana gösteriyor ve satıcının sorduğu şey "hangisi
+     * bana kaça mal olur". Tam kargo bedeli bu soruyu yanıtlamıyor: pay KADEME
+     * BAZINDA yapılandırılıyor (`CommissionRuleShippingShare`), dolayısıyla üç
+     * kademenin oranı farklı olabilir — hatta satıcı maliyeti sıralaması tam
+     * bedel sıralamasından farklı çıkabilir. Ücretsiz kargo eşiği de fiyata
+     * bağlı olduğu için tutar ilanın fiyatıyla değişir.
+     *
+     * Üçü de burada, seçili kademeyle AYNI karar fonksiyonundan üretilir; form
+     * kendi hesabını yapmaz ve kart ile özet kutusu ayrışamaz.
+     */
+    packageTierShipping: Array<{
+      code: ShippingPackageTierCode;
+      sellerShippingAmount: number;
+    }>;
   }> {
     const [result, seller, tariff] = await Promise.all([
       this.calculateCommission(amount, sellerId, categoryId, pinnedRuleSetId),
@@ -1068,6 +1088,15 @@ export class OrderPricingService {
       buyerServiceTaxAmount,
       shippingDesi,
       packageTier: decision.tierCode,
+      packageTierShipping: SHIPPING_PACKAGE_TIER_ORDER.map((code) => ({
+        code,
+        sellerShippingAmount: this.resolveShippingDecision({
+          tariff,
+          subtotal: amount,
+          billableDesi: billableDesiForTier(code),
+          lineShares: [result.shippingBuyerShares],
+        }).seller,
+      })),
     };
   }
 

@@ -215,6 +215,108 @@ describe("OrderPricingService listing commission preview", () => {
     });
   });
 
+  describe("packageTierShipping (ilan formundaki üç kart)", () => {
+    it("her kademe için SATICI payını verir — seçili kademeden bağımsız", async () => {
+      jest.spyOn(service, "calculateCommission").mockResolvedValue({
+        sellerFeeAmount: 100,
+        buyerFeeAmount: 30,
+        commissionAmount: 130,
+        shippingBuyerShare: 100,
+        shippingBuyerShares: { small: 100, medium: 40, large: 50 },
+      } as any);
+
+      // Seçili kademe küçük olsa da üç kartın tutarı birden döner.
+      const preview = await (service.getCommissionPreview as any)(
+        1000,
+        "seller-1",
+        "category-1",
+        2,
+      );
+
+      expect(preview.packageTierShipping).toEqual([
+        // small: pay %100 alıcı → satıcı ödemiyor
+        { code: "small", sellerShippingAmount: 0 },
+        // medium: 180 × %60 = 108
+        { code: "medium", sellerShippingAmount: 108 },
+        // large: 260 × %50 = 130
+        { code: "large", sellerShippingAmount: 130 },
+      ]);
+    });
+
+    it("seçili kademenin kart tutarı özet kutusundaki kesintiyle aynıdır", async () => {
+      // Kart ile altındaki "Kargo ücreti" satırının ayrışması bu işin çıkış
+      // noktasıydı; ikisi aynı karar fonksiyonundan gelmeli.
+      const preview = await (service.getCommissionPreview as any)(
+        1000,
+        "seller-1",
+        "category-1",
+        5,
+      );
+
+      const selectedCard = preview.packageTierShipping.find(
+        (tier: { code: string }) => tier.code === preview.packageTier,
+      );
+      expect(selectedCard.sellerShippingAmount).toBe(preview.shippingAmount);
+    });
+
+    it("kart tutarı satıcı payıdır, tam kargo bedeli DEĞİL", async () => {
+      const preview = await (service.getCommissionPreview as any)(
+        1000,
+        "seller-1",
+        "category-1",
+        2,
+      );
+
+      // Küçük paketin tam bedeli 100, payı %60 → 60. Kart 100 gösterseydi
+      // satıcı ödemeyeceği bir tutara bakarak karar verirdi.
+      expect(preview.fullShippingAmount).toBe(100);
+      expect(preview.packageTierShipping[0]).toEqual({
+        code: "small",
+        sellerShippingAmount: 60,
+      });
+    });
+
+    it("ücretsiz kargo eşiği aşıldığında üç kart da sıfırlanır", async () => {
+      const freeShipping = new OrderPricingService(
+        prisma as any,
+        {} as any,
+        {
+          getActiveOutboundTariff: jest.fn().mockResolvedValue({
+            id: "tariff-1",
+            version: 3,
+            freeShippingEnabled: true,
+            freeShippingThreshold: 500,
+            packageTiers: packageTiers(100, 180, 260),
+          }),
+        } as any,
+        {} as any,
+        noVatTaxPolicy(),
+      );
+      jest.spyOn(freeShipping, "calculateCommission").mockResolvedValue({
+        sellerFeeAmount: 100,
+        buyerFeeAmount: 30,
+        commissionAmount: 130,
+        shippingBuyerShare: 40,
+        shippingBuyerShares: flatShares(40),
+      } as any);
+
+      // Kart tutarının ilanın FİYATINA da bağlı olmasının nedeni bu: sabit
+      // tarife tutarı gösteren eski kart bunu hiç yansıtamıyordu.
+      const preview = await (freeShipping.getCommissionPreview as any)(
+        1000,
+        "seller-1",
+        "category-1",
+        2,
+      );
+
+      expect(
+        preview.packageTierShipping.map(
+          (tier: { sellerShippingAmount: number }) => tier.sellerShippingAmount,
+        ),
+      ).toEqual([0, 0, 0]);
+    });
+  });
+
   describe("batch preview (ilanlarım listesi)", () => {
     it("her kalemin paket boyutunu kendi kademe fiyatı ve payıyla hesaplar", async () => {
       jest.spyOn(service, "calculateCommission").mockResolvedValue({

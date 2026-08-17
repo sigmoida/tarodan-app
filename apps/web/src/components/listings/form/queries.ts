@@ -130,6 +130,17 @@ export function useCarModels(brandSlug: string | undefined) {
 }
 
 /** Estimated platform fee / net for a price + category + package size. */
+/**
+ * Bir paket boyutunun SATICIYA maliyeti. Tam kargo bedeli değildir ve satıcıya
+ * hiç gösterilmez: pay kademe bazında yapılandırıldığı için üç kademenin oranı
+ * farklı olabilir, üstelik ücretsiz kargo eşiği yüzünden ilanın fiyatına da
+ * bağlıdır. Sunucu hesaplar; form aritmetik yapmaz.
+ */
+export interface PackageTierShipping {
+  code: PackageTierCode;
+  sellerShippingAmount: number;
+}
+
 export function useCommissionPreview(
   price: string | number,
   categoryId: string,
@@ -143,6 +154,7 @@ export function useCommissionPreview(
     withholdingTaxAmount: number;
     shippingAmount: number;
     sellerNetAmount: number;
+    packageTierShipping: PackageTierShipping[];
   }>({
     resource: "listing-form-commission",
     params: [String(price), categoryId, packageTier],
@@ -159,6 +171,12 @@ export function useCommissionPreview(
         withholdingTaxAmount: Number(res.data?.withholdingTaxAmount ?? 0),
         shippingAmount: Number(res.data?.shippingAmount ?? 0),
         sellerNetAmount: Number(res.data?.sellerNetAmount ?? 0),
+        packageTierShipping: (
+          (res.data?.packageTierShipping ?? []) as PackageTierShipping[]
+        ).map((tier) => ({
+          code: tier.code,
+          sellerShippingAmount: Number(tier.sellerShippingAmount ?? 0),
+        })),
       };
     },
     enabled,

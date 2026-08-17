@@ -773,6 +773,7 @@
     "shippingFee": "Shipping fee",
     "sellerEarning": "Your earnings",
     "packageFeeLabel": "Package fee",
+    "packageFeeNeedsPriceAndCategory": "Enter a price and a category to see your package fee.",
     "sampleDimensionsLabel": "Sample size (W × L × H)",
     "rejectionReason": "Rejection reason",
     "imageGrid": {

@@ -773,6 +773,7 @@
     "shippingFee": "Kargo ücreti",
     "sellerEarning": "Hak edişiniz",
     "packageFeeLabel": "Paket ücreti",
+    "packageFeeNeedsPriceAndCategory": "Paket ücretinizi görmek için fiyat ve kategori girin.",
     "sampleDimensionsLabel": "Örnek ölçü (en × boy × yükseklik)",
     "rejectionReason": "Red gerekçesi",
     "imageGrid": {
