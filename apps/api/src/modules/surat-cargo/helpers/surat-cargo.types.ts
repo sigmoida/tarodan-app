@@ -3,6 +3,8 @@
  * payload tipleri. Resmi Sürat Kargo API dokümanlarına dayanır.
  */
 
+import type { CargoShipmentRequest } from "./cargo-provider";
+
 // ─── Technical error classification ───────────────────────────────────────────
 
 export type SuratTechnicalCode =
@@ -182,10 +184,23 @@ export interface SuratGonderiPayload {
   EntegrasyonFirmasi?: string;
 }
 
+/**
+ * Bir gönderiyi tel biçiminden ÖNCE tanımlayan nötr girdi.
+ *
+ * Taşıyıcı istemcisinin sözleşmesi budur; hangi Sürat sürümüne hangi alan
+ * adlarıyla gidileceği istemcinin içinde kalır. Böylece `SuratCargoService`
+ * (idempotency, retry, takip) sürümden habersiz çalışır ve iki sürüm yan yana
+ * yaşayabilir.
+ */
+export type SuratCreateShipmentInput = Omit<
+  CargoShipmentRequest,
+  "idempotencyKey" | "correlationId"
+>;
+
 export interface SuratShipmentInput {
   idempotencyKey: string;
   correlationId: string;
-  payload: SuratGonderiPayload;
+  shipment: SuratCreateShipmentInput;
 }
 
 // ─── Kargo Takip API types (REST) ─────────────────────────────────────────────

@@ -500,6 +500,16 @@ export class TradeShipmentService {
     // varsayılanı) → builder'ın `KisiKurum.trim() || "Alıcı"` mantığı no-op olur.
     return {
       reference: ozelKargoTakipNo,
+      // Gönderen artık taşıyıcıya gerçek alan olarak gidiyor; `content` içindeki
+      // "(Gönderen: …)" etiketi eskiden bunun tek izi olduğu için korunuyor.
+      sender: {
+        name: senderLabel,
+        address: fromAddress.address ?? "",
+        city: fromAddress.city ?? "",
+        district: fromAddress.district ?? "",
+        phone: fromAddress.phone ?? "",
+        email: user?.email || undefined,
+      },
       recipient: {
         name: warehouse.fullName,
         address: warehouse.address,

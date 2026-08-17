@@ -18,14 +18,14 @@ import type {
   CargoShipmentRequest,
   CargoShipmentResult,
 } from "./helpers/cargo-provider";
-import { buildStandardGonderiPayload } from "./mappers/surat-address.util";
 import { errorMessage } from "../../common/helpers/error-message";
 
 export const SURAT_CARRIER_CLIENT = Symbol("SURAT_CARRIER_CLIENT");
 
-// Idempotency caches are keyed by OzelKargoTakipNo (= our order/trade/refund
-// number) so create and local cancel can compute the same key. Local cancel
-// invalidates it to avoid leaving a stale success in our own cache.
+// Idempotency caches are keyed by our own shipment reference (order/trade/refund
+// number, whatever the active Sürat contract calls it on the wire) so create and
+// local cancel compute the same key. Local cancel invalidates it to avoid leaving
+// a stale success in our own cache.
 const IDEM_CACHE_PREFIX = "surat:idem:ok:";
 const IDEM_BARCODE_PREFIX = "surat:idem:barcode:";
 const IDEM_CACHE_TTL_SEC = 7 * 24 * 3600;
@@ -85,20 +85,11 @@ export class SuratCargoService implements CargoProvider {
   async createShipment(
     input: CargoShipmentRequest,
   ): Promise<CargoShipmentResult> {
+    const { idempotencyKey, correlationId, ...shipment } = input;
     const result = await this.createShipmentWithBarcode({
-      idempotencyKey: input.idempotencyKey,
-      correlationId: input.correlationId,
-      payload: buildStandardGonderiPayload({
-        recipientName: input.recipient.name,
-        address: input.recipient.address,
-        city: input.recipient.city,
-        district: input.recipient.district,
-        phone: input.recipient.phone,
-        ref: input.reference,
-        content: input.content,
-        desi: input.desi ?? undefined,
-        isReturn: input.isReturn,
-      }),
+      idempotencyKey,
+      correlationId,
+      shipment,
     });
     if (result.ok) {
       return {
@@ -146,11 +137,11 @@ export class SuratCargoService implements CargoProvider {
   async submitShipmentWithRetry(
     input: SuratShipmentInput,
   ): Promise<SuratShipmentResult> {
-    const cacheKey = `${IDEM_CACHE_PREFIX}${input.payload.OzelKargoTakipNo}`;
+    const cacheKey = `${IDEM_CACHE_PREFIX}${input.shipment.reference}`;
     const cached = await this.cache.get<SuratShipmentSuccess>(cacheKey);
     if (cached?.ok === true && cached.suratMessage === "Tamam") {
       this.logger.log(
-        `Surat idempotency cache hit oid=${input.payload.OzelKargoTakipNo} correlation=${input.correlationId}`,
+        `Surat idempotency cache hit ref=${input.shipment.reference} correlation=${input.correlationId}`,
       );
       return {
         ok: true,
@@ -184,10 +175,10 @@ export class SuratCargoService implements CargoProvider {
     input: SuratShipmentInput,
     timeoutMs: number,
   ): Promise<SuratShipmentResult> {
-    const { idempotencyKey, correlationId, payload } = input;
+    const { idempotencyKey, correlationId, shipment } = input;
     let raw: string | undefined;
     try {
-      raw = await this.carrierClient.callGonderiyiKargoyaGonder(payload, {
+      raw = await this.carrierClient.callCreateShipment(shipment, {
         timeoutMs,
       });
     } catch (e) {
@@ -270,9 +261,9 @@ export class SuratCargoService implements CargoProvider {
 
   /**
    * Resmi iki-adımlı akış:
-   * 1) GonderiyiKargoyaGonder ile idempotent gönderi oluştur.
-   * 2) Aynı OzelKargoTakipNo'yu WebSiparisKodu olarak KargoTakipHareketDetayi
-   *    üzerinden sorgulayıp gerçek KargoTakipNo'yu al.
+   * 1) Aktif create ucuyla idempotent gönderi oluştur.
+   * 2) Aynı referansı WebSiparisKodu olarak KargoTakipHareketDetayi üzerinden
+   *    sorgulayıp gerçek KargoTakipNo'yu al.
    *
    * Takip kaydı Sürat tarafında henüz görünmüyorsa TRACKING_PENDING döner;
    * çağıran yerel gönderiyi pending+kodsuz bırakır ve 30 dk'lık retry aynı resmi
@@ -282,12 +273,12 @@ export class SuratCargoService implements CargoProvider {
   async createShipmentWithBarcode(
     input: SuratShipmentInput,
   ): Promise<SuratBarcodeResult> {
-    const oid = input.payload.OzelKargoTakipNo;
-    const cacheKey = `${IDEM_BARCODE_PREFIX}${oid}`;
+    const ref = input.shipment.reference;
+    const cacheKey = `${IDEM_BARCODE_PREFIX}${ref}`;
     const cached = await this.cache.get<SuratBarcodeSuccess>(cacheKey);
     if (cached?.ok === true && cached.kargoTakipNo) {
       this.logger.log(
-        `Surat barcode idempotency cache hit oid=${oid} correlation=${input.correlationId}`,
+        `Surat barcode idempotency cache hit ref=${ref} correlation=${input.correlationId}`,
       );
       return {
         ...cached,
@@ -299,10 +290,10 @@ export class SuratCargoService implements CargoProvider {
     const createResult = await this.submitShipmentWithRetry(input);
     if (!createResult.ok) return createResult as SuratShipmentFailure;
 
-    const localTrackingCode = this.carrierClient.getLocalTrackingCode(oid);
+    const localTrackingCode = this.carrierClient.getLocalTrackingCode(ref);
     const lookup = localTrackingCode
       ? null
-      : await this.trackingClient.lookupTracking(oid);
+      : await this.trackingClient.lookupTracking(ref);
     if (lookup?.kind === "failure") {
       return {
         ok: false,
@@ -323,7 +314,7 @@ export class SuratCargoService implements CargoProvider {
         msg: "Surat shipment created but tracking code is not available yet",
         correlationId: input.correlationId,
         idempotencyKey: input.idempotencyKey,
-        webSiparisKodu: oid,
+        webSiparisKodu: ref,
       });
       return {
         ok: false,

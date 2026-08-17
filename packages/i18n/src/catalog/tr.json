@@ -8601,6 +8601,10 @@
         "title": "Adres Gerekli — Takas Kargosu",
         "message": "{tradeNumber} takasınız için kargo başlatılamadı: kayıtlı adresiniz yok. Profilinizden adres ekleyin; kargo otomatik oluşturulacaktır."
       },
+      "sellerAddressRequired": {
+        "title": "Adres Gerekli — Sipariş Kargosu",
+        "message": "{orderNumber} siparişiniz için kargo başlatılamadı: kayıtlı adresiniz yok. Kargo gönderici bilgisi olarak adresinizi gerektiriyor. Profilinizden adres ekleyin; kargo otomatik oluşturulacaktır."
+      },
       "cargoCodeReady": {
         "title": "Kargo Kodunuz Hazır",
         "message": "{reference} için kargo kodunuz oluşturuldu. Kodu görüntüleyip paketi Sürat Kargo şubesine teslim edebilirsiniz."

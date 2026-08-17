@@ -97,10 +97,19 @@ export class AdminTradeWarehouseService {
         labelZpl: null,
       };
     }
+    const warehouse = await this.common.resolveWarehouseAddress();
     const result = await this.cargo.createShipment({
       idempotencyKey: `surat:trade-return:${oid}`,
       correlationId: `trade-reject-${tradeId}`,
       reference: oid,
+      // Depodan çıkan bacak: gönderen depo, alıcı ürünün sahibi.
+      sender: {
+        name: warehouse.fullName,
+        address: warehouse.address,
+        city: warehouse.city,
+        district: warehouse.district,
+        phone: warehouse.phone,
+      },
       recipient: {
         name: address.fullName || user?.displayName || "Takas İade",
         address: address.address,
@@ -154,10 +163,19 @@ export class AdminTradeWarehouseService {
         labelZpl: null,
       };
     }
+    const warehouse = await this.common.resolveWarehouseAddress();
     const result = await this.cargo.createShipment({
       idempotencyKey: `surat:trade:${oid}`,
       correlationId: `trade-approve-${tradeId}`,
       reference: oid,
+      // Depodan çıkan bacak: gönderen depo, alıcı karşı taraf.
+      sender: {
+        name: warehouse.fullName,
+        address: warehouse.address,
+        city: warehouse.city,
+        district: warehouse.district,
+        phone: warehouse.phone,
+      },
       recipient: {
         name: address.fullName || user?.displayName || "Takas Alıcısı",
         address: address.address,

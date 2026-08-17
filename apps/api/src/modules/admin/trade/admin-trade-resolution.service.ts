@@ -375,10 +375,19 @@ export class AdminTradeResolutionService {
           orderBy: { isDefault: "desc" },
         });
         if (arrivedAddress && this.cargo && this.cargo.isEnabled()) {
+          const warehouse = await this.common.resolveWarehouseAddress();
           const result = await this.cargo.createShipment({
             idempotencyKey: `surat:trade-stuck-return:${txResult.returnShipmentDraft.oid}`,
             correlationId: `trade-force-cancel-${tradeId}`,
             reference: txResult.returnShipmentDraft.oid,
+            // Depodan çıkan bacak: gönderen depo, alıcı kolisi ulaşmış olan taraf.
+            sender: {
+              name: warehouse.fullName,
+              address: warehouse.address,
+              city: warehouse.city,
+              district: warehouse.district,
+              phone: warehouse.phone,
+            },
             recipient: {
               name:
                 arrivedAddress.fullName ||

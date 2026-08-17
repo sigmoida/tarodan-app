@@ -209,10 +209,20 @@ describe("Trade Auto-Shipping (E2E)", () => {
 
     // Sürat stub must have been called twice — one per leg.
     expect(ctx.surat.shipmentCalls.length).toBe(2);
-    const stubRefs = ctx.surat.shipmentCalls
-      .map((p) => p.OzelKargoTakipNo)
-      .sort();
+    const stubRefs = ctx.surat.shipmentCalls.map((p) => p.reference).sort();
     expect(stubRefs).toEqual(toWarehouse.map((s) => s.trackingNumber!).sort());
+
+    // Depoya giriş bacağında GÖNDEREN kullanıcıdır, ALICI depodur. İki koli aynı
+    // depoya gider ama farklı kullanıcılardan çıkar — gönderici alanı yanlış
+    // beslenirse (ör. iki bacakta da depo yazılırsa) bu iki assertion düşer.
+    const senderAddresses = ctx.surat.shipmentCalls.map(
+      (p) => p.sender.address,
+    );
+    expect(new Set(senderAddresses).size).toBe(2);
+    const recipientAddresses = ctx.surat.shipmentCalls.map(
+      (p) => p.recipient.address,
+    );
+    expect(new Set(recipientAddresses).size).toBe(1);
   });
 
   it("only one to_warehouse leg delivered → trade stays in shipping_to_warehouse", async () => {

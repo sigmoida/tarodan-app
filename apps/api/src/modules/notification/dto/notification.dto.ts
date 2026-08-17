@@ -78,6 +78,10 @@ export enum NotificationType {
   // Takas kargosu başlatılamadı: tarafın kayıtlı adresi yok — kullanıcı adres eklemeli
   // (adres eklenince reconciliation cron kargoyu otomatik oluşturur).
   TRADE_ADDRESS_REQUIRED = "trade_address_required",
+  // Sipariş kargosu başlatılamadı: satıcının kayıtlı adresi yok. Taşıyıcı artık
+  // GÖNDERİCİ bilgisi istiyor, dolayısıyla adres olmadan gönderi açılamaz —
+  // satıcı adres ekleyince barkod retry cron'u kargoyu otomatik oluşturur.
+  SELLER_ADDRESS_REQUIRED = "seller_address_required",
   // Kargo kodu gecikmeli oluştuğunda (retry job doldurunca) gönderene haber ver —
   // şubeye boşa gitmesin (insani senaryo A2/C24).
   CARGO_CODE_READY = "cargo_code_ready",

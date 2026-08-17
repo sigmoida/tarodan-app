@@ -1,6 +1,9 @@
 import { Injectable } from "@nestjs/common";
 import { Prisma } from "@prisma/client";
-import { WarehouseAddressService } from "../../shipping/warehouse/warehouse-address.service";
+import {
+  WarehouseAddressService,
+  type ResolvedWarehouseAddress,
+} from "../../shipping/warehouse/warehouse-address.service";
 
 /**
  * Takas yönetimi (safe-trade / depo escrow) için gruplar-arası paylaşılan
@@ -26,5 +29,16 @@ export class AdminTradeCommonService {
     tx: Prisma.TransactionClient,
   ): Promise<string> {
     return this.warehouseAddress.resolveId(tx);
+  }
+
+  /**
+   * Depo adresinin TAM alanları — kargo payload'ında depo GÖNDERİCİ olduğunda
+   * gerekir (depo → kullanıcı çıkış, red iadesi, kayıp iadesi). Asla throw etmez:
+   * ayar satırı yoksa env metnine düşer, böylece eksik bir ayar takası kilitlemez.
+   */
+  async resolveWarehouseAddress(
+    tx?: Prisma.TransactionClient,
+  ): Promise<ResolvedWarehouseAddress> {
+    return this.warehouseAddress.resolve(tx);
   }
 }

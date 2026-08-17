@@ -14,6 +14,10 @@ import {
   type CargoShipmentFailure,
 } from "../helpers/cargo-provider";
 import { i18nMessage } from "../../i18n";
+import { CacheService } from "../../cache/cache.service";
+import { NotificationService } from "../../notification/notification.service";
+import { NotificationType } from "../../notification/dto";
+import { errorMessage } from "../../../common/helpers/error-message";
 
 export type OrderShipmentProvisionResult =
   "created" | "revived" | "exists" | "skipped";
@@ -30,7 +34,36 @@ export class OrderShipmentProvisioner {
   constructor(
     private readonly prisma: PrismaService,
     @Inject(CARGO_PROVIDER) private readonly cargo: CargoProvider,
+    private readonly notifications: NotificationService,
+    private readonly cache: CacheService,
   ) {}
+
+  /**
+   * Satıcıya "çıkış adresi ekle" bildirimi. `createBarcode` 30 dk'lık retry
+   * cron'undan da çağrıldığı için günde bire dedupe edilir — aksi halde adressiz
+   * bir satıcı günde onlarca aynı bildirimi alır. Bildirim gönderilemezse gönderi
+   * akışı etkilenmez: fail-closed kararı zaten verilmiş durumda.
+   */
+  private async notifySellerAddressRequired(
+    sellerId: string,
+    orderId: string,
+    orderNumber: string,
+  ): Promise<void> {
+    const dedupeKey = `order:seller-addr-missing-notified:${orderId}`;
+    try {
+      if (await this.cache.get(dedupeKey)) return;
+      await this.cache.set(dedupeKey, 1, { ttl: 24 * 3600 });
+      await this.notifications.createInAppNotification(
+        sellerId,
+        NotificationType.SELLER_ADDRESS_REQUIRED,
+        { orderId, orderNumber },
+      );
+    } catch (error) {
+      this.logger.warn(
+        `SELLER_ADDRESS_REQUIRED notify failed order=${orderId} seller=${sellerId}: ${errorMessage(error)}`,
+      );
+    }
+  }
 
   private async resolveCarrierReference(
     orderNumber: string,
@@ -102,7 +135,21 @@ export class OrderShipmentProvisioner {
         orderNumber: true,
         shippingAddress: true,
         packageId: true,
+        sellerId: true,
         product: { select: { title: true, shippingDesi: true } },
+        // Taşıyıcı GÖNDERİCİ bilgisi ister ve satışta gönderici satıcıdır.
+        // Paket satırları da aynı satıcıya ait olduğundan (OrderPackage.sellerId)
+        // tek okuma yeterli — zaten `OrderPackage`'ta seller relation'ı yok.
+        seller: {
+          select: {
+            displayName: true,
+            email: true,
+            addresses: {
+              orderBy: { isDefault: "desc" },
+              take: 1,
+            },
+          },
+        },
       },
     });
     if (!order) {
@@ -161,11 +208,36 @@ export class OrderShipmentProvisioner {
       return null;
     }
 
+    // Gönderici = satıcı. Adresi yoksa fail-closed: gönderi AÇILMAZ (uydurma bir
+    // çıkış adresiyle koli açmak, hiç açmamaktan kötüdür). Shipment satırı
+    // pending+kodsuz kalır, satıcıya adres eklemesi bildirilir ve barkod retry
+    // cron'u adres eklenince gönderiyi kendiliğinden oluşturur.
+    const sellerAddress = order.seller?.addresses[0];
+    if (!sellerAddress) {
+      this.logger.warn(
+        `Cargo barcode skipped: seller has no address order=${orderId} seller=${order.sellerId}`,
+      );
+      await this.notifySellerAddressRequired(
+        order.sellerId,
+        orderId,
+        order.orderNumber,
+      );
+      return null;
+    }
+
     try {
       const result = await this.cargo.createShipment({
         idempotencyKey,
         correlationId: ref,
         reference: ref,
+        sender: {
+          name: sellerAddress.fullName || order.seller?.displayName || "Satıcı",
+          address: sellerAddress.address,
+          city: sellerAddress.city,
+          district: sellerAddress.district,
+          phone: sellerAddress.phone,
+          email: order.seller?.email,
+        },
         recipient: {
           name: String(address.fullName ?? ""),
           address: String(address.address).trim(),

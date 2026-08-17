@@ -1,24 +1,28 @@
-import * as request from 'supertest';
+import * as request from "supertest";
 import {
   OrderStatus,
   PaymentHoldStatus,
   PaymentStatus,
   RefundRequestStatus,
   ShipmentStatus,
-} from '@prisma/client';
-import { createE2ETestApp, E2ETestApp } from '../test-utils/create-app';
+} from "@prisma/client";
+import { createE2ETestApp, E2ETestApp } from "../test-utils/create-app";
 import {
   truncateAll,
   getPrisma,
   seedBaseline,
   disconnectPrisma,
-} from '../test-utils/db';
-import { createUser, createAdminUser, authHeader } from '../factories/user.factory';
-import { createProduct } from '../factories/product.factory';
-import { createAddress } from '../factories/address.factory';
-import { signCallback } from '../mocks/paytr.mock';
-import { RefundService } from '../../src/modules/refund/refund.service';
-import { PaymentService } from '../../src/modules/payment/payment.service';
+} from "../test-utils/db";
+import {
+  createUser,
+  createAdminUser,
+  authHeader,
+} from "../factories/user.factory";
+import { createProduct } from "../factories/product.factory";
+import { createAddress } from "../factories/address.factory";
+import { signCallback } from "../mocks/paytr.mock";
+import { RefundService } from "../../src/modules/refund/refund.service";
+import { PaymentService } from "../../src/modules/payment/payment.service";
 
 /**
  * Helper: full purchase + paid order. No automatic shipping happens
@@ -31,15 +35,15 @@ async function buyAndPay(
   shippingAddressId: string,
 ): Promise<{ orderId: string }> {
   const buyRes = await request(ctx.app.getHttpServer())
-    .post('/api/orders/buy')
+    .post("/api/orders/buy")
     .set(authHeader(buyer))
     .send({ productId, shippingAddressId })
     .expect(201);
 
   await request(ctx.app.getHttpServer())
-    .post('/api/payments/initiate')
+    .post("/api/payments/initiate")
     .set(authHeader(buyer))
-    .send({ orderId: buyRes.body.orderId, provider: 'paytr' })
+    .send({ orderId: buyRes.body.orderId, provider: "paytr" })
     .expect(201);
 
   const prisma = getPrisma();
@@ -47,11 +51,11 @@ async function buyAndPay(
     where: { orderId: buyRes.body.orderId },
   });
   await request(ctx.app.getHttpServer())
-    .post('/api/payments/callback/paytr')
+    .post("/api/payments/callback/paytr")
     .send(
       signCallback({
         merchantOid: payment!.providerConversationId!,
-        status: 'success',
+        status: "success",
         totalAmount: Math.round(Number(payment!.amount) * 100),
       }),
     );
@@ -59,7 +63,7 @@ async function buyAndPay(
   return { orderId: buyRes.body.orderId };
 }
 
-describe('Refund flow (E2E)', () => {
+describe("Refund flow (E2E)", () => {
   let ctx: E2ETestApp;
   let baseline: { categoryId: string; brandId: string; manufacturerId: string };
 
@@ -79,7 +83,7 @@ describe('Refund flow (E2E)', () => {
     ctx.surat.reset();
   });
 
-  it('paid + not yet shipped → instant refund (PayTR refund + Sürat cancel + Order=cancelled)', async () => {
+  it("paid + not yet shipped → instant refund (PayTR refund + Sürat cancel + Order=cancelled)", async () => {
     const buyer = await createUser(ctx.module);
     const seller = await createUser(ctx.module, { isSeller: true });
     const product = await createProduct({
@@ -94,14 +98,16 @@ describe('Refund flow (E2E)', () => {
     const { orderId } = await buyAndPay(ctx, buyer, product.id, buyerAddr.id);
     const prisma = getPrisma();
 
-    const shipmentBefore = await prisma.shipment.findFirst({ where: { orderId } });
-    expect(shipmentBefore?.provider).toBe('surat');
+    const shipmentBefore = await prisma.shipment.findFirst({
+      where: { orderId },
+    });
+    expect(shipmentBefore?.provider).toBe("surat");
     expect(shipmentBefore?.status).toBe(ShipmentStatus.pending);
 
     const res = await request(ctx.app.getHttpServer())
       .post(`/api/orders/${orderId}/refund-requests`)
       .set(authHeader(buyer))
-      .send({ reason: 'changed_mind' })
+      .send({ reason: "changed_mind" })
       .expect(201);
 
     expect(res.body.status).toBe(RefundRequestStatus.refunded);
@@ -123,7 +129,7 @@ describe('Refund flow (E2E)', () => {
     expect(payment!.status).toBe(PaymentStatus.refunded);
   });
 
-  it('rejects duplicate active refund requests for the same order', async () => {
+  it("rejects duplicate active refund requests for the same order", async () => {
     const buyer = await createUser(ctx.module);
     const seller = await createUser(ctx.module, { isSeller: true });
     const product = await createProduct({
@@ -151,19 +157,19 @@ describe('Refund flow (E2E)', () => {
     await request(ctx.app.getHttpServer())
       .post(`/api/orders/${orderId}/refund-requests`)
       .set(authHeader(buyer))
-      .send({ reason: 'changed_mind' })
+      .send({ reason: "changed_mind" })
       .expect(201);
 
     const dup = await request(ctx.app.getHttpServer())
       .post(`/api/orders/${orderId}/refund-requests`)
       .set(authHeader(buyer))
-      .send({ reason: 'changed_mind' })
+      .send({ reason: "changed_mind" })
       .expect(400);
 
     expect(dup.body.message).toMatch(/zaten aktif bir iade/i);
   });
 
-  it('shipped (in_transit) → wait_for_delivery; delivered + cron → return shipment opens with Iademi=true', async () => {
+  it("shipped (in_transit) → wait_for_delivery; delivered + cron → return shipment opens with Iademi=true", async () => {
     const buyer = await createUser(ctx.module);
     const seller = await createUser(ctx.module, { isSeller: true });
     const product = await createProduct({
@@ -187,15 +193,15 @@ describe('Refund flow (E2E)', () => {
       where: { orderId },
       data: {
         status: ShipmentStatus.in_transit,
-        trackingNumber: 'TEST-TRK',
-        providerTrackingId: 'TEST-TRK',
+        trackingNumber: "TEST-TRK",
+        providerTrackingId: "TEST-TRK",
       },
     });
 
     const createRes = await request(ctx.app.getHttpServer())
       .post(`/api/orders/${orderId}/refund-requests`)
       .set(authHeader(buyer))
-      .send({ reason: 'changed_mind' })
+      .send({ reason: "changed_mind" })
       .expect(201);
 
     expect(createRes.body.status).toBe(RefundRequestStatus.wait_for_delivery);
@@ -229,18 +235,22 @@ describe('Refund flow (E2E)', () => {
       where: { id: createRes.body.id },
     });
     expect(rr!.status).toBe(RefundRequestStatus.return_shipment_open);
-    expect(rr!.returnProvider).toBe('surat');
+    expect(rr!.returnProvider).toBe("surat");
     expect(rr!.returnTrackingNumber).toMatch(/^RFD-[0-9A-Z]{10,14}$/);
 
-    // Stub recorded a return shipment with Iademi=true
+    // Stub recorded a return shipment, and it goes the RIGHT WAY: an iade is a
+    // direction change, so the buyer is the sender and the seller (or, when the
+    // seller has no address, the warehouse) is the recipient.
     const returnCall = ctx.surat.shipmentCalls.find(
-      (c) => c.OzelKargoTakipNo === rr!.returnTrackingNumber,
+      (c) => c.reference === rr!.returnTrackingNumber,
     );
     expect(returnCall).toBeDefined();
-    expect(returnCall!.Iademi).toBe(true);
+    expect(returnCall!.isReturn).toBe(true);
+    expect(returnCall!.sender.address).toBeTruthy();
+    expect(returnCall!.sender.address).not.toBe(returnCall!.recipient.address);
   });
 
-  it('14-day cooling-off (delivered, ≤14 days) → return shipment opens immediately, no seller approval needed', async () => {
+  it("14-day cooling-off (delivered, ≤14 days) → return shipment opens immediately, no seller approval needed", async () => {
     const buyer = await createUser(ctx.module);
     const seller = await createUser(ctx.module, { isSeller: true });
     const product = await createProduct({
@@ -264,30 +274,34 @@ describe('Refund flow (E2E)', () => {
       data: {
         status: ShipmentStatus.delivered,
         deliveredAt: new Date(),
-        trackingNumber: 'DELIV-1',
-        providerTrackingId: 'DELIV-1',
+        trackingNumber: "DELIV-1",
+        providerTrackingId: "DELIV-1",
       },
     });
 
     const createRes = await request(ctx.app.getHttpServer())
       .post(`/api/orders/${orderId}/refund-requests`)
       .set(authHeader(buyer))
-      .send({ reason: 'changed_mind' })
+      .send({ reason: "changed_mind" })
       .expect(201);
 
     // Auto-approved — return shipment opens during create call (no seller step)
-    expect(createRes.body.status).toBe(RefundRequestStatus.return_shipment_open);
-    expect(createRes.body.returnProvider).toBe('surat');
-    expect(createRes.body.returnTrackingNumber).toMatch(/^RFD-[0-9A-Z]{10,14}$/);
+    expect(createRes.body.status).toBe(
+      RefundRequestStatus.return_shipment_open,
+    );
+    expect(createRes.body.returnProvider).toBe("surat");
+    expect(createRes.body.returnTrackingNumber).toMatch(
+      /^RFD-[0-9A-Z]{10,14}$/,
+    );
 
     const returnCall = ctx.surat.shipmentCalls.find(
-      (c) => c.OzelKargoTakipNo === createRes.body.returnTrackingNumber,
+      (c) => c.reference === createRes.body.returnTrackingNumber,
     );
     expect(returnCall).toBeDefined();
-    expect(returnCall!.Iademi).toBe(true);
+    expect(returnCall!.isReturn).toBe(true);
   });
 
-  it('past 14 days → refund is blocked entirely (no description/evidence path anymore)', async () => {
+  it("past 14 days → refund is blocked entirely (no description/evidence path anymore)", async () => {
     const buyer = await createUser(ctx.module);
     const seller = await createUser(ctx.module, { isSeller: true });
     const product = await createProduct({
@@ -312,8 +326,8 @@ describe('Refund flow (E2E)', () => {
       data: {
         status: ShipmentStatus.delivered,
         deliveredAt: oldDelivery,
-        trackingNumber: 'OLD-1',
-        providerTrackingId: 'OLD-1',
+        trackingNumber: "OLD-1",
+        providerTrackingId: "OLD-1",
       },
     });
 
@@ -323,7 +337,7 @@ describe('Refund flow (E2E)', () => {
     const blocked = await request(ctx.app.getHttpServer())
       .post(`/api/orders/${orderId}/refund-requests`)
       .set(authHeader(buyer))
-      .send({ reason: 'damaged', description: 'broken' })
+      .send({ reason: "damaged", description: "broken" })
       .expect(400);
     expect(blocked.body.message).toMatch(/14 gün|dolmuş|oluşturulamaz/i);
 
@@ -331,14 +345,14 @@ describe('Refund flow (E2E)', () => {
       .post(`/api/orders/${orderId}/refund-requests`)
       .set(authHeader(buyer))
       .send({
-        reason: 'damaged',
-        description: 'Ürün ambalajı yırtık geldi, kapısı kırık.',
-        evidencePhotoUrls: ['https://example.com/photo1.jpg'],
+        reason: "damaged",
+        description: "Ürün ambalajı yırtık geldi, kapısı kırık.",
+        evidencePhotoUrls: ["https://example.com/photo1.jpg"],
       })
       .expect(400);
   });
 
-  it('refuses refund on pending_payment order (must cancel order instead)', async () => {
+  it("refuses refund on pending_payment order (must cancel order instead)", async () => {
     const buyer = await createUser(ctx.module);
     const seller = await createUser(ctx.module, { isSeller: true });
     const product = await createProduct({
@@ -350,7 +364,7 @@ describe('Refund flow (E2E)', () => {
     const addr = await createAddress({ userId: buyer.id });
 
     const buyRes = await request(ctx.app.getHttpServer())
-      .post('/api/orders/buy')
+      .post("/api/orders/buy")
       .set(authHeader(buyer))
       .send({ productId: product.id, shippingAddressId: addr.id })
       .expect(201);
@@ -358,13 +372,13 @@ describe('Refund flow (E2E)', () => {
     const res = await request(ctx.app.getHttpServer())
       .post(`/api/orders/${buyRes.body.orderId}/refund-requests`)
       .set(authHeader(buyer))
-      .send({ reason: 'changed_mind' })
+      .send({ reason: "changed_mind" })
       .expect(400);
 
     expect(res.body.message).toMatch(/ödenmemiş/i);
   });
 
-  it('only the buyer can request refund', async () => {
+  it("only the buyer can request refund", async () => {
     const buyer = await createUser(ctx.module);
     const seller = await createUser(ctx.module, { isSeller: true });
     const stranger = await createUser(ctx.module);
@@ -382,12 +396,12 @@ describe('Refund flow (E2E)', () => {
     await request(ctx.app.getHttpServer())
       .post(`/api/orders/${orderId}/refund-requests`)
       .set(authHeader(stranger))
-      .send({ reason: 'changed_mind' })
+      .send({ reason: "changed_mind" })
       .expect(403);
   });
 
   // ── E. Escrow hold ↔ iade etkileşimi ───────────────────────────────────
-  it('E1: cooling-off iade açılınca satıcı PaymentHold dondurulur (frozenByRefundId)', async () => {
+  it("E1: cooling-off iade açılınca satıcı PaymentHold dondurulur (frozenByRefundId)", async () => {
     const buyer = await createUser(ctx.module);
     const seller = await createUser(ctx.module, { isSeller: true });
     const product = await createProduct({
@@ -403,7 +417,9 @@ describe('Refund flow (E2E)', () => {
     const prisma = getPrisma();
 
     // Ödeme sonrası hold oluşur ve henüz dondurulmamıştır
-    const holdBefore = await prisma.paymentHold.findFirst({ where: { orderId } });
+    const holdBefore = await prisma.paymentHold.findFirst({
+      where: { orderId },
+    });
     expect(holdBefore).toBeTruthy();
     expect(holdBefore!.status).toBe(PaymentHoldStatus.held);
     expect(holdBefore!.frozenByRefundId).toBeNull();
@@ -420,14 +436,16 @@ describe('Refund flow (E2E)', () => {
     const createRes = await request(ctx.app.getHttpServer())
       .post(`/api/orders/${orderId}/refund-requests`)
       .set(authHeader(buyer))
-      .send({ reason: 'changed_mind' })
+      .send({ reason: "changed_mind" })
       .expect(201);
 
-    const holdAfter = await prisma.paymentHold.findFirst({ where: { orderId } });
+    const holdAfter = await prisma.paymentHold.findFirst({
+      where: { orderId },
+    });
     expect(holdAfter!.frozenByRefundId).toBe(createRes.body.id);
   });
 
-  it('E3: iade iptal edilince hold kilidi çözülür (frozenByRefundId → null)', async () => {
+  it("E3: iade iptal edilince hold kilidi çözülür (frozenByRefundId → null)", async () => {
     const buyer = await createUser(ctx.module);
     const seller = await createUser(ctx.module, { isSeller: true });
     const product = await createProduct({
@@ -451,15 +469,15 @@ describe('Refund flow (E2E)', () => {
       where: { orderId },
       data: {
         status: ShipmentStatus.in_transit,
-        trackingNumber: 'TRK-E3',
-        providerTrackingId: 'TRK-E3',
+        trackingNumber: "TRK-E3",
+        providerTrackingId: "TRK-E3",
       },
     });
 
     const createRes = await request(ctx.app.getHttpServer())
       .post(`/api/orders/${orderId}/refund-requests`)
       .set(authHeader(buyer))
-      .send({ reason: 'changed_mind' })
+      .send({ reason: "changed_mind" })
       .expect(201);
     expect(createRes.body.status).toBe(RefundRequestStatus.wait_for_delivery);
 
@@ -476,7 +494,7 @@ describe('Refund flow (E2E)', () => {
     expect(unfrozen!.status).toBe(PaymentHoldStatus.held);
   });
 
-  it('E2/E4: iade açıkken releaseAt geçmiş olsa bile hold serbest BIRAKILMAZ (frozen guard)', async () => {
+  it("E2/E4: iade açıkken releaseAt geçmiş olsa bile hold serbest BIRAKILMAZ (frozen guard)", async () => {
     const buyer = await createUser(ctx.module);
     const seller = await createUser(ctx.module, { isSeller: true });
     const product = await createProduct({
@@ -503,7 +521,7 @@ describe('Refund flow (E2E)', () => {
     const createRes = await request(ctx.app.getHttpServer())
       .post(`/api/orders/${orderId}/refund-requests`)
       .set(authHeader(buyer))
-      .send({ reason: 'changed_mind' })
+      .send({ reason: "changed_mind" })
       .expect(201);
 
     // 14. gün yarışı: releaseAt'i geçmişe çek — ama hold frozen olduğu için cron atlamalı
@@ -549,19 +567,19 @@ describe('Refund flow (E2E)', () => {
       where: { orderId },
       data: {
         status: ShipmentStatus.in_transit,
-        trackingNumber: 'TRK-C',
-        providerTrackingId: 'TRK-C',
+        trackingNumber: "TRK-C",
+        providerTrackingId: "TRK-C",
       },
     });
     const createRes = await request(ctx.app.getHttpServer())
       .post(`/api/orders/${orderId}/refund-requests`)
       .set(authHeader(buyer))
-      .send({ reason: 'changed_mind' })
+      .send({ reason: "changed_mind" })
       .expect(201);
     return { buyer, orderId, refundId: createRes.body.id as string };
   }
 
-  it('C3: admin override-policy ürün-only seçince iade tutarı = total - shipping - buyerFee olarak yeniden hesaplanır', async () => {
+  it("C3: admin override-policy ürün-only seçince iade tutarı = total - shipping - buyerFee olarak yeniden hesaplanır", async () => {
     const { orderId, refundId } = await setupWaitForDeliveryRefund();
     const admin = await createAdminUser(ctx.module);
     const prisma = getPrisma();
@@ -583,12 +601,14 @@ describe('Refund flow (E2E)', () => {
       })
       .expect(200);
 
-    const rr = await prisma.refundRequest.findUnique({ where: { id: refundId } });
+    const rr = await prisma.refundRequest.findUnique({
+      where: { id: refundId },
+    });
     expect(Number(rr!.amount)).toBeCloseTo(expected, 2);
     expect(Number(rr!.amount)).toBeLessThan(Number(order!.totalAmount));
   });
 
-  it('C6: admin set-shipping-payer iade kargo tarafını günceller (seller)', async () => {
+  it("C6: admin set-shipping-payer iade kargo tarafını günceller (seller)", async () => {
     const { refundId } = await setupWaitForDeliveryRefund();
     const admin = await createAdminUser(ctx.module);
     const prisma = getPrisma();
@@ -596,15 +616,17 @@ describe('Refund flow (E2E)', () => {
     await request(ctx.app.getHttpServer())
       .patch(`/api/admin/refund-requests/${refundId}/set-shipping-payer`)
       .set(authHeader(admin))
-      .send({ payer: 'seller' })
+      .send({ payer: "seller" })
       .expect(200);
 
-    const rr = await prisma.refundRequest.findUnique({ where: { id: refundId } });
-    expect(rr!.returnShippingPayer).toBe('seller');
+    const rr = await prisma.refundRequest.findUnique({
+      where: { id: refundId },
+    });
+    expect(rr!.returnShippingPayer).toBe("seller");
   });
 
   // ── Liste yanıtı iade durumunu yansıtır (sipariş listesi ↔ detay tutarlılığı) ──
-  it('LIST: teslim edilmiş siparişte aktif iade açıksa GET /orders yanıtı activeRefundRequest döner', async () => {
+  it("LIST: teslim edilmiş siparişte aktif iade açıksa GET /orders yanıtı activeRefundRequest döner", async () => {
     const buyer = await createUser(ctx.module);
     const seller = await createUser(ctx.module, { isSeller: true });
     const product = await createProduct({
@@ -630,13 +652,13 @@ describe('Refund flow (E2E)', () => {
     await request(ctx.app.getHttpServer())
       .post(`/api/orders/${orderId}/refund-requests`)
       .set(authHeader(buyer))
-      .send({ reason: 'changed_mind' })
+      .send({ reason: "changed_mind" })
       .expect(201);
 
     // Liste yanıtı: ilgili sipariş activeRefundRequest içermeli (fix öncesi null'dı →
     // liste "Teslim Edildi" gösteriyordu; detay ise iade gösteriyordu = tutarsızlık)
     const listRes = await request(ctx.app.getHttpServer())
-      .get('/api/orders?role=buyer')
+      .get("/api/orders?role=buyer")
       .set(authHeader(buyer))
       .expect(200);
 
@@ -674,7 +696,7 @@ describe('Refund flow (E2E)', () => {
     const createRes = await request(ctx.app.getHttpServer())
       .post(`/api/orders/${orderId}/refund-requests`)
       .set(authHeader(buyer))
-      .send({ reason: 'changed_mind' })
+      .send({ reason: "changed_mind" })
       .expect(201);
     const refundService = ctx.app.get(RefundService);
     await prisma.refundRequest.update({
@@ -688,14 +710,14 @@ describe('Refund flow (E2E)', () => {
 
     // Varsayılan liste (cancelled hariç) → sipariş YOK
     const def = await request(ctx.app.getHttpServer())
-      .get('/api/orders?role=buyer')
+      .get("/api/orders?role=buyer")
       .set(authHeader(buyer))
       .expect(200);
     expect((def.body.data as any[]).find((o) => o.id === orderId)).toBeFalsy();
 
     // İadeler sekmesi (refundsOnly) → sipariş VAR, "İade Edildi"
     const refunds = await request(ctx.app.getHttpServer())
-      .get('/api/orders?role=buyer&refundsOnly=true')
+      .get("/api/orders?role=buyer&refundsOnly=true")
       .set(authHeader(buyer))
       .expect(200);
     const row = (refunds.body.data as any[]).find((o) => o.id === orderId);
@@ -704,7 +726,7 @@ describe('Refund flow (E2E)', () => {
   });
 
   // ── I/J. Cron idempotency + bildirimler ────────────────────────────────
-  it('I1: processRefundedOrders idempotent — iade tamamlandıktan sonra ikinci tur PayTR çağırmaz', async () => {
+  it("I1: processRefundedOrders idempotent — iade tamamlandıktan sonra ikinci tur PayTR çağırmaz", async () => {
     const buyer = await createUser(ctx.module);
     const seller = await createUser(ctx.module, { isSeller: true });
     const product = await createProduct({
@@ -720,7 +742,7 @@ describe('Refund flow (E2E)', () => {
     await request(ctx.app.getHttpServer())
       .post(`/api/orders/${orderId}/cancel`)
       .set(authHeader(buyer))
-      .send({ reason: 'vazgeçtim' })
+      .send({ reason: "vazgeçtim" })
       .expect(200);
 
     const paymentService = ctx.app.get(PaymentService);
@@ -733,7 +755,7 @@ describe('Refund flow (E2E)', () => {
     expect(ctx.paytr.refundCalls).toHaveLength(1);
   });
 
-  it('J1: cooling-off iade onaylanınca alıcıya REFUND_APPROVED bildirimi gider', async () => {
+  it("J1: cooling-off iade onaylanınca alıcıya REFUND_APPROVED bildirimi gider", async () => {
     const buyer = await createUser(ctx.module);
     const seller = await createUser(ctx.module, { isSeller: true });
     const product = await createProduct({
@@ -756,23 +778,23 @@ describe('Refund flow (E2E)', () => {
       where: { orderId },
       data: {
         status: ShipmentStatus.in_transit,
-        trackingNumber: 'TRK-J1',
-        providerTrackingId: 'TRK-J1',
+        trackingNumber: "TRK-J1",
+        providerTrackingId: "TRK-J1",
       },
     });
     await request(ctx.app.getHttpServer())
       .post(`/api/orders/${orderId}/refund-requests`)
       .set(authHeader(buyer))
-      .send({ reason: 'changed_mind' })
+      .send({ reason: "changed_mind" })
       .expect(201);
 
     const notif = await prisma.notificationLog.findFirst({
-      where: { userId: buyer.id, type: 'refund_approved' },
+      where: { userId: buyer.id, type: "refund_approved" },
     });
     expect(notif).toBeTruthy();
   });
 
-  it('J2: alıcı iade talebini iptal edince satıcıya REFUND_CANCELLED bildirimi gider', async () => {
+  it("J2: alıcı iade talebini iptal edince satıcıya REFUND_CANCELLED bildirimi gider", async () => {
     const buyer = await createUser(ctx.module);
     const seller = await createUser(ctx.module, { isSeller: true });
     const product = await createProduct({
@@ -794,14 +816,14 @@ describe('Refund flow (E2E)', () => {
       where: { orderId },
       data: {
         status: ShipmentStatus.in_transit,
-        trackingNumber: 'TRK-J2',
-        providerTrackingId: 'TRK-J2',
+        trackingNumber: "TRK-J2",
+        providerTrackingId: "TRK-J2",
       },
     });
     const createRes = await request(ctx.app.getHttpServer())
       .post(`/api/orders/${orderId}/refund-requests`)
       .set(authHeader(buyer))
-      .send({ reason: 'changed_mind' })
+      .send({ reason: "changed_mind" })
       .expect(201);
 
     await request(ctx.app.getHttpServer())
@@ -810,13 +832,13 @@ describe('Refund flow (E2E)', () => {
       .expect(200);
 
     const notif = await prisma.notificationLog.findFirst({
-      where: { userId: seller.id, type: 'refund_cancelled' },
+      where: { userId: seller.id, type: "refund_cancelled" },
     });
     expect(notif).toBeTruthy();
   });
 
   // ── B. İade kargosu yaşam döngüsü + finalize ───────────────────────────
-  it('B3/B5: iade kargo takibi in_transit→delivered ilerler; 30dk sonra finalize cron iadeyi tamamlar', async () => {
+  it("B3/B5: iade kargo takibi in_transit→delivered ilerler; 30dk sonra finalize cron iadeyi tamamlar", async () => {
     const buyer = await createUser(ctx.module);
     const seller = await createUser(ctx.module, { isSeller: true });
     const product = await createProduct({
@@ -841,9 +863,11 @@ describe('Refund flow (E2E)', () => {
     const createRes = await request(ctx.app.getHttpServer())
       .post(`/api/orders/${orderId}/refund-requests`)
       .set(authHeader(buyer))
-      .send({ reason: 'changed_mind' })
+      .send({ reason: "changed_mind" })
       .expect(201);
-    expect(createRes.body.status).toBe(RefundRequestStatus.return_shipment_open);
+    expect(createRes.body.status).toBe(
+      RefundRequestStatus.return_shipment_open,
+    );
 
     const refundService = ctx.app.get(RefundService);
     const refundId = createRes.body.id;
@@ -877,14 +901,16 @@ describe('Refund flow (E2E)', () => {
     expect(due).toContain(refundId);
 
     await refundService.finalizeRefundForReturnedShipment(refundId);
-    const finalRr = await prisma.refundRequest.findUnique({ where: { id: refundId } });
+    const finalRr = await prisma.refundRequest.findUnique({
+      where: { id: refundId },
+    });
     expect(finalRr!.status).toBe(RefundRequestStatus.refunded);
     expect(finalRr!.refundedAt).toBeTruthy();
     expect(ctx.paytr.refundCalls).toHaveLength(1);
 
     // "İade Sürecinde" → "İade Edildi" geçişi: alıcıya REFUND_COMPLETED bildirimi gider
     const notif = await prisma.notificationLog.findFirst({
-      where: { userId: buyer.id, type: 'refund_completed' },
+      where: { userId: buyer.id, type: "refund_completed" },
     });
     expect(notif).toBeTruthy(); // alıcıya iade tamamlandı bildirimi
 
@@ -892,14 +918,16 @@ describe('Refund flow (E2E)', () => {
     // varsayılan listeden (cancelled hariç) düşer, "İptal Edilenler" (status=cancelled)
     // sekmesinde activeRefundRequest.status='refunded' ile görünür → UI "İade Edildi".
     const cancelledList = await request(ctx.app.getHttpServer())
-      .get('/api/orders?role=buyer&status=cancelled')
+      .get("/api/orders?role=buyer&status=cancelled")
       .set(authHeader(buyer))
       .expect(200);
-    const row = (cancelledList.body.data as any[]).find((o) => o.id === orderId);
+    const row = (cancelledList.body.data as any[]).find(
+      (o) => o.id === orderId,
+    );
     expect(row?.activeRefundRequest?.status).toBe(RefundRequestStatus.refunded);
   });
 
-  it('B6: satıcının adresi YOKKEN iade kargosu depo adresi fallback ile yine de açılır', async () => {
+  it("B6: satıcının adresi YOKKEN iade kargosu depo adresi fallback ile yine de açılır", async () => {
     const buyer = await createUser(ctx.module);
     const seller = await createUser(ctx.module, { isSeller: true });
     const product = await createProduct({
@@ -925,16 +953,18 @@ describe('Refund flow (E2E)', () => {
     const createRes = await request(ctx.app.getHttpServer())
       .post(`/api/orders/${orderId}/refund-requests`)
       .set(authHeader(buyer))
-      .send({ reason: 'changed_mind' })
+      .send({ reason: "changed_mind" })
       .expect(201);
 
     // Satıcı adresi olmamasına rağmen iade kargosu açılmalı (fallback)
-    expect(createRes.body.status).toBe(RefundRequestStatus.return_shipment_open);
-    expect(createRes.body.returnProvider).toBe('surat');
+    expect(createRes.body.status).toBe(
+      RefundRequestStatus.return_shipment_open,
+    );
+    expect(createRes.body.returnProvider).toBe("surat");
   });
 
   // ── F. Sipariş iptali → iade ────────────────────────────────────────────
-  it('F2: paid sipariş iptali → status=refunded; processRefundedOrders cron PayTR iadesi yapar + order=cancelled', async () => {
+  it("F2: paid sipariş iptali → status=refunded; processRefundedOrders cron PayTR iadesi yapar + order=cancelled", async () => {
     const buyer = await createUser(ctx.module);
     const seller = await createUser(ctx.module, { isSeller: true });
     const product = await createProduct({
@@ -953,10 +983,12 @@ describe('Refund flow (E2E)', () => {
     await request(ctx.app.getHttpServer())
       .post(`/api/orders/${orderId}/cancel`)
       .set(authHeader(buyer))
-      .send({ reason: 'vazgeçtim' })
+      .send({ reason: "vazgeçtim" })
       .expect(200);
 
-    const afterCancel = await prisma.order.findUnique({ where: { id: orderId } });
+    const afterCancel = await prisma.order.findUnique({
+      where: { id: orderId },
+    });
     expect(afterCancel!.status).toBe(OrderStatus.refunded);
     expect(ctx.paytr.refundCalls).toHaveLength(0);
 
@@ -966,13 +998,15 @@ describe('Refund flow (E2E)', () => {
     expect(res.refunded).toBeGreaterThanOrEqual(1);
 
     expect(ctx.paytr.refundCalls).toHaveLength(1);
-    const finalOrder = await prisma.order.findUnique({ where: { id: orderId } });
+    const finalOrder = await prisma.order.findUnique({
+      where: { id: orderId },
+    });
     expect(finalOrder!.status).toBe(OrderStatus.cancelled);
     const payment = await prisma.payment.findFirst({ where: { orderId } });
     expect(payment!.status).toBe(PaymentStatus.refunded);
   });
 
-  it('F4: PayTR iadesi başarısızsa sipariş refunded kalır; sonraki cron turu retry edip tamamlar', async () => {
+  it("F4: PayTR iadesi başarısızsa sipariş refunded kalır; sonraki cron turu retry edip tamamlar", async () => {
     const buyer = await createUser(ctx.module);
     const seller = await createUser(ctx.module, { isSeller: true });
     const product = await createProduct({
@@ -990,7 +1024,7 @@ describe('Refund flow (E2E)', () => {
     await request(ctx.app.getHttpServer())
       .post(`/api/orders/${orderId}/cancel`)
       .set(authHeader(buyer))
-      .send({ reason: 'vazgeçtim' })
+      .send({ reason: "vazgeçtim" })
       .expect(200);
 
     const paymentService = ctx.app.get(PaymentService);
@@ -1009,13 +1043,15 @@ describe('Refund flow (E2E)', () => {
     const second = await paymentService.processRefundedOrders();
     expect(second.refunded).toBeGreaterThanOrEqual(1);
 
-    const finalOrder = await prisma.order.findUnique({ where: { id: orderId } });
+    const finalOrder = await prisma.order.findUnique({
+      where: { id: orderId },
+    });
     expect(finalOrder!.status).toBe(OrderStatus.cancelled);
     const finalPay = await prisma.payment.findFirst({ where: { orderId } });
     expect(finalPay!.status).toBe(PaymentStatus.refunded);
   });
 
-  it('F3: kargoya verildikten (shipped) sonra sipariş iptali reddedilir (400)', async () => {
+  it("F3: kargoya verildikten (shipped) sonra sipariş iptali reddedilir (400)", async () => {
     const buyer = await createUser(ctx.module);
     const seller = await createUser(ctx.module, { isSeller: true });
     const product = await createProduct({
@@ -1038,7 +1074,7 @@ describe('Refund flow (E2E)', () => {
     await request(ctx.app.getHttpServer())
       .post(`/api/orders/${orderId}/cancel`)
       .set(authHeader(buyer))
-      .send({ reason: 'vazgeçtim' })
+      .send({ reason: "vazgeçtim" })
       .expect(400);
   });
 });

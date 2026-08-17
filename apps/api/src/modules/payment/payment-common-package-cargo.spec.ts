@@ -17,6 +17,25 @@ describe("PaymentCommonService — paket-konsolide Sürat kargo (Faz 2a)", () =>
     address: "Test cad. 1",
   };
 
+  // Gönderici = satıcı. Adresi olmayan satıcıda `createBarcode` fail-closed
+  // davranır (gönderi açılmaz), o yüzden fixture'ların ortak varsayılanı budur;
+  // bu davranışın kendisi ayrı bir testte ölçülüyor.
+  const validSellerAddr = {
+    fullName: "Satıcı",
+    phone: "+905559876543",
+    city: "İstanbul",
+    district: "Maltepe",
+    address: "Depo cad. 1",
+  };
+  const defaultSeller = {
+    sellerId: "seller-1",
+    seller: {
+      displayName: "Satıcı",
+      email: "satici@example.com",
+      addresses: [validSellerAddr],
+    },
+  };
+
   const makeService = (over: {
     orderUnique?: any;
     packageOrders?: any[];
@@ -40,7 +59,11 @@ describe("PaymentCommonService — paket-konsolide Sürat kargo (Faz 2a)", () =>
     };
     const prisma = {
       order: {
-        findUnique: jest.fn().mockResolvedValue(over.orderUnique ?? null),
+        findUnique: jest
+          .fn()
+          .mockResolvedValue(
+            over.orderUnique ? { ...defaultSeller, ...over.orderUnique } : null,
+          ),
         findMany: jest
           .fn()
           .mockImplementation(({ where }: any) =>
@@ -105,11 +128,71 @@ describe("PaymentCommonService — paket-konsolide Sürat kargo (Faz 2a)", () =>
         return Promise.resolve({ ok: true });
       }),
     } as any;
-    const provisioner = new OrderShipmentProvisioner(prisma, cargo);
+    const notifications = {
+      createInAppNotification: jest.fn().mockResolvedValue(undefined),
+    } as any;
+    const cache = {
+      get: jest.fn().mockResolvedValue(null),
+      set: jest.fn().mockResolvedValue(undefined),
+    } as any;
+    const provisioner = new OrderShipmentProvisioner(
+      prisma,
+      cargo,
+      notifications,
+      cache,
+    );
     const cancellations = new CarrierCancellationService(prisma, cargo);
     const svc = new PaymentCommonService(prisma, cancellations);
-    return { svc, provisioner, captured, prisma, cargo };
+    return { svc, provisioner, captured, prisma, cargo, notifications };
   };
+
+  it("OrderShipmentProvisioner: gönderici satıcıdır, alıcı teslimat adresidir", async () => {
+    const { provisioner, captured } = makeService({
+      orderUnique: {
+        orderNumber: "ORD-3",
+        shippingAddress: validAddr,
+        packageId: null,
+        product: { title: "A", shippingDesi: 2 },
+      },
+    });
+
+    await provisioner.createBarcode("o3");
+
+    // Yön testi: satıcı Maltepe'den gönderir, alıcı Kadıköy'de teslim alır.
+    // İki taraf yer değiştirirse koli ters yöne açılır.
+    expect(captured.barcodeCall.sender).toMatchObject({
+      district: "Maltepe",
+      phone: "+905559876543",
+    });
+    expect(captured.barcodeCall.recipient).toMatchObject({
+      district: "Kadıköy",
+      phone: "+905551112233",
+    });
+  });
+
+  it("OrderShipmentProvisioner: satıcının adresi yoksa gönderi AÇILMAZ ve satıcı bilgilendirilir", async () => {
+    const { provisioner, captured, cargo, notifications } = makeService({
+      orderUnique: {
+        orderNumber: "ORD-4",
+        shippingAddress: validAddr,
+        packageId: null,
+        product: { title: "A", shippingDesi: 2 },
+        // Satıcının kayıtlı adresi yok → taşıyıcıya yazacak gönderici bilgisi yok.
+        seller: { displayName: "Satıcı", email: "s@x.com", addresses: [] },
+      },
+    });
+
+    // Fail-closed: uydurma bir çıkış adresiyle koli açmaktansa hiç açma. Satır
+    // pending+kodsuz kalır ve barkod retry cron'u adres eklenince tamamlar.
+    await expect(provisioner.createBarcode("o4")).resolves.toBeNull();
+    expect(cargo.createShipment).not.toHaveBeenCalled();
+    expect(captured.barcodeCall).toBeUndefined();
+    expect(notifications.createInAppNotification).toHaveBeenCalledWith(
+      "seller-1",
+      "seller_address_required",
+      expect.objectContaining({ orderNumber: "ORD-4" }),
+    );
+  });
 
   it("OrderShipmentProvisioner: paket başına TEK gönderi (ortak ref + toplam adet + birleşik içerik)", async () => {
     const { provisioner, captured } = makeService({

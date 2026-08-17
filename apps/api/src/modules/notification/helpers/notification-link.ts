@@ -213,6 +213,12 @@ export const NOTIFICATION_LINKS: Record<
   [NotificationType.TRADE_STUCK_AT_WAREHOUSE]: free("adminLink"),
   [NotificationType.TRADE_OUTBOUND_DELIVERY_MISSING]: free("adminLink"),
   [NotificationType.TRADE_ADDRESS_REQUIRED]: pattern("/profile/trades"),
+  // Satıcıyı doğrudan siparişe götür (adres eksikliği orada anlatılır); sipariş
+  // kimliği yoksa adres yönetimine düşer.
+  [NotificationType.SELLER_ADDRESS_REQUIRED]: pattern(
+    "/seller/orders/{{orderId}}",
+    "/profile/addresses",
+  ),
   // Kargo kodu satış siparişinin gönderenine (satıcı) gider; takas bacağı için
   // üretilirse orderId olmaz ve takas listesine düşer.
   [NotificationType.CARGO_CODE_READY]: pattern(

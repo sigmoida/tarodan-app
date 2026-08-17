@@ -8601,6 +8601,10 @@
         "title": "Address Needed — Trade Shipping",
         "message": "Shipping for your trade {tradeNumber} could not start: you have no saved address. Add an address in your profile and the shipment will be created automatically."
       },
+      "sellerAddressRequired": {
+        "title": "Address Needed — Order Shipping",
+        "message": "Shipping for your order {orderNumber} could not start: you have no saved address. The carrier requires it as the sender address. Add an address in your profile and the shipment will be created automatically."
+      },
       "cargoCodeReady": {
         "title": "Your Cargo Code Is Ready",
         "message": "The cargo code for {reference} has been created. View the code and drop the package off at a Sürat Kargo branch."

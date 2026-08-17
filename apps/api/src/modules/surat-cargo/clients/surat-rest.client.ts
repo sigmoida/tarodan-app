@@ -1,6 +1,10 @@
 import { Injectable, Logger } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
-import type { SuratGonderiPayload } from "../helpers/surat-cargo.types";
+import type {
+  SuratCreateShipmentInput,
+  SuratGonderiPayload,
+} from "../helpers/surat-cargo.types";
+import { buildStandardGonderiPayload } from "../mappers/surat-address.util";
 import { SuratCarrierClient, type SuratCallOptions } from "./surat-soap.client";
 
 /** Resmi Sürat Kargo gönderi oluşturma REST endpoint'leri (2024 dokümanı). */
@@ -91,10 +95,25 @@ export class RestSuratClient extends SuratCarrierClient {
     );
   }
 
-  async callGonderiyiKargoyaGonder(
-    payload: SuratGonderiPayload,
+  async callCreateShipment(
+    input: SuratCreateShipmentInput,
     options: SuratCallOptions,
   ): Promise<string> {
+    // Bu sözleşmede gönderici alanı YOK: gönderi Sürat'ta kurumsal cari
+    // hesabımızın üstüne açılır ve `input.sender` yalnız yok sayılır. Gerçek
+    // göndericiyi taşıyan uç GonderiOlustur'dur.
+    const payload = buildStandardGonderiPayload({
+      recipientName: input.recipient.name,
+      address: input.recipient.address,
+      city: input.recipient.city,
+      district: input.recipient.district,
+      phone: input.recipient.phone,
+      ref: input.reference,
+      content: input.content,
+      desi: input.desi ?? undefined,
+      isReturn: input.isReturn,
+    });
+
     const kullaniciAdi = this.configService.get<string>(
       "SURAT_KARGO_CARI_KODU",
       "",

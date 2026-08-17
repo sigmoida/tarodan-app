@@ -12,7 +12,25 @@ describe("RestSuratClient — 4xx başarı sayılmaz", () => {
       (({ SURAT_KARGO_CARI_KODU: "u", SURAT_KARGO_SIFRE: "p" }) as any)[k] ?? d,
   } as any;
   const client = new RestSuratClient(config);
-  const payload = { OzelKargoTakipNo: "ref-1" } as any;
+  // Nötr girdi: alan adlarını client'ın kendisi kurar (bkz.
+  // surat-rest-client-mapping.spec.ts). Bu dosya yalnız YANIT yorumlamayı ölçer.
+  const shipment = {
+    reference: "ref-1",
+    sender: {
+      name: "Satan Kisi",
+      address: "Depo Mah. No:1",
+      city: "İstanbul",
+      district: "Maltepe",
+      phone: "05559876543",
+    },
+    recipient: {
+      name: "Alan Kisi",
+      address: "Adres 1",
+      city: "İstanbul",
+      district: "Kadıköy",
+      phone: "05551112233",
+    },
+  } as any;
   const opts = { timeoutMs: 1000 } as any;
 
   afterEach(() => {
@@ -25,9 +43,9 @@ describe("RestSuratClient — 4xx başarı sayılmaz", () => {
       text: async () => JSON.stringify({ Message: "Hatalı istek" }),
     }) as any;
 
-    await expect(
-      client.callGonderiyiKargoyaGonder(payload, opts),
-    ).rejects.toThrow(/HTTP 400/);
+    await expect(client.callCreateShipment(shipment, opts)).rejects.toThrow(
+      /HTTP 400/,
+    );
   });
 
   it("401 (auth) → THROW", async () => {
@@ -36,9 +54,9 @@ describe("RestSuratClient — 4xx başarı sayılmaz", () => {
       text: async () => "Unauthorized",
     }) as any;
 
-    await expect(
-      client.callGonderiyiKargoyaGonder(payload, opts),
-    ).rejects.toThrow(/HTTP 401/);
+    await expect(client.callCreateShipment(shipment, opts)).rejects.toThrow(
+      /HTTP 401/,
+    );
   });
 
   it("200 + IsError:false → 'Tamam' (gerçek başarı korunur)", async () => {
@@ -48,7 +66,7 @@ describe("RestSuratClient — 4xx başarı sayılmaz", () => {
         JSON.stringify({ IsError: false, Message: "başarıyla oluşturuldu" }),
     }) as any;
 
-    const res = await client.callGonderiyiKargoyaGonder(payload, opts);
+    const res = await client.callCreateShipment(shipment, opts);
     expect(res).toBe("Tamam");
   });
 
@@ -58,9 +76,9 @@ describe("RestSuratClient — 4xx başarı sayılmaz", () => {
       text: async () => JSON.stringify({ Message: "Belirsiz cevap" }),
     }) as any;
 
-    await expect(
-      client.callGonderiyiKargoyaGonder(payload, opts),
-    ).resolves.toBe("Belirsiz cevap");
+    await expect(client.callCreateShipment(shipment, opts)).resolves.toBe(
+      "Belirsiz cevap",
+    );
   });
 
   it("resmi string cevap sözleşmesini kabul eder", async () => {
@@ -69,9 +87,9 @@ describe("RestSuratClient — 4xx başarı sayılmaz", () => {
       text: async () => JSON.stringify("Tamam"),
     }) as any;
 
-    await expect(
-      client.callGonderiyiKargoyaGonder(payload, opts),
-    ).resolves.toBe("Tamam");
+    await expect(client.callCreateShipment(shipment, opts)).resolves.toBe(
+      "Tamam",
+    );
   });
 
   it("resmi string cevap düz metin dönerse de kabul eder", async () => {
@@ -80,9 +98,9 @@ describe("RestSuratClient — 4xx başarı sayılmaz", () => {
       text: async () => "Tamam",
     }) as any;
 
-    await expect(
-      client.callGonderiyiKargoyaGonder(payload, opts),
-    ).resolves.toBe("Tamam");
+    await expect(client.callCreateShipment(shipment, opts)).resolves.toBe(
+      "Tamam",
+    );
   });
 
   it("4xx yanıt gövdesini teşhis için hata mesajına ekler", async () => {
@@ -91,8 +109,8 @@ describe("RestSuratClient — 4xx başarı sayılmaz", () => {
       text: async () => JSON.stringify({ Message: "Endpoint bulunamadı" }),
     }) as any;
 
-    await expect(
-      client.callGonderiyiKargoyaGonder(payload, opts),
-    ).rejects.toThrow(/HTTP 404.*Endpoint bulunamadı/);
+    await expect(client.callCreateShipment(shipment, opts)).rejects.toThrow(
+      /HTTP 404.*Endpoint bulunamadı/,
+    );
   });
 });

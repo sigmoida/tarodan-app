@@ -194,10 +194,10 @@ describe("12 — İade & İptal (REF)", () => {
       expect(res.body.returnTrackingNumber).toMatch(/^RFD-[0-9A-Z]{10,14}$/);
 
       const returnCall = ctx.surat.shipmentCalls.find(
-        (c) => c.OzelKargoTakipNo === res.body.returnTrackingNumber,
+        (c) => c.reference === res.body.returnTrackingNumber,
       );
       expect(returnCall).toBeDefined();
-      expect(returnCall!.Iademi).toBe(true);
+      expect(returnCall!.isReturn).toBe(true);
     });
 
     scenario("REF-004", async () => {
@@ -868,10 +868,10 @@ describe("12 — İade & İptal (REF)", () => {
       expect(rr!.returnProvider).toBe("surat");
       expect(rr!.returnTrackingNumber).toMatch(/^RFD-[0-9A-Z]{10,14}$/);
       const returnCall = ctx.surat.shipmentCalls.find(
-        (c) => c.OzelKargoTakipNo === rr!.returnTrackingNumber,
+        (c) => c.reference === rr!.returnTrackingNumber,
       );
       expect(returnCall).toBeDefined();
-      expect(returnCall!.Iademi).toBe(true);
+      expect(returnCall!.isReturn).toBe(true);
     });
 
     scenario("REF-061", async () => {

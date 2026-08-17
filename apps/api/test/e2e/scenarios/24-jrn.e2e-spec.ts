@@ -1776,10 +1776,10 @@ describe("24 — Uçtan Uca Entegrasyon Journeyleri (JRN)", () => {
 
       // İade kargosu açıldı (Sürat çağrısı, Iademi=true).
       const returnCall = ctx.surat.shipmentCalls.find(
-        (c) => c.OzelKargoTakipNo === res.body.returnTrackingNumber,
+        (c) => c.reference === res.body.returnTrackingNumber,
       );
       expect(returnCall).toBeDefined();
-      expect(returnCall!.Iademi).toBe(true);
+      expect(returnCall!.isReturn).toBe(true);
     },
     LONG,
   );

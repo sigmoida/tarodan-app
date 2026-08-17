@@ -2,6 +2,7 @@ import { Module } from "@nestjs/common";
 import { ConfigModule, ConfigService } from "@nestjs/config";
 import { CacheModule } from "../cache/cache.module";
 import { PrismaModule } from "../../prisma";
+import { NotificationModule } from "../notification/notification.module";
 import { SuratCargoService, SURAT_CARRIER_CLIENT } from "./surat-cargo.service";
 import { SuratTrackingService } from "./sync/surat-tracking.service";
 import { SuratTrackingClient } from "./clients/surat-tracking.client";
@@ -63,7 +64,9 @@ export function resolveSuratCarrierClient(
 }
 
 @Module({
-  imports: [ConfigModule, CacheModule, PrismaModule],
+  // NotificationModule: adressiz satıcıya "çıkış adresi ekle" bildirimi
+  // (OrderShipmentProvisioner). Leaf modül — döngü yok.
+  imports: [ConfigModule, CacheModule, PrismaModule, NotificationModule],
   providers: [
     {
       provide: SURAT_CARRIER_CLIENT,

@@ -155,6 +155,16 @@ export class RefundShipmentService {
       idempotencyKey: `surat:refund-return:${rr.refundNumber}`,
       correlationId: `refund-${rr.id}`,
       reference: rr.refundNumber,
+      // İade bir YÖN değişimidir: gönderen alıcı, alıcı satıcı (ya da depo).
+      // `buyerAddr` yukarıda zaten çözüldü — misafir siparişte sipariş JSON'undan
+      // gelir, çünkü `buyer.addresses` PAYLAŞILAN sistem misafir kullanıcısına ait.
+      sender: {
+        name: buyerAddr.fullName,
+        address: buyerAddr.address,
+        city: buyerAddr.city,
+        district: buyerAddr.district,
+        phone: buyerAddr.phone,
+      },
       recipient: {
         name: sellerAddr.fullName || rr.order.seller.displayName,
         address: sellerAddr.address,
