@@ -21,6 +21,11 @@ import {
   WarehouseAddressService,
   type ResolvedWarehouseAddress,
 } from "../../shipping/warehouse/warehouse-address.service";
+import {
+  TRADE_DESI_ITEM_SELECT,
+  tradeSideBillableDesi,
+  type TradeItemSide,
+} from "../helpers/trade-shipment-desi.helper";
 
 type CargoShipmentDetails = Omit<
   CargoShipmentRequest,
@@ -191,6 +196,8 @@ export class TradeShipmentService {
               },
             },
           },
+          // Koli desisi ürünün paket boyutundan gelir (Küçük/Orta/Büyük).
+          items: { select: TRADE_DESI_ITEM_SELECT },
         },
       });
       if (!trade) {
@@ -240,6 +247,8 @@ export class TradeShipmentService {
         shipperId: string;
         user: { displayName: string | null; email: string };
         address: typeof initiatorAddress;
+        /** Bu kolideki ürünlerin tarafı — girişte taraf KENDİ ürününü yollar. */
+        itemSide: TradeItemSide;
       };
       const sides: Side[] = [
         {
@@ -247,12 +256,14 @@ export class TradeShipmentService {
           shipperId: trade.initiatorId,
           user: trade.initiator,
           address: initiatorAddress,
+          itemSide: "initiator",
         },
         {
           suffix: "REC",
           shipperId: trade.receiverId,
           user: trade.receiver,
           address: receiverAddress,
+          itemSide: "receiver",
         },
       ];
 
@@ -350,6 +361,7 @@ export class TradeShipmentService {
             trackingNumber,
             trade.tradeNumber,
             warehouse,
+            tradeSideBillableDesi(trade.items, side.itemSide),
           );
 
           dispatched.push({
@@ -487,6 +499,7 @@ export class TradeShipmentService {
     ozelKargoTakipNo: string,
     tradeNumber: string,
     warehouse: ResolvedWarehouseAddress,
+    desi: number,
   ): CargoShipmentDetails | null {
     if (!fromAddress) return null;
 
@@ -518,6 +531,7 @@ export class TradeShipmentService {
         phone: warehouse.phone,
       },
       content: `Takas Inbound: ${tradeNumber} (Gönderen: ${senderLabel})`,
+      desi,
     };
   }
 
@@ -535,7 +549,13 @@ export class TradeShipmentService {
     const ship = await this.prisma.tradeShipment.findUnique({
       where: { id: tradeShipmentId },
       include: {
-        trade: { select: { tradeNumber: true } },
+        trade: {
+          select: {
+            tradeNumber: true,
+            initiatorId: true,
+            items: { select: TRADE_DESI_ITEM_SELECT },
+          },
+        },
         fromAddress: true,
       },
     });
@@ -563,6 +583,11 @@ export class TradeShipmentService {
       ship.trackingNumber,
       ship.trade.tradeNumber,
       await this.warehouseAddress.resolve(),
+      // Girişte gönderen kendi ürününü yollar.
+      tradeSideBillableDesi(
+        ship.trade.items,
+        ship.shipperId === ship.trade.initiatorId ? "initiator" : "receiver",
+      ),
     );
     if (!payload) return false;
 
