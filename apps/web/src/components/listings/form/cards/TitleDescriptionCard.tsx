@@ -25,7 +25,7 @@ export default function TitleDescriptionCard() {
           placeholder={t("product.descriptionPlaceholder")}
           rows={5}
           minLength={30}
-          maxLength={330}
+          maxLength={10000}
           helperText={t("product.descriptionLength")}
         />
       </div>
