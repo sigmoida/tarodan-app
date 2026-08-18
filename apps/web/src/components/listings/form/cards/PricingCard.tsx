@@ -15,17 +15,19 @@ import {
   sampleDimensionsLabel,
   type PackageTierCode,
 } from "../usePackageTiers";
+import type { CommissionPreview, PackageTierShipping } from "../queries";
 
 interface PricingCardProps {
   locale: string;
-  commissionPreview: {
-    sellerFeeAmount: number;
-    withholdingTaxAmount: number;
-    shippingAmount: number;
-    sellerNetAmount: number;
-  } | null;
+  commissionPreview: CommissionPreview | null;
   commissionPreviewLoading: boolean;
   commissionPreviewError?: unknown;
+  /**
+   * Önizleme istenebilir durumda mı (fiyat + kategori girildi mi). "Henüz
+   * sormadık" ile "sunucu veremedi" ayrı durumlar; ikisine aynı mesajı
+   * göstermek, fiyatını girmiş satıcıya "fiyat gir" demek olur.
+   */
+  commissionPreviewEnabled: boolean;
   /** Stock-quantity placeholder + helper differ between new ("1") and edit ("unlimited"). */
   quantityPlaceholder: string;
   quantityHelper: string;
@@ -41,6 +43,7 @@ export default function PricingCard({
   commissionPreview,
   commissionPreviewLoading,
   commissionPreviewError,
+  commissionPreviewEnabled,
   quantityPlaceholder,
   quantityHelper,
 }: PricingCardProps) {
@@ -67,7 +70,11 @@ export default function PricingCard({
         />
       </div>
 
-      <PackageSizePicker />
+      <PackageSizePicker
+        tierShipping={commissionPreview?.packageTierShipping ?? null}
+        shippingLoading={commissionPreviewLoading}
+        missingInputs={!commissionPreviewEnabled}
+      />
 
       {(commissionPreviewLoading ||
         commissionPreview ||
@@ -103,19 +110,43 @@ const TIER_IMAGE: Record<PackageTierCode, string> = {
 };
 
 /**
- * Kargo girdisi: satıcı desi yazmaz, üç paket boyutundan birini seçer. Kartlar
- * aktif tarifeden gelir (etiket + tam kargo bedeli + örnek ölçü); desi arayüzde
- * hiç görünmez. Seçim, altındaki "size kalan" önizlemesini canlı günceller.
+ * Kargo girdisi: satıcı desi yazmaz, üç paket boyutundan birini seçer. Kartın
+ * adı ve örnek ölçüsü aktif tarifeden, TUTARI komisyon önizlemesinden gelir;
+ * desi arayüzde hiç görünmez. Seçim, altındaki hak ediş önizlemesini canlı
+ * günceller.
+ *
+ * Kartta yazan tutar satıcının ÖDEYECEĞİ paydır, kargonun tam bedeli değil —
+ * satıcının sorduğu soru "bu boyut bana kaça mal olur". Tam bedeli göstermek
+ * hem alakasız hem yanıltıcıydı: pay kademe bazında yapılandırıldığı için üç
+ * kademenin oranı farklı olabiliyor.
+ *
+ * Fiyat ya da kategori girilmeden tutar HESAPLANAMAZ (pay bu ikisiyle eşleşen
+ * komisyon kuralından çıkar). O durumda kart tutarsız kalır ve neyin eksik
+ * olduğunu söyleyen bir ipucu gösterilir — eski davranış burada tam bedeli
+ * gösterip fiyat girilince başka bir sayıya atlıyordu.
  *
  * Kutu görseli kararın ASIL yardımcısı: satıcı "ürünüm bu koliye sığar mı"
  * sorusunu ölçü metninden önce gözüyle cevaplıyor. Bu yüzden görsel kartın
  * merkezinde, ücret ve örnek ölçü onun altında kendi bloklarında durur.
  */
-function PackageSizePicker() {
+function PackageSizePicker({
+  tierShipping,
+  shippingLoading,
+  missingInputs,
+}: {
+  tierShipping: PackageTierShipping[] | null;
+  shippingLoading: boolean;
+  /** Fiyat/kategori henüz girilmedi — tutar hesaplanamaz, bu kullanıcının işi. */
+  missingInputs: boolean;
+}) {
   const t = useTranslations();
   const { setValue, watch } = useFormContext();
   const { tiers, tiersLoading } = usePackageTiers();
   const selected = watch("shippingPackageTier") as PackageTierCode;
+
+  const amountByTier = new Map(
+    (tierShipping ?? []).map((tier) => [tier.code, tier.sellerShippingAmount]),
+  );
 
   return (
     <div className="mt-4">
@@ -133,24 +164,36 @@ function PackageSizePicker() {
           {t("product.packageSizeUnavailable")}
         </p>
       ) : (
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-          {tiers.map((tier) => (
-            <PackageSizeOption
-              key={tier.code}
-              label={tier.label}
-              code={tier.code}
-              amount={tier.amount}
-              dimensions={sampleDimensionsLabel(tier)}
-              isSelected={selected === tier.code}
-              onSelect={() =>
-                setValue("shippingPackageTier", tier.code, {
-                  shouldDirty: true,
-                  shouldValidate: true,
-                })
-              }
-            />
-          ))}
-        </div>
+        <>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+            {tiers.map((tier) => (
+              <PackageSizeOption
+                key={tier.code}
+                label={tier.label}
+                code={tier.code}
+                amount={amountByTier.get(tier.code) ?? null}
+                amountLoading={shippingLoading}
+                dimensions={sampleDimensionsLabel(tier)}
+                isSelected={selected === tier.code}
+                onSelect={() =>
+                  setValue("shippingPackageTier", tier.code, {
+                    shouldDirty: true,
+                    shouldValidate: true,
+                  })
+                }
+              />
+            ))}
+          </div>
+          {/* Yalnız EKSİK GİRDİ durumunda: sunucu hatasında (ör. aktif tarife
+              yok → 503) ya da sürüm uyuşmazlığında bu mesaj görünürse, alanları
+              doldurmuş satıcıya doldurmadığını söylemiş oluruz. Hata mesajını
+              aşağıdaki özet kutusu veriyor. */}
+          {missingInputs && (
+            <p className="mt-2 text-xs text-muted">
+              {t("product.packageFeeNeedsPriceAndCategory")}
+            </p>
+          )}
+        </>
       )}
     </div>
   );
@@ -167,13 +210,16 @@ function PackageSizeOption({
   label,
   code,
   amount,
+  amountLoading,
   dimensions,
   isSelected,
   onSelect,
 }: {
   label: string;
   code: PackageTierCode;
-  amount: number;
+  /** Satıcının ödeyeceği pay; fiyat/kategori girilmeden hesaplanamaz → null. */
+  amount: number | null;
+  amountLoading: boolean;
   dimensions: string | null;
   isSelected: boolean;
   onSelect: () => void;
@@ -221,12 +267,29 @@ function PackageSizeOption({
         <span className="truncate text-sm font-semibold text-heading sm:text-center">
           {label}
         </span>
-        <span className="block rounded-lg bg-primary-600 px-3 py-1.5 text-center">
-          <span className="block text-[10px] font-medium uppercase tracking-wide text-inverted/80">
+        {/* Tutar yokken şerit KAYBOLMAZ: kart yüksekliği sabit kalsın ve
+            satıcı ücretin var olduğunu, yalnız henüz hesaplanmadığını görsün. */}
+        <span
+          className={cn(
+            "block rounded-lg px-3 py-1.5 text-center",
+            amount == null ? "bg-surface-alt" : "bg-primary-600",
+          )}
+        >
+          <span
+            className={cn(
+              "block text-[10px] font-medium uppercase tracking-wide",
+              amount == null ? "text-muted" : "text-inverted/80",
+            )}
+          >
             {t("product.packageFeeLabel")}
           </span>
-          <span className="block text-base font-bold text-inverted">
-            {fmt(amount)}
+          <span
+            className={cn(
+              "block text-base font-bold",
+              amount == null ? "text-subtle" : "text-inverted",
+            )}
+          >
+            {amountLoading ? "…" : amount == null ? "—" : fmt(amount)}
           </span>
         </span>
         {dimensions && (

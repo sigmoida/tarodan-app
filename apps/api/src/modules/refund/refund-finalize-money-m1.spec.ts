@@ -4,6 +4,7 @@ import { RefundShipmentService } from "./refund-shipment.service";
 import { RefundCreationService } from "./refund-creation.service";
 import { RefundDecisionService } from "./refund-decision.service";
 import { RefundRequestStatus } from "@prisma/client";
+import { warehouseAddressStub } from "../shipping/testing/warehouse-address-fixture";
 
 /**
  * MONEY-M1: finalizeRefundForReturnedShipment concurrency-safe. 3 eşzamanlı çağıran
@@ -53,6 +54,7 @@ describe("RefundService.finalizeRefundForReturnedShipment — MONEY-M1 CAS claim
       {} as any,
       notifications as any,
       financials as any,
+      warehouseAddressStub() as any,
     );
     const creation = new RefundCreationService(
       prisma as any,

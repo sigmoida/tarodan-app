@@ -1,21 +1,40 @@
 /** Uygulama katmanının somut kargo sağlayıcısından bağımsız DI sınırı. */
 export const CARGO_PROVIDER = Symbol("CARGO_PROVIDER");
 
-export interface CargoRecipient {
+/**
+ * Bir gönderinin taraflarından biri. Gönderici ve alıcı AYNI şekle sahiptir —
+ * çünkü taşıyıcı ikisinden de aynı bilgileri ister ve bir iade, alanları farklı
+ * doldurmak değil, iki tarafı yer değiştirmektir.
+ */
+export interface CargoParty {
   name: string;
   address: string;
   city: string;
   district: string;
   phone: string;
+  /** Taşıyıcı için opsiyonel; misafir siparişte bulunmayabilir. */
+  email?: string;
 }
 
 export interface CargoShipmentRequest {
   idempotencyKey: string;
   correlationId: string;
   reference: string;
-  recipient: CargoRecipient;
+  /**
+   * Koliyi fiilen gönderen taraf: satışta satıcı, iadede alıcı, takasın depoya
+   * giriş bacağında kullanıcı, çıkış bacağında depo. Zorunludur — eskiden
+   * gönderici diye bir alan yoktu ve her koli taşıyıcıda kurumsal cari
+   * hesabımızın üstüne açılıyordu.
+   */
+  sender: CargoParty;
+  recipient: CargoParty;
   content?: string;
   desi?: number | null;
+  /**
+   * Kolinin bir iade bacağı olduğu. Taşıyıcıya giden bir alan DEĞİL — yön
+   * `sender`/`recipient` ile ifade edilir; bu bayrak yalnız kendi kayıt ve
+   * raporlama tarafımız için taşınır.
+   */
   isReturn?: boolean;
 }
 

@@ -1,19 +1,15 @@
 import { Injectable, Logger } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
-import type { SuratGonderiPayload } from "../helpers/surat-cargo.types";
+import type {
+  SuratCreateShipmentInput,
+  SuratGonderiPayload,
+} from "../helpers/surat-cargo.types";
+import { buildStandardGonderiPayload } from "../mappers/surat-address.util";
 import { SuratCarrierClient, type SuratCallOptions } from "./surat-soap.client";
+import { postSuratCreate, suratHost } from "./surat-rest-transport";
 
-/** Resmi Sürat Kargo gönderi oluşturma REST endpoint'leri (2024 dokümanı). */
-const SURAT_CREATE_LIVE =
-  "https://api01.suratkargo.com.tr/api/GonderiyiKargoyaGonder";
-const SURAT_CREATE_TEST =
-  "https://api02.suratkargo.com.tr/api/GonderiyiKargoyaGonder";
-
-interface SuratRestResult {
-  Message?: string | null;
-  IsError?: boolean;
-  StatusCode?: number;
-}
+/** Resmi Sürat Kargo gönderi oluşturma REST yolu (2024 dokümanı). */
+const SURAT_CREATE_PATH = "/api/GonderiyiKargoyaGonder";
 
 const cap = (value: string | undefined | null, max: number): string =>
   String(value ?? "")
@@ -68,13 +64,6 @@ export function buildRestGonderi(
   };
 }
 
-function responseSnippet(text: string): string {
-  return text
-    .replace(/[\r\n\t]+/g, " ")
-    .trim()
-    .slice(0, 200);
-}
-
 @Injectable()
 export class RestSuratClient extends SuratCarrierClient {
   private readonly logger = new Logger(RestSuratClient.name);
@@ -91,10 +80,25 @@ export class RestSuratClient extends SuratCarrierClient {
     );
   }
 
-  async callGonderiyiKargoyaGonder(
-    payload: SuratGonderiPayload,
+  async callCreateShipment(
+    input: SuratCreateShipmentInput,
     options: SuratCallOptions,
   ): Promise<string> {
+    // Bu sözleşmede gönderici alanı YOK: gönderi Sürat'ta kurumsal cari
+    // hesabımızın üstüne açılır ve `input.sender` yalnız yok sayılır. Gerçek
+    // göndericiyi taşıyan uç GonderiOlustur'dur.
+    const payload = buildStandardGonderiPayload({
+      recipientName: input.recipient.name,
+      address: input.recipient.address,
+      city: input.recipient.city,
+      district: input.recipient.district,
+      phone: input.recipient.phone,
+      ref: input.reference,
+      content: input.content,
+      desi: input.desi ?? undefined,
+      isReturn: input.isReturn,
+    });
+
     const kullaniciAdi = this.configService.get<string>(
       "SURAT_KARGO_CARI_KODU",
       "",
@@ -106,79 +110,20 @@ export class RestSuratClient extends SuratCarrierClient {
       );
     }
 
-    const url = this.isTestMode() ? SURAT_CREATE_TEST : SURAT_CREATE_LIVE;
-    const body = JSON.stringify({
-      KullaniciAdi: kullaniciAdi,
-      Sifre: sifre,
-      Gonderi: buildRestGonderi(payload),
-    });
+    const url = `${suratHost(this.isTestMode())}${SURAT_CREATE_PATH}`;
 
     this.logger.debug(
       `Surat GonderiyiKargoyaGonder ref=${payload.OzelKargoTakipNo} test=${this.isTestMode()} timeout=${options.timeoutMs}ms`,
     );
 
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), options.timeoutMs);
-    try {
-      const response = await fetch(url, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Accept: "application/json",
-        },
-        body,
-        signal: controller.signal,
-      });
-      const text = await response.text();
-
-      if (response.status >= 400) {
-        const snippet = responseSnippet(text);
-        const err = new Error(
-          `HTTP ${response.status}${snippet ? `: ${snippet}` : ""}`,
-        ) as Error & { statusCode?: number; rawBodySnippet?: string };
-        err.statusCode = response.status;
-        err.rawBodySnippet = snippet;
-        throw err;
-      }
-
-      if (!text.trim()) return "";
-
-      let decoded: string | SuratRestResult;
-      try {
-        decoded = JSON.parse(text) as string | SuratRestResult;
-      } catch {
-        // Dönüş tipi dokümanda string. Sunucu bunu JSON string yerine düz metin
-        // döndürürse servis katmanı yalnız tam "Tamam" değerini başarı sayar;
-        // HTML veya başka bir metin yanlışlıkla başarıya dönüşmez.
-        decoded = text.trim();
-      }
-
-      // Resmi doküman dönüş tipini string olarak tanımlar ("Tamam" veya hata
-      // mesajı). Bazı Sürat kurulumları aynı sonucu IsError/Message zarfında verir;
-      // iki resmi create varyantını da güvenli biçimde kabul ediyoruz.
-      if (typeof decoded === "string") return decoded.trim();
-
-      const message = String(decoded.Message ?? "").trim();
-      if (decoded.IsError === false) {
-        this.logger.log(
-          `Surat GonderiyiKargoyaGonder ok ref=${payload.OzelKargoTakipNo} message="${message}"`,
-        );
-        return "Tamam";
-      }
-
-      return (
-        message ||
-        `Beklenmeyen Sürat yanıtı (hata kodu: ${decoded.StatusCode ?? "bilinmiyor"})`
-      );
-    } catch (error: unknown) {
-      if (error instanceof Error && error.name === "AbortError") {
-        const timeout = new Error("ETIMEDOUT");
-        (timeout as NodeJS.ErrnoException).code = "ETIMEDOUT";
-        throw timeout;
-      }
-      throw error;
-    } finally {
-      clearTimeout(timer);
-    }
+    return postSuratCreate(
+      url,
+      {
+        KullaniciAdi: kullaniciAdi,
+        Sifre: sifre,
+        Gonderi: buildRestGonderi(payload),
+      },
+      options.timeoutMs,
+    );
   }
 }

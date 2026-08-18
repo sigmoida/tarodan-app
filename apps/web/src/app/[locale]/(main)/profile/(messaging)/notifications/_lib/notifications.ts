@@ -42,6 +42,7 @@ export const NOTIFICATION_CATEGORIES: Record<string, FilterType> = {
   trade_shipped: "trades",
   trade_completed: "trades",
   trade_address_required: "trades",
+  seller_address_required: "orders",
   cargo_code_ready: "orders",
   cargo_movement_missing: "orders",
   new_message: "messages",

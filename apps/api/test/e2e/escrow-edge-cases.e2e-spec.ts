@@ -868,9 +868,18 @@ describe("Escrow Edge Cases (E2E)", () => {
 
       // Two from_warehouse shipments submitted to Sürat
       expect(ctx.surat.shipmentCalls.length).toBe(2);
-      const oids = ctx.surat.shipmentCalls.map((c) => c.OzelKargoTakipNo);
+      const oids = ctx.surat.shipmentCalls.map((c) => c.reference);
       expect(oids.some((o) => o.includes("INI"))).toBe(true);
       expect(oids.some((o) => o.includes("REC"))).toBe(true);
+
+      // Depodan ÇIKAN bacak: gönderen depo (tek adres), alıcılar iki farklı
+      // kullanıcı. Inbound bacağın tam tersi yön.
+      const senders = ctx.surat.shipmentCalls.map((c) => c.sender.address);
+      expect(new Set(senders).size).toBe(1);
+      const recipients = ctx.surat.shipmentCalls.map(
+        (c) => c.recipient.address,
+      );
+      expect(new Set(recipients).size).toBe(2);
 
       // Both shipments marked as Sürat carrier
       const prisma = getPrisma();
@@ -893,7 +902,7 @@ describe("Escrow Edge Cases (E2E)", () => {
 
       // Two return shipments submitted to Sürat with Iademi=true
       expect(ctx.surat.shipmentCalls.length).toBe(2);
-      expect(ctx.surat.shipmentCalls.every((c) => c.Iademi === true)).toBe(
+      expect(ctx.surat.shipmentCalls.every((c) => c.isReturn === true)).toBe(
         true,
       );
     });

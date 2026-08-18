@@ -6,6 +6,7 @@ import { RefundFinancialService } from "./refund-financial.service";
 import { RefundShipmentService } from "./refund-shipment.service";
 import { RefundCreationService } from "./refund-creation.service";
 import { RefundDecisionService } from "./refund-decision.service";
+import { warehouseAddressStub } from "../shipping/testing/warehouse-address-fixture";
 
 /**
  * REFUND_CANCELLED iki YÖNE gider ve hedef ekran audience'tan seçilir.
@@ -49,6 +50,7 @@ describe("RefundService — REFUND_CANCELLED hedef kitlesi", () => {
       {} as any,
       notifications as any,
       financials as any,
+      warehouseAddressStub() as any,
     );
     const creation = new RefundCreationService(
       prisma as any,

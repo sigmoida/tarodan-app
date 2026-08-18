@@ -47,6 +47,7 @@ function NewListingLayout() {
     commissionPreview,
     commissionPreviewLoading,
     commissionPreviewError,
+    commissionPreviewEnabled,
     limits,
     imageItems,
     uploadingImages,
@@ -119,6 +120,7 @@ function NewListingLayout() {
               commissionPreview={commissionPreview}
               commissionPreviewLoading={commissionPreviewLoading}
               commissionPreviewError={commissionPreviewError}
+              commissionPreviewEnabled={commissionPreviewEnabled}
               quantityPlaceholder="1"
               quantityHelper={t("product.quantityDefaultHint")}
             />

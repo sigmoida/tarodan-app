@@ -142,11 +142,11 @@ export default function EditListingClient() {
   const { manufacturerAttrGroups } = useManufacturerAttributes(
     selectedManufacturerSlug,
   );
-  const { commissionPreview, commissionPreviewLoading } = useCommissionPreview(
-    price,
-    categoryId,
-    shippingPackageTier,
-  );
+  const {
+    commissionPreview,
+    commissionPreviewLoading,
+    commissionPreviewEnabled,
+  } = useCommissionPreview(price, categoryId, shippingPackageTier);
   const { productDiscounts } = useProductDiscounts({
     id,
     authLoading,
@@ -287,6 +287,7 @@ export default function EditListingClient() {
           locale={locale}
           commissionPreview={commissionPreview}
           commissionPreviewLoading={commissionPreviewLoading}
+          commissionPreviewEnabled={commissionPreviewEnabled}
           quantityPlaceholder={t("membership.unlimited")}
           quantityHelper={t("product.leaveEmptyUnlimitedStock")}
         />

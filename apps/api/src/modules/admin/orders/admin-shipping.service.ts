@@ -18,7 +18,6 @@ import {
 } from "../../../common/list";
 import { SuratCargoService } from "../../surat-cargo/surat-cargo.service";
 import { SuratTrackingService } from "../../surat-cargo/sync/surat-tracking.service";
-import { buildStandardGonderiPayload } from "../../surat-cargo/mappers/surat-address.util";
 import { requestCarrierCancellationTask } from "../../surat-cargo/sync/carrier-cancellation-task";
 import { StorageService } from "../../storage/storage.service";
 import { i18nMessage } from "../../i18n";
@@ -327,22 +326,30 @@ export class AdminShippingService {
       };
     }
 
-    // 1) Gönderi oluştur — Sürat'a gerçek test gönderisi (REST create)
+    // 1) Gönderi oluştur — Sürat'a gerçek test gönderisi.
+    // Nötr girdiyle gider: hangi create ucu aktifse test onu vurur, dolayısıyla
+    // bu araç sürüm geçişinde sessizce eski sözleşmeyi denemeye devam etmez.
     const createResult = await this.suratCargoService.submitShipmentWithRetry({
       idempotencyKey: ref,
       correlationId: ref,
-      payload: buildStandardGonderiPayload({
-        recipientName: "ADMIN TEST ALICI",
-        address: "Caferağa Mah. Moda Cad. No:14",
-        city: "İstanbul",
-        district: "Kadıköy",
-        phone: "5321112233",
-        ref,
+      shipment: {
+        reference: ref,
+        sender: {
+          name: "ADMIN TEST GÖNDERİCİ",
+          address: "Depo Mah. Sevk Cad. No:1",
+          city: "İstanbul",
+          district: "Maltepe",
+          phone: "5321112233",
+        },
+        recipient: {
+          name: "ADMIN TEST ALICI",
+          address: "Caferağa Mah. Moda Cad. No:14",
+          city: "İstanbul",
+          district: "Kadıköy",
+          phone: "5321112233",
+        },
         content: "Endpoint testi",
-        // Test payload'u telefonu HAM (05xx normalizasyonu olmadan) gönderir;
-        // builder normalize eder → birebir korumak için override.
-        overrides: { TelefonCep: "5321112233" },
-      }),
+      },
     });
 
     const create = createResult.ok

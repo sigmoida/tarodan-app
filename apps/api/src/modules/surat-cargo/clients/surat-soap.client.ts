@@ -1,6 +1,6 @@
 import { Injectable, Logger } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
-import type { SuratGonderiPayload } from "../helpers/surat-cargo.types";
+import type { SuratCreateShipmentInput } from "../helpers/surat-cargo.types";
 
 export interface SuratCallOptions {
   timeoutMs: number;
@@ -8,12 +8,16 @@ export interface SuratCallOptions {
 
 /**
  * Sürat taşıyıcı sözleşmesi bilinçli olarak tek yazma operasyonuyla sınırlıdır:
- * resmi GonderiyiKargoyaGonder REST endpoint'i. Kargo kodu ve hareketleri ayrı,
+ * resmi gönderi-oluşturma REST endpoint'i. Kargo kodu ve hareketleri ayrı,
  * salt-okuma KargoTakipHareketDetayi istemcisinden alınır.
+ *
+ * Girdi NÖTRDÜR: hangi endpoint'e hangi alan adlarıyla gidileceği somut
+ * istemcinin içinde kalır. Sürat sözleşmesi değiştiğinde yalnız bir istemci
+ * eklenir; servis katmanı ve testler dokunulmadan kalır.
  */
 export abstract class SuratCarrierClient {
-  abstract callGonderiyiKargoyaGonder(
-    payload: SuratGonderiPayload,
+  abstract callCreateShipment(
+    input: SuratCreateShipmentInput,
     options: SuratCallOptions,
   ): Promise<string>;
 
@@ -34,8 +38,14 @@ export abstract class SuratCarrierClient {
 export class StubSuratSoapClient extends SuratCarrierClient {
   private readonly logger = new Logger(StubSuratSoapClient.name);
 
-  /** Test introspection: gönderi oluşturma çağrıları. */
-  public readonly shipmentCalls: SuratGonderiPayload[] = [];
+  /**
+   * Test introspection: gönderi oluşturma çağrıları.
+   *
+   * Nötr girdiyi tutar, tel biçimini değil. Testler "hangi referans kargolandı,
+   * göndereni kim, iade miydi" sorularını sorar; Sürat'ın alan adlarına
+   * bağlanmaları her sözleşme değişiminde onlarını birlikte kırıyordu.
+   */
+  public readonly shipmentCalls: SuratCreateShipmentInput[] = [];
   /** Test introspection: yalnız yerel iptal kararları. */
   public readonly cancelCalls: string[] = [];
 
@@ -48,17 +58,17 @@ export class StubSuratSoapClient extends SuratCarrierClient {
     super();
   }
 
-  async callGonderiyiKargoyaGonder(
-    payload: SuratGonderiPayload,
+  async callCreateShipment(
+    input: SuratCreateShipmentInput,
     _options: SuratCallOptions,
   ): Promise<string> {
-    this.shipmentCalls.push(payload);
+    this.shipmentCalls.push(input);
     const sim = this.configService
       .get<string>("SURAT_STUB_THROW", "")
       ?.trim()
       .toUpperCase();
     this.logger.debug(
-      `Stub Surat create ref=${payload.OzelKargoTakipNo} sim=${sim || "none"}`,
+      `Stub Surat create ref=${input.reference} sim=${sim || "none"}`,
     );
 
     if (sim === "TIMEOUT") {

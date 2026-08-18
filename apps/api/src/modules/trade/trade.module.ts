@@ -7,6 +7,7 @@ import { TradeCommonService } from "./trade-common.service";
 import { TradeQueryService } from "./trade-query.service";
 import { TradeQuoteService } from "./trade-quote.service";
 import { ShippingTariffModule } from "../shipping/tariff/shipping-tariff.module";
+import { WarehouseAddressModule } from "../shipping/warehouse/warehouse-address.module";
 import { TradeLifecycleService } from "./lifecycle/trade-lifecycle.service";
 import { TradeReconciliationService } from "./lifecycle/trade-reconciliation.service";
 import { TradeSchedulerService } from "./jobs/trade-scheduler.service";
@@ -39,6 +40,8 @@ import { DiscountModule } from "../discount/discount.module";
     SuratCargoModule,
     // Takas kargo bedeli sipariş tarifesiyle AYNI kaynaktan gelir (leaf modül).
     ShippingTariffModule,
+    // Depo adresi (inbound bacağın ALICI'sı) tek kaynaktan okunur (leaf modül).
+    WarehouseAddressModule,
     // Takas hizmet bedeli kampanyası (İ25) — DiscountService kabulde çözer.
     DiscountModule,
     BullModule.registerQueue({ name: QUEUE_NAMES.SCHEDULED }),

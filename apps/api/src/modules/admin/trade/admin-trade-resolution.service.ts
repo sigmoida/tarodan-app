@@ -18,6 +18,10 @@ import {
   type CargoProvider,
 } from "../../surat-cargo/helpers/cargo-provider";
 import { AdminTradeCommonService } from "./admin-trade-common.service";
+import {
+  TRADE_DESI_ITEM_SELECT,
+  tradeSideBillableDesi,
+} from "../../trade/helpers/trade-shipment-desi.helper";
 import { REFERENCE_PREFIX } from "../../../common/helpers/code-prefixes";
 import { generateReferenceCode } from "../../../common/helpers/generate-reference";
 import { CarrierCancellationService } from "../../surat-cargo/sync/carrier-cancellation.service";
@@ -194,7 +198,10 @@ export class AdminTradeResolutionService {
 
       const trade = await tx.trade.findUnique({
         where: { id: tradeId },
-        include: { cashPayments: true },
+        include: {
+          cashPayments: true,
+          items: { select: TRADE_DESI_ITEM_SELECT },
+        },
       });
       if (!trade) {
         throw new NotFoundException(i18nMessage("server.trade.notFound"));
@@ -228,6 +235,7 @@ export class AdminTradeResolutionService {
         id: string;
         recipientUserId: string;
         oid: string;
+        desi: number;
       } | null = null;
 
       if (sendArrivedItemBack && arrived.recipientUserId === null) {
@@ -257,6 +265,11 @@ export class AdminTradeResolutionService {
           id: draft.id,
           recipientUserId: arrivedOwnerId,
           oid,
+          // Kayıp iadesinde kullanıcı KENDİ ürününü geri alır.
+          desi: tradeSideBillableDesi(
+            trade.items,
+            arrivedOwnerId === trade.initiatorId ? "initiator" : "receiver",
+          ),
         };
       }
 
@@ -375,10 +388,19 @@ export class AdminTradeResolutionService {
           orderBy: { isDefault: "desc" },
         });
         if (arrivedAddress && this.cargo && this.cargo.isEnabled()) {
+          const warehouse = await this.common.resolveWarehouseAddress();
           const result = await this.cargo.createShipment({
             idempotencyKey: `surat:trade-stuck-return:${txResult.returnShipmentDraft.oid}`,
             correlationId: `trade-force-cancel-${tradeId}`,
             reference: txResult.returnShipmentDraft.oid,
+            // Depodan çıkan bacak: gönderen depo, alıcı kolisi ulaşmış olan taraf.
+            sender: {
+              name: warehouse.fullName,
+              address: warehouse.address,
+              city: warehouse.city,
+              district: warehouse.district,
+              phone: warehouse.phone,
+            },
             recipient: {
               name:
                 arrivedAddress.fullName ||
@@ -391,6 +413,7 @@ export class AdminTradeResolutionService {
             },
             content: "Takas Kayıp İade",
             isReturn: true,
+            desi: txResult.returnShipmentDraft.desi,
           });
           if (result.ok) {
             await this.prisma.tradeShipment.update({

@@ -39,6 +39,11 @@ const ENV_KEYS_TO_RESET = [
   "SURAT_SOAP_MODE",
   "SURAT_STUB_RESPONSE",
   "SURAT_STUB_THROW",
+  // Bu ikisi listede yoktu: geliştiricinin shell'inden sızan bir değer stub'ın
+  // takip kodunu ya da create sözleşmesini sessizce değiştirebiliyordu.
+  "SURAT_STUB_KARGO_TAKIP_NO",
+  "SURAT_CREATE_API_VERSION",
+  "SURAT_FIRMA_ID",
   "SURAT_CARGO_ENABLED",
   "SURAT_WEBHOOK_SECRET",
   "SURAT_KARGO_CARI_KODU",

@@ -1,6 +1,6 @@
 # Kargo — Sürat Entegrasyonu, Paket Kademeleri ve Yaşam Döngüsü
 
-> Kalıcı referans (2026-08-02, kod üzerinden doğrulandı). Doküman ile kod
+> Kalıcı referans (2026-08-17, kod üzerinden doğrulandı). Doküman ile kod
 > çelişirse kod doğrudur. Para tarafı (escrow/iade maliyeti dağılımının
 > gerekçesi) için [PAYMENTS.md](./PAYMENTS.md), kod biçimleri için
 > [CODE_SCHEME.md](./CODE_SCHEME.md).
@@ -9,11 +9,11 @@
 
 ## 1. Üç kimlik — yeni gelenlerin en çok karıştırdığı şey
 
-| Kimlik                        | Biçim                | Ne                                                                                                                                                                                                                                      |
-| ----------------------------- | -------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `Order.orderNumber`           | `ORD-…`              | Satır sipariş                                                                                                                                                                                                                           |
-| `OrderPackage.packageNumber`  | `PKG-…`              | **Bir fiziksel koli.** Sürat'a `OzelKargoTakipNo` olarak gönderilir ve `Shipment.trackingNumber`'a yazılır. Takip sorgusunun anahtarıdır. Türetilmez, saklanan kolondur (türetilen referans geçmişte kaymış ve mükerrer koli üretmişti) |
-| `Shipment.providerTrackingId` | Sürat `KargoTakipNo` | Sürat'ın kendi numarası; UI'da gösterilen budur. Resmi iki endpoint ZPL döndürmediğinden legacy `Shipment.labelZpl` alanı boş kalır                                                                                                     |
+| Kimlik                        | Biçim                | Ne                                                                                                                                                                                                                                                                                      |
+| ----------------------------- | -------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `Order.orderNumber`           | `ORD-…`              | Satır sipariş                                                                                                                                                                                                                                                                           |
+| `OrderPackage.packageNumber`  | `PKG-…`              | **Bir fiziksel koli.** Sürat'a referans olarak gönderilir (v1'de `OzelKargoTakipNo`, v2'de `SatisKodu` — aynı alan) ve `Shipment.trackingNumber`'a yazılır. Takip sorgusunun anahtarıdır. Türetilmez, saklanan kolondur (türetilen referans geçmişte kaymış ve mükerrer koli üretmişti) |
+| `Shipment.providerTrackingId` | Sürat `KargoTakipNo` | Sürat'ın kendi numarası; UI'da gösterilen budur. Resmi iki endpoint ZPL döndürmediğinden legacy `Shipment.labelZpl` alanı boş kalır                                                                                                                                                     |
 
 Kullanıcıya dönük ad: `packageNumber` = **"Teslimat No"**.
 
@@ -25,15 +25,31 @@ Kullanıcıya dönük ad: `packageNumber` = **"Teslimat No"**.
 korunan `SURAT_SOAP_MODE` production'da yalnız `rest` olabilir. Dış Sürat
 trafiği iki resmi endpoint'le sınırlıdır.
 
-- **Gönderi oluşturma:** `createShipmentWithBarcode()` önce resmi
-  `GonderiyiKargoyaGonder` endpoint'ine idempotent create gönderir.
-- **Gerçek kargo kodu:** aynı `OzelKargoTakipNo`, resmi
-  `KargoTakipHareketDetayi` endpoint'ine `WebSiparisKodu` olarak verilir;
+- **Gönderi oluşturma:** `createShipmentWithBarcode()` aktif create ucuna
+  idempotent create gönderir. Hangi uç olduğunu `SURAT_CREATE_API_VERSION`
+  seçer:
+  - `v1` = `GonderiyiKargoyaGonder`. **Gönderici alanı YOKTUR** — koli, fiilen
+    kimin yolladığından bağımsız olarak Sürat'taki kurumsal cari hesabımızın
+    üstüne açılır.
+  - `v2` = `GonderiOlustur`. Gerçek göndericiyi taşır (satışta satıcı, iadede
+    alıcı, takasta kullanıcı ya da depo) — pazaryeri için gereken budur.
+    `SURAT_FIRMA_ID` zorunludur; ili **plaka koduyla** ister (`@tarodan/types`
+    → `resolveTrPlateCode`), adı/soyadı ayrı ister ve `Iademi` bayrağı yoktur:
+    iade artık gönderen/alıcının yer değiştirmesiyle ifade edilir.
+
+  Taraf bilgisi `CargoProvider` portunda `sender`/`recipient` olarak taşınır;
+  Sürat alan adları yalnız istemcinin içindedir. Çözülemeyen bir il ya da
+  telefon **fail-closed**'dur: gönderi açılmaz. Satıcının kayıtlı adresi yoksa
+  koli açılmaz, satıcıya `SELLER_ADDRESS_REQUIRED` bildirimi gider ve barkod
+  retry cron'u adres eklenince tamamlar.
+
+- **Gerçek kargo kodu:** aynı referans (v1 `OzelKargoTakipNo` / v2 `SatisKodu`),
+  resmi `KargoTakipHareketDetayi` endpoint'ine `WebSiparisKodu` olarak verilir;
   yanıttaki `KargoTakipNo`, `providerTrackingId` alanına yazılır. Takip kaydı
   henüz görünmüyorsa shipment `pending`+kodsuz kalır ve retry worker tamamlar.
   Bu sözleşme ZPL döndürmediği için `labelZpl` null kalır.
 - **Retry + idempotency:** `withSuratTechnicalRetries` (3 deneme, 200 ms taban,
-  15 sn timeout); create başarısı Redis'te `OzelKargoTakipNo` anahtarıyla 7 gün
+  15 sn timeout); create başarısı Redis'te kendi referansımızla 7 gün
   cache'lenir. Takip kodu görünür olduğunda ayrıca cache'lenir; yerel iptal bu
   cache'leri geçersiz kılar.
 - **Ortak fulfilment yolu:** `PaymentCommonService.ensureSuratShipmentForOrder`
@@ -159,16 +175,16 @@ tazmin edilir mi, (c) dönüş bacağını kim öder.
 Takaslar eşten-eşe değil, **Tarodan deposu üzerinden iki bacak** gider:
 
 1. **`to_warehouse`** — takas `shipping_to_warehouse`'a geçince taraf başına bir
-   `TradeShipment` otomatik açılır; `OzelKargoTakipNo` =
-   `` `${tradeNumber}-WH-${INI|REC}` ``. Satırlar kısa transaction'da yaratılır,
+   `TradeShipment` otomatik açılır; referans =
+   `` `${tradeNumber}-WH-${INI|REC}` ``. Gönderen kullanıcı, alıcı depodur. Satırlar kısa transaction'da yaratılır,
    Sürat çağrısı commit **sonrası** taraf başına yapılır; `(tradeId, shipperId,
 leg)` idempotenttir; adresi olmayan taraf uyarıyla atlanır ve kabulü
    bloklamaz (fire-and-forget).
 2. **`from_warehouse`** — inceleme sonrası admin depo operasyonları açar;
    geri gönderim için üçüncü bacak `return` vardır.
 
-`TradeShipment` sipariş modelini aynalar (`trackingNumber` = bizim
-`OzelKargoTakipNo`, `providerTrackingId` = Sürat, `labelZpl`, `leg`,
+`TradeShipment` sipariş modelini aynalar (`trackingNumber` = bizim referansımız,
+`providerTrackingId` = Sürat, `labelZpl`, `leg`,
 kayıp takibi için `lostAt`/`lostReason`). Takip aynı 30 dk cron'unda
 `trade-tracking-sync.service.ts` ile senkronlanır.
 
@@ -176,6 +192,19 @@ kayıp takibi için `lostAt`/`lostReason`). Takip aynı 30 dk cron'unda
 `commissionTaxAmount` nakit ödeyene aittir ve `totalAmount`'a dahildir; takas
 tamamlanınca `holdReleaseAt` kurulur ve saatlik release cron'u açar; kendi
 `PayoutTransfer` dalı vardır.
+
+**Depo adresi tek kaynaktan gelir:** `WarehouseAddressService`
+(`modules/shipping/warehouse/`) admin Ayarlar'daki `warehouse_address_id`
+satırını okur; `config/warehouse.ts` env metni yalnız o satır yoksa devreye
+girer. Dört takas bacağının hepsi (2 giriş + 2 çıkış) aynı adresi kullanır —
+eskiden giriş env'den, çıkış DB'den okuduğu için depo taşındığında ikisi
+ayrışıyordu.
+
+**Takas kolisinin desisi** ürünün paket boyutundan (`Product.shippingDesi`)
+gelir ve `calculatePackageDesi` ile toplanır — takas fiyatlamasının kullandığı
+FONKSİYONUN AYNISI, böylece tahsil edilen ve bildirilen desi ayrışmaz. Hangi
+tarafın ürünü olduğu koliye göre değişir: girişte taraf kendi ürününü yollar,
+çıkışta karşı tarafın ürününü alır, redde kendi ürünü geri döner.
 
 **`SHP-` yedek takip numarası yalnız takas yollarında** kullanılır (taşıyıcı
 entegrasyonu kapalıyken/barkod alınamadığında). Sipariş gönderileri `SHP-`

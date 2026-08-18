@@ -773,6 +773,7 @@
     "shippingFee": "Kargo ücreti",
     "sellerEarning": "Hak edişiniz",
     "packageFeeLabel": "Paket ücreti",
+    "packageFeeNeedsPriceAndCategory": "Paket ücretinizi görmek için fiyat ve kategori girin.",
     "sampleDimensionsLabel": "Örnek ölçü (en × boy × yükseklik)",
     "rejectionReason": "Red gerekçesi",
     "imageGrid": {
@@ -8601,6 +8602,10 @@
         "title": "Adres Gerekli — Takas Kargosu",
         "message": "{tradeNumber} takasınız için kargo başlatılamadı: kayıtlı adresiniz yok. Profilinizden adres ekleyin; kargo otomatik oluşturulacaktır."
       },
+      "sellerAddressRequired": {
+        "title": "Adres Gerekli — Sipariş Kargosu",
+        "message": "{orderNumber} siparişiniz için kargo başlatılamadı: kayıtlı adresiniz yok. Kargo gönderici bilgisi olarak adresinizi gerektiriyor. Profilinizden adres ekleyin; kargo otomatik oluşturulacaktır."
+      },
       "cargoCodeReady": {
         "title": "Kargo Kodunuz Hazır",
         "message": "{reference} için kargo kodunuz oluşturuldu. Kodu görüntüleyip paketi Sürat Kargo şubesine teslim edebilirsiniz."
@@ -9181,6 +9186,8 @@
       "tariffArchived": "Arşivlenmiş tarife tekrar aktive edilemez",
       "tariffNegativeAmount": "Tarife tutarları negatif olamaz",
       "invalidRecipientPhone": "Gönderi oluşturulamadı: alıcı telefonu geçerli bir Türkiye cep numarası değil",
+      "invalidSenderPhone": "Gönderi oluşturulamadı: gönderici telefonu geçerli bir Türkiye cep numarası değil",
+      "unknownProvince": "Gönderi oluşturulamadı: \"{province}\" geçerli bir il değil, kargo il kodu belirlenemedi",
       "unsupportedProvider": "Desteklenmeyen kargo sağlayıcısı",
       "createForbidden": "Bu sipariş için kargo oluşturamazsınız",
       "orderNotPreparing": "Sipariş hazırlanma durumunda değil",

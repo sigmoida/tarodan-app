@@ -91,27 +91,19 @@ export class OrderService {
     return this.orderPricing.getCheckoutQuote(dto, userId);
   }
 
+  /**
+   * Dönüş tipi fiyatlama servisinden TÜRETİLİR, elle yazılmaz: bu cephe elle
+   * listelenmiş daha dar bir şekil taşıdığı için `packageTier` ve
+   * `packageTierShipping` eklendiğinde tip onları gizlemeye devam etti — alanlar
+   * tele çıkıyordu ama sözleşme "yok" diyordu. Türetmek ikisinin ayrışmasını
+   * mümkünsüz kılar.
+   */
   async getCommissionPreview(
     amount: number,
     sellerId: string,
     categoryId?: string | null,
     shippingDesi = 1,
-  ): Promise<{
-    sellerFeeAmount: number;
-    buyerFeeAmount: number;
-    commissionAmount: number;
-    withholdingTaxAmount: number;
-    fullShippingAmount: number;
-    buyerShippingAmount: number;
-    sellerShippingAmount: number;
-    shippingAmount: number;
-    sellerNetAmount: number;
-    /** Satıcıya verilen hizmetlerin KDV'si — payout'tan kesilir. */
-    sellerServiceTaxAmount: number;
-    /** Alıcıya verilen hizmetlerin KDV'si — alıcının ödediğine eklenir. */
-    buyerServiceTaxAmount: number;
-    shippingDesi: number;
-  }> {
+  ): Promise<Awaited<ReturnType<OrderPricingService["getCommissionPreview"]>>> {
     return this.orderPricing.getCommissionPreview(
       amount,
       sellerId,

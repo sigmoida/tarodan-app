@@ -241,10 +241,20 @@ ile birebir aynı olmalı, düz `OK` döner) · payout transfer-sonuç URL'i
 `https://<api-host>/api/payouts/callback/paytr-transfer` (yalnız bayrağı
 açacağın gün) · mağaza canlı modda.
 
-**Sürat depo etiketi:** `TARODAN_WAREHOUSE_NAME/ADDRESS/CITY/DISTRICT/PHONE`
-set edilmezse gönderi etiketine "Tarodan Merkez Depo Adresi / Maltepe /
-05000000000" placeholder'ları basılır — admin'deki Warehouse sekmesi bunları
-KAPSAMAZ, ayrı env'dir.
+**Sürat depo adresi:** artık **admin → Ayarlar → Warehouse** sekmesindeki adres
+satırı (`warehouse_address_id`) tek kaynaktır; hem depoya gelen hem depodan
+çıkan kolilerde kullanılır. `TARODAN_WAREHOUSE_*` env'leri yalnız o satır hiç
+yoksa devreye giren son çare fallback'tir. **Şehri ilin tam adıyla yaz**
+("İstanbul", "K.Maraş" değil): v2 create sözleşmesi ili plaka koduna çevirir ve
+çözemediğinde gönderiyi açmaz.
+
+**Sürat create sözleşmesi:** `SURAT_CREATE_API_VERSION` (`v1` varsayılan).
+`v2`ye (GonderiOlustur — gerçek gönderici, pazaryeri için gereken) geçmeden önce
+Sürat'tan `SURAT_FIRMA_ID` alınmış olmalı; ikisi olmadan boot fail eder. Geçiş
+sırası: staging'de `SURAT_KARGO_TEST_MODE=true` + `v2` ile doğrula, sonra
+production'da `v2`ye al. Geri dönüş bu tek değişkendir. Takip ucu
+(`KargoTakipHareketDetayi`) her iki sözleşmede de aynıdır, dolayısıyla geçiş
+takibi etkilemez.
 
 ### Adım 3-4 — Dry run + reset
 

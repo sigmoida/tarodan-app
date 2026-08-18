@@ -11,8 +11,6 @@ export interface PackageTier {
   code: PackageTierCode;
   /** Satıcıya gösterilen ad ("Küçük Paket") — admin belirler. */
   label: string;
-  /** Tam kargo bedeli; satıcının payı komisyon kuralına göre bunun bir kısmıdır. */
-  amount: number;
   sampleWidth: number | null;
   sampleHeight: number | null;
   sampleLength: number | null;
@@ -23,6 +21,12 @@ export interface PackageTier {
  *
  * Desi arayüze HİÇ girmez: satıcı boyut seçer, fiyat ve net kazanç sunucudan gelir.
  * Aktif tarife yoksa uç 503 verir ve form fiyat gösteremez (fail-closed).
+ *
+ * TUTAR bilerek buradan okunmaz. Bu uç public'tir; kategoriyi, fiyatı ve
+ * satıcıyı bilmediği için yalnız TAM kargo bedelini verebilir — oysa satıcının
+ * ödeyeceği pay komisyon kuralından, kademe kademe çıkar. Kart tutarları
+ * `useCommissionPreview` üzerinden gelir; ikisi de tek karar fonksiyonundan
+ * türediği için kartla özet kutusu ayrışamaz.
  */
 export function usePackageTiers() {
   const query = useWebList<PackageTier[]>({

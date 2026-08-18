@@ -3,6 +3,8 @@
  * payload tipleri. Resmi Sürat Kargo API dokümanlarına dayanır.
  */
 
+import type { CargoShipmentRequest } from "./cargo-provider";
+
 // ─── Technical error classification ───────────────────────────────────────────
 
 export type SuratTechnicalCode =
@@ -182,10 +184,100 @@ export interface SuratGonderiPayload {
   EntegrasyonFirmasi?: string;
 }
 
+/**
+ * Bir gönderiyi tel biçiminden ÖNCE tanımlayan nötr girdi.
+ *
+ * Taşıyıcı istemcisinin sözleşmesi budur; hangi Sürat sürümüne hangi alan
+ * adlarıyla gidileceği istemcinin içinde kalır. Böylece `SuratCargoService`
+ * (idempotency, retry, takip) sürümden habersiz çalışır ve iki sürüm yan yana
+ * yaşayabilir.
+ */
+export type SuratCreateShipmentInput = Omit<
+  CargoShipmentRequest,
+  "idempotencyKey" | "correlationId"
+>;
+
 export interface SuratShipmentInput {
   idempotencyKey: string;
   correlationId: string;
-  payload: SuratGonderiPayload;
+  shipment: SuratCreateShipmentInput;
+}
+
+// ─── GonderiOlustur (v2) payload — "SURAT API_Gönderi Oluştur v2" dokümanı ────
+// v1'den ayrı tutuluyor: iki sözleşme geçiş süresince yan yana yaşıyor ve
+// alanların yarısı ya adını ya anlamını değiştiriyor.
+
+/** KimOder: kargo ücretini kimin ödediği. */
+export enum SuratKimOder {
+  Bos = 0,
+  GondericiOder = 1,
+  AliciOder = 2,
+  EntegrasyonFirmasiOder = 3,
+  EntegrasyonFirmasiKendiOder = 4,
+}
+
+/** GonderiDurumu: gönderinin statüsü; oluşturmada daima Kullanilmadi. */
+export enum SuratGonderiDurumu {
+  Kullanilmadi = 1,
+  Kullanildi = 2,
+  Iptal = 3,
+}
+
+/** GonderiSekli (v2): 0=Standart, 5=Bukoli, 8=Pudo. */
+export enum SuratGonderiOlusturSekli {
+  Standart = 0,
+  Bukoli = 5,
+  Pudo = 8,
+}
+
+/**
+ * Gönderen/Alıcı — v2'de iki taraf AYNI şekle sahiptir. `IlId` il plakasıdır
+ * (isim değil) ve `Adi`/`Soyadi` ayrı zorunlu alanlardır.
+ */
+export interface SuratGonderiOlusturParty {
+  /** Alfanumerik cari referansı (telefon, e-posta vb.). */
+  MusteriId: string;
+  Adi: string;
+  Soyadi: string;
+  Telefon: string;
+  /** Dokümanda opsiyonel tek alan. */
+  Email: string;
+  Adres: string;
+  /** İl PLAKASI (1-81). */
+  IlId: number;
+  IlceAdi: string;
+}
+
+/** `Data[]` dizisinin tek elemanı. */
+export interface SuratGonderiOlusturData {
+  /** Teslimatın TOPLAM desisi (v1'deki birim desi değil). */
+  Desi: number;
+  /** Teslimatın TOPLAM kg'si. */
+  Kg: number;
+  Adet: number;
+  KimOder: SuratKimOder;
+  /** = v1 OzelKargoTakipNo; takip ucunun WebSiparisKodu'su. */
+  SatisKodu: string;
+  Gonderen: SuratGonderiOlusturParty;
+  Alici: SuratGonderiOlusturParty;
+  GonderiDurumu: SuratGonderiDurumu;
+  GonderiSekli: SuratGonderiOlusturSekli;
+  IsKapidanTahsilat: boolean;
+  KapidaTahsilatTutari: number;
+  /** Parçalı gönderi kırılımı: "desi:kg:kargoTürü:adet;" — tek kolide boş. */
+  Icerik?: string;
+  Fiyat?: string;
+  TeslimKodu?: string;
+  TeslimNoktaKodu?: string;
+}
+
+/** `POST /api/GonderiOlustur` istek gövdesi. */
+export interface SuratGonderiOlusturRequest {
+  KullaniciAdi: string;
+  Sifre: string;
+  /** Sürat'ın müşteriye verdiği entegrasyon firma id'si. */
+  FirmaId: number;
+  Data: SuratGonderiOlusturData[];
 }
 
 // ─── Kargo Takip API types (REST) ─────────────────────────────────────────────

@@ -55,6 +55,7 @@ import { AdminPayoutService } from "./finance/admin-payout.service";
 import { AdminFinanceService } from "./finance/admin-finance.service";
 import { AdminTradeService } from "./trade/admin-trade.service";
 import { AdminTradeCommonService } from "./trade/admin-trade-common.service";
+import { WarehouseAddressModule } from "../shipping/warehouse/warehouse-address.module";
 import { AdminTradeQueryService } from "./trade/admin-trade-query.service";
 import { AdminTradeWarehouseService } from "./trade/admin-trade-warehouse.service";
 import { AdminTradeResolutionService } from "./trade/admin-trade-resolution.service";
@@ -129,6 +130,8 @@ import { scheduledProcessors } from "../../workers/scheduled-processors";
     ModerationModule,
     ElogoModule,
     ShippingTariffModule,
+    // Depo adresi tek kaynağı — AdminTradeCommonService buna delege eder.
+    WarehouseAddressModule,
     TradeModule,
     CommissionModule,
     MembershipModule,

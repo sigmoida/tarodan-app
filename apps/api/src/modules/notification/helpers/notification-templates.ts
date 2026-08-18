@@ -371,6 +371,11 @@ export const NOTIFICATION_TEMPLATES: Partial<
     messageKey: "server.notification.tradeAddressRequired.message",
     icon: "📍",
   },
+  [NotificationType.SELLER_ADDRESS_REQUIRED]: {
+    titleKey: "server.notification.sellerAddressRequired.title",
+    messageKey: "server.notification.sellerAddressRequired.message",
+    icon: "📍",
+  },
   [NotificationType.CARGO_CODE_READY]: {
     titleKey: "server.notification.cargoCodeReady.title",
     messageKey: "server.notification.cargoCodeReady.message",

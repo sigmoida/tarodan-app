@@ -25,6 +25,10 @@ import { canTransitionShipmentStatus } from "../../shipping/helpers/shipment-sta
 import { REFERENCE_PREFIX } from "../../../common/helpers/code-prefixes";
 import { generateReferenceCode } from "../../../common/helpers/generate-reference";
 import { i18nMessage } from "../../i18n";
+import {
+  TRADE_DESI_ITEM_SELECT,
+  tradeSideBillableDesi,
+} from "../../trade/helpers/trade-shipment-desi.helper";
 
 /**
  * Safe-trade (depo escrow) admin akışının depo-tarafı: depo teslim alma
@@ -80,6 +84,8 @@ export class AdminTradeWarehouseService {
     oid: string,
     address: any,
     user: any,
+    /** Kolideki ürünlerin desisi — redde kullanıcı KENDİ ürününü geri alır. */
+    desi: number,
   ): Promise<{
     carrier: string;
     trackingNumber: string;
@@ -97,10 +103,19 @@ export class AdminTradeWarehouseService {
         labelZpl: null,
       };
     }
+    const warehouse = await this.common.resolveWarehouseAddress();
     const result = await this.cargo.createShipment({
       idempotencyKey: `surat:trade-return:${oid}`,
       correlationId: `trade-reject-${tradeId}`,
       reference: oid,
+      // Depodan çıkan bacak: gönderen depo, alıcı ürünün sahibi.
+      sender: {
+        name: warehouse.fullName,
+        address: warehouse.address,
+        city: warehouse.city,
+        district: warehouse.district,
+        phone: warehouse.phone,
+      },
       recipient: {
         name: address.fullName || user?.displayName || "Takas İade",
         address: address.address,
@@ -110,6 +125,7 @@ export class AdminTradeWarehouseService {
       },
       content: "Takas İade Gönderisi",
       isReturn: true,
+      desi,
     });
     if (!result.ok) {
       const r = result as any;
@@ -138,6 +154,8 @@ export class AdminTradeWarehouseService {
     oid: string,
     address: any,
     user: any,
+    /** Kolideki ürünlerin desisi — çıkışta kullanıcı KARŞI tarafın ürününü alır. */
+    desi: number,
   ): Promise<{
     carrier: string;
     trackingNumber: string;
@@ -154,10 +172,19 @@ export class AdminTradeWarehouseService {
         labelZpl: null,
       };
     }
+    const warehouse = await this.common.resolveWarehouseAddress();
     const result = await this.cargo.createShipment({
       idempotencyKey: `surat:trade:${oid}`,
       correlationId: `trade-approve-${tradeId}`,
       reference: oid,
+      // Depodan çıkan bacak: gönderen depo, alıcı karşı taraf.
+      sender: {
+        name: warehouse.fullName,
+        address: warehouse.address,
+        city: warehouse.city,
+        district: warehouse.district,
+        phone: warehouse.phone,
+      },
       recipient: {
         name: address.fullName || user?.displayName || "Takas Alıcısı",
         address: address.address,
@@ -166,6 +193,7 @@ export class AdminTradeWarehouseService {
         phone: address.phone,
       },
       content: "Takas Gönderisi",
+      desi,
     });
     if (!result.ok) {
       const r = result as any;
@@ -204,6 +232,7 @@ export class AdminTradeWarehouseService {
             initiatorId: true,
             initiatorAddressId: true,
             receiverAddressId: true,
+            items: { select: TRADE_DESI_ITEM_SELECT },
           },
         },
       },
@@ -249,6 +278,11 @@ export class AdminTradeWarehouseService {
         oid,
         address,
         user,
+        // Çıkışta alıcı KARŞI tarafın ürününü alır.
+        tradeSideBillableDesi(
+          ship.trade.items,
+          isInitiator ? "receiver" : "initiator",
+        ),
       );
       await this.prisma.tradeShipment.update({
         where: { id: tradeShipmentId },
@@ -302,6 +336,7 @@ export class AdminTradeWarehouseService {
             receiverId: true,
             initiatorAddressId: true,
             receiverAddressId: true,
+            items: { select: TRADE_DESI_ITEM_SELECT },
           },
         },
       },
@@ -361,6 +396,11 @@ export class AdminTradeWarehouseService {
         oid,
         address,
         user,
+        // İadede alıcı KENDİ ürününü geri alır.
+        tradeSideBillableDesi(
+          ship.trade.items,
+          isInitiator ? "initiator" : "receiver",
+        ),
       );
       await this.prisma.tradeShipment.update({
         where: { id: tradeShipmentId },
@@ -816,7 +856,7 @@ export class AdminTradeWarehouseService {
       const trade = await tx.trade.findUnique({
         where: { id: tradeId },
         include: {
-          items: true,
+          items: { include: { product: { select: { shippingDesi: true } } } },
         },
       });
       if (!trade) {
@@ -945,12 +985,15 @@ export class AdminTradeWarehouseService {
             oid: initiatorOid,
             address: initiatorAddress,
             recipientUserId: trade.initiatorId,
+            // Initiator'a giden koli RECEIVER'ın ürününü taşır.
+            desi: tradeSideBillableDesi(trade.items, "receiver"),
           },
           {
             id: shipmentToReceiver.id,
             oid: receiverOid,
             address: receiverAddress,
             recipientUserId: trade.receiverId,
+            desi: tradeSideBillableDesi(trade.items, "initiator"),
           },
         ],
       };
@@ -969,6 +1012,7 @@ export class AdminTradeWarehouseService {
           draft.oid,
           draft.address,
           user,
+          draft.desi,
         );
         await this.prisma.tradeShipment.update({
           where: { id: draft.id },
@@ -1075,7 +1119,7 @@ export class AdminTradeWarehouseService {
       const trade = await tx.trade.findUnique({
         where: { id: tradeId },
         include: {
-          items: true,
+          items: { include: { product: { select: { shippingDesi: true } } } },
           cashPayments: true,
         },
       });
@@ -1212,12 +1256,15 @@ export class AdminTradeWarehouseService {
             oid: initiatorReturnOid,
             address: initiatorAddress,
             recipientUserId: trade.initiatorId,
+            // İadede herkes KENDİ ürününü geri alır.
+            desi: tradeSideBillableDesi(trade.items, "initiator"),
           },
           {
             id: returnToReceiver.id,
             oid: receiverReturnOid,
             address: receiverAddress,
             recipientUserId: trade.receiverId,
+            desi: tradeSideBillableDesi(trade.items, "receiver"),
           },
         ],
       };
@@ -1236,6 +1283,7 @@ export class AdminTradeWarehouseService {
           draft.oid,
           draft.address,
           user,
+          draft.desi,
         );
         await this.prisma.tradeShipment.update({
           where: { id: draft.id },

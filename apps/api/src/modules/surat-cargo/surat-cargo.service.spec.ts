@@ -5,35 +5,31 @@ import { CacheService } from "../cache/cache.service";
 import { SuratTrackingClient } from "./clients/surat-tracking.client";
 import type {
   SuratBusinessFailure,
-  SuratGonderiPayload,
+  SuratCreateShipmentInput,
   SuratTechnicalFailure,
 } from "./helpers/surat-cargo.types";
-import {
-  SuratKargoTuru,
-  SuratOdemeTipi,
-  SuratTasimaSekli,
-  SuratTeslimSekli,
-  SuratGonderiSekli,
-} from "./helpers/surat-cargo.types";
 
-const basePayload: SuratGonderiPayload = {
-  KisiKurum: "Ali Veli",
-  AliciAdresi: "Atatürk Cad. No:5",
-  Il: "İstanbul",
-  Ilce: "Kadıköy",
-  TelefonCep: "05551234567",
-  KargoTuru: SuratKargoTuru.Koli,
-  OdemeTipi: SuratOdemeTipi.Pesin,
-  OzelKargoTakipNo: "ORD-1",
-  Adet: 1,
-  BirimDesi: 1,
-  BirimKg: 1,
-  KapidanOdemeTahsilatTipi: 1,
-  TasimaSekli: SuratTasimaSekli.KaraYolu,
-  TeslimSekli: SuratTeslimSekli.AdreseTeslim,
-  GonderiSekli: SuratGonderiSekli.Standart,
-  Pazaryerimi: 0,
-  Iademi: false,
+/**
+ * NÖTR girdi: bu spec servisin sonuç sözleşmesini (Tamam/business/technical,
+ * retry, idempotency, takip) ölçer — tel biçimini değil. Alan adları istemcinin
+ * içinde kaldığı için Sürat sözleşmesi değiştiğinde bu dosya dokunulmaz.
+ */
+const baseShipment: SuratCreateShipmentInput = {
+  reference: "ORD-1",
+  sender: {
+    name: "Satan Kisi",
+    address: "Depo Mah. Sevk Cad. No:1",
+    city: "İstanbul",
+    district: "Maltepe",
+    phone: "05559876543",
+  },
+  recipient: {
+    name: "Ali Veli",
+    address: "Atatürk Cad. No:5",
+    city: "İstanbul",
+    district: "Kadıköy",
+    phone: "05551234567",
+  },
 };
 
 describe("SuratCargoService", () => {
@@ -70,7 +66,7 @@ describe("SuratCargoService", () => {
         {
           provide: SURAT_CARRIER_CLIENT,
           useValue: {
-            callGonderiyiKargoyaGonder: soapCall,
+            callCreateShipment: soapCall,
             getLocalTrackingCode: () => null,
             recordLocalCancel,
           },
@@ -102,7 +98,7 @@ describe("SuratCargoService", () => {
     const r = await service.submitShipmentWithRetry({
       idempotencyKey: "k1",
       correlationId: "c1",
-      payload: basePayload,
+      shipment: baseShipment,
     });
     expect(r.ok).toBe(true);
     if (r.ok) expect(r.suratMessage).toBe("Tamam");
@@ -114,7 +110,7 @@ describe("SuratCargoService", () => {
     const r = await service.submitShipmentWithRetry({
       idempotencyKey: "k2",
       correlationId: "c2",
-      payload: basePayload,
+      shipment: baseShipment,
     });
     expect(r.ok).toBe(false);
     const b = r as SuratBusinessFailure;
@@ -128,7 +124,7 @@ describe("SuratCargoService", () => {
     const r = await service.submitShipmentWithRetry({
       idempotencyKey: "k3",
       correlationId: "c3",
-      payload: basePayload,
+      shipment: baseShipment,
     });
     expect(r.ok).toBe(false);
     expect((r as SuratTechnicalFailure).code).toBe("EMPTY_RESPONSE");
@@ -141,7 +137,7 @@ describe("SuratCargoService", () => {
     const r = await service.submitShipmentWithRetry({
       idempotencyKey: "k4b",
       correlationId: "c4b",
-      payload: basePayload,
+      shipment: baseShipment,
     });
     expect(r.ok).toBe(false);
     expect((r as SuratTechnicalFailure).code).toBe("HTTP_5XX");
@@ -154,7 +150,7 @@ describe("SuratCargoService", () => {
     const r = await service.submitShipmentWithRetry({
       idempotencyKey: "k4",
       correlationId: "c4",
-      payload: basePayload,
+      shipment: baseShipment,
     });
     expect(r.ok).toBe(false);
     expect((r as SuratTechnicalFailure).code).toBe("TIMEOUT");
@@ -170,7 +166,7 @@ describe("SuratCargoService", () => {
     const r = await service.submitShipmentWithRetry({
       idempotencyKey: "idem",
       correlationId: "new-corr",
-      payload: basePayload,
+      shipment: baseShipment,
     });
     expect(r.ok).toBe(true);
     expect(soapCall).not.toHaveBeenCalled();
@@ -190,7 +186,7 @@ describe("SuratCargoService", () => {
     const r = await service.submitShipmentWithRetry({
       idempotencyKey: "k5",
       correlationId: "c5",
-      payload: basePayload,
+      shipment: baseShipment,
     });
     expect(r.ok).toBe(true);
     expect(soapCall).toHaveBeenCalledTimes(2);
@@ -201,7 +197,7 @@ describe("SuratCargoService", () => {
     const r = await service.submitShipmentWithRetry({
       idempotencyKey: "k6",
       correlationId: "c6",
-      payload: basePayload,
+      shipment: baseShipment,
     });
     expect(r.ok).toBe(false);
     expect(soapCall).toHaveBeenCalledTimes(1);
@@ -213,7 +209,7 @@ describe("SuratCargoService", () => {
     const result = await service.submitShipmentWithRetry({
       idempotencyKey: "duplicate",
       correlationId: "duplicate",
-      payload: basePayload,
+      shipment: baseShipment,
     });
 
     expect(result.ok).toBe(true);
@@ -224,7 +220,7 @@ describe("SuratCargoService", () => {
     const result = await service.createShipmentWithBarcode({
       idempotencyKey: "create-track",
       correlationId: "create-track",
-      payload: basePayload,
+      shipment: baseShipment,
     });
 
     expect(result.ok).toBe(true);
@@ -236,18 +232,28 @@ describe("SuratCargoService", () => {
     }
   });
 
-  it("maps the provider-neutral shipment port to the documented Surat payload", async () => {
+  it("hands the carrier client both parties untouched — wire mapping is the client's job", async () => {
+    const sender = {
+      name: "Satan Kisi",
+      address: "Depo Mah. Sevk Cad. No:1",
+      city: "İstanbul",
+      district: "Maltepe",
+      phone: "05559876543",
+    };
+    const recipient = {
+      name: "Ayşe Kaya",
+      address: "Adres 1",
+      city: "İstanbul",
+      district: "Kadıköy",
+      phone: "05551112233",
+    };
+
     const result = await service.createShipment({
       idempotencyKey: "neutral-create",
       correlationId: "neutral-create",
       reference: "PKG-42",
-      recipient: {
-        name: "  Ayşe Kaya  ",
-        address: "Adres 1",
-        city: " İstanbul ",
-        district: " Kadıköy ",
-        phone: "+90 555 111 22 33",
-      },
+      sender,
+      recipient,
       content: "Ürün",
       desi: 4,
       isReturn: true,
@@ -259,16 +265,18 @@ describe("SuratCargoService", () => {
       labelData: null,
       providerMessage: "Tamam",
     });
+    // Servis alan adı bilmez: idempotencyKey/correlationId'yi ayırıp gönderinin
+    // kendisini olduğu gibi iletir. `sender` buradan geçmezse pazaryeri
+    // migrasyonunun tamamı sessizce çalışmaz.
     expect(soapCall).toHaveBeenCalledWith(
-      expect.objectContaining({
-        OzelKargoTakipNo: "PKG-42",
-        KisiKurum: "Ayşe Kaya",
-        Il: "İstanbul",
-        Ilce: "Kadıköy",
-        TelefonCep: "05551112233",
-        BirimDesi: 4,
-        Iademi: true,
-      }),
+      {
+        reference: "PKG-42",
+        sender,
+        recipient,
+        content: "Ürün",
+        desi: 4,
+        isReturn: true,
+      },
       expect.any(Object),
     );
   });
@@ -279,7 +287,7 @@ describe("SuratCargoService", () => {
     const result = await service.createShipmentWithBarcode({
       idempotencyKey: "barcode-empty",
       correlationId: "barcode-empty",
-      payload: basePayload,
+      shipment: baseShipment,
     });
 
     expect(result.ok).toBe(false);
@@ -296,13 +304,8 @@ describe("SuratCargoService", () => {
         idempotencyKey: "registered-pending",
         correlationId: "registered-pending",
         reference: "PKG-PENDING",
-        recipient: {
-          name: "Ayşe Kaya",
-          address: "Adres 1",
-          city: "İstanbul",
-          district: "Kadıköy",
-          phone: "05551112233",
-        },
+        sender: baseShipment.sender,
+        recipient: baseShipment.recipient,
       }),
     ).resolves.toEqual({
       ok: true,

@@ -992,20 +992,24 @@ describe("14 — Kargo & Teslimat (SHP)", () => {
   describe("Sürat integration on payment fulfillment", () => {
     scenario("SHP-121", async () => {
       // Barkod yalnız başarılı ödeme sonrasında üretilir.
-      const { productId } = await makeSellerWithProduct();
+      // Satıcı İstanbul, alıcı Ankara → gönderici/alıcı karışırsa bu test düşer.
+      const { productId } = await makeSellerWithProduct({
+        sellerCity: "İstanbul",
+      });
       const { buyer, addressId } = await makeBuyerWithAddress("Ankara");
 
       const { orderId } = await buyAndPay(ctx, buyer, productId, addressId);
       expect(orderId).toBeTruthy();
 
       expect(ctx.surat.shipmentCalls.length).toBe(1);
-      const payload = ctx.surat.shipmentCalls[0];
-      expect(payload.Pazaryerimi).toBe(0);
-      expect(payload.KargoTuru).toBe(3); // Koli
-      expect(payload.OdemeTipi).toBe(1); // Peşin
-      expect(payload.KapidanOdemeTahsilatTipi).toBe(1); // Nakit
-      expect(payload.Iademi).toBe(false);
-      expect(payload.OzelKargoTakipNo).toBeTruthy();
+      const shipment = ctx.surat.shipmentCalls[0];
+      // Satışta gönderen SATICIdır. Taşıyıcı sabitleri (koli türü, ödeme tipi,
+      // pazaryeri bayrağı) artık istemcinin işidir ve orada pin'li
+      // (surat-rest-client-mapping.spec.ts); burada ölçülen şey YÖNdür.
+      expect(shipment.sender.city).toBe("İstanbul");
+      expect(shipment.recipient.city).toBe("Ankara");
+      expect(shipment.isReturn).toBeFalsy();
+      expect(shipment.reference).toBeTruthy();
     });
 
     scenario.skip(
@@ -1116,9 +1120,9 @@ describe("14 — Kargo & Teslimat (SHP)", () => {
         where: { id: orderId },
       });
       expect(ctx.surat.shipmentCalls.length).toBe(1);
-      const payload = ctx.surat.shipmentCalls[0];
-      expect(payload.OzelKargoTakipNo).toBe(order!.orderNumber);
-      expect(payload.OzelKargoTakipNo.length).toBeLessThanOrEqual(50);
+      const shipment = ctx.surat.shipmentCalls[0];
+      expect(shipment.reference).toBe(order!.orderNumber);
+      expect(shipment.reference.length).toBeLessThanOrEqual(50);
     });
 
     scenario("SHP-193", async () => {
@@ -1140,9 +1144,7 @@ describe("14 — Kargo & Teslimat (SHP)", () => {
       await buyAndPay(ctx, buyer, product.id, addressId);
 
       expect(ctx.surat.shipmentCalls.length).toBe(1);
-      expect(ctx.surat.shipmentCalls[0].SahisBirim).toBe(
-        "Nadir Vinil Plak 1975",
-      );
+      expect(ctx.surat.shipmentCalls[0].content).toBe("Nadir Vinil Plak 1975");
     });
   });
 
