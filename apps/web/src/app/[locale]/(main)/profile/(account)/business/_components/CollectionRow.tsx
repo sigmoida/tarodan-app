@@ -1,19 +1,21 @@
 /** @format */
 
+"use client";
+
 import { Link } from "@/i18n/navigation";
 import OptimizedImage from "@/components/OptimizedImage";
 import { BookOpenIcon, EyeIcon, HeartIcon } from "@heroicons/react/24/outline";
 import type { CollectionStats } from "../_lib/types";
-import { getTranslations } from "next-intl/server";
+import { useTranslations } from "next-intl";
 
-export default async function CollectionRow({
+export default function CollectionRow({
   collection,
   index,
 }: {
   collection: CollectionStats;
   index: number;
 }) {
-  const t = await getTranslations();
+  const t = useTranslations();
   return (
     <Link
       href={`/collections/${collection.id}`}

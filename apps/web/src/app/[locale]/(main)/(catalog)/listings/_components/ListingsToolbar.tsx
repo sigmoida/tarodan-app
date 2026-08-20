@@ -146,7 +146,7 @@ export function ActiveFilterChips() {
   const valueFilters: Array<{ k: string; v?: string }> = [
     { k: "category", v: filtersForSidebar.category },
     { k: "brand", v: filters.brand },
-    { k: t("page.listings.listingstoolbar.carmodel"), v: filters.carModel },
+    { k: "carModel", v: filters.carModel },
     { k: "scale", v: filters.scale },
     { k: "material", v: filters.material },
     { k: "condition", v: filters.condition },
@@ -172,8 +172,7 @@ export function ActiveFilterChips() {
           updates.carModel = "";
         }
         if (k === "category") updates.categoryId = "";
-        if (k === t("page.listings.listingstoolbar.carmodel"))
-          updates.carModelId = "";
+        if (k === "carModel") updates.carModelId = "";
         handleFiltersChange(updates);
       },
     });

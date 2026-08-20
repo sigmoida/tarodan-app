@@ -1,15 +1,17 @@
 /** @format */
 
+"use client";
+
 import { ClockIcon } from "@heroicons/react/24/outline";
 import { Alert } from "@tarodan/ui";
-import { getTranslations } from "next-intl/server";
+import { useTranslations } from "next-intl";
 
-export default async function TradeCountdown({
+export default function TradeCountdown({
   countdown,
 }: {
   countdown: string | null;
 }) {
-  const t = await getTranslations();
+  const t = useTranslations();
   if (!countdown) return null;
   return (
     <Alert

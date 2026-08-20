@@ -80,7 +80,7 @@ export default async function ListingsPage({ searchParams }: Props) {
   // a slug we ALSO seed `['categoryBySlug', slug]` so the client reads its `.id`
   // synchronously on first render — that keeps resolvedCategoryId (and thus the
   // listings key) identical to the server seed, so there's no refetch flash.
-  const urlCategoryId = sp.get(t("page.listings.page.categoryid")) || "";
+  const urlCategoryId = sp.get("categoryId") || "";
   const categorySlug = filters.category;
   let resolvedCategoryId: string | undefined = urlCategoryId || undefined;
 

@@ -1,9 +1,11 @@
 /** @format */
 
+"use client";
+
 import { Link } from "@/i18n/navigation";
 import { Button } from "@tarodan/ui";
 import { EmptyStateCard } from "@/components/ui";
-import { getTranslations } from "next-intl/server";
+import { useTranslations } from "next-intl";
 
 /**
  * Backend hints that the company name is missing → send the user to /profile;
@@ -22,8 +24,8 @@ function needsCompanyName(error: string): boolean {
   /* eslint-enable @tarodan/no-hardcoded-turkish */
 }
 
-export default async function BusinessError({ error }: { error: string }) {
-  const t = await getTranslations();
+export default function BusinessError({ error }: { error: string }) {
+  const t = useTranslations();
   const companyNameHint = needsCompanyName(error);
 
   return (

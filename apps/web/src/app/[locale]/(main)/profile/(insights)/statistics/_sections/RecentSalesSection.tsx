@@ -1,19 +1,17 @@
 /** @format */
 
+"use client";
+
 import { Link } from "@/i18n/navigation";
 import OptimizedImage from "@/components/OptimizedImage";
 import { TagIcon } from "@heroicons/react/24/outline";
 import SectionCard from "@/components/ui/SectionCard";
 import { formatDate, formatTL } from "@/lib/format";
 import type { RecentSale } from "../_lib/types";
-import { getTranslations } from "next-intl/server";
+import { useTranslations } from "next-intl";
 
-export default async function RecentSalesSection({
-  sales,
-}: {
-  sales: RecentSale[];
-}) {
-  const t = await getTranslations();
+export default function RecentSalesSection({ sales }: { sales: RecentSale[] }) {
+  const t = useTranslations();
   if (sales.length === 0) return null;
 
   return (

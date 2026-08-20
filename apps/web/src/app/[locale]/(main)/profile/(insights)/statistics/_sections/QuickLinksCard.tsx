@@ -1,5 +1,7 @@
 /** @format */
 
+"use client";
+
 import { Link } from "@/i18n/navigation";
 import type { ComponentType, SVGProps } from "react";
 import {
@@ -10,7 +12,7 @@ import {
 } from "@heroicons/react/24/outline";
 import SectionCard from "@/components/ui/SectionCard";
 import type { Translate } from "@/types/i18n";
-import { getTranslations } from "next-intl/server";
+import { useTranslations } from "next-intl";
 
 type Icon = ComponentType<SVGProps<SVGSVGElement>>;
 
@@ -37,8 +39,8 @@ const LINKS = (t: Translate): { href: string; label: string; icon: Icon }[] => [
   },
 ];
 
-export default async function QuickLinksCard() {
-  const t = await getTranslations();
+export default function QuickLinksCard() {
+  const t = useTranslations();
   return (
     <SectionCard title={t("profile.statisticsLinks.hizliErisim")}>
       <div className="grid grid-cols-2 gap-4 md:grid-cols-4">

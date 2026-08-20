@@ -1,16 +1,18 @@
 /** @format */
 
+"use client";
+
 import SectionCard from "@/components/ui/SectionCard";
 import CollectionRow from "../_components/CollectionRow";
 import type { CollectionStats } from "../_lib/types";
-import { getTranslations } from "next-intl/server";
+import { useTranslations } from "next-intl";
 
-export default async function CollectionsTab({
+export default function CollectionsTab({
   collections,
 }: {
   collections: CollectionStats[];
 }) {
-  const t = await getTranslations();
+  const t = useTranslations();
   return (
     <SectionCard
       title={t("page.business.collectionstab.enPopulerKoleksiyonlar")}

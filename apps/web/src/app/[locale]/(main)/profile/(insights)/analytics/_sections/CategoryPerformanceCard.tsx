@@ -1,15 +1,17 @@
 /** @format */
 
+"use client";
+
 import SectionCard from "@/components/ui/SectionCard";
 import type { CategoryStat } from "../_lib/types";
-import { getTranslations } from "next-intl/server";
+import { useTranslations } from "next-intl";
 
-export default async function CategoryPerformanceCard({
+export default function CategoryPerformanceCard({
   categories,
 }: {
   categories: CategoryStat[];
 }) {
-  const t = await getTranslations();
+  const t = useTranslations();
   const maxViews = Math.max(...categories.map((c) => c.views), 1);
 
   return (

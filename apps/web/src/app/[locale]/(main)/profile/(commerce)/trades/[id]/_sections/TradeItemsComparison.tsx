@@ -1,5 +1,7 @@
 /** @format */
 
+"use client";
+
 import { Link } from "@/i18n/navigation";
 import OptimizedImage from "@/components/OptimizedImage";
 import { formatTL } from "@/lib/format";
@@ -9,10 +11,10 @@ import {
   type TradeItem,
 } from "../../_lib/types";
 import { TradeSwapBadge } from "../../_components/TradeSwapBadge";
-import { getTranslations } from "next-intl/server";
+import { useTranslations } from "next-intl";
 import { imagePlaceholder } from "@/lib/placeholder";
 
-async function ItemColumn({
+function ItemColumn({
   heading,
   items,
   tradeId,
@@ -23,7 +25,7 @@ async function ItemColumn({
   tradeId: string;
   logPage: string;
 }) {
-  const t = await getTranslations();
+  const t = useTranslations();
   return (
     // `min-w-0`: `lg`de iki kolon yan yana geliyor ve tam o kırılımda profil
     // kenar çubuğu da açılıyor, yani ana sütun en dar hâlinde. `flex-1` tek
@@ -77,7 +79,7 @@ async function ItemColumn({
   );
 }
 
-export default async function TradeItemsComparison({
+export default function TradeItemsComparison({
   theirItems,
   myItems,
   theirName,
@@ -88,7 +90,7 @@ export default async function TradeItemsComparison({
   theirName: string;
   tradeId: string;
 }) {
-  const t = await getTranslations();
+  const t = useTranslations();
   return (
     <div className="flex flex-col lg:flex-row items-stretch gap-6 mb-6">
       {/* SOL - Karşı Tarafın Ürünü */}

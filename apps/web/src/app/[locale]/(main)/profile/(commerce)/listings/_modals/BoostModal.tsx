@@ -246,9 +246,7 @@ export default function BoostModal({
                     <label
                       key={opt.durationDays}
                       className={`flex items-center justify-between px-3 py-3 cursor-pointer transition-colors ${
-                        active
-                          ? "bg-warning-50"
-                          : t("page.listings.boostmodal.hoverBgSurfaceAlt40")
+                        active ? "bg-warning-50" : "hover:bg-surface-alt/40"
                       }`}
                     >
                       <div className="flex items-center gap-3">

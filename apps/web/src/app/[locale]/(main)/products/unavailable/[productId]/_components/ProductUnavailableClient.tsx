@@ -32,8 +32,8 @@ export default function ProductUnavailableClient() {
         <div
           className={`mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full ${
             isBackInStock
-              ? t("product.unavailable.bgSuccess100TextSuccess600")
-              : t("product.unavailable.bgDanger100TextDanger600")
+              ? "bg-success-100 text-success-600"
+              : "bg-danger-100 text-danger-600"
           }`}
         >
           {isBackInStock ? (

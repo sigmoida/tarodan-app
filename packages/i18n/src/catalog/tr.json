@@ -384,8 +384,6 @@
       "hotWheelsMatchboxAUTOartMinichampsVe": "Hot Wheels, Matchbox, AUTOart, Minichamps ve daha fazlası — diecast üreticilerini keşfedin."
     },
     "manufacturerCard": {
-      "borderPrimary300ShadowMd": "border-primary-300 shadow-md",
-      "borderBorderHoverBorderPrimary200": "border-border hover:border-primary-200 hover:shadow-sm",
       "kurulus": "Kuruluş:",
       "aktifIlan": "Aktif İlan:",
       "webSitesi": "Web Sitesi",
@@ -823,8 +821,6 @@
     "removedTitle": "Bu ürün kaldırıldı",
     "removedDescription": "Bu ürün yönetici tarafından kaldırılmış ve yeniden açılamaz. Tekrar satmak için yeni bir ilan oluşturabilirsiniz.",
     "unavailable": {
-      "bgSuccess100TextSuccess600": "bg-success-100 text-success-600",
-      "bgDanger100TextDanger600": "bg-danger-100 text-danger-600",
       "iyiHaberUrunTekrarSatista": "İyi haber: ürün tekrar satışta!",
       "titleTekrarStogaDustu": "\"{title}\" tekrar stoğa düştü.",
       "beklediginizUrunTekrarSatista": "Beklediğiniz ürün tekrar satışta.",
@@ -1680,7 +1676,6 @@
     "checkout": {
       "gecersizUyelikPlani": "Geçersiz üyelik planı",
       "planlaraDon": "Planlara Dön",
-      "trTR": "tr-TR",
       "uyelikYukseltme": "Üyelik Yükseltme",
       "guvenliOdemeIleUyeliginiziYukseltin": "Güvenli ödeme ile üyeliğinizi yükseltin",
       "guvenliOdeme": "Güvenli Ödeme",
@@ -1698,7 +1693,6 @@
       "temel": "Temel",
       "premium": "Premium",
       "is": "İş",
-      "trTR": "tr-TR",
       "donemSonunaKadar": "Dönem sonuna kadar",
       "donemSonunda": "dönem sonunda",
       "ucretsiz": "Ücretsiz",
@@ -1712,7 +1706,6 @@
       "onDate": "{date} tarihinde"
     },
     "currentCard": {
-      "trTR": "tr-TR",
       "mevcutUyelikBilgileri": "Mevcut Üyelik Bilgileri",
       "uyelikBaslangicTarihi": "Üyelik Başlangıç Tarihi",
       "gecerlilikBitisTarihi": "Geçerlilik Bitiş Tarihi",
@@ -9948,9 +9941,7 @@
         "bYardimaMiIhtiyacinizVarB": "<b>Yardıma mı ihtiyacınız var?</b>Ödeme sırasında sorun yaşarsanız, lütfen <link2>destek ekibimiz</link2> ile iletişime geçin."
       },
       "usepaymentstatus": {
-        "guestTrue": "guest=true",
         "odemeBasarili": "Ödeme başarılı",
-        "guestTrue2": "&guest=true",
         "failedToFetchPayment": "Failed to fetch payment:",
         "odemeBilgisiYuklenemedi": "Ödeme bilgisi yüklenemedi",
         "odemeIptalEdildiUrunTekrarSatisa": "Ödeme iptal edildi, ürün tekrar satışa açıldı."
@@ -9958,9 +9949,6 @@
     },
     "checkout": {
       "checkoutcontext": {
-        "buynow": "buyNow",
-        "sellerSALESSUSPENDED": "SELLER_SALES_SUSPENDED",
-        "productNOTACTIVE": "PRODUCT_NOT_ACTIVE",
         "usecheckoutMustBeUsedWithinA": "useCheckout must be used within a CheckoutProvider"
       },
       "schema": {
@@ -10008,17 +9996,11 @@
       }
     },
     "listings": {
-      "productspecs": {
-        "olcek": "Ölçek",
-        "malzeme": "Malzeme",
-        "mdGridCols2": "md:grid-cols-2"
-      },
       "page": {
         "ilanBulunamadiTarodan": "İlan Bulunamadı | Tarodan",
         "titleTarodanDaSatista": "{title} Tarodan'da satışta",
         "urunlerTarodan": "Ürünler | Tarodan",
         "diecastModelArabaKoleksiyonVeModel": "Diecast model araba, koleksiyon ve model araç ilanlarını keşfedin. Markaya, ölçeğe, fiyata ve duruma göre filtreleyin; takas ve indirimli ürünleri bulun.",
-        "categoryid": "categoryId",
         "sil": "Sil"
       },
       "usesidebarfilters": {
@@ -10051,12 +10033,10 @@
         "diecastMetal": "Diecast (Metal)",
         "resinRecine": "Resin (Reçine)",
         "composite": "Composite",
-        "plastic": "Plastic",
-        "carmodel": "carModel"
+        "plastic": "Plastic"
       },
       "boostmodal": {
-        "aktifOneCikarma": "Aktif Öne Çıkarma",
-        "hoverBgSurfaceAlt40": "hover:bg-surface-alt/40"
+        "aktifOneCikarma": "Aktif Öne Çıkarma"
       }
     },
     "new": {
@@ -10096,11 +10076,6 @@
         "karsiTarafOdeyecek": "Karşı taraf ödeyecek",
         "toplamTeklif": "Toplam Teklif:",
         "istenenUrun": "İstenen Ürün:"
-      },
-      "usenewtrade": {
-        "takasOzelligi": "Takas özelliği",
-        "uyeliginizdeMevcutDegil": "üyeliğinizde mevcut değil",
-        "takasOzelligineSahipDegil": "takas özelliğine sahip değil"
       }
     },
     "manufacturers": {
@@ -10126,7 +10101,6 @@
     },
     "trackOrder": {
       "trackorderclient": {
-        "ordernumber": "orderNumber",
         "ornORDK7X9M2QF3N": "örn. ORD-K7X9M2QF3N",
         "siparisteKullandiginizEPosta": "siparişte kullandığınız e-posta",
         "suratKargo": "Sürat Kargo"
@@ -10214,10 +10188,8 @@
       "ticketdetailclient": {
         "destekMerkezi": "Destek Merkezi",
         "mesajlar": "Mesajlar",
-        "textInverted90": "text-inverted/90",
         "siz": "Siz",
         "destekEkibi": "Destek Ekibi",
-        "textInverted70": "text-inverted/70",
         "buTalepKapatilmistirYeniBirSorun": "Bu talep kapatılmıştır. Yeni bir sorun için destek talebi oluşturabilirsiniz.",
         "gonder": "Gönder"
       }
@@ -10345,8 +10317,7 @@
     "app": {
       "page": {
         "tarodanDiecastModelArabaPazari": "Tarodan - Diecast Model Araba Pazarı",
-        "diecastModelArabaKoleksiyonculariIcinGuvenli": "Diecast model araba koleksiyoncuları için güvenli alış, satış ve takas platformu. Öne çıkan ürünler, indirimler, takas vitrini ve popüler ilanları keşfedin.",
-        "productsList": "products:list"
+        "diecastModelArabaKoleksiyonculariIcinGuvenli": "Diecast model araba koleksiyoncuları için güvenli alış, satış ve takas platformu. Öne çıkan ürünler, indirimler, takas vitrini ve popüler ilanları keşfedin."
       },
       "notFound": {
         "sayfaBulunamadi": "Sayfa bulunamadı",
@@ -10395,14 +10366,9 @@
         "invalidOrderResponse": "Invalid order response",
         "iletisimSellerCommunication5KargoSellerShipping5": "İletişim: {sellerCommunication}/5, Kargo: {sellerShipping}/5, Paketleme: {sellerPackaging}/5",
         "reviewSubmitError": "Review submit error:",
-        "blank": "_blank",
-        "noopenerNoreferrer": "noopener,noreferrer",
-        "contentType": "Content-Type",
-        "multipartFormData": "multipart/form-data"
+        "contentType": "Content-Type"
       },
       "useorders": {
-        "blank": "_blank",
-        "noopenerNoreferrer": "noopener,noreferrer",
         "iletisimSellerCommunication5KargoSellerShipping5": "İletişim: {sellerCommunication}/5, Kargo: {sellerShipping}/5, Paketleme: {sellerPackaging}/5"
       }
     },
@@ -10482,17 +10448,11 @@
     },
     "messages": {
       "messagecomposer": {
-        "uyari": "Uyarı",
-        "enter": "Enter"
+        "uyari": "Uyarı"
       },
       "messageticks": {
-        "textInverted60": "text-inverted/60",
         "okundu": "Okundu",
-        "iletildi": "İletildi",
-        "currentcolor": "currentColor",
-        "m186717l55": "M18 6 7 17l-5-5",
-        "m22107575L13": "m22 10-7.5 7.5L13 16",
-        "m206917l55": "M20 6 9 17l-5-5"
+        "iletildi": "İletildi"
       }
     },
     "profile": {

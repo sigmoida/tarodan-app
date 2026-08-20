@@ -65,7 +65,7 @@ export default function TicketDetailClient() {
                   >
                     <div className="mb-1 flex items-center justify-between gap-3">
                       <span
-                        className={`text-xs font-medium ${mine ? t("page.support.ticketdetailclient.textInverted90") : "text-heading"}`}
+                        className={`text-xs font-medium ${mine ? "text-inverted/90" : "text-heading"}`}
                       >
                         {mine
                           ? t("page.support.ticketdetailclient.siz")
@@ -73,7 +73,7 @@ export default function TicketDetailClient() {
                             t("page.support.ticketdetailclient.destekEkibi")}
                       </span>
                       <span
-                        className={`text-2xs ${mine ? t("page.support.ticketdetailclient.textInverted70") : "text-muted"}`}
+                        className={`text-2xs ${mine ? "text-inverted/70" : "text-muted"}`}
                       >
                         {formatDateTime(message.createdAt)}
                       </span>

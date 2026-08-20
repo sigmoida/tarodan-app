@@ -424,11 +424,7 @@ export function useDownloadElogoInvoice() {
       const res = await api.get(`/elogo/invoices/${invoiceId}/pdf`);
       const url = res.data?.url;
       if (!url) throw new Error("not-ready");
-      window.open(
-        url,
-        t("page.orders.useorderdetail.blank"),
-        t("page.orders.useorderdetail.noopenerNoreferrer"),
-      );
+      window.open(url, "_blank", "noopener,noreferrer");
     },
     onSuccess: () => {
       toast.success(t("order.invoiceOpened"));
@@ -483,11 +479,7 @@ export function useDownloadSellerInvoice(orderId: string) {
       const res = await api.get(`/orders/${orderId}/seller-invoice/download`);
       const url = res.data?.url;
       if (!url) throw new Error("not-found");
-      window.open(
-        url,
-        t("page.orders.useorderdetail.blank"),
-        t("page.orders.useorderdetail.noopenerNoreferrer"),
-      );
+      window.open(url, "_blank", "noopener,noreferrer");
     },
     onError: (err: any) => {
       if (err?.message === "not-found") {
