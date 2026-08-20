@@ -73,9 +73,7 @@ export default function TrackOrderClient() {
   const statusLabel = order ? getOrderStatusLabel(order.status) : null;
   const shipAddr = order?.shippingAddress as Record<string, string> | undefined;
   const looking =
-    loading &&
-    searchParams.get(t("page.trackOrder.trackorderclient.ordernumber")) &&
-    searchParams.get("email");
+    loading && searchParams.get("orderNumber") && searchParams.get("email");
 
   return (
     <PageShell className="pb-8">

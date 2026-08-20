@@ -126,8 +126,7 @@ function useCheckoutValue() {
   // Ödenecek kapsam: "Hemen Al" ile gelindiyse yalnız o ürün, aksi halde
   // sepette SEÇİLİ satırlar. Sepetin tamamı değil — seçim dışı bırakılan ürün
   // sepette durur ama tahsil edilmez.
-  const buyNowRequested =
-    searchParams.get(t("page.checkout.checkoutcontext.buynow")) === "true";
+  const buyNowRequested = searchParams.get("buyNow") === "true";
   const { scopedLines, isBuyNow } = useCheckoutScope(
     cartLines,
     buyNowRequested,
@@ -188,9 +187,9 @@ function useCheckoutValue() {
       (item) => item.productId === first.productId,
     );
     const message =
-      first.code === t("page.checkout.checkoutcontext.sellerSALESSUSPENDED")
+      first.code === "SELLER_SALES_SUSPENDED"
         ? t("server.commission.sellerSalesSuspended")
-        : first.code === t("page.checkout.checkoutcontext.productNOTACTIVE")
+        : first.code === "PRODUCT_NOT_ACTIVE"
           ? t("server.order.productNotActiveByTitle", {
               title: requested?.title ?? first.productId,
             })

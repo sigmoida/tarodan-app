@@ -164,11 +164,7 @@ export function useInvoiceDownload() {
       const res = await api.get(`/elogo/invoices/${invoice.id}/pdf`);
       const url = res.data?.url;
       if (url) {
-        window.open(
-          url,
-          t("page.orders.useorders.blank"),
-          t("page.orders.useorders.noopenerNoreferrer"),
-        );
+        window.open(url, "_blank", "noopener,noreferrer");
         toast.success(t("order.invoiceOpened"));
       } else {
         toast.error(t("order.invoiceNotReady"));

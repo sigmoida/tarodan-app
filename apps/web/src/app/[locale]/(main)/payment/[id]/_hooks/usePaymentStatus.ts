@@ -84,7 +84,7 @@ export function usePaymentStatus() {
             router.push(
               isMembershipPayment
                 ? membershipSuccessUrl
-                : `/payment/success?paymentId=${paymentId}${!hasSession ? t("page.payment.usepaymentstatus.guestTrue2") : ""}`,
+                : `/payment/success?paymentId=${paymentId}${!hasSession ? "&guest=true" : ""}`,
             );
             return;
           }

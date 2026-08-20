@@ -61,7 +61,7 @@ async function fetchProducts(
   const res = await fetch(`${API_BASE}/api/products?${qs}`, {
     // `products:list` tag lets the backend on-demand revalidate every rail when a
     // product/discount changes (see app/api/revalidate); revalidate is the fallback.
-    next: { revalidate: 60, tags: [t("page.app.page.productsList")] },
+    next: { revalidate: 60, tags: ["products:list"] },
   });
   if (!res.ok) throw new Error(`products ${res.status}`);
   return unwrapList<Product>(await res.json());

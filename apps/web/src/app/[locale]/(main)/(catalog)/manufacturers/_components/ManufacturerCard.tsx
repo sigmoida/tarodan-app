@@ -25,8 +25,8 @@ export default function ManufacturerCard({
       value={brand.slug}
       className={`overflow-hidden rounded-lg border bg-surface-elevated transition-all last:border-b ${
         expanded
-          ? t("brands.manufacturerCard.borderPrimary300ShadowMd")
-          : t("brands.manufacturerCard.borderBorderHoverBorderPrimary200")
+          ? "border-primary-300 shadow-md"
+          : "border-border hover:border-primary-200 hover:shadow-sm"
       }`}
     >
       {/* Header — always visible; the trigger renders its own chevron.

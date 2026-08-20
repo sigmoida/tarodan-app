@@ -132,10 +132,7 @@ export default function MessageComposer({
           value={newMessage}
           onChange={(e) => onMessageChange(e.target.value)}
           onKeyDown={(e) => {
-            if (
-              e.key === t("page.messages.messagecomposer.enter") &&
-              !e.shiftKey
-            ) {
+            if (e.key === "Enter" && !e.shiftKey) {
               e.preventDefault();
               onSend();
             }

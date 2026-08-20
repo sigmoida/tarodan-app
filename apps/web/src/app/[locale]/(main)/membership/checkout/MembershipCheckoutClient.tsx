@@ -69,13 +69,10 @@ export default function MembershipCheckoutClient() {
     );
   }
 
-  const priceLabel = tierInfo.price.toLocaleString(
-    t("membership.checkout.trTR"),
-    {
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
-    },
-  );
+  const priceLabel = tierInfo.price.toLocaleString(t("common.dateLocale"), {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
 
   return (
     <PageShell>
