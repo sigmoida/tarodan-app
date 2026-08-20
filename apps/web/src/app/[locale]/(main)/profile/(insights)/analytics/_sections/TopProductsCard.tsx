@@ -1,5 +1,7 @@
 /** @format */
 
+"use client";
+
 import { Link } from "@/i18n/navigation";
 import { EyeIcon, HeartIcon } from "@heroicons/react/24/outline";
 import { Badge, type BadgeVariant } from "@tarodan/ui";
@@ -7,7 +9,7 @@ import SectionCard from "@/components/ui/SectionCard";
 import { getProductEffectivePrice } from "@/lib/productPrice";
 import { formatTL } from "@/lib/format";
 import type { TopProduct } from "../_lib/types";
-import { getTranslations } from "next-intl/server";
+import { useTranslations } from "next-intl";
 import type { Translate } from "@/types/i18n";
 
 const RANK_CLASS = [
@@ -33,12 +35,12 @@ function statusBadge(
   return { variant: "primary", label: status };
 }
 
-export default async function TopProductsCard({
+export default function TopProductsCard({
   products,
 }: {
   products: TopProduct[];
 }) {
-  const t = await getTranslations();
+  const t = useTranslations();
   return (
     <SectionCard title={t("page.analytics.topproductscard.enPopulerIlanlar")}>
       <div className="space-y-3">

@@ -1,12 +1,14 @@
 /** @format */
 
+"use client";
+
 import { Badge } from "@tarodan/ui";
 import SectionCard from "@/components/ui/SectionCard";
 import { DIECAST_TIMELINE } from "../_lib/brands-data";
-import { getTranslations } from "next-intl/server";
+import { useTranslations } from "next-intl";
 
-export default async function DiecastTimeline() {
-  const t = await getTranslations();
+export default function DiecastTimeline() {
+  const t = useTranslations();
   return (
     <SectionCard
       title={t("page.manufacturers.diecasttimeline.diecastTarihi")}

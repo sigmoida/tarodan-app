@@ -1,9 +1,11 @@
 /** @format */
 
+"use client";
+
 import { Link } from "@/i18n/navigation";
 import { Button } from "@tarodan/ui";
 import type { Translate } from "@/types/i18n";
-import { getTranslations } from "next-intl/server";
+import { useTranslations } from "next-intl";
 
 const PERKS = (t: Translate) => [
   t("profile.analyticsUpsell.detayliSatisTahminleri"),
@@ -18,8 +20,8 @@ const PERKS = (t: Translate) => [
  * turuncu gradient + ikonlarla duruyordu ve sayfadaki tek "reklam" gibi
  * görünüyordu. Aynı bilgi standart kart yüzeyinde, ikonsuz veriliyor.
  */
-export default async function PremiumUpsell() {
-  const t = await getTranslations();
+export default function PremiumUpsell() {
+  const t = useTranslations();
   return (
     <div className="rounded-lg border border-border bg-surface-elevated p-6">
       <div className="flex flex-col justify-between gap-5 lg:flex-row lg:items-center">

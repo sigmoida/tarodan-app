@@ -10486,13 +10486,8 @@
         "enter": "Enter"
       },
       "messageticks": {
-        "textInverted60": "text-inverted/60",
         "okundu": "Okundu",
-        "iletildi": "İletildi",
-        "currentcolor": "currentColor",
-        "m186717l55": "M18 6 7 17l-5-5",
-        "m22107575L13": "m22 10-7.5 7.5L13 16",
-        "m206917l55": "M20 6 9 17l-5-5"
+        "iletildi": "İletildi"
       }
     },
     "profile": {

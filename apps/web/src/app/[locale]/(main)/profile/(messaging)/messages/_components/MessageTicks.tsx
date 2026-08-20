@@ -1,15 +1,18 @@
 /** @format */
-import { getTranslations } from "next-intl/server";
+
+"use client";
+
+import { useTranslations } from "next-intl";
 
 /**
  * Read-receipt indicator. read=false → single tick (delivered); read=true →
  * blue double tick (read). Lucide-style stroke icons.
  */
-export default async function MessageTicks({ read }: { read: boolean }) {
-  const t = await getTranslations();
+export default function MessageTicks({ read }: { read: boolean }) {
+  const t = useTranslations();
   return (
     <span
-      className={`inline-flex shrink-0 ${read ? "text-primary-400" : t("page.messages.messageticks.textInverted60")}`}
+      className={`inline-flex shrink-0 ${read ? "text-primary-400" : "text-inverted/60"}`}
       title={
         read
           ? t("page.messages.messageticks.okundu")
@@ -26,7 +29,7 @@ export default async function MessageTicks({ read }: { read: boolean }) {
         height="15"
         viewBox="0 0 24 24"
         fill="none"
-        stroke={t("page.messages.messageticks.currentcolor")}
+        stroke="currentColor"
         strokeWidth="2.5"
         strokeLinecap="round"
         strokeLinejoin="round"
@@ -34,11 +37,11 @@ export default async function MessageTicks({ read }: { read: boolean }) {
       >
         {read ? (
           <>
-            <path d={t("page.messages.messageticks.m186717l55")} />
-            <path d={t("page.messages.messageticks.m22107575L13")} />
+            <path d="M18 6 7 17l-5-5" />
+            <path d="m22 10-7.5 7.5L13 16" />
           </>
         ) : (
-          <path d={t("page.messages.messageticks.m206917l55")} />
+          <path d="M20 6 9 17l-5-5" />
         )}
       </svg>
     </span>

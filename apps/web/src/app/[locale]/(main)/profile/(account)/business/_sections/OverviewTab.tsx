@@ -1,5 +1,7 @@
 /** @format */
 
+"use client";
+
 import {
   EyeIcon,
   HeartIcon,
@@ -11,10 +13,10 @@ import SectionCard from "@/components/ui/SectionCard";
 import { MetricCard } from "@/components/ui";
 import { formatTL } from "@/lib/format";
 import type { BusinessStats } from "../_lib/types";
-import { getTranslations } from "next-intl/server";
+import { useTranslations } from "next-intl";
 
-export default async function OverviewTab({ stats }: { stats: BusinessStats }) {
-  const t = await getTranslations();
+export default function OverviewTab({ stats }: { stats: BusinessStats }) {
+  const t = useTranslations();
   const { overview, weekly } = stats;
 
   return (

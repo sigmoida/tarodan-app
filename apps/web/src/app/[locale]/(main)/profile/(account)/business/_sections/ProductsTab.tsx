@@ -1,18 +1,20 @@
 /** @format */
 
+"use client";
+
 import SectionCard from "@/components/ui/SectionCard";
 import ProductRow from "../_components/ProductRow";
 import type { ProductStats } from "../_lib/types";
-import { getTranslations } from "next-intl/server";
+import { useTranslations } from "next-intl";
 
-async function ProductList({
+function ProductList({
   products,
   metric,
 }: {
   products: ProductStats[];
   metric: "views" | "likes";
 }) {
-  const t = await getTranslations();
+  const t = useTranslations();
   if (products.length === 0) {
     return (
       <p className="py-4 text-center text-muted">
@@ -34,12 +36,12 @@ async function ProductList({
   );
 }
 
-export default async function ProductsTab({
+export default function ProductsTab({
   topProducts,
 }: {
   topProducts: { byViews: ProductStats[]; byLikes: ProductStats[] };
 }) {
-  const t = await getTranslations();
+  const t = useTranslations();
   return (
     <div className="space-y-6">
       <SectionCard

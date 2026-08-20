@@ -1,17 +1,19 @@
 /** @format */
 
+"use client";
+
 import { CheckBadgeIcon } from "@heroicons/react/24/solid";
 import { Badge } from "@tarodan/ui";
 import UserAvatar from "@/components/UserAvatar";
 import type { BusinessStats } from "../_lib/types";
-import { getTranslations } from "next-intl/server";
+import { useTranslations } from "next-intl";
 
-export default async function BusinessHeader({
+export default function BusinessHeader({
   company,
 }: {
   company: BusinessStats["company"];
 }) {
-  const t = await getTranslations();
+  const t = useTranslations();
   return (
     <div className="flex items-center gap-4 rounded-lg border border-border bg-surface-elevated p-6">
       <UserAvatar
