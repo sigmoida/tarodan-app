@@ -22,6 +22,7 @@ const shipment: SuratCreateShipmentInput = {
     district: "Maltepe",
     phone: "05559876543",
     email: "satici@example.com",
+    customerId: "S000045",
   },
   recipient: {
     name: "Ayşe Nur Kaya",
@@ -29,6 +30,7 @@ const shipment: SuratCreateShipmentInput = {
     city: "Ankara",
     district: "Çankaya",
     phone: "+90 555 111 22 33",
+    customerId: "B000123",
   },
 };
 
@@ -37,7 +39,7 @@ describe("buildGonderiOlusturData", () => {
     const data = buildGonderiOlusturData(shipment);
 
     expect(data.Gonderen).toEqual({
-      MusteriId: "05559876543",
+      MusteriId: "S000045",
       Adi: "Mehmet",
       Soyadi: "Satıcı",
       Telefon: "05559876543",
@@ -47,7 +49,7 @@ describe("buildGonderiOlusturData", () => {
       IlceAdi: "Maltepe",
     });
     expect(data.Alici).toEqual({
-      MusteriId: "05551112233",
+      MusteriId: "B000123",
       Adi: "Ayşe Nur",
       Soyadi: "Kaya",
       Telefon: "05551112233",
@@ -55,6 +57,51 @@ describe("buildGonderiOlusturData", () => {
       Adres: "Atatürk Cad. No:5",
       IlId: 6,
       IlceAdi: "Çankaya",
+    });
+  });
+
+  describe("MusteriId", () => {
+    it("carries the account reference, never the phone", () => {
+      // Sürat telefon göndermememizi istedi. `Telefon` alanı zaten var; bu alan
+      // kalıcı hesap referansını (User.adminCode) taşır.
+      const data = buildGonderiOlusturData(shipment);
+      expect(data.Gonderen.MusteriId).toBe("S000045");
+      expect(data.Alici.MusteriId).toBe("B000123");
+      expect(data.Gonderen.MusteriId).not.toBe(data.Gonderen.Telefon);
+      expect(data.Alici.MusteriId).not.toBe(data.Alici.Telefon);
+    });
+
+    it("falls back to the shipment reference when a party has no account code", () => {
+      // Misafir siparişi: alıcı tek sistem kullanıcısını paylaştığı için kod
+      // gönderilmez. Telefona DÜŞMEZ — koli başına ayrık bir değer kullanılır.
+      const guest = buildGonderiOlusturData({
+        ...shipment,
+        recipient: { ...shipment.recipient, customerId: undefined },
+      });
+      expect(guest.Alici.MusteriId).toBe("PKG-42");
+      expect(guest.Alici.MusteriId).not.toBe(guest.Alici.Telefon);
+      // Diğer taraf kendi kodunu korur.
+      expect(guest.Gonderen.MusteriId).toBe("S000045");
+    });
+
+    it("treats a blank account code as missing", () => {
+      const blank = buildGonderiOlusturData({
+        ...shipment,
+        sender: { ...shipment.sender, customerId: "   " },
+      });
+      expect(blank.Gonderen.MusteriId).toBe("PKG-42");
+    });
+
+    it("never leaks a phone number into MusteriId for any party", () => {
+      // Regresyon kilidi: bu alan bir dönem telefon taşıyordu.
+      const data = buildGonderiOlusturData({
+        ...shipment,
+        sender: { ...shipment.sender, customerId: undefined },
+        recipient: { ...shipment.recipient, customerId: undefined },
+      });
+      for (const party of [data.Gonderen, data.Alici]) {
+        expect(party.MusteriId).not.toMatch(/^\d{10,}$/);
+      }
     });
   });
 

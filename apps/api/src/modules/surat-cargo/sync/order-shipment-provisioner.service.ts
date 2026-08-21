@@ -13,6 +13,7 @@ import {
   type CargoProvider,
   type CargoShipmentFailure,
 } from "../helpers/cargo-provider";
+import { resolveCargoCustomerId } from "../helpers/cargo-customer-id";
 import { i18nMessage } from "../../i18n";
 import { CacheService } from "../../cache/cache.service";
 import { NotificationService } from "../../notification/notification.service";
@@ -151,12 +152,17 @@ export class OrderShipmentProvisioner {
           select: {
             displayName: true,
             email: true,
+            adminCode: true,
             addresses: {
               orderBy: { isDefault: "desc" },
               take: 1,
             },
           },
         },
+        // Yalnız `MusteriId` için: alıcının kalıcı hesap referansı. `email`
+        // ayırt edici — misafir siparişleri tek sistem kullanıcısını paylaşır
+        // ve o kaydın kodu kişiyi göstermez.
+        buyer: { select: { adminCode: true, email: true } },
       },
     });
     if (!order) {
@@ -251,6 +257,7 @@ export class OrderShipmentProvisioner {
           district: sellerAddress?.district ?? "",
           phone: sellerAddress?.phone ?? "",
           email: order.seller?.email,
+          customerId: resolveCargoCustomerId(order.seller),
         },
         recipient: {
           name: String(address.fullName ?? ""),
@@ -258,6 +265,9 @@ export class OrderShipmentProvisioner {
           city: String(address.city),
           district: String(address.district),
           phone: String(address.phone ?? ""),
+          // Misafirde `undefined` → gönderi referansına düşer; adres JSON'undaki
+          // telefon buraya KOPYALANMAZ.
+          customerId: resolveCargoCustomerId(order.buyer),
         },
         content,
         desi,

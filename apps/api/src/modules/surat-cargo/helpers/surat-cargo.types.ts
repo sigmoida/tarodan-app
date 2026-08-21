@@ -235,7 +235,10 @@ export enum SuratGonderiOlusturSekli {
  * (isim değil) ve `Adi`/`Soyadi` ayrı zorunlu alanlardır.
  */
 export interface SuratGonderiOlusturParty {
-  /** Alfanumerik cari referansı (telefon, e-posta vb.). */
+  /**
+   * Alfanumerik cari referansı — bizim müşteri anahtarımız. Sürat telefon
+   * göndermemizi istemiyor; `helpers/cargo-customer-id.ts`'e bak.
+   */
   MusteriId: string;
   Adi: string;
   Soyadi: string;
