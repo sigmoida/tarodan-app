@@ -17,6 +17,7 @@ import {
   resolveOrderBy,
 } from "../../../common/list";
 import { SuratCargoService } from "../../surat-cargo/surat-cargo.service";
+import { TEST_CARGO_CUSTOMER_ID } from "../../surat-cargo/helpers/cargo-customer-id";
 import { SuratTrackingService } from "../../surat-cargo/sync/surat-tracking.service";
 import { requestCarrierCancellationTask } from "../../surat-cargo/sync/carrier-cancellation-task";
 import { StorageService } from "../../storage/storage.service";
@@ -340,6 +341,8 @@ export class AdminShippingService {
           city: "İstanbul",
           district: "Maltepe",
           phone: "5321112233",
+          // Test gönderileri Sürat'ta gerçek bir cariye karışmasın.
+          customerId: TEST_CARGO_CUSTOMER_ID,
         },
         recipient: {
           name: "ADMIN TEST ALICI",
@@ -347,6 +350,7 @@ export class AdminShippingService {
           city: "İstanbul",
           district: "Kadıköy",
           phone: "5321112233",
+          customerId: TEST_CARGO_CUSTOMER_ID,
         },
         content: "Endpoint testi",
       },

@@ -2,7 +2,10 @@ import { ShipmentStatus } from "@prisma/client";
 import { RefundReturnTrackingSyncService } from "./refund-return-tracking-sync.service";
 
 describe("RefundReturnTrackingSyncService", () => {
-  const makeService = (code: number) => {
+  const makeService = (
+    code: number,
+    gonderiOverrides: Record<string, unknown> = {},
+  ) => {
     const refundRequest = {
       id: "refund-1",
       returnProvider: "surat",
@@ -34,6 +37,7 @@ describe("RefundReturnTrackingSyncService", () => {
               KargonunDurumu: `status-${code}`,
               KargoTakipNo: "RETURN-CARGO-CODE",
               TeslimTarihi: code === 12 ? "28.07.2026 12:00:00" : "",
+              ...gonderiOverrides,
             },
           ],
         },
@@ -114,5 +118,40 @@ describe("RefundReturnTrackingSyncService", () => {
 
     expect(prisma.refundRequest.update).not.toHaveBeenCalled();
     expect(refundService.applyReturnTrackingUpdate).not.toHaveBeenCalled();
+  });
+
+  it("finalises a return that completes with code 13, not 12", () => {
+    // Sürat canlıda tamamlanmış iadeyi 13 ile döndü; tablo 13'ü
+    // `return_in_progress`'e eşliyor. Buraya `return_in_progress` geçilirse iade
+    // talebi `return_in_transit`'te donar, muayene penceresi hiç başlamaz ve
+    // alıcı parasını hiç alamaz.
+    const { service, refundService } = makeService(13, {
+      KargonunDurumu: "Teslim Edildi (İade)",
+      IadeDurum: "Evet",
+      TeslimTarihi: "21/08/2026",
+      Hareketler: [{ Islem: "İade Edildi" }],
+    });
+
+    return service.syncRefundReturnTracking("refund-1").then(() => {
+      expect(refundService.applyReturnTrackingUpdate).toHaveBeenCalledWith(
+        "refund-1",
+        expect.objectContaining({ status: ShipmentStatus.returned }),
+      );
+    });
+  });
+
+  it("leaves a genuinely in-transit return alone", () => {
+    const { service, refundService } = makeService(13, {
+      KargonunDurumu: "İade Gönderi Yolda",
+      IadeDurum: "Evet",
+      Hareketler: [{ Islem: "Kargo İade Sürecinde" }],
+    });
+
+    return service.syncRefundReturnTracking("refund-1").then(() => {
+      expect(refundService.applyReturnTrackingUpdate).toHaveBeenCalledWith(
+        "refund-1",
+        expect.objectContaining({ status: ShipmentStatus.return_in_progress }),
+      );
+    });
   });
 });

@@ -48,6 +48,15 @@ type PartyRole = "sender" | "recipient";
 function buildParty(
   party: CargoParty,
   role: PartyRole,
+  /**
+   * `customerId` taşımayan taraf için müşteri anahtarı — pratikte gönderi
+   * referansı (SatisKodu). Alan zorunlu olduğu için boş geçilemez, ama eksik
+   * bir kod yüzünden koli açılmaması da doğru değil: bu alan teslimatı,
+   * takibi ya da faturayı etkilemez, yalnız Sürat'ın cari eşleştirmesini
+   * besler. Fail-closed davranış adres/telefon/il için geçerli — burası
+   * bilinçli olarak fail-open.
+   */
+  fallbackCustomerId: string,
 ): SuratGonderiOlusturParty {
   const phone = normalizeSuratPhone(party.phone);
   if (!phone) {
@@ -71,11 +80,12 @@ function buildParty(
   const { firstName, lastName } = splitPersonName(party.name);
 
   return {
-    // Sürat cari eşleştirmesi için alfanumerik bir değer bekliyor ve telefonu
-    // örnek olarak veriyor. Telefon yukarıda garanti altına alındığı için
-    // e-posta'ya düşmeye gerek yok — misafir siparişte de normalize telefon var
-    // ve uuid yazmak Sürat tarafında hiçbir şeye karşılık gelmezdi.
-    MusteriId: phone,
+    // Sürat cari eşleştirmesi için alfanumerik bir değer bekliyor; dokümanı
+    // telefonu örnek veriyor ve entegrasyon başlangıcında telefon gönderiyorduk.
+    // Sürat telefon istemediğini bildirdi → kalıcı hesap referansı (adminCode)
+    // ya da onun bulunmadığı yerde gönderi referansı. Telefon bu alana ARTIK
+    // GİRMEMELİ; gerçekten gerektiği yer olan `Telefon` alanında zaten var.
+    MusteriId: party.customerId?.trim() || fallbackCustomerId,
     Adi: firstName,
     Soyadi: lastName,
     Telefon: phone,
@@ -111,8 +121,8 @@ export function buildGonderiOlusturData(
     Adet: SINGLE_PARCEL_COUNT,
     KimOder: KIM_ODER,
     SatisKodu: input.reference,
-    Gonderen: buildParty(input.sender, "sender"),
-    Alici: buildParty(input.recipient, "recipient"),
+    Gonderen: buildParty(input.sender, "sender", input.reference),
+    Alici: buildParty(input.recipient, "recipient", input.reference),
     GonderiDurumu: SuratGonderiDurumu.Kullanilmadi,
     GonderiSekli: SuratGonderiOlusturSekli.Standart,
     IsKapidanTahsilat: false,

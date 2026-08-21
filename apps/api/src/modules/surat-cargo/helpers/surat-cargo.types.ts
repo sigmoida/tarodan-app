@@ -235,7 +235,10 @@ export enum SuratGonderiOlusturSekli {
  * (isim değil) ve `Adi`/`Soyadi` ayrı zorunlu alanlardır.
  */
 export interface SuratGonderiOlusturParty {
-  /** Alfanumerik cari referansı (telefon, e-posta vb.). */
+  /**
+   * Alfanumerik cari referansı — bizim müşteri anahtarımız. Sürat telefon
+   * göndermemizi istemiyor; `helpers/cargo-customer-id.ts`'e bak.
+   */
   MusteriId: string;
   Adi: string;
   Soyadi: string;
@@ -343,6 +346,14 @@ export interface SuratTakipResponse {
 export type SuratTrackingLookupResult =
   | { kind: "found"; data: SuratTakipResponse }
   | { kind: "pending"; message: string }
+  /**
+   * Gönderi taşıyıcı tarafında iptal edilmiş. Hata DEĞİL, terminal bir gerçek:
+   * Sürat bu durumda geçmişi de vermez, dolayısıyla yeniden sormanın anlamı
+   * yoktur. Ayrı bir durum olmasının sebebi, `failure` sayıldığında cron'un her
+   * turda başarısızlık kaydedip alarm üretmesi ve gönderi hiçbir zaman terminale
+   * geçmediği için bunun sonsuza kadar sürmesiydi.
+   */
+  | { kind: "cancelled"; message: string }
   | {
       kind: "failure";
       category:

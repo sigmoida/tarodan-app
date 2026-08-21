@@ -21,6 +21,10 @@ import {
   CARGO_PROVIDER,
   type CargoProvider,
 } from "../surat-cargo/helpers/cargo-provider";
+import {
+  resolveCargoCustomerId,
+  WAREHOUSE_CARGO_CUSTOMER_ID,
+} from "../surat-cargo/helpers/cargo-customer-id";
 import { CarrierCancellationService } from "../surat-cargo/sync/carrier-cancellation.service";
 import { SuratTrackingService } from "../surat-cargo/sync/surat-tracking.service";
 import { canTransitionShipmentStatus } from "../shipping/helpers/shipment-state-machine";
@@ -103,8 +107,11 @@ export class RefundShipmentService {
     // (çoğu satıcı/platform mağazası kayıtlı adres tutmaz → iade bloke olmasın/askıda
     // kalmasın). Depo adresi takas akışıyla AYNI kaynaktan gelir
     // (WarehouseAddressService) ve asla null dönmez.
-    const sellerAddr =
-      rr.order.seller.addresses[0] ?? (await this.warehouseAddress.resolve());
+    // Depoya mı satıcıya mı gittiğini AYRI tut: `MusteriId` bu ikisinde farklı
+    // (satıcının hesap referansı vs. sabit depo kodu) ve birleşik ifadede kolinin
+    // hangi uca gittiği kayboluyordu.
+    const sellerOwnAddr = rr.order.seller.addresses[0] ?? null;
+    const sellerAddr = sellerOwnAddr ?? (await this.warehouseAddress.resolve());
 
     // Yalnız alıcı adresi gerçekten bulunamazsa iade kargosu açılamaz.
     if (!buyerAddr) {
@@ -164,6 +171,9 @@ export class RefundShipmentService {
         city: buyerAddr.city,
         district: buyerAddr.district,
         phone: buyerAddr.phone,
+        // Misafirde `undefined` → gönderi referansına düşer (adres JSON'undaki
+        // telefon buraya kopyalanmaz).
+        customerId: resolveCargoCustomerId(rr.order.buyer),
       },
       recipient: {
         name: sellerAddr.fullName || rr.order.seller.displayName,
@@ -171,6 +181,9 @@ export class RefundShipmentService {
         city: sellerAddr.city,
         district: sellerAddr.district,
         phone: sellerAddr.phone,
+        customerId: sellerOwnAddr
+          ? resolveCargoCustomerId(rr.order.seller)
+          : WAREHOUSE_CARGO_CUSTOMER_ID,
       },
       content: `İade: ${rr.order.orderNumber}`,
       isReturn: true,

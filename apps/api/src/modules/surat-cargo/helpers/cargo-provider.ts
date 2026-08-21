@@ -14,6 +14,13 @@ export interface CargoParty {
   phone: string;
   /** Taşıyıcı için opsiyonel; misafir siparişte bulunmayabilir. */
   email?: string;
+  /**
+   * Bu tarafın bizim sistemimizdeki kalıcı müşteri anahtarı (`User.adminCode`,
+   * ya da depo/test için sabit kod) — taşıyıcının `MusteriId` alanına gider.
+   * Opsiyonel: misafir siparişinde kimseyi göstermez, o zaman mapper gönderi
+   * referansına düşer. Ayrıntı: `helpers/cargo-customer-id.ts`.
+   */
+  customerId?: string;
 }
 
 export interface CargoShipmentRequest {

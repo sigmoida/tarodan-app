@@ -15,4 +15,18 @@ export class ShippingScheduledProcessor {
       this.scheduler.runSyncSuratTracking(log),
     );
   }
+
+  @Process("sync-surat-post-delivery")
+  async handlePostDelivery(job: Job) {
+    return runTrackedJob(job, "sync-surat-post-delivery", (log) =>
+      this.scheduler.runSyncSuratPostDelivery(log),
+    );
+  }
+
+  @Process("sync-surat-post-delivery-tail")
+  async handlePostDeliveryTail(job: Job) {
+    return runTrackedJob(job, "sync-surat-post-delivery-tail", (log) =>
+      this.scheduler.runSyncSuratPostDeliveryTail(log),
+    );
+  }
 }

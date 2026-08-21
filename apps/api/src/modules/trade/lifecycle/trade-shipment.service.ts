@@ -12,6 +12,10 @@ import {
   type CargoProvider,
   type CargoShipmentRequest,
 } from "../../surat-cargo/helpers/cargo-provider";
+import {
+  resolveCargoCustomerId,
+  WAREHOUSE_CARGO_CUSTOMER_ID,
+} from "../../surat-cargo/helpers/cargo-customer-id";
 import { i18nMessage } from "../../i18n";
 import { CacheService } from "../../cache/cache.service";
 import { NotificationService } from "../../notification/notification.service";
@@ -245,7 +249,11 @@ export class TradeShipmentService {
       type Side = {
         suffix: SideKey;
         shipperId: string;
-        user: { displayName: string | null; email: string };
+        user: {
+          displayName: string | null;
+          email: string;
+          adminCode?: string | null;
+        };
         address: typeof initiatorAddress;
         /** Bu kolideki ürünlerin tarafı — girişte taraf KENDİ ürününü yollar. */
         itemSide: TradeItemSide;
@@ -488,7 +496,11 @@ export class TradeShipmentService {
    * stays synchronous.
    */
   private buildSuratPayloadForInboundLeg(
-    user: { displayName: string | null; email: string },
+    user: {
+      displayName: string | null;
+      email: string;
+      adminCode?: string | null;
+    },
     fromAddress: {
       fullName?: string | null;
       phone?: string | null;
@@ -522,6 +534,7 @@ export class TradeShipmentService {
         district: fromAddress.district ?? "",
         phone: fromAddress.phone ?? "",
         email: user?.email || undefined,
+        customerId: resolveCargoCustomerId(user),
       },
       recipient: {
         name: warehouse.fullName,
@@ -529,6 +542,7 @@ export class TradeShipmentService {
         city: warehouse.city,
         district: warehouse.district,
         phone: warehouse.phone,
+        customerId: WAREHOUSE_CARGO_CUSTOMER_ID,
       },
       content: `Takas Inbound: ${tradeNumber} (Gönderen: ${senderLabel})`,
       desi,
@@ -574,7 +588,7 @@ export class TradeShipmentService {
     // shipper bir relation değil (yalnız shipperId scalar) → kullanıcıyı ayrı yükle.
     const shipper = await this.prisma.user.findUnique({
       where: { id: ship.shipperId },
-      select: { displayName: true, email: true },
+      select: { displayName: true, email: true, adminCode: true },
     });
 
     const payload = this.buildSuratPayloadForInboundLeg(

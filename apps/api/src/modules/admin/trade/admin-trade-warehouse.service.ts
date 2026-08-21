@@ -18,6 +18,10 @@ import {
   CARGO_PROVIDER,
   type CargoProvider,
 } from "../../surat-cargo/helpers/cargo-provider";
+import {
+  resolveCargoCustomerId,
+  WAREHOUSE_CARGO_CUSTOMER_ID,
+} from "../../surat-cargo/helpers/cargo-customer-id";
 import { AdminTradeCommonService } from "./admin-trade-common.service";
 import { startTradeConfirmationWindowIfDelivered } from "../../../common/helpers/trade-escrow";
 import { TRADE_VALID_TRANSITIONS } from "../../trade/helpers/trade.state-machine";
@@ -115,6 +119,7 @@ export class AdminTradeWarehouseService {
         city: warehouse.city,
         district: warehouse.district,
         phone: warehouse.phone,
+        customerId: WAREHOUSE_CARGO_CUSTOMER_ID,
       },
       recipient: {
         name: address.fullName || user?.displayName || "Takas İade",
@@ -122,6 +127,7 @@ export class AdminTradeWarehouseService {
         city: address.city,
         district: address.district,
         phone: address.phone,
+        customerId: resolveCargoCustomerId(user),
       },
       content: "Takas İade Gönderisi",
       isReturn: true,
@@ -184,6 +190,7 @@ export class AdminTradeWarehouseService {
         city: warehouse.city,
         district: warehouse.district,
         phone: warehouse.phone,
+        customerId: WAREHOUSE_CARGO_CUSTOMER_ID,
       },
       recipient: {
         name: address.fullName || user?.displayName || "Takas Alıcısı",
@@ -191,6 +198,7 @@ export class AdminTradeWarehouseService {
         city: address.city,
         district: address.district,
         phone: address.phone,
+        customerId: resolveCargoCustomerId(user),
       },
       content: "Takas Gönderisi",
       desi,

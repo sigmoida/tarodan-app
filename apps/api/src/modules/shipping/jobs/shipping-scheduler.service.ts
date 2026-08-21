@@ -5,6 +5,20 @@ import { registerRepeatableCron } from "../../../monitoring/bull-cron.helper";
 import { QUEUE_NAMES } from "../../../workers/constants";
 import { SuratTrackingService } from "../../surat-cargo/sync/surat-tracking.service";
 import { CronStepFailuresError } from "../../../monitoring/cron-step-runner";
+import {
+  PAYMENT_CONFIG_KEYS,
+  envConfigNumber,
+} from "../../payment/helpers/payment.constants";
+
+/**
+ * Teslim sonrası SICAK pencere. İade orijinal etiketle dönüyorsa teslimden hemen
+ * sonra başlıyor; bu sınırın ötesi günlük taramaya bırakılıyor.
+ */
+const POST_DELIVERY_HOT_HOURS = 48;
+
+/** İade hakkı süresi — teslim sonrası izlemenin dış sınırı. Ayrı sabit tutmuyoruz. */
+const returnWindowDays = (): number =>
+  envConfigNumber(PAYMENT_CONFIG_KEYS.RETURN_WINDOW_DAYS);
 
 @Injectable()
 export class ShippingSchedulerService implements OnModuleInit {
@@ -22,6 +36,72 @@ export class ShippingSchedulerService implements OnModuleInit {
       "*/30 * * * *",
       this.logger,
     );
+    // Teslim sonrası izleme iki kademeli. Maliyet sıklıktan değil PENCERENİN
+    // uzunluğundan geliyor: iade hakkı 14 gün, yani her teslim edilmiş koli o
+    // kadar süre havuzda kalıyor. Taşıyıcı tarafında başlatılan iade orijinal
+    // etiketle ve teslimin hemen ardından yürüyor (prod vakasında 74 dakika),
+    // bu yüzden ilk 48 saat saatlik; geri kalan 12 gün günde bir taranıyor.
+    await registerRepeatableCron(
+      this.scheduledQueue,
+      "sync-surat-post-delivery",
+      "0 * * * *",
+      this.logger,
+    );
+    await registerRepeatableCron(
+      this.scheduledQueue,
+      "sync-surat-post-delivery-tail",
+      "20 4 * * *",
+      this.logger,
+    );
+  }
+
+  /** Sıcak pencere: son 48 saatte teslim edilmiş koliler, saatte bir. */
+  async runSyncSuratPostDelivery(log: (msg: string) => void = () => {}) {
+    return this.runPostDeliverySweep(
+      "sync-surat-post-delivery",
+      POST_DELIVERY_HOT_HOURS,
+      0,
+      log,
+    );
+  }
+
+  /** Kuyruk: 2-14 gün önce teslim edilmiş koliler, günde bir. */
+  async runSyncSuratPostDeliveryTail(log: (msg: string) => void = () => {}) {
+    return this.runPostDeliverySweep(
+      "sync-surat-post-delivery-tail",
+      returnWindowDays() * 24,
+      POST_DELIVERY_HOT_HOURS,
+      log,
+    );
+  }
+
+  private async runPostDeliverySweep(
+    step: string,
+    fromHoursAgo: number,
+    toHoursAgo: number,
+    log: (msg: string) => void,
+  ) {
+    try {
+      const result = await this.suratTracking.syncPostDeliveryShipments(
+        fromHoursAgo,
+        toHoursAgo,
+      );
+      const summary =
+        `Teslim sonrası kargo senkron (${fromHoursAgo}s-${toHoursAgo}s): ` +
+        `${result.synced} güncellendi, ${result.pending} beklemede, ${result.failed} başarısız`;
+      log(summary);
+      if (result.failed > 0) {
+        throw new CronStepFailuresError(
+          [step],
+          [`${step}: ${result.failed} kayıt senkronlanamadı`],
+        );
+      }
+      return { summary, stats: { ...result } };
+    } catch (error: any) {
+      if (error instanceof CronStepFailuresError) throw error;
+      this.logger.error(`${step} error: ${error?.message}`);
+      throw error;
+    }
   }
 
   /**

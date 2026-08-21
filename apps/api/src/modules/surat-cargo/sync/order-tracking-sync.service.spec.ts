@@ -43,6 +43,7 @@ describe("OrderTrackingSyncService", () => {
     code?: number;
     casCount?: number;
     refundClaimCount?: number;
+    openRefund?: Record<string, unknown> | null;
   }) => {
     const tx = {
       shipment: {
@@ -65,6 +66,10 @@ describe("OrderTrackingSyncService", () => {
         updateMany: jest
           .fn()
           .mockResolvedValue({ count: opts?.refundClaimCount ?? 1 }),
+      },
+      refundRequest: {
+        // Varsayılan: açık iade talebi YOK → otomatik iade serbest.
+        findFirst: jest.fn().mockResolvedValue(opts?.openRefund ?? null),
       },
       $transaction: jest.fn((fn: (client: typeof tx) => Promise<unknown>) =>
         fn(tx),

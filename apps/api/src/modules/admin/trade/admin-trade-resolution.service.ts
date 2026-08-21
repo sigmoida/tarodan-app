@@ -17,6 +17,10 @@ import {
   CARGO_PROVIDER,
   type CargoProvider,
 } from "../../surat-cargo/helpers/cargo-provider";
+import {
+  resolveCargoCustomerId,
+  WAREHOUSE_CARGO_CUSTOMER_ID,
+} from "../../surat-cargo/helpers/cargo-customer-id";
 import { AdminTradeCommonService } from "./admin-trade-common.service";
 import {
   TRADE_DESI_ITEM_SELECT,
@@ -400,6 +404,7 @@ export class AdminTradeResolutionService {
               city: warehouse.city,
               district: warehouse.district,
               phone: warehouse.phone,
+              customerId: WAREHOUSE_CARGO_CUSTOMER_ID,
             },
             recipient: {
               name:
@@ -410,6 +415,7 @@ export class AdminTradeResolutionService {
               city: arrivedAddress.city,
               district: arrivedAddress.district,
               phone: arrivedAddress.phone,
+              customerId: resolveCargoCustomerId(arrivedUser),
             },
             content: "Takas Kayıp İade",
             isReturn: true,
