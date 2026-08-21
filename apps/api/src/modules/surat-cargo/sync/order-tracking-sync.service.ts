@@ -1,7 +1,12 @@
 import { Injectable, Logger } from "@nestjs/common";
 import { ModuleRef } from "@nestjs/core";
 import { PrismaService } from "../../../prisma";
-import { ShipmentStatus, OrderStatus } from "@prisma/client";
+import {
+  ShipmentStatus,
+  OrderStatus,
+  RefundRequestStatus,
+  Prisma,
+} from "@prisma/client";
 import type {
   SuratTakipGonderi,
   SuratTrackingLookupResult,
@@ -77,16 +82,61 @@ export class OrderTrackingSyncService {
     // Only sync shipments that have a tracking reference. Auto-created
     // pending shipments without a Sürat tracking number would just spam
     // the API with "not found" responses.
+    return this.syncShipmentsWhere({
+      status: {
+        notIn: [
+          ShipmentStatus.delivered,
+          ShipmentStatus.returned,
+          ShipmentStatus.cancelled,
+        ],
+      },
+    });
+  }
+
+  /**
+   * Teslim EDİLMİŞ kolileri, iade penceresi boyunca sormaya devam eder.
+   *
+   * Neden ayrı bir yüzey: `syncAllActiveShipments` teslim edilmişi sorgudan
+   * düşürüyor, çünkü teslim normalde son duraktır. Ama taşıyıcı tarafında elle
+   * başlatılan iade teslimden SONRA gelir ve AYNI etiket üzerinde yürür — koli
+   * `delivered` olduğu an peşini bıraktığımız için o hareketleri hiç görmüyorduk.
+   * Prod'da bire bir bu yaşandı: 10:51'de teslim, 11:00'de son poll, 12:09'da
+   * iade satıcıya ulaştı ve sistemde hiçbir izi olmadı.
+   *
+   * Pencere kademeli, çünkü maliyet sıklıktan değil pencerenin uzunluğundan
+   * geliyor: 14 gün boyunca her teslim edilmiş koliyi sık sormak taşıyıcıya
+   * giden yükü katlar. İade orijinal etiketle dönüyorsa teslimin hemen ardından
+   * başlar (bu vakada 74 dakika), o yüzden ilk aralık sık, kuyruk seyrek.
+   *
+   * @param fromHoursAgo pencerenin YAŞLI ucu (bu kadar saat öncesine kadar)
+   * @param toHoursAgo pencerenin TAZE ucu; 0 = şimdi
+   */
+  async syncPostDeliveryShipments(
+    fromHoursAgo: number,
+    toHoursAgo = 0,
+  ): Promise<{ synced: number; pending: number; failed: number }> {
+    const now = Date.now();
+    return this.syncShipmentsWhere({
+      status: ShipmentStatus.delivered,
+      deliveredAt: {
+        gte: new Date(now - fromHoursAgo * 3_600_000),
+        lt: new Date(now - toHoursAgo * 3_600_000),
+      },
+    });
+  }
+
+  /**
+   * Koli bazında sorgulama çekirdeği. Aktif ve teslim-sonrası yüzeyler yalnız
+   * WHERE'de ayrışır; gruplama, tek-sorgu ve uygulama mantığı ortak kalmalı ki
+   * biri düzelirken diğeri geride kalmasın.
+   */
+  private async syncShipmentsWhere(
+    where: Prisma.ShipmentWhereInput,
+  ): Promise<{ synced: number; pending: number; failed: number }> {
     const activeShipments = await this.prisma.shipment.findMany({
       where: {
         provider: "surat",
-        status: {
-          notIn: [
-            ShipmentStatus.delivered,
-            ShipmentStatus.returned,
-            ShipmentStatus.cancelled,
-          ],
-        },
+        ...where,
         OR: [
           { providerTrackingId: { not: null } },
           { trackingNumber: { not: null } },
@@ -120,6 +170,12 @@ export class OrderTrackingSyncService {
           pending += siblings.length;
           continue;
         }
+        if (lookup.kind === "cancelled") {
+          // Taşıyıcıda iptal: hata değil, sonuç. Yerelde de terminale çekilmezse
+          // koli sorguda kalır ve her tur "başarısız" sayılıp alarm üretir.
+          synced += await this.markParcelCancelled(siblings, lookup.message);
+          continue;
+        }
         if (lookup.kind !== "found") {
           failed += siblings.length;
           continue;
@@ -143,6 +199,40 @@ export class OrderTrackingSyncService {
         `${activeShipments.length} shipments in ${parcels.size} parcels`,
     );
     return { synced, pending, failed };
+  }
+
+  /**
+   * Taşıyıcıda iptal edilmiş bir kolinin satırlarını yerelde de kapatır.
+   *
+   * Durum makinesine UYAR: `delivered`/`returned` gibi terminal bir satır
+   * `cancelled`'a geri çekilemez (teslim edilmiş koliyi iptale düşürmek escrow
+   * kararını geri sarardı), o satırlar olduğu gibi bırakılır — zaten poller
+   * sorgusunda değiller.
+   */
+  private async markParcelCancelled(
+    siblings: { id: string; status: ShipmentStatus }[],
+    providerMessage: string,
+  ): Promise<number> {
+    let closed = 0;
+    for (const shipment of siblings) {
+      if (
+        !canTransitionShipmentStatus(shipment.status, ShipmentStatus.cancelled)
+      ) {
+        this.logger.warn(
+          `Surat reports ${shipment.id} cancelled but local status ${shipment.status} is terminal; leaving as is`,
+        );
+        continue;
+      }
+      const cas = await this.prisma.shipment.updateMany({
+        where: { id: shipment.id, status: shipment.status },
+        data: {
+          status: ShipmentStatus.cancelled,
+          providerRawStatus: providerMessage,
+        },
+      });
+      closed += cas.count;
+    }
+    return closed;
   }
 
   /** Bir koliyi Sürat'tan tek sorguyla çeker (OzelKargoTakipNo = PKG-…). */
@@ -173,11 +263,16 @@ export class OrderTrackingSyncService {
         `Unknown Surat status code ${gonderi.KargonunDurumuSayi} ("${gonderi.KargonunDurumu}") for shipment ${shipment.id}; keeping status ${shipment.status}`,
       );
     }
-    const newStatus = mappedStatus ?? shipment.status;
     const isDelivered = isSuratDelivered(gonderi.KargonunDurumuSayi);
-    const isReturnCompleted = isSuratReturnCompleted(
-      gonderi.KargonunDurumuSayi,
-    );
+    const isReturnCompleted = isSuratReturnCompleted(gonderi);
+    // Tamamlanmış iade `returned`'dır — kod tablosu ne derse desin. Canlıda
+    // tamamlanma kodu 13 ile geliyor ve tablo 13'ü `return_in_progress`'e
+    // eşliyor; haritaya bırakılırsa koli iade parası çoktan ödenmişken
+    // "iade sürecinde" takılı kalır, terminal olmadığı için de sonsuza kadar
+    // sorgulanır. Tek karar mercii `isSuratReturnCompleted`.
+    const newStatus = isReturnCompleted
+      ? ShipmentStatus.returned
+      : (mappedStatus ?? shipment.status);
     // KargoTakipHareketDetayi'nda gönderi satırının görünmesi, ön bildirimin
     // şubede kabul edilip gerçek Sürat koduna dönüştüğü ilk güvenilir işarettir.
     const firstPhysicalHandoff =
@@ -414,7 +509,40 @@ export class OrderTrackingSyncService {
       }
     }
 
-    if (isReturnCompleted && shipment.order) {
+    // Bu sipariş için ZATEN yürüyen bir iade talebi varsa otomatik iadeyi
+    // ÇALIŞTIRMA. İkisi de aynı siparişin parasına dokunuyor: biri
+    // `processRefund`'ı doğrudan çağırıyor, diğeri kendi muhasebe anlık
+    // görüntüsüyle (financial_policy_snapshot) finalize ediyor. İkisi birden
+    // koşarsa alıcıya iki kez iade çıkabilir. Karar hakkı iade hattının —
+    // orada politika, tutar kırılımı ve muayene penceresi zaten hesaplanmış.
+    //
+    // Prod'da bu tam olarak mümkün oldu: koli taşıyıcıda iade döndü, operatör
+    // aynı sipariş için panelden iade açtı; teslim sonrası izleme devreye
+    // girdiğinde iki yol da tetiklenecekti.
+    const openRefund =
+      isReturnCompleted && shipment.order
+        ? await this.prisma.refundRequest.findFirst({
+            where: {
+              orderId: shipment.orderId,
+              status: {
+                notIn: [
+                  RefundRequestStatus.refunded,
+                  RefundRequestStatus.rejected,
+                  RefundRequestStatus.cancelled,
+                ],
+              },
+            },
+            select: { id: true, refundNumber: true, status: true },
+          })
+        : null;
+    if (openRefund) {
+      this.logger.log(
+        `Carrier return completed for order ${shipment.orderId} but refund ${openRefund.refundNumber} ` +
+          `is already in flight (${openRefund.status}); leaving the refund pipeline to settle it`,
+      );
+    }
+
+    if (isReturnCompleted && shipment.order && !openRefund) {
       // SEAM-B3: Outbound paket göndericiye İADE döndü (Sürat kod 12). Bu, buyer'ın
       // açtığı RefundRequest pipeline'ından AYRI bir senaryodur (alıcı teslim almadı/
       // reddetti → paket geri geldi; RefundRequest yok). Order'ı ATOMİK olarak

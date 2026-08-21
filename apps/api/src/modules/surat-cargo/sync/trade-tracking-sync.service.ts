@@ -73,6 +73,25 @@ export class TradeTrackingSyncService {
         `Sürat takip ${lookup.category} hatası: ${lookup.message}`,
       );
     }
+    if (lookup.kind === "cancelled") {
+      // Taşıyıcıda iptal edilmiş: geçmiş de dönmüyor, tekrar sormanın anlamı yok.
+      // Terminal bir yerel statüyü geri sarmıyoruz (durum makinesi karar verir).
+      if (
+        canTransitionShipmentStatus(
+          tradeShipment.status,
+          ShipmentStatus.cancelled,
+        )
+      ) {
+        await this.prisma.tradeShipment.updateMany({
+          where: { id: tradeShipment.id, status: tradeShipment.status },
+          data: { status: ShipmentStatus.cancelled },
+        });
+      }
+      this.logger.warn(
+        `TradeShipment ${tradeShipment.id} cancelled at carrier: ${lookup.message}`,
+      );
+      return "ignored";
+    }
     const data = lookup.data;
     if (data.Gonderiler.length === 0) return "pending";
 

@@ -65,6 +65,13 @@ export class SuratTrackingService {
     return this.orderSync.syncAllActiveShipments();
   }
 
+  syncPostDeliveryShipments(
+    fromHoursAgo: number,
+    toHoursAgo?: number,
+  ): Promise<{ synced: number; pending: number; failed: number }> {
+    return this.orderSync.syncPostDeliveryShipments(fromHoursAgo, toHoursAgo);
+  }
+
   // ─── Barkod retry (BarcodeRetryService) ───────────────────────────────────
 
   retryPendingBarcodes(): Promise<{

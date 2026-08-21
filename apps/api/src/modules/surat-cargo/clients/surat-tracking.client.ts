@@ -11,6 +11,12 @@ const SURAT_API_TEST =
   "https://api02.suratkargo.com.tr/api/KargoTakipHareketDetayi";
 
 /**
+ * Sürat tarihleri saat dilimi ofseti taşımaz; hepsi Türkiye yerel saatidir.
+ * Türkiye 2016'dan beri kalıcı UTC+3 (yaz saati yok), bu yüzden sabit ofset.
+ */
+const SURAT_UTC_OFFSET = "+03:00";
+
+/**
  * Sürat takip URL'i — kimlik (CariKodu/Sifre) query auth ile taşınır
  * (resmi sözleşme; bu uç body/header auth kabul etmez). TEK chokepoint: kimlik
  * içeren URL yalnız buradan üretilir. INVARYANT: bu URL HİÇBİR log/hata/breadcrumb'a
@@ -53,6 +59,11 @@ export class SuratTrackingClient {
 
   private isAcceptancePending(message: string): boolean {
     return /veri\s+aktar[ıi]m[ıi].*kargo\s+kabul\s+bekleniyor/i.test(message);
+  }
+
+  /** "Gönderi iptal edilmiştir." — taşıyıcı tarafında iptal, tekrar sorma. */
+  private isCarrierCancelled(message: string): boolean {
+    return /g[oö]nderi\s+iptal\s+edilmi[sş]tir/i.test(message);
   }
 
   /**
@@ -124,6 +135,12 @@ export class SuratTrackingClient {
             kind: "pending",
             message: providerMessage || "Kargo kabul bekleniyor",
           };
+        }
+        if (this.isCarrierCancelled(providerMessage)) {
+          this.logger.log(
+            `Surat tracking reports cancelled shipment ${webSiparisKodu}: ${providerMessage}`,
+          );
+          return { kind: "cancelled", message: providerMessage };
         }
         this.logger.warn(
           `Surat tracking API error for ${webSiparisKodu}: ${providerMessage}`,
@@ -254,21 +271,37 @@ export class SuratTrackingClient {
    * Invalid Date, prisma update'ine sızıp senkronu patlatıyor ve teslim edilen
    * siparişte `handleOrderDelivered` (escrow) hiç çalışmadan her poll'da yeniden
    * throw ediyordu. Çağıran taraf null'da güvenli fallback'e düşer.
+   *
+   * SAAT DİLİMİ: Sürat hiçbir formatında ofset göndermez ve verdiği saatler
+   * Türkiye yerel saatidir. İki dal da bunu yanlış yorumluyordu — GG/AA/YYYY
+   * sonuna `Z` ekleyip UTC sayıyor, ISO benzeri dize ise `new Date()` ile
+   * SUNUCU yerel saatine göre çözülüyordu. Konteyner UTC olduğu için her
+   * hareket 3 saat ileriye yazılıyordu: prod'da "Evrak Oluşturuldu" gerçekte
+   * 06:23Z'de olmuşken `shipment_events`'e 09:23 düşmüştü ve aynı gönderinin
+   * `shipped_at`'i (poll anı, gerçek UTC) 06:30Z idi — yani hareket, kendisini
+   * gören poll'dan sonra görünüyordu. Türkiye 2016'dan beri sabit UTC+3, yaz
+   * saati uygulamıyor; o yüzden sabit ofset doğru ve yeterli.
    */
   parseSuratDate(dateStr: string): Date | null {
+    const raw = dateStr.trim();
     // DD/MM/YYYY veya DD.MM.YYYY (+ opsiyonel HH:mm[:ss])
-    const ddmmyyyy = dateStr
-      .trim()
-      .match(
-        /^(\d{1,2})[./](\d{1,2})[./](\d{4})(?:\s+(\d{1,2}):(\d{2})(?::(\d{2}))?)?$/,
-      );
+    const ddmmyyyy = raw.match(
+      /^(\d{1,2})[./](\d{1,2})[./](\d{4})(?:\s+(\d{1,2}):(\d{2})(?::(\d{2}))?)?$/,
+    );
     if (ddmmyyyy) {
       const [, d, m, y, hh, mm, ss] = ddmmyyyy;
-      const iso = `${y}-${m.padStart(2, "0")}-${d.padStart(2, "0")}T${(hh ?? "0").padStart(2, "0")}:${mm ?? "00"}:${ss ?? "00"}.000Z`;
+      const iso = `${y}-${m.padStart(2, "0")}-${d.padStart(2, "0")}T${(hh ?? "0").padStart(2, "0")}:${mm ?? "00"}:${ss ?? "00"}.000${SURAT_UTC_OFFSET}`;
       const parsed = new Date(iso);
       return Number.isNaN(parsed.getTime()) ? null : parsed;
     }
-    const parsed = new Date(dateStr);
+    // "2026-08-21T10:51:48.520" — ISO gibi duruyor ama ofseti yok. Ofset
+    // eklenmezse çalıştığı makinenin saat dilimine göre çözülür.
+    const zoneless = /^\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}(:\d{2}(\.\d+)?)?$/.test(
+      raw,
+    );
+    const parsed = new Date(
+      zoneless ? `${raw.replace(" ", "T")}${SURAT_UTC_OFFSET}` : raw,
+    );
     if (Number.isNaN(parsed.getTime())) {
       this.logger.warn(`Unparseable Surat date: "${dateStr}"`);
       return null;

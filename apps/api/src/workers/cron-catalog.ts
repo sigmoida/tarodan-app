@@ -120,6 +120,20 @@ export const CRON_CATALOG: CronCatalogEntry[] = [
     triggerable: true,
   },
   {
+    key: "sync-surat-post-delivery",
+    label: "Sürat teslim sonrası takip (sıcak)",
+    description:
+      "Son 48 saatte teslim edilen kolileri sorgular — taşıyıcı tarafında başlatılan iade aynı etiket üzerinde teslimden SONRA yürür",
+    triggerable: true,
+  },
+  {
+    key: "sync-surat-post-delivery-tail",
+    label: "Sürat teslim sonrası takip (kuyruk)",
+    description:
+      "2-14 gün önce teslim edilen kolileri günde bir sorgular; geç başlatılan iadeler için",
+    triggerable: true,
+  },
+  {
     key: "elogo-retry-pending",
     label: "e-Fatura gönderimlerini yeniden dene",
     description: "Bekleyen/başarısız e-Logo faturalarını yeniden dener",

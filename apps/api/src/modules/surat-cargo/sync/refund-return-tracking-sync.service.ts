@@ -80,6 +80,16 @@ export class RefundReturnTrackingSyncService {
 
     const lookup = await this.client.lookupTracking(rr.returnTrackingNumber);
     if (lookup.kind === "pending") return "pending";
+    if (lookup.kind === "cancelled") {
+      // İade etiketi taşıyıcıda iptal edilmiş. İade TALEBİNİN statüsüne burada
+      // DOKUNMUYORUZ: para akışını bir taşıyıcı iptaline dayanarak değiştirmek,
+      // ürün geri gelmişken iadeyi kapatmak gibi yanlış sonuçlar doğurabilir.
+      // Yalnız hata sayılmasını engelliyoruz; kararı operasyon verir.
+      this.logger.warn(
+        `Refund return ${rr.refundNumber} cancelled at carrier: ${lookup.message}; leaving refund status ${rr.status} for operator review`,
+      );
+      return "ignored";
+    }
     if (lookup.kind === "failure") {
       throw new Error(
         `Sürat takip ${lookup.category} hatası: ${lookup.message}`,
@@ -103,7 +113,15 @@ export class RefundReturnTrackingSyncService {
     // gönderinin 6/7 kodları bu akışta geçerli değil; yine de tolerans için
     // ikisini de kabul ediyoruz.
     const isReturnDelivered =
-      isSuratReturnCompleted(suratCode) || isSuratDelivered(suratCode);
+      isSuratReturnCompleted(gonderi) || isSuratDelivered(suratCode);
+    // Tamamlanmışsa `returned` gönder — kod tablosuna bırakma. `applyReturn
+    // TrackingUpdate` iade talebinin statüsünü BU değerden türetiyor: canlıda
+    // tamamlanma kodu 13 geliyor, tablo onu `return_in_progress`'e eşliyor ve
+    // talep `return_in_transit`'te kalıyor. Orada kalırsa muayene penceresi hiç
+    // başlamaz, finalize sweep'i hiç görmez ve alıcı parasını hiç alamaz.
+    const effectiveStatus = isReturnDelivered
+      ? ShipmentStatus.returned
+      : newStatus;
 
     // Backfill: gerçek Sürat kodu (KargoTakipNo) kayıtlı değilse poll cevabından
     // doldur — order/trade path'lerindeki backfill'in paritesi. Barkod-rework
@@ -132,11 +150,11 @@ export class RefundReturnTrackingSyncService {
     }
 
     await refundService.applyReturnTrackingUpdate(refundRequestId, {
-      status: newStatus,
+      status: effectiveStatus,
       shippedAt:
         !rr.returnShippedAt &&
-        newStatus !== ShipmentStatus.pending &&
-        newStatus !== ShipmentStatus.label_created
+        effectiveStatus !== ShipmentStatus.pending &&
+        effectiveStatus !== ShipmentStatus.label_created
           ? new Date()
           : undefined,
       // H1: parse edilemeyen tarihte teslim gerçeği kaybolmasın — şimdi'ye düş.

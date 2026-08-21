@@ -346,6 +346,14 @@ export interface SuratTakipResponse {
 export type SuratTrackingLookupResult =
   | { kind: "found"; data: SuratTakipResponse }
   | { kind: "pending"; message: string }
+  /**
+   * Gönderi taşıyıcı tarafında iptal edilmiş. Hata DEĞİL, terminal bir gerçek:
+   * Sürat bu durumda geçmişi de vermez, dolayısıyla yeniden sormanın anlamı
+   * yoktur. Ayrı bir durum olmasının sebebi, `failure` sayıldığında cron'un her
+   * turda başarısızlık kaydedip alarm üretmesi ve gönderi hiçbir zaman terminale
+   * geçmediği için bunun sonsuza kadar sürmesiydi.
+   */
+  | { kind: "cancelled"; message: string }
   | {
       kind: "failure";
       category:
