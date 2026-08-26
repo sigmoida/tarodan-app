@@ -171,6 +171,7 @@ export class CollectionCoverService {
         try {
           const imageBuffer = await this.downloadImage(singleImageUrl);
           const resizedBuffer = await sharp(imageBuffer)
+            .autoOrient()
             .resize(1200, 600, { fit: "cover" })
             .toBuffer();
 
@@ -204,6 +205,7 @@ export class CollectionCoverService {
         try {
           const buffer = await this.downloadImage(url);
           const resized = await sharp(buffer)
+            .autoOrient()
             .resize(400, 400, { fit: "cover" })
             .toBuffer();
           imageBuffers.push(resized);
