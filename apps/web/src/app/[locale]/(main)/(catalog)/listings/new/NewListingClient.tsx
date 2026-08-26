@@ -54,6 +54,7 @@ function NewListingLayout() {
     handleFileUpload,
     removeImage,
     retryImage,
+    rotateImage,
     moveImage,
     makeCover,
     manufacturerAttrGroups,
@@ -142,6 +143,7 @@ function NewListingLayout() {
               handleFileUpload={handleFileUpload}
               removeImage={removeImage}
               retryImage={retryImage}
+              rotateImage={rotateImage}
               moveImage={moveImage}
               makeCover={makeCover}
             />
