@@ -28,6 +28,7 @@ import {
   type ListingImageItem,
   type RejectedFile,
 } from "./listing-image-item";
+import { canRotateFile, rotateImageFile } from "./rotate-image";
 
 export type { ListingImageItem } from "./listing-image-item";
 
@@ -319,6 +320,68 @@ export function useListingImageUpload({
     [commit, queue],
   );
 
+  /**
+   * Kalemi 90° çevirip YENİDEN yükler.
+   *
+   * Sunucu EXIF etiketini artık kendisi uyguluyor; bu düğme etiketi HİÇ
+   * olmayan fotoğraflar içindir. Çevirmek dosyayı değiştirdiği için tek yol
+   * yeniden yüklemektir — `retryImage` ile aynı kuyruk yolunu kullanır.
+   */
+  const rotateImage = useCallback(
+    async (clientId: string) => {
+      const target = itemsRef.current.find(
+        (item) => item.clientId === clientId,
+      );
+      // Kayıtlı (sunucudan gelen) görselde `file` yoktur: orada çevirmek
+      // yeniden yükleme demek olurdu, düğme de zaten çıkmaz.
+      if (!target?.file || !canRotateFile(target.file)) return;
+
+      // Kalem yüklenme ortasındaysa eski istek DURDURULUR; aksi halde çevrilen
+      // görselin yanında eskisi de depoya inip çöp bırakırdı.
+      queue.cancel(clientId);
+
+      let rotated: File;
+      try {
+        rotated = await rotateImageFile(target.file);
+      } catch {
+        commit(
+          patchItem(itemsRef.current, clientId, {
+            status: "failed",
+            progress: 0,
+            error: t("product.imageUpload.rotateFailed"),
+          }),
+        );
+        return;
+      }
+
+      // `await` sırasında liste değişmiş olabilir: kullanıcı kalemi kaldırmış
+      // ya da başka bir ilana geçilmiş olabilir. Kalem artık yoksa yüklemeyi
+      // BAŞLATMA — kaldırılmış bir görsel için depoya sahipsiz nesne inerdi.
+      const current = itemsRef.current.find(
+        (item) => item.clientId === clientId,
+      );
+      if (!current) return;
+
+      if (current.isObjectUrl) URL.revokeObjectURL(current.previewUrl);
+      commit(
+        patchItem(itemsRef.current, clientId, {
+          file: rotated,
+          previewUrl: URL.createObjectURL(rotated),
+          isObjectUrl: true,
+          status: "queued",
+          progress: 0,
+          error: undefined,
+          // Anahtarlar TEMİZLENMELİ: yoksa forma çevrilmemiş (yan) görselin
+          // anahtarı yazılı kalırdı.
+          cardKey: undefined,
+          detailKey: undefined,
+        }),
+      );
+      queue.enqueue([{ clientId, file: rotated }]);
+    },
+    [commit, queue, t],
+  );
+
   /** Hata alan kalemi yeniden kuyruğa alır. */
   const retryImage = useCallback(
     (clientId: string) => {
@@ -381,6 +444,7 @@ export function useListingImageUpload({
     handleFileUpload,
     removeImage,
     retryImage,
+    rotateImage,
     moveImage,
     makeCover,
   };

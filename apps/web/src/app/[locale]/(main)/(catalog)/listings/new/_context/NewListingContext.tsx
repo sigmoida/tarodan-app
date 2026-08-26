@@ -166,6 +166,7 @@ function useNewListingValue() {
     handleFileUpload,
     removeImage,
     retryImage,
+    rotateImage,
     moveImage,
     makeCover,
   } = useListingImageUpload({
@@ -268,6 +269,7 @@ function useNewListingValue() {
     imageSubmitBlocker,
     imageItems,
     retryImage,
+    rotateImage,
     moveImage,
     makeCover,
     CONDITIONS,

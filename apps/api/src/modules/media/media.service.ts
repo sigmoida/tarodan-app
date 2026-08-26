@@ -147,6 +147,7 @@ export class MediaService {
       // Process image if resize options provided and sharp is available
       if (resize && file.mimetype.startsWith("image/") && sharp) {
         buffer = await sharp(buffer)
+          .autoOrient()
           .resize(resize.width, resize.height, { fit: resize.fit || "cover" })
           .toBuffer();
       }
@@ -197,6 +198,7 @@ export class MediaService {
       // Generate thumbnail if requested and sharp is available
       if (generateThumbnail && file.mimetype.startsWith("image/") && sharp) {
         const thumbBuffer = await sharp(file.buffer)
+          .autoOrient()
           .resize(200, 200, { fit: "cover" })
           .toBuffer();
 
@@ -395,11 +397,13 @@ export class MediaService {
     };
 
     const cardBuffer = await sharp(file.buffer)
+      .autoOrient()
       .resize(500, 500, { fit: "cover" })
       .webp({ quality: 85 })
       .toBuffer();
 
     const detailBuffer = await sharp(file.buffer)
+      .autoOrient()
       .resize(1200, 1200, { fit: "inside" })
       .webp({ quality: 90 })
       .toBuffer();
@@ -457,6 +461,7 @@ export class MediaService {
     }
 
     const buffer = await sharp(file.buffer)
+      .autoOrient()
       .resize(1200, 600, { fit: "cover" })
       .webp({ quality: 85 })
       .toBuffer();

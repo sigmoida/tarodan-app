@@ -9,9 +9,18 @@ import { NextIntlClientProvider } from "next-intl";
 import { getMessages } from "@tarodan/i18n";
 import { useListingImageUpload } from "./useListingImageUpload";
 import type { UploadPort } from "./listing-upload-queue";
+import { rotateImageFile } from "./rotate-image";
 
 vi.mock("react-hot-toast", () => ({
   default: { error: vi.fn(), success: vi.fn() },
+}));
+
+// Çevirmenin canvas kısmı tarayıcı tesisatıdır (jsdom'da canvas yok); burada
+// ölçülen şey, çevirme sonrasındaki DURUM GEÇİŞİ. Karar mantığı gerçek kalır,
+// yalnız çizim değiştirilir.
+vi.mock("./rotate-image", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("./rotate-image")>()),
+  rotateImageFile: vi.fn(),
 }));
 
 // `next-intl` BİLEREK mock'lanmıyor: koşucu gerçek `NextIntlClientProvider` ile
@@ -423,6 +432,129 @@ describe("useListingImageUpload — gönderim engeli", () => {
     act(() => result.current.handleFileUpload([fakeFile("a.png")]));
 
     expect(result.current.submitBlocker?.reason).toBe("pending");
+    unmount();
+  });
+});
+
+describe("useListingImageUpload — görsel çevirme", () => {
+  const rotated = vi.mocked(rotateImageFile);
+
+  /** Yüklenmiş tek kalemli hook; `upload` her seferinde aynı anahtarları döner. */
+  const setupUploaded = async () => {
+    const setValue = vi.fn();
+    const upload = vi.fn<UploadPort>(async () => ({
+      cardKey: "card",
+      detailKey: "detail",
+    }));
+    const hook = renderHook(() =>
+      useListingImageUpload({
+        form: { setValue } as never,
+        maxImages: 5,
+        upload,
+      }),
+    );
+    await act(async () => {
+      hook.result.current.handleFileUpload([fakeFile("yatay.png")]);
+      await Promise.resolve();
+    });
+    return { ...hook, upload, setValue };
+  };
+
+  beforeEach(() => {
+    Object.defineProperty(URL, "createObjectURL", {
+      value: vi.fn(() => "blob:preview"),
+      writable: true,
+    });
+    Object.defineProperty(URL, "revokeObjectURL", {
+      value: vi.fn(),
+      writable: true,
+    });
+  });
+
+  afterEach(() => vi.clearAllMocks());
+
+  it("çevrilen kalem yeniden yüklenir ve eski önizleme bırakılır", async () => {
+    const { result, upload, unmount } = await setupUploaded();
+    expect(result.current.items[0].status).toBe("uploaded");
+
+    const newFile = fakeFile("cevrilmis.png");
+    rotated.mockResolvedValueOnce(newFile);
+
+    await act(async () => {
+      await result.current.rotateImage(result.current.items[0].clientId);
+      await Promise.resolve();
+    });
+
+    // Çevrilen dosya kuyruğa GİRMELİ: içerik değiştiği için eski nesne artık
+    // bu kalemi temsil etmiyor.
+    expect(upload).toHaveBeenCalledTimes(2);
+    expect(upload.mock.calls[1][0]).toBe(newFile);
+    expect(URL.revokeObjectURL).toHaveBeenCalledWith("blob:preview");
+    expect(result.current.items[0].file).toBe(newFile);
+    unmount();
+  });
+
+  it("çevirme başarısızsa kalem hata durumuna düşer, yeniden yüklenmez", async () => {
+    const { result, upload, unmount } = await setupUploaded();
+    rotated.mockRejectedValueOnce(new Error("nope"));
+
+    await act(async () => {
+      await result.current.rotateImage(result.current.items[0].clientId);
+    });
+
+    expect(upload).toHaveBeenCalledTimes(1);
+    expect(result.current.items[0].status).toBe("failed");
+    // Mesaj katalogdan gelmeli — gerçek `tr` kataloğuyla koşuyoruz.
+    expect(result.current.items[0].error).toBe("Görsel çevrilemedi");
+    unmount();
+  });
+
+  it("çevirme sürerken kaldırılan kalem yeniden YÜKLENMEZ", async () => {
+    const { result, upload, unmount } = await setupUploaded();
+    const clientId = result.current.items[0].clientId;
+
+    // Çevirme çözülmeden ÖNCE kullanıcı kalemi kaldırıyor. Kuyruğa girseydi
+    // depoya, listede karşılığı olmayan sahipsiz bir nesne inerdi.
+    let finish: (file: File) => void = () => {};
+    rotated.mockReturnValueOnce(
+      new Promise<File>((resolve) => {
+        finish = resolve;
+      }),
+    );
+
+    let rotating: Promise<void> = Promise.resolve();
+    act(() => {
+      rotating = result.current.rotateImage(clientId);
+    });
+    act(() => result.current.removeImage(clientId));
+
+    await act(async () => {
+      finish(fakeFile("cevrilmis.png"));
+      await rotating;
+    });
+
+    expect(upload).toHaveBeenCalledTimes(1);
+    expect(result.current.items).toHaveLength(0);
+    unmount();
+  });
+
+  it("kayıtlı (dosyasız) görselde hiçbir şey yapmaz", async () => {
+    const setValue = vi.fn();
+    const { result, unmount } = renderHook(() =>
+      useListingImageUpload({
+        form: { setValue } as never,
+        maxImages: 5,
+        upload: async () => ({ cardKey: "c", detailKey: "d" }),
+      }),
+    );
+    act(() => result.current.seedExistingImages([existing("kayitli")]));
+
+    await act(async () => {
+      await result.current.rotateImage(result.current.items[0].clientId);
+    });
+
+    expect(rotated).not.toHaveBeenCalled();
+    expect(result.current.items[0].cardKey).toBe("kayitli-card");
     unmount();
   });
 });

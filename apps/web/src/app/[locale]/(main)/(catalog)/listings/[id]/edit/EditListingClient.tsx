@@ -161,6 +161,7 @@ export default function EditListingClient() {
     handleFileUpload,
     removeImage,
     retryImage,
+    rotateImage,
     moveImage,
     makeCover,
   } = useListingImageUpload({
@@ -308,6 +309,7 @@ export default function EditListingClient() {
           handleFileUpload={handleFileUpload}
           removeImage={removeImage}
           retryImage={retryImage}
+          rotateImage={rotateImage}
           moveImage={moveImage}
           makeCover={makeCover}
         />

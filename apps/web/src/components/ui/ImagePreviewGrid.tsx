@@ -23,6 +23,7 @@ import {
 import { CSS } from "@dnd-kit/utilities";
 import {
   ArrowPathIcon,
+  ArrowUturnRightIcon,
   Bars3Icon,
   ExclamationTriangleIcon,
   StarIcon,
@@ -36,6 +37,7 @@ import {
   MIN_RECOMMENDED_DIMENSION,
   type ListingImageItem,
 } from "@/components/listings/form/listing-image-item";
+import { canRotateFile } from "@/components/listings/form/rotate-image";
 
 export interface ImagePreviewGridProps {
   /** Görseller — EKRANDAKİ sırayla. İlk kalem kapak görselidir. */
@@ -48,6 +50,11 @@ export interface ImagePreviewGridProps {
   onMove?: (from: number, to: number) => void;
   /** Kalemi kapak yap (listenin başına al). */
   onMakeCover?: (index: number) => void;
+  /**
+   * Kalemi 90° çevir. Sunucu EXIF etiketini kendisi uyguluyor; bu, etiketi
+   * HİÇ olmayan fotoğraflar (ekran görüntüsü vb.) için kurtarma yoludur.
+   */
+  onRotate?: (clientId: string) => void;
   /**
    * Izgaranın SONUNA eklenen hücre — tipik olarak "+ Ekle" kutucuğu. Sortable
    * DEĞİLDİR: sıralamaya giren yalnız `items`tir, böylece ızgara ekleme
@@ -78,6 +85,7 @@ export default function ImagePreviewGrid({
   onRetry,
   onMove,
   onMakeCover,
+  onRotate,
   trailing,
   className = "",
 }: ImagePreviewGridProps) {
@@ -125,6 +133,7 @@ export default function ImagePreviewGrid({
       onRemove={onRemove}
       onRetry={onRetry}
       onMakeCover={onMakeCover}
+      onRotate={onRotate}
     />
   ));
 
@@ -181,6 +190,7 @@ function SortableTile({
   onRemove,
   onRetry,
   onMakeCover,
+  onRotate,
 }: {
   item: ListingImageItem;
   index: number;
@@ -190,6 +200,7 @@ function SortableTile({
   onRemove: (clientId: string) => void;
   onRetry?: (clientId: string) => void;
   onMakeCover?: (index: number) => void;
+  onRotate?: (clientId: string) => void;
 }) {
   const t = useTranslations();
   const {
@@ -213,6 +224,16 @@ function SortableTile({
     item.status === "queued" ||
     item.status === "uploading" ||
     item.status === "processing";
+
+  /**
+   * Sağ alt şeridin iki düğmesi. Yalnız YÜKLENMİŞ kalemde çıkarlar: yükleme
+   * sürerken şeridin yerini ilerleme çubuğu, hatada ise hata katmanı alıyor.
+   * Çevirme ayrıca dosya gerektirir — kayıtlı görselin `file`ı yoktur ve GIF
+   * canvas'ta düzleşeceği için `canRotateFile` onu da eler.
+   */
+  const canRotate =
+    !!onRotate && item.status === "uploaded" && canRotateFile(item.file);
+  const canMakeCover = !!onMakeCover && item.status === "uploaded" && !isCover;
 
   const label = { index: index + 1 };
   /** Dokunmatikte hover yok: ikonlar mobilde AÇIK, masaüstünde hover ile. */
@@ -301,16 +322,36 @@ function SortableTile({
         </IconButton>
       )}
 
-      {!isCover && onMakeCover && item.status === "uploaded" && (
-        <IconButton
-          variant="ghost"
-          size="xs"
-          onClick={() => onMakeCover(index)}
-          aria-label={t("product.imageUpload.makeCoverImage", label)}
-          className={`absolute bottom-1.5 right-1.5 rounded-full bg-surface-elevated/90 text-muted shadow-sm ring-1 ring-border backdrop-blur-sm hover:bg-primary-500 hover:text-inverted ${revealOnHover}`}
-        >
-          <StarIcon className="h-4 w-4" />
-        </IconButton>
+      {/* Karonun sağ ALT şeridi: çevir + kapak yap. Tek tek konumlandırmak
+          yerine tek satırda toplanır — biri gizlendiğinde diğerinin yeri
+          kaymaz ve konum sınıfı iki kez yazılmaz. */}
+      {(canRotate || canMakeCover) && (
+        <div className="absolute bottom-1.5 right-1.5 flex items-center gap-1">
+          {canRotate && (
+            <IconButton
+              variant="ghost"
+              size="xs"
+              onClick={() => onRotate?.(item.clientId)}
+              aria-label={t("product.imageUpload.rotateImage", label)}
+              title={t("product.imageUpload.rotate")}
+              className={`rounded-full bg-surface-elevated/90 text-muted shadow-sm ring-1 ring-border backdrop-blur-sm hover:bg-primary-500 hover:text-inverted ${revealOnHover}`}
+            >
+              <ArrowUturnRightIcon className="h-4 w-4" />
+            </IconButton>
+          )}
+
+          {canMakeCover && (
+            <IconButton
+              variant="ghost"
+              size="xs"
+              onClick={() => onMakeCover?.(index)}
+              aria-label={t("product.imageUpload.makeCoverImage", label)}
+              className={`rounded-full bg-surface-elevated/90 text-muted shadow-sm ring-1 ring-border backdrop-blur-sm hover:bg-primary-500 hover:text-inverted ${revealOnHover}`}
+            >
+              <StarIcon className="h-4 w-4" />
+            </IconButton>
+          )}
+        </div>
       )}
 
       {/* Bayt aktarımı: gerçek yüzde. Aktarım bitip yanıt beklenirken sunucu

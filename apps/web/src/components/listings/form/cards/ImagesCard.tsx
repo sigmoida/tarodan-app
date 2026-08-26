@@ -31,6 +31,7 @@ interface ImagesCardProps {
   handleFileUpload: (files: FileList | File[] | null) => void;
   removeImage: (clientId: string) => void;
   retryImage: (clientId: string) => void;
+  rotateImage: (clientId: string) => void;
   moveImage: (from: number, to: number) => void;
   makeCover: (index: number) => void;
 }
@@ -51,6 +52,7 @@ export default function ImagesCard({
   handleFileUpload,
   removeImage,
   retryImage,
+  rotateImage,
   moveImage,
   makeCover,
 }: ImagesCardProps) {
@@ -106,6 +108,7 @@ export default function ImagesCard({
             items={items}
             onRemove={removeImage}
             onRetry={retryImage}
+            onRotate={rotateImage}
             onMove={moveImage}
             onMakeCover={makeCover}
             trailing={
