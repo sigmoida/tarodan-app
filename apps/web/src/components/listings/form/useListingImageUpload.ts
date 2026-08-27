@@ -332,9 +332,48 @@ export function useListingImageUpload({
       const target = itemsRef.current.find(
         (item) => item.clientId === clientId,
       );
-      // Kayıtlı (sunucudan gelen) görselde `file` yoktur: orada çevirmek
-      // yeniden yükleme demek olurdu, düğme de zaten çıkmaz.
-      if (!target?.file || !canRotateFile(target.file)) return;
+      if (!target) return;
+
+      // KAYITLI görselde tarayıcıda dosya yoktur, yalnız depodaki anahtar
+      // vardır — çevirmeyi sunucu yapar ve YENİ anahtarlar döner. Yerel
+      // dosyayı indirip canvas'a çekmek S3 tarafında CORS isterdi ve görseli
+      // bir kez daha sıkıştırırdı.
+      if (!target.file) {
+        if (!target.detailKey) return;
+        commit(
+          patchItem(itemsRef.current, clientId, {
+            status: "processing",
+            progress: 0,
+            error: undefined,
+          }),
+        );
+        try {
+          const { data } = await mediaApi.rotateProductImage(target.detailKey);
+          commit(
+            patchItem(itemsRef.current, clientId, {
+              cardKey: data.cardKey,
+              detailKey: data.detailKey,
+              // Önizleme yeni nesneyi göstermeli; eskisi tarayıcı önbelleğinde
+              // duruyor ve aynı URL kalsaydı çevrilmemiş hâli görünürdü.
+              previewUrl: data.cardUrl,
+              isObjectUrl: false,
+              status: "uploaded",
+              progress: 100,
+            }),
+          );
+        } catch {
+          commit(
+            patchItem(itemsRef.current, clientId, {
+              status: "uploaded",
+              error: undefined,
+            }),
+          );
+          toast.error(t("product.imageUpload.rotateFailed"));
+        }
+        return;
+      }
+
+      if (!canRotateFile(target.file)) return;
 
       // Kalem yüklenme ortasındaysa eski istek DURDURULUR; aksi halde çevrilen
       // görselin yanında eskisi de depoya inip çöp bırakırdı.

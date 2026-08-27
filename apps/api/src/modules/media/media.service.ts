@@ -1,4 +1,5 @@
 import {
+  ForbiddenException,
   Injectable,
   Logger,
   BadRequestException,
@@ -8,7 +9,10 @@ import { ConfigService } from "@nestjs/config";
 import { v4 as uuidv4 } from "uuid";
 import { MembershipService } from "../membership/membership.service";
 import { PrismaService } from "../../prisma";
-import { productImageFolder } from "../product/helpers/product-image-keys";
+import {
+  productImageFolder,
+  isOwnedProductImageKey,
+} from "../product/helpers/product-image-keys";
 import {
   StorageService,
   UploadOptions as StorageUploadOptions,
@@ -388,6 +392,76 @@ export class MediaService {
       throw new BadRequestException(i18nMessage("server.media.fileTooLarge"));
     }
 
+    return this.writeProductImageVariants(file.buffer, ownerUserId);
+  }
+
+  /**
+   * Kayıtlı bir ürün görselini 90° çevirip YENİ türevler üretir.
+   *
+   * Yüklemeden sonra düzeltmenin tek yolu buydu: EXIF etiketi taşımayan
+   * fotoğraflarda (ekran görüntüsü, meta verisi silinmiş dosyalar) sunucunun
+   * otomatik yönlendirmesi çalışacak bir bilgi bulamıyor, satıcının da elinde
+   * artık yerel dosya yok — yalnız depodaki türevler var.
+   *
+   * Kaynak DETAY türevidir (1200px): kart 500×500 kırpılmış olduğu için onu
+   * çevirip yeniden kırpmak kadrajı ikinci kez daraltırdı. Orijinal dosya
+   * saklanmadığından bu bir tur daha kayıplı kodlama demektir; kaçınılmaz.
+   *
+   * Eski anahtarlar SİLİNMEZ: ürün yeni anahtarlara bağlanınca eskiler
+   * sahipsiz kalır ve günlük `media-temp-cleanup` işi onları toplar. Burada
+   * silmek, kayıt başarısız olursa satıcıyı görselsiz bırakırdı.
+   */
+  async rotateProductImageVariants(
+    detailKey: string,
+    ownerUserId: string,
+  ): Promise<{ cardKey: string; detailKey: string }> {
+    if (!sharp) {
+      this.logger.error(
+        `sharp unavailable (load error: ${sharpLoadError ?? "unknown"}) — image rotate rejected`,
+      );
+      throw new BadRequestException(
+        "Image processing (sharp) is not available",
+      );
+    }
+    // Sahiplik İKİ yoldan kabul edilir, çünkü depoda iki anahtar şeması var:
+    //
+    //  - yeni şema anahtarı kullanıcının yükleme klasöründedir
+    //    (`product-images/temp/u/{userId}/`) — henüz kaydedilmemiş, taze
+    //    yüklenmiş görseller böyle doğrulanır;
+    //  - ESKİ şemadaki anahtarlar o klasörde DEĞİLDİR. Onlar için ölçüt,
+    //    anahtarın kullanıcının kendi ürününe hâlen bağlı olmasıdır.
+    //
+    // Yalnız klasöre bakmak, eski şemadaki görsellerin (kayıtların çoğu)
+    // sahibi tarafından bile çevrilememesi demekti. Kaydetme yolu da aynı
+    // kaçışı kullanıyor (`assertValidProductImages` → `existingKeys`).
+    const ownsKey =
+      isOwnedProductImageKey(detailKey, ownerUserId) ||
+      (await this.prisma.productImage.count({
+        where: { detailKey, product: { sellerId: ownerUserId } },
+      })) > 0;
+    if (!ownsKey) {
+      throw new ForbiddenException(i18nMessage("server.media.fileForbidden"));
+    }
+
+    const source = await this.storageService.downloadFileByKey(detailKey);
+    // Saat yönünde 90°. Kaynak zaten yönlendirilmiş bir WebP, o yüzden
+    // `autoOrient` burada etkisiz — çevirme AÇIKÇA istenir.
+    const rotated = await sharp(source).rotate(90).toBuffer();
+
+    return this.writeProductImageVariants(rotated, ownerUserId);
+  }
+
+  /**
+   * Bir görsel tamponundan kart + detay türevlerini üretip depoya yazar.
+   *
+   * Yükleme ve DÖNDÜRME aynı gövdeyi paylaşır: iki ölçü, iki kalite ve
+   * yönlendirme kuralı tek yerde durmalı, yoksa döndürülen bir görsel
+   * yüklenenle aynı biçimde üretilmiyor olurdu.
+   */
+  private async writeProductImageVariants(
+    source: Buffer,
+    ownerUserId: string,
+  ): Promise<{ cardKey: string; detailKey: string }> {
     const baseId = uuidv4();
     const folder = productImageFolder(ownerUserId);
     const cacheOpts = {
@@ -396,13 +470,13 @@ export class MediaService {
       skipMediaFile: true,
     };
 
-    const cardBuffer = await sharp(file.buffer)
+    const cardBuffer = await sharp(source)
       .autoOrient()
       .resize(500, 500, { fit: "cover" })
       .webp({ quality: 85 })
       .toBuffer();
 
-    const detailBuffer = await sharp(file.buffer)
+    const detailBuffer = await sharp(source)
       .autoOrient()
       .resize(1200, 1200, { fit: "inside" })
       .webp({ quality: 90 })

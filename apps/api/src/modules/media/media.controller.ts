@@ -10,6 +10,7 @@ import {
   UploadedFiles,
   UseGuards,
   BadRequestException,
+  Body,
   Request,
   Res,
 } from "@nestjs/common";
@@ -23,6 +24,7 @@ import { MediaAccessService } from "../storage/media-access.service";
 import { ModerationAiClient } from "../moderation/moderation-ai.client";
 import { MAX_PRODUCT_IMAGES } from "../product/helpers/product-image-keys";
 import { resolveUploadTarget } from "./helpers/upload-target";
+import { RotateProductImageDto } from "./dto/media.dto";
 import { i18nMessage } from "../i18n";
 
 @Controller("media")
@@ -183,6 +185,35 @@ export class MediaController {
       cardUrl: this.storageService.getPublicAssetUrl(r.cardKey),
       detailUrl: this.storageService.getPublicAssetUrl(r.detailKey),
     }));
+  }
+
+  /**
+   * Kayıtlı bir ürün görselini 90° çevirir ve YENİ anahtarlar döner.
+   *
+   * Düzenleme ekranında satıcının elinde artık yerel dosya yoktur; EXIF'i
+   * olmayan bir fotoğrafı düzeltmenin tek yolu budur. Sahiplik anahtarın
+   * klasöründen doğrulanır, yükleme yolundaki kuralın aynısı.
+   */
+  @Post("product-image/rotate")
+  async rotateProductImage(
+    @Request() req: any,
+    @Body() dto: RotateProductImageDto,
+  ): Promise<{
+    cardKey: string;
+    detailKey: string;
+    cardUrl: string;
+    detailUrl: string;
+  }> {
+    const result = await this.mediaService.rotateProductImageVariants(
+      dto.detailKey,
+      req.user.id,
+    );
+    return {
+      cardKey: result.cardKey,
+      detailKey: result.detailKey,
+      cardUrl: this.storageService.getPublicAssetUrl(result.cardKey),
+      detailUrl: this.storageService.getPublicAssetUrl(result.detailKey),
+    };
   }
 
   @Post("upload/avatar")

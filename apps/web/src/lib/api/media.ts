@@ -30,6 +30,21 @@ export const mediaApi = {
       },
     });
   },
+  /**
+   * Kayıtlı bir ürün görselini 90° çevirir; sunucu YENİ anahtarlar üretir.
+   *
+   * Düzenleme ekranında tarayıcıda yerel dosya yoktur, elde yalnız depodaki
+   * anahtar vardır — bu yüzden çevirme sunucuda yapılır. Tarayıcıda yapmak
+   * S3 tarafında CORS gerektirir ve görseli bir kez daha sıkıştırırdı.
+   */
+  rotateProductImage: (detailKey: string) =>
+    api.post<{
+      cardKey: string;
+      detailKey: string;
+      cardUrl: string;
+      detailUrl: string;
+    }>("/media/product-image/rotate", { detailKey }),
+
   uploadProductImages: (files: File[]) => {
     const formData = new FormData();
     files.forEach((file) => {
