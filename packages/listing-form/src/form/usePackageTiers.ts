@@ -2,8 +2,8 @@
 
 "use client";
 
-import { api } from "@/lib/api/client";
-import { useWebList } from "@/hooks/useWebResource";
+import { useQuery } from "@tanstack/react-query";
+import { useListingFormApi } from "./api-context";
 
 export type PackageTierCode = "small" | "medium" | "large";
 
@@ -29,13 +29,16 @@ export interface PackageTier {
  * türediği için kartla özet kutusu ayrışamaz.
  */
 export function usePackageTiers() {
-  const query = useWebList<PackageTier[]>({
-    resource: "shipping-package-tiers",
-    fetcher: async () => {
-      const res = await api.get("/shipping/package-tiers");
-      return (res.data?.tiers ?? []) as PackageTier[];
+  const api = useListingFormApi();
+  const query = useQuery<PackageTier[]>({
+    queryKey: ["listing-form", "shipping-package-tiers"],
+    queryFn: async () => {
+      const body = await api.get<{ tiers?: PackageTier[] }>(
+        "/shipping/package-tiers",
+      );
+      return body?.tiers ?? [];
     },
-    query: { staleTime: 5 * 60 * 1000 },
+    staleTime: 5 * 60 * 1000,
   });
 
   return {

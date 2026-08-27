@@ -8,7 +8,7 @@ import {
   emptyBaseListingValues,
   listingFieldMessages,
   listingImageSchema,
-} from "@/components/listings/form/schema";
+} from "@tarodan/listing-form";
 
 /**
  * New-listing form schema — shared base fields plus new-only extras (at least one

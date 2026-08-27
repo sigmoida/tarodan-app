@@ -6,7 +6,6 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslations } from "next-intl";
 import type { UseFormReturn } from "react-hook-form";
 import toast from "react-hot-toast";
-import { mediaApi } from "@/lib/api";
 import {
   createUploadQueue,
   type QueueEvent,
@@ -29,6 +28,7 @@ import {
   type RejectedFile,
 } from "./listing-image-item";
 import { canRotateFile, rotateImageFile } from "./rotate-image";
+import { useListingFormApi, type ListingFormApi } from "./api-context";
 
 export type { ListingImageItem } from "./listing-image-item";
 
@@ -54,13 +54,9 @@ interface UseListingImageUploadParams {
  * Türkçe bir mesaj `/en` kullanıcısına da Türkçe düşerdi.
  */
 const createDefaultUpload =
-  (t: Translate): UploadPort =>
+  (t: Translate, api: ListingFormApi): UploadPort =>
   async (file, { signal, onProgress }) => {
-    const response = await mediaApi.uploadProductImage(file, {
-      signal,
-      onProgress,
-    });
-    const [result] = response.data ?? [];
+    const result = await api.uploadProductImage(file, { signal, onProgress });
     if (!result?.cardKey || !result?.detailKey) {
       throw new Error(t("product.imageUpload.noServerResult"));
     }
@@ -118,11 +114,12 @@ export function useListingImageUpload({
   upload,
 }: UseListingImageUploadParams) {
   const t = useTranslations();
-  // Varsayılan port çeviriciye bağlı olduğu için burada kurulur; testler kendi
-  // portlarını enjekte etmeye devam eder.
+  // Varsayılan port çeviriciye VE uygulamanın API portuna bağlı olduğu için
+  // burada kurulur; testler kendi portlarını enjekte etmeye devam eder.
+  const api = useListingFormApi();
   const activeUpload = useMemo(
-    () => upload ?? createDefaultUpload(t),
-    [t, upload],
+    () => upload ?? createDefaultUpload(t, api),
+    [api, t, upload],
   );
   const [items, setItems] = useState<ListingImageItem[]>([]);
   /**

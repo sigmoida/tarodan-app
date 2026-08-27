@@ -8,7 +8,7 @@ import {
   emptyBaseListingValues,
   listingFieldMessages,
   listingImageSchema,
-} from "@/components/listings/form/schema";
+} from "../form/schema";
 
 /**
  * Edit-listing form schema — shared base fields plus edit-only extras (preorder,

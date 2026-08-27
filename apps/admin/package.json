@@ -27,6 +27,7 @@
     "@tarodan/brand": "workspace:*",
     "@tarodan/design-tokens": "workspace:*",
     "@tarodan/i18n": "workspace:*",
+    "@tarodan/listing-form": "workspace:*",
     "@tarodan/logger": "workspace:*",
     "@tarodan/shared": "workspace:*",
     "@tarodan/ui": "workspace:*",

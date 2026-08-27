@@ -43,6 +43,7 @@ const nextConfig = {
   typescript: { ignoreBuildErrors: false },
   transpilePackages: [
     '@tarodan/ui',
+    '@tarodan/listing-form',
     '@tarodan/design-tokens',
     '@tarodan/api-client',
     '@tarodan/shared',

@@ -8,8 +8,8 @@ import { useFormContext } from "react-hook-form";
 import { CheckIcon } from "@heroicons/react/24/solid";
 import { Radio, cn } from "@tarodan/ui";
 import { FormInput } from "@tarodan/ui/form";
-import { SectionCard } from "@/components/ui";
-import { formatTL } from "@/lib/format";
+import SectionCard from "@tarodan/ui/section-card";
+import { formatTL } from "@tarodan/shared";
 import {
   usePackageTiers,
   sampleDimensionsLabel,

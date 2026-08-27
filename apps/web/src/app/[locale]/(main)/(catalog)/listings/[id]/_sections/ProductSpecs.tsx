@@ -2,14 +2,17 @@
 
 import type { ReactNode } from "react";
 import { Link } from "@/i18n/navigation";
-import SectionCard from "@/components/ui/SectionCard";
+import SectionCard from "@tarodan/ui/section-card";
 import { formatCondition } from "@/lib/format";
 import {
   COLOR_GROUP_SLUG,
   COLOR_LABEL_SEPARATOR,
   MATERIAL_GROUP_SLUG,
   SCALE_GROUP_SLUG,
-} from "@/components/listings/form/constants";
+  // Alt-yol BİLEREK: bu bir sunucu bileşeni, paketin barrel'ı ise istemci
+  // kartlarını (ve onların üzerinden `useState` taşıyan primitifleri) sunucu
+  // zincirine sürüklüyor.
+} from "@tarodan/listing-form/constants";
 import type { Listing } from "../_lib/types";
 
 type Translator = (key: any) => string;

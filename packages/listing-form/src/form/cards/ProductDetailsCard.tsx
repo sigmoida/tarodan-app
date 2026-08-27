@@ -6,7 +6,7 @@ import { useTranslations } from "next-intl";
 import { Controller, useFormContext } from "react-hook-form";
 import { Select } from "@tarodan/ui";
 import { FormInput, FormSelect } from "@tarodan/ui/form";
-import { SectionCard } from "@/components/ui";
+import SectionCard from "@tarodan/ui/section-card";
 import {
   FALLBACK_MATERIALS,
   FALLBACK_SCALES,

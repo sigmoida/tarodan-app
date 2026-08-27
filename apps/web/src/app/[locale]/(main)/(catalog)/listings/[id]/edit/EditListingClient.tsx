@@ -25,11 +25,11 @@ import {
   useManufacturerAttributes,
   DiscountCard,
   ManufacturerAttributesCard,
-} from "@/components/listings/form";
+} from "@tarodan/listing-form";
 import { useEditListingForm } from "./_hooks/useEditListingForm";
 import { useProductDiscounts } from "./_hooks/useProductDiscounts";
 import { useListingLifecycle } from "./_hooks/useListingLifecycle";
-import { withSelectedReference } from "./_lib/selected-option";
+import { withSelectedReference } from "@tarodan/listing-form";
 import StatusBanners from "./_sections/StatusBanners";
 import DeleteListingModal from "./_modals/DeleteListingModal";
 
