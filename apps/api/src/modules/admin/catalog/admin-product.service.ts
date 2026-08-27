@@ -14,15 +14,23 @@ import { getProductStatusFromQuantity } from "../../product/helpers/product-stat
 import { billableDesiForTier } from "../../shipping/helpers/shipping-package-tier";
 import {
   AdminProductQueryDto,
-  UpdateProductDto,
   ApproveProductDto,
   RejectProductDto,
 } from "../dto";
+// Ürün modülünün DTO'su BİLEREK: yönetici düzenleme formu satıcınınkiyle aynı
+// alanları gönderiyor, `admin/dto` içindeki dar sürüm ise görsel, nitelik,
+// marka ve indirim alanlarını hiç tanımıyor. O sürüm yerinde duruyor; bu uç
+// tam sözleşmeyi kullanıyor.
+import { UpdateProductDto } from "../../product/dto/update-product.dto";
 import { ProductStatus, OrderStatus, Prisma } from "@prisma/client";
 import { DiscountService } from "../../discount/discount.service";
 import { SearchService } from "../../search/search.service";
 import { CacheService } from "../../cache/cache.service";
 import { NotificationService } from "../../notification/notification.service";
+import { ProductService } from "../../product/product.service";
+import { buildProductEditProjection } from "../../product/helpers/product-edit-projection";
+import { MediaService } from "../../media/media.service";
+import { MembershipService } from "../../membership/membership.service";
 import { NotificationType } from "../../notification/dto/notification.dto";
 import { dateRangeWhere, paginate, resolveOrderBy } from "../../../common/list";
 import { catalogProductWhere } from "../../product/helpers/catalog-product-where";
@@ -53,7 +61,56 @@ export class AdminProductService {
     @Optional()
     private readonly storageService: StorageService,
     private readonly commissionGuard: CommissionRuleGuardService,
+    private readonly productService: ProductService,
+    private readonly mediaService: MediaService,
+    private readonly membershipService: MembershipService,
   ) {}
+
+  /**
+   * Yöneticinin bir ilana görsel yüklemesi.
+   *
+   * Nesne, yüklemeyi YAPANIN değil ilanın SAHİBİNİN klasörüne iner
+   * (`product-images/temp/u/{sellerId}`). Sebebi: kaydetme yolundaki
+   * `assertValidProductImages` anahtarın sahibini klasörden doğruluyor —
+   * yönetici kendi klasörüne yükleseydi kendi yüklediği görseli ürüne
+   * iliştiremezdi. Doğrulamayı gevşetmek yerine nesneyi doğru yere koyuyoruz,
+   * böylece satıcı ve yönetici yolları AYNI kuralı paylaşmaya devam ediyor.
+   *
+   * Adet sınırı da sahibin üyeliğinden okunur: ilan onun kotasına yazılıdır.
+   */
+  async uploadProductImages(productId: string, files: Express.Multer.File[]) {
+    if (!files?.length) {
+      throw new BadRequestException(i18nMessage("server.media.fileMissing"));
+    }
+
+    const product = await this.prisma.product.findUnique({
+      where: { id: productId },
+      select: { sellerId: true },
+    });
+    if (!product) {
+      throw new NotFoundException(i18nMessage("server.offer.productNotFound"));
+    }
+
+    const limits = await this.membershipService.getUserLimits(product.sellerId);
+    if (files.length > limits.maxImages) {
+      throw new BadRequestException(
+        i18nMessage("server.media.tooManyImages", { max: limits.maxImages }),
+      );
+    }
+
+    const results = await Promise.all(
+      files.map((file) =>
+        this.mediaService.uploadProductImageVariants(file, product.sellerId),
+      ),
+    );
+
+    return results.map((r) => ({
+      cardKey: r.cardKey,
+      detailKey: r.detailKey,
+      cardUrl: this.resolveProductImageUrl(r.cardKey),
+      detailUrl: this.resolveProductImageUrl(r.detailKey),
+    }));
+  }
 
   // AdminService'teki leaf yardımcı ile birebir aynı (bilinçli kopya; facade'da
   // başka bölümler de kullandığı için oradan kaldırılamadı).
@@ -311,6 +368,19 @@ export class AdminProductService {
       ...product,
       scale: attributeValue(SCALE_GROUP_SLUG),
       material: attributeValue(MATERIAL_GROUP_SLUG),
+      // Yönetici düzenleme formu satıcınınkiyle AYNI kartları kullanıyor, bu
+      // yüzden AYNI ham projeksiyonu ister (`GET /products/my/:id` ile birebir).
+      // Gösterim alanları (yukarısı) yerelleştirilmiş metin taşır; form ise
+      // id/slug ister — ikisini tek şekle sıkıştırmak, formu görünen metinle
+      // doldurmaya çalışmak demekti.
+      // Görsel kotası ilanın SAHİBİNE aittir, ekranı açan yöneticiye değil —
+      // yönetici formu satıcının görebileceğinden fazla görsel eklettiremez.
+      maxImagesPerListing: (
+        await this.membershipService.getUserLimits(product.sellerId)
+      ).maxImages,
+      edit: buildProductEditProjection(product, {
+        imageUrl: (key: string) => this.resolveProductImageUrl(key) ?? key,
+      }),
       images: imagesWithPresignedUrls,
       price: Number(product.price),
       originalPrice:
@@ -322,84 +392,44 @@ export class AdminProductService {
   /**
    * Update product details
    */
+  /**
+   * Ürünü yönetici olarak günceller.
+   *
+   * Yazma İŞİ domain servisinindir (`ProductService.updateAsAdmin`): fiyat/
+   * indirim matematiği, komisyon kuralı, görsel sahipliği, iyimser kilit,
+   * arama indeksi ve ISR tazeleme orada TEK yerde durur. Buradaki eski kopya
+   * bunların hiçbirini yapmıyordu; kademe düzeltmesi dışında bir alana
+   * dokunmak sessizce kuralsız yazıyordu (bkz. apps/api/CLAUDE.md §15/3).
+   *
+   * Yöneticiye özgü olan tek şey DENETİM KAYDIdır — onu burada tutuyoruz.
+   */
   async updateProduct(
     adminId: string,
     productId: string,
     dto: UpdateProductDto,
   ) {
-    const product = await this.prisma.product.findUnique({
+    const before = await this.prisma.product.findUnique({
       where: { id: productId },
     });
 
-    if (!product) {
+    if (!before) {
       throw new NotFoundException(i18nMessage("server.offer.productNotFound"));
     }
 
-    const data: Prisma.ProductUpdateInput = {};
-
-    if (dto.title !== undefined) data.title = dto.title;
-    if (dto.description !== undefined) data.description = dto.description;
-    if (dto.price !== undefined) data.price = dto.price;
-    if (dto.oldPrice !== undefined) data.oldPrice = dto.oldPrice;
-    if (dto.quantity !== undefined) {
-      data.quantity = dto.quantity;
-    }
-    // Paket boyutu düzeltmesi (moderasyon): satıcı yanlış boyut seçtiğinde farkı
-    // platform üstleniyor, bu yüzden admin düzeltebilir. Desi kademeden TÜRETİLİR —
-    // ikisi ayrışırsa paket desisi toplamı yanlış kademeye düşer.
-    if (dto.shippingPackageTier !== undefined) {
-      data.shippingPackageTier = dto.shippingPackageTier;
-      data.shippingDesi = billableDesiForTier(dto.shippingPackageTier);
-    }
-    // Açıkça seçilen status admin'in override'ı olarak öncelikli — aksi halde
-    // düzenleme formu quantity'yi de gönderdiğinden status her zaman miktardan
-    // türetilir ve stoklu ürün "Pasif"e alınamazdı. Status verilmediyse ve
-    // quantity değiştiyse, status'ü miktardan türet (0 → inactive).
-    if (dto.status !== undefined) {
-      data.status = dto.status;
-    } else if (dto.quantity !== undefined) {
-      data.status = getProductStatusFromQuantity(dto.quantity);
-    }
-    if (dto.condition !== undefined) data.condition = dto.condition;
-    if (dto.categoryId !== undefined) {
-      data.category = { connect: { id: dto.categoryId } };
-    }
-
-    const updated = await this.prisma.product.update({
-      where: { id: productId },
-      data,
-      include: {
-        category: { select: { id: true, name: true, slug: true } },
-        seller: { select: { id: true, displayName: true, email: true } },
-        images: { orderBy: { sortOrder: "asc" } },
-      },
-    });
+    const updated = await this.productService.updateAsAdmin(
+      productId,
+      adminId,
+      dto,
+    );
 
     await this.audit.createAuditLog(
       adminId,
       "product_update",
       "Product",
       productId,
-      product,
+      before,
       updated,
     );
-
-    // Invalidate caches
-    if (this.cache) {
-      await this.cache.del(`products:detail:${productId}`);
-      await this.cache.delPattern("products:list:*");
-    }
-
-    // Arama index'ini güncelle: status/quantity değişmiş olabilir →
-    // listelenebilir ise indexle, değilse (pasif-stoklu/kaldırıldı vb.) kaldır
-    this.searchService
-      .syncProduct(productId)
-      .catch((err) =>
-        this.logger.warn(`ES sync failed for ${productId}: ${err?.message}`),
-      );
-
-    // Web ISR'yi anında tazele (fiyat/indirim değişimi web'e hemen yansısın).
-    void notifyWebRevalidate(["products:list", `product:${productId}`]);
 
     return updated;
   }

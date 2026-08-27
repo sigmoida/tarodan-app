@@ -69,6 +69,14 @@ export class ProductService implements OnModuleInit {
     return this.updateService.update(id, sellerId, dto);
   }
 
+  /**
+   * Yönetici düzenlemesi — sahiplik ve üyelik kapıları uygulanmaz, ilanın
+   * statüsü değişmez. Para ve görsel sahipliği kuralları aynen geçerlidir.
+   */
+  async updateAsAdmin(id: string, adminId: string, dto: UpdateProductDto) {
+    return this.updateService.updateAsAdmin(id, adminId, dto);
+  }
+
   async remove(id: string, sellerId: string): Promise<void> {
     return this.updateService.remove(id, sellerId);
   }

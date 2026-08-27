@@ -64,7 +64,6 @@ import {
   CreateStaticPageDto,
   UpdateStaticPageDto,
   UpdateEmailTemplateDto,
-  UpdateProductDto,
   RatingQueryDto,
   RatingStatus,
   AdminUserRatingQueryDto,
@@ -85,6 +84,11 @@ import {
   SecurityLogQueryDto,
   EmailLogQueryDto,
 } from "./dto";
+// Ürün modülünün DTO'su BİLEREK: yönetici düzenleme formu satıcınınkiyle aynı
+// alanları gönderiyor, `admin/dto` içindeki dar sürüm ise görsel, nitelik,
+// marka ve indirim alanlarını hiç tanımıyor. O sürüm yerinde duruyor; bu uç
+// tam sözleşmeyi kullanıyor.
+import { UpdateProductDto } from "../product/dto/update-product.dto";
 import {
   TicketStatus,
   TicketPriority,
@@ -389,6 +393,10 @@ export class AdminService {
     sellerId?: string;
   }) {
     return this.productService.exportProducts(query);
+  }
+
+  async uploadProductImages(productId: string, files: Express.Multer.File[]) {
+    return this.productService.uploadProductImages(productId, files);
   }
 
   async getProduct(productId: string) {

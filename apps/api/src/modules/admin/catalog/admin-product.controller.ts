@@ -41,6 +41,11 @@ import {
   UpdateAdvertisementDto,
   ReorderAdsDto,
 } from "../../advertisement/dto";
+// Ürün modülünün DTO'su BİLEREK: yönetici düzenleme formu satıcınınkiyle aynı
+// alanları gönderiyor, `admin/dto` içindeki dar sürüm ise görsel, nitelik,
+// marka ve indirim alanlarını hiç tanımıyor. O sürüm yerinde duruyor; bu uç
+// tam sözleşmeyi kullanıyor.
+import { UpdateProductDto } from "../../product/dto/update-product.dto";
 import { DiscountService } from "../../discount/discount.service";
 import {
   CreateDiscountDto,
@@ -56,7 +61,10 @@ import { CurrentUser } from "../../auth/decorators/current-user.decorator";
 import { AdminRoute } from "../../auth/decorators/admin-route.decorator";
 import { Public } from "../../auth/decorators/public.decorator";
 import { AdminRole } from "@prisma/client";
+import { FilesInterceptor } from "@nestjs/platform-express";
 import { UPLOAD_MULTER_OPTIONS } from "../../../common/upload/multer-options";
+// Mutlak tavan tek kaynaktan — satıcı ucu (media.controller) ile AYNI sabit.
+import { MAX_PRODUCT_IMAGES } from "../../product/helpers/product-image-keys";
 import { totalLimitedMemoryStorage } from "../../../common/upload/total-limited-memory-storage";
 import {
   PRODUCT_BULK_IMPORT_LIMITS,
@@ -101,7 +109,6 @@ import {
   CreateStaticPageDto,
   UpdateStaticPageDto,
   UpdateEmailTemplateDto,
-  UpdateProductDto,
   SendTestEmailDto,
   RatingQueryDto,
   UpdateRatingStatusDto,
@@ -208,6 +215,24 @@ export class AdminProductController {
   @ApiParam({ name: "id", description: "Product ID" })
   async getProduct(@Param("id") id: string) {
     return this.adminService.getProduct(id);
+  }
+
+  /**
+   * İlana görsel yükler. Nesne ilanın SAHİBİNİN klasörüne iner; yönetici kendi
+   * klasörüne yükleseydi kaydetme yolundaki sahiplik doğrulaması onu reddederdi.
+   */
+  @Post("products/:id/images")
+  @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
+  @UseInterceptors(
+    FilesInterceptor("images", MAX_PRODUCT_IMAGES, UPLOAD_MULTER_OPTIONS),
+  )
+  @ApiOperation({ summary: "Upload product images as an administrator" })
+  @ApiParam({ name: "id", description: "Product ID" })
+  async uploadProductImages(
+    @Param("id") id: string,
+    @UploadedFiles() files: Express.Multer.File[],
+  ) {
+    return this.adminService.uploadProductImages(id, files);
   }
 
   @Patch("products/:id")
