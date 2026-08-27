@@ -1,4 +1,5 @@
 import {
+  NotFoundException,
   Injectable,
   BadRequestException,
   InternalServerErrorException,
@@ -666,6 +667,31 @@ export class StorageService implements OnModuleInit {
       throw new InternalServerErrorException(
         i18nMessage("server.storage.presignFailed"),
       );
+    }
+  }
+
+  /**
+   * Depodaki bir nesneyi belleğe okur.
+   *
+   * Anahtar tam yolu taşır (env öneki dahil), çünkü ürün görselleri veritabanında
+   * öyle saklanıyor. Sunucu tarafı yeniden işleme (görsel döndürme) nesneyi
+   * public URL üzerinden ÇEKMEZ: private köklerde böyle bir URL yok ve public
+   * olanda da gereksiz bir tur atmak gerekirdi.
+   */
+  async downloadFileByKey(key: string): Promise<Buffer> {
+    try {
+      const response = await this.client().send(
+        new GetObjectCommand({ Bucket: this.baseBucket, Key: key }),
+      );
+      const body = response.Body as
+        { transformToByteArray(): Promise<Uint8Array> } | undefined;
+      if (!body) {
+        throw new NotFoundException(i18nMessage("server.media.fileNotFound"));
+      }
+      return Buffer.from(await body.transformToByteArray());
+    } catch (error: any) {
+      this.logger.error(`❌ S3 download error (${key}): ${error.message}`);
+      throw new NotFoundException(i18nMessage("server.media.fileNotFound"));
     }
   }
 

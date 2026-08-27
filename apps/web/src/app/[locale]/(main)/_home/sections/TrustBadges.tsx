@@ -19,8 +19,8 @@ const TRUST_BADGES = (t: Translate) => ({
       icon: ShieldCheckIcon,
     },
     {
-      label: t("page.sections.trustbadges.ucretsizKargo"),
-      description: t("page.sections.trustbadges.3000TLVeUzeriSiparislerde"),
+      label: t("page.sections.trustbadges.guvenliKargo"),
+      description: t("page.sections.trustbadges.hizliTakipImkaniyla"),
       icon: TruckIcon,
     },
     {
@@ -51,8 +51,8 @@ const TRUST_BADGES = (t: Translate) => ({
       icon: ShieldCheckIcon,
     },
     {
-      label: t("page.sections.trustbadges.freeShipping"),
-      description: t("page.sections.trustbadges.onOrdersOver3000TL"),
+      label: t("page.sections.trustbadges.secureShipping"),
+      description: t("page.sections.trustbadges.withFastTracking"),
       icon: TruckIcon,
     },
     {

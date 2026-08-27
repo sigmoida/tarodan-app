@@ -1,6 +1,8 @@
+import { ApiProperty } from "@nestjs/swagger";
 import {
   IsOptional,
   IsString,
+  IsNotEmpty,
   IsNumber,
   IsBoolean,
   IsArray,
@@ -55,4 +57,17 @@ export class DeleteFilesDto {
   @IsArray()
   @IsString({ each: true })
   keys: string[];
+}
+
+export class RotateProductImageDto {
+  /**
+   * Çevrilecek görselin DETAY anahtarı. Kart değil: kart 500×500 kırpılmış
+   * olduğu için onu kaynak almak kadrajı ikinci kez daraltırdı.
+   */
+  @ApiProperty({
+    example: "dev/products/product-images/temp/u/<userId>/<id>-detail.webp",
+  })
+  @IsString()
+  @IsNotEmpty()
+  detailKey: string;
 }

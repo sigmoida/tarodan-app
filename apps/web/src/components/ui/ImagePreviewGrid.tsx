@@ -228,11 +228,16 @@ function SortableTile({
   /**
    * Sağ alt şeridin iki düğmesi. Yalnız YÜKLENMİŞ kalemde çıkarlar: yükleme
    * sürerken şeridin yerini ilerleme çubuğu, hatada ise hata katmanı alıyor.
-   * Çevirme ayrıca dosya gerektirir — kayıtlı görselin `file`ı yoktur ve GIF
-   * canvas'ta düzleşeceği için `canRotateFile` onu da eler.
+   *
+   * Çevirme iki yoldan yapılabilir. YENİ seçilmiş dosyada tarayıcı çevirir —
+   * orada GIF elenir, çünkü canvas animasyonu düzleştirir. KAYITLI görselde
+   * (düzenleme ekranı) tarayıcıda dosya yoktur; sunucu depodaki türevi çevirir,
+   * o yüzden tek şart anahtarın bilinmesidir.
    */
   const canRotate =
-    !!onRotate && item.status === "uploaded" && canRotateFile(item.file);
+    !!onRotate &&
+    item.status === "uploaded" &&
+    (item.file ? canRotateFile(item.file) : !!item.detailKey);
   const canMakeCover = !!onMakeCover && item.status === "uploaded" && !isCover;
 
   const label = { index: index + 1 };
