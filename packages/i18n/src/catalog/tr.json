@@ -5105,7 +5105,8 @@
         "bulkImportCreated": "{count} ürün aktif olarak yayınlandı",
         "bulkImportFileTooLarge": "{name} dosyası çok büyük. Tek dosya en fazla {size} olabilir.",
         "bulkImportTooManyImages": "En fazla {max} görsel seçebilirsiniz.",
-        "bulkImportTotalTooLarge": "Seçilen dosyaların toplam boyutu {size} sınırını aşamaz."
+        "bulkImportTotalTooLarge": "Seçilen dosyaların toplam boyutu {size} sınırını aşamaz.",
+        "updated": "İlan güncellendi"
       },
       "import": {
         "button": "Excel ile İçe Aktar",

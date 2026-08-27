@@ -5105,7 +5105,8 @@
         "bulkImportCreated": "{count} products were published as active",
         "bulkImportFileTooLarge": "{name} is too large. Each file can be at most {size}.",
         "bulkImportTooManyImages": "You can select at most {max} images.",
-        "bulkImportTotalTooLarge": "The selected files cannot exceed {size} in total."
+        "bulkImportTotalTooLarge": "The selected files cannot exceed {size} in total.",
+        "updated": "Listing updated"
       },
       "import": {
         "button": "Import from Excel",
