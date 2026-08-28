@@ -262,7 +262,13 @@ export function DatePicker({
                 left: popoverPos.left,
                 width: `min(${POPOVER_WIDTH}px, calc(100vw - 2rem))`,
               }}
-              className="fixed z-popover rounded-lg border border-border bg-surface-elevated p-3 shadow-lg"
+              // Modal içinde de tıklanabilir kalmalı: Radix modal dialog açıkken
+              // `body`ye `pointer-events: none` uyguluyor ve yalnız dialog
+              // içeriğini istisna tutuyor. Portal dialogun DIŞINDA olduğu için
+              // takvim devralıyordu — tıklama takvimden geçip altındaki
+              // karartmaya iniyor, o da dialogu kapatıyordu.
+              data-ui-popover=""
+              className="pointer-events-auto fixed z-popover rounded-lg border border-border bg-surface-elevated p-3 shadow-lg"
             >
               <div className="mb-2 flex items-center justify-between gap-2">
                 <div className="flex min-w-0 items-center gap-1">
