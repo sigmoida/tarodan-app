@@ -1189,6 +1189,7 @@
     "cargoCodeCopied": "Cargo number copied",
     "cargoCodePending": "Your cargo number is being generated. It will appear here in a few minutes. We will notify you when it is ready.",
     "cargoOneParcelPerOrder": "This cargo code represents one SELLER PACKAGE: put all its items in a SINGLE parcel and hand it over with this code. Do not mix orders that have a different cargo code into the same parcel.",
+    "cargoBranchIssueNotice": "If the branch has trouble with this code, tell them “ENTEGRASYON ÜZERİNDEN BARKOD KESİLECEK” — the barcode is issued through the integration.",
     "cargoFeeCoveredNotice": "Shipping is paid by Tarodan; the branch will not charge you. The branch may measure the package on drop-off.",
     "refundWindowPassed": "The 14-day refund window has passed; a refund can no longer be requested for this order.",
     "cancelOrderConfirm": "Cancel this order? Your payment will be refunded.",

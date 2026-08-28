@@ -99,6 +99,15 @@ export const Modal = React.forwardRef<HTMLDivElement, ModalProps>(
                 if (!closeOnEscape || dismissDisabled) event.preventDefault();
               }}
               onPointerDownOutside={(event) => {
+                // Portala taşınan iç katmanlar (tarih seçici takvimi) DOM'da
+                // dialogun dışındadır ama MANTIKEN içindedir. İşaretlenmemiş
+                // olsalardı takvimde bir güne tıklamak dialogu kapatırdı.
+                const target = event.detail.originalEvent
+                  .target as Element | null;
+                if (target?.closest?.("[data-ui-popover]")) {
+                  event.preventDefault();
+                  return;
+                }
                 if (!closeOnBackdrop || dismissDisabled) event.preventDefault();
               }}
               className={cn(
