@@ -16,6 +16,7 @@ import type { UseFormReturn } from "react-hook-form";
 import { useZodForm } from "@tarodan/ui/form";
 import toast from "react-hot-toast";
 import { listingsApi, bankAccountApi } from "@/lib/api";
+import { useDispatchAddress } from "@/hooks/useDispatchAddress";
 import { queryKeys } from "@/lib/query/keys";
 import { useAuthStore } from "@/stores/authStore";
 import { useLocale, useTranslations } from "next-intl";
@@ -72,6 +73,14 @@ function useNewListingValue() {
   });
   const hasBankAccount = !!bankAccountQuery.data;
   const bankAccountLoading = bankAccountQuery.isLoading;
+
+  // Çıkış adresi kapısı — kural ve seçim mantığı `useDispatchAddress`'te tek
+  // kaynakta duruyor; giriş sonrası hatırlatma popup'ı da aynısını kullanıyor.
+  const {
+    hasDispatchAddress,
+    needsFix: dispatchAddressNeedsFix,
+    isLoading: addressLoading,
+  } = useDispatchAddress(isAuthenticated);
 
   const currentYear = new Date().getFullYear();
   const yearOptions = Array.from(
@@ -297,6 +306,9 @@ function useNewListingValue() {
     commissionPreviewEnabled,
     hasBankAccount,
     bankAccountLoading,
+    hasDispatchAddress,
+    dispatchAddressNeedsFix,
+    addressLoading,
     // actions
     handleFileUpload,
     removeImage,
