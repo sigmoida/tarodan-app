@@ -5,6 +5,7 @@ import { RealtimeProvider } from "@/components/realtime/RealtimeProvider";
 import { PlatformFeeAnnouncementBanner } from "@/components/banners/PlatformFeeAnnouncementBanner";
 import { ConfirmProvider } from "@/components/ConfirmProvider";
 import BusinessMembershipGuard from "@/components/BusinessMembershipGuard";
+import SellerAddressPrompt from "@/components/SellerAddressPrompt";
 import Header from "@/components/layout/Header";
 import Footer from "@/components/layout/Footer";
 import { Container } from "@/components/layout/Container";
@@ -29,6 +30,7 @@ export default function MainLayout({
       <PlatformFeeAnnouncementBanner />
       <ConfirmProvider>
         <BusinessMembershipGuard>
+          <SellerAddressPrompt />
           <Header />
           <main className="flex-1 w-full py-4">
             <Container>{children}</Container>

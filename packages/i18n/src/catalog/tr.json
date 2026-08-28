@@ -2661,7 +2661,14 @@
     "fullNamePlaceholderLong": "Adınız Soyadınız",
     "addressPlaceholderLong": "Mahalle, sokak, bina ve daire bilgileri",
     "zipCodeOptional": "Posta Kodu (opsiyonel)",
-    "zipCodePlaceholder": "Örn: 34000"
+    "zipCodePlaceholder": "Örn: 34000",
+    "dispatchPromptTitle": "Kargo çıkış adresi eksik",
+    "dispatchPromptFixTitle": "Kargo çıkış adresiniz kullanılamıyor",
+    "dispatchPromptDesc": "Geçerli bir adres girmeniz gerekmektedir.",
+    "dispatchPromptLater": "Daha Sonra",
+    "dispatchAddButton": "Adres Ekle",
+    "dispatchFixButton": "Adresi Düzenle",
+    "dispatchPromptWarning": "Adresinizi eklemezseniz kargo kodu üretiminde sorun yaşayabilir, siparişlerinizi kargoya veremezsiniz."
   },
   "contact": {
     "title": "İletişim",
@@ -10067,7 +10074,9 @@
         "premiumAGec": "Premium'a Geç",
         "ilanVermedenOnceBankaHesabiEklemelisiniz": "İlan vermeden önce banka hesabı eklemelisiniz",
         "satislarinizdanEldeEdeceginizTutarinSizeAktarilabilmesi": "Satışlarınızdan elde edeceğiniz tutarın size aktarılabilmesi için IBAN bilgisi gereklidir.",
-        "ibanEkle": "IBAN Ekle"
+        "ibanEkle": "IBAN Ekle",
+        "ilanVermedenOnceKargoAdresiEklemelisiniz": "İlan vermeden önce kargo çıkış adresi eklemelisiniz",
+        "kargoAdresiniDuzeltmelisiniz": "Kargo çıkış adresinizi düzeltmelisiniz"
       },
       "tradeproductpicker": {
         "takasEdilebilirAktifIlaninizYok": "Takas edilebilir aktif ilanınız yok."

@@ -2661,7 +2661,14 @@
     "fullNamePlaceholderLong": "Your full name",
     "addressPlaceholderLong": "Neighbourhood, street, building and flat details",
     "zipCodeOptional": "Postcode (optional)",
-    "zipCodePlaceholder": "e.g. 34000"
+    "zipCodePlaceholder": "e.g. 34000",
+    "dispatchPromptTitle": "Pickup address missing",
+    "dispatchPromptFixTitle": "Your pickup address cannot be used",
+    "dispatchPromptDesc": "You need to enter a valid address.",
+    "dispatchPromptLater": "Later",
+    "dispatchAddButton": "Add Address",
+    "dispatchFixButton": "Edit Address",
+    "dispatchPromptWarning": "If you do not add your address you may run into problems generating the shipping code and will not be able to hand your orders over to the courier."
   },
   "contact": {
     "title": "Contact Us",
@@ -10067,7 +10074,9 @@
         "premiumAGec": "Premium'a Geç",
         "ilanVermedenOnceBankaHesabiEklemelisiniz": "İlan vermeden önce banka hesabı eklemelisiniz",
         "satislarinizdanEldeEdeceginizTutarinSizeAktarilabilmesi": "Satışlarınızdan elde edeceğiniz tutarın size aktarılabilmesi için IBAN bilgisi gereklidir.",
-        "ibanEkle": "IBAN Ekle"
+        "ibanEkle": "IBAN Ekle",
+        "ilanVermedenOnceKargoAdresiEklemelisiniz": "Add a pickup address before creating a listing",
+        "kargoAdresiniDuzeltmelisiniz": "Your pickup address needs fixing"
       },
       "tradeproductpicker": {
         "takasEdilebilirAktifIlaninizYok": "Takas edilebilir aktif ilanınız yok."

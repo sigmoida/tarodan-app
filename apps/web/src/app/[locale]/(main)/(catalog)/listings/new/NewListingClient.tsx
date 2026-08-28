@@ -21,7 +21,7 @@ import {
   useNewListing,
 } from "./_context/NewListingContext";
 import SubmitBar from "./_sections/SubmitBar";
-import { LimitBanner, BankGate } from "./_sections/ListingBanners";
+import { LimitBanner, BankGate, AddressGate } from "./_sections/ListingBanners";
 import NewListingTour from "./_components/NewListingTour";
 
 function NewListingLayout() {
@@ -30,6 +30,7 @@ function NewListingLayout() {
     authLoading,
     isAuthenticated,
     hasBankAccount,
+    hasDispatchAddress,
     form,
     onSubmit,
     locale,
@@ -73,6 +74,10 @@ function NewListingLayout() {
   }
   if (!isAuthenticated) return null; // the context effect handles the redirect
 
+  // İlan formu ancak satıcı hem ödeme alabilecek hem de koliyi teslim
+  // edebilecek durumdayken açılır.
+  const canCreateListing = hasBankAccount && hasDispatchAddress;
+
   return (
     <PageShell>
       <PageHeader
@@ -84,12 +89,13 @@ function NewListingLayout() {
 
       <LimitBanner />
       <BankGate />
+      <AddressGate />
 
-      {/* Tur yalnız form gerçekten render edildiğinde çalışabilir: IBAN kapısı
-          kapalıysa hedefler DOM'da yok. */}
-      <NewListingTour ready={hasBankAccount} />
+      {/* Tur yalnız form gerçekten render edildiğinde çalışabilir: kapılardan
+          biri kapalıysa hedefler DOM'da yok. */}
+      <NewListingTour ready={canCreateListing} />
 
-      {hasBankAccount && (
+      {canCreateListing && (
         <Form form={form} onSubmit={onSubmit} className="space-y-4">
           <div data-tour="listing-basics">
             <TitleDescriptionCard />

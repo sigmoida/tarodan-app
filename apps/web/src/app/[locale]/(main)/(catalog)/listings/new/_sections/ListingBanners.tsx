@@ -83,3 +83,40 @@ export function BankGate() {
     </div>
   );
 }
+
+/**
+ * Kargo çıkış adresi kapısı — IBAN kapısının kardeşi.
+ *
+ * Kargo sözleşmesi göndericiyi zorunlu tutuyor: satıcının adresi ya da geçerli
+ * cep numarası yoksa sipariş ödendikten SONRA koli hiç açılamıyor ve kimse fark
+ * etmiyor. Eksikliği ilan aşamasında yakalamak, satışta yakalamaktan ucuz.
+ *
+ * Kayıt var ama kullanılamaz durumdaysa (ör. telefon sabit hat) metin "ekle"
+ * değil "düzelt" demeli — yoksa satıcı ikinci bir adres ekleyip aynı yere düşer.
+ */
+export function AddressGate() {
+  const t = useTranslations();
+  const { addressLoading, hasDispatchAddress, dispatchAddressNeedsFix } =
+    useNewListing();
+  if (addressLoading || hasDispatchAddress) return null;
+
+  return (
+    <div className="mb-5 p-4 rounded-lg border bg-danger-50 border-danger-200">
+      <p className="font-medium text-danger-800 mb-1">
+        {dispatchAddressNeedsFix
+          ? t("page.new.listingbanners.kargoAdresiniDuzeltmelisiniz")
+          : t(
+              "page.new.listingbanners.ilanVermedenOnceKargoAdresiEklemelisiniz",
+            )}
+      </p>
+      <p className="text-sm text-danger-700 mb-3">
+        {t("address.dispatchPromptDesc")}
+      </p>
+      <ButtonLink href="/profile">
+        {dispatchAddressNeedsFix
+          ? t("address.dispatchFixButton")
+          : t("address.dispatchAddButton")}
+      </ButtonLink>
+    </div>
+  );
+}
