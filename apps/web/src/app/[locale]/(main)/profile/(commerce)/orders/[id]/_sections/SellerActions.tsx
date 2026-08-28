@@ -48,6 +48,16 @@ export default function SellerActions({
       null;
     return (
       <SectionCard title={t("order.cargoReference")}>
+        {/* Şubede kodun tanınmadığı durumlar için satıcının söylemesi gereken
+            cümle. Kartın EN ÜSTÜNDE ve `danger` tonunda duruyor: satıcı bunu
+            şubeye gitmeden önce görmeli, aşağıdaki paketleme uyarısıyla aynı
+            tonda olsaydı gözden kaçardı. */}
+        <Alert
+          variant="danger"
+          className="mb-4"
+          icon={<ExclamationTriangleIcon className="h-5 w-5 text-danger-600" />}
+          title={t("order.cargoBranchIssueNotice")}
+        />
         {/* Bu kod hangi koliye ait: aynı alıcının aynı sepetteki diğer ürünleri
             de bu kolide gider, tek etiketle gönderilir. */}
         {order.packageNumber && (

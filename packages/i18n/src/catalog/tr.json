@@ -1189,6 +1189,7 @@
     "cargoCodeCopied": "Kargo numarası kopyalandı",
     "cargoCodePending": "Kargo numarası oluşturuluyor. Birkaç dakika içinde burada görünecektir. Hazır olduğunda size bildirim göndereceğiz.",
     "cargoOneParcelPerOrder": "Bu kargo kodu bir SATICI PAKETİNİ temsil eder: paketteki tüm ürünleri TEK koliye koyup bu kodla teslim edin. Farklı kargo kodu olan siparişleri aynı koliye koymayın.",
+    "cargoBranchIssueNotice": "Kargo şubesinde kod ile ilgili sorun yaşamanız durumunda “ENTEGRASYON ÜZERİNDEN BARKOD KESİLECEK” olarak belirtmeniz gerekmektedir.",
     "cargoFeeCoveredNotice": "Kargo ücreti Tarodan tarafından karşılanır; şubede sizden ücret talep edilmez. Şube, paketi teslim alırken ölçüm yapabilir.",
     "refundWindowPassed": "14 günlük iade süresi doldu; bu sipariş için artık iade talebi oluşturulamaz.",
     "cancelOrderConfirm": "Bu siparişi iptal etmek istediğinize emin misiniz? Ödemeniz iade edilecektir.",
