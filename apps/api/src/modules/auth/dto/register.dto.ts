@@ -102,13 +102,18 @@ export class RegisterDto {
   @MaxLength(100, { message: "İsim en fazla 100 karakter olabilir" })
   displayName: string;
 
-  @ApiProperty({
+  // OPSİYONEL — App Store Review 5.1.1(v) (16 Tem 2026): pazar yerinin çekirdek
+  // işlevi için gerekli olmayan kişisel veri kayıtta zorunlu tutulamaz. Alan
+  // gönderilirse hâlâ geçerli bir tarih ve 18+ olmak zorunda; hiç gönderilmezse
+  // kayıt kabul edilir ve birthDate null kalır (Prisma: DateTime?).
+  @ApiPropertyOptional({
     example: "1990-01-15",
-    description: "Birth date (YYYY-MM-DD) - Must be 18 or older",
+    description: "Birth date (YYYY-MM-DD) - if provided, must be 18 or older",
   })
+  @IsOptional()
   @IsDateString({}, { message: "Geçerli bir tarih giriniz (YYYY-MM-DD)" })
   @Validate(IsAdultConstraint)
-  birthDate: string;
+  birthDate?: string;
 
   @ApiPropertyOptional({
     example: false,

@@ -153,11 +153,10 @@ export class AuthRegistrationService {
       if (age < 18) {
         throw new BadRequestException(i18nMessage("server.auth.minAge18"));
       }
-    } else {
-      throw new BadRequestException(
-        i18nMessage("server.auth.birthDateRequired"),
-      );
     }
+    // birthDate YOKSA hata YOK — alan opsiyonel (App Store Review 5.1.1(v)).
+    // 18+ kontrolü yalnız değer geldiğinde uygulanır; yaş gerçekten gerektiğinde
+    // (satıcı olma / ödeme-KYC) orada zorunlu istenir.
 
     // Hash password
     const passwordHash = await bcrypt.hash(dto.password, 12);
@@ -180,7 +179,7 @@ export class AuthRegistrationService {
           phone: dto.phone,
           passwordHash,
           displayName: dto.displayName,
-          birthDate: new Date(dto.birthDate),
+          birthDate: dto.birthDate ? new Date(dto.birthDate) : null,
           isSeller: dto.isSeller ?? false,
           sellerType: dto.isSeller ? SellerType.individual : null,
           isVerified: false, // Email verification required
