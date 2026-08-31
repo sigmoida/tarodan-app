@@ -8,8 +8,6 @@ import { Select } from "@tarodan/ui";
 import { FormInput, FormSelect } from "@tarodan/ui/form";
 import SectionCard from "@tarodan/ui/section-card";
 import {
-  FALLBACK_MATERIALS,
-  FALLBACK_SCALES,
   type Brand,
   type CarModel,
   type Category,
@@ -56,9 +54,21 @@ export default function ProductDetailsCard({
   const brandId = watch("brandId");
   const t = useTranslations();
 
-  const scales = scaleList.length > 0 ? scaleList : FALLBACK_SCALES;
-  const materials =
-    materialList.length > 0 ? materialList : FALLBACK_MATERIALS(t);
+  /**
+   * Seçenekler YALNIZ katalogdan gelir; boşsa boş kalır.
+   *
+   * Burada bir zamanlar gömülü yedek listeler vardı (ölçek ve malzeme).
+   * Katalog boşken uydurma seçenek gösteriyor, satıcı onlardan birini
+   * seçiyor, kayıt yolu karşılığı olmayan slug'ı sessizce düşürüyordu — ilan
+   * o alan olmadan kaydediliyor ve filtreden hiç bulunamıyordu. Boş liste
+   * doğru cevaptır; sunucu da aynı kuralı uygular
+   * (product-filter.service: "Boş filtre listesi doğru cevaptır").
+   *
+   * Sessiz boş bir açılır liste "sistem bozuk" hissi verdiği için alan devre
+   * dışı bırakılıp sebebi yazılır — yönetici grubu doldurunca kendiliğinden
+   * çalışır.
+   */
+  const noOptions = t("product.noOptionsDefined");
 
   return (
     <SectionCard title={t("product.productDetails")}>
@@ -128,15 +138,19 @@ export default function ProductDetailsCard({
         <FormSelect
           name="scale"
           label={t("product.scaleRequired")}
-          placeholder={t("product.selectScale")}
-          options={scales.map((s) => ({ value: s, label: s }))}
+          placeholder={scaleList.length ? t("product.selectScale") : noOptions}
+          disabled={scaleList.length === 0}
+          options={scaleList.map((s) => ({ value: s, label: s }))}
         />
 
         <FormSelect
           name="material"
           label={t("product.materialRequired")}
-          placeholder={t("product.selectMaterial")}
-          options={materials.map((m) => ({ value: m.slug, label: m.label }))}
+          placeholder={
+            materialList.length ? t("product.selectMaterial") : noOptions
+          }
+          disabled={materialList.length === 0}
+          options={materialList.map((m) => ({ value: m.slug, label: m.label }))}
         />
 
         <FormSelect

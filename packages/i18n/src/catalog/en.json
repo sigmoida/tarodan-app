@@ -839,7 +839,8 @@
     },
     "newListing": "New Listing",
     "originalPriceTry": "Original Price (₺)",
-    "imageFormatsHint": "JPEG, PNG, WebP, GIF · max {maxMb} MB"
+    "imageFormatsHint": "JPEG, PNG, WebP, GIF · max {maxMb} MB",
+    "noOptionsDefined": "No options defined for this field"
   },
   "cart": {
     "myCart": "My Cart",
@@ -4906,7 +4907,8 @@
         "color": "Color",
         "required": "Required",
         "groupNameRequired": "Name is required",
-        "valueRequired": "Value is required"
+        "valueRequired": "Value is required",
+        "usedInProducts": "in {count} product(s)"
       },
       "brands": {
         "title": "Brand Management",
@@ -9261,7 +9263,11 @@
         "attributeNotFound": "Attribute value not found",
         "brandInUse": "This brand cannot be deleted: it is linked to {products} products and {models} car models.",
         "attributeGroupInUse": "This group has {count} attribute values. Delete them first.",
-        "attributeInUse": "This attribute is used by {count} products. Remove it from them first."
+        "attributeInUse": "This attribute is used by {count} products. Remove it from them first.",
+        "attributeDeactivateInUse": "This attribute is used by {count} product(s) and cannot be deactivated. Remove it from the products first.",
+        "attributeLastInRequiredGroup": "The last active value of \"{group}\" cannot be removed: the listing form requires this field, and sellers cannot create a listing while the group is empty. Add another value first.",
+        "attributeGroupProtected": "\"{name}\" cannot be deactivated because the listing form requires it.",
+        "attributeGroupDeactivateInUse": "This group's values are used by {count} product(s), so the group cannot be deactivated."
       },
       "bulkImport": {
         "idempotencyKeyRequired": "A valid Idempotency-Key must be sent for a bulk import.",

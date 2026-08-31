@@ -54,8 +54,6 @@ export const getYearOptions = (): number[] => {
   );
 };
 
-export const FALLBACK_SCALES = ["1:18", "1:24", "1:43", "1:64", "1:87"];
-
 /**
  * İlan başına en fazla renk. Sunucudaki `MAX_PRODUCT_COLORS` ile aynı olmalı —
  * fazlası API'de 400 döner.
@@ -87,13 +85,6 @@ export interface ColorOption {
   label: string;
   color?: string | null;
 }
-
-export const FALLBACK_MATERIALS = (t: Translate) => [
-  { slug: "diecast", label: t("page.form.constants.diecastMetal") },
-  { slug: "resin", label: t("page.form.constants.resinRecine") },
-  { slug: "composite", label: t("page.form.constants.compositeKompozit") },
-  { slug: "plastic", label: t("page.form.constants.plasticPlastik") },
-];
 
 // Brand/scale categories have their own dedicated fields, so they are dropped
 // from the category picker (opt-in via useListingCategories).

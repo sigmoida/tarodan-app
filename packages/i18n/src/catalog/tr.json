@@ -839,7 +839,8 @@
     },
     "newListing": "Yeni İlan",
     "originalPriceTry": "Orijinal Fiyat (₺)",
-    "imageFormatsHint": "JPEG, PNG, WebP, GIF · en fazla {maxMb} MB"
+    "imageFormatsHint": "JPEG, PNG, WebP, GIF · en fazla {maxMb} MB",
+    "noOptionsDefined": "Bu alan için seçenek tanımlanmamış"
   },
   "cart": {
     "myCart": "Sepetim",
@@ -4906,7 +4907,8 @@
         "color": "Renk",
         "required": "Zorunlu",
         "groupNameRequired": "Ad zorunlu",
-        "valueRequired": "Değer zorunlu"
+        "valueRequired": "Değer zorunlu",
+        "usedInProducts": "{count} üründe"
       },
       "brands": {
         "title": "Marka Yönetimi",
@@ -9261,7 +9263,11 @@
         "attributeNotFound": "Özellik değeri bulunamadı",
         "brandInUse": "Bu marka silinemez: {products} ürün ve {models} araç modeli ile ilişkili.",
         "attributeGroupInUse": "Bu grupta {count} özellik değeri var. Önce değerleri silin.",
-        "attributeInUse": "Bu özellik {count} üründe kullanılıyor. Önce ürünlerden kaldırın."
+        "attributeInUse": "Bu özellik {count} üründe kullanılıyor. Önce ürünlerden kaldırın.",
+        "attributeDeactivateInUse": "Bu özellik {count} üründe kullanılıyor; pasife alınamaz. Önce ürünlerden kaldırın.",
+        "attributeLastInRequiredGroup": "\"{group}\" grubunun son aktif değeri kaldırılamaz: bu alan ilan formunda zorunludur ve grup boşalırsa ilan verilemez. Önce yeni bir değer ekleyin.",
+        "attributeGroupProtected": "\"{name}\" grubu ilan formunda zorunlu olduğu için pasife alınamaz.",
+        "attributeGroupDeactivateInUse": "Bu grubun değerleri {count} üründe kullanılıyor; grup pasife alınamaz."
       },
       "bulkImport": {
         "idempotencyKeyRequired": "Toplu yükleme için geçerli bir Idempotency-Key gönderilmelidir.",
