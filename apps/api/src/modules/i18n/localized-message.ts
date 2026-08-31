@@ -13,6 +13,8 @@
 // and additionally exposes `i18nKey` for clients that want to re-render.
 // =============================================================================
 
+import { HttpException } from "@nestjs/common";
+
 import { type MessageKey, type MessageValues } from "@tarodan/i18n";
 
 export interface LocalizedMessagePayload {
@@ -39,4 +41,18 @@ export function isLocalizedMessage(
     value !== null &&
     typeof (value as LocalizedMessagePayload).i18nKey === "string"
   );
+}
+
+/**
+ * The catalog payload an exception carries, if it carries one. Nest cannot turn
+ * an object payload into `error.message` — it degrades to the class name ("Bad
+ * Request Exception") — so anything that re-reads a caught exception (log lines,
+ * wrapping rethrows) has to ask for the payload instead of the message.
+ */
+export function localizedPayloadOf(
+  error: unknown,
+): LocalizedMessagePayload | undefined {
+  if (!(error instanceof HttpException)) return undefined;
+  const response = error.getResponse();
+  return isLocalizedMessage(response) ? response : undefined;
 }

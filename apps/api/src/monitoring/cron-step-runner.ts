@@ -1,5 +1,7 @@
 import type { Logger } from "@nestjs/common";
 
+import { errorMessage } from "../common/helpers/error-message";
+
 /**
  * En az bir cron adımı başarısız olduğunda tur sonunda fırlatılan hata.
  * `runTrackedJob` bunu görünce Bull job'ını "failed" işaretler → attempts/backoff
@@ -51,7 +53,7 @@ export function createCronStepRunner(params: {
         log?.(`✓ ${name}`);
         return result;
       } catch (error: any) {
-        const message = String(error?.message ?? error);
+        const message = errorMessage(error);
         logger.error(`Step "${name}" failed: ${message}`, error?.stack);
         log?.(`✗ ${name}: ${message}`);
         failedSteps.push(name);
