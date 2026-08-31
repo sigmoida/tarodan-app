@@ -5389,7 +5389,9 @@
         "platformCost": "Platforma maliyeti",
         "budgetRemaining": "Kalan bütçe",
         "searchUser": "Ad veya e-posta ile ara",
-        "selectUsers": "Kişi seçin"
+        "selectUsers": "Kişi seçin",
+        "userSearchFailed": "Kullanıcılar yüklenemedi",
+        "noUserFound": "Kullanıcı bulunamadı"
       },
       "emailTemplates": {
         "title": "E-posta Şablonları",

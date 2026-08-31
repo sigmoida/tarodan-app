@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useRef } from "react";
 import {
   FormModal,
   FormInput,
@@ -182,6 +183,26 @@ export function DiscountFormModal({
     audience === "specific_buyers" || audience === "specific_sellers",
   );
 
+  /**
+   * Kitle TARAFI değişince seçilenler sıfırlanır.
+   *
+   * Alıcı seçip sonra "belirli satıcılar"a geçildiğinde seçenek kaynağı
+   * satıcılara dönüyor ama çipler duruyordu: kampanya alıcı kimlikleriyle
+   * "belirli satıcılar" olarak kaydediliyor ve hiçbir zaman uygulanmıyordu —
+   * ne şema ne sunucu kimliklerin gerçekten satıcı olduğunu doğruluyor.
+   */
+  const audienceSideRef = useRef(audience);
+  useEffect(() => {
+    if (audienceSideRef.current === audience) return;
+    const wasSpecific =
+      audienceSideRef.current === "specific_buyers" ||
+      audienceSideRef.current === "specific_sellers";
+    const isSpecific =
+      audience === "specific_buyers" || audience === "specific_sellers";
+    if (wasSpecific && isSpecific) form.setValue("targetUserIds", []);
+    audienceSideRef.current = audience;
+  }, [audience, form]);
+
   const save = useAdminMutation(
     (v: DiscountFormValues) =>
       isEdit
@@ -273,6 +294,12 @@ export function DiscountFormModal({
             helperText={t("admin.marketing.discounts.targetUsersHelper")}
             searchPlaceholder={t("admin.marketing.discounts.searchUser")}
             placeholder={t("admin.marketing.discounts.selectUsers")}
+            loadingText={t("common.loading")}
+            emptyText={
+              userOptions.failed
+                ? t("admin.marketing.discounts.userSearchFailed")
+                : t("admin.marketing.discounts.noUserFound")
+            }
             {...userOptions}
           />
         )}

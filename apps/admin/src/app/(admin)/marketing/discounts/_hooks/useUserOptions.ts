@@ -72,16 +72,22 @@ export function useUserOptions(kind: "buyers" | "sellers", enabled: boolean) {
     },
   });
 
-  const options: SearchableSelectOption[] = useMemo(
-    () =>
-      (infinite.data?.pages ?? []).flatMap((page) =>
-        (page.data ?? []).map((user) => ({
-          value: user.id,
-          label: userOptionLabel(user),
-        })),
-      ),
-    [infinite.data],
-  );
+  const options: SearchableSelectOption[] = useMemo(() => {
+    // Kimliğe göre TEKİLLEŞTİR: liste `lastLoginAt` ile sıralanıyor, yani
+    // sayfa 1 ile 2 arasında biri giriş yaparsa satırlar kayar ve aynı kişi
+    // iki sayfada birden gelebilir — menüde çift görünür, React de yinelenen
+    // key uyarısı verir.
+    const seen = new Set<string>();
+    const out: SearchableSelectOption[] = [];
+    for (const page of infinite.data?.pages ?? []) {
+      for (const user of page.data ?? []) {
+        if (seen.has(user.id)) continue;
+        seen.add(user.id);
+        out.push({ value: user.id, label: userOptionLabel(user) });
+      }
+    }
+    return out;
+  }, [infinite.data]);
 
   return {
     options,
@@ -90,6 +96,12 @@ export function useUserOptions(kind: "buyers" | "sellers", enabled: boolean) {
     // kaydırırken listeyi sessizce donmuş gösterirdi.
     loading: infinite.isFetching,
     hasMore: infinite.hasNextPage,
+    /**
+     * İstek düştü mü? Yetkisiz (moderatör altı rol) ya da geçici bir hatada
+     * `options` boş kalıyor ve menü "Sonuç bulunamadı" diyordu: yönetici
+     * seçicinin bozuk olduğunu değil, hiç kullanıcı olmadığını sanıyordu.
+     */
+    failed: infinite.isError,
     onLoadMore: () => {
       if (infinite.hasNextPage && !infinite.isFetchingNextPage) {
         void infinite.fetchNextPage();

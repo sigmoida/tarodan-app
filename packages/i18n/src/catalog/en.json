@@ -5389,7 +5389,9 @@
         "platformCost": "Cost to the platform",
         "budgetRemaining": "Remaining budget",
         "searchUser": "Search by name or email",
-        "selectUsers": "Select people"
+        "selectUsers": "Select people",
+        "userSearchFailed": "Users could not be loaded",
+        "noUserFound": "No user found"
       },
       "emailTemplates": {
         "title": "Email Templates",
