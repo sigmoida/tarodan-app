@@ -1,9 +1,14 @@
 import {
   Injectable,
+  Logger,
   NotFoundException,
   BadRequestException,
 } from "@nestjs/common";
+import { InjectQueue } from "@nestjs/bull";
+import type { Queue } from "bull";
 import { PrismaService } from "../../../prisma";
+import { QUEUE_NAMES } from "../../../workers/constants";
+import { PayoutService } from "../../payout/payout.service";
 import { AdminAuditService } from "../ops/admin-audit.service";
 import { PayoutTransactionsQueryDto, PayoutExportQueryDto } from "../dto";
 import {
@@ -26,11 +31,57 @@ import { i18nMessage } from "../../i18n";
  */
 @Injectable()
 export class AdminPayoutService {
+  private readonly logger = new Logger(AdminPayoutService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly audit: AdminAuditService,
     private readonly paymentService: PaymentService,
+    private readonly payoutCore: PayoutService,
+    @InjectQueue(QUEUE_NAMES.SCHEDULED) private readonly scheduledQueue: Queue,
   ) {}
+
+  /**
+   * Release SONRASI hızlı yol: transfer satırını KAPSAMLI oluştur (DB-only,
+   * HTTP process'te güvenli), sonra worker'a 'payout-process' fişi at. Para
+   * HTTP process'inde ASLA akmaz — PAYOUTS_DISABLED / IBAN cooldown /
+   * açık-iade guard'ları ve Bull tek-sefer (concurrency-1) çift-ödeme kilidi
+   * worker'daki processPendingPayouts'ta aynen geçerli kalır.
+   *
+   * Hata release'i GERİ ALMAZ: release çoktan commit'lidir; burada throw
+   * edilseydi admin başarılı release'i başarısız sanırdı. Saatlik
+   * payment-release-holds + 15dk payout-process cron'ları emniyet ağıdır —
+   * fast-path düşerse transfer en geç oradan akar.
+   *
+   * Custom jobId/dedupe BİLEREK yok: Bull, id çakışan `add`'i sessizce yutar
+   * (removeOnComplete temizlemeden önce biten eski işin id'si dahil) — admin
+   * fiş atıldı sanırdı. Yığılma admin tıklamasıyla sınırlı; aynı isimli işler
+   * named-processor concurrency-1 altında sıralanır ve boş süpürme ucuzdur.
+   */
+  private async queueImmediatePayout(scope: {
+    orderId?: string;
+    tradeId?: string;
+  }): Promise<{ transfersCreated: number; transferQueued: boolean }> {
+    let transfersCreated = 0;
+    try {
+      transfersCreated =
+        await this.payoutCore.createPayoutsForReleasedHolds(scope);
+      await this.scheduledQueue.add(
+        "payout-process",
+        // Payload'ı hiçbir processor okumaz — Bull Board'da fişin kaynağını
+        // görünür kılmak için (runTrackedJob manuel ayrımını opts.repeat
+        // yokluğundan yapar, bu bayraktan değil).
+        { manual: true, source: "admin-release", ...scope },
+        { removeOnComplete: 50, removeOnFail: 50 },
+      );
+      return { transfersCreated, transferQueued: true };
+    } catch (e) {
+      this.logger.warn(
+        `Immediate payout fast-path failed for ${JSON.stringify(scope)} — cron will sweep: ${e instanceof Error ? e.message : e}`,
+      );
+      return { transfersCreated, transferQueued: false };
+    }
+  }
 
   // ==================== SELLER PAYOUTS ====================
 
@@ -624,10 +675,16 @@ export class AdminPayoutService {
       },
       { releasedAt: new Date(), force },
     );
+    // Fast-path: hold released → transfer satırını hemen oluştur + worker'a
+    // fiş at. Normal ve ERKEN release aynı yoldur (force yalnız tarih şartını
+    // esnetir). Mesaj bilinçli olarak "serbest bırakıldı" — "ödendi" DEĞİL:
+    // staging'de PAYOUTS_DISABLED=true iken fiş koşar ama transfer atlanır.
+    const fastPath = await this.queueImmediatePayout({ orderId });
     return {
       success: true,
       orderId,
       message: "Ödeme satıcıya serbest bırakıldı",
+      ...fastPath,
     };
   }
 
@@ -702,11 +759,17 @@ export class AdminPayoutService {
         rows.length > 0 &&
         rows.every((r) => r.releasedAt !== null || r.refundedAt !== null)
       ) {
+        // İdempotent yolda da fast-path koşar: double-click/retry'da ilk
+        // istek release'i yazıp transfer oluşturamadan düşmüş ya da transfer
+        // 15dk cron'unu bekliyor olabilir — scoped oluşturma idempotenttir,
+        // fiş bekleyen transferi hemen ittirir.
+        const idempotentFastPath = await this.queueImmediatePayout({ tradeId });
         return {
           success: true,
           tradeId,
           releasedRows: 0,
           message: "Zaten serbest bırakılmış",
+          ...idempotentFastPath,
         };
       }
       throw new BadRequestException(
@@ -726,11 +789,13 @@ export class AdminPayoutService {
       },
       { releasedAt: now, releasedRows: released.count, force },
     );
+    const fastPath = await this.queueImmediatePayout({ tradeId });
     return {
       success: true,
       tradeId,
       releasedRows: released.count,
       message: "Takas nakit ödemesi serbest bırakıldı",
+      ...fastPath,
     };
   }
 

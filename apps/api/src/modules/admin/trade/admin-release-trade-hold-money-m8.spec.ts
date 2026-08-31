@@ -32,12 +32,20 @@ describe("AdminPayoutService.releaseTradePaymentHold", () => {
     const audit = {
       createRequiredAuditLog: jest.fn().mockResolvedValue(undefined),
     };
+    // Fast-path bağımlılıkları: release sonrası scoped payout + fiş. Bu spec'in
+    // konusu değil; sözleşmesi admin-release-immediate-payout.spec.ts'te.
+    const payoutCore = {
+      createPayoutsForReleasedHolds: jest.fn().mockResolvedValue(0),
+    };
+    const queue = { add: jest.fn().mockResolvedValue({ id: "job-1" }) };
     const service = new AdminPayoutService(
       prisma as any,
       audit as any,
       {} as any, // paymentService
+      payoutCore as any,
+      queue as any,
     );
-    return { service, prisma, audit };
+    return { service, prisma, audit, payoutCore, queue };
   };
 
   it("sebep verilmezse reddeder, hiçbir satıra dokunmaz", async () => {

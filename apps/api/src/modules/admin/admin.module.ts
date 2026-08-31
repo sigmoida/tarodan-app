@@ -85,6 +85,8 @@ import { QUEUE_NAMES } from "../../workers/constants";
 import { PrismaModule } from "../../prisma";
 import { AuthModule } from "../auth";
 import { PaymentModule } from "../payment";
+// Manuel escrow release fast-path'i: scoped payout oluşturma PayoutService'ten.
+import { PayoutModule } from "../payout/payout.module";
 import { MessagingModule } from "../messaging";
 import { SupportModule } from "../support";
 import { SearchModule } from "../search/search.module";
@@ -113,6 +115,7 @@ import { scheduledProcessors } from "../../workers/scheduled-processors";
     PrismaModule,
     AuthModule,
     PaymentModule,
+    PayoutModule,
     MessagingModule,
     SupportModule,
     SearchModule,

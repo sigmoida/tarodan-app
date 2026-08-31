@@ -205,22 +205,36 @@ export class PayoutService {
   /**
    * Create PayoutTransfer records for all newly released holds.
    * Called after releaseHoldsDue() marks holds as released.
+   *
+   * `scope` (opsiyonel): admin manuel release fast-path'i tek sipariş/takas
+   * için çağırır — sınırsız tarama + ilgisiz hold başına iade-guard sorgusu
+   * yapmasın diye. `orderId` verilirse yalnız o siparişin hold'ları taranır ve
+   * takas bölümü atlanır; `tradeId` verilirse tersi. Scope'suz çağrı (saatlik
+   * cron süpürmesi) birebir eski davranıştır. Her iki yol da idempotenttir
+   * (payoutTransfer:null filtresi + paymentHoldId/transId unique).
    */
-  async createPayoutsForReleasedHolds(): Promise<number> {
+  async createPayoutsForReleasedHolds(scope?: {
+    orderId?: string;
+    tradeId?: string;
+  }): Promise<number> {
     // 1) Order PaymentHolds released but no PayoutTransfer yet
-    const releasedHolds = await this.prisma.paymentHold.findMany({
-      where: {
-        status: PaymentHoldStatus.released,
-        payoutTransfer: null,
-        // MONEY-M3: donuk (açık iade ile kilitli) hold'a payout OLUŞTURMA — defansif;
-        // releaseHoldsDue zaten frozen'ı release etmez ama katmanlı guard.
-        frozenByRefundId: null,
-      },
-      include: {
-        payment: true,
-        seller: { include: { bankAccount: true } },
-      },
-    });
+    const releasedHolds =
+      scope && !scope.orderId
+        ? []
+        : await this.prisma.paymentHold.findMany({
+            where: {
+              status: PaymentHoldStatus.released,
+              payoutTransfer: null,
+              // MONEY-M3: donuk (açık iade ile kilitli) hold'a payout OLUŞTURMA — defansif;
+              // releaseHoldsDue zaten frozen'ı release etmez ama katmanlı guard.
+              frozenByRefundId: null,
+              ...(scope?.orderId ? { orderId: scope.orderId } : {}),
+            },
+            include: {
+              payment: true,
+              seller: { include: { bankAccount: true } },
+            },
+          });
 
     // KRİTİK: Sipariş, payment.order üzerinden DEĞİL hold.orderId üzerinden yüklenir.
     // Grup/sepet ödemelerinde Payment.orderId=null (checkoutGroupId'ye bağlı) olduğundan
@@ -333,19 +347,23 @@ export class PayoutService {
     // v2: her takasta İKİ ödeme satırı vardır ama karşı tarafa geçen tek kalem nakit
     // farktır — hizmet bedeli ve kargo platformda kalır. Farkı olmayan tarafın
     // satırında `recipientId` NULL'dur; onu buraya almak alıcısız transfer üretirdi.
-    const releasedTradeCash = await this.prisma.tradeCashPayment.findMany({
-      where: {
-        status: PaymentStatus.completed,
-        releasedAt: { not: null },
-        payoutTransfers: { none: {} },
-        recipientId: { not: null },
-        amount: { gt: 0 },
-      },
-      include: {
-        trade: true,
-        payment: true,
-      },
-    });
+    const releasedTradeCash =
+      scope && !scope.tradeId
+        ? []
+        : await this.prisma.tradeCashPayment.findMany({
+            where: {
+              status: PaymentStatus.completed,
+              releasedAt: { not: null },
+              payoutTransfers: { none: {} },
+              recipientId: { not: null },
+              amount: { gt: 0 },
+              ...(scope?.tradeId ? { tradeId: scope.tradeId } : {}),
+            },
+            include: {
+              trade: true,
+              payment: true,
+            },
+          });
 
     for (const tcp of releasedTradeCash) {
       if (tcp.payment) {

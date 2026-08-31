@@ -168,6 +168,13 @@ export const CRON_CATALOG: CronCatalogEntry[] = [
       "Defter invaryantlarını doğrular (grup toplamı sıfır, fazla iade yok); ihlalde alarm üretir",
     triggerable: true,
   },
+  {
+    key: "pending-moderation-digest",
+    label: "Bekleyen ilan özeti",
+    description:
+      "Moderasyonda 48 saatten uzun bekleyen ilanlar için adminlere günlük özet",
+    triggerable: true,
+  },
 
   // ── Elle tetiklenmez: zaten dakikada bir koşuyor — butonun kazancı yok ─────
   {
@@ -231,7 +238,11 @@ export const CRON_CATALOG: CronCatalogEntry[] = [
     triggerable: false,
   },
 
-  // ── Elle tetiklenmez: gerçek para akışı — yalnız zamanlanmış koşum ─────────
+  // ── Elle tetiklenmez (test aracından): gerçek para akışı ──────────────────
+  // İKİNCİ üretici: admin manuel escrow release fast-path'i de 'payout-process'
+  // fişi atar (admin-payout.service.queueImmediatePayout) — iş yine yalnız
+  // worker'da, tek-sefer kilidiyle koşar. triggerable:false yalnız Test
+  // Araçları düğmesini kapatır; release sonrası tetikleme bilinçli istisnadır.
   {
     key: "payout-process",
     label: "Payout işleme",
@@ -263,12 +274,5 @@ export const CRON_CATALOG: CronCatalogEntry[] = [
     label: "Eski ilan süre dolumu",
     description: "Süresi dolan eski ilanları yayından kaldırır",
     triggerable: false,
-  },
-  {
-    key: "pending-moderation-digest",
-    label: "Bekleyen ilan özeti",
-    description:
-      "Moderasyonda 48 saatten uzun bekleyen ilanlar için adminlere günlük özet",
-    triggerable: true,
   },
 ];
