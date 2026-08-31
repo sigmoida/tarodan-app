@@ -12,15 +12,14 @@ import {
   type Locale,
   type MessageKey,
   type MessageValues,
-  type Messages,
   locales,
   defaultLocale,
   isLocale,
   resolveLocale,
-  formatMessage,
   getMessages,
 } from "@tarodan/i18n";
 import { parseAcceptLanguage } from "./locale.util";
+import { translateMessage, lookupNode } from "./translate";
 
 /** Back-compat alias — the codebase's locale type is the shared `Locale`. */
 export type SupportedLanguage = Locale;
@@ -37,12 +36,7 @@ export class I18nService {
     lang: Locale = defaultLocale,
     values?: MessageValues,
   ): string {
-    const locale = resolveLocale(lang);
-    const message =
-      this.lookup(getMessages(locale), key) ??
-      this.lookup(getMessages(defaultLocale), key) ??
-      key;
-    return formatMessage(message, values, locale);
+    return translateMessage(key, lang, values);
   }
 
   /** Supported locales, in display order. */
@@ -63,7 +57,7 @@ export class I18nService {
     namespace?: string,
   ): unknown {
     const all = getMessages(resolveLocale(lang)) as Record<string, unknown>;
-    return namespace ? (this.lookupNode(all, namespace) ?? {}) : all;
+    return namespace ? (lookupNode(all, namespace) ?? {}) : all;
   }
 
   /** Best-effort locale from an `Accept-Language` header (q-values honored). */
@@ -74,25 +68,5 @@ export class I18nService {
   /** Narrow an arbitrary value (query/header) to a supported locale. */
   validateLanguage(lang?: string): Locale {
     return isLocale(lang) ? lang : defaultLocale;
-  }
-
-  // -- internal dot-path lookup into the nested catalog --------------------
-
-  private lookup(tree: Messages, key: string): string | undefined {
-    const node = this.lookupNode(tree as Record<string, unknown>, key);
-    return typeof node === "string" ? node : undefined;
-  }
-
-  private lookupNode(tree: Record<string, unknown>, path: string): unknown {
-    return path.split(".").reduce<unknown>((node, part) => {
-      if (
-        node &&
-        typeof node === "object" &&
-        part in (node as Record<string, unknown>)
-      ) {
-        return (node as Record<string, unknown>)[part];
-      }
-      return undefined;
-    }, tree);
   }
 }
