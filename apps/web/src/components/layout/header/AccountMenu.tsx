@@ -13,6 +13,7 @@ import {
   ArrowRightOnRectangleIcon,
   ArrowsRightLeftIcon,
   CurrencyDollarIcon,
+  ReceiptPercentIcon,
   ChevronDownIcon,
   BellIcon,
   SparklesIcon,
@@ -273,6 +274,19 @@ export default function AccountMenu({
                   </Badge>
                 )}
               </Link>
+              {/* İndirimlerim SATICIYA özel: /profile/discounts satıcı olmayanı
+                  hata mesajıyla profile geri atıyor, menüde herkese göstermek
+                  onları o duvara yollamak olurdu. */}
+              {user?.isSeller && (
+                <Link
+                  href="/profile/discounts"
+                  onClick={close}
+                  className={MENU_LINK_CLASS}
+                >
+                  <ReceiptPercentIcon className="w-5 h-5" />
+                  {t("seller.discounts.title")}
+                </Link>
+              )}
 
               <div className="border-t border-border-subtle my-1" />
 
