@@ -4800,7 +4800,9 @@
         "cronResultDone": "Job completed — {summary}",
         "cronResultDoneNoSummary": "Job completed",
         "cronResultFailed": "Job failed: {reason}",
-        "cronResultPending": "Job still running — follow the result in the Bull history"
+        "cronResultPending": "Job still running — follow the result in the Bull history",
+        "cronResultRunning": "Job running…",
+        "cronResultNotFound": "The job record was trimmed from the queue history — it most likely completed; the result is no longer viewable"
       },
       "media": {
         "title": "Media",
@@ -6243,7 +6245,8 @@
         "earlyReleaseHint": "Deliberate early release before the return window closes — a reason is required.",
         "earlyReleaseWarning": "The return window has not closed yet: you are releasing this payout EARLY. This cannot be undone; any refund opened afterwards must be recovered from the seller. Undelivered orders or orders with an open refund are still rejected.",
         "transferQueuedInfo": "Transfer queued — it will be processed within seconds; follow it on the Transfers tab",
-        "transferQueueFallback": "Immediate transfer could not be queued — the hourly payout sweep will pick it up"
+        "transferQueueFallback": "Immediate transfer could not be queued — the hourly payout sweep will pick it up",
+        "transferDeferred": "No transfer row was created right now (blocked or already existing) — a pending transfer is processed immediately, a blocked one by the hourly sweep"
       },
       "tax": {
         "title": "Tax Settings",

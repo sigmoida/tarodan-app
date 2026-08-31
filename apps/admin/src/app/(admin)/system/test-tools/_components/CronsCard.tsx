@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Button } from "@tarodan/ui";
+import { Button, Spinner } from "@tarodan/ui";
 import toast from "react-hot-toast";
 import { adminApi } from "@/lib/api";
 import { adminKeys } from "@/lib/query/keys";
@@ -13,9 +13,9 @@ import { useConfirm } from "@/provider/ConfirmProvider";
 import { type CronDef } from "../_lib/types";
 import { useTranslations } from "next-intl";
 
-/** cron-status polling: ~5 deneme × 2sn — çoğu iş bu pencerede biter. */
-const STATUS_POLL_ATTEMPTS = 5;
-const STATUS_POLL_INTERVAL_MS = 2000;
+/** Durum izleme penceresi: bu süre içinde terminal olmayan iş "hâlâ çalışıyor" sayılır. */
+const STATUS_WATCH_MS = 15_000;
+const STATUS_POLL_INTERVAL_MS = 2_000;
 
 interface CronStatus {
   state: string;
@@ -23,26 +23,29 @@ interface CronStatus {
   failedReason: string | null;
 }
 
+interface WatchedJob {
+  key: string;
+  label: string;
+  jobId: string;
+  deadline: number;
+}
+
 /**
  * Zamanlanmış işleri elle tetikler (yalnız CRON_CATALOG.triggerable olanlar).
  *
  * İki koruma: (1) tetikleme onay penceresinden geçer — prod'da gerçek veri
  * uyarısıyla (TimeAdjustCard ile aynı desen); (2) "kuyruğa alındı" son söz
- * değildir — fişin akıbeti cron-status ucundan birkaç kez sorgulanır ve
- * gerçek sonuç (bitti/hata/hâlâ çalışıyor) toast'lanır. Worker kapalıysa iş
- * kuyrukta bekler; polling "hâlâ çalışıyor" der, admin başarılı sanmaz.
+ * değildir — fişin akıbeti cron-status ucundan useQuery refetchInterval'ıyla
+ * izlenir (useProductBulkImport'taki iş-izleme deseni) ve sonuç kartta KALICI
+ * bir satır olarak görünür; geçici toast değil. Worker kapalıysa iş kuyrukta
+ * bekler, satır "hâlâ çalışıyor" der — admin başarılı sanmaz. `not_found`
+ * ayrı anlatılır: fiş removeOnComplete ile geçmişten temizlenmiştir; bunu
+ * "çalışıyor" diye göstermek admin'i işi İKİNCİ kez tetiklemeye itiyordu.
  */
 export function CronsCard({ isProd }: { isProd: boolean }) {
   const t = useTranslations();
   const confirm = useConfirm();
-  // Unmount sonrası setTimeout zinciri toast atmasın.
-  const aliveRef = useRef(true);
-  useEffect(() => {
-    aliveRef.current = true;
-    return () => {
-      aliveRef.current = false;
-    };
-  }, []);
+  const [watched, setWatched] = useState<WatchedJob | null>(null);
 
   const cronsQuery = useQuery<CronDef[]>({
     queryKey: adminKeys.all("test-tools-crons"),
@@ -50,57 +53,41 @@ export function CronsCard({ isProd }: { isProd: boolean }) {
   });
   const crons = cronsQuery.data ?? [];
 
-  const pollStatus = async (jobId: string) => {
-    for (let i = 0; i < STATUS_POLL_ATTEMPTS; i++) {
-      await new Promise((r) => setTimeout(r, STATUS_POLL_INTERVAL_MS));
-      if (!aliveRef.current) return;
-      let status: CronStatus;
-      try {
-        status = (
-          await adminApi.get("/admin/test-tools/cron-status", {
-            params: { jobId },
-          })
-        ).data;
-      } catch {
-        continue; // geçici ağ hatası — sıradaki denemede tekrar sor
-      }
-      if (!aliveRef.current) return;
-      if (status.state === "completed") {
-        toast.success(
-          status.summary
-            ? t("admin.system.testTools.cronResultDone", {
-                summary: status.summary,
-              })
-            : t("admin.system.testTools.cronResultDoneNoSummary"),
-        );
-        return;
-      }
-      if (status.state === "failed") {
-        toast.error(
-          t("admin.system.testTools.cronResultFailed", {
-            reason: status.failedReason ?? "?",
-          }),
-        );
-        return;
-      }
-      if (status.state === "not_found") break;
-    }
-    if (aliveRef.current) {
-      toast(t("admin.system.testTools.cronResultPending"));
-    }
-  };
+  const statusQuery = useQuery<CronStatus>({
+    queryKey: adminKeys.detail("test-tools-cron-status", watched?.jobId ?? "-"),
+    queryFn: async () =>
+      (
+        await adminApi.get("/admin/test-tools/cron-status", {
+          params: { jobId: watched?.jobId },
+        })
+      ).data,
+    enabled: !!watched,
+    refetchInterval: (query) => {
+      const state = query.state.data?.state;
+      const terminal =
+        state === "completed" || state === "failed" || state === "not_found";
+      if (terminal || !watched || Date.now() > watched.deadline) return false;
+      return STATUS_POLL_INTERVAL_MS;
+    },
+  });
 
   const runCronMut = useAdminMutation(
     (key: string) =>
       adminApi.post("/admin/test-tools/run-cron", { key }).then((r) => r.data),
     {
       errorMessage: t("admin.system.testTools.cronError"),
-      // Tetikleme asenkron: yanıt kuyruk fişidir; gerçek sonuç polling'den gelir.
-      onSuccess: (data) => {
+      // Tetikleme asenkron: yanıt kuyruk fişidir; akıbet statusQuery'de.
+      onSuccess: (data, key) => {
         toast.success(
           t("admin.system.testTools.cronQueued", { jobId: data.jobId }),
         );
-        void pollStatus(String(data.jobId));
+        const cron = crons.find((c) => c.key === key);
+        setWatched({
+          key,
+          label: cron?.label ?? key,
+          jobId: String(data.jobId),
+          deadline: Date.now() + STATUS_WATCH_MS,
+        });
       },
     },
   );
@@ -127,6 +114,46 @@ export function CronsCard({ isProd }: { isProd: boolean }) {
     });
   };
 
+  const statusLine = (() => {
+    if (!watched) return null;
+    const status = statusQuery.data;
+    if (status?.state === "completed") {
+      return {
+        tone: "text-success-700",
+        text: status.summary
+          ? t("admin.system.testTools.cronResultDone", {
+              summary: status.summary,
+            })
+          : t("admin.system.testTools.cronResultDoneNoSummary"),
+      };
+    }
+    if (status?.state === "failed") {
+      return {
+        tone: "text-danger-700",
+        text: t("admin.system.testTools.cronResultFailed", {
+          reason: status.failedReason ?? "?",
+        }),
+      };
+    }
+    if (status?.state === "not_found") {
+      return {
+        tone: "text-muted",
+        text: t("admin.system.testTools.cronResultNotFound"),
+      };
+    }
+    if (Date.now() > watched.deadline) {
+      return {
+        tone: "text-muted",
+        text: t("admin.system.testTools.cronResultPending"),
+      };
+    }
+    return {
+      tone: "text-muted",
+      text: t("admin.system.testTools.cronResultRunning"),
+      busy: true,
+    };
+  })();
+
   if (cronsQuery.isError) {
     return (
       <QueryErrorCard
@@ -144,6 +171,13 @@ export function CronsCard({ isProd }: { isProd: boolean }) {
       <p className="-mt-2 text-sm text-muted">
         {t("admin.system.testTools.cronsDescription")}
       </p>
+      {watched && statusLine && (
+        <div className="flex items-center gap-2 rounded-lg bg-surface-alt p-3 text-sm">
+          {statusLine.busy && <Spinner size="sm" />}
+          <span className="font-medium text-heading">{watched.label}:</span>
+          <span className={statusLine.tone}>{statusLine.text}</span>
+        </div>
+      )}
       <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
         {crons.map((c) => (
           <div

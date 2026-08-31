@@ -4800,7 +4800,9 @@
         "cronResultDone": "İş tamamlandı — {summary}",
         "cronResultDoneNoSummary": "İş tamamlandı",
         "cronResultFailed": "İş başarısız: {reason}",
-        "cronResultPending": "İş hâlâ çalışıyor — sonucu Bull geçmişinden izleyin"
+        "cronResultPending": "İş hâlâ çalışıyor — sonucu Bull geçmişinden izleyin",
+        "cronResultRunning": "İş çalışıyor…",
+        "cronResultNotFound": "İş kaydı kuyruk geçmişinden temizlendi — büyük olasılıkla tamamlandı, sonuç artık görüntülenemiyor"
       },
       "media": {
         "title": "Medya",
@@ -6243,7 +6245,8 @@
         "earlyReleaseHint": "İade penceresi dolmadan bilinçli erken bırakma — gerekçe istenir.",
         "earlyReleaseWarning": "İade penceresi henüz kapanmadı: bu ödemeyi ERKEN serbest bırakıyorsunuz. İşlem geri alınamaz; sonrasında açılan bir iadede tahsilat satıcıdan yapılmak zorunda kalır. Teslim edilmemiş ya da iadesi süren siparişte sistem yine reddeder.",
         "transferQueuedInfo": "Transfer kuyruğa alındı — birkaç saniye içinde işlenir; Transferler sekmesinden izleyin",
-        "transferQueueFallback": "Anında transfer kuyruğa alınamadı — saatlik ödeme taraması devreye girecek"
+        "transferQueueFallback": "Anında transfer kuyruğa alınamadı — saatlik ödeme taraması devreye girecek",
+        "transferDeferred": "Transfer satırı şu an oluşmadı (engel ya da zaten mevcut olabilir) — bekleyen transfer hemen, engelli olan saatlik taramada işlenir"
       },
       "tax": {
         "title": "Vergi Ayarları",
