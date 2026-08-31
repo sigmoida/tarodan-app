@@ -117,6 +117,7 @@ function useNewListingValue() {
     brands,
     manufacturers: manufacturerList,
     brandsLoading,
+    optionsStatus,
   } = useListingFilters();
   const selectedBrandSlug = brands.find((b) => b.id === brandId)?.slug;
   const { models, modelsLoading } = useCarModels(selectedBrandSlug);
@@ -290,6 +291,7 @@ function useNewListingValue() {
     colorList,
     brands,
     brandsLoading,
+    optionsStatus,
     models,
     modelsLoading,
     manufacturerList,

@@ -137,6 +137,7 @@ export default function ProductEditClient({ id }: { id: string }) {
     brands,
     manufacturers,
     brandsLoading,
+    optionsStatus,
   } = useListingFilters(true);
   const brandId = form.watch("brandId");
   const manufacturerId = form.watch("manufacturerId");
@@ -217,6 +218,7 @@ export default function ProductEditClient({ id }: { id: string }) {
           flatCategories={categoryOptions}
           brands={brandOptions}
           brandsLoading={brandsLoading}
+          optionsStatus={optionsStatus}
           models={modelOptions}
           modelsLoading={modelsLoading && modelOptions.length === 0}
           scaleList={scaleList}

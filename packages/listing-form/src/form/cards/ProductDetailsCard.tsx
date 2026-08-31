@@ -31,6 +31,12 @@ interface ProductDetailsCardProps {
   legacyColor?: string | null;
   manufacturerList: Ref[];
   yearOptions: number[];
+  /**
+   * Seçenek listelerinin durumu (useListingFilters'tan). Boş bir liste üç
+   * ayrı sebepten doğar ve kullanıcıya üçü aynı şekilde anlatılamaz — bkz.
+   * `optionText`. Verilmezse "hazır" varsayılır.
+   */
+  optionsStatus?: "loading" | "failed" | "ready";
 }
 
 /** "Ürün Detayları" — the category/condition + brand/model/scale/material/
@@ -49,6 +55,7 @@ export default function ProductDetailsCard({
   legacyColor,
   manufacturerList,
   yearOptions,
+  optionsStatus = "ready",
 }: ProductDetailsCardProps) {
   const { setValue, watch } = useFormContext();
   const brandId = watch("brandId");
@@ -68,7 +75,28 @@ export default function ProductDetailsCard({
    * dışı bırakılıp sebebi yazılır — yönetici grubu doldurunca kendiliğinden
    * çalışır.
    */
-  const noOptions = t("product.noOptionsDefined");
+  /**
+   * Boş bir seçenek listesinin ekranda ne diyeceği.
+   *
+   * "Tanımlanmamış" demek YALNIZ katalog gerçekten boşken doğrudur. İstek
+   * düştüğünde aynı şeyi demek satıcıyı yanıltır — hatayı katalogda sanır ve
+   * ölçek/malzeme zorunlu olduğu için ilanı hiç kaydedemez; sayfayı yenilemek
+   * çözerken kimse söylemez. Yükleme anında da göstermek, her açılışta
+   * "bozuk" görünen bir form demektir.
+   */
+  const optionText = (count: number, ready: string) => {
+    if (count > 0) return { placeholder: ready, disabled: false };
+    if (optionsStatus === "loading")
+      return { placeholder: t("common.loading"), disabled: true };
+    if (optionsStatus === "failed")
+      return { placeholder: t("product.optionsLoadFailed"), disabled: true };
+    return { placeholder: t("product.noOptionsDefined"), disabled: true };
+  };
+  const scaleField = optionText(scaleList.length, t("product.selectScale"));
+  const materialField = optionText(
+    materialList.length,
+    t("product.selectMaterial"),
+  );
 
   return (
     <SectionCard title={t("product.productDetails")}>
@@ -138,18 +166,16 @@ export default function ProductDetailsCard({
         <FormSelect
           name="scale"
           label={t("product.scaleRequired")}
-          placeholder={scaleList.length ? t("product.selectScale") : noOptions}
-          disabled={scaleList.length === 0}
+          placeholder={scaleField.placeholder}
+          disabled={scaleField.disabled}
           options={scaleList.map((s) => ({ value: s, label: s }))}
         />
 
         <FormSelect
           name="material"
           label={t("product.materialRequired")}
-          placeholder={
-            materialList.length ? t("product.selectMaterial") : noOptions
-          }
-          disabled={materialList.length === 0}
+          placeholder={materialField.placeholder}
+          disabled={materialField.disabled}
           options={materialList.map((m) => ({ value: m.slug, label: m.label }))}
         />
 

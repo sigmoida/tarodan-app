@@ -70,6 +70,7 @@ export default function EditListingClient() {
   const {
     brands,
     brandsLoading,
+    optionsStatus,
     scales: scaleList,
     materials: materialList,
     colors: colorList,
@@ -265,6 +266,7 @@ export default function EditListingClient() {
           flatCategories={categoryOptions}
           brands={brandOptions}
           brandsLoading={brandsLoading}
+          optionsStatus={optionsStatus}
           models={modelOptions}
           modelsLoading={modelsLoading && modelOptions.length === 0}
           scaleList={scaleList}

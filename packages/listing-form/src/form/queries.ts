@@ -89,6 +89,14 @@ export function useListingFilters(enabled = true) {
     colors: ColorOption[];
     brands: Brand[];
     manufacturers: Ref[];
+    /**
+     * Katalog isteği düştü mü? İstek hatası burada YUTULUYOR (markalar için
+     * ikinci bir kaynak denenebilsin diye), o yüzden `query.isError` asla true
+     * olmuyor. Ekranın "katalog boş" ile "katalog GELMEDİ" ayrımını yapabilmesi
+     * için bayrak veriyle birlikte taşınır: ikisi de boş dizi üretir ama
+     * kullanıcıya söylenmesi gereken şey farklıdır.
+     */
+    failed: boolean;
   }>({
     resource: "listing-form-filters",
     fetcher: async () => {
@@ -97,6 +105,7 @@ export function useListingFilters(enabled = true) {
       let colors: ColorOption[] = [];
       let brands: Brand[] = [];
       let manufacturers: Ref[] = [];
+      let failed = false;
       try {
         const d = (await api.get<any>("/products/filters")) as {
           scales?: string[];
@@ -111,6 +120,7 @@ export function useListingFilters(enabled = true) {
         brands = (d.brands ?? []) as Brand[];
         manufacturers = d.manufacturers ?? [];
       } catch {
+        failed = true;
         // fall through to the brands fallback below
       }
       if (!brands.length) {
@@ -123,18 +133,30 @@ export function useListingFilters(enabled = true) {
           brands = [];
         }
       }
-      return { scales, materials, colors, brands, manufacturers };
+      return { scales, materials, colors, brands, manufacturers, failed };
     },
     enabled,
     query: { staleTime: 5 * 60 * 1000 },
   });
+  const pending = query.isPending && enabled;
   return {
     scales: query.data?.scales ?? [],
     materials: query.data?.materials ?? [],
     colors: query.data?.colors ?? [],
     brands: query.data?.brands ?? [],
     manufacturers: query.data?.manufacturers ?? [],
-    brandsLoading: query.isPending && enabled,
+    brandsLoading: pending,
+    /**
+     * Seçenek listelerinin durumu — boş bir liste ÜÇ ayrı sebepten doğar ve
+     * kullanıcıya üçü aynı şekilde anlatılamaz: henüz yüklenmedi, istek düştü,
+     * ya da katalogda gerçekten tanımlı değer yok. Yalnız sonuncusunda
+     * "yönetici tanımlamamış" demek doğrudur.
+     */
+    optionsStatus: pending
+      ? ("loading" as const)
+      : query.data?.failed
+        ? ("failed" as const)
+        : ("ready" as const),
   };
 }
 

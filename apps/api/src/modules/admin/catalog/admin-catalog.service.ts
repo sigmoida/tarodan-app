@@ -1138,7 +1138,16 @@ export class AdminCatalogService {
     // sorguları `group.isActive` şartıyla çalıştığı için içindeki TÜM öğeler
     // web'den kaybolur. O yüzden silmeyle aynı kapılardan geçer.
     if (dto.isActive === false && existing.isActive) {
-      if (isProtectedAttributeGroup(existing)) {
+      // Koruma, bu isteğin SONUNDAKİ hale göre değerlendirilir: form modalı
+      // `isRequired` ve `isActive`'i birlikte gönderiyor, ikisini aynı anda
+      // kaldıran admin "bu grup zorunlu" diyen bir 400 alırdı — oysa aynı
+      // istek zorunluluğu kaldırıyor. Slug tabanlı koruma yine de geçerli:
+      // ölçek/malzeme/renk bayraktan bağımsız korunur.
+      const effective = {
+        slug: existing.slug,
+        isRequired: dto.isRequired ?? existing.isRequired,
+      };
+      if (isProtectedAttributeGroup(effective)) {
         throw new BadRequestException(
           i18nMessage("server.admin.catalog.attributeGroupProtected", {
             name: existing.name,
@@ -1211,6 +1220,19 @@ export class AdminCatalogService {
       throw new BadRequestException(
         i18nMessage("server.admin.catalog.attributeGroupInUse", {
           count: existing._count.attributes,
+        }),
+      );
+    }
+
+    // Pasife almanın kapatıldığı yerde SİLME açık kalırsa kapı kapanmamış olur:
+    // değerleri boşalmış (yeni kurulum, yarım kalmış seed, ya da bu kural
+    // gelmeden önce boşaltılmış) korunan bir grup silinebilirdi. Admin onu
+    // yeniden oluşturduğunda slug ADDAN üretilir — "Malzeme" → `malzeme` — ve
+    // `material` slug'ına bağlı filtre/where/yazma hattı kalıcı olarak kopardı.
+    if (isProtectedAttributeGroup(existing)) {
+      throw new BadRequestException(
+        i18nMessage("server.admin.catalog.attributeGroupProtected", {
+          name: existing.name,
         }),
       );
     }

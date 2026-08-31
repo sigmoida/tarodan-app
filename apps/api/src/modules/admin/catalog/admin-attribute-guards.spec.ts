@@ -254,6 +254,71 @@ describe("AdminCatalogService — öznitelik grubu kapıları", () => {
     expect(data.slug).toBeUndefined();
   });
 
+  it("BOŞ da olsa korunan grup SİLİNEMEZ (pasife almanın arka kapısı)", async () => {
+    // Değerleri boşalmış korunan bir grup silinebilseydi, yeniden
+    // oluşturulduğunda slug ADDAN üretilir ("Malzeme" → `malzeme`) ve
+    // `material` slug'ına bağlı tüm hat kalıcı olarak koparadı.
+    prisma.attributeGroup.findUnique.mockResolvedValue({
+      id: "grp-1",
+      name: "Malzeme",
+      slug: "material",
+      isRequired: false,
+      isActive: true,
+      _count: { attributes: 0 },
+    });
+
+    await expect(
+      service.deleteAttributeGroup("admin-1", "grp-1"),
+    ).rejects.toMatchObject({
+      response: { i18nKey: "server.admin.catalog.attributeGroupProtected" },
+    });
+    expect(prisma.attributeGroup.delete).not.toHaveBeenCalled();
+  });
+
+  it("aynı kaydetmede 'Zorunlu' kaldırılıyorsa pasife alma engellenmez", async () => {
+    // Form modalı isRequired ve isActive'i BİRLİKTE gönderiyor; koruma isteğin
+    // sonundaki hale bakmazsa admin, zorunluluğu kaldıran isteğin kendisinden
+    // "bu grup zorunlu" hatası alırdı.
+    prisma.attributeGroup.findUnique.mockResolvedValue({
+      id: "grp-2",
+      name: "Seri",
+      slug: "hw-series",
+      isRequired: true,
+      isActive: true,
+    });
+    prisma.productAttribute.count.mockResolvedValue(0);
+    prisma.attributeGroup.update.mockResolvedValue({
+      id: "grp-2",
+      _count: { attributes: 2 },
+    });
+
+    await service.updateAttributeGroup("admin-1", "grp-2", {
+      isRequired: false,
+      isActive: false,
+    });
+
+    expect(prisma.attributeGroup.update).toHaveBeenCalled();
+  });
+
+  it("ama slug korumalıysa 'Zorunlu' kaldırmak yetmez", async () => {
+    prisma.attributeGroup.findUnique.mockResolvedValue({
+      id: "grp-1",
+      name: "Malzeme",
+      slug: "material",
+      isRequired: true,
+      isActive: true,
+    });
+
+    await expect(
+      service.updateAttributeGroup("admin-1", "grp-1", {
+        isRequired: false,
+        isActive: false,
+      }),
+    ).rejects.toMatchObject({
+      response: { i18nKey: "server.admin.catalog.attributeGroupProtected" },
+    });
+  });
+
   it("korunmayan grup yeniden adlandırılınca slug'ı güncellenir", async () => {
     prisma.attributeGroup.findUnique.mockResolvedValue({
       id: "grp-2",

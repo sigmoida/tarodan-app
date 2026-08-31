@@ -38,6 +38,7 @@ function NewListingLayout() {
     flatCategories,
     brands,
     brandsLoading,
+    optionsStatus,
     models,
     modelsLoading,
     scaleList,
@@ -107,6 +108,7 @@ function NewListingLayout() {
               flatCategories={flatCategories}
               brands={brands}
               brandsLoading={brandsLoading}
+              optionsStatus={optionsStatus}
               models={models}
               modelsLoading={modelsLoading}
               scaleList={scaleList}

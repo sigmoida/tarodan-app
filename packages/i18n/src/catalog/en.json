@@ -840,7 +840,8 @@
     "newListing": "New Listing",
     "originalPriceTry": "Original Price (₺)",
     "imageFormatsHint": "JPEG, PNG, WebP, GIF · max {maxMb} MB",
-    "noOptionsDefined": "No options defined for this field"
+    "noOptionsDefined": "No options defined for this field",
+    "optionsLoadFailed": "Options could not be loaded — refresh the page"
   },
   "cart": {
     "myCart": "My Cart",

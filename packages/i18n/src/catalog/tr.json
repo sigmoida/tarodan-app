@@ -840,7 +840,8 @@
     "newListing": "Yeni İlan",
     "originalPriceTry": "Orijinal Fiyat (₺)",
     "imageFormatsHint": "JPEG, PNG, WebP, GIF · en fazla {maxMb} MB",
-    "noOptionsDefined": "Bu alan için seçenek tanımlanmamış"
+    "noOptionsDefined": "Bu alan için seçenek tanımlanmamış",
+    "optionsLoadFailed": "Seçenekler yüklenemedi — sayfayı yenileyin"
   },
   "cart": {
     "myCart": "Sepetim",
