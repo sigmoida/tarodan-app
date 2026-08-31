@@ -28,6 +28,11 @@ export interface SearchableMultiSelectProps {
   onQueryChange?: (query: string) => void;
   /** Async fetch in flight — shows `loadingText` instead of `emptyText`. */
   loading?: boolean;
+  /** Sayfalı async kaynaklarda sonraki sayfayı ister: liste sonuna yaklaşınca
+   *  çağrılır. Verilmezse bileşen eskisi gibi tek seferlik listeyle çalışır. */
+  onLoadMore?: () => void;
+  /** Yüklenecek başka sayfa var mı — `onLoadMore` yalnız true iken çağrılır. */
+  hasMore?: boolean;
   placeholder?: string;
   searchPlaceholder?: string;
   emptyText?: string;
@@ -55,6 +60,8 @@ export function SearchableMultiSelect({
   options,
   onQueryChange,
   loading,
+  onLoadMore,
+  hasMore,
   placeholder,
   searchPlaceholder,
   emptyText = "Sonuç bulunamadı",
@@ -242,6 +249,23 @@ export function SearchableMultiSelect({
             role="listbox"
             aria-multiselectable
             className="max-h-56 overflow-y-auto p-1"
+            onScroll={
+              onLoadMore
+                ? (e) => {
+                    // Dibe YAKLAŞINCA (son ekranın bir miktar öncesi) iste:
+                    // tam dibe basmayı beklemek, kullanıcıyı her sayfada boş
+                    // bir duraklamaya sokuyor.
+                    if (!hasMore || loading) return;
+                    const el = e.currentTarget;
+                    if (
+                      el.scrollTop + el.clientHeight >=
+                      el.scrollHeight - 48
+                    ) {
+                      onLoadMore();
+                    }
+                  }
+                : undefined
+            }
           >
             {filtered.length === 0 ? (
               <li className="px-3 py-2 text-center text-sm text-muted">
@@ -272,6 +296,12 @@ export function SearchableMultiSelect({
                   </li>
                 );
               })
+            )}
+            {/* Liste DOLUYKEN gelen sayfa: boş-durum satırı bunu göstermez. */}
+            {filtered.length > 0 && loading && (
+              <li className="px-3 py-2 text-center text-sm text-muted">
+                {loadingText}
+              </li>
             )}
           </ul>
         </div>
