@@ -296,3 +296,109 @@ export const orderAmountOf = (o: OrderDetail): number =>
 /** Birincil ürün bilgisi (tekil ürün veya ilk kalem). */
 export const getProductInfo = (o: OrderDetail) =>
   o.product || o.items?.[0]?.product;
+
+/** Kuruşa yuvarlar. */
+const money = (value: number): number => Math.round(value * 100) / 100;
+
+/**
+ * Ürün bedeli: `pricing.subtotal`, yoksa alıcı toplamının tersten okunuşu
+ * (ödenen − kargo payı − alıcı ücreti). Alıcı ve satıcı özetleri AYNI tabanı
+ * kullanır — taban iki yerde ayrı türetildiğinde satıcı tarafı bir dönem ham
+ * `totalAmount`'a düşüp kazancı kargo+ücret kadar şişik gösteriyordu.
+ */
+const productBaseOf = (o: OrderDetail): number => {
+  const p = o.pricing;
+  return (
+    p?.subtotal ??
+    orderAmountOf(o) -
+      (p?.shippingAmount ?? o.shippingCost ?? 0) -
+      (p?.buyerFeeAmount ?? o.buyerFeeAmount ?? 0)
+  );
+};
+
+/**
+ * Sipariş özetinin GÖSTERİLEN satırları — sepet/checkout ile AYNI kural.
+ *
+ * KDV dağıtımı: kargo satırı tarifeden gelen SABİT tutardır ve KDV'siz
+ * gösterilir; hizmet KDV'sinin TAMAMI — kargo payının KDV'si dahil — hizmet
+ * bedeli satırına yazılır. Alıcı için kargo pazarlık edilen tek bir kalem,
+ * vergi ise platformun hizmetine ait tek bir kalemdir. Backend `pricing.summary`
+ * (apps/api/src/modules/order/pricing/order-pricing.service.ts) sepet ve
+ * checkout'ta bunu böyle döner; bu ekran KDV'yi kendi dağıttığında alıcı
+ * ödediği kırılımı sipariş detayında başka türlü görüyordu.
+ *
+ * İki taraf da terim terim backend formülüyle aynıdır: alıcı satırlarının
+ * toplamı `buyerTotalOf` (apps/api/.../helpers/order-total.helper.ts), satıcı
+ * satırlarının toplamı `sellerNetAmountOf` (order-net.helper.ts). Denetlenen
+ * artifakt: yanı başındaki `order-summary.test.ts`.
+ */
+export interface BuyerOrderSummary {
+  /** Ürün bedeli (indirim sonrası; vitrin fiyatı KDV dahil kabul edilir). */
+  productAmount: number;
+  /** Alıcının üstlendiği kargo payı — KDV'siz. */
+  shippingAmount: number;
+  /** Alıcı ücretleri + alıcıya verilen hizmetlerin KDV'sinin tamamı. */
+  serviceFeeAmount: number;
+  /** Alıcının ödediği toplam — üç satırın toplamına EŞİTTİR. */
+  paidAmount: number;
+}
+
+export const buyerOrderSummaryOf = (o: OrderDetail): BuyerOrderSummary => {
+  const p = o.pricing;
+  const paidAmount = orderAmountOf(o);
+  const shippingAmount = p?.shippingAmount ?? o.shippingCost ?? 0;
+  const buyerFee = p?.buyerFeeAmount ?? o.buyerFeeAmount ?? 0;
+  const productAmount = productBaseOf(o);
+  // `pricing` hiç yoksa KDV tutarı bilinmez ve taban zaten tersten türetildiği
+  // için kalan fark 0'dır — üç satır yine ödenen tutarı verir; KDV o durumda
+  // ürün satırının içinde kalır (ayrıştıracak veri yok).
+  const serviceTax =
+    p?.buyerServiceTaxAmount ??
+    Math.max(0, money(paidAmount - productAmount - shippingAmount - buyerFee));
+
+  return {
+    productAmount,
+    shippingAmount,
+    serviceFeeAmount: money(buyerFee + serviceTax),
+    paidAmount,
+  };
+};
+
+export interface SellerOrderSummary {
+  /** Satıcının hak ettiği ürün bedeli. */
+  productAmount: number;
+  /** Satıcının üstlendiği kargo payı — KDV'siz. */
+  shippingDeduction: number;
+  /** Satıcı ücretleri + satıcıya verilen hizmetlerin KDV'sinin tamamı. */
+  serviceFeeDeduction: number;
+  /** Stopaj (GVK 94/19) — yalnız kurumsal satıcıda doğar. */
+  withholdingTax: number;
+  /** Satıcının eline geçen — ürün bedeli eksi üç kesinti. */
+  payout: number;
+}
+
+export const sellerOrderSummaryOf = (o: OrderDetail): SellerOrderSummary => {
+  const p = o.pricing;
+  const productAmount = money(productBaseOf(o) + (p?.taxAmount ?? 0));
+  const shippingDeduction = p?.sellerShippingAmount ?? 0;
+  const serviceFeeDeduction = money(
+    (p?.sellerFeeAmount ?? o.sellerFeeAmount ?? 0) +
+      (p?.sellerServiceTaxAmount ?? 0),
+  );
+  const withholdingTax = p?.withholdingTaxAmount ?? 0;
+
+  return {
+    productAmount,
+    shippingDeduction,
+    serviceFeeDeduction,
+    withholdingTax,
+    payout:
+      p?.sellerNetAmount ??
+      money(
+        productAmount -
+          shippingDeduction -
+          serviceFeeDeduction -
+          withholdingTax,
+      ),
+  };
+};
