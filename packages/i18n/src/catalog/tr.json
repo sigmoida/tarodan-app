@@ -4793,7 +4793,14 @@
           "offer": "teklif id veya ürün başlığı",
           "trade": "takas id",
           "userEmail": "kullanıcı e-posta"
-        }
+        },
+        "cronConfirmTitle": "Cron'u tetikle",
+        "cronConfirmDescription": "\"{label}\" işi kuyruğa alınacak ve worker'da hemen çalışacak. Devam edilsin mi?",
+        "cronProdWarning": "⚠ PROD — iş gerçek müşteri verisi üzerinde çalışacak.",
+        "cronResultDone": "İş tamamlandı — {summary}",
+        "cronResultDoneNoSummary": "İş tamamlandı",
+        "cronResultFailed": "İş başarısız: {reason}",
+        "cronResultPending": "İş hâlâ çalışıyor — sonucu Bull geçmişinden izleyin"
       },
       "media": {
         "title": "Medya",
@@ -6234,7 +6241,9 @@
         },
         "releaseEarly": "Erken Serbest Bırak",
         "earlyReleaseHint": "İade penceresi dolmadan bilinçli erken bırakma — gerekçe istenir.",
-        "earlyReleaseWarning": "İade penceresi henüz kapanmadı: bu ödemeyi ERKEN serbest bırakıyorsunuz. İşlem geri alınamaz; sonrasında açılan bir iadede tahsilat satıcıdan yapılmak zorunda kalır. Teslim edilmemiş ya da iadesi süren siparişte sistem yine reddeder."
+        "earlyReleaseWarning": "İade penceresi henüz kapanmadı: bu ödemeyi ERKEN serbest bırakıyorsunuz. İşlem geri alınamaz; sonrasında açılan bir iadede tahsilat satıcıdan yapılmak zorunda kalır. Teslim edilmemiş ya da iadesi süren siparişte sistem yine reddeder.",
+        "transferQueuedInfo": "Transfer kuyruğa alındı — birkaç saniye içinde işlenir; Transferler sekmesinden izleyin",
+        "transferQueueFallback": "Anında transfer kuyruğa alınamadı — saatlik ödeme taraması devreye girecek"
       },
       "tax": {
         "title": "Vergi Ayarları",

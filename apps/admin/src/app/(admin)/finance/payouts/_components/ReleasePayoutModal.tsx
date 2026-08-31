@@ -2,6 +2,7 @@
 
 import { FormModal, FormTextarea, useZodForm } from "@tarodan/ui/form";
 import { useTranslations } from "next-intl";
+import toast from "react-hot-toast";
 import { adminApi } from "@/lib/api";
 import { useAdminMutation } from "@/hooks/useAdminMutation";
 import { releasePayoutSchema, type ReleasePayoutValues } from "../_lib/schema";
@@ -24,9 +25,23 @@ export function ReleasePayoutModal({
     (v: ReleasePayoutValues) =>
       adminApi.releasePayout(orderId, v.reason.trim(), early),
     {
-      invalidates: ["payouts-transactions", "payouts-summary"],
+      // Fast-path anında bir PayoutTransfer (pending) satırı oluşturur —
+      // Transferler sekmesi de tazelenmeli, yoksa satır elle yenileyene
+      // kadar görünmez.
+      invalidates: [
+        "payouts-transactions",
+        "payouts-summary",
+        "payouts-transfers",
+      ],
       successMessage: t("admin.finance.payouts.releasedToSeller"),
-      onSuccess: onClose,
+      onSuccess: (res) => {
+        // transferQueued:false = fast-path düştü, saatlik cron emniyet ağı
+        // devralacak — admin "anında" beklemesin diye ayrıca söylenir.
+        if (res?.data?.transferQueued === false) {
+          toast(t("admin.finance.payouts.transferQueueFallback"));
+        }
+        onClose();
+      },
     },
   );
 

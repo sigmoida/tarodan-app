@@ -33,7 +33,7 @@ export default function TestToolsPage() {
         </Alert>
       )}
 
-      <CronsCard />
+      <CronsCard isProd={!!env?.isProd} />
       <TimeAdjustCard isProd={!!env?.isProd} />
     </AdminPage>
   );

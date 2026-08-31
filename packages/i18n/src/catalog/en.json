@@ -4793,7 +4793,14 @@
           "offer": "offer ID or product title",
           "trade": "trade ID",
           "userEmail": "user email"
-        }
+        },
+        "cronConfirmTitle": "Trigger cron",
+        "cronConfirmDescription": "The \"{label}\" job will be queued and run on the worker immediately. Continue?",
+        "cronProdWarning": "⚠ PROD — the job will run on real customer data.",
+        "cronResultDone": "Job completed — {summary}",
+        "cronResultDoneNoSummary": "Job completed",
+        "cronResultFailed": "Job failed: {reason}",
+        "cronResultPending": "Job still running — follow the result in the Bull history"
       },
       "media": {
         "title": "Media",
@@ -6234,7 +6241,9 @@
         },
         "releaseEarly": "Release Early",
         "earlyReleaseHint": "Deliberate early release before the return window closes — a reason is required.",
-        "earlyReleaseWarning": "The return window has not closed yet: you are releasing this payout EARLY. This cannot be undone; any refund opened afterwards must be recovered from the seller. Undelivered orders or orders with an open refund are still rejected."
+        "earlyReleaseWarning": "The return window has not closed yet: you are releasing this payout EARLY. This cannot be undone; any refund opened afterwards must be recovered from the seller. Undelivered orders or orders with an open refund are still rejected.",
+        "transferQueuedInfo": "Transfer queued — it will be processed within seconds; follow it on the Transfers tab",
+        "transferQueueFallback": "Immediate transfer could not be queued — the hourly payout sweep will pick it up"
       },
       "tax": {
         "title": "Tax Settings",
