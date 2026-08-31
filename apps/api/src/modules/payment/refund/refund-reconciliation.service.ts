@@ -11,6 +11,65 @@ import {
 import { PaymentRefundService } from "./payment-refund.service";
 import { PaymentProviderRegistry } from "../../payment-providers/payment-provider.registry";
 import { PaymentProviderEventService } from "../payment-provider-event.service";
+import { errorMessage } from "../../../common/helpers/error-message";
+
+/**
+ * İade sweep'inin aday satırı: siparişin kendi ödemesi (tekil) VEYA grubunun
+ * ödemesi (sepet) — hangisi varsa iade kaydı orada tutulur.
+ */
+const REFUND_SWEEP_CANDIDATE_SELECT = {
+  id: true,
+  payment: { select: { metadata: true } },
+  checkoutGroup: { select: { payment: { select: { metadata: true } } } },
+} as const;
+
+interface RefundSweepCandidate {
+  id: string;
+  payment?: { metadata: unknown } | null;
+  checkoutGroup?: { payment?: { metadata: unknown } | null } | null;
+}
+
+/**
+ * Bu sipariş için ödemede KAYITLI bir iade var mı (tam ya da kısmi)?
+ *
+ * Kayıt varsa iade zaten İCRA EDİLMİŞ bir karardır: kısmi tutar, satıcı kusuru
+ * / kargo payı gibi bir settlement'ın sonucudur ve sipariş o kararla kapanmıştır.
+ * Sweep ise her zaman TAM tutarı ister — tekrar denerse MONEY-H4 kümülatif tavanı
+ * `refundAmountExceedsLimit` fırlatır ve sipariş her cron turunda sonsuza dek
+ * "başarısız" loglanır (TARODAN-API-8). Başarısız kalmış bir iade metadata'ya
+ * HİÇ yazılmadığından retry hedefi kaybolmaz; yalnız bitmiş işler elenir.
+ */
+function hasRecordedRefund(metadata: unknown, orderId: string): boolean {
+  const meta = (metadata as Record<string, unknown> | null) ?? {};
+  const refundedOrders =
+    (meta.refundedOrders as Record<string, number> | undefined) ?? {};
+  return Number(refundedOrders[orderId] ?? 0) > 0;
+}
+
+/**
+ * Adayları "iadesi henüz yapılmamış" / "iadesi zaten kayıtlı" diye ayırır
+ * (tekil ve grup ödemeler için ortak).
+ *
+ * `skipped` çağırana geri verilir çünkü atlamanın anlamı DALA GÖRE değişir:
+ * terminal durumdaki (cancelled/refunded) bir siparişte iade kararı icra
+ * edilmiş demektir ve sessizce elenmesi doğrudur; terminal OLMAYAN bir
+ * siparişte ise sipariş takılı kalmış demektir ve görünür olmalıdır.
+ */
+function partitionRefundCandidates(candidates: RefundSweepCandidate[]): {
+  pending: string[];
+  skipped: string[];
+} {
+  const pending: string[] = [];
+  const skipped: string[] = [];
+  for (const candidate of candidates) {
+    const metadata =
+      candidate.payment?.metadata ?? candidate.checkoutGroup?.payment?.metadata;
+    (hasRecordedRefund(metadata, candidate.id) ? skipped : pending).push(
+      candidate.id,
+    );
+  }
+  return { pending, skipped };
+}
 
 /** İade sonucu belirsiz kalan attempt'in durum-sorguyla çözülmeden önce bekleyeceği süre. */
 const REFUND_RESOLVE_MIN_AGE_MINUTES = 15;
@@ -173,7 +232,7 @@ export class RefundReconciliationService {
         }
       } catch (error: any) {
         this.logger.error(
-          `Refund resolve: attempt ${attempt.id} çözümlenemedi: ${error?.message}`,
+          `Refund resolve: attempt ${attempt.id} çözümlenemedi: ${errorMessage(error)}`,
         );
       }
     }
@@ -225,16 +284,22 @@ export class RefundReconciliationService {
    * processRefund order'ı `cancelled` + payment'ı `refunded` yaptığından (ve payout
    * tamamlandıysa K1 guard'ı bloke ettiğinden) sweep idempotenttir: işlenen sipariş bir
    * daha eşleşmez, kalıcı bloke olan nadir vaka her turda loglanır (manuel alarm sinyali).
+   * Tek istisna KISMİ iadedir — payment `completed` kalır — bu yüzden her üç dal da
+   * `hasRecordedRefund` ile elenir: iadesi bir kez icra edilmiş sipariş sweep'in işi
+   * değildir (kalan bakiye admin kararıdır).
    * Yani bu sweep aynı zamanda tx-dışı iadeler için bir retry/outbox görevi görür.
    */
   async processRefundedOrders(): Promise<{ refunded: number; failed: number }> {
     // 1) Tekil (order-bazlı) ödemeler — Order.payment doğrudan siparişe bağlı.
+    // Kısmi iade sonrası payment `completed` KALIR (MONEY-H4: sonraki kısmi iadeler
+    // mümkün olsun diye), o yüzden bu sorgu iadesi çoktan bitmiş siparişi de görür →
+    // `hasRecordedRefund` ile elenir (grup dalıyla aynı kural).
     const orders = await this.prisma.order.findMany({
       where: {
         status: { in: [OrderStatus.refunded, OrderStatus.cancelled] },
         payment: { is: { status: PaymentStatus.completed } },
       },
-      select: { id: true },
+      select: REFUND_SWEEP_CANDIDATE_SELECT,
       take: 50,
     });
 
@@ -255,23 +320,9 @@ export class RefundReconciliationService {
           is: { payment: { is: { status: PaymentStatus.completed } } },
         },
       },
-      select: {
-        id: true,
-        checkoutGroup: {
-          select: { payment: { select: { metadata: true } } },
-        },
-      },
+      select: REFUND_SWEEP_CANDIDATE_SELECT,
       take: 50,
     });
-    const pendingGroupOrderIds = groupOrders
-      .filter((o) => {
-        const meta =
-          (o.checkoutGroup?.payment?.metadata as Record<string, unknown>) || {};
-        const refundedOrders =
-          (meta.refundedOrders as Record<string, number>) || {};
-        return !refundedOrders[o.id];
-      })
-      .map((o) => o.id);
 
     // 3) SEAM-B3 recovery: outbound paket göndericiye İADE DÖNMÜŞ (shipment.status=returned)
     // ama processRefund başarısız olduğu için `refund_requested`'da TAKILI siparişler.
@@ -286,28 +337,43 @@ export class RefundReconciliationService {
         status: OrderStatus.refund_requested,
         shipment: { is: { status: ShipmentStatus.returned } },
       },
-      select: { id: true },
+      select: REFUND_SWEEP_CANDIDATE_SELECT,
       take: 50,
     });
 
+    // Dal 1 ve 2'de atlananlar TERMİNAL durumdadır (cancelled/refunded): iade
+    // kararı icra edilmiş, sipariş kapanmıştır → sessizce elenirler. Dal 3'te ise
+    // sipariş `refund_requested`, yani terminal DEĞİL: iadesi kısmen kaydedilmiş
+    // ama sipariş kapanmamış bir paket bu sweep dışında hiçbir yerden ilerlemez
+    // (poller terminal shipment'ı artık pollamaz) → sessiz kalmasın, alarm ver.
+    const returnedCandidates = partitionRefundCandidates(returnedStuckOrders);
+    if (returnedCandidates.skipped.length > 0) {
+      this.logger.warn(
+        `REFUND_MANUAL_REVIEW: ${returnedCandidates.skipped.length} sipariş iadesi kayıtlı ama ` +
+          `hâlâ refund_requested — sweep ilerletemiyor, manuel inceleme gerekli: ` +
+          `${returnedCandidates.skipped.join(", ")}`,
+      );
+    }
+
     const allOrderIds = [
-      ...orders.map((o) => o.id),
-      ...pendingGroupOrderIds,
-      ...returnedStuckOrders.map((o) => o.id),
+      ...partitionRefundCandidates(orders).pending,
+      ...partitionRefundCandidates(groupOrders).pending,
+      ...returnedCandidates.pending,
     ];
 
     let refunded = 0;
     let failed = 0;
-    const failedIds: string[] = [];
+    const failures: string[] = [];
     for (const orderId of allOrderIds) {
       try {
         await this.paymentRefund.processRefund(orderId);
         refunded++;
-      } catch (error: any) {
+      } catch (error) {
         failed++;
-        failedIds.push(orderId);
+        const reason = errorMessage(error);
+        failures.push(`${orderId} (${reason})`);
         this.logger.error(
-          `Auto-refund (iptal edilen sipariş ${orderId}) başarısız: ${error.message}`,
+          `Auto-refund (iptal edilen sipariş ${orderId}) başarısız: ${reason}`,
         );
       }
     }
@@ -317,7 +383,8 @@ export class RefundReconciliationService {
     // takılı iade YALNIZ para tarafını etkiler; envanter piyasadan silinmez.
     if (failed > 0) {
       this.logger.warn(
-        `REFUND_MANUAL_REVIEW: ${failed} sipariş için otomatik para iadesi hâlâ başarısız — manuel inceleme gerekli: ${failedIds.join(", ")}`,
+        `REFUND_MANUAL_REVIEW: ${failed} sipariş için otomatik para iadesi hâlâ başarısız — ` +
+          `manuel inceleme gerekli: ${failures.join(", ")}`,
       );
     }
     return { refunded, failed };
@@ -374,7 +441,7 @@ export class RefundReconciliationService {
         );
       } catch (e: any) {
         this.logger.error(
-          `Refund attempt recovery failed attempt=${attempt.id} order=${attempt.orderId}: ${e?.message}`,
+          `Refund attempt recovery failed attempt=${attempt.id} order=${attempt.orderId}: ${errorMessage(e)}`,
         );
       }
     }
@@ -400,7 +467,7 @@ export class RefundReconciliationService {
         if (result.refunded) recovered++;
       } catch (e: any) {
         this.logger.error(
-          `Trade refund attempt recovery failed attempt=${attempt.id} trade=${attempt.tradeId}: ${e?.message}`,
+          `Trade refund attempt recovery failed attempt=${attempt.id} trade=${attempt.tradeId}: ${errorMessage(e)}`,
         );
       }
     }
