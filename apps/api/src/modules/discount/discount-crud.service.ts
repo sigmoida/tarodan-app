@@ -685,6 +685,19 @@ export class DiscountCrudService {
         include: {
           seller: { select: { id: true, displayName: true } },
           category: { select: { id: true, name: true } },
+          // Hedef kitle satırları listede de gelmeli: yönetim ekranı düzenleme
+          // formunu LİSTE satırından dolduruyor. Bunlar gelmediğinde form kitleyi
+          // boş görüyor, kaydedildiğinde de boş gönderiyordu — "belirli alıcılar"
+          // kampanyası bir düzenlemede hedefini kaybediyordu.
+          targetTiers: { select: { tierType: true } },
+          targetUsers: {
+            select: {
+              userId: true,
+              // Ad/e-posta, kimliği ekranda okunur kılmak için: seçim çipleri
+              // UUID değil kişi gösterir.
+              user: { select: { id: true, displayName: true, email: true } },
+            },
+          },
         },
         orderBy,
         skip: (page - 1) * limit,

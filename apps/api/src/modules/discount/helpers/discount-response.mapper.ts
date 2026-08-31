@@ -58,6 +58,17 @@ export function toDiscountResponse(discount: any): DiscountResponseDto {
     audience: discount.audience,
     targetTierTypes: discount.targetTiers?.map((row: any) => row.tierType),
     targetUserIds: discount.targetUsers?.map((row: any) => row.userId),
+    // Kimlik + görünen ad birlikte: düzenleme formu seçili kişileri UUID olarak
+    // değil adıyla gösterebilsin. İlişki `user` seçilmeden okunduğunda (bazı
+    // okuma yolları yalnız userId alır) alan düşer, çağıran targetUserIds'e
+    // geri döner.
+    targetUsers: discount.targetUsers
+      ?.filter((row: any) => row.user)
+      .map((row: any) => ({
+        id: row.user.id,
+        displayName: row.user.displayName ?? null,
+        email: row.user.email ?? null,
+      })),
     budgetLimit:
       discount.budgetLimit != null ? Number(discount.budgetLimit) : undefined,
     budgetSpent: Number(discount.budgetSpent ?? 0),
