@@ -7,20 +7,25 @@ import { useZodForm } from "@tarodan/ui/form";
 import { listingsApi, userApi } from "@/lib/api";
 import { queryKeys } from "@/lib/query/keys";
 import {
+  toEditListingValues,
+  buildListingUpdatePayload,
   createEmptySaleData,
   saleDataToPayload,
   type SaleData,
-} from "@/components/listings/form";
+} from "@tarodan/listing-form";
 import {
   buildListingFormData,
   buildSaleDataFromListing,
-} from "../_lib/build-edit-form-data";
+} from "@tarodan/listing-form";
 import {
   editListingSchema,
   emptyEditValues,
   type EditListingValues,
-} from "../_lib/schema";
-import type { EditListingFormData, ListingEditPayload } from "../_lib/types";
+} from "@tarodan/listing-form";
+import type {
+  EditListingFormData,
+  ListingEditPayload,
+} from "@tarodan/listing-form";
 
 interface UseEditListingFormParams {
   id: string;
@@ -29,22 +34,6 @@ interface UseEditListingFormParams {
 }
 
 /** Normalize the mixed-typed merge result into all-string form values. */
-function toValues(fd: EditListingFormData): EditListingValues {
-  return {
-    ...emptyEditValues,
-    ...fd,
-    year: fd.year !== undefined && fd.year !== null ? String(fd.year) : "",
-    quantity:
-      fd.quantity !== undefined && fd.quantity !== null && fd.quantity !== ""
-        ? String(fd.quantity)
-        : "",
-    shippingPackageTier: fd.shippingPackageTier ?? "small",
-    bundleSize:
-      fd.bundleSize !== undefined && fd.bundleSize !== null
-        ? String(fd.bundleSize)
-        : "",
-  };
-}
 
 export function useEditListingForm({
   id,
@@ -164,7 +153,7 @@ export function useEditListingForm({
     populatedForRef.current = id;
 
     const { newFormData } = buildListingFormData(edit);
-    reset(toValues(newFormData));
+    reset(toEditListingValues(newFormData));
     // Kayıtlı görseller `uploaded` olarak yerleşir; yeniden YÜKLENMEZ.
     // İlan kimliği geçilir: aynı ilanda refetch kullanıcının düzenini ezmez,
     // BAŞKA ilana geçildiğinde liste zorunlu olarak yenilenir.
@@ -207,50 +196,7 @@ export function useEditListingForm({
       toast.error(imageSubmitBlockerRef.current.message);
       return;
     }
-    const formPrice = Number(values.price);
-
-    const payload: Record<string, unknown> = {
-      title: values.title,
-      description: values.description || undefined,
-      price: formPrice,
-      categoryId: values.categoryId,
-      condition: values.condition,
-      brandId: values.brandId || undefined,
-      carModelId: values.carModelId || null,
-      modelCode: values.modelCode.trim() || null,
-      // Renk seçimi gönderildiğinde sunucu önceki renk bağlarını temizleyip
-      // bunları yazar ve `color` kolonunu adlardan tazeler. Katalog boşsa
-      // (serbest metin yedeği) eski alan gider.
-      ...(values.colors.length > 0
-        ? { colors: values.colors }
-        : { color: values.color }),
-      scale: values.scale || undefined,
-      material: values.material || undefined,
-      manufacturerId: values.manufacturerId || undefined,
-      isBoxed: values.isBoxed === "boxed",
-      year: values.year ? Number(values.year) : undefined,
-      isTradeEnabled: values.isTradeEnabled,
-      isSet: values.isSet,
-      bundleSize:
-        values.isSet && Number(values.bundleSize) >= 2
-          ? Number(values.bundleSize)
-          : null,
-      quantity:
-        values.quantity && values.quantity !== ""
-          ? Number(values.quantity)
-          : null,
-      shippingPackageTier: values.shippingPackageTier,
-      images: values.images.length > 0 ? values.images : undefined,
-      status: values.status,
-      // Üreticiye özel nitelikler — sunucu önceki seçimleri temizleyip bunları
-      // yazar, yani boş dizi "seçim yok" demektir.
-      attributes: Object.values(values.customAttributes ?? {})
-        .flat()
-        .filter(Boolean),
-    };
-    Object.assign(payload, saleDataToPayload(saleData, formPrice));
-
-    updateMutation.mutate(payload);
+    updateMutation.mutate(buildListingUpdatePayload(values, saleData));
   };
 
   return {

@@ -5,7 +5,7 @@
 import { useFormContext } from "react-hook-form";
 import { useTranslations } from "next-intl";
 import { Button, Select } from "@tarodan/ui";
-import SectionCard from "@/components/ui/SectionCard";
+import SectionCard from "@tarodan/ui/section-card";
 
 interface ManufacturerAttributeGroup {
   slug: string;

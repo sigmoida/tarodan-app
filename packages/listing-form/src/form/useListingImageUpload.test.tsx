@@ -8,6 +8,7 @@ import { useForm } from "react-hook-form";
 import { NextIntlClientProvider } from "next-intl";
 import { getMessages } from "@tarodan/i18n";
 import { useListingImageUpload } from "./useListingImageUpload";
+import { ListingFormApiProvider, type ListingFormApi } from "./api-context";
 import type { UploadPort } from "./listing-upload-queue";
 import { rotateImageFile } from "./rotate-image";
 
@@ -55,7 +56,11 @@ function renderHook<T>(useHookFn: () => T) {
     // yanlışları testte de görünsün.
     root.render(
       <NextIntlClientProvider locale="tr" messages={getMessages("tr")}>
-        <Probe />
+        {/* Hook gerçek montajda API portunu bağlamdan okur; bu testler kendi
+            `upload` portlarını enjekte ettiği için port yalnız var olmalı. */}
+        <ListingFormApiProvider api={TEST_API}>
+          <Probe />
+        </ListingFormApiProvider>
       </NextIntlClientProvider>,
     );
   });
@@ -69,6 +74,19 @@ function renderHook<T>(useHookFn: () => T) {
       }),
   };
 }
+
+/** Testler kendi `upload` portlarını verir; bu port yalnız bağlamı doldurur. */
+const TEST_API: ListingFormApi = {
+  get: async () => {
+    throw new Error("bu testler katalog sorgusu yapmaz");
+  },
+  uploadProductImage: async () => {
+    throw new Error("yükleme testlerin enjekte ettiği port üzerinden gider");
+  },
+  rotateProductImage: async () => {
+    throw new Error("kayıtlı görsel çevirme portu testlerde ayrıca verilir");
+  },
+};
 
 /** 1 KB alt sınırının üstünde, geçerli tipte sahte dosya. */
 const fakeFile = (name: string): File => {

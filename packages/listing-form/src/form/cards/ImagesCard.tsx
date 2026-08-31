@@ -10,7 +10,8 @@ import {
   ExclamationCircleIcon,
 } from "@heroicons/react/24/outline";
 import { Badge } from "@tarodan/ui";
-import { SectionCard, ImagePreviewGrid } from "@/components/ui";
+import SectionCard from "@tarodan/ui/section-card";
+import ImagePreviewGrid from "../ImagePreviewGrid";
 import { occupiedSlots, type ListingImageItem } from "../listing-image-item";
 import ImageGuidelines from "./ImageGuidelines";
 import ListingImageDropzone from "./ListingImageDropzone";

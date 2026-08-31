@@ -7,7 +7,7 @@ import toast from "react-hot-toast";
 import { useTranslations } from "next-intl";
 import { listingsApi, api } from "@/lib/api";
 import { useAuthStore } from "@/stores/authStore";
-import type { EditListingValues } from "../_lib/schema";
+import type { EditListingValues } from "@tarodan/listing-form";
 
 interface UseListingLifecycleParams {
   id: string;

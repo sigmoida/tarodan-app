@@ -7,6 +7,8 @@ import {
   ConflictException,
 } from "@nestjs/common";
 import { i18nMessage } from "../../i18n";
+import type { ProductUpdateActor } from "../helpers/product-update-actor";
+import { resolveUpdatedStatus } from "../helpers/product-update-status";
 import { PrismaService } from "../../../prisma";
 import { assertValidProductImages } from "../helpers/product-image-keys";
 import { CacheService } from "../../cache/cache.service";
@@ -85,6 +87,28 @@ export class ProductUpdateService {
    * PATCH /products/:id
    */
   async update(id: string, sellerId: string, dto: UpdateProductDto) {
+    return this.updateAsActor(id, dto, { kind: "seller", sellerId });
+  }
+
+  /**
+   * Update product as an administrator
+   * PATCH /admin/products/:id
+   *
+   * Aynı gövde, farklı KAPILAR: destek ekibi satıcı adına düzeltme yapar, o
+   * yüzden sahiplik ve üyelik kapıları uygulanmaz ve ilanın statüsü DEĞİŞMEZ
+   * (yayından kaldırma/onaya düşürme ayrı uçların işi). Para, görsel sahipliği
+   * ve iyimser kilit gibi bütünlük kuralları ise aynen geçerlidir.
+   */
+  async updateAsAdmin(id: string, adminId: string, dto: UpdateProductDto) {
+    return this.updateAsActor(id, dto, { kind: "admin", adminId });
+  }
+
+  private async updateAsActor(
+    id: string,
+    dto: UpdateProductDto,
+    actor: ProductUpdateActor,
+  ) {
+    const isAdmin = actor.kind === "admin";
     // Find product with optimistic locking
     const product = await this.prisma.product.findUnique({
       where: { id },
@@ -98,9 +122,14 @@ export class ProductUpdateService {
     }
 
     // Verify ownership
-    if (product.sellerId !== sellerId) {
+    if (actor.kind === "seller" && product.sellerId !== actor.sellerId) {
       throw new ForbiddenException(i18nMessage("server.product.editForbidden"));
     }
+
+    // Sahiplik doğrulandıktan SONRA çalışılan kimlik her iki yolda da ilanın
+    // sahibidir: üyelik sınırları, görsel klasörü ve moderasyon kaydı satıcıya
+    // aittir, düzenlemeyi kimin yaptığına değil.
+    const sellerId = product.sellerId;
 
     // Check if user is banned
     const seller = await this.prisma.user.findUnique({
@@ -120,7 +149,9 @@ export class ProductUpdateService {
       },
     });
 
-    if (seller?.isBanned) {
+    // Banlı satıcı kendi ilanını düzenleyemez — ama yönetici onun adına
+    // düzeltebilmeli; banlı hesabın ilanını toparlamak destek işidir.
+    if (!isAdmin && seller?.isBanned) {
       throw new ForbiddenException(
         i18nMessage("server.product.bannedCannotEdit"),
       );
@@ -129,6 +160,7 @@ export class ProductUpdateService {
     // Askıdaki kurumsal satıcı ilanını pasife alabilir; satışta tutan veya
     // yeniden satışa çıkaran tüm diğer değişiklikler BUSINESS yenilenene dek kapalıdır.
     if (
+      !isAdmin &&
       seller &&
       isCorporateSellingSuspended(seller.membership, seller) &&
       dto.status !== ProductStatus.inactive
@@ -160,7 +192,10 @@ export class ProductUpdateService {
       product.status === ProductStatus.sold ||
       product.status === ProductStatus.inactive
     ) {
-      if (dto.status === ProductStatus.active) {
+      // Yeniden satışa açma SATICININ isteğidir: üyelik limiti ve komisyon
+      // kuralı burada denetlenir. Yönetici statü göndermez (politika onu
+      // yok sayar), bu dal ona hiç işlemez.
+      if (!isAdmin && dto.status === ProductStatus.active) {
         const newQuantity =
           dto.quantity != null ? Number(dto.quantity) : product.quantity;
         if (newQuantity != null && newQuantity <= 0) {
@@ -274,7 +309,7 @@ export class ProductUpdateService {
     // Düzenleme, oluşturma ile AYNI içerik kapılarından geçer — onaylı ilanın
     // metni sonradan serbestçe değiştirilebiliyordu (moderasyonsuz düzenleme).
     // İlan pending'e DÜŞÜRÜLMEZ; yalnız uygunsuz içerik anında engellenir.
-    if (dto.title !== undefined && dto.title !== product.title) {
+    if (!isAdmin && dto.title !== undefined && dto.title !== product.title) {
       await this.moderationAi.assertTextClean(dto.title, {
         entityType: "product",
         userId: sellerId,
@@ -406,7 +441,7 @@ export class ProductUpdateService {
           ? priceUpdate
           : dto.price;
 
-    const resolvedStatus = this.resolveUpdatedStatus(product, dto);
+    const resolvedStatus = resolveUpdatedStatus(product, dto, actor);
     const remainsListable =
       dto.status !== ProductStatus.inactive &&
       resolvedStatus !== ProductStatus.inactive;
@@ -770,45 +805,6 @@ export class ProductUpdateService {
    *   (sıralama status/inStock üzerinden yapılır) ve yeniden satışa açma
    *   akışıyla (sold/inactive → active, quantity>0 şartı) çelişir.
    */
-  private resolveUpdatedStatus(
-    product: { status: ProductStatus; quantity: number | null },
-    dto: UpdateProductDto,
-  ): ProductStatus | undefined {
-    const requested = dto.status;
-    const newQuantity =
-      dto.quantity !== undefined
-        ? dto.quantity === null
-          ? null
-          : Number(dto.quantity)
-        : product.quantity;
-
-    // Satıcı kendi ilanını pasife alabilir.
-    if (requested === ProductStatus.inactive) {
-      return ProductStatus.inactive;
-    }
-
-    // Reddedilen ürün düzenlenince otomatik yeniden incelemeye girer.
-    if (product.status === ProductStatus.rejected) {
-      return ProductStatus.pending;
-    }
-
-    // Satıcı DOĞRUDAN aktifleştiremez: aktif olmayan bir ilanı aktif etme isteği
-    // admin onayına (pending) yönlendirilir. Zaten aktif ilanda statü değişmez.
-    if (
-      requested === ProductStatus.active &&
-      product.status !== ProductStatus.active
-    ) {
-      return ProductStatus.pending;
-    }
-
-    // Aktif ilanın stoğu 0'a düşerse otomatik pasif.
-    if (newQuantity === 0 && product.status === ProductStatus.active) {
-      return ProductStatus.inactive;
-    }
-
-    // Diğer tüm izinsiz/anlamsız statü istekleri yok sayılır (statü değişmez).
-    return undefined;
-  }
 
   /**
    * Notify users who have this product in their wishlist about price change

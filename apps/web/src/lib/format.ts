@@ -8,10 +8,6 @@ const translator = (locale: string) =>
 // Cached Intl instances — built once and reused across every row (constructing an
 // Intl formatter is the costly part; formatting with it is cheap). Replaces the
 // per-render `new Date().toLocaleDateString()` / `toLocaleString()` churn in lists.
-const tlNumberFmt = new Intl.NumberFormat("tr-TR", {
-  minimumFractionDigits: 2,
-  maximumFractionDigits: 2,
-});
 const dateFmt = new Intl.DateTimeFormat("tr-TR");
 const timeFmt = new Intl.DateTimeFormat("tr-TR", {
   hour: "2-digit",
@@ -51,23 +47,10 @@ export function formatDateTime(value: DateLike): string {
 /**
  * Format price as "12.30 TL" instead of "₺12.30" or "TRY 12.30"
  */
-export function formatPrice(price: number | string | null | undefined): string {
-  if (price === null || price === undefined) {
-    return "0,00 TL";
-  }
-
-  const numPrice = typeof price === "string" ? parseFloat(price) : price;
-
-  if (isNaN(numPrice)) {
-    return "0,00 TL";
-  }
-
-  return `${tlNumberFmt.format(numPrice)} TL`;
-}
-
-/** Alias of {@link formatPrice} — "12,30 TL". The single money formatter used
- * across profile surfaces (my-listings, orders, offers, trades, …). */
-export const formatTL = formatPrice;
+// Para biçimlendirici @tarodan/shared'a taşındı: ilan formu artık iki
+// uygulamada da çalışıyor ve aynı tutarı aynı biçimde göstermeli.
+// Buradan re-export edilir ki mevcut çağrı yerleri değişmesin.
+export { formatPrice, formatTL } from "@tarodan/shared";
 
 /**
  * Format price without TL suffix (for cases where TL is added separately)

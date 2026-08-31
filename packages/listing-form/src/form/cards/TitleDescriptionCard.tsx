@@ -4,7 +4,7 @@
 
 import { useTranslations } from "next-intl";
 import { FormInput, FormTextarea } from "@tarodan/ui/form";
-import { SectionCard } from "@/components/ui";
+import SectionCard from "@tarodan/ui/section-card";
 
 /** "Temel Bilgiler" — title + description. Shared by new & edit forms. */
 export default function TitleDescriptionCard() {

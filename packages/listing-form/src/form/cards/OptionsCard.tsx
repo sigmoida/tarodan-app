@@ -2,12 +2,12 @@
 
 "use client";
 
-import { Link } from "@/i18n/navigation";
+import type { ReactNode } from "react";
 import { useTranslations } from "next-intl";
 import { Controller, useFormContext } from "react-hook-form";
 import { Toggle } from "@tarodan/ui";
 import { FormInput } from "@tarodan/ui/form";
-import { SectionCard } from "@/components/ui";
+import SectionCard from "@tarodan/ui/section-card";
 
 // Set / Paket (bundle) is temporarily disabled and hidden from the form.
 // Flip to `true` to bring the toggle + piece-count input back.
@@ -18,12 +18,19 @@ interface OptionsCardProps {
   canTrade: boolean;
   /** Show the "Ön Sipariş" (preorder) toggle — edit form only. */
   showPreorder?: boolean;
+  /**
+   * Takas hakkı olmayan satıcıya gösterilen yükseltme bağlantısı. Hedef sayfa
+   * uygulamaya göre değişir (vitrinde `/membership`, yönetici panelinde yok),
+   * bu yüzden kart onu üretmez — çağıran verir, vermezse hiç çıkmaz.
+   */
+  upgradeLink?: ReactNode;
 }
 
 /** "Seçenekler" — trade / (optional preorder) / set toggles + set size. Shared. */
 export default function OptionsCard({
   canTrade,
   showPreorder = false,
+  upgradeLink = null,
 }: OptionsCardProps) {
   const { watch } = useFormContext();
   const isSet = watch("isSet");
@@ -56,12 +63,10 @@ export default function OptionsCard({
               )}
             />
           ) : (
-            <Link
-              href="/membership"
-              className="text-sm text-primary-600 hover:text-primary-700 font-medium"
-            >
-              {t("product.upgradeArrow")}
-            </Link>
+            // Takas hakkı yoksa gösterilen yükseltme bağlantısı UYGULAMAYA
+            // aittir: vitrinde `/membership` var, yönetici panelinde yok.
+            // Kart onu render etmez, çağıran verir.
+            upgradeLink
           )}
         </div>
 

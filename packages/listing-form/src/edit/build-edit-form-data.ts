@@ -1,7 +1,7 @@
 /** @format */
 
-import type { SaleData } from "@/components/listings/form";
-import { COLOR_GROUP_SLUG } from "@/components/listings/form/constants";
+import type { SaleData } from "../form";
+import { COLOR_GROUP_SLUG } from "../form/constants";
 import type {
   EditListingFormData,
   ListingEditAttribute,

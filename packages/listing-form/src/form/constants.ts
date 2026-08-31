@@ -4,7 +4,7 @@
 
 import { createTranslator } from "next-intl";
 import { getMessages, resolveLocale } from "@tarodan/i18n";
-import type { Translate } from "@/types/i18n";
+import type { Translate } from "./translate";
 
 export interface Category {
   id: string;

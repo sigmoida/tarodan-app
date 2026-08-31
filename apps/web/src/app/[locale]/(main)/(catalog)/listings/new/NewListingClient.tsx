@@ -15,7 +15,7 @@ import {
   ImagesCard,
   DiscountCard,
   ManufacturerAttributesCard,
-} from "@/components/listings/form";
+} from "@tarodan/listing-form";
 import {
   NewListingProvider,
   useNewListing,

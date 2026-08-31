@@ -1,6 +1,6 @@
+import type { ReactNode } from "react";
 import type { Dispatch, SetStateAction } from "react";
 import { useTranslations } from "next-intl";
-import { Link } from "@/i18n/navigation";
 import { useFormContext } from "react-hook-form";
 import {
   ChevronRightIcon,
@@ -10,7 +10,7 @@ import {
   ReceiptPercentIcon,
 } from "@heroicons/react/24/outline";
 import { Badge, Button, DatePicker, Input } from "@tarodan/ui";
-import { formatTL } from "@/lib/format";
+import { formatTL } from "@tarodan/shared";
 
 /**
  * İlan indirimi — yeni ilan ve düzenleme formlarının ORTAK bölümü.
@@ -32,6 +32,11 @@ interface DiscountCardProps {
   setShowDiscountSection: Dispatch<SetStateAction<boolean>>;
   /** Ürüne uygulanmış kampanyalar — yalnız düzenleme ekranında bilinir. */
   productDiscounts?: any[];
+  /**
+   * "Tüm indirimleri yönet" bağlantısı. Hedef sayfa uygulamaya göre değişir,
+   * bu yüzden kart onu üretmez — verilmezse bölüm hiç çıkmaz.
+   */
+  manageDiscountsLink?: ReactNode;
 }
 
 export default function DiscountCard({
@@ -40,6 +45,7 @@ export default function DiscountCard({
   showDiscountSection,
   setShowDiscountSection,
   productDiscounts = [],
+  manageDiscountsLink = null,
 }: DiscountCardProps) {
   const t = useTranslations();
   const { watch } = useFormContext();
@@ -190,17 +196,13 @@ export default function DiscountCard({
             </div>
           )}
 
-          {/* Link to full discount management */}
-          <div className="pt-2 border-t border-border-subtle">
-            <Link
-              href="/profile/discounts"
-              className="inline-flex items-center gap-2 text-primary-600 hover:text-primary-700 text-sm font-medium"
-            >
-              <ReceiptPercentIcon className="w-4 h-4" />
-              {t("product.manageAllDiscounts")}
-              <ChevronRightIcon className="w-4 h-4" />
-            </Link>
-          </div>
+          {/* İndirim yönetimi sayfasına bağlantı — UYGULAMAYA ait (vitrinde
+              `/profile/discounts`, yönetici panelinde karşılığı yok). */}
+          {manageDiscountsLink && (
+            <div className="pt-2 border-t border-border-subtle">
+              {manageDiscountsLink}
+            </div>
+          )}
         </div>
       )}
     </div>

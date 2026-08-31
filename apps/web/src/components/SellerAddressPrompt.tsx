@@ -9,7 +9,7 @@ import { Button, Modal } from "@tarodan/ui";
 import { useTranslations } from "next-intl";
 import { useAuthStore } from "@/stores/authStore";
 import { useDispatchAddress } from "@/hooks/useDispatchAddress";
-import { useListingLimits } from "@/components/listings/form/queries";
+import { useListingLimits } from "@tarodan/listing-form";
 import { shouldStartTour } from "@/lib/userExperiencePolicy.mjs";
 
 /**

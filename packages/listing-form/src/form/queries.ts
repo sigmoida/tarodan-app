@@ -2,8 +2,8 @@
 
 "use client";
 
-import { api, listingsApi, brandsApi } from "@/lib/api";
-import { useWebList } from "@/hooks/useWebResource";
+import { useQuery } from "@tanstack/react-query";
+import { useListingFormApi } from "./api-context";
 import type { PackageTierCode } from "./usePackageTiers";
 import {
   EXCLUDED_BRAND_SLUGS,
@@ -17,6 +17,32 @@ import {
 
 // Shared TanStack Query hooks for the new/edit listing forms. One set of query
 // keys → the two forms share the cache.
+
+/**
+ * `useWebList`in paket içi karşılığı — iki uygulamada da `QueryClientProvider`
+ * var, o yüzden sorgu doğrudan TanStack'e iner. Anahtar öneki paketin kendisine
+ * aittir ki uygulamaların kendi önbellek anahtarlarıyla çakışmasın.
+ */
+function useListingQuery<T>({
+  resource,
+  fetcher,
+  params,
+  enabled = true,
+  query,
+}: {
+  resource: string;
+  fetcher: () => Promise<T>;
+  params?: unknown;
+  enabled?: boolean;
+  query?: Record<string, unknown>;
+}) {
+  return useQuery<T>({
+    ...query,
+    queryKey: ["listing-form", resource, params ?? null],
+    queryFn: fetcher,
+    enabled,
+  });
+}
 
 function flatten(cats: Category[]): Category[] {
   const out: Category[] = [];
@@ -33,11 +59,12 @@ export function useListingCategories(
   enabled: boolean,
   excludeBrandScale = false,
 ) {
-  const query = useWebList<Category[]>({
+  const api = useListingFormApi();
+  const query = useListingQuery<Category[]>({
     resource: "listing-form-categories",
     fetcher: async () => {
-      const res = await api.get("/categories");
-      return res.data.data || res.data || [];
+      const body = await api.get<any>("/categories");
+      return body?.data ?? body ?? [];
     },
     enabled,
     query: { staleTime: 5 * 60 * 1000 },
@@ -55,7 +82,8 @@ export function useListingCategories(
 /** Scale / material / brand / manufacturer option lists, with a brands fallback
  *  to `brandsApi.findAll()`. */
 export function useListingFilters(enabled = true) {
-  const query = useWebList<{
+  const api = useListingFormApi();
+  const query = useListingQuery<{
     scales: string[];
     materials: Array<{ slug: string; label: string }>;
     colors: ColorOption[];
@@ -70,8 +98,7 @@ export function useListingFilters(enabled = true) {
       let brands: Brand[] = [];
       let manufacturers: Ref[] = [];
       try {
-        const res = await listingsApi.getFilters();
-        const d = res.data as {
+        const d = (await api.get<any>("/products/filters")) as {
           scales?: string[];
           materials?: Array<{ slug: string; label: string }>;
           colors?: ColorOption[];
@@ -88,7 +115,7 @@ export function useListingFilters(enabled = true) {
       }
       if (!brands.length) {
         try {
-          const raw = (await brandsApi.findAll()).data;
+          const raw = await api.get<any>("/brands");
           brands = (
             Array.isArray(raw) ? raw : (raw as any)?.data || []
           ) as Brand[];
@@ -113,11 +140,14 @@ export function useListingFilters(enabled = true) {
 
 /** Car models for the selected brand slug. */
 export function useCarModels(brandSlug: string | undefined) {
-  const query = useWebList<CarModel[]>({
+  const api = useListingFormApi();
+  const query = useListingQuery<CarModel[]>({
     resource: "listing-form-car-models",
     params: brandSlug,
     fetcher: async () => {
-      const res = await api.get(`/car-models?brand=${brandSlug}`);
+      const res = {
+        data: await api.get<any>("/car-models", { brand: brandSlug }),
+      };
       return Array.isArray(res.data) ? res.data : res.data?.data || [];
     },
     enabled: !!brandSlug,
@@ -158,17 +188,18 @@ export function useCommissionPreview(
   const amount = Number(price);
   const enabled =
     !!price && !!categoryId && !Number.isNaN(amount) && amount > 0;
-  const query = useWebList<CommissionPreview>({
+  const api = useListingFormApi();
+  const query = useListingQuery<CommissionPreview>({
     resource: "listing-form-commission",
     params: [String(price), categoryId, packageTier],
     fetcher: async () => {
-      const res = await api.get("/orders/commission-preview", {
-        params: {
+      const res = {
+        data: await api.get<any>("/orders/commission-preview", {
           amount: price,
           categoryId: categoryId || undefined,
           packageTier,
-        },
-      });
+        }),
+      };
       return {
         sellerFeeAmount: Number(res.data?.sellerFeeAmount ?? 0),
         withholdingTaxAmount: Number(res.data?.withholdingTaxAmount ?? 0),
@@ -219,13 +250,16 @@ export interface AttributeGroup {
 export function useManufacturerAttributes(
   manufacturerSlug: string | undefined,
 ) {
-  const query = useWebList<AttributeGroup[]>({
+  const api = useListingFormApi();
+  const query = useListingQuery<AttributeGroup[]>({
     resource: "listing-form-mfr-attrs",
     params: manufacturerSlug,
     fetcher: async () => {
-      const res = await listingsApi.getAttributeGroups({
-        manufacturer: manufacturerSlug!,
-      });
+      const res = {
+        data: await api.get<any>("/products/attribute-groups", {
+          manufacturer: manufacturerSlug!,
+        }),
+      };
       const groups = (res.data as AttributeGroup[]) ?? [];
       return groups.filter((g) => g.manufacturerSlug === manufacturerSlug);
     },
@@ -246,13 +280,14 @@ export interface ListingLimits {
 
 /** The seller's listing-quota stats (new-listing limit banner). */
 export function useListingLimits(enabled: boolean) {
-  const query = useWebList<ListingLimits>({
+  const api = useListingFormApi();
+  const query = useListingQuery<ListingLimits>({
     resource: "listing-form-limits",
     fetcher: async () => {
       try {
-        const res = await api.get("/products/my/stats", {
-          params: { _t: Date.now() },
-        });
+        const res = {
+          data: await api.get<any>("/products/my/stats", { _t: Date.now() }),
+        };
         const stats = res.data;
         const tierType = stats.limits?.tierType || "free";
         return {
