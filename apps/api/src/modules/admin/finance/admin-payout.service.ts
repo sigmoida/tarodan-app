@@ -58,10 +58,9 @@ export class AdminPayoutService {
    * fiş atıldı sanırdı. Yığılma admin tıklamasıyla sınırlı; aynı isimli işler
    * named-processor concurrency-1 altında sıralanır ve boş süpürme ucuzdur.
    */
-  private async queueImmediatePayout(scope: {
-    orderId?: string;
-    tradeId?: string;
-  }): Promise<{ transfersCreated: number; transferQueued: boolean }> {
+  private async queueImmediatePayout(
+    scope: { orderId: string } | { tradeId: string },
+  ): Promise<{ transfersCreated: number; transferQueued: boolean }> {
     let transfersCreated = 0;
     try {
       transfersCreated =
