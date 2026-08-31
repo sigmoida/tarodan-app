@@ -9452,6 +9452,9 @@
         "onlyXlsx": "Only .xlsx Excel files can be uploaded.",
         "fileTooLarge": "The file may be at most {max} MB.",
         "missingColumns": "Missing Excel columns: {columns}. Download the sample file again."
+      },
+      "testTools": {
+        "jobIdRequired": "A job id is required"
       }
     },
     "advertisement": {

@@ -82,6 +82,39 @@ export class AdminTestToolsService {
     return { key, jobId: String(job.id), queuedAt: new Date().toISOString() };
   }
 
+  /**
+   * Tetiklenen fişin akıbeti — UI "kuyruğa alındı"da bırakmasın diye.
+   * Salt okuma: Bull'dan durum + runTrackedJob'un returnvalue özeti +
+   * failedReason. `not_found` = fiş removeOnComplete ile temizlenmiş ya da
+   * kimlik yanlış — UI bunu "sonuç artık görünmez" olarak ele alır.
+   */
+  async getCronStatus(jobId: string): Promise<{
+    jobId: string;
+    state: string;
+    summary: string | null;
+    failedReason: string | null;
+  }> {
+    if (!jobId?.trim()) {
+      throw new BadRequestException(
+        i18nMessage("server.admin.testTools.jobIdRequired"),
+      );
+    }
+    const job = await this.scheduledQueue.getJob(jobId);
+    if (!job) {
+      return { jobId, state: "not_found", summary: null, failedReason: null };
+    }
+    const state = await job.getState();
+    const summary =
+      (job.returnvalue as { summary?: string } | null | undefined)?.summary ??
+      null;
+    return {
+      jobId,
+      state,
+      summary,
+      failedReason: job.failedReason ?? null,
+    };
+  }
+
   // ─────────────────────────── Arama ───────────────────────────
   async search(type: TestToolType, q: string): Promise<SearchItem[]> {
     const query = (q ?? "").trim();

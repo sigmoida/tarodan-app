@@ -57,6 +57,60 @@ describe("AdminTestToolsService cron tetikleme (kuyruk üzerinden)", () => {
     await expect(service.runCron("marketing-weekly")).rejects.toThrow();
     expect(queue.add).not.toHaveBeenCalled();
   });
+
+  // ── cron-status: UI "kuyruğa alındı"da kalmasın, fişin akıbetini görsün ────
+  const makeStatusService = (job: unknown) => {
+    const queue = {
+      add: jest.fn(),
+      getJob: jest.fn().mockResolvedValue(job),
+    };
+    const service = new AdminTestToolsService({} as any, queue as any);
+    return { service, queue };
+  };
+
+  it("cron-status: fiş bulunamazsa not_found döner (removeOnComplete temizlemiş olabilir)", async () => {
+    const { service } = makeStatusService(null);
+    const res = await service.getCronStatus("42");
+    expect(res).toEqual({
+      jobId: "42",
+      state: "not_found",
+      summary: null,
+      failedReason: null,
+    });
+  });
+
+  it("cron-status: tamamlanan fişte runTrackedJob özetini döner", async () => {
+    const { service } = makeStatusService({
+      getState: jest.fn().mockResolvedValue("completed"),
+      returnvalue: { ok: true, summary: "3 hold serbest · 2 payout" },
+      failedReason: undefined,
+    });
+    const res = await service.getCronStatus("42");
+    expect(res).toMatchObject({
+      state: "completed",
+      summary: "3 hold serbest · 2 payout",
+      failedReason: null,
+    });
+  });
+
+  it("cron-status: düşen fişte failedReason döner", async () => {
+    const { service } = makeStatusService({
+      getState: jest.fn().mockResolvedValue("failed"),
+      returnvalue: null,
+      failedReason: "PayTR timeout",
+    });
+    const res = await service.getCronStatus("42");
+    expect(res).toMatchObject({
+      state: "failed",
+      summary: null,
+      failedReason: "PayTR timeout",
+    });
+  });
+
+  it("cron-status: boş jobId 400 verir", async () => {
+    const { service } = makeStatusService(null);
+    await expect(service.getCronStatus("  ")).rejects.toThrow();
+  });
 });
 
 /**

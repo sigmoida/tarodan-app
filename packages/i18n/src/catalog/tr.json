@@ -9452,6 +9452,9 @@
         "onlyXlsx": "Yalnızca .xlsx uzantılı Excel dosyası yüklenebilir.",
         "fileTooLarge": "Dosya en fazla {max} MB olabilir.",
         "missingColumns": "Excel sütunları eksik: {columns}. Örnek dosyayı yeniden indirin."
+      },
+      "testTools": {
+        "jobIdRequired": "İş kimliği (jobId) zorunludur"
       }
     },
     "advertisement": {
