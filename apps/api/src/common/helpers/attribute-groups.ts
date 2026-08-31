@@ -12,6 +12,39 @@ export const SCALE_GROUP_SLUG = "scale";
 export const MATERIAL_GROUP_SLUG = "material";
 export const COLOR_GROUP_SLUG = "color";
 
+/**
+ * İlan formunun ZORUNLU tuttuğu gruplar.
+ *
+ * Ölçek ve malzeme şemada sert zorunlu (`z.string().min(1)`), renk ise
+ * katalog seçimi ya da serbest metinden biriyle karşılanmak zorunda. Üçü de
+ * boşalırsa satıcı ilan veremez — bu yüzden son aktif öğeleri silinemez ve
+ * pasife alınamaz (bkz. isProtectedAttributeGroup).
+ *
+ * Bu liste FORMUN gerçeğidir, veritabanı bayrağının değil: `isRequired`
+ * kolonu canlıda yalnız renk için true, ölçek ve malzeme false. Yalnız bayrağa
+ * dayanmak, asıl korunması gerekenleri korumasız bırakırdı.
+ */
+export const FORM_REQUIRED_GROUP_SLUGS: readonly string[] = [
+  SCALE_GROUP_SLUG,
+  MATERIAL_GROUP_SLUG,
+  COLOR_GROUP_SLUG,
+];
+
+/**
+ * Bu grup boşalmaya karşı korunuyor mu?
+ *
+ * İki ölçüt: formun zorunlu tuttuğu global gruplar (yukarıdaki liste) ve
+ * admin'in `isRequired` işaretlediği HERHANGİ bir grup — üretici-kapsamlı
+ * kendi grupları dahil. İkincisi, bugüne dek yazılıp hiç okunmayan kolona
+ * nihayet bir anlam verir.
+ */
+export function isProtectedAttributeGroup(group: {
+  slug: string;
+  isRequired: boolean;
+}): boolean {
+  return FORM_REQUIRED_GROUP_SLUGS.includes(group.slug) || group.isRequired;
+}
+
 /** İlan başına seçilebilecek en fazla renk sayısı (web formu ile ortak kural). */
 export const MAX_PRODUCT_COLORS = 3;
 

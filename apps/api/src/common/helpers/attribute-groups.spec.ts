@@ -7,6 +7,7 @@ import {
   normalizeColorToken,
   resolveColorsFromText,
   splitColorText,
+  isProtectedAttributeGroup,
 } from "./attribute-groups";
 
 const OPTIONS = COLOR_CATALOG.map((entry) => ({
@@ -102,5 +103,31 @@ describe("launch seed data", () => {
         hex: entry.hex,
       })),
     );
+  });
+});
+
+/**
+ * Bir grubun boşalmaya karşı korunup korunmadığı — silme/pasife alma
+ * kapılarının dayandığı tek ölçüt.
+ */
+describe("isProtectedAttributeGroup", () => {
+  it("formun zorunlu tuttuğu global gruplar bayraktan BAĞIMSIZ korunur", () => {
+    // Canlıda scale ve material'ın isRequired'ı false; yalnız bayrağa
+    // dayansaydık asıl korunması gerekenler korumasız kalırdı.
+    for (const slug of ["scale", "material", "color"]) {
+      expect(isProtectedAttributeGroup({ slug, isRequired: false })).toBe(true);
+    }
+  });
+
+  it("isRequired işaretli her grup korunur — admin kendi grubunu koruyabilir", () => {
+    expect(
+      isProtectedAttributeGroup({ slug: "hw-series", isRequired: true }),
+    ).toBe(true);
+  });
+
+  it("ne listede ne işaretli olan grup korunmaz", () => {
+    expect(
+      isProtectedAttributeGroup({ slug: "hw-series", isRequired: false }),
+    ).toBe(false);
   });
 });

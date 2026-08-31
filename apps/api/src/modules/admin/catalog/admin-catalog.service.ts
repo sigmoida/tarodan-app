@@ -33,7 +33,10 @@ import {
   CATEGORIES_CACHE_KEY,
 } from "../../category/category-integrity.helper";
 import { i18nMessage } from "../../i18n";
-import { SCALE_GROUP_SLUG } from "../../../common/helpers/attribute-groups";
+import {
+  SCALE_GROUP_SLUG,
+  isProtectedAttributeGroup,
+} from "../../../common/helpers/attribute-groups";
 
 /**
  * Katalog taksonomisi admin operasyonları (kategori, marka, üretici, araç
@@ -1131,10 +1134,40 @@ export class AdminCatalogService {
       );
     }
 
+    // Pasife alma, silmenin sessiz eşdeğeridir: grup pasifken filtre/form
+    // sorguları `group.isActive` şartıyla çalıştığı için içindeki TÜM öğeler
+    // web'den kaybolur. O yüzden silmeyle aynı kapılardan geçer.
+    if (dto.isActive === false && existing.isActive) {
+      if (isProtectedAttributeGroup(existing)) {
+        throw new BadRequestException(
+          i18nMessage("server.admin.catalog.attributeGroupProtected", {
+            name: existing.name,
+          }),
+        );
+      }
+      const usedCount = await this.prisma.productAttribute.count({
+        where: { attribute: { groupId } },
+      });
+      if (usedCount > 0) {
+        throw new BadRequestException(
+          i18nMessage("server.admin.catalog.attributeGroupDeactivateInUse", {
+            count: usedCount,
+          }),
+        );
+      }
+    }
+
     const updateData: Prisma.AttributeGroupUpdateInput = {};
     if (dto.name !== undefined) {
       updateData.name = dto.name;
-      updateData.slug = generateSlug(dto.name);
+      // Slug KORUNAN grupta sabittir: `scale`/`material`/`color` slug'ları kod
+      // sözleşmesidir (filtre üretimi, where kurulumu, ürün yazma yolu üçü de
+      // bu değerle eşleşir). Adı değiştirmek slug'ı da değiştirseydi grup
+      // yeniden adlandırıldığı anda tüm hat sessizce eşleşmeyi bırakırdı —
+      // görünen ad admin'in, kimlik sistemindir.
+      if (!isProtectedAttributeGroup(existing)) {
+        updateData.slug = generateSlug(dto.name);
+      }
     }
     if (dto.description !== undefined) updateData.description = dto.description;
     if (dto.isRequired !== undefined) updateData.isRequired = dto.isRequired;
@@ -1328,12 +1361,22 @@ export class AdminCatalogService {
   ) {
     const existing = await this.prisma.attribute.findUnique({
       where: { id: attributeId },
+      include: { _count: { select: { productAttributes: true } } },
     });
 
     if (!existing) {
       throw new NotFoundException(
         i18nMessage("server.admin.catalog.attributeNotFound"),
       );
+    }
+
+    // Pasife alma silmenin arka kapısıydı: silme kullanımdaysa reddediliyor
+    // ama pasife alma hiçbir kontrolden geçmiyordu — oysa sonucu web'de aynı.
+    // Öğe filtreden ve formdan düşer, o öğeyi taşıyan ürünler filtreyle
+    // bulunamaz hale gelir ve ilan yeniden kaydedilince değer sessizce silinir
+    // (product-common.resolveProductAttributes bilinmeyen slug'ı yutar).
+    if (dto.isActive === false && existing.isActive) {
+      await this.assertAttributeRemovable(existing, "deactivate");
     }
 
     const updateData: Prisma.AttributeUpdateInput = {};
@@ -1378,6 +1421,64 @@ export class AdminCatalogService {
   }
 
   /**
+   * Bir öğenin kaldırılabilir (silinebilir ya da pasife alınabilir) olup
+   * olmadığı — silme ve pasife alma yollarının PAYLAŞTIĞI tek kural.
+   *
+   * İki kapı var:
+   *  1. KULLANIMDA: o öğeyi taşıyan ürün varsa dokunulmaz. Silme bunu zaten
+   *     yapıyordu; pasife alma yapmıyordu ve web'de sonucu aynıydı.
+   *  2. KORUNAN GRUBUN SON AKTİF ÖĞESİ: ölçek/malzeme/renk (ve isRequired
+   *     işaretli her grup) ilan formunda zorunludur. Son aktif öğe de giderse
+   *     grup boşalır ve satıcı hiç ilan veremez — sistemin seçenek uydurduğu
+   *     eski davranışın yerine bu kapı geçiyor.
+   */
+  private async assertAttributeRemovable(
+    attribute: {
+      id: string;
+      groupId: string;
+      isActive: boolean;
+      _count: { productAttributes: number };
+    },
+    intent: "delete" | "deactivate",
+  ): Promise<void> {
+    if (attribute._count.productAttributes > 0) {
+      throw new BadRequestException(
+        i18nMessage(
+          intent === "delete"
+            ? "server.admin.catalog.attributeInUse"
+            : "server.admin.catalog.attributeDeactivateInUse",
+          { count: attribute._count.productAttributes },
+        ),
+      );
+    }
+
+    const group = await this.prisma.attributeGroup.findUnique({
+      where: { id: attribute.groupId },
+      select: { name: true, slug: true, isRequired: true },
+    });
+    if (!group || !isProtectedAttributeGroup(group)) return;
+
+    // Pasif bir öğe grubun aktif sayısına zaten girmiyor; onu silmek grubu
+    // boşaltmaz. Yalnız AKTİF öğenin kaldırılması sayıyı düşürür.
+    if (!attribute.isActive) return;
+
+    const activeSiblings = await this.prisma.attribute.count({
+      where: {
+        groupId: attribute.groupId,
+        isActive: true,
+        id: { not: attribute.id },
+      },
+    });
+    if (activeSiblings === 0) {
+      throw new BadRequestException(
+        i18nMessage("server.admin.catalog.attributeLastInRequiredGroup", {
+          group: group.name,
+        }),
+      );
+    }
+  }
+
+  /**
    * Delete attribute value
    */
   async deleteAttribute(adminId: string, attributeId: string) {
@@ -1392,13 +1493,7 @@ export class AdminCatalogService {
       );
     }
 
-    if (existing._count.productAttributes > 0) {
-      throw new BadRequestException(
-        i18nMessage("server.admin.catalog.attributeInUse", {
-          count: existing._count.productAttributes,
-        }),
-      );
-    }
+    await this.assertAttributeRemovable(existing, "delete");
 
     await this.prisma.attribute.delete({
       where: { id: attributeId },
