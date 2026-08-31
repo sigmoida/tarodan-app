@@ -5387,7 +5387,9 @@
         "budgetUsage": "Bütçe",
         "budgetStopped": "Bütçe doldu",
         "platformCost": "Platforma maliyeti",
-        "budgetRemaining": "Kalan bütçe"
+        "budgetRemaining": "Kalan bütçe",
+        "searchUser": "Ad veya e-posta ile ara",
+        "selectUsers": "Kişi seçin"
       },
       "emailTemplates": {
         "title": "E-posta Şablonları",

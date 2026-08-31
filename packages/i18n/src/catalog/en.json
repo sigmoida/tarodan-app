@@ -5387,7 +5387,9 @@
         "budgetUsage": "Budget",
         "budgetStopped": "Budget spent",
         "platformCost": "Cost to the platform",
-        "budgetRemaining": "Remaining budget"
+        "budgetRemaining": "Remaining budget",
+        "searchUser": "Search by name or email",
+        "selectUsers": "Select people"
       },
       "emailTemplates": {
         "title": "Email Templates",

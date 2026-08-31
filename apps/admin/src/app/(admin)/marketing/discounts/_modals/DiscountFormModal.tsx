@@ -11,6 +11,7 @@ import {
   useZodForm,
 } from "@tarodan/ui/form";
 import { adminApi } from "@/lib/api";
+import { useUserOptions, userOptionLabel } from "../_hooks/useUserOptions";
 import { useAdminMutation } from "@/hooks/useAdminMutation";
 import { useCategories } from "@/hooks/useCategories";
 import { discountSchema, type DiscountFormValues } from "../_lib/schema";
@@ -43,7 +44,7 @@ function toDefaults(d?: Discount): DiscountFormValues {
       target: "buyer_commission",
       audience: "everyone",
       targetTierTypes: [],
-      targetUserIds: "",
+      targetUserIds: [],
       budgetLimit: "",
       minCartValue: "",
       minQuantity: "",
@@ -76,7 +77,21 @@ function toDefaults(d?: Discount): DiscountFormValues {
       value,
       label: value,
     })),
-    targetUserIds: (d.targetUserIds ?? []).join(", "),
+    // Sunucu hedeflenen kişileri adlarıyla döndürür; yalnız kimlik geldiğinde
+    // (eski yanıt) çip kimliği gösterir — seçim yine de KAYBOLMAZ, ki düzenleme
+    // kaydı kitleyi sıfırlamasın.
+    targetUserIds: (d.targetUsers?.length
+      ? d.targetUsers.map((u) => ({
+          value: u.id,
+          label: userOptionLabel(u),
+        }))
+      : (d.targetUserIds ?? []).map((id) => ({
+          value: id,
+          label: id,
+        }))) as Array<{
+      value: string;
+      label: string;
+    }>,
     budgetLimit: d.budgetLimit?.toString() ?? "",
     minCartValue: d.minCartValue?.toString() ?? "",
     minQuantity: d.minQuantity?.toString() ?? "",
@@ -134,10 +149,7 @@ function toPayload(v: DiscountFormValues) {
         : [],
     targetUserIds:
       v.audience === "specific_buyers" || v.audience === "specific_sellers"
-        ? v.targetUserIds
-            .split(",")
-            .map((id) => id.trim())
-            .filter(Boolean)
+        ? v.targetUserIds.map((option) => option.value)
         : [],
     budgetLimit: v.budgetLimit ? parseFloat(v.budgetLimit) : undefined,
   };
@@ -163,6 +175,12 @@ export function DiscountFormModal({
   const type = form.watch("type");
   const scope = form.watch("scope");
   const audience = form.watch("audience");
+  // Liste yalnız kitle "belirli kişiler" iken çekilir; diğer kitlelerde alan
+  // hiç görünmediği için istek de atılmaz.
+  const userOptions = useUserOptions(
+    audience === "specific_sellers" ? "sellers" : "buyers",
+    audience === "specific_buyers" || audience === "specific_sellers",
+  );
 
   const save = useAdminMutation(
     (v: DiscountFormValues) =>
@@ -249,10 +267,13 @@ export function DiscountFormModal({
         )}
         {(audience === "specific_buyers" ||
           audience === "specific_sellers") && (
-          <FormInput
+          <FormSearchableMultiSelect
             name="targetUserIds"
             label={t("admin.marketing.discounts.targetUsers")}
             helperText={t("admin.marketing.discounts.targetUsersHelper")}
+            searchPlaceholder={t("admin.marketing.discounts.searchUser")}
+            placeholder={t("admin.marketing.discounts.selectUsers")}
+            {...userOptions}
           />
         )}
       </div>
