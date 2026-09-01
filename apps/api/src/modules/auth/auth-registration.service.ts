@@ -23,6 +23,21 @@ import { i18nMessage } from "../i18n";
 import { isUsernameAllowed, normalizeUsername } from "./utils/username.util";
 import { ENTITY_PREFIX } from "../../common/helpers/code-prefixes";
 import { errorMessage } from "../../common/helpers/error-message";
+import { InjectQueue } from "@nestjs/bull";
+import { Queue } from "bull";
+import { QUEUE_NAMES } from "../../workers/constants";
+import { getEmailTemplateSubject } from "../../common/helpers/email-template-renderer";
+import {
+  buildEmailVerificationTemplateData,
+  EMAIL_VERIFICATION_TEMPLATE,
+  EMAIL_VERIFICATION_TTL_MS,
+} from "../../common/helpers/email-verification-mail";
+
+/** Aktivasyon mailinin gönderim sonucu (NotificationAccountService sözleşmesi). */
+export interface EmailVerificationSendResult {
+  success: boolean;
+  error?: string;
+}
 
 /** Hesap tipi öneki — yalnızca bireysel (B) veya kurumsal (K). */
 type EntityUserPrefix =
@@ -47,6 +62,7 @@ export class AuthRegistrationService {
     private readonly notificationService: NotificationService,
     private readonly newsletterService: NewsletterService,
     private readonly moduleRef: ModuleRef,
+    @InjectQueue(QUEUE_NAMES.EMAIL) private readonly emailQueue: Queue,
   ) {}
 
   /**
@@ -351,37 +367,119 @@ export class AuthRegistrationService {
   }
 
   /**
-   * Send email verification link
+   * Send email verification link.
+   *
+   * Gönderim sonucunu döndürür: kayıt akışı bunu görmezden gelir (kullanıcı
+   * yine de kaydolur), admin "yeniden gönder" yolu ise başarısızlığı hata
+   * olarak yüzeye çıkarır.
    */
-  async sendEmailVerification(userId: string, email: string): Promise<void> {
-    // Generate verification token
+  async sendEmailVerification(
+    userId: string,
+    email: string,
+  ): Promise<EmailVerificationSendResult> {
+    const verificationToken = await this.issueEmailVerificationToken(
+      userId,
+      email,
+    );
+    return this.notificationService.sendEmailVerification(
+      userId,
+      verificationToken,
+    );
+  }
+
+  /**
+   * Yeni doğrulama token'ı üretir (kullanıcının eskileri silinir) ve HAM
+   * token'ı döndürür. DB'de yalnız sha256 özeti durur: DB okuma yetkisi tek
+   * başına bekleyen bir e-postayı doğrulamaya yetmesin.
+   *
+   * Private: ham token bir kimlik bilgisidir, onu üreten modülün dışına
+   * çıkmaz — senkron ve kuyruklu gönderim yollarının ikisi de buradan geçer.
+   */
+  private async issueEmailVerificationToken(
+    userId: string,
+    email: string,
+  ): Promise<string> {
     const verificationToken = crypto.randomBytes(32).toString("hex");
     const hashedToken = crypto
       .createHash("sha256")
       .update(verificationToken)
       .digest("hex");
-    const expiresAt = new Date(Date.now() + 24 * 3600000); // 24 hours
+    const expiresAt = new Date(Date.now() + EMAIL_VERIFICATION_TTL_MS);
 
-    // Delete existing tokens for this user
-    await this.prisma.emailVerificationToken.deleteMany({
-      where: { userId },
+    await this.prisma.emailVerificationToken.deleteMany({ where: { userId } });
+    await this.prisma.emailVerificationToken.create({
+      data: { userId, token: hashedToken, email, expiresAt },
     });
 
-    // Create new token
-    await this.prisma.emailVerificationToken.create({
-      data: {
+    return verificationToken;
+  }
+
+  /**
+   * Aktivasyon mailini KUYRUĞA alır (gönderim değil).
+   *
+   * Admin toplu gönderiminin yolu: 500 kullanıcıya sırayla SMTP beklemek
+   * isteği dakikalarca tutardı. Karşılığı, başarısızlığın anında görünmemesi —
+   * sonuç Loglar → E-postalar'dan izlenir. Tekil gönderim bilinçli olarak
+   * senkron kalır.
+   *
+   * Kuyruğa `send-template` işi yazılır; worker şablonu kendisi çözer ve
+   * `renderManagedEmailTemplate` ile aynı çıktıyı üretir (override geçilmez).
+   */
+  async queueEmailVerification(userId: string): Promise<void> {
+    const user = await this.loadUnverifiedUser(userId);
+    const verificationToken = await this.issueEmailVerificationToken(
+      userId,
+      user.email,
+    );
+    const templateData = buildEmailVerificationTemplateData(
+      user.displayName,
+      verificationToken,
+    );
+
+    await this.emailQueue.add("send-template", {
+      to: user.email,
+      // Konu, senkron yolun `renderManagedEmailTemplate` içindeki varsayılanıyla
+      // birebir aynı kaynaktan gelsin.
+      subject: getEmailTemplateSubject(
+        EMAIL_VERIFICATION_TEMPLATE,
+        templateData,
+      ),
+      template: EMAIL_VERIFICATION_TEMPLATE,
+      templateData: { ...templateData, userId },
+      // Senkron yol her gönderimde bir notification_log satırı yazıyor; worker
+      // hiç yazmıyordu. İki yol aynı denetim izini bıraksın.
+      notificationLog: {
         userId,
-        token: hashedToken,
-        email,
-        expiresAt,
+        type: "email_verification",
+        title: "E-posta Doğrulama",
+      },
+      // templateData CANLI token'lı linki taşıyor; EmailLog.metadata'ya
+      // yazılsaydı token kalıcı olarak düz metin saklanırdı.
+      redactTemplateData: true,
+    });
+  }
+
+  /** Aktivasyon gönderiminin ortak ön koşulu: hesap var ve henüz doğrulanmamış. */
+  private async loadUnverifiedUser(userId: string) {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        id: true,
+        email: true,
+        displayName: true,
+        isEmailVerified: true,
       },
     });
 
-    // Send verification email
-    await this.notificationService.sendEmailVerification(
-      userId,
-      verificationToken,
-    );
+    if (!user) {
+      throw new NotFoundException(i18nMessage("server.auth.userNotFound"));
+    }
+    if (user.isEmailVerified) {
+      throw new BadRequestException(
+        i18nMessage("server.auth.emailAlreadyVerified"),
+      );
+    }
+    return user;
   }
 
   /**
@@ -627,21 +725,10 @@ export class AuthRegistrationService {
    * Resend email verification
    * POST /auth/resend-verification
    */
-  async resendEmailVerification(userId: string): Promise<void> {
-    const user = await this.prisma.user.findUnique({
-      where: { id: userId },
-    });
-
-    if (!user) {
-      throw new NotFoundException(i18nMessage("server.auth.userNotFound"));
-    }
-
-    if (user.isEmailVerified) {
-      throw new BadRequestException(
-        i18nMessage("server.auth.emailAlreadyVerified"),
-      );
-    }
-
-    await this.sendEmailVerification(userId, user.email);
+  async resendEmailVerification(
+    userId: string,
+  ): Promise<EmailVerificationSendResult> {
+    const user = await this.loadUnverifiedUser(userId);
+    return this.sendEmailVerification(userId, user.email);
   }
 }

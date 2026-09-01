@@ -10,7 +10,10 @@ import {
   TwoFactorChallengeDto,
 } from "./dto";
 import { AuthTokenService } from "./auth-token.service";
-import { AuthRegistrationService } from "./auth-registration.service";
+import {
+  AuthRegistrationService,
+  type EmailVerificationSendResult,
+} from "./auth-registration.service";
 import { AuthPasswordService } from "./auth-password.service";
 import { AuthLoginService } from "./auth-login.service";
 import { SocialLoginService } from "./social/social-login.service";
@@ -57,7 +60,10 @@ export class AuthService {
     return this.registration.register(dto);
   }
 
-  sendEmailVerification(userId: string, email: string): Promise<void> {
+  sendEmailVerification(
+    userId: string,
+    email: string,
+  ): Promise<EmailVerificationSendResult> {
     return this.registration.sendEmailVerification(userId, email);
   }
 
@@ -65,8 +71,15 @@ export class AuthService {
     return this.registration.verifyEmail(token);
   }
 
-  resendEmailVerification(userId: string): Promise<void> {
+  resendEmailVerification(
+    userId: string,
+  ): Promise<EmailVerificationSendResult> {
     return this.registration.resendEmailVerification(userId);
+  }
+
+  /** Aktivasyon mailini kuyruğa alır — toplu admin gönderiminin yolu. */
+  queueEmailVerification(userId: string): Promise<void> {
+    return this.registration.queueEmailVerification(userId);
   }
 
   registerBusiness(dto: BusinessRegisterDto) {

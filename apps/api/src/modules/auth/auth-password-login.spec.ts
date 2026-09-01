@@ -1,5 +1,7 @@
 // apps/api/src/modules/auth/auth-password-login.spec.ts
 import { Test } from "@nestjs/testing";
+import { getQueueToken } from "@nestjs/bull";
+import { QUEUE_NAMES } from "../../workers/constants";
 import { JwtService } from "@nestjs/jwt";
 import { ConfigService } from "@nestjs/config";
 import { UnauthorizedException } from "@nestjs/common";
@@ -67,6 +69,11 @@ describe("AuthService.login - password login edge cases", () => {
         {
           provide: NewsletterService,
           useValue: { syncUserConsent: jest.fn() },
+        },
+        // AuthRegistrationService toplu aktivasyon mailini kuyruğa yazıyor.
+        {
+          provide: getQueueToken(QUEUE_NAMES.EMAIL),
+          useValue: { add: jest.fn().mockResolvedValue({ id: "job" }) },
         },
       ],
     }).compile();

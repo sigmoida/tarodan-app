@@ -15,8 +15,13 @@ import {
 import { NotificationDispatchService } from "./notification-dispatch.service";
 import {
   frontendUrl as resolveFrontendUrl,
+  frontendUrlForEnvironment,
   LOCAL_FRONTEND_URL,
 } from "../../config/app-urls";
+import {
+  buildEmailVerificationTemplateData,
+  EMAIL_VERIFICATION_TEMPLATE,
+} from "../../common/helpers/email-verification-mail";
 
 @Injectable()
 export class NotificationAccountService {
@@ -195,21 +200,19 @@ export class NotificationAccountService {
 
     if (!user) return { success: false, error: "User not found" };
 
-    const frontendUrl = resolveFrontendUrl(LOCAL_FRONTEND_URL);
-    const verifyUrl = `${frontendUrl}/verify-email?token=${verificationToken}`;
-    const displayName = user.displayName || "";
-    const templateData = {
-      name: displayName,
-      displayName,
-      verificationUrl: verifyUrl,
-      expiresIn: "24 saat",
-    };
+    // Link ve süre metni kuyruklu yolla ORTAK helper'dan gelir; iki yolun
+    // farklı host'a işaret etmesi mümkün olmasın.
+    const frontendUrl = frontendUrlForEnvironment();
+    const templateData = buildEmailVerificationTemplateData(
+      user.displayName,
+      verificationToken,
+    );
 
     const dbTemplate = await this.prisma.emailTemplate.findUnique({
-      where: { key: "email-verification" },
+      where: { key: EMAIL_VERIFICATION_TEMPLATE },
     });
     const email = renderManagedEmailTemplate(
-      "email-verification",
+      EMAIL_VERIFICATION_TEMPLATE,
       { ...templateData, to: user.email },
       dbTemplate,
       frontendUrl,
