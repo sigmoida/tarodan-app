@@ -26,10 +26,13 @@ import { PaymentModule } from "../payment";
 import { scheduledProcessors } from "../../workers/scheduled-processors";
 import { CommissionModule } from "../commission/commission.module";
 
+import { UserBlockModule } from "../user-block/user-block.module";
+
 @Module({
   imports: [
     MembershipModule,
     SearchModule,
+    UserBlockModule,
     WishlistModule,
     NotificationModule,
     DiscountModule,

@@ -4,7 +4,10 @@ import {
   NotFoundException,
   ForbiddenException,
 } from "@nestjs/common";
+import { createHash } from "crypto";
 import { PrismaService } from "../../../prisma";
+import { UserBlockService } from "../../user-block/user-block.service";
+import { excludeIds } from "../../user-block/user-block.helpers";
 import { i18nMessage } from "../../i18n";
 import { CacheService } from "../../cache/cache.service";
 import { SearchService } from "../../search/search.service";
@@ -31,6 +34,12 @@ import { paginate } from "../../../common/list";
  * ProductCommonService'e delege eder (this.common.formatProductResponse). ES/PG
  * fallback, cache okuma (products:detail/list) ve stok-duyarlı sıralama birebir korunur.
  */
+/** Gizli satıcı listesi (sıralı) → kısa, deterministik cache anahtarı parçası. */
+function hashIds(ids: string[]): string | undefined {
+  if (ids.length === 0) return undefined;
+  return createHash("sha1").update(ids.join(",")).digest("hex").slice(0, 16);
+}
+
 @Injectable()
 export class ProductQueryService {
   private readonly logger = new Logger(ProductQueryService.name);
@@ -41,6 +50,7 @@ export class ProductQueryService {
     private readonly searchService: SearchService,
     private readonly discountService: DiscountService,
     private readonly common: ProductCommonService,
+    private readonly userBlocks: UserBlockService,
   ) {}
 
   /**
@@ -50,7 +60,11 @@ export class ProductQueryService {
    * Primary path: Elasticsearch (fast filtering + sorting)
    * Fallback: PostgreSQL via Prisma (when ES unavailable)
    */
-  async findAll(query: ProductQueryDto) {
+  async findAll(query: ProductQueryDto, viewerId?: string) {
+    // Engelli satıcılar viewer'a özgüdür: yalnız DOLU olduğunda cache anahtarına
+    // girer → anonim/çoğunluk aynı anahtarı paylaşmaya devam eder, sayfalama ve
+    // total ise where'e girdiği için doğru kalır (post-filter olsa 17/20 sayfa).
+    const hiddenSellerIds = await this.userBlocks.getHiddenUserIds(viewerId);
     const {
       search,
       categoryId,
@@ -108,6 +122,7 @@ export class ProductQueryService {
       carModelId,
       attributeSlugs: query.attributeSlugs,
       attrGroups: query.attrGroups,
+      hidden: hashIds(hiddenSellerIds),
     })}`;
 
     const hasSearch = !!(search && String(search).trim());
@@ -121,7 +136,7 @@ export class ProductQueryService {
       // the search path (page/filters included), so pages don't cross-contaminate.
       return this.cache.getOrSet(
         cacheKey,
-        () => this.findAllViaPostgres(query),
+        () => this.findAllViaPostgres(query, hiddenSellerIds),
         { ttl: 120 },
       );
     }
@@ -129,13 +144,16 @@ export class ProductQueryService {
     const runListQuery = async () => {
       if (this.searchService.isAvailable()) {
         try {
-          const esResult = await this.findAllViaElasticsearch(query);
+          const esResult = await this.findAllViaElasticsearch(
+            query,
+            hiddenSellerIds,
+          );
           if (esResult) return esResult;
         } catch (err) {
           this.logger.warn("ES findAll failed, falling back to PostgreSQL");
         }
       }
-      return this.findAllViaPostgres(query);
+      return this.findAllViaPostgres(query, hiddenSellerIds);
     };
     return this.cache.getOrSet(cacheKey, runListQuery, { ttl: 300 });
   }
@@ -158,12 +176,14 @@ export class ProductQueryService {
    * Popüler ilanlar – sadece view count'a göre, indirim filtresi yok (cache yok)
    * GET /products/popular
    */
-  async findPopular(limit: number, page: number) {
+  async findPopular(limit: number, page: number, viewerId?: string) {
+    const hidden = await this.userBlocks.getHiddenUserIds(viewerId);
     const where: Prisma.ProductWhereInput = {
       ...catalogProductWhere(),
       status: ProductStatus.active,
       AND: [{ OR: this.inStockOrConditions() }],
       seller: saleCapableSellerWhere(),
+      sellerId: excludeIds(hidden),
     };
     const result = await paginate(
       this.prisma.product,
@@ -204,7 +224,10 @@ export class ProductQueryService {
   /**
    * ES-based product listing: query ES for IDs + total, then hydrate via Prisma
    */
-  private async findAllViaElasticsearch(query: ProductQueryDto) {
+  private async findAllViaElasticsearch(
+    query: ProductQueryDto,
+    hiddenSellerIds: string[] = [],
+  ) {
     const {
       search,
       categoryId,
@@ -253,6 +276,7 @@ export class ProductQueryService {
       page,
       pageSize: limit,
       sortBy: sortBy || "relevance",
+      excludeSellerIds: hiddenSellerIds,
     };
 
     const esResult = await this.searchService.searchProductIds(esOptions);
@@ -271,6 +295,7 @@ export class ProductQueryService {
           buildProductWhere({
             ...query,
             material: query.material,
+            hiddenSellerIds,
             ...(query.tradeOnly
               ? {
                   tradeCapableSeller: tradeCapableSellerWhere(
@@ -360,7 +385,10 @@ export class ProductQueryService {
    * Text search (when present) uses title/description contains as a fallback.
    * Sorting is always DB-level with skip/take pagination (no in-memory scoring).
    */
-  private async findAllViaPostgres(query: ProductQueryDto) {
+  private async findAllViaPostgres(
+    query: ProductQueryDto,
+    hiddenSellerIds: string[] = [],
+  ) {
     const { discountOnly, sortBy, page = 1, limit = 20 } = query;
 
     // Full-text search via tsvector/tsquery (replaces ILIKE contains)
@@ -373,6 +401,7 @@ export class ProductQueryService {
       {
         ...query,
         material: query.material,
+        hiddenSellerIds,
         // Takas filtresinde satıcının GÜNCEL yetkisi de aranır (bayrak yalnız
         // niyettir; üyelik bitince üründe kalır).
         ...(query.tradeOnly
@@ -565,8 +594,11 @@ export class ProductQueryService {
    * Get single product by ID
    * GET /products/:id
    */
-  async findOne(id: string) {
+  async findOne(id: string, viewerId?: string) {
     const cacheKey = `products:detail:${id}`;
+    // Engelli satıcının ilanı viewer için yok: kontrol cache'in DIŞINDA
+    // (detay projeksiyonu viewer-bağımsız kalır, anahtar patlamaz).
+    const hidden = await this.userBlocks.getHiddenUserIds(viewerId);
 
     // Seller entitlement is evaluated outside the cached projection. Otherwise
     // a detail cached just before BUSINESS expiry remains purchasable-looking
@@ -576,6 +608,7 @@ export class ProductQueryService {
         ...catalogProductWhere(),
         id,
         seller: saleCapableSellerWhere(),
+        sellerId: excludeIds(hidden),
         OR: [
           { status: ProductStatus.active },
           { status: ProductStatus.sold },
@@ -736,13 +769,14 @@ export class ProductQueryService {
    * Aynı kategorideki, aktif ve stoklu, kendisi olmayan en yeni ürünleri
    * döner. Stockout cancel sayfası "alternatif ürünler" carousel'inde kullanır.
    */
-  async findSimilarProducts(productId: string, limit = 12) {
+  async findSimilarProducts(productId: string, limit = 12, viewerId?: string) {
     const product = await this.prisma.product.findFirst({
       where: { id: productId, ...catalogProductWhere() },
       select: { categoryId: true },
     });
     if (!product?.categoryId) return [];
 
+    const hidden = await this.userBlocks.getHiddenUserIds(viewerId);
     const products = await this.prisma.product.findMany({
       where: {
         ...catalogProductWhere(),
@@ -750,6 +784,7 @@ export class ProductQueryService {
         id: { not: productId },
         status: ProductStatus.active,
         seller: saleCapableSellerWhere(),
+        sellerId: excludeIds(hidden),
         // Bulgu A: rezerv-duyarlı stok filtresi (kanonik inStockCondition ile aynı).
         // quantity = null → sınırsız stok (dijital/preorder) dahil; tamamen rezerve
         // ürün (available=0) "alternatif ürünler"de gösterilmez.

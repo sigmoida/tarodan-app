@@ -1,4 +1,5 @@
 import { TarodanWebSocketGateway } from "./websocket.gateway";
+import { userBlockServiceStub } from "../user-block/user-block.testing";
 
 describe("TarodanWebSocketGateway room authorization", () => {
   let gateway: TarodanWebSocketGateway;
@@ -25,6 +26,7 @@ describe("TarodanWebSocketGateway room authorization", () => {
       {} as any, // configService
       mockPrisma as any,
       {} as any, // securityService
+      userBlockServiceStub() as any, // userBlocks
     );
   });
 
@@ -61,16 +63,16 @@ describe("TarodanWebSocketGateway room authorization", () => {
     expect(res).toEqual({ event: "error", data: { threadId: "t1" } });
   });
 
-  it("only emits typing state after the socket joined the authorized room", () => {
+  it("only emits typing state after the socket joined the authorized room", async () => {
     const client = makeClient("u1");
 
-    expect(
+    await expect(
       gateway.handleTypingStart(client as any, { threadId: "t1" }),
-    ).toEqual({ event: "error", data: { threadId: "t1" } });
+    ).resolves.toEqual({ event: "error", data: { threadId: "t1" } });
     expect(client.to).not.toHaveBeenCalled();
 
     client.rooms.add("thread:t1");
-    gateway.handleTypingStart(client as any, { threadId: "t1" });
+    await gateway.handleTypingStart(client as any, { threadId: "t1" });
     expect(client.to).toHaveBeenCalledWith("thread:t1");
   });
 
@@ -144,6 +146,7 @@ describe("TarodanWebSocketGateway connection authentication", () => {
       configService as any,
       prisma as any,
       security as any,
+      userBlockServiceStub() as any,
     );
   });
 
@@ -249,5 +252,57 @@ describe("TarodanWebSocketGateway connection authentication", () => {
 
     expect(client.join).not.toHaveBeenCalled();
     expect(client.disconnect).toHaveBeenCalled();
+  });
+});
+
+describe("TarodanWebSocketGateway — user blocks", () => {
+  const prisma = {
+    messageThread: {
+      findUnique: jest.fn().mockResolvedValue({
+        id: "t1",
+        participant1Id: "u1",
+        participant2Id: "u2",
+      }),
+    },
+  };
+  const userBlocks = userBlockServiceStub({ blockedEither: true });
+  const gateway = new TarodanWebSocketGateway(
+    {} as any,
+    {} as any,
+    prisma as any,
+    {} as any,
+    userBlocks as any,
+  );
+  const makeClient = () => {
+    const rooms = new Set<string>();
+    return {
+      userId: "u1",
+      rooms,
+      join: jest.fn((room: string) => rooms.add(room)),
+      leave: jest.fn((room: string) => rooms.delete(room)),
+      emit: jest.fn(),
+      to: jest.fn(() => ({ emit: jest.fn() })),
+    };
+  };
+
+  it("denies join:thread for a blocked pair even though the user is a participant", async () => {
+    const client = makeClient();
+    const res = await gateway.handleJoinThread(client as any, {
+      threadId: "t1",
+    });
+    expect(client.join).not.toHaveBeenCalled();
+    expect(res).toEqual({ event: "error", data: { threadId: "t1" } });
+    expect(userBlocks.isBlockedEither).toHaveBeenCalledWith("u1", "u2");
+  });
+
+  it("drops a socket that joined before the block from the room on typing:start", async () => {
+    const client = makeClient();
+    client.rooms.add("thread:t1");
+    const res = await gateway.handleTypingStart(client as any, {
+      threadId: "t1",
+    });
+    expect(res).toEqual({ event: "error", data: { threadId: "t1" } });
+    expect(client.leave).toHaveBeenCalledWith("thread:t1");
+    expect(client.to).not.toHaveBeenCalled();
   });
 });

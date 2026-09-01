@@ -31,6 +31,7 @@ import { resolveSalePrice } from "../product/helpers/product-sale-window";
 import { generateUniqueReference } from "../../common/helpers/generate-reference";
 import { REFERENCE_PREFIX } from "../../common/helpers/code-prefixes";
 import { i18nMessage } from "../i18n";
+import { UserBlockService } from "../user-block/user-block.service";
 import { OFFER_CANCEL_REASON } from "../trade/helpers/trade-cancel-reasons";
 import {
   PUBLIC_NAME_SELECT,
@@ -58,6 +59,7 @@ export class OfferService {
     // Teklif siparişinin bedelleri (kargo + KDV + stopaj + toplam) normal satışla
     // AYNI primitiften gelir; burada ayrı hesap yapılmaz.
     private readonly checkoutCommon: OrderCheckoutCommonService,
+    private readonly userBlocks: UserBlockService,
     @Optional()
     private readonly feeDiscounts?: OrderFeeDiscountService,
   ) {
@@ -134,6 +136,8 @@ export class OfferService {
           i18nMessage("server.offer.cannotOfferOwnProduct"),
         );
       }
+
+      await this.assertNotBlocked(buyerId, product.sellerId);
 
       // Check minimum offer percentage
       //
@@ -306,6 +310,9 @@ export class OfferService {
           }),
         );
       }
+
+      // Kabul yeni bir bağ (sipariş) kurar: engel varsa teklif bekler/dolar.
+      await this.assertNotBlocked(offerData.buyerId, offerData.sellerId);
 
       // Check expiration
       if (new Date() > new Date(offerData.expiresAt)) {
@@ -663,6 +670,8 @@ export class OfferService {
         );
       }
 
+      await this.assertNotBlocked(offer.buyerId, offer.sellerId);
+
       if (offer.status !== OfferStatus.pending) {
         throw new BadRequestException(
           i18nMessage("server.offer.alreadyInStatus", { status: offer.status }),
@@ -794,6 +803,8 @@ export class OfferService {
           i18nMessage("server.offer.notAuthorizedToBuyerCounter"),
         );
       }
+
+      await this.assertNotBlocked(offer.buyerId, offer.sellerId);
 
       if (offer.status !== OfferStatus.pending) {
         throw new BadRequestException(
@@ -1298,5 +1309,10 @@ export class OfferService {
       }
     }
     return null;
+  }
+
+  /** İki yönlü engel varsa yeni teklif / karşı teklif / kabul 403. */
+  private assertNotBlocked(a: string, b: string): Promise<void> {
+    return this.userBlocks.assertNotBlocked(a, b, "server.offer.blocked");
   }
 }

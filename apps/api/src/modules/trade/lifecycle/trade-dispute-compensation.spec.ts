@@ -84,6 +84,10 @@ describe("TradeLifecycleService.resolveDispute — tazminat sözleşmesi", () =>
       tradeCommon as any,
       tradeQuery as any,
       {} as any, // tradeQuote
+      {
+        isBlockedEither: async () => false,
+        getHiddenUserIds: async () => [],
+      } as any, // userBlocks
       undefined, // discountService
     );
 

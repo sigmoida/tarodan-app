@@ -6,6 +6,8 @@ import {
   Logger,
 } from "@nestjs/common";
 import { PrismaService } from "../../prisma";
+import { UserBlockService } from "../user-block/user-block.service";
+import { excludeIds } from "../user-block/user-block.helpers";
 import { CacheService } from "../cache/cache.service";
 import { NotificationService } from "../notification/notification.service";
 import { NotificationType } from "../notification/dto";
@@ -36,6 +38,7 @@ export class WishlistService {
     private readonly discountService: DiscountService,
     @Optional()
     private readonly storageService: StorageService,
+    private readonly userBlocks: UserBlockService,
   ) {}
 
   // ==========================================================================
@@ -60,11 +63,15 @@ export class WishlistService {
   // ==========================================================================
   async getWishlist(userId: string): Promise<WishlistResponseDto> {
     const wishlist = await this.getOrCreateWishlist(userId);
+    const hidden = await this.userBlocks.getHiddenUserIds(userId);
 
     const items = await this.prisma.wishlistItem.findMany({
       where: {
         wishlistId: wishlist.id,
-        product: catalogProductWhere(),
+        product: {
+          ...catalogProductWhere(),
+          sellerId: excludeIds(hidden),
+        },
       },
       include: {
         product: {

@@ -25,6 +25,10 @@ import { RefundService } from "../refund/refund.service";
 import { OrderStatus, ProductStatus } from "@prisma/client";
 import { flatPackageTiers } from "../shipping/testing/tariff-fixture";
 import { OrderTaxPolicyService } from "./pricing/order-tax-policy.service";
+import { UserBlockService } from "../user-block/user-block.service";
+
+// Engel kapısı: bu testlerde çift engelli değil.
+const userBlocksStub = { assertNotBlocked: async () => undefined };
 
 // Active shipping tariff stub (29.99 / free over 500) so the real OrderPricingService
 // resolves without a DB. Kademeler zorunlu: önizleme de checkout gibi kademe
@@ -148,6 +152,7 @@ describe("OrderService findOne (response shape for mobile order detail)", () => 
         OrderCheckoutCommonService,
         OrderCheckoutDirectService,
         OrderCheckoutGroupService,
+        { provide: UserBlockService, useValue: userBlocksStub },
         OrderGuestCheckoutService,
         OrderCommonService,
         OrderQueryService,
@@ -336,6 +341,7 @@ describe("OrderService getCommissionPreview (stopaj / withholding)", () => {
         OrderCheckoutCommonService,
         OrderCheckoutDirectService,
         OrderCheckoutGroupService,
+        { provide: UserBlockService, useValue: userBlocksStub },
         OrderGuestCheckoutService,
         OrderCommonService,
         OrderQueryService,

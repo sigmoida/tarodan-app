@@ -61,6 +61,12 @@ export interface ProductFilterParams {
    * Accepts either the parsed object or its JSON string form (controller-friendly).
    */
   attrGroups?: Record<string, string[]> | string;
+
+  /**
+   * Viewer'a görünmemesi gereken satıcılar (engellediği ∪ onu engelleyen).
+   * Boş/undefined ise koşul eklenmez; anonim viewer için her zaman boştur.
+   */
+  hiddenSellerIds?: string[];
 }
 
 export interface BuildWhereOptions {
@@ -109,9 +115,16 @@ export function buildProductWhere(
     maxPrice,
     attributeSlugs,
     attrGroups,
+    hiddenSellerIds,
   } = params;
 
   const andConditions: Prisma.ProductWhereInput[] = [];
+
+  // Engelli satıcılar (simetrik): akış/arama/vitrin/benzer ürün hepsi bu
+  // builder'dan geçtiği için tek noktadan düşer.
+  if (hiddenSellerIds && hiddenSellerIds.length > 0) {
+    andConditions.push({ sellerId: { notIn: hiddenSellerIds } });
+  }
 
   // Public catalog reads never expose a listing whose seller cannot currently
   // sell. The predicate is time-aware, so an expired BUSINESS term is hidden

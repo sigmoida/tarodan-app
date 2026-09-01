@@ -15,6 +15,7 @@ import { CacheService } from "../cache/cache.service";
 import { NotificationService } from "../notification/notification.service";
 import { RatingService } from "../rating/rating.service";
 import { ModerationAiClient } from "../moderation/moderation-ai.client";
+import { UserBlockService } from "../user-block/user-block.service";
 
 describe("UserService deleteAddress (edge case 1.11)", () => {
   let service: UserService;
@@ -58,6 +59,7 @@ describe("UserService deleteAddress (edge case 1.11)", () => {
         { provide: CacheService, useValue: { checkRateLimit: jest.fn() } },
         { provide: NotificationService, useValue: {} },
         { provide: RatingService, useValue: {} },
+        { provide: UserBlockService, useValue: {} },
         {
           provide: ModerationAiClient,
           useValue: { assertTextClean: jest.fn(), assertImageClean: jest.fn() },

@@ -399,6 +399,42 @@ export class NotificationDispatchService {
    * Create in-app notification directly (for use by other services)
    * This method is public and can be called from EventService, OrderService, etc.
    */
+  /**
+   * Aktif tüm admin kullanıcılarına in-app bildirim. Tek bir admin'in hatası
+   * diğerlerini durdurmaz; toplam da asla fırlatmaz (çağıran akış kırılmasın).
+   * Engelleme/şikayet olayları için ortak kapı; mevcut beş kopya (order/trade/
+   * refund/product/discount) takip işi olarak buraya taşınacak.
+   */
+  async notifyAllAdmins(
+    type: NotificationType,
+    data?: Record<string, any>,
+  ): Promise<number> {
+    try {
+      const admins = await this.prisma.adminUser.findMany({
+        where: { isActive: true },
+        select: { userId: true },
+      });
+      let delivered = 0;
+      for (const admin of admins) {
+        try {
+          if (await this.createInAppNotification(admin.userId, type, data)) {
+            delivered++;
+          }
+        } catch (err: any) {
+          this.logger.error(
+            `[notifyAllAdmins] type=${type} admin=${admin.userId}: ${err?.message}`,
+          );
+        }
+      }
+      return delivered;
+    } catch (err: any) {
+      this.logger.warn(
+        `[notifyAllAdmins] type=${type} failed: ${err?.message}`,
+      );
+      return 0;
+    }
+  }
+
   async createInAppNotification(
     userId: string,
     type: NotificationType,

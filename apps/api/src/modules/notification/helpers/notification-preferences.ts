@@ -59,6 +59,8 @@ const ADMIN_ALARM_TYPES = new Set<string>([
   NotificationType.TRADE_STUCK_AT_WAREHOUSE,
   NotificationType.TRADE_OUTBOUND_DELIVERY_MISSING,
   NotificationType.REFUND_REVIEW_REQUIRED_ADMIN,
+  NotificationType.USER_BLOCKED_ADMIN,
+  NotificationType.USER_REPORTED_ADMIN,
 ]);
 
 /**

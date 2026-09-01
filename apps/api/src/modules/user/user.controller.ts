@@ -36,6 +36,8 @@ import {
   ClaimUsernameDto,
 } from "./dto";
 import { errorMessage } from "../../common/helpers/error-message";
+import { Throttle } from "@nestjs/throttler";
+import { BlockUserDto } from "./dto/block-user.dto";
 
 @ApiTags("users")
 @Controller("users")
@@ -439,11 +441,30 @@ export class UserController {
   // ==========================================================================
 
   /**
+   * GET /users/:id/block
+   * Did the current user block the target? (menüde Engelle / Engeli Kaldır)
+   */
+  @Get(":id/block")
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: "Engel durumunu kontrol et" })
+  @ApiResponse({ status: 200, description: "Engel durumu" })
+  async checkBlocked(
+    @CurrentUser("id") currentUserId: string,
+    @Param("id") targetUserId: string,
+  ) {
+    return {
+      blocked: await this.userService.hasBlocked(currentUserId, targetUserId),
+    };
+  }
+
+  /**
    * POST /users/:id/block
    * Block a user
    */
   @Post(":id/block")
   @UseGuards(JwtAuthGuard)
+  @Throttle({ default: { limit: 20, ttl: 60000 } })
   @ApiBearerAuth()
   @ApiOperation({ summary: "Kullanıcıyı engelle" })
   @ApiResponse({ status: 200, description: "Kullanıcı engellendi" })
@@ -453,10 +474,12 @@ export class UserController {
     @CurrentUser("id") currentUserId: string,
     @Param("id") targetUserId: string,
     @ReqLocale() locale: Locale,
+    @Body() dto?: BlockUserDto,
   ) {
     const result = await this.userService.blockUser(
       currentUserId,
       targetUserId,
+      dto?.reason,
     );
     return {
       success: result.success,
@@ -472,6 +495,7 @@ export class UserController {
    */
   @Delete(":id/block")
   @UseGuards(JwtAuthGuard)
+  @Throttle({ default: { limit: 20, ttl: 60000 } })
   @ApiBearerAuth()
   @ApiOperation({ summary: "Engeli kaldır" })
   @ApiResponse({ status: 200, description: "Engel kaldırıldı" })
@@ -615,10 +639,13 @@ export class UserController {
    */
   @Get("top-collections")
   @Public()
-  async getTopCollections(@Query("limit") limit?: string) {
+  async getTopCollections(
+    @Query("limit") limit?: string,
+    @CurrentUser("id") viewerId?: string,
+  ) {
     try {
       const limitNum = limit ? parseInt(limit, 10) : 20;
-      return await this.userService.getTopCollections(limitNum);
+      return await this.userService.getTopCollections(limitNum, viewerId);
     } catch (err) {
       this.logger.warn(`getTopCollections failed: ${errorMessage(err)}`);
       return [];
@@ -654,9 +681,9 @@ export class UserController {
       },
     },
   })
-  async getFeaturedCollector() {
+  async getFeaturedCollector(@CurrentUser("id") viewerId?: string) {
     try {
-      return await this.userService.getFeaturedCollector();
+      return await this.userService.getFeaturedCollector(viewerId);
     } catch (err) {
       this.logger.warn(`getFeaturedCollector failed: ${errorMessage(err)}`);
       return null;
@@ -691,9 +718,9 @@ export class UserController {
       },
     },
   })
-  async getFeaturedBusiness() {
+  async getFeaturedBusiness(@CurrentUser("id") viewerId?: string) {
     try {
-      return await this.userService.getFeaturedBusiness();
+      return await this.userService.getFeaturedBusiness(viewerId);
     } catch (err) {
       this.logger.warn(`getFeaturedBusiness failed: ${errorMessage(err)}`);
       return null;
@@ -714,8 +741,14 @@ export class UserController {
     description: "Limit (default: 5)",
   })
   @ApiResponse({ status: 200, description: "En iyi satıcılar listesi" })
-  async getTopSellers(@Query("limit") limit?: string) {
-    return this.userService.getTopSellers(limit ? parseInt(limit, 10) : 5);
+  async getTopSellers(
+    @Query("limit") limit?: string,
+    @CurrentUser("id") viewerId?: string,
+  ) {
+    return this.userService.getTopSellers(
+      limit ? parseInt(limit, 10) : 5,
+      viewerId,
+    );
   }
 
   /**
@@ -732,10 +765,15 @@ export class UserController {
     type: Number,
     description: "Limit (default: 8)",
   })
-  async searchSellers(@Query("q") q?: string, @Query("limit") limit?: string) {
+  async searchSellers(
+    @Query("q") q?: string,
+    @Query("limit") limit?: string,
+    @CurrentUser("id") viewerId?: string,
+  ) {
     return this.userService.searchSellers(
       q ?? "",
       limit ? parseInt(limit, 10) : 8,
+      viewerId,
     );
   }
 

@@ -5,3 +5,4 @@ export * from "./notification-settings.dto";
 export * from "./complete-tour.dto";
 export * from "./claim-username.dto";
 export * from "./corporate-application.dto";
+export * from "./block-user.dto";

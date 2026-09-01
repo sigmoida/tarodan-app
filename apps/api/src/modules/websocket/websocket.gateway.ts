@@ -19,6 +19,7 @@ import { ConfigService } from "@nestjs/config";
 import { PrismaService } from "../../prisma";
 import { resolveCorsOrigins } from "../../config/cors-origins";
 import { JwtPayload } from "../auth/interfaces";
+import { UserBlockService } from "../user-block/user-block.service";
 import { SecurityService } from "../security/security.service";
 import {
   PUBLIC_NAME_SELECT,
@@ -63,6 +64,7 @@ export class TarodanWebSocketGateway
     private readonly configService: ConfigService,
     private readonly prisma: PrismaService,
     private readonly securityService: SecurityService,
+    private readonly userBlocks: UserBlockService,
   ) {}
 
   afterInit(server: Server) {
@@ -210,7 +212,15 @@ export class TarodanWebSocketGateway
       (client.userId === thread.participant1Id ||
         client.userId === thread.participant2Id);
 
-    if (!isParticipant) {
+    // Engelli çift odaya giremez: yazıyor/okundu sinyalleri sızmasın.
+    const blocked =
+      isParticipant &&
+      (await this.userBlocks.isBlockedEither(
+        thread.participant1Id,
+        thread.participant2Id,
+      ));
+
+    if (!isParticipant || blocked) {
       this.logger.warn(
         `User ${client.userId} denied join to thread ${data.threadId}`,
       );
@@ -221,6 +231,18 @@ export class TarodanWebSocketGateway
     client.join(`thread:${data.threadId}`);
     this.logger.log(`User ${client.userId} joined thread ${data.threadId}`);
     return { event: "joined:thread", data: { threadId: data.threadId } };
+  }
+
+  private async isThreadBlocked(threadId: string): Promise<boolean> {
+    const thread = await this.prisma.messageThread.findUnique({
+      where: { id: threadId },
+      select: { participant1Id: true, participant2Id: true },
+    });
+    if (!thread) return false;
+    return this.userBlocks.isBlockedEither(
+      thread.participant1Id,
+      thread.participant2Id,
+    );
   }
 
   @SubscribeMessage("leave:thread")
@@ -234,11 +256,16 @@ export class TarodanWebSocketGateway
   }
 
   @SubscribeMessage("typing:start")
-  handleTypingStart(
+  async handleTypingStart(
     @ConnectedSocket() client: AuthenticatedSocket,
     @MessageBody() data: { threadId: string },
   ) {
     if (!client.rooms.has(`thread:${data.threadId}`)) {
+      return { event: "error", data: { threadId: data.threadId } };
+    }
+    // Odaya engelden önce girmiş bir soket yazıyor sinyali sızdırmasın.
+    if (await this.isThreadBlocked(data.threadId)) {
+      client.leave(`thread:${data.threadId}`);
       return { event: "error", data: { threadId: data.threadId } };
     }
     client.to(`thread:${data.threadId}`).emit("typing:started", {
@@ -249,11 +276,15 @@ export class TarodanWebSocketGateway
   }
 
   @SubscribeMessage("typing:stop")
-  handleTypingStop(
+  async handleTypingStop(
     @ConnectedSocket() client: AuthenticatedSocket,
     @MessageBody() data: { threadId: string },
   ) {
     if (!client.rooms.has(`thread:${data.threadId}`)) {
+      return { event: "error", data: { threadId: data.threadId } };
+    }
+    if (await this.isThreadBlocked(data.threadId)) {
+      client.leave(`thread:${data.threadId}`);
       return { event: "error", data: { threadId: data.threadId } };
     }
     client.to(`thread:${data.threadId}`).emit("typing:stopped", {

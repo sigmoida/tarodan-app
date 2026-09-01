@@ -179,6 +179,10 @@ export enum NotificationType {
   TRADE_RETURN_LOST = "trade_return_lost",
   TRADE_REFUND_FAILED = "trade_refund_failed",
   TRADE_REFUND_COMPLETED = "trade_refund_completed",
+
+  // Admin'e gider (Apple App Review: engelleme/şikayet "notify the developer").
+  USER_BLOCKED_ADMIN = "user_blocked_admin",
+  USER_REPORTED_ADMIN = "user_reported_admin",
 }
 
 export enum NotificationChannel {

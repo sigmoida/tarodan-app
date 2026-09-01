@@ -6,6 +6,7 @@ import {
   Logger,
 } from "@nestjs/common";
 import { PrismaService } from "../../prisma";
+import { UserBlockService } from "../user-block/user-block.service";
 import { Prisma, ProductKind } from "@prisma/client";
 import { CollectionListResponseDto } from "./dto";
 import { NotificationService } from "../notification/notification.service";
@@ -45,6 +46,7 @@ export class CollectionSocialService {
     private readonly prisma: PrismaService,
     private readonly notificationService: NotificationService,
     private readonly common: CollectionCommonService,
+    private readonly userBlocks: UserBlockService,
   ) {}
 
   // ==========================================================================
@@ -160,6 +162,9 @@ export class CollectionSocialService {
     if (collection.userId === userId) {
       throw new BadRequestException(i18nMessage("server.collection.likeOwn"));
     }
+
+    // Beğeni sahibe COLLECTION_LIKED bildirimi düşürür: engelli çift için 403.
+    await this.userBlocks.assertNotBlocked(userId, collection.userId);
 
     // Check if user already liked this collection
     // Use findFirst to avoid composite key issues

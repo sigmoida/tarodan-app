@@ -58,6 +58,7 @@ import {
   TradeResponseDto,
 } from "../dto";
 import { i18nMessage } from "../../i18n";
+import { UserBlockService } from "../../user-block/user-block.service";
 import { REFERENCE_PREFIX } from "../../../common/helpers/code-prefixes";
 import {
   generateReferenceCode,
@@ -91,6 +92,7 @@ export class TradeLifecycleService {
     private readonly tradeCommon: TradeCommonService,
     private readonly tradeQuery: TradeQueryService,
     private readonly tradeQuote: TradeQuoteService,
+    private readonly userBlocks: UserBlockService,
     // Takas hizmet bedeli kampanyası (İ25) — yoksa takas indirimsiz akar.
     @Optional() private readonly discountService?: DiscountService,
   ) {}
@@ -141,6 +143,9 @@ export class TradeLifecycleService {
     if (!receiver) {
       throw new NotFoundException(i18nMessage("server.trade.receiverNotFound"));
     }
+
+    // İki yönlü engel varsa yeni takas teklifi 403 (Apple: abuse stop).
+    await this.assertNotBlocked(initiatorId, dto.receiverId);
 
     const initiatorCanTrade =
       await this.membershipService.canCreateTrade(initiatorId);
@@ -366,6 +371,8 @@ export class TradeLifecycleService {
       select: { initiatorId: true },
     });
     if (tradeParties) {
+      // Kabul escrow'lu süreç açar: engel varsa teklif bekler/dolar.
+      await this.assertNotBlocked(tradeParties.initiatorId, userId);
       const initiatorCanTrade = await this.membershipService.canCreateTrade(
         tradeParties.initiatorId,
       );
@@ -776,6 +783,9 @@ export class TradeLifecycleService {
         i18nMessage("server.trade.onlyReceiverCanCounter"),
       );
     }
+
+    // Karşı teklif yeni etkileşimdir: engel varsa 403.
+    await this.assertNotBlocked(trade.initiatorId, trade.receiverId);
 
     // Trade must be in pending status
     if (trade.status !== TradeStatus.pending) {
@@ -1711,5 +1721,10 @@ export class TradeLifecycleService {
     }
 
     return trade;
+  }
+
+  /** İki yönlü engel varsa yeni takas / karşı teklif / kabul 403. */
+  private assertNotBlocked(a: string, b: string): Promise<void> {
+    return this.userBlocks.assertNotBlocked(a, b, "server.trade.blocked");
   }
 }

@@ -137,6 +137,10 @@ export class SearchProductService {
 
     const must: any[] = [];
     const filter: any[] = [];
+    const mustNot: any[] = [];
+    if (options.excludeSellerIds?.length) {
+      mustNot.push({ terms: { sellerId: options.excludeSellerIds } });
+    }
 
     // Text search
     if (query) {
@@ -346,6 +350,7 @@ export class SearchProductService {
               bool: {
                 must: must.length > 0 ? must : [{ match_all: {} }],
                 filter,
+                ...(mustNot.length > 0 ? { must_not: mustNot } : {}),
               },
             },
             functions: [
@@ -769,6 +774,7 @@ export class SearchProductService {
         manufacturerId: options.manufacturerId,
         carModelId: options.carModelId,
         sellerId: options.sellerId,
+        hiddenSellerIds: options.excludeSellerIds,
         condition: options.condition,
         brand: options.brand,
         scale: options.scale,

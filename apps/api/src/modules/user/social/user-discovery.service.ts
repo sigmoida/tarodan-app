@@ -1,5 +1,7 @@
 import { Injectable, Logger, Optional } from "@nestjs/common";
 import { PrismaService } from "../../../prisma";
+import { UserBlockService } from "../../user-block/user-block.service";
+import { excludeIds } from "../../user-block/user-block.helpers";
 import { StorageService } from "../../storage/storage.service";
 import { CacheService } from "../../cache/cache.service";
 import { UserCommonService } from "../user-common.service";
@@ -70,12 +72,29 @@ export class UserDiscoveryService {
     @Optional()
     private readonly cache: CacheService,
     private readonly common: UserCommonService,
+    private readonly userBlocks: UserBlockService,
   ) {}
 
   /**
    * Featured (anasayfa öne çıkarma) yanıtlarını cache-aside ile sarar.
    * Redis yoksa veya hata verirse otomatik olarak factory'ye düşer (graceful).
    */
+  /**
+   * Site-geneli cache'lenen "haftanın koleksiyoncusu/işletmesi" seçimi viewer'a
+   * özel değildir; engelli sahip için cache SONRASI null'a çevrilir (tek kayıt,
+   * sayfalama yok → post-filter doğru ve ucuz).
+   */
+  private async hideIfOwnerBlocked<T>(
+    featured: T,
+    ownerId: string | undefined,
+    viewerId?: string,
+  ): Promise<T | null> {
+    if (!featured || !ownerId || !viewerId) return featured;
+    return (await this.userBlocks.isBlockedEither(viewerId, ownerId))
+      ? null
+      : featured;
+  }
+
   private async cacheFeatured<T>(
     key: string,
     factory: () => Promise<T>,
@@ -111,10 +130,16 @@ export class UserDiscoveryService {
   /**
    * En iyi koleksiyonlar (anasayfa). Görüntülenme/beğeniye göre sıralı, cache'li.
    */
-  async getTopCollections(limit: number = 20) {
-    return this.cacheFeatured(`featured:top-collections:${limit}`, () =>
-      this.computeTopCollections(limit),
+  async getTopCollections(limit: number = 20, viewerId?: string) {
+    const collections = await this.cacheFeatured(
+      `featured:top-collections:${limit}`,
+      () => this.computeTopCollections(limit),
     );
+    // Site-geneli cache viewer'a özel değil: engelli sahipler cache SONRASI düşer.
+    const hidden = await this.userBlocks.getHiddenUserIds(viewerId);
+    if (hidden.length === 0) return collections;
+    const hiddenSet = new Set(hidden);
+    return collections.filter((c) => !hiddenSet.has(c.user?.id ?? ""));
   }
 
   private async computeTopCollections(limit: number) {
@@ -197,7 +222,12 @@ export class UserDiscoveryService {
    * (presigned URL'ler hep güncel kalır). Snapshot yoksa (ilk açılış) ya da
    * kazanan artık uygun değilse anında hesaplayıp snapshot'ı tazeler.
    */
-  async getFeaturedCollector() {
+  async getFeaturedCollector(viewerId?: string) {
+    const featured = await this.getFeaturedCollectorCached();
+    return this.hideIfOwnerBlocked(featured, featured?.user?.id, viewerId);
+  }
+
+  private async getFeaturedCollectorCached() {
     return this.cacheFeatured("featured:collector", async () => {
       const snap = await this.prisma.featuredSnapshot.findUnique({
         where: { type: "collector" },
@@ -398,7 +428,12 @@ export class UserDiscoveryService {
    * cron'da yapılır, burada kazanan iş hesabı taze veriyle doldurulur. Snapshot
    * yoksa ya da kazanan artık uygun değilse anında hesaplayıp snapshot'ı tazeler.
    */
-  async getFeaturedBusiness() {
+  async getFeaturedBusiness(viewerId?: string) {
+    const featured = await this.getFeaturedBusinessCached();
+    return this.hideIfOwnerBlocked(featured, featured?.id, viewerId);
+  }
+
+  private async getFeaturedBusinessCached() {
     return this.cacheFeatured("featured:business", async () => {
       const snap = await this.prisma.featuredSnapshot.findUnique({
         where: { type: "business" },
@@ -767,12 +802,14 @@ export class UserDiscoveryService {
   /**
    * Get top sellers (for homepage)
    */
-  async getTopSellers(limit: number = 5) {
+  async getTopSellers(limit: number = 5, viewerId?: string) {
+    const hidden = await this.userBlocks.getHiddenUserIds(viewerId);
     // Get sellers with most sales and good ratings
     const sellers = await this.prisma.user.findMany({
       where: {
         ...saleCapableSellerWhere(),
         isSeller: true,
+        id: excludeIds(hidden),
         products: {
           some: { ...catalogProductWhere(), status: "active" },
         },
@@ -839,17 +876,19 @@ export class UserDiscoveryService {
    * kullanıcı adını seçmiş bir üye artık gerçek adıyla bulunamaz.
    * Yalnızca aktif ürünü olan, banlı/silinmemiş satıcıları döndürür.
    */
-  async searchSellers(query: string, limit: number = 8) {
+  async searchSellers(query: string, limit: number = 8, viewerId?: string) {
     const q = (query || "").trim();
     if (q.length < 2) {
       return [];
     }
 
+    const hidden = await this.userBlocks.getHiddenUserIds(viewerId);
     const sellers = await this.prisma.user.findMany({
       where: {
         ...saleCapableSellerWhere(),
         isSeller: true,
         isBanned: false,
+        id: excludeIds(hidden),
         deletedAt: null,
         products: {
           some: { ...catalogProductWhere(), status: "active" },

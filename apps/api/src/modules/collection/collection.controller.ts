@@ -73,6 +73,7 @@ export class CollectionController {
     @Query("search") search?: string,
     @Query("categoryId") categoryId?: string,
     @Query("category") category?: string,
+    @Request() req?: any,
   ): Promise<CollectionListResponseDto> {
     return this.collectionService.browsePublicCollections(
       page,
@@ -81,6 +82,7 @@ export class CollectionController {
       search,
       categoryId,
       category,
+      req?.user?.id,
     );
   }
 

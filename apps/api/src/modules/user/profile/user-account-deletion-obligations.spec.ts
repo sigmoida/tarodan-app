@@ -34,7 +34,12 @@ describe("UserProfileService account deletion obligations", () => {
       },
       $transaction: jest.fn(),
     };
-    const service = new UserProfileService(prisma as any, {} as any, {} as any);
+    const service = new UserProfileService(
+      prisma as any,
+      {} as any,
+      {} as any,
+      {} as any,
+    );
 
     await expect(service.deleteAccount("user-1")).rejects.toThrow();
 

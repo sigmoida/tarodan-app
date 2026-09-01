@@ -1,6 +1,7 @@
 import { Module } from "@nestjs/common";
 import { ConfigModule } from "@nestjs/config";
 import { BullModule } from "@nestjs/bull";
+import { UserBlockModule } from "../user-block/user-block.module";
 import { OfferController } from "./offer.controller";
 import { OfferService } from "./offer.service";
 import { OfferSchedulerService } from "./offer-scheduler.service";
@@ -22,6 +23,7 @@ import { scheduledProcessors } from "../../workers/scheduled-processors";
     CacheModule,
     EventModule,
     NotificationModule,
+    UserBlockModule,
     StorageModule,
     OrderModule,
     ProductModule,

@@ -3,6 +3,7 @@ import { OfferStatus, ProductStatus } from "@prisma/client";
 import { OfferService } from "./offer.service";
 import { OfferSchedulerService } from "./offer-scheduler.service";
 import { NotificationType } from "../notification/dto";
+import { userBlockServiceStub } from "../user-block/user-block.testing";
 
 /**
  * Teklif sürecinin sessiz kalan üç noktası:
@@ -101,6 +102,7 @@ describe("Teklif — bildirimler ve fiyat tabanı", () => {
           totalAmount: 1000,
         }),
       } as any,
+      userBlockServiceStub() as any,
     );
     return { service, notificationService, tx };
   };
@@ -196,6 +198,7 @@ describe("Teklif — bildirimler ve fiyat tabanı", () => {
       {} as any,
       undefined as any,
       {} as any,
+      userBlockServiceStub() as any,
     );
 
     await service.buyerCounter("offer-1", "buyer-1", { amount: 800 } as any);

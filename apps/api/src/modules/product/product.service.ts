@@ -45,24 +45,24 @@ export class ProductService implements OnModuleInit {
     return this.createService.create(sellerId, dto);
   }
 
-  async findAll(query: ProductQueryDto) {
-    return this.queryService.findAll(query);
+  async findAll(query: ProductQueryDto, viewerId?: string) {
+    return this.queryService.findAll(query, viewerId);
   }
 
-  async findPopular(limit: number, page: number) {
-    return this.queryService.findPopular(limit, page);
+  async findPopular(limit: number, page: number, viewerId?: string) {
+    return this.queryService.findPopular(limit, page, viewerId);
   }
 
-  async findOne(id: string) {
-    return this.queryService.findOne(id);
+  async findOne(id: string, viewerId?: string) {
+    return this.queryService.findOne(id, viewerId);
   }
 
   async findMyProductById(id: string, userId: string) {
     return this.queryService.findMyProductById(id, userId);
   }
 
-  async findSimilarProducts(productId: string, limit = 12) {
-    return this.queryService.findSimilarProducts(productId, limit);
+  async findSimilarProducts(productId: string, limit = 12, viewerId?: string) {
+    return this.queryService.findSimilarProducts(productId, limit, viewerId);
   }
 
   async update(id: string, sellerId: string, dto: UpdateProductDto) {

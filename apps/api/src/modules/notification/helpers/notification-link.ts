@@ -232,6 +232,9 @@ export const NOTIFICATION_LINKS: Record<
   [NotificationType.CAMPAIGN_BUDGET_EXHAUSTED]: free("adminLink"),
   // Admin'e gider: bekleyen ilan kuyruğu (serbest link).
   [NotificationType.MODERATION_QUEUE_STALE]: free("adminLink"),
+  // Admin'e gider: engellenen kullanıcının / şikayetin admin paneli sayfası.
+  [NotificationType.USER_BLOCKED_ADMIN]: free("adminLink"),
+  [NotificationType.USER_REPORTED_ADMIN]: free("adminLink"),
 
   // ── İade ─────────────────────────────────────────────────────────────────
   // İKİ yöne de gider: alıcı kendi talebini iptal edince SATICIYA ("iade talebi

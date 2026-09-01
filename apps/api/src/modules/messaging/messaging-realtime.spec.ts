@@ -5,6 +5,8 @@ import { NotificationService } from "../notification/notification.service";
 import { RealtimeService } from "../websocket/realtime.service";
 import { StorageService } from "../storage/storage.service";
 import { PrismaService } from "../../prisma";
+import { UserBlockService } from "../user-block/user-block.service";
+import { userBlockServiceStub } from "../user-block/user-block.testing";
 
 describe("MessagingService realtime emit", () => {
   let service: MessagingService;
@@ -46,16 +48,18 @@ describe("MessagingService realtime emit", () => {
         MessagingService,
         { provide: PrismaService, useValue: mockPrisma },
         {
+          provide: UserBlockService,
+          useValue: userBlockServiceStub(),
+        },
+        {
           provide: ContentFilterService,
           useValue: {
-            moderateWithAI: jest
-              .fn()
-              .mockResolvedValue({
-                isClean: true,
-                requiresApproval: false,
-                filteredContent: null,
-                flaggedReason: null,
-              }),
+            moderateWithAI: jest.fn().mockResolvedValue({
+              isClean: true,
+              requiresApproval: false,
+              filteredContent: null,
+              flaggedReason: null,
+            }),
           },
         },
         {

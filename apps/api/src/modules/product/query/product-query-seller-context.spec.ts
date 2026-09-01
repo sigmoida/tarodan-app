@@ -27,6 +27,10 @@ describe("ProductQueryService.findSellerProducts", () => {
       {} as any,
       {} as any,
       common as any,
+      {
+        isBlockedEither: async () => false,
+        getHiddenUserIds: async () => [],
+      } as any,
     );
 
     const result = await service.findSellerProducts("seller-1", {

@@ -16,6 +16,8 @@ import { StorageModule } from "../storage/storage.module";
 import { QUEUE_NAMES } from "../../workers/constants";
 import { scheduledProcessors } from "../../workers/scheduled-processors";
 
+import { UserBlockModule } from "../user-block/user-block.module";
+
 @Module({
   imports: [
     PrismaModule,
@@ -23,6 +25,7 @@ import { scheduledProcessors } from "../../workers/scheduled-processors";
     ConfigModule,
     BullModule.registerQueue({ name: QUEUE_NAMES.SEARCH }),
     BullModule.registerQueue({ name: QUEUE_NAMES.SCHEDULED }),
+    UserBlockModule,
   ],
   controllers: [SearchController],
   providers: [
