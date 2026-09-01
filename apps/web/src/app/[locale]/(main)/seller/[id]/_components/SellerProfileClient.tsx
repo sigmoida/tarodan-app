@@ -51,6 +51,7 @@ export default function SellerProfileClient() {
     handleFollow,
     handleMessage,
     handleReport,
+    requireAuthForAction,
   } = useSellerProfile();
 
   const [tab, setTab] = useState<SellerTab>("listings");
@@ -96,6 +97,7 @@ export default function SellerProfileClient() {
         onMessage={handleMessage}
         onFollow={handleFollow}
         onReport={handleReport}
+        onRequireAuth={requireAuthForAction}
       />
 
       <Tabs value={tab} onValueChange={(v) => setTab(v as SellerTab)}>

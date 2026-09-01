@@ -8,9 +8,9 @@ import {
   ArrowsRightLeftIcon,
   StarIcon,
   ChatBubbleLeftRightIcon,
-  FlagIcon,
 } from "@heroicons/react/24/outline";
-import { Badge, Button, IconButton } from "@tarodan/ui";
+import { Badge, Button } from "@tarodan/ui";
+import UserActionsMenu from "@/components/UserActionsMenu";
 import { useTranslations } from "next-intl";
 import UserAvatar from "@/components/UserAvatar";
 import { MetricCard } from "@/components/ui";
@@ -27,6 +27,8 @@ interface SellerHeaderProps {
   onMessage: () => void;
   onFollow: () => void;
   onReport: () => void;
+  /** Giriş kapısı (engelleme için); false dönerse modal çağıranda açılır. */
+  onRequireAuth: () => boolean;
 }
 
 /** Profile-style seller header — mirrors the account overview card (bordered
@@ -41,6 +43,7 @@ export default function SellerHeader({
   onMessage,
   onFollow,
   onReport,
+  onRequireAuth,
 }: SellerHeaderProps) {
   const t = useTranslations();
   const stats = seller.stats;
@@ -113,14 +116,12 @@ export default function SellerHeader({
             >
               {isFollowing ? t("seller.following") : t("seller.follow")}
             </Button>
-            <IconButton
-              variant="ghost"
-              size="sm"
-              onClick={onReport}
-              aria-label={t("profile.report")}
-            >
-              <FlagIcon className="h-5 w-5" />
-            </IconButton>
+            <UserActionsMenu
+              userId={seller.id}
+              userName={publicNameOf(seller)}
+              onReport={onReport}
+              requireAuth={onRequireAuth}
+            />
           </div>
         )}
       </div>

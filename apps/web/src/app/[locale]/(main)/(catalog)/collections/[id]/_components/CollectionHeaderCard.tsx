@@ -3,7 +3,12 @@
 "use client";
 
 import { Link } from "@/i18n/navigation";
-import { HeartIcon, EyeIcon, ShareIcon } from "@heroicons/react/24/outline";
+import {
+  HeartIcon,
+  EyeIcon,
+  ShareIcon,
+  FlagIcon,
+} from "@heroicons/react/24/outline";
 import { HeartIcon as HeartIconSolid } from "@heroicons/react/24/solid";
 import { Button, IconButton } from "@tarodan/ui";
 import { ButtonLink } from "@/components/ui/ButtonLink";
@@ -32,6 +37,7 @@ export default function CollectionHeaderCard() {
     handleShare,
     handleLike,
     setShowAddModal,
+    handleReport,
   } = useCollectionDetail();
 
   if (!collection) return null;
@@ -94,18 +100,28 @@ export default function CollectionHeaderCard() {
                 <ShareIcon className="h-5 w-5" />
               </IconButton>
               {!isOwner && (
-                <IconButton
-                  variant={isLiked ? "danger" : "ghost"}
-                  onClick={handleLike}
-                  aria-label={t("collection.likes")}
-                  title={t("collection.likes")}
-                >
-                  {isLiked ? (
-                    <HeartIconSolid className="h-5 w-5" />
-                  ) : (
-                    <HeartIcon className="h-5 w-5" />
-                  )}
-                </IconButton>
+                <>
+                  <IconButton
+                    variant={isLiked ? "danger" : "ghost"}
+                    onClick={handleLike}
+                    aria-label={t("collection.likes")}
+                    title={t("collection.likes")}
+                  >
+                    {isLiked ? (
+                      <HeartIconSolid className="h-5 w-5" />
+                    ) : (
+                      <HeartIcon className="h-5 w-5" />
+                    )}
+                  </IconButton>
+                  <IconButton
+                    variant="ghost"
+                    onClick={handleReport}
+                    aria-label={t("collection.report")}
+                    title={t("collection.report")}
+                  >
+                    <FlagIcon className="h-5 w-5" />
+                  </IconButton>
+                </>
               )}
             </div>
           </div>

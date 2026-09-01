@@ -13,6 +13,16 @@ import CollectionBreadcrumbs from "./_components/CollectionBreadcrumbs";
 import CollectionHeaderCard from "./_components/CollectionHeaderCard";
 import CollectionItemsGrid from "./_components/CollectionItemsGrid";
 import AddItemModal from "./_modals/AddItemModal";
+import dynamic from "next/dynamic";
+import { withChunkErrorLogging } from "@/lib/withChunkErrorLogging";
+
+const ReportModal = dynamic(
+  withChunkErrorLogging(
+    () => import("@/components/ReportModal"),
+    "ReportModal",
+  ),
+  { ssr: false },
+);
 
 function CollectionDetailSkeleton() {
   return (
@@ -44,7 +54,16 @@ function CollectionDetailSkeleton() {
 }
 
 function CollectionDetailLayout() {
-  const { t, isLoading, error, collection, authModal } = useCollectionDetail();
+  const {
+    t,
+    isLoading,
+    error,
+    collection,
+    authModal,
+    showReportModal,
+    setShowReportModal,
+    locale,
+  } = useCollectionDetail();
 
   return (
     <PageShell>
@@ -69,6 +88,16 @@ function CollectionDetailLayout() {
           <CollectionHeaderCard />
           <CollectionItemsGrid />
           <AddItemModal />
+          {showReportModal && collection && (
+            <ReportModal
+              isOpen
+              onClose={() => setShowReportModal(false)}
+              entityType="collection"
+              entityId={collection.id}
+              entityName={collection.name}
+              locale={locale}
+            />
+          )}
         </>
       )}
 

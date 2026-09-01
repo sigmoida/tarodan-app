@@ -25,6 +25,7 @@ import {
   LifebuoyIcon,
   BuildingStorefrontIcon,
   ShieldCheckIcon,
+  NoSymbolIcon,
   ArrowRightOnRectangleIcon,
   SparklesIcon,
 } from "@heroicons/react/24/outline";
@@ -233,6 +234,11 @@ export default function ProfileSidebar({
           icon: ShieldCheckIcon,
           label: t("profile.sidebar.guvenlik"),
           href: "/profile/security",
+        },
+        {
+          icon: NoSymbolIcon,
+          label: t("profile.sidebar.engellenenler"),
+          href: "/profile/blocked",
         },
       ],
     },

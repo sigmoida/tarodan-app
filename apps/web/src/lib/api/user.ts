@@ -26,7 +26,24 @@ export const userApi = {
     api.get("/users/top-collections", { params: { limit } }),
   getFeaturedCollector: () => api.get("/users/featured-collector"),
   getFeaturedBusiness: () => api.get("/users/featured-business"),
+  // Engelleme (Apple App Review: kalıcı, simetrik; mobil ile aynı uçlar)
+  getBlockStatus: (userId: string) =>
+    api.get<{ blocked: boolean }>(`/users/${userId}/block`),
+  block: (userId: string, reason?: string) =>
+    api.post(`/users/${userId}/block`, reason ? { reason } : {}),
+  unblock: (userId: string) => api.delete(`/users/${userId}/block`),
+  getBlockedUsers: () => api.get<BlockedUser[]>("/users/me/blocked"),
 };
+
+/** `GET /users/me/blocked` satırı: public kimlik + engelleme zamanı. */
+export interface BlockedUser {
+  id: string;
+  username?: string | null;
+  publicName?: string;
+  displayName: string;
+  avatarUrl?: string | null;
+  blockedAt: string;
+}
 
 export type CorporateDocumentStatus =
   "pending" | "approved" | "rejected" | "revision_requested" | "appealed";
