@@ -23,6 +23,7 @@ import {
   resolveOrderBy,
 } from "../../../common/list";
 import { catalogProductWhere } from "../../product/helpers/catalog-product-where";
+import { PUBLIC_IDENTITY_SELECT } from "../../../common/helpers/public-identity";
 import { i18nMessage } from "../../i18n";
 
 /**
@@ -409,6 +410,27 @@ export class AdminUserService {
             verifiedAt: true,
           },
         },
+        // Apple App Review: admin engellemeleri görebilsin (iki yön).
+        blocksGiven: {
+          take: 20,
+          orderBy: { createdAt: "desc" },
+          select: {
+            id: true,
+            reason: true,
+            createdAt: true,
+            blocked: { select: PUBLIC_IDENTITY_SELECT },
+          },
+        },
+        blocksReceived: {
+          take: 20,
+          orderBy: { createdAt: "desc" },
+          select: {
+            id: true,
+            reason: true,
+            createdAt: true,
+            blocker: { select: PUBLIC_IDENTITY_SELECT },
+          },
+        },
         _count: {
           select: {
             products: { where: catalogProductWhere() },
@@ -420,6 +442,8 @@ export class AdminUserService {
             receivedTrades: true,
             sentMessages: true,
             receivedMessages: true,
+            blocksGiven: true,
+            blocksReceived: true,
           },
         },
       },
@@ -549,6 +573,8 @@ export class AdminUserService {
         receivedMessagesCount: u._count.receivedMessages,
         givenRatingsCount: u._count.givenRatings,
         receivedRatingsCount: u._count.receivedRatings,
+        blocksGivenCount: u._count.blocksGiven,
+        blocksReceivedCount: u._count.blocksReceived,
       },
     };
   }

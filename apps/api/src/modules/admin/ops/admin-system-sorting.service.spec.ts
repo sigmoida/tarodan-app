@@ -373,7 +373,7 @@ describe("admin system and user list sorting", () => {
 
   it("sorts user reports by type", async () => {
     const report = createDelegate();
-    const service = new UserReportService({ report } as any);
+    const service = new UserReportService({ report } as any, {} as any);
 
     await service.getAllReports({ sortBy: "type", sortOrder: "desc" });
 
