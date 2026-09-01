@@ -1,4 +1,6 @@
 import {
+  ArrayMaxSize,
+  ArrayMinSize,
   IsOptional,
   IsString,
   IsBoolean,
@@ -8,6 +10,7 @@ import {
 import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
 import { Transform } from "class-transformer";
 import { AdminListQueryDto } from "../../../common/list";
+import { BULK_PRODUCT_ACTION_MAX } from "./admin-action.dto";
 
 // =============================================================================
 // Query DTOs
@@ -105,9 +108,17 @@ export class UpdateAdminCollectionDto {
   coverImageKey?: string;
 }
 
+/**
+ * Bu DTO vardı ama rota `@Body() body: { productIds: string[] }` satır içi
+ * tipini kullanıyordu — TypeScript tipleri çalışma zamanında yok, dolayısıyla
+ * hiçbir doğrulama koşmuyordu ve boş gövde serviste `productIds.map` üzerinde
+ * 500 veriyordu. Rota artık buraya bağlı; sınır fan-out'u da kapatıyor.
+ */
 export class AddCollectionItemsDto {
   @ApiProperty({ example: ["uuid-product-1", "uuid-product-2"] })
   @IsArray()
+  @ArrayMinSize(1)
+  @ArrayMaxSize(BULK_PRODUCT_ACTION_MAX)
   @IsUUID("4", { each: true })
   productIds: string[];
 }

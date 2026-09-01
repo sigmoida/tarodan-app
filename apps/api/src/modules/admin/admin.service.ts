@@ -446,11 +446,19 @@ export class AdminService {
     return this.productService.rejectProduct(adminId, productId, dto);
   }
 
-  async bulkApproveProducts(adminId: string, ids: string[], note?: string) {
+  async bulkApproveProducts(
+    adminId: string,
+    ids: string[] | undefined,
+    note?: string,
+  ) {
     return this.productService.bulkApproveProducts(adminId, ids, note);
   }
 
-  async bulkRejectProducts(adminId: string, ids: string[], reason: string) {
+  async bulkRejectProducts(
+    adminId: string,
+    ids: string[] | undefined,
+    reason: string,
+  ) {
     return this.productService.bulkRejectProducts(adminId, ids, reason);
   }
 
