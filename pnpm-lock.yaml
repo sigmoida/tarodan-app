@@ -116,6 +116,9 @@ importers:
       '@tarodan/shared':
         specifier: workspace:*
         version: link:../../packages/shared
+      '@tarodan/types':
+        specifier: workspace:*
+        version: link:../../packages/types
       '@tarodan/ui':
         specifier: workspace:*
         version: link:../../packages/ui

@@ -63,6 +63,9 @@ import {
   ApproveProductDto,
   RejectProductDto,
   BanUserDto,
+  BulkBanUsersDto,
+  BulkUserIdsDto,
+  BulkQueuedUserIdsDto,
   AssignAdminStaffDto,
   UpdateAdminStaffDto,
   UpdateStaffSettingsDto,
@@ -118,6 +121,81 @@ export class AdminUserController {
   @ApiOperation({ summary: "Get users with filters" })
   async getUsers(@Query() query: AdminUserQueryDto) {
     return this.adminService.getUsers(query);
+  }
+
+  // Toplu rotalar `users/:id/*`'dan ÖNCE: aksi halde ":id" segmenti "bulk"
+  // metnini yakalar ve istek tekil rotaya düşer.
+
+  @Post("users/bulk/ban")
+  @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: "Ban several users with one reason" })
+  async bulkBanUsers(
+    @CurrentUser("id") adminId: string,
+    @Body() dto: BulkBanUsersDto,
+  ) {
+    return this.adminService.bulkBanUsers(adminId, dto.ids, {
+      reason: dto.reason,
+    });
+  }
+
+  @Post("users/bulk/unban")
+  @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: "Lift the ban of several users" })
+  async bulkUnbanUsers(
+    @CurrentUser("id") adminId: string,
+    @Body() dto: BulkUserIdsDto,
+  ) {
+    return this.adminService.bulkUnbanUsers(adminId, dto.ids);
+  }
+
+  @Post("users/bulk/resend-verification")
+  @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: "Queue the activation email for several users" })
+  async bulkResendUserVerification(
+    @CurrentUser("id") adminId: string,
+    // Bu yol kuyruğa yazar, SMTP beklemez — ban/unban'ın 50'lik sınırından
+    // farklı olarak sayfa boyutu kadar id kabul edebilir.
+    @Body() dto: BulkQueuedUserIdsDto,
+  ) {
+    return this.adminService.bulkResendUserVerification(adminId, dto.ids);
+  }
+
+  @Post("users/bulk/verify-email")
+  @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: "Mark several users' emails as verified (admin)" })
+  async bulkVerifyUserEmail(
+    @CurrentUser("id") adminId: string,
+    @Body() dto: BulkUserIdsDto,
+  ) {
+    return this.adminService.bulkVerifyUserEmail(adminId, dto.ids);
+  }
+
+  @Post("users/:id/resend-verification")
+  @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: "Resend the activation email to a user" })
+  @ApiParam({ name: "id", description: "User ID" })
+  async resendUserVerification(
+    @Param("id") id: string,
+    @CurrentUser("id") adminId: string,
+  ) {
+    return this.adminService.resendUserVerification(adminId, id);
+  }
+
+  @Post("users/:id/verify-email")
+  @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: "Mark a user's email as verified (admin)" })
+  @ApiParam({ name: "id", description: "User ID" })
+  async verifyUserEmail(
+    @Param("id") id: string,
+    @CurrentUser("id") adminId: string,
+  ) {
+    return this.adminService.verifyUserEmail(adminId, id);
   }
 
   @Post("users/:id/ban")

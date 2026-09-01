@@ -4473,8 +4473,6 @@
         "membership": "Üyelik",
         "products": "Ürün",
         "orders": "Sipariş",
-        "banned": "Yasaklı",
-        "unverified": "Doğrulanmamış",
         "empty": "Satıcı bulunamadı",
         "totalSellers": "Toplam Satıcı",
         "mostOrders": "En Çok Siparişli",
@@ -7514,7 +7512,6 @@
       "filterAll": "Tüm Kullanıcılar",
       "filterSellers": "Satıcılar",
       "filterBuyers": "Alıcılar",
-      "filterBanned": "Engelliler",
       "banned": "Kullanıcı engellendi",
       "unbanned": "Kullanıcı engeli kaldırıldı",
       "banTitle": "Kullanıcıyı Engelle",
@@ -7524,8 +7521,6 @@
       "unbanAction": "Engeli Kaldır",
       "columnUser": "Kullanıcı",
       "seller": "Satıcı",
-      "verified": "Doğrulanmış",
-      "notVerified": "Doğrulanmamış",
       "bannedBadge": "Engelli",
       "membership": "Üyelik",
       "membershipFree": "Ücretsiz",
@@ -7552,16 +7547,7 @@
         "bothShipped": "Gönderildi"
       },
       "detail": {
-        "banned": "Kullanıcı banlandı",
-        "unbanned": "Kullanıcı banı kaldırıldı",
-        "banTitle": "Kullanıcıyı Banla",
-        "banReasonLabel": "Ban Nedeni",
-        "banReasonPlaceholder": "Ban nedenini açıklayın",
-        "banConfirm": "Banla",
-        "banReasonRequired": "Ban nedeni gereklidir",
-        "unbanTitle": "Banı Kaldır",
-        "unbanConfirmDesc": "Bu kullanıcının banını kaldırmak istediğinizden emin misiniz?",
-        "bannedBadge": "Banlı",
+        "banReasonLabel": "Engelleme Nedeni",
         "infoTitle": "Kullanıcı Bilgileri",
         "ratingsCount": "({count} değerlendirme)",
         "emailLabel": "Email",
@@ -7578,7 +7564,7 @@
         "tcKimlikNoLabel": "TC Kimlik No",
         "verifiedAtLabel": "Doğrulama Tarihi",
         "noBankAccount": "Banka hesabı eklenmemiş",
-        "banDateLabel": "Ban Tarihi:",
+        "banDateLabel": "Engellenme Tarihi:",
         "quickActionsTitle": "Hızlı İşlemler",
         "allOrders": "Tüm Siparişler ({count})",
         "allProducts": "Tüm Ürünler ({count})",
@@ -7628,7 +7614,32 @@
         "raterLabel": "Değerlendiren",
         "rateeLabel": "Değerlendirilen",
         "anonymous": "Anonim"
-      }
+      },
+      "columnUserType": "Kullanıcı Türü",
+      "userTypeBuyer": "Alıcı",
+      "filterAccountStatusAll": "Tüm Durumlar",
+      "unbanConfirmDesc": "Bu kullanıcının engelini kaldırmak istediğinizden emin misiniz?",
+      "resendVerification": "Aktivasyon Maili Gönder",
+      "verifyEmail": "Manuel Aktive Et",
+      "verificationSent": "Aktivasyon e-postası gönderildi",
+      "emailVerifiedByAdmin": "Hesap aktive edildi",
+      "verifyEmailConfirmTitle": "Hesabı manuel aktive et",
+      "verifyEmailConfirmDesc": "E-posta doğrulaması admin tarafından yapılmış sayılacak ve kullanıcı giriş yapabilecek. Devam edilsin mi?",
+      "bulkBanTitle": "{count} kullanıcıyı engelle",
+      "bulkUnbanTitle": "{count} kullanıcının engelini kaldır",
+      "bulkResendTitle": "{count} kullanıcıya aktivasyon maili gönder",
+      "bulkVerifyTitle": "{count} hesabı manuel aktive et",
+      "bulkConfirmDesc": "Seçimdeki uygun olmayan satırlar atlanır. Devam edilsin mi?",
+      "bulkResult": "{ok} başarılı, {failed} başarısız",
+      "bulkFailedAll": "İşlem hiçbir kullanıcıda uygulanamadı",
+      "emailVerified": "E-posta doğrulandı",
+      "emailNotVerified": "E-posta doğrulanmadı",
+      "phoneVerified": "Telefon doğrulandı",
+      "phoneNotVerified": "Telefon doğrulanmadı",
+      "bulkNoneEligible": "Seçimde bu işleme uygun kullanıcı yok",
+      "bulkResendQueued": "{ok} kullanıcının aktivasyon maili kuyruğa alındı",
+      "bulkResendQueuedPartial": "{ok} kuyruğa alındı, {failed} başarısız",
+      "bulkResendConfirmDesc": "Aktivasyon mailleri arka planda kuyruktan gönderilir; sonucu e-posta loglarından izleyebilirsiniz. Uygun olmayan satırlar atlanır. Devam edilsin mi?"
     },
     "roles": {
       "title": "Roller ve İzinler",
@@ -8267,7 +8278,8 @@
           "template": "Şablon",
           "action": "İşlem",
           "entityType": "Varlık türü",
-          "shipmentLeg": "Gönderi yönü"
+          "shipmentLeg": "Gönderi yönü",
+          "accountStatus": "Hesap durumu"
         }
       },
       "bulkActionBar": {
@@ -9235,8 +9247,10 @@
         "shipmentToInTransitForbidden": "Kargo {status} durumundan yolda durumuna geçirilemez"
       },
       "user": {
-        "notBanned": "Kullanıcı zaten banlı değil",
-        "alreadyBanned": "Kullanıcı zaten banlı"
+        "notBanned": "Kullanıcı zaten engelli değil",
+        "alreadyBanned": "Kullanıcı zaten engelli",
+        "deleted": "Silinmiş hesap üzerinde bu işlem yapılamaz",
+        "verificationMailFailed": "Aktivasyon e-postası gönderilemedi"
       },
       "catalog": {
         "categoryHasProducts": "Bu kategoride ürünler bulunmaktadır. Önce ürünleri başka kategoriye taşıyın.",
@@ -9416,7 +9430,8 @@
         "reservedNotDeletable": "Rezerve edilmiş ürünler silinemez",
         "withActiveOrderNotDeletable": "Aktif siparişi olan ürünler silinemez",
         "boostedNotHardDeletable": "Öne çıkarma kaydı olan ürün kalıcı silinemez; pasife alın (soft delete)",
-        "restoreRemovedOnly": "Yalnızca kaldırılmış ürünler geri yüklenebilir"
+        "restoreRemovedOnly": "Yalnızca kaldırılmış ürünler geri yüklenebilir",
+        "rejectReasonRequired": "Red sebebi zorunludur"
       },
       "membership": {
         "monthlyPriceRange": "Üyelik aylık fiyatı 0 ile 1.000.000 arasında olmalıdır",
@@ -9620,7 +9635,6 @@
       "twoFactorDisabled": "2FA etkin değil",
       "tokenAlreadyUsed": "Bu token zaten kullanılmış",
       "currentPasswordWrong": "Mevcut şifre yanlış",
-      "invalidToken": "Geçersiz doğrulama tokeni",
       "accessBlocked": "Erişim engellendi"
     },
     "storage": {
@@ -9858,6 +9872,12 @@
     },
     "shipmentProvider": {
       "surat": "Sürat Kargo"
+    },
+    "accountStatus": {
+      "active": "Aktif",
+      "pending_activation": "Aktivasyon Bekliyor",
+      "banned": "Engelli",
+      "deleted": "Silinmiş"
     }
   },
   "page": {

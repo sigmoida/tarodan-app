@@ -2,6 +2,7 @@ import {
   Badge,
   StatusBadge,
   enumLabel,
+  accountStatusConfig,
   membershipTierConfig,
   subscriptionStatusConfig,
 } from "@tarodan/ui";
@@ -14,6 +15,7 @@ import { statusConfig } from "@/lib/statusLabels";
 type T = ReturnType<typeof useTranslations<never>>;
 
 export function userColumns(t: T, rowMenu: (u: User) => RowActionItem[]) {
+  const accountStatus = statusConfig(accountStatusConfig, t);
   return [
     col.code<User>(t("admin.users.userId"), (u) => u.adminCode, {
       minWidth: 130,
@@ -30,25 +32,22 @@ export function userColumns(t: T, rowMenu: (u: User) => RowActionItem[]) {
       }),
       { minWidth: 520, sortKey: "displayName", sortType: "text" },
     ),
-    col.custom<User>(
+    // Hesap durumu tek türetimden gelir (sunucu: deriveAccountStatus); kimlik
+    // rozeti (isVerified) bilinçli olarak burada değil, detay kartında.
+    col.badge<User>(
       t("common.status"),
-      (u) => (
-        <div className="flex flex-col items-start gap-1">
-          {u.isSeller && (
-            <Badge variant="info">{t("admin.users.seller")}</Badge>
-          )}
-          {u.isVerified && (
-            <Badge variant="success">{t("admin.users.verified")}</Badge>
-          )}
-          {u.isBanned && (
-            <Badge variant="danger">{t("admin.users.bannedBadge")}</Badge>
-          )}
-          {!u.isSeller && !u.isVerified && !u.isBanned && (
-            <span className="text-muted">—</span>
-          )}
-        </div>
-      ),
-      { grow: 1, minWidth: 130, sortKey: "isVerified", sortType: "number" },
+      (u) => <Badge status={u.accountStatus} config={accountStatus} />,
+      { minWidth: 150, sortKey: "isEmailVerified", sortType: "number" },
+    ),
+    col.badge<User>(
+      t("admin.users.columnUserType"),
+      (u) =>
+        u.isSeller ? (
+          <Badge variant="info">{t("admin.users.seller")}</Badge>
+        ) : (
+          <Badge variant="default">{t("admin.users.userTypeBuyer")}</Badge>
+        ),
+      { minWidth: 110, sortKey: "isSeller", sortType: "number" },
     ),
     col.badge<User>(
       t("admin.users.membership"),

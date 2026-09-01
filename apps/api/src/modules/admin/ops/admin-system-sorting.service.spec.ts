@@ -74,7 +74,9 @@ describe("admin system and user list sorting", () => {
     expect(user.findMany).toHaveBeenNthCalledWith(
       2,
       expect.objectContaining({
-        where: { id: { in: ["user-b", "user-a"] } },
+        // `deletedAt: null` varsayılan hesap-durumu filtresi: silinmiş
+        // (anonimleştirilmiş) hesaplar listede görünmez.
+        where: { deletedAt: null, id: { in: ["user-b", "user-a"] } },
       }),
     );
     expect(result.meta).toEqual({

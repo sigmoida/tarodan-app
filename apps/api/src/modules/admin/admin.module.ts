@@ -36,6 +36,7 @@ import { AdminSiteAccessService } from "./users/admin-site-access.service";
 import { AdminSiteAccessController } from "./users/admin-site-access.controller";
 import { SiteAccessModule } from "../site-access/site-access.module";
 import { AdminUserService } from "./users/admin-user.service";
+import { AdminUserAccountService } from "./users/admin-user-account.service";
 import { AdminStaffService } from "./users/admin-staff.service";
 import { AdminProductService } from "./catalog/admin-product.service";
 import { AdminProductBulkImportService } from "./catalog/admin-product-bulk-import.service";
@@ -180,6 +181,7 @@ import { scheduledProcessors } from "../../workers/scheduled-processors";
     AdminSettingsService,
     AdminSiteAccessService,
     AdminUserService,
+    AdminUserAccountService,
     AdminStaffService,
     AdminProductService,
     AdminProductBulkImportService,

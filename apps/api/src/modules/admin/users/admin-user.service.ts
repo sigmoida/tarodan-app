@@ -24,6 +24,33 @@ import {
 } from "../../../common/list";
 import { catalogProductWhere } from "../../product/helpers/catalog-product-where";
 import { i18nMessage } from "../../i18n";
+import {
+  deriveAccountStatus,
+  type AccountStatus,
+  type AccountStatusInput,
+} from "@tarodan/types";
+
+/**
+ * Türetilmiş hesap durumu filtresi → Prisma where. Filtre verilmezse silinmiş
+ * (anonimleştirilmiş) hesaplar listelenmez; onları yalnız "deleted" getirir.
+ * Eşleme deriveAccountStatus önceliğinin tersidir; ikisi birlikte test edilir.
+ */
+export function accountStatusWhere(
+  status: AccountStatus | undefined,
+): Prisma.UserWhereInput {
+  switch (status) {
+    case "deleted":
+      return { deletedAt: { not: null } };
+    case "banned":
+      return { deletedAt: null, isBanned: true };
+    case "pending_activation":
+      return { deletedAt: null, isBanned: false, isEmailVerified: false };
+    case "active":
+      return { deletedAt: null, isBanned: false, isEmailVerified: true };
+    default:
+      return { deletedAt: null };
+  }
+}
 
 /**
  * Kullanıcı yönetimi + admin üyelik override'ları — AdminService'in
@@ -111,8 +138,15 @@ export class AdminUserService {
       where.isVerified = isVerified;
     }
 
-    if (query.isBanned === true) {
-      where.isBanned = true;
+    // `isBanned` bu filtrenin eski hâli; `accountStatus=banned` onu kapsıyor.
+    // İkisi birden gelirse accountStatus kazanır — ama bunu sessiz bir üzerine
+    // yazmaya bırakmıyoruz: eski parametre yalnız yenisi YOKKEN uygulanır,
+    // yoksa `isBanned=true&accountStatus=active` engelli olmayanları döndürür.
+    if (query.accountStatus) {
+      Object.assign(where, accountStatusWhere(query.accountStatus));
+    } else {
+      if (query.isBanned === true) where.isBanned = true;
+      Object.assign(where, accountStatusWhere(undefined));
     }
 
     // Membership lifecycle filters (tier / status / "expiring soon"). All narrow
@@ -152,7 +186,9 @@ export class AdminUserService {
       isSeller: true,
       sellerType: true,
       isVerified: true,
+      isEmailVerified: true,
       isBanned: true,
+      deletedAt: true,
       createdAt: true,
       lastLoginAt: true,
       lastActivityAt: true,
@@ -225,7 +261,7 @@ export class AdminUserService {
       );
 
       return {
-        data: await this.attachCancelledCounts(rows),
+        data: await this.decorateUserRows(rows),
         meta: {
           total: counts.length,
           page,
@@ -282,8 +318,22 @@ export class AdminUserService {
     );
     return {
       ...result,
-      data: await this.attachCancelledCounts(result.data),
+      data: await this.decorateUserRows(result.data),
     };
+  }
+
+  /**
+   * Liste satırının türetilmiş alanları — her iki dönüş yolu (ordersCount
+   * sıralaması ve paginate) aynı süslemeden geçer: iptal sayısı + hesap durumu.
+   */
+  private async decorateUserRows<T extends { id: string } & AccountStatusInput>(
+    rows: T[],
+  ) {
+    const withCounts = await this.attachCancelledCounts(rows);
+    return withCounts.map((row) => ({
+      ...row,
+      accountStatus: deriveAccountStatus(row),
+    }));
   }
 
   /**
@@ -327,8 +377,44 @@ export class AdminUserService {
   async getUserById(userId: string) {
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
-      include: {
-        addresses: true,
+      // `include:` idi ve dönüş `...u` ile yayılıyordu: User'ın HER sütunu
+      // (passwordHash, fcmToken, notificationSettings, bannedBy…) ve ilişkilerin
+      // her alanı yanıta giriyordu. Açık select, ekranın gerçekten okuduğu
+      // alanlarla sınırlar (CLAUDE.md §5 "yalnız döndürdüğünü sorgula").
+      // getUsers'ın select'iyle birleştirilmedi: liste satırı sayaç/üyelik
+      // alt-seçimlerinde farklı, ortak sabit ikisini de bozardı.
+      select: {
+        id: true,
+        email: true,
+        phone: true,
+        displayName: true,
+        avatarUrl: true,
+        bio: true,
+        isVerified: true,
+        isEmailVerified: true,
+        isPhoneVerified: true,
+        isSeller: true,
+        sellerType: true,
+        taxId: true,
+        companyName: true,
+        createdAt: true,
+        bannedAt: true,
+        bannedReason: true,
+        isBanned: true,
+        deletedAt: true,
+        lastLoginAt: true,
+        lastActivityAt: true,
+        addresses: {
+          select: {
+            id: true,
+            title: true,
+            address: true,
+            city: true,
+            district: true,
+            zipCode: true,
+            isDefault: true,
+          },
+        },
         products: {
           where: catalogProductWhere(),
           take: 10,
@@ -345,7 +431,13 @@ export class AdminUserService {
         buyerOrders: {
           take: 10,
           orderBy: { createdAt: "desc" },
-          include: {
+          select: {
+            id: true,
+            orderNumber: true,
+            totalAmount: true,
+            commissionAmount: true,
+            status: true,
+            createdAt: true,
             seller: { select: { id: true, displayName: true } },
             product: { select: { id: true, title: true } },
           },
@@ -353,7 +445,13 @@ export class AdminUserService {
         sellerOrders: {
           take: 10,
           orderBy: { createdAt: "desc" },
-          include: {
+          select: {
+            id: true,
+            orderNumber: true,
+            totalAmount: true,
+            commissionAmount: true,
+            status: true,
+            createdAt: true,
             buyer: { select: { id: true, displayName: true } },
             product: { select: { id: true, title: true } },
           },
@@ -361,40 +459,71 @@ export class AdminUserService {
         initiatedTrades: {
           take: 10,
           orderBy: { createdAt: "desc" },
-          include: {
+          select: {
+            id: true,
+            tradeNumber: true,
+            status: true,
+            createdAt: true,
+            cashAmount: true,
             receiver: { select: { id: true, displayName: true } },
             items: {
-              include: { product: { select: { id: true, title: true } } },
+              select: {
+                side: true,
+                product: { select: { id: true, title: true } },
+              },
             },
           },
         },
         receivedTrades: {
           take: 10,
           orderBy: { createdAt: "desc" },
-          include: {
+          select: {
+            id: true,
+            tradeNumber: true,
+            status: true,
+            createdAt: true,
+            cashAmount: true,
             initiator: { select: { id: true, displayName: true } },
             items: {
-              include: { product: { select: { id: true, title: true } } },
+              select: {
+                side: true,
+                product: { select: { id: true, title: true } },
+              },
             },
           },
         },
         givenRatings: {
           take: 5,
           orderBy: { createdAt: "desc" },
-          include: {
+          select: {
+            id: true,
+            score: true,
+            comment: true,
+            createdAt: true,
             receiver: { select: { id: true, displayName: true } },
           },
         },
         receivedRatings: {
           take: 5,
           orderBy: { createdAt: "desc" },
-          include: {
+          select: {
+            id: true,
+            score: true,
+            comment: true,
+            createdAt: true,
             giver: { select: { id: true, displayName: true } },
           },
         },
         membership: {
-          include: {
-            tier: true,
+          select: {
+            status: true,
+            currentPeriodStart: true,
+            currentPeriodEnd: true,
+            autoRenew: true,
+            cancelledAt: true,
+            scheduledTierType: true,
+            scheduledBillingPeriod: true,
+            tier: { select: { name: true, type: true } },
           },
         },
         // Satıcı banka hesabı (IBAN) — admin görüntüleyebilsin. Hassas ama yalnız
@@ -429,60 +558,58 @@ export class AdminUserService {
       throw new NotFoundException(i18nMessage("server.auth.userNotFound"));
     }
 
-    const u = user as typeof user & {
-      receivedRatings: Array<{ score: number }>;
-      initiatedTrades: Array<{ createdAt: Date }>;
-      receivedTrades: Array<{ createdAt: Date }>;
-      buyerOrders: Array<{
-        totalAmount: unknown;
-        commissionAmount: unknown;
-        seller: unknown;
-      }>;
-      sellerOrders: Array<{
-        totalAmount: unknown;
-        commissionAmount: unknown;
-        buyer: unknown;
-      }>;
-      products: Array<{ images?: Array<{ cardKey: string }> }>;
-      givenRatings: unknown[];
-      _count: {
-        products: number;
-        buyerOrders: number;
-        sellerOrders: number;
-        givenRatings: number;
-        receivedRatings: number;
-        initiatedTrades: number;
-        receivedTrades: number;
-        sentMessages: number;
-        receivedMessages: number;
+    const avgRating =
+      user.receivedRatings.length > 0
+        ? user.receivedRatings.reduce((sum, r) => sum + r.score, 0) /
+          user.receivedRatings.length
+        : null;
+
+    // Takas kalemleri tek `items` dizisinde `side` ile geliyor; ekran
+    // "a ürün ↔ b ürün" özetini initiatorItems/receiverItems'tan okuyor.
+    // Ham `items` döndürülüyordu, dolayısıyla Takaslar sekmesi
+    // `initiatorItems.length` üzerinde TypeError ile patlıyordu.
+    const splitTradeItems = <
+      T extends { items: Array<{ side: string; product: unknown }> },
+    >(
+      trade: T,
+    ) => {
+      const { items, ...rest } = trade;
+      return {
+        ...rest,
+        initiatorItems: items.filter((i) => i.side === "initiator"),
+        receiverItems: items.filter((i) => i.side !== "initiator"),
       };
     };
 
-    const avgRating =
-      u.receivedRatings.length > 0
-        ? u.receivedRatings.reduce((sum, r) => sum + r.score, 0) /
-          u.receivedRatings.length
-        : null;
-
     const allTrades = [
-      ...u.initiatedTrades.map((t) => ({ ...t, role: "initiator" as const })),
-      ...u.receivedTrades.map((t) => ({ ...t, role: "receiver" as const })),
+      ...user.initiatedTrades.map((t) => ({
+        ...splitTradeItems(t),
+        role: "initiator" as const,
+      })),
+      ...user.receivedTrades.map((t) => ({
+        ...splitTradeItems(t),
+        role: "receiver" as const,
+      })),
     ]
       .sort(
         (a, b) =>
           new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
       )
-      .slice(0, 10);
+      .slice(0, 10)
+      .map((t) => ({
+        ...t,
+        cashAmount: t.cashAmount ? Number(t.cashAmount) : null,
+      }));
 
     const allOrders = [
-      ...u.buyerOrders.map((o) => ({
+      ...user.buyerOrders.map((o) => ({
         ...o,
         role: "buyer" as const,
         totalAmount: Number(o.totalAmount),
         commissionAmount: Number(o.commissionAmount),
         otherParty: o.seller,
       })),
-      ...u.sellerOrders.map((o) => ({
+      ...user.sellerOrders.map((o) => ({
         ...o,
         role: "seller" as const,
         totalAmount: Number(o.totalAmount),
@@ -498,57 +625,83 @@ export class AdminUserService {
 
     // Üyeliği admin UI'ın beklediği şekle çevir (startDate/endDate alan adları +
     // status/autoRenew/cancelledAt). Aksi halde tarihler boş görünüyordu.
-    const membershipForUi = (u as any).membership
+    const membershipForUi = user.membership
       ? {
           tier: {
-            name: (u as any).membership.tier?.name,
-            type: (u as any).membership.tier?.type,
+            name: user.membership.tier?.name,
+            type: user.membership.tier?.type,
           },
-          status: (u as any).membership.status,
-          startDate: (u as any).membership.currentPeriodStart,
-          endDate: (u as any).membership.currentPeriodEnd,
-          autoRenew: (u as any).membership.autoRenew,
-          cancelledAt: (u as any).membership.cancelledAt,
-          scheduledTierType: (u as any).membership.scheduledTierType,
-          scheduledBillingPeriod: (u as any).membership.scheduledBillingPeriod,
+          status: user.membership.status,
+          startDate: user.membership.currentPeriodStart,
+          endDate: user.membership.currentPeriodEnd,
+          autoRenew: user.membership.autoRenew,
+          cancelledAt: user.membership.cancelledAt,
+          scheduledTierType: user.membership.scheduledTierType,
+          scheduledBillingPeriod: user.membership.scheduledBillingPeriod,
         }
       : undefined;
 
     return {
-      ...u,
+      id: user.id,
+      email: user.email,
+      phone: user.phone,
+      displayName: user.displayName,
+      avatarUrl: user.avatarUrl,
+      bio: user.bio,
+      isVerified: user.isVerified,
+      isEmailVerified: user.isEmailVerified,
+      isPhoneVerified: user.isPhoneVerified,
+      isSeller: user.isSeller,
+      sellerType: user.sellerType,
+      taxId: user.taxId,
+      companyName: user.companyName,
+      createdAt: user.createdAt,
+      isBanned: user.isBanned,
+      bannedAt: user.bannedAt,
+      bannedReason: user.bannedReason,
+      deletedAt: user.deletedAt,
+      accountStatus: deriveAccountStatus(user),
+      bankAccount: user.bankAccount,
       membership: membershipForUi,
-      lastLoginAt: u.lastLoginAt ?? null,
-      lastActivityAt: u.lastActivityAt ?? null,
+      lastLoginAt: user.lastLoginAt ?? null,
+      lastActivityAt: user.lastActivityAt ?? null,
       averageRating: avgRating ? Math.round(avgRating * 10) / 10 : null,
-      products: await Promise.all(
-        u.products.map(async (p) => ({
-          ...p,
-          price: Number(p.price),
-          imageUrl: this.resolveProductImageUrl(p.images?.[0]?.cardKey) || null,
-        })),
-      ),
-      recentOrders: allOrders,
-      recentTrades: allTrades.map((t) => ({
-        ...t,
-        cashAmount: (t as any).cashAmount
-          ? Number((t as any).cashAmount)
-          : null,
+      // Address sütunları `address`/`zipCode`; ekran `fullAddress`/`postalCode`
+      // okuyor. Eşleme yoktu, o iki satır boş basılıyordu.
+      addresses: user.addresses.map((a) => ({
+        id: a.id,
+        title: a.title,
+        fullAddress: a.address,
+        city: a.city,
+        district: a.district,
+        postalCode: a.zipCode,
+        isDefault: a.isDefault,
       })),
-      givenRatings: u.givenRatings,
-      receivedRatings: u.receivedRatings,
+      products: user.products.map((p) => ({
+        id: p.id,
+        title: p.title,
+        status: p.status,
+        createdAt: p.createdAt,
+        price: Number(p.price),
+        imageUrl: this.resolveProductImageUrl(p.images?.[0]?.cardKey) || null,
+      })),
+      recentOrders: allOrders,
+      recentTrades: allTrades,
+      givenRatings: user.givenRatings,
+      receivedRatings: user.receivedRatings,
       stats: {
-        productsCount: u._count.products,
-        ordersCount: u._count.buyerOrders + u._count.sellerOrders,
-        buyerOrdersCount: u._count.buyerOrders,
-        sellerOrdersCount: u._count.sellerOrders,
-        tradesCount: u._count.initiatedTrades + u._count.receivedTrades,
-        initiatedTradesCount: u._count.initiatedTrades,
-        receivedTradesCount: u._count.receivedTrades,
-        messagesCount: u._count.sentMessages + u._count.receivedMessages,
-        sentMessagesCount: u._count.sentMessages,
-        receivedMessagesCount: u._count.receivedMessages,
-        givenRatingsCount: u._count.givenRatings,
-        receivedRatingsCount: u._count.receivedRatings,
+        productsCount: user._count.products,
+        ordersCount: user._count.buyerOrders + user._count.sellerOrders,
+        buyerOrdersCount: user._count.buyerOrders,
+        sellerOrdersCount: user._count.sellerOrders,
+        tradesCount: user._count.initiatedTrades + user._count.receivedTrades,
+        initiatedTradesCount: user._count.initiatedTrades,
+        receivedTradesCount: user._count.receivedTrades,
+        messagesCount: user._count.sentMessages + user._count.receivedMessages,
+        sentMessagesCount: user._count.sentMessages,
+        receivedMessagesCount: user._count.receivedMessages,
+        givenRatingsCount: user._count.givenRatings,
+        receivedRatingsCount: user._count.receivedRatings,
       },
     };
   }

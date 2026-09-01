@@ -15,12 +15,14 @@ import {
   mapUsers,
   getUserTabs,
   userFilterParams,
+  accountStatusParams,
   membershipTierParams,
   membershipLifecycleParams,
 } from "./_lib/types";
 import { userFilterFields } from "./_lib/filters";
 import { UsersSummary } from "./_components/UsersSummary";
 import { UsersTable } from "./_components/UsersTable";
+import { UsersBulkBar } from "./_components/UsersBulkBar";
 
 export default function UsersPage() {
   const t = useTranslations();
@@ -40,11 +42,18 @@ export default function UsersPage() {
         <ResourceList<User>
           resource="users"
           fetcher={(params) => {
-            const { filter, membershipTier, lifecycle, ...rest } = params;
+            const {
+              filter,
+              accountStatus,
+              membershipTier,
+              lifecycle,
+              ...rest
+            } = params;
             return adminApi
               .getUsers({
                 ...rest,
                 ...userFilterParams(filter),
+                ...accountStatusParams(accountStatus, filter),
                 ...membershipTierParams(membershipTier),
                 ...membershipLifecycleParams(lifecycle),
               })
@@ -60,9 +69,11 @@ export default function UsersPage() {
           }}
           getRowId={(u) => u.id}
           syncUrl
+          selectable
           filters={userFilterFields(t)}
         >
           <ResourceList.Toolbar />
+          <UsersBulkBar />
           <UsersTable />
           <ResourceList.Pagination />
         </ResourceList>

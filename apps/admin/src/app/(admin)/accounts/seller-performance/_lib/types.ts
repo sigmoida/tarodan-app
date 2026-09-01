@@ -1,4 +1,5 @@
 import type { StatusConfig } from "@tarodan/ui";
+import type { AccountStatus } from "@tarodan/types";
 import type { useTranslations } from "next-intl";
 
 type T = ReturnType<typeof useTranslations<never>>;
@@ -11,7 +12,9 @@ export interface Seller {
   avatarUrl?: string;
   sellerType: string | null;
   isVerified: boolean;
+  isEmailVerified: boolean;
   isBanned: boolean;
+  accountStatus: AccountStatus;
   createdAt: string;
   membership?: { tier?: { type?: string; name?: string } };
   cancelledOrdersCount?: number;

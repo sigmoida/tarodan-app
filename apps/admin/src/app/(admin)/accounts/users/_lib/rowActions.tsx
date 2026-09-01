@@ -1,25 +1,41 @@
-import { NoSymbolIcon, CheckCircleIcon } from "@heroicons/react/24/outline";
+import {
+  NoSymbolIcon,
+  CheckCircleIcon,
+  EnvelopeIcon,
+  CheckBadgeIcon,
+} from "@heroicons/react/24/outline";
 import { useTranslations } from "next-intl";
 import type { RowActionItem } from "@/components/table";
 import type { User } from "./types";
+import { actionsForStatus, type UserAccountAction } from "./bulkEligibility";
+import {
+  ACTION_LABEL_KEY,
+  isActionBusy,
+  type UserActionBusy,
+} from "./useUserActions";
 
 type T = ReturnType<typeof useTranslations<never>>;
 
 export interface UserRowActions {
-  onBanToggle: (u: User) => void;
-  busyId?: string;
+  onAction: (action: UserAccountAction, u: User) => void;
+  busy?: UserActionBusy;
 }
 
-export function userRowMenu(t: T, { onBanToggle, busyId }: UserRowActions) {
-  return (u: User): RowActionItem[] => [
-    {
-      label: u.isBanned
-        ? t("admin.users.unbanAction")
-        : t("admin.users.banAction"),
-      icon: u.isBanned ? CheckCircleIcon : NoSymbolIcon,
-      onClick: () => onBanToggle(u),
-      destructive: !u.isBanned,
-      isLoading: busyId === u.id,
-    },
-  ];
+const ICONS: Record<UserAccountAction, typeof NoSymbolIcon> = {
+  resend: EnvelopeIcon,
+  verify: CheckBadgeIcon,
+  ban: NoSymbolIcon,
+  unban: CheckCircleIcon,
+};
+
+/** Satır menüsü hesap durumuna göre kurulur; silinmiş hesapta boş kalır. */
+export function userRowMenu(t: T, { onAction, busy }: UserRowActions) {
+  return (u: User): RowActionItem[] =>
+    actionsForStatus(u.accountStatus).map((action) => ({
+      label: t(ACTION_LABEL_KEY[action]),
+      icon: ICONS[action],
+      onClick: () => onAction(action, u),
+      destructive: action === "ban",
+      isLoading: isActionBusy(busy, u.id, action),
+    }));
 }

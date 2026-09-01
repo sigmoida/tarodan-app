@@ -3,6 +3,7 @@
 import {
   createContext,
   useContext,
+  useRef,
   useState,
   type MutableRefObject,
 } from "react";
@@ -18,8 +19,25 @@ export interface SelectionState {
   clear: () => void;
 }
 
-export function useSelection(selectable = false): SelectionState {
+/**
+ * Row selection for the current view.
+ *
+ * `viewKey` identifies WHAT is on screen (page, page size, search, filters).
+ * Selection is scoped to it: bulk bars can only inspect the rows they actually
+ * hold, so a selection carried across a page change would be shown in the
+ * "N selected" counter and then silently dropped by the action. Changing the
+ * view clears it instead.
+ */
+export function useSelection(
+  selectable = false,
+  viewKey?: string,
+): SelectionState {
   const [set, setSet] = useState<Set<string>>(new Set());
+  const lastViewKey = useRef(viewKey);
+  if (lastViewKey.current !== viewKey) {
+    lastViewKey.current = viewKey;
+    if (set.size > 0) setSet(new Set());
+  }
   return {
     selectable,
     selectedIds: Array.from(set),

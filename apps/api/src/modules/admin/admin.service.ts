@@ -3,6 +3,7 @@ import { AdminAuditService } from "./ops/admin-audit.service";
 import { AdminCommissionService } from "./finance/admin-commission.service";
 import { AdminSettingsService } from "./ops/admin-settings.service";
 import { AdminUserService } from "./users/admin-user.service";
+import { AdminUserAccountService } from "./users/admin-user-account.service";
 import { AdminStaffService } from "./users/admin-staff.service";
 import { AdminProductService } from "./catalog/admin-product.service";
 import { AdminOrderService } from "./orders/admin-order.service";
@@ -108,6 +109,7 @@ export class AdminService {
     private readonly commissionService: AdminCommissionService,
     private readonly settingsService: AdminSettingsService,
     private readonly userService: AdminUserService,
+    private readonly userAccountService: AdminUserAccountService,
     private readonly staffService: AdminStaffService,
     private readonly productService: AdminProductService,
     private readonly adminOrderService: AdminOrderService,
@@ -374,6 +376,31 @@ export class AdminService {
 
   async banUser(adminId: string, userId: string, dto: BanUserDto) {
     return this.staffService.banUser(adminId, userId, dto);
+  }
+
+  // Hesap aktivasyonu + toplu kullanıcı işlemleri — admin-user-account.service.ts
+  resendUserVerification(adminId: string, userId: string) {
+    return this.userAccountService.resendVerification(adminId, userId);
+  }
+
+  verifyUserEmail(adminId: string, userId: string) {
+    return this.userAccountService.verifyEmailByAdmin(adminId, userId);
+  }
+
+  bulkBanUsers(adminId: string, ids: string[], dto: BanUserDto) {
+    return this.userAccountService.bulkBan(adminId, ids, dto);
+  }
+
+  bulkUnbanUsers(adminId: string, ids: string[]) {
+    return this.userAccountService.bulkUnban(adminId, ids);
+  }
+
+  bulkResendUserVerification(adminId: string, ids: string[]) {
+    return this.userAccountService.bulkResendVerification(adminId, ids);
+  }
+
+  bulkVerifyUserEmail(adminId: string, ids: string[]) {
+    return this.userAccountService.bulkVerifyEmail(adminId, ids);
   }
 
   // ==================== PRODUCT MANAGEMENT ====================
