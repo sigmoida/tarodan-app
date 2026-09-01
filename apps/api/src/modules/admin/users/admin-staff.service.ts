@@ -273,7 +273,13 @@ export class AdminStaffService {
     const email = dto.email.toLowerCase().trim();
     let user = await this.prisma.user.findUnique({
       where: { email },
-      select: { id: true, email: true, displayName: true, avatarUrl: true },
+      select: {
+        id: true,
+        email: true,
+        displayName: true,
+        avatarUrl: true,
+        isEmailVerified: true,
+      },
     });
 
     // Kayıt yoksa hesabı oluştur. Şifre verilmediyse geçici üret + yanıtta döndür (süper admin paylaşsın).
@@ -294,7 +300,26 @@ export class AdminStaffService {
           isEmailVerified: true,
           isVerified: true,
         },
-        select: { id: true, email: true, displayName: true, avatarUrl: true },
+        select: {
+          id: true,
+          email: true,
+          displayName: true,
+          avatarUrl: true,
+          isEmailVerified: true,
+        },
+      });
+    }
+
+    // Davet, e-postanın sahibine güvenildiğini söyler — hesabı sistemin açtığı
+    // dal bunu zaten `isEmailVerified: true` ile yazıyor. Mevcut bir hesap
+    // personele terfi ettiğinde de aynısı geçerli olmalı; aksi halde admin
+    // panele girebilen ama kullanıcı listesinde "Aktivasyon Bekliyor" görünen
+    // bir hesap kalıyordu (adminLogin bilinçli olarak bu bayrağı aramıyor,
+    // bkz. auth-token.service.ts'teki admin muafiyeti).
+    if (!user.isEmailVerified) {
+      await this.prisma.user.update({
+        where: { id: user.id },
+        data: { isEmailVerified: true },
       });
     }
 
