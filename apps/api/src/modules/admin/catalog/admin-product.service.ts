@@ -624,7 +624,13 @@ export class AdminProductService {
   /**
    * Bulk approve multiple products
    */
-  async bulkApproveProducts(adminId: string, ids: string[], note?: string) {
+  async bulkApproveProducts(
+    adminId: string,
+    // DTO `ids`'i opsiyonel bırakıyor: boş/eksik seçimin yerelleştirilmiş
+    // mesajı aşağıdaki guard'dan gelir (bkz. BulkProductIdsDto yorumu).
+    ids: string[] | undefined,
+    note?: string,
+  ) {
     if (!ids || ids.length === 0) {
       throw new BadRequestException(
         i18nMessage("server.admin.product.selectionRequired"),
@@ -665,7 +671,11 @@ export class AdminProductService {
    * eder: gerekçe KALICI yazılır ve satıcıya PRODUCT_REJECTED bildirimi gider
    * (eski kopya gövde yalnız statü yazıyordu; satıcı gerekçeyi hiç göremiyordu).
    */
-  async bulkRejectProducts(adminId: string, ids: string[], reason: string) {
+  async bulkRejectProducts(
+    adminId: string,
+    ids: string[] | undefined,
+    reason: string,
+  ) {
     if (!ids || ids.length === 0) {
       throw new BadRequestException(
         i18nMessage("server.admin.product.selectionRequired"),
@@ -673,7 +683,9 @@ export class AdminProductService {
     }
 
     if (!reason || reason.trim() === "") {
-      throw new BadRequestException("Red sebebi zorunludur");
+      throw new BadRequestException(
+        i18nMessage("server.admin.product.rejectReasonRequired"),
+      );
     }
 
     const results: { id: string; success: boolean; error?: string }[] = [];

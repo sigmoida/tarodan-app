@@ -1,5 +1,11 @@
 import { api } from "./client";
 
+/** Toplu kullanıcı işlemi sonucu (API `runBulk` sözleşmesi). */
+export interface BulkUserResult {
+  succeeded: string[];
+  failed: Array<{ id: string; error: string }>;
+}
+
 /** Users, admin staff & roles, and seller applications. */
 export const usersApi = {
   // Users
@@ -9,6 +15,19 @@ export const usersApi = {
   banUser: (id: string, reason: string) =>
     api.post(`/admin/users/${id}/ban`, { reason }),
   unbanUser: (id: string) => api.post(`/admin/users/${id}/unban`),
+  // Hesap aktivasyonu (e-posta doğrulama) — tekil
+  resendUserVerification: (id: string) =>
+    api.post(`/admin/users/${id}/resend-verification`),
+  verifyUserEmail: (id: string) => api.post(`/admin/users/${id}/verify-email`),
+  // Toplu kullanıcı işlemleri — sonuç { succeeded: string[], failed: { id, error }[] }
+  bulkBanUsers: (ids: string[], reason: string) =>
+    api.post<BulkUserResult>("/admin/users/bulk/ban", { ids, reason }),
+  bulkUnbanUsers: (ids: string[]) =>
+    api.post<BulkUserResult>("/admin/users/bulk/unban", { ids }),
+  bulkResendUserVerification: (ids: string[]) =>
+    api.post<BulkUserResult>("/admin/users/bulk/resend-verification", { ids }),
+  bulkVerifyUserEmail: (ids: string[]) =>
+    api.post<BulkUserResult>("/admin/users/bulk/verify-email", { ids }),
   cancelUserMembership: (id: string) =>
     api.post(`/admin/users/${id}/membership/cancel`),
   changeUserMembership: (

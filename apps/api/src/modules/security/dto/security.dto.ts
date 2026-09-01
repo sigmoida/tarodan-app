@@ -1,7 +1,6 @@
 import {
   IsString,
   IsEmail,
-  IsOptional,
   MinLength,
   MaxLength,
   Matches,
@@ -82,26 +81,10 @@ export class ChangePasswordDto {
   newPassword: string;
 }
 
-// =============================================================================
-// EMAIL VERIFICATION (GAP-006)
-// =============================================================================
-
-export class VerifyEmailDto {
-  @IsString()
-  token: string;
-}
-
-export class ResendVerificationDto {
-  @IsOptional()
-  @IsEmail()
-  email?: string;
-}
-
-export class EmailVerificationStatusDto {
-  isVerified: boolean;
-  email: string;
-  pendingVerification: boolean;
-}
+// E-posta doğrulama DTO'ları buradaydı. Bu modülde ikinci bir doğrulama akışı
+// vardı: token'ı HAM saklıyor, mail hiç göndermiyor ve çağrıldığında auth'un
+// gönderdiği gerçek token'ı kullanılmış işaretliyordu. Tek doğrulama yolu artık
+// auth (`POST /auth/verify-email`, `POST /auth/resend-verification`).
 
 // =============================================================================
 // CSRF PROTECTION (GAP-017)

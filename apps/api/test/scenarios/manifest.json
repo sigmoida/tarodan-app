@@ -710,19 +710,6 @@
       "gapRefs": []
     },
     {
-      "id": "AUTH-043",
-      "code": "01",
-      "prefix": "AUTH",
-      "domTitle": "01 — Kimlik Doğrulama & Hesap Güvenliği",
-      "title": "E-posta doğrulama durumu (oturumlu)",
-      "tur": "Happy path",
-      "pri": "P2",
-      "steps": "1. GET /api/security/email/status Bearer token ile.",
-      "exp": "HTTP 200; { isVerified, email, pendingVerification }. — security.controller.ts:160-165, security.service.ts:443-461.",
-      "gap": false,
-      "gapRefs": []
-    },
-    {
       "id": "AUTH-044",
       "code": "01",
       "prefix": "AUTH",

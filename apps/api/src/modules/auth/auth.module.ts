@@ -1,5 +1,7 @@
 import { Module } from "@nestjs/common";
+import { BullModule } from "@nestjs/bull";
 import { JwtModule } from "@nestjs/jwt";
+import { QUEUE_NAMES } from "../../workers/constants";
 import { PassportModule } from "@nestjs/passport";
 import { ConfigModule, ConfigService } from "@nestjs/config";
 import { AuthService } from "./auth.service";
@@ -47,6 +49,10 @@ import { MarketingModule } from "../marketing/marketing.module";
     // Kayıtta pazarlama izni verilirse üye bülten listesine yazılır
     // (NewsletterService). MarketingModule Auth'a bağlı değil, döngü yok.
     MarketingModule,
+    // Toplu aktivasyon maili kuyruğa yazılır. Bull KÖK bağlantısı global
+    // (BullRootModule), bu yüzden PROCESS_ROLE=web süreci de üretici olabilir;
+    // işi tüketen worker ayrı rolde koşar.
+    BullModule.registerQueue({ name: QUEUE_NAMES.EMAIL }),
   ],
   controllers: [AuthController, AdminAuthController],
   providers: [

@@ -1,4 +1,5 @@
 import type { StatusConfig } from "@tarodan/ui";
+import type { AccountStatus } from "@tarodan/types";
 import { useTranslations } from "next-intl";
 
 type T = ReturnType<typeof useTranslations<never>>;
@@ -6,10 +7,9 @@ type T = ReturnType<typeof useTranslations<never>>;
 export interface UserProduct {
   id: string;
   title: string;
+  /** Kampanya alanları (originalPrice/salePrice/isOnSale) burada tanımlıydı ama
+   * bu uç onları hiç döndürmüyor; ekran da yalnız `price` kullanıyor. */
   price: number;
-  originalPrice?: number | null;
-  salePrice?: number | null;
-  isOnSale?: boolean;
   status: string;
   createdAt: string;
   imageUrl?: string;
@@ -70,6 +70,9 @@ export interface UserDetail {
   isEmailVerified: boolean;
   isPhoneVerified: boolean;
   isBanned: boolean;
+  deletedAt?: string | null;
+  /** Sunucuda türetilir (deletedAt / isBanned / isEmailVerified). */
+  accountStatus: AccountStatus;
   bannedAt?: string;
   bannedReason?: string;
   sellerType?: string;

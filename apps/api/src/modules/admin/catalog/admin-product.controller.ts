@@ -89,6 +89,9 @@ import {
   AuditLogQueryDto,
   ApproveProductDto,
   RejectProductDto,
+  BulkApproveProductsDto,
+  BulkRejectProductsDto,
+  GenerateVoucherCodesDto,
   BanUserDto,
   AssignAdminStaffDto,
   UpdateAdminStaffDto,
@@ -360,13 +363,9 @@ export class AdminProductController {
   @ApiParam({ name: "id", description: "Discount (template) ID" })
   async generateVoucherCodes(
     @Param("id") id: string,
-    @Body() body: { count: number; prefix?: string },
+    @Body() dto: GenerateVoucherCodesDto,
   ) {
-    return this.discountService.generateCodes(
-      id,
-      Number(body?.count) || 0,
-      body?.prefix,
-    );
+    return this.discountService.generateCodes(id, dto.count, dto.prefix);
   }
 
   @Get("discounts/:id/codes")
@@ -438,9 +437,9 @@ export class AdminProductController {
   @ApiResponse({ status: HttpStatus.OK, description: "Products approved" })
   async bulkApproveProducts(
     @CurrentUser("id") adminId: string,
-    @Body() body: { ids: string[]; note?: string },
+    @Body() dto: BulkApproveProductsDto,
   ) {
-    return this.adminService.bulkApproveProducts(adminId, body.ids, body.note);
+    return this.adminService.bulkApproveProducts(adminId, dto.ids, dto.note);
   }
 
   @Post("products/bulk-reject")
@@ -450,9 +449,9 @@ export class AdminProductController {
   @ApiResponse({ status: HttpStatus.OK, description: "Products rejected" })
   async bulkRejectProducts(
     @CurrentUser("id") adminId: string,
-    @Body() body: { ids: string[]; reason: string },
+    @Body() dto: BulkRejectProductsDto,
   ) {
-    return this.adminService.bulkRejectProducts(adminId, body.ids, body.reason);
+    return this.adminService.bulkRejectProducts(adminId, dto.ids, dto.reason);
   }
 
   // ==================== PRODUCT DELETION (ADMIN) ====================

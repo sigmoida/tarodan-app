@@ -3,58 +3,41 @@
 import { useParams } from "next/navigation";
 import { StarIcon } from "@heroicons/react/24/outline";
 import { useTranslations } from "next-intl";
-import { Badge, Button } from "@tarodan/ui";
+import { Badge, Button, accountStatusConfig } from "@tarodan/ui";
 import { adminApi } from "@/lib/api";
+import { statusConfig } from "@/lib/statusLabels";
 import { DetailPage } from "@/components/detail/DetailPage";
-import { useConfirm } from "@/provider/ConfirmProvider";
-import { usePrompt } from "@/provider/PromptProvider";
-import { useAdminMutation } from "@/hooks/useAdminMutation";
 import { type UserDetail } from "./types";
 import { UserStats } from "./_sections/UserStats";
 import { UserInfoSection } from "./_sections/UserInfoSection";
 import { MembershipSection } from "./_sections/MembershipSection";
 import { UserActivityTabs } from "./_sections/UserActivityTabs";
 import { UserSidebar } from "./_sections/UserSidebar";
+import {
+  actionsForStatus,
+  type UserAccountAction,
+} from "../_lib/bulkEligibility";
+import {
+  ACTION_LABEL_KEY,
+  isActionBusy,
+  useUserActions,
+} from "../_lib/useUserActions";
+
+const ACTION_VARIANT: Record<
+  UserAccountAction,
+  "outline" | "success" | "danger"
+> = {
+  resend: "outline",
+  verify: "outline",
+  ban: "danger",
+  unban: "success",
+};
 
 export default function UserDetailPage() {
   const t = useTranslations();
   const { id } = useParams<{ id: string }>();
-  const confirm = useConfirm();
-  const prompt = usePrompt();
-
-  const ban = useAdminMutation(
-    (reason: string) => adminApi.banUser(id, reason),
-    {
-      invalidates: ["users"],
-      successMessage: t("admin.users.detail.banned"),
-    },
-  );
-  const unban = useAdminMutation(() => adminApi.unbanUser(id), {
-    invalidates: ["users"],
-    successMessage: t("admin.users.detail.unbanned"),
-  });
-
-  const onBan = async () => {
-    const reason = await prompt({
-      title: t("admin.users.detail.banTitle"),
-      label: t("admin.users.detail.banReasonLabel"),
-      placeholder: t("admin.users.detail.banReasonPlaceholder"),
-      confirmLabel: t("admin.users.detail.banConfirm"),
-      requiredMessage: t("admin.users.detail.banReasonRequired"),
-      destructive: true,
-    });
-    if (!reason) return;
-    ban.mutate(reason);
-  };
-
-  const onUnban = async () => {
-    await confirm({
-      title: t("admin.users.detail.unbanTitle"),
-      description: t("admin.users.detail.unbanConfirmDesc"),
-      confirmLabel: t("admin.users.detail.unbanTitle"),
-      onConfirm: () => unban.mutateAsync(),
-    });
-  };
+  const { runOne, busy } = useUserActions();
+  const accountStatus = statusConfig(accountStatusConfig, t);
 
   return (
     <DetailPage<UserDetail>
@@ -80,28 +63,22 @@ export default function UserDetailPage() {
           )}
         </span>
       )}
-      badge={(u) =>
-        u.isBanned ? (
-          <Badge variant="danger">{t("admin.users.detail.bannedBadge")}</Badge>
-        ) : (
-          <Badge variant="success">{t("common.active")}</Badge>
-        )
-      }
-      actions={(u) =>
-        u.isBanned ? (
-          <Button
-            variant="success"
-            onClick={onUnban}
-            isLoading={unban.isPending}
-          >
-            {t("admin.users.detail.unbanTitle")}
-          </Button>
-        ) : (
-          <Button variant="danger" onClick={onBan} isLoading={ban.isPending}>
-            {t("admin.users.detail.banConfirm")}
-          </Button>
-        )
-      }
+      // Liste ile aynı türetim: rozet ve aksiyonlar hesap durumundan gelir.
+      badge={(u) => <Badge status={u.accountStatus} config={accountStatus} />}
+      actions={(u) => (
+        <div className="flex flex-wrap items-center gap-2">
+          {actionsForStatus(u.accountStatus).map((action) => (
+            <Button
+              key={action}
+              variant={ACTION_VARIANT[action]}
+              onClick={() => runOne(action, u.id)}
+              isLoading={isActionBusy(busy, u.id, action)}
+            >
+              {t(ACTION_LABEL_KEY[action])}
+            </Button>
+          ))}
+        </div>
+      )}
     >
       {(u) => (
         <>

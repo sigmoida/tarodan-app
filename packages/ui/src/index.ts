@@ -234,6 +234,7 @@ export {
   paymentHoldStatusConfig,
   payoutStatusConfig,
   subscriptionStatusConfig,
+  accountStatusConfig,
   discountTypeConfig,
   discountScopeConfig,
   messageStatusConfig,

@@ -30,6 +30,7 @@
     "@tarodan/listing-form": "workspace:*",
     "@tarodan/logger": "workspace:*",
     "@tarodan/shared": "workspace:*",
+    "@tarodan/types": "workspace:*",
     "@tarodan/ui": "workspace:*",
     "axios": "^1.20.0",
     "chart.js": "^4.4.1",

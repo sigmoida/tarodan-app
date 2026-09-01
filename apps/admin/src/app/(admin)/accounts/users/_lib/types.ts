@@ -1,4 +1,7 @@
 import { useTranslations } from "next-intl";
+import { ACCOUNT_STATUSES, type AccountStatus } from "@tarodan/types";
+import { accountStatusConfig } from "@tarodan/shared";
+import { statusLabel } from "@/lib/statusLabels";
 
 type T = ReturnType<typeof useTranslations<never>>;
 
@@ -11,7 +14,10 @@ export interface User {
   phone?: string;
   isSeller: boolean;
   isVerified: boolean;
+  isEmailVerified: boolean;
   isBanned: boolean;
+  /** Sunucuda türetilir (deletedAt / isBanned / isEmailVerified). */
+  accountStatus: AccountStatus;
   createdAt: string;
   lastLoginAt?: string;
   membershipTier?: string;
@@ -35,7 +41,9 @@ export function mapUsers(raw: any[]): User[] {
     phone: u.phone,
     isSeller: u.isSeller,
     isVerified: u.isVerified,
+    isEmailVerified: Boolean(u.isEmailVerified),
     isBanned: Boolean(u.isBanned),
+    accountStatus: u.accountStatus,
     createdAt: u.createdAt,
     lastLoginAt: u.lastLoginAt,
     membershipTier: u.membership?.tier?.type ?? "free",
@@ -60,16 +68,42 @@ export const getUserFilterOptions = (t: T) => [
   { value: "all", label: t("admin.users.filterAll") },
   { value: "sellers", label: t("admin.users.filterSellers") },
   { value: "buyers", label: t("admin.users.filterBuyers") },
-  { value: "banned", label: t("admin.users.filterBanned") },
 ];
 
-/** Map the "filter" chip to getUsers query flags. */
+/** Map the "filter" (user type) chip to the getUsers isSeller flag. */
 export function userFilterParams(filter?: string) {
   return {
     isSeller:
       filter === "sellers" ? true : filter === "buyers" ? false : undefined,
-    isBanned: filter === "banned" ? true : undefined,
   };
+}
+
+/** Hesap durumu filtresi: Tüm Durumlar + türetilmiş her durum (etiketler tek haritadan). */
+export const getAccountStatusFilterOptions = (t: T) => [
+  { value: "all", label: t("admin.users.filterAccountStatusAll") },
+  ...ACCOUNT_STATUSES.map((value) => ({
+    value,
+    label: statusLabel(accountStatusConfig, value, t),
+  })),
+];
+
+/**
+ * Map the account-status chip to a getUsers query param ("all" → varsayılan:
+ * silinmişler gizli).
+ *
+ * `filter=banned` ESKİ değer: "Engelliler" kullanıcı-türü seçeneğiydi, artık
+ * hesap durumu filtresinde. Liste `syncUrl` olduğu için kaydedilmiş bir
+ * `?filter=banned` bağlantısı hâlâ gelebilir; eşlemezsek sessizce TÜM
+ * kullanıcıları gösterirdi.
+ */
+export function accountStatusParams(status?: string, legacyFilter?: string) {
+  const resolved =
+    status && status !== "all"
+      ? status
+      : legacyFilter === "banned"
+        ? "banned"
+        : undefined;
+  return resolved ? { accountStatus: resolved } : {};
 }
 
 /** Membership tier filter options (Tüm Katmanlar + each tier). */

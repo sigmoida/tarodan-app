@@ -14,7 +14,6 @@ import * as QRCode from "qrcode";
 import {
   Enable2FAResponseDto,
   TwoFactorStatusDto,
-  EmailVerificationStatusDto,
   CsrfTokenResponseDto,
   AdminSessionDto,
   AdminSessionListDto,
@@ -420,117 +419,6 @@ export class SecurityService {
       where: { id: userId },
       data: { passwordHash },
     });
-  }
-
-  // ==========================================================================
-  // GAP-006: EMAIL VERIFICATION
-  // ==========================================================================
-
-  /**
-   * Send email verification
-   */
-  async sendEmailVerification(userId: string, email?: string): Promise<void> {
-    const user = await this.prisma.user.findUnique({
-      where: { id: userId },
-    });
-
-    if (!user) {
-      throw new NotFoundException(i18nMessage("server.auth.userNotFound"));
-    }
-
-    const targetEmail = email || user.email;
-
-    // Invalidate existing tokens
-    await this.prisma.emailVerificationToken.updateMany({
-      where: { userId, usedAt: null },
-      data: { usedAt: new Date() },
-    });
-
-    // Generate token
-    const token = crypto.randomBytes(32).toString("hex");
-
-    const expiresAt = new Date();
-    expiresAt.setHours(expiresAt.getHours() + this.TOKEN_EXPIRY_HOURS);
-
-    await this.prisma.emailVerificationToken.create({
-      data: {
-        userId,
-        token,
-        email: targetEmail,
-        expiresAt,
-      },
-    });
-
-    // TODO: Send email with verification link
-    this.logger.log("Email verification token created");
-  }
-
-  /**
-   * Verify email with token
-   */
-  async verifyEmail(token: string): Promise<void> {
-    const verificationToken =
-      await this.prisma.emailVerificationToken.findUnique({
-        where: { token },
-      });
-
-    if (!verificationToken) {
-      throw new BadRequestException(
-        i18nMessage("server.security.invalidToken"),
-      );
-    }
-
-    if (verificationToken.usedAt) {
-      throw new BadRequestException(
-        i18nMessage("server.security.tokenAlreadyUsed"),
-      );
-    }
-
-    if (verificationToken.expiresAt < new Date()) {
-      throw new BadRequestException(
-        i18nMessage("server.auth.resetTokenExpired"),
-      );
-    }
-
-    // Update user
-    await this.prisma.user.update({
-      where: { id: verificationToken.userId },
-      data: {
-        isEmailVerified: true,
-        email: verificationToken.email,
-      },
-    });
-
-    // Mark token as used
-    await this.prisma.emailVerificationToken.update({
-      where: { id: verificationToken.id },
-      data: { usedAt: new Date() },
-    });
-  }
-
-  /**
-   * Get email verification status
-   */
-  async getEmailVerificationStatus(
-    userId: string,
-  ): Promise<EmailVerificationStatusDto> {
-    const user = await this.prisma.user.findUnique({
-      where: { id: userId },
-    });
-
-    if (!user) {
-      throw new NotFoundException(i18nMessage("server.auth.userNotFound"));
-    }
-
-    const pendingToken = await this.prisma.emailVerificationToken.findFirst({
-      where: { userId, usedAt: null, expiresAt: { gt: new Date() } },
-    });
-
-    return {
-      isVerified: user.isEmailVerified,
-      email: user.email,
-      pendingVerification: !!pendingToken,
-    };
   }
 
   // ==========================================================================

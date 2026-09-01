@@ -4492,8 +4492,6 @@
         "membership": "Membership",
         "products": "Products",
         "orders": "Orders",
-        "banned": "Banned",
-        "unverified": "Unverified",
         "empty": "No sellers found",
         "totalSellers": "Total Sellers",
         "mostOrders": "Most Orders",
@@ -7551,7 +7549,6 @@
       "filterAll": "All Users",
       "filterSellers": "Sellers",
       "filterBuyers": "Buyers",
-      "filterBanned": "Banned",
       "banned": "User banned",
       "unbanned": "User ban lifted",
       "banTitle": "Ban User",
@@ -7561,8 +7558,6 @@
       "unbanAction": "Lift Ban",
       "columnUser": "User",
       "seller": "Seller",
-      "verified": "Verified",
-      "notVerified": "Not Verified",
       "bannedBadge": "Banned",
       "membership": "Membership",
       "membershipFree": "Free",
@@ -7589,16 +7584,7 @@
         "bothShipped": "Shipped"
       },
       "detail": {
-        "banned": "User banned",
-        "unbanned": "User ban lifted",
-        "banTitle": "Ban User",
         "banReasonLabel": "Ban Reason",
-        "banReasonPlaceholder": "Describe the reason for the ban...",
-        "banConfirm": "Ban",
-        "banReasonRequired": "Ban reason is required",
-        "unbanTitle": "Lift Ban",
-        "unbanConfirmDesc": "Are you sure you want to lift this user's ban?",
-        "bannedBadge": "Banned",
         "infoTitle": "User Information",
         "ratingsCount": "({count} ratings)",
         "emailLabel": "Email",
@@ -7669,7 +7655,32 @@
         "blocksGivenTitle": "Blocked by this user",
         "blocksReceivedTitle": "Blocked this user",
         "blocksEmpty": "No block records"
-      }
+      },
+      "columnUserType": "User Type",
+      "userTypeBuyer": "Buyer",
+      "filterAccountStatusAll": "All Statuses",
+      "unbanConfirmDesc": "Are you sure you want to lift this user's ban?",
+      "resendVerification": "Send Activation Email",
+      "verifyEmail": "Activate Manually",
+      "verificationSent": "Activation email sent",
+      "emailVerifiedByAdmin": "Account activated",
+      "verifyEmailConfirmTitle": "Activate account manually",
+      "verifyEmailConfirmDesc": "The email will be treated as verified by an admin and the user will be able to sign in. Continue?",
+      "bulkBanTitle": "Ban {count} users",
+      "bulkUnbanTitle": "Lift ban for {count} users",
+      "bulkResendTitle": "Send activation email to {count} users",
+      "bulkVerifyTitle": "Activate {count} accounts manually",
+      "bulkConfirmDesc": "Ineligible rows in the selection are skipped. Continue?",
+      "bulkResult": "{ok} succeeded, {failed} failed",
+      "bulkFailedAll": "The action could not be applied to any user",
+      "emailVerified": "Email verified",
+      "emailNotVerified": "Email not verified",
+      "phoneVerified": "Phone verified",
+      "phoneNotVerified": "Phone not verified",
+      "bulkNoneEligible": "No selected user is eligible for this action",
+      "bulkResendQueued": "Activation e-mail queued for {ok} users",
+      "bulkResendQueuedPartial": "{ok} queued, {failed} failed",
+      "bulkResendConfirmDesc": "Activation e-mails are sent from the background queue; track the outcome in the e-mail logs. Ineligible rows are skipped. Continue?"
     },
     "roles": {
       "title": "Roles & Permissions",
@@ -8308,7 +8319,8 @@
           "template": "Template",
           "action": "Action",
           "entityType": "Entity type",
-          "shipmentLeg": "Shipment leg"
+          "shipmentLeg": "Shipment leg",
+          "accountStatus": "Account status"
         }
       },
       "bulkActionBar": {
@@ -9290,7 +9302,9 @@
       },
       "user": {
         "notBanned": "The user is not banned",
-        "alreadyBanned": "The user is already banned"
+        "alreadyBanned": "The user is already banned",
+        "deleted": "This action is not available for a deleted account",
+        "verificationMailFailed": "The activation email could not be sent"
       },
       "catalog": {
         "categoryHasProducts": "This category still has products. Move them to another category first.",
@@ -9474,7 +9488,8 @@
         "reservedNotDeletable": "Reserved products cannot be deleted",
         "withActiveOrderNotDeletable": "Products with an active order cannot be deleted",
         "boostedNotHardDeletable": "A product with a boost record cannot be hard-deleted; deactivate it instead",
-        "restoreRemovedOnly": "Only removed products can be restored"
+        "restoreRemovedOnly": "Only removed products can be restored",
+        "rejectReasonRequired": "A rejection reason is required"
       },
       "membership": {
         "monthlyPriceRange": "The monthly membership price must be between 0 and 1,000,000",
@@ -9682,7 +9697,6 @@
       "twoFactorDisabled": "Two-factor authentication is not enabled",
       "tokenAlreadyUsed": "This token has already been used",
       "currentPasswordWrong": "The current password is incorrect",
-      "invalidToken": "Invalid verification token",
       "accessBlocked": "Access blocked"
     },
     "storage": {
@@ -9920,6 +9934,12 @@
     },
     "shipmentProvider": {
       "surat": "Sürat Kargo"
+    },
+    "accountStatus": {
+      "active": "Active",
+      "pending_activation": "Pending Activation",
+      "banned": "Banned",
+      "deleted": "Deleted"
     }
   },
   "page": {
