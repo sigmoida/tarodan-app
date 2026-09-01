@@ -10,6 +10,7 @@ import { useTranslations } from "next-intl";
 import { useAuthStore } from "@/stores/authStore";
 import { useDispatchAddress } from "@/hooks/useDispatchAddress";
 import { useListingLimits } from "@tarodan/listing-form";
+import ListingFormProvider from "@/components/listings/ListingFormProvider";
 import { shouldStartTour } from "@/lib/userExperiencePolicy.mjs";
 
 /**
@@ -27,8 +28,20 @@ import { shouldStartTour } from "@/lib/userExperiencePolicy.mjs";
  * gezebilsin diye; kalıcı çözüm adresi girmek.
  *
  * Yalnız satıcılara çıkar: alıcının çıkış adresi olmaması normaldir.
+ *
+ * Ana layout'tan, ilan formunun çok dışında render edilir; `useListingLimits`
+ * ise API portunu ister. Portu burada kendimiz sarıyoruz ki bileşen nereye
+ * konursa konsun sağlayıcı beklemesin.
  */
 export default function SellerAddressPrompt() {
+  return (
+    <ListingFormProvider>
+      <SellerAddressPromptInner />
+    </ListingFormProvider>
+  );
+}
+
+function SellerAddressPromptInner() {
   const t = useTranslations();
   const pathname = usePathname();
   const { isAuthenticated, isLoading: authLoading, user } = useAuthStore();
