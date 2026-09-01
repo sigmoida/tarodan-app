@@ -3723,6 +3723,7 @@
         "metaRemarketing": "Meta (Facebook/Instagram) remarketing",
         "tiktokPixel": "TikTok Pixel — conversion measurement",
         "googleAdsRetargeting": "Google Ads & YouTube retargeting",
+        "googleAdsConversion": "Google Ads — ad click and conversion measurement",
         "yandexDirect": "Yandex Direct ad delivery"
       },
       "duration": {

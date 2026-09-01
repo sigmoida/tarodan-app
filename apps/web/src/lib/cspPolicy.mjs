@@ -24,6 +24,29 @@ const PAYTR_ORIGIN = "https://www.paytr.com";
 /** Apple ile giriş — YALNIZ auth sayfalarında, ödeme sayfasında ASLA. */
 const APPLE_SCRIPT_ORIGIN = "https://appleid.cdn-apple.com";
 const APPLE_AUTH_ORIGIN = "https://appleid.apple.com";
+/**
+ * Google Ads (gtag.js + dönüşüm/remarketing uçları) — ödeme profiline ASLA
+ * girmez (PCI 6.4.3 üçüncü taraf script daraltması). gtag googletagmanager'dan
+ * yüklenir ama oradan googleadservices'in dönüşüm script'ini zincirler,
+ * doubleclick/google uçlarına ping atar ve gizli remarketing iframe'leri
+ * enjekte eder; www.google.com.tr TR trafiğindeki bölgesel dönüşüm ping'idir.
+ */
+const GOOGLE_ADS_SCRIPT_ORIGINS = [
+  "https://www.googletagmanager.com",
+  "https://www.googleadservices.com",
+  "https://googleads.g.doubleclick.net",
+  "https://www.google.com",
+];
+const GOOGLE_ADS_PING_ORIGINS = [
+  "https://googleads.g.doubleclick.net",
+  "https://www.googleadservices.com",
+  "https://www.google.com",
+  "https://www.google.com.tr",
+];
+const GOOGLE_ADS_FRAME_ORIGINS = [
+  "https://td.doubleclick.net",
+  "https://googleads.g.doubleclick.net",
+];
 /** Ürün görselleri (next.config images.remotePatterns ile aynı kaynaklar). */
 const IMAGE_ORIGINS = [
   "https://amzn-tarodan.s3.eu-west-1.amazonaws.com",
@@ -128,6 +151,8 @@ export function buildContentSecurityPolicy({
     !isProduction && "'unsafe-eval'",
     // Apple ile giriş auth sayfalarında; kart sayfasının yüzeyine SOKULMAZ.
     !isPayment && APPLE_SCRIPT_ORIGIN,
+    // Google Ads etiketi de yalnız ödeme dışı profilde (rızaya bağlı yüklenir).
+    ...(isPayment ? [] : GOOGLE_ADS_SCRIPT_ORIGINS),
   ];
 
   // Kendi altyapımız ödeme sayfasında da erişilebilir kalır: sayfa storefront
@@ -143,6 +168,8 @@ export function buildContentSecurityPolicy({
     wsOrigin,
     !isProduction && "ws:",
     !isProduction && "wss:",
+    // gtag dönüşüm/remarketing ping'leri (sendBeacon/fetch) — ödeme dışı.
+    ...(isPayment ? [] : GOOGLE_ADS_PING_ORIGINS),
   ];
 
   const policy = [
@@ -154,7 +181,14 @@ export function buildContentSecurityPolicy({
     directive("style-src", ["'self'", "'unsafe-inline'"]),
     // Görseller her iki profilde de aynı: görsel script çalıştıramaz, kısıtlamak
     // koruma getirmez — ürün/avatar görselleri chrome'da her sayfada görünür.
-    directive("img-src", ["'self'", "data:", "blob:", ...IMAGE_ORIGINS]),
+    // Google ping origin'leri gtag'in <img> piksel geri düşüşü için (ödeme dışı).
+    directive("img-src", [
+      "'self'",
+      "data:",
+      "blob:",
+      ...IMAGE_ORIGINS,
+      ...(isPayment ? [] : GOOGLE_ADS_PING_ORIGINS),
+    ]),
     directive("font-src", ["'self'", "data:"]),
     directive("connect-src", connectSrc),
     // Kart alanlarının gidebileceği TEK dış hedef.
@@ -162,6 +196,7 @@ export function buildContentSecurityPolicy({
     directive("frame-src", [
       "'self'",
       isPayment ? PAYTR_ORIGIN : APPLE_AUTH_ORIGIN,
+      ...(isPayment ? [] : GOOGLE_ADS_FRAME_ORIGINS),
     ]),
     directive("frame-ancestors", ["'self'"]),
     // Göreli script URL'lerini başka origin'e kaçıran <base> enjeksiyonunu kapat.
