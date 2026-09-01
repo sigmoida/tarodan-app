@@ -10,31 +10,29 @@ import {
   HttpCode,
   HttpStatus,
   UseGuards,
-} from '@nestjs/common';
-import { Throttle } from '@nestjs/throttler';
-import { SecurityService } from './security.service';
+} from "@nestjs/common";
+import { Throttle } from "@nestjs/throttler";
+import { SecurityService } from "./security.service";
 import {
   Verify2FADto,
   Disable2FADto,
   RequestPasswordResetDto,
   ResetPasswordDto,
   ChangePasswordDto,
-  VerifyEmailDto,
   Enable2FAResponseDto,
   TwoFactorStatusDto,
-  EmailVerificationStatusDto,
   CsrfTokenResponseDto,
   AdminSessionListDto,
-} from './dto';
-import { Public } from '../auth/decorators/public.decorator';
-import { Roles } from '../auth/decorators/roles.decorator';
-import { AdminRoute } from '../auth/decorators/admin-route.decorator';
-import { RequirePermission } from '../auth/decorators/require-permission.decorator';
-import { AdminJwtAuthGuard } from '../auth/guards/admin-jwt-auth.guard';
-import { RolesGuard } from '../auth/guards/roles.guard';
-import { AdminRole } from '@prisma/client';
+} from "./dto";
+import { Public } from "../auth/decorators/public.decorator";
+import { Roles } from "../auth/decorators/roles.decorator";
+import { AdminRoute } from "../auth/decorators/admin-route.decorator";
+import { RequirePermission } from "../auth/decorators/require-permission.decorator";
+import { AdminJwtAuthGuard } from "../auth/guards/admin-jwt-auth.guard";
+import { RolesGuard } from "../auth/guards/roles.guard";
+import { AdminRole } from "@prisma/client";
 
-@Controller('security')
+@Controller("security")
 export class SecurityController {
   constructor(private readonly securityService: SecurityService) {}
 
@@ -46,7 +44,7 @@ export class SecurityController {
    * Get 2FA status
    * GET /security/2fa/status
    */
-  @Get('2fa/status')
+  @Get("2fa/status")
   async get2FAStatus(@Request() req: any): Promise<TwoFactorStatusDto> {
     return this.securityService.get2FAStatus(req.user.id);
   }
@@ -55,7 +53,7 @@ export class SecurityController {
    * Enable 2FA (get secret and QR code)
    * POST /security/2fa/enable
    */
-  @Post('2fa/enable')
+  @Post("2fa/enable")
   async enable2FA(@Request() req: any): Promise<Enable2FAResponseDto> {
     return this.securityService.enable2FA(req.user.id);
   }
@@ -63,8 +61,8 @@ export class SecurityController {
   /**
    * Verify 2FA code and complete setup
    * POST /security/2fa/verify
-  */
-  @Post('2fa/verify')
+   */
+  @Post("2fa/verify")
   @Throttle({ default: { limit: 10, ttl: 60000 } })
   async verify2FA(
     @Request() req: any,
@@ -77,8 +75,8 @@ export class SecurityController {
   /**
    * Disable 2FA
    * POST /security/2fa/disable
-  */
-  @Post('2fa/disable')
+   */
+  @Post("2fa/disable")
   @Throttle({ default: { limit: 10, ttl: 60000 } })
   async disable2FA(
     @Request() req: any,
@@ -91,8 +89,8 @@ export class SecurityController {
   /**
    * Regenerate backup codes
    * POST /security/2fa/backup-codes
-  */
-  @Post('2fa/backup-codes')
+   */
+  @Post("2fa/backup-codes")
   @Throttle({ default: { limit: 5, ttl: 60000 } })
   async regenerateBackupCodes(
     @Request() req: any,
@@ -114,7 +112,7 @@ export class SecurityController {
    * POST /security/password/request-reset
    */
   @Public()
-  @Post('password/request-reset')
+  @Post("password/request-reset")
   @Throttle({ default: { limit: 3, ttl: 60000 } })
   @HttpCode(HttpStatus.OK)
   async requestPasswordReset(
@@ -123,7 +121,7 @@ export class SecurityController {
     await this.securityService.requestPasswordReset(dto.email);
     return {
       message:
-        'Eğer bu e-posta adresi kayıtlıysa, şifre sıfırlama bağlantısı gönderildi',
+        "Eğer bu e-posta adresi kayıtlıysa, şifre sıfırlama bağlantısı gönderildi",
     };
   }
 
@@ -132,21 +130,21 @@ export class SecurityController {
    * POST /security/password/reset
    */
   @Public()
-  @Post('password/reset')
+  @Post("password/reset")
   @Throttle({ default: { limit: 10, ttl: 60000 } })
   @HttpCode(HttpStatus.OK)
   async resetPassword(
     @Body() dto: ResetPasswordDto,
   ): Promise<{ message: string }> {
     await this.securityService.resetPassword(dto.token, dto.newPassword);
-    return { message: 'Şifreniz başarıyla değiştirildi' };
+    return { message: "Şifreniz başarıyla değiştirildi" };
   }
 
   /**
    * Change password (authenticated)
    * POST /security/password/change
-  */
-  @Post('password/change')
+   */
+  @Post("password/change")
   @Throttle({ default: { limit: 5, ttl: 60000 } })
   @HttpCode(HttpStatus.OK)
   async changePassword(
@@ -158,49 +156,7 @@ export class SecurityController {
       dto.currentPassword,
       dto.newPassword,
     );
-    return { message: 'Şifreniz başarıyla değiştirildi' };
-  }
-
-  // ==========================================================================
-  // EMAIL VERIFICATION (GAP-006)
-  // ==========================================================================
-
-  /**
-   * Get email verification status
-   * GET /security/email/status
-   */
-  @Get('email/status')
-  async getEmailVerificationStatus(
-    @Request() req: any,
-  ): Promise<EmailVerificationStatusDto> {
-    return this.securityService.getEmailVerificationStatus(req.user.id);
-  }
-
-  /**
-   * Send verification email
-   * POST /security/email/send-verification
-  */
-  @Post('email/send-verification')
-  @Throttle({ default: { limit: 3, ttl: 60000 } })
-  @HttpCode(HttpStatus.OK)
-  async sendEmailVerification(
-    @Request() req: any,
-  ): Promise<{ message: string }> {
-    await this.securityService.sendEmailVerification(req.user.id);
-    return { message: 'Doğrulama e-postası gönderildi' };
-  }
-
-  /**
-   * Verify email with token (public)
-   * POST /security/email/verify
-   */
-  @Public()
-  @Post('email/verify')
-  @Throttle({ default: { limit: 10, ttl: 60000 } })
-  @HttpCode(HttpStatus.OK)
-  async verifyEmail(@Body() dto: VerifyEmailDto): Promise<{ message: string }> {
-    await this.securityService.verifyEmail(dto.token);
-    return { message: 'E-posta adresiniz doğrulandı' };
+    return { message: "Şifreniz başarıyla değiştirildi" };
   }
 
   // ==========================================================================
@@ -211,10 +167,10 @@ export class SecurityController {
    * Get CSRF token
    * GET /security/csrf-token
    */
-  @Get('csrf-token')
+  @Get("csrf-token")
   async getCsrfToken(@Request() req: any): Promise<CsrfTokenResponseDto> {
     // Use session ID or user ID as session identifier
-    const sessionId = req.user?.sessionId || req.user?.id || 'anonymous';
+    const sessionId = req.user?.sessionId || req.user?.id || "anonymous";
     return this.securityService.generateCsrfToken(sessionId);
   }
 
@@ -225,12 +181,12 @@ export class SecurityController {
   /**
    * Get admin sessions
    * GET /security/admin/sessions
-  */
-  @Get('admin/sessions')
+   */
+  @Get("admin/sessions")
   @AdminRoute()
   @UseGuards(AdminJwtAuthGuard, RolesGuard)
   @Roles(AdminRole.admin, AdminRole.super_admin)
-  @RequirePermission('settings')
+  @RequirePermission("settings")
   async getAdminSessions(@Request() req: any): Promise<AdminSessionListDto> {
     return this.securityService.getAdminSessions(
       req.user.adminId,
@@ -241,15 +197,15 @@ export class SecurityController {
   /**
    * Terminate specific admin session
    * DELETE /security/admin/sessions/:id
-  */
-  @Delete('admin/sessions/:id')
+   */
+  @Delete("admin/sessions/:id")
   @AdminRoute()
   @UseGuards(AdminJwtAuthGuard, RolesGuard)
   @Roles(AdminRole.admin, AdminRole.super_admin)
-  @RequirePermission('settings')
+  @RequirePermission("settings")
   @HttpCode(HttpStatus.NO_CONTENT)
   async terminateAdminSession(
-    @Param('id', ParseUUIDPipe) id: string,
+    @Param("id", ParseUUIDPipe) id: string,
     @Request() req: any,
   ): Promise<void> {
     return this.securityService.terminateAdminSession(id, req.user.adminId);
@@ -258,12 +214,12 @@ export class SecurityController {
   /**
    * Terminate all admin sessions (logout everywhere)
    * DELETE /security/admin/sessions
-  */
-  @Delete('admin/sessions')
+   */
+  @Delete("admin/sessions")
   @AdminRoute()
   @UseGuards(AdminJwtAuthGuard, RolesGuard)
   @Roles(AdminRole.admin, AdminRole.super_admin)
-  @RequirePermission('settings')
+  @RequirePermission("settings")
   @HttpCode(HttpStatus.NO_CONTENT)
   async terminateAllAdminSessions(@Request() req: any): Promise<void> {
     return this.securityService.terminateAllAdminSessions(req.user.adminId);
@@ -273,7 +229,7 @@ export class SecurityController {
    * Revoke all refresh tokens
    * DELETE /security/tokens
    */
-  @Delete('tokens')
+  @Delete("tokens")
   @HttpCode(HttpStatus.NO_CONTENT)
   async revokeAllTokens(@Request() req: any): Promise<void> {
     return this.securityService.revokeAllUserTokens(req.user.id);

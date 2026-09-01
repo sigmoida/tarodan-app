@@ -36,10 +36,18 @@ describe("critical public route throttles", () => {
       method: "requestPasswordReset",
       limit: 3,
     },
+    // E-posta doğrulama artık YALNIZ auth'ta. Security modülünde ikinci bir
+    // uç vardı: token'ı ham saklıyor, mail hiç göndermiyor ve çağrıldığında
+    // auth'un gönderdiği gerçek token'ı iptal ediyordu — kaldırıldı.
     {
-      controller: SecurityController,
+      controller: AuthController,
       method: "verifyEmail",
       limit: 10,
+    },
+    {
+      controller: AuthController,
+      method: "resendVerification",
+      limit: 3,
     },
     {
       controller: OrderController,
