@@ -75,8 +75,13 @@ describe("admin system and user list sorting", () => {
       2,
       expect.objectContaining({
         // `deletedAt: null` varsayılan hesap-durumu filtresi: silinmiş
-        // (anonimleştirilmiş) hesaplar listede görünmez.
-        where: { deletedAt: null, id: { in: ["user-b", "user-a"] } },
+        // (anonimleştirilmiş) hesaplar listede görünmez; `adminUser: null`
+        // personel hesaplarını müşteri listesinin dışında tutar.
+        where: {
+          adminUser: null,
+          deletedAt: null,
+          id: { in: ["user-b", "user-a"] },
+        },
       }),
     );
     expect(result.meta).toEqual({
