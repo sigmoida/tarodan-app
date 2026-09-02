@@ -8,9 +8,10 @@ import * as Sentry from "@sentry/node";
 import { SentryService } from "./sentry.service";
 import { SentryInterceptor } from "./sentry.interceptor";
 import { initAppLogger } from "../../common/logging/logger";
-import { redactSensitive } from "../../common/security/redact-sensitive";
 import {
+  applySentryBreadcrumbPolicy,
   applySentryEventPolicy,
+  applySentryTransactionPolicy,
   isProductionRuntime,
   resolveSentryEnvironment,
   resolveSentryRelease,
@@ -51,16 +52,10 @@ export class SentryModule implements OnModuleInit {
         // HTTP instrumentation; no deprecated @sentry/tracing shim is needed.
         // Sağlık kontrolü filtresi + redaksiyon + korelasyon tag'i: tek kapı.
         beforeSend: applySentryEventPolicy,
-        // Capture user context
-        beforeBreadcrumb(breadcrumb) {
-          if (
-            breadcrumb.category === "http" &&
-            breadcrumb.data?.url?.includes("/health")
-          ) {
-            return null;
-          }
-          return redactSensitive(breadcrumb) as typeof breadcrumb;
-        },
+        // Sağlık kontrolü filtresi + alan/URL redaksiyonu: worker ile ortak kapı.
+        beforeBreadcrumb: applySentryBreadcrumbPolicy,
+        // Performans izleri de dış çağrı URL'lerini taşır; aynı redaksiyon.
+        beforeSendTransaction: applySentryTransactionPolicy,
       });
       initAppLogger(this.sentryService);
       this.logger.log("Sentry initialized");

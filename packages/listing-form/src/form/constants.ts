@@ -60,16 +60,28 @@ export const getYearOptions = (): number[] => {
 export const MAX_LISTING_COLORS = 3;
 
 /**
- * Global (üreticiden bağımsız) attribute gruplarının slug'ları — sunucudaki
- * `common/helpers/attribute-groups.ts` ile aynı olmalı; kayıttaki nitelikler
- * bunlarla kendi alanlarına ayrıştırılır.
+ * Global (üreticiden bağımsız) attribute gruplarının slug'ları ve grup
+ * kuralları — tek kaynak `@tarodan/types` (sunucu da oradan okur); kayıttaki
+ * nitelikler bunlarla kendi alanlarına ayrıştırılır.
  *
  * Grubun ADI ("Ölçek", "Renk") değil slug'ı kullanılır: ad kataloğa bağlıdır,
  * slug değildir.
  */
-export const SCALE_GROUP_SLUG = "scale";
-export const MATERIAL_GROUP_SLUG = "material";
-export const COLOR_GROUP_SLUG = "color";
+export {
+  SCALE_GROUP_SLUG,
+  MATERIAL_GROUP_SLUG,
+  COLOR_GROUP_SLUG,
+  DEDICATED_ATTRIBUTE_GROUP_SLUGS,
+  HIDDEN_ATTRIBUTE_GROUP_SLUGS,
+  isDedicatedAttributeGroup,
+  isHiddenAttributeGroup,
+  isGlobalCustomAttributeGroup,
+  attributeGroupSelectionMode,
+} from "@tarodan/types";
+export type {
+  AttributeGroupRef,
+  AttributeGroupSelectionMode,
+} from "@tarodan/types";
 
 /**
  * Birden çok rengin tek satırda birleştirilme ayracı — sunucudaki

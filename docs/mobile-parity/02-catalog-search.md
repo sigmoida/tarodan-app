@@ -54,15 +54,15 @@ adlarını kullanmalı.
 
 ### Endpoint'ler
 
-| Method | Path                                   | Amaç                                                             |
-| ------ | -------------------------------------- | ---------------------------------------------------------------- |
-| `GET`  | `/products`                            | Ana liste (parametreler aşağıda)                                 |
-| `GET`  | `/categories`                          | Kategori listesi                                                 |
-| `GET`  | `/categories/slug/:slug`               | Slug → id çözümleme                                              |
-| `GET`  | `/manufacturers`                       | Üretici filtresi                                                 |
-| `GET`  | `/products/filters`                    | Facet'ler: `scales, materials, brands, carModels, manufacturers` |
-| `GET`  | `/products/filters?manufacturer=:slug` | Üreticiye özel `customAttributes` grupları                       |
-| `POST` | `/products/:id/click`                  | Tıklama takibi                                                   |
+| Method | Path                                   | Amaç                                                                                                             |
+| ------ | -------------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
+| `GET`  | `/products`                            | Ana liste (parametreler aşağıda)                                                                                 |
+| `GET`  | `/categories`                          | Kategori listesi                                                                                                 |
+| `GET`  | `/categories/slug/:slug`               | Slug → id çözümleme                                                                                              |
+| `GET`  | `/manufacturers`                       | Üretici filtresi                                                                                                 |
+| `GET`  | `/products/filters`                    | Facet'ler: `scales, materials, colors, brands, carModels, manufacturers` + **genel** `customAttributes` grupları |
+| `GET`  | `/products/filters?manufacturer=:slug` | Aynı yanıt + üreticiye bağlı `customAttributes` grupları                                                         |
+| `POST` | `/products/:id/click`                  | Tıklama takibi                                                                                                   |
 
 ### `GET /products` parametreleri
 
@@ -78,7 +78,31 @@ Kurallar:
 - `sortBy` **`relevance` iken gönderilmez** (sunucunun kendi ilgi sıralaması devreye girer).
   Seçenekler: `relevance | created_desc | created_asc | view_count_desc | price_asc | price_desc | rating_desc | title_asc | title_desc`.
 - `attrGroups` = `JSON.stringify({ grupSlug: [ozellikSlug, ...] })`; boş gruplar atılır.
-  Sunucu semantiği: **grup içi OR, gruplar arası AND**.
+  Sunucu semantiği: **grup içi OR, gruplar arası AND**. Genel özel gruplar
+  (üreticisiz) da aynı parametreyle filtrelenir; üretici seçili olması gerekmez.
+
+### `customAttributes` (2026-09-02)
+
+`/products/filters` **üreticisiz** çağrıda da `customAttributes` döner: admin'in
+kataloğa eklediği, her ilanda sorulan **genel özel gruplar** (ör.
+`nadirlik-bulunabilirlik` "Nadirlik/Bulunabilirlik"). `manufacturer` verilince
+o üreticiye bağlı gruplar listeye eklenir. Ölçek/malzeme/renk burada dönmez
+(kendi facet'leri var); gizli gruplar (`vehicle_type`) hiç dönmez.
+
+```ts
+customAttributes: Array<{
+  slug: string;
+  name: string;
+  isRequired: boolean;
+  manufacturerSlug: string | null; // null = genel grup
+  selectionMode: "single" | "multi"; // genel özel = single, üreticiye bağlı = multi
+  attributes: Array<{ slug: string; label: string; color: string | null }>;
+}>;
+```
+
+Kenar çubuğu: genel grupları üretici seçilmeden de göster; üretici değişince
+yalnız üreticiye bağlı grupların seçimlerini sıfırla, genel seçimleri koru.
+
 - `condition` değerleri: `new, like_new, very_good, good, fair`.
 
 ### Kart gösterim kuralları (birebir uygulanmalı)

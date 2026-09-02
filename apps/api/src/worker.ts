@@ -8,7 +8,9 @@ import * as Sentry from "@sentry/node";
 import { AppModule } from "./app.module";
 import { AppNestLogger } from "./common/logging/nest-logger";
 import {
+  applySentryBreadcrumbPolicy,
   applySentryEventPolicy,
+  applySentryTransactionPolicy,
   isProductionRuntime,
   resolveSentryEnvironment,
   resolveSentryRelease,
@@ -19,8 +21,11 @@ import { errorStack } from "./common/helpers/error-message";
  * Initialize Sentry for the worker process (#71). The worker runs as a separate
  * process and does NOT import the API's SentryModule, so without this every
  * background-job error — and any uncaught exception in the worker — went
- * unreported. Mirrors the API's Sentry config (minus the HTTP integration,
- * which is irrelevant to a headless worker).
+ * unreported. Mirrors the API's Sentry config. The breadcrumb policy is NOT
+ * optional here: Sentry's default fetch instrumentation records every outbound
+ * call (Sürat tracking polls run in this process) and the Sürat contract carries
+ * credentials in the query string — without the policy the password landed in
+ * Sentry breadcrumbs verbatim.
  */
 function initWorkerSentry(logger: Logger): boolean {
   const dsn = process.env.SENTRY_DSN;
@@ -36,6 +41,8 @@ function initWorkerSentry(logger: Logger): boolean {
     release: resolveSentryRelease(),
     tracesSampleRate: isProductionRuntime() ? 0.2 : 1.0,
     beforeSend: applySentryEventPolicy,
+    beforeBreadcrumb: applySentryBreadcrumbPolicy,
+    beforeSendTransaction: applySentryTransactionPolicy,
   });
   logger.log("Sentry initialized (worker)");
   return true;

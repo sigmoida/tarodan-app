@@ -63,6 +63,33 @@ function redactPanStrings(value: string): string {
 }
 
 /**
+ * Query-string anahtarları için ek liste: sağlayıcı sözleşmeleri kimliği URL'de
+ * taşıyabiliyor (Sürat `CariKodu`/`Sifre`). Değer olarak `***` yazılır; URL'nin
+ * yolu ve diğer parametreleri okunur kalır.
+ */
+const SENSITIVE_QUERY_KEYS = new Set([
+  ...SENSITIVE_KEYS,
+  "sifre",
+  "carikodu",
+  "key",
+  "signature",
+  "sig",
+]);
+
+/**
+ * URL ya da URL içeren bir metindeki hassas query parametrelerini maskeler.
+ * Parse etmez, tam metin üzerinde çalışır: hata mesajı gibi URL'nin gömülü
+ * olduğu dizelerde de işe yarar ve geçersiz URL'de patlamaz.
+ */
+export function redactUrlQuery(value: string): string {
+  return value.replace(
+    /([?&])([^=&#\s]+)=([^&#\s]*)/g,
+    (match, sep: string, key: string) =>
+      SENSITIVE_QUERY_KEYS.has(normalizeKey(key)) ? `${sep}${key}=***` : match,
+  );
+}
+
+/**
  * Produces a serializable copy suitable for logs and telemetry. Sensitive keys
  * are matched case/format-insensitively and PAN-looking strings are removed
  * even when nested under an unexpected key.

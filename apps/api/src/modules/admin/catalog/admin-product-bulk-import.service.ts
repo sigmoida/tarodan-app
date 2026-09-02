@@ -73,7 +73,8 @@ import {
   PRODUCT_BULK_IMPORT_PUBLIC_LIMITS,
   PRODUCT_BULK_IMPORT_STALE_MINUTES,
 } from "./admin-product-bulk-import.constants";
-import { i18nMessage } from "../../i18n";
+import { i18nMessage, localizedPayloadOf } from "../../i18n";
+import { translateMessage } from "../../i18n/translate";
 
 const STALE_BATCH_MESSAGE =
   "Yükleme yarıda kaldı (sunucu yeniden başlatılmış olabilir). Hiçbir ürün oluşturulmadı; dosyayı yeniden yükleyin.";
@@ -951,7 +952,7 @@ export class AdminProductBulkImportService {
             colors: resolvedColors.slugs,
             attributeSlugs: csvList(cellText(get("ek_ozellikler"))),
           },
-          { rejectUnknown: true },
+          { rejectUnknown: true, enforceRequiredGroups: true },
         );
         const attributeIds = resolvedAttributes.ids;
         const isSet = parseBoolean(get("set_urun"), false);
@@ -1099,6 +1100,12 @@ export class AdminProductBulkImportService {
       error instanceof BadRequestException ||
       error instanceof ConflictException
     ) {
+      // i18n yüklü hatalar (renk, zorunlu grup, tek seçim) Nest'in "Bad Request
+      // Exception" yedeğine düşüyordu; satır hatası Türkçe metinle raporlanır.
+      const localized = localizedPayloadOf(error);
+      if (localized) {
+        return translateMessage(localized.i18nKey, "tr", localized.i18nParams);
+      }
       const response = error.getResponse();
       if (typeof response === "string") return response;
       if (response && typeof response === "object") {

@@ -307,8 +307,10 @@ export class ProductCreateService {
       attributeIds: dto.attributeIds,
       attributeSlugs: dto.attributes,
     };
-    const resolvedAttributes =
-      await this.common.resolveProductAttributes(attributeSelection);
+    const resolvedAttributes = await this.common.resolveProductAttributes(
+      attributeSelection,
+      { enforceRequiredGroups: true },
+    );
 
     try {
       const product = await this.prisma.product.create({

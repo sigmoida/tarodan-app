@@ -8,6 +8,9 @@ import {
   resolveColorsFromText,
   splitColorText,
   isProtectedAttributeGroup,
+  isGlobalCustomAttributeGroup,
+  attributeGroupSelectionMode,
+  NON_CUSTOM_GROUP_SLUGS,
 } from "./attribute-groups";
 
 const OPTIONS = COLOR_CATALOG.map((entry) => ({
@@ -129,5 +132,28 @@ describe("isProtectedAttributeGroup", () => {
     expect(
       isProtectedAttributeGroup({ slug: "hw-series", isRequired: false }),
     ).toBe(false);
+  });
+});
+
+describe("isGlobalCustomAttributeGroup / attributeGroupSelectionMode", () => {
+  it("admin'in açtığı üreticisiz grup genel özeldir ve tek seçimlidir", () => {
+    const group = { slug: "nadirlik-bulunabilirlik", manufacturerSlug: null };
+    expect(isGlobalCustomAttributeGroup(group)).toBe(true);
+    expect(attributeGroupSelectionMode(group)).toBe("single");
+  });
+
+  it("sabit üçlü ve gizli grup genel özel sayılmaz", () => {
+    for (const slug of ["scale", "material", "color", "vehicle_type"]) {
+      expect(
+        isGlobalCustomAttributeGroup({ slug, manufacturerSlug: null }),
+      ).toBe(false);
+      expect(NON_CUSTOM_GROUP_SLUGS).toContain(slug);
+    }
+  });
+
+  it("üreticiye bağlı grup çoklu seçimli kalır", () => {
+    const group = { slug: "hw-segment", manufacturerSlug: "hot-wheels" };
+    expect(isGlobalCustomAttributeGroup(group)).toBe(false);
+    expect(attributeGroupSelectionMode(group)).toBe("multi");
   });
 });

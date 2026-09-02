@@ -3,6 +3,15 @@
 import { useQuery } from "@tanstack/react-query";
 import { queryKeys } from "@/lib/query/keys";
 import { listingsApi } from "@/lib/api";
+import type { AttributeGroup } from "@tarodan/listing-form";
+
+/**
+ * Özel attribute grubu — genel özel (üreticisiz, her ilanda) ya da üreticiye
+ * bağlı; `/products/attribute-groups` ile aynı şekil, ilan formu paketinin
+ * tipi yeniden kullanılır. `/products/filters` üreticisiz çağrıda yalnız genel
+ * grupları döner.
+ */
+export type CustomAttributeGroup = AttributeGroup;
 
 /** `/products/filters` yanıtı — kenar çubuğunun beslendiği katalog metadatası. */
 export interface FiltersData {
@@ -16,6 +25,7 @@ export interface FiltersData {
     slug: string;
     brandId: string;
   }>;
+  customAttributes?: CustomAttributeGroup[];
 }
 
 /** Katalog metadatası oturum boyunca değişmez sayılır. */

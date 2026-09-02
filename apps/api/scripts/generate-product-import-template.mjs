@@ -354,7 +354,11 @@ const notes = [
   ["urun_ref", "Dosya içinde benzersiz, sizin takip numaranızdır."],
   ["durum", "new, like_new, very_good, good veya fair."],
   ["malzeme", "Admin özelliklerinde tanımlı slug; örneğin diecast."],
-  ["ek_ozellikler", "Opsiyonel. Admin özellik slug'larını virgülle ayırın."],
+  [
+    "ek_ozellikler",
+    "Özel özellik slug'ları, virgülle ayrılır (renk/ölçek/malzeme buraya yazılmaz). " +
+      "Zorunlu işaretli genel gruplardan (örn. Nadirlik) birer slug ZORUNLUDUR; eksikse satır reddedilir.",
+  ],
   ["set_parca_sayisi", "Yalnız set_urun=Evet ise zorunlu ve en az 2."],
   ["gorsel_1..10", "En az 3, en fazla 10 görsel dosya adı."],
 ];

@@ -90,12 +90,10 @@ describe("ProductCreateService required listing details", () => {
     },
   };
   const common = {
-    resolveProductAttributes: jest
-      .fn()
-      .mockResolvedValue({
-        ids: ["attr-scale", "attr-material"],
-        colorLabels: [],
-      }),
+    resolveProductAttributes: jest.fn().mockResolvedValue({
+      ids: ["attr-scale", "attr-material"],
+      colorLabels: [],
+    }),
     attachProductAttributes: jest.fn().mockResolvedValue(undefined),
     formatProductResponse: jest.fn().mockImplementation((product) => product),
   };
@@ -158,13 +156,17 @@ describe("ProductCreateService required listing details", () => {
         }),
       }),
     );
-    expect(common.resolveProductAttributes).toHaveBeenCalledWith({
-      scale: "1:64",
-      material: "diecast",
-      colors: undefined,
-      attributeIds: undefined,
-      attributeSlugs: undefined,
-    });
+    // Create'te zorunlu genel özel gruplar her zaman denetlenir.
+    expect(common.resolveProductAttributes).toHaveBeenCalledWith(
+      {
+        scale: "1:64",
+        material: "diecast",
+        colors: undefined,
+        attributeIds: undefined,
+        attributeSlugs: undefined,
+      },
+      { enforceRequiredGroups: true },
+    );
     expect(common.attachProductAttributes).toHaveBeenCalledWith("product-1", [
       "attr-scale",
       "attr-material",

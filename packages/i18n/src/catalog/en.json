@@ -841,7 +841,10 @@
     "originalPriceTry": "Original Price (₺)",
     "imageFormatsHint": "JPEG, PNG, WebP, GIF · max {maxMb} MB",
     "noOptionsDefined": "No options defined for this field",
-    "optionsLoadFailed": "Options could not be loaded — refresh the page"
+    "optionsLoadFailed": "Options could not be loaded — refresh the page",
+    "additionalDetails": "Additional details",
+    "globalAttrsHint": "Extra fields that apply to every listing. Buyers can filter by these.",
+    "requiredFieldLabel": "{name} *"
   },
   "cart": {
     "myCart": "My Cart",
@@ -9128,7 +9131,9 @@
       "imageKeyInvalid": "The image key is invalid",
       "imageKeyWrongPath": "The image key is not on the product-image path",
       "createFailed": "The listing could not be created: {reason}",
-      "invalidColors": "Invalid colour selection: {colors}"
+      "invalidColors": "Invalid colour selection: {colors}",
+      "requiredAttributeGroups": "Required attribute selection missing: {groups}",
+      "attributeGroupSingleSelect": "Only one option can be selected in this attribute group: {groups}"
     },
     "refund": {
       "alreadyActive": "There is already an active refund request for this order",

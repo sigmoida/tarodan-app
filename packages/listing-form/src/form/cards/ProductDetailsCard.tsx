@@ -15,6 +15,7 @@ import {
   type Ref,
 } from "../constants";
 import ColorSelectField from "./ColorSelectField";
+import { optionPlaceholder } from "./option-text";
 
 interface ProductDetailsCardProps {
   locale: string;
@@ -75,23 +76,15 @@ export default function ProductDetailsCard({
    * dışı bırakılıp sebebi yazılır — yönetici grubu doldurunca kendiliğinden
    * çalışır.
    */
-  /**
-   * Boş bir seçenek listesinin ekranda ne diyeceği.
-   *
-   * "Tanımlanmamış" demek YALNIZ katalog gerçekten boşken doğrudur. İstek
-   * düştüğünde aynı şeyi demek satıcıyı yanıltır — hatayı katalogda sanır ve
-   * ölçek/malzeme zorunlu olduğu için ilanı hiç kaydedemez; sayfayı yenilemek
-   * çözerken kimse söylemez. Yükleme anında da göstermek, her açılışta
-   * "bozuk" görünen bir form demektir.
-   */
-  const optionText = (count: number, ready: string) => {
-    if (count > 0) return { placeholder: ready, disabled: false };
-    if (optionsStatus === "loading")
-      return { placeholder: t("common.loading"), disabled: true };
-    if (optionsStatus === "failed")
-      return { placeholder: t("product.optionsLoadFailed"), disabled: true };
-    return { placeholder: t("product.noOptionsDefined"), disabled: true };
-  };
+  // Boş listenin ne diyeceği tek yerde (bkz. option-text.ts); özel grup
+  // kartı da aynı kuralı kullanır.
+  const optionText = (count: number, ready: string) =>
+    optionPlaceholder(optionsStatus, count, {
+      loading: t("common.loading"),
+      failed: t("product.optionsLoadFailed"),
+      empty: t("product.noOptionsDefined"),
+      ready,
+    });
   const scaleField = optionText(scaleList.length, t("product.selectScale"));
   const materialField = optionText(
     materialList.length,

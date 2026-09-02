@@ -6,6 +6,8 @@
 export * from "./constants";
 export * from "./queries";
 export * from "./schema";
+export * from "./attribute-groups";
+export * from "./cards/option-text";
 export {
   useListingImageUpload,
   type ListingImage,
@@ -19,6 +21,7 @@ export { default as ImagesCard } from "./cards/ImagesCard";
 export { default as DiscountCard, type SaleData } from "./cards/DiscountCard";
 export * from "./sale-data";
 export { default as ManufacturerAttributesCard } from "./cards/ManufacturerAttributesCard";
+export { default as GlobalAttributesCard } from "./cards/GlobalAttributesCard";
 
 // Sunucuya açılan tek kapı — uygulamalar kendi istemcilerini buradan verir.
 export {

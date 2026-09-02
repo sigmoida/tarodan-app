@@ -55,14 +55,17 @@ export function mapSuratStatusToShipmentStatus(
 }
 
 /**
- * Whether a Sürat status indicates the shipment has been successfully delivered.
+ * Whether a Sürat status CODE is a delivery code. Tek başına "alıcıya teslim"
+ * kanıtı DEĞİLDİR — iade bayrağıyla birlikte okunmalı; karar `interpretSuratTracking`'te.
  */
 export function isSuratDelivered(kargonunDurumuSayi: number): boolean {
   return kargonunDurumuSayi === 6 || kargonunDurumuSayi === 7;
 }
 
 /**
- * Whether a Sürat status indicates the shipment is in a return flow.
+ * Whether a Sürat status CODE sits in the documented return range. Canlıda bu
+ * aralık gerçek iade olmadan da geliyor (aşağıya bak); tek başına karar için
+ * kullanma, `interpretSuratTracking().isReturnFlow`'a bak.
  */
 export function isSuratReturnFlow(kargonunDurumuSayi: number): boolean {
   return kargonunDurumuSayi >= 9 && kargonunDurumuSayi <= 16;
@@ -73,7 +76,13 @@ export interface SuratReturnSignals {
   KargonunDurumuSayi: number;
   KargonunDurumu?: string | null;
   IadeDurum?: string | null;
-  Hareketler?: { Islem?: string | null }[] | null;
+  Hareketler?:
+    | {
+        Islem?: string | null;
+        IslemTarihi?: string | null;
+        KargoHareketKargonunDurumuSayi?: string | number | null;
+      }[]
+    | null;
 }
 
 /**
@@ -122,4 +131,121 @@ export function isSuratReturnCompleted(gonderi: SuratReturnSignals): boolean {
   return (gonderi.Hareketler ?? []).some((h) =>
     /iade\s*edildi/.test(normalizeTr(h?.Islem)),
   );
+}
+
+/** `interpretSuratTracking`'in tek çıktısı — üç senkron servisi de bunu okur. */
+export interface SuratTrackingInterpretation {
+  /** Yerel statü hedefi; `null` = statüyü DEĞİŞTİRME (bilinmeyen ya da belirsiz). */
+  status: ShipmentStatus | null;
+  /** Alıcıya teslim (escrow/teslim işleyicisini tetikler). */
+  isDelivered: boolean;
+  /** Koli gerçekten iade akışında (bayrak "Evet" ya da tamamlanmış iade). */
+  isReturnFlow: boolean;
+  /** İade göndericiye geri teslim edildi. */
+  isReturnCompleted: boolean;
+}
+
+/**
+ * En son hareketin taşıdığı kod (Sürat string döner); parse edilemezse null.
+ * Sürat listeyi yeniden-eskiye veriyor ama sıraya güvenmek yerine tarihe bakılır
+ * (ISO benzeri "2026-09-02T10:57:12.000" metni sözlük sırasıyla karşılaştırılabilir).
+ */
+function latestMovementCode(gonderi: SuratReturnSignals): number | null {
+  const movements = gonderi.Hareketler ?? [];
+  let latest: (typeof movements)[number] | undefined;
+  for (const h of movements) {
+    if (!latest) {
+      latest = h;
+      continue;
+    }
+    if ((h?.IslemTarihi ?? "") > (latest.IslemTarihi ?? "")) latest = h;
+  }
+  const raw = latest?.KargoHareketKargonunDurumuSayi;
+  if (raw === null || raw === undefined || raw === "") return null;
+  const code = Number(raw);
+  return Number.isInteger(code) ? code : null;
+}
+
+/**
+ * Sürat takip cevabını yerel karara çeviren TEK yer.
+ *
+ * Kod tablosu (1–16) tek başına güvenilir değil; canlıda iki kez yanıldı:
+ *  - Tamamlanmış iade dokümandaki 12 yerine 13 ("İade Gönderi Yolda") ile geldi.
+ *  - Normal bir teslimat, koli daha şubedeyken 9 ("İade Sürecinde") gösterdi;
+ *    `IadeDurum: "Hayır"`, hareketler sıradan yükleme kayıtlarıydı ve ertesi
+ *    gün 6 ile teslim edildi (PKG-2HGNFGEGTD, 2026-09-01). Kodu sorgusuz
+ *    kabul eden eski mapper koliyi `return_in_progress`'e düşürdü; durum
+ *    makinesi oradan teslime geçişi yasakladığı için koli sonsuza dek kilitlendi,
+ *    sipariş "hazırlanıyor"da kaldı ve satıcı ödemesi hiç başlamadı.
+ *
+ * Bu yüzden iade kararı KOD'a değil Sürat'ın iade BAYRAĞINA (`IadeDurum`) ve
+ * tamamlanma sinyallerine bağlanır; kod yalnız akış içindeki konumu söyler.
+ */
+export function interpretSuratTracking(
+  gonderi: SuratReturnSignals,
+): SuratTrackingInterpretation {
+  const code = gonderi.KargonunDurumuSayi;
+  const flagged = isReturnFlagged(gonderi.IadeDurum);
+
+  if (isSuratReturnCompleted(gonderi)) {
+    return {
+      status: ShipmentStatus.returned,
+      isDelivered: false,
+      isReturnFlow: true,
+      isReturnCompleted: true,
+    };
+  }
+
+  if (isSuratDelivered(code)) {
+    // İade bayraklı "teslim" ama tamamlanma sinyali yok: alıcıya mı, göndericiye
+    // mi teslim belli değil. Alıcıya sayıp escrow'u satıcıya açmak para hatası
+    // olur; göndericiye sayıp alıcıya para iade etmek de öyle. Dokunma, uyar.
+    if (flagged) {
+      return {
+        status: null,
+        isDelivered: false,
+        isReturnFlow: true,
+        isReturnCompleted: false,
+      };
+    }
+    return {
+      status: ShipmentStatus.delivered,
+      isDelivered: true,
+      isReturnFlow: false,
+      isReturnCompleted: false,
+    };
+  }
+
+  if (isSuratReturnFlow(code)) {
+    if (flagged) {
+      return {
+        status: ShipmentStatus.return_in_progress,
+        isDelivered: false,
+        isReturnFlow: true,
+        isReturnCompleted: false,
+      };
+    }
+    // Bayraksız iade kodu = iade DEĞİL. Konumu son hareketin kodundan türet;
+    // hareket kodu da iade aralığındaysa ya da yoksa statüye dokunma.
+    const movementCode = latestMovementCode(gonderi);
+    const status =
+      movementCode !== null &&
+      !isSuratReturnFlow(movementCode) &&
+      !isSuratDelivered(movementCode)
+        ? mapSuratStatusToShipmentStatus(movementCode)
+        : null;
+    return {
+      status,
+      isDelivered: false,
+      isReturnFlow: false,
+      isReturnCompleted: false,
+    };
+  }
+
+  return {
+    status: mapSuratStatusToShipmentStatus(code),
+    isDelivered: false,
+    isReturnFlow: false,
+    isReturnCompleted: false,
+  };
 }

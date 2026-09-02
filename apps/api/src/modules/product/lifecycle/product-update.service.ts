@@ -25,6 +25,7 @@ import { PUBLIC_IDENTITY_SELECT } from "../../../common/helpers/public-identity"
 import {
   COLOR_GROUP_SLUG,
   MATERIAL_GROUP_SLUG,
+  NON_CUSTOM_GROUP_SLUGS,
   SCALE_GROUP_SLUG,
   colorColumnValue,
 } from "../../../common/helpers/attribute-groups";
@@ -473,13 +474,18 @@ export class ProductUpdateService {
       dto.colors !== undefined ||
       dto.attributes !== undefined;
     const resolvedAttributes = attributesChanged
-      ? await this.common.resolveProductAttributes({
-          scale: dto.scale,
-          material: dto.material,
-          colors: dto.colors,
-          attributeIds: dto.attributeIds,
-          attributeSlugs: dto.attributes,
-        })
+      ? await this.common.resolveProductAttributes(
+          {
+            scale: dto.scale,
+            material: dto.material,
+            colors: dto.colors,
+            attributeIds: dto.attributeIds,
+            attributeSlugs: dto.attributes,
+          },
+          // Zorunlu genel gruplar yalnız `attributes` gönderildiğinde denetlenir:
+          // aşağıdaki sıfırlama o alanla tetiklenir, son durum = bu seçim.
+          { enforceRequiredGroups: dto.attributes !== undefined },
+        )
       : null;
 
     const updateData: Prisma.ProductUpdateInput = {
@@ -667,33 +673,33 @@ export class ProductUpdateService {
           ...(dto.material !== undefined ? [MATERIAL_GROUP_SLUG] : []),
           ...(dto.colors !== undefined ? [COLOR_GROUP_SLUG] : []),
         ];
+        // Silme ilişki filtresiyle yapılır: grubun tüm attribute id'lerini
+        // belleğe çekip `in` listesi kurmak renk/ölçek kataloğu büyüdükçe her
+        // güncellemede gereksiz yük bindiriyordu.
         if (groupsToReset.length > 0) {
-          const groupAttrIds = await this.prisma.attribute
-            .findMany({
-              where: { group: { slug: { in: groupsToReset } } },
-              select: { id: true },
-            })
-            .then((a) => a.map((x) => x.id));
-          if (groupAttrIds.length > 0) {
-            await this.prisma.productAttribute.deleteMany({
-              where: { productId: id, attributeId: { in: groupAttrIds } },
-            });
-          }
+          await this.prisma.productAttribute.deleteMany({
+            where: {
+              productId: id,
+              attribute: { group: { slug: { in: groupsToReset } } },
+            },
+          });
         }
-        // Also clear any prior manufacturer-scoped attribute selections so the user can
-        // replace them via the update payload (matches POST create semantics).
+        // `attributes` payload'ın sahibi olduğu TÜM özel grupları sıfırlar:
+        // genel özel (Nadirlik gibi) + üreticiye bağlı. Eskiden yalnız
+        // üreticiye bağlı gruplar temizleniyordu; genel bir grubun seçimi
+        // geri alınamıyor, eski bağlar birikiyordu. `resolveProductAttributes`
+        // aynı küme dışına yazamadığı için sıfırlama ile bağlama simetriktir.
+        // Tx dışında kalır (create ile aynı): yarım kalırsa sonraki kayıt
+        // onarır; upsert döngüsünü etkileşimli tx'e sokmak zaman aşımı riski.
         if (dto.attributes !== undefined) {
-          const scopedAttrIds = await this.prisma.attribute
-            .findMany({
-              where: { group: { manufacturerSlug: { not: null } } },
-              select: { id: true },
-            })
-            .then((a) => a.map((x) => x.id));
-          if (scopedAttrIds.length > 0) {
-            await this.prisma.productAttribute.deleteMany({
-              where: { productId: id, attributeId: { in: scopedAttrIds } },
-            });
-          }
+          await this.prisma.productAttribute.deleteMany({
+            where: {
+              productId: id,
+              attribute: {
+                group: { slug: { notIn: [...NON_CUSTOM_GROUP_SLUGS] } },
+              },
+            },
+          });
         }
         await this.common.attachProductAttributes(id, resolvedAttributes.ids);
       }
@@ -756,11 +762,10 @@ export class ProductUpdateService {
           );
       }
 
-      // Refetch product after attribute linking so response includes updated scale/material
+      // Nitelik bağlama tx sonrası yapıldığı için yanıt yeniden okunur; koşul
+      // çözümlemeyle aynı (renk/özel-grup değişimi de taze `attributes[]` ister).
       const toReturn =
-        dto.scale !== undefined ||
-        dto.attributeIds !== undefined ||
-        dto.material !== undefined
+        resolvedAttributes !== null
           ? await this.prisma.product.findUnique({
               where: { id },
               include: {

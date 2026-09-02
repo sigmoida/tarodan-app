@@ -31,6 +31,38 @@ describe("shipment-state-machine (#86)", () => {
       expect(canTransitionShipmentStatus(S.delivered, S.returned)).toBe(true);
     });
 
+    it("lets a return-flagged parcel still be delivered (Sürat's transient code 9)", () => {
+      // PKG-2HGNFGEGTD: bayraksız kod 9 → return_in_progress, ertesi gün kod 6.
+      // Bu geçiş kapalıyken koli sonsuza dek kilitlendi; admin override da aynı
+      // grafiği kullandığı için kodsuz kurtarma yoktu.
+      expect(
+        canTransitionShipmentStatus(S.return_in_progress, S.delivered),
+      ).toBe(true);
+      expect(
+        canTransitionShipmentStatus(S.return_in_progress, S.returned),
+      ).toBe(true);
+      expect(
+        canTransitionShipmentStatus(S.return_in_progress, S.in_transit),
+      ).toBe(false);
+    });
+
+    it("lets the carrier cancel a parcel from any non-terminal state", () => {
+      // PKG-ANSXZR4QFC: "Gönderi iptal edilmiştir" picked_up'ta 13 gün yutuldu.
+      for (const from of [
+        S.picked_up,
+        S.in_transit,
+        S.at_delivery_branch,
+        S.out_for_delivery,
+        S.failed,
+        S.return_in_progress,
+      ]) {
+        expect(canTransitionShipmentStatus(from, S.cancelled)).toBe(true);
+      }
+      // Para akmış terminal satırlar iptale geri sarılamaz.
+      expect(canTransitionShipmentStatus(S.delivered, S.cancelled)).toBe(false);
+      expect(canTransitionShipmentStatus(S.returned, S.cancelled)).toBe(false);
+    });
+
     it("locks returned / cancelled as fully terminal", () => {
       for (const to of Object.values(S)) {
         if (to === S.returned) continue;

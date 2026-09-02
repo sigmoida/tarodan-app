@@ -1,7 +1,11 @@
 /** @format */
 
 import type { SaleData } from "../form";
-import { COLOR_GROUP_SLUG } from "../form/constants";
+import {
+  COLOR_GROUP_SLUG,
+  isDedicatedAttributeGroup,
+  isHiddenAttributeGroup,
+} from "../form/constants";
 import type {
   EditListingFormData,
   ListingEditAttribute,
@@ -37,17 +41,24 @@ const attributeOf = (
   (attributes ?? []).find((a) => a.groupSlug === groupSlug);
 
 /**
- * Üreticiye özel nitelik seçimleri: `{ grupSlug: [nitelikSlug] }`.
+ * Özel grup seçimleri: `{ grupSlug: [nitelikSlug] }` — genel özel gruplar
+ * (Nadirlik gibi) ve üreticiye bağlı gruplar birlikte.
  *
- * Yalnız üreticiye BAĞLI gruplar alınır; ölçek ve malzeme gibi global grupların
- * kendi form alanları vardır ve bu bölüme sızmamalıdır.
+ * Yalnız sabit üçlü (ölçek/malzeme/renk) ve gizli gruplar dışarıda kalır;
+ * onların kendi alanları var. Eskiden üreticisiz her grup atlanıyordu:
+ * genel bir grubun seçimi forma dolmuyor ve kaydetme payload'ı `attributes`
+ * listesini her zaman gönderdiği için kayıt anında SİLİNİYORDU.
  */
 function customAttributesOf(
   attributes: ListingEditAttribute[] | undefined,
 ): Record<string, string[]> {
   const grouped: Record<string, string[]> = {};
   for (const attribute of attributes ?? []) {
-    if (!attribute.manufacturerSlug) continue;
+    if (
+      isDedicatedAttributeGroup(attribute.groupSlug) ||
+      isHiddenAttributeGroup(attribute.groupSlug)
+    )
+      continue;
     (grouped[attribute.groupSlug] ??= []).push(attribute.slug);
   }
   return grouped;
@@ -56,8 +67,8 @@ function customAttributesOf(
 /**
  * İlanın renk seçimleri — global "color" grubundaki nitelikler.
  *
- * `customAttributesOf` yalnız ÜRETİCİYE bağlı grupları alır, bu yüzden renk
- * oraya sızmaz; kendi alanı olarak burada toplanır.
+ * `customAttributesOf` sabit üçlüyü dışarıda tutar, bu yüzden renk oraya
+ * sızmaz; kendi alanı olarak burada toplanır.
  */
 function colorSlugsOf(
   attributes: ListingEditAttribute[] | undefined,

@@ -11,13 +11,11 @@ import type {
   SuratTakipGonderi,
   SuratTrackingLookupResult,
 } from "../helpers/surat-cargo.types";
+import { interpretSuratTracking } from "../mappers/surat-status.mapper";
 import {
-  mapSuratStatusToShipmentStatus,
-  isSuratDelivered,
-  isSuratReturnFlow,
-  isSuratReturnCompleted,
-} from "../mappers/surat-status.mapper";
-import { canTransitionShipmentStatus } from "../../shipping/helpers/shipment-state-machine";
+  canTransitionShipmentStatus,
+  isTerminalShipmentStatus,
+} from "../../shipping/helpers/shipment-state-machine";
 import { SHIPPABLE_ORDER_STATUSES } from "../../order/helpers/order-state-machine";
 import { SuratTrackingClient } from "../clients/surat-tracking.client";
 
@@ -207,7 +205,9 @@ export class OrderTrackingSyncService {
    * Durum makinesine UYAR: `delivered`/`returned` gibi terminal bir satır
    * `cancelled`'a geri çekilemez (teslim edilmiş koliyi iptale düşürmek escrow
    * kararını geri sarardı), o satırlar olduğu gibi bırakılır — zaten poller
-   * sorgusunda değiller.
+   * sorgusunda değiller. Ara durumların hepsi (`picked_up` dahil) iptale
+   * çekilebilir: canlıda `picked_up`'taki bir koli için "Gönderi iptal
+   * edilmiştir" 13 gün boyunca sessizce yutuldu ve sipariş "kargoda" kaldı.
    */
   private async markParcelCancelled(
     siblings: { id: string; status: ShipmentStatus }[],
@@ -218,8 +218,11 @@ export class OrderTrackingSyncService {
       if (
         !canTransitionShipmentStatus(shipment.status, ShipmentStatus.cancelled)
       ) {
+        const why = isTerminalShipmentStatus(shipment.status)
+          ? "is terminal"
+          : "cannot move to cancelled";
         this.logger.warn(
-          `Surat reports ${shipment.id} cancelled but local status ${shipment.status} is terminal; leaving as is`,
+          `Surat reports ${shipment.id} cancelled but local status ${shipment.status} ${why}; leaving as is`,
         );
         continue;
       }
@@ -254,31 +257,25 @@ export class OrderTrackingSyncService {
     shipment: any,
     gonderi: SuratTakipGonderi,
   ): Promise<boolean> {
-    const mappedStatus = mapSuratStatusToShipmentStatus(
-      gonderi.KargonunDurumuSayi,
-    );
-    // L2: bilinmeyen kod statüyü değiştirmez; ham kod yine kaydedilir.
-    if (mappedStatus === null) {
+    // Tek karar mercii: kod + iade bayrağı + tamamlanma sinyalleri birlikte
+    // okunur (mapper'daki gerekçe). `status: null` = statüye dokunma; ham kod
+    // yine kaydedilir.
+    const reading = interpretSuratTracking(gonderi);
+    if (reading.status === null) {
       this.logger.warn(
-        `Unknown Surat status code ${gonderi.KargonunDurumuSayi} ("${gonderi.KargonunDurumu}") for shipment ${shipment.id}; keeping status ${shipment.status}`,
+        reading.isReturnFlow
+          ? `Ambiguous Surat state for shipment ${shipment.id}: code=${gonderi.KargonunDurumuSayi} ("${gonderi.KargonunDurumu}") IadeDurum=${gonderi.IadeDurum}; keeping status ${shipment.status}`
+          : `Unknown Surat status code ${gonderi.KargonunDurumuSayi} ("${gonderi.KargonunDurumu}") for shipment ${shipment.id}; keeping status ${shipment.status}`,
       );
     }
-    const isDelivered = isSuratDelivered(gonderi.KargonunDurumuSayi);
-    const isReturnCompleted = isSuratReturnCompleted(gonderi);
-    // Tamamlanmış iade `returned`'dır — kod tablosu ne derse desin. Canlıda
-    // tamamlanma kodu 13 ile geliyor ve tablo 13'ü `return_in_progress`'e
-    // eşliyor; haritaya bırakılırsa koli iade parası çoktan ödenmişken
-    // "iade sürecinde" takılı kalır, terminal olmadığı için de sonsuza kadar
-    // sorgulanır. Tek karar mercii `isSuratReturnCompleted`.
-    const newStatus = isReturnCompleted
-      ? ShipmentStatus.returned
-      : (mappedStatus ?? shipment.status);
+    const { isDelivered, isReturnCompleted } = reading;
+    const newStatus = reading.status ?? shipment.status;
     // KargoTakipHareketDetayi'nda gönderi satırının görünmesi, ön bildirimin
     // şubede kabul edilip gerçek Sürat koduna dönüştüğü ilk güvenilir işarettir.
     const firstPhysicalHandoff =
       !shipment.shippedAt &&
       Boolean(gonderi.KargoTakipNo) &&
-      !isSuratReturnFlow(gonderi.KargonunDurumuSayi);
+      !reading.isReturnFlow;
 
     // #86: a re-poll can return a stale/older code; never regress a terminal
     // shipment (e.g. delivered → in_transit). Skip the update, keep current state.
@@ -346,7 +343,7 @@ export class OrderTrackingSyncService {
     }
 
     // Return info
-    if (isSuratReturnFlow(gonderi.KargonunDurumuSayi)) {
+    if (reading.isReturnFlow) {
       const reason = gonderi.IadeAciklama || gonderi.DevirSebebi || "";
       if (reason) {
         updateData.returnReason = reason;

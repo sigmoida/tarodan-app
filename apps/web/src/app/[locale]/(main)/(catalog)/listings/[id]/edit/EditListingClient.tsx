@@ -22,8 +22,9 @@ import {
   useCarModels,
   useCommissionPreview,
   useListingImageUpload,
-  useManufacturerAttributes,
+  useAttributeGroups,
   DiscountCard,
+  GlobalAttributesCard,
   ManufacturerAttributesCard,
 } from "@tarodan/listing-form";
 import { useEditListingForm } from "./_hooks/useEditListingForm";
@@ -51,6 +52,7 @@ export default function EditListingClient() {
     seedExistingImagesRef,
     imageSubmitBlockerRef,
     hasUserImageEditsRef,
+    requiredGroupSlugsRef,
     showDiscountSection,
     setShowDiscountSection,
     isLoading,
@@ -140,9 +142,13 @@ export default function EditListingClient() {
     record?.manufacturerSlug,
     manufacturerList,
   );
-  const { manufacturerAttrGroups } = useManufacturerAttributes(
-    selectedManufacturerSlug,
-  );
+  const {
+    globalAttrGroups,
+    manufacturerAttrGroups,
+    requiredGroupSlugs,
+    attrGroupsStatus,
+  } = useAttributeGroups(selectedManufacturerSlug);
+  requiredGroupSlugsRef.current = requiredGroupSlugs;
   const {
     commissionPreview,
     commissionPreviewLoading,
@@ -275,6 +281,10 @@ export default function EditListingClient() {
           legacyColor={record?.color ?? null}
           manufacturerList={manufacturerOptions}
           yearOptions={getYearOptions()}
+        />
+        <GlobalAttributesCard
+          attrGroups={globalAttrGroups}
+          attrGroupsStatus={attrGroupsStatus}
         />
         {/* Üretici nitelikleri: yeni ilan formunda vardı, burada yoktu —
             satıcı seçimlerini göremiyor, kaydedince hepsi siliniyordu. */}

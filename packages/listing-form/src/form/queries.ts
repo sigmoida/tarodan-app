@@ -8,12 +8,14 @@ import type { PackageTierCode } from "./usePackageTiers";
 import {
   EXCLUDED_BRAND_SLUGS,
   EXCLUDED_SCALE_SLUGS,
+  type AttributeGroupSelectionMode,
   type Brand,
   type Category,
   type CarModel,
   type ColorOption,
   type Ref,
 } from "./constants";
+import { requiredGroupSlugsOf, splitAttributeGroups } from "./attribute-groups";
 
 // Shared TanStack Query hooks for the new/edit listing forms. One set of query
 // keys → the two forms share the cache.
@@ -265,30 +267,52 @@ export interface AttributeGroup {
   name: string;
   manufacturerSlug: string | null;
   isRequired: boolean;
+  /** Sunucu kuralı: genel özel = tek, renk/üreticiye bağlı = çoklu. */
+  selectionMode?: AttributeGroupSelectionMode;
   attributes: Array<{ slug: string; label: string; color?: string | null }>;
 }
 
-/** Manufacturer-scoped attribute groups (global scale/material groups dropped). */
-export function useManufacturerAttributes(
-  manufacturerSlug: string | undefined,
-) {
+export type AttributeGroupsStatus = "loading" | "failed" | "ready";
+
+/**
+ * Özel attribute grupları — genel özel gruplar (admin'in açtığı, her ilanda
+ * sorulan) HER ZAMAN, üreticiye bağlı gruplar üretici seçilince.
+ *
+ * Eskiden yalnız üretici seçilince istek atılıyor ve yanıttan üreticisiz
+ * gruplar eleniyordu; admin'den açılan hiçbir grup forma ulaşamıyordu.
+ * Üretici değişince anahtar değişir; `placeholderData` önceki yanıtı tutar ki
+ * genel gruplar bir an için kaybolup formu "bozuk" göstermesin.
+ */
+export function useAttributeGroups(manufacturerSlug: string | undefined) {
   const api = useListingFormApi();
   const query = useListingQuery<AttributeGroup[]>({
-    resource: "listing-form-mfr-attrs",
-    params: manufacturerSlug,
-    fetcher: async () => {
-      const res = {
-        data: await api.get<any>("/products/attribute-groups", {
-          manufacturer: manufacturerSlug!,
-        }),
-      };
-      const groups = (res.data as AttributeGroup[]) ?? [];
-      return groups.filter((g) => g.manufacturerSlug === manufacturerSlug);
+    resource: "listing-form-attr-groups",
+    params: manufacturerSlug ?? null,
+    fetcher: async () =>
+      ((await api.get<any>(
+        "/products/attribute-groups",
+        manufacturerSlug ? { manufacturer: manufacturerSlug } : undefined,
+      )) as AttributeGroup[]) ?? [],
+    query: {
+      staleTime: 5 * 60 * 1000,
+      placeholderData: (prev: AttributeGroup[] | undefined) => prev,
     },
-    enabled: !!manufacturerSlug,
-    query: { staleTime: 5 * 60 * 1000 },
   });
-  return { manufacturerAttrGroups: manufacturerSlug ? (query.data ?? []) : [] };
+  const { global, scoped } = splitAttributeGroups(
+    query.data ?? [],
+    manufacturerSlug,
+  );
+  const attrGroupsStatus: AttributeGroupsStatus = query.isError
+    ? "failed"
+    : query.isPending && !query.data
+      ? "loading"
+      : "ready";
+  return {
+    globalAttrGroups: global,
+    manufacturerAttrGroups: scoped,
+    requiredGroupSlugs: requiredGroupSlugsOf(global),
+    attrGroupsStatus,
+  };
 }
 
 export interface ListingLimits {

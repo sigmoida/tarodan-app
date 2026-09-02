@@ -69,3 +69,6 @@ export interface ApiError {
   error?: string;
   details?: Record<string, any>;
 }
+
+// Attribute group rules (dedicated/hidden/global-custom groups, selection mode)
+export * from "./attribute-group";

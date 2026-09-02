@@ -8,6 +8,7 @@ import {
   Squares2X2Icon,
   ChevronRightIcon,
 } from "@heroicons/react/24/outline";
+import { isHiddenAttributeGroup } from "@tarodan/types";
 import { adminApi } from "@/lib/api";
 import { extractList } from "@/lib/extract";
 import { clientListFetcher } from "@/lib/query/client-list";
@@ -26,7 +27,7 @@ const attributeGroupsFetcher = clientListFetcher<AttributeGroup>(
   (raw) => extractList<AttributeGroup>(raw),
   {
     // No searchFields → full-content search across all displayed columns (#378).
-    filter: (group) => group.slug !== "vehicle_type",
+    filter: (group) => !isHiddenAttributeGroup(group.slug),
   },
 );
 

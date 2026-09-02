@@ -6,6 +6,7 @@ import {
   createContext,
   useContext,
   useEffect,
+  useMemo,
   useRef,
   useState,
   type ReactNode,
@@ -30,9 +31,11 @@ import {
   useListingCategories,
   useListingFilters,
   useCarModels,
-  useManufacturerAttributes,
+  useAttributeGroups,
   useListingLimits,
   useCommissionPreview,
+  keepAttributeGroups,
+  sameAttributeSelections,
 } from "@tarodan/listing-form";
 import { useListingImageUpload } from "@tarodan/listing-form";
 import {
@@ -54,7 +57,14 @@ function useNewListingValue() {
   const t = useTranslations();
   const CONDITIONS = getConditions(locale);
 
-  const form = useZodForm(newListingSchema(locale), {
+  // Zorunlu genel özel gruplar sorgudan gelir; şema onları doğrulama anında
+  // ref üzerinden okur (form kurulduğunda liste henüz yok).
+  const requiredGroupSlugsRef = useRef<readonly string[]>([]);
+  const schema = useMemo(
+    () => newListingSchema(locale, () => requiredGroupSlugsRef.current),
+    [locale],
+  );
+  const form = useZodForm(schema, {
     defaultValues: emptyListingValues,
   });
   const { watch, setValue, getValues } = form;
@@ -124,9 +134,13 @@ function useNewListingValue() {
   const selectedManufacturerSlug = manufacturerList.find(
     (m) => m.id === manufacturerId,
   )?.slug;
-  const { manufacturerAttrGroups } = useManufacturerAttributes(
-    selectedManufacturerSlug,
-  );
+  const {
+    globalAttrGroups,
+    manufacturerAttrGroups,
+    requiredGroupSlugs,
+    attrGroupsStatus,
+  } = useAttributeGroups(selectedManufacturerSlug);
+  requiredGroupSlugsRef.current = requiredGroupSlugs;
   const { listingLimits, limitsLoading, refetchLimits } =
     useListingLimits(queryEnabled);
   const {
@@ -152,18 +166,23 @@ function useNewListingValue() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isAuthenticated, authLoading]);
 
-  // Drop the previous manufacturer's attribute selections when it genuinely changes.
+  // Üretici gerçekten değişince ÖNCEKİ üreticinin grup seçimleri düşer; genel
+  // özel gruplar (Nadirlik gibi) üreticiden bağımsızdır ve korunur.
   const activeAttrManufacturer = useRef<string>("");
   useEffect(() => {
     if (manufacturerList.length === 0) return;
     const newKey =
       manufacturerList.find((m) => m.id === manufacturerId)?.id ?? "";
     if (activeAttrManufacturer.current === newKey) return;
-    if (
-      activeAttrManufacturer.current !== "" &&
-      Object.keys(getValues("customAttributes")).length > 0
-    ) {
-      setValue("customAttributes", {});
+    if (activeAttrManufacturer.current !== "") {
+      const current = getValues("customAttributes");
+      const kept = keepAttributeGroups(
+        current,
+        globalAttrGroups.map((g) => g.slug),
+      );
+      if (!sameAttributeSelections(current, kept)) {
+        setValue("customAttributes", kept);
+      }
     }
     activeAttrManufacturer.current = newKey;
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -295,7 +314,9 @@ function useNewListingValue() {
     models,
     modelsLoading,
     manufacturerList,
+    globalAttrGroups,
     manufacturerAttrGroups,
+    attrGroupsStatus,
     saleData,
     setSaleData,
     showDiscountSection,

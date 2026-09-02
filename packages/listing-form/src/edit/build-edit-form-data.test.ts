@@ -192,7 +192,57 @@ describe("buildListingFormData", () => {
     });
   });
 
-  it("global nitelikler (ölçek/malzeme) üretici bölümüne SIZMAZ", () => {
+  it("genel özel grup seçimleri forma dolar (kayıtta silinme regresyonu)", () => {
+    // Eskiden üreticisiz her grup atlanıyordu; payload `attributes` listesini
+    // her zaman gönderdiği için Nadirlik gibi genel bir seçim kaydetmede
+    // siliniyordu.
+    const { newFormData } = buildListingFormData(
+      edit({
+        attributes: [
+          {
+            groupSlug: "nadirlik-bulunabilirlik",
+            groupName: "Nadirlik/Bulunabilirlik",
+            slug: "nadir",
+            value: "Nadir",
+            displayValue: null,
+            manufacturerSlug: null,
+          },
+          {
+            groupSlug: "hw-segment",
+            groupName: "Hot Wheels Segment",
+            slug: "mainline",
+            value: "Mainline",
+            displayValue: null,
+            manufacturerSlug: "hot-wheels",
+          },
+        ],
+      }),
+    );
+    expect(newFormData.customAttributes).toEqual({
+      "nadirlik-bulunabilirlik": ["nadir"],
+      "hw-segment": ["mainline"],
+    });
+  });
+
+  it("gizli grup (vehicle_type) forma dolmaz", () => {
+    const { newFormData } = buildListingFormData(
+      edit({
+        attributes: [
+          {
+            groupSlug: "vehicle_type",
+            groupName: "Araç Türü",
+            slug: "suv",
+            value: "SUV",
+            displayValue: null,
+            manufacturerSlug: null,
+          },
+        ],
+      }),
+    );
+    expect(newFormData.customAttributes).toEqual({});
+  });
+
+  it("sabit üçlü (ölçek/malzeme) özel gruplara SIZMAZ", () => {
     const { newFormData } = buildListingFormData(
       edit({
         attributes: [

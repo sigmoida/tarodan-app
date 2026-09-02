@@ -273,10 +273,15 @@ export class CreateProductDto {
   attributeIds?: string[];
 
   @ApiPropertyOptional({
-    example: ["treasure-hunt", "mainline", "red"],
+    example: ["treasure-hunt", "mainline", "nadir"],
     description:
-      "Additional attribute slugs (e.g. Hot Wheels Segment/Assortment/Rarity selections). " +
-      "Resolved server-side to ProductAttribute rows via Attribute.slug lookup.",
+      "Custom attribute slugs: global custom groups (e.g. Nadirlik/Bulunabilirlik) and " +
+      "manufacturer-scoped groups (e.g. Hot Wheels Segment). Resolved server-side via " +
+      "Attribute.slug. Scale/material/color slugs are ignored here (they have their own fields). " +
+      "Global custom groups accept ONE slug each (400 server.product.attributeGroupSingleSelect); " +
+      "every isRequired global custom group from GET /products/attribute-groups must be present " +
+      "on create and whenever this field is sent on update (400 server.product.requiredAttributeGroups). " +
+      "attributeIds do not satisfy required groups.",
   })
   @IsOptional()
   @IsArray()

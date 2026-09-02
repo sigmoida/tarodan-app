@@ -25,6 +25,10 @@ import {
   type ProductDetail,
 } from "../_lib/types";
 import { statusConfig } from "@/lib/statusLabels";
+import {
+  isDedicatedAttributeGroup,
+  isHiddenAttributeGroup,
+} from "@tarodan/types";
 
 function Row({
   label,
@@ -122,6 +126,21 @@ export function ProductInfoSection({ product }: { product: ProductDetail }) {
               ? t("product.boxed")
               : t("product.unboxed")}
         </Row>
+        {/* Özel grup seçimleri (genel + üreticiye bağlı); sabit üçlü yukarıda. */}
+        {(product.edit?.attributes ?? [])
+          .filter(
+            (attribute) =>
+              !isDedicatedAttributeGroup(attribute.groupSlug) &&
+              !isHiddenAttributeGroup(attribute.groupSlug),
+          )
+          .map((attribute) => (
+            <Row
+              key={`${attribute.groupSlug}:${attribute.slug}`}
+              label={attribute.groupName ?? attribute.groupSlug}
+            >
+              {attribute.displayValue ?? attribute.value ?? attribute.slug}
+            </Row>
+          ))}
       </div>
       <div className="grid grid-cols-1 gap-4 border-t border-border pt-3 sm:grid-cols-2">
         <Row label={t("admin.catalog.products.viewCount")}>

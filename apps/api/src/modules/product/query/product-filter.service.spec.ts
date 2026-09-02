@@ -71,3 +71,114 @@ describe("ProductFilterService.getFilters", () => {
     expect(filters.materials).toEqual([{ slug: "ahsap", label: "Ahşap" }]);
   });
 });
+
+/**
+ * Özel gruplar: admin'in açtığı üreticisiz gruplar (Nadirlik gibi) üretici
+ * seçilmeden de döner; üreticiye bağlı olanlar yalnız `manufacturer` ile
+ * eklenir. Bir dönem yalnız üreticiye bağlı gruplar dönüyordu ve admin'den
+ * açılan hiçbir grup ilan formuna/filtreye ulaşamıyordu.
+ */
+describe("ProductFilterService özel gruplar", () => {
+  const rarity = {
+    slug: "nadirlik-bulunabilirlik",
+    name: "Nadirlik/Bulunabilirlik",
+    description: null,
+    isRequired: true,
+    manufacturerSlug: null,
+    attributes: [
+      { slug: "nadir", value: "Nadir", displayValue: null, color: null },
+    ],
+  };
+  const hwSegment = {
+    slug: "hw-segment",
+    name: "Hot Wheels Segment",
+    description: null,
+    isRequired: false,
+    manufacturerSlug: "hot-wheels",
+    attributes: [
+      { slug: "mainline", value: "Mainline", displayValue: null, color: null },
+    ],
+  };
+
+  const build = () => {
+    const prisma = {
+      category: { findMany: jest.fn().mockResolvedValue([]) },
+      brand: { findMany: jest.fn().mockResolvedValue([]) },
+      manufacturer: { findMany: jest.fn().mockResolvedValue([]) },
+      carModel: { findMany: jest.fn().mockResolvedValue([]) },
+      attribute: { findMany: jest.fn().mockResolvedValue([]) },
+      attributeGroup: {
+        findMany: jest.fn().mockImplementation(({ where }: any) => {
+          const scoped = (where.OR ?? []).some(
+            (clause: any) => clause.manufacturerSlug === "hot-wheels",
+          );
+          return Promise.resolve(scoped ? [rarity, hwSegment] : [rarity]);
+        }),
+      },
+    };
+    return { prisma, service: new ProductFilterService(prisma as any) };
+  };
+
+  it("getFilters üreticisiz de genel özel grupları döner, seçim kipiyle", async () => {
+    const { service } = build();
+
+    const filters = await service.getFilters();
+
+    expect(filters.customAttributes).toEqual([
+      {
+        slug: "nadirlik-bulunabilirlik",
+        name: "Nadirlik/Bulunabilirlik",
+        isRequired: true,
+        manufacturerSlug: null,
+        selectionMode: "single",
+        attributes: [{ slug: "nadir", label: "Nadir", color: null }],
+      },
+    ]);
+  });
+
+  it("getFilters sabit üçlüyü ve gizli grubu özel gruplardan dışlar", async () => {
+    const { prisma, service } = build();
+
+    await service.getFilters("hot-wheels");
+
+    const where = prisma.attributeGroup.findMany.mock.calls[0][0].where;
+    expect(where.isActive).toBe(true);
+    expect(where.slug.notIn).toEqual(
+      expect.arrayContaining(["scale", "material", "color", "vehicle_type"]),
+    );
+    expect(where.OR).toEqual([
+      { manufacturerSlug: null },
+      { manufacturerSlug: "hot-wheels" },
+    ]);
+  });
+
+  it("üretici verilince üreticiye bağlı grup çoklu kipte eklenir", async () => {
+    const { service } = build();
+
+    const filters = await service.getFilters("hot-wheels");
+
+    expect(
+      filters.customAttributes.map((g) => [g.slug, g.selectionMode]),
+    ).toEqual([
+      ["nadirlik-bulunabilirlik", "single"],
+      ["hw-segment", "multi"],
+    ]);
+  });
+
+  it("attribute-groups ucu yalnız gizli grubu dışlar (sabit üçlü formun alanları)", async () => {
+    const { prisma, service } = build();
+
+    const groups = await service.getAttributeGroupsForManufacturer();
+
+    const where = prisma.attributeGroup.findMany.mock.calls[0][0].where;
+    expect(where.slug.notIn).toEqual(["vehicle_type"]);
+    expect(groups[0]).toEqual(
+      expect.objectContaining({
+        slug: "nadirlik-bulunabilirlik",
+        isRequired: true,
+        selectionMode: "single",
+        description: null,
+      }),
+    );
+  });
+});

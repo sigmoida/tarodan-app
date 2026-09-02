@@ -59,27 +59,27 @@ web yalnızca **`sellerNetAmount`** ve **`shippingAmount`** gösteriyor. Yalnız
 
 ### Alanlar ve doğrulama
 
-| Alan                  | Kural                                                             |
-| --------------------- | ----------------------------------------------------------------- |
-| `title`               | trim, 1–200                                                       |
-| `description`         | trim, **30–330 (zorunlu)**                                        |
-| `categoryId`          | zorunlu                                                           |
-| `condition`           | zorunlu — `new \| like_new \| very_good \| good \| fair`          |
-| `brandId`             | zorunlu                                                           |
-| `carModelId`          | zorunlu (marka seçilene kadar kapalı)                             |
-| `modelCode`           | trim, 1–100 (zorunlu)                                             |
-| `color`               | trim, 1–80 (zorunlu)                                              |
-| `scale`               | zorunlu                                                           |
-| `material`            | zorunlu (slug)                                                    |
-| `manufacturerId`      | zorunlu                                                           |
-| `isBoxed`             | zorunlu — `boxed \| unboxed` (boş başlar, seçim zorunlu)          |
-| `year`                | opsiyonel (1950–bu yıl)                                           |
-| `isTradeEnabled`      | üyelikte `canTrade` yoksa anahtar yerine yükseltme bağlantısı     |
-| `quantity`            | oluşturmada varsayılan 1                                          |
-| `shippingPackageTier` | zorunlu, `small` \| `medium` \| `large` (bkz. doküman 14)         |
-| `price`               | zorunlu, ≥ 1                                                      |
-| `images`              | **oluşturmada en az 3**; üst sınır `maxImagesPerListing` (üyelik) |
-| `customAttributes`    | `Record<string, string[]>`                                        |
+| Alan                  | Kural                                                                                                                                           |
+| --------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| `title`               | trim, 1–200                                                                                                                                     |
+| `description`         | trim, **30–330 (zorunlu)**                                                                                                                      |
+| `categoryId`          | zorunlu                                                                                                                                         |
+| `condition`           | zorunlu — `new \| like_new \| very_good \| good \| fair`                                                                                        |
+| `brandId`             | zorunlu                                                                                                                                         |
+| `carModelId`          | zorunlu (marka seçilene kadar kapalı)                                                                                                           |
+| `modelCode`           | trim, 1–100 (zorunlu)                                                                                                                           |
+| `color`               | trim, 1–80 (zorunlu)                                                                                                                            |
+| `scale`               | zorunlu                                                                                                                                         |
+| `material`            | zorunlu (slug)                                                                                                                                  |
+| `manufacturerId`      | zorunlu                                                                                                                                         |
+| `isBoxed`             | zorunlu — `boxed \| unboxed` (boş başlar, seçim zorunlu)                                                                                        |
+| `year`                | opsiyonel (1950–bu yıl)                                                                                                                         |
+| `isTradeEnabled`      | üyelikte `canTrade` yoksa anahtar yerine yükseltme bağlantısı                                                                                   |
+| `quantity`            | oluşturmada varsayılan 1                                                                                                                        |
+| `shippingPackageTier` | zorunlu, `small` \| `medium` \| `large` (bkz. doküman 14)                                                                                       |
+| `price`               | zorunlu, ≥ 1                                                                                                                                    |
+| `images`              | **oluşturmada en az 3**; üst sınır `maxImagesPerListing` (üyelik)                                                                               |
+| `customAttributes`    | `Record<string, string[]>` — genel özel gruplar **tek** değer, üreticiye bağlı gruplar çoklu; zorunlu genel grup boş bırakılamaz (bkz. aşağıda) |
 
 **Gövde:** `{ title, description?, price:number, categoryId, condition, brandId?, carModelId?,
 modelCode, color, scale?, material?, manufacturerId?, isBoxed:boolean, year?:number,
@@ -87,6 +87,28 @@ isTradeEnabled, isPreorder:false, isSet, bundleSize?:number, quantity:number, sh
 images?:[{cardKey, detailKey}], attributes?: string[] }`
 
 `attributes` = seçilen tüm özel özellik **slug'larının düz listesi** (gruplar birleştirilir).
+
+### Özel gruplar ve zorunluluk (2026-09-02)
+
+Grup listesi `GET /products/attribute-groups` (üretici seçiliyse
+`?manufacturer=:slug`). Her grup `isRequired`, `manufacturerSlug` ve
+`selectionMode` taşır. Kurallar:
+
+- **Genel özel gruplar** (`manufacturerSlug == null`, slug ∉ `scale|material|color`):
+  her ilanda sorulur, `selectionMode: "single"` — gruptan **tek** slug gönderilir.
+  İkiden fazla → `400 server.product.attributeGroupSingleSelect`.
+- **Zorunlu genel gruplar** (`isRequired: true`): oluşturmada ve `attributes`
+  alanı gönderilen her `PATCH`'te seçimde bulunmak zorunda; eksikse
+  `400 server.product.requiredAttributeGroups` (`{groups}` grup adları).
+  `attributes` gönderilmeyen bir `PATCH` (yalnız fiyat, stok vb.) bu denetime
+  girmez ve mevcut seçimlere dokunmaz. `attributeIds` zorunluluğu karşılamaz.
+- Üreticiye bağlı gruplar (`manufacturerSlug` dolu) çoklu seçimlidir;
+  `isRequired` bayrağı bunlar için **zorlanmaz**.
+- Ölçek/malzeme/renk slug'ları `attributes` içinde **yok sayılır**; kendi
+  alanları (`scale`, `material`, `colors`) kullanılır.
+- `PATCH` ile `attributes` gönderildiğinde sunucu ilanın **tüm** özel grup
+  bağlarını (genel + üreticiye bağlı) bu listeyle değiştirir; `[]` = hepsini
+  temizle (zorunlu grup varsa 400).
 
 Başarı → kendi ilanlarım ekranına `status=pending` filtresiyle git (ilan admin onayı bekler).
 
@@ -112,6 +134,12 @@ boş `quantity` **`null`** olarak gönderilir ("sınırsız stok"), set değilse
 İndirim aktifken (`oldPrice > price`) web **`price` alanına `oldPrice`'ı** yazıyor
 (indirim öncesi fiyat). `material` ve `scale` boşsa `attributes[]` içinden türetiliyor.
 `isTradeEnabled = isTradeEnabled ?? trade_available ?? false`.
+
+`customAttributes` formu `edit.attributes` içinden **`groupSlug ∉ scale|material|color`**
+olan her nitelikle doldurulur (`manufacturerSlug` null olsa da). Yalnız
+`manufacturerSlug` dolu olanları alan bir istemci, genel grup seçimlerini
+(Nadirlik gibi) forma yüklemez ve `attributes` listesi her kayıtta gönderildiği
+için onları **siler**.
 
 ### Terminal durumlar
 

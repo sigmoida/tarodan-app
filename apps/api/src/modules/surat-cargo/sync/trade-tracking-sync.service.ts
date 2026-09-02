@@ -6,10 +6,7 @@ import { NotificationService } from "../../notification/notification.service";
 import { NotificationType } from "../../notification/dto";
 import { ElogoInvoicingService } from "../../elogo/elogo-invoicing.service";
 import type { SuratTakipGonderi } from "../helpers/surat-cargo.types";
-import {
-  mapSuratStatusToShipmentStatus,
-  isSuratDelivered,
-} from "../mappers/surat-status.mapper";
+import { interpretSuratTracking } from "../mappers/surat-status.mapper";
 import { canTransitionShipmentStatus } from "../../shipping/helpers/shipment-state-machine";
 import { TRADE_VALID_TRANSITIONS } from "../../trade/helpers/trade.state-machine";
 import { startTradeConfirmationWindowIfDelivered } from "../../../common/helpers/trade-escrow";
@@ -96,17 +93,17 @@ export class TradeTrackingSyncService {
     if (data.Gonderiler.length === 0) return "pending";
 
     const gonderi = data.Gonderiler[0];
-    const mappedStatus = mapSuratStatusToShipmentStatus(
-      gonderi.KargonunDurumuSayi,
-    );
-    // L2: bilinmeyen kod statüyü değiştirmez; backfill/shippedAt yine işlenir.
-    if (mappedStatus === null) {
+    // Tek karar mercii (order path ile aynı): kod + iade bayrağı birlikte okunur.
+    // `status: null` (bilinmeyen/belirsiz) statüyü değiştirmez; backfill/shippedAt
+    // yine işlenir.
+    const reading = interpretSuratTracking(gonderi);
+    if (reading.status === null) {
       this.logger.warn(
-        `Unknown Surat status code ${gonderi.KargonunDurumuSayi} for trade-shipment ${tradeShipment.id}; keeping status ${tradeShipment.status}`,
+        `${reading.isReturnFlow ? "Ambiguous Surat state" : "Unknown Surat status code"} ${gonderi.KargonunDurumuSayi} (IadeDurum=${gonderi.IadeDurum}) for trade-shipment ${tradeShipment.id}; keeping status ${tradeShipment.status}`,
       );
     }
-    const newStatus = mappedStatus ?? tradeShipment.status;
-    const isDelivered = isSuratDelivered(gonderi.KargonunDurumuSayi);
+    const newStatus = reading.status ?? tradeShipment.status;
+    const isDelivered = reading.isDelivered;
 
     // #86: same terminal-regression guard for the trade-shipment poll path.
     if (!canTransitionShipmentStatus(tradeShipment.status, newStatus)) {
