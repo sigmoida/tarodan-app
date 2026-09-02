@@ -283,8 +283,6 @@ export function getEmailTemplateSubject(
     "guest-checkout-otp": "Misafir Sipariş Doğrulama Kodu",
     "email-change-otp": "E-posta Değişikliği Doğrulama Kodu",
     "site-access-invite": "Tarodan Erken Erişim Davetiniz",
-    "invoice-buyer": `Faturanız - ${data?.invoiceNumber || ""}`,
-    "invoice-seller": `Satış Faturası - ${data?.invoiceNumber || ""}`,
     "elogo-invoice": `Tarodan e-Arşiv Faturanız - ${data?.invoiceNumber || ""}`,
     "seller-invoice": `Satıcı Faturanız - Sipariş #${data?.orderNumber || ""}`,
     "seller-invoice-reminder": `Fatura Bekleniyor - Sipariş #${data?.orderNumber || ""}`,
@@ -1067,52 +1065,6 @@ export function renderEmailTemplate(
       <p style="font-size: 14px; color: #6b7280; margin: 24px 0 0 0;">Görüşmek üzere!<br/><strong style="color: #f97316;">Tarodan Ekibi</strong></p>
     `,
       "Tarodan Erken Erişim Davetiniz",
-    ),
-
-    "invoice-buyer": wrapEmail(
-      `
-      ${titleBlock("Faturanız Hazır", "🧾")}
-      ${greeting(data?.buyerName)}
-      <p style="font-size: 15px; color: #4b5563; line-height: 1.6; margin: 0 0 20px 0;">Siparişinize ait fatura aşağıdaki bilgileri içermektedir.</p>
-      ${detailsBox(`
-        <table width="100%" cellspacing="0" cellpadding="0">
-          ${detailRow("Fatura No", data?.invoiceNumber || "")}
-          ${detailRow("Sipariş No", "#" + (data?.orderNumber || ""))}
-          ${detailRow("Ürün", data?.productTitle || "")}
-          ${detailRow("Satıcı", data?.sellerName || "")}
-          ${detailRow("Toplam Tutar", formatEmailPrice(data?.totalAmount || 0) + " TL", true)}
-        </table>
-      `)}
-      <div style="text-align: center; margin: 32px 0;">
-        ${primaryButton("Siparişi Görüntüle", data?.invoiceUrl || `${frontendUrl}/profile/orders/${data?.orderId || ""}`)}
-      </div>
-      <p style="font-size: 13px; color: #9ca3af; margin: 16px 0 0 0;">Fatura bilgileriniz yasal yükümlülükler gereği saklanmaktadır.</p>
-    `,
-      "Faturanız Hazır",
-    ),
-
-    "invoice-seller": wrapEmail(
-      `
-      ${titleBlock("Satış Faturanız Hazır", "🧾")}
-      ${greeting(data?.sellerName)}
-      <p style="font-size: 15px; color: #4b5563; line-height: 1.6; margin: 0 0 20px 0;">Bu siparişe ait satış faturanız aşağıda özetlenmiştir.</p>
-      ${detailsBox(`
-        <table width="100%" cellspacing="0" cellpadding="0">
-          ${detailRow("Fatura No", data?.invoiceNumber || "")}
-          ${detailRow("Sipariş No", "#" + (data?.orderNumber || ""))}
-          ${detailRow("Ürün", data?.productTitle || "")}
-          ${detailRow("Alıcı", data?.buyerName || "")}
-          ${detailRow("Satış Tutarı", formatEmailPrice(data?.totalAmount || 0) + " TL")}
-          ${detailRow("Platform Komisyonu", formatEmailPrice(data?.commissionAmount || 0) + " TL")}
-          ${detailRow("Net Kazancınız", formatEmailPrice(Number(data?.totalAmount || 0) - Number(data?.commissionAmount || 0)) + " TL", true)}
-        </table>
-      `)}
-      <div style="text-align: center; margin: 32px 0;">
-        ${primaryButton("Siparişi Görüntüle", `${frontendUrl}/seller/orders/${data?.orderId || ""}`)}
-      </div>
-      <p style="font-size: 13px; color: #9ca3af; margin: 16px 0 0 0;">Fatura bilgileriniz yasal yükümlülükler gereği saklanmaktadır.</p>
-    `,
-      "Satış Faturanız Hazır",
     ),
 
     // eLogo e-Arşiv / e-Fatura — Tarodan'ın kestiği TÜM gelir belgeleri (komisyon, hizmet

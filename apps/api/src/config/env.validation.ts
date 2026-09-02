@@ -120,6 +120,7 @@ const envSchema = z
     ELOGO_WS_PASSWORD: z.string().optional(),
     ELOGO_COMPANY_VKN: z.string().optional(),
     ELOGO_COMPANY_TITLE: z.string().optional(),
+    ELOGO_ALLOW_NON_LIVE_HOST: z.string().optional(),
 
     // Production delivery/telemetry dependencies.
     SENDGRID_API_KEY: z.string().optional(),
@@ -483,7 +484,10 @@ const envSchema = z
     const elogoEnabled = ["true", "1"].includes(
       (env.ELOGO_ENABLED ?? "").trim().toLowerCase(),
     );
-    if (!elogoEnabled) {
+    // Canlı pazaryeri e-belge olmadan çalışamaz; staging ise eLogo'suz
+    // koşabilir (aksi halde staging ya demo hesabına ya da — daha kötüsü —
+    // canlı hesaba bağlanmak ZORUNDA kalır).
+    if (!elogoEnabled && isProductionDeployment) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
         path: ["ELOGO_ENABLED"],
@@ -500,12 +504,44 @@ const envSchema = z
         });
       }
 
-      if (!env.ELOGO_SOAP_URL?.trim().startsWith("https://")) {
+      const soapUrl = (env.ELOGO_SOAP_URL ?? "").trim();
+      if (!soapUrl.startsWith("https://")) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
           path: ["ELOGO_SOAP_URL"],
           message:
             "ELOGO_SOAP_URL must be an HTTPS URL in production when ELOGO_ENABLED is set",
+        });
+      }
+
+      // eLogo'da "test bayrağı" yoktur: belgenin GİB'e gidip gitmediğini
+      // yalnız HOST belirler. Canlı bir API demo host'una bağlanırsa belgeler
+      // sandbox'ta kalır (PDF'te DEMO filigranı, GİB'e hiç ulaşmayan fatura);
+      // staging canlı host'a bağlanırsa test siparişleri GİB'e GERÇEK fatura
+      // keser ve canlı numara sayacıyla çakışır. İki yön de boot'ta durur.
+      const ELOGO_LIVE_HOST = "pb.elogo.com.tr";
+      let soapHost = "";
+      try {
+        soapHost = new URL(soapUrl).hostname.toLowerCase();
+      } catch {
+        soapHost = "";
+      }
+      const isLiveHost = soapHost === ELOGO_LIVE_HOST;
+      const allowNonLiveHost = ["true", "1"].includes(
+        (env.ELOGO_ALLOW_NON_LIVE_HOST ?? "").trim().toLowerCase(),
+      );
+      if (isProductionDeployment && !isLiveHost && !allowNonLiveHost) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["ELOGO_SOAP_URL"],
+          message: `ELOGO_SOAP_URL must point at the live eLogo host (${ELOGO_LIVE_HOST}) in production — a demo/sandbox host issues documents that never reach GİB and carry a DEMO watermark; set ELOGO_ALLOW_NON_LIVE_HOST=true only for a deliberate, temporary exception`,
+        });
+      }
+      if (isStagingDeployment && isLiveHost) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["ELOGO_SOAP_URL"],
+          message: `ELOGO_SOAP_URL must not be the live eLogo host (${ELOGO_LIVE_HOST}) on a staging deployment — test orders would issue real invoices to GİB and collide with the production number sequence; use the demo host or set ELOGO_ENABLED=false`,
         });
       }
 

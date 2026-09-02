@@ -16,6 +16,7 @@ import { StorageModule } from "../storage/storage.module";
 import { TaxModule } from "../tax/tax.module";
 import { OrderTaxPolicyService } from "../order/pricing/order-tax-policy.service";
 import { MailModule } from "../mail/mail.module";
+import { NotificationModule } from "../notification/notification.module";
 import {
   ElogoSoapClient,
   LiveElogoSoapClient,
@@ -31,6 +32,8 @@ import { scheduledProcessors } from "../../workers/scheduled-processors";
 @Module({
   imports: [
     MailModule,
+    // Deneme bütçesi tükenen belgeler admin'e in-app alarm olarak düşer.
+    NotificationModule,
     ConfigModule,
     StorageModule,
     TaxModule,

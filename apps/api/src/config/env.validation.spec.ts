@@ -50,7 +50,7 @@ describe("validateEnv", () => {
     NETGSM_MSGHEADER: "TARODAN",
     ELOGO_ENABLED: "true",
     ELOGO_SOAP_MODE: "live",
-    ELOGO_SOAP_URL: "https://elogo.test/PostBoxService.svc",
+    ELOGO_SOAP_URL: "https://pb.elogo.com.tr/PostBoxService.svc",
     ELOGO_WS_USERNAME: "service-user",
     ELOGO_WS_PASSWORD: "service-password",
     ELOGO_COMPANY_VKN: "1234567890",
@@ -76,6 +76,7 @@ describe("validateEnv", () => {
       "https://staging.tarodan.com.tr/api/payments/callback/paytr",
     PAYOUTS_DISABLED: "true",
     SURAT_KARGO_TEST_MODE: "true",
+    ELOGO_SOAP_URL: "https://pb-demo.elogo.com.tr/PostboxService.svc",
   };
 
   it("passes with a complete, strong production config", () => {
@@ -351,6 +352,54 @@ describe("validateEnv", () => {
         ELOGO_COMPANY_TITLE: "Tarodan",
       }),
     ).not.toThrow();
+  });
+
+  /**
+   * Canlı API bir dönem eLogo demo host'una bağlı kaldı: belgeler sandbox'ta
+   * kaldı (PDF'te DEMO filigranı), GİB'e hiç ulaşmadı ve XSLT tasarımı
+   * silinince tüm gönderimler düştü. Host bir "test bayrağı" ile değil,
+   * yalnız URL ile belirlenir; bu yüzden boot'ta kilitlenir.
+   */
+  it("rejects a demo/sandbox eLogo host on a production deployment", () => {
+    expect(() =>
+      validateEnv({
+        ...prodBase,
+        ELOGO_SOAP_URL: "https://pb-demo.elogo.com.tr/PostboxService.svc",
+      }),
+    ).toThrow(/ELOGO_SOAP_URL.*live eLogo host/);
+    expect(() =>
+      validateEnv({
+        ...prodBase,
+        ELOGO_SOAP_URL:
+          "https://betatest.elogo.com.tr/webservice/PostBoxService.svc",
+      }),
+    ).toThrow(/ELOGO_SOAP_URL.*live eLogo host/);
+  });
+
+  it("allows a non-live eLogo host in production only with the explicit override", () => {
+    expect(() =>
+      validateEnv({
+        ...prodBase,
+        ELOGO_SOAP_URL: "https://pb-demo.elogo.com.tr/PostboxService.svc",
+        ELOGO_ALLOW_NON_LIVE_HOST: "true",
+      }),
+    ).not.toThrow();
+  });
+
+  it("rejects the live eLogo host on a staging deployment", () => {
+    expect(() =>
+      validateEnv({
+        ...stagingBase,
+        ELOGO_SOAP_URL: "https://pb.elogo.com.tr/PostBoxService.svc",
+      }),
+    ).toThrow(/ELOGO_SOAP_URL.*staging/);
+  });
+
+  it("lets staging run with eLogo disabled or on the demo host", () => {
+    expect(() =>
+      validateEnv({ ...stagingBase, ELOGO_ENABLED: "false" }),
+    ).not.toThrow();
+    expect(() => validateEnv({ ...stagingBase })).not.toThrow();
   });
 
   it("rejects production when the required eLogo integration is disabled", () => {

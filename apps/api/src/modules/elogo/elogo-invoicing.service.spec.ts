@@ -1,4 +1,5 @@
 import { ConfigService } from "@nestjs/config";
+import { Prisma } from "@prisma/client";
 import { ElogoInvoicingService } from "./elogo-invoicing.service";
 import { ElogoDocumentService } from "./elogo-document.service";
 import { ElogoDeliveryService } from "./elogo-delivery.service";
@@ -80,8 +81,8 @@ function makePrisma(seed: any = {}) {
         if (!rec) throw new Error("not found");
         for (const [k, v] of Object.entries<any>(data)) {
           rec[k] =
-            v && typeof v === "object" && "increment" in v
-              ? (rec[k] ?? 0) + v.increment
+            v && typeof v === "object" && ("increment" in v || "decrement" in v)
+              ? (rec[k] ?? 0) + (v.increment ?? 0) - (v.decrement ?? 0)
               : v;
         }
         return rec;
@@ -99,8 +100,8 @@ function makePrisma(seed: any = {}) {
         if (!rec) return { count: 0 };
         for (const [k, v] of Object.entries<any>(data)) {
           rec[k] =
-            v && typeof v === "object" && "increment" in v
-              ? (rec[k] ?? 0) + v.increment
+            v && typeof v === "object" && ("increment" in v || "decrement" in v)
+              ? (rec[k] ?? 0) + (v.increment ?? 0) - (v.decrement ?? 0)
               : v;
         }
         return { count: 1 };
@@ -219,7 +220,9 @@ describe("ElogoInvoicingService", () => {
     const prisma = makePrisma({
       orders: { o1: { sellerId: "s1" } },
       ledgers: { o1: { sellerCommission: 120, refundedSellerCommission: 0 } },
-      users: { s1: { displayName: "Satıcı X", taxId: null } },
+      users: {
+        s1: { displayName: "Satıcı X", taxId: null, email: "s1@example.com" },
+      },
     });
     const elogo = makeElogo();
     // Tek zincir, PAYLAŞILAN örnekler: kesim ve ters kayıt aynı belge ve
@@ -246,6 +249,11 @@ describe("ElogoInvoicingService", () => {
     expect(params.documentType).toBe("EARCHIVE");
     expect(params.documentNumber).toMatch(/^TRD\d{13}$/);
     expect(params.ublXml).toContain("<cbc:ID>gonderimSekli</cbc:ID>");
+    // E-postası olan alıcıya ELEKTRONIK gönderim.
+    expect(params.ublXml).toContain(
+      "<cbc:DocumentType>ELEKTRONIK</cbc:DocumentType>",
+    );
+    expect(prisma.invoices[0].sendType).toBe("ELEKTRONIK");
     expect(params.ublXml).toContain("120.00"); // matrah = saklanan tutar
     expect(params.xsltUuid).toBe("XSLT-UUID");
     const rec = prisma.invoices[0];
@@ -1060,6 +1068,138 @@ describe("ElogoInvoicingService", () => {
       520.22,
       2,
     );
+  });
+
+  /**
+   * Sentry TARODAN-API-G/H: komisyon ve hizmet bedeli aynı sayaç satırını
+   * artırırken SERIALIZABLE transaction P2034 ile düşüyor, `cut` hatayı yutup
+   * belgeyi 10 dakikalık backfill'e bırakıyordu. Çakışma yeniden denenmeli ve
+   * belge AYNI çağrıda kesilmeli.
+   */
+  it("numara sayacı çakışmasında (P2034) kesim yeniden denenir ve belge kesilir", async () => {
+    const prisma = makePrisma({
+      orders: { o1: { sellerId: "s1", buyerId: "b1" } },
+      ledgers: {
+        o1: {
+          sellerCommission: 120,
+          refundedSellerCommission: 0,
+          buyerFee: 0,
+          refundedBuyerFee: 0,
+        },
+      },
+      users: { s1: { displayName: "Satıcı", taxId: null } },
+    });
+    const conflict = new Prisma.PrismaClientKnownRequestError(
+      "Transaction failed due to a write conflict or a deadlock. Please retry your transaction",
+      { code: "P2034", clientVersion: "test" },
+    );
+    let seqValue = 0;
+    prisma.elogoDocSequence.upsert
+      .mockRejectedValueOnce(conflict)
+      .mockImplementation(async () => ({ lastValue: ++seqValue }));
+    const elogo = makeElogo();
+    const documents = new ElogoDocumentService(prisma, elogo, fakeConfig());
+    const delivery = new ElogoDeliveryService(prisma, elogo, documents);
+    const svc = new ElogoIssuingService(prisma, documents, delivery);
+
+    await svc.issueCommissionInvoice("o1");
+
+    expect(prisma.elogoDocSequence.upsert).toHaveBeenCalledTimes(2);
+    expect(prisma.invoices).toHaveLength(1);
+    expect(prisma.invoices[0].invoiceNumber).toMatch(/^TRD\d{4}000000001$/);
+    expect(prisma.invoices[0].status).toBe("sent");
+  });
+
+  /**
+   * Teslim faturaları SIRALI kesilir: paralel kesim aynı sayaç satırında
+   * çakışıyordu. Sıra: komisyon → hizmet bedeli → platform satışı; biri
+   * patlarsa diğerleri yine denenir, işaret konmaz.
+   */
+  it("teslim faturaları sırayla kesilir; biri patlarsa diğerleri yine denenir ve işaret konmaz", async () => {
+    const prisma = makePrisma({
+      orders: { o1: { sellerId: "s1", buyerId: "b1", packageId: "o1" } },
+    });
+    prisma.order.update = jest.fn(async () => ({}));
+    const svc = new ElogoIssuingService(prisma, {} as any, {} as any);
+    const calls: string[] = [];
+    jest.spyOn(svc, "issueCommissionInvoice").mockImplementation(async () => {
+      calls.push("commission");
+      throw new Error("boom");
+    });
+    jest.spyOn(svc, "issueServiceFeeInvoice").mockImplementation(async () => {
+      calls.push("service_fee");
+    });
+    jest.spyOn(svc, "issuePlatformSaleInvoice").mockImplementation(async () => {
+      calls.push("platform_sale");
+    });
+
+    await svc.issueOrderRevenueInvoices("o1");
+
+    expect(calls).toEqual(["commission", "service_fee", "platform_sale"]);
+    expect(prisma.order.update).not.toHaveBeenCalled();
+  });
+
+  /**
+   * e-Arşiv gönderim şekli: eLogo ELEKTRONIK belgeyi alıcının e-postasına
+   * yollar. E-posta yoksa GİB KAGIT bekler; her durumda ELEKTRONIK yazmak ya
+   * reddediliyor ya da belge alıcıya hiç ulaşmıyordu.
+   */
+  it("alıcının e-postası yoksa e-Arşiv KAGIT gönderim şekliyle kesilir", async () => {
+    const prisma = makePrisma({
+      orders: { o1: { sellerId: "s1" } },
+      ledgers: { o1: { sellerCommission: 120, refundedSellerCommission: 0 } },
+      users: { s1: { displayName: "Satıcı X", taxId: null, email: null } },
+    });
+    const elogo = makeElogo();
+    const documents = new ElogoDocumentService(prisma, elogo, fakeConfig());
+    const delivery = new ElogoDeliveryService(prisma, elogo, documents);
+    const svc = new ElogoIssuingService(prisma, documents, delivery);
+
+    await svc.issueCommissionInvoice("o1");
+
+    const params = (elogo.sendDocument as jest.Mock).mock.calls[0][0];
+    expect(params.ublXml).toContain(
+      "<cbc:DocumentType>KAGIT</cbc:DocumentType>",
+    );
+    expect(prisma.invoices[0].sendType).toBe("KAGIT");
+  });
+
+  /**
+   * Mükellef sorgusu (GetValidateGIBUser) ağ hatasıyla düşerse belge kalıcı
+   * `failed` oluyordu ve deneme bütçesi tükeniyordu; oysa bu gönderimdeki
+   * geçici arızayla aynı durumdur.
+   */
+  it("mükellef sorgusunda geçici ağ hatası belgeyi pending bırakır, sayacı tüketmez", async () => {
+    const prisma = makePrisma({
+      orders: { o1: { sellerId: "s1" } },
+      ledgers: { o1: { sellerCommission: 120, refundedSellerCommission: 0 } },
+      users: {
+        s1: {
+          companyName: "Satıcı A.Ş.",
+          taxId: "1234567890",
+          email: "s@x.tr",
+        },
+      },
+    });
+    const timeout = Object.assign(new Error("ETIMEDOUT"), {
+      code: "ETIMEDOUT",
+    });
+    const elogo = makeElogo({
+      checkUser: jest.fn(async () => {
+        throw timeout;
+      }),
+    });
+    const documents = new ElogoDocumentService(prisma, elogo, fakeConfig());
+    const delivery = new ElogoDeliveryService(prisma, elogo, documents);
+    const svc = new ElogoIssuingService(prisma, documents, delivery);
+
+    await svc.issueCommissionInvoice("o1");
+
+    expect(elogo.sendDocument).not.toHaveBeenCalled();
+    const rec = prisma.invoices[0];
+    expect(rec.status).toBe("pending");
+    expect(rec.attemptCount).toBe(0);
+    expect(rec.elogoResultMsg).toContain("could not be resolved");
   });
 
   it("eLogo kapalıysa göndermez ama retry için pending kayıt bırakır", async () => {

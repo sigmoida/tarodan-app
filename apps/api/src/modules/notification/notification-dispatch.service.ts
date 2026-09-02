@@ -7,7 +7,12 @@
  * sub-services (commerce/account) and the NotificationService facade delegate
  * to this single engine.
  */
-import { Injectable, Logger, NotFoundException } from "@nestjs/common";
+import {
+  Injectable,
+  Logger,
+  NotFoundException,
+  Optional,
+} from "@nestjs/common";
 import { PrismaService } from "../../prisma";
 import { i18nMessage } from "../i18n";
 import {
@@ -20,6 +25,7 @@ import { ExpoPushProvider } from "./providers/expo-push.provider";
 import { SmsProvider } from "./providers/sms.provider";
 import { SmtpProvider } from "../mail/smtp.provider";
 import { RealtimeService } from "../websocket/realtime.service";
+import { CacheService } from "../cache/cache.service";
 import {
   escapeEmailHtml,
   renderManagedEmailTemplate,
@@ -60,7 +66,45 @@ export class NotificationDispatchService {
     private readonly smtpProvider: SmtpProvider,
     private readonly realtime: RealtimeService,
     private readonly i18n: I18nService,
+    // CacheModule global'dir; yalnız kısmi test kurulumlarında eksik olabilir
+    // ve o zaman tekilleştirme yapılmadan her çağrı bildirim üretir.
+    @Optional() private readonly cache?: CacheService,
   ) {}
+
+  /**
+   * Cron alarmlarının TEK tekilleştirme noktası. Aynı `key` için `ttlSeconds`
+   * içinde ikinci kez çağrılırsa bildirim üretmez ve `false` döner; çağıran
+   * bu sonuçla log seviyesini de seçer (yeni alarm → error/Sentry, tekrar →
+   * warn). Eskiden her cron kendi cache anahtarını tutuyor ya da hiç
+   * tutmuyordu: 10 dakikalık bir tarama aynı durumu günde 144 kez Sentry'ye
+   * yazıyor, gerçek yeni alarm gürültüde kayboluyordu.
+   *
+   * Cache erişilemezse alarm YİNE gönderilir (tekrar riski, sessizlikten iyidir).
+   */
+  async notifyAllAdminsOnce(
+    key: string,
+    ttlSeconds: number,
+    type: NotificationType,
+    data?: Record<string, unknown>,
+  ): Promise<boolean> {
+    const cacheKey = `admin-alarm:${key}`;
+    try {
+      if (await this.cache?.get<boolean>(cacheKey)) return false;
+    } catch (err: unknown) {
+      this.logger.warn(
+        `[notifyAllAdminsOnce] cache okunamadı (${key}): ${(err as Error)?.message}`,
+      );
+    }
+    await this.notifyAllAdmins(type, data);
+    try {
+      await this.cache?.set(cacheKey, true, { ttl: ttlSeconds });
+    } catch (err: unknown) {
+      this.logger.warn(
+        `[notifyAllAdminsOnce] cache yazılamadı (${key}): ${(err as Error)?.message}`,
+      );
+    }
+    return true;
+  }
 
   /**
    * Kullanıcının bildirim tercihlerini yükle (varsayılanlarla birleştirilmiş).

@@ -19,16 +19,19 @@ import {
 } from "@nestjs/common";
 import { PrismaService } from "../../prisma";
 import { StorageService } from "../storage/storage.service";
-import { NotificationService } from "../notification/notification.service";
-import { SmtpProvider } from "../mail/smtp.provider";
-import { NotificationType, NotificationChannel } from "../notification/dto";
 import { TaxService } from "../tax";
-import { renderManagedEmailTemplate } from "../../common/helpers/email-template-renderer";
 import { InvoicePdfService, InvoiceData } from "./invoice-pdf.service";
 import { storedProductBaseOf } from "../order/helpers/order-charged-base.helper";
-import { frontendUrlForEnvironment } from "../../config/app-urls";
 import { i18nMessage } from "../i18n";
 
+/**
+ * NOT: Bu modülün ürettiği belge "Sipariş Özeti"dir (SPR- numarası) — mali
+ * belge (fatura) DEĞİLDİR; şablonun altında bu açıkça yazar. Tarodan'ın resmî
+ * gelir belgeleri `ElogoInvoice` (eLogo e-Arşiv/e-Fatura), satıcının ürün
+ * faturası ise `SellerUploadedInvoice`'tır. Uçlar (`/invoices/*`) mobil
+ * uygulama sözleşmesinde olduğu için korunur; eski "alıcı+satıcıya fatura
+ * maili" yolu kaldırıldı (hiçbir yerden çağrılmıyordu).
+ */
 @Injectable()
 export class InvoiceService {
   private readonly logger = new Logger(InvoiceService.name);
@@ -36,8 +39,6 @@ export class InvoiceService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly storageService: StorageService,
-    private readonly notificationService: NotificationService,
-    private readonly smtpProvider: SmtpProvider,
     private readonly taxService: TaxService,
     private readonly pdf: InvoicePdfService,
   ) {}
@@ -270,7 +271,7 @@ export class InvoiceService {
   /**
    * Güvenlik (#63): Fatura oluşturmanın sahiplik-korumalı HTTP giriş noktası.
    * `generateForOrder` paylaşılan executor olarak sahiplik kontrolü YAPMAZ (iç çağıranlar:
-   * lazy-gen getByOrderId + sistem e-posta akışı generateAndSendInvoice); bu yüzden IDOR
+   * lazy-gen getByOrderId); bu yüzden IDOR
    * guard'ı burada, uçta durur — yalnız siparişin tarafı (alıcı/satıcı) fatura üretebilir.
    * Sahipler faturayı zaten GET /invoices/order/:orderId üzerinden (lazy üretimle) alır;
    * bu uç sahip/idari elle üretim içindir. Yetkisiz kullanıcı → 403.
@@ -289,142 +290,6 @@ export class InvoiceService {
       );
     }
     return this.generateForOrder(orderId);
-  }
-
-  /**
-   * Generate and send invoice to buyer and seller via email
-   * Sends professional invoice emails to both parties when a product is sold
-   */
-  async generateAndSendInvoice(orderId: string): Promise<boolean> {
-    try {
-      const { invoiceNumber } = await this.generateForOrder(orderId);
-
-      // Get order with full details
-      const order = await this.prisma.order.findUnique({
-        where: { id: orderId },
-        include: {
-          buyer: true,
-          seller: true,
-          product: true,
-        },
-      });
-
-      if (!order) return false;
-
-      // Check if this is a guest order - get actual email from shippingAddress
-      const shippingAddressData = order.shippingAddress as any;
-      const buyerIsSystemGuest =
-        !order.buyer.email ||
-        order.buyer.email === "guest@tarodan.system" ||
-        (order.buyer.email &&
-          order.buyer.email.toLowerCase().includes("guest@tarodan"));
-      const isGuestOrder =
-        buyerIsSystemGuest || shippingAddressData?.isGuestOrder === true;
-
-      // Get actual buyer email and name for guest orders
-      const buyerEmail = isGuestOrder
-        ? shippingAddressData?.guestEmail ||
-          shippingAddressData?.email ||
-          order.buyer.email
-        : order.buyer.email;
-      const buyerName = isGuestOrder
-        ? shippingAddressData?.guestName ||
-          shippingAddressData?.fullName ||
-          "Misafir Müşteri"
-        : order.buyer.displayName || order.buyer.email.split("@")[0];
-
-      const sellerName =
-        order.seller.displayName || order.seller.email.split("@")[0];
-
-      this.logger.log(
-        `Invoice will be sent to buyer: ${buyerEmail} (isGuest: ${isGuestOrder})`,
-      );
-      const frontendUrl = frontendUrlForEnvironment();
-      // Guest: track-order (no login). Member: orders/[id] (login → redirect back to order)
-      const buyerOrderUrl =
-        isGuestOrder && (buyerEmail || order.buyer.email)
-          ? `${frontendUrl}/track-order?orderNumber=${encodeURIComponent(order.orderNumber)}&email=${encodeURIComponent((buyerEmail || order.buyer.email || "").trim().toLowerCase())}`
-          : `${frontendUrl}/orders/${orderId}`;
-
-      // Send invoice email to BUYER
-      const buyerTemplateData = {
-        buyerName,
-        invoiceNumber,
-        orderNumber: order.orderNumber,
-        productTitle: order.product.title,
-        totalAmount: Number(order.totalAmount),
-        sellerName,
-        invoiceUrl: buyerOrderUrl,
-        orderId,
-      };
-      const buyerDbTemplate = await this.prisma.emailTemplate.findUnique({
-        where: { key: "invoice-buyer" },
-      });
-      const buyerEmailContent = renderManagedEmailTemplate(
-        "invoice-buyer",
-        { ...buyerTemplateData, to: buyerEmail },
-        buyerDbTemplate,
-        frontendUrl,
-      );
-
-      const buyerResult = await this.smtpProvider.sendEmail({
-        to: buyerEmail,
-        subject: buyerEmailContent.subject,
-        html: buyerEmailContent.html,
-      });
-
-      if (buyerResult.success) {
-        this.logger.log(
-          `Invoice ${invoiceNumber} sent to buyer: ${buyerEmail}`,
-        );
-      } else {
-        this.logger.error(
-          `Failed to send invoice to buyer ${buyerEmail}: ${buyerResult.error}`,
-        );
-      }
-
-      // Send invoice email to SELLER
-      const sellerTemplateData = {
-        sellerName,
-        invoiceNumber,
-        orderNumber: order.orderNumber,
-        productTitle: order.product.title,
-        totalAmount: Number(order.totalAmount),
-        commissionAmount: Number(order.commissionAmount || 0),
-        buyerName,
-        orderId,
-      };
-      const sellerDbTemplate = await this.prisma.emailTemplate.findUnique({
-        where: { key: "invoice-seller" },
-      });
-      const sellerEmailContent = renderManagedEmailTemplate(
-        "invoice-seller",
-        { ...sellerTemplateData, to: order.seller.email },
-        sellerDbTemplate,
-        frontendUrl,
-      );
-
-      const sellerResult = await this.smtpProvider.sendEmail({
-        to: order.seller.email,
-        subject: sellerEmailContent.subject,
-        html: sellerEmailContent.html,
-      });
-
-      if (sellerResult.success) {
-        this.logger.log(
-          `Invoice ${invoiceNumber} sent to seller: ${order.seller.email}`,
-        );
-      } else {
-        this.logger.error(
-          `Failed to send invoice to seller: ${sellerResult.error}`,
-        );
-      }
-
-      return buyerResult.success && sellerResult.success;
-    } catch (error) {
-      this.logger.error("Failed to generate and send invoice:", error);
-      return false;
-    }
   }
 
   /**

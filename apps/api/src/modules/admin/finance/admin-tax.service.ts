@@ -34,6 +34,7 @@ export class AdminTaxService {
     membership: "Üyelik",
     boost: "Öne Çıkarma",
     trade_commission: "Takas Komisyonu",
+    trade_service_fee: "Takas Hizmet Bedeli",
     platform_sale: "Platform Satışı",
     return_invoice: "İade Faturası",
   };

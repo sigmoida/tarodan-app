@@ -14,6 +14,7 @@ describe("NotificationDispatchService.notifyAllAdmins", () => {
       {} as any,
       {} as any,
       {} as any,
+      { get: jest.fn().mockResolvedValue(null), set: jest.fn() } as any,
     );
   });
 

@@ -48,6 +48,9 @@ export class OrderSchedulerService implements OnModuleInit {
    * Takılı kargolar için aktif admin'lere in-app bildirim (24s cache dedup —
    * cron 10 dk'da bir çalışır, çözülmeyen sipariş ertesi gün tekrar hatırlatılır).
    * Non-blocking: bildirim hatası cron turunu bozmaz.
+   *
+   * @returns bu turda İLK kez bildirilen sipariş sayısı — çağıran, log
+   *   seviyesini buna göre seçer (yeni alarm → error/Sentry, tekrar → warn).
    */
   private async notifyAdminsOfStuckShipments(
     orders: Array<{
@@ -57,7 +60,7 @@ export class OrderSchedulerService implements OnModuleInit {
       sellerId?: string;
       shipment: { shippedAt: Date | null } | null;
     }>,
-  ): Promise<void> {
+  ): Promise<number> {
     try {
       const fresh: typeof orders = [];
       for (const order of orders) {
@@ -66,7 +69,7 @@ export class OrderSchedulerService implements OnModuleInit {
         fresh.push(order);
         await this.cache.set(key, true, { ttl: 24 * 60 * 60 });
       }
-      if (fresh.length === 0) return;
+      if (fresh.length === 0) return 0;
 
       const admins = await this.prisma.adminUser.findMany({
         where: { isActive: true },
@@ -117,9 +120,29 @@ export class OrderSchedulerService implements OnModuleInit {
           }
         }
       }
+      return fresh.length;
     } catch (err: any) {
       this.logger.warn(`notifyAdminsOfStuckShipments failed: ${err?.message}`);
+      // Tekilleştirme çalışmadıysa alarm görünür kalsın (sessizlikten iyidir).
+      return orders.length;
     }
+  }
+
+  /**
+   * Sayı bazlı (siparişsiz) alarmlar için günde bir error, aradaki turlarda
+   * warn. Cache okunamazsa alarm yine verilir.
+   */
+  private async alarmOncePerDay(key: string): Promise<boolean> {
+    const cacheKey = `admin-alarm:${key}`;
+    try {
+      if (await this.cache.get<boolean>(cacheKey)) return false;
+      await this.cache.set(cacheKey, true, { ttl: 24 * 60 * 60 });
+    } catch (err: unknown) {
+      this.logger.warn(
+        `alarm tekilleştirme cache hatası (${key}): ${(err as Error)?.message}`,
+      );
+    }
+    return true;
   }
 
   async onModuleInit(): Promise<void> {
@@ -280,6 +303,11 @@ export class OrderSchedulerService implements OnModuleInit {
       }),
     ]);
 
+    // Alarm politikası (üç alarm için aynı): durum İLK görüldüğünde error
+    // (Sentry'ye düşer) + admin in-app bildirimi; çözülene kadar sonraki 10
+    // dakikalık turlarda yalnız warn. Eskiden her tur error yazıyor, tek bir
+    // çözülmemiş sipariş günde ~144 Sentry olayı üretiyor ve yeni alarmlar
+    // gürültüde kayboluyordu.
     const stuckShipped = stuckShippedOrders.length;
     if (stuckShipped > 0) {
       // Sayı-only alarm eyleme dönük değildi: hangi siparişin takıldığı
@@ -287,22 +315,27 @@ export class OrderSchedulerService implements OnModuleInit {
       // bildirim düşer — kurtarma yolu (PATCH /admin/orders/:id status=delivered)
       // ancak takılan sipariş bilinirse kullanılabilir. Teslim kanıtı yokken
       // para yine akmaz; amaç askıda kalanı GÖRÜNÜR kılmaktır.
-      this.logger.error(
+      const freshStuck =
+        await this.notifyAdminsOfStuckShipments(stuckShippedOrders);
+      const message =
         `ORDERS_STUCK_SHIPPED count=${stuckShipped} — ${stuckDays} günden uzun süre kargoda; ` +
-          `teslimat poll'lanmadıysa fatura kesilmez ve escrow serbest bırakılmaz: ` +
-          stuckShippedOrders
-            .map(
-              (o) =>
-                `${o.orderNumber}(id=${o.id} shippedAt=${o.shipment?.shippedAt?.toISOString() ?? "?"})`,
-            )
-            .join(", "),
-      );
-      await this.notifyAdminsOfStuckShipments(stuckShippedOrders);
+        `teslimat poll'lanmadıysa fatura kesilmez ve escrow serbest bırakılmaz: ` +
+        stuckShippedOrders
+          .map(
+            (o) =>
+              `${o.orderNumber}(id=${o.id} shippedAt=${o.shipment?.shippedAt?.toISOString() ?? "?"})`,
+          )
+          .join(", ");
+      if (freshStuck > 0) this.logger.error(message);
+      else this.logger.warn(`${message} (daha önce bildirildi)`);
     }
     if (uninvoicedDelivered > 0) {
-      this.logger.error(
-        `ORDERS_DELIVERED_UNINVOICED count=${uninvoicedDelivered} — teslimden ${invoiceDeadlineDays} günden uzun süre geçti, gelir faturası hâlâ kesilmedi (e-Arşiv süresi riski)`,
-      );
+      const message = `ORDERS_DELIVERED_UNINVOICED count=${uninvoicedDelivered} — teslimden ${invoiceDeadlineDays} günden uzun süre geçti, gelir faturası hâlâ kesilmedi (e-Arşiv süresi riski)`;
+      if (await this.alarmOncePerDay("delivered-uninvoiced")) {
+        this.logger.error(message);
+      } else {
+        this.logger.warn(`${message} (daha önce bildirildi)`);
+      }
     }
 
     // SATICI ürün faturası: Tarodan'ın kendi e-Arşivlerinin satıcı tarafındaki
@@ -316,12 +349,38 @@ export class OrderSchedulerService implements OnModuleInit {
       .remindMissing({ deadlineDays: sellerInvoiceDeadlineDays })
       .catch((e: any) => {
         this.logger.warn(`satıcı fatura taraması hatası: ${e?.message}`);
-        return { missing: 0, reminded: 0 };
+        return { missing: 0, reminded: 0, missingOrders: [] };
       });
     if (sellerInvoices.missing > 0) {
-      this.logger.error(
-        `SELLER_INVOICE_MISSING count=${sellerInvoices.missing} reminded=${sellerInvoices.reminded} — kurumsal satıcı ürün faturasını teslimden ${sellerInvoiceDeadlineDays} gün sonra hâlâ yüklemedi`,
-      );
+      // Sipariş başına 24 saatte bir admin bildirimi; yeni sipariş yoksa
+      // yalnız warn (satıcıya hatırlatma zaten gitti, takip operasyonda).
+      const sample = sellerInvoices.missingOrders ?? [];
+      const sellerInvoicesLink = `${adminUrl()}/finance/invoices?tab=seller`;
+      let freshMissing = 0;
+      for (const order of sample) {
+        const isNew = await this.notificationService
+          .notifyAllAdminsOnce(
+            `seller-invoice-missing:${order.id}`,
+            24 * 60 * 60,
+            NotificationType.SELLER_INVOICE_MISSING,
+            {
+              orderId: order.id,
+              orderNumber: order.orderNumber,
+              deadlineDays: sellerInvoiceDeadlineDays,
+              adminLink: sellerInvoicesLink,
+            },
+          )
+          .catch((err: unknown) => {
+            this.logger.warn(
+              `satıcı faturası admin bildirimi başarısız (order=${order.id}): ${(err as Error)?.message}`,
+            );
+            return true;
+          });
+        if (isNew) freshMissing++;
+      }
+      const message = `SELLER_INVOICE_MISSING count=${sellerInvoices.missing} reminded=${sellerInvoices.reminded} — kurumsal satıcı ürün faturasını teslimden ${sellerInvoiceDeadlineDays} gün sonra hâlâ yüklemedi: ${sample.map((o) => o.orderNumber).join(", ") || "-"}`;
+      if (freshMissing > 0 || sample.length === 0) this.logger.error(message);
+      else this.logger.warn(`${message} (daha önce bildirildi)`);
     }
 
     return {

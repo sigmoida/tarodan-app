@@ -1,6 +1,7 @@
 import { ElogoDeliveryService } from "../elogo-delivery.service";
 import {
   ELOGO_MAX_SEND_ATTEMPTS,
+  isConfigurationElogoFailure,
   isTransientElogoFailure,
 } from "./elogo-retry-policy";
 
@@ -34,6 +35,20 @@ describe("eLogo retry policy — transient failures do not burn the budget", () 
   it("deneme üst sınırı tek kaynaktan gelir", () => {
     expect(ELOGO_MAX_SEND_ATTEMPTS).toBeGreaterThan(0);
   });
+
+  /**
+   * Sentry TARODAN-API-13: "XSLT tasarım hatası … GetXsltDocument fail!" hesaba
+   * özgü bir yapılandırma reddidir; 8 deneme × 30 dk boyunca sessizce denendi.
+   */
+  it("XSLT/tasarım reddi YAPILANDIRMA hatası sayılır, belge reddi sayılmaz", () => {
+    expect(
+      isConfigurationElogoFailure(
+        "XSLT tasarım hatası. (id: 326502, uuid: B85241B4) (GetXsltDocument fail! Document not found.)",
+      ),
+    ).toBe(true);
+    expect(isConfigurationElogoFailure("VKN gecersiz")).toBe(false);
+    expect(isConfigurationElogoFailure(null)).toBe(false);
+  });
 });
 
 /**
@@ -41,8 +56,14 @@ describe("eLogo retry policy — transient failures do not burn the budget", () 
  * müdahalesiyle yeniden denenebilmelidir.
  */
 describe("ElogoInvoicingService — exhausted invoice recovery", () => {
-  const makeService = (rows: any[]) => {
+  const makeService = (
+    rows: any[],
+    opts: { notifications?: { alreadyAlerted: boolean } } = {},
+  ) => {
     const updates: any[] = [];
+    const notifyAllAdminsOnce = jest
+      .fn()
+      .mockResolvedValue(!opts.notifications?.alreadyAlerted);
     const prisma = {
       elogoInvoice: {
         findMany: jest.fn().mockResolvedValue(rows),
@@ -61,11 +82,52 @@ describe("ElogoInvoicingService — exhausted invoice recovery", () => {
       prisma as any,
       { isEnabled: () => true } as any,
       {} as any, // documents
+      undefined,
+      undefined,
+      opts.notifications ? ({ notifyAllAdminsOnce } as any) : undefined,
     );
     const logger = { error: jest.fn(), warn: jest.fn(), log: jest.fn() };
     (service as any).logger = logger;
-    return { service, prisma, updates, logger };
+    return { service, prisma, updates, logger, notifyAllAdminsOnce };
   };
+
+  /**
+   * Sentry TARODAN-API-13: aynı beş belge 30 dakikada bir Sentry'ye düşüyordu.
+   * Belge başına 24 saatte bir admin bildirimi + error; sonrası warn.
+   */
+  it("tükenmiş belge admin'e bir kez bildirilir, tekrar turlarında error yazılmaz", async () => {
+    const row = {
+      id: "inv-1",
+      invoiceNumber: "TRD2026000000256",
+      status: "failed",
+      attemptCount: ELOGO_MAX_SEND_ATTEMPTS,
+      type: "trade_service_fee",
+      sourceId: "tcp-1",
+      elogoResultMsg: "XSLT tasarım hatası.",
+    };
+    const first = makeService([row], {
+      notifications: { alreadyAlerted: false },
+    });
+    expect(await first.service.reportExhaustedInvoices()).toBe(1);
+    expect(first.notifyAllAdminsOnce).toHaveBeenCalledWith(
+      "elogo-exhausted:inv-1",
+      24 * 60 * 60,
+      expect.any(String),
+      expect.objectContaining({ invoiceNumber: "TRD2026000000256" }),
+    );
+    expect(first.logger.error).toHaveBeenCalledWith(
+      expect.stringContaining("ELOGO_INVOICE_EXHAUSTED"),
+    );
+
+    const repeat = makeService([row], {
+      notifications: { alreadyAlerted: true },
+    });
+    expect(await repeat.service.reportExhaustedInvoices()).toBe(1);
+    expect(repeat.logger.error).not.toHaveBeenCalled();
+    expect(repeat.logger.warn).toHaveBeenCalledWith(
+      expect.stringContaining("daha önce bildirildi"),
+    );
+  });
 
   it("bütçesi tükenmiş faturalar alarm olarak raporlanır", async () => {
     const { service, logger } = makeService([
