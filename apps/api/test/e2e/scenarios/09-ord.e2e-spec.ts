@@ -39,8 +39,10 @@ import {
 } from "../../factories/user.factory";
 import { createProduct } from "../../factories/product.factory";
 import { createAddress } from "../../factories/address.factory";
-import { createOfferRow } from "../../factories/offer.factory";
-import { buyNow as createBuyNowRequest } from "../../factories/flows";
+import {
+  acceptOfferToOrder,
+  buyNow as createBuyNowRequest,
+} from "../../factories/flows";
 import { scenario } from "../../test-utils/scenario";
 import { signCallback } from "../../mocks/paytr.mock";
 import {
@@ -423,9 +425,9 @@ describe("09 — Sipariş Yaşam Döngüsü (ORD)", () => {
     });
   });
 
-  // ──────────────────────────── Teklif → sipariş (POST /orders) ────────────────────────────
-  describe("POST /api/orders (teklif → sipariş)", () => {
-    async function makeAcceptedOffer(amount = 400) {
+  // ──────────────────────────── Teklif → sipariş (POST /offers/:id/accept) ────────────────────────────
+  describe("Teklif kabulü → sipariş", () => {
+    async function makeOfferParties() {
       const buyer = await createUser(ctx.module);
       const seller = await createUser(ctx.module, { isSeller: true });
       const product = await createProduct({
@@ -434,108 +436,75 @@ describe("09 — Sipariş Yaşam Döngüsü (ORD)", () => {
         price: 500,
       });
       const addr = await createAddress({ userId: buyer.id });
-      const offer = await createOfferRow({
-        productId: product.id,
-        buyerId: buyer.id,
-        sellerId: seller.id,
-        amount,
-        status: OfferStatus.accepted,
-      });
-      return { buyer, seller, product, addr, offer };
+      return { buyer, seller, product, addr };
     }
 
     scenario("ORD-009", async () => {
-      const { buyer, addr, offer } = await makeAcceptedOffer(400);
+      // Kabul, siparişi accept İÇİNDE yaratır: origin=offer, PKG kolisi var,
+      // CheckoutGroup YOK (ödeme tekil yoldan gider), tarife snapshot'ı yazılır.
+      const { buyer, seller, product, addr } = await makeOfferParties();
+      const { offerId, orderId } = await acceptOfferToOrder(ctx, {
+        buyer,
+        seller,
+        productId: product.id,
+        amount: 400,
+        address: addr,
+      });
       const res = await request(server())
-        .post("/api/orders")
+        .get(`/api/orders/${orderId}`)
         .set(authHeader(buyer))
-        .send({ offerId: offer.id, shippingAddressId: addr.id })
-        .expect(201);
+        .expect(200);
       expect(res.body.status).toBe(OrderStatus.pending_payment);
-      expect(res.body.offerId).toBe(offer.id);
+      expect(res.body.offerId).toBe(offerId);
+      expect(res.body.origin).toBe("offer");
 
       const prisma = getPrisma();
       const order = await prisma.order.findUnique({
-        where: { id: res.body.id },
+        where: { id: orderId },
+        include: { package: true },
       });
-      expect(order?.offerId).toBe(offer.id);
-      // Teklif tutarı da normal checkout gibi aktif kargo tarifesini snapshot'lar.
+      expect(order?.offerId).toBe(offerId);
+      expect(order?.origin).toBe("offer");
+      expect(order?.checkoutGroupId).toBeNull();
+      expect(order?.packageId).toBeTruthy();
+      expect(order?.package?.packageNumber).toMatch(/^PKG-/);
+      expect(order?.package?.checkoutGroupId).toBeNull();
+      expect(order?.package?.shippingTariffId).toBeTruthy();
+      const productRow = await prisma.product.findUnique({
+        where: { id: product.id },
+        select: { shippingDesi: true },
+      });
+      expect(order?.package?.billableDesi).toBe(productRow?.shippingDesi ?? 1);
+      // Teklif tutarı da normal checkout gibi aktif kargo tarifesini snapshot'lar;
+      // toplam = teklif + alıcı kargo payı + alıcı ücreti + KDV'ler (canlı kabul
+      // yolu; eski sabit 429.99 ölü POST /orders yoluna aitti).
       expect(Number(order?.shippingCost)).toBe(29.99);
-      expect(Number(order?.totalAmount)).toBe(429.99);
-      const group = await prisma.checkoutGroup.findUnique({
-        where: { id: order!.checkoutGroupId! },
-      });
-      expect(group?.groupNumber).toMatch(/^GRP/);
+      const expectedTotal =
+        400 +
+        Number(order?.buyerShippingAmount) +
+        Number(order?.buyerFeeAmount) +
+        Number(order?.taxAmount) +
+        Number(order?.buyerServiceTaxAmount);
+      expect(Number(order?.totalAmount)).toBeCloseTo(expectedTotal, 2);
+      expect((order?.financialSnapshot as any)?.shipping?.tariffId).toBe(
+        order?.package?.shippingTariffId,
+      );
     });
 
     scenario("ORD-010", async () => {
-      const buyer = await createUser(ctx.module);
-      const seller = await createUser(ctx.module, { isSeller: true });
-      const product = await createProduct({
-        sellerId: seller.id,
-        categoryId: baseline.categoryId,
-        price: 500,
-      });
-      const addr = await createAddress({ userId: buyer.id });
-      const offer = await createOfferRow({
+      // Aynı teklif ikinci kez kabul edilemez (teklif başına TEK sipariş).
+      const { buyer, seller, product } = await makeOfferParties();
+      const { offerId } = await acceptOfferToOrder(ctx, {
+        buyer,
+        seller,
         productId: product.id,
-        buyerId: buyer.id,
-        sellerId: seller.id,
         amount: 400,
-        status: OfferStatus.pending,
       });
-      const res = await request(server())
-        .post("/api/orders")
-        .set(authHeader(buyer))
-        .send({ offerId: offer.id, shippingAddressId: addr.id })
-        .expect(400);
-      expect(JSON.stringify(res.body)).toContain(
-        "Sadece kabul edilmiş tekliflerden",
-      );
-    });
-
-    scenario("ORD-011", async () => {
-      const { buyer, addr, offer } = await makeAcceptedOffer(400);
       await request(server())
-        .post("/api/orders")
-        .set(authHeader(buyer))
-        .send({ offerId: offer.id, shippingAddressId: addr.id })
-        .expect(201);
-      const res = await request(server())
-        .post("/api/orders")
-        .set(authHeader(buyer))
-        .send({ offerId: offer.id, shippingAddressId: addr.id })
+        .post(`/api/offers/${offerId}/accept`)
+        .set(authHeader(seller))
         .expect(400);
-      expect(JSON.stringify(res.body)).toContain(
-        "Bu teklif için zaten bir sipariş mevcut",
-      );
-    });
-
-    scenario("ORD-012", async () => {
-      const deniz = await createUser(ctx.module);
-      const ceren = await createUser(ctx.module);
-      const seller = await createUser(ctx.module, { isSeller: true });
-      const product = await createProduct({
-        sellerId: seller.id,
-        categoryId: baseline.categoryId,
-        price: 500,
-      });
-      const cerenAddr = await createAddress({ userId: ceren.id });
-      const offer = await createOfferRow({
-        productId: product.id,
-        buyerId: deniz.id,
-        sellerId: seller.id,
-        amount: 400,
-        status: OfferStatus.accepted,
-      });
-      const res = await request(server())
-        .post("/api/orders")
-        .set(authHeader(ceren))
-        .send({ offerId: offer.id, shippingAddressId: cerenAddr.id })
-        .expect(403);
-      expect(JSON.stringify(res.body)).toContain(
-        "Bu tekliften sipariş oluşturma yetkiniz yok",
-      );
+      expect(await getPrisma().order.count({ where: { offerId } })).toBe(1);
     });
   });
 
@@ -879,20 +848,13 @@ describe("09 — Sipariş Yaşam Döngüsü (ORD)", () => {
         price: 500,
       });
       const addr = await createAddress({ userId: buyer.id });
-      const offer = await createOfferRow({
+      const { orderId } = await acceptOfferToOrder(ctx, {
+        buyer,
+        seller,
         productId: product.id,
-        buyerId: buyer.id,
-        sellerId: seller.id,
         amount: 400,
-        status: OfferStatus.accepted,
+        address: addr,
       });
-      const orderId = (
-        await request(server())
-          .post("/api/orders")
-          .set(authHeader(buyer))
-          .send({ offerId: offer.id, shippingAddressId: addr.id })
-          .expect(201)
-      ).body.id;
 
       const body = {
         fullName: "Yeni Ad",
@@ -1317,20 +1279,13 @@ describe("09 — Sipariş Yaşam Döngüsü (ORD)", () => {
         quantity: 1,
       });
       const addr = await createAddress({ userId: buyer.id });
-      const offer = await createOfferRow({
+      const { orderId, offerId } = await acceptOfferToOrder(ctx, {
+        buyer,
+        seller,
         productId: product.id,
-        buyerId: buyer.id,
-        sellerId: seller.id,
         amount: 400,
-        status: OfferStatus.accepted,
+        address: addr,
       });
-      const orderId = (
-        await request(server())
-          .post("/api/orders")
-          .set(authHeader(buyer))
-          .send({ offerId: offer.id, shippingAddressId: addr.id })
-          .expect(201)
-      ).body.id;
       // İptal et (offer cancelled olur → reactivate öncesi accepted'a geri al)
       await request(server())
         .post(`/api/orders/${orderId}/cancel`)
@@ -1338,10 +1293,10 @@ describe("09 — Sipariş Yaşam Döngüsü (ORD)", () => {
         .send({})
         .expect(200);
       await getPrisma().offer.update({
-        where: { id: offer.id },
+        where: { id: offerId },
         data: { status: OfferStatus.accepted },
       });
-      return { buyer, seller, product, addr, orderId, offerId: offer.id };
+      return { buyer, seller, product, addr, orderId, offerId };
     }
 
     scenario("ORD-080", async () => {
@@ -2522,110 +2477,8 @@ describe("09 — Sipariş Yaşam Döngüsü (ORD)", () => {
     });
   });
 
-  // ──────────────────────────── Admin müdahaleleri ────────────────────────────
-  describe("Admin order aksiyonları", () => {
-    scenario("ORD-200", async () => {
-      // super_admin force-complete: awaiting → completed (admin_force)
-      const { buyer, product, addr } = await makeBuyerSellerProduct();
-      const orderId = await buyAndPay(buyer, product.id, addr.id);
-      await setOrderStatus(orderId, OrderStatus.awaiting_buyer_confirmation, {
-        confirmationDeadline: new Date(Date.now() + 48 * 3600 * 1000),
-      });
-      const admin = await createAdminUser(ctx.module, {
-        email: "super@tarodan.com",
-      });
-      const res = await request(server())
-        .post(`/api/admin/orders/${orderId}/force-complete`)
-        .set(authHeader(admin))
-        .send({ reason: "destek talebi" })
-        .expect(200);
-      expect(res.body.completed).toBe(true);
-      const order = await getPrisma().order.findUnique({
-        where: { id: orderId },
-      });
-      expect(order?.status).toBe(OrderStatus.completed);
-      expect(order?.buyerConfirmationType).toBe("admin_force");
-    });
-
-    scenario("ORD-201", async () => {
-      // moderator force-complete → 403
-      const { buyer, product, addr } = await makeBuyerSellerProduct();
-      const orderId = await buyAndPay(buyer, product.id, addr.id);
-      await setOrderStatus(orderId, OrderStatus.awaiting_buyer_confirmation, {
-        confirmationDeadline: new Date(Date.now() + 48 * 3600 * 1000),
-      });
-      const mod = await createAdminUser(ctx.module, {
-        email: "mod@tarodan.com",
-        role: "moderator" as any,
-      });
-      await request(server())
-        .post(`/api/admin/orders/${orderId}/force-complete`)
-        .set(authHeader(mod))
-        .send({ reason: "x" })
-        .expect(403);
-    });
-
-    scenario("ORD-202", async () => {
-      // extend-confirmation: deadline 24 saat ileri
-      const { buyer, product, addr } = await makeBuyerSellerProduct();
-      const orderId = await buyAndPay(buyer, product.id, addr.id);
-      const base = new Date(Date.now() + 10 * 3600 * 1000);
-      await setOrderStatus(orderId, OrderStatus.awaiting_buyer_confirmation, {
-        confirmationDeadline: base,
-      });
-      const admin = await createAdminUser(ctx.module, {
-        email: "super2@tarodan.com",
-      });
-      const res = await request(server())
-        .post(`/api/admin/orders/${orderId}/extend-confirmation`)
-        .set(authHeader(admin))
-        .send({ hours: 24 })
-        .expect(200);
-      expect(res.body.newDeadline).toBeTruthy();
-      const newDeadline = new Date(res.body.newDeadline).getTime();
-      expect(newDeadline - base.getTime()).toBeCloseTo(24 * 3600 * 1000, -3);
-    });
-
-    scenario("ORD-203", async () => {
-      // hours sınırı (1-168): 0 ve 169 → 400 (DTO)
-      const { buyer, product, addr } = await makeBuyerSellerProduct();
-      const orderId = await buyAndPay(buyer, product.id, addr.id);
-      await setOrderStatus(orderId, OrderStatus.awaiting_buyer_confirmation, {
-        confirmationDeadline: new Date(Date.now() + 10 * 3600 * 1000),
-      });
-      const admin = await createAdminUser(ctx.module, {
-        email: "super3@tarodan.com",
-      });
-      await request(server())
-        .post(`/api/admin/orders/${orderId}/extend-confirmation`)
-        .set(authHeader(admin))
-        .send({ hours: 0 })
-        .expect(400);
-      await request(server())
-        .post(`/api/admin/orders/${orderId}/extend-confirmation`)
-        .set(authHeader(admin))
-        .send({ hours: 169 })
-        .expect(400);
-    });
-
-    scenario("ORD-204", async () => {
-      // extend-confirmation: awaiting değil (completed) → 400
-      const { buyer, product, addr } = await makeBuyerSellerProduct();
-      const orderId = await buyAndPay(buyer, product.id, addr.id);
-      await setOrderStatus(orderId, OrderStatus.completed);
-      const admin = await createAdminUser(ctx.module, {
-        email: "super4@tarodan.com",
-      });
-      const res = await request(server())
-        .post(`/api/admin/orders/${orderId}/extend-confirmation`)
-        .set(authHeader(admin))
-        .send({ hours: 24 })
-        .expect(400);
-      expect(JSON.stringify(res.body)).toContain(
-        "Sadece 48h penceresindeki siparişlerde uzatılabilir",
-      );
-    });
-
+  // ──────────────────────────── Admin yetki sınırı ────────────────────────────
+  describe("Admin order listesi yetkisi", () => {
     scenario("ORD-205", async () => {
       // Normal kullanıcı admin orders listesi → yetkisiz (401/403)
       const user = await createUser(ctx.module);

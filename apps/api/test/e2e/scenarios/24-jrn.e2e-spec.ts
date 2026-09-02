@@ -1958,44 +1958,6 @@ describe("24 — Uçtan Uca Entegrasyon Journeyleri (JRN)", () => {
   // ══════════════════════════ Admin uyuşmazlık çözümü journeyleri ══════════════════════════
 
   scenario(
-    "JRN-060",
-    async () => {
-      // Sipariş anlaşmazlığını admin çözer (resolve-dispute).
-      const { buyer, orderId } = await paidOrder({ price: 200 });
-      const admin = await createAdminUser(ctx.module);
-      const prisma = getPrisma();
-      // refund_requested → "disputed" listesinde görünür.
-      await prisma.order.update({
-        where: { id: orderId },
-        data: { status: OrderStatus.refund_requested },
-      });
-
-      // 1) Admin disputes listesi.
-      const list = await request(server())
-        .get("/api/admin/orders/disputes")
-        .set(authHeader(admin))
-        .expect(200);
-      expect(Array.isArray(list.body.data)).toBe(true);
-      expect(list.body.data.some((o: any) => o.id === orderId)).toBe(true);
-
-      // 2) Admin resolve (seller_favor → completed).
-      const res = await post(`/api/admin/orders/${orderId}/resolve`, admin)
-        .send({ resolution: "seller_favor", note: "Satıcı lehine" })
-        .expect(200);
-      expect(res.body.newStatus).toBe(OrderStatus.completed);
-      expect(
-        (await prisma.order.findUnique({ where: { id: orderId } }))?.status,
-      ).toBe(OrderStatus.completed);
-
-      // 3) Normal kullanıcı token'ı admin JWT stratejisinde doğrulanmaz → 401.
-      await post(`/api/admin/orders/${orderId}/resolve`, buyer)
-        .send({ resolution: "seller_favor", note: "x" })
-        .expect(401);
-    },
-    LONG,
-  );
-
-  scenario(
     "JRN-061",
     async () => {
       // Takas anlaşmazlığı açma yetkisi (yalnız katılımcı) + admin çözer.
@@ -2978,21 +2940,13 @@ describe("24 — Uçtan Uca Entegrasyon Journeyleri (JRN)", () => {
       const { orderId } = await paidOrder({ price: 100 });
       expect(
         (
-          await post(`/api/admin/orders/${orderId}/resolve`, normalUser).send({
-            resolution: "dismissed",
-            note: "x",
+          await post(`/api/admin/orders/${orderId}/tracking`, normalUser).send({
+            trackingNumber: "x",
+            carrier: "surat",
+            notes: "x",
           })
         ).status,
       ).toBe(401);
-      // 3) Moderatör force-complete (super_admin) → 403.
-      expect(
-        (
-          await post(
-            `/api/admin/orders/${orderId}/force-complete`,
-            moderator,
-          ).send({ reason: "x" })
-        ).status,
-      ).toBe(403);
     },
     LONG,
   );

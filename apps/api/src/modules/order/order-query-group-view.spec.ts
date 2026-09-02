@@ -178,6 +178,33 @@ describe("OrderQueryService group-umbrella views", () => {
       expect(view.orders).toHaveLength(1);
     });
 
+    it("paketli ama grupsuz (teklif) sipariş: koli numarası ve kargo ücreti KOLİDEN gelir", async () => {
+      const { svc, prisma } = makeService();
+      prisma.order.findUnique.mockResolvedValue(
+        groupOrder("o10", {
+          checkoutGroupId: null,
+          packageId: "pkg-offer",
+          shippingCost: 29.9,
+          package: {
+            id: "pkg-offer",
+            packageNumber: "PKG-OFFER00001",
+            sellerId: "sA",
+            shippingCost: 29.9,
+          },
+          payment: null,
+        }),
+      );
+
+      const view = await svc.findGroupViewByOrder("o10", "buyer-1");
+
+      expect(view.kind).toBe("synthetic");
+      expect(view.packages).toHaveLength(1);
+      expect(view.packages[0].id).toBe("pkg-offer");
+      expect(view.packages[0].packageNumber).toBe("PKG-OFFER00001");
+      expect(view.packages[0].shippingCost).toBe(29.9);
+      expect(view.packages[0].orders).toHaveLength(1);
+    });
+
     it("sentetik görünümde satıcı ödeme bilgisini görmez", async () => {
       const { svc, prisma } = makeService();
       prisma.order.findUnique.mockResolvedValue(

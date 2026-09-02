@@ -116,13 +116,22 @@ export function orderColumns({ t, expandedId, toggleRow }: OrderColumnProps) {
                 <TruncatedText className="max-w-full text-xs text-muted">
                   {`${cancelReasonLabel(o.cancelReason, t)} · ${t(
                     "admin.operations.orders.originCancellation",
-                    { origin: orderOriginLabel(o.offerId, t) },
+                    { origin: orderOriginLabel(o.origin, t) },
                   )}`}
                 </TruncatedText>
               )}
           </div>
         ),
       { minWidth: 190 },
+    ),
+    col.custom<OrderGroupRow>(
+      t("admin.operations.orders.origin"),
+      (o) => (
+        <Badge variant={o.origin === "offer" ? "info" : "default"}>
+          {orderOriginLabel(o.origin, t)}
+        </Badge>
+      ),
+      { minWidth: 110 },
     ),
     col.user<OrderGroupRow>(
       t("admin.operations.orders.buyer"),

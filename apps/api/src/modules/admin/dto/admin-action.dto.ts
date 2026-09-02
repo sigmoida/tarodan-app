@@ -157,33 +157,6 @@ export class GenerateVoucherCodesDto {
   prefix?: string;
 }
 
-export class ResolveDisputeDto {
-  @ApiProperty({
-    example: "buyer_refund",
-    description: "Resolution type",
-    enum: ["buyer_refund", "seller_favor", "partial_refund", "dismissed"],
-  })
-  @IsString()
-  resolution: "buyer_refund" | "seller_favor" | "partial_refund" | "dismissed";
-
-  @ApiProperty({
-    example: "Alıcıya iade yapılacak",
-    description: "Resolution note",
-  })
-  @IsString()
-  @MaxLength(1000)
-  note: string;
-
-  @ApiPropertyOptional({
-    example: 150.0,
-    description: "Kısmi iade tutarı (yalnızca partial_refund için)",
-  })
-  @IsOptional()
-  @IsNumber()
-  @Min(0)
-  refundAmount?: number;
-}
-
 export class UpdateProductDto {
   @ApiPropertyOptional({ example: "iPhone 15 Pro" })
   @IsOptional()

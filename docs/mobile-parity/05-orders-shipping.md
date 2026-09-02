@@ -47,18 +47,28 @@ completed, cancelled, refund_requested, refunded`.
 
 ---
 
+### Sipariş kaynağı (`origin`)
+
+Sipariş yanıtları `origin` taşır: `direct_sale` (sepet/hemen al), `offer`
+(kabul edilen teklif), `platform_service` (üyelik/öne çıkarma). `offerId` yalnız
+teklif ilişkisidir; "tekliften geldi" kararı `origin === 'offer'` ile verilir.
+Teklif siparişi de koli (`packageId`/`packageNumber`) taşır ama `checkoutGroupId`
+null'dur — ödeme `POST /payments/initiate { orderId }` ile tekil yoldan
+başlatılır. Satıcı listesinde teklif siparişi de koli çatısı olarak görünür
+(kart başlığı `PKG-…`).
+
 ## 2. Sipariş detayı
 
-| Method  | Path                           | Auth   | Amaç                                                                                      |
-| ------- | ------------------------------ | ------ | ----------------------------------------------------------------------------------------- |
-| `GET`   | `/orders/:id`                  | bearer | Detay                                                                                     |
-| `GET`   | `/orders/:id/my-review`        | bearer | Kullanıcının kendi yorumu (`{ product, seller }`, yoksa null) — **mobil bunu çağırmıyor** |
-| `POST`  | `/orders/:id/confirm`          | bearer | Alıcı teslimatı onaylar                                                                   |
-| `POST`  | `/orders/:id/confirm-receipt`  | bearer | 48 saatlik pencerede erken onay → `{ completed }`                                         |
-| `POST`  | `/orders/:id/prepare`          | bearer | Satıcı "hazırlanıyor" işaretler                                                           |
-| `POST`  | `/orders/:id/cancel`           | bearer | Kargolamadan önce iptal (`{ reasonCode, reason? }`)                                       |
-| `POST`  | `/orders/:id/reactivate`       | bearer | Süresi dolmuş teklif siparişini ödemeye yeniden açar                                      |
-| `PATCH` | `/orders/:id/shipping-address` | bearer | Yalnız `pending_payment` iken (teklif siparişi ödeme öncesi adres)                        |
+| Method  | Path                           | Auth   | Amaç                                                                                                                   |
+| ------- | ------------------------------ | ------ | ---------------------------------------------------------------------------------------------------------------------- |
+| `GET`   | `/orders/:id`                  | bearer | Detay                                                                                                                  |
+| `GET`   | `/orders/:id/my-review`        | bearer | Kullanıcının kendi yorumu (`{ product, seller }`, yoksa null) — **mobil bunu çağırmıyor**                              |
+| `POST`  | `/orders/:id/confirm`          | bearer | Alıcı teslimatı onaylar                                                                                                |
+| `POST`  | `/orders/:id/confirm-receipt`  | bearer | 48 saatlik pencerede erken onay → `{ completed }`                                                                      |
+| `POST`  | `/orders/:id/prepare`          | bearer | Satıcı "hazırlanıyor" işaretler                                                                                        |
+| `POST`  | `/orders/:id/cancel`           | bearer | Kargolamadan önce iptal (`{ reasonCode, reason? }`)                                                                    |
+| `POST`  | `/orders/:id/reactivate`       | bearer | Süresi dolmuş teklif siparişini ödemeye yeniden açar (ödenmiş/iade edilmişte 400 `server.order.reactivateAlreadyPaid`) |
+| `PATCH` | `/orders/:id/shipping-address` | bearer | Yalnız `pending_payment` iken (teklif siparişi ödeme öncesi adres)                                                     |
 
 İptal sebepleri (`reasonCode`): `delivery_delayed, wrong_product_selected, changed_mind,
 wrong_card, price_changed_mind, unavailable_at_address, other`.

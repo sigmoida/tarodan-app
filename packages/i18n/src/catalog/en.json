@@ -5091,6 +5091,7 @@
         "quickLinks": "Quick Links",
         "viewSeller": "View Seller",
         "viewOrders": "View Orders",
+        "viewOffers": "Offers ({count})",
         "categoryLabel": "Category: {name}",
         "aiFlagged": "Inappropriate",
         "aiReview": "Review",
@@ -6382,6 +6383,49 @@
         "saving": "Saving",
         "errorOccurred": "An error occurred"
       },
+      "offers": {
+        "totalCount": "{count} offers",
+        "empty": "No offers yet",
+        "emptyFiltered": "No offers match the filter",
+        "listPrice": "List price",
+        "listPriceShort": "List: {price}",
+        "percentOfList": "{pct}% of list price",
+        "awaitingBuyer": "Awaiting buyer response",
+        "awaitingSeller": "Awaiting seller response",
+        "turn": "Turn",
+        "linkedOrder": "Linked order",
+        "noOrder": "No order",
+        "noOrderYet": "No order was created because the offer was not accepted",
+        "paymentStatus": "Payment status",
+        "noPayment": "Payment not started",
+        "expiresAt": "Expires",
+        "message": "Message",
+        "detailTitle": "Offer · {product}",
+        "notFound": "Offer not found",
+        "summaryTitle": "Offer details",
+        "chainTitle": "Negotiation history",
+        "chainNote": "Counter-offers create a new record; the previous round closes as \"rejected\".",
+        "chainActor": {
+          "buyer": "Buyer",
+          "seller": "Seller"
+        },
+        "chainCurrent": "This record",
+        "productOffersTitle": "Other offers on this product ({count})",
+        "noOtherOffers": "No other offers on this product",
+        "viewAllForProduct": "All offers for this product",
+        "competingAccepted": "{count} accepted offers — the first buyer to pay wins",
+        "competingPending": "{count} orders awaiting payment",
+        "productSold": "Product sold:",
+        "productStock": "Stock: {quantity} · Reserved: {reserved}",
+        "cancel": "Cancel offer",
+        "cancelTitle": "Cancel offer",
+        "cancelDescription": "The offer is closed; buyer and seller are notified with the reason.",
+        "cancelReason": "Cancellation reason",
+        "cancelReasonPlaceholder": "Why is it being cancelled? (required)",
+        "cancelWillCancelOrder": "The linked order awaiting payment will be cancelled too.",
+        "cancelled": "Offer cancelled",
+        "cancelFailed": "Offer could not be cancelled"
+      },
       "orders": {
         "title": "Orders",
         "loadError": "Failed to load orders",
@@ -6417,6 +6461,12 @@
         "groupDone": "Done",
         "groupOngoing": "In progress",
         "originCancellation": "{origin} cancellation",
+        "origin": "Origin",
+        "pageDescription": "Purchase orders and offers made on products",
+        "tabs": {
+          "orders": "Orders",
+          "offers": "Offers"
+        },
         "updateStatus": "Update Status",
         "newStatus": "New Status",
         "statusChangeReason": "Manual Operation Reason",
@@ -8340,11 +8390,19 @@
         "paymentExpired": "Payment window expired",
         "buyerCancelled": "Cancelled by buyer",
         "sellerMissedShipping": "Seller missed shipping",
-        "deadlineExpired": "Deadline expired"
+        "deadlineExpired": "Deadline expired",
+        "supersededBySellerCounter": "Seller counter-offered",
+        "supersededByBuyerCounter": "Buyer made a new offer",
+        "orderCancelled": "Linked order cancelled",
+        "orderRefunded": "Linked order refunded",
+        "listingDeleted": "Listing removed",
+        "accountBanned": "Account suspended",
+        "adminCancelled": "Cancelled by admin"
       },
       "orderOrigin": {
         "offer": "Offer",
-        "directSale": "Direct Sale"
+        "directSale": "Direct Sale",
+        "platformService": "Platform Service"
       },
       "rateRange": "The rate must be between {min} and {max}",
       "rowActions": {
@@ -8454,10 +8512,6 @@
         "title": "The buyer confirmed the order",
         "message": "The buyer confirmed the order. Your payout will be transferred to your account 14 days after delivery (once the return period ends)."
       },
-      "orderForceCompletedByAdmin": {
-        "title": "Order completed by an administrator",
-        "message": "An administrator completed your order manually."
-      },
       "sellerDidNotShipRefunded": {
         "title": "Order cancelled",
         "message": "The order was cancelled because the seller did not ship within the required time, and a full refund has been initiated."
@@ -8497,6 +8551,10 @@
       "offerPaymentExpired": {
         "title": "Payment Window Expired",
         "message": "Your 24-hour payment window for {productTitle} expired and the order was closed. If the product is still available you can reopen the order and pay."
+      },
+      "offerCancelledByAdmin": {
+        "title": "Offer cancelled by an administrator",
+        "message": "The offer for {productTitle} was cancelled by an administrator: {reason}"
       },
       "offerCancelledOutOfStock": {
         "title": "Your offer was cancelled: product out of stock",
@@ -8939,7 +8997,6 @@
       "confirmForbidden": "You are not authorized to confirm this order",
       "confirmOnlyDelivered": "Only delivered orders can be confirmed",
       "couponNotSupportedForGuest": "Coupon codes are not supported for guest checkout",
-      "extendOnlyWithinWindow": "Can only be extended for orders within the 48h window",
       "groupAlreadyCancelled": "All orders in this cart are already cancelled.",
       "groupCancelBlockedShipped": "At least one order in this cart has been handed to the carrier — cart cancellation is closed. You can request a refund after delivery.",
       "groupNotFound": "Order group not found",
@@ -8967,11 +9024,9 @@
       "notFound": "Order not found",
       "notOrderSeller": "You are not the seller of this order",
       "notYourTransaction": "This transaction does not belong to you",
-      "offerAlreadyHasOrder": "An order already exists for this offer",
       "offerNotAccepted": "An order can only be created from an accepted offer",
       "offerNotAcceptedYet": "The offer has not been accepted",
       "offerNotFound": "Offer not found",
-      "offerOrderForbidden": "You are not authorized to create an order from this offer",
       "openRefundExists": "There is an open refund request; it must be resolved first",
       "orderAccessForbidden": "You are not authorized to access this order",
       "prepareOnlyPaid": "Only paid orders can be marked as preparing",
@@ -8981,6 +9036,7 @@
       "productNotFoundById": "Product not found: {productId}",
       "productNotOnSale": "This product is not for sale",
       "productOutOfStock": "This product is out of stock",
+      "reactivateAlreadyPaid": "An order that was paid or refunded cannot be reactivated",
       "reactivateForbidden": "You are not authorized to reactivate this order",
       "reactivateInsufficientStock": "There is not enough available quantity for this product",
       "reactivateNotFromOffer": "This order cannot be reactivated because it was not created from an offer",
@@ -9288,12 +9344,15 @@
       "holdNotFound": "Hold not found",
       "tokenNotFound": "Token not found",
       "shipmentToDeliveredForbidden": "A shipment in the {status} state cannot be moved to delivered",
+      "offer": {
+        "notCancellableStatus": "Offer is {status}; only pending or unpaid accepted offers can be cancelled",
+        "orderAlreadyPaid": "The linked order is already paid; use the refund flow instead"
+      },
       "order": {
         "shipmentMissingForDelivery": "No shipment is linked to this order, so it cannot be marked delivered",
         "shipmentStatusChanged": "The shipment status just changed; refresh the page and try again",
         "deliveryRaceLost": "The order's delivery state changed concurrently",
         "statusChanged": "The order status just changed; refresh the page and try again",
-        "couponPendingPaymentOnly": "A coupon can only be changed on an order awaiting payment",
         "couponNotFound": "Coupon code not found",
         "couponInactive": "This coupon is not active",
         "couponNotStarted": "This coupon has not started yet",

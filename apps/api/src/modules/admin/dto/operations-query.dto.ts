@@ -2,6 +2,7 @@ import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
 import {
   CarrierCancellationTaskStatus,
   MessageStatus,
+  OfferStatus,
   ShipmentStatus,
   TradeStatus,
 } from "@prisma/client";
@@ -40,6 +41,47 @@ export class AdminTradeQueryDto extends AdminListQueryDto {
   @IsOptional()
   @IsString()
   userId?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsDateString()
+  fromDate?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsDateString()
+  toDate?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  search?: string;
+}
+
+export class AdminOfferQueryDto extends AdminListQueryDto {
+  @ApiPropertyOptional({
+    enum: OfferStatus,
+    description:
+      "Teklif durumu. `pending` yalnız süresi dolmamışları, `expired` süresi dolmuş pending'leri de kapsar.",
+  })
+  @IsOptional()
+  @IsEnum(OfferStatus)
+  status?: OfferStatus;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  productId?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  userId?: string;
+
+  @ApiPropertyOptional({ enum: ["buyer", "seller"] })
+  @IsOptional()
+  @IsIn(["buyer", "seller"])
+  userRole?: "buyer" | "seller";
 
   @ApiPropertyOptional()
   @IsOptional()

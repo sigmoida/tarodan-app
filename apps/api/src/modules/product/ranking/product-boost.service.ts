@@ -11,6 +11,7 @@ import { i18nMessage } from "../../i18n";
 import {
   ProductKind,
   ProductStatus,
+  OrderOrigin,
   OrderStatus,
   MembershipTierType,
   Prisma,
@@ -419,6 +420,7 @@ export class ProductBoostService {
           buyerId: userId,
           sellerId: platformSeller.id,
           productId: virtualProductId,
+          origin: OrderOrigin.platform_service,
           totalAmount: price,
           commissionAmount: 0,
           shippingCost: 0,

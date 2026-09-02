@@ -29,6 +29,7 @@ import {
   AdminRole,
 } from "@prisma/client";
 import { safeDecrementReserved } from "../../product/helpers/product-availability.helper";
+import { OFFER_CANCEL_REASON } from "../../trade/helpers/trade-cancel-reasons";
 import { randomInt } from "crypto";
 import { i18nMessage } from "../../i18n";
 
@@ -582,14 +583,17 @@ export class AdminStaffService {
         },
       });
 
-      // 5. Aktif teklifleri cancelled yap (buyer olarak)
+      // 5. Bekleyen teklifleri kapat — alıcı VE satıcı olarak. Yasaklı satıcının
+      //    aldığı teklifler açık kalırsa alıcılar süre dolana dek "yanıt bekliyor"
+      //    görür; gerekçe ekranlarda "hesap askıya alındı" olarak okunur.
       await tx.offer.updateMany({
         where: {
-          buyerId: userId,
           status: OfferStatus.pending,
+          OR: [{ buyerId: userId }, { sellerId: userId }],
         },
         data: {
           status: OfferStatus.cancelled,
+          cancelReason: OFFER_CANCEL_REASON.accountBanned,
         },
       });
 

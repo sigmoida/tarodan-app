@@ -92,17 +92,6 @@ export class AdminAnalyticsService {
     return this.order.addOrderTracking(adminId, orderId, dto);
   }
 
-  async sendOrderNotification(
-    adminId: string,
-    orderId: string,
-    dto: {
-      type: "status_update" | "shipped" | "delivered" | "custom";
-      message?: string;
-    },
-  ) {
-    return this.order.sendOrderNotification(adminId, orderId, dto);
-  }
-
   async generateOrderInvoice(orderId: string) {
     return this.order.generateOrderInvoice(orderId);
   }

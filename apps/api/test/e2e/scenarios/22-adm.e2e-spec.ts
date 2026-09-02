@@ -40,7 +40,12 @@
  *     regresyon (429 GÖRÜLMEMELİ) test EDİLİR.
  */
 import * as request from "supertest";
-import { AdminRole, PaymentStatus, PayoutStatus } from "@prisma/client";
+import {
+  AdminRole,
+  OfferStatus,
+  PaymentStatus,
+  PayoutStatus,
+} from "@prisma/client";
 import { createE2ETestApp, E2ETestApp } from "../../test-utils/create-app";
 import {
   truncateAll,
@@ -55,7 +60,13 @@ import {
 } from "../../factories/user.factory";
 import { createProduct } from "../../factories/product.factory";
 import { createAddress } from "../../factories/address.factory";
-import { buyAndPay } from "../../factories/flows";
+import {
+  acceptOfferToOrder,
+  buyAndPay,
+  completePaymentByCallback,
+  initiatePayment,
+} from "../../factories/flows";
+import { createOfferRow } from "../../factories/offer.factory";
 import { scenario } from "../../test-utils/scenario";
 import { RolesGuard } from "../../../src/modules/auth/guards/roles.guard";
 import { ADMIN_PERMISSION_KEYS } from "../../../src/modules/admin/dto/role-permissions.dto";
@@ -936,75 +947,6 @@ describe("22 — Admin Paneli & Yetkilendirme (ADM)", () => {
       .set(authHeader(moderator))
       .expect(403);
     expect(String(res.body.message)).toContain("orders");
-  });
-
-  scenario("ADM-034", async () => {
-    // Force-complete yalnız super_admin. admin 403; super_admin 200 (geçerli sipariş).
-    const admin = await createAdminUser(ctx.module, {
-      email: "fc-admin@test.com",
-      role: AdminRole.admin,
-    });
-    const superAdmin = await createAdminUser(ctx.module, {
-      email: "fc-sa@test.com",
-      role: AdminRole.super_admin,
-    });
-    const seller = await createUser(ctx.module, { isSeller: true });
-    const buyer = await createUser(ctx.module);
-    const addr = await createAddress({ userId: buyer.id });
-    const product = await createProduct({
-      sellerId: seller.id,
-      categoryId: baseline.categoryId,
-      status: "active",
-      quantity: 5,
-    });
-    const { orderId } = await buyAndPay(ctx, buyer, product.id, addr.id);
-
-    // admin → 403 (rol yetersiz).
-    await request(server())
-      .post(`/api/admin/orders/${orderId}/force-complete`)
-      .set(authHeader(admin))
-      .send({ reason: "test" })
-      .expect(403);
-    // super_admin → 200.
-    await request(server())
-      .post(`/api/admin/orders/${orderId}/force-complete`)
-      .set(authHeader(superAdmin))
-      .send({ reason: "test" })
-      .expect(200);
-  });
-
-  scenario("ADM-041", async () => {
-    // Dispute çözümü → dispute_resolve AuditLog (entityType=Order). resolveDispute yalnız
-    // var olan sipariş ister; 'seller_favor' → status=completed.
-    const superAdmin = await createAdminUser(ctx.module, {
-      role: AdminRole.super_admin,
-    });
-    const seller = await createUser(ctx.module, { isSeller: true });
-    const buyer = await createUser(ctx.module);
-    const addr = await createAddress({ userId: buyer.id });
-    const product = await createProduct({
-      sellerId: seller.id,
-      categoryId: baseline.categoryId,
-      status: "active",
-      quantity: 5,
-    });
-    const { orderId } = await buyAndPay(ctx, buyer, product.id, addr.id);
-    const prisma = getPrisma();
-
-    await request(server())
-      .post(`/api/admin/orders/${orderId}/resolve`)
-      .set(authHeader(superAdmin))
-      .send({ resolution: "seller_favor", note: "Satıcı lehine" })
-      .expect(200);
-    const log = await prisma.auditLog.findFirst({
-      where: {
-        action: "dispute_resolve",
-        entityType: "Order",
-        entityId: orderId,
-      },
-    });
-    expect(log).toBeTruthy();
-    expect((log?.newValue as any)?.resolution).toBe("seller_favor");
   });
 
   scenario("ADM-111", async () => {
@@ -2360,5 +2302,244 @@ describe("22 — Admin Paneli & Yetkilendirme (ADM)", () => {
       .send({ reason: "x" })
       .expect(400);
     expect(String(r3.body.message)).toMatch(/zaten banlı/i);
+  });
+
+  // ══════════════════════════ Teklif yönetimi (/admin/offers, izin: orders) ══════════════════════════
+
+  async function offerFixture(opts: { amount?: number } = {}) {
+    const seller = await createUser(ctx.module, { isSeller: true });
+    const buyer = await createUser(ctx.module);
+    const addr = await createAddress({ userId: buyer.id });
+    const product = await createProduct({
+      sellerId: seller.id,
+      categoryId: baseline.categoryId,
+      status: "active",
+      price: 1000,
+      quantity: 1,
+    });
+    return { seller, buyer, addr, product, amount: opts.amount ?? 700 };
+  }
+
+  scenario("ADM-121", async () => {
+    // Teklif listesi: moderator (orders izni yok) 403; admin 200 ve productId filtresi.
+    const { seller, buyer, product, amount } = await offerFixture();
+    const offer = await createOfferRow({
+      productId: product.id,
+      buyerId: buyer.id,
+      sellerId: seller.id,
+      amount,
+    });
+    const moderator = await createAdminUser(ctx.module, {
+      role: AdminRole.moderator,
+    });
+    const admin = await createAdminUser(ctx.module, { role: AdminRole.admin });
+
+    await request(server())
+      .get("/api/admin/offers")
+      .set(authHeader(moderator))
+      .expect(403);
+    const res = await request(server())
+      .get("/api/admin/offers")
+      .query({ productId: product.id })
+      .set(authHeader(admin))
+      .expect(200);
+    expect(res.body.data).toHaveLength(1);
+    expect(res.body.data[0]).toEqual(
+      expect.objectContaining({
+        id: offer.id,
+        status: "pending",
+        amount,
+        product: expect.objectContaining({ id: product.id, listPrice: 1000 }),
+        order: null,
+      }),
+    );
+  });
+
+  scenario("ADM-122", async () => {
+    // Detay: satıcı karşı teklifi sonrası zincir 2 kayıt; başka alıcının teklifi kardeş listesinde.
+    const { seller, buyer, product } = await offerFixture();
+    const first = await createOfferRow({
+      productId: product.id,
+      buyerId: buyer.id,
+      sellerId: seller.id,
+      amount: 600,
+    });
+    const counter = await request(server())
+      .post(`/api/offers/${first.id}/counter`)
+      .set(authHeader(seller))
+      .send({ amount: 800 });
+    expect(counter.status).toBeLessThan(300);
+    const counterId = counter.body.id as string;
+    const otherBuyer = await createUser(ctx.module);
+    const sibling = await createOfferRow({
+      productId: product.id,
+      buyerId: otherBuyer.id,
+      sellerId: seller.id,
+      amount: 650,
+    });
+    const admin = await createAdminUser(ctx.module, { role: AdminRole.admin });
+
+    const res = await request(server())
+      .get(`/api/admin/offers/${counterId}`)
+      .set(authHeader(admin))
+      .expect(200);
+    expect(res.body.chain.map((c: any) => c.id)).toEqual([first.id, counterId]);
+    expect(res.body.chain[0]).toEqual(
+      expect.objectContaining({ status: "rejected", actor: "buyer" }),
+    );
+    expect(res.body.chain[1]).toEqual(
+      expect.objectContaining({ actor: "seller", isCurrent: true }),
+    );
+    expect(res.body.siblings.map((s: any) => s.id)).toEqual([sibling.id]);
+    expect(res.body.competing.acceptedOffers).toBe(0);
+  });
+
+  scenario("ADM-123", async () => {
+    // Bekleyen teklif iptali: cancelled + yönetici gerekçesi + AuditLog(Offer/offer_cancel).
+    const { seller, buyer, product } = await offerFixture();
+    const offer = await createOfferRow({
+      productId: product.id,
+      buyerId: buyer.id,
+      sellerId: seller.id,
+      amount: 700,
+    });
+    const admin = await createAdminUser(ctx.module, { role: AdminRole.admin });
+
+    const res = await request(server())
+      .post(`/api/admin/offers/${offer.id}/cancel`)
+      .set(authHeader(admin))
+      .send({ reason: "Şüpheli hesap" })
+      .expect(200);
+    expect(res.body.offer.status).toBe("cancelled");
+    const prisma = getPrisma();
+    const row = await prisma.offer.findUnique({ where: { id: offer.id } });
+    expect(row?.status).toBe("cancelled");
+    expect(row?.cancelReason).toBe(
+      "Yönetici tarafından iptal edildi: Şüpheli hesap",
+    );
+    const log = await prisma.auditLog.findFirst({
+      where: {
+        action: "offer_cancel",
+        entityType: "Offer",
+        entityId: offer.id,
+      },
+    });
+    expect(log).toBeTruthy();
+    expect((log?.newValue as any)?.reason).toBe("Şüpheli hesap");
+  });
+
+  scenario("ADM-124", async () => {
+    // Kabul edilmiş + ödeme bekleyen sipariş: teklif iptali siparişi de kapatır (cancelled/iptal), rezerv bozulmaz.
+    const { seller, buyer, addr, product } = await offerFixture();
+    const { offerId, orderId } = await acceptOfferToOrder(ctx, {
+      buyer,
+      seller,
+      productId: product.id,
+      amount: 700,
+      address: addr,
+    });
+    const admin = await createAdminUser(ctx.module, { role: AdminRole.admin });
+    const prisma = getPrisma();
+    const before = await prisma.product.findUnique({
+      where: { id: product.id },
+      select: { reservedQuantity: true },
+    });
+
+    const res = await request(server())
+      .post(`/api/admin/offers/${offerId}/cancel`)
+      .set(authHeader(admin))
+      .send({ reason: "Satıcı talebi" })
+      .expect(200);
+    expect(res.body.order.status).toBe("cancelled");
+    const order = await prisma.order.findUnique({ where: { id: orderId } });
+    expect(order?.status).toBe("cancelled");
+    expect(order?.cancellationType).toBe("iptal");
+    expect(order?.cancelReason).toBe(
+      "Yönetici tarafından iptal edildi: Satıcı talebi",
+    );
+    // Teklif siparişi ödeme başlatılmadan rezerve edilmez → sayaç değişmez, negatife düşmez.
+    const after = await prisma.product.findUnique({
+      where: { id: product.id },
+      select: { reservedQuantity: true },
+    });
+    expect(after?.reservedQuantity).toBe(before?.reservedQuantity);
+  });
+
+  scenario("ADM-125", async () => {
+    // Ödenmiş teklif siparişi: iptal 400 (iade akışı), teklif accepted kalır.
+    const { seller, buyer, addr, product } = await offerFixture();
+    const { offerId, orderId } = await acceptOfferToOrder(ctx, {
+      buyer,
+      seller,
+      productId: product.id,
+      amount: 700,
+      address: addr,
+    });
+    await initiatePayment(ctx, buyer, orderId);
+    await completePaymentByCallback(ctx, orderId);
+    const admin = await createAdminUser(ctx.module, { role: AdminRole.admin });
+
+    const res = await request(server())
+      .post(`/api/admin/offers/${offerId}/cancel`)
+      .set(authHeader(admin))
+      .send({ reason: "x" })
+      .expect(400);
+    expect(String(res.body.message)).toMatch(/ödendi/i);
+    const row = await getPrisma().offer.findUnique({ where: { id: offerId } });
+    expect(row?.status).toBe("accepted");
+  });
+
+  scenario("ADM-126", async () => {
+    // Zaten iptal edilmiş teklif → 400; moderator iptal → 403.
+    const { seller, buyer, product } = await offerFixture();
+    const offer = await createOfferRow({
+      productId: product.id,
+      buyerId: buyer.id,
+      sellerId: seller.id,
+      amount: 700,
+      status: OfferStatus.cancelled,
+    });
+    const admin = await createAdminUser(ctx.module, { role: AdminRole.admin });
+    const moderator = await createAdminUser(ctx.module, {
+      role: AdminRole.moderator,
+    });
+    await request(server())
+      .post(`/api/admin/offers/${offer.id}/cancel`)
+      .set(authHeader(admin))
+      .send({ reason: "x" })
+      .expect(400);
+    await request(server())
+      .post(`/api/admin/offers/${offer.id}/cancel`)
+      .set(authHeader(moderator))
+      .send({ reason: "x" })
+      .expect(403);
+  });
+
+  scenario("ADM-127", async () => {
+    // Sipariş listesi origin filtresi: teklif siparişi origin=offer ile gelir, direct_sale ile gelmez.
+    const { seller, buyer, addr, product } = await offerFixture();
+    const { orderId } = await acceptOfferToOrder(ctx, {
+      buyer,
+      seller,
+      productId: product.id,
+      amount: 700,
+      address: addr,
+    });
+    const admin = await createAdminUser(ctx.module, { role: AdminRole.admin });
+    const offerList = await request(server())
+      .get("/api/admin/orders")
+      .query({ origin: "offer", productId: product.id })
+      .set(authHeader(admin))
+      .expect(200);
+    expect(offerList.body.data.some((o: any) => o.id === orderId)).toBe(true);
+    expect(offerList.body.data.every((o: any) => o.origin === "offer")).toBe(
+      true,
+    );
+    const directList = await request(server())
+      .get("/api/admin/orders")
+      .query({ origin: "direct_sale", productId: product.id })
+      .set(authHeader(admin))
+      .expect(200);
+    expect(directList.body.data.some((o: any) => o.id === orderId)).toBe(false);
   });
 });

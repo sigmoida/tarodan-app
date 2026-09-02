@@ -149,21 +149,6 @@ export class NotificationCommerceService {
     });
   }
 
-  /** Hem alıcıya hem satıcıya gider; hedef ekran `audience` ile ayrılır. */
-  async notifyOrderForceCompletedByAdmin(
-    userId: string,
-    orderId: string,
-    audience: NotificationAudience,
-    reason?: string,
-  ) {
-    return this.dispatch.send({
-      userId,
-      type: NotificationType.ORDER_FORCE_COMPLETED_BY_ADMIN,
-      channels: [NotificationChannel.PUSH, NotificationChannel.IN_APP],
-      data: { orderId, reason, audience },
-    });
-  }
-
   async notifySellerDidNotShipRefunded(buyerId: string, orderId: string) {
     await this.dispatch.send({
       userId: buyerId,
@@ -344,6 +329,24 @@ export class NotificationCommerceService {
     return this.dispatch.send({
       userId: buyerId,
       type: NotificationType.OFFER_CANCELLED_OUT_OF_STOCK,
+      channels: [NotificationChannel.IN_APP, NotificationChannel.PUSH],
+      data,
+    });
+  }
+
+  /** Yönetici iptali: alıcıya VE satıcıya, gerekçeyle. */
+  async notifyOfferCancelledByAdmin(
+    userId: string,
+    data: {
+      offerId: string;
+      productId: string;
+      productTitle: string;
+      reason: string;
+    },
+  ) {
+    return this.dispatch.send({
+      userId,
+      type: NotificationType.OFFER_CANCELLED_BY_ADMIN,
       channels: [NotificationChannel.IN_APP, NotificationChannel.PUSH],
       data,
     });

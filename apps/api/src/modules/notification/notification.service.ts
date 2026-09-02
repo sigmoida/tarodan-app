@@ -154,21 +154,6 @@ export class NotificationService {
     return this.commerce.notifyCouponReturned(userId, code);
   }
 
-  /** `audience` ZORUNLU: aynı bildirim iki tarafa da gidiyor. */
-  async notifyOrderForceCompletedByAdmin(
-    userId: string,
-    orderId: string,
-    audience: NotificationAudience,
-    reason?: string,
-  ) {
-    return this.commerce.notifyOrderForceCompletedByAdmin(
-      userId,
-      orderId,
-      audience,
-      reason,
-    );
-  }
-
   async notifySellerDidNotShipRefunded(buyerId: string, orderId: string) {
     return this.commerce.notifySellerDidNotShipRefunded(buyerId, orderId);
   }
@@ -236,6 +221,18 @@ export class NotificationService {
       _productTitle,
       _categoryId,
     );
+  }
+
+  async notifyOfferCancelledByAdmin(
+    userId: string,
+    data: {
+      offerId: string;
+      productId: string;
+      productTitle: string;
+      reason: string;
+    },
+  ) {
+    return this.commerce.notifyOfferCancelledByAdmin(userId, data);
   }
 
   async notifyOfferCancelledOutOfStock(

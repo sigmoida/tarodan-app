@@ -115,6 +115,14 @@ export function ProductSidebar({
         >
           {t("admin.catalog.products.viewOrders")}
         </Link>
+        <Link
+          href={`/operations/orders?tab=teklifler&productId=${product.id}`}
+          className="block rounded-lg px-4 py-2 text-body transition-colors hover:bg-surface"
+        >
+          {t("admin.catalog.products.viewOffers", {
+            count: product._count?.offers ?? 0,
+          })}
+        </Link>
       </SectionCard>
     </>
   );

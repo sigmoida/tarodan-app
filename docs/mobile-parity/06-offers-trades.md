@@ -36,13 +36,21 @@ Kurallar (istemci + sunucu):
 | `GET`  | `/offers?type=received\|sent`      | bearer | Liste (ayrıca `status`, `productId`, `page`, `limit`) |
 | `GET`  | `/offers/:id`                      | bearer | Detay                                                 |
 | `GET`  | `/offers/pending-count`            | bearer | `{ received, sent, total }` — badge                   |
-| `POST` | `/offers/:id/accept`               | bearer | Kabul                                                 |
+| `POST` | `/offers/:id/accept`               | bearer | Kabul — siparişi de oluşturur (`orderId` yanıtta)     |
 | `POST` | `/offers/:id/reject`               | bearer | Reddet                                                |
 | `POST` | `/offers/:id/cancel`               | bearer | Kendi teklifini iptal et                              |
 | `POST` | `/offers/:id/counter`              | bearer | **Satıcı** karşı teklifi (`{ amount, message? }`)     |
 | `POST` | `/offers/:id/buyer-counter`        | bearer | **Alıcı** daha düşük karşı teklif                     |
 | `GET`  | `/offers/product/:productId`       | bearer | Bir ürünün teklifleri (satıcı)                        |
 | `POST` | `/orders/commission-preview-batch` | bearer | Gelen tekliflerde "net kazanç" önizlemesi             |
+
+Kabul siparişi **kendi içinde** yaratır: `origin=offer`, tek koli (`PKG-…`),
+`CheckoutGroup` yok; ayrı bir "tekliften sipariş" ucu **yoktur**. Kabul
+tekelleştirmez: aynı ürün için birden çok teklif kabul edilebilir, ürünü **ilk
+ödeyen** alır; kaybedenler stok bitince `cancelled` (`cancelReason`: stok) olur.
+Tam iade edilen sipariş teklifi `cancelled` yapar ("Bağlı sipariş iade edildiği
+için teklif kapatıldı"); yönetici iptali `cancelReason` "Yönetici tarafından
+iptal edildi: …" ve `offer_cancelled_by_admin` bildirimiyle gelir.
 
 Durumlar: `pending, accepted, rejected, expired, cancelled, payment_expired`.
 **`countered` sunucuda YOK** — karşı teklif, `buyerMustAccept` bayrağı ile aynı teklif

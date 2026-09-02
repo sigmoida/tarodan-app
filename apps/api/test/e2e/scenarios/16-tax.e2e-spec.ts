@@ -52,7 +52,7 @@ import {
 } from "../../factories/user.factory";
 import { createProduct } from "../../factories/product.factory";
 import { createAddress } from "../../factories/address.factory";
-import { createOfferRow } from "../../factories/offer.factory";
+import { acceptOfferToOrder } from "../../factories/flows";
 import { scenario } from "../../test-utils/scenario";
 import { signCallback } from "../../mocks/paytr.mock";
 import {
@@ -60,7 +60,6 @@ import {
   extractCode,
   clearMailbox,
 } from "../../test-utils/mail";
-import { OfferStatus } from "@prisma/client";
 import { ConfigService } from "@nestjs/config";
 import { JwtService } from "@nestjs/jwt";
 
@@ -727,19 +726,18 @@ describe("16 — Vergi & Fatura (TAX)", () => {
         quantity: 1,
       });
       const addr = await createAddress({ userId: buyer.id });
-      // Kabul edilmiş teklif (500₺) seed et; buyer order'ı POST /orders ile oluşturur.
-      const offer = await createOfferRow({
+      // Teklif (500₺) satıcı tarafından kabul edilir; sipariş kabul içinde oluşur.
+      const { orderId } = await acceptOfferToOrder(ctx, {
+        buyer,
+        seller,
         productId: product.id,
-        buyerId: buyer.id,
-        sellerId: seller.id,
         amount: 500,
-        status: OfferStatus.accepted,
+        address: addr,
       });
       const orderRes = await request(server())
-        .post("/api/orders")
+        .get(`/api/orders/${orderId}`)
         .set(authHeader(buyer))
-        .send({ offerId: offer.id, shippingAddressId: addr.id })
-        .expect(201);
+        .expect(200);
 
       // offerAmount 500 * 20% = 100.
       expect(orderRes.body.pricing.taxAmount).toBe(100);
