@@ -1,10 +1,131 @@
 import {
+  applySentryBreadcrumbPolicy,
   applySentryEventPolicy,
+  applySentryTransactionPolicy,
   isProductionRuntime,
   resolveSentryEnvironment,
   resolveSentryRelease,
 } from "./sentry-event";
 import { runWithRequestId } from "../../common/context/request-context";
+
+/**
+ * Breadcrumb kapısı: Sentry'nin fetch entegrasyonu her dış çağrının URL'ini
+ * kaydeder; Sürat sözleşmesi kimliği query'de taşır. Canlıda şifre Sentry
+ * olaylarında düz metin göründü — bu testler o sızıntıyı kapalı tutar.
+ */
+describe("applySentryBreadcrumbPolicy", () => {
+  const suratUrl =
+    "https://api01.suratkargo.com.tr/api/KargoTakipHareketDetayi?CariKodu=1561604773&Sifre=S3CR3T&WebSiparisKodu=PKG-2HGNFGEGTD";
+
+  it("masks carrier credentials in outbound http breadcrumbs, keeps the reference", () => {
+    const crumb = applySentryBreadcrumbPolicy({
+      category: "http",
+      data: {
+        url: suratUrl,
+        "http.query":
+          "?CariKodu=1561604773&Sifre=S3CR3T&WebSiparisKodu=PKG-2HGNFGEGTD",
+        method: "POST",
+      },
+    } as any);
+    const serialized = JSON.stringify(crumb);
+    expect(serialized).not.toContain("S3CR3T");
+    expect(serialized).not.toContain("1561604773");
+    expect(crumb?.data?.url).toContain("Sifre=***");
+    expect(crumb?.data?.url).toContain("CariKodu=***");
+    expect(crumb?.data?.url).toContain("WebSiparisKodu=PKG-2HGNFGEGTD");
+    expect(crumb?.data?.["http.query"]).toContain("Sifre=***");
+    expect(crumb?.data?.method).toBe("POST");
+  });
+
+  it("drops health-check breadcrumbs", () => {
+    expect(
+      applySentryBreadcrumbPolicy({
+        category: "http",
+        data: { url: "https://api/x/health" },
+      } as any),
+    ).toBeNull();
+  });
+
+  it("still redacts sensitive keys in breadcrumb data and masks urls in messages", () => {
+    const crumb = applySentryBreadcrumbPolicy({
+      category: "console",
+      message: `Surat tracking API request failed for ${suratUrl}`,
+      data: { password: "hunter2" },
+    } as any);
+    expect(JSON.stringify(crumb)).not.toContain("hunter2");
+    expect(crumb?.message).not.toContain("S3CR3T");
+    expect(crumb?.message).toContain("Sifre=***");
+  });
+
+  it("passes breadcrumbs without data through untouched", () => {
+    const crumb = { category: "navigation", message: "x" } as any;
+    expect(applySentryBreadcrumbPolicy(crumb)).toEqual(crumb);
+  });
+});
+
+/**
+ * Performans izleri: fetch entegrasyonu her dış çağrı için `http.client` span'ı
+ * üretir ve tam URL'yi span verisine yazar. Breadcrumb temizlense de span
+ * üzerinden sızardı — bu kapı onu kapatır.
+ */
+describe("applySentryTransactionPolicy", () => {
+  const suratUrl =
+    "https://api01.suratkargo.com.tr/api/KargoTakipHareketDetayi?CariKodu=1561604773&Sifre=S3CR3T&WebSiparisKodu=PKG-2HGNFGEGTD";
+
+  it("masks credentials in outbound http spans, span descriptions and the trace context", () => {
+    const tx = applySentryTransactionPolicy({
+      type: "transaction",
+      transaction: "cron sync-surat-tracking",
+      contexts: {
+        trace: {
+          trace_id: "t",
+          span_id: "s",
+          op: "queue.process",
+          data: { "url.full": suratUrl },
+        },
+      },
+      spans: [
+        {
+          span_id: "s1",
+          trace_id: "t",
+          start_timestamp: 1,
+          op: "http.client",
+          description: `POST ${suratUrl}`,
+          data: {
+            "url.full": suratUrl,
+            "http.url": suratUrl,
+            "http.target":
+              "/api/KargoTakipHareketDetayi?CariKodu=1561604773&Sifre=S3CR3T",
+            "http.request.method": "POST",
+            "http.response.status_code": 200,
+          },
+        },
+      ],
+    } as any);
+
+    const serialized = JSON.stringify(tx);
+    expect(serialized).not.toContain("S3CR3T");
+    expect(serialized).not.toContain("1561604773");
+    expect(tx?.spans?.[0]?.description).toContain("Sifre=***");
+    expect(tx?.spans?.[0]?.data?.["url.full"]).toContain(
+      "WebSiparisKodu=PKG-2HGNFGEGTD",
+    );
+    expect(tx?.spans?.[0]?.data?.["http.response.status_code"]).toBe(200);
+    expect(tx?.contexts?.trace?.data?.["url.full"]).toContain("Sifre=***");
+    expect(tx?.transaction).toBe("cron sync-surat-tracking");
+  });
+
+  it("drops health-check transactions and keeps ordinary ones", () => {
+    expect(
+      applySentryTransactionPolicy({
+        type: "transaction",
+        request: { url: "https://api/x/health" },
+      } as any),
+    ).toBeNull();
+    const plain = { type: "transaction", transaction: "GET /orders" } as any;
+    expect(applySentryTransactionPolicy(plain)).toMatchObject(plain);
+  });
+});
 
 /**
  * Sentry'ye giden her olayın geçtiği TEK kapı. Üç sözleşme:

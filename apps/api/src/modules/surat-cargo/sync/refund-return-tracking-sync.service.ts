@@ -2,11 +2,7 @@ import { Injectable, Logger } from "@nestjs/common";
 import { ModuleRef } from "@nestjs/core";
 import { ShipmentStatus } from "@prisma/client";
 import { PrismaService } from "../../../prisma";
-import {
-  mapSuratStatusToShipmentStatus,
-  isSuratDelivered,
-  isSuratReturnCompleted,
-} from "../mappers/surat-status.mapper";
+import { interpretSuratTracking } from "../mappers/surat-status.mapper";
 import { SuratTrackingClient } from "../clients/surat-tracking.client";
 
 /**
@@ -100,28 +96,26 @@ export class RefundReturnTrackingSyncService {
 
     const gonderi = data.Gonderiler[0];
     const suratCode = gonderi.KargonunDurumuSayi;
-    const newStatus = mapSuratStatusToShipmentStatus(suratCode);
-    // L2: bilinmeyen kodda iade durumunu değiştirme — güncellenecek şey yok.
-    if (newStatus === null) {
+    // Tek karar mercii (order/trade path ile aynı): kod + iade bayrağı +
+    // tamamlanma sinyalleri birlikte okunur. `status: null` (bilinmeyen ya da
+    // belirsiz) iade durumunu değiştirmez — güncellenecek şey yok.
+    const reading = interpretSuratTracking(gonderi);
+    if (reading.status === null) {
       this.logger.warn(
-        `Unknown Surat status code ${suratCode} for refund return ${refundRequestId}; skipping update`,
+        `${reading.isReturnFlow ? "Ambiguous Surat state" : "Unknown Surat status code"} ${suratCode} (IadeDurum=${gonderi.IadeDurum}) for refund return ${refundRequestId}; skipping update`,
       );
       return "ignored";
     }
-    // İade gönderisinin "geri teslim edildi" durumu, Sürat dokümanına (KargoTakip
-    // HareketDetayi) göre KargonunDurumuSayi = 12 (İade Teslim Edildi). İleri
-    // gönderinin 6/7 kodları bu akışta geçerli değil; yine de tolerans için
-    // ikisini de kabul ediyoruz.
-    const isReturnDelivered =
-      isSuratReturnCompleted(gonderi) || isSuratDelivered(suratCode);
-    // Tamamlanmışsa `returned` gönder — kod tablosuna bırakma. `applyReturn
-    // TrackingUpdate` iade talebinin statüsünü BU değerden türetiyor: canlıda
-    // tamamlanma kodu 13 geliyor, tablo onu `return_in_progress`'e eşliyor ve
-    // talep `return_in_transit`'te kalıyor. Orada kalırsa muayene penceresi hiç
-    // başlamaz, finalize sweep'i hiç görmez ve alıcı parasını hiç alamaz.
+    // İade dönüşünde "geri teslim" iki şekilde gelir: dokümandaki 12 / canlıdaki
+    // 13+bayrak (tamamlanmış iade) ya da ileri gönderi kodu 6/7 (koli satıcıya
+    // ulaştı). İkisi de `returned` yazılır — `applyReturnTrackingUpdate` iade
+    // talebinin statüsünü BU değerden türetiyor; tabloya bırakılırsa talep
+    // `return_in_transit`'te kalır, muayene penceresi hiç başlamaz ve alıcı
+    // parasını hiç alamaz.
+    const isReturnDelivered = reading.isReturnCompleted || reading.isDelivered;
     const effectiveStatus = isReturnDelivered
       ? ShipmentStatus.returned
-      : newStatus;
+      : reading.status;
 
     // Backfill: gerçek Sürat kodu (KargoTakipNo) kayıtlı değilse poll cevabından
     // doldur — order/trade path'lerindeki backfill'in paritesi. Barkod-rework

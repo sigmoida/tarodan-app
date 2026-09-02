@@ -9,7 +9,17 @@ import { ShipmentStatus } from "@prisma/client";
  *
  * Carrier updates may skip intermediate states and a failed delivery may return
  * to a branch. The explicit graph allows those branches while rejecting lifecycle
- * regressions such as `in_transit -> pending` and leaving a return flow.
+ * regressions such as `in_transit -> pending`.
+ *
+ * Two lessons from production (2026-09-02):
+ *  - `return_in_progress -> delivered` must stay open. Sürat flags a parcel as
+ *    "İade Sürecinde" transiently during a normal delivery; locking the return
+ *    state froze a delivered parcel forever (PKG-2HGNFGEGTD) and no manual path
+ *    could unlock it because the admin override runs the same graph.
+ *  - Any non-terminal state may go to `cancelled`: the carrier can cancel a
+ *    parcel that already left the branch (PKG-ANSXZR4QFC sat in `picked_up`
+ *    for 13 days after Sürat reported "Gönderi iptal edilmiştir").
+ * `delivered` / `returned` / `cancelled` remain terminal: money already moved.
  */
 export const TERMINAL_SHIPMENT_STATUSES: ReadonlySet<ShipmentStatus> = new Set([
   ShipmentStatus.delivered,
@@ -60,6 +70,7 @@ export function canTransitionShipmentStatus(
       ShipmentStatus.failed,
       ShipmentStatus.return_in_progress,
       ShipmentStatus.returned,
+      ShipmentStatus.cancelled,
     ],
     [ShipmentStatus.in_transit]: [
       ShipmentStatus.at_delivery_branch,
@@ -68,6 +79,7 @@ export function canTransitionShipmentStatus(
       ShipmentStatus.failed,
       ShipmentStatus.return_in_progress,
       ShipmentStatus.returned,
+      ShipmentStatus.cancelled,
     ],
     [ShipmentStatus.at_delivery_branch]: [
       ShipmentStatus.in_transit,
@@ -76,6 +88,7 @@ export function canTransitionShipmentStatus(
       ShipmentStatus.failed,
       ShipmentStatus.return_in_progress,
       ShipmentStatus.returned,
+      ShipmentStatus.cancelled,
     ],
     [ShipmentStatus.out_for_delivery]: [
       ShipmentStatus.in_transit,
@@ -84,6 +97,7 @@ export function canTransitionShipmentStatus(
       ShipmentStatus.failed,
       ShipmentStatus.return_in_progress,
       ShipmentStatus.returned,
+      ShipmentStatus.cancelled,
     ],
     [ShipmentStatus.delivered]: [
       ShipmentStatus.return_in_progress,
@@ -99,7 +113,11 @@ export function canTransitionShipmentStatus(
       ShipmentStatus.returned,
       ShipmentStatus.cancelled,
     ],
-    [ShipmentStatus.return_in_progress]: [ShipmentStatus.returned],
+    [ShipmentStatus.return_in_progress]: [
+      ShipmentStatus.delivered,
+      ShipmentStatus.returned,
+      ShipmentStatus.cancelled,
+    ],
     [ShipmentStatus.returned]: [],
     [ShipmentStatus.cancelled]: [],
   };
