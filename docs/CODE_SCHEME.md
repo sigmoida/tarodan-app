@@ -64,11 +64,19 @@ PKG-…  koli           → satıcı sayısı kadar (her satıcı ayrı kargolar
 ORD-…  sipariş satırı → ürün satırı sayısı kadar
 ```
 
-| Sepet içeriği     | GRP | PKG | ORD |
-| ----------------- | --- | --- | --- |
-| 1 ürün / 1 satıcı | 1   | 1   | 1   |
-| 2 ürün / 1 satıcı | 1   | 1   | 2   |
-| 3 ürün / 2 satıcı | 1   | 2   | 3   |
+| Sepet içeriği              | GRP | PKG | ORD |
+| -------------------------- | --- | --- | --- |
+| 1 ürün / 1 satıcı          | 1   | 1   | 1   |
+| 2 ürün / 1 satıcı          | 1   | 1   | 2   |
+| 3 ürün / 2 satıcı          | 1   | 2   | 3   |
+| Teklif siparişi (tek ürün) | 0   | 1   | 1   |
+
+**Teklif siparişi GRP taşımaz.** Kabul (`POST /offers/:id/accept`) siparişi
+kendi içinde, tek koliyle (`PKG-…`) yaratır ama `CheckoutGroup` açmaz: ödeme
+tekil sipariş yolundan gider ve stok rezervasyonu ilk ödeme başlatmada alınır
+(grup ödeme yolu bu kuralı bilmez). Kaynak `Order.origin = offer` ile açıktır
+(`direct_sale` / `offer` / `platform_service`); `offerId` tek ayırt edici
+değildir.
 
 **Kargo referansı `PKG-…`'dir.** Sürat'a `OzelKargoTakipNo` olarak bu gönderilir,
 Sürat karşılığında kendi `KargoTakipNo`'sunu döner (`providerTrackingId`), müşteri
@@ -79,6 +87,14 @@ referansı "paketteki en küçük `orderNumber`" olarak hesaplanıyordu; paketin
 sipariş kümesi değişince (iptal, `packageId` taşıması) referans kayıyor, 48
 saatlik barkod retry penceresinde Sürat'ın idempotency önbelleğini (anahtar =
 `OzelKargoTakipNo`) ıskalıyor ve **mükerrer fiziksel gönderi** açabiliyordu.
+
+Geçmişte teklif siparişleri paketsiz yaratılıyor ve Sürat'a `ORD-…` gidiyordu.
+Migration `20260902100000_order_origin_offer_packages` bu kayıtlara koli
+üretir: koli numarası sipariş numarasından **tek seferlik** türetilir
+(`ORD-X` → `PKG-X`, tekillik `order_number`'dan gelir) ve canlı gönderisi olan
+siparişte `carrierReference = mevcut Shipment.trackingNumber (ORD-…)` yazılır.
+**Geçmiş kargo kodları değişmez**: takip ve barkod tekrar denemesi aynı `ORD-…`
+referansıyla sürer; o kayıtlarda `PKG-…` yalnız iç koli kimliğidir.
 
 Aynı koliyi paylaşan gönderi satırları `Shipment.packageId` ile bağlıdır: Sürat
 koli başına **bir kez** sorgulanır ve taşıyıcı webhook'u kolinin **tüm** sipariş
