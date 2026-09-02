@@ -5,7 +5,7 @@ import { useTranslations } from "next-intl";
 import { Alert, Modal, ModalFooter, Textarea } from "@tarodan/ui";
 import { adminApi } from "@/lib/api";
 import { useAdminMutation } from "@/hooks/useAdminMutation";
-import { cancelClosesOrder } from "../../../_lib/offers";
+import { cancelClosesOrder } from "../../_lib/offers";
 
 /**
  * Teklif iptali: gerekçe zorunlu (alıcı ve satıcıya bildirim olarak gider).

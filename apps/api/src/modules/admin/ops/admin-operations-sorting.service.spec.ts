@@ -469,25 +469,4 @@ describe("admin operations list sorting", () => {
       }),
     );
   });
-
-  it("sorts refund history and maps its response", async () => {
-    // İade geçmişi artık RefundRequest bazlı (grup modelinde Payment 'refunded'
-    // olmadığından eski Payment-bazlı liste grup iadelerini göremiyordu).
-    const refundRequest = createDelegate();
-    const service = new AdminPaymentService(
-      { refundRequest } as any,
-      {} as any,
-      {} as any,
-    );
-
-    await service.getRefundHistory({ sortBy: "amount", sortOrder: "asc" });
-
-    expect(refundRequest.findMany).toHaveBeenCalledWith(
-      expect.objectContaining({
-        orderBy: { amount: "asc" },
-        skip: 0,
-        take: 20,
-      }),
-    );
-  });
 });

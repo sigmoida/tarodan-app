@@ -1,7 +1,6 @@
 import Link from "next/link";
 import { useTranslations } from "next-intl";
-import { Badge, IconButton, shipmentStatusConfig } from "@tarodan/ui";
-import { ChevronRightIcon } from "@heroicons/react/24/outline";
+import { Badge, shipmentStatusConfig } from "@tarodan/ui";
 import {
   col,
   CellCode,
@@ -19,12 +18,6 @@ import type {
 import { statusConfig } from "@/lib/statusLabels";
 
 type T = ReturnType<typeof useTranslations<never>>;
-
-interface PhysicalShipmentColumnProps {
-  t: T;
-  expandedId: string | null;
-  toggleRow: (id: string) => void;
-}
 
 /**
  * Kolinin başlığı = gerçek koli numarası (PKG-…). Bu kod Sürat'a
@@ -47,56 +40,10 @@ function carrierLabel(provider: string | null, t: T): string | null {
 /**
  * Columns for the PHYSICAL shipment list: one row per parcel (sibling orders
  * that share a package are already merged upstream — see `toPhysicalShipments`).
- * The expandable detail preserves per-order navigation even though the rows are
- * consolidated.
+ * The parcel's contents (products, order links, quantities) live in the
+ * always-open card under the row, so there is no products column here.
  */
-export const physicalShipmentColumns = ({
-  t,
-  expandedId,
-  toggleRow,
-}: PhysicalShipmentColumnProps) => [
-  col.custom<PhysicalShipmentRow>(
-    "",
-    (row) => {
-      const open = expandedId === row.id;
-      return (
-        <IconButton
-          type="button"
-          variant="ghost"
-          size="sm"
-          onClick={(event) => {
-            event.stopPropagation();
-            toggleRow(row.id);
-          }}
-          aria-expanded={open}
-          title={
-            open
-              ? t("admin.operations.shipping.orders.hideContents")
-              : t("admin.operations.shipping.orders.showContents")
-          }
-          aria-label={
-            open
-              ? t("admin.operations.shipping.orders.hideContents")
-              : t("admin.operations.shipping.orders.showContents")
-          }
-          className="text-muted hover:text-primary-600"
-        >
-          <ChevronRightIcon
-            className={`h-4 w-4 transition-transform ${
-              open ? "rotate-90 text-primary-600" : ""
-            }`}
-          />
-        </IconButton>
-      );
-    },
-    {
-      id: "expand",
-      minWidth: 52,
-      fixed: true,
-      align: "center",
-      sortable: false,
-    },
-  ),
+export const physicalShipmentColumns = (t: T) => [
   col.custom<PhysicalShipmentRow>(
     t("admin.operations.shipping.orders.shipment"),
     (row) => (
@@ -121,27 +68,6 @@ export const physicalShipmentColumns = ({
       sortType: "text",
       exportValue: (row) => parcelLabel(row),
     },
-  ),
-  col.product<PhysicalShipmentRow>(
-    t("admin.operations.shipping.orders.products"),
-    (row) => {
-      const first = row.items[0];
-      const quantity = row.items.reduce((sum, item) => sum + item.quantity, 0);
-      return first?.productTitle
-        ? {
-            title: first.productTitle,
-            secondary: t("admin.operations.shipping.orders.productSummary", {
-              products: row.items.length,
-              quantity,
-            }),
-            image: first.productImageUrl,
-            href: first.productId
-              ? `/catalog/products/${first.productId}`
-              : undefined,
-          }
-        : null;
-    },
-    { minWidth: 340, sortKey: "order.product.title" },
   ),
   col.user<PhysicalShipmentRow>(
     t("admin.operations.shipping.sender"),

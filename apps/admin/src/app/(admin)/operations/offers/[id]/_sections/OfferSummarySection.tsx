@@ -7,7 +7,7 @@ import { SectionCard } from "@/components/detail/SectionCard";
 import { fmtDateTime, fmtTry } from "@/lib/format";
 import { cancelReasonLabel } from "@/lib/utils";
 import { statusConfig } from "@/lib/statusLabels";
-import { offerPercentOfList, type OfferRow } from "../../../_lib/offers";
+import { offerPercentOfList, type OfferRow } from "../../_lib/offers";
 
 export function OfferSummarySection({ offer }: { offer: OfferRow }) {
   const t = useTranslations();

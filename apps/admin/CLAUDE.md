@@ -156,7 +156,7 @@ context (`useResourceList` / `useFilter`).
 ```tsx
 <ResourceList resource="orders" fetcher={(p) => adminApi.getOrders(p)}
   getRowId={(o) => o.id} syncUrl initialFilters={{ status: 'all' }}>
-  <ResourceList.Header title="Siparişler" description={<OrdersSummary />} actions={…} />
+  <ResourceList.Header title="Siparişler" description={<DeepLinkFilterSummary totalLabel={…} />} actions={…} />
   <ResourceList.Toolbar>
     <ResourceList.Search placeholder="…" />
     <ResourceList.FilterSelect name="status" options={statusOptions} />
@@ -169,7 +169,7 @@ context (`useResourceList` / `useFilter`).
 
 - Columns live at **module level** (static). Header bits that need list state
   (total, active-filter notice) are tiny context-reading components rendered
-  inside `<ResourceList>` (e.g. `OrdersSummary`).
+  inside `<ResourceList>` (e.g. `components/list/DeepLinkFilterSummary`).
 - Pages that transform rows (accordion, mapping) read `rows` from context in a
   page-local `…Table` component and render `DataTable` directly (see
   `orders/_components/OrdersTable`).

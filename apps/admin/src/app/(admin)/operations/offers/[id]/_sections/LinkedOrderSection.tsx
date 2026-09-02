@@ -8,7 +8,7 @@ import { SectionCard } from "@/components/detail/SectionCard";
 import { fmtDateTime, fmtTry } from "@/lib/format";
 import { cancelReasonLabel } from "@/lib/utils";
 import { statusConfig } from "@/lib/statusLabels";
-import type { OfferLinkedOrder } from "../../../_lib/offers";
+import type { OfferLinkedOrder } from "../../_lib/offers";
 
 export function LinkedOrderSection({
   order,

@@ -39,7 +39,6 @@ import {
   AdminTradeQueryDto,
   AdminMessageQueryDto,
   AdminShipmentQueryDto,
-  AdminRefundHistoryQueryDto,
   TradeShipmentQueryDto,
   RefundRequestQueryDto,
   ApproveRefundRequestDto,
@@ -356,6 +355,14 @@ export class AdminService {
 
   bulkVerifyUserEmail(adminId: string, ids: string[]) {
     return this.userAccountService.bulkVerifyEmail(adminId, ids);
+  }
+
+  deleteNeverLoggedInUser(adminId: string, userId: string) {
+    return this.userAccountService.deleteNeverLoggedIn(adminId, userId);
+  }
+
+  bulkDeleteNeverLoggedInUsers(adminId: string, ids: string[]) {
+    return this.userAccountService.bulkDeleteNeverLoggedIn(adminId, ids);
   }
 
   // ==================== PRODUCT MANAGEMENT ====================
@@ -694,10 +701,6 @@ export class AdminService {
       attemptId,
       dto,
     );
-  }
-
-  async getRefundHistory(query: AdminRefundHistoryQueryDto) {
-    return this.adminPaymentService.getRefundHistory(query);
   }
 
   async forceCancelPayment(adminId: string, paymentId: string, reason: string) {

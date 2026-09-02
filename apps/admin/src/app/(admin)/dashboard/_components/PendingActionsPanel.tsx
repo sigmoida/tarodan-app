@@ -91,7 +91,7 @@ export function PendingActionsPanel({
           message={t("admin.dashboard.pendingActions.productsPending", {
             count: pending.pendingProducts,
           })}
-          href="/catalog/products?status=pending"
+          href="/catalog/products?tab=pending"
           reviewLabel={reviewLabel}
         />
       )}
@@ -124,7 +124,7 @@ export function PendingActionsPanel({
           message={t("admin.dashboard.pendingActions.identityVerification", {
             count: pending.identityVerificationRequests ?? 0,
           })}
-          href="/accounts/users?status=pending_verification"
+          href="/accounts/users?tab=pending_activation"
           reviewLabel={reviewLabel}
         />
       )}

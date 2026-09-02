@@ -1,36 +1,50 @@
 import { describe, expect, it } from "vitest";
-import { actionsForStatus, eligibleIds, isEligible } from "./bulkEligibility";
+import { actionsFor, eligibleIds } from "./bulkEligibility";
+
+const row = (
+  id: string,
+  accountStatus: "active" | "pending_activation" | "banned" | "deleted",
+  lastLoginAt: string | null = null,
+) => ({ id, accountStatus, lastLoginAt });
 
 describe("bulkEligibility", () => {
   it("silinmiş hesap hiçbir aksiyona uygun değil", () => {
-    expect(actionsForStatus("deleted")).toEqual([]);
+    expect(actionsFor(row("d", "deleted"))).toEqual([]);
   });
 
   it("aktivasyon aksiyonları yalnız bekleyen hesapta", () => {
-    expect(actionsForStatus("pending_activation")).toEqual([
+    expect(actionsFor(row("p", "pending_activation"))).toEqual([
       "resend",
       "verify",
       "ban",
+      "delete",
     ]);
-    expect(isEligible("resend", "active")).toBe(false);
-    expect(isEligible("verify", "banned")).toBe(false);
+    expect(actionsFor(row("a", "active", "2026-01-01"))).toEqual(["ban"]);
   });
 
-  it("engelli hesapta yalnız engel kaldırma", () => {
-    expect(actionsForStatus("banned")).toEqual(["unban"]);
-    expect(actionsForStatus("active")).toEqual(["ban"]);
+  it("engelli hesapta engel kaldırma; giriş yapmamışsa silme de", () => {
+    expect(actionsFor(row("b", "banned", "2026-01-01"))).toEqual(["unban"]);
+    expect(actionsFor(row("b", "banned"))).toEqual(["unban", "delete"]);
+  });
+
+  it("silme yalnız hiç giriş yapmamış hesapta", () => {
+    const rows = [
+      row("never", "active"),
+      row("logged", "active", "2026-05-01"),
+      row("pending", "pending_activation"),
+      row("gone", "deleted"),
+    ];
+    expect(eligibleIds("delete", rows)).toEqual(["never", "pending"]);
   });
 
   it("karışık seçimde her aksiyon kendi uygun satırlarını alır", () => {
     const rows = [
-      { id: "a", accountStatus: "active" as const },
-      { id: "p", accountStatus: "pending_activation" as const },
-      { id: "b", accountStatus: "banned" as const },
-      { id: "d", accountStatus: "deleted" as const },
+      row("a", "active", "2026-05-01"),
+      row("p", "pending_activation"),
+      row("b", "banned"),
     ];
     expect(eligibleIds("ban", rows)).toEqual(["a", "p"]);
     expect(eligibleIds("unban", rows)).toEqual(["b"]);
     expect(eligibleIds("resend", rows)).toEqual(["p"]);
-    expect(eligibleIds("verify", rows)).toEqual(["p"]);
   });
 });

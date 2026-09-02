@@ -11,7 +11,7 @@ import {
 import { SectionCard } from "@/components/detail/SectionCard";
 import { fmtDateTime, fmtTry } from "@/lib/format";
 import { statusConfig } from "@/lib/statusLabels";
-import type { OfferRow } from "../../../_lib/offers";
+import type { OfferRow } from "../../_lib/offers";
 import type { AdminOfferDetail } from "../_lib/types";
 
 /**
@@ -37,7 +37,7 @@ export function ProductOffersSection({
       })}
       actions={
         <Link
-          href={`/operations/orders?tab=teklifler&productId=${productId}`}
+          href={`/operations/offers?productId=${productId}`}
           className="text-sm text-primary-600 hover:underline"
         >
           {t("admin.operations.offers.viewAllForProduct")}
@@ -95,7 +95,7 @@ export function ProductOffersSection({
                 <tr key={s.id}>
                   <td className="py-2 pr-3">
                     <Link
-                      href={`/operations/orders/offers/${s.id}`}
+                      href={`/operations/offers/${s.id}`}
                       className="text-primary-600 hover:underline"
                     >
                       {s.buyer.displayName}

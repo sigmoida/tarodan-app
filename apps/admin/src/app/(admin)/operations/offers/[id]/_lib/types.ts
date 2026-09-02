@@ -1,4 +1,4 @@
-import type { OfferRow } from "../../../_lib/offers";
+import type { OfferRow } from "../../_lib/offers";
 
 export interface OfferChainEntry extends OfferRow {
   /** Karşı teklif satırını kim açtı (buyerMustAccept=true → satıcı). */

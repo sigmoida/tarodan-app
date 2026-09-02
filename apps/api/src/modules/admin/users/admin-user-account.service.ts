@@ -12,6 +12,7 @@ import { AdminStaffService } from "./admin-staff.service";
 import { AdminAnalyticsOrderService } from "../analytics/admin-analytics-order.service";
 import { BanUserDto } from "../dto";
 import { runBulk, type BulkResult } from "../common/run-bulk";
+import { UserService } from "../../user/user.service";
 
 /**
  * Hesap aktivasyonu (e-posta doğrulama) admin işlemleri + kullanıcı toplu
@@ -35,7 +36,71 @@ export class AdminUserAccountService {
     private readonly authService: AuthService,
     private readonly staffService: AdminStaffService,
     private readonly analyticsOrderService: AdminAnalyticsOrderService,
+    private readonly userService: UserService,
   ) {}
+
+  // ==================== SİLME (yalnız hiç giriş yapmamış hesap) ====================
+
+  /**
+   * Hiç giriş yapmamış hesabı siler. Kapsam bilinçli olarak dar: `lastLoginAt`
+   * boş olan hesabın ilanı, siparişi, takası olamaz (hepsi oturum ister) —
+   * kayıt çöpü ve yanlış e-postayla açılmış hesaplar için. Silme, kullanıcının
+   * kendi hesap silme yolunun aynısı (anonimleştirme + deletedAt): PII temizlenir,
+   * e-posta/telefon serbest kalır, kayıt muhasebe ilişkileri için durur.
+   */
+  async deleteNeverLoggedIn(adminId: string, userId: string) {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        id: true,
+        email: true,
+        displayName: true,
+        lastLoginAt: true,
+        deletedAt: true,
+        createdAt: true,
+        adminUser: { select: { id: true } },
+      },
+    });
+    if (!user) {
+      throw new NotFoundException(i18nMessage("server.auth.userNotFound"));
+    }
+    if (user.adminUser) {
+      throw new BadRequestException(
+        i18nMessage("server.admin.user.staffAccount"),
+      );
+    }
+    if (user.deletedAt) {
+      throw new BadRequestException(i18nMessage("server.admin.user.deleted"));
+    }
+    if (user.lastLoginAt) {
+      throw new BadRequestException(
+        i18nMessage("server.admin.user.deleteRequiresNeverLoggedIn"),
+      );
+    }
+
+    await this.userService.deleteAccount(userId);
+
+    await this.audit.createRequiredAuditLog(
+      adminId,
+      "user_delete_never_logged_in",
+      "User",
+      userId,
+      {
+        email: user.email,
+        displayName: user.displayName,
+        createdAt: user.createdAt,
+      },
+      { deleted: true },
+    );
+    this.logger.warn(
+      `Admin ${adminId} deleted never-logged-in user ${userId} (${user.email})`,
+    );
+    return { success: true, userId };
+  }
+
+  bulkDeleteNeverLoggedIn(adminId: string, ids: string[]): Promise<BulkResult> {
+    return runBulk(ids, (id) => this.deleteNeverLoggedIn(adminId, id));
+  }
 
   // ==================== AKTİVASYON ====================
 

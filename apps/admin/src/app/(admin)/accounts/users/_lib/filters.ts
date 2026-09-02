@@ -1,25 +1,12 @@
 import { dateRangeField } from "@/components/list/filters/fields";
 import type { FilterField, TranslateFn } from "@/components/list/filters/types";
 import {
-  getUserFilterOptions,
-  getAccountStatusFilterOptions,
   getMembershipTierFilterOptions,
   getMembershipLifecycleOptions,
 } from "./types";
 
+/** Hesap durumu ve kullanıcı türü filtre DEĞİLDİR: durum sekmedir, tür kolon/filtre olarak kaldırıldı. */
 export const userFilterFields = (t: TranslateFn): FilterField[] => [
-  {
-    type: "select",
-    name: "filter",
-    label: t("admin.shared.filterDialog.labels.userType"),
-    options: getUserFilterOptions(t),
-  },
-  {
-    type: "select",
-    name: "accountStatus",
-    label: t("admin.shared.filterDialog.labels.accountStatus"),
-    options: getAccountStatusFilterOptions(t),
-  },
   {
     type: "select",
     name: "membershipTier",

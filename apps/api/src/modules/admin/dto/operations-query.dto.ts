@@ -172,20 +172,3 @@ export class ResolveCarrierCancellationTaskDto {
   @MaxLength(1000)
   resolution!: string;
 }
-
-export class AdminRefundHistoryQueryDto extends AdminListQueryDto {
-  @ApiPropertyOptional()
-  @IsOptional()
-  @IsString()
-  search?: string;
-
-  @ApiPropertyOptional()
-  @IsOptional()
-  @IsDateString()
-  startDate?: string;
-
-  @ApiPropertyOptional()
-  @IsOptional()
-  @IsDateString()
-  endDate?: string;
-}

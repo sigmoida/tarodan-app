@@ -32,10 +32,13 @@ const baseUser = {
   adminUser: null,
 };
 
-function makeService(tokenRow: Record<string, unknown> | null) {
+function makeService(
+  tokenRow: Record<string, unknown> | null,
+  user: Record<string, unknown> = baseUser,
+) {
   const prisma = {
     user: {
-      findUnique: jest.fn().mockResolvedValue(baseUser),
+      findUnique: jest.fn().mockResolvedValue(user),
     },
     refreshToken: {
       findUnique: jest.fn().mockResolvedValue(tokenRow),
@@ -105,6 +108,29 @@ describe("refresh token rotation grace window", () => {
     await expect(service.refreshTokens("u1", "stolen-token")).rejects.toThrow(
       UnauthorizedException,
     );
+  });
+
+  it("rejects a customer refresh for a staff (AdminUser) account with STAFF_ACCOUNT", async () => {
+    const { service, prisma } = makeService(
+      {
+        id: "rt1",
+        userId: "u1",
+        revokedAt: null,
+        expiresAt: new Date(Date.now() + 86_400_000),
+      },
+      { ...baseUser, adminUser: { id: "admin-1" } },
+    );
+
+    await expect(
+      service.refreshTokens("u1", "live-token"),
+    ).rejects.toMatchObject({
+      response: {
+        i18nKey: "server.auth.staffAccountCustomerLogin",
+        errorCode: "STAFF_ACCOUNT",
+      },
+    });
+    // Eski refresh token burada ölür: rotasyon/tüketim hiç başlamaz.
+    expect(prisma.refreshToken.updateMany).not.toHaveBeenCalled();
   });
 
   it("keeps consuming a live token atomically (normal rotation unchanged)", async () => {

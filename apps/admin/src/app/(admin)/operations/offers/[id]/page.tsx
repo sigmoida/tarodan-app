@@ -11,7 +11,7 @@ import { statusConfig } from "@/lib/statusLabels";
 import { DetailPage } from "@/components/detail/DetailPage";
 import { PartyCard } from "@/components/detail/PartyCard";
 import { SectionCard } from "@/components/detail/SectionCard";
-import { canCancelOffer } from "../../_lib/offers";
+import { canCancelOffer } from "../_lib/offers";
 import type { AdminOfferDetail } from "./_lib/types";
 import { OfferSummarySection } from "./_sections/OfferSummarySection";
 import { OfferChainSection } from "./_sections/OfferChainSection";
@@ -20,7 +20,7 @@ import { ProductOffersSection } from "./_sections/ProductOffersSection";
 import { CancelOfferModal } from "./_modals/CancelOfferModal";
 
 /**
- * Teklif detayı: /operations/orders/offers/[id] — sipariş route'unun alt
+ * Teklif detayı: /operations/offers/[id] — sipariş route'unun alt
  * sayfası (izin `orders`, breadcrumb Operasyon > Siparişler > Detay).
  */
 export default function OfferDetailPage() {
@@ -33,7 +33,7 @@ export default function OfferDetailPage() {
       resource="offers"
       id={id}
       fetcher={(oid) => adminApi.getOffer(oid).then((r) => r.data)}
-      backHref="/operations/orders?tab=teklifler"
+      backHref="/operations/offers"
       emptyTitle={t("admin.operations.offers.notFound")}
       title={(d) =>
         t("admin.operations.offers.detailTitle", { product: d.product.title })

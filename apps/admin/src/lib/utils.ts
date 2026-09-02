@@ -108,27 +108,6 @@ export function orderOriginLabel(origin: OrderOrigin, t: T): string {
 }
 
 /**
- * Origins the operations/orders list can actually contain. `platform_service`
- * (üyelik/öne çıkarma) orders are deliberately excluded by the API's
- * `product.kind = listing` guard, so offering it as a filter would always
- * return an empty list.
- */
-const LISTING_ORDER_ORIGINS: OrderOrigin[] = ["direct_sale", "offer"];
-
-/** Filter options for the order origin select (prepends "all"). */
-export function orderOriginFilterOptions(
-  t: T,
-): { value: string; label: string }[] {
-  return [
-    { value: "all", label: t("common.all") },
-    ...LISTING_ORDER_ORIGINS.map((value) => ({
-      value,
-      label: orderOriginLabel(value, t),
-    })),
-  ];
-}
-
-/**
  * Derives { value, label } options for a list filter from a shared status map;
  * prepends an "all" entry. Labels always come from the same map the badges use →
  * filter options stay perfectly consistent with them.

@@ -28,6 +28,10 @@ export const usersApi = {
     api.post<BulkUserResult>("/admin/users/bulk/resend-verification", { ids }),
   bulkVerifyUserEmail: (ids: string[]) =>
     api.post<BulkUserResult>("/admin/users/bulk/verify-email", { ids }),
+  // Silme: yalnız hiç giriş yapmamış hesap (sunucu 400 ile korur).
+  deleteUser: (id: string) => api.delete(`/admin/users/${id}`),
+  bulkDeleteUsers: (ids: string[]) =>
+    api.post<BulkUserResult>("/admin/users/bulk/delete", { ids }),
   cancelUserMembership: (id: string) =>
     api.post(`/admin/users/${id}/membership/cancel`),
   changeUserMembership: (

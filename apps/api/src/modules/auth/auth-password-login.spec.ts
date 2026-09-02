@@ -144,6 +144,31 @@ describe("AuthService.login - password login edge cases", () => {
     }
   });
 
+  it("rejects a staff (AdminUser) account on the customer login with STAFF_ACCOUNT", async () => {
+    const passwordHash = await bcrypt.hash("Correct123!", 4);
+    prisma.user.findUnique.mockResolvedValue({
+      id: "staff-1",
+      email: "staff@tarodan.com",
+      passwordHash,
+      isEmailVerified: true,
+      isBanned: false,
+      deletedAt: null,
+      isSeller: false,
+      membership: null,
+      twoFactorSecret: null,
+      adminUser: { id: "admin-1" },
+    });
+
+    await expect(
+      service.login({ email: "staff@tarodan.com", password: "Correct123!" }),
+    ).rejects.toMatchObject({
+      response: {
+        i18nKey: "server.auth.staffAccountCustomerLogin",
+        errorCode: "STAFF_ACCOUNT",
+      },
+    });
+  });
+
   it("rejects a banned account before issuing tokens", async () => {
     prisma.user.findUnique.mockResolvedValue({
       id: "u-banned",

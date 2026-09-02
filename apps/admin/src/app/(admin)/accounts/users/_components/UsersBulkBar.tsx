@@ -15,6 +15,8 @@ const BULK_ACTIONS: Array<{
   { action: "verify", variant: "outline" },
   { action: "unban", variant: "success" },
   { action: "ban", variant: "danger" },
+  // Yalnız hiç giriş yapmamış hesaplar; diğerleri sayılmaz ve atlanır.
+  { action: "delete", variant: "danger" },
 ];
 
 /**

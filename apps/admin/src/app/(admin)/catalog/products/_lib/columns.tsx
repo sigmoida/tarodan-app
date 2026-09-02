@@ -1,21 +1,16 @@
 /** @format */
 
 import { CheckIcon, XMarkIcon } from "@heroicons/react/24/outline";
-import {
-  Badge,
-  productStatusConfig,
-  productConditionConfig,
-  enumLabel,
-} from "@tarodan/ui";
+import { productConditionConfig, enumLabel } from "@tarodan/ui";
 import { useTranslations } from "next-intl";
-import { col, Empty } from "@/components/table";
+import { col } from "@/components/table";
 import {
   getProductEffectivePrice,
   isProductOnSaleDisplay,
   getProductOriginalPriceForDisplay,
 } from "@/lib/product-price";
 import { fmtTry } from "@/lib/format";
-import { aiCheckConfig, aiCheckKey, type Product } from "./types";
+import type { Product } from "./types";
 import { statusConfig } from "@/lib/statusLabels";
 
 // eslint-disable-next-line @tarodan/no-hardcoded-turkish -- URL query payload, not display copy
@@ -24,7 +19,11 @@ const PLACEHOLDER = "https://placehold.co/100x100/f3f4f6/666?text=Ürün";
 type T = ReturnType<typeof useTranslations<never>>;
 
 export function productColumns(t: T) {
+  // İlan No en başta; durum sekmede, AI denetimi kendi sekmesinde (kolon değil).
   return [
+    col.code<Product>(t("product.productCode"), "productCode", {
+      minWidth: 110,
+    }),
     col.product<Product>(
       t("admin.catalog.common.product"),
       (p) => ({
@@ -37,9 +36,6 @@ export function productColumns(t: T) {
       }),
       { minWidth: 560, sortKey: "title", sortType: "text" },
     ),
-    col.code<Product>(t("product.productCode"), "productCode", {
-      minWidth: 110,
-    }),
     col.user<Product>(
       t("admin.catalog.products.seller"),
       (p) => ({
@@ -93,29 +89,6 @@ export function productColumns(t: T) {
           />
         ),
       { minWidth: 120 },
-    ),
-    col.badge<Product>(
-      t("common.status"),
-      (p) => (
-        <Badge
-          status={p.status}
-          config={statusConfig(productStatusConfig, t)}
-        />
-      ),
-      { sortKey: "status", sortType: "text" },
-    ),
-    col.badge<Product>(
-      "AI",
-      (p) =>
-        p.aiCheckStatus ? (
-          <Badge
-            status={aiCheckKey(p.aiCheckStatus)}
-            config={aiCheckConfig(t)}
-          />
-        ) : (
-          <Empty />
-        ),
-      { sortKey: "aiCheckStatus", sortType: "text" },
     ),
     col.muted<Product>(
       t("admin.catalog.products.condition"),

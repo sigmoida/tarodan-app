@@ -5,17 +5,6 @@ import { api } from "./client";
  * moderated messages, and shipment tracking.
  */
 export const operationsApi = {
-  // Refunds (payment refund history)
-  getRefundHistory: (params?: {
-    search?: string;
-    startDate?: string;
-    endDate?: string;
-    page?: number;
-    limit?: number;
-    sortBy?: string;
-    sortOrder?: "asc" | "desc";
-  }) => api.get("/admin/payments/refunds", { params }),
-
   // Orders
   getOrders: (params?: any) => api.get("/admin/orders", { params }),
   /** Grup dosyası: order id grup çatısına çözülür (ödeme + paketler + sipariş finans/escrow/iade). */
@@ -32,7 +21,7 @@ export const operationsApi = {
   ) => api.post(`/admin/orders/${id}/tracking`, payload),
   getOrderInvoice: (id: string) => api.get(`/admin/orders/${id}/invoice`),
 
-  // Offers (Teklifler — /operations/orders?tab=teklifler; izin: orders)
+  // Offers (Teklifler — /operations/offers; izin: orders)
   getOffers: (params?: any) => api.get("/admin/offers", { params }),
   getOffer: (id: string) => api.get(`/admin/offers/${id}`),
   cancelOffer: (id: string, reason: string) =>

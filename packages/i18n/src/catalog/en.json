@@ -6384,6 +6384,7 @@
         "errorOccurred": "An error occurred"
       },
       "offers": {
+        "title": "Offers",
         "totalCount": "{count} offers",
         "empty": "No offers yet",
         "emptyFiltered": "No offers match the filter",
@@ -6431,7 +6432,6 @@
         "loadError": "Failed to load orders",
         "empty": "No orders yet",
         "emptyFiltered": "No orders match the filter",
-        "totalCount": "{count} order groups in total",
         "filteringByProduct": "Filtering by product",
         "filteringByProductNamed": "Filtering by product: {title}",
         "orderNumber": "Order No",
@@ -6461,12 +6461,13 @@
         "groupDone": "Done",
         "groupOngoing": "In progress",
         "originCancellation": "{origin} cancellation",
-        "origin": "Origin",
         "pageDescription": "Purchase orders and offers made on products",
         "tabs": {
-          "orders": "Orders",
-          "offers": "Offers"
+          "directSale": "Direct Sales",
+          "acceptedOffers": "Accepted Offers"
         },
+        "amountCommission": "Amount / Commission",
+        "commissionShort": "Commission",
         "updateStatus": "Update Status",
         "newStatus": "New Status",
         "statusChangeReason": "Manual Operation Reason",
@@ -6632,6 +6633,7 @@
         }
       },
       "trades": {
+        "cashPayer": "Cash / Payer",
         "title": "Trades",
         "loadError": "Failed to load trades",
         "empty": "No trades found",
@@ -6782,6 +6784,8 @@
         "faultySideNeither": "Not item related (operational rejection)"
       },
       "refundRequests": {
+        "amountAndFee": "Amount / Fee",
+        "feeShort": "Fee reversed",
         "title": "Refund Tracking",
         "description": "Ongoing refunds — the automatic flow is monitored; admin intervention is only needed in exceptional cases",
         "loadError": "Failed to load refund requests",
@@ -6972,16 +6976,6 @@
         "chargeOutboundToSeller": "Outbound shipping debt (to seller)",
         "sellerShippingCompensation": "Shipping share compensation (back to seller)"
       },
-      "refunds": {
-        "title": "Refund History",
-        "description": "Completed refunds",
-        "loadError": "Failed to load refund history",
-        "empty": "No refunds found",
-        "colId": "ID",
-        "refundedAt": "Refund Date",
-        "refundNumber": "Refund No",
-        "refundedFee": "Reversed Fee"
-      },
       "shipping": {
         "title": "Shipping Operations",
         "description": "All shipping operations — track order, trade and return shipments in one place",
@@ -7029,13 +7023,10 @@
           "empty": "No shipments found",
           "unit": "shipments",
           "shipment": "Shipment",
-          "products": "Products",
           "carrierAndTracking": "Carrier & Tracking",
           "packageSummary": "{orders} orders · {products} products",
           "productSummary": "{products} products · {quantity} units",
           "contentsTitle": "Package Contents",
-          "showContents": "Show package contents",
-          "hideContents": "Hide package contents",
           "carrierPending": "Carrier pending",
           "carrierSurat": "Sürat Kargo",
           "trackingPending": "Tracking number pending",
@@ -7599,14 +7590,19 @@
       "loadError": "Failed to load users",
       "empty": "No users found",
       "totalCount": "<value>{count}</value> users total",
-      "filterAll": "All Users",
-      "filterSellers": "Sellers",
-      "filterBuyers": "Buyers",
       "banned": "User banned",
       "unbanned": "User ban lifted",
       "banTitle": "Ban User",
       "banReasonLabel": "Ban reason (optional)",
       "banDefaultReason": "Banned by admin",
+      "deleteAction": "Delete",
+      "deleteTitle": "Delete user",
+      "deleteConfirmDesc": "This account has never logged in. It will be anonymized and deleted; this cannot be undone.",
+      "deleted": "User deleted",
+      "bulkDeleteTitle": "Delete {count} users",
+      "bulkDeleteConfirmDesc": "Only accounts that never logged in are deleted; other selected rows are skipped. This cannot be undone.",
+      "staffAccountNotice": "This is a staff account (role: {role}). User actions are disabled; manage it from the Staff screen.",
+      "staffAccountLink": "Open the Staff screen",
       "banAction": "Ban",
       "unbanAction": "Lift Ban",
       "columnUser": "User",
@@ -7709,9 +7705,6 @@
         "blocksReceivedTitle": "Blocked this user",
         "blocksEmpty": "No block records"
       },
-      "columnUserType": "User Type",
-      "userTypeBuyer": "Buyer",
-      "filterAccountStatusAll": "All Statuses",
       "unbanConfirmDesc": "Are you sure you want to lift this user's ban?",
       "resendVerification": "Send Activation Email",
       "verifyEmail": "Activate Manually",
@@ -7837,10 +7830,6 @@
         "refundRequests": {
           "label": "Refund Requests",
           "description": "Refund request list, detail view, approve, and reject."
-        },
-        "refundHistory": {
-          "label": "Refund History",
-          "description": "Completed refund records and history list."
         },
         "products": {
           "label": "Products",
@@ -8014,6 +8003,11 @@
           "description": "View and manage all orders",
           "keywords": "order"
         },
+        "offers": {
+          "name": "Offers",
+          "description": "Track offers and negotiations on products",
+          "keywords": "offer,negotiation"
+        },
         "trades": {
           "name": "Trades",
           "description": "Track and manage product trade requests",
@@ -8028,11 +8022,6 @@
           "name": "Refund Tracking",
           "description": "Review and resolve open refund requests",
           "keywords": "refund,return,request,tracking"
-        },
-        "refundHistory": {
-          "name": "Refund History",
-          "description": "History of completed refund transactions",
-          "keywords": "refund,return,history"
         },
         "products": {
           "name": "Products",
@@ -8365,15 +8354,13 @@
           "active": "Active",
           "membershipTier": "Membership tier",
           "lifecycle": "Membership status",
-          "userType": "User type",
           "package": "Package",
           "severity": "Severity",
           "resolved": "Resolution",
           "template": "Template",
           "action": "Action",
           "entityType": "Entity type",
-          "shipmentLeg": "Shipment leg",
-          "accountStatus": "Account status"
+          "shipmentLeg": "Shipment leg"
         }
       },
       "bulkActionBar": {
@@ -8837,6 +8824,7 @@
       "accountBanned": "Your account has been banned. Please contact the support team.",
       "accountDeleted": "Account has been deleted",
       "accountSuspended": "Your account has been suspended",
+      "staffAccountCustomerLogin": "Staff accounts cannot sign in to the web or mobile app; use the admin panel",
       "adminAccountDeactivated": "Admin account has been deactivated",
       "adminAccountNotFoundOrInactive": "Admin account not found or inactive",
       "adminAuthRequired": "Admin authorization is required",
@@ -9366,6 +9354,8 @@
       },
       "user": {
         "notBanned": "The user is not banned",
+        "deleteRequiresNeverLoggedIn": "Only accounts that never logged in can be deleted",
+        "staffAccount": "This is a staff account; manage it from the Staff screen",
         "alreadyBanned": "The user is already banned",
         "deleted": "This action is not available for a deleted account",
         "verificationMailFailed": "The activation email could not be sent"
@@ -9577,6 +9567,7 @@
         "roleAssignSuperAdminOnly": "Only a super admin can assign roles (the manager permission is off)",
         "superAdminOnly": "Only a super admin can act on the super-admin role",
         "notFound": "Admin record not found",
+        "emailBelongsToCustomer": "This email belongs to a customer account; use a different email for staff",
         "lastSuperAdminImmutable": "The last super admin in the system cannot be changed",
         "cannotRemoveSelf": "You cannot remove your own admin access",
         "lastSuperAdminUndeletable": "The last super admin in the system cannot be removed"

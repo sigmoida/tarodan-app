@@ -14,7 +14,8 @@ import { adminKeys } from "@/lib/query/keys";
 export interface UseAdminMutationOptions<TData, TVars> {
   /**
    * Resource names whose queries refresh on success. Each entry invalidates
-   * EVERY query of that resource (all lists + details) — so a list re-fetches
+   * EVERY query of that resource (all lists + details) AND its count queries
+   * (`adminKeys.count` — tab badges, header summaries) — so a list re-fetches
    * automatically after an action, no manual refetch().
    */
   invalidates?: string[];
@@ -120,9 +121,13 @@ export function useAdminMutation<TData, TVars = void>(
       return { snapshots, userContext };
     },
     onSuccess: (data, vars) => {
-      invalidates.forEach((resource) =>
-        queryClient.invalidateQueries({ queryKey: adminKeys.all(resource) }),
-      );
+      invalidates.forEach((resource) => {
+        queryClient.invalidateQueries({ queryKey: adminKeys.all(resource) });
+        // Sayaçlar ayrı kökte (`<resource>-count`); rozetler de tazelensin.
+        queryClient.invalidateQueries({
+          queryKey: adminKeys.countAll(resource),
+        });
+      });
       if (successMessage) toast.success(successMessage);
       onSuccess?.(data, vars);
     },

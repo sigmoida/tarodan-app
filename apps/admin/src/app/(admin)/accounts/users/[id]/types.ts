@@ -73,6 +73,8 @@ export interface UserDetail {
   deletedAt?: string | null;
   /** Sunucuda türetilir (deletedAt / isBanned / isEmailVerified). */
   accountStatus: AccountStatus;
+  /** Personel hesabı (AdminUser satırı); kullanıcı aksiyonları kapalı. */
+  staff?: { role: string; isActive: boolean } | null;
   bannedAt?: string;
   bannedReason?: string;
   sellerType?: string;

@@ -12,7 +12,6 @@ import {
 } from "../../../common/helpers/fulltext-search";
 import {
   AdminPaymentQueryDto,
-  AdminRefundHistoryQueryDto,
   PaymentStatisticsQueryDto,
   RefundAttemptQueryDto,
   ResolveRefundAttemptDto,
@@ -1076,94 +1075,6 @@ export class AdminPaymentService {
       },
     );
     return updated;
-  }
-
-  /**
-   * İade geçmişi — RefundRequest bazlı (R5: iade sipariş bazındadır).
-   * Eski kurgu Payment.status=refunded satırlarına bakıyordu; grup modelinde
-   * kısmi iadelerde paylaşılan Payment 'completed' kaldığı için grup iadeleri
-   * listede HİÇ görünmüyordu, görünen satırlar da order=null ile boş kalıyordu.
-   */
-  async getRefundHistory(query: AdminRefundHistoryQueryDto) {
-    const { search, startDate: startDateValue, endDate: endDateValue } = query;
-    const startDate = startDateValue ? new Date(startDateValue) : undefined;
-    const endDate = endDateValue ? new Date(endDateValue) : undefined;
-
-    const where: Prisma.RefundRequestWhereInput = {
-      status: RefundRequestStatus.refunded,
-    };
-
-    if (search) {
-      const userIds = await fulltextUserSearch(this.prisma, search);
-      const s = search.trim();
-      const conditions: Prisma.RefundRequestWhereInput[] = [
-        { refundNumber: { contains: s, mode: "insensitive" } },
-        { order: { orderNumber: { contains: s, mode: "insensitive" } } },
-        {
-          order: {
-            product: { title: { contains: s, mode: "insensitive" } },
-          },
-        },
-      ];
-      if (userIds.length > 0) {
-        conditions.push({
-          order: {
-            OR: [{ buyerId: { in: userIds } }, { sellerId: { in: userIds } }],
-          },
-        });
-      }
-      where.OR = conditions;
-    }
-
-    if (startDate || endDate) {
-      where.refundedAt = {};
-      if (startDate) where.refundedAt.gte = startDate;
-      if (endDate) where.refundedAt.lte = endDate;
-    }
-
-    const orderBy =
-      resolveOrderBy<Prisma.RefundRequestOrderByWithRelationInput>(
-        "RefundRequest",
-        query,
-        { defaultSort: { refundedAt: "desc" } },
-      );
-    const result = await paginate(
-      this.prisma.refundRequest,
-      {
-        where,
-        include: {
-          order: {
-            include: {
-              buyer: { select: { id: true, displayName: true, email: true } },
-              seller: { select: { id: true, displayName: true, email: true } },
-              product: { select: { id: true, title: true } },
-            },
-          },
-        },
-        orderBy,
-      },
-      query,
-    );
-
-    return {
-      ...result,
-      data: result.data.map((r: any) => ({
-        id: r.id,
-        refundNumber: r.refundNumber,
-        orderId: r.orderId,
-        orderNumber: r.order?.orderNumber ?? null,
-        amount: Number(r.amount),
-        // İade edilen tutarın yanında GERİ ÇEVRİLEN kesinti (orijinal komisyon
-        // değil — o rakam iade tablosunda yanıltıcıydı).
-        refundedSellerFee: Number(r.refundedSellerFeeAmount ?? 0),
-        reason: r.reason,
-        refundedAt: r.refundedAt ?? r.updatedAt,
-        createdAt: r.createdAt,
-        buyer: r.order?.buyer ?? null,
-        seller: r.order?.seller ?? null,
-        product: r.order?.product ?? null,
-      })),
-    };
   }
 
   /**

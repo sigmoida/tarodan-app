@@ -58,52 +58,34 @@ export function mapUsers(raw: any[]): User[] {
   }));
 }
 
-/** list ↔ AI Denetim tabs. */
-export const getUserTabs = (t: T) => [
-  { key: "list", label: t("admin.users.title") },
-  { key: "ai", label: t("admin.catalog.common.aiModeration") },
-];
-
-export const getUserFilterOptions = (t: T) => [
-  { value: "all", label: t("admin.users.filterAll") },
-  { value: "sellers", label: t("admin.users.filterSellers") },
-  { value: "buyers", label: t("admin.users.filterBuyers") },
-];
-
-/** Map the "filter" (user type) chip to the getUsers isSeller flag. */
-export function userFilterParams(filter?: string) {
-  return {
-    isSeller:
-      filter === "sellers" ? true : filter === "buyers" ? false : undefined,
-  };
-}
-
-/** Hesap durumu filtresi: Tüm Durumlar + türetilmiş her durum (etiketler tek haritadan). */
-export const getAccountStatusFilterOptions = (t: T) => [
-  { value: "all", label: t("admin.users.filterAccountStatusAll") },
-  ...ACCOUNT_STATUSES.map((value) => ({
-    value,
-    label: statusLabel(accountStatusConfig, value, t),
-  })),
-];
+/** AI Denetim sekmesinin anahtarı (durum sekmelerinin yanında durur). */
+export const AI_TAB = "ai";
 
 /**
- * Map the account-status chip to a getUsers query param ("all" → varsayılan:
- * silinmişler gizli).
- *
- * `filter=banned` ESKİ değer: "Engelliler" kullanıcı-türü seçeneğiydi, artık
- * hesap durumu filtresinde. Liste `syncUrl` olduğu için kaydedilmiş bir
- * `?filter=banned` bağlantısı hâlâ gelebilir; eşlemezsek sessizce TÜM
- * kullanıcıları gösterirdi.
+ * Sekmeler = hesap durumları (türetilmiş; etiketler tek haritadan) + AI Denetim.
+ * Durum artık kolon/filtre değil, sekmedir; `counts` sekme etiketine "(n)"
+ * olarak yazılır (filtreden bağımsız toplam).
  */
-export function accountStatusParams(status?: string, legacyFilter?: string) {
-  const resolved =
-    status && status !== "all"
-      ? status
-      : legacyFilter === "banned"
-        ? "banned"
-        : undefined;
-  return resolved ? { accountStatus: resolved } : {};
+export const getUserTabs = (
+  t: T,
+  counts: Partial<Record<AccountStatus, number | undefined>> = {},
+) => [
+  ...ACCOUNT_STATUSES.map((value) => ({
+    key: value,
+    label: `${statusLabel(accountStatusConfig, value, t)} (${
+      counts[value] ?? "…"
+    })`,
+  })),
+  { key: AI_TAB, label: t("admin.catalog.common.aiModeration") },
+];
+
+export function isAccountStatus(value: string): value is AccountStatus {
+  return (ACCOUNT_STATUSES as readonly string[]).includes(value);
+}
+
+/** Sekmenin durumu → getUsers `accountStatus` parametresi. */
+export function accountStatusParams(status?: string) {
+  return status && isAccountStatus(status) ? { accountStatus: status } : {};
 }
 
 /** Membership tier filter options (Tüm Katmanlar + each tier). */

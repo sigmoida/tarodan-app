@@ -120,6 +120,8 @@ export class TarodanWebSocketGateway
         !user ||
         user.deletedAt ||
         user.isBanned ||
+        // Personel hesabı kullanıcı kapsamında soket açamaz (bkz. jwt.strategy).
+        (authScope !== "admin" && user.adminUser != null) ||
         (authScope === "admin" &&
           (!payload.isAdmin ||
             !isActiveAdmin ||

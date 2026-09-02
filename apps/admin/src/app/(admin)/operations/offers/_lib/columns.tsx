@@ -22,7 +22,7 @@ export function offerColumns({ t, onView, onCancel }: OfferColumnProps) {
       (o) => ({
         title: o.product.title,
         image: o.product.imageUrl,
-        href: `/operations/orders/offers/${o.id}`,
+        href: `/operations/offers/${o.id}`,
         secondary: t("admin.operations.offers.listPriceShort", {
           price: fmtTry(o.product.listPrice) ?? "—",
         }),

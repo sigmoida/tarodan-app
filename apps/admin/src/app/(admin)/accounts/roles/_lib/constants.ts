@@ -105,12 +105,6 @@ export const getPermissionGroups = (t: T): PermGroup[] => [
           "/operations/refund-requests/:id",
         ],
       },
-      {
-        key: "refund_history",
-        label: t("admin.roles.permissions.refundHistory.label"),
-        description: t("admin.roles.permissions.refundHistory.description"),
-        pages: ["/operations/refunds"],
-      },
     ],
   },
   {

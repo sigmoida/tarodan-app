@@ -12,7 +12,8 @@ import { useResourceList } from "@/components/list";
 export function DeepLinkFilterSummary({
   totalLabel,
 }: {
-  totalLabel: (count: number) => string;
+  /** Omit to render only the deep-link chip (e.g. under a tab bar). */
+  totalLabel?: (count: number) => string;
 }) {
   const t = useTranslations();
   const { total, filters, setFilter, rows } = useResourceList<any>();
@@ -31,9 +32,10 @@ export function DeepLinkFilterSummary({
       ? t("admin.operations.common.filteringByUser")
       : null;
 
+  if (!totalLabel && !deepLinkFilterLabel) return null;
   return (
     <>
-      {totalLabel(total)}
+      {totalLabel?.(total)}
       {deepLinkFilterLabel && (
         <span className="ml-2">
           — {deepLinkFilterLabel}

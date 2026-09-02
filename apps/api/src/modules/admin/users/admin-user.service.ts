@@ -113,7 +113,9 @@ export class AdminUserService {
   async getUsers(query: AdminUserQueryDto) {
     const { search, isSeller, isVerified } = query;
 
-    const where: Prisma.UserWhereInput = {};
+    // Personel (AdminUser satırı olan) hesaplar müşteri listesinde yer almaz;
+    // onlar Personel ekranında yönetilir. Sayaçlar da aynı sorgudan geçer.
+    const where: Prisma.UserWhereInput = { adminUser: null };
 
     if (search) {
       const userIds = await fulltextUserSearch(this.prisma, search);
@@ -398,6 +400,9 @@ export class AdminUserService {
         sellerType: true,
         taxId: true,
         companyName: true,
+        // Personel hesabı detayda yalnız uyarı ve Personel ekranına bağlantı
+        // gösterir; kullanıcı aksiyonları kapalıdır.
+        adminUser: { select: { role: true, isActive: true } },
         createdAt: true,
         bannedAt: true,
         bannedReason: true,
@@ -685,6 +690,9 @@ export class AdminUserService {
       bannedReason: user.bannedReason,
       deletedAt: user.deletedAt,
       accountStatus: deriveAccountStatus(user),
+      staff: user.adminUser
+        ? { role: user.adminUser.role, isActive: user.adminUser.isActive }
+        : null,
       bankAccount: user.bankAccount,
       membership: membershipForUi,
       lastLoginAt: user.lastLoginAt ?? null,

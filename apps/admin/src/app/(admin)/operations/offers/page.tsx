@@ -3,13 +3,17 @@
 import { useTranslations } from "next-intl";
 import { adminApi } from "@/lib/api";
 import { ResourceList } from "@/components/list";
-import { offerFilterFields } from "../_lib/filters";
-import type { OfferRow } from "../_lib/offers";
-import { DeepLinkFilterSummary } from "./DeepLinkFilterSummary";
-import { OffersTable } from "./OffersTable";
+import { DeepLinkFilterSummary } from "@/components/list/DeepLinkFilterSummary";
+import { offerFilterFields } from "./_lib/filters";
+import type { OfferRow } from "./_lib/offers";
+import { OffersTable } from "./_components/OffersTable";
 
-/** "Teklifler" sekmesi — ürün/kullanıcı detayından `productId`/`userId` deep-link alır. */
-export function OffersTab() {
+/**
+ * Teklifler (pazarlık kayıtları) — siparişlerden ayrı route; izin `orders`
+ * (nav item'ın permission alanı). Ürün/kullanıcı detayından `productId`/`userId`
+ * deep-link alır.
+ */
+export default function OffersPage() {
   const t = useTranslations();
   return (
     <ResourceList<OfferRow>
@@ -21,7 +25,7 @@ export function OffersTab() {
       initialFilters={{ userId: "", userRole: "", productId: "" }}
     >
       <ResourceList.Header
-        title={t("admin.operations.orders.tabs.offers")}
+        title={t("admin.operations.offers.title")}
         description={
           <DeepLinkFilterSummary
             totalLabel={(count) =>

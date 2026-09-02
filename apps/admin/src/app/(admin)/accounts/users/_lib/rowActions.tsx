@@ -3,11 +3,12 @@ import {
   CheckCircleIcon,
   EnvelopeIcon,
   CheckBadgeIcon,
+  TrashIcon,
 } from "@heroicons/react/24/outline";
 import { useTranslations } from "next-intl";
 import type { RowActionItem } from "@/components/table";
 import type { User } from "./types";
-import { actionsForStatus, type UserAccountAction } from "./bulkEligibility";
+import { actionsFor, type UserAccountAction } from "./bulkEligibility";
 import {
   ACTION_LABEL_KEY,
   isActionBusy,
@@ -26,16 +27,20 @@ const ICONS: Record<UserAccountAction, typeof NoSymbolIcon> = {
   verify: CheckBadgeIcon,
   ban: NoSymbolIcon,
   unban: CheckCircleIcon,
+  delete: TrashIcon,
 };
 
-/** Satır menüsü hesap durumuna göre kurulur; silinmiş hesapta boş kalır. */
+/**
+ * Satır menüsü hesap durumuna (ve silme için giriş geçmişine) göre kurulur;
+ * silinmiş hesapta boş kalır.
+ */
 export function userRowMenu(t: T, { onAction, busy }: UserRowActions) {
   return (u: User): RowActionItem[] =>
-    actionsForStatus(u.accountStatus).map((action) => ({
+    actionsFor(u).map((action) => ({
       label: t(ACTION_LABEL_KEY[action]),
       icon: ICONS[action],
       onClick: () => onAction(action, u),
-      destructive: action === "ban",
+      destructive: action === "ban" || action === "delete",
       isLoading: isActionBusy(busy, u.id, action),
     }));
 }

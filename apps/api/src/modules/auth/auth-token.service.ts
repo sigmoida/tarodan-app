@@ -12,6 +12,7 @@ import { TokensDto } from "./dto";
 import { JwtPayload } from "./interfaces";
 import { SecurityService } from "../security/security.service";
 import { i18nMessage } from "../i18n";
+import { assertNotStaffAccount } from "./utils/staff-account";
 import { errorMessage } from "../../common/helpers/error-message";
 
 /**
@@ -79,6 +80,9 @@ export class AuthTokenService {
         errorCode: "EMAIL_NOT_VERIFIED",
       });
     }
+    // Personel hesabının web/mobil (kullanıcı) oturumu yenilenmez — panel
+    // dışında oturum açamaz; eldeki eski refresh token da burada ölür.
+    if (!opts?.isAdmin) assertNotStaffAccount(user);
 
     // Sunulan refresh token'ı persist edilmiş duruma karşı doğrula + rotasyon için
     // iptal et. Logout/önceki rotation ile iptal edilmiş ya da süresi dolmuş token

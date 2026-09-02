@@ -39,6 +39,7 @@ describe("AdminUserAccountService", () => {
       authService as any,
       staffService as any,
       analyticsOrderService as any,
+      { deleteAccount: jest.fn() } as any,
     );
     return {
       service,
@@ -160,6 +161,79 @@ describe("AdminUserAccountService", () => {
         response: { i18nKey: "server.auth.emailAlreadyVerified" },
       });
       expect(prisma.$transaction).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("deleteNeverLoggedIn", () => {
+    const setup = (user: Record<string, unknown> | null) => {
+      const prisma = {
+        user: { findUnique: jest.fn().mockResolvedValue(user) },
+      };
+      const audit = { createRequiredAuditLog: jest.fn().mockResolvedValue({}) };
+      const userService = { deleteAccount: jest.fn().mockResolvedValue({}) };
+      const service = new AdminUserAccountService(
+        prisma as any,
+        audit as any,
+        {} as any,
+        {} as any,
+        {} as any,
+        userService as any,
+      );
+      return { service, audit, userService };
+    };
+
+    it("hiç giriş yapmamış hesabı anonimleştirir ve zorunlu audit yazar", async () => {
+      const { service, audit, userService } = setup({
+        id: "u1",
+        email: "x@y.z",
+        displayName: "X",
+        lastLoginAt: null,
+        deletedAt: null,
+        createdAt: new Date(),
+      });
+      await expect(
+        service.deleteNeverLoggedIn("admin-1", "u1"),
+      ).resolves.toEqual({ success: true, userId: "u1" });
+      expect(userService.deleteAccount).toHaveBeenCalledWith("u1");
+      expect(audit.createRequiredAuditLog).toHaveBeenCalledWith(
+        "admin-1",
+        "user_delete_never_logged_in",
+        "User",
+        "u1",
+        expect.objectContaining({ email: "x@y.z" }),
+        { deleted: true },
+      );
+    });
+
+    it("giriş yapmış hesapta 400 ve silme çağrılmaz", async () => {
+      const { service, userService } = setup({
+        id: "u1",
+        lastLoginAt: new Date(),
+        deletedAt: null,
+      });
+      await expect(
+        service.deleteNeverLoggedIn("admin-1", "u1"),
+      ).rejects.toMatchObject({
+        response: { i18nKey: "server.admin.user.deleteRequiresNeverLoggedIn" },
+      });
+      expect(userService.deleteAccount).not.toHaveBeenCalled();
+    });
+
+    it("zaten silinmiş hesapta 400, olmayan hesapta 404", async () => {
+      await expect(
+        setup({
+          id: "u1",
+          lastLoginAt: null,
+          deletedAt: new Date(),
+        }).service.deleteNeverLoggedIn("admin-1", "u1"),
+      ).rejects.toMatchObject({
+        response: { i18nKey: "server.admin.user.deleted" },
+      });
+      await expect(
+        setup(null).service.deleteNeverLoggedIn("admin-1", "nope"),
+      ).rejects.toMatchObject({
+        response: { i18nKey: "server.auth.userNotFound" },
+      });
     });
   });
 

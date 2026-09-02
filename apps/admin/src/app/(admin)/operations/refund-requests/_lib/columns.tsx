@@ -7,6 +7,7 @@ import {
   shipmentStatusConfig,
 } from "@tarodan/ui";
 import { col } from "@/components/table";
+import { fmtTry } from "@/lib/format";
 import { statusConfig } from "@/lib/statusLabels";
 
 type T = ReturnType<typeof useTranslations<never>>;
@@ -16,7 +17,9 @@ export interface RefundRequestRow {
   refundNumber: string;
   status: string;
   amount: number | string;
-  /** Adet bazlı kısmi iade: siparişin kaç adedi iade ediliyor. */
+  /** İadeyle geri çevrilen satıcı kesintisi (komisyon/hizmet bedeli iadesi). */
+  refundedSellerFeeAmount?: number | string | null;
+  /** Adet bazlı kısmi iade: siparişin kaç adedi iade ediliyor (detayda gösterilir). */
   refundQuantity?: number;
   reason: string;
   createdAt: string;
@@ -79,16 +82,31 @@ export const refundRequestColumns = (t: T) => [
     }),
     { sortKey: "order.seller.displayName" },
   ),
-  col.money<RefundRequestRow>(t("common.amount"), "amount"),
-  col.text<RefundRequestRow>(
-    t("admin.operations.refundRequests.refundQuantity"),
-    (r) =>
-      r.refundQuantity != null
-        ? t("admin.operations.orders.itemCountUnit", {
-            count: r.refundQuantity,
-          })
-        : null,
-    { minWidth: 90 },
+  // İade tutarı + iadeyle geri çevrilen satıcı kesintisi tek hücrede.
+  col.custom<RefundRequestRow>(
+    t("admin.operations.refundRequests.amountAndFee"),
+    (r) => {
+      const fee = Number(r.refundedSellerFeeAmount ?? 0);
+      return (
+        <div className="flex flex-col leading-tight">
+          <span className="text-sm font-semibold tabular-nums text-danger-600">
+            {fmtTry(r.amount)}
+          </span>
+          <span className="whitespace-nowrap text-xs tabular-nums text-muted">
+            {t("admin.operations.refundRequests.feeShort")}{" "}
+            <span className="font-medium text-body">
+              {fee > 0 ? fmtTry(fee) : "—"}
+            </span>
+          </span>
+        </div>
+      );
+    },
+    {
+      minWidth: 150,
+      sortKey: "amount",
+      sortType: "number",
+      exportValue: (r) => `${r.amount} / ${r.refundedSellerFeeAmount ?? 0}`,
+    },
   ),
   col.text<RefundRequestRow>(
     t("admin.operations.refundRequests.reason"),

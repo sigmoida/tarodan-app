@@ -1096,10 +1096,16 @@ export class AdminAnalyticsOrderService {
   async unbanUser(adminId: string, userId: string) {
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
+      include: { adminUser: { select: { id: true } } },
     });
 
     if (!user) {
       throw new NotFoundException(i18nMessage("server.auth.userNotFound"));
+    }
+    if (user.adminUser) {
+      throw new BadRequestException(
+        i18nMessage("server.admin.user.staffAccount"),
+      );
     }
 
     if (!(user as any).isBanned) {

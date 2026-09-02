@@ -1,6 +1,5 @@
 import { Select } from "@tarodan/ui";
 import type { FilterField, TranslateFn } from "@/components/list/filters/types";
-import { getProductStatusOptions } from "./types";
 
 interface Brand {
   id: string;
@@ -23,12 +22,6 @@ export const productFilterFields = (
   brands: Brand[],
   models: CarModel[],
 ): FilterField[] => [
-  {
-    type: "select",
-    name: "status",
-    label: t("common.status"),
-    options: getProductStatusOptions(t),
-  },
   {
     type: "custom",
     names: ["brandId"],

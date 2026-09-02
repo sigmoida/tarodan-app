@@ -25,4 +25,6 @@ export const adminKeys = {
     [resource, "preview", params] as const,
   count: (resource: string, params?: unknown) =>
     [`${resource}-count`, params] as const,
+  /** Prefix of every `count` key of a resource — a mutation invalidates badges/summaries with it. */
+  countAll: (resource: string) => [`${resource}-count`] as const,
 };

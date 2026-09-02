@@ -26,7 +26,6 @@ interface User {
   isSeller: boolean;
   sellerType?: string;
   createdAt: Date;
-  isAdmin?: boolean;
   role?: string;
 
   // Business account fields
@@ -162,8 +161,6 @@ const mapApiUser = (apiUser: any): User => ({
   isSeller: apiUser.isSeller || apiUser.is_seller || false,
   sellerType: apiUser.sellerType || apiUser.seller_type,
   createdAt: apiUser.createdAt || apiUser.created_at,
-  isAdmin: apiUser.isAdmin || apiUser.is_admin || apiUser.role === "admin",
-  role: apiUser.role,
   companyName: apiUser.companyName || apiUser.company_name,
   taxId: apiUser.taxId || apiUser.tax_id,
   businessStatus: apiUser.businessStatus || apiUser.business_status,

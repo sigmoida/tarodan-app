@@ -7,6 +7,10 @@ import { JwtPayload, RequestUser } from "../interfaces";
 import { PrismaService } from "../../../prisma";
 import { COOKIE_NAMES, readCookie } from "../utils/auth-cookies";
 import { i18nMessage } from "../../i18n";
+import {
+  assertNotStaffAccount,
+  STAFF_ACCOUNT_SELECT,
+} from "../utils/staff-account";
 
 @Injectable()
 export class JwtStrategy extends PassportStrategy(Strategy, "jwt") {
@@ -33,10 +37,17 @@ export class JwtStrategy extends PassportStrategy(Strategy, "jwt") {
       );
     }
 
-    // Check if user still exists and is active
+    // Her korumalı istekte çalışan sıcak yol: yalnız gereken sütunlar.
     const user = await this.prisma.user.findUnique({
       where: { id: payload.sub },
-      include: { adminUser: true },
+      select: {
+        id: true,
+        email: true,
+        isSeller: true,
+        preferredLanguage: true,
+        deletedAt: true,
+        ...STAFF_ACCOUNT_SELECT,
+      },
     });
 
     if (!user) {
@@ -50,12 +61,17 @@ export class JwtStrategy extends PassportStrategy(Strategy, "jwt") {
       );
     }
 
+    // Personel hesabı kullanıcı (web/mobil) token'ıyla hiçbir uca giremez;
+    // elde kalmış eski oturumlar da burada kapanır. Yönetim paneli ayrı
+    // strateji ve ayrı gizli anahtarla (AdminJwtStrategy) çalışır.
+    assertNotStaffAccount(user);
+
+    // Kullanıcı token'ı admin bilgisi TAŞIMAZ (isAdmin/role yalnız admin
+    // stratejisinden gelir).
     return {
       id: user.id,
       email: user.email,
       isSeller: user.isSeller,
-      isAdmin: !!user.adminUser?.isActive,
-      role: user.adminUser?.role,
       preferredLanguage: user.preferredLanguage,
     };
   }

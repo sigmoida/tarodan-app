@@ -3,6 +3,7 @@ import { Badge, tradeStatusConfig } from "@tarodan/ui";
 import { useTranslations } from "next-intl";
 import { cancelReasonLabel } from "@/lib/utils";
 import { col, TruncatedText } from "@/components/table";
+import { fmtTry } from "@/lib/format";
 import { type Trade, disputeConfig, cashPayer } from "./trades";
 import { statusConfig } from "@/lib/statusLabels";
 
@@ -64,28 +65,43 @@ export function tradeColumns(t: T) {
       secondary: r.receiver.email,
       href: `/accounts/users/${r.receiver.id}`,
     })),
-    col.money<Trade>(
-      t("admin.operations.trades.cash"),
-      (r) => r.cashAmount || null,
-      {
-        tone: "primary",
-        sortKey: "cashAmount",
-        sortType: "number",
-      },
-    ),
-    col.user<Trade>(
-      t("admin.operations.trades.paidBy"),
+    // Nakit fark + ödeyen tek hücrede: tutar başlıkta, ödeyen taraf altında.
+    col.custom<Trade>(
+      t("admin.operations.trades.cashPayer"),
       (r) => {
         const payer = cashPayer(r);
-        return payer
-          ? {
-              name: payer.displayName,
-              secondary: payer.email,
-              href: `/accounts/users/${payer.id}`,
-            }
-          : null;
+        if (!r.cashAmount || !payer) {
+          return <span className="text-subtle">—</span>;
+        }
+        return (
+          <div className="flex min-w-0 flex-col leading-tight">
+            <span className="text-sm font-semibold tabular-nums text-primary-700">
+              {fmtTry(r.cashAmount)}
+            </span>
+            <span className="min-w-0 truncate text-xs text-muted">
+              {t("admin.operations.trades.paidBy")}:{" "}
+              <Link
+                href={`/accounts/users/${payer.id}`}
+                className="font-medium text-body hover:text-primary-600 hover:underline"
+              >
+                {payer.displayName}
+              </Link>
+            </span>
+            {payer.email && (
+              <span className="truncate text-xs text-muted">{payer.email}</span>
+            )}
+          </div>
+        );
       },
-      { minWidth: 300 },
+      {
+        minWidth: 240,
+        sortKey: "cashAmount",
+        sortType: "number",
+        exportValue: (r) =>
+          r.cashAmount
+            ? `${r.cashAmount} / ${cashPayer(r)?.displayName ?? ""}`
+            : "",
+      },
     ),
     col.date<Trade>(t("common.date"), "createdAt"),
   ];

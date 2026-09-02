@@ -5,9 +5,9 @@ import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { DataTable } from "@/components/DataTable";
 import { useResourceList } from "@/components/list";
-import { offerColumns } from "../_lib/offerColumns";
+import { offerColumns } from "../_lib/columns";
 import type { OfferRow } from "../_lib/offers";
-import { CancelOfferModal } from "../offers/[id]/_modals/CancelOfferModal";
+import { CancelOfferModal } from "../[id]/_modals/CancelOfferModal";
 
 export function OffersTable() {
   const t = useTranslations();
@@ -18,7 +18,7 @@ export function OffersTable() {
 
   const columns = offerColumns({
     t,
-    onView: (o) => router.push(`/operations/orders/offers/${o.id}`),
+    onView: (o) => router.push(`/operations/offers/${o.id}`),
     onCancel: (o) => setCancelTarget(o),
   });
 

@@ -58,6 +58,8 @@ export interface DataTableProps<T> {
   // ── Expandable row (optional) ──
   /** Panel rendered full-width below the open row (e.g. brand models). */
   renderExpanded?: (row: T) => ReactNode;
+  /** Render the expanded panel under EVERY row (no toggle) — card-style lists. */
+  expandAll?: boolean;
   /** Id of the currently open row (matches getRowId). When set, it opens/closes smoothly. */
   expandedId?: string | null;
   // ── Sorting (optional) ──
@@ -91,6 +93,7 @@ export function DataTable<T>({
   onToggleAll,
   renderExpanded,
   expandedId,
+  expandAll = false,
   sort,
   onSort,
 }: DataTableProps<T>) {
@@ -229,7 +232,8 @@ export function DataTable<T>({
             ) : (
               table.getRowModel().rows.map((row) => {
                 const id = getRowId ? getRowId(row.original) : row.id;
-                const isExpanded = renderExpanded != null && expandedId === id;
+                const isExpanded =
+                  renderExpanded != null && (expandAll || expandedId === id);
                 return (
                   <Fragment key={row.id}>
                     <TableRow

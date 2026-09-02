@@ -1,11 +1,5 @@
 import Link from "next/link";
-import {
-  Badge,
-  IconButton,
-  orderStatusConfig,
-  shipmentStatusConfig,
-} from "@tarodan/ui";
-import { ChevronRightIcon } from "@heroicons/react/24/outline";
+import { Badge, orderStatusConfig } from "@tarodan/ui";
 import { useTranslations } from "next-intl";
 import { cancelReasonLabel, orderOriginLabel } from "@/lib/utils";
 import { fmtTry } from "@/lib/format";
@@ -15,56 +9,13 @@ import { statusConfig } from "@/lib/statusLabels";
 
 type T = ReturnType<typeof useTranslations<never>>;
 
-export interface OrderColumnProps {
-  t: T;
-  expandedId: string | null;
-  toggleRow: (id: string) => void;
-}
-
-export function orderColumns({ t, expandedId, toggleRow }: OrderColumnProps) {
+/**
+ * Ana satır = sipariş/sepet çatısı: numara, durum, alıcı, tutar+komisyon,
+ * tarih. Ürünler, kargo durumu ve adet satırın altındaki kartta (hep açık)
+ * olduğu için burada kolon değildir; kaynak sekmeden bellidir.
+ */
+export function orderColumns({ t }: { t: T }) {
   return [
-    col.custom<OrderGroupRow>(
-      "",
-      (o) => {
-        const open = expandedId === o.id;
-        return (
-          <IconButton
-            type="button"
-            variant="ghost"
-            size="sm"
-            onClick={(e) => {
-              e.stopPropagation();
-              toggleRow(o.id);
-            }}
-            aria-expanded={open}
-            title={
-              open
-                ? t("admin.operations.orders.hideItems")
-                : t("admin.operations.orders.showItems")
-            }
-            aria-label={
-              open
-                ? t("admin.operations.orders.hideItems")
-                : t("admin.operations.orders.showItems")
-            }
-            className="text-muted hover:text-primary-600"
-          >
-            <ChevronRightIcon
-              className={`h-4 w-4 transition-transform ${
-                open ? "rotate-90 text-primary-600" : ""
-              }`}
-            />
-          </IconButton>
-        );
-      },
-      {
-        id: "expand",
-        minWidth: 52,
-        fixed: true,
-        align: "center",
-        sortable: false,
-      },
-    ),
     col.custom<OrderGroupRow>(
       t("admin.operations.orders.groupNumber"),
       (o) => (
@@ -113,25 +64,16 @@ export function orderColumns({ t, expandedId, toggleRow }: OrderColumnProps) {
             )}
             {(o.status === "cancelled" || o.cancellationType === "iptal") &&
               cancelReasonLabel(o.cancelReason, t) && (
-                <TruncatedText className="max-w-full text-xs text-muted">
+                <span className="max-w-full whitespace-normal break-words text-xs leading-snug text-muted">
                   {`${cancelReasonLabel(o.cancelReason, t)} · ${t(
                     "admin.operations.orders.originCancellation",
                     { origin: orderOriginLabel(o.origin, t) },
                   )}`}
-                </TruncatedText>
+                </span>
               )}
           </div>
         ),
       { minWidth: 190 },
-    ),
-    col.custom<OrderGroupRow>(
-      t("admin.operations.orders.origin"),
-      (o) => (
-        <Badge variant={o.origin === "offer" ? "info" : "default"}>
-          {orderOriginLabel(o.origin, t)}
-        </Badge>
-      ),
-      { minWidth: 110 },
     ),
     col.user<OrderGroupRow>(
       t("admin.operations.orders.buyer"),
@@ -142,74 +84,37 @@ export function orderColumns({ t, expandedId, toggleRow }: OrderColumnProps) {
         href: o.buyer.isGuest ? undefined : `/accounts/users/${o.buyer.id}`,
       }),
       {
-        minWidth: 480,
+        minWidth: 240,
         sortKey: "buyer.displayName",
         sortType: "text",
       },
     ),
-    col.product<OrderGroupRow>(
-      t("admin.catalog.common.product"),
-      (o) => {
-        const product = o.items[0]?.product;
-        return product
-          ? {
-              title: product.title,
-              image: o.items[0]?.productImageUrl,
-              href: `/catalog/products/${product.id}`,
-            }
-          : null;
-      },
-      {
-        minWidth: 480,
-      },
-    ),
-    col.number<OrderGroupRow>(
-      t("admin.operations.orders.productCount"),
-      (o) => o.itemCount,
-      {
-        // Tek haneli sayı; kazanılan yer Alıcı ve Ürün kolonlarına gitsin.
-        minWidth: 96,
-        sortable: false,
-      },
-    ),
-    col.money<OrderGroupRow>(t("common.amount"), (o) => o.totalAmount, {
-      tone: "primary",
-      minWidth: 110,
-      sortKey: "totalAmount",
-      sortType: "number",
-    }),
     col.custom<OrderGroupRow>(
-      t("admin.operations.orders.commission"),
+      t("admin.operations.orders.amountCommission"),
       (o) => {
         const rate =
           o.subtotal > 0 ? Math.round((o.commission / o.subtotal) * 100) : null;
         return (
-          <span className="whitespace-nowrap tabular-nums">
-            <span className="font-medium text-success-600">
-              {fmtTry(o.commission)}
+          <div className="flex flex-col items-start leading-tight">
+            <span className="text-sm font-semibold tabular-nums text-primary-700">
+              {fmtTry(o.totalAmount)}
             </span>
-            {rate != null && (
-              <span className="ml-1 text-xs text-muted">%{rate}</span>
-            )}
-          </span>
+            <span className="whitespace-nowrap text-xs tabular-nums text-muted">
+              {t("admin.operations.orders.commissionShort")}{" "}
+              <span className="font-medium text-success-600">
+                {fmtTry(o.commission)}
+              </span>
+              {rate != null && ` · %${rate}`}
+            </span>
+          </div>
         );
       },
       {
-        minWidth: 130,
+        minWidth: 170,
+        sortKey: "totalAmount",
+        sortType: "number",
+        exportValue: (o) => `${o.totalAmount} / ${o.commission}`,
       },
-    ),
-    col.badge<OrderGroupRow>(
-      t("admin.operations.orders.cargoStatus"),
-      (o) =>
-        o.itemCount > 1 || !o.shipmentStatus ? (
-          <span className="text-subtle">—</span>
-        ) : (
-          <Badge
-            status={o.shipmentStatus}
-            config={statusConfig(shipmentStatusConfig, t)}
-          />
-        ),
-      { minWidth: 130 },
     ),
     col.date<OrderGroupRow>(t("common.date"), "createdAt", { minWidth: 110 }),
   ];
