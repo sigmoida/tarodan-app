@@ -531,8 +531,16 @@ export class OrderQueryService {
     refundRequests: { orderBy: { createdAt: "desc" as const } },
     offer: { select: { status: true } },
     // Koli numarası (PKG-…) satır bazında da taşınır: satıcı ekranı ve sipariş
-    // detayı kargo etiketindeki kodu doğrudan gösterebilsin.
-    package: { select: { packageNumber: true } },
+    // detayı kargo etiketindeki kodu doğrudan gösterebilsin. id/sellerId/
+    // shippingCost sentetik (grupsuz) görünümün paket meta'sı içindir.
+    package: {
+      select: {
+        id: true,
+        packageNumber: true,
+        sellerId: true,
+        shippingCost: true,
+      },
+    },
   };
 
   private paymentSummary(payment: any) {
@@ -546,21 +554,32 @@ export class OrderQueryService {
     };
   }
 
-  /** Grupsuz (ör. teklif kabulü) sipariş = tek siparişlik sentetik grup çatısı. */
+  /**
+   * Grupsuz (ör. teklif kabulü) sipariş = tek siparişlik sentetik grup çatısı.
+   * Teklif siparişi KOLİ taşır ama grup taşımaz: paket meta'sı gerçek koliden
+   * gelir (buildPackagesView `packageId` ile eşler; sabit `nopkg:` meta'sı
+   * paketli siparişte eşleşmeyip koli numarasını ve kargo ücretini düşürürdü).
+   */
   private async formatSyntheticGroupView(
     order: any,
     userId: string,
     viewerRole: "buyer" | "seller",
   ) {
-    const packages = await this.buildPackagesView(
-      [order],
-      [
-        {
+    const packageMeta = order.package
+      ? {
+          id: order.package.id,
+          packageNumber: order.package.packageNumber ?? null,
+          sellerId: order.package.sellerId ?? order.sellerId,
+          shippingCost: order.package.shippingCost ?? order.shippingCost ?? 0,
+        }
+      : {
           id: `nopkg:${order.id}`,
           sellerId: order.sellerId,
           shippingCost: order.shippingCost ?? 0,
-        },
-      ],
+        };
+    const packages = await this.buildPackagesView(
+      [order],
+      [packageMeta],
       userId,
     );
     return {
@@ -753,7 +772,9 @@ export class OrderQueryService {
         ? this.prisma.orderPackage.findMany({
             where: { id: { in: pkgIds } },
             include: {
-              orders: { include: this.groupOrderInclude },
+              // Teklif siparişi grup(suz) koli taşır: ödeme satırı siparişin
+              // üstündedir — loose yol gibi burada da yüklenmeli.
+              orders: { include: { ...this.groupOrderInclude, payment: true } },
               // Satıcı da sepet (çatı) numarasını görür — alıcıyla aynı
               // numarayı konuşabilmek için.
               checkoutGroup: { select: { groupNumber: true } },

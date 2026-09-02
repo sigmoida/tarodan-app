@@ -34,7 +34,10 @@ export function OrdersTable() {
   });
 
   const emptyText =
-    search || filters.status !== "all" || filters.userId
+    search ||
+    filters.status !== "all" ||
+    (filters.origin && filters.origin !== "all") ||
+    filters.userId
       ? t("admin.operations.orders.emptyFiltered")
       : t("admin.operations.orders.empty");
 

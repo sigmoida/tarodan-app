@@ -8,6 +8,7 @@ import { AdminAnalyticsController } from "./analytics/admin-analytics.controller
 import { AdminModerationController } from "./ops/admin-moderation.controller";
 import { AdminPaymentController } from "./finance/admin-payment.controller";
 import { AdminTradeController } from "./trade/admin-trade.controller";
+import { AdminOfferController } from "./orders/admin-offer.controller";
 import { AdminRefundController } from "./orders/admin-refund.controller";
 import { AdminContentController } from "./catalog/admin-content.controller";
 import { AdminMessagingController } from "./ops/admin-messaging.controller";
@@ -58,6 +59,8 @@ import { AdminTradeService } from "./trade/admin-trade.service";
 import { AdminTradeCommonService } from "./trade/admin-trade-common.service";
 import { WarehouseAddressModule } from "../shipping/warehouse/warehouse-address.module";
 import { AdminTradeQueryService } from "./trade/admin-trade-query.service";
+import { AdminOfferQueryService } from "./orders/admin-offer-query.service";
+import { AdminOfferService } from "./orders/admin-offer.service";
 import { AdminTradeWarehouseService } from "./trade/admin-trade-warehouse.service";
 import { AdminTradeResolutionService } from "./trade/admin-trade-resolution.service";
 import { AdminRefundService } from "./orders/admin-refund.service";
@@ -155,6 +158,7 @@ import { scheduledProcessors } from "../../workers/scheduled-processors";
     AdminModerationController,
     AdminPaymentController,
     AdminTradeController,
+    AdminOfferController,
     AdminRefundController,
     AdminContentController,
     AdminMessagingController,
@@ -201,6 +205,8 @@ import { scheduledProcessors } from "../../workers/scheduled-processors";
     AdminTradeService,
     AdminTradeCommonService,
     AdminTradeQueryService,
+    AdminOfferQueryService,
+    AdminOfferService,
     AdminTradeWarehouseService,
     AdminTradeResolutionService,
     AdminRefundService,

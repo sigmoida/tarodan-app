@@ -29,6 +29,8 @@ export const PERMISSION_MAP: Record<string, string[]> = {
   analytics: ["analytics"],
   reports: ["analytics"],
   orders: ["orders"],
+  // Teklifler /operations/orders sekmesinde yaşar → sipariş izniyle görünür.
+  offers: ["orders"],
   trades: ["trades"],
   "trade-shipments": ["trades"],
   "refund-requests": ["refund_requests"],

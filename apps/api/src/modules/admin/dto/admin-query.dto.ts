@@ -12,6 +12,7 @@ import { ApiPropertyOptional } from "@nestjs/swagger";
 import { Transform, Type } from "class-transformer";
 import {
   ProductStatus,
+  OrderOrigin,
   OrderStatus,
   MembershipTierType,
   SubscriptionStatus,
@@ -129,6 +130,14 @@ export class AdminOrderQueryDto extends AdminListQueryDto {
   @IsOptional()
   @IsEnum(OrderStatus)
   status?: OrderStatus;
+
+  @ApiPropertyOptional({
+    enum: OrderOrigin,
+    description: "Sipariş kaynağı: doğrudan satış / teklif / platform hizmeti",
+  })
+  @IsOptional()
+  @IsEnum(OrderOrigin)
+  origin?: OrderOrigin;
 
   @ApiPropertyOptional({ example: "2024-01-01" })
   @IsOptional()

@@ -96,11 +96,6 @@ export const NOTIFICATION_TEMPLATES: Partial<
     messageKey: "server.notification.orderManuallyConfirmed.message",
     icon: "💸",
   },
-  [NotificationType.ORDER_FORCE_COMPLETED_BY_ADMIN]: {
-    titleKey: "server.notification.orderForceCompletedByAdmin.title",
-    messageKey: "server.notification.orderForceCompletedByAdmin.message",
-    icon: "🛡️",
-  },
   [NotificationType.SELLER_DID_NOT_SHIP_REFUNDED]: {
     titleKey: "server.notification.sellerDidNotShipRefunded.title",
     messageKey: "server.notification.sellerDidNotShipRefunded.message",
@@ -155,6 +150,11 @@ export const NOTIFICATION_TEMPLATES: Partial<
     titleKey: "server.notification.offerCancelledOutOfStock.title",
     messageKey: "server.notification.offerCancelledOutOfStock.message",
     icon: "❌",
+  },
+  [NotificationType.OFFER_CANCELLED_BY_ADMIN]: {
+    titleKey: "server.notification.offerCancelledByAdmin.title",
+    messageKey: "server.notification.offerCancelledByAdmin.message",
+    icon: "🛡️",
   },
   [NotificationType.OFFER_CANCELLED_LISTING_REMOVED]: {
     titleKey: "server.notification.offerCancelledListingRemoved.title",

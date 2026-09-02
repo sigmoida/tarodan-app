@@ -9,7 +9,9 @@ import * as request from "supertest";
 import { E2ETestApp } from "../test-utils/create-app";
 import { getPrisma } from "../test-utils/db";
 import { authHeader } from "./user.factory";
+import { createOfferRow } from "./offer.factory";
 import { signCallback } from "../mocks/paytr.mock";
+import { OfferStatus } from "@prisma/client";
 
 type Auth = { accessToken: string };
 
@@ -65,6 +67,64 @@ export function buyNow(
   }) as typeof req.end;
 
   return req;
+}
+
+/**
+ * Teklif → sipariş. Sipariş `POST /offers/:id/accept` İÇİNDE oluşur (ayrı
+ * "tekliften sipariş" ucu yok): bekleyen teklif satırı seed edilir, satıcı kabul
+ * eder, alıcı adresi PATCH ile yazar. Döner: teklif ve sipariş id'si.
+ */
+export async function acceptOfferToOrder(
+  ctx: E2ETestApp,
+  params: {
+    buyer: Auth & { id: string };
+    seller: Auth & { id: string };
+    productId: string;
+    amount: number;
+    /** Adres satırı (createAddress dönüşü) — yalnız `id` gelse de alanlar varsayılanla dolar. */
+    address?: {
+      id?: string;
+      fullName?: string | null;
+      phone?: string | null;
+      city?: string | null;
+      district?: string | null;
+      address?: string | null;
+      zipCode?: string | null;
+    } | null;
+  },
+): Promise<{ offerId: string; orderId: string }> {
+  const offer = await createOfferRow({
+    productId: params.productId,
+    buyerId: params.buyer.id,
+    sellerId: params.seller.id,
+    amount: params.amount,
+    status: OfferStatus.pending,
+  });
+  const res = await request(server(ctx))
+    .post(`/api/offers/${offer.id}/accept`)
+    .set(authHeader(params.seller));
+  if (res.status >= 300 || !res.body?.orderId) {
+    throw new Error(
+      `acceptOfferToOrder: accept failed (${res.status}) ${JSON.stringify(res.body)}`,
+    );
+  }
+  const orderId = res.body.orderId as string;
+  if (params.address) {
+    const a = params.address;
+    await request(server(ctx))
+      .patch(`/api/orders/${orderId}/shipping-address`)
+      .set(authHeader(params.buyer))
+      .send({
+        fullName: a.fullName ?? "Test User",
+        phone: a.phone ?? "+905551112233",
+        city: a.city ?? "İstanbul",
+        district: a.district ?? "Kadıköy",
+        address: a.address ?? "Cad. No:1",
+        ...(a.zipCode ? { zipCode: a.zipCode } : {}),
+      })
+      .expect(200);
+  }
+  return { offerId: offer.id, orderId };
 }
 
 /** POST /api/payments/initiate — siparişe PayTR ödemesi başlat (pending). */

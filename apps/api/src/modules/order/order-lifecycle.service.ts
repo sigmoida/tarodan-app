@@ -11,18 +11,28 @@ import { isShipmentHandedToCarrier } from "../shipping/helpers/shipment-handover
 import { i18nMessage } from "../i18n";
 import { CacheService } from "../cache/cache.service";
 import { CancelOrderDto, GuestOrderCancelDto } from "./dto";
-import { OrderStatus, OfferStatus, RefundRequestStatus } from "@prisma/client";
+import {
+  OrderCancellationReason,
+  OrderStatus,
+  OfferStatus,
+  Prisma,
+  RefundRequestStatus,
+} from "@prisma/client";
 import { getAvailableQuantity } from "../product/helpers/product-availability.helper";
 import { ProductLockService } from "../product/lock/product-lock.service";
 import { NotificationService } from "../notification/notification.service";
 import { CommissionLedgerService } from "../commission/commission-ledger.service";
 import { ElogoInvoicingService } from "../elogo";
-import { OrderCommonService } from "./order-common.service";
+import {
+  OrderCommonService,
+  isReactivatablePayment,
+} from "./order-common.service";
 import { OrderQueryService } from "./order-query.service";
 import { DiscountService } from "../discount/discount.service";
 import { RefundService } from "../refund/refund.service";
 import { PUBLIC_NAME_SELECT } from "../../common/helpers/public-identity";
 import { paymentWindowEnd } from "../payment/helpers/payment.constants";
+import { OFFER_CANCEL_REASON } from "../trade/helpers/trade-cancel-reasons";
 
 /**
  * Sipariş yaşam döngüsü (adres güncelleme, durum geçişleri, tamamlama/onay,
@@ -107,9 +117,7 @@ export class OrderLifecycleService {
    */
   async completeOrder(
     orderId: string,
-    type: "manual_ok" | "auto_timeout" | "admin_force",
-    /** admin_force gerekçesi — bildirim payload'una taşınır (matris sözü). */
-    reason?: string,
+    type: "manual_ok" | "auto_timeout",
   ): Promise<{ completed: boolean }> {
     const result = await this.prisma.$transaction(async (tx) => {
       const now = new Date();
@@ -202,21 +210,6 @@ export class OrderLifecycleService {
                 "seller",
               ),
             ]);
-          } else if (type === "admin_force") {
-            await Promise.allSettled([
-              this.notificationService.notifyOrderForceCompletedByAdmin(
-                order.buyerId,
-                orderId,
-                "buyer",
-                reason,
-              ),
-              this.notificationService.notifyOrderForceCompletedByAdmin(
-                order.sellerId,
-                orderId,
-                "seller",
-                reason,
-              ),
-            ]);
           }
         }
       } catch (e: any) {
@@ -294,58 +287,6 @@ export class OrderLifecycleService {
     }
 
     return this.completeOrder(orderId, "manual_ok");
-  }
-
-  /**
-   * Admin force-complete: awaiting_buyer_confirmation → completed.
-   * Spec Bölüm 9.1. Audit log için reason parametresi.
-   */
-  async forceComplete(
-    orderId: string,
-    adminId: string,
-    reason?: string,
-  ): Promise<{ completed: boolean }> {
-    this.logger.log(
-      `Admin ${adminId} force-completing order ${orderId}. reason="${reason ?? ""}"`,
-    );
-    // Gerekçe bildirime de taşınır — eskiden yalnız log/audit'te kalıyordu,
-    // kullanıcı payload'da hep undefined görüyordu.
-    return this.completeOrder(orderId, "admin_force", reason);
-  }
-
-  /**
-   * Admin 48h penceresini uzatır.
-   * Spec Bölüm 9.1.
-   */
-  async extendConfirmation(
-    orderId: string,
-    adminId: string,
-    hours: number,
-    reason?: string,
-  ): Promise<{ newDeadline: Date }> {
-    const order = await this.prisma.order.findUnique({
-      where: { id: orderId },
-      select: { id: true, status: true, confirmationDeadline: true },
-    });
-    if (!order)
-      throw new NotFoundException(i18nMessage("server.order.notFound"));
-    if (order.status !== OrderStatus.awaiting_buyer_confirmation) {
-      throw new BadRequestException(
-        i18nMessage("server.order.extendOnlyWithinWindow"),
-      );
-    }
-
-    const base = order.confirmationDeadline ?? new Date();
-    const newDeadline = new Date(base.getTime() + hours * 3_600_000);
-    await this.prisma.order.update({
-      where: { id: orderId },
-      data: { confirmationDeadline: newDeadline },
-    });
-
-    this.logger.log(
-      `Admin ${adminId} extended confirmationDeadline of ${orderId} by ${hours}h → ${newDeadline.toISOString()} reason="${reason ?? ""}"`,
-    );
-    return { newDeadline };
   }
 
   /**
@@ -500,32 +441,13 @@ export class OrderLifecycleService {
       }
 
       // Erken dal paid/preparing'i tüketti (createCancellationRefund) — buraya
-      // yalnız pending_payment ulaşmalı. Preflight ile tx arasında ödeme
-      // tamamlandıysa (yarış) iptali burada sürdürmek PARAYI İADE ETMEDEN statü
-      // yazmak olurdu; reddet — alıcı yeniden dener ve paid yolu iade
-      // makinesiyle iptal eder.
-      if (order.status !== OrderStatus.pending_payment) {
-        throw new BadRequestException(
-          i18nMessage("server.order.cannotCancelShipped"),
-        );
-      }
-
+      // yalnız pending_payment ulaşmalı; yarış (preflight→tx arası ödeme)
+      // guard'ı cancelUnpaidOrderInTx içinde, tüm çağıranlar için tek yerde.
       // Ödenmemiş iptal: PSP'ye gidilmez, statü doğrudan cancelled olur.
-      // cancellationType='iptal' raporlama/admin için "İADE değil İPTAL" der.
-      const cancelReasonText =
-        dto?.reason?.trim() || "Alıcı tarafından iptal edildi";
-      const cancelledOrder = await tx.order.update({
-        where: {
-          id: orderId,
-          version: order.version,
-        },
-        data: {
-          status: OrderStatus.cancelled,
-          cancellationType: "iptal",
-          cancellationReasonCode: dto?.reasonCode,
-          cancelReason: cancelReasonText,
-          version: { increment: 1 },
-        },
+      const cancelledOrder = await this.cancelUnpaidOrderInTx(tx, order, {
+        reason: dto?.reason?.trim() || "Alıcı tarafından iptal edildi",
+        reasonCode: dto?.reasonCode,
+        ledgerReason: "buyer_cancelled",
         include: {
           product: {
             include: {
@@ -551,65 +473,6 @@ export class OrderLifecycleService {
         },
       });
 
-      // Rezervasyonu kaldır (sipariş adedi kadar serbest bırak).
-      // GUARD: reservationReleasedAt doluysa rezervasyon 5dk cron (releaseExpiredOrder
-      // Reservations) tarafından ZATEN bırakılmıştır; burada 2. kez düşmemeliyiz —
-      // yoksa reservedQuantity negatife düşer (oversell).
-      // CLAMP: GREATEST(...,0) ile atomik + 0'a sabitli (read-modify-write yarışına kapalı),
-      // invalidatePendingOrdersForProduct'taki pattern ile aynı.
-      // (pending_payment'ta quantity hiç düşmediği için stok geri-yükleme yoktur;
-      // ödenmiş iptallerin stok geri-yüklemesi processRefund'da tek yazıcıdır.)
-      if (!order.reservationReleasedAt) {
-        await tx.$executeRaw`
-          UPDATE "products"
-          SET "reserved_quantity" = GREATEST("reserved_quantity" - ${order.quantity ?? 1}, 0)
-          WHERE "id" = ${order.productId}
-        `;
-      }
-
-      // Re-enable the offer (or mark as cancelled)
-      if (order.offerId) {
-        await tx.offer.update({
-          where: { id: order.offerId },
-          data: { status: OfferStatus.cancelled },
-        });
-      }
-
-      // Ledger: paid/preparing'den iptalse pending → waived (Faz 3B.5).
-      // pending_payment'da ledger henüz yaratılmamıştır (PaymentService.processSuccessfulPayment'da
-      // upsert ediliyor); markWaived noop döner. Spec Bölüm 7.4 (buyer-initiated)
-      // ile uyumlu — komisyon alınmaz çünkü iş tamamlanmadı.
-      await this.commissionLedger.markWaived(orderId, "buyer_cancelled", tx);
-
-      if (order.status === OrderStatus.pending_payment) {
-        let reservationOrderIds = [order.id];
-        let canRelease = true;
-        if (order.checkoutGroupId) {
-          const aliveSibling = await tx.order.findFirst({
-            where: {
-              checkoutGroupId: order.checkoutGroupId,
-              status: OrderStatus.pending_payment,
-              id: { not: order.id },
-            },
-            select: { id: true },
-          });
-          canRelease = !aliveSibling;
-          if (canRelease) {
-            const groupOrders = await tx.order.findMany({
-              where: { checkoutGroupId: order.checkoutGroupId },
-              select: { id: true },
-            });
-            reservationOrderIds = groupOrders.map((item) => item.id);
-          }
-        }
-        if (canRelease) {
-          await this.discountService?.releaseReservedUsageForOrders(
-            reservationOrderIds,
-            tx,
-          );
-        }
-      }
-
       // Note: Refund will be handled by PaymentModule when status is 'refunded'
 
       return await this.orderCommon.formatOrderResponse(cancelledOrder, userId);
@@ -621,6 +484,121 @@ export class OrderLifecycleService {
   }
 
   /**
+   * ÖDENMEMİŞ (pending_payment) siparişin tx içi iptali — alıcı iptali ve admin
+   * teklif iptali aynı adımları yürütür: statü cancelled + cancellationType
+   * 'iptal' (raporlama "İADE değil İPTAL" der), rezervasyon serbest bırakma,
+   * bağlı teklifin kapatılması, ledger waived, kupon rezervasyonu iadesi.
+   * Çağıran, satırı tx içinde okumuş ve yetkiyi doğrulamış olmalıdır.
+   */
+  async cancelUnpaidOrderInTx<TInclude extends Prisma.OrderInclude | undefined>(
+    tx: Prisma.TransactionClient,
+    order: {
+      id: string;
+      status: OrderStatus;
+      version: number;
+      quantity: number | null;
+      productId: string;
+      offerId: string | null;
+      checkoutGroupId: string | null;
+      reservationReleasedAt: Date | null;
+    },
+    opts: {
+      reason: string;
+      reasonCode?: OrderCancellationReason | null;
+      ledgerReason: "buyer_cancelled" | "admin_cancelled";
+      /** Teklif satırını çağıran zaten yazdıysa (admin iptali) atla. */
+      skipOfferUpdate?: boolean;
+      include?: TInclude;
+    },
+  ) {
+    // Preflight ile tx arasında ödeme tamamlandıysa (yarış) iptali burada
+    // sürdürmek PARAYI İADE ETMEDEN statü yazmak olurdu; reddet.
+    if (order.status !== OrderStatus.pending_payment) {
+      throw new BadRequestException(
+        i18nMessage("server.order.cannotCancelShipped"),
+      );
+    }
+
+    const cancelledOrder = await tx.order.update({
+      where: { id: order.id, version: order.version },
+      data: {
+        status: OrderStatus.cancelled,
+        cancellationType: "iptal",
+        cancellationReasonCode: opts.reasonCode ?? undefined,
+        cancelReason: opts.reason,
+        version: { increment: 1 },
+      },
+      include: opts.include,
+    });
+
+    // Rezervasyonu kaldır (sipariş adedi kadar serbest bırak).
+    // GUARD: reservationReleasedAt doluysa rezervasyon 5dk cron (releaseExpiredOrder
+    // Reservations) tarafından ZATEN bırakılmıştır; burada 2. kez düşmemeliyiz —
+    // yoksa reservedQuantity negatife düşer (oversell).
+    // CLAMP: GREATEST(...,0) ile atomik + 0'a sabitli (read-modify-write yarışına kapalı),
+    // invalidatePendingOrdersForProduct'taki pattern ile aynı.
+    // (pending_payment'ta quantity hiç düşmediği için stok geri-yükleme yoktur;
+    // ödenmiş iptallerin stok geri-yüklemesi processRefund'da tek yazıcıdır.)
+    if (!order.reservationReleasedAt) {
+      await tx.$executeRaw`
+        UPDATE "products"
+        SET "reserved_quantity" = GREATEST("reserved_quantity" - ${order.quantity ?? 1}, 0)
+        WHERE "id" = ${order.productId}
+      `;
+    }
+
+    if (order.offerId && !opts.skipOfferUpdate) {
+      await tx.offer.update({
+        where: { id: order.offerId },
+        data: {
+          status: OfferStatus.cancelled,
+          cancelReason: OFFER_CANCEL_REASON.orderCancelled,
+        },
+      });
+    }
+
+    // Ledger: pending_payment'da ledger henüz yaratılmamıştır (processSuccessfulPayment
+    // upsert eder); markWaived noop döner. Komisyon alınmaz çünkü iş tamamlanmadı.
+    await this.commissionLedger.markWaived(order.id, opts.ledgerReason, tx);
+
+    // Ödenmiş iptal/iade gerçek kupon kullanımını geri vermez; pending_payment
+    // iptalinde yalnız geçici CouponReservation serbest bırakılır (grupta son
+    // canlı üye kapanınca tüm grup için).
+    let reservationOrderIds = [order.id];
+    let canRelease = true;
+    if (order.checkoutGroupId) {
+      const aliveSibling = await tx.order.findFirst({
+        where: {
+          checkoutGroupId: order.checkoutGroupId,
+          status: OrderStatus.pending_payment,
+          id: { not: order.id },
+        },
+        select: { id: true },
+      });
+      canRelease = !aliveSibling;
+      if (canRelease) {
+        const groupOrders = await tx.order.findMany({
+          where: { checkoutGroupId: order.checkoutGroupId },
+          select: { id: true },
+        });
+        reservationOrderIds = groupOrders.map((item) => item.id);
+      }
+    }
+    if (canRelease) {
+      await this.discountService?.releaseReservedUsageForOrders(
+        reservationOrderIds,
+        tx,
+      );
+    }
+
+    return cancelledOrder;
+  }
+
+  async invalidateProductCaches(productId: string): Promise<void> {
+    return this.orderCommon.invalidateProductCaches(productId);
+  }
+
+  /**
    * Reactivate a cancelled order that came from an accepted offer.
    * Allowed when: order is cancelled, has offerId, offer still accepted, product still available, user is buyer.
    * Used when the order was auto-cancelled by payment timeout; buyer can reopen to complete payment.
@@ -628,7 +606,12 @@ export class OrderLifecycleService {
   async reactivate(orderId: string, userId: string) {
     const order = await this.prisma.order.findUnique({
       where: { id: orderId },
-      include: { product: true, offer: true },
+      include: {
+        product: true,
+        offer: true,
+        payment: { select: { status: true } },
+        checkoutGroup: { select: { payment: { select: { status: true } } } },
+      },
     });
     if (!order) {
       throw new NotFoundException(i18nMessage("server.order.notFound"));
@@ -646,6 +629,13 @@ export class OrderLifecycleService {
     if (!order.offerId || !order.offer) {
       throw new BadRequestException(
         i18nMessage("server.order.reactivateNotFromOffer"),
+      );
+    }
+    // Tam iade edilmiş (ödemesi tamamlanmış/iade edilmiş) sipariş ikinci kez
+    // tahsil edilemez — iptal + accepted teklif görüntüsü yanıltıcıdır.
+    if (!isReactivatablePayment(order)) {
+      throw new BadRequestException(
+        i18nMessage("server.order.reactivateAlreadyPaid"),
       );
     }
     // O8: Ödeme zaman aşımı teklifi `payment_expired`'a çeker ("tekrar

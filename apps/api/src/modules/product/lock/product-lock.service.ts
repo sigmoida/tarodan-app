@@ -187,8 +187,9 @@ export class ProductLockService {
   }
 
   /**
-   * Auto-reject every pending+accepted offer that targets `productId`.
-   * Used by the cron sweep when quantity reaches 0.
+   * Auto-CANCEL every pending+accepted offer that targets `productId`
+   * (status=cancelled, cancelReason=stockDepleted — "rejected" değil: satıcı
+   * reddetmedi, stok bitti). Used by the cron sweep when quantity reaches 0.
    */
   async invalidateRelatedOffers(
     tx: PrismaTx,

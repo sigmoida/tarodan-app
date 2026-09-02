@@ -5091,6 +5091,7 @@
         "quickLinks": "Hızlı Linkler",
         "viewSeller": "Satıcıyı Görüntüle",
         "viewOrders": "Siparişleri Görüntüle",
+        "viewOffers": "Teklifler ({count})",
         "categoryLabel": "Kategori: {name}",
         "aiFlagged": "Uygunsuz",
         "aiReview": "İnceleme",
@@ -6382,6 +6383,49 @@
         "saving": "Kaydediliyor",
         "errorOccurred": "Hata oluştu"
       },
+      "offers": {
+        "totalCount": "{count} teklif",
+        "empty": "Henüz teklif yok",
+        "emptyFiltered": "Filtreye uyan teklif yok",
+        "listPrice": "Liste fiyatı",
+        "listPriceShort": "Liste: {price}",
+        "percentOfList": "liste fiyatının %{pct}'i",
+        "awaitingBuyer": "Alıcı yanıtı bekleniyor",
+        "awaitingSeller": "Satıcı yanıtı bekleniyor",
+        "turn": "Sıra",
+        "linkedOrder": "Bağlı sipariş",
+        "noOrder": "Sipariş yok",
+        "noOrderYet": "Teklif kabul edilmediği için sipariş oluşmadı",
+        "paymentStatus": "Ödeme durumu",
+        "noPayment": "Ödeme başlatılmadı",
+        "expiresAt": "Son geçerlilik",
+        "message": "Mesaj",
+        "detailTitle": "Teklif · {product}",
+        "notFound": "Teklif bulunamadı",
+        "summaryTitle": "Teklif bilgileri",
+        "chainTitle": "Pazarlık geçmişi",
+        "chainNote": "Karşı teklifler yeni kayıt açar; önceki tur \"reddedildi\" olarak kapanır.",
+        "chainActor": {
+          "buyer": "Alıcı",
+          "seller": "Satıcı"
+        },
+        "chainCurrent": "Bu kayıt",
+        "productOffersTitle": "Bu ürüne verilen diğer teklifler ({count})",
+        "noOtherOffers": "Bu ürüne başka teklif verilmemiş",
+        "viewAllForProduct": "Ürünün tüm teklifleri",
+        "competingAccepted": "{count} kabul edilmiş teklif var — ürünü ilk ödeyen alır",
+        "competingPending": "{count} ödeme bekleyen sipariş",
+        "productSold": "Ürün satıldı:",
+        "productStock": "Stok: {quantity} · Rezerve: {reserved}",
+        "cancel": "Teklifi iptal et",
+        "cancelTitle": "Teklifi iptal et",
+        "cancelDescription": "Teklif kapatılır; alıcı ve satıcıya gerekçeyle bildirim gider.",
+        "cancelReason": "İptal gerekçesi",
+        "cancelReasonPlaceholder": "Neden iptal ediliyor? (zorunlu)",
+        "cancelWillCancelOrder": "Bağlı ödeme bekleyen sipariş de iptal edilecek.",
+        "cancelled": "Teklif iptal edildi",
+        "cancelFailed": "Teklif iptal edilemedi"
+      },
       "orders": {
         "title": "Siparişler",
         "loadError": "Siparişler yüklenemedi",
@@ -6417,6 +6461,12 @@
         "groupDone": "Bitti",
         "groupOngoing": "Devam ediyor",
         "originCancellation": "{origin} iptali",
+        "origin": "Kaynak",
+        "pageDescription": "Satın alma siparişleri ve ürünlere verilen teklifler",
+        "tabs": {
+          "orders": "Siparişler",
+          "offers": "Teklifler"
+        },
         "updateStatus": "Durum Güncelle",
         "newStatus": "Yeni Durum",
         "statusChangeReason": "Manuel İşlem Gerekçesi",
@@ -8340,11 +8390,19 @@
         "paymentExpired": "Ödeme süresi doldu",
         "buyerCancelled": "Alıcı iptal etti",
         "sellerMissedShipping": "Satıcı kargolamadı",
-        "deadlineExpired": "Süre doldu"
+        "deadlineExpired": "Süre doldu",
+        "supersededBySellerCounter": "Satıcı karşı teklif verdi",
+        "supersededByBuyerCounter": "Alıcı yeni teklif verdi",
+        "orderCancelled": "Bağlı sipariş iptal edildi",
+        "orderRefunded": "Bağlı sipariş iade edildi",
+        "listingDeleted": "İlan kaldırıldı",
+        "accountBanned": "Hesap askıya alındı",
+        "adminCancelled": "Yönetici iptal etti"
       },
       "orderOrigin": {
         "offer": "Teklif",
-        "directSale": "Doğrudan Satış"
+        "directSale": "Doğrudan Satış",
+        "platformService": "Platform Hizmeti"
       },
       "rateRange": "Oran {min} ile {max} arasında olmalı",
       "rowActions": {
@@ -8454,10 +8512,6 @@
         "title": "Alıcı siparişini onayladı",
         "message": "Alıcı siparişi onayladı. Ödemeniz, teslimden 14 gün sonra (iade süresi dolunca) hesabınıza aktarılır."
       },
-      "orderForceCompletedByAdmin": {
-        "title": "Sipariş yönetici tarafından tamamlandı",
-        "message": "Bir yönetici siparişini manuel olarak tamamladı."
-      },
       "sellerDidNotShipRefunded": {
         "title": "Sipariş iptal edildi",
         "message": "Satıcı belirlenen süre içinde kargoya vermediği için sipariş iptal edildi ve tam iade işlemi başlatıldı."
@@ -8497,6 +8551,10 @@
       "offerPaymentExpired": {
         "title": "Ödeme Süresi Doldu",
         "message": "{productTitle} için 24 saatlik ödeme süreniz doldu ve sipariş kapandı. Ürün hâlâ uygunsa siparişi yeniden açıp ödeyebilirsiniz."
+      },
+      "offerCancelledByAdmin": {
+        "title": "Teklif yönetici tarafından iptal edildi",
+        "message": "{productTitle} için teklif yönetici tarafından iptal edildi: {reason}"
       },
       "offerCancelledOutOfStock": {
         "title": "Teklifiniz iptal edildi: ürün stokta kalmadı",
@@ -8939,7 +8997,6 @@
       "confirmForbidden": "Bu siparişi onaylama yetkiniz yok",
       "confirmOnlyDelivered": "Sadece teslim edilmiş siparişler onaylanabilir",
       "couponNotSupportedForGuest": "Kupon kodu misafir alışverişte desteklenmiyor",
-      "extendOnlyWithinWindow": "Sadece 48h penceresindeki siparişlerde uzatılabilir",
       "groupAlreadyCancelled": "Bu sepetin tüm siparişleri zaten iptal edilmiş.",
       "groupCancelBlockedShipped": "Sepetteki en az bir sipariş kargoya verildi — sepet iptali kapalı. Teslimat sonrası iade talebi oluşturabilirsiniz.",
       "groupNotFound": "Sipariş grubu bulunamadı",
@@ -8967,11 +9024,9 @@
       "notFound": "Sipariş bulunamadı",
       "notOrderSeller": "Bu siparişin satıcısı değilsiniz",
       "notYourTransaction": "Bu işlem size ait değil",
-      "offerAlreadyHasOrder": "Bu teklif için zaten bir sipariş mevcut",
       "offerNotAccepted": "Sadece kabul edilmiş tekliflerden sipariş oluşturulabilir",
       "offerNotAcceptedYet": "Teklif kabul edilmemiş",
       "offerNotFound": "Teklif bulunamadı",
-      "offerOrderForbidden": "Bu tekliften sipariş oluşturma yetkiniz yok",
       "openRefundExists": "Açık bir iade talebi var; önce sonuçlanması gerek",
       "orderAccessForbidden": "Bu siparişe erişim yetkiniz yok",
       "prepareOnlyPaid": "Sadece ödenmiş siparişler hazırlanabilir",
@@ -8981,6 +9036,7 @@
       "productNotFoundById": "Ürün bulunamadı: {productId}",
       "productNotOnSale": "Bu ürün satışta değil",
       "productOutOfStock": "Bu ürün stokta bulunmamaktadır",
+      "reactivateAlreadyPaid": "Ödemesi tamamlanmış veya iade edilmiş sipariş yeniden aktive edilemez",
       "reactivateForbidden": "Bu siparişi yeniden aktive etme yetkiniz yok",
       "reactivateInsufficientStock": "Ürün için yeterli müsait adet yok",
       "reactivateNotFromOffer": "Bu sipariş tekliften oluşmadığı için yeniden aktive edilemez",
@@ -9288,12 +9344,15 @@
       "holdNotFound": "Hold bulunamadı",
       "tokenNotFound": "Token bulunamadı",
       "shipmentToDeliveredForbidden": "Kargo {status} durumundan teslim edildi durumuna geçirilemez",
+      "offer": {
+        "notCancellableStatus": "Teklif {status} durumunda; yalnız bekleyen veya ödenmemiş kabul edilmiş teklif iptal edilebilir",
+        "orderAlreadyPaid": "Bağlı sipariş ödendiği için teklif iptal edilemez; iade akışını kullanın"
+      },
       "order": {
         "shipmentMissingForDelivery": "Teslim geçişi için siparişe bağlı kargo kaydı bulunamadı",
         "shipmentStatusChanged": "Kargo durumu az önce değişti; sayfayı yenileyip tekrar deneyin",
         "deliveryRaceLost": "Sipariş teslim durumu eşzamanlı olarak değişti",
         "statusChanged": "Sipariş durumu az önce değişti; sayfayı yenileyip tekrar deneyin",
-        "couponPendingPaymentOnly": "Kupon yalnızca ödemesi beklenen siparişlerde değiştirilebilir",
         "couponNotFound": "Kupon kodu bulunamadı",
         "couponInactive": "Bu kupon aktif değil",
         "couponNotStarted": "Bu kupon henüz başlamadı",

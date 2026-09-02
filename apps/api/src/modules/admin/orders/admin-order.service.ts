@@ -1,20 +1,13 @@
-import {
-  Injectable,
-  NotFoundException,
-  BadRequestException,
-  Optional,
-} from "@nestjs/common";
+import { Injectable, Optional } from "@nestjs/common";
 import { PrismaService } from "../../../prisma";
 import { StorageService } from "../../storage/storage.service";
 import { AdminAuditService } from "../ops/admin-audit.service";
-import { PaymentService } from "../../payment/payment.service";
-import { AdminOrderQueryDto, ResolveDisputeDto } from "../dto";
+import { AdminOrderQueryDto } from "../dto";
 import { OrderStatus, Prisma, ProductKind } from "@prisma/client";
-import { paginate } from "../../../common/list";
 import { i18nMessage } from "../../i18n";
 
 /**
- * Sipariş yönetimi (liste, ihtilaflar, ihtilaf çözümü) — AdminService'in
+ * Sipariş yönetimi (liste) — AdminService'in
  * ORDER MANAGEMENT bölümünden birebir taşındı. AdminService aynı imzalarla
  * buraya delege eder.
  */
@@ -25,8 +18,6 @@ export class AdminOrderService {
     private readonly audit: AdminAuditService,
     @Optional()
     private readonly storageService: StorageService,
-    @Optional()
-    private readonly paymentService?: PaymentService,
   ) {}
 
   // AdminService'teki leaf yardımcı ile birebir aynı (bilinçli kopya; facade'da
@@ -68,8 +59,16 @@ export class AdminOrderService {
    * Get orders with filters
    */
   async getOrders(query: AdminOrderQueryDto) {
-    const { search, status, fromDate, toDate, userId, userRole, productId } =
-      query;
+    const {
+      search,
+      status,
+      origin,
+      fromDate,
+      toDate,
+      userId,
+      userRole,
+      productId,
+    } = query;
 
     const where: Prisma.OrderWhereInput = {};
     // Birden çok OR bloğu (arama + kullanıcı filtresi) birbirini ezmesin diye
@@ -109,6 +108,12 @@ export class AdminOrderService {
 
     if (status) {
       where.status = status;
+    }
+
+    // Kaynak filtresi (teklif / doğrudan satış / platform hizmeti). Aynı `where`
+    // hem grup hem grupsuz dalı beslediği için tek satır iki dalı da kapsar.
+    if (origin) {
+      where.origin = origin;
     }
 
     if (userId) {
@@ -458,133 +463,5 @@ export class AdminOrderService {
       email: guestEmail || buyer.email,
       isGuest: true,
     };
-  }
-
-  /**
-   * Get disputed orders
-   * Requirement: GET /admin/orders/disputes (project.txt)
-   */
-  async getDisputedOrders(query: AdminOrderQueryDto) {
-    const { fromDate, toDate, page = 1, limit = 20 } = query;
-
-    const where: Prisma.OrderWhereInput = {
-      status: { in: [OrderStatus.refund_requested, OrderStatus.cancelled] },
-    };
-
-    if (fromDate || toDate) {
-      where.createdAt = {};
-      if (fromDate) {
-        where.createdAt.gte = new Date(fromDate);
-      }
-      if (toDate) {
-        where.createdAt.lte = new Date(toDate);
-      }
-    }
-
-    const result = await paginate(
-      this.prisma.order,
-      {
-        where,
-        include: {
-          buyer: { select: { id: true, displayName: true, email: true } },
-          seller: { select: { id: true, displayName: true, email: true } },
-          product: { select: { id: true, title: true } },
-          payment: { select: { id: true, status: true } },
-        },
-        orderBy: { createdAt: "desc" },
-      },
-      { page, limit },
-    );
-
-    return {
-      ...result,
-      data: result.data.map((o) => ({
-        ...o,
-        buyer: this.resolveGuestBuyerForAdmin(o.buyer, o.shippingAddress),
-        amount: Number(o.totalAmount),
-        commissionAmount: Number(o.commissionAmount),
-      })),
-    };
-  }
-
-  /**
-   * Resolve order dispute
-   */
-  async resolveDispute(
-    adminId: string,
-    orderId: string,
-    dto: ResolveDisputeDto,
-  ) {
-    const order = await this.prisma.order.findUnique({
-      where: { id: orderId },
-    });
-
-    if (!order) {
-      throw new NotFoundException(i18nMessage("server.order.notFound"));
-    }
-
-    // Refund resolutions MUST go through the canonical refund orchestrator (F3.2):
-    // PayTR refund + payout void + hold release + stock restore + ledger. A bare
-    // status write would leave money/hold/stock/ledger inconsistent. Money moves
-    // FIRST — if the refund fails (e.g. payout already started) the dispute is NOT
-    // marked resolved (fail-closed).
-    let newStatus: OrderStatus = order.status;
-    switch (dto.resolution) {
-      case "buyer_refund":
-        if (!this.paymentService) {
-          throw new Error("PaymentService kullanılamıyor: iade işlenemedi");
-        }
-        await this.paymentService.processRefund(orderId, undefined, {
-          idempotencyKey: `admin-dispute:${orderId}`,
-        });
-        newStatus = OrderStatus.refunded;
-        break;
-      case "partial_refund":
-        if (dto.refundAmount == null || dto.refundAmount <= 0) {
-          throw new BadRequestException(
-            i18nMessage("server.admin.payment.partialAmountRequired"),
-          );
-        }
-        if (!this.paymentService) {
-          throw new Error("PaymentService kullanılamıyor: iade işlenemedi");
-        }
-        await this.paymentService.processRefund(orderId, dto.refundAmount, {
-          idempotencyKey: `admin-dispute:${orderId}`,
-        });
-        // Kısmi iade siparişi tamamen 'refunded' yapmaz — durum korunur; iade
-        // ödeme/ledger'a kaydedilir.
-        newStatus = order.status;
-        break;
-      case "seller_favor":
-        newStatus = OrderStatus.completed;
-        break;
-      case "dismissed":
-      default:
-        newStatus = order.status; // Keep current status
-        break;
-    }
-
-    const updated =
-      newStatus === order.status
-        ? order
-        : await this.prisma.order.update({
-            where: { id: orderId },
-            data: { status: newStatus },
-          });
-
-    await this.audit.createAuditLog(
-      adminId,
-      "dispute_resolve",
-      "Order",
-      orderId,
-      order,
-      {
-        ...updated,
-        resolution: dto.resolution,
-        note: dto.note,
-      },
-    );
-
-    return { success: true, orderId, resolution: dto.resolution, newStatus };
   }
 }

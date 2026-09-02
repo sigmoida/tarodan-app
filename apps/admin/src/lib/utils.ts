@@ -69,21 +69,63 @@ export function cancelReasonLabel(
     return t("admin.shared.cancelReason.sellerMissedShipping");
   if (reason.startsWith("Süre dolumu"))
     return t("admin.shared.cancelReason.deadlineExpired");
+  // Teklif gerekçeleri (OFFER_CANCEL_REASON / offerAdminCancelReason)
+  if (reason === "Satıcı karşı teklif verdiği için kapatıldı")
+    return t("admin.shared.cancelReason.supersededBySellerCounter");
+  if (reason === "Alıcı yeni teklif verdiği için kapatıldı")
+    return t("admin.shared.cancelReason.supersededByBuyerCounter");
+  if (reason === "Bağlı sipariş iptal edildiği için teklif kapatıldı")
+    return t("admin.shared.cancelReason.orderCancelled");
+  if (reason === "Bağlı sipariş iade edildiği için teklif kapatıldı")
+    return t("admin.shared.cancelReason.orderRefunded");
+  if (reason === "İlan satıcı tarafından kaldırıldığı için teklif kapatıldı")
+    return t("admin.shared.cancelReason.listingDeleted");
+  if (reason === "Hesap askıya alındığı için teklif kapatıldı")
+    return t("admin.shared.cancelReason.accountBanned");
+  if (reason.startsWith("Yönetici tarafından iptal edildi"))
+    return `${t("admin.shared.cancelReason.adminCancelled")}${reason.includes(":") ? reason.slice(reason.indexOf(":")) : ""}`;
   /* eslint-enable @tarodan/no-hardcoded-turkish */
   return reason;
 }
 
+export type OrderOrigin = "direct_sale" | "offer" | "platform_service";
+
+/** Sipariş kaynağı etiketleri — filtre seçenekleri ve rozet aynı haritayı kullanır. */
+export const ORDER_ORIGIN_LABEL_KEYS: Record<
+  OrderOrigin,
+  | "admin.shared.orderOrigin.directSale"
+  | "admin.shared.orderOrigin.offer"
+  | "admin.shared.orderOrigin.platformService"
+> = {
+  direct_sale: "admin.shared.orderOrigin.directSale",
+  offer: "admin.shared.orderOrigin.offer",
+  platform_service: "admin.shared.orderOrigin.platformService",
+};
+
+/** Human label for an order's origin (`Order.origin` is NOT NULL). */
+export function orderOriginLabel(origin: OrderOrigin, t: T): string {
+  return t(ORDER_ORIGIN_LABEL_KEYS[origin]);
+}
+
 /**
- * Human label for an order's origin: offer-based orders carry an offerId,
- * everything else is a direct purchase.
+ * Origins the operations/orders list can actually contain. `platform_service`
+ * (üyelik/öne çıkarma) orders are deliberately excluded by the API's
+ * `product.kind = listing` guard, so offering it as a filter would always
+ * return an empty list.
  */
-export function orderOriginLabel(
-  offerId: string | null | undefined,
+const LISTING_ORDER_ORIGINS: OrderOrigin[] = ["direct_sale", "offer"];
+
+/** Filter options for the order origin select (prepends "all"). */
+export function orderOriginFilterOptions(
   t: T,
-): string {
-  return offerId
-    ? t("admin.shared.orderOrigin.offer")
-    : t("admin.shared.orderOrigin.directSale");
+): { value: string; label: string }[] {
+  return [
+    { value: "all", label: t("common.all") },
+    ...LISTING_ORDER_ORIGINS.map((value) => ({
+      value,
+      label: orderOriginLabel(value, t),
+    })),
+  ];
 }
 
 /**

@@ -13,7 +13,9 @@ import { SuratCargoService } from "../../surat-cargo/surat-cargo.service";
 import { TaxService } from "../../tax/tax.service";
 import {
   CommissionResult,
+  CommissionRuleSetSnapshot,
   OrderPricingService,
+  ShippingTariffSnapshot,
 } from "../pricing/order-pricing.service";
 import { OrderFeeDiscountService } from "../pricing/order-fee-discount.service";
 import type { AppliedFeeDiscount } from "../../discount/engine/fee-discount.engine";
@@ -194,6 +196,114 @@ export class OrderCheckoutCommonService {
       serviceVatRate,
       totalAmount,
     };
+  }
+
+  /**
+   * Teklif siparişi için tx DIŞINDA alınan anlık görüntüler: aktif kargo tarifesi
+   * ve komisyon kural seti. Kabul işlemi satır kilitleriyle çalıştığı için bu
+   * okumalar transaction'a girmez (direct/group checkout ile aynı sıra).
+   */
+  async resolveOfferOrderSnapshots(): Promise<{
+    shippingTariff: ShippingTariffSnapshot;
+    commissionRuleSet: CommissionRuleSetSnapshot;
+  }> {
+    const [shippingTariff, commissionRuleSet] = await Promise.all([
+      this.orderPricing.resolveShippingTariffSnapshot(),
+      this.orderPricing.resolveCommissionRuleSetSnapshot(),
+    ]);
+    return { shippingTariff, commissionRuleSet };
+  }
+
+  /**
+   * Tek satıcılı, tek koli (OrderPackage). Teklif siparişi ve misafir satın alma
+   * bunu kullanır; `checkoutGroupId` null = grup yok (teklif: ödeme tekil yoldan
+   * gider, grup ödeme yoluna yönlenmemeli). Kargo referansı `packageNumber`'dır.
+   */
+  async createSingleSellerPackage(
+    tx: Prisma.TransactionClient,
+    params: {
+      sellerId: string;
+      buyerId: string;
+      checkoutGroupId: string | null;
+      billableDesi: number;
+      shippingTariff: ShippingTariffSnapshot;
+      fullShippingAmount: number;
+      buyerShippingAmount: number;
+      sellerShippingAmount: number;
+    },
+  ): Promise<{ id: string; packageNumber: string }> {
+    const { shippingTariff } = params;
+    return tx.orderPackage.create({
+      data: {
+        packageNumber: await this.generatePackageNumber(),
+        checkoutGroupId: params.checkoutGroupId,
+        sellerId: params.sellerId,
+        buyerId: params.buyerId,
+        // Kanonik olarak ALICI payı (tüm checkout yolları aynı semantiği yazar).
+        shippingCost: params.buyerShippingAmount,
+        shippingTariffId: shippingTariff.tariffId,
+        shippingTariffVersion: shippingTariff.tariffVersion,
+        billableDesi: params.billableDesi,
+        shippingPricingSnapshot: {
+          provider: shippingTariff.tariff.provider ?? "surat",
+          tariffId: shippingTariff.tariffId,
+          tariffVersion: shippingTariff.tariffVersion,
+          billableDesi: params.billableDesi,
+          fullShippingAmount: params.fullShippingAmount,
+        },
+        fullShippingAmount: params.fullShippingAmount,
+        buyerShippingAmount: params.buyerShippingAmount,
+        sellerShippingAmount: params.sellerShippingAmount,
+      },
+      select: { id: true, packageNumber: true },
+    });
+  }
+
+  /**
+   * Teklif siparişinin finans anlık görüntüsü: tek ürün, adet 1, indirim yok,
+   * birim fiyat = teklif tutarı. Direct/group checkout'un yazdığı v2 şeklinin
+   * aynısı; ödeme sonrası e-fatura/iade denetimi bu şekle bakar.
+   */
+  buildOfferFinancialSnapshot(params: {
+    productId: string;
+    amount: number;
+    shippingDesi: number;
+    shippingTariff: ShippingTariffSnapshot;
+    pricing: Awaited<
+      ReturnType<OrderCheckoutCommonService["resolveOfferOrderPricing"]>
+    >;
+  }): Prisma.InputJsonObject {
+    const { pricing, shippingTariff } = params;
+    return this.buildFinancialSnapshot({
+      pricingHash: this.orderPricing.computePricingHash([
+        {
+          productId: params.productId,
+          unitPrice: params.amount,
+          quantity: 1,
+          shippingDesi: params.shippingDesi,
+        },
+      ]),
+      productId: params.productId,
+      quantity: 1,
+      unitPrice: params.amount,
+      originalUnitPrice: params.amount,
+      subtotal: params.amount,
+      discountAmount: 0,
+      platformFundedDiscount: 0,
+      shipping: {
+        tariffId: shippingTariff.tariffId,
+        tariffVersion: shippingTariff.tariffVersion,
+        fullAmount: pricing.fullShippingAmount,
+        buyerAmount: pricing.buyerShippingAmount,
+        sellerAmount: pricing.sellerShippingAmount,
+      },
+      commission: pricing.commission,
+      taxAmount: pricing.taxAmount,
+      withholdingTaxAmount: pricing.withholdingTaxAmount,
+      buyerServiceTaxAmount: pricing.buyerServiceTaxAmount,
+      sellerServiceTaxAmount: pricing.sellerServiceTaxAmount,
+      totalAmount: pricing.totalAmount,
+    });
   }
 
   buildSuratIdempotencyKey(parts: string[]): string {

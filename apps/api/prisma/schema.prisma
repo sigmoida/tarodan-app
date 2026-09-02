@@ -1389,6 +1389,9 @@ model Offer {
 
   @@index([productId])
   @@index([status])
+  @@index([buyerId, status])
+  @@index([sellerId, status])
+  @@index([status, createdAt])
   @@map("offers")
 }
 
@@ -1471,6 +1474,10 @@ model Order {
   sellerId                   String                   @map("seller_id")
   productId                  String                   @map("product_id")
   offerId                    String?                  @unique @map("offer_id")
+  // Sipariş kaynağı: `offerId` tek ayırt edici olmasın (rapor/filtre; ilişki
+  // sonradan kopsa da kaynak kalıcı). offer = kabul edilen tekliften (misafir
+  // teklif dahil), platform_service = üyelik/öne çıkarma sanal ürün siparişi.
+  origin                     OrderOrigin              @default(direct_sale)
   checkoutGroupId            String?                  @map("checkout_group_id")
   // Satıcı-paketi (çatı): aynı sepet+satıcı order'ları burada birleşir. Nullable —
   // Faz 1'de grup/direct checkout doldurur; eski/diğer yollar null kalabilir.
@@ -1595,6 +1602,7 @@ model Order {
   @@index([status, revenueInvoicedAt, deliveredAt])
   @@index([checkoutGroupId])
   @@index([packageId])
+  @@index([origin])
   @@map("orders")
 }
 
@@ -3220,6 +3228,14 @@ enum OrderStatus {
   cancelled
   refund_requested
   refunded
+}
+
+/// Siparişin nereden doğduğu. Teklif siparişi normal satıştan yalnız başlangıçta
+/// ayrılır (tek ürün, pazarlık fiyatı, grup yok); sonrası aynı hattır.
+enum OrderOrigin {
+  direct_sale
+  offer
+  platform_service
 }
 
 /// İPTAL (kargo öncesi) vs İADE (kargo sonrası) ayrımı. status alanı para akışı

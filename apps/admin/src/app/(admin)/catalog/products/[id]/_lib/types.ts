@@ -57,6 +57,8 @@ export interface ProductDetail {
    * seçimlerini (Nadirlik gibi) `edit.attributes` üzerinden gösterir.
    */
   edit?: Pick<ListingEditPayload, "attributes"> | null;
+  /** Ürüne verilen toplam teklif sayısı (tüm durumlar) — hızlı link rozeti. */
+  _count?: { offers: number };
 }
 
 export interface Review {

@@ -29,7 +29,6 @@ export enum NotificationType {
   ORDER_DELIVERED_CONFIRM = "order_delivered_confirm",
   ORDER_AUTO_COMPLETED = "order_auto_completed",
   ORDER_MANUALLY_CONFIRMED = "order_manually_confirmed",
-  ORDER_FORCE_COMPLETED_BY_ADMIN = "order_force_completed_by_admin",
   SELLER_DID_NOT_SHIP_REFUNDED = "seller_did_not_ship_refunded",
 
   // Offer notifications
@@ -45,6 +44,7 @@ export enum NotificationType {
   OFFER_CANCELLED_OUT_OF_STOCK = "offer_cancelled_out_of_stock",
   /** İlan satıcı tarafından silindiği için teklif kapandı (stok bitişi DEĞİL). */
   OFFER_CANCELLED_LISTING_REMOVED = "offer_cancelled_listing_removed",
+  OFFER_CANCELLED_BY_ADMIN = "offer_cancelled_by_admin",
 
   // Product notifications
   PRODUCT_APPROVED = "product_approved",

@@ -26,7 +26,14 @@ describe("OfferService — user blocks", () => {
       {} as any,
       {} as any,
       undefined as any,
-      {} as any,
+      {
+        // accept() tarife/kural seti snapshot'ını tx'ten ÖNCE alır; blok
+        // kontrolü tx içinde gelir.
+        resolveOfferOrderSnapshots: jest.fn().mockResolvedValue({
+          shippingTariff: { tariffId: "t", tariffVersion: 1, tariff: {} },
+          commissionRuleSet: { id: "rs" },
+        }),
+      } as any,
       userBlocks as any,
     );
     return { service, tx, userBlocks };

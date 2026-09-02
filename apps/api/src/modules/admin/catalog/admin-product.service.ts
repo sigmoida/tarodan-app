@@ -375,6 +375,8 @@ export class AdminProductService {
           include: { attribute: { include: { group: true } } },
         },
         images: { orderBy: { sortOrder: "asc" } },
+        // Ürün detayındaki "Teklifler (n)" hızlı linki için.
+        _count: { select: { offers: true } },
       },
     });
     if (!product) {
