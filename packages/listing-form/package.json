@@ -24,6 +24,7 @@
     "@heroicons/react": "^2.1.1",
     "@tarodan/i18n": "workspace:*",
     "@tarodan/shared": "workspace:*",
+    "@tarodan/types": "workspace:*",
     "@tarodan/ui": "workspace:*"
   },
   "peerDependencies": {

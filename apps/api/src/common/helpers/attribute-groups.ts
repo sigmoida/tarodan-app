@@ -1,16 +1,47 @@
 import { transliterateTurkish } from "./turkish-text";
+import {
+  SCALE_GROUP_SLUG,
+  MATERIAL_GROUP_SLUG,
+  COLOR_GROUP_SLUG,
+  DEDICATED_ATTRIBUTE_GROUP_SLUGS,
+  HIDDEN_ATTRIBUTE_GROUP_SLUGS,
+} from "@tarodan/types";
 
 /**
  * Global (üreticiden bağımsız) attribute gruplarının slug'ları ve renk
  * kataloğu.
  *
  * Ölçek/malzeme/renk üç yerde birden geçiyor (filtre üretimi, where kurulumu,
- * ürün yazma yolu). Slug'lar serbest string olarak dolaşınca bir taraf
- * değişince diğerleri sessizce eşleşmiyordu; tek kaynak burasıdır.
+ * ürün yazma yolu) ve iki istemci paketinde daha. Slug'lar serbest string
+ * olarak dolaşınca bir taraf değişince diğerleri sessizce eşleşmiyordu; tek
+ * kaynak `@tarodan/types` (attribute-group.ts), burası yalnız yeniden dışa
+ * aktarır ki mevcut import yolları değişmesin.
  */
-export const SCALE_GROUP_SLUG = "scale";
-export const MATERIAL_GROUP_SLUG = "material";
-export const COLOR_GROUP_SLUG = "color";
+export {
+  SCALE_GROUP_SLUG,
+  MATERIAL_GROUP_SLUG,
+  COLOR_GROUP_SLUG,
+  DEDICATED_ATTRIBUTE_GROUP_SLUGS,
+  HIDDEN_ATTRIBUTE_GROUP_SLUGS,
+  isDedicatedAttributeGroup,
+  isHiddenAttributeGroup,
+  isGlobalCustomAttributeGroup,
+  attributeGroupSelectionMode,
+} from "@tarodan/types";
+export type {
+  AttributeGroupRef,
+  AttributeGroupSelectionMode,
+} from "@tarodan/types";
+
+/**
+ * Ürün yazma yolunda KENDİ alanı olan ya da istemciye hiç verilmeyen gruplar:
+ * `attributes[]` (serbest slug listesi) bunlara yazamaz, güncelleme
+ * sıfırlaması bunlara dokunmaz, zorunluluk denetimi bunları saymaz.
+ */
+export const NON_CUSTOM_GROUP_SLUGS: readonly string[] = [
+  ...DEDICATED_ATTRIBUTE_GROUP_SLUGS,
+  ...HIDDEN_ATTRIBUTE_GROUP_SLUGS,
+];
 
 /**
  * İlan formunun ZORUNLU tuttuğu gruplar.
@@ -21,8 +52,9 @@ export const COLOR_GROUP_SLUG = "color";
  * pasife alınamaz (bkz. isProtectedAttributeGroup).
  *
  * Bu liste FORMUN gerçeğidir, veritabanı bayrağının değil: `isRequired`
- * kolonu canlıda yalnız renk için true, ölçek ve malzeme false. Yalnız bayrağa
- * dayanmak, asıl korunması gerekenleri korumasız bırakırdı.
+ * kolonu bu üçlü için DTO ve renk yolu tarafından zaten uygulanıyor. Bayrak
+ * genel ÖZEL gruplar için ayrıca okunur — `resolveProductAttributes`
+ * `enforceRequiredGroups` ile eksik zorunlu grubu 400 döner.
  */
 export const FORM_REQUIRED_GROUP_SLUGS: readonly string[] = [
   SCALE_GROUP_SLUG,

@@ -7,8 +7,7 @@ import { formatCondition } from "@/lib/format";
 import {
   COLOR_GROUP_SLUG,
   COLOR_LABEL_SEPARATOR,
-  MATERIAL_GROUP_SLUG,
-  SCALE_GROUP_SLUG,
+  DEDICATED_ATTRIBUTE_GROUP_SLUGS,
   // Alt-yol BİLEREK: bu bir sunucu bileşeni, paketin barrel'ı ise istemci
   // kartlarını (ve onların üzerinden `useState` taşıyan primitifleri) sunucu
   // zincirine sürüklüyor.
@@ -26,11 +25,7 @@ type Translator = (key: any) => string;
  * metin gerektirirdi hem de /en yerelinde yanlış olurdu. API her nitelikte
  * `groupSlug` döndürüyor (`product-common.service`).
  */
-const DERIVED_GROUP_SLUGS: string[] = [
-  SCALE_GROUP_SLUG,
-  MATERIAL_GROUP_SLUG,
-  COLOR_GROUP_SLUG,
-];
+const DERIVED_GROUP_SLUGS: readonly string[] = DEDICATED_ATTRIBUTE_GROUP_SLUGS;
 
 type ListingAttribute = NonNullable<Listing["attributes"]>[number];
 
