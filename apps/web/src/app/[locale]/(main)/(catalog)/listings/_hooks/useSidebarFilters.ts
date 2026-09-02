@@ -1,13 +1,17 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { keepPreviousData, useQuery } from "@tanstack/react-query";
+import { keepAttributeGroups } from "@tarodan/listing-form";
 import { queryKeys } from "@/lib/query/keys";
 import { useLocale, useTranslations } from "next-intl";
 import { categoriesApi, manufacturersApi, listingsApi } from "@/lib/api";
 import { matchesSearch } from "@tarodan/ui";
 import type { Filters } from "../_lib/params";
-import { useListingFiltersQuery } from "./useListingFiltersQuery";
+import {
+  useListingFiltersQuery,
+  type CustomAttributeGroup,
+} from "./useListingFiltersQuery";
 
 interface Category {
   id: string;
@@ -20,13 +24,6 @@ interface ManufacturerItem {
   name: string;
   slug: string;
   _count?: { products: number };
-}
-
-interface CustomAttributeGroup {
-  slug: string;
-  name: string;
-  manufacturerSlug: string | null;
-  attributes: Array<{ slug: string; label: string; color?: string | null }>;
 }
 
 const STALE = 60 * 60 * 1000;
@@ -106,8 +103,9 @@ export function useSidebarFilters({
     [filtersQuery.data],
   );
 
-  // The selected manufacturer's slug (DB-authoritative) drives its scoped
-  // attribute groups. No manufacturer selected → no groups.
+  // The selected manufacturer's slug (DB-authoritative) adds its scoped
+  // attribute groups on top of the global custom groups (which the base
+  // filters request already carries, manufacturer or not).
   const manufacturerSlug = useMemo(() => {
     if (filters.manufacturerId)
       return manufacturerList.find((m) => m.id === filters.manufacturerId)
@@ -119,8 +117,8 @@ export function useSidebarFilters({
     return undefined;
   }, [filters.manufacturerId, filters.manufacturer, manufacturerList]);
 
-  const customAttrGroupsQuery = useQuery({
-    queryKey: queryKeys.manufacturers.customAttrs(manufacturerSlug ?? ""),
+  const scopedAttrGroupsQuery = useQuery({
+    queryKey: queryKeys.listings.scopedAttrGroups(manufacturerSlug ?? ""),
     queryFn: async (): Promise<CustomAttributeGroup[]> => {
       const res = await listingsApi.getFilters({
         manufacturer: manufacturerSlug,
@@ -131,11 +129,24 @@ export function useSidebarFilters({
       );
     },
     enabled: !!manufacturerSlug,
+    placeholderData: keepPreviousData,
     staleTime: STALE,
   });
+  // Üreticisiz durumda ek istek yok: genel gruplar temel filtre yanıtında.
+  // `keepPreviousData` üretici A→B geçişinde A'nın yanıtını gösterir; A'ya
+  // bağlı gruplar B'nin başlığı altında çıkmasın diye kapsamlı gruplar seçili
+  // üreticiye göre süzülür, genel gruplar her zaman kalır.
+  const globalAttrGroups = filtersQuery.data?.customAttributes;
   const customAttrGroups = useMemo(
-    () => (manufacturerSlug ? (customAttrGroupsQuery.data ?? []) : []),
-    [manufacturerSlug, customAttrGroupsQuery.data],
+    () =>
+      manufacturerSlug
+        ? (scopedAttrGroupsQuery.data ?? globalAttrGroups ?? []).filter(
+            (g) =>
+              g.manufacturerSlug == null ||
+              g.manufacturerSlug === manufacturerSlug,
+          )
+        : (globalAttrGroups ?? []),
+    [manufacturerSlug, scopedAttrGroupsQuery.data, globalAttrGroups],
   );
 
   // Open custom-attribute groups by default once they load.
@@ -229,19 +240,27 @@ export function useSidebarFilters({
     manufacturerId: string,
     manufacturerName: string,
   ) => {
+    // Üretici değişince onun gruplarındaki seçimler düşer; genel özel grup
+    // seçimleri (Nadirlik gibi) üreticiden bağımsızdır ve kalır.
+    const customAttributes = keepAttributeGroups(
+      filters.customAttributes,
+      customAttrGroups
+        .filter((g) => g.manufacturerSlug == null)
+        .map((g) => g.slug),
+    );
     if (filters.manufacturerId === manufacturerId) {
       onFilterChange({
         ...filters,
         manufacturerId: "",
         manufacturer: "",
-        customAttributes: {},
+        customAttributes,
       });
     } else {
       onFilterChange({
         ...filters,
         manufacturerId,
         manufacturer: manufacturerName,
-        customAttributes: {},
+        customAttributes,
       });
     }
   };

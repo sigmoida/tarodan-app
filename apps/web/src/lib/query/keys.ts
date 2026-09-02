@@ -28,8 +28,14 @@ export const queryKeys = {
       categoryId: string | undefined,
       page: number,
     ) => ["listings", filters, categoryId ?? "", page] as const,
-    /** The listings filter facets (scales, brands, materials, …). */
+    /** The listings filter facets (scales, brands, materials, global custom groups, …). */
     filters: () => ["listings", "filters"] as const,
+    /**
+     * Custom attribute groups for one manufacturer: its scoped groups (e.g.
+     * Hot Wheels) plus the global ones the base facets already carry.
+     */
+    scopedAttrGroups: (manufacturerSlug: string) =>
+      ["listings", "attr-groups", manufacturerSlug] as const,
     /** The listings family root — one invalidate refreshes every grid page. */
     all: () => ["listings"] as const,
   },
@@ -73,9 +79,6 @@ export const queryKeys = {
     products: (slug: string) => ["manufacturers", "products", slug] as const,
     /** The 4-item listings teaser inside an accordion card (keyed by id). */
     preview: (id: string) => ["manufacturers", "preview", id] as const,
-    /** Manufacturer-scoped custom attribute filter groups (e.g. Hot Wheels). */
-    customAttrs: (slug: string) =>
-      ["manufacturers", "custom-attrs", slug] as const,
   },
   category: {
     bySlug: (slug: string) => ["categoryBySlug", slug] as const,
