@@ -841,7 +841,10 @@
     "originalPriceTry": "Orijinal Fiyat (₺)",
     "imageFormatsHint": "JPEG, PNG, WebP, GIF · en fazla {maxMb} MB",
     "noOptionsDefined": "Bu alan için seçenek tanımlanmamış",
-    "optionsLoadFailed": "Seçenekler yüklenemedi — sayfayı yenileyin"
+    "optionsLoadFailed": "Seçenekler yüklenemedi — sayfayı yenileyin",
+    "additionalDetails": "Ek Özellikler",
+    "globalAttrsHint": "Tüm ilanlar için geçerli ek alanlar. Alıcılar bunlara göre filtreleyebilir.",
+    "requiredFieldLabel": "{name} *"
   },
   "cart": {
     "myCart": "Sepetim",
@@ -9128,7 +9131,9 @@
       "imageKeyInvalid": "Görsel anahtarı geçersiz",
       "imageKeyWrongPath": "Görsel anahtarı ürün görseli yolunda değil",
       "createFailed": "İlan oluşturulamadı: {reason}",
-      "invalidColors": "Geçersiz renk seçimi: {colors}"
+      "invalidColors": "Geçersiz renk seçimi: {colors}",
+      "requiredAttributeGroups": "Zorunlu özellik seçimi eksik: {groups}",
+      "attributeGroupSingleSelect": "Bu özellik grubunda yalnız bir seçenek seçilebilir: {groups}"
     },
     "refund": {
       "alreadyActive": "Bu sipariş için zaten aktif bir iade talebi var",

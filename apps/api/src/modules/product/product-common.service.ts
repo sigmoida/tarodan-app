@@ -27,7 +27,14 @@ import {
   SCALE_GROUP_SLUG,
   MATERIAL_GROUP_SLUG,
   COLOR_GROUP_SLUG,
+  NON_CUSTOM_GROUP_SLUGS,
 } from "../../common/helpers/attribute-groups";
+import {
+  findMissingRequiredGroups,
+  findMultiSelectedGlobalCustomGroups,
+  loadRequiredGlobalCustomGroups,
+  type ResolvedAttributeRow,
+} from "./helpers/attribute-selection-rules";
 
 /** Bir ilanın seçtiği tüm katalog değerleri (ölçek/malzeme/renk/serbest slug). */
 export interface ProductAttributeSelection {
@@ -35,8 +42,25 @@ export interface ProductAttributeSelection {
   material?: string;
   /** Global "color" grubundaki attribute slug'ları. */
   colors?: string[];
+  /** Ham Attribute id'leri — grup denetiminden geçmez, zorunluluğu karşılamaz. */
   attributeIds?: string[];
+  /**
+   * Özel grupların attribute slug'ları (genel özel + üreticiye bağlı).
+   * Ölçek/malzeme/renk buradan bağlanamaz; onların kendi alanları var.
+   */
   attributeSlugs?: string[];
+}
+
+export interface ResolveAttributeOptions {
+  /** Bilinmeyen ölçek/malzeme/slug'da sessizce düşürmek yerine hata fırlat (toplu içe aktarma). */
+  rejectUnknown?: boolean;
+  /**
+   * Zorunlu genel özel grupların (`isRequired`, üreticisiz, sabit üçlü ve
+   * gizli dışı) seçimde temsil edilmesini şart koş. Create'te her zaman,
+   * güncellemede yalnız `attributes` gönderildiğinde açılır: `attributes`
+   * gelmeyen bir PATCH özel bağlara dokunmaz, son durum değişmez.
+   */
+  enforceRequiredGroups?: boolean;
 }
 
 export interface ResolvedProductAttributes {
@@ -571,7 +595,7 @@ export class ProductCommonService {
    */
   async resolveProductAttributes(
     selection: ProductAttributeSelection,
-    options: { rejectUnknown?: boolean } = {},
+    options: ResolveAttributeOptions = {},
   ): Promise<ResolvedProductAttributes> {
     const {
       scale,
@@ -663,8 +687,13 @@ export class ProductCommonService {
 
     if (attributeIds?.length) toLink.push(...attributeIds);
 
+    // Özel gruplar: yalnız `attributes[]`'in sahibi olduğu gruplarda aranır.
+    // Sabit üçlü ve gizli gruplar dışlanır ki bir renk slug'ı buradan sızıp
+    // MAX_PRODUCT_COLORS ve denormalize kolonu atlayamasın; güncelleme
+    // sıfırlaması da aynı küme üzerinde çalışır (bkz. product-update).
     const requestedSlugs =
       attributeSlugs?.map((slug) => slug.trim()).filter(Boolean) ?? [];
+    let customRows: ResolvedAttributeRow[] = [];
     if (requestedSlugs.length) {
       const resolved = await this.prisma.attribute.findMany({
         where: {
@@ -672,19 +701,61 @@ export class ProductCommonService {
             slug: { equals: slug, mode: "insensitive" as const },
           })),
           isActive: true,
-          group: { isActive: true },
+          group: {
+            isActive: true,
+            slug: { notIn: [...NON_CUSTOM_GROUP_SLUGS] },
+          },
         },
-        select: { id: true, slug: true },
+        select: {
+          id: true,
+          slug: true,
+          group: {
+            select: {
+              id: true,
+              slug: true,
+              name: true,
+              manufacturerSlug: true,
+            },
+          },
+        },
       });
+      // Slug'lar ASCII; `toLocaleLowerCase("tr-TR")` "I"→"ı" çevirip Prisma'nın
+      // duyarsız eşlediği bir slug'ı "bilinmiyor" diye raporluyordu.
       const resolvedSlugs = new Set(
-        resolved.map((item) => item.slug.toLocaleLowerCase("tr-TR")),
+        resolved.map((item) => item.slug.toLowerCase()),
       );
       unknown.push(
         ...requestedSlugs
-          .filter((slug) => !resolvedSlugs.has(slug.toLocaleLowerCase("tr-TR")))
+          .filter((slug) => !resolvedSlugs.has(slug.toLowerCase()))
           .map((slug) => `özellik '${slug}'`),
       );
+      customRows = resolved;
       toLink.push(...resolved.map((item) => item.id));
+
+      const multiSelected = findMultiSelectedGlobalCustomGroups(customRows);
+      if (multiSelected.length) {
+        throw new BadRequestException(
+          i18nMessage("server.product.attributeGroupSingleSelect", {
+            groups: multiSelected.join(", "),
+          }),
+        );
+      }
+    }
+
+    // İstek hiç slug taşımasa da çalışır: zorunlu grup varken boş seçim de
+    // eksiktir (grup ölçütleri: loadRequiredGlobalCustomGroups).
+    if (options.enforceRequiredGroups) {
+      const missing = findMissingRequiredGroups(
+        await loadRequiredGlobalCustomGroups(this.prisma),
+        customRows,
+      );
+      if (missing.length) {
+        throw new BadRequestException(
+          i18nMessage("server.product.requiredAttributeGroups", {
+            groups: missing.join(", "),
+          }),
+        );
+      }
     }
 
     if (unknown.length && options.rejectUnknown) {

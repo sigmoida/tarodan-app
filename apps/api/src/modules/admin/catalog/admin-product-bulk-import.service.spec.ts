@@ -331,7 +331,7 @@ describe("AdminProductBulkImportService", () => {
         colors: ["purple"],
         attributeSlugs: [],
       },
-      { rejectUnknown: true },
+      { rejectUnknown: true, enforceRequiredGroups: true },
     );
     expect(ranking.recomputeProductRanking).toHaveBeenCalledTimes(1);
     expect(moderationQueue.add).toHaveBeenCalledWith(
