@@ -1,6 +1,9 @@
-import type { Event } from "@sentry/node";
+import type { Breadcrumb, Event } from "@sentry/node";
 import { getRequestId } from "../../common/context/request-context";
-import { redactSensitive } from "../../common/security/redact-sensitive";
+import {
+  redactSensitive,
+  redactUrlQuery,
+} from "../../common/security/redact-sensitive";
 
 /**
  * Sentry'ye giden her olayın geçtiği tek kapı (Sentry.init → beforeSend).
@@ -19,6 +22,98 @@ export function applySentryEventPolicy<T extends Event>(event: T): T | null {
   }
 
   return redactSensitive(event) as T;
+}
+
+/**
+ * Sentry breadcrumb'larının geçtiği tek kapı (Sentry.init → beforeBreadcrumb);
+ * API ve worker süreçleri AYNI fonksiyonu kullanmalı.
+ *
+ * Neden ayrı bir kapı: Sentry'nin varsayılan fetch/undici entegrasyonu her dış
+ * çağrıyı `http` breadcrumb'ı olarak URL'iyle birlikte kaydeder. Sürat takip
+ * sözleşmesi kimliği (`CariKodu`/`Sifre`) query parametresinde taşıdığı için
+ * canlıda şifre Sentry olaylarında düz metin göründü. `redactSensitive` anahtar
+ * adına bakar, URL'yi ayrıştırmaz; o yüzden `url` ve `http.query` alanları ayrıca
+ * `redactUrlQuery`'den geçirilir.
+ */
+export function applySentryBreadcrumbPolicy<T extends Breadcrumb>(
+  breadcrumb: T,
+): T | null {
+  const url = breadcrumb.data?.url;
+  // Sağlık kontrolleri dakikada bir koşar; breadcrumb listesini boğar.
+  if (
+    breadcrumb.category === "http" &&
+    typeof url === "string" &&
+    url.includes("/health")
+  ) {
+    return null;
+  }
+
+  const redacted = redactSensitive(breadcrumb) as T;
+  if (redacted.data && typeof redacted.data === "object") {
+    const data: Record<string, unknown> = { ...redacted.data };
+    for (const field of ["url", "http.query"]) {
+      const value = data[field];
+      if (typeof value === "string") data[field] = redactUrlQuery(value);
+    }
+    redacted.data = data;
+  }
+  if (typeof redacted.message === "string") {
+    redacted.message = redactUrlQuery(redacted.message);
+  }
+  return redacted;
+}
+
+/** Bir span/trace veri sözlüğündeki her metin değerinde URL query'sini maskeler. */
+function redactSpanData(
+  data: Record<string, unknown> | undefined,
+): Record<string, unknown> | undefined {
+  if (!data) return data;
+  return Object.fromEntries(
+    Object.entries(data).map(([key, value]) => [
+      key,
+      typeof value === "string" ? redactUrlQuery(value) : value,
+    ]),
+  );
+}
+
+/**
+ * Performans izlerinin (transaction) geçtiği tek kapı (Sentry.init →
+ * beforeSendTransaction); API ve worker AYNI fonksiyonu kullanmalı.
+ *
+ * Breadcrumb kapısı yetmiyor: aynı fetch entegrasyonu her dış çağrı için bir
+ * `http.client` span'ı da üretir ve tam URL'yi span verisine (`url.full`,
+ * `http.url`, `http.target`) ve açıklamasına yazar. `tracesSampleRate` sıfır
+ * olmadığı sürece bu izler Sentry'ye gider — yani Sürat şifresi breadcrumb'dan
+ * silinse bile span üzerinden sızmaya devam ederdi. Anahtar adına güvenmek
+ * yerine span'daki HER metin değeri query redaksiyonundan geçirilir.
+ */
+export function applySentryTransactionPolicy<T extends Event>(
+  event: T,
+): T | null {
+  const base = applySentryEventPolicy(event);
+  if (!base) return null;
+
+  if (typeof base.transaction === "string") {
+    base.transaction = redactUrlQuery(base.transaction);
+  }
+  if (base.spans) {
+    base.spans = base.spans.map((span) => ({
+      ...span,
+      description:
+        typeof span.description === "string"
+          ? redactUrlQuery(span.description)
+          : span.description,
+      data: redactSpanData(span.data),
+    }));
+  }
+  const trace = base.contexts?.trace;
+  if (trace) {
+    base.contexts = {
+      ...base.contexts,
+      trace: { ...trace, data: redactSpanData(trace.data) },
+    };
+  }
+  return base;
 }
 
 /**

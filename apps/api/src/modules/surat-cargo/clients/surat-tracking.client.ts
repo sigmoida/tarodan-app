@@ -4,6 +4,7 @@ import type {
   SuratTakipResponse,
   SuratTrackingLookupResult,
 } from "../helpers/surat-cargo.types";
+import { redactUrlQuery } from "../../../common/security/redact-sensitive";
 
 const SURAT_API_LIVE =
   "https://api01.suratkargo.com.tr/api/KargoTakipHareketDetayi";
@@ -31,9 +32,13 @@ export function buildAuthedSuratUrl(
   return `${baseUrl}?CariKodu=${encodeURIComponent(cariKodu)}&Sifre=${encodeURIComponent(sifre)}&WebSiparisKodu=${encodeURIComponent(webSiparisKodu)}`;
 }
 
-/** Kimlik içeren Sürat URL'ini log-güvenli hale getir (Sifre maskelenir). */
+/**
+ * Kimlik içeren Sürat URL'ini log-güvenli hale getir (Sifre ve CariKodu
+ * maskelenir). Genel query redaksiyonuna delege eder ki Sentry breadcrumb
+ * kapısı ile log mesajları aynı kuralı paylaşsın.
+ */
 export function redactSuratUrl(url: string): string {
-  return url.replace(/([?&]Sifre=)[^&]*/gi, "$1***");
+  return redactUrlQuery(url);
 }
 
 /**
