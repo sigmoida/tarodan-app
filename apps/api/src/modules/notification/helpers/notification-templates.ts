@@ -361,6 +361,16 @@ export const NOTIFICATION_TEMPLATES: Partial<
     messageKey: "server.notification.orderStuckInTransit.message",
     icon: "⚠️",
   },
+  [NotificationType.ELOGO_INVOICE_EXHAUSTED]: {
+    titleKey: "server.notification.elogoInvoiceExhausted.title",
+    messageKey: "server.notification.elogoInvoiceExhausted.message",
+    icon: "🧾",
+  },
+  [NotificationType.SELLER_INVOICE_MISSING]: {
+    titleKey: "server.notification.sellerInvoiceMissing.title",
+    messageKey: "server.notification.sellerInvoiceMissing.message",
+    icon: "🧾",
+  },
   [NotificationType.TRADE_OUTBOUND_DELIVERY_MISSING]: {
     titleKey: "server.notification.tradeOutboundDeliveryMissing.title",
     messageKey: "server.notification.tradeOutboundDeliveryMissing.message",

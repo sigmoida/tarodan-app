@@ -4,18 +4,28 @@ import { Prisma, type ElogoInvoice } from "@prisma/client";
 import { PrismaService } from "../../prisma";
 import {
   ELOGO_MAX_SEND_ATTEMPTS,
+  isConfigurationElogoFailure,
   isTransientElogoFailure,
 } from "./helpers/elogo-retry-policy";
+import { retryOnWriteConflict } from "./helpers/elogo-write-conflict";
 import { LINE_DESCRIPTION } from "./invoice/invoice-line-description";
 import { invoiceIssueYear } from "./invoice/invoice-datetime";
 import { renderManagedEmailTemplate } from "../../common/helpers/email-template-renderer";
-import { frontendUrl as resolveFrontendUrl } from "../../config/app-urls";
+import {
+  adminUrl,
+  frontendUrl as resolveFrontendUrl,
+} from "../../config/app-urls";
+import { NotificationService } from "../notification/notification.service";
+import { NotificationType } from "../notification/dto";
 import { buildInvoiceXml } from "./ubl/ubl-invoice.builder";
 import {
   invoiceTotalsFromLines,
   readInvoiceLineItems,
 } from "./invoice/invoice-lines";
-import type { ElogoDocumentType } from "./helpers/elogo.types";
+import type {
+  ElogoDocumentType,
+  ElogoUserCheckResult,
+} from "./helpers/elogo.types";
 import type { CutOptions, RevenueType } from "./elogo-invoicing.service";
 import { ElogoService } from "./elogo.service";
 import { ElogoDocumentService } from "./elogo-document.service";
@@ -48,6 +58,7 @@ export class ElogoDeliveryService {
     private readonly documents: ElogoDocumentService,
     @Optional() private readonly storage?: StorageService,
     @Optional() private readonly smtp?: SmtpProvider,
+    @Optional() private readonly notifications?: NotificationService,
   ) {}
 
   // ───────────────────────── core ─────────────────────────
@@ -100,49 +111,60 @@ export class ElogoDeliveryService {
 
       // Sequence artışı ve unique(type,sourceId) aynı SERIALIZABLE transaction'da:
       // yarışın kaybedeni numara tüketmez; kazanan kayıt tek ETTN ile gönderilir.
-      const record = await this.prisma.$transaction(
-        async (tx) => {
-          const raced = await tx.elogoInvoice.findUnique({
-            where: { type_sourceId: { type, sourceId } },
-          });
-          if (raced) return raced;
-          const invoiceNumber =
-            await this.documents.allocateInvoiceNumberInTransaction(
-              tx,
-              invoiceIssueYear(now),
-            );
-          return tx.elogoInvoice.create({
-            data: {
-              type,
-              sourceId,
-              recipientUserId,
-              recipientVknTckn: recipient.vknTckn,
-              recipientName: recipient.name,
-              // Kesim anındaki iletişim bilgisi: misafir siparişlerinde gönderim
-              // anında kullanıcı kaydına dönmek sistem e-postasına/boş adrese düşer.
-              recipientEmail: recipient.email ?? null,
-              recipientCity: recipient.address?.city ?? null,
-              recipientDistrict: recipient.address?.district ?? null,
-              recipientStreet: recipient.address?.street ?? null,
-              documentType: recipient.documentType,
-              sendType: "ELEKTRONIK",
-              invoiceNumber,
-              ettn: randomUUID(),
-              netAmount: amounts.net,
-              taxAmount: amounts.tax,
-              total: amounts.total,
-              originalTotal: amounts.total,
-              vatRate,
-              status: "pending",
-              lineDescription: lineDescription?.trim() || null,
-              lineItems: hasLines
-                ? (lineItems as unknown as Prisma.InputJsonValue)
-                : Prisma.DbNull,
-              createdAt: now,
+      // Aynı sayaç satırında çakışan iki belge (P2034) kısa beklemeyle yeniden
+      // denenir — bkz. elogo-write-conflict.ts.
+      const record = await retryOnWriteConflict(
+        () =>
+          this.prisma.$transaction(
+            async (tx) => {
+              const raced = await tx.elogoInvoice.findUnique({
+                where: { type_sourceId: { type, sourceId } },
+              });
+              if (raced) return raced;
+              const invoiceNumber =
+                await this.documents.allocateInvoiceNumberInTransaction(
+                  tx,
+                  invoiceIssueYear(now),
+                );
+              return tx.elogoInvoice.create({
+                data: {
+                  type,
+                  sourceId,
+                  recipientUserId,
+                  recipientVknTckn: recipient.vknTckn,
+                  recipientName: recipient.name,
+                  // Kesim anındaki iletişim bilgisi: misafir siparişlerinde gönderim
+                  // anında kullanıcı kaydına dönmek sistem e-postasına/boş adrese düşer.
+                  recipientEmail: recipient.email ?? null,
+                  recipientCity: recipient.address?.city ?? null,
+                  recipientDistrict: recipient.address?.district ?? null,
+                  recipientStreet: recipient.address?.street ?? null,
+                  documentType: recipient.documentType,
+                  sendType: "ELEKTRONIK",
+                  invoiceNumber,
+                  ettn: randomUUID(),
+                  netAmount: amounts.net,
+                  taxAmount: amounts.tax,
+                  total: amounts.total,
+                  originalTotal: amounts.total,
+                  vatRate,
+                  status: "pending",
+                  lineDescription: lineDescription?.trim() || null,
+                  lineItems: hasLines
+                    ? (lineItems as unknown as Prisma.InputJsonValue)
+                    : Prisma.DbNull,
+                  createdAt: now,
+                },
+              });
             },
-          });
+            { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
+          ),
+        {
+          onRetry: (attempt) =>
+            this.logger.warn(
+              `eLogo ${type} numara sayacı çakıştı (source=${sourceId}), ${attempt}. deneme yenileniyor`,
+            ),
         },
-        { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
       );
       if (providerEnabled) {
         await this.sendRecord(record.id);
@@ -257,9 +279,30 @@ export class ElogoDeliveryService {
       (inv.recipientVknTckn.length === 10 ||
         inv.recipientVknTckn.length === 11);
     if (!isReturn && isRealIdentifier) {
-      const chk = await this.elogo
-        .checkUser(inv.recipientVknTckn)
-        .catch(() => null);
+      let chk: ElogoUserCheckResult | null = null;
+      try {
+        chk = await this.elogo.checkUser(inv.recipientVknTckn);
+      } catch (err: unknown) {
+        // Mükellef sorgusu ağ/sağlayıcı arızasıyla düşerse belge KALICI
+        // `failed` olmamalı: bu, gönderimdeki geçici arızayla aynı durumdur —
+        // sayaç geri alınır, kayıt `pending` kalır ve cron yeniden dener.
+        const transient = isTransientElogoFailure(err);
+        const reason = String((err as Error)?.message ?? err).slice(0, 400);
+        await this.prisma.elogoInvoice
+          .update({
+            where: { id: inv.id },
+            data: {
+              status: transient ? "pending" : "failed",
+              ...(transient ? { attemptCount: { decrement: 1 } } : {}),
+              elogoResultMsg: `Recipient e-Invoice status could not be resolved: ${reason}`,
+            },
+          })
+          .catch(() => undefined);
+        this.logger[transient ? "warn" : "error"](
+          `eLogo ${inv.type} mükellef sorgusu hatası (${currentNumber}, ${transient ? "geçici" : "kalıcı"}): ${reason}`,
+        );
+        return;
+      }
       if (!chk) {
         await this.prisma.elogoInvoice.update({
           where: { id: inv.id },
@@ -318,14 +361,21 @@ export class ElogoDeliveryService {
             address: inv.recipientStreet,
           }
         : null;
+    // Snapshot önce: misafir siparişlerinde kullanıcı kaydı paylaşılan sistem
+    // hesabıdır (sistem e-postası + adres yok).
+    const recipientEmail = inv.recipientEmail ?? recipientUser?.email ?? null;
     const party = this.documents.buildParty(
       inv.recipientVknTckn,
       inv.recipientName || "Müşteri",
-      // Snapshot önce: misafir siparişlerinde kullanıcı kaydı paylaşılan sistem
-      // hesabıdır (sistem e-postası + adres yok).
-      inv.recipientEmail ?? recipientUser?.email,
+      recipientEmail,
       snapshotAddress ?? addr,
     );
+    // e-Arşiv gönderim şekli: eLogo ELEKTRONIK belgeyi alıcının e-postasına
+    // yollar; e-posta yoksa GİB KAGIT bekler — ELEKTRONIK göndermek ya
+    // reddedilir ya da belge alıcıya hiç ulaşmaz. e-Fatura'da bu alan yoktur.
+    const sendType: "ELEKTRONIK" | "KAGIT" = recipientEmail
+      ? "ELEKTRONIK"
+      : "KAGIT";
     const desc =
       inv.lineDescription || LINE_DESCRIPTION[inv.type] || "Hizmet bedeli";
 
@@ -353,7 +403,7 @@ export class ElogoDeliveryService {
         issueTime: this.documents.hms(issueMoment),
         currency: "TRY",
         // Gönderim şekli yalnız e-Arşiv'de gerekli (e-Fatura'da AdditionalDocumentReference yok).
-        sendType: isEInvoice ? undefined : "ELEKTRONIK",
+        sendType: isEInvoice ? undefined : sendType,
         note: desc,
         supplier: this.documents.supplierParty(),
         customer: party,
@@ -381,7 +431,7 @@ export class ElogoDeliveryService {
           recipientName: inv.recipientName,
           lineDescription: inv.lineDescription,
         },
-        inv.recipientEmail ?? recipientUser?.email ?? null,
+        recipientEmail,
       ).catch((e) =>
         this.logger.warn(
           `eLogo PDF teslim hatası (${invoiceNumber}): ${e?.message}`,
@@ -464,6 +514,7 @@ export class ElogoDeliveryService {
               netAmount: totals.taxExclusive,
               taxAmount: totals.tax,
               total: totals.payable,
+              sendType,
               status: "sent",
               elogoRefId: res.refId != null ? String(res.refId) : null,
               elogoResultCode: res.code ?? null,
@@ -495,6 +546,12 @@ export class ElogoDeliveryService {
         }
 
         // Başka bir red (veya çakışma denemeleri tükendi) → failed olarak işaretle.
+        // YAPILANDIRMA reddi (XSLT tasarımı yok vb.) belgeye değil hesaba
+        // özgüdür: yeniden denemek sonucu değiştirmez, bu yüzden bütçe hemen
+        // tüketilmiş sayılır ve alarm bir sonraki cron turunda görünür.
+        const configurationFailure = isConfigurationElogoFailure(
+          res.description,
+        );
         await this.prisma.elogoInvoice.update({
           where: { id: inv.id },
           data: {
@@ -503,12 +560,17 @@ export class ElogoDeliveryService {
             taxAmount: totals.tax,
             total: totals.payable,
             status: "failed",
+            ...(configurationFailure
+              ? { attemptCount: ELOGO_MAX_SEND_ATTEMPTS }
+              : {}),
             elogoResultCode: res.code ?? null,
             elogoResultMsg: res.description ?? null,
           },
         });
         this.logger.error(
-          `eLogo ${inv.type} faturası reddedildi (${currentNumber}): ${res.description}`,
+          configurationFailure
+            ? `ELOGO_CONFIG_ERROR ${inv.type} faturası sağlayıcı yapılandırma reddi (${currentNumber}): ${res.description} — XSLT/hesap ayarı düzeltilmeden yeniden denenmeyecek`
+            : `eLogo ${inv.type} faturası reddedildi (${currentNumber}): ${res.description}`,
         );
         return;
       }
@@ -685,6 +747,10 @@ export class ElogoDeliveryService {
    * Deneme bütçesi tükenmiş (`failed` + attemptCount >= üst sınır) faturaları
    * greplenebilir ALARM olarak raporlar. Bunlar otomatik kurtarılmaz: yasal süre
    * işlerken kimse fark etmezse fatura hiç kesilmez.
+   *
+   * Alarm belge başına 24 saatte BİR üretilir (admin in-app bildirimi + error
+   * log/Sentry); aynı belge sonraki turlarda yalnız warn ile sayılır. Eskiden
+   * 30 dakikalık her tur aynı beş belgeyi Sentry'ye yeniden yazıyordu.
    */
   async reportExhaustedInvoices(): Promise<number> {
     const exhausted = await this.prisma.elogoInvoice.findMany({
@@ -701,10 +767,41 @@ export class ElogoDeliveryService {
       },
       take: 100,
     });
+    if (exhausted.length === 0) return 0;
+
+    const invoicesLink = `${adminUrl()}/finance/invoices?status=failed`;
+    let fresh = 0;
     for (const inv of exhausted) {
-      this.logger.error(
-        `ELOGO_INVOICE_EXHAUSTED id=${inv.id} type=${inv.type} source=${inv.sourceId} no=${inv.invoiceNumber}: ${inv.elogoResultMsg ?? "-"}`,
-      );
+      const line = `ELOGO_INVOICE_EXHAUSTED id=${inv.id} type=${inv.type} source=${inv.sourceId} no=${inv.invoiceNumber}: ${inv.elogoResultMsg ?? "-"}`;
+      // Bildirim servisi yoksa (birim testleri, kısmi kurulum) tekilleştirme de
+      // yoktur: alarm her turda görünür kalsın — sessizlikten iyidir.
+      const isNew = this.notifications
+        ? await this.notifications
+            .notifyAllAdminsOnce(
+              `elogo-exhausted:${inv.id}`,
+              24 * 60 * 60,
+              NotificationType.ELOGO_INVOICE_EXHAUSTED,
+              {
+                invoiceId: inv.id,
+                invoiceNumber: inv.invoiceNumber ?? inv.id,
+                typeLabel: LINE_DESCRIPTION[inv.type] ?? inv.type,
+                reason: (inv.elogoResultMsg ?? "-").slice(0, 200),
+                adminLink: invoicesLink,
+              },
+            )
+            .catch((err: unknown) => {
+              this.logger.warn(
+                `tükenmiş fatura admin bildirimi başarısız (${inv.id}): ${(err as Error)?.message}`,
+              );
+              return true;
+            })
+        : true;
+      if (isNew) {
+        fresh++;
+        this.logger.error(line);
+      } else {
+        this.logger.warn(`${line} (daha önce bildirildi)`);
+      }
     }
     return exhausted.length;
   }

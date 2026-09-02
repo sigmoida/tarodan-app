@@ -62,24 +62,33 @@ export class ElogoIssuingService {
       ? await this.isPackageFullyDelivered(packageId)
       : false;
 
-    const results = await Promise.allSettled([
+    // SIRALI kesim, paralel değil: üç belge aynı numara sayacı satırını
+    // artırır; SERIALIZABLE transaction'lar aynı anda koşunca Postgres birini
+    // "write conflict" (P2034) ile düşürüyor, kaybeden belge yalnız 10 dakikalık
+    // backfill'de kesiliyor ve her çok belgeli teslimat Sentry'ye hata
+    // yazıyordu. Belgeler birbirini BLOKLAMAZ: biri patlarsa diğerleri yine
+    // denenir, işaret konmaz ve sonraki tur eksik olanı tamamlar.
+    const steps: Array<() => Promise<void>> = [
       ...(packageId && packageReady
         ? [
-            this.issueCommissionInvoice(packageId),
-            this.issueServiceFeeInvoice(packageId),
+            () => this.issueCommissionInvoice(packageId),
+            () => this.issueServiceFeeInvoice(packageId),
           ]
         : []),
-      this.issuePlatformSaleInvoice(orderId),
-    ]);
-    const failures = results.filter(
-      (r): r is PromiseRejectedResult => r.status === "rejected",
-    );
-    for (const failure of failures) {
-      this.logger.warn(
-        `eLogo teslim faturası hatası ${orderId}: ${failure.reason?.message ?? failure.reason}`,
-      );
+      () => this.issuePlatformSaleInvoice(orderId),
+    ];
+    let failures = 0;
+    for (const step of steps) {
+      try {
+        await step();
+      } catch (error: any) {
+        failures++;
+        this.logger.warn(
+          `eLogo teslim faturası hatası ${orderId}: ${error?.message ?? error}`,
+        );
+      }
     }
-    if (failures.length > 0) return;
+    if (failures > 0) return;
     // Paket henüz tamamlanmadıysa komisyon/hizmet bedeli faturaları KESİLMEDİ.
     // İşareti şimdi koyarsak bu sipariş backfill penceresinden çıkar; kardeş
     // sipariş iptal edilirse paket faturası hiç kesilmez. İşaret, paket

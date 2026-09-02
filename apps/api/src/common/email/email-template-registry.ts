@@ -217,12 +217,6 @@ export const EMAIL_TEMPLATE_DEFINITIONS = [
     name: "Satıcı faturası (kurumsal, PDF ekli)",
     group: "Fatura",
   },
-  { key: "invoice-buyer", name: "Fatura (alıcı)", group: "Fatura" },
-  {
-    key: "invoice-seller",
-    name: "Satış faturası (satıcı)",
-    group: "Fatura",
-  },
   {
     key: "review-received-seller",
     name: "Değerlendirme alındı (satıcı)",

@@ -6010,6 +6010,7 @@
           "membership": "Membership",
           "boost": "Boost",
           "tradeCommission": "Trade Commission",
+          "tradeServiceFee": "Trade Service Fee",
           "platformSale": "Platform Sale",
           "returnInvoice": "Return Invoice"
         },
@@ -8730,6 +8731,14 @@
       "orderStuckInTransit": {
         "title": "Stuck Shipment — Admin Action Required",
         "message": "Order {orderNumber} has been in transit for a long time with no carrier delivery report; the seller payout stays on hold until delivery is recorded."
+      },
+      "elogoInvoiceExhausted": {
+        "title": "e-Invoice Delivery Blocked — Admin Action Required",
+        "message": "Document {invoiceNumber} ({typeLabel}) could not be sent to eLogo and has run out of attempts: {reason}. The legal deadline is running; fix the cause and use \"Retry\" on the Invoices screen."
+      },
+      "sellerInvoiceMissing": {
+        "title": "Seller Invoice Not Uploaded",
+        "message": "Order {orderNumber} was delivered more than {deadlineDays} days ago and the corporate seller still has not uploaded the product invoice. The seller has been reminded; operations follow-up is needed."
       },
       "offerAutoRejected": {
         "title": "Your Offer Was Closed",

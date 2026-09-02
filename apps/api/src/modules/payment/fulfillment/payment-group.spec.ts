@@ -245,7 +245,7 @@ describe("PaymentService group payment (checkout group)", () => {
         { provide: EventService, useValue: mockEvents },
         {
           provide: InvoiceService,
-          useValue: { generateAndSendInvoice: jest.fn() },
+          useValue: {},
         },
         { provide: ProductLockService, useValue: mockProductLock },
         { provide: NotificationService, useValue: {} },

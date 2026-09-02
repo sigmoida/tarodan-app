@@ -68,6 +68,12 @@ export enum NotificationType {
   // Admin uyarısı: sipariş uzun süredir kargoda ve taşıyıcıdan teslim raporu yok.
   // Teslim yazılmadan escrow release tarihi kurulmaz → satıcı parası askıda kalır.
   ORDER_STUCK_IN_TRANSIT = "order_stuck_in_transit",
+  // Admin uyarısı: bir e-Arşiv/e-Fatura belgesi deneme bütçesini tüketti — cron
+  // artık denemez, yasal süre işliyor; admin "Yeniden Dene" ile kurtarır.
+  ELOGO_INVOICE_EXHAUSTED = "elogo_invoice_exhausted",
+  // Admin uyarısı: kurumsal satıcı teslimden N gün sonra ürün faturasını
+  // hâlâ yüklemedi; satıcı hatırlatıldı, takip operasyonda.
+  SELLER_INVOICE_MISSING = "seller_invoice_missing",
   // Kargo uzun süredir hareketsiz — alıcı ve satıcıya bilgi.
   ORDER_SHIPMENT_DELAYED = "order_shipment_delayed",
   // Her iki ürün de depoya ulaştı → kontrol aşaması başlıyor.

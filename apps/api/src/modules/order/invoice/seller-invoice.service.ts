@@ -213,7 +213,12 @@ export class SellerInvoiceService {
     deadlineDays: number;
     batch?: number;
     now?: Date;
-  }): Promise<{ missing: number; reminded: number }> {
+  }): Promise<{
+    missing: number;
+    reminded: number;
+    /** Eksik faturalı siparişlerin örneklemi (alarm/bildirim için; en eski önce). */
+    missingOrders: Array<{ id: string; orderNumber: string }>;
+  }> {
     const now = opts.now ?? new Date();
     const deliveredBefore = new Date(
       now.getTime() - opts.deadlineDays * 24 * 60 * 60 * 1000,
@@ -235,7 +240,14 @@ export class SellerInvoiceService {
     };
 
     const missing = await this.prisma.order.count({ where: scope });
-    if (missing === 0) return { missing: 0, reminded: 0 };
+    if (missing === 0) return { missing: 0, reminded: 0, missingOrders: [] };
+
+    const missingOrders = await this.prisma.order.findMany({
+      where: scope,
+      orderBy: { deliveredAt: "asc" },
+      take: 50,
+      select: { id: true, orderNumber: true },
+    });
 
     const pending = await this.prisma.order.findMany({
       where: { ...scope, sellerInvoiceReminderAt: null },
@@ -273,7 +285,7 @@ export class SellerInvoiceService {
         );
       reminded++;
     }
-    return { missing, reminded };
+    return { missing, reminded, missingOrders };
   }
 
   /** Hatırlatma maili. Gönderilemezse `false` — çağıran işareti KOYMAZ. */

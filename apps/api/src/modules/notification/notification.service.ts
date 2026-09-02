@@ -50,6 +50,16 @@ export class NotificationService {
     return this.dispatch.notifyAllAdmins(type, data);
   }
 
+  /** Aynı `key` için `ttlSeconds` içinde tek admin alarmı; yeni alarmsa `true`. */
+  async notifyAllAdminsOnce(
+    key: string,
+    ttlSeconds: number,
+    type: NotificationType,
+    data?: Record<string, unknown>,
+  ): Promise<boolean> {
+    return this.dispatch.notifyAllAdminsOnce(key, ttlSeconds, type, data);
+  }
+
   async registerPushToken(userId: string, dto: RegisterPushTokenDto) {
     return this.dispatch.registerPushToken(userId, dto);
   }

@@ -34,6 +34,27 @@ const TRANSIENT_PATTERNS = [
 ];
 
 /**
+ * Sağlayıcının BİZİM yapılandırmamızı reddettiği hatalar: XSLT görsel tasarımı
+ * bulunamadı, tasarım hatası vb. Bunlar belgeye özgü değil, hesaba/ortama
+ * özgüdür — bir belge düştüyse hepsi düşer ve yeniden denemek hiçbir şeyi
+ * değiştirmez. Eskiden 8 deneme × 30 dk = 4 saat sessizce yeniniyor, ancak
+ * sonra alarm çıkıyordu. Artık ilk redde bütçe tüketilmiş sayılır ve alarm
+ * hemen görünür; düzeltme sonrası admin "Yeniden Dene" sayacı sıfırlar.
+ */
+const CONFIGURATION_PATTERNS = [
+  "xslt",
+  "tasarım hatası",
+  "tasarim hatasi",
+  "getxsltdocument",
+];
+
+export function isConfigurationElogoFailure(message?: string | null): boolean {
+  if (!message) return false;
+  const lower = message.toLocaleLowerCase("tr");
+  return CONFIGURATION_PATTERNS.some((pattern) => lower.includes(pattern));
+}
+
+/**
  * Hata GEÇİCİ mi (ağ/sağlayıcı erişilebilirliği) yoksa KALICI mı (iş kuralı,
  * doğrulama, mükellef bulunamadı)? Geçici hatalar deneme sayacını artırmaz.
  */

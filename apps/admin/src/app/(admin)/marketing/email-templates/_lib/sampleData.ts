@@ -253,25 +253,6 @@ export const sampleData = (t: T): Record<string, Record<string, unknown>> => ({
     orderNumber: "TRD-12345",
     productTitle: "Hot Wheels Ferrari 458",
   },
-  "invoice-buyer": {
-    buyerName: t("admin.marketing.emailTemplates.sample.buyer"),
-    invoiceNumber: "FT-2024-001",
-    orderNumber: "TRD-12345",
-    orderId: "sample-id",
-    productTitle: "Hot Wheels Ferrari 458",
-    sellerName: t("admin.marketing.emailTemplates.sample.seller"),
-    totalAmount: 199.99,
-  },
-  "invoice-seller": {
-    sellerName: t("admin.marketing.emailTemplates.sample.seller"),
-    invoiceNumber: "FT-2024-002",
-    orderNumber: "TRD-12345",
-    orderId: "sample-id",
-    productTitle: "Hot Wheels Ferrari 458",
-    buyerName: t("admin.marketing.emailTemplates.sample.buyer"),
-    totalAmount: 199.99,
-    commissionAmount: 20,
-  },
   // Order cancellation
   "order-cancelled-buyer": {
     buyerName: t("admin.marketing.emailTemplates.sample.buyer"),

@@ -17,6 +17,7 @@
     "verify:prod:launch": "node dist-seed/maintenance/verify-production-launch.js",
     "seed:prod:colors": "node dist-seed/maintenance/seed-color-attributes.js",
     "backfill:prod:colors": "node dist-seed/maintenance/backfill-product-colors.js",
+    "elogo:reissue-demo:prod": "node dist-seed/maintenance/reissue-demo-elogo-invoices.js",
     "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
     "start": "nest start",
     "predev": "prisma generate",

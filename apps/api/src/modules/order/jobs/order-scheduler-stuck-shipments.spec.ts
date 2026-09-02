@@ -54,7 +54,9 @@ describe("OrderSchedulerService — takılı kargo alarmları", () => {
       set: jest.fn().mockResolvedValue(undefined),
     };
     const sellerInvoice = {
-      remindMissing: jest.fn().mockResolvedValue({ missing: 0, reminded: 0 }),
+      remindMissing: jest
+        .fn()
+        .mockResolvedValue({ missing: 0, reminded: 0, missingOrders: [] }),
     };
     const service = new OrderSchedulerService(
       prisma as never,

@@ -6010,6 +6010,7 @@
           "membership": "Üyelik",
           "boost": "Öne Çıkarma",
           "tradeCommission": "Takas Komisyonu",
+          "tradeServiceFee": "Takas Hizmet Bedeli",
           "platformSale": "Platform Satışı",
           "returnInvoice": "İade Faturası"
         },
@@ -8730,6 +8731,14 @@
       "orderStuckInTransit": {
         "title": "Kargoda Takılı Sipariş — Yönetim Gerekli",
         "message": "{orderNumber} siparişi uzun süredir kargoda ve taşıyıcıdan teslim bilgisi gelmedi; teslim işlenmediği için satıcı ödemesi askıda."
+      },
+      "elogoInvoiceExhausted": {
+        "title": "e-Fatura Gönderimi Tıkandı — Yönetim Gerekli",
+        "message": "{invoiceNumber} numaralı {typeLabel} belgesi eLogo'ya gönderilemedi ve deneme hakkı tükendi: {reason}. Yasal süre işliyor; nedeni giderip Faturalar ekranından \"Yeniden Dene\" ile gönderin."
+      },
+      "sellerInvoiceMissing": {
+        "title": "Satıcı Faturası Yüklenmedi",
+        "message": "{orderNumber} siparişi teslim edileli {deadlineDays} günü geçti, kurumsal satıcı ürün faturasını hâlâ yüklemedi. Satıcı hatırlatıldı; operasyon takibi gerekiyor."
       },
       "offerAutoRejected": {
         "title": "Teklifiniz Kapatıldı",

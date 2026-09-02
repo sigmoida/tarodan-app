@@ -12,6 +12,7 @@ import { invoiceAmountsFor } from "./invoice/invoice-amounts";
 import { invoiceIssueDate, invoiceIssueTime } from "./invoice/invoice-datetime";
 import { VAT_SOURCE_BY_TYPE } from "./invoice/invoice-vat-rate";
 import { formatElogoInvoiceNumber } from "./invoice/elogo-document-number";
+import { DEFAULT_ELOGO_INVOICE_PREFIX } from "../../config/elogo";
 
 /**
  * Faturanın GÖVDESİNİ kuran katman — ElogoInvoicingService'ten birebir taşındı.
@@ -84,7 +85,7 @@ export class ElogoDocumentService {
     return this.vatRate;
   }
   private get prefix(): string {
-    return this.cfg("ELOGO_INVOICE_PREFIX", "TRD");
+    return this.cfg("ELOGO_INVOICE_PREFIX", DEFAULT_ELOGO_INVOICE_PREFIX);
   }
   get xsltUuid(): string | undefined {
     return this.cfg("ELOGO_INVOICE_XSLT_UUID") || undefined;

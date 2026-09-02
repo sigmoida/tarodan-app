@@ -145,6 +145,9 @@ export const NOTIFICATION_LINKS: Record<
   // ekranı adminin oturumunda açılmaz — hedef admin panelindeki sipariş
   // dosyasıdır (serbest link, üretici verir).
   [NotificationType.ORDER_STUCK_IN_TRANSIT]: free("adminLink"),
+  // Fatura alarmları admin Faturalar ekranına gider (üretici tam linki verir).
+  [NotificationType.ELOGO_INVOICE_EXHAUSTED]: free("adminLink"),
+  [NotificationType.SELLER_INVOICE_MISSING]: free("adminLink"),
   // Satıcının ürünü satışa kapandı: alıcı tarafındaki "artık satışta değil"
   // sayfası, kaldırılmış ürünün 404'üne gitmesin.
   [NotificationType.ORDER_CANCELLED_OUT_OF_STOCK]: UNAVAILABLE,
