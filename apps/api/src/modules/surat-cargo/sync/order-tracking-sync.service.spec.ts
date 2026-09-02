@@ -57,6 +57,8 @@ describe("OrderTrackingSyncService", () => {
       shipment: {
         findUnique: jest.fn().mockResolvedValue(opts?.shipment ?? shipment()),
         findMany: jest.fn().mockResolvedValue([]),
+        // Taşıyıcı iptali tx dışında, doğrudan prisma üzerinden CAS yazar.
+        updateMany: jest.fn().mockResolvedValue({ count: 1 }),
       },
       shipmentEvent: {
         findMany: jest.fn().mockResolvedValue([]),
@@ -278,6 +280,181 @@ describe("OrderTrackingSyncService", () => {
       "order-1",
       "SURAT-CODE-1",
     );
+  });
+
+  /**
+   * Prod vakası PKG-2HGNFGEGTD (2026-09-01/02): Sürat koli şubedeyken üst
+   * kodu 9 ("İade Sürecinde") verdi, `IadeDurum: "Hayır"`; ertesi gün kod 6 ile
+   * teslim etti. Eski kod 9'u sorgusuz iade sayıp koliyi `return_in_progress`'e
+   * düşürdü, oradan teslime geçiş yasaktı: sipariş "hazırlanıyor"da dondu,
+   * satıcı ödemesi hiç başlamadı ve cron her turda "1 kayıt senkronlanamadı" attı.
+   */
+  it("does not drop a parcel into the return flow on Sürat's transient code 9 without the return flag", async () => {
+    const atBranch = shipment({
+      status: ShipmentStatus.label_created,
+      shippedAt: null,
+      order: {
+        id: "order-1",
+        buyerId: "buyer-1",
+        status: OrderStatus.preparing,
+      },
+    });
+    const { service, tx, paymentService, client } = makeService({
+      shipment: atBranch,
+    });
+    client.lookupTracking.mockResolvedValue({
+      kind: "found",
+      data: {
+        Gonderiler: [
+          tracking(9, {
+            KargonunDurumu: "İade Sürecinde",
+            IadeDurum: "Hayır",
+            Hareketler: [
+              {
+                Islem: "Kargo Araca Yüklendi",
+                IslemTarihi: "2026-09-01T17:54:20.000",
+                HareketYeri: "Halimağa Acente",
+                KargoHareketKargonunDurumuSayi: "1",
+              },
+            ],
+          }),
+        ],
+      },
+    });
+
+    await expect(service.syncShipmentTracking("shipment-1")).resolves.toBe(
+      true,
+    );
+
+    expect(tx.shipment.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          status: ShipmentStatus.picked_up,
+          shippedAt: expect.any(Date),
+          providerStatusCode: 9,
+        }),
+      }),
+    );
+    // Kargoya veriliş sipariş satırına da işlenir (eskiden iade sanıp atlıyordu).
+    expect(tx.order.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ status: OrderStatus.shipped }),
+      }),
+    );
+    expect(paymentService.handleOrderDelivered).not.toHaveBeenCalled();
+    expect(paymentService.processRefund).not.toHaveBeenCalled();
+  });
+
+  it("unlocks a parcel already stuck in return_in_progress once Sürat reports a flagless delivery", async () => {
+    // Canlıdaki kilitli satır: statü return_in_progress, shippedAt hiç yazılmamış,
+    // sipariş hâlâ preparing. Tek poll turunda üçü birden düzelmeli.
+    const stuck = shipment({
+      status: ShipmentStatus.return_in_progress,
+      shippedAt: null,
+      order: {
+        id: "order-1",
+        buyerId: "buyer-1",
+        status: OrderStatus.preparing,
+      },
+    });
+    const { service, tx, paymentService, client } = makeService({
+      shipment: stuck,
+    });
+    client.lookupTracking.mockResolvedValue({
+      kind: "found",
+      data: {
+        Gonderiler: [
+          tracking(6, {
+            KargonunDurumu: "Teslim Edildi",
+            IadeDurum: "Hayır",
+            TeslimTarihi: "02/09/2026",
+            TeslimAlan: "MUTLU İMAL",
+          }),
+        ],
+      },
+    });
+
+    await expect(service.syncShipmentTracking("shipment-1")).resolves.toBe(
+      true,
+    );
+
+    expect(tx.shipment.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          id: "shipment-1",
+          status: ShipmentStatus.return_in_progress,
+          shippedAt: null,
+        },
+        data: expect.objectContaining({
+          status: ShipmentStatus.delivered,
+          shippedAt: expect.any(Date),
+          deliveredAt: expect.any(Date),
+          receivedBy: "MUTLU İMAL",
+        }),
+      }),
+    );
+    expect(tx.order.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ status: OrderStatus.shipped }),
+      }),
+    );
+    expect(paymentService.handleOrderDelivered).toHaveBeenCalledWith(
+      "order-1",
+      expect.any(Date),
+      tx,
+    );
+    expect(paymentService.processRefund).not.toHaveBeenCalled();
+  });
+
+  it("keeps a return-flagged delivery undecided instead of releasing escrow", async () => {
+    const { service, tx, paymentService, client } = makeService();
+    client.lookupTracking.mockResolvedValue({
+      kind: "found",
+      data: {
+        Gonderiler: [tracking(6, { IadeDurum: "Evet", Hareketler: [] })],
+      },
+    });
+
+    await expect(service.syncShipmentTracking("shipment-1")).resolves.toBe(
+      true,
+    );
+
+    expect(tx.shipment.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ status: ShipmentStatus.in_transit }),
+      }),
+    );
+    expect(paymentService.handleOrderDelivered).not.toHaveBeenCalled();
+    expect(paymentService.processRefund).not.toHaveBeenCalled();
+  });
+
+  /**
+   * Prod vakası PKG-ANSXZR4QFC: Sürat "Gönderi iptal edilmiştir" dedi, satır
+   * `picked_up`'taydı; durum makinesi picked_up → cancelled'ı tanımadığı için
+   * koli 13 gün "kargoda" kaldı ve günlük ORDERS_STUCK_SHIPPED alarmı üretti.
+   */
+  it("closes a picked-up parcel the carrier reports as cancelled", async () => {
+    const { service, prisma, client } = makeService();
+    prisma.shipment.findMany.mockResolvedValue([
+      shipment({ id: "s1", status: ShipmentStatus.picked_up }),
+    ]);
+    client.lookupTracking.mockResolvedValue({
+      kind: "cancelled",
+      message: "Gönderi iptal edilmiştir.",
+    });
+
+    await expect(service.syncAllActiveShipments()).resolves.toEqual({
+      synced: 1,
+      pending: 0,
+      failed: 0,
+    });
+    expect(prisma.shipment.updateMany).toHaveBeenCalledWith({
+      where: { id: "s1", status: ShipmentStatus.picked_up },
+      data: {
+        status: ShipmentStatus.cancelled,
+        providerRawStatus: "Gönderi iptal edilmiştir.",
+      },
+    });
   });
 
   it("counts carrier-acceptance waiting records as pending, not failed", async () => {
