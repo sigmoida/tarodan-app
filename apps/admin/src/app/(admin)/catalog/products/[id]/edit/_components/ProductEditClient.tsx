@@ -7,6 +7,7 @@ import { Button } from "@tarodan/ui";
 import { Form, useZodForm } from "@tarodan/ui/form";
 import {
   DiscountCard,
+  GlobalAttributesCard,
   ImagesCard,
   ManufacturerAttributesCard,
   OptionsCard,
@@ -18,7 +19,7 @@ import {
   buildListingUpdatePayload,
   buildSaleDataFromListing,
   createEmptySaleData,
-  editListingSchema,
+  buildEditListingSchema,
   emptyEditValues,
   getConditions,
   getYearOptions,
@@ -26,7 +27,7 @@ import {
   useListingCategories,
   useListingFilters,
   useListingImageUpload,
-  useManufacturerAttributes,
+  useAttributeGroups,
   withSelectedReference,
   type EditListingValues,
   type ListingEditPayload,
@@ -72,7 +73,14 @@ export default function ProductEditClient({ id }: { id: string }) {
   });
   const item = productQuery.data;
 
-  const form = useZodForm(editListingSchema, {
+  // Zorunlu genel özel gruplar sorgudan gelir; şema onları doğrulama anında
+  // ref üzerinden okur (form, grup sorgusundan önce kurulur).
+  const requiredGroupSlugsRef = useRef<readonly string[]>([]);
+  const schema = useMemo(
+    () => buildEditListingSchema(() => requiredGroupSlugsRef.current),
+    [],
+  );
+  const form = useZodForm(schema, {
     defaultValues: emptyEditValues,
   });
   const [saleData, setSaleData] = useState<SaleData>(createEmptySaleData());
@@ -146,8 +154,13 @@ export default function ProductEditClient({ id }: { id: string }) {
   const manufacturerSlug = manufacturers.find(
     (m) => m.id === manufacturerId,
   )?.slug;
-  const { manufacturerAttrGroups } =
-    useManufacturerAttributes(manufacturerSlug);
+  const {
+    globalAttrGroups,
+    manufacturerAttrGroups,
+    requiredGroupSlugs,
+    attrGroupsStatus,
+  } = useAttributeGroups(manufacturerSlug);
+  requiredGroupSlugsRef.current = requiredGroupSlugs;
 
   /**
    * Kaydın KENDİ seçimini listeye geri koy.
@@ -227,6 +240,10 @@ export default function ProductEditClient({ id }: { id: string }) {
           legacyColor={record?.color ?? null}
           manufacturerList={manufacturerOptions}
           yearOptions={getYearOptions()}
+        />
+        <GlobalAttributesCard
+          attrGroups={globalAttrGroups}
+          attrGroupsStatus={attrGroupsStatus}
         />
         <ManufacturerAttributesCard
           manufacturerList={manufacturerOptions}

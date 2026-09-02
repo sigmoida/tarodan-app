@@ -5,9 +5,12 @@ import {
   baseListingFields,
   bundleSizeRefine,
   colorsRefine,
+  customAttributesField,
   emptyBaseListingValues,
   listingFieldMessages,
   listingImageSchema,
+  requiredAttributeGroupsRefine,
+  type RequiredGroupSlugsSource,
 } from "../form/schema";
 
 /**
@@ -22,13 +25,25 @@ export const editListingSchema = z
     isPreorder: z.boolean(),
     images: z.array(listingImageSchema),
     status: z.string(),
-    // Üreticiye özel nitelikler — yeni ilan formunda da var.
-    customAttributes: z.record(z.string(), z.array(z.string())),
+    // Özel grup seçimleri (genel + üreticiye bağlı) — yeni ilan formunda da var.
+    customAttributes: customAttributesField,
   })
   .superRefine(bundleSizeRefine(msg.setSize))
   .superRefine(colorsRefine(msg.required));
 
 export type EditListingValues = z.infer<typeof editListingSchema>;
+
+/**
+ * Düzenleme şeması + zorunlu genel özel gruplar. Gruplar sorgudan geldiği
+ * için getter alır (bkz. `RequiredGroupSlugsSource`); `editListingSchema`
+ * tip ve varsayılanlar için olduğu gibi kalır.
+ */
+export const buildEditListingSchema = (
+  getRequiredGroupSlugs: RequiredGroupSlugsSource,
+) =>
+  editListingSchema.superRefine(
+    requiredAttributeGroupsRefine(getRequiredGroupSlugs, msg.required),
+  );
 
 /** Seed values for `useZodForm({ defaultValues })`. */
 export const emptyEditValues: EditListingValues = {

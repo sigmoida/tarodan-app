@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "@/i18n/navigation";
 import toast from "react-hot-toast";
 import { useTranslations } from "next-intl";
@@ -18,7 +18,7 @@ import {
   buildSaleDataFromListing,
 } from "@tarodan/listing-form";
 import {
-  editListingSchema,
+  buildEditListingSchema,
   emptyEditValues,
   type EditListingValues,
 } from "@tarodan/listing-form";
@@ -44,7 +44,15 @@ export function useEditListingForm({
   const router = useRouter();
   const queryClient = useQueryClient();
 
-  const form = useZodForm(editListingSchema, {
+  // Zorunlu genel özel gruplar (ör. Nadirlik) sorgudan gelir; şema onları
+  // doğrulama anında ref üzerinden okur. Ref'i ekran, grup sorgusundan sonra
+  // doldurur (bkz. EditListingClient).
+  const requiredGroupSlugsRef = useRef<readonly string[]>([]);
+  const schema = useMemo(
+    () => buildEditListingSchema(() => requiredGroupSlugsRef.current),
+    [],
+  );
+  const form = useZodForm(schema, {
     defaultValues: emptyEditValues,
   });
   const { reset, formState } = form;
@@ -209,6 +217,7 @@ export function useEditListingForm({
     seedExistingImagesRef,
     imageSubmitBlockerRef,
     hasUserImageEditsRef,
+    requiredGroupSlugsRef,
     showDiscountSection,
     setShowDiscountSection,
     isLoading,

@@ -112,6 +112,6 @@ export interface EditListingFormData {
   shippingPackageTier: "small" | "medium" | "large";
   images: Array<{ cardKey: string; detailKey: string }>;
   status: string;
-  /** Üreticiye özel nitelik seçimleri: { grupSlug: [nitelikSlug] }. */
+  /** Özel grup seçimleri (genel + üreticiye bağlı): { grupSlug: [nitelikSlug] }. */
   customAttributes: Record<string, string[]>;
 }

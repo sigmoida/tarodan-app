@@ -12,6 +12,7 @@ export const PACKAGE_TIER_OPTIONS = [
 }>;
 
 import { useTranslations } from "next-intl";
+import type { ListingEditPayload } from "@tarodan/listing-form";
 
 type T = ReturnType<typeof useTranslations<never>>;
 
@@ -51,6 +52,11 @@ export interface ProductDetail {
   aiRelevanceScore?: number | null;
   aiNsfwScore?: number | null;
   aiCheckReason?: string | null;
+  /**
+   * Kaydın ham hâli (düzenleme ekranıyla ortak). Detay sayfası özel grup
+   * seçimlerini (Nadirlik gibi) `edit.attributes` üzerinden gösterir.
+   */
+  edit?: Pick<ListingEditPayload, "attributes"> | null;
 }
 
 export interface Review {

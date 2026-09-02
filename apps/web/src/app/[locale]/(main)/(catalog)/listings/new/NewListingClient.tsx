@@ -14,6 +14,7 @@ import {
   PricingCard,
   ImagesCard,
   DiscountCard,
+  GlobalAttributesCard,
   ManufacturerAttributesCard,
 } from "@tarodan/listing-form";
 import {
@@ -59,7 +60,9 @@ function NewListingLayout() {
     rotateImage,
     moveImage,
     makeCover,
+    globalAttrGroups,
     manufacturerAttrGroups,
+    attrGroupsStatus,
     saleData,
     setSaleData,
     showDiscountSection,
@@ -118,6 +121,10 @@ function NewListingLayout() {
               yearOptions={yearOptions}
             />
           </div>
+          <GlobalAttributesCard
+            attrGroups={globalAttrGroups}
+            attrGroupsStatus={attrGroupsStatus}
+          />
           <ManufacturerAttributesCard
             manufacturerList={manufacturerList}
             manufacturerAttrGroups={manufacturerAttrGroups}

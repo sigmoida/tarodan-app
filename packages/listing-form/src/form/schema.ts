@@ -93,6 +93,46 @@ export function colorsRefine(requiredMsg: string) {
   };
 }
 
+/**
+ * Özel grup seçimleri: `{ grupSlug: [nitelikSlug] }`. Genel özel gruplar tek
+ * değer taşır, üreticiye bağlı gruplar birden çok; ikisi de aynı haritada.
+ * Değer asla `undefined` olmaz — temizlemede `[]` yazılır.
+ */
+export const customAttributesField = z.record(z.string(), z.array(z.string()));
+
+/**
+ * Zorunlu genel özel grupların slug'larını DOĞRULAMA ANINDA veren kaynak.
+ *
+ * Şema, gruplar sunucudan gelmeden kurulur (hook sırası: form önce, sorgu
+ * sonra). react-hook-form çözümleyiciyi her render'da yeniden okuduğu için
+ * bir getter, gönderim anında güncel listeyi görür; şemayı yeniden kurmak
+ * ve formu remount etmek gerekmez.
+ */
+export type RequiredGroupSlugsSource = () => readonly string[];
+
+/**
+ * superRefine: zorunlu genel özel gruplardan her biri için en az bir seçim.
+ * Hata ilgili grubun alanına (`customAttributes.<slug>`) bağlanır.
+ */
+export function requiredAttributeGroupsRefine(
+  getRequired: RequiredGroupSlugsSource,
+  requiredMsg: string,
+) {
+  return (
+    val: { customAttributes: Record<string, string[]> },
+    ctx: z.RefinementCtx,
+  ) => {
+    for (const slug of getRequired()) {
+      if ((val.customAttributes[slug] ?? []).length > 0) continue;
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["customAttributes", slug],
+        message: requiredMsg,
+      });
+    }
+  };
+}
+
 /** superRefine: when it's a set, require bundleSize >= 2. */
 export function bundleSizeRefine(setSizeMsg: string) {
   return (

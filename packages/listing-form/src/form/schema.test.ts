@@ -1,6 +1,11 @@
 import { z } from "zod";
 import { describe, expect, it } from "vitest";
-import { baseListingFields, colorsRefine } from "./schema";
+import {
+  baseListingFields,
+  colorsRefine,
+  customAttributesField,
+  requiredAttributeGroupsRefine,
+} from "./schema";
 
 describe("listing form catalog details", () => {
   const messages = {
@@ -68,5 +73,48 @@ describe("listing form catalog details", () => {
     });
 
     expect(result.success).toBe(false);
+  });
+});
+
+describe("requiredAttributeGroupsRefine", () => {
+  const requiredMsg = "required";
+  let required: string[] = [];
+  const schema = z
+    .object({ customAttributes: customAttributesField })
+    .superRefine(requiredAttributeGroupsRefine(() => required, requiredMsg));
+
+  it("zorunlu grup seçilmemişse hatayı o grubun alanına bağlar", () => {
+    required = ["nadirlik-bulunabilirlik"];
+    const result = schema.safeParse({ customAttributes: {} });
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error.issues).toEqual([
+        expect.objectContaining({
+          path: ["customAttributes", "nadirlik-bulunabilirlik"],
+          message: requiredMsg,
+        }),
+      ]);
+    }
+  });
+
+  it("boş dizi de eksik sayılır, seçim varsa geçer", () => {
+    required = ["nadirlik-bulunabilirlik"];
+    expect(
+      schema.safeParse({
+        customAttributes: { "nadirlik-bulunabilirlik": [] },
+      }).success,
+    ).toBe(false);
+    expect(
+      schema.safeParse({
+        customAttributes: { "nadirlik-bulunabilirlik": ["nadir"] },
+      }).success,
+    ).toBe(true);
+  });
+
+  it("getter doğrulama anında okunur — liste sonradan gelse de geçerli", () => {
+    required = [];
+    expect(schema.safeParse({ customAttributes: {} }).success).toBe(true);
+    required = ["kutu-durumu"];
+    expect(schema.safeParse({ customAttributes: {} }).success).toBe(false);
   });
 });
