@@ -4,7 +4,56 @@ import {
   SCALE_GROUP_SLUG,
   MATERIAL_GROUP_SLUG,
   COLOR_GROUP_SLUG,
+  HIDDEN_ATTRIBUTE_GROUP_SLUGS,
+  NON_CUSTOM_GROUP_SLUGS,
+  attributeGroupSelectionMode,
 } from "../../../common/helpers/attribute-groups";
+
+/** `include: { attributes }` ile okunan grup satırı — iki uç da bunu eşler. */
+const GROUP_ATTRIBUTE_SELECT = {
+  where: { isActive: true },
+  select: {
+    slug: true,
+    value: true,
+    displayValue: true,
+    color: true,
+  },
+  orderBy: { sortOrder: "asc" as const },
+};
+
+interface GroupWithAttributes {
+  slug: string;
+  name: string;
+  description?: string | null;
+  isRequired: boolean;
+  manufacturerSlug: string | null;
+  attributes: Array<{
+    slug: string;
+    value: string;
+    displayValue: string | null;
+    color: string | null;
+  }>;
+}
+
+/**
+ * Filtre ve ilan formu uçlarının ortak grup gövdesi. `selectionMode` sunucu
+ * kuralıdır (genel özel = tek, renk/üreticiye bağlı = çoklu); istemciler
+ * kuralı kopyalamak yerine bunu okur.
+ */
+function mapAttributeGroup(g: GroupWithAttributes) {
+  return {
+    slug: g.slug,
+    name: g.name,
+    isRequired: g.isRequired,
+    manufacturerSlug: g.manufacturerSlug,
+    selectionMode: attributeGroupSelectionMode(g),
+    attributes: g.attributes.map((a) => ({
+      slug: a.slug,
+      label: a.displayValue || a.value,
+      color: a.color,
+    })),
+  };
+}
 
 /**
  * ProductFilterService — dinamik filtre/öznitelik metadatası (kategori/marka/ölçek/
@@ -107,27 +156,22 @@ export class ProductFilterService {
       orderBy: [{ brandId: "asc" }, { sortOrder: "asc" }, { name: "asc" }],
     });
 
-    // 6. Manufacturer-scoped custom attribute groups (e.g. Hot Wheels).
-    //    Empty array when no manufacturer or no scoped groups exist.
-    //    Global groups (scale, material) are NOT duplicated here — they're already above.
-    const customAttributes = manufacturer
-      ? await this.prisma.attributeGroup.findMany({
-          where: { isActive: true, manufacturerSlug: manufacturer },
-          include: {
-            attributes: {
-              where: { isActive: true },
-              select: {
-                slug: true,
-                value: true,
-                displayValue: true,
-                color: true,
-              },
-              orderBy: { sortOrder: "asc" },
-            },
-          },
-          orderBy: { sortOrder: "asc" },
-        })
-      : [];
+    // 6. Özel attribute grupları: genel özel gruplar (Nadirlik gibi, admin'in
+    //    açtığı üreticisiz gruplar) HER ZAMAN; üreticiye bağlı gruplar yalnız
+    //    `manufacturer` verildiğinde eklenir. Sabit üçlü yukarıda kendi
+    //    alanlarında, gizli gruplar hiçbir yerde dönmez.
+    const customAttributes = await this.prisma.attributeGroup.findMany({
+      where: {
+        isActive: true,
+        slug: { notIn: [...NON_CUSTOM_GROUP_SLUGS] },
+        OR: [
+          { manufacturerSlug: null },
+          ...(manufacturer ? [{ manufacturerSlug: manufacturer }] : []),
+        ],
+      },
+      include: { attributes: GROUP_ATTRIBUTE_SELECT },
+      orderBy: { sortOrder: "asc" },
+    });
 
     return {
       categories: categories.map((c) => ({
@@ -147,16 +191,7 @@ export class ProductFilterService {
       manufacturers,
       colors,
       materials,
-      customAttributes: customAttributes.map((g) => ({
-        slug: g.slug,
-        name: g.name,
-        manufacturerSlug: g.manufacturerSlug,
-        attributes: g.attributes.map((a) => ({
-          slug: a.slug,
-          label: a.displayValue || a.value,
-          color: a.color,
-        })),
-      })),
+      customAttributes: customAttributes.map(mapAttributeGroup),
     };
   }
 
@@ -168,41 +203,24 @@ export class ProductFilterService {
    * groups when manufacturer slug is provided.
    */
   async getAttributeGroupsForManufacturer(manufacturer?: string) {
+    // Sabit üçlü burada DÖNER (ilan formu kendi alanlarında kullanır); yalnız
+    // gizli gruplar dışlanır.
     const groups = await this.prisma.attributeGroup.findMany({
       where: {
         isActive: true,
+        slug: { notIn: [...HIDDEN_ATTRIBUTE_GROUP_SLUGS] },
         OR: [
           { manufacturerSlug: null },
           ...(manufacturer ? [{ manufacturerSlug: manufacturer }] : []),
         ],
       },
-      include: {
-        attributes: {
-          where: { isActive: true },
-          select: {
-            slug: true,
-            value: true,
-            displayValue: true,
-            color: true,
-            sortOrder: true,
-          },
-          orderBy: { sortOrder: "asc" },
-        },
-      },
+      include: { attributes: GROUP_ATTRIBUTE_SELECT },
       orderBy: { sortOrder: "asc" },
     });
 
     return groups.map((g) => ({
-      slug: g.slug,
-      name: g.name,
+      ...mapAttributeGroup(g),
       description: g.description,
-      isRequired: g.isRequired,
-      manufacturerSlug: g.manufacturerSlug,
-      attributes: g.attributes.map((a) => ({
-        slug: a.slug,
-        label: a.displayValue || a.value,
-        color: a.color,
-      })),
     }));
   }
 }
