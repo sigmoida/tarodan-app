@@ -23,7 +23,7 @@ const base: DiscountFormValues = {
   target: "buyer_commission",
   audience: "everyone",
   targetTierTypes: [],
-  targetUserIds: "",
+  targetUserIds: [],
   budgetLimit: "1000",
   minCartValue: "",
   minQuantity: "",
@@ -103,31 +103,36 @@ describe("discountSchema — membership_tiers audience requires targetTierTypes"
 });
 
 describe("discountSchema — specific_buyers/specific_sellers require targetUserIds", () => {
-  it("rejects an empty targetUserIds for specific_buyers", () => {
+  // Kimlikler artık virgülle ayrılmış metin değil, etiketli seçim nesneleri:
+  // yönetici UUID yazmak yerine listeden kişi seçiyor ve çip kimi seçtiğini
+  // gösteriyor. Şema da bu şekle göre doğrular.
+  const user = (id: string) => ({ value: id, label: `Kullanıcı ${id}` });
+
+  it("rejects an empty selection for specific_buyers", () => {
     const result = schema.safeParse({
       ...base,
       audience: "specific_buyers",
-      targetUserIds: "",
+      targetUserIds: [],
     });
     expect(result.success).toBe(false);
     expect(issuePaths(result)).toContain("targetUserIds");
   });
 
-  it("rejects a whitespace-only targetUserIds", () => {
+  it("rejects an empty selection for specific_sellers", () => {
     const result = schema.safeParse({
       ...base,
       audience: "specific_sellers",
-      targetUserIds: "   ",
+      targetUserIds: [],
     });
     expect(result.success).toBe(false);
     expect(issuePaths(result)).toContain("targetUserIds");
   });
 
-  it("accepts a non-empty targetUserIds", () => {
+  it("accepts one or more selected users", () => {
     const result = schema.safeParse({
       ...base,
       audience: "specific_buyers",
-      targetUserIds: "user-1,user-2",
+      targetUserIds: [user("user-1"), user("user-2")],
     });
     expect(result.success).toBe(true);
   });
@@ -149,7 +154,7 @@ describe("discountSchema — target side must match audience side", () => {
       ...base,
       target: "seller_platform_fee",
       audience: "specific_buyers",
-      targetUserIds: "user-1",
+      targetUserIds: [{ value: "user-1", label: "Kullanıcı 1" }],
     });
     expect(result.success).toBe(false);
     expect(issuePaths(result)).toContain("audience");
@@ -179,7 +184,7 @@ describe("discountSchema — target side must match audience side", () => {
       ...base,
       target: "buyer_service_fee",
       audience: "specific_sellers",
-      targetUserIds: "user-1",
+      targetUserIds: [{ value: "user-1", label: "Kullanıcı 1" }],
     });
     expect(result.success).toBe(false);
     expect(issuePaths(result)).toContain("audience");

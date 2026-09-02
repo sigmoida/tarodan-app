@@ -87,6 +87,7 @@ const nextConfig = {
   transpilePackages: [
     '@tarodan/shared',
     '@tarodan/ui',
+    '@tarodan/listing-form',
     '@tarodan/design-tokens',
     '@tarodan/api-client',
   ],

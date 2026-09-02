@@ -431,6 +431,16 @@ export const NOTIFICATION_TEMPLATES: Partial<
     messageKey: "server.notification.moderationQueueStale.message",
     icon: "⏳",
   },
+  [NotificationType.USER_BLOCKED_ADMIN]: {
+    titleKey: "server.notification.userBlockedAdmin.title",
+    messageKey: "server.notification.userBlockedAdmin.message",
+    icon: "🚫",
+  },
+  [NotificationType.USER_REPORTED_ADMIN]: {
+    titleKey: "server.notification.userReportedAdmin.title",
+    messageKey: "server.notification.userReportedAdmin.message",
+    icon: "🚩",
+  },
   [NotificationType.REFUND_REQUEST_RECEIVED]: {
     titleKey: "server.notification.refundRequestReceived.title",
     messageKey: "server.notification.refundRequestReceived.message",

@@ -6,6 +6,8 @@ import {
   Logger,
 } from "@nestjs/common";
 import { PrismaService } from "../../prisma";
+import { UserBlockService } from "../user-block/user-block.service";
+import { excludeIds } from "../user-block/user-block.helpers";
 import { Prisma, ProductKind } from "@prisma/client";
 import {
   fulltextCollectionSearch,
@@ -66,7 +68,17 @@ export class CollectionCrudService {
     private readonly moderationAi: ModerationAiClient,
     private readonly common: CollectionCommonService,
     private readonly cover: CollectionCoverService,
+    private readonly userBlocks: UserBlockService,
   ) {}
+
+  /** Sahip ile viewer arasında engel varsa koleksiyon "yok" davranır (404). */
+  private assertOwnerVisible(ownerId: string, viewerId?: string) {
+    return this.userBlocks.assertVisibleTo(
+      viewerId,
+      ownerId,
+      "server.collection.notFound",
+    );
+  }
 
   // ==========================================================================
   // CREATE COLLECTION
@@ -152,12 +164,13 @@ export class CollectionCrudService {
     // First get basic collection info
     const basicCollection = await this.prisma.collection.findUnique({
       where: { id: collectionId },
-      select: { id: true },
+      select: { id: true, userId: true },
     });
 
     if (!basicCollection) {
       throw new NotFoundException(i18nMessage("server.collection.notFound"));
     }
+    await this.assertOwnerVisible(basicCollection.userId, viewerId);
 
     // Now get full collection with relations
     const collection = await this.prisma.collection.findUnique({
@@ -337,6 +350,7 @@ export class CollectionCrudService {
     if (!collection) {
       throw new NotFoundException(i18nMessage("server.collection.notFound"));
     }
+    await this.assertOwnerVisible(collection.userId, viewerId);
 
     // Private collection can only be seen by owner
     if (!collection.isPublic && collection.userId !== viewerId) {
@@ -400,6 +414,7 @@ export class CollectionCrudService {
 
     // If viewing own collections, show all. Otherwise only public.
     const isOwner = userId === viewerId;
+    if (!isOwner) await this.assertOwnerVisible(userId, viewerId);
 
     const where: Prisma.CollectionWhereInput = {
       userId,
@@ -481,9 +496,12 @@ export class CollectionCrudService {
     search?: string,
     categoryId?: string,
     categorySlug?: string,
+    viewerId?: string,
   ): Promise<CollectionListResponseDto> {
     const safePage = Math.max(1, Number(page) || 1);
     const safePageSize = Math.min(100, Math.max(1, Number(pageSize) || 20));
+    // Engelli sahiplerin (simetrik) koleksiyonları keşiften düşer.
+    const hiddenUserIds = await this.userBlocks.getHiddenUserIds(viewerId);
 
     let resolvedCategoryId = categoryId;
     if (!resolvedCategoryId && categorySlug?.trim()) {
@@ -500,6 +518,7 @@ export class CollectionCrudService {
       query: search,
       categoryId: resolvedCategoryId,
       isPublic: true,
+      excludeUserIds: hiddenUserIds,
       sortBy,
       page: safePage,
       pageSize: safePageSize,
@@ -522,6 +541,7 @@ export class CollectionCrudService {
           sortBy,
           search,
           resolvedCategoryId,
+          hiddenUserIds,
         );
       }
 
@@ -542,6 +562,7 @@ export class CollectionCrudService {
           sortBy,
           search,
           resolvedCategoryId,
+          hiddenUserIds,
         );
       }
       return hydrated;
@@ -554,6 +575,7 @@ export class CollectionCrudService {
       sortBy,
       search,
       resolvedCategoryId,
+      hiddenUserIds,
     );
   }
 
@@ -626,10 +648,12 @@ export class CollectionCrudService {
     sortBy: string,
     search?: string,
     resolvedCategoryId?: string,
+    hiddenUserIds: string[] = [],
   ): Promise<CollectionListResponseDto> {
     const where: Prisma.CollectionWhereInput = {
       isPublic: true,
       ...(resolvedCategoryId ? { categoryId: resolvedCategoryId } : {}),
+      userId: excludeIds(hiddenUserIds),
     };
 
     if (search && search.trim() !== "") {

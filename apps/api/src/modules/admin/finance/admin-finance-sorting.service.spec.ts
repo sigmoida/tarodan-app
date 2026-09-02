@@ -222,6 +222,8 @@ describe("admin finance list sorting", () => {
       } as any,
       {} as any,
       {} as any,
+      {} as any, // payoutCore — bu spec'in konusu değil
+      {} as any, // scheduledQueue
     );
 
     await service.getPayoutsTransactions({
@@ -247,6 +249,8 @@ describe("admin finance list sorting", () => {
       } as any,
       {} as any,
       {} as any,
+      {} as any, // payoutCore — bu spec'in konusu değil
+      {} as any, // scheduledQueue
     );
 
     await service.getPayoutsTransactions({
@@ -272,6 +276,8 @@ describe("admin finance list sorting", () => {
       { paymentHold, order } as any,
       {} as any,
       {} as any,
+      {} as any, // payoutCore — bu spec'in konusu değil
+      {} as any, // scheduledQueue
     );
 
     await service.getPayoutsSchedule({

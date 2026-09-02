@@ -249,45 +249,20 @@ export class UserService {
     return this.social.getFollowing(userId);
   }
 
-  /**
-   * Block a user
-   */
-  async blockUser(
-    blockerId: string,
-    blockedId: string,
-  ): Promise<{ success: boolean; blockedDisplayName: string }> {
-    return this.social.blockUser(blockerId, blockedId);
+  blockUser(blockerId: string, blockedId: string, reason?: string) {
+    return this.social.blockUser(blockerId, blockedId, reason);
   }
 
-  /**
-   * Unblock a user
-   */
-  async unblockUser(
-    blockerId: string,
-    blockedId: string,
-  ): Promise<{ success: boolean }> {
+  unblockUser(blockerId: string, blockedId: string) {
     return this.social.unblockUser(blockerId, blockedId);
   }
 
-  /**
-   * Get list of blocked users
-   */
-  async getBlockedUsers(userId: string): Promise<any[]> {
+  getBlockedUsers(userId: string) {
     return this.social.getBlockedUsers(userId);
   }
 
-  /**
-   * Check if a user is blocked
-   */
-  isUserBlocked(blockerId: string, blockedId: string): boolean {
-    return this.social.isUserBlocked(blockerId, blockedId);
-  }
-
-  /**
-   * Check if either user has blocked the other
-   */
-  areUsersBlocked(userId1: string, userId2: string): boolean {
-    return this.social.areUsersBlocked(userId1, userId2);
+  hasBlocked(blockerId: string, blockedId: string) {
+    return this.social.hasBlocked(blockerId, blockedId);
   }
 
   /**
@@ -336,8 +311,8 @@ export class UserService {
   /**
    * En iyi koleksiyonlar (anasayfa). Görüntülenme/beğeniye göre sıralı, cache'li.
    */
-  async getTopCollections(limit: number = 20) {
-    return this.discovery.getTopCollections(limit);
+  async getTopCollections(limit: number = 20, viewerId?: string) {
+    return this.discovery.getTopCollections(limit, viewerId);
   }
 
   /**
@@ -346,8 +321,8 @@ export class UserService {
    * (presigned URL'ler hep güncel kalır). Snapshot yoksa (ilk açılış) ya da
    * kazanan artık uygun değilse anında hesaplayıp snapshot'ı tazeler.
    */
-  async getFeaturedCollector() {
-    return this.discovery.getFeaturedCollector();
+  async getFeaturedCollector(viewerId?: string) {
+    return this.discovery.getFeaturedCollector(viewerId);
   }
 
   /**
@@ -368,8 +343,8 @@ export class UserService {
    * cron'da yapılır, burada kazanan iş hesabı taze veriyle doldurulur. Snapshot
    * yoksa ya da kazanan artık uygun değilse anında hesaplayıp snapshot'ı tazeler.
    */
-  async getFeaturedBusiness() {
-    return this.discovery.getFeaturedBusiness();
+  async getFeaturedBusiness(viewerId?: string) {
+    return this.discovery.getFeaturedBusiness(viewerId);
   }
 
   /**
@@ -397,16 +372,16 @@ export class UserService {
   /**
    * Get top sellers (for homepage)
    */
-  async getTopSellers(limit: number = 5) {
-    return this.discovery.getTopSellers(limit);
+  async getTopSellers(limit: number = 5, viewerId?: string) {
+    return this.discovery.getTopSellers(limit, viewerId);
   }
 
   /**
    * İsimle satıcı arama (autocomplete). Yalnızca aktif ürünü olan, banlı/silinmemiş
    * satıcıları döndürür — profili herkese açık olmayanları sızdırmaz.
    */
-  async searchSellers(query: string, limit: number = 8) {
-    return this.discovery.searchSellers(query, limit);
+  async searchSellers(query: string, limit: number = 8, viewerId?: string) {
+    return this.discovery.searchSellers(query, limit, viewerId);
   }
 
   async getBankAccount(userId: string) {

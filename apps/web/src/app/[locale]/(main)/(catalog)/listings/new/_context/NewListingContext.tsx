@@ -25,7 +25,7 @@ import {
   emptyListingValues,
   type NewListingValues,
 } from "../_lib/schema";
-import { getConditions } from "@/components/listings/form/constants";
+import { getConditions } from "@tarodan/listing-form";
 import {
   useListingCategories,
   useListingFilters,
@@ -33,13 +33,13 @@ import {
   useManufacturerAttributes,
   useListingLimits,
   useCommissionPreview,
-} from "@/components/listings/form/queries";
-import { useListingImageUpload } from "@/components/listings/form/useListingImageUpload";
+} from "@tarodan/listing-form";
+import { useListingImageUpload } from "@tarodan/listing-form";
 import {
   createEmptySaleData,
   saleDataToPayload,
   type SaleData,
-} from "@/components/listings/form";
+} from "@tarodan/listing-form";
 
 function useNewListingValue() {
   const router = useRouter();
@@ -117,6 +117,7 @@ function useNewListingValue() {
     brands,
     manufacturers: manufacturerList,
     brandsLoading,
+    optionsStatus,
   } = useListingFilters();
   const selectedBrandSlug = brands.find((b) => b.id === brandId)?.slug;
   const { models, modelsLoading } = useCarModels(selectedBrandSlug);
@@ -290,6 +291,7 @@ function useNewListingValue() {
     colorList,
     brands,
     brandsLoading,
+    optionsStatus,
     models,
     modelsLoading,
     manufacturerList,

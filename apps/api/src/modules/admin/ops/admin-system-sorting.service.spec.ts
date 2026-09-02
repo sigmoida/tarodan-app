@@ -74,7 +74,9 @@ describe("admin system and user list sorting", () => {
     expect(user.findMany).toHaveBeenNthCalledWith(
       2,
       expect.objectContaining({
-        where: { id: { in: ["user-b", "user-a"] } },
+        // `deletedAt: null` varsayılan hesap-durumu filtresi: silinmiş
+        // (anonimleştirilmiş) hesaplar listede görünmez.
+        where: { deletedAt: null, id: { in: ["user-b", "user-a"] } },
       }),
     );
     expect(result.meta).toEqual({
@@ -373,7 +375,7 @@ describe("admin system and user list sorting", () => {
 
   it("sorts user reports by type", async () => {
     const report = createDelegate();
-    const service = new UserReportService({ report } as any);
+    const service = new UserReportService({ report } as any, {} as any);
 
     await service.getAllReports({ sortBy: "type", sortOrder: "desc" });
 

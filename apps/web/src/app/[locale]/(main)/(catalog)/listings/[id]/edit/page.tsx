@@ -5,6 +5,7 @@ import { redirect } from "@/i18n/navigation";
 import { getLocale, getTranslations } from "next-intl/server";
 import { getSession } from "@/lib/server/session";
 import EditListingClient from "./EditListingClient";
+import ListingFormProvider from "@/components/listings/ListingFormProvider";
 
 export async function generateMetadata(): Promise<Metadata> {
   const t = await getTranslations();
@@ -30,5 +31,9 @@ export default async function EditListingPage({
       href: `/login?redirect=/listings/${id}/edit`,
       locale: await getLocale(),
     });
-  return <EditListingClient />;
+  return (
+    <ListingFormProvider>
+      <EditListingClient />
+    </ListingFormProvider>
+  );
 }

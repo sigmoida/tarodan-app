@@ -152,7 +152,12 @@ export default function CustomItemForm({
         <FormSelect
           name="scale"
           label={t("product.scale")}
-          placeholder={t("product.selectScale")}
+          placeholder={
+            filters.scales.length
+              ? t("product.selectScale")
+              : t("product.noOptionsDefined")
+          }
+          disabled={filters.scales.length === 0}
           options={filters.scales.map((s) => ({ value: s, label: s }))}
         />
       </div>
@@ -169,7 +174,12 @@ export default function CustomItemForm({
         <FormSelect
           name="material"
           label={t("product.material")}
-          placeholder={t("product.selectMaterial")}
+          placeholder={
+            filters.materials.length
+              ? t("product.selectMaterial")
+              : t("product.noOptionsDefined")
+          }
+          disabled={filters.materials.length === 0}
           options={filters.materials.map((m) => ({
             value: m.slug,
             label: m.label,

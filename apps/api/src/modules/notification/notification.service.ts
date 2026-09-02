@@ -43,6 +43,13 @@ export class NotificationService {
     return this.dispatch.createInAppNotification(userId, type, data);
   }
 
+  async notifyAllAdmins(
+    type: NotificationType,
+    data?: Record<string, any>,
+  ): Promise<number> {
+    return this.dispatch.notifyAllAdmins(type, data);
+  }
+
   async registerPushToken(userId: string, dto: RegisterPushTokenDto) {
     return this.dispatch.registerPushToken(userId, dto);
   }

@@ -1,5 +1,6 @@
 import { BadRequestException } from "@nestjs/common";
 import { TradeLifecycleService } from "./trade-lifecycle.service";
+import { userBlockServiceStub } from "../../user-block/user-block.testing";
 
 /**
  * Takas teklifi, ALICI da takas yetkisine sahipse oluşturulmalı.
@@ -47,6 +48,7 @@ describe("TradeLifecycleService.createTrade — alıcı yetkisi kapısı", () =>
       {} as any,
       {} as any,
       { quoteForTrade: jest.fn().mockResolvedValue(null) } as any,
+      userBlockServiceStub() as any,
     );
     return { service, prisma, canCreateTrade };
   };

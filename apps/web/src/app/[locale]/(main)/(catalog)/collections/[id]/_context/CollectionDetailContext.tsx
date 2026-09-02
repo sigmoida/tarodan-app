@@ -152,6 +152,12 @@ function useCollectionDetailValue() {
     );
   };
 
+  const [showReportModal, setShowReportModal] = useState(false);
+  const handleReport = () => {
+    if (!requireAuth({ message: t("auth.authRequiredMessage") })) return;
+    setShowReportModal(true);
+  };
+
   const handleShare = async () => {
     if (!collection) return;
     const url = window.location.href;
@@ -203,6 +209,9 @@ function useCollectionDetailValue() {
     authModal,
     handleLike,
     handleShare,
+    handleReport,
+    showReportModal,
+    setShowReportModal,
     handleRemoveItem,
   };
 }

@@ -8,6 +8,7 @@ import {
   XCircleIcon,
   TrashIcon,
   ArrowUturnLeftIcon,
+  PencilSquareIcon,
 } from "@heroicons/react/24/outline";
 import { SectionCard } from "@/components/detail/SectionCard";
 import type { ProductDetail } from "../_lib/types";
@@ -39,10 +40,21 @@ export function ProductSidebar({
     product.status !== "sold" &&
     product.status !== "reserved" &&
     product.status !== "deleted";
+  // Kaldırılmış ilan düzenlenemez (sunucu da reddeder); rezerve ilan bir
+  // işlemin ortasındadır ve alanları oynatmak siparişi bozar.
+  const canEdit = product.status !== "deleted" && product.status !== "reserved";
 
   return (
     <>
       <SectionCard title={t("common.actions")} bodyClassName="space-y-2">
+        {canEdit && (
+          <Button variant="primary" asChild className="w-full">
+            <Link href={`/catalog/products/${product.id}/edit`}>
+              <PencilSquareIcon className="h-5 w-5" />
+              {t("common.edit")}
+            </Link>
+          </Button>
+        )}
         {canApprove && (
           <Button
             variant="success"

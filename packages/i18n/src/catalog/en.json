@@ -839,7 +839,9 @@
     },
     "newListing": "New Listing",
     "originalPriceTry": "Original Price (₺)",
-    "imageFormatsHint": "JPEG, PNG, WebP, GIF · max {maxMb} MB"
+    "imageFormatsHint": "JPEG, PNG, WebP, GIF · max {maxMb} MB",
+    "noOptionsDefined": "No options defined for this field",
+    "optionsLoadFailed": "Options could not be loaded — refresh the page"
   },
   "cart": {
     "myCart": "My Cart",
@@ -1853,7 +1855,8 @@
     "nameRequired": "Name is required",
     "createFailed": "The collection could not be created",
     "selectCategoryOptional": "Select a category (optional)",
-    "itemCountShort": "{count} item(s)"
+    "itemCountShort": "{count} item(s)",
+    "report": "Report collection"
   },
   "notification": {
     "notifications": "Notifications",
@@ -2308,7 +2311,22 @@
       "iletisim": "İletişim",
       "hesap": "Hesap",
       "isletme": "İşletme",
-      "guvenlik": "Güvenlik"
+      "guvenlik": "Güvenlik",
+      "engellenenler": "Blocked Users"
+    },
+    "unblock": "Unblock",
+    "blockSeller": "Block seller",
+    "blockConfirmTitle": "Block {name}?",
+    "blockConfirmBody": "You won't see each other's listings, collections or profiles, and messages, offers and trades are closed both ways. You can lift the block any time from the Blocked Users page.",
+    "blockedToast": "{name} has been blocked",
+    "unblockedToast": "Block removed",
+    "blockFailed": "Could not block user",
+    "blockedPage": {
+      "title": "Blocked Users",
+      "description": "{count} users blocked",
+      "empty": "You haven't blocked anyone",
+      "emptyDesc": "You can block a user from their profile, a listing or your messages.",
+      "blockedAt": "Blocked on {date}"
     }
   },
   "review": {
@@ -3721,6 +3739,7 @@
         "metaRemarketing": "Meta (Facebook/Instagram) remarketing",
         "tiktokPixel": "TikTok Pixel — conversion measurement",
         "googleAdsRetargeting": "Google Ads & YouTube retargeting",
+        "googleAdsConversion": "Google Ads — ad click and conversion measurement",
         "yandexDirect": "Yandex Direct ad delivery"
       },
       "duration": {
@@ -4473,8 +4492,6 @@
         "membership": "Membership",
         "products": "Products",
         "orders": "Orders",
-        "banned": "Banned",
-        "unverified": "Unverified",
         "empty": "No sellers found",
         "totalSellers": "Total Sellers",
         "mostOrders": "Most Orders",
@@ -4793,7 +4810,16 @@
           "offer": "offer ID or product title",
           "trade": "trade ID",
           "userEmail": "user email"
-        }
+        },
+        "cronConfirmTitle": "Trigger cron",
+        "cronConfirmDescription": "The \"{label}\" job will be queued and run on the worker immediately. Continue?",
+        "cronProdWarning": "⚠ PROD — the job will run on real customer data.",
+        "cronResultDone": "Job completed — {summary}",
+        "cronResultDoneNoSummary": "Job completed",
+        "cronResultFailed": "Job failed: {reason}",
+        "cronResultPending": "Job still running — follow the result in the Bull history",
+        "cronResultRunning": "Job running…",
+        "cronResultNotFound": "The job record was trimmed from the queue history — it most likely completed; the result is no longer viewable"
       },
       "media": {
         "title": "Media",
@@ -4897,7 +4923,8 @@
         "color": "Color",
         "required": "Required",
         "groupNameRequired": "Name is required",
-        "valueRequired": "Value is required"
+        "valueRequired": "Value is required",
+        "usedInProducts": "in {count} product(s)"
       },
       "brands": {
         "title": "Brand Management",
@@ -5113,7 +5140,8 @@
         "bulkImportCreated": "{count} products were published as active",
         "bulkImportFileTooLarge": "{name} is too large. Each file can be at most {size}.",
         "bulkImportTooManyImages": "You can select at most {max} images.",
-        "bulkImportTotalTooLarge": "The selected files cannot exceed {size} in total."
+        "bulkImportTotalTooLarge": "The selected files cannot exceed {size} in total.",
+        "updated": "Listing updated"
       },
       "import": {
         "button": "Import from Excel",
@@ -5374,7 +5402,11 @@
         "budgetUsage": "Budget",
         "budgetStopped": "Budget spent",
         "platformCost": "Cost to the platform",
-        "budgetRemaining": "Remaining budget"
+        "budgetRemaining": "Remaining budget",
+        "searchUser": "Search by name or email",
+        "selectUsers": "Select people",
+        "userSearchFailed": "Users could not be loaded",
+        "noUserFound": "No user found"
       },
       "emailTemplates": {
         "title": "Email Templates",
@@ -6234,7 +6266,10 @@
         },
         "releaseEarly": "Release Early",
         "earlyReleaseHint": "Deliberate early release before the return window closes — a reason is required.",
-        "earlyReleaseWarning": "The return window has not closed yet: you are releasing this payout EARLY. This cannot be undone; any refund opened afterwards must be recovered from the seller. Undelivered orders or orders with an open refund are still rejected."
+        "earlyReleaseWarning": "The return window has not closed yet: you are releasing this payout EARLY. This cannot be undone; any refund opened afterwards must be recovered from the seller. Undelivered orders or orders with an open refund are still rejected.",
+        "transferQueuedInfo": "Transfer queued — it will be processed within seconds; follow it on the Transfers tab",
+        "transferQueueFallback": "Immediate transfer could not be queued — the hourly payout sweep will pick it up",
+        "transferDeferred": "No transfer row was created right now (blocked or already existing) — a pending transfer is processed immediately, a blocked one by the hourly sweep"
       },
       "tax": {
         "title": "Tax Settings",
@@ -7514,7 +7549,6 @@
       "filterAll": "All Users",
       "filterSellers": "Sellers",
       "filterBuyers": "Buyers",
-      "filterBanned": "Banned",
       "banned": "User banned",
       "unbanned": "User ban lifted",
       "banTitle": "Ban User",
@@ -7524,8 +7558,6 @@
       "unbanAction": "Lift Ban",
       "columnUser": "User",
       "seller": "Seller",
-      "verified": "Verified",
-      "notVerified": "Not Verified",
       "bannedBadge": "Banned",
       "membership": "Membership",
       "membershipFree": "Free",
@@ -7552,16 +7584,7 @@
         "bothShipped": "Shipped"
       },
       "detail": {
-        "banned": "User banned",
-        "unbanned": "User ban lifted",
-        "banTitle": "Ban User",
         "banReasonLabel": "Ban Reason",
-        "banReasonPlaceholder": "Describe the reason for the ban...",
-        "banConfirm": "Ban",
-        "banReasonRequired": "Ban reason is required",
-        "unbanTitle": "Lift Ban",
-        "unbanConfirmDesc": "Are you sure you want to lift this user's ban?",
-        "bannedBadge": "Banned",
         "infoTitle": "User Information",
         "ratingsCount": "({count} ratings)",
         "emailLabel": "Email",
@@ -7627,8 +7650,37 @@
         "noGivenRatings": "Hasn't given any ratings yet",
         "raterLabel": "Rated by",
         "rateeLabel": "Rated",
-        "anonymous": "Anonymous"
-      }
+        "anonymous": "Anonymous",
+        "blocksTab": "Blocks",
+        "blocksGivenTitle": "Blocked by this user",
+        "blocksReceivedTitle": "Blocked this user",
+        "blocksEmpty": "No block records"
+      },
+      "columnUserType": "User Type",
+      "userTypeBuyer": "Buyer",
+      "filterAccountStatusAll": "All Statuses",
+      "unbanConfirmDesc": "Are you sure you want to lift this user's ban?",
+      "resendVerification": "Send Activation Email",
+      "verifyEmail": "Activate Manually",
+      "verificationSent": "Activation email sent",
+      "emailVerifiedByAdmin": "Account activated",
+      "verifyEmailConfirmTitle": "Activate account manually",
+      "verifyEmailConfirmDesc": "The email will be treated as verified by an admin and the user will be able to sign in. Continue?",
+      "bulkBanTitle": "Ban {count} users",
+      "bulkUnbanTitle": "Lift ban for {count} users",
+      "bulkResendTitle": "Send activation email to {count} users",
+      "bulkVerifyTitle": "Activate {count} accounts manually",
+      "bulkConfirmDesc": "Ineligible rows in the selection are skipped. Continue?",
+      "bulkResult": "{ok} succeeded, {failed} failed",
+      "bulkFailedAll": "The action could not be applied to any user",
+      "emailVerified": "Email verified",
+      "emailNotVerified": "Email not verified",
+      "phoneVerified": "Phone verified",
+      "phoneNotVerified": "Phone not verified",
+      "bulkNoneEligible": "No selected user is eligible for this action",
+      "bulkResendQueued": "Activation e-mail queued for {ok} users",
+      "bulkResendQueuedPartial": "{ok} queued, {failed} failed",
+      "bulkResendConfirmDesc": "Activation e-mails are sent from the background queue; track the outcome in the e-mail logs. Ineligible rows are skipped. Continue?"
     },
     "roles": {
       "title": "Roles & Permissions",
@@ -8267,7 +8319,8 @@
           "template": "Template",
           "action": "Action",
           "entityType": "Entity type",
-          "shipmentLeg": "Shipment leg"
+          "shipmentLeg": "Shipment leg",
+          "accountStatus": "Account status"
         }
       },
       "bulkActionBar": {
@@ -8501,6 +8554,14 @@
       "priceDrop": {
         "title": "Price Drop! 🔥",
         "message": "The price of {productTitle} dropped from {oldPrice} TL to {newPrice} TL!"
+      },
+      "userBlockedAdmin": {
+        "title": "User Blocked",
+        "message": "{blockerName} blocked {blockedName}.{hasReason, select, yes { Reason: {reason}} other {}}"
+      },
+      "userReportedAdmin": {
+        "title": "New Report",
+        "message": "{reporterName} reported {type, select, product {a listing} collection {a collection} message {a message} other {a user}}: {reason, select, spam {Spam} inappropriate_content {Inappropriate Content} fake_product {Fake/Misleading Product} scam {Scam} harassment {Harassment} hate_speech {Hate Speech} counterfeit {Counterfeit Product} wrong_category {Wrong Category} misleading_info {Misleading Information} other {Other}}."
       },
       "wishlistItemSold": {
         "title": "You Missed It! 😢",
@@ -8793,6 +8854,7 @@
       "awaitingBuyerResponse": "Waiting for the buyer to respond to the current counter-offer; a new counter-offer cannot be made right now",
       "belowMinimumBuyerCounter": "Offer amount is too low. Product price: {productPrice} TL. Minimum: {minOffer} TL ({minOfferPercentage}% of the price).",
       "belowMinimumOffer": "Offer amount is too low. Product price: {productPrice} TL. Minimum offer: {minOffer} TL ({minOfferPercentage}% of the price). Your offer: {offerAmount} TL",
+      "blocked": "You cannot send an offer to this seller",
       "buyerCounterMustBeLower": "The buyer counter-offer must be lower than the seller's counter-offer",
       "buyerCounterOnlyAfterSellerCounter": "A buyer counter-offer can only be made in response to the seller's latest counter-offer",
       "cannotOfferOwnProduct": "You cannot make an offer on your own product",
@@ -8818,6 +8880,7 @@
     "trade": {
       "addressNotFound": "Address not found",
       "alreadyShipped": "You have already shipped",
+      "blocked": "You cannot start a trade with this user",
       "cannotAcceptInStatus": "A trade in status '{status}' cannot be accepted",
       "cannotCancelAfterBothShipped": "Cannot be cancelled after both parties have shipped",
       "cannotCancelAfterShippedToCargo": "The trade cannot be cancelled once the product has been handed to the courier. If there is a problem, open a dispute or contact support.",
@@ -8864,7 +8927,9 @@
       "accountBanned": "Your account is banned. You cannot create new orders.",
       "addressOnlyPendingPayment": "An address can only be added to orders awaiting payment",
       "atLeastOneProductRequired": "At least one product is required",
+      "cancelAfterHandover": "An order already handed to the carrier cannot be cancelled; open a refund request instead",
       "cancelForbidden": "You are not authorized to cancel this order",
+      "cancelReasonRequired": "A reason code is required to cancel a paid order",
       "cannotBuyOwnProduct": "You cannot buy your own product",
       "cannotCancelShipped": "The order cannot be cancelled after it has been shipped",
       "cartProductNotFound": "One of the products in your cart could not be found",
@@ -8872,6 +8937,8 @@
       "confirmOnlyDelivered": "Only delivered orders can be confirmed",
       "couponNotSupportedForGuest": "Coupon codes are not supported for guest checkout",
       "extendOnlyWithinWindow": "Can only be extended for orders within the 48h window",
+      "groupAlreadyCancelled": "All orders in this cart are already cancelled.",
+      "groupCancelBlockedShipped": "At least one order in this cart has been handed to the carrier — cart cancellation is closed. You can request a refund after delivery.",
       "groupNotFound": "Order group not found",
       "groupViewForbidden": "You are not authorized to view this order group",
       "guestOtpIncorrect": "Incorrect verification code",
@@ -8883,6 +8950,7 @@
       "invalidBillingAddress": "Invalid billing address",
       "invalidCouponCode": "Invalid coupon code",
       "invalidOffer": "Invalid offer",
+      "invalidPackageSize": "Invalid shipping package size",
       "invalidShippingAddress": "Invalid shipping address",
       "invoiceAccessForbidden": "You are not authorized to access this invoice",
       "invoiceNotUploaded": "No invoice has been uploaded for this order",
@@ -8915,6 +8983,7 @@
       "reactivateNotFromOffer": "This order cannot be reactivated because it was not created from an offer",
       "reactivateOfferNotAccepted": "The related offer is no longer accepted",
       "reactivateOnlyCancelled": "Only cancelled orders can be reactivated",
+      "sellerBlocked": "You cannot buy from this seller",
       "setAddressForbidden": "You are not authorized to add an address to this order",
       "shippingAddressCityRequired": "City is required for the shipping address",
       "shippingAddressDistrictRequired": "District is required for the shipping address",
@@ -8927,12 +8996,7 @@
       "statusChangeSystemOnly": "This status change is performed by the system",
       "statusTransitionNotAllowed": "Order status cannot be changed from {from} to {to}",
       "updateForbidden": "You are not authorized to update this order",
-      "viewForbidden": "You are not authorized to view this order",
-      "groupAlreadyCancelled": "All orders in this cart are already cancelled.",
-      "groupCancelBlockedShipped": "At least one order in this cart has been handed to the carrier — cart cancellation is closed. You can request a refund after delivery.",
-      "cancelReasonRequired": "A reason code is required to cancel a paid order",
-      "cancelAfterHandover": "An order already handed to the carrier cannot be cancelled; open a refund request instead",
-      "invalidPackageSize": "Invalid shipping package size"
+      "viewForbidden": "You are not authorized to view this order"
     },
     "payment": {
       "cancelPaymentForbidden": "You do not have permission to cancel this payment",
@@ -9108,12 +9172,18 @@
       "addressLimitReached": "You can add up to 3 addresses. Delete an existing address to add a new one.",
       "addressNotFound": "Address not found",
       "alreadyBlocked": "This user is already blocked",
+      "appealRejectedOnly": "Only a rejected document, or one sent back for revision, can be appealed",
+      "applicationLocked": "The application is not open to document changes at this stage",
       "bankAccountNotFound": "Bank account not found",
+      "blockLimitReached": "You have reached the block limit",
       "businessFeatureOnly": "This feature is only available to accounts with a business membership. Upgrade your membership.",
       "cannotBlockSelf": "You cannot block yourself",
       "cannotFollowSelf": "You cannot follow yourself",
       "cannotUnfollowSelf": "You cannot unfollow yourself",
+      "companyFieldsMissing": "Missing company details: {fields}",
       "companyNameRequired": "A company name is required to use the business dashboard. Please add your company name in your profile settings.",
+      "corporateApplicantsOnly": "Only users with a corporate seller application can upload documents",
+      "corporateApplicationNotFound": "Corporate application not found",
       "deleteAccountBlocked": "To delete your account, you must first complete the following:",
       "deleteAccountFailed": "An error occurred while deleting your account. Please contact support.",
       "deleteBlockedActiveListings": "You have {count} active listings. Please remove all of your listings first.",
@@ -9122,29 +9192,25 @@
       "deleteBlockedPaymentHolds": "You have {count} unsettled payment holds. Please wait for the money flow to finish.",
       "deleteBlockedPendingOrders": "You have {count} pending purchase/sale transactions. Please complete or cancel your orders.",
       "deleteBlockedPendingPayouts": "You have {count} unsettled seller payouts. Please wait for the payouts to finish.",
+      "documentFormats": "Only PDF, JPEG, PNG or WebP",
+      "documentNotFound": "Document not found",
+      "documentTypeMismatch": "The document type does not match the selected person's identity type",
+      "documentsIncomplete": "The required documents, plus the front and back of every owner's or partner's ID or passport, must be complete",
+      "interactionBlocked": "You cannot interact with this user",
+      "invalidDocumentType": "Invalid document type",
       "noFieldsToUpdate": "No fields to update were provided",
       "notBlocked": "This user is not blocked",
       "notFound": "User not found",
       "notSeller": "This user is not a seller account",
       "phoneAlreadyInUse": "This phone number is already in use",
+      "stakeholderNotFound": "Company owner or partner not found",
+      "stakeholderRequired": "Select the company owner or partner for an ID or passport document",
       "unfollowed": "Unfollowed",
+      "unknownOnboardingTour": "Unknown onboarding tour",
       "userBlocked": "{displayName} has been blocked",
       "userUnblocked": "Block removed",
-      "unknownOnboardingTour": "Unknown onboarding tour",
-      "corporateApplicantsOnly": "Only users with a corporate seller application can upload documents",
-      "applicationLocked": "The application is not open to document changes at this stage",
-      "invalidDocumentType": "Invalid document type",
-      "documentFormats": "Only PDF, JPEG, PNG or WebP",
-      "stakeholderRequired": "Select the company owner or partner for an ID or passport document",
-      "stakeholderNotFound": "Company owner or partner not found",
-      "documentTypeMismatch": "The document type does not match the selected person's identity type",
-      "corporateApplicationNotFound": "Corporate application not found",
-      "documentNotFound": "Document not found",
-      "appealRejectedOnly": "Only a rejected document, or one sent back for revision, can be appealed",
-      "documentsIncomplete": "The required documents, plus the front and back of every owner's or partner's ID or passport, must be complete",
-      "usernameFormat": "A username must be 3-30 characters and may contain only lowercase letters, digits, dots and underscores.",
       "usernameAlreadySet": "The username has already been set.",
-      "companyFieldsMissing": "Missing company details: {fields}"
+      "usernameFormat": "A username must be 3-30 characters and may contain only lowercase letters, digits, dots and underscores."
     },
     "membership": {
       "alreadyCancelled": "Membership has already been cancelled",
@@ -9236,7 +9302,9 @@
       },
       "user": {
         "notBanned": "The user is not banned",
-        "alreadyBanned": "The user is already banned"
+        "alreadyBanned": "The user is already banned",
+        "deleted": "This action is not available for a deleted account",
+        "verificationMailFailed": "The activation email could not be sent"
       },
       "catalog": {
         "categoryHasProducts": "This category still has products. Move them to another category first.",
@@ -9248,7 +9316,11 @@
         "attributeNotFound": "Attribute value not found",
         "brandInUse": "This brand cannot be deleted: it is linked to {products} products and {models} car models.",
         "attributeGroupInUse": "This group has {count} attribute values. Delete them first.",
-        "attributeInUse": "This attribute is used by {count} products. Remove it from them first."
+        "attributeInUse": "This attribute is used by {count} products. Remove it from them first.",
+        "attributeDeactivateInUse": "This attribute is used by {count} product(s) and cannot be deactivated. Remove it from the products first.",
+        "attributeLastInRequiredGroup": "The last active value of \"{group}\" cannot be removed: the listing form requires this field, and sellers cannot create a listing while the group is empty. Add another value first.",
+        "attributeGroupProtected": "\"{name}\" cannot be deactivated because the listing form requires it.",
+        "attributeGroupDeactivateInUse": "This group's values are used by {count} product(s), so the group cannot be deactivated."
       },
       "bulkImport": {
         "idempotencyKeyRequired": "A valid Idempotency-Key must be sent for a bulk import.",
@@ -9416,7 +9488,8 @@
         "reservedNotDeletable": "Reserved products cannot be deleted",
         "withActiveOrderNotDeletable": "Products with an active order cannot be deleted",
         "boostedNotHardDeletable": "A product with a boost record cannot be hard-deleted; deactivate it instead",
-        "restoreRemovedOnly": "Only removed products can be restored"
+        "restoreRemovedOnly": "Only removed products can be restored",
+        "rejectReasonRequired": "A rejection reason is required"
       },
       "membership": {
         "monthlyPriceRange": "The monthly membership price must be between 0 and 1,000,000",
@@ -9452,6 +9525,9 @@
         "onlyXlsx": "Only .xlsx Excel files can be uploaded.",
         "fileTooLarge": "The file may be at most {max} MB.",
         "missingColumns": "Missing Excel columns: {columns}. Download the sample file again."
+      },
+      "testTools": {
+        "jobIdRequired": "A job id is required"
       }
     },
     "advertisement": {
@@ -9532,6 +9608,7 @@
       "imageUploadFailed": "Image upload failed"
     },
     "messaging": {
+      "blocked": "You cannot message this user",
       "messageNotFound": "Message not found",
       "recipientRequired": "A recipient user ID is required (recipientId or participantId)",
       "selfMessage": "You cannot send a message to yourself",
@@ -9620,7 +9697,6 @@
       "twoFactorDisabled": "Two-factor authentication is not enabled",
       "tokenAlreadyUsed": "This token has already been used",
       "currentPasswordWrong": "The current password is incorrect",
-      "invalidToken": "Invalid verification token",
       "accessBlocked": "Access blocked"
     },
     "storage": {
@@ -9858,6 +9934,12 @@
     },
     "shipmentProvider": {
       "surat": "Sürat Kargo"
+    },
+    "accountStatus": {
+      "active": "Active",
+      "pending_activation": "Pending Activation",
+      "banned": "Banned",
+      "deleted": "Deleted"
     }
   },
   "page": {

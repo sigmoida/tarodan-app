@@ -16,6 +16,7 @@ import {
   MembershipTierType,
   SubscriptionStatus,
 } from "@prisma/client";
+import { ACCOUNT_STATUSES, type AccountStatus } from "@tarodan/types";
 import { AdminListQueryDto } from "../../../common/list";
 
 export class AdminUserQueryDto extends AdminListQueryDto {
@@ -24,12 +25,18 @@ export class AdminUserQueryDto extends AdminListQueryDto {
   @IsString()
   search?: string;
 
+  // Query string'den "false" gelince de false olmalı; dönüşümsüz hali "false"
+  // metnini truthy olarak Prisma'ya geçiriyordu (Alıcılar filtresi çalışmıyordu).
   @ApiPropertyOptional({ example: true })
   @IsOptional()
+  @Transform(({ value }) => value === "true" || value === true)
+  @IsBoolean()
   isSeller?: boolean;
 
   @ApiPropertyOptional({ example: true })
   @IsOptional()
+  @Transform(({ value }) => value === "true" || value === true)
+  @IsBoolean()
   isVerified?: boolean;
 
   @ApiPropertyOptional({ example: true })
@@ -37,6 +44,15 @@ export class AdminUserQueryDto extends AdminListQueryDto {
   @Transform(({ value }) => value === "true" || value === true)
   @IsBoolean()
   isBanned?: boolean;
+
+  /**
+   * Türetilmiş hesap durumu (deletedAt / isBanned / isEmailVerified).
+   * Verilmezse silinmiş hesaplar listelenmez.
+   */
+  @ApiPropertyOptional({ enum: ACCOUNT_STATUSES })
+  @IsOptional()
+  @IsIn(ACCOUNT_STATUSES)
+  accountStatus?: AccountStatus;
 
   /** Filter by current membership tier (free/basic/premium/business). */
   @ApiPropertyOptional({ enum: MembershipTierType })

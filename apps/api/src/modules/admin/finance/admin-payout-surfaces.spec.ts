@@ -19,7 +19,13 @@ describe("AdminPayoutService — transfer ve borç listeleri", () => {
       order: { findMany: jest.fn().mockResolvedValue([]) },
       ...overrides,
     };
-    const service = new AdminPayoutService(prisma as any, {} as any, {} as any);
+    const service = new AdminPayoutService(
+      prisma as any,
+      {} as any,
+      {} as any,
+      {} as any, // payoutCore — bu spec'in konusu değil
+      {} as any, // scheduledQueue
+    );
     return { service, prisma };
   };
 
@@ -78,7 +84,13 @@ describe("AdminPayoutService.getPayoutsSummary — transfer ayrışması", () =>
         count: jest.fn().mockResolvedValue(1), // failed/returned
       },
     };
-    const service = new AdminPayoutService(prisma as any, {} as any, {} as any);
+    const service = new AdminPayoutService(
+      prisma as any,
+      {} as any,
+      {} as any,
+      {} as any, // payoutCore — bu spec'in konusu değil
+      {} as any, // scheduledQueue
+    );
 
     const result = await service.getPayoutsSummary();
 

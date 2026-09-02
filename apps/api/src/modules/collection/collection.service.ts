@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger } from "@nestjs/common";
 import {
   CreateCollectionDto,
   UpdateCollectionDto,
@@ -7,11 +7,11 @@ import {
   CollectionResponseDto,
   CollectionListResponseDto,
   CollectionItemResponseDto,
-} from './dto';
-import { CollectionCrudService } from './collection-crud.service';
-import { CollectionCoverService } from './collection-cover.service';
-import { CollectionItemsService } from './collection-items.service';
-import { CollectionSocialService } from './collection-social.service';
+} from "./dto";
+import { CollectionCrudService } from "./collection-crud.service";
+import { CollectionCoverService } from "./collection-cover.service";
+import { CollectionItemsService } from "./collection-items.service";
+import { CollectionSocialService } from "./collection-social.service";
 
 /**
  * CollectionService (facade) — her public imza aynen korunur. CRUD/okuma/browse
@@ -81,12 +81,27 @@ export class CollectionService {
   async browsePublicCollections(
     page?: number,
     pageSize?: number,
-    sortBy: 'popular' | 'recent' | 'name' | 'items' | 'items_asc' | 'items_desc' = 'popular',
+    sortBy:
+      | "popular"
+      | "recent"
+      | "name"
+      | "items"
+      | "items_asc"
+      | "items_desc" = "popular",
     search?: string,
     categoryId?: string,
     categorySlug?: string,
+    viewerId?: string,
   ): Promise<CollectionListResponseDto> {
-    return this.crud.browsePublicCollections(page, pageSize, sortBy, search, categoryId, categorySlug);
+    return this.crud.browsePublicCollections(
+      page,
+      pageSize,
+      sortBy,
+      search,
+      categoryId,
+      categorySlug,
+      viewerId,
+    );
   }
 
   // ==========================================================================
@@ -108,7 +123,11 @@ export class CollectionService {
     userId: string,
     coverImageKey: string,
   ): Promise<CollectionResponseDto> {
-    return this.cover.updateCollectionCover(collectionId, userId, coverImageKey);
+    return this.cover.updateCollectionCover(
+      collectionId,
+      userId,
+      coverImageKey,
+    );
   }
 
   // ==========================================================================
@@ -162,14 +181,20 @@ export class CollectionService {
   // ==========================================================================
   // LIKE COLLECTION (delegate → CollectionSocialService)
   // ==========================================================================
-  async likeCollection(idOrSlug: string, userId: string): Promise<{ liked: boolean; likeCount: number }> {
+  async likeCollection(
+    idOrSlug: string,
+    userId: string,
+  ): Promise<{ liked: boolean; likeCount: number }> {
     return this.social.likeCollection(idOrSlug, userId);
   }
 
   // ==========================================================================
   // UNLIKE COLLECTION (delegate → CollectionSocialService)
   // ==========================================================================
-  async unlikeCollection(idOrSlug: string, userId: string): Promise<{ liked: boolean; likeCount: number }> {
+  async unlikeCollection(
+    idOrSlug: string,
+    userId: string,
+  ): Promise<{ liked: boolean; likeCount: number }> {
     return this.social.unlikeCollection(idOrSlug, userId);
   }
 

@@ -6,8 +6,17 @@ import { fmtDate, fmtDateTime } from "@/lib/format";
 import { SectionCard } from "@/components/detail/SectionCard";
 import { type UserDetail } from "../types";
 
-function Verified({ ok }: { ok: boolean }) {
+/** "Doğrulanmış" tek başına neyin doğrulandığını söylemiyordu; rozet kanalını da söyler. */
+function Verified({ kind, ok }: { kind: "email" | "phone"; ok: boolean }) {
   const t = useTranslations();
+  const label =
+    kind === "email"
+      ? ok
+        ? t("admin.users.emailVerified")
+        : t("admin.users.emailNotVerified")
+      : ok
+        ? t("admin.users.phoneVerified")
+        : t("admin.users.phoneNotVerified");
   return (
     <Badge
       className="mt-1"
@@ -15,7 +24,7 @@ function Verified({ ok }: { ok: boolean }) {
       variant={ok ? "success" : "default"}
       icon={ok ? <CheckCircleIcon className="h-3.5 w-3.5" /> : undefined}
     >
-      {ok ? t("admin.users.verified") : t("admin.users.notVerified")}
+      {label}
     </Badge>
   );
 }
@@ -44,13 +53,13 @@ export function UserInfoSection({ user }: { user: UserDetail }) {
       <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
         <Item label={t("admin.users.detail.emailLabel")}>
           <p className="font-medium text-heading">{user.email}</p>
-          <Verified ok={user.isEmailVerified} />
+          <Verified kind="email" ok={user.isEmailVerified} />
         </Item>
         <Item label={t("common.phone")}>
           <p className="font-medium text-heading">
             {user.phone || t("admin.operations.common.notSpecified")}
           </p>
-          {user.phone && <Verified ok={user.isPhoneVerified} />}
+          {user.phone && <Verified kind="phone" ok={user.isPhoneVerified} />}
         </Item>
         <Item label={t("admin.users.registeredAt")}>
           <p className="text-heading">{fmtDate(user.createdAt)}</p>
@@ -108,8 +117,8 @@ export function UserInfoSection({ user }: { user: UserDetail }) {
                   variant={user.bankAccount.isVerified ? "success" : "warning"}
                 >
                   {user.bankAccount.isVerified
-                    ? t("admin.users.verified")
-                    : t("admin.users.notVerified")}
+                    ? t("profile.bank.verified")
+                    : t("profile.bank.unverified")}
                 </Badge>
               )}
             </div>

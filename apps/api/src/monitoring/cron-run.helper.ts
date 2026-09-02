@@ -54,9 +54,16 @@ export async function runTrackedJob(
 
   // CronTracker: /admin/jobs + Sentry check-in besle. track() sonucu döndürür ve hatayı
   // AYNEN rethrow eder → Bull yine "failed" işaretler; davranış korunur.
+  //
+  // YALNIZ zamanlanmış koşumlar izlenir: repeatable'dan doğan her fişte
+  // `opts.repeat.cron` vardır; manuel/tek-seferlik fişlerde (test aracı,
+  // admin-release fast-path'i, Bull Board retry) yoktur. Manuel fiş tracker'a
+  // girseydi /admin/jobs'ta schedule "bull"a ezilir, runs/failures sayaçları
+  // kirlenir ve Sentry cron monitörü yanlış alarm üretir ya da gerçekten
+  // kaçmış bir zamanlanmış koşumun "missed" alarmını maskelerdi. Manuel koşum
+  // Bull Board'da (log/Veri/Hata sekmeleri) görünmeye devam eder.
   const tracker = getCronTracker();
-  if (!tracker) return exec();
-  const schedule =
-    (job?.opts as { repeat?: { cron?: string } })?.repeat?.cron ?? "bull";
-  return tracker.track(jobName, schedule, exec);
+  const cron = (job?.opts as { repeat?: { cron?: string } })?.repeat?.cron;
+  if (!tracker || !cron) return exec();
+  return tracker.track(jobName, cron, exec);
 }

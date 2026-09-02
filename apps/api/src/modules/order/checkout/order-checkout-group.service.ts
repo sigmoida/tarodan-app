@@ -7,6 +7,7 @@ import {
   Optional,
 } from "@nestjs/common";
 import { PrismaService } from "../../../prisma";
+import { UserBlockService } from "../../user-block/user-block.service";
 import { buyerTotalOf } from "../helpers/order-total.helper";
 import { chargedProductBaseOf } from "../helpers/order-charged-base.helper";
 import { paymentWindowEnd } from "../../payment/helpers/payment.constants";
@@ -71,6 +72,7 @@ export class OrderCheckoutGroupService {
     private readonly orderPricing: OrderPricingService,
     private readonly orderCommon: OrderCommonService,
     private readonly checkoutCommon: OrderCheckoutCommonService,
+    private readonly userBlocks: UserBlockService,
     @Optional()
     private readonly feeDiscounts?: OrderFeeDiscountService,
   ) {}
@@ -293,6 +295,14 @@ export class OrderCheckoutGroupService {
             if (!isGuest && product.sellerId === buyerId) {
               throw new ForbiddenException(
                 i18nMessage("server.order.cannotBuyOwnProduct"),
+              );
+            }
+            // Engelli çift arasında sipariş açılmaz (misafirde alıcı yok).
+            if (!isGuest) {
+              await this.userBlocks.assertNotBlocked(
+                buyerId,
+                product.sellerId,
+                "server.order.sellerBlocked",
               );
             }
           }

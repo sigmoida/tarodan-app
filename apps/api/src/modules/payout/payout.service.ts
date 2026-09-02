@@ -12,6 +12,7 @@ import {
   PaymentHoldStatus,
   PaymentStatus,
   OrderStatus,
+  Prisma,
   RefundRequestStatus,
   RefundAttemptStatus,
   LedgerAccount,
@@ -76,6 +77,22 @@ function entitledNetFromHold(hold: {
   refundedAmount?: unknown;
 }): number {
   return Number(hold.amount) - Number(hold.refundedAmount ?? 0);
+}
+
+/**
+ * P2002 (unique ihlali) = payout'u eşzamanlı İKİNCİ üretici çoktan oluşturdu.
+ * İki üretici var: saatlik cron süpürmesi ve admin manuel release fast-path'i
+ * (createPayoutsForReleasedHolds scoped çağrısı). İkisi de adayları
+ * `payoutTransfer: null` anlık görüntüsüyle okur; pencere içinde diğeri
+ * commit'lerse buradaki create paymentHoldId/tradeCashPaymentId unique'ine
+ * takılır. Bu bir hata değil "iş zaten yapılmış" durumudur — yutulmazsa tek
+ * yarış, scope'suz süpürmenin döngüsünü ortadan keser ve o turda kalan TÜM
+ * hold'lar payout'suz kalırdı (bir sonraki saate kadar).
+ */
+function isUniqueViolation(e: unknown): boolean {
+  return (
+    e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2002"
+  );
 }
 
 @Injectable()
@@ -205,22 +222,43 @@ export class PayoutService {
   /**
    * Create PayoutTransfer records for all newly released holds.
    * Called after releaseHoldsDue() marks holds as released.
+   *
+   * `scope` (opsiyonel): admin manuel release fast-path'i tek sipariş/takas
+   * için çağırır — sınırsız tarama + ilgisiz hold başına iade-guard sorgusu
+   * yapmasın diye. `orderId` verilirse yalnız o siparişin hold'ları taranır ve
+   * takas bölümü atlanır; `tradeId` verilirse tersi. Scope'suz çağrı (saatlik
+   * cron süpürmesi) birebir eski davranıştır. Her iki yol da idempotenttir
+   * (payoutTransfer:null filtresi + paymentHoldId/transId unique).
+   *
+   * Tip AYRIK birliktir (opsiyonel alanlı tek obje değil): `{}` ya da
+   * `{ orderId: undefined }` geçen bir çağıran iki bölümü de sessizce atlar ve
+   * 0 "yapılacak iş yok" gibi okunurdu — eksik kimlik derleme hatası olmalı.
    */
-  async createPayoutsForReleasedHolds(): Promise<number> {
+  async createPayoutsForReleasedHolds(
+    scope?: { orderId: string } | { tradeId: string },
+  ): Promise<number> {
+    const scopedOrderId =
+      scope && "orderId" in scope ? scope.orderId : undefined;
+    const scopedTradeId =
+      scope && "tradeId" in scope ? scope.tradeId : undefined;
     // 1) Order PaymentHolds released but no PayoutTransfer yet
-    const releasedHolds = await this.prisma.paymentHold.findMany({
-      where: {
-        status: PaymentHoldStatus.released,
-        payoutTransfer: null,
-        // MONEY-M3: donuk (açık iade ile kilitli) hold'a payout OLUŞTURMA — defansif;
-        // releaseHoldsDue zaten frozen'ı release etmez ama katmanlı guard.
-        frozenByRefundId: null,
-      },
-      include: {
-        payment: true,
-        seller: { include: { bankAccount: true } },
-      },
-    });
+    const releasedHolds =
+      scope && !scopedOrderId
+        ? []
+        : await this.prisma.paymentHold.findMany({
+            where: {
+              status: PaymentHoldStatus.released,
+              payoutTransfer: null,
+              // MONEY-M3: donuk (açık iade ile kilitli) hold'a payout OLUŞTURMA — defansif;
+              // releaseHoldsDue zaten frozen'ı release etmez ama katmanlı guard.
+              frozenByRefundId: null,
+              ...(scopedOrderId ? { orderId: scopedOrderId } : {}),
+            },
+            include: {
+              payment: true,
+              seller: { include: { bankAccount: true } },
+            },
+          });
 
     // KRİTİK: Sipariş, payment.order üzerinden DEĞİL hold.orderId üzerinden yüklenir.
     // Grup/sepet ödemelerinde Payment.orderId=null (checkoutGroupId'ye bağlı) olduğundan
@@ -306,26 +344,35 @@ export class PayoutService {
         continue;
       }
 
-      await this.prisma.payoutTransfer.create({
-        data: {
-          paymentHoldId: hold.id,
-          sellerId: hold.sellerId,
-          amount: order.totalAmount,
-          commission: order.commissionAmount,
-          // Sipariş anında kesilen stopaj snapshot'ı (hold.amount zaten stopaj düşülmüş).
-          // Muhtasar raporu completed transferlerin bu alanından beslenir. Kısmi iadede
-          // stopaj yeniden hesaplanmaz (bilinen kenar durum — satıcı beyannamede mahsup eder).
-          withholdingTax: order.withholdingTaxAmount ?? 0,
-          netAmount: netPayout,
-          merchantOid,
-          transId,
-          transferIban: bankAccount?.iban || "",
-          transferName: bankAccount?.accountHolder || "",
-          status: bankAccount ? PayoutStatus.pending : PayoutStatus.failed,
-          failureReason: bankAccount ? null : "no_bank_account",
-        },
-      });
-      created++;
+      try {
+        await this.prisma.payoutTransfer.create({
+          data: {
+            paymentHoldId: hold.id,
+            sellerId: hold.sellerId,
+            amount: order.totalAmount,
+            commission: order.commissionAmount,
+            // Sipariş anında kesilen stopaj snapshot'ı (hold.amount zaten stopaj düşülmüş).
+            // Muhtasar raporu completed transferlerin bu alanından beslenir. Kısmi iadede
+            // stopaj yeniden hesaplanmaz (bilinen kenar durum — satıcı beyannamede mahsup eder).
+            withholdingTax: order.withholdingTaxAmount ?? 0,
+            netAmount: netPayout,
+            merchantOid,
+            transId,
+            transferIban: bankAccount?.iban || "",
+            transferName: bankAccount?.accountHolder || "",
+            status: bankAccount ? PayoutStatus.pending : PayoutStatus.failed,
+            failureReason: bankAccount ? null : "no_bank_account",
+          },
+        });
+        created++;
+      } catch (e) {
+        // Yarış: diğer üretici bu hold'un payout'unu az önce oluşturdu — atla,
+        // döngü kalan hold'larla devam etsin. Diğer her hata yükselir.
+        if (!isUniqueViolation(e)) throw e;
+        this.logger.warn(
+          `Payout for hold ${hold.id} already created by a concurrent producer — skipping`,
+        );
+      }
     }
 
     // 2) TradeCashPayment released but no PayoutTransfer yet
@@ -333,19 +380,23 @@ export class PayoutService {
     // v2: her takasta İKİ ödeme satırı vardır ama karşı tarafa geçen tek kalem nakit
     // farktır — hizmet bedeli ve kargo platformda kalır. Farkı olmayan tarafın
     // satırında `recipientId` NULL'dur; onu buraya almak alıcısız transfer üretirdi.
-    const releasedTradeCash = await this.prisma.tradeCashPayment.findMany({
-      where: {
-        status: PaymentStatus.completed,
-        releasedAt: { not: null },
-        payoutTransfers: { none: {} },
-        recipientId: { not: null },
-        amount: { gt: 0 },
-      },
-      include: {
-        trade: true,
-        payment: true,
-      },
-    });
+    const releasedTradeCash =
+      scope && !scopedTradeId
+        ? []
+        : await this.prisma.tradeCashPayment.findMany({
+            where: {
+              status: PaymentStatus.completed,
+              releasedAt: { not: null },
+              payoutTransfers: { none: {} },
+              recipientId: { not: null },
+              amount: { gt: 0 },
+              ...(scopedTradeId ? { tradeId: scopedTradeId } : {}),
+            },
+            include: {
+              trade: true,
+              payment: true,
+            },
+          });
 
     for (const tcp of releasedTradeCash) {
       if (tcp.payment) {
@@ -389,22 +440,29 @@ export class PayoutService {
       );
       const bankAccount = recipient.bankAccount;
 
-      await this.prisma.payoutTransfer.create({
-        data: {
-          tradeCashPaymentId: tcp.id,
-          sellerId: recipientId,
-          amount: tcp.totalAmount,
-          commission: tcp.commission,
-          netAmount: tcp.amount,
-          merchantOid,
-          transId,
-          transferIban: bankAccount?.iban || "",
-          transferName: bankAccount?.accountHolder || "",
-          status: bankAccount ? PayoutStatus.pending : PayoutStatus.failed,
-          failureReason: bankAccount ? null : "no_bank_account",
-        },
-      });
-      created++;
+      try {
+        await this.prisma.payoutTransfer.create({
+          data: {
+            tradeCashPaymentId: tcp.id,
+            sellerId: recipientId,
+            amount: tcp.totalAmount,
+            commission: tcp.commission,
+            netAmount: tcp.amount,
+            merchantOid,
+            transId,
+            transferIban: bankAccount?.iban || "",
+            transferName: bankAccount?.accountHolder || "",
+            status: bankAccount ? PayoutStatus.pending : PayoutStatus.failed,
+            failureReason: bankAccount ? null : "no_bank_account",
+          },
+        });
+        created++;
+      } catch (e) {
+        if (!isUniqueViolation(e)) throw e;
+        this.logger.warn(
+          `Payout for trade cash ${tcp.id} already created by a concurrent producer — skipping`,
+        );
+      }
     }
 
     if (created > 0) {

@@ -90,6 +90,11 @@ export {
   CardFooter,
   type CardProps,
 } from "./components/Card";
+// Uygulama genelindeki TEK kartlı çerçeve: yüzey + kenarlık + yarıçap +
+// dolgu, isteğe bağlı başlık/rozet/aksiyon. İlan formu artık iki
+// uygulamada da kullandığı için web'den buraya taşındı.
+export { default as SectionCard } from "./components/SectionCard";
+export type { SectionCardProps } from "./components/SectionCard";
 export { Badge, badgeVariants, type BadgeProps } from "./components/Badge";
 export { StatusBadge, type StatusBadgeProps } from "./components/StatusBadge";
 export {
@@ -229,6 +234,7 @@ export {
   paymentHoldStatusConfig,
   payoutStatusConfig,
   subscriptionStatusConfig,
+  accountStatusConfig,
   discountTypeConfig,
   discountScopeConfig,
   messageStatusConfig,

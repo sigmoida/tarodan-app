@@ -41,6 +41,12 @@ export interface Discount {
   audience: DiscountAudience;
   targetTierTypes?: string[];
   targetUserIds?: string[];
+  /** Hedeflenen kişiler, adlarıyla — düzenleme formundaki çipler için. */
+  targetUsers?: Array<{
+    id: string;
+    displayName?: string | null;
+    email?: string | null;
+  }>;
   budgetLimit: number | null;
   budgetSpent: number;
   budgetStoppedAt: string | null;

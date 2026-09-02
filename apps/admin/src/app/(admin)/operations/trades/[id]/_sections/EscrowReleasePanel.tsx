@@ -4,6 +4,7 @@ import { Button } from "@tarodan/ui";
 import { BanknotesIcon } from "@heroicons/react/24/outline";
 import { useTranslations } from "next-intl";
 import { adminApi } from "@/lib/api";
+import { toastReleaseFastPath } from "@/components/finance/release-fast-path";
 import { fmtDateTime } from "@/lib/format";
 import { useSession } from "@/context/SessionContext";
 import { usePrompt } from "@/provider/PromptProvider";
@@ -25,8 +26,17 @@ export function EscrowReleasePanel({ trade }: { trade: TradeDetail }) {
     ({ reason, early }: { reason: string; early: boolean }) =>
       adminApi.releaseTradeHold(trade.id, reason, early),
     {
-      invalidates: ["trades"],
+      // Fast-path anında bir PayoutTransfer (pending) satırı oluşturur — finans
+      // ekranındaki Transferler sekmesi ve özet de tazelensin.
+      invalidates: ["trades", "payouts-transfers", "payouts-summary"],
       successMessage: t("admin.operations.trades.escrowReleasedMsg"),
+      onSuccess: (res) => {
+        toastReleaseFastPath(res?.data, {
+          queued: t("admin.finance.payouts.transferQueuedInfo"),
+          deferred: t("admin.finance.payouts.transferDeferred"),
+          fallback: t("admin.finance.payouts.transferQueueFallback"),
+        });
+      },
     },
   );
 

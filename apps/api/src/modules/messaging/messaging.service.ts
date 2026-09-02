@@ -30,6 +30,8 @@ import {
   publicName,
 } from "../../common/helpers/public-identity";
 import { i18nMessage } from "../i18n";
+import { UserBlockService } from "../user-block/user-block.service";
+import { excludeIds } from "../user-block/user-block.helpers";
 
 // Daily message limit - now read from platform settings (default: 50)
 
@@ -44,6 +46,7 @@ export class MessagingService {
     @Optional()
     private readonly storageService: StorageService,
     private readonly realtime: RealtimeService,
+    private readonly userBlocks: UserBlockService,
   ) {}
 
   private async resolveAvatarUrl(
@@ -103,6 +106,8 @@ export class MessagingService {
     if (!recipient) {
       throw new NotFoundException(i18nMessage("server.trade.receiverNotFound"));
     }
+
+    await this.assertNotBlocked(senderId, recipientId);
 
     // Verify product if provided
     if (dto.productId) {
@@ -220,6 +225,8 @@ export class MessagingService {
         ? thread.participant2Id
         : thread.participant1Id;
 
+    await this.assertNotBlocked(senderId, receiverId);
+
     // Apply content filtering
     const filterResult = await this.contentFilterService.moderateWithAI(
       dto.content,
@@ -322,8 +329,19 @@ export class MessagingService {
   ): Promise<ThreadListResponseDto> {
     const { page = 1, pageSize = 20 } = query;
 
+    // Engellenen / engelleyen kişilerin konuları listeden düşer (simetrik).
+    // Konu silinmez: engel kalkınca geçmiş olduğu gibi geri gelir.
+    const hidden = await this.userBlocks.getHiddenUserIds(userId);
     const where: Prisma.MessageThreadWhereInput = {
       OR: [{ participant1Id: userId }, { participant2Id: userId }],
+      ...(hidden.length > 0
+        ? {
+            NOT: [
+              { participant1Id: { in: hidden } },
+              { participant2Id: { in: hidden } },
+            ],
+          }
+        : {}),
     };
 
     const [threads, total] = await Promise.all([
@@ -424,13 +442,21 @@ export class MessagingService {
    * = receiverId=me, okunmamış, görünür statü.
    */
   async getUnreadMessageCount(userId: string): Promise<number> {
+    // Rozet, listede görünmeyen (engelli) konuların mesajlarını saymasın.
+    const hidden = await this.userBlocks.getHiddenUserIds(userId);
     return this.prisma.message.count({
       where: {
         receiverId: userId,
         readAt: null,
         status: { in: [MessageStatus.sent, MessageStatus.approved] },
+        senderId: excludeIds(hidden),
       },
     });
+  }
+
+  /** İki yönlü engel varsa konu açma/okuma/yazma 403 (Apple: abuse stop). */
+  private assertNotBlocked(a: string, b: string): Promise<void> {
+    return this.userBlocks.assertNotBlocked(a, b, "server.messaging.blocked");
   }
 
   // ==========================================================================
@@ -455,6 +481,9 @@ export class MessagingService {
         i18nMessage("server.messaging.viewForbidden"),
       );
     }
+
+    // Listeden düşen (engelli) konu derin linkle de açılmasın.
+    await this.assertNotBlocked(thread.participant1Id, thread.participant2Id);
 
     const [participant1, participant2, product, lastMessage, unreadCount] =
       await Promise.all([
@@ -538,6 +567,9 @@ export class MessagingService {
         i18nMessage("server.messaging.viewForbidden"),
       );
     }
+
+    // Engelli çift geçmişi okuyamaz; okundu bilgisi de karşı tarafa sızmaz.
+    await this.assertNotBlocked(thread.participant1Id, thread.participant2Id);
 
     const where: Prisma.MessageWhereInput = {
       threadId,

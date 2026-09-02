@@ -19,6 +19,12 @@ import {
   SCALE_GROUP_SLUG,
   MATERIAL_GROUP_SLUG,
 } from "../../../common/helpers/attribute-groups";
+import { excludeIds } from "../../user-block/user-block.helpers";
+
+/** Engelli satıcılar (simetrik) öneri sonuçlarından `must_not terms` ile düşer. */
+function excludeSellersEs(ids: string[]) {
+  return ids.length > 0 ? { must_not: [{ terms: { sellerId: ids } }] } : {};
+}
 
 /**
  * Otomatik tamamlama alt servisi (search.service.ts'ten birebir taşındı):
@@ -39,9 +45,13 @@ export class SearchAutocompleteService {
 
   // ──────────────────────────── Autocomplete ────────────────────────────
 
-  async autocomplete(query: string, limit = 10): Promise<string[]> {
+  async autocomplete(
+    query: string,
+    limit = 10,
+    excludeSellerIds: string[] = [],
+  ): Promise<string[]> {
     if (!this.common.isAvailable())
-      return this.fallbackAutocomplete(query, limit);
+      return this.fallbackAutocomplete(query, limit, excludeSellerIds);
 
     try {
       const response = await this.common.client.search({
@@ -90,6 +100,7 @@ export class SearchAutocompleteService {
               ...saleCapableEsFilters(),
               { term: { productKind: ProductKind.listing } },
             ],
+            ...excludeSellersEs(excludeSellerIds),
           },
         },
         _source: ["title"],
@@ -102,13 +113,14 @@ export class SearchAutocompleteService {
         .slice(0, limit);
     } catch (error) {
       this.logger.warn("Elasticsearch autocomplete error, using fallback");
-      return this.fallbackAutocomplete(query, limit);
+      return this.fallbackAutocomplete(query, limit, excludeSellerIds);
     }
   }
 
   private async fallbackAutocomplete(
     query: string,
     limit: number,
+    excludeSellerIds: string[] = [],
   ): Promise<string[]> {
     const productIds = await fulltextProductSearch(this.prisma, query, limit);
     if (productIds.length === 0) return [];
@@ -118,6 +130,7 @@ export class SearchAutocompleteService {
         id: { in: productIds },
         status: ProductStatus.active,
         seller: saleCapableSellerWhere(),
+        sellerId: excludeIds(excludeSellerIds),
         kind: ProductKind.listing,
       },
       select: { title: true },
@@ -129,7 +142,10 @@ export class SearchAutocompleteService {
 
   // ──────────────────────────── Rich Autocomplete ────────────────────────────
 
-  async autocompleteRich(query: string): Promise<{
+  async autocompleteRich(
+    query: string,
+    excludeSellerIds: string[] = [],
+  ): Promise<{
     products: Array<{
       id: string;
       title: string;
@@ -188,7 +204,7 @@ export class SearchAutocompleteService {
       conditions,
       suggestions,
     ] = await Promise.all([
-      this.richAutocompleteProducts(trimmed, 5),
+      this.richAutocompleteProducts(trimmed, 5, excludeSellerIds),
       this.richAutocompleteBrands(trimmed, 3),
       this.richAutocompleteCategories(trimmed, 3),
       this.richAutocompleteManufacturers(trimmed, 3),
@@ -196,7 +212,7 @@ export class SearchAutocompleteService {
       this.richAutocompleteScales(trimmed, 5),
       this.richAutocompleteMaterials(trimmed, 5),
       this.richAutocompleteConditions(trimmed, 5),
-      this.autocomplete(trimmed, 5),
+      this.autocomplete(trimmed, 5, excludeSellerIds),
     ]);
 
     return {
@@ -215,6 +231,7 @@ export class SearchAutocompleteService {
   private async richAutocompleteProducts(
     query: string,
     limit: number,
+    excludeSellerIds: string[] = [],
   ): Promise<
     Array<{
       id: string;
@@ -272,6 +289,7 @@ export class SearchAutocompleteService {
                 ...saleCapableEsFilters(),
                 { term: { productKind: ProductKind.listing } },
               ],
+              ...excludeSellersEs(excludeSellerIds),
             },
           },
           _source: ["id", "title", "imageUrl", "price", "brandName"],
@@ -301,6 +319,7 @@ export class SearchAutocompleteService {
               id: { in: productIds },
               status: ProductStatus.active,
               seller: saleCapableSellerWhere(),
+              sellerId: excludeIds(excludeSellerIds),
               kind: ProductKind.listing,
             },
             select: {

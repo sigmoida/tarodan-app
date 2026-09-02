@@ -63,6 +63,12 @@ export class AdminTestToolsController {
     return res;
   }
 
+  @Get("cron-status")
+  @ApiOperation({ summary: "Tetiklenen cron fişinin akıbeti (salt okuma)" })
+  getCronStatus(@Query("jobId") jobId: string) {
+    return this.service.getCronStatus(jobId);
+  }
+
   @Get("search")
   @ApiOperation({ summary: "Süre ayarlamak için kayıt ara" })
   search(@Query("type") type: TestToolType, @Query("q") q: string) {

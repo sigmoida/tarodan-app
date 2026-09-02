@@ -34,7 +34,8 @@ import {
 } from "../../outbox/outbox.types";
 import { LedgerService } from "../../ledger/ledger.service";
 import { MONEY_EPSILON } from "../helpers/payment.constants";
-import { i18nMessage } from "../../i18n";
+import { errorMessage } from "../../../common/helpers/error-message";
+import { i18nMessage, localizedPayloadOf } from "../../i18n";
 import {
   ProviderRefundOutcomeUnknownException,
   ProviderRefundRejectedException,
@@ -1080,7 +1081,7 @@ export class PaymentRefundService {
       return refundCommitResult;
     } catch (error: any) {
       this.logger.error(
-        `Refund error for payment ${payment.id}: ${error.message}`,
+        `Refund error for payment ${payment.id}: ${errorMessage(error)}`,
       );
       // MONEY-M3: PayTR iadeyi YAPMADAN patladıysak, PayTR'den önce void ettiğimiz
       // payout'ları GERİ AL (order_refunded → pending) ki satıcı ödenebilsin. PayTR
@@ -1116,9 +1117,14 @@ export class PaymentRefundService {
           .catch(() => undefined);
       }
       if (paytrRefunded || providerOutcomeUncertain) {
+        // Sarmalarken katalog payload'unu KORU: `error.message` yerelleştirilmiş
+        // istisnalarda "Bad Request Exception"a düşer, yani istemci de log da
+        // gerçek sebebi kaybederdi.
         throw error instanceof RefundPendingReconciliationException
           ? error
-          : new RefundPendingReconciliationException(error.message);
+          : new RefundPendingReconciliationException(
+              localizedPayloadOf(error) ?? errorMessage(error),
+            );
       }
       throw error;
     }

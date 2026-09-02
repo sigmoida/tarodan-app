@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useRef } from "react";
 import {
   FormModal,
   FormInput,
@@ -11,6 +12,7 @@ import {
   useZodForm,
 } from "@tarodan/ui/form";
 import { adminApi } from "@/lib/api";
+import { useUserOptions, userOptionLabel } from "../_hooks/useUserOptions";
 import { useAdminMutation } from "@/hooks/useAdminMutation";
 import { useCategories } from "@/hooks/useCategories";
 import { discountSchema, type DiscountFormValues } from "../_lib/schema";
@@ -43,7 +45,7 @@ function toDefaults(d?: Discount): DiscountFormValues {
       target: "buyer_commission",
       audience: "everyone",
       targetTierTypes: [],
-      targetUserIds: "",
+      targetUserIds: [],
       budgetLimit: "",
       minCartValue: "",
       minQuantity: "",
@@ -76,7 +78,21 @@ function toDefaults(d?: Discount): DiscountFormValues {
       value,
       label: value,
     })),
-    targetUserIds: (d.targetUserIds ?? []).join(", "),
+    // Sunucu hedeflenen kişileri adlarıyla döndürür; yalnız kimlik geldiğinde
+    // (eski yanıt) çip kimliği gösterir — seçim yine de KAYBOLMAZ, ki düzenleme
+    // kaydı kitleyi sıfırlamasın.
+    targetUserIds: (d.targetUsers?.length
+      ? d.targetUsers.map((u) => ({
+          value: u.id,
+          label: userOptionLabel(u),
+        }))
+      : (d.targetUserIds ?? []).map((id) => ({
+          value: id,
+          label: id,
+        }))) as Array<{
+      value: string;
+      label: string;
+    }>,
     budgetLimit: d.budgetLimit?.toString() ?? "",
     minCartValue: d.minCartValue?.toString() ?? "",
     minQuantity: d.minQuantity?.toString() ?? "",
@@ -134,10 +150,7 @@ function toPayload(v: DiscountFormValues) {
         : [],
     targetUserIds:
       v.audience === "specific_buyers" || v.audience === "specific_sellers"
-        ? v.targetUserIds
-            .split(",")
-            .map((id) => id.trim())
-            .filter(Boolean)
+        ? v.targetUserIds.map((option) => option.value)
         : [],
     budgetLimit: v.budgetLimit ? parseFloat(v.budgetLimit) : undefined,
   };
@@ -163,6 +176,32 @@ export function DiscountFormModal({
   const type = form.watch("type");
   const scope = form.watch("scope");
   const audience = form.watch("audience");
+  // Liste yalnız kitle "belirli kişiler" iken çekilir; diğer kitlelerde alan
+  // hiç görünmediği için istek de atılmaz.
+  const userOptions = useUserOptions(
+    audience === "specific_sellers" ? "sellers" : "buyers",
+    audience === "specific_buyers" || audience === "specific_sellers",
+  );
+
+  /**
+   * Kitle TARAFI değişince seçilenler sıfırlanır.
+   *
+   * Alıcı seçip sonra "belirli satıcılar"a geçildiğinde seçenek kaynağı
+   * satıcılara dönüyor ama çipler duruyordu: kampanya alıcı kimlikleriyle
+   * "belirli satıcılar" olarak kaydediliyor ve hiçbir zaman uygulanmıyordu —
+   * ne şema ne sunucu kimliklerin gerçekten satıcı olduğunu doğruluyor.
+   */
+  const audienceSideRef = useRef(audience);
+  useEffect(() => {
+    if (audienceSideRef.current === audience) return;
+    const wasSpecific =
+      audienceSideRef.current === "specific_buyers" ||
+      audienceSideRef.current === "specific_sellers";
+    const isSpecific =
+      audience === "specific_buyers" || audience === "specific_sellers";
+    if (wasSpecific && isSpecific) form.setValue("targetUserIds", []);
+    audienceSideRef.current = audience;
+  }, [audience, form]);
 
   const save = useAdminMutation(
     (v: DiscountFormValues) =>
@@ -249,10 +288,19 @@ export function DiscountFormModal({
         )}
         {(audience === "specific_buyers" ||
           audience === "specific_sellers") && (
-          <FormInput
+          <FormSearchableMultiSelect
             name="targetUserIds"
             label={t("admin.marketing.discounts.targetUsers")}
             helperText={t("admin.marketing.discounts.targetUsersHelper")}
+            searchPlaceholder={t("admin.marketing.discounts.searchUser")}
+            placeholder={t("admin.marketing.discounts.selectUsers")}
+            loadingText={t("common.loading")}
+            emptyText={
+              userOptions.failed
+                ? t("admin.marketing.discounts.userSearchFailed")
+                : t("admin.marketing.discounts.noUserFound")
+            }
+            {...userOptions}
           />
         )}
       </div>

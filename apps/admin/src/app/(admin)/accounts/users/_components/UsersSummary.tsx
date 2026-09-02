@@ -6,7 +6,7 @@ import { useTranslations } from "next-intl";
 import { AsyncValue } from "@tarodan/ui";
 import { adminApi } from "@/lib/api";
 import { adminKeys } from "@/lib/query/keys";
-import { userFilterParams } from "../_lib/types";
+import { accountStatusParams, userFilterParams } from "../_lib/types";
 
 /**
  * Page-level header subtitle — live total respecting the active URL filters, so
@@ -17,15 +17,19 @@ export function UsersSummary() {
   const searchParams = useSearchParams();
   const search = searchParams.get("q") ?? "";
   const filter = searchParams.get("filter") ?? "all";
+  // Hesap durumu listeyi daraltıyor; toplam da aynı daralmayı görmeli, aksi
+  // halde "Silinmiş" filtresinde başlık tüm kullanıcıları sayıyordu.
+  const accountStatus = searchParams.get("accountStatus") ?? "all";
 
   const { data: total, isLoading } = useQuery({
-    queryKey: adminKeys.count("users", { search, filter }),
+    queryKey: adminKeys.count("users", { search, filter, accountStatus }),
     queryFn: async () => {
       const res = await adminApi.getUsers({
         page: 1,
         limit: 1,
         ...(search ? { search } : {}),
         ...userFilterParams(filter),
+        ...accountStatusParams(accountStatus, filter),
       });
       const root = (res.data ?? {}) as any;
       return (root.meta?.total ?? root.total ?? 0) as number;

@@ -110,6 +110,14 @@ export class DiscountResponseDto {
   @ApiPropertyOptional({ isArray: true, type: String })
   targetUserIds?: string[];
 
+  /** Hedeflenen kullanıcılar, görünen adlarıyla — yönetim formu için. */
+  @ApiPropertyOptional({ isArray: true, type: Object })
+  targetUsers?: Array<{
+    id: string;
+    displayName: string | null;
+    email: string | null;
+  }>;
+
   @ApiPropertyOptional()
   budgetLimit?: number;
 

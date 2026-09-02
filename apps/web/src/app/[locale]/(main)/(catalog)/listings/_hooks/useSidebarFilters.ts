@@ -5,11 +5,9 @@ import { useQuery } from "@tanstack/react-query";
 import { queryKeys } from "@/lib/query/keys";
 import { useLocale, useTranslations } from "next-intl";
 import { categoriesApi, manufacturersApi, listingsApi } from "@/lib/api";
-import { SCALE_FALLBACK } from "@/lib/constants";
 import { matchesSearch } from "@tarodan/ui";
 import type { Filters } from "../_lib/params";
 import { useListingFiltersQuery } from "./useListingFiltersQuery";
-import type { Translate } from "@/types/i18n";
 
 interface Category {
   id: string;
@@ -32,41 +30,6 @@ interface CustomAttributeGroup {
 }
 
 const STALE = 60 * 60 * 1000;
-
-const MATERIAL_FALLBACK = (t: Translate) => [
-  { slug: "diecast", label: t("page.listings.usesidebarfilters.diecastMetal") },
-  { slug: "resin", label: t("page.listings.usesidebarfilters.resinRecine") },
-  {
-    slug: "composite",
-    label: t("page.listings.usesidebarfilters.compositeKompozit"),
-  },
-  {
-    slug: "plastic",
-    label: t("page.listings.usesidebarfilters.plasticPlastik"),
-  },
-];
-
-// Üreticiler - API'den yüklenecek, bu liste sadece fallback
-const MANUFACTURERS_FALLBACK = (t: Translate) => [
-  t("page.listings.usesidebarfilters.hotWheels"),
-  t("page.listings.usesidebarfilters.matchbox"),
-  t("page.listings.usesidebarfilters.majorette"),
-  t("page.listings.usesidebarfilters.tomica"),
-  t("page.listings.usesidebarfilters.bburago"),
-  t("page.listings.usesidebarfilters.maisto"),
-  t("page.listings.usesidebarfilters.autoart"),
-  t("page.listings.usesidebarfilters.minichamps"),
-  t("page.listings.usesidebarfilters.kyosho"),
-  t("page.listings.usesidebarfilters.cmc"),
-  t("page.listings.usesidebarfilters.gtSpirit"),
-  t("page.listings.usesidebarfilters.almostReal"),
-  t("page.listings.usesidebarfilters.spark"),
-  t("page.listings.usesidebarfilters.schuco"),
-  t("page.listings.usesidebarfilters.norev"),
-  t("page.listings.usesidebarfilters.oxfordDiecast"),
-  t("page.listings.usesidebarfilters.greenlight"),
-  t("page.listings.usesidebarfilters.ertl"),
-];
 
 export const BASE_SECTIONS = [
   "category",
@@ -316,35 +279,22 @@ export function useSidebarFilters({
       matchesSearch(m.name, modelSearch),
   );
 
-  // Fallback listeleri YALNIZ istek başarısızken devreye girer. Eskiden "liste
-  // boşsa" koşuluna bağlıydılar; boş katalogda (yeni kurulum) bu, olmayan 18
-  // üretici + 5 ölçek + 4 malzeme reklam edip her tıklamayı sıfır sonuca
-  // götürüyordu. Başarılı ama boş yanıt bir gerçektir — onu göstermeliyiz.
-  const useManufacturerFallback =
-    manufacturersQuery.isError && manufacturerList.length === 0;
-  const useFilterFallback = filtersQuery.isError;
-
-  const displayManufacturers = useManufacturerFallback
-    ? MANUFACTURERS_FALLBACK(t)
-        .filter((m) => matchesSearch(m, manufacturerSearch))
-        .map((name) => ({
-          id: "",
-          name,
-          slug: name.toLowerCase().replace(/\s+/g, "-"),
-        }))
-    : manufacturerList.filter((m) => matchesSearch(m.name, manufacturerSearch));
+  // Filtre seçenekleri YALNIZ katalogdan gelir — hiçbir koşulda yedek liste
+  // yok. Bir zamanlar "liste boşsa" koşuluna bağlıydılar ve boş katalogda
+  // olmayan 18 üretici + 5 ölçek + 4 malzeme reklam ediyor, her tıklama sıfır
+  // sonuca gidiyordu. Sonra "yalnız istek hata verirse" diye daraltıldı; o da
+  // yanlış: ağ hatasında uydurma çip göstermek, hiç göstermemekten kötüdür —
+  // kullanıcı seçer, sonuç boş gelir ve hatayı katalogda sanır. Başarılı ama
+  // boş yanıt da, başarısız yanıt da "seçenek yok" demektir.
+  const displayManufacturers = manufacturerList.filter((m) =>
+    matchesSearch(m.name, manufacturerSearch),
+  );
 
   const filteredCategories = categories.filter((c) =>
     matchesSearch(c.name, categorySearch),
   );
-  const scaleOptions = useFilterFallback ? SCALE_FALLBACK : scaleList;
-  const filteredScales = scaleOptions.filter((s) =>
-    matchesSearch(s, scaleSearch),
-  );
-  const materialOptions = useFilterFallback
-    ? MATERIAL_FALLBACK(t)
-    : materialList;
-  const filteredMaterials = materialOptions.filter((m) =>
+  const filteredScales = scaleList.filter((s) => matchesSearch(s, scaleSearch));
+  const filteredMaterials = materialList.filter((m) =>
     matchesSearch(m.label, materialSearch),
   );
 

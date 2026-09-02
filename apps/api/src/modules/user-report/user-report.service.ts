@@ -21,12 +21,22 @@ import {
 import { Prisma } from "@prisma/client";
 import { dateRangeWhere, paginate, resolveOrderBy } from "../../common/list";
 import { i18nMessage } from "../i18n";
+import { NotificationService } from "../notification/notification.service";
+import { NotificationType } from "../notification/dto";
+import { adminUrl } from "../../config/app-urls";
+import {
+  PUBLIC_NAME_SELECT,
+  publicName,
+} from "../../common/helpers/public-identity";
 
 @Injectable()
 export class UserReportService {
   private readonly logger = new Logger(UserReportService.name);
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly notifications: NotificationService,
+  ) {}
 
   /**
    * Create a new report
@@ -68,6 +78,8 @@ export class UserReportService {
     this.logger.log(
       `Report created: ${report.id} by user ${reporterId} for ${dto.type}:${dto.targetId}`,
     );
+
+    await this.notifyAdmins(report.id, reporterId, dto);
 
     return this.mapToResponse(report);
   }
@@ -263,6 +275,40 @@ export class UserReportService {
   // ==========================================================================
   // HELPER METHODS
   // ==========================================================================
+
+  /**
+   * Apple App Review "notify the developer": her şikayet aktif admin'lere
+   * in-app bildirim olarak düşer. Bildirim hatası şikayeti geri almaz.
+   */
+  private async notifyAdmins(
+    reportId: string,
+    reporterId: string,
+    dto: CreateReportDto,
+  ): Promise<void> {
+    try {
+      const reporter = await this.prisma.user.findUnique({
+        where: { id: reporterId },
+        select: PUBLIC_NAME_SELECT,
+      });
+      await this.notifications.notifyAllAdmins(
+        NotificationType.USER_REPORTED_ADMIN,
+        {
+          reportId,
+          reporterId,
+          reporterName: publicName(reporter),
+          // Tür/gerekçe etiketleri şablonda (ICU select) alıcının diline göre.
+          type: dto.type,
+          targetId: dto.targetId,
+          reason: dto.reason,
+          adminLink: `${adminUrl()}/accounts/reports?search=${reportId}`,
+        },
+      );
+    } catch (err: any) {
+      this.logger.warn(
+        `Report admin notification failed (${reportId}): ${err?.message ?? err}`,
+      );
+    }
+  }
 
   private async validateTarget(
     type: ReportType,

@@ -25,11 +25,11 @@ import {
   useManufacturerAttributes,
   DiscountCard,
   ManufacturerAttributesCard,
-} from "@/components/listings/form";
+} from "@tarodan/listing-form";
 import { useEditListingForm } from "./_hooks/useEditListingForm";
 import { useProductDiscounts } from "./_hooks/useProductDiscounts";
 import { useListingLifecycle } from "./_hooks/useListingLifecycle";
-import { withSelectedReference } from "./_lib/selected-option";
+import { withSelectedReference } from "@tarodan/listing-form";
 import StatusBanners from "./_sections/StatusBanners";
 import DeleteListingModal from "./_modals/DeleteListingModal";
 
@@ -70,6 +70,7 @@ export default function EditListingClient() {
   const {
     brands,
     brandsLoading,
+    optionsStatus,
     scales: scaleList,
     materials: materialList,
     colors: colorList,
@@ -265,6 +266,7 @@ export default function EditListingClient() {
           flatCategories={categoryOptions}
           brands={brandOptions}
           brandsLoading={brandsLoading}
+          optionsStatus={optionsStatus}
           models={modelOptions}
           modelsLoading={modelsLoading && modelOptions.length === 0}
           scaleList={scaleList}

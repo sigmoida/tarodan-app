@@ -17,6 +17,10 @@ describe("formatOfferResponse counterparty", () => {
       {} as any, // productLockService
       undefined as any, // storageService (@Optional)
       {} as any, // checkoutCommon
+      {
+        isBlockedEither: async () => false,
+        getHiddenUserIds: async () => [],
+      } as any,
     );
 
   const offer = {

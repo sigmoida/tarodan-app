@@ -8,6 +8,7 @@ import {
   Logger,
 } from "@nestjs/common";
 import { PrismaService } from "../../prisma";
+import { UserBlockService } from "../user-block/user-block.service";
 import { DiscountService } from "../discount/discount.service";
 import { isPublicStorageKey, StorageService } from "../storage/storage.service";
 import {
@@ -57,6 +58,7 @@ export class CartService {
     private readonly shippingTariffs: ShippingTariffService,
     @Optional()
     private readonly storageService: StorageService,
+    private readonly userBlocks: UserBlockService,
   ) {}
 
   /**
@@ -170,6 +172,13 @@ export class CartService {
         i18nMessage("server.order.cannotBuyOwnProduct"),
       );
     }
+
+    // Engelli çift alışveriş bağı kuramaz (ilan zaten 404; eski kart/derin link).
+    await this.userBlocks.assertNotBlocked(
+      userId,
+      product.sellerId,
+      "server.order.sellerBlocked",
+    );
 
     // Sepet: fiziksel stok üst sınırı kontrolü
     if (!canAddRequestedQuantityToCart(product, dto.quantity || 1)) {

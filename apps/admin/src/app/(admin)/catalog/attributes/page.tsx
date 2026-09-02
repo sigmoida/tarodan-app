@@ -188,6 +188,13 @@ function AttributesPageContent() {
                           {a.displayValue || a.value}
                         </span>
                         {!a.isActive && <ActiveBadge active={false} />}
+                        {!!a.usageCount && (
+                          <span className="flex-shrink-0 whitespace-nowrap text-xs text-muted">
+                            {t("admin.catalog.attributes.usedInProducts", {
+                              count: a.usageCount,
+                            })}
+                          </span>
+                        )}
                       </div>
                       <div className="flex flex-shrink-0 gap-1">
                         <ActionIconButton

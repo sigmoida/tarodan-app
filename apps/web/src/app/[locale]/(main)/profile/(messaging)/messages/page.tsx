@@ -9,10 +9,25 @@ import ChatHeader from "./_components/ChatHeader";
 import MessageBubble from "./_components/MessageBubble";
 import MessageComposer from "./_components/MessageComposer";
 import EmptyConversation from "./_components/EmptyConversation";
+import { useState } from "react";
+import dynamic from "next/dynamic";
+import { useLocale } from "next-intl";
+import { withChunkErrorLogging } from "@/lib/withChunkErrorLogging";
+import { publicNameOf } from "@/lib/public-name";
+
+const ReportModal = dynamic(
+  withChunkErrorLogging(
+    () => import("@/components/ReportModal"),
+    "ReportModal",
+  ),
+  { ssr: false },
+);
 
 export default function MessagesPage() {
   const t = useTranslations();
+  const locale = useLocale();
   const { ready } = useRequireAuth();
+  const [showReportModal, setShowReportModal] = useState(false);
 
   const vm = useMessaging(ready);
 
@@ -56,7 +71,19 @@ export default function MessagesPage() {
                 thread={selectedThread}
                 typing={vm.typing}
                 onBack={() => vm.selectThread(null)}
+                onReport={() => setShowReportModal(true)}
+                onBlocked={() => vm.selectThread(null)}
               />
+              {showReportModal && (
+                <ReportModal
+                  isOpen
+                  onClose={() => setShowReportModal(false)}
+                  entityType="user"
+                  entityId={selectedThread.otherUser.id}
+                  entityName={publicNameOf(selectedThread.otherUser)}
+                  locale={locale}
+                />
+              )}
 
               <div
                 ref={vm.messagesScrollRef}

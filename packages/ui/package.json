@@ -11,7 +11,8 @@
     "./hooks": "./src/hooks/index.ts",
     "./logo": "./src/components/Logo.tsx",
     "./spinner": "./src/components/Spinner.tsx",
-    "./alert": "./src/components/Alert.tsx"
+    "./alert": "./src/components/Alert.tsx",
+    "./section-card": "./src/components/SectionCard.tsx"
   },
   "scripts": {
     "lint": "eslint \"src/**/*.{ts,tsx}\"",
@@ -44,7 +45,7 @@
     "@types/react-dom": "^18.2.18",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
-    "react-hook-form": "^7.84.0",
+    "react-hook-form": "^7.86.0",
     "typescript": "^5.3.2",
     "zod": "3.25.76"
   },

@@ -7,6 +7,8 @@ import {
   RichAutocompleteResult,
 } from "./search.service";
 import { Public } from "../auth/decorators/public.decorator";
+import { CurrentUser } from "../auth/decorators/current-user.decorator";
+import { UserBlockService } from "../user-block/user-block.service";
 import { Roles } from "../auth/decorators/roles.decorator";
 import { AdminRoute } from "../auth/decorators/admin-route.decorator";
 import { RequirePermission } from "../auth/decorators/require-permission.decorator";
@@ -19,6 +21,7 @@ export class SearchController {
   constructor(
     private readonly searchService: SearchService,
     private readonly configService: ConfigService,
+    private readonly userBlocks: UserBlockService,
   ) {}
 
   @Public()
@@ -44,8 +47,11 @@ export class SearchController {
     @Query("page") page?: string,
     @Query("pageSize") pageSize?: string,
     @Query("sortBy") sortBy?: string,
+    @CurrentUser("id") viewerId?: string,
   ): Promise<SearchResponse> {
     const options: SearchOptions = {
+      // Engelli satıcılar (simetrik) arama sonuçlarından düşer.
+      excludeSellerIds: await this.userBlocks.getHiddenUserIds(viewerId),
       query: query || "",
       categoryId,
       brandId,
@@ -76,10 +82,12 @@ export class SearchController {
   async autocomplete(
     @Query("q") query: string,
     @Query("limit") limit?: string,
+    @CurrentUser("id") viewerId?: string,
   ): Promise<{ suggestions: string[] }> {
     const suggestions = await this.searchService.autocomplete(
       query,
       limit ? parseInt(limit) : 10,
+      await this.userBlocks.getHiddenUserIds(viewerId),
     );
     return { suggestions };
   }
@@ -88,8 +96,13 @@ export class SearchController {
   @Get("autocomplete-rich")
   async autocompleteRich(
     @Query("q") query: string,
+    @CurrentUser("id") viewerId?: string,
   ): Promise<RichAutocompleteResult> {
-    return this.searchService.autocompleteRich(query || "");
+    // Engelli satıcıların ilanları başlık önerilerinde de görünmez.
+    return this.searchService.autocompleteRich(
+      query || "",
+      await this.userBlocks.getHiddenUserIds(viewerId),
+    );
   }
 
   @Post("admin/reindex")

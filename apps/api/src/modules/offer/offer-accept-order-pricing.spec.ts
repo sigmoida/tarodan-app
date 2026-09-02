@@ -1,5 +1,6 @@
 import { OfferService } from "./offer.service";
 import { OfferStatus, ProductStatus } from "@prisma/client";
+import { userBlockServiceStub } from "../user-block/user-block.testing";
 
 /**
  * BLOCKER: teklif kabulünde oluşturulan sipariş yalnız komisyonu yazıyordu;
@@ -97,6 +98,7 @@ describe("OfferService.accept — order carries shipping, VAT and withholding", 
       } as any,
       undefined as any,
       checkoutCommon as any,
+      userBlockServiceStub() as any,
     );
     return { service, created, checkoutCommon, tx };
   };

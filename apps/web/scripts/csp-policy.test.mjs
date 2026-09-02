@@ -95,6 +95,56 @@ test("keeps third-party auth scripts OUT of the payment page", () => {
   assert.ok(other.includes("appleid.cdn-apple.com"));
 });
 
+/**
+ * Google Ads yüzeyi: gtag googletagmanager'dan yüklenir, googleadservices'ten
+ * dönüşüm script'i zincirler, doubleclick/google uçlarına ping atar ve gizli
+ * remarketing iframe'leri enjekte eder. Bu origin'ler storefront profilinde
+ * açık, PCI-daraltılmış ödeme profilinde KAPALI kalmalı — iki yönde de sızma
+ * sessiz olurdu: ödemeye sızarsa 6.4.3 ihlali, storefront'tan düşerse dönüşüm
+ * ölçümü sessizce ölür.
+ */
+test("storefront profile admits the full Google Ads surface", () => {
+  const d = directives(
+    buildContentSecurityPolicy({
+      nonce: "n",
+      isPayment: false,
+      isProduction: true,
+    }),
+  );
+
+  assert.ok(d["script-src"].includes("https://www.googletagmanager.com"));
+  assert.ok(d["script-src"].includes("https://www.googleadservices.com"));
+  assert.ok(d["script-src"].includes("https://googleads.g.doubleclick.net"));
+  for (const dir of ["connect-src", "img-src"]) {
+    assert.ok(
+      d[dir].includes("https://googleads.g.doubleclick.net"),
+      `${dir} doubleclick`,
+    );
+    assert.ok(d[dir].includes("https://www.google.com"), `${dir} google`);
+    // Bölgesel dönüşüm ping'i (TR trafiği).
+    assert.ok(d[dir].includes("https://www.google.com.tr"), `${dir} google.tr`);
+  }
+  assert.ok(d["frame-src"].includes("https://td.doubleclick.net"));
+  assert.ok(d["frame-src"].includes("https://googleads.g.doubleclick.net"));
+});
+
+test("payment profile carries NO Google Ads origin in any directive", () => {
+  const policy = buildContentSecurityPolicy({
+    nonce: "n",
+    isPayment: true,
+    isProduction: true,
+  });
+
+  for (const origin of [
+    "googletagmanager.com",
+    "googleadservices.com",
+    "doubleclick.net",
+    "www.google.com",
+  ]) {
+    assert.ok(!policy.includes(origin), origin);
+  }
+});
+
 test("allows the configured API, websocket and Sentry origins to be reached", () => {
   const policy = buildContentSecurityPolicy({
     nonce: "n",

@@ -7,85 +7,84 @@ import { AdminProductService } from "./admin-product.service";
  * (Sürat faturası platforma gelir). Bu yüzden adminin kademeyi düzeltebilmesi ve
  * düzeltmenin denetim kaydına düşmesi gerekiyor.
  *
- * Kademe düzeltilince `shippingDesi` de TÜRETİLİR — ikisi ayrışırsa paket desisi
- * toplamı yanlış kademeye düşer.
+ * Yazma İŞİ artık domain servisinde (`ProductService.updateAsAdmin`): kademeden
+ * desi türetimi orada, satıcı yoluyla AYNI yardımcıdan yapılır
+ * (`productShippingTierData`). Buradaki eski kopya kaldırıldı — o kopya
+ * komisyon, görsel sahipliği ve iyimser kilit denetimlerinin hiçbirini
+ * yapmıyordu. Bu spec artık yöneticiye ÖZGÜ olan iki şeyi sabitler: isteğin
+ * domain servisine olduğu gibi geçmesi ve denetim kaydının düşmesi.
  */
 describe("AdminProductService — package tier override", () => {
   const makeService = () => {
+    const before = {
+      id: "p1",
+      shippingPackageTier: ShippingPackageTierCode.small,
+      shippingDesi: 2,
+    };
     const prisma = {
-      product: {
-        findUnique: jest.fn().mockResolvedValue({
-          id: "p1",
-          shippingPackageTier: ShippingPackageTierCode.small,
-          shippingDesi: 2,
-        }),
-        update: jest.fn().mockImplementation(({ data }: any) =>
-          Promise.resolve({
-            id: "p1",
-            ...data,
-            category: null,
-            seller: null,
-            images: [],
-          }),
-        ),
-      },
+      product: { findUnique: jest.fn().mockResolvedValue(before) },
     } as any;
     const audit = { createAuditLog: jest.fn().mockResolvedValue(undefined) };
+    const productService = {
+      updateAsAdmin: jest.fn().mockResolvedValue({ id: "p1", updated: true }),
+    };
     const service = new AdminProductService(
       prisma,
       audit as any,
       {} as any, // discountService
-      { syncProduct: jest.fn().mockResolvedValue(undefined) } as any, // searchService
-      { del: jest.fn(), delPattern: jest.fn() } as any, // cache
+      {} as any, // searchService
+      {} as any, // cache
       {} as any, // notificationService
       undefined as any, // storageService (@Optional)
       { assertListingRuleExists: jest.fn() } as any,
+      productService as any,
+      {} as any, // mediaService — görsel yükleme bu testlerin konusu değil
+      {} as any, // membershipService
     );
-    return { service, prisma, audit };
+    return { service, prisma, audit, productService, before };
   };
 
-  it("kademeyi düzeltir ve desiyi kademeden TÜRETİR", async () => {
-    const { service, prisma } = makeService();
+  it("kademe düzeltmesini domain servisine devreder", async () => {
+    const { service, productService } = makeService();
 
     await service.updateProduct("admin-1", "p1", {
       shippingPackageTier: ShippingPackageTierCode.large,
     } as any);
 
-    expect(prisma.product.update).toHaveBeenCalledWith(
-      expect.objectContaining({
-        data: expect.objectContaining({
-          shippingPackageTier: ShippingPackageTierCode.large,
-          // Büyük paketin temsilci desisi 10.
-          shippingDesi: 10,
-        }),
-      }),
-    );
+    // Desi TÜRETİMİ domain servisinin işi; burada isteğin bozulmadan geçmesi
+    // ve yöneticinin kimliğinin taşınması sabitlenir.
+    expect(productService.updateAsAdmin).toHaveBeenCalledWith("p1", "admin-1", {
+      shippingPackageTier: ShippingPackageTierCode.large,
+    });
   });
 
   it("kademe düzeltmesi denetim kaydına düşer", async () => {
-    const { service, audit } = makeService();
+    const { service, audit, before } = makeService();
 
-    await service.updateProduct("admin-1", "p1", {
+    const result = await service.updateProduct("admin-1", "p1", {
       shippingPackageTier: ShippingPackageTierCode.medium,
     } as any);
 
+    // Denetim kaydı ÖNCE/SONRA halini taşımalı: yöneticinin neyi değiştirdiği
+    // sonradan yalnız buradan okunabiliyor.
     expect(audit.createAuditLog).toHaveBeenCalledWith(
       "admin-1",
-      expect.any(String),
+      "product_update",
       "Product",
       "p1",
-      expect.anything(),
-      expect.anything(),
+      before,
+      result,
     );
   });
 
-  it("kademe gönderilmediyse desiye dokunulmaz", async () => {
-    const { service, prisma } = makeService();
+  it("ürün yoksa yazma yoluna hiç girmez", async () => {
+    const { service, prisma, productService } = makeService();
+    prisma.product.findUnique.mockResolvedValue(null);
 
-    await service.updateProduct("admin-1", "p1", { title: "Yeni ad" } as any);
+    await expect(
+      service.updateProduct("admin-1", "yok", { title: "x" } as any),
+    ).rejects.toThrow();
 
-    const data = prisma.product.update.mock.calls[0][0].data;
-    expect(data.shippingPackageTier).toBeUndefined();
-    expect(data.shippingDesi).toBeUndefined();
+    expect(productService.updateAsAdmin).not.toHaveBeenCalled();
   });
 });

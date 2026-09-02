@@ -26,10 +26,11 @@ const fmtTL = (n: number) =>
  * `POST /orders/quote` → `pricing.summary` ile AYNI şekil.
  *
  * Ekran hiçbir tutar türetmez; API ne gönderdiyse onu basar. KDV'yi kalemlere
- * API dağıtır (kargonunki kargo satırına, ücretlerinki hizmet bedeline) ve üç
- * satırın toplamının `total`'a eşit olduğu API testinde sabittir. Ekranlar bu
- * dağıtımı kendileri yaptığında kargonun KDV'si ücret satırına yığılıyor, aynı
- * sepet sepette ve checkout'ta farklı kırılım gösteriyordu.
+ * API dağıtır — kargo satırı tarifeden gelen SABİT tutardır (KDV'siz), hizmet
+ * KDV'sinin tamamı (kargo payınınki dahil) hizmet bedeli satırına yazılır — ve
+ * üç satırın toplamının `total`'a eşit olduğu API testinde sabittir. Ekranlar
+ * bu dağıtımı kendileri yaptığında aynı sepet sepette, checkout'ta ve sipariş
+ * detayında farklı kırılım gösteriyordu.
  */
 export interface OrderSummaryAmounts {
   productAmount: number;

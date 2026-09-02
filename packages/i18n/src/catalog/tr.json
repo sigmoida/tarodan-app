@@ -839,7 +839,9 @@
     },
     "newListing": "Yeni İlan",
     "originalPriceTry": "Orijinal Fiyat (₺)",
-    "imageFormatsHint": "JPEG, PNG, WebP, GIF · en fazla {maxMb} MB"
+    "imageFormatsHint": "JPEG, PNG, WebP, GIF · en fazla {maxMb} MB",
+    "noOptionsDefined": "Bu alan için seçenek tanımlanmamış",
+    "optionsLoadFailed": "Seçenekler yüklenemedi — sayfayı yenileyin"
   },
   "cart": {
     "myCart": "Sepetim",
@@ -1853,7 +1855,8 @@
     "nameRequired": "İsim zorunlu",
     "createFailed": "Koleksiyon oluşturulamadı",
     "selectCategoryOptional": "Kategori seçin (isteğe bağlı)",
-    "itemCountShort": "{count} ürün"
+    "itemCountShort": "{count} ürün",
+    "report": "Koleksiyonu Şikayet Et"
   },
   "notification": {
     "notifications": "Bildirimler",
@@ -2308,7 +2311,22 @@
       "iletisim": "İletişim",
       "hesap": "Hesap",
       "isletme": "İşletme",
-      "guvenlik": "Güvenlik"
+      "guvenlik": "Güvenlik",
+      "engellenenler": "Engellenen Kullanıcılar"
+    },
+    "unblock": "Engeli Kaldır",
+    "blockSeller": "Satıcıyı Engelle",
+    "blockConfirmTitle": "{name} engellensin mi?",
+    "blockConfirmBody": "Birbirinizin ilanlarını, koleksiyonlarını ve profillerini göremezsiniz; mesaj, teklif ve takas iki yönlü kapanır. Engeli istediğiniz zaman Engellenen Kullanıcılar sayfasından kaldırabilirsiniz.",
+    "blockedToast": "{name} engellendi",
+    "unblockedToast": "Engel kaldırıldı",
+    "blockFailed": "Engelleme başarısız",
+    "blockedPage": {
+      "title": "Engellenen Kullanıcılar",
+      "description": "{count} kullanıcı engellendi",
+      "empty": "Engellediğiniz kullanıcı yok",
+      "emptyDesc": "Bir kullanıcıyı profilinden, ilanından veya mesajlardan engelleyebilirsiniz.",
+      "blockedAt": "{date} tarihinde engellendi"
     }
   },
   "review": {
@@ -3721,6 +3739,7 @@
         "metaRemarketing": "Meta (Facebook/Instagram) yeniden pazarlama",
         "tiktokPixel": "TikTok Pixel — dönüşüm ölçümü",
         "googleAdsRetargeting": "Google Ads & YouTube yeniden hedefleme",
+        "googleAdsConversion": "Google Ads — reklam tıklaması ve dönüşüm ölçümü",
         "yandexDirect": "Yandex Direct reklam gösterimi"
       },
       "duration": {
@@ -4473,8 +4492,6 @@
         "membership": "Üyelik",
         "products": "Ürün",
         "orders": "Sipariş",
-        "banned": "Yasaklı",
-        "unverified": "Doğrulanmamış",
         "empty": "Satıcı bulunamadı",
         "totalSellers": "Toplam Satıcı",
         "mostOrders": "En Çok Siparişli",
@@ -4793,7 +4810,16 @@
           "offer": "teklif id veya ürün başlığı",
           "trade": "takas id",
           "userEmail": "kullanıcı e-posta"
-        }
+        },
+        "cronConfirmTitle": "Cron'u tetikle",
+        "cronConfirmDescription": "\"{label}\" işi kuyruğa alınacak ve worker'da hemen çalışacak. Devam edilsin mi?",
+        "cronProdWarning": "⚠ PROD — iş gerçek müşteri verisi üzerinde çalışacak.",
+        "cronResultDone": "İş tamamlandı — {summary}",
+        "cronResultDoneNoSummary": "İş tamamlandı",
+        "cronResultFailed": "İş başarısız: {reason}",
+        "cronResultPending": "İş hâlâ çalışıyor — sonucu Bull geçmişinden izleyin",
+        "cronResultRunning": "İş çalışıyor…",
+        "cronResultNotFound": "İş kaydı kuyruk geçmişinden temizlendi — büyük olasılıkla tamamlandı, sonuç artık görüntülenemiyor"
       },
       "media": {
         "title": "Medya",
@@ -4897,7 +4923,8 @@
         "color": "Renk",
         "required": "Zorunlu",
         "groupNameRequired": "Ad zorunlu",
-        "valueRequired": "Değer zorunlu"
+        "valueRequired": "Değer zorunlu",
+        "usedInProducts": "{count} üründe"
       },
       "brands": {
         "title": "Marka Yönetimi",
@@ -5113,7 +5140,8 @@
         "bulkImportCreated": "{count} ürün aktif olarak yayınlandı",
         "bulkImportFileTooLarge": "{name} dosyası çok büyük. Tek dosya en fazla {size} olabilir.",
         "bulkImportTooManyImages": "En fazla {max} görsel seçebilirsiniz.",
-        "bulkImportTotalTooLarge": "Seçilen dosyaların toplam boyutu {size} sınırını aşamaz."
+        "bulkImportTotalTooLarge": "Seçilen dosyaların toplam boyutu {size} sınırını aşamaz.",
+        "updated": "İlan güncellendi"
       },
       "import": {
         "button": "Excel ile İçe Aktar",
@@ -5374,7 +5402,11 @@
         "budgetUsage": "Bütçe",
         "budgetStopped": "Bütçe doldu",
         "platformCost": "Platforma maliyeti",
-        "budgetRemaining": "Kalan bütçe"
+        "budgetRemaining": "Kalan bütçe",
+        "searchUser": "Ad veya e-posta ile ara",
+        "selectUsers": "Kişi seçin",
+        "userSearchFailed": "Kullanıcılar yüklenemedi",
+        "noUserFound": "Kullanıcı bulunamadı"
       },
       "emailTemplates": {
         "title": "E-posta Şablonları",
@@ -6234,7 +6266,10 @@
         },
         "releaseEarly": "Erken Serbest Bırak",
         "earlyReleaseHint": "İade penceresi dolmadan bilinçli erken bırakma — gerekçe istenir.",
-        "earlyReleaseWarning": "İade penceresi henüz kapanmadı: bu ödemeyi ERKEN serbest bırakıyorsunuz. İşlem geri alınamaz; sonrasında açılan bir iadede tahsilat satıcıdan yapılmak zorunda kalır. Teslim edilmemiş ya da iadesi süren siparişte sistem yine reddeder."
+        "earlyReleaseWarning": "İade penceresi henüz kapanmadı: bu ödemeyi ERKEN serbest bırakıyorsunuz. İşlem geri alınamaz; sonrasında açılan bir iadede tahsilat satıcıdan yapılmak zorunda kalır. Teslim edilmemiş ya da iadesi süren siparişte sistem yine reddeder.",
+        "transferQueuedInfo": "Transfer kuyruğa alındı — birkaç saniye içinde işlenir; Transferler sekmesinden izleyin",
+        "transferQueueFallback": "Anında transfer kuyruğa alınamadı — saatlik ödeme taraması devreye girecek",
+        "transferDeferred": "Transfer satırı şu an oluşmadı (engel ya da zaten mevcut olabilir) — bekleyen transfer hemen, engelli olan saatlik taramada işlenir"
       },
       "tax": {
         "title": "Vergi Ayarları",
@@ -7514,7 +7549,6 @@
       "filterAll": "Tüm Kullanıcılar",
       "filterSellers": "Satıcılar",
       "filterBuyers": "Alıcılar",
-      "filterBanned": "Engelliler",
       "banned": "Kullanıcı engellendi",
       "unbanned": "Kullanıcı engeli kaldırıldı",
       "banTitle": "Kullanıcıyı Engelle",
@@ -7524,8 +7558,6 @@
       "unbanAction": "Engeli Kaldır",
       "columnUser": "Kullanıcı",
       "seller": "Satıcı",
-      "verified": "Doğrulanmış",
-      "notVerified": "Doğrulanmamış",
       "bannedBadge": "Engelli",
       "membership": "Üyelik",
       "membershipFree": "Ücretsiz",
@@ -7552,16 +7584,7 @@
         "bothShipped": "Gönderildi"
       },
       "detail": {
-        "banned": "Kullanıcı banlandı",
-        "unbanned": "Kullanıcı banı kaldırıldı",
-        "banTitle": "Kullanıcıyı Banla",
-        "banReasonLabel": "Ban Nedeni",
-        "banReasonPlaceholder": "Ban nedenini açıklayın",
-        "banConfirm": "Banla",
-        "banReasonRequired": "Ban nedeni gereklidir",
-        "unbanTitle": "Banı Kaldır",
-        "unbanConfirmDesc": "Bu kullanıcının banını kaldırmak istediğinizden emin misiniz?",
-        "bannedBadge": "Banlı",
+        "banReasonLabel": "Engelleme Nedeni",
         "infoTitle": "Kullanıcı Bilgileri",
         "ratingsCount": "({count} değerlendirme)",
         "emailLabel": "Email",
@@ -7578,7 +7601,7 @@
         "tcKimlikNoLabel": "TC Kimlik No",
         "verifiedAtLabel": "Doğrulama Tarihi",
         "noBankAccount": "Banka hesabı eklenmemiş",
-        "banDateLabel": "Ban Tarihi:",
+        "banDateLabel": "Engellenme Tarihi:",
         "quickActionsTitle": "Hızlı İşlemler",
         "allOrders": "Tüm Siparişler ({count})",
         "allProducts": "Tüm Ürünler ({count})",
@@ -7627,8 +7650,37 @@
         "noGivenRatings": "Henüz değerlendirme vermemiş",
         "raterLabel": "Değerlendiren",
         "rateeLabel": "Değerlendirilen",
-        "anonymous": "Anonim"
-      }
+        "anonymous": "Anonim",
+        "blocksTab": "Engellemeler",
+        "blocksGivenTitle": "Engelledikleri",
+        "blocksReceivedTitle": "Onu Engelleyenler",
+        "blocksEmpty": "Engelleme kaydı yok"
+      },
+      "columnUserType": "Kullanıcı Türü",
+      "userTypeBuyer": "Alıcı",
+      "filterAccountStatusAll": "Tüm Durumlar",
+      "unbanConfirmDesc": "Bu kullanıcının engelini kaldırmak istediğinizden emin misiniz?",
+      "resendVerification": "Aktivasyon Maili Gönder",
+      "verifyEmail": "Manuel Aktive Et",
+      "verificationSent": "Aktivasyon e-postası gönderildi",
+      "emailVerifiedByAdmin": "Hesap aktive edildi",
+      "verifyEmailConfirmTitle": "Hesabı manuel aktive et",
+      "verifyEmailConfirmDesc": "E-posta doğrulaması admin tarafından yapılmış sayılacak ve kullanıcı giriş yapabilecek. Devam edilsin mi?",
+      "bulkBanTitle": "{count} kullanıcıyı engelle",
+      "bulkUnbanTitle": "{count} kullanıcının engelini kaldır",
+      "bulkResendTitle": "{count} kullanıcıya aktivasyon maili gönder",
+      "bulkVerifyTitle": "{count} hesabı manuel aktive et",
+      "bulkConfirmDesc": "Seçimdeki uygun olmayan satırlar atlanır. Devam edilsin mi?",
+      "bulkResult": "{ok} başarılı, {failed} başarısız",
+      "bulkFailedAll": "İşlem hiçbir kullanıcıda uygulanamadı",
+      "emailVerified": "E-posta doğrulandı",
+      "emailNotVerified": "E-posta doğrulanmadı",
+      "phoneVerified": "Telefon doğrulandı",
+      "phoneNotVerified": "Telefon doğrulanmadı",
+      "bulkNoneEligible": "Seçimde bu işleme uygun kullanıcı yok",
+      "bulkResendQueued": "{ok} kullanıcının aktivasyon maili kuyruğa alındı",
+      "bulkResendQueuedPartial": "{ok} kuyruğa alındı, {failed} başarısız",
+      "bulkResendConfirmDesc": "Aktivasyon mailleri arka planda kuyruktan gönderilir; sonucu e-posta loglarından izleyebilirsiniz. Uygun olmayan satırlar atlanır. Devam edilsin mi?"
     },
     "roles": {
       "title": "Roller ve İzinler",
@@ -8267,7 +8319,8 @@
           "template": "Şablon",
           "action": "İşlem",
           "entityType": "Varlık türü",
-          "shipmentLeg": "Gönderi yönü"
+          "shipmentLeg": "Gönderi yönü",
+          "accountStatus": "Hesap durumu"
         }
       },
       "bulkActionBar": {
@@ -8501,6 +8554,14 @@
       "priceDrop": {
         "title": "Fiyat Düştü! 🔥",
         "message": "{productTitle} ürününün fiyatı {oldPrice} TL'den {newPrice} TL'ye düştü!"
+      },
+      "userBlockedAdmin": {
+        "title": "Kullanıcı Engellendi",
+        "message": "{blockerName}, {blockedName} adlı kullanıcıyı engelledi.{hasReason, select, yes { Gerekçe: {reason}} other {}}"
+      },
+      "userReportedAdmin": {
+        "title": "Yeni Şikayet",
+        "message": "{reporterName} {type, select, product {bir ilanı} collection {bir koleksiyonu} message {bir mesajı} other {bir kullanıcıyı}} şikayet etti: {reason, select, spam {Spam} inappropriate_content {Uygunsuz İçerik} fake_product {Sahte/Yanıltıcı Ürün} scam {Dolandırıcılık} harassment {Taciz} hate_speech {Nefret Söylemi} counterfeit {Taklit Ürün} wrong_category {Yanlış Kategori} misleading_info {Yanıltıcı Bilgi} other {Diğer}}."
       },
       "wishlistItemSold": {
         "title": "Kaçırdınız! 😢",
@@ -8793,6 +8854,7 @@
       "awaitingBuyerResponse": "Alıcının mevcut karşı teklife yanıt vermesi bekleniyor; şu an yeni karşı teklif verilemez",
       "belowMinimumBuyerCounter": "Teklif tutarı çok düşük. Ürün fiyatı: {productPrice} TL. Minimum: {minOffer} TL (fiyatın %{minOfferPercentage}'i).",
       "belowMinimumOffer": "Teklif tutarı çok düşük. Ürün fiyatı: {productPrice} TL. Minimum teklif: {minOffer} TL (fiyatın %{minOfferPercentage}'i). Teklifiniz: {offerAmount} TL",
+      "blocked": "Bu satıcıya teklif gönderemezsiniz",
       "buyerCounterMustBeLower": "Alıcı karşı teklifi, satıcının karşı teklifinden düşük olmalıdır",
       "buyerCounterOnlyAfterSellerCounter": "Alıcı karşı teklifi yalnızca satıcının son karşı teklifine yanıt olarak verilebilir",
       "cannotOfferOwnProduct": "Kendi ürününüze teklif veremezsiniz",
@@ -8818,6 +8880,7 @@
     "trade": {
       "addressNotFound": "Adres bulunamadı",
       "alreadyShipped": "Zaten gönderim yaptınız",
+      "blocked": "Bu kullanıcıyla takas başlatamazsınız",
       "cannotAcceptInStatus": "Takas durumu '{status}' kabul edilemez",
       "cannotCancelAfterBothShipped": "Her iki taraf da gönderdikten sonra iptal edilemez",
       "cannotCancelAfterShippedToCargo": "Ürün kargoya verildikten sonra takas iptal edilemez. Sorun varsa itiraz açın veya destek ile iletişime geçin.",
@@ -8864,7 +8927,9 @@
       "accountBanned": "Hesabınız banlanmış. Yeni sipariş oluşturamazsınız.",
       "addressOnlyPendingPayment": "Sadece ödeme bekleyen siparişlere adres eklenebilir",
       "atLeastOneProductRequired": "En az bir ürün gereklidir",
+      "cancelAfterHandover": "Kargoya teslim edilmiş sipariş iptal edilemez; iade talebi oluşturun",
       "cancelForbidden": "Bu siparişi iptal etme yetkiniz yok",
+      "cancelReasonRequired": "Ödenmiş sipariş iptalinde neden kodu zorunludur",
       "cannotBuyOwnProduct": "Kendi ürününüzü satın alamazsınız",
       "cannotCancelShipped": "Sipariş kargoya verildikten sonra iptal edilemez",
       "cartProductNotFound": "Sepetteki ürünlerden biri bulunamadı",
@@ -8872,6 +8937,8 @@
       "confirmOnlyDelivered": "Sadece teslim edilmiş siparişler onaylanabilir",
       "couponNotSupportedForGuest": "Kupon kodu misafir alışverişte desteklenmiyor",
       "extendOnlyWithinWindow": "Sadece 48h penceresindeki siparişlerde uzatılabilir",
+      "groupAlreadyCancelled": "Bu sepetin tüm siparişleri zaten iptal edilmiş.",
+      "groupCancelBlockedShipped": "Sepetteki en az bir sipariş kargoya verildi — sepet iptali kapalı. Teslimat sonrası iade talebi oluşturabilirsiniz.",
       "groupNotFound": "Sipariş grubu bulunamadı",
       "groupViewForbidden": "Bu sipariş grubunu görüntüleme yetkiniz yok",
       "guestOtpIncorrect": "Doğrulama kodu hatalı",
@@ -8883,6 +8950,7 @@
       "invalidBillingAddress": "Geçersiz fatura adresi",
       "invalidCouponCode": "Kupon kodu geçersiz",
       "invalidOffer": "Geçersiz teklif",
+      "invalidPackageSize": "Geçersiz kargo paket boyutu",
       "invalidShippingAddress": "Geçersiz teslimat adresi",
       "invoiceAccessForbidden": "Bu faturaya erişim yetkiniz yok",
       "invoiceNotUploaded": "Bu siparişe yüklenmiş fatura yok",
@@ -8915,6 +8983,7 @@
       "reactivateNotFromOffer": "Bu sipariş tekliften oluşmadığı için yeniden aktive edilemez",
       "reactivateOfferNotAccepted": "İlgili teklif artık kabul edilmiş değil",
       "reactivateOnlyCancelled": "Sadece iptal edilmiş siparişler yeniden aktive edilebilir",
+      "sellerBlocked": "Bu satıcıdan satın alamazsınız",
       "setAddressForbidden": "Bu siparişe adres ekleme yetkiniz yok",
       "shippingAddressCityRequired": "Teslimat adresi için şehir gereklidir",
       "shippingAddressDistrictRequired": "Teslimat adresi için ilçe gereklidir",
@@ -8927,12 +8996,7 @@
       "statusChangeSystemOnly": "Bu durum değişikliği sistem tarafından yapılır",
       "statusTransitionNotAllowed": "Sipariş durumu {from}'den {to}'e değiştirilemez",
       "updateForbidden": "Bu siparişi güncelleme yetkiniz yok",
-      "viewForbidden": "Bu siparişi görüntüleme yetkiniz yok",
-      "groupAlreadyCancelled": "Bu sepetin tüm siparişleri zaten iptal edilmiş.",
-      "groupCancelBlockedShipped": "Sepetteki en az bir sipariş kargoya verildi — sepet iptali kapalı. Teslimat sonrası iade talebi oluşturabilirsiniz.",
-      "cancelReasonRequired": "Ödenmiş sipariş iptalinde neden kodu zorunludur",
-      "cancelAfterHandover": "Kargoya teslim edilmiş sipariş iptal edilemez; iade talebi oluşturun",
-      "invalidPackageSize": "Geçersiz kargo paket boyutu"
+      "viewForbidden": "Bu siparişi görüntüleme yetkiniz yok"
     },
     "payment": {
       "cancelPaymentForbidden": "Bu ödemeyi iptal etme yetkiniz yok",
@@ -9108,12 +9172,18 @@
       "addressLimitReached": "En fazla 3 adres ekleyebilirsiniz. Yeni adres eklemek için mevcut bir adresi silin.",
       "addressNotFound": "Adres bulunamadı",
       "alreadyBlocked": "Bu kullanıcı zaten engellenmiş",
+      "appealRejectedOnly": "Yalnız reddedilen veya revizyon istenen belgeye itiraz edilebilir",
+      "applicationLocked": "Başvuru bu aşamada belge değişikliğine açık değil",
       "bankAccountNotFound": "Banka hesabı bulunamadı",
+      "blockLimitReached": "Engelleme sınırına ulaştınız",
       "businessFeatureOnly": "Bu özellik sadece işletme üyeliğine sahip hesaplar için geçerlidir. Üyeliğinizi yükseltin.",
       "cannotBlockSelf": "Kendinizi engelleyemezsiniz",
       "cannotFollowSelf": "Kendinizi takip edemezsiniz",
       "cannotUnfollowSelf": "Kendinizi takipten çıkaramazsınız",
+      "companyFieldsMissing": "Eksik şirket bilgileri: {fields}",
       "companyNameRequired": "İşletme panelini kullanmak için şirket adı bilgisi gereklidir. Lütfen profil ayarlarınızdan şirket adınızı ekleyin.",
+      "corporateApplicantsOnly": "Yalnızca kurumsal satıcı başvurusu yapan kullanıcılar belge yükleyebilir",
+      "corporateApplicationNotFound": "Kurumsal başvuru bulunamadı",
       "deleteAccountBlocked": "Hesabınızı silmek için aşağıdaki işlemleri tamamlamanız gerekmektedir:",
       "deleteAccountFailed": "Hesap silinirken bir hata oluştu. Lütfen destek ile iletişime geçin.",
       "deleteBlockedActiveListings": "{count} aktif ilanınız bulunmaktadır. Lütfen önce tüm ilanlarınızı kaldırın.",
@@ -9122,29 +9192,25 @@
       "deleteBlockedPaymentHolds": "{count} sonuçlanmamış ödeme blokajınız bulunmaktadır. Lütfen para akışının tamamlanmasını bekleyin.",
       "deleteBlockedPendingOrders": "{count} bekleyen satın alım/satış işleminiz bulunmaktadır. Lütfen siparişlerinizi tamamlayın veya iptal edin.",
       "deleteBlockedPendingPayouts": "{count} sonuçlanmamış satıcı ödemeniz bulunmaktadır. Lütfen ödemelerin tamamlanmasını bekleyin.",
+      "documentFormats": "Yalnızca PDF, JPEG, PNG veya WebP",
+      "documentNotFound": "Belge bulunamadı",
+      "documentTypeMismatch": "Belge tipi, seçilen kişinin kimlik türüyle eşleşmiyor",
+      "documentsIncomplete": "Zorunlu belgeler ile her şirket sahibi/ortağının kimlik veya pasaport ön-arka yüzleri tamamlanmalıdır",
+      "interactionBlocked": "Bu kullanıcıyla etkileşim kuramazsınız",
+      "invalidDocumentType": "Geçersiz belge tipi",
       "noFieldsToUpdate": "Güncellenecek alan bulunamadı",
       "notBlocked": "Bu kullanıcı engellenmemiş",
       "notFound": "Kullanıcı bulunamadı",
       "notSeller": "Bu kullanıcı satıcı hesabı değil",
       "phoneAlreadyInUse": "Bu telefon numarası zaten kullanılıyor",
+      "stakeholderNotFound": "Şirket sahibi/ortağı bulunamadı",
+      "stakeholderRequired": "Kimlik veya pasaport belgesi için şirket sahibi/ortağı seçilmelidir",
       "unfollowed": "Takip bırakıldı",
+      "unknownOnboardingTour": "Bilinmeyen tanıtım turu",
       "userBlocked": "{displayName} engellendi",
       "userUnblocked": "Engel kaldırıldı",
-      "unknownOnboardingTour": "Bilinmeyen tanıtım turu",
-      "corporateApplicantsOnly": "Yalnızca kurumsal satıcı başvurusu yapan kullanıcılar belge yükleyebilir",
-      "applicationLocked": "Başvuru bu aşamada belge değişikliğine açık değil",
-      "invalidDocumentType": "Geçersiz belge tipi",
-      "documentFormats": "Yalnızca PDF, JPEG, PNG veya WebP",
-      "stakeholderRequired": "Kimlik veya pasaport belgesi için şirket sahibi/ortağı seçilmelidir",
-      "stakeholderNotFound": "Şirket sahibi/ortağı bulunamadı",
-      "documentTypeMismatch": "Belge tipi, seçilen kişinin kimlik türüyle eşleşmiyor",
-      "corporateApplicationNotFound": "Kurumsal başvuru bulunamadı",
-      "documentNotFound": "Belge bulunamadı",
-      "appealRejectedOnly": "Yalnız reddedilen veya revizyon istenen belgeye itiraz edilebilir",
-      "documentsIncomplete": "Zorunlu belgeler ile her şirket sahibi/ortağının kimlik veya pasaport ön-arka yüzleri tamamlanmalıdır",
-      "usernameFormat": "Kullanıcı adı 3-30 karakter olmalı; yalnızca küçük harf, rakam, nokta ve alt çizgi içerebilir.",
       "usernameAlreadySet": "Kullanıcı adı daha önce belirlenmiş.",
-      "companyFieldsMissing": "Eksik şirket bilgileri: {fields}"
+      "usernameFormat": "Kullanıcı adı 3-30 karakter olmalı; yalnızca küçük harf, rakam, nokta ve alt çizgi içerebilir."
     },
     "membership": {
       "alreadyCancelled": "Üyelik zaten iptal edilmiş",
@@ -9235,8 +9301,10 @@
         "shipmentToInTransitForbidden": "Kargo {status} durumundan yolda durumuna geçirilemez"
       },
       "user": {
-        "notBanned": "Kullanıcı zaten banlı değil",
-        "alreadyBanned": "Kullanıcı zaten banlı"
+        "notBanned": "Kullanıcı zaten engelli değil",
+        "alreadyBanned": "Kullanıcı zaten engelli",
+        "deleted": "Silinmiş hesap üzerinde bu işlem yapılamaz",
+        "verificationMailFailed": "Aktivasyon e-postası gönderilemedi"
       },
       "catalog": {
         "categoryHasProducts": "Bu kategoride ürünler bulunmaktadır. Önce ürünleri başka kategoriye taşıyın.",
@@ -9248,7 +9316,11 @@
         "attributeNotFound": "Özellik değeri bulunamadı",
         "brandInUse": "Bu marka silinemez: {products} ürün ve {models} araç modeli ile ilişkili.",
         "attributeGroupInUse": "Bu grupta {count} özellik değeri var. Önce değerleri silin.",
-        "attributeInUse": "Bu özellik {count} üründe kullanılıyor. Önce ürünlerden kaldırın."
+        "attributeInUse": "Bu özellik {count} üründe kullanılıyor. Önce ürünlerden kaldırın.",
+        "attributeDeactivateInUse": "Bu özellik {count} üründe kullanılıyor; pasife alınamaz. Önce ürünlerden kaldırın.",
+        "attributeLastInRequiredGroup": "\"{group}\" grubunun son aktif değeri kaldırılamaz: bu alan ilan formunda zorunludur ve grup boşalırsa ilan verilemez. Önce yeni bir değer ekleyin.",
+        "attributeGroupProtected": "\"{name}\" grubu ilan formunda zorunlu olduğu için pasife alınamaz.",
+        "attributeGroupDeactivateInUse": "Bu grubun değerleri {count} üründe kullanılıyor; grup pasife alınamaz."
       },
       "bulkImport": {
         "idempotencyKeyRequired": "Toplu yükleme için geçerli bir Idempotency-Key gönderilmelidir.",
@@ -9416,7 +9488,8 @@
         "reservedNotDeletable": "Rezerve edilmiş ürünler silinemez",
         "withActiveOrderNotDeletable": "Aktif siparişi olan ürünler silinemez",
         "boostedNotHardDeletable": "Öne çıkarma kaydı olan ürün kalıcı silinemez; pasife alın (soft delete)",
-        "restoreRemovedOnly": "Yalnızca kaldırılmış ürünler geri yüklenebilir"
+        "restoreRemovedOnly": "Yalnızca kaldırılmış ürünler geri yüklenebilir",
+        "rejectReasonRequired": "Red sebebi zorunludur"
       },
       "membership": {
         "monthlyPriceRange": "Üyelik aylık fiyatı 0 ile 1.000.000 arasında olmalıdır",
@@ -9452,6 +9525,9 @@
         "onlyXlsx": "Yalnızca .xlsx uzantılı Excel dosyası yüklenebilir.",
         "fileTooLarge": "Dosya en fazla {max} MB olabilir.",
         "missingColumns": "Excel sütunları eksik: {columns}. Örnek dosyayı yeniden indirin."
+      },
+      "testTools": {
+        "jobIdRequired": "İş kimliği (jobId) zorunludur"
       }
     },
     "advertisement": {
@@ -9532,6 +9608,7 @@
       "imageUploadFailed": "Resim yükleme başarısız"
     },
     "messaging": {
+      "blocked": "Bu kullanıcıyla mesajlaşamazsınız",
       "messageNotFound": "Mesaj bulunamadı",
       "recipientRequired": "Alıcı kullanıcı ID gereklidir (recipientId veya participantId)",
       "selfMessage": "Kendinize mesaj gönderemezsiniz",
@@ -9620,7 +9697,6 @@
       "twoFactorDisabled": "2FA etkin değil",
       "tokenAlreadyUsed": "Bu token zaten kullanılmış",
       "currentPasswordWrong": "Mevcut şifre yanlış",
-      "invalidToken": "Geçersiz doğrulama tokeni",
       "accessBlocked": "Erişim engellendi"
     },
     "storage": {
@@ -9858,6 +9934,12 @@
     },
     "shipmentProvider": {
       "surat": "Sürat Kargo"
+    },
+    "accountStatus": {
+      "active": "Aktif",
+      "pending_activation": "Aktivasyon Bekliyor",
+      "banned": "Engelli",
+      "deleted": "Silinmiş"
     }
   },
   "page": {

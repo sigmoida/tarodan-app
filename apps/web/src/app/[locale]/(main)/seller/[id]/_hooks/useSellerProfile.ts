@@ -218,6 +218,9 @@ export function useSellerProfile() {
     setShowReportModal(true);
   };
 
+  const requireAuthForAction = () =>
+    requireAuth({ message: t("auth.authRequiredMessage") });
+
   const membershipDuration = (() => {
     if (!seller?.createdAt) return t("seller.newMember");
     const created = new Date(seller.createdAt);
@@ -252,5 +255,6 @@ export function useSellerProfile() {
     handleFollow,
     handleMessage,
     handleReport,
+    requireAuthForAction,
   };
 }

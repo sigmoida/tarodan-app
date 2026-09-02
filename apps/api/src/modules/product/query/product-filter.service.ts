@@ -65,6 +65,12 @@ export class ProductFilterService {
     }));
 
     // 4. Materials (from Attribute group "material" - Malzeme)
+    // Ölçekle AYNI kural: burada da dört malzemelik gömülü bir yedek liste
+    // vardı ve grup boşken devreye giriyordu. Sonucu şuydu: API katalogda
+    // KARŞILIĞI OLMAYAN slug'lar ilan ediyor; ilan formu onları seçtiriyor,
+    // kayıt yolu (product-common.resolveProductAttributes) slug'ı bulamayıp
+    // değeri sessizce düşürüyor ve filtre o malzemeyi hiç listelemediği için
+    // ürün oradan bulunamıyordu. Boş liste doğru cevaptır — admin doldurur.
     const materialAttrs = await this.prisma.attribute.findMany({
       where: {
         isActive: true,
@@ -140,15 +146,7 @@ export class ProductFilterService {
       scales,
       manufacturers,
       colors,
-      materials:
-        materials.length > 0
-          ? materials
-          : [
-              { slug: "diecast", label: "Diecast (Metal)" },
-              { slug: "resin", label: "Resin (Reçine)" },
-              { slug: "composite", label: "Composite (Kompozit)" },
-              { slug: "plastic", label: "Plastic (Plastik)" },
-            ],
+      materials,
       customAttributes: customAttributes.map((g) => ({
         slug: g.slug,
         name: g.name,

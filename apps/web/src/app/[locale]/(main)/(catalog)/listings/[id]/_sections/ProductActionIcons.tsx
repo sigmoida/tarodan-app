@@ -1,6 +1,7 @@
 "use client";
 
 import { FlagIcon, HeartIcon, ShareIcon } from "@heroicons/react/24/outline";
+import UserActionsMenu from "@/components/UserActionsMenu";
 import { HeartIcon as HeartSolidIcon } from "@heroicons/react/24/solid";
 import { Button, IconButton } from "@tarodan/ui";
 import { useListingDetail } from "../_context/ListingDetailContext";
@@ -21,7 +22,22 @@ export default function ProductActionIcons() {
     shareToSocial,
     requireAuth,
     setShowReportModal,
+    listing,
+    isOwner,
   } = useListingDetail();
+
+  const openReport = () => {
+    if (!isAuthenticated) {
+      requireAuth({
+        title: t("product.reportListing"),
+        message: t("product.reportListingMsg"),
+        icon: <FlagIcon className="w-10 h-10 text-danger-500" />,
+      });
+    } else {
+      setShowReportModal(true);
+    }
+  };
+  const sellerId = listing?.seller?.id || listing?.sellerId;
 
   return (
     <div className="flex justify-end gap-2">
@@ -78,24 +94,30 @@ export default function ProductActionIcons() {
         )}
       </div>
 
-      <IconButton
-        variant="ghost"
-        onClick={() => {
-          if (!isAuthenticated) {
-            requireAuth({
-              title: t("product.reportListing"),
-              message: t("product.reportListingMsg"),
-              icon: <FlagIcon className="w-10 h-10 text-danger-500" />,
-            });
-          } else {
-            setShowReportModal(true);
+      {sellerId && !isOwner ? (
+        // Apple App Review: ilan detayından hem ilanı şikayet hem satıcıyı
+        // engelleme (mobil ile aynı menü).
+        <UserActionsMenu
+          userId={sellerId}
+          userName={listing?.seller?.displayName || t("common.user")}
+          onReport={openReport}
+          reportLabel={t("product.reportListing")}
+          blockLabel={t("profile.blockSeller")}
+          requireAuth={() =>
+            requireAuth({ message: t("auth.authRequiredMessage") })
           }
-        }}
-        aria-label={t("product.reportListing")}
-        title={t("product.reportListing")}
-      >
-        <FlagIcon className="w-6 h-6" />
-      </IconButton>
+          size="md"
+        />
+      ) : (
+        <IconButton
+          variant="ghost"
+          onClick={openReport}
+          aria-label={t("product.reportListing")}
+          title={t("product.reportListing")}
+        >
+          <FlagIcon className="w-6 h-6" />
+        </IconButton>
+      )}
     </div>
   );
 }

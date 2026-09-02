@@ -9,6 +9,7 @@
  */
 
 import type { Translate } from "@/types/i18n";
+import { GOOGLE_ADS_ID, updateGtagConsent } from "./googleAds";
 
 export type CookieCategory =
   "necessary" | "functional" | "analytics" | "marketing";
@@ -34,6 +35,13 @@ export const ALL_ACCEPTED: CookiePreferences = {
 
 export const CONSENT_KEY = "cookie_consent";
 export const PREFERENCES_KEY = "cookie_preferences";
+
+/**
+ * `saveConsent` her kayıttan sonra bu olayı yayar. Rızaya bağlı yüklenen
+ * script'ler (ör. GoogleAdsTag) banner/panel hangi bileşende olursa olsun
+ * kararı buradan duyar — hook state'i bileşen-yerel olduğu için tek köprü bu.
+ */
+export const CONSENT_CHANGED_EVENT = "tarodan:cookie-consent-changed";
 
 /** Rıza kaydının yasal ispat süresi (PDF: "Çerez Rıza ve Tercih Logları — 1 Yıl"). */
 const CONSENT_MAX_AGE_DAYS = 365;
@@ -196,6 +204,14 @@ export function cookieCategories(t: Translate): CookieCategoryInfo[] {
           duration: t("legal.cookies.duration.m13"),
         },
         {
+          name: "_gcl_au",
+          purpose: t("legal.cookies.purpose.googleAdsConversion"),
+          duration: t("legal.cookies.duration.d90"),
+          // Etiket kimliği yapılandırılmamış build'lerde (staging/dev) bu çerezi
+          // yazabilecek kod gemide yoktur — envanter "Pasif" demeli.
+          active: Boolean(GOOGLE_ADS_ID),
+        },
+        {
           name: "IDE / NID",
           purpose: t("legal.cookies.purpose.googleAdsRetargeting"),
           duration: t("legal.cookies.duration.m1Or13"),
@@ -214,7 +230,18 @@ export function cookieCategories(t: Translate): CookieCategoryInfo[] {
 const PURGEABLE: Record<Exclude<CookieCategory, "necessary">, string[]> = {
   functional: ["VISITOR_INFO1_LIVE", "YSC"],
   analytics: ["_ga", "_gid", "_gat", "_ym_uid", "_ym_d", "_ym_isad"],
-  marketing: ["_fbp", "_fbc", "tt_web_id", "_ttp", "IDE", "NID", "yandexuid"],
+  marketing: [
+    "_fbp",
+    "_fbc",
+    "tt_web_id",
+    "_ttp",
+    "IDE",
+    "NID",
+    "yandexuid",
+    "_gcl_au",
+    "_gcl_aw",
+    "_gcl_gs",
+  ],
 };
 
 function setCookie(name: string, value: string, maxAgeDays: number) {
@@ -261,22 +288,6 @@ export function hasConsent(): boolean {
   return localStorage.getItem(CONSENT_KEY) === "true";
 }
 
-/** Rıza durumuna göre Google Consent Mode sinyallerini günceller. */
-function syncConsentMode(prefs: CookiePreferences) {
-  const gtag = (window as unknown as { gtag?: (...args: unknown[]) => void })
-    .gtag;
-  if (typeof gtag !== "function") return;
-  gtag("consent", "update", {
-    security_storage: "granted",
-    functionality_storage: prefs.functional ? "granted" : "denied",
-    personalization_storage: prefs.functional ? "granted" : "denied",
-    analytics_storage: prefs.analytics ? "granted" : "denied",
-    ad_storage: prefs.marketing ? "granted" : "denied",
-    ad_user_data: prefs.marketing ? "granted" : "denied",
-    ad_personalization: prefs.marketing ? "granted" : "denied",
-  });
-}
-
 /**
  * Tercihleri kalıcılaştırır: yerel depolama + sunucunun okuyabildiği çerez,
  * Consent Mode güncellemesi, reddedilen kategorilerin temizliği ve KVKK ispat
@@ -295,7 +306,8 @@ export function saveConsent(input: CookiePreferences): CookiePreferences {
   setCookie(CONSENT_KEY, "true", CONSENT_MAX_AGE_DAYS);
   setCookie(PREFERENCES_KEY, serialized, CONSENT_MAX_AGE_DAYS);
 
-  syncConsentMode(prefs);
+  updateGtagConsent(prefs);
+  window.dispatchEvent(new Event(CONSENT_CHANGED_EVENT));
 
   for (const [category, names] of Object.entries(PURGEABLE)) {
     if (prefs[category as CookieCategory]) continue;

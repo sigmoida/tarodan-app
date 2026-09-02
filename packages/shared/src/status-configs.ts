@@ -749,6 +749,26 @@ export const subscriptionStatusConfig: StatusConfigDefMap = {
   },
 };
 
+/** Hesap durumu (AccountStatus — bkz. account-status.ts). */
+export const accountStatusConfig: StatusConfigDefMap = {
+  active: {
+    labelKey: "status.accountStatus.active",
+    variant: "success",
+  },
+  pending_activation: {
+    labelKey: "status.accountStatus.pending_activation",
+    variant: "warning",
+  },
+  banned: {
+    labelKey: "status.accountStatus.banned",
+    variant: "danger",
+  },
+  deleted: {
+    labelKey: "status.accountStatus.deleted",
+    variant: "secondary",
+  },
+};
+
 /** İndirim tipi (DiscountType). */
 export const discountTypeConfig: StatusConfigDefMap = {
   percentage: {

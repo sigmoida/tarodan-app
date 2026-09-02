@@ -68,9 +68,12 @@ export class ProductController {
     description: "Ürün listesi",
     type: PaginatedProductsDto,
   })
-  async findAll(@Query() query: ProductQueryDto) {
+  async findAll(
+    @Query() query: ProductQueryDto,
+    @CurrentUser("id") viewerId?: string,
+  ) {
     try {
-      return await this.productService.findAll(query);
+      return await this.productService.findAll(query, viewerId);
     } catch (err) {
       this.logger.error("findAll failed", errorStack(err));
       return {
@@ -101,10 +104,12 @@ export class ProductController {
   async getPopular(
     @Query("limit") limit?: number,
     @Query("page") page?: number,
+    @CurrentUser("id") viewerId?: string,
   ) {
     return this.productService.findPopular(
       Number(limit) || 20,
       Number(page) || 1,
+      viewerId,
     );
   }
 
@@ -341,8 +346,9 @@ export class ProductController {
       }),
     )
     id: string,
+    @CurrentUser("id") viewerId?: string,
   ) {
-    return this.productService.findOne(id);
+    return this.productService.findOne(id, viewerId);
   }
 
   /**
@@ -367,9 +373,10 @@ export class ProductController {
     )
     id: string,
     @Query("limit") limit?: string,
+    @CurrentUser("id") viewerId?: string,
   ) {
     const n = limit ? Math.min(parseInt(limit, 10) || 12, 24) : 12;
-    return this.productService.findSimilarProducts(id, n);
+    return this.productService.findSimilarProducts(id, n, viewerId);
   }
 
   /**

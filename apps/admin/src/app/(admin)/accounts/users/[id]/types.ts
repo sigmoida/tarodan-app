@@ -1,4 +1,5 @@
 import type { StatusConfig } from "@tarodan/ui";
+import type { AccountStatus } from "@tarodan/types";
 import { useTranslations } from "next-intl";
 
 type T = ReturnType<typeof useTranslations<never>>;
@@ -6,10 +7,9 @@ type T = ReturnType<typeof useTranslations<never>>;
 export interface UserProduct {
   id: string;
   title: string;
+  /** Kampanya alanları (originalPrice/salePrice/isOnSale) burada tanımlıydı ama
+   * bu uç onları hiç döndürmüyor; ekran da yalnız `price` kullanıyor. */
   price: number;
-  originalPrice?: number | null;
-  salePrice?: number | null;
-  isOnSale?: boolean;
   status: string;
   createdAt: string;
   imageUrl?: string;
@@ -49,6 +49,15 @@ export interface UserRatingItem {
   receiver?: { id: string; displayName: string };
 }
 
+/** Engelleme satırı (admin görünümü): karşı tarafın public kimliği + gerekçe. */
+export interface UserBlockItem {
+  id: string;
+  reason?: string | null;
+  createdAt: string;
+  blocked?: { id: string; displayName: string; username?: string | null };
+  blocker?: { id: string; displayName: string; username?: string | null };
+}
+
 export interface UserDetail {
   id: string;
   email: string;
@@ -61,6 +70,9 @@ export interface UserDetail {
   isEmailVerified: boolean;
   isPhoneVerified: boolean;
   isBanned: boolean;
+  deletedAt?: string | null;
+  /** Sunucuda türetilir (deletedAt / isBanned / isEmailVerified). */
+  accountStatus: AccountStatus;
   bannedAt?: string;
   bannedReason?: string;
   sellerType?: string;
@@ -102,6 +114,8 @@ export interface UserDetail {
   recentTrades?: UserTrade[];
   givenRatings?: UserRatingItem[];
   receivedRatings?: UserRatingItem[];
+  blocksGiven?: UserBlockItem[];
+  blocksReceived?: UserBlockItem[];
   stats?: {
     productsCount: number;
     ordersCount: number;
@@ -115,6 +129,8 @@ export interface UserDetail {
     receivedMessagesCount: number;
     givenRatingsCount: number;
     receivedRatingsCount: number;
+    blocksGivenCount?: number;
+    blocksReceivedCount?: number;
   };
 }
 

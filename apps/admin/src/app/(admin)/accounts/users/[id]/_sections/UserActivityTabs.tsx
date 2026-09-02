@@ -5,7 +5,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { CubeIcon, StarIcon } from "@heroicons/react/24/outline";
+import { CubeIcon, NoSymbolIcon, StarIcon } from "@heroicons/react/24/outline";
 import { useTranslations } from "next-intl";
 import { StatusBadge } from "@tarodan/ui";
 import { SectionCard } from "@/components/detail/SectionCard";
@@ -14,10 +14,47 @@ import { ModerationEventsPanel } from "@/components/ModerationEventsPanel";
 import { getProductEffectivePrice } from "@/lib/product-price";
 import { fmtDate, fmtTry } from "@/lib/format";
 import {
+  type UserBlockItem,
   type UserDetail,
   type UserRatingItem,
   getUserStatusConfig,
 } from "../types";
+
+/** Engelleme satırı: karşı taraf + tarih + (varsa) gerekçe. */
+function BlockRow({
+  item,
+  other,
+  reasonLabel,
+}: {
+  item: UserBlockItem;
+  other?: { id: string; displayName: string };
+  reasonLabel: string;
+}) {
+  return (
+    <div className="flex items-center justify-between rounded-lg bg-surface-alt p-4">
+      <div className="min-w-0">
+        {other ? (
+          <Link
+            href={`/accounts/users/${other.id}`}
+            className="font-medium text-heading hover:underline"
+          >
+            {other.displayName}
+          </Link>
+        ) : (
+          <span className="font-medium text-heading">—</span>
+        )}
+        {item.reason && (
+          <p className="mt-1 truncate text-sm text-muted">
+            {reasonLabel}: {item.reason}
+          </p>
+        )}
+      </div>
+      <span className="ml-4 shrink-0 text-sm text-subtle">
+        {fmtDate(item.createdAt)}
+      </span>
+    </div>
+  );
+}
 
 function Stars({ score }: { score: number }) {
   return (
@@ -71,8 +108,11 @@ export function UserActivityTabs({
   const t = useTranslations();
   const userStatusConfig = getUserStatusConfig(t);
   const [tab, setTab] = useState<
-    "orders" | "products" | "trades" | "ratings" | "ai"
+    "orders" | "products" | "trades" | "ratings" | "blocks" | "ai"
   >("orders");
+  const blocksCount =
+    (user.stats?.blocksGivenCount ?? user.blocksGiven?.length ?? 0) +
+    (user.stats?.blocksReceivedCount ?? user.blocksReceived?.length ?? 0);
 
   const tabs = [
     {
@@ -94,6 +134,12 @@ export function UserActivityTabs({
       key: "ratings",
       label: t("admin.users.detail.ratingsTab"),
       badge: user.receivedRatings?.length || 0,
+    },
+    {
+      key: "blocks",
+      label: t("admin.users.detail.blocksTab"),
+      icon: NoSymbolIcon,
+      badge: blocksCount,
     },
     { key: "ai", label: t("admin.catalog.common.aiModeration") },
   ];
@@ -330,6 +376,45 @@ export function UserActivityTabs({
           )}
         </div>
       )}
+
+      {tab === "blocks" &&
+        (blocksCount > 0 ? (
+          <div className="space-y-6">
+            <div className="space-y-3">
+              <h4 className="text-sm font-semibold text-heading">
+                {t("admin.users.detail.blocksGivenTitle")} (
+                {user.stats?.blocksGivenCount ?? user.blocksGiven?.length ?? 0})
+              </h4>
+              {(user.blocksGiven ?? []).map((b) => (
+                <BlockRow
+                  key={b.id}
+                  item={b}
+                  other={b.blocked}
+                  reasonLabel={t("common.reason")}
+                />
+              ))}
+            </div>
+            <div className="space-y-3">
+              <h4 className="text-sm font-semibold text-heading">
+                {t("admin.users.detail.blocksReceivedTitle")} (
+                {user.stats?.blocksReceivedCount ??
+                  user.blocksReceived?.length ??
+                  0}
+                )
+              </h4>
+              {(user.blocksReceived ?? []).map((b) => (
+                <BlockRow
+                  key={b.id}
+                  item={b}
+                  other={b.blocker}
+                  reasonLabel={t("common.reason")}
+                />
+              ))}
+            </div>
+          </div>
+        ) : (
+          <EmptyLine>{t("admin.users.detail.blocksEmpty")}</EmptyLine>
+        ))}
 
       {tab === "ai" && (
         <ModerationEventsPanel

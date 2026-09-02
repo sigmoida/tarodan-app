@@ -6,15 +6,20 @@ import UserAvatar from "@/components/UserAvatar";
 import { useTranslations } from "next-intl";
 import type { MessageThread } from "../_lib/messages";
 import { publicNameOf } from "@/lib/public-name";
+import UserActionsMenu from "@/components/UserActionsMenu";
 
 export default function ChatHeader({
   thread,
   typing,
   onBack,
+  onReport,
+  onBlocked,
 }: {
   thread: MessageThread;
   typing: boolean;
   onBack: () => void;
+  onReport: () => void;
+  onBlocked: () => void;
 }) {
   const t = useTranslations();
 
@@ -49,6 +54,14 @@ export default function ChatHeader({
           </p>
         ) : null}
       </div>
+      {thread.otherUser?.id && (
+        <UserActionsMenu
+          userId={thread.otherUser.id}
+          userName={publicNameOf(thread.otherUser, t("common.user"))}
+          onReport={onReport}
+          onBlocked={onBlocked}
+        />
+      )}
     </div>
   );
 }

@@ -21,6 +21,8 @@ import { StorageModule } from "../storage/storage.module";
 import { RatingModule } from "../rating/rating.module";
 import { ModerationModule } from "../moderation/moderation.module";
 import { scheduledProcessors } from "../../workers/scheduled-processors";
+import { UserBlockModule } from "../user-block/user-block.module";
+import { UserBlockAdminListener } from "./social/user-block-admin.listener";
 
 @Module({
   imports: [
@@ -28,6 +30,7 @@ import { scheduledProcessors } from "../../workers/scheduled-processors";
     StorageModule,
     RatingModule,
     ModerationModule,
+    UserBlockModule,
     BullModule.registerQueue({ name: QUEUE_NAMES.SCHEDULED }),
   ],
   controllers: [UserController, SellerDocumentController],
@@ -44,6 +47,7 @@ import { scheduledProcessors } from "../../workers/scheduled-processors";
     UserBankService,
     UserEngagementService,
     FeaturedSchedulerService,
+    UserBlockAdminListener,
     ...scheduledProcessors(FeaturedScheduledProcessor),
   ],
   exports: [UserService],

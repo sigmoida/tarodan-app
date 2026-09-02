@@ -46,7 +46,11 @@ export const discountSchema = (t: T) =>
       targetTierTypes: z.array(
         z.object({ value: z.string(), label: z.string() }),
       ),
-      targetUserIds: z.string(),
+      // Çipler etiketleriyle taşınır: seçilenler formda UUID değil kişi olarak
+      // görünsün diye (FormSearchableMultiSelect sözleşmesi).
+      targetUserIds: z.array(
+        z.object({ value: z.string(), label: z.string() }),
+      ),
       budgetLimit: z.string(),
       minCartValue: z.string(),
       minQuantity: z.string(),
@@ -86,7 +90,7 @@ export const discountSchema = (t: T) =>
       (d) =>
         (d.audience !== "specific_buyers" &&
           d.audience !== "specific_sellers") ||
-        d.targetUserIds.trim().length > 0,
+        d.targetUserIds.length > 0,
       {
         message: t("admin.marketing.discounts.validation.usersRequired"),
         path: ["targetUserIds"],

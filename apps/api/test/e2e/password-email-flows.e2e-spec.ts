@@ -1,15 +1,15 @@
-import * as request from 'supertest';
-import * as crypto from 'crypto';
-import { createE2ETestApp, E2ETestApp } from '../test-utils/create-app';
+import * as request from "supertest";
+import * as crypto from "crypto";
+import { createE2ETestApp, E2ETestApp } from "../test-utils/create-app";
 import {
   truncateAll,
   getPrisma,
   seedBaseline,
   disconnectPrisma,
-} from '../test-utils/db';
-import { createUser, authHeader } from '../factories/user.factory';
+} from "../test-utils/db";
+import { createUser, authHeader } from "../factories/user.factory";
 
-describe('Password & Email Verification flows (E2E)', () => {
+describe("Password & Email Verification flows (E2E)", () => {
   let ctx: E2ETestApp;
 
   beforeAll(async () => {
@@ -30,57 +30,57 @@ describe('Password & Email Verification flows (E2E)', () => {
   // Password change (authenticated)
   // ============================================================================
 
-  describe('POST /api/security/password/change', () => {
-    it('changes password with correct current password', async () => {
-      const user = await createUser(ctx.module, { password: 'OldPass123!' });
+  describe("POST /api/security/password/change", () => {
+    it("changes password with correct current password", async () => {
+      const user = await createUser(ctx.module, { password: "OldPass123!" });
 
       await request(ctx.app.getHttpServer())
-        .post('/api/security/password/change')
+        .post("/api/security/password/change")
         .set(authHeader(user))
-        .send({ currentPassword: 'OldPass123!', newPassword: 'NewPass456!' })
+        .send({ currentPassword: "OldPass123!", newPassword: "NewPass456!" })
         .expect(200);
 
       // Old password no longer works
       await request(ctx.app.getHttpServer())
-        .post('/api/auth/login')
-        .send({ email: user.email, password: 'OldPass123!' })
+        .post("/api/auth/login")
+        .send({ email: user.email, password: "OldPass123!" })
         .expect(401);
 
       // New password works
       const login = await request(ctx.app.getHttpServer())
-        .post('/api/auth/login')
-        .send({ email: user.email, password: 'NewPass456!' })
+        .post("/api/auth/login")
+        .send({ email: user.email, password: "NewPass456!" })
         .expect(200);
       expect(login.body.tokens?.accessToken).toBeTruthy();
     });
 
-    it('rejects with 401 when current password is wrong', async () => {
-      const user = await createUser(ctx.module, { password: 'RealPass123!' });
+    it("rejects with 401 when current password is wrong", async () => {
+      const user = await createUser(ctx.module, { password: "RealPass123!" });
 
       await request(ctx.app.getHttpServer())
-        .post('/api/security/password/change')
+        .post("/api/security/password/change")
         .set(authHeader(user))
         .send({
-          currentPassword: 'WrongPass123!',
-          newPassword: 'NewPass456!',
+          currentPassword: "WrongPass123!",
+          newPassword: "NewPass456!",
         })
         .expect(401);
     });
 
-    it('rejects weak new password (validation rule)', async () => {
-      const user = await createUser(ctx.module, { password: 'OldPass123!' });
+    it("rejects weak new password (validation rule)", async () => {
+      const user = await createUser(ctx.module, { password: "OldPass123!" });
 
       await request(ctx.app.getHttpServer())
-        .post('/api/security/password/change')
+        .post("/api/security/password/change")
         .set(authHeader(user))
-        .send({ currentPassword: 'OldPass123!', newPassword: 'weakpass' })
+        .send({ currentPassword: "OldPass123!", newPassword: "weakpass" })
         .expect(400);
     });
 
-    it('rejects unauthenticated request (401)', async () => {
+    it("rejects unauthenticated request (401)", async () => {
       await request(ctx.app.getHttpServer())
-        .post('/api/security/password/change')
-        .send({ currentPassword: 'x', newPassword: 'NewPass456!' })
+        .post("/api/security/password/change")
+        .send({ currentPassword: "x", newPassword: "NewPass456!" })
         .expect(401);
     });
   });
@@ -89,47 +89,52 @@ describe('Password & Email Verification flows (E2E)', () => {
   // Password reset (public — token-based)
   // ============================================================================
 
-  describe('POST /api/security/password/request-reset + /reset', () => {
-    it('does not reveal whether email exists (200 for both real and fake)', async () => {
+  describe("POST /api/security/password/request-reset + /reset", () => {
+    it("does not reveal whether email exists (200 for both real and fake)", async () => {
       const user = await createUser(ctx.module);
 
       const realRes = await request(ctx.app.getHttpServer())
-        .post('/api/security/password/request-reset')
+        .post("/api/security/password/request-reset")
         .send({ email: user.email })
         .expect(200);
       expect(realRes.body.message).toMatch(/şifre sıfırlama/i);
 
       const fakeRes = await request(ctx.app.getHttpServer())
-        .post('/api/security/password/request-reset')
-        .send({ email: 'nonexistent@example.com' })
+        .post("/api/security/password/request-reset")
+        .send({ email: "nonexistent@example.com" })
         .expect(200);
       expect(fakeRes.body.message).toMatch(/şifre sıfırlama/i);
     });
 
-    it('successfully resets password with a valid token (and revokes refresh tokens)', async () => {
-      const user = await createUser(ctx.module, { password: 'OldPass123!' });
+    it("successfully resets password with a valid token (and revokes refresh tokens)", async () => {
+      const user = await createUser(ctx.module, { password: "OldPass123!" });
       const prisma = getPrisma();
 
       // Seed an active refresh token; reset should revoke it
       const seededRefresh = await prisma.refreshToken.create({
         data: {
           userId: user.id,
-          tokenHash: 'active-refresh-hash-' + Date.now(),
+          tokenHash: "active-refresh-hash-" + Date.now(),
           expiresAt: new Date(Date.now() + 7 * 24 * 3600 * 1000),
         },
       });
 
       // Trigger token creation
       await request(ctx.app.getHttpServer())
-        .post('/api/security/password/request-reset')
+        .post("/api/security/password/request-reset")
         .send({ email: user.email })
         .expect(200);
 
       // Service stores sha256(rawToken) in DB; we can't pull the raw token from
       // process logs, so create a new one directly to control its value.
-      const rawToken = crypto.randomBytes(32).toString('hex');
-      const tokenHash = crypto.createHash('sha256').update(rawToken).digest('hex');
-      await prisma.passwordResetToken.deleteMany({ where: { userId: user.id } });
+      const rawToken = crypto.randomBytes(32).toString("hex");
+      const tokenHash = crypto
+        .createHash("sha256")
+        .update(rawToken)
+        .digest("hex");
+      await prisma.passwordResetToken.deleteMany({
+        where: { userId: user.id },
+      });
       await prisma.passwordResetToken.create({
         data: {
           userId: user.id,
@@ -139,18 +144,18 @@ describe('Password & Email Verification flows (E2E)', () => {
       });
 
       await request(ctx.app.getHttpServer())
-        .post('/api/security/password/reset')
-        .send({ token: rawToken, newPassword: 'BrandNew789!' })
+        .post("/api/security/password/reset")
+        .send({ token: rawToken, newPassword: "BrandNew789!" })
         .expect(200);
 
       // Old password no longer works, new one does
       await request(ctx.app.getHttpServer())
-        .post('/api/auth/login')
-        .send({ email: user.email, password: 'OldPass123!' })
+        .post("/api/auth/login")
+        .send({ email: user.email, password: "OldPass123!" })
         .expect(401);
       await request(ctx.app.getHttpServer())
-        .post('/api/auth/login')
-        .send({ email: user.email, password: 'BrandNew789!' })
+        .post("/api/auth/login")
+        .send({ email: user.email, password: "BrandNew789!" })
         .expect(200);
 
       // Reset, RESET ÖNCESİ var olan refresh token'ları revoke etmeli. (Reset'ten
@@ -168,12 +173,15 @@ describe('Password & Email Verification flows (E2E)', () => {
       expect(usedToken!.usedAt).not.toBeNull();
     });
 
-    it('rejects already-used token with 400', async () => {
+    it("rejects already-used token with 400", async () => {
       const user = await createUser(ctx.module);
       const prisma = getPrisma();
 
-      const rawToken = crypto.randomBytes(32).toString('hex');
-      const tokenHash = crypto.createHash('sha256').update(rawToken).digest('hex');
+      const rawToken = crypto.randomBytes(32).toString("hex");
+      const tokenHash = crypto
+        .createHash("sha256")
+        .update(rawToken)
+        .digest("hex");
       await prisma.passwordResetToken.create({
         data: {
           userId: user.id,
@@ -184,18 +192,21 @@ describe('Password & Email Verification flows (E2E)', () => {
       });
 
       const res = await request(ctx.app.getHttpServer())
-        .post('/api/security/password/reset')
-        .send({ token: rawToken, newPassword: 'NewPass789!' })
+        .post("/api/security/password/reset")
+        .send({ token: rawToken, newPassword: "NewPass789!" })
         .expect(400);
       expect(res.body.message).toMatch(/zaten kullanılmış/i);
     });
 
-    it('rejects expired token with 400', async () => {
+    it("rejects expired token with 400", async () => {
       const user = await createUser(ctx.module);
       const prisma = getPrisma();
 
-      const rawToken = crypto.randomBytes(32).toString('hex');
-      const tokenHash = crypto.createHash('sha256').update(rawToken).digest('hex');
+      const rawToken = crypto.randomBytes(32).toString("hex");
+      const tokenHash = crypto
+        .createHash("sha256")
+        .update(rawToken)
+        .digest("hex");
       await prisma.passwordResetToken.create({
         data: {
           userId: user.id,
@@ -205,45 +216,57 @@ describe('Password & Email Verification flows (E2E)', () => {
       });
 
       const res = await request(ctx.app.getHttpServer())
-        .post('/api/security/password/reset')
-        .send({ token: rawToken, newPassword: 'NewPass789!' })
+        .post("/api/security/password/reset")
+        .send({ token: rawToken, newPassword: "NewPass789!" })
         .expect(400);
       expect(res.body.message).toMatch(/süresi dolmuş/i);
     });
 
-    it('rejects invalid (unknown) token with 400', async () => {
+    it("rejects invalid (unknown) token with 400", async () => {
       await request(ctx.app.getHttpServer())
-        .post('/api/security/password/reset')
-        .send({ token: 'totally-fake-token', newPassword: 'NewPass789!' })
+        .post("/api/security/password/reset")
+        .send({ token: "totally-fake-token", newPassword: "NewPass789!" })
         .expect(400);
     });
   });
 
   // ============================================================================
-  // Email verification
+  // Email verification — auth is the ONLY verification path.
+  //
+  // Bu blok eskiden /api/security/email/verify'i test ediyordu: o uc token'i
+  // HAM ariyordu ve test de elle ham token ekiyordu, dolayisiyla gercek akisi
+  // (auth sha256 YAZAR) hic dogrulamiyordu. Uc kaldirildi; test artik kayit
+  // akisinin urettigi token'in nasil saklandigini ve nasil tuketildigini pinler.
   // ============================================================================
 
-  describe('POST /api/security/email/verify', () => {
-    it('verifies email with a valid token and flips isEmailVerified to true', async () => {
+  describe("POST /api/auth/verify-email", () => {
+    const hash = (token: string) =>
+      crypto.createHash("sha256").update(token).digest("hex");
+
+    it("verifies email with a valid token and flips isEmailVerified to true", async () => {
       const user = await createUser(ctx.module, { isEmailVerified: false });
       const prisma = getPrisma();
 
-      const rawToken = crypto.randomBytes(32).toString('hex');
+      const rawToken = crypto.randomBytes(32).toString("hex");
       await prisma.emailVerificationToken.create({
         data: {
           userId: user.id,
-          token: rawToken,
+          // Auth token'i HASH'leyerek saklar - DB okuma yetkisi tek basina
+          // bekleyen bir e-postayi dogrulamaya yetmesin.
+          token: hash(rawToken),
           email: user.email,
           expiresAt: new Date(Date.now() + 24 * 3600 * 1000),
         },
       });
 
       await request(ctx.app.getHttpServer())
-        .post('/api/security/email/verify')
+        .post("/api/auth/verify-email")
         .send({ token: rawToken })
         .expect(200);
 
-      const refreshed = await prisma.user.findUnique({ where: { id: user.id } });
+      const refreshed = await prisma.user.findUnique({
+        where: { id: user.id },
+      });
       expect(refreshed!.isEmailVerified).toBe(true);
 
       const usedToken = await prisma.emailVerificationToken.findFirst({
@@ -252,44 +275,50 @@ describe('Password & Email Verification flows (E2E)', () => {
       expect(usedToken!.usedAt).not.toBeNull();
     });
 
-    it('rejects already-used or expired tokens with 400', async () => {
-      const user = await createUser(ctx.module);
+    it("rejects expired and unknown tokens with 400", async () => {
+      const user = await createUser(ctx.module, { isEmailVerified: false });
       const prisma = getPrisma();
 
-      const usedToken = crypto.randomBytes(32).toString('hex');
+      const expiredToken = crypto.randomBytes(32).toString("hex");
       await prisma.emailVerificationToken.create({
         data: {
           userId: user.id,
-          token: usedToken,
-          email: user.email,
-          expiresAt: new Date(Date.now() + 3600 * 1000),
-          usedAt: new Date(),
-        },
-      });
-      await request(ctx.app.getHttpServer())
-        .post('/api/security/email/verify')
-        .send({ token: usedToken })
-        .expect(400);
-
-      const expiredToken = crypto.randomBytes(32).toString('hex');
-      await prisma.emailVerificationToken.create({
-        data: {
-          userId: user.id,
-          token: expiredToken,
+          token: hash(expiredToken),
           email: user.email,
           expiresAt: new Date(Date.now() - 60 * 1000),
         },
       });
       await request(ctx.app.getHttpServer())
-        .post('/api/security/email/verify')
+        .post("/api/auth/verify-email")
         .send({ token: expiredToken })
         .expect(400);
 
-      // Unknown token
       await request(ctx.app.getHttpServer())
-        .post('/api/security/email/verify')
-        .send({ token: 'unknown-token' })
+        .post("/api/auth/verify-email")
+        .send({ token: "unknown-token" })
         .expect(400);
+    });
+
+    it("is idempotent for an already verified account", async () => {
+      const user = await createUser(ctx.module, { isEmailVerified: true });
+      const prisma = getPrisma();
+
+      const usedToken = crypto.randomBytes(32).toString("hex");
+      await prisma.emailVerificationToken.create({
+        data: {
+          userId: user.id,
+          token: hash(usedToken),
+          email: user.email,
+          expiresAt: new Date(Date.now() + 3600 * 1000),
+          usedAt: new Date(),
+        },
+      });
+
+      // Kullanici linke iki kez tiklarsa hata degil, sessiz onay gormeli.
+      await request(ctx.app.getHttpServer())
+        .post("/api/auth/verify-email")
+        .send({ token: usedToken })
+        .expect(200);
     });
   });
 });

@@ -105,11 +105,18 @@ export class SearchService implements OnModuleInit {
   // Taşındı: search-autocomplete.service.ts — otomatik tamamlama
   // (facade delege; imzalar aynen korunuyor).
 
-  async autocomplete(query: string, limit = 10): Promise<string[]> {
-    return this.autocompleteSvc.autocomplete(query, limit);
+  async autocomplete(
+    query: string,
+    limit = 10,
+    excludeSellerIds: string[] = [],
+  ): Promise<string[]> {
+    return this.autocompleteSvc.autocomplete(query, limit, excludeSellerIds);
   }
 
-  async autocompleteRich(query: string): Promise<{
+  async autocompleteRich(
+    query: string,
+    excludeSellerIds: string[] = [],
+  ): Promise<{
     products: Array<{
       id: string;
       title: string;
@@ -141,7 +148,7 @@ export class SearchService implements OnModuleInit {
     conditions: Array<{ value: string; label: string }>;
     suggestions: string[];
   }> {
-    return this.autocompleteSvc.autocompleteRich(query);
+    return this.autocompleteSvc.autocompleteRich(query, excludeSellerIds);
   }
 
   // Taşındı: search-collection.service.ts — koleksiyon indeksleme + arama
@@ -165,6 +172,7 @@ export class SearchService implements OnModuleInit {
     isPublic?: boolean;
     isFeatured?: boolean;
     userId?: string;
+    excludeUserIds?: string[];
     sortBy?:
       "popular" | "recent" | "name" | "items" | "items_asc" | "items_desc";
     page?: number;

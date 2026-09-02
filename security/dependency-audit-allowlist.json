@@ -10,8 +10,8 @@
     {
       "ghsa": "GHSA-f88m-g3jw-g9cj",
       "package": "sharp",
-      "expires": "2026-08-31",
-      "reason": "Sharp 0.35 prebuilt binaries require x86-64-v2 but the current Coolify host is v1. The upstream workaround is active: GIF, TIFF and VIPS loaders are blocked globally, and transformed uploads reject blocked MIME types while the host upgrade or source build is prepared."
+      "expires": "2026-11-30",
+      "reason": "Sharp 0.35 prebuilt binaries require x86-64-v2 but the current Coolify host is v1. The upstream workaround is active: GIF, TIFF and VIPS loaders are blocked globally, and transformed uploads reject blocked MIME types while the host upgrade or source build is prepared. Host upgrade plan and the sharp 0.35 rollout are tracked in docs/SHARP_HOST_UPGRADE.md."
     }
   ]
 }

@@ -201,6 +201,8 @@ export class SearchCollectionService {
     isPublic?: boolean;
     isFeatured?: boolean;
     userId?: string;
+    /** Viewer için gizli koleksiyon sahipleri (engel, simetrik). */
+    excludeUserIds?: string[];
     sortBy?:
       "popular" | "recent" | "name" | "items" | "items_asc" | "items_desc";
     page?: number;
@@ -257,6 +259,10 @@ export class SearchCollectionService {
     if (isFeatured !== undefined) filter.push({ term: { isFeatured } });
     if (categoryId) filter.push({ term: { categoryId } });
     if (userId) filter.push({ term: { userId } });
+    const mustNot: any[] = [];
+    if (options.excludeUserIds?.length) {
+      mustNot.push({ terms: { userId: options.excludeUserIds } });
+    }
 
     let sort: any[];
     switch (sortBy) {
@@ -287,6 +293,7 @@ export class SearchCollectionService {
           bool: {
             must: must.length > 0 ? must : [{ match_all: {} }],
             filter,
+            ...(mustNot.length > 0 ? { must_not: mustNot } : {}),
           },
         },
         sort,

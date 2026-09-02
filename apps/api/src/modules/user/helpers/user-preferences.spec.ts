@@ -27,6 +27,10 @@ describe("user preferences", () => {
       prisma as any,
       moderation as any,
       {} as any,
+      {
+        isBlockedEither: async () => false,
+        getHiddenUserIds: async () => [],
+      } as any,
     );
   });
 

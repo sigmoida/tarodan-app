@@ -2,10 +2,8 @@
 
 "use client";
 
-import { useTranslations } from "next-intl";
 import { listingsApi } from "@/lib/api";
 import { useWebList } from "@/hooks/useWebResource";
-import type { Translate } from "@/types/i18n";
 
 interface FilterOption {
   id: string;
@@ -24,35 +22,18 @@ interface FiltersData {
   materials: MaterialOption[];
 }
 
-const FALLBACK_SCALES = ["1:18", "1:24", "1:43", "1:64", "1:87"];
-const FALLBACK_MATERIALS = (t: Translate): MaterialOption[] => [
-  {
-    slug: "diecast",
-    label: t("page.collections.usecollectionfilters.diecastMetal"),
-  },
-  {
-    slug: "resin",
-    label: t("page.collections.usecollectionfilters.resinRecine"),
-  },
-  {
-    slug: "composite",
-    label: t("page.collections.usecollectionfilters.compositeKompozit"),
-  },
-  {
-    slug: "plastic",
-    label: t("page.collections.usecollectionfilters.plasticPlastik"),
-  },
-];
-
 const RESOURCE = "collection-item-filters";
 
 /**
  * Brand / manufacturer / scale / material options for the custom-item form.
- * Replaces the old `useEffect` + `useState` fetch; falls back to sensible
- * defaults when the request fails or a facet is empty.
+ *
+ * Options come from the catalog only. This hook used to substitute five scales
+ * and four materials whenever a facet came back empty, so a collector could
+ * pick a material the catalog does not define — the same fabrication the
+ * listing form and the API were doing, in a third place. An empty facet is a
+ * fact about the catalog, and the form shows it as such.
  */
 export function useCollectionFilters(enabled: boolean) {
-  const t = useTranslations();
   const query = useWebList<Partial<FiltersData>>({
     resource: RESOURCE,
     fetcher: async () => {
@@ -65,9 +46,9 @@ export function useCollectionFilters(enabled: boolean) {
 
   const data = query.data;
   return {
-    scales: data?.scales?.length ? data.scales : FALLBACK_SCALES,
+    scales: data?.scales ?? [],
     brands: data?.brands ?? [],
     manufacturers: data?.manufacturers ?? [],
-    materials: data?.materials?.length ? data.materials : FALLBACK_MATERIALS(t),
+    materials: data?.materials ?? [],
   };
 }

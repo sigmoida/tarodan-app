@@ -9,41 +9,28 @@ import { NotificationService } from "../../notification/notification.service";
 import { NotificationType } from "../../notification/dto";
 import { UserCommonService } from "../user-common.service";
 import { i18nMessage } from "../../i18n";
-import { randomUUID } from "crypto";
+import { UserBlockService } from "../../user-block/user-block.service";
 import { catalogProductWhere } from "../../product/helpers/catalog-product-where";
 import {
   PUBLIC_IDENTITY_SELECT,
   PUBLIC_NAME_SELECT,
   publicName,
-  toPublicIdentity,
 } from "../../../common/helpers/public-identity";
 
-// In-memory storage for user blocks until schema is updated
-interface UserBlock {
-  id: string;
-  blockerId: string;
-  blockedId: string;
-  createdAt: Date;
-}
-
 /**
- * UserSocialService — takip (follow/unfollow/checkFollowing/getFollowing) ve
- * engelleme (block/unblock/getBlockedUsers/isUserBlocked/areUsersBlocked).
- * Engeller in-memory Map'te tutulur (şema henüz güncellenmedi); bu yüzden tüm
- * engelleme metotları TEK serviste kalır ki aynı Map örneğini paylaşsınlar.
+ * UserSocialService — takip (follow/unfollow/checkFollowing/getFollowing).
+ * Engelleme çağrıları UserBlockService'e delege edilir (kalıcı, simetrik).
  * Avatar çözümü için common'a delege eder.
  */
 @Injectable()
 export class UserSocialService {
   private readonly logger = new Logger(UserSocialService.name);
 
-  // Temporary in-memory storage for user blocks
-  private userBlocks: Map<string, UserBlock> = new Map();
-
   constructor(
     private readonly prisma: PrismaService,
     private readonly notificationService: NotificationService,
     private readonly common: UserCommonService,
+    private readonly blocks: UserBlockService,
   ) {}
 
   /**
@@ -71,6 +58,10 @@ export class UserSocialService {
         i18nMessage("server.user.cannotFollowSelf"),
       );
     }
+
+    // Engel anında iki yönlü takip silinir; engelli taraf yeniden takip edip
+    // NEW_FOLLOWER bildirimi/e-postası düşüremez.
+    await this.blocks.assertNotBlocked(currentUserId, targetUserId);
 
     // Check if target user exists
     const targetUser = await this.prisma.user.findUnique({
@@ -220,127 +211,30 @@ export class UserSocialService {
     return { following: resolved };
   }
 
-  /**
-   * Block a user
-   */
-  async blockUser(
-    blockerId: string,
-    blockedId: string,
-  ): Promise<{ success: boolean; blockedDisplayName: string }> {
-    // Cannot block yourself
-    if (blockerId === blockedId) {
-      throw new BadRequestException(i18nMessage("server.user.cannotBlockSelf"));
-    }
+  // ── Engelleme: kalıcı kaynak UserBlockService (user-block modülü) ──────
+  // Controller route'ları burada kalsın diye ince delegasyon; mantık ve cache
+  // tek yerde (simetrik gizleme, iki yönlü unfollow, admin olayı).
 
-    // Check if blocked user exists
-    const blockedUser = await this.prisma.user.findUnique({
-      where: { id: blockedId },
-      select: { id: true, ...PUBLIC_NAME_SELECT },
-    });
-
-    if (!blockedUser) {
-      throw new NotFoundException(i18nMessage("server.user.notFound"));
-    }
-
-    // Check if already blocked
-    const existingBlock = Array.from(this.userBlocks.values()).find(
-      (b) => b.blockerId === blockerId && b.blockedId === blockedId,
-    );
-
-    if (existingBlock) {
-      throw new BadRequestException(i18nMessage("server.user.alreadyBlocked"));
-    }
-
-    // Create block
-    const block: UserBlock = {
-      id: this.generateUUID(),
-      blockerId,
-      blockedId,
-      createdAt: new Date(),
-    };
-
-    this.userBlocks.set(block.id, block);
-
-    this.logger.log(`User ${blockerId} blocked user ${blockedId}`);
-
-    // #224: mesaj artık UserController.blockUser() tarafından locale'e göre
-    // kuruluyor (server.user.userBlocked, {displayName} parametreli) — servis
-    // burada sabit metin döndürmüyor.
-    return { success: true, blockedDisplayName: publicName(blockedUser) };
+  blockUser(blockerId: string, blockedId: string, reason?: string) {
+    return this.blocks.block(blockerId, blockedId, reason);
   }
 
-  /**
-   * Unblock a user
-   */
-  async unblockUser(
-    blockerId: string,
-    blockedId: string,
-  ): Promise<{ success: boolean }> {
-    // Find the block
-    const block = Array.from(this.userBlocks.values()).find(
-      (b) => b.blockerId === blockerId && b.blockedId === blockedId,
-    );
-
-    if (!block) {
-      throw new NotFoundException(i18nMessage("server.user.notBlocked"));
-    }
-
-    // Remove block
-    this.userBlocks.delete(block.id);
-
-    this.logger.log(`User ${blockerId} unblocked user ${blockedId}`);
-
-    // #224: mesaj artık UserController.unblockUser() tarafından locale'e göre
-    // kuruluyor (server.user.userUnblocked) — servis burada sabit metin döndürmüyor.
-    return { success: true };
+  unblockUser(blockerId: string, blockedId: string) {
+    return this.blocks.unblock(blockerId, blockedId);
   }
 
-  /**
-   * Get list of blocked users
-   */
-  async getBlockedUsers(userId: string): Promise<any[]> {
-    const blocks = Array.from(this.userBlocks.values()).filter(
-      (b) => b.blockerId === userId,
-    );
-
-    const blockedUserIds = blocks.map((b) => b.blockedId);
-
-    if (blockedUserIds.length === 0) {
-      return [];
-    }
-
-    const blockedUsers = await this.prisma.user.findMany({
-      where: { id: { in: blockedUserIds } },
-      select: PUBLIC_IDENTITY_SELECT,
-    });
-
-    return blockedUsers.map((user) => ({
-      ...toPublicIdentity(user),
-      blockedAt: blocks.find((b) => b.blockedId === user.id)?.createdAt,
-    }));
-  }
-
-  /**
-   * Check if a user is blocked
-   */
-  isUserBlocked(blockerId: string, blockedId: string): boolean {
-    return Array.from(this.userBlocks.values()).some(
-      (b) => b.blockerId === blockerId && b.blockedId === blockedId,
+  /** Engellenenler listesi; avatar anahtarı burada presigned URL'ye çözülür. */
+  async getBlockedUsers(userId: string) {
+    const blocked = await this.blocks.getBlockedUsers(userId);
+    return Promise.all(
+      blocked.map(async (u) => ({
+        ...u,
+        avatarUrl: await this.common.resolveAvatarUrl(u.avatarUrl),
+      })),
     );
   }
 
-  /**
-   * Check if either user has blocked the other
-   */
-  areUsersBlocked(userId1: string, userId2: string): boolean {
-    return Array.from(this.userBlocks.values()).some(
-      (b) =>
-        (b.blockerId === userId1 && b.blockedId === userId2) ||
-        (b.blockerId === userId2 && b.blockedId === userId1),
-    );
-  }
-
-  private generateUUID(): string {
-    return randomUUID();
+  hasBlocked(blockerId: string, blockedId: string) {
+    return this.blocks.hasBlocked(blockerId, blockedId);
   }
 }

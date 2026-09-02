@@ -98,6 +98,7 @@ import {
   RefundRequestQueryDto,
   AdminChangeMembershipDto,
   AdminCollectionQueryDto,
+  AddCollectionItemsDto,
 } from "../dto";
 
 @ApiTags("admin")
@@ -193,9 +194,9 @@ export class AdminCollectionController {
   async addItemsToCollection(
     @Param("id") id: string,
     @CurrentUser("id") adminId: string,
-    @Body() body: { productIds: string[] },
+    @Body() dto: AddCollectionItemsDto,
   ) {
-    return this.adminService.addItemsToCollection(adminId, id, body.productIds);
+    return this.adminService.addItemsToCollection(adminId, id, dto.productIds);
   }
 
   @Delete("collections/:collectionId/items/:itemId")

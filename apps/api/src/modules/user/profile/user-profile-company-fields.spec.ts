@@ -33,6 +33,10 @@ describe("UserProfileService.updateProfile — şirket alanları", () => {
       prisma as any,
       moderationAi as any,
       common as any,
+      {
+        isBlockedEither: async () => false,
+        getHiddenUserIds: async () => [],
+      } as any,
     );
     // updateProfile sonda tam profili yeniden okur — bu test yazılan ALANLARA
     // baktığı için ağır okuma zinciri stub'lanır.

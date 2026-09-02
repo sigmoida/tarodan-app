@@ -27,6 +27,8 @@ import { scheduledProcessors } from "../../workers/scheduled-processors";
 import { OrderTaxPolicyService } from "../order/pricing/order-tax-policy.service";
 import { DiscountModule } from "../discount/discount.module";
 
+import { UserBlockModule } from "../user-block/user-block.module";
+
 @Module({
   imports: [
     PrismaModule,
@@ -37,6 +39,7 @@ import { DiscountModule } from "../discount/discount.module";
     PaymentModule,
     ProductModule,
     EventModule,
+    UserBlockModule,
     SuratCargoModule,
     // Takas kargo bedeli sipariş tarifesiyle AYNI kaynaktan gelir (leaf modül).
     ShippingTariffModule,

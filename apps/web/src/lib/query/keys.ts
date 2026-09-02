@@ -97,6 +97,12 @@ export const queryKeys = {
   // NOTE: every factory below returns the SAME array a call site used inline
   // before the registry existed — do NOT change the string values, or an
   // SSR-seeded cache (or a query and its invalidation) would drift apart.
+  blocks: {
+    /** Engellediğim kullanıcılar (profil → Engellenen Kullanıcılar). */
+    list: () => ["blocked-users"] as const,
+    /** Hedef kullanıcıyı engelledim mi? (menüde Engelle / Engeli Kaldır). */
+    status: (id: string) => ["block-status", id] as const,
+  },
   seller: {
     profile: (id: string) => ["seller", id] as const,
     products: (id: string) => ["seller-products", id] as const,

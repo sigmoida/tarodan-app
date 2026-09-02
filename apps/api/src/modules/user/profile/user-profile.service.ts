@@ -6,6 +6,7 @@ import {
   Logger,
 } from "@nestjs/common";
 import { PrismaService } from "../../../prisma";
+import { UserBlockService } from "../../user-block/user-block.service";
 import {
   User,
   Prisma,
@@ -59,6 +60,7 @@ export class UserProfileService {
     private readonly prisma: PrismaService,
     private readonly moderationAi: ModerationAiClient,
     private readonly common: UserCommonService,
+    private readonly userBlocks: UserBlockService,
   ) {}
 
   /**
@@ -794,6 +796,13 @@ export class UserProfileService {
       throw new NotFoundException(i18nMessage("server.user.notFound"));
     }
     const userId = identity.id;
+
+    // Engel (iki yön) varsa profil "yok" davranır; engellendiğini sızdırmaz.
+    await this.userBlocks.assertVisibleTo(
+      viewerId,
+      userId,
+      "server.user.notFound",
+    );
 
     // Sahibin kendi profili mi? Sahip ise sayaçlar "tümünü" gösterir
     // (ilan: draft hariç tüm durumlar, takas: tüm statüler, koleksiyon: özel dahil);

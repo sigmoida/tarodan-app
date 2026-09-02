@@ -1,9 +1,14 @@
 const { z } = require("zod");
 
-const optionalUrl = z.preprocess(
-  (value) => (value === "" ? undefined : value),
-  z.string().url().optional(),
-);
+/**
+ * Coolify/CI boş değişkeni "" olarak geçirir; opsiyonel bir alan için bu
+ * "yok" demektir. Normalizasyon tek yerde ki bir düzeltme (ör. trim) tüm
+ * opsiyonel değişkenlere aynı anda uygulansın.
+ */
+const emptyToUndefined = (schema) =>
+  z.preprocess((value) => (value === "" ? undefined : value), schema);
+
+const optionalUrl = emptyToUndefined(z.string().url().optional());
 
 const boolFromEnv = z.preprocess((value) => {
   if (typeof value === "boolean") return value;
@@ -11,13 +16,18 @@ const boolFromEnv = z.preprocess((value) => {
   return value.toLowerCase() === "true" || value === "1";
 }, z.boolean().default(false));
 
-const optionalSecret = z.preprocess(
-  (value) => (value === "" ? undefined : value),
-  z.string().min(6).max(128).optional(),
+const optionalSecret = emptyToUndefined(z.string().min(6).max(128).optional());
+
+// Google Ads dönüşüm etiketi kimliği (gtag.js). Boş bırakılırsa etiket hiç
+// render edilmez — staging/dev bilinçli olarak boş kalır.
+const optionalGoogleAdsId = emptyToUndefined(
+  z
+    .string()
+    .regex(/^AW-\d+$/, "NEXT_PUBLIC_GOOGLE_ADS_ID must look like AW-123456789")
+    .optional(),
 );
 
-const optionalUnlockSecret = z.preprocess(
-  (value) => (value === "" ? undefined : value),
+const optionalUnlockSecret = emptyToUndefined(
   z.string().min(32).max(256).optional(),
 );
 
@@ -35,6 +45,7 @@ function createSchema(isProduction) {
         : z.string().url().default("http://localhost:3000"),
       API_INTERNAL_URL: optionalUrl,
       NEXT_PUBLIC_WS_URL: optionalUrl,
+      NEXT_PUBLIC_GOOGLE_ADS_ID: optionalGoogleAdsId,
       NEXT_PUBLIC_SENTRY_DSN: optionalUrl,
       SENTRY_DSN: optionalUrl,
       SENTRY_AUTH_TOKEN: z.string().optional(),

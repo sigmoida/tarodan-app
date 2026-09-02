@@ -23,7 +23,10 @@ describe("RefundReconciliationService.processRefundedOrders — MONEY-H5 group +
       { resolve: () => ({}) } as any, // paymentProviders (bu testte kullanılmaz)
       { get: jest.fn().mockReturnValue(undefined) } as any, // configService
     );
-    return { service, prisma, paymentRefund };
+    const warn = jest
+      .spyOn((service as any).logger, "warn")
+      .mockImplementation(() => undefined);
+    return { service, prisma, paymentRefund, warn };
   };
 
   it("tekil + grup siparişlerini iade eder; zaten iade edilmiş grup siparişini atlar", async () => {
@@ -88,6 +91,99 @@ describe("RefundReconciliationService.processRefundedOrders — MONEY-H5 group +
     const res = await service.processRefundedOrders();
 
     expect(res).toEqual({ refunded: 1, failed: 1 });
+  });
+
+  /**
+   * TARODAN-API-8: kısmi iade edilmiş TEKİL sipariş sonsuz döngüye giriyordu.
+   * Kısmi iadeden sonra payment `completed` KALIR (MONEY-H4), sipariş `cancelled`
+   * olur → dal 1 onu her turda görür, sweep TAM tutarı ister ve kümülatif tavan
+   * `refundAmountExceedsLimit` (BadRequest) fırlatır. Grup dalında bu eleme vardı,
+   * tekil dalda yoktu.
+   */
+  it("tekil ödemede kısmi iade kaydı olan siparişi atlar (sonsuz retry döngüsü)", async () => {
+    const { service, prisma, paymentRefund } = makeService();
+    prisma.order.findMany
+      .mockResolvedValueOnce([
+        // 1864 TL siparişin 1748.80'i alıcı kusurlu iade settlement'ıyla ödendi
+        {
+          id: "single-partially-refunded",
+          payment: {
+            metadata: {
+              refundedOrders: { "single-partially-refunded": 1748.8 },
+            },
+          },
+        },
+        { id: "single-untouched", payment: { metadata: {} } },
+      ])
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([]);
+
+    const res = await service.processRefundedOrders();
+
+    expect(paymentRefund.processRefund).toHaveBeenCalledWith(
+      "single-untouched",
+    );
+    expect(paymentRefund.processRefund).not.toHaveBeenCalledWith(
+      "single-partially-refunded",
+    );
+    expect(res).toEqual({ refunded: 1, failed: 0 });
+  });
+
+  /**
+   * Dal 3 atlaması SESSİZ OLMAMALI: sipariş `refund_requested`, yani terminal
+   * değil. İadesi kayıtlı ama sipariş kapanmamışsa bu sweep dışında hiçbir yol
+   * onu ilerletemez (poller terminal shipment'ı artık pollamaz) → alarm şart.
+   */
+  it("returned-arm dalinda iadesi kayıtlı siparişi atlar ama alarm verir", async () => {
+    const { service, prisma, paymentRefund, warn } = makeService();
+    prisma.order.findMany
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([
+        {
+          id: "returned-refunded",
+          payment: {
+            metadata: { refundedOrders: { "returned-refunded": 500 } },
+          },
+        },
+      ]);
+
+    const res = await service.processRefundedOrders();
+
+    expect(paymentRefund.processRefund).not.toHaveBeenCalled();
+    expect(res).toEqual({ refunded: 0, failed: 0 });
+    expect(warn).toHaveBeenCalledWith(
+      expect.stringContaining("REFUND_MANUAL_REVIEW"),
+    );
+    expect(warn).toHaveBeenCalledWith(
+      expect.stringContaining("returned-refunded"),
+    );
+  });
+
+  it("terminal (cancelled/refunded) dallardaki atlamalar sessizdir", async () => {
+    const { service, prisma, warn } = makeService();
+    prisma.order.findMany
+      .mockResolvedValueOnce([
+        {
+          id: "single-settled",
+          payment: { metadata: { refundedOrders: { "single-settled": 100 } } },
+        },
+      ])
+      .mockResolvedValueOnce([
+        {
+          id: "group-settled",
+          checkoutGroup: {
+            payment: {
+              metadata: { refundedOrders: { "group-settled": 250 } },
+            },
+          },
+        },
+      ])
+      .mockResolvedValueOnce([]);
+
+    await service.processRefundedOrders();
+
+    expect(warn).not.toHaveBeenCalled();
   });
 
   // SEAM-B3: outbound paket göndericiye iade dönmüş (shipment=returned) ama

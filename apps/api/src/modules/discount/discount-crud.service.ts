@@ -578,6 +578,23 @@ export class DiscountCrudService {
       include: {
         seller: { select: { id: true, displayName: true } },
         category: { select: { id: true, name: true } },
+        // Liste yolundaki kuralın AYNISI: kitle satırları yalnız yönetim
+        // yolunda, hedeflenen kişinin adı/e-postası da yalnız orada. Detay
+        // ucu bunları döndürmeseydi, formu detaydan tazeleyen bir çağıran
+        // kitleyi yine boş görür ve kaydedince silerdi.
+        ...(isAdmin
+          ? {
+              targetTiers: { select: { tierType: true } },
+              targetUsers: {
+                select: {
+                  userId: true,
+                  user: {
+                    select: { id: true, displayName: true, email: true },
+                  },
+                },
+              },
+            }
+          : {}),
       },
     });
 
@@ -685,6 +702,30 @@ export class DiscountCrudService {
         include: {
           seller: { select: { id: true, displayName: true } },
           category: { select: { id: true, name: true } },
+          // Hedef kitle satırları YALNIZ yönetim yolunda gelir.
+          //
+          // Gelmeleri gerekiyor çünkü yönetim ekranı düzenleme formunu LİSTE
+          // satırından dolduruyor; yoksa form kitleyi boş görüyor ve kaydedince
+          // boş gönderiyordu — kampanya bir düzenlemede hedefini kaybediyordu.
+          //
+          // Ama bu uç satıcıya da açık (`GET /discounts`, isAdmin=false) ve
+          // hedeflenen kişinin ADI ile E-POSTASI oradan görünmemeli: satıcı
+          // kendi kampanyasına istediği kullanıcı kimliğini hedef yazabildiği
+          // için, bu alanlar koşulsuz dönseydi uç bir kimlik→e-posta sorgusuna
+          // dönerdi.
+          ...(isAdmin
+            ? {
+                targetTiers: { select: { tierType: true } },
+                targetUsers: {
+                  select: {
+                    userId: true,
+                    user: {
+                      select: { id: true, displayName: true, email: true },
+                    },
+                  },
+                },
+              }
+            : {}),
         },
         orderBy,
         skip: (page - 1) * limit,

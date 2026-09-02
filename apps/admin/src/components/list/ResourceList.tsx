@@ -116,7 +116,11 @@ function ResourceListInner<T>({
     initialFilters: { ...filterDefaults(filters), ...initialFilters },
     debounceMs,
   });
-  const selection = useSelection(selectable);
+  // Selection belongs to the rows currently on screen — see useSelection.
+  const selection = useSelection(
+    selectable,
+    `${data.page}|${data.pageSize}|${data.search}|${JSON.stringify(data.filters)}`,
+  );
   const exportRef = useRef<any[]>([]);
   const exportRowsRef = useRef<any[]>([]);
 

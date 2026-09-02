@@ -11,6 +11,8 @@ import { isLocale } from "@tarodan/i18n";
 import { zIndex } from "@tarodan/design-tokens";
 import { routing } from "@/i18n/routing";
 import DynamicCookieConsentBanner from "@/components/DynamicCookieConsentBanner";
+import GoogleAdsTag from "@/components/GoogleAdsTag";
+import { GOOGLE_ADS_ID } from "@/lib/googleAds";
 import "../globals.css";
 
 const notoSans = Noto_Sans({
@@ -82,6 +84,12 @@ export default async function LocaleLayout({
           >
             {children}
             <DynamicCookieConsentBanner />
+            {/*
+              Pazarlama rızasına bağlı Google Ads etiketi (gtag.js). Kimlik
+              build'e hiç verilmemişse ada render edilmez — istemciye ölü bir
+              hidrasyon adası ve bundle yükü gitmez.
+            */}
+            {GOOGLE_ADS_ID ? <GoogleAdsTag adsId={GOOGLE_ADS_ID} /> : null}
             {/*
               Bildirimler ekranın alt kenarına yapışır; `bottom` varsayılan 16px
               yerine ana ekran çizgisinin payını da ekler, yoksa çentikli

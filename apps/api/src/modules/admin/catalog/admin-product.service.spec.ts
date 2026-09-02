@@ -20,6 +20,9 @@ describe("AdminProductService list sorting", () => {
       {} as any,
       {} as any,
       { assertListingRuleExists: jest.fn() } as any,
+      {} as any, // productService — bu testler yazma yoluna girmiyor
+      {} as any, // mediaService
+      {} as any, // membershipService
     );
   });
 

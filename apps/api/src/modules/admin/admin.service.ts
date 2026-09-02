@@ -3,6 +3,7 @@ import { AdminAuditService } from "./ops/admin-audit.service";
 import { AdminCommissionService } from "./finance/admin-commission.service";
 import { AdminSettingsService } from "./ops/admin-settings.service";
 import { AdminUserService } from "./users/admin-user.service";
+import { AdminUserAccountService } from "./users/admin-user-account.service";
 import { AdminStaffService } from "./users/admin-staff.service";
 import { AdminProductService } from "./catalog/admin-product.service";
 import { AdminOrderService } from "./orders/admin-order.service";
@@ -64,7 +65,6 @@ import {
   CreateStaticPageDto,
   UpdateStaticPageDto,
   UpdateEmailTemplateDto,
-  UpdateProductDto,
   RatingQueryDto,
   RatingStatus,
   AdminUserRatingQueryDto,
@@ -85,6 +85,11 @@ import {
   SecurityLogQueryDto,
   EmailLogQueryDto,
 } from "./dto";
+// Ürün modülünün DTO'su BİLEREK: yönetici düzenleme formu satıcınınkiyle aynı
+// alanları gönderiyor, `admin/dto` içindeki dar sürüm ise görsel, nitelik,
+// marka ve indirim alanlarını hiç tanımıyor. O sürüm yerinde duruyor; bu uç
+// tam sözleşmeyi kullanıyor.
+import { UpdateProductDto } from "../product/dto/update-product.dto";
 import {
   TicketStatus,
   TicketPriority,
@@ -108,6 +113,7 @@ export class AdminService {
     private readonly commissionService: AdminCommissionService,
     private readonly settingsService: AdminSettingsService,
     private readonly userService: AdminUserService,
+    private readonly userAccountService: AdminUserAccountService,
     private readonly staffService: AdminStaffService,
     private readonly productService: AdminProductService,
     private readonly adminOrderService: AdminOrderService,
@@ -376,6 +382,31 @@ export class AdminService {
     return this.staffService.banUser(adminId, userId, dto);
   }
 
+  // Hesap aktivasyonu + toplu kullanıcı işlemleri — admin-user-account.service.ts
+  resendUserVerification(adminId: string, userId: string) {
+    return this.userAccountService.resendVerification(adminId, userId);
+  }
+
+  verifyUserEmail(adminId: string, userId: string) {
+    return this.userAccountService.verifyEmailByAdmin(adminId, userId);
+  }
+
+  bulkBanUsers(adminId: string, ids: string[], dto: BanUserDto) {
+    return this.userAccountService.bulkBan(adminId, ids, dto);
+  }
+
+  bulkUnbanUsers(adminId: string, ids: string[]) {
+    return this.userAccountService.bulkUnban(adminId, ids);
+  }
+
+  bulkResendUserVerification(adminId: string, ids: string[]) {
+    return this.userAccountService.bulkResendVerification(adminId, ids);
+  }
+
+  bulkVerifyUserEmail(adminId: string, ids: string[]) {
+    return this.userAccountService.bulkVerifyEmail(adminId, ids);
+  }
+
   // ==================== PRODUCT MANAGEMENT ====================
   // Taşındı: admin-product.service.ts — imzalar aynen korunuyor (facade delege).
 
@@ -389,6 +420,14 @@ export class AdminService {
     sellerId?: string;
   }) {
     return this.productService.exportProducts(query);
+  }
+
+  async uploadProductImages(productId: string, files: Express.Multer.File[]) {
+    return this.productService.uploadProductImages(productId, files);
+  }
+
+  async rotateProductImage(productId: string, detailKey: string) {
+    return this.productService.rotateProductImage(productId, detailKey);
   }
 
   async getProduct(productId: string) {
@@ -419,11 +458,19 @@ export class AdminService {
     return this.productService.rejectProduct(adminId, productId, dto);
   }
 
-  async bulkApproveProducts(adminId: string, ids: string[], note?: string) {
+  async bulkApproveProducts(
+    adminId: string,
+    ids: string[] | undefined,
+    note?: string,
+  ) {
     return this.productService.bulkApproveProducts(adminId, ids, note);
   }
 
-  async bulkRejectProducts(adminId: string, ids: string[], reason: string) {
+  async bulkRejectProducts(
+    adminId: string,
+    ids: string[] | undefined,
+    reason: string,
+  ) {
     return this.productService.bulkRejectProducts(adminId, ids, reason);
   }
 

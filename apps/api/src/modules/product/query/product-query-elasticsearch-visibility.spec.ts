@@ -19,6 +19,10 @@ describe("ProductQueryService Elasticsearch visibility", () => {
       search as never,
       {} as never,
       {} as never,
+      {
+        isBlockedEither: async () => false,
+        getHiddenUserIds: async () => [],
+      } as any,
     );
 
     await (service as any).findAllViaElasticsearch({

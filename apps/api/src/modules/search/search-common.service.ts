@@ -57,6 +57,8 @@ export interface SearchOptions {
   page?: number;
   pageSize?: number;
   sortBy?: string;
+  /** Viewer için gizli satıcılar (engel, simetrik) — `must_not terms sellerId`. */
+  excludeSellerIds?: string[];
 }
 
 export interface SearchResponse {

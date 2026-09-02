@@ -24,6 +24,7 @@ import {
   renderStoredEmailTemplate,
 } from "../common/helpers/email-template-renderer";
 import { frontendUrlForEnvironment } from "../config/app-urls";
+import { NotificationDispatchService } from "../modules/notification/notification-dispatch.service";
 
 export interface EmailJobData {
   to: string;
@@ -41,6 +42,18 @@ export interface EmailJobData {
     content: Buffer | string;
     contentType?: string;
   }>;
+  /**
+   * Doldurulursa gönderim sonucu `notification_log`'a yazılır. OPSİYONEL:
+   * yalnız senkron karşılığı bu satırı yazan üreticiler geçirir, böylece
+   * mevcut sipariş mailleri etkilenmez.
+   */
+  notificationLog?: { userId: string; type: string; title: string };
+  /**
+   * `templateData`'yı `EmailLog.metadata`'ya YAZMA. Yük bir sır taşıyorsa
+   * (token'lı aktivasyon linki gibi) metadata onu kalıcı olarak düz metin
+   * saklardı.
+   */
+  redactTemplateData?: boolean;
 }
 
 @Processor("email")
@@ -51,6 +64,7 @@ export class EmailWorker {
     private readonly configService: ConfigService,
     private readonly prisma: PrismaService,
     private readonly smtp: SmtpProvider,
+    private readonly dispatch: NotificationDispatchService,
   ) {}
 
   @Process("send")
@@ -67,6 +81,8 @@ export class EmailWorker {
       attachments,
       template,
       templateData,
+      notificationLog,
+      redactTemplateData,
     } = job.data;
     if (!html) throw new Error("Email HTML content is required");
     const fromEmail = from || this.smtp.defaultFrom;
@@ -88,10 +104,29 @@ export class EmailWorker {
       attachments,
       template: template || undefined,
       userId: (templateData as Record<string, any>)?.userId || undefined,
-      metadata: templateData
-        ? (templateData as Record<string, unknown>)
-        : undefined,
+      metadata:
+        templateData && !redactTemplateData
+          ? (templateData as Record<string, unknown>)
+          : undefined,
     });
+
+    // Senkron gönderim yolları her denemede DEĞİL, her mantıksal gönderimde bir
+    // notification_log satırı yazıyor. Bull 3 kez deneyeceği için başarısızlıkta
+    // yalnız SON denemede yazılır; aksi halde tek mail üç satır üretirdi.
+    if (notificationLog) {
+      const isFinalAttempt =
+        (job.attemptsMade ?? 0) + 1 >= (job.opts?.attempts ?? 1);
+      if (result.success || isFinalAttempt) {
+        await this.dispatch.logNotification(
+          notificationLog.userId,
+          "email",
+          notificationLog.type,
+          notificationLog.title,
+          "",
+          result.success,
+        );
+      }
+    }
 
     if (result.success) {
       this.logger.log(
@@ -168,6 +203,10 @@ export class EmailWorker {
       );
     }
 
+    // Yayılan nesne `attemptsMade` ve `opts`'u da taşımalı: handleSend
+    // notification_log'u SON denemede yazıp yazmayacağına onlara bakarak karar
+    // veriyor. Bull'da ikisi de Job üzerinde kendi (own) özellik olduğu için
+    // spread ile geliyor — bu davranış artık taşıyıcı.
     return this.handleSend({
       ...job,
       data: { ...job.data, html, subject },

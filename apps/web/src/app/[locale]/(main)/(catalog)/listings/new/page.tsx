@@ -2,6 +2,7 @@
 
 import type { Metadata } from "next";
 import NewListingClient from "./NewListingClient";
+import ListingFormProvider from "@/components/listings/ListingFormProvider";
 import { getTranslations } from "next-intl/server";
 
 export async function generateMetadata(): Promise<Metadata> {
@@ -14,5 +15,9 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 
 export default function NewListingPage() {
-  return <NewListingClient />;
+  return (
+    <ListingFormProvider>
+      <NewListingClient />
+    </ListingFormProvider>
+  );
 }

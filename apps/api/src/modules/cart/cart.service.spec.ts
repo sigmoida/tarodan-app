@@ -6,6 +6,8 @@ import { StorageService } from "../storage/storage.service";
 import { ShippingTariffService } from "../shipping/tariff/shipping-tariff.service";
 import { ProductKind, ProductStatus } from "@prisma/client";
 import { flatPackageTiers } from "../shipping/testing/tariff-fixture";
+import { UserBlockService } from "../user-block/user-block.service";
+import { userBlockServiceStub } from "../user-block/user-block.testing";
 
 /**
  * addItem — "sepette zaten olan ürüne tekrar ekleme" davranışı.
@@ -54,6 +56,7 @@ describe("CartService.addItem — idempotent re-add", () => {
         { provide: PrismaService, useValue: mockPrisma },
         { provide: DiscountService, useValue: {} },
         { provide: StorageService, useValue: {} },
+        { provide: UserBlockService, useValue: userBlockServiceStub() },
         {
           provide: ShippingTariffService,
           useValue: {
@@ -242,6 +245,7 @@ describe("CartService.calculateCart — unavailable items", () => {
         }),
       } as any,
       {} as StorageService,
+      userBlockServiceStub() as any,
     );
 
     const response = await service.getOrCreate("buyer-1");

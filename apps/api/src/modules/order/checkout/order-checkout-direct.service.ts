@@ -8,6 +8,7 @@ import {
   Optional,
 } from "@nestjs/common";
 import { PrismaService } from "../../../prisma";
+import { UserBlockService } from "../../user-block/user-block.service";
 import { buyerTotalOf } from "../helpers/order-total.helper";
 import { chargedProductBaseOf } from "../helpers/order-charged-base.helper";
 import { paymentWindowEnd } from "../../payment/helpers/payment.constants";
@@ -65,6 +66,7 @@ export class OrderCheckoutDirectService {
     private readonly orderCommon: OrderCommonService,
     private readonly checkoutCommon: OrderCheckoutCommonService,
     private readonly group: OrderCheckoutGroupService,
+    private readonly userBlocks: UserBlockService,
     @Optional()
     private readonly feeDiscounts?: OrderFeeDiscountService,
   ) {}
@@ -208,6 +210,13 @@ export class OrderCheckoutDirectService {
           i18nMessage("server.order.cannotBuyOwnProduct"),
         );
       }
+
+      // Engelli çift arasında sipariş açılmaz (Apple: abuse stop).
+      await this.userBlocks.assertNotBlocked(
+        buyerId,
+        product.sellerId,
+        "server.order.sellerBlocked",
+      );
 
       // Resolve shipping address - either from saved address or inline address
       let shippingAddress: any;

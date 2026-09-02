@@ -46,7 +46,12 @@ jobs:
       - name: Lint
         run: pnpm exec turbo run lint --filter='!@tarodan/web'
 
-      # Both apps' vitest suites. Web's ran nowhere until now — not here and
+      # Both apps' vitest suites plus @tarodan/listing-form, which owns the
+      # listing form's specs since the form moved out of apps/web. A spec that
+      # silently stops running is worse than no spec, so the package is named
+      # here explicitly.
+      #
+      # Web's ran nowhere until now — not here and
       # not in the pre-push gate — so its specs, including the regression that
       # pins the phone field's editing behaviour, were decorative. Web's
       # "test" script also runs the node:test scripts under apps/web/scripts.
@@ -58,4 +63,4 @@ jobs:
       - name: Unit tests
         env:
           NODE_ENV: test
-        run: pnpm --filter @tarodan/admin --filter @tarodan/web test
+        run: pnpm --filter @tarodan/admin --filter @tarodan/web --filter @tarodan/listing-form test

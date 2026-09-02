@@ -1,5 +1,6 @@
-import { Badge } from "@tarodan/ui";
+import { Badge, accountStatusConfig } from "@tarodan/ui";
 import { col } from "@/components/table";
+import { statusConfig } from "@/lib/statusLabels";
 import { type Seller, membershipConfig } from "./types";
 import type { useTranslations } from "next-intl";
 
@@ -57,20 +58,16 @@ export const sellerColumns = (t: T) => [
     t("admin.users.refundsCount"),
     (s) => s._count.refundRequests ?? 0,
   ),
+  // Kullanıcılar listesiyle aynı türetim (accountStatus); isVerified "Aktif"
+  // demek değildi.
   col.badge<Seller>(
     t("common.status"),
-    (s) =>
-      s.isBanned ? (
-        <Badge variant="danger">
-          {t("admin.accounts.sellerPerformance.banned")}
-        </Badge>
-      ) : s.isVerified ? (
-        <Badge variant="success">{t("common.active")}</Badge>
-      ) : (
-        <Badge variant="warning">
-          {t("admin.accounts.sellerPerformance.unverified")}
-        </Badge>
-      ),
-    { sortKey: "isVerified", sortType: "number" },
+    (s) => (
+      <Badge
+        status={s.accountStatus}
+        config={statusConfig(accountStatusConfig, t)}
+      />
+    ),
+    { sortKey: "isEmailVerified", sortType: "number" },
   ),
 ];
