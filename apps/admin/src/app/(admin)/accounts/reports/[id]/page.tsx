@@ -9,9 +9,10 @@ import {
   PencilSquareIcon,
   TrashIcon,
 } from "@heroicons/react/24/outline";
-import { Badge, Button } from "@tarodan/ui";
+import { Badge, Button, productStatusConfig } from "@tarodan/ui";
 import { useTranslations } from "next-intl";
 import { adminApi } from "@/lib/api";
+import { statusLabel } from "@/lib/statusLabels";
 import { useAdminMutation } from "@/hooks/useAdminMutation";
 import { usePrompt } from "@/provider/PromptProvider";
 import { DetailPage } from "@/components/detail/DetailPage";
@@ -149,7 +150,11 @@ export default function ReportDetailPage() {
                             <Field
                               label={t("admin.reports.detail.listingStatus")}
                             >
-                              {target.status}
+                              {statusLabel(
+                                productStatusConfig,
+                                target.status,
+                                t,
+                              )}
                             </Field>
                             <Field
                               label={t("admin.reports.detail.sellerLabel")}

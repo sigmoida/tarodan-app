@@ -218,6 +218,10 @@ export class UserReportService {
     const isClosing =
       dto.status === ReportStatus.RESOLVED ||
       dto.status === ReportStatus.DISMISSED;
+    // Bildirim YALNIZ karar değiştiğinde gider. Kapalı bir şikayette admin
+    // yalnız açıklamayı düzeltip kaydettiğinde (durum aynı) şikayet eden ikinci
+    // bir "şikayetiniz sonuçlandı" e-postası/bildirimi almamalı.
+    const isNewDecision = isClosing && report.status !== dto.status;
 
     const updated = await this.prisma.report.update({
       where: { id: reportId },
@@ -233,9 +237,9 @@ export class UserReportService {
       `Report ${reportId} status updated to ${dto.status} by admin ${adminId}`,
     );
 
-    // Karar verildiyse şikayet eden haberdar edilir. `under_review` ara durumu
-    // henüz bir sonuç değil — o aşamada kullanıcıya bildirim gitmez.
-    if (isClosing) {
+    // Yeni bir karar verildiyse şikayet eden haberdar edilir. `under_review`
+    // ara durumu henüz bir sonuç değil — o aşamada kullanıcıya bildirim gitmez.
+    if (isNewDecision) {
       await this.notifyReporterOfDecision(updated);
     }
 

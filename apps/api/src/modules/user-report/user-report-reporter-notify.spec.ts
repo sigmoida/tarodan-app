@@ -103,6 +103,33 @@ describe("UserReportService updateReportStatus → reporter notification", () =>
     expect(data).toMatchObject({ status: "dismissed", hasNote: "no" });
   });
 
+  it("does not notify again when only the note changes on a closed report", async () => {
+    // Kapalı şikayette admin açıklamayı düzeltip kaydeder: durum aynı kalır,
+    // şikayet eden ikinci bir "sonuçlandı" e-postası almamalı.
+    prisma.report.findUnique.mockResolvedValue({
+      ...existing,
+      status: "resolved",
+      resolvedAt: new Date(),
+      adminNote: "İlk açıklama.",
+    });
+
+    await resolveWith(ReportStatus.RESOLVED, "Düzeltilmiş açıklama.");
+
+    expect(notifications.createInAppNotification).not.toHaveBeenCalled();
+    expect(notifications.sendTemplateEmailToUser).not.toHaveBeenCalled();
+  });
+
+  it("notifies when a resolved report is turned into a dismissal", async () => {
+    prisma.report.findUnique.mockResolvedValue({
+      ...existing,
+      status: "resolved",
+    });
+
+    await resolveWith(ReportStatus.DISMISSED);
+
+    expect(notifications.createInAppNotification).toHaveBeenCalledTimes(1);
+  });
+
   it("stays quiet while the report is only under review", async () => {
     await resolveWith(ReportStatus.UNDER_REVIEW);
 

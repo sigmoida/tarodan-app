@@ -32,7 +32,10 @@ export function ReportStatusModal({
     () =>
       adminApi.updateUserReport(reportId, {
         status,
-        adminNote: adminNote.trim() || undefined,
+        // Boş metin de gönderilir: `undefined` geçilirse Prisma alanı hiç
+        // yazmaz ve silinen açıklama kayıtta kalıp kullanıcıya gitmeye devam
+        // ederdi. Kutuda ne görünüyorsa kayda giden odur.
+        adminNote: adminNote.trim(),
       }),
     {
       invalidates: ["reports"],
