@@ -270,6 +270,50 @@ alanındadır.
 
 ---
 
+## 8b. Gelir e-belgeleri (eLogo)
+
+Düzenleyen **hep platform firmasıdır**, satıcı adına değil; ürün bedelinin
+beyanı satıcıya aittir (platform satışı hariç — orada satıcı zaten Tarodan'dır).
+
+**Her hizmet kaleminin kendi e-belgesi vardır.** Bir alım-satımda taraf başına
+üç belge kesilir:
+
+| Muhatap | Belge türü            | Matrah (`Order` / `CommissionLedger`)    |
+| ------- | --------------------- | ---------------------------------------- |
+| Alıcı   | `buyer_commission`    | `buyerCommissionAmount`                  |
+| Alıcı   | `buyer_service_fee`   | `buyerPlatformFeeAmount` (koruma bedeli) |
+| Alıcı   | `buyer_shipping`      | `buyerShippingAmount`                    |
+| Satıcı  | `seller_commission`   | `sellerCommissionAmount`                 |
+| Satıcı  | `seller_platform_fee` | `sellerPlatformFeeAmount`                |
+| Satıcı  | `seller_shipping`     | `sellerShippingAmount`                   |
+
+Altısı da §2'deki hizmet KDV'sine tabidir ve matrahları
+`order-service-tax.helper.ts`'in KDV tabanlarının BİREBİR karşılığıdır — iki
+liste ayrışırsa tahsil edilen KDV ile beyan edilen KDV ayrışır. Tanım tek
+yerdedir: `modules/elogo/invoice/package-fee-components.ts`.
+
+- **Anahtar pakettir** (`sourceId = orderPackage.id`), sipariş değil: sepette
+  aynı satıcıdan iki ürün alındığında `Order` iki tanedir ama gönderi, kargo
+  ücreti ve ticari ilişki tektir. Çok siparişli pakette kalemler ürün ürün
+  satırlanır, belge yine tektir.
+- **Sıfır matrah belge doğurmaz.** Bedeli doğmamış hizmet faturalanmaz.
+- **Tetik teslimattır** ve paketin TÜM siparişleri teslim olmadan hiçbiri
+  kesilmez; belgeler sırayla kesilir (ortak numara sayacı, P2034).
+- **İki nesil bir arada yaşamaz.** Kesinti kırılımı olmayan eski defterlerde
+  (`componentBreakdownComplete = false`) ve daha önce birleşik belgeyle
+  faturalanmış paketlerde ücretler LEGACY `commission` / `service_fee` ile
+  kesilir; aksi halde aynı bedel iki belgede yer alır. Kargo payı belgeleri iki
+  nesilde de kalem bazlıdır (birleşik belgeye hiç girmiyordu).
+- **İade** her belgeyi kendi kaleminin iade tutarı oranında tersler
+  (`RefundFinancialComponent`); satıcı kargo payının kalem karşılığı yoktur,
+  genel iade oranına düşer.
+
+Diğer türler: `platform_sale` (Tarodan kendi ürününü satarken, alıcıya kalem
+kalem ürün faturası), `membership`, `boost`, `trade_service_fee` /
+`trade_commission` (§8), `return_invoice`.
+
+---
+
 ## 9. Ledger ve mutabakat
 
 `modules/ledger/ledger.service.ts` append-only çift kayıt defteridir:

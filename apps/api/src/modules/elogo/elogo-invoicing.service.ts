@@ -7,8 +7,8 @@ import { ElogoReversalService } from "./elogo-reversal.service";
 import { type InvoiceLineItem } from "./invoice/invoice-lines";
 
 /**
- * Tarodan'ın KENDİ gelir e-belgelerini (komisyon, hizmet bedeli, üyelik, boost, iade)
- * eLogo'ya keser. Düzenleyen HEP platform firması (Serhatlar) — satıcı adına DEĞİL.
+ * Tarodan'ın KENDİ gelir e-belgelerini (komisyon, hizmet bedeli, kargo payı,
+ * üyelik, boost, iade) eLogo'ya keser. Düzenleyen HEP platform firması (Serhatlar) — satıcı adına DEĞİL.
  *
  * İlkeler:
  *  - Tutarlar olay anındaki KAYITLI snapshot'tan gelir (CommissionLedger / MembershipPayment /
@@ -18,8 +18,16 @@ import { type InvoiceLineItem } from "./invoice/invoice-lines";
  *  - Numara gap-free (ElogoDocSequence); retry aynı numara/ETTN'i yeniden kullanır.
  */
 export type RevenueType =
+  // LEGACY birleşik paket belgeleri (kalem kırılımı olmayan defterler için).
   | "commission"
   | "service_fee"
+  // Hizmet başına paket belgeleri — taraf başına üç.
+  | "buyer_commission"
+  | "buyer_service_fee"
+  | "buyer_shipping"
+  | "seller_commission"
+  | "seller_platform_fee"
+  | "seller_shipping"
   | "membership"
   | "boost"
   | "trade_commission"
@@ -54,6 +62,10 @@ export class ElogoInvoicingService {
 
   issueOrderRevenueInvoices(orderId: string): Promise<void> {
     return this.issuing.issueOrderRevenueInvoices(orderId);
+  }
+
+  issuePackageFeeInvoices(packageId: string): Promise<void> {
+    return this.issuing.issuePackageFeeInvoices(packageId);
   }
 
   issueCommissionInvoice(packageId: string): Promise<void> {
@@ -127,6 +139,12 @@ export class ElogoInvoicingService {
 
   listForUser(...args: Parameters<ElogoQueryService["listForUser"]>) {
     return this.queries.listForUser(...args);
+  }
+
+  listOrderInvoicesForUser(
+    ...args: Parameters<ElogoQueryService["listOrderInvoicesForUser"]>
+  ) {
+    return this.queries.listOrderInvoicesForUser(...args);
   }
 
   findOrderInvoiceForUser(

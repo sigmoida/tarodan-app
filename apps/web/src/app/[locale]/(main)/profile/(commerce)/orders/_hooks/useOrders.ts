@@ -147,21 +147,35 @@ export function useReorder() {
   };
 }
 
-/** eLogo e-Arşiv invoice for an order (opens the PDF), with per-order loading. */
+/**
+ * Siparişin e-Arşiv belgesi (PDF'i açar), sipariş başına yükleniyor durumuyla.
+ *
+ * Bir siparişte artık birden çok belge olabilir (her hizmet kalemi kendi
+ * belgesini alır). Listede tek düğme var: TEK belge varsa doğrudan açılır,
+ * birden çoksa hepsini yan yana gösteren sipariş detayına gidilir — rastgele
+ * birini açmak kullanıcıya "faturam bu" dedirtirdi.
+ */
 export function useInvoiceDownload() {
   const t = useTranslations();
+  const router = useRouter();
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
 
   const download = async (orderId: string) => {
     setDownloadingId(orderId);
     try {
-      const invoiceRes = await api.get(`/elogo/invoices/by-order/${orderId}`);
-      const invoice = invoiceRes.data;
-      if (!invoice?.id) {
+      const invoiceRes = await api.get(
+        `/elogo/invoices/by-order/${orderId}/all`,
+      );
+      const invoices = Array.isArray(invoiceRes.data) ? invoiceRes.data : [];
+      if (invoices.length === 0) {
         toast.error(t("order.invoiceNotReady"));
         return;
       }
-      const res = await api.get(`/elogo/invoices/${invoice.id}/pdf`);
+      if (invoices.length > 1) {
+        router.push(`/profile/orders/${orderId}`);
+        return;
+      }
+      const res = await api.get(`/elogo/invoices/${invoices[0].id}/pdf`);
       const url = res.data?.url;
       if (url) {
         window.open(url, "_blank", "noopener,noreferrer");

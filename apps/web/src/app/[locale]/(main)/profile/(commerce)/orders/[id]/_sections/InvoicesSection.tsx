@@ -10,7 +10,7 @@ import { useTranslations } from "next-intl";
 import {
   useDownloadElogoInvoice,
   useDownloadSellerInvoice,
-  useElogoInvoice,
+  useElogoInvoices,
   useSellerInvoice,
   useUploadSellerInvoice,
 } from "../_hooks/useOrderDetail";
@@ -20,7 +20,7 @@ export default function InvoicesSection({ order }: { order: OrderDetail }) {
   const t = useTranslations();
   const orderId = order.id;
 
-  const elogoQuery = useElogoInvoice(orderId, order);
+  const elogoQuery = useElogoInvoices(orderId, order);
   const sellerInvoiceQuery = useSellerInvoice(orderId, order);
   const downloadElogo = useDownloadElogoInvoice();
   const uploadSeller = useUploadSellerInvoice(orderId);
@@ -30,7 +30,7 @@ export default function InvoicesSection({ order }: { order: OrderDetail }) {
   // Ödeme öncesi / iptal edilmiş siparişte fatura kartları gösterilmez.
   const invoiceVisible =
     order.status !== "pending_payment" && order.status !== "cancelled";
-  const elogoInvoice = invoiceVisible ? (elogoQuery.data ?? null) : null;
+  const elogoInvoices = invoiceVisible ? (elogoQuery.data ?? []) : [];
   const sellerInvoice = invoiceVisible
     ? (sellerInvoiceQuery.data ?? null)
     : null;
@@ -53,44 +53,53 @@ export default function InvoicesSection({ order }: { order: OrderDetail }) {
 
   return (
     <>
-      {/* Invoice Section - yalnız gerçek e-Arşiv HAZIRSA çıkar */}
-      {elogoInvoice && (
+      {/* e-Arşiv belgeleri — HER HİZMET İÇİN AYRI belge kesilir (komisyon,
+          hizmet bedeli, kargo payı), bu yüzden kart tek değil listedir. */}
+      {elogoInvoices.length > 0 && (
         <SectionCard title={t("order.invoice")}>
-          <div className="flex items-start gap-3 p-3 bg-surface-alt rounded-lg border border-border-subtle">
-            <svg
-              className="w-5 h-5 text-success-600 mt-0.5 flex-shrink-0"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"
-              />
-            </svg>
-            <div className="flex-1">
-              <p className="text-sm text-body mb-1">
-                {t("order.invoiceSentToEmail")}
-              </p>
-              {elogoInvoice.invoiceNumber && (
-                <p className="text-xs text-muted mb-2">
-                  {t("order.invoiceNo") + elogoInvoice.invoiceNumber}
-                </p>
-              )}
-              <Button
-                variant="primary"
-                size="sm"
-                onClick={() => downloadElogo.mutate(elogoInvoice.id)}
-                disabled={downloadElogo.isPending}
+          <p className="text-sm text-body mb-3">
+            {t("order.invoiceSentToEmail")}
+          </p>
+          <ul className="space-y-2">
+            {elogoInvoices.map((invoice) => (
+              <li
+                key={invoice.id}
+                className="flex flex-wrap items-center gap-3 p-3 bg-surface-alt rounded-lg border border-border-subtle"
               >
-                {downloadElogo.isPending
-                  ? t("common.opening")
-                  : t("order.viewDownloadInvoice")}
-              </Button>
-            </div>
-          </div>
+                <svg
+                  className="w-5 h-5 text-success-600 flex-shrink-0"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"
+                  />
+                </svg>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm text-body truncate">{invoice.label}</p>
+                  {invoice.invoiceNumber && (
+                    <p className="text-xs text-muted">
+                      {t("order.invoiceNo") + invoice.invoiceNumber}
+                    </p>
+                  )}
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => downloadElogo.mutate(invoice.id)}
+                  disabled={downloadElogo.isPending}
+                >
+                  {downloadElogo.isPending
+                    ? t("common.opening")
+                    : t("order.viewDownloadInvoice")}
+                </Button>
+              </li>
+            ))}
+          </ul>
         </SectionCard>
       )}
 

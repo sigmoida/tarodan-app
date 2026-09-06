@@ -69,6 +69,32 @@ export const invoiceStatusConfig = (t: T): Record<string, StatusConfig> => ({
 
 export const typeFilterOptions = (t: T) => [
   { value: "all", label: t("admin.finance.invoices.filters.allTypes") },
+  {
+    value: "buyer_commission",
+    label: t("admin.finance.invoices.types.buyerCommission"),
+  },
+  {
+    value: "buyer_service_fee",
+    label: t("admin.finance.invoices.types.buyerServiceFee"),
+  },
+  {
+    value: "buyer_shipping",
+    label: t("admin.finance.invoices.types.buyerShipping"),
+  },
+  {
+    value: "seller_commission",
+    label: t("admin.finance.invoices.types.sellerCommission"),
+  },
+  {
+    value: "seller_platform_fee",
+    label: t("admin.finance.invoices.types.sellerPlatformFee"),
+  },
+  {
+    value: "seller_shipping",
+    label: t("admin.finance.invoices.types.sellerShipping"),
+  },
+  // Birleşik nesil: yalnız eski kayıtlarda ve kesinti kırılımı olmayan
+  // paketlerde vardır; filtreden düşerse o belgeler görünmez olur.
   { value: "commission", label: t("admin.finance.invoices.types.commission") },
   { value: "service_fee", label: t("admin.finance.invoices.types.serviceFee") },
   { value: "membership", label: t("admin.finance.invoices.types.membership") },

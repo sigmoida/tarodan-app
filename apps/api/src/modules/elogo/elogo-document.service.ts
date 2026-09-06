@@ -9,6 +9,12 @@ import { TaxService } from "../tax/tax.service";
 import { OrderTaxPolicyService } from "../order/pricing/order-tax-policy.service";
 import { type UblParty } from "./ubl/ubl-invoice.builder";
 import { invoiceAmountsFor } from "./invoice/invoice-amounts";
+import {
+  buildPackageFeeDocuments,
+  hasCompleteComponentBreakdown,
+  type PackageFeeDocument,
+  type PackageFeeOrderRow,
+} from "./invoice/package-fee-basis";
 import { invoiceIssueDate, invoiceIssueTime } from "./invoice/invoice-datetime";
 import { VAT_SOURCE_BY_TYPE } from "./invoice/invoice-vat-rate";
 import { formatElogoInvoiceNumber } from "./invoice/elogo-document-number";
@@ -266,6 +272,159 @@ export class ElogoDocumentService {
         select: { city: true, district: true, address: true },
       })
       .catch(() => null);
+  }
+
+  /**
+   * Alıcıya GERİ VERİLMİŞ gidiş kargosu, sipariş bazında.
+   *
+   * Kargo payının kesinti defterinde kümülatif iade sütunu yoktur (ücretler
+   * gibi), bu yüzden iade bileşenlerinden toplanır. Yalnız parası GERÇEKTEN
+   * iade edilmiş talepler sayılır: politikası kesinleşmiş ama ödemesi dönmemiş
+   * bir talebi düşmek faturayı tahsilatın altına indirirdi.
+   */
+  private async refundedBuyerShippingByOrder(
+    orderIds: string[],
+  ): Promise<Map<string, number>> {
+    const byOrder = new Map<string, number>();
+    try {
+      const rows = await this.prisma.refundFinancialComponent.findMany({
+        where: {
+          componentCode: "outbound_shipping",
+          treatment: "buyer_refund",
+          refundRequest: {
+            orderId: { in: orderIds },
+            refundedAt: { not: null },
+          },
+        },
+        select: {
+          netAmount: true,
+          refundRequest: { select: { orderId: true } },
+        },
+      });
+      for (const row of rows) {
+        const orderId = row.refundRequest.orderId;
+        byOrder.set(
+          orderId,
+          (byOrder.get(orderId) ?? 0) + Number(row.netAmount),
+        );
+      }
+    } catch {
+      // İade bileşenleri okunamadı — kargo matrahı iade DÜŞÜLMEDEN kesilir ve
+      // fazlası iade faturasıyla dengelenir; belgeyi hiç kesmemek daha kötüdür.
+    }
+    return byOrder;
+  }
+
+  /**
+   * Paketin HİZMET BAŞINA belge matrahları — kalem bazlı kesimin TEK kaynağı.
+   *
+   * Kesim (`ElogoIssuingService`), iade öncesi yeniden fiyatlama ve iade faturası
+   * oranı aynı bu metodu okur; hiçbiri kendi toplamasını yapmaz. `documents`
+   * yalnız matrahı SIFIR OLMAYAN kalemleri taşır — bedeli doğmamış hizmet için
+   * belge kesilmez.
+   *
+   * `componentBreakdownComplete` false ise paketin defterlerinde kalem kırılımı
+   * yoktur (v2 öncesi kayıt): kalem bazlı belge üretilemez, çağıran LEGACY
+   * birleşik belgeye düşer.
+   */
+  async resolvePackageFeeBasis(packageId: string): Promise<{
+    sellerId: string;
+    buyerId: string;
+    componentBreakdownComplete: boolean;
+    shippingAddress: unknown;
+    documents: PackageFeeDocument[];
+  } | null> {
+    const pkg = await this.prisma.orderPackage
+      .findUnique({
+        where: { id: packageId },
+        select: {
+          sellerId: true,
+          buyerId: true,
+          orders: {
+            select: {
+              id: true,
+              shippingAddress: true,
+              buyerShippingAmount: true,
+              sellerShippingAmount: true,
+              product: { select: { title: true } },
+              commissionLedger: {
+                select: {
+                  componentBreakdownComplete: true,
+                  buyerCommissionAmount: true,
+                  buyerPlatformFeeAmount: true,
+                  sellerCommissionAmount: true,
+                  sellerPlatformFeeAmount: true,
+                  refundedBuyerCommissionAmount: true,
+                  refundedBuyerPlatformFeeAmount: true,
+                  refundedSellerCommissionAmount: true,
+                  refundedSellerPlatformFeeAmount: true,
+                },
+              },
+            },
+            orderBy: { createdAt: "asc" },
+          },
+        },
+      })
+      .catch(() => null);
+    if (!pkg || pkg.orders.length === 0) return null;
+
+    // Alıcıya GERİ VERİLMİŞ gidiş kargosu: kargo payının kesinti defterinde
+    // kümülatif iade sütunu yoktur, iade bileşenlerinden toplanır. Yalnız parası
+    // gerçekten iade edilmiş talepler sayılır — politika kesinleşmiş ama ödeme
+    // dönmemiş bir talebi düşmek faturayı tahsilatın altına indirirdi.
+    const refundedShippingByOrder = await this.refundedBuyerShippingByOrder(
+      pkg.orders.map((o) => o.id),
+    );
+
+    const orders: PackageFeeOrderRow[] = pkg.orders.map((order) => ({
+      id: order.id,
+      productName: order.product?.title ?? "",
+      buyerShippingAmount: Number(order.buyerShippingAmount ?? 0),
+      sellerShippingAmount: Number(order.sellerShippingAmount ?? 0),
+      refundedBuyerShippingAmount: refundedShippingByOrder.get(order.id) ?? 0,
+      ledger: order.commissionLedger
+        ? {
+            componentBreakdownComplete:
+              order.commissionLedger.componentBreakdownComplete,
+            buyerCommissionAmount: Number(
+              order.commissionLedger.buyerCommissionAmount,
+            ),
+            buyerPlatformFeeAmount: Number(
+              order.commissionLedger.buyerPlatformFeeAmount,
+            ),
+            sellerCommissionAmount: Number(
+              order.commissionLedger.sellerCommissionAmount,
+            ),
+            sellerPlatformFeeAmount: Number(
+              order.commissionLedger.sellerPlatformFeeAmount,
+            ),
+            refundedBuyerCommissionAmount: Number(
+              order.commissionLedger.refundedBuyerCommissionAmount,
+            ),
+            refundedBuyerPlatformFeeAmount: Number(
+              order.commissionLedger.refundedBuyerPlatformFeeAmount,
+            ),
+            refundedSellerCommissionAmount: Number(
+              order.commissionLedger.refundedSellerCommissionAmount,
+            ),
+            refundedSellerPlatformFeeAmount: Number(
+              order.commissionLedger.refundedSellerPlatformFeeAmount,
+            ),
+          }
+        : null,
+    }));
+
+    // Oran TEK kez çözülür: altı kalem de aynı hizmet KDV'sine tabidir ve kalem
+    // başına ayrı okumak, ayar kesim ortasında değişirse belgeleri ayrıştırırdı.
+    const vatRate = await this.resolveVatRate("buyer_service_fee");
+
+    return {
+      sellerId: pkg.sellerId,
+      buyerId: pkg.buyerId,
+      componentBreakdownComplete: hasCompleteComponentBreakdown(orders),
+      shippingAddress: pkg.orders[0].shippingAddress,
+      documents: buildPackageFeeDocuments(orders, vatRate),
+    };
   }
 
   /**

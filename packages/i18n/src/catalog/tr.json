@@ -6005,8 +6005,14 @@
           "cancelled": "İptal"
         },
         "types": {
-          "commission": "Komisyon",
-          "serviceFee": "Hizmet Bedeli",
+          "commission": "Komisyon (birleşik)",
+          "serviceFee": "Hizmet Bedeli (birleşik)",
+          "buyerCommission": "Alıcı Komisyonu",
+          "buyerServiceFee": "Alıcı Koruma Hizmet Bedeli",
+          "buyerShipping": "Kargo Bedeli (Alıcı Payı)",
+          "sellerCommission": "Satıcı Komisyonu",
+          "sellerPlatformFee": "Platform Hizmet Bedeli",
+          "sellerShipping": "Kargo Bedeli (Satıcı Payı)",
           "membership": "Üyelik",
           "boost": "Öne Çıkarma",
           "tradeCommission": "Takas Komisyonu",

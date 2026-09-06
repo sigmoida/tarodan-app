@@ -20,6 +20,14 @@ export type InvoiceVatSource = "service" | "category" | "standard";
 export const VAT_SOURCE_BY_TYPE: Record<ElogoInvoiceType, InvoiceVatSource> = {
   commission: "service",
   service_fee: "service",
+  // Hizmet başına kesilen paket belgeleri — hepsi platformun kendi hizmetidir ve
+  // KDV'si checkout'ta AYNI ayarla tahsil edilir (order-service-tax.helper.ts).
+  buyer_commission: "service",
+  buyer_service_fee: "service",
+  buyer_shipping: "service",
+  seller_commission: "service",
+  seller_platform_fee: "service",
+  seller_shipping: "service",
   // Takas ücretleri de platformun hizmet bedelidir; aynı ayardan yönetilir.
   trade_commission: "service",
   trade_service_fee: "service",

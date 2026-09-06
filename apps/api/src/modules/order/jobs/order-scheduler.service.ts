@@ -4,10 +4,19 @@ import { Queue } from "bull";
 import { registerRepeatableCron } from "../../../monitoring/bull-cron.helper";
 import { QUEUE_NAMES } from "../../../workers/constants";
 import { ConfigService } from "@nestjs/config";
-import { OrderStatus, TradeStatus, PaymentStatus } from "@prisma/client";
+import {
+  OrderStatus,
+  TradeStatus,
+  PaymentStatus,
+  type ElogoInvoiceType,
+} from "@prisma/client";
 import { PrismaService } from "../../../prisma";
 import { OrderService } from "../order.service";
 import { ElogoInvoicingService } from "../../elogo/elogo-invoicing.service";
+import {
+  LEGACY_PACKAGE_FEE_INVOICE_TYPES,
+  PACKAGE_FEE_INVOICE_TYPES,
+} from "../../elogo/invoice/package-fee-components";
 import {
   PAYMENT_CONFIG_KEYS,
   resolvePaymentConfigNumber,
@@ -415,8 +424,17 @@ export class OrderSchedulerService implements OnModuleInit {
       select: {
         id: true,
         packageId: true,
+        buyerShippingAmount: true,
+        sellerShippingAmount: true,
         commissionLedger: {
-          select: { buyerFee: true, sellerCommission: true },
+          select: {
+            buyerFee: true,
+            sellerCommission: true,
+            buyerCommissionAmount: true,
+            buyerPlatformFeeAmount: true,
+            sellerCommissionAmount: true,
+            sellerPlatformFeeAmount: true,
+          },
         },
         seller: { select: { sellerType: true } },
       },
@@ -424,9 +442,9 @@ export class OrderSchedulerService implements OnModuleInit {
     });
     let invoiced = 0;
     if (delivered.length > 0) {
-      // Komisyon ve hizmet bedeli PAKET anahtarlı, platform satışı SİPARİŞ
-      // anahtarlıdır. İki anahtar da sorulmazsa "zaten faturalanmış" testi hiç
-      // tutmaz ve her tur boşa fatura denemesi yapılır.
+      // Ücret belgeleri PAKET anahtarlı, platform satışı SİPARİŞ anahtarlıdır.
+      // İki anahtar da sorulmazsa "zaten faturalanmış" testi hiç tutmaz ve her
+      // tur boşa fatura denemesi yapılır.
       const invSources = await this.prisma.elogoInvoice.findMany({
         where: {
           sourceId: {
@@ -437,28 +455,59 @@ export class OrderSchedulerService implements OnModuleInit {
                 .filter((id): id is string => !!id),
             ],
           },
-          type: { in: ["commission", "service_fee", "platform_sale"] as any },
+          type: {
+            in: [
+              ...PACKAGE_FEE_INVOICE_TYPES,
+              ...LEGACY_PACKAGE_FEE_INVOICE_TYPES,
+              "platform_sale",
+            ] as ElogoInvoiceType[],
+          },
         },
         select: { sourceId: true, type: true },
       });
       const invoicedKeys = new Set(
         invSources.map((i) => `${i.sourceId}:${i.type}`),
       );
+      const has = (key: string) => invoicedKeys.has(key);
       for (const o of delivered) {
         // Paketi olmayan (eski) siparişlerde ücret faturaları sipariş anahtarlıdır.
         const feeSourceId = o.packageId ?? o.id;
-        const expectedKeys =
+        const ledger = o.commissionLedger;
+        // Ücret belgeleri İKİ NESİLDEN biriyle kesilmiş olabilir: birleşik
+        // (commission + service_fee) ya da hizmet başına (taraf başına iki
+        // ücret belgesi). Hangisi tamsa sipariş faturalanmış sayılır — yalnız
+        // birini sormak, diğer nesille kesilmiş paketi sonsuza dek aday
+        // kümesinde tutar. Kargo payı belgeleri iki nesilde de kesilir.
+        const legacyFeesDone =
+          (!(Number(ledger?.sellerCommission) > 0) ||
+            has(`${feeSourceId}:commission`)) &&
+          (!(Number(ledger?.buyerFee) > 0) ||
+            has(`${feeSourceId}:service_fee`));
+        const perServiceFeesDone = (
+          [
+            ["sellerCommissionAmount", "seller_commission"],
+            ["sellerPlatformFeeAmount", "seller_platform_fee"],
+            ["buyerCommissionAmount", "buyer_commission"],
+            ["buyerPlatformFeeAmount", "buyer_service_fee"],
+          ] as const
+        ).every(
+          ([field, type]) =>
+            !(Number(ledger?.[field]) > 0) || has(`${feeSourceId}:${type}`),
+        );
+        const shippingDone = (
+          [
+            [o.buyerShippingAmount, "buyer_shipping"],
+            [o.sellerShippingAmount, "seller_shipping"],
+          ] as const
+        ).every(
+          ([amount, type]) =>
+            !(Number(amount) > 0) || has(`${feeSourceId}:${type}`),
+        );
+        const invoicesComplete =
           o.seller.sellerType === "platform"
-            ? [`${o.id}:platform_sale`]
-            : [
-                ...(Number(o.commissionLedger?.sellerCommission) > 0
-                  ? [`${feeSourceId}:commission`]
-                  : []),
-                ...(Number(o.commissionLedger?.buyerFee) > 0
-                  ? [`${feeSourceId}:service_fee`]
-                  : []),
-              ];
-        if (expectedKeys.every((key) => invoicedKeys.has(key))) {
+            ? has(`${o.id}:platform_sale`)
+            : (legacyFeesDone || perServiceFeesDone) && shippingDone;
+        if (invoicesComplete) {
           // Faturaları tam ama işareti eksik (tekil tetiklerle kesilmiş) sipariş:
           // işaretlemeden atlanırsa aday penceresinde sonsuza dek yer tutar ve
           // işaretin çözdüğü take:500 doygunluğu geri gelir. İşaretle ve çık.

@@ -2224,8 +2224,20 @@ model SellerUploadedInvoice {
 }
 
 enum ElogoInvoiceType {
+  /// LEGACY birleşik satıcı belgesi (komisyon + platform hizmet bedeli). Yeni
+  /// teslimatlarda kesilmez; kesinti kırılımı olmayan eski ledger'lar ve daha
+  /// önce bu türle faturalanmış paketler için korunur.
   commission
+  /// LEGACY birleşik alıcı belgesi (alıcı komisyonu + koruma hizmet bedeli).
   service_fee
+  /// Paket başına HİZMET BAŞINA kesilen belgeler. Her kesinti kaleminin kendi
+  /// e-belgesi vardır: taraf başına üç (komisyon, hizmet bedeli, kargo payı).
+  buyer_commission
+  buyer_service_fee
+  buyer_shipping
+  seller_commission
+  seller_platform_fee
+  seller_shipping
   membership
   boost
   trade_commission

@@ -1,7 +1,11 @@
 import { Injectable, Logger } from "@nestjs/common";
-import { OrderStatus } from "@prisma/client";
+import { OrderStatus, type ElogoInvoiceType } from "@prisma/client";
 import { PrismaService } from "../../prisma";
 import { buildPlatformSaleLines } from "./invoice/invoice-lines";
+import {
+  LEGACY_PACKAGE_FEE_INVOICE_TYPES,
+  PACKAGE_FEE_COMPONENT_BY_TYPE,
+} from "./invoice/package-fee-components";
 import { LINE_DESCRIPTION } from "./invoice/invoice-line-description";
 import { resolveGuestInvoiceRecipient } from "./invoice/elogo-guest-recipient";
 import { ElogoDocumentService } from "./elogo-document.service";
@@ -62,23 +66,14 @@ export class ElogoIssuingService {
       ? await this.isPackageFullyDelivered(packageId)
       : false;
 
-    // SIRALI kesim, paralel değil: üç belge aynı numara sayacı satırını
-    // artırır; SERIALIZABLE transaction'lar aynı anda koşunca Postgres birini
-    // "write conflict" (P2034) ile düşürüyor, kaybeden belge yalnız 10 dakikalık
+    // SIRALI kesim, paralel değil: belgeler aynı numara sayacı satırını artırır;
+    // SERIALIZABLE transaction'lar aynı anda koşunca Postgres birini "write
+    // conflict" (P2034) ile düşürüyor, kaybeden belge yalnız 10 dakikalık
     // backfill'de kesiliyor ve her çok belgeli teslimat Sentry'ye hata
     // yazıyordu. Belgeler birbirini BLOKLAMAZ: biri patlarsa diğerleri yine
     // denenir, işaret konmaz ve sonraki tur eksik olanı tamamlar.
-    const steps: Array<() => Promise<void>> = [
-      ...(packageId && packageReady
-        ? [
-            () => this.issueCommissionInvoice(packageId),
-            () => this.issueServiceFeeInvoice(packageId),
-          ]
-        : []),
-      () => this.issuePlatformSaleInvoice(orderId),
-    ];
     let failures = 0;
-    for (const step of steps) {
+    const run = async (step: () => Promise<void>) => {
       try {
         await step();
       } catch (error: any) {
@@ -87,7 +82,11 @@ export class ElogoIssuingService {
           `eLogo teslim faturası hatası ${orderId}: ${error?.message ?? error}`,
         );
       }
+    };
+    if (packageId && packageReady) {
+      await run(() => this.issuePackageFeeInvoices(packageId));
     }
+    await run(() => this.issuePlatformSaleInvoice(orderId));
     if (failures > 0) return;
     // Paket henüz tamamlanmadıysa komisyon/hizmet bedeli faturaları KESİLMEDİ.
     // İşareti şimdi koyarsak bu sipariş backfill penceresinden çıkar; kardeş
@@ -197,7 +196,103 @@ export class ElogoIssuingService {
     };
   }
 
-  /** Komisyon faturası → SATICIYA, satıcı paketi başına TEK. */
+  /**
+   * Paketin HİZMET BAŞINA gelir faturaları — alıcıya üç, satıcıya üç.
+   *
+   * Her kesinti kaleminin kendi e-belgesi vardır (komisyon / hizmet bedeli /
+   * kargo payı). Belge PAKET başınadır: sepette aynı satıcıdan iki ürün
+   * alındığında `Order` iki tanedir ama gönderi, kargo ücreti ve ticari ilişki
+   * tektir; sipariş anahtarlı kesim aynı hizmet için mükerrer belge üretiyordu.
+   * Çok siparişli pakette kalemler ürün ürün satırlanır (`PackageFeeDocument.lines`).
+   *
+   * İKİ NESİL BİR ARADA YAŞAYAMAZ: paket daha önce birleşik `commission` /
+   * `service_fee` ile faturalandıysa ya da kesinti defterinde kalem kırılımı
+   * yoksa (v2 öncesi kayıt) ücret belgeleri ESKİ yoldan kesilir — aksi halde
+   * aynı bedel hem birleşik hem kalem bazlı belgede yer alır ve mükerrer beyan
+   * doğar. Kargo payı iki nesilde de kalem bazlıdır: birleşik belgeye hiç
+   * girmiyordu, dolayısıyla mükerrer kesim riski taşımaz.
+   *
+   * Belgeler SIRALI kesilir (ortak numara sayacı) ve birbirini bloklamaz; biri
+   * patlarsa diğerleri yine denenir ve metot sonunda hata fırlatılır, böylece
+   * `revenueInvoicedAt` işareti konmaz ve sonraki tur eksiği tamamlar.
+   */
+  async issuePackageFeeInvoices(packageId: string): Promise<void> {
+    const basis = await this.documents.resolvePackageFeeBasis(packageId);
+    if (!basis) return;
+    // Platform kendi ürününü satıyorsa kesintiler kendine faturalanamaz; alıcı
+    // tarafı da `platform_sale` belgesinin kalemlerinde zaten yer alır.
+    if (await this.isPlatformSeller(basis.sellerId)) return;
+
+    const legacyIssued = await this.hasPackageInvoiceOfType(
+      packageId,
+      LEGACY_PACKAGE_FEE_INVOICE_TYPES,
+    );
+    const useLegacyFees = legacyIssued || !basis.componentBreakdownComplete;
+
+    const steps: Array<() => Promise<void>> = [];
+    if (useLegacyFees) {
+      steps.push(
+        () => this.issueCommissionInvoice(packageId),
+        () => this.issueServiceFeeInvoice(packageId),
+      );
+    }
+    for (const doc of basis.documents) {
+      const isShipping =
+        PACKAGE_FEE_COMPONENT_BY_TYPE[doc.type].source.kind === "shipping";
+      if (useLegacyFees && !isShipping) continue;
+      steps.push(() =>
+        this.delivery.cut(
+          doc.type,
+          packageId,
+          doc.side === "buyer" ? basis.buyerId : basis.sellerId,
+          doc.net,
+          {
+            lineItems: doc.lines,
+            // Misafir siparişinde alıcının gerçek kimliği yalnız kargo
+            // adresinde durur; satıcı tarafı için anlamsızdır.
+            guestRecipient:
+              doc.side === "buyer"
+                ? resolveGuestInvoiceRecipient(basis.shippingAddress)
+                : null,
+          },
+        ),
+      );
+    }
+
+    const failures: string[] = [];
+    for (const step of steps) {
+      try {
+        await step();
+      } catch (error: any) {
+        failures.push(String(error?.message ?? error));
+      }
+    }
+    if (failures.length > 0) {
+      throw new Error(
+        `eLogo paket ücret faturaları eksik (${packageId}): ${failures.join("; ")}`,
+      );
+    }
+  }
+
+  /** Paket için verilen türlerden İPTAL EDİLMEMİŞ bir belge var mı? */
+  private async hasPackageInvoiceOfType(
+    packageId: string,
+    types: readonly ElogoInvoiceType[],
+  ): Promise<boolean> {
+    const row = await this.prisma.elogoInvoice
+      .findFirst({
+        where: {
+          sourceId: packageId,
+          type: { in: types as ElogoInvoiceType[] },
+          status: { not: "cancelled" },
+        },
+        select: { id: true },
+      })
+      .catch(() => null);
+    return !!row;
+  }
+
+  /** LEGACY: birleşik komisyon faturası → SATICIYA, satıcı paketi başına TEK. */
   async issueCommissionInvoice(packageId: string): Promise<void> {
     const basis = await this.resolvePackageInvoiceBasis(packageId);
     if (!basis) return;
@@ -220,7 +315,7 @@ export class ElogoIssuingService {
     );
   }
 
-  /** Hizmet bedeli faturası → ALICIYA, satıcı paketi başına TEK. */
+  /** LEGACY: birleşik hizmet bedeli faturası → ALICIYA, satıcı paketi başına TEK. */
   async issueServiceFeeInvoice(packageId: string): Promise<void> {
     const basis = await this.resolvePackageInvoiceBasis(packageId);
     if (!basis) return;
