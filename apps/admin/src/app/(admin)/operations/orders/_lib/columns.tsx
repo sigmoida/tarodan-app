@@ -202,6 +202,11 @@ export function orderColumns({ t, expandedId, toggleRow }: OrderColumnProps) {
         ),
       { minWidth: 130 },
     ),
-    col.date<OrderGroupRow>(t("common.date"), "createdAt", { minWidth: 110 }),
+    // Sipariş saati operasyonda tarih kadar okunuyor (kargo kesimi, aynı gün
+    // içindeki sıralama) — tooltip'te kalmasın, kolonda görünsün.
+    col.date<OrderGroupRow>(t("common.date"), "createdAt", {
+      withTime: true,
+      minWidth: 140,
+    }),
   ];
 }

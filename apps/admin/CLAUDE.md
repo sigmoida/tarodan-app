@@ -248,7 +248,7 @@ const columns = [
 Generators: `text` · `muted` · `money` (`tone`) · `number` · `date` · `code`
 (mono) · `link` · `user` · `badge` · `actions` · `custom` (escape hatch — free
 JSX but still aligned/sized via meta). Format helpers live in **`lib/format.ts`**
-(`fmtTry`/`fmtNumber`/`fmtDate`/`fmtDateTime`, all null-safe → `—`). Cell
+(`fmtTry`/`fmtNumber`/`fmtDate`/`fmtDateTime`/`fmtTime`, all null-safe → `—`). Cell
 primitives are in `components/table/cells.tsx`; use them directly only inside
 `col.custom` (e.g. `<CellText>`, `<CellCode>`, `<TruncatedText>`).
 
@@ -343,7 +343,7 @@ the examples below are shorthand for a catalog key, not a licence to inline one.
 - Add the key to the catalog first; a string used on two screens must not exist
   twice under two names.
 - Dates, money and numbers go through `lib/format.ts` (`fmtTry` / `fmtNumber` /
-  `fmtDate` / `fmtDateTime`, all null-safe → `—`), never a per-component
+  `fmtDate` / `fmtDateTime` / `fmtTime`, all null-safe → `—`), never a per-component
   `toLocaleString` with inline options.
 - Copy a shared primitive can't own is passed in by the caller that has the
   `t()` (modal labels, confirm text, mutation `successMessage`) — that is why
