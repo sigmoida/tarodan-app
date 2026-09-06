@@ -7621,6 +7621,8 @@
       "registeredAt": "Registered On",
       "lastLogin": "Last Login",
       "neverLoggedIn": "Never logged in",
+      "filterLoginStateAll": "All Login States",
+      "filterLoggedIn": "Logged In",
       "status": {
         "pending": "Pending",
         "bothShipped": "Shipped"
@@ -8362,7 +8364,8 @@
           "action": "Action",
           "entityType": "Entity type",
           "shipmentLeg": "Shipment leg",
-          "accountStatus": "Account status"
+          "accountStatus": "Account status",
+          "loginState": "Login state"
         }
       },
       "bulkActionBar": {

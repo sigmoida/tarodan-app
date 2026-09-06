@@ -18,6 +18,7 @@ import {
   accountStatusParams,
   membershipTierParams,
   membershipLifecycleParams,
+  loginStateParams,
 } from "./_lib/types";
 import { userFilterFields } from "./_lib/filters";
 import { UsersSummary } from "./_components/UsersSummary";
@@ -47,6 +48,7 @@ export default function UsersPage() {
               accountStatus,
               membershipTier,
               lifecycle,
+              loginState,
               ...rest
             } = params;
             return adminApi
@@ -56,6 +58,7 @@ export default function UsersPage() {
                 ...accountStatusParams(accountStatus, filter),
                 ...membershipTierParams(membershipTier),
                 ...membershipLifecycleParams(lifecycle),
+                ...loginStateParams(loginState),
               })
               .then((res) => {
                 const root = res.data ?? {};

@@ -7621,6 +7621,8 @@
       "registeredAt": "Kayıt Tarihi",
       "lastLogin": "Son Giriş",
       "neverLoggedIn": "Hiç giriş yapmadı",
+      "filterLoginStateAll": "Tüm Giriş Durumları",
+      "filterLoggedIn": "Giriş Yapmış",
       "status": {
         "pending": "Bekliyor",
         "bothShipped": "Gönderildi"
@@ -8362,7 +8364,8 @@
           "action": "İşlem",
           "entityType": "Varlık türü",
           "shipmentLeg": "Gönderi yönü",
-          "accountStatus": "Hesap durumu"
+          "accountStatus": "Hesap durumu",
+          "loginState": "Giriş durumu"
         }
       },
       "bulkActionBar": {

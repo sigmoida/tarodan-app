@@ -5,6 +5,7 @@ import {
   getAccountStatusFilterOptions,
   getMembershipTierFilterOptions,
   getMembershipLifecycleOptions,
+  getLoginStateFilterOptions,
 } from "./types";
 
 export const userFilterFields = (t: TranslateFn): FilterField[] => [
@@ -31,6 +32,12 @@ export const userFilterFields = (t: TranslateFn): FilterField[] => [
     name: "lifecycle",
     label: t("admin.shared.filterDialog.labels.lifecycle"),
     options: getMembershipLifecycleOptions(t),
+  },
+  {
+    type: "select",
+    name: "loginState",
+    label: t("admin.shared.filterDialog.labels.loginState"),
+    options: getLoginStateFilterOptions(t),
   },
   dateRangeField(t),
 ];

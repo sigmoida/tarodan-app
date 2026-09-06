@@ -34,6 +34,9 @@ export * from "./admin";
 // Account lifecycle status derived from deletedAt / isBanned / isEmailVerified
 export * from "./account-status";
 
+// Login state filter ("never logged in") — shared by the admin list and the API
+export * from "./login-state";
+
 // Phone rules (shared by API validators, web schemas and the PhoneInput control)
 export * from "./phone";
 

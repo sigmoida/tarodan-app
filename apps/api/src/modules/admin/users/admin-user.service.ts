@@ -27,6 +27,7 @@ import { PUBLIC_IDENTITY_SELECT } from "../../../common/helpers/public-identity"
 import { i18nMessage } from "../../i18n";
 import {
   deriveAccountStatus,
+  loginStateWhere,
   type AccountStatus,
   type AccountStatusInput,
 } from "@tarodan/types";
@@ -149,6 +150,10 @@ export class AdminUserService {
       if (query.isBanned === true) where.isBanned = true;
       Object.assign(where, accountStatusWhere(undefined));
     }
+
+    // Giriş durumu ("hiç giriş yapmadı" / "giriş yapmış") — koşul
+    // @tarodan/types'ta, panel seçeneğiyle aynı kaynaktan.
+    Object.assign(where, loginStateWhere(query.loginState));
 
     // Membership lifecycle filters (tier / status / "expiring soon"). All narrow
     // the to-one membership relation, so they compose within a single relation

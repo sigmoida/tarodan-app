@@ -1,5 +1,9 @@
 import { useTranslations } from "next-intl";
-import { ACCOUNT_STATUSES, type AccountStatus } from "@tarodan/types";
+import {
+  ACCOUNT_STATUSES,
+  type AccountStatus,
+  type LoginState,
+} from "@tarodan/types";
 import { accountStatusConfig } from "@tarodan/shared";
 import { statusLabel } from "@/lib/statusLabels";
 
@@ -76,6 +80,22 @@ export function userFilterParams(filter?: string) {
     isSeller:
       filter === "sellers" ? true : filter === "buyers" ? false : undefined,
   };
+}
+
+/**
+ * Giriş durumu filtresi. "Hiç giriş yapmadı" tablodaki Son Giriş sütununun
+ * boş hâliyle aynı şeyi söyler (`admin.users.neverLoggedIn` etiketi ortak) —
+ * kayıt olup hesabını hiç kullanmayanları ayıklamak için.
+ */
+export const getLoginStateFilterOptions = (t: T) => [
+  { value: "all", label: t("admin.users.filterLoginStateAll") },
+  { value: "never", label: t("admin.users.neverLoggedIn") },
+  { value: "logged_in", label: t("admin.users.filterLoggedIn") },
+];
+
+/** Giriş durumu çipini getUsers sorgusuna çevirir ("all" → filtre yok). */
+export function loginStateParams(state?: string) {
+  return state && state !== "all" ? { loginState: state as LoginState } : {};
 }
 
 /** Hesap durumu filtresi: Tüm Durumlar + türetilmiş her durum (etiketler tek haritadan). */
