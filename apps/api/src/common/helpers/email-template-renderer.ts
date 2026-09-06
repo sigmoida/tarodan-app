@@ -28,10 +28,22 @@ export function escapeEmailHtml(value: unknown): string {
     .replace(/'/g, "&#39;");
 }
 
+/**
+ * Yalnız düz nesneler (`{}` / prototipsiz) gezilir. Prisma `Decimal`, `Date`,
+ * `Buffer` gibi sınıf örnekleri olduğu gibi bırakılır: `Object.fromEntries`
+ * bunları iç alanlarından (`{s,e,d}`) ibaret düz nesneye çevirip `valueOf`
+ * davranışını yok ediyordu — bültendeki fiyatların "NaN TL" basılmasının nedeni
+ * buydu. İçlerinde kaçırılması gereken kullanıcı metni de yok.
+ */
+function isPlainObject(value: object): boolean {
+  const prototype = Object.getPrototypeOf(value);
+  return prototype === Object.prototype || prototype === null;
+}
+
 function escapeEmailTemplateData(value: any): any {
   if (typeof value === "string") return escapeEmailHtml(value);
   if (Array.isArray(value)) return value.map(escapeEmailTemplateData);
-  if (value && typeof value === "object" && !(value instanceof Date)) {
+  if (value && typeof value === "object" && isPlainObject(value)) {
     return Object.fromEntries(
       Object.entries(value).map(([key, nested]) => [
         key,
@@ -235,12 +247,30 @@ export function renderManagedEmailTemplate(
   };
 }
 
-export function formatEmailPrice(amount: number | string): string {
-  if (typeof amount === "string") return amount;
+/**
+ * Tutarı tr-TR biçiminde basar. Sayı, sayısal metin (kuyruk/JSON turundan
+ * geçmiş Decimal'ler string olur) ve Prisma `Decimal` gibi `valueOf`'u sayıya
+ * çözülen nesneler kabul edilir. Zaten biçimlenmiş metin ("1.234,50", "1.234")
+ * olduğu gibi geçer; çözülemeyen değer maile "NaN" basmak yerine "0,00" olur.
+ */
+export function formatEmailPrice(
+  amount: number | string | { valueOf(): unknown } | null | undefined,
+): string {
+  if (typeof amount === "string") {
+    const text = amount.trim();
+    if (!text) return "0,00";
+    // Zaten tr-TR biçimlenmiş metne dokunma: ondalık virgül ("1.234,50") ya da
+    // üçerli binlik grupları ("1.234"). Bunları `Number` 1,23'e çevirirdi.
+    if (/,/.test(text) || /^-?\d{1,3}(\.\d{3})+$/.test(text)) return amount;
+    // Kalan yalnız makine biçimli sayısal metin ("1234.5") biçimlenir.
+    if (!/^-?\d+(\.\d+)?$/.test(text)) return amount;
+  }
+  const numeric = Number(amount);
+  if (!Number.isFinite(numeric)) return "0,00";
   return new Intl.NumberFormat("tr-TR", {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
-  }).format(amount);
+  }).format(numeric);
 }
 
 export function getEmailTemplateSubject(

@@ -1,7 +1,9 @@
+import { Prisma } from "@prisma/client";
 import {
   EMAIL_CONTENT_END,
   EMAIL_CONTENT_START,
   extractEmailTemplateContent,
+  formatEmailPrice,
   renderEmailTemplate,
   renderStoredEmailTemplate,
 } from "./email-template-renderer";
@@ -47,6 +49,38 @@ describe("email template renderer", () => {
     );
     expect(rendered.html).toContain("{{missing.value}}");
     expect(rendered.html).not.toContain('<img src=x onerror="alert(1)">');
+  });
+
+  it("formats Prisma Decimal product prices instead of printing NaN", () => {
+    const html = renderEmailTemplate(
+      "marketing-newsletter",
+      {
+        userName: "Ali",
+        trendingProducts: [
+          {
+            title: "Ürün",
+            price: new Prisma.Decimal("1234.5"),
+            productUrl: "https://tarodan.com.tr/listings/1",
+          },
+        ],
+      },
+      { frontendUrl: "https://tarodan.com.tr" },
+    );
+
+    expect(html).toContain("1.234,50 TL");
+    expect(html).not.toContain("NaN");
+  });
+
+  it("formats amounts coming from numbers, numeric strings and Decimals alike", () => {
+    expect(formatEmailPrice(199)).toBe("199,00");
+    expect(formatEmailPrice("199.5")).toBe("199,50");
+    expect(formatEmailPrice(new Prisma.Decimal("1234.5"))).toBe("1.234,50");
+    // Zaten biçimlenmiş metin olduğu gibi geçer, çözülemeyen değer 0,00 olur.
+    expect(formatEmailPrice("1.234,50")).toBe("1.234,50");
+    // Binlik grubu ("1.234") 1,23'e düşürülmemeli.
+    expect(formatEmailPrice("1.234")).toBe("1.234");
+    expect(formatEmailPrice(undefined)).toBe("0,00");
+    expect(formatEmailPrice("")).toBe("0,00");
   });
 
   it("extracts only the editable content from a wrapped email", () => {
