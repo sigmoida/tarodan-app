@@ -21,6 +21,7 @@ import {
   GuestCheckoutGroupDto,
 } from "../dto";
 import {
+  OrderOrigin,
   OrderStatus,
   OfferStatus,
   ProductKind,
@@ -518,28 +519,17 @@ export class OrderGuestCheckoutService {
       });
 
       // Faz 1: misafir tek siparişi de satıcı-paketi altında (uniform model).
-      const guestOrderPackage = await tx.orderPackage.create({
-        data: {
-          packageNumber: await this.checkoutCommon.generatePackageNumber(),
-          checkoutGroupId: guestOrderGroup.id,
+      const guestOrderPackage =
+        await this.checkoutCommon.createSingleSellerPackage(tx, {
           sellerId: product.sellerId,
           buyerId: guestUser.id,
-          shippingCost,
-          shippingTariffId: shippingTariff.tariffId,
-          shippingTariffVersion: shippingTariff.tariffVersion,
+          checkoutGroupId: guestOrderGroup.id,
           billableDesi: product.shippingDesi,
-          shippingPricingSnapshot: {
-            provider: shippingTariff.tariff.provider ?? "surat",
-            tariffId: shippingTariff.tariffId,
-            tariffVersion: shippingTariff.tariffVersion,
-            billableDesi: product.shippingDesi,
-            fullShippingAmount: fullShipping,
-          },
+          shippingTariff,
           fullShippingAmount: fullShipping,
           buyerShippingAmount,
           sellerShippingAmount,
-        },
-      });
+        });
 
       // Create order - store all guest info in shippingAddress JSON
       const order = await tx.order.create({
@@ -549,6 +539,7 @@ export class OrderGuestCheckoutService {
           buyerId: guestUser.id,
           sellerId: product.sellerId,
           offerId: dto.offerId,
+          origin: dto.offerId ? OrderOrigin.offer : OrderOrigin.direct_sale,
           checkoutGroupId: guestOrderGroup.id,
           packageId: guestOrderPackage.id,
           totalAmount,

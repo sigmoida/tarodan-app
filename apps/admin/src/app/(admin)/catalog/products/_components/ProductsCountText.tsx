@@ -1,11 +1,10 @@
 "use client";
 
-import { useQuery } from "@tanstack/react-query";
 import { useTranslations } from "next-intl";
 import { useRouter, usePathname, useSearchParams } from "next/navigation";
 import { AsyncValue, Button } from "@tarodan/ui";
 import { adminApi } from "@/lib/api";
-import { adminKeys } from "@/lib/query/keys";
+import { useListTotal } from "@/hooks/useListTotal";
 
 /**
  * Page-level header subtitle — live total (respecting the active URL filters) +
@@ -19,35 +18,24 @@ export function ProductsCountText() {
   const pathname = usePathname();
   const searchParams = useSearchParams();
 
-  const status = searchParams.get("status") ?? "all";
+  // Sekme = durum; varsayılan sekme URL'ye yazılmaz → "active".
+  const status = searchParams.get("tab") ?? "active";
   const search = searchParams.get("q") ?? "";
   const sellerId = searchParams.get("sellerId") ?? "";
   const brandId = searchParams.get("brandId") ?? "";
   const carModelId = searchParams.get("carModelId") ?? "";
 
-  const { data: total, isLoading } = useQuery({
-    queryKey: adminKeys.count("products", {
-      status,
-      search,
-      sellerId,
-      brandId,
-      carModelId,
-    }),
-    queryFn: async () => {
-      const res = await adminApi.getProducts({
-        page: 1,
-        limit: 1,
-        ...(search ? { search } : {}),
-        ...(status !== "all" ? { status } : {}),
-        ...(sellerId ? { sellerId } : {}),
-        ...(brandId ? { brandId } : {}),
-        ...(carModelId ? { carModelId } : {}),
-      });
-      const root = (res.data ?? {}) as any;
-      return (root.meta?.total ?? root.total ?? 0) as number;
+  const { data: total, isLoading } = useListTotal(
+    "products",
+    {
+      ...(status !== "ai" ? { status } : {}),
+      ...(search ? { search } : {}),
+      ...(sellerId ? { sellerId } : {}),
+      ...(brandId ? { brandId } : {}),
+      ...(carModelId ? { carModelId } : {}),
     },
-    staleTime: 30_000,
-  });
+    adminApi.getProducts,
+  );
 
   const removeSeller = () => {
     const params = new URLSearchParams(searchParams.toString());

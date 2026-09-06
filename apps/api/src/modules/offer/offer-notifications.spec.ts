@@ -90,6 +90,15 @@ describe("Teklif — bildirimler ve fiyat tabanı", () => {
       } as any,
       undefined as any,
       {
+        resolveOfferOrderSnapshots: jest.fn().mockResolvedValue({
+          shippingTariff: { tariffId: "t", tariffVersion: 1, tariff: {} },
+          commissionRuleSet: { id: "rs" },
+        }),
+        generateOrderNumber: jest.fn().mockResolvedValue("ORD-NOTIF00001"),
+        createSingleSellerPackage: jest
+          .fn()
+          .mockResolvedValue({ id: "pkg-1", packageNumber: "PKG-NOTIF00001" }),
+        buildOfferFinancialSnapshot: jest.fn().mockReturnValue({ version: 2 }),
         resolveOfferOrderPricing: jest.fn().mockResolvedValue({
           commission: {},
           buyerShippingAmount: 0,

@@ -127,10 +127,6 @@ export const NOTIFICATION_LINKS: Record<
     "/profile/orders/{{orderId}}",
     "/seller/orders/{{orderId}}",
   ),
-  [NotificationType.ORDER_FORCE_COMPLETED_BY_ADMIN]: byAudience(
-    "/profile/orders/{{orderId}}",
-    "/seller/orders/{{orderId}}",
-  ),
   [NotificationType.SELLER_DID_NOT_SHIP_REFUNDED]: BUYER_ORDER,
   [NotificationType.RESERVATION_EXPIRED]: pattern("/profile/orders"),
 
@@ -149,6 +145,9 @@ export const NOTIFICATION_LINKS: Record<
   // ekranı adminin oturumunda açılmaz — hedef admin panelindeki sipariş
   // dosyasıdır (serbest link, üretici verir).
   [NotificationType.ORDER_STUCK_IN_TRANSIT]: free("adminLink"),
+  // Fatura alarmları admin Faturalar ekranına gider (üretici tam linki verir).
+  [NotificationType.ELOGO_INVOICE_EXHAUSTED]: free("adminLink"),
+  [NotificationType.SELLER_INVOICE_MISSING]: free("adminLink"),
   // Satıcının ürünü satışa kapandı: alıcı tarafındaki "artık satışta değil"
   // sayfası, kaldırılmış ürünün 404'üne gitmesin.
   [NotificationType.ORDER_CANCELLED_OUT_OF_STOCK]: UNAVAILABLE,
@@ -177,6 +176,7 @@ export const NOTIFICATION_LINKS: Record<
   [NotificationType.OFFER_EXPIRED_SELLER]: LISTING,
   [NotificationType.OFFER_CANCELLED_OUT_OF_STOCK]: UNAVAILABLE,
   [NotificationType.OFFER_CANCELLED_LISTING_REMOVED]: UNAVAILABLE,
+  [NotificationType.OFFER_CANCELLED_BY_ADMIN]: LISTING,
 
   // ── Ürün / ilan ──────────────────────────────────────────────────────────
   [NotificationType.PRODUCT_APPROVED]: LISTING,
@@ -235,6 +235,9 @@ export const NOTIFICATION_LINKS: Record<
   // Admin'e gider: engellenen kullanıcının / şikayetin admin paneli sayfası.
   [NotificationType.USER_BLOCKED_ADMIN]: free("adminLink"),
   [NotificationType.USER_REPORTED_ADMIN]: free("adminLink"),
+  // Şikayet edene gider: kararın kendisi mesajın içinde, kullanıcı tarafında
+  // gidilecek bir "şikayetlerim" ekranı yok — link taşımaz.
+  [NotificationType.REPORT_RESOLVED]: none,
 
   // ── İade ─────────────────────────────────────────────────────────────────
   // İKİ yöne de gider: alıcı kendi talebini iptal edince SATICIYA ("iade talebi

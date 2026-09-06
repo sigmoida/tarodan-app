@@ -24,7 +24,7 @@ import { readCommissionRuleSnapshot } from "../../order/helpers/order-commission
 
 /**
  * Admin sipariş işlemleri (+ unbanUser kullanıcı moderasyonu) — AdminAnalyticsService'ten
- * birebir taşındı: getOrderById, updateOrderStatus, addOrderTracking, sendOrderNotification,
+ * birebir taşındı: getOrderById, updateOrderStatus, addOrderTracking,
  * generateOrderInvoice, unbanUser. AdminAnalyticsService ince alt-facade olarak buraya delege
  * eder. Ürün görsel URL çözümü (resolveProductImageUrl) gruplar-arası paylaşıldığı için
  * AdminAnalyticsCommonService'te. Inject: prisma, audit, search, cache, common.
@@ -1020,90 +1020,6 @@ export class AdminAnalyticsOrderService {
   }
 
   /**
-   * Send notification about order to buyer/seller
-   */
-  async sendOrderNotification(
-    adminId: string,
-    orderId: string,
-    dto: {
-      type: "status_update" | "shipped" | "delivered" | "custom";
-      message?: string;
-    },
-  ) {
-    const order = await this.prisma.order.findUnique({
-      where: { id: orderId },
-      include: {
-        buyer: { select: { id: true, email: true, displayName: true } },
-        seller: { select: { id: true, email: true, displayName: true } },
-        product: { select: { title: true } },
-      },
-    });
-
-    if (!order) {
-      throw new NotFoundException(i18nMessage("server.order.notFound"));
-    }
-
-    const statusLabels: Record<string, string> = {
-      pending_payment: "Ödeme Bekleniyor",
-      paid: "Ödendi",
-      preparing: "Hazırlanıyor",
-      shipped: "Kargoya Verildi",
-      delivered: "Teslim Edildi",
-      completed: "Tamamlandı",
-      cancelled: "İptal Edildi",
-    };
-
-    let title = "";
-    let body = "";
-
-    switch (dto.type) {
-      case "status_update":
-        title = "Sipariş Durumu Güncellendi";
-        body = `#${order.orderNumber} numaralı siparişinizin durumu "${statusLabels[order.status] || order.status}" olarak güncellendi.`;
-        break;
-      case "shipped":
-        title = "Siparişiniz Kargoda";
-        body = `#${order.orderNumber} numaralı siparişiniz kargoya verildi.`;
-        break;
-      case "delivered":
-        title = "Siparişiniz Teslim Edildi";
-        body = `#${order.orderNumber} numaralı siparişiniz teslim edildi.`;
-        break;
-      case "custom":
-        title = "Sipariş Bildirimi";
-        body = dto.message || "Siparişinizle ilgili bir güncelleme var.";
-        break;
-    }
-
-    // Create notification for buyer
-    await this.prisma.notificationLog.create({
-      data: {
-        userId: order.buyerId,
-        channel: "system",
-        type: "order",
-        title,
-        body: body,
-        data: { orderId, orderNumber: order.orderNumber },
-        status: "sent",
-      },
-    });
-
-    await this.audit.createAuditLog(
-      adminId,
-      "order_notification_sent",
-      "Order",
-      orderId,
-      null,
-      {
-        type: dto.type,
-        buyerId: order.buyerId,
-      },
-    );
-
-    return { success: true, message: "Bildirim gönderildi" };
-  }
-
-  /**
    * Generate invoice data for order
    */
   async generateOrderInvoice(orderId: string) {
@@ -1180,10 +1096,16 @@ export class AdminAnalyticsOrderService {
   async unbanUser(adminId: string, userId: string) {
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
+      include: { adminUser: { select: { id: true } } },
     });
 
     if (!user) {
       throw new NotFoundException(i18nMessage("server.auth.userNotFound"));
+    }
+    if (user.adminUser) {
+      throw new BadRequestException(
+        i18nMessage("server.admin.user.staffAccount"),
+      );
     }
 
     if (!(user as any).isBanned) {

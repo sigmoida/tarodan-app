@@ -8,6 +8,7 @@ import {
 } from "./invoice/invoice-lines";
 import { invoiceIssueYear } from "./invoice/invoice-datetime";
 import { LINE_DESCRIPTION } from "./invoice/invoice-line-description";
+import { retryOnWriteConflict } from "./helpers/elogo-write-conflict";
 import type { InvoiceRefundReversePayload } from "../outbox/outbox.types";
 import { ElogoService } from "./elogo.service";
 import { ElogoDocumentService } from "./elogo-document.service";
@@ -538,60 +539,65 @@ export class ElogoReversalService {
       : this.documents.round2(returnTotal * netRatio);
 
     const now = new Date();
-    const record = await this.prisma.$transaction(
-      async (tx) => {
-        const raced = await tx.elogoInvoice.findUnique({
-          where: {
-            type_sourceId: {
+    // Aynı sayaç satırında başka bir kesimle çakışırsa (P2034) yeniden dene;
+    // kaybeden transaction numara tüketmez. Bkz. elogo-write-conflict.ts.
+    const record = await retryOnWriteConflict(() =>
+      this.prisma.$transaction(
+        async (tx) => {
+          const raced = await tx.elogoInvoice.findUnique({
+            where: {
+              type_sourceId: {
+                type: "return_invoice",
+                sourceId: reversalSourceId,
+              },
+            },
+          });
+          if (raced) return raced;
+          const number =
+            await this.documents.allocateInvoiceNumberInTransaction(
+              tx,
+              invoiceIssueYear(now),
+            );
+          return tx.elogoInvoice.create({
+            data: {
               type: "return_invoice",
               sourceId: reversalSourceId,
+              recipientUserId: inv.recipientUserId,
+              recipientVknTckn: inv.recipientVknTckn,
+              recipientName: inv.recipientName,
+              // İletişim/adres snapshot'ı da TAŞINIR: misafir siparişlerinde tüm
+              // alıcılar tek sistem kullanıcısını paylaşır, kullanıcı kaydına
+              // dönmek iade faturasını sistem e-postasına ve boş adrese yazıyordu.
+              recipientEmail: inv.recipientEmail,
+              recipientCity: inv.recipientCity,
+              recipientDistrict: inv.recipientDistrict,
+              recipientStreet: inv.recipientStreet,
+              documentType: inv.documentType,
+              sendType: "ELEKTRONIK",
+              invoiceNumber: number,
+              ettn: randomUUID(),
+              netAmount: returnNet,
+              taxAmount: this.documents.round2(returnTotal - returnNet),
+              total: returnTotal,
+              originalTotal: returnTotal,
+              vatRate: inv.vatRate,
+              status: "pending",
+              billingReference: inv.invoiceNumber,
+              billingReferenceIssueDate: inv.issuedAt,
+              lineDescription: `İade: ${
+                inv.lineDescription ||
+                LINE_DESCRIPTION[inv.type] ||
+                "Hizmet bedeli"
+              }`,
+              lineItems: componentLines.length
+                ? (componentLines as unknown as Prisma.InputJsonValue)
+                : undefined,
+              createdAt: now,
             },
-          },
-        });
-        if (raced) return raced;
-        const number = await this.documents.allocateInvoiceNumberInTransaction(
-          tx,
-          invoiceIssueYear(now),
-        );
-        return tx.elogoInvoice.create({
-          data: {
-            type: "return_invoice",
-            sourceId: reversalSourceId,
-            recipientUserId: inv.recipientUserId,
-            recipientVknTckn: inv.recipientVknTckn,
-            recipientName: inv.recipientName,
-            // İletişim/adres snapshot'ı da TAŞINIR: misafir siparişlerinde tüm
-            // alıcılar tek sistem kullanıcısını paylaşır, kullanıcı kaydına
-            // dönmek iade faturasını sistem e-postasına ve boş adrese yazıyordu.
-            recipientEmail: inv.recipientEmail,
-            recipientCity: inv.recipientCity,
-            recipientDistrict: inv.recipientDistrict,
-            recipientStreet: inv.recipientStreet,
-            documentType: inv.documentType,
-            sendType: "ELEKTRONIK",
-            invoiceNumber: number,
-            ettn: randomUUID(),
-            netAmount: returnNet,
-            taxAmount: this.documents.round2(returnTotal - returnNet),
-            total: returnTotal,
-            originalTotal: returnTotal,
-            vatRate: inv.vatRate,
-            status: "pending",
-            billingReference: inv.invoiceNumber,
-            billingReferenceIssueDate: inv.issuedAt,
-            lineDescription: `İade: ${
-              inv.lineDescription ||
-              LINE_DESCRIPTION[inv.type] ||
-              "Hizmet bedeli"
-            }`,
-            lineItems: componentLines.length
-              ? (componentLines as unknown as Prisma.InputJsonValue)
-              : undefined,
-            createdAt: now,
-          },
-        });
-      },
-      { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
+          });
+        },
+        { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
+      ),
     );
     await this.delivery.sendRecord(record.id);
   }

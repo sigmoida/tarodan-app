@@ -130,6 +130,11 @@ export const EMAIL_TEMPLATE_DEFINITIONS = [
     group: "Pazarlama",
   },
   {
+    key: "report-resolved",
+    name: "Şikayet sonuçlandı (şikayet eden)",
+    group: "Şikayet",
+  },
+  {
     key: "seller-application-approved",
     name: "Kurumsal başvuru onaylandı",
     group: "Kurumsal Başvuru",
@@ -215,12 +220,6 @@ export const EMAIL_TEMPLATE_DEFINITIONS = [
   {
     key: "seller-invoice",
     name: "Satıcı faturası (kurumsal, PDF ekli)",
-    group: "Fatura",
-  },
-  { key: "invoice-buyer", name: "Fatura (alıcı)", group: "Fatura" },
-  {
-    key: "invoice-seller",
-    name: "Satış faturası (satıcı)",
     group: "Fatura",
   },
   {

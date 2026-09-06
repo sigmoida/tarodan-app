@@ -1,5 +1,6 @@
 import { OrderStatus } from "@prisma/client";
 import { OrderSchedulerService } from "../jobs/order-scheduler.service";
+import { NotificationType } from "../../notification/dto";
 
 /**
  * HIGH (eLogo): kargo poll'u teslimatı hiç raporlamazsa sipariş `shipped`'te takılı
@@ -13,10 +14,15 @@ import { OrderSchedulerService } from "../jobs/order-scheduler.service";
 describe("OrderSchedulerService — invoice staleness alarms", () => {
   const makeService = (
     counts: { stuckShipped: number; uninvoiced: number },
-    sellerInvoices: { missing: number; reminded: number } = {
+    sellerInvoices: {
+      missing: number;
+      reminded: number;
+      missingOrders?: Array<{ id: string; orderNumber: string }>;
+    } = {
       missing: 0,
       reminded: 0,
     },
+    opts: { alreadyAlerted?: boolean } = {},
   ) => {
     const stuckRows = Array.from(
       { length: counts.stuckShipped },
@@ -45,6 +51,9 @@ describe("OrderSchedulerService — invoice staleness alarms", () => {
       tradeCashPayment: { findMany: jest.fn().mockResolvedValue([]) },
     };
     const logger = { error: jest.fn(), warn: jest.fn(), log: jest.fn() };
+    const notifyAllAdminsOnce = jest
+      .fn()
+      .mockResolvedValue(!opts.alreadyAlerted);
     const service = new OrderSchedulerService(
       prisma as any,
       {
@@ -53,13 +62,21 @@ describe("OrderSchedulerService — invoice staleness alarms", () => {
       } as any,
       { get: () => undefined } as any,
       { issueTradeCashFeeInvoice: jest.fn() } as any,
-      { remindMissing: async () => sellerInvoices } as any,
-      { createInAppNotification: jest.fn() } as any,
-      { get: jest.fn(), set: jest.fn() } as any,
+      {
+        remindMissing: async () => ({
+          missingOrders: [],
+          ...sellerInvoices,
+        }),
+      } as any,
+      { createInAppNotification: jest.fn(), notifyAllAdminsOnce } as any,
+      {
+        get: jest.fn().mockResolvedValue(opts.alreadyAlerted ? true : null),
+        set: jest.fn(),
+      } as any,
       {} as any,
     );
     (service as any).logger = logger;
-    return { service, logger };
+    return { service, logger, notifyAllAdminsOnce };
   };
 
   it("uzun süre `shipped`'te takılı siparişler alarm verir", async () => {
@@ -109,9 +126,13 @@ describe("OrderSchedulerService — invoice staleness alarms", () => {
   // Tarodan'ın kendi e-Arşivleri için alarm vardı; ürün faturasını KESEN taraf
   // satıcı olduğunda hiçbir sinyal yoktu — yüklenmeyen fatura sessizce kayboluyordu.
   it("kurumsal satıcının yüklemediği ürün faturaları alarm verir", async () => {
-    const { service, logger } = makeService(
+    const { service, logger, notifyAllAdminsOnce } = makeService(
       { stuckShipped: 0, uninvoiced: 0 },
-      { missing: 3, reminded: 2 },
+      {
+        missing: 3,
+        reminded: 2,
+        missingOrders: [{ id: "o-1", orderNumber: "ORD-1" }],
+      },
     );
 
     const result = await service.reportInvoiceStaleness();
@@ -119,6 +140,44 @@ describe("OrderSchedulerService — invoice staleness alarms", () => {
     expect(result.missingSellerInvoices).toBe(3);
     expect(logger.error).toHaveBeenCalledWith(
       expect.stringContaining("SELLER_INVOICE_MISSING count=3 reminded=2"),
+    );
+    // Admin'e sipariş başına in-app alarm düşer (Sentry TARODAN-API-12: log
+    // satırı tek başına eyleme dönük değildi).
+    expect(notifyAllAdminsOnce).toHaveBeenCalledWith(
+      "seller-invoice-missing:o-1",
+      24 * 60 * 60,
+      NotificationType.SELLER_INVOICE_MISSING,
+      expect.objectContaining({ orderId: "o-1", orderNumber: "ORD-1" }),
+    );
+  });
+
+  /**
+   * Sentry TARODAN-API-12: cron 10 dakikada bir koşar; aynı çözülmemiş
+   * sipariş her turda error yazıp günde ~144 Sentry olayı üretiyordu. Durum
+   * ilk görüldüğünde error, sonraki turlarda warn.
+   */
+  it("daha önce bildirilmiş alarmlar sonraki turlarda error yerine warn yazar", async () => {
+    const { service, logger } = makeService(
+      { stuckShipped: 2, uninvoiced: 1 },
+      {
+        missing: 1,
+        reminded: 0,
+        missingOrders: [{ id: "o-1", orderNumber: "ORD-1" }],
+      },
+      { alreadyAlerted: true },
+    );
+
+    await service.reportInvoiceStaleness();
+
+    expect(logger.error).not.toHaveBeenCalled();
+    expect(logger.warn).toHaveBeenCalledWith(
+      expect.stringContaining("ORDERS_STUCK_SHIPPED"),
+    );
+    expect(logger.warn).toHaveBeenCalledWith(
+      expect.stringContaining("ORDERS_DELIVERED_UNINVOICED"),
+    );
+    expect(logger.warn).toHaveBeenCalledWith(
+      expect.stringContaining("SELLER_INVOICE_MISSING"),
     );
   });
 

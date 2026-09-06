@@ -1,7 +1,6 @@
 import { Injectable } from "@nestjs/common";
 import { ShippingPackageTierCode } from "@prisma/client";
 import {
-  CreateOrderDto,
   OrderQueryDto,
   CancelOrderDto,
   GuestCheckoutDto,
@@ -162,10 +161,6 @@ export class OrderService {
     return this.orderCheckout.createCheckoutGroup(params);
   }
 
-  async create(buyerId: string, dto: CreateOrderDto) {
-    return this.orderCheckout.create(buyerId, dto);
-  }
-
   async sendGuestCheckoutVerificationCode(
     dto: GuestSendVerificationCodeDto,
   ): Promise<{
@@ -250,7 +245,7 @@ export class OrderService {
 
   async completeOrder(
     orderId: string,
-    type: "manual_ok" | "auto_timeout" | "admin_force",
+    type: "manual_ok" | "auto_timeout",
   ): Promise<{ completed: boolean }> {
     return this.orderLifecycle.completeOrder(orderId, type);
   }
@@ -262,34 +257,23 @@ export class OrderService {
     return this.orderLifecycle.confirmReceipt(orderId, userId);
   }
 
-  async forceComplete(
-    orderId: string,
-    adminId: string,
-    reason?: string,
-  ): Promise<{ completed: boolean }> {
-    return this.orderLifecycle.forceComplete(orderId, adminId, reason);
-  }
-
-  async extendConfirmation(
-    orderId: string,
-    adminId: string,
-    hours: number,
-    reason?: string,
-  ): Promise<{ newDeadline: Date }> {
-    return this.orderLifecycle.extendConfirmation(
-      orderId,
-      adminId,
-      hours,
-      reason,
-    );
-  }
-
   async cancelGroup(groupId: string, userId: string, dto: CancelOrderDto) {
     return this.orderLifecycle.cancelGroup(groupId, userId, dto);
   }
 
   async cancel(orderId: string, userId: string, dto: CancelOrderDto) {
     return this.orderLifecycle.cancel(orderId, userId, dto);
+  }
+
+  /** Ödenmemiş siparişin tx içi iptali (admin teklif iptali bunu kullanır). */
+  cancelUnpaidOrderInTx(
+    ...args: Parameters<OrderLifecycleService["cancelUnpaidOrderInTx"]>
+  ) {
+    return this.orderLifecycle.cancelUnpaidOrderInTx(...args);
+  }
+
+  async invalidateProductCaches(productId: string): Promise<void> {
+    return this.orderLifecycle.invalidateProductCaches(productId);
   }
 
   async reactivate(orderId: string, userId: string) {

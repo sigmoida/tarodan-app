@@ -44,7 +44,7 @@ export function bulkResultMessage(
 export function bulkConfirmDescriptionKey(
   action: UserAccountAction,
 ): MessageKey {
-  return action === "resend"
-    ? "admin.users.bulkResendConfirmDesc"
-    : "admin.users.bulkConfirmDesc";
+  if (action === "resend") return "admin.users.bulkResendConfirmDesc";
+  if (action === "delete") return "admin.users.bulkDeleteConfirmDesc";
+  return "admin.users.bulkConfirmDesc";
 }

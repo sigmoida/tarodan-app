@@ -5,6 +5,7 @@ import {
   UsersIcon,
   ShoppingBagIcon,
   ClipboardDocumentListIcon,
+  TagIcon,
   ChartBarIcon,
   Cog6ToothIcon,
   CurrencyDollarIcon,
@@ -125,6 +126,18 @@ export function getNavGroups(t: T): NavGroup[] {
           permission: "orders",
         },
         {
+          name: t("admin.nav.items.offers.name"),
+          href: "/operations/offers",
+          icon: TagIcon,
+          description: t("admin.nav.items.offers.description"),
+          keywords: t("admin.nav.items.offers.keywords")
+            .split(",")
+            .map((k) => k.trim()),
+          // Teklifler sipariş operasyonunun parçası: ayrı izin anahtarı yok
+          // (API tarafında `offers` segmenti de `orders` iznine eşlenir).
+          permission: "orders",
+        },
+        {
           name: t("admin.nav.items.trades.name"),
           href: "/operations/trades",
           icon: ArrowsRightLeftIcon,
@@ -153,16 +166,6 @@ export function getNavGroups(t: T): NavGroup[] {
             .split(",")
             .map((k) => k.trim()),
           permission: "refund_requests",
-        },
-        {
-          name: t("admin.nav.items.refundHistory.name"),
-          href: "/operations/refunds",
-          icon: BanknotesIcon,
-          description: t("admin.nav.items.refundHistory.description"),
-          keywords: t("admin.nav.items.refundHistory.keywords")
-            .split(",")
-            .map((k) => k.trim()),
-          permission: "refund_history",
         },
       ],
     },

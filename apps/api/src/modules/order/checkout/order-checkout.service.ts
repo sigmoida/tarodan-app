@@ -1,6 +1,5 @@
 import { Injectable } from "@nestjs/common";
 import {
-  CreateOrderDto,
   GuestCheckoutDto,
   DirectBuyDto,
   GuestSendVerificationCodeDto,
@@ -47,10 +46,6 @@ export class OrderCheckoutService {
     guest?: { email: string; phone?: string; name?: string };
   }) {
     return this.group.createCheckoutGroup(params);
-  }
-
-  async create(buyerId: string, dto: CreateOrderDto) {
-    return this.direct.create(buyerId, dto);
   }
 
   async sendGuestCheckoutVerificationCode(

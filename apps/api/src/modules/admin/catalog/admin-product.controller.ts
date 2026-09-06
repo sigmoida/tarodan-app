@@ -75,7 +75,6 @@ import {
   PRODUCT_BULK_IMPORT_MAX_IMAGES,
 } from "./admin-product-bulk-import.constants";
 import { AdminProductBulkImportService } from "./admin-product-bulk-import.service";
-import { ForceCompleteOrderDto, ExtendConfirmationDto } from "../../order/dto";
 import {
   CreateCommissionRuleDto,
   UpdateCommissionRuleDto,
@@ -85,7 +84,6 @@ import {
   AdminUserQueryDto,
   AdminProductQueryDto,
   AdminOrderQueryDto,
-  AdminRefundHistoryQueryDto,
   AuditLogQueryDto,
   ApproveProductDto,
   RejectProductDto,
@@ -97,7 +95,6 @@ import {
   UpdateAdminStaffDto,
   UpdateStaffSettingsDto,
   SetRolePermissionsDto,
-  ResolveDisputeDto,
   AnalyticsQueryDto,
   UpdateOrderStatusDto,
   ReportQueryDto,
@@ -288,13 +285,6 @@ export class AdminProductController {
       `attachment; filename="${result.filename}"`,
     );
     res.send(result.content);
-  }
-
-  @Get("payments/refunds")
-  @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
-  @ApiOperation({ summary: "Get refund history" })
-  async getRefundHistory(@Query() query: AdminRefundHistoryQueryDto) {
-    return this.adminService.getRefundHistory(query);
   }
 
   // ==================== DISCOUNT MANAGEMENT (admin token) ====================

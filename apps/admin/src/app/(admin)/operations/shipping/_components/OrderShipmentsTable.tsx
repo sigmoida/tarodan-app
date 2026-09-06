@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useMemo, useState } from "react";
+import { useMemo } from "react";
 import { useTranslations } from "next-intl";
 import { DataTable } from "@/components/DataTable";
 import { useResourceList } from "@/components/list";
@@ -17,18 +17,10 @@ import { OrderShipmentDetail } from "./OrderShipmentDetail";
  */
 export function OrderShipmentsTable() {
   const t = useTranslations();
-  const [expandedId, setExpandedId] = useState<string | null>(null);
   const { rows, isLoading, sort, setSort } =
     useResourceList<OrderShipmentRow>();
   const parcels = useMemo(() => toPhysicalShipments(rows), [rows]);
-  const toggleRow = useCallback(
-    (id: string) => setExpandedId((current) => (current === id ? null : id)),
-    [],
-  );
-  const columns = useMemo(
-    () => physicalShipmentColumns({ t, expandedId, toggleRow }),
-    [expandedId, t, toggleRow],
-  );
+  const columns = useMemo(() => physicalShipmentColumns(t), [t]);
 
   return (
     <DataTable
@@ -37,9 +29,8 @@ export function OrderShipmentsTable() {
       loading={isLoading}
       getRowId={(r) => r.id}
       emptyText={t("admin.operations.shipping.orders.empty")}
-      expandedId={expandedId}
+      expandAll
       renderExpanded={(shipment) => <OrderShipmentDetail shipment={shipment} />}
-      onRowClick={(shipment) => toggleRow(shipment.id)}
       sort={sort}
       onSort={setSort}
     />

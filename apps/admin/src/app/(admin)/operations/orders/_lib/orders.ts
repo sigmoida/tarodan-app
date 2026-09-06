@@ -1,7 +1,7 @@
 import { useMemo } from "react";
 import { orderStatusConfig } from "@tarodan/ui";
 import { useTranslations } from "next-intl";
-import { statusFilterOptions } from "@/lib/utils";
+import { statusFilterOptions, type OrderOrigin } from "@/lib/utils";
 
 type T = ReturnType<typeof useTranslations<never>>;
 
@@ -30,6 +30,8 @@ export interface Order {
     refundNumber?: string;
   } | null;
   offerId?: string | null;
+  /** Sipariş kaynağı (`Order.origin`). */
+  origin: OrderOrigin;
   checkoutGroupId?: string | null;
   packageId?: string | null;
   /** Koli numarası (PKG-…): kargo etiketindeki ve Sürat'a giden kod. */
@@ -99,6 +101,7 @@ export interface OrderGroupRow {
   cancelReason?: string;
   cancellationType?: string | null;
   offerId?: string | null;
+  origin: OrderOrigin;
 }
 
 /** Filter options derived from orderStatusConfig → exactly consistent with badges. */
@@ -132,6 +135,7 @@ export function mapOrders(raw: any[], t: T): Order[] {
     cancellationType: o.cancellationType ?? null,
     activeRefundRequest: o.activeRefundRequest ?? null,
     offerId: o.offerId ?? null,
+    origin: o.origin,
     checkoutGroupId: o.checkoutGroupId ?? null,
     packageId: o.packageId ?? null,
     packageNumber: o.packageNumber ?? null,
@@ -257,6 +261,7 @@ export function useOrderGroups(orders: Order[]): OrderGroupRow[] {
         cancelReason: head.cancelReason,
         cancellationType: head.cancellationType,
         offerId: head.offerId,
+        origin: head.origin,
       } satisfies OrderGroupRow;
     });
   }, [orders]);

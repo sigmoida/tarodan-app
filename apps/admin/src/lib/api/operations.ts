@@ -5,20 +5,8 @@ import { api } from "./client";
  * moderated messages, and shipment tracking.
  */
 export const operationsApi = {
-  // Refunds (payment refund history)
-  getRefundHistory: (params?: {
-    search?: string;
-    startDate?: string;
-    endDate?: string;
-    page?: number;
-    limit?: number;
-    sortBy?: string;
-    sortOrder?: "asc" | "desc";
-  }) => api.get("/admin/payments/refunds", { params }),
-
   // Orders
   getOrders: (params?: any) => api.get("/admin/orders", { params }),
-  getOrder: (id: string) => api.get(`/admin/orders/${id}`),
   /** Grup dosyası: order id grup çatısına çözülür (ödeme + paketler + sipariş finans/escrow/iade). */
   getOrderFile: (id: string) => api.get(`/admin/orders/${id}/file`),
   updateOrderStatus: (id: string, status: string, notes: string) =>
@@ -32,15 +20,12 @@ export const operationsApi = {
     },
   ) => api.post(`/admin/orders/${id}/tracking`, payload),
   getOrderInvoice: (id: string) => api.get(`/admin/orders/${id}/invoice`),
-  applyOrderCoupon: (id: string, code: string | null) =>
-    api.post(`/admin/orders/${id}/apply-coupon`, { code }),
-  // 48h window (Phase 4A.1)
-  forceCompleteOrder: (id: string, reason: string) =>
-    api.post(`/admin/orders/${id}/force-complete`, { reason }),
-  extendOrderConfirmation: (
-    id: string,
-    payload: { hours: number; reason?: string },
-  ) => api.post(`/admin/orders/${id}/extend-confirmation`, payload),
+
+  // Offers (Teklifler — /operations/offers; izin: orders)
+  getOffers: (params?: any) => api.get("/admin/offers", { params }),
+  getOffer: (id: string) => api.get(`/admin/offers/${id}`),
+  cancelOffer: (id: string, reason: string) =>
+    api.post(`/admin/offers/${id}/cancel`, { reason }),
 
   // Trades
   getTrades: (params?: any) => api.get("/admin/trades", { params }),

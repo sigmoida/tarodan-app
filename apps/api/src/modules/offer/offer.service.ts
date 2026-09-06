@@ -13,6 +13,7 @@ import { isPublicStorageKey, StorageService } from "../storage/storage.service";
 import { CreateOfferDto, CounterOfferDto, OfferQueryDto } from "./dto";
 import {
   OfferStatus,
+  OrderOrigin,
   ProductStatus,
   OrderStatus,
   Prisma,
@@ -28,8 +29,6 @@ import { paymentWindowEnd } from "../payment/helpers/payment.constants";
 import { ProductLockService } from "../product/lock/product-lock.service";
 import { getAvailableQuantity } from "../product/helpers/product-availability.helper";
 import { resolveSalePrice } from "../product/helpers/product-sale-window";
-import { generateUniqueReference } from "../../common/helpers/generate-reference";
-import { REFERENCE_PREFIX } from "../../common/helpers/code-prefixes";
 import { i18nMessage } from "../i18n";
 import { UserBlockService } from "../user-block/user-block.service";
 import { OFFER_CANCEL_REASON } from "../trade/helpers/trade-cancel-reasons";
@@ -70,18 +69,6 @@ export class OfferService {
     this.minOfferPercentage = parseInt(
       this.configService.get("MIN_OFFER_PERCENTAGE") || "50",
       10,
-    );
-  }
-
-  /**
-   * Generate a non-guessable, unique order number (e.g. "ORD-K7X9M2QF3N").
-   * Shares the same generator as OrderService so the format stays consistent.
-   */
-  private async generateOrderNumber(): Promise<string> {
-    return generateUniqueReference(
-      REFERENCE_PREFIX.order,
-      async (code) =>
-        (await this.prisma.order.count({ where: { orderNumber: code } })) > 0,
     );
   }
 
@@ -268,6 +255,10 @@ export class OfferService {
    * kod bunu hiç yapmıyordu.) Ekranlar bu yarışı açıkça göstermek zorundadır.
    */
   async accept(offerId: string, userId: string) {
+    // Tarife + komisyon kural seti anlık görüntüleri satır kilitlerinden ÖNCE
+    // (direct/group checkout ile aynı sıra; tx içinde dış okuma yapılmaz).
+    const { shippingTariff, commissionRuleSet } =
+      await this.checkoutCommon.resolveOfferOrderSnapshots();
     const result = await this.prisma.$transaction(async (tx) => {
       // Lock offer row with FOR UPDATE
       const lockedOffers = await tx.$queryRaw<{ id: string }[]>`
@@ -399,6 +390,8 @@ export class OfferService {
         sellerId: offerData.sellerId,
         categoryId: productData.categoryId,
         shippingDesi: productData.shippingDesi,
+        shippingTariff: shippingTariff.tariff,
+        commissionRuleSetId: commissionRuleSet.id,
         // Teklifte kupon geçmez ama platformun OTOMATİK bedel kampanyaları
         // (ör. üyelik avantajı) burada da geçerlidir — kitle eşleşmesi için
         // alıcının kimliği gerekir.
@@ -407,8 +400,24 @@ export class OfferService {
       const commissionResult = offerPricing.commission;
       const totalAmount = offerPricing.totalAmount;
 
-      // Generate order number
-      const orderNumber = await this.generateOrderNumber();
+      const orderNumber = await this.checkoutCommon.generateOrderNumber();
+
+      // Teklif siparişi de KOLİ taşır (tek biçim): Sürat referansı PKG-…, desi ve
+      // tarife koliden. CheckoutGroup YOK — ödeme tekil sipariş yolundan gider
+      // (rezervasyon ilk ödeme başlatmada alınır; grup yolu bunu bilmez).
+      const orderPackage = await this.checkoutCommon.createSingleSellerPackage(
+        tx,
+        {
+          sellerId: offerData.sellerId,
+          buyerId: offerData.buyerId,
+          checkoutGroupId: null,
+          billableDesi: productData.shippingDesi,
+          shippingTariff,
+          fullShippingAmount: offerPricing.fullShippingAmount,
+          buyerShippingAmount: offerPricing.buyerShippingAmount,
+          sellerShippingAmount: offerPricing.sellerShippingAmount,
+        },
+      );
 
       // Create order with pending_payment status (buyer adds address later via PATCH)
       const order = await tx.order.create({
@@ -418,6 +427,8 @@ export class OfferService {
           buyerId: offerData.buyerId,
           sellerId: offerData.sellerId,
           offerId: offerId,
+          origin: OrderOrigin.offer,
+          packageId: orderPackage.id,
           totalAmount,
           subtotal: Number(offerData.amount),
           unitPrice: Number(offerData.amount),
@@ -449,13 +460,20 @@ export class OfferService {
           buyerServiceFeeAmount: commissionResult.buyerServiceFeeAmount,
           sellerCommissionAmount: commissionResult.sellerCommissionAmount,
           sellerPlatformFeeAmount: commissionResult.sellerPlatformFeeAmount,
+          financialSnapshot: this.checkoutCommon.buildOfferFinancialSnapshot({
+            productId: offerData.productId,
+            amount: Number(offerData.amount),
+            shippingDesi: productData.shippingDesi,
+            shippingTariff,
+            pricing: offerPricing,
+          }),
           status: OrderStatus.pending_payment,
           paymentExpiresAt: paymentWindowEnd(),
         },
       });
 
       this.logger.log(
-        `Order ${orderNumber} created for accepted offer ${offerId} (total=${totalAmount}, commission=${commissionResult.commissionAmount}, shipping=${offerPricing.buyerShippingAmount}, tax=${offerPricing.taxAmount})`,
+        `Order ${orderNumber} (package ${orderPackage.packageNumber}) created for accepted offer ${offerId} (total=${totalAmount}, commission=${commissionResult.commissionAmount}, shipping=${offerPricing.buyerShippingAmount}, tax=${offerPricing.taxAmount})`,
       );
 
       // Kodsuz (otomatik) kampanyaların bütçesi sipariş oluşurken harcanır;

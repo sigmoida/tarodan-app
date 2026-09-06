@@ -1,10 +1,9 @@
 "use client";
 
-import { useQuery } from "@tanstack/react-query";
 import { useSearchParams } from "next/navigation";
 import { AsyncValue } from "@tarodan/ui";
 import { adminApi } from "@/lib/api";
-import { adminKeys } from "@/lib/query/keys";
+import { useListTotal } from "@/hooks/useListTotal";
 import { mapFilterToApiStatus } from "../_lib/types";
 import { useTranslations } from "next-intl";
 
@@ -20,20 +19,11 @@ export function MessagesSummary() {
   // Default filter is "pending" (initialFilters) — cleared from the URL when active.
   const status = searchParams.get("status") ?? "pending";
 
-  const { data: total, isLoading } = useQuery({
-    queryKey: adminKeys.count("messages", { search, status }),
-    queryFn: async () => {
-      const res = await adminApi.getMessages({
-        page: 1,
-        limit: 1,
-        ...(search ? { search } : {}),
-        status: mapFilterToApiStatus(status),
-      });
-      const root = (res.data ?? {}) as any;
-      return (root.meta?.total ?? root.total ?? 0) as number;
-    },
-    staleTime: 30_000,
-  });
+  const { data: total, isLoading } = useListTotal(
+    "messages",
+    { ...(search ? { search } : {}), status: mapFilterToApiStatus(status) },
+    adminApi.getMessages,
+  );
 
   const count = <AsyncValue loading={isLoading}>{total ?? 0}</AsyncValue>;
   if (status === "approved")

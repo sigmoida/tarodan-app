@@ -29,6 +29,7 @@ import {
   AdminRole,
 } from "@prisma/client";
 import { safeDecrementReserved } from "../../product/helpers/product-availability.helper";
+import { OFFER_CANCEL_REASON } from "../../trade/helpers/trade-cancel-reasons";
 import { randomInt } from "crypto";
 import { i18nMessage } from "../../i18n";
 
@@ -282,9 +283,33 @@ export class AdminStaffService {
       },
     });
 
-    // Kayıt yoksa hesabı oluştur. Şifre verilmediyse geçici üret + yanıtta döndür (süper admin paylaşsın).
     let tempPassword: string | undefined;
-    if (!user) {
+    let existing: Awaited<ReturnType<typeof this.prisma.adminUser.findUnique>> =
+      null;
+    if (user) {
+      existing = await this.prisma.adminUser.findUnique({
+        where: { userId: user.id },
+      });
+      // Personel ile müşteri hesabı KESİN ayrı: ilan/sipariş/takas taşıyan ya da
+      // sosyal hesapla açılmış bir müşteri hesabı personele terfi ettirilmez —
+      // personel hesabı web/mobil'e giremez. "AdminUser satırı yok" tek başına
+      // müşteri demek DEĞİLDİR: personelden çıkarılan hesabın User satırı kalır
+      // (removeAdminStaff yalnız AdminUser'ı siler) ve yeniden davet edilebilmeli.
+      if (!existing && (await this.hasCustomerFootprint(user.id))) {
+        throw new BadRequestException(
+          i18nMessage("server.admin.staff.emailBelongsToCustomer"),
+        );
+      }
+      // Davet, e-postanın sahibine güvenildiğini söyler (adminLogin bu bayrağı
+      // aramaz; yeni açılan hesap zaten doğrulanmış yazılır).
+      if (!user.isEmailVerified) {
+        await this.prisma.user.update({
+          where: { id: user.id },
+          data: { isEmailVerified: true },
+        });
+      }
+    } else {
+      // Kayıt yoksa hesabı oluştur. Şifre verilmediyse geçici üret + yanıtta döndür (süper admin paylaşsın).
       const rawPassword = dto.password || this.generateTempPassword();
       if (!dto.password) tempPassword = rawPassword;
       const passwordHash = await bcrypt.hash(rawPassword, 12);
@@ -310,22 +335,6 @@ export class AdminStaffService {
       });
     }
 
-    // Davet, e-postanın sahibine güvenildiğini söyler — hesabı sistemin açtığı
-    // dal bunu zaten `isEmailVerified: true` ile yazıyor. Mevcut bir hesap
-    // personele terfi ettiğinde de aynısı geçerli olmalı; aksi halde admin
-    // panele girebilen ama kullanıcı listesinde "Aktivasyon Bekliyor" görünen
-    // bir hesap kalıyordu (adminLogin bilinçli olarak bu bayrağı aramıyor,
-    // bkz. auth-token.service.ts'teki admin muafiyeti).
-    if (!user.isEmailVerified) {
-      await this.prisma.user.update({
-        where: { id: user.id },
-        data: { isEmailVerified: true },
-      });
-    }
-
-    const existing = await this.prisma.adminUser.findUnique({
-      where: { userId: user.id },
-    });
     if (existing) {
       await this.assertCanManage(actingUserId, existing.role, dto.role);
       const updated = await this.prisma.adminUser.update({
@@ -354,6 +363,24 @@ export class AdminStaffService {
       created,
     );
     return { ...this.shapeStaff(created, user), tempPassword };
+  }
+
+  /**
+   * Hesabın müşteri izi var mı: ilan, sipariş (alıcı/satıcı), takas ya da
+   * sosyal giriş bağı. Böyle bir hesap personele terfi ettirilmez.
+   */
+  private async hasCustomerFootprint(userId: string): Promise<boolean> {
+    const [products, orders, trades, oauth] = await Promise.all([
+      this.prisma.product.count({ where: { sellerId: userId } }),
+      this.prisma.order.count({
+        where: { OR: [{ buyerId: userId }, { sellerId: userId }] },
+      }),
+      this.prisma.trade.count({
+        where: { OR: [{ initiatorId: userId }, { receiverId: userId }] },
+      }),
+      this.prisma.oAuthAccount.count({ where: { userId } }),
+    ]);
+    return products + orders + trades + oauth > 0;
   }
 
   /** Admin personelin rolünü/aktifliğini güncelle. */
@@ -457,10 +484,18 @@ export class AdminStaffService {
   async banUser(adminId: string, userId: string, dto: BanUserDto) {
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
+      include: { adminUser: { select: { id: true } } },
     });
 
     if (!user) {
       throw new NotFoundException(i18nMessage("server.auth.userNotFound"));
+    }
+    // Personel hesabı kullanıcı aksiyonlarıyla değil, Personel ekranından
+    // (pasifleştirme/rol) yönetilir.
+    if (user.adminUser) {
+      throw new BadRequestException(
+        i18nMessage("server.admin.user.staffAccount"),
+      );
     }
 
     if ((user as any).isBanned) {
@@ -582,14 +617,17 @@ export class AdminStaffService {
         },
       });
 
-      // 5. Aktif teklifleri cancelled yap (buyer olarak)
+      // 5. Bekleyen teklifleri kapat — alıcı VE satıcı olarak. Yasaklı satıcının
+      //    aldığı teklifler açık kalırsa alıcılar süre dolana dek "yanıt bekliyor"
+      //    görür; gerekçe ekranlarda "hesap askıya alındı" olarak okunur.
       await tx.offer.updateMany({
         where: {
-          buyerId: userId,
           status: OfferStatus.pending,
+          OR: [{ buyerId: userId }, { sellerId: userId }],
         },
         data: {
           status: OfferStatus.cancelled,
+          cancelReason: OFFER_CANCEL_REASON.accountBanned,
         },
       });
 

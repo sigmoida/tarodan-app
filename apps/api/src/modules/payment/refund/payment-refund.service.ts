@@ -11,10 +11,12 @@ import {
   Prisma,
   PaymentStatus,
   PaymentHoldStatus,
+  OfferStatus,
   OrderStatus,
   RefundAttemptStatus,
   SellerAdjustmentType,
 } from "@prisma/client";
+import { OFFER_CANCEL_REASON } from "../../trade/helpers/trade-cancel-reasons";
 import { getProductStatusFromQuantity } from "../../product/helpers/product-status.helper";
 import { PaymentProviderRegistry } from "../../payment-providers/payment-provider.registry";
 import { PaymentProvider } from "../dto";
@@ -890,6 +892,7 @@ export class PaymentRefundService {
                 sellerId: true,
                 quantity: true,
                 stockRestoredAt: true,
+                offerId: true,
               },
             });
             const sellerAdjustments = (
@@ -937,6 +940,21 @@ export class PaymentRefundService {
                 where: { id: orderId },
                 data: { status: OrderStatus.cancelled },
               });
+              // Teklif siparişi: teklif `accepted` kalırsa reactivate/"Ödemeyi
+              // tamamla" iade edilmiş siparişi yeniden ödemeye açar. Tam iade
+              // = anlaşma bitti.
+              if (orderRow?.offerId) {
+                await tx.offer.updateMany({
+                  where: {
+                    id: orderRow.offerId,
+                    status: OfferStatus.accepted,
+                  },
+                  data: {
+                    status: OfferStatus.cancelled,
+                    cancelReason: OFFER_CANCEL_REASON.orderRefunded,
+                  },
+                });
+              }
             }
 
             // Stok geri-yükleme YALNIZ BİR KEZ: order.cancel() ödenmiş iptalde stoğu zaten

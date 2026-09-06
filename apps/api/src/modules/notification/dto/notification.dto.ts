@@ -29,7 +29,6 @@ export enum NotificationType {
   ORDER_DELIVERED_CONFIRM = "order_delivered_confirm",
   ORDER_AUTO_COMPLETED = "order_auto_completed",
   ORDER_MANUALLY_CONFIRMED = "order_manually_confirmed",
-  ORDER_FORCE_COMPLETED_BY_ADMIN = "order_force_completed_by_admin",
   SELLER_DID_NOT_SHIP_REFUNDED = "seller_did_not_ship_refunded",
 
   // Offer notifications
@@ -45,6 +44,7 @@ export enum NotificationType {
   OFFER_CANCELLED_OUT_OF_STOCK = "offer_cancelled_out_of_stock",
   /** İlan satıcı tarafından silindiği için teklif kapandı (stok bitişi DEĞİL). */
   OFFER_CANCELLED_LISTING_REMOVED = "offer_cancelled_listing_removed",
+  OFFER_CANCELLED_BY_ADMIN = "offer_cancelled_by_admin",
 
   // Product notifications
   PRODUCT_APPROVED = "product_approved",
@@ -68,6 +68,12 @@ export enum NotificationType {
   // Admin uyarısı: sipariş uzun süredir kargoda ve taşıyıcıdan teslim raporu yok.
   // Teslim yazılmadan escrow release tarihi kurulmaz → satıcı parası askıda kalır.
   ORDER_STUCK_IN_TRANSIT = "order_stuck_in_transit",
+  // Admin uyarısı: bir e-Arşiv/e-Fatura belgesi deneme bütçesini tüketti — cron
+  // artık denemez, yasal süre işliyor; admin "Yeniden Dene" ile kurtarır.
+  ELOGO_INVOICE_EXHAUSTED = "elogo_invoice_exhausted",
+  // Admin uyarısı: kurumsal satıcı teslimden N gün sonra ürün faturasını
+  // hâlâ yüklemedi; satıcı hatırlatıldı, takip operasyonda.
+  SELLER_INVOICE_MISSING = "seller_invoice_missing",
   // Kargo uzun süredir hareketsiz — alıcı ve satıcıya bilgi.
   ORDER_SHIPMENT_DELAYED = "order_shipment_delayed",
   // Her iki ürün de depoya ulaştı → kontrol aşaması başlıyor.
@@ -183,6 +189,9 @@ export enum NotificationType {
   // Admin'e gider (Apple App Review: engelleme/şikayet "notify the developer").
   USER_BLOCKED_ADMIN = "user_blocked_admin",
   USER_REPORTED_ADMIN = "user_reported_admin",
+
+  // Şikayet edene gider: admin şikayeti sonuçlandırdığında (çözüldü/reddedildi).
+  REPORT_RESOLVED = "report_resolved",
 }
 
 export enum NotificationChannel {

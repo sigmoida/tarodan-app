@@ -39,6 +39,7 @@ const BULK_TITLE_KEY = {
   verify: "admin.users.bulkVerifyTitle",
   ban: "admin.users.bulkBanTitle",
   unban: "admin.users.bulkUnbanTitle",
+  delete: "admin.users.bulkDeleteTitle",
 } as const satisfies Record<UserAccountAction, MessageKey>;
 
 /** Aksiyon → buton/menü etiketi anahtarı (tekil ve toplu aynı kelime). */
@@ -47,6 +48,7 @@ export const ACTION_LABEL_KEY = {
   verify: "admin.users.verifyEmail",
   ban: "admin.users.banAction",
   unban: "admin.users.unbanAction",
+  delete: "admin.users.deleteAction",
 } as const satisfies Record<UserAccountAction, MessageKey>;
 
 /**
@@ -62,6 +64,7 @@ const BULK_REQUEST_MAX: Record<UserAccountAction, number> = {
   verify: 50,
   ban: 50,
   unban: 50,
+  delete: 50,
 };
 
 function callBulkChunk(
@@ -78,6 +81,8 @@ function callBulkChunk(
       return adminApi.bulkResendUserVerification(ids);
     case "verify":
       return adminApi.bulkVerifyUserEmail(ids);
+    case "delete":
+      return adminApi.bulkDeleteUsers(ids);
   }
 }
 
@@ -128,6 +133,10 @@ export function useUserActions() {
     (id: string) => adminApi.verifyUserEmail(id),
     { invalidates, successMessage: t("admin.users.emailVerifiedByAdmin") },
   );
+  const del = useAdminMutation((id: string) => adminApi.deleteUser(id), {
+    invalidates,
+    successMessage: t("admin.users.deleted"),
+  });
   const bulk = useAdminMutation(
     (v: { action: UserAccountAction; ids: string[]; reason?: string }) =>
       callBulk(v.action, v.ids, v.reason),
@@ -178,6 +187,15 @@ export function useUserActions() {
           onConfirm: () => verify.mutateAsync(id),
         });
         return;
+      case "delete":
+        await confirm({
+          title: t("admin.users.deleteTitle"),
+          description: t("admin.users.deleteConfirmDesc"),
+          confirmLabel: t("admin.users.deleteAction"),
+          destructive: true,
+          onConfirm: () => del.mutateAsync(id),
+        });
+        return;
     }
   };
 
@@ -205,7 +223,7 @@ export function useUserActions() {
       title: t(BULK_TITLE_KEY[action], { count: ids.length }),
       description: t(bulkConfirmDescriptionKey(action)),
       confirmLabel: t(ACTION_LABEL_KEY[action]),
-      destructive: action === "ban",
+      destructive: action === "ban" || action === "delete",
       onConfirm: () => bulk.mutateAsync({ action, ids, reason }),
     });
   };
@@ -221,7 +239,9 @@ export function useUserActions() {
           ? { id: resend.variables, action: "resend" }
           : verify.isPending && verify.variables
             ? { id: verify.variables, action: "verify" }
-            : undefined;
+            : del.isPending && del.variables
+              ? { id: del.variables, action: "delete" }
+              : undefined;
 
   return { runOne, runBulk, busy, isBulkPending: bulk.isPending };
 }

@@ -31,6 +31,38 @@
   API'den bağımsız acil yedek koddur. Erken erişim PIN'leri admin
   `System → Early Access`'ten yönetilir (unlock cookie 10 gün).
 
+### eLogo ortamı: demo ile canlı arasında "test bayrağı" yok
+
+eLogo'da PayTR/Sürat'taki gibi bir test modu yoktur; belgenin GİB'e gidip
+gitmediğini yalnız **host** belirler. Demo host'unda (`pb-demo.elogo.com.tr`)
+üretilen her belge sandbox'ta kalır: PDF'inde DEMO filigranı vardır, GİB'e
+ulaşmaz ve **yasal olarak kesilmemiş sayılır**. 2026-09'da canlı API bir dönem
+demo host'una bağlı kaldı; belgeler "sent" görünürken hiçbiri resmî değildi ve
+sandbox'taki XSLT tasarımı silinince tüm gönderimler düştü.
+
+API açılışta kilitler (`config/env.validation.ts`):
+
+| Ortam   | `ELOGO_SOAP_URL` host'u                                                       | `ELOGO_ENABLED`  |
+| ------- | ----------------------------------------------------------------------------- | ---------------- |
+| Canlı   | `pb.elogo.com.tr` ZORUNLU (`ELOGO_ALLOW_NON_LIVE_HOST=true` bilinçli istisna) | `true` zorunlu   |
+| Staging | `pb.elogo.com.tr` YASAK — test siparişleri GİB'e gerçek fatura keser          | `false` olabilir |
+
+Canlı env'i doğrulamak için konteynerde `pnpm smoke:elogo -- diagnose`
+(belge kesmez). Sandbox'ta üretilmiş belgeler varsa sıra:
+
+1. Env'i canlıya çevir (host, kimlik, canlı portala yüklenmiş tasarımın
+   `ELOGO_INVOICE_XSLT_UUID`'i ya da varsayılan tasarım için boş).
+2. Mali müşavirle numara kararı: canlı hesapta hiç belge yoksa sayaç sıfırlanır
+   (ilk belge `TRD<yıl>000000001`); yoksa GİB'de 1–N arası boşluk kalır.
+3. `pnpm elogo:reissue-demo:prod -- --before=<ortamın canlıya çevrildiği ISO an>`
+   önce dry-run; sonra `--apply` (gerekirse `--reset-sequence`). Script demo
+   belgeleri `cancelled/demo_environment` yapar, numarayı `DEMO-`, kaynağı
+   `demo:` önekiyle saklar ve yeniden kesimi outbox'a yazar (takas ücretleri
+   10 dk'lık cron'da kendiliğinden kesilir).
+4. Admin → Finans → Faturalar'da "Deneme Tükendi" kalan belgeler için
+   "Yeniden Dene". Tükenmiş belge alarmı belge başına günde bir kez admin
+   bildirimi + Sentry olayı üretir; çözülene kadar sonraki turlar yalnız warn'dır.
+
 ### Her API açılışında otomatik koşanlar
 
 `apps/api/entrypoint.sh` → `prisma migrate deploy` + `dist-seed/prisma/seed-production.js`.

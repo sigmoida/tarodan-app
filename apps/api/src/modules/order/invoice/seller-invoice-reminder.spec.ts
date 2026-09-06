@@ -120,6 +120,7 @@ describe("SellerInvoiceService.remindMissing", () => {
     expect(await svc.remindMissing({ deadlineDays: 7, now: NOW })).toEqual({
       missing: 0,
       reminded: 0,
+      missingOrders: [],
     });
   });
 

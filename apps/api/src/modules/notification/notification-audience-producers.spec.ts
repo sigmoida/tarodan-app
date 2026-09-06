@@ -47,35 +47,6 @@ describe("bildirim üreticileri hedef kitleyi taşır", () => {
       ).toBe("/seller/orders/o1");
     });
 
-    it("yönetici zorla tamamlama: alıcı ve satıcı AYRI ekrana gider", async () => {
-      const { send, service } = dispatchOf();
-      await service.notifyOrderForceCompletedByAdmin(
-        "u-buyer",
-        "o1",
-        "buyer",
-        "gerekçe",
-      );
-      await service.notifyOrderForceCompletedByAdmin(
-        "u-seller",
-        "o1",
-        "seller",
-        "gerekçe",
-      );
-
-      const [buyerCall, sellerCall] = send.mock.calls.map((c) => c[0]);
-      // `reason` audience'ın YERİNE geçmemeli (imza sırası değişti).
-      expect(buyerCall.data.reason).toBe("gerekçe");
-      expect(
-        linkOf(NotificationType.ORDER_FORCE_COMPLETED_BY_ADMIN, buyerCall.data),
-      ).toBe("/profile/orders/o1");
-      expect(
-        linkOf(
-          NotificationType.ORDER_FORCE_COMPLETED_BY_ADMIN,
-          sellerCall.data,
-        ),
-      ).toBe("/seller/orders/o1");
-    });
-
     it("satıcı onayı satıcı ekranına gider", async () => {
       const { send, service } = dispatchOf();
       await service.notifyOrderManuallyConfirmed("u-seller", "o1");

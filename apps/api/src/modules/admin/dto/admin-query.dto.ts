@@ -12,11 +12,17 @@ import { ApiPropertyOptional } from "@nestjs/swagger";
 import { Transform, Type } from "class-transformer";
 import {
   ProductStatus,
+  OrderOrigin,
   OrderStatus,
   MembershipTierType,
   SubscriptionStatus,
 } from "@prisma/client";
-import { ACCOUNT_STATUSES, type AccountStatus } from "@tarodan/types";
+import {
+  ACCOUNT_STATUSES,
+  LOGIN_STATES,
+  type AccountStatus,
+  type LoginState,
+} from "@tarodan/types";
 import { AdminListQueryDto } from "../../../common/list";
 
 export class AdminUserQueryDto extends AdminListQueryDto {
@@ -73,6 +79,16 @@ export class AdminUserQueryDto extends AdminListQueryDto {
   @IsInt()
   @Min(1)
   expiringInDays?: number;
+
+  /**
+   * Giriş durumu: `never` → hiç giriş yapmamışlar (`lastLoginAt` boş),
+   * `logged_in` → en az bir kez giriş yapmışlar. Kayıt olup hesabını hiç
+   * kullanmayanları ayıklamak için (davet/aktivasyon takibi).
+   */
+  @ApiPropertyOptional({ enum: LOGIN_STATES })
+  @IsOptional()
+  @IsIn(LOGIN_STATES)
+  loginState?: LoginState;
 }
 
 export class SellerApplicationQueryDto extends AdminListQueryDto {
@@ -129,6 +145,14 @@ export class AdminOrderQueryDto extends AdminListQueryDto {
   @IsOptional()
   @IsEnum(OrderStatus)
   status?: OrderStatus;
+
+  @ApiPropertyOptional({
+    enum: OrderOrigin,
+    description: "Sipariş kaynağı: doğrudan satış / teklif / platform hizmeti",
+  })
+  @IsOptional()
+  @IsEnum(OrderOrigin)
+  origin?: OrderOrigin;
 
   @ApiPropertyOptional({ example: "2024-01-01" })
   @IsOptional()

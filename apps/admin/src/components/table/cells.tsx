@@ -10,7 +10,7 @@ import {
 } from "@heroicons/react/24/outline";
 import { Avatar, IconButton } from "@tarodan/ui";
 import { cn } from "@/lib/utils";
-import { fmtDate, fmtDateTime, fmtNumber, fmtTry } from "@/lib/format";
+import { fmtDate, fmtDateTime, fmtNumber, fmtTime, fmtTry } from "@/lib/format";
 import { TruncatedText } from "./TruncatedText";
 
 /**
@@ -107,13 +107,25 @@ export function CellNumber({ value }: { value?: number | string | null }) {
   );
 }
 
-/** Short date — no wrap; full date+time on hover. */
-export function CellDate({ value }: { value?: string | number | Date | null }) {
+/**
+ * Short date — no wrap; full date+time on hover. `withTime` also prints the
+ * clock next to it (muted, so the date stays the thing you scan) for tables
+ * where the hour matters at a glance instead of only on hover.
+ */
+export function CellDate({
+  value,
+  withTime,
+}: {
+  value?: string | number | Date | null;
+  withTime?: boolean;
+}) {
   const text = fmtDate(value);
   if (text == null) return <Empty />;
+  const time = withTime ? fmtTime(value) : undefined;
   return (
     <span className="whitespace-nowrap text-body" title={fmtDateTime(value)}>
       {text}
+      {time && <span className="ml-1 tabular-nums text-muted">{time}</span>}
     </span>
   );
 }

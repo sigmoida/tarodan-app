@@ -2,7 +2,7 @@ import { Injectable, Optional, Logger } from "@nestjs/common";
 import { PrismaService } from "../../prisma";
 import { CacheService } from "../cache/cache.service";
 import { isPublicStorageKey, StorageService } from "../storage/storage.service";
-import { OrderStatus, OfferStatus } from "@prisma/client";
+import { OrderStatus, OfferStatus, PaymentStatus } from "@prisma/client";
 import { getAvailableQuantity } from "../product/helpers/product-availability.helper";
 import { sellerNetAmountOf } from "./helpers/order-net.helper";
 import { storedProductBaseOf } from "./helpers/order-charged-base.helper";
@@ -14,6 +14,27 @@ import { publicIdentityFields } from "../../common/helpers/public-identity";
  * alt servisleri ve facade buraya delege eder (admin split'teki ortak
  * AdminAuditService deseniyle aynı).
  */
+/**
+ * Yeniden ödemeye açılabilen sipariş = hiç ödenmemiş sipariş. Ödemesi
+ * tamamlanmış/iade edilmiş (tam iade → cancelled + stockRestoredAt) sipariş
+ * "Ödemeyi tamamla" ile ikinci kez tahsil edilmemeli. reactivate() ile aynı kural.
+ */
+export function isReactivatablePayment(order: {
+  stockRestoredAt?: Date | null;
+  payment?: { status?: PaymentStatus | string | null } | null;
+  checkoutGroup?: {
+    payment?: { status?: PaymentStatus | string | null } | null;
+  } | null;
+}): boolean {
+  if (order.stockRestoredAt) return false;
+  // Ödeme satırı siparişte ya da (grup ödemesi) çatı grupta — formatOrderResponse
+  // ile aynı geri dönüş sırası.
+  const status = order.payment?.status ?? order.checkoutGroup?.payment?.status;
+  return (
+    status !== PaymentStatus.completed && status !== PaymentStatus.refunded
+  );
+}
+
 @Injectable()
 export class OrderCommonService {
   private readonly logger = new Logger(OrderCommonService.name);
@@ -107,6 +128,7 @@ export class OrderCommonService {
     if (order.status !== OrderStatus.cancelled) return false;
     if (order.buyerId !== userId) return false;
     if (!order.offerId || !order.offer) return false;
+    if (!isReactivatablePayment(order)) return false;
     // `payment_expired` DE yeniden açılabilir — reactivate() bu iki statüyü
     // kabul eder ve 24 saatlik pencere cron'u teklifi HER ZAMAN
     // `payment_expired` yapar. Yalnız `accepted` arandığı için buton tam da
@@ -377,6 +399,7 @@ export class OrderCommonService {
       isSeller: order.sellerId === userId,
       ...(await this.getOrderRatingFlags(order, userId)),
       offerId: order.offerId ?? undefined,
+      origin: order.origin ?? undefined,
       payment: (() => {
         const p = order.payment ?? order.checkoutGroup?.payment ?? null;
         return p

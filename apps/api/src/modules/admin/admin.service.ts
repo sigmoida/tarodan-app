@@ -39,7 +39,6 @@ import {
   AdminTradeQueryDto,
   AdminMessageQueryDto,
   AdminShipmentQueryDto,
-  AdminRefundHistoryQueryDto,
   TradeShipmentQueryDto,
   RefundRequestQueryDto,
   ApproveRefundRequestDto,
@@ -51,7 +50,6 @@ import {
   UpdateAdminStaffDto,
   UpdateStaffSettingsDto,
   SetRolePermissionsDto,
-  ResolveDisputeDto,
   AnalyticsQueryDto,
   UpdateOrderStatusDto,
   AddOrderTrackingDto,
@@ -100,7 +98,6 @@ import {
   RefundReason,
 } from "@prisma/client";
 import { RefundService } from "../refund/refund.service";
-import { OrderService } from "../order/order.service";
 import { SuratTrackingService } from "../surat-cargo/sync/surat-tracking.service";
 
 @Injectable()
@@ -137,55 +134,8 @@ export class AdminService {
     private readonly reviewService: AdminReviewService,
     private readonly sellerApplicationService: AdminSellerApplicationService,
     @Optional()
-    private readonly orderService?: OrderService,
-    @Optional()
     private readonly suratTrackingService?: SuratTrackingService,
   ) {}
-
-  // ---------- Order 48h pencere admin müdahaleleri (Faz 3B.4) ----------
-
-  async forceCompleteOrder(
-    orderId: string,
-    adminId: string,
-    reason: string,
-  ): Promise<{ completed: boolean }> {
-    if (!this.orderService) {
-      throw new Error("OrderService not available");
-    }
-    const result = await this.orderService.forceComplete(
-      orderId,
-      adminId,
-      reason,
-    );
-    if (result.completed) {
-      await this.auditService.createAuditLog(
-        adminId,
-        "order_force_completed",
-        "Order",
-        orderId,
-        { status: OrderStatus.awaiting_buyer_confirmation },
-        { status: OrderStatus.completed, reason },
-      );
-    }
-    return result;
-  }
-
-  async extendOrderConfirmation(
-    orderId: string,
-    adminId: string,
-    hours: number,
-    reason?: string,
-  ): Promise<{ newDeadline: Date }> {
-    if (!this.orderService) {
-      throw new Error("OrderService not available");
-    }
-    return this.orderService.extendConfirmation(
-      orderId,
-      adminId,
-      hours,
-      reason,
-    );
-  }
 
   async approveRefundRequest(
     adminId: string,
@@ -407,6 +357,14 @@ export class AdminService {
     return this.userAccountService.bulkVerifyEmail(adminId, ids);
   }
 
+  deleteNeverLoggedInUser(adminId: string, userId: string) {
+    return this.userAccountService.deleteNeverLoggedIn(adminId, userId);
+  }
+
+  bulkDeleteNeverLoggedInUsers(adminId: string, ids: string[]) {
+    return this.userAccountService.bulkDeleteNeverLoggedIn(adminId, ids);
+  }
+
   // ==================== PRODUCT MANAGEMENT ====================
   // Taşındı: admin-product.service.ts — imzalar aynen korunuyor (facade delege).
 
@@ -483,21 +441,9 @@ export class AdminService {
     return this.adminOrderService.getOrders(query);
   }
 
-  async getDisputedOrders(query: AdminOrderQueryDto) {
-    return this.adminOrderService.getDisputedOrders(query);
-  }
-
-  async resolveDispute(
-    adminId: string,
-    orderId: string,
-    dto: ResolveDisputeDto,
-  ) {
-    return this.adminOrderService.resolveDispute(adminId, orderId, dto);
-  }
-
   // ==================== ANALYTICS & REPORTS ====================
   // Taşındı: admin-analytics.service.ts — imzalar aynen korunuyor (facade delege).
-  // Not: getOrderById, updateOrderStatus, addOrderTracking, sendOrderNotification,
+  // Not: getOrderById, updateOrderStatus, addOrderTracking,
   // generateOrderInvoice, unbanUser, getRecentOrders, getPendingActions da bu
   // banner aralığında olduğu için bölümle birlikte taşındı. getDateKey private
   // yardımcısı yalnız bu bölümde kullanılıyordu, o da taşındı.
@@ -544,17 +490,6 @@ export class AdminService {
     dto: AddOrderTrackingDto,
   ) {
     return this.analyticsService.addOrderTracking(adminId, orderId, dto);
-  }
-
-  async sendOrderNotification(
-    adminId: string,
-    orderId: string,
-    dto: {
-      type: "status_update" | "shipped" | "delivered" | "custom";
-      message?: string;
-    },
-  ) {
-    return this.analyticsService.sendOrderNotification(adminId, orderId, dto);
   }
 
   async generateOrderInvoice(orderId: string) {
@@ -766,10 +701,6 @@ export class AdminService {
       attemptId,
       dto,
     );
-  }
-
-  async getRefundHistory(query: AdminRefundHistoryQueryDto) {
-    return this.adminPaymentService.getRefundHistory(query);
   }
 
   async forceCancelPayment(adminId: string, paymentId: string, reason: string) {
@@ -1849,7 +1780,7 @@ export class AdminService {
 
   // ==================== SELLER APPLICATIONS ====================
   // Taşındı: admin-seller-application.service.ts — imzalar aynen korunuyor (facade delege).
-  // Not: updateUserRatingStatus ve applyOrderCoupon da bu banner aralığında
+  // Not: updateUserRatingStatus da bu banner aralığında
   // olduğu için bölümle birlikte taşındı.
 
   async getSellerApplications(query: SellerApplicationQueryDto) {
@@ -1911,18 +1842,6 @@ export class AdminService {
       adminId,
       ratingId,
       status,
-    );
-  }
-
-  async applyOrderCoupon(
-    orderId: string,
-    adminId: string,
-    code: string | null,
-  ) {
-    return this.sellerApplicationService.applyOrderCoupon(
-      orderId,
-      adminId,
-      code,
     );
   }
 }

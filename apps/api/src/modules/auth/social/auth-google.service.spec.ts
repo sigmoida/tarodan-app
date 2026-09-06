@@ -144,6 +144,55 @@ describe("AuthService.loginWithGoogle", () => {
     );
   });
 
+  it("rejects a staff (AdminUser) account with STAFF_ACCOUNT before issuing tokens", async () => {
+    google.verifyIdToken.mockResolvedValue({
+      sub: "g1",
+      email: "a@b.com",
+      name: "Ali",
+    });
+    prisma.oAuthAccount.findUnique.mockResolvedValue({
+      id: "oa1",
+      userId: "u1",
+    });
+    prisma.user.findUnique.mockResolvedValue({
+      ...baseUser,
+      adminUser: { id: "admin-1" },
+    });
+
+    await expect(service.loginWithGoogle("tok")).rejects.toMatchObject({
+      response: {
+        i18nKey: "server.auth.staffAccountCustomerLogin",
+        errorCode: "STAFF_ACCOUNT",
+      },
+    });
+    expect(prisma.refreshToken.create).not.toHaveBeenCalled();
+  });
+
+  it("stamps lastLoginAt/lastActivityAt like password login", async () => {
+    google.verifyIdToken.mockResolvedValue({
+      sub: "g1",
+      email: "a@b.com",
+      name: "Ali",
+    });
+    prisma.oAuthAccount.findUnique.mockResolvedValue({
+      id: "oa1",
+      userId: "u1",
+    });
+    prisma.user.findUnique.mockResolvedValue(baseUser);
+
+    await service.loginWithGoogle("tok");
+
+    expect(prisma.user.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: "u1" },
+        data: expect.objectContaining({
+          lastLoginAt: expect.any(Date),
+          lastActivityAt: expect.any(Date),
+        }),
+      }),
+    );
+  });
+
   it("auto-links to existing user with same email", async () => {
     google.verifyIdToken.mockResolvedValue({
       sub: "g1",

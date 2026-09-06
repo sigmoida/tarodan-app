@@ -912,29 +912,19 @@ export class OrderCheckoutGroupService {
               buyer: decision.buyer,
               seller: decision.seller,
             };
-            const pkg = await tx.orderPackage.create({
-              data: {
-                packageNumber:
-                  await this.checkoutCommon.generatePackageNumber(),
-                checkoutGroupId: group.id,
+            const pkg = await this.checkoutCommon.createSingleSellerPackage(
+              tx,
+              {
                 sellerId,
                 buyerId,
-                shippingCost: bd.buyer,
-                shippingTariffId: shippingTariff.tariffId,
-                shippingTariffVersion: shippingTariff.tariffVersion,
+                checkoutGroupId: group.id,
                 billableDesi: sellerDesi.get(sellerId) ?? 1,
-                shippingPricingSnapshot: {
-                  provider: shippingTariff.tariff.provider ?? "surat",
-                  tariffId: shippingTariff.tariffId,
-                  tariffVersion: shippingTariff.tariffVersion,
-                  billableDesi: sellerDesi.get(sellerId) ?? 1,
-                  fullShippingAmount: bd.full,
-                },
+                shippingTariff,
                 fullShippingAmount: bd.full,
                 buyerShippingAmount: bd.buyer,
                 sellerShippingAmount: bd.seller,
               },
-            });
+            );
             packageBySeller.set(sellerId, pkg.id);
           }
 

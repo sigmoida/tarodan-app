@@ -1,14 +1,14 @@
-'use client';
+"use client";
 
-import { useSuspenseQuery } from '@tanstack/react-query';
-import { isNotFoundError } from '@/lib/error';
-import { adminKeys } from '@/lib/query/keys';
+import { useSuspenseQuery } from "@tanstack/react-query";
+import { isNotFoundError } from "@/lib/error";
+import { adminKeys } from "@/lib/query/keys";
 
 export interface UseAdminItemOptions<T> {
   /** Resource name — must match the list's resource so invalidation hits both. */
   resource: string;
   id: string;
-  /** Fetches (and unwraps) the item, e.g. `(id) => adminApi.getOrder(id).then(r => r.data)`. */
+  /** Fetches (and unwraps) the item, e.g. `(id) => adminApi.getOrderFile(id).then(r => r.data)`. */
   fetcher: (id: string) => Promise<T>;
 }
 
@@ -19,7 +19,11 @@ export interface UseAdminItemOptions<T> {
  * state instead of entering the retry boundary. Keyed with the shared
  * `[resource, 'detail', id]` convention.
  */
-export function useAdminItem<T>({ resource, id, fetcher }: UseAdminItemOptions<T>) {
+export function useAdminItem<T>({
+  resource,
+  id,
+  fetcher,
+}: UseAdminItemOptions<T>) {
   const query = useSuspenseQuery({
     queryKey: adminKeys.detail(resource, id),
     queryFn: async () => {

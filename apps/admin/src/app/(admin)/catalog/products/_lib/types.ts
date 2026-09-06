@@ -1,6 +1,6 @@
 import { productStatusConfig, type StatusConfig } from "@tarodan/ui";
 import { useTranslations } from "next-intl";
-import { statusFilterOptions } from "@/lib/utils";
+import { statusLabel } from "@/lib/statusLabels";
 
 type T = ReturnType<typeof useTranslations<never>>;
 
@@ -88,14 +88,39 @@ export function mapProducts(raw: any[], t: T): Product[] {
   }));
 }
 
-/** Status filter options derived from productStatusConfig (badge-consistent). */
-export const getProductStatusOptions = (t: T) =>
-  statusFilterOptions(productStatusConfig, t, {
-    allLabel: t("admin.catalog.products.allProducts"),
-  });
+/** AI Denetim sekmesinin anahtarı (durum sekmelerinin yanında durur). */
+export const AI_TAB = "ai";
 
-/** list ↔ AI moderation tabs (shared by the list and the AI branch). */
-export const getProductTabs = (t: T) => [
-  { key: "list", label: t("admin.catalog.products.title") },
-  { key: "ai", label: t("admin.catalog.common.aiModeration") },
+/** Durum sekmelerinin sırası: operasyon önceliğine göre (onay bekleyen önde). */
+export const PRODUCT_STATUS_TABS = [
+  "active",
+  "pending",
+  "reserved",
+  "sold",
+  "inactive",
+  "suspended",
+  "rejected",
+  "deleted",
+] as const;
+export type ProductStatusTab = (typeof PRODUCT_STATUS_TABS)[number];
+
+export function isProductStatusTab(value: string): value is ProductStatusTab {
+  return (PRODUCT_STATUS_TABS as readonly string[]).includes(value);
+}
+
+/**
+ * Sekmeler = ürün durumları (etiketler rozetle aynı haritadan) + AI Denetim.
+ * Durum artık kolon/filtre değil, sekmedir; `counts` "(n)" olarak yazılır.
+ */
+export const getProductTabs = (
+  t: T,
+  counts: Partial<Record<ProductStatusTab, number | undefined>> = {},
+) => [
+  ...PRODUCT_STATUS_TABS.map((value) => ({
+    key: value,
+    label: `${statusLabel(productStatusConfig, value, t)} (${
+      counts[value] ?? "…"
+    })`,
+  })),
+  { key: AI_TAB, label: t("admin.catalog.common.aiModeration") },
 ];

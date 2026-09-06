@@ -4,8 +4,17 @@ import { useTranslations } from "next-intl";
 import { Button } from "@tarodan/ui";
 import { useResourceList } from "@/components/list";
 
-/** List header description: total count + active deep-link filter notice. */
-export function OrdersSummary() {
+/**
+ * List header description: total count + active deep-link filter notice
+ * (productId / userId gelen linkler için "filtreyi kaldır" chip'i). Sipariş ve
+ * teklif sekmeleri aynı bileşeni kullanır.
+ */
+export function DeepLinkFilterSummary({
+  totalLabel,
+}: {
+  /** Omit to render only the deep-link chip (e.g. under a tab bar). */
+  totalLabel?: (count: number) => string;
+}) {
   const t = useTranslations();
   const { total, filters, setFilter, rows } = useResourceList<any>();
 
@@ -23,9 +32,10 @@ export function OrdersSummary() {
       ? t("admin.operations.common.filteringByUser")
       : null;
 
+  if (!totalLabel && !deepLinkFilterLabel) return null;
   return (
     <>
-      {t("admin.operations.orders.totalCount", { count: total })}
+      {totalLabel?.(total)}
       {deepLinkFilterLabel && (
         <span className="ml-2">
           — {deepLinkFilterLabel}

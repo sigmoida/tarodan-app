@@ -27,4 +27,15 @@ export const OFFER_CANCEL_REASON = {
   supersededBySellerCounter: "Satıcı karşı teklif verdiği için kapatıldı",
   supersededByBuyerCounter: "Alıcı yeni teklif verdiği için kapatıldı",
   listingDeleted: "İlan satıcı tarafından kaldırıldığı için teklif kapatıldı",
+  /**
+   * Tam iade sonrası teklif `accepted` kalmasın: sipariş yeniden ödemeye
+   * (reactivate) açılabiliyordu. Migration 20260902100000 aynı metni yazar.
+   */
+  orderRefunded: "Bağlı sipariş iade edildiği için teklif kapatıldı",
+  accountBanned: "Hesap askıya alındığı için teklif kapatıldı",
 } as const;
+
+/** Yönetici iptali: serbest gerekçe sabit önekle saklanır; ekranlar öneki tanır. */
+export const OFFER_ADMIN_CANCEL_PREFIX = "Yönetici tarafından iptal edildi";
+export const offerAdminCancelReason = (reason: string): string =>
+  `${OFFER_ADMIN_CANCEL_PREFIX}: ${reason.trim()}`;

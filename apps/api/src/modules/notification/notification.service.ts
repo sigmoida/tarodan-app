@@ -50,6 +50,16 @@ export class NotificationService {
     return this.dispatch.notifyAllAdmins(type, data);
   }
 
+  /** Aynı `key` için `ttlSeconds` içinde tek admin alarmı; yeni alarmsa `true`. */
+  async notifyAllAdminsOnce(
+    key: string,
+    ttlSeconds: number,
+    type: NotificationType,
+    data?: Record<string, unknown>,
+  ): Promise<boolean> {
+    return this.dispatch.notifyAllAdminsOnce(key, ttlSeconds, type, data);
+  }
+
   async registerPushToken(userId: string, dto: RegisterPushTokenDto) {
     return this.dispatch.registerPushToken(userId, dto);
   }
@@ -154,21 +164,6 @@ export class NotificationService {
     return this.commerce.notifyCouponReturned(userId, code);
   }
 
-  /** `audience` ZORUNLU: aynı bildirim iki tarafa da gidiyor. */
-  async notifyOrderForceCompletedByAdmin(
-    userId: string,
-    orderId: string,
-    audience: NotificationAudience,
-    reason?: string,
-  ) {
-    return this.commerce.notifyOrderForceCompletedByAdmin(
-      userId,
-      orderId,
-      audience,
-      reason,
-    );
-  }
-
   async notifySellerDidNotShipRefunded(buyerId: string, orderId: string) {
     return this.commerce.notifySellerDidNotShipRefunded(buyerId, orderId);
   }
@@ -236,6 +231,18 @@ export class NotificationService {
       _productTitle,
       _categoryId,
     );
+  }
+
+  async notifyOfferCancelledByAdmin(
+    userId: string,
+    data: {
+      offerId: string;
+      productId: string;
+      productTitle: string;
+      reason: string;
+    },
+  ) {
+    return this.commerce.notifyOfferCancelledByAdmin(userId, data);
   }
 
   async notifyOfferCancelledOutOfStock(

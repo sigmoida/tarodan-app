@@ -49,7 +49,6 @@ import { CurrentUser } from "../../auth/decorators/current-user.decorator";
 import { AdminRoute } from "../../auth/decorators/admin-route.decorator";
 import { Public } from "../../auth/decorators/public.decorator";
 import { AdminRole } from "@prisma/client";
-import { ForceCompleteOrderDto, ExtendConfirmationDto } from "../../order/dto";
 import {
   CreateCommissionRuleDto,
   UpdateCommissionRuleDto,
@@ -70,7 +69,6 @@ import {
   UpdateAdminStaffDto,
   UpdateStaffSettingsDto,
   SetRolePermissionsDto,
-  ResolveDisputeDto,
   AnalyticsQueryDto,
   UpdateOrderStatusDto,
   ReportQueryDto,
@@ -172,6 +170,33 @@ export class AdminUserController {
     @Body() dto: BulkUserIdsDto,
   ) {
     return this.adminService.bulkVerifyUserEmail(adminId, dto.ids);
+  }
+
+  @Post("users/bulk/delete")
+  @Roles(AdminRole.super_admin, AdminRole.admin)
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary:
+      "Delete several never-logged-in users (anonymize); others are skipped",
+  })
+  async bulkDeleteNeverLoggedInUsers(
+    @CurrentUser("id") adminId: string,
+    @Body() dto: BulkUserIdsDto,
+  ) {
+    return this.adminService.bulkDeleteNeverLoggedInUsers(adminId, dto.ids);
+  }
+
+  @Delete("users/:id")
+  @Roles(AdminRole.super_admin, AdminRole.admin)
+  @ApiOperation({
+    summary: "Delete a user that never logged in (anonymize); 400 otherwise",
+  })
+  @ApiParam({ name: "id", description: "User ID" })
+  async deleteNeverLoggedInUser(
+    @CurrentUser("id") adminId: string,
+    @Param("id") id: string,
+  ) {
+    return this.adminService.deleteNeverLoggedInUser(adminId, id);
   }
 
   @Post("users/:id/resend-verification")

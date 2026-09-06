@@ -5091,6 +5091,7 @@
         "quickLinks": "Hızlı Linkler",
         "viewSeller": "Satıcıyı Görüntüle",
         "viewOrders": "Siparişleri Görüntüle",
+        "viewOffers": "Teklifler ({count})",
         "categoryLabel": "Kategori: {name}",
         "aiFlagged": "Uygunsuz",
         "aiReview": "İnceleme",
@@ -6009,6 +6010,7 @@
           "membership": "Üyelik",
           "boost": "Öne Çıkarma",
           "tradeCommission": "Takas Komisyonu",
+          "tradeServiceFee": "Takas Hizmet Bedeli",
           "platformSale": "Platform Satışı",
           "returnInvoice": "İade Faturası"
         },
@@ -6382,12 +6384,55 @@
         "saving": "Kaydediliyor",
         "errorOccurred": "Hata oluştu"
       },
+      "offers": {
+        "title": "Teklifler",
+        "totalCount": "{count} teklif",
+        "empty": "Henüz teklif yok",
+        "emptyFiltered": "Filtreye uyan teklif yok",
+        "listPrice": "Liste fiyatı",
+        "listPriceShort": "Liste: {price}",
+        "percentOfList": "liste fiyatının %{pct}'i",
+        "awaitingBuyer": "Alıcı yanıtı bekleniyor",
+        "awaitingSeller": "Satıcı yanıtı bekleniyor",
+        "turn": "Sıra",
+        "linkedOrder": "Bağlı sipariş",
+        "noOrder": "Sipariş yok",
+        "noOrderYet": "Teklif kabul edilmediği için sipariş oluşmadı",
+        "paymentStatus": "Ödeme durumu",
+        "noPayment": "Ödeme başlatılmadı",
+        "expiresAt": "Son geçerlilik",
+        "message": "Mesaj",
+        "detailTitle": "Teklif · {product}",
+        "notFound": "Teklif bulunamadı",
+        "summaryTitle": "Teklif bilgileri",
+        "chainTitle": "Pazarlık geçmişi",
+        "chainNote": "Karşı teklifler yeni kayıt açar; önceki tur \"reddedildi\" olarak kapanır.",
+        "chainActor": {
+          "buyer": "Alıcı",
+          "seller": "Satıcı"
+        },
+        "chainCurrent": "Bu kayıt",
+        "productOffersTitle": "Bu ürüne verilen diğer teklifler ({count})",
+        "noOtherOffers": "Bu ürüne başka teklif verilmemiş",
+        "viewAllForProduct": "Ürünün tüm teklifleri",
+        "competingAccepted": "{count} kabul edilmiş teklif var — ürünü ilk ödeyen alır",
+        "competingPending": "{count} ödeme bekleyen sipariş",
+        "productSold": "Ürün satıldı:",
+        "productStock": "Stok: {quantity} · Rezerve: {reserved}",
+        "cancel": "Teklifi iptal et",
+        "cancelTitle": "Teklifi iptal et",
+        "cancelDescription": "Teklif kapatılır; alıcı ve satıcıya gerekçeyle bildirim gider.",
+        "cancelReason": "İptal gerekçesi",
+        "cancelReasonPlaceholder": "Neden iptal ediliyor? (zorunlu)",
+        "cancelWillCancelOrder": "Bağlı ödeme bekleyen sipariş de iptal edilecek.",
+        "cancelled": "Teklif iptal edildi",
+        "cancelFailed": "Teklif iptal edilemedi"
+      },
       "orders": {
         "title": "Siparişler",
         "loadError": "Siparişler yüklenemedi",
         "empty": "Henüz sipariş yok",
         "emptyFiltered": "Filtreye uygun sipariş bulunamadı",
-        "totalCount": "Toplam {count} sipariş grubu",
         "filteringByProduct": "Ürüne göre filtreleniyor",
         "filteringByProductNamed": "Ürüne göre filtreleniyor: {title}",
         "orderNumber": "Sipariş No",
@@ -6417,6 +6462,13 @@
         "groupDone": "Bitti",
         "groupOngoing": "Devam ediyor",
         "originCancellation": "{origin} iptali",
+        "pageDescription": "Satın alma siparişleri ve ürünlere verilen teklifler",
+        "tabs": {
+          "directSale": "Doğrudan Satış",
+          "acceptedOffers": "Kabul Edilen Teklifler"
+        },
+        "amountCommission": "Tutar / Komisyon",
+        "commissionShort": "Komisyon",
         "updateStatus": "Durum Güncelle",
         "newStatus": "Yeni Durum",
         "statusChangeReason": "Manuel İşlem Gerekçesi",
@@ -6582,6 +6634,7 @@
         }
       },
       "trades": {
+        "cashPayer": "Nakit / Ödeyen",
         "title": "Takaslar",
         "loadError": "Takaslar yüklenemedi",
         "empty": "Takas bulunamadı",
@@ -6732,6 +6785,8 @@
         "faultySideNeither": "Ürün kaynaklı değil (operasyonel red)"
       },
       "refundRequests": {
+        "amountAndFee": "Tutar / Kesinti",
+        "feeShort": "Kesinti",
         "title": "İade Takibi",
         "description": "Devam eden iadeler — otomatik akış izlenir; yalnız istisnai durumlarda admin müdahalesi gerekir",
         "loadError": "İade talepleri yüklenemedi",
@@ -6922,16 +6977,6 @@
         "chargeOutboundToSeller": "Gidiş kargosu borcu (satıcıya)",
         "sellerShippingCompensation": "Kargo payı tazmini (satıcıya iade)"
       },
-      "refunds": {
-        "title": "İade Geçmişi",
-        "description": "Tamamlanmış iadeler",
-        "loadError": "İade geçmişi yüklenemedi",
-        "empty": "İade bulunamadı",
-        "colId": "ID",
-        "refundedAt": "İade Tarihi",
-        "refundNumber": "İade No",
-        "refundedFee": "İade Edilen Kesinti"
-      },
       "shipping": {
         "title": "Kargo İşlemleri",
         "description": "Tüm kargo işlemleri — sipariş, takas ve iade gönderilerini tek yerden takip edin",
@@ -6979,13 +7024,10 @@
           "empty": "Gönderi bulunamadı",
           "unit": "gönderi",
           "shipment": "Gönderi",
-          "products": "Ürünler",
           "carrierAndTracking": "Kargo ve Takip",
           "packageSummary": "{orders} sipariş · {products} ürün",
           "productSummary": "{products} ürün · {quantity} adet",
           "contentsTitle": "Paket İçeriği",
-          "showContents": "Paket içeriğini göster",
-          "hideContents": "Paket içeriğini gizle",
           "carrierPending": "Kargo bekleniyor",
           "carrierSurat": "Sürat Kargo",
           "trackingPending": "Takip numarası bekleniyor",
@@ -7247,6 +7289,45 @@
         "requestId": "Talep ID",
         "userId": "Kullanıcı ID",
         "resolution": "Dönüş/Çözüm"
+      },
+      "detail": {
+        "notFound": "Şikayet bulunamadı",
+        "active": "Aktif",
+        "banned": "Askıya alınmış",
+        "accountStatus": "Hesap durumu",
+        "userDescription": "Kullanıcının açıklaması",
+        "resolvedAt": "Sonuçlandırıldı",
+        "sellerLabel": "Satıcı",
+        "targetDeleted": "İçerik silinmiş veya erişilemiyor",
+        "ownerLabel": "Sahibi",
+        "noAdminNote": "Henüz açıklama iletilmedi",
+        "senderLabel": "Gönderen",
+        "reportInfo": "Şikayet Bilgisi",
+        "targetTitle": "Şikayet Edilen İçerik",
+        "messageContent": "Mesaj içeriği",
+        "reportedAt": "Bildirildi",
+        "noDescription": "Açıklama girilmemiş",
+        "openTarget": "İçeriği aç",
+        "reporterTitle": "Şikayet Eden",
+        "adminNote": "Kullanıcıya iletilen açıklama",
+        "listingStatus": "İlan durumu"
+      },
+      "statusModal": {
+        "noteHelp": "Şikayeti \"Çözüldü\" ya da \"Reddedildi\" olarak kapattığınızda bu metin şikayet edene bildirim ve e-posta olarak iletilir.",
+        "title": "Şikayeti sonuçlandır",
+        "updated": "Şikayet güncellendi",
+        "newStatus": "Yeni durum",
+        "notePlaceholder": "Kararınızı şikayet eden kullanıcıya kısaca açıklayın",
+        "noteLabel": "Kullanıcıya iletilecek açıklama"
+      },
+      "actions": {
+        "removeListing": "İlanı yayından kaldır",
+        "removeListingReason": "İlanın neden kaldırıldığını yazın — satıcıya bu gerekçe iletilir",
+        "banUserReason": "Askıya alma gerekçesi",
+        "banUser": "Kullanıcıyı askıya al",
+        "listingRemoved": "İlan yayından kaldırıldı",
+        "userBanned": "Kullanıcı askıya alındı",
+        "updateStatus": "Şikayeti sonuçlandır"
       }
     },
     "earlyAccess": {
@@ -7549,14 +7630,19 @@
       "loadError": "Kullanıcılar yüklenemedi",
       "empty": "Kullanıcı bulunamadı",
       "totalCount": "Toplam <value>{count}</value> kullanıcı",
-      "filterAll": "Tüm Kullanıcılar",
-      "filterSellers": "Satıcılar",
-      "filterBuyers": "Alıcılar",
       "banned": "Kullanıcı engellendi",
       "unbanned": "Kullanıcı engeli kaldırıldı",
       "banTitle": "Kullanıcıyı Engelle",
       "banReasonLabel": "Engelleme sebebi (isteğe bağlı)",
       "banDefaultReason": "Admin tarafından engellendi",
+      "deleteAction": "Sil",
+      "deleteTitle": "Kullanıcıyı sil",
+      "deleteConfirmDesc": "Bu hesap hiç giriş yapmamış. Hesap anonimleştirilerek silinecek; bu işlem geri alınamaz.",
+      "deleted": "Kullanıcı silindi",
+      "bulkDeleteTitle": "{count} kullanıcıyı sil",
+      "bulkDeleteConfirmDesc": "Yalnız hiç giriş yapmamış hesaplar silinir; diğer seçili satırlar atlanır. Bu işlem geri alınamaz.",
+      "staffAccountNotice": "Bu hesap personel hesabı (rol: {role}). Kullanıcı aksiyonları kapalıdır; hesap Personel ekranından yönetilir.",
+      "staffAccountLink": "Personel ekranına git",
       "banAction": "Engelle",
       "unbanAction": "Engeli Kaldır",
       "columnUser": "Kullanıcı",
@@ -7659,9 +7745,6 @@
         "blocksReceivedTitle": "Onu Engelleyenler",
         "blocksEmpty": "Engelleme kaydı yok"
       },
-      "columnUserType": "Kullanıcı Türü",
-      "userTypeBuyer": "Alıcı",
-      "filterAccountStatusAll": "Tüm Durumlar",
       "unbanConfirmDesc": "Bu kullanıcının engelini kaldırmak istediğinizden emin misiniz?",
       "resendVerification": "Aktivasyon Maili Gönder",
       "verifyEmail": "Manuel Aktive Et",
@@ -7683,7 +7766,9 @@
       "bulkNoneEligible": "Seçimde bu işleme uygun kullanıcı yok",
       "bulkResendQueued": "{ok} kullanıcının aktivasyon maili kuyruğa alındı",
       "bulkResendQueuedPartial": "{ok} kuyruğa alındı, {failed} başarısız",
-      "bulkResendConfirmDesc": "Aktivasyon mailleri arka planda kuyruktan gönderilir; sonucu e-posta loglarından izleyebilirsiniz. Uygun olmayan satırlar atlanır. Devam edilsin mi?"
+      "bulkResendConfirmDesc": "Aktivasyon mailleri arka planda kuyruktan gönderilir; sonucu e-posta loglarından izleyebilirsiniz. Uygun olmayan satırlar atlanır. Devam edilsin mi?",
+      "filterLoginStateAll": "Tüm Giriş Durumları",
+      "filterLoggedIn": "Giriş Yapmış"
     },
     "roles": {
       "title": "Roller ve İzinler",
@@ -7787,10 +7872,6 @@
         "refundRequests": {
           "label": "İade Talepleri",
           "description": "İade talep listesi, detay görüntüleme, onaylama ve reddetme."
-        },
-        "refundHistory": {
-          "label": "İade Geçmişi",
-          "description": "Tamamlanmış iade kayıtları ve geçmiş liste."
         },
         "products": {
           "label": "Ürünler",
@@ -7964,6 +8045,11 @@
           "description": "Tüm siparişleri görüntüleyin ve yönetin",
           "keywords": "order"
         },
+        "offers": {
+          "name": "Teklifler",
+          "description": "Ürünlere verilen teklifleri ve pazarlıkları takip edin",
+          "keywords": "teklif,offer,pazarlık"
+        },
         "trades": {
           "name": "Takaslar",
           "description": "Ürün takas taleplerini takip edin ve yönetin",
@@ -7978,11 +8064,6 @@
           "name": "İade Takibi",
           "description": "Açık iade taleplerini inceleyin ve sonuçlandırın",
           "keywords": "iade,refund,talep,takip"
-        },
-        "refundHistory": {
-          "name": "İade Geçmişi",
-          "description": "Tamamlanmış iade işlemlerinin geçmişi",
-          "keywords": "iade,refund,geçmiş"
         },
         "products": {
           "name": "Ürünler",
@@ -8315,7 +8396,6 @@
           "active": "Aktiflik",
           "membershipTier": "Üyelik katmanı",
           "lifecycle": "Üyelik durumu",
-          "userType": "Kullanıcı türü",
           "package": "Paket",
           "severity": "Önem düzeyi",
           "resolved": "Çözüm durumu",
@@ -8323,7 +8403,7 @@
           "action": "İşlem",
           "entityType": "Varlık türü",
           "shipmentLeg": "Gönderi yönü",
-          "accountStatus": "Hesap durumu"
+          "loginState": "Giriş durumu"
         }
       },
       "bulkActionBar": {
@@ -8340,11 +8420,19 @@
         "paymentExpired": "Ödeme süresi doldu",
         "buyerCancelled": "Alıcı iptal etti",
         "sellerMissedShipping": "Satıcı kargolamadı",
-        "deadlineExpired": "Süre doldu"
+        "deadlineExpired": "Süre doldu",
+        "supersededBySellerCounter": "Satıcı karşı teklif verdi",
+        "supersededByBuyerCounter": "Alıcı yeni teklif verdi",
+        "orderCancelled": "Bağlı sipariş iptal edildi",
+        "orderRefunded": "Bağlı sipariş iade edildi",
+        "listingDeleted": "İlan kaldırıldı",
+        "accountBanned": "Hesap askıya alındı",
+        "adminCancelled": "Yönetici iptal etti"
       },
       "orderOrigin": {
         "offer": "Teklif",
-        "directSale": "Doğrudan Satış"
+        "directSale": "Doğrudan Satış",
+        "platformService": "Platform Hizmeti"
       },
       "rateRange": "Oran {min} ile {max} arasında olmalı",
       "rowActions": {
@@ -8454,10 +8542,6 @@
         "title": "Alıcı siparişini onayladı",
         "message": "Alıcı siparişi onayladı. Ödemeniz, teslimden 14 gün sonra (iade süresi dolunca) hesabınıza aktarılır."
       },
-      "orderForceCompletedByAdmin": {
-        "title": "Sipariş yönetici tarafından tamamlandı",
-        "message": "Bir yönetici siparişini manuel olarak tamamladı."
-      },
       "sellerDidNotShipRefunded": {
         "title": "Sipariş iptal edildi",
         "message": "Satıcı belirlenen süre içinde kargoya vermediği için sipariş iptal edildi ve tam iade işlemi başlatıldı."
@@ -8497,6 +8581,10 @@
       "offerPaymentExpired": {
         "title": "Ödeme Süresi Doldu",
         "message": "{productTitle} için 24 saatlik ödeme süreniz doldu ve sipariş kapandı. Ürün hâlâ uygunsa siparişi yeniden açıp ödeyebilirsiniz."
+      },
+      "offerCancelledByAdmin": {
+        "title": "Teklif yönetici tarafından iptal edildi",
+        "message": "{productTitle} için teklif yönetici tarafından iptal edildi: {reason}"
       },
       "offerCancelledOutOfStock": {
         "title": "Teklifiniz iptal edildi: ürün stokta kalmadı",
@@ -8686,6 +8774,14 @@
         "title": "Kargoda Takılı Sipariş — Yönetim Gerekli",
         "message": "{orderNumber} siparişi uzun süredir kargoda ve taşıyıcıdan teslim bilgisi gelmedi; teslim işlenmediği için satıcı ödemesi askıda."
       },
+      "elogoInvoiceExhausted": {
+        "title": "e-Fatura Gönderimi Tıkandı — Yönetim Gerekli",
+        "message": "{invoiceNumber} numaralı {typeLabel} belgesi eLogo'ya gönderilemedi ve deneme hakkı tükendi: {reason}. Yasal süre işliyor; nedeni giderip Faturalar ekranından \"Yeniden Dene\" ile gönderin."
+      },
+      "sellerInvoiceMissing": {
+        "title": "Satıcı Faturası Yüklenmedi",
+        "message": "{orderNumber} siparişi teslim edileli {deadlineDays} günü geçti, kurumsal satıcı ürün faturasını hâlâ yüklemedi. Satıcı hatırlatıldı; operasyon takibi gerekiyor."
+      },
       "offerAutoRejected": {
         "title": "Teklifiniz Kapatıldı",
         "message": "{cancelReason}"
@@ -8773,12 +8869,17 @@
       "orderShipmentDelayed": {
         "title": "Kargonuz beklenenden uzun sürüyor",
         "message": "Kargonuzda bir süredir hareket görünmüyor. Ekibimiz taşıyıcıyla durumu takip ediyor; sizin bir işlem yapmanıza gerek yok."
+      },
+      "reportResolved": {
+        "message": "{type, select, product {Bir ilan hakkındaki} collection {Bir koleksiyon hakkındaki} message {Bir mesaj hakkındaki} other {Bir kullanıcı hakkındaki}} şikayetiniz incelendi ve {status, select, dismissed {işleme alınmadı} other {sonuçlandırıldı}}.{hasNote, select, yes { Açıklama: {note}} other {}}",
+        "title": "Şikayetiniz Sonuçlandı"
       }
     },
     "auth": {
       "accountBanned": "Hesabınız banlanmış. Destek ekibiyle iletişime geçin.",
       "accountDeleted": "Hesap silinmiş",
       "accountSuspended": "Hesabınız askıya alınmış",
+      "staffAccountCustomerLogin": "Personel hesabıyla web veya mobil uygulamaya giriş yapılamaz; yönetim paneline giriş yapın",
       "adminAccountDeactivated": "Admin hesabı deaktif edilmiş",
       "adminAccountNotFoundOrInactive": "Admin hesabı bulunamadı veya deaktif",
       "adminAuthRequired": "Admin yetkisi gerekiyor",
@@ -8939,7 +9040,6 @@
       "confirmForbidden": "Bu siparişi onaylama yetkiniz yok",
       "confirmOnlyDelivered": "Sadece teslim edilmiş siparişler onaylanabilir",
       "couponNotSupportedForGuest": "Kupon kodu misafir alışverişte desteklenmiyor",
-      "extendOnlyWithinWindow": "Sadece 48h penceresindeki siparişlerde uzatılabilir",
       "groupAlreadyCancelled": "Bu sepetin tüm siparişleri zaten iptal edilmiş.",
       "groupCancelBlockedShipped": "Sepetteki en az bir sipariş kargoya verildi — sepet iptali kapalı. Teslimat sonrası iade talebi oluşturabilirsiniz.",
       "groupNotFound": "Sipariş grubu bulunamadı",
@@ -8967,11 +9067,9 @@
       "notFound": "Sipariş bulunamadı",
       "notOrderSeller": "Bu siparişin satıcısı değilsiniz",
       "notYourTransaction": "Bu işlem size ait değil",
-      "offerAlreadyHasOrder": "Bu teklif için zaten bir sipariş mevcut",
       "offerNotAccepted": "Sadece kabul edilmiş tekliflerden sipariş oluşturulabilir",
       "offerNotAcceptedYet": "Teklif kabul edilmemiş",
       "offerNotFound": "Teklif bulunamadı",
-      "offerOrderForbidden": "Bu tekliften sipariş oluşturma yetkiniz yok",
       "openRefundExists": "Açık bir iade talebi var; önce sonuçlanması gerek",
       "orderAccessForbidden": "Bu siparişe erişim yetkiniz yok",
       "prepareOnlyPaid": "Sadece ödenmiş siparişler hazırlanabilir",
@@ -8981,6 +9079,7 @@
       "productNotFoundById": "Ürün bulunamadı: {productId}",
       "productNotOnSale": "Bu ürün satışta değil",
       "productOutOfStock": "Bu ürün stokta bulunmamaktadır",
+      "reactivateAlreadyPaid": "Ödemesi tamamlanmış veya iade edilmiş sipariş yeniden aktive edilemez",
       "reactivateForbidden": "Bu siparişi yeniden aktive etme yetkiniz yok",
       "reactivateInsufficientStock": "Ürün için yeterli müsait adet yok",
       "reactivateNotFromOffer": "Bu sipariş tekliften oluşmadığı için yeniden aktive edilemez",
@@ -9288,12 +9387,15 @@
       "holdNotFound": "Hold bulunamadı",
       "tokenNotFound": "Token bulunamadı",
       "shipmentToDeliveredForbidden": "Kargo {status} durumundan teslim edildi durumuna geçirilemez",
+      "offer": {
+        "notCancellableStatus": "Teklif {status} durumunda; yalnız bekleyen veya ödenmemiş kabul edilmiş teklif iptal edilebilir",
+        "orderAlreadyPaid": "Bağlı sipariş ödendiği için teklif iptal edilemez; iade akışını kullanın"
+      },
       "order": {
         "shipmentMissingForDelivery": "Teslim geçişi için siparişe bağlı kargo kaydı bulunamadı",
         "shipmentStatusChanged": "Kargo durumu az önce değişti; sayfayı yenileyip tekrar deneyin",
         "deliveryRaceLost": "Sipariş teslim durumu eşzamanlı olarak değişti",
         "statusChanged": "Sipariş durumu az önce değişti; sayfayı yenileyip tekrar deneyin",
-        "couponPendingPaymentOnly": "Kupon yalnızca ödemesi beklenen siparişlerde değiştirilebilir",
         "couponNotFound": "Kupon kodu bulunamadı",
         "couponInactive": "Bu kupon aktif değil",
         "couponNotStarted": "Bu kupon henüz başlamadı",
@@ -9307,6 +9409,8 @@
       },
       "user": {
         "notBanned": "Kullanıcı zaten engelli değil",
+        "deleteRequiresNeverLoggedIn": "Yalnız hiç giriş yapmamış hesaplar silinebilir",
+        "staffAccount": "Bu hesap personel hesabı; Personel ekranından yönetilir",
         "alreadyBanned": "Kullanıcı zaten engelli",
         "deleted": "Silinmiş hesap üzerinde bu işlem yapılamaz",
         "verificationMailFailed": "Aktivasyon e-postası gönderilemedi"
@@ -9518,6 +9622,7 @@
         "roleAssignSuperAdminOnly": "Rol atama yetkisi yalnızca süper adminde (yönetici izni kapalı)",
         "superAdminOnly": "Süper admin rolüyle ilgili işlemi yalnızca süper admin yapabilir",
         "notFound": "Admin kaydı bulunamadı",
+        "emailBelongsToCustomer": "Bu e-posta bir müşteri hesabına ait; personel için farklı bir e-posta kullanın",
         "lastSuperAdminImmutable": "Sistemdeki son süper admin değiştirilemez",
         "cannotRemoveSelf": "Kendi admin yetkinizi kaldıramazsınız",
         "lastSuperAdminUndeletable": "Sistemdeki son süper admin kaldırılamaz"

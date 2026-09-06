@@ -112,7 +112,7 @@ describe("bildirim hedefleri", () => {
   describe("hedef kitle (audience)", () => {
     /**
      * Regresyon: bazı tipler AYNI tiple hem alıcıya hem satıcıya gidiyor
-     * (ORDER_AUTO_COMPLETED, ORDER_FORCE_COMPLETED_BY_ADMIN) ya da yalnız
+     * (ORDER_AUTO_COMPLETED) ya da yalnız
      * satıcıya gidiyor (ORDER_PAID, ORDER_MANUALLY_CONFIRMED,
      * ORDER_PREPARING_DEADLINE_WARNING). Hedef tek başına tipten çıkarılamaz.
      */
@@ -121,7 +121,6 @@ describe("bildirim hedefleri", () => {
       NotificationType.ORDER_MANUALLY_CONFIRMED,
       NotificationType.ORDER_PREPARING_DEADLINE_WARNING,
       NotificationType.ORDER_AUTO_COMPLETED,
-      NotificationType.ORDER_FORCE_COMPLETED_BY_ADMIN,
       NotificationType.PAYMENT_REFUNDED,
       // Kargo gecikmesi alıcıya VE satıcıya gider (order-scheduler).
       NotificationType.ORDER_SHIPMENT_DELAYED,

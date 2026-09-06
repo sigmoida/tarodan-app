@@ -96,11 +96,6 @@ export const NOTIFICATION_TEMPLATES: Partial<
     messageKey: "server.notification.orderManuallyConfirmed.message",
     icon: "💸",
   },
-  [NotificationType.ORDER_FORCE_COMPLETED_BY_ADMIN]: {
-    titleKey: "server.notification.orderForceCompletedByAdmin.title",
-    messageKey: "server.notification.orderForceCompletedByAdmin.message",
-    icon: "🛡️",
-  },
   [NotificationType.SELLER_DID_NOT_SHIP_REFUNDED]: {
     titleKey: "server.notification.sellerDidNotShipRefunded.title",
     messageKey: "server.notification.sellerDidNotShipRefunded.message",
@@ -155,6 +150,11 @@ export const NOTIFICATION_TEMPLATES: Partial<
     titleKey: "server.notification.offerCancelledOutOfStock.title",
     messageKey: "server.notification.offerCancelledOutOfStock.message",
     icon: "❌",
+  },
+  [NotificationType.OFFER_CANCELLED_BY_ADMIN]: {
+    titleKey: "server.notification.offerCancelledByAdmin.title",
+    messageKey: "server.notification.offerCancelledByAdmin.message",
+    icon: "🛡️",
   },
   [NotificationType.OFFER_CANCELLED_LISTING_REMOVED]: {
     titleKey: "server.notification.offerCancelledListingRemoved.title",
@@ -361,6 +361,16 @@ export const NOTIFICATION_TEMPLATES: Partial<
     messageKey: "server.notification.orderStuckInTransit.message",
     icon: "⚠️",
   },
+  [NotificationType.ELOGO_INVOICE_EXHAUSTED]: {
+    titleKey: "server.notification.elogoInvoiceExhausted.title",
+    messageKey: "server.notification.elogoInvoiceExhausted.message",
+    icon: "🧾",
+  },
+  [NotificationType.SELLER_INVOICE_MISSING]: {
+    titleKey: "server.notification.sellerInvoiceMissing.title",
+    messageKey: "server.notification.sellerInvoiceMissing.message",
+    icon: "🧾",
+  },
   [NotificationType.TRADE_OUTBOUND_DELIVERY_MISSING]: {
     titleKey: "server.notification.tradeOutboundDeliveryMissing.title",
     messageKey: "server.notification.tradeOutboundDeliveryMissing.message",
@@ -440,6 +450,11 @@ export const NOTIFICATION_TEMPLATES: Partial<
     titleKey: "server.notification.userReportedAdmin.title",
     messageKey: "server.notification.userReportedAdmin.message",
     icon: "🚩",
+  },
+  [NotificationType.REPORT_RESOLVED]: {
+    titleKey: "server.notification.reportResolved.title",
+    messageKey: "server.notification.reportResolved.message",
+    icon: "📋",
   },
   [NotificationType.REFUND_REQUEST_RECEIVED]: {
     titleKey: "server.notification.refundRequestReceived.title",

@@ -144,6 +144,7 @@ describe("PaymentRefundService.processRefund — MONEY-H3/H4 partial refund", ()
         findUnique: jest.fn().mockResolvedValue({ quantity: 5 }),
         update: jest.fn().mockResolvedValue({}),
       },
+      offer: { updateMany: jest.fn().mockResolvedValue({ count: 1 }) },
     };
 
     const prisma = {
@@ -295,6 +296,62 @@ describe("PaymentRefundService.processRefund — MONEY-H3/H4 partial refund", ()
     });
     // PayTR'a hiç gidilmemeli (fazladan para iade edilmesin).
     expect(paytr.createRefund).not.toHaveBeenCalled();
+  });
+
+  /**
+   * Teklif siparişi tam iade edilince teklif `accepted` kalıyordu → sipariş
+   * "cancelled + accepted teklif" görüntüsüyle reactivate/"Ödemeyi tamamla"ya
+   * açık kalıyordu. Tam iade = anlaşma bitti; kısmi iade teklife dokunmaz.
+   */
+  it("tam iade: teklif siparişinin teklifi cancelled/orderRefunded olur", async () => {
+    const { service, mockTx } = makeService({ paymentAmount: 1000 });
+    mockTx.order.findUnique.mockResolvedValue({
+      status: "preparing",
+      productId: "prod-1",
+      quantity: 1,
+      stockRestoredAt: null,
+      offerId: "offer-1",
+      buyerId: "b1",
+      sellerId: "s1",
+      orderNumber: "ORD1",
+      cancellationType: "iade",
+      buyer: { id: "b1", email: "b@x", displayName: "B" },
+      seller: { id: "s1", email: "s@x", displayName: "S" },
+    });
+
+    await service.processRefund(ORDER_ID, 1000, {
+      idempotencyKey: "full-refund-offer",
+    });
+
+    expect(mockTx.offer.updateMany).toHaveBeenCalledWith({
+      where: { id: "offer-1", status: "accepted" },
+      data: {
+        status: "cancelled",
+        cancelReason: "Bağlı sipariş iade edildiği için teklif kapatıldı",
+      },
+    });
+  });
+
+  it("kısmi iade teklife dokunmaz", async () => {
+    const { service, mockTx } = makeService({ paymentAmount: 1000 });
+    mockTx.order.findUnique.mockResolvedValue({
+      status: "preparing",
+      productId: "prod-1",
+      quantity: 1,
+      stockRestoredAt: null,
+      offerId: "offer-1",
+      buyerId: "b1",
+      sellerId: "s1",
+      orderNumber: "ORD1",
+      buyer: { id: "b1", email: "b@x", displayName: "B" },
+      seller: { id: "s1", email: "s@x", displayName: "S" },
+    });
+
+    await service.processRefund(ORDER_ID, 400, {
+      idempotencyKey: "partial-refund-offer",
+    });
+
+    expect(mockTx.offer.updateMany).not.toHaveBeenCalled();
   });
 
   it("aynı idempotency anahtarı farklı tutarla tekrar kullanılamaz", async () => {

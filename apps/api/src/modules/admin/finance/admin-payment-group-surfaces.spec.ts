@@ -11,9 +11,6 @@ jest.mock("../../../common/helpers/fulltext-search", () => ({
  *  - getPayments: sepet ödemesinde grup kimliği (groupNumber/orderCount/anchor)
  *    ve alıcı checkoutGroup'tan gelir; arama grup numarasıyla da eşleşir.
  *  - getPaymentById: grubun siparişleri + ödemeye karşı iade denemeleri döner.
- *  - getRefundHistory: Payment değil RefundRequest bazlıdır (grup modelinde
- *    kısmi iadelerde Payment 'refunded' olmaz — eski kurgu grup iadelerini
- *    hiç göremiyordu).
  *  - getFailedPayments: order'sız (grup) ödemede 500 atmaz.
  */
 describe("AdminPaymentService group surfaces", () => {
@@ -82,40 +79,6 @@ describe("AdminPaymentService group surfaces", () => {
       (c: any) => c.checkoutGroup,
     );
     expect(hasGroupCondition).toBe(true);
-  });
-
-  it("getRefundHistory: RefundRequest bazlıdır ve iade edilen kesintiyi döner", async () => {
-    const { svc, prisma } = makeService();
-    prisma.refundRequest.findMany.mockResolvedValue([
-      {
-        id: "rr-1",
-        refundNumber: "RFD-1",
-        orderId: "o1",
-        amount: 120,
-        reason: "damaged",
-        refundedSellerFeeAmount: 9.6,
-        refundedAt: new Date("2026-07-20"),
-        createdAt: new Date("2026-07-18"),
-        order: {
-          orderNumber: "ORD-1",
-          commissionAmount: 12,
-          buyer: { id: "b1", displayName: "Buyer", email: "b@x.com" },
-          seller: { id: "s1", displayName: "Seller", email: "s@x.com" },
-          product: { id: "p1", title: "Ürün" },
-        },
-      },
-    ]);
-    prisma.refundRequest.count.mockResolvedValue(1);
-
-    const res = await (svc as any).getRefundHistory({ page: 1, limit: 20 });
-    const row = res.data[0];
-
-    expect(prisma.refundRequest.findMany).toHaveBeenCalled();
-    expect(row.refundNumber).toBe("RFD-1");
-    expect(row.orderNumber).toBe("ORD-1");
-    expect(row.amount).toBe(120);
-    expect(row.refundedSellerFee).toBe(9.6);
-    expect(row.buyer?.displayName).toBe("Buyer");
   });
 
   it("getFailedPayments: order'sız (grup) ödemede patlamaz, grup alıcısına düşer", async () => {

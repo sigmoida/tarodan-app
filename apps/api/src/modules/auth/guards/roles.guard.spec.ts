@@ -78,7 +78,7 @@ describe("RolesGuard — refund_requests izin kapısı (retry-refund money-path)
 /**
  * Admin iade yüzeyi — URL-segment tabanlı izin kapısı (explicit @RequirePermission
  * OLMAYAN endpoint'ler). RolesGuard URL'in ilk admin segmentinden izin türetir
- * (PERMISSION_MAP). İade işlemleri 'refund_requests'/'refund_history'/'payments'
+ * (PERMISSION_MAP). İade işlemleri 'refund_requests'/'payments'
  * izni ister; moderator bu izinlere sahip olmadığından TÜM iade yüzeyinden bloke
  * olmalı, admin/super_admin geçmeli. (H1–H4, H6, H7 karakterizasyonu.)
  */
@@ -132,7 +132,6 @@ describe("RolesGuard — admin iade yüzeyi URL-segment izin kapısı", () => {
       "/api/admin/refund-requests/abc/set-shipping-payer",
     ],
     ["manual-refund", "POST", "/api/admin/payments/abc/manual-refund"],
-    ["iade geçmişi", "GET", "/api/admin/refunds"],
   ];
 
   describe("moderator iade yüzeyinin TAMAMINDAN bloke", () => {

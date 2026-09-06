@@ -17,6 +17,12 @@
 
 Kullanıcıya dönük ad: `packageNumber` = **"Teslimat No"**.
 
+Sürat'a giden referans her sipariş kargosunda `OrderPackage.carrierReference ??
+packageNumber`'dır — teklif siparişleri dahil (kabul tek koli açar; bkz.
+`CODE_SCHEME.md` §2.1). Tek istisna, 2026-09 öncesi paketsiz yaratılmış teklif
+siparişleri: backfill kolisi `carrierReference` olarak canlı `ORD-…`
+referansını taşır, böylece Sürat'taki mevcut gönderi ve takip kesintisiz sürer.
+
 ---
 
 ## 2. Sürat entegrasyonu

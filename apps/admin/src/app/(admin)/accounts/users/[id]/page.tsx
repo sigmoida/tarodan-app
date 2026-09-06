@@ -1,9 +1,10 @@
 "use client";
 
+import Link from "next/link";
 import { useParams } from "next/navigation";
 import { StarIcon } from "@heroicons/react/24/outline";
 import { useTranslations } from "next-intl";
-import { Badge, Button, accountStatusConfig } from "@tarodan/ui";
+import { Alert, Badge, Button, accountStatusConfig } from "@tarodan/ui";
 import { adminApi } from "@/lib/api";
 import { statusConfig } from "@/lib/statusLabels";
 import { DetailPage } from "@/components/detail/DetailPage";
@@ -13,10 +14,7 @@ import { UserInfoSection } from "./_sections/UserInfoSection";
 import { MembershipSection } from "./_sections/MembershipSection";
 import { UserActivityTabs } from "./_sections/UserActivityTabs";
 import { UserSidebar } from "./_sections/UserSidebar";
-import {
-  actionsForStatus,
-  type UserAccountAction,
-} from "../_lib/bulkEligibility";
+import { actionsFor, type UserAccountAction } from "../_lib/bulkEligibility";
 import {
   ACTION_LABEL_KEY,
   isActionBusy,
@@ -31,6 +29,7 @@ const ACTION_VARIANT: Record<
   verify: "outline",
   ban: "danger",
   unban: "success",
+  delete: "danger",
 };
 
 export default function UserDetailPage() {
@@ -65,23 +64,34 @@ export default function UserDetailPage() {
       )}
       // Liste ile aynı türetim: rozet ve aksiyonlar hesap durumundan gelir.
       badge={(u) => <Badge status={u.accountStatus} config={accountStatus} />}
-      actions={(u) => (
-        <div className="flex flex-wrap items-center gap-2">
-          {actionsForStatus(u.accountStatus).map((action) => (
-            <Button
-              key={action}
-              variant={ACTION_VARIANT[action]}
-              onClick={() => runOne(action, u.id)}
-              isLoading={isActionBusy(busy, u.id, action)}
-            >
-              {t(ACTION_LABEL_KEY[action])}
-            </Button>
-          ))}
-        </div>
-      )}
+      // Personel hesabında kullanıcı aksiyonları yok (Personel ekranı yönetir).
+      actions={(u) =>
+        u.staff ? undefined : (
+          <div className="flex flex-wrap items-center gap-2">
+            {actionsFor(u).map((action) => (
+              <Button
+                key={action}
+                variant={ACTION_VARIANT[action]}
+                onClick={() => runOne(action, u.id)}
+                isLoading={isActionBusy(busy, u.id, action)}
+              >
+                {t(ACTION_LABEL_KEY[action])}
+              </Button>
+            ))}
+          </div>
+        )
+      }
     >
       {(u) => (
         <>
+          {u.staff && (
+            <Alert variant="warning" className="mb-4">
+              {t("admin.users.staffAccountNotice", { role: u.staff.role })}{" "}
+              <Link href="/accounts/roles" className="font-medium underline">
+                {t("admin.users.staffAccountLink")}
+              </Link>
+            </Alert>
+          )}
           {u.stats && <UserStats stats={u.stats} />}
           <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
             <div className="space-y-6 lg:col-span-2">

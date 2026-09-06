@@ -206,14 +206,23 @@ export const col = {
     const [g, o] = field(get, opts);
     return base<T>("number", header, (r) => <CellNumber value={g(r)} />, o);
   },
-  /** Short date (full time on hover). Pass a field key to make it sortable. */
+  /**
+   * Short date (full time on hover). Pass a field key to make it sortable.
+   * `withTime: true` prints the clock next to the date (muted) — for tables
+   * where the hour is part of the reading, not just tooltip detail.
+   */
   date<T>(
     header: ReactNode,
     get: Accessor<T, string | number | Date | null | undefined>,
-    opts?: ColOpts,
+    opts?: ColOpts & { withTime?: boolean },
   ) {
     const [g, o] = field(get, opts);
-    return base<T>("date", header, (r) => <CellDate value={g(r)} />, o);
+    return base<T>(
+      "date",
+      header,
+      (r) => <CellDate value={g(r)} withTime={opts?.withTime} />,
+      o,
+    );
   },
   /** ID / tracking no (mono, clipped). Pass a field key to make it sortable. */
   code<T>(header: ReactNode, get: Accessor<T, ReactNode>, opts?: ColOpts) {

@@ -27,6 +27,7 @@ import { PUBLIC_IDENTITY_SELECT } from "../../../common/helpers/public-identity"
 import { i18nMessage } from "../../i18n";
 import {
   deriveAccountStatus,
+  loginStateWhere,
   type AccountStatus,
   type AccountStatusInput,
 } from "@tarodan/types";
@@ -113,7 +114,9 @@ export class AdminUserService {
   async getUsers(query: AdminUserQueryDto) {
     const { search, isSeller, isVerified } = query;
 
-    const where: Prisma.UserWhereInput = {};
+    // Personel (AdminUser satırı olan) hesaplar müşteri listesinde yer almaz;
+    // onlar Personel ekranında yönetilir. Sayaçlar da aynı sorgudan geçer.
+    const where: Prisma.UserWhereInput = { adminUser: null };
 
     if (search) {
       const userIds = await fulltextUserSearch(this.prisma, search);
@@ -149,6 +152,10 @@ export class AdminUserService {
       if (query.isBanned === true) where.isBanned = true;
       Object.assign(where, accountStatusWhere(undefined));
     }
+
+    // Giriş durumu ("hiç giriş yapmadı" / "giriş yapmış") — koşul
+    // @tarodan/types'ta, panel seçeneğiyle aynı kaynaktan.
+    Object.assign(where, loginStateWhere(query.loginState));
 
     // Membership lifecycle filters (tier / status / "expiring soon"). All narrow
     // the to-one membership relation, so they compose within a single relation
@@ -398,6 +405,9 @@ export class AdminUserService {
         sellerType: true,
         taxId: true,
         companyName: true,
+        // Personel hesabı detayda yalnız uyarı ve Personel ekranına bağlantı
+        // gösterir; kullanıcı aksiyonları kapalıdır.
+        adminUser: { select: { role: true, isActive: true } },
         createdAt: true,
         bannedAt: true,
         bannedReason: true,
@@ -685,6 +695,9 @@ export class AdminUserService {
       bannedReason: user.bannedReason,
       deletedAt: user.deletedAt,
       accountStatus: deriveAccountStatus(user),
+      staff: user.adminUser
+        ? { role: user.adminUser.role, isActive: user.adminUser.isActive }
+        : null,
       bankAccount: user.bankAccount,
       membership: membershipForUi,
       lastLoginAt: user.lastLoginAt ?? null,

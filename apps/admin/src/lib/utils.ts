@@ -69,21 +69,42 @@ export function cancelReasonLabel(
     return t("admin.shared.cancelReason.sellerMissedShipping");
   if (reason.startsWith("Süre dolumu"))
     return t("admin.shared.cancelReason.deadlineExpired");
+  // Teklif gerekçeleri (OFFER_CANCEL_REASON / offerAdminCancelReason)
+  if (reason === "Satıcı karşı teklif verdiği için kapatıldı")
+    return t("admin.shared.cancelReason.supersededBySellerCounter");
+  if (reason === "Alıcı yeni teklif verdiği için kapatıldı")
+    return t("admin.shared.cancelReason.supersededByBuyerCounter");
+  if (reason === "Bağlı sipariş iptal edildiği için teklif kapatıldı")
+    return t("admin.shared.cancelReason.orderCancelled");
+  if (reason === "Bağlı sipariş iade edildiği için teklif kapatıldı")
+    return t("admin.shared.cancelReason.orderRefunded");
+  if (reason === "İlan satıcı tarafından kaldırıldığı için teklif kapatıldı")
+    return t("admin.shared.cancelReason.listingDeleted");
+  if (reason === "Hesap askıya alındığı için teklif kapatıldı")
+    return t("admin.shared.cancelReason.accountBanned");
+  if (reason.startsWith("Yönetici tarafından iptal edildi"))
+    return `${t("admin.shared.cancelReason.adminCancelled")}${reason.includes(":") ? reason.slice(reason.indexOf(":")) : ""}`;
   /* eslint-enable @tarodan/no-hardcoded-turkish */
   return reason;
 }
 
-/**
- * Human label for an order's origin: offer-based orders carry an offerId,
- * everything else is a direct purchase.
- */
-export function orderOriginLabel(
-  offerId: string | null | undefined,
-  t: T,
-): string {
-  return offerId
-    ? t("admin.shared.orderOrigin.offer")
-    : t("admin.shared.orderOrigin.directSale");
+export type OrderOrigin = "direct_sale" | "offer" | "platform_service";
+
+/** Sipariş kaynağı etiketleri — filtre seçenekleri ve rozet aynı haritayı kullanır. */
+export const ORDER_ORIGIN_LABEL_KEYS: Record<
+  OrderOrigin,
+  | "admin.shared.orderOrigin.directSale"
+  | "admin.shared.orderOrigin.offer"
+  | "admin.shared.orderOrigin.platformService"
+> = {
+  direct_sale: "admin.shared.orderOrigin.directSale",
+  offer: "admin.shared.orderOrigin.offer",
+  platform_service: "admin.shared.orderOrigin.platformService",
+};
+
+/** Human label for an order's origin (`Order.origin` is NOT NULL). */
+export function orderOriginLabel(origin: OrderOrigin, t: T): string {
+  return t(ORDER_ORIGIN_LABEL_KEYS[origin]);
 }
 
 /**

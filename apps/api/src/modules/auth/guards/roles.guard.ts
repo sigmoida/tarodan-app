@@ -29,10 +29,11 @@ export const PERMISSION_MAP: Record<string, string[]> = {
   analytics: ["analytics"],
   reports: ["analytics"],
   orders: ["orders"],
+  // Teklifler /operations/orders sekmesinde yaşar → sipariş izniyle görünür.
+  offers: ["orders"],
   trades: ["trades"],
   "trade-shipments": ["trades"],
   "refund-requests": ["refund_requests"],
-  refunds: ["refund_history", "refund_requests"],
   payments: ["payments"],
   // /finance/overview + /finance/psp/* ve ödeme ekranının mutabakat sekmesi —
   // hepsi menüde "payments" izniyle görünür.

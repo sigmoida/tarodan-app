@@ -10,6 +10,7 @@ import type {
   ElogoSoapCallOptions,
   ElogoUserCheckResult,
 } from "./helpers/elogo.types";
+import { isPdfBuffer } from "./helpers/elogo-pdf";
 
 /**
  * eLogo PostBoxService (SOAP) soyutlaması.
@@ -567,7 +568,15 @@ export class LiveElogoSoapClient extends ElogoSoapClient {
     if (!blobs.length) return null;
     const b64 = blobs.sort((a, b) => b.length - a.length)[0];
     const buf = Buffer.from(b64, "base64");
-    return buf.slice(0, 5).toString("latin1") === "%PDF-" ? buf : buf; // PDF beklenir; yine de döndür
+    if (!isPdfBuffer(buf)) {
+      // PDF olmayan blob (imzalı XML, hata zarfı) belge değildir; çağıran
+      // "PDF alınamadı" yolunu izler, S3'e/maile gitmez.
+      this.logger.warn(
+        `eLogo PDF yanıtı PDF değil (uuid=${uuid}, ${buf.length} bayt) — atlandı`,
+      );
+      return null;
+    }
+    return buf;
   }
 }
 

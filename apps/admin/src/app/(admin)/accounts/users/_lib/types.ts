@@ -1,5 +1,9 @@
 import { useTranslations } from "next-intl";
-import { ACCOUNT_STATUSES, type AccountStatus } from "@tarodan/types";
+import {
+  ACCOUNT_STATUSES,
+  type AccountStatus,
+  type LoginState,
+} from "@tarodan/types";
 import { accountStatusConfig } from "@tarodan/shared";
 import { statusLabel } from "@/lib/statusLabels";
 
@@ -58,52 +62,50 @@ export function mapUsers(raw: any[]): User[] {
   }));
 }
 
-/** list ↔ AI Denetim tabs. */
-export const getUserTabs = (t: T) => [
-  { key: "list", label: t("admin.users.title") },
-  { key: "ai", label: t("admin.catalog.common.aiModeration") },
-];
-
-export const getUserFilterOptions = (t: T) => [
-  { value: "all", label: t("admin.users.filterAll") },
-  { value: "sellers", label: t("admin.users.filterSellers") },
-  { value: "buyers", label: t("admin.users.filterBuyers") },
-];
-
-/** Map the "filter" (user type) chip to the getUsers isSeller flag. */
-export function userFilterParams(filter?: string) {
-  return {
-    isSeller:
-      filter === "sellers" ? true : filter === "buyers" ? false : undefined,
-  };
-}
-
-/** Hesap durumu filtresi: Tüm Durumlar + türetilmiş her durum (etiketler tek haritadan). */
-export const getAccountStatusFilterOptions = (t: T) => [
-  { value: "all", label: t("admin.users.filterAccountStatusAll") },
-  ...ACCOUNT_STATUSES.map((value) => ({
-    value,
-    label: statusLabel(accountStatusConfig, value, t),
-  })),
-];
+/** AI Denetim sekmesinin anahtarı (durum sekmelerinin yanında durur). */
+export const AI_TAB = "ai";
 
 /**
- * Map the account-status chip to a getUsers query param ("all" → varsayılan:
- * silinmişler gizli).
- *
- * `filter=banned` ESKİ değer: "Engelliler" kullanıcı-türü seçeneğiydi, artık
- * hesap durumu filtresinde. Liste `syncUrl` olduğu için kaydedilmiş bir
- * `?filter=banned` bağlantısı hâlâ gelebilir; eşlemezsek sessizce TÜM
- * kullanıcıları gösterirdi.
+ * Giriş durumu filtresi. "Hiç giriş yapmadı" tablodaki Son Giriş sütununun
+ * boş hâliyle aynı şeyi söyler (`admin.users.neverLoggedIn` etiketi ortak) —
+ * kayıt olup hesabını hiç kullanmayanları ayıklamak için.
  */
-export function accountStatusParams(status?: string, legacyFilter?: string) {
-  const resolved =
-    status && status !== "all"
-      ? status
-      : legacyFilter === "banned"
-        ? "banned"
-        : undefined;
-  return resolved ? { accountStatus: resolved } : {};
+export const getLoginStateFilterOptions = (t: T) => [
+  { value: "all", label: t("admin.users.filterLoginStateAll") },
+  { value: "never", label: t("admin.users.neverLoggedIn") },
+  { value: "logged_in", label: t("admin.users.filterLoggedIn") },
+];
+
+/** Giriş durumu çipini getUsers sorgusuna çevirir ("all" → filtre yok). */
+export function loginStateParams(state?: string) {
+  return state && state !== "all" ? { loginState: state as LoginState } : {};
+}
+
+/**
+ * Sekmeler = hesap durumları (türetilmiş; etiketler tek haritadan) + AI Denetim.
+ * Durum artık kolon/filtre değil, sekmedir; `counts` sekme etiketine "(n)"
+ * olarak yazılır (filtreden bağımsız toplam).
+ */
+export const getUserTabs = (
+  t: T,
+  counts: Partial<Record<AccountStatus, number | undefined>> = {},
+) => [
+  ...ACCOUNT_STATUSES.map((value) => ({
+    key: value,
+    label: `${statusLabel(accountStatusConfig, value, t)} (${
+      counts[value] ?? "…"
+    })`,
+  })),
+  { key: AI_TAB, label: t("admin.catalog.common.aiModeration") },
+];
+
+export function isAccountStatus(value: string): value is AccountStatus {
+  return (ACCOUNT_STATUSES as readonly string[]).includes(value);
+}
+
+/** Sekmenin durumu → getUsers `accountStatus` parametresi. */
+export function accountStatusParams(status?: string) {
+  return status && isAccountStatus(status) ? { accountStatus: status } : {};
 }
 
 /** Membership tier filter options (Tüm Katmanlar + each tier). */

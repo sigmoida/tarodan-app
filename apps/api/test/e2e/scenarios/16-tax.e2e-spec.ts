@@ -52,7 +52,7 @@ import {
 } from "../../factories/user.factory";
 import { createProduct } from "../../factories/product.factory";
 import { createAddress } from "../../factories/address.factory";
-import { createOfferRow } from "../../factories/offer.factory";
+import { acceptOfferToOrder } from "../../factories/flows";
 import { scenario } from "../../test-utils/scenario";
 import { signCallback } from "../../mocks/paytr.mock";
 import {
@@ -60,7 +60,6 @@ import {
   extractCode,
   clearMailbox,
 } from "../../test-utils/mail";
-import { OfferStatus } from "@prisma/client";
 import { ConfigService } from "@nestjs/config";
 import { JwtService } from "@nestjs/jwt";
 
@@ -219,8 +218,9 @@ describe("16 — Vergi & Fatura (TAX)", () => {
   /**
    * Fatura üretimini InvoiceService üzerinden doğrudan koştur (TAX-095 deseni).
    * Ödeme anındaki otomatik makbuz KALDIRILDI (eLogo e-Arşiv sipariş tamamlanınca kesilir;
-   * test ortamında ELOGO_ENABLED yok → no-op). Fatura kaydını/e-postasını üreten public
-   * çağrı InvoiceService.generateAndSendInvoice — ödenmiş siparişte lazy-generate ile aynıdır.
+   * test ortamında ELOGO_ENABLED yok → no-op). Sipariş özeti kaydını üreten public çağrı
+   * InvoiceService.generateForOrder — lazy GET ile aynı yol. Eski "iki tarafa fatura
+   * e-postası" yolu kaldırıldı (sipariş özeti mali belge değildir; e-posta gitmez).
    */
   async function generateInvoice(orderId: string): Promise<void> {
     // Idempotent: fatura zaten varsa tekrar üretme (generateForOrder existence-check YAPMAZ →
@@ -232,7 +232,7 @@ describe("16 — Vergi & Fatura (TAX)", () => {
     const { InvoiceService } =
       await import("../../../src/modules/invoice/invoice.service");
     const invoiceService = ctx.module.get(InvoiceService);
-    await invoiceService.generateAndSendInvoice(orderId);
+    await invoiceService.generateForOrder(orderId);
   }
 
   /**
@@ -727,19 +727,18 @@ describe("16 — Vergi & Fatura (TAX)", () => {
         quantity: 1,
       });
       const addr = await createAddress({ userId: buyer.id });
-      // Kabul edilmiş teklif (500₺) seed et; buyer order'ı POST /orders ile oluşturur.
-      const offer = await createOfferRow({
+      // Teklif (500₺) satıcı tarafından kabul edilir; sipariş kabul içinde oluşur.
+      const { orderId } = await acceptOfferToOrder(ctx, {
+        buyer,
+        seller,
         productId: product.id,
-        buyerId: buyer.id,
-        sellerId: seller.id,
         amount: 500,
-        status: OfferStatus.accepted,
+        address: addr,
       });
       const orderRes = await request(server())
-        .post("/api/orders")
+        .get(`/api/orders/${orderId}`)
         .set(authHeader(buyer))
-        .send({ offerId: offer.id, shippingAddressId: addr.id })
-        .expect(201);
+        .expect(200);
 
       // offerAmount 500 * 20% = 100.
       expect(orderRes.body.pricing.taxAmount).toBe(100);
@@ -823,105 +822,29 @@ describe("16 — Vergi & Fatura (TAX)", () => {
   // ════════════════════════════ Ödeme sonrası otomatik fatura + e-posta ════════════════════════════
   describe("Otomatik fatura üretimi (ödeme başarısı)", () => {
     scenario("TAX-024", async () => {
-      await clearMailbox();
       const { buyer, seller, product, addr } = await makeBuyerSellerProduct({
         price: 1000,
       });
       const { orderId } = await buyAndPay(buyer, product.id, addr.id);
 
-      // DB'de en az bir issued fatura oluşmalı (buyAndPay faturayı üretir).
+      // DB'de en az bir issued sipariş özeti oluşmalı (buyAndPay üretir).
       const prisma = getPrisma();
       const invoice = await prisma.invoice.findFirst({ where: { orderId } });
       expect(invoice).toBeTruthy();
       expect(invoice!.status).toBe("issued");
 
-      // İki tarafa e-posta (MailHog). Buyer + seller adreslerine mail gelir.
-      const buyerMail = await getLastEmailTo(buyer.email);
-      expect(buyerMail.subject).toBeTruthy();
-      const sellerMail = await getLastEmailTo(seller.email);
-      expect(sellerMail.subject).toBeTruthy();
+      // Sipariş özeti mali belge değildir: taraflara ayrıca "fatura e-postası"
+      // gitmez (resmî belge eLogo e-Arşiv'dir ve kendi bildirim yolunu kullanır).
+      expect(seller.id).toBeTruthy();
     });
 
-    scenario("TAX-095", async () => {
-      // Misafir siparişte fatura e-postası gerçek misafir adresine gider.
-      // Guest checkout OTP akışı ağır olduğundan, misafir siparişi + payment inline seed edip
-      // generateAndSendInvoice yolunu InvoiceService üzerinden doğrudan koştururuz
-      // (payment.service ile aynı public çağrı). shippingAddress.guestEmail'e gönderilir.
-      await clearMailbox();
-      const seller = await createUser(ctx.module, { isSeller: true });
-      const product = await createProduct({
-        sellerId: seller.id,
-        categoryId: baseline.categoryId,
-        price: 500,
-        quantity: 1,
-      });
-      const prisma = getPrisma();
-      // Misafir alıcı kullanıcı (system guest e-posta) + sipariş.
-      const guestUser = await prisma.user.create({
-        data: {
-          email: "guest@tarodan.system",
-          passwordHash: null,
-          displayName: "Misafir",
-          isEmailVerified: false,
-          isVerified: false,
-          birthDate: new Date("1990-01-01"),
-        },
-      });
-      const guestEmail = "real-guest-tax@test.com";
-      const group = await prisma.checkoutGroup.create({
-        data: {
-          groupNumber: `GRPGUEST${Date.now()}`,
-          buyerId: guestUser.id,
-          totalAmount: 500,
-          isGuest: true,
-        },
-      });
-      const order = await prisma.order.create({
-        data: {
-          orderNumber: `ORDGUEST${Date.now()}`,
-          productId: product.id,
-          buyerId: guestUser.id,
-          sellerId: seller.id,
-          checkoutGroupId: group.id,
-          totalAmount: 500,
-          subtotal: 500,
-          commissionAmount: 0,
-          buyerFeeAmount: 0,
-          sellerFeeAmount: 0,
-          taxAmount: 0,
-          shippingCost: 0,
-          // Order.paymentExpiresAt NOT NULL + default'suz (schema.prisma:1095) → inline create'de
-          // zorunlu; verilmezse prisma create runtime'da patlar.
-          paymentExpiresAt: new Date(Date.now() + 60 * 60 * 1000),
-          status: "completed" as any,
-          shippingAddress: {
-            isGuestOrder: true,
-            guestEmail,
-            guestName: "Gerçek Misafir",
-            fullName: "Gerçek Misafir",
-            addressLine1: "Test Cad. 1",
-            city: "İstanbul",
-            district: "Kadıköy",
-          } as any,
-        },
-      });
-
-      const { InvoiceService } =
-        await import("../../../src/modules/invoice/invoice.service");
-      const invoiceService = ctx.module.get(InvoiceService);
-      await invoiceService.generateAndSendInvoice(order.id);
-
-      // Fatura kaydı oluştu.
-      const invoice = await prisma.invoice.findFirst({
-        where: { orderId: order.id },
-      });
-      expect(invoice).toBeTruthy();
-
-      // Fatura e-postası SİSTEM guest adresine (guest@tarodan.system) DEĞİL, gerçek misafir
-      // adresine (shippingAddress.guestEmail) gider — login gerektirmeyen track linkiyle.
-      const mail = await getLastEmailTo(guestEmail);
-      expect(mail.subject).toBeTruthy();
-    });
+    // Eski "misafire fatura e-postası" yolu kaldırıldı: sipariş özeti mali belge
+    // değildir ve e-posta göndermez; misafir e-Arşiv belgesi eLogo tarafında
+    // kesim anındaki iletişim bilgisiyle (shippingAddress.guestEmail) gider.
+    scenario.skip(
+      "TAX-095",
+      "Kaldırıldı: sipariş özeti e-postası artık gönderilmiyor (fatura = eLogo e-Arşiv)",
+    );
   });
 
   // ════════════════════════════ Lazy / manuel fatura üretimi ════════════════════════════

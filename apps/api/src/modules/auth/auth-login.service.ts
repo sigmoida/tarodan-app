@@ -15,6 +15,12 @@ import { AuthTokenService } from "./auth-token.service";
 import { resolveAvatarUrl } from "./utils/avatar-url.util";
 import { DUMMY_BCRYPT_HASH } from "./utils/timing-pad";
 import { i18nMessage } from "../i18n";
+import {
+  isStaffAccount,
+  STAFF_ACCOUNT_SELECT,
+  staffAccountCustomerLoginError,
+} from "./utils/staff-account";
+import { stampUserLogin } from "./utils/login-stamp";
 import { errorMessage, errorStack } from "../../common/helpers/error-message";
 
 /**
@@ -57,6 +63,10 @@ export class AuthLoginService {
           twoFactorSecret: {
             select: { isEnabled: true },
           },
+          // Personel hesabı web/mobil oturumu AÇAMAZ (utils/staff-account).
+          // Şifre doğrulandıktan sonra reddedilir ki e-postadan personel olup
+          // olmadığı sızmasın.
+          ...STAFF_ACCOUNT_SELECT,
         },
       });
 
@@ -120,6 +130,15 @@ export class AuthLoginService {
         );
       }
 
+      if (isStaffAccount(user)) {
+        await this.logSecurityEvent("failed_login", "medium", {
+          email: dto.email,
+          userId: user.id,
+          reason: "staff_account_customer_login",
+        });
+        throw staffAccountCustomerLoginError();
+      }
+
       if (user.isBanned) {
         await this.logSecurityEvent("failed_login", "high", {
           email: dto.email,
@@ -146,18 +165,8 @@ export class AuthLoginService {
       );
       if (twoFactorChallenge) return twoFactorChallenge;
 
-      // Update lastLoginAt immediately so it's persisted before any other async work
-      const now = new Date();
-      try {
-        await this.prisma.user.update({
-          where: { id: user.id },
-          data: { lastLoginAt: now, lastActivityAt: now },
-        });
-      } catch (err) {
-        this.logger.warn(
-          `Failed to update lastLoginAt for user ${user.id}: ${err}`,
-        );
-      }
+      // Giriş damgası token'dan önce yazılır (utils/login-stamp).
+      await stampUserLogin(this.prisma, this.logger, user.id);
 
       // Generate tokens
       const tokens = await this.tokens.generateTokens(

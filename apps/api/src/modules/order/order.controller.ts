@@ -27,7 +27,6 @@ import { CurrentUser } from "../auth/decorators/current-user.decorator";
 import { ShippingPackageTierCode } from "@prisma/client";
 import { billableDesiForTier } from "../shipping/helpers/shipping-package-tier";
 import {
-  CreateOrderDto,
   OrderQueryDto,
   CancelOrderDto,
   OrderResponseDto,
@@ -315,34 +314,6 @@ export class OrderController {
     @Body() dto: DirectBuyDto,
   ): Promise<DirectBuyResponseDto> {
     return this.orderService.createDirectOrder(userId, dto);
-  }
-
-  /**
-   * POST /orders - Create order from accepted offer
-   * Requirement: Create order from accepted offer (project.md)
-   */
-  @Post()
-  @UseGuards(JwtAuthGuard)
-  @ApiBearerAuth()
-  @ApiOperation({ summary: "Create order from an accepted offer" })
-  @ApiResponse({
-    status: HttpStatus.CREATED,
-    description: "Order created successfully",
-    type: OrderResponseDto,
-  })
-  @ApiResponse({
-    status: HttpStatus.BAD_REQUEST,
-    description: "Invalid data or offer not accepted",
-  })
-  @ApiResponse({
-    status: HttpStatus.NOT_FOUND,
-    description: "Offer not found",
-  })
-  async create(
-    @CurrentUser("id") userId: string,
-    @Body() dto: CreateOrderDto,
-  ): Promise<OrderResponseDto> {
-    return this.orderService.create(userId, dto);
   }
 
   /**

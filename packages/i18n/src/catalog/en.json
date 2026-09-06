@@ -5091,6 +5091,7 @@
         "quickLinks": "Quick Links",
         "viewSeller": "View Seller",
         "viewOrders": "View Orders",
+        "viewOffers": "Offers ({count})",
         "categoryLabel": "Category: {name}",
         "aiFlagged": "Inappropriate",
         "aiReview": "Review",
@@ -6009,6 +6010,7 @@
           "membership": "Membership",
           "boost": "Boost",
           "tradeCommission": "Trade Commission",
+          "tradeServiceFee": "Trade Service Fee",
           "platformSale": "Platform Sale",
           "returnInvoice": "Return Invoice"
         },
@@ -6382,12 +6384,55 @@
         "saving": "Saving",
         "errorOccurred": "An error occurred"
       },
+      "offers": {
+        "title": "Offers",
+        "totalCount": "{count} offers",
+        "empty": "No offers yet",
+        "emptyFiltered": "No offers match the filter",
+        "listPrice": "List price",
+        "listPriceShort": "List: {price}",
+        "percentOfList": "{pct}% of list price",
+        "awaitingBuyer": "Awaiting buyer response",
+        "awaitingSeller": "Awaiting seller response",
+        "turn": "Turn",
+        "linkedOrder": "Linked order",
+        "noOrder": "No order",
+        "noOrderYet": "No order was created because the offer was not accepted",
+        "paymentStatus": "Payment status",
+        "noPayment": "Payment not started",
+        "expiresAt": "Expires",
+        "message": "Message",
+        "detailTitle": "Offer · {product}",
+        "notFound": "Offer not found",
+        "summaryTitle": "Offer details",
+        "chainTitle": "Negotiation history",
+        "chainNote": "Counter-offers create a new record; the previous round closes as \"rejected\".",
+        "chainActor": {
+          "buyer": "Buyer",
+          "seller": "Seller"
+        },
+        "chainCurrent": "This record",
+        "productOffersTitle": "Other offers on this product ({count})",
+        "noOtherOffers": "No other offers on this product",
+        "viewAllForProduct": "All offers for this product",
+        "competingAccepted": "{count} accepted offers — the first buyer to pay wins",
+        "competingPending": "{count} orders awaiting payment",
+        "productSold": "Product sold:",
+        "productStock": "Stock: {quantity} · Reserved: {reserved}",
+        "cancel": "Cancel offer",
+        "cancelTitle": "Cancel offer",
+        "cancelDescription": "The offer is closed; buyer and seller are notified with the reason.",
+        "cancelReason": "Cancellation reason",
+        "cancelReasonPlaceholder": "Why is it being cancelled? (required)",
+        "cancelWillCancelOrder": "The linked order awaiting payment will be cancelled too.",
+        "cancelled": "Offer cancelled",
+        "cancelFailed": "Offer could not be cancelled"
+      },
       "orders": {
         "title": "Orders",
         "loadError": "Failed to load orders",
         "empty": "No orders yet",
         "emptyFiltered": "No orders match the filter",
-        "totalCount": "{count} order groups in total",
         "filteringByProduct": "Filtering by product",
         "filteringByProductNamed": "Filtering by product: {title}",
         "orderNumber": "Order No",
@@ -6417,6 +6462,13 @@
         "groupDone": "Done",
         "groupOngoing": "In progress",
         "originCancellation": "{origin} cancellation",
+        "pageDescription": "Purchase orders and offers made on products",
+        "tabs": {
+          "directSale": "Direct Sales",
+          "acceptedOffers": "Accepted Offers"
+        },
+        "amountCommission": "Amount / Commission",
+        "commissionShort": "Commission",
         "updateStatus": "Update Status",
         "newStatus": "New Status",
         "statusChangeReason": "Manual Operation Reason",
@@ -6582,6 +6634,7 @@
         }
       },
       "trades": {
+        "cashPayer": "Cash / Payer",
         "title": "Trades",
         "loadError": "Failed to load trades",
         "empty": "No trades found",
@@ -6732,6 +6785,8 @@
         "faultySideNeither": "Not item related (operational rejection)"
       },
       "refundRequests": {
+        "amountAndFee": "Amount / Fee",
+        "feeShort": "Fee reversed",
         "title": "Refund Tracking",
         "description": "Ongoing refunds — the automatic flow is monitored; admin intervention is only needed in exceptional cases",
         "loadError": "Failed to load refund requests",
@@ -6922,16 +6977,6 @@
         "chargeOutboundToSeller": "Outbound shipping debt (to seller)",
         "sellerShippingCompensation": "Shipping share compensation (back to seller)"
       },
-      "refunds": {
-        "title": "Refund History",
-        "description": "Completed refunds",
-        "loadError": "Failed to load refund history",
-        "empty": "No refunds found",
-        "colId": "ID",
-        "refundedAt": "Refund Date",
-        "refundNumber": "Refund No",
-        "refundedFee": "Reversed Fee"
-      },
       "shipping": {
         "title": "Shipping Operations",
         "description": "All shipping operations — track order, trade and return shipments in one place",
@@ -6979,13 +7024,10 @@
           "empty": "No shipments found",
           "unit": "shipments",
           "shipment": "Shipment",
-          "products": "Products",
           "carrierAndTracking": "Carrier & Tracking",
           "packageSummary": "{orders} orders · {products} products",
           "productSummary": "{products} products · {quantity} units",
           "contentsTitle": "Package Contents",
-          "showContents": "Show package contents",
-          "hideContents": "Hide package contents",
           "carrierPending": "Carrier pending",
           "carrierSurat": "Sürat Kargo",
           "trackingPending": "Tracking number pending",
@@ -7247,6 +7289,45 @@
         "requestId": "Request ID",
         "userId": "User ID",
         "resolution": "Response / Resolution"
+      },
+      "detail": {
+        "notFound": "Report not found",
+        "active": "Active",
+        "banned": "Suspended",
+        "accountStatus": "Account status",
+        "userDescription": "Reporter's description",
+        "resolvedAt": "Resolved",
+        "sellerLabel": "Seller",
+        "targetDeleted": "Content deleted or unavailable",
+        "ownerLabel": "Owner",
+        "noAdminNote": "No explanation sent yet",
+        "senderLabel": "Sender",
+        "reportInfo": "Report Details",
+        "targetTitle": "Reported Content",
+        "messageContent": "Message content",
+        "reportedAt": "Reported",
+        "noDescription": "No description provided",
+        "openTarget": "Open content",
+        "reporterTitle": "Reported By",
+        "adminNote": "Explanation sent to the user",
+        "listingStatus": "Listing status"
+      },
+      "statusModal": {
+        "noteHelp": "When you close the report as \"Resolved\" or \"Dismissed\", this text is sent to the reporter as a notification and an email.",
+        "title": "Resolve report",
+        "updated": "Report updated",
+        "newStatus": "New status",
+        "notePlaceholder": "Briefly explain your decision to the reporter",
+        "noteLabel": "Explanation sent to the user"
+      },
+      "actions": {
+        "removeListing": "Remove listing",
+        "removeListingReason": "Explain why the listing is removed — the seller receives this reason",
+        "banUserReason": "Suspension reason",
+        "banUser": "Suspend user",
+        "listingRemoved": "Listing removed",
+        "userBanned": "User suspended",
+        "updateStatus": "Resolve report"
       }
     },
     "earlyAccess": {
@@ -7549,14 +7630,19 @@
       "loadError": "Failed to load users",
       "empty": "No users found",
       "totalCount": "<value>{count}</value> users total",
-      "filterAll": "All Users",
-      "filterSellers": "Sellers",
-      "filterBuyers": "Buyers",
       "banned": "User banned",
       "unbanned": "User ban lifted",
       "banTitle": "Ban User",
       "banReasonLabel": "Ban reason (optional)",
       "banDefaultReason": "Banned by admin",
+      "deleteAction": "Delete",
+      "deleteTitle": "Delete user",
+      "deleteConfirmDesc": "This account has never logged in. It will be anonymized and deleted; this cannot be undone.",
+      "deleted": "User deleted",
+      "bulkDeleteTitle": "Delete {count} users",
+      "bulkDeleteConfirmDesc": "Only accounts that never logged in are deleted; other selected rows are skipped. This cannot be undone.",
+      "staffAccountNotice": "This is a staff account (role: {role}). User actions are disabled; manage it from the Staff screen.",
+      "staffAccountLink": "Open the Staff screen",
       "banAction": "Ban",
       "unbanAction": "Lift Ban",
       "columnUser": "User",
@@ -7659,9 +7745,6 @@
         "blocksReceivedTitle": "Blocked this user",
         "blocksEmpty": "No block records"
       },
-      "columnUserType": "User Type",
-      "userTypeBuyer": "Buyer",
-      "filterAccountStatusAll": "All Statuses",
       "unbanConfirmDesc": "Are you sure you want to lift this user's ban?",
       "resendVerification": "Send Activation Email",
       "verifyEmail": "Activate Manually",
@@ -7683,7 +7766,9 @@
       "bulkNoneEligible": "No selected user is eligible for this action",
       "bulkResendQueued": "Activation e-mail queued for {ok} users",
       "bulkResendQueuedPartial": "{ok} queued, {failed} failed",
-      "bulkResendConfirmDesc": "Activation e-mails are sent from the background queue; track the outcome in the e-mail logs. Ineligible rows are skipped. Continue?"
+      "bulkResendConfirmDesc": "Activation e-mails are sent from the background queue; track the outcome in the e-mail logs. Ineligible rows are skipped. Continue?",
+      "filterLoginStateAll": "All Login States",
+      "filterLoggedIn": "Logged In"
     },
     "roles": {
       "title": "Roles & Permissions",
@@ -7787,10 +7872,6 @@
         "refundRequests": {
           "label": "Refund Requests",
           "description": "Refund request list, detail view, approve, and reject."
-        },
-        "refundHistory": {
-          "label": "Refund History",
-          "description": "Completed refund records and history list."
         },
         "products": {
           "label": "Products",
@@ -7964,6 +8045,11 @@
           "description": "View and manage all orders",
           "keywords": "order"
         },
+        "offers": {
+          "name": "Offers",
+          "description": "Track offers and negotiations on products",
+          "keywords": "offer,negotiation"
+        },
         "trades": {
           "name": "Trades",
           "description": "Track and manage product trade requests",
@@ -7978,11 +8064,6 @@
           "name": "Refund Tracking",
           "description": "Review and resolve open refund requests",
           "keywords": "refund,return,request,tracking"
-        },
-        "refundHistory": {
-          "name": "Refund History",
-          "description": "History of completed refund transactions",
-          "keywords": "refund,return,history"
         },
         "products": {
           "name": "Products",
@@ -8315,7 +8396,6 @@
           "active": "Active",
           "membershipTier": "Membership tier",
           "lifecycle": "Membership status",
-          "userType": "User type",
           "package": "Package",
           "severity": "Severity",
           "resolved": "Resolution",
@@ -8323,7 +8403,7 @@
           "action": "Action",
           "entityType": "Entity type",
           "shipmentLeg": "Shipment leg",
-          "accountStatus": "Account status"
+          "loginState": "Login state"
         }
       },
       "bulkActionBar": {
@@ -8340,11 +8420,19 @@
         "paymentExpired": "Payment window expired",
         "buyerCancelled": "Cancelled by buyer",
         "sellerMissedShipping": "Seller missed shipping",
-        "deadlineExpired": "Deadline expired"
+        "deadlineExpired": "Deadline expired",
+        "supersededBySellerCounter": "Seller counter-offered",
+        "supersededByBuyerCounter": "Buyer made a new offer",
+        "orderCancelled": "Linked order cancelled",
+        "orderRefunded": "Linked order refunded",
+        "listingDeleted": "Listing removed",
+        "accountBanned": "Account suspended",
+        "adminCancelled": "Cancelled by admin"
       },
       "orderOrigin": {
         "offer": "Offer",
-        "directSale": "Direct Sale"
+        "directSale": "Direct Sale",
+        "platformService": "Platform Service"
       },
       "rateRange": "The rate must be between {min} and {max}",
       "rowActions": {
@@ -8454,10 +8542,6 @@
         "title": "The buyer confirmed the order",
         "message": "The buyer confirmed the order. Your payout will be transferred to your account 14 days after delivery (once the return period ends)."
       },
-      "orderForceCompletedByAdmin": {
-        "title": "Order completed by an administrator",
-        "message": "An administrator completed your order manually."
-      },
       "sellerDidNotShipRefunded": {
         "title": "Order cancelled",
         "message": "The order was cancelled because the seller did not ship within the required time, and a full refund has been initiated."
@@ -8497,6 +8581,10 @@
       "offerPaymentExpired": {
         "title": "Payment Window Expired",
         "message": "Your 24-hour payment window for {productTitle} expired and the order was closed. If the product is still available you can reopen the order and pay."
+      },
+      "offerCancelledByAdmin": {
+        "title": "Offer cancelled by an administrator",
+        "message": "The offer for {productTitle} was cancelled by an administrator: {reason}"
       },
       "offerCancelledOutOfStock": {
         "title": "Your offer was cancelled: product out of stock",
@@ -8686,6 +8774,14 @@
         "title": "Stuck Shipment — Admin Action Required",
         "message": "Order {orderNumber} has been in transit for a long time with no carrier delivery report; the seller payout stays on hold until delivery is recorded."
       },
+      "elogoInvoiceExhausted": {
+        "title": "e-Invoice Delivery Blocked — Admin Action Required",
+        "message": "Document {invoiceNumber} ({typeLabel}) could not be sent to eLogo and has run out of attempts: {reason}. The legal deadline is running; fix the cause and use \"Retry\" on the Invoices screen."
+      },
+      "sellerInvoiceMissing": {
+        "title": "Seller Invoice Not Uploaded",
+        "message": "Order {orderNumber} was delivered more than {deadlineDays} days ago and the corporate seller still has not uploaded the product invoice. The seller has been reminded; operations follow-up is needed."
+      },
       "offerAutoRejected": {
         "title": "Your Offer Was Closed",
         "message": "{cancelReason}"
@@ -8773,12 +8869,17 @@
       "orderShipmentDelayed": {
         "title": "Your parcel is taking longer than expected",
         "message": "Your parcel has shown no movement for a while. Our team is following it up with the carrier; you do not need to do anything."
+      },
+      "reportResolved": {
+        "message": "Your report about {type, select, product {a listing} collection {a collection} message {a message} other {a user}} was reviewed and {status, select, dismissed {no action was taken} other {resolved}}.{hasNote, select, yes { Note: {note}} other {}}",
+        "title": "Your Report Has Been Reviewed"
       }
     },
     "auth": {
       "accountBanned": "Your account has been banned. Please contact the support team.",
       "accountDeleted": "Account has been deleted",
       "accountSuspended": "Your account has been suspended",
+      "staffAccountCustomerLogin": "Staff accounts cannot sign in to the web or mobile app; use the admin panel",
       "adminAccountDeactivated": "Admin account has been deactivated",
       "adminAccountNotFoundOrInactive": "Admin account not found or inactive",
       "adminAuthRequired": "Admin authorization is required",
@@ -8939,7 +9040,6 @@
       "confirmForbidden": "You are not authorized to confirm this order",
       "confirmOnlyDelivered": "Only delivered orders can be confirmed",
       "couponNotSupportedForGuest": "Coupon codes are not supported for guest checkout",
-      "extendOnlyWithinWindow": "Can only be extended for orders within the 48h window",
       "groupAlreadyCancelled": "All orders in this cart are already cancelled.",
       "groupCancelBlockedShipped": "At least one order in this cart has been handed to the carrier — cart cancellation is closed. You can request a refund after delivery.",
       "groupNotFound": "Order group not found",
@@ -8967,11 +9067,9 @@
       "notFound": "Order not found",
       "notOrderSeller": "You are not the seller of this order",
       "notYourTransaction": "This transaction does not belong to you",
-      "offerAlreadyHasOrder": "An order already exists for this offer",
       "offerNotAccepted": "An order can only be created from an accepted offer",
       "offerNotAcceptedYet": "The offer has not been accepted",
       "offerNotFound": "Offer not found",
-      "offerOrderForbidden": "You are not authorized to create an order from this offer",
       "openRefundExists": "There is an open refund request; it must be resolved first",
       "orderAccessForbidden": "You are not authorized to access this order",
       "prepareOnlyPaid": "Only paid orders can be marked as preparing",
@@ -8981,6 +9079,7 @@
       "productNotFoundById": "Product not found: {productId}",
       "productNotOnSale": "This product is not for sale",
       "productOutOfStock": "This product is out of stock",
+      "reactivateAlreadyPaid": "An order that was paid or refunded cannot be reactivated",
       "reactivateForbidden": "You are not authorized to reactivate this order",
       "reactivateInsufficientStock": "There is not enough available quantity for this product",
       "reactivateNotFromOffer": "This order cannot be reactivated because it was not created from an offer",
@@ -9288,12 +9387,15 @@
       "holdNotFound": "Hold not found",
       "tokenNotFound": "Token not found",
       "shipmentToDeliveredForbidden": "A shipment in the {status} state cannot be moved to delivered",
+      "offer": {
+        "notCancellableStatus": "Offer is {status}; only pending or unpaid accepted offers can be cancelled",
+        "orderAlreadyPaid": "The linked order is already paid; use the refund flow instead"
+      },
       "order": {
         "shipmentMissingForDelivery": "No shipment is linked to this order, so it cannot be marked delivered",
         "shipmentStatusChanged": "The shipment status just changed; refresh the page and try again",
         "deliveryRaceLost": "The order's delivery state changed concurrently",
         "statusChanged": "The order status just changed; refresh the page and try again",
-        "couponPendingPaymentOnly": "A coupon can only be changed on an order awaiting payment",
         "couponNotFound": "Coupon code not found",
         "couponInactive": "This coupon is not active",
         "couponNotStarted": "This coupon has not started yet",
@@ -9307,6 +9409,8 @@
       },
       "user": {
         "notBanned": "The user is not banned",
+        "deleteRequiresNeverLoggedIn": "Only accounts that never logged in can be deleted",
+        "staffAccount": "This is a staff account; manage it from the Staff screen",
         "alreadyBanned": "The user is already banned",
         "deleted": "This action is not available for a deleted account",
         "verificationMailFailed": "The activation email could not be sent"
@@ -9518,6 +9622,7 @@
         "roleAssignSuperAdminOnly": "Only a super admin can assign roles (the manager permission is off)",
         "superAdminOnly": "Only a super admin can act on the super-admin role",
         "notFound": "Admin record not found",
+        "emailBelongsToCustomer": "This email belongs to a customer account; use a different email for staff",
         "lastSuperAdminImmutable": "The last super admin in the system cannot be changed",
         "cannotRemoveSelf": "You cannot remove your own admin access",
         "lastSuperAdminUndeletable": "The last super admin in the system cannot be removed"

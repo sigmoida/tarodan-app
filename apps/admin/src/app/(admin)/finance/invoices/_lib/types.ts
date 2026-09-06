@@ -78,6 +78,10 @@ export const typeFilterOptions = (t: T) => [
     label: t("admin.finance.invoices.types.tradeCommission"),
   },
   {
+    value: "trade_service_fee",
+    label: t("admin.finance.invoices.types.tradeServiceFee"),
+  },
+  {
     value: "platform_sale",
     label: t("admin.finance.invoices.types.platformSale"),
   },

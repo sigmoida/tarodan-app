@@ -2,7 +2,6 @@ import {
   Badge,
   StatusBadge,
   enumLabel,
-  accountStatusConfig,
   membershipTierConfig,
   subscriptionStatusConfig,
 } from "@tarodan/ui";
@@ -14,8 +13,9 @@ import { statusConfig } from "@/lib/statusLabels";
 
 type T = ReturnType<typeof useTranslations<never>>;
 
+// Hesap durumu sekmeden bellidir (deriveAccountStatus); kullanıcı türü
+// (alıcı/satıcı) yalnız "ilan açmış mı" bayrağıdır ve listede gösterilmez.
 export function userColumns(t: T, rowMenu: (u: User) => RowActionItem[]) {
-  const accountStatus = statusConfig(accountStatusConfig, t);
   return [
     col.code<User>(t("admin.users.userId"), (u) => u.adminCode, {
       minWidth: 130,
@@ -31,23 +31,6 @@ export function userColumns(t: T, rowMenu: (u: User) => RowActionItem[]) {
         href: `/accounts/users/${u.id}`,
       }),
       { minWidth: 520, sortKey: "displayName", sortType: "text" },
-    ),
-    // Hesap durumu tek türetimden gelir (sunucu: deriveAccountStatus); kimlik
-    // rozeti (isVerified) bilinçli olarak burada değil, detay kartında.
-    col.badge<User>(
-      t("common.status"),
-      (u) => <Badge status={u.accountStatus} config={accountStatus} />,
-      { minWidth: 150, sortKey: "isEmailVerified", sortType: "number" },
-    ),
-    col.badge<User>(
-      t("admin.users.columnUserType"),
-      (u) =>
-        u.isSeller ? (
-          <Badge variant="info">{t("admin.users.seller")}</Badge>
-        ) : (
-          <Badge variant="default">{t("admin.users.userTypeBuyer")}</Badge>
-        ),
-      { minWidth: 110, sortKey: "isSeller", sortType: "number" },
     ),
     col.badge<User>(
       t("admin.users.membership"),

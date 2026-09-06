@@ -1,4 +1,4 @@
-import { Injectable, UnauthorizedException } from "@nestjs/common";
+import { Injectable, Logger, UnauthorizedException } from "@nestjs/common";
 import { PrismaService } from "../../../prisma";
 import { AuthResponseDto } from "../dto";
 import { AuthTokenService } from "../auth-token.service";
@@ -8,6 +8,11 @@ import { AppleAuthService } from "./apple-auth.service";
 import { allocateUsernameFromEmail } from "../utils/username.util";
 import { resolveAvatarUrl } from "../utils/avatar-url.util";
 import { i18nMessage } from "../../i18n";
+import {
+  assertNotStaffAccount,
+  STAFF_ACCOUNT_SELECT,
+} from "../utils/staff-account";
+import { stampUserLogin } from "../utils/login-stamp";
 
 /**
  * Google ve Apple ile giriş. AuthService'ten birebir taşındı.
@@ -20,6 +25,8 @@ import { i18nMessage } from "../../i18n";
  */
 @Injectable()
 export class SocialLoginService {
+  private readonly logger = new Logger(SocialLoginService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly tokens: AuthTokenService,
@@ -39,11 +46,14 @@ export class SocialLoginService {
       include: {
         membership: { include: { tier: true } },
         twoFactorSecret: { select: { isEnabled: true } },
+        ...STAFF_ACCOUNT_SELECT,
       },
     });
     if (!user) {
       throw new UnauthorizedException(i18nMessage("server.auth.userNotFound"));
     }
+    // Personel hesabı sosyal girişle de web/mobil oturumu açamaz (bkz. login).
+    assertNotStaffAccount(user);
     // Silinmiş/banlı satıra token verme: aksi halde login "başarılı" olur ama
     // ilk korumalı istekte guard reddeder → kafa karıştırıcı "askıya alındı" ekranı.
     if (user.deletedAt) {
@@ -63,6 +73,10 @@ export class SocialLoginService {
         errorCode: "TWO_FACTOR_PASSWORD_REQUIRED",
       });
     }
+
+    // Sosyal giriş de giriş damgası basar; aksi halde yalnız Google/Apple ile
+    // giren hesap "hiç giriş yapmamış" sayılır (admin silme uygunluğu buna bakar).
+    await stampUserLogin(this.prisma, this.logger, user.id);
 
     const tokens = await this.tokens.generateTokens(
       user.id,

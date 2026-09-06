@@ -78,9 +78,31 @@ describe("OfferService.accept — order carries shipping, VAT and withholding", 
       },
       offer: { findUnique: jest.fn().mockResolvedValue({ ...offer }) },
     };
-    const checkoutCommon = {
-      resolveOfferOrderPricing: jest.fn().mockResolvedValue(offerPricing),
+    const shippingTariff = {
+      tariffId: "tariff-1",
+      tariffVersion: 3,
+      tariff: { provider: "surat" },
     };
+    const calls: string[] = [];
+    const checkoutCommon = {
+      resolveOfferOrderSnapshots: jest.fn().mockImplementation(async () => {
+        calls.push("snapshots");
+        return { shippingTariff, commissionRuleSet: { id: "ruleset-1" } };
+      }),
+      resolveOfferOrderPricing: jest.fn().mockResolvedValue(offerPricing),
+      generateOrderNumber: jest.fn().mockResolvedValue("ORD-TEST123456"),
+      createSingleSellerPackage: jest.fn().mockImplementation(async () => {
+        calls.push("package");
+        return { id: "pkg-1", packageNumber: "PKG-TEST123456" };
+      }),
+      buildOfferFinancialSnapshot: jest
+        .fn()
+        .mockReturnValue({ version: 2, pricing: { hash: "h" } }),
+    };
+    prisma.$transaction.mockImplementation((fn: any) => {
+      calls.push("tx");
+      return fn(tx);
+    });
     const service = new OfferService(
       prisma as any,
       { del: jest.fn(), delByPattern: jest.fn() } as any,
@@ -100,7 +122,7 @@ describe("OfferService.accept — order carries shipping, VAT and withholding", 
       checkoutCommon as any,
       userBlockServiceStub() as any,
     );
-    return { service, created, checkoutCommon, tx };
+    return { service, created, checkoutCommon, tx, calls, shippingTariff };
   };
 
   it("sipariş KDV, stopaj, kargo ve alt toplamı taşır", async () => {
@@ -132,6 +154,75 @@ describe("OfferService.accept — order carries shipping, VAT and withholding", 
         shippingDesi: 2,
       }),
     );
+  });
+
+  it("bedel hesabı tarife + komisyon kural seti snapshot'ıyla sabitlenir", async () => {
+    const { service, checkoutCommon, shippingTariff } = makeService();
+
+    await service.accept("offer-1", "seller-1");
+
+    expect(checkoutCommon.resolveOfferOrderPricing).toHaveBeenCalledWith(
+      expect.objectContaining({
+        shippingTariff: shippingTariff.tariff,
+        commissionRuleSetId: "ruleset-1",
+        buyerId: "buyer-1",
+      }),
+    );
+  });
+
+  /**
+   * Teklif siparişi de KOLİ taşır: Sürat referansı PKG-… olur, desi ve tarife
+   * koliden gelir. Grup YOK — ödeme tekil sipariş yolundan gitmeli (rezervasyon
+   * ilk ödeme başlatmada alınır; grup yolu bunu bilmez).
+   */
+  it("sipariş bir OrderPackage'a bağlanır, CheckoutGroup açılmaz", async () => {
+    const { service, created, checkoutCommon } = makeService();
+
+    await service.accept("offer-1", "seller-1");
+
+    expect(checkoutCommon.createSingleSellerPackage).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        sellerId: "seller-1",
+        buyerId: "buyer-1",
+        checkoutGroupId: null,
+        billableDesi: 2,
+        fullShippingAmount: 80,
+        buyerShippingAmount: 80,
+        sellerShippingAmount: 0,
+      }),
+    );
+    expect(created[0].packageId).toBe("pkg-1");
+    expect(created[0].checkoutGroupId).toBeUndefined();
+    expect(created[0].orderNumber).toBe("ORD-TEST123456");
+  });
+
+  it("sipariş kaynağı 'offer' ve finans snapshot'ı yazılır", async () => {
+    const { service, created, checkoutCommon } = makeService();
+
+    await service.accept("offer-1", "seller-1");
+
+    expect(created[0].origin).toBe("offer");
+    expect(checkoutCommon.buildOfferFinancialSnapshot).toHaveBeenCalledWith(
+      expect.objectContaining({
+        productId: "product-1",
+        amount: 1000,
+        shippingDesi: 2,
+        pricing: offerPricing,
+      }),
+    );
+    expect(created[0].financialSnapshot).toEqual(
+      expect.objectContaining({ version: 2 }),
+    );
+  });
+
+  it("tarife/kural seti snapshot'ları transaction'dan ÖNCE alınır", async () => {
+    const { service, calls } = makeService();
+
+    await service.accept("offer-1", "seller-1");
+
+    expect(calls.indexOf("snapshots")).toBeLessThan(calls.indexOf("tx"));
+    expect(calls.indexOf("tx")).toBeLessThan(calls.indexOf("package"));
   });
 
   it("kargo alıcı/satıcı payları siparişe yazılır", async () => {

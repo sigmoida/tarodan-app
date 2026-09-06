@@ -18,7 +18,6 @@ export const ordersApi = {
         createdAt: string;
       } | null;
     }>(`/orders/${id}/my-review`),
-  create: (data: any) => api.post("/orders", data),
   // Direct buy for authenticated users (Buy Now)
   directBuy: (data: {
     productId: string;
