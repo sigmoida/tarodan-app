@@ -7214,6 +7214,45 @@
       "description": "Kullanıcıların ürün, kullanıcı, koleksiyon ve mesajlar için gönderdiği şikayetler",
       "loadError": "Şikayetler yüklenirken hata oluştu",
       "empty": "Henüz şikayet yok",
+      "detail": {
+        "notFound": "Şikayet bulunamadı",
+        "reportInfo": "Şikayet Bilgisi",
+        "reporterTitle": "Şikayet Eden",
+        "targetTitle": "Şikayet Edilen İçerik",
+        "targetDeleted": "İçerik silinmiş veya erişilemiyor",
+        "openTarget": "İçeriği aç",
+        "userDescription": "Kullanıcının açıklaması",
+        "noDescription": "Açıklama girilmemiş",
+        "adminNote": "Kullanıcıya iletilen açıklama",
+        "noAdminNote": "Henüz açıklama iletilmedi",
+        "reportedAt": "Bildirildi",
+        "resolvedAt": "Sonuçlandırıldı",
+        "sellerLabel": "Satıcı",
+        "ownerLabel": "Sahibi",
+        "senderLabel": "Gönderen",
+        "messageContent": "Mesaj içeriği",
+        "listingStatus": "İlan durumu",
+        "accountStatus": "Hesap durumu",
+        "banned": "Askıya alınmış",
+        "active": "Aktif"
+      },
+      "actions": {
+        "updateStatus": "Şikayeti sonuçlandır",
+        "removeListing": "İlanı yayından kaldır",
+        "banUser": "Kullanıcıyı askıya al",
+        "removeListingReason": "İlanın neden kaldırıldığını yazın — satıcıya bu gerekçe iletilir",
+        "banUserReason": "Askıya alma gerekçesi",
+        "listingRemoved": "İlan yayından kaldırıldı",
+        "userBanned": "Kullanıcı askıya alındı"
+      },
+      "statusModal": {
+        "title": "Şikayeti sonuçlandır",
+        "newStatus": "Yeni durum",
+        "noteLabel": "Kullanıcıya iletilecek açıklama",
+        "notePlaceholder": "Kararınızı şikayet eden kullanıcıya kısaca açıklayın",
+        "noteHelp": "Şikayeti \"Çözüldü\" ya da \"Reddedildi\" olarak kapattığınızda bu metin şikayet edene bildirim ve e-posta olarak iletilir.",
+        "updated": "Şikayet güncellendi"
+      },
       "allTypes": "Tüm Türler",
       "allStatuses": "Tüm Durumlar",
       "status": {
@@ -8561,6 +8600,10 @@
       "userBlockedAdmin": {
         "title": "Kullanıcı Engellendi",
         "message": "{blockerName}, {blockedName} adlı kullanıcıyı engelledi.{hasReason, select, yes { Gerekçe: {reason}} other {}}"
+      },
+      "reportResolved": {
+        "title": "Şikayetiniz Sonuçlandı",
+        "message": "{type, select, product {Bir ilan hakkındaki} collection {Bir koleksiyon hakkındaki} message {Bir mesaj hakkındaki} other {Bir kullanıcı hakkındaki}} şikayetiniz incelendi ve {status, select, dismissed {işleme alınmadı} other {sonuçlandırıldı}}.{hasNote, select, yes { Açıklama: {note}} other {}}"
       },
       "userReportedAdmin": {
         "title": "Yeni Şikayet",

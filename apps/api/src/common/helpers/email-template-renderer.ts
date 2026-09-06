@@ -273,6 +273,48 @@ export function formatEmailPrice(
   }).format(numeric);
 }
 
+/** `03.07.2026` — tarih; çözülemeyen değer boş string olur (satır boş görünür). */
+export function formatEmailDate(value?: string | number | Date | null): string {
+  if (!value) return "";
+  const date = new Date(value);
+  return Number.isNaN(date.getTime())
+    ? ""
+    : new Intl.DateTimeFormat("tr-TR", {
+        day: "2-digit",
+        month: "2-digit",
+        year: "numeric",
+      }).format(date);
+}
+
+// Şikayet tür/gerekçe etiketleri. Mail katmanı tek dilli (Türkçe) olduğu için
+// etiketler burada durur; in-app bildirimin karşılığı i18n kataloğunda ICU
+// `select` ile alıcının diline göre kurulur.
+const REPORT_TYPE_LABELS: Record<string, string> = {
+  product: "İlan",
+  user: "Kullanıcı",
+  collection: "Koleksiyon",
+  message: "Mesaj",
+};
+
+const REPORT_REASON_LABELS: Record<string, string> = {
+  spam: "Spam",
+  inappropriate_content: "Uygunsuz içerik",
+  fake_product: "Sahte/yanıltıcı ürün",
+  scam: "Dolandırıcılık",
+  harassment: "Taciz",
+  hate_speech: "Nefret söylemi",
+  counterfeit: "Taklit ürün",
+  wrong_category: "Yanlış kategori",
+  misleading_info: "Yanıltıcı bilgi",
+  other: "Diğer",
+};
+
+const reportTypeLabel = (type?: string): string =>
+  (type && REPORT_TYPE_LABELS[type]) || "İçerik";
+
+const reportReasonLabel = (reason?: string): string =>
+  (reason && REPORT_REASON_LABELS[reason]) || "Diğer";
+
 export function getEmailTemplateSubject(
   template: string,
   data: Record<string, any>,
@@ -299,6 +341,7 @@ export function getEmailTemplateSubject(
     "membership-expiring": `${data?.tierName || "Üyeliğiniz"} Sona Eriyor`,
     "membership-expiring-urgent": `${data?.tierName || "Üyeliğiniz"} Yarın Sona Eriyor!`,
     "product-approved": "Ürününüz Onaylandı",
+    "report-resolved": "Şikayetiniz Sonuçlandı",
     "seller-document-revision": "Kurumsal Başvurunuzda Belge Güncellemesi",
     "wishlist-price-change": data?.isPriceDrop
       ? `Fiyat Düştü: ${data?.productTitle || ""}`
@@ -888,6 +931,38 @@ export function renderEmailTemplate(
       </div>
     `,
       "Ürününüz Onaylandı",
+    ),
+
+    // Şikayet eden kullanıcıya kararın bildirimi. Reddedilen şikayette de aynı
+    // şablon kullanılır — fark yalnız karar cümlesi ve kutunun tonudur.
+    "report-resolved": wrapEmail(
+      `
+      ${titleBlock("Şikayetiniz Sonuçlandı", "📋")}
+      ${greeting(data?.reporterName)}
+      <p style="font-size: 15px; color: #4b5563; line-height: 1.6; margin: 0 0 20px 0;">${
+        data?.status === "dismissed"
+          ? "Bildiriminiz incelendi. Yaptığımız değerlendirme sonucunda kurallarımıza aykırı bir durum tespit edilmedi ve işlem yapılmadı."
+          : "Bildiriminiz incelendi ve gereken işlem yapıldı. Tarodan'ı daha güvenli tuttuğunuz için teşekkür ederiz."
+      }</p>
+      ${detailsBox(`
+        <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0">
+          ${detailRow("Şikayet Konusu", reportTypeLabel(data?.type))}
+          ${detailRow("Gerekçe", reportReasonLabel(data?.reason))}
+          ${detailRow("Bildirim Tarihi", formatEmailDate(data?.createdAt))}
+          ${detailRow("Sonuç", data?.status === "dismissed" ? "İşleme alınmadı" : "Sonuçlandırıldı", true)}
+        </table>
+      `)}
+      ${
+        data?.adminNote
+          ? infoBox(
+              `<p style="margin: 0 0 8px 0; font-size: 14px; font-weight: 600; color: #9a3412;">Ekibimizin açıklaması</p>
+               <p style="margin: 0; font-size: 14px; color: #7c2d12; line-height: 1.6; white-space: pre-wrap;">${data.adminNote}</p>`,
+            )
+          : ""
+      }
+      <p style="font-size: 14px; color: #6b7280; line-height: 1.6; margin: 24px 0 0 0;">Kararla ilgili sorunuz varsa bu e-postayı yanıtlayabilir ya da destek ekibimize yazabilirsiniz.</p>
+    `,
+      "Şikayetiniz Sonuçlandı",
     ),
 
     "seller-application-approved": wrapEmail(

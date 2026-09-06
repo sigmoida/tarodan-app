@@ -441,6 +441,11 @@ export const NOTIFICATION_TEMPLATES: Partial<
     messageKey: "server.notification.userReportedAdmin.message",
     icon: "🚩",
   },
+  [NotificationType.REPORT_RESOLVED]: {
+    titleKey: "server.notification.reportResolved.title",
+    messageKey: "server.notification.reportResolved.message",
+    icon: "📋",
+  },
   [NotificationType.REFUND_REQUEST_RECEIVED]: {
     titleKey: "server.notification.refundRequestReceived.title",
     messageKey: "server.notification.refundRequestReceived.message",

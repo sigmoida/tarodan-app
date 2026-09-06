@@ -7214,6 +7214,45 @@
       "description": "Complaints submitted by users for products, users, collections, and messages",
       "loadError": "Failed to load complaints",
       "empty": "No complaints yet",
+      "detail": {
+        "notFound": "Report not found",
+        "reportInfo": "Report Details",
+        "reporterTitle": "Reported By",
+        "targetTitle": "Reported Content",
+        "targetDeleted": "Content deleted or unavailable",
+        "openTarget": "Open content",
+        "userDescription": "Reporter's description",
+        "noDescription": "No description provided",
+        "adminNote": "Explanation sent to the user",
+        "noAdminNote": "No explanation sent yet",
+        "reportedAt": "Reported",
+        "resolvedAt": "Resolved",
+        "sellerLabel": "Seller",
+        "ownerLabel": "Owner",
+        "senderLabel": "Sender",
+        "messageContent": "Message content",
+        "listingStatus": "Listing status",
+        "accountStatus": "Account status",
+        "banned": "Suspended",
+        "active": "Active"
+      },
+      "actions": {
+        "updateStatus": "Resolve report",
+        "removeListing": "Remove listing",
+        "banUser": "Suspend user",
+        "removeListingReason": "Explain why the listing is removed — the seller receives this reason",
+        "banUserReason": "Suspension reason",
+        "listingRemoved": "Listing removed",
+        "userBanned": "User suspended"
+      },
+      "statusModal": {
+        "title": "Resolve report",
+        "newStatus": "New status",
+        "noteLabel": "Explanation sent to the user",
+        "notePlaceholder": "Briefly explain your decision to the reporter",
+        "noteHelp": "When you close the report as \"Resolved\" or \"Dismissed\", this text is sent to the reporter as a notification and an email.",
+        "updated": "Report updated"
+      },
       "allTypes": "All Types",
       "allStatuses": "All Statuses",
       "status": {
@@ -8561,6 +8600,10 @@
       "userBlockedAdmin": {
         "title": "User Blocked",
         "message": "{blockerName} blocked {blockedName}.{hasReason, select, yes { Reason: {reason}} other {}}"
+      },
+      "reportResolved": {
+        "title": "Your Report Has Been Reviewed",
+        "message": "Your report about {type, select, product {a listing} collection {a collection} message {a message} other {a user}} was reviewed and {status, select, dismissed {no action was taken} other {resolved}}.{hasNote, select, yes { Note: {note}} other {}}"
       },
       "userReportedAdmin": {
         "title": "New Report",

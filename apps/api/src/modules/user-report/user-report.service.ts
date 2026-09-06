@@ -233,6 +233,12 @@ export class UserReportService {
       `Report ${reportId} status updated to ${dto.status} by admin ${adminId}`,
     );
 
+    // Karar verildiyse şikayet eden haberdar edilir. `under_review` ara durumu
+    // henüz bir sonuç değil — o aşamada kullanıcıya bildirim gitmez.
+    if (isClosing) {
+      await this.notifyReporterOfDecision(updated);
+    }
+
     return this.mapToResponse(updated);
   }
 
@@ -306,6 +312,66 @@ export class UserReportService {
     } catch (err: any) {
       this.logger.warn(
         `Report admin notification failed (${reportId}): ${err?.message ?? err}`,
+      );
+    }
+  }
+
+  /**
+   * Şikayet eden kullanıcıya kararı bildirir: in-app bildirim + e-posta.
+   * `adminNote` panelde "kullanıcıya iletilecek açıklama" olarak girilir, yani
+   * iç not değil — kullanıcının gördüğü metin budur.
+   *
+   * Bildirim hatası kararı geri almaz (şikayet zaten kapandı); tıpkı
+   * `notifyAdmins` gibi yutulur ve loglanır.
+   */
+  private async notifyReporterOfDecision(report: {
+    id: string;
+    reporterId: string;
+    type: string;
+    reason: string;
+    status: string;
+    adminNote: string | null;
+    createdAt: Date;
+  }): Promise<void> {
+    try {
+      await this.notifications.createInAppNotification(
+        report.reporterId,
+        NotificationType.REPORT_RESOLVED,
+        {
+          reportId: report.id,
+          // Tür/durum etiketleri şablonda (ICU select) alıcının diline göre.
+          type: report.type,
+          status: report.status,
+          hasNote: report.adminNote ? "yes" : "no",
+          note: report.adminNote ?? "",
+        },
+      );
+    } catch (err: any) {
+      this.logger.warn(
+        `Report reporter notification failed (${report.id}): ${err?.message ?? err}`,
+      );
+    }
+
+    try {
+      const reporter = await this.prisma.user.findUnique({
+        where: { id: report.reporterId },
+        select: PUBLIC_NAME_SELECT,
+      });
+      await this.notifications.sendTemplateEmailToUser(
+        report.reporterId,
+        "report-resolved",
+        {
+          reporterName: publicName(reporter),
+          type: report.type,
+          reason: report.reason,
+          status: report.status,
+          adminNote: report.adminNote ?? "",
+          createdAt: report.createdAt,
+        },
+      );
+    } catch (err: any) {
+      this.logger.warn(
+        `Report reporter email failed (${report.id}): ${err?.message ?? err}`,
       );
     }
   }

@@ -104,6 +104,12 @@ export const systemApi = {
   }) => api.get("/user-reports/admin", { params }),
   getUserReportStats: () => api.get("/user-reports/admin/stats"),
   getUserReportById: (id: string) => api.get(`/user-reports/admin/${id}`),
+  // `adminNote` iç not DEĞİL: şikayet kapandığında (resolved/dismissed) şikayet
+  // edene bildirim + e-posta ile aynen iletilir.
+  updateUserReport: (
+    id: string,
+    body: { status: string; adminNote?: string },
+  ) => api.patch(`/user-reports/admin/${id}`, body),
 
   // Medya tarayıcısı (Faz 3): bucket klasörleri + dosya sahipliği (read-only)
   getMediaBrowse: (prefix = "") =>

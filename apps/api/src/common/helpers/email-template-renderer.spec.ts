@@ -83,6 +83,42 @@ describe("email template renderer", () => {
     expect(formatEmailPrice("")).toBe("0,00");
   });
 
+  it("tells the reporter what was decided, and shows the admin's note", () => {
+    const html = renderEmailTemplate(
+      "report-resolved",
+      {
+        reporterName: "Ayşe",
+        type: "product",
+        reason: "counterfeit",
+        status: "resolved",
+        adminNote: "İlan yayından kaldırıldı.",
+        createdAt: "2026-07-03T12:00:00Z",
+      },
+      { frontendUrl: "https://tarodan.com.tr" },
+    );
+
+    expect(html).toContain("Şikayetiniz Sonuçlandı");
+    expect(html).toContain("İlan"); // tür etiketi
+    expect(html).toContain("Taklit ürün"); // gerekçe etiketi
+    expect(html).toContain("03.07.2026");
+    expect(html).toContain("İlan yayından kaldırıldı.");
+    expect(html).toContain("gereken işlem yapıldı");
+  });
+
+  it("says no action was taken when the report is dismissed", () => {
+    const html = renderEmailTemplate("report-resolved", {
+      reporterName: "Ayşe",
+      type: "user",
+      reason: "spam",
+      status: "dismissed",
+    });
+
+    expect(html).toContain("İşleme alınmadı");
+    expect(html).toContain("kurallarımıza aykırı bir durum tespit edilmedi");
+    // Not yoksa açıklama kutusu hiç basılmaz.
+    expect(html).not.toContain("Ekibimizin açıklaması");
+  });
+
   it("extracts only the editable content from a wrapped email", () => {
     const wrapped = renderEmailTemplate(
       "password-reset",

@@ -235,6 +235,9 @@ export const NOTIFICATION_LINKS: Record<
   // Admin'e gider: engellenen kullanıcının / şikayetin admin paneli sayfası.
   [NotificationType.USER_BLOCKED_ADMIN]: free("adminLink"),
   [NotificationType.USER_REPORTED_ADMIN]: free("adminLink"),
+  // Şikayet edene gider: kararın kendisi mesajın içinde, kullanıcı tarafında
+  // gidilecek bir "şikayetlerim" ekranı yok — link taşımaz.
+  [NotificationType.REPORT_RESOLVED]: none,
 
   // ── İade ─────────────────────────────────────────────────────────────────
   // İKİ yöne de gider: alıcı kendi talebini iptal edince SATICIYA ("iade talebi
