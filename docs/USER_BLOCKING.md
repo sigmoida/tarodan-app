@@ -46,6 +46,27 @@ teklif/takas iptal edilmez; ancak engel sürdükçe kabul/karşı teklif de yap�
   ICU `select` ile alıcının diline göre kurulur; çağıran ham enum/değer geçer.
 - `GET /admin/users/:id` → `blocksGiven[]`, `blocksReceived[]`,
   `stats.blocksGivenCount/blocksReceivedCount`; panelde "Engellemeler" sekmesi.
+- Şikayet detayı ve sonuçlandırma: `GET /user-reports/admin/:id` (şikayet +
+  şikayet eden + **şikayet edilen içeriğin kendisi**; silinmiş hedefte
+  `target: { id, deleted: true }`), `PATCH /user-reports/admin/:id`
+  `{ status, adminNote? }`. Panelde `/accounts/reports/:id` detay sayfası —
+  hedefe müdahale (ilanı yayından kaldır / kullanıcıyı askıya al) oradan yapılır.
+
+## Şikayetin sonucu — şikayet edene geri bildirim
+
+Şikayet `resolved` ya da `dismissed` olarak kapandığında şikayet eden
+bilgilendirilir: `report_resolved` in-app bildirimi (tür/durum cümleleri ICU
+`select` ile alıcının dilinde) **ve** `report-resolved` e-postası. `under_review`
+ara durumunda bildirim gitmez — o bir sonuç değildir.
+
+`adminNote` iç not DEĞİLDİR: panelde "kullanıcıya iletilecek açıklama" olarak
+girilir ve bu iki mesajda da aynen kullanıcıya gösterilir. Bildirim gönderimi
+başarısız olursa şikayet yine de kapanır (hata yutulur ve loglanır).
+
+Mobil not: `report_resolved` link taşımaz (kullanıcı tarafında "şikayetlerim"
+ekranı yoktur) — bildirim listesinde başlık + mesaj olarak gösterilmesi yeterli.
+`GET /user-reports/me` kullanıcının kendi şikayetlerini `status`/`adminNote` ile
+döndürür; bir ekran açılacaksa kaynağı budur.
 
 ## İstemci notu (mobil)
 

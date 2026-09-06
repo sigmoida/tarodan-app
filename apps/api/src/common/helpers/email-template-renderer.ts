@@ -28,10 +28,22 @@ export function escapeEmailHtml(value: unknown): string {
     .replace(/'/g, "&#39;");
 }
 
+/**
+ * Yalnız düz nesneler (`{}` / prototipsiz) gezilir. Prisma `Decimal`, `Date`,
+ * `Buffer` gibi sınıf örnekleri olduğu gibi bırakılır: `Object.fromEntries`
+ * bunları iç alanlarından (`{s,e,d}`) ibaret düz nesneye çevirip `valueOf`
+ * davranışını yok ediyordu — bültendeki fiyatların "NaN TL" basılmasının nedeni
+ * buydu. İçlerinde kaçırılması gereken kullanıcı metni de yok.
+ */
+function isPlainObject(value: object): boolean {
+  const prototype = Object.getPrototypeOf(value);
+  return prototype === Object.prototype || prototype === null;
+}
+
 function escapeEmailTemplateData(value: any): any {
   if (typeof value === "string") return escapeEmailHtml(value);
   if (Array.isArray(value)) return value.map(escapeEmailTemplateData);
-  if (value && typeof value === "object" && !(value instanceof Date)) {
+  if (value && typeof value === "object" && isPlainObject(value)) {
     return Object.fromEntries(
       Object.entries(value).map(([key, nested]) => [
         key,
@@ -235,13 +247,73 @@ export function renderManagedEmailTemplate(
   };
 }
 
-export function formatEmailPrice(amount: number | string): string {
-  if (typeof amount === "string") return amount;
+/**
+ * Tutarı tr-TR biçiminde basar. Sayı, sayısal metin (kuyruk/JSON turundan
+ * geçmiş Decimal'ler string olur) ve Prisma `Decimal` gibi `valueOf`'u sayıya
+ * çözülen nesneler kabul edilir. Zaten biçimlenmiş metin ("1.234,50", "1.234")
+ * olduğu gibi geçer; çözülemeyen değer maile "NaN" basmak yerine "0,00" olur.
+ */
+export function formatEmailPrice(
+  amount: number | string | { valueOf(): unknown } | null | undefined,
+): string {
+  if (typeof amount === "string") {
+    const text = amount.trim();
+    if (!text) return "0,00";
+    // Zaten tr-TR biçimlenmiş metne dokunma: ondalık virgül ("1.234,50") ya da
+    // üçerli binlik grupları ("1.234"). Bunları `Number` 1,23'e çevirirdi.
+    if (/,/.test(text) || /^-?\d{1,3}(\.\d{3})+$/.test(text)) return amount;
+    // Kalan yalnız makine biçimli sayısal metin ("1234.5") biçimlenir.
+    if (!/^-?\d+(\.\d+)?$/.test(text)) return amount;
+  }
+  const numeric = Number(amount);
+  if (!Number.isFinite(numeric)) return "0,00";
   return new Intl.NumberFormat("tr-TR", {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
-  }).format(amount);
+  }).format(numeric);
 }
+
+/** `03.07.2026` — tarih; çözülemeyen değer boş string olur (satır boş görünür). */
+export function formatEmailDate(value?: string | number | Date | null): string {
+  if (!value) return "";
+  const date = new Date(value);
+  return Number.isNaN(date.getTime())
+    ? ""
+    : new Intl.DateTimeFormat("tr-TR", {
+        day: "2-digit",
+        month: "2-digit",
+        year: "numeric",
+      }).format(date);
+}
+
+// Şikayet tür/gerekçe etiketleri. Mail katmanı tek dilli (Türkçe) olduğu için
+// etiketler burada durur; in-app bildirimin karşılığı i18n kataloğunda ICU
+// `select` ile alıcının diline göre kurulur.
+const REPORT_TYPE_LABELS: Record<string, string> = {
+  product: "İlan",
+  user: "Kullanıcı",
+  collection: "Koleksiyon",
+  message: "Mesaj",
+};
+
+const REPORT_REASON_LABELS: Record<string, string> = {
+  spam: "Spam",
+  inappropriate_content: "Uygunsuz içerik",
+  fake_product: "Sahte/yanıltıcı ürün",
+  scam: "Dolandırıcılık",
+  harassment: "Taciz",
+  hate_speech: "Nefret söylemi",
+  counterfeit: "Taklit ürün",
+  wrong_category: "Yanlış kategori",
+  misleading_info: "Yanıltıcı bilgi",
+  other: "Diğer",
+};
+
+const reportTypeLabel = (type?: string): string =>
+  (type && REPORT_TYPE_LABELS[type]) || "İçerik";
+
+const reportReasonLabel = (reason?: string): string =>
+  (reason && REPORT_REASON_LABELS[reason]) || "Diğer";
 
 export function getEmailTemplateSubject(
   template: string,
@@ -269,6 +341,7 @@ export function getEmailTemplateSubject(
     "membership-expiring": `${data?.tierName || "Üyeliğiniz"} Sona Eriyor`,
     "membership-expiring-urgent": `${data?.tierName || "Üyeliğiniz"} Yarın Sona Eriyor!`,
     "product-approved": "Ürününüz Onaylandı",
+    "report-resolved": "Şikayetiniz Sonuçlandı",
     "seller-document-revision": "Kurumsal Başvurunuzda Belge Güncellemesi",
     "wishlist-price-change": data?.isPriceDrop
       ? `Fiyat Düştü: ${data?.productTitle || ""}`
@@ -856,6 +929,38 @@ export function renderEmailTemplate(
       </div>
     `,
       "Ürününüz Onaylandı",
+    ),
+
+    // Şikayet eden kullanıcıya kararın bildirimi. Reddedilen şikayette de aynı
+    // şablon kullanılır — fark yalnız karar cümlesi ve kutunun tonudur.
+    "report-resolved": wrapEmail(
+      `
+      ${titleBlock("Şikayetiniz Sonuçlandı", "📋")}
+      ${greeting(data?.reporterName)}
+      <p style="font-size: 15px; color: #4b5563; line-height: 1.6; margin: 0 0 20px 0;">${
+        data?.status === "dismissed"
+          ? "Bildiriminiz incelendi. Yaptığımız değerlendirme sonucunda kurallarımıza aykırı bir durum tespit edilmedi ve işlem yapılmadı."
+          : "Bildiriminiz incelendi ve gereken işlem yapıldı. Tarodan'ı daha güvenli tuttuğunuz için teşekkür ederiz."
+      }</p>
+      ${detailsBox(`
+        <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0">
+          ${detailRow("Şikayet Konusu", reportTypeLabel(data?.type))}
+          ${detailRow("Gerekçe", reportReasonLabel(data?.reason))}
+          ${detailRow("Bildirim Tarihi", formatEmailDate(data?.createdAt))}
+          ${detailRow("Sonuç", data?.status === "dismissed" ? "İşleme alınmadı" : "Sonuçlandırıldı", true)}
+        </table>
+      `)}
+      ${
+        data?.adminNote
+          ? infoBox(
+              `<p style="margin: 0 0 8px 0; font-size: 14px; font-weight: 600; color: #9a3412;">Ekibimizin açıklaması</p>
+               <p style="margin: 0; font-size: 14px; color: #7c2d12; line-height: 1.6; white-space: pre-wrap;">${data.adminNote}</p>`,
+            )
+          : ""
+      }
+      <p style="font-size: 14px; color: #6b7280; line-height: 1.6; margin: 24px 0 0 0;">Kararla ilgili sorunuz varsa bu e-postayı yanıtlayabilir ya da destek ekibimize yazabilirsiniz.</p>
+    `,
+      "Şikayetiniz Sonuçlandı",
     ),
 
     "seller-application-approved": wrapEmail(

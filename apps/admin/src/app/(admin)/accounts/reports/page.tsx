@@ -2,6 +2,7 @@
 
 "use client";
 
+import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { adminApi } from "@/lib/api";
 import { AdminPage } from "@/components/page/AdminPage";
@@ -13,6 +14,7 @@ import { reportFilterFields } from "./_lib/filters";
 
 export default function ReportsPage() {
   const t = useTranslations();
+  const router = useRouter();
   return (
     <AdminPage>
       <PageHeader
@@ -30,6 +32,7 @@ export default function ReportsPage() {
         <ResourceList.Table
           columns={reportColumns({ t })}
           emptyText={t("admin.reports.empty")}
+          onRowClick={(report) => router.push(`/accounts/reports/${report.id}`)}
         />
         <ResourceList.Pagination />
       </ResourceList>

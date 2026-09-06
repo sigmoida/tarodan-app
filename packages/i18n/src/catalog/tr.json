@@ -7289,6 +7289,45 @@
         "requestId": "Talep ID",
         "userId": "Kullanıcı ID",
         "resolution": "Dönüş/Çözüm"
+      },
+      "detail": {
+        "notFound": "Şikayet bulunamadı",
+        "active": "Aktif",
+        "banned": "Askıya alınmış",
+        "accountStatus": "Hesap durumu",
+        "userDescription": "Kullanıcının açıklaması",
+        "resolvedAt": "Sonuçlandırıldı",
+        "sellerLabel": "Satıcı",
+        "targetDeleted": "İçerik silinmiş veya erişilemiyor",
+        "ownerLabel": "Sahibi",
+        "noAdminNote": "Henüz açıklama iletilmedi",
+        "senderLabel": "Gönderen",
+        "reportInfo": "Şikayet Bilgisi",
+        "targetTitle": "Şikayet Edilen İçerik",
+        "messageContent": "Mesaj içeriği",
+        "reportedAt": "Bildirildi",
+        "noDescription": "Açıklama girilmemiş",
+        "openTarget": "İçeriği aç",
+        "reporterTitle": "Şikayet Eden",
+        "adminNote": "Kullanıcıya iletilen açıklama",
+        "listingStatus": "İlan durumu"
+      },
+      "statusModal": {
+        "noteHelp": "Şikayeti \"Çözüldü\" ya da \"Reddedildi\" olarak kapattığınızda bu metin şikayet edene bildirim ve e-posta olarak iletilir.",
+        "title": "Şikayeti sonuçlandır",
+        "updated": "Şikayet güncellendi",
+        "newStatus": "Yeni durum",
+        "notePlaceholder": "Kararınızı şikayet eden kullanıcıya kısaca açıklayın",
+        "noteLabel": "Kullanıcıya iletilecek açıklama"
+      },
+      "actions": {
+        "removeListing": "İlanı yayından kaldır",
+        "removeListingReason": "İlanın neden kaldırıldığını yazın — satıcıya bu gerekçe iletilir",
+        "banUserReason": "Askıya alma gerekçesi",
+        "banUser": "Kullanıcıyı askıya al",
+        "listingRemoved": "İlan yayından kaldırıldı",
+        "userBanned": "Kullanıcı askıya alındı",
+        "updateStatus": "Şikayeti sonuçlandır"
       }
     },
     "earlyAccess": {
@@ -7727,7 +7766,9 @@
       "bulkNoneEligible": "Seçimde bu işleme uygun kullanıcı yok",
       "bulkResendQueued": "{ok} kullanıcının aktivasyon maili kuyruğa alındı",
       "bulkResendQueuedPartial": "{ok} kuyruğa alındı, {failed} başarısız",
-      "bulkResendConfirmDesc": "Aktivasyon mailleri arka planda kuyruktan gönderilir; sonucu e-posta loglarından izleyebilirsiniz. Uygun olmayan satırlar atlanır. Devam edilsin mi?"
+      "bulkResendConfirmDesc": "Aktivasyon mailleri arka planda kuyruktan gönderilir; sonucu e-posta loglarından izleyebilirsiniz. Uygun olmayan satırlar atlanır. Devam edilsin mi?",
+      "filterLoginStateAll": "Tüm Giriş Durumları",
+      "filterLoggedIn": "Giriş Yapmış"
     },
     "roles": {
       "title": "Roller ve İzinler",
@@ -8361,7 +8402,8 @@
           "template": "Şablon",
           "action": "İşlem",
           "entityType": "Varlık türü",
-          "shipmentLeg": "Gönderi yönü"
+          "shipmentLeg": "Gönderi yönü",
+          "loginState": "Giriş durumu"
         }
       },
       "bulkActionBar": {
@@ -8827,6 +8869,10 @@
       "orderShipmentDelayed": {
         "title": "Kargonuz beklenenden uzun sürüyor",
         "message": "Kargonuzda bir süredir hareket görünmüyor. Ekibimiz taşıyıcıyla durumu takip ediyor; sizin bir işlem yapmanıza gerek yok."
+      },
+      "reportResolved": {
+        "message": "{type, select, product {Bir ilan hakkındaki} collection {Bir koleksiyon hakkındaki} message {Bir mesaj hakkındaki} other {Bir kullanıcı hakkındaki}} şikayetiniz incelendi ve {status, select, dismissed {işleme alınmadı} other {sonuçlandırıldı}}.{hasNote, select, yes { Açıklama: {note}} other {}}",
+        "title": "Şikayetiniz Sonuçlandı"
       }
     },
     "auth": {

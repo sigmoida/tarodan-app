@@ -130,6 +130,11 @@ export const EMAIL_TEMPLATE_DEFINITIONS = [
     group: "Pazarlama",
   },
   {
+    key: "report-resolved",
+    name: "Şikayet sonuçlandı (şikayet eden)",
+    group: "Şikayet",
+  },
+  {
     key: "seller-application-approved",
     name: "Kurumsal başvuru onaylandı",
     group: "Kurumsal Başvuru",

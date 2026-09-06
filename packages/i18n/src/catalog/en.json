@@ -7289,6 +7289,45 @@
         "requestId": "Request ID",
         "userId": "User ID",
         "resolution": "Response / Resolution"
+      },
+      "detail": {
+        "notFound": "Report not found",
+        "active": "Active",
+        "banned": "Suspended",
+        "accountStatus": "Account status",
+        "userDescription": "Reporter's description",
+        "resolvedAt": "Resolved",
+        "sellerLabel": "Seller",
+        "targetDeleted": "Content deleted or unavailable",
+        "ownerLabel": "Owner",
+        "noAdminNote": "No explanation sent yet",
+        "senderLabel": "Sender",
+        "reportInfo": "Report Details",
+        "targetTitle": "Reported Content",
+        "messageContent": "Message content",
+        "reportedAt": "Reported",
+        "noDescription": "No description provided",
+        "openTarget": "Open content",
+        "reporterTitle": "Reported By",
+        "adminNote": "Explanation sent to the user",
+        "listingStatus": "Listing status"
+      },
+      "statusModal": {
+        "noteHelp": "When you close the report as \"Resolved\" or \"Dismissed\", this text is sent to the reporter as a notification and an email.",
+        "title": "Resolve report",
+        "updated": "Report updated",
+        "newStatus": "New status",
+        "notePlaceholder": "Briefly explain your decision to the reporter",
+        "noteLabel": "Explanation sent to the user"
+      },
+      "actions": {
+        "removeListing": "Remove listing",
+        "removeListingReason": "Explain why the listing is removed — the seller receives this reason",
+        "banUserReason": "Suspension reason",
+        "banUser": "Suspend user",
+        "listingRemoved": "Listing removed",
+        "userBanned": "User suspended",
+        "updateStatus": "Resolve report"
       }
     },
     "earlyAccess": {
@@ -7727,7 +7766,9 @@
       "bulkNoneEligible": "No selected user is eligible for this action",
       "bulkResendQueued": "Activation e-mail queued for {ok} users",
       "bulkResendQueuedPartial": "{ok} queued, {failed} failed",
-      "bulkResendConfirmDesc": "Activation e-mails are sent from the background queue; track the outcome in the e-mail logs. Ineligible rows are skipped. Continue?"
+      "bulkResendConfirmDesc": "Activation e-mails are sent from the background queue; track the outcome in the e-mail logs. Ineligible rows are skipped. Continue?",
+      "filterLoginStateAll": "All Login States",
+      "filterLoggedIn": "Logged In"
     },
     "roles": {
       "title": "Roles & Permissions",
@@ -8361,7 +8402,8 @@
           "template": "Template",
           "action": "Action",
           "entityType": "Entity type",
-          "shipmentLeg": "Shipment leg"
+          "shipmentLeg": "Shipment leg",
+          "loginState": "Login state"
         }
       },
       "bulkActionBar": {
@@ -8827,6 +8869,10 @@
       "orderShipmentDelayed": {
         "title": "Your parcel is taking longer than expected",
         "message": "Your parcel has shown no movement for a while. Our team is following it up with the carrier; you do not need to do anything."
+      },
+      "reportResolved": {
+        "message": "Your report about {type, select, product {a listing} collection {a collection} message {a message} other {a user}} was reviewed and {status, select, dismissed {no action was taken} other {resolved}}.{hasNote, select, yes { Note: {note}} other {}}",
+        "title": "Your Report Has Been Reviewed"
       }
     },
     "auth": {

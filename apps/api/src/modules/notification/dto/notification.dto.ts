@@ -189,6 +189,9 @@ export enum NotificationType {
   // Admin'e gider (Apple App Review: engelleme/şikayet "notify the developer").
   USER_BLOCKED_ADMIN = "user_blocked_admin",
   USER_REPORTED_ADMIN = "user_reported_admin",
+
+  // Şikayet edene gider: admin şikayeti sonuçlandırdığında (çözüldü/reddedildi).
+  REPORT_RESOLVED = "report_resolved",
 }
 
 export enum NotificationChannel {

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { fmtDate, fmtDateTime, fmtNumber, fmtTry } from "./format";
+import { fmtDate, fmtDateTime, fmtNumber, fmtTime, fmtTry } from "./format";
 
 describe("fmtTry", () => {
   it("formats a number as TRY with two decimals", () => {
@@ -69,5 +69,21 @@ describe("fmtDateTime", () => {
   it("returns undefined for falsy or invalid input", () => {
     expect(fmtDateTime(null)).toBeUndefined();
     expect(fmtDateTime("garbage")).toBeUndefined();
+  });
+});
+
+describe("fmtTime", () => {
+  it("formats only the clock", () => {
+    expect(fmtTime(NOON_UTC)).toMatch(/^\d{2}:\d{2}$/);
+  });
+
+  it("agrees with the time half of fmtDateTime", () => {
+    expect(fmtDateTime(NOON_UTC)).toBe(`03.07.2026 ${fmtTime(NOON_UTC)}`);
+  });
+
+  it("returns undefined for falsy or invalid input", () => {
+    expect(fmtTime(null)).toBeUndefined();
+    expect(fmtTime(undefined)).toBeUndefined();
+    expect(fmtTime("garbage")).toBeUndefined();
   });
 });

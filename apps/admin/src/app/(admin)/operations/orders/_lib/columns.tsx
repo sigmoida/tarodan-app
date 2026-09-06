@@ -116,6 +116,11 @@ export function orderColumns({ t }: { t: T }) {
         exportValue: (o) => `${o.totalAmount} / ${o.commission}`,
       },
     ),
-    col.date<OrderGroupRow>(t("common.date"), "createdAt", { minWidth: 110 }),
+    // Sipariş saati operasyonda tarih kadar okunuyor (kargo kesimi, aynı gün
+    // içindeki sıralama) — tooltip'te kalmasın, kolonda görünsün.
+    col.date<OrderGroupRow>(t("common.date"), "createdAt", {
+      withTime: true,
+      minWidth: 140,
+    }),
   ];
 }

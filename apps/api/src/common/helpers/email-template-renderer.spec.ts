@@ -1,7 +1,9 @@
+import { Prisma } from "@prisma/client";
 import {
   EMAIL_CONTENT_END,
   EMAIL_CONTENT_START,
   extractEmailTemplateContent,
+  formatEmailPrice,
   renderEmailTemplate,
   renderStoredEmailTemplate,
 } from "./email-template-renderer";
@@ -47,6 +49,74 @@ describe("email template renderer", () => {
     );
     expect(rendered.html).toContain("{{missing.value}}");
     expect(rendered.html).not.toContain('<img src=x onerror="alert(1)">');
+  });
+
+  it("formats Prisma Decimal product prices instead of printing NaN", () => {
+    const html = renderEmailTemplate(
+      "marketing-newsletter",
+      {
+        userName: "Ali",
+        trendingProducts: [
+          {
+            title: "Ürün",
+            price: new Prisma.Decimal("1234.5"),
+            productUrl: "https://tarodan.com.tr/listings/1",
+          },
+        ],
+      },
+      { frontendUrl: "https://tarodan.com.tr" },
+    );
+
+    expect(html).toContain("1.234,50 TL");
+    expect(html).not.toContain("NaN");
+  });
+
+  it("formats amounts coming from numbers, numeric strings and Decimals alike", () => {
+    expect(formatEmailPrice(199)).toBe("199,00");
+    expect(formatEmailPrice("199.5")).toBe("199,50");
+    expect(formatEmailPrice(new Prisma.Decimal("1234.5"))).toBe("1.234,50");
+    // Zaten biçimlenmiş metin olduğu gibi geçer, çözülemeyen değer 0,00 olur.
+    expect(formatEmailPrice("1.234,50")).toBe("1.234,50");
+    // Binlik grubu ("1.234") 1,23'e düşürülmemeli.
+    expect(formatEmailPrice("1.234")).toBe("1.234");
+    expect(formatEmailPrice(undefined)).toBe("0,00");
+    expect(formatEmailPrice("")).toBe("0,00");
+  });
+
+  it("tells the reporter what was decided, and shows the admin's note", () => {
+    const html = renderEmailTemplate(
+      "report-resolved",
+      {
+        reporterName: "Ayşe",
+        type: "product",
+        reason: "counterfeit",
+        status: "resolved",
+        adminNote: "İlan yayından kaldırıldı.",
+        createdAt: "2026-07-03T12:00:00Z",
+      },
+      { frontendUrl: "https://tarodan.com.tr" },
+    );
+
+    expect(html).toContain("Şikayetiniz Sonuçlandı");
+    expect(html).toContain("İlan"); // tür etiketi
+    expect(html).toContain("Taklit ürün"); // gerekçe etiketi
+    expect(html).toContain("03.07.2026");
+    expect(html).toContain("İlan yayından kaldırıldı.");
+    expect(html).toContain("gereken işlem yapıldı");
+  });
+
+  it("says no action was taken when the report is dismissed", () => {
+    const html = renderEmailTemplate("report-resolved", {
+      reporterName: "Ayşe",
+      type: "user",
+      reason: "spam",
+      status: "dismissed",
+    });
+
+    expect(html).toContain("İşleme alınmadı");
+    expect(html).toContain("kurallarımıza aykırı bir durum tespit edilmedi");
+    // Not yoksa açıklama kutusu hiç basılmaz.
+    expect(html).not.toContain("Ekibimizin açıklaması");
   });
 
   it("extracts only the editable content from a wrapped email", () => {

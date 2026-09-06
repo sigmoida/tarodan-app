@@ -20,6 +20,7 @@ import {
   isAccountStatus,
   membershipTierParams,
   membershipLifecycleParams,
+  loginStateParams,
 } from "./_lib/types";
 import { userFilterFields } from "./_lib/filters";
 import { UsersSummary } from "./_components/UsersSummary";
@@ -60,7 +61,7 @@ export default function UsersPage() {
           key={status}
           resource="users"
           fetcher={(params) => {
-            const { membershipTier, lifecycle, ...rest } = params;
+            const { membershipTier, lifecycle, loginState, ...rest } = params;
             return adminApi
               .getUsers({
                 ...rest,
@@ -68,6 +69,7 @@ export default function UsersPage() {
                 accountStatus: status,
                 ...membershipTierParams(membershipTier),
                 ...membershipLifecycleParams(lifecycle),
+                ...loginStateParams(loginState),
               })
               .then((res) => {
                 const root = res.data ?? {};

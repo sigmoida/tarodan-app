@@ -114,7 +114,14 @@ export class UpdateReportStatusDto {
   @IsEnum(ReportStatus)
   status: ReportStatus;
 
-  @ApiPropertyOptional({ description: "Admin note about the resolution" })
+  /**
+   * Kararın gerekçesi. İÇ NOT DEĞİL: şikayet kapandığında (resolved/dismissed)
+   * şikayet edene bildirim ve e-posta ile aynen iletilir.
+   */
+  @ApiPropertyOptional({
+    description:
+      "Kararın açıklaması — şikayet kapandığında şikayet edene iletilir",
+  })
   @IsOptional()
   @IsString()
   @MaxLength(500)
