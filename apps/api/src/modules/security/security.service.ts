@@ -20,13 +20,16 @@ import {
 } from "./dto";
 import { generateTotpSecret, verifyTotpCode } from "./totp.util";
 import { i18nMessage } from "../i18n";
+import {
+  adminSessionExpiryFrom,
+  resolveAdminSessionTimeoutMinutes,
+} from "./helpers/admin-session-timeout";
 
 @Injectable()
 export class SecurityService {
   private readonly logger = new Logger(SecurityService.name);
   private readonly SECRET_BYTES = 20;
   private readonly TOKEN_EXPIRY_HOURS = 24;
-  private readonly ADMIN_SESSION_TIMEOUT_MINUTES = 30;
   private readonly CSRF_TOKEN_EXPIRY_MINUTES = 60;
 
   constructor(
@@ -551,10 +554,8 @@ export class SecurityService {
   ): Promise<string> {
     const sessionToken = crypto.randomBytes(32).toString("hex");
 
-    const expiresAt = new Date();
-    expiresAt.setMinutes(
-      expiresAt.getMinutes() + this.ADMIN_SESSION_TIMEOUT_MINUTES,
-    );
+    const timeoutMinutes = await resolveAdminSessionTimeoutMinutes(this.prisma);
+    const expiresAt = adminSessionExpiryFrom(timeoutMinutes);
 
     await this.prisma.adminSession.create({
       data: {
@@ -570,9 +571,15 @@ export class SecurityService {
   }
 
   /**
-   * Validate admin session
+   * Admin oturumunu doğrular ve AKTİVİTEYLE UZATIR (kayan pencere).
+   *
+   * Yeni son tarihi de döndürür: panelin boşta kalma uyarısını gösterebilmesi
+   * için istemcinin bu anı bilmesi gerekiyor ve tek doğru kaynak burasıdır —
+   * süre artık ayardan geldiği için istemciye sabit yazılamaz.
    */
-  async validateAdminSession(sessionToken: string): Promise<string | null> {
+  async validateAdminSession(
+    sessionToken: string,
+  ): Promise<{ adminUserId: string; expiresAt: Date } | null> {
     const session = await this.prisma.adminSession.findUnique({
       where: { sessionToken },
     });
@@ -580,11 +587,8 @@ export class SecurityService {
     if (!session) return null;
     if (session.expiresAt < new Date()) return null;
 
-    // Extend session on activity
-    const newExpiresAt = new Date();
-    newExpiresAt.setMinutes(
-      newExpiresAt.getMinutes() + this.ADMIN_SESSION_TIMEOUT_MINUTES,
-    );
+    const timeoutMinutes = await resolveAdminSessionTimeoutMinutes(this.prisma);
+    const newExpiresAt = adminSessionExpiryFrom(timeoutMinutes);
 
     await this.prisma.adminSession.update({
       where: { id: session.id },
@@ -594,7 +598,7 @@ export class SecurityService {
       },
     });
 
-    return session.adminUserId;
+    return { adminUserId: session.adminUserId, expiresAt: newExpiresAt };
   }
 
   /**

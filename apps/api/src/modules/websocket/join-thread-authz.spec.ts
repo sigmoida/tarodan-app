@@ -217,7 +217,12 @@ describe("TarodanWebSocketGateway connection authentication", () => {
       ...activeUser,
       adminUser: { id: "admin-1", isActive: true, role: "admin" },
     });
-    security.validateAdminSession.mockResolvedValue("admin-1");
+    // validateAdminSession artık son tarihi de döndürüyor (panelin boşta kalma
+    // uyarısı bunu okuyor); soket yalnız adminUserId'yi karşılaştırır.
+    security.validateAdminSession.mockResolvedValue({
+      adminUserId: "admin-1",
+      expiresAt: new Date("2026-09-07T10:30:00.000Z"),
+    });
     const client = makeClient();
 
     await gateway.handleConnection(client as any);

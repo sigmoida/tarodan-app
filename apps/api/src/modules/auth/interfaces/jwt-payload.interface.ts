@@ -20,6 +20,11 @@ export interface RequestUser {
   adminId?: string;
   /** Active admin session token; never returned by response serializers. */
   sessionToken?: string;
+  /**
+   * Admin oturumunun (kayan) bitiş anı. AdminJwtStrategy doldurur; yalnız
+   * AdminSessionHeaderInterceptor okur ve yanıt başlığına yazar.
+   */
+  sessionExpiresAt?: Date;
   role?: string;
   /** Stored locale preference; read by resolveRequestLocale (#224). */
   preferredLanguage?: string | null;

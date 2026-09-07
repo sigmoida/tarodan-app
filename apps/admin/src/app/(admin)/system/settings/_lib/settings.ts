@@ -15,9 +15,12 @@ export interface Settings {
   maxMessageLength: number;
   /** PSP (PayTR) kesinti oranı (%) — hak ediş ekranlarındaki tahmini maliyet. */
   pspFeeRate: number;
+  /** Admin panelinde boşta kalma süresi (dk) — oturumu bitiren gerçek sayaç. */
+  adminSessionTimeoutMinutes: number;
 }
 
-export type SettingsTab = "listing" | "trade" | "message" | "finance";
+export type SettingsTab =
+  "listing" | "trade" | "message" | "finance" | "security";
 /** All page tabs — "warehouse" renders its own card, not the numeric form. */
 export type SettingsPageTab = SettingsTab | "warehouse";
 
@@ -76,6 +79,15 @@ const FIELD_DEFS: Record<SettingsTab, FieldMeta[]> = {
   finance: [
     { key: "pspFeeRate", backendKey: "psp_fee_rate", min: 0, step: 0.01 },
   ],
+  // min 5: daha kısa bir değer, yöneticiyi ayarı düzeltmeye fırsat bulamadan
+  // dışarı atardı (kendini kilitleme). Backend de <5'i varsayılana düşürür.
+  security: [
+    {
+      key: "adminSessionTimeoutMinutes",
+      backendKey: "admin_session_timeout_minutes",
+      min: 5,
+    },
+  ],
 };
 
 /** Per-field translation keys (label/helper) — display-only, kept apart from `FIELD_DEFS`. */
@@ -117,6 +129,10 @@ const FIELD_LABEL_KEYS = {
     label: "admin.settings.fields.pspFeeRate.label",
     helper: "admin.settings.fields.pspFeeRate.helper",
   },
+  adminSessionTimeoutMinutes: {
+    label: "admin.settings.fields.adminSessionTimeoutMinutes.label",
+    helper: "admin.settings.fields.adminSessionTimeoutMinutes.helper",
+  },
 } as const satisfies Record<keyof Settings, { label: string; helper: string }>;
 
 export function settingsTabs(t: T): { key: SettingsPageTab; label: string }[] {
@@ -125,6 +141,7 @@ export function settingsTabs(t: T): { key: SettingsPageTab; label: string }[] {
     { key: "trade", label: t("admin.settings.tabs.trade") },
     { key: "message", label: t("admin.settings.tabs.message") },
     { key: "finance", label: t("admin.settings.tabs.finance") },
+    { key: "security", label: t("admin.settings.tabs.security") },
     { key: "warehouse", label: t("admin.settings.tabs.warehouse") },
   ];
 }
@@ -135,6 +152,7 @@ export function tabTitle(t: T): Record<SettingsTab, string> {
     trade: t("admin.settings.tabTitle.trade"),
     message: t("admin.settings.tabTitle.message"),
     finance: t("admin.settings.tabTitle.finance"),
+    security: t("admin.settings.tabTitle.security"),
   };
 }
 
@@ -151,6 +169,7 @@ export function tabFields(t: T): Record<SettingsTab, FieldDef[]> {
     trade: withLabels(FIELD_DEFS.trade),
     message: withLabels(FIELD_DEFS.message),
     finance: withLabels(FIELD_DEFS.finance),
+    security: withLabels(FIELD_DEFS.security),
   };
 }
 
@@ -165,6 +184,9 @@ const DEFAULTS: Settings = {
   maxMessageLength: 1000,
   // Ayar satırı yokken gösterimde kullanılan oran — kırılım ekranlarıyla TEK kaynak.
   pspFeeRate: DEFAULT_PSP_FEE_RATE,
+  // Backend'deki ADMIN_SESSION_TIMEOUT_SETTING.default ile aynı olmalı: ayar
+  // satırı yokken form, sunucunun gerçekte uyguladığı değeri göstermeli.
+  adminSessionTimeoutMinutes: 30,
 };
 
 /** Normalize the API response (array of key/value rows OR plain object) into Settings. */

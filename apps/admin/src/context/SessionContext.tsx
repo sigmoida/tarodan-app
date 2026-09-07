@@ -1,8 +1,12 @@
-'use client';
+"use client";
 
-import { createContext, useContext } from 'react';
-import { logoutAction } from '@/lib/server/auth-actions';
-import type { AdminUser } from '@/lib/server/session';
+import { createContext, useContext, useEffect } from "react";
+import { logoutAction } from "@/lib/server/auth-actions";
+import {
+  clearSessionDeadline,
+  publishServerDeadline,
+} from "@/lib/session-deadline";
+import type { AdminUser } from "@/lib/server/session";
 
 interface SessionValue {
   /** Always present — the (admin) layout gates on a valid session server-side. */
@@ -20,15 +24,27 @@ const SessionContext = createContext<SessionValue | null>(null);
  */
 export function SessionProvider({
   user,
+  sessionExpiresAt,
   children,
 }: {
   user: AdminUser;
+  /** Layout'un sunucuda okuduğu oturum son tarihi (ISO). */
+  sessionExpiresAt?: string | null;
   children: React.ReactNode;
 }) {
-  const logout = async (redirectTo = '/login') => {
+  // Her navigasyonda tazelenir: RSC'nin profil çağrısı oturumu uzatıyor, bu da
+  // panelin son tarihini o uzatmayla hizalar.
+  useEffect(() => {
+    publishServerDeadline(sessionExpiresAt);
+  }, [sessionExpiresAt]);
+
+  const logout = async (redirectTo = "/login") => {
     try {
       await logoutAction();
     } finally {
+      // Oturumun son tarihi localStorage'da yaşıyor; temizlenmezse bir sonraki
+      // (daha kısa pencereli) oturum eski, ileri tarihi devralırdı.
+      clearSessionDeadline();
       window.location.assign(redirectTo);
     }
   };
@@ -42,6 +58,6 @@ export function SessionProvider({
 
 export function useSession(): SessionValue {
   const ctx = useContext(SessionContext);
-  if (!ctx) throw new Error('useSession must be used within SessionProvider');
+  if (!ctx) throw new Error("useSession must be used within SessionProvider");
   return ctx;
 }

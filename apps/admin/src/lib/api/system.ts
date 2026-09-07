@@ -128,4 +128,11 @@ export const systemApi = {
   }) => api.post("/admin/moderation/ai-config", body),
   testModerationImage: (imageUrl: string) =>
     api.post("/admin/moderation/test-image", { imageUrl }),
+
+  /**
+   * Boşta kalma uyarısındaki "Devam et". Herhangi bir admin isteği oturum
+   * penceresini ileri iter; profil ucu bunların en ucuzu ve izin gerektirmeyeni.
+   * Yanıtın `x-admin-session-expires-at` başlığı yeni son tarihi getirir.
+   */
+  extendAdminSession: () => api.get("/auth/admin/profile"),
 };

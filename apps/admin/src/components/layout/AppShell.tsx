@@ -9,6 +9,7 @@ import { ForbiddenScreen } from "@/components/page/ForbiddenScreen";
 import { Sidebar } from "./Sidebar";
 import { SidebarNavDrawer } from "./SidebarNavDrawer";
 import { Topbar } from "./Topbar";
+import { SessionIdleWarning } from "./SessionIdleWarning";
 
 /**
  * The authenticated app chrome: sidebar + top bar + page content. Thin
@@ -29,6 +30,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           overlay'ini, odak tuzağını ve kaydırma kilidini getiriyor. */}
       <Sidebar />
       <SidebarNavDrawer open={open} onClose={closeSidebar} />
+      {/* Oturum bitmeden önce uyarır; çıkışı useIdleLogout yapar. */}
+      <SessionIdleWarning />
 
       {/* pt-[--admin-topbar-h] clears the fixed Topbar (which is out of flow). */}
       <div className="min-w-0 pt-[var(--admin-topbar-h)] lg:pl-[var(--admin-sidebar-w)]">

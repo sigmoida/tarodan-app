@@ -17,6 +17,12 @@ export type ApiResponseErrorHandler = (
 
 export interface CreateApiClientOptions extends AxiosRequestConfig {
   onRequest?: ApiRequestHandler;
+  /**
+   * Başarılı yanıtları gözlemler (gövdeyi DEĞİŞTİRMEK için değil). Yanıt
+   * başlıklarından yan bilgi okumak içindir — admin panelinde oturumun bitiş
+   * anı böyle taşınır. Yanıtı olduğu gibi döndürmek çağıranın sorumluluğudur.
+   */
+  onResponse?: (response: AxiosResponse) => AxiosResponse;
   onResponseError?: ApiResponseErrorHandler;
 }
 
@@ -28,6 +34,7 @@ export interface CreateApiClientOptions extends AxiosRequestConfig {
  */
 export function createApiClient({
   onRequest,
+  onResponse,
   onResponseError,
   ...axiosConfig
 }: CreateApiClientOptions): AxiosInstance {
@@ -44,7 +51,7 @@ export function createApiClient({
   }
 
   client.interceptors.response.use(
-    (response) => response,
+    (response) => (onResponse ? onResponse(response) : response),
     (error: AxiosError) =>
       onResponseError ? onResponseError(error, client) : Promise.reject(error),
   );

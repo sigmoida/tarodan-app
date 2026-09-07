@@ -99,6 +99,16 @@ export const FORWARDED_REQUEST_HEADERS = [
 ] as const;
 
 /**
+ * Yukarıdan tarayıcıya GERİ taşınan başlıklar. `content-type` ve
+ * `content-disposition` ayrıca ele alınır; bu liste onların dışındakiler için.
+ * Beyaz liste bilinçli: upstream'in her başlığını geçirmek, ileride eklenecek
+ * bir iç başlığı sessizce dışarı sızdırırdı.
+ */
+export const FORWARDED_RESPONSE_HEADERS = [
+  "x-admin-session-expires-at",
+] as const;
+
+/**
  * The BFF proxy handlers, factored out of the admin app. Every client data call
  * goes to same-origin `/api/*` (no CORS) and is forwarded to the upstream API
  * with a server-side `Bearer` header; the browser never holds the API tokens.
@@ -152,6 +162,13 @@ export function createBffProxy(session: ProxySession) {
     const disposition = upstream.headers.get("content-disposition");
     if (ct) headers.set("content-type", ct);
     if (disposition) headers.set("content-disposition", disposition);
+    // Oturumun bitiş anı: panelin boşta kalma uyarısı bunu okur. Kullanıcının
+    // zaten yaptığı isteklere iliştiği için fazladan istek doğurmaz — ayrı bir
+    // "ne kadar kaldı" ucu, sorduğu için pencereyi uzatırdı.
+    for (const name of FORWARDED_RESPONSE_HEADERS) {
+      const value = upstream.headers.get(name);
+      if (value) headers.set(name, value);
+    }
 
     const response = new NextResponse(upstream.body, {
       status: upstream.status,

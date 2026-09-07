@@ -68,10 +68,9 @@ export class JwtRefreshStrategy extends PassportStrategy(
           i18nMessage("server.auth.invalidAdminToken"),
         );
       }
-      adminId =
-        (await this.securityService.validateAdminSession(
-          payload.sessionToken,
-        )) ?? undefined;
+      adminId = (
+        await this.securityService.validateAdminSession(payload.sessionToken)
+      )?.adminUserId;
       if (!adminId) {
         throw new UnauthorizedException(
           i18nMessage("server.auth.invalidAdminToken"),

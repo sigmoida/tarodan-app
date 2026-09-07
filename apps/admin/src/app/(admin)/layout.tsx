@@ -22,7 +22,15 @@ export default async function AdminRouteLayout({
   children: React.ReactNode;
 }) {
   const pathname = (await headers()).get("x-admin-pathname");
-  const user = await getSession();
+  // Bu profil çağrısı oturumu UZATIR; son tarihi de yakala. Yanıtı gateway
+  // proxy'sinden geçmediği için başlık kendiliğinden tarayıcıya ulaşmıyor ve
+  // XHR atmayan bir sayfada panelin sayacı geride kalıyordu.
+  let sessionExpiresAt: string | null = null;
+  const user = await getSession({
+    onResponse: (res) => {
+      sessionExpiresAt = res.headers.get("x-admin-session-expires-at");
+    },
+  });
   if (!user) redirect(expiredLoginHref("session", pathname ?? "/dashboard"));
 
   const permissions = await getPermissions(user);
@@ -36,7 +44,7 @@ export default async function AdminRouteLayout({
   }
 
   return (
-    <SessionProvider user={user}>
+    <SessionProvider user={user} sessionExpiresAt={sessionExpiresAt}>
       <PermissionsProvider permissions={permissions}>
         <AdminProviders>
           <RouteMetadata />

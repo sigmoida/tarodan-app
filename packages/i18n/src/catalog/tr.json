@@ -7410,13 +7410,15 @@
         "trade": "Takas",
         "message": "Mesaj",
         "warehouse": "Depo",
-        "finance": "Finans"
+        "finance": "Finans",
+        "security": "Güvenlik"
       },
       "tabTitle": {
         "listing": "İlan Ayarları",
         "trade": "Takas Ayarları",
         "message": "Mesaj Ayarları",
-        "finance": "Finans Ayarları"
+        "finance": "Finans Ayarları",
+        "security": "Güvenlik"
       },
       "warehouse": {
         "title": "Depo Adresi",
@@ -7468,6 +7470,10 @@
         "pspFeeRate": {
           "label": "PayTR Kesinti Oranı (%)",
           "helper": "Ödeme sağlayıcısının işlem başına kestiği oran; hak ediş ekranlarında tahmini PSP maliyeti bu orandan hesaplanır"
+        },
+        "adminSessionTimeoutMinutes": {
+          "label": "Panel oturumu boşta kalma süresi (dk)",
+          "helper": "Bu süre boyunca panelde hiçbir işlem yapılmazsa oturum kapanır. Her istek süreyi baştan başlatır. Kısa değer güvenli, uzun değer rahat; ortak kullanılan bir bilgisayarda kısa tutun. En az 5 dakika. Değişiklik en geç 1 dakika içinde geçerli olur."
         }
       },
       "validation": {
@@ -8474,6 +8480,13 @@
         "emailInvalid": "Geçerli bir e-posta girin",
         "passwordMin": "Şifre en az 6 karakter olmalı",
         "codeInvalid": "6 haneli kod girin"
+      }
+    },
+    "session": {
+      "idleWarning": {
+        "title": "Oturumun sona ermek üzere",
+        "description": "Güvenlik için hareketsiz kalan oturumlar kapatılır. Kalan süre: {time}",
+        "stayLoggedIn": "Oturumda kal"
       }
     }
   },
