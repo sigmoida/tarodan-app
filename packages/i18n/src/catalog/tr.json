@@ -6456,7 +6456,8 @@
             "pspFee": "PayTR kesintisi",
             "settlementNet": "Hakediş net (satış − iade − kesinti)",
             "payouts": "Gönderilen transferler"
-          }
+          },
+          "informationalHint": "Valör farkı: bugünün satışı henüz PayTR hakediş projeksiyonuna girmedi; bu satır bilgi amaçlıdır."
         },
         "diagnostics": {
           "title": "Sağlamayı bozan kayıtlar",

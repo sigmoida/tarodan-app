@@ -9,6 +9,7 @@ import {
   PaymentStatus,
   PayoutStatus,
   PaytrStatementLineType,
+  Prisma,
   RefundAttemptStatus,
   RefundFinancialTreatment,
   RefundRequestStatus,
@@ -20,7 +21,7 @@ import {
   COLLECTED_PAYMENT_STATUSES,
   RevenueSplitService,
 } from "./revenue-split.service";
-import { splitGrossByVat } from "./helpers/revenue-split.helper";
+import { splitGrossByVat, type VatRates } from "./helpers/revenue-split.helper";
 import {
   balancedAmount,
   round2,
@@ -58,19 +59,29 @@ export class FinanceReconciliationService {
 
   async build(): Promise<FinanceReconciliation> {
     const syncEnabled = paytrReportSyncEnabled(this.config);
-    const s1 = await this.revenueSplit.compute();
+    // S3 ve PayTR karşılaştırması aynı psp_fee toplamını okur — tek sorgu.
+    const pspFeeBooked = this.pspFeeBooked();
+    const s1Promise = this.revenueSplit.compute();
     const [
+      s1,
       sellerShare,
       tradeCounterpart,
       platformNet,
       buyerRefunds,
       comparison,
     ] = await Promise.all([
+      s1Promise,
       this.sellerShareSection(),
       this.tradeCounterpartSection(),
-      this.platformNetSection(s1.platformFeesNet, s1.rates.serviceVatRate),
+      s1Promise.then((split) =>
+        this.platformNetSection(
+          split.platformFeesNet,
+          split.rates,
+          pspFeeBooked,
+        ),
+      ),
       this.buyerRefundsSection(),
-      this.pspComparison(syncEnabled),
+      this.pspComparison(syncEnabled, pspFeeBooked),
     ]);
     return {
       syncEnabled,
@@ -184,46 +195,52 @@ export class FinanceReconciliationService {
 
   /** S2b — Takas karşı taraf parası: Σ TCP.amount = release bekleyen + yolda + ödendi + iade. */
   private async tradeCounterpartSection(): Promise<ReconciliationSection> {
-    const rows = await this.prisma.tradeCashPayment.findMany({
-      where: { payment: { status: { in: [...COLLECTED_PAYMENT_STATUSES] } } },
-      select: {
-        amount: true,
-        status: true,
-        releasedAt: true,
-        payoutTransfers: {
-          select: { status: true, netAmount: true, adjustmentDeduction: true },
-        },
-      },
-    });
-    let total = 0;
-    let awaiting = 0;
-    let inTransit = 0;
-    let paid = 0;
-    let deducted = 0;
-    let refunded = 0;
-    let awaitingCount = 0;
-    let paidCount = 0;
-    for (const r of rows) {
-      const amount = num(r.amount);
-      total += amount;
-      if (r.status === PaymentStatus.refunded) {
-        refunded += amount;
-        continue;
-      }
-      const completed = r.payoutTransfers.find(
-        (p) => p.status === PayoutStatus.completed,
-      );
-      if (completed) {
-        paid += num(completed.netAmount);
-        deducted += num(completed.adjustmentDeduction);
-        paidCount++;
-      } else if (r.releasedAt) {
-        inTransit += amount;
-      } else {
-        awaiting += amount;
-        awaitingCount++;
-      }
-    }
+    const collected: Prisma.TradeCashPaymentWhereInput = {
+      payment: { status: { in: [...COLLECTED_PAYMENT_STATUSES] } },
+    };
+    const live: Prisma.TradeCashPaymentWhereInput = {
+      ...collected,
+      status: { not: PaymentStatus.refunded },
+    };
+    // Bir TCP'nin en fazla bir transferi var (tradeCashPaymentId unique); "ödendi"
+    // = tamamlanmış transfer, aksi hâlde release edildiyse yolda, edilmediyse bekliyor.
+    const noCompletedPayout = {
+      payoutTransfers: { none: { status: PayoutStatus.completed } },
+    };
+    const [all, refundedAgg, paidAgg, inTransitAgg, awaitingAgg] =
+      await Promise.all([
+        this.prisma.tradeCashPayment.aggregate({
+          where: collected,
+          _sum: { amount: true },
+          _count: { id: true },
+        }),
+        this.prisma.tradeCashPayment.aggregate({
+          where: { ...collected, status: PaymentStatus.refunded },
+          _sum: { amount: true },
+        }),
+        this.prisma.payoutTransfer.aggregate({
+          where: { status: PayoutStatus.completed, tradeCashPayment: live },
+          _sum: { netAmount: true, adjustmentDeduction: true },
+          _count: { id: true },
+        }),
+        this.prisma.tradeCashPayment.aggregate({
+          where: { ...live, releasedAt: { not: null }, ...noCompletedPayout },
+          _sum: { amount: true },
+        }),
+        this.prisma.tradeCashPayment.aggregate({
+          where: { ...live, releasedAt: null, ...noCompletedPayout },
+          _sum: { amount: true },
+          _count: { id: true },
+        }),
+      ]);
+    const total = num(all._sum.amount);
+    const awaiting = num(awaitingAgg._sum.amount);
+    const awaitingCount = awaitingAgg._count.id;
+    const inTransit = num(inTransitAgg._sum.amount);
+    const paid = num(paidAgg._sum.netAmount);
+    const deducted = num(paidAgg._sum.adjustmentDeduction);
+    const paidCount = paidAgg._count.id;
+    const refunded = num(refundedAgg._sum.amount);
     const components: ReconciliationLine[] = [
       {
         key: "awaitingRelease",
@@ -248,7 +265,7 @@ export class FinanceReconciliationService {
       total: {
         key: "tradeCounterpart",
         amount: round2(total),
-        count: rows.length,
+        count: all._count.id,
         href: "/operations/trades",
       },
       components,
@@ -257,10 +274,23 @@ export class FinanceReconciliationService {
     };
   }
 
+  /** Deftere işlenmiş PayTR kesintisi (psp_fee borç toplamı). */
+  private async pspFeeBooked(): Promise<number> {
+    const agg = await this.prisma.ledgerEntry.aggregate({
+      where: {
+        account: LedgerAccount.psp_fee,
+        direction: LedgerDirection.debit,
+      },
+      _sum: { amount: true },
+    });
+    return num(agg._sum.amount);
+  }
+
   /** S3 — Platform ücret geliri → Tarodan hak edişi (şelale). */
   private async platformNetSection(
     platformFeesNet: number,
-    serviceVatRate: number,
+    rates: VatRates,
+    pspFeeBooked: Promise<number>,
   ): Promise<ReconciliationSection> {
     const [
       refundedFees,
@@ -305,22 +335,17 @@ export class FinanceReconciliationService {
         },
         _sum: { netAmount: true },
       }),
-      this.prisma.ledgerEntry.aggregate({
-        where: {
-          account: LedgerAccount.psp_fee,
-          direction: LedgerDirection.debit,
-        },
-        _sum: { amount: true },
-      }),
+      pspFeeBooked,
     ]);
 
     const tradeFeeNet = splitGrossByVat(
       num(tradeReversed._sum.tradeFeeAmount),
-      serviceVatRate,
+      rates.serviceVatRate,
     ).net;
+    // S1 sanal siparişi standart KDV ile gelir saydı; iadesi de aynı oranla ters çevrilir.
     const virtualNet = splitGrossByVat(
       num(virtualRefunded._sum.totalAmount),
-      serviceVatRate,
+      rates.standardVatRate,
     ).net;
     const components: ReconciliationLine[] = [
       {
@@ -352,7 +377,7 @@ export class FinanceReconciliationService {
       },
       {
         key: "pspFee",
-        amount: round2(-num(pspFee._sum.amount)),
+        amount: round2(-pspFee),
         syncDependent: true,
         href: "/finance/psp",
       },
@@ -446,6 +471,7 @@ export class FinanceReconciliationService {
    */
   private async pspComparison(
     syncEnabled: boolean,
+    pspFeeBooked: Promise<number>,
   ): Promise<ComparisonSection> {
     const first = await this.prisma.paytrStatementLine.findFirst({
       orderBy: { transactionDate: "asc" },
@@ -478,8 +504,9 @@ export class FinanceReconciliationService {
         where: { type: PaytrStatementLineType.refund },
         _sum: { amount: true },
       }),
+      // Gerçekleşen + aktarılacak (projeksiyon): PayTR T+1 valörle öder; yalnız
+      // gerçekleşene bakmak her gün son günün satışını "eksik" gösterirdi.
       this.prisma.paytrSettlement.aggregate({
-        where: { isProjection: false },
         _sum: { netTotal: true },
       }),
       this.prisma.payment.aggregate({
@@ -509,13 +536,7 @@ export class FinanceReconciliationService {
         },
         _sum: { amount: true },
       }),
-      this.prisma.ledgerEntry.aggregate({
-        where: {
-          account: LedgerAccount.psp_fee,
-          direction: LedgerDirection.debit,
-        },
-        _sum: { amount: true },
-      }),
+      pspFeeBooked,
       this.prisma.payoutTransfer.aggregate({
         where: { submittedAt: { not: null } },
         _sum: { submittedAmount: true },
@@ -558,19 +579,23 @@ export class FinanceReconciliationService {
     const ourSales =
       num(ourPayments._sum.amount) + num(ourRenewals._sum.amount);
     const ourRefundTotal = num(ourRefunds._sum.amount);
-    const ourFee = num(ourPspFee._sum.amount);
+    const ourFee = ourPspFee;
     const awaiting = num(payoutsAwaiting._sum.submittedAmount);
     const rows: ComparisonRow[] = [
       row("sales", ourSales, num(theirSales._sum.amount)),
       row("refunds", ourRefundTotal, num(theirRefunds._sum.amount)),
       row("pspFee", ourFee, num(theirSales._sum.fee)),
       // Hakediş net = satış − iade − kesinti (satıcı payı dahil, merchant hesabına
-      // giren TÜM para); Tarodan hak edişiyle KARŞILAŞTIRILMAZ. Valör farkı olur.
-      row(
-        "settlementNet",
-        ourSales - ourRefundTotal - ourFee,
-        num(settlements._sum.netTotal),
-      ),
+      // giren TÜM para); Tarodan hak edişiyle KARŞILAŞTIRILMAZ. Projeksiyona
+      // girmemiş bugünkü satış yüzünden fark yapısal: bilgi satırı, kırmızı değil.
+      {
+        ...row(
+          "settlementNet",
+          ourSales - ourRefundTotal - ourFee,
+          num(settlements._sum.netTotal),
+        ),
+        informational: true,
+      },
       // PayTR transfer sonuç listesi yok: tamamlanan (callback) + geri dönen (liste)
       // ne kadarını açıklıyorsa "onlar"; kalan sonucu bekleyen talimat.
       {

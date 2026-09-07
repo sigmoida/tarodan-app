@@ -37,6 +37,7 @@ export interface ComparisonRow {
   difference: number;
   balanced: boolean;
   count?: number;
+  informational?: boolean;
 }
 
 export interface ComparisonSection {

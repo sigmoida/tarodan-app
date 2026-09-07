@@ -49,6 +49,8 @@ export interface ComparisonRow {
   balanced: boolean;
   /** Ek açıklama sayısı (ör. sonucu bekleyen payout adedi). */
   count?: number;
+  /** Fark yapısal olarak sıfır olamaz (valör gecikmesi); kırmızı değil, bilgi. */
+  informational?: boolean;
 }
 
 export interface ComparisonSection {

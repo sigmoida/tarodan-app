@@ -25,6 +25,7 @@ import {
   type PaytrSyncState,
 } from "../../../modules/payment/reconciliation/paytr-sync-state.service";
 import { AdminAuditService } from "../ops/admin-audit.service";
+import { round2 } from "../../finance-reconciliation/finance-reconciliation.types";
 import { i18nMessage } from "../../i18n";
 import type {
   PspLineFilter,
@@ -32,6 +33,13 @@ import type {
 } from "./dto/psp-reconciliation.dto";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
+/** `YYYY-MM-DD` gününün kendisi ve ±1 komşusu (oid kayması toleransı). */
+const neighbourDays = (day: string): string[] =>
+  [-1, 0, 1].map((k) =>
+    new Date(Date.parse(`${day}T00:00:00Z`) + k * DAY_MS)
+      .toISOString()
+      .slice(0, 10),
+  );
 
 export interface DayCard {
   date: string;
@@ -62,8 +70,6 @@ export interface DayCard {
   /** Eşleştiriciyle aynı tolerans (kuruş yuvarlaması). */
   tolerance: number;
 }
-
-const round2 = (n: number): number => Math.round(n * 100) / 100;
 
 /**
  * Admin PSP mutabakat okuma modeli (Faz 4). PayTR'ye canlı istek ATMAZ —
@@ -96,57 +102,78 @@ export class AdminPspReconciliationService {
     const today = trCalendarDate(now);
     const since = this.windowStart(days, now);
 
-    const [sync, lines, payments, renewals, refunds] = await Promise.all([
-      this.syncState.getState(),
-      this.prisma.paytrStatementLine.findMany({
-        where: { transactionDate: { gte: since } },
-        select: {
-          merchantOid: true,
-          type: true,
-          amount: true,
-          fee: true,
-          net: true,
-          transactionDate: true,
-          matchStatus: true,
-          ledgerRecordedAt: true,
-          resolvedAt: true,
-        },
-      }),
-      this.prisma.payment.findMany({
-        where: {
-          provider: "paytr",
-          status: { in: [PaymentStatus.completed, PaymentStatus.refunded] },
-          paidAt: { gte: since },
-        },
-        select: {
-          id: true,
-          amount: true,
-          paidAt: true,
-          providerConversationId: true,
-          metadata: true,
-        },
-      }),
-      // Üyelik yenilemeleri Payment tablosunda değildir; ciroda ve dökümde vardır.
-      this.prisma.membershipPayment.findMany({
-        where: {
-          provider: "paytr",
-          orderId: null,
-          status: { in: [PaymentStatus.completed, PaymentStatus.refunded] },
-          createdAt: { gte: since },
-        },
-        select: { id: true, amount: true, createdAt: true, merchantOid: true },
-      }),
-      this.prisma.refundAttempt.findMany({
-        where: {
-          provider: "paytr",
-          status: {
-            in: [RefundAttemptStatus.succeeded, RefundAttemptStatus.finalized],
+    const [sync, lines, priorDaySales, payments, renewals, refunds] =
+      await Promise.all([
+        this.syncState.getState(),
+        this.prisma.paytrStatementLine.findMany({
+          where: { transactionDate: { gte: since } },
+          select: {
+            merchantOid: true,
+            type: true,
+            amount: true,
+            fee: true,
+            net: true,
+            transactionDate: true,
+            matchStatus: true,
+            ledgerRecordedAt: true,
+            resolvedAt: true,
           },
-          providerSucceededAt: { gte: since },
-        },
-        select: { amount: true, providerSucceededAt: true },
-      }),
-    ]);
+        }),
+        // Pencereden bir önceki günün satış oid'leri: ilk günün ödemesinin döküm
+        // satırı komşu güne kaymış olabilir (yalnız oid kümesi için; karta işlenmez).
+        this.prisma.paytrStatementLine.findMany({
+          where: {
+            type: PaytrStatementLineType.sale,
+            transactionDate: {
+              gte: new Date(since.getTime() - DAY_MS),
+              lt: since,
+            },
+          },
+          select: { merchantOid: true, transactionDate: true },
+        }),
+        this.prisma.payment.findMany({
+          where: {
+            provider: "paytr",
+            status: { in: [PaymentStatus.completed, PaymentStatus.refunded] },
+            paidAt: { gte: since },
+          },
+          select: {
+            id: true,
+            amount: true,
+            paidAt: true,
+            providerConversationId: true,
+            metadata: true,
+          },
+        }),
+        // Üyelik yenilemeleri Payment tablosunda değildir; ciroda ve dökümde vardır.
+        this.prisma.membershipPayment.findMany({
+          where: {
+            provider: "paytr",
+            orderId: null,
+            status: { in: [PaymentStatus.completed, PaymentStatus.refunded] },
+            createdAt: { gte: since },
+          },
+          select: {
+            id: true,
+            amount: true,
+            createdAt: true,
+            merchantOid: true,
+          },
+        }),
+        this.prisma.refundAttempt.findMany({
+          where: {
+            provider: "paytr",
+            status: {
+              in: [
+                RefundAttemptStatus.succeeded,
+                RefundAttemptStatus.finalized,
+              ],
+            },
+            providerSucceededAt: { gte: since },
+          },
+          select: { amount: true, providerSucceededAt: true },
+        }),
+      ]);
 
     const cards = new Map<string, DayCard>();
     const cardOf = (date: string): DayCard => {
@@ -176,17 +203,37 @@ export class AdminPspReconciliationService {
       return card;
     };
 
-    // PayTR tarafı + pencere-GLOBAL satış oid kümesi (ters yön için). Set gün-lokal
-    // DEĞİL: gün sınırındaki ödemenin döküm satırı komşu günde olabilir.
-    const windowSaleOids = new Set<string>();
+    // PayTR tarafı + gün-bazlı satış oid kümesi (ters yön için). Bir ödeme,
+    // kendi gününün ±1 komşusundaki dökümde görünüyorsa "yok" sayılmaz —
+    // getMissingPayments ile aynı kural.
+    const saleOidsByDay = new Map<string, Set<string>>();
+    const seenInPaytr = (day: string, oids: string[]): boolean =>
+      neighbourDays(day).some((d) => {
+        const set = saleOidsByDay.get(d);
+        return !!set && oids.some((o) => set.has(o));
+      });
+    const addSaleOid = (day: string, oid: string) => {
+      let set = saleOidsByDay.get(day);
+      if (!set) saleOidsByDay.set(day, (set = new Set()));
+      set.add(oid);
+    };
+    for (const line of priorDaySales) {
+      addSaleOid(
+        line.transactionDate.toISOString().slice(0, 10),
+        line.merchantOid,
+      );
+    }
     for (const line of lines) {
-      const card = cardOf(line.transactionDate.toISOString().slice(0, 10));
+      const day = line.transactionDate.toISOString().slice(0, 10);
+      if (line.type === PaytrStatementLineType.sale) {
+        addSaleOid(day, line.merchantOid);
+      }
+      const card = cardOf(day);
       card.paytrCovered = true;
       const amount = Number(line.amount);
       if (line.type === PaytrStatementLineType.sale) {
         card.paytr.salesCount++;
         card.paytr.salesTotal += amount;
-        windowSaleOids.add(line.merchantOid);
         if (line.ledgerRecordedAt) card.ours.feeBooked += Number(line.fee ?? 0);
       } else {
         card.paytr.refundCount++;
@@ -205,26 +252,24 @@ export class AdminPspReconciliationService {
     // Bizim taraf — İSTANBUL gününe dilinir + ters yön (yalnız dökümü olan günlerde).
     for (const payment of payments) {
       if (!payment.paidAt) continue;
-      const card = cardOf(trCalendarDate(payment.paidAt));
+      const day = trCalendarDate(payment.paidAt);
+      const card = cardOf(day);
       card.ours.salesCount++;
       card.ours.salesTotal += Number(payment.amount);
       const oids = paymentOids(payment);
-      if (
-        card.paytrCovered &&
-        oids.length > 0 &&
-        !oids.some((o) => windowSaleOids.has(o))
-      ) {
+      if (card.paytrCovered && oids.length > 0 && !seenInPaytr(day, oids)) {
         card.missingInPaytr++;
       }
     }
     for (const renewal of renewals) {
-      const card = cardOf(trCalendarDate(renewal.createdAt));
+      const day = trCalendarDate(renewal.createdAt);
+      const card = cardOf(day);
       card.ours.salesCount++;
       card.ours.salesTotal += Number(renewal.amount);
       if (
         card.paytrCovered &&
         renewal.merchantOid &&
-        !windowSaleOids.has(renewal.merchantOid)
+        !seenInPaytr(day, [renewal.merchantOid])
       ) {
         card.missingInPaytr++;
       }
@@ -261,7 +306,7 @@ export class AdminPspReconciliationService {
   /**
    * Gün kartındaki "dökümde yok" sayacının listesi: o İstanbul günü bizde
    * tamamlanmış ama PayTR dökümünde hiçbir oid'i görünmeyen ödemeler. Kartla
-   * aynı kural (pencere-global oid kümesi: komşu güne kayan satır "yok" sayılmaz).
+   * aynı kural (±1 komşu günün oid kümesi: gün sınırına kayan satır "yok" sayılmaz).
    */
   async getMissingPayments(date: string): Promise<{
     date: string;
@@ -336,6 +381,7 @@ export class AdminPspReconciliationService {
       ReturnType<AdminPspReconciliationService["getMissingPayments"]>
     >["items"] = [];
     for (const p of payments) {
+      if (!p.paidAt) continue;
       const oids = paymentOids(p);
       if (oids.length === 0 || oids.some((o) => paytrOids.has(o))) continue;
       items.push({
@@ -343,7 +389,7 @@ export class AdminPspReconciliationService {
         id: p.id,
         amount: Number(p.amount),
         merchantOid: oids[0] ?? null,
-        paidAt: p.paidAt!.toISOString(),
+        paidAt: p.paidAt.toISOString(),
         reference:
           p.order?.orderNumber ??
           p.checkoutGroup?.groupNumber ??
@@ -370,7 +416,7 @@ export class AdminPspReconciliationService {
     includeResolved: boolean,
   ): Prisma.PaytrStatementLineWhereInput {
     const resolvedClause = includeResolved ? {} : { resolvedAt: null };
-    if (status === "all") return includeResolved ? {} : {};
+    if (status === "all") return resolvedClause;
     if (status && status !== "problem") {
       return { matchStatus: status, ...resolvedClause };
     }
@@ -536,17 +582,26 @@ export class AdminPspReconciliationService {
       where,
       orderBy: [{ isProjection: "asc" }, { datePaid: "desc" }],
       take: limit,
-      include: {
-        _count: { select: { items: true } },
-        items: { select: { amount: true } },
-      },
     });
+    // Kalem toplamı/sayısı DB'de gruplanır; satır satır çekilmez.
+    const itemGroups = settlements.length
+      ? await this.prisma.paytrSettlementItem.groupBy({
+          by: ["settlementId"],
+          where: { settlementId: { in: settlements.map((s) => s.id) } },
+          _sum: { amount: true },
+          _count: { _all: true },
+        })
+      : [];
+    const itemsBySettlement = new Map(
+      itemGroups.map((g) => [
+        g.settlementId,
+        { sum: Number(g._sum.amount ?? 0), count: g._count._all },
+      ]),
+    );
     return {
-      data: settlements.map(({ _count, items, ...settlement }) => {
-        const itemSum =
-          items.length > 0
-            ? items.reduce((sum, i) => sum + Number(i.amount), 0)
-            : null;
+      data: settlements.map((settlement) => {
+        const items = itemsBySettlement.get(settlement.id);
+        const itemSum = items ? items.sum : null;
         const check = settlement.isProjection
           ? { consistent: null, itemsConsistent: null }
           : PaytrReportMatchingService.settlementConsistency({
@@ -555,7 +610,7 @@ export class AdminPspReconciliationService {
             });
         return {
           ...settlement,
-          itemCount: _count.items,
+          itemCount: items?.count ?? 0,
           itemsSynced: settlement.itemsSyncedAt != null,
           ...check,
         };

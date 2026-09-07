@@ -36,6 +36,9 @@ export interface RevenueSplitResult {
  * → hold. Sipariş anındaki snapshot kolonlarından okunur; defter (eksik hesaplar)
  * kullanılmaz. Diğer her şey Prisma aggregate.
  */
+/** eLogo belgeleriyle aynı varsayılan standart KDV (env yoksa). */
+const ELOGO_DEFAULT_VAT_RATE = 20;
+
 @Injectable()
 export class RevenueSplitService {
   constructor(
@@ -63,7 +66,9 @@ export class RevenueSplitService {
     }
     if (standardVatRate === null) {
       const env = Number(this.config.get<string>("ELOGO_VAT_RATE"));
-      standardVatRate = Number.isFinite(env) && env > 0 ? env : serviceVatRate;
+      // ElogoDocumentService.resolveVatRate ile aynı son basamak: 20.
+      standardVatRate =
+        Number.isFinite(env) && env > 0 ? env : ELOGO_DEFAULT_VAT_RATE;
     }
     return { serviceVatRate, standardVatRate };
   }

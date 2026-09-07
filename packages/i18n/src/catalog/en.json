@@ -6456,7 +6456,8 @@
             "pspFee": "PayTR fee",
             "settlementNet": "Settlement net (sales − refunds − fee)",
             "payouts": "Submitted transfers"
-          }
+          },
+          "informationalHint": "Value-date lag: today's sales are not yet in PayTR's settlement projection; this row is informational."
         },
         "diagnostics": {
           "title": "Records breaking the reconciliation",

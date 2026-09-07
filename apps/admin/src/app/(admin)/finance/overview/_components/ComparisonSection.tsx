@@ -83,15 +83,20 @@ export function ComparisonSectionView({
               <td className="py-2 tabular-nums">{fmtTry(row.theirs)}</td>
               <td
                 className={`py-2 tabular-nums ${
-                  row.balanced
-                    ? "text-success-700"
-                    : "font-semibold text-danger-600"
+                  row.informational && !row.balanced
+                    ? "text-muted"
+                    : row.balanced
+                      ? "text-success-700"
+                      : "font-semibold text-danger-600"
                 }`}
+                title={
+                  row.informational ? t(`${base}.informationalHint`) : undefined
+                }
               >
                 <span className="inline-flex items-center gap-1">
                   {row.balanced ? (
                     <CheckCircleIcon className="h-4 w-4" />
-                  ) : (
+                  ) : row.informational ? null : (
                     <ExclamationTriangleIcon className="h-4 w-4" />
                   )}
                   {row.difference < 0 ? "−" : ""}

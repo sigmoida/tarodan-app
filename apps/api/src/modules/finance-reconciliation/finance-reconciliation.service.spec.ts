@@ -30,6 +30,8 @@ function makePrisma(overrides: Record<string, any> = {}) {
       aggregate: jest.fn().mockImplementation(({ where }: any) => {
         if (where.paymentHoldId)
           return agg({ netAmount: 800, adjustmentDeduction: 34 }, 1);
+        if (where.tradeCashPayment)
+          return agg({ netAmount: 150, adjustmentDeduction: 0 }, 1);
         // S4 payout satırları
         if (where.status === PayoutStatus.completed)
           return agg({ submittedAmount: 800 }, 1);
@@ -41,35 +43,15 @@ function makePrisma(overrides: Record<string, any> = {}) {
       }),
     },
     tradeCashPayment: {
-      findMany: jest.fn().mockResolvedValue([
-        {
-          amount: 300,
-          status: PaymentStatus.completed,
-          releasedAt: null,
-          payoutTransfers: [],
-        },
-        {
-          amount: 150,
-          status: PaymentStatus.completed,
-          releasedAt: new Date(),
-          payoutTransfers: [
-            {
-              status: PayoutStatus.completed,
-              netAmount: 150,
-              adjustmentDeduction: 0,
-            },
-          ],
-        },
-        {
-          amount: 50,
-          status: PaymentStatus.refunded,
-          releasedAt: null,
-          payoutTransfers: [],
-        },
-      ]),
-      aggregate: jest
-        .fn()
-        .mockResolvedValue({ _sum: { tradeFeeAmount: 0, commission: 0 } }),
+      // 300 bekliyor (release yok), 150 ödendi (transfer tamam), 50 iade.
+      aggregate: jest.fn().mockImplementation(({ where }: any) => {
+        if (where.fullRefundEntitled)
+          return { _sum: { tradeFeeAmount: 0, commission: 0 } };
+        if (where.status === PaymentStatus.refunded) return agg({ amount: 50 });
+        if (where.releasedAt === null) return agg({ amount: 300 }, 1);
+        if (where.releasedAt?.not === null) return agg({ amount: 0 });
+        return agg({ amount: 500 }, 3);
+      }),
     },
     commissionLedger: {
       aggregate: jest
@@ -270,7 +252,12 @@ describe("FinanceReconciliationService.build", () => {
       ours: 2365.2,
       theirs: 2365.2,
       balanced: true,
+      informational: true,
     });
+    // Gerçekleşen + projeksiyon birlikte (valör): isProjection filtresi YOK.
+    expect(
+      prisma.paytrSettlement.aggregate.mock.calls[0][0].where,
+    ).toBeUndefined();
     expect(rows.payouts).toMatchObject({
       ours: 890,
       theirs: 800,

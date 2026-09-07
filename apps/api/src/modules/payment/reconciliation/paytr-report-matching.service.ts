@@ -14,7 +14,11 @@ import { istanbulDayStart } from "../../../common/helpers/tr-calendar";
 
 /** Tutar eşlemesi toleransı (kuruş yuvarlamaları). Gün kartı farkı da bunu kullanır. */
 export const MATCH_TOLERANCE_TL = 0.05;
-/** Bir sorguda çekilecek satır (cursor döngüsü tümünü gezer). */
+/**
+ * Bir sorguda çekilecek satır. Döngü aynı sorguyu yineler: işlenen her satır
+ * damgalanıp (lastMatchAttemptAt/matchStatus) where'den düştüğü için cursor gerekmez —
+ * cursor satırı damgalandığında Prisma yeniden-denenecek eski satırları atlıyordu.
+ */
 const MATCH_PAGE = 200;
 /** Bir gecede en fazla denenecek satır — kalıcı karşılıksızlar büyüse de sınır. */
 const MATCH_MAX_PER_RUN = 2000;
@@ -119,7 +123,6 @@ export class PaytrReportMatchingService {
     let mismatched = 0;
     let unmatched = 0;
     let processed = 0;
-    let cursor: string | undefined;
 
     while (processed < MATCH_MAX_PER_RUN) {
       const lines = await this.prisma.paytrStatementLine.findMany({
@@ -137,8 +140,7 @@ export class PaytrReportMatchingService {
           { transactionDate: "asc" },
           { id: "asc" },
         ],
-        take: MATCH_PAGE,
-        ...(cursor ? { skip: 1, cursor: { id: cursor } } : {}),
+        take: Math.min(MATCH_PAGE, MATCH_MAX_PER_RUN - processed),
       });
       if (lines.length === 0) break;
 
@@ -149,7 +151,6 @@ export class PaytrReportMatchingService {
         else if (outcome === "mismatched") mismatched++;
         else unmatched++;
       }
-      cursor = lines[lines.length - 1].id;
       if (lines.length < MATCH_PAGE) break;
     }
 
@@ -187,6 +188,29 @@ export class PaytrReportMatchingService {
   }
 
   /**
+   * Karşı tarafı (Payment/MembershipPayment) zaten TÜKETMİŞ başka bir döküm
+   * satırı var mı? Yalnız `matched` satır tüketir: `amount_mismatch` satırı
+   * geçici bağdır (admin "çözümledi" diye işaretlese de kalır) ve aynı oid'in
+   * düzeltilmiş ikinci satırının eşleşmesini engellememeli.
+   */
+  private consumedBy(
+    linkField: "paymentId" | "membershipPaymentId",
+    counterpartId: string,
+    type: PaytrStatementLineType,
+    lineId: string,
+  ): Promise<{ id: string } | null> {
+    return this.prisma.paytrStatementLine.findFirst({
+      where: {
+        [linkField]: counterpartId,
+        type,
+        id: { not: lineId },
+        matchStatus: PaytrMatchStatus.matched,
+      },
+      select: { id: true },
+    });
+  }
+
+  /**
    * Tek satırın eşleştirilmesi. Her denemede `lastMatchAttemptAt` damgalanır.
    * Tüketilmiş karşılık koruması: aynı Payment/RefundAttempt'e ikinci bir satır
    * bağlanamaz — çift tahsilat/çift iade `unmatched` kalır ve PAYTR_DUPLICATE_LINE
@@ -212,15 +236,12 @@ export class PaytrReportMatchingService {
       }
       const linkField =
         counterpart.kind === "payment" ? "paymentId" : "membershipPaymentId";
-      const alreadyLinked = await this.prisma.paytrStatementLine.findFirst({
-        where: {
-          [linkField]: counterpart.id,
-          type: PaytrStatementLineType.sale,
-          id: { not: line.id },
-          matchStatus: { not: PaytrMatchStatus.unmatched },
-        },
-        select: { id: true },
-      });
+      const alreadyLinked = await this.consumedBy(
+        linkField,
+        counterpart.id,
+        PaytrStatementLineType.sale,
+        line.id,
+      );
       if (alreadyLinked) {
         this.logger.error(
           `PAYTR_DUPLICATE_LINE: satış satırı ${line.id} oid=${line.merchantOid} ` +
@@ -260,7 +281,7 @@ export class PaytrReportMatchingService {
         type: PaytrStatementLineType.refund,
         id: { not: line.id },
         refundAttemptId: { not: null },
-        matchStatus: { not: PaytrMatchStatus.unmatched },
+        matchStatus: PaytrMatchStatus.matched,
       },
       select: { refundAttemptId: true },
     });
@@ -317,6 +338,23 @@ export class PaytrReportMatchingService {
       select: { id: true, amount: true },
     });
     if (membership && this.amountsAgree(membership.amount, line.amount)) {
+      const alreadyLinked = await this.consumedBy(
+        "membershipPaymentId",
+        membership.id,
+        PaytrStatementLineType.refund,
+        line.id,
+      );
+      if (alreadyLinked) {
+        this.logger.error(
+          `PAYTR_DUPLICATE_LINE: iade satırı ${line.id} oid=${line.merchantOid} ` +
+            `zaten ${alreadyLinked.id} ile eşleşmiş üyelik ödemesi ${membership.id}'a bağlanmak istiyor — çift iade olabilir`,
+        );
+        await this.prisma.paytrStatementLine.update({
+          where: { id: line.id },
+          data: stamp,
+        });
+        return "unmatched";
+      }
       await this.prisma.paytrStatementLine.update({
         where: { id: line.id },
         data: {

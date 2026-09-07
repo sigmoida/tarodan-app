@@ -27,6 +27,7 @@ function makePrisma(opts: {
   renewals?: any[];
   refunds?: any[];
   settlements?: any[];
+  settlementItemGroups?: any[];
   linesList?: any[];
   linesCount?: number;
   paymentRows?: any[];
@@ -38,6 +39,10 @@ function makePrisma(opts: {
       findMany: jest.fn().mockImplementation((args: any) => {
         if (args?.skip !== undefined) {
           return Promise.resolve(opts.linesList ?? []);
+        }
+        // Özet: pencere öncesi günün satış oid'leri (type + transactionDate seçili) — testlerde boş.
+        if (args?.where?.type !== undefined && args?.select?.transactionDate) {
+          return Promise.resolve([]);
         }
         return Promise.resolve(opts.lines ?? []);
       }),
@@ -74,6 +79,9 @@ function makePrisma(opts: {
     },
     paytrSettlement: {
       findMany: jest.fn().mockResolvedValue(opts.settlements ?? []),
+    },
+    paytrSettlementItem: {
+      groupBy: jest.fn().mockResolvedValue(opts.settlementItemGroups ?? []),
     },
   };
 }
@@ -519,8 +527,6 @@ describe("AdminPspReconciliationService.getSettlements", () => {
           isProjection: false,
           merchantIban: "TR00...01",
           itemsSyncedAt: new Date(),
-          _count: { items: 2 },
-          items: [{ amount: 900 }, { amount: 50.95 }],
         },
         {
           id: "stl-bad",
@@ -531,8 +537,13 @@ describe("AdminPspReconciliationService.getSettlements", () => {
           isProjection: false,
           merchantIban: null,
           itemsSyncedAt: null,
-          _count: { items: 0 },
-          items: [],
+        },
+      ],
+      settlementItemGroups: [
+        {
+          settlementId: "stl-1",
+          _sum: { amount: 950.95 },
+          _count: { _all: 2 },
         },
       ],
     });

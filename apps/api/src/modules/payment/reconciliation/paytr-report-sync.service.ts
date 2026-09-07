@@ -156,16 +156,16 @@ export class PaytrReportSyncService {
     const projections = summaries.filter((s) => s.projection && s.datePaid);
     await this.prisma.$transaction(async (tx) => {
       await tx.paytrSettlement.deleteMany({ where: { isProjection: true } });
-      for (const summary of projections) {
-        await tx.paytrSettlement.create({
-          data: {
-            datePaid: new Date(`${summary.datePaid}T00:00:00Z`),
-            currency: summary.currency,
-            isProjection: true,
-            ...toRow(summary),
-          },
-        });
-      }
+      if (projections.length === 0) return;
+      // Tek INSERT: satır satır create etkileşimli işlemin 5 sn sınırını zorluyordu.
+      await tx.paytrSettlement.createMany({
+        data: projections.map((summary) => ({
+          datePaid: new Date(`${summary.datePaid}T00:00:00Z`),
+          currency: summary.currency,
+          isProjection: true,
+          ...toRow(summary),
+        })),
+      });
     });
 
     for (const summary of summaries) {

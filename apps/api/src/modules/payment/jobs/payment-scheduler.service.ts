@@ -79,10 +79,10 @@ export class PaymentSchedulerService implements OnModuleInit {
     }
     try {
       return await this.syncPaytrStatementEnabled(log);
-    } catch (error: any) {
+    } catch (error: unknown) {
       await this.paytrSyncState.recordRun("statement", {
         status: "error",
-        error: String(error?.message ?? error),
+        error: error instanceof Error ? error.message : String(error),
       });
       throw error;
     }
@@ -128,10 +128,10 @@ export class PaymentSchedulerService implements OnModuleInit {
     }
     try {
       return await this.syncPaytrSettlementsEnabled(log);
-    } catch (error: any) {
+    } catch (error: unknown) {
       await this.paytrSyncState.recordRun("settlement", {
         status: "error",
-        error: String(error?.message ?? error),
+        error: error instanceof Error ? error.message : String(error),
       });
       throw error;
     }

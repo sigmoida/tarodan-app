@@ -30,7 +30,7 @@ function makePrisma(opts: { itemsSyncedAt?: Date | null } = {}) {
         }),
       ),
       deleteMany: jest.fn().mockResolvedValue({ count: 0 }),
-      create: jest.fn().mockResolvedValue({}),
+      createMany: jest.fn().mockResolvedValue({ count: 1 }),
       update: jest.fn().mockResolvedValue({}),
     },
     paytrSettlementItem: {
@@ -246,11 +246,9 @@ describe("PaytrReportSyncService.syncSettlements", () => {
     expect(prisma.paytrSettlement.deleteMany).toHaveBeenCalledWith({
       where: { isProjection: true },
     });
-    expect(prisma.paytrSettlement.create).toHaveBeenCalledWith(
-      expect.objectContaining({
-        data: expect.objectContaining({ isProjection: true, netTotal: 97 }),
-      }),
-    );
+    expect(prisma.paytrSettlement.createMany).toHaveBeenCalledWith({
+      data: [expect.objectContaining({ isProjection: true, netTotal: 97 })],
+    });
     // Projeksiyonun detayı yoktur — odeme-detayi çağrılmaz.
     expect(getSettlementDetail).not.toHaveBeenCalled();
   });
