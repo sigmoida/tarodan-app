@@ -55,7 +55,15 @@ export interface SessionToolkit<TUser> {
    * session that no longer exists.
    */
   clearSessionCookies: (res: NextResponse) => void;
-  getSession: () => Promise<TUser | null>;
+  /**
+   * `onResponse`: upstream profil yanıtını çağrı başına görmek isteyen çağıran
+   * için (admin paneli oturum son tarihi başlığını böyle okur). Modül düzeyinde
+   * saklanmaz — sunucu süreci istekler arasında paylaşıldığı için bir
+   * kullanıcının oturum bilgisi diğerine sızardı.
+   */
+  getSession: (opts?: {
+    onResponse?: (res: Response) => void;
+  }) => Promise<TUser | null>;
   apiBaseUrl: () => string;
 }
 
@@ -269,7 +277,16 @@ export function createSession<TUser>(
       res.cookies.set(indicatorCookie, "", { path: "/", maxAge: 0 });
   };
 
-  async function getSession(): Promise<TUser | null> {
+  /**
+   * Oturumu çözer. `onResponse`, upstream yanıtını ÇAĞRI BAŞINA görmek isteyen
+   * çağıran içindir (admin paneli oturum son tarihi başlığını böyle okur).
+   * Bilerek callback: değeri modül düzeyinde saklamak, sunucu süreci istekler
+   * arasında paylaşıldığı için bir kullanıcının oturum bilgisini diğerine
+   * sızdırırdı.
+   */
+  async function getSession(opts?: {
+    onResponse?: (res: Response) => void;
+  }): Promise<TUser | null> {
     // apiFetch üzerinden: süresi dolmuş access REFRESH edilir (rotasyon cache'i
     // + API grace penceresiyle güvenli). Eski çıplak-fetch hali herhangi bir
     // 401'de refresh denemeden null dönüyor ve layout guard'ları canlı oturumu
@@ -277,6 +294,7 @@ export function createSession<TUser>(
     const { access, refresh } = await readTokens();
     if (!access && !refresh) return null;
     const { res } = await apiFetch(endpoints.profile);
+    opts?.onResponse?.(res);
     if (!res.ok) return null;
     const raw = await res.json().catch(() => null);
     return mapUser(raw);

@@ -7410,13 +7410,15 @@
         "trade": "Trade",
         "message": "Message",
         "warehouse": "Warehouse",
-        "finance": "Finance"
+        "finance": "Finance",
+        "security": "Security"
       },
       "tabTitle": {
         "listing": "Listing Settings",
         "trade": "Trade Settings",
         "message": "Message Settings",
-        "finance": "Finance settings"
+        "finance": "Finance settings",
+        "security": "Security"
       },
       "warehouse": {
         "title": "Warehouse Address",
@@ -7468,6 +7470,10 @@
         "pspFeeRate": {
           "label": "PayTR fee rate (%)",
           "helper": "Rate the payment provider deducts per transaction; the estimated PSP cost on payout screens is derived from it"
+        },
+        "adminSessionTimeoutMinutes": {
+          "label": "Panel idle timeout (minutes)",
+          "helper": "The session closes after this long with no activity in the panel. Every request restarts the clock. Short is safer, long is more comfortable; keep it short on a shared computer. Minimum 5 minutes. Changes take effect within a minute."
         }
       },
       "validation": {
@@ -8474,6 +8480,13 @@
         "emailInvalid": "Enter a valid email",
         "passwordMin": "Password must be at least 6 characters",
         "codeInvalid": "Enter a 6-digit code"
+      }
+    },
+    "session": {
+      "idleWarning": {
+        "title": "Your session is about to end",
+        "description": "Idle sessions are closed for security. Time left: {time}",
+        "stayLoggedIn": "Stay signed in"
       }
     }
   },

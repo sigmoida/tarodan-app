@@ -40,10 +40,10 @@ export class AdminJwtStrategy extends PassportStrategy(Strategy, "admin-jwt") {
         i18nMessage("server.auth.invalidAdminToken"),
       );
     }
-    const sessionAdminId = await this.securityService.validateAdminSession(
+    const session = await this.securityService.validateAdminSession(
       payload.sessionToken,
     );
-    if (!sessionAdminId) {
+    if (!session) {
       throw new UnauthorizedException(
         i18nMessage("server.auth.invalidAdminToken"),
       );
@@ -52,7 +52,7 @@ export class AdminJwtStrategy extends PassportStrategy(Strategy, "admin-jwt") {
     // Check if admin user exists and is active – select only User columns that exist in DB
     const adminUser = await this.prisma.adminUser.findFirst({
       where: {
-        id: sessionAdminId,
+        id: session.adminUserId,
         userId: payload.sub,
         isActive: true,
       },
@@ -89,6 +89,9 @@ export class AdminJwtStrategy extends PassportStrategy(Strategy, "admin-jwt") {
       isAdmin: true,
       adminId: adminUser.id,
       sessionToken: payload.sessionToken,
+      // Panelin boşta kalma uyarısı bu andan beslenir; interceptor yanıt
+      // başlığına yazar. Kayan pencere olduğu için her istekte tazelenir.
+      sessionExpiresAt: session.expiresAt,
       role: adminUser.role,
     };
   }

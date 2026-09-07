@@ -1,4 +1,8 @@
 import { BadRequestException, Injectable } from "@nestjs/common";
+import {
+  ADMIN_SESSION_TIMEOUT_SETTING,
+  resetAdminSessionTimeoutCache,
+} from "../../security/helpers/admin-session-timeout";
 import { MembershipTierType, SellerType } from "@prisma/client";
 import { PrismaService } from "../../../prisma";
 import { AdminAuditService } from "./admin-audit.service";
@@ -100,6 +104,19 @@ export class AdminSettingsService {
         i18nMessage("server.admin.membership.monthlyPriceRange"),
       );
     }
+    // Panel oturum süresi: min altındaki bir değer sessizce varsayılana
+    // düşüyordu — ayar ekranı 2 dk gösterirken sunucu 30 dk uygulardı. Reddet.
+    if (
+      dto.key === ADMIN_SESSION_TIMEOUT_SETTING.key &&
+      (!Number.isFinite(numericValue) ||
+        numericValue < ADMIN_SESSION_TIMEOUT_SETTING.min)
+    ) {
+      throw new BadRequestException(
+        i18nMessage("validation.minValue", {
+          min: ADMIN_SESSION_TIMEOUT_SETTING.min,
+        }),
+      );
+    }
     if (
       dto.key === "yearly_discount_percentage" &&
       (!Number.isFinite(numericValue) || numericValue < 0 || numericValue > 90)
@@ -171,6 +188,12 @@ export class AdminSettingsService {
         existing,
         setting,
       );
+    }
+
+    // Oturum süresi cache'li okunuyor (sıcak yol); kaydeden yönetici değişikliği
+    // 60 sn beklemeden görmeli.
+    if (dto.key === ADMIN_SESSION_TIMEOUT_SETTING.key) {
+      resetAdminSessionTimeoutCache();
     }
 
     return setting;

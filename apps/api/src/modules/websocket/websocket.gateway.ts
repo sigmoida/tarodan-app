@@ -125,7 +125,7 @@ export class TarodanWebSocketGateway
         (authScope === "admin" &&
           (!payload.isAdmin ||
             !isActiveAdmin ||
-            sessionAdminId !== user.adminUser?.id))
+            sessionAdminId?.adminUserId !== user.adminUser?.id))
       ) {
         throw new Error("Inactive user");
       }

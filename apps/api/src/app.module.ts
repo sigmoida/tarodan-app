@@ -108,6 +108,7 @@ import { EventEmitterModule } from "@nestjs/event-emitter";
 import { ErrorLogInterceptor } from "./common/interceptors/error-log.interceptor";
 import { BlockedIpGuard } from "./common/guards/blocked-ip.guard";
 import { StripSensitiveFieldsInterceptor } from "./common/interceptors/strip-sensitive-fields.interceptor";
+import { AdminSessionHeaderInterceptor } from "./common/interceptors/admin-session-header.interceptor";
 import { AllExceptionsFilter } from "./common/filters/all-exceptions.filter";
 import { isTest } from "./config/environment";
 
@@ -295,6 +296,12 @@ import { isTest } from "./config/environment";
     {
       provide: APP_INTERCEPTOR,
       useClass: StripSensitiveFieldsInterceptor,
+    },
+    // Admin oturumunun bitiş anını yanıt başlığına yazar; panel boşta kalma
+    // uyarısını buradan besler (ayrı bir uç pencereyi uzatırdı).
+    {
+      provide: APP_INTERCEPTOR,
+      useClass: AdminSessionHeaderInterceptor,
     },
     // Global exception filter — maps Prisma errors to clean 4xx and sanitizes
     // any unhandled 5xx so no internal detail leaks to clients (#70).

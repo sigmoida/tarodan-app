@@ -20,6 +20,19 @@ const POST_DELIVERY_HOT_HOURS = 48;
 const returnWindowDays = (): number =>
   envConfigNumber(PAYMENT_CONFIG_KEYS.RETURN_WINDOW_DAYS);
 
+/**
+ * Başarısız koli listesini alarm metnine sığacak hâle getirir. Alarm tek satır
+ * okunuyor; hepsini basmak mesajı kullanılmaz yapar, hiçbirini basmamak da
+ * teşhis edilemez (yaşanan durum buydu). İlk birkaçı + kalan sayısı.
+ */
+const MAX_LISTED_FAILURES = 3;
+const describeFailures = (failures: string[] = []): string => {
+  if (failures.length === 0) return "";
+  const listed = failures.slice(0, MAX_LISTED_FAILURES).join(", ");
+  const rest = failures.length - MAX_LISTED_FAILURES;
+  return `: ${listed}${rest > 0 ? ` (+${rest} kayıt daha)` : ""}`;
+};
+
 @Injectable()
 export class ShippingSchedulerService implements OnModuleInit {
   private readonly logger = new Logger(ShippingSchedulerService.name);
@@ -93,10 +106,15 @@ export class ShippingSchedulerService implements OnModuleInit {
       if (result.failed > 0) {
         throw new CronStepFailuresError(
           [step],
-          [`${step}: ${result.failed} kayıt senkronlanamadı`],
+          [
+            `${step}: ${result.failed} kayıt senkronlanamadı${describeFailures(result.failures)}`,
+          ],
         );
       }
-      return { summary, stats: { ...result } };
+      // `stats` sayısal telemetri (Record<string, number>); failures metinsel
+      // teşhis bilgisi ve yeri alarm mesajı — ikisi karışmasın.
+      const { failures: _failures, ...counts } = result;
+      return { summary, stats: counts };
     } catch (error: any) {
       if (error instanceof CronStepFailuresError) throw error;
       this.logger.error(`${step} error: ${error?.message}`);
@@ -165,13 +183,18 @@ export class ShippingSchedulerService implements OnModuleInit {
       stats.shipmentPending = result.pending;
       stats.failed += result.failed;
       if (result.failed > 0) {
+        // Sebebi alarmın METNİNE koy: bu Sentry olayı 30 dakikada bir tekrar
+        // ediyordu ve hangi koli, neden başarısız hiçbir yerde yazmıyordu.
         recordStepFailure(
           "order-tracking-records",
-          new Error(`${result.failed} kayıt senkronlanamadı`),
+          new Error(
+            `${result.failed} kayıt senkronlanamadı${describeFailures(result.failures)}`,
+          ),
         );
       }
       log(
-        `Sipariş kargo senkron: ${result.synced} güncellendi, ${result.pending} kabul bekliyor, ${result.failed} başarısız`,
+        `Sipariş kargo senkron: ${result.synced} güncellendi, ${result.pending} kabul bekliyor, ` +
+          `${result.skipped} atlandı (taşıyıcı kodu geriye sardı), ${result.failed} başarısız`,
       );
       if (result.synced > 0 || result.failed > 0) {
         this.logger.log(

@@ -1,6 +1,7 @@
 import { createApiClient } from "@tarodan/api-client";
 import { defaultLocale, formatMessage, getMessages } from "@tarodan/i18n";
 import { expiredLoginHref } from "@/lib/auth-redirect";
+import { readSessionDeadline } from "@/lib/session-deadline";
 
 let isRedirectingToLogin = false;
 
@@ -13,6 +14,12 @@ let isRedirectingToLogin = false;
 export const api = createApiClient({
   baseURL: "/gateway",
   headers: { "Content-Type": "application/json" },
+  // Oturumun bitiş anı her admin yanıtının başlığında gelir; boşta kalma
+  // uyarısı bunu okur. Gövdeye dokunulmaz.
+  onResponse: (response) => {
+    readSessionDeadline(response.headers);
+    return response;
+  },
   // On 401, retry the request ONCE before giving up. A transient 401
   // happens when a sibling BFF call is rotating the session cookie.
   onResponseError: async (error, client) => {
