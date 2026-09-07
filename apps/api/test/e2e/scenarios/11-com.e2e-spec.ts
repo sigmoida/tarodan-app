@@ -1136,7 +1136,8 @@ describe("11 — Komisyon & Ödeme/Payout (COM)", () => {
       expect(payout!.transferIban).toBe(IBAN_A);
       expect(payout!.transferName).toBe("Mehmet Yılmaz");
       expect(Number(payout!.netAmount)).toBeGreaterThan(0);
-      expect(payout!.transId.startsWith("ORD")).toBe(true);
+      // PayTR trans_id: tiresiz PYT referansı (payout-trans-id.ts).
+      expect(payout!.transId).toMatch(/^PYT[A-Z0-9]{10}$/);
     });
 
     scenario("COM-036", async () => {
@@ -1206,7 +1207,7 @@ describe("11 — Komisyon & Ödeme/Payout (COM)", () => {
       expect(payout!.sellerId).toBe(recipient.id);
       expect(payout!.transferIban).toBe(IBAN_A);
       expect(payout!.status).toBe(PayoutStatus.pending);
-      expect(payout!.transId.startsWith("TRD")).toBe(true);
+      expect(payout!.transId).toMatch(/^PYT[A-Z0-9]{10}$/);
     });
 
     scenario("COM-038", async () => {
@@ -2273,7 +2274,8 @@ describe("11 — Komisyon & Ödeme/Payout (COM)", () => {
       });
       expect(after!.status).toBe(PayoutStatus.pending);
       expect(after!.transId).not.toBe(oldTransId);
-      expect(after!.transId).toContain("R");
+      // Yeni referans da PayTR uyumlu (tiresiz) olmalı.
+      expect(after!.transId).toMatch(/^PYT[A-Z0-9]{10}$/);
     });
 
     scenario("COM-074", async () => {

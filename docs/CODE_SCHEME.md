@@ -49,9 +49,16 @@ son güvence ilgili kolondaki `@unique`.
 | `GST` | Misafir iletişim kaydı                                  |
 | `BST` | Öne çıkarma / vitrin siparişi                           |
 | `MEM` | Üyelik siparişi                                         |
-| `PYT` | Satıcıya para gönderimi                                 |
+| `PYT` | Satıcıya para gönderimi — **tiresiz** (`PYTK7X9M2QF3N`) |
 | `SHP` | Kargo entegrasyonu kapalıyken yedek takip no            |
 | `VCH` | Hediye / kupon kodu (yönetici öneki geçersiz kılabilir) |
+
+**PYT istisnası:** PayTR Platform Transfer `trans_id` alanı yalnız harf/rakam
+kabul eder (≤60). Tireli `PYT-…` üretimde reddedildi; payout referansı bu
+yüzden tiresiz üretilir (`common/helpers/payout-trans-id.ts`). Tire yalnız
+gönderirken silinemez: PayTR sonuç callback'i ve dönen transfer listesi numarayı
+aldığı biçimde döndürür, veritabanıyla eşleşmezdi. Eski tireli satırlar payout
+işleme anında tek noktada yeniden üretilir.
 
 ### 2.1 Sipariş üç seviyede numaralanır
 

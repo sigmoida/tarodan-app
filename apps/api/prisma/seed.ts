@@ -52,6 +52,7 @@ import {
   reprefixReference,
 } from "../src/common/helpers/code-prefixes";
 import { generateReferenceCode } from "../src/common/helpers/generate-reference";
+import { generatePayoutTransIdCode } from "../src/common/helpers/payout-trans-id";
 import { publicProductRatingWhere } from "../src/common/helpers/public-rating";
 import {
   formatElogoInvoiceNumber,
@@ -104,8 +105,8 @@ const generateOrderNumber = () => generateReferenceCode(REFERENCE_PREFIX.order);
 const generateTradeNumber = () => generateReferenceCode(REFERENCE_PREFIX.trade);
 const generateTicketNumber = () =>
   generateReferenceCode(REFERENCE_PREFIX.supportTicket);
-const generatePayoutRef = () =>
-  generateReferenceCode(REFERENCE_PREFIX.payoutTransfer);
+// PayTR trans_id tiresizdir — runtime ile aynı yardımcı (payout-trans-id.ts).
+const generatePayoutRef = () => generatePayoutTransIdCode();
 
 /** Tek satıcılı sepette grup no sipariş numarasından türetilir (runtime ile aynı). */
 const groupNumberFor = (orderNumber: string) =>
