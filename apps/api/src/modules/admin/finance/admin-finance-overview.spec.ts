@@ -3,8 +3,8 @@ import { AdminFinanceService } from "./admin-finance.service";
 /**
  * Finans özeti: admin'in "para nerede?" sorusuna TEK bakışta cevap.
  *
- * Huni: Tahsilat (dönem) → Escrow'da bekleyen (anlık) → Satıcıya transfer
- * edilen (dönem) → Platform NET geliri (dönem, ledger formülü). Sağlık şeridi:
+ * Huni: Tahsilat (tüm zaman) → Escrow'da bekleyen (anlık) → Satıcıya transfer
+ * edilen (tüm zaman) → Platform NET geliri (tüm zaman, ledger formülü). Sağlık şeridi:
  * başarısız/dönen transferler, süresi geçmiş hold'lar, faturasız teslimatlar,
  * deneme bütçesi tükenmiş eLogo belgeleri, açık satıcı borçları. Bu sayılar
  * zaten üretiliyordu ama yalnız log'a gidiyordu — admin yüzeyine iner.
@@ -47,7 +47,7 @@ describe("AdminFinanceService.getFinanceOverview", () => {
           .mockResolvedValue({ _sum: { totalAmount: 0 }, _count: { id: 0 } }),
       },
       elogoInvoice: { count: jest.fn().mockResolvedValue(1) }, // tükenen
-      // Dönemin GERÇEK PSP kesintisi: defterdeki psp_fee debit toplamı
+      // GERÇEK PSP kesintisi: defterdeki psp_fee debit toplamı
       // (PayTR ekstresinden eşleştirilip yazılır) — tahmini oran DEĞİL.
       ledgerEntry: {
         aggregate: jest.fn().mockResolvedValue({ _sum: { amount: 30 } }),
@@ -181,6 +181,36 @@ describe("AdminFinanceService.getFinanceOverview", () => {
 
     expect(result.funnel.tradeFeeRevenueNet).toBe(120);
     expect(result.funnel.platformRevenueNet).toBe(570);
+  });
+
+  it("akış kartları TÜM ZAMAN toplanır — hiçbir aggregate'e tarih filtresi girmez", async () => {
+    const { service, prisma } = makeService();
+
+    const result = await service.getFinanceOverview();
+
+    expect(result).not.toHaveProperty("period");
+    // Tarih anahtarları iç içe (AND/OR/NOT) de olsa yakalanır; her çağrı denetlenir.
+    const dateKeys = (node: unknown, path: string[] = []): string[] => {
+      if (Array.isArray(node)) return node.flatMap((n) => dateKeys(n, path));
+      if (!node || typeof node !== "object" || node instanceof Date) return [];
+      return Object.entries(node as Record<string, unknown>).flatMap(
+        ([k, v]) =>
+          /At$/.test(k) ? [[...path, k].join(".")] : dateKeys(v, [...path, k]),
+      );
+    };
+    for (const fn of [
+      prisma.payment.aggregate,
+      prisma.payoutTransfer.aggregate,
+      prisma.commissionLedger.aggregate,
+      prisma.ledgerEntry.aggregate,
+      prisma.tradeCashPayment.aggregate,
+      prisma.order.aggregate,
+    ]) {
+      expect(fn).toHaveBeenCalled();
+      for (const [arg] of fn.mock.calls) {
+        expect(dateKeys(arg?.where ?? {})).toEqual([]);
+      }
+    }
   });
 
   it("transfer toplamı yalnız completed transferlerin NET tutarıdır", async () => {

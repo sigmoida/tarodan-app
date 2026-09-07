@@ -6363,7 +6363,7 @@
       },
       "overview": {
         "title": "Finance Overview",
-        "subtitle": "The money flow at a glance (this month)",
+        "subtitle": "The money flow at a glance",
         "funnel": {
           "collected": "Collected (GMV)",
           "collectedHint": "{count} completed payments",
@@ -6374,7 +6374,7 @@
           "platformRevenue": "Platform Revenue (Net)",
           "platformRevenueHint": "Commission + service fees − refunds",
           "pspFee": "PayTR fees",
-          "pspFeeHint": "Actual fees booked from the provider statement in this period",
+          "pspFeeHint": "Actual fees booked from the provider statement",
           "netAfterPsp": "Tarodan net revenue",
           "netAfterPspHint": "Commission revenue minus PayTR fees",
           "tradeFee": "Trade service fee",
@@ -6388,6 +6388,10 @@
           "exhaustedInvoices": "Invoices out of retry budget",
           "openAdjustments": "Open seller debts",
           "allClear": "All clear — nothing needs intervention"
+        },
+        "scope": {
+          "allTime": "All time",
+          "instant": "Right now"
         }
       }
     },

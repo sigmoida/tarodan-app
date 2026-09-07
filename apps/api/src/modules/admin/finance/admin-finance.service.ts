@@ -3,6 +3,7 @@ import {
   CommissionLedgerStatus,
   LedgerAccount,
   LedgerDirection,
+  OrderOrigin,
   OrderStatus,
   PaymentHoldStatus,
   PaymentStatus,
@@ -51,10 +52,14 @@ export class AdminFinanceService {
     return new Date(now.getFullYear(), now.getMonth(), 1);
   }
 
+  /**
+   * Finans Özeti — TÜM ZAMAN birikimli toplamlar. Ay/dönem kırılımı ve trend
+   * bilinçli olarak burada değil: dönemsel bakış dashboard/analiz ekranlarının
+   * işi. Akış kartları (tahsilat, transfer, gelir, PSP kesintisi) kuruluştan
+   * bugüne toplanır; stok kartları (escrow, sağlık şeridi) zaten anlıktır.
+   */
   async getFinanceOverview() {
     const now = new Date();
-    const periodStart = this.startOfMonth(now);
-    const createdAt = { gte: periodStart, lte: now };
     const uninvoicedBefore = new Date(
       now.getTime() - this.invoiceDeadlineDays() * 24 * 60 * 60 * 1000,
     );
@@ -74,10 +79,10 @@ export class AdminFinanceService {
       serviceVatRate,
       boostOrders,
     ] = await Promise.all([
-      // Tahsilat (dönem): tamamlanan ödemelerin brüt toplamı = ciro. Platform
+      // Tahsilat (tüm zaman): tamamlanan ödemelerin brüt toplamı = ciro. Platform
       // geliri DEĞİLDİR — o ledger'dan gelir (aşağıda).
       this.prisma.payment.aggregate({
-        where: { status: PaymentStatus.completed, createdAt },
+        where: { status: PaymentStatus.completed },
         _sum: { amount: true },
         _count: { id: true },
       }),
@@ -87,17 +92,16 @@ export class AdminFinanceService {
         _sum: { amount: true },
         _count: { id: true },
       }),
-      // Satıcıya gerçekten TRANSFER edilen (dönem): completed transferlerin
+      // Satıcıya gerçekten TRANSFER edilen (tüm zaman): completed transferlerin
       // NET tutarı (borç mahsupları düşülmüş hali).
       this.prisma.payoutTransfer.aggregate({
-        where: { status: PayoutStatus.completed, createdAt },
+        where: { status: PayoutStatus.completed },
         _sum: { netAmount: true },
         _count: { id: true },
       }),
-      // Platform NET geliri (dönem): ledger formülü (ledgerNetRevenue).
+      // Platform NET geliri (tüm zaman): ledger formülü (ledgerNetRevenue).
       this.prisma.commissionLedger.aggregate({
         where: {
-          createdAt,
           status: { not: CommissionLedgerStatus.waived },
         },
         _sum: {
@@ -141,7 +145,7 @@ export class AdminFinanceService {
         _sum: { remainingAmount: true },
         _count: { id: true },
       }),
-      // PSP (PayTR) kesintisi (dönem): defterdeki `psp_fee` DEBIT toplamı.
+      // PSP (PayTR) kesintisi (tüm zaman): defterdeki `psp_fee` DEBIT toplamı.
       // GERÇEK tutardır — PayTR ekstresi eşleştirilirken yazılır (tahmini oran
       // yalnız sipariş/kural ekranlarında kullanılır). Komisyon gelirinin
       // İÇİNDEN çıkar: hak ediş = ledger net gelir − PSP kesintisi.
@@ -149,27 +153,28 @@ export class AdminFinanceService {
         where: {
           account: LedgerAccount.psp_fee,
           direction: LedgerDirection.debit,
-          createdAt,
         },
         _sum: { amount: true },
       }),
-      // TAKAS HİZMET BEDELİ (dönem): takas geliri sipariş komisyonundan ayrı bir
-      // kalemdir ve `commissionLedger`'da HİÇ görünmez — buradan gelmezse platform
-      // geliri takasların tamamı kadar eksik raporlanır. Ödeme anına (paidAt) göre
-      // dilimlenir; iade edilen satır `refunded` olduğu için kendiliğinden düşer.
+      // TAKAS HİZMET BEDELİ (tüm zaman): takas geliri sipariş komisyonundan ayrı
+      // bir kalemdir ve `commissionLedger`'da HİÇ görünmez — buradan gelmezse
+      // platform geliri takasların tamamı kadar eksik raporlanır. İade edilen
+      // satır `refunded` olduğu için kendiliğinden düşer.
       this.prisma.tradeCashPayment.aggregate({
-        where: { status: PaymentStatus.completed, paidAt: createdAt },
+        where: { status: PaymentStatus.completed },
         _sum: { tradeFeeAmount: true },
       }),
       this.serviceVatRate(),
-      // ÖNE ÇIKARMA (boost) geliri (dönem): BST- sanal siparişleri komisyon
+      // ÖNE ÇIKARMA (boost) geliri (tüm zaman): BST- sanal siparişleri komisyon
       // defterinde görünmez — buradan gelmezse boost cirosu hiçbir finans
       // raporunda toplanmıyordu (yalnız satır listesi + eLogo faturaları).
+      // `origin` filtresi indeksli daraltma içindir (prefix LIKE indeks kullanmaz);
+      // MEM- siparişleri de platform_service olduğundan BST- öneki şarttır.
       this.prisma.order.aggregate({
         where: {
+          origin: OrderOrigin.platform_service,
           orderNumber: { startsWith: "BST-" },
           status: OrderStatus.completed,
-          createdAt,
         },
         _sum: { totalAmount: true },
         _count: { id: true },
@@ -186,7 +191,6 @@ export class AdminFinanceService {
     const pspFeeTotal = round2(Number(pspFees._sum.amount ?? 0));
 
     return {
-      period: { start: periodStart, end: now },
       funnel: {
         collectedTotal: round2(Number(collected._sum.amount ?? 0)),
         collectedCount: collected._count.id,
