@@ -152,12 +152,21 @@ export const financeApi = {
   // PSP (PayTR) mutabakat — gece rapor sync'inin doldurduğu yerel tablolardan okur
   getPspReconciliation: (days = 7) =>
     api.get("/admin/finance/psp/reconciliation", { params: { days } }),
+  /** Gün kartındaki "dökümde yok" sayacının listesi (İstanbul günü, YYYY-MM-DD). */
+  getPspMissingPayments: (date: string) =>
+    api.get("/admin/finance/psp/missing-payments", { params: { date } }),
   getPspStatementLines: (params?: {
     status?: string;
     page?: number;
     limit?: number;
+    includeResolved?: boolean;
   }) => api.get("/admin/finance/psp/statement-lines", { params }),
-  getPspSettlements: () => api.get("/admin/finance/psp/settlements"),
+  resolvePspStatementLine: (lineId: string, note: string) =>
+    api.post(`/admin/finance/psp/statement-lines/${lineId}/resolve`, { note }),
+  rematchPspStatementLine: (lineId: string) =>
+    api.post(`/admin/finance/psp/statement-lines/${lineId}/rematch`),
+  getPspSettlements: (params?: { limit?: number; days?: number }) =>
+    api.get("/admin/finance/psp/settlements", { params }),
 
   getPayoutsTransactions: (params?: {
     search?: string;

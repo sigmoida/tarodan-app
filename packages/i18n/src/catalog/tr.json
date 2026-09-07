@@ -6183,7 +6183,13 @@
           "matched": "{count} eşleşti",
           "mismatched": "{count} tutar farkı",
           "unmatched": "{count} karşılıksız",
-          "missing": "{count} dökümde yok"
+          "missing": "{count} dökümde yok",
+          "emptyDisabled": "Senkron kapalı olduğu için PayTR verisi yok.",
+          "lastDays": "Son {count} gün",
+          "provisional": "Geçici",
+          "diff": "Fark",
+          "inBalance": "Dengede",
+          "feeBookedHint": "Eşleşen satırlardan deftere yazılan kesinti"
         },
         "lines": {
           "description": "Varsayılan görünüm sorunlu satırlardır: sistemde karşılığı bulunamayan ya da tutarı uyuşmayan PayTR hareketleri.",
@@ -6199,7 +6205,8 @@
           "status": {
             "matched": "Eşleşti",
             "unmatched": "Karşılıksız",
-            "amount_mismatch": "Tutar farkı"
+            "amount_mismatch": "Tutar farkı",
+            "resolved": "Çözüldü"
           },
           "filter": {
             "problem": "Sorunlu satırlar",
@@ -6207,7 +6214,15 @@
             "matched": "Eşleşenler",
             "unmatched": "Karşılıksız",
             "amountMismatch": "Tutar farkı"
-          }
+          },
+          "includeResolved": "Çözülenleri göster",
+          "rematch": "Yeniden eşle",
+          "resolve": "Çözüldü",
+          "rematched": "Satır yeniden eşlendi",
+          "resolved": "Satır çözüldü olarak işaretlendi",
+          "resolveTitle": "Satırı çözüldü olarak kapat",
+          "resolveDescription": "{oid} · {amount} — satır iş listesinden düşer ve gün kartında sayılmaz. Neden çözüldüğünü yazın (denetim kaydına geçer).",
+          "resolveNotePlaceholder": "Örn. PayTR panelinden teyit edildi; test işlemi."
         },
         "settlements": {
           "empty": "Henüz hakediş kaydı yok.",
@@ -6215,7 +6230,24 @@
           "state": "Durum",
           "items": "Kalem",
           "realized": "Aktarıldı",
-          "projection": "Aktarılacak"
+          "projection": "Aktarılacak",
+          "check": "Tutarlılık",
+          "consistent": "Tutarlı",
+          "inconsistent": "Uyumsuz",
+          "itemsPending": "bekliyor"
+        },
+        "sync": {
+          "disabled": "PayTR rapor senkronu kapalı (PAYTR_REPORT_SYNC_ENABLED). Veriler PayTR'den çekilmiyor; kartlar ve satırlar güncel değil.",
+          "error": "Son PayTR senkronu hata verdi: {error}",
+          "stale": "PayTR senkronu bayat: son başarılı çalışma {at}. Gece cron'u kontrol edin.",
+          "lastOk": "Son PayTR senkronu: {at}"
+        },
+        "missing": {
+          "title": "{date} — dökümde olmayan ödemeler",
+          "description": "Bizde tamamlanmış görünen ama o günün PayTR dökümünde hiçbir merchant_oid'i bulunmayan ödemeler. Para PayTR'ye düşmemiş olabilir; PayTR panelinden teyit edin.",
+          "empty": "Bu gün için dökümde olmayan ödeme yok.",
+          "paidAt": "Ödeme anı",
+          "membership": "Üyelik yenilemesi"
         }
       },
       "payouts": {
@@ -9651,6 +9683,11 @@
       },
       "testTools": {
         "jobIdRequired": "İş kimliği (jobId) zorunludur"
+      },
+      "psp": {
+        "invalidDate": "Geçersiz tarih (YYYY-MM-DD bekleniyor)",
+        "lineNotFound": "Döküm satırı bulunamadı",
+        "lineAlreadyMatched": "Eşleşmiş satır çözümlenemez"
       }
     },
     "advertisement": {

@@ -28,6 +28,13 @@ import {
 } from "@nestjs/swagger";
 import { AdminService } from "../admin.service";
 import { AdminPspReconciliationService } from "./admin-psp-reconciliation.service";
+import {
+  PspMissingPaymentsQueryDto,
+  PspReconciliationQueryDto,
+  PspSettlementsQueryDto,
+  PspStatementLinesQueryDto,
+  ResolveStatementLineDto,
+} from "./dto/psp-reconciliation.dto";
 import { AdvertisementService } from "../../advertisement/advertisement.service";
 import { MediaService } from "../../media/media.service";
 import {
@@ -229,43 +236,78 @@ export class AdminPaymentController {
   @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
   @ApiOperation({
     summary:
-      "PSP reconciliation day cards: PayTR statement vs our records, diffs + match counts",
+      "PSP reconciliation day cards: PayTR statement vs our records, diffs + match counts, sync state",
   })
   @ApiResponse({ status: HttpStatus.OK, description: "Day cards" })
-  async getPspReconciliation(@Query("days") days?: string) {
-    const parsed = days ? Number.parseInt(days, 10) : 7;
-    return this.pspReconciliation.getReconciliationSummary(
-      Number.isFinite(parsed) && parsed > 0 ? Math.min(parsed, 31) : 7,
-    );
+  async getPspReconciliation(@Query() query: PspReconciliationQueryDto) {
+    return this.pspReconciliation.getReconciliationSummary(query.days ?? 7);
+  }
+
+  @Get("finance/psp/missing-payments")
+  @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
+  @ApiOperation({
+    summary:
+      "Payments completed on an Istanbul day that do not appear in PayTR's statement",
+  })
+  @ApiResponse({ status: HttpStatus.OK, description: "Missing payments" })
+  async getPspMissingPayments(@Query() query: PspMissingPaymentsQueryDto) {
+    return this.pspReconciliation.getMissingPayments(query.date);
   }
 
   @Get("finance/psp/statement-lines")
   @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
   @ApiOperation({
     summary:
-      "PayTR statement lines (default: problem rows — unmatched/amount_mismatch)",
+      "PayTR statement lines (default: unresolved problem rows — unmatched/amount_mismatch)",
   })
   @ApiResponse({ status: HttpStatus.OK, description: "Statement lines" })
-  async getPspStatementLines(
-    @Query("status") status?: string,
-    @Query("page") page?: string,
-    @Query("limit") limit?: string,
+  async getPspStatementLines(@Query() query: PspStatementLinesQueryDto) {
+    return this.pspReconciliation.getStatementLines(query);
+  }
+
+  @Post("finance/psp/statement-lines/:lineId/resolve")
+  @Roles(AdminRole.super_admin, AdminRole.admin)
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary:
+      "Mark a problem statement line as reviewed/resolved (drops off the work list)",
+  })
+  @ApiParam({ name: "lineId", description: "PaytrStatementLine ID" })
+  @ApiResponse({ status: HttpStatus.OK, description: "Line resolved" })
+  async resolvePspStatementLine(
+    @Param("lineId") lineId: string,
+    @Body() dto: ResolveStatementLineDto,
+    @CurrentUser("id") adminId: string,
   ) {
-    return this.pspReconciliation.getStatementLines({
-      status,
-      page: page ? Number.parseInt(page, 10) : undefined,
-      limit: limit ? Number.parseInt(limit, 10) : undefined,
-    });
+    return this.pspReconciliation.resolveStatementLine(
+      adminId,
+      lineId,
+      dto.note,
+    );
+  }
+
+  @Post("finance/psp/statement-lines/:lineId/rematch")
+  @Roles(AdminRole.super_admin, AdminRole.admin)
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: "Re-run matching for a single statement line" })
+  @ApiParam({ name: "lineId", description: "PaytrStatementLine ID" })
+  @ApiResponse({ status: HttpStatus.OK, description: "Match outcome" })
+  async rematchPspStatementLine(
+    @Param("lineId") lineId: string,
+    @CurrentUser("id") adminId: string,
+  ) {
+    return this.pspReconciliation.rematchStatementLine(adminId, lineId);
   }
 
   @Get("finance/psp/settlements")
   @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
   @ApiOperation({
-    summary: "PayTR settlements (realized + future_payments projections)",
+    summary:
+      "PayTR settlements (realized + future_payments projections) with consistency flags",
   })
   @ApiResponse({ status: HttpStatus.OK, description: "Settlements" })
-  async getPspSettlements() {
-    return this.pspReconciliation.getSettlements();
+  async getPspSettlements(@Query() query: PspSettlementsQueryDto) {
+    return this.pspReconciliation.getSettlements(query);
   }
 
   @Get("invoices/summary")

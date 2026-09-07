@@ -9,12 +9,21 @@ const tryFmt = new Intl.NumberFormat("tr-TR", {
   maximumFractionDigits: 2,
 });
 const numFmt = new Intl.NumberFormat("tr-TR");
+/**
+ * Platform yalnız Türkiye'de işler ve iş anlamındaki "gün" İstanbul takvimidir
+ * (PayTR döküm/hakediş günleri, kargo günleri, fatura tarihleri). Tarayıcı saat
+ * dilimine bırakılsaydı UTC gece yarısı olarak saklanan gün anahtarları batıdaki
+ * bir tarayıcıda bir gün geri kayardı.
+ */
+export const ADMIN_TIME_ZONE = "Europe/Istanbul";
 const dateFmt = new Intl.DateTimeFormat("tr-TR", {
+  timeZone: ADMIN_TIME_ZONE,
   day: "2-digit",
   month: "2-digit",
   year: "numeric",
 });
 const dateTimeFmt = new Intl.DateTimeFormat("tr-TR", {
+  timeZone: ADMIN_TIME_ZONE,
   day: "2-digit",
   month: "2-digit",
   year: "numeric",
@@ -22,6 +31,7 @@ const dateTimeFmt = new Intl.DateTimeFormat("tr-TR", {
   minute: "2-digit",
 });
 const timeFmt = new Intl.DateTimeFormat("tr-TR", {
+  timeZone: ADMIN_TIME_ZONE,
   hour: "2-digit",
   minute: "2-digit",
 });
