@@ -1,6 +1,11 @@
 import { Injectable, Logger } from "@nestjs/common";
-import { InitiatePaymentDto, PayTRCallbackDto, DirectPaymentDto } from "./dto";
-import { Prisma, PaymentStatus } from "@prisma/client";
+import {
+  InitiatePaymentDto,
+  PayTRCallbackDto,
+  DirectPaymentDto,
+  PaymentQueryDto,
+} from "./dto";
+import { Prisma } from "@prisma/client";
 import { type Locale } from "@tarodan/i18n";
 import { Request } from "express";
 import { PaymentCommonService } from "./payment-common.service";
@@ -261,14 +266,7 @@ export class PaymentService {
 
   async getUserPayments(
     userId: string,
-    options?: {
-      status?: PaymentStatus;
-      provider?: string;
-      startDate?: Date;
-      endDate?: Date;
-      page?: number;
-      limit?: number;
-    },
+    options?: PaymentQueryDto,
     locale?: Locale,
   ) {
     return this.paymentQuery.getUserPayments(userId, options, locale);

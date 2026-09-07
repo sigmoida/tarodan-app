@@ -21,9 +21,12 @@ import {
 } from "@prisma/client";
 import { NotificationService } from "../notification/notification.service";
 import { LedgerService } from "../ledger/ledger.service";
-import { REFERENCE_PREFIX } from "../../common/helpers/code-prefixes";
 import { isValidTrIban } from "../../common/validators/tr-iban";
-import { generateUniqueReference } from "../../common/helpers/generate-reference";
+import {
+  generatePayoutTransId,
+  isValidPayoutTransId,
+} from "../../common/helpers/payout-trans-id";
+import { trCalendarDate } from "../../common/helpers/tr-calendar";
 
 /** IBAN'ı log-güvenli hale getir (KVKK): yalnız son 4 hane. */
 function maskIban(iban: string | null | undefined): string {
@@ -313,9 +316,8 @@ export class PayoutService {
 
       const bankAccount = hold.seller.bankAccount;
       // PayTR platform transfer referansı. Tekillik `transId` unique index'i
-      // ile garanti; format diğer işlem referanslarıyla aynı ailede.
-      const transId = await generateUniqueReference(
-        REFERENCE_PREFIX.payoutTransfer,
+      // ile garanti; biçim TİRESİZ (PayTR trans_id şartı, payout-trans-id.ts).
+      const transId = await generatePayoutTransId(
         async (code) =>
           (await this.prisma.payoutTransfer.count({
             where: { transId: code },
@@ -431,8 +433,7 @@ export class PayoutService {
         payment?.providerConversationId?.trim() ||
         tcp.tradeId.replace(/-/g, "");
 
-      const transId = await generateUniqueReference(
-        REFERENCE_PREFIX.payoutTransfer,
+      const transId = await generatePayoutTransId(
         async (code) =>
           (await this.prisma.payoutTransfer.count({
             where: { transId: code },
@@ -650,11 +651,14 @@ export class PayoutService {
             // Transfer öncesi bayat-net doğrulaması için gerekli (aşağıya bkz).
             amount: true,
             refundedAmount: true,
+            // Aynı-gün koruması: PayTR ödeme gününde transfer talimatı kabul etmez.
+            payment: { select: { paidAt: true, createdAt: true } },
           },
         },
         tradeCashPayment: {
           select: {
             tradeId: true,
+            paidAt: true,
             payment: { select: { id: true } },
           },
         },
@@ -811,6 +815,46 @@ export class PayoutService {
           });
         }
         continue;
+      }
+
+      // PayTR aynı-gün kuralı: "Sipariş ödemesi ile aynı gün transfer talebi
+      // oluşturamazsınız." Normal akışta hold teslimattan günler sonra açılır; ama
+      // admin manuel release aynı gün yapılırsa talimat reddedilir ve ~5 saatlik
+      // retry penceresi (15dk/1sa/4sa) gün dönmeden tükenip payout'u kalıcı
+      // failed yapardı. Bekle: status pending kalır, retry sayacı yanmaz.
+      // Gün Türkiye takvimine göre (süreç UTC'de koşar, Date#getDate güvenilmez).
+      const paidAt =
+        payout.paymentHold?.payment?.paidAt ??
+        payout.paymentHold?.payment?.createdAt ??
+        payout.tradeCashPayment?.paidAt ??
+        null;
+      if (paidAt && trCalendarDate(paidAt) === trCalendarDate(new Date())) {
+        this.logger.warn(
+          `Payout ${payout.id} beklemede: ödeme bugün tamamlandı, PayTR ertesi günü şart koşuyor. Sonraki turda denenecek.`,
+        );
+        continue;
+      }
+
+      // Eski tireli referans (PYT-…): PayTR trans_id'de yalnız harf/rakam kabul
+      // eder. Admin retry (failed dalı) ve IBAN sonrası requeue mevcut transId'yi
+      // korur; burada TEK noktada tiresiz yeniden üretilir ki hiçbir yol eski
+      // biçimi PayTR'ye taşımasın. Claim'den önce: yarışta kaybedersek dokunmayız.
+      if (!isValidPayoutTransId(payout.transId)) {
+        const healedTransId = await generatePayoutTransId(
+          async (code) =>
+            (await this.prisma.payoutTransfer.count({
+              where: { transId: code },
+            })) > 0,
+        );
+        const healed = await this.prisma.payoutTransfer.updateMany({
+          where: { id: payout.id, status: PayoutStatus.pending },
+          data: { transId: healedTransId },
+        });
+        if (healed.count === 0) continue;
+        this.logger.warn(
+          `Payout ${payout.id} trans_id yeniden üretildi: ${payout.transId} → ${healedTransId} (PayTR alfanümerik şartı)`,
+        );
+        payout.transId = healedTransId;
       }
 
       // IBAN cooldown (F2.1): satıcı IBAN'ını YAKIN ZAMANDA değiştirdiyse bu turda

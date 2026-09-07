@@ -11,6 +11,9 @@
  *   İşlem referansı → üç harf + tire + 10 karakter, RASTGELE (ORD-K7X9M2QF3N)
  *                   Sayım sızdırmaz, enumerasyon edilemez. Daima
  *                   `generateUniqueReference` ile üretilir.
+ *                   İSTİSNA: PYT (payout) TİRESİZDİR (PYTK7X9M2QF3N) — PayTR
+ *                   Platform Transfer `trans_id` yalnız harf/rakam kabul eder;
+ *                   bkz. payout-trans-id.ts.
  *
  * Yeni bir kod türü eklerken önekini BURAYA ekleyin; çakışma testi
  * (code-prefixes.spec.ts) aynı önekin iki kez kullanılmasını engeller.
@@ -64,7 +67,7 @@ export const REFERENCE_PREFIX = {
   boostOrder: "BST",
   /** Üyelik satın alma / yenileme siparişi */
   membershipOrder: "MEM",
-  /** Satıcıya para gönderimi (PayTR platform transfer) */
+  /** Satıcıya para gönderimi (PayTR platform transfer) — tiresiz üretilir */
   payoutTransfer: "PYT",
   /** Kargo entegrasyonu kapalıyken üretilen yedek takip numarası */
   shipmentFallback: "SHP",

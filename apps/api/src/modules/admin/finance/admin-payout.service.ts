@@ -20,8 +20,7 @@ import {
 } from "@prisma/client";
 import { PaymentService } from "../../payment/payment.service";
 import { paginate, resolveOrderBy } from "../../../common/list";
-import { REFERENCE_PREFIX } from "../../../common/helpers/code-prefixes";
-import { generateUniqueReference } from "../../../common/helpers/generate-reference";
+import { generatePayoutTransId } from "../../../common/helpers/payout-trans-id";
 import { i18nMessage } from "../../i18n";
 
 /**
@@ -825,8 +824,7 @@ export class AdminPayoutService {
     const isReturned = transfer.status === "returned";
     // PayTR iade edilen bir transId'yi tekrar kabul etmez; yeni referans üret.
     const newTransId = isReturned
-      ? await generateUniqueReference(
-          REFERENCE_PREFIX.payoutTransfer,
+      ? await generatePayoutTransId(
           async (code) =>
             (await this.prisma.payoutTransfer.count({
               where: { transId: code },

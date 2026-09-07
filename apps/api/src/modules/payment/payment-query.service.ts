@@ -5,7 +5,6 @@ import {
   ForbiddenException,
 } from "@nestjs/common";
 import { PrismaService } from "../../prisma";
-import { PaymentStatus } from "@prisma/client";
 import { StorageService } from "../storage/storage.service";
 import { i18nMessage, I18nService } from "../i18n";
 import { type Locale, defaultLocale } from "@tarodan/i18n";
@@ -14,6 +13,8 @@ import {
   publicName,
   toPublicIdentity,
 } from "../../common/helpers/public-identity";
+import { dateRangeWhere } from "../../common/list";
+import { PaymentQueryDto } from "./dto";
 
 // Aktif (devam eden) iade talebi durumları — order-common.pickActiveRefundRequest
 // ile aynı liste. "refunded" burada YOK; tamamlanmış iade ayrı ele alınır.
@@ -406,14 +407,7 @@ export class PaymentQueryService {
    */
   async getUserPayments(
     userId: string,
-    options?: {
-      status?: PaymentStatus;
-      provider?: string;
-      startDate?: Date;
-      endDate?: Date;
-      page?: number;
-      limit?: number;
-    },
+    options?: PaymentQueryDto,
     locale: Locale = defaultLocale,
   ) {
     const page = options?.page || 1;
@@ -441,15 +435,8 @@ export class PaymentQueryService {
       where.provider = options.provider;
     }
 
-    if (options?.startDate || options?.endDate) {
-      where.createdAt = {};
-      if (options.startDate) {
-        where.createdAt.gte = options.startDate;
-      }
-      if (options.endDate) {
-        where.createdAt.lte = options.endDate;
-      }
-    }
+    // Bitiş günü kapsayıcı: `endDate=2026-09-01` o günün 23:59:59'una genişler.
+    Object.assign(where, dateRangeWhere(options ?? {}));
 
     const [payments, total] = await Promise.all([
       this.prisma.payment.findMany({
