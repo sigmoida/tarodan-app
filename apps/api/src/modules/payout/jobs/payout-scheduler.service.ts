@@ -101,12 +101,24 @@ export class PayoutSchedulerService implements OnModuleInit {
    */
   async runCheckReturnedTransfers(log: (msg: string) => void = () => {}) {
     try {
-      const returned = await this.payoutService.checkReturnedTransfers();
-      log(`${returned} iade edilen payout transferi bulundu`);
+      const { returned, unmatched } =
+        await this.payoutService.checkReturnedTransfers();
+      log(
+        `${returned} iade edilen payout transferi bulundu · ${unmatched} eşleşmeyen satır`,
+      );
       if (returned > 0) {
         this.logger.warn(`Found ${returned} returned payout transfer(s)`);
       }
-      return { summary: `${returned} iade transfer`, stats: { returned } };
+      if (unmatched > 0) {
+        // PayTR'nin döndürdüğü ama bizde karşılığı bulunamayan satır: elle inceleme.
+        this.logger.error(
+          `${unmatched} geri dönen transfer satırı hiçbir payout ile eşleşmedi`,
+        );
+      }
+      return {
+        summary: `${returned} iade transfer${unmatched ? ` · ${unmatched} eşleşmeyen` : ""}`,
+        stats: { returned, unmatched },
+      };
     } catch (error: any) {
       this.logger.error(`Returned transfer check error: ${error.message}`);
       log(`HATA: ${error.message}`);

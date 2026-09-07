@@ -1,4 +1,8 @@
 import type {
+  PaytrPlatformTransferResult,
+  PaytrReturnedTransfer,
+} from "./paytr/paytr-transfer.service";
+import type {
   PayTRBuyer,
   PayTRBasketItem,
   PayTRCallbackData,
@@ -114,12 +118,13 @@ export interface IPaymentProvider {
     totalAmount: number;
     transferName: string;
     transferIban: string;
-  }): Promise<{ status: string; err_no?: string; err_msg?: string }>;
+  }): Promise<PaytrPlatformTransferResult>;
 
+  /** Bankadan geri dönen transferler (normalize satırlar; failed → boş, error → throw). */
   getReturnedTransfers(params: {
     startDate: string;
     endDate: string;
-  }): Promise<any>;
+  }): Promise<PaytrReturnedTransfer[]>;
 
   /** Aşama-2 (platform transfer sonucu) callback hash doğrulaması — ham trans_ids string'i ile. */
   verifyTransferCallback(params: { transIds: string; hash: string }): boolean;

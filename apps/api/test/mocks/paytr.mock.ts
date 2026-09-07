@@ -1,4 +1,5 @@
 import * as crypto from "crypto";
+import type { PaytrReturnedTransfer } from "../../src/modules/payment-providers/paytr/paytr-transfer.service";
 import type {
   PayTRBuyer,
   PayTRBasketItem,
@@ -234,8 +235,8 @@ export class MockPayTRService {
   async getReturnedTransfers(_params: {
     startDate: string;
     endDate: string;
-  }): Promise<any> {
-    return { status: "success", data: [] };
+  }): Promise<PaytrReturnedTransfer[]> {
+    return [];
   }
 
   async resendReturnedTransfers(_params: {

@@ -46,6 +46,13 @@ export function trCalendarTime(at: Date): string {
   return `${p.hour}:${p.minute}:${p.second}`;
 }
 
+/** "yyyy-mm-dd HH:mm:ss", Türkiye takvimi/saati — PayTR tarih aralığı parametreleri
+ *  (rapor ve geri dönen transfer uçları) bu biçimi İstanbul saatiyle yorumlar. */
+export function trCalendarDateTime(at: Date): string {
+  const p = trCalendarParts(at);
+  return `${p.year}-${p.month}-${p.day} ${p.hour}:${p.minute}:${p.second}`;
+}
+
 /** Türkiye takviminde yıl. */
 export function trCalendarYear(at: Date): number {
   return Number(trCalendarParts(at).year);
