@@ -29,29 +29,34 @@ function build(payouts: any[], rows: PaytrReturnedTransfer[]) {
   const updates: any[] = [];
   const prisma = {
     payoutTransfer: {
+      // Referans durumdan bağımsız aranır (işlenmiş satırı tanımak için).
       findFirst: jest
         .fn()
         .mockImplementation(({ where }: any) =>
           Promise.resolve(
             payouts.find(
-              (p) =>
-                p.providerReference === where.providerReference &&
-                where.status.in.includes(p.status),
+              (p) => p.providerReference === where.providerReference,
             ) ?? null,
           ),
         ),
-      findMany: jest
-        .fn()
-        .mockImplementation(({ where }: any) =>
-          Promise.resolve(
-            payouts.filter(
-              (p) =>
-                p.providerReference == null &&
-                p.transferIban === where.transferIban &&
-                where.status.in.includes(p.status),
-            ),
-          ),
+      findMany: jest.fn().mockImplementation(({ where }: any) =>
+        Promise.resolve(
+          payouts.filter((p) => {
+            const amount = where.OR[0].submittedAmount;
+            const amountOk =
+              p.submittedAmount != null
+                ? Number(p.submittedAmount).toFixed(2) === amount
+                : Number(p.netAmount).toFixed(2) === amount;
+            return (
+              p.providerReference == null &&
+              p.transferIban === where.transferIban &&
+              where.status.in.includes(p.status) &&
+              amountOk &&
+              (!where.submittedAt || p.submittedAt <= where.submittedAt.lte)
+            );
+          }),
         ),
+      ),
       updateMany: jest.fn().mockImplementation(({ where, data }: any) => {
         const p = payouts.find((x) => x.id === where.id);
         if (!p || !where.status.in.includes(p.status)) {
@@ -148,16 +153,54 @@ describe("PayoutService.checkReturnedTransfers — ref_no ile eşleme", () => {
     expect(notification.sendTemplateEmailToUser).not.toHaveBeenCalled();
   });
 
-  it("does not re-mark a payout that was already returned or re-queued", async () => {
-    const { service, updates } = build(
+  it("treats a re-delivered row whose ref is already on a non-active payout as handled, not unmatched", async () => {
+    const { service, updates, notification } = build(
       [payout({ status: PayoutStatus.pending })],
       [row()],
     );
 
     const result = await service.checkReturnedTransfers();
 
-    expect(result).toEqual({ returned: 0, unmatched: 1 });
+    expect(result).toEqual({ returned: 0, unmatched: 0 });
     expect(updates).toHaveLength(0);
+    expect(notification.sendTemplateEmailToUser).not.toHaveBeenCalled();
+  });
+
+  it("does not let a re-delivered, already-returned ref fall through to the IBAN fallback", async () => {
+    // Gün 1'de A returned yapıldı (ref üzerinde). Gün 2'de PayTR aynı satırı yine
+    // verir; aynı satıcının eş tutarlı eski payout'u B YANLIŞLIKLA returned olmamalı.
+    const a = payout({ id: "a", status: PayoutStatus.returned });
+    const b = payout({ id: "b", providerReference: null });
+    const { service, updates, prisma } = build([a, b], [row()]);
+
+    const result = await service.checkReturnedTransfers();
+
+    expect(result).toEqual({ returned: 0, unmatched: 0 });
+    expect(updates).toHaveLength(0);
+    expect(prisma.payoutTransfer.findMany).not.toHaveBeenCalled();
+    expect(b.status).toBe(PayoutStatus.completed);
+  });
+
+  it("filters legacy candidates by amount in the query so a crowded IBAN still matches uniquely", async () => {
+    const others = Array.from({ length: 6 }, (_, i) =>
+      payout({ id: `o${i}`, providerReference: null, submittedAmount: 10 + i }),
+    );
+    const target = payout({ id: "t", providerReference: null });
+    const { service, updates, prisma } = build(
+      [...others, target],
+      [row({ refNo: "OLDREF" })],
+    );
+
+    const result = await service.checkReturnedTransfers();
+
+    expect(result).toEqual({ returned: 1, unmatched: 0 });
+    expect(updates).toEqual([expect.objectContaining({ id: "t" })]);
+    const query = prisma.payoutTransfer.findMany.mock.calls[0][0];
+    expect(query.take).toBeUndefined();
+    expect(query.where.OR).toEqual([
+      { submittedAmount: "90.00" },
+      { submittedAmount: null, netAmount: "90.00" },
+    ]);
   });
 
   it("sends the window to PayTR in Istanbul wall-clock format", async () => {

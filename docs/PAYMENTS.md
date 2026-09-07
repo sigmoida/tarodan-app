@@ -173,9 +173,14 @@ geçişte açılır.
    IBAN son-4 ve (varsa) sebep taşır; günlük returned taraması + 30 dk stuck-processing
    tespiti vardır. **Geri dönen transfer eşlemesi**: PayTR'nin listesi bizim
    `trans_id`'mizi değil kendi `ref_no`'sunu verir; talimat yanıtındaki `reference`
-   `PayoutTransfer.providerReference`'a yazılır ve eşleme onunla yapılır (eski
-   satırlar için IBAN + tutar + tarih; belirsizlikte dokunulmaz, loglanır). Yeniden
-   gönderim (admin retry, requeue) referansı sıfırlar.
+   `PayoutTransfer.providerReference`'a yazılır ve eşleme onunla yapılır (migration
+   eski satırları `provider_response->>'reference'`'tan doldurur; referanssız kalan
+   eski satırlar için IBAN + tutar + tarih; belirsizlikte dokunulmaz, loglanır).
+   PayTR aynı satırı pencere boyunca her gün yeniden verir: referansı taşıyan
+   payout artık completed/processing değilse satır "işlendi" sayılır, sezgiye
+   düşülmez. Yeniden gönderim (admin retry, requeue) referansı sıfırlar;
+   `providerResponse` yeni gönderime dek kalır, admin retry'ın audit kaydı
+   önceki referans/yanıtı taşır.
 
 ---
 

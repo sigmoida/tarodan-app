@@ -1,6 +1,8 @@
 import type {
   PaytrPlatformTransferResult,
   PaytrReturnedTransfer,
+} from "./paytr/paytr-transfer.service";
+import type {
   PayTRBuyer,
   PayTRBasketItem,
   PayTRCallbackData,

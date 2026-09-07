@@ -4,6 +4,7 @@ import * as crypto from "crypto";
 import { PayTRCredentials } from "./paytr-credentials.service";
 import { isValidPayoutTransId } from "../../../common/helpers/payout-trans-id";
 import { parsePaytrMoneyString } from "./paytr-money.util";
+import { normalizeTrIban } from "../../../common/validators/tr-iban";
 
 /** Platform transfer talimatı yanıtı (aşama-1 kabul). `reference` PayTR'nin kendi
  *  takip numarasıdır; geri dönen transfer listesi (`ref_no`) yalnız bununla eşlenir. */
@@ -232,21 +233,28 @@ export class PayTRTransferService {
           }),
         );
       }
-      const rows = Array.isArray(data?.data) ? data!.data : [];
-      return rows.map((r: any): PaytrReturnedTransfer => ({
-        refNo: String(r?.ref_no ?? ""),
-        dateDetected: String(r?.date_detected ?? ""),
-        dateReimbursed: String(r?.date_reimbursed ?? ""),
-        transferName: String(r?.transfer_name ?? ""),
-        transferIban: String(r?.transfer_iban ?? "").replace(/\s/g, ""),
-        transferAmount:
-          parsePaytrMoneyString(
-            r?.transfer_amount != null ? String(r.transfer_amount) : undefined,
-          ) ?? 0,
-        transferCurrency: String(r?.transfer_currency ?? "TL"),
-        transferDate: String(r?.transfer_date ?? ""),
-        raw: r as Record<string, unknown>,
-      }));
+      const payload = data?.data;
+      const rows: unknown[] = Array.isArray(payload) ? payload : [];
+      return rows.map((item): PaytrReturnedTransfer => {
+        const r: Record<string, unknown> =
+          item && typeof item === "object"
+            ? (item as Record<string, unknown>)
+            : {};
+        return {
+          refNo: String(r.ref_no ?? ""),
+          dateDetected: String(r.date_detected ?? ""),
+          dateReimbursed: String(r.date_reimbursed ?? ""),
+          transferName: String(r.transfer_name ?? ""),
+          transferIban: normalizeTrIban(String(r.transfer_iban ?? "")),
+          transferAmount:
+            parsePaytrMoneyString(
+              r.transfer_amount != null ? String(r.transfer_amount) : undefined,
+            ) ?? 0,
+          transferCurrency: String(r.transfer_currency ?? "TL"),
+          transferDate: String(r.transfer_date ?? ""),
+          raw: r,
+        };
+      });
     } catch (error: any) {
       if (error instanceof BadRequestException) throw error;
       this.logger.error(`Get returned transfers failed: ${error.message}`);
