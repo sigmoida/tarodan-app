@@ -45,7 +45,7 @@ class StubPaymentProvider implements IPaymentProvider {
     return { status: "success" };
   }
   async getReturnedTransfers() {
-    return {};
+    return [];
   }
   verifyTransferCallback() {
     return true;

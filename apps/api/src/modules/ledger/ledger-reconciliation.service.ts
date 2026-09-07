@@ -1,4 +1,4 @@
-import { Injectable, Logger, OnModuleInit } from "@nestjs/common";
+import { Injectable, Logger, OnModuleInit, Optional } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { InjectQueue } from "@nestjs/bull";
 import { Queue } from "bull";
@@ -14,6 +14,7 @@ import {
 import { registerRepeatableCron } from "../../monitoring/bull-cron.helper";
 import { QUEUE_NAMES } from "../../workers/constants";
 import { LedgerBalanceService } from "./ledger-balance.service";
+import { RevenueSplitService } from "../finance-reconciliation/revenue-split.service";
 
 const EPSILON = 0.01;
 
@@ -31,6 +32,8 @@ export interface ReconciliationReport {
   pspFeeAccrualLag: number;
   /** Payout'u tamamlanmış ama escrow'u kapanmamış sipariş sayısı (düşmüş kayıt). */
   escrowResidueOrders: number;
+  /** 7) Ciro bölünmesi: tahsilat − Σ(satıcı payı + ücret + KDV + kargo + stopaj − açık). */
+  revenueSplitDifference: number;
   driftAlarms: string[];
 }
 
@@ -56,6 +59,7 @@ export class LedgerReconciliationService implements OnModuleInit {
     private readonly prisma: PrismaService,
     private readonly config: ConfigService,
     @InjectQueue(QUEUE_NAMES.SCHEDULED) private readonly scheduledQueue: Queue,
+    @Optional() private readonly revenueSplit?: RevenueSplitService,
   ) {}
 
   async onModuleInit(): Promise<void> {
@@ -242,6 +246,25 @@ export class LedgerReconciliationService implements OnModuleInit {
       }
     }
 
+    // 7) CİRO BÖLÜNMESİ — Finans Özeti'nin S1 kimliği: tahsilat, snapshot
+    //    kolonlarından türeyen bileşenlere tam bölünmeli. Fark ≠ 0 ⇒ ya ödemesi
+    //    olup siparişi/hold'u olmayan kayıt var ya da fiyatlama formülü snapshot
+    //    kolonlarıyla ayrıştı. Aynı hesap ekranda kırmızı görünür; burada alarm.
+    let revenueSplitDifference = 0;
+    if (this.revenueSplit) {
+      const split = await this.revenueSplit.compute();
+      revenueSplitDifference = split.section.difference;
+      if (Math.abs(revenueSplitDifference) > EPSILON) {
+        const msg =
+          `REVENUE_SPLIT_DRIFT collected=${split.section.total.amount.toFixed(2)} ` +
+          `diff=${revenueSplitDifference.toFixed(2)} ` +
+          `ordersWithoutHold=${split.diagnostics.ordersWithoutHold} ` +
+          `paymentsWithoutOrders=${split.diagnostics.paymentsWithoutOrders}`;
+        driftAlarms.push(msg);
+        this.logger.error(`RECONCILE ALARM: ${msg}`);
+      }
+    }
+
     const report: ReconciliationReport = {
       ledgerGroupsChecked: groupNet.size,
       unbalancedGroups,
@@ -251,10 +274,11 @@ export class LedgerReconciliationService implements OnModuleInit {
       pspFeeLedgerTotal: Math.round(pspFeeLedgerTotal * 100) / 100,
       pspFeeAccrualLag,
       escrowResidueOrders,
+      revenueSplitDifference: Math.round(revenueSplitDifference * 100) / 100,
       driftAlarms,
     };
     log(
-      `Reconcile: ${groupNet.size} defter grubu · ${unbalancedGroups} dengesiz · ${overRefundedPayments} ödeme-fazla-iade · ${overRefundedOrders} sipariş-fazla-iade · psp-fee ${report.pspFeeStampedTotal}/${report.pspFeeLedgerTotal}${pspFeeAccrualLag ? ` · ${pspFeeAccrualLag} tahakkuk gecikmesi` : ""}${escrowResidueOrders ? ` · ${escrowResidueOrders} escrow kalıntısı` : ""}`,
+      `Reconcile: ${groupNet.size} defter grubu · ${unbalancedGroups} dengesiz · ${overRefundedPayments} ödeme-fazla-iade · ${overRefundedOrders} sipariş-fazla-iade · psp-fee ${report.pspFeeStampedTotal}/${report.pspFeeLedgerTotal}${pspFeeAccrualLag ? ` · ${pspFeeAccrualLag} tahakkuk gecikmesi` : ""}${escrowResidueOrders ? ` · ${escrowResidueOrders} escrow kalıntısı` : ""}${Math.abs(revenueSplitDifference) > EPSILON ? ` · ciro bölünmesi farkı ${report.revenueSplitDifference}` : ""}`,
     );
     if (driftAlarms.length === 0) {
       this.logger.log(

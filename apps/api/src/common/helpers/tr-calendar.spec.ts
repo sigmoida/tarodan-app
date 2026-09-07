@@ -3,6 +3,7 @@ import {
   trCalendarDate,
   trCalendarTime,
   trCalendarYear,
+  trMonthStart,
 } from "./tr-calendar";
 
 /**
@@ -26,6 +27,16 @@ describe("Türkiye takvimi", () => {
     // 1978 model yılı, yerel gece yarısı Ocak 1 olarak yazılır.
     expect(trCalendarYear(new Date("1977-12-31T22:00:00.000Z"))).toBe(1978);
     expect(trCalendarYear(new Date("2026-12-31T21:30:00.000Z"))).toBe(2027);
+  });
+
+  it("ay başı Türkiye gece yarısıdır, UTC değil", () => {
+    // 31 Ağustos 22:30Z = 1 Eylül 01:30 İstanbul → Eylül ayı (UTC hâlâ Ağustos).
+    expect(
+      trMonthStart(new Date("2026-08-31T22:30:00.000Z")).toISOString(),
+    ).toBe("2026-08-31T21:00:00.000Z");
+    expect(
+      trMonthStart(new Date("2026-09-15T12:00:00.000Z")).toISOString(),
+    ).toBe("2026-08-31T21:00:00.000Z");
   });
 
   it("süreç saat dilimi ne olursa olsun aynı sonucu verir", () => {

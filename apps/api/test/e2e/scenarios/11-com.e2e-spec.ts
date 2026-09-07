@@ -1777,17 +1777,28 @@ describe("11 — Komisyon & Ödeme/Payout (COM)", () => {
         transferName: "X",
         status: PayoutStatus.completed,
         processedAt: new Date(),
+        // Talimat yanıtındaki PayTR referansı; geri dönen liste bununla eşlenir.
+        providerReference: `REF${Date.now()}`,
       },
     });
     const spy = jest
       .spyOn(ctx.paytr, "getReturnedTransfers")
-      .mockResolvedValueOnce({
-        status: "success",
-        data: [{ trans_id: transId, reason: "hesap kapalı" }],
-      });
+      .mockResolvedValueOnce([
+        {
+          refNo: transfer.providerReference!,
+          dateDetected: "2026-08-03",
+          dateReimbursed: "2026-08-02",
+          transferName: "X",
+          transferIban: IBAN_A,
+          transferAmount: 96,
+          transferCurrency: "TL",
+          transferDate: "2026-08-01",
+          raw: { ref_no: transfer.providerReference },
+        },
+      ]);
     try {
       const updated = await ctx.app.get(PayoutService).checkReturnedTransfers();
-      expect(updated).toBeGreaterThanOrEqual(1);
+      expect(updated.returned).toBeGreaterThanOrEqual(1);
       const after = await prisma.payoutTransfer.findUnique({
         where: { id: transfer.id },
       });

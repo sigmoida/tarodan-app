@@ -1869,8 +1869,17 @@ model PaytrStatementLine {
   matchStatus      PaytrMatchStatus       @default(unmatched) @map("match_status")
   paymentId        String?                @map("payment_id")
   refundAttemptId  String?                @map("refund_attempt_id")
+  // Üyelik yenilemesi (MembershipPayment) karşılığı — Payment tablosunda değildir.
+  membershipPaymentId String?             @map("membership_payment_id")
   // psp_fee_accrued ledger kaydı yazıldı mı (idempotens damgası) — Faz 5.
   ledgerRecordedAt DateTime?              @map("ledger_recorded_at")
+  // Eşleştirme motoru son ne zaman denedi: kalıcı karşılıksız satırlar her gece
+  // sırayı tıkamasın (yeni satır önce, eskiler günde bir).
+  lastMatchAttemptAt DateTime?            @map("last_match_attempt_at")
+  // Çözümleme akışı: admin satırı inceleyip kapattı (iş listesinden düşer).
+  resolvedAt       DateTime?              @map("resolved_at")
+  resolvedById     String?                @map("resolved_by_id")
+  resolutionNote   String?                @map("resolution_note")
   raw              Json?
   createdAt        DateTime               @default(now()) @map("created_at")
   updatedAt        DateTime               @updatedAt @map("updated_at")
@@ -1880,6 +1889,8 @@ model PaytrStatementLine {
   @@unique([merchantOid, type, transactionDate, amount], name: "statement_line_dedup")
   @@index([transactionDate])
   @@index([matchStatus])
+  @@index([matchStatus, lastMatchAttemptAt])
+  @@index([membershipPaymentId])
   @@map("paytr_statement_lines")
 }
 
@@ -1906,6 +1917,8 @@ model PaytrSettlement {
   netTotal     Decimal               @map("net_total") @db.Decimal(12, 2)
   merchantIban String?               @map("merchant_iban")
   isProjection Boolean               @default(false) @map("is_projection")
+  // odeme-detayi kalemleri çekildi (boş dönse bile): her gece yeniden istenmesin.
+  itemsSyncedAt DateTime?            @map("items_synced_at")
   raw          Json?
   createdAt    DateTime              @default(now()) @map("created_at")
   updatedAt    DateTime              @updatedAt @map("updated_at")
@@ -2001,6 +2014,9 @@ model PayoutTransfer {
   transferIban           String                        @map("transfer_iban")
   transferName           String                        @map("transfer_name")
   status                 PayoutStatus                  @default(pending)
+  // PayTR'nin talimat yanıtındaki `reference`; geri dönen transfer listesi (`ref_no`)
+  // yalnız bununla eşlenir (listede trans_id yoktur). Yeniden gönderimde sıfırlanır.
+  providerReference      String?                       @map("provider_reference")
   providerResponse       Json?                         @map("provider_response")
   failureReason          String?                       @map("failure_reason")
   retryCount             Int                           @default(0) @map("retry_count")
@@ -2023,6 +2039,7 @@ model PayoutTransfer {
   @@index([sellerId])
   @@index([status])
   @@index([processedAt])
+  @@index([providerReference])
   @@map("payout_transfers")
 }
 

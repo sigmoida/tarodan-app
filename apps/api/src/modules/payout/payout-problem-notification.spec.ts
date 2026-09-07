@@ -57,8 +57,21 @@ function makePrisma(payout: any, account: any) {
               : null,
           ),
         ),
+      findFirst: jest
+        .fn()
+        .mockImplementation(({ where }: any) =>
+          Promise.resolve(
+            where.providerReference &&
+              where.providerReference === payout.providerReference
+              ? { ...payout, ...state.data, status: state.status }
+              : null,
+          ),
+        ),
       updateMany: jest.fn().mockImplementation(({ where, data }: any) => {
-        if (where.status && where.status !== state.status) {
+        const allowed = where.status?.in
+          ? where.status.in.includes(state.status)
+          : !where.status || where.status === state.status;
+        if (!allowed) {
           return Promise.resolve({ count: 0 });
         }
         apply(data);
@@ -82,16 +95,14 @@ function makePrisma(payout: any, account: any) {
 function makeService(opts: {
   prisma: any;
   transferResult?: { status: string; err_msg?: string };
-  returnedTransfers?: { status: string; data?: any[] };
+  returnedTransfers?: any[];
 }) {
   const createPlatformTransfer = jest
     .fn()
     .mockResolvedValue(opts.transferResult ?? { status: "success" });
   const getReturnedTransfers = jest
     .fn()
-    .mockResolvedValue(
-      opts.returnedTransfers ?? { status: "success", data: [] },
-    );
+    .mockResolvedValue(opts.returnedTransfers ?? []);
   const notification = { sendTemplateEmailToUser: jest.fn() };
   const service = new PayoutService(
     opts.prisma,
@@ -115,19 +126,31 @@ const activeAccount = {
 
 describe("payout problem notifications", () => {
   it("emails the seller when a completed transfer is returned by the bank", async () => {
-    const payout = makePayout({ status: PayoutStatus.completed });
+    const payout = makePayout({
+      status: PayoutStatus.completed,
+      providerReference: "PAYTRREF1",
+    });
     const prisma = makePrisma(payout, activeAccount);
     const { service, notification } = makeService({
       prisma,
-      returnedTransfers: {
-        status: "success",
-        data: [{ trans_id: "TRANSFER1", reason: "hesap kapalı" }],
-      },
+      returnedTransfers: [
+        {
+          refNo: "PAYTRREF1",
+          dateDetected: "2026-08-03",
+          dateReimbursed: "2026-08-02",
+          transferName: "Seller",
+          transferIban: VALID_IBAN,
+          transferAmount: 90,
+          transferCurrency: "TL",
+          transferDate: "2026-08-01",
+          raw: {},
+        },
+      ],
     });
 
     const updated = await service.checkReturnedTransfers();
 
-    expect(updated).toBe(1);
+    expect(updated).toEqual({ returned: 1, unmatched: 0 });
     expect(prisma.state.status).toBe(PayoutStatus.returned);
     expect(notification.sendTemplateEmailToUser).toHaveBeenCalledWith(
       "seller-1",

@@ -1,106 +1,67 @@
 import { AdminFinanceService } from "./admin-finance.service";
 
 /**
- * Finans özeti: admin'in "para nerede?" sorusuna TEK bakışta cevap.
- *
- * Huni: Tahsilat (dönem) → Escrow'da bekleyen (anlık) → Satıcıya transfer
- * edilen (dönem) → Platform NET geliri (dönem, ledger formülü). Sağlık şeridi:
- * başarısız/dönen transferler, süresi geçmiş hold'lar, faturasız teslimatlar,
- * deneme bütçesi tükenmiş eLogo belgeleri, açık satıcı borçları. Bu sayılar
- * zaten üretiliyordu ama yalnız log'a gidiyordu — admin yüzeyine iner.
+ * Finans özeti: sağlamalı bölümler FinanceReconciliationService'ten gelir; bu
+ * servis yalnız sağlık şeridini (başarısız/dönen transfer, süresi geçmiş hold,
+ * faturasız teslimat, tükenmiş eLogo denemesi, açık satıcı borcu) ekler. Bu
+ * sayılar zaten üretiliyordu ama yalnız log'a gidiyordu — admin yüzeyine iner.
  */
 describe("AdminFinanceService.getFinanceOverview", () => {
+  const reconciliation = {
+    syncEnabled: true,
+    sections: [
+      {
+        key: "revenueSplit",
+        kind: "identity",
+        scope: "allTime",
+        total: { key: "collected", amount: 2597.2, count: 7 },
+        components: [],
+        difference: 0,
+        balanced: true,
+      },
+    ],
+    comparison: { key: "psp", syncEnabled: true, coverageFrom: null, rows: [] },
+    diagnostics: {
+      paymentsWithoutOrders: 0,
+      ordersWithoutHold: 0,
+      productTaxTotal: 0,
+      commissionLedgerDrift: 0,
+    },
+  };
+
   const makeService = () => {
     const prisma = {
-      payment: {
-        aggregate: jest
-          .fn()
-          .mockResolvedValue({ _sum: { amount: 5000 }, _count: { id: 12 } }),
-      },
-      paymentHold: {
-        aggregate: jest
-          .fn()
-          .mockResolvedValue({ _sum: { amount: 1800 }, _count: { id: 7 } }),
-        count: jest.fn().mockResolvedValue(2), // süresi geçmiş held
-      },
-      payoutTransfer: {
-        aggregate: jest
-          .fn()
-          .mockResolvedValue({ _sum: { netAmount: 2500 }, _count: { id: 9 } }),
-        count: jest.fn().mockResolvedValue(3), // failed/returned
-      },
-      commissionLedger: {
-        aggregate: jest.fn().mockResolvedValue({
-          _sum: {
-            sellerCommission: 400,
-            refundedSellerCommission: 50,
-            buyerFee: 120,
-            refundedBuyerFee: 20,
-          },
-        }),
-      },
-      order: {
-        count: jest.fn().mockResolvedValue(4), // faturasız teslimat
-        // Boost (BST-) ciro toplamı — bu spec'in konusu değil, 0 döner.
-        aggregate: jest
-          .fn()
-          .mockResolvedValue({ _sum: { totalAmount: 0 }, _count: { id: 0 } }),
-      },
+      paymentHold: { count: jest.fn().mockResolvedValue(2) }, // süresi geçmiş held
+      payoutTransfer: { count: jest.fn().mockResolvedValue(3) }, // failed/returned
+      order: { count: jest.fn().mockResolvedValue(4) }, // faturasız teslimat
       elogoInvoice: { count: jest.fn().mockResolvedValue(1) }, // tükenen
-      // Dönemin GERÇEK PSP kesintisi: defterdeki psp_fee debit toplamı
-      // (PayTR ekstresinden eşleştirilip yazılır) — tahmini oran DEĞİL.
-      ledgerEntry: {
-        aggregate: jest.fn().mockResolvedValue({ _sum: { amount: 30 } }),
-      },
       sellerAccountAdjustment: {
         aggregate: jest.fn().mockResolvedValue({
           _sum: { remainingAmount: 340 },
           _count: { id: 5 },
         }),
       },
-      // Takas hizmet bedeli: KDV DAHİL 120 tahsil edildi (%20 → matrah 100).
-      tradeCashPayment: {
-        aggregate: jest
-          .fn()
-          .mockResolvedValue({ _sum: { tradeFeeAmount: 120 } }),
-      },
     };
-    const taxPolicy = {
-      resolve: jest
-        .fn()
-        .mockResolvedValue({ serviceVatEnabled: true, serviceVatRate: 20 }),
-      effectiveServiceVatRate: (p: any) =>
-        p.serviceVatEnabled ? p.serviceVatRate : 0,
-    };
+    const build = jest.fn().mockResolvedValue(reconciliation);
     return {
-      service: new AdminFinanceService(prisma as any, taxPolicy as any),
+      service: new AdminFinanceService(prisma as any, { build } as any),
       prisma,
+      build,
     };
   };
 
-  it("huni + sağlık alanlarını tek yanıtta toplar", async () => {
-    const { service } = makeService();
+  it("returns the reconciliation sections alongside the health strip", async () => {
+    const { service, build } = makeService();
 
     const result = await service.getFinanceOverview();
 
-    expect(result.funnel).toEqual({
-      collectedTotal: 5000,
-      collectedCount: 12,
-      escrowHeldTotal: 1800,
-      escrowHeldCount: 7,
-      transferredTotal: 2500,
-      transferredCount: 9,
-      // Ledger formülü (400−50)+(120−20)=450 + takas ücreti matrahı 100.
-      platformRevenueNet: 550,
-      tradeFeeRevenueNet: 100,
-      // Boost cirosu bu fixture'da 0 (BST- siparişi yok).
-      boostRevenueCollected: 0,
-      boostRevenueCount: 0,
-      tradeFeeCollected: 120,
-      // PSP kesintisi gelirin İÇİNDEN çıkar: hak ediş 550 − 30.
-      pspFeeTotal: 30,
-      platformNetAfterPsp: 520,
-    });
+    expect(build).toHaveBeenCalledTimes(1);
+    expect(result.syncEnabled).toBe(true);
+    expect(result.sections).toBe(reconciliation.sections);
+    expect(result.comparison).toBe(reconciliation.comparison);
+    expect(result.diagnostics).toBe(reconciliation.diagnostics);
+    expect(result).not.toHaveProperty("funnel");
+    expect(result).not.toHaveProperty("period");
     expect(result.health).toEqual({
       failedTransfers: 3,
       overdueHolds: 2,
@@ -111,89 +72,20 @@ describe("AdminFinanceService.getFinanceOverview", () => {
     });
   });
 
-  it("tahsilat yalnız completed ödemeleri sayar", async () => {
+  it("health counters are instantaneous — only the overdue-hold and uninvoiced queries carry a date bound", async () => {
     const { service, prisma } = makeService();
 
     await service.getFinanceOverview();
 
-    expect(prisma.payment.aggregate).toHaveBeenCalledWith(
-      expect.objectContaining({
-        where: expect.objectContaining({ status: "completed" }),
-      }),
-    );
-  });
-
-  it("PSP kesintisini defterdeki psp_fee DEBIT satırlarından toplar", async () => {
-    const { service, prisma } = makeService();
-
-    await service.getFinanceOverview();
-
-    expect(prisma.ledgerEntry.aggregate).toHaveBeenCalledWith(
-      expect.objectContaining({
-        where: expect.objectContaining({
-          account: "psp_fee",
-          direction: "debit",
-        }),
-        _sum: { amount: true },
-      }),
-    );
-  });
-
-  it("defterde PSP satırı yoksa hak ediş gelire eşittir", async () => {
-    const { service, prisma } = makeService();
-    prisma.ledgerEntry.aggregate.mockResolvedValue({ _sum: { amount: null } });
-
-    const result = await service.getFinanceOverview();
-
-    expect(result.funnel.pspFeeTotal).toBe(0);
-    expect(result.funnel.platformNetAfterPsp).toBe(550);
-  });
-
-  /**
-   * Takas geliri `commissionLedger`'da HİÇ görünmez (o tablo sipariş bazlıdır).
-   * Buradan gelmezse platform geliri takasların TAMAMI kadar eksik raporlanır.
-   */
-  it("takas hizmet bedelini yalnız ödemesi tamamlanmış satırlardan toplar", async () => {
-    const { service, prisma } = makeService();
-
-    await service.getFinanceOverview();
-
-    expect(prisma.tradeCashPayment.aggregate).toHaveBeenCalledWith(
-      expect.objectContaining({
-        where: expect.objectContaining({ status: "completed" }),
-        _sum: { tradeFeeAmount: true },
-      }),
-    );
-  });
-
-  it("hizmet KDV'si kapalıysa ücretin tamamı gelir yazılır", async () => {
-    const prisma = (makeService() as any).prisma;
-    const taxPolicy = {
-      resolve: jest
-        .fn()
-        .mockResolvedValue({ serviceVatEnabled: false, serviceVatRate: 20 }),
-      effectiveServiceVatRate: (p: any) =>
-        p.serviceVatEnabled ? p.serviceVatRate : 0,
-    };
-    const service = new AdminFinanceService(prisma as any, taxPolicy as any);
-
-    const result = await service.getFinanceOverview();
-
-    expect(result.funnel.tradeFeeRevenueNet).toBe(120);
-    expect(result.funnel.platformRevenueNet).toBe(570);
-  });
-
-  it("transfer toplamı yalnız completed transferlerin NET tutarıdır", async () => {
-    const { service, prisma } = makeService();
-
-    await service.getFinanceOverview();
-
-    expect(prisma.payoutTransfer.aggregate).toHaveBeenCalledWith(
-      expect.objectContaining({
-        where: expect.objectContaining({ status: "completed" }),
-        _sum: { netAmount: true },
-      }),
-    );
+    expect(prisma.payoutTransfer.count.mock.calls[0][0].where).toEqual({
+      status: { in: ["failed", "returned"] },
+    });
+    expect(
+      prisma.paymentHold.count.mock.calls[0][0].where.releaseAt.lte,
+    ).toBeInstanceOf(Date);
+    expect(
+      prisma.order.count.mock.calls[0][0].where.deliveredAt.lt,
+    ).toBeInstanceOf(Date);
   });
 });
 
@@ -216,7 +108,7 @@ describe("AdminFinanceService.getInvoicesSummary", () => {
           .mockResolvedValueOnce(1), // exhausted
       },
     };
-    const service = new AdminFinanceService(prisma as any);
+    const service = new AdminFinanceService(prisma as any, {} as any);
 
     const result = await service.getInvoicesSummary();
 

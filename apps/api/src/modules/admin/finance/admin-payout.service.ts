@@ -838,16 +838,29 @@ export class AdminPayoutService {
         failureReason: null,
         retryCount: 0,
         nextRetryAt: null,
+        // Yeni gönderim yeni PayTR referansı üretir; eskisi kalırsa geri dönen
+        // transfer taraması aynı ref_no ile bu satırı tekrar returned yapardı.
+        // providerResponse (talimat + dönüş satırı) yeni gönderime dek kalır;
+        // hiçbir okuyucu pending satırda ona bakmaz, iz kaybolmasın.
+        providerReference: null,
         ...(newTransId ? { transId: newTransId } : {}),
       },
     });
+    // Yeniden gönderim providerResponse'u ezer; PayTR ref/dönüş kaydı yalnız burada kalır.
     await this.audit.createRequiredAuditLog(
       adminId,
       "payout_retry",
       "PayoutTransfer",
       transferId,
-      { action: "admin_retry", wasReturned: isReturned },
-      { status: "pending" },
+      {
+        action: "admin_retry",
+        wasReturned: isReturned,
+        transId: transfer.transId,
+        providerReference: transfer.providerReference,
+        providerResponse: transfer.providerResponse,
+        failureReason: transfer.failureReason,
+      },
+      { status: "pending", ...(newTransId ? { transId: newTransId } : {}) },
     );
     return {
       success: true,

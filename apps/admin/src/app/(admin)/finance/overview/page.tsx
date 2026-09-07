@@ -2,33 +2,27 @@
 
 "use client";
 
-import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
-import {
-  ArrowsRightLeftIcon,
-  BanknotesIcon,
-  ChartPieIcon,
-  CreditCardIcon,
-  LockClosedIcon,
-} from "@heroicons/react/24/outline";
 import { adminApi } from "@/lib/api";
 import { adminKeys } from "@/lib/query/keys";
 import { AdminPage } from "@/components/page/AdminPage";
 import { PageHeader } from "@/components/AdminList";
-import { MetricCard } from "@/components/MetricCard";
 import { QueryErrorCard } from "@/components/page/QueryErrorCard";
 import { fmtTry } from "@/lib/format";
 import { useTranslations } from "next-intl";
 import { HealthStrip } from "./_components/HealthStrip";
+import { ReconciliationSectionView } from "./_components/ReconciliationSection";
+import { ComparisonSectionView } from "./_components/ComparisonSection";
 import type { FinanceOverview } from "./_lib/types";
 
 /**
- * Finans Özeti — "para nerede?" sorusuna tek bakışta cevap.
+ * Finans Özeti — "para nerede?" sorusuna SAĞLAMASI olan cevap.
  *
- * Huni, para AKIŞININ sırasını takip eder: Tahsilat (alıcıdan giren ciro) →
- * Escrow'da bekleyen (satıcı payı rezerve) → Satıcıya ödenen (tamamlanan banka
- * transferi, net) → Platform geliri (ledger'dan, iadeler düşülmüş). Her kart
- * ilgili listeye götürür; sağlık şeridi müdahale isteyenleri gösterir.
+ * Her bölümde sol toplam sağdaki bileşenlerin toplamına eşit olmak zorundadır;
+ * fark 0 değilse kırmızı. Bölümler: ciro nereye gitti (tüm zaman) → satıcı
+ * hakedişi nerede (anlık) → takas karşı taraf (anlık) → platform gelirinden
+ * Tarodan hak edişine (şelale) → alıcı iadeleri (kırılım) → PayTR karşılaştırması.
+ * Aylık kırılım ve trend bu ekranın işi değil; dashboard/analiz ekranlarında.
  */
 export default function FinanceOverviewPage() {
   const t = useTranslations();
@@ -38,7 +32,35 @@ export default function FinanceOverviewPage() {
       queryFn: async () => (await adminApi.getFinanceOverview()).data,
     });
 
-  const funnel = data?.funnel;
+  const diagnostics = data?.diagnostics;
+  const diagnosticItems = diagnostics
+    ? [
+        {
+          key: "paymentsWithoutOrders" as const,
+          value: diagnostics.paymentsWithoutOrders,
+          bad: diagnostics.paymentsWithoutOrders > 0,
+          text: String(diagnostics.paymentsWithoutOrders),
+        },
+        {
+          key: "ordersWithoutHold" as const,
+          value: diagnostics.ordersWithoutHold,
+          bad: diagnostics.ordersWithoutHold > 0,
+          text: String(diagnostics.ordersWithoutHold),
+        },
+        {
+          key: "productTax" as const,
+          value: diagnostics.productTaxTotal,
+          bad: Math.abs(diagnostics.productTaxTotal) > 0.01,
+          text: fmtTry(diagnostics.productTaxTotal) ?? "",
+        },
+        {
+          key: "commissionLedgerDrift" as const,
+          value: diagnostics.commissionLedgerDrift,
+          bad: Math.abs(diagnostics.commissionLedgerDrift) > 0.01,
+          text: fmtTry(diagnostics.commissionLedgerDrift) ?? "",
+        },
+      ].filter((d) => d.bad)
+    : [];
 
   return (
     <AdminPage>
@@ -53,120 +75,35 @@ export default function FinanceOverviewPage() {
           isRetrying={isFetching}
         />
       ) : (
-        <>
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
-            <Link href="/finance/payments" className="block">
-              <MetricCard
-                icon={CreditCardIcon}
-                tone="info"
-                label={t("admin.finance.overview.funnel.collected")}
-                value={funnel ? fmtTry(funnel.collectedTotal) : "—"}
-                loading={isLoading}
-                footer={
-                  <span className="text-muted">
-                    {t("admin.finance.overview.funnel.collectedHint", {
-                      count: funnel?.collectedCount ?? 0,
-                    })}
-                  </span>
-                }
-              />
-            </Link>
-            <Link href="/finance/payouts?tab=escrow" className="block">
-              <MetricCard
-                icon={LockClosedIcon}
-                tone="warning"
-                label={t("admin.finance.overview.funnel.escrowHeld")}
-                value={funnel ? fmtTry(funnel.escrowHeldTotal) : "—"}
-                loading={isLoading}
-                footer={
-                  <span className="text-muted">
-                    {t("admin.finance.overview.funnel.escrowHeldHint", {
-                      count: funnel?.escrowHeldCount ?? 0,
-                    })}
-                  </span>
-                }
-              />
-            </Link>
-            <Link href="/finance/payouts?tab=transfers" className="block">
-              <MetricCard
-                icon={BanknotesIcon}
-                tone="success"
-                label={t("admin.finance.overview.funnel.transferred")}
-                value={funnel ? fmtTry(funnel.transferredTotal) : "—"}
-                loading={isLoading}
-                footer={
-                  <span className="text-muted">
-                    {t("admin.finance.overview.funnel.transferredHint", {
-                      count: funnel?.transferredCount ?? 0,
-                    })}
-                  </span>
-                }
-              />
-            </Link>
-            <Link href="/finance/commission" className="block">
-              <MetricCard
-                icon={ChartPieIcon}
-                tone="primary"
-                label={t("admin.finance.overview.funnel.platformRevenue")}
-                value={funnel ? fmtTry(funnel.platformRevenueNet) : "—"}
-                loading={isLoading}
-                footer={
-                  <span className="text-muted">
-                    {t("admin.finance.overview.funnel.platformRevenueHint")}
-                  </span>
-                }
-              />
-            </Link>
-            {/* Takas geliri komisyon defterinde GÖRÜNMEZ (o tablo sipariş
-                bazlıdır); platform gelirinin içindeki payı ayrıca gösterilir. */}
-            <Link href="/operations/trades" className="block">
-              <MetricCard
-                icon={ArrowsRightLeftIcon}
-                tone="primary"
-                label={t("admin.finance.overview.funnel.tradeFee")}
-                value={funnel ? fmtTry(funnel.tradeFeeRevenueNet) : "—"}
-                loading={isLoading}
-                footer={
-                  <span className="text-muted">
-                    {t("admin.finance.overview.funnel.tradeFeeHint", {
-                      collected: funnel
-                        ? fmtTry(funnel.tradeFeeCollected)
-                        : "—",
-                    })}
-                  </span>
-                }
-              />
-            </Link>
-            {/* Komisyon geliri hak edişin KENDİSİ değil: PSP kesintisi içinden
-                çıkar. İki kart, "kalan" ile "hak ediş" farkını görünür kılar. */}
-            <MetricCard
-              icon={CreditCardIcon}
-              tone="warning"
-              label={t("admin.finance.overview.funnel.pspFee")}
-              value={funnel ? fmtTry(funnel.pspFeeTotal) : "—"}
+        <div className="space-y-4">
+          {(data?.sections ?? []).map((section) => (
+            <ReconciliationSectionView
+              key={section.key}
+              section={section}
+              syncEnabled={data?.syncEnabled ?? true}
               loading={isLoading}
-              footer={
-                <span className="text-muted">
-                  {t("admin.finance.overview.funnel.pspFeeHint")}
-                </span>
-              }
             />
-            <MetricCard
-              icon={BanknotesIcon}
-              tone="success"
-              label={t("admin.finance.overview.funnel.netAfterPsp")}
-              value={funnel ? fmtTry(funnel.platformNetAfterPsp) : "—"}
-              loading={isLoading}
-              footer={
-                <span className="text-muted">
-                  {t("admin.finance.overview.funnel.netAfterPspHint")}
-                </span>
-              }
-            />
-          </div>
-
+          ))}
+          {isLoading && !data && (
+            <p className="py-8 text-center text-muted">{t("common.loading")}</p>
+          )}
+          {data && <ComparisonSectionView comparison={data.comparison} />}
+          {diagnosticItems.length > 0 && (
+            <div className="rounded-lg border border-danger-200 bg-danger-50 px-3 py-2 text-sm text-danger-700">
+              <p className="font-semibold">
+                {t("admin.finance.overview.diagnostics.title")}
+              </p>
+              <ul className="mt-1 list-disc pl-5">
+                {diagnosticItems.map((d) => (
+                  <li key={d.key}>
+                    {t(`admin.finance.overview.diagnostics.${d.key}`)}: {d.text}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
           {data && <HealthStrip health={data.health} />}
-        </>
+        </div>
       )}
     </AdminPage>
   );

@@ -6,6 +6,7 @@ import { LedgerBalanceService } from "./ledger-balance.service";
 import { LedgerReconciliationService } from "./ledger-reconciliation.service";
 import { LedgerScheduledProcessor } from "./ledger-scheduled.processor";
 import { scheduledProcessors } from "../../workers/scheduled-processors";
+import { FinanceReconciliationModule } from "../finance-reconciliation/finance-reconciliation.module";
 
 /**
  * LedgerModule (Faz 6) — değişmez çift-taraflı defter + günlük drift reconciliation.
@@ -14,7 +15,11 @@ import { scheduledProcessors } from "../../workers/scheduled-processors";
  */
 @Global()
 @Module({
-  imports: [BullModule.registerQueue({ name: QUEUE_NAMES.SCHEDULED })],
+  imports: [
+    BullModule.registerQueue({ name: QUEUE_NAMES.SCHEDULED }),
+    // 7. invariant: ciro bölünmesi (S1) farkı — Finans Özeti ile aynı hesap.
+    FinanceReconciliationModule,
+  ],
   providers: [
     LedgerService,
     LedgerBalanceService,

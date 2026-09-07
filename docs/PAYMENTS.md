@@ -170,8 +170,17 @@ geçişte açılır.
 5. **Callback** — `POST /payouts/callback/paytr-transfer` (public, hash
    doğrulamalı, düz `"OK"` dönmek zorunda). 3 günü aşan callback gecikmesi alarm
    üretir. `payout-failed-seller` / `payout-returned-seller` e-postaları maskeli
-   IBAN son-4 ve sebep taşır; günlük returned taraması + 30 dk stuck-processing
-   tespiti vardır.
+   IBAN son-4 ve (varsa) sebep taşır; günlük returned taraması + 30 dk stuck-processing
+   tespiti vardır. **Geri dönen transfer eşlemesi**: PayTR'nin listesi bizim
+   `trans_id`'mizi değil kendi `ref_no`'sunu verir; talimat yanıtındaki `reference`
+   `PayoutTransfer.providerReference`'a yazılır ve eşleme onunla yapılır (migration
+   eski satırları `provider_response->>'reference'`'tan doldurur; referanssız kalan
+   eski satırlar için IBAN + tutar + tarih; belirsizlikte dokunulmaz, loglanır).
+   PayTR aynı satırı pencere boyunca her gün yeniden verir: referansı taşıyan
+   payout artık completed/processing değilse satır "işlendi" sayılır, sezgiye
+   düşülmez. Yeniden gönderim (admin retry, requeue) referansı sıfırlar;
+   `providerResponse` yeni gönderime dek kalır, admin retry'ın audit kaydı
+   önceki referans/yanıtı taşır.
 
 ---
 
@@ -278,6 +287,34 @@ RefundAttempt'e eşlenir (±0.05 TL toleransla `matched`/`amount_mismatch`/
 ödemeleri bulur (en yüksek alarm); settlement'lar `satış − iade == net` ile
 doğrulanır; PSP ücretleri ledger'a damgalanır. `ledger-reconciliation.service.ts`
 (her gün 04:00, salt-okuma) beş invariantı denetler ve para taşımaz, alarm basar.
+
+### Finans Özeti sağlaması (admin → Finans → Özet)
+
+`modules/finance-reconciliation/`: ekran defterden değil, sipariş anında dondurulan
+snapshot kolonlarından hesaplanır ve her bölüm kendi kimliğini taşır (fark ≠ 0 →
+kırmızı; aynı fark gece `ledger-reconcile`'da `REVENUE_SPLIT_DRIFT` alarmı):
+
+- **Ciro nereye gitti** (tüm zaman): tahsilat (`Payment` completed|refunded + üyelik
+  yenilemeleri) = satıcı hakedişi (Σ hold) + takas karşı taraf + platform ücret geliri
+  (KDV hariç) + hizmet KDV'si + kargo + stopaj − kargo açığı (hold 0'a kırpılınca).
+  Fiziksel sipariş kimliği kapalı formdur: `hold + (commission − pfd) + (bST+sST) +
+(bShip+sShip) + wh − deficit = total`.
+- **Satıcı hakedişi nerede** (anlık): Σ hold = escrow'da + yolda + ödendi (net) +
+  mahsup + alıcıya iade. **Takas nakit farkı nerede**: release bekleyen + yolda +
+  ödendi + iade.
+- **Platform gelirinden Tarodan hak edişine** (şelale): − iade edilen ücretler −
+  feragat − takas tam iadesi − sanal iadeler − platformun karşıladığı iade kalemleri
+  − PayTR kesintisi (defter `psp_fee`; senkron kapalıysa rozet).
+- **PayTR ile karşılaştırma**: satış/iade/kesinti ↔ döküm satırları, `tahsilat −
+iade − kesinti` ↔ gerçekleşen hakediş net (satıcı payı dahil; Tarodan hak edişiyle
+  KARŞILAŞTIRILMAZ), gönderilen transferler ↔ callback+dönen. "Bizim" taraf dökümün
+  ilk gününden itibaren sayılır.
+- **Teşhis**: siparişi olmayan ödeme, hold'u olmayan ödenmiş sipariş, sıfır olmayan
+  ürün KDV'si, sipariş komisyonu ↔ komisyon defteri farkı.
+
+Defter bilinçli olarak kaynak değildir: `payment_captured` kargo ve hizmet KDV'sini
+`seller_escrow` içinde bırakır, MEM-/BST- deftere yazmaz, iade tersine kaydı oransaldır
+(ayrı epik).
 
 ## 10. Para cron'ları
 

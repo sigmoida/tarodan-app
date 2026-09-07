@@ -90,6 +90,7 @@ import { QUEUE_NAMES } from "../../workers/constants";
 import { PrismaModule } from "../../prisma";
 import { AuthModule } from "../auth";
 import { PaymentModule } from "../payment";
+import { FinanceReconciliationModule } from "../finance-reconciliation/finance-reconciliation.module";
 // Manuel escrow release fast-path'i: scoped payout oluşturma PayoutService'ten.
 import { PayoutModule } from "../payout/payout.module";
 import { MessagingModule } from "../messaging";
@@ -120,6 +121,7 @@ import { scheduledProcessors } from "../../workers/scheduled-processors";
     PrismaModule,
     AuthModule,
     PaymentModule,
+    FinanceReconciliationModule,
     PayoutModule,
     MessagingModule,
     SupportModule,

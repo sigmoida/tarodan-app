@@ -82,6 +82,7 @@ export class UserBankService {
         failureReason: null,
         retryCount: 0,
         nextRetryAt: null,
+        providerReference: null,
       },
     });
     if (requeued.count > 0) {

@@ -3,6 +3,41 @@ import { i18nMessage } from "../../i18n";
 import * as crypto from "crypto";
 import { PayTRCredentials } from "./paytr-credentials.service";
 import { isValidPayoutTransId } from "../../../common/helpers/payout-trans-id";
+import { parsePaytrMoneyString } from "./paytr-money.util";
+import { normalizeTrIban } from "../../../common/validators/tr-iban";
+
+/** Platform transfer talimatı yanıtı (aşama-1 kabul). `reference` PayTR'nin kendi
+ *  takip numarasıdır; geri dönen transfer listesi (`ref_no`) yalnız bununla eşlenir. */
+export interface PaytrPlatformTransferResult {
+  status: string;
+  err_no?: string;
+  err_msg?: string;
+  trans_id?: string;
+  reference?: string;
+  merchant_amount?: string;
+  submerchant_amount?: string;
+}
+
+/**
+ * Geri dönen (bankadan iade olan) transfer satırı — /odeme/geri-donen-transfer.
+ * Doküman alanları: ref_no, date_detected, date_reimbursed, transfer_name,
+ * transfer_iban, transfer_amount, transfer_currency, transfer_date. `trans_id` ve
+ * sebep alanı YOKTUR; eşleme `refNo` (talimat yanıtındaki `reference`) ile yapılır.
+ */
+export interface PaytrReturnedTransfer {
+  refNo: string;
+  /** YYYY-MM-DD */
+  dateDetected: string;
+  /** YYYY-MM-DD */
+  dateReimbursed: string;
+  transferName: string;
+  transferIban: string;
+  transferAmount: number;
+  transferCurrency: string;
+  /** Transfer talep tarihi, YYYY-MM-DD */
+  transferDate: string;
+  raw: Record<string, unknown>;
+}
 
 /**
  * PayTR Platform Transfer — satıcıya para çıkışı. PayTRService'ten birebir
@@ -55,7 +90,7 @@ export class PayTRTransferService {
     totalAmount: number;
     transferName: string;
     transferIban: string;
-  }): Promise<{ status: string; err_no?: string; err_msg?: string }> {
+  }): Promise<PaytrPlatformTransferResult> {
     // PayTR: trans_id yalnız harf/rakam. Tire SİLİNMEZ — sonuç callback'i ve dönen
     // transfer listesi numarayı aldığı biçimde döndürür, DB ile eşleşmezdi.
     // Biçimi çağıran (payout.service) garanti eder; burası son savunma.
@@ -106,11 +141,9 @@ export class PayTRTransferService {
         signal: AbortSignal.timeout(this.httpTimeoutMs),
       });
       const rawText = await response.text();
-      const parsed = this.parsePaytrJson<{
-        status: string;
-        err_no?: string;
-        err_msg?: string;
-      }>(rawText) ?? {
+      const parsed = this.parsePaytrJson<PaytrPlatformTransferResult>(
+        rawText,
+      ) ?? {
         status: "failed",
         err_msg: "PayTR geçersiz/boş yanıt",
       };
@@ -152,12 +185,14 @@ export class PayTRTransferService {
   }
 
   /**
-   * Query returned (failed) transfers within a date range.
+   * Bankadan geri dönen transferler (tarih aralığı, maks 31 gün; "YYYY-MM-DD hh:mm:ss",
+   * PayTR günleri İstanbul saatiyle). `failed` = kayıt yok → boş liste; `error` → throw
+   * (cron loglayıp alarm üretsin). Satırlar normalize edilir; `raw` olduğu gibi saklanır.
    */
   async getReturnedTransfers(params: {
     startDate: string;
     endDate: string;
-  }): Promise<any> {
+  }): Promise<PaytrReturnedTransfer[]> {
     const hashStr =
       this.merchantId + params.startDate + params.endDate + this.merchantSalt;
 
@@ -184,8 +219,44 @@ export class PayTRTransferService {
         },
       );
       const rawText = await response.text();
-      return this.parsePaytrJson(rawText) ?? { status: "failed" };
+      const data = this.parsePaytrJson<{
+        status?: string;
+        err_msg?: string;
+        data?: unknown;
+      }>(rawText);
+      const status = String(data?.status ?? "");
+      if (status === "failed") return [];
+      if (status !== "success") {
+        throw new BadRequestException(
+          i18nMessage("server.payment.paytrReturnedTransferQueryFailed", {
+            reason: String(data?.err_msg ?? "PayTR geçersiz/boş yanıt"),
+          }),
+        );
+      }
+      const payload = data?.data;
+      const rows: unknown[] = Array.isArray(payload) ? payload : [];
+      return rows.map((item): PaytrReturnedTransfer => {
+        const r: Record<string, unknown> =
+          item && typeof item === "object"
+            ? (item as Record<string, unknown>)
+            : {};
+        return {
+          refNo: String(r.ref_no ?? ""),
+          dateDetected: String(r.date_detected ?? ""),
+          dateReimbursed: String(r.date_reimbursed ?? ""),
+          transferName: String(r.transfer_name ?? ""),
+          transferIban: normalizeTrIban(String(r.transfer_iban ?? "")),
+          transferAmount:
+            parsePaytrMoneyString(
+              r.transfer_amount != null ? String(r.transfer_amount) : undefined,
+            ) ?? 0,
+          transferCurrency: String(r.transfer_currency ?? "TL"),
+          transferDate: String(r.transfer_date ?? ""),
+          raw: r,
+        };
+      });
     } catch (error: any) {
+      if (error instanceof BadRequestException) throw error;
       this.logger.error(`Get returned transfers failed: ${error.message}`);
       throw new BadRequestException(
         i18nMessage("server.payment.paytrReturnedTransferQueryFailed", {

@@ -10,8 +10,13 @@ import {
  * servisi (Y4, transfer öncesi son kontrol) bunu kullanır; regex tek başına
  * rastgele rakam dizisini geçirir, checksum ~%99'unu eler.
  */
+/** IBAN'ı karşılaştırma/saklama biçimine getir: boşluksuz, büyük harf. */
+export function normalizeTrIban(iban: string | null | undefined): string {
+  return (iban || "").replace(/\s/g, "").toUpperCase();
+}
+
 export function isValidTrIban(iban: string): boolean {
-  const v = (iban || "").replace(/\s/g, "").toUpperCase();
+  const v = normalizeTrIban(iban);
   if (!/^TR\d{24}$/.test(v)) return false;
   const rearranged = v.slice(4) + v.slice(0, 4);
   const numeric = rearranged.replace(/[A-Z]/g, (c) =>

@@ -55,8 +55,22 @@ function makePrisma(payout: any, account: any) {
               : null,
           ),
         ),
+      // Geri dönen transfer eşlemesi: providerReference ile arar.
+      findFirst: jest
+        .fn()
+        .mockImplementation(({ where }: any) =>
+          Promise.resolve(
+            where.providerReference &&
+              where.providerReference === payout.providerReference
+              ? { ...payout, ...state.data, status: state.status }
+              : null,
+          ),
+        ),
       updateMany: jest.fn().mockImplementation(({ where, data }: any) => {
-        if (where.status && where.status !== state.status) {
+        const allowed = where.status?.in
+          ? where.status.in.includes(state.status)
+          : !where.status || where.status === state.status;
+        if (!allowed) {
           return Promise.resolve({ count: 0 });
         }
         apply(data);
@@ -310,14 +324,25 @@ describe("PayoutService.checkReturnedTransfers with callback flow", () => {
         status: PayoutStatus.processing,
         submittedAt: new Date("2026-08-01T10:00:00Z"),
         submittedAmount: 88,
+        providerReference: "PAYTRREF1",
       }),
       // Doğrulanmış hesap: geri dönüş doğrulamayı GERİ ALMALI (false yazmalı).
       { ...activeAccount, isVerified: true },
     );
-    const getReturnedTransfers = jest.fn().mockResolvedValue({
-      status: "success",
-      data: [{ trans_id: "TRANSFER1", reason: "iban kapalı" }],
-    });
+    // PayTR listesi bizim trans_id'mizi vermez; yalnız ref_no (talimat yanıtındaki reference).
+    const getReturnedTransfers = jest.fn().mockResolvedValue([
+      {
+        refNo: "PAYTRREF1",
+        dateDetected: "2026-08-03",
+        dateReimbursed: "2026-08-02",
+        transferName: "Seller",
+        transferIban: VALID_IBAN,
+        transferAmount: 88,
+        transferCurrency: "TL",
+        transferDate: "2026-08-01",
+        raw: { ref_no: "PAYTRREF1" },
+      },
+    ]);
     const service = new PayoutService(
       prisma as any,
       { resolve: () => ({ getReturnedTransfers }) } as any,
@@ -327,7 +352,7 @@ describe("PayoutService.checkReturnedTransfers with callback flow", () => {
 
     const updated = await service.checkReturnedTransfers();
 
-    expect(updated).toBe(1);
+    expect(updated).toEqual({ returned: 1, unmatched: 0 });
     expect(prisma.state.status).toBe(PayoutStatus.returned);
     // Geri dönen transfer → IBAN doğrulaması geri alınır.
     expect(prisma.sellerBankAccount.update).toHaveBeenCalledWith(
