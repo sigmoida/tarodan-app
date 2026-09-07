@@ -42,7 +42,7 @@
     "next-intl": "^3",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
-    "react-hook-form": "^7.86.0",
+    "react-hook-form": "^7.87.0",
     "typescript": "^5.3.2",
     "vitest": "^3.2.7",
     "zod": "3.25.76"
