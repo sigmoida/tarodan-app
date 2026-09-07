@@ -6183,7 +6183,13 @@
           "matched": "{count} matched",
           "mismatched": "{count} amount mismatch",
           "unmatched": "{count} unmatched",
-          "missing": "{count} missing in statement"
+          "missing": "{count} missing in statement",
+          "emptyDisabled": "No PayTR data because sync is off.",
+          "lastDays": "Last {count} days",
+          "provisional": "Provisional",
+          "diff": "Diff",
+          "inBalance": "In balance",
+          "feeBookedHint": "Fee booked to the ledger from matched lines"
         },
         "lines": {
           "description": "The default view shows problem rows: PayTR movements with no counterpart in the system or with a diverging amount.",
@@ -6199,7 +6205,8 @@
           "status": {
             "matched": "Matched",
             "unmatched": "Unmatched",
-            "amount_mismatch": "Amount mismatch"
+            "amount_mismatch": "Amount mismatch",
+            "resolved": "Resolved"
           },
           "filter": {
             "problem": "Problem rows",
@@ -6207,7 +6214,15 @@
             "matched": "Matched",
             "unmatched": "Unmatched",
             "amountMismatch": "Amount mismatch"
-          }
+          },
+          "includeResolved": "Show resolved",
+          "rematch": "Re-match",
+          "resolve": "Resolve",
+          "rematched": "Line re-matched",
+          "resolved": "Line marked as resolved",
+          "resolveTitle": "Resolve statement line",
+          "resolveDescription": "{oid} · {amount} — the line leaves the work list and no longer counts on the day card. Note why (recorded in the audit log).",
+          "resolveNotePlaceholder": "e.g. Verified in the PayTR panel; test transaction."
         },
         "settlements": {
           "empty": "No settlement records yet.",
@@ -6215,7 +6230,24 @@
           "state": "State",
           "items": "Items",
           "realized": "Transferred",
-          "projection": "Upcoming"
+          "projection": "Upcoming",
+          "check": "Check",
+          "consistent": "Consistent",
+          "inconsistent": "Inconsistent",
+          "itemsPending": "pending"
+        },
+        "sync": {
+          "disabled": "PayTR report sync is off (PAYTR_REPORT_SYNC_ENABLED). Nothing is fetched from PayTR; cards and rows are not current.",
+          "error": "The last PayTR sync failed: {error}",
+          "stale": "PayTR sync is stale: last successful run {at}. Check the nightly cron.",
+          "lastOk": "Last PayTR sync: {at}"
+        },
+        "missing": {
+          "title": "{date} — payments missing from the statement",
+          "description": "Payments completed on our side whose merchant_oid does not appear in that day's PayTR statement. The money may never have reached PayTR; verify in the PayTR panel.",
+          "empty": "No missing payments for this day.",
+          "paidAt": "Paid at",
+          "membership": "Membership renewal"
         }
       },
       "payouts": {
@@ -6331,25 +6363,7 @@
       },
       "overview": {
         "title": "Finance Overview",
-        "subtitle": "The money flow at a glance",
-        "funnel": {
-          "collected": "Collected (GMV)",
-          "collectedHint": "{count} completed payments",
-          "escrowHeld": "Held in Escrow",
-          "escrowHeldHint": "{count} active holds",
-          "transferred": "Paid to Sellers (Net)",
-          "transferredHint": "{count} completed transfers",
-          "platformRevenue": "Platform Revenue (Net)",
-          "platformRevenueHint": "Commission + service fees − refunds",
-          "pspFee": "PayTR fees",
-          "pspFeeHint": "Actual fees booked from the provider statement",
-          "netAfterPsp": "Tarodan net revenue",
-          "netAfterPspHint": "Commission revenue minus PayTR fees",
-          "tradeFee": "Trade service fee",
-          "tradeFeeHint": "Net of VAT · {collected} collected",
-          "boost": "Boost revenue",
-          "boostHint": "{count} completed package purchases · incl. VAT"
-        },
+        "subtitle": "Where is the money? Every section carries its own check; a non-zero difference is red",
         "health": {
           "title": "Needs Attention",
           "failedTransfers": "Failed / returned transfers",
@@ -6362,6 +6376,95 @@
         "scope": {
           "allTime": "All time",
           "instant": "Right now"
+        },
+        "difference": "Difference",
+        "balanced": "Reconciles",
+        "syncOff": "Sync off",
+        "syncOffHint": "PayTR report sync is off (PAYTR_REPORT_SYNC_ENABLED); the PayTR fee counts as 0 and the comparison is empty.",
+        "sections": {
+          "revenueSplit": {
+            "title": "Where the collected money went",
+            "total": "Collected (gross GMV)",
+            "lines": {
+              "sellerShare": "Seller entitlement (gross)",
+              "tradeCounterpart": "Trade counterparty",
+              "platformFeesNet": "Platform service revenue (net of VAT)",
+              "serviceVat": "Service VAT",
+              "shipping": "Shipping (to carrier)",
+              "withholding": "Withholding tax",
+              "shippingDeficit": "Shipping deficit (hold clamped)"
+            }
+          },
+          "sellerShare": {
+            "title": "Where the seller entitlement is",
+            "total": "Seller entitlement created",
+            "lines": {
+              "escrowHeld": "Held in escrow",
+              "inTransit": "In transit (released, transfer pending)",
+              "paidNet": "Paid to sellers (net)",
+              "adjustmentDeducted": "Deducted for seller debt",
+              "refundedToBuyer": "Refunded to buyers"
+            }
+          },
+          "tradeCounterpart": {
+            "title": "Where the trade cash difference is",
+            "total": "Owed to counterparty",
+            "lines": {
+              "awaitingRelease": "Awaiting release",
+              "inTransit": "In transit",
+              "paidNet": "Paid (net)",
+              "adjustmentDeducted": "Deducted",
+              "refunded": "Refunded"
+            }
+          },
+          "platformNet": {
+            "title": "From platform revenue to Tarodan net",
+            "total": "Platform service revenue (net of VAT)",
+            "lines": {
+              "refundedFees": "Refunded fees",
+              "waivedFees": "Waived fees",
+              "tradeFeeReversed": "Trade full refunds (fee reversed)",
+              "virtualRefundsNet": "Membership / boost refunds",
+              "platformAbsorbed": "Refund items absorbed by the platform",
+              "pspFee": "PayTR fee",
+              "tarodanNet": "Tarodan net"
+            }
+          },
+          "buyerRefunds": {
+            "title": "Refunded to buyers",
+            "total": "Successful refunds",
+            "lines": {
+              "product": "Product amount",
+              "outboundShipping": "Outbound shipping",
+              "buyerFees": "Buyer fees",
+              "buyerVat": "Buyer VAT",
+              "returnShippingCharged": "Return shipping charged to buyer",
+              "unclassified": "Unclassified (legacy policy / manual / trade)"
+            }
+          }
+        },
+        "comparison": {
+          "title": "Comparison with PayTR",
+          "open": "PSP screen",
+          "ours": "Ours",
+          "diff": "Diff",
+          "coverageFrom": "from {date}",
+          "awaiting": "({count} awaiting result)",
+          "rows": {
+            "sales": "Sales",
+            "refunds": "Refunds",
+            "pspFee": "PayTR fee",
+            "settlementNet": "Settlement net (sales − refunds − fee)",
+            "payouts": "Submitted transfers"
+          },
+          "informationalHint": "Value-date lag: today's sales are not yet in PayTR's settlement projection; this row is informational."
+        },
+        "diagnostics": {
+          "title": "Records breaking the reconciliation",
+          "paymentsWithoutOrders": "Completed payments with no order/trade",
+          "ordersWithoutHold": "Paid orders without a hold",
+          "productTax": "Product VAT is not zero (code inconsistency)",
+          "commissionLedgerDrift": "Order commission vs commission ledger drift"
         }
       }
     },
@@ -9657,6 +9760,11 @@
       },
       "testTools": {
         "jobIdRequired": "A job id is required"
+      },
+      "psp": {
+        "invalidDate": "Invalid date (expected YYYY-MM-DD)",
+        "lineNotFound": "Statement line not found",
+        "lineAlreadyMatched": "A matched line cannot be resolved"
       }
     },
     "advertisement": {

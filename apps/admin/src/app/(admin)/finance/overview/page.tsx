@@ -8,23 +8,21 @@ import { adminKeys } from "@/lib/query/keys";
 import { AdminPage } from "@/components/page/AdminPage";
 import { PageHeader } from "@/components/AdminList";
 import { QueryErrorCard } from "@/components/page/QueryErrorCard";
+import { fmtTry } from "@/lib/format";
 import { useTranslations } from "next-intl";
-import { FunnelCards } from "./_components/FunnelCards";
 import { HealthStrip } from "./_components/HealthStrip";
+import { ReconciliationSectionView } from "./_components/ReconciliationSection";
+import { ComparisonSectionView } from "./_components/ComparisonSection";
 import type { FinanceOverview } from "./_lib/types";
 
 /**
- * Finans Özeti — "para nerede?" sorusuna tek bakışta cevap.
+ * Finans Özeti — "para nerede?" sorusuna SAĞLAMASI olan cevap.
  *
- * Huni, para AKIŞININ sırasını takip eder: Tahsilat (alıcıdan giren ciro) →
- * Escrow'da bekleyen (satıcı payı rezerve) → Satıcıya ödenen (tamamlanan banka
- * transferi, net) → Platform geliri (ledger'dan, iadeler düşülmüş). Her kart
- * ilgili listeye götürür; sağlık şeridi müdahale isteyenleri gösterir.
- *
- * Zaman kapsamı her kartın altında yazar: akış kartları TÜM ZAMAN birikimli,
- * stok kartları (escrow) ANLIK. Aylık kırılım bu ekranın işi değil (ve henüz
- * başka bir ekranda da yok — dashboard yalnız sipariş/komisyon defterini ay
- * bazında gösterir).
+ * Her bölümde sol toplam sağdaki bileşenlerin toplamına eşit olmak zorundadır;
+ * fark 0 değilse kırmızı. Bölümler: ciro nereye gitti (tüm zaman) → satıcı
+ * hakedişi nerede (anlık) → takas karşı taraf (anlık) → platform gelirinden
+ * Tarodan hak edişine (şelale) → alıcı iadeleri (kırılım) → PayTR karşılaştırması.
+ * Aylık kırılım ve trend bu ekranın işi değil; dashboard/analiz ekranlarında.
  */
 export default function FinanceOverviewPage() {
   const t = useTranslations();
@@ -33,6 +31,36 @@ export default function FinanceOverviewPage() {
       queryKey: adminKeys.all("finance-overview"),
       queryFn: async () => (await adminApi.getFinanceOverview()).data,
     });
+
+  const diagnostics = data?.diagnostics;
+  const diagnosticItems = diagnostics
+    ? [
+        {
+          key: "paymentsWithoutOrders" as const,
+          value: diagnostics.paymentsWithoutOrders,
+          bad: diagnostics.paymentsWithoutOrders > 0,
+          text: String(diagnostics.paymentsWithoutOrders),
+        },
+        {
+          key: "ordersWithoutHold" as const,
+          value: diagnostics.ordersWithoutHold,
+          bad: diagnostics.ordersWithoutHold > 0,
+          text: String(diagnostics.ordersWithoutHold),
+        },
+        {
+          key: "productTax" as const,
+          value: diagnostics.productTaxTotal,
+          bad: Math.abs(diagnostics.productTaxTotal) > 0.01,
+          text: fmtTry(diagnostics.productTaxTotal) ?? "",
+        },
+        {
+          key: "commissionLedgerDrift" as const,
+          value: diagnostics.commissionLedgerDrift,
+          bad: Math.abs(diagnostics.commissionLedgerDrift) > 0.01,
+          text: fmtTry(diagnostics.commissionLedgerDrift) ?? "",
+        },
+      ].filter((d) => d.bad)
+    : [];
 
   return (
     <AdminPage>
@@ -47,10 +75,35 @@ export default function FinanceOverviewPage() {
           isRetrying={isFetching}
         />
       ) : (
-        <>
-          <FunnelCards funnel={data?.funnel} loading={isLoading} />
+        <div className="space-y-4">
+          {(data?.sections ?? []).map((section) => (
+            <ReconciliationSectionView
+              key={section.key}
+              section={section}
+              syncEnabled={data?.syncEnabled ?? true}
+              loading={isLoading}
+            />
+          ))}
+          {isLoading && !data && (
+            <p className="py-8 text-center text-muted">{t("common.loading")}</p>
+          )}
+          {data && <ComparisonSectionView comparison={data.comparison} />}
+          {diagnosticItems.length > 0 && (
+            <div className="rounded-lg border border-danger-200 bg-danger-50 px-3 py-2 text-sm text-danger-700">
+              <p className="font-semibold">
+                {t("admin.finance.overview.diagnostics.title")}
+              </p>
+              <ul className="mt-1 list-disc pl-5">
+                {diagnosticItems.map((d) => (
+                  <li key={d.key}>
+                    {t(`admin.finance.overview.diagnostics.${d.key}`)}: {d.text}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
           {data && <HealthStrip health={data.health} />}
-        </>
+        </div>
       )}
     </AdminPage>
   );

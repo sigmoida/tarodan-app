@@ -15,8 +15,10 @@ import { PaytrReportSyncService } from "./paytr-report-sync.service";
  *  - future_payments projeksiyonları her turda SİL-YAZ (PayTR her gün günceller).
  */
 
-function makePrisma() {
-  return {
+function makePrisma(opts: { itemsSyncedAt?: Date | null } = {}) {
+  const prisma: any = {
+    // Projeksiyon sil-yaz tek işlemde: tx istemcisi = aynı mock.
+    $transaction: jest.fn().mockImplementation((fn: any) => fn(prisma)),
     paytrStatementLine: {
       upsert: jest.fn().mockResolvedValue({}),
     },
@@ -24,10 +26,12 @@ function makePrisma() {
       upsert: jest.fn().mockImplementation(({ create }: any) =>
         Promise.resolve({
           id: `stl-${create.datePaid.toISOString().slice(0, 10)}`,
+          itemsSyncedAt: opts.itemsSyncedAt ?? null,
         }),
       ),
       deleteMany: jest.fn().mockResolvedValue({ count: 0 }),
-      create: jest.fn().mockResolvedValue({}),
+      createMany: jest.fn().mockResolvedValue({ count: 1 }),
+      update: jest.fn().mockResolvedValue({}),
     },
     paytrSettlementItem: {
       count: jest.fn().mockResolvedValue(0),
@@ -35,6 +39,7 @@ function makePrisma() {
       createMany: jest.fn().mockResolvedValue({ count: 0 }),
     },
   };
+  return prisma;
 }
 
 function makeService(opts: {
@@ -194,9 +199,10 @@ describe("PaytrReportSyncService.syncSettlements", () => {
     expect(r.itemsFetchedFor).toBe(1);
   });
 
-  it("skips the detail call when the settlement already has items", async () => {
-    const prisma = makePrisma();
-    prisma.paytrSettlementItem.count = jest.fn().mockResolvedValue(2);
+  it("skips the detail call when the settlement's items were already synced", async () => {
+    const prisma = makePrisma({
+      itemsSyncedAt: new Date("2026-07-31T02:00:00Z"),
+    });
     const { service, getSettlementDetail } = makeService({
       prisma,
       summary: [REALIZED],
@@ -208,6 +214,25 @@ describe("PaytrReportSyncService.syncSettlements", () => {
     expect(r.itemsFetchedFor).toBe(0);
   });
 
+  it("stamps itemsSyncedAt even when PayTR returns no detail rows (no nightly re-fetch loop)", async () => {
+    // Eski kod kalem sayısına bakıyordu: boş detay dönen hakediş sonsuza dek
+    // her gece yeniden istenirdi.
+    const { service, prisma, getSettlementDetail } = makeService({
+      summary: [REALIZED],
+      detail: [],
+    });
+
+    await service.syncSettlements();
+
+    expect(getSettlementDetail).toHaveBeenCalledTimes(1);
+    expect(prisma.paytrSettlementItem.createMany).not.toHaveBeenCalled();
+    expect(prisma.paytrSettlement.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: { itemsSyncedAt: expect.any(Date) },
+      }),
+    );
+  });
+
   it("replaces projections wholesale on every sync", async () => {
     const { service, prisma, getSettlementDetail } = makeService({
       summary: [PROJECTION],
@@ -216,14 +241,14 @@ describe("PaytrReportSyncService.syncSettlements", () => {
     await service.syncSettlements();
 
     // Projeksiyonlar her turda sil-yaz — PayTR her gün günceller, bayat satır kalmasın.
+    // Tek işlem içinde: ortada çökerse tablo boş kalmaz.
+    expect(prisma.$transaction).toHaveBeenCalledTimes(1);
     expect(prisma.paytrSettlement.deleteMany).toHaveBeenCalledWith({
       where: { isProjection: true },
     });
-    expect(prisma.paytrSettlement.create).toHaveBeenCalledWith(
-      expect.objectContaining({
-        data: expect.objectContaining({ isProjection: true, netTotal: 97 }),
-      }),
-    );
+    expect(prisma.paytrSettlement.createMany).toHaveBeenCalledWith({
+      data: [expect.objectContaining({ isProjection: true, netTotal: 97 })],
+    });
     // Projeksiyonun detayı yoktur — odeme-detayi çağrılmaz.
     expect(getSettlementDetail).not.toHaveBeenCalled();
   });
