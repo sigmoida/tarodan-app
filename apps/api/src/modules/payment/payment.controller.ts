@@ -43,6 +43,7 @@ import {
   CancelPaymentResponseDto,
   RetryPaymentResponseDto,
   DirectPaymentDto,
+  PaymentQueryDto,
 } from "./dto";
 import { isProduction } from "../../config/environment";
 
@@ -334,25 +335,9 @@ export class PaymentController {
   async getMyPayments(
     @CurrentUser("id") userId: string,
     @ReqLocale() locale: Locale,
-    @Query("status") status?: string,
-    @Query("provider") provider?: string,
-    @Query("startDate") startDate?: string,
-    @Query("endDate") endDate?: string,
-    @Query("page") page?: string,
-    @Query("limit") limit?: string,
+    @Query() query: PaymentQueryDto,
   ) {
-    return this.paymentService.getUserPayments(
-      userId,
-      {
-        status: status as any,
-        provider,
-        startDate: startDate ? new Date(startDate) : undefined,
-        endDate: endDate ? new Date(endDate) : undefined,
-        page: page ? parseInt(page, 10) : undefined,
-        limit: limit ? parseInt(limit, 10) : undefined,
-      },
-      locale,
-    );
+    return this.paymentService.getUserPayments(userId, query, locale);
   }
 
   // ============================================================
