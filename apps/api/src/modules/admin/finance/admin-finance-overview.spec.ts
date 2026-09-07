@@ -190,14 +190,8 @@ describe("AdminFinanceService.getFinanceOverview", () => {
 
     expect(result).not.toHaveProperty("period");
     // Tarih anahtarları iç içe (AND/OR/NOT) de olsa yakalanır; her çağrı denetlenir.
-    const dateKeys = (node: unknown, path: string[] = []): string[] => {
-      if (Array.isArray(node)) return node.flatMap((n) => dateKeys(n, path));
-      if (!node || typeof node !== "object" || node instanceof Date) return [];
-      return Object.entries(node as Record<string, unknown>).flatMap(
-        ([k, v]) =>
-          /At$/.test(k) ? [[...path, k].join(".")] : dateKeys(v, [...path, k]),
-      );
-    };
+    // JSON'da `At":` yalnız bir ANAHTARIN sonu olabilir (Date değerleri ISO
+    // dizgesine döner, dizge içindeki tırnaklar kaçışlanır).
     for (const fn of [
       prisma.payment.aggregate,
       prisma.payoutTransfer.aggregate,
@@ -208,7 +202,7 @@ describe("AdminFinanceService.getFinanceOverview", () => {
     ]) {
       expect(fn).toHaveBeenCalled();
       for (const [arg] of fn.mock.calls) {
-        expect(dateKeys(arg?.where ?? {})).toEqual([]);
+        expect(JSON.stringify(arg?.where ?? {})).not.toMatch(/At":/);
       }
     }
   });

@@ -6346,7 +6346,9 @@
           "netAfterPsp": "Tarodan net revenue",
           "netAfterPspHint": "Commission revenue minus PayTR fees",
           "tradeFee": "Trade service fee",
-          "tradeFeeHint": "Net of VAT · {collected} collected"
+          "tradeFeeHint": "Net of VAT · {collected} collected",
+          "boost": "Boost revenue",
+          "boostHint": "{count} completed package purchases · incl. VAT"
         },
         "health": {
           "title": "Needs Attention",

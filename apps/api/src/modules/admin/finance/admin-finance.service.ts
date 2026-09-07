@@ -10,6 +10,8 @@ import {
   PayoutStatus,
   SellerAdjustmentStatus,
 } from "@prisma/client";
+import { REFERENCE_PREFIX } from "../../../common/helpers/code-prefixes";
+import { trMonthStart } from "../../../common/helpers/tr-calendar";
 import { PrismaService } from "../../../prisma";
 import { ledgerNetRevenue } from "../../commission/ledger-net";
 import { ELOGO_MAX_SEND_ATTEMPTS } from "../../elogo/helpers/elogo-retry-policy";
@@ -48,15 +50,15 @@ export class AdminFinanceService {
     return Number(process.env.INVOICE_DEADLINE_DAYS ?? "5") || 5;
   }
 
-  private startOfMonth(now = new Date()): Date {
-    return new Date(now.getFullYear(), now.getMonth(), 1);
-  }
-
   /**
-   * Finans Özeti — TÜM ZAMAN birikimli toplamlar. Ay/dönem kırılımı ve trend
-   * bilinçli olarak burada değil: dönemsel bakış dashboard/analiz ekranlarının
-   * işi. Akış kartları (tahsilat, transfer, gelir, PSP kesintisi) kuruluştan
-   * bugüne toplanır; stok kartları (escrow, sağlık şeridi) zaten anlıktır.
+   * Finans Özeti — TÜM ZAMAN birikimli toplamlar. Akış kartları (tahsilat,
+   * transfer, gelir, PSP kesintisi, boost) kuruluştan bugüne toplanır; stok
+   * kartları (escrow, sağlık şeridi) zaten anlıktır.
+   *
+   * Ay/dönem kırılımı bilinçli olarak burada değil. Dikkat: transfer, PSP
+   * kesintisi, takas ücreti ve boost için dönemsel kırılım HENÜZ hiçbir ekranda
+   * yok — dashboard yalnız sipariş cirosu/komisyon defterini ay bazında gösterir
+   * ve sunucu-yerel ay sınırı kullanır. Dönemsel finans görünümü ayrı iş.
    */
   async getFinanceOverview() {
     const now = new Date();
@@ -173,7 +175,7 @@ export class AdminFinanceService {
       this.prisma.order.aggregate({
         where: {
           origin: OrderOrigin.platform_service,
-          orderNumber: { startsWith: "BST-" },
+          orderNumber: { startsWith: `${REFERENCE_PREFIX.boostOrder}-` },
           status: OrderStatus.completed,
         },
         _sum: { totalAmount: true },
@@ -230,7 +232,7 @@ export class AdminFinanceService {
    */
   async getInvoicesSummary() {
     const now = new Date();
-    const monthStart = this.startOfMonth(now);
+    const monthStart = trMonthStart(now);
 
     const [issued, pendingCount, failedCount, exhaustedCount] =
       await Promise.all([
