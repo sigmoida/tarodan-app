@@ -12,6 +12,7 @@ import { ProductLockService } from "../../product/lock/product-lock.service";
 import { EventService } from "../../events/event.service";
 import { PaytrReportSyncService } from "../reconciliation/paytr-report-sync.service";
 import { PaytrReportMatchingService } from "../reconciliation/paytr-report-matching.service";
+import { PaytrSyncStateService } from "../reconciliation/paytr-sync-state.service";
 import { PayoutService } from "../../payout/payout.service";
 
 /**
@@ -28,6 +29,7 @@ export class PaymentSchedulerService implements OnModuleInit {
     private readonly eventService: EventService,
     private readonly paytrReportSync: PaytrReportSyncService,
     private readonly paytrReportMatching: PaytrReportMatchingService,
+    private readonly paytrSyncState: PaytrSyncStateService,
     @InjectQueue(QUEUE_NAMES.SCHEDULED) private readonly scheduledQueue: Queue,
     @Optional() private readonly payoutService?: PayoutService,
   ) {}
@@ -69,6 +71,24 @@ export class PaymentSchedulerService implements OnModuleInit {
 
   /** Gerçek iş — Bull processor 'paytr-statement-sync' buradan çağırır. */
   async runSyncPaytrStatement(log: (msg: string) => void = () => {}) {
+    if (!this.paytrReportSync.isEnabled()) {
+      // Sessiz no-op değil: ekran "senkron kapalı"yı "veri yok"tan ayırt etsin.
+      await this.paytrSyncState.recordRun("statement", { status: "disabled" });
+      log("PayTR rapor senkronu kapalı (PAYTR_REPORT_SYNC_ENABLED) — atlandı");
+      return { summary: "senkron kapalı", stats: { disabled: 1 } };
+    }
+    try {
+      return await this.syncPaytrStatementEnabled(log);
+    } catch (error: any) {
+      await this.paytrSyncState.recordRun("statement", {
+        status: "error",
+        error: String(error?.message ?? error),
+      });
+      throw error;
+    }
+  }
+
+  private async syncPaytrStatementEnabled(log: (msg: string) => void) {
     const result = await this.paytrReportSync.syncTransactionStatement();
     log(
       `PayTR işlem dökümü: ${result.fetched} satır alındı, ${result.upserted} upsert`,
@@ -87,6 +107,12 @@ export class PaymentSchedulerService implements OnModuleInit {
         `PayTR kesintisi deftere: ${fees.recorded} kayıt${fees.failed ? ` · ${fees.failed} hata` : ""}`,
       );
     }
+    await this.paytrSyncState.recordRun("statement", {
+      status: "ok",
+      fetched: result.fetched,
+      upserted: result.upserted,
+      matched: match.matched,
+    });
     return {
       summary: `${result.upserted} satır · ${match.matched} eşleşti${match.mismatched + match.missingInPaytr > 0 ? ` · ⚠ ${match.mismatched + match.missingInPaytr} fark` : ""}`,
       stats: { ...result, ...match },
@@ -95,6 +121,23 @@ export class PaymentSchedulerService implements OnModuleInit {
 
   /** Gerçek iş — Bull processor 'paytr-settlement-sync' buradan çağırır. */
   async runSyncPaytrSettlements(log: (msg: string) => void = () => {}) {
+    if (!this.paytrReportSync.isEnabled()) {
+      await this.paytrSyncState.recordRun("settlement", { status: "disabled" });
+      log("PayTR rapor senkronu kapalı (PAYTR_REPORT_SYNC_ENABLED) — atlandı");
+      return { summary: "senkron kapalı", stats: { disabled: 1 } };
+    }
+    try {
+      return await this.syncPaytrSettlementsEnabled(log);
+    } catch (error: any) {
+      await this.paytrSyncState.recordRun("settlement", {
+        status: "error",
+        error: String(error?.message ?? error),
+      });
+      throw error;
+    }
+  }
+
+  private async syncPaytrSettlementsEnabled(log: (msg: string) => void) {
     const result = await this.paytrReportSync.syncSettlements();
     log(
       `PayTR hakediş: ${result.settlements} hakediş, ${result.itemsFetchedFor} detay çekildi`,
@@ -104,6 +147,11 @@ export class PaymentSchedulerService implements OnModuleInit {
     log(
       `PayTR hakediş doğrulama: ${verify.checked} denetlendi · ${verify.mismatches} fark`,
     );
+    await this.paytrSyncState.recordRun("settlement", {
+      status: "ok",
+      fetched: result.settlements,
+      upserted: result.settlements,
+    });
     return {
       summary: `${result.settlements} hakediş${verify.mismatches > 0 ? ` · ⚠ ${verify.mismatches} fark` : ""}`,
       stats: { ...result, ...verify },

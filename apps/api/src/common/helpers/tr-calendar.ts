@@ -50,3 +50,12 @@ export function trCalendarTime(at: Date): string {
 export function trCalendarYear(at: Date): number {
   return Number(trCalendarParts(at).year);
 }
+
+/**
+ * "yyyy-mm-dd" Türkiye gününün BAŞLANGIÇ anı (UTC Date). TR 2016'dan beri sabit
+ * UTC+3 (DST yok); PayTR rapor günleri bu takvimdedir. `new Date("yyyy-mm-dd")`
+ * UTC gece yarısı verirdi — 3 saat geç.
+ */
+export function istanbulDayStart(day: string): Date {
+  return new Date(`${day}T00:00:00+03:00`);
+}

@@ -3,6 +3,7 @@ import { ConfigService } from "@nestjs/config";
 import { PrismaService } from "../../../prisma";
 import { PaymentProviderRegistry } from "../../payment-providers/payment-provider.registry";
 import { Prisma } from "@prisma/client";
+import { paytrReportSyncEnabled } from "../../../config/paytr";
 
 /** İşlem dökümü sync penceresi (gün). PayTR aralık limiti 3 gün — pencere kaydırmalı
  *  tekrar tarama geç düşen kayıtları yakalar; dedup anahtarı çift kaydı önler. */
@@ -34,10 +35,13 @@ export class PaytrReportSyncService {
     private readonly configService: ConfigService,
   ) {}
 
+  /** Bayrak kapalıyken hiçbir istek atılmaz; scheduler bunu "disabled" izi olarak yazar. */
+  isEnabled(): boolean {
+    return paytrReportSyncEnabled(this.configService);
+  }
+
   private enabled(): boolean {
-    return (
-      this.configService.get<string>("PAYTR_REPORT_SYNC_ENABLED") === "true"
-    );
+    return this.isEnabled();
   }
 
   /**
@@ -139,33 +143,35 @@ export class PaytrReportSyncService {
     let settlements = 0;
     let itemsFetchedFor = 0;
 
-    // Projeksiyonlar: tam yenileme.
-    await this.prisma.paytrSettlement.deleteMany({
-      where: { isProjection: true },
+    const toRow = (summary: (typeof summaries)[number]) => ({
+      salesTotal: summary.salesTl,
+      returnTotal: summary.returnsTl,
+      netTotal: summary.netTl,
+      merchantIban: summary.merchantIban ?? null,
+      raw: summary.raw as Prisma.InputJsonValue,
+    });
+
+    // Projeksiyonlar: tam yenileme — TEK işlem içinde sil+yaz, ortada çökerse
+    // tablo boş kalmasın (bir sonraki geceye kadar "aktarılacak" satırı yoktu).
+    const projections = summaries.filter((s) => s.projection && s.datePaid);
+    await this.prisma.$transaction(async (tx) => {
+      await tx.paytrSettlement.deleteMany({ where: { isProjection: true } });
+      for (const summary of projections) {
+        await tx.paytrSettlement.create({
+          data: {
+            datePaid: new Date(`${summary.datePaid}T00:00:00Z`),
+            currency: summary.currency,
+            isProjection: true,
+            ...toRow(summary),
+          },
+        });
+      }
     });
 
     for (const summary of summaries) {
-      if (!summary.datePaid) continue;
+      if (!summary.datePaid || summary.projection) continue;
       const datePaid = new Date(`${summary.datePaid}T00:00:00Z`);
-      const data = {
-        salesTotal: summary.salesTl,
-        returnTotal: summary.returnsTl,
-        netTotal: summary.netTl,
-        merchantIban: summary.merchantIban ?? null,
-        raw: summary.raw as Prisma.InputJsonValue,
-      };
-
-      if (summary.projection) {
-        await this.prisma.paytrSettlement.create({
-          data: {
-            datePaid,
-            currency: summary.currency,
-            isProjection: true,
-            ...data,
-          },
-        });
-        continue;
-      }
+      const data = toRow(summary);
 
       const settlement = await this.prisma.paytrSettlement.upsert({
         where: {
@@ -185,23 +191,27 @@ export class PaytrReportSyncService {
       });
       settlements++;
 
-      const existingItems = await this.prisma.paytrSettlementItem.count({
-        where: { settlementId: settlement.id },
-      });
-      if (existingItems > 0) continue;
+      // Kalemler bir kez çekilir; boş dönse bile damgalanır — aksi halde kalemsiz
+      // hakediş her gece yeniden istenirdi (sonsuz tekrar).
+      if (settlement.itemsSyncedAt) continue;
 
       const details = await provider.getSettlementDetail({
         date: summary.datePaid,
       });
-      if (details.length === 0) continue;
-      await this.prisma.paytrSettlementItem.createMany({
-        data: details.map((d) => ({
-          settlementId: settlement.id,
-          merchantOid: d.merchantOid,
-          amount: d.amountTl,
-          currency: d.currency,
-          raw: d.raw as Prisma.InputJsonValue,
-        })),
+      if (details.length > 0) {
+        await this.prisma.paytrSettlementItem.createMany({
+          data: details.map((d) => ({
+            settlementId: settlement.id,
+            merchantOid: d.merchantOid,
+            amount: d.amountTl,
+            currency: d.currency,
+            raw: d.raw as Prisma.InputJsonValue,
+          })),
+        });
+      }
+      await this.prisma.paytrSettlement.update({
+        where: { id: settlement.id },
+        data: { itemsSyncedAt: new Date() },
       });
       itemsFetchedFor++;
     }

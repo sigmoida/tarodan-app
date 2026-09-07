@@ -24,6 +24,7 @@ import { PaymentProviderEventService } from "./payment-provider-event.service";
 import { PaymentLifecycleService } from "./checkout/payment-lifecycle.service";
 import { PaytrReportSyncService } from "./reconciliation/paytr-report-sync.service";
 import { PaytrReportMatchingService } from "./reconciliation/paytr-report-matching.service";
+import { PaytrSyncStateService } from "./reconciliation/paytr-sync-state.service";
 import { PaymentSchedulerService } from "./jobs/payment-scheduler.service";
 import { PaymentScheduledProcessor } from "./jobs/payment-scheduled.processor";
 import { PaymentOutboxHandlers } from "./payment-outbox-handlers.service";
@@ -106,6 +107,7 @@ import { scheduledProcessors } from "../../workers/scheduled-processors";
     PaymentLifecycleService,
     PaytrReportSyncService,
     PaytrReportMatchingService,
+    PaytrSyncStateService,
     PaymentSchedulerService,
     ...scheduledProcessors(PaymentScheduledProcessor),
     PaymentOutboxHandlers,
@@ -115,6 +117,9 @@ import { scheduledProcessors } from "../../workers/scheduled-processors";
     PaymentService,
     PaymentProviderEventService,
     VirtualOrderFulfillmentService,
+    // Admin PSP mutabakat ekranı: tek satır yeniden eşleme + senkron durumu.
+    PaytrReportMatchingService,
+    PaytrSyncStateService,
   ],
 })
 export class PaymentModule implements NestModule {
