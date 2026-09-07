@@ -57,18 +57,19 @@ export class SuratTrackingService {
     return this.orderSync.syncShipmentTracking(shipmentId);
   }
 
-  syncAllActiveShipments(): Promise<{
-    synced: number;
-    pending: number;
-    failed: number;
-  }> {
+  // Dönüş tipleri delege'den TÜRETİLİR, elle tekrar yazılmaz: şekil burada bir
+  // kez daha yazıldığında (failures alanı eklenirken olduğu gibi) facade sessizce
+  // geride kalıyor ve çağıran yeni alanı göremiyor.
+  syncAllActiveShipments(): ReturnType<
+    OrderTrackingSyncService["syncAllActiveShipments"]
+  > {
     return this.orderSync.syncAllActiveShipments();
   }
 
   syncPostDeliveryShipments(
     fromHoursAgo: number,
     toHoursAgo?: number,
-  ): Promise<{ synced: number; pending: number; failed: number }> {
+  ): ReturnType<OrderTrackingSyncService["syncPostDeliveryShipments"]> {
     return this.orderSync.syncPostDeliveryShipments(fromHoursAgo, toHoursAgo);
   }
 

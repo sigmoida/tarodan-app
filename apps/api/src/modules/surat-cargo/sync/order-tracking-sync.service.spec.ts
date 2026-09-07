@@ -221,7 +221,13 @@ describe("OrderTrackingSyncService", () => {
     expect(client.lookupTracking).toHaveBeenCalledWith("PKG-BBB");
     // Ama güncelleme SATIR bazında kalır: iade/escrow muhasebesi sipariş bazlı.
     expect(tx.shipment.updateMany).toHaveBeenCalledTimes(4);
-    expect(res).toEqual({ synced: 4, pending: 0, failed: 0 });
+    expect(res).toEqual({
+      synced: 4,
+      pending: 0,
+      failed: 0,
+      skipped: 0,
+      failures: [],
+    });
   });
 
   it("marks the order shipped and notifies the buyer on first carrier acceptance", async () => {
@@ -447,6 +453,8 @@ describe("OrderTrackingSyncService", () => {
       synced: 1,
       pending: 0,
       failed: 0,
+      skipped: 0,
+      failures: [],
     });
     expect(prisma.shipment.updateMany).toHaveBeenCalledWith({
       where: { id: "s1", status: ShipmentStatus.picked_up },
@@ -471,6 +479,51 @@ describe("OrderTrackingSyncService", () => {
       synced: 0,
       pending: 1,
       failed: 0,
+      skipped: 0,
+      failures: [],
     });
+  });
+
+  it("taşıyıcı kodu geriye sardığında ATLAR, başarısız saymaz", async () => {
+    // Canlı vaka (PKG-N36QWQGKEK): koli bizde at_delivery_branch, Sürat kod 1
+    // ("Gönderi Hazırlanıyor" → picked_up) döndü. Geçişi reddetmek DOĞRU, ama
+    // bu `failed` sayıldığı için cron 30 dakikada bir alarm üretiyordu.
+    const { service, prisma } = makeService({ code: 1 });
+    prisma.shipment.findMany.mockResolvedValue([
+      shipment({
+        id: "s1",
+        trackingNumber: "PKG-REGRESS",
+        status: ShipmentStatus.at_delivery_branch,
+      }),
+    ]);
+
+    const res = await service.syncAllActiveShipments();
+
+    expect(res.skipped).toBe(1);
+    expect(res.failed).toBe(0);
+    expect(res.failures).toEqual([]);
+  });
+
+  it("başarısız kolinin kimliğini ve sebebini raporlar", async () => {
+    // Canlıda bu dal sessizdi: cron 30 dakikada bir "1 kayıt senkronlanamadı"
+    // diyor, hangi koli ve neden hiçbir yere yazılmıyordu. fetchParcel Sürat
+    // hatasında fırlatmadığı için catch'teki log da hiç çalışmıyordu.
+    const { service, prisma, client } = makeService();
+    prisma.shipment.findMany.mockResolvedValue([
+      shipment({ id: "s1", trackingNumber: "PKG-BROKEN" }),
+    ]);
+    client.lookupTracking.mockResolvedValue({
+      kind: "failure",
+      category: "http",
+      message: "Surat tracking API HTTP 500 for PKG-BROKEN",
+      httpStatus: 500,
+    });
+
+    const res = await service.syncAllActiveShipments();
+
+    expect(res.failed).toBe(1);
+    expect(res.failures).toEqual([
+      "PKG-BROKEN (http: Surat tracking API HTTP 500 for PKG-BROKEN)",
+    ]);
   });
 });

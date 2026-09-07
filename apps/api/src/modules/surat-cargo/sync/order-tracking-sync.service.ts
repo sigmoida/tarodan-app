@@ -59,7 +59,10 @@ export class OrderTrackingSyncService {
     }
     const lookup = await this.fetchParcel(shipment.trackingNumber);
     if (lookup.kind !== "found") return false;
-    return this.applyTrackingUpdate(shipment, lookup.gonderi);
+    // Dış sözleşme boolean kalır: "gerçekten güncellendi mi?"
+    return (
+      (await this.applyTrackingUpdate(shipment, lookup.gonderi)) === "updated"
+    );
   }
 
   /**
@@ -76,6 +79,13 @@ export class OrderTrackingSyncService {
     synced: number;
     pending: number;
     failed: number;
+    /**
+     * Taşıyıcı kodu geriye sardığı için BİLİNÇLİ atlanan satırlar. Hata değil:
+     * alarm üretmez, yalnız telemetriye yazılır.
+     */
+    skipped: number;
+    /** Başarısız kolilerin kimliği + sebebi; cron alarmı bunu metne basar. */
+    failures: string[];
   }> {
     // Only sync shipments that have a tracking reference. Auto-created
     // pending shipments without a Sürat tracking number would just spam
@@ -112,7 +122,18 @@ export class OrderTrackingSyncService {
   async syncPostDeliveryShipments(
     fromHoursAgo: number,
     toHoursAgo = 0,
-  ): Promise<{ synced: number; pending: number; failed: number }> {
+  ): Promise<{
+    synced: number;
+    pending: number;
+    failed: number;
+    /**
+     * Taşıyıcı kodu geriye sardığı için BİLİNÇLİ atlanan satırlar. Hata değil:
+     * alarm üretmez, yalnız telemetriye yazılır.
+     */
+    skipped: number;
+    /** Başarısız kolilerin kimliği + sebebi; cron alarmı bunu metne basar. */
+    failures: string[];
+  }> {
     const now = Date.now();
     return this.syncShipmentsWhere({
       status: ShipmentStatus.delivered,
@@ -128,9 +149,18 @@ export class OrderTrackingSyncService {
    * WHERE'de ayrışır; gruplama, tek-sorgu ve uygulama mantığı ortak kalmalı ki
    * biri düzelirken diğeri geride kalmasın.
    */
-  private async syncShipmentsWhere(
-    where: Prisma.ShipmentWhereInput,
-  ): Promise<{ synced: number; pending: number; failed: number }> {
+  private async syncShipmentsWhere(where: Prisma.ShipmentWhereInput): Promise<{
+    synced: number;
+    pending: number;
+    failed: number;
+    /**
+     * Taşıyıcı kodu geriye sardığı için BİLİNÇLİ atlanan satırlar. Hata değil:
+     * alarm üretmez, yalnız telemetriye yazılır.
+     */
+    skipped: number;
+    /** Başarısız kolilerin kimliği + sebebi; cron alarmı bunu metne basar. */
+    failures: string[];
+  }> {
     const activeShipments = await this.prisma.shipment.findMany({
       where: {
         provider: "surat",
@@ -157,13 +187,26 @@ export class OrderTrackingSyncService {
     let synced = 0;
     let pending = 0;
     let failed = 0;
+    let skipped = 0;
+    // Başarısız kolinin kimliği + sebebi: cron alarmı bunları taşısın ki
+    // "1 kayıt senkronlanamadı" tek başına teşhis edilemez olmaktan çıksın.
+    const failures: string[] = [];
+    const recordFailure = (ref: string, reason: string) => {
+      failures.push(`${ref} (${reason})`);
+      // warn: aynı koli her turda tekrar eder, error olsaydı Sentry'yi doldururdu.
+      this.logger.warn(`Surat parcel ${ref} senkronlanamadı — ${reason}`);
+    };
 
     for (const [ref, siblings] of parcels) {
       try {
         // Tek Sürat çağrısı; sonuç kolinin tüm satırlarına uygulanır.
         const lookup = siblings[0].trackingNumber
           ? await this.fetchParcel(siblings[0].trackingNumber)
-          : ({ kind: "failure" } as const);
+          : ({
+              kind: "failure",
+              category: "configuration",
+              message: "koli takip referansı yok",
+            } as const);
         if (lookup.kind === "pending") {
           pending += siblings.length;
           continue;
@@ -175,28 +218,39 @@ export class OrderTrackingSyncService {
           continue;
         }
         if (lookup.kind !== "found") {
+          // Buraya yalnız `failure` düşer (pending/cancelled/found yukarıda ele
+          // alındı). fetchParcel Sürat hatasında FIRLATMAZ, nesne DÖNDÜRÜR — yani
+          // aşağıdaki catch'e hiç girilmez. Burada yazmazsak sayaç sessizce artar,
+          // cron "1 kayıt senkronlanamadı" der ve hangi koli hangi sebeple
+          // düştüğü hiçbir yere yazılmaz (takas/iade senkronu kimliği logluyor).
+          recordFailure(ref, `${lookup.category}: ${lookup.message}`);
           failed += siblings.length;
           continue;
         }
         for (const shipment of siblings) {
-          const success = await this.applyTrackingUpdate(
+          const outcome = await this.applyTrackingUpdate(
             shipment,
             lookup.gonderi,
           );
-          if (success) synced++;
-          else failed++;
+          if (outcome === "updated") synced++;
+          else if (outcome === "skipped") skipped++;
+          else {
+            recordFailure(ref, `durum uygulanamadı (shipment ${shipment.id})`);
+            failed++;
+          }
         }
       } catch (error: any) {
         this.logger.error(`Failed to sync parcel ${ref}: ${error.message}`);
+        failures.push(`${ref} (${error?.message ?? "bilinmeyen hata"})`);
         failed += siblings.length;
       }
     }
 
     this.logger.log(
-      `Surat tracking sync: ${synced} synced, ${pending} pending, ${failed} failed out of ` +
-        `${activeShipments.length} shipments in ${parcels.size} parcels`,
+      `Surat tracking sync: ${synced} synced, ${pending} pending, ${skipped} skipped, ` +
+        `${failed} failed out of ${activeShipments.length} shipments in ${parcels.size} parcels`,
     );
-    return { synced, pending, failed };
+    return { synced, pending, failed, skipped, failures };
   }
 
   /**
@@ -253,10 +307,18 @@ export class OrderTrackingSyncService {
       : { kind: "pending", message: "Takip kaydı henüz görünmüyor" };
   }
 
+  /**
+   * Sürat okumasını koliye uygular.
+   *
+   * "skipped" ile "failed" AYRIDIR: taşıyıcı kodu geriye sardığında (şubedeki
+   * koli için "hazırlanıyor" gibi) geçişi reddetmek sistemin DOĞRU davranışıdır,
+   * senkron hatası değil. İkisi tek sayaçta toplanınca kodu bir kez geri sarmış
+   * her koli, düzelene kadar 30 dakikada bir cron alarmı üretiyordu.
+   */
   private async applyTrackingUpdate(
     shipment: any,
     gonderi: SuratTakipGonderi,
-  ): Promise<boolean> {
+  ): Promise<"updated" | "skipped" | "failed"> {
     // Tek karar mercii: kod + iade bayrağı + tamamlanma sinyalleri birlikte
     // okunur (mapper'daki gerekçe). `status: null` = statüye dokunma; ham kod
     // yine kaydedilir.
@@ -284,7 +346,7 @@ export class OrderTrackingSyncService {
         `Skipping illegal shipment transition ${shipment.status} → ${newStatus} ` +
           `for ${shipment.id} (Sürat poll, code=${gonderi.KargonunDurumuSayi})`,
       );
-      return false;
+      return "skipped";
     }
 
     // Build update data
@@ -378,6 +440,8 @@ export class OrderTrackingSyncService {
         },
         data: updateData,
       });
+      // DİKKAT: bu dönüş tx callback'inin sonucudur (`flipped`), metodun değil —
+      // boolean kalmalı. Sonuç sınıflandırması aşağıda `!flipped` dalında yapılır.
       if (cas.count === 0) return false;
       if (firstPhysicalHandoff) {
         const orderCas = await tx.order.updateMany({
@@ -419,7 +483,9 @@ export class OrderTrackingSyncService {
       this.logger.warn(
         `Skipping stale shipment update for ${shipment.id}: status changed concurrently (snapshot=${shipment.status})`,
       );
-      return false;
+      // Yarış: araya başka bir yazar (webhook/admin) girdi. Bu da hata değil —
+      // sonraki tur taze snapshot'la işler; alarm üretmemeli.
+      return "skipped";
     }
 
     // Sync movement events (Hareketler) — POST-COMMIT (bilgi amaçlı, kritik değil).
@@ -586,7 +652,7 @@ export class OrderTrackingSyncService {
       `Shipment ${shipment.id} synced: status=${newStatus} suratCode=${gonderi.KargonunDurumuSayi} (${gonderi.KargonunDurumu})`,
     );
 
-    return true;
+    return "updated";
   }
 
   /**
