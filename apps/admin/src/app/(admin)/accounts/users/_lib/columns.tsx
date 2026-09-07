@@ -99,20 +99,9 @@ export function userColumns(t: T, rowMenu: (u: User) => RowActionItem[]) {
         sortType: "date",
       },
     ),
-    col.number<User>(t("admin.operations.common.order"), (u) => u.ordersCount, {
-      sortKey: "ordersCount",
-    }),
-    col.number<User>(
-      t("admin.catalog.common.product"),
-      (u) => u.productsCount,
-      { sortKey: "productsCount" },
-    ),
-    col.number<User>(t("admin.users.tradesCount"), (u) => u.tradesCount),
-    col.number<User>(
-      t("admin.users.cancellationsCount"),
-      (u) => u.cancellationsCount,
-    ),
-    col.number<User>(t("admin.users.refundsCount"), (u) => u.refundsCount),
+    // Sipariş / ürün / takas / iptal / iade sayıları BURADA DEĞİL: aynı beş
+    // sayı Satıcı Performansı tablosunda zaten var ve orası onların yeri.
+    // Kullanıcılar listesi kimlik + hesap durumu + üyelik ekranıdır.
     col.date<User>(t("admin.users.registeredAt"), "createdAt"),
     col.muted<User>(
       t("admin.users.lastLogin"),
