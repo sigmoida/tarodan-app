@@ -6331,7 +6331,7 @@
       },
       "overview": {
         "title": "Finans Özeti",
-        "subtitle": "Para akışının tek bakışta durumu (bu ay)",
+        "subtitle": "Para akışının tek bakışta durumu",
         "funnel": {
           "collected": "Tahsilat (Ciro)",
           "collectedHint": "{count} tamamlanan ödeme",
@@ -6342,7 +6342,7 @@
           "platformRevenue": "Platform Geliri (Net)",
           "platformRevenueHint": "Komisyon + hizmet bedeli − iadeler",
           "pspFee": "PayTR kesintisi",
-          "pspFeeHint": "Dönem içinde sağlayıcı ekstresinden deftere yazılan gerçek kesinti",
+          "pspFeeHint": "Sağlayıcı ekstresinden deftere yazılan gerçek kesinti",
           "netAfterPsp": "Tarodan hak edişi",
           "netAfterPspHint": "Komisyon geliri eksi PayTR kesintisi",
           "tradeFee": "Takas hizmet bedeli",
@@ -6356,6 +6356,10 @@
           "exhaustedInvoices": "Deneme bütçesi tükenen fatura",
           "openAdjustments": "Açık satıcı borcu",
           "allClear": "Her şey yolunda — müdahale gerektiren kayıt yok"
+        },
+        "scope": {
+          "allTime": "Tüm zaman",
+          "instant": "Anlık"
         }
       }
     },
