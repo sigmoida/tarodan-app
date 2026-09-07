@@ -41,6 +41,7 @@ describe("UserBankService.upsertBankAccount — payout requeue", () => {
         failureReason: null,
         retryCount: 0,
         nextRetryAt: null,
+        providerReference: null,
       },
     });
   });
