@@ -1,7 +1,7 @@
 /** @format */
 
 export interface FinanceOverview {
-  period: { start: string; end: string };
+  /** Akış kartları kuruluştan bugüne birikimlidir; dönem kırılımı dashboard'da. */
   funnel: {
     collectedTotal: number;
     collectedCount: number;
@@ -14,7 +14,10 @@ export interface FinanceOverview {
     tradeFeeRevenueNet: number;
     /** Taraflardan tahsil edilen takas ücreti (KDV dahil). */
     tradeFeeCollected: number;
-    /** Dönemin GERÇEK PSP kesintisi (defterdeki psp_fee debit toplamı). */
+    /** Öne çıkarma (boost) satışları — tahsil edilen brüt (KDV dahil). */
+    boostRevenueCollected: number;
+    boostRevenueCount: number;
+    /** GERÇEK PSP kesintisi (defterdeki psp_fee debit toplamı). */
     pspFeeTotal: number;
     /** Komisyon geliri − PSP kesintisi. */
     platformNetAfterPsp: number;
