@@ -4,6 +4,10 @@ import { PrismaService } from "../../../prisma";
 import { PaymentProviderRegistry } from "../../payment-providers/payment-provider.registry";
 import { Prisma } from "@prisma/client";
 import { paytrReportSyncEnabled } from "../../../config/paytr";
+import {
+  trCalendarDate,
+  trCalendarDateTime,
+} from "../../../common/helpers/tr-calendar";
 
 /** İşlem dökümü sync penceresi (gün). PayTR aralık limiti 3 gün — pencere kaydırmalı
  *  tekrar tarama geç düşen kayıtları yakalar; dedup anahtarı çift kaydı önler. */
@@ -11,9 +15,9 @@ const STATEMENT_WINDOW_DAYS = 3;
 /** Hakediş özeti geriye bakış penceresi (gün) — PayTR aralık limiti 31 gün. */
 const SETTLEMENT_WINDOW_DAYS = 31;
 
-const dateOnly = (d: Date): string => d.toISOString().slice(0, 10);
-const dateTime = (d: Date): string =>
-  d.toISOString().replace("T", " ").slice(0, 19);
+// PayTR tarih aralıklarını İstanbul saatiyle yorumlar; süreç UTC'de koşar.
+const dateOnly = trCalendarDate;
+const dateTime = trCalendarDateTime;
 
 /**
  * PayTR rapor senkronu (PSP mutabakat katmanı, Faz 2). Gece cron'ları işlem

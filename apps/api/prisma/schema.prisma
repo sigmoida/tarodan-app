@@ -2014,6 +2014,9 @@ model PayoutTransfer {
   transferIban           String                        @map("transfer_iban")
   transferName           String                        @map("transfer_name")
   status                 PayoutStatus                  @default(pending)
+  // PayTR'nin talimat yanıtındaki `reference`; geri dönen transfer listesi (`ref_no`)
+  // yalnız bununla eşlenir (listede trans_id yoktur). Yeniden gönderimde sıfırlanır.
+  providerReference      String?                       @map("provider_reference")
   providerResponse       Json?                         @map("provider_response")
   failureReason          String?                       @map("failure_reason")
   retryCount             Int                           @default(0) @map("retry_count")
@@ -2036,6 +2039,7 @@ model PayoutTransfer {
   @@index([sellerId])
   @@index([status])
   @@index([processedAt])
+  @@index([providerReference])
   @@map("payout_transfers")
 }
 
