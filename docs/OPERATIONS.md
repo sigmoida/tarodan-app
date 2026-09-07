@@ -273,6 +273,14 @@ ile birebir aynı olmalı, düz `OK` döner) · payout transfer-sonuç URL'i
 `https://<api-host>/api/payouts/callback/paytr-transfer` (yalnız bayrağı
 açacağın gün) · mağaza canlı modda.
 
+**Payout trans_id düzeltmesi sonrası sıra (2026-09):** (1) tiresiz `trans_id`
+düzeltmesi canlıya çıkar; (2) panelde transfer-sonuç URL'i tanımlıysa
+`PAYTR_TRANSFER_CALLBACK_ENABLED=true` eklenir; (3) admin → Finans → Payouts
+→ `failed` durumundaki eski `PYT-…` kayıtları "Tekrar dene" ile pending'e
+alınır — cron işleme anında transId'yi tiresiz yeniden üretir ve gönderir
+(log: `trans_id yeniden üretildi`). Beklenen: satır `processing` +
+`submittedAt` dolu; ertesi gün callback → `completed`.
+
 **Sürat depo adresi:** artık **admin → Ayarlar → Warehouse** sekmesindeki adres
 satırı (`warehouse_address_id`) tek kaynaktır; hem depoya gelen hem depodan
 çıkan kolilerde kullanılır. `TARODAN_WAREHOUSE_*` env'leri yalnız o satır hiç

@@ -1721,7 +1721,8 @@ describe("22 — Admin Paneli & Yetkilendirme (ADM)", () => {
       where: { id: transfer.id },
     });
     expect(after?.status).toBe(PayoutStatus.pending);
-    expect(after?.transId).not.toBe(oldTransId); // yeni ...R<timestamp>
+    expect(after?.transId).not.toBe(oldTransId);
+    expect(after?.transId).toMatch(/^PYT[A-Z0-9]{10}$/);
   });
 
   scenario("ADM-092", async () => {

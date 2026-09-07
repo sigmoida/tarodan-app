@@ -32,10 +32,17 @@ describe("code prefixes", () => {
 
   it("produces references that parse back to their prefix", () => {
     for (const prefix of Object.values(REFERENCE_PREFIX)) {
+      // PYT istisnası: PayTR trans_id tire kabul etmez (payout-trans-id.ts).
+      if (prefix === REFERENCE_PREFIX.payoutTransfer) continue;
       const code = generateReferenceCode(prefix);
       expect(code).toMatch(/^[A-Z]{3}-[23456789ABCDEFGHJKMNPQRSTVWXYZ]{10}$/);
       expect(code.split("-")[0]).toBe(prefix);
     }
+  });
+
+  it("supports a hyphen-free separator for provider-imposed formats", () => {
+    const code = generateReferenceCode(REFERENCE_PREFIX.payoutTransfer, 10, "");
+    expect(code).toMatch(/^PYT[23456789ABCDEFGHJKMNPQRSTVWXYZ]{10}$/);
   });
 
   describe("promoteUserCodeToCorporate", () => {

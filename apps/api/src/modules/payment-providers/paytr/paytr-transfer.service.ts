@@ -2,6 +2,7 @@ import { BadRequestException, Injectable, Logger } from "@nestjs/common";
 import { i18nMessage } from "../../i18n";
 import * as crypto from "crypto";
 import { PayTRCredentials } from "./paytr-credentials.service";
+import { isValidPayoutTransId } from "../../../common/helpers/payout-trans-id";
 
 /**
  * PayTR Platform Transfer — satıcıya para çıkışı. PayTRService'ten birebir
@@ -55,6 +56,16 @@ export class PayTRTransferService {
     transferName: string;
     transferIban: string;
   }): Promise<{ status: string; err_no?: string; err_msg?: string }> {
+    // PayTR: trans_id yalnız harf/rakam. Tire SİLİNMEZ — sonuç callback'i ve dönen
+    // transfer listesi numarayı aldığı biçimde döndürür, DB ile eşleşmezdi.
+    // Biçimi çağıran (payout.service) garanti eder; burası son savunma.
+    if (!isValidPayoutTransId(params.transId)) {
+      throw new BadRequestException(
+        i18nMessage("server.payment.paytrPlatformTransferFailed", {
+          reason: `trans_id alfanümerik olmalı (aldı: ${params.transId})`,
+        }),
+      );
+    }
     const submerchantAmountKurus = Math.round(
       params.submerchantAmount * 100,
     ).toString();

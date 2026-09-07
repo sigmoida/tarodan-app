@@ -148,7 +148,8 @@ geçişte açılır.
 `payout-check-returned` her gün 06:00. Kill-switch: `PAYOUTS_DISABLED=true`.
 
 1. **Oluşturma** — `released` ve dondurulmamış her hold için (bloklayan iade
-   yoksa) `PYT-…` referanslı transfer; `netPayout = hold − iade edilen`.
+   yoksa) `PYT…` referanslı transfer (tiresiz — PayTR `trans_id` şartı, bkz.
+   docs/CODE_SCHEME.md); `netPayout = hold − iade edilen`.
 2. **Satıcı borcu mahsubu** — açık `sellerAccountAdjustment` varsa FIFO tahsis
    (`FOR UPDATE`), `netAmount = max(0, net − Σtahsis)`; dengeli ledger grubu
    `seller_debt_recovery / seller_escrow`.
@@ -156,8 +157,10 @@ geçişte açılır.
    koruması** (yalnız aşağı düzeltme; `fully_refunded` → failed); IBAN her
    seferinde güncel `SellerBankAccount`'tan okunur (snapshot'a güvenilmez);
    `isValidTrIban` (mod-97) geçemeyen → failed; **3 günlük IBAN değişiklik
-   soğuması** → pending bekler; atomik `pending → processing` claim + claim
-   sonrası TOCTOU yeniden okuma.
+   soğuması** → pending bekler; **aynı-gün koruması** (PayTR ödeme gününde
+   talimat kabul etmez; `paidAt` Türkiye takviminde bugünse pending bekler,
+   retry sayacı yanmaz); eski tireli `PYT-…` transId tiresiz yeniden üretilir;
+   atomik `pending → processing` claim + claim sonrası TOCTOU yeniden okuma.
 4. **Submitted / processed ayrımı** — PayTR `success` yalnız _talimat kabulü_
    demektir. `PAYTR_TRANSFER_CALLBACK_ENABLED=true` iken payout `processing` +
    `submittedAt` olarak kalır (**submitted**); tamamlanma yalnız callback'te.
