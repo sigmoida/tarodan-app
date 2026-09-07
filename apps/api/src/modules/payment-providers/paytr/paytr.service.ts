@@ -167,6 +167,10 @@ export { parsePaytrTestMode } from "./paytr-test-mode.util";
 import { PayTRCredentials } from "./paytr-credentials.service";
 import { PayTRReportService } from "./paytr-report.service";
 import { PayTRTransferService } from "./paytr-transfer.service";
+export type {
+  PaytrPlatformTransferResult,
+  PaytrReturnedTransfer,
+} from "./paytr-transfer.service";
 import { parsePaytrMoneyString } from "./paytr-money.util";
 
 // =============================================================================

@@ -838,6 +838,10 @@ export class AdminPayoutService {
         failureReason: null,
         retryCount: 0,
         nextRetryAt: null,
+        // Yeni gönderim yeni PayTR referansı üretir; eskisi kalırsa geri dönen
+        // transfer taraması aynı ref_no ile bu satırı tekrar returned yapardı.
+        providerReference: null,
+        providerResponse: Prisma.DbNull,
         ...(newTransId ? { transId: newTransId } : {}),
       },
     });

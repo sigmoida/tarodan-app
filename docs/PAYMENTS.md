@@ -170,8 +170,12 @@ geçişte açılır.
 5. **Callback** — `POST /payouts/callback/paytr-transfer` (public, hash
    doğrulamalı, düz `"OK"` dönmek zorunda). 3 günü aşan callback gecikmesi alarm
    üretir. `payout-failed-seller` / `payout-returned-seller` e-postaları maskeli
-   IBAN son-4 ve sebep taşır; günlük returned taraması + 30 dk stuck-processing
-   tespiti vardır.
+   IBAN son-4 ve (varsa) sebep taşır; günlük returned taraması + 30 dk stuck-processing
+   tespiti vardır. **Geri dönen transfer eşlemesi**: PayTR'nin listesi bizim
+   `trans_id`'mizi değil kendi `ref_no`'sunu verir; talimat yanıtındaki `reference`
+   `PayoutTransfer.providerReference`'a yazılır ve eşleme onunla yapılır (eski
+   satırlar için IBAN + tutar + tarih; belirsizlikte dokunulmaz, loglanır). Yeniden
+   gönderim (admin retry, requeue) referansı sıfırlar.
 
 ---
 

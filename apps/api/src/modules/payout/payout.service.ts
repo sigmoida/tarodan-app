@@ -26,7 +26,11 @@ import {
   generatePayoutTransId,
   isValidPayoutTransId,
 } from "../../common/helpers/payout-trans-id";
-import { trCalendarDate } from "../../common/helpers/tr-calendar";
+import {
+  trCalendarDate,
+  trCalendarTime,
+} from "../../common/helpers/tr-calendar";
+import type { PaytrReturnedTransfer } from "../payment-providers/paytr/paytr-transfer.service";
 
 /** IBAN'ı log-güvenli hale getir (KVKK): yalnız son 4 hane. */
 function maskIban(iban: string | null | undefined): string {
@@ -50,7 +54,10 @@ const OPEN_REFUND_STATUSES: RefundRequestStatus[] = [
   RefundRequestStatus.disputed,
 ];
 
-const IBAN_COOLDOWN_MS = 3 * 24 * 60 * 60 * 1000;
+const DAY_MS = 24 * 60 * 60 * 1000;
+const IBAN_COOLDOWN_MS = 3 * DAY_MS;
+/** Geri dönen transfer taraması: PayTR aralık sınırı 31 gün; 7 gün günlük cron için bol. */
+const RETURNED_TRANSFER_WINDOW_DAYS = 7;
 
 /**
  * Aşama-1 kabulünden sonra transfer sonucu callback'inin makul bekleme süresi.
@@ -936,6 +943,8 @@ export class PayoutService {
               where: { id: payout.id },
               data: {
                 providerResponse: result as any,
+                // Geri dönen transfer listesi yalnız bu referansla eşlenir.
+                providerReference: result.reference ?? null,
                 submittedAt,
                 submittedAmount: netToTransfer,
               },
@@ -953,6 +962,7 @@ export class PayoutService {
               data: {
                 status: PayoutStatus.completed,
                 providerResponse: result as any,
+                providerReference: result.reference ?? null,
                 processedAt: submittedAt,
                 submittedAt,
                 submittedAmount: netToTransfer,
@@ -1227,7 +1237,12 @@ export class PayoutService {
           status: PayoutStatus.failed,
           failureReason: "order_refunded",
         },
-        data: { status: PayoutStatus.pending, failureReason: null },
+        data: {
+          status: PayoutStatus.pending,
+          failureReason: null,
+          providerReference: null,
+          providerResponse: Prisma.DbNull,
+        },
       });
       if (claim.count === 0) continue;
 
@@ -1329,76 +1344,135 @@ export class PayoutService {
   }
 
   /**
-   * Check for returned transfers from PayTR and update status.
+   * Bankadan geri dönen transferleri PayTR'den çekip ilgili payout'u `returned` yapar.
+   *
+   * PayTR listesinde bizim `trans_id`'miz YOK; yalnız PayTR referansı (`ref_no`) var.
+   * Eşleme önce talimat yanıtından saklanan `providerReference` ile, o yoksa (eski
+   * satırlar) IBAN + tutar + tarih ile yapılır; birden fazla aday varsa dokunulmaz.
+   * Hata yutulmaz: PayTR/DB hatası cron'u başarısız düşürür ki alarm üretsin —
+   * eski kod hatayı yutup 0 döndüğü için yanlış alan adı aylarca fark edilmedi.
    */
-  async checkReturnedTransfers(): Promise<number> {
+  async checkReturnedTransfers(): Promise<{
+    returned: number;
+    unmatched: number;
+  }> {
     const now = new Date();
-    const yesterday = new Date(now);
-    yesterday.setDate(yesterday.getDate() - 7);
+    const start = new Date(
+      now.getTime() - RETURNED_TRANSFER_WINDOW_DAYS * DAY_MS,
+    );
+    // PayTR tarih aralığını İstanbul saatiyle yorumlar; süreç UTC'de koşar.
+    const stamp = (d: Date) => `${trCalendarDate(d)} ${trCalendarTime(d)}`;
 
-    const startDate = yesterday.toISOString().replace("T", " ").slice(0, 19);
-    const endDate = now.toISOString().replace("T", " ").slice(0, 19);
+    const rows = await this.paymentProviders.resolve().getReturnedTransfers({
+      startDate: stamp(start),
+      endDate: stamp(now),
+    });
 
-    try {
-      const result = await this.paymentProviders
-        .resolve()
-        .getReturnedTransfers({
-          startDate,
-          endDate,
-        });
-
-      if (result.status !== "success" || !Array.isArray(result.data)) {
-        return 0;
+    let returned = 0;
+    let unmatched = 0;
+    for (const row of rows) {
+      const transfer = await this.findReturnedTransferCandidate(row);
+      if (!transfer) {
+        unmatched++;
+        this.logger.warn(
+          `Geri dönen transfer eşleşmedi: ref=${row.refNo} iban=${maskIban(row.transferIban)} tutar=${row.transferAmount} tarih=${row.transferDate}`,
+        );
+        continue;
       }
 
-      let updated = 0;
-      for (const returned of result.data) {
-        const transfer = await this.prisma.payoutTransfer.findUnique({
-          where: { transId: returned.trans_id },
-        });
-        // `processing` de kapsanır: 2. aşama akışında transfer bankadan geri
-        // dönerse PayTR onu tamamlananlar callback'ine hiç koymaz — payout
-        // completed'a geçemeden geri döner. Yalnız completed'ı yakalasaydık
-        // kayıt sonsuza dek processing'te kalırdı.
-        if (
-          transfer &&
-          (transfer.status === PayoutStatus.completed ||
-            transfer.status === PayoutStatus.processing)
-        ) {
-          await this.prisma.payoutTransfer.update({
-            where: { id: transfer.id },
-            data: {
-              status: PayoutStatus.returned,
-              failureReason: `Geri döndü: ${returned.reason || "bilinmeyen neden"}`,
-              providerResponse: returned as any,
-            },
-          });
-          // Transfer geri döndü = IBAN sorunlu → doğrulamayı geri al.
-          await this.syncBankAccountVerification(
-            transfer.sellerId,
-            transfer.transferIban,
-            false,
-          );
-          // Satıcı haber almalı: para escrow'a döndü, IBAN güncellenmeli.
-          await this.sendPayoutProblemEmail({
-            sellerId: transfer.sellerId,
-            template: "payout-returned-seller",
-            netAmount: Number(transfer.netAmount),
-            iban: transfer.transferIban,
-            reason: returned.reason || undefined,
-          });
-          updated++;
-          this.logger.warn(
-            `Payout ${transfer.transId} returned: ${returned.reason}`,
-          );
-        }
-      }
+      // Atomik: yalnız hâlâ completed/processing ise returned'a al (tekrar çalışan
+      // cron aynı satırı ikinci kez işlemez, mail iki kez gitmez).
+      const previous =
+        transfer.providerResponse &&
+        typeof transfer.providerResponse === "object" &&
+        !Array.isArray(transfer.providerResponse)
+          ? (transfer.providerResponse as Record<string, unknown>)
+          : {};
+      const claim = await this.prisma.payoutTransfer.updateMany({
+        where: {
+          id: transfer.id,
+          status: {
+            in: [PayoutStatus.completed, PayoutStatus.processing],
+          },
+        },
+        data: {
+          status: PayoutStatus.returned,
+          failureReason: `Geri döndü (PayTR ref ${row.refNo}, tespit ${row.dateDetected})`,
+          // Talimat yanıtı (reference dahil) korunur; dönüş satırı yanına eklenir.
+          providerResponse: { ...previous, returned: row.raw } as any,
+          providerReference: transfer.providerReference ?? row.refNo,
+        },
+      });
+      if (claim.count === 0) continue;
 
-      return updated;
-    } catch (error: any) {
-      this.logger.error(`Check returned transfers failed: ${error.message}`);
-      return 0;
+      // Transfer geri döndü = IBAN sorunlu → doğrulamayı geri al.
+      await this.syncBankAccountVerification(
+        transfer.sellerId,
+        transfer.transferIban,
+        false,
+      );
+      // Satıcı haber almalı: para escrow'a döndü, IBAN güncellenmeli. PayTR sebep
+      // vermez; e-posta şablonu sebep satırını koşullu basar.
+      await this.sendPayoutProblemEmail({
+        sellerId: transfer.sellerId,
+        template: "payout-returned-seller",
+        netAmount: Number(transfer.netAmount),
+        iban: transfer.transferIban,
+      });
+      returned++;
+      this.logger.warn(
+        `Payout ${transfer.transId} returned (PayTR ref ${row.refNo}, tespit ${row.dateDetected})`,
+      );
     }
+
+    return { returned, unmatched };
+  }
+
+  /**
+   * Geri dönen satır → payout adayı. Birincil anahtar `providerReference`; eski
+   * satırlar (referans yazılmadan önce gönderilenler) için IBAN + net tutar +
+   * transfer tarihi. Belirsizlikte (birden fazla aday) null: yanlış satıcıyı
+   * "geri döndü" yapmaktansa satırı eşleşmemiş bırakıp loglamak daha güvenli.
+   */
+  private async findReturnedTransferCandidate(row: PaytrReturnedTransfer) {
+    const active = [PayoutStatus.completed, PayoutStatus.processing];
+    if (row.refNo) {
+      const byRef = await this.prisma.payoutTransfer.findFirst({
+        where: { providerReference: row.refNo, status: { in: active } },
+      });
+      if (byRef) return byRef;
+    }
+    const iban = row.transferIban.replace(/\s/g, "").toUpperCase();
+    if (!iban || !(row.transferAmount > 0)) return null;
+    const transferDate = new Date(row.transferDate);
+    const candidates = await this.prisma.payoutTransfer.findMany({
+      where: {
+        providerReference: null,
+        transferIban: iban,
+        status: { in: active },
+        ...(Number.isNaN(transferDate.getTime())
+          ? {}
+          : {
+              submittedAt: {
+                lte: new Date(transferDate.getTime() + DAY_MS),
+              },
+            }),
+      },
+      take: 5,
+    });
+    const byAmount = candidates.filter(
+      (c) =>
+        Math.abs(
+          Number(c.submittedAmount ?? c.netAmount) - row.transferAmount,
+        ) < 0.01,
+    );
+    if (byAmount.length === 1) return byAmount[0];
+    if (byAmount.length > 1) {
+      this.logger.error(
+        `Geri dönen transfer için ${byAmount.length} aday var (ref=${row.refNo}, iban=${maskIban(iban)}, tutar=${row.transferAmount}) — elle eşleme gerekir`,
+      );
+    }
+    return null;
   }
 
   /**

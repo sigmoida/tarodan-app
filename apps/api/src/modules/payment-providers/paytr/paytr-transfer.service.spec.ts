@@ -153,4 +153,79 @@ describe("PayTRTransferService.createPlatformTransfer", () => {
     });
     expect(fetchSpy).not.toHaveBeenCalled();
   });
+
+  describe("getReturnedTransfers", () => {
+    const START = "2026-08-01 00:00:00";
+    const END = "2026-08-07 23:59:59";
+
+    it("posts the documented token and normalises PayTR's ref_no rows", async () => {
+      fetchSpy.mockResolvedValue({
+        text: async () =>
+          JSON.stringify({
+            status: "success",
+            data: [
+              {
+                ref_no: "1000001",
+                date_detected: "2020-06-10",
+                date_reimbursed: "2020-06-08",
+                transfer_name: "ÖRNEK İSİM",
+                transfer_iban: "TR10 0000 0000 0000 0000 0000 01",
+                transfer_amount: "35,18",
+                transfer_currency: "TL",
+                transfer_date: "2020-06-08",
+              },
+            ],
+          }),
+      });
+
+      const rows = await service.getReturnedTransfers({
+        startDate: START,
+        endDate: END,
+      });
+
+      expect(fetchSpy.mock.calls[0][0]).toBe(
+        "https://www.paytr.com/odeme/geri-donen-transfer",
+      );
+      const body = bodyOf();
+      expect(body.get("start_date")).toBe(START);
+      expect(body.get("end_date")).toBe(END);
+      expect(body.get("paytr_token")).toBe(hmac(MID + START + END + SALT));
+      // Dokümanda trans_id YOK; yalnız PayTR'nin ref_no'su döner.
+      expect(rows).toEqual([
+        expect.objectContaining({
+          refNo: "1000001",
+          dateDetected: "2020-06-10",
+          dateReimbursed: "2020-06-08",
+          transferName: "ÖRNEK İSİM",
+          transferIban: "TR100000000000000000000001",
+          transferAmount: 35.18,
+          transferCurrency: "TL",
+          transferDate: "2020-06-08",
+        }),
+      ]);
+      expect(rows[0].raw).toEqual(
+        expect.objectContaining({ ref_no: "1000001" }),
+      );
+    });
+
+    it("treats failed (no records) as an empty list and error as a thrown error", async () => {
+      fetchSpy.mockResolvedValueOnce({
+        text: async () => JSON.stringify({ status: "failed" }),
+      });
+      await expect(
+        service.getReturnedTransfers({ startDate: START, endDate: END }),
+      ).resolves.toEqual([]);
+
+      fetchSpy.mockResolvedValueOnce({
+        text: async () =>
+          JSON.stringify({
+            status: "error",
+            err_msg: "tarih araligi 31 gunu asamaz",
+          }),
+      });
+      await expect(
+        service.getReturnedTransfers({ startDate: START, endDate: END }),
+      ).rejects.toBeInstanceOf(BadRequestException);
+    });
+  });
 });
