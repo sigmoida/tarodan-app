@@ -59,3 +59,13 @@ export function trCalendarYear(at: Date): number {
 export function istanbulDayStart(day: string): Date {
   return new Date(`${day}T00:00:00+03:00`);
 }
+
+/**
+ * Türkiye takviminde ayın ilk anı (UTC `Date`). `new Date(y, m, 1)` sürecin
+ * saat dilimini kullanır — sunucu UTC koşarken ay sınırı Türkiye'ye göre üç
+ * saat kayar. Türkiye 2016'dan beri sabit UTC+03:00'dadır.
+ */
+export function trMonthStart(at: Date): Date {
+  const p = trCalendarParts(at);
+  return new Date(`${p.year}-${p.month}-01T00:00:00+03:00`);
+}

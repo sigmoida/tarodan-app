@@ -6,6 +6,7 @@ import {
   SellerAdjustmentStatus,
 } from "@prisma/client";
 import { PrismaService } from "../../../prisma";
+import { trMonthStart } from "../../../common/helpers/tr-calendar";
 import { ELOGO_MAX_SEND_ATTEMPTS } from "../../elogo/helpers/elogo-retry-policy";
 import { FinanceReconciliationService } from "../../finance-reconciliation/finance-reconciliation.service";
 
@@ -29,10 +30,6 @@ export class AdminFinanceService {
   /** Faturasız teslimat alarmıyla (order-scheduler) AYNI eşik. */
   private invoiceDeadlineDays(): number {
     return Number(process.env.INVOICE_DEADLINE_DAYS ?? "5") || 5;
-  }
-
-  private startOfMonth(now = new Date()): Date {
-    return new Date(now.getFullYear(), now.getMonth(), 1);
   }
 
   /**
@@ -114,7 +111,8 @@ export class AdminFinanceService {
    */
   async getInvoicesSummary() {
     const now = new Date();
-    const monthStart = this.startOfMonth(now);
+    // Ay sınırı Türkiye takvimine göre (süreç UTC'de koşar).
+    const monthStart = trMonthStart(now);
 
     const [issued, pendingCount, failedCount, exhaustedCount] =
       await Promise.all([
