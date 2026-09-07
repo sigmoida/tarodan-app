@@ -6363,23 +6363,7 @@
       },
       "overview": {
         "title": "Finance Overview",
-        "subtitle": "The money flow at a glance",
-        "funnel": {
-          "collected": "Collected (GMV)",
-          "collectedHint": "{count} completed payments",
-          "escrowHeld": "Held in Escrow",
-          "escrowHeldHint": "{count} active holds",
-          "transferred": "Paid to Sellers (Net)",
-          "transferredHint": "{count} completed transfers",
-          "platformRevenue": "Platform Revenue (Net)",
-          "platformRevenueHint": "Commission + service fees − refunds",
-          "pspFee": "PayTR fees",
-          "pspFeeHint": "Actual fees booked from the provider statement",
-          "netAfterPsp": "Tarodan net revenue",
-          "netAfterPspHint": "Commission revenue minus PayTR fees",
-          "tradeFee": "Trade service fee",
-          "tradeFeeHint": "Net of VAT · {collected} collected"
-        },
+        "subtitle": "Where is the money? Every section carries its own check; a non-zero difference is red",
         "health": {
           "title": "Needs Attention",
           "failedTransfers": "Failed / returned transfers",
@@ -6392,6 +6376,94 @@
         "scope": {
           "allTime": "All time",
           "instant": "Right now"
+        },
+        "difference": "Difference",
+        "balanced": "Reconciles",
+        "syncOff": "Sync off",
+        "syncOffHint": "PayTR report sync is off (PAYTR_REPORT_SYNC_ENABLED); the PayTR fee counts as 0 and the comparison is empty.",
+        "sections": {
+          "revenueSplit": {
+            "title": "Where the collected money went",
+            "total": "Collected (gross GMV)",
+            "lines": {
+              "sellerShare": "Seller entitlement (gross)",
+              "tradeCounterpart": "Trade counterparty",
+              "platformFeesNet": "Platform service revenue (net of VAT)",
+              "serviceVat": "Service VAT",
+              "shipping": "Shipping (to carrier)",
+              "withholding": "Withholding tax",
+              "shippingDeficit": "Shipping deficit (hold clamped)"
+            }
+          },
+          "sellerShare": {
+            "title": "Where the seller entitlement is",
+            "total": "Seller entitlement created",
+            "lines": {
+              "escrowHeld": "Held in escrow",
+              "inTransit": "In transit (released, transfer pending)",
+              "paidNet": "Paid to sellers (net)",
+              "adjustmentDeducted": "Deducted for seller debt",
+              "refundedToBuyer": "Refunded to buyers"
+            }
+          },
+          "tradeCounterpart": {
+            "title": "Where the trade cash difference is",
+            "total": "Owed to counterparty",
+            "lines": {
+              "awaitingRelease": "Awaiting release",
+              "inTransit": "In transit",
+              "paidNet": "Paid (net)",
+              "adjustmentDeducted": "Deducted",
+              "refunded": "Refunded"
+            }
+          },
+          "platformNet": {
+            "title": "From platform revenue to Tarodan net",
+            "total": "Platform service revenue (net of VAT)",
+            "lines": {
+              "refundedFees": "Refunded fees",
+              "waivedFees": "Waived fees",
+              "tradeFeeReversed": "Trade full refunds (fee reversed)",
+              "virtualRefundsNet": "Membership / boost refunds",
+              "platformAbsorbed": "Refund items absorbed by the platform",
+              "pspFee": "PayTR fee",
+              "tarodanNet": "Tarodan net"
+            }
+          },
+          "buyerRefunds": {
+            "title": "Refunded to buyers",
+            "total": "Successful refunds",
+            "lines": {
+              "product": "Product amount",
+              "outboundShipping": "Outbound shipping",
+              "buyerFees": "Buyer fees",
+              "buyerVat": "Buyer VAT",
+              "returnShippingCharged": "Return shipping charged to buyer",
+              "unclassified": "Unclassified (legacy policy / manual / trade)"
+            }
+          }
+        },
+        "comparison": {
+          "title": "Comparison with PayTR",
+          "open": "PSP screen",
+          "ours": "Ours",
+          "diff": "Diff",
+          "coverageFrom": "from {date}",
+          "awaiting": "({count} awaiting result)",
+          "rows": {
+            "sales": "Sales",
+            "refunds": "Refunds",
+            "pspFee": "PayTR fee",
+            "settlementNet": "Settlement net (sales − refunds − fee)",
+            "payouts": "Submitted transfers"
+          }
+        },
+        "diagnostics": {
+          "title": "Records breaking the reconciliation",
+          "paymentsWithoutOrders": "Completed payments with no order/trade",
+          "ordersWithoutHold": "Paid orders without a hold",
+          "productTax": "Product VAT is not zero (code inconsistency)",
+          "commissionLedgerDrift": "Order commission vs commission ledger drift"
         }
       }
     },

@@ -279,6 +279,34 @@ RefundAttempt'e eşlenir (±0.05 TL toleransla `matched`/`amount_mismatch`/
 doğrulanır; PSP ücretleri ledger'a damgalanır. `ledger-reconciliation.service.ts`
 (her gün 04:00, salt-okuma) beş invariantı denetler ve para taşımaz, alarm basar.
 
+### Finans Özeti sağlaması (admin → Finans → Özet)
+
+`modules/finance-reconciliation/`: ekran defterden değil, sipariş anında dondurulan
+snapshot kolonlarından hesaplanır ve her bölüm kendi kimliğini taşır (fark ≠ 0 →
+kırmızı; aynı fark gece `ledger-reconcile`'da `REVENUE_SPLIT_DRIFT` alarmı):
+
+- **Ciro nereye gitti** (tüm zaman): tahsilat (`Payment` completed|refunded + üyelik
+  yenilemeleri) = satıcı hakedişi (Σ hold) + takas karşı taraf + platform ücret geliri
+  (KDV hariç) + hizmet KDV'si + kargo + stopaj − kargo açığı (hold 0'a kırpılınca).
+  Fiziksel sipariş kimliği kapalı formdur: `hold + (commission − pfd) + (bST+sST) +
+(bShip+sShip) + wh − deficit = total`.
+- **Satıcı hakedişi nerede** (anlık): Σ hold = escrow'da + yolda + ödendi (net) +
+  mahsup + alıcıya iade. **Takas nakit farkı nerede**: release bekleyen + yolda +
+  ödendi + iade.
+- **Platform gelirinden Tarodan hak edişine** (şelale): − iade edilen ücretler −
+  feragat − takas tam iadesi − sanal iadeler − platformun karşıladığı iade kalemleri
+  − PayTR kesintisi (defter `psp_fee`; senkron kapalıysa rozet).
+- **PayTR ile karşılaştırma**: satış/iade/kesinti ↔ döküm satırları, `tahsilat −
+iade − kesinti` ↔ gerçekleşen hakediş net (satıcı payı dahil; Tarodan hak edişiyle
+  KARŞILAŞTIRILMAZ), gönderilen transferler ↔ callback+dönen. "Bizim" taraf dökümün
+  ilk gününden itibaren sayılır.
+- **Teşhis**: siparişi olmayan ödeme, hold'u olmayan ödenmiş sipariş, sıfır olmayan
+  ürün KDV'si, sipariş komisyonu ↔ komisyon defteri farkı.
+
+Defter bilinçli olarak kaynak değildir: `payment_captured` kargo ve hizmet KDV'sini
+`seller_escrow` içinde bırakır, MEM-/BST- deftere yazmaz, iade tersine kaydı oransaldır
+(ayrı epik).
+
 ## 10. Para cron'ları
 
 Tek kaynak `apps/api/src/workers/cron-catalog.ts` (Bull `scheduled` kuyruğu,

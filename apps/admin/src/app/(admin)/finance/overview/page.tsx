@@ -2,59 +2,27 @@
 
 "use client";
 
-import { Fragment, type ComponentType } from "react";
-import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
-import {
-  ArrowsRightLeftIcon,
-  BanknotesIcon,
-  ChartPieIcon,
-  CreditCardIcon,
-  LockClosedIcon,
-} from "@heroicons/react/24/outline";
 import { adminApi } from "@/lib/api";
 import { adminKeys } from "@/lib/query/keys";
 import { AdminPage } from "@/components/page/AdminPage";
 import { PageHeader } from "@/components/AdminList";
-import { MetricCard, type MetricTone } from "@/components/MetricCard";
 import { QueryErrorCard } from "@/components/page/QueryErrorCard";
 import { fmtTry } from "@/lib/format";
 import { useTranslations } from "next-intl";
 import { HealthStrip } from "./_components/HealthStrip";
+import { ReconciliationSectionView } from "./_components/ReconciliationSection";
+import { ComparisonSectionView } from "./_components/ComparisonSection";
 import type { FinanceOverview } from "./_lib/types";
 
-type FunnelCard = {
-  /** i18n etiket anahtarının son parçası (`admin.finance.overview.funnel.*`). */
-  key:
-    | "collected"
-    | "escrowHeld"
-    | "transferred"
-    | "platformRevenue"
-    | "tradeFee"
-    | "pspFee"
-    | "netAfterPsp";
-  icon: ComponentType<{ className?: string }>;
-  tone: MetricTone;
-  /** Kartın götürdüğü liste; yoksa kart tıklanmaz. */
-  href?: string;
-  /** Yüklenmeden önce undefined → "—". */
-  value: number | undefined;
-  hint: string;
-  /** Akış kartları tüm zaman birikimli, stok kartları (escrow) anlık. */
-  scope: "allTime" | "instant";
-};
-
 /**
- * Finans Özeti — "para nerede?" sorusuna tek bakışta cevap.
+ * Finans Özeti — "para nerede?" sorusuna SAĞLAMASI olan cevap.
  *
- * Huni, para AKIŞININ sırasını takip eder: Tahsilat (alıcıdan giren ciro) →
- * Escrow'da bekleyen (satıcı payı rezerve) → Satıcıya ödenen (tamamlanan banka
- * transferi, net) → Platform geliri (ledger'dan, iadeler düşülmüş). Her kart
- * ilgili listeye götürür; sağlık şeridi müdahale isteyenleri gösterir.
- *
- * Zaman kapsamı her kartın altında yazar: akış kartları TÜM ZAMAN birikimli,
- * stok kartları (escrow) ANLIK. Aylık kırılım ve trend bu ekranın işi değil,
- * dashboard/analiz ekranlarında yapılır.
+ * Her bölümde sol toplam sağdaki bileşenlerin toplamına eşit olmak zorundadır;
+ * fark 0 değilse kırmızı. Bölümler: ciro nereye gitti (tüm zaman) → satıcı
+ * hakedişi nerede (anlık) → takas karşı taraf (anlık) → platform gelirinden
+ * Tarodan hak edişine (şelale) → alıcı iadeleri (kırılım) → PayTR karşılaştırması.
+ * Aylık kırılım ve trend bu ekranın işi değil; dashboard/analiz ekranlarında.
  */
 export default function FinanceOverviewPage() {
   const t = useTranslations();
@@ -64,88 +32,35 @@ export default function FinanceOverviewPage() {
       queryFn: async () => (await adminApi.getFinanceOverview()).data,
     });
 
-  const funnel = data?.funnel;
-
-  /**
-   * Huni kartları tek tablodan üretilir: her satır ikon/ton/bağlantı/etiket/
-   * değer/ipucu/zaman kapsamını taşır; render tek bir map'tir. Yeni kart = yeni
-   * satır. `scope` her kartın altında yazar (akış = tüm zaman, stok = anlık).
-   */
-  const cards: FunnelCard[] = [
-    {
-      key: "collected",
-      icon: CreditCardIcon,
-      tone: "info",
-      href: "/finance/payments",
-      value: funnel?.collectedTotal,
-      hint: t("admin.finance.overview.funnel.collectedHint", {
-        count: funnel?.collectedCount ?? 0,
-      }),
-      scope: "allTime",
-    },
-    {
-      key: "escrowHeld",
-      icon: LockClosedIcon,
-      tone: "warning",
-      href: "/finance/payouts?tab=escrow",
-      value: funnel?.escrowHeldTotal,
-      hint: t("admin.finance.overview.funnel.escrowHeldHint", {
-        count: funnel?.escrowHeldCount ?? 0,
-      }),
-      scope: "instant",
-    },
-    {
-      key: "transferred",
-      icon: BanknotesIcon,
-      tone: "success",
-      href: "/finance/payouts?tab=transfers",
-      value: funnel?.transferredTotal,
-      hint: t("admin.finance.overview.funnel.transferredHint", {
-        count: funnel?.transferredCount ?? 0,
-      }),
-      scope: "allTime",
-    },
-    {
-      key: "platformRevenue",
-      icon: ChartPieIcon,
-      tone: "primary",
-      href: "/finance/commission",
-      value: funnel?.platformRevenueNet,
-      hint: t("admin.finance.overview.funnel.platformRevenueHint"),
-      scope: "allTime",
-    },
-    // Takas geliri komisyon defterinde GÖRÜNMEZ (o tablo sipariş bazlıdır);
-    // platform gelirinin içindeki payı ayrıca gösterilir.
-    {
-      key: "tradeFee",
-      icon: ArrowsRightLeftIcon,
-      tone: "primary",
-      href: "/operations/trades",
-      value: funnel?.tradeFeeRevenueNet,
-      hint: t("admin.finance.overview.funnel.tradeFeeHint", {
-        collected: funnel ? fmtTry(funnel.tradeFeeCollected) : "—",
-      }),
-      scope: "allTime",
-    },
-    // Komisyon geliri hak edişin KENDİSİ değil: PSP kesintisi içinden çıkar.
-    // İki kart, "kalan" ile "hak ediş" farkını görünür kılar.
-    {
-      key: "pspFee",
-      icon: CreditCardIcon,
-      tone: "warning",
-      value: funnel?.pspFeeTotal,
-      hint: t("admin.finance.overview.funnel.pspFeeHint"),
-      scope: "allTime",
-    },
-    {
-      key: "netAfterPsp",
-      icon: BanknotesIcon,
-      tone: "success",
-      value: funnel?.platformNetAfterPsp,
-      hint: t("admin.finance.overview.funnel.netAfterPspHint"),
-      scope: "allTime",
-    },
-  ];
+  const diagnostics = data?.diagnostics;
+  const diagnosticItems = diagnostics
+    ? [
+        {
+          key: "paymentsWithoutOrders" as const,
+          value: diagnostics.paymentsWithoutOrders,
+          bad: diagnostics.paymentsWithoutOrders > 0,
+          text: String(diagnostics.paymentsWithoutOrders),
+        },
+        {
+          key: "ordersWithoutHold" as const,
+          value: diagnostics.ordersWithoutHold,
+          bad: diagnostics.ordersWithoutHold > 0,
+          text: String(diagnostics.ordersWithoutHold),
+        },
+        {
+          key: "productTax" as const,
+          value: diagnostics.productTaxTotal,
+          bad: Math.abs(diagnostics.productTaxTotal) > 0.01,
+          text: fmtTry(diagnostics.productTaxTotal) ?? "",
+        },
+        {
+          key: "commissionLedgerDrift" as const,
+          value: diagnostics.commissionLedgerDrift,
+          bad: Math.abs(diagnostics.commissionLedgerDrift) > 0.01,
+          text: fmtTry(diagnostics.commissionLedgerDrift) ?? "",
+        },
+      ].filter((d) => d.bad)
+    : [];
 
   return (
     <AdminPage>
@@ -160,36 +75,35 @@ export default function FinanceOverviewPage() {
           isRetrying={isFetching}
         />
       ) : (
-        <>
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
-            {cards.map((card) => {
-              const metric = (
-                <MetricCard
-                  icon={card.icon}
-                  tone={card.tone}
-                  label={t(`admin.finance.overview.funnel.${card.key}`)}
-                  value={card.value === undefined ? "—" : fmtTry(card.value)}
-                  loading={isLoading}
-                  footer={
-                    <span className="text-muted">
-                      {card.hint} ·{" "}
-                      {t(`admin.finance.overview.scope.${card.scope}`)}
-                    </span>
-                  }
-                />
-              );
-              return card.href ? (
-                <Link key={card.key} href={card.href} className="block">
-                  {metric}
-                </Link>
-              ) : (
-                <Fragment key={card.key}>{metric}</Fragment>
-              );
-            })}
-          </div>
-
+        <div className="space-y-4">
+          {(data?.sections ?? []).map((section) => (
+            <ReconciliationSectionView
+              key={section.key}
+              section={section}
+              syncEnabled={data?.syncEnabled ?? true}
+              loading={isLoading}
+            />
+          ))}
+          {isLoading && !data && (
+            <p className="py-8 text-center text-muted">{t("common.loading")}</p>
+          )}
+          {data && <ComparisonSectionView comparison={data.comparison} />}
+          {diagnosticItems.length > 0 && (
+            <div className="rounded-lg border border-danger-200 bg-danger-50 px-3 py-2 text-sm text-danger-700">
+              <p className="font-semibold">
+                {t("admin.finance.overview.diagnostics.title")}
+              </p>
+              <ul className="mt-1 list-disc pl-5">
+                {diagnosticItems.map((d) => (
+                  <li key={d.key}>
+                    {t(`admin.finance.overview.diagnostics.${d.key}`)}: {d.text}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
           {data && <HealthStrip health={data.health} />}
-        </>
+        </div>
       )}
     </AdminPage>
   );

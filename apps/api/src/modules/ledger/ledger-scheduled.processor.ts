@@ -22,6 +22,7 @@ export class LedgerScheduledProcessor {
           groups: r.ledgerGroupsChecked,
           unbalanced: r.unbalancedGroups,
           overRefunded: r.overRefundedPayments,
+          revenueSplitDifference: r.revenueSplitDifference,
         },
       };
     });

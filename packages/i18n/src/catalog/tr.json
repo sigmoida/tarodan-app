@@ -6363,23 +6363,7 @@
       },
       "overview": {
         "title": "Finans Özeti",
-        "subtitle": "Para akışının tek bakışta durumu",
-        "funnel": {
-          "collected": "Tahsilat (Ciro)",
-          "collectedHint": "{count} tamamlanan ödeme",
-          "escrowHeld": "Escrow'da Bekleyen",
-          "escrowHeldHint": "{count} aktif hold",
-          "transferred": "Satıcıya Ödenen (Net)",
-          "transferredHint": "{count} tamamlanan transfer",
-          "platformRevenue": "Platform Geliri (Net)",
-          "platformRevenueHint": "Komisyon + hizmet bedeli − iadeler",
-          "pspFee": "PayTR kesintisi",
-          "pspFeeHint": "Sağlayıcı ekstresinden deftere yazılan gerçek kesinti",
-          "netAfterPsp": "Tarodan hak edişi",
-          "netAfterPspHint": "Komisyon geliri eksi PayTR kesintisi",
-          "tradeFee": "Takas hizmet bedeli",
-          "tradeFeeHint": "KDV hariç gelir · tahsil edilen {collected}"
-        },
+        "subtitle": "Para nerede? Her bölüm kendi sağlamasını taşır; fark sıfır değilse kırmızıdır",
         "health": {
           "title": "Dikkat Gerektirenler",
           "failedTransfers": "Başarısız / dönen transfer",
@@ -6392,6 +6376,94 @@
         "scope": {
           "allTime": "Tüm zaman",
           "instant": "Anlık"
+        },
+        "difference": "Fark",
+        "balanced": "Sağlama tutuyor",
+        "syncOff": "Senkron kapalı",
+        "syncOffHint": "PayTR rapor senkronu kapalı (PAYTR_REPORT_SYNC_ENABLED); PayTR kesintisi 0 sayılır, karşılaştırma boş.",
+        "sections": {
+          "revenueSplit": {
+            "title": "Ciro nereye gitti",
+            "total": "Tahsilat (brüt ciro)",
+            "lines": {
+              "sellerShare": "Satıcı hakedişi (brüt)",
+              "tradeCounterpart": "Takas karşı tarafa",
+              "platformFeesNet": "Platform hizmet geliri (KDV hariç)",
+              "serviceVat": "Hizmet KDV'si",
+              "shipping": "Kargo (Sürat'a)",
+              "withholding": "Stopaj",
+              "shippingDeficit": "Kargo açığı (hold sıfırlandı)"
+            }
+          },
+          "sellerShare": {
+            "title": "Satıcı hakedişi nerede",
+            "total": "Oluşan satıcı hakedişi",
+            "lines": {
+              "escrowHeld": "Escrow'da bekliyor",
+              "inTransit": "Yolda (release edildi, transfer bitmedi)",
+              "paidNet": "Satıcıya ödendi (net)",
+              "adjustmentDeducted": "Satıcı borcundan mahsup",
+              "refundedToBuyer": "Alıcıya iade edildi"
+            }
+          },
+          "tradeCounterpart": {
+            "title": "Takas nakit farkı nerede",
+            "total": "Karşı tarafa aktarılacak",
+            "lines": {
+              "awaitingRelease": "Release bekliyor",
+              "inTransit": "Yolda",
+              "paidNet": "Ödendi (net)",
+              "adjustmentDeducted": "Mahsup",
+              "refunded": "İade edildi"
+            }
+          },
+          "platformNet": {
+            "title": "Platform gelirinden Tarodan hak edişine",
+            "total": "Platform hizmet geliri (KDV hariç)",
+            "lines": {
+              "refundedFees": "İade edilen ücretler",
+              "waivedFees": "Feragat edilen ücretler",
+              "tradeFeeReversed": "Takas tam iadesi (ücret geri)",
+              "virtualRefundsNet": "Üyelik / öne çıkarma iadeleri",
+              "platformAbsorbed": "Platformun karşıladığı iade kalemleri",
+              "pspFee": "PayTR kesintisi",
+              "tarodanNet": "Tarodan hak edişi"
+            }
+          },
+          "buyerRefunds": {
+            "title": "Alıcıya iade edilen",
+            "total": "Başarılı iadeler",
+            "lines": {
+              "product": "Ürün bedeli",
+              "outboundShipping": "Giden kargo",
+              "buyerFees": "Alıcı ücretleri",
+              "buyerVat": "Alıcı KDV'si",
+              "returnShippingCharged": "Alıcıya yansıtılan iade kargosu",
+              "unclassified": "Ayrıştırılamayan (eski politika / elle / takas)"
+            }
+          }
+        },
+        "comparison": {
+          "title": "PayTR ile karşılaştırma",
+          "open": "PSP ekranı",
+          "ours": "Bizim",
+          "diff": "Fark",
+          "coverageFrom": "{date} tarihinden itibaren",
+          "awaiting": "({count} sonucu bekleyen)",
+          "rows": {
+            "sales": "Satış",
+            "refunds": "İade",
+            "pspFee": "PayTR kesintisi",
+            "settlementNet": "Hakediş net (satış − iade − kesinti)",
+            "payouts": "Gönderilen transferler"
+          }
+        },
+        "diagnostics": {
+          "title": "Sağlamayı bozan kayıtlar",
+          "paymentsWithoutOrders": "Siparişi/takası bulunamayan tamamlanmış ödeme",
+          "ordersWithoutHold": "Hold'u olmayan ödenmiş sipariş",
+          "productTax": "Ürün KDV'si sıfır değil (kod tutarsızlığı)",
+          "commissionLedgerDrift": "Sipariş komisyonu ile komisyon defteri farkı"
         }
       }
     },
