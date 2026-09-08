@@ -543,6 +543,9 @@ export class ElogoDeliveryService {
               netAmount: totals.taxExclusive,
               taxAmount: totals.tax,
               total: totals.payable,
+              // İskonto da belgeden okunur: kayıt, gerçekten basılan XML ile
+              // aynı iskontoyu taşımalı (rapor bu kolonu okur).
+              discountTotal: totals.allowance,
               sendType,
               status: "sent",
               elogoRefId: res.refId != null ? String(res.refId) : null,
@@ -588,6 +591,7 @@ export class ElogoDeliveryService {
             netAmount: totals.taxExclusive,
             taxAmount: totals.tax,
             total: totals.payable,
+            discountTotal: totals.allowance,
             status: "failed",
             ...(configurationFailure
               ? { attemptCount: ELOGO_MAX_SEND_ATTEMPTS }

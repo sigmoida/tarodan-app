@@ -76,18 +76,20 @@ export function readInvoiceLineItems(raw: unknown): InvoiceLineItem[] {
     if (!Number.isFinite(vatRate) || vatRate < 0) continue;
     const unitPrice = Number(r.unitPrice);
     const taxAmount = Number(r.taxAmount);
-    const discount = Number(r.discount);
+    const rawDiscount = Number(r.discount);
+    const discount =
+      Number.isFinite(rawDiscount) && rawDiscount > 0 ? round2(rawDiscount) : 0;
     lines.push({
       name,
       quantity,
       net: round2(net),
-      ...(Number.isFinite(discount) && discount > 0
-        ? { discount: round2(discount) }
-        : {}),
+      ...(discount > 0 ? { discount } : {}),
+      // Birim fiyat BRÜT'tür: iskontolu satırda matrahtan türetmek, UBL'de
+      // `miktar × fiyat − iskonto = matrah` eşitliğini bozardı.
       unitPrice:
         Number.isFinite(unitPrice) && unitPrice > 0
           ? unitPrice
-          : net / quantity,
+          : (net + discount) / quantity,
       vatRate,
       ...(Number.isFinite(taxAmount) && taxAmount >= 0
         ? { taxAmount: round2(taxAmount) }
