@@ -12,6 +12,7 @@ import { invoiceAmountsFor } from "./invoice/invoice-amounts";
 import {
   buildPackageFeeDocuments,
   hasCompleteComponentBreakdown,
+  readFeeDiscounts,
   type PackageFeeDocument,
   type PackageFeeOrderRow,
 } from "./invoice/package-fee-basis";
@@ -345,6 +346,7 @@ export class ElogoDocumentService {
               shippingAddress: true,
               buyerShippingAmount: true,
               sellerShippingAmount: true,
+              feeDiscountBreakdown: true,
               commissionLedger: {
                 select: {
                   componentBreakdownComplete: true,
@@ -386,6 +388,7 @@ export class ElogoDocumentService {
       sellerShippingAmount: Number(order.sellerShippingAmount ?? 0),
       refundedBuyerShippingAmount:
         order.id === shippingCarrierId ? refundedBuyerShipping : 0,
+      feeDiscounts: readFeeDiscounts(order.feeDiscountBreakdown),
       ledger: order.commissionLedger
         ? {
             componentBreakdownComplete:

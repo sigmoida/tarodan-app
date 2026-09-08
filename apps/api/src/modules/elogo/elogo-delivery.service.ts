@@ -19,6 +19,7 @@ import { NotificationService } from "../notification/notification.service";
 import { NotificationType } from "../notification/dto";
 import { buildInvoiceXml } from "./ubl/ubl-invoice.builder";
 import {
+  invoiceDiscountFromLines,
   invoiceTotalsFromLines,
   readInvoiceLineItems,
 } from "./invoice/invoice-lines";
@@ -153,6 +154,9 @@ export class ElogoDeliveryService {
                   taxAmount: amounts.tax,
                   total: amounts.total,
                   originalTotal: amounts.total,
+                  discountTotal: hasLines
+                    ? invoiceDiscountFromLines(lineItems!)
+                    : 0,
                   vatRate,
                   status: "pending",
                   sourceReference: sourceReference?.trim() || null,
@@ -428,6 +432,7 @@ export class ElogoDeliveryService {
               quantity: l.quantity,
               unitPrice: l.unitPrice,
               lineExtension: l.net,
+              discount: l.discount,
               vatRate: l.vatRate,
               taxAmount: l.taxAmount,
             }))

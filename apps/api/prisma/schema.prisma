@@ -2136,6 +2136,10 @@ model ElogoInvoice {
   invoiceNumber             String?            @unique @map("invoice_number")
   ettn                      String?            @unique
   netAmount                 Decimal            @map("net_amount") @db.Decimal(10, 2)
+  /// Belgede gösterilen İSKONTO toplamı (KDV hariç). Kesinti kolonları indirim
+  /// SONRASI tutarı taşır; brüt bedel = netAmount + discountTotal. Raporlama için
+  /// kolon, kalem kırılımı lineItems'ta.
+  discountTotal             Decimal            @default(0) @map("discount_total") @db.Decimal(10, 2)
   taxAmount                 Decimal            @map("tax_amount") @db.Decimal(10, 2)
   total                     Decimal            @db.Decimal(10, 2)
   /// İlk oluşturma anındaki brüt tutar. Pending belge iadede netleştirilse bile

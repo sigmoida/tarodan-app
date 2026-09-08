@@ -1,6 +1,7 @@
 import {
   buildPackageFeeDocuments,
   hasCompleteComponentBreakdown,
+  readFeeDiscounts,
   type PackageFeeOrderRow,
 } from "./package-fee-basis";
 
@@ -35,6 +36,7 @@ const order = (over: Partial<PackageFeeOrderRow> = {}): PackageFeeOrderRow => ({
   buyerShippingAmount: 0,
   sellerShippingAmount: 0,
   refundedBuyerShippingAmount: 0,
+  feeDiscounts: {},
   ledger: ledger(),
   ...over,
 });
@@ -172,6 +174,129 @@ describe("buildPackageFeeDocuments", () => {
       0,
     );
     expect(docs[0].lines[0]).toMatchObject({ vatRate: 0, taxAmount: 0 });
+  });
+});
+
+describe("iskonto", () => {
+  it("brüt bedeli birim fiyat yazar, indirimi ayrı gösterir", () => {
+    // Kesinti kolonu indirim SONRASI tutarı taşır: 49,95 tahsil edilmiş,
+    // 9,99 indirim verilmiş → faturada 59,94 brüt + 9,99 iskonto.
+    const docs = buildPackageFeeDocuments(
+      [
+        order({
+          feeDiscounts: { seller_commission: 9.99 },
+          ledger: ledger({ sellerCommissionAmount: 49.95 }),
+        }),
+      ],
+      20,
+    );
+
+    const doc = docs.find((d) => d.type === "seller_commission")!;
+    expect(doc).toMatchObject({ net: 49.95, discount: 9.99 });
+    expect(doc.lines[0]).toMatchObject({
+      net: 49.95,
+      discount: 9.99,
+      unitPrice: 59.94,
+      // KDV indirimli matrah üzerinden.
+      taxAmount: 9.99,
+    });
+  });
+
+  it("indirim yoksa kalemde iskonto alanı hiç doğmaz", () => {
+    const docs = buildPackageFeeDocuments(
+      [order({ ledger: ledger({ sellerCommissionAmount: 20 }) })],
+      20,
+    );
+    const doc = docs.find((d) => d.type === "seller_commission")!;
+    expect(doc.discount).toBe(0);
+    expect(doc.lines[0]).not.toHaveProperty("discount");
+  });
+
+  it("kısmi iadede iskonto matrahla AYNI oranda küçülür", () => {
+    // 100 matrahın 40'ı iade edildi → kalan %60; 10 TL indirimin de %60'ı.
+    const docs = buildPackageFeeDocuments(
+      [
+        order({
+          feeDiscounts: { seller_commission: 10 },
+          ledger: ledger({
+            sellerCommissionAmount: 100,
+            refundedSellerCommissionAmount: 40,
+          }),
+        }),
+      ],
+      20,
+    );
+    const doc = docs.find((d) => d.type === "seller_commission")!;
+    expect(doc).toMatchObject({ base: 100, net: 60, discount: 6 });
+    expect(doc.lines[0].unitPrice).toBe(66);
+  });
+
+  it("matrahı tamamen iade edilmiş kalem iskonto göstermez", () => {
+    const docs = buildPackageFeeDocuments(
+      [
+        order({
+          feeDiscounts: { seller_commission: 10 },
+          ledger: ledger({
+            sellerCommissionAmount: 100,
+            refundedSellerCommissionAmount: 100,
+          }),
+        }),
+      ],
+      20,
+    );
+    expect(docs[0]).toMatchObject({ net: 0, discount: 0, lines: [] });
+  });
+
+  it("çok siparişli pakette indirimler tek satırda toplanır", () => {
+    const docs = buildPackageFeeDocuments(
+      [
+        order({
+          id: "o1",
+          feeDiscounts: { seller_commission: 4 },
+          ledger: ledger({ sellerCommissionAmount: 20 }),
+        }),
+        order({
+          id: "o2",
+          feeDiscounts: { seller_commission: 6 },
+          ledger: ledger({ sellerCommissionAmount: 30 }),
+        }),
+      ],
+      20,
+    );
+    const doc = docs.find((d) => d.type === "seller_commission")!;
+    expect(doc).toMatchObject({ net: 50, discount: 10 });
+    expect(doc.lines[0].unitPrice).toBe(60);
+  });
+});
+
+describe("readFeeDiscounts", () => {
+  it("indirim motorunun snapshot'ını kalem başına toplar", () => {
+    expect(
+      readFeeDiscounts([
+        { target: "seller_commission", amount: 4, side: "seller" },
+        { target: "seller_commission", amount: 6, side: "seller" },
+        { target: "buyer_shipping", amount: 15, side: "buyer" },
+      ]),
+    ).toEqual({ seller_commission: 10, buyer_shipping: 15 });
+  });
+
+  it("ürün fiyatı indirimini ve bozuk satırları eler", () => {
+    expect(
+      readFeeDiscounts([
+        // Ürün indirimi bir HİZMET bedeli indirimi değildir; faturaya girmez.
+        { target: "product_price", amount: 50 },
+        { target: "seller_commission", amount: 0 },
+        { target: "seller_commission", amount: "abc" },
+        null,
+        "x",
+        { amount: 5 },
+      ]),
+    ).toEqual({});
+  });
+
+  it("snapshot yoksa boş döner", () => {
+    expect(readFeeDiscounts(null)).toEqual({});
+    expect(readFeeDiscounts({})).toEqual({});
   });
 });
 

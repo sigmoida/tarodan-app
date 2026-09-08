@@ -5988,6 +5988,7 @@
         "invoiceUnit": "fatura",
         "invoiceNumber": "Fatura No",
         "type": "Tür",
+        "discount": "İskonto",
         "orderAmount": "Sipariş Tutarı",
         "uploadedAt": "Yüklenme",
         "replaced": "Değiştirildi",

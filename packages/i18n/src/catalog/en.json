@@ -5988,6 +5988,7 @@
         "invoiceUnit": "invoices",
         "invoiceNumber": "Invoice No.",
         "type": "Type",
+        "discount": "Discount",
         "orderAmount": "Order Amount",
         "uploadedAt": "Uploaded At",
         "replaced": "Replaced",
