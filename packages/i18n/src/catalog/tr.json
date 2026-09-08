@@ -6019,6 +6019,7 @@
           "tradeCommission": "Takas Komisyonu",
           "tradeServiceFee": "Takas Hizmet Bedeli",
           "platformSale": "Platform Satışı",
+          "penalty": "Ceza Faturası",
           "returnInvoice": "İade Faturası"
         },
         "documentTypes": {

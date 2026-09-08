@@ -7,8 +7,10 @@ import {
   PACKAGE_FEE_COMPONENT_BY_TYPE,
 } from "./invoice/package-fee-components";
 import { LINE_DESCRIPTION } from "./invoice/invoice-line-description";
+import { buildPenaltyBasis } from "./invoice/penalty-basis";
 import { resolveGuestInvoiceRecipient } from "./invoice/elogo-guest-recipient";
 import { invoiceRecordReference } from "../../common/helpers/code-prefixes";
+import { translateMessage } from "../i18n/translate";
 import { ElogoDocumentService } from "./elogo-document.service";
 import { ElogoDeliveryService } from "./elogo-delivery.service";
 
@@ -431,6 +433,116 @@ export class ElogoIssuingService {
         sourceReference: invoiceRecordReference(order.orderNumber),
       },
     );
+  }
+
+  /**
+   * CEZA FATURASI → kusurlu tarafa, iade TALEBİ başına tek belge.
+   *
+   * Politika kusurluya yüklenen kargoyu (`*_charge`) zaten hesaplıyor ama hiçbir
+   * belge kesmiyordu. Matrah SADECE FARKTIR (`penalty-basis.ts`): kusurluya
+   * daha önce kesilmiş kargo belgesi ayakta kalır. Hizmet bedeli için de yeni
+   * belge yoktur — `platform_retain` demek "kesilmiş belge geçerli" demektir;
+   * komisyon ise mevcut iade faturası yolundan geri verilir.
+   *
+   * Anahtar `refundRequestId`: aynı kolinin birden fazla iadesi ayrı ayrı
+   * cezalanır, aynı talebin yeniden işlenmesi ikinci belge doğurmaz.
+   */
+  async issuePenaltyInvoice(refundRequestId: string): Promise<void> {
+    const request = await this.prisma.refundRequest
+      .findUnique({
+        where: { id: refundRequestId },
+        select: {
+          faultParty: true,
+          resolvedReason: true,
+          financialComponents: {
+            select: {
+              componentCode: true,
+              treatment: true,
+              netAmount: true,
+            },
+          },
+          order: {
+            select: {
+              packageId: true,
+              buyerId: true,
+              sellerId: true,
+              serviceVatRate: true,
+              shippingAddress: true,
+            },
+          },
+        },
+      })
+      .catch(() => null);
+    const order = request?.order;
+    if (!request || !order) return;
+    // Platform kendi ürününü satıyorsa ceza kendine faturalanamaz.
+    if (await this.isPlatformSeller(order.sellerId)) return;
+
+    // Satıcıya paket için zaten kesilmiş gidiş kargo payı — cezadan düşülür.
+    const invoicedSellerShipping = order.packageId
+      ? await this.invoicedSellerShippingOf(order.packageId)
+      : 0;
+
+    const basis = buildPenaltyBasis({
+      faultParty: request.faultParty,
+      components: request.financialComponents.map((c) => ({
+        componentCode: c.componentCode,
+        treatment: c.treatment,
+        netAmount: Number(c.netAmount),
+      })),
+      invoicedSellerShipping,
+      vatRate: Number(order.serviceVatRate ?? 0),
+    });
+    if (!basis) return;
+
+    const reason = request.resolvedReason
+      ? translateMessage(`status.refundReason.${request.resolvedReason}`, "tr")
+      : null;
+    const packageNumber = order.packageId
+      ? await this.packageNumberOf(order.packageId)
+      : null;
+
+    await this.delivery.cut(
+      "penalty",
+      refundRequestId,
+      basis.side === "seller" ? order.sellerId : order.buyerId,
+      basis.net,
+      {
+        lineItems: [basis.line],
+        lineDescription: reason
+          ? `${LINE_DESCRIPTION.penalty} — ${reason}`
+          : LINE_DESCRIPTION.penalty,
+        sourceReference: invoiceRecordReference(packageNumber) ?? undefined,
+        guestRecipient:
+          basis.side === "buyer"
+            ? resolveGuestInvoiceRecipient(order.shippingAddress)
+            : null,
+      },
+    );
+  }
+
+  /** Paketin satıcıya faturalanmış gidiş kargo payı toplamı. */
+  private async invoicedSellerShippingOf(packageId: string): Promise<number> {
+    const orders = await this.prisma.order
+      .findMany({
+        where: { packageId },
+        select: { sellerShippingAmount: true },
+      })
+      .catch(() => []);
+    return orders.reduce(
+      (sum, o) => sum + Number(o.sellerShippingAmount ?? 0),
+      0,
+    );
+  }
+
+  private async packageNumberOf(packageId: string): Promise<string | null> {
+    const pkg = await this.prisma.orderPackage
+      .findUnique({
+        where: { id: packageId },
+        select: { packageNumber: true },
+      })
+      .catch(() => null);
+    return pkg?.packageNumber ?? null;
   }
 
   private async isPlatformSeller(sellerId: string): Promise<boolean> {

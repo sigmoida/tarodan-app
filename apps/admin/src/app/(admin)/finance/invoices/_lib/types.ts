@@ -119,6 +119,7 @@ export const typeFilterOptions = (t: T) => [
     value: "return_invoice",
     label: t("admin.finance.invoices.types.returnInvoice"),
   },
+  { value: "penalty", label: t("admin.finance.invoices.types.penalty") },
 ];
 
 export const statusFilterOptions = (t: T) => [

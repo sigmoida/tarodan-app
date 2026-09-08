@@ -32,7 +32,8 @@ export type RevenueType =
   | "boost"
   | "trade_commission"
   | "trade_service_fee"
-  | "platform_sale";
+  | "platform_sale"
+  | "penalty";
 
 /** `cut()` çağrısının türe göre değişen bağlamı. */
 export interface CutOptions {
@@ -106,6 +107,10 @@ export class ElogoInvoicingService {
 
   issueTradeCashFeeInvoice(tradeCashPaymentId: string): Promise<void> {
     return this.issuing.issueTradeCashFeeInvoice(tradeCashPaymentId);
+  }
+
+  issuePenaltyInvoice(refundRequestId: string): Promise<void> {
+    return this.issuing.issuePenaltyInvoice(refundRequestId);
   }
 
   // ───────────────────────── iade / ters kayıt ─────────────────────────

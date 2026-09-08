@@ -32,6 +32,8 @@ export const VAT_SOURCE_BY_TYPE: Record<ElogoInvoiceType, InvoiceVatSource> = {
   trade_commission: "service",
   trade_service_fee: "service",
   platform_sale: "category",
+  // Ceza bedeli kargo hizmetidir — KDV'si aynı hizmet ayarından gelir.
+  penalty: "service",
   membership: "standard",
   boost: "standard",
   // İade faturası kaynak faturanın oranını AYNEN taşır (snapshot); bu değer

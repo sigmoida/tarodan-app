@@ -39,6 +39,8 @@ export const AMOUNT_BASIS_BY_TYPE: Record<
   platform_sale: "gross",
   membership: "gross",
   boost: "gross",
+  // Ceza bedeli kargo MATRAHIDIR; KDV üstüne eklenir (kargo belgeleriyle aynı yön).
+  penalty: "net",
   // Takas nakit komisyonu (v1 — LEGACY) matrah saklar: KDV'si `commission_tax_amount`
   // kolonunda ayrı durur ve ödeyenin toplamına eklenir.
   trade_commission: "net",
