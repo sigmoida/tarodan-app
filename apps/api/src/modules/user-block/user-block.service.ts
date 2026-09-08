@@ -9,6 +9,7 @@ import { EventEmitter2 } from "@nestjs/event-emitter";
 import { Prisma } from "@prisma/client";
 import { PrismaService } from "../../prisma";
 import { CacheService } from "../cache/cache.service";
+import { AccountLaneService } from "../account-lane/account-lane.service";
 import type { MessageKey } from "@tarodan/i18n";
 import { i18nMessage } from "../i18n";
 import {
@@ -44,6 +45,7 @@ export class UserBlockService {
     private readonly prisma: PrismaService,
     private readonly cache: CacheService,
     private readonly events: EventEmitter2,
+    private readonly lanes: AccountLaneService,
   ) {}
 
   async block(
@@ -184,11 +186,18 @@ export class UserBlockService {
     );
   }
 
-  /** İki kullanıcıdan biri diğerini engellemiş mi? (DM/teklif/takas kapısı) */
+  /**
+   * İki kullanıcı birbirine kapalı mı? (DM/teklif/takas/oda kapısı)
+   * Karşılıklı engel VEYA farklı hesap şeridi (canlı ↔ test) kapalı sayılır;
+   * şerit kuralı tek kapıdan geçsin diye burada birleştirildi.
+   */
   async isBlockedEither(userA: string, userB: string): Promise<boolean> {
     if (!userA || !userB || userA === userB) return false;
-    const hidden = await this.getHiddenUserIds(userA);
-    return hidden.includes(userB);
+    const [hidden, lanesDiffer] = await Promise.all([
+      this.getHiddenUserIds(userA),
+      this.lanes.lanesDiffer(userA, userB),
+    ]);
+    return lanesDiffer || hidden.includes(userB);
   }
 
   /**

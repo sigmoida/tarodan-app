@@ -9424,6 +9424,7 @@
       "documentsIncomplete": "Zorunlu belgeler ile her şirket sahibi/ortağının kimlik veya pasaport ön-arka yüzleri tamamlanmalıdır",
       "interactionBlocked": "Bu kullanıcıyla etkileşim kuramazsınız",
       "invalidDocumentType": "Geçersiz belge tipi",
+      "laneMismatch": "Bu kullanıcıyla işlem yapamazsınız (test hesabı sınırı)",
       "noFieldsToUpdate": "Güncellenecek alan bulunamadı",
       "notBlocked": "Bu kullanıcı engellenmemiş",
       "notFound": "Kullanıcı bulunamadı",

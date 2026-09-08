@@ -9424,6 +9424,7 @@
       "documentsIncomplete": "The required documents, plus the front and back of every owner's or partner's ID or passport, must be complete",
       "interactionBlocked": "You cannot interact with this user",
       "invalidDocumentType": "Invalid document type",
+      "laneMismatch": "You cannot transact with this user (test account boundary)",
       "noFieldsToUpdate": "No fields to update were provided",
       "notBlocked": "This user is not blocked",
       "notFound": "User not found",

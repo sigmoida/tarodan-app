@@ -15,6 +15,7 @@ import { paymentWindowEnd } from "../../payment/helpers/payment.constants";
 import { resolveSalePrice } from "../../product/helpers/product-sale-window";
 import { i18nMessage } from "../../i18n";
 import { CacheService } from "../../cache/cache.service";
+import { AccountLaneService } from "../../account-lane/account-lane.service";
 import {
   GuestCheckoutDto,
   GuestSendVerificationCodeDto,
@@ -66,6 +67,7 @@ export class OrderGuestCheckoutService {
     private readonly orderCommon: OrderCommonService,
     private readonly checkoutCommon: OrderCheckoutCommonService,
     private readonly group: OrderCheckoutGroupService,
+    private readonly lanes: AccountLaneService,
     @Optional()
     private readonly feeDiscounts?: OrderFeeDiscountService,
   ) {}
@@ -259,6 +261,9 @@ export class OrderGuestCheckoutService {
           i18nMessage("server.order.productNotFound"),
         );
       }
+
+      // Misafir her zaman canlı şerittir: test satıcısının ilanı satın alınamaz.
+      await this.lanes.assertSameLane(undefined, product.sellerId);
 
       if (product.status !== ProductStatus.active) {
         throw new BadRequestException(

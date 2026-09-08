@@ -47,6 +47,7 @@ import { SecurityModule } from "./modules/security";
 import { StorageModule } from "./modules/storage";
 import { SearchModule } from "./modules/search";
 import { CacheModule } from "./modules/cache";
+import { AccountLaneModule } from "./modules/account-lane";
 import { PaymentProvidersModule } from "./modules/payment-providers";
 
 // PHASE 5 - Platform Operations (AUDIT REMEDIATION)
@@ -159,6 +160,9 @@ import { isTest } from "./config/environment";
 
     // Global Cache (Redis) - GAP-020
     CacheModule,
+
+    // Hesap şeridi (canlı/test) çözümü — @Global
+    AccountLaneModule,
 
     // Reliable side-effect queue (Faz 5) — @Global
     OutboxModule,

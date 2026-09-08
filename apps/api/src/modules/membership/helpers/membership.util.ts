@@ -1,4 +1,9 @@
 import {
+  AccountLane,
+  LIVE_LANE,
+  laneUserWhere,
+} from "../../account-lane/account-lane";
+import {
   BusinessStatus,
   SubscriptionStatus,
   MembershipTierType,
@@ -210,11 +215,17 @@ export function canSellFromMembership(
   return isBusinessMembershipEntitled(membership, owner);
 }
 
-/** Prisma equivalent of `canSellFromMembership`, shared by public catalog reads. */
+/**
+ * Prisma equivalent of `canSellFromMembership`, shared by public catalog reads.
+ * Şerit varsayılanı `live`: test hesaplarının ilanları canlı vitrine/aramaya/
+ * ES indeksine hiç girmez; yalnız test şeridi viewer'ı `lane: "test"` geçer.
+ */
 export function saleCapableSellerWhere(
   now = new Date(),
+  lane: AccountLane = LIVE_LANE,
 ): Prisma.UserWhereInput {
   return {
+    ...laneUserWhere(lane),
     OR: [
       { businessStatus: null },
       {

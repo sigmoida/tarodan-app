@@ -296,4 +296,11 @@ describe("corporate selling suspension", () => {
       ],
     });
   });
+
+  it("saleCapableSellerWhere pins the live lane by default and flips for test viewers", () => {
+    expect(saleCapableSellerWhere()).toMatchObject({ isTestAccount: false });
+    expect(saleCapableSellerWhere(undefined, "test")).toMatchObject({
+      isTestAccount: true,
+    });
+  });
 });
