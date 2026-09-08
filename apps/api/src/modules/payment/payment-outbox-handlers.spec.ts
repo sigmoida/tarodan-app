@@ -8,7 +8,11 @@ import {
   OUTBOX_REVENUE_INVOICE_ISSUE,
 } from "../outbox/outbox.types";
 
-const makeDeps = (over?: { order?: any; payment?: any }) => {
+const makeDeps = (over?: {
+  order?: any;
+  payment?: any;
+  refundAttempt?: any;
+}) => {
   const registry = new OutboxHandlerRegistry();
   const paymentCommon = {
     cancelSuratShipmentIfExists: jest.fn().mockResolvedValue({ ok: true }),
@@ -17,6 +21,7 @@ const makeDeps = (over?: { order?: any; payment?: any }) => {
     handleOrderRefund: jest.fn().mockResolvedValue(undefined),
     handleTradeCashRefund: jest.fn().mockResolvedValue(undefined),
     issueVirtualOrderInvoice: jest.fn().mockResolvedValue(undefined),
+    issuePenaltyInvoice: jest.fn().mockResolvedValue(undefined),
   } as any;
   const prisma = {
     order: {
@@ -28,6 +33,13 @@ const makeDeps = (over?: { order?: any; payment?: any }) => {
       findFirst: jest
         .fn()
         .mockResolvedValue("payment" in (over ?? {}) ? over!.payment : null),
+    },
+    refundAttempt: {
+      findUnique: jest
+        .fn()
+        .mockResolvedValue(
+          "refundAttempt" in (over ?? {}) ? over!.refundAttempt : null,
+        ),
     },
   } as any;
   const fulfillmentFinalizer = {
@@ -111,6 +123,28 @@ describe("PaymentOutboxHandlers", () => {
       "o3",
       payload,
     );
+    // Talebe bağlanamayan deneme ceza faturası doğurmaz.
+    expect(elogoInvoicing.issuePenaltyInvoice).not.toHaveBeenCalled();
+  });
+
+  it("ters kayıttan sonra kusurlu tarafın ceza faturasını keser", async () => {
+    const { registry, elogoInvoicing, svc } = makeDeps({
+      refundAttempt: { idempotencyKey: "refund-request:rr9" },
+    });
+    svc.onModuleInit();
+
+    await registry.get(OUTBOX_INVOICE_REFUND_REVERSE)!(
+      {
+        orderId: "o4",
+        refundAttemptId: "ra4",
+        refundRatio: 1,
+        fullyRefunded: true,
+      },
+      {} as any,
+    );
+
+    expect(elogoInvoicing.handleOrderRefund).toHaveBeenCalled();
+    expect(elogoInvoicing.issuePenaltyInvoice).toHaveBeenCalledWith("rr9");
   });
 
   it("invoice.trade_cash_refund_reverse handler'ını kaydeder ve eLogo takas ters kaydına yönlendirir", async () => {

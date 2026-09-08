@@ -16,6 +16,7 @@ import {
 } from "./invoice/package-fee-components";
 import type { PackageFeeDocument } from "./invoice/package-fee-basis";
 import { retryOnWriteConflict } from "./helpers/elogo-write-conflict";
+import { refundRequestIdOf } from "./helpers/refund-request-key";
 import type { InvoiceRefundReversePayload } from "../outbox/outbox.types";
 import { ElogoService } from "./elogo.service";
 import { ElogoDocumentService } from "./elogo-document.service";
@@ -91,9 +92,7 @@ export class ElogoReversalService {
       resolved = {
         ...adjustment,
         finalizedAt: attempt.finalizedAt,
-        refundRequestId: attempt.idempotencyKey?.startsWith("refund-request:")
-          ? attempt.idempotencyKey.slice("refund-request:".length)
-          : undefined,
+        refundRequestId: refundRequestIdOf(attempt.idempotencyKey),
       };
     }
     await this.reverseByKeys(await this.relatedInvoiceKeys(orderId), resolved);

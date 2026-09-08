@@ -2253,6 +2253,11 @@ enum ElogoInvoiceType {
   trade_service_fee
   platform_sale
   return_invoice
+  /// Kusurlu taraftan tahsil edilen kargo bedeli. Matrah SADECE FARKTIR: kusurluya
+  /// zaten kesilmiş kargo belgesi ayakta kalır, üstüne yalnız yeni yüklenen tutar
+  /// faturalanır. Hizmet bedeli platformda kalır (mevcut belgesi durur), komisyon
+  /// ise iade faturasıyla geri verilir. Kaynak = RefundRequest.id.
+  penalty
 }
 
 enum ElogoInvoiceStatus {

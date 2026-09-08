@@ -7,8 +7,10 @@ import {
   PACKAGE_FEE_COMPONENT_BY_TYPE,
 } from "./invoice/package-fee-components";
 import { LINE_DESCRIPTION } from "./invoice/invoice-line-description";
+import { buildPenaltyBasis } from "./invoice/penalty-basis";
 import { resolveGuestInvoiceRecipient } from "./invoice/elogo-guest-recipient";
 import { invoiceRecordReference } from "../../common/helpers/code-prefixes";
+import { translateMessage } from "../i18n/translate";
 import { ElogoDocumentService } from "./elogo-document.service";
 import { ElogoDeliveryService } from "./elogo-delivery.service";
 
@@ -30,6 +32,9 @@ import { ElogoDeliveryService } from "./elogo-delivery.service";
  * göndermez (ElogoDeliveryService) — yalnız hangi olayın hangi belgeyi
  * doğurduğunu bilir.
  */
+const round2 = (value: number): number =>
+  Math.round((value + Number.EPSILON) * 100) / 100;
+
 @Injectable()
 export class ElogoIssuingService {
   private readonly logger = new Logger(ElogoIssuingService.name);
@@ -431,6 +436,149 @@ export class ElogoIssuingService {
         sourceReference: invoiceRecordReference(order.orderNumber),
       },
     );
+  }
+
+  /**
+   * CEZA FATURASI → kusurlu tarafa, iade TALEBİ başına tek belge.
+   *
+   * Politika kusurluya yüklenen kargoyu (`*_charge`) zaten hesaplıyor ama hiçbir
+   * belge kesmiyordu. Matrah SADECE FARKTIR (`penalty-basis.ts`): kusurluya
+   * daha önce kesilmiş kargo belgesi ayakta kalır. Hizmet bedeli için de yeni
+   * belge yoktur — `platform_retain` demek "kesilmiş belge geçerli" demektir;
+   * komisyon ise mevcut iade faturası yolundan geri verilir.
+   *
+   * Anahtar `refundRequestId`: aynı kolinin birden fazla iadesi ayrı ayrı
+   * cezalanır, aynı talebin yeniden işlenmesi ikinci belge doğurmaz.
+   */
+  async issuePenaltyInvoice(refundRequestId: string): Promise<void> {
+    const request = await this.prisma.refundRequest
+      .findUnique({
+        where: { id: refundRequestId },
+        select: {
+          faultParty: true,
+          resolvedReason: true,
+          financialComponents: {
+            select: {
+              componentCode: true,
+              treatment: true,
+              netAmount: true,
+            },
+          },
+          order: {
+            select: {
+              packageId: true,
+              buyerId: true,
+              sellerId: true,
+              serviceVatRate: true,
+              shippingAddress: true,
+            },
+          },
+        },
+      })
+      .catch(() => null);
+    const order = request?.order;
+    if (!request || !order) return;
+
+    // Satıcıya paket için AYAKTA DURAN gidiş kargo belgesi — cezadan düşülür.
+    const invoicedSellerShipping = order.packageId
+      ? await this.invoicedSellerShippingOf(order.packageId)
+      : 0;
+
+    const basis = buildPenaltyBasis({
+      faultParty: request.faultParty,
+      components: request.financialComponents.map((c) => ({
+        componentCode: c.componentCode,
+        treatment: c.treatment,
+        netAmount: Number(c.netAmount),
+      })),
+      invoicedSellerShipping,
+      vatRate: Number(order.serviceVatRate ?? 0),
+    });
+    if (!basis) return;
+    // Platform kendi ürününü satıyorsa ceza KENDİNE faturalanamaz. Alıcı
+    // kusurunda ise bedel yine alıcıdan tahsil edilir; muhatap platform değil
+    // alıcıdır ve belgesi kesilmelidir.
+    if (
+      basis.side === "seller" &&
+      (await this.isPlatformSeller(order.sellerId))
+    )
+      return;
+
+    const reason = request.resolvedReason
+      ? translateMessage(`status.refundReason.${request.resolvedReason}`, "tr")
+      : null;
+    const packageNumber = order.packageId
+      ? await this.packageNumberOf(order.packageId)
+      : null;
+
+    await this.delivery.cut(
+      "penalty",
+      refundRequestId,
+      basis.side === "seller" ? order.sellerId : order.buyerId,
+      basis.net,
+      {
+        lineItems: [basis.line],
+        lineDescription: reason
+          ? `${LINE_DESCRIPTION.penalty} — ${reason}`
+          : LINE_DESCRIPTION.penalty,
+        sourceReference: invoiceRecordReference(packageNumber) ?? undefined,
+        guestRecipient:
+          basis.side === "buyer"
+            ? resolveGuestInvoiceRecipient(order.shippingAddress)
+            : null,
+      },
+    );
+  }
+
+  /**
+   * Paketin gidiş kargo payı için satıcıda AYAKTA DURAN belge tutarı (KDV hariç).
+   *
+   * Matrah farktır, ama fark ancak gerçekten duran bir belgeden düşülebilir.
+   * `seller_shipping` belgesinin iade karşılığı yoktur; iade hattı onu genel
+   * iade oranıyla iptal eder ya da iade faturasıyla dengeler — ve ceza kesimi
+   * ters kayıttan SONRA çalışır. Sipariş kolonundan okunsaydı iptal edilmiş bir
+   * belge hâlâ duruyormuş sayılır, kusurlu satıcı o tutar kadar EKSİK
+   * faturalanırdı. Belge hiç kesilmediyse (kargo öncesi iade, platform satışı)
+   * düşülecek bir şey de yoktur.
+   */
+  private async invoicedSellerShippingOf(packageId: string): Promise<number> {
+    const invoice = await this.prisma.elogoInvoice
+      .findUnique({
+        where: {
+          type_sourceId: { type: "seller_shipping", sourceId: packageId },
+        },
+        select: { netAmount: true, status: true, invoiceNumber: true },
+      })
+      .catch(() => null);
+    if (!invoice || invoice.status === "cancelled") return 0;
+    const issued = Math.max(0, Number(invoice.netAmount ?? 0));
+    if (!(issued > 0) || !invoice.invoiceNumber) return issued;
+
+    const reversals = await this.prisma.elogoInvoice
+      .findMany({
+        where: {
+          type: "return_invoice",
+          billingReference: invoice.invoiceNumber,
+          status: { not: "cancelled" },
+        },
+        select: { netAmount: true },
+      })
+      .catch(() => []);
+    const reversed = reversals.reduce(
+      (sum, row) => sum + Number(row.netAmount ?? 0),
+      0,
+    );
+    return Math.max(0, round2(issued - reversed));
+  }
+
+  private async packageNumberOf(packageId: string): Promise<string | null> {
+    const pkg = await this.prisma.orderPackage
+      .findUnique({
+        where: { id: packageId },
+        select: { packageNumber: true },
+      })
+      .catch(() => null);
+    return pkg?.packageNumber ?? null;
   }
 
   private async isPlatformSeller(sellerId: string): Promise<boolean> {

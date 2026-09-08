@@ -16,6 +16,7 @@ import {
 } from "../outbox/outbox.types";
 import { PaymentCommonService } from "./payment-common.service";
 import { ElogoInvoicingService } from "../elogo";
+import { refundRequestIdOf } from "../elogo/helpers/refund-request-key";
 import { PrismaService } from "../../prisma";
 import { FulfillmentFinalizer } from "./fulfillment/fulfillment-finalizer.service";
 import { PaymentStatus } from "@prisma/client";
@@ -66,6 +67,15 @@ export class PaymentOutboxHandlers implements OnModuleInit {
         adjustment.orderId,
         adjustment,
       );
+      // Ters kayıttan SONRA: kusurluya yüklenen kargo bedelinin belgesi. Ters
+      // kayıt önce çalışmalı ki iade faturaları ile ceza aynı sıraya girsin.
+      // İdempotent (type+sourceId) ve `cut` hatayı yutar — iadeyi bloklamaz.
+      const refundRequestId = await this.resolveRefundRequestId(
+        adjustment.refundAttemptId,
+      );
+      if (refundRequestId) {
+        await this.elogoInvoicing.issuePenaltyInvoice(refundRequestId);
+      }
     });
 
     this.registry.register(
@@ -139,5 +149,22 @@ export class PaymentOutboxHandlers implements OnModuleInit {
         transactionId,
       });
     });
+  }
+
+  /**
+   * İade denemesinden TALEP kimliği — ceza faturasının kaynağı budur.
+   * Kusur tarafı ve kargo yüklemeleri yalnız talebin finansal bileşenlerinde
+   * durur; deneme tek başına hangi belgeyi doğuracağını bilmez.
+   */
+  private async resolveRefundRequestId(
+    refundAttemptId: string,
+  ): Promise<string | undefined> {
+    const attempt = await this.prisma.refundAttempt
+      .findUnique({
+        where: { id: refundAttemptId },
+        select: { idempotencyKey: true },
+      })
+      .catch(() => null);
+    return refundRequestIdOf(attempt?.idempotencyKey);
   }
 }
