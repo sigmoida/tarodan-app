@@ -488,6 +488,8 @@ export async function normalizeSeedCommerce(
         withholdingTaxAmount,
         sellerShippingAmount: lineSellerShipping,
         sellerServiceTaxAmount,
+        // Seed kupon üretmez; platform-fonlu kampanya payı yok.
+        platformFundedDiscount: 0,
       });
       const discountAmount = money(
         numeric(order.discountAmount) ||

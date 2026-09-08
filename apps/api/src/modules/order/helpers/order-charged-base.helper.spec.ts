@@ -79,6 +79,7 @@ describe("tahsil edilen ürün tabanı", () => {
         withholdingTaxAmount: 0,
         sellerShippingAmount: 50,
         sellerServiceTaxAmount: 20.4,
+        platformFundedDiscount: 0,
       }),
     ).toBe(397.8);
   });

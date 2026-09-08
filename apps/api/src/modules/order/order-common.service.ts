@@ -242,6 +242,9 @@ export class OrderCommonService {
       withholdingTaxAmount,
       sellerShippingAmount,
       sellerServiceTaxAmount,
+      // Platform-fonlu kupon payı satıcıya GERİ eklenir (escrow da böyle yapar);
+      // satıcı-fonlu kuponda 0'dır.
+      platformFundedDiscount: Number(order.platformFundedDiscount ?? 0),
     });
 
     const pricing = {

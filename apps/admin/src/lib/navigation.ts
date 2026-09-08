@@ -430,6 +430,14 @@ export function getNavGroups(t: T): NavGroup[] {
           permission: "invoices",
         },
         {
+          name: t("admin.nav.items.settlement.name"),
+          href: "/finance/settlement",
+          icon: DocumentTextIcon,
+          description: t("admin.nav.items.settlement.description"),
+          // Döküm faturanın dayanağıdır; fatura yetkisiyle aynı kapıdan geçer.
+          permission: "invoices",
+        },
+        {
           name: t("admin.nav.items.tax.name"),
           href: "/finance/tax",
           icon: CalculatorIcon,

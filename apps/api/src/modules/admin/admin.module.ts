@@ -69,6 +69,8 @@ import { AdminMessagingService } from "./ops/admin-messaging.service";
 import { AdminSupportService } from "./ops/admin-support.service";
 import { AdminContentService } from "./catalog/admin-content.service";
 import { AdminTaxService } from "./finance/admin-tax.service";
+import { SettlementReportService } from "./finance/settlement/settlement-report.service";
+import { SettlementReportWorkbookService } from "./finance/settlement/settlement-report-workbook.service";
 import { AdminMembershipService } from "./finance/admin-membership.service";
 import { AdminCatalogService } from "./catalog/admin-catalog.service";
 import { AdminCollectionService } from "./catalog/admin-collection.service";
@@ -218,6 +220,8 @@ import { scheduledProcessors } from "../../workers/scheduled-processors";
     AdminSupportService,
     AdminContentService,
     AdminTaxService,
+    SettlementReportService,
+    SettlementReportWorkbookService,
     AdminMembershipService,
     AdminCatalogService,
     CatalogImportService,

@@ -6034,6 +6034,26 @@
         "retried": "Fatura yeniden kuyruğa alındı",
         "documentCount": "{count} belge"
       },
+      "settlement": {
+        "title": "Hakediş Dökümü",
+        "subtitle": "Satıcıya kesilen komisyon faturasının dayanağı — dönem teslimat tarihine göredir",
+        "searchPlaceholder": "Koli kodu, sipariş no veya satıcı ara",
+        "empty": "Seçilen dönemde teslim edilmiş sipariş yok",
+        "exportExcel": "Excel indir",
+        "exported": "Hakediş dökümü indirildi",
+        "exportFailed": "Döküm indirilemedi",
+        "columns": {
+          "record": "Kayıt / Sipariş No",
+          "transactionType": "İşlem Tipi",
+          "seller": "Satıcı",
+          "product": "Ürün",
+          "commission": "Tarodan Hakedişi",
+          "sellerEarning": "Satıcı Hakedişi",
+          "withholding": "Stopaj",
+          "maturity": "Vade",
+          "maturityDays": "{days} gün"
+        }
+      },
       "payments": {
         "title": "Ödeme Yönetimi",
         "subtitle": "Tüm ödeme işlemleri ve durumları",
@@ -8299,6 +8319,10 @@
           "name": "Faturalar",
           "description": "Fatura ve e-fatura işlemlerini yönetin",
           "keywords": "fatura,invoice,e-arşiv,e-fatura,elogo,iade faturası"
+        },
+        "settlement": {
+          "name": "Hakediş Dökümü",
+          "description": "Komisyon faturasının dayanağı; Excel olarak indirilir"
         },
         "tax": {
           "name": "Vergi Ayarları",

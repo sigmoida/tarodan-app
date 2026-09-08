@@ -379,6 +379,7 @@ export class AdminAnalyticsOrderService {
           withholdingTaxAmount: num(o.withholdingTaxAmount),
           sellerShippingAmount: num(o.sellerShippingAmount),
           sellerServiceTaxAmount: num(o.sellerServiceTaxAmount),
+          platformFundedDiscount: num(o.platformFundedDiscount),
         }),
       },
       escrow: (() => {
