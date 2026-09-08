@@ -145,6 +145,7 @@ export class ElogoIssuingService {
   private async resolvePackageInvoiceBasis(packageId: string): Promise<{
     sellerId: string;
     buyerId: string;
+    packageNumber: string;
     netCommission: number;
     netBuyerFee: number;
     hasSellerCommission: boolean;
@@ -158,6 +159,7 @@ export class ElogoIssuingService {
       select: {
         sellerId: true,
         buyerId: true,
+        packageNumber: true,
         orders: {
           select: {
             id: true,
@@ -177,6 +179,7 @@ export class ElogoIssuingService {
     return {
       sellerId: pkg.sellerId,
       buyerId: pkg.buyerId,
+      packageNumber: pkg.packageNumber,
       netCommission: totals?.netSellerCommission ?? 0,
       netBuyerFee: totals?.netBuyerFee ?? 0,
       hasSellerCommission: pkg.orders.some(
@@ -248,6 +251,7 @@ export class ElogoIssuingService {
           doc.net,
           {
             lineItems: doc.lines,
+            sourceReference: basis.packageNumber,
             // Misafir siparişinde alıcının gerçek kimliği yalnız kargo
             // adresinde durur; satıcı tarafı için anlamsızdır.
             guestRecipient:
@@ -311,7 +315,7 @@ export class ElogoIssuingService {
       packageId,
       basis.sellerId,
       basis.netCommission,
-      { lineDescription: desc },
+      { lineDescription: desc, sourceReference: basis.packageNumber },
     );
   }
 
@@ -337,6 +341,7 @@ export class ElogoIssuingService {
       basis.netBuyerFee,
       {
         lineDescription: desc,
+        sourceReference: basis.packageNumber,
         guestRecipient: resolveGuestInvoiceRecipient(basis.shippingAddress),
       },
     );
@@ -356,6 +361,7 @@ export class ElogoIssuingService {
       select: {
         sellerId: true,
         buyerId: true,
+        orderNumber: true,
         totalAmount: true,
         checkoutGroupId: true,
         shippingAddress: true,
@@ -416,6 +422,9 @@ export class ElogoIssuingService {
         guestRecipient: resolveGuestInvoiceRecipient(order.shippingAddress),
         categoryId,
         lineItems,
+        // Ürün faturası SİPARİŞ anahtarlıdır (koli değil) — referansı da sipariş
+        // numarasıdır.
+        sourceReference: order.orderNumber,
       },
     );
   }

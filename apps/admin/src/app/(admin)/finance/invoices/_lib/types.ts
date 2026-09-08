@@ -13,6 +13,8 @@ export interface Invoice {
   documentTypeLabel: string;
   invoiceNumber: string | null;
   ettn: string | null;
+  /** Belgenin kaynağı — koli kodu (PKG-…) ya da sipariş numarası. */
+  sourceReference: string | null;
   recipientName: string | null;
   recipientVknTckn: string | null;
   netAmount: number;
@@ -148,6 +150,7 @@ export function mapInvoices(raw: any[]): Invoice[] {
     documentTypeLabel: r.documentTypeLabel,
     invoiceNumber: r.invoiceNumber,
     ettn: r.ettn,
+    sourceReference: r.sourceReference ?? null,
     recipientName: r.recipientName,
     recipientVknTckn: r.recipientVknTckn,
     netAmount: Number(r.netAmount || 0),

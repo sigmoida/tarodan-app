@@ -15,10 +15,14 @@ import {
  *  - **Ne kadarı kesilecek**: `base` iade ÖNCESİ matrah (kısmi iade oranının
  *    paydası), `net` iade DÜŞÜLMÜŞ matrah (belgeye yazılan). İkisini birlikte
  *    döndürmek zorunlu: iade faturası oranı orijinal matraha göre hesaplanır.
- *  - **Kalemler**: paketin her siparişi kendi satırını alır. KDV satır bazında
- *    yuvarlanır ve bu, checkout'un tahsil ederken yaptığı yuvarlamanın AYNISIDIR
- *    (`order-service-tax.helper.ts`); toplayıp sonra yuvarlamak beyanla tahsilat
- *    arasında kuruşluk fark bırakırdı.
+ *  - **Kalem**: belge TEK satırdır — hizmetin adı, 1 adet, paketin o hizmet için
+ *    doğan toplam bedeli. Fatura adedi ürün adedi değildir; iki ürünlük bir koli
+ *    de tek bir aracılık hizmeti almıştır.
+ *
+ * Satır tek olsa da **KDV sipariş bazında yuvarlanır** ve toplamı satıra açıkça
+ * yazılır (`InvoiceLineItem.taxAmount`): checkout tahsil ederken tam olarak böyle
+ * yuvarlıyor (`order-service-tax.helper.ts`). Birleşik matrah üzerinden yeniden
+ * yuvarlamak beyanla tahsilat arasında kuruşluk fark bırakırdı.
  */
 
 const round2 = (value: number): number =>
@@ -42,8 +46,6 @@ export interface PackageFeeLedgerRow {
 
 export interface PackageFeeOrderRow {
   id: string;
-  /** Fatura satırının adı çok siparişli pakette bu olur. */
-  productName: string;
   /** Kargo payları paketin YALNIZ bir siparişinde doludur (checkout kuralı). */
   buyerShippingAmount: number;
   sellerShippingAmount: number;
@@ -59,7 +61,7 @@ export interface PackageFeeDocument {
   base: number;
   /** İade düşülmüş matrah — belgeye yazılan tutar. */
   net: number;
-  /** Belgenin kalemleri; tek satırlıksa da doldurulur (KDV satır bazlı yuvarlanır). */
+  /** Belgenin kalemi — tek satır (matrah tamamı iade edilmişse boş). */
   lines: InvoiceLineItem[];
 }
 
@@ -119,25 +121,31 @@ export function buildPackageFeeDocuments(
     if (base <= 0) continue;
     const rows = all.filter((row) => row.net > 0);
 
-    // Tek satırlı belgede kalem adı hizmetin kendisidir; çok satırlıda hangi
-    // ürünün hizmeti olduğu görünmeli — belge paket başınadır ama alıcı/satıcı
-    // kalemin hangi üründen doğduğunu faturada görmek zorunda.
-    const multiple = rows.length > 1;
-    const lines: InvoiceLineItem[] = rows.map((row) => ({
-      name: multiple
-        ? row.order.productName.trim() || LINE_DESCRIPTION[spec.type]
-        : LINE_DESCRIPTION[spec.type],
-      quantity: 1,
-      net: round2(row.net),
-      unitPrice: round2(row.net),
-      vatRate: rate,
-    }));
+    // Belge tek satırdır: kalem adı hizmetin kendisidir, miktar 1. KDV ise
+    // sipariş sipariş yuvarlanıp toplanır ve satıra açıkça yazılır.
+    const net = round2(rows.reduce((sum, row) => sum + row.net, 0));
+    const taxAmount = round2(
+      rows.reduce((sum, row) => sum + round2((row.net * rate) / 100), 0),
+    );
+    const lines: InvoiceLineItem[] =
+      rows.length > 0
+        ? [
+            {
+              name: LINE_DESCRIPTION[spec.type],
+              quantity: 1,
+              net,
+              unitPrice: net,
+              vatRate: rate,
+              taxAmount,
+            },
+          ]
+        : [];
 
     documents.push({
       type: spec.type,
       side: spec.side,
       base,
-      net: round2(rows.reduce((sum, row) => sum + row.net, 0)),
+      net,
       lines,
     });
   }

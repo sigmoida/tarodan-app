@@ -11,6 +11,10 @@ import {
  * her belgenin matrahı TEK bir hizmetin bedelidir. Kalemleri tek belgede
  * toplamak (eski davranış) hangi hizmetin ne kadarının faturalandığını
  * belgeden okunamaz hale getiriyordu; kargo payı ise hiç faturalanmıyordu.
+ *
+ * Belge TEK satırdır (fatura adedi ürün adedi değildir) ama KDV hâlâ sipariş
+ * bazında yuvarlanıp satıra açıkça yazılır — tahsilatla beyanın kuruşu kuruşuna
+ * eşleşmesi buna bağlı.
  */
 
 const ledger = (over: Partial<PackageFeeOrderRow["ledger"]> = {}) => ({
@@ -28,7 +32,6 @@ const ledger = (over: Partial<PackageFeeOrderRow["ledger"]> = {}) => ({
 
 const order = (over: Partial<PackageFeeOrderRow> = {}): PackageFeeOrderRow => ({
   id: "o1",
-  productName: "Ürün 1",
   buyerShippingAmount: 0,
   sellerShippingAmount: 0,
   refundedBuyerShippingAmount: 0,
@@ -63,7 +66,7 @@ describe("buildPackageFeeDocuments", () => {
       "seller_shipping",
     ]);
     expect(docs.map((d) => d.net)).toEqual([5, 8, 40, 20, 12, 10]);
-    // Tek satırlı belgede kalem adı hizmetin kendisidir.
+    // Kalem adı hizmetin kendisidir; miktar her zaman 1 adettir.
     expect(docs[2].lines).toEqual([
       {
         name: "Kargo hizmet bedeli (alıcı payı)",
@@ -71,6 +74,7 @@ describe("buildPackageFeeDocuments", () => {
         net: 40,
         unitPrice: 40,
         vatRate: 20,
+        taxAmount: 8,
       },
     ]);
   });
@@ -83,29 +87,44 @@ describe("buildPackageFeeDocuments", () => {
     expect(docs.map((d) => d.type)).toEqual(["seller_commission"]);
   });
 
-  it("çok siparişli pakette matrahı toplar ve kalemleri ürün ürün satırlar", () => {
+  it("çok siparişli pakette matrahı TEK satırda toplar", () => {
     const docs = buildPackageFeeDocuments(
       [
-        order({
-          id: "o1",
-          productName: "Ürün 1",
-          ledger: ledger({ sellerCommissionAmount: 20 }),
-        }),
-        order({
-          id: "o2",
-          productName: "Ürün 2",
-          ledger: ledger({ sellerCommissionAmount: 30.55 }),
-        }),
+        order({ id: "o1", ledger: ledger({ sellerCommissionAmount: 20 }) }),
+        order({ id: "o2", ledger: ledger({ sellerCommissionAmount: 30.55 }) }),
       ],
       20,
     );
 
     const doc = docs.find((d) => d.type === "seller_commission")!;
     expect(doc.net).toBe(50.55);
-    expect(doc.lines.map((l) => [l.name, l.net])).toEqual([
-      ["Ürün 1", 20],
-      ["Ürün 2", 30.55],
+    expect(doc.lines).toEqual([
+      {
+        name: "Satıcı aracılık hizmet (komisyon) bedeli",
+        quantity: 1,
+        net: 50.55,
+        unitPrice: 50.55,
+        vatRate: 20,
+        taxAmount: 10.11,
+      },
     ]);
+  });
+
+  it("KDV'yi sipariş bazında yuvarlar — birleşik matrahtan hesaplamaz", () => {
+    // 12,53 × %20 = 2,506 → 2,51 ve 8,53 × %20 = 1,706 → 1,71 ⇒ 4,22.
+    // Birleşik matrahtan: 21,06 × %20 = 4,212 → 4,21. Aradaki kuruş, tahsil
+    // edilen KDV ile beyan edilen KDV'yi ayırırdı.
+    const docs = buildPackageFeeDocuments(
+      [
+        order({ id: "o1", ledger: ledger({ sellerCommissionAmount: 12.53 }) }),
+        order({ id: "o2", ledger: ledger({ sellerCommissionAmount: 8.53 }) }),
+      ],
+      20,
+    );
+
+    const doc = docs.find((d) => d.type === "seller_commission")!;
+    expect(doc.net).toBe(21.06);
+    expect(doc.lines[0].taxAmount).toBe(4.22);
   });
 
   it("kısmi iade matrahtan düşülür ama iade öncesi matrah korunur", () => {
@@ -152,7 +171,7 @@ describe("buildPackageFeeDocuments", () => {
       [order({ ledger: ledger({ sellerCommissionAmount: 20 }) })],
       0,
     );
-    expect(docs[0].lines[0].vatRate).toBe(0);
+    expect(docs[0].lines[0]).toMatchObject({ vatRate: 0, taxAmount: 0 });
   });
 });
 

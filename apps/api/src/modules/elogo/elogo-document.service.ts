@@ -326,6 +326,8 @@ export class ElogoDocumentService {
   async resolvePackageFeeBasis(packageId: string): Promise<{
     sellerId: string;
     buyerId: string;
+    /** Koli kodu — belgeye "Sipariş No" olarak basılır. */
+    packageNumber: string;
     componentBreakdownComplete: boolean;
     shippingAddress: unknown;
     documents: PackageFeeDocument[];
@@ -336,13 +338,13 @@ export class ElogoDocumentService {
         select: {
           sellerId: true,
           buyerId: true,
+          packageNumber: true,
           orders: {
             select: {
               id: true,
               shippingAddress: true,
               buyerShippingAmount: true,
               sellerShippingAmount: true,
-              product: { select: { title: true } },
               commissionLedger: {
                 select: {
                   componentBreakdownComplete: true,
@@ -380,7 +382,6 @@ export class ElogoDocumentService {
 
     const orders: PackageFeeOrderRow[] = pkg.orders.map((order) => ({
       id: order.id,
-      productName: order.product?.title ?? "",
       buyerShippingAmount: Number(order.buyerShippingAmount ?? 0),
       sellerShippingAmount: Number(order.sellerShippingAmount ?? 0),
       refundedBuyerShippingAmount:
@@ -424,6 +425,7 @@ export class ElogoDocumentService {
     return {
       sellerId: pkg.sellerId,
       buyerId: pkg.buyerId,
+      packageNumber: pkg.packageNumber,
       componentBreakdownComplete: hasCompleteComponentBreakdown(orders),
       shippingAddress: pkg.orders[0].shippingAddress,
       documents: buildPackageFeeDocuments(orders, vatRate),

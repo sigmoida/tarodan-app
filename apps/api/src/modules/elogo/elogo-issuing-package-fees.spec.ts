@@ -31,7 +31,11 @@ type CutArgs = [
   sourceId: string,
   recipientUserId: string,
   grossAmount: number,
-  opts?: { lineItems?: unknown; guestRecipient?: unknown },
+  opts?: {
+    lineItems?: unknown;
+    guestRecipient?: unknown;
+    sourceReference?: string | null;
+  },
 ];
 
 const ALL_SIX: PackageFeeDocument[] = [
@@ -70,6 +74,7 @@ function makeService(options: {
     resolvePackageFeeBasis: jest.fn(async () => ({
       sellerId: "s1",
       buyerId: "b1",
+      packageNumber: "PKG-000123",
       componentBreakdownComplete: options.componentBreakdownComplete ?? true,
       shippingAddress: null,
       documents: options.documents ?? ALL_SIX,
@@ -104,6 +109,16 @@ describe("ElogoIssuingService.issuePackageFeeInvoices", () => {
     ]);
     // Kalemler kesim anında snapshot'lanır: KDV satır bazında yuvarlanır.
     expect(cut.mock.calls[0][4]?.lineItems).toEqual(ALL_SIX[0].lines);
+  });
+
+  it("her belge koli kodunu taşır — faturada 'Sipariş No' olarak basılır", async () => {
+    const { service, cut } = makeService({});
+
+    await service.issuePackageFeeInvoices("pkg1");
+
+    expect(cut.mock.calls.map((c) => c[4]?.sourceReference)).toEqual(
+      Array(6).fill("PKG-000123"),
+    );
   });
 
   it("kesinti kırılımı olmayan pakette ücretler BİRLEŞİK kesilir, kargo yine kalem bazlı", async () => {

@@ -294,8 +294,19 @@ yerdedir: `modules/elogo/invoice/package-fee-components.ts`.
 
 - **Anahtar pakettir** (`sourceId = orderPackage.id`), sipariş değil: sepette
   aynı satıcıdan iki ürün alındığında `Order` iki tanedir ama gönderi, kargo
-  ücreti ve ticari ilişki tektir. Çok siparişli pakette kalemler ürün ürün
-  satırlanır, belge yine tektir.
+  ücreti ve ticari ilişki tektir.
+- **Belge TEK satırdır**: hizmetin adı, 1 adet, paketin o hizmet için doğan
+  toplam bedeli. Fatura adedi ürün adedi değildir. Satır tek olsa da KDV
+  SİPARİŞ bazında yuvarlanıp toplanır ve satıra açıkça yazılır
+  (`InvoiceLineItem.taxAmount`) — checkout tahsil ederken böyle yuvarlıyor
+  (`order-service-tax.helper.ts`), birleşik matrahtan yeniden hesaplamak beyanı
+  tahsilattan bir kuruş ayırabilirdi.
+- **Kaynak referansı** (`ElogoInvoice.sourceReference`) kesim anında
+  snapshot'lanır: paket belgelerinde koli kodu (`PKG-…`), ürün faturasında
+  sipariş numarası. Faturaya hem belge notuna hem kalemin
+  `cac:Item/cbc:Description`'ına "Sipariş No: …" olarak basılır; `sourceId` bir
+  UUID olduğu için belgede gösterilemezdi. **eLogo XSLT tasarımının** bu alanı
+  basması ayrı bir ayardır (`ELOGO_INVOICE_XSLT_UUID`).
 - **Sıfır matrah belge doğurmaz.** Bedeli doğmamış hizmet faturalanmaz.
 - **Tetik teslimattır** ve paketin TÜM siparişleri teslim olmadan hiçbiri
   kesilmez; belgeler sırayla kesilir (ortak numara sayacı, P2034).
