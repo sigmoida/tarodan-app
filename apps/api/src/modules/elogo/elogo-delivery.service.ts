@@ -385,11 +385,12 @@ export class ElogoDeliveryService {
       : "KAGIT";
     const desc =
       inv.lineDescription || LINE_DESCRIPTION[inv.type] || "Hizmet bedeli";
-    // "Açıklama: Sipariş No" — belge hangi koliden doğduğunu taşımak zorunda.
-    // Hem belge notuna hem kalemin açıklamasına yazılır: eLogo'nun XSLT tasarımı
-    // hangisini bastığına göre değişir, ikisinde de durması belgeyi bozmaz.
+    // "Kayıt No" — belgenin hangi alışverişten doğduğunu taşımak zorunda; aynı
+    // kod hakediş dökümünün "Kayıt No" kolonunda da durur. Hem belge notuna hem
+    // kalemin açıklamasına yazılır: eLogo'nun XSLT tasarımı hangisini bastığına
+    // göre değişir, ikisinde de durması belgeyi bozmaz.
     const orderNote = inv.sourceReference?.trim()
-      ? `Sipariş No: ${inv.sourceReference.trim()}`
+      ? `Kayıt No: ${inv.sourceReference.trim()}`
       : null;
 
     let billingRef: { invoiceId: string; issueDate: string } | undefined;

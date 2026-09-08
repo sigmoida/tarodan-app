@@ -8,6 +8,7 @@ import {
 } from "./invoice/package-fee-components";
 import { LINE_DESCRIPTION } from "./invoice/invoice-line-description";
 import { resolveGuestInvoiceRecipient } from "./invoice/elogo-guest-recipient";
+import { invoiceRecordReference } from "../../common/helpers/code-prefixes";
 import { ElogoDocumentService } from "./elogo-document.service";
 import { ElogoDeliveryService } from "./elogo-delivery.service";
 
@@ -251,7 +252,7 @@ export class ElogoIssuingService {
           doc.net,
           {
             lineItems: doc.lines,
-            sourceReference: basis.packageNumber,
+            sourceReference: invoiceRecordReference(basis.packageNumber),
             // Misafir siparişinde alıcının gerçek kimliği yalnız kargo
             // adresinde durur; satıcı tarafı için anlamsızdır.
             guestRecipient:
@@ -315,7 +316,10 @@ export class ElogoIssuingService {
       packageId,
       basis.sellerId,
       basis.netCommission,
-      { lineDescription: desc, sourceReference: basis.packageNumber },
+      {
+        lineDescription: desc,
+        sourceReference: invoiceRecordReference(basis.packageNumber),
+      },
     );
   }
 
@@ -341,7 +345,7 @@ export class ElogoIssuingService {
       basis.netBuyerFee,
       {
         lineDescription: desc,
-        sourceReference: basis.packageNumber,
+        sourceReference: invoiceRecordReference(basis.packageNumber),
         guestRecipient: resolveGuestInvoiceRecipient(basis.shippingAddress),
       },
     );
@@ -422,9 +426,9 @@ export class ElogoIssuingService {
         guestRecipient: resolveGuestInvoiceRecipient(order.shippingAddress),
         categoryId,
         lineItems,
-        // Ürün faturası SİPARİŞ anahtarlıdır (koli değil) — referansı da sipariş
-        // numarasıdır.
-        sourceReference: order.orderNumber,
+        // Ürün faturası SİPARİŞ anahtarlıdır (koli değil) — kayıt no da sipariş
+        // numarasının gövdesinden türetilir.
+        sourceReference: invoiceRecordReference(order.orderNumber),
       },
     );
   }

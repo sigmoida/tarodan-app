@@ -2,6 +2,7 @@ import {
   ENTITY_PREFIX,
   EXTERNAL_CODE_FORMATS,
   REFERENCE_PREFIX,
+  invoiceRecordReference,
   promoteUserCodeToCorporate,
 } from "./code-prefixes";
 import { generateReferenceCode } from "./generate-reference";
@@ -70,5 +71,19 @@ describe("code prefixes", () => {
     expect(generateReferenceCode(REFERENCE_PREFIX.order)).not.toMatch(
       entityPattern,
     );
+  });
+
+  describe("invoiceRecordReference", () => {
+    it("koli kodunun GÖVDESİNİ korur, yalnız öneki değiştirir", () => {
+      // Gövde aynı kaldığı için fatura ile koli gözle eşleşir; ayrı bir
+      // eşleme tablosu tutulmaz.
+      expect(invoiceRecordReference("PKG-K7X9M2QF3N")).toBe("KYT-K7X9M2QF3N");
+      expect(invoiceRecordReference("ORD-A1B2C3D4E5")).toBe("KYT-A1B2C3D4E5");
+    });
+
+    it("kaynağı olmayan belge referanssız kesilir", () => {
+      expect(invoiceRecordReference(null)).toBeNull();
+      expect(invoiceRecordReference("  ")).toBeNull();
+    });
   });
 });

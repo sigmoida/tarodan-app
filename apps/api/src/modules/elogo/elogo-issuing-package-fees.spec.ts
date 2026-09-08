@@ -74,7 +74,7 @@ function makeService(options: {
     resolvePackageFeeBasis: jest.fn(async () => ({
       sellerId: "s1",
       buyerId: "b1",
-      packageNumber: "PKG-000123",
+      packageNumber: "PKG-K7X9M2QF3N",
       componentBreakdownComplete: options.componentBreakdownComplete ?? true,
       shippingAddress: null,
       documents: options.documents ?? ALL_SIX,
@@ -111,13 +111,15 @@ describe("ElogoIssuingService.issuePackageFeeInvoices", () => {
     expect(cut.mock.calls[0][4]?.lineItems).toEqual(ALL_SIX[0].lines);
   });
 
-  it("her belge koli kodunu taşır — faturada 'Sipariş No' olarak basılır", async () => {
+  it("her belge KAYIT NO taşır — koli kodunun gövdesinden türetilir", async () => {
     const { service, cut } = makeService({});
 
     await service.issuePackageFeeInvoices("pkg1");
 
+    // PKG-K7X9M2QF3N → KYT-K7X9M2QF3N: gövde aynı, önek mali tarafın. Kargo
+    // takip numarası (PKG) mali belgenin üstünde durmaz.
     expect(cut.mock.calls.map((c) => c[4]?.sourceReference)).toEqual(
-      Array(6).fill("PKG-000123"),
+      Array(6).fill("KYT-K7X9M2QF3N"),
     );
   });
 

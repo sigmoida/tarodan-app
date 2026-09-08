@@ -301,11 +301,13 @@ yerdedir: `modules/elogo/invoice/package-fee-components.ts`.
   (`InvoiceLineItem.taxAmount`) — checkout tahsil ederken böyle yuvarlıyor
   (`order-service-tax.helper.ts`), birleşik matrahtan yeniden hesaplamak beyanı
   tahsilattan bir kuruş ayırabilirdi.
-- **Kaynak referansı** (`ElogoInvoice.sourceReference`) kesim anında
-  snapshot'lanır: paket belgelerinde koli kodu (`PKG-…`), ürün faturasında
-  sipariş numarası. Faturaya hem belge notuna hem kalemin
-  `cac:Item/cbc:Description`'ına "Sipariş No: …" olarak basılır; `sourceId` bir
-  UUID olduğu için belgede gösterilemezdi. **eLogo XSLT tasarımının** bu alanı
+- **Fatura kayıt no** (`ElogoInvoice.sourceReference`) kesim anında
+  snapshot'lanır: koli kodunun gövdesinden türetilen `KYT-…`
+  (`invoiceRecordReference`, bkz. CODE_SCHEME.md §2); ürün faturası sipariş
+  anahtarlı olduğu için sipariş numarasının gövdesinden türer. Faturaya hem
+  belge notuna hem kalemin `cac:Item/cbc:Description`'ına "Kayıt No: …" olarak
+  basılır ve hakediş dökümünün aynı adlı kolonunda durur; `sourceId` bir UUID
+  olduğu için belgede gösterilemezdi. **eLogo XSLT tasarımının** bu alanı
   basması ayrı bir ayardır (`ELOGO_INVOICE_XSLT_UUID`).
 - **Sıfır matrah belge doğurmaz.** Bedeli doğmamış hizmet faturalanmaz.
 - **Tetik teslimattır** ve paketin TÜM siparişleri teslim olmadan hiçbiri

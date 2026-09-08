@@ -38,20 +38,31 @@ Tümü `generateUniqueReference` ile üretilir: `randomInt` (CSPRNG), 30 harflik
 karışmaz alfabe (`0/O`, `1/I/L` ve `U` yok), 10 karakter, çakışmada 6 deneme,
 son güvence ilgili kolondaki `@unique`.
 
-| Önek  | İşlem                                                   |
-| ----- | ------------------------------------------------------- |
-| `ORD` | Sipariş satırı (bir üründen bir adet-grubu)             |
-| `GRP` | Sepet / ödeme grubu                                     |
-| `PKG` | Koli (satıcı paketi) — Sürat'a giden `OzelKargoTakipNo` |
-| `TKS` | Takas                                                   |
-| `RFD` | İade talebi                                             |
-| `TKT` | Destek talebi                                           |
-| `GST` | Misafir iletişim kaydı                                  |
-| `BST` | Öne çıkarma / vitrin siparişi                           |
-| `MEM` | Üyelik siparişi                                         |
-| `PYT` | Satıcıya para gönderimi — **tiresiz** (`PYTK7X9M2QF3N`) |
-| `SHP` | Kargo entegrasyonu kapalıyken yedek takip no            |
-| `VCH` | Hediye / kupon kodu (yönetici öneki geçersiz kılabilir) |
+| Önek  | İşlem                                                               |
+| ----- | ------------------------------------------------------------------- |
+| `ORD` | Sipariş satırı (bir üründen bir adet-grubu)                         |
+| `GRP` | Sepet / ödeme grubu                                                 |
+| `PKG` | Koli (satıcı paketi) — Sürat'a giden `OzelKargoTakipNo`             |
+| `KYT` | Fatura kayıt no — koli/sipariş referansından TÜRETİLİR (gövde aynı) |
+| `TKS` | Takas                                                               |
+| `RFD` | İade talebi                                                         |
+| `TKT` | Destek talebi                                                       |
+| `GST` | Misafir iletişim kaydı                                              |
+| `BST` | Öne çıkarma / vitrin siparişi                                       |
+| `MEM` | Üyelik siparişi                                                     |
+| `PYT` | Satıcıya para gönderimi — **tiresiz** (`PYTK7X9M2QF3N`)             |
+| `SHP` | Kargo entegrasyonu kapalıyken yedek takip no                        |
+| `VCH` | Hediye / kupon kodu (yönetici öneki geçersiz kılabilir)             |
+
+**KYT türetilir, üretilmez.** Bir alışverişten doğan tüm e-belgeler ortak bir
+referans taşır ve bu referans koli kodunun gövdesinden gelir:
+`PKG-K7X9M2QF3N` → `KYT-K7X9M2QF3N` (`invoiceRecordReference`). Ürün faturası
+sipariş anahtarlı olduğu için onunki sipariş numarasının gövdesinden türer.
+
+Neden ayrı bir önek: `PKG` aynı zamanda Sürat'a giden KARGO TAKİP numarasıdır ve
+müşteri kargosunu onunla sorgular — mali belgenin üstünde taşıyıcı referansı
+durmamalı. Gövde aynı kaldığı için iki kod gözle eşleşir, eşleme tablosu
+gerekmez. Fatura ve hakediş dökümü bu kodu "Kayıt No" olarak gösterir.
 
 **PYT istisnası:** PayTR Platform Transfer `trans_id` alanı yalnız harf/rakam
 kabul eder (≤60). Tireli `PYT-…` üretimde reddedildi; payout referansı bu
