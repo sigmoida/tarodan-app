@@ -45,6 +45,8 @@ export interface SettlementOrderInput {
   sellerShippingAmount: number;
   sellerServiceTaxAmount: number;
   withholdingTaxAmount: number;
+  /** Platform-fonlu kupon payı — hold yoksa nete geri eklenir. */
+  platformFundedDiscount: number;
   sellerId: string;
   sellerName: string;
   sellerCompanyName: string | null;
@@ -169,6 +171,7 @@ export function buildSettlementRow(order: SettlementOrderInput): SettlementRow {
             withholdingTaxAmount: num(order.withholdingTaxAmount),
             sellerShippingAmount: num(order.sellerShippingAmount),
             sellerServiceTaxAmount: num(order.sellerServiceTaxAmount),
+            platformFundedDiscount: num(order.platformFundedDiscount),
           }),
     withholdingTax: round2(num(order.withholdingTaxAmount)),
     maturityDays: settlementMaturityDays(order.deliveredAt, order.releaseAt),

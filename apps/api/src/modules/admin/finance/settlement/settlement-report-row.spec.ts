@@ -33,6 +33,7 @@ const order = (
   sellerShippingAmount: 60,
   sellerServiceTaxAmount: 33.98,
   withholdingTaxAmount: 9.99,
+  platformFundedDiscount: 0,
   sellerId: "s1",
   sellerName: "Toolstoy",
   sellerCompanyName: "SERHATLAR LTD ŞTİ",
