@@ -17,7 +17,12 @@ import {
  * iptal/red/return yollarında geçerlidir.
  */
 describe("takas iade politikası", () => {
-  const line = { totalAmount: 295, shippingAmount: 60, tradeFeeAmount: 35 };
+  const line = {
+    totalAmount: 295,
+    shippingAmount: 60,
+    tradeFeeAmount: 35,
+    fullRefundEntitled: false,
+  };
 
   describe("tradeRefundExcludesShipping", () => {
     it("hiçbir ürün kargoya verilmediyse kargo da iade edilir", () => {

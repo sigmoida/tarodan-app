@@ -6018,6 +6018,7 @@
           "boost": "Öne Çıkarma",
           "tradeCommission": "Takas Komisyonu",
           "tradeServiceFee": "Takas Hizmet Bedeli",
+          "tradeShipping": "Takas Kargo Bedeli",
           "platformSale": "Platform Satışı",
           "penalty": "Ceza Faturası",
           "returnInvoice": "İade Faturası"

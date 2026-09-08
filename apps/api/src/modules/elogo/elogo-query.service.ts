@@ -24,6 +24,7 @@ const INVOICE_DISPLAY_ORDER: readonly string[] = [
   "service_fee",
   "trade_commission",
   "trade_service_fee",
+  "trade_shipping",
   "return_invoice",
 ];
 

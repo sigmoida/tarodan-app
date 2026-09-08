@@ -6018,6 +6018,7 @@
           "boost": "Boost",
           "tradeCommission": "Trade Commission",
           "tradeServiceFee": "Trade Service Fee",
+          "tradeShipping": "Trade Shipping",
           "platformSale": "Platform Sale",
           "penalty": "Penalty Invoice",
           "returnInvoice": "Return Invoice"

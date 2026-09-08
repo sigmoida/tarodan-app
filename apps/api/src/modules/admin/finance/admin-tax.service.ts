@@ -41,6 +41,7 @@ export class AdminTaxService {
     boost: "Öne Çıkarma",
     trade_commission: "Takas Komisyonu",
     trade_service_fee: "Takas Hizmet Bedeli",
+    trade_shipping: "Takas Kargo Bedeli",
     platform_sale: "Platform Satışı",
     penalty: "Ceza Faturası",
     return_invoice: "İade Faturası",

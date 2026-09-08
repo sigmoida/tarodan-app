@@ -597,7 +597,7 @@ export class OrderSchedulerService implements OnModuleInit {
           },
         },
       },
-      select: { id: true },
+      select: { id: true, shippingAmount: true },
       // Sipariş tarafıyla aynı gerekçe: tamamlanan takaslar aday kümesinden hiç
       // çıkmadığı için sırasız pencere yeni takasları dışarıda bırakabiliyordu.
       orderBy: { updatedAt: "desc" },
@@ -605,20 +605,38 @@ export class OrderSchedulerService implements OnModuleInit {
     });
     let tradeInvoiced = 0;
     if (paidWarehouseTcps.length > 0) {
-      const invoicedTcp = new Set(
-        (
-          await this.prisma.elogoInvoice.findMany({
-            where: {
-              sourceId: { in: paidWarehouseTcps.map((c) => c.id) },
-              // v1 komisyon / v2 hizmet bedeli — ikisi de bu satırın faturasıdır.
-              type: { in: ["trade_commission", "trade_service_fee"] as any },
-            },
-            select: { sourceId: true },
-          })
-        ).map((i) => i.sourceId),
-      );
+      // Satırın BÜTÜN belgeleri sorulur: hizmet bedeli kesilip kargo belgesi
+      // kesilemediyse (`cut` hatayı yutar, "cron toparlar") yalnız bedele
+      // bakmak satırı sonsuza dek faturalanmış sayar ve kargo belgesi hiç
+      // doğmazdı.
+      const invoicedTypes = new Map<string, Set<string>>();
+      for (const inv of await this.prisma.elogoInvoice.findMany({
+        where: {
+          sourceId: { in: paidWarehouseTcps.map((c) => c.id) },
+          // v1 komisyon / v2 hizmet bedeli + ayrı kesilen kargo belgesi.
+          type: {
+            in: [
+              "trade_commission",
+              "trade_service_fee",
+              "trade_shipping",
+            ] as any,
+          },
+        },
+        select: { sourceId: true, type: true },
+      })) {
+        const types = invoicedTypes.get(inv.sourceId) ?? new Set<string>();
+        types.add(inv.type);
+        invoicedTypes.set(inv.sourceId, types);
+      }
       for (const c of paidWarehouseTcps) {
-        if (invoicedTcp.has(c.id)) continue;
+        const types = invoicedTypes.get(c.id);
+        const feeInvoiced =
+          !!types &&
+          (types.has("trade_commission") || types.has("trade_service_fee"));
+        const shippingInvoiced =
+          !(Number(c.shippingAmount ?? 0) > 0) ||
+          !!types?.has("trade_shipping");
+        if (feeInvoiced && shippingInvoiced) continue;
         try {
           await this.elogoInvoicing.issueTradeCashFeeInvoice(c.id);
           tradeInvoiced++;

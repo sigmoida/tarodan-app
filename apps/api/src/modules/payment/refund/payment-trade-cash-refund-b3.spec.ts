@@ -278,6 +278,27 @@ describe("PaymentService trade cash refund idempotency", () => {
     });
   });
 
+  it("queues the e-document reversal with the refund transaction", async () => {
+    // Takas kargosu artık faturalanıyor; kargolanmadan iptalde bedeli iade
+    // edilen belgenin ayakta bırakılması yanlış beyan olurdu. Ters kaydın
+    // KUYRUĞA ALINMASI iade tx'iyle atomiktir — hangi belgenin terslendiğine
+    // ElogoReversalService iade politikasını okuyarak karar verir.
+    mockPrisma.payment.findMany.mockResolvedValue([basePayment()]);
+    mockTx.refundAttempt.findUnique.mockResolvedValue(
+      refundAttempt(RefundAttemptStatus.succeeded),
+    );
+
+    await service.refundTradeCashPaymentIfCompleted(TRADE_ID);
+
+    expect(mockOutbox.enqueue).toHaveBeenCalledWith(
+      mockTx,
+      expect.objectContaining({
+        type: "invoice.trade_cash_refund_reverse",
+        payload: { tradeCashPaymentId: "tcp-1" },
+      }),
+    );
+  });
+
   it("treats an already-finalized attempt as an idempotent success", async () => {
     mockPrisma.payment.findMany.mockResolvedValue([basePayment()]);
     mockTx.refundAttempt.findUnique.mockResolvedValue(

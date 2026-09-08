@@ -17,6 +17,8 @@ import {
 import type { PackageFeeDocument } from "./invoice/package-fee-basis";
 import { retryOnWriteConflict } from "./helpers/elogo-write-conflict";
 import { refundRequestIdOf } from "./helpers/refund-request-key";
+import { tradeRefundExcludesShipping } from "../trade/helpers/trade-refund-policy";
+import { tradeHandedToCargo } from "../trade/helpers/trade-handed-to-cargo";
 import type { InvoiceRefundReversePayload } from "../outbox/outbox.types";
 import { ElogoService } from "./elogo.service";
 import { ElogoDocumentService } from "./elogo-document.service";
@@ -104,10 +106,51 @@ export class ElogoReversalService {
    * denenir — `reverseByKeys` var olmayan anahtarı sessizce atlar.
    */
   async handleTradeCashRefund(tradeCashPaymentId: string): Promise<void> {
-    await this.reverseByKeys([
-      { type: "trade_commission", sourceId: tradeCashPaymentId },
-      { type: "trade_service_fee", sourceId: tradeCashPaymentId },
-    ]);
+    await this.reverseByKeys(await this.tradeReversalKeys(tradeCashPaymentId));
+  }
+
+  /**
+   * Takas iadesinde HANGİ belgelerin terslendiği.
+   *
+   * Karar burada verilir, tutar üzerinden değil: takasta iade KALEM BAZLIDIR ve
+   * belgeler birbirinden bağımsız ayakta kalabilir (`trade-refund-policy.ts`
+   * tek kaynaktır). Sipariş tarafındaki gibi bir oran uygulanamaz.
+   *
+   *  - **Hizmet bedeli** hiçbir iptalde iade edilmez → belgesi ayakta kalır.
+   *    Tek istisna KUSURSUZ tarafın tam iadesidir (`fullRefundEntitled`):
+   *    orada bedel de geri verilir, belge de terslenir.
+   *  - **Kargo** yalnız fiilen kullanıldıysa (koli kargoya verildiyse) elde
+   *    kalır; kargolanmadan iptalde iade edilir ve belgesi terslenir.
+   *
+   * Para hiç iade edilmediyse hiçbir belgeye dokunulmaz.
+   */
+  private async tradeReversalKeys(
+    tradeCashPaymentId: string,
+  ): Promise<Array<{ type: string; sourceId: string }>> {
+    // Okuma hatası YUTULMAZ: `null`/`0`'a düşmek "iade edilmemiş" ya da
+    // "kargolanmamış" demek olur — ilki ters kaydı sessizce düşürür, ikincisi
+    // geçerli bir kargo belgesini geri alınamaz biçimde iptal ettirir. Hata
+    // yukarı taşınır, outbox yeniden dener.
+    const tcp = await this.prisma.tradeCashPayment.findUnique({
+      where: { id: tradeCashPaymentId },
+      select: { tradeId: true, refundedAt: true, fullRefundEntitled: true },
+    });
+    if (!tcp?.refundedAt) return [];
+
+    const key = (type: string) => ({ type, sourceId: tradeCashPaymentId });
+    if (tcp.fullRefundEntitled) {
+      return ["trade_commission", "trade_service_fee", "trade_shipping"].map(
+        key,
+      );
+    }
+
+    // Eşik iade yolununkiyle AYNI yardımcıdan okunur; ayrı hesaplanırsa iade
+    // edilen tutar ile ayakta kalan belge birbirinden sapar.
+    const handedToCargo = await tradeHandedToCargo(this.prisma, tcp.tradeId);
+    // Kargoya verildiyse hizmet tüketilmiştir → kargo belgesi de ayakta kalır.
+    return tradeRefundExcludesShipping(tcp, { handedToCargo })
+      ? []
+      : [key("trade_shipping")];
   }
 
   /**

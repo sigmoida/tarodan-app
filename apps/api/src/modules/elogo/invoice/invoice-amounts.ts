@@ -47,6 +47,10 @@ export const AMOUNT_BASIS_BY_TYPE: Record<
   // Takas hizmet bedeli (v2): admin kurala KDV DAHİL tutarı girer ve taraftan bu
   // tutar tahsil edilir — üstüne KDV EKLENMEZ, içinden ayrıştırılır.
   trade_service_fee: "gross",
+  // Takas kargosu da hizmet bedeliyle aynı yöndedir: takas toplamı
+  // (hizmet bedeli + kargo + fark) üstüne KDV EKLENMEDEN tahsil edilir,
+  // dolayısıyla saklanan tutar KDV DAHİLDİR ve vergi içinden ayrıştırılır.
+  trade_shipping: "gross",
   // İade faturası kaynak faturanın tutarını terslediği için onun matrahını izler;
   // pratikte `repriceUnsentInvoice`/refund yolu kendi kaynağından hesaplar.
   return_invoice: "gross",

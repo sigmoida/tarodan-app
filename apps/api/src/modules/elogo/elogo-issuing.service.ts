@@ -692,26 +692,52 @@ export class ElogoIssuingService {
   async issueTradeCashFeeInvoice(tradeCashPaymentId: string): Promise<void> {
     const tcp = await this.prisma.tradeCashPayment.findUnique({
       where: { id: tradeCashPaymentId },
-      select: { payerId: true, commission: true, tradeFeeAmount: true },
+      select: {
+        payerId: true,
+        commission: true,
+        tradeFeeAmount: true,
+        shippingAmount: true,
+        trade: { select: { tradeNumber: true } },
+      },
     });
     if (!tcp) return;
+    const sourceReference =
+      invoiceRecordReference(tcp.trade?.tradeNumber) ?? undefined;
+
+    // HİZMET BEDELİ: v2 sabit ücret, yoksa v1 yüzde komisyonu (ikisi bir arada
+    // olmaz — biri doluysa öteki 0'dır).
     const tradeFee = Number(tcp.tradeFeeAmount ?? 0);
+    const commission = Number(tcp.commission ?? 0);
     if (tradeFee > 0) {
       await this.delivery.cut(
         "trade_service_fee",
         tradeCashPaymentId,
         tcp.payerId,
         tradeFee,
+        { sourceReference },
       );
-      return;
-    }
-    const commission = Number(tcp.commission ?? 0);
-    if (commission > 0) {
+    } else if (commission > 0) {
       await this.delivery.cut(
         "trade_commission",
         tradeCashPaymentId,
         tcp.payerId,
         commission,
+        { sourceReference },
+      );
+    }
+
+    // KARGO: tarafın 2 bacaklık payı. Tahsil ediliyordu ama hiç
+    // faturalanmıyordu — satıştaki kargo payı eksikliğinin takas karşılığı.
+    // Hizmet bedelinden AYRI belgedir: iade yolları farklı (bedel hiçbir
+    // iptalde iade edilmez, kargo kargolanmamış iptalde iade edilir).
+    const shipping = Number(tcp.shippingAmount ?? 0);
+    if (shipping > 0) {
+      await this.delivery.cut(
+        "trade_shipping",
+        tradeCashPaymentId,
+        tcp.payerId,
+        shipping,
+        { sourceReference },
       );
     }
   }

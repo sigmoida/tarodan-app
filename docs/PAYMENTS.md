@@ -263,7 +263,20 @@ kargo platformda kalır. Payout yalnız fark taşıyan satır için üretilir. D
 fark `seller_escrow`, ücret `platform_commission`, kargo `shipping_income`
 (gelir değil, taşıyıcıya geçiş kalemi) hesabına düşer. Fatura taraf başına
 kesilir: v2 satırı `trade_service_fee` (KDV **dahil**, içinden ayrıştırılır),
-v1 satırı `trade_commission` (KDV hariç matrah).
+v1 satırı `trade_commission` (KDV hariç matrah). **Kargo payı da ayrı bir belge
+alır** (`trade_shipping`, o da KDV dahil): takas toplamının üstüne KDV
+EKLENMEDİĞİ için tahsil edilen tutar KDV dahildir. Ayrı belge olmasının nedeni
+iade yollarının AYRIŞMASIdır — bedel hiçbir iptalde iade edilmez, kargo
+kargolanmamış iptalde iade edilir.
+
+**Belgelerin ters kaydı** iade tx'iyle atomik olarak kuyruğa alınır
+(`invoice.trade_cash_refund_reverse`) ve hangi belgenin terslendiğine
+`ElogoReversalService.tradeReversalKeys` karar verir; kural yine
+`trade-refund-policy.ts`'tir: hizmet bedeli yalnız KUSURSUZ tarafın tam
+iadesinde (`fullRefundEntitled`), kargo ise koli yola çıkmadıysa terslenir.
+Eskiden ters kayıt hiç kuyruğa alınmıyordu ("iade edilen kısım faturalanan
+hizmet bedeli değil" gerekçesiyle); kargo faturalanınca bu gerekçe geçersiz
+kaldı.
 
 **v1 takaslar** eski kuralla biter: ayrım tek yerde, `Trade.pricingVersion`
 alanındadır.
@@ -350,7 +363,7 @@ değil, ters kayıttan SONRA ayakta kalan `seller_shipping` belgesinden okunur.
 
 Diğer türler: `platform_sale` (Tarodan kendi ürününü satarken, alıcıya kalem
 kalem ürün faturası), `membership`, `boost`, `trade_service_fee` /
-`trade_commission` (§8), `return_invoice`.
+`trade_shipping` / `trade_commission` (§8), `return_invoice`.
 
 ### Satıcı hakediş dökümü
 
