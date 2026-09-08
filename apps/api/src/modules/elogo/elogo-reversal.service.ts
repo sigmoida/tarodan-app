@@ -18,6 +18,7 @@ import type { PackageFeeDocument } from "./invoice/package-fee-basis";
 import { retryOnWriteConflict } from "./helpers/elogo-write-conflict";
 import { refundRequestIdOf } from "./helpers/refund-request-key";
 import { tradeRefundExcludesShipping } from "../trade/helpers/trade-refund-policy";
+import { tradeHandedToCargo } from "../trade/helpers/trade-handed-to-cargo";
 import type { InvoiceRefundReversePayload } from "../outbox/outbox.types";
 import { ElogoService } from "./elogo.service";
 import { ElogoDocumentService } from "./elogo-document.service";
@@ -126,12 +127,14 @@ export class ElogoReversalService {
   private async tradeReversalKeys(
     tradeCashPaymentId: string,
   ): Promise<Array<{ type: string; sourceId: string }>> {
-    const tcp = await this.prisma.tradeCashPayment
-      .findUnique({
-        where: { id: tradeCashPaymentId },
-        select: { tradeId: true, refundedAt: true, fullRefundEntitled: true },
-      })
-      .catch(() => null);
+    // Okuma hatası YUTULMAZ: `null`/`0`'a düşmek "iade edilmemiş" ya da
+    // "kargolanmamış" demek olur — ilki ters kaydı sessizce düşürür, ikincisi
+    // geçerli bir kargo belgesini geri alınamaz biçimde iptal ettirir. Hata
+    // yukarı taşınır, outbox yeniden dener.
+    const tcp = await this.prisma.tradeCashPayment.findUnique({
+      where: { id: tradeCashPaymentId },
+      select: { tradeId: true, refundedAt: true, fullRefundEntitled: true },
+    });
     if (!tcp?.refundedAt) return [];
 
     const key = (type: string) => ({ type, sourceId: tradeCashPaymentId });
@@ -141,18 +144,9 @@ export class ElogoReversalService {
       );
     }
 
-    const [trade, shippedCount] = await Promise.all([
-      this.prisma.trade
-        .findUnique({
-          where: { id: tcp.tradeId },
-          select: { firstWarehouseArrivalAt: true },
-        })
-        .catch(() => null),
-      this.prisma.tradeShipment
-        .count({ where: { tradeId: tcp.tradeId, shippedAt: { not: null } } })
-        .catch(() => 0),
-    ]);
-    const handedToCargo = !!trade?.firstWarehouseArrivalAt || shippedCount > 0;
+    // Eşik iade yolununkiyle AYNI yardımcıdan okunur; ayrı hesaplanırsa iade
+    // edilen tutar ile ayakta kalan belge birbirinden sapar.
+    const handedToCargo = await tradeHandedToCargo(this.prisma, tcp.tradeId);
     // Kargoya verildiyse hizmet tüketilmiştir → kargo belgesi de ayakta kalır.
     return tradeRefundExcludesShipping(tcp, { handedToCargo })
       ? []

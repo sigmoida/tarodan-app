@@ -24,6 +24,7 @@ import {
   RefundPendingReconciliationException,
 } from "../../payment-providers/refund-errors";
 import { tradePaymentRefundableAmountFor } from "../../trade/helpers/trade-refund-policy";
+import { tradeHandedToCargo } from "../../trade/helpers/trade-handed-to-cargo";
 import { isProduction } from "../../../config/environment";
 import { PaymentRefundAttemptService } from "./payment-refund-attempt.service";
 import { OutboxService } from "../../outbox/outbox.service";
@@ -125,7 +126,7 @@ export class PaymentTradeRefundService {
       return { refunded: false, skippedReason: "no_completed_paytr_payment" };
     }
 
-    const handedToCargo = await this.tradeHandedToCargo(tradeId);
+    const handedToCargo = await tradeHandedToCargo(this.prisma, tradeId);
 
     let refundedPaymentId: string | undefined;
     let skippedReason: string | undefined;
@@ -175,24 +176,6 @@ export class PaymentTradeRefundService {
           refunded: false,
           skippedReason: skippedReason ?? "nothing_refundable",
         };
-  }
-
-  /**
-   * Takasın herhangi bir bacağı kargoya verildi mi — iade matrisinin eşiği.
-   * Kullanıcı iptal kilidiyle AYNI ölçüt (`computeTradeCanCancel`): gönderi
-   * `shippedAt` aldıysa ya da depoya varış damgalandıysa kargo tüketilmiştir.
-   */
-  private async tradeHandedToCargo(tradeId: string): Promise<boolean> {
-    const [trade, shippedCount] = await Promise.all([
-      this.prisma.trade.findUnique({
-        where: { id: tradeId },
-        select: { firstWarehouseArrivalAt: true },
-      }),
-      this.prisma.tradeShipment.count({
-        where: { tradeId, shippedAt: { not: null } },
-      }),
-    ]);
-    return !!trade?.firstWarehouseArrivalAt || shippedCount > 0;
   }
 
   /** Tek bir takas ödemesinin PayTR iadesi (tutar çağırandan gelir). */
@@ -433,7 +416,7 @@ export class PaymentTradeRefundService {
             // ayakta bırakılamaz. Hangi belgenin ne kadar terslendiğine
             // ElogoReversalService karar verir (iade politikasını okur); burası
             // yalnız "para geri döndü" sinyalini dayanıklı biçimde iletir.
-            if (this.outbox && payment.tradeCashPaymentId) {
+            if (this.outbox) {
               await this.outbox.enqueue(tx, {
                 type: OUTBOX_INVOICE_TRADE_CASH_REFUND_REVERSE,
                 payload: {
