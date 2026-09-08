@@ -115,14 +115,14 @@ const COLUMNS: Column[] = [
     key: "platformEarning",
     width: 18,
     format: "money",
-    note: "Satıcıdan yapılan kesinti: satıcı komisyonu + platform hizmet bedeli (KDV hariç). Alıcıdan alınan komisyon/koruma bedeli buraya GİRMEZ.",
+    note: "Satıcıdan yapılan kesinti: satıcı komisyonu + platform hizmet bedeli (KDV hariç), İADE DÜŞÜLMÜŞ. İade edilen sipariş 0'a iner; iade tahsil edileni aşarsa tutar eksiye döner. Alıcıdan alınan komisyon/koruma bedeli buraya GİRMEZ.",
   },
   {
     header: "Satıcı Hakedişi",
     key: "sellerEarning",
     width: 18,
     format: "money",
-    note: "Satıcıya ödenen net tutar: ürün bedeli − satıcı ücretleri − hizmet KDV'si − stopaj − satıcı kargo payı.",
+    note: "Satıcıya ödenen net tutar (escrow'da ayrılan, iade düşülmüş): ürün bedeli − satıcı ücretleri − hizmet KDV'si − stopaj − satıcı kargo payı, varsa platform-fonlu kupon payı eklenmiş.",
   },
   {
     header: "Stopaj",
@@ -245,7 +245,11 @@ export class SettlementReportWorkbookService {
     });
     sheet.addRow({
       header: "Tutarlar",
-      note: "Aksi belirtilmedikçe KDV hariçtir.",
+      note: "Aksi belirtilmedikçe KDV hariçtir ve iade düşülmüştür; kolonun toplamı doğrudan alınabilir.",
+    });
+    sheet.addRow({
+      header: "Kapsam",
+      note: "Dönemin TÜM satırları yazılır, dosya kesilmez.",
     });
   }
 }

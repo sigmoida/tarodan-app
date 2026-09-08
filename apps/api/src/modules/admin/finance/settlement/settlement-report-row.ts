@@ -33,6 +33,15 @@ export interface SettlementOrderInput {
   sellerFeeAmount: number;
   sellerCommissionAmount: number;
   sellerPlatformFeeAmount: number;
+  /** Kesinti defterinden kümülatif iadeler — hakediş ve kesinti bunlarla netleşir. */
+  refundedSellerCommissionAmount: number;
+  refundedSellerPlatformFeeAmount: number;
+  /**
+   * Escrow hold'unda satıcıya ayrılan ve HÂLÂ duran para (iade düşülmüş).
+   * Varsa hakediş buradan okunur: hold gerçekten ayrılan tutardır, platform-fonlu
+   * kupon payını içerir ve iadeyi düşer. Yoksa formüle düşülür.
+   */
+  heldNet: number | null;
   sellerShippingAmount: number;
   sellerServiceTaxAmount: number;
   withholdingTaxAmount: number;
@@ -111,6 +120,17 @@ export function settlementMaturityDays(
 export function buildSettlementRow(order: SettlementOrderInput): SettlementRow {
   const subtotal = num(order.subtotal);
   const sellerCommission = num(order.sellerCommissionAmount);
+  // İADE DÜŞÜLMÜŞ kesinti: dönem içinde teslim edilip iade edilen sipariş,
+  // kolonu şişirmeden satırda kalır. Tamamı iade edilmişse kesinti 0'a iner
+  // (kusurlu tarafta platformda kalan hizmet bedeli kadarı durur); platformun
+  // iade ettiği kesinti tahsil ettiğini aşarsa tutar EKSİYE döner — işaret
+  // aritmetikten doğar, satıra sonradan basılmaz.
+  const netPlatformEarning = round2(
+    sellerCommission -
+      num(order.refundedSellerCommissionAmount) +
+      num(order.sellerPlatformFeeAmount) -
+      num(order.refundedSellerPlatformFeeAmount),
+  );
 
   return {
     // Kayıt no, FATURALARIN üstünde yazanla birebir aynı olmalı: müşavir dökümü
@@ -134,18 +154,22 @@ export function buildSettlementRow(order: SettlementOrderInput): SettlementRow {
     // Oran sipariş üzerinde saklanmıyor; tahsil edilen tutardan geri hesaplanır.
     commissionRate:
       subtotal > 0 ? round2((sellerCommission / subtotal) * 100) : null,
-    platformEarning: round2(
-      sellerCommission + num(order.sellerPlatformFeeAmount),
-    ),
-    sellerEarning: sellerNetAmountOf({
-      subtotal,
-      // Ürün KDV'si varsayılan olarak kapalı; açıldığında sipariş kolonundan gelir.
-      productTaxAmount: 0,
-      sellerFeeAmount: num(order.sellerFeeAmount),
-      withholdingTaxAmount: num(order.withholdingTaxAmount),
-      sellerShippingAmount: num(order.sellerShippingAmount),
-      sellerServiceTaxAmount: num(order.sellerServiceTaxAmount),
-    }),
+    platformEarning: netPlatformEarning,
+    // Hakediş önce ESCROW'dan okunur: hold satıcıya gerçekten ayrılan paradır
+    // ve iadeyi düşer. Hold yoksa (eski/sanal sipariş) payout'la aynı formüle
+    // düşülür — iki yol da aynı sayıyı vermek zorunda.
+    sellerEarning:
+      order.heldNet != null
+        ? round2(order.heldNet)
+        : sellerNetAmountOf({
+            subtotal,
+            // Ürün KDV'si varsayılan olarak kapalı; açıldığında sipariş kolonundan gelir.
+            productTaxAmount: 0,
+            sellerFeeAmount: num(order.sellerFeeAmount),
+            withholdingTaxAmount: num(order.withholdingTaxAmount),
+            sellerShippingAmount: num(order.sellerShippingAmount),
+            sellerServiceTaxAmount: num(order.sellerServiceTaxAmount),
+          }),
     withholdingTax: round2(num(order.withholdingTaxAmount)),
     maturityDays: settlementMaturityDays(order.deliveredAt, order.releaseAt),
     deliveredAt: order.deliveredAt,

@@ -27,6 +27,9 @@ const order = (
   sellerFeeAmount: 109.89,
   sellerCommissionAmount: 59.94,
   sellerPlatformFeeAmount: 49.95,
+  refundedSellerCommissionAmount: 0,
+  refundedSellerPlatformFeeAmount: 0,
+  heldNet: null,
   sellerShippingAmount: 60,
   sellerServiceTaxAmount: 33.98,
   withholdingTaxAmount: 9.99,
@@ -90,6 +93,41 @@ describe("buildSettlementRow", () => {
       buildSettlementRow(order({ subtotal: 0 })).commissionRate,
     ).toBeNull();
   });
+});
+
+it("iade edilen kesinti tutardan DÜŞÜLÜR — iade satırı kolonu şişirmez", () => {
+  // Tamamı iade edilmiş komisyon, platformda kalan hizmet bedeli duruyor.
+  const row = buildSettlementRow(
+    order({
+      cancellationType: "iade",
+      refundedSellerCommissionAmount: 59.94,
+    }),
+  );
+  expect(row.transactionType).toBe("İade");
+  expect(row.platformEarning).toBe(49.95);
+});
+
+it("iade tahsil edileni aşarsa tutar EKSİYE döner", () => {
+  const row = buildSettlementRow(
+    order({
+      cancellationType: "iade",
+      refundedSellerCommissionAmount: 59.94,
+      refundedSellerPlatformFeeAmount: 59.95,
+    }),
+  );
+  expect(row.platformEarning).toBe(-10);
+});
+
+it("hakediş escrow hold'undan okunur — platform-fonlu kupon ve iade dahil", () => {
+  // Hold satıcıya gerçekten ayrılan paradır; formül platform-fonlu kupon
+  // payını görmez, hold görür.
+  expect(buildSettlementRow(order({ heldNet: 885.14 })).sellerEarning).toBe(
+    885.14,
+  );
+});
+
+it("hold yoksa payout formülüne düşer", () => {
+  expect(buildSettlementRow(order()).sellerEarning).toBe(785.14);
 });
 
 describe("settlementTransactionType", () => {

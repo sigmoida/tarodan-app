@@ -23,8 +23,15 @@ import {
  * edilmemiş sipariş dökümde yer almaz — henüz faturalanacak bir şey yoktur.
  */
 
-/** Excel'e tek seferde yazılacak azami satır; üstü sayfalı uçtan okunur. */
-export const SETTLEMENT_EXPORT_MAX_ROWS = 20_000;
+/**
+ * Excel için veritabanından TEK SEFERDE okunacak satır sayısı.
+ *
+ * Tavan değil SAYFA BOYUDUR: `rows()` bu boyutta sayfalar hâlinde okur ve
+ * dosyaya satırların tamamı yazılır. Sabit bir tavan, dönemi geniş seçen
+ * kullanıcıya sessizce eksik döküm verirdi — beyana eksik dayanak gitmesi
+ * demek.
+ */
+export const SETTLEMENT_EXPORT_PAGE_SIZE = 2_000;
 
 /** Ekranda görünen her kolon aranabilir olmalı (#381 tam-içerik araması). */
 const SEARCH_FIELDS = [
@@ -81,6 +88,13 @@ const SELECT = {
   sellerId: true,
   buyerId: true,
   shippingAddress: true,
+  // İade netleştirmesi kesinti defterinin kümülatif iade kolonlarından okunur.
+  commissionLedger: {
+    select: {
+      refundedSellerCommissionAmount: true,
+      refundedSellerPlatformFeeAmount: true,
+    },
+  },
   package: { select: { packageNumber: true } },
   payment: { select: { paidAt: true } },
   seller: { select: { displayName: true, companyName: true } },
@@ -105,15 +119,30 @@ export class SettlementReportService {
     return { ...result, data: await this.rowsOf(orders) };
   }
 
-  /** Excel için TÜM satırlar (tavana kadar) — sayfalama yok. */
+  /**
+   * Excel için dönemin TÜM satırları — sayfa sayfa okunur, kesilmez.
+   *
+   * Sıralama benzersiz değildir (aynı anda teslim edilmiş iki sipariş olabilir),
+   * bu yüzden sayfalama `id` ile ikinci bir anahtara bağlanır; aksi halde sayfa
+   * sınırında satır atlanabilir ya da tekrarlanabilirdi.
+   */
   async rows(query: SettlementReportQueryDto): Promise<SettlementRow[]> {
-    const orders = await this.prisma.order.findMany({
-      where: this.whereOf(query),
-      orderBy: this.orderByOf(query),
-      select: SELECT,
-      take: SETTLEMENT_EXPORT_MAX_ROWS,
-    });
-    return this.rowsOf(orders);
+    const where = this.whereOf(query);
+    const orderBy = [this.orderByOf(query), { id: "asc" as const }];
+    const rows: SettlementRow[] = [];
+    for (let skip = 0; ; skip += SETTLEMENT_EXPORT_PAGE_SIZE) {
+      const orders = await this.prisma.order.findMany({
+        where,
+        orderBy,
+        select: SELECT,
+        skip,
+        take: SETTLEMENT_EXPORT_PAGE_SIZE,
+      });
+      if (orders.length === 0) break;
+      rows.push(...(await this.rowsOf(orders)));
+      if (orders.length < SETTLEMENT_EXPORT_PAGE_SIZE) break;
+    }
+    return rows;
   }
 
   /**
@@ -127,13 +156,30 @@ export class SettlementReportService {
           // Bir sipariş ödeme tekrarında birden fazla hold taşıyabilir
           // (`@@unique([paymentId, orderId])`); vade EN SON hold'undur.
           orderBy: { createdAt: "asc" },
-          select: { orderId: true, releaseAt: true },
+          select: {
+            orderId: true,
+            releaseAt: true,
+            amount: true,
+            refundedAmount: true,
+          },
         })
       : [];
-    const releaseByOrder = new Map(
-      holds.map((h) => [h.orderId, h.releaseAt ?? null]),
-    );
-    return orders.map((o) => this.rowOf(o, releaseByOrder.get(o.id) ?? null));
+    const holdByOrder = new Map(holds.map((h) => [h.orderId, h]));
+    return orders.map((o) => {
+      const hold = holdByOrder.get(o.id);
+      return this.rowOf(o, {
+        releaseAt: hold?.releaseAt ?? null,
+        // Escrow hold'u satıcıya GERÇEKTEN ayrılan paradır: platform-fonlu
+        // kupon payını içerir ve iade edilen kısmı `refundedAmount`'ta taşır.
+        // Hold yoksa (eski/sanal sipariş) satır formüle düşer.
+        heldNet: hold
+          ? Math.max(
+              0,
+              Number(hold.amount ?? 0) - Number(hold.refundedAmount ?? 0),
+            )
+          : null,
+      });
+    });
   }
 
   private orderByOf(
@@ -156,7 +202,10 @@ export class SettlementReportService {
     return search ? { ...where, ...search } : where;
   }
 
-  private rowOf(order: SettlementOrder, releaseAt: Date | null): SettlementRow {
+  private rowOf(
+    order: SettlementOrder,
+    escrow: { releaseAt: Date | null; heldNet: number | null },
+  ): SettlementRow {
     return buildSettlementRow({
       orderNumber: order.orderNumber,
       packageNumber: order.package?.packageNumber ?? null,
@@ -165,7 +214,8 @@ export class SettlementReportService {
       createdAt: order.createdAt,
       paidAt: order.payment?.paidAt ?? null,
       deliveredAt: order.deliveredAt,
-      releaseAt,
+      releaseAt: escrow.releaseAt,
+      heldNet: escrow.heldNet,
       quantity: order.quantity,
       // Ürün tabanı ORTAK helper'dan — payout ile aynı sayı. Ham `subtotal`
       // okunsaydı kolonu yazılmamış eski siparişte hakediş 0 görünürdü.
@@ -173,6 +223,12 @@ export class SettlementReportService {
       sellerFeeAmount: Number(order.sellerFeeAmount),
       sellerCommissionAmount: Number(order.sellerCommissionAmount),
       sellerPlatformFeeAmount: Number(order.sellerPlatformFeeAmount),
+      refundedSellerCommissionAmount: Number(
+        order.commissionLedger?.refundedSellerCommissionAmount ?? 0,
+      ),
+      refundedSellerPlatformFeeAmount: Number(
+        order.commissionLedger?.refundedSellerPlatformFeeAmount ?? 0,
+      ),
       sellerShippingAmount: Number(order.sellerShippingAmount),
       sellerServiceTaxAmount: Number(order.sellerServiceTaxAmount),
       withholdingTaxAmount: Number(order.withholdingTaxAmount),

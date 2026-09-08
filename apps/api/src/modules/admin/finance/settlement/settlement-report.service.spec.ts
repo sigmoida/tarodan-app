@@ -62,12 +62,17 @@ describe("SettlementReportService — dönem/arama/sıralama", () => {
       sortBy: "recordNo",
       sortOrder: "asc",
     } as never);
-    expect(captured.orderBy).toEqual({ package: { packageNumber: "asc" } });
+    // Sayfalı export'ta sıralama `id` ile bağlanır: benzersiz olmayan bir
+    // sıralamada sayfa sınırında satır atlanır ya da tekrarlanırdı.
+    expect(captured.orderBy).toEqual([
+      { package: { packageNumber: "asc" } },
+      { id: "asc" },
+    ]);
   });
 
   it("bilinmeyen sıralama anahtarı teslimat tarihine düşer", async () => {
     const captured: Captured = {};
     await serviceWith(captured).rows({ sortBy: "yok" } as never);
-    expect(captured.orderBy).toEqual({ deliveredAt: "desc" });
+    expect(captured.orderBy).toEqual([{ deliveredAt: "desc" }, { id: "asc" }]);
   });
 });
