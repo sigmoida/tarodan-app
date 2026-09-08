@@ -63,6 +63,7 @@ export class AdminFinanceService {
       // (iade kilidi dahil — admin bakmalı).
       this.prisma.paymentHold.count({
         where: {
+          payment: { isTest: false },
           status: PaymentHoldStatus.held,
           releaseAt: { not: null, lte: now },
         },
@@ -70,6 +71,7 @@ export class AdminFinanceService {
       // order-scheduler'ın ORDERS_DELIVERED_UNINVOICED alarmıyla aynı küme.
       this.prisma.order.count({
         where: {
+          isTest: false,
           status: { in: [OrderStatus.delivered, OrderStatus.completed] },
           commissionLedger: { isNot: null },
           revenueInvoicedAt: null,

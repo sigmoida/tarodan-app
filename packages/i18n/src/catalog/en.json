@@ -4822,7 +4822,38 @@
         "cronResultFailed": "Job failed: {reason}",
         "cronResultPending": "Job still running — follow the result in the Bull history",
         "cronResultRunning": "Job running…",
-        "cronResultNotFound": "The job record was trimmed from the queue history — it most likely completed; the result is no longer viewable"
+        "cronResultNotFound": "The job record was trimmed from the queue history — it most likely completed; the result is no longer viewable",
+        "lane": {
+          "title": "Test Lane — Live Test Accounts",
+          "description": "Isolated accounts on production for store review and mobile QA. Test accounts only see each other; their listings stay out of the storefront and their orders/payments/trades out of finance reports. Payments open in PayTR test mode; no shipment or e-invoice is produced.",
+          "accountsEmpty": "No test accounts yet.",
+          "createTitle": "New test account",
+          "email": "Email",
+          "password": "Password",
+          "displayName": "Display name",
+          "phone": "Phone (optional)",
+          "isSeller": "Open as seller (can create listings)",
+          "create": "Create account",
+          "created": "Test account created: {email}",
+          "createFailed": "Could not create the test account",
+          "reset": "Reset lane",
+          "resetConfirmTitle": "Reset the test lane?",
+          "resetConfirmDescription": "All orders, payments, trades, offers, refunds and carts of the test accounts are deleted. Accounts and listings stay; sold listings go back on sale. Live data is not touched.",
+          "resetDone": "Lane reset: {accounts} accounts, {orders} orders deleted",
+          "resetFailed": "Could not reset the lane",
+          "buyer": "Buyer",
+          "seller": "Seller",
+          "columns": {
+            "code": "Code",
+            "email": "Email",
+            "name": "Name",
+            "role": "Role",
+            "orders": "Orders",
+            "listings": "Listings",
+            "createdAt": "Created"
+          },
+          "reviewHint": "Put the buyer account email and password in the App Store / Play review notes and add \"payments run in test mode, no charge is made\"."
+        }
       },
       "media": {
         "title": "Media",
@@ -7883,7 +7914,11 @@
       "bulkResendQueuedPartial": "{ok} queued, {failed} failed",
       "bulkResendConfirmDesc": "Activation e-mails are sent from the background queue; track the outcome in the e-mail logs. Ineligible rows are skipped. Continue?",
       "filterLoginStateAll": "All Login States",
-      "filterLoggedIn": "Logged In"
+      "filterLoggedIn": "Logged In",
+      "testAccount": "Test account",
+      "testAccountHint": "Test lane: never mixes with live data",
+      "testAccountOnly": "Test accounts only",
+      "liveAccountsOnly": "Real accounts only"
     },
     "roles": {
       "title": "Roles & Permissions",
@@ -8518,7 +8553,8 @@
           "action": "Action",
           "entityType": "Entity type",
           "shipmentLeg": "Shipment leg",
-          "loginState": "Login state"
+          "loginState": "Login state",
+          "testAccount": "Test account"
         }
       },
       "bulkActionBar": {

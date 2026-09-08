@@ -45,6 +45,13 @@ export class AdminUserQueryDto extends AdminListQueryDto {
   @IsBoolean()
   isVerified?: boolean;
 
+  /** Test şeridi hesapları (canlıdaki mağaza incelemesi / QA hesapları). */
+  @ApiPropertyOptional({ example: true })
+  @IsOptional()
+  @Transform(({ value }) => value === "true" || value === true)
+  @IsBoolean()
+  isTestAccount?: boolean;
+
   @ApiPropertyOptional({ example: true })
   @IsOptional()
   @Transform(({ value }) => value === "true" || value === true)

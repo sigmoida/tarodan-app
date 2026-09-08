@@ -94,6 +94,7 @@ export class RevenueSplitService {
         SELECT id AS payment_id, order_id, checkout_group_id
         FROM payments
         WHERE status IN ('completed', 'refunded') AND trade_cash_payment_id IS NULL
+          AND is_test = false
       ),
       paid_orders AS (
         SELECT o.*, p.payment_id FROM orders o JOIN paid p ON p.order_id = o.id
@@ -169,7 +170,7 @@ export class RevenueSplitService {
       this.resolveRates(),
       this.physicalSplit(),
       this.prisma.payment.aggregate({
-        where: { status: { in: paidStatuses } },
+        where: { isTest: false, status: { in: paidStatuses } },
         _sum: { amount: true },
         _count: { id: true },
       }),
@@ -194,6 +195,7 @@ export class RevenueSplitService {
       }),
       this.prisma.order.aggregate({
         where: {
+          isTest: false,
           origin: OrderOrigin.platform_service,
           payment: { status: { in: paidStatuses } },
         },

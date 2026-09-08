@@ -16,6 +16,23 @@ export interface TestEnv {
   isProd: boolean;
 }
 
+export interface TestAccount {
+  id: string;
+  adminCode: string;
+  email: string;
+  displayName: string;
+  isSeller: boolean;
+  createdAt: string;
+  orders: number;
+  listings: number;
+}
+
+export interface TestLaneResetResult {
+  accounts: number;
+  deleted: Record<string, number>;
+  listingsReactivated: number;
+}
+
 export type AdjustAction = "expire_now" | "set_minutes" | "backdate_days";
 
 export const testToolTypes = (

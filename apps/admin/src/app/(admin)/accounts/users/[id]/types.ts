@@ -66,6 +66,7 @@ export interface UserDetail {
   bio?: string;
   avatarUrl?: string;
   isSeller: boolean;
+  isTestAccount?: boolean;
   isVerified: boolean;
   isEmailVerified: boolean;
   isPhoneVerified: boolean;

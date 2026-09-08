@@ -97,11 +97,12 @@ export class AdminAnalyticsDashboardService {
         }),
       ),
       this.getMetricPeriods(periods, (createdAt) =>
-        this.prisma.order.count({ where: { createdAt } }),
+        this.prisma.order.count({ where: { isTest: false, createdAt } }),
       ),
       this.getMetricPeriods(periods, (createdAt) =>
         this.prisma.order.count({
           where: {
+            isTest: false,
             createdAt,
             status: { in: REALIZED_ORDER_STATUSES },
           },
@@ -111,6 +112,7 @@ export class AdminAnalyticsDashboardService {
         const result = await this.prisma.order.aggregate({
           _sum: { commissionAmount: true },
           where: {
+            isTest: false,
             createdAt,
             status: { in: REALIZED_ORDER_STATUSES },
           },
@@ -157,6 +159,7 @@ export class AdminAnalyticsDashboardService {
         const result = await this.prisma.order.aggregate({
           _sum: { totalAmount: true },
           where: {
+            isTest: false,
             createdAt,
             status: { in: REALIZED_ORDER_STATUSES },
           },
@@ -183,7 +186,7 @@ export class AdminAnalyticsDashboardService {
       }),
       this.getMetricPeriods(periods, (createdAt) =>
         this.prisma.order.count({
-          where: { createdAt, status: OrderStatus.cancelled },
+          where: { isTest: false, createdAt, status: OrderStatus.cancelled },
         }),
       ),
       this.getMetricPeriods(periods, (createdAt) =>
@@ -194,6 +197,7 @@ export class AdminAnalyticsDashboardService {
           this.prisma.order.groupBy({
             by: ["cancellationType"],
             where: {
+              isTest: false,
               createdAt: periods[period],
               status: OrderStatus.cancelled,
             },
@@ -220,15 +224,20 @@ export class AdminAnalyticsDashboardService {
         where: { kind: ProductKind.listing, status: ProductStatus.pending },
       }),
       this.prisma.order.count(),
-      this.prisma.order.count({ where: { createdAt: { gte: sevenDaysAgo } } }),
-      this.prisma.order.count({ where: { status: OrderStatus.completed } }),
+      this.prisma.order.count({
+        where: { isTest: false, createdAt: { gte: sevenDaysAgo } },
+      }),
+      this.prisma.order.count({
+        where: { isTest: false, status: OrderStatus.completed },
+      }),
       this.prisma.order.aggregate({
         _sum: { commissionAmount: true },
-        where: { status: { in: REALIZED_ORDER_STATUSES } },
+        where: { isTest: false, status: { in: REALIZED_ORDER_STATUSES } },
       }),
       this.prisma.order.aggregate({
         _sum: { commissionAmount: true },
         where: {
+          isTest: false,
           createdAt: { gte: sevenDaysAgo },
           status: { in: REALIZED_ORDER_STATUSES },
         },
@@ -427,6 +436,7 @@ export class AdminAnalyticsDashboardService {
     const [orders, ordersByStatus] = await Promise.all([
       this.prisma.order.findMany({
         where: {
+          isTest: false,
           createdAt: { gte: startDate, lte: endDate },
           status: { in: [...completedStatuses] },
         },
@@ -438,7 +448,7 @@ export class AdminAnalyticsDashboardService {
       }),
       this.prisma.order.groupBy({
         by: ["status"],
-        where: { createdAt: { gte: startDate, lte: endDate } },
+        where: { isTest: false, createdAt: { gte: startDate, lte: endDate } },
         _count: { id: true },
       }),
     ]);
@@ -514,9 +524,7 @@ export class AdminAnalyticsDashboardService {
       OrderStatus.paid,
     ];
     const orders = await this.prisma.order.findMany({
-      where: {
-        createdAt: { gte: startDate, lte: endDate },
-      },
+      where: { isTest: false, createdAt: { gte: startDate, lte: endDate } },
       select: {
         createdAt: true,
         totalAmount: true,
@@ -605,7 +613,7 @@ export class AdminAnalyticsDashboardService {
     // Get active users (those who placed orders or listed products in the period)
     const [activeOrderUsers, activeSellerUsers] = await Promise.all([
       this.prisma.order.findMany({
-        where: { createdAt: { gte: startDate, lte: endDate } },
+        where: { isTest: false, createdAt: { gte: startDate, lte: endDate } },
         select: { buyerId: true, createdAt: true },
         distinct: ["buyerId"],
       }),
@@ -799,7 +807,7 @@ export class AdminAnalyticsDashboardService {
           where: { kind: ProductKind.listing, status: ProductStatus.pending },
         }),
         this.prisma.order.count({
-          where: { status: OrderStatus.refund_requested },
+          where: { isTest: false, status: OrderStatus.refund_requested },
         }),
         this.prisma.message.count({ where: { status: "pending_approval" } }),
       ]);
@@ -832,6 +840,7 @@ export class AdminAnalyticsDashboardService {
       this.prisma.order.aggregate({
         _sum: { commissionAmount: true },
         where: {
+          isTest: false,
           createdAt: { gte: startDate, lte: endDate },
           status: { in: [OrderStatus.completed, OrderStatus.delivered] },
         },
@@ -851,6 +860,7 @@ export class AdminAnalyticsDashboardService {
           sellerShippingAmount: true,
         },
         where: {
+          isTest: false,
           createdAt: { gte: startDate, lte: endDate },
           status: { in: [OrderStatus.completed, OrderStatus.delivered] },
         },
@@ -864,12 +874,14 @@ export class AdminAnalyticsDashboardService {
         WHERE created_at >= ${startDate} 
           AND created_at <= ${endDate}
           AND status IN ('completed', 'delivered')
+          AND is_test = false
         GROUP BY DATE_TRUNC('month', created_at)
         ORDER BY month DESC
       ` as Promise<Array<{ month: Date; total: number }>>,
       // Commission by category
       this.prisma.order.findMany({
         where: {
+          isTest: false,
           createdAt: { gte: startDate, lte: endDate },
           status: { in: [OrderStatus.completed, OrderStatus.delivered] },
         },

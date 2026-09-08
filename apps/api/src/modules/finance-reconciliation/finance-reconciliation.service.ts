@@ -106,7 +106,7 @@ export class FinanceReconciliationService {
           _count: { id: true },
         }),
         this.prisma.paymentHold.aggregate({
-          where: { status: PaymentHoldStatus.held },
+          where: { payment: { isTest: false }, status: PaymentHoldStatus.held },
           _sum: { amount: true, refundedAmount: true },
           _count: { id: true },
         }),
@@ -114,6 +114,7 @@ export class FinanceReconciliationService {
         // processing / retry / failed / returned): para platformda, satıcıda değil.
         this.prisma.paymentHold.aggregate({
           where: {
+            payment: { isTest: false },
             status: PaymentHoldStatus.released,
             OR: [
               { payoutTransfer: null },
@@ -135,11 +136,17 @@ export class FinanceReconciliationService {
         // hold'da tamamı (iade yolunda refundedAmount=amount, süre dolumunda 0 —
         // ikisi de "satıcıya gitmedi" demektir).
         this.prisma.paymentHold.aggregate({
-          where: { status: { not: PaymentHoldStatus.cancelled } },
+          where: {
+            payment: { isTest: false },
+            status: { not: PaymentHoldStatus.cancelled },
+          },
           _sum: { refundedAmount: true },
         }),
         this.prisma.paymentHold.aggregate({
-          where: { status: PaymentHoldStatus.cancelled },
+          where: {
+            payment: { isTest: false },
+            status: PaymentHoldStatus.cancelled,
+          },
           _sum: { amount: true },
           _count: { id: true },
         }),
@@ -278,6 +285,7 @@ export class FinanceReconciliationService {
   private async pspFeeBooked(): Promise<number> {
     const agg = await this.prisma.ledgerEntry.aggregate({
       where: {
+        isTest: false,
         account: LedgerAccount.psp_fee,
         direction: LedgerDirection.debit,
       },
@@ -322,6 +330,7 @@ export class FinanceReconciliationService {
       // Sanal sipariş (üyelik/öne çıkarma) tam iadesi.
       this.prisma.order.aggregate({
         where: {
+          isTest: false,
           origin: OrderOrigin.platform_service,
           payment: { status: PaymentStatus.refunded },
         },
@@ -511,6 +520,7 @@ export class FinanceReconciliationService {
       }),
       this.prisma.payment.aggregate({
         where: {
+          isTest: false,
           provider: "paytr",
           status: { in: paid },
           ...(from ? { paidAt: { gte: from } } : {}),

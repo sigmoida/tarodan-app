@@ -2,6 +2,7 @@ import { Module } from "@nestjs/common";
 import { BullModule } from "@nestjs/bull";
 import { AdminTestToolsController } from "./admin-test-tools.controller";
 import { AdminTestToolsService } from "./admin-test-tools.service";
+import { TestLaneService } from "./test-lane.service";
 import { AuthModule } from "../auth/auth.module";
 import { QUEUE_NAMES } from "../../workers/constants";
 
@@ -16,6 +17,6 @@ import { QUEUE_NAMES } from "../../workers/constants";
     BullModule.registerQueue({ name: QUEUE_NAMES.SCHEDULED }),
   ],
   controllers: [AdminTestToolsController],
-  providers: [AdminTestToolsService],
+  providers: [AdminTestToolsService, TestLaneService],
 })
 export class AdminTestToolsModule {}

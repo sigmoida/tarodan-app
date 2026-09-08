@@ -17,6 +17,8 @@ export interface User {
   avatarUrl?: string;
   phone?: string;
   isSeller: boolean;
+  /** Test şeridi hesabı (canlıdaki mağaza incelemesi / QA). */
+  isTestAccount: boolean;
   isVerified: boolean;
   isEmailVerified: boolean;
   isBanned: boolean;
@@ -39,6 +41,7 @@ export function mapUsers(raw: any[]): User[] {
     avatarUrl: u.avatarUrl,
     phone: u.phone,
     isSeller: u.isSeller,
+    isTestAccount: Boolean(u.isTestAccount),
     isVerified: u.isVerified,
     isEmailVerified: Boolean(u.isEmailVerified),
     isBanned: Boolean(u.isBanned),

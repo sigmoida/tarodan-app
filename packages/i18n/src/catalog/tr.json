@@ -4822,7 +4822,38 @@
         "cronResultFailed": "İş başarısız: {reason}",
         "cronResultPending": "İş hâlâ çalışıyor — sonucu Bull geçmişinden izleyin",
         "cronResultRunning": "İş çalışıyor…",
-        "cronResultNotFound": "İş kaydı kuyruk geçmişinden temizlendi — büyük olasılıkla tamamlandı, sonuç artık görüntülenemiyor"
+        "cronResultNotFound": "İş kaydı kuyruk geçmişinden temizlendi — büyük olasılıkla tamamlandı, sonuç artık görüntülenemiyor",
+        "lane": {
+          "title": "Test Şeridi — Canlı Test Hesapları",
+          "description": "Mağaza incelemesi ve mobil QA için canlıda izole hesaplar. Test hesapları yalnız birbirini görür; ilanları vitrine, sipariş/ödeme/takasları finans raporlarına girmez. Ödeme PayTR test modunda açılır, kargo ve e-fatura üretilmez.",
+          "accountsEmpty": "Henüz test hesabı yok.",
+          "createTitle": "Yeni test hesabı",
+          "email": "E-posta",
+          "password": "Şifre",
+          "displayName": "Görünen ad",
+          "phone": "Telefon (isteğe bağlı)",
+          "isSeller": "Satıcı olarak aç (ilan verebilsin)",
+          "create": "Hesap aç",
+          "created": "Test hesabı açıldı: {email}",
+          "createFailed": "Test hesabı açılamadı",
+          "reset": "Şeridi sıfırla",
+          "resetConfirmTitle": "Test şeridi sıfırlansın mı?",
+          "resetConfirmDescription": "Tüm test hesaplarının sipariş, ödeme, takas, teklif, iade ve sepet kayıtları silinir. Hesaplar ve ilanlar kalır; satılan ilanlar yeniden satışa açılır. Canlı verilere dokunulmaz.",
+          "resetDone": "Şerit sıfırlandı: {accounts} hesap, {orders} sipariş silindi",
+          "resetFailed": "Şerit sıfırlanamadı",
+          "buyer": "Alıcı",
+          "seller": "Satıcı",
+          "columns": {
+            "code": "Kod",
+            "email": "E-posta",
+            "name": "Ad",
+            "role": "Rol",
+            "orders": "Sipariş",
+            "listings": "İlan",
+            "createdAt": "Açılış"
+          },
+          "reviewHint": "Apple/Google inceleme notuna alıcı hesabın e-posta ve şifresini yaz; \"ödemeler test modunda, tahsilat yapılmaz\" ibaresini ekle."
+        }
       },
       "media": {
         "title": "Medya",
@@ -7883,7 +7914,11 @@
       "bulkResendQueuedPartial": "{ok} kuyruğa alındı, {failed} başarısız",
       "bulkResendConfirmDesc": "Aktivasyon mailleri arka planda kuyruktan gönderilir; sonucu e-posta loglarından izleyebilirsiniz. Uygun olmayan satırlar atlanır. Devam edilsin mi?",
       "filterLoginStateAll": "Tüm Giriş Durumları",
-      "filterLoggedIn": "Giriş Yapmış"
+      "filterLoggedIn": "Giriş Yapmış",
+      "testAccount": "Test hesabı",
+      "testAccountHint": "Test şeridi: canlı verilere karışmaz",
+      "testAccountOnly": "Yalnız test hesapları",
+      "liveAccountsOnly": "Yalnız gerçek hesaplar"
     },
     "roles": {
       "title": "Roller ve İzinler",
@@ -8518,7 +8553,8 @@
           "action": "İşlem",
           "entityType": "Varlık türü",
           "shipmentLeg": "Gönderi yönü",
-          "loginState": "Giriş durumu"
+          "loginState": "Giriş durumu",
+          "testAccount": "Test hesabı"
         }
       },
       "bulkActionBar": {

@@ -30,6 +30,7 @@ export class AdminAnalyticsReportService {
 
     const orders = await this.prisma.order.findMany({
       where: {
+        isTest: false,
         createdAt: { gte: startDate, lte: endDate },
         status: {
           in: [OrderStatus.completed, OrderStatus.delivered, OrderStatus.paid],
@@ -316,7 +317,7 @@ export class AdminAnalyticsReportService {
       : new Date(endDate.getTime() - 30 * 24 * 60 * 60 * 1000);
 
     const trades = await this.prisma.trade.findMany({
-      where: { createdAt: { gte: startDate, lte: endDate } },
+      where: { isTest: false, createdAt: { gte: startDate, lte: endDate } },
       include: {
         initiator: { select: { id: true, displayName: true, email: true } },
         receiver: { select: { id: true, displayName: true, email: true } },
@@ -330,14 +331,17 @@ export class AdminAnalyticsReportService {
     const [totalTrades, completedTrades, pendingTrades, disputedTrades] =
       await Promise.all([
         this.prisma.trade.count(),
-        this.prisma.trade.count({ where: { status: TradeStatus.completed } }),
+        this.prisma.trade.count({
+          where: { isTest: false, status: TradeStatus.completed },
+        }),
         this.prisma.trade.count({
           where: {
+            isTest: false,
             status: { in: [TradeStatus.pending, TradeStatus.accepted] },
           },
         }),
         this.prisma.trade.count({
-          where: { dispute: { isNot: null } },
+          where: { isTest: false, dispute: { isNot: null } },
         }),
       ]);
 
@@ -411,6 +415,7 @@ export class AdminAnalyticsReportService {
     // Get orders with commission
     const orders = await this.prisma.order.findMany({
       where: {
+        isTest: false,
         createdAt: { gte: startDate, lte: endDate },
         status: { in: [OrderStatus.completed, OrderStatus.delivered] },
       },
@@ -541,6 +546,7 @@ export class AdminAnalyticsReportService {
           _count: true,
           _sum: { totalAmount: true, commissionAmount: true },
           where: {
+            isTest: false,
             createdAt: { gte: startDate, lte: endDate },
             status: {
               in: [
@@ -572,6 +578,7 @@ export class AdminAnalyticsReportService {
           _sum: { totalAmount: true },
           _count: true,
           where: {
+            isTest: false,
             createdAt: { gte: startDate, lte: endDate },
             status: { in: [OrderStatus.completed, OrderStatus.delivered] },
           },
@@ -581,6 +588,7 @@ export class AdminAnalyticsReportService {
         // Top categories
         this.prisma.order.findMany({
           where: {
+            isTest: false,
             createdAt: { gte: startDate, lte: endDate },
             status: { in: [OrderStatus.completed, OrderStatus.delivered] },
           },

@@ -12,6 +12,8 @@ import {
   AdjustAction,
   TestToolType,
 } from "./admin-test-tools.service";
+import { TestLaneService } from "./test-lane.service";
+import { CreateTestAccountDto } from "./dto/create-test-account.dto";
 
 /**
  * Admin "Test Araçları / Zaman Makinesi" — yalnız SÜPER-ADMIN.
@@ -27,8 +29,53 @@ import {
 export class AdminTestToolsController {
   constructor(
     private readonly service: AdminTestToolsService,
+    private readonly testLane: TestLaneService,
     private readonly prisma: PrismaService,
   ) {}
+
+  // ───────────── Test şeridi (canlıda izole test hesapları) ─────────────
+
+  @Get("lane/accounts")
+  @ApiOperation({ summary: "Test şeridi hesapları" })
+  listTestAccounts() {
+    return this.testLane.listAccounts();
+  }
+
+  @Post("lane/accounts")
+  @ApiOperation({ summary: "Test şeridi hesabı aç (doğrulanmış, adresli)" })
+  async createTestAccount(
+    @CurrentUser("id") adminId: string,
+    @Body() dto: CreateTestAccountDto,
+  ) {
+    const created = await this.testLane.createAccount(dto);
+    await this.writeAudit(
+      adminId,
+      "test_lane_account_create",
+      "user",
+      created.id,
+      null,
+      { email: created.email, isSeller: created.isSeller },
+    );
+    return created;
+  }
+
+  @Post("lane/reset")
+  @ApiOperation({
+    summary:
+      "Test şeridini sıfırla: işlem kayıtları silinir, hesaplar ve ilanlar kalır",
+  })
+  async resetTestLane(@CurrentUser("id") adminId: string) {
+    const result = await this.testLane.resetLane();
+    await this.writeAudit(
+      adminId,
+      "test_lane_reset",
+      "test_lane",
+      "-",
+      null,
+      result,
+    );
+    return result;
+  }
 
   @Get("environment")
   @ApiOperation({ summary: "Çalışılan ortam (prod uyarısı için)" })

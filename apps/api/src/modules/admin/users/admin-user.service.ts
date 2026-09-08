@@ -137,6 +137,9 @@ export class AdminUserService {
     if (isSeller !== undefined) {
       where.isSeller = isSeller;
     }
+    if (query.isTestAccount !== undefined) {
+      where.isTestAccount = query.isTestAccount;
+    }
 
     if (isVerified !== undefined) {
       where.isVerified = isVerified;
@@ -192,6 +195,7 @@ export class AdminUserService {
       avatarUrl: true,
       phone: true,
       isSeller: true,
+      isTestAccount: true,
       sellerType: true,
       isVerified: true,
       isEmailVerified: true,
@@ -402,6 +406,7 @@ export class AdminUserService {
         isEmailVerified: true,
         isPhoneVerified: true,
         isSeller: true,
+        isTestAccount: true,
         sellerType: true,
         taxId: true,
         companyName: true,

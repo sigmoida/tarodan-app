@@ -3746,8 +3746,12 @@ model LedgerEntry {
   // kayıt (Postgres NULL'ları benzersiz saymaz, çoklu NULL serbest).
   idempotencyKey String?         @map("idempotency_key")
   lineNo         Int             @default(0) @map("line_no")
+  // Test şeridi damgası: bağlı ödeme/sipariş/takas test ise trigger INSERT'te
+  // true yazar; finans mutabakatı test satırlarını dışlar.
+  isTest         Boolean         @default(false) @map("is_test")
 
   @@unique([idempotencyKey, lineNo])
+  @@index([isTest])
   @@index([entryGroupId])
   @@index([account, createdAt])
   @@index([eventType, createdAt])
