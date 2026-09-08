@@ -567,6 +567,14 @@ export class ElogoReversalService {
       ...line,
       net: this.documents.round2(line.net * componentScale),
       unitPrice: (line.net * componentScale) / line.quantity,
+      // KDV de matrahla BİRLİKTE ölçeklenmeli: satır artık kendi KDV'sini açıkça
+      // taşıdığı için (taxAmount) ölçeklenmeyen tutar, küçültülmüş matrahın
+      // üstünde tam KDV beyan ederdi — iade belgesi kalan bakiyeyi aşardı.
+      ...(typeof line.taxAmount === "number"
+        ? {
+            taxAmount: this.documents.round2(line.taxAmount * componentScale),
+          }
+        : {}),
     }));
     const componentTotals = componentLines.length
       ? invoiceTotalsFromLines(componentLines)
