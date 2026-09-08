@@ -107,6 +107,10 @@ function extractSegment(url: string): string {
 export const ROLE_ONLY_ADMIN_SEGMENTS = new Set<string>([
   "invoices",
   "seller-invoices",
+  // Hakediş dökümü faturanın dayanağıdır ve fatura uçlarıyla aynı @Roles
+  // listesini taşır; ayrı bir izin anahtarı tanıtmak matrisi de guard'ı da
+  // ikiye bölerdi.
+  "settlement-report",
 ]);
 
 /**
