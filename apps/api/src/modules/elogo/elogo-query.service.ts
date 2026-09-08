@@ -6,6 +6,33 @@ import { i18nMessage } from "../i18n";
 import { LINE_DESCRIPTION } from "./invoice/invoice-line-description";
 
 /**
+ * Kullanıcıya gösterim sırası: önce ürün/üyelik gibi ALIŞVERİŞİN kendi belgesi,
+ * sonra hizmet bedelleri, en sonda iade belgesi. Listede yer almayan tür sona
+ * düşer, aynı rütbedekiler kesim sırasına göre sıralanır.
+ */
+const INVOICE_DISPLAY_ORDER: readonly string[] = [
+  "platform_sale",
+  "membership",
+  "boost",
+  "buyer_commission",
+  "buyer_service_fee",
+  "buyer_shipping",
+  "seller_commission",
+  "seller_platform_fee",
+  "seller_shipping",
+  "commission",
+  "service_fee",
+  "trade_commission",
+  "trade_service_fee",
+  "return_invoice",
+];
+
+const invoiceDisplayRank = (type: string): number => {
+  const index = INVOICE_DISPLAY_ORDER.indexOf(type);
+  return index === -1 ? INVOICE_DISPLAY_ORDER.length : index;
+};
+
+/**
  * Faturanın OKUMA yüzeyi — ElogoInvoicingService'ten birebir taşındı. Kesme,
  * gönderme ve ters kayıt hattının hiçbirine dokunmaz: burada yalnız "bu
  * kullanıcının hangi faturaları var ve PDF'ini nasıl indiririm" sorusu yaşar.
@@ -54,66 +81,71 @@ export class ElogoQueryService {
   }
 
   /**
-   * Bir SİPARİŞE ait, kullanıcının kendi e-Arşiv faturası (varsa). App'te "Faturayı İndir"
-   * butonunu yalnız fatura HAZIRSA (sent/signed) göstermek için. Yoksa null.
+   * Bir SİPARİŞE ait, kullanıcının TÜM hazır (sent/signed) e-Arşiv belgeleri.
+   *
+   * Tek alışverişte taraf başına ÜÇ belge kesilir (komisyon, hizmet bedeli,
+   * kargo payı) — "siparişin faturası" artık tekil bir şey değil. Liste
+   * `INVOICE_DISPLAY_ORDER` ile sıralanır: ürün/üyelik belgesi başta, ardından
+   * hizmet bedelleri, sonra iade belgeleri.
    */
-  async findOrderInvoiceForUser(orderId: string, userId: string) {
+  async listOrderInvoicesForUser(orderId: string, userId: string) {
     const sel = {
       id: true,
       invoiceNumber: true,
       type: true,
       total: true,
       issuedAt: true,
+      createdAt: true,
       lineDescription: true,
     } as const;
-    // 1) Sipariş/üyelik e-Arşivleri. Komisyon ve hizmet bedeli PAKET anahtarlıdır
-    //    (satıcı başına tek fatura); platform satışı ve üyelik sipariş anahtarlı.
-    //    Siparişin paketi de aranmazsa aynı pakette iki ürün alan alıcı faturasına
-    //    hiçbir siparişten ulaşamaz.
+    // Ücret belgeleri PAKET anahtarlıdır (satıcı başına tek belge); platform
+    // satışı ve üyelik sipariş anahtarlı. Siparişin paketi de aranmazsa aynı
+    // pakette iki ürün alan alıcı belgelerine hiçbir siparişten ulaşamaz.
     const order = await this.prisma.order
       .findUnique({ where: { id: orderId }, select: { packageId: true } })
       .catch(() => null);
     const sourceIds = order?.packageId ? [orderId, order.packageId] : [orderId];
+    // BOOST belgesi sipariş değil, boost kaydı anahtarlıdır.
+    const boost = await this.prisma.productBoost
+      .findUnique({ where: { orderId }, select: { id: true } })
+      .catch(() => null);
+    if (boost) sourceIds.push(boost.id);
 
-    let inv = await this.prisma.elogoInvoice.findFirst({
+    const rows = await this.prisma.elogoInvoice.findMany({
       where: {
         sourceId: { in: sourceIds },
         recipientUserId: userId,
-        type: {
-          in: ["commission", "service_fee", "platform_sale", "membership"],
-        },
         status: { in: ["sent", "signed"] },
       },
-      orderBy: { createdAt: "desc" },
       select: sel,
     });
-    // 2) BOOST e-Arşivi: sourceId = productBoost.id (order üzerinden boost'u bul).
-    if (!inv) {
-      const boost = await this.prisma.productBoost
-        .findUnique({ where: { orderId }, select: { id: true } })
-        .catch(() => null);
-      if (boost) {
-        inv = await this.prisma.elogoInvoice.findFirst({
-          where: {
-            sourceId: boost.id,
-            recipientUserId: userId,
-            type: "boost",
-            status: { in: ["sent", "signed"] },
-          },
-          orderBy: { createdAt: "desc" },
-          select: sel,
-        });
-      }
-    }
-    if (!inv) return null;
-    return {
-      id: inv.id,
-      invoiceNumber: inv.invoiceNumber,
-      type: inv.type,
-      label: inv.lineDescription || LINE_DESCRIPTION[inv.type] || "Fatura",
-      total: inv.total,
-      issuedAt: inv.issuedAt,
-    };
+
+    return rows
+      .sort(
+        (a, b) =>
+          invoiceDisplayRank(a.type) - invoiceDisplayRank(b.type) ||
+          a.createdAt.getTime() - b.createdAt.getTime(),
+      )
+      .map((inv) => ({
+        id: inv.id,
+        invoiceNumber: inv.invoiceNumber,
+        type: inv.type,
+        label: inv.lineDescription || LINE_DESCRIPTION[inv.type] || "Fatura",
+        total: inv.total,
+        issuedAt: inv.issuedAt,
+      }));
+  }
+
+  /**
+   * Bir SİPARİŞE ait, kullanıcının TEK e-Arşiv belgesi (varsa). Tek belge
+   * gösteren eski istemciler (mobil "Faturayı İndir") için korunur; listenin
+   * ilkini — yani ürün/üyelik belgesi varsa onu — döndürür. Yeni istemciler
+   * `listOrderInvoicesForUser` kullanmalı: bir siparişte artık birden çok belge
+   * vardır.
+   */
+  async findOrderInvoiceForUser(orderId: string, userId: string) {
+    const [first] = await this.listOrderInvoicesForUser(orderId, userId);
+    return first ?? null;
   }
 
   /**

@@ -6005,8 +6005,14 @@
           "cancelled": "Cancelled"
         },
         "types": {
-          "commission": "Commission",
-          "serviceFee": "Service Fee",
+          "commission": "Commission (combined)",
+          "serviceFee": "Service Fee (combined)",
+          "buyerCommission": "Buyer Commission",
+          "buyerServiceFee": "Buyer Protection Fee",
+          "buyerShipping": "Shipping Fee (Buyer Share)",
+          "sellerCommission": "Seller Commission",
+          "sellerPlatformFee": "Platform Service Fee",
+          "sellerShipping": "Shipping Fee (Seller Share)",
           "membership": "Membership",
           "boost": "Boost",
           "tradeCommission": "Trade Commission",

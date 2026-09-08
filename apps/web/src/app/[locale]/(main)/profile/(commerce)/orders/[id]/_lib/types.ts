@@ -140,11 +140,15 @@ export interface SellerInvoiceStatus {
   sellerIssuesInvoice: boolean;
 }
 
-/** eLogo e-Arşiv (gerçek yasal fatura). */
+/**
+ * eLogo e-Arşiv belgesi. Bir siparişte BİRDEN ÇOK olur: her hizmet kalemi
+ * (komisyon, hizmet bedeli, kargo payı) kendi belgesini alır, bu yüzden hangi
+ * hizmetin belgesi olduğunu söyleyen `label` zorunludur.
+ */
 export interface ElogoInvoice {
   id: string;
   invoiceNumber: string;
-  label?: string;
+  label: string;
 }
 
 /**

@@ -27,6 +27,14 @@ export const AMOUNT_BASIS_BY_TYPE: Record<
   // Platformun kestiği hizmet faturaları — matrah saklanır, KDV ayrı kolonda.
   commission: "net",
   service_fee: "net",
+  // Hizmet başına paket belgeleri: saklanan tutar kesinti MATRAHIDIR
+  // (`CommissionLedger` / kargo payı kolonları), KDV üstüne eklenir.
+  buyer_commission: "net",
+  buyer_service_fee: "net",
+  buyer_shipping: "net",
+  seller_commission: "net",
+  seller_platform_fee: "net",
+  seller_shipping: "net",
   // Tüketici fiyatı üzerinden kesilenler — fiyat KDV dahildir.
   platform_sale: "gross",
   membership: "gross",

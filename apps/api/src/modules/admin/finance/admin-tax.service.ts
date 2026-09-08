@@ -29,8 +29,14 @@ export class AdminTaxService {
   ) {}
 
   private static readonly ELOGO_TYPE_LABELS: Record<string, string> = {
-    commission: "Komisyon",
-    service_fee: "Hizmet Bedeli",
+    commission: "Komisyon (birleşik)",
+    service_fee: "Hizmet Bedeli (birleşik)",
+    buyer_commission: "Alıcı Komisyonu",
+    buyer_service_fee: "Alıcı Koruma Hizmet Bedeli",
+    buyer_shipping: "Kargo Bedeli (Alıcı Payı)",
+    seller_commission: "Satıcı Komisyonu",
+    seller_platform_fee: "Platform Hizmet Bedeli",
+    seller_shipping: "Kargo Bedeli (Satıcı Payı)",
     membership: "Üyelik",
     boost: "Öne Çıkarma",
     trade_commission: "Takas Komisyonu",

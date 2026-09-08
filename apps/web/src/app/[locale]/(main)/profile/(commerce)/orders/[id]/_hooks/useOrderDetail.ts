@@ -88,19 +88,24 @@ export function useOrderQuery(orderId: string, enabled: boolean) {
 const invoiceEnabled = (order: OrderDetail | null | undefined) =>
   !!order && order.status !== "pending_payment" && order.status !== "cancelled";
 
-/** eLogo e-Arşiv (gerçek yasal fatura) hazır mı? Hazırsa "Faturayı İndir" çıkar. */
-export function useElogoInvoice(
+/**
+ * Siparişin HAZIR e-Arşiv belgeleri. Tek alışverişte taraf başına ÜÇ belge
+ * kesilir (komisyon, hizmet bedeli, kargo payı), bu yüzden tekil değil liste
+ * okunur — tek belge gösteren eski uç kullanıcının yalnız birine ulaşmasına
+ * sebep oluyordu.
+ */
+export function useElogoInvoices(
   orderId: string,
   order: OrderDetail | null | undefined,
 ) {
   return useQuery({
-    queryKey: queryKeys.orders.elogoInvoice(orderId),
-    queryFn: async (): Promise<ElogoInvoice | null> => {
+    queryKey: queryKeys.orders.elogoInvoices(orderId),
+    queryFn: async (): Promise<ElogoInvoice[]> => {
       try {
-        const res = await api.get(`/elogo/invoices/by-order/${orderId}`);
-        return (res.data as ElogoInvoice) || null;
+        const res = await api.get(`/elogo/invoices/by-order/${orderId}/all`);
+        return Array.isArray(res.data) ? (res.data as ElogoInvoice[]) : [];
       } catch {
-        return null;
+        return [];
       }
     },
     enabled: !!orderId && invoiceEnabled(order),

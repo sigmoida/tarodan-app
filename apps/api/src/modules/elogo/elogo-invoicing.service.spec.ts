@@ -1112,8 +1112,8 @@ describe("ElogoInvoicingService", () => {
 
   /**
    * Teslim faturaları SIRALI kesilir: paralel kesim aynı sayaç satırında
-   * çakışıyordu. Sıra: komisyon → hizmet bedeli → platform satışı; biri
-   * patlarsa diğerleri yine denenir, işaret konmaz.
+   * çakışıyordu. Sıra: paketin hizmet başına ücret belgeleri → platform satışı;
+   * biri patlarsa diğerleri yine denenir, işaret konmaz.
    */
   it("teslim faturaları sırayla kesilir; biri patlarsa diğerleri yine denenir ve işaret konmaz", async () => {
     const prisma = makePrisma({
@@ -1122,12 +1122,9 @@ describe("ElogoInvoicingService", () => {
     prisma.order.update = jest.fn(async () => ({}));
     const svc = new ElogoIssuingService(prisma, {} as any, {} as any);
     const calls: string[] = [];
-    jest.spyOn(svc, "issueCommissionInvoice").mockImplementation(async () => {
-      calls.push("commission");
+    jest.spyOn(svc, "issuePackageFeeInvoices").mockImplementation(async () => {
+      calls.push("package_fees");
       throw new Error("boom");
-    });
-    jest.spyOn(svc, "issueServiceFeeInvoice").mockImplementation(async () => {
-      calls.push("service_fee");
     });
     jest.spyOn(svc, "issuePlatformSaleInvoice").mockImplementation(async () => {
       calls.push("platform_sale");
@@ -1135,7 +1132,7 @@ describe("ElogoInvoicingService", () => {
 
     await svc.issueOrderRevenueInvoices("o1");
 
-    expect(calls).toEqual(["commission", "service_fee", "platform_sale"]);
+    expect(calls).toEqual(["package_fees", "platform_sale"]);
     expect(prisma.order.update).not.toHaveBeenCalled();
   });
 
