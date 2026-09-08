@@ -27,6 +27,9 @@ export function SettlementExport() {
         startDate,
         endDate,
         sellerId: sp.get("sellerId") || undefined,
+        // Dosya EKRANDAKİ satırların aynısı olmalı; arama atlanırsa müşavire
+        // giden döküm ekranda görülenden geniş çıkardı.
+        search: sp.get("q") || undefined,
       });
       const period = [startDate, endDate].filter(Boolean).join("_");
       downloadBlob(

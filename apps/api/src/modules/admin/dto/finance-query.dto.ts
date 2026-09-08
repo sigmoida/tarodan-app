@@ -71,4 +71,11 @@ export class SettlementReportQueryDto extends AdminListQueryDto {
   @IsOptional()
   @IsString()
   sellerId?: string;
+
+  @ApiPropertyOptional({
+    description: "Koli/kayıt kodu, sipariş no, satıcı, ürün",
+  })
+  @IsOptional()
+  @IsString()
+  search?: string;
 }

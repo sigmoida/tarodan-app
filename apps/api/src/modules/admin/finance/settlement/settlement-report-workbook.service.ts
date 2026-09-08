@@ -153,11 +153,11 @@ const COLUMNS: Column[] = [
     note: "Hak edişin satıcıya serbest bırakıldığı/bırakılacağı an.",
   },
   {
-    header: "Ürün Listeleme Fiyatı",
+    header: "Ürün Tutarı",
     key: "listingPrice",
     width: 20,
     format: "money",
-    note: "İlan fiyatı × adet. Alıcının indirim ve kupon sonrası ödediği tutar DEĞİLDİR.",
+    note: "Komisyonun hesaplandığı ürün tutarı (KDV hariç, indirim ve kupon sonrası). Komisyon Oranı × bu tutar = Tarodan Hakedişinin komisyon kısmı. Alıcının ödediği toplam DEĞİLDİR — ona kargo ve hizmet bedelleri eklenir.",
   },
   {
     header: "Müşteri ID",

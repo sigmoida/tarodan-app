@@ -1,7 +1,14 @@
 import { Injectable } from "@nestjs/common";
 import { Prisma } from "@prisma/client";
 import { PrismaService } from "../../../../prisma";
-import { paginate } from "../../../../common/list";
+import {
+  buildSearchWhere,
+  dateRangeWhere,
+  paginate,
+  resolveOrderBy,
+} from "../../../../common/list";
+import { storedProductBaseOf } from "../../../order/helpers/order-charged-base.helper";
+import { resolveGuestInvoiceRecipient } from "../../../elogo/invoice/elogo-guest-recipient";
 import type { SettlementReportQueryDto } from "../../dto";
 import {
   buildSettlementRow,
@@ -19,6 +26,34 @@ import {
 /** Excel'e tek seferde yazılacak azami satır; üstü sayfalı uçtan okunur. */
 export const SETTLEMENT_EXPORT_MAX_ROWS = 20_000;
 
+/** Ekranda görünen her kolon aranabilir olmalı (#381 tam-içerik araması). */
+const SEARCH_FIELDS = [
+  "orderNumber",
+  "package.packageNumber",
+  "seller.displayName",
+  "seller.companyName",
+  "product.title",
+  "product.productCode",
+] as const;
+
+const DEFAULT_SORT: Prisma.OrderOrderByWithRelationInput = {
+  deliveredAt: "desc",
+};
+
+/**
+ * Kayıt no (`KYT-…`) türetilmiş bir koddur, kolonu yoktur: gövdesi koli/sipariş
+ * numarasının gövdesidir. Bu yüzden sıralama koli numarasına, arama da önekten
+ * arındırılmış gövdeye düşer — yoksa ekrandaki kodu kopyalayıp aramak
+ * (`KYT-K7X9…`) hiçbir satır getirmezdi.
+ */
+const SORT_MAP = {
+  recordNo: (direction: "asc" | "desc") => ({
+    package: { packageNumber: direction },
+  }),
+} as const;
+
+const CODE_PREFIX = /^[A-Za-zÇĞİÖŞÜçğıöşü]{2,5}-/;
+
 const SELECT = {
   id: true,
   orderNumber: true,
@@ -29,6 +64,14 @@ const SELECT = {
   quantity: true,
   unitPrice: true,
   subtotal: true,
+  // `storedProductBaseOf` için: `subtotal` yazılmamış eski siparişte ürün tabanı
+  // alıcı toplamının tanımından tersten okunur.
+  totalAmount: true,
+  buyerShippingAmount: true,
+  shippingCost: true,
+  buyerFeeAmount: true,
+  taxAmount: true,
+  buyerServiceTaxAmount: true,
   sellerFeeAmount: true,
   sellerCommissionAmount: true,
   sellerPlatformFeeAmount: true,
@@ -55,7 +98,7 @@ export class SettlementReportService {
     const where = this.whereOf(query);
     const result = await paginate(
       this.prisma.order,
-      { where, orderBy: { deliveredAt: "desc" }, select: SELECT },
+      { where, orderBy: this.orderByOf(query), select: SELECT },
       query,
     );
     const orders = result.data as SettlementOrder[];
@@ -66,7 +109,7 @@ export class SettlementReportService {
   async rows(query: SettlementReportQueryDto): Promise<SettlementRow[]> {
     const orders = await this.prisma.order.findMany({
       where: this.whereOf(query),
-      orderBy: { deliveredAt: "desc" },
+      orderBy: this.orderByOf(query),
       select: SELECT,
       take: SETTLEMENT_EXPORT_MAX_ROWS,
     });
@@ -81,6 +124,9 @@ export class SettlementReportService {
     const holds = orders.length
       ? await this.prisma.paymentHold.findMany({
           where: { orderId: { in: orders.map((o) => o.id) } },
+          // Bir sipariş ödeme tekrarında birden fazla hold taşıyabilir
+          // (`@@unique([paymentId, orderId])`); vade EN SON hold'undur.
+          orderBy: { createdAt: "asc" },
           select: { orderId: true, releaseAt: true },
         })
       : [];
@@ -90,16 +136,24 @@ export class SettlementReportService {
     return orders.map((o) => this.rowOf(o, releaseByOrder.get(o.id) ?? null));
   }
 
+  private orderByOf(
+    query: SettlementReportQueryDto,
+  ): Prisma.OrderOrderByWithRelationInput {
+    return resolveOrderBy<Prisma.OrderOrderByWithRelationInput>(
+      "Order",
+      query,
+      { defaultSort: DEFAULT_SORT, sortMap: SORT_MAP },
+    );
+  }
+
   private whereOf(query: SettlementReportQueryDto): Prisma.OrderWhereInput {
+    // Dönem ORTAK yardımcıdan: bitiş günü gün SONUNA genişler, yoksa son günün
+    // teslimatları dökümden (ve dolayısıyla faturanın dayanağından) düşerdi.
     const where: Prisma.OrderWhereInput = { deliveredAt: { not: null } };
-    if (query.startDate || query.endDate) {
-      const range: Prisma.DateTimeFilter = {};
-      if (query.startDate) range.gte = new Date(query.startDate);
-      if (query.endDate) range.lte = new Date(query.endDate);
-      where.deliveredAt = range;
-    }
+    Object.assign(where, dateRangeWhere(query, "deliveredAt"));
     if (query.sellerId) where.sellerId = query.sellerId;
-    return where;
+    const search = buildSearchWhere(searchTermOf(query.search), SEARCH_FIELDS);
+    return search ? { ...where, ...search } : where;
   }
 
   private rowOf(order: SettlementOrder, releaseAt: Date | null): SettlementRow {
@@ -113,8 +167,9 @@ export class SettlementReportService {
       deliveredAt: order.deliveredAt,
       releaseAt,
       quantity: order.quantity,
-      unitPrice: order.unitPrice != null ? Number(order.unitPrice) : null,
-      subtotal: order.subtotal != null ? Number(order.subtotal) : null,
+      // Ürün tabanı ORTAK helper'dan — payout ile aynı sayı. Ham `subtotal`
+      // okunsaydı kolonu yazılmamış eski siparişte hakediş 0 görünürdü.
+      subtotal: storedProductBaseOf(order),
       sellerFeeAmount: Number(order.sellerFeeAmount),
       sellerCommissionAmount: Number(order.sellerCommissionAmount),
       sellerPlatformFeeAmount: Number(order.sellerPlatformFeeAmount),
@@ -125,20 +180,22 @@ export class SettlementReportService {
       sellerName: order.seller?.displayName ?? "",
       sellerCompanyName: order.seller?.companyName ?? null,
       buyerId: order.buyerId,
-      // Misafir siparişinde alıcı kaydı paylaşılan sistem kullanıcısıdır;
-      // gerçek isim yalnız kargo adresinde durur.
+      // Misafir siparişinde alıcı kaydı paylaşılan sistem kullanıcısıdır
+      // (GUEST_SYSTEM); gerçek isim yalnız kargo adresinde durur ve e-belgeyle
+      // AYNI çözücüden okunur.
       buyerName:
-        guestNameOf(order.shippingAddress) ?? order.buyer?.displayName ?? "",
+        resolveGuestInvoiceRecipient(order.shippingAddress)?.name ??
+        order.buyer?.displayName ??
+        "",
       productName: order.product?.title ?? "",
       productCode: order.product?.productCode ?? "",
     });
   }
 }
 
-/** Misafir siparişinin kargo adresindeki gerçek alıcı adı. */
-function guestNameOf(shippingAddress: Prisma.JsonValue): string | null {
-  if (!shippingAddress || typeof shippingAddress !== "object") return null;
-  const raw = (shippingAddress as Record<string, unknown>).guestName;
-  const name = typeof raw === "string" ? raw.trim() : "";
-  return name && name !== "GUEST_SYSTEM" ? name : null;
+/** `KYT-K7X9…` / `PKG-…` / `ORD-…` — önek atılır, gövde her iki kolonu da bulur. */
+function searchTermOf(search: string | undefined): string | undefined {
+  const term = search?.trim();
+  if (!term) return undefined;
+  return CODE_PREFIX.test(term) ? term.slice(term.indexOf("-") + 1) : term;
 }

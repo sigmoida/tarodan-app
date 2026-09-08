@@ -34,9 +34,12 @@ export default function SettlementReportPage() {
             };
           })
         }
-        getRowId={(r) => `${r.orderNumber}`}
+        getRowId={(r) => r.orderNumber}
         syncUrl
         filters={settlementFilterFields(t)}
+        // Kendi kontrolü olmayan derin bağlantı: satıcı ekranından gelen
+        // `?sellerId=` hem listeye hem Excel'e uygulanır, ikisi ayrışmasın.
+        initialFilters={{ sellerId: "" }}
       >
         <ResourceList.Toolbar
           searchPlaceholder={t("admin.finance.settlement.searchPlaceholder")}

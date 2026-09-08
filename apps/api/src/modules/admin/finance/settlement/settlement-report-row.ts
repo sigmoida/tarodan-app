@@ -29,7 +29,6 @@ export interface SettlementOrderInput {
   deliveredAt: Date | null;
   releaseAt: Date | null;
   quantity: number;
-  unitPrice: number | null;
   subtotal: number | null;
   sellerFeeAmount: number;
   sellerCommissionAmount: number;
@@ -151,8 +150,12 @@ export function buildSettlementRow(order: SettlementOrderInput): SettlementRow {
     maturityDays: settlementMaturityDays(order.deliveredAt, order.releaseAt),
     deliveredAt: order.deliveredAt,
     maturityAt: order.releaseAt,
-    // İlan (liste) fiyatı — alıcının indirim sonrası ödediği tutar DEĞİL.
-    listingPrice: round2(num(order.unitPrice) * Math.max(1, order.quantity)),
+    // ÜRÜN TABANI: komisyonun hesaplandığı tutar. `unitPrice × adet` DEĞİL —
+    // o alan kampanya fiyatını taşır (`campaignPrice ?? basePrice`), ne liste
+    // fiyatıdır ne de tahsil edilen taban. Müşavirin dosyasında bu kolonla
+    // komisyon oranının çarpımı komisyonu vermek zorunda; ikisi aynı tabandan
+    // okunmazsa döküm kendi içinde tutmaz.
+    listingPrice: subtotal,
     customerId: order.buyerId,
     customerName: order.buyerName,
   };

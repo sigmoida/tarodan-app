@@ -23,7 +23,6 @@ const order = (
   deliveredAt: new Date("2026-08-04T12:00:00Z"),
   releaseAt: new Date("2026-08-10T12:00:00Z"),
   quantity: 1,
-  unitPrice: 999,
   subtotal: 999,
   sellerFeeAmount: 109.89,
   sellerCommissionAmount: 59.94,
@@ -71,11 +70,14 @@ describe("buildSettlementRow", () => {
     );
   });
 
-  it("listeleme fiyatı ilan fiyatı × adettir (ödenen tutar değil)", () => {
-    expect(
-      buildSettlementRow(order({ quantity: 3, unitPrice: 250, subtotal: 600 }))
-        .listingPrice,
-    ).toBe(750);
+  it("ürün tabanı komisyon oranıyla aynı kaynaktan okunur", () => {
+    // Oran × taban = komisyon eşitliği dökümün kendi içinde tutmasını sağlar;
+    // `unitPrice × adet` kampanya fiyatını taşıdığı için bu eşitliği bozardı.
+    const row = buildSettlementRow(
+      order({ quantity: 3, subtotal: 600, sellerCommissionAmount: 36 }),
+    );
+    expect(row.listingPrice).toBe(600);
+    expect(row.commissionRate).toBe(6);
   });
 
   it("ödeme kaydı yoksa işlem tarihi sipariş tarihine düşer", () => {

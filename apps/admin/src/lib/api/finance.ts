@@ -99,6 +99,7 @@ export const financeApi = {
     startDate?: string;
     endDate?: string;
     sellerId?: string;
+    search?: string;
   }) =>
     api.get("/admin/settlement-report/export", {
       params,
