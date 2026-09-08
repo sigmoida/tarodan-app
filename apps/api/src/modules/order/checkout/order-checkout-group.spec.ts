@@ -10,6 +10,8 @@ import { OrderCheckoutCommonService } from "./order-checkout-common.service";
 import { OrderCheckoutDirectService } from "./order-checkout-direct.service";
 import { OrderCheckoutGroupService } from "./order-checkout-group.service";
 import { OrderGuestCheckoutService } from "./order-guest-checkout.service";
+import { AccountLaneService } from "../../account-lane/account-lane.service";
+import { accountLaneServiceStub } from "../../account-lane/account-lane.testing";
 import { OrderCommonService } from "../order-common.service";
 import { OrderQueryService } from "../order-query.service";
 import { OrderLifecycleService } from "../order-lifecycle.service";
@@ -255,6 +257,7 @@ describe("OrderService checkout group (batch checkout)", () => {
         OrderCheckoutDirectService,
         OrderCheckoutGroupService,
         { provide: UserBlockService, useValue: userBlocksStub },
+        { provide: AccountLaneService, useValue: accountLaneServiceStub() },
         OrderGuestCheckoutService,
         OrderCommonService,
         OrderQueryService,
