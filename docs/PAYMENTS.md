@@ -336,16 +336,17 @@ kargo ona yüklenir (`*_charge`) — eksik olan yalnız bu son kalemin belgesiyd
 
 Matrah **FARKTIR**, yeniden faturalama değil (`invoice/penalty-basis.ts`):
 
-| Kusur            | Ceza matrahı                                                                                                        |
-| ---------------- | ------------------------------------------------------------------------------------------------------------------- |
-| Satıcı           | `outbound_shipping/seller_charge` − paketin faturalanmış `sellerShippingAmount`'ı + `return_shipping/seller_charge` |
-| Alıcı            | `outbound_shipping/buyer_charge` + `return_shipping/buyer_charge` (ikisi de alıcıya hiç faturalanmamıştı)           |
-| Kargo / platform | belge yok (`platform_absorb`)                                                                                       |
+| Kusur            | Ceza matrahı                                                                                                          |
+| ---------------- | --------------------------------------------------------------------------------------------------------------------- |
+| Satıcı           | `outbound_shipping/seller_charge` − satıcıda AYAKTA DURAN `seller_shipping` belgesi + `return_shipping/seller_charge` |
+| Alıcı            | `outbound_shipping/buyer_charge` + `return_shipping/buyer_charge` (ikisi de alıcıya hiç faturalanmamıştı)             |
+| Kargo / platform | belge yok (`platform_absorb`)                                                                                         |
 
 Anahtar iade TALEBİdir (`sourceId = refundRequest.id`): aynı kolinin birden
 fazla iadesi ayrı ayrı cezalanır, aynı talebin yeniden işlenmesi ikinci belge
 doğurmaz. Tetik `invoice.refund_reverse` outbox handler'ıdır — ters kayıt
-tamamlandıktan SONRA çalışır.
+tamamlandıktan SONRA çalışır; düşülen tutar da bu yüzden sipariş kolonundan
+değil, ters kayıttan SONRA ayakta kalan `seller_shipping` belgesinden okunur.
 
 Diğer türler: `platform_sale` (Tarodan kendi ürününü satarken, alıcıya kalem
 kalem ürün faturası), `membership`, `boost`, `trade_service_fee` /

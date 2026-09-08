@@ -32,6 +32,9 @@ import { ElogoDeliveryService } from "./elogo-delivery.service";
  * göndermez (ElogoDeliveryService) — yalnız hangi olayın hangi belgeyi
  * doğurduğunu bilir.
  */
+const round2 = (value: number): number =>
+  Math.round((value + Number.EPSILON) * 100) / 100;
+
 @Injectable()
 export class ElogoIssuingService {
   private readonly logger = new Logger(ElogoIssuingService.name);
@@ -475,10 +478,8 @@ export class ElogoIssuingService {
       .catch(() => null);
     const order = request?.order;
     if (!request || !order) return;
-    // Platform kendi ürününü satıyorsa ceza kendine faturalanamaz.
-    if (await this.isPlatformSeller(order.sellerId)) return;
 
-    // Satıcıya paket için zaten kesilmiş gidiş kargo payı — cezadan düşülür.
+    // Satıcıya paket için AYAKTA DURAN gidiş kargo belgesi — cezadan düşülür.
     const invoicedSellerShipping = order.packageId
       ? await this.invoicedSellerShippingOf(order.packageId)
       : 0;
@@ -494,6 +495,14 @@ export class ElogoIssuingService {
       vatRate: Number(order.serviceVatRate ?? 0),
     });
     if (!basis) return;
+    // Platform kendi ürününü satıyorsa ceza KENDİNE faturalanamaz. Alıcı
+    // kusurunda ise bedel yine alıcıdan tahsil edilir; muhatap platform değil
+    // alıcıdır ve belgesi kesilmelidir.
+    if (
+      basis.side === "seller" &&
+      (await this.isPlatformSeller(order.sellerId))
+    )
+      return;
 
     const reason = request.resolvedReason
       ? translateMessage(`status.refundReason.${request.resolvedReason}`, "tr")
@@ -521,18 +530,45 @@ export class ElogoIssuingService {
     );
   }
 
-  /** Paketin satıcıya faturalanmış gidiş kargo payı toplamı. */
+  /**
+   * Paketin gidiş kargo payı için satıcıda AYAKTA DURAN belge tutarı (KDV hariç).
+   *
+   * Matrah farktır, ama fark ancak gerçekten duran bir belgeden düşülebilir.
+   * `seller_shipping` belgesinin iade karşılığı yoktur; iade hattı onu genel
+   * iade oranıyla iptal eder ya da iade faturasıyla dengeler — ve ceza kesimi
+   * ters kayıttan SONRA çalışır. Sipariş kolonundan okunsaydı iptal edilmiş bir
+   * belge hâlâ duruyormuş sayılır, kusurlu satıcı o tutar kadar EKSİK
+   * faturalanırdı. Belge hiç kesilmediyse (kargo öncesi iade, platform satışı)
+   * düşülecek bir şey de yoktur.
+   */
   private async invoicedSellerShippingOf(packageId: string): Promise<number> {
-    const orders = await this.prisma.order
+    const invoice = await this.prisma.elogoInvoice
+      .findUnique({
+        where: {
+          type_sourceId: { type: "seller_shipping", sourceId: packageId },
+        },
+        select: { netAmount: true, status: true, invoiceNumber: true },
+      })
+      .catch(() => null);
+    if (!invoice || invoice.status === "cancelled") return 0;
+    const issued = Math.max(0, Number(invoice.netAmount ?? 0));
+    if (!(issued > 0) || !invoice.invoiceNumber) return issued;
+
+    const reversals = await this.prisma.elogoInvoice
       .findMany({
-        where: { packageId },
-        select: { sellerShippingAmount: true },
+        where: {
+          type: "return_invoice",
+          billingReference: invoice.invoiceNumber,
+          status: { not: "cancelled" },
+        },
+        select: { netAmount: true },
       })
       .catch(() => []);
-    return orders.reduce(
-      (sum, o) => sum + Number(o.sellerShippingAmount ?? 0),
+    const reversed = reversals.reduce(
+      (sum, row) => sum + Number(row.netAmount ?? 0),
       0,
     );
+    return Math.max(0, round2(issued - reversed));
   }
 
   private async packageNumberOf(packageId: string): Promise<string | null> {

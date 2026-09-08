@@ -14,7 +14,8 @@ import type { InvoiceLineItem } from "./invoice-lines";
  *
  *  - **Satıcı kusurlu**: gidiş kargonun TAMAMI satıcıya yüklenir, ama satıcının
  *    kendi payı (`seller_shipping`) ona zaten faturalanmıştı → aradaki fark
- *    (alıcının payı) + iade kargosu.
+ *    (alıcının payı) + iade kargosu. Belge iade hattında ters kaydedildiyse
+ *    düşülecek bir şey kalmaz (bkz. `invoicedSellerShipping`).
  *  - **Alıcı kusurlu**: satıcının gidiş payı alıcıya devredilir ve iade kargosu
  *    ona yüklenir; ikisi de alıcıya hiç faturalanmamıştı → tamamı.
  *  - **Kargo/platform kusurlu**: bedel platformda kalır (`platform_absorb`),
@@ -34,8 +35,9 @@ export interface PenaltyBasisInput {
   faultParty: PenaltyFaultParty | null;
   components: PenaltyComponentRow[];
   /**
-   * Satıcıya paket için ZATEN kesilmiş gidiş kargo payı (`seller_shipping`
-   * belgesinin matrahı). Satıcı kusurunda bu tutar cezadan düşülür.
+   * Satıcıda AYAKTA DURAN gidiş kargo belgesinin matrahı (`seller_shipping`,
+   * iptal ve iade faturaları düşülmüş). Satıcı kusurunda bu tutar cezadan
+   * düşülür — iade hattı belgeyi ters kaydettiyse düşülecek bir şey kalmaz.
    */
   invoicedSellerShipping: number;
   /** Hizmet KDV oranı (%) — siparişin tahsil anındaki snapshot'ı. */

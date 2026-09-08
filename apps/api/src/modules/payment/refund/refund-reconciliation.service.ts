@@ -12,6 +12,7 @@ import { PaymentRefundService } from "./payment-refund.service";
 import { PaymentProviderRegistry } from "../../payment-providers/payment-provider.registry";
 import { PaymentProviderEventService } from "../payment-provider-event.service";
 import { errorMessage } from "../../../common/helpers/error-message";
+import { refundRequestIdOf } from "../../elogo/helpers/refund-request-key";
 
 /**
  * İade sweep'inin aday satırı: siparişin kendi ödemesi (tekil) VEYA grubunun
@@ -417,11 +418,8 @@ export class RefundReconciliationService {
           Number(attempt.amount),
           { idempotencyKey: attempt.idempotencyKey },
         );
-        const refundRequestPrefix = "refund-request:";
-        if (attempt.idempotencyKey.startsWith(refundRequestPrefix)) {
-          const refundRequestId = attempt.idempotencyKey.slice(
-            refundRequestPrefix.length,
-          );
+        const refundRequestId = refundRequestIdOf(attempt.idempotencyKey);
+        if (refundRequestId) {
           await this.prisma.refundRequest.updateMany({
             where: {
               id: refundRequestId,

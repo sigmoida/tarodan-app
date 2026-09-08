@@ -35,7 +35,14 @@ function makeService(options: {
     netAmount: number;
   }>;
   resolvedReason?: string | null;
-  sellerShipping?: number;
+  /** Satıcıda ayakta duran `seller_shipping` belgesi (yoksa null). */
+  sellerShippingInvoice?: {
+    netAmount: number;
+    status: string;
+    invoiceNumber: string | null;
+  } | null;
+  /** O belgeye kesilmiş iade faturaları. */
+  sellerShippingReturns?: Array<{ netAmount: number }>;
   sellerType?: string;
   request?: unknown;
 }) {
@@ -69,10 +76,13 @@ function makeService(options: {
 
   const prisma = {
     refundRequest: { findUnique: jest.fn(async () => request) },
-    order: {
-      findMany: jest.fn(async () => [
-        { sellerShippingAmount: options.sellerShipping ?? 60 },
-      ]),
+    elogoInvoice: {
+      findUnique: jest.fn(async () =>
+        options.sellerShippingInvoice === undefined
+          ? { netAmount: 60, status: "sent", invoiceNumber: "TRD2026000000123" }
+          : options.sellerShippingInvoice,
+      ),
+      findMany: jest.fn(async () => options.sellerShippingReturns ?? []),
     },
     orderPackage: {
       findUnique: jest.fn(async () => ({ packageNumber: "PKG-K7X9M2QF3N" })),
@@ -141,6 +151,46 @@ describe("ElogoIssuingService.issuePenaltyInvoice", () => {
       name: "Ayşe Yılmaz",
       email: "ayse@example.com",
     });
+  });
+
+  it("gidiş kargo belgesi ters kaydedildiyse hiçbir şey düşülmez", async () => {
+    // İade hattı `seller_shipping` belgesini iptal etti: ortada ayakta duran
+    // belge yok, dolayısıyla ceza gidiş kargonun TAMAMINI kapsamalı.
+    const cancelled = makeService({
+      sellerShippingInvoice: {
+        netAmount: 60,
+        status: "cancelled",
+        invoiceNumber: "TRD2026000000123",
+      },
+    });
+    await cancelled.service.issuePenaltyInvoice("rr6");
+    expect(cancelled.cut.mock.calls[0][3]).toBe(240);
+
+    // İade faturasıyla dengelendiyse de aynı sonuç.
+    const reversed = makeService({
+      sellerShippingReturns: [{ netAmount: 60 }],
+    });
+    await reversed.service.issuePenaltyInvoice("rr7");
+    expect(reversed.cut.mock.calls[0][3]).toBe(240);
+  });
+
+  it("alıcı kusurunda platform satıcı olsa bile ALICIYA keser", async () => {
+    const { service, cut } = makeService({
+      sellerType: "platform",
+      faultParty: "buyer",
+      components: [
+        {
+          componentCode: "return_shipping",
+          treatment: "buyer_charge",
+          netAmount: 120,
+        },
+      ],
+    });
+
+    await service.issuePenaltyInvoice("rr8");
+
+    expect(cut.mock.calls[0][2]).toBe("b1");
+    expect(cut.mock.calls[0][3]).toBe(120);
   });
 
   it("kusur kargodaysa belge kesilmez", async () => {
