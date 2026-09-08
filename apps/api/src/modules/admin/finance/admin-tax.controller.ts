@@ -28,7 +28,10 @@ import {
   ApiQuery,
 } from "@nestjs/swagger";
 import { AdminService } from "../admin.service";
+import type { Response } from "express";
 import { ElogoInvoicingService } from "../../elogo/elogo-invoicing.service";
+import { SettlementReportService } from "./settlement/settlement-report.service";
+import { SettlementReportWorkbookService } from "./settlement/settlement-report-workbook.service";
 import { AdvertisementService } from "../../advertisement/advertisement.service";
 import { MediaService } from "../../media/media.service";
 import {
@@ -74,6 +77,7 @@ import {
   AdminPaymentQueryDto,
   ElogoInvoiceQueryDto,
   SellerUploadedInvoiceQueryDto,
+  SettlementReportQueryDto,
   PaymentStatisticsQueryDto,
   PayoutTransactionsQueryDto,
   PayoutExportQueryDto,
@@ -114,6 +118,8 @@ export class AdminTaxController {
   constructor(
     private readonly adminService: AdminService,
     private readonly elogoInvoicing: ElogoInvoicingService,
+    private readonly settlementReport: SettlementReportService,
+    private readonly settlementWorkbook: SettlementReportWorkbookService,
   ) {}
 
   // ==================== TAX SETTINGS (Regions, Rates, Rules, Reporting) ====================
@@ -416,5 +422,40 @@ export class AdminTaxController {
   @ApiOperation({ summary: "Satıcı faturası PDF (S3 presigned URL)" })
   async getSellerUploadedInvoicePdf(@Param("id", ParseUUIDPipe) id: string) {
     return this.adminService.getSellerUploadedInvoicePdf(id);
+  }
+
+  // ==================== SATICI HAKEDİŞ DÖKÜMÜ ====================
+
+  @Get("settlement-report")
+  @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
+  @ApiOperation({
+    summary:
+      "Satıcı hakediş dökümü (sayfalı) — kesilen komisyon faturasının dayanağı",
+  })
+  async getSettlementReport(@Query() query: SettlementReportQueryDto) {
+    return this.settlementReport.list(query);
+  }
+
+  @Get("settlement-report/export")
+  @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
+  @ApiOperation({ summary: "Satıcı hakediş dökümü (Excel)" })
+  async exportSettlementReport(
+    @Query() query: SettlementReportQueryDto,
+    @Res() res: Response,
+  ) {
+    const rows = await this.settlementReport.rows(query);
+    const buffer = await this.settlementWorkbook.build(rows);
+    res.setHeader(
+      "Content-Type",
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    );
+    res.setHeader(
+      "Content-Disposition",
+      `attachment; filename="${this.settlementWorkbook.filename(
+        query.startDate,
+        query.endDate,
+      )}"`,
+    );
+    res.send(buffer);
   }
 }

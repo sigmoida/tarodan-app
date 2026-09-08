@@ -352,6 +352,27 @@ Diğer türler: `platform_sale` (Tarodan kendi ürününü satarken, alıcıya k
 kalem ürün faturası), `membership`, `boost`, `trade_service_fee` /
 `trade_commission` (§8), `return_invoice`.
 
+### Satıcı hakediş dökümü
+
+Kesilen komisyon faturasının DAYANAĞI: hangi siparişlerden doğduğu ve o
+siparişten satıcıya ne kaldığı. Admin > Finans > Hakediş Dökümü'nden dönem
+seçilip Excel indirilir (`GET /admin/settlement-report[/export]`,
+`finance/settlement/`); mali müşavire fatura ile birlikte gider.
+
+Dönem **teslimat** tarihine göredir — hak ediş ve fatura teslimatla doğar.
+Satıcı hakedişi `sellerNetAmountOf` ile hesaplanır (payout ile tek formül).
+İki kolonun tanımı dosyanın "Aciklama" sayfasında da yazar:
+
+- **Komisyon Oranı** SATICI komisyonunun oranıdır; sipariş üzerinde
+  saklanmadığı için tahsil edilen tutardan geri hesaplanır.
+- **Tarodan Hakedişi** satıcıdan yapılan kesintidir (satıcı komisyonu +
+  platform hizmet bedeli, KDV hariç); alıcıdan alınan komisyon/koruma bedeli
+  buraya GİRMEZ — o alıcının kendi belgelerinin konusudur.
+
+**Stopaj** dökümde kolon olarak durur, e-belgeye girmez: satıcının vergisinden
+kaynakta kesilen tutardır ve muhtasar ile beyan edilir (aylık satıcı bazlı
+toplam: `GET /admin/tax/withholding-report`).
+
 ---
 
 ## 9. Ledger ve mutabakat

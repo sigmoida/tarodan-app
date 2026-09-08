@@ -6034,6 +6034,26 @@
         "retried": "Invoice re-queued",
         "documentCount": "{count} documents"
       },
+      "settlement": {
+        "title": "Settlement Report",
+        "subtitle": "The basis behind the seller's commission invoice — the period follows the delivery date",
+        "searchPlaceholder": "Search parcel code, order number or seller",
+        "empty": "No delivered orders in the selected period",
+        "exportExcel": "Download Excel",
+        "exported": "Settlement report downloaded",
+        "exportFailed": "Could not download the report",
+        "columns": {
+          "record": "Record / Order No",
+          "transactionType": "Transaction Type",
+          "seller": "Seller",
+          "product": "Product",
+          "commission": "Tarodan Earning",
+          "sellerEarning": "Seller Earning",
+          "withholding": "Withholding",
+          "maturity": "Maturity",
+          "maturityDays": "{days} days"
+        }
+      },
       "payments": {
         "title": "Payment Management",
         "subtitle": "All payment transactions and statuses",
@@ -8299,6 +8319,10 @@
           "name": "Invoices",
           "description": "Manage invoice and e-invoice operations",
           "keywords": "invoice,e-archive,e-invoice,elogo,refund invoice"
+        },
+        "settlement": {
+          "name": "Settlement Report",
+          "description": "The basis behind the commission invoice; downloadable as Excel"
         },
         "tax": {
           "name": "Tax Settings",

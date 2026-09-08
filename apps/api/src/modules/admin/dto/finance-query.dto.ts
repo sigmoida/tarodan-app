@@ -51,3 +51,24 @@ export class SellerUploadedInvoiceQueryDto extends AdminListQueryDto {
   @IsDateString()
   endDate?: string;
 }
+
+/**
+ * Satıcı hakediş dökümü. Dönem TESLİMAT tarihine göredir — hak ediş ve fatura
+ * teslimatla doğar, sipariş tarihiyle değil.
+ */
+export class SettlementReportQueryDto extends AdminListQueryDto {
+  @ApiPropertyOptional({ description: "Teslimat tarihi başlangıcı" })
+  @IsOptional()
+  @IsDateString()
+  startDate?: string;
+
+  @ApiPropertyOptional({ description: "Teslimat tarihi bitişi" })
+  @IsOptional()
+  @IsDateString()
+  endDate?: string;
+
+  @ApiPropertyOptional({ description: "Tek satıcıya daralt" })
+  @IsOptional()
+  @IsString()
+  sellerId?: string;
+}
