@@ -164,6 +164,8 @@ export class OrderTrackingSyncService {
     const activeShipments = await this.prisma.shipment.findMany({
       where: {
         provider: "surat",
+        // Test şeridi kolileri taşıyıcıya gitmedi; sorgulamak yalnız gürültü/alarm üretir.
+        order: { isTest: false },
         ...where,
         OR: [
           { providerTrackingId: { not: null } },

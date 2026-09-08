@@ -393,9 +393,14 @@ export class AdminTradeResolutionService {
         });
         if (arrivedAddress && this.cargo && this.cargo.isEnabled()) {
           const warehouse = await this.common.resolveWarehouseAddress();
+          const lane = await this.prisma.trade.findUnique({
+            where: { id: tradeId },
+            select: { isTest: true },
+          });
           const result = await this.cargo.createShipment({
             idempotencyKey: `surat:trade-stuck-return:${txResult.returnShipmentDraft.oid}`,
             correlationId: `trade-force-cancel-${tradeId}`,
+            testLane: lane?.isTest === true,
             reference: txResult.returnShipmentDraft.oid,
             // Depodan çıkan bacak: gönderen depo, alıcı kolisi ulaşmış olan taraf.
             sender: {

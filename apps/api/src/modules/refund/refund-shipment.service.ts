@@ -159,6 +159,7 @@ export class RefundShipmentService {
     }
 
     const result = await this.cargo.createShipment({
+      testLane: rr.order.isTest,
       idempotencyKey: `surat:refund-return:${rr.refundNumber}`,
       correlationId: `refund-${rr.id}`,
       reference: rr.refundNumber,

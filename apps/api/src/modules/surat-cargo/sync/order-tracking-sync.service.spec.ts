@@ -526,4 +526,14 @@ describe("OrderTrackingSyncService", () => {
       "PKG-BROKEN (http: Surat tracking API HTTP 500 for PKG-BROKEN)",
     ]);
   });
+
+  it("syncAllActiveShipments scans live-lane orders only", async () => {
+    const { service, prisma } = makeService();
+    prisma.shipment.findMany.mockResolvedValue([]);
+    await service.syncAllActiveShipments();
+    expect(prisma.shipment.findMany.mock.calls[0][0].where).toMatchObject({
+      provider: "surat",
+      order: { isTest: false },
+    });
+  });
 });

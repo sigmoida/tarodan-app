@@ -61,6 +61,12 @@ function classifyCaughtError(e: unknown): SuratTechnicalCode {
   return "UNKNOWN";
 }
 
+/** Test şeridi kolisinin sahte takip kodu: taşıyıcı kodlarıyla karışmasın diye TEST öneki. */
+export function testLaneTrackingCode(reference: string): string {
+  return `TEST${reference.replace(/\D/g, "").slice(-10).padStart(10, "0")}`;
+}
+export const TEST_LANE_PROVIDER_MESSAGE = "test_lane_no_dispatch";
+
 @Injectable()
 export class SuratCargoService implements CargoProvider {
   private readonly logger = new Logger(SuratCargoService.name);
@@ -90,7 +96,18 @@ export class SuratCargoService implements CargoProvider {
   async createShipment(
     input: CargoShipmentRequest,
   ): Promise<CargoShipmentResult> {
-    const { idempotencyKey, correlationId, ...shipment } = input;
+    const { idempotencyKey, correlationId, testLane, ...shipment } = input;
+    if (testLane) {
+      this.logger.log(
+        `Surat create skipped for test lane ref=${shipment.reference} correlation=${correlationId}`,
+      );
+      return {
+        ok: true,
+        trackingCode: testLaneTrackingCode(shipment.reference),
+        labelData: null,
+        providerMessage: TEST_LANE_PROVIDER_MESSAGE,
+      };
+    }
     const result = await this.createShipmentWithBarcode({
       idempotencyKey,
       correlationId,
