@@ -82,9 +82,15 @@ export function tradeServiceFeeOf(payment: RefundablePayment): number {
   );
 }
 
-/** Kargo bedeli iade dışı mı? (yalnız kargoya verildikten sonra, kusurlu tarafta) */
+/**
+ * Kargo bedeli iade dışı mı? (yalnız kargoya verildikten sonra, kusurlu tarafta)
+ *
+ * Karar YALNIZ kusursuzluk bayrağına ve kargo eşiğine bakar; tutarlara değil.
+ * Parametre bu yüzden daraltılmıştır — e-belge tarafı bu kuralı tutar taşımadan
+ * sorar ve sahte alanlar uydurmak zorunda kalmaz.
+ */
 export function tradeRefundExcludesShipping(
-  payment: RefundablePayment,
+  payment: Pick<RefundablePayment, "fullRefundEntitled">,
   ctx: TradeRefundContext,
 ): boolean {
   if (payment.fullRefundEntitled) return false;

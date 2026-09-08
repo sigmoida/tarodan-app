@@ -19,6 +19,7 @@ export const LINE_DESCRIPTION: Record<string, string> = {
   boost: "İlan öne çıkarma (boost) bedeli",
   trade_commission: "Takas aracılık hizmet (komisyon) bedeli",
   trade_service_fee: "Takas hizmet bedeli",
+  trade_shipping: "Takas kargo bedeli",
   platform_sale: "Ürün/hizmet bedeli",
   penalty: "Ceza bedeli (kargo)",
   return_invoice: "İade faturası",

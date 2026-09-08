@@ -31,6 +31,7 @@ export const VAT_SOURCE_BY_TYPE: Record<ElogoInvoiceType, InvoiceVatSource> = {
   // Takas ücretleri de platformun hizmet bedelidir; aynı ayardan yönetilir.
   trade_commission: "service",
   trade_service_fee: "service",
+  trade_shipping: "service",
   platform_sale: "category",
   // Ceza bedeli kargo hizmetidir — KDV'si aynı hizmet ayarından gelir.
   penalty: "service",

@@ -2251,6 +2251,9 @@ enum ElogoInvoiceType {
   trade_commission
   /// Takas v2 hizmet bedeli — KDV DAHİL sabit tutar (v1 komisyonundan farklı KDV yönü).
   trade_service_fee
+  /// Takas kargo bedeli — tarafın 2 bacaklık kargo payı. Hizmet bedeli gibi KDV
+  /// DAHİL tahsil edilir (takas toplamına KDV ayrıca EKLENMEZ), KDV içinden ayrışır.
+  trade_shipping
   platform_sale
   return_invoice
   /// Kusurlu taraftan tahsil edilen kargo bedeli. Matrah SADECE FARKTIR: kusurluya

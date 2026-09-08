@@ -32,6 +32,7 @@ export type RevenueType =
   | "boost"
   | "trade_commission"
   | "trade_service_fee"
+  | "trade_shipping"
   | "platform_sale"
   | "penalty";
 
