@@ -2,6 +2,7 @@ import { LINE_DESCRIPTION } from "./invoice-line-description";
 import type { InvoiceLineItem } from "./invoice-lines";
 import {
   PACKAGE_FEE_COMPONENTS,
+  PACKAGE_FEE_INVOICE_TYPES,
   type PackageFeeComponentSpec,
   type PackageFeeInvoiceType,
 } from "./package-fee-components";
@@ -44,6 +45,11 @@ export interface PackageFeeLedgerRow {
   refundedSellerPlatformFeeAmount: number;
 }
 
+/** Kalem başına verilmiş bedel indirimi (KDV hariç) — `Order.feeDiscountBreakdown`. */
+export type PackageFeeDiscounts = Partial<
+  Record<PackageFeeInvoiceType, number>
+>;
+
 export interface PackageFeeOrderRow {
   id: string;
   /** Kargo payları paketin YALNIZ bir siparişinde doludur (checkout kuralı). */
@@ -51,6 +57,11 @@ export interface PackageFeeOrderRow {
   sellerShippingAmount: number;
   /** Alıcıya geri verilmiş gidiş kargosu matrahı (iade bileşenlerinden). */
   refundedBuyerShippingAmount: number;
+  /**
+   * Bu siparişte hangi kaleme ne kadar indirim verildiği. Kesinti kolonları
+   * indirim SONRASI tutarı taşıdığı için brüt bedel ancak buradan geri kurulur.
+   */
+  feeDiscounts: PackageFeeDiscounts;
   ledger: PackageFeeLedgerRow | null;
 }
 
@@ -61,6 +72,8 @@ export interface PackageFeeDocument {
   base: number;
   /** İade düşülmüş matrah — belgeye yazılan tutar. */
   net: number;
+  /** Belgede gösterilen iskonto (KDV hariç); brüt bedel = `net + discount`. */
+  discount: number;
   /** Belgenin kalemi — tek satır (matrah tamamı iade edilmişse boş). */
   lines: InvoiceLineItem[];
 }
@@ -77,6 +90,34 @@ export function hasCompleteComponentBreakdown(
     orders.length > 0 &&
     orders.every((order) => order.ledger?.componentBreakdownComplete === true)
   );
+}
+
+/**
+ * `Order.feeDiscountBreakdown` snapshot'ından kalem başına indirim toplamı.
+ *
+ * Snapshot indirim motorunun `AppliedFeeDiscount[]` çıktısıdır; `target` değerleri
+ * (DiscountTarget) altı belge tipiyle BİREBİR aynı isimdedir, bu yüzden eşleme
+ * gerekmez. Bozuk/eksik satır sessizce elenir: indirim gösterilememesi belgenin
+ * hiç kesilmemesinden yeğdir (matrah zaten doğru, iskonto yalnız sunumdur).
+ */
+export function readFeeDiscounts(raw: unknown): PackageFeeDiscounts {
+  if (!Array.isArray(raw)) return {};
+  const totals: PackageFeeDiscounts = {};
+  for (const entry of raw) {
+    if (!entry || typeof entry !== "object") continue;
+    const { target, amount } = entry as Record<string, unknown>;
+    if (
+      typeof target !== "string" ||
+      !(PACKAGE_FEE_INVOICE_TYPES as readonly string[]).includes(target)
+    ) {
+      continue;
+    }
+    const value = Number(amount);
+    if (!Number.isFinite(value) || value <= 0) continue;
+    const key = target as PackageFeeInvoiceType;
+    totals[key] = round2((totals[key] ?? 0) + value);
+  }
+  return totals;
 }
 
 function amountsFor(
@@ -112,6 +153,7 @@ export function buildPackageFeeDocuments(
   for (const spec of PACKAGE_FEE_COMPONENTS) {
     const all = orders.map((order) => ({
       order,
+      discount: order.feeDiscounts?.[spec.type] ?? 0,
       ...amountsFor(order, spec),
     }));
     const base = round2(all.reduce((sum, row) => sum + row.base, 0));
@@ -127,6 +169,16 @@ export function buildPackageFeeDocuments(
     const taxAmount = round2(
       rows.reduce((sum, row) => sum + round2((row.net * rate) / 100), 0),
     );
+    // İskonto matrahla AYNI oranda küçülür: kısmi iadede indirimin de iade
+    // edilen kısmı gösterilmemeli, yoksa brüt bedel tahsil edilenden büyük
+    // görünür. Matrahı sıfırlanmış kalem iskonto da göstermez.
+    const discount = round2(
+      rows.reduce(
+        (sum, row) =>
+          sum + (row.base > 0 ? (row.discount * row.net) / row.base : 0),
+        0,
+      ),
+    );
     const lines: InvoiceLineItem[] =
       rows.length > 0
         ? [
@@ -134,7 +186,8 @@ export function buildPackageFeeDocuments(
               name: LINE_DESCRIPTION[spec.type],
               quantity: 1,
               net,
-              unitPrice: net,
+              ...(discount > 0 ? { discount } : {}),
+              unitPrice: round2(net + discount),
               vatRate: rate,
               taxAmount,
             },
@@ -146,6 +199,7 @@ export function buildPackageFeeDocuments(
       side: spec.side,
       base,
       net,
+      discount: rows.length > 0 ? discount : 0,
       lines,
     });
   }

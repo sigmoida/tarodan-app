@@ -3,6 +3,7 @@ import { randomUUID } from "crypto";
 import { Prisma, type ElogoInvoice } from "@prisma/client";
 import { PrismaService } from "../../prisma";
 import {
+  invoiceDiscountFromLines,
   invoiceTotalsFromLines,
   type InvoiceLineItem,
 } from "./invoice/invoice-lines";
@@ -252,7 +253,11 @@ export class ElogoReversalService {
         elogoResultMsg: null,
         refundAdjustedAt: adjustment?.finalizedAt,
         ...(doc
-          ? { lineItems: doc.lines as unknown as Prisma.InputJsonValue }
+          ? {
+              lineItems: doc.lines as unknown as Prisma.InputJsonValue,
+              // İskonto da matrahla birlikte küçülür; kayıt satırlarla tutmalı.
+              discountTotal: invoiceDiscountFromLines(doc.lines),
+            }
           : {}),
       },
     });

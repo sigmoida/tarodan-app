@@ -19,6 +19,7 @@ import { NotificationService } from "../notification/notification.service";
 import { NotificationType } from "../notification/dto";
 import { buildInvoiceXml } from "./ubl/ubl-invoice.builder";
 import {
+  invoiceDiscountFromLines,
   invoiceTotalsFromLines,
   readInvoiceLineItems,
 } from "./invoice/invoice-lines";
@@ -153,6 +154,9 @@ export class ElogoDeliveryService {
                   taxAmount: amounts.tax,
                   total: amounts.total,
                   originalTotal: amounts.total,
+                  discountTotal: hasLines
+                    ? invoiceDiscountFromLines(lineItems!)
+                    : 0,
                   vatRate,
                   status: "pending",
                   sourceReference: sourceReference?.trim() || null,
@@ -428,6 +432,7 @@ export class ElogoDeliveryService {
               quantity: l.quantity,
               unitPrice: l.unitPrice,
               lineExtension: l.net,
+              discount: l.discount,
               vatRate: l.vatRate,
               taxAmount: l.taxAmount,
             }))
@@ -538,6 +543,9 @@ export class ElogoDeliveryService {
               netAmount: totals.taxExclusive,
               taxAmount: totals.tax,
               total: totals.payable,
+              // İskonto da belgeden okunur: kayıt, gerçekten basılan XML ile
+              // aynı iskontoyu taşımalı (rapor bu kolonu okur).
+              discountTotal: totals.allowance,
               sendType,
               status: "sent",
               elogoRefId: res.refId != null ? String(res.refId) : null,
@@ -583,6 +591,7 @@ export class ElogoDeliveryService {
             netAmount: totals.taxExclusive,
             taxAmount: totals.tax,
             total: totals.payable,
+            discountTotal: totals.allowance,
             status: "failed",
             ...(configurationFailure
               ? { attemptCount: ELOGO_MAX_SEND_ATTEMPTS }

@@ -22,6 +22,7 @@ const doc = (
   side,
   base: net,
   net,
+  discount: 0,
   lines: [{ name: type, quantity: 1, net, unitPrice: net, vatRate: 20 }],
 });
 

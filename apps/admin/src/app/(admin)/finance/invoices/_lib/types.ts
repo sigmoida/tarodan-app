@@ -20,6 +20,8 @@ export interface Invoice {
   netAmount: number;
   taxAmount: number;
   total: number;
+  /** Belgede gösterilen iskonto (KDV hariç); brüt bedel = netAmount + bu. */
+  discountTotal: number;
   vatRate: number;
   billingReference: string | null;
   hasPdf: boolean;
@@ -156,6 +158,7 @@ export function mapInvoices(raw: any[]): Invoice[] {
     netAmount: Number(r.netAmount || 0),
     taxAmount: Number(r.taxAmount || 0),
     total: Number(r.total || 0),
+    discountTotal: Number(r.discountTotal || 0),
     vatRate: Number(r.vatRate || 0),
     billingReference: r.billingReference,
     hasPdf: !!r.hasPdf,

@@ -72,6 +72,11 @@ export const elogoColumns = (
         <p className="text-xs text-muted">
           {t("admin.finance.common.vat")}: {fmtTry(i.taxAmount)}
         </p>
+        {i.discountTotal > 0 && (
+          <p className="text-xs text-muted">
+            {t("admin.finance.invoices.discount")}: {fmtTry(i.discountTotal)}
+          </p>
+        )}
       </div>
     ),
     { align: "right", minWidth: 120, sortKey: "total", sortType: "number" },

@@ -13,9 +13,15 @@
 export interface InvoiceLineItem {
   name: string;
   quantity: number;
-  /** Satırın KDV HARİÇ toplamı. */
+  /** Satırın KDV HARİÇ, İSKONTO DÜŞÜLMÜŞ toplamı — KDV matrahı budur. */
   net: number;
-  /** KDV hariç birim fiyat (`net / quantity`, bölünmeden). */
+  /**
+   * Satıra uygulanan iskonto (KDV hariç). Kesinti kolonları indirim SONRASI
+   * tutarı taşır; fatura ise şablon gereği BRÜT bedeli birim fiyat yazıp indirimi
+   * ayrı gösterir. Brüt = `net + discount`, matrah yine `net`.
+   */
+  discount?: number;
+  /** KDV hariç BRÜT birim fiyat (`(net + discount) / quantity`, bölünmeden). */
   unitPrice: number;
   /** Satırın KDV oranı (%). */
   vatRate: number;
@@ -70,14 +76,20 @@ export function readInvoiceLineItems(raw: unknown): InvoiceLineItem[] {
     if (!Number.isFinite(vatRate) || vatRate < 0) continue;
     const unitPrice = Number(r.unitPrice);
     const taxAmount = Number(r.taxAmount);
+    const rawDiscount = Number(r.discount);
+    const discount =
+      Number.isFinite(rawDiscount) && rawDiscount > 0 ? round2(rawDiscount) : 0;
     lines.push({
       name,
       quantity,
       net: round2(net),
+      ...(discount > 0 ? { discount } : {}),
+      // Birim fiyat BRÜT'tür: iskontolu satırda matrahtan türetmek, UBL'de
+      // `miktar × fiyat − iskonto = matrah` eşitliğini bozardı.
       unitPrice:
         Number.isFinite(unitPrice) && unitPrice > 0
           ? unitPrice
-          : net / quantity,
+          : (net + discount) / quantity,
       vatRate,
       ...(Number.isFinite(taxAmount) && taxAmount >= 0
         ? { taxAmount: round2(taxAmount) }
@@ -96,6 +108,11 @@ export function lineTaxOf(line: InvoiceLineItem): number {
   return typeof line.taxAmount === "number" && Number.isFinite(line.taxAmount)
     ? round2(line.taxAmount)
     : round2((line.net * line.vatRate) / 100);
+}
+
+/** Kalemlerin iskonto toplamı (KDV hariç) — belgenin `discountTotal`'ı. */
+export function invoiceDiscountFromLines(lines: InvoiceLineItem[]): number {
+  return round2(lines.reduce((sum, l) => sum + (l.discount ?? 0), 0));
 }
 
 /** Kalemlerden belge toplamları — çok oranlı belgede tek oranla hesaplanamaz. */

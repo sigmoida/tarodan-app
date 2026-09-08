@@ -301,6 +301,13 @@ yerdedir: `modules/elogo/invoice/package-fee-components.ts`.
   (`InvoiceLineItem.taxAmount`) — checkout tahsil ederken böyle yuvarlıyor
   (`order-service-tax.helper.ts`), birleşik matrahtan yeniden hesaplamak beyanı
   tahsilattan bir kuruş ayırabilirdi.
+- **İskonto**: bedel indirimleri (`DiscountTarget.*_commission` / `*_service_fee`
+  / `*_platform_fee` / `*_shipping`) kesinti kolonlarına indirim SONRASI yazılır,
+  bu yüzden fatura indirimi göremiyordu. Belge artık BRÜT bedeli birim fiyat
+  yazar ve indirimi `cac:AllowanceCharge` + `cbc:AllowanceTotalAmount` ile ayrı
+  gösterir; KDV matrahı yine indirimli tutardır. Kaynak `Order.feeDiscountBreakdown`
+  snapshot'ıdır (hedef adları belge tipleriyle birebir aynı), belge toplamı
+  `ElogoInvoice.discountTotal`. Kısmi iadede iskonto matrahla aynı oranda küçülür.
 - **Fatura kayıt no** (`ElogoInvoice.sourceReference`) kesim anında
   snapshot'lanır: koli kodunun gövdesinden türetilen `KYT-…`
   (`invoiceRecordReference`, bkz. CODE_SCHEME.md §2); ürün faturası sipariş
