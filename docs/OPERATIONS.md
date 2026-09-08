@@ -31,6 +31,27 @@
   API'den bağımsız acil yedek koddur. Erken erişim PIN'leri admin
   `System → Early Access`'ten yönetilir (unlock cookie 10 gün).
 
+### Canlıda test şeridi (App Review / mobil QA hesapları)
+
+Canlıda `User.isTestAccount=true` hesaplar izole bir **test şeridi** oluşturur
+(bkz. `docs/mobile-parity/20-test-lane-2026-09-08.md`). Sipariş/ödeme/takas/ledger
+satırları DB trigger'ıyla `is_test` damgası alır; uygulama kodu bayrağı unutamaz.
+
+- **Hesap açma:** admin → Sistem → Test Araçları → Test Şeridi (yalnız süper-admin,
+  audit'e yazılır). Hesap doğrulanmış ve adresli açılır.
+- **Ne olmaz:** PayTR gerçek tahsilat (form `test_mode=1`), Sürat gönderisi
+  (`TEST…` takip kodu), eLogo belgesi, payout, finans/dashboard sayımı, canlı
+  vitrinde görünürlük.
+- **Sıfırlama:** aynı karttaki "Şeridi sıfırla" test hesaplarının işlem
+  kayıtlarını siler; hesaplar ve ilanlar kalır. Canlı satırlar sorguya giremez
+  (filtre `is_test`/test hesap kimlikleri üzerinden).
+- **Guard:** prod'da test-modu PayTR callback'i yalnız `Payment.isTest=true`
+  ödemeler için kabul edilir; canlı ödemeye gelen `test_mode=1` başarı bildirimi
+  ve test ödemesine gelen `test_mode=0` başarı bildirimi reddedilir
+  (`PAYTR_TEST_MODE_CALLBACK_REJECTED`).
+- Yeni bir dış-dünya yan etkisi (fatura/kargo/para) eklenirse `isTest`
+  kapısı zorunludur; şerit kuralları `modules/account-lane/` altında.
+
 ### eLogo ortamı: demo ile canlı arasında "test bayrağı" yok
 
 eLogo'da PayTR/Sürat'taki gibi bir test modu yoktur; belgenin GİB'e gidip

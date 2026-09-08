@@ -17,26 +17,27 @@ kabul kriteri** verir. Ekranın nasıl görüneceği mobil reponun kendi tasarı
 
 Sıra tesadüfi değil: para akışı ve yasal zorunluluk taşıyan alanlar öncedir.
 
-| #   | Dosya                           | Kapsam                                                           |
-| --- | ------------------------------- | ---------------------------------------------------------------- |
-| 01  | `01-auth-account.md`            | Kayıt, giriş, 2FA, e-posta doğrulama, şifre, Google/Apple        |
-| 02  | `02-catalog-search.md`          | Anasayfa, kategori/marka, ürün detay, arama, koleksiyon, favori  |
-| 03  | `03-listings-seller.md`         | İlan oluştur/düzenle, görseller, indirim, öne çıkarma paketleri  |
-| 04  | `04-cart-checkout-payment.md`   | Sepet, kupon, quote, checkout, PayTR/3DS, misafir ödeme          |
-| 05  | `05-orders-shipping.md`         | Sipariş listesi/detay, kargo takip, teslim onayı, fatura         |
-| 06  | `06-offers-trades.md`           | Teklif ve takas akışları                                         |
-| 07  | `07-refunds-returns.md`         | İade talebi, iade kargosu, durum akışı                           |
-| 08  | `08-membership-corporate.md`    | Üyelik katmanları, satın alma, kurumsal başvuru + belgeler       |
-| 09  | `09-messaging-notifications.md` | Mesajlar, bildirimler, push, realtime (Socket.IO)                |
-| 10  | `10-profile-settings.md`        | Profil, adres, IBAN, ayarlar, hesap silme                        |
-| 11  | `11-api-contract.md`            | İstemci sözleşmesi, hata kodları, endpoint kataloğu (üretilen)   |
-| 12  | `12-mobile-platform.md`         | Token saklama, deep link, force-update, i18n, izinler            |
-| 13  | `13-parity-matrix.md`           | Web işlevi → mobildeki durum → öncelik (**v2, 2026-08-02**)      |
-| 14  | `14-shipping-package-tiers.md`  | **Kargo paket boyutları** — desi kaldırıldı; 03 ve 04'ü ezer     |
-| 15  | `15-api-delta-2026-08-02.md`    | **Değişiklik güncesi** (31 Tem → 2 Ağu) — çelişkide bu kazanır   |
-| 16  | `16-agent-brief.md`             | **Agent brifingi** — ne yapıldı, okuma sırası, ilk 4 iş          |
-| 17  | `17-api-delta-2026-08-04.md`    | **Değişiklik güncesi** (2 → 4 Ağu)                               |
-| 18  | `18-api-delta-2026-08-07.md`    | **Güncel değişiklik güncesi** (4 → 7 Ağu) — çelişkide bu kazanır |
+| #   | Dosya                           | Kapsam                                                             |
+| --- | ------------------------------- | ------------------------------------------------------------------ |
+| 01  | `01-auth-account.md`            | Kayıt, giriş, 2FA, e-posta doğrulama, şifre, Google/Apple          |
+| 02  | `02-catalog-search.md`          | Anasayfa, kategori/marka, ürün detay, arama, koleksiyon, favori    |
+| 03  | `03-listings-seller.md`         | İlan oluştur/düzenle, görseller, indirim, öne çıkarma paketleri    |
+| 04  | `04-cart-checkout-payment.md`   | Sepet, kupon, quote, checkout, PayTR/3DS, misafir ödeme            |
+| 05  | `05-orders-shipping.md`         | Sipariş listesi/detay, kargo takip, teslim onayı, fatura           |
+| 06  | `06-offers-trades.md`           | Teklif ve takas akışları                                           |
+| 07  | `07-refunds-returns.md`         | İade talebi, iade kargosu, durum akışı                             |
+| 08  | `08-membership-corporate.md`    | Üyelik katmanları, satın alma, kurumsal başvuru + belgeler         |
+| 09  | `09-messaging-notifications.md` | Mesajlar, bildirimler, push, realtime (Socket.IO)                  |
+| 10  | `10-profile-settings.md`        | Profil, adres, IBAN, ayarlar, hesap silme                          |
+| 11  | `11-api-contract.md`            | İstemci sözleşmesi, hata kodları, endpoint kataloğu (üretilen)     |
+| 12  | `12-mobile-platform.md`         | Token saklama, deep link, force-update, i18n, izinler              |
+| 13  | `13-parity-matrix.md`           | Web işlevi → mobildeki durum → öncelik (**v2, 2026-08-02**)        |
+| 14  | `14-shipping-package-tiers.md`  | **Kargo paket boyutları** — desi kaldırıldı; 03 ve 04'ü ezer       |
+| 15  | `15-api-delta-2026-08-02.md`    | **Değişiklik güncesi** (31 Tem → 2 Ağu) — çelişkide bu kazanır     |
+| 16  | `16-agent-brief.md`             | **Agent brifingi** — ne yapıldı, okuma sırası, ilk 4 iş            |
+| 17  | `17-api-delta-2026-08-04.md`    | **Değişiklik güncesi** (2 → 4 Ağu)                                 |
+| 18  | `18-api-delta-2026-08-07.md`    | **Güncel değişiklik güncesi** (4 → 7 Ağu) — çelişkide bu kazanır   |
+| 20  | `20-test-lane-2026-09-08.md`    | **Canlı test şeridi** — App Review / QA hesapları, PayTR test modu |
 
 **Önce `11` ve `12` okunmalı.** Oradaki istemci sözleşmesi (bearer token, hata kodları,
 sayfalama) her domain dosyasında varsayılır ve tekrar edilmez.
