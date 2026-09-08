@@ -87,13 +87,19 @@ export default function InvoicesSection({ order }: { order: OrderDetail }) {
                     </p>
                   )}
                 </div>
+                {/* Yükleniyor durumu SATIR bazlıdır: tek `isPending` bayrağı
+                    tıklanmayan belgelerin düğmesini de kilitliyordu. */}
                 <Button
                   variant="outline"
                   size="sm"
                   onClick={() => downloadElogo.mutate(invoice.id)}
-                  disabled={downloadElogo.isPending}
+                  disabled={
+                    downloadElogo.isPending &&
+                    downloadElogo.variables === invoice.id
+                  }
                 >
-                  {downloadElogo.isPending
+                  {downloadElogo.isPending &&
+                  downloadElogo.variables === invoice.id
                     ? t("common.opening")
                     : t("order.viewDownloadInvoice")}
                 </Button>

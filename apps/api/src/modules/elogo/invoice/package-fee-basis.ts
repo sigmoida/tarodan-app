@@ -2,6 +2,7 @@ import { LINE_DESCRIPTION } from "./invoice-line-description";
 import type { InvoiceLineItem } from "./invoice-lines";
 import {
   PACKAGE_FEE_COMPONENTS,
+  type PackageFeeComponentSpec,
   type PackageFeeInvoiceType,
 } from "./package-fee-components";
 
@@ -78,9 +79,8 @@ export function hasCompleteComponentBreakdown(
 
 function amountsFor(
   order: PackageFeeOrderRow,
-  type: PackageFeeInvoiceType,
+  spec: PackageFeeComponentSpec,
 ): { base: number; net: number } {
-  const spec = PACKAGE_FEE_COMPONENTS.find((c) => c.type === type)!;
   if (spec.source.kind === "shipping") {
     const base = positive(order[spec.source.amountField]);
     const refunded =
@@ -110,7 +110,7 @@ export function buildPackageFeeDocuments(
   for (const spec of PACKAGE_FEE_COMPONENTS) {
     const all = orders.map((order) => ({
       order,
-      ...amountsFor(order, spec.type),
+      ...amountsFor(order, spec),
     }));
     const base = round2(all.reduce((sum, row) => sum + row.base, 0));
     // Bedeli hiç doğmamış hizmet için belge yoktur. Tamamı iade edilmiş kalem

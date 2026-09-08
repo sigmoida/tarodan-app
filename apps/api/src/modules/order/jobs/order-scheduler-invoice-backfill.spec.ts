@@ -11,29 +11,30 @@ import { OrderSchedulerService } from "./order-scheduler.service";
  * çözmek için eklendiği pencere-doygunluğu hatası geri dönüyordu.
  */
 describe("OrderSchedulerService — fatura backfill işareti", () => {
-  const makeService = () => {
+  const makeService = (
+    candidate: Record<string, unknown> = {
+      id: "order-1",
+      commissionLedger: { buyerFee: 30, sellerCommission: 100 },
+      seller: { sellerType: "individual" },
+    },
+    invoices: Array<{ sourceId: string; type: string }> = [
+      { sourceId: "order-1", type: "commission" },
+      { sourceId: "order-1", type: "service_fee" },
+    ],
+  ) => {
     const prisma = {
       order: {
         // 1. çağrı: backfill adayları; 2. çağrı: iade penceresi kapananlar.
         findMany: jest
           .fn()
-          .mockResolvedValueOnce([
-            {
-              id: "order-1",
-              commissionLedger: { buyerFee: 30, sellerCommission: 100 },
-              seller: { sellerType: "individual" },
-            },
-          ])
+          .mockResolvedValueOnce([candidate])
           .mockResolvedValue([]),
         update: jest.fn().mockResolvedValue({}),
         count: jest.fn().mockResolvedValue(0),
       },
       elogoInvoice: {
         // Beklenen her iki fatura türü de mevcut → sipariş tam faturalı.
-        findMany: jest.fn().mockResolvedValue([
-          { sourceId: "order-1", type: "commission" },
-          { sourceId: "order-1", type: "service_fee" },
-        ]),
+        findMany: jest.fn().mockResolvedValue(invoices),
       },
       tradeCashPayment: { findMany: jest.fn().mockResolvedValue([]) },
     };
@@ -67,6 +68,65 @@ describe("OrderSchedulerService — fatura backfill işareti", () => {
           revenueInvoicedAt: expect.any(Date),
         }),
       }),
+    );
+  });
+
+  /**
+   * Kırılımı OLMAYAN defterde altı bileşen sütunu da 0'dır; "hizmet başına
+   * belgeler tam mı?" testi bu yüzden kendiliğinden doğru döner. İki nesli
+   * OR'lamak, kesilmemiş birleşik komisyon faturası olan siparişi faturalanmış
+   * işaretleyip bir daha hiç denemiyordu — gelir belgesi kalıcı olarak kaybolur.
+   */
+  it("kırılımı olmayan defterde birleşik belge eksikse sipariş İŞARETLENMEZ", async () => {
+    const { service, prisma } = makeService(
+      {
+        id: "order-1",
+        packageId: "pkg-1",
+        buyerShippingAmount: 40,
+        commissionLedger: {
+          buyerFee: 30,
+          sellerCommission: 100,
+          componentBreakdownComplete: false,
+          buyerCommissionAmount: 0,
+          buyerPlatformFeeAmount: 0,
+          sellerCommissionAmount: 0,
+          sellerPlatformFeeAmount: 0,
+        },
+        seller: { sellerType: "individual" },
+      },
+      // Yalnız kargo belgesi kesilmiş; birleşik komisyon/hizmet bedeli YOK.
+      [{ sourceId: "pkg-1", type: "buyer_shipping" }],
+    );
+
+    await service.runProcessDeliveredOrders();
+
+    expect(prisma.order.update).not.toHaveBeenCalled();
+  });
+
+  /**
+   * Kargo belgeleri yalnız PAKET anahtarlı kesilir; paketi olmayan eski
+   * siparişte hiç doğmaz. Orada aranırsa sipariş sonsuza dek aday penceresinde
+   * kalır — işaretin çözdüğü doygunluk hatası geri gelir.
+   */
+  it("paketi olmayan siparişte kargo belgesi aranmaz", async () => {
+    const { service, prisma } = makeService(
+      {
+        id: "order-1",
+        packageId: null,
+        buyerShippingAmount: 40,
+        commissionLedger: { buyerFee: 30, sellerCommission: 100 },
+        seller: { sellerType: "individual" },
+      },
+      [
+        { sourceId: "order-1", type: "commission" },
+        { sourceId: "order-1", type: "service_fee" },
+      ],
+    );
+
+    await service.runProcessDeliveredOrders();
+
+    expect(prisma.order.update).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { id: "order-1" } }),
     );
   });
 });

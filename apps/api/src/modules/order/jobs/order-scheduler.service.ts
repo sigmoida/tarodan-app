@@ -430,6 +430,7 @@ export class OrderSchedulerService implements OnModuleInit {
           select: {
             buyerFee: true,
             sellerCommission: true,
+            componentBreakdownComplete: true,
             buyerCommissionAmount: true,
             buyerPlatformFeeAmount: true,
             sellerCommissionAmount: true,
@@ -473,11 +474,16 @@ export class OrderSchedulerService implements OnModuleInit {
         // Paketi olmayan (eski) siparişlerde ücret faturaları sipariş anahtarlıdır.
         const feeSourceId = o.packageId ?? o.id;
         const ledger = o.commissionLedger;
-        // Ücret belgeleri İKİ NESİLDEN biriyle kesilmiş olabilir: birleşik
-        // (commission + service_fee) ya da hizmet başına (taraf başına iki
-        // ücret belgesi). Hangisi tamsa sipariş faturalanmış sayılır — yalnız
-        // birini sormak, diğer nesille kesilmiş paketi sonsuza dek aday
-        // kümesinde tutar. Kargo payı belgeleri iki nesilde de kesilir.
+        // Ücret belgeleri İKİ NESİLDEN biriyle kesilir ve nesil seçimi
+        // ElogoIssuingService.issuePackageFeeInvoices'taki kuralın AYNISIDIR:
+        // birleşik belge zaten varsa ya da defterde kalem kırılımı yoksa eski
+        // nesil, aksi halde hizmet başına. İki nesli "biri tamsa tamam" diye
+        // OR'lamak sessiz bir kayıp üretiyordu: kırılımı olmayan defterde altı
+        // bileşen sütunu da 0'dır, dolayısıyla hizmet başına test kendiliğinden
+        // "tam" döner ve kesilmemiş birleşik komisyon faturası olan sipariş
+        // faturalanmış işaretlenip bir daha hiç denenmezdi.
+        const legacyIssued =
+          has(`${feeSourceId}:commission`) || has(`${feeSourceId}:service_fee`);
         const legacyFeesDone =
           (!(Number(ledger?.sellerCommission) > 0) ||
             has(`${feeSourceId}:commission`)) &&
@@ -494,19 +500,28 @@ export class OrderSchedulerService implements OnModuleInit {
           ([field, type]) =>
             !(Number(ledger?.[field]) > 0) || has(`${feeSourceId}:${type}`),
         );
-        const shippingDone = (
-          [
-            [o.buyerShippingAmount, "buyer_shipping"],
-            [o.sellerShippingAmount, "seller_shipping"],
-          ] as const
-        ).every(
-          ([amount, type]) =>
-            !(Number(amount) > 0) || has(`${feeSourceId}:${type}`),
-        );
+        const feesDone =
+          legacyIssued || !ledger?.componentBreakdownComplete
+            ? legacyFeesDone
+            : perServiceFeesDone;
+        // Kargo belgeleri YALNIZ paket anahtarlı kesilir; paketi olmayan eski
+        // siparişte hiç doğmaz, dolayısıyla orada aranmaz — aranırsa sipariş
+        // sonsuza dek aday penceresinde kalır ve her tur boşa denenir.
+        const shippingDone =
+          !o.packageId ||
+          (
+            [
+              [o.buyerShippingAmount, "buyer_shipping"],
+              [o.sellerShippingAmount, "seller_shipping"],
+            ] as const
+          ).every(
+            ([amount, type]) =>
+              !(Number(amount) > 0) || has(`${feeSourceId}:${type}`),
+          );
         const invoicesComplete =
           o.seller.sellerType === "platform"
             ? has(`${o.id}:platform_sale`)
-            : (legacyFeesDone || perServiceFeesDone) && shippingDone;
+            : feesDone && shippingDone;
         if (invoicesComplete) {
           // Faturaları tam ama işareti eksik (tekil tetiklerle kesilmiş) sipariş:
           // işaretlemeden atlanırsa aday penceresinde sonsuza dek yer tutar ve

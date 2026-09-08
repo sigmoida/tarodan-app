@@ -275,17 +275,22 @@ export class ElogoDocumentService {
   }
 
   /**
-   * Alıcıya GERİ VERİLMİŞ gidiş kargosu, sipariş bazında.
+   * Alıcıya GERİ VERİLMİŞ gidiş kargosu — PAKET toplamı.
    *
    * Kargo payının kesinti defterinde kümülatif iade sütunu yoktur (ücretler
    * gibi), bu yüzden iade bileşenlerinden toplanır. Yalnız parası GERÇEKTEN
    * iade edilmiş talepler sayılır: politikası kesinleşmiş ama ödemesi dönmemiş
    * bir talebi düşmek faturayı tahsilatın altına indirirdi.
+   *
+   * Toplam SİPARİŞ BAZINDA dağıtılmaz: grup checkout kargo payını satıcının
+   * yalnız İLK siparişine yazar, gidiş kargosunu iade eden talep ise paketi
+   * KAPATAN (çoğu kez kardeş) siparişe düşer. İadeyi doğduğu siparişte düşmek
+   * onu yok ediyordu (0 − iade = 0) ve kargo tamamen geri verildikten sonra da
+   * belge tam matrahla kesiliyordu.
    */
-  private async refundedBuyerShippingByOrder(
+  private async refundedBuyerShippingForOrders(
     orderIds: string[],
-  ): Promise<Map<string, number>> {
-    const byOrder = new Map<string, number>();
+  ): Promise<number> {
     try {
       const rows = await this.prisma.refundFinancialComponent.findMany({
         where: {
@@ -296,23 +301,14 @@ export class ElogoDocumentService {
             refundedAt: { not: null },
           },
         },
-        select: {
-          netAmount: true,
-          refundRequest: { select: { orderId: true } },
-        },
+        select: { netAmount: true },
       });
-      for (const row of rows) {
-        const orderId = row.refundRequest.orderId;
-        byOrder.set(
-          orderId,
-          (byOrder.get(orderId) ?? 0) + Number(row.netAmount),
-        );
-      }
+      return rows.reduce((sum, row) => sum + Number(row.netAmount), 0);
     } catch {
       // İade bileşenleri okunamadı — kargo matrahı iade DÜŞÜLMEDEN kesilir ve
       // fazlası iade faturasıyla dengelenir; belgeyi hiç kesmemek daha kötüdür.
+      return 0;
     }
-    return byOrder;
   }
 
   /**
@@ -372,16 +368,23 @@ export class ElogoDocumentService {
     // kümülatif iade sütunu yoktur, iade bileşenlerinden toplanır. Yalnız parası
     // gerçekten iade edilmiş talepler sayılır — politika kesinleşmiş ama ödeme
     // dönmemiş bir talebi düşmek faturayı tahsilatın altına indirirdi.
-    const refundedShippingByOrder = await this.refundedBuyerShippingByOrder(
+    //
+    // Paket toplamı, kargo payını TAŞIYAN siparişe yazılır: iade kardeş
+    // siparişten doğmuş olabilir ve orada düşülürse (matrahı 0) yok olurdu.
+    const refundedBuyerShipping = await this.refundedBuyerShippingForOrders(
       pkg.orders.map((o) => o.id),
     );
+    const shippingCarrierId =
+      pkg.orders.find((o) => Number(o.buyerShippingAmount ?? 0) > 0)?.id ??
+      null;
 
     const orders: PackageFeeOrderRow[] = pkg.orders.map((order) => ({
       id: order.id,
       productName: order.product?.title ?? "",
       buyerShippingAmount: Number(order.buyerShippingAmount ?? 0),
       sellerShippingAmount: Number(order.sellerShippingAmount ?? 0),
-      refundedBuyerShippingAmount: refundedShippingByOrder.get(order.id) ?? 0,
+      refundedBuyerShippingAmount:
+        order.id === shippingCarrierId ? refundedBuyerShipping : 0,
       ledger: order.commissionLedger
         ? {
             componentBreakdownComplete:
