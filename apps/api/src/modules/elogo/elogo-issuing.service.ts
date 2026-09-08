@@ -8,6 +8,7 @@ import {
 } from "./invoice/package-fee-components";
 import { LINE_DESCRIPTION } from "./invoice/invoice-line-description";
 import { resolveGuestInvoiceRecipient } from "./invoice/elogo-guest-recipient";
+import { invoiceRecordReference } from "../../common/helpers/code-prefixes";
 import { ElogoDocumentService } from "./elogo-document.service";
 import { ElogoDeliveryService } from "./elogo-delivery.service";
 
@@ -145,6 +146,7 @@ export class ElogoIssuingService {
   private async resolvePackageInvoiceBasis(packageId: string): Promise<{
     sellerId: string;
     buyerId: string;
+    packageNumber: string;
     netCommission: number;
     netBuyerFee: number;
     hasSellerCommission: boolean;
@@ -158,6 +160,7 @@ export class ElogoIssuingService {
       select: {
         sellerId: true,
         buyerId: true,
+        packageNumber: true,
         orders: {
           select: {
             id: true,
@@ -177,6 +180,7 @@ export class ElogoIssuingService {
     return {
       sellerId: pkg.sellerId,
       buyerId: pkg.buyerId,
+      packageNumber: pkg.packageNumber,
       netCommission: totals?.netSellerCommission ?? 0,
       netBuyerFee: totals?.netBuyerFee ?? 0,
       hasSellerCommission: pkg.orders.some(
@@ -248,6 +252,7 @@ export class ElogoIssuingService {
           doc.net,
           {
             lineItems: doc.lines,
+            sourceReference: invoiceRecordReference(basis.packageNumber),
             // Misafir siparişinde alıcının gerçek kimliği yalnız kargo
             // adresinde durur; satıcı tarafı için anlamsızdır.
             guestRecipient:
@@ -311,7 +316,10 @@ export class ElogoIssuingService {
       packageId,
       basis.sellerId,
       basis.netCommission,
-      { lineDescription: desc },
+      {
+        lineDescription: desc,
+        sourceReference: invoiceRecordReference(basis.packageNumber),
+      },
     );
   }
 
@@ -337,6 +345,7 @@ export class ElogoIssuingService {
       basis.netBuyerFee,
       {
         lineDescription: desc,
+        sourceReference: invoiceRecordReference(basis.packageNumber),
         guestRecipient: resolveGuestInvoiceRecipient(basis.shippingAddress),
       },
     );
@@ -356,6 +365,7 @@ export class ElogoIssuingService {
       select: {
         sellerId: true,
         buyerId: true,
+        orderNumber: true,
         totalAmount: true,
         checkoutGroupId: true,
         shippingAddress: true,
@@ -416,6 +426,9 @@ export class ElogoIssuingService {
         guestRecipient: resolveGuestInvoiceRecipient(order.shippingAddress),
         categoryId,
         lineItems,
+        // Ürün faturası SİPARİŞ anahtarlıdır (koli değil) — kayıt no da sipariş
+        // numarasının gövdesinden türetilir.
+        sourceReference: invoiceRecordReference(order.orderNumber),
       },
     );
   }

@@ -44,6 +44,12 @@ export interface CutOptions {
   categoryId?: string | null;
   /** Çok kalemli belge (ürün + kargo + hizmet bedeli). Boşsa tek kalem kesilir. */
   lineItems?: InvoiceLineItem[];
+  /**
+   * Kaynağın insan-okur kodu (koli kodu, ör. `PKG-000123`). Belgeye "Sipariş No"
+   * olarak basılır ve kayda snapshot'lanır — `sourceId` bir UUID olduğu için
+   * faturada gösterilemez, admin listesinde de belgeyi siparişe bağlamaz.
+   */
+  sourceReference?: string | null;
 }
 
 @Injectable()

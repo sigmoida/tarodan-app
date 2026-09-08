@@ -32,6 +32,13 @@ export interface UblParty {
 
 export interface UblInvoiceLine {
   name: string;
+  /**
+   * Kalemin AÇIKLAMASI (`cac:Item/cbc:Description`) — hizmet faturalarında
+   * "Sipariş No: PKG-…". Belgenin hangi koliden doğduğu kalemin üstünde
+   * durmalı; belge notu tek başına yeterli değil, çoğu XSLT tasarımı satırın
+   * açıklamasını basar.
+   */
+  description?: string;
   quantity: number;
   /** Birim kodu (UBL). Adet=C62, ay=MON. Varsayılan C62. */
   unitCode?: string;
@@ -47,6 +54,14 @@ export interface UblInvoiceLine {
   lineExtension?: number;
   /** KDV oranı (%). Örn. 20. */
   vatRate: number;
+  /**
+   * Satırın KDV'si, AÇIKÇA verildiğinde. Verilmezse `lineExtension × vatRate`.
+   *
+   * Paket hizmet belgeleri tek satırdır ama KDV'leri sipariş bazında yuvarlanıp
+   * toplanır (checkout tahsil ederken böyle yuvarlar). Birleşik matrahtan yeniden
+   * hesaplamak beyanı tahsilattan bir kuruş ayırabilirdi.
+   */
+  taxAmount?: number;
 }
 
 export interface UblInvoiceInput {
@@ -195,7 +210,11 @@ export function buildInvoiceXml(input: UblInvoiceInput): UblInvoiceResult {
     const lineExt = round2(
       line.lineExtension ?? line.quantity * line.unitPrice,
     );
-    const lineTax = round2((lineExt * line.vatRate) / 100);
+    const lineTax = round2(
+      typeof line.taxAmount === "number" && Number.isFinite(line.taxAmount)
+        ? line.taxAmount
+        : (lineExt * line.vatRate) / 100,
+    );
     lineExtensionSum = round2(lineExtensionSum + lineExt);
     taxSum = round2(taxSum + lineTax);
     const group = byRate.get(line.vatRate) ?? { base: 0, tax: 0 };
@@ -217,7 +236,9 @@ export function buildInvoiceXml(input: UblInvoiceInput): UblInvoiceResult {
           `currencyID="${currency}"`,
         ) +
         `<cac:TaxTotal>${el("cbc:TaxAmount", money(lineTax), `currencyID="${currency}"`)}${buildTaxSubtotal(lineExt, line.vatRate, lineTax, currency)}</cac:TaxTotal>` +
-        `<cac:Item>${el("cbc:Name", line.name)}</cac:Item>` +
+        // UBL 2.1 ItemType sırası: Description, Name'den ÖNCE gelir. Ters yazmak
+        // şema doğrulamasında belgeyi reddettirir.
+        `<cac:Item>${line.description ? el("cbc:Description", line.description) : ""}${el("cbc:Name", line.name)}</cac:Item>` +
         `<cac:Price>${el("cbc:PriceAmount", unitMoney(line.unitPrice), `currencyID="${currency}"`)}</cac:Price>` +
         `</cac:InvoiceLine>`,
     );

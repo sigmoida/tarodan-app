@@ -2117,6 +2117,10 @@ model ElogoInvoice {
   type                      ElogoInvoiceType
   /// Kaynak kaydın id'si (orderId / membershipPaymentId / boostId). type+sourceId tekil → idempotency.
   sourceId                  String             @map("source_id")
+  /// FATURA KAYIT NO (ör. KYT-K7X9M2QF3N) — kesim anında snapshot'lanır. Koli/sipariş
+  /// referansından türetilir (gövde aynı, önek KYT); faturaya "Kayıt No" olarak basılır
+  /// ve hakediş dökümünün aynı adlı kolonunda durur. sourceId bir UUID, belgede yeri yok.
+  sourceReference           String?            @map("source_reference")
   recipientUserId           String?            @map("recipient_user_id")
   recipientVknTckn          String?            @map("recipient_vkn_tckn")
   recipientName             String?            @map("recipient_name")

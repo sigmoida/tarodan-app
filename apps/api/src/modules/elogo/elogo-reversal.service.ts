@@ -423,6 +423,10 @@ export class ElogoReversalService {
           net,
           unitPrice: net / quantity,
           vatRate: net > 0 ? this.documents.round2((tax / net) * 100) : 0,
+          // İade bileşeninin KDV'si politika tarafından hesaplanmıştır; orandan
+          // yeniden türetmek (oran zaten tutardan geri hesaplandı) kuruş
+          // kaydırabilir. İade faturası, gerçekten geri verilen KDV'yi yazar.
+          taxAmount: tax,
         };
       });
   }
@@ -563,6 +567,14 @@ export class ElogoReversalService {
       ...line,
       net: this.documents.round2(line.net * componentScale),
       unitPrice: (line.net * componentScale) / line.quantity,
+      // KDV de matrahla BİRLİKTE ölçeklenmeli: satır artık kendi KDV'sini açıkça
+      // taşıdığı için (taxAmount) ölçeklenmeyen tutar, küçültülmüş matrahın
+      // üstünde tam KDV beyan ederdi — iade belgesi kalan bakiyeyi aşardı.
+      ...(typeof line.taxAmount === "number"
+        ? {
+            taxAmount: this.documents.round2(line.taxAmount * componentScale),
+          }
+        : {}),
     }));
     const componentTotals = componentLines.length
       ? invoiceTotalsFromLines(componentLines)
@@ -629,6 +641,9 @@ export class ElogoReversalService {
               status: "pending",
               billingReference: inv.invoiceNumber,
               billingReferenceIssueDate: inv.issuedAt,
+              // İade faturası da hangi koliden doğduğunu taşır — orijinalin
+              // referansı aynen devralınır.
+              sourceReference: inv.sourceReference,
               lineDescription: `İade: ${
                 inv.lineDescription ||
                 LINE_DESCRIPTION[inv.type] ||
