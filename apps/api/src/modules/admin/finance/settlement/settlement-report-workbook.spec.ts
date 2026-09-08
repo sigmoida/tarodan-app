@@ -9,7 +9,7 @@ import type { SettlementRow } from "./settlement-report-row";
  */
 
 const row: SettlementRow = {
-  recordNo: "PKG-000123",
+  recordNo: "KYT-K7X9M2QF3N",
   transactionType: "Satış",
   orderNumber: "ORD-10001",
   orderedAt: new Date("2026-08-01T10:00:00Z"),
@@ -52,7 +52,7 @@ describe("SettlementReportWorkbookService", () => {
     expect(headers[20]).toBe("Müşteri Ad Soyad");
 
     const data = sheet.getRow(2);
-    expect(data.getCell(1).value).toBe("PKG-000123");
+    expect(data.getCell(1).value).toBe("KYT-K7X9M2QF3N");
     // Tutar kolonları gerçekten kendi değerlerini taşıyor — kayma yok.
     expect(data.getCell(13).value).toBe(109.89); // Tarodan Hakedişi
     expect(data.getCell(14).value).toBe(785.14); // Satıcı Hakedişi

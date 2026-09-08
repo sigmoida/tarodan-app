@@ -31,7 +31,7 @@ const COLUMNS: Column[] = [
     key: "recordNo",
     width: 20,
     format: "text",
-    note: "Koli kodu. Bu alışverişten doğan tüm faturaların (alıcı komisyonu, kargo, hizmet bedeli) ortak kaynağı.",
+    note: "Fatura kayıt no. Bu alışverişten doğan TÜM faturaların (alıcı komisyonu, kargo, hizmet bedeli) üstünde aynı kod yazar; belgeyi bu satıra bununla bağlarsınız.",
   },
   {
     header: "İşlem Tipi",

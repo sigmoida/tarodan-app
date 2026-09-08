@@ -355,7 +355,8 @@ kalem ürün faturası), `membership`, `boost`, `trade_service_fee` /
 ### Satıcı hakediş dökümü
 
 Kesilen komisyon faturasının DAYANAĞI: hangi siparişlerden doğduğu ve o
-siparişten satıcıya ne kaldığı. Admin > Finans > Hakediş Dökümü'nden dönem
+siparişten satıcıya ne kaldığı. "Kayıt No" kolonu faturaların üstünde yazan
+kodun (`KYT-…`) AYNISIDIR — belge dökümdeki satıra bununla bağlanır. Admin > Finans > Hakediş Dökümü'nden dönem
 seçilip Excel indirilir (`GET /admin/settlement-report[/export]`,
 `finance/settlement/`); mali müşavire fatura ile birlikte gider.
 

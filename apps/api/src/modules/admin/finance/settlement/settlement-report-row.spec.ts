@@ -15,7 +15,7 @@ const order = (
   over: Partial<SettlementOrderInput> = {},
 ): SettlementOrderInput => ({
   orderNumber: "ORD-10001",
-  packageNumber: "PKG-000123",
+  packageNumber: "PKG-K7X9M2QF3N",
   origin: "direct_sale",
   cancellationType: null,
   createdAt: new Date("2026-08-01T10:00:00Z"),
@@ -64,10 +64,10 @@ describe("buildSettlementRow", () => {
     ).toBe(0);
   });
 
-  it("kayıt no koli kodudur, koli yoksa sipariş numarasına düşer", () => {
-    expect(buildSettlementRow(order()).recordNo).toBe("PKG-000123");
+  it("kayıt no faturadakiyle AYNI koddur, koli yoksa siparişten türer", () => {
+    expect(buildSettlementRow(order()).recordNo).toBe("KYT-K7X9M2QF3N");
     expect(buildSettlementRow(order({ packageNumber: null })).recordNo).toBe(
-      "ORD-10001",
+      "KYT-10001",
     );
   });
 

@@ -1,3 +1,4 @@
+import { invoiceRecordReference } from "../../../../common/helpers/code-prefixes";
 import { sellerNetAmountOf } from "../../../order/helpers/order-net.helper";
 
 /**
@@ -113,9 +114,11 @@ export function buildSettlementRow(order: SettlementOrderInput): SettlementRow {
   const sellerCommission = num(order.sellerCommissionAmount);
 
   return {
-    // Kayıt no KOLİ kodudur: alıcı komisyonu, kargo ve hizmet bedeli
-    // belgelerinin tamamı aynı koliden doğar, dökümü onlara bağlayan anahtar bu.
-    recordNo: order.packageNumber ?? order.orderNumber,
+    // Kayıt no, FATURALARIN üstünde yazanla birebir aynı olmalı: müşavir dökümü
+    // belgeye bununla bağlar. Koli kodunun gövdesinden türer (KYT-…); koli yoksa
+    // sipariş numarasından.
+    recordNo:
+      invoiceRecordReference(order.packageNumber ?? order.orderNumber) ?? "",
     transactionType: settlementTransactionType(
       order.origin,
       order.cancellationType,
