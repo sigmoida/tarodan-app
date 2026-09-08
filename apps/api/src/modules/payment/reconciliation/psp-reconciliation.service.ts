@@ -62,6 +62,8 @@ export class PspReconciliationService {
     const candidates = await this.prisma.payment.findMany({
       where: {
         provider: "paytr",
+        // Test şeridi ödemeleri PayTR'nin canlı sorgu/rapor akışına girmez.
+        isTest: false,
         status: PaymentStatus.pending,
         providerConversationId: { not: null },
         OR: [
@@ -226,6 +228,7 @@ export class PspReconciliationService {
     const candidates = await this.prisma.payment.findMany({
       where: {
         provider: "paytr",
+        isTest: false,
         status: PaymentStatus.failed,
         providerConversationId: { not: null },
         updatedAt: { gt: since },

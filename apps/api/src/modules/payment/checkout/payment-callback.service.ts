@@ -369,6 +369,25 @@ export class PaymentCallbackService {
     });
 
     if (!payment && recurringPayment) {
+      // Şerit uyumu (bkz. paytr-test-mode.guard): üyelik sahibinin şeridi ile
+      // bildirimin test_mode bayrağı prod'da eşleşmek zorunda.
+      const membershipOwner = await this.prisma.userMembership.findUnique({
+        where: { id: recurringPayment.membershipId },
+        select: { user: { select: { isTestAccount: true } } },
+      });
+      if (
+        isRejectableTestModeSuccess({
+          nodeEnv: nodeEnv(),
+          status: dto.status,
+          testMode: parsed.testMode,
+          paymentIsTest: membershipOwner?.user.isTestAccount ?? false,
+        })
+      ) {
+        this.logger.error(
+          `PAYTR_TEST_MODE_CALLBACK_REJECTED merchant_oid=${dto.merchant_oid} — recurring bildirimde test_mode üyelik şeridiyle uyuşmuyor; ödeme TAMAMLANMADI`,
+        );
+        return "OK";
+      }
       const toleranceTl = parseFloat(
         this.configService.get("PAYTR_RECONCILE_AMOUNT_TOLERANCE_TL") || "0.05",
       );
@@ -444,10 +463,11 @@ export class PaymentCallbackService {
         nodeEnv: nodeEnv(),
         status: dto.status,
         testMode: parsed.testMode,
+        paymentIsTest: payment.isTest,
       })
     ) {
       this.logger.error(
-        `PAYTR_TEST_MODE_CALLBACK_REJECTED merchant_oid=${dto.merchant_oid} — production ortamında test-modu başarı bildirimi; ödeme TAMAMLANMADI`,
+        `PAYTR_TEST_MODE_CALLBACK_REJECTED merchant_oid=${dto.merchant_oid} — production ortamında test_mode=${String(parsed.testMode)} bildirimi ödeme şeridiyle (isTest=${String(payment.isTest)}) uyuşmuyor; ödeme TAMAMLANMADI`,
       );
       return "OK";
     }

@@ -6,18 +6,24 @@
  * gerçek-hash'li bir `test_mode=1` başarı bildirimi üretebilir — `merchant_oid`
  * bekleyen bir prod ödemesiyle eşleşirse sipariş SIFIR gelirle tamamlanır.
  *
- * Olasılık düşük (boot doğrulaması prod'da `PAYTR_TEST_MODE=false` zorlar ve oid
- * çakışması beklenmez) ama savunma ucuz: prod'da test-modu BAŞARI bildirimini
- * reddet. Başarısızlık bildirimleri engellenmez; sipariş temizliği çalışabilsin.
+ * Kural prod'da simetriktir: bildirimin test-modu bayrağı ödemenin kendi
+ * şeridiyle (`Payment.isTest`, DB trigger damgası) EŞLEŞMEK zorundadır.
+ *   - canlı ödeme + test_mode=1 başarı → ret (sıfır gelirle kapanmasın)
+ *   - test şeridi ödemesi + test_mode=0 başarı → ret (test hattı gerçek para
+ *     taşımasın; form zaten test_mode=1 ile açılır, uyuşmazlık sahtecilik/
+ *     yanlış yapılandırma işaretidir)
+ * Başarısızlık bildirimleri engellenmez; sipariş temizliği çalışabilsin.
+ * `test_mode` bildirimde yoksa (undefined) mevcut davranış korunur.
  */
 export function isRejectableTestModeSuccess(params: {
   nodeEnv: string | undefined;
   status: string;
   testMode: boolean | undefined;
+  /** Ödemenin şeridi; bilinmiyorsa (eski çağıranlar) canlı varsayılır. */
+  paymentIsTest?: boolean;
 }): boolean {
-  return (
-    params.nodeEnv === "production" &&
-    params.status === "success" &&
-    params.testMode === true
-  );
+  if (params.nodeEnv !== "production") return false;
+  if (params.status !== "success") return false;
+  if (params.testMode === undefined) return false;
+  return params.testMode !== (params.paymentIsTest ?? false);
 }

@@ -56,6 +56,36 @@ describe("isRejectableTestModeSuccess", () => {
     ).toBe(false);
   });
 
+  it("test şeridi ödemesi + test_mode=1 → kabul (canlı merchant'ta test kartı)", () => {
+    expect(
+      isRejectableTestModeSuccess({
+        nodeEnv: "production",
+        status: "success",
+        testMode: true,
+        paymentIsTest: true,
+      }),
+    ).toBe(false);
+  });
+
+  it("test şeridi ödemesi + test_mode=0 başarı → REDDEDİLİR (test hattı gerçek para taşımaz)", () => {
+    expect(
+      isRejectableTestModeSuccess({
+        nodeEnv: "production",
+        status: "success",
+        testMode: false,
+        paymentIsTest: true,
+      }),
+    ).toBe(true);
+    expect(
+      isRejectableTestModeSuccess({
+        nodeEnv: "production",
+        status: "failed",
+        testMode: false,
+        paymentIsTest: true,
+      }),
+    ).toBe(false);
+  });
+
   it("test_mode bilinmiyorsa engellenmez (mevcut davranış korunur)", () => {
     expect(
       isRejectableTestModeSuccess({
