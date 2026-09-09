@@ -32,6 +32,7 @@ import {
   TicketIcon,
   SparklesIcon,
   PhotoIcon,
+  ArchiveBoxIcon,
 } from "@heroicons/react/24/outline";
 
 /**
@@ -241,6 +242,18 @@ export function getNavGroups(t: T): NavGroup[] {
           icon: UsersIcon,
           description: t("admin.nav.items.users.description"),
           keywords: t("admin.nav.items.users.keywords")
+            .split(",")
+            .map((k) => k.trim()),
+          permission: "users",
+        },
+        {
+          // Silinen hesapların yasal kimlik arşivi. Kullanıcılar ekranının bir
+          // parçası olduğu için aynı `users` iznine bağlı.
+          name: t("admin.nav.items.deletedIdentities.name"),
+          href: "/accounts/deleted-identities",
+          icon: ArchiveBoxIcon,
+          description: t("admin.nav.items.deletedIdentities.description"),
+          keywords: t("admin.nav.items.deletedIdentities.keywords")
             .split(",")
             .map((k) => k.trim()),
           permission: "users",

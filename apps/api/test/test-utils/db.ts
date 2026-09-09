@@ -95,6 +95,10 @@ const TABLES_TO_TRUNCATE = [
   "push_tokens",
   "cache_entries",
   "admin_users",
+  // Kimlik arşivi: satır silinemez (BEFORE DELETE tetikleyicisi) ama TRUNCATE
+  // bilinçli olarak serbest bırakıldı; `users`ın CASCADE'i zaten süpürürdü,
+  // liste kendini belgelesin diye açıkça yazılı.
+  "deleted_user_identities",
   "users",
   // Reference data (also truncated so seedBaseline can re-insert deterministically)
   "attributes",

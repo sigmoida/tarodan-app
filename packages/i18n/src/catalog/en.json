@@ -7885,6 +7885,41 @@
       "filterLoginStateAll": "All Login States",
       "filterLoggedIn": "Logged In"
     },
+    "deletedIdentities": {
+      "title": "Deleted Account Identities",
+      "description": "Legal retention record for deleted accounts. The monthly official filing is exported from this list.",
+      "empty": "No archived identity records",
+      "totalCount": "{count} records",
+      "columnUser": "User",
+      "email": "Email",
+      "phone": "Phone",
+      "nationalId": "National ID",
+      "taxId": "Tax ID",
+      "companyName": "Company",
+      "city": "City / District",
+      "wasSeller": "Seller",
+      "registeredAt": "Registered",
+      "deletedAt": "Deleted",
+      "retainUntil": "Retention Ends",
+      "source": "Source",
+      "sourceLive": "At deletion",
+      "sourceBackfill": "Backfilled",
+      "deletedBy": "Deleted by",
+      "actorSelf": "User",
+      "actorAdmin": "Admin",
+      "actorUnknown": "Unknown",
+      "filterSource": "Source",
+      "filterWasSeller": "Seller accounts",
+      "filterRetentionExpired": "Retention expired",
+      "exportTitle": "Monthly filing",
+      "exportHint": "Pick a period; the file covers accounts deleted that month.",
+      "exportButton": "Download Excel",
+      "exportYear": "Year",
+      "exportMonth": "Month",
+      "exported": "Filing file downloaded",
+      "exportFailed": "Could not generate the filing file",
+      "retentionNotice": "Records are retained under a legal obligation and cannot be deleted; expired ones can be filtered."
+    },
     "roles": {
       "title": "Roles & Permissions",
       "description": "View and edit what each role is allowed to do",
@@ -8213,6 +8248,11 @@
           "name": "Users",
           "description": "View and manage user accounts",
           "keywords": "user,member"
+        },
+        "deletedIdentities": {
+          "name": "Deleted Identities",
+          "description": "Legal identity archive of deleted accounts and monthly filing",
+          "keywords": "deleted,archive,filing,identity,gdpr"
         },
         "sellerApplications": {
           "name": "Seller Applications",

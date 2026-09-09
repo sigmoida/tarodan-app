@@ -60,7 +60,13 @@ Herkese açık yükte `displayName` alanı **korunur ama içeriği `publicName`'
   (`guest@tarodan.system`). Satıcıya bu hesap değil, siparişin teslimat
   verisindeki gerçek alıcı adı gösterilir.
 - **Silinmiş hesap:** anonimleştirmede `displayName` "Silinmiş Kullanıcı"
-  olur; kullanıcı adı satırda kalır (yeniden dağıtılmaz).
+  olur; kullanıcı adı satırda kalır (yeniden dağıtılmaz). Silme ÖNCESİ gerçek
+  kimlik (e-posta, telefon, ad, TCKN/VKN, adres) `DeletedUserIdentity` arşivine
+  kopyalanır — aylık resmî bildirim yükümlülüğü için. Arşiv yalnız yönetici
+  panelinden okunur, DB tetikleyicisiyle silinemez; geçmiş raporlar (stopaj)
+  silinmiş satıcının kimliğini oradan çözer. Sentinel değerler
+  (`deleted_...@deleted.local`, "Silinmiş Kullanıcı") kimlik SAYILMAZ:
+  `common/helpers/deleted-user-identity.ts` bunları eler.
 
 ## 5. Yeni bir yüzey eklerken
 

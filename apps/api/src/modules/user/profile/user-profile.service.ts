@@ -16,6 +16,8 @@ import {
   RefundRequestStatus,
   PayoutStatus,
   PaymentHoldStatus,
+  DeletionActor,
+  IdentitySnapshotSource,
 } from "@prisma/client";
 import { ModerationAiClient } from "../../moderation/moderation-ai.client";
 import { computeTrustScore } from "../helpers/trust-score";
@@ -45,6 +47,22 @@ import {
   toPublicIdentity,
 } from "../../../common/helpers/public-identity";
 import { catalogProductWhere } from "../../product/helpers/catalog-product-where";
+import {
+  ANONYMIZED_DISPLAY_NAME,
+  anonymizedEmailFor,
+  computeRetainUntil,
+  resolveIdentityFields,
+} from "../../../common/helpers/deleted-user-identity";
+
+/**
+ * Silmeyi kimin başlattığı — arşiv kaydına yazılır. Varsayılan `self`, böylece
+ * mevcut çağıranlar değişmeden derlenir.
+ */
+export interface DeleteAccountOptions {
+  actor?: "self" | "admin";
+  /** Yöneticinin USER id'si (AdminAuditService ile aynı sözleşme). */
+  adminUserId?: string;
+}
 
 /**
  * UserProfileService — profil/lookup/hesap grubu: avatar redirect, find*,
@@ -501,8 +519,11 @@ export class UserProfileService {
    * - All products are removed (inactive, sold, rejected, draft)
    * - No active trades (pending, accepted, shipped, etc.)
    * - No pending orders (pending_payment, paid, preparing, shipped, delivered)
+   *
+   * Kimlik, anonimleştirmeden ÖNCE `DeletedUserIdentity`'ye kopyalanır; arşiv
+   * yazılamazsa hesap da silinmez (aylık resmî bildirim yükümlülüğü).
    */
-  async deleteAccount(userId: string) {
+  async deleteAccount(userId: string, options?: DeleteAccountOptions) {
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
     });
@@ -695,6 +716,14 @@ export class UserProfileService {
     try {
       await this.prisma.$transaction(
         async (tx) => {
+          // 0) YASAL KİMLİK ARŞİVİ — her şeyden ÖNCE.
+          // Aylık resmî bildirim, hesap silinse de kimliği gerektiriyor; bu
+          // satır yazılmadan hiçbir şey yok edilmemeli. Sıra zorunlu: (3)
+          // adresleri, (4) e-posta/telefon/VKN'yi geri dönülemez şekilde
+          // siliyor. Commit sonrasına bırakılamaz — araya giren bir çökme
+          // veriyi sessizce ve kalıcı olarak kaybettirirdi.
+          await this.archiveIdentity(tx, userId, options);
+
           // 1) Kimlik-doğrulama / oturum verileri (login imkânsız hale gelir)
           await tx.refreshToken.deleteMany({ where: { userId } });
           await tx.passwordResetToken.deleteMany({ where: { userId } });
@@ -724,10 +753,10 @@ export class UserProfileService {
           await tx.user.update({
             where: { id: userId },
             data: {
-              email: `deleted_${userId}@deleted.local`,
+              email: anonymizedEmailFor(userId),
               phone: null,
               passwordHash: "",
-              displayName: "Silinmiş Kullanıcı",
+              displayName: ANONYMIZED_DISPLAY_NAME,
               avatarUrl: null,
               bio: null,
               fcmToken: null,
@@ -748,13 +777,134 @@ export class UserProfileService {
       // #224: mesaj artık UserController.deleteAccount() tarafından locale'e göre
       // kuruluyor (server.user.accountDeleted) — servis burada sabit metin döndürmüyor.
     } catch (error: any) {
+      // Ayırt edilebilir işaret: "arşiv yazılamadı" ile "FK patladı" aynı 400'e
+      // düşüyor; log'da ayrışmazsa kimlik kaybı riski taşıyan hata fark edilmez.
       this.logger.error(
-        `Delete account (anonymize) failed for ${userId}: ${error?.message}`,
+        `deleted-identity-archive-or-anonymize-failed userId=${userId}: ${error?.message}`,
       );
       throw new BadRequestException(
         i18nMessage("server.user.deleteAccountFailed"),
       );
     }
+  }
+
+  /**
+   * Silme transaction'ının ilk adımı: kimliği arşive kopyalar.
+   *
+   * Okumalar transaction İÇİNDE yapılır — dış `findUnique` ile bu nokta arasında
+   * altı adet engel sorgusu koşuyor, yani o nesne bayat; ayrıca eşzamanlı bir
+   * adres/IBAN değişikliği okuma-silme arasına giremesin.
+   *
+   * `upsert` + BOŞ `update`: ilk yazım kazanır. Aksi hâlde ikinci bir silme
+   * çağrısı, o an ARTIK ANONİMLEŞMİŞ satırı okuyup iyi arşivi çöple ezerdi.
+   */
+  private async archiveIdentity(
+    tx: Prisma.TransactionClient,
+    userId: string,
+    options?: DeleteAccountOptions,
+  ): Promise<void> {
+    const fresh = await tx.user.findUnique({
+      where: { id: userId },
+      select: {
+        id: true,
+        email: true,
+        username: true,
+        displayName: true,
+        phone: true,
+        birthDate: true,
+        taxId: true,
+        taxOffice: true,
+        companyName: true,
+        companyType: true,
+        companyCity: true,
+        companyDistrict: true,
+        sellerType: true,
+        businessStatus: true,
+        isSeller: true,
+        adminCode: true,
+        createdAt: true,
+        deletedAt: true,
+      },
+    });
+    if (!fresh) {
+      throw new NotFoundException(i18nMessage("server.user.notFound"));
+    }
+
+    const [address, bankAccount, corporateApplication] = await Promise.all([
+      // Address.userId tekil DEĞİL → findFirst. Varsayılan adres önce.
+      tx.address.findFirst({
+        where: { userId },
+        orderBy: [{ isDefault: "desc" }, { createdAt: "desc" }],
+        select: {
+          fullName: true,
+          phone: true,
+          city: true,
+          district: true,
+          address: true,
+        },
+      }),
+      tx.sellerBankAccount.findUnique({
+        where: { userId },
+        select: {
+          tcKimlikNo: true,
+          taxId: true,
+          iban: true,
+          accountHolder: true,
+        },
+      }),
+      tx.corporateApplication.findUnique({
+        where: { userId },
+        select: {
+          id: true,
+          authorizedFullName: true,
+          companyLegalName: true,
+          companyTitle: true,
+          companyEmail: true,
+          companyAddress: true,
+          companyCity: true,
+          companyDistrict: true,
+          phone: true,
+          contactPhone: true,
+          taxId: true,
+          taxOffice: true,
+          companyType: true,
+          iban: true,
+          bankAccountHolder: true,
+          stakeholders: {
+            select: {
+              fullName: true,
+              identityType: true,
+              identityNumber: true,
+            },
+          },
+        },
+      }),
+    ]);
+
+    const resolved = resolveIdentityFields({
+      user: fresh,
+      address,
+      bankAccount,
+      corporateApplication,
+    });
+    const deletedAt = new Date();
+
+    await tx.deletedUserIdentity.upsert({
+      where: { userId },
+      create: {
+        userId,
+        ...resolved.values,
+        deletedAt,
+        deletedByActor:
+          options?.actor === "admin" ? DeletionActor.admin : DeletionActor.self,
+        deletedByAdminUserId: options?.adminUserId ?? null,
+        source: IdentitySnapshotSource.live,
+        sourceDetail: resolved.sourceDetail,
+        sourceRefs: resolved.sourceRefs,
+        retainUntil: computeRetainUntil(deletedAt),
+      },
+      update: {},
+    });
   }
 
   /**

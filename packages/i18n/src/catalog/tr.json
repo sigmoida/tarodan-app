@@ -7885,6 +7885,41 @@
       "filterLoginStateAll": "Tüm Giriş Durumları",
       "filterLoggedIn": "Giriş Yapmış"
     },
+    "deletedIdentities": {
+      "title": "Silinen Hesap Kimlikleri",
+      "description": "Silinen hesapların yasal saklama kaydı. Aylık resmî bildirim bu listeden alınır.",
+      "empty": "Arşivlenmiş kimlik kaydı yok",
+      "totalCount": "{count} kayıt",
+      "columnUser": "Kullanıcı",
+      "email": "E-posta",
+      "phone": "Telefon",
+      "nationalId": "TC Kimlik No",
+      "taxId": "Vergi No",
+      "companyName": "Firma",
+      "city": "İl / İlçe",
+      "wasSeller": "Satıcı",
+      "registeredAt": "Kayıt",
+      "deletedAt": "Silinme",
+      "retainUntil": "Saklama Bitişi",
+      "source": "Kaynak",
+      "sourceLive": "Silme anında",
+      "sourceBackfill": "Geriye dönük",
+      "deletedBy": "Silen",
+      "actorSelf": "Kullanıcı",
+      "actorAdmin": "Yönetici",
+      "actorUnknown": "Bilinmiyor",
+      "filterSource": "Kaynak",
+      "filterWasSeller": "Satıcı hesapları",
+      "filterRetentionExpired": "Saklama süresi dolmuş",
+      "exportTitle": "Aylık bildirim",
+      "exportHint": "Dönem seçin; dosya o ay silinen hesapları içerir.",
+      "exportButton": "Excel İndir",
+      "exportYear": "Yıl",
+      "exportMonth": "Ay",
+      "exported": "Bildirim dosyası indirildi",
+      "exportFailed": "Bildirim dosyası oluşturulamadı",
+      "retentionNotice": "Kayıtlar hukuki yükümlülük gereği saklanır ve silinemez; saklama süresi dolanlar filtreyle listelenir."
+    },
     "roles": {
       "title": "Roller ve İzinler",
       "description": "Her rolün hangi işlemleri yapabileceğini görüntüleyin ve düzenleyin",
@@ -8213,6 +8248,11 @@
           "name": "Kullanıcılar",
           "description": "Kullanıcı hesaplarını görüntüleyin ve yönetin",
           "keywords": "user,üye"
+        },
+        "deletedIdentities": {
+          "name": "Silinen Kimlikler",
+          "description": "Silinen hesapların yasal kimlik arşivi ve aylık bildirim",
+          "keywords": "silinen,arşiv,bildirim,kimlik,kvkk"
         },
         "sellerApplications": {
           "name": "Satıcı Başvuruları",

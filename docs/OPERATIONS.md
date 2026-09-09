@@ -122,6 +122,42 @@ Yukarıdaki uyarı burada da geçerli: delta/reconcile bu alanları tazelemez.
 Veritabanı tarafında yapılacak bir işlem YOKTUR — şema, benzersiz indeks ve
 `legacy_########` yer tutucuları zaten mevcut (`20260729180000` migration'ı).
 
+### Bir kerelik: silinen hesap kimlik arşivi backfill'i
+
+`20260909090000_deleted_user_identity` migration'ı `deleted_user_identities`
+tablosunu açar ve silme yolu bundan sonra kimliği silmeden ÖNCE arşivler. Ama
+**daha önce silinmiş hesaplar** için arşiv boştur; onların kimliği yalnız
+kalıntı kayıtlardan (banka hesabı, kurumsal başvuru, e-belge, sipariş adres
+snapshot'ı, denetim kaydı, e-posta/güvenlik logları) toparlanabilir.
+
+Deploy'dan sonra **önce sayım**, sonra yazma:
+
+```
+pnpm --filter @tarodan/api backfill:prod:deleted-identities -- --dry-run
+pnpm --filter @tarodan/api backfill:prod:deleted-identities
+```
+
+Dry-run çıktısı alan bazında kurtarma oranını ve hiçbir kimlik alanı
+çözülemeyen hesapların id'lerini basar; script tahmin YAZMAZ, boş bırakır.
+
+**Beklemek maliyetli:** `email_logs` 90, `security_logs` 180 gün sonra
+log-retention cron'u ile siliniyor (`admin/jobs/log-retention.service.ts`).
+Her geçen hafta e-posta kurtarma oranı düşer. `audit_logs` hiç silinmediği
+için yönetici silmelerinde kimlik kalıcı olarak kurtarılabilir.
+
+Backfill idempotenttir (`upsert` + boş `update`): tekrar çalıştırmak mevcut
+satırları bozmaz. Tablo satırları DB tetikleyicisiyle **silinemez**; yasal
+imha gerekirse `SET LOCAL "tarodan.allow_identity_purge" = 'on'` gerekir.
+
+### Her ay: silinen hesap bildirimi
+
+Panelde **Kullanıcılar → Silinen Kimlikler** ekranından dönem seçilip Excel
+indirilir (`GET /api/admin/deleted-identities/export`). Dosya, o ay **silinen**
+hesapları içerir (arşiv satırının oluşturulma tarihini değil, `deleted_at`'i
+esas alır — backfill satırlarının hepsi aynı güne düşer). Her indirme
+`deleted_identity_export` adıyla denetim kaydına yazılır; kayda kimlik
+DEĞERLERİ değil yalnız dönem ve satır sayısı düşer.
+
 ---
 
 ## 2. Staging reset ve seed-assets modeli

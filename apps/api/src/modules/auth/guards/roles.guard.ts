@@ -57,6 +57,10 @@ export const PERMISSION_MAP: Record<string, string[]> = {
   "email-templates": ["email_templates"],
   pages: ["pages"],
   users: ["users", "seller_performance"],
+  // Silinen hesapların kimlik arşivi Kullanıcılar ekranının bir parçası; ayrı
+  // bir anahtar gerçek bir sınır kurmazdı (aynı izinle kullanıcı detayında
+  // TCKN/IBAN zaten görülüyor) ama rol matrisi göçü gerektirirdi.
+  "deleted-identities": ["users"],
   "seller-applications": ["seller_applications", "seller_performance"],
   "user-ratings": ["reviews"],
   reviews: ["reviews"],
