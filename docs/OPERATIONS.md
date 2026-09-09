@@ -130,12 +130,17 @@ tablosunu açar ve silme yolu bundan sonra kimliği silmeden ÖNCE arşivler. Am
 kalıntı kayıtlardan (banka hesabı, kurumsal başvuru, e-belge, sipariş adres
 snapshot'ı, denetim kaydı, e-posta/güvenlik logları) toparlanabilir.
 
-Deploy'dan sonra **önce sayım**, sonra yazma:
+Migration deploy'da **kendiliğinden** koşar (`entrypoint.sh` → `migrate deploy`),
+ama backfill KOŞMAZ — elle tetiklenir. Coolify host'unda, API konteynerinde
+(`production-reset.yml`'deki `docker exec` kalıbının aynısı), **önce sayım**:
 
 ```
-pnpm --filter @tarodan/api backfill:prod:deleted-identities -- --dry-run
-pnpm --filter @tarodan/api backfill:prod:deleted-identities
+docker exec "$API_CID" sh -c 'cd /app && node dist-seed/maintenance/backfill-deleted-user-identities.js --dry-run'
+docker exec "$API_CID" sh -c 'cd /app && node dist-seed/maintenance/backfill-deleted-user-identities.js'
 ```
+
+Yerelde aynı script `pnpm --filter @tarodan/api backfill:prod:deleted-identities`
+ile koşar (önce `build:seed`); prod konteynerinde pnpm workspace yoktur.
 
 Dry-run çıktısı alan bazında kurtarma oranını ve hiçbir kimlik alanı
 çözülemeyen hesapların id'lerini basar; script tahmin YAZMAZ, boş bırakır.
