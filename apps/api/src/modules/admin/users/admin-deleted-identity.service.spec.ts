@@ -128,6 +128,10 @@ describe("AdminDeletedIdentityService.exportPeriod", () => {
     );
   });
 
+  // Tavanı sınamanın tek yolu tavan kadar satır üretmek, o da ExcelJS'e gerçek
+  // bir 5000 satırlık dosya yazdırıyor: boş makinede ~4 sn, jest'in 5 sn'lik
+  // varsayılanının hemen altı. Paralel koşuda düzenli olarak aşıyordu ve
+  // push'u bloke ediyordu; süre testin gerçek maliyeti, açıkça yazılır.
   it("tavanı aşan dönemi SESSİZCE kırpmaz, işaretler", async () => {
     const many = Array.from({ length: 5001 }, (_, index) => ({
       ...row,
@@ -139,7 +143,7 @@ describe("AdminDeletedIdentityService.exportPeriod", () => {
 
     expect(result.truncated).toBe(true);
     expect(result.rowCount).toBe(5000);
-  });
+  }, 30_000);
 
   it("tavan altındaki dönemi kırpılmamış işaretler", async () => {
     const { service } = makeService([row]);
