@@ -5979,15 +5979,31 @@
       "invoices": {
         "title": "Faturalar",
         "subtitle": "e-Arşiv / e-Fatura belgeleri ve satıcı yüklemesi faturaları",
-        "elogoTab": "eLogo Faturaları",
-        "sellerTab": "Satıcı Faturaları",
+        "allTab": "Tüm Faturalar",
+        "buyerTab": "Alıcıya Kesilen Faturalar",
+        "sellerPartyTab": "Satıcıya Kesilen Faturalar",
+        "corporateTab": "Kurumsal Cari Faturaları",
+        "penaltyTab": "Ceza Faturaları",
+        "platformTab": "Reklam, İndirim, Üyelik Faturaları",
         "loadError": "Faturalar yüklenemedi",
         "empty": "Fatura bulunamadı",
-        "searchPlaceholder": "Fatura no, alıcı, VKN veya ETTN ara",
+        "searchPlaceholder": "Fatura no, taraf, VKN veya ETTN ara",
         "documentUnit": "belge",
         "invoiceUnit": "fatura",
         "invoiceNumber": "Fatura No",
         "type": "Tür",
+        "description": "Açıklama",
+        "context": "Sipariş Gerçekleşme Şekli",
+        "totalWithVat": "KDV DAHİL TUTAR",
+        "detail": "Detay",
+        "detailExport": "Detay Dökümü",
+        "detailExported": "Detay dökümü indirildi",
+        "detailExportFailed": "Detay dökümü indirilemedi",
+        "handling": "İşleme Al",
+        "sendEmail": "E-posta olarak gönder",
+        "emailSent": "Fatura {email} adresine gönderildi",
+        "emailResendConfirm": "Fatura {invoiceNumber}, alıcısına yeniden e-postalanacak. Devam edilsin mi?",
+        "emailSentAt": "Gönderildi: {date}",
         "discount": "İskonto",
         "orderAmount": "Sipariş Tutarı",
         "uploadedAt": "Yüklenme",
@@ -5996,14 +6012,27 @@
         "filters": {
           "allTypes": "Tüm Türler",
           "allStatuses": "Tüm Durumlar",
-          "allDocuments": "Tüm Belgeler"
+          "allDocuments": "Tüm Belgeler",
+          "allContexts": "Tüm İşlem Türleri",
+          "invoiceNumber": "Fatura No ile arama",
+          "description": "Fatura açıklaması ile arama",
+          "descriptionPlaceholder": "komisyon, kargo, platform bedeli…",
+          "userCode": "Kullanıcı ID ile arama",
+          "userCodePlaceholder": "B010001 / K010001"
+        },
+        "contexts": {
+          "directSale": "Doğrudan satış",
+          "offer": "Teklif",
+          "trade": "Takas",
+          "platformService": "Platform hizmeti"
         },
         "status": {
-          "pending": "Bekliyor",
-          "sent": "Kesildi",
-          "signed": "İmzalandı",
-          "failed": "Başarısız",
-          "cancelled": "İptal"
+          "pending": "Beklemede",
+          "processing": "Gönderiliyor",
+          "sent": "Faturalandı",
+          "signed": "Faturalandı (imzalı)",
+          "failed": "Hata",
+          "cancelled": "Fatura İptal Edildi"
         },
         "types": {
           "commission": "Komisyon (birleşik)",
@@ -7056,6 +7085,12 @@
         "disputeNotePlaceholder": "İtiraz gerekçesi (en az 10 karakter) — ör. satıcı ürünün hasarlı döndüğünü bildirdi",
         "disputeConfirm": "İtirazı Kaydet",
         "disputeMarked": "İade itiraz olarak işaretlendi; otomatik tamamlama durduruldu",
+        "closeButton": "İadesiz Kapat",
+        "closeExplainer": "İade talebi PARA İADESİ YAPILMADAN kapatılır: satıcının bekleyen tutarındaki kilit kalkar ve sipariş normal akışına döner. Ürün geri gelmediyse (koli hiç kargoya verilmedi ya da etiket taşıyıcıda iptal edildiyse) doğru işlem budur.",
+        "closeReasonPlaceholder": "Kapatma gerekçesi (en az 10 karakter) — ör. iade kargosu 14 gün içinde şubeye teslim edilmedi",
+        "closeConfirm": "İadeyi Kapat",
+        "closeConfirmPrompt": "İade talebi para iadesi yapılmadan kapatılacak ve satıcının tutarındaki kilit kalkacak. Onaylıyor musunuz?",
+        "closed": "İade talebi para iadesi yapılmadan kapatıldı; satıcı kilidi çözüldü",
         "counterfeitTitle": "Sahte / taklit ürün şikayeti",
         "counterfeitBody": "Bu talep sahte ürün gerekçesiyle açıldı. İade onaylandıktan sonra satıcı için yaptırım değerlendirin (uyarı, geçici askı veya fesih) ve satıcının diğer ürünleri için risk incelemesi yapın.",
         "policyTitle": "İade Politikası",
@@ -9866,7 +9901,10 @@
     },
     "elogo": {
       "archiveInvoiceNotFound": "e-Arşiv faturası bulunamadı",
-      "invoicePdfUnavailable": "Fatura PDF alınamadı"
+      "invoicePdfUnavailable": "Fatura PDF alınamadı",
+      "invoiceNotIssued": "Bu belge henüz kesilmedi; e-posta yalnız kesilmiş faturalar için gönderilebilir.",
+      "invoiceRecipientEmailMissing": "Faturanın alıcısına ait e-posta adresi kayıtlı değil.",
+      "invoiceMailUnavailable": "E-posta servisi kapalı; fatura gönderilemedi."
     },
     "manufacturer": {
       "notFound": "Üretici bulunamadı",

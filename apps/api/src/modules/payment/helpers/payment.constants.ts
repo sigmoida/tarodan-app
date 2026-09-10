@@ -47,10 +47,25 @@ export const PAYMENT_CONFIG_KEYS = {
     key: "PAYTR_RECONCILE_AMOUNT_TOLERANCE_TL",
     default: 0.05,
   },
-  /** İade drop-off (şubeye götürme) süresi (gün) — D25. */
+  /**
+   * İade drop-off (şubeye götürme) süresi (gün) — D25. Ürün kuralı: iade
+   * başlatıldıktan sonra bu süre içinde koli kargoya verilmezse iade hakkı
+   * düşer. Alıcının cayma penceresiyle (RETURN_WINDOW_DAYS) aynı uzunlukta
+   * tutulur ki kullanıcıya tek bir "14 gün" anlatılabilsin.
+   */
   RETURN_DROPOFF_DAYS: {
     key: "REFUND_RETURN_DROPOFF_DAYS",
-    default: 7,
+    default: 14,
+    min: 1,
+  },
+  /**
+   * Emniyet supabı (gün): takip sorgusu doğrulanamasa BİLE iadenin kapatılacağı
+   * üst sınır. Sürat'a hiç ulaşılamayan bir dönemde donuk hold'un süresiz
+   * kalmasını engeller; her zaman RETURN_DROPOFF_DAYS'ten küçük olamaz.
+   */
+  RETURN_DROPOFF_HARD_DAYS: {
+    key: "REFUND_RETURN_DROPOFF_HARD_DAYS",
+    default: 21,
     min: 1,
   },
   /** wait_for_delivery'de takılı iade timeout (gün) — MONEY-H6. */

@@ -18,6 +18,7 @@
     "seed:prod:colors": "node dist-seed/maintenance/seed-color-attributes.js",
     "backfill:prod:colors": "node dist-seed/maintenance/backfill-product-colors.js",
     "backfill:prod:deleted-identities": "node dist-seed/maintenance/backfill-deleted-user-identities.js",
+    "backfill:prod:invoice-parties": "node dist-seed/maintenance/backfill-elogo-invoice-parties.js",
     "elogo:reissue-demo:prod": "node dist-seed/maintenance/reissue-demo-elogo-invoices.js",
     "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
     "start": "nest start",

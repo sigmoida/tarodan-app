@@ -9,7 +9,13 @@ import { type SellerInvoice, mapSellerInvoices } from "../_lib/types";
 import { sellerInvoiceFilterFields } from "../_lib/filters";
 import { useTranslations } from "next-intl";
 
-export function SellerInvoicesTab() {
+/**
+ * "Kurumsal Cari Faturaları" — kurumsal satıcıların siparişe ELLE yüklediği ürün
+ * faturaları. Tarodan'ın kestiği belgelerle aynı tabloda gösterilemez: bunlar
+ * bizim değil satıcının belgeleridir, ne fatura numaraları bizim sayacımızdan
+ * gelir ne de bir e-belge durumları vardır.
+ */
+export function CorporateInvoicesTab() {
   const t = useTranslations();
   return (
     <ResourceList<SellerInvoice>
@@ -30,6 +36,7 @@ export function SellerInvoicesTab() {
       filters={sellerInvoiceFilterFields(t)}
     >
       <ResourceList.Toolbar />
+      <ResourceList.Total unit={t("admin.finance.invoices.invoiceUnit")} />
       <ResourceList.Table
         columns={sellerColumns(t)}
         emptyText={t("admin.finance.invoices.empty")}

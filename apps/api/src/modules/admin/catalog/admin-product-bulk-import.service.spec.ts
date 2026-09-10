@@ -279,6 +279,9 @@ describe("AdminProductBulkImportService", () => {
     };
   }
 
+  // Bu test tam import yolunu gerçek bir ExcelJS workbook'u üzerinden koşuyor:
+  // boş makinede ~4 sn, jest'in 5 sn'lik varsayılanının hemen altı. Paralel
+  // koşuda aşıyor ve push'u bloke ediyordu; süre testin gerçek maliyeti.
   it("publishes every valid row as an active non-trade listing", async () => {
     const {
       service,
@@ -354,7 +357,7 @@ describe("AdminProductBulkImportService", () => {
         }),
       }),
     });
-  });
+  }, 30_000);
 
   it("accepts bulk-import rows without car model and model code", async () => {
     const { service, tx } = setup();

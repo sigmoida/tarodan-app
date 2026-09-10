@@ -1,7 +1,7 @@
 "use client";
 
 import { useTranslations } from "next-intl";
-import { DatePicker, Select } from "@tarodan/ui";
+import { DatePicker, Input, Select } from "@tarodan/ui";
 import {
   DEFAULT_FROM_NAME,
   DEFAULT_TO_NAME,
@@ -33,6 +33,17 @@ export function FilterFieldRow({
         value={draft.values[field.name] ?? ""}
         onChange={(event) => draft.set({ [field.name]: event.target.value })}
         options={field.options}
+      />
+    );
+  }
+
+  if (field.type === "text") {
+    return (
+      <Input
+        label={field.label}
+        placeholder={field.placeholder}
+        value={draft.values[field.name] ?? ""}
+        onChange={(event) => draft.set({ [field.name]: event.target.value })}
       />
     );
   }

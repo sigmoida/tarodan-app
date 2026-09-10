@@ -5979,15 +5979,31 @@
       "invoices": {
         "title": "Invoices",
         "subtitle": "e-Archive / e-Invoice documents and seller-uploaded invoices",
-        "elogoTab": "eLogo Invoices",
-        "sellerTab": "Seller Invoices",
+        "allTab": "All Invoices",
+        "buyerTab": "Invoices Issued to Buyers",
+        "sellerPartyTab": "Invoices Issued to Sellers",
+        "corporateTab": "Corporate Account Invoices",
+        "penaltyTab": "Penalty Invoices",
+        "platformTab": "Advertising, Discount & Membership Invoices",
         "loadError": "Invoices could not be loaded",
         "empty": "No invoice found",
-        "searchPlaceholder": "Search invoice number, buyer, tax ID, or ETTN",
+        "searchPlaceholder": "Search invoice number, party, tax ID, or ETTN",
         "documentUnit": "documents",
         "invoiceUnit": "invoices",
         "invoiceNumber": "Invoice No.",
         "type": "Type",
+        "description": "Description",
+        "context": "Transaction Type",
+        "totalWithVat": "TOTAL INCL. VAT",
+        "detail": "Detail",
+        "detailExport": "Detail Export",
+        "detailExported": "Detail export downloaded",
+        "detailExportFailed": "The detail export could not be downloaded",
+        "handling": "Actions",
+        "sendEmail": "Send by e-mail",
+        "emailSent": "The invoice was sent to {email}",
+        "emailResendConfirm": "Invoice {invoiceNumber} will be e-mailed to its recipient again. Continue?",
+        "emailSentAt": "Sent: {date}",
         "discount": "Discount",
         "orderAmount": "Order Amount",
         "uploadedAt": "Uploaded At",
@@ -5996,14 +6012,27 @@
         "filters": {
           "allTypes": "All Types",
           "allStatuses": "All Statuses",
-          "allDocuments": "All Documents"
+          "allDocuments": "All Documents",
+          "allContexts": "All Transaction Types",
+          "invoiceNumber": "Search by invoice number",
+          "description": "Search by invoice description",
+          "descriptionPlaceholder": "commission, shipping, platform fee…",
+          "userCode": "Search by user ID",
+          "userCodePlaceholder": "B010001 / K010001"
+        },
+        "contexts": {
+          "directSale": "Direct sale",
+          "offer": "Offer",
+          "trade": "Trade",
+          "platformService": "Platform service"
         },
         "status": {
           "pending": "Pending",
+          "processing": "Sending",
           "sent": "Issued",
-          "signed": "Signed",
+          "signed": "Issued (signed)",
           "failed": "Failed",
-          "cancelled": "Cancelled"
+          "cancelled": "Invoice cancelled"
         },
         "types": {
           "commission": "Commission (combined)",
@@ -7056,6 +7085,12 @@
         "disputeNotePlaceholder": "Dispute reason (min 10 characters) — e.g. seller reported the item came back damaged",
         "disputeConfirm": "Confirm Dispute",
         "disputeMarked": "Refund marked as disputed; auto-finalize paused",
+        "closeButton": "Close Without Refund",
+        "closeExplainer": "The refund request is closed WITHOUT refunding any money: the hold on the seller's balance is released and the order returns to its normal flow. This is the right action when the item never came back — the parcel was never handed to cargo, or the label was cancelled at the carrier.",
+        "closeReasonPlaceholder": "Reason for closing (at least 10 characters) — e.g. the return was not handed to a branch within 14 days",
+        "closeConfirm": "Close Refund",
+        "closeConfirmPrompt": "The refund request will be closed without refunding, and the hold on the seller's balance will be released. Do you confirm?",
+        "closed": "Refund request closed without a refund; the seller's hold was released",
         "counterfeitTitle": "Counterfeit / fake product complaint",
         "counterfeitBody": "This request was opened on grounds of a counterfeit product. After the refund is approved, consider a sanction for the seller (warning, temporary suspension or termination) and run a risk review on the seller's other products.",
         "policyTitle": "Refund Policy",
@@ -9866,7 +9901,10 @@
     },
     "elogo": {
       "archiveInvoiceNotFound": "e-Archive invoice not found",
-      "invoicePdfUnavailable": "The invoice PDF could not be retrieved"
+      "invoicePdfUnavailable": "The invoice PDF could not be retrieved",
+      "invoiceNotIssued": "This document has not been issued yet; e-mail is only available for issued invoices.",
+      "invoiceRecipientEmailMissing": "No e-mail address is on record for the invoice recipient.",
+      "invoiceMailUnavailable": "The e-mail service is disabled; the invoice could not be sent."
     },
     "manufacturer": {
       "notFound": "Manufacturer not found",

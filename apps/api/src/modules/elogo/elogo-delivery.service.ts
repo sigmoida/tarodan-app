@@ -1,4 +1,11 @@
-import { Injectable, Logger, Optional } from "@nestjs/common";
+import {
+  BadRequestException,
+  Injectable,
+  Logger,
+  NotFoundException,
+  Optional,
+  ServiceUnavailableException,
+} from "@nestjs/common";
 import { randomUUID } from "crypto";
 import { Prisma, type ElogoInvoice } from "@prisma/client";
 import { PrismaService } from "../../prisma";
@@ -8,7 +15,11 @@ import {
   isTransientElogoFailure,
 } from "./helpers/elogo-retry-policy";
 import { retryOnWriteConflict } from "./helpers/elogo-write-conflict";
-import { LINE_DESCRIPTION } from "./invoice/invoice-line-description";
+import {
+  invoiceDescriptionOf,
+  LINE_DESCRIPTION,
+} from "./invoice/invoice-line-description";
+import { resolveInvoiceParties } from "./invoice/invoice-parties";
 import { invoiceIssueYear } from "./invoice/invoice-datetime";
 import { renderManagedEmailTemplate } from "../../common/helpers/email-template-renderer";
 import {
@@ -28,6 +39,7 @@ import type {
   ElogoUserCheckResult,
 } from "./helpers/elogo.types";
 import type { CutOptions, RevenueType } from "./elogo-invoicing.service";
+import { i18nMessage } from "../i18n";
 import { ElogoService } from "./elogo.service";
 import { ElogoDocumentService } from "./elogo-document.service";
 import { StorageService } from "../storage/storage.service";
@@ -107,6 +119,10 @@ export class ElogoDeliveryService {
         recipientUserId,
         guestRecipient,
       );
+      // İşlemin tarafları ve gerçekleşme şekli KESİM ANINDA snapshot'lanır:
+      // admin listesi bu kolonlarla filtreleyip sıralıyor, sonradan çözülen bir
+      // değerle sunucu tarafı sayfalama kurulamaz.
+      const parties = await resolveInvoiceParties(this.prisma, type, sourceId);
       const now = new Date();
       // Kalem listesi varsa belge ÇOK ORANLI olabilir; toplamlar satırlardan
       // gelir ve `vatRate` yalnız geriye-uyumluluk için (tek oranlı özet) tutulur.
@@ -137,6 +153,9 @@ export class ElogoDeliveryService {
                 data: {
                   type,
                   sourceId,
+                  sellerUserId: parties.sellerUserId,
+                  buyerUserId: parties.buyerUserId,
+                  context: parties.context,
                   recipientUserId,
                   recipientVknTckn: recipient.vknTckn,
                   recipientName: recipient.name,
@@ -850,5 +869,101 @@ export class ElogoDeliveryService {
       data: { attemptCount: 0, status: "pending" },
     });
     await this.sendRecord(invoiceId);
+  }
+
+  /**
+   * Admin müdahalesi: kesilmiş faturayı alıcısına YENİDEN e-postalar.
+   *
+   * Kesim yolundaki "bir kez mail" güvencesini bilerek aşar — o güvence
+   * otomatik tetikleyicilerin (completeOrder/cron/at_warehouse) aynı belgeyi
+   * defalarca yollamasını engellemek içindir, "müşteriye ulaşmadı, tekrar
+   * gönder" kararını değil. Bu yüzden `cut` yolundan ayrı bir metottur.
+   *
+   * PDF önce S3'ten okunur: kesilmiş belgenin kopyası zaten oradadır ve
+   * sağlayıcıya bağımlı olmayan yol daha hızlıdır; yoksa eLogo'dan canlı çekilir.
+   */
+  async emailInvoice(invoiceId: string): Promise<{ sentTo: string }> {
+    const invoice = await this.prisma.elogoInvoice.findUnique({
+      where: { id: invoiceId },
+      select: {
+        id: true,
+        ettn: true,
+        invoiceNumber: true,
+        type: true,
+        total: true,
+        status: true,
+        pdfUrl: true,
+        recipientEmail: true,
+        recipientName: true,
+        lineDescription: true,
+      },
+    });
+    if (!invoice)
+      throw new NotFoundException(
+        i18nMessage("server.elogo.archiveInvoiceNotFound"),
+      );
+    if (
+      !invoice.ettn ||
+      !invoice.invoiceNumber ||
+      (invoice.status !== "sent" && invoice.status !== "signed")
+    )
+      throw new BadRequestException(
+        i18nMessage("server.elogo.invoiceNotIssued"),
+      );
+    const to = invoice.recipientEmail?.trim();
+    if (!to)
+      throw new BadRequestException(
+        i18nMessage("server.elogo.invoiceRecipientEmailMissing"),
+      );
+    if (!this.smtp)
+      throw new ServiceUnavailableException(
+        i18nMessage("server.elogo.invoiceMailUnavailable"),
+      );
+
+    const stored =
+      invoice.pdfUrl && this.storage?.isStorageAvailable?.()
+        ? await this.storage.downloadFileByKey(invoice.pdfUrl).catch(() => null)
+        : null;
+    const pdf =
+      stored ??
+      (await this.elogo.getEArchiveInvoicePdf(invoice.ettn).catch(() => null));
+    if (!pdf || pdf.length < 200)
+      throw new ServiceUnavailableException(
+        i18nMessage("server.elogo.invoicePdfUnavailable"),
+      );
+
+    const template = await this.prisma.emailTemplate
+      .findUnique({ where: { key: "elogo-invoice" } })
+      .catch(() => null);
+    const email = renderManagedEmailTemplate(
+      "elogo-invoice",
+      {
+        recipientName: invoice.recipientName || "Değerli Müşterimiz",
+        description: invoiceDescriptionOf(
+          invoice.type,
+          invoice.lineDescription,
+        ),
+        invoiceNumber: invoice.invoiceNumber,
+        total: Number(invoice.total),
+        type: invoice.type,
+        to,
+      },
+      template,
+      resolveFrontendUrl(),
+    );
+    await this.smtp.sendEmail({
+      to,
+      subject: email.subject,
+      html: email.html,
+      attachments: [{ filename: `${invoice.invoiceNumber}.pdf`, content: pdf }],
+    } as any);
+    await this.prisma.elogoInvoice.update({
+      where: { id: invoice.id },
+      data: { emailSentAt: new Date() },
+    });
+    this.logger.log(
+      `eLogo fatura e-postası elle gönderildi (${invoice.invoiceNumber}) → ${to}`,
+    );
+    return { sentTo: to };
   }
 }

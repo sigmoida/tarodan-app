@@ -37,6 +37,17 @@ export class SuratTrackingService {
     return this.client.fetchTrackingInfo(webSiparisKodu);
   }
 
+  /**
+   * Ayrıştırılmış takip sonucu. `fetchTrackingInfo` "kayıt yok", "iptal edildi"
+   * ve "soramadık"ı tek bir `null`'a indirdiği için bu üçünü ayırması gereken
+   * çağıranlar (D25 süre-aşımı) doğrudan buradan okur.
+   */
+  lookupTracking(
+    webSiparisKodu: string,
+  ): ReturnType<SuratTrackingClient["lookupTracking"]> {
+    return this.client.lookupTracking(webSiparisKodu);
+  }
+
   probeTracking(webSiparisKodu: string): Promise<{
     ok: boolean;
     httpStatus?: number;

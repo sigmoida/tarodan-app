@@ -154,6 +154,32 @@ Backfill idempotenttir (`upsert` + boş `update`): tekrar çalıştırmak mevcut
 satırları bozmaz. Tablo satırları DB tetikleyicisiyle **silinemez**; yasal
 imha gerekirse `SET LOCAL "tarodan.allow_identity_purge" = 'on'` gerekir.
 
+### Bir kerelik: fatura taraf/işlem kolonları backfill'i
+
+`20260910100000_elogo_invoice_parties_and_context` migration'ı
+`elogo_invoices` tablosuna `seller_user_id`, `buyer_user_id` ve `context`
+(sipariş gerçekleşme şekli) kolonlarını ekler. Yeni kesilen belgeler bunları
+kesim anında yazar; **migration'dan önce kesilmiş belgelerde boştur**.
+
+Kolonlar boşken o belgeler admin **Faturalar** ekranında görünür ama "Satıcı",
+"Alıcı" ve "Sipariş Gerçekleşme Şekli" kolonları `—` gösterir, ayrıca
+"Alıcıya/Satıcıya Kesilen" sekmelerine düşmezler ("Tüm Faturalar"da dururlar).
+
+Migration deploy'da kendiliğinden koşar, backfill KOŞMAZ:
+
+```
+docker exec "$API_CID" sh -c 'cd /app && node dist-seed/maintenance/backfill-elogo-invoice-parties.js --dry-run'
+docker exec "$API_CID" sh -c 'cd /app && node dist-seed/maintenance/backfill-elogo-invoice-parties.js'
+```
+
+Yerelde: `pnpm --filter @tarodan/api backfill:prod:invoice-parties` (önce
+`build:seed`). Çözümleme kesim yolunun aynı fonksiyonudur
+(`resolveInvoiceParties`), ikinci bir eşleme yoktur.
+
+Idempotenttir: yalnız üç kolonu da boş olan satırlara dokunur. `--dry-run`
+iade faturalarını "çözülemeyen" sayar — tarafları ters çevirdikleri belgeden
+devraldıkları için kaynakları henüz yazılmamıştır; gerçek koşuda dolarlar.
+
 ### Her ay: silinen hesap bildirimi
 
 Panelde **Kullanıcılar → Silinen Kimlikler** ekranından dönem seçilip Excel

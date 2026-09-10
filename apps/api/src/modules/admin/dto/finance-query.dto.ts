@@ -1,9 +1,46 @@
 import { ApiPropertyOptional } from "@nestjs/swagger";
-import { IsDateString, IsOptional, IsString } from "class-validator";
+import { IsDateString, IsIn, IsOptional, IsString } from "class-validator";
 
 import { AdminListQueryDto } from "../../../common/list";
+import {
+  ELOGO_INVOICE_SCOPES,
+  type ElogoInvoiceScope,
+} from "../finance/invoice-scope";
 
 export class ElogoInvoiceQueryDto extends AdminListQueryDto {
+  /**
+   * Fatura ekranının sekmesi. Sekmeler ÇAKIŞIR (ceza faturası hem kendi
+   * sekmesinde hem tarafın sekmesinde görünür) — bunlar birer görünüm, ayrık
+   * kümeler değil.
+   */
+  @ApiPropertyOptional({ enum: ELOGO_INVOICE_SCOPES })
+  @IsOptional()
+  @IsIn(ELOGO_INVOICE_SCOPES)
+  scope?: ElogoInvoiceScope;
+
+  /** İşlemin gerçekleşme şekli (doğrudan satış / teklif / takas / platform hizmeti). */
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  context?: string;
+
+  /** Yalnız fatura numarasında arar — genel `search` kutusundan ayrı alan. */
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  invoiceNumber?: string;
+
+  /** Fatura açıklamasında arar (ör. "komisyon", "kargo", "platform bedeli"). */
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  description?: string;
+
+  /** Kullanıcı kodu (B010001/K010001) ya da id'si — satıcı VEYA alıcı tarafında arar. */
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  userCode?: string;
   @ApiPropertyOptional()
   @IsOptional()
   @IsString()

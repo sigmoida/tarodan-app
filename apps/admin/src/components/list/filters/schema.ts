@@ -4,6 +4,7 @@ import { DEFAULT_FROM_NAME, DEFAULT_TO_NAME, type FilterField } from "./types";
 export function fieldKeys(field: FilterField): string[] {
   switch (field.type) {
     case "select":
+    case "text":
       return [field.name];
     case "dateRange":
       return [
@@ -22,6 +23,7 @@ function fieldDefaults(field: FilterField): Record<string, string> {
       return {
         [field.name]: field.defaultValue ?? field.options[0]?.value ?? "",
       };
+    case "text":
     case "dateRange":
       return Object.fromEntries(fieldKeys(field).map((key) => [key, ""]));
     case "custom":
