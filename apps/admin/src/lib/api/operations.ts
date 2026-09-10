@@ -89,6 +89,11 @@ export const operationsApi = {
     api.post(`/admin/refund-requests/${id}/force-finalize`),
   markRefundDisputed: (id: string, note: string) =>
     api.post(`/admin/refund-requests/${id}/dispute`, { note: note.trim() }),
+  // Para iade ETMEDEN kapatır: donuk hold çözülür, satıcı normal escrow akışına
+  // döner. Şubeye hiç götürülmeyen iadenin tek panel çıkışı budur —
+  // force-finalize yalnız return_delivered/disputed kabul eder.
+  closeStuckRefund: (id: string, reason: string) =>
+    api.post(`/admin/refund-requests/${id}/close`, { reason: reason.trim() }),
   markTradeReturnLost: (
     tradeId: string,
     body: { shipmentId: string; reason: string; compensateUserId?: string },

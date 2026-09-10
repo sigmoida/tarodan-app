@@ -17,6 +17,7 @@ import {
   CheckCircleIcon,
   XCircleIcon,
   BanknotesIcon,
+  NoSymbolIcon,
 } from "@heroicons/react/24/outline";
 import {
   guidanceForStatus,
@@ -53,6 +54,13 @@ export interface RefundNextActionPanelProps {
   canDispute: boolean;
   disputing: boolean;
   onDispute: (note: string) => void;
+  /**
+   * MONEY-H6: takılı iadeyi para iade ETMEDEN kapat. Şubeye hiç götürülmemiş
+   * iadenin tek manuel çıkışı — force-finalize bu durumda 400 döner.
+   */
+  canClose: boolean;
+  closing: boolean;
+  onClose: (reason: string) => void;
   reviewing: boolean;
   onPreview: (decision: {
     resolvedReason: string;
@@ -85,6 +93,9 @@ export function RefundNextActionPanel({
   canDispute,
   disputing,
   onDispute,
+  canClose,
+  closing,
+  onClose,
   reviewing,
   onPreview,
   onApprove,
@@ -95,6 +106,8 @@ export function RefundNextActionPanel({
   const [reviewNote, setReviewNote] = useState("");
   const [disputeOpen, setDisputeOpen] = useState(false);
   const [disputeNote, setDisputeNote] = useState("");
+  const [closeOpen, setCloseOpen] = useState(false);
+  const [closeReason, setCloseReason] = useState("");
   const [resolvedReason, setResolvedReason] = useState(reason);
   const carrierHasPackage =
     shipmentStatus != null &&
@@ -154,7 +167,7 @@ export function RefundNextActionPanel({
             </p>
           )}
 
-          {(canForceFinalize || canDispute) && (
+          {(canForceFinalize || canDispute || canClose) && (
             <div className="flex flex-wrap items-start gap-2">
               {canForceFinalize && (
                 <Button
@@ -177,6 +190,52 @@ export function RefundNextActionPanel({
                   {t("admin.operations.refundRequests.disputeButton")}
                 </Button>
               )}
+              {canClose && !closeOpen && (
+                <Button
+                  variant="secondary"
+                  onClick={() => setCloseOpen(true)}
+                  disabled={closing || finalizing}
+                >
+                  <NoSymbolIcon className="mr-1.5 h-5 w-5" />
+                  {t("admin.operations.refundRequests.closeButton")}
+                </Button>
+              )}
+            </div>
+          )}
+
+          {canClose && closeOpen && (
+            <div className="space-y-2 rounded-lg border border-danger-200 bg-surface-elevated p-3">
+              <p className="text-sm">
+                {t("admin.operations.refundRequests.closeExplainer")}
+              </p>
+              <Textarea
+                value={closeReason}
+                placeholder={t(
+                  "admin.operations.refundRequests.closeReasonPlaceholder",
+                )}
+                onChange={(event) =>
+                  setCloseReason(event.target.value.slice(0, 500))
+                }
+                rows={2}
+                maxLength={500}
+              />
+              <div className="flex gap-2">
+                <Button
+                  variant="danger"
+                  onClick={() => onClose(closeReason.trim())}
+                  isLoading={closing}
+                  disabled={closing || closeReason.trim().length < 10}
+                >
+                  {t("admin.operations.refundRequests.closeConfirm")}
+                </Button>
+                <Button
+                  variant="secondary"
+                  onClick={() => setCloseOpen(false)}
+                  disabled={closing}
+                >
+                  {t("common.cancel")}
+                </Button>
+              </div>
             </div>
           )}
 

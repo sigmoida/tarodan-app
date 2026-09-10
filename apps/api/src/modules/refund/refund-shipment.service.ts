@@ -33,6 +33,7 @@ import { i18nMessage } from "../i18n";
 import { WarehouseAddressService } from "../shipping/warehouse/warehouse-address.service";
 import { RefundNotificationService } from "./refund-notification.service";
 import { RefundFinancialService } from "./refund-financial.service";
+import { decideReturnDropoffExpiry } from "./helpers/return-dropoff-expiry";
 
 /**
  * İadenin FİZİKSEL bacağı — RefundService'ten birebir taşındı. Ürünün alıcıdan
@@ -418,25 +419,35 @@ export class RefundShipmentService {
   /**
    * D25 (insani senaryo): alıcı iadeyi açtı ama paketi hiç şubeye götürmedi —
    * satıcının hold'u süresiz donuk kalıyordu. `return_shipment_open` + N gün
-   * (env REFUND_RETURN_DROPOFF_DAYS, vars. 7) hareketsiz kalan Sürat iadelerini
+   * (env REFUND_RETURN_DROPOFF_DAYS, vars. 14) hareketsiz kalan Sürat iadelerini
    * yerelde iptal eder: hold çözülür ve alıcıya bildirim gider. Resmi REST
    * sözleşmesinde uzak iptal olmadığı için fiziksel kayıt/kod operasyon ekibinin
    * Sürat paneli müdahalesini gerektirir.
    *
    * Güvenlik: iptal ETMEDEN önce Sürat'tan CANLI takip çekilir — pakette
    * hareket varsa (alıcı son anda götürdü, poll henüz görmedi) iptal atlanır ve
-   * normal poll akışına bırakılır. Sorgu başarısızsa da (belirsizlik) iptal
-   * edilmez, sonraki tick tekrar dener. Yalnız `surat` iadeler: manuel iade
-   * poll'lanamadığından yanlış iptal riski var → ops takibi.
+   * normal poll akışına bırakılır. Kararı `decideReturnDropoffExpiry` verir:
+   * "Sürat'ta kayıt yok" (pending) ve "taşıyıcıda iptal" (cancelled) HAREKET
+   * YOK demektir ve iptal edilir; yalnız gerçek sorgu hatası (failure)
+   * belirsizliktir ve atlanır — o da RETURN_DROPOFF_HARD_DAYS'i aşana kadar.
+   * Yalnız `surat` iadeler: manuel iade poll'lanamadığından yanlış iptal riski
+   * var → ops takibi.
    */
   async expireStaleOpenReturns(): Promise<number> {
     const days = envConfigNumber(PAYMENT_CONFIG_KEYS.RETURN_DROPOFF_DAYS);
     const cutoff = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
+    // Emniyet supabı hiçbir koşulda normal pencereden kısa olamaz.
+    const hardDays = Math.max(
+      envConfigNumber(PAYMENT_CONFIG_KEYS.RETURN_DROPOFF_HARD_DAYS),
+      days,
+    );
+    const hardCutoff = new Date(Date.now() - hardDays * 24 * 60 * 60 * 1000);
 
     let stale: Array<{
       id: string;
       refundNumber: string;
       requesterId: string;
+      returnCreatedAt: Date | null;
       order: { id: string; sellerId: string };
     }>;
     try {
@@ -450,6 +461,7 @@ export class RefundShipmentService {
           id: true,
           refundNumber: true,
           requesterId: true,
+          returnCreatedAt: true,
           order: { select: { id: true, sellerId: true } },
         },
         take: 25,
@@ -463,18 +475,15 @@ export class RefundShipmentService {
     for (const rr of stale) {
       try {
         // Canlı doğrulama: pakette hareket varsa iptal etme.
-        const live = await this.suratTrackingService.fetchTrackingInfo(
+        const lookup = await this.suratTrackingService.lookupTracking(
           rr.refundNumber,
         );
-        if (!live) continue; // belirsizlik → bu tick atla
-        const gonderi = live.Gonderiler?.[0];
-        const hasMovement =
-          !!gonderi &&
-          ((gonderi.Hareketler?.length ?? 0) > 0 ||
-            (gonderi.KargonunDurumuSayi ?? 1) >= 2);
-        if (hasMovement) {
+        const decision = decideReturnDropoffExpiry(lookup, {
+          hardOverdue: !!rr.returnCreatedAt && rr.returnCreatedAt < hardCutoff,
+        });
+        if (!decision.expire) {
           this.logger.log(
-            `Skip expiry for ${rr.refundNumber}: live Surat data shows movement; poll will pick it up`,
+            `Skip expiry for ${rr.refundNumber}: ${decision.reason}`,
           );
           continue;
         }
@@ -489,6 +498,7 @@ export class RefundShipmentService {
             orderId: rr.order.id,
             refundNumber: rr.refundNumber,
             dropoffDays: days,
+            expiryReason: decision.reason,
           },
           updateLocal: async (tx) => {
             await tx.refundRequest.update({
@@ -506,10 +516,14 @@ export class RefundShipmentService {
         await this.notifications.appendHistory(rr.id, {
           action: "return_dropoff_expired",
           by: "system",
-          details: { days, carrierCancellationRequired: true },
+          details: {
+            days,
+            carrierCancellationRequired: true,
+            expiryReason: decision.reason,
+          },
         });
         this.logger.warn(
-          `Refund ${rr.refundNumber} locally expired; carrier cancellation task=${cancellationTask.id}`,
+          `Refund ${rr.refundNumber} locally expired (${decision.reason}); carrier cancellation task=${cancellationTask.id}`,
         );
         await this.notifications.safeNotify(
           rr.requesterId,

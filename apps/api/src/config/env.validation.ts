@@ -66,6 +66,18 @@ const envSchema = z
     PAYTR_MERCHANT_SALT: z.string().optional(),
     PAYTR_TEST_MODE: z.string().optional(),
     REFUND_POLICY_V2_ENABLED: z.string().optional(),
+    // İade drop-off penceresi ve emniyet supabı (gün). Bir env DOSYASINDAN
+    // ayarlanabilmeleri için burada bildirilmeleri şart — bildirilmezse
+    // `apps/api/.env`'deki değer hiç ulaşmaz ve koddaki varsayılan sessizce
+    // kazanır (yukarıdaki CAVEAT).
+    //
+    // KAPSAM NOTU: aynı .env.example bloğundaki RETURN_WINDOW_DAYS,
+    // REFUND_RETURN_INSPECTION_HOURS ve REFUND_WAIT_DELIVERY_MAX_DAYS de
+    // bildirilmemiş durumda; onları burada bildirmek para yollarının süre
+    // pencerelerini değiştirir ve CLAUDE.md §15'te "karar bekleyen" başlığı
+    // altındadır — bu düzeltmenin kapsamına alınmadı, ayrı karar.
+    REFUND_RETURN_DROPOFF_DAYS: z.string().optional(),
+    REFUND_RETURN_DROPOFF_HARD_DAYS: z.string().optional(),
     PAYTR_CALLBACK_URL: z.string().optional(),
     // "true" iken payout, aşama-1 kabulünde completed OLMAZ; PayTR'nin transfer
     // sonucu callback'ini (2. aşama) bekler. Panelde "Platform Transfer Sonucu
