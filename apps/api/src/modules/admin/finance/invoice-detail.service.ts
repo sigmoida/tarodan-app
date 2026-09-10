@@ -1,5 +1,9 @@
 import { Injectable, NotFoundException } from "@nestjs/common";
-import type { ElogoInvoiceContext, ElogoInvoiceType } from "@prisma/client";
+import type {
+  ElogoInvoiceContext,
+  ElogoInvoiceType,
+  Prisma,
+} from "@prisma/client";
 import { PrismaService } from "../../../prisma";
 import { i18nMessage } from "../../i18n";
 import { invoiceDescriptionOf } from "../../elogo/invoice/invoice-line-description";
@@ -63,7 +67,7 @@ const partySelect = {
   adminCode: true,
   displayName: true,
   companyName: true,
-} as const;
+} satisfies Prisma.UserSelect;
 
 const partyName = (
   user: { displayName: string; companyName: string | null } | null,
@@ -368,14 +372,18 @@ export class InvoiceDetailService {
   private async sourceOfPackageOrOrder(
     sourceId: string,
   ): Promise<InvoiceSourceRow[]> {
+    // `satisfies` ŞART: select bir DEĞİŞKENDE durduğu için Prisma'nın jeneriği
+    // alan adlarını doğrulamıyor — `paidAt` böyle geçmişti ve `Order`'da öyle
+    // bir alan olmadığı için döküm canlıda 500 veriyordu (TARODAN-API-20).
+    // Ödeme tarihi `Payment`'ta durur, siparişte değil.
     const orderSelect = {
       orderNumber: true,
       quantity: true,
       totalAmount: true,
       createdAt: true,
-      paidAt: true,
+      payment: { select: { paidAt: true } },
       product: { select: { title: true } },
-    } as const;
+    } satisfies Prisma.OrderSelect;
     const pkg = await this.prisma.orderPackage.findUnique({
       where: { id: sourceId },
       select: {
@@ -392,7 +400,7 @@ export class InvoiceDetailService {
       description: order.product?.title ?? "",
       quantity: order.quantity,
       amount: Number(order.totalAmount),
-      occurredAt: order.paidAt ?? order.createdAt,
+      occurredAt: order.payment?.paidAt ?? order.createdAt,
     }));
   }
 }
