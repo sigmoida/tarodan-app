@@ -7,8 +7,16 @@ import SidebarFilters from "./SidebarFilters";
 import { useListings } from "../_context/ListingsContext";
 
 /**
- * Desktop sidebar card + the mobile drawer. A plain static column — the filter
- * sections collapse via the shared Accordion, so no sticky positioning.
+ * Desktop sidebar card + the mobile drawer.
+ *
+ * Masaüstünde sütun `sticky` ve KENDİ İÇİNDE kaydırılır. Eskiden sayfayla
+ * birlikte akan sade bir sütundu; filtre listelerinin hiçbirinde yükseklik
+ * sınırı olmadığı için (özellikle yüzlerce satırlık üretici listesi) sütun
+ * sonuç ızgarasından metrelerce uzun oluyor, kullanıcı yanında bomboş bir
+ * alanla birlikte sayfayı aşağı kaydırmak zorunda kalıyordu. Bölüm içi
+ * listeler artık kendi sınırlarını taşıyor (`FilterOptionList`), sütun da
+ * görüntü alanına sabitlenip taşma durumunda kendi içinde kayıyor — sonuçlar
+ * ile filtreler birbirinden bağımsız kaydırılıyor.
  *
  * Mobil panel, gezinme çekmeceleriyle AYNI `MobileDrawer` gövdesini kullanır:
  * marka başlığı, masaüstüne büyüyünce kapanma ve Radix'in odak tuzağı / Escape
@@ -47,8 +55,8 @@ export default function ListingsSidebar() {
   return (
     <>
       {/* Sidebar Filters (Desktop) */}
-      <div className="hidden lg:block w-56 flex-shrink-0">
-        <div className="bg-surface-elevated rounded-lg border border-border overflow-hidden">
+      <div className="hidden w-56 flex-shrink-0 lg:block">
+        <div className="sticky top-24 max-h-[calc(100vh-8rem)] overflow-y-auto overscroll-contain rounded-lg border border-border bg-surface-elevated">
           {filters}
         </div>
       </div>

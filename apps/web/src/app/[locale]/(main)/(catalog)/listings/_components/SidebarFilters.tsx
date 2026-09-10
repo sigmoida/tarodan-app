@@ -9,10 +9,9 @@ import {
   Button,
   Checkbox,
   Input,
-  Radio,
-  matchesSearch,
 } from "@tarodan/ui";
 import { useSidebarFilters } from "../_hooks/useSidebarFilters";
+import FilterOptionList, { type FilterOption } from "./FilterOptionList";
 import type { Filters } from "../_lib/params";
 
 interface SidebarFiltersProps {
@@ -21,12 +20,6 @@ interface SidebarFiltersProps {
   activeFilterCount: number;
   onClearFilters: () => void;
 }
-
-// Selected/active row styling reused by every option list.
-const rowClass = (selected: boolean) =>
-  `flex items-center gap-2 px-2 py-1.5 rounded cursor-pointer transition-colors ${
-    selected ? "bg-primary-100 text-primary-700" : "text-body hover:bg-surface"
-  }`;
 
 export default function SidebarFilters({
   filters,
@@ -37,25 +30,11 @@ export default function SidebarFilters({
     t,
     openSections,
     setOpenSections,
-    brandSearch,
-    setBrandSearch,
-    manufacturerSearch,
-    setManufacturerSearch,
-    modelSearch,
-    setModelSearch,
-    categorySearch,
-    setCategorySearch,
-    scaleSearch,
-    setScaleSearch,
-    materialSearch,
-    setMaterialSearch,
-    customAttrSearch,
-    setCustomAttrSearch,
-    filteredCategories,
-    filteredBrands,
+    categories,
+    brandList,
     modelsForBrand,
-    filteredScales,
-    filteredMaterials,
+    scaleList,
+    materialList,
     colorList,
     displayManufacturers,
     customAttrGroups,
@@ -71,33 +50,55 @@ export default function SidebarFilters({
     handleConditionChange,
   } = useSidebarFilters({ filters, onFilterChange });
 
-  // Shown when a search filters an option list down to nothing.
-  const noResults = (
-    <p className="px-2 py-3 text-sm text-muted text-center">
-      {t("common.noResults")}
-    </p>
-  );
+  // Her bölüm aynı gövdeyi (arama + sınırlı yükseklik + boş durum) kullanır;
+  // burada yalnız katalog kaydını seçenek biçimine çeviriyoruz.
+  const noResults = t("common.noResults");
 
-  // A compact search box reused above each searchable option list.
-  const searchBox = (
-    value: string,
-    onChange: (v: string) => void,
-    placeholder: string,
-  ) => (
-    <Input
-      type="text"
-      placeholder={placeholder}
-      value={value}
-      onChange={(e) => onChange(e.target.value)}
-      inputSize="sm"
-      className="rounded border-border focus:border-primary-400 mb-2"
-    />
-  );
+  const categoryOptions: FilterOption[] = categories.map((c) => ({
+    value: c.id,
+    label: c.name,
+    id: c.id,
+  }));
+
+  const brandOptions: FilterOption[] = brandList.map((b) => ({
+    value: b.id || b.name,
+    label: b.name,
+    id: b.id,
+  }));
+
+  const modelOptions: FilterOption[] = modelsForBrand.map((m) => ({
+    value: m.id,
+    label: m.name,
+    id: m.id,
+  }));
+
+  const scaleOptions: FilterOption[] = scaleList.map((s) => ({
+    value: s,
+    label: s,
+  }));
+
+  const materialOptions: FilterOption[] = materialList.map((m) => ({
+    value: m.slug,
+    label: m.label,
+  }));
+
+  const colorOptions: FilterOption[] = colorList.map((c) => ({
+    value: c.slug,
+    label: c.label,
+    color: c.color,
+  }));
+
+  const manufacturerOptions: FilterOption[] = displayManufacturers.map((m) => ({
+    value: m.id || m.name,
+    label: m.name,
+    id: m.id,
+    count: m._count?.products,
+  }));
 
   return (
     <div className="flex flex-col">
       {/* Header */}
-      <div className="flex items-center justify-between px-4 py-3 bg-surface border-b border-border-subtle">
+      <div className="flex items-center justify-between border-b border-border-subtle bg-surface px-4 py-3">
         <div className="flex items-center gap-2">
           <span className="font-semibold text-heading">
             {t("product.filters")}
@@ -124,31 +125,14 @@ export default function SidebarFilters({
         <AccordionItem value="category">
           <AccordionTrigger>{t("product.vehicleType")}</AccordionTrigger>
           <AccordionContent>
-            {searchBox(
-              categorySearch,
-              setCategorySearch,
-              t("product.searchTypes"),
-            )}
-            {filteredCategories.length === 0 ? (
-              noResults
-            ) : (
-              <div className="space-y-1">
-                {filteredCategories.map((cat) => {
-                  const isSelected = filters.categoryId === cat.id;
-                  return (
-                    <label key={cat.id} className={rowClass(isSelected)}>
-                      <Radio
-                        name="category"
-                        checked={isSelected}
-                        onChange={() => handleCategoryChange(cat.id, cat.name)}
-                        className="w-4 h-4 text-primary-500 focus:ring-primary-400"
-                      />
-                      <span className="text-sm">{cat.name}</span>
-                    </label>
-                  );
-                })}
-              </div>
-            )}
+            <FilterOptionList
+              name="category"
+              options={categoryOptions}
+              isSelected={(o) => filters.categoryId === o.id}
+              onSelect={(o) => handleCategoryChange(o.id ?? "", o.label)}
+              searchPlaceholder={t("product.searchTypes")}
+              emptyText={noResults}
+            />
           </AccordionContent>
         </AccordionItem>
 
@@ -156,33 +140,18 @@ export default function SidebarFilters({
         <AccordionItem value="brand">
           <AccordionTrigger>{t("product.brand")}</AccordionTrigger>
           <AccordionContent>
-            <Input
-              type="text"
-              placeholder={t("brands.searchPlaceholder")}
-              value={brandSearch}
-              onChange={(e) => setBrandSearch(e.target.value)}
-              inputSize="sm"
-              className="rounded border-border focus:border-primary-400 mb-2"
+            <FilterOptionList
+              name="brand"
+              options={brandOptions}
+              isSelected={(o) =>
+                filters.brandId
+                  ? filters.brandId === o.id
+                  : filters.brand === o.label
+              }
+              onSelect={(o) => handleBrandChange(o.id ?? "", o.label)}
+              searchPlaceholder={t("brands.searchPlaceholder")}
+              emptyText={noResults}
             />
-            <div className="space-y-1">
-              {filteredBrands.length === 0 && noResults}
-              {filteredBrands.map((brand) => {
-                const isSelected = filters.brandId
-                  ? filters.brandId === brand.id
-                  : filters.brand === brand.name;
-                return (
-                  <label key={brand.id} className={rowClass(isSelected)}>
-                    <Radio
-                      name="brand"
-                      checked={isSelected}
-                      onChange={() => handleBrandChange(brand.id, brand.name)}
-                      className="w-4 h-4 text-primary-500 focus:ring-primary-400"
-                    />
-                    <span className="text-sm">{brand.name}</span>
-                  </label>
-                );
-              })}
-            </div>
           </AccordionContent>
         </AccordionItem>
 
@@ -190,31 +159,14 @@ export default function SidebarFilters({
         <AccordionItem value="model">
           <AccordionTrigger>Model</AccordionTrigger>
           <AccordionContent>
-            <Input
-              type="text"
-              placeholder={t("product.searchModels")}
-              value={modelSearch}
-              onChange={(e) => setModelSearch(e.target.value)}
-              inputSize="sm"
-              className="rounded border-border focus:border-primary-400 mb-2"
+            <FilterOptionList
+              name="carModel"
+              options={modelOptions}
+              isSelected={(o) => filters.carModelId === o.id}
+              onSelect={(o) => handleCarModelChange(o.id ?? "", o.label)}
+              searchPlaceholder={t("product.searchModels")}
+              emptyText={noResults}
             />
-            <div className="space-y-1 max-h-48 overflow-y-auto">
-              {modelsForBrand.length === 0 && noResults}
-              {modelsForBrand.map((m) => {
-                const isSelected = filters.carModelId === m.id;
-                return (
-                  <label key={m.id} className={rowClass(isSelected)}>
-                    <Radio
-                      name="carModel"
-                      checked={isSelected}
-                      onChange={() => handleCarModelChange(m.id, m.name)}
-                      className="w-4 h-4 text-primary-500 focus:ring-primary-400"
-                    />
-                    <span className="text-sm">{m.name}</span>
-                  </label>
-                );
-              })}
-            </div>
           </AccordionContent>
         </AccordionItem>
 
@@ -222,27 +174,14 @@ export default function SidebarFilters({
         <AccordionItem value="scale">
           <AccordionTrigger>{t("product.scale")}</AccordionTrigger>
           <AccordionContent>
-            {searchBox(scaleSearch, setScaleSearch, t("product.searchScale"))}
-            {filteredScales.length === 0 ? (
-              noResults
-            ) : (
-              <div className="space-y-1">
-                {filteredScales.map((scale) => {
-                  const isSelected = filters.scale === scale;
-                  return (
-                    <label key={scale} className={rowClass(isSelected)}>
-                      <Radio
-                        name="scale"
-                        checked={isSelected}
-                        onChange={() => handleScaleChange(scale)}
-                        className="w-4 h-4 text-primary-500 focus:ring-primary-400"
-                      />
-                      <span className="text-sm">{scale}</span>
-                    </label>
-                  );
-                })}
-              </div>
-            )}
+            <FilterOptionList
+              name="scale"
+              options={scaleOptions}
+              isSelected={(o) => filters.scale === o.value}
+              onSelect={(o) => handleScaleChange(o.value)}
+              searchPlaceholder={t("product.searchScale")}
+              emptyText={noResults}
+            />
           </AccordionContent>
         </AccordionItem>
 
@@ -250,31 +189,14 @@ export default function SidebarFilters({
         <AccordionItem value="material">
           <AccordionTrigger>{t("product.material")}</AccordionTrigger>
           <AccordionContent>
-            {searchBox(
-              materialSearch,
-              setMaterialSearch,
-              t("product.searchMaterial"),
-            )}
-            {filteredMaterials.length === 0 ? (
-              noResults
-            ) : (
-              <div className="space-y-1">
-                {filteredMaterials.map((m) => {
-                  const isSelected = filters.material === m.slug;
-                  return (
-                    <label key={m.slug} className={rowClass(isSelected)}>
-                      <Radio
-                        name="material"
-                        checked={isSelected}
-                        onChange={() => handleMaterialChange(m.slug)}
-                        className="w-4 h-4 text-primary-500 focus:ring-primary-400"
-                      />
-                      <span className="text-sm">{m.label}</span>
-                    </label>
-                  );
-                })}
-              </div>
-            )}
+            <FilterOptionList
+              name="material"
+              options={materialOptions}
+              isSelected={(o) => filters.material === o.value}
+              onSelect={(o) => handleMaterialChange(o.value)}
+              searchPlaceholder={t("product.searchMaterial")}
+              emptyText={noResults}
+            />
           </AccordionContent>
         </AccordionItem>
 
@@ -292,30 +214,13 @@ export default function SidebarFilters({
               </span>
             </AccordionTrigger>
             <AccordionContent>
-              <div className="space-y-1">
-                {colorList.map((option) => {
-                  const isSelected = (filters.colors ?? []).includes(
-                    option.slug,
-                  );
-                  return (
-                    <label key={option.slug} className={rowClass(isSelected)}>
-                      <Checkbox
-                        checked={isSelected}
-                        onChange={() => toggleColor(option.slug)}
-                        className="w-4 h-4"
-                      />
-                      {option.color && (
-                        <span
-                          className="w-3 h-3 rounded-full border border-border-subtle flex-shrink-0"
-                          style={{ backgroundColor: option.color }}
-                          aria-hidden="true"
-                        />
-                      )}
-                      <span className="text-sm">{option.label}</span>
-                    </label>
-                  );
-                })}
-              </div>
+              <FilterOptionList
+                options={colorOptions}
+                isSelected={(o) => (filters.colors ?? []).includes(o.value)}
+                onSelect={(o) => toggleColor(o.value)}
+                searchPlaceholder={t("product.color")}
+                emptyText={noResults}
+              />
             </AccordionContent>
           </AccordionItem>
         )}
@@ -324,33 +229,18 @@ export default function SidebarFilters({
         <AccordionItem value="manufacturer">
           <AccordionTrigger>{t("product.manufacturer")}</AccordionTrigger>
           <AccordionContent>
-            <Input
-              type="text"
-              placeholder={t("product.searchManufacturers")}
-              value={manufacturerSearch}
-              onChange={(e) => setManufacturerSearch(e.target.value)}
-              inputSize="sm"
-              className="rounded border-border focus:border-primary-400 mb-2"
+            <FilterOptionList
+              name="manufacturer"
+              options={manufacturerOptions}
+              isSelected={(o) =>
+                o.id
+                  ? filters.manufacturerId === o.id
+                  : filters.manufacturer === o.label
+              }
+              onSelect={(o) => handleManufacturerChange(o.id ?? "", o.label)}
+              searchPlaceholder={t("product.searchManufacturers")}
+              emptyText={noResults}
             />
-            <div className="space-y-1">
-              {displayManufacturers.length === 0 && noResults}
-              {displayManufacturers.map((m) => {
-                const isSelected = m.id
-                  ? filters.manufacturerId === m.id
-                  : filters.manufacturer === m.name;
-                return (
-                  <label key={m.id || m.name} className={rowClass(isSelected)}>
-                    <Radio
-                      name="manufacturer"
-                      checked={isSelected}
-                      onChange={() => handleManufacturerChange(m.id, m.name)}
-                      className="w-4 h-4 text-primary-500 focus:ring-primary-400"
-                    />
-                    <span className="text-sm">{m.name}</span>
-                  </label>
-                );
-              })}
-            </div>
           </AccordionContent>
         </AccordionItem>
 
@@ -359,11 +249,11 @@ export default function SidebarFilters({
           const selected = new Set(
             filters.customAttributes?.[group.slug] ?? [],
           );
-          const searchTerm = customAttrSearch[group.slug] ?? "";
-          const filteredAttrs = searchTerm
-            ? group.attributes.filter((a) => matchesSearch(a.label, searchTerm))
-            : group.attributes;
-          const showSearch = group.attributes.length > 15;
+          const options: FilterOption[] = group.attributes.map((a) => ({
+            value: a.slug,
+            label: a.label,
+            color: a.color,
+          }));
           return (
             <AccordionItem key={group.slug} value={`customAttr:${group.slug}`}>
               <AccordionTrigger>
@@ -377,49 +267,15 @@ export default function SidebarFilters({
                 </span>
               </AccordionTrigger>
               <AccordionContent>
-                {showSearch && (
-                  <Input
-                    type="text"
-                    placeholder={t("product.searchAttribute", {
-                      name: group.name,
-                    })}
-                    value={searchTerm}
-                    onChange={(e) =>
-                      setCustomAttrSearch((s) => ({
-                        ...s,
-                        [group.slug]: e.target.value,
-                      }))
-                    }
-                    inputSize="sm"
-                    className="rounded border-border focus:border-primary-400 mb-2"
-                  />
-                )}
-                <div
-                  className={`space-y-1 ${group.attributes.length > 15 ? "max-h-64 overflow-y-auto" : ""}`}
-                >
-                  {filteredAttrs.map((attr) => {
-                    const isSelected = selected.has(attr.slug);
-                    return (
-                      <label key={attr.slug} className={rowClass(isSelected)}>
-                        <Checkbox
-                          checked={isSelected}
-                          onChange={() =>
-                            toggleCustomAttribute(group.slug, attr.slug)
-                          }
-                          className="w-4 h-4"
-                        />
-                        {attr.color && (
-                          <span
-                            className="w-3 h-3 rounded-full border border-border-subtle flex-shrink-0"
-                            style={{ backgroundColor: attr.color }}
-                            aria-hidden="true"
-                          />
-                        )}
-                        <span className="text-sm">{attr.label}</span>
-                      </label>
-                    );
+                <FilterOptionList
+                  options={options}
+                  isSelected={(o) => selected.has(o.value)}
+                  onSelect={(o) => toggleCustomAttribute(group.slug, o.value)}
+                  searchPlaceholder={t("product.searchAttribute", {
+                    name: group.name,
                   })}
-                </div>
+                  emptyText={noResults}
+                />
               </AccordionContent>
             </AccordionItem>
           );
@@ -429,22 +285,17 @@ export default function SidebarFilters({
         <AccordionItem value="condition">
           <AccordionTrigger>{t("product.condition")}</AccordionTrigger>
           <AccordionContent>
-            <div className="space-y-1">
-              {CONDITIONS.map((condition) => (
-                <label
-                  key={condition.value}
-                  className={rowClass(filters.condition === condition.value)}
-                >
-                  <Radio
-                    name="condition"
-                    checked={filters.condition === condition.value}
-                    onChange={() => handleConditionChange(condition.value)}
-                    className="w-4 h-4 text-primary-500 focus:ring-primary-400"
-                  />
-                  <span className="text-sm">{condition.label}</span>
-                </label>
-              ))}
-            </div>
+            <FilterOptionList
+              name="condition"
+              options={CONDITIONS.map((c) => ({
+                value: c.value,
+                label: c.label,
+              }))}
+              isSelected={(o) => filters.condition === o.value}
+              onSelect={(o) => handleConditionChange(o.value)}
+              searchPlaceholder={t("product.condition")}
+              emptyText={noResults}
+            />
           </AccordionContent>
         </AccordionItem>
 
@@ -453,7 +304,7 @@ export default function SidebarFilters({
           <AccordionTrigger>{t("product.price")}</AccordionTrigger>
           <AccordionContent>
             <div className="space-y-2">
-              <div className="flex gap-2 items-center">
+              <div className="flex items-center gap-2">
                 <Input
                   type="number"
                   placeholder="Min ₺"
@@ -462,9 +313,9 @@ export default function SidebarFilters({
                     onFilterChange({ ...filters, minPrice: e.target.value })
                   }
                   inputSize="sm"
-                  className="flex-1 min-w-0 px-2 rounded border-border focus:border-primary-400"
+                  className="min-w-0 flex-1 rounded border-border px-2 focus:border-primary-400"
                 />
-                <span className="text-subtle flex-shrink-0">-</span>
+                <span className="flex-shrink-0 text-subtle">-</span>
                 <Input
                   type="number"
                   placeholder="Max ₺"
@@ -473,7 +324,7 @@ export default function SidebarFilters({
                     onFilterChange({ ...filters, maxPrice: e.target.value })
                   }
                   inputSize="sm"
-                  className="flex-1 min-w-0 px-2 rounded border-border focus:border-primary-400"
+                  className="min-w-0 flex-1 rounded border-border px-2 focus:border-primary-400"
                 />
               </div>
               <div className="flex flex-wrap gap-1">
@@ -501,7 +352,7 @@ export default function SidebarFilters({
                           });
                         }
                       }}
-                      className={`px-2 py-1 text-xs rounded transition-colors ${
+                      className={`rounded px-2 py-1 text-xs transition-colors ${
                         isActive
                           ? "bg-primary-500 text-inverted"
                           : "bg-surface-alt text-muted hover:bg-border-subtle"
@@ -520,7 +371,7 @@ export default function SidebarFilters({
         <AccordionItem value="options">
           <AccordionTrigger>{t("product.options")}</AccordionTrigger>
           <AccordionContent>
-            <label className="flex items-center gap-3 px-2 py-2 rounded cursor-pointer hover:bg-surface">
+            <label className="flex cursor-pointer items-center gap-3 rounded px-2 py-2 hover:bg-surface">
               <Checkbox
                 checked={filters.tradeOnly}
                 onChange={(e) =>
