@@ -6,7 +6,6 @@ import { keepAttributeGroups } from "@tarodan/listing-form";
 import { queryKeys } from "@/lib/query/keys";
 import { useLocale, useTranslations } from "next-intl";
 import { categoriesApi, manufacturersApi, listingsApi } from "@/lib/api";
-import { matchesSearch } from "@tarodan/ui";
 import type { Filters } from "../_lib/params";
 import {
   useListingFiltersQuery,
@@ -56,10 +55,6 @@ export function useSidebarFilters({
   const t = useTranslations();
   const locale = useLocale();
 
-  const [customAttrSearch, setCustomAttrSearch] = useState<
-    Record<string, string>
-  >({});
-
   // Open accordion sections (controlled so async-loaded custom groups open too).
   const [openSections, setOpenSections] = useState<string[]>(BASE_SECTIONS);
 
@@ -92,7 +87,7 @@ export function useSidebarFilters({
   const scaleList = filtersQuery.data?.scales ?? [];
   const materialList = filtersQuery.data?.materials ?? [];
   const colorList = filtersQuery.data?.colors ?? [];
-  const carModelList = filtersQuery.data?.carModels ?? [];
+  const carModelList = filtersQuery.data?.carModels;
   const brandList = useMemo(
     () =>
       (filtersQuery.data?.brands ?? []).map((b) =>
@@ -159,13 +154,6 @@ export function useSidebarFilters({
       ]),
     ]);
   }, [customAttrGroups]);
-
-  const [brandSearch, setBrandSearch] = useState("");
-  const [manufacturerSearch, setManufacturerSearch] = useState("");
-  const [modelSearch, setModelSearch] = useState("");
-  const [categorySearch, setCategorySearch] = useState("");
-  const [scaleSearch, setScaleSearch] = useState("");
-  const [materialSearch, setMaterialSearch] = useState("");
 
   const CONDITIONS = [
     { value: "new", label: t("product.conditionNew") },
@@ -287,15 +275,14 @@ export function useSidebarFilters({
     }
   };
 
-  const filteredBrands =
-    brandList.length > 0
-      ? brandList.filter((b) => matchesSearch(b.name, brandSearch))
-      : [];
-
-  const modelsForBrand = carModelList.filter(
-    (m) =>
-      (!filters.brandId || m.brandId === filters.brandId) &&
-      matchesSearch(m.name, modelSearch),
+  // Seçilen markanın modelleri; marka seçili değilse tüm modeller. Metin
+  // araması listenin kendi bileşeninde (FilterOptionList) yapılır.
+  const modelsForBrand = useMemo(
+    () =>
+      (carModelList ?? []).filter(
+        (m) => !filters.brandId || m.brandId === filters.brandId,
+      ),
+    [carModelList, filters.brandId],
   );
 
   // Filtre seçenekleri YALNIZ katalogdan gelir — hiçbir koşulda yedek liste
@@ -305,17 +292,22 @@ export function useSidebarFilters({
   // yanlış: ağ hatasında uydurma çip göstermek, hiç göstermemekten kötüdür —
   // kullanıcı seçer, sonuç boş gelir ve hatayı katalogda sanır. Başarılı ama
   // boş yanıt da, başarısız yanıt da "seçenek yok" demektir.
-  const displayManufacturers = manufacturerList.filter((m) =>
-    matchesSearch(m.name, manufacturerSearch),
-  );
-
-  const filteredCategories = categories.filter((c) =>
-    matchesSearch(c.name, categorySearch),
-  );
-  const filteredScales = scaleList.filter((s) => matchesSearch(s, scaleSearch));
-  const filteredMaterials = materialList.filter((m) =>
-    matchesSearch(m.label, materialSearch),
-  );
+  //
+  // Aynı gerekçe İLANI OLMAYAN üretici için de geçerli: katalogdaki üreticilerin
+  // büyük çoğunluğunun aktif ilanı yok ve hepsini listelemek, kullanıcıyı
+  // yüzlerce satır arasından garanti boş bir sonuca götürüyordu. Liste ilan
+  // sayısına göre azalan sırada — en çok ilanı olan üretici en üstte.
+  const displayManufacturers = useMemo(() => {
+    const hasCounts = manufacturerList.some((m) => m._count?.products != null);
+    const pool = hasCounts
+      ? manufacturerList.filter((m) => (m._count?.products ?? 0) > 0)
+      : manufacturerList;
+    return [...pool].sort(
+      (a, b) =>
+        (b._count?.products ?? 0) - (a._count?.products ?? 0) ||
+        a.name.localeCompare(b.name),
+    );
+  }, [manufacturerList]);
 
   return {
     t,
@@ -323,27 +315,12 @@ export function useSidebarFilters({
     // accordion
     openSections,
     setOpenSections,
-    // per-list search state
-    brandSearch,
-    setBrandSearch,
-    manufacturerSearch,
-    setManufacturerSearch,
-    modelSearch,
-    setModelSearch,
-    categorySearch,
-    setCategorySearch,
-    scaleSearch,
-    setScaleSearch,
-    materialSearch,
-    setMaterialSearch,
-    customAttrSearch,
-    setCustomAttrSearch,
     // option lists
-    filteredCategories,
-    filteredBrands,
+    categories,
+    brandList,
     modelsForBrand,
-    filteredScales,
-    filteredMaterials,
+    scaleList,
+    materialList,
     colorList,
     displayManufacturers,
     customAttrGroups,

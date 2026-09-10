@@ -13,6 +13,16 @@ interface VehicleType {
   slug: string;
 }
 
+/**
+ * "Kategoriler" mega-paneli: solda araç türleri, sağda popüler üreticiler.
+ *
+ * Sütunlar EŞİT genişlikte değil. Araç türü bir avuç kayıttır, üretici listesi
+ * ise onlarca; eşit bölünce sol sütun yarım panel boyunca boş kalıyor, üretici
+ * sütunu da gereksiz yere dar kalıp satır satır sarıyordu.
+ *
+ * Üretici listesi `groupManufacturers` ile ilan sayısına göre kırpılır — panel
+ * artık ekran boyuna sığar; tam listeye alttaki bağlantı götürür.
+ */
 export default function CategoriesPanel({
   vehicleTypes,
   manufacturers,
@@ -25,18 +35,18 @@ export default function CategoriesPanel({
 
   return (
     <NavPanel>
-      <div className="grid grid-cols-2 gap-8">
+      <div className="grid gap-8 md:grid-cols-[minmax(0,200px)_minmax(0,1fr)]">
         {/* Vehicle types */}
         <div>
           <h3 className="mb-3 text-xs font-semibold uppercase tracking-wide text-muted">
             {t("nav.vehicleTypes")}
           </h3>
-          <div className="grid grid-cols-2 gap-x-8 gap-y-2">
+          <div className="flex flex-col gap-y-1">
             {vehicleTypes.map((type) => (
               <NavigationMenuLink asChild key={type.slug}>
                 <Link
                   href={navHref.vehicleType(type.slug)}
-                  className="text-sm text-muted hover:text-primary-600 transition-colors py-1"
+                  className="py-1 text-sm text-muted transition-colors hover:text-primary-600"
                 >
                   {type.label}
                 </Link>
@@ -62,13 +72,13 @@ export default function CategoriesPanel({
                       <NavigationMenuLink asChild>
                         <Link
                           href={navHref.manufacturer(item)}
-                          className="text-sm text-muted hover:text-primary-600 transition-colors"
+                          className="text-sm text-muted transition-colors hover:text-primary-600"
                         >
                           {item.name}
                         </Link>
                       </NavigationMenuLink>
                       {idx < group.items.length - 1 && (
-                        <span className="text-border-strong mx-1">·</span>
+                        <span className="mx-1 text-border-strong">·</span>
                       )}
                     </span>
                   ))}
@@ -78,9 +88,14 @@ export default function CategoriesPanel({
             <NavigationMenuLink asChild>
               <Link
                 href={navHref.allManufacturers}
-                className="text-xs text-primary-500 font-semibold hover:text-primary-600 transition-colors inline-block mt-1"
+                className="mt-1 inline-flex items-center gap-1 text-xs font-semibold text-primary-500 transition-colors hover:text-primary-600"
               >
                 {t("nav.allManufacturers")}
+                {manufacturers.length > 0 && (
+                  <span className="font-normal text-subtle">
+                    ({manufacturers.length})
+                  </span>
+                )}
               </Link>
             </NavigationMenuLink>
           </div>
