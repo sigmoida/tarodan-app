@@ -4,9 +4,41 @@ import {
   typeFilterOptions,
   statusFilterOptions,
   documentTypeFilterOptions,
+  contextFilterOptions,
 } from "./types";
 
+/**
+ * Fatura listesinin filtreleri.
+ *
+ * Numara, açıklama ve kullanıcı kodu AYRI metin alanlarıdır, toolbar'ın tek
+ * arama kutusuna yığılmaz: operatör hangi kolonu aradığını bilir ve hepsini
+ * birden eşleştiren bir arama dar sorguyu imkânsız kılar (bir fatura numarası
+ * bir kullanıcı kodu değildir).
+ */
 export const elogoInvoiceFilterFields = (t: TranslateFn): FilterField[] => [
+  {
+    type: "text",
+    name: "invoiceNumber",
+    label: t("admin.finance.invoices.filters.invoiceNumber"),
+  },
+  {
+    type: "text",
+    name: "description",
+    label: t("admin.finance.invoices.filters.description"),
+    placeholder: t("admin.finance.invoices.filters.descriptionPlaceholder"),
+  },
+  {
+    type: "text",
+    name: "userCode",
+    label: t("admin.finance.invoices.filters.userCode"),
+    placeholder: t("admin.finance.invoices.filters.userCodePlaceholder"),
+  },
+  {
+    type: "select",
+    name: "context",
+    label: t("admin.finance.invoices.context"),
+    options: contextFilterOptions(t),
+  },
   {
     type: "select",
     name: "type",

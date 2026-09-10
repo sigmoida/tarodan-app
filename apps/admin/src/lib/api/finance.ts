@@ -61,9 +61,15 @@ export const financeApi = {
   getPayment: (id: string) => api.get(`/admin/payments/${id}`),
   // Invoices (e-Archive/e-Invoice) — issued + refund documents
   getInvoices: (params?: {
+    /** Ekranın sekmesi: all | buyer | seller | penalty | platform. */
+    scope?: string;
     type?: string;
     status?: string;
     documentType?: string;
+    context?: string;
+    invoiceNumber?: string;
+    description?: string;
+    userCode?: string;
     search?: string;
     startDate?: string;
     endDate?: string;
@@ -73,6 +79,10 @@ export const financeApi = {
     sortOrder?: "asc" | "desc";
   }) => api.get("/admin/invoices", { params }),
   getInvoicePdf: (id: string) => api.get(`/admin/invoices/${id}/pdf`),
+  // Tek faturanın detay dökümü: kalem kırılımı + dayandığı işlem (Excel).
+  getInvoiceDetailExport: (id: string) =>
+    api.get(`/admin/invoices/${id}/detail`, { responseType: "blob" }),
+  emailInvoice: (id: string) => api.post(`/admin/invoices/${id}/email`),
   // Product invoices manually uploaded by corporate sellers (separate tab)
   getSellerInvoices: (params?: {
     search?: string;

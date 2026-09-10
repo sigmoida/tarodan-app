@@ -3,7 +3,7 @@ import { PrismaService } from "../../prisma";
 import { StorageService } from "../storage/storage.service";
 import { ElogoService } from "./elogo.service";
 import { i18nMessage } from "../i18n";
-import { LINE_DESCRIPTION } from "./invoice/invoice-line-description";
+import { invoiceDescriptionOf } from "./invoice/invoice-line-description";
 
 /**
  * Kullanıcıya gösterim sırası: önce ürün/üyelik gibi ALIŞVERİŞİN kendi belgesi,
@@ -72,7 +72,7 @@ export class ElogoQueryService {
     return rows.map((r) => ({
       id: r.id,
       type: r.type,
-      label: r.lineDescription || LINE_DESCRIPTION[r.type] || "Fatura",
+      label: invoiceDescriptionOf(r.type, r.lineDescription),
       invoiceNumber: r.invoiceNumber,
       documentType: r.documentType,
       total: r.total,
@@ -131,7 +131,7 @@ export class ElogoQueryService {
         id: inv.id,
         invoiceNumber: inv.invoiceNumber,
         type: inv.type,
-        label: inv.lineDescription || LINE_DESCRIPTION[inv.type] || "Fatura",
+        label: invoiceDescriptionOf(inv.type, inv.lineDescription),
         total: inv.total,
         issuedAt: inv.issuedAt,
       }));

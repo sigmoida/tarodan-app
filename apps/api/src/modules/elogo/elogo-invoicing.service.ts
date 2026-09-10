@@ -145,6 +145,11 @@ export class ElogoInvoicingService {
     return this.delivery.resetInvoiceAttempts(invoiceId);
   }
 
+  /** Admin: kesilmiş faturayı alıcısına yeniden e-postala. */
+  emailInvoice(invoiceId: string): Promise<{ sentTo: string }> {
+    return this.delivery.emailInvoice(invoiceId);
+  }
+
   // ───────────────────────── app: görüntüleme/indirme ─────────────────────────
   // Uygulama ve elogo-invoice.controller bu servisi adresliyor; gövde
   // ElogoQueryService'e taşındı, imzalar burada kaldı.
