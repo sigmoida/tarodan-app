@@ -78,7 +78,11 @@ export const financeApi = {
     sortBy?: string;
     sortOrder?: "asc" | "desc";
   }) => api.get("/admin/invoices", { params }),
-  getInvoicePdf: (id: string) => api.get(`/admin/invoices/${id}/pdf`),
+  // Uç İKİ biçim döndürür: S3 kopyası varsa `{url}` JSON'u, yoksa ham PDF
+  // gövdesi. Blob istenir, çağıran içerik tipine bakıp ayırır — JSON varsayan
+  // eski hâl, stream gelen belgede sessizce hiçbir şey yapmıyordu.
+  getInvoicePdf: (id: string) =>
+    api.get(`/admin/invoices/${id}/pdf`, { responseType: "blob" }),
   // Tek faturanın detay dökümü: kalem kırılımı + dayandığı işlem (Excel).
   getInvoiceDetailExport: (id: string) =>
     api.get(`/admin/invoices/${id}/detail`, { responseType: "blob" }),

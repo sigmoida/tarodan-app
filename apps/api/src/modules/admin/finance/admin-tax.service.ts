@@ -24,6 +24,7 @@ import {
   invoiceTypesMatchingDescription,
 } from "../../elogo/invoice/invoice-line-description";
 import { elogoInvoiceScopeWhere } from "./invoice-scope";
+import { isInvoiceDownloadable } from "./invoice-downloadable";
 import { i18nMessage } from "../../i18n";
 
 /**
@@ -1266,7 +1267,7 @@ export class AdminTaxService {
         discountTotal: Number(r.discountTotal),
         vatRate: Number(r.vatRate),
         billingReference: r.billingReference,
-        hasPdf: !!r.pdfUrl,
+        hasPdf: isInvoiceDownloadable(r),
         emailSentAt: r.emailSentAt,
         resultMsg: r.elogoResultMsg,
         issuedAt: r.issuedAt,
