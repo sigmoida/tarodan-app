@@ -72,6 +72,8 @@ model User {
   sellerOffers            Offer[]                  @relation("SellerOffers")
   buyerOrders             Order[]                  @relation("BuyerOrders")
   sellerOrders            Order[]                  @relation("SellerOrders")
+  elogoInvoicesAsSeller   ElogoInvoice[]           @relation("ElogoInvoiceSeller")
+  elogoInvoicesAsBuyer    ElogoInvoice[]           @relation("ElogoInvoiceBuyer")
   buyerCheckoutGroups     CheckoutGroup[]          @relation("BuyerCheckoutGroups")
   passwordResetTokens     PasswordResetToken[]
   paymentHolds            PaymentHold[]
@@ -2198,6 +2200,17 @@ model ElogoInvoice {
   /// referansından türetilir (gövde aynı, önek KYT); faturaya "Kayıt No" olarak basılır
   /// ve hakediş dökümünün aynı adlı kolonunda durur. sourceId bir UUID, belgede yeri yok.
   sourceReference           String?            @map("source_reference")
+  /// İşlemin SATICI tarafı — belgenin MUHATABI değil (o `recipientUserId`),
+  /// dayandığı işlemin satan tarafıdır. Üyelik/öne çıkarma gibi Tarodan'ın
+  /// kendi satışlarında PLATFORM SATICISI kullanıcısıdır; takasta bedeli
+  /// ödemeyen taraftır. Kaynak çözülemezse NULL kalır.
+  sellerUserId              String?            @map("seller_user_id")
+  /// İşlemin ALICI tarafı = bedeli ödeyen taraf. Takasta ödeyen taraftır.
+  buyerUserId               String?            @map("buyer_user_id")
+  /// İşlemin GERÇEKLEŞME ŞEKLİ — belgenin hangi işlemden doğduğu (doğrudan
+  /// satış / teklif / takas / platform hizmeti). Kaynak kayıttan kesim anında
+  /// çözülür; çözülemeyen eski kayıtlarda NULL kalır.
+  context                   ElogoInvoiceContext? @map("context")
   recipientUserId           String?            @map("recipient_user_id")
   recipientVknTckn          String?            @map("recipient_vkn_tckn")
   recipientName             String?            @map("recipient_name")
@@ -2254,10 +2267,15 @@ model ElogoInvoice {
   cancelReason              String?            @map("cancel_reason")
   createdAt                 DateTime           @default(now()) @map("created_at")
   updatedAt                 DateTime           @updatedAt @map("updated_at")
+  seller                    User?              @relation("ElogoInvoiceSeller", fields: [sellerUserId], references: [id])
+  buyer                     User?              @relation("ElogoInvoiceBuyer", fields: [buyerUserId], references: [id])
 
   @@unique([type, sourceId])
   @@index([status])
   @@index([recipientUserId])
+  @@index([sellerUserId])
+  @@index([buyerUserId])
+  @@index([context])
   @@map("elogo_invoices")
 }
 
@@ -2338,6 +2356,16 @@ enum ElogoInvoiceType {
   /// faturalanır. Hizmet bedeli platformda kalır (mevcut belgesi durur), komisyon
   /// ise iade faturasıyla geri verilir. Kaynak = RefundRequest.id.
   penalty
+}
+
+/// Faturanın dayandığı işlemin GERÇEKLEŞME ŞEKLİ. `OrderOrigin` ile aynı
+/// değerleri taşır, artı `trade`: takasın siparişi yoktur, dolayısıyla origin'i
+/// de yoktur — fatura ekranı ikisini tek kolonda gösterir.
+enum ElogoInvoiceContext {
+  direct_sale
+  offer
+  trade
+  platform_service
 }
 
 enum ElogoInvoiceStatus {

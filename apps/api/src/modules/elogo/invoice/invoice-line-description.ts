@@ -24,3 +24,29 @@ export const LINE_DESCRIPTION: Record<string, string> = {
   penalty: "Ceza bedeli (kargo)",
   return_invoice: "İade faturası",
 };
+
+/**
+ * Belgede yazan açıklama. Kesim anındaki snapshot varsa O geçerlidir — belge
+ * kesildikten sonra tipin varsayılan metni değişse bile faturanın üstündeki
+ * yazı değişmez.
+ */
+export function invoiceDescriptionOf(
+  type: string,
+  lineDescription: string | null | undefined,
+): string {
+  return lineDescription?.trim() || LINE_DESCRIPTION[type] || "Fatura";
+}
+
+/**
+ * Açıklamaya göre arama, snapshot'ı OLMAYAN belgeleri de bulmak zorunda:
+ * "komisyon" araması `lineDescription` boş olan eski kayıtları da getirsin diye
+ * metin, tipin varsayılan açıklamasıyla da eşleştirilir ve eşleşen tipler
+ * döner.
+ */
+export function invoiceTypesMatchingDescription(search: string): string[] {
+  const needle = search.trim().toLocaleLowerCase("tr");
+  if (!needle) return [];
+  return Object.entries(LINE_DESCRIPTION)
+    .filter(([, label]) => label.toLocaleLowerCase("tr").includes(needle))
+    .map(([type]) => type);
+}

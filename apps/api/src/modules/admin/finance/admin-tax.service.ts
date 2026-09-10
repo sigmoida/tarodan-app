@@ -3,7 +3,12 @@ import {
   NotFoundException,
   BadRequestException,
 } from "@nestjs/common";
-import { ElogoInvoiceStatus, ElogoInvoiceType, Prisma } from "@prisma/client";
+import {
+  type ElogoInvoiceContext,
+  ElogoInvoiceStatus,
+  ElogoInvoiceType,
+  Prisma,
+} from "@prisma/client";
 import { PrismaService } from "../../../prisma";
 import { AdminAuditService } from "../ops/admin-audit.service";
 import { AdminDeletedIdentityService } from "../users/admin-deleted-identity.service";
@@ -14,6 +19,11 @@ import {
   paginateComputedRows,
   resolveOrderBy,
 } from "../../../common/list";
+import {
+  invoiceDescriptionOf,
+  invoiceTypesMatchingDescription,
+} from "../../elogo/invoice/invoice-line-description";
+import { elogoInvoiceScopeWhere } from "./invoice-scope";
 import { i18nMessage } from "../../i18n";
 
 /**
@@ -29,25 +39,6 @@ export class AdminTaxService {
     private readonly storageService: StorageService,
     private readonly deletedIdentities: AdminDeletedIdentityService,
   ) {}
-
-  private static readonly ELOGO_TYPE_LABELS: Record<string, string> = {
-    commission: "Komisyon (birleşik)",
-    service_fee: "Hizmet Bedeli (birleşik)",
-    buyer_commission: "Alıcı Komisyonu",
-    buyer_service_fee: "Alıcı Koruma Hizmet Bedeli",
-    buyer_shipping: "Kargo Bedeli (Alıcı Payı)",
-    seller_commission: "Satıcı Komisyonu",
-    seller_platform_fee: "Platform Hizmet Bedeli",
-    seller_shipping: "Kargo Bedeli (Satıcı Payı)",
-    membership: "Üyelik",
-    boost: "Öne Çıkarma",
-    trade_commission: "Takas Komisyonu",
-    trade_service_fee: "Takas Hizmet Bedeli",
-    trade_shipping: "Takas Kargo Bedeli",
-    platform_sale: "Platform Satışı",
-    penalty: "Ceza Faturası",
-    return_invoice: "İade Faturası",
-  };
 
   // ==================== TAX SETTINGS (Regions, Rates, Rules, Reporting) ====================
   /** Prisma client with Tax models; at runtime may be missing until prisma generate is run */
@@ -1015,49 +1006,165 @@ export class AdminTaxService {
 
   // ==================== ELOGO FATURA (e-Arşiv/e-Fatura) ====================
 
+  /** Satır kartı: kolonda görünen ad + insan-okur kullanıcı kodu (B010001). */
+  private static partyCard(
+    user: {
+      id: string;
+      adminCode: string;
+      displayName: string;
+      companyName: string | null;
+    } | null,
+  ) {
+    return user
+      ? {
+          id: user.id,
+          code: user.adminCode,
+          name: user.companyName || user.displayName,
+        }
+      : null;
+  }
+
   /**
-   * Tarodan'ın kestiği e-Arşiv/e-Fatura gelir belgeleri (komisyon/hizmet/üyelik/boost/takas/
-   * platform satışı) + iade faturaları. Sayfalı + tür/durum/belge/tarih filtreli + arama.
+   * Açıklamaya göre arama. `lineDescription` kesim anında snapshot'lanır ama
+   * eski belgelerde boştur; o yüzden metin tiplerin varsayılan açıklamalarıyla
+   * da eşleştirilir — "komisyon" araması snapshot'sız belgeleri de bulmalı.
+   */
+  private invoiceDescriptionWhere(
+    search: string,
+  ): Prisma.ElogoInvoiceWhereInput {
+    const types = invoiceTypesMatchingDescription(search) as ElogoInvoiceType[];
+    return {
+      OR: [
+        { lineDescription: { contains: search, mode: "insensitive" } },
+        // Tipe düşüş YALNIZ snapshot'sız belgeler için: snapshot'ı olan bir
+        // belgede ekranda yazan metin odur, tipinin varsayılanı değil. Koşulsuz
+        // bırakılırsa "komisyon" araması, açıklaması "Kargo bedeli" olarak
+        // snapshot'lanmış bir komisyon belgesini de getirirdi.
+        ...(types.length > 0
+          ? [
+              {
+                type: { in: types },
+                OR: [{ lineDescription: null }, { lineDescription: "" }],
+              },
+            ]
+          : []),
+      ],
+    };
+  }
+
+  /**
+   * Kullanıcı koduna (B010001/K010001) ya da id'sine göre arama — kişi belgede
+   * satıcı, alıcı veya muhatap olarak geçebilir, üçü de aranır.
+   */
+  private async invoicePartyWhere(
+    code: string,
+  ): Promise<Prisma.ElogoInvoiceWhereInput> {
+    const user = await this.prisma.user.findFirst({
+      where: {
+        OR: [
+          { adminCode: { equals: code, mode: "insensitive" } },
+          { id: code },
+        ],
+      },
+      select: { id: true },
+    });
+    // Eşleşen kullanıcı yoksa sonuç BOŞ olmalı: filtreyi sessizce düşürmek,
+    // aranan kişinin faturaları sanılan dolu bir liste gösterirdi.
+    if (!user) return { id: { in: [] } };
+    return {
+      OR: [
+        { sellerUserId: user.id },
+        { buyerUserId: user.id },
+        { recipientUserId: user.id },
+      ],
+    };
+  }
+
+  /** Toolbar'ın tek arama kutusu — numara, taraf, VKN, ETTN ve tutar birlikte. */
+  private invoiceSearchWhere(search: string): Prisma.ElogoInvoiceWhereInput {
+    const normalized = search.toLowerCase();
+    const numeric = Number(search.replace(",", "."));
+    const like = { contains: search, mode: "insensitive" } as const;
+    const or: Prisma.ElogoInvoiceWhereInput[] = [
+      { invoiceNumber: like },
+      { recipientName: like },
+      { recipientVknTckn: like },
+      { ettn: like },
+      { billingReference: like },
+      { sourceReference: like },
+      // Belgenin muhatabı taraflardan yalnız BİRİdir; karşı tarafın adıyla
+      // arama (alıcı komisyonu belgesini satıcının adıyla bulmak) ancak
+      // ilişkiler üzerinden mümkün.
+      {
+        seller: { is: { OR: [{ displayName: like }, { companyName: like }] } },
+      },
+      { buyer: { is: { OR: [{ displayName: like }, { companyName: like }] } } },
+    ];
+    if (
+      Object.values(ElogoInvoiceType).includes(normalized as ElogoInvoiceType)
+    )
+      or.push({ type: normalized as ElogoInvoiceType });
+    if (
+      Object.values(ElogoInvoiceStatus).includes(
+        normalized as ElogoInvoiceStatus,
+      )
+    )
+      or.push({ status: normalized as ElogoInvoiceStatus });
+    if (Number.isFinite(numeric))
+      or.push(
+        { netAmount: numeric },
+        { taxAmount: numeric },
+        { total: numeric },
+      );
+    return { OR: or };
+  }
+
+  /**
+   * Tarodan'ın kestiği e-Arşiv/e-Fatura gelir belgeleri (komisyon/hizmet/üyelik/
+   * boost/takas/platform satışı) + iade ve ceza belgeleri. Sayfalı, sekmeli
+   * (`scope`), filtreli.
+   *
+   * Satır ETİKET ÜRETMEZ: ham `type`/`status`/`documentType` döner, çeviri
+   * admin kataloğunun işidir. Tek istisna `description` — o, belgenin ÜSTÜNDE
+   * yazan metnin ta kendisidir, çeviri değil kayıttır.
    */
   async getElogoInvoices(query: ElogoInvoiceQueryDto) {
-    const where: Prisma.ElogoInvoiceWhereInput = {};
-    if (query.type) where.type = query.type as any;
-    if (query.status) where.status = query.status as any;
-    if (query.documentType) where.documentType = query.documentType;
+    const filters: Prisma.ElogoInvoiceWhereInput[] = [
+      elogoInvoiceScopeWhere(query.scope, this.prisma.elogoInvoice.fields),
+    ];
+    if (query.type) filters.push({ type: query.type as ElogoInvoiceType });
+    if (query.status)
+      filters.push({ status: query.status as ElogoInvoiceStatus });
+    if (query.documentType) filters.push({ documentType: query.documentType });
+    if (query.context)
+      filters.push({ context: query.context as ElogoInvoiceContext });
+    if (query.invoiceNumber?.trim())
+      filters.push({
+        invoiceNumber: {
+          contains: query.invoiceNumber.trim(),
+          mode: "insensitive",
+        },
+      });
+    if (query.description?.trim())
+      filters.push(this.invoiceDescriptionWhere(query.description.trim()));
+    if (query.userCode?.trim())
+      filters.push(await this.invoicePartyWhere(query.userCode.trim()));
     if (query.startDate || query.endDate) {
-      where.createdAt = {};
-      if (query.startDate) where.createdAt.gte = new Date(query.startDate);
-      if (query.endDate) where.createdAt.lte = new Date(query.endDate);
+      const createdAt: Prisma.DateTimeFilter = {};
+      if (query.startDate) createdAt.gte = new Date(query.startDate);
+      if (query.endDate) createdAt.lte = new Date(query.endDate);
+      filters.push({ createdAt });
     }
-    if (query.search?.trim()) {
-      const q = query.search.trim();
-      const normalized = q.toLowerCase();
-      const numeric = Number(q.replace(",", "."));
-      where.OR = [
-        { invoiceNumber: { contains: q, mode: "insensitive" } },
-        { recipientName: { contains: q, mode: "insensitive" } },
-        { recipientVknTckn: { contains: q, mode: "insensitive" } },
-        { ettn: { contains: q, mode: "insensitive" } },
-        { billingReference: { contains: q, mode: "insensitive" } },
-      ];
-      if (
-        Object.values(ElogoInvoiceType).includes(normalized as ElogoInvoiceType)
-      )
-        where.OR.push({ type: normalized as ElogoInvoiceType });
-      if (
-        Object.values(ElogoInvoiceStatus).includes(
-          normalized as ElogoInvoiceStatus,
-        )
-      )
-        where.OR.push({ status: normalized as ElogoInvoiceStatus });
-      if (Number.isFinite(numeric))
-        where.OR.push(
-          { netAmount: numeric },
-          { taxAmount: numeric },
-          { total: numeric },
-        );
-    }
+    if (query.search?.trim())
+      filters.push(this.invoiceSearchWhere(query.search.trim()));
+    const where: Prisma.ElogoInvoiceWhereInput = { AND: filters };
 
+    const partySelect = {
+      id: true,
+      adminCode: true,
+      displayName: true,
+      companyName: true,
+    } satisfies Prisma.UserSelect;
     const select = {
       id: true,
       type: true,
@@ -1066,9 +1173,14 @@ export class AdminTaxService {
       invoiceNumber: true,
       ettn: true,
       sourceReference: true,
+      lineDescription: true,
+      context: true,
       recipientName: true,
       recipientVknTckn: true,
       recipientUserId: true,
+      recipientEmail: true,
+      seller: { select: partySelect },
+      buyer: { select: partySelect },
       netAmount: true,
       taxAmount: true,
       total: true,
@@ -1095,12 +1207,30 @@ export class AdminTaxService {
         { ...query, sortType: "number" },
       );
     } else {
-      const orderBy =
-        resolveOrderBy<Prisma.ElogoInvoiceOrderByWithRelationInput>(
-          "ElogoInvoice",
-          query,
-          { defaultSort: { createdAt: "desc" } },
-        );
+      const orderBy = resolveOrderBy<
+        | Prisma.ElogoInvoiceOrderByWithRelationInput
+        | Prisma.ElogoInvoiceOrderByWithRelationInput[]
+      >("ElogoInvoice", query, {
+        defaultSort: { createdAt: "desc" },
+        // Taraf kolonları önce ünvanı, yoksa görünen adı basar; sıralama da
+        // aynı sırayı izlemeli, yoksa başlık tıklaması hücreyle uyuşmaz.
+        sortMap: {
+          sellerName: (direction) => [
+            { seller: { companyName: { sort: direction, nulls: "last" } } },
+            { seller: { displayName: direction } },
+          ],
+          buyerName: (direction) => [
+            { buyer: { companyName: { sort: direction, nulls: "last" } } },
+            { buyer: { displayName: direction } },
+          ],
+          // Açıklama snapshot'sızsa tipin varsayılan metni gösteriliyor;
+          // snapshot boş olanlar tipe göre kendi içinde sıralanır.
+          description: (direction) => [
+            { lineDescription: { sort: direction, nulls: "last" } },
+            { type: direction },
+          ],
+        },
+      });
       result = await paginate(
         this.prisma.elogoInvoice,
         { where, orderBy, select },
@@ -1116,18 +1246,20 @@ export class AdminTaxService {
       data: rows.map((r) => ({
         id: r.id,
         type: r.type,
-        typeLabel: AdminTaxService.ELOGO_TYPE_LABELS[r.type] || "Fatura",
         isReturn: r.type === "return_invoice",
         status: r.status,
         documentType: r.documentType,
-        documentTypeLabel:
-          r.documentType === "EINVOICE" ? "e-Fatura" : "e-Arşiv",
         invoiceNumber: r.invoiceNumber,
         ettn: r.ettn,
         sourceReference: r.sourceReference,
+        description: invoiceDescriptionOf(r.type, r.lineDescription),
+        context: r.context,
+        seller: AdminTaxService.partyCard(r.seller),
+        buyer: AdminTaxService.partyCard(r.buyer),
         recipientName: r.recipientName,
         recipientVknTckn: r.recipientVknTckn,
         recipientUserId: r.recipientUserId,
+        recipientEmail: r.recipientEmail,
         netAmount: Number(r.netAmount),
         taxAmount: Number(r.taxAmount),
         total: Number(r.total),

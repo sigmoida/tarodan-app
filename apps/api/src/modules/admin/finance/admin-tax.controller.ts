@@ -32,6 +32,8 @@ import type { Response } from "express";
 import { ElogoInvoicingService } from "../../elogo/elogo-invoicing.service";
 import { SettlementReportService } from "./settlement/settlement-report.service";
 import { SettlementReportWorkbookService } from "./settlement/settlement-report-workbook.service";
+import { InvoiceDetailService } from "./invoice-detail.service";
+import { InvoiceDetailWorkbookService } from "./invoice-detail-workbook.service";
 import { AdvertisementService } from "../../advertisement/advertisement.service";
 import { MediaService } from "../../media/media.service";
 import {
@@ -120,6 +122,8 @@ export class AdminTaxController {
     private readonly elogoInvoicing: ElogoInvoicingService,
     private readonly settlementReport: SettlementReportService,
     private readonly settlementWorkbook: SettlementReportWorkbookService,
+    private readonly invoiceDetail: InvoiceDetailService,
+    private readonly invoiceDetailWorkbook: InvoiceDetailWorkbookService,
   ) {}
 
   // ==================== TAX SETTINGS (Regions, Rates, Rules, Reporting) ====================
@@ -383,6 +387,40 @@ export class AdminTaxController {
     // okunurdu ve tükenmiş faturayı yalnız DB'ye elle dokunarak kurtarmak mümkündü.
     await this.elogoInvoicing.resetInvoiceAttempts(id);
     return { success: true };
+  }
+
+  @Post("invoices/:id/email")
+  @Roles(AdminRole.super_admin, AdminRole.admin)
+  @ApiOperation({
+    summary:
+      "Kesilmiş faturayı alıcısına yeniden e-postala (kesimdeki tek-gönderim güvencesini bilerek aşar)",
+  })
+  async emailElogoInvoice(@Param("id", ParseUUIDPipe) id: string) {
+    return this.elogoInvoicing.emailInvoice(id);
+  }
+
+  @Get("invoices/:id/detail")
+  @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
+  @ApiOperation({
+    summary: "Fatura detay dökümü (Excel) — kalem kırılımı + kaynak işlem",
+  })
+  async getElogoInvoiceDetail(
+    @Param("id", ParseUUIDPipe) id: string,
+    @Res() res: Response,
+  ) {
+    const detail = await this.invoiceDetail.build(id);
+    const buffer = await this.invoiceDetailWorkbook.build(detail);
+    res.setHeader(
+      "Content-Type",
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    );
+    res.setHeader(
+      "Content-Disposition",
+      `attachment; filename="${this.invoiceDetailWorkbook.filename(
+        detail.invoiceNumber,
+      )}"`,
+    );
+    res.send(buffer);
   }
 
   @Get("invoices/:id/pdf")
