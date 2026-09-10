@@ -58,7 +58,20 @@ export interface CustomField extends BaseField {
   render: (draft: FilterDraft) => ReactNode;
 }
 
-export type FilterField = SelectField | DateRangeField | CustomField;
+/**
+ * A free-text filter that targets ONE field, unlike the toolbar's search box
+ * which sprays across many. Lists reach for it when the operator knows which
+ * column they are searching — an invoice number is not a buyer name, and a
+ * combined search that matches both makes narrow lookups impossible.
+ */
+export interface TextField extends BaseField {
+  type: "text";
+  name: string;
+  placeholder?: string;
+}
+
+export type FilterField =
+  SelectField | TextField | DateRangeField | CustomField;
 
 export const DEFAULT_FROM_NAME = "startDate";
 export const DEFAULT_TO_NAME = "endDate";
