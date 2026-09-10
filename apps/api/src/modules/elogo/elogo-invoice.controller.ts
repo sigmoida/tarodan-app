@@ -35,13 +35,25 @@ export class ElogoInvoiceController {
   @Get("by-order/:orderId")
   @ApiOperation({
     summary:
-      'Bir siparişe ait kullanıcının e-Arşiv faturası (yoksa null) — "Faturayı İndir" butonu için',
+      "Bir siparişe ait kullanıcının TEK e-Arşiv faturası (yoksa null) — tek belge gösteren eski istemciler için; yenileri /all kullanır",
   })
   async byOrder(
     @Param("orderId", ParseUUIDPipe) orderId: string,
     @CurrentUser("id") userId: string,
   ) {
     return this.invoicing.findOrderInvoiceForUser(orderId, userId);
+  }
+
+  @Get("by-order/:orderId/all")
+  @ApiOperation({
+    summary:
+      "Bir siparişe ait kullanıcının TÜM e-Arşiv belgeleri — taraf başına üç hizmet belgesi kesilir",
+  })
+  async byOrderAll(
+    @Param("orderId", ParseUUIDPipe) orderId: string,
+    @CurrentUser("id") userId: string,
+  ) {
+    return this.invoicing.listOrderInvoicesForUser(orderId, userId);
   }
 
   @Get(":id/pdf")

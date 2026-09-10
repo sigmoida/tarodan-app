@@ -1,7 +1,10 @@
 import { Injectable, Logger } from "@nestjs/common";
 import { User } from "@prisma/client";
 import { NotificationSettings, UpdateNotificationSettingsDto } from "./dto";
-import { UserProfileService } from "./profile/user-profile.service";
+import {
+  UserProfileService,
+  type DeleteAccountOptions,
+} from "./profile/user-profile.service";
 import type { OnboardingTourKey } from "./helpers/user-preferences.constants";
 import { UserAddressService } from "./profile/user-address.service";
 import { UserSocialService } from "./social/user-social.service";
@@ -144,8 +147,8 @@ export class UserService {
    * - No active trades (pending, accepted, shipped, etc.)
    * - No pending orders (pending_payment, paid, preparing, shipped, delivered)
    */
-  async deleteAccount(userId: string) {
-    return this.profile.deleteAccount(userId);
+  async deleteAccount(userId: string, options?: DeleteAccountOptions) {
+    return this.profile.deleteAccount(userId, options);
   }
 
   /**

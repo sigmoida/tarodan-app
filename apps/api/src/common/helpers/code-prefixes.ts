@@ -69,6 +69,14 @@ export const REFERENCE_PREFIX = {
   membershipOrder: "MEM",
   /** Satıcıya para gönderimi (PayTR platform transfer) — tiresiz üretilir */
   payoutTransfer: "PYT",
+  /**
+   * FATURA KAYIT NO — bir alışverişten doğan TÜM e-belgelerin ortak referansı.
+   * Koli kodundan TÜRETİLİR (gövde aynı, önek değişir): `PKG-K7X9M2QF3N` →
+   * `KYT-K7X9M2QF3N`. Ayrı bir önek olmasının nedeni PKG'nin aynı zamanda
+   * Sürat'a giden KARGO TAKİP numarası olmasıdır; mali belge taşıyıcı
+   * referansını taşımamalı. Gövde aynı kaldığı için eşleme tablosu gerekmez.
+   */
+  invoiceRecord: "KYT",
   /** Kargo entegrasyonu kapalıyken üretilen yedek takip numarası */
   shipmentFallback: "SHP",
   /** Hediye / kupon kodu (öneki yönetici tarafından değiştirilebilir) */
@@ -89,6 +97,21 @@ export function reprefixReference(code: string, prefix: string): string {
   const separator = code.indexOf("-");
   const body = separator === -1 ? code : code.slice(separator + 1);
   return `${prefix}-${body}`;
+}
+
+/**
+ * Bir belgenin FATURA KAYIT NO'su: kaynağının referansından türetilir.
+ *
+ * Kesim anında snapshot'lanır ve faturaya "Kayıt No" olarak basılır; hakediş
+ * dökümünün "Kayıt No" kolonu da aynı kodu taşır, böylece müşavir belgeyi
+ * dökümdeki satıra tek bakışta bağlar. Kaynak çözülemezse `null` — belge
+ * referanssız kesilir, kesilmemesi yeğ değildir.
+ */
+export function invoiceRecordReference(
+  sourceCode: string | null | undefined,
+): string | null {
+  const code = sourceCode?.trim();
+  return code ? reprefixReference(code, REFERENCE_PREFIX.invoiceRecord) : null;
 }
 
 /**

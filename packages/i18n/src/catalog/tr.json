@@ -5988,6 +5988,7 @@
         "invoiceUnit": "fatura",
         "invoiceNumber": "Fatura No",
         "type": "Tür",
+        "discount": "İskonto",
         "orderAmount": "Sipariş Tutarı",
         "uploadedAt": "Yüklenme",
         "replaced": "Değiştirildi",
@@ -6005,13 +6006,21 @@
           "cancelled": "İptal"
         },
         "types": {
-          "commission": "Komisyon",
-          "serviceFee": "Hizmet Bedeli",
+          "commission": "Komisyon (birleşik)",
+          "serviceFee": "Hizmet Bedeli (birleşik)",
+          "buyerCommission": "Alıcı Komisyonu",
+          "buyerServiceFee": "Alıcı Koruma Hizmet Bedeli",
+          "buyerShipping": "Kargo Bedeli (Alıcı Payı)",
+          "sellerCommission": "Satıcı Komisyonu",
+          "sellerPlatformFee": "Platform Hizmet Bedeli",
+          "sellerShipping": "Kargo Bedeli (Satıcı Payı)",
           "membership": "Üyelik",
           "boost": "Öne Çıkarma",
           "tradeCommission": "Takas Komisyonu",
           "tradeServiceFee": "Takas Hizmet Bedeli",
+          "tradeShipping": "Takas Kargo Bedeli",
           "platformSale": "Platform Satışı",
+          "penalty": "Ceza Faturası",
           "returnInvoice": "İade Faturası"
         },
         "documentTypes": {
@@ -6025,6 +6034,26 @@
         "retry": "Yeniden Dene",
         "retried": "Fatura yeniden kuyruğa alındı",
         "documentCount": "{count} belge"
+      },
+      "settlement": {
+        "title": "Hakediş Dökümü",
+        "subtitle": "Satıcıya kesilen komisyon faturasının dayanağı — dönem teslimat tarihine göredir",
+        "searchPlaceholder": "Koli kodu, sipariş no veya satıcı ara",
+        "empty": "Seçilen dönemde teslim edilmiş sipariş yok",
+        "exportExcel": "Excel indir",
+        "exported": "Hakediş dökümü indirildi",
+        "exportFailed": "Döküm indirilemedi",
+        "columns": {
+          "record": "Kayıt / Sipariş No",
+          "transactionType": "İşlem Tipi",
+          "seller": "Satıcı",
+          "product": "Ürün",
+          "commission": "Tarodan Hakedişi",
+          "sellerEarning": "Satıcı Hakedişi",
+          "withholding": "Stopaj",
+          "maturity": "Vade",
+          "maturityDays": "{days} gün"
+        }
       },
       "payments": {
         "title": "Ödeme Yönetimi",
@@ -7885,6 +7914,41 @@
       "filterLoginStateAll": "Tüm Giriş Durumları",
       "filterLoggedIn": "Giriş Yapmış"
     },
+    "deletedIdentities": {
+      "title": "Silinen Hesap Kimlikleri",
+      "description": "Silinen hesapların yasal saklama kaydı. Aylık resmî bildirim bu listeden alınır.",
+      "empty": "Arşivlenmiş kimlik kaydı yok",
+      "totalCount": "{count} kayıt",
+      "columnUser": "Kullanıcı",
+      "email": "E-posta",
+      "phone": "Telefon",
+      "nationalId": "TC Kimlik No",
+      "taxId": "Vergi No",
+      "companyName": "Firma",
+      "city": "İl / İlçe",
+      "wasSeller": "Satıcı",
+      "registeredAt": "Kayıt",
+      "deletedAt": "Silinme",
+      "retainUntil": "Saklama Bitişi",
+      "source": "Kaynak",
+      "sourceLive": "Silme anında",
+      "sourceBackfill": "Geriye dönük",
+      "deletedBy": "Silen",
+      "actorSelf": "Kullanıcı",
+      "actorAdmin": "Yönetici",
+      "actorUnknown": "Bilinmiyor",
+      "filterSource": "Kaynak",
+      "filterWasSeller": "Satıcı hesapları",
+      "filterRetentionExpired": "Saklama süresi dolmuş",
+      "exportTitle": "Aylık bildirim",
+      "exportHint": "Dönem seçin; dosya o ay silinen hesapları içerir.",
+      "exportButton": "Excel İndir",
+      "exportYear": "Yıl",
+      "exportMonth": "Ay",
+      "exported": "Bildirim dosyası indirildi",
+      "exportFailed": "Bildirim dosyası oluşturulamadı",
+      "retentionNotice": "Kayıtlar hukuki yükümlülük gereği saklanır ve silinemez; saklama süresi dolanlar filtreyle listelenir."
+    },
     "roles": {
       "title": "Roller ve İzinler",
       "description": "Her rolün hangi işlemleri yapabileceğini görüntüleyin ve düzenleyin",
@@ -8214,6 +8278,11 @@
           "description": "Kullanıcı hesaplarını görüntüleyin ve yönetin",
           "keywords": "user,üye"
         },
+        "deletedIdentities": {
+          "name": "Silinen Kimlikler",
+          "description": "Silinen hesapların yasal kimlik arşivi ve aylık bildirim",
+          "keywords": "silinen,arşiv,bildirim,kimlik,kvkk"
+        },
         "sellerApplications": {
           "name": "Satıcı Başvuruları",
           "description": "Satıcı olma başvurularını inceleyin ve onaylayın"
@@ -8291,6 +8360,10 @@
           "name": "Faturalar",
           "description": "Fatura ve e-fatura işlemlerini yönetin",
           "keywords": "fatura,invoice,e-arşiv,e-fatura,elogo,iade faturası"
+        },
+        "settlement": {
+          "name": "Hakediş Dökümü",
+          "description": "Komisyon faturasının dayanağı; Excel olarak indirilir"
         },
         "tax": {
           "name": "Vergi Ayarları",

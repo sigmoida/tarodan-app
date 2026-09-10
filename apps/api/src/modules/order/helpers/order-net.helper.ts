@@ -7,9 +7,15 @@
  *       − satıcı hizmet KDV'si   (satıcıya verilen hizmetlerin KDV'si)
  *       − stopaj                 (GVK 94/19)
  *       − satıcı kargo payı      (satıcının üstlendiği gerçek maliyet)
+ *       + platform-fonlu kupon   (indirimi platform üstlendiyse satıcıya GERİ eklenir)
  *
  * Eskiden sipariş yanıtı ile admin/ilan önizlemesi bu hesabı ayrı ayrı yazıyordu;
  * ikisi de buraya delege eder ki önizleme ile gerçek payout ayrışmasın.
+ *
+ * Escrow (`escrow-hold.service.ts`) aynı parayı alıcı toplamından geriye doğru
+ * ayrıştırır; iki hesap terim terim aynı sonucu verir. Platform-fonlu kupon payı
+ * yalnız escrow'da geri ekleniyordu, dolayısıyla böyle bir kampanyada ekranlar
+ * satıcıya ödenenden DÜŞÜK bir net gösteriyordu.
  */
 
 export interface SellerNetInput {
@@ -25,6 +31,13 @@ export interface SellerNetInput {
   sellerShippingAmount: number;
   /** Satıcıya verilen hizmetlerin KDV'si. */
   sellerServiceTaxAmount: number;
+  /**
+   * Kupon indiriminin PLATFORM tarafından finanse edilen kısmı
+   * (`Order.platformFundedDiscount`). Satıcı indirim ÖNCESİ tutar üzerinden
+   * ödenir, farkı platform üstlenir — bu yüzden nete GERİ eklenir. Satıcı-fonlu
+   * (varsayılan) kuponda 0'dır.
+   */
+  platformFundedDiscount: number;
 }
 
 const num = (value: number | null | undefined): number =>
@@ -37,7 +50,8 @@ export function sellerNetAmountOf(input: SellerNetInput): number {
     num(input.sellerFeeAmount) -
     num(input.withholdingTaxAmount) -
     num(input.sellerShippingAmount) -
-    num(input.sellerServiceTaxAmount);
+    num(input.sellerServiceTaxAmount) +
+    num(input.platformFundedDiscount);
 
   // Kesintiler bedeli aşarsa payout 0'dır — negatif hak ediş yazılmaz.
   return Math.max(0, Math.round((net + Number.EPSILON) * 100) / 100);

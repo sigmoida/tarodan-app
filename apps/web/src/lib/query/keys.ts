@@ -139,7 +139,8 @@ export const queryKeys = {
     all: () => ["orders"] as const,
     /** The single-order aggregate root (`['order']` also invalidates every sub-key). */
     detail: () => ["order"] as const,
-    elogoInvoice: (id: string) => ["order", id, "elogo-invoice"] as const,
+    /** Siparişin TÜM e-Arşiv belgeleri — taraf başına üç hizmet belgesi kesilir. */
+    elogoInvoices: (id: string) => ["order", id, "elogo-invoices"] as const,
     sellerInvoice: (id: string) => ["order", id, "seller-invoice"] as const,
     myReview: (id: string) => ["order", id, "my-review"] as const,
   },

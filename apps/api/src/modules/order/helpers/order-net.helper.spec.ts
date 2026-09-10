@@ -15,6 +15,7 @@ describe("sellerNetAmountOf", () => {
     withholdingTaxAmount: 5,
     sellerShippingAmount: 50,
     sellerServiceTaxAmount: 21,
+    platformFundedDiscount: 0,
     ...over,
   });
 
@@ -43,6 +44,19 @@ describe("sellerNetAmountOf", () => {
     ).toBe(0);
   });
 
+  it("platform-fonlu kupon payı nete GERİ eklenir", () => {
+    // Kupon indirimini platform üstlendiyse satıcı indirim ÖNCESİ tutar
+    // üzerinden ödenir; escrow da payout'a bunu ekler. Terim eksikken ekranlar
+    // satıcıya ödenenden düşük bir net gösteriyordu.
+    const funded = sellerNetAmountOf(input({ platformFundedDiscount: 100 }));
+
+    expect(funded - sellerNetAmountOf(input())).toBe(100);
+  });
+
+  it("satıcı-fonlu kuponda net değişmez", () => {
+    expect(sellerNetAmountOf(input({ platformFundedDiscount: 0 }))).toBe(369);
+  });
+
   it("kuruş hassasiyetini korur", () => {
     expect(
       sellerNetAmountOf({
@@ -50,6 +64,7 @@ describe("sellerNetAmountOf", () => {
         productTaxAmount: 0,
         sellerFeeAmount: 109.89,
         withholdingTaxAmount: 9.99,
+        platformFundedDiscount: 0,
         sellerShippingAmount: 50,
         sellerServiceTaxAmount: 31.98,
       }),

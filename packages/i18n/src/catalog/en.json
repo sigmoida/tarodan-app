@@ -5988,6 +5988,7 @@
         "invoiceUnit": "invoices",
         "invoiceNumber": "Invoice No.",
         "type": "Type",
+        "discount": "Discount",
         "orderAmount": "Order Amount",
         "uploadedAt": "Uploaded At",
         "replaced": "Replaced",
@@ -6005,13 +6006,21 @@
           "cancelled": "Cancelled"
         },
         "types": {
-          "commission": "Commission",
-          "serviceFee": "Service Fee",
+          "commission": "Commission (combined)",
+          "serviceFee": "Service Fee (combined)",
+          "buyerCommission": "Buyer Commission",
+          "buyerServiceFee": "Buyer Protection Fee",
+          "buyerShipping": "Shipping Fee (Buyer Share)",
+          "sellerCommission": "Seller Commission",
+          "sellerPlatformFee": "Platform Service Fee",
+          "sellerShipping": "Shipping Fee (Seller Share)",
           "membership": "Membership",
           "boost": "Boost",
           "tradeCommission": "Trade Commission",
           "tradeServiceFee": "Trade Service Fee",
+          "tradeShipping": "Trade Shipping",
           "platformSale": "Platform Sale",
+          "penalty": "Penalty Invoice",
           "returnInvoice": "Return Invoice"
         },
         "documentTypes": {
@@ -6025,6 +6034,26 @@
         "retry": "Retry",
         "retried": "Invoice re-queued",
         "documentCount": "{count} documents"
+      },
+      "settlement": {
+        "title": "Settlement Report",
+        "subtitle": "The basis behind the seller's commission invoice — the period follows the delivery date",
+        "searchPlaceholder": "Search parcel code, order number or seller",
+        "empty": "No delivered orders in the selected period",
+        "exportExcel": "Download Excel",
+        "exported": "Settlement report downloaded",
+        "exportFailed": "Could not download the report",
+        "columns": {
+          "record": "Record / Order No",
+          "transactionType": "Transaction Type",
+          "seller": "Seller",
+          "product": "Product",
+          "commission": "Tarodan Earning",
+          "sellerEarning": "Seller Earning",
+          "withholding": "Withholding",
+          "maturity": "Maturity",
+          "maturityDays": "{days} days"
+        }
       },
       "payments": {
         "title": "Payment Management",
@@ -7885,6 +7914,41 @@
       "filterLoginStateAll": "All Login States",
       "filterLoggedIn": "Logged In"
     },
+    "deletedIdentities": {
+      "title": "Deleted Account Identities",
+      "description": "Legal retention record for deleted accounts. The monthly official filing is exported from this list.",
+      "empty": "No archived identity records",
+      "totalCount": "{count} records",
+      "columnUser": "User",
+      "email": "Email",
+      "phone": "Phone",
+      "nationalId": "National ID",
+      "taxId": "Tax ID",
+      "companyName": "Company",
+      "city": "City / District",
+      "wasSeller": "Seller",
+      "registeredAt": "Registered",
+      "deletedAt": "Deleted",
+      "retainUntil": "Retention Ends",
+      "source": "Source",
+      "sourceLive": "At deletion",
+      "sourceBackfill": "Backfilled",
+      "deletedBy": "Deleted by",
+      "actorSelf": "User",
+      "actorAdmin": "Admin",
+      "actorUnknown": "Unknown",
+      "filterSource": "Source",
+      "filterWasSeller": "Seller accounts",
+      "filterRetentionExpired": "Retention expired",
+      "exportTitle": "Monthly filing",
+      "exportHint": "Pick a period; the file covers accounts deleted that month.",
+      "exportButton": "Download Excel",
+      "exportYear": "Year",
+      "exportMonth": "Month",
+      "exported": "Filing file downloaded",
+      "exportFailed": "Could not generate the filing file",
+      "retentionNotice": "Records are retained under a legal obligation and cannot be deleted; expired ones can be filtered."
+    },
     "roles": {
       "title": "Roles & Permissions",
       "description": "View and edit what each role is allowed to do",
@@ -8214,6 +8278,11 @@
           "description": "View and manage user accounts",
           "keywords": "user,member"
         },
+        "deletedIdentities": {
+          "name": "Deleted Identities",
+          "description": "Legal identity archive of deleted accounts and monthly filing",
+          "keywords": "deleted,archive,filing,identity,gdpr"
+        },
         "sellerApplications": {
           "name": "Seller Applications",
           "description": "Review and approve seller applications"
@@ -8291,6 +8360,10 @@
           "name": "Invoices",
           "description": "Manage invoice and e-invoice operations",
           "keywords": "invoice,e-archive,e-invoice,elogo,refund invoice"
+        },
+        "settlement": {
+          "name": "Settlement Report",
+          "description": "The basis behind the commission invoice; downloadable as Excel"
         },
         "tax": {
           "name": "Tax Settings",

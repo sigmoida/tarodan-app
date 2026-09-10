@@ -1,9 +1,16 @@
 import { Injectable, Logger } from "@nestjs/common";
-import { OrderStatus } from "@prisma/client";
+import { OrderStatus, type ElogoInvoiceType } from "@prisma/client";
 import { PrismaService } from "../../prisma";
 import { buildPlatformSaleLines } from "./invoice/invoice-lines";
+import {
+  LEGACY_PACKAGE_FEE_INVOICE_TYPES,
+  PACKAGE_FEE_COMPONENT_BY_TYPE,
+} from "./invoice/package-fee-components";
 import { LINE_DESCRIPTION } from "./invoice/invoice-line-description";
+import { buildPenaltyBasis } from "./invoice/penalty-basis";
 import { resolveGuestInvoiceRecipient } from "./invoice/elogo-guest-recipient";
+import { invoiceRecordReference } from "../../common/helpers/code-prefixes";
+import { translateMessage } from "../i18n/translate";
 import { ElogoDocumentService } from "./elogo-document.service";
 import { ElogoDeliveryService } from "./elogo-delivery.service";
 
@@ -25,6 +32,9 @@ import { ElogoDeliveryService } from "./elogo-delivery.service";
  * göndermez (ElogoDeliveryService) — yalnız hangi olayın hangi belgeyi
  * doğurduğunu bilir.
  */
+const round2 = (value: number): number =>
+  Math.round((value + Number.EPSILON) * 100) / 100;
+
 @Injectable()
 export class ElogoIssuingService {
   private readonly logger = new Logger(ElogoIssuingService.name);
@@ -62,23 +72,14 @@ export class ElogoIssuingService {
       ? await this.isPackageFullyDelivered(packageId)
       : false;
 
-    // SIRALI kesim, paralel değil: üç belge aynı numara sayacı satırını
-    // artırır; SERIALIZABLE transaction'lar aynı anda koşunca Postgres birini
-    // "write conflict" (P2034) ile düşürüyor, kaybeden belge yalnız 10 dakikalık
+    // SIRALI kesim, paralel değil: belgeler aynı numara sayacı satırını artırır;
+    // SERIALIZABLE transaction'lar aynı anda koşunca Postgres birini "write
+    // conflict" (P2034) ile düşürüyor, kaybeden belge yalnız 10 dakikalık
     // backfill'de kesiliyor ve her çok belgeli teslimat Sentry'ye hata
     // yazıyordu. Belgeler birbirini BLOKLAMAZ: biri patlarsa diğerleri yine
     // denenir, işaret konmaz ve sonraki tur eksik olanı tamamlar.
-    const steps: Array<() => Promise<void>> = [
-      ...(packageId && packageReady
-        ? [
-            () => this.issueCommissionInvoice(packageId),
-            () => this.issueServiceFeeInvoice(packageId),
-          ]
-        : []),
-      () => this.issuePlatformSaleInvoice(orderId),
-    ];
     let failures = 0;
-    for (const step of steps) {
+    const run = async (step: () => Promise<void>) => {
       try {
         await step();
       } catch (error: any) {
@@ -87,7 +88,11 @@ export class ElogoIssuingService {
           `eLogo teslim faturası hatası ${orderId}: ${error?.message ?? error}`,
         );
       }
+    };
+    if (packageId && packageReady) {
+      await run(() => this.issuePackageFeeInvoices(packageId));
     }
+    await run(() => this.issuePlatformSaleInvoice(orderId));
     if (failures > 0) return;
     // Paket henüz tamamlanmadıysa komisyon/hizmet bedeli faturaları KESİLMEDİ.
     // İşareti şimdi koyarsak bu sipariş backfill penceresinden çıkar; kardeş
@@ -146,6 +151,7 @@ export class ElogoIssuingService {
   private async resolvePackageInvoiceBasis(packageId: string): Promise<{
     sellerId: string;
     buyerId: string;
+    packageNumber: string;
     netCommission: number;
     netBuyerFee: number;
     hasSellerCommission: boolean;
@@ -159,6 +165,7 @@ export class ElogoIssuingService {
       select: {
         sellerId: true,
         buyerId: true,
+        packageNumber: true,
         orders: {
           select: {
             id: true,
@@ -178,6 +185,7 @@ export class ElogoIssuingService {
     return {
       sellerId: pkg.sellerId,
       buyerId: pkg.buyerId,
+      packageNumber: pkg.packageNumber,
       netCommission: totals?.netSellerCommission ?? 0,
       netBuyerFee: totals?.netBuyerFee ?? 0,
       hasSellerCommission: pkg.orders.some(
@@ -197,7 +205,104 @@ export class ElogoIssuingService {
     };
   }
 
-  /** Komisyon faturası → SATICIYA, satıcı paketi başına TEK. */
+  /**
+   * Paketin HİZMET BAŞINA gelir faturaları — alıcıya üç, satıcıya üç.
+   *
+   * Her kesinti kaleminin kendi e-belgesi vardır (komisyon / hizmet bedeli /
+   * kargo payı). Belge PAKET başınadır: sepette aynı satıcıdan iki ürün
+   * alındığında `Order` iki tanedir ama gönderi, kargo ücreti ve ticari ilişki
+   * tektir; sipariş anahtarlı kesim aynı hizmet için mükerrer belge üretiyordu.
+   * Çok siparişli pakette kalemler ürün ürün satırlanır (`PackageFeeDocument.lines`).
+   *
+   * İKİ NESİL BİR ARADA YAŞAYAMAZ: paket daha önce birleşik `commission` /
+   * `service_fee` ile faturalandıysa ya da kesinti defterinde kalem kırılımı
+   * yoksa (v2 öncesi kayıt) ücret belgeleri ESKİ yoldan kesilir — aksi halde
+   * aynı bedel hem birleşik hem kalem bazlı belgede yer alır ve mükerrer beyan
+   * doğar. Kargo payı iki nesilde de kalem bazlıdır: birleşik belgeye hiç
+   * girmiyordu, dolayısıyla mükerrer kesim riski taşımaz.
+   *
+   * Belgeler SIRALI kesilir (ortak numara sayacı) ve birbirini bloklamaz; biri
+   * patlarsa diğerleri yine denenir ve metot sonunda hata fırlatılır, böylece
+   * `revenueInvoicedAt` işareti konmaz ve sonraki tur eksiği tamamlar.
+   */
+  async issuePackageFeeInvoices(packageId: string): Promise<void> {
+    const basis = await this.documents.resolvePackageFeeBasis(packageId);
+    if (!basis) return;
+    // Platform kendi ürününü satıyorsa kesintiler kendine faturalanamaz; alıcı
+    // tarafı da `platform_sale` belgesinin kalemlerinde zaten yer alır.
+    if (await this.isPlatformSeller(basis.sellerId)) return;
+
+    const legacyIssued = await this.hasPackageInvoiceOfType(
+      packageId,
+      LEGACY_PACKAGE_FEE_INVOICE_TYPES,
+    );
+    const useLegacyFees = legacyIssued || !basis.componentBreakdownComplete;
+
+    const steps: Array<() => Promise<void>> = [];
+    if (useLegacyFees) {
+      steps.push(
+        () => this.issueCommissionInvoice(packageId),
+        () => this.issueServiceFeeInvoice(packageId),
+      );
+    }
+    for (const doc of basis.documents) {
+      const isShipping =
+        PACKAGE_FEE_COMPONENT_BY_TYPE[doc.type].source.kind === "shipping";
+      if (useLegacyFees && !isShipping) continue;
+      steps.push(() =>
+        this.delivery.cut(
+          doc.type,
+          packageId,
+          doc.side === "buyer" ? basis.buyerId : basis.sellerId,
+          doc.net,
+          {
+            lineItems: doc.lines,
+            sourceReference: invoiceRecordReference(basis.packageNumber),
+            // Misafir siparişinde alıcının gerçek kimliği yalnız kargo
+            // adresinde durur; satıcı tarafı için anlamsızdır.
+            guestRecipient:
+              doc.side === "buyer"
+                ? resolveGuestInvoiceRecipient(basis.shippingAddress)
+                : null,
+          },
+        ),
+      );
+    }
+
+    const failures: string[] = [];
+    for (const step of steps) {
+      try {
+        await step();
+      } catch (error: any) {
+        failures.push(String(error?.message ?? error));
+      }
+    }
+    if (failures.length > 0) {
+      throw new Error(
+        `eLogo paket ücret faturaları eksik (${packageId}): ${failures.join("; ")}`,
+      );
+    }
+  }
+
+  /** Paket için verilen türlerden İPTAL EDİLMEMİŞ bir belge var mı? */
+  private async hasPackageInvoiceOfType(
+    packageId: string,
+    types: readonly ElogoInvoiceType[],
+  ): Promise<boolean> {
+    const row = await this.prisma.elogoInvoice
+      .findFirst({
+        where: {
+          sourceId: packageId,
+          type: { in: types as ElogoInvoiceType[] },
+          status: { not: "cancelled" },
+        },
+        select: { id: true },
+      })
+      .catch(() => null);
+    return !!row;
+  }
+
+  /** LEGACY: birleşik komisyon faturası → SATICIYA, satıcı paketi başına TEK. */
   async issueCommissionInvoice(packageId: string): Promise<void> {
     const basis = await this.resolvePackageInvoiceBasis(packageId);
     if (!basis) return;
@@ -216,11 +321,14 @@ export class ElogoIssuingService {
       packageId,
       basis.sellerId,
       basis.netCommission,
-      { lineDescription: desc },
+      {
+        lineDescription: desc,
+        sourceReference: invoiceRecordReference(basis.packageNumber),
+      },
     );
   }
 
-  /** Hizmet bedeli faturası → ALICIYA, satıcı paketi başına TEK. */
+  /** LEGACY: birleşik hizmet bedeli faturası → ALICIYA, satıcı paketi başına TEK. */
   async issueServiceFeeInvoice(packageId: string): Promise<void> {
     const basis = await this.resolvePackageInvoiceBasis(packageId);
     if (!basis) return;
@@ -242,6 +350,7 @@ export class ElogoIssuingService {
       basis.netBuyerFee,
       {
         lineDescription: desc,
+        sourceReference: invoiceRecordReference(basis.packageNumber),
         guestRecipient: resolveGuestInvoiceRecipient(basis.shippingAddress),
       },
     );
@@ -261,6 +370,7 @@ export class ElogoIssuingService {
       select: {
         sellerId: true,
         buyerId: true,
+        orderNumber: true,
         totalAmount: true,
         checkoutGroupId: true,
         shippingAddress: true,
@@ -321,8 +431,154 @@ export class ElogoIssuingService {
         guestRecipient: resolveGuestInvoiceRecipient(order.shippingAddress),
         categoryId,
         lineItems,
+        // Ürün faturası SİPARİŞ anahtarlıdır (koli değil) — kayıt no da sipariş
+        // numarasının gövdesinden türetilir.
+        sourceReference: invoiceRecordReference(order.orderNumber),
       },
     );
+  }
+
+  /**
+   * CEZA FATURASI → kusurlu tarafa, iade TALEBİ başına tek belge.
+   *
+   * Politika kusurluya yüklenen kargoyu (`*_charge`) zaten hesaplıyor ama hiçbir
+   * belge kesmiyordu. Matrah SADECE FARKTIR (`penalty-basis.ts`): kusurluya
+   * daha önce kesilmiş kargo belgesi ayakta kalır. Hizmet bedeli için de yeni
+   * belge yoktur — `platform_retain` demek "kesilmiş belge geçerli" demektir;
+   * komisyon ise mevcut iade faturası yolundan geri verilir.
+   *
+   * Anahtar `refundRequestId`: aynı kolinin birden fazla iadesi ayrı ayrı
+   * cezalanır, aynı talebin yeniden işlenmesi ikinci belge doğurmaz.
+   */
+  async issuePenaltyInvoice(refundRequestId: string): Promise<void> {
+    const request = await this.prisma.refundRequest
+      .findUnique({
+        where: { id: refundRequestId },
+        select: {
+          faultParty: true,
+          resolvedReason: true,
+          financialComponents: {
+            select: {
+              componentCode: true,
+              treatment: true,
+              netAmount: true,
+            },
+          },
+          order: {
+            select: {
+              packageId: true,
+              buyerId: true,
+              sellerId: true,
+              serviceVatRate: true,
+              shippingAddress: true,
+            },
+          },
+        },
+      })
+      .catch(() => null);
+    const order = request?.order;
+    if (!request || !order) return;
+
+    // Satıcıya paket için AYAKTA DURAN gidiş kargo belgesi — cezadan düşülür.
+    const invoicedSellerShipping = order.packageId
+      ? await this.invoicedSellerShippingOf(order.packageId)
+      : 0;
+
+    const basis = buildPenaltyBasis({
+      faultParty: request.faultParty,
+      components: request.financialComponents.map((c) => ({
+        componentCode: c.componentCode,
+        treatment: c.treatment,
+        netAmount: Number(c.netAmount),
+      })),
+      invoicedSellerShipping,
+      vatRate: Number(order.serviceVatRate ?? 0),
+    });
+    if (!basis) return;
+    // Platform kendi ürününü satıyorsa ceza KENDİNE faturalanamaz. Alıcı
+    // kusurunda ise bedel yine alıcıdan tahsil edilir; muhatap platform değil
+    // alıcıdır ve belgesi kesilmelidir.
+    if (
+      basis.side === "seller" &&
+      (await this.isPlatformSeller(order.sellerId))
+    )
+      return;
+
+    const reason = request.resolvedReason
+      ? translateMessage(`status.refundReason.${request.resolvedReason}`, "tr")
+      : null;
+    const packageNumber = order.packageId
+      ? await this.packageNumberOf(order.packageId)
+      : null;
+
+    await this.delivery.cut(
+      "penalty",
+      refundRequestId,
+      basis.side === "seller" ? order.sellerId : order.buyerId,
+      basis.net,
+      {
+        lineItems: [basis.line],
+        lineDescription: reason
+          ? `${LINE_DESCRIPTION.penalty} — ${reason}`
+          : LINE_DESCRIPTION.penalty,
+        sourceReference: invoiceRecordReference(packageNumber) ?? undefined,
+        guestRecipient:
+          basis.side === "buyer"
+            ? resolveGuestInvoiceRecipient(order.shippingAddress)
+            : null,
+      },
+    );
+  }
+
+  /**
+   * Paketin gidiş kargo payı için satıcıda AYAKTA DURAN belge tutarı (KDV hariç).
+   *
+   * Matrah farktır, ama fark ancak gerçekten duran bir belgeden düşülebilir.
+   * `seller_shipping` belgesinin iade karşılığı yoktur; iade hattı onu genel
+   * iade oranıyla iptal eder ya da iade faturasıyla dengeler — ve ceza kesimi
+   * ters kayıttan SONRA çalışır. Sipariş kolonundan okunsaydı iptal edilmiş bir
+   * belge hâlâ duruyormuş sayılır, kusurlu satıcı o tutar kadar EKSİK
+   * faturalanırdı. Belge hiç kesilmediyse (kargo öncesi iade, platform satışı)
+   * düşülecek bir şey de yoktur.
+   */
+  private async invoicedSellerShippingOf(packageId: string): Promise<number> {
+    const invoice = await this.prisma.elogoInvoice
+      .findUnique({
+        where: {
+          type_sourceId: { type: "seller_shipping", sourceId: packageId },
+        },
+        select: { netAmount: true, status: true, invoiceNumber: true },
+      })
+      .catch(() => null);
+    if (!invoice || invoice.status === "cancelled") return 0;
+    const issued = Math.max(0, Number(invoice.netAmount ?? 0));
+    if (!(issued > 0) || !invoice.invoiceNumber) return issued;
+
+    const reversals = await this.prisma.elogoInvoice
+      .findMany({
+        where: {
+          type: "return_invoice",
+          billingReference: invoice.invoiceNumber,
+          status: { not: "cancelled" },
+        },
+        select: { netAmount: true },
+      })
+      .catch(() => []);
+    const reversed = reversals.reduce(
+      (sum, row) => sum + Number(row.netAmount ?? 0),
+      0,
+    );
+    return Math.max(0, round2(issued - reversed));
+  }
+
+  private async packageNumberOf(packageId: string): Promise<string | null> {
+    const pkg = await this.prisma.orderPackage
+      .findUnique({
+        where: { id: packageId },
+        select: { packageNumber: true },
+      })
+      .catch(() => null);
+    return pkg?.packageNumber ?? null;
   }
 
   private async isPlatformSeller(sellerId: string): Promise<boolean> {
@@ -436,26 +692,52 @@ export class ElogoIssuingService {
   async issueTradeCashFeeInvoice(tradeCashPaymentId: string): Promise<void> {
     const tcp = await this.prisma.tradeCashPayment.findUnique({
       where: { id: tradeCashPaymentId },
-      select: { payerId: true, commission: true, tradeFeeAmount: true },
+      select: {
+        payerId: true,
+        commission: true,
+        tradeFeeAmount: true,
+        shippingAmount: true,
+        trade: { select: { tradeNumber: true } },
+      },
     });
     if (!tcp) return;
+    const sourceReference =
+      invoiceRecordReference(tcp.trade?.tradeNumber) ?? undefined;
+
+    // HİZMET BEDELİ: v2 sabit ücret, yoksa v1 yüzde komisyonu (ikisi bir arada
+    // olmaz — biri doluysa öteki 0'dır).
     const tradeFee = Number(tcp.tradeFeeAmount ?? 0);
+    const commission = Number(tcp.commission ?? 0);
     if (tradeFee > 0) {
       await this.delivery.cut(
         "trade_service_fee",
         tradeCashPaymentId,
         tcp.payerId,
         tradeFee,
+        { sourceReference },
       );
-      return;
-    }
-    const commission = Number(tcp.commission ?? 0);
-    if (commission > 0) {
+    } else if (commission > 0) {
       await this.delivery.cut(
         "trade_commission",
         tradeCashPaymentId,
         tcp.payerId,
         commission,
+        { sourceReference },
+      );
+    }
+
+    // KARGO: tarafın 2 bacaklık payı. Tahsil ediliyordu ama hiç
+    // faturalanmıyordu — satıştaki kargo payı eksikliğinin takas karşılığı.
+    // Hizmet bedelinden AYRI belgedir: iade yolları farklı (bedel hiçbir
+    // iptalde iade edilmez, kargo kargolanmamış iptalde iade edilir).
+    const shipping = Number(tcp.shippingAmount ?? 0);
+    if (shipping > 0) {
+      await this.delivery.cut(
+        "trade_shipping",
+        tradeCashPaymentId,
+        tcp.payerId,
+        shipping,
+        { sourceReference },
       );
     }
   }

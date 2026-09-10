@@ -32,6 +32,7 @@ import {
   TicketIcon,
   SparklesIcon,
   PhotoIcon,
+  ArchiveBoxIcon,
 } from "@heroicons/react/24/outline";
 
 /**
@@ -246,6 +247,18 @@ export function getNavGroups(t: T): NavGroup[] {
           permission: "users",
         },
         {
+          // Silinen hesapların yasal kimlik arşivi. Kullanıcılar ekranının bir
+          // parçası olduğu için aynı `users` iznine bağlı.
+          name: t("admin.nav.items.deletedIdentities.name"),
+          href: "/accounts/deleted-identities",
+          icon: ArchiveBoxIcon,
+          description: t("admin.nav.items.deletedIdentities.description"),
+          keywords: t("admin.nav.items.deletedIdentities.keywords")
+            .split(",")
+            .map((k) => k.trim()),
+          permission: "users",
+        },
+        {
           name: t("admin.nav.items.sellerApplications.name"),
           href: "/accounts/seller-applications",
           icon: ClipboardDocumentCheckIcon,
@@ -427,6 +440,14 @@ export function getNavGroups(t: T): NavGroup[] {
           keywords: t("admin.nav.items.invoices.keywords")
             .split(",")
             .map((k) => k.trim()),
+          permission: "invoices",
+        },
+        {
+          name: t("admin.nav.items.settlement.name"),
+          href: "/finance/settlement",
+          icon: DocumentTextIcon,
+          description: t("admin.nav.items.settlement.description"),
+          // Döküm faturanın dayanağıdır; fatura yetkisiyle aynı kapıdan geçer.
           permission: "invoices",
         },
         {

@@ -100,6 +100,7 @@ describe("buildOrderBreakdown", () => {
       withholdingTaxAmount: REFERENCE.withholdingTaxAmount,
       sellerShippingAmount: REFERENCE.sellerShippingAmount,
       sellerServiceTaxAmount: 32,
+      platformFundedDiscount: 0,
     });
 
     expect(view.seller.net).toBe(payout);

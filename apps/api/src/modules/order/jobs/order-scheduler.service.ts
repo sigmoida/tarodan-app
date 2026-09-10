@@ -4,10 +4,19 @@ import { Queue } from "bull";
 import { registerRepeatableCron } from "../../../monitoring/bull-cron.helper";
 import { QUEUE_NAMES } from "../../../workers/constants";
 import { ConfigService } from "@nestjs/config";
-import { OrderStatus, TradeStatus, PaymentStatus } from "@prisma/client";
+import {
+  OrderStatus,
+  TradeStatus,
+  PaymentStatus,
+  type ElogoInvoiceType,
+} from "@prisma/client";
 import { PrismaService } from "../../../prisma";
 import { OrderService } from "../order.service";
 import { ElogoInvoicingService } from "../../elogo/elogo-invoicing.service";
+import {
+  LEGACY_PACKAGE_FEE_INVOICE_TYPES,
+  PACKAGE_FEE_INVOICE_TYPES,
+} from "../../elogo/invoice/package-fee-components";
 import {
   PAYMENT_CONFIG_KEYS,
   resolvePaymentConfigNumber,
@@ -415,8 +424,18 @@ export class OrderSchedulerService implements OnModuleInit {
       select: {
         id: true,
         packageId: true,
+        buyerShippingAmount: true,
+        sellerShippingAmount: true,
         commissionLedger: {
-          select: { buyerFee: true, sellerCommission: true },
+          select: {
+            buyerFee: true,
+            sellerCommission: true,
+            componentBreakdownComplete: true,
+            buyerCommissionAmount: true,
+            buyerPlatformFeeAmount: true,
+            sellerCommissionAmount: true,
+            sellerPlatformFeeAmount: true,
+          },
         },
         seller: { select: { sellerType: true } },
       },
@@ -424,9 +443,9 @@ export class OrderSchedulerService implements OnModuleInit {
     });
     let invoiced = 0;
     if (delivered.length > 0) {
-      // Komisyon ve hizmet bedeli PAKET anahtarlı, platform satışı SİPARİŞ
-      // anahtarlıdır. İki anahtar da sorulmazsa "zaten faturalanmış" testi hiç
-      // tutmaz ve her tur boşa fatura denemesi yapılır.
+      // Ücret belgeleri PAKET anahtarlı, platform satışı SİPARİŞ anahtarlıdır.
+      // İki anahtar da sorulmazsa "zaten faturalanmış" testi hiç tutmaz ve her
+      // tur boşa fatura denemesi yapılır.
       const invSources = await this.prisma.elogoInvoice.findMany({
         where: {
           sourceId: {
@@ -437,28 +456,73 @@ export class OrderSchedulerService implements OnModuleInit {
                 .filter((id): id is string => !!id),
             ],
           },
-          type: { in: ["commission", "service_fee", "platform_sale"] as any },
+          type: {
+            in: [
+              ...PACKAGE_FEE_INVOICE_TYPES,
+              ...LEGACY_PACKAGE_FEE_INVOICE_TYPES,
+              "platform_sale",
+            ] as ElogoInvoiceType[],
+          },
         },
         select: { sourceId: true, type: true },
       });
       const invoicedKeys = new Set(
         invSources.map((i) => `${i.sourceId}:${i.type}`),
       );
+      const has = (key: string) => invoicedKeys.has(key);
       for (const o of delivered) {
         // Paketi olmayan (eski) siparişlerde ücret faturaları sipariş anahtarlıdır.
         const feeSourceId = o.packageId ?? o.id;
-        const expectedKeys =
+        const ledger = o.commissionLedger;
+        // Ücret belgeleri İKİ NESİLDEN biriyle kesilir ve nesil seçimi
+        // ElogoIssuingService.issuePackageFeeInvoices'taki kuralın AYNISIDIR:
+        // birleşik belge zaten varsa ya da defterde kalem kırılımı yoksa eski
+        // nesil, aksi halde hizmet başına. İki nesli "biri tamsa tamam" diye
+        // OR'lamak sessiz bir kayıp üretiyordu: kırılımı olmayan defterde altı
+        // bileşen sütunu da 0'dır, dolayısıyla hizmet başına test kendiliğinden
+        // "tam" döner ve kesilmemiş birleşik komisyon faturası olan sipariş
+        // faturalanmış işaretlenip bir daha hiç denenmezdi.
+        const legacyIssued =
+          has(`${feeSourceId}:commission`) || has(`${feeSourceId}:service_fee`);
+        const legacyFeesDone =
+          (!(Number(ledger?.sellerCommission) > 0) ||
+            has(`${feeSourceId}:commission`)) &&
+          (!(Number(ledger?.buyerFee) > 0) ||
+            has(`${feeSourceId}:service_fee`));
+        const perServiceFeesDone = (
+          [
+            ["sellerCommissionAmount", "seller_commission"],
+            ["sellerPlatformFeeAmount", "seller_platform_fee"],
+            ["buyerCommissionAmount", "buyer_commission"],
+            ["buyerPlatformFeeAmount", "buyer_service_fee"],
+          ] as const
+        ).every(
+          ([field, type]) =>
+            !(Number(ledger?.[field]) > 0) || has(`${feeSourceId}:${type}`),
+        );
+        const feesDone =
+          legacyIssued || !ledger?.componentBreakdownComplete
+            ? legacyFeesDone
+            : perServiceFeesDone;
+        // Kargo belgeleri YALNIZ paket anahtarlı kesilir; paketi olmayan eski
+        // siparişte hiç doğmaz, dolayısıyla orada aranmaz — aranırsa sipariş
+        // sonsuza dek aday penceresinde kalır ve her tur boşa denenir.
+        const shippingDone =
+          !o.packageId ||
+          (
+            [
+              [o.buyerShippingAmount, "buyer_shipping"],
+              [o.sellerShippingAmount, "seller_shipping"],
+            ] as const
+          ).every(
+            ([amount, type]) =>
+              !(Number(amount) > 0) || has(`${feeSourceId}:${type}`),
+          );
+        const invoicesComplete =
           o.seller.sellerType === "platform"
-            ? [`${o.id}:platform_sale`]
-            : [
-                ...(Number(o.commissionLedger?.sellerCommission) > 0
-                  ? [`${feeSourceId}:commission`]
-                  : []),
-                ...(Number(o.commissionLedger?.buyerFee) > 0
-                  ? [`${feeSourceId}:service_fee`]
-                  : []),
-              ];
-        if (expectedKeys.every((key) => invoicedKeys.has(key))) {
+            ? has(`${o.id}:platform_sale`)
+            : feesDone && shippingDone;
+        if (invoicesComplete) {
           // Faturaları tam ama işareti eksik (tekil tetiklerle kesilmiş) sipariş:
           // işaretlemeden atlanırsa aday penceresinde sonsuza dek yer tutar ve
           // işaretin çözdüğü take:500 doygunluğu geri gelir. İşaretle ve çık.
@@ -533,7 +597,7 @@ export class OrderSchedulerService implements OnModuleInit {
           },
         },
       },
-      select: { id: true },
+      select: { id: true, shippingAmount: true },
       // Sipariş tarafıyla aynı gerekçe: tamamlanan takaslar aday kümesinden hiç
       // çıkmadığı için sırasız pencere yeni takasları dışarıda bırakabiliyordu.
       orderBy: { updatedAt: "desc" },
@@ -541,20 +605,38 @@ export class OrderSchedulerService implements OnModuleInit {
     });
     let tradeInvoiced = 0;
     if (paidWarehouseTcps.length > 0) {
-      const invoicedTcp = new Set(
-        (
-          await this.prisma.elogoInvoice.findMany({
-            where: {
-              sourceId: { in: paidWarehouseTcps.map((c) => c.id) },
-              // v1 komisyon / v2 hizmet bedeli — ikisi de bu satırın faturasıdır.
-              type: { in: ["trade_commission", "trade_service_fee"] as any },
-            },
-            select: { sourceId: true },
-          })
-        ).map((i) => i.sourceId),
-      );
+      // Satırın BÜTÜN belgeleri sorulur: hizmet bedeli kesilip kargo belgesi
+      // kesilemediyse (`cut` hatayı yutar, "cron toparlar") yalnız bedele
+      // bakmak satırı sonsuza dek faturalanmış sayar ve kargo belgesi hiç
+      // doğmazdı.
+      const invoicedTypes = new Map<string, Set<string>>();
+      for (const inv of await this.prisma.elogoInvoice.findMany({
+        where: {
+          sourceId: { in: paidWarehouseTcps.map((c) => c.id) },
+          // v1 komisyon / v2 hizmet bedeli + ayrı kesilen kargo belgesi.
+          type: {
+            in: [
+              "trade_commission",
+              "trade_service_fee",
+              "trade_shipping",
+            ] as any,
+          },
+        },
+        select: { sourceId: true, type: true },
+      })) {
+        const types = invoicedTypes.get(inv.sourceId) ?? new Set<string>();
+        types.add(inv.type);
+        invoicedTypes.set(inv.sourceId, types);
+      }
       for (const c of paidWarehouseTcps) {
-        if (invoicedTcp.has(c.id)) continue;
+        const types = invoicedTypes.get(c.id);
+        const feeInvoiced =
+          !!types &&
+          (types.has("trade_commission") || types.has("trade_service_fee"));
+        const shippingInvoiced =
+          !(Number(c.shippingAmount ?? 0) > 0) ||
+          !!types?.has("trade_shipping");
+        if (feeInvoiced && shippingInvoiced) continue;
         try {
           await this.elogoInvoicing.issueTradeCashFeeInvoice(c.id);
           tradeInvoiced++;

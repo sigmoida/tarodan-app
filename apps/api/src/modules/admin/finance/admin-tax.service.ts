@@ -6,6 +6,7 @@ import {
 import { ElogoInvoiceStatus, ElogoInvoiceType, Prisma } from "@prisma/client";
 import { PrismaService } from "../../../prisma";
 import { AdminAuditService } from "../ops/admin-audit.service";
+import { AdminDeletedIdentityService } from "../users/admin-deleted-identity.service";
 import { StorageService } from "../../storage/storage.service";
 import { ElogoInvoiceQueryDto, SellerUploadedInvoiceQueryDto } from "../dto";
 import {
@@ -26,16 +27,25 @@ export class AdminTaxService {
     private readonly prisma: PrismaService,
     private readonly audit: AdminAuditService,
     private readonly storageService: StorageService,
+    private readonly deletedIdentities: AdminDeletedIdentityService,
   ) {}
 
   private static readonly ELOGO_TYPE_LABELS: Record<string, string> = {
-    commission: "Komisyon",
-    service_fee: "Hizmet Bedeli",
+    commission: "Komisyon (birleşik)",
+    service_fee: "Hizmet Bedeli (birleşik)",
+    buyer_commission: "Alıcı Komisyonu",
+    buyer_service_fee: "Alıcı Koruma Hizmet Bedeli",
+    buyer_shipping: "Kargo Bedeli (Alıcı Payı)",
+    seller_commission: "Satıcı Komisyonu",
+    seller_platform_fee: "Platform Hizmet Bedeli",
+    seller_shipping: "Kargo Bedeli (Satıcı Payı)",
     membership: "Üyelik",
     boost: "Öne Çıkarma",
     trade_commission: "Takas Komisyonu",
     trade_service_fee: "Takas Hizmet Bedeli",
+    trade_shipping: "Takas Kargo Bedeli",
     platform_sale: "Platform Satışı",
+    penalty: "Ceza Faturası",
     return_invoice: "İade Faturası",
   };
 
@@ -915,11 +925,20 @@ export class AdminTaxService {
             companyName: true,
             taxId: true,
             email: true,
+            deletedAt: true,
           },
         },
       },
       orderBy: { processedAt: "asc" },
     });
+
+    // Silinen satıcının kimliği canlı satırda YOK (anonimleştirme e-postayı
+    // `deleted_...@deleted.local`, adı "Silinmiş Kullanıcı" yapıyor, VKN'yi
+    // null'lıyor) — bu rapor onu canlı okuduğu için GEÇMİŞ dönemler de geriye
+    // dönük bozuluyordu. Kimlik arşivinden çözülür.
+    const archived = await this.deletedIdentities.resolveArchivedIdentities(
+      transfers.filter((t) => t.seller?.deletedAt).map((t) => t.sellerId),
+    );
 
     const bySeller = new Map<
       string,
@@ -928,17 +947,30 @@ export class AdminTaxService {
         sellerName: string;
         taxId: string | null;
         email: string | null;
+        sellerDeleted: boolean;
+        identityArchived: boolean | null;
         transferCount: number;
         grossAmount: number;
         withholdingTax: number;
       }
     >();
     for (const t of transfers) {
+      const isDeleted = !!t.seller?.deletedAt;
+      const archive = isDeleted ? archived.get(t.sellerId) : undefined;
       const cur = bySeller.get(t.sellerId) || {
         sellerId: t.sellerId,
-        sellerName: t.seller?.companyName || t.seller?.displayName || "—",
-        taxId: t.seller?.taxId || null,
-        email: t.seller?.email || null,
+        sellerName: isDeleted
+          ? archive?.companyName || archive?.displayName || "—"
+          : t.seller?.companyName || t.seller?.displayName || "—",
+        // Kurumsalda VKN, bireyselde TCKN bildirilir.
+        taxId: isDeleted
+          ? (archive?.taxId ?? archive?.nationalId ?? null)
+          : (t.seller?.taxId ?? null),
+        // Sentinel adres bir devlet bildirimine sızmamalı: arşiv yoksa boş.
+        email: isDeleted ? (archive?.email ?? null) : (t.seller?.email ?? null),
+        sellerDeleted: isDeleted,
+        /** Arşivsiz silinmiş satıcı: sessiz boşluk değil, işaretli eksik. */
+        identityArchived: isDeleted ? !!archive : null,
         transferCount: 0,
         grossAmount: 0,
         withholdingTax: 0,
@@ -1033,12 +1065,14 @@ export class AdminTaxService {
       documentType: true,
       invoiceNumber: true,
       ettn: true,
+      sourceReference: true,
       recipientName: true,
       recipientVknTckn: true,
       recipientUserId: true,
       netAmount: true,
       taxAmount: true,
       total: true,
+      discountTotal: true,
       vatRate: true,
       billingReference: true,
       pdfUrl: true,
@@ -1090,12 +1124,14 @@ export class AdminTaxService {
           r.documentType === "EINVOICE" ? "e-Fatura" : "e-Arşiv",
         invoiceNumber: r.invoiceNumber,
         ettn: r.ettn,
+        sourceReference: r.sourceReference,
         recipientName: r.recipientName,
         recipientVknTckn: r.recipientVknTckn,
         recipientUserId: r.recipientUserId,
         netAmount: Number(r.netAmount),
         taxAmount: Number(r.taxAmount),
         total: Number(r.total),
+        discountTotal: Number(r.discountTotal),
         vatRate: Number(r.vatRate),
         billingReference: r.billingReference,
         hasPdf: !!r.pdfUrl,

@@ -27,16 +27,30 @@ export const AMOUNT_BASIS_BY_TYPE: Record<
   // Platformun kestiği hizmet faturaları — matrah saklanır, KDV ayrı kolonda.
   commission: "net",
   service_fee: "net",
+  // Hizmet başına paket belgeleri: saklanan tutar kesinti MATRAHIDIR
+  // (`CommissionLedger` / kargo payı kolonları), KDV üstüne eklenir.
+  buyer_commission: "net",
+  buyer_service_fee: "net",
+  buyer_shipping: "net",
+  seller_commission: "net",
+  seller_platform_fee: "net",
+  seller_shipping: "net",
   // Tüketici fiyatı üzerinden kesilenler — fiyat KDV dahildir.
   platform_sale: "gross",
   membership: "gross",
   boost: "gross",
+  // Ceza bedeli kargo MATRAHIDIR; KDV üstüne eklenir (kargo belgeleriyle aynı yön).
+  penalty: "net",
   // Takas nakit komisyonu (v1 — LEGACY) matrah saklar: KDV'si `commission_tax_amount`
   // kolonunda ayrı durur ve ödeyenin toplamına eklenir.
   trade_commission: "net",
   // Takas hizmet bedeli (v2): admin kurala KDV DAHİL tutarı girer ve taraftan bu
   // tutar tahsil edilir — üstüne KDV EKLENMEZ, içinden ayrıştırılır.
   trade_service_fee: "gross",
+  // Takas kargosu da hizmet bedeliyle aynı yöndedir: takas toplamı
+  // (hizmet bedeli + kargo + fark) üstüne KDV EKLENMEDEN tahsil edilir,
+  // dolayısıyla saklanan tutar KDV DAHİLDİR ve vergi içinden ayrıştırılır.
+  trade_shipping: "gross",
   // İade faturası kaynak faturanın tutarını terslediği için onun matrahını izler;
   // pratikte `repriceUnsentInvoice`/refund yolu kendi kaynağından hesaplar.
   return_invoice: "gross",

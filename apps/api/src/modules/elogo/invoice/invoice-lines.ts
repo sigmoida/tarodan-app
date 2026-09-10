@@ -13,12 +13,28 @@
 export interface InvoiceLineItem {
   name: string;
   quantity: number;
-  /** Satırın KDV HARİÇ toplamı. */
+  /** Satırın KDV HARİÇ, İSKONTO DÜŞÜLMÜŞ toplamı — KDV matrahı budur. */
   net: number;
-  /** KDV hariç birim fiyat (`net / quantity`, bölünmeden). */
+  /**
+   * Satıra uygulanan iskonto (KDV hariç). Kesinti kolonları indirim SONRASI
+   * tutarı taşır; fatura ise şablon gereği BRÜT bedeli birim fiyat yazıp indirimi
+   * ayrı gösterir. Brüt = `net + discount`, matrah yine `net`.
+   */
+  discount?: number;
+  /** KDV hariç BRÜT birim fiyat (`(net + discount) / quantity`, bölünmeden). */
   unitPrice: number;
   /** Satırın KDV oranı (%). */
   vatRate: number;
+  /**
+   * Satırın KDV'si, AÇIKÇA verildiğinde. Verilmezse `net × vatRate` hesaplanır.
+   *
+   * Paket belgeleri tek satıra indi ama KDV hâlâ SİPARİŞ bazında yuvarlanıyor
+   * (`order-service-tax.helper.ts` tahsil ederken böyle yuvarlar). İki siparişlik
+   * bir pakette `round2(a×%20) + round2(b×%20)` ile `round2((a+b)×%20)` bir kuruş
+   * ayrışabilir; tahsil edilenle beyan edilen ayrışmasın diye toplam burada
+   * taşınır ve UBL'ye olduğu gibi yazılır.
+   */
+  taxAmount?: number;
 }
 
 export interface PlatformSaleBasis {
@@ -59,18 +75,44 @@ export function readInvoiceLineItems(raw: unknown): InvoiceLineItem[] {
     if (!name || !Number.isFinite(net) || net <= 0) continue;
     if (!Number.isFinite(vatRate) || vatRate < 0) continue;
     const unitPrice = Number(r.unitPrice);
+    const taxAmount = Number(r.taxAmount);
+    const rawDiscount = Number(r.discount);
+    const discount =
+      Number.isFinite(rawDiscount) && rawDiscount > 0 ? round2(rawDiscount) : 0;
     lines.push({
       name,
       quantity,
       net: round2(net),
+      ...(discount > 0 ? { discount } : {}),
+      // Birim fiyat BRÜT'tür: iskontolu satırda matrahtan türetmek, UBL'de
+      // `miktar × fiyat − iskonto = matrah` eşitliğini bozardı.
       unitPrice:
         Number.isFinite(unitPrice) && unitPrice > 0
           ? unitPrice
-          : net / quantity,
+          : (net + discount) / quantity,
       vatRate,
+      ...(Number.isFinite(taxAmount) && taxAmount >= 0
+        ? { taxAmount: round2(taxAmount) }
+        : {}),
     });
   }
   return lines;
+}
+
+/**
+ * Satırın KDV'si: açıkça taşınıyorsa o, yoksa matrahtan hesaplanan.
+ * Kesim, iade ve UBL üçü de bu tek yerden okumak zorunda — biri hesaplayıp
+ * öteki snapshot'ı kullanırsa belge kendi içinde tutmaz.
+ */
+export function lineTaxOf(line: InvoiceLineItem): number {
+  return typeof line.taxAmount === "number" && Number.isFinite(line.taxAmount)
+    ? round2(line.taxAmount)
+    : round2((line.net * line.vatRate) / 100);
+}
+
+/** Kalemlerin iskonto toplamı (KDV hariç) — belgenin `discountTotal`'ı. */
+export function invoiceDiscountFromLines(lines: InvoiceLineItem[]): number {
+  return round2(lines.reduce((sum, l) => sum + (l.discount ?? 0), 0));
 }
 
 /** Kalemlerden belge toplamları — çok oranlı belgede tek oranla hesaplanamaz. */
@@ -80,9 +122,7 @@ export function invoiceTotalsFromLines(lines: InvoiceLineItem[]): {
   total: number;
 } {
   const net = round2(lines.reduce((sum, l) => sum + l.net, 0));
-  const tax = round2(
-    lines.reduce((sum, l) => sum + round2((l.net * l.vatRate) / 100), 0),
-  );
+  const tax = round2(lines.reduce((sum, l) => sum + lineTaxOf(l), 0));
   return { net, tax, total: round2(net + tax) };
 }
 

@@ -263,10 +263,129 @@ kargo platformda kalır. Payout yalnız fark taşıyan satır için üretilir. D
 fark `seller_escrow`, ücret `platform_commission`, kargo `shipping_income`
 (gelir değil, taşıyıcıya geçiş kalemi) hesabına düşer. Fatura taraf başına
 kesilir: v2 satırı `trade_service_fee` (KDV **dahil**, içinden ayrıştırılır),
-v1 satırı `trade_commission` (KDV hariç matrah).
+v1 satırı `trade_commission` (KDV hariç matrah). **Kargo payı da ayrı bir belge
+alır** (`trade_shipping`, o da KDV dahil): takas toplamının üstüne KDV
+EKLENMEDİĞİ için tahsil edilen tutar KDV dahildir. Ayrı belge olmasının nedeni
+iade yollarının AYRIŞMASIdır — bedel hiçbir iptalde iade edilmez, kargo
+kargolanmamış iptalde iade edilir.
+
+**Belgelerin ters kaydı** iade tx'iyle atomik olarak kuyruğa alınır
+(`invoice.trade_cash_refund_reverse`) ve hangi belgenin terslendiğine
+`ElogoReversalService.tradeReversalKeys` karar verir; kural yine
+`trade-refund-policy.ts`'tir: hizmet bedeli yalnız KUSURSUZ tarafın tam
+iadesinde (`fullRefundEntitled`), kargo ise koli yola çıkmadıysa terslenir.
+Eskiden ters kayıt hiç kuyruğa alınmıyordu ("iade edilen kısım faturalanan
+hizmet bedeli değil" gerekçesiyle); kargo faturalanınca bu gerekçe geçersiz
+kaldı.
 
 **v1 takaslar** eski kuralla biter: ayrım tek yerde, `Trade.pricingVersion`
 alanındadır.
+
+---
+
+## 8b. Gelir e-belgeleri (eLogo)
+
+Düzenleyen **hep platform firmasıdır**, satıcı adına değil; ürün bedelinin
+beyanı satıcıya aittir (platform satışı hariç — orada satıcı zaten Tarodan'dır).
+
+**Her hizmet kaleminin kendi e-belgesi vardır.** Bir alım-satımda taraf başına
+üç belge kesilir:
+
+| Muhatap | Belge türü            | Matrah (`Order` / `CommissionLedger`)    |
+| ------- | --------------------- | ---------------------------------------- |
+| Alıcı   | `buyer_commission`    | `buyerCommissionAmount`                  |
+| Alıcı   | `buyer_service_fee`   | `buyerPlatformFeeAmount` (koruma bedeli) |
+| Alıcı   | `buyer_shipping`      | `buyerShippingAmount`                    |
+| Satıcı  | `seller_commission`   | `sellerCommissionAmount`                 |
+| Satıcı  | `seller_platform_fee` | `sellerPlatformFeeAmount`                |
+| Satıcı  | `seller_shipping`     | `sellerShippingAmount`                   |
+
+Altısı da §2'deki hizmet KDV'sine tabidir ve matrahları
+`order-service-tax.helper.ts`'in KDV tabanlarının BİREBİR karşılığıdır — iki
+liste ayrışırsa tahsil edilen KDV ile beyan edilen KDV ayrışır. Tanım tek
+yerdedir: `modules/elogo/invoice/package-fee-components.ts`.
+
+- **Anahtar pakettir** (`sourceId = orderPackage.id`), sipariş değil: sepette
+  aynı satıcıdan iki ürün alındığında `Order` iki tanedir ama gönderi, kargo
+  ücreti ve ticari ilişki tektir.
+- **Belge TEK satırdır**: hizmetin adı, 1 adet, paketin o hizmet için doğan
+  toplam bedeli. Fatura adedi ürün adedi değildir. Satır tek olsa da KDV
+  SİPARİŞ bazında yuvarlanıp toplanır ve satıra açıkça yazılır
+  (`InvoiceLineItem.taxAmount`) — checkout tahsil ederken böyle yuvarlıyor
+  (`order-service-tax.helper.ts`), birleşik matrahtan yeniden hesaplamak beyanı
+  tahsilattan bir kuruş ayırabilirdi.
+- **İskonto**: bedel indirimleri (`DiscountTarget.*_commission` / `*_service_fee`
+  / `*_platform_fee` / `*_shipping`) kesinti kolonlarına indirim SONRASI yazılır,
+  bu yüzden fatura indirimi göremiyordu. Belge artık BRÜT bedeli birim fiyat
+  yazar ve indirimi `cac:AllowanceCharge` + `cbc:AllowanceTotalAmount` ile ayrı
+  gösterir; KDV matrahı yine indirimli tutardır. Kaynak `Order.feeDiscountBreakdown`
+  snapshot'ıdır (hedef adları belge tipleriyle birebir aynı), belge toplamı
+  `ElogoInvoice.discountTotal`. Kısmi iadede iskonto matrahla aynı oranda küçülür.
+- **Fatura kayıt no** (`ElogoInvoice.sourceReference`) kesim anında
+  snapshot'lanır: koli kodunun gövdesinden türetilen `KYT-…`
+  (`invoiceRecordReference`, bkz. CODE_SCHEME.md §2); ürün faturası sipariş
+  anahtarlı olduğu için sipariş numarasının gövdesinden türer. Faturaya hem
+  belge notuna hem kalemin `cac:Item/cbc:Description`'ına "Kayıt No: …" olarak
+  basılır ve hakediş dökümünün aynı adlı kolonunda durur; `sourceId` bir UUID
+  olduğu için belgede gösterilemezdi. **eLogo XSLT tasarımının** bu alanı
+  basması ayrı bir ayardır (`ELOGO_INVOICE_XSLT_UUID`).
+- **Sıfır matrah belge doğurmaz.** Bedeli doğmamış hizmet faturalanmaz.
+- **Tetik teslimattır** ve paketin TÜM siparişleri teslim olmadan hiçbiri
+  kesilmez; belgeler sırayla kesilir (ortak numara sayacı, P2034).
+- **İki nesil bir arada yaşamaz.** Kesinti kırılımı olmayan eski defterlerde
+  (`componentBreakdownComplete = false`) ve daha önce birleşik belgeyle
+  faturalanmış paketlerde ücretler LEGACY `commission` / `service_fee` ile
+  kesilir; aksi halde aynı bedel iki belgede yer alır. Kargo payı belgeleri iki
+  nesilde de kalem bazlıdır (birleşik belgeye hiç girmiyordu).
+- **İade** her belgeyi kendi kaleminin iade tutarı oranında tersler
+  (`RefundFinancialComponent`); satıcı kargo payının kalem karşılığı yoktur,
+  genel iade oranına düşer.
+
+**Ceza faturası** (`penalty`) iadede kusurlu taraftan tahsil edilen KARGO
+bedelini belgeler. Politika parayı zaten doğru dağıtıyordu
+(`refund-financial-policy-v2.ts`): kusurlunun komisyonu iade edilir, hizmet
+bedeli platformda kalır (`platform_retain` → kesilmiş belgesi ayakta durur),
+kargo ona yüklenir (`*_charge`) — eksik olan yalnız bu son kalemin belgesiydi.
+
+Matrah **FARKTIR**, yeniden faturalama değil (`invoice/penalty-basis.ts`):
+
+| Kusur            | Ceza matrahı                                                                                                          |
+| ---------------- | --------------------------------------------------------------------------------------------------------------------- |
+| Satıcı           | `outbound_shipping/seller_charge` − satıcıda AYAKTA DURAN `seller_shipping` belgesi + `return_shipping/seller_charge` |
+| Alıcı            | `outbound_shipping/buyer_charge` + `return_shipping/buyer_charge` (ikisi de alıcıya hiç faturalanmamıştı)             |
+| Kargo / platform | belge yok (`platform_absorb`)                                                                                         |
+
+Anahtar iade TALEBİdir (`sourceId = refundRequest.id`): aynı kolinin birden
+fazla iadesi ayrı ayrı cezalanır, aynı talebin yeniden işlenmesi ikinci belge
+doğurmaz. Tetik `invoice.refund_reverse` outbox handler'ıdır — ters kayıt
+tamamlandıktan SONRA çalışır; düşülen tutar da bu yüzden sipariş kolonundan
+değil, ters kayıttan SONRA ayakta kalan `seller_shipping` belgesinden okunur.
+
+Diğer türler: `platform_sale` (Tarodan kendi ürününü satarken, alıcıya kalem
+kalem ürün faturası), `membership`, `boost`, `trade_service_fee` /
+`trade_shipping` / `trade_commission` (§8), `return_invoice`.
+
+### Satıcı hakediş dökümü
+
+Kesilen komisyon faturasının DAYANAĞI: hangi siparişlerden doğduğu ve o
+siparişten satıcıya ne kaldığı. "Kayıt No" kolonu faturaların üstünde yazan
+kodun (`KYT-…`) AYNISIDIR — belge dökümdeki satıra bununla bağlanır. Admin > Finans > Hakediş Dökümü'nden dönem
+seçilip Excel indirilir (`GET /admin/settlement-report[/export]`,
+`finance/settlement/`); mali müşavire fatura ile birlikte gider.
+
+Dönem **teslimat** tarihine göredir — hak ediş ve fatura teslimatla doğar.
+Satıcı hakedişi `sellerNetAmountOf` ile hesaplanır (payout ile tek formül).
+İki kolonun tanımı dosyanın "Aciklama" sayfasında da yazar:
+
+- **Komisyon Oranı** SATICI komisyonunun oranıdır; sipariş üzerinde
+  saklanmadığı için tahsil edilen tutardan geri hesaplanır.
+- **Tarodan Hakedişi** satıcıdan yapılan kesintidir (satıcı komisyonu +
+  platform hizmet bedeli, KDV hariç); alıcıdan alınan komisyon/koruma bedeli
+  buraya GİRMEZ — o alıcının kendi belgelerinin konusudur.
+
+**Stopaj** dökümde kolon olarak durur, e-belgeye girmez: satıcının vergisinden
+kaynakta kesilen tutardır ve muhtasar ile beyan edilir (aylık satıcı bazlı
+toplam: `GET /admin/tax/withholding-report`).
 
 ---
 

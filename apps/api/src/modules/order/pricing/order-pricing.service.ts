@@ -1071,6 +1071,8 @@ export class OrderPricingService {
       withholdingTaxAmount,
       sellerShippingAmount,
       sellerServiceTaxAmount,
+      // İlan önizlemesinde henüz kupon yok; kampanya checkout'ta uygulanır.
+      platformFundedDiscount: 0,
     });
     return {
       sellerFeeAmount: result.sellerFeeAmount,

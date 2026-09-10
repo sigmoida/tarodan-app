@@ -51,6 +51,103 @@ describe("buildInvoiceXml (UBL-TR)", () => {
     );
   });
 
+  it("kalem açıklaması Name'den ÖNCE basılır (UBL 2.1 ItemType sırası)", () => {
+    const { xml } = buildInvoiceXml(
+      baseInput({
+        lines: [
+          {
+            name: "Satıcı aracılık hizmet (komisyon) bedeli",
+            description: "Sipariş No: PKG-000123",
+            quantity: 1,
+            unitPrice: 100,
+            vatRate: 20,
+          },
+        ],
+      }),
+    );
+    expect(xml).toContain(
+      "<cac:Item><cbc:Description>Sipariş No: PKG-000123</cbc:Description>" +
+        "<cbc:Name>Satıcı aracılık hizmet (komisyon) bedeli</cbc:Name></cac:Item>",
+    );
+  });
+
+  it("açıklaması olmayan kalem Item'ı bugünkü gibi bırakır", () => {
+    const { xml } = buildInvoiceXml(baseInput());
+    expect(xml).toContain(
+      "<cac:Item><cbc:Name>Komisyon / hizmet bedeli</cbc:Name></cac:Item>",
+    );
+  });
+
+  it("satırın KDV'si açıkça verildiğinde matrahtan yeniden hesaplanmaz", () => {
+    // Paket belgesi tek satırdır ama KDV'si sipariş bazında yuvarlanmıştır:
+    // 12,53 + 8,53 = 21,06 matrahın KDV'si 4,22 (4,21 değil). Belge tahsil
+    // edilen KDV'yi taşımak zorunda.
+    const { xml, totals } = buildInvoiceXml(
+      baseInput({
+        lines: [
+          {
+            name: "Satıcı aracılık hizmet (komisyon) bedeli",
+            quantity: 1,
+            unitPrice: 21.06,
+            vatRate: 20,
+            taxAmount: 4.22,
+          },
+        ],
+      }),
+    );
+    expect(totals.tax).toBe(4.22);
+    expect(totals.taxInclusive).toBe(25.28);
+    expect(xml).toContain(
+      '<cbc:TaxAmount currencyID="TRY">4.22</cbc:TaxAmount>',
+    );
+    expect(xml).toContain(
+      '<cbc:TaxableAmount currencyID="TRY">21.06</cbc:TaxableAmount>',
+    );
+  });
+
+  it("iskonto: brüt birim fiyat + AllowanceCharge, KDV indirimli matrahtan", () => {
+    // Şablon: Birim Fiyat 59,94 (indirimsiz) — İskonto 9,99 — Matrah 49,95 —
+    // KDV %20 → 9,99 — Toplam 59,94.
+    const { xml, totals } = buildInvoiceXml(
+      baseInput({
+        lines: [
+          {
+            name: "Satıcı aracılık hizmet (komisyon) bedeli",
+            quantity: 1,
+            unitPrice: 59.94,
+            lineExtension: 49.95,
+            discount: 9.99,
+            vatRate: 20,
+          },
+        ],
+      }),
+    );
+
+    expect(totals.taxExclusive).toBe(49.95);
+    expect(totals.allowance).toBe(9.99);
+    expect(totals.tax).toBe(9.99);
+    expect(totals.payable).toBe(59.94);
+    expect(xml).toContain(
+      "<cac:AllowanceCharge><cbc:ChargeIndicator>false</cbc:ChargeIndicator>" +
+        '<cbc:Amount currencyID="TRY">9.99</cbc:Amount>' +
+        '<cbc:BaseAmount currencyID="TRY">59.94</cbc:BaseAmount></cac:AllowanceCharge>',
+    );
+    expect(xml).toContain(
+      '<cbc:AllowanceTotalAmount currencyID="TRY">9.99</cbc:AllowanceTotalAmount>',
+    );
+    // Birim fiyat BRÜT; matrah indirim düşülmüş olarak durur.
+    expect(xml).toContain(
+      '<cbc:PriceAmount currencyID="TRY">59.9400</cbc:PriceAmount>',
+    );
+  });
+
+  it("indirimsiz belgede iskonto düğümleri hiç basılmaz", () => {
+    const { xml, totals } = buildInvoiceXml(baseInput());
+    expect(totals.allowance).toBe(0);
+    expect(xml).not.toContain("AllowanceCharge");
+    expect(xml).not.toContain("AllowanceTotalAmount");
+  });
+
   it('e-Arşiv gönderim şekli: cbc:ID="gonderimSekli" + DocumentType=ELEKTRONIK (canlı doğrulandı)', () => {
     // eLogo marker'ı ID="gonderimSekli"; değer DocumentType'ta. ID'ye ELEKTRONIK yazılırsa
     // eLogo "Faturanın gönderim şekli belirtilmelidir" hatası verir.

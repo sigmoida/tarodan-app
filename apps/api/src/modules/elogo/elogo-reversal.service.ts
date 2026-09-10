@@ -3,12 +3,22 @@ import { randomUUID } from "crypto";
 import { Prisma, type ElogoInvoice } from "@prisma/client";
 import { PrismaService } from "../../prisma";
 import {
+  invoiceDiscountFromLines,
   invoiceTotalsFromLines,
   type InvoiceLineItem,
 } from "./invoice/invoice-lines";
 import { invoiceIssueYear } from "./invoice/invoice-datetime";
 import { LINE_DESCRIPTION } from "./invoice/invoice-line-description";
+import {
+  PACKAGE_FEE_COMPONENT_BY_TYPE,
+  PACKAGE_FEE_INVOICE_TYPES,
+  isPackageFeeInvoiceType,
+} from "./invoice/package-fee-components";
+import type { PackageFeeDocument } from "./invoice/package-fee-basis";
 import { retryOnWriteConflict } from "./helpers/elogo-write-conflict";
+import { refundRequestIdOf } from "./helpers/refund-request-key";
+import { tradeRefundExcludesShipping } from "../trade/helpers/trade-refund-policy";
+import { tradeHandedToCargo } from "../trade/helpers/trade-handed-to-cargo";
 import type { InvoiceRefundReversePayload } from "../outbox/outbox.types";
 import { ElogoService } from "./elogo.service";
 import { ElogoDocumentService } from "./elogo-document.service";
@@ -84,9 +94,7 @@ export class ElogoReversalService {
       resolved = {
         ...adjustment,
         finalizedAt: attempt.finalizedAt,
-        refundRequestId: attempt.idempotencyKey?.startsWith("refund-request:")
-          ? attempt.idempotencyKey.slice("refund-request:".length)
-          : undefined,
+        refundRequestId: refundRequestIdOf(attempt.idempotencyKey),
       };
     }
     await this.reverseByKeys(await this.relatedInvoiceKeys(orderId), resolved);
@@ -98,10 +106,51 @@ export class ElogoReversalService {
    * denenir — `reverseByKeys` var olmayan anahtarı sessizce atlar.
    */
   async handleTradeCashRefund(tradeCashPaymentId: string): Promise<void> {
-    await this.reverseByKeys([
-      { type: "trade_commission", sourceId: tradeCashPaymentId },
-      { type: "trade_service_fee", sourceId: tradeCashPaymentId },
-    ]);
+    await this.reverseByKeys(await this.tradeReversalKeys(tradeCashPaymentId));
+  }
+
+  /**
+   * Takas iadesinde HANGİ belgelerin terslendiği.
+   *
+   * Karar burada verilir, tutar üzerinden değil: takasta iade KALEM BAZLIDIR ve
+   * belgeler birbirinden bağımsız ayakta kalabilir (`trade-refund-policy.ts`
+   * tek kaynaktır). Sipariş tarafındaki gibi bir oran uygulanamaz.
+   *
+   *  - **Hizmet bedeli** hiçbir iptalde iade edilmez → belgesi ayakta kalır.
+   *    Tek istisna KUSURSUZ tarafın tam iadesidir (`fullRefundEntitled`):
+   *    orada bedel de geri verilir, belge de terslenir.
+   *  - **Kargo** yalnız fiilen kullanıldıysa (koli kargoya verildiyse) elde
+   *    kalır; kargolanmadan iptalde iade edilir ve belgesi terslenir.
+   *
+   * Para hiç iade edilmediyse hiçbir belgeye dokunulmaz.
+   */
+  private async tradeReversalKeys(
+    tradeCashPaymentId: string,
+  ): Promise<Array<{ type: string; sourceId: string }>> {
+    // Okuma hatası YUTULMAZ: `null`/`0`'a düşmek "iade edilmemiş" ya da
+    // "kargolanmamış" demek olur — ilki ters kaydı sessizce düşürür, ikincisi
+    // geçerli bir kargo belgesini geri alınamaz biçimde iptal ettirir. Hata
+    // yukarı taşınır, outbox yeniden dener.
+    const tcp = await this.prisma.tradeCashPayment.findUnique({
+      where: { id: tradeCashPaymentId },
+      select: { tradeId: true, refundedAt: true, fullRefundEntitled: true },
+    });
+    if (!tcp?.refundedAt) return [];
+
+    const key = (type: string) => ({ type, sourceId: tradeCashPaymentId });
+    if (tcp.fullRefundEntitled) {
+      return ["trade_commission", "trade_service_fee", "trade_shipping"].map(
+        key,
+      );
+    }
+
+    // Eşik iade yolununkiyle AYNI yardımcıdan okunur; ayrı hesaplanırsa iade
+    // edilen tutar ile ayakta kalan belge birbirinden sapar.
+    const handedToCargo = await tradeHandedToCargo(this.prisma, tcp.tradeId);
+    // Kargoya verildiyse hizmet tüketilmiştir → kargo belgesi de ayakta kalır.
+    return tradeRefundExcludesShipping(tcp, { handedToCargo })
+      ? []
+      : [key("trade_shipping")];
   }
 
   /**
@@ -124,6 +173,13 @@ export class ElogoReversalService {
     const keys: Array<{ type: string; sourceId: string }> = [
       ...(packageId
         ? [
+            // Hizmet başına belgeler + eski birleşik nesil. Paket hangi nesille
+            // faturalandıysa yalnız onun anahtarı bulunur; `reverseByKeys` var
+            // olmayanı sessizce atlar.
+            ...PACKAGE_FEE_INVOICE_TYPES.map((type) => ({
+              type: type as string,
+              sourceId: packageId,
+            })),
             { type: "commission", sourceId: packageId },
             { type: "service_fee", sourceId: packageId },
           ]
@@ -223,7 +279,12 @@ export class ElogoReversalService {
       return;
     }
     const rate = Number(inv.vatRate);
-    const amounts = this.documents.invoiceAmounts(inv.type, gross, rate);
+    // Kalem bazlı paket belgesinde satırlar da yeniden kurulur: KDV satır satır
+    // yuvarlandığı için eski satırlarla yeni toplam birbirini tutmazdı.
+    const doc = await this.resolvePackageFeeDocument(inv);
+    const amounts = doc
+      ? invoiceTotalsFromLines(doc.lines)
+      : this.documents.invoiceAmounts(inv.type, gross, rate);
     await this.prisma.elogoInvoice.update({
       where: { id: inv.id },
       data: {
@@ -233,12 +294,24 @@ export class ElogoReversalService {
         status: "pending",
         elogoResultMsg: null,
         refundAdjustedAt: adjustment?.finalizedAt,
+        ...(doc
+          ? {
+              lineItems: doc.lines as unknown as Prisma.InputJsonValue,
+              // İskonto da matrahla birlikte küçülür; kayıt satırlarla tutmalı.
+              discountTotal: invoiceDiscountFromLines(doc.lines),
+            }
+          : {}),
       },
     });
   }
 
   /** İade sonrası ilgili faturanın bugün itibarıyla kesilmesi gereken net brüt tutar. */
   private async resolveCurrentInvoiceGross(inv: ElogoInvoice): Promise<number> {
+    if (isPackageFeeInvoiceType(inv.type)) {
+      const doc = await this.resolvePackageFeeDocument(inv);
+      return doc ? doc.net : 0;
+    }
+
     if (inv.type === "commission" || inv.type === "service_fee") {
       const totals = await this.documents.resolveFeeLedgerTotals(inv.sourceId);
       if (!totals) return 0;
@@ -318,27 +391,46 @@ export class ElogoReversalService {
    * Kesilmiş faturayı tersine çevir. Tam ve daha önce düzeltme almamış e-Arşiv
    * ≤8 günde iptal edilir; diğer durumlarda attempt-bazlı IADE faturası kesilir.
    */
+  /**
+   * Kalem bazlı paket belgesinin GÜNCEL matrahı — kesimle iade aynı kaynaktan
+   * okur. Belge bu türden değilse ya da paket çözülemezse null.
+   */
+  private async resolvePackageFeeDocument(
+    inv: ElogoInvoice,
+  ): Promise<PackageFeeDocument | null> {
+    if (!isPackageFeeInvoiceType(inv.type)) return null;
+    const basis = await this.documents.resolvePackageFeeBasis(inv.sourceId);
+    return basis?.documents.find((doc) => doc.type === inv.type) ?? null;
+  }
+
   private async refundComponentLinesForInvoice(
     inv: ElogoInvoice,
     adjustment?: ResolvedRefundAdjustment,
   ): Promise<InvoiceLineItem[]> {
     if (!adjustment?.refundRequestId) return [];
+    // Kalem bazlı belgede karşılık TEK bileşendir; karşılığı olmayan kalem
+    // (satıcı kargo payı) genel iade oranına düşer.
+    const componentSpec = isPackageFeeInvoiceType(inv.type)
+      ? PACKAGE_FEE_COMPONENT_BY_TYPE[inv.type].refundComponent
+      : null;
+    if (isPackageFeeInvoiceType(inv.type) && !componentSpec) return [];
+    const treatment =
+      componentSpec?.treatment ??
+      (inv.type === "commission" ? "seller_refund" : "buyer_refund");
     const rr = await this.prisma.refundRequest.findUnique({
       where: { id: adjustment.refundRequestId },
       select: {
         refundQuantity: true,
         financialComponents: {
-          where: {
-            treatment:
-              inv.type === "commission" ? "seller_refund" : "buyer_refund",
-          },
+          where: { treatment },
           orderBy: { createdAt: "asc" },
         },
       },
     });
     if (!rr?.financialComponents.length) return [];
-    const allowed =
-      inv.type === "commission"
+    const allowed = componentSpec
+      ? new Set<string>([componentSpec.code])
+      : inv.type === "commission"
         ? new Set(["seller_commission", "seller_platform_fee"])
         : inv.type === "service_fee"
           ? new Set(["buyer_commission", "buyer_platform_fee"])
@@ -378,6 +470,10 @@ export class ElogoReversalService {
           net,
           unitPrice: net / quantity,
           vatRate: net > 0 ? this.documents.round2((tax / net) * 100) : 0,
+          // İade bileşeninin KDV'si politika tarafından hesaplanmıştır; orandan
+          // yeniden türetmek (oran zaten tutardan geri hesaplandı) kuruş
+          // kaydırabilir. İade faturası, gerçekten geri verilen KDV'yi yazar.
+          taxAmount: tax,
         };
       });
   }
@@ -518,6 +614,14 @@ export class ElogoReversalService {
       ...line,
       net: this.documents.round2(line.net * componentScale),
       unitPrice: (line.net * componentScale) / line.quantity,
+      // KDV de matrahla BİRLİKTE ölçeklenmeli: satır artık kendi KDV'sini açıkça
+      // taşıdığı için (taxAmount) ölçeklenmeyen tutar, küçültülmüş matrahın
+      // üstünde tam KDV beyan ederdi — iade belgesi kalan bakiyeyi aşardı.
+      ...(typeof line.taxAmount === "number"
+        ? {
+            taxAmount: this.documents.round2(line.taxAmount * componentScale),
+          }
+        : {}),
     }));
     const componentTotals = componentLines.length
       ? invoiceTotalsFromLines(componentLines)
@@ -584,6 +688,9 @@ export class ElogoReversalService {
               status: "pending",
               billingReference: inv.invoiceNumber,
               billingReferenceIssueDate: inv.issuedAt,
+              // İade faturası da hangi koliden doğduğunu taşır — orijinalin
+              // referansı aynen devralınır.
+              sourceReference: inv.sourceReference,
               lineDescription: `İade: ${
                 inv.lineDescription ||
                 LINE_DESCRIPTION[inv.type] ||
@@ -609,6 +716,31 @@ export class ElogoReversalService {
     if (!adjustment) {
       return { refundRatio: 1, fullyRefunded: true };
     }
+    // Kalem bazlı belgede oran, o KALEMİN kendi iade tutarının belgenin iade
+    // ÖNCESİ matrahına bölümüdür. Paketin toplam iade oranı burada yanlış olur:
+    // ürün iade edilirken kargo payı hiç geri verilmemiş olabilir.
+    if (isPackageFeeInvoiceType(inv.type)) {
+      const spec = PACKAGE_FEE_COMPONENT_BY_TYPE[inv.type].refundComponent;
+      const doc = await this.resolvePackageFeeDocument(inv);
+      if (spec && adjustment.refundRequestId && doc && doc.base > 0) {
+        const component = await this.prisma.refundFinancialComponent
+          .findFirst({
+            where: {
+              refundRequestId: adjustment.refundRequestId,
+              componentCode: spec.code,
+              treatment: spec.treatment,
+            },
+            select: { netAmount: true },
+          })
+          .catch(() => null);
+        const refundRatio = Math.min(
+          Math.max(Number(component?.netAmount ?? 0) / doc.base, 0),
+          1,
+        );
+        return { refundRatio, fullyRefunded: refundRatio >= 0.9999 };
+      }
+    }
+
     if (
       (inv.type === "commission" &&
         adjustment.sellerFeeRefundAmount !== undefined) ||
@@ -642,6 +774,17 @@ export class ElogoReversalService {
 
   /** Refund oranının uygulanacağı faturanın iade öncesi ekonomik brüt bazı. */
   private async resolveInvoiceRefundBase(inv: ElogoInvoice): Promise<number> {
+    if (isPackageFeeInvoiceType(inv.type)) {
+      const doc = await this.resolvePackageFeeDocument(inv);
+      if (doc) {
+        return this.documents.invoiceAmounts(
+          inv.type,
+          doc.base,
+          Number(inv.vatRate),
+        ).total;
+      }
+    }
+
     if (inv.type === "commission" || inv.type === "service_fee") {
       const totals = await this.documents.resolveFeeLedgerTotals(inv.sourceId);
       if (totals) {

@@ -78,7 +78,12 @@ export class AdminUserAccountService {
       );
     }
 
-    await this.userService.deleteAccount(userId);
+    // Kimlik arşivine "yönetici sildi" olarak damgalanır — yasal kayıtta
+    // silmeyi kimin başlattığı tahmin edilemez olmamalı.
+    await this.userService.deleteAccount(userId, {
+      actor: "admin",
+      adminUserId: adminId,
+    });
 
     await this.audit.createRequiredAuditLog(
       adminId,

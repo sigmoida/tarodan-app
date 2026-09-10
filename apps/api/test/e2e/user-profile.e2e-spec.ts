@@ -1,16 +1,16 @@
-import * as request from 'supertest';
-import { createE2ETestApp, E2ETestApp } from '../test-utils/create-app';
+import * as request from "supertest";
+import { createE2ETestApp, E2ETestApp } from "../test-utils/create-app";
 import {
   truncateAll,
   getPrisma,
   seedBaseline,
   disconnectPrisma,
-} from '../test-utils/db';
-import { createUser, authHeader } from '../factories/user.factory';
-import { createProduct } from '../factories/product.factory';
-import { createAddress } from '../factories/address.factory';
+} from "../test-utils/db";
+import { createUser, authHeader } from "../factories/user.factory";
+import { createProduct } from "../factories/product.factory";
+import { createAddress } from "../factories/address.factory";
 
-describe('User profile + addresses + follow + block (E2E)', () => {
+describe("User profile + addresses + follow + block (E2E)", () => {
   let ctx: E2ETestApp;
   let baseline: { categoryId: string; brandId: string; manufacturerId: string };
 
@@ -32,47 +32,47 @@ describe('User profile + addresses + follow + block (E2E)', () => {
   // PATCH /api/users/me — profile update
   // ============================================================================
 
-  describe('PATCH /api/users/me', () => {
-    it('updates display name and bio', async () => {
+  describe("PATCH /api/users/me", () => {
+    it("updates display name and bio", async () => {
       const user = await createUser(ctx.module);
 
       const res = await request(ctx.app.getHttpServer())
-        .patch('/api/users/me')
+        .patch("/api/users/me")
         .set(authHeader(user))
         .send({
-          displayName: 'Yeni İsim',
-          bio: 'Koleksiyoncu, F1 sever',
+          displayName: "Yeni İsim",
+          bio: "Koleksiyoncu, F1 sever",
         })
         .expect(200);
 
-      expect(res.body.displayName).toBe('Yeni İsim');
-      expect(res.body.bio).toBe('Koleksiyoncu, F1 sever');
+      expect(res.body.displayName).toBe("Yeni İsim");
+      expect(res.body.bio).toBe("Koleksiyoncu, F1 sever");
     });
 
-    it('rejects invalid Turkish phone format (400)', async () => {
+    it("rejects invalid Turkish phone format (400)", async () => {
       const user = await createUser(ctx.module);
 
       await request(ctx.app.getHttpServer())
-        .patch('/api/users/me')
+        .patch("/api/users/me")
         .set(authHeader(user))
-        .send({ phone: '12345' })
+        .send({ phone: "12345" })
         .expect(400);
     });
 
-    it('rejects too-long bio (>500 chars)', async () => {
+    it("rejects too-long bio (>500 chars)", async () => {
       const user = await createUser(ctx.module);
 
       await request(ctx.app.getHttpServer())
-        .patch('/api/users/me')
+        .patch("/api/users/me")
         .set(authHeader(user))
-        .send({ bio: 'a'.repeat(501) })
+        .send({ bio: "a".repeat(501) })
         .expect(400);
     });
 
-    it('rejects unauthenticated', async () => {
+    it("rejects unauthenticated", async () => {
       await request(ctx.app.getHttpServer())
-        .patch('/api/users/me')
-        .send({ displayName: 'X' })
+        .patch("/api/users/me")
+        .send({ displayName: "X" })
         .expect(401);
     });
   });
@@ -81,8 +81,8 @@ describe('User profile + addresses + follow + block (E2E)', () => {
   // DELETE /api/users/me — account deletion guards
   // ============================================================================
 
-  describe('DELETE /api/users/me', () => {
-    it('rejects deletion when user has active products (400)', async () => {
+  describe("DELETE /api/users/me", () => {
+    it("rejects deletion when user has active products (400)", async () => {
       const user = await createUser(ctx.module, { isSeller: true });
       await createProduct({
         sellerId: user.id,
@@ -92,15 +92,61 @@ describe('User profile + addresses + follow + block (E2E)', () => {
       });
 
       const res = await request(ctx.app.getHttpServer())
-        .delete('/api/users/me')
+        .delete("/api/users/me")
         .set(authHeader(user));
       expect([400, 403]).toContain(res.status);
     });
 
-    it('rejects unauthenticated (401)', async () => {
+    it("rejects unauthenticated (401)", async () => {
       await request(ctx.app.getHttpServer())
-        .delete('/api/users/me')
+        .delete("/api/users/me")
         .expect(401);
+    });
+
+    // Anonimleştirme kimliği geri dönülemez şekilde siliyor; aylık resmî
+    // bildirim için silme ÖNCESİ kimlik arşive kopyalanmalı.
+    it("archives the pre-deletion identity for legal reporting", async () => {
+      const user = await createUser(ctx.module);
+      const prisma = getPrisma();
+      const before = await prisma.user.findUnique({
+        where: { id: user.id },
+        select: { email: true, username: true, displayName: true },
+      });
+      await createAddress({
+        userId: user.id,
+        city: "İstanbul",
+        district: "Kadıköy",
+      });
+
+      await request(ctx.app.getHttpServer())
+        .delete("/api/users/me")
+        .set(authHeader(user))
+        .expect(200);
+
+      const archived = await prisma.deletedUserIdentity.findUnique({
+        where: { userId: user.id },
+      });
+      expect(archived).not.toBeNull();
+      expect(archived!.email).toBe(before!.email);
+      expect(archived!.username).toBe(before!.username);
+      expect(archived!.displayName).toBe(before!.displayName);
+      expect(archived!.addressCity).toBe("İstanbul");
+      expect(archived!.source).toBe("live");
+      expect(archived!.deletedByActor).toBe("self");
+
+      // Canlı satır anonim; kimlik yalnız arşivde kaldı.
+      const anonymized = await prisma.user.findUnique({
+        where: { id: user.id },
+        select: { email: true, deletedAt: true },
+      });
+      expect(anonymized!.email).toBe(`deleted_${user.id}@deleted.local`);
+      expect(anonymized!.deletedAt).not.toBeNull();
+
+      // Saklama bitişi: silme + 10 yıl.
+      expect(
+        archived!.retainUntil.getUTCFullYear() -
+          archived!.deletedAt.getUTCFullYear(),
+      ).toBe(10);
     });
   });
 
@@ -108,20 +154,20 @@ describe('User profile + addresses + follow + block (E2E)', () => {
   // Address CRUD
   // ============================================================================
 
-  describe('Address CRUD (POST/PATCH/DELETE /api/users/me/addresses)', () => {
-    it('creates a new address with isDefault flag', async () => {
+  describe("Address CRUD (POST/PATCH/DELETE /api/users/me/addresses)", () => {
+    it("creates a new address with isDefault flag", async () => {
       const user = await createUser(ctx.module);
 
       const res = await request(ctx.app.getHttpServer())
-        .post('/api/users/me/addresses')
+        .post("/api/users/me/addresses")
         .set(authHeader(user))
         .send({
-          title: 'Ev',
-          fullName: 'Ahmet Yılmaz',
-          phone: '+905551234567',
-          city: 'İstanbul',
-          district: 'Kadıköy',
-          address: 'Caferağa Mah. Moda Cad. No:123',
+          title: "Ev",
+          fullName: "Ahmet Yılmaz",
+          phone: "+905551234567",
+          city: "İstanbul",
+          district: "Kadıköy",
+          address: "Caferağa Mah. Moda Cad. No:123",
           isDefault: true,
         })
         .expect(201);
@@ -130,36 +176,36 @@ describe('User profile + addresses + follow + block (E2E)', () => {
       expect(res.body.isDefault).toBe(true);
     });
 
-    it('rejects address with too-short fullName (400)', async () => {
+    it("rejects address with too-short fullName (400)", async () => {
       const user = await createUser(ctx.module);
 
       await request(ctx.app.getHttpServer())
-        .post('/api/users/me/addresses')
+        .post("/api/users/me/addresses")
         .set(authHeader(user))
         .send({
-          fullName: 'X',
-          phone: '+905551234567',
-          city: 'İstanbul',
-          district: 'Kadıköy',
-          address: 'Caferağa Mah. Moda Cad. No:123',
+          fullName: "X",
+          phone: "+905551234567",
+          city: "İstanbul",
+          district: "Kadıköy",
+          address: "Caferağa Mah. Moda Cad. No:123",
         })
         .expect(400);
     });
 
-    it('updates an existing address', async () => {
+    it("updates an existing address", async () => {
       const user = await createUser(ctx.module);
       const addr = await createAddress({ userId: user.id });
 
       const res = await request(ctx.app.getHttpServer())
         .patch(`/api/users/me/addresses/${addr.id}`)
         .set(authHeader(user))
-        .send({ title: 'İş Yeri' })
+        .send({ title: "İş Yeri" })
         .expect(200);
 
-      expect(res.body.title).toBe('İş Yeri');
+      expect(res.body.title).toBe("İş Yeri");
     });
 
-    it('rejects updating another user\'s address (404 not found)', async () => {
+    it("rejects updating another user's address (404 not found)", async () => {
       const userA = await createUser(ctx.module);
       const userB = await createUser(ctx.module);
       const bAddr = await createAddress({ userId: userB.id });
@@ -167,11 +213,11 @@ describe('User profile + addresses + follow + block (E2E)', () => {
       const res = await request(ctx.app.getHttpServer())
         .patch(`/api/users/me/addresses/${bAddr.id}`)
         .set(authHeader(userA))
-        .send({ title: 'Hacked' });
+        .send({ title: "Hacked" });
       expect([403, 404]).toContain(res.status);
     });
 
-    it('deletes an address with no blocking orders', async () => {
+    it("deletes an address with no blocking orders", async () => {
       const user = await createUser(ctx.module);
       const addr = await createAddress({ userId: user.id });
 
@@ -191,24 +237,24 @@ describe('User profile + addresses + follow + block (E2E)', () => {
   // Public profile + follow
   // ============================================================================
 
-  describe('GET /api/users/:id/profile (public)', () => {
-    it('returns public profile (no auth required)', async () => {
+  describe("GET /api/users/:id/profile (public)", () => {
+    it("returns public profile (no auth required)", async () => {
       const user = await createUser(ctx.module, {
-        displayName: 'Public Tester',
+        displayName: "Public Tester",
       });
 
       const res = await request(ctx.app.getHttpServer())
         .get(`/api/users/${user.id}/profile`)
         .expect(200);
 
-      expect(res.body.displayName).toBe('Public Tester');
+      expect(res.body.displayName).toBe("Public Tester");
       // Email should not leak in public profile
       expect(res.body.email).toBeUndefined();
     });
   });
 
-  describe('Follow / unfollow', () => {
-    it('follow + check + unfollow flow', async () => {
+  describe("Follow / unfollow", () => {
+    it("follow + check + unfollow flow", async () => {
       const me = await createUser(ctx.module);
       const target = await createUser(ctx.module);
 
@@ -224,10 +270,11 @@ describe('User profile + addresses + follow + block (E2E)', () => {
       expect(status.body.following).toBe(true);
 
       const myFollowing = await request(ctx.app.getHttpServer())
-        .get('/api/users/me/following')
+        .get("/api/users/me/following")
         .set(authHeader(me))
         .expect(200);
-      const followingArr: any[] = myFollowing.body?.following ?? myFollowing.body ?? [];
+      const followingArr: any[] =
+        myFollowing.body?.following ?? myFollowing.body ?? [];
       const followingIds = followingArr.map(
         (entry: any) => entry.following?.id ?? entry.id,
       );
@@ -245,7 +292,7 @@ describe('User profile + addresses + follow + block (E2E)', () => {
       expect(after.body.following).toBe(false);
     });
 
-    it('cannot follow yourself (400)', async () => {
+    it("cannot follow yourself (400)", async () => {
       const me = await createUser(ctx.module);
 
       const res = await request(ctx.app.getHttpServer())
@@ -259,8 +306,8 @@ describe('User profile + addresses + follow + block (E2E)', () => {
   // Block / unblock
   // ============================================================================
 
-  describe('Block / unblock', () => {
-    it('block + appears in blocked list + unblock removes it', async () => {
+  describe("Block / unblock", () => {
+    it("block + appears in blocked list + unblock removes it", async () => {
       const me = await createUser(ctx.module);
       const target = await createUser(ctx.module);
 
@@ -270,7 +317,7 @@ describe('User profile + addresses + follow + block (E2E)', () => {
         .expect(201);
 
       const list = await request(ctx.app.getHttpServer())
-        .get('/api/users/me/blocked')
+        .get("/api/users/me/blocked")
         .set(authHeader(me))
         .expect(200);
       const blockedIds = (list.body || []).map((u: any) => u.id);
@@ -282,13 +329,13 @@ describe('User profile + addresses + follow + block (E2E)', () => {
         .expect(200);
 
       const after = await request(ctx.app.getHttpServer())
-        .get('/api/users/me/blocked')
+        .get("/api/users/me/blocked")
         .set(authHeader(me))
         .expect(200);
       expect((after.body || []).map((u: any) => u.id)).not.toContain(target.id);
     });
 
-    it('cannot block yourself (400)', async () => {
+    it("cannot block yourself (400)", async () => {
       const me = await createUser(ctx.module);
 
       const res = await request(ctx.app.getHttpServer())

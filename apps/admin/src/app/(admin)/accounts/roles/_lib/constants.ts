@@ -163,7 +163,11 @@ export const getPermissionGroups = (t: T): PermGroup[] => [
         key: "users",
         label: t("admin.roles.permissions.users.label"),
         description: t("admin.roles.permissions.users.description"),
-        pages: ["/accounts/users", "/accounts/users/:id"],
+        pages: [
+          "/accounts/users",
+          "/accounts/users/:id",
+          "/accounts/deleted-identities",
+        ],
       },
       {
         key: "seller_applications",
@@ -285,7 +289,7 @@ export const getPermissionGroups = (t: T): PermGroup[] => [
         key: "invoices",
         label: t("admin.roles.permissions.invoices.label"),
         description: t("admin.roles.permissions.invoices.description"),
-        pages: ["/finance/invoices"],
+        pages: ["/finance/invoices", "/finance/settlement"],
       },
       // Backend `settings: ["settings", "payment_settings"]` — bu anahtar
       // matriste yoksa hiç verilemez, oysa guard onu geçerli sayıyor.

@@ -26,6 +26,11 @@ export const elogoColumns = (
         <Badge variant={i.isReturn ? "danger" : "secondary"} size="sm">
           {i.documentTypeLabel}
         </Badge>
+        {i.sourceReference && (
+          <p className="mt-1 font-mono text-xs text-muted">
+            {i.sourceReference}
+          </p>
+        )}
         {i.isReturn && i.billingReference && (
           <p className="mt-1 text-xs text-danger-600">
             {t("admin.finance.invoices.returnReference", {
@@ -67,6 +72,11 @@ export const elogoColumns = (
         <p className="text-xs text-muted">
           {t("admin.finance.common.vat")}: {fmtTry(i.taxAmount)}
         </p>
+        {i.discountTotal > 0 && (
+          <p className="text-xs text-muted">
+            {t("admin.finance.invoices.discount")}: {fmtTry(i.discountTotal)}
+          </p>
+        )}
       </div>
     ),
     { align: "right", minWidth: 120, sortKey: "total", sortType: "number" },

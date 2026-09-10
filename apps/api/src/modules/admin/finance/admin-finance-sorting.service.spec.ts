@@ -132,6 +132,7 @@ describe("admin finance list sorting", () => {
       { elogoInvoice } as any,
       {} as any,
       {} as any,
+      {} as any,
     );
 
     await service.getElogoInvoices({ sortBy: "total", sortOrder: "asc" });
@@ -155,6 +156,7 @@ describe("admin finance list sorting", () => {
       { elogoInvoice } as any,
       {} as any,
       {} as any,
+      {} as any,
     );
 
     const result = await service.getElogoInvoices({
@@ -169,6 +171,7 @@ describe("admin finance list sorting", () => {
     const sellerUploadedInvoice = createDelegate();
     const service = new AdminTaxService(
       { sellerUploadedInvoice } as any,
+      {} as any,
       {} as any,
       {} as any,
     );
@@ -188,6 +191,7 @@ describe("admin finance list sorting", () => {
     const sellerUploadedInvoice = createDelegate();
     const service = new AdminTaxService(
       { sellerUploadedInvoice } as any,
+      {} as any,
       {} as any,
       {} as any,
     );

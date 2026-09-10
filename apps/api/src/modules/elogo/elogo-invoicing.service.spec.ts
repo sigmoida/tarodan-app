@@ -167,6 +167,16 @@ function makePrisma(seed: any = {}) {
         async ({ where }: any) => seed.tradeCash?.[where.id] ?? null,
       ),
     },
+    trade: {
+      findUnique: jest.fn(
+        async ({ where }: any) => seed.trades?.[where.id] ?? null,
+      ),
+    },
+    tradeShipment: {
+      count: jest.fn(
+        async ({ where }: any) => seed.shippedLegs?.[where.tradeId] ?? 0,
+      ),
+    },
     payment: {
       findFirst: jest.fn(
         async ({ where }: any) => seed.payments?.[where.orderId] ?? null,
@@ -771,6 +781,76 @@ describe("ElogoInvoicingService", () => {
     expect(Number(prisma.invoices[0].total)).toBeCloseTo(60, 2);
   });
 
+  it("takas: kargo bedeli AYRI belge olarak kesilir (KDV içinden ayrışır)", async () => {
+    // Kargo taraftan tahsil ediliyordu ama hiç faturalanmıyordu. Takas toplamına
+    // KDV ayrıca EKLENMEZ, dolayısıyla 120 TL KDV DAHİLDİR: 100 + 20.
+    const prisma = makePrisma({
+      tradeCash: {
+        tcp1: {
+          payerId: "p1",
+          commission: 0,
+          tradeFeeAmount: 60,
+          shippingAmount: 120,
+          trade: { tradeNumber: "TKS-K7X9M2QF3N" },
+        },
+      },
+      users: { p1: { displayName: "Ödeyen", taxId: null } },
+    });
+    const elogo = makeElogo();
+    const documents = new ElogoDocumentService(prisma, elogo, fakeConfig());
+    const delivery = new ElogoDeliveryService(prisma, elogo, documents);
+    const svc = new ElogoInvoicingService(
+      {} as any, // queries
+      delivery,
+      new ElogoIssuingService(prisma, documents, delivery),
+      new ElogoReversalService(prisma, elogo, documents, delivery),
+    );
+
+    await svc.issueTradeCashFeeInvoice("tcp1");
+
+    expect(prisma.invoices.map((i: any) => i.type)).toEqual([
+      "trade_service_fee",
+      "trade_shipping",
+    ]);
+    const shipping = prisma.invoices[1];
+    expect(Number(shipping.netAmount)).toBeCloseTo(100, 2);
+    expect(Number(shipping.taxAmount)).toBeCloseTo(20, 2);
+    expect(Number(shipping.total)).toBeCloseTo(120, 2);
+    // İki belge de takas kodunun gövdesinden türeyen kayıt no'yu taşır.
+    expect(prisma.invoices.map((i: any) => i.sourceReference)).toEqual([
+      "KYT-K7X9M2QF3N",
+      "KYT-K7X9M2QF3N",
+    ]);
+  });
+
+  it("takas: kargosuz satırda kargo belgesi doğmaz", async () => {
+    const prisma = makePrisma({
+      tradeCash: {
+        tcp1: {
+          payerId: "p1",
+          commission: 0,
+          tradeFeeAmount: 60,
+          shippingAmount: 0,
+        },
+      },
+      users: { p1: { displayName: "Ödeyen", taxId: null } },
+    });
+    const elogo = makeElogo();
+    const documents = new ElogoDocumentService(prisma, elogo, fakeConfig());
+    const delivery = new ElogoDeliveryService(prisma, elogo, documents);
+    const svc = new ElogoInvoicingService(
+      {} as any, // queries
+      delivery,
+      new ElogoIssuingService(prisma, documents, delivery),
+      new ElogoReversalService(prisma, elogo, documents, delivery),
+    );
+
+    await svc.issueTradeCashFeeInvoice("tcp1");
+    expect(prisma.invoices.map((i: any) => i.type)).toEqual([
+      "trade_service_fee",
+    ]);
+  });
+
   it("takas: ücretsiz satır için fatura KESMEZ", async () => {
     const prisma = makePrisma({
       tradeCash: { tcp1: { payerId: "p1", commission: 0, tradeFeeAmount: 0 } },
@@ -798,8 +878,12 @@ describe("ElogoInvoicingService", () => {
     expect(elogo.sendDocument).not.toHaveBeenCalled();
   });
 
-  it("takas iadesi: v2 hizmet bedeli faturasını da iptal eder", async () => {
-    const prisma = makePrisma();
+  it("takas iadesi: hizmet bedeli belgesi YALNIZ kusursuz tarafın tam iadesinde iptal edilir", async () => {
+    const prisma = makePrisma({
+      tradeCash: {
+        tcp2: { refundedAt: new Date(), fullRefundEntitled: true },
+      },
+    });
     prisma.invoices.push({
       id: "t2",
       type: "trade_service_fee",
@@ -834,8 +918,12 @@ describe("ElogoInvoicingService", () => {
     expect(prisma.invoices[0].status).toBe("cancelled");
   });
 
-  it("takas iadesi: takas komisyon faturasını iptal eder", async () => {
-    const prisma = makePrisma();
+  it("takas iadesi: v1 komisyon belgesi de aynı kurala tabidir", async () => {
+    const prisma = makePrisma({
+      tradeCash: {
+        tcp1: { refundedAt: new Date(), fullRefundEntitled: true },
+      },
+    });
     prisma.invoices.push({
       id: "t1",
       type: "trade_commission",
@@ -868,6 +956,147 @@ describe("ElogoInvoicingService", () => {
     await svc.handleTradeCashRefund("tcp1");
     expect(elogo.cancelEArchiveInvoice).toHaveBeenCalledWith("te1", "9");
     expect(prisma.invoices[0].status).toBe("cancelled");
+  });
+
+  it("takas iadesi: kusuru olan tarafın hizmet bedeli belgesi AYAKTA KALIR", async () => {
+    const prisma = makePrisma({
+      tradeCash: {
+        tcp3: { refundedAt: new Date(), fullRefundEntitled: false },
+      },
+    });
+    prisma.invoices.push({
+      id: "t3",
+      type: "trade_service_fee",
+      sourceId: "tcp3",
+      documentType: "EARCHIVE",
+      status: "sent",
+      ettn: "te3",
+      invoiceNumber: "TRD2026000000011",
+      elogoRefId: "11",
+      issuedAt: new Date(),
+    });
+    const elogo = makeElogo({ refundStrategy: jest.fn(() => "CANCEL") });
+    const documents = new ElogoDocumentService(prisma, elogo, fakeConfig());
+    const delivery = new ElogoDeliveryService(prisma, elogo, documents);
+    const svc = new ElogoInvoicingService(
+      {} as any, // queries
+      delivery,
+      new ElogoIssuingService(prisma, documents, delivery),
+      new ElogoReversalService(prisma, elogo, documents, delivery),
+    );
+
+    await svc.handleTradeCashRefund("tcp3");
+    // Bedel hiçbir iptalde iade edilmez; belge de terslenmez.
+    expect(elogo.cancelEArchiveInvoice).not.toHaveBeenCalled();
+    expect(prisma.invoices[0].status).toBe("sent");
+  });
+
+  it("takas iadesi: kargolanmadan iptalde KARGO belgesi iptal edilir", async () => {
+    const prisma = makePrisma({
+      tradeCash: {
+        tcp4: {
+          tradeId: "tr4",
+          refundedAt: new Date(),
+          fullRefundEntitled: false,
+        },
+      },
+      trades: { tr4: { firstWarehouseArrivalAt: null } },
+      shippedLegs: { tr4: 0 },
+    });
+    prisma.invoices.push({
+      id: "t4",
+      type: "trade_shipping",
+      sourceId: "tcp4",
+      documentType: "EARCHIVE",
+      status: "sent",
+      ettn: "te4",
+      invoiceNumber: "TRD2026000000012",
+      elogoRefId: "12",
+      issuedAt: new Date(),
+    });
+    const elogo = makeElogo({ refundStrategy: jest.fn(() => "CANCEL") });
+    const documents = new ElogoDocumentService(prisma, elogo, fakeConfig());
+    const delivery = new ElogoDeliveryService(prisma, elogo, documents);
+    const svc = new ElogoInvoicingService(
+      {} as any, // queries
+      delivery,
+      new ElogoIssuingService(prisma, documents, delivery),
+      new ElogoReversalService(prisma, elogo, documents, delivery),
+    );
+
+    await svc.handleTradeCashRefund("tcp4");
+    // Hiçbir koli yola çıkmadı → kargo hizmeti doğmadı, bedeli iade edildi.
+    expect(elogo.cancelEArchiveInvoice).toHaveBeenCalledWith("te4", "12");
+    expect(prisma.invoices[0].status).toBe("cancelled");
+  });
+
+  it("takas iadesi: koli yola çıktıysa KARGO belgesi ayakta kalır", async () => {
+    const prisma = makePrisma({
+      tradeCash: {
+        tcp5: {
+          tradeId: "tr5",
+          refundedAt: new Date(),
+          fullRefundEntitled: false,
+        },
+      },
+      trades: { tr5: { firstWarehouseArrivalAt: null } },
+      shippedLegs: { tr5: 1 },
+    });
+    prisma.invoices.push({
+      id: "t5",
+      type: "trade_shipping",
+      sourceId: "tcp5",
+      documentType: "EARCHIVE",
+      status: "sent",
+      ettn: "te5",
+      invoiceNumber: "TRD2026000000013",
+      elogoRefId: "13",
+      issuedAt: new Date(),
+    });
+    const elogo = makeElogo({ refundStrategy: jest.fn(() => "CANCEL") });
+    const documents = new ElogoDocumentService(prisma, elogo, fakeConfig());
+    const delivery = new ElogoDeliveryService(prisma, elogo, documents);
+    const svc = new ElogoInvoicingService(
+      {} as any, // queries
+      delivery,
+      new ElogoIssuingService(prisma, documents, delivery),
+      new ElogoReversalService(prisma, elogo, documents, delivery),
+    );
+
+    await svc.handleTradeCashRefund("tcp5");
+    // Platform kargo maliyetini gerçekten ödedi; bedel iade edilmez.
+    expect(elogo.cancelEArchiveInvoice).not.toHaveBeenCalled();
+    expect(prisma.invoices[0].status).toBe("sent");
+  });
+
+  it("takas iadesi: para hiç iade edilmediyse hiçbir belgeye dokunulmaz", async () => {
+    const prisma = makePrisma({
+      tradeCash: { tcp6: { refundedAt: null, fullRefundEntitled: false } },
+    });
+    prisma.invoices.push({
+      id: "t6",
+      type: "trade_shipping",
+      sourceId: "tcp6",
+      documentType: "EARCHIVE",
+      status: "sent",
+      ettn: "te6",
+      invoiceNumber: "TRD2026000000014",
+      elogoRefId: "14",
+      issuedAt: new Date(),
+    });
+    const elogo = makeElogo({ refundStrategy: jest.fn(() => "CANCEL") });
+    const documents = new ElogoDocumentService(prisma, elogo, fakeConfig());
+    const delivery = new ElogoDeliveryService(prisma, elogo, documents);
+    const svc = new ElogoInvoicingService(
+      {} as any, // queries
+      delivery,
+      new ElogoIssuingService(prisma, documents, delivery),
+      new ElogoReversalService(prisma, elogo, documents, delivery),
+    );
+
+    await svc.handleTradeCashRefund("tcp6");
+    expect(elogo.cancelEArchiveInvoice).not.toHaveBeenCalled();
+    expect(prisma.invoices[0].status).toBe("sent");
   });
 
   it("iade: boost faturasını da iptal eder (orderId → boost)", async () => {
@@ -1112,8 +1341,8 @@ describe("ElogoInvoicingService", () => {
 
   /**
    * Teslim faturaları SIRALI kesilir: paralel kesim aynı sayaç satırında
-   * çakışıyordu. Sıra: komisyon → hizmet bedeli → platform satışı; biri
-   * patlarsa diğerleri yine denenir, işaret konmaz.
+   * çakışıyordu. Sıra: paketin hizmet başına ücret belgeleri → platform satışı;
+   * biri patlarsa diğerleri yine denenir, işaret konmaz.
    */
   it("teslim faturaları sırayla kesilir; biri patlarsa diğerleri yine denenir ve işaret konmaz", async () => {
     const prisma = makePrisma({
@@ -1122,12 +1351,9 @@ describe("ElogoInvoicingService", () => {
     prisma.order.update = jest.fn(async () => ({}));
     const svc = new ElogoIssuingService(prisma, {} as any, {} as any);
     const calls: string[] = [];
-    jest.spyOn(svc, "issueCommissionInvoice").mockImplementation(async () => {
-      calls.push("commission");
+    jest.spyOn(svc, "issuePackageFeeInvoices").mockImplementation(async () => {
+      calls.push("package_fees");
       throw new Error("boom");
-    });
-    jest.spyOn(svc, "issueServiceFeeInvoice").mockImplementation(async () => {
-      calls.push("service_fee");
     });
     jest.spyOn(svc, "issuePlatformSaleInvoice").mockImplementation(async () => {
       calls.push("platform_sale");
@@ -1135,7 +1361,7 @@ describe("ElogoInvoicingService", () => {
 
     await svc.issueOrderRevenueInvoices("o1");
 
-    expect(calls).toEqual(["commission", "service_fee", "platform_sale"]);
+    expect(calls).toEqual(["package_fees", "platform_sale"]);
     expect(prisma.order.update).not.toHaveBeenCalled();
   });
 

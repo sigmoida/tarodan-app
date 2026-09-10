@@ -85,6 +85,26 @@ export const financeApi = {
   }) => api.get("/admin/seller-invoices", { params }),
   getSellerInvoicePdf: (id: string) =>
     api.get(`/admin/seller-invoices/${id}/pdf`),
+  // Seller settlement report — the basis behind the commission invoice
+  getSettlementReport: (params?: {
+    startDate?: string;
+    endDate?: string;
+    sellerId?: string;
+    page?: number;
+    limit?: number;
+    sortBy?: string;
+    sortOrder?: "asc" | "desc";
+  }) => api.get("/admin/settlement-report", { params }),
+  exportSettlementReport: (params?: {
+    startDate?: string;
+    endDate?: string;
+    sellerId?: string;
+    search?: string;
+  }) =>
+    api.get("/admin/settlement-report/export", {
+      params,
+      responseType: "blob",
+    }),
   getPaymentStatistics: (params?: {
     period?: "daily" | "weekly" | "monthly";
     startDate?: string;

@@ -19,6 +19,7 @@ import { NotificationService } from "../notification/notification.service";
 import { NotificationType } from "../notification/dto";
 import { buildInvoiceXml } from "./ubl/ubl-invoice.builder";
 import {
+  invoiceDiscountFromLines,
   invoiceTotalsFromLines,
   readInvoiceLineItems,
 } from "./invoice/invoice-lines";
@@ -71,7 +72,13 @@ export class ElogoDeliveryService {
     grossAmount: number,
     opts: CutOptions = {},
   ): Promise<void> {
-    const { lineDescription, guestRecipient, categoryId, lineItems } = opts;
+    const {
+      lineDescription,
+      guestRecipient,
+      categoryId,
+      lineItems,
+      sourceReference,
+    } = opts;
     try {
       const providerEnabled = this.elogo.isEnabled();
       if (!providerEnabled) {
@@ -147,8 +154,12 @@ export class ElogoDeliveryService {
                   taxAmount: amounts.tax,
                   total: amounts.total,
                   originalTotal: amounts.total,
+                  discountTotal: hasLines
+                    ? invoiceDiscountFromLines(lineItems!)
+                    : 0,
                   vatRate,
                   status: "pending",
+                  sourceReference: sourceReference?.trim() || null,
                   lineDescription: lineDescription?.trim() || null,
                   lineItems: hasLines
                     ? (lineItems as unknown as Prisma.InputJsonValue)
@@ -378,6 +389,13 @@ export class ElogoDeliveryService {
       : "KAGIT";
     const desc =
       inv.lineDescription || LINE_DESCRIPTION[inv.type] || "Hizmet bedeli";
+    // "Kayıt No" — belgenin hangi alışverişten doğduğunu taşımak zorunda; aynı
+    // kod hakediş dökümünün "Kayıt No" kolonunda da durur. Hem belge notuna hem
+    // kalemin açıklamasına yazılır: eLogo'nun XSLT tasarımı hangisini bastığına
+    // göre değişir, ikisinde de durması belgeyi bozmaz.
+    const orderNote = inv.sourceReference?.trim()
+      ? `Kayıt No: ${inv.sourceReference.trim()}`
+      : null;
 
     let billingRef: { invoiceId: string; issueDate: string } | undefined;
     if (isReturn && inv.billingReference) {
@@ -404,18 +422,29 @@ export class ElogoDeliveryService {
         currency: "TRY",
         // Gönderim şekli yalnız e-Arşiv'de gerekli (e-Fatura'da AdditionalDocumentReference yok).
         sendType: isEInvoice ? undefined : sendType,
-        note: desc,
+        note: orderNote ? `${desc} — ${orderNote}` : desc,
         supplier: this.documents.supplierParty(),
         customer: party,
         lines: snapshotLines.length
           ? snapshotLines.map((l) => ({
               name: l.name,
+              description: orderNote ?? undefined,
               quantity: l.quantity,
               unitPrice: l.unitPrice,
               lineExtension: l.net,
+              discount: l.discount,
               vatRate: l.vatRate,
+              taxAmount: l.taxAmount,
             }))
-          : [{ name: desc, quantity: 1, unitPrice: net, vatRate: rate }],
+          : [
+              {
+                name: desc,
+                description: orderNote ?? undefined,
+                quantity: 1,
+                unitPrice: net,
+                vatRate: rate,
+              },
+            ],
         ...(billingRef ? { billingReference: billingRef } : {}),
       });
 
@@ -514,6 +543,9 @@ export class ElogoDeliveryService {
               netAmount: totals.taxExclusive,
               taxAmount: totals.tax,
               total: totals.payable,
+              // İskonto da belgeden okunur: kayıt, gerçekten basılan XML ile
+              // aynı iskontoyu taşımalı (rapor bu kolonu okur).
+              discountTotal: totals.allowance,
               sendType,
               status: "sent",
               elogoRefId: res.refId != null ? String(res.refId) : null,
@@ -559,6 +591,7 @@ export class ElogoDeliveryService {
             netAmount: totals.taxExclusive,
             taxAmount: totals.tax,
             total: totals.payable,
+            discountTotal: totals.allowance,
             status: "failed",
             ...(configurationFailure
               ? { attemptCount: ELOGO_MAX_SEND_ATTEMPTS }

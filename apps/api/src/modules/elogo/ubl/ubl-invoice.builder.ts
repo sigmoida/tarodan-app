@@ -32,11 +32,25 @@ export interface UblParty {
 
 export interface UblInvoiceLine {
   name: string;
+  /**
+   * Kalemin AÇIKLAMASI (`cac:Item/cbc:Description`) — hizmet faturalarında
+   * "Sipariş No: PKG-…". Belgenin hangi koliden doğduğu kalemin üstünde
+   * durmalı; belge notu tek başına yeterli değil, çoğu XSLT tasarımı satırın
+   * açıklamasını basar.
+   */
+  description?: string;
   quantity: number;
   /** Birim kodu (UBL). Adet=C62, ay=MON. Varsayılan C62. */
   unitCode?: string;
   /** Birim fiyat (KDV hariç). */
   unitPrice: number;
+  /**
+   * Satıra uygulanan İSKONTO (KDV hariç). Verildiğinde satırda
+   * `cac:AllowanceCharge` (ChargeIndicator=false) basılır ve belge toplamına
+   * `cbc:AllowanceTotalAmount` eklenir. `lineExtension` (matrah) indirim
+   * SONRASI tutardır — UBL-TR kuralı budur; `unitPrice` ise brüt birim fiyat.
+   */
+  discount?: number;
   /**
    * Satırın KDV hariç toplamı. Verilmezse `quantity × unitPrice` hesaplanır.
    *
@@ -47,6 +61,14 @@ export interface UblInvoiceLine {
   lineExtension?: number;
   /** KDV oranı (%). Örn. 20. */
   vatRate: number;
+  /**
+   * Satırın KDV'si, AÇIKÇA verildiğinde. Verilmezse `lineExtension × vatRate`.
+   *
+   * Paket hizmet belgeleri tek satırdır ama KDV'leri sipariş bazında yuvarlanıp
+   * toplanır (checkout tahsil ederken böyle yuvarlar). Birleşik matrahtan yeniden
+   * hesaplamak beyanı tahsilattan bir kuruş ayırabilirdi.
+   */
+  taxAmount?: number;
 }
 
 export interface UblInvoiceInput {
@@ -83,6 +105,8 @@ export interface UblInvoiceResult {
     tax: number;
     taxInclusive: number;
     payable: number;
+    /** Belgede gösterilen toplam iskonto (matraha DAHİL DEĞİL, ondan düşülmüştür). */
+    allowance: number;
   };
 }
 
@@ -189,13 +213,18 @@ export function buildInvoiceXml(input: UblInvoiceInput): UblInvoiceResult {
   // için ayrı TaxSubtotal bekler.
   let lineExtensionSum = 0;
   let taxSum = 0;
+  let allowanceSum = 0;
   const byRate = new Map<number, { base: number; tax: number }>();
   const lineXmls: string[] = [];
   input.lines.forEach((line, i) => {
     const lineExt = round2(
       line.lineExtension ?? line.quantity * line.unitPrice,
     );
-    const lineTax = round2((lineExt * line.vatRate) / 100);
+    const lineTax = round2(
+      typeof line.taxAmount === "number" && Number.isFinite(line.taxAmount)
+        ? line.taxAmount
+        : (lineExt * line.vatRate) / 100,
+    );
     lineExtensionSum = round2(lineExtensionSum + lineExt);
     taxSum = round2(taxSum + lineTax);
     const group = byRate.get(line.vatRate) ?? { base: 0, tax: 0 };
@@ -203,6 +232,25 @@ export function buildInvoiceXml(input: UblInvoiceInput): UblInvoiceResult {
       base: round2(group.base + lineExt),
       tax: round2(group.tax + lineTax),
     });
+    // İskonto: brüt bedel (matrah + indirim) satırın BaseAmount'ı, indirim
+    // Amount. Matrah zaten indirim düşülmüş tutardır, dolayısıyla KDV değişmez.
+    const allowance = round2(
+      Number.isFinite(line.discount as number) && (line.discount as number) > 0
+        ? (line.discount as number)
+        : 0,
+    );
+    allowanceSum = round2(allowanceSum + allowance);
+    const allowanceXml = allowance
+      ? `<cac:AllowanceCharge>${el("cbc:ChargeIndicator", "false")}${el(
+          "cbc:Amount",
+          money(allowance),
+          `currencyID="${currency}"`,
+        )}${el(
+          "cbc:BaseAmount",
+          money(lineExt + allowance),
+          `currencyID="${currency}"`,
+        )}</cac:AllowanceCharge>`
+      : "";
     lineXmls.push(
       `<cac:InvoiceLine>` +
         el("cbc:ID", i + 1) +
@@ -216,13 +264,19 @@ export function buildInvoiceXml(input: UblInvoiceInput): UblInvoiceResult {
           money(lineExt),
           `currencyID="${currency}"`,
         ) +
+        allowanceXml +
         `<cac:TaxTotal>${el("cbc:TaxAmount", money(lineTax), `currencyID="${currency}"`)}${buildTaxSubtotal(lineExt, line.vatRate, lineTax, currency)}</cac:TaxTotal>` +
-        `<cac:Item>${el("cbc:Name", line.name)}</cac:Item>` +
+        // UBL 2.1 ItemType sırası: Description, Name'den ÖNCE gelir. Ters yazmak
+        // şema doğrulamasında belgeyi reddettirir.
+        `<cac:Item>${line.description ? el("cbc:Description", line.description) : ""}${el("cbc:Name", line.name)}</cac:Item>` +
         `<cac:Price>${el("cbc:PriceAmount", unitMoney(line.unitPrice), `currencyID="${currency}"`)}</cac:Price>` +
         `</cac:InvoiceLine>`,
     );
   });
 
+  // UBL-TR: LineExtensionAmount satır matrahlarının toplamıdır (indirim düşülmüş);
+  // AllowanceTotalAmount belgede gösterilen toplam iskontodur ve
+  // TaxExclusiveAmount'ı DEĞİŞTİRMEZ — indirim zaten matrahın içinden düşülmüştür.
   const taxExclusive = lineExtensionSum;
   const taxInclusive = round2(taxExclusive + taxSum);
   const payable = taxInclusive;
@@ -295,6 +349,13 @@ export function buildInvoiceXml(input: UblInvoiceInput): UblInvoiceResult {
       money(taxInclusive),
       `currencyID="${currency}"`,
     ) +
+    (allowanceSum > 0
+      ? el(
+          "cbc:AllowanceTotalAmount",
+          money(allowanceSum),
+          `currencyID="${currency}"`,
+        )
+      : "") +
     el("cbc:PayableAmount", money(payable), `currencyID="${currency}"`) +
     `</cac:LegalMonetaryTotal>` +
     lineXmls.join("") +
@@ -308,6 +369,7 @@ export function buildInvoiceXml(input: UblInvoiceInput): UblInvoiceResult {
       tax: taxSum,
       taxInclusive,
       payable,
+      allowance: allowanceSum,
     },
   };
 }
