@@ -163,7 +163,11 @@ export const getPermissionGroups = (t: T): PermGroup[] => [
         key: "users",
         label: t("admin.roles.permissions.users.label"),
         description: t("admin.roles.permissions.users.description"),
-        pages: ["/accounts/users", "/accounts/users/:id"],
+        pages: [
+          "/accounts/users",
+          "/accounts/users/:id",
+          "/accounts/deleted-identities",
+        ],
       },
       {
         key: "seller_applications",

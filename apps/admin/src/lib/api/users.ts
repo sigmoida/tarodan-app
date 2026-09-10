@@ -28,6 +28,20 @@ export const usersApi = {
     api.post<BulkUserResult>("/admin/users/bulk/resend-verification", { ids }),
   bulkVerifyUserEmail: (ids: string[]) =>
     api.post<BulkUserResult>("/admin/users/bulk/verify-email", { ids }),
+  // Silinen hesapların kimlik arşivi (yasal saklama + aylık bildirim).
+  // Yol `users/` altında DEĞİL: izin `/admin/` sonrası ilk segmentten çözülüyor
+  // ve `users/:id` bu yolu yutardı — kardeş literal segment kullanılır.
+  getDeletedIdentities: (params?: any) =>
+    api.get("/admin/deleted-identities", { params }),
+  getDeletedIdentitiesExport: (params: {
+    year: number;
+    month: number;
+    wasSeller?: boolean;
+  }) =>
+    api.get("/admin/deleted-identities/export", {
+      params,
+      responseType: "blob",
+    }),
   // Silme: yalnız hiç giriş yapmamış hesap (sunucu 400 ile korur).
   deleteUser: (id: string) => api.delete(`/admin/users/${id}`),
   bulkDeleteUsers: (ids: string[]) =>

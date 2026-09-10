@@ -2,6 +2,7 @@ import { Module } from "@nestjs/common";
 import { BullModule } from "@nestjs/bull";
 import { AdminCommissionController } from "./finance/admin-commission.controller";
 import { AdminUserController } from "./users/admin-user.controller";
+import { AdminDeletedIdentityController } from "./users/admin-deleted-identity.controller";
 import { AdminProductController } from "./catalog/admin-product.controller";
 import { AdminOrderController } from "./orders/admin-order.controller";
 import { AdminAnalyticsController } from "./analytics/admin-analytics.controller";
@@ -39,6 +40,7 @@ import { SiteAccessModule } from "../site-access/site-access.module";
 import { AdminUserService } from "./users/admin-user.service";
 import { UserModule } from "../user/user.module";
 import { AdminUserAccountService } from "./users/admin-user-account.service";
+import { AdminDeletedIdentityService } from "./users/admin-deleted-identity.service";
 import { AdminStaffService } from "./users/admin-staff.service";
 import { AdminProductService } from "./catalog/admin-product.service";
 import { AdminProductBulkImportService } from "./catalog/admin-product-bulk-import.service";
@@ -158,6 +160,7 @@ import { scheduledProcessors } from "../../workers/scheduled-processors";
     AdminMediaController,
     AdminCommissionController,
     AdminUserController,
+    AdminDeletedIdentityController,
     AdminProductController,
     AdminOrderController,
     AdminAnalyticsController,
@@ -195,6 +198,7 @@ import { scheduledProcessors } from "../../workers/scheduled-processors";
     AdminSiteAccessService,
     AdminUserService,
     AdminUserAccountService,
+    AdminDeletedIdentityService,
     AdminStaffService,
     AdminProductService,
     AdminProductBulkImportService,

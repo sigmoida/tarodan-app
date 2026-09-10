@@ -104,12 +104,89 @@ model User {
   oauthAccounts           OAuthAccount[]
   reports                 Report[]                 @relation("ReporterReports")
   productBoosts           ProductBoost[]
+  deletedIdentity         DeletedUserIdentity?
 
   @@index([email])
   @@index([adminCode])
   @@index([username])
   @@index([isSeller])
   @@map("users")
+}
+
+/// Silinen hesabın kimlik anlık görüntüsü — hesap silme PII'yi geri dönülemez
+/// şekilde anonimleştirdiği için (e-posta `deleted_...@deleted.local`, telefon /
+/// taxId null, ad "Silinmiş Kullanıcı"), aylık resmî bildirim yükümlülüğü
+/// karşılanamıyordu. Snapshot silme transaction'ının İLK adımında, hiçbir alan
+/// üzerine yazılmadan alınır. Satır DB tetikleyicisiyle silinemez.
+model DeletedUserIdentity {
+  id                String          @id @default(uuid())
+  /// Anonimleştirilmiş User satırıyla tek-tek bağ. Restrict: arşiv, kullanıcı
+  /// kaydının yanlışlıkla fiziksel silinmesini de engeller (CLAUDE.md §13).
+  userId            String          @unique @map("user_id")
+  /// Silme anındaki gerçek kimlik. Backfill satırlarında kaynak bulunamayan
+  /// alanlar boş kalır — tahmin edilmez.
+  email             String?
+  username          String
+  displayName       String?         @map("display_name")
+  phone             String?
+  birthDate         DateTime?       @map("birth_date")
+  /// TCKN: bireysel satıcıda banka hesabından, kurumsalda ortak kaydından gelir.
+  nationalId        String?         @map("national_id")
+  /// VKN: kurumsal satıcının User.taxId değeri (anonimleştirmede null'lanıyor).
+  taxId             String?         @map("tax_id")
+  taxOffice         String?         @map("tax_office")
+  companyName       String?         @map("company_name")
+  companyType       String?         @map("company_type")
+  sellerType        SellerType?     @map("seller_type")
+  businessStatus    BusinessStatus? @map("business_status")
+  addressCity       String?         @map("address_city")
+  addressDistrict   String?         @map("address_district")
+  addressLine       String?         @map("address_line")
+  iban              String?
+  bankAccountHolder String?         @map("bank_account_holder")
+  /// Silme anında satıcı mıydı: silme `isSeller`'ı false'a çekiyor, bildirimde
+  /// satıcı ayrımı bu alandan yapılır.
+  wasSeller         Boolean         @default(false) @map("was_seller")
+  adminCode         String?         @map("admin_code")
+  registeredAt      DateTime        @map("registered_at")
+  deletedAt         DateTime        @map("deleted_at")
+  deletedByActor    DeletionActor   @default(self) @map("deleted_by_actor")
+  /// İşlemi yapan yöneticinin USER id'si (AdminUser.id DEĞİL — AdminAuditService
+  /// ile aynı sözleşme). Backfill satırlarında bilinemez.
+  deletedByAdminUserId String?      @map("deleted_by_admin_user_id")
+  source            IdentitySnapshotSource @default(live)
+  /// Kolon başına kaynak: {"nationalId":"seller_bank_account","email":null,...}.
+  /// Denetimde "bu TCKN nereden geldi / bu alan neden boş" sorusunun tek cevabı.
+  sourceDetail      Json?           @map("source_detail")
+  /// Kullanılan kayıtların id'leri: {"corporateApplicationId":"...","orderId":"..."}.
+  sourceRefs        Json?           @map("source_refs")
+  /// Yasal saklama bitişi (silme + 10 yıl, TTK m.82). Otomatik imha YOK; bu
+  /// tarih yalnızca politikayı belgeler ve panelde süresi dolanlar filtrelenir.
+  retainUntil       DateTime        @map("retain_until")
+  createdAt         DateTime        @default(now()) @map("created_at")
+  user              User            @relation(fields: [userId], references: [id], onDelete: Restrict)
+
+  @@index([deletedAt])
+  @@index([retainUntil])
+  @@index([nationalId])
+  @@index([taxId])
+  @@map("deleted_user_identities")
+}
+
+/// Hesabı kimin sildiği. `unknown` yalnız backfill içindir: denetim kaydı
+/// yoksa "yönetici silmedi" ile "kullanıcı sildi" ayırt edilemez ve yasal bir
+/// kayda tahmin yazılmaz.
+enum DeletionActor {
+  self
+  admin
+  unknown
+}
+
+/// Arşiv satırının kaynağı: silme anında canlı veriden mi alındı, yoksa
+/// geçmişe dönük backfill ile kalıntı kayıtlardan mı toparlandı.
+enum IdentitySnapshotSource {
+  live
+  backfill
 }
 
 /// Kurumsal hesap, ön başvuru onaylanmadan User oluşturmaz. Başvuru onaylanınca

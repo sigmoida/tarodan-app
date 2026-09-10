@@ -194,7 +194,11 @@ describe("AdminUserAccountService", () => {
       await expect(
         service.deleteNeverLoggedIn("admin-1", "u1"),
       ).resolves.toEqual({ success: true, userId: "u1" });
-      expect(userService.deleteAccount).toHaveBeenCalledWith("u1");
+      // Kimlik arşivine silmeyi kimin başlattığı damgalanır.
+      expect(userService.deleteAccount).toHaveBeenCalledWith("u1", {
+        actor: "admin",
+        adminUserId: "admin-1",
+      });
       expect(audit.createRequiredAuditLog).toHaveBeenCalledWith(
         "admin-1",
         "user_delete_never_logged_in",
