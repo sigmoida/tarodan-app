@@ -69,7 +69,7 @@
     "zustand": "4.5.7"
   },
   "devDependencies": {
-    "@playwright/test": "^1.62.1",
+    "@playwright/test": "^1.63.0",
     "vitest": "^3.2.7",
     "@tarodan/brand": "workspace:*",
     "@tarodan/eslint-config": "workspace:*",
@@ -78,7 +78,7 @@
     "@types/node": "^20.19.43",
     "@types/react": "^18.2.42",
     "@types/react-dom": "^18.2.17",
-    "autoprefixer": "^10.5.2",
+    "autoprefixer": "^10.5.6",
     "eslint": "^8.55.0",
     "eslint-config-next": "15.5.21",
     "postcss": "^8.5.28",
