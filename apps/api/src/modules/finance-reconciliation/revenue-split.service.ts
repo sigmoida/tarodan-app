@@ -177,12 +177,17 @@ export class RevenueSplitService {
       // MEM- siparişi hem Payment hem MembershipPayment üretir; yalnız yenilemeler
       // (order_id NULL) Payment tablosunun dışındadır.
       this.prisma.membershipPayment.aggregate({
-        where: { status: { in: paidStatuses }, orderId: null },
+        where: {
+          // Yenilemede sipariş yok → şerit damgası da yok; sahibin bayrağından okunur.
+          membership: { user: { isTestAccount: false } },
+          status: { in: paidStatuses },
+          orderId: null,
+        },
         _sum: { amount: true },
         _count: { id: true },
       }),
       this.prisma.tradeCashPayment.aggregate({
-        where: { payment: { status: { in: paidStatuses } } },
+        where: { payment: { isTest: false, status: { in: paidStatuses } } },
         _sum: {
           amount: true,
           tradeFeeAmount: true,
@@ -203,6 +208,7 @@ export class RevenueSplitService {
         _count: { id: true },
       }),
       this.prisma.commissionLedger.aggregate({
+        where: { order: { isTest: false } },
         _sum: { sellerCommission: true, buyerFee: true },
       }),
     ]);
