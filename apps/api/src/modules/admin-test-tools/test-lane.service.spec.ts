@@ -18,7 +18,7 @@ describe("TestLaneService", () => {
       }),
     });
     const tx: Record<string, any> = {
-      ledgerEntry: del("ledgerEntry"),
+      ledgerEntry: { count: jest.fn(async () => 4) },
       refundAttempt: del("refundAttempt"),
       refundFinancialComponent: del("refundFinancialComponent"),
       refundRequest: del("refundRequest"),
@@ -39,6 +39,10 @@ describe("TestLaneService", () => {
       offer: del("offer"),
       cartItem: del("cartItem"),
       product: { updateMany: jest.fn(async () => ({ count: 1 })) },
+      $executeRawUnsafe: jest.fn(async (sql: string) => {
+        calls.push(`raw:${sql}`);
+        return 0;
+      }),
       user: {
         create: jest.fn(async ({ data }: any) => ({
           id: "u-new",
@@ -115,8 +119,11 @@ describe("TestLaneService", () => {
       const result = await service.resetLane();
 
       expect(calls).toEqual([
-        "ledgerEntry",
+        // Tahliye kapısı transaction'ın ilk ifadesi: SET LOCAL commit/rollback'te düşer.
+        "raw:SET LOCAL app.test_lane_purge = 'on'",
         "refundAttempt",
+        // Kargo mahsubu iade kayıtlarından ÖNCE: refundRequestId zorunlu + Restrict.
+        "packageShippingSettlement",
         "refundFinancialComponent",
         "refundRequest",
         "payoutTransfer",
@@ -129,15 +136,24 @@ describe("TestLaneService", () => {
         "paymentProviderEvent",
         "payment",
         "order",
-        "packageShippingSettlement",
         "orderPackage",
         "checkoutGroup",
         "trade",
         "offer",
         "cartItem",
       ]);
-      expect(tx.ledgerEntry.deleteMany).toHaveBeenCalledWith({
+      // Defter append-only: silinmez, sayılır.
+      expect(tx.ledgerEntry.count).toHaveBeenCalledWith({
         where: { isTest: true },
+      });
+      // packageId=null mahsuplar (pakete bağlanmayan iade kargosu) da kapsanır.
+      expect(tx.packageShippingSettlement.deleteMany).toHaveBeenCalledWith({
+        where: {
+          OR: [
+            { packageId: { in: ["k1"] } },
+            { refundRequest: { order: { isTest: true } } },
+          ],
+        },
       });
       expect(tx.payment.deleteMany).toHaveBeenCalledWith({
         where: { isTest: true },
@@ -164,6 +180,7 @@ describe("TestLaneService", () => {
         accounts: 2,
         deleted: expect.objectContaining({ orders: 3, payments: 2, trades: 1 }),
         listingsReactivated: 1,
+        retainedLedgerEntries: 4,
       });
     });
 

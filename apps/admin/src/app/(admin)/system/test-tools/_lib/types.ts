@@ -31,6 +31,8 @@ export interface TestLaneResetResult {
   accounts: number;
   deleted: Record<string, number>;
   listingsReactivated: number;
+  /** Append-only defterde bırakılan test satırı sayısı (silinmez, raporlanmaz). */
+  retainedLedgerEntries: number;
 }
 
 export type AdjustAction = "expire_now" | "set_minutes" | "backdate_days";

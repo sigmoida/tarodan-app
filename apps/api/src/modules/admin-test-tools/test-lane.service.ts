@@ -26,6 +26,8 @@ export interface TestLaneResetResult {
   accounts: number;
   deleted: Record<string, number>;
   listingsReactivated: number;
+  /** Append-only defterde bırakılan test satırı sayısı (silinmez, raporlanmaz). */
+  retainedLedgerEntries: number;
 }
 
 /** Test hesabına açılan varsayılan teslimat adresi; tester adres girmeden checkout'a ulaşır. */
@@ -146,8 +148,9 @@ export class TestLaneService {
 
   /**
    * Test şeridinin işlem geçmişini temizler. Sıra FK zincirini izler:
-   * ledger → iade → hold/payout → kargo → fatura/komisyon → ödeme → sipariş →
-   * paket → sepet grubu → takas → teklif → sepet. Hesaplar ve ilanlar kalır.
+   * kargo mahsubu → iade → hold/payout → kargo → fatura/komisyon →
+   * ödeme → sipariş → paket → sepet grubu → takas → teklif → sepet.
+   * Hesaplar ve ilanlar kalır.
    */
   async resetLane(): Promise<TestLaneResetResult> {
     const accounts = await this.prisma.user.findMany({
@@ -180,12 +183,19 @@ export class TestLaneService {
       deleted[key] = r.count;
     };
 
+    let retainedLedgerEntries = 0;
     const listingsReactivated = await this.prisma.$transaction(
       async (tx) => {
-        count(
-          "ledgerEntries",
-          await tx.ledgerEntry.deleteMany({ where: { isTest: true } }),
-        );
+        // Defter (ledger_entries) append-only: DELETE trigger'la yasak ve satırlar
+        // FK taşımıyor ("kaynak silinse de iz kalır"). Test satırları is_test
+        // damgalı ve finans raporlarından süzülüyor → yerinde bırakılır, sayılır.
+        retainedLedgerEntries = await tx.ledgerEntry.count({
+          where: { isTest: true },
+        });
+        // İade kalemleri/kargo mahsupları için dar tahliye kapısı: yalnız BU
+        // transaction boyunca ve yalnız siparişi is_test olan satırlar silinebilir
+        // (bkz. 20260916130000_test_lane_purge_gate).
+        await tx.$executeRawUnsafe(`SET LOCAL app.test_lane_purge = 'on'`);
         count(
           "refundAttempts",
           await tx.refundAttempt.deleteMany({
@@ -194,6 +204,20 @@ export class TestLaneService {
                 { payment: testPayment },
                 { order: testOrder },
                 { trade: testTrade },
+              ],
+            },
+          }),
+        );
+        // PackageShippingSettlement.refundRequestId ZORUNLU ve onDelete: Restrict —
+        // iade kayıtlarından ÖNCE silinmeli. packageId null olabildiği için (iade
+        // kargosu pakete bağlanmadan mahsup edilir) refundRequest üzerinden de süzülür.
+        count(
+          "packageShippingSettlements",
+          await tx.packageShippingSettlement.deleteMany({
+            where: {
+              OR: [
+                { packageId: { in: packageIds } },
+                { refundRequest: { order: testOrder } },
               ],
             },
           }),
@@ -254,12 +278,6 @@ export class TestLaneService {
         count("payments", await tx.payment.deleteMany({ where: testPayment }));
         count("orders", await tx.order.deleteMany({ where: testOrder }));
         count(
-          "packageShippingSettlements",
-          await tx.packageShippingSettlement.deleteMany({
-            where: { packageId: { in: packageIds } },
-          }),
-        );
-        count(
           "orderPackages",
           await tx.orderPackage.deleteMany({ where: { sellerId: inUsers } }),
         );
@@ -306,8 +324,13 @@ export class TestLaneService {
     );
 
     this.logger.warn(
-      `Test lane reset: ${userIds.length} accounts, deleted=${JSON.stringify(deleted)}, listingsReactivated=${listingsReactivated}`,
+      `Test lane reset: ${userIds.length} accounts, deleted=${JSON.stringify(deleted)}, listingsReactivated=${listingsReactivated}, retainedLedgerEntries=${retainedLedgerEntries}`,
     );
-    return { accounts: userIds.length, deleted, listingsReactivated };
+    return {
+      accounts: userIds.length,
+      deleted,
+      listingsReactivated,
+      retainedLedgerEntries,
+    };
   }
 }
