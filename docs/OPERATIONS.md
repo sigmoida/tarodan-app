@@ -44,7 +44,20 @@ satırları DB trigger'ıyla `is_test` damgası alır; uygulama kodu bayrağı u
   vitrinde görünürlük.
 - **Sıfırlama:** aynı karttaki "Şeridi sıfırla" test hesaplarının işlem
   kayıtlarını siler; hesaplar ve ilanlar kalır. Canlı satırlar sorguya giremez
-  (filtre `is_test`/test hesap kimlikleri üzerinden).
+  (filtre `is_test`/test hesap kimlikleri üzerinden). İki istisna:
+  - **Defter (`ledger_entries`) silinmez.** Tablo append-only (DELETE trigger'la
+    yasak) ve FK taşımaz — "kaynak satır silinse de iz kalır" tasarımı gereği.
+    Test satırları `is_test` damgalı olduğundan finans raporlarına girmez;
+    sıfırlama sonucu bunları `retainedLedgerEntries` olarak bildirir.
+  - **İade kalemleri için dar bir tahliye kapısı vardır.**
+    `refund_financial_components` ve `package_shipping_settlements` de
+    append-only; ama `refund_requests`'e ZORUNLU + `Restrict` ile bağlı oldukları
+    için silinmeden sipariş zinciri çözülemiyor. Guard yerinde kalır ve DELETE
+    yalnız iki koşul birden sağlanınca geçer: oturum `SET LOCAL
+app.test_lane_purge = 'on'` demiş olacak (yalnız `resetLane` transaction'ı
+    verir, commit/rollback'te düşer) **ve** satırın iade talebinin siparişi
+    `is_test=true` olacak. Canlı satırda ikinci koşul asla sağlanmaz; UPDATE her
+    koşulda yasaktır (`20260916130000_test_lane_purge_gate`).
 - **Guard:** prod'da test-modu PayTR callback'i yalnız `Payment.isTest=true`
   ödemeler için kabul edilir; canlı ödemeye gelen `test_mode=1` başarı bildirimi
   ve test ödemesine gelen `test_mode=0` başarı bildirimi reddedilir
