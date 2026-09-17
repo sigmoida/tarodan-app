@@ -3,6 +3,8 @@
 import { useCallback } from "react";
 import { useRouter, usePathname, useSearchParams } from "next/navigation";
 
+const NO_PARAMS: readonly string[] = [];
+
 export interface TabParamOptions {
   /** URL parameter holding the tab. Default: `tab`. */
   param?: string;
@@ -22,7 +24,7 @@ export interface TabParamOptions {
  */
 export function useTabParam(
   defaultTab: string,
-  { param = "tab", clearOnChange = [] }: TabParamOptions = {},
+  { param = "tab", clearOnChange = NO_PARAMS }: TabParamOptions = {},
 ): [string, (key: string) => void] {
   const router = useRouter();
   const pathname = usePathname();

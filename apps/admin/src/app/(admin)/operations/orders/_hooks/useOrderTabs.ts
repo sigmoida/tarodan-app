@@ -10,6 +10,8 @@ import {
 import { useTabParam } from "@/hooks/useTabParam";
 
 const TAB_OPTIONS = { clearOnChange: ["bucket"] } as const;
+// Module-level so `setBucket` keeps its identity across renders.
+const BUCKET_OPTIONS = { param: "bucket" } as const;
 
 /**
  * Sekme (`?tab=`) + alt sekme (`?bucket=`) durumu. URL tek kaynaktır: sekme
@@ -24,9 +26,10 @@ export function useOrderTabs(): {
 } {
   const [rawTab, setTab] = useTabParam("all", TAB_OPTIONS);
   const tab = resolveAdminOrderTab(rawTab);
-  const [rawBucket, setBucket] = useTabParam(ADMIN_ORDER_TAB_BUCKETS[tab][0], {
-    param: "bucket",
-  });
+  const [rawBucket, setBucket] = useTabParam(
+    ADMIN_ORDER_TAB_BUCKETS[tab][0],
+    BUCKET_OPTIONS,
+  );
   const bucket = resolveAdminOrderBucket(tab, rawBucket);
   return { tab, bucket, setTab, setBucket };
 }
