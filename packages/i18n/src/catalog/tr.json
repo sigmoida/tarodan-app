@@ -6794,6 +6794,7 @@
           "commissionRuleUnnamed": "Adsız kural"
         },
         "buckets": {
+          "all": "Tümü",
           "new": "Yeni",
           "pending": "Bekleyen",
           "expired": "Süresi Dolan",

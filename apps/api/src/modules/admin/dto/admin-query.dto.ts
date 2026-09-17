@@ -233,7 +233,7 @@ export class AdminOrderQueryDto extends AdminOrderCountsQueryDto {
   @ApiPropertyOptional({
     enum: ADMIN_ORDER_BUCKETS,
     description:
-      "Alt sekme; sekmede olmayan kova sekmenin ilk kovasına düşer, verilmezse sekmenin tümü",
+      "Alt sekme; `all` ya da verilmezse sekmenin tümü, sekmede olmayan kova da tümüne düşer",
   })
   @IsOptional()
   @IsIn(ADMIN_ORDER_BUCKETS)

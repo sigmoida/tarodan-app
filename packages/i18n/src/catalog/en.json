@@ -6794,6 +6794,7 @@
           "commissionRuleUnnamed": "Unnamed rule"
         },
         "buckets": {
+          "all": "All",
           "new": "New",
           "pending": "Pending",
           "expired": "Expired",

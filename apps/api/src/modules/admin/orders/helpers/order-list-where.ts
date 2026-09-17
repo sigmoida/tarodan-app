@@ -5,6 +5,7 @@ import {
   type Prisma,
 } from "@prisma/client";
 import {
+  adminOrderBucketFilter,
   resolveAdminOrderBucket,
   resolveAdminOrderTab,
   type AdminOrderBucket,
@@ -163,6 +164,7 @@ export function offerFilterWhere(
  *   kaynak ürün türüyle sınırlıdır: üyelik ve öne çıkarma siparişleri de grupsuz
  *   oluşur ama operasyon satırı değildir.
  * - offer: teklifin kendisi (sipariş olmuşsa siparişiyle birlikte).
+ * "Tümü" (ya da kova yok) kova koşulu eklemez: sekmenin kapsamı + filtreler.
  * Liste ve sayaçlar bu fonksiyonu paylaşır.
  */
 export function orderListSourceWheres(
@@ -175,13 +177,14 @@ export function orderListSourceWheres(
   loose?: Prisma.OrderWhereInput;
   offer?: Prisma.OfferWhereInput;
 } {
+  const filterBucket = adminOrderBucketFilter(bucket);
   if (tab === "offer") {
     const parts: Prisma.OfferWhereInput[] = [offerFilterWhere(filters)];
-    if (bucket) parts.push(offerBucketWhere(bucket, now));
+    if (filterBucket) parts.push(offerBucketWhere(filterBucket, now));
     return { offer: { AND: parts } };
   }
 
-  const cartBucket = bucket as CartBucket | undefined;
+  const cartBucket = filterBucket as CartBucket | undefined;
   const lineFilter = orderLineFilterWhere(filters);
   const hasFilter = Object.keys(lineFilter).length > 0;
 
@@ -220,19 +223,16 @@ export interface OrderListQuery extends OrderListFilters {
 /**
  * İstekten sekme, kova ve filtreleri çözer. Eski parametreler yeni karşılığına
  * çevrilir (`origin` → sekme, `fromDate`/`toDate` → `startDate`/`endDate`).
- * Sekmede olmayan kova sekmenin ilk kovasına düşer; kova hiç verilmemişse
- * sekmenin tüm satırları döner (kullanıcı/ürün deep-link'i).
+ * Kova hiç verilmemişse ya da sekmede yoksa "Tümü"ne düşer: sekmenin bütün
+ * satırları (kullanıcı/ürün deep-link'i, eski istemci).
  */
 export function orderListScopeOf(query: OrderListQuery): {
   tab: AdminOrderTab;
-  bucket: AdminOrderBucket | undefined;
+  bucket: AdminOrderBucket;
   filters: OrderListFilters;
 } {
   const tab = resolveAdminOrderTab(query.tab ?? originTab(query.origin));
-  const bucket =
-    query.bucket === undefined || query.bucket === ""
-      ? undefined
-      : resolveAdminOrderBucket(tab, query.bucket);
+  const bucket = resolveAdminOrderBucket(tab, query.bucket);
   const filters: OrderListFilters = {
     search: query.search,
     party: query.party,

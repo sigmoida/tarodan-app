@@ -2,6 +2,7 @@ import { Injectable, Optional } from "@nestjs/common";
 import type { Prisma } from "@prisma/client";
 import {
   ADMIN_ORDER_TABS,
+  ADMIN_ORDER_ALL_BUCKET,
   ADMIN_ORDER_TAB_BUCKETS,
   type AdminOrderBucket,
   type AdminOrderCounts,
@@ -97,7 +98,7 @@ export class AdminOrderService {
   /**
    * Her sekmenin her kovasının sayacı — tek istek, tek `$transaction`. Aynı
    * `where`'li sorgu (ör. tüm/doğrudan sekmelerinin grup kaynağı) bir kez
-   * koşar. Kovalar bir sekmeyi tam bölüştüğü için toplam = kova toplamı.
+   * koşar. Sekme toplamı "Tümü" kovasının sayacıdır — listeyle aynı `where`.
    */
   async getOrderCounts(
     query: AdminOrderCountsQueryDto,
@@ -162,7 +163,7 @@ export class AdminOrderService {
     for (const { tab, bucket, keys: parts } of plan) {
       const n = parts.reduce((sum, key) => sum + (countOf.get(key) ?? 0), 0);
       counts[tab].buckets[bucket] = n;
-      counts[tab].total += n;
+      if (bucket === ADMIN_ORDER_ALL_BUCKET) counts[tab].total = n;
     }
     return counts;
   }

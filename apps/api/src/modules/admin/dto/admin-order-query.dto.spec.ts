@@ -32,6 +32,14 @@ describe("AdminOrderQueryDto", () => {
     ).resolves.toEqual([]);
   });
 
+  it("accepts the all (Tümü) bucket on every tab", async () => {
+    for (const tab of ["all", "direct_sale", "offer"]) {
+      await expect(
+        errorsOf(AdminOrderQueryDto, { tab, bucket: "all" }),
+      ).resolves.toEqual([]);
+    }
+  });
+
   it("rejects an unknown tab or bucket", async () => {
     await expect(
       errorsOf(AdminOrderQueryDto, { tab: "trades", bucket: "lost" }),

@@ -4,7 +4,7 @@ import {
   OFFER_PENDING_RULE,
   ORDER_LINE_STAGES,
   ORDER_LINE_STAGE_RULES,
-  type AdminOrderBucket,
+  type AdminOrderFilterBucket,
   type OrderLineStage,
 } from "@tarodan/types";
 
@@ -97,7 +97,7 @@ const OFFER_BUCKET_PRECEDENCE = [
   "delivered",
   "pending",
   "expired",
-] as const satisfies readonly AdminOrderBucket[];
+] as const satisfies readonly AdminOrderFilterBucket[];
 
 type OfferRawBucket = (typeof OFFER_BUCKET_PRECEDENCE)[number];
 
@@ -150,7 +150,7 @@ function offerRawWhere(
  * Her kova kendinden önceki kovaları dışlar → her teklif tek kovada.
  */
 export function offerBucketWhere(
-  bucket: AdminOrderBucket,
+  bucket: AdminOrderFilterBucket,
   now: Date,
 ): Prisma.OfferWhereInput {
   if (bucket === "other") {

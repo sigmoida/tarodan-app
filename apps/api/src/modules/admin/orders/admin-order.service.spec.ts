@@ -376,9 +376,9 @@ describe("AdminOrderService.getOrderCounts", () => {
 
     expect(prisma.$transaction).toHaveBeenCalledTimes(1);
     // group source is identical for "all" and "direct_sale" → counted once
-    expect(prisma.checkoutGroup.count).toHaveBeenCalledTimes(5);
-    expect(prisma.order.count).toHaveBeenCalledTimes(10);
-    expect(prisma.offer.count).toHaveBeenCalledTimes(7);
+    expect(prisma.checkoutGroup.count).toHaveBeenCalledTimes(6);
+    expect(prisma.order.count).toHaveBeenCalledTimes(12);
+    expect(prisma.offer.count).toHaveBeenCalledTimes(8);
     // the same where-builder as the list, filters included
     expect(prisma.offer.count).toHaveBeenCalledWith({
       where: orderListSourceWheres("offer", "new", { party: "ali" }, T1).offer,
@@ -386,15 +386,37 @@ describe("AdminOrderService.getOrderCounts", () => {
     expect(prisma.checkoutGroup.count).toHaveBeenCalledWith({
       where: orderListSourceWheres("all", "other", { party: "ali" }, T1).group,
     });
-
-    expect(counts.all).toEqual({
-      total: 15,
-      buckets: { new: 3, shipped: 3, in_transit: 3, delivered: 3, other: 3 },
+    // "Tümü" counts the tab with the list's own unbucketed where
+    expect(prisma.offer.count).toHaveBeenCalledWith({
+      where: orderListSourceWheres("offer", undefined, { party: "ali" }, T1)
+        .offer,
     });
-    expect(counts.direct_sale.total).toBe(15);
-    expect(counts.offer).toEqual({
-      total: 21,
+    expect(prisma.order.count).toHaveBeenCalledWith({
+      where: orderListSourceWheres(
+        "direct_sale",
+        undefined,
+        { party: "ali" },
+        T1,
+      ).loose,
+    });
+
+    // the total is the all bucket's count, not a sum over the buckets
+    expect(counts.all).toEqual({
+      total: 3,
       buckets: {
+        all: 3,
+        new: 3,
+        shipped: 3,
+        in_transit: 3,
+        delivered: 3,
+        other: 3,
+      },
+    });
+    expect(counts.direct_sale.total).toBe(3);
+    expect(counts.offer).toEqual({
+      total: 3,
+      buckets: {
+        all: 3,
         new: 3,
         pending: 3,
         expired: 3,

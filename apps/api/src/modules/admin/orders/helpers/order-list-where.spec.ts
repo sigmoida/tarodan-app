@@ -149,6 +149,18 @@ describe("orderListSourceWheres", () => {
     });
   });
 
+  it("the all bucket adds no bucket condition — same as no bucket", () => {
+    const filters = { userId: "u1" };
+    for (const tab of ["all", "direct_sale", "offer"] as const) {
+      expect(orderListSourceWheres(tab, "all", filters, NOW)).toEqual(
+        orderListSourceWheres(tab, undefined, filters, NOW),
+      );
+    }
+    expect(orderListSourceWheres("offer", "all", filters, NOW)).toEqual({
+      offer: { AND: [offerFilterWhere(filters)] },
+    });
+  });
+
   it("direct sale tab keeps legacy groupless direct orders reachable", () => {
     expect(orderListSourceWheres("direct_sale", "delivered", {}, NOW)).toEqual({
       group: { AND: [cartBucketWhere("delivered", groupLines)] },
@@ -193,10 +205,17 @@ describe("legacy status filter", () => {
 });
 
 describe("orderListScopeOf", () => {
-  it("defaults to the all tab without a bucket", () => {
+  it("defaults to the all tab and the all bucket", () => {
     expect(orderListScopeOf({})).toEqual(
-      expect.objectContaining({ tab: "all", bucket: undefined }),
+      expect.objectContaining({ tab: "all", bucket: "all" }),
     );
+    expect(orderListScopeOf({ tab: "offer", bucket: "" }).bucket).toBe("all");
+  });
+
+  it("keeps an explicit all bucket (deep-link scope)", () => {
+    expect(
+      orderListScopeOf({ tab: "direct_sale", bucket: "all", userId: "u1" }),
+    ).toEqual(expect.objectContaining({ tab: "direct_sale", bucket: "all" }));
   });
 
   it("maps the legacy origin and date parameters", () => {
@@ -218,9 +237,9 @@ describe("orderListScopeOf", () => {
     expect(orderListScopeOf({ tab: "all", origin: "offer" }).tab).toBe("all");
   });
 
-  it("a bucket the tab does not have falls back to the tab's first bucket", () => {
+  it("a bucket the tab does not have falls back to all (unfiltered)", () => {
     expect(orderListScopeOf({ tab: "direct_sale", bucket: "pending" })).toEqual(
-      expect.objectContaining({ tab: "direct_sale", bucket: "new" }),
+      expect.objectContaining({ tab: "direct_sale", bucket: "all" }),
     );
     expect(orderListScopeOf({ tab: "offer", bucket: "expired" }).bucket).toBe(
       "expired",

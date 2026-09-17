@@ -21,6 +21,7 @@ export const ADMIN_ORDER_TABS = ["all", "direct_sale", "offer"] as const;
 export type AdminOrderTab = (typeof ADMIN_ORDER_TABS)[number];
 
 export const ADMIN_ORDER_BUCKETS = [
+  "all",
   "new",
   "pending",
   "expired",
@@ -31,6 +32,31 @@ export const ADMIN_ORDER_BUCKETS = [
 ] as const;
 
 export type AdminOrderBucket = (typeof ADMIN_ORDER_BUCKETS)[number];
+
+/**
+ * "Tümü": kova filtresi UYGULAMAYAN alt sekme — sekmenin bütün satırları.
+ * Kova hiç verilmemiş istekle aynı anlamdadır; sayacı sekmenin toplamıdır.
+ */
+export const ADMIN_ORDER_ALL_BUCKET = "all" satisfies AdminOrderBucket;
+
+/** Satırları gerçekten süzen kovalar ("Tümü" dışındakiler). */
+export type AdminOrderFilterBucket = Exclude<
+  AdminOrderBucket,
+  typeof ADMIN_ORDER_ALL_BUCKET
+>;
+
+/**
+ * Kapsamsız açılışın alt sekmesi: operasyonun iş kuyruğu "Yeni". Kullanıcı /
+ * ürün deep-link'i ise "Tümü"nde açılır (bkz. panel `useOrderTabs`).
+ */
+export const ADMIN_ORDER_DEFAULT_BUCKET = "new" satisfies AdminOrderBucket;
+
+/** Kovanın süzgeci: "Tümü" (ya da kova yok) süzgeç yok demektir. */
+export function adminOrderBucketFilter(
+  bucket: AdminOrderBucket | undefined,
+): AdminOrderFilterBucket | undefined {
+  return bucket === ADMIN_ORDER_ALL_BUCKET ? undefined : bucket;
+}
 
 /**
  * Bir sipariş satırının (Order) ilerleme aşamaları, İLERLEME SIRASIYLA.
@@ -118,14 +144,15 @@ export const OFFER_EXPIRED_RULE = {
   lapsedStatuses: ["pending"] as readonly OfferStatusValue[],
 } as const;
 
-/** Sekme → alt sekmeler, ekrandaki sırayla. İlk kova varsayılandır. */
+/** Sekme → alt sekmeler, ekrandaki sırayla. Her sekme "Tümü" ile başlar. */
 export const ADMIN_ORDER_TAB_BUCKETS: Record<
   AdminOrderTab,
   readonly AdminOrderBucket[]
 > = {
-  all: ["new", "shipped", "in_transit", "delivered", "other"],
-  direct_sale: ["new", "shipped", "in_transit", "delivered", "other"],
+  all: ["all", "new", "shipped", "in_transit", "delivered", "other"],
+  direct_sale: ["all", "new", "shipped", "in_transit", "delivered", "other"],
   offer: [
+    "all",
     "new",
     "pending",
     "expired",
@@ -143,6 +170,7 @@ export const ADMIN_ORDER_TAB_I18N_KEYS = {
 } as const satisfies Record<AdminOrderTab, string>;
 
 export const ADMIN_ORDER_BUCKET_I18N_KEYS = {
+  all: "admin.operations.orders.buckets.all",
   new: "admin.operations.orders.buckets.new",
   pending: "admin.operations.orders.buckets.pending",
   expired: "admin.operations.orders.buckets.expired",
@@ -168,14 +196,16 @@ export function resolveAdminOrderTab(value: unknown): AdminOrderTab {
   return isAdminOrderTab(value) ? value : "all";
 }
 
-/** Sekmede olmayan kova sekmenin ilk kovasına düşer. */
+/**
+ * Sekmede olmayan (ya da hiç verilmemiş) kova `fallback`'e düşer — varsayılan
+ * "Tümü", yani süzgeçsiz liste.
+ */
 export function resolveAdminOrderBucket(
   tab: AdminOrderTab,
   value: unknown,
+  fallback: AdminOrderBucket = ADMIN_ORDER_ALL_BUCKET,
 ): AdminOrderBucket {
-  return isAdminOrderBucketOfTab(tab, value)
-    ? value
-    : ADMIN_ORDER_TAB_BUCKETS[tab][0];
+  return isAdminOrderBucketOfTab(tab, value) ? value : fallback;
 }
 
 /**
