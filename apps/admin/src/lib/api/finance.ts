@@ -70,6 +70,8 @@ export const financeApi = {
     invoiceNumber?: string;
     description?: string;
     userCode?: string;
+    /** İşlem numarası (ORD-/TKS-/RFD-/BST-/MEM-), tam eşleşme. */
+    processRef?: string;
     search?: string;
     startDate?: string;
     endDate?: string;

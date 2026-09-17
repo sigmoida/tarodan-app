@@ -5987,7 +5987,7 @@
         "platformTab": "Reklam, İndirim, Üyelik Faturaları",
         "loadError": "Faturalar yüklenemedi",
         "empty": "Fatura bulunamadı",
-        "searchPlaceholder": "Fatura no, taraf, VKN veya ETTN ara",
+        "searchPlaceholder": "Fatura no, işlem no, taraf, VKN veya ETTN ara",
         "documentUnit": "belge",
         "invoiceUnit": "fatura",
         "invoiceNumber": "Fatura No",
@@ -6009,6 +6009,14 @@
         "uploadedAt": "Yüklenme",
         "replaced": "Değiştirildi",
         "returnReference": "İade → {reference}",
+        "processLinks": {
+          "order": "Sipariş",
+          "offer": "Teklif",
+          "trade": "Takas",
+          "refundRequest": "İade talebi",
+          "boost": "Öne çıkarma",
+          "membership": "Üye sayfası"
+        },
         "filters": {
           "allTypes": "Tüm Türler",
           "allStatuses": "Tüm Durumlar",
@@ -6018,7 +6026,9 @@
           "description": "Fatura açıklaması ile arama",
           "descriptionPlaceholder": "komisyon, kargo, platform bedeli…",
           "userCode": "Kullanıcı ID ile arama",
-          "userCodePlaceholder": "B010001 / K010001"
+          "userCodePlaceholder": "B010001 / K010001",
+          "processRef": "İşlem No ile arama",
+          "processRefPlaceholder": "ORD-… / TKS-… / RFD-… / BST-… / MEM-…"
         },
         "contexts": {
           "directSale": "Doğrudan satış",

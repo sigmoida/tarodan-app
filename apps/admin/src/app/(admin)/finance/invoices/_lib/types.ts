@@ -1,5 +1,11 @@
+import type {
+  InvoiceProcess,
+  InvoiceProcessKind,
+  InvoiceProcessRef,
+} from "@tarodan/types";
 import type { StatusConfig } from "@tarodan/ui";
 import type { useTranslations } from "next-intl";
+import { readInvoiceProcess } from "@/lib/invoice-process";
 
 type T = ReturnType<typeof useTranslations<never>>;
 
@@ -25,6 +31,11 @@ export interface Invoice {
   description: string;
   /** İşlemin gerçekleşme şekli — doğrudan satış / teklif / takas / platform hizmeti. */
   context: string | null;
+  /**
+   * Belgenin dayandığı işlem: numaraları (ORD-/TKS-/RFD-/BST-/MEM-) ve detay
+   * bağlantısının hedefi. Kaynağı çözülemeyen belgede `null`.
+   */
+  process: InvoiceProcess | null;
   /** İşlemin tarafları; belgenin muhatabı bunlardan biridir. */
   seller: InvoiceParty | null;
   buyer: InvoiceParty | null;
@@ -129,6 +140,22 @@ export const invoiceContextLabels = (t: T): Record<string, string> => ({
   trade: t("admin.finance.invoices.contexts.trade"),
   platform_service: t("admin.finance.invoices.contexts.platformService"),
 });
+
+/**
+ * Numarası olmayan işlem referansının (siparişsiz üyelik ödemesi / boost)
+ * bağlantı metni — bağlantı yine çalışır, yalnız gösterilecek numara yoktur.
+ */
+const processLinkLabels = (t: T): Record<InvoiceProcessKind, string> => ({
+  order: t("admin.finance.invoices.processLinks.order"),
+  offer: t("admin.finance.invoices.processLinks.offer"),
+  trade: t("admin.finance.invoices.processLinks.trade"),
+  refund_request: t("admin.finance.invoices.processLinks.refundRequest"),
+  boost: t("admin.finance.invoices.processLinks.boost"),
+  membership: t("admin.finance.invoices.processLinks.membership"),
+});
+
+export const invoiceProcessLabel = (t: T, ref: InvoiceProcessRef): string =>
+  ref.label ?? processLinkLabels(t)[ref.kind];
 
 export const contextFilterOptions = (t: T) => [
   { value: "all", label: t("admin.finance.invoices.filters.allContexts") },
@@ -272,6 +299,7 @@ export function mapInvoices(raw: any[]): Invoice[] {
     sourceReference: r.sourceReference ?? null,
     description: r.description ?? "",
     context: r.context ?? null,
+    process: readInvoiceProcess(r.process),
     seller: mapParty(r.seller),
     buyer: mapParty(r.buyer),
     recipientName: r.recipientName,
