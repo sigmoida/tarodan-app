@@ -33,6 +33,7 @@ export default function OrdersPage() {
         key={`${tab}:${bucket}`}
         resource="orders"
         fetcher={(params) => adminApi.getOrders({ ...params, tab, bucket })}
+        scope={{ tab, bucket }}
         getRowId={(row: { kind: string; id: string }) =>
           `${row.kind}:${row.id}`
         }
