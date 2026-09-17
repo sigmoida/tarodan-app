@@ -516,18 +516,11 @@ export class PaymentCallbackService {
         );
         return "OK";
       }
-      await this.paymentFulfillment.processSuccessfulPayment(
-        payment,
-        dto.merchant_oid,
-        dto.merchant_oid, // FLOW-M5: çekilen oid'i providerConversationId'ye senkronla
-        {
-          paymentType: parsed.paymentType,
-          installmentCount: parsed.installmentCount,
-          currency: parsed.currency,
-        },
-      );
       // CAPI (Faz 3): store_card ödemesinde PayTR bildirimle utoken döndürür → kullanıcının
       // kayıtlı kartlarını SavedCard'a senkronla (recurring için). Best-effort, ödemeyi etkilemez.
+      // Fulfillment'tan ÖNCE: üyelik aktivasyonu autoRenew'i "kullanılabilir kart var mı"
+      // ile belirler (D1) — kart sonra yazılsaydı kartını kaydeden üye de autoRenew=false
+      // kalırdı. Kartı kaydetmeyen üyede autoRenew kapalı kalır.
       const savedCardOwnerId =
         payment.order?.buyerId ??
         payment.checkoutGroup?.buyerId ??
@@ -549,6 +542,16 @@ export class PaymentCallbackService {
           );
         }
       }
+      await this.paymentFulfillment.processSuccessfulPayment(
+        payment,
+        dto.merchant_oid,
+        dto.merchant_oid, // FLOW-M5: çekilen oid'i providerConversationId'ye senkronla
+        {
+          paymentType: parsed.paymentType,
+          installmentCount: parsed.installmentCount,
+          currency: parsed.currency,
+        },
+      );
     } else {
       // Gecikmiş fail bildirimi ESKİ bir oid'e aitse ve o ödemede canlı bir 3DS
       // çekimi sürüyorsa ertele: aksi halde attempt-1'in geç failed'i attempt-2

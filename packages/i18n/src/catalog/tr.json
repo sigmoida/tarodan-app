@@ -8924,6 +8924,10 @@
         "title": "Üyeliğiniz Sona Erdi",
         "message": "{tierName} üyeliğiniz sona erdi. Yenileyin ve avantajlardan yararlanın!"
       },
+      "membershipRenewalCardRequired": {
+        "title": "Otomatik Yenileme İçin Kartınızı Ekleyin",
+        "message": "{tierName} üyeliğinizin otomatik yenilemesi kapatıldı: ödeme altyapımız değişti ve kayıtlı kartınız yeni sistemde kullanılamıyor. Üyeliğinizi kesintisiz sürdürmek için kartınızı yeniden ekleyip yenilemeyi açın."
+      },
       "membershipUpgraded": {
         "title": "Üyeliğiniz Yükseltildi! 🎉",
         "message": "{tierName} üyeliğine hoş geldiniz! Yeni avantajlarınız aktif."

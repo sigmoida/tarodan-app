@@ -8924,6 +8924,10 @@
         "title": "Your Membership Has Ended",
         "message": "Your {tierName} membership has ended. Renew now and keep your benefits!"
       },
+      "membershipRenewalCardRequired": {
+        "title": "Add Your Card to Keep Auto-Renewal",
+        "message": "Auto-renewal for your {tierName} membership has been turned off: our payment provider setup changed and your saved card cannot be used for renewals anymore. Add your card again and turn renewal back on to keep your membership without interruption."
+      },
       "membershipUpgraded": {
         "title": "Your Membership Was Upgraded! 🎉",
         "message": "Welcome to {tierName} membership! Your new benefits are active."

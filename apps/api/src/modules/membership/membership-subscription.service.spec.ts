@@ -3,13 +3,33 @@ import {
   MembershipTierType,
   OrderStatus,
   PaymentStatus,
+  PaytrMerchant,
   SavedCardStatus,
   SubscriptionStatus,
 } from "@prisma/client";
+import { NotificationType } from "../notification/dto";
 import { BadRequestException, ForbiddenException } from "@nestjs/common";
 import { PaymentProvider } from "../payment/dto";
 import { MembershipSubscriptionService } from "./membership-subscription.service";
 import { OUTBOX_SAVED_CARD_PROVIDER_DELETE } from "../outbox/outbox.types";
+
+/**
+ * runAutoRenewals iki `userMembership.findMany` atar: kartsız (yenilemesi
+ * kapatılacak) üyeler (`savedCards.none`) ve çekilecek üyeler (`savedCards.some`).
+ */
+function mockRenewalQueries(
+  prisma: { userMembership: { findMany: jest.Mock } },
+  rows: { due?: unknown[]; stranded?: unknown[] },
+) {
+  prisma.userMembership.findMany.mockImplementation(
+    (args: { where?: { user?: { savedCards?: { none?: unknown } } } }) =>
+      Promise.resolve(
+        args?.where?.user?.savedCards?.none
+          ? (rows.stranded ?? [])
+          : (rows.due ?? []),
+      ),
+  );
+}
 
 describe("MembershipSubscriptionService", () => {
   const money = (value: number) => ({
@@ -78,6 +98,7 @@ describe("MembershipSubscriptionService", () => {
         findMany: jest.fn().mockResolvedValue([]),
         create: jest.fn(),
         update: jest.fn(),
+        updateMany: jest.fn().mockResolvedValue({ count: 1 }),
       },
       membershipPayment: {
         findFirst: jest.fn().mockResolvedValue(null),
@@ -90,7 +111,11 @@ describe("MembershipSubscriptionService", () => {
       user: { findUnique: jest.fn(), findFirst: jest.fn() },
       category: { findFirst: jest.fn() },
       product: { findUnique: jest.fn(), create: jest.fn() },
-      savedCard: { findFirst: jest.fn(), update: jest.fn() },
+      savedCard: {
+        findFirst: jest.fn(),
+        findMany: jest.fn().mockResolvedValue([]),
+        update: jest.fn(),
+      },
       $transaction: jest.fn((fn: (client: typeof tx) => Promise<unknown>) =>
         fn(tx),
       ),
@@ -148,6 +173,7 @@ describe("MembershipSubscriptionService", () => {
       outbox,
       virtualOrder,
       notifications,
+      paymentProviders,
     };
   };
 
@@ -610,8 +636,12 @@ describe("MembershipSubscriptionService", () => {
     config.get.mockImplementation((key: string) =>
       key === "PAYTR_RECURRING_ENABLED" ? "true" : undefined,
     );
-    prisma.userMembership.findMany.mockResolvedValue([current]);
-    prisma.membershipPayment.create.mockResolvedValue({ id: "renewal-1" });
+    mockRenewalQueries(prisma, { due: [current] });
+    prisma.membershipPayment.create.mockResolvedValue({
+      id: "renewal-1",
+      provider: "paytr",
+      paytrMerchant: PaytrMerchant.membership,
+    });
     provider.chargeRecurring.mockResolvedValue({
       status: "failed",
       reason: "temporary provider error",
@@ -627,6 +657,7 @@ describe("MembershipSubscriptionService", () => {
       data: expect.objectContaining({ status: PaymentStatus.failed }),
     });
     expect(prisma.userMembership.update).not.toHaveBeenCalled();
+    expect(prisma.userMembership.updateMany).not.toHaveBeenCalled();
     expect(prisma.savedCard.update).not.toHaveBeenCalled();
     expect(
       virtualOrder.completeRecurringMembershipPayment,
@@ -637,6 +668,189 @@ describe("MembershipSubscriptionService", () => {
         status: "failed",
       }),
     );
+  });
+
+  describe("PayTR üyelik mağazası — yenileme kartı ve mağaza", () => {
+    const dueMember = (savedCards: unknown[]) =>
+      membership(tier(MembershipTierType.premium), {
+        autoRenew: true,
+        currentPeriodEnd: new Date(Date.now() + 30 * 60 * 1000),
+        user: {
+          id: "user-1",
+          displayName: "Test User",
+          email: "user@example.com",
+          phone: "+905551112233",
+          businessStatus: BusinessStatus.approved,
+          companyName: "Acme A.S.",
+          taxId: "1234567890",
+          savedCards,
+        },
+      });
+
+    const recurringOn = (harness: ReturnType<typeof makeService>) =>
+      harness.config.get.mockImplementation((key: string) =>
+        key === "PAYTR_RECURRING_ENABLED" ? "true" : undefined,
+      );
+
+    it("selects only cards stored on the membership merchant", async () => {
+      const harness = makeService();
+      recurringOn(harness);
+      await harness.service.runAutoRenewals();
+      const dueCall = harness.prisma.userMembership.findMany.mock.calls.find(
+        ([arg]: [{ where: { user: { savedCards: { some?: unknown } } } }]) =>
+          arg.where.user.savedCards.some,
+      );
+      expect(dueCall[0].where.user.savedCards.some).toMatchObject({
+        paytrMerchant: PaytrMerchant.membership,
+        status: SavedCardStatus.active,
+        requireCvv: false,
+      });
+      expect(dueCall[0].include.user.include.savedCards.where).toMatchObject({
+        paytrMerchant: PaytrMerchant.membership,
+      });
+    });
+
+    it("charges on the membership merchant with the card's mandate IP and records the merchant", async () => {
+      const harness = makeService();
+      recurringOn(harness);
+      mockRenewalQueries(harness.prisma, {
+        due: [
+          dueMember([
+            {
+              id: "card-1",
+              utoken: "ut",
+              ctoken: "ct",
+              last4: "4242",
+              mandateIp: "85.1.2.3",
+            },
+          ]),
+        ],
+      });
+      harness.prisma.membershipPayment.create.mockResolvedValue({
+        id: "renewal-1",
+        provider: "paytr",
+        paytrMerchant: PaytrMerchant.membership,
+      });
+      harness.provider.chargeRecurring.mockResolvedValue({
+        status: "success",
+        raw: {},
+      });
+      harness.virtualOrder.completeRecurringMembershipPayment.mockResolvedValue(
+        true,
+      );
+
+      await harness.service.runAutoRenewals();
+
+      expect(
+        harness.prisma.membershipPayment.create.mock.calls[0][0].data,
+      ).toMatchObject({ paytrMerchant: PaytrMerchant.membership });
+      expect(harness.paymentProviders.resolve).toHaveBeenCalledWith(
+        "paytr",
+        PaytrMerchant.membership,
+      );
+      expect(harness.provider.chargeRecurring).toHaveBeenCalledWith(
+        expect.objectContaining({
+          buyer: expect.objectContaining({ ip: "85.1.2.3" }),
+        }),
+      );
+    });
+
+    it("turns auto-renew off and asks the member to re-add a card when no usable membership card exists", async () => {
+      const harness = makeService();
+      recurringOn(harness);
+      mockRenewalQueries(harness.prisma, {
+        stranded: [
+          { id: "membership-9", userId: "user-9", tier: { name: "Premium" } },
+        ],
+      });
+
+      const result = await harness.service.runAutoRenewals();
+
+      const strandedCall =
+        harness.prisma.userMembership.findMany.mock.calls.find(
+          ([arg]: [
+            { where: { user?: { savedCards?: { none?: unknown } } } },
+          ]) => arg.where.user?.savedCards?.none,
+        );
+      expect(strandedCall[0].where.user.savedCards.none).toMatchObject({
+        paytrMerchant: PaytrMerchant.membership,
+      });
+      expect(harness.prisma.userMembership.updateMany).toHaveBeenCalledWith({
+        where: { id: "membership-9", autoRenew: true },
+        data: { autoRenew: false },
+      });
+      expect(
+        harness.notifications.createInAppNotification,
+      ).toHaveBeenCalledWith(
+        "user-9",
+        NotificationType.MEMBERSHIP_RENEWAL_CARD_REQUIRED,
+        { tierName: "Premium" },
+      );
+      expect(harness.provider.chargeRecurring).not.toHaveBeenCalled();
+      expect(result).toEqual({ renewed: 0, failed: 0, attempted: 0 });
+    });
+
+    it("does not notify twice when another worker already turned auto-renew off", async () => {
+      const harness = makeService();
+      recurringOn(harness);
+      mockRenewalQueries(harness.prisma, {
+        stranded: [
+          { id: "membership-9", userId: "user-9", tier: { name: "Premium" } },
+        ],
+      });
+      harness.prisma.userMembership.updateMany.mockResolvedValue({ count: 0 });
+
+      await harness.service.runAutoRenewals();
+
+      expect(
+        harness.notifications.createInAppNotification,
+      ).not.toHaveBeenCalled();
+    });
+
+    it("does nothing while recurring is disabled for the membership merchant", async () => {
+      const harness = makeService();
+      await harness.service.runAutoRenewals();
+      expect(harness.prisma.userMembership.findMany).not.toHaveBeenCalled();
+      expect(harness.prisma.userMembership.updateMany).not.toHaveBeenCalled();
+    });
+
+    it("lists cards per purpose and marks only membership cards auto-renew eligible", async () => {
+      const harness = makeService();
+      harness.prisma.savedCard.findMany.mockResolvedValue([
+        {
+          id: "card-m",
+          paytrMerchant: PaytrMerchant.membership,
+          requireCvv: false,
+        },
+        {
+          id: "card-c",
+          paytrMerchant: PaytrMerchant.marketplace,
+          requireCvv: false,
+        },
+      ]);
+
+      const cards = await harness.service.listSavedCards(
+        "user-1",
+        "membership",
+      );
+
+      expect(harness.prisma.savedCard.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            paytrMerchant: PaytrMerchant.membership,
+          }),
+        }),
+      );
+      expect(cards.map((c) => [c.id, c.purpose, c.autoRenewEligible])).toEqual([
+        ["card-m", "membership", true],
+        ["card-c", "checkout", false],
+      ]);
+
+      await harness.service.listSavedCards("user-1");
+      expect(
+        harness.prisma.savedCard.findMany.mock.calls[1][0].where,
+      ).not.toHaveProperty("paytrMerchant");
+    });
   });
 
   describe("D3 — süre dolmadan çekim + dönem ekleme (append)", () => {
@@ -671,9 +885,11 @@ describe("MembershipSubscriptionService", () => {
       harness.config.get.mockImplementation((key: string) =>
         key === "PAYTR_RECURRING_ENABLED" ? "true" : undefined,
       );
-      harness.prisma.userMembership.findMany.mockResolvedValue([current]);
+      mockRenewalQueries(harness.prisma, { due: [current] });
       harness.prisma.membershipPayment.create.mockResolvedValue({
         id: "renewal-1",
+        provider: "paytr",
+        paytrMerchant: PaytrMerchant.membership,
       });
       harness.provider.chargeRecurring.mockResolvedValue({
         status: "success",
@@ -692,7 +908,10 @@ describe("MembershipSubscriptionService", () => {
 
       await service.runAutoRenewals();
 
-      const where = prisma.userMembership.findMany.mock.calls[0][0].where;
+      const where = prisma.userMembership.findMany.mock.calls.find(
+        ([arg]: [{ where: { user: { savedCards: { some?: unknown } } } }]) =>
+          arg.where.user.savedCards.some,
+      )[0].where;
       const lte: Date = where.currentPeriodEnd.lte;
       // now + 1 saat (çağrı süresi toleransıyla)
       expect(lte.getTime()).toBeGreaterThanOrEqual(before + 59 * 60 * 1000);

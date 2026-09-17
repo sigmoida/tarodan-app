@@ -187,7 +187,9 @@ describe("PaymentCallbackService — per-merchant routing", () => {
   });
 
   it("syncs the stored card on the charging merchant with the payer IP as mandate", async () => {
-    const { svc, reconciliation } = setup({ payment: membershipPayment });
+    const { svc, reconciliation, fulfillment } = setup({
+      payment: membershipPayment,
+    });
     await svc.handlePayTRCallback(
       { ...signed(PaytrMerchant.membership, body), utoken: "ut-1" },
       PaytrMerchant.membership,
@@ -197,6 +199,12 @@ describe("PaymentCallbackService — per-merchant routing", () => {
       "ut-1",
       { ip: "85.100.1.2" },
       PaytrMerchant.membership,
+    );
+    // Kart, üyelik aktivasyonundan ÖNCE yazılır: autoRenew kararı (D1) onu görür.
+    expect(
+      reconciliation.syncSavedCardsFromUtoken.mock.invocationCallOrder[0],
+    ).toBeLessThan(
+      fulfillment.processSuccessfulPayment.mock.invocationCallOrder[0],
     );
   });
 

@@ -264,24 +264,10 @@ export class MembershipService {
   // ==========================================================================
   // SAVED CARDS (CAPI) — listele (delegate → MembershipSubscriptionService)
   // ==========================================================================
-  async listSavedCards(userId: string): Promise<
-    Array<{
-      id: string;
-      last4: string;
-      brand: string | null;
-      bank: string | null;
-      cardType: string | null;
-      cardScheme: string | null;
-      businessCard: boolean | null;
-      expMonth: string | null;
-      expYear: string | null;
-      requireCvv: boolean;
-      isDefault: boolean;
-      autoRenewEligible: boolean;
-      createdAt: Date;
-    }>
-  > {
-    return this.subscription.listSavedCards(userId);
+  async listSavedCards(
+    ...args: Parameters<MembershipSubscriptionService["listSavedCards"]>
+  ): ReturnType<MembershipSubscriptionService["listSavedCards"]> {
+    return this.subscription.listSavedCards(...args);
   }
 
   // ==========================================================================
