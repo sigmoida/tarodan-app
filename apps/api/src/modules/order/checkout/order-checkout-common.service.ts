@@ -29,6 +29,7 @@ import {
   type ServiceTaxBreakdown,
 } from "../helpers/order-service-tax.helper";
 import { buyerTotalOf } from "../helpers/order-total.helper";
+import { OFFER_SNAPSHOT_KEY } from "../helpers/order-offer-snapshot";
 import { OrderTaxPolicyService } from "../pricing/order-tax-policy.service";
 
 /**
@@ -267,6 +268,13 @@ export class OrderCheckoutCommonService {
   buildOfferFinancialSnapshot(params: {
     productId: string;
     amount: number;
+    /**
+     * Ürünün kabul anındaki ilan fiyatı. Teklif siparişinin `originalUnitPrice`'ı
+     * pazarlık tutarıdır; ilan fiyatı başka yerde saklanmadığı için admin
+     * "ilan − teklif" farkını sonradan değişen ürün fiyatından okumasın diye
+     * burada donar (`readOfferListingUnitPrice`).
+     */
+    listingUnitPrice: number;
     shippingDesi: number;
     shippingTariff: ShippingTariffSnapshot;
     pricing: Awaited<
@@ -274,7 +282,7 @@ export class OrderCheckoutCommonService {
     >;
   }): Prisma.InputJsonObject {
     const { pricing, shippingTariff } = params;
-    return this.buildFinancialSnapshot({
+    const snapshot = this.buildFinancialSnapshot({
       pricingHash: this.orderPricing.computePricingHash([
         {
           productId: params.productId,
@@ -304,6 +312,13 @@ export class OrderCheckoutCommonService {
       sellerServiceTaxAmount: pricing.sellerServiceTaxAmount,
       totalAmount: pricing.totalAmount,
     });
+    return {
+      ...snapshot,
+      [OFFER_SNAPSHOT_KEY]: {
+        listingUnitPrice: params.listingUnitPrice,
+        amount: params.amount,
+      },
+    };
   }
 
   buildSuratIdempotencyKey(parts: string[]): string {

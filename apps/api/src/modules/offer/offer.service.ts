@@ -463,6 +463,7 @@ export class OfferService {
           financialSnapshot: this.checkoutCommon.buildOfferFinancialSnapshot({
             productId: offerData.productId,
             amount: Number(offerData.amount),
+            listingUnitPrice: Number(productData.price),
             shippingDesi: productData.shippingDesi,
             shippingTariff,
             pricing: offerPricing,
