@@ -46,6 +46,7 @@ export default function CardPaymentSection({
     saveCard,
     setSaveCard,
     cardStorageEnabled,
+    purpose,
   } = card;
 
   const usingNewCard = selected === NEW_CARD;
@@ -82,6 +83,7 @@ export default function CardPaymentSection({
         <NewCardFields
           form={form}
           cardStorageEnabled={cardStorageEnabled}
+          purpose={purpose}
           saveCard={saveCard}
           onSaveCardChange={setSaveCard}
         />

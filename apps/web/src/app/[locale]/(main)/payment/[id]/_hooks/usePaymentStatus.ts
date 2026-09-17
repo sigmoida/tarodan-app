@@ -6,7 +6,12 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "@/i18n/navigation";
 import { useParams, useSearchParams } from "next/navigation";
 import toast from "react-hot-toast";
-import { paymentsApi } from "@/lib/api";
+import {
+  paymentCapabilities,
+  paymentsApi,
+  type PaymentConfig,
+  type PaymentPurpose,
+} from "@/lib/api";
 import { useAuthStore } from "@/stores/authStore";
 import { hasAuthMarker } from "@/lib/authMarker";
 import { useTranslations } from "next-intl";
@@ -33,6 +38,9 @@ export function usePaymentStatus() {
   const paymentId = params.id as string;
   const isGuestCheckout = searchParams.get("guest") === "true";
   const isMembershipPayment = searchParams.get("type") === "membership";
+  const purpose: PaymentPurpose = isMembershipPayment
+    ? "membership"
+    : "checkout";
   const kind = searchParams.get("kind");
 
   const [payment, setPayment] = useState<any>(null);
@@ -50,7 +58,7 @@ export function usePaymentStatus() {
       setIsLoading(true);
       const isGuest = isGuestCheckout || urlHasGuest();
 
-      let cfg = {
+      let cfg: PaymentConfig = {
         bypassEnabled: false,
         cardStorageEnabled: false,
         recurringEnabled: false,
@@ -60,7 +68,9 @@ export function usePaymentStatus() {
       } catch {
         /* safe default: new-card only, no bypass */
       }
-      setCardStorageEnabled(cfg.cardStorageEnabled && !isGuest);
+      setCardStorageEnabled(
+        paymentCapabilities(cfg, purpose).cardStorageEnabled && !isGuest,
+      );
 
       const response = isGuest
         ? await paymentsApi.getStatusLightGuest(paymentId)
@@ -200,5 +210,6 @@ export function usePaymentStatus() {
     directTarget,
     hasTarget,
     isMembershipPayment,
+    purpose,
   };
 }
