@@ -111,3 +111,231 @@ describe("InvoiceDetailService.build — kaynak işlem tablosu", () => {
     expect(select).not.toHaveProperty("paidAt");
   });
 });
+
+/**
+ * Kaynak tablosu faturanın TÜRÜNE göre başka kayda bakar. Tür → tablo eşlemesi
+ * tek kaynağa (`invoice-source.ts`) taşındığında dökümün ÇIKTISI değişmemeli;
+ * her dal burada sabitlenir.
+ */
+describe("InvoiceDetailService.build — tür başına kaynak dalı", () => {
+  const baseInvoice = {
+    id: "inv-1",
+    sourceReference: null,
+    lineDescription: null,
+    lineItems: null,
+    documentType: "EARCHIVE",
+    status: "sent",
+    context: null,
+    ettn: null,
+    invoiceNumber: "TRD2026000000002",
+    billingReference: null,
+    issuedAt: null,
+    createdAt: new Date("2026-09-01"),
+    cancelledAt: null,
+    cancelReason: null,
+    recipientName: null,
+    recipientVknTckn: null,
+    recipientEmail: null,
+    netAmount: 10,
+    discountTotal: 0,
+    taxAmount: 2,
+    vatRate: 20,
+    total: 12,
+    seller: null,
+    buyer: null,
+  };
+
+  const found = (value: unknown) => ({
+    findUnique: jest.fn().mockResolvedValue(value),
+  });
+  const none = () => found(null);
+
+  const build = (
+    invoice: { type: string; sourceId: string },
+    tables: Record<string, { findUnique: jest.Mock }> = {},
+  ) => {
+    const prisma = {
+      elogoInvoice: found({ ...baseInvoice, ...invoice }),
+      orderPackage: none(),
+      order: none(),
+      tradeCashPayment: none(),
+      refundRequest: none(),
+      productBoost: none(),
+      membershipPayment: none(),
+      ...tables,
+    };
+    return new InvoiceDetailService(prisma as never).build("inv-1");
+  };
+
+  const paidAt = new Date("2026-09-03T00:00:00Z");
+
+  it("takas belgesi ödemenin dolu kalemlerini takas numarasıyla döker", async () => {
+    const detail = await build(
+      { type: "trade_service_fee", sourceId: "tcp-1" },
+      {
+        tradeCashPayment: found({
+          amount: 0,
+          tradeFeeAmount: 50,
+          shippingAmount: 30,
+          commission: 0,
+          paidAt,
+          createdAt: new Date("2026-09-01"),
+          trade: { tradeNumber: "TKS-AAA" },
+        }),
+      },
+    );
+
+    expect(detail.source).toEqual([
+      {
+        reference: "TKS-AAA",
+        description: "Takas hizmet bedeli",
+        quantity: null,
+        amount: 50,
+        occurredAt: paidAt,
+      },
+      {
+        reference: "TKS-AAA",
+        description: "Takas kargo bedeli",
+        quantity: null,
+        amount: 30,
+        occurredAt: paidAt,
+      },
+    ]);
+  });
+
+  it("ceza belgesi iade talebini siparişiyle birlikte döker", async () => {
+    const detail = await build(
+      { type: "penalty", sourceId: "rr-1" },
+      {
+        refundRequest: found({
+          refundNumber: "RFD-AAA",
+          amount: 75,
+          createdAt: paidAt,
+          order: { orderNumber: "ORD-AAA", product: { title: "Kaput" } },
+        }),
+      },
+    );
+
+    expect(detail.source).toEqual([
+      {
+        reference: "RFD-AAA",
+        description: "İade talebi — Kaput (ORD-AAA)",
+        quantity: null,
+        amount: 75,
+        occurredAt: paidAt,
+      },
+    ]);
+  });
+
+  it("öne çıkarma belgesi boost siparişinin numarasını taşır", async () => {
+    const detail = await build(
+      { type: "boost", sourceId: "boost-1" },
+      {
+        productBoost: found({
+          packageName: "Vitrin",
+          durationDays: 7,
+          price: 99,
+          purchasedAt: paidAt,
+          createdAt: new Date("2026-09-01"),
+          orderId: "order-b",
+          product: { title: "Jant" },
+        }),
+        order: found({ orderNumber: "BST-AAA" }),
+      },
+    );
+
+    expect(detail.source).toEqual([
+      {
+        reference: "BST-AAA",
+        description: "Vitrin — Jant",
+        quantity: 7,
+        amount: 99,
+        occurredAt: paidAt,
+      },
+    ]);
+  });
+
+  it("üyelik ödemesi anahtarlı belge ödemenin siparişinden çözülür", async () => {
+    const order = {
+      findUnique: jest
+        .fn()
+        .mockResolvedValueOnce(null)
+        .mockResolvedValueOnce({
+          orderNumber: "MEM-AAA",
+          quantity: 1,
+          totalAmount: 120,
+          createdAt: paidAt,
+          payment: null,
+          product: { title: "Pro üyelik" },
+        }),
+    };
+    const detail = await build(
+      { type: "membership", sourceId: "mp-1" },
+      { order, membershipPayment: found({ orderId: "order-m" }) },
+    );
+
+    expect(detail.source).toEqual([
+      {
+        reference: "MEM-AAA",
+        description: "Pro üyelik",
+        quantity: 1,
+        amount: 120,
+        occurredAt: paidAt,
+      },
+    ]);
+    expect(order.findUnique).toHaveBeenLastCalledWith(
+      expect.objectContaining({ where: { id: "order-m" } }),
+    );
+  });
+
+  it("iade faturası ters çevirdiği belgenin kaynağını gösterir (kısmi anahtar dahil)", async () => {
+    const elogoInvoice = {
+      findUnique: jest
+        .fn()
+        .mockResolvedValueOnce({
+          ...baseInvoice,
+          type: "return_invoice",
+          sourceId: "inv-0:attempt-1",
+        })
+        .mockResolvedValueOnce({ type: "platform_sale", sourceId: "order-p" }),
+    };
+    const detail = await build(
+      { type: "return_invoice", sourceId: "inv-0:attempt-1" },
+      {
+        elogoInvoice,
+        order: found({
+          orderNumber: "ORD-PPP",
+          quantity: 1,
+          totalAmount: 40,
+          createdAt: paidAt,
+          payment: null,
+          product: { title: "Filtre" },
+        }),
+      },
+    );
+
+    expect(detail.source.map((row) => row.reference)).toEqual(["ORD-PPP"]);
+    expect(elogoInvoice.findUnique).toHaveBeenLastCalledWith(
+      expect.objectContaining({ where: { id: "inv-0" } }),
+    );
+  });
+
+  it("iade faturasının kaynağı yine iade faturasıysa döngüye girmez", async () => {
+    const elogoInvoice = {
+      findUnique: jest
+        .fn()
+        .mockResolvedValueOnce({
+          ...baseInvoice,
+          type: "return_invoice",
+          sourceId: "inv-0",
+        })
+        .mockResolvedValueOnce({ type: "return_invoice", sourceId: "inv-1" }),
+    };
+    const detail = await build(
+      { type: "return_invoice", sourceId: "inv-0" },
+      { elogoInvoice },
+    );
+
+    expect(detail.source).toEqual([]);
+  });
+});
