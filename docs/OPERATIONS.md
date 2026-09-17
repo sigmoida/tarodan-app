@@ -226,11 +226,13 @@ Script yapmasa da saatlik cron aynı işi yenileme zamanında yapar; script yaln
 üyeyi dönem sonunu beklemeden bilgilendirir. Tekrar çalıştırmak güvenlidir.
 
 ```
-docker exec "$API_CID" sh -c 'cd /app && node dist-seed/maintenance/notify-membership-card-readd.js --dry-run'
 docker exec "$API_CID" sh -c 'cd /app && node dist-seed/maintenance/notify-membership-card-readd.js'
+docker exec "$API_CID" sh -c 'cd /app && node dist-seed/maintenance/notify-membership-card-readd.js --apply'
 ```
 
-Yerelde: `pnpm --filter @tarodan/api notify:prod:membership-card-readd` (önce
+Bayraksız koşu kurudur (yalnız sayar); yazma ve bildirim yalnız `--apply` ile.
+
+Yerelde: `pnpm --filter @tarodan/api notify:prod:membership-card-readd -- --apply` (önce
 `build` + `build:seed`; script derlenmiş `dist/` uygulamasını `PROCESS_ROLE=web`
 ile başsız yükler, zamanlanmış işleri koşturmaz).
 

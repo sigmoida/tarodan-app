@@ -16,9 +16,12 @@
  * Nest uygulama bağlamı DERLENMİŞ uygulamadan (`dist/`) yüklenir; seed grafiğine
  * AppModule'ü sokmamak için bilinçli (bkz. tsconfig.seed.json).
  *
+ * Varsayılan KURU koşudur (yalnız sayar): üyelere geri alınamaz bildirim
+ * gittiği için yazma ancak açık `--apply` ile yapılır.
+ *
  * Kullanım (API konteynerinde, deploy + migrate sonrası):
- *   node dist-seed/maintenance/notify-membership-card-readd.js --dry-run
  *   node dist-seed/maintenance/notify-membership-card-readd.js
+ *   node dist-seed/maintenance/notify-membership-card-readd.js --apply
  */
 import { join } from "node:path";
 import type { INestApplicationContext, Type } from "@nestjs/common";
@@ -33,7 +36,8 @@ interface MembershipServiceLike {
 }
 
 async function main(): Promise<void> {
-  const dryRun = process.argv.includes("--dry-run");
+  // Bildirim geri alınamaz: yanlışlıkla bayraksız koşu yalnız saysın.
+  const dryRun = !process.argv.includes("--apply");
 
   // Bu süreç yalnız tek bir servis çağrısı için ayağa kalkar: zamanlanmış
   // işler (worker rolü) burada KOŞMAMALI — çalışan worker ile çift tur olurdu.
