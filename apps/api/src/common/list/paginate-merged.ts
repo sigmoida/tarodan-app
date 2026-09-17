@@ -7,9 +7,9 @@ import type { ListQuery, PaginatedResult } from "./list.types";
 
 /**
  * One table feeding a list that is paginated across several tables.
- * `head(take)` must return the source's first `take` rows in the SAME order
- * `compare` defines — including its tie-break — or rows can repeat or vanish at
- * page boundaries.
+ * `head(take)` returns the source's first `take` rows in a stable order (with a
+ * unique tie-break). That order should follow `compare` for the page to read
+ * well; where it cannot (collation), pages still never repeat or drop a row.
  */
 export interface MergedListSource<TRow> {
   count(): PromiseLike<number>;
@@ -37,6 +37,12 @@ function positive(
  * many candidates, they are merged with `compare`, and the page is sliced out.
  * Cost grows with the page number, which is acceptable for operator lists that
  * are read from the top.
+ *
+ * The heads are MERGED, never re-sorted: each source keeps the order the
+ * database returned. `compare` only picks which source's next row comes first,
+ * so the first `take` merged rows depend only on each source's first `take`
+ * rows. Pages therefore never repeat or drop a row even where JS and the
+ * database disagree on an order (string collation, text ids, NULLs).
  */
 export async function paginateMerged<TRow>(
   sources: readonly MergedListSource<TRow>[],
@@ -56,10 +62,39 @@ export async function paginateMerged<TRow>(
     Promise.all(sources.map((source) => source.head(take))),
   ]);
   const total = counts.reduce((sum, n) => sum + n, 0);
-  const merged = heads.flat().sort(compare);
+  const merged = mergeSorted(heads, compare, take);
 
   return {
-    data: merged.slice((page - 1) * limit, take),
+    data: merged.slice((page - 1) * limit),
     meta: { total, page, limit, totalPages: Math.ceil(total / limit) },
   };
+}
+
+/**
+ * Stable k-way merge of already-ordered lists, up to `take` rows. On a tie the
+ * earlier source wins, so the result is deterministic across pages.
+ */
+function mergeSorted<TRow>(
+  lists: readonly (readonly TRow[])[],
+  compare: (left: TRow, right: TRow) => number,
+  take: number,
+): TRow[] {
+  const cursors = lists.map(() => 0);
+  const out: TRow[] = [];
+  while (out.length < take) {
+    let best = -1;
+    for (let i = 0; i < lists.length; i++) {
+      if (cursors[i] >= lists[i].length) continue;
+      if (
+        best === -1 ||
+        compare(lists[i][cursors[i]], lists[best][cursors[best]]) < 0
+      ) {
+        best = i;
+      }
+    }
+    if (best === -1) break;
+    out.push(lists[best][cursors[best]]);
+    cursors[best] += 1;
+  }
+  return out;
 }

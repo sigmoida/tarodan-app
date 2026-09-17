@@ -383,8 +383,9 @@ export class AdminOrderService {
 
 /**
  * İki kaynağın DB sırası ile bellekteki birleştirme sırası AYNI tanımdır:
- * birincil anahtar, sonra createdAt DESC, sonra id. Biri değişirse diğeri de
- * değişmeli — yoksa `take` sınırında satır iki sayfada birden çıkar.
+ * birincil anahtar, sonra createdAt DESC, sonra id. `paginateMerged` kaynak
+ * sırasını korur (yeniden sıralamaz); metin kolonlarında JS ile DB harmanlaması
+ * ayrışırsa yalnız kaynaklar arası serpiştirme kayar, sayfa sınırı bozulmaz.
  */
 function groupOrderBy(
   key: CartSortKey,
