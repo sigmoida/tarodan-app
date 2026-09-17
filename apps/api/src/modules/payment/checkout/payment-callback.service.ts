@@ -62,20 +62,25 @@ export class PaymentCallbackService {
    * PayTR bildiriminden yapısal ödeme-yöntemi verisi çıkar (gözlemlenebilirlik).
    * parseCallback taksit/currency/tutar/test_mode'u tiplenmiş döndürür.
    */
-  private parsePaytrCallbackData(dto: PayTRCallbackDto) {
-    return this.paymentProviders.resolve(PaymentProvider.paytr).parseCallback({
-      merchant_oid: dto.merchant_oid as string,
-      status: dto.status as "success" | "failed",
-      total_amount: dto.total_amount as string,
-      hash: dto.hash as string,
-      failed_reason_code: dto.failed_reason_code,
-      failed_reason_msg: dto.failed_reason_msg,
-      test_mode: dto.test_mode,
-      payment_type: dto.payment_type,
-      currency: dto.currency,
-      payment_amount: dto.payment_amount,
-      installment_count: dto.installment_count,
-    });
+  private parsePaytrCallbackData(
+    dto: PayTRCallbackDto,
+    merchant: PaytrMerchant,
+  ) {
+    return this.paymentProviders
+      .resolve(PaymentProvider.paytr, merchant)
+      .parseCallback({
+        merchant_oid: dto.merchant_oid as string,
+        status: dto.status as "success" | "failed",
+        total_amount: dto.total_amount as string,
+        hash: dto.hash as string,
+        failed_reason_code: dto.failed_reason_code,
+        failed_reason_msg: dto.failed_reason_msg,
+        test_mode: dto.test_mode,
+        payment_type: dto.payment_type,
+        currency: dto.currency,
+        payment_amount: dto.payment_amount,
+        installment_count: dto.installment_count,
+      });
   }
 
   /**
@@ -380,7 +385,7 @@ export class PaymentCallbackService {
 
     // Gözlemlenebilirlik: her doğrulanmış (hash geçerli) bildirimi denetim günlüğüne
     // yaz — başarı/başarısızlık, ödeme yöntemi, taksit, tutarlar. Best-effort.
-    const parsed = this.parsePaytrCallbackData(dto);
+    const parsed = this.parsePaytrCallbackData(dto, merchant);
     await this.providerEvents.record({
       eventType: "callback",
       merchantOid: dto.merchant_oid,

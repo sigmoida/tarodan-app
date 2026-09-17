@@ -26,7 +26,7 @@ export class MiscReconciliationService {
    * `merchant`: kartın saklandığı PayTR mağazası (= çekimin yapıldığı mağaza).
    * utoken/ctoken mağazaya özeldir; liste o mağazadan istenir ve kart o mağazayla
    * damgalanır. `mandate.ip` kullanıcısız yenilemede user_ip olarak gider —
-   * yalnız kart ilk kez eklendiğinde yazılır, sonraki senkronlar ezmez (boşsa doldurur).
+   * yalnız kart ilk kez eklendiğinde yazılır; sonraki senkronlar ne ezer ne doldurur.
    */
   async syncSavedCardsFromUtoken(
     userId: string,
