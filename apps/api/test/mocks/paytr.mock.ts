@@ -1,4 +1,5 @@
 import * as crypto from "crypto";
+import { PaytrMerchant } from "@prisma/client";
 import type { PaytrReturnedTransfer } from "../../src/modules/payment-providers/paytr/paytr-transfer.service";
 import type {
   PayTRBuyer,
@@ -17,17 +18,53 @@ import type {
  * verifyCallback() preserves the real hash check (uses the same secret/salt
  * as .env.test) so callback security paths stay covered. parseCallback() is
  * delegated to the same logic as production.
+ *
+ * Two merchants, like production: `forMerchant()` returns a view bound to the
+ * other merchant that shares every recorded call and test switch with the root,
+ * and verifies callbacks with that merchant's key pair (see .env.test).
  */
 
-const MERCHANT_KEY = "test-key";
-const MERCHANT_SALT = "test-salt";
+export const MOCK_PAYTR_SECRETS: Record<
+  PaytrMerchant,
+  { key: string; salt: string }
+> = {
+  [PaytrMerchant.marketplace]: { key: "test-key", salt: "test-salt" },
+  [PaytrMerchant.membership]: {
+    key: "test-membership-key",
+    salt: "test-membership-salt",
+  },
+};
 
 export class MockPayTRService {
   public readonly key = "paytr";
+  public readonly merchant: PaytrMerchant = PaytrMerchant.marketplace;
+  private readonly views = new Map<PaytrMerchant, MockPayTRService>();
+
+  /**
+   * A view bound to `merchant`. Reads and writes go to the root (shared call
+   * logs and switches); only `merchant` differs, so recorded calls say which
+   * merchant they were made on.
+   */
+  forMerchant(merchant: PaytrMerchant): MockPayTRService {
+    if (merchant === this.merchant) return this;
+    const cached = this.views.get(merchant);
+    if (cached) return cached;
+    const view = new Proxy(this, {
+      get: (target, prop, receiver) =>
+        prop === "merchant"
+          ? merchant
+          : prop === "forMerchant"
+            ? (m: PaytrMerchant) => target.forMerchant(m)
+            : Reflect.get(target, prop, receiver),
+    });
+    this.views.set(merchant, view);
+    return view;
+  }
   public readonly iframeCalls: Array<{ orderId: string; amount: number }> = [];
   public readonly refundCalls: Array<{
     merchantOid: string;
     refundAmount: number;
+    merchant?: PaytrMerchant;
   }> = [];
   public readonly transferCalls: Array<{
     merchantOid: string;
@@ -49,6 +86,8 @@ export class MockPayTRService {
     ctoken: string;
     amount: number;
     merchantOid: string;
+    merchant?: PaytrMerchant;
+    userIp?: string;
   }> = [];
   /** Kayıtlı-karttan-ödeme (CIT) çağrıları — interaktif kayıtlı kart yolu buraya düşer. */
   public readonly registeredCardCalls: Array<{
@@ -59,11 +98,15 @@ export class MockPayTRService {
     requireCvv?: boolean;
     cvv?: string;
   }> = [];
-  public readonly capiDeleteCalls: Array<{ utoken: string; ctoken: string }> =
-    [];
+  public readonly capiDeleteCalls: Array<{
+    utoken: string;
+    ctoken: string;
+    merchant?: PaytrMerchant;
+  }> = [];
   public readonly directPaymentCalls: Array<{
     merchantOid: string;
     amount: number;
+    merchant?: PaytrMerchant;
     storeCard?: boolean;
     utoken?: string;
     savedCard?: {
@@ -165,12 +208,14 @@ export class MockPayTRService {
   }
 
   verifyCallback(callback: PayTRCallbackData): boolean {
-    const hashStr = `${callback.merchant_oid}${MERCHANT_SALT}${callback.status}${callback.total_amount}`;
-    const expectedHash = crypto
-      .createHmac("sha256", MERCHANT_KEY)
-      .update(hashStr)
-      .digest("base64");
-    return callback.hash === expectedHash;
+    return (
+      callback.hash ===
+      paytrNotificationHash(this.merchant, {
+        merchantOid: callback.merchant_oid,
+        status: callback.status,
+        totalAmount: callback.total_amount,
+      })
+    );
   }
 
   parseCallback(callback: PayTRCallbackData): {
@@ -195,7 +240,11 @@ export class MockPayTRService {
     merchantOid: string,
     refundAmount: number,
   ): Promise<{ status: string; mock: true }> {
-    this.refundCalls.push({ merchantOid, refundAmount });
+    this.refundCalls.push({
+      merchantOid,
+      refundAmount,
+      merchant: this.merchant,
+    });
     if (this.nextRefundFails) {
       this.nextRefundFails = false;
       // Gerçek PayTRService non-success'te throw eder; mock da aynısını yapsın.
@@ -264,6 +313,8 @@ export class MockPayTRService {
       ctoken: params.ctoken,
       amount: params.amount,
       merchantOid: params.merchantOid,
+      merchant: this.merchant,
+      userIp: params.buyer.ip,
     });
     if (this.nextRecurringResult) {
       const r = this.nextRecurringResult;
@@ -332,6 +383,7 @@ export class MockPayTRService {
     this.directPaymentCalls.push({
       merchantOid,
       amount,
+      merchant: this.merchant,
       storeCard: options?.storeCard,
       utoken: options?.utoken,
       savedCard: options?.savedCard,
@@ -379,7 +431,7 @@ export class MockPayTRService {
     utoken: string,
     ctoken: string,
   ): Promise<{ status: string; reason?: string }> {
-    this.capiDeleteCalls.push({ utoken, ctoken });
+    this.capiDeleteCalls.push({ utoken, ctoken, merchant: this.merchant });
     const cards = this.storedCardsByUtoken.get(utoken);
     if (cards)
       this.storedCardsByUtoken.set(
@@ -406,11 +458,25 @@ export class MockPayTRService {
   }
 }
 
+function paytrNotificationHash(
+  merchant: PaytrMerchant,
+  input: { merchantOid: string; status: string; totalAmount: string },
+): string {
+  const { key, salt } = MOCK_PAYTR_SECRETS[merchant];
+  return crypto
+    .createHmac("sha256", key)
+    .update(`${input.merchantOid}${salt}${input.status}${input.totalAmount}`)
+    .digest("base64");
+}
+
 /**
  * Build a callback body whose hash will pass `verifyCallback` against the
  * .env.test merchant key/salt. Use this in tests to simulate PayTR webhook.
+ * `merchant` picks the key pair (default marketplace); a membership callback
+ * is posted to /api/payments/callback/paytr/membership.
  */
 export function signCallback(input: {
+  merchant?: PaytrMerchant;
   merchantOid: string;
   status: "success" | "failed";
   totalAmount: number; // kuruş
@@ -419,11 +485,14 @@ export function signCallback(input: {
   utoken?: string;
 }): PayTRCallbackData {
   const totalAmountStr = String(input.totalAmount);
-  const hashStr = `${input.merchantOid}${MERCHANT_SALT}${input.status}${totalAmountStr}`;
-  const hash = crypto
-    .createHmac("sha256", MERCHANT_KEY)
-    .update(hashStr)
-    .digest("base64");
+  const hash = paytrNotificationHash(
+    input.merchant ?? PaytrMerchant.marketplace,
+    {
+      merchantOid: input.merchantOid,
+      status: input.status,
+      totalAmount: totalAmountStr,
+    },
+  );
   return {
     merchant_oid: input.merchantOid,
     status: input.status,

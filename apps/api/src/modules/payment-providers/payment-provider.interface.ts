@@ -1,3 +1,4 @@
+import type { PaytrMerchant } from "@prisma/client";
 import type {
   PaytrPlatformTransferResult,
   PaytrReturnedTransfer,
@@ -28,6 +29,16 @@ import type {
 export interface IPaymentProvider {
   /** Stable key used to resolve this provider; matches `Payment.provider`. */
   readonly key: string;
+
+  /**
+   * The merchant account every call on this instance is signed for. A record
+   * remembers the merchant it was charged on (`paytrMerchant`), so refunds,
+   * status inquiries and card deletes always go back to that merchant.
+   */
+  readonly merchant: PaytrMerchant;
+
+  /** The same provider bound to another merchant account. */
+  forMerchant(merchant: PaytrMerchant): IPaymentProvider;
 
   queryPaymentStatus(merchantOid: string): Promise<PayTRStatusInquiryResult>;
 
