@@ -2,6 +2,10 @@ import type { PublicIdentity } from "./user";
 
 import { Address } from "./user";
 
+/**
+ * @deprecated Values never matched the database (Prisma uses lowercase). Use
+ * `OrderStatusValue` / `ORDER_STATUSES` from `./commerce-status`.
+ */
 export enum OrderStatus {
   PENDING = "PENDING",
   PAYMENT_PENDING = "PAYMENT_PENDING",
@@ -87,6 +91,10 @@ export interface Shipment {
   createdAt: Date;
 }
 
+/**
+ * @deprecated Values never matched the database (Prisma uses lowercase). Use
+ * `ShipmentStatusValue` / `SHIPMENT_STATUSES` from `./commerce-status`.
+ */
 export enum ShipmentStatus {
   PENDING = "PENDING",
   LABEL_CREATED = "LABEL_CREATED",
