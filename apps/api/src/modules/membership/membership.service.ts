@@ -261,6 +261,15 @@ export class MembershipService {
     return this.subscription.runAutoRenewals();
   }
 
+  /** Kartsız oto-yenilemeleri kapat + bildir (cron "due", geçiş script'i "all"). */
+  async disableRenewalsWithoutUsableCard(
+    ...args: Parameters<
+      MembershipSubscriptionService["disableRenewalsWithoutUsableCard"]
+    >
+  ): Promise<number> {
+    return this.subscription.disableRenewalsWithoutUsableCard(...args);
+  }
+
   // ==========================================================================
   // SAVED CARDS (CAPI) — listele (delegate → MembershipSubscriptionService)
   // ==========================================================================

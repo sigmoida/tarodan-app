@@ -180,6 +180,65 @@ Idempotenttir: yalnız üç kolonu da boş olan satırlara dokunur. `--dry-run`
 iade faturalarını "çözülemeyen" sayar — tarafları ters çevirdikleri belgeden
 devraldıkları için kaynakları henüz yazılmamıştır; gerçek koşuda dolarlar.
 
+### Bir kerelik: PayTR üyelik mağazası geçişi (2026-09)
+
+Üyelik ödemeleri (ilk satın alma + oto-yenileme) non-3D yetkili **ayrı bir PayTR
+mağazasına** taşındı; sipariş/takas/öne çıkarma/payout pazaryeri mağazasında
+kalır. Kartlar **taşınmaz** (token'lar mağazaya özel). Ayrıntı: `PAYMENTS.md` §1
+"İki PayTR mağazası", mobil sözleşme: `mobile-parity/20-api-delta-2026-09-17.md`.
+
+**1. Coolify secrets (production VE staging, API servisinde — worker dahil aynı env):**
+
+| Değişken                                  | Production                                                             | Staging                                                                 |
+| ----------------------------------------- | ---------------------------------------------------------------------- | ----------------------------------------------------------------------- |
+| `PAYTR_MEMBERSHIP_MERCHANT_ID`            | yeni mağaza no (**`PAYTR_MERCHANT_ID`'den farklı**, boot kontrol eder) | yeni mağaza no                                                          |
+| `PAYTR_MEMBERSHIP_MERCHANT_KEY` / `_SALT` | panelden                                                               | panelden                                                                |
+| `PAYTR_MEMBERSHIP_TEST_MODE`              | `false`                                                                | `true`                                                                  |
+| `PAYTR_MEMBERSHIP_CALLBACK_URL`           | `https://api.tarodan.com.tr/api/payments/callback/paytr/membership`    | `https://staging.tarodan.com.tr/api/payments/callback/paytr/membership` |
+| `PAYTR_RECURRING_ENABLED`                 | `true` (yalnız üyelik mağazasını etkiler)                              | `true`                                                                  |
+| `PAYTR_MEMBERSHIP_CARD_STORAGE_ENABLED`   | boş/`true` (acil kapatma: `false`)                                     | boş/`true`                                                              |
+
+Kimlik veya callback URL eksikse API production/staging'de **açılmaz**. Bu yüzden
+secrets deploy'dan ÖNCE girilir.
+
+**2. PayTR panelleri — Bildirim URL:**
+
+- Pazaryeri mağazası: `https://<api-host>/api/payments/callback/paytr` (değişmedi).
+- Üyelik mağazası: `https://<api-host>/api/payments/callback/paytr/membership`.
+  İki mağaza aynı URL'i KULLANAMAZ: her uç kendi mağazasının anahtarıyla doğrular,
+  yanlış uca düşen bildirim hash uyuşmazlığına düşer.
+- Üyelik mağazasında canlı mod, non-3D, recurring, kart saklama (CAPI) ve Direkt
+  API yetkilerinin açık olduğu teyit edilir. Rapor senkronu açıksa rapor yetkisi de.
+
+**3. Deploy:** migration `20260917100000_paytr_membership_merchant` deploy'da
+kendiliğinden koşar (tüm mevcut satırlar `marketplace` olarak işaretlenir; tablo
+yeniden yazılmaz). Ayrı backfill yoktur.
+
+**4. Duman testi (staging, sonra production'da küçük tutarla):** premium satın
+al → direct-form alanlarında `merchant_id` üyelik mağazası → ödeme tamamlanır →
+admin'de ödeme; `saved_cards.paytr_merchant = membership`, `mandate_ip` dolu,
+üyelikte `autoRenew = true`. Log'da `PAYTR_MERCHANT_MISMATCH` görünmemeli.
+
+**5. Mevcut oto-yenilemeli üyeler — tek seferlik bildirim:** üyelik mağazasında
+kartı olmayan tüm oto-yenilemeli ücretli üyelerin `autoRenew`'i kapatılır ve
+`membership_renewal_card_required` bildirimi (zil + push, tercihlere uyar) gider.
+Script yapmasa da saatlik cron aynı işi yenileme zamanında yapar; script yalnız
+üyeyi dönem sonunu beklemeden bilgilendirir. Tekrar çalıştırmak güvenlidir.
+
+```
+docker exec "$API_CID" sh -c 'cd /app && node dist-seed/maintenance/notify-membership-card-readd.js --dry-run'
+docker exec "$API_CID" sh -c 'cd /app && node dist-seed/maintenance/notify-membership-card-readd.js'
+```
+
+Yerelde: `pnpm --filter @tarodan/api notify:prod:membership-card-readd` (önce
+`build` + `build:seed`; script derlenmiş `dist/` uygulamasını `PROCESS_ROLE=web`
+ile başsız yükler, zamanlanmış işleri koşturmaz).
+
+**Bilinen sınır:** ayrı "kart ekle" akışı yoktur; kart yalnız bir üyelik
+ödemesinde saklanır. Dönemi süren üye kartını bir sonraki satın almada ekler.
+Geçiş öncesi alınmış üyelik ödemelerinin iadeleri eski (pazaryeri) mağazadan
+yapılır — ek iş gerekmez.
+
 ### Her ay: silinen hesap bildirimi
 
 Panelde **Kullanıcılar → Silinen Kimlikler** ekranından dönem seçilip Excel
@@ -311,6 +370,7 @@ Reset workflow'unun API container'ında aradığı değerler (biri tutmazsa hiç
 | `S3_ENV_PREFIX`                                                                        | `prod`                                           |                                                                                          |
 | `PAYMENT_BYPASS` / `PAYOUTS_DISABLED`                                                  | `false` (harfi harfine)                          |                                                                                          |
 | `PAYTR_TEST_MODE`                                                                      | `false` veya `0`                                 |                                                                                          |
+| `PAYTR_MEMBERSHIP_TEST_MODE`                                                           | `false`                                          | Üyelik mağazası; API boot'u da zorlar                                                    |
 | `ELASTICSEARCH_INDEX_PREFIX`                                                           | boş veya `production`                            |                                                                                          |
 | `REDIS_URL`, `REDIS_HOST`                                                              | dolu                                             | Cache ve **kuyruk** Redis'i ayrı; ikisi de temizlenir                                    |
 | `ELASTICSEARCH_NODE` (veya `_URL`), `ELASTICSEARCH_USERNAME`, `ELASTICSEARCH_PASSWORD` | dolu                                             | Uygulama bunları default'lar, runtime reset ZORUNLU kılar                                |
@@ -325,7 +385,8 @@ yolda patlamaya yol açıyordu. Artık dry run da kontrol eder.
 tanımlanmadan açılırsa hiçbir payout tamamlanamaz), `PAYTR_REPORT_SYNC_ENABLED`
 (panel yetkisi ister), `SHIPPING_WEBHOOK_ENABLED`,
 `FEATURE_48H_CONFIRMATION_WINDOW`, `PAYTR_CARD_STORAGE_ENABLED`,
-`PAYTR_RECURRING_ENABLED`, `BULLBOARD_ENABLED`, `ENABLE_SWAGGER`.
+`BULLBOARD_ENABLED`, `ENABLE_SWAGGER`. (`PAYTR_RECURRING_ENABLED` artık yalnız
+üyelik mağazasını etkiler; üyelik mağazası geçişi runbook'una bakın.)
 
 **İade politikası v2 — VARSAYILAN AÇIK:** Bileşen bazlı iade politikası (v2)
 artık kod tarafında varsayılan AÇIKTIR; launch'ta env eklemek GEREKMEZ.
@@ -334,9 +395,11 @@ para hesabında beklenmedik sorun çıkarsa v1 oransal formüle döndürür. Bir
 stabil haftadan sonra bayrağın ve v1 hesaplayıcının tamamen sökülmesi planlıdır
 (yeni kayıtlar zaten çift yazılır, geri dönüş güvenlidir).
 
-**PayTR panel tarafı:** ödeme bildirim URL'i
+**PayTR panel tarafı:** pazaryeri mağazasının ödeme bildirim URL'i
 `https://<api-host>/api/payments/callback/paytr` (env'deki `PAYTR_CALLBACK_URL`
-ile birebir aynı olmalı, düz `OK` döner) · payout transfer-sonuç URL'i
+ile birebir aynı olmalı, düz `OK` döner) · üyelik mağazasının bildirim URL'i
+`https://<api-host>/api/payments/callback/paytr/membership`
+(`PAYTR_MEMBERSHIP_CALLBACK_URL`) · payout transfer-sonuç URL'i
 `https://<api-host>/api/payouts/callback/paytr-transfer` (yalnız bayrağı
 açacağın gün) · mağaza canlı modda.
 

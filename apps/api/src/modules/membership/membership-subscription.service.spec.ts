@@ -99,6 +99,7 @@ describe("MembershipSubscriptionService", () => {
         create: jest.fn(),
         update: jest.fn(),
         updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+        count: jest.fn().mockResolvedValue(0),
       },
       membershipPayment: {
         findFirst: jest.fn().mockResolvedValue(null),
@@ -802,6 +803,52 @@ describe("MembershipSubscriptionService", () => {
 
       await harness.service.runAutoRenewals();
 
+      expect(
+        harness.notifications.createInAppNotification,
+      ).not.toHaveBeenCalled();
+    });
+
+    it("cutover scope targets every auto-renewing paid member without a membership card", async () => {
+      const harness = makeService();
+      harness.prisma.userMembership.findMany.mockResolvedValueOnce([
+        { id: "membership-1", userId: "user-1", tier: { name: "Premium" } },
+      ]);
+
+      const disabled = await harness.service.disableRenewalsWithoutUsableCard({
+        scope: "all",
+      });
+
+      expect(disabled).toBe(1);
+      const where =
+        harness.prisma.userMembership.findMany.mock.calls[0][0].where;
+      // Pencere yok: dönemi aylar sonra bitecek üye de geçişte bilgilendirilir.
+      expect(where).not.toHaveProperty("currentPeriodEnd");
+      expect(where).toMatchObject({
+        autoRenew: true,
+        user: {
+          savedCards: {
+            none: expect.objectContaining({
+              paytrMerchant: PaytrMerchant.membership,
+            }),
+          },
+        },
+      });
+      expect(
+        harness.notifications.createInAppNotification,
+      ).toHaveBeenCalledTimes(1);
+    });
+
+    it("dry run only counts", async () => {
+      const harness = makeService();
+      harness.prisma.userMembership.count.mockResolvedValue(7);
+
+      await expect(
+        harness.service.disableRenewalsWithoutUsableCard({
+          scope: "all",
+          dryRun: true,
+        }),
+      ).resolves.toBe(7);
+      expect(harness.prisma.userMembership.updateMany).not.toHaveBeenCalled();
       expect(
         harness.notifications.createInAppNotification,
       ).not.toHaveBeenCalled();

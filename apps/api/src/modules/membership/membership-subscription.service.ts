@@ -820,7 +820,7 @@ export class MembershipSubscriptionService {
     }
     const now = new Date();
     await this.reconcilePendingRecurringPayments(now);
-    await this.disableRenewalsWithoutUsableCard(now);
+    await this.disableRenewalsWithoutUsableCard({ scope: "due", now });
     const due = await this.prisma.userMembership.findMany({
       where: {
         ...this.renewalDueWhere(now),
@@ -1152,30 +1152,66 @@ export class MembershipSubscriptionService {
   }
 
   /**
-   * Yenileme zamanı gelmiş ama üyelik mağazasında kullanılabilir kartı OLMAYAN
-   * üyelikler: oto-yenileme kapatılır ve üyeye "kartınızı yeniden ekleyin"
-   * bildirimi gider. Eskiden bunlar sorguya hiç girmez, autoRenew=true kalır ve
-   * dönem sonunda sessizce free'ye düşerlerdi. PayTR mağaza geçişinde kart
-   * token'ları taşınmadığı için geçiş öncesi her yenilemeli üye bu yoldan geçer.
+   * Oto-yenilemesi açık ama üyelik mağazasında kullanılabilir kartı OLMAYAN
+   * üyelikler: oto-yenileme kapatılır ve üyeye MEMBERSHIP_RENEWAL_CARD_REQUIRED
+   * bildirimi gider. Eskiden bunlar yenileme sorgusuna hiç girmez, autoRenew=true
+   * kalır ve dönem sonunda sessizce free'ye düşerlerdi. PayTR mağaza geçişinde
+   * kart token'ları taşınmadığı için geçiş öncesi her yenilemeli üye bu yoldan
+   * geçer.
+   *
+   * - `scope: "due"`: yalnız bu turda yenilenecekler (saatlik cron).
+   * - `scope: "all"`: tüm aktif ücretli üyelikler — geçiş anında bir kez,
+   *   `maintenance/notify-membership-card-readd.ts` ile. `dryRun` yalnız sayar.
    *
    * Free'ye planlı geçişi olan üye hariç: onun yenilemesi zaten denenmez.
-   * CAS (autoRenew=true koşullu updateMany): iki worker aynı üyeyi iki kez
-   * bildirmez.
+   * CAS (autoRenew=true koşullu updateMany): iki süreç aynı üyeyi iki kez
+   * bildirmez; bu yüzden tekrar çalıştırmak güvenlidir.
    */
-  private async disableRenewalsWithoutUsableCard(now: Date): Promise<number> {
-    const stranded = await this.prisma.userMembership.findMany({
-      where: {
-        ...this.renewalDueWhere(now),
-        OR: [
-          { scheduledTierType: null },
-          { scheduledTierType: { not: MembershipTierType.free } },
-        ],
-        user: { savedCards: { none: USABLE_RECURRING_CARD_WHERE } },
-      },
-      select: { id: true, userId: true, tier: { select: { name: true } } },
-      orderBy: { currentPeriodEnd: "asc" },
-      take: 200,
-    });
+  async disableRenewalsWithoutUsableCard(opts: {
+    scope: "due" | "all";
+    now?: Date;
+    dryRun?: boolean;
+  }): Promise<number> {
+    const now = opts.now ?? new Date();
+    const where: Prisma.UserMembershipWhereInput = {
+      ...(opts.scope === "due"
+        ? this.renewalDueWhere(now)
+        : {
+            autoRenew: true,
+            status: SubscriptionStatus.active,
+            tier: { type: { not: MembershipTierType.free } },
+          }),
+      OR: [
+        { scheduledTierType: null },
+        { scheduledTierType: { not: MembershipTierType.free } },
+      ],
+      user: { savedCards: { none: USABLE_RECURRING_CARD_WHERE } },
+    };
+    if (opts.dryRun) {
+      return this.prisma.userMembership.count({ where });
+    }
+    let disabled = 0;
+    // "due" tek sayfa (saatlik tur); "all" sayfalar biter bitmez durur — CAS'ı
+    // geçen satır autoRenew=false olup sorgudan düştüğü için imleç gerekmez.
+    for (;;) {
+      const page = await this.prisma.userMembership.findMany({
+        where,
+        select: { id: true, userId: true, tier: { select: { name: true } } },
+        orderBy: { currentPeriodEnd: "asc" },
+        take: 200,
+      });
+      const before = disabled;
+      disabled += await this.disableAndNotify(page);
+      if (opts.scope === "due" || page.length < 200 || disabled === before) {
+        break;
+      }
+    }
+    return disabled;
+  }
+
+  private async disableAndNotify(
+    stranded: Array<{ id: string; userId: string; tier: { name: string } }>,
+  ): Promise<number> {
     let disabled = 0;
     for (const m of stranded) {
       const claimed = await this.prisma.userMembership.updateMany({
