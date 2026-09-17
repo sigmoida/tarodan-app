@@ -40,7 +40,7 @@ export function HealthStrip({ health }: { health: FinanceOverview["health"] }) {
       key: "uninvoicedDelivered",
       label: t("admin.finance.overview.health.uninvoicedDelivered"),
       count: health.uninvoicedDelivered,
-      href: "/operations/orders?status=delivered",
+      href: "/operations/orders?bucket=delivered&status=delivered",
     },
     {
       key: "exhaustedInvoices",
