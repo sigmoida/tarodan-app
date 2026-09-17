@@ -194,13 +194,18 @@ export const financeApi = {
     page?: number;
     limit?: number;
     includeResolved?: boolean;
+    /** "marketplace" | "membership"; boş = tüm mağazalar. */
+    merchant?: string;
   }) => api.get("/admin/finance/psp/statement-lines", { params }),
   resolvePspStatementLine: (lineId: string, note: string) =>
     api.post(`/admin/finance/psp/statement-lines/${lineId}/resolve`, { note }),
   rematchPspStatementLine: (lineId: string) =>
     api.post(`/admin/finance/psp/statement-lines/${lineId}/rematch`),
-  getPspSettlements: (params?: { limit?: number; days?: number }) =>
-    api.get("/admin/finance/psp/settlements", { params }),
+  getPspSettlements: (params?: {
+    limit?: number;
+    days?: number;
+    merchant?: string;
+  }) => api.get("/admin/finance/psp/settlements", { params }),
 
   getPayoutsTransactions: (params?: {
     search?: string;

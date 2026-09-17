@@ -6226,6 +6226,12 @@
       "psp": {
         "title": "PayTR Mutabakat",
         "subtitle": "PayTR raporları ile sistem kayıtlarının gün bazlı karşılaştırması",
+        "merchant": {
+          "label": "Mağaza",
+          "all": "Tüm mağazalar",
+          "marketplace": "Pazaryeri",
+          "membership": "Üyelik"
+        },
         "tabs": {
           "summary": "Gün Özetleri",
           "lines": "Döküm Satırları",
@@ -8928,8 +8934,8 @@
         "message": "{tierName} üyeliğiniz sona erdi. Yenileyin ve avantajlardan yararlanın!"
       },
       "membershipRenewalCardRequired": {
-        "title": "Otomatik Yenileme İçin Kartınızı Ekleyin",
-        "message": "{tierName} üyeliğinizin otomatik yenilemesi kapatıldı: ödeme altyapımız değişti ve kayıtlı kartınız yeni sistemde kullanılamıyor. Üyeliğinizi kesintisiz sürdürmek için kartınızı yeniden ekleyip yenilemeyi açın."
+        "title": "Otomatik Yenileme Kapatıldı",
+        "message": "{tierName} üyeliğinizin otomatik yenilemesi kapatıldı: ödeme altyapımız değişti ve kayıtlı kartınız yenilemede kullanılamıyor. Üyeliğiniz dönem sonuna kadar sürer; yenilerken kartınızı kaydederseniz otomatik yenileme yeniden açılır."
       },
       "membershipUpgraded": {
         "title": "Üyeliğiniz Yükseltildi! 🎉",

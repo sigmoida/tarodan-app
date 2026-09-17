@@ -6226,6 +6226,12 @@
       "psp": {
         "title": "PayTR Reconciliation",
         "subtitle": "Day-by-day comparison of PayTR reports against system records",
+        "merchant": {
+          "label": "Merchant",
+          "all": "All merchants",
+          "marketplace": "Marketplace",
+          "membership": "Membership"
+        },
         "tabs": {
           "summary": "Day Summaries",
           "lines": "Statement Lines",
@@ -8928,8 +8934,8 @@
         "message": "Your {tierName} membership has ended. Renew now and keep your benefits!"
       },
       "membershipRenewalCardRequired": {
-        "title": "Add Your Card to Keep Auto-Renewal",
-        "message": "Auto-renewal for your {tierName} membership has been turned off: our payment provider setup changed and your saved card cannot be used for renewals anymore. Add your card again and turn renewal back on to keep your membership without interruption."
+        "title": "Auto-Renewal Turned Off",
+        "message": "Auto-renewal for your {tierName} membership has been turned off: our payment setup changed and your saved card can no longer be used for renewals. Your membership stays active until the end of the period; save your card when you renew and auto-renewal switches back on."
       },
       "membershipUpgraded": {
         "title": "Your Membership Was Upgraded! 🎉",

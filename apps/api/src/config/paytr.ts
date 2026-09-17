@@ -128,6 +128,20 @@ export function paytrMerchantConfig(
 }
 
 /**
+ * Kimliği (id + key + salt) tanımlı mağazalar. Mağaza başına yapılan toplu
+ * işler (rapor senkronu) tanımsız mağazayı atlar — ör. üyelik mağazası henüz
+ * açılmamış bir geliştirme ortamı.
+ */
+export function configuredPaytrMerchants(
+  config: ConfigService,
+): PaytrMerchant[] {
+  return Object.values(PaytrMerchant).filter((merchant) => {
+    const c = paytrMerchantConfig(config, merchant);
+    return Boolean(c.merchantId && c.merchantKey && c.merchantSalt);
+  });
+}
+
+/**
  * Ödeme AMACI (istemcinin gördüğü sözlük) → mağaza. İstemci mağaza adını
  * bilmez; "sepet ödemesi" mi "üyelik" mi olduğunu bilir.
  */

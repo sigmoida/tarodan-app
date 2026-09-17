@@ -1,3 +1,4 @@
+import { PaytrMerchant } from "@prisma/client";
 import { PaytrReportSyncService } from "./paytr-report-sync.service";
 
 /**
@@ -42,12 +43,25 @@ function makePrisma(opts: { itemsSyncedAt?: Date | null } = {}) {
   return prisma;
 }
 
+const MARKETPLACE_ENV = {
+  PAYTR_MERCHANT_ID: "111",
+  PAYTR_MERCHANT_KEY: "k",
+  PAYTR_MERCHANT_SALT: "s",
+};
+const MEMBERSHIP_ENV = {
+  PAYTR_MEMBERSHIP_MERCHANT_ID: "222",
+  PAYTR_MEMBERSHIP_MERCHANT_KEY: "mk",
+  PAYTR_MEMBERSHIP_MERCHANT_SALT: "ms",
+};
+
 function makeService(opts: {
   prisma?: any;
   enabled?: boolean;
   statement?: any[];
   summary?: any[];
   detail?: any[];
+  /** Kimliği tanımlı mağazaların env'i (varsayılan: yalnız pazaryeri). */
+  env?: Record<string, string>;
 }) {
   const prisma = opts.prisma ?? makePrisma();
   const getTransactionStatement = jest
@@ -55,25 +69,28 @@ function makeService(opts: {
     .mockResolvedValue(opts.statement ?? []);
   const getSettlementSummary = jest.fn().mockResolvedValue(opts.summary ?? []);
   const getSettlementDetail = jest.fn().mockResolvedValue(opts.detail ?? []);
+  const resolve = jest.fn(() => ({
+    getTransactionStatement,
+    getSettlementSummary,
+    getSettlementDetail,
+  }));
+  const env: Record<string, string> = opts.env ?? MARKETPLACE_ENV;
   const service = new PaytrReportSyncService(
     prisma as any,
-    {
-      resolve: () => ({
-        getTransactionStatement,
-        getSettlementSummary,
-        getSettlementDetail,
-      }),
-    } as any,
+    { resolve } as any,
     {
       get: jest.fn((key: string) =>
-        key === "PAYTR_REPORT_SYNC_ENABLED" && opts.enabled !== false
-          ? "true"
-          : undefined,
+        key === "PAYTR_REPORT_SYNC_ENABLED"
+          ? opts.enabled !== false
+            ? "true"
+            : undefined
+          : env[key],
       ),
     } as any,
   );
   return {
     service,
+    resolve,
     prisma,
     getTransactionStatement,
     getSettlementSummary,
@@ -135,6 +152,7 @@ describe("PaytrReportSyncService.syncTransactionStatement", () => {
     const first = prisma.paytrStatementLine.upsert.mock.calls[0][0];
     // Dedup: aynı satır ikinci sync'te yeni kayıt AÇMAMALI.
     expect(first.where.statement_line_dedup).toMatchObject({
+      paytrMerchant: PaytrMerchant.marketplace,
       merchantOid: "ORD1",
       type: "sale",
       amount: 100,
@@ -150,6 +168,46 @@ describe("PaytrReportSyncService.syncTransactionStatement", () => {
       net: 97.65,
       currency: "TL",
       cardBrand: "WORLD",
+    });
+  });
+});
+
+describe("PaytrReportSyncService — per merchant", () => {
+  it("syncs every configured merchant's statement and stamps the rows", async () => {
+    const { service, prisma, resolve } = makeService({
+      env: { ...MARKETPLACE_ENV, ...MEMBERSHIP_ENV },
+      statement: [SALE],
+    });
+
+    const r = await service.syncTransactionStatement();
+
+    expect(resolve).toHaveBeenCalledWith("paytr", PaytrMerchant.marketplace);
+    expect(resolve).toHaveBeenCalledWith("paytr", PaytrMerchant.membership);
+    expect(r).toEqual({ fetched: 2, upserted: 2 });
+    const merchants = prisma.paytrStatementLine.upsert.mock.calls.map(
+      ([arg]: any[]) => arg.create.paytrMerchant,
+    );
+    expect(merchants).toEqual([
+      PaytrMerchant.marketplace,
+      PaytrMerchant.membership,
+    ]);
+  });
+
+  it("skips a merchant whose credentials are not configured", async () => {
+    const { service, resolve } = makeService({ env: MARKETPLACE_ENV });
+    await service.syncSettlements();
+    expect(resolve).toHaveBeenCalledTimes(1);
+    expect(resolve).toHaveBeenCalledWith("paytr", PaytrMerchant.marketplace);
+  });
+
+  it("replaces only the syncing merchant's projections", async () => {
+    const { service, prisma } = makeService({
+      env: { ...MARKETPLACE_ENV, ...MEMBERSHIP_ENV },
+      summary: [],
+    });
+    await service.syncSettlements();
+    expect(prisma.paytrSettlement.deleteMany).toHaveBeenCalledWith({
+      where: { paytrMerchant: PaytrMerchant.membership, isProjection: true },
     });
   });
 });
@@ -244,7 +302,7 @@ describe("PaytrReportSyncService.syncSettlements", () => {
     // Tek işlem içinde: ortada çökerse tablo boş kalmaz.
     expect(prisma.$transaction).toHaveBeenCalledTimes(1);
     expect(prisma.paytrSettlement.deleteMany).toHaveBeenCalledWith({
-      where: { isProjection: true },
+      where: { paytrMerchant: PaytrMerchant.marketplace, isProjection: true },
     });
     expect(prisma.paytrSettlement.createMany).toHaveBeenCalledWith({
       data: [expect.objectContaining({ isProjection: true, netTotal: 97 })],

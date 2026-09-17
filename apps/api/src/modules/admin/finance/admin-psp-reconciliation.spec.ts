@@ -447,6 +447,28 @@ describe("AdminPspReconciliationService.getStatementLines", () => {
   });
 });
 
+describe("AdminPspReconciliationService — merchant filter", () => {
+  it("narrows statement lines and settlements to one PayTR merchant", async () => {
+    const prisma = makePrisma({
+      linesList: [],
+      linesCount: 0,
+      settlements: [],
+      settlementItemGroups: [],
+    });
+    const { service } = makeService(prisma);
+
+    await service.getStatementLines({ merchant: "membership" as never });
+    await service.getSettlements({ merchant: "membership" as never });
+
+    expect(
+      prisma.paytrStatementLine.findMany.mock.calls[0][0].where,
+    ).toMatchObject({ paytrMerchant: "membership" });
+    expect(
+      prisma.paytrSettlement.findMany.mock.calls[0][0].where,
+    ).toMatchObject({ paytrMerchant: "membership" });
+  });
+});
+
 describe("AdminPspReconciliationService resolve / rematch", () => {
   it("resolves a problem line with a note and writes an audit log", async () => {
     const prisma = makePrisma({

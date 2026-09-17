@@ -3,7 +3,11 @@ import { ConfigService } from "@nestjs/config";
 import { PrismaService } from "../../../prisma";
 import { PaymentProviderRegistry } from "../../payment-providers/payment-provider.registry";
 import { PaytrMerchant, Prisma } from "@prisma/client";
-import { paytrReportSyncEnabled } from "../../../config/paytr";
+import {
+  configuredPaytrMerchants,
+  paytrReportSyncEnabled,
+} from "../../../config/paytr";
+import { PaymentProvider } from "../dto";
 import {
   trCalendarDate,
   trCalendarDateTime,
@@ -24,6 +28,10 @@ const dateTime = trCalendarDateTime;
  * dökümünü ve hakediş kayıtlarını yerel tablolara idempotent upsert eder;
  * admin finans/mutabakat ekranları PayTR'ye canlı sorgu atmaz, buradan okur.
  * Eşleştirme (Payment/RefundAttempt ↔ satır) Faz 3'te bu tabloların üzerine gelir.
+ *
+ * Her PayTR mağazası (pazaryeri, üyelik) kendi dökümünü ve hakedişini verir;
+ * senkron kimliği tanımlı her mağaza için ayrı koşar ve satırları mağazayla
+ * damgalar (tekillik anahtarları mağazayı içerir).
  *
  * PAYTR_REPORT_SYNC_ENABLED=true olmadan HİÇBİR istek atılmaz: rapor uçları
  * PayTR panelinde ayrı yetki isteyebilir; yetkisiz ortamda cron her gece alarm
@@ -58,11 +66,24 @@ export class PaytrReportSyncService {
     days = STATEMENT_WINDOW_DAYS,
   ): Promise<{ fetched: number; upserted: number }> {
     if (!this.enabled()) return { fetched: 0, upserted: 0 };
+    let fetched = 0;
+    let upserted = 0;
+    for (const merchant of configuredPaytrMerchants(this.configService)) {
+      const r = await this.syncMerchantStatement(merchant, days);
+      fetched += r.fetched;
+      upserted += r.upserted;
+    }
+    return { fetched, upserted };
+  }
 
+  private async syncMerchantStatement(
+    merchant: PaytrMerchant,
+    days: number,
+  ): Promise<{ fetched: number; upserted: number }> {
     const end = new Date();
     const start = new Date(end.getTime() - days * 24 * 60 * 60 * 1000);
     const entries = await this.paymentProviders
-      .resolve()
+      .resolve(PaymentProvider.paytr, merchant)
       .getTransactionStatement({
         startDate: dateTime(start),
         endDate: dateTime(end),
@@ -95,7 +116,7 @@ export class PaytrReportSyncService {
       await this.prisma.paytrStatementLine.upsert({
         where: {
           statement_line_dedup: {
-            paytrMerchant: PaytrMerchant.marketplace,
+            paytrMerchant: merchant,
             merchantOid: entry.merchantOid,
             type: entry.type,
             transactionDate,
@@ -103,6 +124,7 @@ export class PaytrReportSyncService {
           },
         },
         create: {
+          paytrMerchant: merchant,
           merchantOid: entry.merchantOid,
           type: entry.type,
           amount: entry.amountTl,
@@ -116,7 +138,7 @@ export class PaytrReportSyncService {
 
     if (upserted > 0) {
       this.logger.log(
-        `PayTR işlem dökümü sync: ${upserted}/${entries.length} satır upsert edildi (${days} günlük pencere)`,
+        `PayTR[${merchant}] işlem dökümü sync: ${upserted}/${entries.length} satır upsert edildi (${days} günlük pencere)`,
       );
     }
     return { fetched: entries.length, upserted };
@@ -134,12 +156,28 @@ export class PaytrReportSyncService {
     itemsFetchedFor: number;
   }> {
     if (!this.enabled()) return { settlements: 0, itemsFetchedFor: 0 };
+    let settlements = 0;
+    let itemsFetchedFor = 0;
+    for (const merchant of configuredPaytrMerchants(this.configService)) {
+      const r = await this.syncMerchantSettlements(merchant);
+      settlements += r.settlements;
+      itemsFetchedFor += r.itemsFetchedFor;
+    }
+    return { settlements, itemsFetchedFor };
+  }
 
+  private async syncMerchantSettlements(merchant: PaytrMerchant): Promise<{
+    settlements: number;
+    itemsFetchedFor: number;
+  }> {
     const end = new Date();
     const start = new Date(
       end.getTime() - SETTLEMENT_WINDOW_DAYS * 24 * 60 * 60 * 1000,
     );
-    const provider = this.paymentProviders.resolve();
+    const provider = this.paymentProviders.resolve(
+      PaymentProvider.paytr,
+      merchant,
+    );
     const summaries = await provider.getSettlementSummary({
       startDate: dateOnly(start),
       endDate: dateOnly(end),
@@ -160,11 +198,15 @@ export class PaytrReportSyncService {
     // tablo boş kalmasın (bir sonraki geceye kadar "aktarılacak" satırı yoktu).
     const projections = summaries.filter((s) => s.projection && s.datePaid);
     await this.prisma.$transaction(async (tx) => {
-      await tx.paytrSettlement.deleteMany({ where: { isProjection: true } });
+      // Yalnız BU mağazanın projeksiyonları: diğer mağazanınki kendi turunda yenilenir.
+      await tx.paytrSettlement.deleteMany({
+        where: { paytrMerchant: merchant, isProjection: true },
+      });
       if (projections.length === 0) return;
       // Tek INSERT: satır satır create etkileşimli işlemin 5 sn sınırını zorluyordu.
       await tx.paytrSettlement.createMany({
         data: projections.map((summary) => ({
+          paytrMerchant: merchant,
           datePaid: new Date(`${summary.datePaid}T00:00:00Z`),
           currency: summary.currency,
           isProjection: true,
@@ -181,13 +223,14 @@ export class PaytrReportSyncService {
       const settlement = await this.prisma.paytrSettlement.upsert({
         where: {
           settlement_day: {
-            paytrMerchant: PaytrMerchant.marketplace,
+            paytrMerchant: merchant,
             datePaid,
             currency: summary.currency,
             isProjection: false,
           },
         },
         create: {
+          paytrMerchant: merchant,
           datePaid,
           currency: summary.currency,
           isProjection: false,
@@ -224,7 +267,7 @@ export class PaytrReportSyncService {
 
     if (settlements > 0) {
       this.logger.log(
-        `PayTR hakediş sync: ${settlements} hakediş upsert, ${itemsFetchedFor} tanesi için kalemler çekildi`,
+        `PayTR[${merchant}] hakediş sync: ${settlements} hakediş upsert, ${itemsFetchedFor} tanesi için kalemler çekildi`,
       );
     }
     return { settlements, itemsFetchedFor };

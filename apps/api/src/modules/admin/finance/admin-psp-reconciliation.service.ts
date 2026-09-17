@@ -5,6 +5,7 @@ import {
 } from "@nestjs/common";
 import {
   PaytrMatchStatus,
+  PaytrMerchant,
   PaytrStatementLineType,
   PaymentStatus,
   Prisma,
@@ -432,10 +433,10 @@ export class AdminPspReconciliationService {
   ): Promise<{ data: unknown[]; meta: { total: number } }> {
     const page = params.page ?? 1;
     const limit = params.limit ?? 50;
-    const where = this.lineFilterWhere(
-      params.status,
-      params.includeResolved ?? false,
-    );
+    const where: Prisma.PaytrStatementLineWhereInput = {
+      ...this.lineFilterWhere(params.status, params.includeResolved ?? false),
+      ...(params.merchant ? { paytrMerchant: params.merchant } : {}),
+    };
 
     const [rows, total] = await Promise.all([
       this.prisma.paytrStatementLine.findMany({
@@ -573,11 +574,15 @@ export class AdminPspReconciliationService {
   async getSettlements(params: {
     limit?: number;
     days?: number;
+    merchant?: PaytrMerchant;
   }): Promise<{ data: unknown[] }> {
     const limit = params.limit ?? 60;
-    const where: Prisma.PaytrSettlementWhereInput = params.days
-      ? { datePaid: { gte: this.windowStart(params.days) } }
-      : {};
+    const where: Prisma.PaytrSettlementWhereInput = {
+      ...(params.days
+        ? { datePaid: { gte: this.windowStart(params.days) } }
+        : {}),
+      ...(params.merchant ? { paytrMerchant: params.merchant } : {}),
+    };
     const settlements = await this.prisma.paytrSettlement.findMany({
       where,
       orderBy: [{ isProjection: "asc" }, { datePaid: "desc" }],
