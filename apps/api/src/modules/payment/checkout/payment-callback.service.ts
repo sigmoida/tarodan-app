@@ -210,7 +210,7 @@ export class PaymentCallbackService {
         return "OK";
       }
       const inquiry = await this.paymentProviders
-        .resolveFor(recurringPayment)
+        .resolve(recurringPayment.provider, recurringPayment.paytrMerchant)
         .queryPaymentStatus(dto.merchant_oid);
       const tolerance = parseFloat(
         this.configService.get("PAYTR_RECONCILE_AMOUNT_TOLERANCE_TL") || "0.05",
@@ -280,7 +280,10 @@ export class PaymentCallbackService {
       return "OK";
     }
 
-    const provider = this.paymentProviders.resolveFor(payment);
+    const provider = this.paymentProviders.resolve(
+      payment.provider,
+      payment.paytrMerchant,
+    );
     let inquiry = await provider.queryPaymentStatus(oid);
     if (!inquiry.ok && oid.includes("-")) {
       inquiry = await provider.queryPaymentStatus(oid.replace(/-/g, ""));

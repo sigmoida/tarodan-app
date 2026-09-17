@@ -278,7 +278,7 @@ export class PaymentTradeRefundService {
       } else {
         try {
           refundResult = (await this.paymentProviders
-            .resolve(payment.provider)
+            .resolve(payment.provider, payment.paytrMerchant)
             // reference_no = attempt id (durum-sorgu mutabakatı için).
             .createRefund(
               oid,

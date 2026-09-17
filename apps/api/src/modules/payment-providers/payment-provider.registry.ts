@@ -47,12 +47,4 @@ export class PaymentProviderRegistry {
     }
     return provider.forMerchant(merchant ?? PaytrMerchant.marketplace);
   }
-
-  /** Shorthand for a stored record: `{ provider, paytrMerchant }`. */
-  resolveFor(record: {
-    provider?: string | null;
-    paytrMerchant?: PaytrMerchant | null;
-  }): IPaymentProvider {
-    return this.resolve(record.provider, record.paytrMerchant);
-  }
 }

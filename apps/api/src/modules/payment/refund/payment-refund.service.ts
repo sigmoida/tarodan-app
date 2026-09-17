@@ -552,8 +552,9 @@ export class PaymentRefundService {
             };
           } else {
             try {
+              // İade, ödemenin ALINDIĞI mağazaya gider (kaydın paytrMerchant'ı).
               refundResult = await this.paymentProviders
-                .resolve(payment.provider)
+                .resolve(payment.provider, payment.paytrMerchant)
                 // reference_no = attempt id: PayTR durum-sorgu yanıtında geri
                 // döner, mutabakatta iade ↔ attempt eşlemesini mümkün kılar.
                 .createRefund(

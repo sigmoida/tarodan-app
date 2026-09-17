@@ -97,12 +97,6 @@ describe("PaymentProviderRegistry (#89)", () => {
     // Aynı mağaza her seferinde aynı örnek — önbellek paylaşılır.
     expect(registry.resolve(null, PaytrMerchant.membership)).toBe(membership);
     expect(membership.forMerchant(PaytrMerchant.marketplace)).toBe(paytr);
-    expect(
-      registry.resolveFor({
-        provider: "paytr",
-        paytrMerchant: PaytrMerchant.membership,
-      }),
-    ).toBe(membership);
     expect(registry.resolve("paytr", null).merchant).toBe(
       PaytrMerchant.marketplace,
     );

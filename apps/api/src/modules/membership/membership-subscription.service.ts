@@ -1156,7 +1156,7 @@ export class MembershipSubscriptionService {
       if (!merchantOid) continue;
       try {
         const inquiry = await this.paymentProviders
-          .resolve()
+          .resolve(attempt.provider, attempt.paytrMerchant)
           .queryPaymentStatus(merchantOid);
         if (
           inquiry.ok &&
