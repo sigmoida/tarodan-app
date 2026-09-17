@@ -193,6 +193,36 @@ describe("PaytrReportSyncService — per merchant", () => {
     ]);
   });
 
+  it("keeps syncing the other merchant when one merchant's report fails", async () => {
+    // Yeni mağazada rapor yetkisi açılmamış olabilir: pazaryeri dökümü yine
+    // yazılmalı ve çağıran (eşleştirme/kesinti) çalışmaya devam edebilmeli.
+    const { service, prisma, getTransactionStatement } = makeService({
+      env: { ...MARKETPLACE_ENV, ...MEMBERSHIP_ENV },
+      statement: [SALE],
+    });
+    getTransactionStatement
+      .mockResolvedValueOnce([SALE])
+      .mockRejectedValueOnce(new Error("yetkisiz"));
+
+    const r = await service.syncTransactionStatement();
+
+    expect(r).toEqual({
+      fetched: 1,
+      upserted: 1,
+      failedMerchants: [PaytrMerchant.membership],
+    });
+    expect(prisma.paytrStatementLine.upsert).toHaveBeenCalledTimes(1);
+  });
+
+  it("throws when every configured merchant's report fails", async () => {
+    const { service, getSettlementSummary } = makeService({
+      env: { ...MARKETPLACE_ENV, ...MEMBERSHIP_ENV },
+    });
+    getSettlementSummary.mockRejectedValue(new Error("down"));
+
+    await expect(service.syncSettlements()).rejects.toThrow("down");
+  });
+
   it("skips a merchant whose credentials are not configured", async () => {
     const { service, resolve } = makeService({ env: MARKETPLACE_ENV });
     await service.syncSettlements();

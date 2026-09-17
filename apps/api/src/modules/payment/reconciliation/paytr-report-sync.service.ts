@@ -62,18 +62,56 @@ export class PaytrReportSyncService {
    * aynı satırı iki kez yazamaz; PayTR tarafı satırı sonradan zenginleştirirse
    * (ör. kesinti kesinleşirse) update tarafı tazeler.
    */
-  async syncTransactionStatement(
-    days = STATEMENT_WINDOW_DAYS,
-  ): Promise<{ fetched: number; upserted: number }> {
+  async syncTransactionStatement(days = STATEMENT_WINDOW_DAYS): Promise<{
+    fetched: number;
+    upserted: number;
+    failedMerchants?: PaytrMerchant[];
+  }> {
     if (!this.enabled()) return { fetched: 0, upserted: 0 };
     let fetched = 0;
     let upserted = 0;
-    for (const merchant of configuredPaytrMerchants(this.configService)) {
-      const r = await this.syncMerchantStatement(merchant, days);
-      fetched += r.fetched;
-      upserted += r.upserted;
+    const failedMerchants = await this.forEachMerchant(
+      "işlem dökümü",
+      async (merchant) => {
+        const r = await this.syncMerchantStatement(merchant, days);
+        fetched += r.fetched;
+        upserted += r.upserted;
+      },
+    );
+    return { fetched, upserted, ...failedMerchants };
+  }
+
+  /**
+   * Senkronu kimliği tanımlı her mağaza için AYRI koşturur. Bir mağazanın
+   * rapor hatası (ör. yeni mağazada rapor yetkisi henüz açılmamış) diğerinin
+   * senkronunu ve ardından koşan eşleştirme/kesinti tahakkukunu DURDURMAZ:
+   * hata loglanır, mağaza `failedMerchants`'a yazılır. Yalnız HER mağaza
+   * düştüyse ilk hata fırlatılır (tek mağazalı eski davranış).
+   */
+  private async forEachMerchant(
+    label: string,
+    fn: (merchant: PaytrMerchant) => Promise<void>,
+  ): Promise<{ failedMerchants?: PaytrMerchant[] }> {
+    const merchants = configuredPaytrMerchants(this.configService);
+    const failed: PaytrMerchant[] = [];
+    let firstError: unknown;
+    for (const merchant of merchants) {
+      try {
+        await fn(merchant);
+      } catch (error: unknown) {
+        failed.push(merchant);
+        firstError ??= error;
+        this.logger.error(
+          `PAYTR_REPORT_SYNC_MERCHANT_FAILED PayTR[${merchant}] ${label} senkronu başarısız: ${
+            error instanceof Error ? error.message : String(error)
+          }`,
+        );
+      }
     }
-    return { fetched, upserted };
+    if (failed.length > 0 && failed.length === merchants.length) {
+      throw firstError;
+    }
+    return failed.length > 0 ? { failedMerchants: failed } : {};
   }
 
   private async syncMerchantStatement(
@@ -154,16 +192,20 @@ export class PaytrReportSyncService {
   async syncSettlements(): Promise<{
     settlements: number;
     itemsFetchedFor: number;
+    failedMerchants?: PaytrMerchant[];
   }> {
     if (!this.enabled()) return { settlements: 0, itemsFetchedFor: 0 };
     let settlements = 0;
     let itemsFetchedFor = 0;
-    for (const merchant of configuredPaytrMerchants(this.configService)) {
-      const r = await this.syncMerchantSettlements(merchant);
-      settlements += r.settlements;
-      itemsFetchedFor += r.itemsFetchedFor;
-    }
-    return { settlements, itemsFetchedFor };
+    const failedMerchants = await this.forEachMerchant(
+      "hakediş",
+      async (merchant) => {
+        const r = await this.syncMerchantSettlements(merchant);
+        settlements += r.settlements;
+        itemsFetchedFor += r.itemsFetchedFor;
+      },
+    );
+    return { settlements, itemsFetchedFor, ...failedMerchants };
   }
 
   private async syncMerchantSettlements(merchant: PaytrMerchant): Promise<{
