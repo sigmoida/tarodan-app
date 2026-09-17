@@ -167,6 +167,23 @@ export function extractData<T>(
   return { rows, total };
 }
 
+/**
+ * The search + filter part of a list request: empty values and the "all"
+ * sentinel are not sent. Exported so companion requests that must match the
+ * list exactly (e.g. tab counts) build their params the same way.
+ */
+export function listFilterParams(
+  search: string,
+  filters: Record<string, string>,
+): Record<string, string> {
+  const params: Record<string, string> = {};
+  if (search) params.search = search;
+  Object.entries(filters).forEach(([key, val]) => {
+    if (val && val !== "all") params[key] = val;
+  });
+  return params;
+}
+
 // ─── Hook ──────────────────────────────────────────────────────────────────
 
 /**
@@ -464,11 +481,11 @@ export function useAdminResource<T>({
   // ── Query params (for fetch) ────────────────────────────────────────────────
   // Don't send the "all" value to the backend — pass only real filter values
   const buildParams = useCallback(() => {
-    const params: Record<string, any> = { page, limit: pageSize };
-    if (committedSearch) params.search = committedSearch;
-    Object.entries(filters).forEach(([key, val]) => {
-      if (val && val !== "all") params[key] = val;
-    });
+    const params: Record<string, any> = {
+      page,
+      limit: pageSize,
+      ...listFilterParams(committedSearch, filters),
+    };
     // Sort metadata is shared by client comparators and server DTOs.
     if (sort.sortBy) {
       params.sortBy = sort.sortBy;
