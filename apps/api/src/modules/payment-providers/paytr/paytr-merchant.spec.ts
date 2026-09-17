@@ -142,6 +142,27 @@ describe("PaytrMerchantCredentials — signing per merchant", () => {
     );
   });
 
+  it("an unconfigured merchant verifies nothing (empty-key HMAC is forgeable)", () => {
+    const unconfigured = new PayTRCredentials(
+      configWith({
+        ...ENV,
+        PAYTR_MEMBERSHIP_MERCHANT_ID: undefined,
+        PAYTR_MEMBERSHIP_MERCHANT_KEY: undefined,
+        PAYTR_MEMBERSHIP_MERCHANT_SALT: undefined,
+      }),
+    ).forMerchant(PaytrMerchant.membership);
+    const body = { merchantOid: "ORD1", status: "success", totalAmount: "100" };
+    const forged = hmac(
+      "",
+      `${body.merchantOid}${body.status}${body.totalAmount}`,
+    );
+
+    expect(
+      unconfigured.verifyPaymentNotification({ ...body, hash: forged }),
+    ).toBe(false);
+    expect(unconfigured.verifyWithSalt("x", hmac("", "x"))).toBe(false);
+  });
+
   it("recognises two profiles pointing at the same PayTR store", () => {
     const shared = new PayTRCredentials(
       configWith({

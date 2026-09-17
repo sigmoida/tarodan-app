@@ -68,8 +68,13 @@ export class PaytrMerchantCredentials {
     return a.length === b.length && crypto.timingSafeEqual(a, b);
   }
 
-  /** `data + merchant_salt` imzasını doğrular (ör. transfer sonucu bildirimi). */
+  /**
+   * `data + merchant_salt` imzasını doğrular (ör. transfer sonucu bildirimi).
+   * Kimliği tanımsız mağaza HİÇBİR imzayı doğrulamaz: boş anahtarlı HMAC'i
+   * herkes hesaplayabilir, sahte bildirim geçerli sayılırdı.
+   */
   verifyWithSalt(data: string, hash: string): boolean {
+    if (!this.isConfigured) return false;
     return PaytrMerchantCredentials.safeEqual(this.signWithSalt(data), hash);
   }
 
@@ -93,6 +98,9 @@ export class PaytrMerchantCredentials {
     totalAmount: string;
     hash: string;
   }): boolean {
+    // Tanımsız mağaza (ör. üyelik kimliği girilmemiş ortam): boş anahtarla
+    // hesaplanan hash tahmin edilebilir — bildirim ucu sahteyi kabul etmesin.
+    if (!this.isConfigured) return false;
     return PaytrMerchantCredentials.safeEqual(
       this.signPaymentNotification(input),
       input.hash,
