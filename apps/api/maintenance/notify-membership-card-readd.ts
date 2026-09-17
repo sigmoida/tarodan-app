@@ -44,11 +44,11 @@ async function main(): Promise<void> {
   pinProcessRole("web");
 
   const dist = join(__dirname, "..", "..", "dist");
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
   const { AppModule } = require(join(dist, "app.module")) as {
     AppModule: Type<unknown>;
   };
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
   const { MembershipService } = require(
     join(dist, "modules", "membership", "membership.service"),
   ) as { MembershipService: Type<MembershipServiceLike> };
