@@ -45,7 +45,11 @@ Kurallar (tek kaynak `config/paytr.ts` + `payment/helpers/paytr-merchant.helper.
 - Bildirim hash'i **ucun** mağazasının anahtarıyla doğrulanır. Doğrulanmış ama kaydı
   diğer mağazada alınmış bir bildirim `PAYTR_MERCHANT_MISMATCH` ile loglanıp
   uygulanmadan `OK` döner (ör. mağaza değişmiş bir ödemenin eski oid'i ya da panelde
-  yanlış Bildirim URL'i) — manuel inceleme.
+  yanlış Bildirim URL'i) — manuel inceleme. Geçiş sonrası yarım ödeme kontrolü
+  (log araması + salt-okunur SQL + manuel çözüm adımları) ve üyelik mağazası
+  panelindeki Bildirim URL uyarısı (yalnız `/callback/paytr/membership`; `/callback`
+  alias'ı ve pazaryeri URL'i her bildirimi hash hatasına düşürür):
+  `OPERATIONS.md` → "Bir kerelik: PayTR üyelik mağazası geçişi" 2. ve 6. adım.
 - Kartlar (`saved_cards.paytr_merchant`) mağazaya özeldir: sepet ödemesi pazaryeri,
   üyelik ödemesi ve oto-yenileme üyelik kartlarını kullanır. Kart **taşınmaz**.
 

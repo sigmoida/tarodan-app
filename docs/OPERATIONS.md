@@ -207,6 +207,16 @@ secrets deploy'dan ÖNCE girilir.
 - Üyelik mağazası: `https://<api-host>/api/payments/callback/paytr/membership`.
   İki mağaza aynı URL'i KULLANAMAZ: her uç kendi mağazasının anahtarıyla doğrular,
   yanlış uca düşen bildirim hash uyuşmazlığına düşer.
+
+> **UYARI — üyelik mağazasının Bildirim URL'i:** panelde yalnız
+> `/api/payments/callback/paytr/membership` girilir. Eski `/api/payments/callback`
+> alias'ı **ve** pazaryeri URL'i (`/api/payments/callback/paytr`) YASAKTIR: alias
+> her zaman pazaryeri mağazasına eşlenir, yani iki yanlış URL de bildirimi pazaryeri
+> anahtarıyla doğrular. Sonuç: **her** üyelik bildirimi hash doğrulamasından düşer,
+> hiçbir üyelik ödemesi callback ile tamamlanmaz (log'da
+> `PAYTR_MERCHANT_MISMATCH (invalid hash) ... route=marketplace record=membership`).
+> Panele kaydettikten sonra URL'i bir kez daha harf harf karşılaştırın.
+
 - Üyelik mağazasında canlı mod, non-3D, recurring, kart saklama (CAPI) ve Direkt
   API yetkilerinin açık olduğu teyit edilir. Rapor senkronu açıksa rapor yetkisi de.
 
@@ -232,9 +242,98 @@ docker exec "$API_CID" sh -c 'cd /app && node dist-seed/maintenance/notify-membe
 
 Bayraksız koşu kurudur (yalnız sayar); yazma ve bildirim yalnız `--apply` ile.
 
+**Büyük olasılıkla no-op:** eski (pazaryeri) mağazanın non-3D yetkisi hiç olmadı,
+yani recurring hiç çalışmadı; oto-yenilemeye hazır saklı kartlı üye beklenmez.
+Önce **yalnız bayraksız (kuru) koşuyu** çalıştırın; sayı `0` ise `--apply`'ı
+**atlayın**. Sıfırdan büyükse sayıyı kaydedip `--apply` ile devam edin.
+
 Yerelde: `pnpm --filter @tarodan/api notify:prod:membership-card-readd -- --apply` (önce
 `build` + `build:seed`; script derlenmiş `dist/` uygulamasını `PROCESS_ROLE=web`
 ile başsız yükler, zamanlanmış işleri koşturmaz).
+
+**6. Geçiş sonrası kontrol — yarım kalmış ödemeler (geçişten 24-48 saat sonra, bir
+kez):** geçişten ÖNCE pazaryeri mağazasında başlatılıp geçişten SONRA yeniden
+denenen bir üyelik ödemesinin satırı artık `paytr_merchant = membership` taşır;
+eski oid'i `payments.metadata.merchantOidHistory`'de kalır. Eski oid için pazaryeri
+mağazasından gelen (hash'i geçerli) bildirim bu yüzden **uygulanmaz** ve
+`PAYTR_MERCHANT_MISMATCH` loglanır. Kullanıcı eski formda ödediyse para pazaryeri
+mağazasına geçmiş ama üyelik açılmamış olabilir.
+
+_a) Log araması:_ `PAYTR_MERCHANT_MISMATCH` `logger.error` ile yazılır; Sentry'ye
+ayrı bir issue olarak **gitmez** — kaynak API konteynerinin logudur (Coolify → API
+servisi → Logs'ta arama, ya da):
+
+```
+docker logs --since 72h "$API_CID" 2>&1 | grep PAYTR_MERCHANT_MISMATCH
+```
+
+Satırda `merchant_oid`, `route` (bildirimin geldiği uç), `record` (kaydın mağazası)
+ve `status` bulunur. `(invalid hash)` içeren satırlar yarım ödeme değil, panelde
+yanlış Bildirim URL'idir → 2. adımdaki uyarıya bakın. Aynı bilgi kalıcı olarak DB'de de
+vardır: bildirimler `payment_provider_events`'e mağazasıyla kaydedilir (sorgu b).
+
+_b) Salt-okunur SQL_ (production DB'de yalnız `SELECT`; `<GECIS_ANI>` yerine
+deploy'un UTC zamanını yazın, ör. `'2026-09-18 07:30:00+00'`):
+
+```sql
+-- Geçişten önce oluşturulmuş, geçişten sonra üyelik mağazasında yeniden
+-- başlatılmış (eski oid'leri geçmişte duran) ve tamamlanmamış üyelik ödemeleri.
+SELECT p.id                                    AS payment_id,
+       o.order_number,
+       o.buyer_id,
+       p.status,
+       p.amount,
+       p.created_at,
+       p.metadata->>'lastChargeStartedAt'      AS son_cekim_basi,
+       p.provider_conversation_id              AS guncel_oid,
+       p.metadata->'merchantOidHistory'        AS eski_oidler,
+       (SELECT json_agg(json_build_object(
+                 'oid', e.merchant_oid, 'magaza', e.paytr_merchant,
+                 'status', e.status, 'hash', e.hash_valid, 'at', e.created_at)
+               ORDER BY e.created_at)
+          FROM payment_provider_events e
+         WHERE e.event_type = 'callback'
+           AND e.merchant_oid IN (
+                 SELECT jsonb_array_elements_text(p.metadata->'merchantOidHistory'))
+       )                                       AS eski_oid_bildirimleri
+  FROM payments p
+  JOIN orders o ON o.id = p.order_id
+ WHERE p.provider = 'paytr'
+   AND p.paytr_merchant = 'membership'
+   AND o.product_id LIKE 'membership-%'
+   AND p.created_at < TIMESTAMPTZ '<GECIS_ANI>'
+   AND jsonb_typeof(p.metadata->'merchantOidHistory') = 'array'
+   AND jsonb_array_length(p.metadata->'merchantOidHistory') > 0
+   AND p.status NOT IN ('completed', 'refunded')
+ ORDER BY p.created_at;
+```
+
+Oid'lerin kendisinde tarih yoktur (sonek yalnız milisaniyenin son 6 hanesi); "geçiş
+öncesi oid" bu yüzden satırın `created_at`'i geçişten önce olmasıyla yakalanır —
+geçmişteki oid'lerden en az biri pazaryeri mağazasında başlatılmıştır. Satır
+dönmezse kontrol biter. `eski_oid_bildirimleri`'nde `magaza = marketplace`,
+`status = success` görülen satır **öncelikli**dir (para eski mağazada alınmış).
+`p.status = 'completed'` satırlarına da bir kez göz atmak isterseniz son filtreyi
+kaldırın: eski oid'de de `success` varsa çift çekimdir.
+
+_c) Manuel çözüm (her satır için):_
+
+1. **Eski mağazada sorgula:** `eski_oidler`'deki her oid için **pazaryeri** mağaza
+   panelinde (İşlemler → sipariş no araması) ya da pazaryeri mağazasının
+   kimlikleriyle PayTR durum-sorgu (`/odeme/durum-sorgu`) ile sonucu alın. Üyelik
+   mağazasının kimlikleriyle sorgulamayın — o oid orada yoktur.
+2. **Hiçbirinde başarılı çekim yoksa:** işlem gerekmez; ödeme kendi akışında
+   (yeni deneme ya da süre dolumu) kapanır.
+3. **Eski oid'de başarılı çekim varsa ve kullanıcı yeni mağazada da ödemediyse:**
+   ya kullanıcıya üyeliği admin panelinden elle tanımlayın (dönem = ödenen paket;
+   karar ve tutar destek kaydına yazılır) ya da tutarı **pazaryeri** mağaza
+   panelinden iade edip kullanıcıya yeniden satın almasını söyleyin. Uygulama bu
+   ödeme satırını eski mağazanın sonucuyla kendiliğinden tamamlamaz; iade de
+   uygulamadan yapılamaz (satırın mağazası artık `membership`) — iade panelden.
+4. **Hem eski hem yeni oid'de başarılı çekim varsa (çift çekim):** eski oid'in
+   tutarını pazaryeri mağaza panelinden iade edin.
+5. Yapılan işlemi oid, kullanıcı ve tutarla destek/muhasebe kaydına geçin (rapor
+   mutabakatında pazaryeri mağazasının dökümünde eşleşmeyen satır olarak görünür).
 
 **Bilinen sınır:** ayrı "kart ekle" akışı yoktur; kart yalnız bir üyelik
 ödemesinde saklanır. Dönemi süren üye kartını bir sonraki satın almada ekler.
