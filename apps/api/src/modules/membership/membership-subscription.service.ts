@@ -611,6 +611,9 @@ export class MembershipSubscriptionService {
             idempotencyKey,
             amount: price,
             provider,
+            // Üyelik siparişinin ödemesi üyelik mağazasında çekilir
+            // (resolvePaytrMerchant); niyet kaydı da aynı mağazayı taşır.
+            paytrMerchant: PaytrMerchant.membership,
             status: PaymentStatus.pending,
             periodStart,
             periodEnd,

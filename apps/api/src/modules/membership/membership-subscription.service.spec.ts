@@ -552,6 +552,7 @@ describe("MembershipSubscriptionService", () => {
         billingPeriod: "monthly",
         amount: 100,
         provider: PaymentProvider.paytr,
+        paytrMerchant: PaytrMerchant.membership,
         status: PaymentStatus.pending,
         metadata: expect.objectContaining({
           kind: "one_time",
