@@ -75,3 +75,6 @@ export interface ApiError {
 
 // Attribute group rules (dedicated/hidden/global-custom groups, selection mode)
 export * from "./attribute-group";
+
+// Admin invoice list: the process an invoice was issued for
+export * from "./invoice";
