@@ -36,7 +36,7 @@ import { createAddress } from "../../factories/address.factory";
 import { createOfferRow } from "../../factories/offer.factory";
 import { buyNow as createBuyNowRequest } from "../../factories/flows";
 import { scenario } from "../../test-utils/scenario";
-import { signCallback } from "../../mocks/paytr.mock";
+import { paytrCallbackPath, signCallback } from "../../mocks/paytr.mock";
 import { PaymentService } from "../../../src/modules/payment/payment.service";
 import { PayoutService } from "../../../src/modules/payout/payout.service";
 
@@ -137,8 +137,14 @@ describe("10 — Ödeme & Escrow (PAY)", () => {
     req.end = ((callback?: (err: any, res: any) => void) => {
       lastPayment(orderId).then(
         (payment) => {
+          // Üyelik ödemesi üyelik mağazasının ucuna gider (kayıt mağazası belirler).
+          req.url = req.url.replace(
+            "/api/payments/callback/paytr",
+            paytrCallbackPath(payment!.paytrMerchant),
+          );
           req.send(
             signCallback({
+              merchant: payment!.paytrMerchant,
               merchantOid: payment!.providerConversationId!,
               status: "success",
               totalAmount:

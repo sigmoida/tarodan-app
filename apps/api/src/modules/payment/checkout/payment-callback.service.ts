@@ -4,7 +4,7 @@ import { PrismaService } from "../../../prisma";
 import { isRejectableTestModeSuccess } from "./paytr-test-mode.guard";
 import { shouldDeferSupersededOidFailure } from "./paytr-superseded-oid.guard";
 import { PaymentProvider, PayTRCallbackDto } from "../dto";
-import { PaymentStatus, OrderStatus } from "@prisma/client";
+import { PaymentStatus, OrderStatus, PaytrMerchant } from "@prisma/client";
 import { PaymentProviderRegistry } from "../../payment-providers/payment-provider.registry";
 import { PaymentCommonService } from "../payment-common.service";
 import { PaymentFulfillmentService } from "../fulfillment/payment-fulfillment.service";
@@ -14,6 +14,7 @@ import { CacheService } from "../../cache/cache.service";
 import { VirtualOrderFulfillmentService } from "../fulfillment/virtual-order-fulfillment.service";
 import { nodeEnv } from "../../../config/environment";
 import { errorMessage } from "../../../common/helpers/error-message";
+import { payerIpFromPaymentMetadata } from "../helpers/paytr-merchant.helper";
 
 /**
  * A callback whose four protocol-required fields are present.
@@ -62,7 +63,7 @@ export class PaymentCallbackService {
    * parseCallback taksit/currency/tutar/test_mode'u tiplenmiş döndürür.
    */
   private parsePaytrCallbackData(dto: PayTRCallbackDto) {
-    return this.paymentProviders.resolve().parseCallback({
+    return this.paymentProviders.resolve(PaymentProvider.paytr).parseCallback({
       merchant_oid: dto.merchant_oid as string,
       status: dto.status as "success" | "failed",
       total_amount: dto.total_amount as string,
@@ -85,6 +86,7 @@ export class PaymentCallbackService {
    */
   private async allowHashMismatchInquiry(
     merchantOid: string,
+    merchant: PaytrMerchant = PaytrMerchant.marketplace,
   ): Promise<boolean> {
     const windowSec = parseInt(
       this.configService.get("PAYTR_HASH_MISMATCH_WINDOW_SEC") || "60",
@@ -94,7 +96,11 @@ export class PaymentCallbackService {
       this.configService.get("PAYTR_HASH_MISMATCH_MAX_PER_WINDOW") || "5",
       10,
     );
-    const key = `paytr:hashmismatch:${merchantOid}`;
+    // Pazaryeri anahtarı geriye uyum için değişmedi; diğer mağaza kendi sayacını tutar.
+    const key =
+      merchant === PaytrMerchant.marketplace
+        ? `paytr:hashmismatch:${merchantOid}`
+        : `paytr:hashmismatch:${merchant}:${merchantOid}`;
     const count = await this.cache.incr(key);
     if (count === 1) {
       await this.cache.set(key, count, { ttl: windowSec });
@@ -156,6 +162,7 @@ export class PaymentCallbackService {
    */
   private async handlePayTRCallbackHashMismatch(
     dto: VerifiedPayTRCallback,
+    merchant: PaytrMerchant,
   ): Promise<string> {
     const payment = await this.findPaymentForPaytrCallback(dto.merchant_oid);
     const recurringPayment = payment
@@ -175,22 +182,35 @@ export class PaymentCallbackService {
       merchantOid: dto.merchant_oid,
       paymentId: payment?.id ?? null,
       membershipPaymentId: recurringPayment?.id ?? null,
+      paytrMerchant: merchant,
       status: dto.status,
       hashValid: false,
       raw: { ...dto },
     });
+
+    // Durum-sorgu YALNIZ kaydın alındığı mağazaya ve o mağazanın bildirim
+    // ucundan gelen istek için atılır: başka mağazanın ucuna düşmüş bir
+    // bildirim bu mağazanın kaydını tamamlatamaz.
+    const recordMerchant =
+      payment?.paytrMerchant ?? recurringPayment?.paytrMerchant ?? null;
+    if (recordMerchant && recordMerchant !== merchant) {
+      this.logger.error(
+        `PAYTR_MERCHANT_MISMATCH (invalid hash) merchant_oid=${dto.merchant_oid} route=${merchant} record=${recordMerchant}`,
+      );
+      return "OK";
+    }
 
     if (!payment && recurringPayment) {
       if (
         recurringPayment.provider !== PaymentProvider.paytr ||
         (recurringPayment.status !== PaymentStatus.pending &&
           recurringPayment.status !== PaymentStatus.processing) ||
-        !(await this.allowHashMismatchInquiry(dto.merchant_oid))
+        !(await this.allowHashMismatchInquiry(dto.merchant_oid, merchant))
       ) {
         return "OK";
       }
       const inquiry = await this.paymentProviders
-        .resolve()
+        .resolveFor(recurringPayment)
         .queryPaymentStatus(dto.merchant_oid);
       const tolerance = parseFloat(
         this.configService.get("PAYTR_RECONCILE_AMOUNT_TOLERANCE_TL") || "0.05",
@@ -253,18 +273,17 @@ export class PaymentCallbackService {
 
     // Cap the outbound durum-sorgu per merchant_oid so replayed bad-hash
     // callbacks cannot amplify into unbounded outbound requests (#71).
-    if (!(await this.allowHashMismatchInquiry(dto.merchant_oid))) {
+    if (!(await this.allowHashMismatchInquiry(dto.merchant_oid, merchant))) {
       this.logger.warn(
         `PayTR hash mismatch: durum-sorgu rate-limited payment=${payment.id} merchant_oid=${dto.merchant_oid}`,
       );
       return "OK";
     }
 
-    let inquiry = await this.paymentProviders.resolve().queryPaymentStatus(oid);
+    const provider = this.paymentProviders.resolveFor(payment);
+    let inquiry = await provider.queryPaymentStatus(oid);
     if (!inquiry.ok && oid.includes("-")) {
-      inquiry = await this.paymentProviders
-        .resolve()
-        .queryPaymentStatus(oid.replace(/-/g, ""));
+      inquiry = await provider.queryPaymentStatus(oid.replace(/-/g, ""));
     }
 
     if (!inquiry.ok) {
@@ -308,11 +327,19 @@ export class PaymentCallbackService {
   }
 
   /**
-   * Handle PayTR callback
-   * POST /payments/callback/paytr
+   * Handle PayTR callback.
+   * POST /payments/callback/paytr            → marketplace merchant
+   * POST /payments/callback/paytr/membership → membership merchant
+   *
+   * `merchant` is the merchant whose notification URL was hit. The hash is
+   * verified with THAT merchant's key; a verified notification for a record
+   * charged on the other merchant is logged and acknowledged, never applied.
    */
-  async handlePayTRCallback(dto: PayTRCallbackDto) {
-    this.logger.log("PayTR callback received");
+  async handlePayTRCallback(
+    dto: PayTRCallbackDto,
+    merchant: PaytrMerchant = PaytrMerchant.marketplace,
+  ) {
+    this.logger.log(`PayTR callback received (merchant=${merchant})`);
 
     // PayTR keeps retrying unless we reply with literal "OK". Always return
     // "OK" — even on bad/missing payloads — and just log the issue.
@@ -323,17 +350,19 @@ export class PaymentCallbackService {
       return "OK";
     }
 
-    const isValid = this.paymentProviders.resolve().verifyCallback({
-      merchant_oid: dto.merchant_oid,
-      status: dto.status as "success" | "failed",
-      total_amount: dto.total_amount,
-      hash: dto.hash,
-      failed_reason_code: dto.failed_reason_code,
-      failed_reason_msg: dto.failed_reason_msg,
-    });
+    const isValid = this.paymentProviders
+      .resolve(PaymentProvider.paytr, merchant)
+      .verifyCallback({
+        merchant_oid: dto.merchant_oid,
+        status: dto.status as "success" | "failed",
+        total_amount: dto.total_amount,
+        hash: dto.hash,
+        failed_reason_code: dto.failed_reason_code,
+        failed_reason_msg: dto.failed_reason_msg,
+      });
 
     if (!isValid) {
-      return this.handlePayTRCallbackHashMismatch(dto);
+      return this.handlePayTRCallbackHashMismatch(dto, merchant);
     }
 
     const payment = await this.findPaymentForPaytrCallback(dto.merchant_oid);
@@ -354,6 +383,7 @@ export class PaymentCallbackService {
       merchantOid: dto.merchant_oid,
       paymentId: payment?.id ?? null,
       membershipPaymentId: recurringPayment?.id ?? null,
+      paytrMerchant: merchant,
       status: dto.status,
       paymentType: parsed.paymentType ?? null,
       installmentCount: parsed.installmentCount ?? null,
@@ -367,6 +397,19 @@ export class PaymentCallbackService {
       hashValid: true,
       raw: { ...dto },
     });
+
+    const recordMerchant =
+      payment?.paytrMerchant ?? recurringPayment?.paytrMerchant ?? null;
+    if (recordMerchant && recordMerchant !== merchant) {
+      // Hash bu mağazanın anahtarıyla GEÇERLİ ama kayıt diğer mağazada alındı:
+      // yeniden başlatılmış bir ödemenin eski oid'i ya da panelde yanlış
+      // Bildirim URL'i. Kaydı yanlış mağazanın sonucuyla değiştirmek para
+      // kaybettirir — PayTR tekrar denemesin diye OK, inceleme için alarm.
+      this.logger.error(
+        `PAYTR_MERCHANT_MISMATCH merchant_oid=${dto.merchant_oid} route=${merchant} record=${recordMerchant} status=${dto.status} — bildirim uygulanmadı, manuel inceleme gerekir`,
+      );
+      return "OK";
+    }
 
     if (!payment && recurringPayment) {
       const toleranceTl = parseFloat(
@@ -488,9 +531,14 @@ export class PaymentCallbackService {
         payment.tradeCashPayment?.payerId;
       if (dto.utoken && savedCardOwnerId) {
         try {
+          // Kart, çekimin yapıldığı mağazanın kasasındadır. Vekâlet IP'si ödemeyi
+          // başlatan istemcinin IP'sidir (direct-form'da metadata'ya yazılır) —
+          // kullanıcısız yenileme user_ip olarak bunu gönderir, 0.0.0.0 değil.
           await this.paymentReconciliation.syncSavedCardsFromUtoken(
             savedCardOwnerId,
             dto.utoken,
+            { ip: payerIpFromPaymentMetadata(payment.metadata) },
+            payment.paytrMerchant,
           );
         } catch (error: unknown) {
           this.logger.error(

@@ -5,7 +5,7 @@ import {
   DirectPaymentDto,
   PaymentQueryDto,
 } from "./dto";
-import { Prisma } from "@prisma/client";
+import { PaytrMerchant, Prisma } from "@prisma/client";
 import { type Locale } from "@tarodan/i18n";
 import { Request } from "express";
 import { PaymentCommonService } from "./payment-common.service";
@@ -89,8 +89,8 @@ export class PaymentService {
     return this.paymentInitiation.bypassCompletePayment(paymentId, userId);
   }
 
-  async handlePayTRCallback(dto: PayTRCallbackDto) {
-    return this.paymentCallback.handlePayTRCallback(dto);
+  async handlePayTRCallback(dto: PayTRCallbackDto, merchant?: PaytrMerchant) {
+    return this.paymentCallback.handlePayTRCallback(dto, merchant);
   }
 
   async retryPayment(paymentId: string, userId: string, req?: Request) {
@@ -221,11 +221,13 @@ export class PaymentService {
     userId: string,
     utoken: string,
     mandate?: { ip?: string; termsVersion?: string },
+    merchant?: PaytrMerchant,
   ): Promise<number> {
     return this.paymentReconciliation.syncSavedCardsFromUtoken(
       userId,
       utoken,
       mandate,
+      merchant,
     );
   }
 

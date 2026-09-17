@@ -46,6 +46,7 @@ import {
   PaymentQueryDto,
 } from "./dto";
 import { isProduction } from "../../config/environment";
+import { PaytrMerchant } from "@prisma/client";
 
 @ApiTags("payments")
 @Controller("payments")
@@ -299,9 +300,34 @@ export class PaymentController {
   // bounded separately in the hash-mismatch handler.
   @Throttle({ default: { limit: 60, ttl: 60000 } })
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: "PayTR payment callback (webhook)" })
+  @ApiOperation({
+    summary: "PayTR payment callback (webhook) — marketplace merchant",
+  })
   async paytrCallback(@Body() dto: PayTRCallbackDto) {
-    return this.paymentService.handlePayTRCallback(dto);
+    return this.paymentService.handlePayTRCallback(
+      dto,
+      PaytrMerchant.marketplace,
+    );
+  }
+
+  /**
+   * POST /payments/callback/paytr/membership - PayTR webhook of the MEMBERSHIP
+   * merchant (panel "Bildirim URL" of that store). Same handler; the hash is
+   * verified with the membership merchant's key.
+   */
+  @Post("callback/paytr/membership")
+  @Public()
+  @Throttle({ default: { limit: 60, ttl: 60000 } })
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: "PayTR payment callback (webhook) — membership merchant",
+  })
+  @ApiResponse({ status: HttpStatus.OK, description: 'Literal "OK"' })
+  async paytrMembershipCallback(@Body() dto: PayTRCallbackDto) {
+    return this.paymentService.handlePayTRCallback(
+      dto,
+      PaytrMerchant.membership,
+    );
   }
 
   // ============================================================

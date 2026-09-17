@@ -1,5 +1,6 @@
 import * as crypto from "crypto";
 import { PaytrMerchant } from "@prisma/client";
+import { PAYTR_CALLBACK_PATHS } from "../../src/config/paytr";
 import type { PaytrReturnedTransfer } from "../../src/modules/payment-providers/paytr/paytr-transfer.service";
 import type {
   PayTRBuyer,
@@ -456,6 +457,13 @@ export class MockPayTRService {
     this.nextRegisteredCardResult = null;
     this.storedCardsByUtoken.clear();
   }
+}
+
+/** The notification route of `merchant` (what its PayTR panel posts to). */
+export function paytrCallbackPath(
+  merchant: PaytrMerchant | null | undefined,
+): string {
+  return PAYTR_CALLBACK_PATHS[merchant ?? PaytrMerchant.marketplace];
 }
 
 function paytrNotificationHash(
