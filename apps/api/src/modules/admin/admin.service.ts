@@ -36,6 +36,7 @@ import {
   AdminUserQueryDto,
   AdminProductQueryDto,
   AdminOrderQueryDto,
+  AdminOrderCountsQueryDto,
   AdminTradeQueryDto,
   AdminMessageQueryDto,
   AdminShipmentQueryDto,
@@ -439,6 +440,10 @@ export class AdminService {
 
   async getOrders(query: AdminOrderQueryDto) {
     return this.adminOrderService.getOrders(query);
+  }
+
+  async getOrderCounts(query: AdminOrderCountsQueryDto) {
+    return this.adminOrderService.getOrderCounts(query);
   }
 
   // ==================== ANALYTICS & REPORTS ====================

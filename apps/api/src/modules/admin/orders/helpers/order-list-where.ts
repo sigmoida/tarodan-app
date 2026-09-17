@@ -1,5 +1,15 @@
-import { OrderOrigin, ProductKind, type Prisma } from "@prisma/client";
-import type { AdminOrderBucket, AdminOrderTab } from "@tarodan/types";
+import {
+  OrderOrigin,
+  OrderStatus,
+  ProductKind,
+  type Prisma,
+} from "@prisma/client";
+import {
+  resolveAdminOrderBucket,
+  resolveAdminOrderTab,
+  type AdminOrderBucket,
+  type AdminOrderTab,
+} from "@tarodan/types";
 import { buildSearchWhere, dateRangeWhere } from "../../../../common/list";
 import {
   cartBucketWhere,
@@ -22,6 +32,8 @@ export interface OrderListFilters {
   userId?: string;
   userRole?: "buyer" | "seller";
   productId?: string;
+  /** Eski deep-link'ler (`?status=delivered`): tek sipariş durumu. */
+  status?: OrderStatus;
 }
 
 /**
@@ -36,6 +48,8 @@ interface TextFilterColumns {
   orderNumber: readonly string[];
   packageNumber: readonly string[];
   groupNumber: readonly string[];
+  /** Sipariş durumu filtresinin kaynağa göre koşulu. */
+  status: (status: OrderStatus) => Record<string, unknown>;
 }
 
 const PARTY_COLUMNS = ["buyer", "seller"].flatMap((side) =>
@@ -53,6 +67,7 @@ const ORDER_COLUMNS: TextFilterColumns = {
   orderNumber: ["orderNumber"],
   packageNumber: ["package.packageNumber"],
   groupNumber: ["checkoutGroup.groupNumber"],
+  status: (status) => ({ status }),
 };
 
 const OFFER_COLUMNS: TextFilterColumns = {
@@ -61,6 +76,7 @@ const OFFER_COLUMNS: TextFilterColumns = {
   orderNumber: ["order.orderNumber"],
   packageNumber: ["order.package.packageNumber"],
   groupNumber: [],
+  status: (status) => ({ order: { is: { status } } }),
 };
 
 const TEXT_FILTERS = [
@@ -106,6 +122,7 @@ function filterParts(
     const where = textFilterWhere(filters[key], columns[key]);
     if (where) parts.push(where);
   }
+  if (filters.status) parts.push(columns.status(filters.status));
   const dates = dateRangeWhere(filters);
   if (Object.keys(dates).length > 0) parts.push(dates);
   parts.push(...scopeParts(filters));
@@ -187,4 +204,54 @@ export function orderListSourceWheres(
   if (cartBucket) loose.push(cartBucketWhere(cartBucket, singleLine));
 
   return { group: { AND: group }, loose: { AND: loose } };
+}
+
+/** Liste/sayaç isteğinin ham alanları — DTO'lar bunu karşılar. */
+export interface OrderListQuery extends OrderListFilters {
+  tab?: string;
+  bucket?: string;
+  /** Eski istemci: `origin` sekmeyi seçerdi. */
+  origin?: OrderOrigin;
+  /** Eski istemci: tarih aralığının eski adları. */
+  fromDate?: string;
+  toDate?: string;
+}
+
+/**
+ * İstekten sekme, kova ve filtreleri çözer. Eski parametreler yeni karşılığına
+ * çevrilir (`origin` → sekme, `fromDate`/`toDate` → `startDate`/`endDate`).
+ * Sekmede olmayan kova sekmenin ilk kovasına düşer; kova hiç verilmemişse
+ * sekmenin tüm satırları döner (kullanıcı/ürün deep-link'i).
+ */
+export function orderListScopeOf(query: OrderListQuery): {
+  tab: AdminOrderTab;
+  bucket: AdminOrderBucket | undefined;
+  filters: OrderListFilters;
+} {
+  const tab = resolveAdminOrderTab(query.tab ?? originTab(query.origin));
+  const bucket =
+    query.bucket === undefined || query.bucket === ""
+      ? undefined
+      : resolveAdminOrderBucket(tab, query.bucket);
+  const filters: OrderListFilters = {
+    search: query.search,
+    party: query.party,
+    orderNumber: query.orderNumber,
+    packageNumber: query.packageNumber,
+    groupNumber: query.groupNumber,
+    productQuery: query.productQuery,
+    startDate: query.startDate ?? query.fromDate,
+    endDate: query.endDate ?? query.toDate,
+    userId: query.userId,
+    userRole: query.userRole,
+    productId: query.productId,
+    status: query.status,
+  };
+  return { tab, bucket, filters };
+}
+
+function originTab(origin: OrderOrigin | undefined): AdminOrderTab | undefined {
+  if (origin === OrderOrigin.offer) return "offer";
+  if (origin === OrderOrigin.direct_sale) return "direct_sale";
+  return undefined;
 }

@@ -8,6 +8,7 @@ import {
   offerFilterWhere,
   orderLineFilterWhere,
   orderLineScopeWhere,
+  orderListScopeOf,
   orderListSourceWheres,
 } from "./order-list-where";
 
@@ -177,5 +178,52 @@ describe("orderListSourceWheres", () => {
         AND: [offerFilterWhere(filters), offerBucketWhere("pending", NOW)],
       },
     });
+  });
+});
+
+describe("legacy status filter", () => {
+  it("narrows orders by their status and offers through their order", () => {
+    expect(orderLineFilterWhere({ status: "delivered" })).toEqual({
+      AND: [{ status: "delivered" }],
+    });
+    expect(offerFilterWhere({ status: "delivered" })).toEqual({
+      AND: [{ order: { is: { status: "delivered" } } }],
+    });
+  });
+});
+
+describe("orderListScopeOf", () => {
+  it("defaults to the all tab without a bucket", () => {
+    expect(orderListScopeOf({})).toEqual(
+      expect.objectContaining({ tab: "all", bucket: undefined }),
+    );
+  });
+
+  it("maps the legacy origin and date parameters", () => {
+    const scope = orderListScopeOf({
+      origin: "offer",
+      fromDate: "2026-09-01",
+      toDate: "2026-09-02",
+    });
+    expect(scope.tab).toBe("offer");
+    expect(scope.filters).toEqual(
+      expect.objectContaining({
+        startDate: "2026-09-01",
+        endDate: "2026-09-02",
+      }),
+    );
+  });
+
+  it("an explicit tab wins over origin", () => {
+    expect(orderListScopeOf({ tab: "all", origin: "offer" }).tab).toBe("all");
+  });
+
+  it("a bucket the tab does not have falls back to the tab's first bucket", () => {
+    expect(orderListScopeOf({ tab: "direct_sale", bucket: "pending" })).toEqual(
+      expect.objectContaining({ tab: "direct_sale", bucket: "new" }),
+    );
+    expect(orderListScopeOf({ tab: "offer", bucket: "expired" }).bucket).toBe(
+      "expired",
+    );
   });
 });

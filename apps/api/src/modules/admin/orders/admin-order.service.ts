@@ -1,15 +1,73 @@
 import { Injectable, Optional } from "@nestjs/common";
+import type { Prisma } from "@prisma/client";
+import {
+  ADMIN_ORDER_TABS,
+  ADMIN_ORDER_TAB_BUCKETS,
+  type AdminOrderBucket,
+  type AdminOrderCounts,
+  type AdminOrderTab,
+  type AdminOrderListRow,
+} from "@tarodan/types";
 import { PrismaService } from "../../../prisma";
 import { StorageService } from "../../storage/storage.service";
 import { AdminAuditService } from "../ops/admin-audit.service";
-import { AdminOrderQueryDto } from "../dto";
-import { OrderStatus, Prisma, ProductKind } from "@prisma/client";
-import { i18nMessage } from "../../i18n";
+import { AdminOrderCountsQueryDto, AdminOrderQueryDto } from "../dto";
+import {
+  paginate,
+  paginateMerged,
+  resolveOrderBy,
+  type PaginatedResult,
+  type SortDirection,
+} from "../../../common/list";
+import {
+  orderLineScopeWhere,
+  orderListScopeOf,
+  orderListSourceWheres,
+  type OrderListFilters,
+} from "./helpers/order-list-where";
+import {
+  LIST_INVOICE_SELECT,
+  LIST_LINE_SELECT,
+  LIST_OFFER_SELECT,
+  ORDER_INVOICE_TYPES,
+  type ListInvoice,
+  type ListLine,
+} from "./helpers/order-list-select";
+import {
+  mapCartRow,
+  mapOfferRow,
+  type RowMapContext,
+} from "./helpers/order-list-row.mapper";
+
+/** Sepet sekmelerinde birleşik sıralamanın okuduğu alanlar. */
+interface CartHeadRow {
+  kind: "group" | "order";
+  id: string;
+  number: string;
+  totalAmount: number;
+  buyerName: string;
+  createdAt: Date;
+}
+
+/** Panelin sıralanabilir kolonları → iki kaynaktaki karşılıkları. */
+type CartSortKey = "createdAt" | "number" | "totalAmount" | "buyer.displayName";
+
+const CART_SORT_ALIASES: Record<string, CartSortKey> = {
+  createdAt: "createdAt",
+  number: "number",
+  // Eski panel sipariş numarasıyla sıralardı; satır numarası aynı kolondur.
+  orderNumber: "number",
+  totalAmount: "totalAmount",
+  "buyer.displayName": "buyer.displayName",
+};
 
 /**
- * Sipariş yönetimi (liste) — AdminService'in
- * ORDER MANAGEMENT bölümünden birebir taşındı. AdminService aynı imzalarla
- * buraya delege eder.
+ * Admin sipariş listesi ve alt sekme sayaçları.
+ *
+ * Satır = sepet (doğrudan satışta CheckoutGroup, teklifte tekil sipariş) ya da
+ * teklif sekmesinde teklifin kendisi. Kova tanımları `@tarodan/types`
+ * `order-buckets.ts`'te; Prisma karşılıkları `helpers/order-bucket-where.ts`'te
+ * ve liste ile sayaçlar AYNI builder'ı kullanır.
  */
 @Injectable()
 export class AdminOrderService {
@@ -20,13 +78,286 @@ export class AdminOrderService {
     private readonly storageService: StorageService,
   ) {}
 
-  // AdminService'teki leaf yardımcı ile birebir aynı (bilinçli kopya; facade'da
-  // başka bölümler de kullandığı için oradan kaldırılamadı).
+  async getOrders(
+    query: AdminOrderQueryDto,
+  ): Promise<PaginatedResult<AdminOrderListRow>> {
+    const now = new Date();
+    const { tab, bucket, filters } = orderListScopeOf(query);
+    const sources = orderListSourceWheres(tab, bucket, filters, now);
+    if (sources.offer) return this.listOffers(sources.offer, query, now);
+    return this.listCarts(
+      sources.group ?? {},
+      sources.loose ?? {},
+      filters,
+      query,
+      now,
+    );
+  }
+
+  /**
+   * Her sekmenin her kovasının sayacı — tek istek, tek `$transaction`. Aynı
+   * `where`'li sorgu (ör. tüm/doğrudan sekmelerinin grup kaynağı) bir kez
+   * koşar. Kovalar bir sekmeyi tam bölüştüğü için toplam = kova toplamı.
+   */
+  async getOrderCounts(
+    query: AdminOrderCountsQueryDto,
+  ): Promise<AdminOrderCounts> {
+    const now = new Date();
+    const { filters } = orderListScopeOf(query);
+
+    const queries = new Map<string, Prisma.PrismaPromise<number>>();
+    const plan: Array<{
+      tab: AdminOrderTab;
+      bucket: AdminOrderBucket;
+      keys: string[];
+    }> = [];
+    const enqueue = (
+      source: string,
+      where: unknown,
+      run: () => Prisma.PrismaPromise<number>,
+    ) => {
+      const key = `${source}:${JSON.stringify(where)}`;
+      if (!queries.has(key)) queries.set(key, run());
+      return key;
+    };
+
+    for (const tab of ADMIN_ORDER_TABS) {
+      for (const bucket of ADMIN_ORDER_TAB_BUCKETS[tab]) {
+        const { group, loose, offer } = orderListSourceWheres(
+          tab,
+          bucket,
+          filters,
+          now,
+        );
+        const keys: string[] = [];
+        if (group)
+          keys.push(
+            enqueue("group", group, () =>
+              this.prisma.checkoutGroup.count({ where: group }),
+            ),
+          );
+        if (loose)
+          keys.push(
+            enqueue("order", loose, () =>
+              this.prisma.order.count({ where: loose }),
+            ),
+          );
+        if (offer)
+          keys.push(
+            enqueue("offer", offer, () =>
+              this.prisma.offer.count({ where: offer }),
+            ),
+          );
+        plan.push({ tab, bucket, keys });
+      }
+    }
+
+    const keys = [...queries.keys()];
+    const results = await this.prisma.$transaction([...queries.values()]);
+    const countOf = new Map(keys.map((key, i) => [key, results[i] ?? 0]));
+
+    const counts = Object.fromEntries(
+      ADMIN_ORDER_TABS.map((tab) => [tab, { total: 0, buckets: {} }]),
+    ) as AdminOrderCounts;
+    for (const { tab, bucket, keys: parts } of plan) {
+      const n = parts.reduce((sum, key) => sum + (countOf.get(key) ?? 0), 0);
+      counts[tab].buckets[bucket] = n;
+      counts[tab].total += n;
+    }
+    return counts;
+  }
+
+  // ── Teklif sekmesi: tek kaynak (Offer) ────────────────────────────────────
+
+  private async listOffers(
+    where: Prisma.OfferWhereInput,
+    query: AdminOrderQueryDto,
+    now: Date,
+  ): Promise<PaginatedResult<AdminOrderListRow>> {
+    const orderBy = resolveOrderBy<Prisma.OfferOrderByWithRelationInput>(
+      "Offer",
+      query,
+      {
+        defaultSort: { createdAt: "desc" },
+        sortMap: {
+          number: (dir) => ({ order: { orderNumber: dir } }),
+          orderNumber: (dir) => ({ order: { orderNumber: dir } }),
+          totalAmount: (dir) => ({ amount: dir }),
+        },
+      },
+    );
+    const page = await paginate(
+      this.prisma.offer,
+      { where, select: LIST_OFFER_SELECT, orderBy },
+      query,
+    );
+    const orders = page.data.flatMap((offer) =>
+      offer.order ? [offer.order] : [],
+    );
+    const ctx = await this.rowContext(orders, now);
+    return { ...page, data: page.data.map((offer) => mapOfferRow(offer, ctx)) };
+  }
+
+  // ── Sepet sekmeleri: CheckoutGroup + grupsuz sipariş ──────────────────────
+
+  private async listCarts(
+    groupWhere: Prisma.CheckoutGroupWhereInput,
+    looseWhere: Prisma.OrderWhereInput,
+    filters: OrderListFilters,
+    query: AdminOrderQueryDto,
+    now: Date,
+  ): Promise<PaginatedResult<AdminOrderListRow>> {
+    const sortKey = CART_SORT_ALIASES[query.sortBy ?? ""] ?? "createdAt";
+    const dir: SortDirection =
+      query.sortBy && query.sortOrder === "asc" ? "asc" : "desc";
+
+    const page = await paginateMerged<CartHeadRow>(
+      [
+        {
+          count: () => this.prisma.checkoutGroup.count({ where: groupWhere }),
+          head: async (take) =>
+            (
+              await this.prisma.checkoutGroup.findMany({
+                where: groupWhere,
+                select: {
+                  id: true,
+                  groupNumber: true,
+                  totalAmount: true,
+                  createdAt: true,
+                  buyer: { select: { displayName: true } },
+                },
+                orderBy: groupOrderBy(sortKey, dir),
+                take,
+              })
+            ).map((group) => ({
+              kind: "group" as const,
+              id: group.id,
+              number: group.groupNumber,
+              totalAmount: Number(group.totalAmount),
+              buyerName: group.buyer?.displayName ?? "",
+              createdAt: group.createdAt,
+            })),
+        },
+        {
+          count: () => this.prisma.order.count({ where: looseWhere }),
+          head: async (take) =>
+            (
+              await this.prisma.order.findMany({
+                where: looseWhere,
+                select: {
+                  id: true,
+                  orderNumber: true,
+                  totalAmount: true,
+                  createdAt: true,
+                  buyer: { select: { displayName: true } },
+                },
+                orderBy: looseOrderBy(sortKey, dir),
+                take,
+              })
+            ).map((order) => ({
+              kind: "order" as const,
+              id: order.id,
+              number: order.orderNumber,
+              totalAmount: Number(order.totalAmount),
+              buyerName: order.buyer?.displayName ?? "",
+              createdAt: order.createdAt,
+            })),
+        },
+      ],
+      cartComparator(sortKey, dir),
+      query,
+    );
+
+    const groupIds = page.data
+      .filter((h) => h.kind === "group")
+      .map((h) => h.id);
+    const orderIds = page.data
+      .filter((h) => h.kind === "order")
+      .map((h) => h.id);
+    const lines =
+      page.data.length === 0
+        ? []
+        : await this.prisma.order.findMany({
+            where: {
+              OR: [
+                ...(groupIds.length
+                  ? [
+                      {
+                        AND: [
+                          { checkoutGroupId: { in: groupIds } },
+                          orderLineScopeWhere(filters),
+                        ],
+                      },
+                    ]
+                  : []),
+                ...(orderIds.length ? [{ id: { in: orderIds } }] : []),
+              ],
+            },
+            select: LIST_LINE_SELECT,
+            orderBy: [{ createdAt: "asc" }, { orderNumber: "asc" }],
+          });
+
+    const byCart = new Map<string, ListLine[]>();
+    for (const line of lines) {
+      const key = line.checkoutGroupId ?? line.id;
+      byCart.set(key, [...(byCart.get(key) ?? []), line]);
+    }
+    const ctx = await this.rowContext(lines, now);
+    return {
+      ...page,
+      data: page.data.flatMap((head) => {
+        const members = byCart.get(head.id);
+        return members?.length ? [mapCartRow(head, members, ctx)] : [];
+      }),
+    };
+  }
+
+  // ── Ortak ──────────────────────────────────────────────────────────────────
+
+  /**
+   * Sayfadaki paketlerin e-belgeleri TEK sorguda: kaynak paket id'si (güncel)
+   * ya da sipariş id'si (paket öncesi eski belgeler).
+   */
+  private async rowContext(
+    orders: ReadonlyArray<{ id: string; packageId: string | null }>,
+    now: Date,
+  ): Promise<RowMapContext> {
+    const sourceIds = [
+      ...new Set(
+        orders.flatMap((order) =>
+          order.packageId ? [order.packageId, order.id] : [order.id],
+        ),
+      ),
+    ];
+    const invoices = sourceIds.length
+      ? await this.prisma.elogoInvoice.findMany({
+          where: {
+            sourceId: { in: sourceIds },
+            type: { in: ORDER_INVOICE_TYPES },
+          },
+          select: LIST_INVOICE_SELECT,
+          orderBy: { createdAt: "asc" },
+        })
+      : [];
+    const invoicesBySource = new Map<string, ListInvoice[]>();
+    for (const invoice of invoices) {
+      invoicesBySource.set(invoice.sourceId, [
+        ...(invoicesBySource.get(invoice.sourceId) ?? []),
+        invoice,
+      ]);
+    }
+    return {
+      now,
+      invoicesBySource,
+      imageUrl: (key) => this.resolveProductImageUrl(key),
+    };
+  }
+
   private resolveProductImageUrl(
     imageKeyOrUrl: string | null | undefined,
   ): string | null {
     if (!imageKeyOrUrl) return null;
-    // Strip expired presigned S3 query params to get the clean public URL
+    // Süresi dolmuş presigned S3 parametrelerini at → kalıcı genel URL.
     if (
       (imageKeyOrUrl.startsWith("http://") ||
         imageKeyOrUrl.startsWith("https://")) &&
@@ -46,422 +377,59 @@ export class AdminOrderService {
       imageKeyOrUrl.startsWith("/")
     )
       return imageKeyOrUrl;
-    // Try to resolve any non-URL string as an S3 key (covers dev/, prod/, and other prefixes)
-    if (this.storageService) {
-      return this.storageService.getPublicAssetUrl(imageKeyOrUrl) ?? null;
-    }
-    return null;
+    return this.storageService?.getPublicAssetUrl(imageKeyOrUrl) ?? null;
   }
+}
 
-  // ==================== ORDER MANAGEMENT ====================
+/**
+ * İki kaynağın DB sırası ile bellekteki birleştirme sırası AYNI tanımdır:
+ * birincil anahtar, sonra createdAt DESC, sonra id. Biri değişirse diğeri de
+ * değişmeli — yoksa `take` sınırında satır iki sayfada birden çıkar.
+ */
+function groupOrderBy(
+  key: CartSortKey,
+  dir: SortDirection,
+): Prisma.CheckoutGroupOrderByWithRelationInput[] {
+  const primary: Prisma.CheckoutGroupOrderByWithRelationInput =
+    key === "number"
+      ? { groupNumber: dir }
+      : key === "totalAmount"
+        ? { totalAmount: dir }
+        : key === "buyer.displayName"
+          ? { buyer: { displayName: dir } }
+          : { createdAt: dir };
+  return [primary, { createdAt: "desc" }, { id: "asc" }];
+}
 
-  /**
-   * Get orders with filters
-   */
-  async getOrders(query: AdminOrderQueryDto) {
-    const {
-      search,
-      status,
-      origin,
-      fromDate,
-      toDate,
-      userId,
-      userRole,
-      productId,
-    } = query;
+function looseOrderBy(
+  key: CartSortKey,
+  dir: SortDirection,
+): Prisma.OrderOrderByWithRelationInput[] {
+  const primary: Prisma.OrderOrderByWithRelationInput =
+    key === "number"
+      ? { orderNumber: dir }
+      : key === "totalAmount"
+        ? { totalAmount: dir }
+        : key === "buyer.displayName"
+          ? { buyer: { displayName: dir } }
+          : { createdAt: dir };
+  return [primary, { createdAt: "desc" }, { id: "asc" }];
+}
 
-    const where: Prisma.OrderWhereInput = {};
-    // Birden çok OR bloğu (arama + kullanıcı filtresi) birbirini ezmesin diye
-    // AND altında toplanır — eski kod userId set edilince aramayı yutuyordu.
-    const and: Prisma.OrderWhereInput[] = [];
-
-    if (search) {
-      const normalized = search.trim().toLowerCase();
-      const numeric = Number(search.replace(",", "."));
-      const searchOr: Prisma.OrderWhereInput[] = [
-        { orderNumber: { contains: search, mode: "insensitive" } },
-        // Liste satırının kimliği grup numarasıdır — onunla da aranabilmeli.
-        {
-          checkoutGroup: {
-            groupNumber: { contains: search, mode: "insensitive" },
-          },
-        },
-        // Koli numarası (PKG-…) — müşteri destek talebinde çoğu zaman elindeki
-        // tek kod kargo etiketindeki bu numaradır.
-        {
-          package: {
-            packageNumber: { contains: search, mode: "insensitive" },
-          },
-        },
-        { buyer: { displayName: { contains: search, mode: "insensitive" } } },
-        { buyer: { email: { contains: search, mode: "insensitive" } } },
-        { seller: { displayName: { contains: search, mode: "insensitive" } } },
-        { seller: { email: { contains: search, mode: "insensitive" } } },
-        { product: { title: { contains: search, mode: "insensitive" } } },
-      ];
-      if (Object.values(OrderStatus).includes(normalized as OrderStatus))
-        searchOr.push({ status: normalized as OrderStatus });
-      if (Number.isFinite(numeric))
-        searchOr.push({ totalAmount: numeric }, { commissionAmount: numeric });
-      and.push({ OR: searchOr });
-    }
-
-    if (status) {
-      where.status = status;
-    }
-
-    // Kaynak filtresi (teklif / doğrudan satış / platform hizmeti). Aynı `where`
-    // hem grup hem grupsuz dalı beslediği için tek satır iki dalı da kapsar.
-    if (origin) {
-      where.origin = origin;
-    }
-
-    if (userId) {
-      if (userRole === "buyer") {
-        where.buyerId = userId;
-      } else if (userRole === "seller") {
-        where.sellerId = userId;
-      } else {
-        and.push({ OR: [{ buyerId: userId }, { sellerId: userId }] });
-      }
-    }
-
-    if (productId) {
-      where.productId = productId;
-    }
-
-    if (fromDate || toDate) {
-      where.createdAt = {};
-      if (fromDate) {
-        where.createdAt.gte = new Date(fromDate);
-      }
-      if (toDate) {
-        where.createdAt.lte = new Date(toDate);
-      }
-    }
-
-    if (and.length > 0) {
-      where.AND = and;
-    }
-
-    // Yönetim listesindeki bir satır ya gerçek CheckoutGroup ya da teklif gibi
-    // grup oluşturmayan geçerli bir tekil sipariştir. İki kaynağı ortak bir
-    // "çatı" listesinde sıralayıp sayfalıyoruz; böylece sepet bölünmez ve
-    // tekliften kabul edilen sipariş de sessizce kaybolmaz.
-    const page = query.page ?? 1;
-    const limit = query.limit ?? 20;
-    const candidateTake = page * limit;
-    const direction = query.sortOrder === "asc" ? 1 : -1;
-    const sortDirection: Prisma.SortOrder =
-      query.sortOrder === "asc" ? "asc" : "desc";
-    const sortBy = query.sortBy ?? "createdAt";
-    const sortsByCreatedAt =
-      sortBy !== "orderNumber" &&
-      sortBy !== "totalAmount" &&
-      sortBy !== "buyer.displayName";
-    // İkincil sıralama, iki kaynağı bellekte birleştirmenin ön koşuludur.
-    // `take` yalnız her kaynağın İLK N satırını çeker; eşit `totalAmount` gibi
-    // değerlerde ikincil anahtar olmadan Postgres bu N'i her istekte farklı
-    // seçebilir ve aynı satır iki sayfada birden çıkabilir ya da hiç çıkmaz.
-    // Anahtar `createdAt DESC`: aşağıdaki karşılaştırıcı da eşitlikte tam olarak
-    // bunu uyguluyor, dolayısıyla DB sırası ile bellekteki sıra aynı tanımdır.
-    // Yön'e göre değişmez — iki tarafın da sabit olması yeterlidir.
-    const secondaryGroupSort: Prisma.CheckoutGroupOrderByWithRelationInput = {
-      createdAt: "desc",
-    };
-    const secondaryLooseSort: Prisma.OrderOrderByWithRelationInput = {
-      createdAt: "desc",
-    };
-    const groupOrderBy: Prisma.CheckoutGroupOrderByWithRelationInput[] =
-      sortsByCreatedAt
-        ? [{ createdAt: sortDirection }]
-        : [
-            sortBy === "orderNumber"
-              ? { groupNumber: sortDirection }
-              : sortBy === "totalAmount"
-                ? { totalAmount: sortDirection }
-                : { buyer: { displayName: sortDirection } },
-            secondaryGroupSort,
-          ];
-    const looseOrderBy: Prisma.OrderOrderByWithRelationInput[] =
-      sortsByCreatedAt
-        ? [{ createdAt: sortDirection }]
-        : [
-            sortBy === "orderNumber"
-              ? { orderNumber: sortDirection }
-              : sortBy === "totalAmount"
-                ? { totalAmount: sortDirection }
-                : { buyer: { displayName: sortDirection } },
-            secondaryLooseSort,
-          ];
-    // Grupsuz sipariş = teklif akışı DEĞİL demek yeterli değil: üyelik
-    // (membership-subscription.service) ve öne çıkarma (product-boost.service)
-    // siparişleri de sanal ürünle, gruba bağlanmadan oluşuyor. Ürün türü şartı
-    // olmadan bu iki tür sipariş yönetim listesine sızardı — kargosu, satıcısı
-    // ve iade süreci olmayan satırlar operasyon ekranını kirletir.
-    const looseOrderWhere: Prisma.OrderWhereInput = {
-      ...where,
-      checkoutGroupId: null,
-      product: { kind: ProductKind.listing },
-    };
-    const [groupCount, looseCount, groups, looseOrders] = await Promise.all([
-      this.prisma.checkoutGroup.count({ where: { orders: { some: where } } }),
-      this.prisma.order.count({ where: looseOrderWhere }),
-      this.prisma.checkoutGroup.findMany({
-        where: { orders: { some: where } },
-        select: {
-          id: true,
-          groupNumber: true,
-          totalAmount: true,
-          createdAt: true,
-          buyer: { select: { displayName: true } },
-        },
-        orderBy: groupOrderBy,
-        take: candidateTake,
-      }),
-      this.prisma.order.findMany({
-        where: looseOrderWhere,
-        select: {
-          id: true,
-          orderNumber: true,
-          totalAmount: true,
-          createdAt: true,
-          buyer: { select: { displayName: true } },
-        },
-        orderBy: looseOrderBy,
-        take: candidateTake,
-      }),
-    ]);
-    type Umbrella = {
-      kind: "group" | "order";
-      id: string;
-      number: string;
-      totalAmount: number;
-      buyerName: string;
-      createdAt: Date;
-    };
-    const umbrellas: Umbrella[] = [
-      ...groups.map((group) => ({
-        kind: "group" as const,
-        id: group.id,
-        number: group.groupNumber,
-        totalAmount: Number(group.totalAmount),
-        buyerName: group.buyer?.displayName ?? "",
-        createdAt: group.createdAt,
-      })),
-      ...looseOrders.map((order) => ({
-        kind: "order" as const,
-        id: order.id,
-        number: order.orderNumber,
-        totalAmount: Number(order.totalAmount),
-        buyerName: order.buyer?.displayName ?? "",
-        createdAt: order.createdAt,
-      })),
-    ];
-    umbrellas.sort((a, b) => {
-      const av =
-        sortBy === "orderNumber"
-          ? a.number
-          : sortBy === "totalAmount"
-            ? a.totalAmount
-            : sortBy === "buyer.displayName"
-              ? a.buyerName
-              : a.createdAt.getTime();
-      const bv =
-        sortBy === "orderNumber"
-          ? b.number
-          : sortBy === "totalAmount"
-            ? b.totalAmount
-            : sortBy === "buyer.displayName"
-              ? b.buyerName
-              : b.createdAt.getTime();
-      const compared =
-        typeof av === "string" && typeof bv === "string"
-          ? av.localeCompare(bv, "tr")
-          : Number(av) - Number(bv);
-      if (compared !== 0) return compared * direction;
-      // Yukarıdaki `secondaryGroupSort`/`secondaryLooseSort` ile AYNI kural:
-      // eşitlikte her iki kaynak da createdAt DESC'e düşer, böylece `take`
-      // sınırında hangi satırların çekildiği ile burada hangi satırların öne
-      // geçtiği çelişmez. Biri değişirse diğeri de değişmeli.
-      return b.createdAt.getTime() - a.createdAt.getTime();
-    });
-    const selected = umbrellas.slice((page - 1) * limit, page * limit);
-    const groupIds = selected
-      .filter((item) => item.kind === "group")
-      .map((item) => item.id);
-    const looseOrderIds = selected
-      .filter((item) => item.kind === "order")
-      .map((item) => item.id);
-
-    const orders =
-      groupIds.length || looseOrderIds.length
-        ? await this.prisma.order.findMany({
-            where: {
-              OR: [
-                ...(groupIds.length
-                  ? [{ checkoutGroupId: { in: groupIds } }]
-                  : []),
-                ...(looseOrderIds.length
-                  ? [{ id: { in: looseOrderIds }, checkoutGroupId: null }]
-                  : []),
-              ],
-            },
-            include: {
-              buyer: { select: { id: true, displayName: true, email: true } },
-              seller: { select: { id: true, displayName: true, email: true } },
-              product: {
-                select: {
-                  id: true,
-                  title: true,
-                  images: {
-                    take: 1,
-                    orderBy: { sortOrder: "asc" },
-                    select: { cardKey: true },
-                  },
-                },
-              },
-              checkoutGroup: { select: { groupNumber: true } },
-              // Koli numarası (PKG-…) — kargo etiketindeki kod; Sürat'a bu gider.
-              package: { select: { packageNumber: true } },
-              // Kargo durumu + takip no — liste kolonu + expanded detayda paket kargosu.
-              shipment: {
-                select: {
-                  id: true,
-                  status: true,
-                  trackingNumber: true,
-                  providerTrackingId: true,
-                },
-              },
-              // Açık (aktif) iade talebi — "İade Sürecinde" rozeti için.
-              refundRequests: {
-                where: {
-                  status: {
-                    notIn: ["refunded", "rejected", "cancelled"] as any,
-                  },
-                },
-                orderBy: { createdAt: "desc" },
-                take: 1,
-                select: { id: true, status: true, refundNumber: true },
-              },
-            },
-            orderBy: { createdAt: "asc" },
-          })
-        : [];
-
-    // userId/productId filtresi: grup satırı yalnız FİLTREYE UYAN üyeleri taşır
-    // (kullanıcı görünümünde başka satıcının siparişleri sızmaz; ürün görünümünde
-    // sepetin ilgisiz kalemleri dökülmez). Toplamlar da bu kapsamı yansıtır.
-    const memberMatches = (o: (typeof orders)[number]) => {
-      if (productId && o.productId !== productId) return false;
-      if (userId) {
-        if (userRole === "buyer" && o.buyerId !== userId) return false;
-        if (userRole === "seller" && o.sellerId !== userId) return false;
-        if (!userRole && o.buyerId !== userId && o.sellerId !== userId)
-          return false;
-      }
-      return true;
-    };
-    const scopedOrders =
-      userId || productId ? orders.filter(memberMatches) : orders;
-
-    // Grup üyelerini sayfadaki grup sırasına (grup createdAt desc) göre bitişik
-    // diz ki client-side gruplama sırayı korusun; her grubun gerçek boyutunu tut.
-    const byGroup = new Map<string, typeof orders>();
-    for (const o of scopedOrders) {
-      const k = o.checkoutGroupId ?? `order:${o.id}`;
-      const bucket = byGroup.get(k);
-      if (bucket) bucket.push(o);
-      else byGroup.set(k, [o]);
-    }
-    const ordered = selected.flatMap(
-      (item) =>
-        byGroup.get(item.kind === "group" ? item.id : `order:${item.id}`) ?? [],
-    );
-    const groupSize = new Map(
-      groupIds.map((id) => [id, byGroup.get(id)?.length ?? 0]),
-    );
-
-    return {
-      data: ordered.map((o) => ({
-        ...o,
-        // Misafir siparişlerinde alıcı, ortak sistem kullanıcısı (GUEST_SYSTEM /
-        // guest@tarodan.system). Admin listede placeholder yerine gerçek misafir
-        // ad/e-postasını shippingAddress'ten göster.
-        buyer: this.resolveGuestBuyerForAdmin(o.buyer, o.shippingAddress),
-        amount: Number(o.totalAmount),
-        commissionAmount: Number(o.commissionAmount),
-        shipmentStatus: (o as any).shipment?.status ?? null,
-        shipmentId: (o as any).shipment?.id ?? null,
-        shipmentTrackingNumber:
-          (o as any).shipment?.providerTrackingId ??
-          (o as any).shipment?.trackingNumber ??
-          null,
-        internalTrackingNumber: (o as any).shipment?.trackingNumber ?? null,
-        // Satıcı-paketi (OrderPackage) referansı — admin listede sepeti satıcı
-        // bazında gruplayabilmek için (checkoutGroupId zaten ...o ile geliyor).
-        packageId: o.packageId ?? null,
-        // Koli numarası (PKG-…): kargo etiketindeki ve Sürat'a giden kod.
-        packageNumber: (o as any).package?.packageNumber ?? null,
-        groupNumber: o.checkoutGroup?.groupNumber ?? null,
-        // Grup artık eksiksiz döndüğü için gerçek üye sayısı = grubun boyutu.
-        groupItemCount: o.checkoutGroupId
-          ? (groupSize.get(o.checkoutGroupId) ?? 1)
-          : 1,
-        productImageUrl: this.resolveProductImageUrl(
-          (o.product as any)?.images?.[0]?.cardKey,
-        ),
-        activeRefundRequest: (o as any).refundRequests?.[0]
-          ? {
-              id: (o as any).refundRequests[0].id,
-              status: (o as any).refundRequests[0].status,
-              refundNumber: (o as any).refundRequests[0].refundNumber,
-            }
-          : null,
-      })),
-      meta: {
-        total: groupCount + looseCount,
-        page,
-        limit,
-        totalPages: Math.ceil((groupCount + looseCount) / limit),
-      },
-    };
-  }
-
-  /**
-   * Misafir siparişinde admin'e gösterilecek alıcıyı çöz: sistem misafir
-   * kullanıcısı (guest@tarodan.system / displayName GUEST_SYSTEM) ise gerçek
-   * misafir ad/e-postasını shippingAddress'ten al. Değilse alıcıyı aynen döndür.
-   */
-  private resolveGuestBuyerForAdmin(
-    buyer: {
-      id: string;
-      displayName: string | null;
-      email: string | null;
-    } | null,
-    shippingAddress: unknown,
-  ): {
-    id: string;
-    displayName: string | null;
-    email: string | null;
-    isGuest?: boolean;
-  } | null {
-    if (!buyer) return buyer;
-    const sa = (shippingAddress as any) || {};
-    const isGuest =
-      buyer.email === "guest@tarodan.system" ||
-      buyer.displayName === "GUEST_SYSTEM" ||
-      sa?.isGuestOrder === true;
-    if (!isGuest) return { ...buyer, isGuest: false };
-    const guestEmail = sa?.guestEmail || sa?.email || null;
-    const guestName = sa?.guestName || sa?.fullName || null;
-    return {
-      // id ortak GUEST_SYSTEM hesabıdır — UI bunu bilerek kullanıcı linki
-      // ÜRETMEZ (tıklayınca tüm misafir siparişleri tek "kullanıcı" görünürdü).
-      id: buyer.id,
-      displayName: guestName || guestEmail || "Misafir",
-      email: guestEmail || buyer.email,
-      isGuest: true,
-    };
-  }
+function cartComparator(key: CartSortKey, dir: SortDirection) {
+  const sign = dir === "asc" ? 1 : -1;
+  return (a: CartHeadRow, b: CartHeadRow): number => {
+    const primary =
+      key === "number"
+        ? a.number.localeCompare(b.number, "tr")
+        : key === "totalAmount"
+          ? a.totalAmount - b.totalAmount
+          : key === "buyer.displayName"
+            ? a.buyerName.localeCompare(b.buyerName, "tr")
+            : a.createdAt.getTime() - b.createdAt.getTime();
+    if (primary !== 0) return primary * sign;
+    const byDate = b.createdAt.getTime() - a.createdAt.getTime();
+    if (byDate !== 0) return byDate;
+    return a.id < b.id ? -1 : a.id > b.id ? 1 : 0;
+  };
 }

@@ -97,6 +97,12 @@ export interface AdminOrderOfferInfo {
   priceDifference: number | null;
   expiresAt: string;
   createdAt: string;
+  /**
+   * Teklif verilen ürün ve teklif alan (satıcı). Siparişe dönmemiş teklif
+   * satırında paket yoktur; hücreler ürünü ve satıcıyı buradan okur.
+   */
+  product: AdminOrderLineProduct;
+  seller: AdminOrderParty;
 }
 
 export interface AdminOrderListRow {

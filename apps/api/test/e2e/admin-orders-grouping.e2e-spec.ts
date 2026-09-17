@@ -124,12 +124,13 @@ describe("Admin orders — group-based pagination (cati)", () => {
     // meta grup sayar (order degil): limit=1 → totalPages = grup sayisi.
     expect(page1.meta.total).toBe(totalGroups);
     expect(page1.meta.totalPages).toBe(totalGroups);
-    // 3-siparisli sepetin TAMAMI tek sayfada — bolunme yok.
-    expect(page1.data).toHaveLength(3);
-    expect(new Set(page1.data.map((o: any) => o.checkoutGroupId))).toEqual(
-      new Set([cart.groupId]),
+    // 3-siparisli sepet TEK satir; kalemlerinin TAMAMI satirda — bolunme yok.
+    expect(page1.data).toHaveLength(1);
+    expect(page1.data[0]).toEqual(
+      expect.objectContaining({ kind: "group", id: cart.groupId }),
     );
-    expect(page1.data.every((o: any) => o.groupItemCount === 3)).toBe(true);
+    const lines = page1.data[0].packages.flatMap((p: any) => p.lines);
+    expect(lines).toHaveLength(3);
   });
 
   it("sonraki sayfa tekli sepeti dondurur (1'lik grup)", async () => {
@@ -149,7 +150,7 @@ describe("Admin orders — group-based pagination (cati)", () => {
       limit: 1,
     } as any);
     expect(last.data).toHaveLength(1);
-    expect(last.data[0].groupItemCount).toBe(1);
-    expect(last.data[0].checkoutGroupId).not.toBe(cart.groupId);
+    expect(last.data[0].packages.flatMap((p: any) => p.lines)).toHaveLength(1);
+    expect(last.data[0].id).not.toBe(cart.groupId);
   });
 });
