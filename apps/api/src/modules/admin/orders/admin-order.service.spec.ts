@@ -322,7 +322,8 @@ describe("AdminOrderService.getOrders — offer tab", () => {
         createdAt: T0,
         buyer: party("b1"),
         seller: party("s1"),
-        product: lineRow().product,
+        // listing 1150 − offer 900 → priceDifference 250
+        product: { ...lineRow().product, price: D(1150) },
         order: null,
       },
     ]);
