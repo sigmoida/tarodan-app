@@ -2,7 +2,7 @@ import { Injectable, Logger } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { PrismaService } from "../../../prisma";
 import { PaymentProviderRegistry } from "../../payment-providers/payment-provider.registry";
-import { Prisma } from "@prisma/client";
+import { PaytrMerchant, Prisma } from "@prisma/client";
 import { paytrReportSyncEnabled } from "../../../config/paytr";
 import {
   trCalendarDate,
@@ -95,6 +95,7 @@ export class PaytrReportSyncService {
       await this.prisma.paytrStatementLine.upsert({
         where: {
           statement_line_dedup: {
+            paytrMerchant: PaytrMerchant.marketplace,
             merchantOid: entry.merchantOid,
             type: entry.type,
             transactionDate,
@@ -180,6 +181,7 @@ export class PaytrReportSyncService {
       const settlement = await this.prisma.paytrSettlement.upsert({
         where: {
           settlement_day: {
+            paytrMerchant: PaytrMerchant.marketplace,
             datePaid,
             currency: summary.currency,
             isProjection: false,
