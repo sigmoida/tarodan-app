@@ -17,7 +17,10 @@ import {
 import type { DashboardDateWindow } from "../dashboard-period.helper";
 import { paidOrdersCte } from "../paid-order.predicate";
 import { AnalyticsTabService } from "./analytics-tab.service";
-import { toAnalyticsRange, type ResolvedAnalyticsRange } from "./analytics-range.helper";
+import {
+  toAnalyticsRange,
+  type ResolvedAnalyticsRange,
+} from "./analytics-range.helper";
 import {
   bucketExpr,
   metric,

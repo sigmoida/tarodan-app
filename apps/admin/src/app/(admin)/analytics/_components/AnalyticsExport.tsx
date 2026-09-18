@@ -57,7 +57,7 @@ export function AnalyticsExport({
         variant="outline"
         leftIcon={<ArrowDownTrayIcon className="h-5 w-5" />}
         onClick={() => void download("csv")}
-        loading={busy === "csv"}
+        isLoading={busy === "csv"}
         aria-label={t("admin.analytics.export.csv")}
       >
         <span className="hidden sm:inline">
@@ -68,7 +68,7 @@ export function AnalyticsExport({
         variant="primary"
         leftIcon={<ArrowDownTrayIcon className="h-5 w-5" />}
         onClick={() => void download("xlsx")}
-        loading={busy === "xlsx"}
+        isLoading={busy === "xlsx"}
         aria-label={t("admin.analytics.export.xlsx")}
       >
         <span className="hidden sm:inline">

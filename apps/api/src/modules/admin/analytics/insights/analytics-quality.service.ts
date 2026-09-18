@@ -266,49 +266,55 @@ export class AnalyticsQualityService extends AnalyticsTabService<AnalyticsQualit
         AND o."cancelled_at" <= ${window.lte}
         AND o."origin" <> ${OrderOrigin.platform_service}::"OrderOrigin"`;
 
-    const [reasons, faults, components, cancelReasons, cancelTypes, installments] =
-      await Promise.all([
-        // `resolvedReason` incelemenin SONUCU; `reason` yalnız alıcının iddiası.
-        // Karara varılmamış satırlarda iddiaya düşülür ki satır kaybolmasın.
-        this.prisma.$queryRaw<BreakdownSqlRow[]>`
-          SELECT COALESCE(r."resolved_reason", r."reason")::text AS key,
-                 COUNT(*)::bigint AS count, COALESCE(SUM(r."amount"), 0) AS amount
-          ${refunded}
-          GROUP BY 1`,
-        this.prisma.$queryRaw<BreakdownSqlRow[]>`
-          SELECT COALESCE(r."fault_party"::text, '') AS key,
-                 COUNT(*)::bigint AS count, COALESCE(SUM(r."amount"), 0) AS amount
-          ${refunded}
-          GROUP BY 1`,
-        // Paranın hangi KALEMDEN geri gittiği: ürün mü, kargo mu, komisyon mu.
-        this.prisma.$queryRaw<BreakdownSqlRow[]>`
-          SELECT fc."component_code"::text AS key,
-                 COUNT(*)::bigint AS count,
-                 COALESCE(SUM(fc."gross_amount"), 0) AS amount
-          FROM "refund_financial_components" fc
-          JOIN "refund_requests" r ON r."id" = fc."refund_request_id"
-          WHERE r."refunded_at" >= ${window.gte}
-            AND r."refunded_at" <= ${window.lte}
-          GROUP BY 1`,
-        this.prisma.$queryRaw<BreakdownSqlRow[]>`
-          SELECT COALESCE(o."cancellation_reason_code"::text, '') AS key,
-                 COUNT(*)::bigint AS count, COALESCE(SUM(o."total_amount"), 0) AS amount
-          ${cancelled}
-          GROUP BY 1`,
-        this.prisma.$queryRaw<BreakdownSqlRow[]>`
-          SELECT COALESCE(o."cancellation_type"::text, '') AS key,
-                 COUNT(*)::bigint AS count, COALESCE(SUM(o."total_amount"), 0) AS amount
-          ${cancelled}
-          GROUP BY 1`,
-        this.prisma.$queryRaw<BreakdownSqlRow[]>`
-          SELECT "installment_count"::text AS key,
-                 COUNT(*)::bigint AS count, COALESCE(SUM("amount"), 0) AS amount
-          FROM "payments"
-          WHERE "status" = ${PaymentStatus.completed}::"PaymentStatus"
-            AND "paid_at" >= ${window.gte}
-            AND "paid_at" <= ${window.lte}
-          GROUP BY 1`,
-      ]);
+    const [
+      reasons,
+      faults,
+      components,
+      cancelReasons,
+      cancelTypes,
+      installments,
+    ] = await Promise.all([
+      // `resolvedReason` incelemenin SONUCU; `reason` yalnız alıcının iddiası.
+      // Karara varılmamış satırlarda iddiaya düşülür ki satır kaybolmasın.
+      this.prisma.$queryRaw<BreakdownSqlRow[]>`
+        SELECT COALESCE(r."resolved_reason", r."reason")::text AS key,
+               COUNT(*)::bigint AS count, COALESCE(SUM(r."amount"), 0) AS amount
+        ${refunded}
+        GROUP BY 1`,
+      this.prisma.$queryRaw<BreakdownSqlRow[]>`
+        SELECT COALESCE(r."fault_party"::text, '') AS key,
+               COUNT(*)::bigint AS count, COALESCE(SUM(r."amount"), 0) AS amount
+        ${refunded}
+        GROUP BY 1`,
+      // Paranın hangi KALEMDEN geri gittiği: ürün mü, kargo mu, komisyon mu.
+      this.prisma.$queryRaw<BreakdownSqlRow[]>`
+        SELECT fc."component_code"::text AS key,
+               COUNT(*)::bigint AS count,
+               COALESCE(SUM(fc."gross_amount"), 0) AS amount
+        FROM "refund_financial_components" fc
+        JOIN "refund_requests" r ON r."id" = fc."refund_request_id"
+        WHERE r."refunded_at" >= ${window.gte}
+          AND r."refunded_at" <= ${window.lte}
+        GROUP BY 1`,
+      this.prisma.$queryRaw<BreakdownSqlRow[]>`
+        SELECT COALESCE(o."cancellation_reason_code"::text, '') AS key,
+               COUNT(*)::bigint AS count, COALESCE(SUM(o."total_amount"), 0) AS amount
+        ${cancelled}
+        GROUP BY 1`,
+      this.prisma.$queryRaw<BreakdownSqlRow[]>`
+        SELECT COALESCE(o."cancellation_type"::text, '') AS key,
+               COUNT(*)::bigint AS count, COALESCE(SUM(o."total_amount"), 0) AS amount
+        ${cancelled}
+        GROUP BY 1`,
+      this.prisma.$queryRaw<BreakdownSqlRow[]>`
+        SELECT "installment_count"::text AS key,
+               COUNT(*)::bigint AS count, COALESCE(SUM("amount"), 0) AS amount
+        FROM "payments"
+        WHERE "status" = ${PaymentStatus.completed}::"PaymentStatus"
+          AND "paid_at" >= ${window.gte}
+          AND "paid_at" <= ${window.lte}
+        GROUP BY 1`,
+    ]);
 
     const rows = (source: BreakdownSqlRow[]) =>
       source.map((row) => ({

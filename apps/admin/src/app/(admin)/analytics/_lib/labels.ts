@@ -1,8 +1,10 @@
+import type { useTranslations } from "next-intl";
 import type { MessageKey } from "@tarodan/i18n";
 import { fmtNumber, fmtTry } from "@/lib/format";
 import type { MetricFormat } from "./tabConfig";
 
-type Translate = (key: MessageKey, values?: Record<string, string>) => string;
+/** The `t` the calling component already holds — same shape everywhere. */
+type Translate = ReturnType<typeof useTranslations<never>>;
 
 /**
  * Schema values the API hands over untranslated.
