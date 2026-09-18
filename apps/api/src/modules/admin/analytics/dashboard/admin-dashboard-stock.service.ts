@@ -48,6 +48,18 @@ export class AdminDashboardStockService {
   }
 
   private async buildStock(): Promise<DashboardStockResponse> {
+    // Katman kırılımı SQL'de gruplanır; satırları çekip bellekte saymak
+    // (rapor uçlarındaki eski kalıp) üyelik sayısıyla birlikte büyürdü.
+    // Sorgu $transaction dizisinin içinde değil kendi değişkeninde kurulur:
+    // dizi içinde yazıldığında Prisma'nın generic'i çözülmüyor ve satır tipi
+    // `_count: true | {...}` birleşimine düşüyor. PrismaPromise tembel
+    // olduğundan yürütme yine transaction içinde olur.
+    const byTierQuery = this.prisma.userMembership.groupBy({
+      by: ["tierId"],
+      where: { status: SubscriptionStatus.active },
+      _count: { id: true },
+    });
+
     const [escrow, debt, listings, memberships, boosts, byTier] =
       await this.prisma.$transaction([
         // Escrow'da GERÇEKTEN duran para = tutulan − kısmi iadelerle tüketilen.
@@ -68,13 +80,7 @@ export class AdminDashboardStockService {
         this.prisma.productBoost.count({
           where: { status: BoostStatus.active },
         }),
-        // Katman kırılımı SQL'de gruplanır; satırları çekip bellekte saymak
-        // (rapor uçlarındaki eski kalıp) üyelik sayısıyla birlikte büyürdü.
-        this.prisma.userMembership.groupBy({
-          by: ["tierId"],
-          where: { status: SubscriptionStatus.active },
-          _count: { _all: true },
-        }),
+        byTierQuery,
       ]);
 
     const tierIds = byTier.map((row) => row.tierId);
@@ -90,7 +96,7 @@ export class AdminDashboardStockService {
       .map((row) => ({
         tierType: tierById.get(row.tierId)?.type ?? "unknown",
         tierName: tierById.get(row.tierId)?.name ?? row.tierId,
-        count: row._count._all,
+        count: row._count.id,
       }))
       .sort((a, b) => b.count - a.count);
 
