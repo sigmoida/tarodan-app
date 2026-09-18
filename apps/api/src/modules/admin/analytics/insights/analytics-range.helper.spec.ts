@@ -18,7 +18,10 @@ describe("resolveAnalyticsRange", () => {
   const now = new Date("2026-06-15T09:30:00.000Z");
 
   it("Türkiye gününün sınırlarını kullanır, sürecin saat dilimini değil", () => {
-    const range = resolveAnalyticsRange({ from: "2026-06-01", to: "2026-06-30" });
+    const range = resolveAnalyticsRange({
+      from: "2026-06-01",
+      to: "2026-06-30",
+    });
 
     expect(range.current.gte).toEqual(trMidnight("2026-06-01"));
     // Kapsayıcı son: Türkiye gününün son milisaniyesi.
@@ -39,8 +42,9 @@ describe("resolveAnalyticsRange", () => {
   });
 
   it("karşılaştırma istenmedikçe önceki pencereyi ÖLÇMEZ", () => {
-    expect(resolveAnalyticsRange({ from: "2026-06-01", to: "2026-06-07" }).previous)
-      .toBeNull();
+    expect(
+      resolveAnalyticsRange({ from: "2026-06-01", to: "2026-06-07" }).previous,
+    ).toBeNull();
   });
 
   it("karşılaştırmada dashboard'un trend penceresiyle aynı aritmetiği kullanır", () => {

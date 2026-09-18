@@ -1,10 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { analyticsRangeIssue } from "@tarodan/types";
-import {
-  readRangeParams,
-  toRangeQuery,
-  writeRangeParams,
-} from "./rangeParams";
+import { readRangeParams, toRangeQuery, writeRangeParams } from "./rangeParams";
 
 const today = new Date("2026-06-15T12:00:00");
 
