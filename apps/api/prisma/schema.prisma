@@ -1487,10 +1487,10 @@ model Offer {
   amount          Decimal     @db.Decimal(10, 2)
   message         String?
   status          OfferStatus @default(pending)
-  /// Satıcı karşı teklifinden sonra: kabul/red için sıra alıcıda (buyerId)
   /// Teklifin CEVAPLANDIĞI an (kabul, ret veya karşı teklifle kapanış).
   /// Süre dolması ve teklifi verenin geri çekmesi cevap değildir, damgalanmaz.
   respondedAt     DateTime?   @map("responded_at")
+  /// Satıcı karşı teklifinden sonra: kabul/red için sıra alıcıda (buyerId)
   buyerMustAccept Boolean     @default(false) @map("buyer_must_accept")
   expiresAt       DateTime    @map("expires_at")
   createdAt       DateTime    @default(now()) @map("created_at")
