@@ -51,6 +51,7 @@ import { isProduction } from "../../../config/environment";
 import { PaymentHoldReleaseService } from "./payment-hold-release.service";
 import { PaymentRefundAttemptService } from "./payment-refund-attempt.service";
 import { PaymentTradeRefundService } from "./payment-trade-refund.service";
+import { orderCancelledData } from "../../order/helpers/order-cancellation";
 
 /**
  * İade / escrow serbest bırakma metodları — PaymentService'ten birebir taşındı
@@ -939,7 +940,7 @@ export class PaymentRefundService {
             if (isFullRefund) {
               await tx.order.update({
                 where: { id: orderId },
-                data: { status: OrderStatus.cancelled },
+                data: orderCancelledData(),
               });
               // Teklif siparişi: teklif `accepted` kalırsa reactivate/"Ödemeyi
               // tamamla" iade edilmiş siparişi yeniden ödemeye açar. Tam iade

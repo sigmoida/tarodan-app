@@ -7329,51 +7329,111 @@
     },
     "dashboard": {
       "title": "Dashboard",
-      "description": "Welcome! Here's today's overview.",
+      "description": "Work queues, alerts and the period summary.",
+      "refresh": "Refresh",
+      "refreshing": "Refreshing…",
+      "zones": {
+        "queues": "Waiting for you",
+        "queuesDescription": "Not date-filtered — it is still waiting whenever it arrived.",
+        "queuesEmpty": "Nothing is waiting.",
+        "alerts": "Alerts",
+        "period": "Period summary",
+        "stock": "Right now",
+        "loadFailed": "This section could not be loaded."
+      },
+      "queues": {
+        "refundRequests": "Refund requests",
+        "tradeOperations": "Trade operations",
+        "listingModeration": "Listing moderation",
+        "sellerApplications": "Seller applications",
+        "supportAndReports": "Support and reports",
+        "moneyOperations": "Money operations",
+        "documents": "Documents",
+        "shipping": "Shipping"
+      },
+      "queueParts": {
+        "refundsPendingReview": "Awaiting review",
+        "refundsDisputed": "Disputed",
+        "tradesAtWarehouse": "At warehouse / in review",
+        "tradeDisputesOpen": "Open disputes",
+        "tradeRefundFailures": "Refund failed",
+        "tradeCompensationPending": "Compensation pending",
+        "productsPending": "Listings awaiting approval",
+        "messagesPendingApproval": "Messages awaiting approval",
+        "corporateApplications": "Corporate applications",
+        "sellerDocuments": "Documents to review",
+        "ticketsOpen": "Open tickets",
+        "ticketsUrgent": "Urgent / high priority",
+        "reportsPending": "Pending reports",
+        "payoutsFailed": "Failed transfers",
+        "holdsOverdue": "Overdue escrow",
+        "adjustmentsOpen": "Open seller debt",
+        "invoicesExhausted": "Documents out of retries",
+        "ordersUninvoiced": "Uninvoiced deliveries",
+        "carrierCancellations": "Carrier cancellation tasks",
+        "shipmentsWithoutTracking": "Shipments without a tracking id"
+      },
+      "alerts": {
+        "stuckShippedOrders": "{count} orders have been shipped for over {threshold} days with no delivery report",
+        "stuckWarehouseTrades": "{count} trade parcels have not reached the warehouse in {threshold} days",
+        "stuckOutboundTrades": "{count} outbound trade parcels have had no delivery report for {threshold} days",
+        "paymentsMissingFromStatement": "{count} payments have no matching PayTR statement line",
+        "unresolvedStatementLines": "{count} statement lines are unmatched and unresolved",
+        "commissionLedgerDrift": "The commission ledger disagrees with the order totals: {amount}",
+        "paymentsWithoutOrders": "{count} completed payments have no order",
+        "ordersWithoutHold": "{count} paid orders have no escrow hold",
+        "outboxDead": "{count} side effects exhausted every attempt (DLQ)",
+        "outboxStuckProcessing": "{count} outbox rows have been processing for {threshold} minutes",
+        "noActiveCommissionRuleSet": "No active commission rule set — checkout is closed",
+        "noActiveShippingTariff": "No active shipping tariff — shipping cannot be priced",
+        "staleCouponReservations": "{count} coupon reservations hold budget past their expiry",
+        "deliveredHoldsWithoutRelease": "{count} delivered orders have an escrow hold with no release date",
+        "agedCarrierCancellations": "{count} carrier cancellation tasks have waited {threshold} hours",
+        "exhaustedPayoutRetries": "{count} payout instructions are out of retries",
+        "preparingDeadlineWithin24h": "{count} orders reach their preparation deadline within 24 hours"
+      },
       "stats": {
-        "totalOrders": "Total Sales",
-        "commissionRevenue": "Commission Revenue",
-        "activeProducts": "Active Products",
-        "totalUsers": "Total Users",
-        "products": "Products",
-        "users": "Users",
-        "grossSales": "Total Sales Amount",
-        "netCommission": "Net Commission",
-        "liveVisitors": "Live / Daily Active Visitors",
-        "cancellationsRefunds": "Cancellations / Refunds",
-        "active": "Active",
-        "passive": "Passive",
-        "live": "Live",
-        "daily": "Daily",
-        "cancellations": "Cancellations",
-        "refunds": "Refunds"
+        "paidOrders": "Paid orders",
+        "paidAmount": "Paid amount",
+        "deliveredOrders": "Delivered orders",
+        "netRevenue": "Net platform revenue",
+        "membershipRevenue": "Membership revenue",
+        "boostRevenue": "Boost revenue",
+        "refundedAmount": "Refunded amount",
+        "cancelledOrders": "Cancelled orders",
+        "completedTrades": "Completed trades",
+        "tradeFeeRevenue": "Trade service revenue",
+        "newUsers": "New users",
+        "newListings": "New listings",
+        "signedInUsers": "Users who signed in",
+        "cancelledFromMigration": "Counts new cancellations only (older rows never recorded when they were cancelled)"
+      },
+      "stock": {
+        "escrowBalance": "Escrow balance",
+        "openSellerDebt": "Open seller debt",
+        "activeListings": "Active listings",
+        "activeMemberships": "Active memberships",
+        "activeBoosts": "Active boosts",
+        "tierBreakdown": "By tier"
+      },
+      "age": {
+        "oldest": "Oldest waiting {age}",
+        "days": "{count} days",
+        "hours": "{count} hours",
+        "minutes": "{count} min"
       },
       "period": {
-        "yesterday": "Yesterday",
-        "thisMonth": "This month",
-        "lastMonth": "Last month"
-      },
-      "quickActions": {
-        "products": "Products",
-        "orders": "Orders",
-        "users": "Users",
-        "messages": "Messages"
-      },
-      "pendingActions": {
-        "productsPending": "{count} products awaiting approval",
-        "refundRequests": "{count} refund requests",
-        "messagesPending": "{count} messages awaiting approval",
-        "identityVerification": "{count} identity verification requests",
-        "review": "Review"
-      },
-      "charts": {
-        "salesLabel": "Sales (₺)",
-        "ordersLabel": "Orders",
-        "sales30dTitle": "Last 30 Days Sales Performance",
-        "dailyOrdersTitle": "Daily Order Count",
-        "categoryTitle": "Category Distribution",
-        "noData": "No Data",
-        "uncategorized": "Uncategorized"
+        "label": "Period",
+        "daily": "Daily",
+        "monthly": "Monthly",
+        "custom": "Date range",
+        "from": "Start date",
+        "to": "End date",
+        "allTime": "All time",
+        "vsPrevious": "vs previous period",
+        "rangeIncomplete": "Pick a start and an end date",
+        "rangeUnparseable": "Pick a valid date",
+        "rangeReversed": "The start date cannot be after the end date"
       },
       "recentOrders": {
         "title": "Recent Orders",
@@ -7384,7 +7444,8 @@
         "empty": "No trades yet"
       },
       "topProducts": {
-        "title": "Top Viewed Products",
+        "title": "Most Viewed Products",
+        "allTimeNote": "All time — view counts are cumulative and cannot be split by period",
         "empty": "No product views yet",
         "columns": {
           "product": "Product",
@@ -7394,22 +7455,19 @@
         }
       },
       "topSellers": {
-        "title": "Top Viewed Sellers",
+        "title": "Most Viewed Sellers",
+        "allTimeNote": "All time — view counts are cumulative and cannot be split by period",
         "empty": "No seller views yet",
         "columns": {
           "seller": "Seller",
           "views": "Views",
           "products": "Products",
-          "activeListings": "Active"
+          "activeListings": "Active Listings"
         }
-      },
-      "status": {
-        "refundRequested": "Refund Requested",
-        "inProgress": "In Progress"
       },
       "relativeTime": {
         "minutesAgo": "{count} min ago",
-        "hoursAgo": "{count} hr ago"
+        "hoursAgo": "{count}h ago"
       }
     },
     "analytics": {
@@ -9934,6 +9992,11 @@
         "invalidDate": "Invalid date (expected YYYY-MM-DD)",
         "lineNotFound": "Statement line not found",
         "lineAlreadyMatched": "A matched line cannot be resolved"
+      },
+      "dashboard": {
+        "rangeIncomplete": "A custom period needs both a start and an end date",
+        "rangeUnparseable": "The period dates must be valid dates",
+        "rangeReversed": "The start date cannot be after the end date"
       }
     },
     "advertisement": {

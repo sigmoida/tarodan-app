@@ -18,7 +18,7 @@ import { chartPalette } from "../_lib/charts";
 export function ProductsTab({ report }: { report: any }) {
   const t = useTranslations();
   // Below `sm` a right-side legend leaves no room for the doughnut itself;
-  // switch to a bottom legend there, matching CategoryChart's pattern.
+  // switch to a bottom legend there.
   const isNarrow = !useMediaQuery(SM_MEDIA_QUERY);
   const categoryChartData = {
     labels: report.categoryDistribution?.map((d: any) => d.name) || [],

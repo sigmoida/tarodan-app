@@ -1,318 +1,227 @@
-import {
-  CommissionLedgerStatus,
-  OrderCancellationType,
-  OrderStatus,
-  ProductKind,
-  ProductStatus,
-  RefundRequestStatus,
-} from "@prisma/client";
+import { DASHBOARD_METRIC_KEYS } from "@tarodan/types";
 import { AdminAnalyticsDashboardService } from "./admin-analytics-dashboard.service";
 
-describe("AdminAnalyticsDashboardService dashboard periods", () => {
-  const now = new Date(2026, 6, 20, 12, 30, 0);
-  const yesterdayStart = new Date(2026, 6, 19);
-  const todayStart = new Date(2026, 6, 20);
-  const thisMonthStart = new Date(2026, 6, 1);
-  const lastMonthStart = new Date(2026, 5, 1);
+interface RecordedCall {
+  model: string;
+  method: string;
+  args: { where?: Record<string, unknown>; _sum?: Record<string, boolean> };
+}
 
+/**
+ * Zone C's contract: every metric answers the selected period, the preceding
+ * window and all-time from ONE definition, in ONE `$transaction`, and each one
+ * measures an EVENT stamp rather than `status + createdAt`.
+ */
+describe("AdminAnalyticsDashboardService.getDashboardStats", () => {
+  const now = new Date(2026, 6, 20, 12, 0, 0);
+  const todayStart = new Date(2026, 6, 20);
+  const monthStart = new Date(2026, 6, 1);
+
+  let calls: RecordedCall[];
   let prisma: any;
+  let cache: any;
   let service: AdminAnalyticsDashboardService;
 
-  const valueForPeriod = (
-    createdAt: { gte: Date },
-    values: [number, number, number],
-  ) => {
-    const start = createdAt.gte.getTime();
-    if (start === yesterdayStart.getTime()) return values[0];
-    if (start === thisMonthStart.getTime()) return values[1];
-    if (start === lastMonthStart.getTime()) return values[2];
-    throw new Error(`Unexpected period start: ${createdAt.gte.toISOString()}`);
-  };
+  /** Every aggregate returns 1 for whatever `_sum` field it asked for. */
+  const sumResult = (args: RecordedCall["args"]) => ({
+    _sum: Object.fromEntries(
+      Object.keys(args._sum ?? {}).map((field) => [field, 1]),
+    ),
+  });
+
+  /** A Prisma stand-in that records the shape of every query it is handed. */
+  function recordingPrisma() {
+    const delegate = (model: string) => ({
+      count: jest.fn(async (args: RecordedCall["args"]) => {
+        calls.push({ model, method: "count", args });
+        return 1;
+      }),
+      aggregate: jest.fn(async (args: RecordedCall["args"]) => {
+        calls.push({ model, method: "aggregate", args });
+        return sumResult(args);
+      }),
+    });
+
+    return {
+      $transaction: jest.fn((ops: Promise<unknown>[]) => Promise.all(ops)),
+      order: delegate("order"),
+      user: delegate("user"),
+      product: delegate("product"),
+      trade: delegate("trade"),
+      commissionLedger: delegate("commissionLedger"),
+      membershipPayment: delegate("membershipPayment"),
+      productBoost: delegate("productBoost"),
+      refundRequest: delegate("refundRequest"),
+      tradeCashPayment: delegate("tradeCashPayment"),
+    };
+  }
+
+  /** The where clauses of the three windows a metric's model was asked for. */
+  const whereFor = (model: string) =>
+    calls.filter((call) => call.model === model).map((call) => call.args.where);
 
   beforeEach(() => {
     jest.useFakeTimers().setSystemTime(now);
-
-    prisma = {
-      user: {
-        count: jest.fn(async (args?: any) => {
-          const where = args?.where;
-          if (!where) return 100;
-          if (where.isBanned === false) {
-            return valueForPeriod(where.createdAt, [3, 20, 10]);
-          }
-          if (where.OR) return valueForPeriod(where.createdAt, [1, 4, 8]);
-          if (where.createdAt.lt || where.createdAt.lte) {
-            return valueForPeriod(where.createdAt, [4, 24, 12]);
-          }
-          return 7;
-        }),
-      },
-      product: {
-        count: jest.fn(async (args?: any) => {
-          const where = args?.where;
-          if (!where) return 80;
-          if (!where.createdAt) {
-            if (where.status === ProductStatus.active) return 40;
-            if (where.status === ProductStatus.pending) return 10;
-            return 80;
-          }
-          if (where.status === ProductStatus.active) {
-            return valueForPeriod(where.createdAt, [2, 8, 5]);
-          }
-          if (where.status?.in) {
-            return valueForPeriod(where.createdAt, [1, 4, 8]);
-          }
-          return valueForPeriod(where.createdAt, [3, 12, 13]);
-        }),
-        groupBy: jest
-          .fn()
-          .mockResolvedValue([{ categoryId: "category-1", _count: { id: 3 } }]),
-      },
-      order: {
-        count: jest.fn(async (args?: any) => {
-          const where = args?.where;
-          if (!where) return 300;
-          if (!where.createdAt && where.status === OrderStatus.completed)
-            return 200;
-          if (where.status === OrderStatus.cancelled) {
-            return valueForPeriod(where.createdAt, [1, 6, 3]);
-          }
-          if (where.status?.in) {
-            return valueForPeriod(where.createdAt, [1, 18, 12]);
-          }
-          if (where.createdAt.lt || where.createdAt.lte) {
-            return valueForPeriod(where.createdAt, [2, 30, 20]);
-          }
-          return 15;
-        }),
-        aggregate: jest.fn(async (args: any) => {
-          const createdAt = args.where.createdAt;
-          if (!createdAt) return { _sum: { commissionAmount: 999 } };
-          if (!createdAt.lt && !createdAt.lte) {
-            return { _sum: { commissionAmount: 77 } };
-          }
-          if (args._sum.totalAmount) {
-            return {
-              _sum: {
-                totalAmount: valueForPeriod(createdAt, [100, 3000, 2000]),
-              },
-            };
-          }
-          return {
-            _sum: {
-              commissionAmount: valueForPeriod(createdAt, [10, 200, 100]),
-            },
-          };
-        }),
-        groupBy: jest.fn(async (args: any) => {
-          if (args.by[0] === "categoryId") return [];
-          const period = valueForPeriod(args.where.createdAt, [0, 1, 2]);
-          return [
-            {
-              cancellationType: OrderCancellationType.iptal,
-              _count: { id: [1, 4, 2][period] },
-            },
-            {
-              cancellationType: OrderCancellationType.iade,
-              _count: { id: [0, 2, 1][period] },
-            },
-          ];
-        }),
-      },
-      commissionLedger: {
-        aggregate: jest.fn(async (args: any) => {
-          const period = valueForPeriod(args.where.createdAt, [0, 1, 2]);
-          return {
-            _sum: {
-              sellerCommission: [8, 100, 50][period],
-              refundedSellerCommission: [1, 20, 10][period],
-              buyerFee: [2, 10, 10][period],
-              refundedBuyerFee: [0, 5, 0][period],
-            },
-          };
-        }),
-      },
-      refundRequest: {
-        count: jest.fn(async (args: any) =>
-          valueForPeriod(args.where.createdAt, [1, 8, 4]),
-        ),
-        groupBy: jest.fn(async (args: any) => {
-          const period = valueForPeriod(args.where.createdAt, [0, 1, 2]);
-          return [
-            {
-              status: RefundRequestStatus.pending_review,
-              _count: { id: [1, 3, 2][period] },
-            },
-            {
-              status: RefundRequestStatus.refunded,
-              _count: { id: [0, 5, 2][period] },
-            },
-          ];
-        }),
-      },
-      category: {
-        findMany: jest
-          .fn()
-          .mockResolvedValue([{ id: "category-1", name: "Collectibles" }]),
-      },
+    calls = [];
+    prisma = recordingPrisma();
+    cache = {
+      // Cache miss on every read — the metric definitions are what is under test.
+      getOrSet: jest.fn(async (_key: string, factory: () => Promise<unknown>) =>
+        factory(),
+      ),
+      del: jest.fn(),
+      delPattern: jest.fn(),
     };
-
-    service = new AdminAnalyticsDashboardService(prisma, {} as any);
+    service = new AdminAnalyticsDashboardService(prisma, {} as any, cache);
   });
 
-  afterEach(() => {
-    jest.useRealTimers();
-  });
+  afterEach(() => jest.useRealTimers());
 
-  it("returns every dashboard metric with calendar period values", async () => {
+  it("returns every catalogued metric with period, previous and all-time", async () => {
     const result = await service.getDashboardStats();
 
-    expect(result.users).toEqual({
-      yesterday: 4,
-      thisMonth: 24,
-      lastMonth: 12,
-      changePercent: 100,
-      total: 100,
-      new7d: 7,
-    });
-    expect(result.products).toMatchObject({
-      yesterday: 3,
-      thisMonth: 12,
-      lastMonth: 13,
-      changePercent: -7.69,
-      total: 80,
-      active: 40,
-      pending: 10,
-    });
-    expect(result.orders).toMatchObject({
-      yesterday: 2,
-      thisMonth: 30,
-      lastMonth: 20,
-      changePercent: 50,
-      total: 300,
-      last7d: 15,
-      completed: 200,
-    });
-    expect(result.commission).toEqual({
-      yesterday: 10,
-      thisMonth: 200,
-      lastMonth: 100,
-      changePercent: 100,
-    });
-    expect(result.totalSales).toEqual({
-      yesterday: 1,
-      thisMonth: 18,
-      lastMonth: 12,
-      changePercent: 50,
-    });
-    expect(result.grossSales).toEqual({
-      yesterday: 100,
-      thisMonth: 3000,
-      lastMonth: 2000,
-      changePercent: 50,
-    });
-    expect(result.netCommission).toEqual({
-      yesterday: 9,
-      thisMonth: 85,
-      lastMonth: 50,
-      changePercent: 70,
-    });
-    expect(result.activeProducts).toMatchObject({ thisMonth: 8, lastMonth: 5 });
-    expect(result.passiveProducts).toMatchObject({
-      thisMonth: 4,
-      lastMonth: 8,
-    });
-    expect(result.activeUsers).toMatchObject({ thisMonth: 20, lastMonth: 10 });
-    expect(result.passiveUsers).toMatchObject({ thisMonth: 4, lastMonth: 8 });
-    expect(result.cancellations).toEqual({
-      yesterday: 1,
-      thisMonth: 6,
-      lastMonth: 3,
-      changePercent: 100,
-    });
-    expect(result.cancellationsByType.iptal).toMatchObject({
-      yesterday: 1,
-      thisMonth: 4,
-      lastMonth: 2,
-    });
-    expect(result.cancellationsByType.iade).toMatchObject({
-      yesterday: 0,
-      thisMonth: 2,
-      lastMonth: 1,
-    });
-    expect(result.refunds).toEqual({
-      yesterday: 1,
-      thisMonth: 8,
-      lastMonth: 4,
-      changePercent: 100,
-    });
-    expect(result.refundsByStatus.pending_review).toMatchObject({
-      yesterday: 1,
-      thisMonth: 3,
-      lastMonth: 2,
-    });
-    expect(result.refundsByStatus.refunded).toMatchObject({
-      yesterday: 0,
-      thisMonth: 5,
-      lastMonth: 2,
+    expect(Object.keys(result.metrics).sort()).toEqual(
+      [...DASHBOARD_METRIC_KEYS].sort(),
+    );
+    for (const key of DASHBOARD_METRIC_KEYS) {
+      expect(result.metrics[key]).toMatchObject({
+        period: expect.any(Number),
+        previous: expect.any(Number),
+        allTime: expect.any(Number),
+      });
+    }
+  });
+
+  it("asks all three windows from one definition, in one transaction", async () => {
+    await service.getDashboardStats();
+
+    expect(prisma.$transaction).toHaveBeenCalledTimes(1);
+    expect(prisma.$transaction.mock.calls[0][0]).toHaveLength(
+      DASHBOARD_METRIC_KEYS.length * 3,
+    );
+    expect(calls).toHaveLength(DASHBOARD_METRIC_KEYS.length * 3);
+  });
+
+  it("defaults to today and echoes the measured window", async () => {
+    const result = await service.getDashboardStats();
+
+    expect(result.range.type).toBe("daily");
+    expect(result.range.from).toBe(todayStart.toISOString());
+    expect(result.range.to).toBe(now.toISOString());
+  });
+
+  it("measures the month to date when asked for the monthly period", async () => {
+    const result = await service.getDashboardStats({ period: "monthly" });
+
+    expect(result.range.from).toBe(monthStart.toISOString());
+    const cancelled = whereFor("order").filter((where) => where?.cancelledAt);
+    expect(cancelled[0]?.cancelledAt).toEqual({
+      gte: monthStart,
+      lte: now,
     });
   });
 
-  it("uses the required state, realized-sale, and ledger filters", async () => {
+  it("measures a custom range inclusively at both ends", async () => {
+    const result = await service.getDashboardStats({
+      period: "custom",
+      from: "2026-07-10",
+      to: "2026-07-12",
+    });
+
+    expect(result.range.from).toBe(new Date(2026, 6, 10).toISOString());
+    expect(result.range.to).toBe(
+      new Date(2026, 6, 12, 23, 59, 59, 999).toISOString(),
+    );
+  });
+
+  describe("measures event stamps, never `status + createdAt`", () => {
+    const stampFor = (model: string, field: string) => () => {
+      const wheres = whereFor(model).filter((where) => where && field in where);
+      expect(wheres).toHaveLength(3);
+      return wheres;
+    };
+
+    beforeEach(async () => {
+      await service.getDashboardStats();
+    });
+
+    it("counts cancellations from Order.cancelledAt", () => {
+      const wheres = stampFor("order", "cancelledAt")();
+      expect(wheres[0]?.cancelledAt).toEqual({ gte: todayStart, lte: now });
+      // all-time still measures the EVENT, it just drops the range
+      expect(wheres[2]?.cancelledAt).toEqual({ not: null });
+    });
+
+    it("counts deliveries from Order.deliveredAt", () => {
+      const wheres = stampFor("order", "deliveredAt")();
+      expect(wheres[2]?.deliveredAt).toEqual({ not: null });
+    });
+
+    it("counts completed trades from Trade.completedAt", () => {
+      const wheres = stampFor("trade", "completedAt")();
+      expect(wheres[2]?.completedAt).toEqual({ not: null });
+    });
+
+    it("counts new listings from Product.publishedAt", () => {
+      const wheres = stampFor("product", "publishedAt")();
+      expect(wheres[2]?.publishedAt).toEqual({ not: null });
+    });
+
+    it("reads refunded money from RefundRequest.refundedAt", () => {
+      const wheres = stampFor("refundRequest", "refundedAt")();
+      expect(wheres[2]?.refundedAt).toEqual({ not: null });
+    });
+
+    it("reads net platform revenue from CommissionLedger.earnedAt", () => {
+      const wheres = stampFor("commissionLedger", "earnedAt")();
+      expect(wheres[0]).toMatchObject({ status: { not: "waived" } });
+      expect(wheres[2]?.earnedAt).toEqual({ not: null });
+    });
+
+    it("reads boost revenue from ProductBoost.purchasedAt", () => {
+      const wheres = stampFor("productBoost", "purchasedAt")();
+      expect(wheres[2]?.purchasedAt).toEqual({ not: null });
+    });
+
+    it("counts a paid order through either its own or its group's payment", () => {
+      const paid = whereFor("order").filter((where) => where && "OR" in where);
+      expect(paid).toHaveLength(6); // adet + tutar, üç pencere
+      const [first] = paid as Array<Record<string, any>>;
+      expect(first.OR[0].payment.is).toMatchObject({ status: "completed" });
+      expect(first.OR[1].checkoutGroup.is.payment.is).toMatchObject({
+        status: "completed",
+      });
+      // virtual (membership / boost) orders never enter the sales figure
+      expect(first.origin).toEqual({ not: "platform_service" });
+    });
+  });
+
+  it("derives the trend from the preceding window of equal length", async () => {
+    const result = await service.getDashboardStats();
+
+    // Every stub answers 1, so period == previous → no change.
+    expect(result.metrics.cancelledOrders.changePercent).toBe(0);
+  });
+
+  it("caches a live period under a bucketed key and a closed range under its own", async () => {
     await service.getDashboardStats();
-
-    expect(prisma.user.count).toHaveBeenCalledWith({
-      where: {
-        createdAt: expect.any(Object),
-        isBanned: false,
-        deletedAt: null,
-      },
-    });
-    expect(prisma.user.count).toHaveBeenCalledWith({
-      where: {
-        createdAt: expect.any(Object),
-        OR: [{ isBanned: true }, { deletedAt: { not: null } }],
-      },
-    });
-    expect(prisma.product.count).toHaveBeenCalledWith({
-      where: {
-        kind: ProductKind.listing,
-        createdAt: expect.any(Object),
-        status: {
-          in: [ProductStatus.inactive, ProductStatus.suspended],
-        },
-      },
+    await service.getDashboardStats({
+      period: "custom",
+      from: "2026-07-01",
+      to: "2026-07-02",
     });
 
-    const grossSalesCall = prisma.order.aggregate.mock.calls.find(
-      ([args]: any[]) => args._sum.totalAmount,
-    )[0];
-    expect(grossSalesCall.where.status.in).toEqual([
-      OrderStatus.paid,
-      OrderStatus.delivered,
-      OrderStatus.completed,
-    ]);
+    const [liveKey, , liveOptions] = cache.getOrSet.mock.calls[0];
+    const [closedKey, , closedOptions] = cache.getOrSet.mock.calls[1];
 
-    const ledgerCall = prisma.commissionLedger.aggregate.mock.calls[0][0];
-    expect(ledgerCall.where.status).toEqual({
-      not: CommissionLedgerStatus.waived,
-    });
-    expect(ledgerCall._sum).toEqual({
-      sellerCommission: true,
-      refundedSellerCommission: true,
-      buyerFee: true,
-      refundedBuyerFee: true,
-    });
-
-    const orderPeriodCalls = prisma.order.count.mock.calls
-      .map(([args]: any[]) => args?.where?.createdAt)
-      .filter((createdAt: any) => createdAt?.lt || createdAt?.lte);
-    expect(orderPeriodCalls).toEqual(
-      expect.arrayContaining([
-        { gte: yesterdayStart, lt: todayStart },
-        { gte: thisMonthStart, lte: now },
-        { gte: lastMonthStart, lt: thisMonthStart },
-      ]),
+    expect(liveKey).toContain("admin:dashboard:period:v1:daily:");
+    expect(liveOptions.ttl).toBe(
+      AdminAnalyticsDashboardService.PERIOD_CACHE_TTL_SECONDS,
+    );
+    // A window that has already closed cannot gain rows — hold it far longer.
+    expect(closedKey).toContain("admin:dashboard:period:v1:custom:");
+    expect(closedOptions.ttl).toBe(
+      AdminAnalyticsDashboardService.CLOSED_RANGE_CACHE_TTL_SECONDS,
     );
   });
 });

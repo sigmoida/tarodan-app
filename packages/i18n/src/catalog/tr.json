@@ -7329,51 +7329,111 @@
     },
     "dashboard": {
       "title": "Dashboard",
-      "description": "Hoş geldiniz! İşte bugünkü genel bakış.",
+      "description": "Bekleyen işler, uyarılar ve dönem özeti.",
+      "refresh": "Yenile",
+      "refreshing": "Yenileniyor…",
+      "zones": {
+        "queues": "Bekleyen işler",
+        "queuesDescription": "Tarih filtresinden bağımsız — ne zaman düştüğü fark etmez, hâlâ bekliyor.",
+        "queuesEmpty": "Bekleyen iş yok.",
+        "alerts": "Uyarılar",
+        "period": "Dönem özeti",
+        "stock": "Şu anki durum",
+        "loadFailed": "Bu bölüm yüklenemedi."
+      },
+      "queues": {
+        "refundRequests": "İade talepleri",
+        "tradeOperations": "Takas operasyonu",
+        "listingModeration": "İlan moderasyonu",
+        "sellerApplications": "Satıcı başvuruları",
+        "supportAndReports": "Destek ve şikayet",
+        "moneyOperations": "Para işlemleri",
+        "documents": "Belgeler",
+        "shipping": "Kargo"
+      },
+      "queueParts": {
+        "refundsPendingReview": "İnceleme bekleyen",
+        "refundsDisputed": "İtirazlı",
+        "tradesAtWarehouse": "Depoda / incelemede",
+        "tradeDisputesOpen": "Açık itiraz",
+        "tradeRefundFailures": "İadesi başarısız",
+        "tradeCompensationPending": "Tazminat bekleyen",
+        "productsPending": "Onay bekleyen ilan",
+        "messagesPendingApproval": "Onay bekleyen mesaj",
+        "corporateApplications": "Kurumsal başvuru",
+        "sellerDocuments": "İncelenecek belge",
+        "ticketsOpen": "Açık destek talebi",
+        "ticketsUrgent": "Acil / yüksek öncelikli",
+        "reportsPending": "Bekleyen şikayet",
+        "payoutsFailed": "Başarısız transfer",
+        "holdsOverdue": "Süresi geçmiş escrow",
+        "adjustmentsOpen": "Açık satıcı borcu",
+        "invoicesExhausted": "Denemesi tükenmiş belge",
+        "ordersUninvoiced": "Faturasız teslimat",
+        "carrierCancellations": "Taşıyıcı iptal görevi",
+        "shipmentsWithoutTracking": "Takip kodu oluşmamış gönderi"
+      },
+      "alerts": {
+        "stuckShippedOrders": "{count} sipariş {threshold} günden uzun süredir kargoda — teslim raporu gelmiyor",
+        "stuckWarehouseTrades": "{count} takas kolisi {threshold} gündür depoya ulaşmadı",
+        "stuckOutboundTrades": "{count} takas çıkış kolisinin teslim raporu {threshold} gündür gelmedi",
+        "paymentsMissingFromStatement": "{count} tahsilatın PayTR dökümünde karşılığı yok",
+        "unresolvedStatementLines": "{count} döküm satırı eşleşmedi ve kapatılmadı",
+        "commissionLedgerDrift": "Komisyon defteri sipariş toplamıyla uyuşmuyor: {amount}",
+        "paymentsWithoutOrders": "{count} tamamlanmış ödemenin siparişi bulunamadı",
+        "ordersWithoutHold": "{count} ödenmiş siparişin escrow kaydı yok",
+        "outboxDead": "{count} yan etki tüm denemelerini tüketti (DLQ)",
+        "outboxStuckProcessing": "{count} outbox satırı {threshold} dakikadır işlemede takılı",
+        "noActiveCommissionRuleSet": "Aktif komisyon kural seti yok — checkout kapalı",
+        "noActiveShippingTariff": "Aktif kargo tarifesi yok — kargo bedeli hesaplanamıyor",
+        "staleCouponReservations": "{count} kupon rezervasyonu süresi dolduğu hâlde bütçeyi tutuyor",
+        "deliveredHoldsWithoutRelease": "{count} teslim edilmiş siparişin escrow'unda serbest bırakma tarihi yok",
+        "agedCarrierCancellations": "{count} taşıyıcı iptal görevi {threshold} saattir bekliyor",
+        "exhaustedPayoutRetries": "{count} transfer talimatı deneme hakkını tüketti",
+        "preparingDeadlineWithin24h": "{count} siparişin hazırlama süresi 24 saat içinde doluyor"
+      },
       "stats": {
-        "totalOrders": "Toplam Satış",
-        "commissionRevenue": "Komisyon Geliri",
-        "activeProducts": "Aktif Ürünler",
-        "totalUsers": "Toplam Kullanıcı",
-        "products": "Ürünler",
-        "users": "Kullanıcılar",
-        "grossSales": "Toplam Satış Tutarı",
-        "netCommission": "Net Komisyon",
-        "liveVisitors": "Canlı / Günlük Aktif Ziyaretçi",
-        "cancellationsRefunds": "İptal / İade",
-        "active": "Aktif",
-        "passive": "Pasif",
-        "live": "Canlı",
-        "daily": "Günlük",
-        "cancellations": "İptal",
-        "refunds": "İade"
+        "paidOrders": "Ödenen sipariş",
+        "paidAmount": "Ödenen tutar",
+        "deliveredOrders": "Teslim edilen sipariş",
+        "netRevenue": "Net platform geliri",
+        "membershipRevenue": "Üyelik geliri",
+        "boostRevenue": "Öne çıkarma geliri",
+        "refundedAmount": "İade edilen tutar",
+        "cancelledOrders": "İptal edilen sipariş",
+        "completedTrades": "Tamamlanan takas",
+        "tradeFeeRevenue": "Takas hizmet geliri",
+        "newUsers": "Yeni kullanıcı",
+        "newListings": "Yeni ilan",
+        "signedInUsers": "Giriş yapan kullanıcı",
+        "cancelledFromMigration": "Yalnız yeni iptaller sayılır (eski kayıtlarda iptal anı tutulmuyordu)"
+      },
+      "stock": {
+        "escrowBalance": "Escrow bakiyesi",
+        "openSellerDebt": "Açık satıcı borcu",
+        "activeListings": "Aktif ilan",
+        "activeMemberships": "Aktif üyelik",
+        "activeBoosts": "Aktif öne çıkarma",
+        "tierBreakdown": "Katman kırılımı"
+      },
+      "age": {
+        "oldest": "En eskisi {age} bekliyor",
+        "days": "{count} gün",
+        "hours": "{count} saat",
+        "minutes": "{count} dk"
       },
       "period": {
-        "yesterday": "Dün",
-        "thisMonth": "Bu Ay",
-        "lastMonth": "Geçen Ay"
-      },
-      "quickActions": {
-        "products": "Ürünler",
-        "orders": "Siparişler",
-        "users": "Kullanıcılar",
-        "messages": "Mesajlar"
-      },
-      "pendingActions": {
-        "productsPending": "{count} ürün onay bekliyor",
-        "refundRequests": "{count} iade talebi",
-        "messagesPending": "{count} mesaj onay bekliyor",
-        "identityVerification": "{count} kimlik doğrulama talebi",
-        "review": "İncele"
-      },
-      "charts": {
-        "salesLabel": "Satışlar (₺)",
-        "ordersLabel": "Siparişler",
-        "sales30dTitle": "Son 30 Gün Satış Performansı",
-        "dailyOrdersTitle": "Günlük Sipariş Sayısı",
-        "categoryTitle": "Kategori Dağılımı",
-        "noData": "Veri Yok",
-        "uncategorized": "Kategorisiz"
+        "label": "Dönem",
+        "daily": "Günlük",
+        "monthly": "Aylık",
+        "custom": "Tarih aralığı",
+        "from": "Başlangıç tarihi",
+        "to": "Bitiş tarihi",
+        "allTime": "Tüm zamanlar",
+        "vsPrevious": "önceki döneme göre",
+        "rangeIncomplete": "Başlangıç ve bitiş tarihi seçin",
+        "rangeUnparseable": "Geçerli bir tarih seçin",
+        "rangeReversed": "Başlangıç tarihi bitiş tarihinden sonra olamaz"
       },
       "recentOrders": {
         "title": "Son Siparişler",
@@ -7385,6 +7445,7 @@
       },
       "topProducts": {
         "title": "En Çok Görüntülenen Ürünler",
+        "allTimeNote": "Tüm zamanlar — görüntülenme kümülatiftir, döneme göre ayrılamaz",
         "empty": "Henüz ürün görüntülemesi bulunmuyor",
         "columns": {
           "product": "Ürün",
@@ -7395,6 +7456,7 @@
       },
       "topSellers": {
         "title": "En Çok Görüntülenen Satıcılar",
+        "allTimeNote": "Tüm zamanlar — görüntülenme kümülatiftir, döneme göre ayrılamaz",
         "empty": "Henüz satıcı görüntülemesi bulunmuyor",
         "columns": {
           "seller": "Satıcı",
@@ -7402,10 +7464,6 @@
           "products": "Ürün",
           "activeListings": "Aktif İlan"
         }
-      },
-      "status": {
-        "refundRequested": "İade Talebi",
-        "inProgress": "Devam Ediyor"
       },
       "relativeTime": {
         "minutesAgo": "{count} dk önce",
@@ -9934,6 +9992,11 @@
         "invalidDate": "Geçersiz tarih (YYYY-MM-DD bekleniyor)",
         "lineNotFound": "Döküm satırı bulunamadı",
         "lineAlreadyMatched": "Eşleşmiş satır çözümlenemez"
+      },
+      "dashboard": {
+        "rangeIncomplete": "Özel dönem için başlangıç ve bitiş tarihi gerekir",
+        "rangeUnparseable": "Dönem tarihleri geçerli birer tarih olmalı",
+        "rangeReversed": "Başlangıç tarihi bitiş tarihinden sonra olamaz"
       }
     },
     "advertisement": {

@@ -51,7 +51,6 @@ module.exports = {
           "DATABASE_URL",
           "ELOGO_DEBUG",
           "EMAIL_LOGO_URL",
-          "INVOICE_DEADLINE_DAYS",
           "JWT_EXPIRES_IN",
           "JWT_REFRESH_EXPIRES_IN",
           "LISTING_TTL_DAYS",

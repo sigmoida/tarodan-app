@@ -1,4 +1,5 @@
 import { Injectable, Optional, Logger } from "@nestjs/common";
+import type { DashboardPeriodQuery } from "@tarodan/types";
 import { AdminAuditService } from "./ops/admin-audit.service";
 import { AdminCommissionService } from "./finance/admin-commission.service";
 import { AdminSettingsService } from "./ops/admin-settings.service";
@@ -449,12 +450,12 @@ export class AdminService {
   // ==================== ANALYTICS & REPORTS ====================
   // Taşındı: admin-analytics.service.ts — imzalar aynen korunuyor (facade delege).
   // Not: getOrderById, updateOrderStatus, addOrderTracking,
-  // generateOrderInvoice, unbanUser, getRecentOrders, getPendingActions da bu
+  // generateOrderInvoice, unbanUser, getRecentOrders da bu
   // banner aralığında olduğu için bölümle birlikte taşındı. getDateKey private
   // yardımcısı yalnız bu bölümde kullanılıyordu, o da taşındı.
 
-  async getDashboardStats() {
-    return this.analyticsService.getDashboardStats();
+  async getDashboardStats(query?: DashboardPeriodQuery) {
+    return this.analyticsService.getDashboardStats(query);
   }
 
   async saveAnalyticsSnapshot() {
@@ -515,10 +516,6 @@ export class AdminService {
 
   async getTopSellers(limit: number = 10) {
     return this.analyticsService.getTopSellers(limit);
-  }
-
-  async getPendingActions() {
-    return this.analyticsService.getPendingActions();
   }
 
   async generateSalesReport(query: ReportQueryDto) {

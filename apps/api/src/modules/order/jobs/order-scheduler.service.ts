@@ -27,6 +27,10 @@ import { NotificationType } from "../../notification/dto";
 import { CacheService } from "../../cache/cache.service";
 import { adminUrl } from "../../../config/app-urls";
 import type { CronRunSummary } from "../../../monitoring/cron-run.helper";
+import {
+  invoiceDeadlineDays,
+  shippedStaleAlertDays,
+} from "../../../config/alert-thresholds";
 
 const OPEN_REFUND_STATUSES = [
   "pending_review",
@@ -270,13 +274,10 @@ export class OrderSchedulerService implements OnModuleInit {
     uninvoicedDelivered: number;
     missingSellerInvoices: number;
   }> {
-    const stuckDays =
-      Number(
-        this.configService.get<string>("SHIPPED_STALE_ALERT_DAYS") ?? "10",
-      ) || 10;
-    const invoiceDeadlineDays =
-      Number(this.configService.get<string>("INVOICE_DEADLINE_DAYS") ?? "5") ||
-      5;
+    // Eşikler TEK kaynakta (config/alert-thresholds): dashboard uyarısı ile bu
+    // cron aynı sayıyı okur.
+    const stuckDays = shippedStaleAlertDays(this.configService);
+    const invoiceDeadline = invoiceDeadlineDays(this.configService);
 
     // Eşik KARGO YAŞINA bakar (shipment.shippedAt), sipariş satırının
     // updatedAt'ine değil: alakasız bir güncelleme (bildirim, adres, fatura
@@ -304,9 +305,7 @@ export class OrderSchedulerService implements OnModuleInit {
           commissionLedger: { isNot: null },
           revenueInvoicedAt: null,
           deliveredAt: {
-            lt: new Date(
-              Date.now() - invoiceDeadlineDays * 24 * 60 * 60 * 1000,
-            ),
+            lt: new Date(Date.now() - invoiceDeadline * 24 * 60 * 60 * 1000),
           },
         },
       }),
@@ -339,7 +338,7 @@ export class OrderSchedulerService implements OnModuleInit {
       else this.logger.warn(`${message} (daha önce bildirildi)`);
     }
     if (uninvoicedDelivered > 0) {
-      const message = `ORDERS_DELIVERED_UNINVOICED count=${uninvoicedDelivered} — teslimden ${invoiceDeadlineDays} günden uzun süre geçti, gelir faturası hâlâ kesilmedi (e-Arşiv süresi riski)`;
+      const message = `ORDERS_DELIVERED_UNINVOICED count=${uninvoicedDelivered} — teslimden ${invoiceDeadline} günden uzun süre geçti, gelir faturası hâlâ kesilmedi (e-Arşiv süresi riski)`;
       if (await this.alarmOncePerDay("delivered-uninvoiced")) {
         this.logger.error(message);
       } else {

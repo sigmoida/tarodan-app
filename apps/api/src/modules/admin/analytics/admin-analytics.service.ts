@@ -1,4 +1,5 @@
 import { Injectable } from "@nestjs/common";
+import type { DashboardPeriodQuery } from "@tarodan/types";
 import {
   AddOrderTrackingDto,
   AnalyticsQueryDto,
@@ -28,8 +29,8 @@ export class AdminAnalyticsService {
 
   // ==================== ANALYTICS & REPORTS ====================
 
-  async getDashboardStats() {
-    return this.dashboard.getDashboardStats();
+  async getDashboardStats(query?: DashboardPeriodQuery) {
+    return this.dashboard.getDashboardStats(query);
   }
 
   async saveAnalyticsSnapshot() {
@@ -58,10 +59,6 @@ export class AdminAnalyticsService {
 
   async getTopSellers(limit: number = 10) {
     return this.dashboard.getTopSellers(limit);
-  }
-
-  async getPendingActions() {
-    return this.dashboard.getPendingActions();
   }
 
   async getCommissionRevenue(query: AnalyticsQueryDto) {

@@ -444,7 +444,9 @@ describe("PaymentRefundService.processRefund — MONEY-H3/H4 partial refund", ()
     expect(mockTx.order.update).toHaveBeenCalledWith(
       expect.objectContaining({
         where: { id: ORDER_ID },
-        data: { status: "cancelled" },
+        // İptal yazan her yol `orderCancelledData` üzerinden geçer: damga da
+        // beklenir, yoksa dönemsel iptal metriği bu yolu sessizce kaçırır.
+        data: { status: "cancelled", cancelledAt: expect.any(Date) },
       }),
     );
   });

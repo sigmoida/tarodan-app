@@ -21,6 +21,7 @@ import { getReservedAwareStatus } from "../helpers/product-status.helper";
 import { NotificationService } from "../../notification/notification.service";
 import { DiscountService } from "../../discount/discount.service";
 import { TRADE_CANCEL_REASON } from "../../trade/helpers/trade-cancel-reasons";
+import { orderCancelledData } from "../../order/helpers/order-cancellation";
 
 type PrismaTx = Prisma.TransactionClient;
 
@@ -368,7 +369,7 @@ export class ProductLockService {
     await tx.order.updateMany({
       where: { id: { in: orders.map((o) => o.id) } },
       data: {
-        status: OrderStatus.cancelled,
+        ...orderCancelledData(),
         cancelReason,
       },
     });
