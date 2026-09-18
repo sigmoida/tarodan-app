@@ -1,29 +1,10 @@
 import { api } from "./client";
 
 /**
- * Finance domain: reports, commission config, payments & invoices, seller
+ * Finance domain: commission config, payments & invoices, seller
  * payouts, and tax (VAT/withholding) settings.
  */
 export const financeApi = {
-  // Reports
-  getSalesReport: (params?: {
-    startDate?: string;
-    endDate?: string;
-    format?: string;
-  }) => api.get("/admin/reports/sales", { params }),
-  getCommissionReport: (params?: { startDate?: string; endDate?: string }) =>
-    api.get("/admin/reports/commission", { params }),
-  getUserReport: (params?: any) => api.get("/admin/reports/users", { params }),
-  getTradeReport: (params?: any) =>
-    api.get("/admin/reports/trades", { params }),
-  getProductReport: (params?: any) =>
-    api.get("/admin/reports/products", { params }),
-  exportReport: (type: string, format: string, params?: any) =>
-    api.get(`/admin/reports/${type}`, {
-      params: { ...params, format },
-      responseType: "json",
-    }),
-
   // Commission
   getCommissionRevenue: (params?: { fromDate?: string; toDate?: string }) =>
     api.get("/admin/commission/revenue", { params }),
