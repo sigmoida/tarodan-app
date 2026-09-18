@@ -409,7 +409,14 @@ export const MEMBERSHIP_METRIC_KEYS = [
   /** `MembershipPayment.orderId IS NULL` — the recurring charge. */
   "renewals",
   "churned",
+  /** Fell past due IN the window — `UserMembership.pastDueAt`. */
   "pastDue",
+  /**
+   * How many sit in `past_due` right now. A balance, not a flow, and the only
+   * single-number snapshot on this screen: the state existed long before it
+   * had a stamp, so the flow figure alone would read as zero history.
+   */
+  "pastDueNow",
   "membershipRevenue",
 ] as const;
 

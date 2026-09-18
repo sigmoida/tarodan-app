@@ -7489,8 +7489,9 @@
         "newMemberships": "New memberships",
         "renewals": "Renewals",
         "churned": "Cancelled memberships",
-        "pastDue": "Past-due memberships",
-        "membershipRevenue": "Membership revenue"
+        "pastDue": "Fell past due in period",
+        "membershipRevenue": "Membership revenue",
+        "pastDueNow": "Past due right now"
       },
       "series": {
         "gmv": "Volume",

@@ -7489,8 +7489,9 @@
         "newMemberships": "Yeni üyelik",
         "renewals": "Yenileme",
         "churned": "İptal edilen üyelik",
-        "pastDue": "Ödemesi geciken üyelik",
-        "membershipRevenue": "Üyelik geliri"
+        "pastDue": "Dönemde ödemesiz kalan üyelik",
+        "membershipRevenue": "Üyelik geliri",
+        "pastDueNow": "Şu an ödemesiz üyelik"
       },
       "series": {
         "gmv": "Ciro",

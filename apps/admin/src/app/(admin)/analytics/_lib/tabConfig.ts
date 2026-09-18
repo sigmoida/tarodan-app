@@ -218,6 +218,7 @@ export const TAB_SECTIONS: Record<AnalyticsTab, TabSections> = {
       card("renewals", ArrowPathIcon, "primary", "count"),
       card("churned", XCircleIcon, "danger", "count"),
       card("pastDue", ExclamationTriangleIcon, "warning", "count"),
+      card("pastDueNow", ExclamationTriangleIcon, "warning", "count"),
       card("membershipRevenue", BanknotesIcon, "success", "currency"),
     ],
     charts: [

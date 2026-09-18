@@ -53,7 +53,12 @@ const EXPECTED_STAMPS: Record<string, string[]> = {
     '"delivered_at"',
   ],
   // Üyelik ödemesinin kendi anı; `MembershipPayment`in updatedAt'i yok.
-  "analytics-membership.service.ts": ['"created_at"', "cancelledAt"],
+  // Ödemesiz kalma da artık AKIŞ: `pastDueAt`.
+  "analytics-membership.service.ts": [
+    '"created_at"',
+    "cancelledAt",
+    "pastDueAt",
+  ],
 };
 
 describe("analitik ölçüm sözleşmesi", () => {

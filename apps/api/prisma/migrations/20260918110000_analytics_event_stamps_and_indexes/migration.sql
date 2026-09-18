@@ -15,6 +15,13 @@ ALTER TABLE "products" ADD COLUMN "sold_at" TIMESTAMP(3);
 -- dolması ve teklifi verenin geri çekmesi cevap DEĞİLDİR, damgalanmaz.
 ALTER TABLE "offers" ADD COLUMN "responded_at" TIMESTAMP(3);
 
+-- Üyeliğin ödemesi gecikmiş duruma DÜŞTÜĞÜ an. Bugün hiçbir kod yolu
+-- `past_due` YAZMIYOR (dayanıklı ödeme niyetleri o geçişin yerini aldı; mevcut
+-- satırlar eski kayıtlar ve seed'den geliyor). Damga yine de şimdi eklenir:
+-- geçişi geri getirecek ilk kod yolu, ölçümü sessizce kaybetmek yerine
+-- `membershipPastDueData()` üzerinden yazmak zorunda kalsın.
+ALTER TABLE "user_memberships" ADD COLUMN "past_due_at" TIMESTAMP(3);
+
 -- GERİYE DÖNÜK DOLDURMA YOK — `updated_at` geçişten sonraki her dokunuşla
 -- kaydığı için o anı temsil etmiyor. Sonuç: bu göçten ÖNCEKİ ret/satış/cevap
 -- olayları hiçbir dönemde görünmez; ekran bunu açıkça söyler.
@@ -25,6 +32,7 @@ ALTER TABLE "offers" ADD COLUMN "responded_at" TIMESTAMP(3);
 CREATE INDEX "trades_rejected_at_idx" ON "trades"("rejected_at");
 CREATE INDEX "products_sold_at_idx" ON "products"("sold_at");
 CREATE INDEX "offers_responded_at_idx" ON "offers"("responded_at");
+CREATE INDEX "user_memberships_past_due_at_idx" ON "user_memberships"("past_due_at");
 
 -- Takas hunisinin ilk iki adımı.
 CREATE INDEX "trades_created_at_idx" ON "trades"("created_at");

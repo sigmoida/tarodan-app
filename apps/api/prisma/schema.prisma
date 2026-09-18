@@ -511,6 +511,11 @@ model UserMembership {
   currentPeriodStart     DateTime            @map("current_period_start")
   currentPeriodEnd       DateTime            @map("current_period_end")
   cancelledAt            DateTime?           @map("cancelled_at")
+  /// Üyeliğin ÖDEMESİ GECİKMİŞ (past_due) duruma DÜŞTÜĞÜ an. `status` yalnız
+  /// "şu an ne" sorusunu yanıtlar; "bu dönemde kaç üyelik ödemesiz kaldı"
+  /// ancak bu damgayla ölçülebilir. `updatedAt` düşüşten sonraki her dokunuşla
+  /// (self-heal denemesi, kart güncellemesi) kaydığı için kullanılamaz.
+  pastDueAt              DateTime?           @map("past_due_at")
   createdAt              DateTime            @default(now()) @map("created_at")
   updatedAt              DateTime            @updatedAt @map("updated_at")
   autoRenew              Boolean             @default(false) @map("auto_renew")
@@ -529,6 +534,8 @@ model UserMembership {
 
   @@index([userId])
   @@index([status])
+  // Analitik: dönem içinde ödemesiz kalan üyelik (düşüş ANI).
+  @@index([pastDueAt])
   @@map("user_memberships")
 }
 

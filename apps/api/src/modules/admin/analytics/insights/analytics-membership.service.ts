@@ -27,6 +27,7 @@ interface MembershipTotals {
   renewals: number;
   churned: number;
   pastDue: number;
+  pastDueNow: number;
   membershipRevenue: number;
 }
 
@@ -84,6 +85,7 @@ export class AnalyticsMembershipService extends AnalyticsTabService<AnalyticsMem
       renewals: of("renewals"),
       churned: of("churned"),
       pastDue: of("pastDue"),
+      pastDueNow: of("pastDueNow"),
       membershipRevenue: of("membershipRevenue"),
     } satisfies Record<MembershipMetricKey, AnalyticsMetric>;
   }
@@ -93,33 +95,39 @@ export class AnalyticsMembershipService extends AnalyticsTabService<AnalyticsMem
   ): Promise<MembershipTotals> {
     const paid = { status: PaymentStatus.completed, createdAt: window };
 
-    const [fresh, renewals, revenue, churned, pastDue] = await Promise.all([
-      this.prisma.membershipPayment.count({
-        where: { ...paid, orderId: { not: null } },
-      }),
-      this.prisma.membershipPayment.count({
-        where: { ...paid, orderId: null },
-      }),
-      this.prisma.membershipPayment.aggregate({
-        _sum: { amount: true },
-        where: paid,
-      }),
-      // İPTAL ANI damgalıdır; "şu an iptal" değil "bu dönemde iptal edildi".
-      this.prisma.userMembership.count({
-        where: { cancelledAt: window },
-      }),
-      // `past_due` bir DURUMDUR, damgası yoktur: dönem sonundaki fotoğraf
-      // olarak gösterilir. Kart bunu açıkça söyler.
-      this.prisma.userMembership.count({
-        where: { status: SubscriptionStatus.past_due },
-      }),
-    ]);
+    const [fresh, renewals, revenue, churned, pastDue, pastDueNow] =
+      await Promise.all([
+        this.prisma.membershipPayment.count({
+          where: { ...paid, orderId: { not: null } },
+        }),
+        this.prisma.membershipPayment.count({
+          where: { ...paid, orderId: null },
+        }),
+        this.prisma.membershipPayment.aggregate({
+          _sum: { amount: true },
+          where: paid,
+        }),
+        // İPTAL ANI damgalıdır; "şu an iptal" değil "bu dönemde iptal edildi".
+        this.prisma.userMembership.count({
+          where: { cancelledAt: window },
+        }),
+        // AKIŞ: dönem içinde ödemesiz KALAN üyelik (düşüş anı). Bir ay boyunca
+        // düşüp geri toparlanan üyelik dönem sonu fotoğrafında hiç görünmüyordu.
+        this.prisma.userMembership.count({ where: { pastDueAt: window } }),
+        // STOK: şu an `past_due` duran üyelik. Damga bu göçle geldiği için eski
+        // düşüşler akış rakamında YOK; fotoğraf onları da kapsıyor, bu yüzden
+        // ikisi birlikte gösterilir ve kart hangisinin ne olduğunu yazar.
+        this.prisma.userMembership.count({
+          where: { status: SubscriptionStatus.past_due },
+        }),
+      ]);
 
     return {
       newMemberships: fresh,
       renewals,
       churned,
       pastDue,
+      pastDueNow,
       membershipRevenue: num(revenue._sum.amount),
     };
   }
