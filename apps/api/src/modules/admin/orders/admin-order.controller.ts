@@ -58,6 +58,7 @@ import {
   AdminUserQueryDto,
   AdminProductQueryDto,
   AdminOrderQueryDto,
+  AdminOrderCountsQueryDto,
   AuditLogQueryDto,
   ApproveProductDto,
   RejectProductDto,
@@ -110,9 +111,27 @@ export class AdminOrderController {
 
   @Get("orders")
   @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
-  @ApiOperation({ summary: "Get orders with filters" })
+  @ApiOperation({
+    summary:
+      "List order carts (groups, offer orders, offers) by tab and bucket",
+  })
+  @ApiResponse({
+    status: 200,
+    description: "{ data: AdminOrderListRow[], meta }",
+  })
   async getOrders(@Query() query: AdminOrderQueryDto) {
     return this.adminService.getOrders(query);
+  }
+
+  // `orders/:id`'den ÖNCE tanımlı olmalı; yoksa "counts" bir sipariş id'si sanılır.
+  @Get("orders/counts")
+  @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
+  @ApiOperation({
+    summary: "Bucket counts for every orders tab, honoring the list filters",
+  })
+  @ApiResponse({ status: 200, description: "AdminOrderCounts" })
+  async getOrderCounts(@Query() query: AdminOrderCountsQueryDto) {
+    return this.adminService.getOrderCounts(query);
   }
 
   @Get("orders/:id")

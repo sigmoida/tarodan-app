@@ -1,3 +1,4 @@
+import type { AdminOrderCounts } from "@tarodan/types";
 import { api } from "./client";
 
 /**
@@ -7,6 +8,9 @@ import { api } from "./client";
 export const operationsApi = {
   // Orders
   getOrders: (params?: any) => api.get("/admin/orders", { params }),
+  /** Every orders tab's bucket counts in one call, honoring the list filters. */
+  getOrderCounts: (params?: Record<string, string>) =>
+    api.get<AdminOrderCounts>("/admin/orders/counts", { params }),
   /** Grup dosyası: order id grup çatısına çözülür (ödeme + paketler + sipariş finans/escrow/iade). */
   getOrderFile: (id: string) => api.get(`/admin/orders/${id}/file`),
   updateOrderStatus: (id: string, status: string, notes: string) =>

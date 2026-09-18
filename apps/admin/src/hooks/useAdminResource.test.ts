@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { extractData } from "./useAdminResource";
+import { extractData, listFilterParams } from "./useAdminResource";
 
 describe("extractData", () => {
   it("reads shape { data: [...], meta: { total } } (getOrders/getTrades/getProducts)", () => {
@@ -59,5 +59,21 @@ describe("extractData", () => {
   it("returns an empty page for null/undefined response data", () => {
     expect(extractData(null, "x")).toEqual({ rows: [], total: 0 });
     expect(extractData(undefined, "x")).toEqual({ rows: [], total: 0 });
+  });
+});
+
+describe("listFilterParams", () => {
+  it("sends the search and real filter values only", () => {
+    expect(
+      listFilterParams("ORD-1", {
+        status: "all",
+        userId: "",
+        party: "K010001",
+      }),
+    ).toEqual({ search: "ORD-1", party: "K010001" });
+  });
+
+  it("is empty for a clean list", () => {
+    expect(listFilterParams("", { status: "all" })).toEqual({});
   });
 });

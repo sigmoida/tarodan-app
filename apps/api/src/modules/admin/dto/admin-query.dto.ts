@@ -19,8 +19,12 @@ import {
 } from "@prisma/client";
 import {
   ACCOUNT_STATUSES,
+  ADMIN_ORDER_BUCKETS,
+  ADMIN_ORDER_TABS,
   LOGIN_STATES,
   type AccountStatus,
+  type AdminOrderBucket,
+  type AdminOrderTab,
   type LoginState,
 } from "@tarodan/types";
 import { AdminListQueryDto } from "../../../common/list";
@@ -135,31 +139,65 @@ export class AdminProductQueryDto extends AdminListQueryDto {
   carModelId?: string;
 }
 
-export class AdminOrderQueryDto extends AdminListQueryDto {
+/**
+ * Admin sipariş listesi ve sayaçlarının ortak filtreleri. Her metin filtresi
+ * TEK bir kolon ailesini arar (bkz. `order-list-where.ts`); `search` hepsini
+ * birden tarar.
+ */
+export class AdminOrderCountsQueryDto extends AdminListQueryDto {
   @ApiPropertyOptional({ example: "ORD-123" })
   @IsOptional()
   @IsString()
   search?: string;
 
-  @ApiPropertyOptional({ enum: OrderStatus })
+  @ApiPropertyOptional({
+    example: "K010001",
+    description: "Alıcı veya satıcı: ad, e-posta ya da kullanıcı kodu",
+  })
+  @IsOptional()
+  @IsString()
+  party?: string;
+
+  @ApiPropertyOptional({ example: "ORD-123" })
+  @IsOptional()
+  @IsString()
+  orderNumber?: string;
+
+  @ApiPropertyOptional({ example: "PKG-123" })
+  @IsOptional()
+  @IsString()
+  packageNumber?: string;
+
+  @ApiPropertyOptional({ example: "GRP-123" })
+  @IsOptional()
+  @IsString()
+  groupNumber?: string;
+
+  @ApiPropertyOptional({ description: "Ürün adı, model kodu ya da ürün kodu" })
+  @IsOptional()
+  @IsString()
+  productQuery?: string;
+
+  @ApiPropertyOptional({
+    enum: OrderStatus,
+    description: "Eski deep-link'ler için tek sipariş durumu",
+  })
   @IsOptional()
   @IsEnum(OrderStatus)
   status?: OrderStatus;
 
   @ApiPropertyOptional({
-    enum: OrderOrigin,
-    description: "Sipariş kaynağı: doğrudan satış / teklif / platform hizmeti",
+    example: "2024-01-01",
+    description: "Eski ad; startDate tercih edilir",
   })
-  @IsOptional()
-  @IsEnum(OrderOrigin)
-  origin?: OrderOrigin;
-
-  @ApiPropertyOptional({ example: "2024-01-01" })
   @IsOptional()
   @IsDateString()
   fromDate?: string;
 
-  @ApiPropertyOptional({ example: "2024-12-31" })
+  @ApiPropertyOptional({
+    example: "2024-12-31",
+    description: "Eski ad; endDate tercih edilir",
+  })
   @IsOptional()
   @IsDateString()
   toDate?: string;
@@ -181,6 +219,34 @@ export class AdminOrderQueryDto extends AdminListQueryDto {
   @IsOptional()
   @IsString()
   productId?: string;
+}
+
+export class AdminOrderQueryDto extends AdminOrderCountsQueryDto {
+  @ApiPropertyOptional({
+    enum: ADMIN_ORDER_TABS,
+    description: "Sekme: tüm siparişler / doğrudan satış / teklifler",
+  })
+  @IsOptional()
+  @IsIn(ADMIN_ORDER_TABS)
+  tab?: AdminOrderTab;
+
+  @ApiPropertyOptional({
+    enum: ADMIN_ORDER_BUCKETS,
+    description:
+      "Alt sekme; `all` ya da verilmezse sekmenin tümü, sekmede olmayan kova da tümüne düşer",
+  })
+  @IsOptional()
+  @IsIn(ADMIN_ORDER_BUCKETS)
+  bucket?: AdminOrderBucket;
+
+  @ApiPropertyOptional({
+    enum: OrderOrigin,
+    description:
+      "Eski istemci: sekmeyi kaynağa göre seçer (tab varsa yok sayılır)",
+  })
+  @IsOptional()
+  @IsEnum(OrderOrigin)
+  origin?: OrderOrigin;
 }
 
 export class AuditLogQueryDto extends AdminListQueryDto {

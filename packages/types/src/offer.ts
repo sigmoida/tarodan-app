@@ -1,5 +1,9 @@
 import type { PublicIdentity } from "./user";
 
+/**
+ * @deprecated Values never matched the database (Prisma uses lowercase). Use
+ * `OfferStatusValue` / `OFFER_STATUSES` from `./commerce-status`.
+ */
 export enum OfferStatus {
   PENDING = "PENDING",
   ACCEPTED = "ACCEPTED",

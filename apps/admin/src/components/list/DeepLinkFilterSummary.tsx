@@ -21,7 +21,10 @@ export function DeepLinkFilterSummary({
   const clearDeepLinkFilter = () =>
     setFilter(filters.productId ? "productId" : "userId", "");
 
-  const firstProductTitle = rows[0]?.product?.title as string | undefined;
+  // Teklif satırı ürünü doğrudan, sipariş sepeti satırı paket kaleminde taşır.
+  const firstProductTitle = (rows[0]?.product?.title ??
+    rows[0]?.offer?.product?.title ??
+    rows[0]?.packages?.[0]?.lines?.[0]?.product?.title) as string | undefined;
   const deepLinkFilterLabel = filters.productId
     ? firstProductTitle
       ? t("admin.operations.orders.filteringByProductNamed", {
