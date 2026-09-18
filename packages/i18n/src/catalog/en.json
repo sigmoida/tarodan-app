@@ -1013,6 +1013,9 @@
     },
     "cardHolderPlaceholder": "Full name",
     "saveCardPaytr": "Save my card with PayTR for future payments",
+    "saveCardForRenewal": "Save my card for automatic renewal",
+    "saveCardForRenewalHint": "Your card is stored securely by PayTR and your membership renews automatically at the end of each period. You can turn auto-renewal off at any time.",
+    "saveCardForRenewalOffHint": "If you do not save your card, auto-renewal stays off and you will need to purchase your membership again when the period ends.",
     "payWithSavedCard": "Pay With Saved Card",
     "loadingCards": "Loading cards…",
     "savedCardCvv": "Saved card CVV",
@@ -6233,6 +6236,12 @@
       "psp": {
         "title": "PayTR Reconciliation",
         "subtitle": "Day-by-day comparison of PayTR reports against system records",
+        "merchant": {
+          "label": "Merchant",
+          "all": "All merchants",
+          "marketplace": "Marketplace",
+          "membership": "Membership"
+        },
         "tabs": {
           "summary": "Day Summaries",
           "lines": "Statement Lines",
@@ -8971,6 +8980,10 @@
       "membershipExpired": {
         "title": "Your Membership Has Ended",
         "message": "Your {tierName} membership has ended. Renew now and keep your benefits!"
+      },
+      "membershipRenewalCardRequired": {
+        "title": "Auto-Renewal Turned Off",
+        "message": "Auto-renewal for your {tierName} membership has been turned off: our payment setup changed and your saved card can no longer be used for renewals. Your membership stays active until the end of the period; save your card when you renew and auto-renewal switches back on."
       },
       "membershipUpgraded": {
         "title": "Your Membership Was Upgraded! 🎉",

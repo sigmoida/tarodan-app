@@ -1013,6 +1013,9 @@
     },
     "cardHolderPlaceholder": "Ad Soyad",
     "saveCardPaytr": "Kartımı sonraki ödemeler için PayTR'da sakla",
+    "saveCardForRenewal": "Kartımı otomatik yenileme için sakla",
+    "saveCardForRenewalHint": "Kartınız PayTR güvencesinde saklanır ve üyeliğiniz dönem sonunda otomatik yenilenir. Otomatik yenilemeyi dilediğiniz zaman kapatabilirsiniz.",
+    "saveCardForRenewalOffHint": "Kartınızı saklamazsanız otomatik yenileme kapalı kalır; dönem sonunda üyeliğinizi yeniden satın almanız gerekir.",
     "payWithSavedCard": "Kayıtlı Kart İle Öde",
     "loadingCards": "Kartlar yükleniyor…",
     "savedCardCvv": "Kayıtlı kart CVV",
@@ -6233,6 +6236,12 @@
       "psp": {
         "title": "PayTR Mutabakat",
         "subtitle": "PayTR raporları ile sistem kayıtlarının gün bazlı karşılaştırması",
+        "merchant": {
+          "label": "Mağaza",
+          "all": "Tüm mağazalar",
+          "marketplace": "Pazaryeri",
+          "membership": "Üyelik"
+        },
         "tabs": {
           "summary": "Gün Özetleri",
           "lines": "Döküm Satırları",
@@ -8971,6 +8980,10 @@
       "membershipExpired": {
         "title": "Üyeliğiniz Sona Erdi",
         "message": "{tierName} üyeliğiniz sona erdi. Yenileyin ve avantajlardan yararlanın!"
+      },
+      "membershipRenewalCardRequired": {
+        "title": "Otomatik Yenileme Kapatıldı",
+        "message": "{tierName} üyeliğinizin otomatik yenilemesi kapatıldı: ödeme altyapımız değişti ve kayıtlı kartınız yenilemede kullanılamıyor. Üyeliğiniz dönem sonuna kadar sürer; yenilerken kartınızı kaydederseniz otomatik yenileme yeniden açılır."
       },
       "membershipUpgraded": {
         "title": "Üyeliğiniz Yükseltildi! 🎉",

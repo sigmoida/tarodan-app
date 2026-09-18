@@ -14,6 +14,7 @@ import {
 import { Type } from "class-transformer";
 import { MembershipTierType, SubscriptionStatus } from "@prisma/client";
 import { MAX_PRODUCT_IMAGES } from "../../product/helpers/product-image-keys";
+import { PAYMENT_PURPOSES, type PaymentPurpose } from "../../../config/paytr";
 
 export class SubscribeDto {
   @IsEnum(MembershipTierType)
@@ -27,6 +28,17 @@ export class SubscribeDto {
 export class ToggleAutoRenewDto {
   @IsBoolean()
   autoRenew: boolean;
+}
+
+/**
+ * GET /membership/cards?purpose=checkout|membership — kartlar mağazaya özeldir;
+ * sepet ödemesi `checkout`, üyelik ödemesi/oto-yenileme `membership` kartlarını
+ * ister. Boş bırakılırsa (eski istemci) tüm aktif kartlar döner.
+ */
+export class ListSavedCardsQueryDto {
+  @IsOptional()
+  @IsIn(PAYMENT_PURPOSES)
+  purpose?: PaymentPurpose;
 }
 
 /**

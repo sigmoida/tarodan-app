@@ -475,6 +475,7 @@ export class PushWorker {
       product_approved: "✅",
       product_sold: "💰",
       membership_expiring: "⏰",
+      membership_renewal_card_required: "💳",
       listing_expiring: "⏰",
       listing_views_milestone: "👀",
       welcome: "🎉",

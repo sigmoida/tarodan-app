@@ -65,6 +65,19 @@ const envSchema = z
     PAYTR_MERCHANT_KEY: z.string().optional(),
     PAYTR_MERCHANT_SALT: z.string().optional(),
     PAYTR_TEST_MODE: z.string().optional(),
+    // Üyelik mağazası (ilk satın alma + oto-yenileme). PayTR non-3D yetkisini
+    // yalnız bu mağazaya verdi; kimlikleri pazaryerinden AYRI tutulur ve
+    // production/staging'de pazaryeriyle aynı kurallara tabidir (aşağıda).
+    PAYTR_MEMBERSHIP_MERCHANT_ID: z.string().optional(),
+    PAYTR_MEMBERSHIP_MERCHANT_KEY: z.string().optional(),
+    PAYTR_MEMBERSHIP_MERCHANT_SALT: z.string().optional(),
+    PAYTR_MEMBERSHIP_TEST_MODE: z.string().optional(),
+    // Panelde üyelik mağazasının "Bildirim URL"i:
+    // {API_URL}/api/payments/callback/paytr/membership
+    PAYTR_MEMBERSHIP_CALLBACK_URL: z.string().optional(),
+    // Üyelik mağazasında kart saklama varsayılan AÇIK; "false" acil kapatma
+    // anahtarıdır (kapalıyken oto-yenileme de kapanır).
+    PAYTR_MEMBERSHIP_CARD_STORAGE_ENABLED: z.string().optional(),
     REFUND_POLICY_V2_ENABLED: z.string().optional(),
     // İade drop-off penceresi ve emniyet supabı (gün). Bir env DOSYASINDAN
     // ayarlanabilmeleri için burada bildirilmeleri şart — bildirilmezse
@@ -189,7 +202,7 @@ const envSchema = z
     }
 
     const requirePublicHttpsUrl = (
-      key: "API_URL" | "PAYTR_CALLBACK_URL",
+      key: "API_URL" | "PAYTR_CALLBACK_URL" | "PAYTR_MEMBERSHIP_CALLBACK_URL",
       value: string | undefined,
     ) => {
       try {
@@ -210,11 +223,31 @@ const envSchema = z
     };
     requirePublicHttpsUrl("API_URL", env.API_URL);
     requirePublicHttpsUrl("PAYTR_CALLBACK_URL", env.PAYTR_CALLBACK_URL);
+    requirePublicHttpsUrl(
+      "PAYTR_MEMBERSHIP_CALLBACK_URL",
+      env.PAYTR_MEMBERSHIP_CALLBACK_URL,
+    );
+    // Her mağazanın bildirimi kendi anahtarıyla doğrulanır; iki panel aynı
+    // URL'e bildirim atarsa bir mağazanın her bildirimi "hash uyuşmazlığı"
+    // olarak düşer.
+    if (
+      env.PAYTR_CALLBACK_URL &&
+      env.PAYTR_CALLBACK_URL.trim() ===
+        env.PAYTR_MEMBERSHIP_CALLBACK_URL?.trim()
+    ) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["PAYTR_MEMBERSHIP_CALLBACK_URL"],
+        message:
+          "PAYTR_MEMBERSHIP_CALLBACK_URL must differ from PAYTR_CALLBACK_URL (each merchant verifies its own notifications)",
+      });
+    }
 
     const deploymentUrls = [
       env.FRONTEND_URL,
       env.API_URL,
       env.PAYTR_CALLBACK_URL,
+      env.PAYTR_MEMBERSHIP_CALLBACK_URL,
     ].filter((value): value is string => Boolean(value));
     // Kanonik alan adı tarodan.com.tr. Eski tarodan.shop staging host'u geçiş
     // boyunca hâlâ staging SAYILIR: buradaki tek iş prod ile staging'i
@@ -341,8 +374,11 @@ const envSchema = z
       "PAYTR_MERCHANT_ID",
       "PAYTR_MERCHANT_KEY",
       "PAYTR_MERCHANT_SALT",
+      "PAYTR_MEMBERSHIP_MERCHANT_ID",
+      "PAYTR_MEMBERSHIP_MERCHANT_KEY",
+      "PAYTR_MEMBERSHIP_MERCHANT_SALT",
     ] as const) {
-      if (!env[key]) {
+      if (!env[key]?.trim()) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
           path: [key],
@@ -350,15 +386,33 @@ const envSchema = z
         });
       }
     }
-    const paytrTestMode = (env.PAYTR_TEST_MODE ?? "").trim().toLowerCase();
+    const paytrTestModes = [
+      ["PAYTR_TEST_MODE", env.PAYTR_TEST_MODE],
+      ["PAYTR_MEMBERSHIP_TEST_MODE", env.PAYTR_MEMBERSHIP_TEST_MODE],
+    ] as const;
     const payoutsDisabled = (env.PAYOUTS_DISABLED ?? "").trim().toLowerCase();
     if (isProductionDeployment) {
-      if (paytrTestMode !== "false") {
+      for (const [key, raw] of paytrTestModes) {
+        if ((raw ?? "").trim().toLowerCase() !== "false") {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: [key],
+            message: `${key} must be explicitly set to 'false' in production`,
+          });
+        }
+      }
+      // Üyelik ödemeleri pazaryeri mağazasına düşerse non-3D recurring
+      // reddedilir ve her yenileme sessizce başarısız olur.
+      if (
+        env.PAYTR_MEMBERSHIP_MERCHANT_ID?.trim() &&
+        env.PAYTR_MEMBERSHIP_MERCHANT_ID.trim() ===
+          env.PAYTR_MERCHANT_ID?.trim()
+      ) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
-          path: ["PAYTR_TEST_MODE"],
+          path: ["PAYTR_MEMBERSHIP_MERCHANT_ID"],
           message:
-            "PAYTR_TEST_MODE must be explicitly set to 'false' in production",
+            "PAYTR_MEMBERSHIP_MERCHANT_ID must be a different PayTR merchant than PAYTR_MERCHANT_ID in production (only the membership merchant has non-3D)",
         });
       }
       if (payoutsDisabled !== "false") {
@@ -370,13 +424,14 @@ const envSchema = z
         });
       }
     } else if (isStagingDeployment) {
-      if (!["true", "1"].includes(paytrTestMode)) {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          path: ["PAYTR_TEST_MODE"],
-          message:
-            "PAYTR_TEST_MODE must be enabled in staging to prevent live charges",
-        });
+      for (const [key, raw] of paytrTestModes) {
+        if (!["true", "1"].includes((raw ?? "").trim().toLowerCase())) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: [key],
+            message: `${key} must be enabled in staging to prevent live charges`,
+          });
+        }
       }
       if (payoutsDisabled !== "true") {
         ctx.addIssue({

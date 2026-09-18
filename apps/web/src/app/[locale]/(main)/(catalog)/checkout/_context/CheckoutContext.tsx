@@ -15,7 +15,7 @@ import { useRouter } from "@/i18n/navigation";
 import { useSearchParams } from "next/navigation";
 import toast from "react-hot-toast";
 import { useQueryClient } from "@tanstack/react-query";
-import { paymentsApi } from "@/lib/api";
+import { paymentCapabilities, paymentsApi } from "@/lib/api";
 import { useCart } from "@/hooks/useCart";
 import { useCartStore } from "@/stores/cartStore";
 import { useCheckoutScope } from "@/hooks/useCartSelection";
@@ -322,7 +322,10 @@ function useCheckoutValue() {
     paymentsApi
       .getConfig()
       .then((res) => {
-        if (alive) setCardStorageEnabled(!!res.data?.cardStorageEnabled);
+        if (alive)
+          setCardStorageEnabled(
+            paymentCapabilities(res.data, "checkout").cardStorageEnabled,
+          );
       })
       .catch(() => {
         if (alive) setCardStorageEnabled(false);
@@ -343,6 +346,7 @@ function useCheckoutValue() {
     return resolved;
   };
   const card = useCardPayment({
+    purpose: "checkout",
     cardStorageEnabled,
     resolvePayment,
   });

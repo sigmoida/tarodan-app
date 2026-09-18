@@ -1,4 +1,5 @@
 import { BadRequestException } from "@nestjs/common";
+import { PaytrMerchant } from "@prisma/client";
 import { PayTRService } from "./paytr/paytr.service";
 import { PayTRCredentials } from "./paytr/paytr-credentials.service";
 import { PayTRReportService } from "./paytr/paytr-report.service";
@@ -12,6 +13,10 @@ import { IPaymentProvider } from "./payment-provider.interface";
  */
 class StubPaymentProvider implements IPaymentProvider {
   readonly key = "stub";
+  readonly merchant = PaytrMerchant.marketplace;
+  forMerchant() {
+    return this;
+  }
   async queryPaymentStatus() {
     return { ok: false } as any;
   }
@@ -83,6 +88,18 @@ describe("PaymentProviderRegistry (#89)", () => {
     expect(registry.resolve()).toBe(paytr);
     expect(registry.resolve(null)).toBe(paytr);
     expect(registry.resolve("")).toBe(paytr);
+  });
+
+  it("binds the provider to the record's merchant (default marketplace)", () => {
+    const membership = registry.resolve("paytr", PaytrMerchant.membership);
+    expect(membership.merchant).toBe(PaytrMerchant.membership);
+    expect(membership).not.toBe(paytr);
+    // Aynı mağaza her seferinde aynı örnek — önbellek paylaşılır.
+    expect(registry.resolve(null, PaytrMerchant.membership)).toBe(membership);
+    expect(membership.forMerchant(PaytrMerchant.marketplace)).toBe(paytr);
+    expect(registry.resolve("paytr", null).merchant).toBe(
+      PaytrMerchant.marketplace,
+    );
   });
 
   it("throws on an unknown provider key", () => {

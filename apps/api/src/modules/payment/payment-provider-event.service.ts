@@ -1,5 +1,9 @@
 import { Injectable, Logger } from "@nestjs/common";
-import { Prisma, PaymentProviderEventType } from "@prisma/client";
+import {
+  Prisma,
+  PaymentProviderEventType,
+  PaytrMerchant,
+} from "@prisma/client";
 import { PrismaService } from "../../prisma";
 
 /**
@@ -9,6 +13,8 @@ import { PrismaService } from "../../prisma";
 export interface RecordProviderEventInput {
   eventType: PaymentProviderEventType;
   provider?: string; // default: paytr
+  /** Etkileşimin yapıldığı PayTR mağazası (default: marketplace). */
+  paytrMerchant?: PaytrMerchant | null;
   merchantOid?: string | null;
   paymentId?: string | null;
   membershipPaymentId?: string | null;
@@ -50,6 +56,7 @@ export class PaymentProviderEventService {
       await this.prisma.paymentProviderEvent.create({
         data: {
           provider: input.provider ?? "paytr",
+          paytrMerchant: input.paytrMerchant ?? PaytrMerchant.marketplace,
           eventType: input.eventType,
           merchantOid: input.merchantOid ?? null,
           paymentId: input.paymentId ?? null,

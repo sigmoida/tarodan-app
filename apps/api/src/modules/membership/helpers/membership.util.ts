@@ -3,6 +3,7 @@ import {
   SubscriptionStatus,
   MembershipTierType,
   SavedCardStatus,
+  PaytrMerchant,
   Prisma,
 } from "@prisma/client";
 
@@ -85,10 +86,24 @@ export function effectiveMembershipTierType(
 }
 
 /**
- * Kullanıcısız (MIT) tekrarlı çekimde kullanılabilir kayıtlı kart var mı?
+ * Kullanıcısız (MIT) tekrarlı çekimde kullanılabilecek kayıtlı kartın TANIMI.
  * PayTR CAPI'de yalnız aktif ve CVV istemeyen kart kullanıcı etkileşimi olmadan
- * çekilebilir. toggleAutoRenew, üyelik fulfillment'ının autoRenew kararı (D1) ve
- * planlı ücretli geçiş kapısı (D2) aynı tanımı paylaşır — tek doğruluk kaynağı.
+ * çekilebilir; üstelik yalnız ÜYELİK mağazasının kasasındaki kart — non-3D
+ * yetkisi yalnız o mağazada, token'lar mağazaya özel. Geçiş öncesi pazaryeri
+ * mağazasında saklanmış kartlar bu yüzden yenilemede kullanılamaz.
+ *
+ * toggleAutoRenew, fulfillment D1, planlı geçiş D2 ve runAutoRenewals'ın kart
+ * seçimi aynı filtreyi paylaşır — tek doğruluk kaynağı.
+ */
+export const USABLE_RECURRING_CARD_WHERE = {
+  provider: "paytr",
+  paytrMerchant: PaytrMerchant.membership,
+  status: SavedCardStatus.active,
+  requireCvv: false,
+} satisfies Prisma.SavedCardWhereInput;
+
+/**
+ * Kullanıcının {@link USABLE_RECURRING_CARD_WHERE} kartı var mı?
  * Transaction içinden çağrılabilsin diye client parametre alır.
  */
 export async function hasUsableRecurringCard(
@@ -96,12 +111,7 @@ export async function hasUsableRecurringCard(
   userId: string,
 ): Promise<boolean> {
   const card = await client.savedCard.findFirst({
-    where: {
-      userId,
-      provider: "paytr",
-      status: SavedCardStatus.active,
-      requireCvv: false,
-    },
+    where: { userId, ...USABLE_RECURRING_CARD_WHERE },
     select: { id: true },
   });
   return card != null;

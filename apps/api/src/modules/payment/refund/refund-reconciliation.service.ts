@@ -131,6 +131,8 @@ export class RefundReconciliationService {
         provider: "paytr",
         updatedAt: { lt: cutoff },
       },
+      // İade hangi mağazaya gönderildiyse durum-sorgu da oraya: ödemenin mağazası.
+      include: { payment: { select: { paytrMerchant: true } } },
       orderBy: { updatedAt: "asc" },
       take: 25,
     });
@@ -149,7 +151,7 @@ export class RefundReconciliationService {
 
       try {
         const inquiry = await this.paymentProviders
-          .resolve(attempt.provider)
+          .resolve(attempt.provider, attempt.payment.paytrMerchant)
           .queryPaymentStatus(attempt.providerReference);
         checked++;
         if (!inquiry.ok) continue; // PayTR'ye ulaşamadık — sonraki tur.

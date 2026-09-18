@@ -954,6 +954,7 @@ describe("03 — Üyelik & Premium (Gating) (MEM)", () => {
       data: {
         userId: user.id,
         provider: "paytr",
+        paytrMerchant: "membership",
         utoken: `UT-${user.id.slice(0, 8)}`,
         ctoken: `CT-active-${user.id.slice(0, 8)}`,
         last4: "4358",
@@ -987,7 +988,8 @@ describe("03 — Üyelik & Premium (Gating) (MEM)", () => {
     expect(card).toHaveProperty("expYear");
     expect(card.requireCvv).toBe(false);
     expect(card.isDefault).toBe(true);
-    expect(card.autoRenewEligible).toBe(true); // !requireCvv
+    expect(card.autoRenewEligible).toBe(true); // üyelik mağazası + !requireCvv
+    expect(card.purpose).toBe("membership");
     expect(card).toHaveProperty("createdAt");
     // PAN/CVV/token sızmaz.
     expect(card).not.toHaveProperty("utoken");
@@ -1986,6 +1988,8 @@ describe("03 — Üyelik & Premium (Gating) (MEM)", () => {
       data: {
         userId: user.id,
         provider: "paytr",
+        // Oto-yenileme yalnız üyelik mağazasının kartını çeker.
+        paytrMerchant: "membership",
         utoken: `UT-${user.id.slice(0, 8)}`,
         ctoken: `CT-${user.id.slice(0, 8)}`,
         last4: "4358",

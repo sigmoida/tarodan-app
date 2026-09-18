@@ -11,6 +11,7 @@ import { SectionCard } from "@/components/ui";
 import CardPaymentSection from "@/components/payment/CardPaymentSection";
 import DistanceSalesConsent from "@/components/payment/DistanceSalesConsent";
 import { useCardPayment, type PaymentTarget } from "@/hooks/useCardPayment";
+import type { PaymentPurpose } from "@/lib/api";
 import AmountSummaryCard, { type TradePricingLines } from "./AmountSummaryCard";
 
 interface PaymentReadyProps {
@@ -19,6 +20,7 @@ interface PaymentReadyProps {
   amount?: number;
   pricing?: TradePricingLines | null;
   cardStorageEnabled?: boolean;
+  purpose: PaymentPurpose;
   hasTarget: boolean;
   onCancel: () => void;
   cancelling: boolean;
@@ -38,6 +40,7 @@ export default function PaymentReady({
   amount,
   pricing,
   cardStorageEnabled = false,
+  purpose,
   hasTarget,
   onCancel,
   cancelling,
@@ -48,7 +51,11 @@ export default function PaymentReady({
     async () => ({ paymentId, target }),
     [paymentId, target],
   );
-  const card = useCardPayment({ cardStorageEnabled, resolvePayment });
+  const card = useCardPayment({
+    purpose,
+    cardStorageEnabled,
+    resolvePayment,
+  });
   const { processing, loadingCards, submit } = card;
   // Checkout ile aynı ön koşul: sözleşme onaylanmadan tahsilat başlatılmaz.
   const [distanceSalesAccepted, setDistanceSalesAccepted] = useState(false);

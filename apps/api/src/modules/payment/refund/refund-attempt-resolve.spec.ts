@@ -1,4 +1,4 @@
-import { RefundAttemptStatus } from "@prisma/client";
+import { PaytrMerchant, RefundAttemptStatus } from "@prisma/client";
 import { RefundReconciliationService } from "./refund-reconciliation.service";
 
 /**
@@ -28,6 +28,7 @@ function makeAttempt(overrides: Record<string, unknown> = {}) {
     providerReference: "OID123",
     status: RefundAttemptStatus.manual_review,
     updatedAt: OLD,
+    payment: { paytrMerchant: PaytrMerchant.marketplace },
     ...overrides,
   };
 }
@@ -67,17 +68,28 @@ function makeHarness(opts: { attempts?: any[]; inquiry?: any }) {
     },
   );
   const providerEvents = { record: jest.fn() };
+  const resolve = jest.fn(() => ({ queryPaymentStatus }));
   const service = new RefundReconciliationService(
     prisma as any,
     {} as any, // paymentRefund — bu süpürmede kullanılmaz
-    { resolve: () => ({ queryPaymentStatus }) } as any,
+    { resolve } as any,
     { get: jest.fn().mockReturnValue(undefined) } as any,
     providerEvents as any,
   );
-  return { service, prisma, queryPaymentStatus, providerEvents };
+  return { service, prisma, queryPaymentStatus, providerEvents, resolve };
 }
 
 describe("RefundReconciliationService.resolveUnknownRefundOutcomes", () => {
+  it("queries the merchant the refunded payment was charged on", async () => {
+    const { service, resolve } = makeHarness({
+      attempts: [
+        makeAttempt({ payment: { paytrMerchant: PaytrMerchant.membership } }),
+      ],
+    });
+    await service.resolveUnknownRefundOutcomes();
+    expect(resolve).toHaveBeenCalledWith("paytr", PaytrMerchant.membership);
+  });
+
   it("confirms the attempt when our reference_no appears in returns (amount matched)", async () => {
     const { service, prisma, providerEvents } = makeHarness({
       attempts: [makeAttempt()],

@@ -14,22 +14,69 @@ gerçek sağlayıcı **PayTR** (`paytr.service.ts`). Uçlar
 `modules/payment/payment.controller.ts`:
 
 - `GET /payments/config` (public) — `bypassEnabled` (prod'da zorla `false`),
-  `cardStorageEnabled`, `recurringEnabled`.
+  `cardStorageEnabled`, `recurringEnabled` ve amaç başına
+  `purposes.{checkout,membership}.{cardStorageEnabled,recurringEnabled}`.
 - `POST /payments/initiate` / `initiate-guest` / `initiate-trade-cash`.
 - `POST /payments/direct-form` — kart akışı (aşağıda).
-- `POST /payments/callback/paytr` — public webhook (60/dk throttle) + alias controller.
+- `POST /payments/callback/paytr` — pazaryeri mağazasının webhook'u (60/dk throttle) + alias controller.
+- `POST /payments/callback/paytr/membership` — üyelik mağazasının webhook'u.
+
+### İki PayTR mağazası
+
+PayTR non-3D (kullanıcısız recurring) yetkisini pazaryeri mağazasına vermedi.
+Bu yüzden iki mağaza vardır (`PaytrMerchant`):
+
+| Mağaza        | Env                           | Ne alınır                                                  | Yetenek                                                                                                     |
+| ------------- | ----------------------------- | ---------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------- |
+| `marketplace` | `PAYTR_MERCHANT_*`            | Sipariş, sepet, takas nakdi, öne çıkarma; satıcı transferi | kart saklama `PAYTR_CARD_STORAGE_ENABLED`; recurring **hiçbir zaman**                                       |
+| `membership`  | `PAYTR_MEMBERSHIP_MERCHANT_*` | Üyelik ilk satın alma + oto-yenileme                       | kart saklama varsayılan açık (`PAYTR_MEMBERSHIP_CARD_STORAGE_ENABLED`); recurring `PAYTR_RECURRING_ENABLED` |
+
+Kurallar (tek kaynak `config/paytr.ts` + `payment/helpers/paytr-merchant.helper.ts`):
+
+- **Yeni** ödemenin mağazası yalnız `resolvePaytrMerchant` ile belirlenir (üyelik
+  siparişi → `membership`, diğer her şey → `marketplace`) ve direct-form claim'inde
+  `payments.paytr_merchant`'a yazılır. Oto-yenileme `membership_payments.paytr_merchant = membership` yazar.
+- **Sonraki** her PayTR çağrısı (durum-sorgu, iade, iade-sonucu çözümü, kart silme,
+  mutabakat) oid önekine değil **kaydın** `paytrMerchant`'ına bakar
+  (`PaymentProviderRegistry.resolve(provider, merchant)`). Geçiş öncesi alınmış
+  üyelik ödemeleri bu yüzden eski mağazadan iade edilir.
+- İmza yalnız `PaytrMerchantCredentials`'ta atılır; iki mağazanın anahtarı hiçbir
+  istemciye kopyalanmaz.
+- Bildirim hash'i **ucun** mağazasının anahtarıyla doğrulanır. Doğrulanmış ama kaydı
+  diğer mağazada alınmış bir bildirim `PAYTR_MERCHANT_MISMATCH` ile loglanıp
+  uygulanmadan `OK` döner (ör. mağaza değişmiş bir ödemenin eski oid'i ya da panelde
+  yanlış Bildirim URL'i) — manuel inceleme. Geçiş sonrası yarım ödeme kontrolü
+  (log araması + salt-okunur SQL + manuel çözüm adımları) ve üyelik mağazası
+  panelindeki Bildirim URL uyarısı (yalnız `/callback/paytr/membership`; `/callback`
+  alias'ı ve pazaryeri URL'i her bildirimi hash hatasına düşürür):
+  `OPERATIONS.md` → "Bir kerelik: PayTR üyelik mağazası geçişi" 2. ve 6. adım.
+- Kartlar (`saved_cards.paytr_merchant`) mağazaya özeldir: sepet ödemesi pazaryeri,
+  üyelik ödemesi ve oto-yenileme üyelik kartlarını kullanır. Kart **taşınmaz**.
 
 **`direct-form` bir tahsilat sonucu DEĞİL, imzalı bir PayTR form tarifi döner:**
 `{ paymentId, action, method, fields[], requireCvv, savedCard, status:"pending" }`.
 İstemci bu alanlara kart bilgilerini ekleyip **doğrudan PayTR'ye** POST eder;
 ödeme, asenkron callback ile tamamlanır. İki akış: yeni kart (`store_card=1`
-yalnız login + `PAYTR_CARD_STORAGE_ENABLED`) ve kayıtlı kart
-(`utoken`/`ctoken`/`require_cvv`; login şart). Form üretilirken Payment atomik
-olarak `processing`'e CLAIM edilir, `finally`'de `pending`'e bırakılır.
+yalnız login + ödemenin mağazasında kart saklama; `saveCard` gönderilmezse
+üyelik ödemesinde saklanır, diğerlerinde saklanmaz) ve kayıtlı kart
+(`utoken`/`ctoken`/`require_cvv`; login şart; kart ödemenin mağazasında olmalı).
+Form üretilirken Payment atomik olarak `processing`'e CLAIM edilir (mağaza +
+ödeyen IP'si `metadata.payerIp` bu anda yazılır), `finally`'de `pending`'e bırakılır.
+
+Callback'te `utoken` gelirse kartlar **fulfillment'tan önce** senkronlanır
+(mağaza + vekâlet IP'si = `payerIp`): üyelik aktivasyonu `autoRenew`'i
+"kullanılabilir üyelik kartı var mı" ile belirler, kartını kaydeden üye böylece
+oto-yenilemeli başlar. Oto-yenileme `user_ip` olarak bu IP'yi gönderir.
 
 **3DS**: `createDirectPaymentForm` içinde `non_3d = "0"` sabittir — alıcı
-başlatan her ödeme 3D Secure'dür. `non_3d=1` yalnız `chargeRecurring`'de
-(`PAYTR_RECURRING_ENABLED` arkasında) vardır.
+başlatan her ödeme 3D Secure'dür. `non_3d=1` yalnız `chargeRecurring`'de, üyelik
+mağazasında (`PAYTR_RECURRING_ENABLED` arkasında) vardır.
+
+**Kartsız oto-yenileme**: yenileme zamanı gelmiş (dönem sonuna ≤1 saat) ve
+üyelik mağazasında CVV'siz aktif kartı olmayan üyenin `autoRenew`'i kapatılır ve
+`membership_renewal_card_required` bildirimi gider (sessizce free'ye düşmez).
+Geçişte aynı işlem tüm üyelere bir kez `notify-membership-card-readd` ile yapılır
+(bkz. OPERATIONS.md).
 
 **Kart verisi sınırı** (`payment-card-data-boundary.spec.ts` sözleşmesi):
 API PAN/CVV'yi asla görmez. (1) Eski `process-direct` rotası yoktur;
@@ -399,7 +446,9 @@ toplam: `GET /admin/tax/withholding-report`).
 (`paytr-report-sync.service.ts`, `PAYTR_REPORT_SYNC_ENABLED=true` iken):
 işlem ekstresi 3 günlük kayan pencereyle (05:00), settlement raporları 31 günle
 (05:30) `paytr_statement_lines`/`paytr_settlements` tablolarına idempotent
-çekilir. (2) **Eşleme + sapma**
+çekilir — kimliği tanımlı **her mağaza için ayrı**, satırlar `paytr_merchant` ile
+damgalanır (tekillik anahtarları mağazayı içerir). Ters tarama kapsamı da mağaza
+başınadır. (2) **Eşleme + sapma**
 (`paytr-report-matching.service.ts`): her ekstre satırı oid üzerinden Payment/
 RefundAttempt'e eşlenir (±0.05 TL toleransla `matched`/`amount_mismatch`/
 `unmatched`); ters tarama bizim `completed` deyip PayTR'nin hiç raporlamadığı

@@ -35,6 +35,12 @@ describe("validateEnv", () => {
     PAYTR_MERCHANT_SALT: "salt",
     PAYTR_TEST_MODE: "false",
     PAYTR_CALLBACK_URL: "https://api.tarodan.test/api/payments/callback/paytr",
+    PAYTR_MEMBERSHIP_MERCHANT_ID: "membership-id",
+    PAYTR_MEMBERSHIP_MERCHANT_KEY: "membership-key",
+    PAYTR_MEMBERSHIP_MERCHANT_SALT: "membership-salt",
+    PAYTR_MEMBERSHIP_TEST_MODE: "false",
+    PAYTR_MEMBERSHIP_CALLBACK_URL:
+      "https://api.tarodan.test/api/payments/callback/paytr/membership",
     PAYOUTS_DISABLED: "false",
     SURAT_CARGO_ENABLED: "true",
     SURAT_SOAP_MODE: "rest",
@@ -74,6 +80,9 @@ describe("validateEnv", () => {
     PAYTR_TEST_MODE: "1",
     PAYTR_CALLBACK_URL:
       "https://staging.tarodan.com.tr/api/payments/callback/paytr",
+    PAYTR_MEMBERSHIP_TEST_MODE: "true",
+    PAYTR_MEMBERSHIP_CALLBACK_URL:
+      "https://staging.tarodan.com.tr/api/payments/callback/paytr/membership",
     PAYOUTS_DISABLED: "true",
     SURAT_KARGO_TEST_MODE: "true",
     ELOGO_SOAP_URL: "https://pb-demo.elogo.com.tr/PostboxService.svc",
@@ -113,6 +122,8 @@ describe("validateEnv", () => {
       API_URL: "https://staging.tarodan.shop/api",
       PAYTR_CALLBACK_URL:
         "https://staging.tarodan.shop/api/payments/callback/paytr",
+      PAYTR_MEMBERSHIP_CALLBACK_URL:
+        "https://staging.tarodan.shop/api/payments/callback/paytr/membership",
     };
     expect(() => validateEnv(legacyStaging)).not.toThrow();
     expect(() =>
@@ -544,6 +555,60 @@ describe("validateEnv", () => {
     expect(() =>
       validateEnv({ ...prodBase, ADMIN_JWT_SECRET: strongSecrets.JWT_SECRET }),
     ).toThrow(/distinct/i);
+  });
+
+  describe("PayTR membership merchant", () => {
+    it("requires the membership merchant credentials in production", () => {
+      for (const key of [
+        "PAYTR_MEMBERSHIP_MERCHANT_ID",
+        "PAYTR_MEMBERSHIP_MERCHANT_KEY",
+        "PAYTR_MEMBERSHIP_MERCHANT_SALT",
+      ]) {
+        expect(() => validateEnv(without(prodBase, key))).toThrow(
+          new RegExp(key),
+        );
+      }
+    });
+
+    it("requires the membership merchant to be live in production and test in staging", () => {
+      expect(() =>
+        validateEnv(without(prodBase, "PAYTR_MEMBERSHIP_TEST_MODE")),
+      ).toThrow(/PAYTR_MEMBERSHIP_TEST_MODE/);
+      expect(() =>
+        validateEnv({ ...stagingBase, PAYTR_MEMBERSHIP_TEST_MODE: "false" }),
+      ).toThrow(/PAYTR_MEMBERSHIP_TEST_MODE/);
+    });
+
+    it("requires a public HTTPS membership callback URL distinct from the marketplace one", () => {
+      expect(() =>
+        validateEnv(without(prodBase, "PAYTR_MEMBERSHIP_CALLBACK_URL")),
+      ).toThrow(/PAYTR_MEMBERSHIP_CALLBACK_URL/);
+      expect(() =>
+        validateEnv({
+          ...prodBase,
+          PAYTR_MEMBERSHIP_CALLBACK_URL: prodBase.PAYTR_CALLBACK_URL,
+        }),
+      ).toThrow(/PAYTR_MEMBERSHIP_CALLBACK_URL must differ/);
+    });
+
+    it("rejects the marketplace merchant reused as the membership merchant in production", () => {
+      expect(() =>
+        validateEnv({
+          ...prodBase,
+          PAYTR_MEMBERSHIP_MERCHANT_ID: prodBase.PAYTR_MERCHANT_ID,
+        }),
+      ).toThrow(/PAYTR_MEMBERSHIP_MERCHANT_ID must be a different/);
+    });
+
+    it("keeps the membership callback on the staging host for a staging deployment", () => {
+      expect(() =>
+        validateEnv({
+          ...stagingBase,
+          PAYTR_MEMBERSHIP_CALLBACK_URL:
+            "https://api.tarodan.com.tr/api/payments/callback/paytr/membership",
+        }),
+      ).toThrow(/APP_ENV/);
+    });
   });
 
   it("throws in production when a PayTR key is missing", () => {

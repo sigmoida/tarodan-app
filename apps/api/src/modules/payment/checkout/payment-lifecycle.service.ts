@@ -465,14 +465,17 @@ export class PaymentLifecycleService {
     let capturedOid: string | null = null;
     let capturedInquiry: PayTRStatusInquirySuccess | null = null;
     let sawMismatch = false;
+    // Durum-sorgu ödemenin alındığı mağazaya (oid o mağazada tanımlıdır).
+    const provider = this.paymentProviders.resolve(
+      payment.provider,
+      payment.paytrMerchant,
+    );
     for (const candidateOid of oids) {
-      let inquiry = await this.paymentProviders
-        .resolve()
-        .queryPaymentStatus(candidateOid);
+      let inquiry = await provider.queryPaymentStatus(candidateOid);
       if (!inquiry.ok && candidateOid.includes("-")) {
-        inquiry = await this.paymentProviders
-          .resolve()
-          .queryPaymentStatus(candidateOid.replace(/-/g, ""));
+        inquiry = await provider.queryPaymentStatus(
+          candidateOid.replace(/-/g, ""),
+        );
       }
       if (!inquiry.ok) continue;
       // Bu oid PayTR'da çekilmiş. Tutar toleransı tutmuyorsa bu oid'i sayma ama

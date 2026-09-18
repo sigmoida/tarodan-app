@@ -146,6 +146,9 @@ export enum NotificationType {
   MEMBERSHIP_EXPIRING = "membership_expiring",
   MEMBERSHIP_EXPIRED = "membership_expired",
   MEMBERSHIP_UPGRADED = "membership_upgraded",
+  // Oto-yenileme açık ama üyelik mağazasında kullanılabilir kart yok (ör. PayTR
+  // mağaza geçişinde kartlar taşınmadı): yenileme kapatıldı, kart yeniden eklenmeli.
+  MEMBERSHIP_RENEWAL_CARD_REQUIRED = "membership_renewal_card_required",
 
   // Listing notifications
   LISTING_EXPIRING = "listing_expiring",

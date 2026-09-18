@@ -1,6 +1,6 @@
 import { Injectable, Logger } from "@nestjs/common";
 import { PrismaService } from "../../../prisma";
-import { PaymentStatus, OrderStatus } from "@prisma/client";
+import { PaymentStatus, OrderStatus, PaytrMerchant } from "@prisma/client";
 import { PaymentProviderRegistry } from "../../payment-providers/payment-provider.registry";
 
 /**
@@ -22,14 +22,22 @@ export class MiscReconciliationService {
    * KART NUMARASI/CVV SAKLANMAZ — yalnız PayTR token'ları + maskeli bilgi. ctoken @unique
    * olduğundan idempotenttir. Callback'ten çağrılır (dairesel bağımlılık olmasın diye persist
    * burada; kart listele/sil yönetimi MembershipService'tedir).
+   *
+   * `merchant`: kartın saklandığı PayTR mağazası (= çekimin yapıldığı mağaza).
+   * utoken/ctoken mağazaya özeldir; liste o mağazadan istenir ve kart o mağazayla
+   * damgalanır. `mandate.ip` kullanıcısız yenilemede user_ip olarak gider —
+   * yalnız kart ilk kez eklendiğinde yazılır; sonraki senkronlar ne ezer ne doldurur.
    */
   async syncSavedCardsFromUtoken(
     userId: string,
     utoken: string,
     mandate?: { ip?: string; termsVersion?: string },
+    merchant: PaytrMerchant = PaytrMerchant.marketplace,
   ): Promise<number> {
     if (!utoken) return 0;
-    const cards = await this.paymentProviders.resolve().capiListCards(utoken);
+    const cards = await this.paymentProviders
+      .resolve(null, merchant)
+      .capiListCards(utoken);
     let saved = 0;
     for (const c of cards) {
       if (!c.ctoken) continue;
@@ -38,6 +46,7 @@ export class MiscReconciliationService {
         create: {
           userId,
           provider: "paytr",
+          paytrMerchant: merchant,
           utoken,
           ctoken: c.ctoken,
           last4: c.last4 || "____",

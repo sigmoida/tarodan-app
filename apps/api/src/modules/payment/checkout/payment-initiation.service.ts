@@ -14,6 +14,7 @@ import {
   OrderStatus,
   TradeStatus,
   SavedCardStatus,
+  PaytrMerchant,
   Prisma,
 } from "@prisma/client";
 import { PayTRBuyer } from "../../payment-providers/paytr/paytr.service";
@@ -30,6 +31,11 @@ import {
   TRADE_PRICING_V2,
 } from "../../trade/helpers/trade.constants";
 import { isProduction } from "../../../config/environment";
+import { paytrMerchantCapabilities } from "../../../config/paytr";
+import {
+  PAYER_IP_METADATA_KEY,
+  resolvePaytrMerchant,
+} from "../helpers/paytr-merchant.helper";
 
 @Injectable()
 export class PaymentInitiationService {
@@ -366,19 +372,11 @@ export class PaymentInitiationService {
     req?: Request,
     capabilityAuthorized = false,
   ) {
-    const cardStorageEnabled =
-      this.configService.get("PAYTR_CARD_STORAGE_ENABLED") === "true";
-
-    // Kayıtlı kart yalnız giriş yapmış kullanıcıya aittir.
+    // Kayıtlı kart yalnız giriş yapmış kullanıcıya aittir. (Mağazanın kart
+    // saklama yetkisi, ödemenin mağazası belli olunca buildDirectPaymentForm'da.)
     if (dto.savedCardId && !userId) {
       throw new ForbiddenException(
         i18nMessage("server.payment.loginRequiredForSavedCard"),
-      );
-    }
-    // Kart saklama/kayıtlı kart özellikleri mağaza yetkisi doğrulanmadan açılmaz.
-    if (dto.savedCardId && !cardStorageEnabled) {
-      throw new GoneException(
-        i18nMessage("server.payment.savedCardPaymentUnavailable"),
       );
     }
 
@@ -454,17 +452,32 @@ export class PaymentInitiationService {
       amount,
       successQueryParams,
     } = ctx;
-    const cardStorageEnabled =
-      this.configService.get("PAYTR_CARD_STORAGE_ENABLED") === "true";
+    // Ödemenin mağazası claim'de yazıldı (resolvePaytrMerchant). Form, kart
+    // kasası ve yetenekler o mağazanındır: üyelik kartları üyelik mağazasında,
+    // sepet kartları pazaryeri mağazasında durur ve birbirinin yerine geçmez.
+    const merchant: PaytrMerchant =
+      payment.paytrMerchant ?? PaytrMerchant.marketplace;
+    const provider = this.paymentProviders.resolve(payment.provider, merchant);
+    const { cardStorage: cardStorageEnabled } = paytrMerchantCapabilities(
+      this.configService,
+      merchant,
+    );
 
     // Flow B — kayıtlı kart: tokenlar yalnız kullanıcı sahipliği doğrulandıktan
     // sonra doğrudan PayTR'ye gönderilecek forma eklenir. Kullanıcı-mevcut ödeme
     // olduğundan recurring_payment kullanılmaz ve checkout 3D Secure kalır.
     if (dto.savedCardId) {
+      // Kart saklama/kayıtlı kart özellikleri mağaza yetkisi doğrulanmadan açılmaz.
+      if (!cardStorageEnabled) {
+        throw new GoneException(
+          i18nMessage("server.payment.savedCardPaymentUnavailable"),
+        );
+      }
       const saved = await this.prisma.savedCard.findFirst({
         where: {
           id: dto.savedCardId,
           userId: userId as string,
+          paytrMerchant: merchant,
           status: SavedCardStatus.active,
         },
       });
@@ -472,20 +485,25 @@ export class PaymentInitiationService {
         throw new NotFoundException(
           i18nMessage("server.payment.savedCardNotFound"),
         );
-      const form = await this.paymentProviders
-        .resolve()
-        .createDirectPaymentForm(merchantOid, amount, buyer, basketItems, {
+      const form = await provider.createDirectPaymentForm(
+        merchantOid,
+        amount,
+        buyer,
+        basketItems,
+        {
           successQueryParams,
           savedCard: {
             utoken: saved.utoken,
             ctoken: saved.ctoken,
             requireCvv: saved.requireCvv,
           },
-        });
+        },
+      );
       await this.providerEvents.record({
         eventType: "direct_payment",
         merchantOid,
         paymentId: payment.id,
+        paytrMerchant: merchant,
         status: "pending",
         paymentType: "card",
         amount,
@@ -501,26 +519,32 @@ export class PaymentInitiationService {
     }
 
     // Flow A — yeni kart: store_card yalnız giriş yapmış kullanıcı ve açık
-    // PayTR CAPI yetkisiyle eklenir. Kullanıcının mevcut utoken'ı varsa yeni
-    // kart aynı PayTR kullanıcı grubuna bağlanır.
-    const storeCard = !!dto.saveCard && !!userId && cardStorageEnabled;
+    // PayTR CAPI yetkisiyle eklenir. Kullanıcının AYNI mağazadaki utoken'ı varsa
+    // yeni kart aynı PayTR kullanıcı grubuna bağlanır (utoken mağazaya özeldir).
+    const storeCard =
+      shouldStoreCard(dto.saveCard, merchant) && !!userId && cardStorageEnabled;
     const existingCard = storeCard
       ? await this.prisma.savedCard.findFirst({
           where: {
             userId: userId as string,
             provider: "paytr",
+            paytrMerchant: merchant,
             status: SavedCardStatus.active,
           },
           select: { utoken: true },
         })
       : null;
-    const form = await this.paymentProviders
-      .resolve()
-      .createDirectPaymentForm(merchantOid, amount, buyer, basketItems, {
+    const form = await provider.createDirectPaymentForm(
+      merchantOid,
+      amount,
+      buyer,
+      basketItems,
+      {
         storeCard,
         utoken: existingCard?.utoken,
         successQueryParams,
-      });
+      },
+    );
 
     // Yalnız form hazırlama olayını kaydet; kart alanları bu servise ulaşmaz.
     await this.providerEvents.record({
@@ -531,6 +555,7 @@ export class PaymentInitiationService {
       paymentType: "card",
       amount,
       totalAmount: amount,
+      paytrMerchant: merchant,
       raw: { formPrepared: true, storeCard },
     });
 
@@ -641,6 +666,8 @@ export class PaymentInitiationService {
     }
 
     let payment: any;
+    // Pazaryeri varsayılan; yalnız üyelik siparişi üyelik mağazasına gider.
+    let paytrMerchant: PaytrMerchant = PaytrMerchant.marketplace;
     let buyer: PayTRBuyer;
     let basketItems: Array<{
       id: string;
@@ -761,7 +788,8 @@ export class PaymentInitiationService {
         },
       ];
       baseOid = String(order.orderNumber || order.id).replace(/-/g, "");
-      const isMembershipOrder = order.productId?.startsWith?.("membership-");
+      paytrMerchant = resolvePaytrMerchant({ order });
+      const isMembershipOrder = paytrMerchant === PaytrMerchant.membership;
       // Misafir siparişinde başarı URL'ine guest=true taşı: aksi halde PayTR
       // dönüşünde /payment/success guest'i tanıyamayıp /login'e atıyor (fatura
       // da görünmüyor). Üyelik ödemesi misafir olamaz.
@@ -1002,6 +1030,8 @@ export class PaymentInitiationService {
         providerPaymentId: null,
         status: PaymentStatus.processing,
         failureReason: null,
+        // Çekim bu mağazada başlıyor; sonraki her PayTR çağrısı bu kolona bakar.
+        paytrMerchant,
         // FLOW-H2: 3DS çekiminin BAŞLADIĞI an. Ödeme-satırını-failed-yapma penceresi
         // (cancelExpiredPayments) ve 24s sipariş kill-switch'i (expireUnpaidOrders)
         // bunu `createdAt` yerine kullanır: kullanıcı initiate'ten çok sonra 3DS'e
@@ -1010,6 +1040,9 @@ export class PaymentInitiationService {
           ...prevMeta,
           merchantOidHistory: oidHistory,
           lastChargeStartedAt: new Date().toISOString(),
+          // Kart saklanırsa vekâlet IP'si olur: kullanıcısız yenileme user_ip
+          // olarak bunu gönderir (0.0.0.0 değil).
+          [PAYER_IP_METADATA_KEY]: clientIp,
         },
       },
     });
@@ -1417,6 +1450,7 @@ export class PaymentInitiationService {
           amount: order.totalAmount,
           currency: "TRY",
           provider: PaymentProvider.paytr,
+          paytrMerchant: resolvePaytrMerchant({ order }),
           status: PaymentStatus.pending,
         },
       });
@@ -1530,4 +1564,16 @@ export class PaymentInitiationService {
 
     return { success: did };
   }
+}
+
+/**
+ * Yeni kart saklansın mı? İstemci açıkça söylediyse o; söylemediyse üyelik
+ * ödemesinde EVET (oto-yenileme için kart gerekir, formda kutu varsayılan
+ * işaretli), diğer ödemelerde HAYIR. Mağaza yetkisi ve oturum ayrıca aranır.
+ */
+export function shouldStoreCard(
+  saveCard: boolean | undefined,
+  merchant: PaytrMerchant,
+): boolean {
+  return saveCard ?? merchant === PaytrMerchant.membership;
 }

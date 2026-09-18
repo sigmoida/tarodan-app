@@ -20,6 +20,7 @@
     "backfill:prod:deleted-identities": "node dist-seed/maintenance/backfill-deleted-user-identities.js",
     "backfill:prod:invoice-parties": "node dist-seed/maintenance/backfill-elogo-invoice-parties.js",
     "elogo:reissue-demo:prod": "node dist-seed/maintenance/reissue-demo-elogo-invoices.js",
+    "notify:prod:membership-card-readd": "node dist-seed/maintenance/notify-membership-card-readd.js",
     "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
     "start": "nest start",
     "predev": "prisma generate",

@@ -3,19 +3,24 @@ import {
   SavedCardStatus,
   PaymentStatus,
   MembershipTierType,
-} from '@prisma/client';
-import { ConfigService } from '@nestjs/config';
-import { createE2ETestApp, E2ETestApp } from '../test-utils/create-app';
-import { truncateAll, getPrisma, seedBaseline, disconnectPrisma } from '../test-utils/db';
-import { createUser } from '../factories/user.factory';
-import { MembershipService } from '../../src/modules/membership/membership.service';
+} from "@prisma/client";
+import { ConfigService } from "@nestjs/config";
+import { createE2ETestApp, E2ETestApp } from "../test-utils/create-app";
+import {
+  truncateAll,
+  getPrisma,
+  seedBaseline,
+  disconnectPrisma,
+} from "../test-utils/db";
+import { createUser } from "../factories/user.factory";
+import { MembershipService } from "../../src/modules/membership/membership.service";
 
 /**
  * Faz 4/5 — Kullanıcısız oto-yenileme (PayTR CAPI recurring) + dunning.
  * Mock'lu PayTR (MockPayTRService.chargeRecurring) ile davranış doğrulanır.
  * GERÇEK PayTR çağrısı yok; canlı doğrulama Non3D yetkisi gelince yapılır.
  */
-describe('Recurring auto-renewal (CAPI, E2E)', () => {
+describe("Recurring auto-renewal (CAPI, E2E)", () => {
   let ctx: E2ETestApp;
 
   beforeAll(async () => {
@@ -37,9 +42,13 @@ describe('Recurring auto-renewal (CAPI, E2E)', () => {
     const cfg = ctx.app.get(ConfigService);
     const real = cfg.get.bind(cfg);
     jest
-      .spyOn(cfg, 'get')
+      .spyOn(cfg, "get")
       .mockImplementation((key: any, def?: any) =>
-        key === 'PAYTR_RECURRING_ENABLED' ? (enabled ? 'true' : 'false') : real(key, def),
+        key === "PAYTR_RECURRING_ENABLED"
+          ? enabled
+            ? "true"
+            : "false"
+          : real(key, def),
       );
   }
 
@@ -65,11 +74,13 @@ describe('Recurring auto-renewal (CAPI, E2E)', () => {
     const card = await prisma.savedCard.create({
       data: {
         userId: user.id,
-        provider: 'paytr',
+        provider: "paytr",
+        // Oto-yenileme yalnız üyelik mağazasının kartını çeker.
+        paytrMerchant: "membership",
         utoken: `UT-${user.id.slice(0, 8)}`,
         ctoken: `CT-${user.id.slice(0, 8)}`,
-        last4: '4358',
-        brand: 'VISA',
+        last4: "4358",
+        brand: "VISA",
         status: SavedCardStatus.active,
         requireCvv: opts.requireCvv ?? false,
       },
@@ -77,7 +88,7 @@ describe('Recurring auto-renewal (CAPI, E2E)', () => {
     return { user, tier, m, card };
   }
 
-  it('flag kapalıyken hiçbir çekim yapmaz (no-op)', async () => {
+  it("flag kapalıyken hiçbir çekim yapmaz (no-op)", async () => {
     setFlag(false);
     await seedDueMembership();
     const res = await ctx.app.get(MembershipService).runAutoRenewals();
@@ -85,17 +96,19 @@ describe('Recurring auto-renewal (CAPI, E2E)', () => {
     expect(ctx.paytr.recurringCalls.length).toBe(0);
   });
 
-  it('başarılı çekimde üyeliği yeniler ve dönemi ileriye uzatır', async () => {
+  it("başarılı çekimde üyeliği yeniler ve dönemi ileriye uzatır", async () => {
     setFlag(true);
     const { m, tier } = await seedDueMembership();
-    ctx.paytr.nextRecurringResult = { status: 'success' };
+    ctx.paytr.nextRecurringResult = { status: "success" };
 
     const res = await ctx.app.get(MembershipService).runAutoRenewals();
 
     expect(res.renewed).toBe(1);
     expect(ctx.paytr.recurringCalls.length).toBe(1);
     const prisma = getPrisma();
-    const after = await prisma.userMembership.findUnique({ where: { id: m.id } });
+    const after = await prisma.userMembership.findUnique({
+      where: { id: m.id },
+    });
     expect(after!.currentPeriodEnd.getTime()).toBeGreaterThan(Date.now());
     expect(after!.status).toBe(SubscriptionStatus.active);
     const mp = await prisma.membershipPayment.findFirst({
@@ -105,10 +118,14 @@ describe('Recurring auto-renewal (CAPI, E2E)', () => {
     expect(Number(mp!.amount)).toBe(Number(tier!.monthlyPrice));
   });
 
-  it('kalıcı başarısızlıkta (try_again=false) kartı revoke eder', async () => {
+  it("kalıcı başarısızlıkta (try_again=false) kartı revoke eder", async () => {
     setFlag(true);
     const { card } = await seedDueMembership();
-    ctx.paytr.nextRecurringResult = { status: 'failed', reason: 'Kart kapalı', tryAgain: false };
+    ctx.paytr.nextRecurringResult = {
+      status: "failed",
+      reason: "Kart kapalı",
+      tryAgain: false,
+    };
 
     const res = await ctx.app.get(MembershipService).runAutoRenewals();
 
@@ -118,10 +135,14 @@ describe('Recurring auto-renewal (CAPI, E2E)', () => {
     expect(c!.status).toBe(SavedCardStatus.revoked);
   });
 
-  it('geçici başarısızlıkta (try_again=true) kartı aktif bırakır', async () => {
+  it("geçici başarısızlıkta (try_again=true) kartı aktif bırakır", async () => {
     setFlag(true);
     const { card } = await seedDueMembership();
-    ctx.paytr.nextRecurringResult = { status: 'failed', reason: 'geçici', tryAgain: true };
+    ctx.paytr.nextRecurringResult = {
+      status: "failed",
+      reason: "geçici",
+      tryAgain: true,
+    };
 
     await ctx.app.get(MembershipService).runAutoRenewals();
 
@@ -130,7 +151,7 @@ describe('Recurring auto-renewal (CAPI, E2E)', () => {
     expect(c!.status).toBe(SavedCardStatus.active);
   });
 
-  it('CVV gerektiren kartı atlar (kullanıcısız çekilemez)', async () => {
+  it("CVV gerektiren kartı atlar (kullanıcısız çekilemez)", async () => {
     setFlag(true);
     await seedDueMembership({ requireCvv: true });
     const res = await ctx.app.get(MembershipService).runAutoRenewals();

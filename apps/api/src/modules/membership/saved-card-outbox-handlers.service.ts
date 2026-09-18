@@ -57,8 +57,9 @@ export class SavedCardOutboxHandlers implements OnModuleInit {
           return;
         }
 
+        // Kart hangi mağazanın kasasındaysa silme de oraya.
         const result = await this.paymentProviders
-          .resolve(card.provider)
+          .resolve(card.provider, card.paytrMerchant)
           .capiDeleteCard(card.utoken, card.ctoken);
 
         if (

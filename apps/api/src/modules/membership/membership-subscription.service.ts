@@ -21,6 +21,7 @@ import {
   PaymentStatus,
   SavedCardStatus,
   TradeStatus,
+  PaytrMerchant,
   type MembershipTier,
   Prisma,
 } from "@prisma/client";
@@ -35,7 +36,13 @@ import { MembershipCommonService } from "./membership-common.service";
 import {
   hasUsableRecurringCard,
   isPremiumEntitled,
+  USABLE_RECURRING_CARD_WHERE,
 } from "./helpers/membership.util";
+import {
+  PAYMENT_PURPOSE_MERCHANT,
+  paytrMerchantCapabilities,
+  type PaymentPurpose,
+} from "../../config/paytr";
 import { NotificationService } from "../notification/notification.service";
 import { NotificationType } from "../notification/dto";
 import { i18nMessage } from "../i18n";
@@ -226,8 +233,7 @@ export class MembershipSubscriptionService {
         // yazılmaz; kullanıcı dönem sonunda istediği paketi yeniden satın alır.
         // Free hedef çekim gerektirmez, her zaman planlanabilir.
         if (dto.tierType !== MembershipTierType.free) {
-          const recurringEnabled =
-            this.configService.get("PAYTR_RECURRING_ENABLED") === "true";
+          const recurringEnabled = this.membershipRecurringEnabled();
           if (
             !recurringEnabled ||
             !(await hasUsableRecurringCard(this.prisma, userId))
@@ -605,6 +611,9 @@ export class MembershipSubscriptionService {
             idempotencyKey,
             amount: price,
             provider,
+            // Üyelik siparişinin ödemesi üyelik mağazasında çekilir
+            // (resolvePaytrMerchant); niyet kaydı da aynı mağazayı taşır.
+            paytrMerchant: PaytrMerchant.membership,
             status: PaymentStatus.pending,
             periodStart,
             periodEnd,
@@ -806,7 +815,7 @@ export class MembershipSubscriptionService {
     failed: number;
     attempted: number;
   }> {
-    if (this.configService.get("PAYTR_RECURRING_ENABLED") !== "true") {
+    if (!this.membershipRecurringEnabled()) {
       return { renewed: 0, failed: 0, attempted: 0 };
     }
     if (!this.virtualOrder) {
@@ -814,37 +823,19 @@ export class MembershipSubscriptionService {
     }
     const now = new Date();
     await this.reconcilePendingRecurringPayments(now);
+    await this.disableRenewalsWithoutUsableCard({ scope: "due", now });
     const due = await this.prisma.userMembership.findMany({
       where: {
-        autoRenew: true,
-        status: SubscriptionStatus.active,
-        // D3: çekim süre DOLMADAN yapılır — saatlik cron'un bir sonraki turuna
-        // kalmasın diye dönem sonuna <= 1 saat kalanlar da bu tura girer.
-        currentPeriodEnd: { lte: new Date(now.getTime() + RENEWAL_WINDOW_MS) },
-        tier: {
-          type: { not: MembershipTierType.free },
-          isActive: true,
-        },
-        user: {
-          savedCards: {
-            some: {
-              provider: "paytr",
-              status: SavedCardStatus.active,
-              requireCvv: false,
-            },
-          },
-        },
+        ...this.renewalDueWhere(now),
+        // Yalnız ÜYELİK mağazasındaki CVV'siz aktif kart (tek tanım).
+        user: { savedCards: { some: USABLE_RECURRING_CARD_WHERE } },
       },
       include: {
         tier: true,
         user: {
           include: {
             savedCards: {
-              where: {
-                provider: "paytr",
-                status: SavedCardStatus.active,
-                requireCvv: false,
-              },
+              where: USABLE_RECURRING_CARD_WHERE,
               orderBy: { isDefault: "desc" },
               take: 1,
             },
@@ -1006,6 +997,8 @@ export class MembershipSubscriptionService {
               idempotencyKey: renewalKey,
               amount: price,
               provider: "paytr",
+              // Kullanıcısız non-3D çekim yalnız üyelik mağazasında yetkili.
+              paytrMerchant: PaytrMerchant.membership,
               providerPaymentId: merchantOid,
               merchantOid,
               paymentType: "card",
@@ -1029,14 +1022,16 @@ export class MembershipSubscriptionService {
         }
         attempted++;
 
-        const result = await this.paymentProviders.resolve().chargeRecurring({
-          utoken: card.utoken,
-          ctoken: card.ctoken,
-          amount: price,
-          merchantOid,
-          buyer,
-          basketItems: basket,
-        });
+        const result = await this.paymentProviders
+          .resolve(paymentAttempt.provider, paymentAttempt.paytrMerchant)
+          .chargeRecurring({
+            utoken: card.utoken,
+            ctoken: card.ctoken,
+            amount: price,
+            merchantOid,
+            buyer,
+            basketItems: basket,
+          });
 
         if (result.status === "success") {
           const completed =
@@ -1134,6 +1129,118 @@ export class MembershipSubscriptionService {
     return { renewed, failed, attempted };
   }
 
+  /** Üyelik mağazasında kullanıcısız recurring açık mı (tek okuma noktası). */
+  private membershipRecurringEnabled(): boolean {
+    return paytrMerchantCapabilities(
+      this.configService,
+      PaytrMerchant.membership,
+    ).recurring;
+  }
+
+  /**
+   * Bu turda yenilenmesi gereken üyelikler (kart koşulu hariç): oto-yenileme
+   * açık, aktif, ücretli ve etkin katman, dönem sonuna <= 1 saat (D3: çekim
+   * süre DOLMADAN yapılır — saatlik cron'un bir sonraki turuna kalmasın).
+   */
+  private renewalDueWhere(now: Date): Prisma.UserMembershipWhereInput {
+    return {
+      autoRenew: true,
+      status: SubscriptionStatus.active,
+      currentPeriodEnd: { lte: new Date(now.getTime() + RENEWAL_WINDOW_MS) },
+      tier: {
+        type: { not: MembershipTierType.free },
+        isActive: true,
+      },
+    };
+  }
+
+  /**
+   * Oto-yenilemesi açık ama üyelik mağazasında kullanılabilir kartı OLMAYAN
+   * üyelikler: oto-yenileme kapatılır ve üyeye MEMBERSHIP_RENEWAL_CARD_REQUIRED
+   * bildirimi gider. Eskiden bunlar yenileme sorgusuna hiç girmez, autoRenew=true
+   * kalır ve dönem sonunda sessizce free'ye düşerlerdi. PayTR mağaza geçişinde
+   * kart token'ları taşınmadığı için geçiş öncesi her yenilemeli üye bu yoldan
+   * geçer.
+   *
+   * - `scope: "due"`: yalnız bu turda yenilenecekler (saatlik cron).
+   * - `scope: "all"`: tüm aktif ücretli üyelikler — geçiş anında bir kez,
+   *   `maintenance/notify-membership-card-readd.ts` ile. `dryRun` yalnız sayar.
+   *
+   * Free'ye planlı geçişi olan üye hariç: onun yenilemesi zaten denenmez.
+   * CAS (autoRenew=true koşullu updateMany): iki süreç aynı üyeyi iki kez
+   * bildirmez; bu yüzden tekrar çalıştırmak güvenlidir.
+   */
+  async disableRenewalsWithoutUsableCard(opts: {
+    scope: "due" | "all";
+    now?: Date;
+    dryRun?: boolean;
+  }): Promise<number> {
+    const now = opts.now ?? new Date();
+    const where: Prisma.UserMembershipWhereInput = {
+      ...(opts.scope === "due"
+        ? this.renewalDueWhere(now)
+        : {
+            autoRenew: true,
+            status: SubscriptionStatus.active,
+            tier: { type: { not: MembershipTierType.free } },
+          }),
+      OR: [
+        { scheduledTierType: null },
+        { scheduledTierType: { not: MembershipTierType.free } },
+      ],
+      user: { savedCards: { none: USABLE_RECURRING_CARD_WHERE } },
+    };
+    if (opts.dryRun) {
+      return this.prisma.userMembership.count({ where });
+    }
+    let disabled = 0;
+    // "due" tek sayfa (saatlik tur); "all" sayfalar biter bitmez durur — CAS'ı
+    // geçen satır autoRenew=false olup sorgudan düştüğü için imleç gerekmez.
+    for (;;) {
+      const page = await this.prisma.userMembership.findMany({
+        where,
+        select: { id: true, userId: true, tier: { select: { name: true } } },
+        orderBy: { currentPeriodEnd: "asc" },
+        take: 200,
+      });
+      const before = disabled;
+      disabled += await this.disableAndNotify(page);
+      if (opts.scope === "due" || page.length < 200 || disabled === before) {
+        break;
+      }
+    }
+    return disabled;
+  }
+
+  private async disableAndNotify(
+    stranded: Array<{ id: string; userId: string; tier: { name: string } }>,
+  ): Promise<number> {
+    let disabled = 0;
+    for (const m of stranded) {
+      const claimed = await this.prisma.userMembership.updateMany({
+        where: { id: m.id, autoRenew: true },
+        data: { autoRenew: false },
+      });
+      if (claimed.count !== 1) continue;
+      disabled++;
+      this.logger.warn(
+        `Oto-yenileme kapatıldı: üyelik mağazasında kullanılabilir kart yok membership=${m.id}`,
+      );
+      await this.notifications
+        ?.createInAppNotification(
+          m.userId,
+          NotificationType.MEMBERSHIP_RENEWAL_CARD_REQUIRED,
+          { tierName: m.tier.name },
+        )
+        .catch((err: unknown) =>
+          this.logger.warn(
+            `MEMBERSHIP_RENEWAL_CARD_REQUIRED bildirimi başarısız (user ${m.userId}): ${(err as Error)?.message}`,
+          ),
+        );
+    }
+    return disabled;
+  }
+
   private async reconcilePendingRecurringPayments(now: Date): Promise<void> {
     if (!this.virtualOrder) return;
     const staleBefore = new Date(now.getTime() - 5 * 60 * 1000);
@@ -1156,7 +1263,7 @@ export class MembershipSubscriptionService {
       if (!merchantOid) continue;
       try {
         const inquiry = await this.paymentProviders
-          .resolve()
+          .resolve(attempt.provider, attempt.paytrMerchant)
           .queryPaymentStatus(merchantOid);
         if (
           inquiry.ok &&
@@ -1214,13 +1321,23 @@ export class MembershipSubscriptionService {
   // ==========================================================================
 
   /**
-   * Kullanıcının kayıtlı (oto-yenilemede kullanılabilir) kartlarını döndürür.
-   * Sadece status=active kartlar; revoke/expired gizlenir. require_cvv kartlar
-   * listelenir ama autoRenewEligible=false (kullanıcısız çekilemez).
+   * Kullanıcının kayıtlı kartlarını döndürür. Sadece status=active kartlar;
+   * revoke/expired gizlenir.
+   *
+   * `purpose` verilirse yalnız o ödeme amacının mağazasındaki kartlar döner:
+   * sepet (checkout) ödemesi pazaryeri kartlarını, üyelik ödemesi üyelik
+   * kartlarını görür — token'lar mağazaya özeldir, diğer mağazada kullanılamaz.
+   * Verilmezse (eski istemci) hepsi döner; her kartın `purpose`'u yazılıdır.
+   * autoRenewEligible yalnız oto-yenilemede gerçekten çekilebilecek karttır
+   * (üyelik mağazası + CVV istemez).
    */
-  async listSavedCards(userId: string): Promise<
+  async listSavedCards(
+    userId: string,
+    purpose?: PaymentPurpose,
+  ): Promise<
     Array<{
       id: string;
+      purpose: PaymentPurpose;
       last4: string;
       brand: string | null;
       bank: string | null;
@@ -1236,11 +1353,22 @@ export class MembershipSubscriptionService {
     }>
   > {
     const cards = await this.prisma.savedCard.findMany({
-      where: { userId, provider: "paytr", status: SavedCardStatus.active },
+      where: {
+        userId,
+        provider: "paytr",
+        status: SavedCardStatus.active,
+        ...(purpose
+          ? { paytrMerchant: PAYMENT_PURPOSE_MERCHANT[purpose] }
+          : {}),
+      },
       orderBy: [{ isDefault: "desc" }, { createdAt: "desc" }],
     });
     return cards.map((c) => ({
       id: c.id,
+      purpose:
+        c.paytrMerchant === PaytrMerchant.membership
+          ? ("membership" as const)
+          : ("checkout" as const),
       last4: c.last4,
       brand: c.brand,
       // PayTR CAPI meta (gözlemlenebilirlik/UX): banka + şema + credit/debit + kurumsal.
@@ -1252,7 +1380,8 @@ export class MembershipSubscriptionService {
       expYear: c.expYear,
       requireCvv: c.requireCvv,
       isDefault: c.isDefault,
-      autoRenewEligible: !c.requireCvv,
+      autoRenewEligible:
+        c.paytrMerchant === PaytrMerchant.membership && !c.requireCvv,
       createdAt: c.createdAt,
     }));
   }

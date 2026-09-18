@@ -274,6 +274,7 @@ export const NOTIFICATION_LINKS: Record<
   [NotificationType.MEMBERSHIP_EXPIRING]: pattern("/membership"),
   [NotificationType.MEMBERSHIP_EXPIRED]: pattern("/membership"),
   [NotificationType.MEMBERSHIP_UPGRADED]: pattern("/profile"),
+  [NotificationType.MEMBERSHIP_RENEWAL_CARD_REQUIRED]: pattern("/membership"),
   [NotificationType.SELLER_APPLICATION_APPROVED]: pattern("/profile"),
   [NotificationType.SELLER_APPLICATION_REJECTED]: pattern("/profile"),
   [NotificationType.WELCOME]: pattern("/listings"),

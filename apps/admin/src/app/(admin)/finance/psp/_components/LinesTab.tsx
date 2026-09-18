@@ -14,6 +14,11 @@ import { fmtDate, fmtTry } from "@/lib/format";
 import { SectionCard } from "@/components/detail/SectionCard";
 import { QueryErrorCard } from "@/components/page/QueryErrorCard";
 import type { PspStatementLine } from "../_lib/types";
+import {
+  MerchantBadge,
+  MerchantFilter,
+  type MerchantFilterValue,
+} from "./MerchantFilter";
 
 const PAGE_SIZE = 50;
 
@@ -35,13 +40,14 @@ export function LinesTab() {
   const t = useTranslations();
   const [status, setStatus] = useState("problem");
   const [includeResolved, setIncludeResolved] = useState(false);
+  const [merchant, setMerchant] = useState<MerchantFilterValue>("");
   const [page, setPage] = useState(1);
   const [resolving, setResolving] = useState<PspStatementLine | null>(null);
 
   const query = useQuery({
     queryKey: adminKeys.list(
       "psp-statement-lines",
-      `${status}:${includeResolved}:${page}`,
+      `${status}:${includeResolved}:${merchant}:${page}`,
     ),
     queryFn: async () => {
       const res = await adminApi.getPspStatementLines({
@@ -49,6 +55,7 @@ export function LinesTab() {
         page,
         limit: PAGE_SIZE,
         includeResolved,
+        merchant: merchant || undefined,
       });
       return res.data as { data: PspStatementLine[]; meta: { total: number } };
     },
@@ -72,7 +79,14 @@ export function LinesTab() {
         <p className="text-sm text-muted">
           {t("admin.finance.psp.lines.description")}
         </p>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <MerchantFilter
+            value={merchant}
+            onChange={(value) => {
+              setMerchant(value);
+              setPage(1);
+            }}
+          />
           <Checkbox
             size="sm"
             checked={includeResolved}
@@ -134,6 +148,9 @@ export function LinesTab() {
                   <th className="px-3 py-3 font-medium">
                     {t("admin.finance.psp.lines.type")}
                   </th>
+                  <th className="px-3 py-3 font-medium">
+                    {t("admin.finance.psp.merchant.label")}
+                  </th>
                   <th className="px-3 py-3 font-medium">merchant_oid</th>
                   <th className="px-3 py-3 font-medium">
                     {t("admin.finance.psp.lines.amount")}
@@ -169,6 +186,9 @@ export function LinesTab() {
                             : "admin.finance.psp.lines.refund",
                         )}
                       </Badge>
+                    </td>
+                    <td className="px-3 py-3">
+                      <MerchantBadge merchant={line.paytrMerchant} />
                     </td>
                     <td className="px-3 py-3 font-mono text-xs">
                       {line.merchantOid}
