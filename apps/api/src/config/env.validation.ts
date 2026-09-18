@@ -232,15 +232,23 @@ const envSchema = z
     };
     requirePublicHttpsUrl("API_URL", env.API_URL);
     requirePublicHttpsUrl("PAYTR_CALLBACK_URL", env.PAYTR_CALLBACK_URL);
-    requirePublicHttpsUrl(
-      "PAYTR_MEMBERSHIP_CALLBACK_URL",
-      env.PAYTR_MEMBERSHIP_CALLBACK_URL,
-    );
+    // Boş bırakmak geçerli bir yapılandırma: config/paytr.ts o zaman
+    // `${API_URL}/api/payments/callback/paytr/membership` türetiyor ve API_URL
+    // zaten yukarıda public HTTPS olarak doğrulandı. Burada boş değeri
+    // reddetmek .env.example'ın söylediğiyle çelişiyordu ve prod boot'unu
+    // kilitliyordu.
+    if (env.PAYTR_MEMBERSHIP_CALLBACK_URL?.trim()) {
+      requirePublicHttpsUrl(
+        "PAYTR_MEMBERSHIP_CALLBACK_URL",
+        env.PAYTR_MEMBERSHIP_CALLBACK_URL,
+      );
+    }
     // Her mağazanın bildirimi kendi anahtarıyla doğrulanır; iki panel aynı
     // URL'e bildirim atarsa bir mağazanın her bildirimi "hash uyuşmazlığı"
-    // olarak düşer.
+    // olarak düşer. Türetilen varsayılanlar yol farkıyla zaten ayrışıyor, o
+    // yüzden kural yalnız ikisi de açıkça verildiğinde işler.
     if (
-      env.PAYTR_CALLBACK_URL &&
+      env.PAYTR_CALLBACK_URL?.trim() &&
       env.PAYTR_CALLBACK_URL.trim() ===
         env.PAYTR_MEMBERSHIP_CALLBACK_URL?.trim()
     ) {

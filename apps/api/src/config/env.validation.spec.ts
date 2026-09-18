@@ -581,7 +581,10 @@ describe("validateEnv", () => {
 
     it("requires a public HTTPS membership callback URL distinct from the marketplace one", () => {
       expect(() =>
-        validateEnv(without(prodBase, "PAYTR_MEMBERSHIP_CALLBACK_URL")),
+        validateEnv({
+          ...prodBase,
+          PAYTR_MEMBERSHIP_CALLBACK_URL: "http://api.tarodan.com.tr/callback",
+        }),
       ).toThrow(/PAYTR_MEMBERSHIP_CALLBACK_URL/);
       expect(() =>
         validateEnv({
@@ -589,6 +592,17 @@ describe("validateEnv", () => {
           PAYTR_MEMBERSHIP_CALLBACK_URL: prodBase.PAYTR_CALLBACK_URL,
         }),
       ).toThrow(/PAYTR_MEMBERSHIP_CALLBACK_URL must differ/);
+    });
+
+    // .env.example boş bırakmayı belgeliyor ve config/paytr.ts URL'i API_URL'den
+    // türetiyor; doğrulamanın boşu reddetmesi prod boot'unu kilitlemişti.
+    it("accepts an empty membership callback URL and leaves it to the API_URL default", () => {
+      expect(() =>
+        validateEnv(without(prodBase, "PAYTR_MEMBERSHIP_CALLBACK_URL")),
+      ).not.toThrow();
+      expect(() =>
+        validateEnv({ ...prodBase, PAYTR_MEMBERSHIP_CALLBACK_URL: "  " }),
+      ).not.toThrow();
     });
 
     it("rejects the marketplace merchant reused as the membership merchant in production", () => {
