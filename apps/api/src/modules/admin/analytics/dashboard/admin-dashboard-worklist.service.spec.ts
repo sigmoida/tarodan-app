@@ -27,20 +27,20 @@ describe("AdminDashboardWorklistService", () => {
 
     // Every definition is stubbed at its own `read`, so the service's assembly
     // (totals, subsets, oldest, ordering, hiding zeros) is what is under test.
-    for (const key of Object.keys(QUEUE_PART_DEFINITIONS)) {
-      const definition = QUEUE_PART_DEFINITIONS[key as never];
-      jest.spyOn(definition, "query").mockReturnValue(key as never);
+    const queueParts = QUEUE_PART_DEFINITIONS as Record<string, any>;
+    for (const key of Object.keys(queueParts)) {
+      jest.spyOn(queueParts[key], "query").mockReturnValue(key);
       jest
-        .spyOn(definition, "read")
+        .spyOn(queueParts[key], "read")
         .mockImplementation(
           () => partReadings[key] ?? { count: 0, oldestAt: null },
         );
     }
-    for (const key of Object.keys(ALERT_DEFINITIONS)) {
-      const definition = ALERT_DEFINITIONS[key as never];
-      jest.spyOn(definition, "query").mockReturnValue(key as never);
+    const alerts = ALERT_DEFINITIONS as Record<string, any>;
+    for (const key of Object.keys(alerts)) {
+      jest.spyOn(alerts[key], "query").mockReturnValue(key);
       jest
-        .spyOn(definition, "read")
+        .spyOn(alerts[key], "read")
         .mockImplementation(() => ({ count: alertCounts[key] ?? 0 }));
     }
 

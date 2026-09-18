@@ -74,7 +74,7 @@ const changePercent = (current: number, previous: number): number => {
  */
 const stamped = (
   window: DashboardDateWindow | undefined,
-): Prisma.DateTimeNullableFilter => window ?? { not: null };
+): DashboardDateWindow | { not: null } => window ?? { not: null };
 
 /**
  * ÖDENMİŞ sipariş yüklemi. Grup sepetinde ödeme satırı siparişte değil

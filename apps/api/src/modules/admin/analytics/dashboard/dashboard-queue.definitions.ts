@@ -84,8 +84,6 @@ function reader(
   };
 }
 
-const AGE = (dateField: string) => ({ _min: { [dateField]: true } });
-
 /** Yalnız SATIŞ ilanları — sanal ürünler (üyelik/boost) moderasyona girmez. */
 const LISTING = { kind: ProductKind.listing } as const;
 
@@ -103,7 +101,7 @@ export const QUEUE_PART_DEFINITIONS: Record<
       prisma.refundRequest.aggregate({
         where: { status: RefundRequestStatus.pending_review },
         _count: { _all: true },
-        ...AGE("createdAt"),
+        _min: { createdAt: true },
       }),
     read: reader("createdAt"),
   },
@@ -113,7 +111,7 @@ export const QUEUE_PART_DEFINITIONS: Record<
       prisma.refundRequest.aggregate({
         where: { status: RefundRequestStatus.disputed },
         _count: { _all: true },
-        ...AGE("createdAt"),
+        _min: { createdAt: true },
       }),
     read: reader("createdAt"),
   },
@@ -131,7 +129,7 @@ export const QUEUE_PART_DEFINITIONS: Record<
           },
         },
         _count: { _all: true },
-        ...AGE("firstWarehouseArrivalAt"),
+        _min: { firstWarehouseArrivalAt: true },
       }),
     read: reader("firstWarehouseArrivalAt"),
   },
@@ -141,7 +139,7 @@ export const QUEUE_PART_DEFINITIONS: Record<
       prisma.tradeDispute.aggregate({
         where: { resolvedAt: null },
         _count: { _all: true },
-        ...AGE("createdAt"),
+        _min: { createdAt: true },
       }),
     read: reader("createdAt"),
   },
@@ -151,7 +149,7 @@ export const QUEUE_PART_DEFINITIONS: Record<
       prisma.trade.aggregate({
         where: { refundFailureAt: { not: null } },
         _count: { _all: true },
-        ...AGE("refundFailureAt"),
+        _min: { refundFailureAt: true },
       }),
     read: reader("refundFailureAt"),
   },
@@ -167,7 +165,7 @@ export const QUEUE_PART_DEFINITIONS: Record<
           compensationResolvedAt: null,
         },
         _count: { _all: true },
-        ...AGE("updatedAt"),
+        _min: { updatedAt: true },
       }),
     read: reader("updatedAt"),
   },
@@ -179,7 +177,7 @@ export const QUEUE_PART_DEFINITIONS: Record<
       prisma.product.aggregate({
         where: { ...LISTING, status: ProductStatus.pending },
         _count: { _all: true },
-        ...AGE("createdAt"),
+        _min: { createdAt: true },
       }),
     read: reader("createdAt"),
   },
@@ -189,7 +187,7 @@ export const QUEUE_PART_DEFINITIONS: Record<
       prisma.message.aggregate({
         where: { status: MessageStatus.pending_approval },
         _count: { _all: true },
-        ...AGE("createdAt"),
+        _min: { createdAt: true },
       }),
     read: reader("createdAt"),
   },
@@ -215,7 +213,7 @@ export const QUEUE_PART_DEFINITIONS: Record<
           },
         },
         _count: { _all: true },
-        ...AGE("createdAt"),
+        _min: { createdAt: true },
       }),
     read: reader("createdAt"),
   },
@@ -244,7 +242,7 @@ export const QUEUE_PART_DEFINITIONS: Record<
           },
         },
         _count: { _all: true },
-        ...AGE("uploadedAt"),
+        _min: { uploadedAt: true },
       }),
     read: reader("uploadedAt"),
   },
@@ -258,7 +256,7 @@ export const QUEUE_PART_DEFINITIONS: Record<
       prisma.supportTicket.aggregate({
         where: { status: { in: [TicketStatus.open, TicketStatus.in_progress] } },
         _count: { _all: true },
-        ...AGE("createdAt"),
+        _min: { createdAt: true },
       }),
     read: reader("createdAt"),
   },
@@ -274,7 +272,7 @@ export const QUEUE_PART_DEFINITIONS: Record<
           priority: { in: [TicketPriority.urgent, TicketPriority.high] },
         },
         _count: { _all: true },
-        ...AGE("createdAt"),
+        _min: { createdAt: true },
       }),
     read: reader("createdAt"),
     subsetOf: "ticketsOpen",
@@ -285,7 +283,7 @@ export const QUEUE_PART_DEFINITIONS: Record<
       prisma.report.aggregate({
         where: { status: { in: ["pending", "under_review"] } },
         _count: { _all: true },
-        ...AGE("createdAt"),
+        _min: { createdAt: true },
       }),
     read: reader("createdAt"),
   },
@@ -297,7 +295,7 @@ export const QUEUE_PART_DEFINITIONS: Record<
       prisma.payoutTransfer.aggregate({
         where: failedTransfersWhere,
         _count: { _all: true },
-        ...AGE("createdAt"),
+        _min: { createdAt: true },
       }),
     read: reader("createdAt"),
   },
@@ -307,7 +305,7 @@ export const QUEUE_PART_DEFINITIONS: Record<
       prisma.paymentHold.aggregate({
         where: overdueHoldsWhere(now),
         _count: { _all: true },
-        ...AGE("releaseAt"),
+        _min: { releaseAt: true },
       }),
     read: reader("releaseAt"),
   },
@@ -318,7 +316,7 @@ export const QUEUE_PART_DEFINITIONS: Record<
         where: openAdjustmentsWhere,
         _count: { _all: true },
         _sum: { remainingAmount: true },
-        ...AGE("createdAt"),
+        _min: { createdAt: true },
       }),
     read: reader("createdAt", "remainingAmount"),
   },
@@ -330,7 +328,7 @@ export const QUEUE_PART_DEFINITIONS: Record<
       prisma.elogoInvoice.aggregate({
         where: exhaustedInvoicesWhere,
         _count: { _all: true },
-        ...AGE("createdAt"),
+        _min: { createdAt: true },
       }),
     read: reader("createdAt"),
   },
@@ -340,7 +338,7 @@ export const QUEUE_PART_DEFINITIONS: Record<
       prisma.order.aggregate({
         where: uninvoicedDeliveredWhere(now, config),
         _count: { _all: true },
-        ...AGE("deliveredAt"),
+        _min: { deliveredAt: true },
       }),
     read: reader("deliveredAt"),
   },
@@ -352,7 +350,7 @@ export const QUEUE_PART_DEFINITIONS: Record<
       prisma.carrierCancellationTask.aggregate({
         where: { status: CarrierCancellationTaskStatus.pending },
         _count: { _all: true },
-        ...AGE("requestedAt"),
+        _min: { requestedAt: true },
       }),
     read: reader("requestedAt"),
   },
@@ -364,7 +362,7 @@ export const QUEUE_PART_DEFINITIONS: Record<
       prisma.shipment.aggregate({
         where: missingTrackingWhere(now, config),
         _count: { _all: true },
-        ...AGE("createdAt"),
+        _min: { createdAt: true },
       }),
     read: reader("createdAt"),
   },
