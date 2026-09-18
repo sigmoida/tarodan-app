@@ -67,6 +67,7 @@ import {
   UpdateStaffSettingsDto,
   SetRolePermissionsDto,
   AnalyticsQueryDto,
+  DashboardStatsQueryDto,
   UpdateOrderStatusDto,
   ReportQueryDto,
   AdminPaymentQueryDto,
@@ -109,9 +110,13 @@ export class AdminAnalyticsController {
 
   @Get("dashboard")
   @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
-  @ApiOperation({ summary: "Get dashboard statistics" })
-  async getDashboardStats() {
-    return this.adminService.getDashboardStats();
+  @ApiOperation({
+    summary:
+      "Dashboard statistics for a period (daily | monthly | custom range), each metric also carrying its all-time figure",
+  })
+  @ApiResponse({ status: 400, description: "Invalid custom range" })
+  async getDashboardStats(@Query() query: DashboardStatsQueryDto) {
+    return this.adminService.getDashboardStats(query);
   }
 
   @Get("dashboard/recent-orders")

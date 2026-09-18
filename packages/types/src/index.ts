@@ -31,6 +31,9 @@ export * from "./support";
 // Admin types
 export * from "./admin";
 
+// Admin dashboard period filter + metric contract
+export * from "./dashboard";
+
 // Account lifecycle status derived from deletedAt / isBanned / isEmailVerified
 export * from "./account-status";
 

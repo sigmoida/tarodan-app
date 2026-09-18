@@ -1,4 +1,5 @@
 import { Injectable, Optional, Logger } from "@nestjs/common";
+import type { DashboardPeriodQuery } from "@tarodan/types";
 import { AdminAuditService } from "./ops/admin-audit.service";
 import { AdminCommissionService } from "./finance/admin-commission.service";
 import { AdminSettingsService } from "./ops/admin-settings.service";
@@ -448,8 +449,8 @@ export class AdminService {
   // banner aralığında olduğu için bölümle birlikte taşındı. getDateKey private
   // yardımcısı yalnız bu bölümde kullanılıyordu, o da taşındı.
 
-  async getDashboardStats() {
-    return this.analyticsService.getDashboardStats();
+  async getDashboardStats(query?: DashboardPeriodQuery) {
+    return this.analyticsService.getDashboardStats(query);
   }
 
   async saveAnalyticsSnapshot() {

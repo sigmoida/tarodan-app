@@ -9873,6 +9873,11 @@
         "invalidDate": "Invalid date (expected YYYY-MM-DD)",
         "lineNotFound": "Statement line not found",
         "lineAlreadyMatched": "A matched line cannot be resolved"
+      },
+      "dashboard": {
+        "rangeIncomplete": "A custom period needs both a start and an end date",
+        "rangeUnparseable": "The period dates must be valid dates",
+        "rangeReversed": "The start date cannot be after the end date"
       }
     },
     "advertisement": {
