@@ -4,6 +4,7 @@ import type {
   OrderOrigin,
   PrismaClient,
 } from "@prisma/client";
+import { invoiceSourceKindOf, reversedInvoiceIdOf } from "./invoice-source";
 
 /**
  * Faturanın dayandığı İŞLEMİN tarafları ve gerçekleşme şekli.
@@ -67,7 +68,8 @@ type PrismaLike = Pick<
  *
  * `sourceId` tipsiz bir anahtardır ve faturanın TÜRÜNE göre başka tabloyu
  * gösterir (koli / sipariş / takas ödemesi / boost / üyelik ödemesi / iade
- * talebi / başka bir fatura). O eşlemenin tek yeri burasıdır.
+ * talebi / başka bir fatura). Hangi türün nereye baktığı `invoice-source.ts`'teki
+ * tek eşlemeden okunur; burası yalnız her kaynağın taraflarını çözer.
  *
  * Çözülemeyen kaynak sessizce boş döner: fatura kesmek para hareketini
  * bloklamaz, admin kolonunun boş kalması kesimin durmasından iyidir.
@@ -78,20 +80,18 @@ export async function resolveInvoiceParties(
   sourceId: string,
 ): Promise<InvoiceParties> {
   try {
-    switch (type) {
-      case "return_invoice":
+    switch (invoiceSourceKindOf(type)) {
+      case "reversed_invoice":
         return await partiesOfReversedInvoice(prisma, sourceId);
-      case "trade_commission":
-      case "trade_service_fee":
-      case "trade_shipping":
+      case "trade_payment":
         return await partiesOfTradePayment(prisma, sourceId);
-      case "penalty":
+      case "refund_request":
         return await partiesOfRefundRequest(prisma, sourceId);
       case "boost":
         return await partiesOfBoost(prisma, sourceId);
       case "membership":
         return await partiesOfMembership(prisma, sourceId);
-      default:
+      case "package_or_order":
         return await partiesOfPackageOrOrder(prisma, sourceId);
     }
   } catch {
@@ -108,7 +108,7 @@ async function partiesOfReversedInvoice(
   sourceId: string,
 ): Promise<InvoiceParties> {
   const original = await prisma.elogoInvoice.findUnique({
-    where: { id: sourceId.split(":")[0] },
+    where: { id: reversedInvoiceIdOf(sourceId) },
     select: { sellerUserId: true, buyerUserId: true, context: true },
   });
   return original ?? EMPTY_INVOICE_PARTIES;

@@ -5987,7 +5987,7 @@
         "platformTab": "Advertising, Discount & Membership Invoices",
         "loadError": "Invoices could not be loaded",
         "empty": "No invoice found",
-        "searchPlaceholder": "Search invoice number, party, tax ID, or ETTN",
+        "searchPlaceholder": "Search invoice number, transaction number, party, tax ID, or ETTN",
         "documentUnit": "documents",
         "invoiceUnit": "invoices",
         "invoiceNumber": "Invoice No.",
@@ -6009,6 +6009,14 @@
         "uploadedAt": "Uploaded At",
         "replaced": "Replaced",
         "returnReference": "Return → {reference}",
+        "processLinks": {
+          "order": "Order",
+          "offer": "Offer",
+          "trade": "Trade",
+          "refundRequest": "Refund request",
+          "boost": "Boost",
+          "membership": "Member page"
+        },
         "filters": {
           "allTypes": "All Types",
           "allStatuses": "All Statuses",
@@ -6018,7 +6026,9 @@
           "description": "Search by invoice description",
           "descriptionPlaceholder": "commission, shipping, platform fee…",
           "userCode": "Search by user ID",
-          "userCodePlaceholder": "B010001 / K010001"
+          "userCodePlaceholder": "B010001 / K010001",
+          "processRef": "Search by transaction number",
+          "processRefPlaceholder": "ORD-… / TKS-… / RFD-… / BST-… / MEM-…"
         },
         "contexts": {
           "directSale": "Direct sale",

@@ -8,6 +8,10 @@ import { PrismaService } from "../../../prisma";
 import { i18nMessage } from "../../i18n";
 import { invoiceDescriptionOf } from "../../elogo/invoice/invoice-line-description";
 import { readInvoiceLineItems } from "../../elogo/invoice/invoice-lines";
+import {
+  invoiceSourceKindOf,
+  reversedInvoiceIdOf,
+} from "../../elogo/invoice/invoice-source";
 
 /** Belgenin üzerindeki tek kalem (çok kalemli belgede birden fazla). */
 export interface InvoiceDetailLine {
@@ -213,27 +217,25 @@ export class InvoiceDetailService {
 
   /**
    * Kaynak işlemin kırılımı. `sourceId` faturanın TÜRÜNE göre başka tabloyu
-   * gösterir; hangi türün nereye baktığı `invoice-parties.ts` ile aynı
-   * eşlemedir — orası "kim", burası "ne" sorusunu cevaplar.
+   * gösterir; hangi türün nereye baktığı `invoice-source.ts`'teki tek
+   * eşlemedir — taraf çözümü "kim", burası "ne" sorusunu cevaplar.
    */
   private async buildSource(
     type: ElogoInvoiceType,
     sourceId: string,
   ): Promise<InvoiceSourceRow[]> {
-    switch (type) {
-      case "return_invoice":
+    switch (invoiceSourceKindOf(type)) {
+      case "reversed_invoice":
         return this.sourceOfReversedInvoice(sourceId);
-      case "trade_commission":
-      case "trade_service_fee":
-      case "trade_shipping":
+      case "trade_payment":
         return this.sourceOfTrade(sourceId);
-      case "penalty":
+      case "refund_request":
         return this.sourceOfRefundRequest(sourceId);
       case "boost":
         return this.sourceOfBoost(sourceId);
       case "membership":
         return this.sourceOfMembership(sourceId);
-      default:
+      case "package_or_order":
         return this.sourceOfPackageOrOrder(sourceId);
     }
   }
@@ -243,7 +245,7 @@ export class InvoiceDetailService {
     sourceId: string,
   ): Promise<InvoiceSourceRow[]> {
     const original = await this.prisma.elogoInvoice.findUnique({
-      where: { id: sourceId.split(":")[0] },
+      where: { id: reversedInvoiceIdOf(sourceId) },
       select: { type: true, sourceId: true },
     });
     // Bir iade faturasının kaynağı yine bir iade faturası olamaz; olsaydı bu

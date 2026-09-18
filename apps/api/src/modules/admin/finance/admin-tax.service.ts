@@ -23,6 +23,11 @@ import {
   invoiceDescriptionOf,
   invoiceTypesMatchingDescription,
 } from "../../elogo/invoice/invoice-line-description";
+import { resolveInvoiceProcesses } from "../../elogo/invoice/invoice-process";
+import {
+  NO_INVOICE_MATCH,
+  invoiceProcessWhere,
+} from "../../elogo/invoice/invoice-process-search";
 import { elogoInvoiceScopeWhere } from "./invoice-scope";
 import { isInvoiceDownloadable } from "./invoice-downloadable";
 import { i18nMessage } from "../../i18n";
@@ -1150,14 +1155,27 @@ export class AdminTaxService {
       filters.push(this.invoiceDescriptionWhere(query.description.trim()));
     if (query.userCode?.trim())
       filters.push(await this.invoicePartyWhere(query.userCode.trim()));
+    if (query.processRef?.trim())
+      filters.push(
+        (await invoiceProcessWhere(this.prisma, query.processRef)) ??
+          NO_INVOICE_MATCH,
+      );
     if (query.startDate || query.endDate) {
       const createdAt: Prisma.DateTimeFilter = {};
       if (query.startDate) createdAt.gte = new Date(query.startDate);
       if (query.endDate) createdAt.lte = new Date(query.endDate);
       filters.push({ createdAt });
     }
-    if (query.search?.trim())
-      filters.push(this.invoiceSearchWhere(query.search.trim()));
+    if (query.search?.trim()) {
+      const search = query.search.trim();
+      // Aranan metin bir işlem numarasıysa (ORD-/TKS-/…) o işlemin belgeleri de
+      // gelir; metin aramasının eşleşmeleri korunur.
+      const processWhere = await invoiceProcessWhere(this.prisma, search);
+      const textWhere = this.invoiceSearchWhere(search);
+      filters.push(
+        processWhere ? { OR: [textWhere, processWhere] } : textWhere,
+      );
+    }
     const where: Prisma.ElogoInvoiceWhereInput = { AND: filters };
 
     const partySelect = {
@@ -1169,6 +1187,7 @@ export class AdminTaxService {
     const select = {
       id: true,
       type: true,
+      sourceId: true,
       status: true,
       documentType: true,
       invoiceNumber: true,
@@ -1241,6 +1260,8 @@ export class AdminTaxService {
     const rows = result.data as Prisma.ElogoInvoiceGetPayload<{
       select: typeof select;
     }>[];
+    // Sayfanın işlem referansları TOPLU çözülür: kaynak tablosu başına tek sorgu.
+    const processes = await resolveInvoiceProcesses(this.prisma, rows);
 
     return {
       ...result,
@@ -1255,6 +1276,7 @@ export class AdminTaxService {
         sourceReference: r.sourceReference,
         description: invoiceDescriptionOf(r.type, r.lineDescription),
         context: r.context,
+        process: processes.get(r.id) ?? null,
         seller: AdminTaxService.partyCard(r.seller),
         buyer: AdminTaxService.partyCard(r.buyer),
         recipientName: r.recipientName,
