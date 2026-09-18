@@ -167,7 +167,12 @@ describe("VirtualOrderFulfillmentService", () => {
 
       expect(tx.order.updateMany).toHaveBeenCalledWith({
         where: { id: { in: ["sib-1", "sib-2"] } },
-        data: { status: OrderStatus.cancelled },
+        // İptal yazan her yol `orderCancelledData` üzerinden geçer: damga da
+        // beklenir, yoksa dönemsel iptal metriği bu yolu sessizce kaçırır.
+        data: {
+          status: OrderStatus.cancelled,
+          cancelledAt: expect.any(Date),
+        },
       });
       expect(tx.payment.updateMany).toHaveBeenCalledWith(
         expect.objectContaining({
