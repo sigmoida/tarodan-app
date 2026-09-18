@@ -48,6 +48,10 @@ describe("CatalogImportTemplateService", () => {
         .map(String);
       expect(headers).toEqual(spec.columns.map((column) => column.key));
     },
+    // Her kaynak için gerçek bir ExcelJS workbook'u üretilip yeniden okunuyor:
+    // boş makinede jest'in 5 sn'lik varsayılanının hemen altı, paralel koşuda
+    // aşıyor ve push'u bloke ediyor. Süre testin gerçek maliyeti.
+    30_000,
   );
 
   it("kolonların anlamını taşıyan Aciklama sayfası ekler", async () => {

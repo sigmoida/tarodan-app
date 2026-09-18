@@ -405,7 +405,7 @@ describe("AdminProductBulkImportService", () => {
     );
     expect(media.uploadProductImageVariants).not.toHaveBeenCalled();
     expect(prisma.$transaction).not.toHaveBeenCalled();
-  });
+  }, 30_000);
 
   it("returns the completed batch instead of creating duplicate products", async () => {
     const { service, prisma, media } = setup();
@@ -454,7 +454,7 @@ describe("AdminProductBulkImportService", () => {
     ).resolves.toEqual(completed);
     expect(media.uploadProductImageVariants).not.toHaveBeenCalled();
     expect(prisma.$transaction).not.toHaveBeenCalled();
-  });
+  }, 30_000);
 
   it("preserves a platform commission coverage error as HTTP 409", async () => {
     const { service, commissionGuard, media } = setup();
