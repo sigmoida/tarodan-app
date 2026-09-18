@@ -1,6 +1,9 @@
 import { BadRequestException } from "@nestjs/common";
 import { ANALYTICS_MAX_RANGE_DAYS } from "@tarodan/types";
-import { TR_TIME_ZONE } from "../../../../common/helpers/tr-calendar";
+import {
+  TR_TIME_ZONE,
+  trCalendarDate,
+} from "../../../../common/helpers/tr-calendar";
 import {
   bucketOf,
   bucketsBetween,
@@ -69,15 +72,15 @@ describe("resolveAnalyticsRange", () => {
     });
 
     it("üst sınırı aşan aralığı reddeder", () => {
+      // Gün adımları Türkiye takviminde sayılır: `toISOString()` ile
+      // biçimlendirmek TR gece yarısını üç saat geri alır ve bir gün eksik
+      // aralık üretir — o aralık sınırın ALTINDA kalır, test de yeşile döner.
       const start = trMidnight("2025-01-01");
-      const tooLate = new Date(
-        start.getTime() + ANALYTICS_MAX_RANGE_DAYS * 86_400_000,
+      const tooLate = trCalendarDate(
+        new Date(start.getTime() + ANALYTICS_MAX_RANGE_DAYS * 86_400_000),
       );
       expect(() =>
-        resolveAnalyticsRange({
-          from: "2025-01-01",
-          to: tooLate.toISOString().slice(0, 10),
-        }),
+        resolveAnalyticsRange({ from: "2025-01-01", to: tooLate }),
       ).toThrow(BadRequestException);
     });
 
