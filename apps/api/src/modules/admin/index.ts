@@ -12,7 +12,6 @@ export * from "./analytics/admin-analytics.service";
 export * from "./analytics/admin-analytics-common.service";
 export * from "./analytics/admin-analytics-dashboard.service";
 export * from "./analytics/admin-analytics-order.service";
-export * from "./analytics/admin-analytics-report.service";
 export * from "./ops/admin-moderation.service";
 export * from "./finance/admin-payment.service";
 export * from "./finance/admin-payout.service";

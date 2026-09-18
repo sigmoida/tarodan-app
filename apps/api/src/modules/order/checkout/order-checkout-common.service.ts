@@ -506,6 +506,4 @@ export class OrderCheckoutCommonService {
         })) > 0,
     );
   }
-
-  }
 }

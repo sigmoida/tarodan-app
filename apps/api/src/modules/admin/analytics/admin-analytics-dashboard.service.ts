@@ -319,35 +319,6 @@ export class AdminAnalyticsDashboardService {
     };
   }
 
-    });
-
-    const result = Array.from(groupedData.entries()).map(([date, data]) => ({
-      date,
-      newUsers: data.newUsers,
-      activeUsers: data.activeUsers.size,
-      newSellers: data.newSellers,
-    }));
-
-    return {
-      data: result,
-      summary: {
-        totalUsers,
-        totalNewUsers: result.reduce((sum, r) => sum + r.newUsers, 0),
-        totalNewSellers: result.reduce((sum, r) => sum + r.newSellers, 0),
-        totalSellers,
-        averageDailyActiveUsers:
-          result.length > 0
-            ? Math.round(
-                result.reduce((sum, r) => sum + r.activeUsers, 0) /
-                  result.length,
-              )
-            : 0,
-        startDate: startDate.toISOString(),
-        endDate: endDate.toISOString(),
-      },
-    };
-  }
-
   /**
    * Get recent orders for dashboard
    * Requirement: Recent Orders Panel (7.1)
