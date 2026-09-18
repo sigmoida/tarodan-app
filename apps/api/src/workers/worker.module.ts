@@ -11,7 +11,6 @@ import { EmailWorker } from "./email.worker";
 import { PushWorker } from "./push.worker";
 import { ImageWorker } from "./image.worker";
 import { SearchWorker } from "./search.worker";
-import { AnalyticsWorker } from "./analytics.worker";
 import { ModerationWorker } from "./moderation.worker";
 
 // Prisma for database access
@@ -45,7 +44,6 @@ import { QUEUE_NAMES } from "./constants";
       { name: QUEUE_NAMES.PUSH },
       { name: QUEUE_NAMES.IMAGE },
       { name: QUEUE_NAMES.SEARCH },
-      { name: QUEUE_NAMES.ANALYTICS },
       { name: QUEUE_NAMES.MODERATION },
     ),
   ],
@@ -54,7 +52,6 @@ import { QUEUE_NAMES } from "./constants";
     PushWorker,
     ImageWorker,
     SearchWorker,
-    AnalyticsWorker,
     ModerationWorker,
   ],
   exports: [BullModule],

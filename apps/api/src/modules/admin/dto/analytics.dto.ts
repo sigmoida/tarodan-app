@@ -23,12 +23,6 @@ import {
   type DashboardPeriodQuery,
 } from "@tarodan/types";
 
-export enum AnalyticsGroupBy {
-  day = "day",
-  week = "week",
-  month = "month",
-}
-
 export class AnalyticsQueryDto {
   @ApiPropertyOptional({ description: "Start date (ISO format)" })
   @IsOptional()
@@ -39,14 +33,6 @@ export class AnalyticsQueryDto {
   @IsOptional()
   @IsDateString()
   endDate?: string;
-
-  @ApiPropertyOptional({
-    enum: AnalyticsGroupBy,
-    default: AnalyticsGroupBy.day,
-  })
-  @IsOptional()
-  @IsEnum(AnalyticsGroupBy)
-  groupBy?: AnalyticsGroupBy = AnalyticsGroupBy.day;
 }
 
 export class SalesAnalyticsResponseDto {

@@ -55,7 +55,6 @@ import { AdminAnalyticsDashboardService } from "./analytics/admin-analytics-dash
 import { AdminDashboardWorklistService } from "./analytics/dashboard/admin-dashboard-worklist.service";
 import { AdminDashboardStockService } from "./analytics/dashboard/admin-dashboard-stock.service";
 import { AdminAnalyticsOrderService } from "./analytics/admin-analytics-order.service";
-import { AdminAnalyticsReportService } from "./analytics/admin-analytics-report.service";
 import { AdminModerationService } from "./ops/admin-moderation.service";
 import { AdminPaymentService } from "./finance/admin-payment.service";
 import { AdminPayoutService } from "./finance/admin-payout.service";
@@ -213,7 +212,6 @@ import { scheduledProcessors } from "../../workers/scheduled-processors";
     AdminDashboardWorklistService,
     AdminDashboardStockService,
     AdminAnalyticsOrderService,
-    AdminAnalyticsReportService,
     AdminModerationService,
     AdminPaymentService,
     AdminPayoutService,

@@ -4,11 +4,9 @@ import {
   AddOrderTrackingDto,
   AnalyticsQueryDto,
   UpdateOrderStatusDto,
-  ReportQueryDto,
 } from "../dto";
 import { AdminAnalyticsDashboardService } from "./admin-analytics-dashboard.service";
 import { AdminAnalyticsOrderService } from "./admin-analytics-order.service";
-import { AdminAnalyticsReportService } from "./admin-analytics-report.service";
 
 /**
  * Analitik & raporlar (+ banner aralığındaki sipariş detay/işlem yardımcıları
@@ -24,29 +22,12 @@ export class AdminAnalyticsService {
   constructor(
     private readonly dashboard: AdminAnalyticsDashboardService,
     private readonly order: AdminAnalyticsOrderService,
-    private readonly report: AdminAnalyticsReportService,
   ) {}
 
   // ==================== ANALYTICS & REPORTS ====================
 
   async getDashboardStats(query?: DashboardPeriodQuery) {
     return this.dashboard.getDashboardStats(query);
-  }
-
-  async saveAnalyticsSnapshot() {
-    return this.dashboard.saveAnalyticsSnapshot();
-  }
-
-  async getSalesAnalytics(query: AnalyticsQueryDto) {
-    return this.dashboard.getSalesAnalytics(query);
-  }
-
-  async getRevenueAnalytics(query: AnalyticsQueryDto) {
-    return this.dashboard.getRevenueAnalytics(query);
-  }
-
-  async getUserAnalytics(query: AnalyticsQueryDto) {
-    return this.dashboard.getUserAnalytics(query);
   }
 
   async getRecentOrders(limit: number = 10) {
@@ -97,27 +78,4 @@ export class AdminAnalyticsService {
     return this.order.unbanUser(adminId, userId);
   }
 
-  async generateSalesReport(query: ReportQueryDto) {
-    return this.report.generateSalesReport(query);
-  }
-
-  async generateUsersReport(query: ReportQueryDto) {
-    return this.report.generateUsersReport(query);
-  }
-
-  async generateProductsReport(query: ReportQueryDto) {
-    return this.report.generateProductsReport(query);
-  }
-
-  async generateTradesReport(query: ReportQueryDto) {
-    return this.report.generateTradesReport(query);
-  }
-
-  async getCommissionReport(query: ReportQueryDto) {
-    return this.report.getCommissionReport(query);
-  }
-
-  async generateCustomReport(query: ReportQueryDto) {
-    return this.report.generateCustomReport(query);
-  }
 }

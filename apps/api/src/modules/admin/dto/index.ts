@@ -12,7 +12,6 @@ export * from "./admin-staff.dto";
 export * from "./notifications-admin.dto";
 export * from "./admin-membership.dto";
 export {
-  AnalyticsGroupBy,
   AnalyticsQueryDto,
   SalesAnalyticsResponseDto,
   RevenueAnalyticsResponseDto,
