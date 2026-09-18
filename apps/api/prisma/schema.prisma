@@ -712,6 +712,10 @@ model Product {
   /// sayılıyordu: süresi dolan ilan yeniden onaylansa bile ertesi cron yine
   /// kapatıyordu (yenileme imkânsızdı). null = eski kayıt → createdAt kullanılır.
   publishedAt         DateTime?               @map("published_at")
+  /// İlanın SATILDIĞI an — ilan hunisinin (oluşturuldu → yayın → satış) son
+  /// adımı ve "satışa kadar geçen süre" ölçümünün ikinci ucu. `updatedAt`
+  /// satıştan sonraki her dokunuşla kaydığı için kullanılamaz.
+  soldAt              DateTime?               @map("sold_at")
   /// Moderasyon reddinin gerekçesi — satıcıya kalıcı olarak gösterilir
   /// (bildirim tek seferlikti, gerekçe kayboluyordu). Onayda temizlenir.
   rejectionReason     String?                 @map("rejection_reason")
@@ -763,6 +767,7 @@ model Product {
   @@index([boostedUntil])
   // Dashboard: dönem içinde yayına giren ilan (yayın damgası, oluşturma değil).
   @@index([publishedAt])
+  @@index([soldAt])
   @@index([boostedUntil, boostedAt(sort: Desc)])
   @@index([homeShowcaseUntil, boostedAt(sort: Desc)])
   @@index([relevanceScore(sort: Desc)])
@@ -966,6 +971,10 @@ model Trade {
   acceptedAt                DateTime?          @map("accepted_at")
   completedAt               DateTime?          @map("completed_at")
   cancelledAt               DateTime?          @map("cancelled_at")
+  /// Takasın REDDEDİLDİĞİ an. `cancelledAt` de yazılır (ret bir iptaldir),
+  /// bu yüzden analitik "iptal" çıkışını `rejectedAt IS NULL` ile ayırır —
+  /// yoksa aynı takas iki çıkışta birden sayılırdı.
+  rejectedAt                DateTime?          @map("rejected_at")
   cancelReason              String?            @map("cancel_reason")
   // Stamped when the first to_warehouse shipment is delivered. Once non-null,
   // user-side cancel is locked: only admin reject/force-cancel can resolve.
@@ -999,6 +1008,10 @@ model Trade {
   @@index([responseDeadline])
   // Dashboard: dönem içinde tamamlanan takas.
   @@index([completedAt])
+  // Analitik: takas hunisi (oluşturuldu → kabul → tamamlandı) ve çıkışlar.
+  @@index([createdAt])
+  @@index([acceptedAt])
+  @@index([rejectedAt])
   @@map("trades")
 }
 
@@ -1468,6 +1481,9 @@ model Offer {
   message         String?
   status          OfferStatus @default(pending)
   /// Satıcı karşı teklifinden sonra: kabul/red için sıra alıcıda (buyerId)
+  /// Teklifin CEVAPLANDIĞI an (kabul, ret veya karşı teklifle kapanış).
+  /// Süre dolması ve teklifi verenin geri çekmesi cevap değildir, damgalanmaz.
+  respondedAt     DateTime?   @map("responded_at")
   buyerMustAccept Boolean     @default(false) @map("buyer_must_accept")
   expiresAt       DateTime    @map("expires_at")
   createdAt       DateTime    @default(now()) @map("created_at")
@@ -1484,6 +1500,7 @@ model Offer {
   @@index([buyerId, status])
   @@index([sellerId, status])
   @@index([status, createdAt])
+  @@index([respondedAt])
   @@map("offers")
 }
 
@@ -1707,6 +1724,8 @@ model Order {
   @@index([cancelledAt])
   @@index([deliveredAt])
   @@index([preparingDeadline])
+  @@index([createdAt])
+  @@index([productId])
   @@map("orders")
 }
 
@@ -1777,6 +1796,7 @@ model Payment {
   // Tahsilat dönem metriği (ödenen sipariş) ve PayTR dökümünde karşılığı
   // olmayan ödeme alarmı bu iki kolondan tarar; tabloda hiç indeks yoktu.
   @@index([status, paidAt])
+  @@index([status, createdAt])
   @@map("payments")
 }
 
@@ -2454,6 +2474,7 @@ model Shipment {
   // Takılı kargo alarmı (status + shippedAt yaşı) ve taşıyıcı kodu hiç
   // oluşmamış gönderi kuyruğu (providerTrackingId IS NULL + yaş).
   @@index([status, shippedAt])
+  @@index([deliveredAt])
   @@index([providerTrackingId, createdAt])
   @@map("shipments")
 }
@@ -2621,6 +2642,7 @@ model RefundRequest {
   @@index([refundNumber])
   // Dashboard: dönem içinde İADE EDİLEN tutar (talep tarihi değil, iade anı).
   @@index([refundedAt])
+  @@index([createdAt])
   @@map("refund_requests")
 }
 

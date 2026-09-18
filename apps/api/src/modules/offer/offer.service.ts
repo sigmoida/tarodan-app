@@ -32,6 +32,7 @@ import { resolveSalePrice } from "../product/helpers/product-sale-window";
 import { i18nMessage } from "../i18n";
 import { UserBlockService } from "../user-block/user-block.service";
 import { OFFER_CANCEL_REASON } from "../trade/helpers/trade-cancel-reasons";
+import { offerRespondedData } from "./helpers/offer-response";
 import {
   PUBLIC_NAME_SELECT,
   publicName,
@@ -347,7 +348,7 @@ export class OfferService {
           version: offerData.version,
         },
         data: {
-          status: OfferStatus.accepted,
+          ...offerRespondedData(OfferStatus.accepted),
           version: { increment: 1 },
         },
         include: {
@@ -609,7 +610,7 @@ export class OfferService {
     const rejectedOffer = await this.prisma.offer.update({
       where: { id: offerId },
       data: {
-        status: OfferStatus.rejected,
+        ...offerRespondedData(OfferStatus.rejected),
         version: { increment: 1 },
       },
       include: {
@@ -729,7 +730,7 @@ export class OfferService {
       await tx.offer.update({
         where: { id: offerId },
         data: {
-          status: OfferStatus.rejected,
+          ...offerRespondedData(OfferStatus.rejected),
           cancelReason: OFFER_CANCEL_REASON.supersededBySellerCounter,
         },
       });
@@ -861,7 +862,7 @@ export class OfferService {
       await tx.offer.update({
         where: { id: offerId },
         data: {
-          status: OfferStatus.rejected,
+          ...offerRespondedData(OfferStatus.rejected),
           cancelReason: OFFER_CANCEL_REASON.supersededByBuyerCounter,
         },
       });

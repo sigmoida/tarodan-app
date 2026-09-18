@@ -8,6 +8,7 @@ import {
 } from "@nestjs/common";
 import { PrismaService } from "../../prisma";
 import { isShipmentHandedToCarrier } from "../shipping/helpers/shipment-handover";
+import { offerReacceptedData } from "../offer/helpers/offer-response";
 import { i18nMessage } from "../i18n";
 import { CacheService } from "../cache/cache.service";
 import { CancelOrderDto, GuestOrderCancelDto } from "./dto";
@@ -681,7 +682,7 @@ export class OrderLifecycleService {
       if (order.offer!.status === OfferStatus.payment_expired) {
         await tx.offer.update({
           where: { id: order.offerId! },
-          data: { status: OfferStatus.accepted },
+          data: offerReacceptedData(),
         });
       }
     });
