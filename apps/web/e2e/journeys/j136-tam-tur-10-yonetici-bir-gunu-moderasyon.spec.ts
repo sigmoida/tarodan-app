@@ -161,9 +161,9 @@ test.describe('J136 — Admin günü tam tur', () => {
     expect((await dbFind(request, 'user' as any, { id: target.id }, { isBanned: true }))?.isBanned).toBe(false);
 
     // 6) Satış ve gelir raporlarını inceler
-    const sales = await request.get(`${API}/admin/reports/sales`, { headers: authHeader(adminToken) });
-    expect(sales.ok(), 'satış raporu').toBeTruthy();
-    const revenue = await request.get(`${API}/admin/analytics/revenue`, { headers: authHeader(adminToken) });
-    expect(revenue.ok(), 'gelir analitiği').toBeTruthy();
+    const sales = await request.get(`${API}/admin/analytics/sales`, { headers: authHeader(adminToken) });
+    expect(sales.ok(), 'satış analitiği').toBeTruthy();
+    const revenue = await request.get(`${API}/admin/analytics/sales/export?format=csv`, { headers: authHeader(adminToken) });
+    expect(revenue.ok(), 'satış analitiği dosyası').toBeTruthy();
   });
 });

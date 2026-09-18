@@ -174,9 +174,9 @@ test.describe('J36 — Komisyon/indirim rol-bazlı + raporlar', () => {
     expect([401, 403]).toContain(modCreate.status());
 
     // 6) Süper yönetici satış ve gelir raporlarını inceler
-    const sales = await request.get(`${API}/admin/reports/sales`, { headers: authHeader(superToken) });
-    expect(sales.ok(), 'satış raporu').toBeTruthy();
-    const revenue = await request.get(`${API}/admin/analytics/revenue`, { headers: authHeader(superToken) });
-    expect(revenue.ok(), 'gelir analitiği').toBeTruthy();
+    const sales = await request.get(`${API}/admin/analytics/sales`, { headers: authHeader(superToken) });
+    expect(sales.ok(), 'satış analitiği').toBeTruthy();
+    const revenue = await request.get(`${API}/admin/analytics/sales/export?format=csv`, { headers: authHeader(superToken) });
+    expect(revenue.ok(), 'satış analitiği dosyası').toBeTruthy();
   });
 });

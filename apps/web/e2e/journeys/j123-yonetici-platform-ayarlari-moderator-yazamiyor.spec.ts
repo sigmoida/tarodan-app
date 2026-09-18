@@ -144,16 +144,16 @@ test.describe('J123 — Platform ayarları + rapor erişimi', () => {
     expect([401, 403]).toContain(modWrite.status());
 
     // 4) Süper yönetici satış, takas ve kullanıcı raporlarını görür
-    const sales = await request.get(`${API}/admin/reports/sales`, { headers: authHeader(superToken) });
-    expect(sales.ok(), 'satış raporu').toBeTruthy();
-    const trades = await request.get(`${API}/admin/reports/trades`, { headers: authHeader(superToken) });
-    expect(trades.ok(), 'takas raporu').toBeTruthy();
-    const users = await request.get(`${API}/admin/reports/users`, { headers: authHeader(superToken) });
-    expect(users.ok(), 'kullanıcı raporu').toBeTruthy();
+    const sales = await request.get(`${API}/admin/analytics/sales`, { headers: authHeader(superToken) });
+    expect(sales.ok(), 'satış analitiği').toBeTruthy();
+    const trades = await request.get(`${API}/admin/analytics/trade`, { headers: authHeader(superToken) });
+    expect(trades.ok(), 'takas analitiği').toBeTruthy();
+    const users = await request.get(`${API}/admin/analytics/membership`, { headers: authHeader(superToken) });
+    expect(users.ok(), 'üyelik analitiği').toBeTruthy();
 
     // 5) Giriş yapmamış biri raporları görmeye çalışır → engellenir
-    const anon = await request.get(`${API}/admin/reports/sales`);
-    expect(anon.ok(), 'anonim raporu görememeli').toBeFalsy();
+    const anon = await request.get(`${API}/admin/analytics/sales`);
+    expect(anon.ok(), 'anonim analitiği görememeli').toBeFalsy();
     expect([401, 403]).toContain(anon.status());
   });
 });

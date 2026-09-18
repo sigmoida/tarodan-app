@@ -359,10 +359,10 @@ test.describe('J36 — Komisyon/indirim rol-bazlı + raporlar', () => {
     expect([401, 403]).toContain(modCreate.status());
 
     // 6) Süper yönetici satış ve gelir raporlarını inceler
-    const sales = await request.get(`${API}/admin/reports/sales`, { headers: authHeader(superToken) });
-    expect(sales.ok(), 'satış raporu').toBeTruthy();
-    const revenue = await request.get(`${API}/admin/analytics/revenue`, { headers: authHeader(superToken) });
-    expect(revenue.ok(), 'gelir analitiği').toBeTruthy();
+    const sales = await request.get(`${API}/admin/analytics/sales`, { headers: authHeader(superToken) });
+    expect(sales.ok(), 'satış analitiği').toBeTruthy();
+    const revenue = await request.get(`${API}/admin/analytics/sales/export?format=csv`, { headers: authHeader(superToken) });
+    expect(revenue.ok(), 'satış analitiği dosyası').toBeTruthy();
   });
 });
 
@@ -701,16 +701,16 @@ test.describe('J123 — Platform ayarları + rapor erişimi', () => {
     expect([401, 403]).toContain(modWrite.status());
 
     // 4) Süper yönetici satış, takas ve kullanıcı raporlarını görür
-    const sales = await request.get(`${API}/admin/reports/sales`, { headers: authHeader(superToken) });
-    expect(sales.ok(), 'satış raporu').toBeTruthy();
-    const trades = await request.get(`${API}/admin/reports/trades`, { headers: authHeader(superToken) });
-    expect(trades.ok(), 'takas raporu').toBeTruthy();
-    const users = await request.get(`${API}/admin/reports/users`, { headers: authHeader(superToken) });
-    expect(users.ok(), 'kullanıcı raporu').toBeTruthy();
+    const sales = await request.get(`${API}/admin/analytics/sales`, { headers: authHeader(superToken) });
+    expect(sales.ok(), 'satış analitiği').toBeTruthy();
+    const trades = await request.get(`${API}/admin/analytics/trade`, { headers: authHeader(superToken) });
+    expect(trades.ok(), 'takas analitiği').toBeTruthy();
+    const users = await request.get(`${API}/admin/analytics/membership`, { headers: authHeader(superToken) });
+    expect(users.ok(), 'üyelik analitiği').toBeTruthy();
 
     // 5) Giriş yapmamış biri raporları görmeye çalışır → engellenir
-    const anon = await request.get(`${API}/admin/reports/sales`);
-    expect(anon.ok(), 'anonim raporu görememeli').toBeFalsy();
+    const anon = await request.get(`${API}/admin/analytics/sales`);
+    expect(anon.ok(), 'anonim analitiği görememeli').toBeFalsy();
     expect([401, 403]).toContain(anon.status());
   });
 });
@@ -832,9 +832,9 @@ test.describe('J136 — Admin günü tam tur', () => {
     expect((await dbFind(request, 'user' as any, { id: target.id }, { isBanned: true }))?.isBanned).toBe(false);
 
     // 6) Satış ve gelir raporlarını inceler
-    const sales = await request.get(`${API}/admin/reports/sales`, { headers: authHeader(adminToken) });
-    expect(sales.ok(), 'satış raporu').toBeTruthy();
-    const revenue = await request.get(`${API}/admin/analytics/revenue`, { headers: authHeader(adminToken) });
-    expect(revenue.ok(), 'gelir analitiği').toBeTruthy();
+    const sales = await request.get(`${API}/admin/analytics/sales`, { headers: authHeader(adminToken) });
+    expect(sales.ok(), 'satış analitiği').toBeTruthy();
+    const revenue = await request.get(`${API}/admin/analytics/sales/export?format=csv`, { headers: authHeader(adminToken) });
+    expect(revenue.ok(), 'satış analitiği dosyası').toBeTruthy();
   });
 });
