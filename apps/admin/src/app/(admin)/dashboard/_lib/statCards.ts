@@ -27,6 +27,8 @@ export interface StatCardConfig {
   format: "count" | "currency";
   /** The headline metric; its trend drives the card's change row. */
   metric: DashboardMetricKey;
+  /** Hides the trend row where a period-over-period comparison would lie. */
+  hideChange?: boolean;
   /** Optional second metric — the card then reads "left / right". */
   secondary?: {
     metric: DashboardMetricKey;
@@ -102,6 +104,10 @@ export const STAT_CARDS: StatCardConfig[] = [
     tone: "info",
     format: "count",
     metric: "visitors",
+    // `lastActivityAt` keeps one stamp per user, so a visitor active in two
+    // periods only counts in the later one — the earlier window is always
+    // understated and a period-over-period trend would be nonsense.
+    hideChange: true,
   },
   {
     id: "cancellations",

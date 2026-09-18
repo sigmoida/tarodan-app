@@ -1,10 +1,11 @@
 "use client";
 
+import type { ReactNode } from "react";
 import { useTranslations } from "next-intl";
 import { MetricCard } from "@/components/MetricCard";
 import { fmtNumber, fmtTry } from "@/lib/format";
 import { STAT_CARDS, type StatCardConfig } from "../_lib/statCards";
-import type { DashboardMetrics } from "../_lib/types";
+import type { DashboardMetrics } from "../_lib/metrics";
 
 const FORMATTERS = {
   count: (n: number) => fmtNumber(n) ?? "—",
@@ -25,7 +26,7 @@ function PairValue({ left, right }: { left: string; right: string }) {
  * All-time figure under the period figure. It never changes with the filter —
  * that contrast is the point of the card.
  */
-function AllTime({ value }: { value: React.ReactNode }) {
+function AllTime({ value }: { value: ReactNode }) {
   const t = useTranslations();
   return (
     <div className="mt-2 flex w-full min-w-0 flex-col">
@@ -74,7 +75,7 @@ function StatCard({
           <span className="tabular-nums">{format(main.period)}</span>
         )
       }
-      change={main.changePercent}
+      change={config.hideChange ? undefined : main.changePercent}
       changeLabel={t("admin.dashboard.period.vsPrevious")}
       footer={
         <AllTime

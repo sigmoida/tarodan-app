@@ -1,5 +1,6 @@
+import { describe, expect, it } from "vitest";
 import { DASHBOARD_METRIC_KEYS } from "@tarodan/types";
-import { toDashboardMetrics } from "./types";
+import { toDashboardMetrics } from "./metrics";
 
 describe("toDashboardMetrics", () => {
   it("fills every metric with zeros when the endpoint gave nothing", () => {

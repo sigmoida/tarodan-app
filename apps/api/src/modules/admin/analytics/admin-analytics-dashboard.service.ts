@@ -225,8 +225,14 @@ export class AdminAnalyticsDashboardService {
           this.prisma.refundRequest.count({ where: { createdAt } }),
       },
       visitors: {
-        // Ziyaretçi = son etkinliği pencereye düşen KAYITLI kullanıcı.
-        // Anonim trafik ölçülmüyor (ayrı bir analitik hattı gerekir).
+        // DİKKAT — ölçülen şey "ziyaretçi" değil: `lastActivityAt` yalnız
+        // BAŞARILI GİRİŞTE damgalanıyor (auth/utils/login-stamp.ts), yani bu
+        // sayı "son girişi bu pencereye düşen kayıtlı kullanıcı" demek.
+        // Anonim trafik hiçbir yerde ölçülmüyor; gerçek ziyaretçi metriği için
+        // ayrı bir sayfa-görüntüleme/oturum hattı gerekir.
+        // Bir de: tek bir "son" damga tutulduğu için, iki dönemde de aktif olan
+        // kullanıcı yalnız SONRAKİ pencerede sayılır — geçmiş pencereler
+        // olduğundan düşük görünür.
         query: (lastActivityAt) =>
           this.prisma.user.count({
             where: { lastActivityAt: lastActivityAt ?? { not: null } },

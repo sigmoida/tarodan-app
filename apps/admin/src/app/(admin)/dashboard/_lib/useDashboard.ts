@@ -7,8 +7,8 @@ import type {
 } from "@tarodan/types";
 import { adminApi } from "@/lib/api";
 import { adminKeys } from "@/lib/query/keys";
+import { toDashboardMetrics } from "./metrics";
 import {
-  toDashboardMetrics,
   type DashboardData,
   type PendingActions,
   type TopProduct,

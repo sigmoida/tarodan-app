@@ -1,53 +1,12 @@
-import {
-  DASHBOARD_METRIC_KEYS,
-  type DashboardMetric,
-  type DashboardMetricKey,
-  type DashboardPeriodRange,
-} from "@tarodan/types";
+import type { DashboardPeriodRange } from "@tarodan/types";
 import { orderStatusConfig, tradeStatusConfig } from "@tarodan/shared";
 import type { StatusConfig } from "@tarodan/ui";
 import { useTranslations } from "next-intl";
 import { fmtDate } from "@/lib/format";
 import { statusConfig } from "@/lib/statusLabels";
+import type { DashboardMetrics } from "./metrics";
 
 type T = ReturnType<typeof useTranslations<never>>;
-
-export type DashboardMetrics = Record<DashboardMetricKey, DashboardMetric>;
-
-const EMPTY_METRIC: DashboardMetric = {
-  period: 0,
-  previous: 0,
-  allTime: 0,
-  changePercent: 0,
-};
-
-/**
- * Coerce the dashboard response into the metric map the cards read.
- *
- * The dashboard tolerates a failing/undeployed endpoint (see `useDashboard`),
- * so every metric falls back to zeros instead of blanking the screen.
- */
-export function toDashboardMetrics(raw: unknown): DashboardMetrics {
-  const source = (raw ?? {}) as Partial<Record<DashboardMetricKey, unknown>>;
-  const metrics = {} as DashboardMetrics;
-
-  for (const key of DASHBOARD_METRIC_KEYS) {
-    const entry = source[key];
-    metrics[key] =
-      entry && typeof entry === "object"
-        ? {
-            period: Number((entry as DashboardMetric).period ?? 0),
-            previous: Number((entry as DashboardMetric).previous ?? 0),
-            allTime: Number((entry as DashboardMetric).allTime ?? 0),
-            changePercent: Number(
-              (entry as DashboardMetric).changePercent ?? 0,
-            ),
-          }
-        : EMPTY_METRIC;
-  }
-
-  return metrics;
-}
 
 export interface TopProduct {
   id: string;
