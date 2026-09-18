@@ -9,7 +9,7 @@ describe("toDashboardMetrics", () => {
     expect(Object.keys(metrics).sort()).toEqual(
       [...DASHBOARD_METRIC_KEYS].sort(),
     );
-    expect(metrics.orders).toEqual({
+    expect(metrics.paidOrders).toEqual({
       period: 0,
       previous: 0,
       allTime: 0,
@@ -19,26 +19,26 @@ describe("toDashboardMetrics", () => {
 
   it("keeps period and all-time apart", () => {
     const metrics = toDashboardMetrics({
-      orders: { period: 5, previous: 4, allTime: 300, changePercent: 25 },
+      paidOrders: { period: 5, previous: 4, allTime: 300, changePercent: 25 },
     });
 
-    expect(metrics.orders).toEqual({
+    expect(metrics.paidOrders).toEqual({
       period: 5,
       previous: 4,
       allTime: 300,
       changePercent: 25,
     });
     // a metric the payload omitted still renders
-    expect(metrics.visitors.allTime).toBe(0);
+    expect(metrics.signedInUsers.allTime).toBe(0);
   });
 
   it("coerces string figures (Decimal columns serialize as strings)", () => {
     const metrics = toDashboardMetrics({
-      grossSales: { period: "1000.50", previous: "0", allTime: "90000" },
+      paidAmount: { period: "1000.50", previous: "0", allTime: "90000" },
     });
 
-    expect(metrics.grossSales.period).toBe(1000.5);
-    expect(metrics.grossSales.allTime).toBe(90000);
-    expect(metrics.grossSales.changePercent).toBe(0);
+    expect(metrics.paidAmount.period).toBe(1000.5);
+    expect(metrics.paidAmount.allTime).toBe(90000);
+    expect(metrics.paidAmount.changePercent).toBe(0);
   });
 });

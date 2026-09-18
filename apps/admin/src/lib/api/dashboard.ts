@@ -9,9 +9,12 @@ export const dashboardApi = {
     api.get("/admin/dashboard", { params }),
   getRecentOrders: (limit?: number) =>
     api.get("/admin/dashboard/recent-orders", { params: { limit } }),
-  getPendingActions: () => api.get("/admin/dashboard/pending-actions"),
-  getIdentityVerificationRequests: () =>
-    api.get("/admin/users/verification-requests"),
+  /** Zone A + B — action queues and alerts; never date-filtered. */
+  getDashboardWorklist: () => api.get("/admin/dashboard/worklist"),
+  /** Zone D — escrow, seller debt, active listings/memberships/boosts. */
+  getDashboardStock: () => api.get("/admin/dashboard/stock"),
+  /** Drops the server-side dashboard caches so the next read recomputes. */
+  refreshDashboard: () => api.post("/admin/dashboard/refresh"),
   getTopProducts: (limit?: number) =>
     api.get("/admin/dashboard/top-products", { params: { limit } }),
   getTopSellers: (limit?: number) =>

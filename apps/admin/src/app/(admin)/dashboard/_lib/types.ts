@@ -1,10 +1,9 @@
-import type { DashboardPeriodRange } from "@tarodan/types";
 import { orderStatusConfig, tradeStatusConfig } from "@tarodan/shared";
 import type { StatusConfig } from "@tarodan/ui";
 import { useTranslations } from "next-intl";
 import { fmtDate } from "@/lib/format";
 import { statusConfig } from "@/lib/statusLabels";
-import type { DashboardMetrics } from "./metrics";
+
 
 type T = ReturnType<typeof useTranslations<never>>;
 
@@ -54,37 +53,6 @@ export interface RecentTrade {
   }>;
 }
 
-export interface PendingActions {
-  pendingProducts: number;
-  refundRequests: number;
-  pendingMessages?: number;
-  identityVerificationRequests?: number;
-  totalPending: number;
-}
-
-export interface DashboardAnalytics {
-  salesByDay: number[];
-  ordersByDay: number[];
-}
-
-export interface DashboardData {
-  metrics: DashboardMetrics;
-  range: DashboardPeriodRange | null;
-  recentOrders: RecentOrder[];
-  recentTrades: RecentTrade[];
-  pendingActions: PendingActions | null;
-  analytics: DashboardAnalytics;
-  topProducts: TopProduct[];
-  topSellers: TopSeller[];
-}
-
-/**
- * Badge copy for the recent-orders / recent-trades lists.
- *
- * The shared maps carry catalog KEYS, not labels, so they have to be resolved
- * with the screen's translator — spreading them raw is what used to print the
- * bare enum value ("shipped", "cancelled") in the UI.
- */
 export function dashboardOrderStatusConfig(t: T): Record<string, StatusConfig> {
   return statusConfig(orderStatusConfig, t);
 }

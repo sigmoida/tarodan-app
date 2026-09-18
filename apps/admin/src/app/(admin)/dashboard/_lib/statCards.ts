@@ -1,12 +1,16 @@
 import {
+  ArrowsRightLeftIcon,
   ArrowTrendingUpIcon,
   BanknotesIcon,
-  ChartBarIcon,
-  CurrencyDollarIcon,
+  MegaphoneIcon,
   ReceiptRefundIcon,
   ShoppingBagIcon,
+  SparklesIcon,
+  TagIcon,
+  TruckIcon,
   UserGroupIcon,
   UsersIcon,
+  XCircleIcon,
 } from "@heroicons/react/24/outline";
 import type { ComponentType } from "react";
 import type { DashboardMetricKey } from "@tarodan/types";
@@ -14,112 +18,120 @@ import type { MessageKey } from "@tarodan/i18n";
 import type { MetricTone } from "@/components/MetricCard";
 
 /**
- * One stat card: which metric(s) it shows and how they are formatted.
+ * One stat card: which metric it shows and how it is formatted.
  *
  * The grid renders this list — a card is a row here, not another copy-pasted
  * block of JSX, so adding or reordering cards stays a one-line change.
  */
 export interface StatCardConfig {
-  id: string;
   labelKey: MessageKey;
   icon: ComponentType<{ className?: string }>;
   tone: MetricTone;
   format: "count" | "currency";
-  /** The headline metric; its trend drives the card's change row. */
   metric: DashboardMetricKey;
   /** Hides the trend row where a period-over-period comparison would lie. */
   hideChange?: boolean;
-  /** Optional second metric — the card then reads "left / right". */
-  secondary?: {
-    metric: DashboardMetricKey;
-    /** Spelled out in the card label, e.g. "Kullanıcılar (Aktif / Pasif)". */
-    leftKey: MessageKey;
-    rightKey: MessageKey;
-  };
+  /** A caveat printed under the card — what the number cannot tell you. */
+  noteKey?: MessageKey;
 }
 
 export const STAT_CARDS: StatCardConfig[] = [
   {
-    id: "orders",
-    labelKey: "admin.dashboard.stats.totalOrders",
+    metric: "paidOrders",
+    labelKey: "admin.dashboard.stats.paidOrders",
     icon: ShoppingBagIcon,
     tone: "info",
     format: "count",
-    metric: "orders",
   },
   {
-    id: "commissionRevenue",
-    labelKey: "admin.dashboard.stats.commissionRevenue",
-    icon: CurrencyDollarIcon,
-    tone: "success",
-    format: "currency",
-    metric: "commissionRevenue",
-  },
-  {
-    id: "products",
-    labelKey: "admin.dashboard.stats.products",
-    icon: ChartBarIcon,
-    tone: "primary",
-    format: "count",
-    metric: "activeProducts",
-    secondary: {
-      metric: "passiveProducts",
-      leftKey: "admin.dashboard.stats.active",
-      rightKey: "admin.dashboard.stats.passive",
-    },
-  },
-  {
-    id: "users",
-    labelKey: "admin.dashboard.stats.users",
-    icon: UsersIcon,
-    tone: "primary",
-    format: "count",
-    metric: "activeUsers",
-    secondary: {
-      metric: "passiveUsers",
-      leftKey: "admin.dashboard.stats.active",
-      rightKey: "admin.dashboard.stats.passive",
-    },
-  },
-  {
-    id: "grossSales",
-    labelKey: "admin.dashboard.stats.grossSales",
+    metric: "paidAmount",
+    labelKey: "admin.dashboard.stats.paidAmount",
     icon: BanknotesIcon,
     tone: "success",
     format: "currency",
-    metric: "grossSales",
   },
   {
-    id: "netCommission",
-    labelKey: "admin.dashboard.stats.netCommission",
+    metric: "netRevenue",
+    labelKey: "admin.dashboard.stats.netRevenue",
     icon: ArrowTrendingUpIcon,
     tone: "success",
     format: "currency",
-    metric: "netCommission",
   },
   {
-    id: "visitors",
-    labelKey: "admin.dashboard.stats.visitors",
+    metric: "deliveredOrders",
+    labelKey: "admin.dashboard.stats.deliveredOrders",
+    icon: TruckIcon,
+    tone: "primary",
+    format: "count",
+  },
+  {
+    metric: "membershipRevenue",
+    labelKey: "admin.dashboard.stats.membershipRevenue",
+    icon: UserGroupIcon,
+    tone: "success",
+    format: "currency",
+  },
+  {
+    metric: "boostRevenue",
+    labelKey: "admin.dashboard.stats.boostRevenue",
+    icon: MegaphoneIcon,
+    tone: "success",
+    format: "currency",
+  },
+  {
+    metric: "completedTrades",
+    labelKey: "admin.dashboard.stats.completedTrades",
+    icon: ArrowsRightLeftIcon,
+    tone: "info",
+    format: "count",
+  },
+  {
+    metric: "tradeFeeRevenue",
+    labelKey: "admin.dashboard.stats.tradeFeeRevenue",
+    icon: SparklesIcon,
+    tone: "success",
+    format: "currency",
+  },
+  {
+    metric: "refundedAmount",
+    labelKey: "admin.dashboard.stats.refundedAmount",
+    icon: ReceiptRefundIcon,
+    tone: "warning",
+    format: "currency",
+  },
+  {
+    metric: "cancelledOrders",
+    labelKey: "admin.dashboard.stats.cancelledOrders",
+    icon: XCircleIcon,
+    tone: "warning",
+    format: "count",
+    // The cancellation stamp only exists from its migration onwards, so a
+    // comparison against an older window would read as a fake improvement.
+    noteKey: "admin.dashboard.stats.cancelledFromMigration",
+  },
+  {
+    metric: "newUsers",
+    labelKey: "admin.dashboard.stats.newUsers",
+    icon: UsersIcon,
+    tone: "primary",
+    format: "count",
+  },
+  {
+    metric: "newListings",
+    labelKey: "admin.dashboard.stats.newListings",
+    icon: TagIcon,
+    tone: "primary",
+    format: "count",
+  },
+  {
+    metric: "signedInUsers",
+    labelKey: "admin.dashboard.stats.signedInUsers",
     icon: UserGroupIcon,
     tone: "info",
     format: "count",
-    metric: "visitors",
-    // `lastActivityAt` keeps one stamp per user, so a visitor active in two
+    // `lastActivityAt` keeps one stamp per user, so someone active in two
     // periods only counts in the later one — the earlier window is always
     // understated and a period-over-period trend would be nonsense.
     hideChange: true,
-  },
-  {
-    id: "cancellations",
-    labelKey: "admin.dashboard.stats.cancellationsRefunds",
-    icon: ReceiptRefundIcon,
-    tone: "warning",
-    format: "count",
-    metric: "cancellations",
-    secondary: {
-      metric: "refunds",
-      leftKey: "admin.dashboard.stats.cancellations",
-      rightKey: "admin.dashboard.stats.refunds",
-    },
   },
 ];
