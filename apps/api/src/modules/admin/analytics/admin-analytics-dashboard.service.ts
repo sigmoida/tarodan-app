@@ -2,8 +2,11 @@ import { Injectable } from "@nestjs/common";
 import { PrismaService } from "../../../prisma";
 import { AnalyticsQueryDto } from "../dto";
 import {
+  BoostStatus,
   CommissionLedgerStatus,
+  OrderOrigin,
   OrderStatus,
+  PaymentStatus,
   Prisma,
   ProductKind,
   ProductStatus,
@@ -16,9 +19,11 @@ import {
   type DashboardStatsResponse,
 } from "@tarodan/types";
 import { AdminAnalyticsCommonService } from "./admin-analytics-common.service";
+import { CacheService } from "../../cache/cache.service";
 import {
   resolveDashboardRange,
   type DashboardDateWindow,
+  type ResolvedDashboardRange,
 } from "./dashboard-period.helper";
 import {
   ledgerNetRevenue,
@@ -47,11 +52,13 @@ interface DashboardMetricDefinition {
 
 const countValue = (raw: unknown): number => Number(raw ?? 0);
 
-/** `aggregate` sonucundaki tek bir `_sum` alanını okur. */
+/** `aggregate` sonucundaki `_sum` alanlarını toplar. */
 const sumOf =
-  (field: "totalAmount" | "commissionAmount") =>
-  (raw: unknown): number =>
-    Number((raw as { _sum: Record<string, unknown> })?._sum?.[field] ?? 0);
+  (...fields: string[]) =>
+  (raw: unknown): number => {
+    const sums = (raw as { _sum: Record<string, unknown> })?._sum ?? {};
+    return fields.reduce((total, field) => total + Number(sums[field] ?? 0), 0);
+  };
 
 const roundMetric = (value: number): number => Math.round(value * 100) / 100;
 
@@ -62,33 +69,114 @@ const changePercent = (current: number, previous: number): number => {
 };
 
 /**
- * Analitik & dashboard grubu (dashboard istatistikleri, snapshot, satış/gelir/
- * kullanıcı analitiği, komisyon geliri, son siparişler, bekleyen aksiyonlar) —
- * AdminAnalyticsService'ten birebir taşındı. AdminAnalyticsService ince alt-facade
- * olarak buraya delege eder. Tarih gruplama anahtarı (getDateKey) gruplar-arası
- * paylaşıldığı için AdminAnalyticsCommonService'te. Inject: prisma, common.
+ * Bir olay damgası filtresi. Pencere yoksa "damga var" koşuluna düşer; böylece
+ * "tüm zamanlar" da AYNI olaydan sayılır, `createdAt`e kaymaz.
+ */
+const stamped = (
+  window: DashboardDateWindow | undefined,
+): Prisma.DateTimeNullableFilter => window ?? { not: null };
+
+/**
+ * ÖDENMİŞ sipariş yüklemi. Grup sepetinde ödeme satırı siparişte değil
+ * checkout grubunda durur (Payment.orderId ∪ Payment.checkoutGroupId), bu
+ * yüzden iki yol da sorulur. Sanal siparişler (üyelik/öne çıkarma) DIŞARIDA:
+ * gelirleri kendi metriklerinde sayılır, satış cirosuna karışmaz.
+ */
+function paidOrderWhere(
+  window: DashboardDateWindow | undefined,
+): Prisma.OrderWhereInput {
+  const paid = { status: PaymentStatus.completed, paidAt: window };
+  return {
+    origin: { not: OrderOrigin.platform_service },
+    OR: [
+      { payment: { is: paid } },
+      { checkoutGroup: { is: { payment: { is: paid } } } },
+    ],
+  };
+}
+
+/**
+ * Analitik & dashboard grubu (dönem özeti, snapshot, satış/gelir/kullanıcı
+ * analitiği, komisyon geliri, son siparişler) — AdminAnalyticsService'ten
+ * birebir taşındı. Bekleyen işler ve uyarılar artık burada DEĞİL: onlar
+ * `dashboard/admin-dashboard-worklist.service.ts`in işi.
  */
 @Injectable()
 export class AdminAnalyticsDashboardService {
+  /** Dönem özeti: 5 dk. Anahtar, ölçülen pencereyi birebir taşır. */
+  static readonly PERIOD_CACHE_TTL_SECONDS = 5 * 60;
+  /**
+   * Tamamen GEÇMİŞTE kalan özel aralık bir daha değişmez (yeni satır o
+   * pencereye düşemez), bu yüzden çok daha uzun tutulabilir.
+   */
+  static readonly CLOSED_RANGE_CACHE_TTL_SECONDS = 6 * 60 * 60;
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly common: AdminAnalyticsCommonService,
+    private readonly cache: CacheService,
   ) {}
 
   // ==================== ANALYTICS & REPORTS ====================
 
   /**
-   * Dashboard istatistikleri (admin açılış ekranı).
+   * Zone C — "Dönem özeti" (dashboard'un TEK tarih filtreli bölgesi).
    *
    * Her metrik TEK yerde tanımlanır ({@link metricDefinitions}); seçilen dönem,
    * ondan önceki eşit uzunluktaki pencere (trend için) ve tüm zamanlar aynı
    * tanımdan, aynı `$transaction` içinde okunur. Böylece "dönem" ile "tüm
    * zamanlar" arasında sessiz bir formül ayrışması olamaz.
+   *
+   * Ölçüm OLAY damgalarından yapılır (ödeme anı, teslim anı, iptal anı, iade
+   * anı, hak ediş anı) — `status + createdAt` değil.
    */
   async getDashboardStats(
     query?: DashboardPeriodQuery,
   ): Promise<DashboardStatsResponse> {
-    const range = resolveDashboardRange(query);
+    const now = new Date();
+    const range = resolveDashboardRange(query, now);
+    const { key, ttl } = this.periodCacheKey(range, now);
+
+    return this.cache.getOrSet(key, () => this.computeStats(range), { ttl });
+  }
+
+  /** Dönem özetinin önbelleğini düşürür (ekrandaki "yenile"). */
+  async invalidatePeriodCache(): Promise<void> {
+    await this.cache.delPattern("admin:dashboard:period:*");
+  }
+
+  /**
+   * Önbellek anahtarı ölçülen pencereyi taşımalı, yoksa iki farklı dönem aynı
+   * satırı okur. Canlı pencerenin `lte`si "şimdi" olduğundan anahtar TTL
+   * boyutunda kovalara yuvarlanır — aksi halde her istek yeni anahtar üretir
+   * ve önbellek hiç tutmazdı.
+   */
+  private periodCacheKey(
+    range: ResolvedDashboardRange,
+    now: Date,
+  ): { key: string; ttl: number } {
+    const from = range.current.gte.toISOString();
+    const closed =
+      range.type === "custom" && range.current.lte.getTime() < now.getTime();
+
+    if (closed) {
+      return {
+        key: `admin:dashboard:period:v1:custom:${from}:${range.current.lte.toISOString()}`,
+        ttl: AdminAnalyticsDashboardService.CLOSED_RANGE_CACHE_TTL_SECONDS,
+      };
+    }
+
+    const ttl = AdminAnalyticsDashboardService.PERIOD_CACHE_TTL_SECONDS;
+    const bucket = Math.floor(now.getTime() / (ttl * 1000));
+    return {
+      key: `admin:dashboard:period:v1:${range.type}:${from}:${bucket}`,
+      ttl,
+    };
+  }
+
+  private async computeStats(
+    range: ResolvedDashboardRange,
+  ): Promise<DashboardStatsResponse> {
     const definitions = this.metricDefinitions();
 
     // `undefined` pencere = tarih filtresi yok = tüm zamanlar.
@@ -134,35 +222,30 @@ export class AdminAnalyticsDashboardService {
    * Metrik kataloğu: anahtar → o metriğin TEK sorgu tanımı.
    *
    * Tanım bir pencere alır; `undefined` geldiğinde tarih filtresi uygulanmaz.
-   * Ürün/kullanıcı durum geçmişi tutulmadığı için dönemsel aktif/pasif değerler
-   * "dönem içinde oluşturulmuş ve bugün bu durumda olan" kayıtları sayar.
    */
   private metricDefinitions(): Record<
     DashboardMetricKey,
     DashboardMetricDefinition
   > {
     return {
-      orders: {
-        query: (createdAt) => this.prisma.order.count({ where: { createdAt } }),
+      paidOrders: {
+        query: (window) =>
+          this.prisma.order.count({ where: paidOrderWhere(window) }),
       },
-      grossSales: {
-        query: (createdAt) =>
+      paidAmount: {
+        query: (window) =>
           this.prisma.order.aggregate({
             _sum: { totalAmount: true },
-            where: { createdAt, status: { in: REALIZED_ORDER_STATUSES } },
+            where: paidOrderWhere(window),
           }),
         toValue: sumOf("totalAmount"),
       },
-      commissionRevenue: {
-        query: (createdAt) =>
-          this.prisma.order.aggregate({
-            _sum: { commissionAmount: true },
-            where: { createdAt, status: { in: REALIZED_ORDER_STATUSES } },
-          }),
-        toValue: sumOf("commissionAmount"),
+      deliveredOrders: {
+        query: (window) =>
+          this.prisma.order.count({ where: { deliveredAt: stamped(window) } }),
       },
-      netCommission: {
-        query: (createdAt) =>
+      netRevenue: {
+        query: (window) =>
           this.prisma.commissionLedger.aggregate({
             _sum: {
               sellerCommission: true,
@@ -171,71 +254,91 @@ export class AdminAnalyticsDashboardService {
               refundedBuyerFee: true,
             },
             where: {
-              createdAt,
+              // Hak ediş ANI — defter satırının açıldığı an değil.
+              earnedAt: stamped(window),
               status: { not: CommissionLedgerStatus.waived },
             },
           }),
-        // TEK formül (ledgerNetRevenue) — finans özetiyle aynı kaynak.
-        // Stopaj satıcının vergi/payout akışına ait; platform geliri değil.
+        // TEK formül (ledgerNetRevenue) — finans özetiyle aynı kaynak. Brüt
+        // `Order.commissionAmount` kartı KALDIRILDI: aynı ekranda bu sayıyla
+        // çelişen ikinci bir "komisyon geliri" gösteriyordu.
         toValue: (raw) => ledgerNetRevenue((raw as LedgerAggregate)._sum),
       },
-      activeProducts: {
-        query: (createdAt) =>
+      membershipRevenue: {
+        // MembershipPayment TEK kaynaktır. Üyelik siparişi (origin =
+        // platform_service) ödenen sipariş tutarından zaten dışlandığı için
+        // burada çifte sayım olmaz.
+        query: (window) =>
+          this.prisma.membershipPayment.aggregate({
+            _sum: { amount: true },
+            where: { status: PaymentStatus.completed, createdAt: window },
+          }),
+        toValue: sumOf("amount"),
+      },
+      boostRevenue: {
+        // `purchasedAt` aktivasyon anında damgalanır — satın alma olayı budur.
+        query: (window) =>
+          this.prisma.productBoost.aggregate({
+            _sum: { price: true },
+            where: {
+              purchasedAt: stamped(window),
+              status: { not: BoostStatus.failed },
+            },
+          }),
+        toValue: sumOf("price"),
+      },
+      refundedAmount: {
+        query: (window) =>
+          this.prisma.refundRequest.aggregate({
+            _sum: { amount: true },
+            where: { refundedAt: stamped(window) },
+          }),
+        toValue: sumOf("amount"),
+      },
+      cancelledOrders: {
+        // DİKKAT: `cancelledAt` bu göçten sonra yazılmaya başladı; daha eski
+        // iptaller hiçbir dönemde görünmez (dürüst backfill yok).
+        query: (window) =>
+          this.prisma.order.count({ where: { cancelledAt: stamped(window) } }),
+      },
+      completedTrades: {
+        query: (window) =>
+          this.prisma.trade.count({ where: { completedAt: stamped(window) } }),
+      },
+      tradeFeeRevenue: {
+        // v2 sabit hizmet bedeli + v1'in yüzde bazlı komisyonu (KDV'siyle) —
+        // ikisi de BRÜT. Aynı satırda ikisi birden dolu olamaz, bu yüzden
+        // toplamak çifte saymaz; `pricingVersion`a göre dallanmaya gerek yok.
+        query: (window) =>
+          this.prisma.tradeCashPayment.aggregate({
+            _sum: {
+              tradeFeeAmount: true,
+              commission: true,
+              commissionTaxAmount: true,
+            },
+            where: { paidAt: stamped(window) },
+          }),
+        toValue: sumOf("tradeFeeAmount", "commission", "commissionTaxAmount"),
+      },
+      newUsers: {
+        query: (createdAt) => this.prisma.user.count({ where: { createdAt } }),
+      },
+      newListings: {
+        query: (window) =>
           this.prisma.product.count({
-            where: {
-              kind: ProductKind.listing,
-              createdAt,
-              status: ProductStatus.active,
-            },
+            where: { kind: ProductKind.listing, publishedAt: stamped(window) },
           }),
       },
-      passiveProducts: {
-        query: (createdAt) =>
-          this.prisma.product.count({
-            where: {
-              kind: ProductKind.listing,
-              createdAt,
-              status: { in: [ProductStatus.inactive, ProductStatus.suspended] },
-            },
-          }),
-      },
-      activeUsers: {
-        query: (createdAt) =>
-          this.prisma.user.count({
-            where: { createdAt, isBanned: false, deletedAt: null },
-          }),
-      },
-      passiveUsers: {
-        query: (createdAt) =>
-          this.prisma.user.count({
-            where: {
-              createdAt,
-              OR: [{ isBanned: true }, { deletedAt: { not: null } }],
-            },
-          }),
-      },
-      cancellations: {
-        query: (createdAt) =>
-          this.prisma.order.count({
-            where: { createdAt, status: OrderStatus.cancelled },
-          }),
-      },
-      refunds: {
-        query: (createdAt) =>
-          this.prisma.refundRequest.count({ where: { createdAt } }),
-      },
-      visitors: {
-        // DİKKAT — ölçülen şey "ziyaretçi" değil: `lastActivityAt` yalnız
-        // BAŞARILI GİRİŞTE damgalanıyor (auth/utils/login-stamp.ts), yani bu
-        // sayı "son girişi bu pencereye düşen kayıtlı kullanıcı" demek.
-        // Anonim trafik hiçbir yerde ölçülmüyor; gerçek ziyaretçi metriği için
-        // ayrı bir sayfa-görüntüleme/oturum hattı gerekir.
-        // Bir de: tek bir "son" damga tutulduğu için, iki dönemde de aktif olan
-        // kullanıcı yalnız SONRAKİ pencerede sayılır — geçmiş pencereler
-        // olduğundan düşük görünür.
+      signedInUsers: {
+        // DİKKAT — bu "ziyaretçi" DEĞİL: `lastActivityAt` yalnız BAŞARILI
+        // GİRİŞTE damgalanıyor (auth/utils/login-stamp.ts), yani "son girişi bu
+        // pencereye düşen kayıtlı kullanıcı" demek. Anonim trafik hiçbir yerde
+        // ölçülmüyor. Tek bir "son" damga tutulduğu için iki dönemde de aktif
+        // olan kullanıcı yalnız SONRAKİ pencerede sayılır — geçmiş pencereler
+        // olduğundan düşük görünür, bu yüzden trend satırı gösterilmez.
         query: (lastActivityAt) =>
           this.prisma.user.count({
-            where: { lastActivityAt: lastActivityAt ?? { not: null } },
+            where: { lastActivityAt: stamped(lastActivityAt) },
           }),
       },
     };
@@ -663,30 +766,6 @@ export class AdminAnalyticsDashboardService {
       productCount: s._count.products,
       activeListings: activeMap.get(s.id) ?? 0,
     }));
-  }
-
-  /**
-   * Get pending actions for dashboard
-   * Requirement: Pending Actions Panel (7.1)
-   */
-  async getPendingActions() {
-    const [pendingProducts, refundRequests, pendingMessages] =
-      await Promise.all([
-        this.prisma.product.count({
-          where: { kind: ProductKind.listing, status: ProductStatus.pending },
-        }),
-        this.prisma.order.count({
-          where: { status: OrderStatus.refund_requested },
-        }),
-        this.prisma.message.count({ where: { status: "pending_approval" } }),
-      ]);
-
-    return {
-      pendingProducts,
-      refundRequests,
-      pendingMessages,
-      totalPending: pendingProducts + refundRequests + pendingMessages,
-    };
   }
 
   /**

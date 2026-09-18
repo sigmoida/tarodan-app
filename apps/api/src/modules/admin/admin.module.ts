@@ -52,6 +52,8 @@ import { AdminOrderService } from "./orders/admin-order.service";
 import { AdminAnalyticsService } from "./analytics/admin-analytics.service";
 import { AdminAnalyticsCommonService } from "./analytics/admin-analytics-common.service";
 import { AdminAnalyticsDashboardService } from "./analytics/admin-analytics-dashboard.service";
+import { AdminDashboardWorklistService } from "./analytics/dashboard/admin-dashboard-worklist.service";
+import { AdminDashboardStockService } from "./analytics/dashboard/admin-dashboard-stock.service";
 import { AdminAnalyticsOrderService } from "./analytics/admin-analytics-order.service";
 import { AdminAnalyticsReportService } from "./analytics/admin-analytics-report.service";
 import { AdminModerationService } from "./ops/admin-moderation.service";
@@ -208,6 +210,8 @@ import { scheduledProcessors } from "../../workers/scheduled-processors";
     AdminAnalyticsService,
     AdminAnalyticsCommonService,
     AdminAnalyticsDashboardService,
+    AdminDashboardWorklistService,
+    AdminDashboardStockService,
     AdminAnalyticsOrderService,
     AdminAnalyticsReportService,
     AdminModerationService,

@@ -79,18 +79,28 @@ export interface DashboardMetric {
   changePercent: number;
 }
 
+
+/**
+ * Zone C — "Dönem özeti". The only date-filtered zone, and every metric is
+ * measured from an EVENT stamp (`Payment.paidAt`, `Order.deliveredAt`,
+ * `Order.cancelledAt`, `CommissionLedger.earnedAt`, …) rather than from
+ * `status + createdAt`: an order placed in March and delivered in April
+ * belongs to April's delivered figure, not March's.
+ */
 export const DASHBOARD_METRIC_KEYS = [
-  "orders",
-  "grossSales",
-  "commissionRevenue",
-  "netCommission",
-  "activeProducts",
-  "passiveProducts",
-  "activeUsers",
-  "passiveUsers",
-  "cancellations",
-  "refunds",
-  "visitors",
+  "paidOrders",
+  "paidAmount",
+  "deliveredOrders",
+  "netRevenue",
+  "membershipRevenue",
+  "boostRevenue",
+  "refundedAmount",
+  "cancelledOrders",
+  "completedTrades",
+  "tradeFeeRevenue",
+  "newUsers",
+  "newListings",
+  "signedInUsers",
 ] as const;
 
 export type DashboardMetricKey = (typeof DASHBOARD_METRIC_KEYS)[number];
@@ -98,4 +108,238 @@ export type DashboardMetricKey = (typeof DASHBOARD_METRIC_KEYS)[number];
 export interface DashboardStatsResponse {
   range: DashboardPeriodRange;
   metrics: Record<DashboardMetricKey, DashboardMetric>;
+}
+
+// ===========================================================================
+// Zone A — "Bekleyen işler" (action queues). NEVER date-filtered: an item that
+// has been waiting since March is exactly the thing today's operator must see.
+// ===========================================================================
+
+export const DASHBOARD_QUEUE_KEYS = [
+  "refundRequests",
+  "tradeOperations",
+  "listingModeration",
+  "sellerApplications",
+  "supportAndReports",
+  "moneyOperations",
+  "documents",
+  "shipping",
+] as const;
+
+export type DashboardQueueKey = (typeof DASHBOARD_QUEUE_KEYS)[number];
+
+/** Every countable line inside a queue tile, flat, so links stay per-line. */
+export const DASHBOARD_QUEUE_PART_KEYS = [
+  // refundRequests
+  "refundsPendingReview",
+  "refundsDisputed",
+  // tradeOperations
+  "tradesAtWarehouse",
+  "tradeDisputesOpen",
+  "tradeRefundFailures",
+  "tradeCompensationPending",
+  // listingModeration
+  "productsPending",
+  "messagesPendingApproval",
+  // sellerApplications
+  "corporateApplications",
+  "sellerDocuments",
+  // supportAndReports
+  "ticketsOpen",
+  "ticketsUrgent",
+  "reportsPending",
+  // moneyOperations
+  "payoutsFailed",
+  "holdsOverdue",
+  "adjustmentsOpen",
+  // documents
+  "invoicesExhausted",
+  "ordersUninvoiced",
+  // shipping
+  "carrierCancellations",
+  "shipmentsWithoutTracking",
+] as const;
+
+export type DashboardQueuePartKey = (typeof DASHBOARD_QUEUE_PART_KEYS)[number];
+
+/** Which tile a line belongs to — the grouping the API and the UI share. */
+export const DASHBOARD_QUEUE_PARTS: Record<
+  DashboardQueueKey,
+  readonly DashboardQueuePartKey[]
+> = {
+  refundRequests: ["refundsPendingReview", "refundsDisputed"],
+  tradeOperations: [
+    "tradesAtWarehouse",
+    "tradeDisputesOpen",
+    "tradeRefundFailures",
+    "tradeCompensationPending",
+  ],
+  listingModeration: ["productsPending", "messagesPendingApproval"],
+  sellerApplications: ["corporateApplications", "sellerDocuments"],
+  supportAndReports: ["ticketsOpen", "ticketsUrgent", "reportsPending"],
+  moneyOperations: ["payoutsFailed", "holdsOverdue", "adjustmentsOpen"],
+  documents: ["invoicesExhausted", "ordersUninvoiced"],
+  shipping: ["carrierCancellations", "shipmentsWithoutTracking"],
+};
+
+/**
+ * The admin screen each line owns. A queue tile is useless without the screen
+ * that clears it, so the link lives with the definition instead of being
+ * re-guessed in JSX.
+ */
+export const DASHBOARD_QUEUE_PART_LINKS: Record<DashboardQueuePartKey, string> =
+  {
+    refundsPendingReview: "/operations/refund-requests",
+    refundsDisputed: "/operations/refund-requests",
+    tradesAtWarehouse: "/operations/trades",
+    tradeDisputesOpen: "/operations/trades",
+    tradeRefundFailures: "/operations/trades",
+    tradeCompensationPending: "/operations/trades",
+    productsPending: "/catalog/products",
+    messagesPendingApproval: "/messaging/messages",
+    corporateApplications: "/accounts/seller-applications",
+    sellerDocuments: "/accounts/seller-applications",
+    ticketsOpen: "/messaging/support",
+    ticketsUrgent: "/messaging/support",
+    reportsPending: "/accounts/reports",
+    payoutsFailed: "/finance/payouts",
+    holdsOverdue: "/finance/overview",
+    adjustmentsOpen: "/finance/overview",
+    invoicesExhausted: "/finance/invoices",
+    ordersUninvoiced: "/finance/invoices",
+    carrierCancellations: "/operations/shipping",
+    shipmentsWithoutTracking: "/operations/shipping",
+  };
+
+/** The tile's own link — the screen that clears most of it. */
+export const DASHBOARD_QUEUE_LINKS: Record<DashboardQueueKey, string> = {
+  refundRequests: "/operations/refund-requests",
+  tradeOperations: "/operations/trades",
+  listingModeration: "/catalog/products",
+  sellerApplications: "/accounts/seller-applications",
+  supportAndReports: "/messaging/support",
+  moneyOperations: "/finance/payouts",
+  documents: "/finance/invoices",
+  shipping: "/operations/shipping",
+};
+
+export interface DashboardQueuePart {
+  key: DashboardQueuePartKey;
+  count: number;
+  /** Age driver: when the oldest waiting item entered the queue. */
+  oldestAt: string | null;
+  /** Only where money is the unit of work (open seller debt). */
+  amount?: number;
+  href: string;
+}
+
+export interface DashboardQueueTile {
+  key: DashboardQueueKey;
+  /** Sum of the tile's lines, minus lines flagged as a subset of another. */
+  total: number;
+  oldestAt: string | null;
+  parts: DashboardQueuePart[];
+  href: string;
+}
+
+// ===========================================================================
+// Zone B — "Uyarılar". Rows that should normally be absent; hidden at zero.
+// ===========================================================================
+
+export const DASHBOARD_ALERT_KEYS = [
+  "stuckShippedOrders",
+  "stuckWarehouseTrades",
+  "stuckOutboundTrades",
+  "paymentsMissingFromStatement",
+  "unresolvedStatementLines",
+  "commissionLedgerDrift",
+  "paymentsWithoutOrders",
+  "ordersWithoutHold",
+  "outboxDead",
+  "outboxStuckProcessing",
+  "noActiveCommissionRuleSet",
+  "noActiveShippingTariff",
+  "staleCouponReservations",
+  "deliveredHoldsWithoutRelease",
+  "agedCarrierCancellations",
+  "exhaustedPayoutRetries",
+  "preparingDeadlineWithin24h",
+] as const;
+
+export type DashboardAlertKey = (typeof DASHBOARD_ALERT_KEYS)[number];
+
+/** How loud a row is. `info` is an early warning, not yet a failure. */
+export type DashboardAlertSeverity = "critical" | "warning" | "info";
+
+/**
+ * The threshold that produced the row, echoed so the UI can say "10 günden
+ * uzun" without keeping its own copy of a number that lives in config.
+ */
+export interface DashboardAlertThreshold {
+  value: number;
+  unit: "days" | "hours" | "minutes" | "attempts";
+}
+
+export interface DashboardAlert {
+  key: DashboardAlertKey;
+  count: number;
+  /** Money-shaped alerts (ledger drift) report an amount, not a count. */
+  amount?: number;
+  threshold?: DashboardAlertThreshold;
+  severity: DashboardAlertSeverity;
+  href: string;
+}
+
+export const DASHBOARD_ALERT_LINKS: Record<DashboardAlertKey, string> = {
+  stuckShippedOrders: "/operations/shipping",
+  stuckWarehouseTrades: "/operations/trades",
+  stuckOutboundTrades: "/operations/trades",
+  paymentsMissingFromStatement: "/finance/psp",
+  unresolvedStatementLines: "/finance/psp",
+  commissionLedgerDrift: "/finance/overview",
+  paymentsWithoutOrders: "/finance/overview",
+  ordersWithoutHold: "/finance/overview",
+  outboxDead: "/system/logs",
+  outboxStuckProcessing: "/system/logs",
+  noActiveCommissionRuleSet: "/finance/commission",
+  noActiveShippingTariff: "/system/shipping-tariffs",
+  staleCouponReservations: "/marketing/discounts",
+  deliveredHoldsWithoutRelease: "/finance/payouts",
+  agedCarrierCancellations: "/operations/shipping",
+  exhaustedPayoutRetries: "/finance/payouts",
+  preparingDeadlineWithin24h: "/operations/orders",
+};
+
+/** Zone A + Zone B — one request, because both answer "what needs me now?". */
+export interface DashboardWorklistResponse {
+  generatedAt: string;
+  queues: DashboardQueueTile[];
+  alerts: DashboardAlert[];
+}
+
+// ===========================================================================
+// Zone D — "Şu anki durum" (stock). Balances, not flows: never date-filtered.
+// ===========================================================================
+
+export const DASHBOARD_STOCK_KEYS = [
+  "escrowBalance",
+  "openSellerDebt",
+  "activeListings",
+  "activeMemberships",
+  "activeBoosts",
+] as const;
+
+export type DashboardStockKey = (typeof DASHBOARD_STOCK_KEYS)[number];
+
+export interface DashboardMembershipTierCount {
+  tierType: string;
+  tierName: string;
+  count: number;
+}
+
+export interface DashboardStockResponse {
+  generatedAt: string;
+  values: Record<DashboardStockKey, number>;
+  /** No admin screen breaks active memberships down by tier today. */
+  membershipsByTier: DashboardMembershipTierCount[];
 }

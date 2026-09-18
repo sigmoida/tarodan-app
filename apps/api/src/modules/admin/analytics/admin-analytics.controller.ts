@@ -27,6 +27,9 @@ import {
   ApiQuery,
 } from "@nestjs/swagger";
 import { AdminService } from "../admin.service";
+import { AdminAnalyticsDashboardService } from "./admin-analytics-dashboard.service";
+import { AdminDashboardStockService } from "./dashboard/admin-dashboard-stock.service";
+import { AdminDashboardWorklistService } from "./dashboard/admin-dashboard-worklist.service";
 import { AdvertisementService } from "../../advertisement/advertisement.service";
 import { MediaService } from "../../media/media.service";
 import {
@@ -104,7 +107,14 @@ import {
 @UseGuards(AdminJwtAuthGuard, RolesGuard)
 @ApiBearerAuth()
 export class AdminAnalyticsController {
-  constructor(private readonly adminService: AdminService) {}
+  constructor(
+    private readonly adminService: AdminService,
+    // Yeni dashboard bölgeleri facade'e eklenmez: AdminService zaten çözülmeye
+    // çalışılan tanrı-facade'dir (apps/api/CLAUDE.md §1/§15).
+    private readonly worklistService: AdminDashboardWorklistService,
+    private readonly stockService: AdminDashboardStockService,
+    private readonly dashboardStatsService: AdminAnalyticsDashboardService,
+  ) {}
 
   // ==================== ANALYTICS & REPORTS ====================
 
@@ -158,11 +168,47 @@ export class AdminAnalyticsController {
     return this.adminService.getTopSellers(safeLimit);
   }
 
-  @Get("dashboard/pending-actions")
+  /**
+   * Zone A + Zone B — bekleyen iş kuyrukları ve uyarılar. Dönem filtresinden
+   * BAĞIMSIZ: geçen aydan beri bekleyen iş bugünün işidir.
+   *
+   * Eski `dashboard/pending-actions` ucunun yerini alır. O uç iade talebini
+   * `Order.status = refund_requested` ile sayıyordu — talebin kendi durumu
+   * değil siparişin durumu — ve incelemeyi bekleyen talepleri kaçırıyordu.
+   */
+  @Get("dashboard/worklist")
   @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
-  @ApiOperation({ summary: "Get pending actions count for dashboard" })
-  async getPendingActions() {
-    return this.adminService.getPendingActions();
+  @ApiOperation({
+    summary:
+      "Action queues and alerts awaiting an operator, with the age of the oldest item in each",
+  })
+  async getDashboardWorklist() {
+    return this.worklistService.getWorklist();
+  }
+
+  @Get("dashboard/stock")
+  @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
+  @ApiOperation({
+    summary:
+      "Current balances: escrow, open seller debt, active listings, memberships by tier, active boosts",
+  })
+  async getDashboardStock() {
+    return this.stockService.getStock();
+  }
+
+  @Post("dashboard/refresh")
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
+  @ApiOperation({
+    summary:
+      "Drop the dashboard caches so the next read recomputes (the screen's explicit refresh control)",
+  })
+  async refreshDashboard() {
+    await Promise.all([
+      this.worklistService.invalidate(),
+      this.stockService.invalidate(),
+      this.dashboardStatsService.invalidatePeriodCache(),
+    ]);
   }
 
   @Get("analytics/sales")

@@ -1,14 +1,15 @@
 import { Injectable } from "@nestjs/common";
-import {
-  OrderStatus,
-  PaymentHoldStatus,
-  PayoutStatus,
-  SellerAdjustmentStatus,
-} from "@prisma/client";
 import { PrismaService } from "../../../prisma";
 import { trMonthStart } from "../../../common/helpers/tr-calendar";
-import { ELOGO_MAX_SEND_ATTEMPTS } from "../../elogo/helpers/elogo-retry-policy";
 import { FinanceReconciliationService } from "../../finance-reconciliation/finance-reconciliation.service";
+import {
+  exhaustedInvoicesWhere,
+  failedTransfersWhere,
+  openAdjustmentsWhere,
+  overdueHoldsWhere,
+  retryableFailedInvoicesWhere,
+  uninvoicedDeliveredWhere,
+} from "./finance-health.where";
 
 /**
  * Finans ÖZETİ — admin'in "para nerede?" sorusuna tek bakışta cevap.
@@ -27,23 +28,18 @@ export class AdminFinanceService {
     private readonly reconciliation: FinanceReconciliationService,
   ) {}
 
-  /** Faturasız teslimat alarmıyla (order-scheduler) AYNI eşik. */
-  private invoiceDeadlineDays(): number {
-    return Number(process.env.INVOICE_DEADLINE_DAYS ?? "5") || 5;
-  }
-
   /**
    * Finans Özeti — SAĞLAMALI bölümler + sağlık şeridi. Bölümler
    * FinanceReconciliationService'ten gelir (ciro bölünmesi, satıcı hakedişi,
    * takas karşı taraf, platform geliri → hak ediş, alıcı iadeleri, PayTR
    * karşılaştırması); her bölüm kendi farkını taşır. Tüm zaman, dönem yok —
    * aylık kırılım dashboard/analiz ekranlarının işi. Sağlık sayaçları anlıktır.
+   *
+   * Sağlık kümelerinin where cümleleri `finance-health.where.ts`te; dashboard'un
+   * "Para işlemleri" / "Belgeler" kuyrukları aynı tanımları okur.
    */
   async getFinanceOverview() {
     const now = new Date();
-    const uninvoicedBefore = new Date(
-      now.getTime() - this.invoiceDeadlineDays() * 24 * 60 * 60 * 1000,
-    );
 
     const [
       reconciliation,
@@ -54,37 +50,12 @@ export class AdminFinanceService {
       openAdjustments,
     ] = await Promise.all([
       this.reconciliation.build(),
-      this.prisma.payoutTransfer.count({
-        where: {
-          status: { in: [PayoutStatus.failed, PayoutStatus.returned] },
-        },
-      }),
-      // Süresi geçmiş ama hâlâ held: releaseAt dolmuş, serbest bırakılmamış
-      // (iade kilidi dahil — admin bakmalı).
-      this.prisma.paymentHold.count({
-        where: {
-          status: PaymentHoldStatus.held,
-          releaseAt: { not: null, lte: now },
-        },
-      }),
-      // order-scheduler'ın ORDERS_DELIVERED_UNINVOICED alarmıyla aynı küme.
-      this.prisma.order.count({
-        where: {
-          status: { in: [OrderStatus.delivered, OrderStatus.completed] },
-          commissionLedger: { isNot: null },
-          revenueInvoicedAt: null,
-          deliveredAt: { lt: uninvoicedBefore },
-        },
-      }),
-      // Deneme bütçesi tükenmiş eLogo belgeleri (yasal süre işliyor).
-      this.prisma.elogoInvoice.count({
-        where: {
-          status: "failed",
-          attemptCount: { gte: ELOGO_MAX_SEND_ATTEMPTS },
-        },
-      }),
+      this.prisma.payoutTransfer.count({ where: failedTransfersWhere }),
+      this.prisma.paymentHold.count({ where: overdueHoldsWhere(now) }),
+      this.prisma.order.count({ where: uninvoicedDeliveredWhere(now) }),
+      this.prisma.elogoInvoice.count({ where: exhaustedInvoicesWhere }),
       this.prisma.sellerAccountAdjustment.aggregate({
-        where: { status: SellerAdjustmentStatus.open },
+        where: openAdjustmentsWhere,
         _sum: { remainingAmount: true },
         _count: { id: true },
       }),
@@ -127,18 +98,8 @@ export class AdminFinanceService {
         this.prisma.elogoInvoice.count({
           where: { status: { in: ["pending", "processing"] } },
         }),
-        this.prisma.elogoInvoice.count({
-          where: {
-            status: "failed",
-            attemptCount: { lt: ELOGO_MAX_SEND_ATTEMPTS },
-          },
-        }),
-        this.prisma.elogoInvoice.count({
-          where: {
-            status: "failed",
-            attemptCount: { gte: ELOGO_MAX_SEND_ATTEMPTS },
-          },
-        }),
+        this.prisma.elogoInvoice.count({ where: retryableFailedInvoicesWhere }),
+        this.prisma.elogoInvoice.count({ where: exhaustedInvoicesWhere }),
       ]);
 
     return {

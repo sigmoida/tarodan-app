@@ -89,6 +89,15 @@ const envSchema = z
     PAYTR_REPORT_SYNC_ENABLED: z.string().optional(),
     PAYOUTS_DISABLED: z.string().optional(),
 
+    // Operasyon alarm eşikleri (config/alert-thresholds.ts). Tanımlı olmadıkça
+    // ConfigModule bunları .env dosyasından DÜŞÜRÜR ve erişimci varsayılana
+    // döner — panel ile cron'un ayrı sayı okuması tam da bu yüzden olurdu.
+    SHIPPED_STALE_ALERT_DAYS: z.string().optional(),
+    INVOICE_DEADLINE_DAYS: z.string().optional(),
+    MISSING_TRACKING_ALERT_HOURS: z.string().optional(),
+    CARRIER_CANCELLATION_ALERT_HOURS: z.string().optional(),
+    OUTBOX_STALE_PROCESSING_MS: z.string().optional(),
+
     // Surat cargo — when the integration is enabled, production must ship for real
     // (mode/test-flag/credentials enforced in the production block below).
     SURAT_CARGO_ENABLED: z.string().optional(),

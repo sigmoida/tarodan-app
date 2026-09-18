@@ -61,10 +61,6 @@ export class AdminAnalyticsService {
     return this.dashboard.getTopSellers(limit);
   }
 
-  async getPendingActions() {
-    return this.dashboard.getPendingActions();
-  }
-
   async getCommissionRevenue(query: AnalyticsQueryDto) {
     return this.dashboard.getCommissionRevenue(query);
   }

@@ -445,7 +445,7 @@ export class AdminService {
   // ==================== ANALYTICS & REPORTS ====================
   // Taşındı: admin-analytics.service.ts — imzalar aynen korunuyor (facade delege).
   // Not: getOrderById, updateOrderStatus, addOrderTracking,
-  // generateOrderInvoice, unbanUser, getRecentOrders, getPendingActions da bu
+  // generateOrderInvoice, unbanUser, getRecentOrders da bu
   // banner aralığında olduğu için bölümle birlikte taşındı. getDateKey private
   // yardımcısı yalnız bu bölümde kullanılıyordu, o da taşındı.
 
@@ -511,10 +511,6 @@ export class AdminService {
 
   async getTopSellers(limit: number = 10) {
     return this.analyticsService.getTopSellers(limit);
-  }
-
-  async getPendingActions() {
-    return this.analyticsService.getPendingActions();
   }
 
   async generateSalesReport(query: ReportQueryDto) {
