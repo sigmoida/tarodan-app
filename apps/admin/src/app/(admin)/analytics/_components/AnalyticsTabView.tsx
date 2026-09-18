@@ -79,6 +79,15 @@ export function AnalyticsTabView({
               // showing "0%" would read as "flat", a different claim.
               change={metric?.changePercent ?? undefined}
               changeLabel={t("admin.analytics.filters.vsPrevious")}
+              // What the number cannot tell you, printed where it is read —
+              // not in a tooltip nobody opens.
+              footer={
+                card.noteKey && (
+                  <span className="mt-2 text-[11px] leading-tight text-subtle">
+                    {t(card.noteKey)}
+                  </span>
+                )
+              }
             />
           );
         })}

@@ -40,6 +40,8 @@ export interface MetricCardConfig {
   icon: ComponentType<{ className?: string }>;
   tone: MetricTone;
   format: MetricFormat;
+  /** A caveat printed under the card — what the number cannot tell you. */
+  noteKey?: MessageKey;
 }
 
 export interface SeriesConfig {
@@ -78,12 +80,14 @@ const card = (
   icon: ComponentType<{ className?: string }>,
   tone: MetricTone,
   format: MetricFormat,
+  noteKey?: MessageKey,
 ): MetricCardConfig => ({
   metric,
   labelKey: `admin.analytics.metric.${metric}` as MessageKey,
   icon,
   tone,
   format,
+  noteKey,
 });
 
 const breakdown = (
@@ -114,7 +118,15 @@ export const TAB_SECTIONS: Record<AnalyticsTab, TabSections> = {
       card("platformFundedDiscount", TagIcon, "warning", "currency"),
       card("feeDiscountCost", TagIcon, "warning", "currency"),
       card("collectedShipping", TruckIcon, "info", "currency"),
-      card("carrierCost", TruckIcon, "danger", "currency"),
+      card(
+        "carrierCost",
+        TruckIcon,
+        "danger",
+        "currency",
+        "admin.analytics.notes.carrierCostReconciledOnly",
+      ),
+      card("shipmentsAwaitingCarrierCost", TruckIcon, "warning", "count"),
+      card("carrierCostReconciledShare", TruckIcon, "info", "percent"),
     ],
     charts: [
       { keys: ["gmv", "netRevenue", "refundedAmount"], kind: "line", format: "currency" },

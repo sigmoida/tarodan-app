@@ -25,6 +25,7 @@ import {
   bucketExpr,
   metric,
   num,
+  rateMetric,
   toBreakdown,
   toSeries,
   type BucketRow,
@@ -42,6 +43,8 @@ interface SalesTotals {
   platformFundedDiscount: number;
   feeDiscountCost: number;
   carrierCost: number;
+  shipmentsReconciled: number;
+  shipmentsAwaitingCarrierCost: number;
   netRevenue: number;
   refundedAmount: number;
 }
@@ -132,6 +135,15 @@ export class AnalyticsSalesService extends AnalyticsTabService<AnalyticsSalesRes
       feeDiscountCost: of("feeDiscountCost"),
       collectedShipping: of("collectedShipping"),
       carrierCost: of("carrierCost"),
+      shipmentsAwaitingCarrierCost: of("shipmentsAwaitingCarrierCost"),
+      carrierCostReconciledShare: rateMetric(
+        current.shipmentsReconciled,
+        current.shipmentsReconciled + current.shipmentsAwaitingCarrierCost,
+        previous ? previous.shipmentsReconciled : null,
+        previous
+          ? previous.shipmentsReconciled + previous.shipmentsAwaitingCarrierCost
+          : null,
+      ),
       refundedAmount: of("refundedAmount"),
     } satisfies Record<SalesMetricKey, AnalyticsMetric>;
   }
@@ -153,11 +165,19 @@ export class AnalyticsSalesService extends AnalyticsTabService<AnalyticsSalesRes
         FROM paid_orders`,
 
       // Kargonun GERÇEKTE faturaladığı tutar, tahsil edilenin karşısına konur.
-      // `carrier_actual_cost` mutabakat sonrası dolar; henüz dolmamış gönderi
-      // sıfır sayılır — abartmaktansa eksik göstermek dürüst olan.
+      // `carrier_actual_cost` taşıyıcı dökümü geldikten sonra dolar. Dolmamış
+      // gönderi SIFIR DEĞİL, BİLİNMEYENDİR — sıfır saymak maliyeti sessizce
+      // küçültüp marjı olduğundan iyi gösteriyordu. Bu yüzden toplam yalnız
+      // mutabık gönderileri kapsar ve bekleyenler AYRI sayılır; ekran hangi
+      // oranın mutabık olduğunu da yazar.
       this.prisma.$queryRaw<
         Array<Record<string, unknown>>
-      >`WITH ${cte} SELECT COALESCE(SUM(s."carrier_actual_cost"), 0) AS carrier_cost
+      >`WITH ${cte} SELECT
+          COALESCE(SUM(s."carrier_actual_cost"), 0) AS carrier_cost,
+          COUNT(*) FILTER (WHERE s."carrier_actual_cost" IS NOT NULL)::bigint
+            AS reconciled,
+          COUNT(*) FILTER (WHERE s."carrier_actual_cost" IS NULL)::bigint
+            AS awaiting
         FROM paid_orders po
         JOIN "shipments" s ON s."order_id" = po."id"`,
 
@@ -190,6 +210,8 @@ export class AnalyticsSalesService extends AnalyticsTabService<AnalyticsSalesRes
       platformFundedDiscount: num(row.platform_funded_discount),
       feeDiscountCost: num(row.fee_discount_cost),
       carrierCost: num(carrier[0]?.carrier_cost),
+      shipmentsReconciled: num(carrier[0]?.reconciled),
+      shipmentsAwaitingCarrierCost: num(carrier[0]?.awaiting),
       netRevenue: ledgerNetRevenue(ledger._sum as LedgerNetSums),
       refundedAmount: num(refunds._sum.amount),
     };

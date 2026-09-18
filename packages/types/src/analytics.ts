@@ -223,7 +223,16 @@ export const SALES_METRIC_KEYS = [
   "feeDiscountCost",
   /** Shipping charged to the buyer vs what the carrier actually billed. */
   "collectedShipping",
+  /**
+   * RECONCILED carrier cost only. `Shipment.carrierActualCost` fills after the
+   * carrier statement lands, so an unreconciled shipment is UNKNOWN, not free —
+   * counting it as zero quietly understated the cost and flattered the margin.
+   */
   "carrierCost",
+  /** Shipments of the window still waiting for a carrier figure. */
+  "shipmentsAwaitingCarrierCost",
+  /** Share of the window's shipments that carry a reconciled cost, in percent. */
+  "carrierCostReconciledShare",
   /** Money actually sent back, partial refunds included. */
   "refundedAmount",
 ] as const;

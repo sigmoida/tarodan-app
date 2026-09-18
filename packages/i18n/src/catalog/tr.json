@@ -7445,7 +7445,8 @@
       },
       "notes": {
         "cancellationsTruncated": "İptal anı {date} tarihinden itibaren kaydediliyor; daha eski iptaller bu sayıda görünmez.",
-        "stockElsewhere": "Anlık durum sayıları Kontrol Paneli'nde."
+        "stockElsewhere": "Anlık durum sayıları Kontrol Paneli'nde.",
+        "carrierCostReconciledOnly": "Yalnız taşıyıcı dökümü gelmiş gönderileri kapsar; karşılaştırma da yalnız onlar üzerinden."
       },
       "metric": {
         "gmv": "Ödenen ciro (GMV)",
@@ -7456,7 +7457,7 @@
         "platformFundedDiscount": "Platformun karşıladığı indirim",
         "feeDiscountCost": "Hizmet bedeli indirimi",
         "collectedShipping": "Tahsil edilen kargo",
-        "carrierCost": "Kargo firması maliyeti",
+        "carrierCost": "Kargo maliyeti (mutabık)",
         "refundedAmount": "İade edilen tutar",
         "averageTradeValue": "Ortalama takas değeri",
         "tradeFeeRevenue": "Takas ücreti geliri",
@@ -7491,7 +7492,9 @@
         "churned": "İptal edilen üyelik",
         "pastDue": "Dönemde ödemesiz kalan üyelik",
         "membershipRevenue": "Üyelik geliri",
-        "pastDueNow": "Şu an ödemesiz üyelik"
+        "pastDueNow": "Şu an ödemesiz üyelik",
+        "shipmentsAwaitingCarrierCost": "Mutabakat bekleyen gönderi",
+        "carrierCostReconciledShare": "Mutabık gönderi oranı"
       },
       "series": {
         "gmv": "Ciro",
