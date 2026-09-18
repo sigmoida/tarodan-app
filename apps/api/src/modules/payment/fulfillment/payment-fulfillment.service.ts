@@ -30,6 +30,7 @@ import {
 } from "../../outbox/outbox.types";
 import { isTradeFullyPaid } from "../../trade/helpers/trade-payment-rows.helper";
 import { addDaysSkippingSundays } from "../../../common/helpers/preparing-deadline";
+import { orderCancelledData } from "../../order/helpers/order-cancellation";
 import {
   PUBLIC_NAME_SELECT,
   publicName,
@@ -309,7 +310,7 @@ export class PaymentFulfillmentService {
           await tx.order.update({
             where: { id: payment.orderId },
             data: {
-              status: OrderStatus.cancelled,
+              ...orderCancelledData(now),
               cancellationType: OrderCancellationType.iptal,
               cancelReason:
                 "Stok tükendi: ödeme sonrası mevcut stok sipariş adedini karşılamadı",
@@ -712,7 +713,7 @@ export class PaymentFulfillmentService {
             await tx.order.update({
               where: { id: order.id },
               data: {
-                status: OrderStatus.cancelled,
+                ...orderCancelledData(now),
                 cancellationType: OrderCancellationType.iptal,
                 cancelReason:
                   "Stok tükendi: ödeme sonrası mevcut stok sipariş adedini karşılamadı",
@@ -1325,7 +1326,7 @@ export class PaymentFulfillmentService {
         this.prisma.order.update({
           where: { id: orderId },
           data: {
-            status: OrderStatus.cancelled,
+            ...orderCancelledData(),
             // İlk kez burada bırakıyorsak işaretle (idempotency / çift-bırakma koruması).
             ...(alreadyReleased ? {} : { reservationReleasedAt: new Date() }),
           },

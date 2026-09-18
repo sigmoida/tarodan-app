@@ -33,6 +33,7 @@ import { RefundService } from "../refund/refund.service";
 import { PUBLIC_NAME_SELECT } from "../../common/helpers/public-identity";
 import { paymentWindowEnd } from "../payment/helpers/payment.constants";
 import { OFFER_CANCEL_REASON } from "../trade/helpers/trade-cancel-reasons";
+import { orderCancelledData } from "./helpers/order-cancellation";
 
 /**
  * Sipariş yaşam döngüsü (adres güncelleme, durum geçişleri, tamamlama/onay,
@@ -522,7 +523,7 @@ export class OrderLifecycleService {
     const cancelledOrder = await tx.order.update({
       where: { id: order.id, version: order.version },
       data: {
-        status: OrderStatus.cancelled,
+        ...orderCancelledData(),
         cancellationType: "iptal",
         cancellationReasonCode: opts.reasonCode ?? undefined,
         cancelReason: opts.reason,

@@ -112,6 +112,9 @@ model User {
   @@index([adminCode])
   @@index([username])
   @@index([isSeller])
+  // Dashboard: dönem içinde yeni kullanıcı + son girişi döneme düşen hesap.
+  @@index([createdAt])
+  @@index([lastActivityAt])
   @@map("users")
 }
 
@@ -555,6 +558,8 @@ model MembershipPayment {
   @@index([merchantOid])
   @@index([membershipId, status])
   @@index([targetTierId])
+  // Dashboard: dönem içinde tahsil edilen üyelik geliri.
+  @@index([status, createdAt])
   @@map("membership_payments")
 }
 
@@ -756,6 +761,8 @@ model Product {
   @@index([averageRating(sort: Desc), ratingCount(sort: Desc)])
   @@index([rankTier(sort: Desc), qualityScore(sort: Desc), createdAt(sort: Desc)])
   @@index([boostedUntil])
+  // Dashboard: dönem içinde yayına giren ilan (yayın damgası, oluşturma değil).
+  @@index([publishedAt])
   @@index([boostedUntil, boostedAt(sort: Desc)])
   @@index([homeShowcaseUntil, boostedAt(sort: Desc)])
   @@index([relevanceScore(sort: Desc)])
@@ -828,6 +835,8 @@ model ProductBoost {
   @@index([userId])
   @@index([status, endsAt])
   @@index([packageId])
+  // Dashboard: dönem içinde satın alınan öne çıkarma geliri.
+  @@index([purchasedAt])
   @@map("product_boosts")
 }
 
@@ -988,6 +997,8 @@ model Trade {
   @@index([receiverId])
   @@index([status])
   @@index([responseDeadline])
+  // Dashboard: dönem içinde tamamlanan takas.
+  @@index([completedAt])
   @@map("trades")
 }
 
@@ -1127,6 +1138,8 @@ model TradeDispute {
   updatedAt       DateTime  @updatedAt @map("updated_at")
   trade           Trade     @relation(fields: [tradeId], references: [id], onDelete: Cascade)
 
+  // Açık itiraz kuyruğu (resolvedAt IS NULL).
+  @@index([resolvedAt])
   @@map("trade_disputes")
 }
 
@@ -1637,6 +1650,13 @@ model Order {
   cancellationReasonCode     OrderCancellationReason? @map("cancellation_reason_code")
   cancellationPolicySnapshot Json?                    @map("cancellation_policy_snapshot")
   cancellationType           OrderCancellationType?   @map("cancellation_type")
+  /// İptalin GERÇEKLEŞTİĞİ an. `status = cancelled` + `createdAt` ikilisi
+  /// "bu dönemde kaç sipariş iptal edildi" sorusuna cevap veremiyordu: sipariş
+  /// oluşturulduğu dönemde değil, iptal edildiği dönemde sayılmalı. Her iptal
+  /// yolu (alıcı/admin iptali, ödeme süresi dolumu, hazırlama süresi dolumu,
+  /// stok tükenmesi kaskadı, checkout temizliği, tam iade) bu damgayı yazar.
+  /// GERİYE DÖNÜK DOLDURULAMAZ — eski iptallerde null kalır.
+  cancelledAt                DateTime?                @map("cancelled_at")
   preparingDeadline          DateTime?                @map("preparing_deadline")
   preparingWarningSentAt     DateTime?                @map("preparing_warning_sent_at")
   reservationReleasedAt      DateTime?                @map("reservation_released_at")
@@ -1682,6 +1702,11 @@ model Order {
   @@index([checkoutGroupId])
   @@index([packageId])
   @@index([origin])
+  // Dashboard dönem metrikleri olay damgalarından okunur (status + createdAt
+  // değil); üçü de aralık taraması yapar.
+  @@index([cancelledAt])
+  @@index([deliveredAt])
+  @@index([preparingDeadline])
   @@map("orders")
 }
 
@@ -1749,6 +1774,9 @@ model Payment {
   checkoutGroup          CheckoutGroup?    @relation(fields: [checkoutGroupId], references: [id])
   tradeCashPayment       TradeCashPayment? @relation(fields: [tradeCashPaymentId], references: [id])
 
+  // Tahsilat dönem metriği (ödenen sipariş) ve PayTR dökümünde karşılığı
+  // olmayan ödeme alarmı bu iki kolondan tarar; tabloda hiç indeks yoktu.
+  @@index([status, paidAt])
   @@map("payments")
 }
 
@@ -1806,6 +1834,8 @@ model PaymentHold {
   @@index([paymentId])
   // Grup dosyası + payouts artık hold'ları orderId ile sorguluyor.
   @@index([orderId])
+  // Escrow bakiyesi + süresi geçmiş hold kuyruğu.
+  @@index([status, releaseAt])
   @@map("payment_holds")
 }
 
@@ -1859,6 +1889,8 @@ model SellerDocument {
   @@index([userId])
   @@index([applicationId, documentType, isCurrent])
   @@index([stakeholderId])
+  // Satıcı başvuru kuyruğu: incelenmeyi bekleyen güncel belgeler.
+  @@index([status, isCurrent])
   @@map("seller_documents")
 }
 
@@ -1969,6 +2001,8 @@ model PaytrStatementLine {
   @@index([transactionDate])
   @@index([matchStatus])
   @@index([matchStatus, lastMatchAttemptAt])
+  @@index([matchStatus, resolvedAt])
+  @@index([paymentId])
   @@index([membershipPaymentId])
   @@map("paytr_statement_lines")
 }
@@ -2417,6 +2451,10 @@ model Shipment {
   orderPackage        OrderPackage?   @relation(fields: [packageId], references: [id])
 
   @@index([packageId])
+  // Takılı kargo alarmı (status + shippedAt yaşı) ve taşıyıcı kodu hiç
+  // oluşmamış gönderi kuyruğu (providerTrackingId IS NULL + yaş).
+  @@index([status, shippedAt])
+  @@index([providerTrackingId, createdAt])
   @@map("shipments")
 }
 
@@ -2581,6 +2619,8 @@ model RefundRequest {
   @@index([requesterId])
   @@index([status])
   @@index([refundNumber])
+  // Dashboard: dönem içinde İADE EDİLEN tutar (talep tarihi değil, iade anı).
+  @@index([refundedAt])
   @@map("refund_requests")
 }
 
@@ -3267,6 +3307,8 @@ model CouponReservation {
   @@index([discountId, status, expiresAt])
   @@index([userId, discountId, status])
   @@index([voucherCodeId, status])
+  // Kampanyadan bağımsız süresi geçmiş rezervasyon taraması (bütçe sızıntısı).
+  @@index([status, expiresAt])
   @@map("coupon_reservations")
 }
 

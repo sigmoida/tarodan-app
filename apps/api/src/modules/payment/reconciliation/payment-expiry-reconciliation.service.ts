@@ -23,6 +23,7 @@ import { PaymentCommonService } from "../payment-common.service";
 import { PaymentFulfillmentService } from "../fulfillment/payment-fulfillment.service";
 import { DiscountService } from "../../discount/discount.service";
 import { isShipmentHandedToCarrier } from "../../shipping/helpers/shipment-handover";
+import { orderCancelledData } from "../../order/helpers/order-cancellation";
 import { ACTIVE_REFUND_REQUEST_STATUSES } from "../../refund/helpers/refund-active-statuses";
 import {
   PUBLIC_NAME_SELECT,
@@ -156,7 +157,7 @@ export class PaymentExpiryReconciliationService {
           await tx.order.update({
             where: { id: order.id },
             data: {
-              status: OrderStatus.cancelled,
+              ...orderCancelledData(),
               cancelReason: "Ödeme süresi (24 saat) doldu",
             },
           });
@@ -397,7 +398,7 @@ export class PaymentExpiryReconciliationService {
           await tx.order.update({
             where: { id: order.id },
             data: {
-              status: OrderStatus.cancelled,
+              ...orderCancelledData(),
               cancellationType: "iptal",
               cancelReason:
                 "Satıcı belirlenen süre içinde kargoya vermediği için otomatik iptal edildi",

@@ -44,6 +44,7 @@ import {
   remainingDiscountAllowanceFor,
 } from "../../discount/engine/fee-discount.engine";
 import { distanceSalesConsent } from "../helpers/distance-sales-contract";
+import { orderCancelledData } from "../helpers/order-cancellation";
 import {
   calculatePackageDesi,
   type ShippingBuyerShareByTier,
@@ -201,7 +202,7 @@ export class OrderCheckoutGroupService {
               await tx.order.update({
                 where: { id: stale.id },
                 data: {
-                  status: OrderStatus.cancelled,
+                  ...orderCancelledData(),
                   cancelReason: "Yeni toplu sipariş ile değiştirildi",
                   reservationReleasedAt:
                     stale.reservationReleasedAt ?? new Date(),

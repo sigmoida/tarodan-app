@@ -23,6 +23,7 @@ import {
 } from "../../membership/helpers/membership.util";
 import { OutboxService } from "../../outbox/outbox.service";
 import { OUTBOX_REVENUE_INVOICE_ISSUE } from "../../outbox/outbox.types";
+import { orderCancelledData } from "../../order/helpers/order-cancellation";
 
 /**
  * VirtualOrderFulfillmentService (Faz 8.2) — SANAL sipariş (üyelik / boost) fulfillment'ı.
@@ -262,7 +263,7 @@ export class VirtualOrderFulfillmentService {
       const ids = siblingPendings.map((o) => o.id);
       await tx.order.updateMany({
         where: { id: { in: ids } },
-        data: { status: OrderStatus.cancelled },
+        data: orderCancelledData(),
       });
       await tx.payment.updateMany({
         where: { orderId: { in: ids }, status: PaymentStatus.pending },
