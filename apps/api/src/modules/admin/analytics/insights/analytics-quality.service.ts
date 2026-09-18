@@ -35,7 +35,6 @@ const ORDER_CANCELLED_AT_SINCE = "2026-09-18T00:00:00.000Z";
 
 interface QualityTotals {
   paidOrders: number;
-  ordersCreated: number;
   refundedOrders: number;
   refundedAmount: number;
   cancelledOrders: number;
@@ -117,15 +116,15 @@ export class AnalyticsQualityService extends AnalyticsTabService<AnalyticsQualit
     return {
       paidOrders: of("paidOrders"),
       refundedOrders: of("refundedOrders"),
-      // İade ORANI aynı pencerenin ödenen siparişine bölünür. İadenin kendi
-      // siparişi başka bir döneme ait olabilir — oran bir kohort değil, dönem
-      // yükü göstergesidir.
+      // İade ve iptal oranlarının paydası AYNI: bu pencerede ÖDENEN sipariş.
+      // Tek payda, tek yüklem (`paidOrderWhere`) — iki oran birbiriyle ve satış
+      // sekmesinin sipariş sayısıyla karşılaştırılabilir kalır. Sayaçların
+      // kendi olayı başka bir döneme ait olabilir; bunlar kohort değil, dönem
+      // YÜKÜ göstergesidir ve kart etiketi paydayı açıkça yazar.
       refundRate: rate("refundedOrders", "paidOrders"),
       refundedAmount: of("refundedAmount"),
       cancelledOrders: of("cancelledOrders"),
-      // İptal oranının paydası AÇILAN sipariştir: iptal ödemeden önce de olur,
-      // ödenene bölmek payda dışındaki olayı sayardı.
-      cancellationRate: rate("cancelledOrders", "ordersCreated"),
+      cancellationRate: rate("cancelledOrders", "paidOrders"),
       paymentAttempts: of("paymentAttempts"),
       failedPayments: of("failedPayments"),
       paymentFailureRate: rate("failedPayments", "paymentAttempts"),
@@ -138,7 +137,6 @@ export class AnalyticsQualityService extends AnalyticsTabService<AnalyticsQualit
   private async totals(window: DashboardDateWindow): Promise<QualityTotals> {
     const [
       paidOrders,
-      ordersCreated,
       refunds,
       cancelledOrders,
       paymentAttempts,
@@ -146,12 +144,6 @@ export class AnalyticsQualityService extends AnalyticsTabService<AnalyticsQualit
       durations,
     ] = await Promise.all([
       this.prisma.order.count({ where: paidOrderWhere(window) }),
-      this.prisma.order.count({
-        where: {
-          createdAt: window,
-          origin: { not: OrderOrigin.platform_service },
-        },
-      }),
       this.prisma.refundRequest.aggregate({
         _count: { _all: true },
         _sum: { amount: true },
@@ -179,7 +171,6 @@ export class AnalyticsQualityService extends AnalyticsTabService<AnalyticsQualit
 
     return {
       paidOrders,
-      ordersCreated,
       refundedOrders: refunds._count._all,
       refundedAmount: num(refunds._sum.amount),
       cancelledOrders,
