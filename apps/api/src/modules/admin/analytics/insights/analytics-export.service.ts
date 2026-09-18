@@ -91,7 +91,7 @@ export class AnalyticsExportService {
     query: AnalyticsRangeQuery | undefined,
   ): Promise<AnalyticsExportFile> {
     const response = await this.load(tab, query);
-    const sheets = this.toSheets(response as Record<string, unknown>);
+    const sheets = this.toSheets(response);
     const range = (response as { range: { from: string; to: string } }).range;
     const stem = `analitik-${tab}-${range.from.slice(0, 10)}-${range.to.slice(0, 10)}`;
 
@@ -127,10 +127,14 @@ export class AnalyticsExportService {
     }
   }
 
-  private toSheets(response: Record<string, unknown>): RenderedSheet[] {
+  private toSheets(response: object): RenderedSheet[] {
     const sheets: RenderedSheet[] = [];
 
-    for (const [field, value] of Object.entries(response)) {
+    // Sekme yanıtları birbirinden farklı arayüzler; sayfalar ALANLARIN
+    // ŞEKLİNDEN türetildiği için burada tek ortak okuma biçimine indirilir.
+    const entries = Object.entries(response) as Array<[string, unknown]>;
+
+    for (const [field, value] of entries) {
       // `range` dosya adında zaten var ve tek satırlık bir sayfa açmaya
       // değmez.
       if (field === "range") continue;
@@ -199,7 +203,7 @@ export class AnalyticsExportService {
     // (yalnız bazı satırlarda dolan `averageViewUplift` gibi) düşmesin.
     const headers = [...new Set(rows.flatMap((row) => Object.keys(row)))];
 
-    return renderSheet(
+    return renderSheet<Record<string, Cell>>(
       name,
       headers.map((header) => ({ header, value: (row) => row[header] })),
       rows,
