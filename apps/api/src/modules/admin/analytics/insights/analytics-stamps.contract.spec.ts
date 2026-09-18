@@ -103,9 +103,15 @@ describe("analitik ölçüm sözleşmesi", () => {
     const allowed =
       /(PaymentStatus|CommissionLedgerStatus|BoostStatus|SubscriptionStatus|OfferStatus)\./;
 
+    // Kural KODA bakar: yorumlar eski davranışı ("`status = active` idi")
+    // anlatmak için bu sözcüğü yazmak zorunda ve bunları ihlal saymak,
+    // değişikliğin NEDENİNİ yazmayı cezalandırırdı.
+    const comment = /^\s*(\/\/|\/\*|\*)/;
+
     const offenders: string[] = [];
     for (const { file, source } of insightsSources()) {
       source.split("\n").forEach((line, index) => {
+        if (comment.test(line)) return;
         if (!/\bstatus\b\s*[:=]/.test(line)) return;
         if (allowed.test(line)) return;
         offenders.push(`${file}:${index + 1}`);
