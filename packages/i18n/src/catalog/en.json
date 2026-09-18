@@ -9936,6 +9936,13 @@
         "rangeIncomplete": "A custom period needs both a start and an end date",
         "rangeUnparseable": "The period dates must be valid dates",
         "rangeReversed": "The start date cannot be after the end date"
+      },
+      "analytics": {
+        "rangeIncomplete": "A date range needs both a start and an end",
+        "rangeUnparseable": "Both ends of the date range must be valid dates",
+        "rangeReversed": "The start date cannot be after the end date",
+        "rangeTooLong": "The date range can cover at most 366 days",
+        "unknownTab": "Unknown analytics tab"
       }
     },
     "advertisement": {

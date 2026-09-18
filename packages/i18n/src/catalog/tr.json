@@ -9936,6 +9936,13 @@
         "rangeIncomplete": "Özel dönem için başlangıç ve bitiş tarihi gerekir",
         "rangeUnparseable": "Dönem tarihleri geçerli birer tarih olmalı",
         "rangeReversed": "Başlangıç tarihi bitiş tarihinden sonra olamaz"
+      },
+      "analytics": {
+        "rangeIncomplete": "Tarih aralığı için başlangıç ve bitiş gerekir",
+        "rangeUnparseable": "Tarih aralığının uçları geçerli birer tarih olmalı",
+        "rangeReversed": "Başlangıç tarihi bitiş tarihinden sonra olamaz",
+        "rangeTooLong": "Tarih aralığı en fazla 366 gün olabilir",
+        "unknownTab": "Bilinmeyen analitik sekmesi"
       }
     },
     "advertisement": {

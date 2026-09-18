@@ -21,6 +21,9 @@ export {
   AddOrderTrackingDto,
   DashboardStatsQueryDto,
   DashboardRangeConstraint,
+  AnalyticsRangeQueryDto,
+  AnalyticsExportQueryDto,
+  AnalyticsRangeConstraint,
 } from "./analytics.dto";
 export {
   CreateTaxRegionDto,
