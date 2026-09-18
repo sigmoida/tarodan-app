@@ -1,146 +1,109 @@
-import {
-  ShoppingBagIcon,
-  CurrencyDollarIcon,
-  ChartBarIcon,
-  UsersIcon,
-  BanknotesIcon,
-  ReceiptRefundIcon,
-  SignalIcon,
-  ArrowTrendingUpIcon,
-} from "@heroicons/react/24/outline";
+"use client";
+
 import { useTranslations } from "next-intl";
 import { MetricCard } from "@/components/MetricCard";
 import { fmtNumber, fmtTry } from "@/lib/format";
-import { PeriodBreakdown } from "./PeriodBreakdown";
-import { type DashboardStats as Stats, type VisitorStats } from "../_lib/types";
+import { STAT_CARDS, type StatCardConfig } from "../_lib/statCards";
+import type { DashboardMetrics } from "../_lib/types";
 
-const fmtCount = (n: number) => fmtNumber(n) ?? "—";
-const fmtCurrency = (n: number) => fmtTry(n) ?? "—";
+const FORMATTERS = {
+  count: (n: number) => fmtNumber(n) ?? "—",
+  currency: (n: number) => fmtTry(n) ?? "—",
+} as const;
 
-function SplitValue({ left, right }: { left: number; right: number }) {
+function PairValue({ left, right }: { left: string; right: string }) {
   return (
     <span className="tabular-nums">
-      {fmtCount(left)}
+      {left}
       <span className="mx-1 text-muted">/</span>
-      {fmtCount(right)}
+      {right}
     </span>
   );
 }
 
 /**
- * The dashboard's two-row / eight-card metric grid (#301). Each card exposes
- * the period breakdown (yesterday / this month / last month) via the shared
- * `MetricCard` footer slot. Row 2 covers gross vs. net revenue plus the live
- * visitor count and cancellations/refunds, replacing the earlier revenue vs.
- * commission conflation.
+ * All-time figure under the period figure. It never changes with the filter —
+ * that contrast is the point of the card.
  */
-export function DashboardStats({
-  stats,
-  visitors,
-}: {
-  stats: Stats;
-  visitors: VisitorStats;
-}) {
+function AllTime({ value }: { value: React.ReactNode }) {
   const t = useTranslations();
   return (
-    <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-4">
-      {/* ── Row 1 ─────────────────────────────────────────────────────────── */}
-      <MetricCard
-        icon={ShoppingBagIcon}
-        tone="info"
-        label={t("admin.dashboard.stats.totalOrders")}
-        value={fmtCount(stats.totalOrders)}
-        change={stats.totalOrdersPeriods.changePercent}
-        footer={<PeriodBreakdown periods={stats.totalOrdersPeriods} />}
-      />
-      <MetricCard
-        icon={CurrencyDollarIcon}
-        tone="success"
-        label={t("admin.dashboard.stats.commissionRevenue")}
-        value={fmtCurrency(stats.netCommissionTotal)}
-        change={stats.netCommissionPeriods.changePercent}
-        footer={
-          <PeriodBreakdown
-            periods={stats.netCommissionPeriods}
-            format={fmtCurrency}
-          />
-        }
-      />
-      <MetricCard
-        icon={ChartBarIcon}
-        tone="primary"
-        label={t("admin.dashboard.stats.products")}
-        value={
-          <SplitValue
-            left={stats.activeProducts}
-            right={stats.passiveProducts}
-          />
-        }
-        title={`${t("admin.dashboard.stats.active")} / ${t("admin.dashboard.stats.passive")}`}
-        change={stats.activeProductsPeriods.changePercent}
-        footer={<PeriodBreakdown periods={stats.activeProductsPeriods} />}
-      />
-      <MetricCard
-        icon={UsersIcon}
-        tone="primary"
-        label={t("admin.dashboard.stats.users")}
-        value={
-          <SplitValue left={stats.activeUsers} right={stats.passiveUsers} />
-        }
-        title={`${t("admin.dashboard.stats.active")} / ${t("admin.dashboard.stats.passive")}`}
-        change={stats.activeUsersPeriods.changePercent}
-        footer={<PeriodBreakdown periods={stats.activeUsersPeriods} />}
-      />
+    <div className="mt-2 flex w-full min-w-0 flex-col">
+      <span className="truncate text-xs text-muted">
+        {t("admin.dashboard.period.allTime")}
+      </span>
+      <span className="truncate text-sm font-semibold tabular-nums text-heading">
+        {value}
+      </span>
+    </div>
+  );
+}
 
-      {/* ── Row 2 ─────────────────────────────────────────────────────────── */}
-      <MetricCard
-        icon={BanknotesIcon}
-        tone="success"
-        label={t("admin.dashboard.stats.grossSales")}
-        value={fmtCurrency(stats.grossSales)}
-        change={stats.grossSalesPeriods.changePercent}
-        footer={
-          <PeriodBreakdown
-            periods={stats.grossSalesPeriods}
-            format={fmtCurrency}
+function StatCard({
+  config,
+  metrics,
+}: {
+  config: StatCardConfig;
+  metrics: DashboardMetrics;
+}) {
+  const t = useTranslations();
+  const format = FORMATTERS[config.format];
+  const main = metrics[config.metric];
+  const secondary = config.secondary
+    ? metrics[config.secondary.metric]
+    : undefined;
+
+  // Two numbers separated by a slash mean nothing on their own — the pair is
+  // named in the label, not hidden in a tooltip (the old "680 / 10" problem).
+  const pairSuffix = config.secondary
+    ? ` (${t(config.secondary.leftKey)} / ${t(config.secondary.rightKey)})`
+    : "";
+
+  return (
+    <MetricCard
+      icon={config.icon}
+      tone={config.tone}
+      label={`${t(config.labelKey)}${pairSuffix}`}
+      value={
+        secondary ? (
+          <PairValue
+            left={format(main.period)}
+            right={format(secondary.period)}
           />
-        }
-      />
-      <MetricCard
-        icon={ArrowTrendingUpIcon}
-        tone="success"
-        label={t("admin.dashboard.stats.netCommission")}
-        value={fmtCurrency(stats.netCommissionRow2.thisMonth)}
-        change={stats.netCommissionRow2.changePercent}
-        footer={
-          <PeriodBreakdown
-            periods={stats.netCommissionRow2}
-            format={fmtCurrency}
-          />
-        }
-      />
-      <MetricCard
-        icon={SignalIcon}
-        tone="info"
-        label={t("admin.dashboard.stats.liveVisitors")}
-        value={
-          <span className="tabular-nums">
-            {fmtCount(visitors.liveVisitors)}
-            <span className="mx-1 text-muted">/</span>
-            {fmtCount(visitors.dailyActiveVisitors)}
-          </span>
-        }
-        title={`${t("admin.dashboard.stats.live")} / ${t("admin.dashboard.stats.daily")}`}
-      />
-      <MetricCard
-        icon={ReceiptRefundIcon}
-        tone="warning"
-        label={t("admin.dashboard.stats.cancellationsRefunds")}
-        value={<SplitValue left={stats.cancellations} right={stats.refunds} />}
-        title={`${t("admin.dashboard.stats.cancellations")} / ${t("admin.dashboard.stats.refunds")}`}
-        change={stats.cancellationsPeriods.changePercent}
-        footer={<PeriodBreakdown periods={stats.cancellationsPeriods} />}
-      />
+        ) : (
+          <span className="tabular-nums">{format(main.period)}</span>
+        )
+      }
+      change={main.changePercent}
+      changeLabel={t("admin.dashboard.period.vsPrevious")}
+      footer={
+        <AllTime
+          value={
+            secondary ? (
+              <PairValue
+                left={format(main.allTime)}
+                right={format(secondary.allTime)}
+              />
+            ) : (
+              format(main.allTime)
+            )
+          }
+        />
+      }
+    />
+  );
+}
+
+/**
+ * The dashboard's eight stat cards. The headline number follows the period
+ * filter; the all-time figure underneath does not.
+ */
+export function DashboardStats({ metrics }: { metrics: DashboardMetrics }) {
+  return (
+    <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-4">
+      {STAT_CARDS.map((config) => (
+        <StatCard key={config.id} config={config} metrics={metrics} />
+      ))}
     </div>
   );
 }

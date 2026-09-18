@@ -7276,25 +7276,29 @@
       "stats": {
         "totalOrders": "Total Sales",
         "commissionRevenue": "Commission Revenue",
-        "activeProducts": "Active Products",
-        "totalUsers": "Total Users",
         "products": "Products",
         "users": "Users",
         "grossSales": "Total Sales Amount",
         "netCommission": "Net Commission",
-        "liveVisitors": "Live / Daily Active Visitors",
         "cancellationsRefunds": "Cancellations / Refunds",
         "active": "Active",
         "passive": "Passive",
-        "live": "Live",
-        "daily": "Daily",
         "cancellations": "Cancellations",
-        "refunds": "Refunds"
+        "refunds": "Refunds",
+        "visitors": "Visitors"
       },
       "period": {
-        "yesterday": "Yesterday",
-        "thisMonth": "This month",
-        "lastMonth": "Last month"
+        "label": "Period",
+        "daily": "Daily",
+        "monthly": "Monthly",
+        "custom": "Date range",
+        "from": "Start date",
+        "to": "End date",
+        "allTime": "All time",
+        "vsPrevious": "vs previous period",
+        "rangeIncomplete": "Pick a start and an end date",
+        "rangeUnparseable": "Pick a valid date",
+        "rangeReversed": "The start date cannot be after the end date"
       },
       "quickActions": {
         "products": "Products",
@@ -7314,9 +7318,7 @@
         "ordersLabel": "Orders",
         "sales30dTitle": "Last 30 Days Sales Performance",
         "dailyOrdersTitle": "Daily Order Count",
-        "categoryTitle": "Category Distribution",
-        "noData": "No Data",
-        "uncategorized": "Uncategorized"
+        "noData": "No Data"
       },
       "recentOrders": {
         "title": "Recent Orders",
@@ -7345,10 +7347,6 @@
           "products": "Products",
           "activeListings": "Active"
         }
-      },
-      "status": {
-        "refundRequested": "Refund Requested",
-        "inProgress": "In Progress"
       },
       "relativeTime": {
         "minutesAgo": "{count} min ago",

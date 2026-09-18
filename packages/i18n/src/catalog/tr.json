@@ -7276,25 +7276,29 @@
       "stats": {
         "totalOrders": "Toplam Satış",
         "commissionRevenue": "Komisyon Geliri",
-        "activeProducts": "Aktif Ürünler",
-        "totalUsers": "Toplam Kullanıcı",
         "products": "Ürünler",
         "users": "Kullanıcılar",
         "grossSales": "Toplam Satış Tutarı",
         "netCommission": "Net Komisyon",
-        "liveVisitors": "Canlı / Günlük Aktif Ziyaretçi",
         "cancellationsRefunds": "İptal / İade",
         "active": "Aktif",
         "passive": "Pasif",
-        "live": "Canlı",
-        "daily": "Günlük",
         "cancellations": "İptal",
-        "refunds": "İade"
+        "refunds": "İade",
+        "visitors": "Ziyaretçiler"
       },
       "period": {
-        "yesterday": "Dün",
-        "thisMonth": "Bu Ay",
-        "lastMonth": "Geçen Ay"
+        "label": "Dönem",
+        "daily": "Günlük",
+        "monthly": "Aylık",
+        "custom": "Tarih aralığı",
+        "from": "Başlangıç tarihi",
+        "to": "Bitiş tarihi",
+        "allTime": "Tüm zamanlar",
+        "vsPrevious": "önceki döneme göre",
+        "rangeIncomplete": "Başlangıç ve bitiş tarihi seçin",
+        "rangeUnparseable": "Geçerli bir tarih seçin",
+        "rangeReversed": "Başlangıç tarihi bitiş tarihinden sonra olamaz"
       },
       "quickActions": {
         "products": "Ürünler",
@@ -7314,9 +7318,7 @@
         "ordersLabel": "Siparişler",
         "sales30dTitle": "Son 30 Gün Satış Performansı",
         "dailyOrdersTitle": "Günlük Sipariş Sayısı",
-        "categoryTitle": "Kategori Dağılımı",
-        "noData": "Veri Yok",
-        "uncategorized": "Kategorisiz"
+        "noData": "Veri Yok"
       },
       "recentOrders": {
         "title": "Son Siparişler",
@@ -7345,10 +7347,6 @@
           "products": "Ürün",
           "activeListings": "Aktif İlan"
         }
-      },
-      "status": {
-        "refundRequested": "İade Talebi",
-        "inProgress": "Devam Ediyor"
       },
       "relativeTime": {
         "minutesAgo": "{count} dk önce",

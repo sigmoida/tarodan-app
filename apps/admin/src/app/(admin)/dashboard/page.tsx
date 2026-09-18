@@ -8,7 +8,10 @@ import { AdminPage } from "@/components/page/AdminPage";
 import { PageHeader } from "@/components/AdminList";
 import { SuspenseBoundary } from "@/components/page/SuspenseBoundary";
 import { useDashboard } from "./_lib/useDashboard";
+import { useDashboardPeriod } from "./_lib/useDashboardPeriod";
+import type { DashboardPeriodSelection } from "./_lib/periodParams";
 import { DashboardStats } from "./_components/DashboardStats";
+import { DashboardPeriodFilter } from "./_components/DashboardPeriodFilter";
 import { PendingActionsPanel } from "./_components/PendingActionsPanel";
 // Charts pull in chart.js/react-chartjs-2 (~150KB) and render below the stat
 // cards, so they load lazily off the /dashboard landing bundle (#102).
@@ -16,21 +19,21 @@ const DashboardCharts = dynamic(
   () => import("./_components/DashboardCharts").then((m) => m.DashboardCharts),
   { ssr: false },
 );
-const CategoryChart = dynamic(
-  () => import("./_components/CategoryChart").then((m) => m.CategoryChart),
-  { ssr: false },
-);
 import { RecentOrders } from "./_components/RecentOrders";
 import { RecentTrades } from "./_components/RecentTrades";
 import { TopProductsWidget } from "./_components/TopProductsWidget";
 import { TopSellersWidget } from "./_components/TopSellersWidget";
 
-function DashboardContent() {
-  const data = useDashboard();
+function DashboardContent({
+  selection,
+}: {
+  selection: DashboardPeriodSelection;
+}) {
+  const data = useDashboard(selection);
 
   return (
     <>
-      <DashboardStats stats={data.stats} visitors={data.visitors} />
+      <DashboardStats metrics={data.metrics} />
       <PendingActionsPanel pending={data.pendingActions} />
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         <TopProductsWidget products={data.topProducts} />
@@ -40,10 +43,7 @@ function DashboardContent() {
         salesByDay={data.analytics.salesByDay}
         ordersByDay={data.analytics.ordersByDay}
       />
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-        <CategoryChart categories={data.analytics.categoryDistribution} />
-        <RecentOrders orders={data.recentOrders} />
-      </div>
+      <RecentOrders orders={data.recentOrders} />
       <RecentTrades trades={data.recentTrades} />
     </>
   );
@@ -54,7 +54,11 @@ function DashboardContent() {
  * until hydration completes before starting those requests, so SSR and the
  * browser's first render share the same loading snapshot.
  */
-function HydratedDashboardContent() {
+function HydratedDashboardContent({
+  selection,
+}: {
+  selection: DashboardPeriodSelection;
+}) {
   const [hydrated, setHydrated] = useState(false);
 
   useEffect(() => setHydrated(true), []);
@@ -67,20 +71,23 @@ function HydratedDashboardContent() {
     );
   }
 
-  return <DashboardContent />;
+  return <DashboardContent selection={selection} />;
 }
 
 export default function DashboardPage() {
   const t = useTranslations();
+  const [selection, setSelection] = useDashboardPeriod();
 
   return (
     <AdminPage>
       <PageHeader
         title={t("admin.dashboard.title")}
         description={t("admin.dashboard.description")}
-      />
+      >
+        <DashboardPeriodFilter selection={selection} onChange={setSelection} />
+      </PageHeader>
       <SuspenseBoundary>
-        <HydratedDashboardContent />
+        <HydratedDashboardContent selection={selection} />
       </SuspenseBoundary>
     </AdminPage>
   );

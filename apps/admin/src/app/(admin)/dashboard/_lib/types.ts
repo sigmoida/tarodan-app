@@ -1,59 +1,52 @@
-import { orderStatusConfig, tradeStatusConfig } from "@tarodan/ui";
+import {
+  DASHBOARD_METRIC_KEYS,
+  type DashboardMetric,
+  type DashboardMetricKey,
+  type DashboardPeriodRange,
+} from "@tarodan/types";
+import { orderStatusConfig, tradeStatusConfig } from "@tarodan/shared";
 import type { StatusConfig } from "@tarodan/ui";
 import { useTranslations } from "next-intl";
 import { fmtDate } from "@/lib/format";
+import { statusConfig } from "@/lib/statusLabels";
 
 type T = ReturnType<typeof useTranslations<never>>;
 
-/**
- * Yesterday / this-month / last-month + changePercent breakdown for a single
- * metric. Mirrors the `MetricPeriods` interface returned by the API dashboard
- * endpoint (#295).
- */
-export interface MetricPeriods {
-  yesterday: number;
-  thisMonth: number;
-  lastMonth: number;
-  changePercent: number;
-}
+export type DashboardMetrics = Record<DashboardMetricKey, DashboardMetric>;
 
-export const EMPTY_PERIODS: MetricPeriods = {
-  yesterday: 0,
-  thisMonth: 0,
-  lastMonth: 0,
+const EMPTY_METRIC: DashboardMetric = {
+  period: 0,
+  previous: 0,
+  allTime: 0,
   changePercent: 0,
 };
 
-export interface DashboardStats {
-  // Row 1
-  totalOrders: number;
-  totalOrdersPeriods: MetricPeriods;
-  netCommissionTotal: number;
-  netCommissionPeriods: MetricPeriods;
-  activeProducts: number;
-  passiveProducts: number;
-  activeProductsPeriods: MetricPeriods;
-  passiveProductsPeriods: MetricPeriods;
-  activeUsers: number;
-  passiveUsers: number;
-  activeUsersPeriods: MetricPeriods;
-  passiveUsersPeriods: MetricPeriods;
+/**
+ * Coerce the dashboard response into the metric map the cards read.
+ *
+ * The dashboard tolerates a failing/undeployed endpoint (see `useDashboard`),
+ * so every metric falls back to zeros instead of blanking the screen.
+ */
+export function toDashboardMetrics(raw: unknown): DashboardMetrics {
+  const source = (raw ?? {}) as Partial<Record<DashboardMetricKey, unknown>>;
+  const metrics = {} as DashboardMetrics;
 
-  // Row 2
-  grossSales: number;
-  grossSalesPeriods: MetricPeriods;
-  netCommissionRow2: MetricPeriods;
-  cancellations: number;
-  refunds: number;
-  cancellationsPeriods: MetricPeriods;
-  refundsPeriods: MetricPeriods;
+  for (const key of DASHBOARD_METRIC_KEYS) {
+    const entry = source[key];
+    metrics[key] =
+      entry && typeof entry === "object"
+        ? {
+            period: Number((entry as DashboardMetric).period ?? 0),
+            previous: Number((entry as DashboardMetric).previous ?? 0),
+            allTime: Number((entry as DashboardMetric).allTime ?? 0),
+            changePercent: Number(
+              (entry as DashboardMetric).changePercent ?? 0,
+            ),
+          }
+        : EMPTY_METRIC;
+  }
 
-  pendingApprovals: number;
-}
-
-export interface VisitorStats {
-  liveVisitors: number;
-  dailyActiveVisitors: number;
+  return metrics;
 }
 
 export interface TopProduct {
@@ -113,12 +106,11 @@ export interface PendingActions {
 export interface DashboardAnalytics {
   salesByDay: number[];
   ordersByDay: number[];
-  categoryDistribution: { name: string; count: number }[];
 }
 
 export interface DashboardData {
-  stats: DashboardStats;
-  visitors: VisitorStats;
+  metrics: DashboardMetrics;
+  range: DashboardPeriodRange | null;
   recentOrders: RecentOrder[];
   recentTrades: RecentTrade[];
   pendingActions: PendingActions | null;
@@ -127,26 +119,19 @@ export interface DashboardData {
   topSellers: TopSeller[];
 }
 
-/** Order config + refund_requested (not in the shared config). */
+/**
+ * Badge copy for the recent-orders / recent-trades lists.
+ *
+ * The shared maps carry catalog KEYS, not labels, so they have to be resolved
+ * with the screen's translator — spreading them raw is what used to print the
+ * bare enum value ("shipped", "cancelled") in the UI.
+ */
 export function dashboardOrderStatusConfig(t: T): Record<string, StatusConfig> {
-  return {
-    ...orderStatusConfig,
-    refund_requested: {
-      label: t("admin.dashboard.status.refundRequested"),
-      variant: "warning",
-    },
-  };
+  return statusConfig(orderStatusConfig, t);
 }
 
-/** Trade config + in_progress (not in the shared config). */
 export function dashboardTradeStatusConfig(t: T): Record<string, StatusConfig> {
-  return {
-    ...tradeStatusConfig,
-    in_progress: {
-      label: t("admin.dashboard.status.inProgress"),
-      variant: "info",
-    },
-  };
+  return statusConfig(tradeStatusConfig, t);
 }
 
 export function formatRelativeDate(dateString: string, t: T) {

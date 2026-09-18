@@ -1,15 +1,17 @@
+import type { DashboardPeriodQuery } from "@tarodan/types";
 import { api } from "./client";
 
 /** Dashboard widgets + analytics charts. */
 export const dashboardApi = {
   // Dashboard
-  getDashboard: () => api.get("/admin/dashboard"),
+  /** Stat cards for one period; every metric also carries its all-time figure. */
+  getDashboard: (params?: DashboardPeriodQuery) =>
+    api.get("/admin/dashboard", { params }),
   getRecentOrders: (limit?: number) =>
     api.get("/admin/dashboard/recent-orders", { params: { limit } }),
   getPendingActions: () => api.get("/admin/dashboard/pending-actions"),
   getIdentityVerificationRequests: () =>
     api.get("/admin/users/verification-requests"),
-  getRealtimeVisitors: () => api.get("/reports/access/realtime"),
   getTopProducts: (limit?: number) =>
     api.get("/admin/dashboard/top-products", { params: { limit } }),
   getTopSellers: (limit?: number) =>

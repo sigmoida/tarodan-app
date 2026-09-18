@@ -1,21 +1,20 @@
 "use client";
 
 import { useSuspenseQuery } from "@tanstack/react-query";
-import { useTranslations } from "next-intl";
+import type {
+  DashboardPeriodQuery,
+  DashboardPeriodRange,
+} from "@tarodan/types";
 import { adminApi } from "@/lib/api";
 import { adminKeys } from "@/lib/query/keys";
 import {
+  toDashboardMetrics,
   type DashboardData,
-  type DashboardStats,
-  EMPTY_PERIODS,
-  type MetricPeriods,
   type PendingActions,
   type TopProduct,
   type TopSeller,
-  type VisitorStats,
 } from "./types";
-
-type T = ReturnType<typeof useTranslations<never>>;
+import { toPeriodQuery, type DashboardPeriodSelection } from "./periodParams";
 
 /** Build a 30-entry series (oldest→newest) from a date→value map. */
 function last30Days(dayMap: Map<string, number>) {
@@ -26,31 +25,20 @@ function last30Days(dayMap: Map<string, number>) {
   });
 }
 
-/** Coerce whatever the API returns into a MetricPeriods object; missing → zeros. */
-function toPeriods(raw: unknown): MetricPeriods {
-  if (!raw || typeof raw !== "object") return EMPTY_PERIODS;
-  const r = raw as Partial<MetricPeriods>;
-  return {
-    yesterday: Number(r.yesterday ?? 0),
-    thisMonth: Number(r.thisMonth ?? 0),
-    lastMonth: Number(r.lastMonth ?? 0),
-    changePercent: Number(r.changePercent ?? 0),
-  };
-}
-
-async function fetchDashboard(t: T): Promise<DashboardData> {
+async function fetchDashboard(
+  query: DashboardPeriodQuery,
+): Promise<DashboardData> {
   // Each widget loads independently: a single missing or failing endpoint (e.g.
   // a dashboard endpoint not yet deployed to the target API) must not blank the
   // whole page. Failed calls fall back to an empty response, so that one widget
   // just renders its empty state while the rest of the dashboard stays up.
   // (A 401 still redirects to login via the api-client interceptor.)
   const settled = await Promise.allSettled([
-    adminApi.getDashboard(),
+    adminApi.getDashboard(query),
     adminApi.getRecentOrders(5),
     adminApi.getPendingActions(),
     adminApi.getSalesAnalytics({ groupBy: "day" }),
     adminApi.getTrades({ limit: 5, sort: "createdAt:desc" }),
-    adminApi.getRealtimeVisitors(),
     adminApi.getTopProducts(10),
     adminApi.getTopSellers(10),
   ]);
@@ -64,65 +52,15 @@ async function fetchDashboard(t: T): Promise<DashboardData> {
   const pendingRes = at(2, { data: null });
   const salesRes = at(3, { data: null });
   const tradesRes = at(4, { data: [] });
-  const visitorsRes = at(5, { data: {} });
-  const topProductsRes = at(6, { data: [] });
-  const topSellersRes = at(7, { data: [] });
+  const topProductsRes = at(5, { data: [] });
+  const topSellersRes = at(6, { data: [] });
 
   // Güvenli erişim: `at()` geri düşüşleri (`{ data: null }`) ve boş gövde
-  // dönen uçlar yüzünden `res.data` null olabiliyor. Bu fonksiyon aynı deseni
-  // bazı satırlarda `?.` ile, bazılarında `.` ile yazıyordu — düz olanlar
-  // panoyu komple çökertiyordu (sunucu render'ı düşüp istemciye geçiyordu).
+  // dönen uçlar yüzünden `res.data` null olabiliyor.
   const data = dashboardRes.data?.data || dashboardRes.data || {};
 
-  // Gross sales and net commission are distinct backend fields (#295); no
-  // longer conflated into one `totalRevenue` scalar.
-  const grossSalesPeriods = toPeriods(data.grossSales);
-  const netCommissionPeriods = toPeriods(data.netCommission);
-  const activeProductsPeriods = toPeriods(data.activeProducts);
-  const passiveProductsPeriods = toPeriods(data.passiveProducts);
-  const activeUsersPeriods = toPeriods(data.activeUsers);
-  const passiveUsersPeriods = toPeriods(data.passiveUsers);
-  const cancellationsPeriods = toPeriods(data.cancellations);
-  const refundsPeriods = toPeriods(data.refunds);
-  const totalOrdersPeriods = toPeriods(data.orders);
-
-  const stats: DashboardStats = {
-    totalOrders: data.orders?.total || 0,
-    totalOrdersPeriods,
-    netCommissionTotal: Number(data.revenue?.total ?? 0),
-    netCommissionPeriods,
-    activeProducts: data.products?.active || 0,
-    passiveProducts:
-      typeof data.products?.passive === "number"
-        ? data.products.passive
-        : passiveProductsPeriods.thisMonth,
-    activeProductsPeriods,
-    passiveProductsPeriods,
-    activeUsers:
-      typeof data.users?.active === "number"
-        ? data.users.active
-        : activeUsersPeriods.thisMonth,
-    passiveUsers:
-      typeof data.users?.passive === "number"
-        ? data.users.passive
-        : passiveUsersPeriods.thisMonth,
-    activeUsersPeriods,
-    passiveUsersPeriods,
-    grossSales: grossSalesPeriods.thisMonth,
-    grossSalesPeriods,
-    netCommissionRow2: netCommissionPeriods,
-    cancellations: cancellationsPeriods.thisMonth,
-    refunds: refundsPeriods.thisMonth,
-    cancellationsPeriods,
-    refundsPeriods,
-    pendingApprovals: data.products?.pending || 0,
-  };
-
-  const visitorsData = visitorsRes.data?.data || visitorsRes.data;
-  const visitors: VisitorStats = {
-    liveVisitors: Number(visitorsData?.liveVisitors ?? 0),
-    dailyActiveVisitors: Number(visitorsData?.dailyActiveVisitors ?? 0),
-  };
+  const metrics = toDashboardMetrics(data.metrics);
+  const range: DashboardPeriodRange | null = data.range ?? null;
 
   const ordersData = ordersRes.data?.data || ordersRes.data || [];
   const recentOrders = Array.isArray(ordersData) ? ordersData : [];
@@ -139,16 +77,7 @@ async function fetchDashboard(t: T): Promise<DashboardData> {
       }
     : null;
 
-  // ── Analytics (30-day series + category distribution) ──────────────────────
-  let categoryDistribution: { name: string; count: number }[] = Array.isArray(
-    data.categoryDistribution,
-  )
-    ? data.categoryDistribution.map((c: { name: string; count: number }) => ({
-        name: c.name || t("admin.dashboard.charts.uncategorized"),
-        count: typeof c.count === "number" ? c.count : 0,
-      }))
-    : [];
-
+  // ── Analytics (30-day series) ──────────────────────────────────────────────
   let salesByDay = Array(30).fill(0);
   let ordersByDay = Array(30).fill(0);
 
@@ -168,12 +97,6 @@ async function fetchDashboard(t: T): Promise<DashboardData> {
     });
     salesByDay = last30Days(salesMap);
     ordersByDay = last30Days(ordersMap);
-    if (salesData && !Array.isArray(salesData)) {
-      categoryDistribution =
-        salesData.categoryDistribution ??
-        salesData.categories ??
-        categoryDistribution;
-    }
   }
 
   const topProductsData =
@@ -188,23 +111,26 @@ async function fetchDashboard(t: T): Promise<DashboardData> {
     : [];
 
   return {
-    stats,
-    visitors,
+    metrics,
+    range,
     recentOrders,
     recentTrades,
     pendingActions,
-    analytics: { salesByDay, ordersByDay, categoryDistribution },
+    analytics: { salesByDay, ordersByDay },
     topProducts,
     topSellers,
   };
 }
 
-/** Loads all dashboard data (stats, recent orders/trades, pending, analytics). */
-export function useDashboard() {
-  const t = useTranslations();
-  const query = useSuspenseQuery({
-    queryKey: adminKeys.all("dashboard"),
-    queryFn: () => fetchDashboard(t),
+/**
+ * Loads all dashboard data for the selected period. The period is part of the
+ * query key, so switching it refetches instead of re-deriving numbers locally.
+ */
+export function useDashboard(selection: DashboardPeriodSelection) {
+  const query = toPeriodQuery(selection);
+  const result = useSuspenseQuery({
+    queryKey: [...adminKeys.all("dashboard"), query],
+    queryFn: () => fetchDashboard(query),
   });
-  return query.data;
+  return result.data;
 }
