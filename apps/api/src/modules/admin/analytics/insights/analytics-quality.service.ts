@@ -14,6 +14,7 @@ import {
   toAnalyticsRange,
   type ResolvedAnalyticsRange,
 } from "./analytics-range.helper";
+import { stampTruncations } from "./analytics-truncation.helper";
 import {
   bucketExpr,
   metric,
@@ -24,14 +25,6 @@ import {
   toSeries,
   type BucketRow,
 } from "./analytics-shapes.helper";
-
-/**
- * `Order.cancelledAt` bu andan itibaren yazılıyor (bkz.
- * `20260918100000_order_cancelled_at_and_dashboard_indexes`). Daha eski
- * iptaller hiçbir dönemde görünmez; dürüst bir geri doldurma yok — `updatedAt`
- * iptalden sonraki her dokunuşla kayıyor.
- */
-const ORDER_CANCELLED_AT_SINCE = "2026-09-18T00:00:00.000Z";
 
 interface QualityTotals {
   paidOrders: number;
@@ -88,10 +81,7 @@ export class AnalyticsQualityService extends AnalyticsTabService<AnalyticsQualit
         toSeries("failedPayments", series.failed, range.buckets),
       ],
       ...breakdowns,
-      cancellationsTruncatedBefore:
-        range.current.gte.toISOString() < ORDER_CANCELLED_AT_SINCE
-          ? ORDER_CANCELLED_AT_SINCE
-          : null,
+      truncations: stampTruncations(range.current, ["orderCancelledAt"]),
     };
   }
 

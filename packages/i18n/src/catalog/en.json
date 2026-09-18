@@ -7444,9 +7444,9 @@
         "xlsx": "Download Excel"
       },
       "notes": {
-        "cancellationsTruncated": "Cancellation time has only been recorded since {date}; earlier cancellations are not in this figure.",
         "stockElsewhere": "Current-state counts live on the Dashboard.",
-        "carrierCostReconciledOnly": "Covers only shipments whose carrier statement has arrived; so does the comparison."
+        "carrierCostReconciledOnly": "Covers only shipments whose carrier statement has arrived; so does the comparison.",
+        "truncated": "{stamp} has only been recorded since {date}; anything earlier is not in these figures."
       },
       "metric": {
         "gmv": "Paid volume (GMV)",
@@ -7600,6 +7600,13 @@
         "percent": "{value}%",
         "days": "{value} d",
         "hours": "{value} h"
+      },
+      "stamp": {
+        "orderCancelledAt": "Order cancellation time",
+        "tradeRejectedAt": "Trade rejection time",
+        "productSoldAt": "Listing sale time",
+        "offerRespondedAt": "Offer response time",
+        "membershipPastDueAt": "Membership past-due time"
       }
     },
     "reports": {

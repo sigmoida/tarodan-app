@@ -16,6 +16,7 @@ import {
   toAnalyticsRange,
   type ResolvedAnalyticsRange,
 } from "./analytics-range.helper";
+import { stampTruncations } from "./analytics-truncation.helper";
 import {
   bucketExpr,
   metric,
@@ -99,6 +100,7 @@ export class AnalyticsCatalogService extends AnalyticsTabService<AnalyticsCatalo
       ]),
       ...breakdowns,
       boostPackages,
+      truncations: stampTruncations(range.current, ["productSoldAt"]),
     };
   }
 

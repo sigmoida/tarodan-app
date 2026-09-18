@@ -7,7 +7,9 @@ import type {
   AnalyticsBoostPackageRow,
   AnalyticsFunnelStep,
   AnalyticsLeaderRow,
+  AnalyticsStampTruncation,
 } from "@tarodan/types";
+import type { MessageKey } from "@tarodan/i18n";
 import { MetricCard } from "@/components/MetricCard";
 import { SectionCard } from "@/components/detail/SectionCard";
 import { fmtDate } from "@/lib/format";
@@ -53,10 +55,9 @@ export function AnalyticsTabView({
     return <EmptyState title={t("admin.analytics.empty")} />;
   }
 
-  const truncated =
-    typeof data?.cancellationsTruncatedBefore === "string"
-      ? data.cancellationsTruncatedBefore
-      : null;
+  // Every stamp whose history starts later than the window asked for. One
+  // sentence, one shape, whichever tab and however many stamps it measures.
+  const truncations = rowsOf<AnalyticsStampTruncation>(data, "truncations");
 
   return (
     <div className="flex flex-col gap-6">
@@ -93,13 +94,16 @@ export function AnalyticsTabView({
         })}
       </div>
 
-      {truncated && (
-        <Alert variant="warning">
-          {t("admin.analytics.notes.cancellationsTruncated", {
-            date: fmtDate(truncated) ?? truncated,
+      {truncations.map((truncation) => (
+        <Alert key={truncation.stamp} variant="warning">
+          {t("admin.analytics.notes.truncated", {
+            stamp: t(
+              `admin.analytics.stamp.${truncation.stamp}` as MessageKey,
+            ),
+            date: fmtDate(truncation.since) ?? truncation.since,
           })}
         </Alert>
-      )}
+      ))}
 
       <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
         {sections.charts.map((chart) => (

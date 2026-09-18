@@ -13,6 +13,7 @@ import {
   toAnalyticsRange,
   type ResolvedAnalyticsRange,
 } from "./analytics-range.helper";
+import { stampTruncations } from "./analytics-truncation.helper";
 import {
   bucketExpr,
   metric,
@@ -70,6 +71,7 @@ export class AnalyticsMembershipService extends AnalyticsTabService<AnalyticsMem
         toSeries("membershipRevenue", series.revenue, range.buckets),
       ],
       byTier,
+      truncations: stampTruncations(range.current, ["membershipPastDueAt"]),
     };
   }
 

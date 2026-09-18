@@ -13,6 +13,7 @@ import {
   toAnalyticsRange,
   type ResolvedAnalyticsRange,
 } from "./analytics-range.helper";
+import { stampTruncations } from "./analytics-truncation.helper";
 import {
   bucketExpr,
   metric,
@@ -107,6 +108,10 @@ export class AnalyticsTradeService extends AnalyticsTabService<AnalyticsTradeRes
         "count",
       ),
       byPricingVersion,
+      truncations: stampTruncations(range.current, [
+        "tradeRejectedAt",
+        "offerRespondedAt",
+      ]),
       offerFunnel: toFunnel([
         { key: "created", count: current.offersCreated },
         { key: "responded", count: current.offersResponded },

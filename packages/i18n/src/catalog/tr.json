@@ -7444,9 +7444,9 @@
         "xlsx": "Excel İndir"
       },
       "notes": {
-        "cancellationsTruncated": "İptal anı {date} tarihinden itibaren kaydediliyor; daha eski iptaller bu sayıda görünmez.",
         "stockElsewhere": "Anlık durum sayıları Kontrol Paneli'nde.",
-        "carrierCostReconciledOnly": "Yalnız taşıyıcı dökümü gelmiş gönderileri kapsar; karşılaştırma da yalnız onlar üzerinden."
+        "carrierCostReconciledOnly": "Yalnız taşıyıcı dökümü gelmiş gönderileri kapsar; karşılaştırma da yalnız onlar üzerinden.",
+        "truncated": "{stamp} {date} tarihinden itibaren kaydediliyor; daha eskiler bu sayılarda görünmez."
       },
       "metric": {
         "gmv": "Ödenen ciro (GMV)",
@@ -7600,6 +7600,13 @@
         "percent": "%{value}",
         "days": "{value} gün",
         "hours": "{value} sa"
+      },
+      "stamp": {
+        "orderCancelledAt": "Sipariş iptal anı",
+        "tradeRejectedAt": "Takas ret anı",
+        "productSoldAt": "İlan satış anı",
+        "offerRespondedAt": "Teklif cevap anı",
+        "membershipPastDueAt": "Üyelik ödemesiz kalma anı"
       }
     },
     "reports": {

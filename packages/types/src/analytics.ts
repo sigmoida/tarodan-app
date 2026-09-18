@@ -206,6 +206,32 @@ export const ANALYTICS_PRICE_BANDS = [
 export type AnalyticsPriceBandKey =
   (typeof ANALYTICS_PRICE_BANDS)[number]["key"];
 
+/**
+ * Event stamps that were added AFTER the data they describe already existed.
+ *
+ * None of them was backfilled — `updatedAt` drifts with every later touch, so
+ * there is no honest value to write — which means anything that happened
+ * before the stamp shipped is invisible to the metric built on it. A tab that
+ * measures one of these says so on screen instead of letting a short history
+ * read as a real decline.
+ */
+export const ANALYTICS_STAMP_KEYS = [
+  "orderCancelledAt",
+  "tradeRejectedAt",
+  "productSoldAt",
+  "offerRespondedAt",
+  "membershipPastDueAt",
+] as const;
+
+export type AnalyticsStampKey = (typeof ANALYTICS_STAMP_KEYS)[number];
+
+/** One stamp whose history starts later than the window the caller asked for. */
+export interface AnalyticsStampTruncation {
+  stamp: AnalyticsStampKey;
+  /** ISO instant the stamp started being written. */
+  since: string;
+}
+
 // ===========================================================================
 // Satış ve Gelir
 // ===========================================================================
@@ -303,6 +329,7 @@ export interface AnalyticsTradeResponse {
   /** v1 vs v2 pricing — the two charge trades in different ways. */
   byPricingVersion: AnalyticsBreakdownRow[];
   offerFunnel: AnalyticsFunnelStep[];
+  truncations: AnalyticsStampTruncation[];
 }
 
 // ===========================================================================
@@ -345,6 +372,7 @@ export interface AnalyticsCatalogResponse {
   byCondition: AnalyticsBreakdownRow[];
   /** Boost packages: purchases, revenue and the view uplift they produced. */
   boostPackages: AnalyticsBoostPackageRow[];
+  truncations: AnalyticsStampTruncation[];
 }
 
 export interface AnalyticsBoostPackageRow {
@@ -400,12 +428,7 @@ export interface AnalyticsQualityResponse {
   cancellationsByReason: AnalyticsBreakdownRow[];
   cancellationsByType: AnalyticsBreakdownRow[];
   installmentMix: AnalyticsBreakdownRow[];
-  /**
-   * `Order.cancelledAt` only exists from the dashboard migration onwards, so
-   * cancellations recorded before it are invisible here. The screen says so
-   * rather than letting the number read as a real decline.
-   */
-  cancellationsTruncatedBefore: string | null;
+  truncations: AnalyticsStampTruncation[];
 }
 
 // ===========================================================================
@@ -444,6 +467,7 @@ export interface AnalyticsMembershipResponse {
   metrics: Record<MembershipMetricKey, AnalyticsMetric>;
   series: AnalyticsSeries<MembershipSeriesKey>[];
   byTier: AnalyticsBreakdownRow[];
+  truncations: AnalyticsStampTruncation[];
 }
 
 // ===========================================================================
