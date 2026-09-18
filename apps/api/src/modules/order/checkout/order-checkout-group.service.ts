@@ -1076,14 +1076,6 @@ export class OrderCheckoutGroupService {
               },
             });
 
-            await this.checkoutCommon.recordCommissionSnapshot(
-              order.id,
-              input.orderNumber,
-              input.commissionResult.commissionAmount,
-              input.totalAmount,
-              input.commissionResult,
-            );
-
             // Kodsuz (otomatik) kampanyaların bütçesi sipariş oluşurken
             // harcanır; ödenmeyen sipariş kapanırken geri verilir. Kuponun
             // bütçesi aşağıdaki reserveUsage ile tutulur.

@@ -50,7 +50,6 @@ import { CacheModule } from "./modules/cache";
 import { PaymentProvidersModule } from "./modules/payment-providers";
 
 // PHASE 5 - Platform Operations (AUDIT REMEDIATION)
-import { ReportsModule } from "./modules/reports";
 
 // Invoice System - requirements.txt: "invoices will be sent to users automatically"
 import { InvoiceModule } from "./modules/invoice";
@@ -203,7 +202,6 @@ import { isTest } from "./config/environment";
     PaymentProvidersModule, // PayTR & kargo
 
     // PHASE 5 - Operations Modules
-    ReportsModule, // GAP-019: Report Export (MEDIUM)
     InvoiceModule, // Invoice Generation & Delivery
     ElogoModule, // eLogo e-Belge (e-Arşiv / e-Fatura) entegrasyonu
     MarketingModule, // Marketing Email Scheduler (weekly newsletter, monthly promotions)

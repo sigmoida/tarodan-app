@@ -458,22 +458,6 @@ export class AdminService {
     return this.analyticsService.getDashboardStats(query);
   }
 
-  async saveAnalyticsSnapshot() {
-    return this.analyticsService.saveAnalyticsSnapshot();
-  }
-
-  async getSalesAnalytics(query: AnalyticsQueryDto) {
-    return this.analyticsService.getSalesAnalytics(query);
-  }
-
-  async getRevenueAnalytics(query: AnalyticsQueryDto) {
-    return this.analyticsService.getRevenueAnalytics(query);
-  }
-
-  async getUserAnalytics(query: AnalyticsQueryDto) {
-    return this.analyticsService.getUserAnalytics(query);
-  }
-
   async getOrderById(orderId: string) {
     return this.analyticsService.getOrderById(orderId);
   }
@@ -518,32 +502,8 @@ export class AdminService {
     return this.analyticsService.getTopSellers(limit);
   }
 
-  async generateSalesReport(query: ReportQueryDto) {
-    return this.analyticsService.generateSalesReport(query);
-  }
-
-  async generateUsersReport(query: ReportQueryDto) {
-    return this.analyticsService.generateUsersReport(query);
-  }
-
-  async generateProductsReport(query: ReportQueryDto) {
-    return this.analyticsService.generateProductsReport(query);
-  }
-
-  async generateTradesReport(query: ReportQueryDto) {
-    return this.analyticsService.generateTradesReport(query);
-  }
-
-  async getCommissionReport(query: ReportQueryDto) {
-    return this.analyticsService.getCommissionReport(query);
-  }
-
   async getCommissionRevenue(query: AnalyticsQueryDto) {
     return this.analyticsService.getCommissionRevenue(query);
-  }
-
-  async generateCustomReport(query: ReportQueryDto) {
-    return this.analyticsService.generateCustomReport(query);
   }
 
   // ==================== AUDIT LOGS ====================

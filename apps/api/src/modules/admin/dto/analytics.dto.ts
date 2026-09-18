@@ -1,4 +1,5 @@
 import {
+  IsBoolean,
   IsOptional,
   IsDateString,
   IsEnum,
@@ -16,18 +17,19 @@ import { ApiPropertyOptional, ApiProperty } from "@nestjs/swagger";
 import { Transform } from "class-transformer";
 import { OrderStatus } from "@prisma/client";
 import {
+  ANALYTICS_EXPORT_FORMATS,
+  ANALYTICS_GROUP_BYS,
   DASHBOARD_PERIODS,
+  DEFAULT_ANALYTICS_GROUP_BY,
   DEFAULT_DASHBOARD_PERIOD,
+  analyticsRangeIssue,
   dashboardRangeIssue,
+  type AnalyticsExportFormat,
+  type AnalyticsGroupBy,
+  type AnalyticsRangeQuery,
   type DashboardPeriod,
   type DashboardPeriodQuery,
 } from "@tarodan/types";
-
-export enum AnalyticsGroupBy {
-  day = "day",
-  week = "week",
-  month = "month",
-}
 
 export class AnalyticsQueryDto {
   @ApiPropertyOptional({ description: "Start date (ISO format)" })
@@ -39,14 +41,6 @@ export class AnalyticsQueryDto {
   @IsOptional()
   @IsDateString()
   endDate?: string;
-
-  @ApiPropertyOptional({
-    enum: AnalyticsGroupBy,
-    default: AnalyticsGroupBy.day,
-  })
-  @IsOptional()
-  @IsEnum(AnalyticsGroupBy)
-  groupBy?: AnalyticsGroupBy = AnalyticsGroupBy.day;
 }
 
 export class SalesAnalyticsResponseDto {
@@ -192,4 +186,71 @@ export class DashboardStatsQueryDto implements DashboardPeriodQuery {
   @IsOptional()
   @IsDateString()
   to?: string;
+}
+
+/**
+ * Aralığın tutarlılığı. Kural `@tarodan/types`ta (`analyticsRangeIssue`) durur;
+ * DTO, aralık çözücü ve admin filtresi aynı tanıma bakar.
+ */
+@ValidatorConstraint({ name: "analyticsRange", async: false })
+export class AnalyticsRangeConstraint implements ValidatorConstraintInterface {
+  validate(_value: unknown, args: ValidationArguments): boolean {
+    return analyticsRangeIssue(args.object as AnalyticsRangeQuery) === null;
+  }
+
+  defaultMessage(args: ValidationArguments): string {
+    const issue = analyticsRangeIssue(args.object as AnalyticsRangeQuery);
+    if (issue === "reversed") return "`from` must be on or before `to`";
+    if (issue === "tooLong") return "the range is longer than the maximum";
+    return "`from` and `to` must be given together, as valid dates";
+  }
+}
+
+/**
+ * Her `GET /admin/analytics/*` ucunun sorgusu.
+ *
+ * Aralık kuralı `groupBy`a ÇAPALANIR, `from`/`to`ya değil: `@IsOptional()`
+ * eksik bir alanın TÜM doğrulayıcılarını atlar, yani tek ucu verilmiş bir
+ * aralık hiç denetlenmezdi. `groupBy`ın varsayılanı olduğu için kural her
+ * istekte çalışır.
+ */
+export class AnalyticsRangeQueryDto implements AnalyticsRangeQuery {
+  @ApiPropertyOptional({
+    enum: ANALYTICS_GROUP_BYS,
+    default: DEFAULT_ANALYTICS_GROUP_BY,
+    description: "Bucket size of the time series",
+  })
+  @IsOptional()
+  @IsIn(ANALYTICS_GROUP_BYS)
+  @Validate(AnalyticsRangeConstraint)
+  groupBy?: AnalyticsGroupBy = DEFAULT_ANALYTICS_GROUP_BY;
+
+  @ApiPropertyOptional({ description: "Inclusive range start (ISO date)" })
+  @IsOptional()
+  @IsDateString()
+  from?: string;
+
+  @ApiPropertyOptional({ description: "Inclusive range end (ISO date)" })
+  @IsOptional()
+  @IsDateString()
+  to?: string;
+
+  @ApiPropertyOptional({
+    description: "Also measure the preceding window of equal length",
+  })
+  @IsOptional()
+  @Transform(({ value }) => value === true || value === "true")
+  @IsBoolean()
+  compare?: boolean;
+}
+
+/** Dışa aktarım sorgusu — ekranla AYNI aralık, artı dosya biçimi. */
+export class AnalyticsExportQueryDto extends AnalyticsRangeQueryDto {
+  @ApiPropertyOptional({
+    enum: ANALYTICS_EXPORT_FORMATS,
+    default: "csv",
+  })
+  @IsOptional()
+  @IsIn(ANALYTICS_EXPORT_FORMATS)
+  format?: AnalyticsExportFormat = "csv";
 }

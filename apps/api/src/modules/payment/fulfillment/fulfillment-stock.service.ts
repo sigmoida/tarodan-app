@@ -1,10 +1,11 @@
 import { Injectable, Logger } from "@nestjs/common";
-import { Prisma, ProductStatus } from "@prisma/client";
+import { Prisma } from "@prisma/client";
 import {
   getProductStatusFromQuantity,
   getReservedAwareStatus,
 } from "../../product/helpers/product-status.helper";
 import { safeDecrementReserved } from "../../product/helpers/product-availability.helper";
+import { productSoldData } from "../../product/helpers/product-sale";
 import { ProductLockService } from "../../product/lock/product-lock.service";
 import {
   StockoutCancelledOrder,
@@ -98,10 +99,9 @@ export class FulfillmentStockService {
       // vaat edilen statüydü ama hiçbir yol yazmıyordu (stok 0 → inactive'e
       // düşüyordu ve "pasife alındı / süresi doldu" ile ayırt edilemiyordu).
       // Takas/kayıp gibi satış olmayan düşümler inactive kalmaya devam eder.
-      status:
-        newQuantity === 0
-          ? ProductStatus.sold
-          : getProductStatusFromQuantity(newQuantity),
+      ...(newQuantity === 0
+        ? productSoldData()
+        : { status: getProductStatusFromQuantity(newQuantity) }),
       reservedQuantity: safeDecrementReserved(
         product.reservedQuantity,
         orderQty,

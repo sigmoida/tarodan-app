@@ -12,7 +12,6 @@ export * from "./admin-staff.dto";
 export * from "./notifications-admin.dto";
 export * from "./admin-membership.dto";
 export {
-  AnalyticsGroupBy,
   AnalyticsQueryDto,
   SalesAnalyticsResponseDto,
   RevenueAnalyticsResponseDto,
@@ -22,6 +21,9 @@ export {
   AddOrderTrackingDto,
   DashboardStatsQueryDto,
   DashboardRangeConstraint,
+  AnalyticsRangeQueryDto,
+  AnalyticsExportQueryDto,
+  AnalyticsRangeConstraint,
 } from "./analytics.dto";
 export {
   CreateTaxRegionDto,

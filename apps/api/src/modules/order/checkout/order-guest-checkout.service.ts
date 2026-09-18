@@ -619,15 +619,6 @@ export class OrderGuestCheckoutService {
         },
       });
 
-      // Record commission snapshot for analytics (3.3)
-      await this.checkoutCommon.recordCommissionSnapshot(
-        order.id,
-        orderNumber,
-        commissionResult.commissionAmount,
-        finalPrice,
-        commissionResult,
-      );
-
       // Kodsuz kampanyaların bütçesi sipariş oluşurken harcanır.
       await this.feeDiscounts?.spendBudgets(feeDiscounted.applied, tx);
 

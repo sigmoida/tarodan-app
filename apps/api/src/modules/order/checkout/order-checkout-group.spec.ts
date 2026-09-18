@@ -149,7 +149,6 @@ describe("OrderService checkout group (batch checkout)", () => {
       findMany: jest.fn().mockResolvedValue([]),
       findUnique: jest.fn().mockResolvedValue(null),
     },
-    analyticsSnapshot: { upsert: jest.fn() },
     $transaction: jest.fn(),
   };
 

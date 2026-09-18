@@ -6,6 +6,7 @@ import { AdminDeletedIdentityController } from "./users/admin-deleted-identity.c
 import { AdminProductController } from "./catalog/admin-product.controller";
 import { AdminOrderController } from "./orders/admin-order.controller";
 import { AdminAnalyticsController } from "./analytics/admin-analytics.controller";
+import { AdminAnalyticsInsightsController } from "./analytics/insights/admin-analytics-insights.controller";
 import { AdminModerationController } from "./ops/admin-moderation.controller";
 import { AdminPaymentController } from "./finance/admin-payment.controller";
 import { AdminTradeController } from "./trade/admin-trade.controller";
@@ -52,10 +53,15 @@ import { AdminOrderService } from "./orders/admin-order.service";
 import { AdminAnalyticsService } from "./analytics/admin-analytics.service";
 import { AdminAnalyticsCommonService } from "./analytics/admin-analytics-common.service";
 import { AdminAnalyticsDashboardService } from "./analytics/admin-analytics-dashboard.service";
+import { AnalyticsSalesService } from "./analytics/insights/analytics-sales.service";
+import { AnalyticsTradeService } from "./analytics/insights/analytics-trade.service";
+import { AnalyticsCatalogService } from "./analytics/insights/analytics-catalog.service";
+import { AnalyticsQualityService } from "./analytics/insights/analytics-quality.service";
+import { AnalyticsMembershipService } from "./analytics/insights/analytics-membership.service";
+import { AnalyticsExportService } from "./analytics/insights/analytics-export.service";
 import { AdminDashboardWorklistService } from "./analytics/dashboard/admin-dashboard-worklist.service";
 import { AdminDashboardStockService } from "./analytics/dashboard/admin-dashboard-stock.service";
 import { AdminAnalyticsOrderService } from "./analytics/admin-analytics-order.service";
-import { AdminAnalyticsReportService } from "./analytics/admin-analytics-report.service";
 import { AdminModerationService } from "./ops/admin-moderation.service";
 import { AdminPaymentService } from "./finance/admin-payment.service";
 import { AdminPayoutService } from "./finance/admin-payout.service";
@@ -168,6 +174,7 @@ import { scheduledProcessors } from "../../workers/scheduled-processors";
     AdminProductController,
     AdminOrderController,
     AdminAnalyticsController,
+    AdminAnalyticsInsightsController,
     AdminModerationController,
     AdminPaymentController,
     AdminTradeController,
@@ -210,10 +217,15 @@ import { scheduledProcessors } from "../../workers/scheduled-processors";
     AdminAnalyticsService,
     AdminAnalyticsCommonService,
     AdminAnalyticsDashboardService,
+    AnalyticsSalesService,
+    AnalyticsTradeService,
+    AnalyticsCatalogService,
+    AnalyticsQualityService,
+    AnalyticsMembershipService,
+    AnalyticsExportService,
     AdminDashboardWorklistService,
     AdminDashboardStockService,
     AdminAnalyticsOrderService,
-    AdminAnalyticsReportService,
     AdminModerationService,
     AdminPaymentService,
     AdminPayoutService,

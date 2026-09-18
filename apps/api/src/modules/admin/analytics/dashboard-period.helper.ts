@@ -47,8 +47,16 @@ const endOfDay = (date: Date) =>
     999,
   );
 
-/** The window of the same length that ends where `current` begins. */
-function previousWindow(current: DashboardDateWindow): DashboardDateWindow {
+/**
+ * The window of the same length that ends where `current` begins.
+ *
+ * Exported because the analytics screen's "compare with previous period"
+ * answers the SAME question as the dashboard's trend; a second copy of this
+ * arithmetic is how two screens start disagreeing about last month.
+ */
+export function previousWindow(
+  current: DashboardDateWindow,
+): DashboardDateWindow {
   const length = current.lte.getTime() - current.gte.getTime();
   return {
     gte: new Date(current.gte.getTime() - length - 1),

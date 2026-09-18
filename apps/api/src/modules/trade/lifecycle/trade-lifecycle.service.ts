@@ -8,6 +8,7 @@ import {
   Optional,
 } from "@nestjs/common";
 import { PrismaService } from "../../../prisma";
+import { tradeRejectedData } from "../helpers/trade-rejection";
 import { MembershipService } from "../../membership/membership.service";
 import { NotificationService } from "../../notification/notification.service";
 import { NotificationType } from "../../notification/dto";
@@ -728,9 +729,7 @@ export class TradeLifecycleService {
       await tx.trade.update({
         where: { id: tradeId, version: trade.version },
         data: {
-          status: TradeStatus.rejected,
-          cancelReason: dto.reason,
-          cancelledAt: new Date(),
+          ...tradeRejectedData(dto.reason),
           version: { increment: 1 },
         },
       });
