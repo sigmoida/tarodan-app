@@ -39,9 +39,14 @@ function isMetricMap(value: unknown): value is Record<string, AnalyticsMetric> {
   );
 }
 
+/**
+ * Boş dizi hiçbir şekle UYMAZ: `every` boş dizide true döndüğü için boş bir
+ * kırılım seri sanılıp yalnız "bucket" başlığı olan boş bir sayfa açıyordu.
+ */
 function isSeriesList(value: unknown): value is AnalyticsSeries[] {
   return (
     Array.isArray(value) &&
+    value.length > 0 &&
     value.every(
       (entry) =>
         typeof entry === "object" &&
