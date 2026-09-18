@@ -1,9 +1,12 @@
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join, relative } from "node:path";
 import { OrderStatus } from "@prisma/client";
+import { apiAppRoot } from "../../../common/helpers/app-root";
 import { orderCancelledData } from "./order-cancellation";
 
-const API_SRC = join(__dirname, "..", "..", "..");
+// Anchored, not counted in `../` hops: this spec reads SOURCE files, so the
+// path must survive the file moving folders (apps/api/CLAUDE.md §1).
+const API_SRC = join(apiAppRoot(), "src");
 
 function sourceFiles(dir: string, out: string[] = []): string[] {
   for (const entry of readdirSync(dir)) {
