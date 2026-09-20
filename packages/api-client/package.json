@@ -18,7 +18,7 @@
     "axios": ">=1.6.0"
   },
   "devDependencies": {
-    "@tanstack/react-query": "^5.102.8",
+    "@tanstack/react-query": "^5.103.1",
     "@tarodan/eslint-config": "workspace:*",
     "@tarodan/tsconfig": "workspace:*",
     "axios": "^1.20.0",
