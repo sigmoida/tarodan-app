@@ -449,7 +449,9 @@ describe("PaymentService group payment (checkout group)", () => {
     );
 
     expect(did).toBe(true);
-    expect(refundSpy).toHaveBeenCalledWith("order-2", 102);
+    expect(refundSpy).toHaveBeenCalledWith("order-2", 102, {
+      cancelledBy: "system",
+    });
     // Sadece canlı sipariş işlenir
     expect(mockTx.paymentHold.create).toHaveBeenCalledTimes(1);
     expect(mockTx.paymentHold.create.mock.calls[0][0].data.orderId).toBe(
