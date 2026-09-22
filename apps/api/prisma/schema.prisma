@@ -730,6 +730,15 @@ model Product {
   /// Moderasyon reddinin gerekçesi — satıcıya kalıcı olarak gösterilir
   /// (bildirim tek seferlikti, gerekçe kayboluyordu). Onayda temizlenir.
   rejectionReason     String?                 @map("rejection_reason")
+  /// `inactive` statüsünün NEDENİ — yalnız `return_quarantine` değeri anlamlıdır:
+  /// teslim SONRASI bir iade yüzünden sistem tarafından pasife alındı (satıcı
+  /// hasar kontrolü yapmalı) ve bu satıcı DOĞRUDAN aktive edebilir (admin onayı
+  /// gerekmez). Diğer her pasif neden (elle pasife alma, stok=0) null bırakır →
+  /// eski davranış: yeniden aktifleştirme admin onayına düşer. Statü `inactive`
+  /// dışına çıkan HER yazım bunu temizlemeli (bkz. clearStaleInactiveReasonOnWrite,
+  /// PrismaService'in Product middleware'inde tek entegrasyon noktası) — aksi
+  /// hâlde bayat bir işaret ilerideki bir moderasyon turunu atlatabilir.
+  inactiveReason      ProductInactiveReason?  @map("inactive_reason")
   qualityScore        Int                     @default(0) @map("quality_score")
   rankTier            Int                     @default(0) @map("rank_tier")
   relevanceScore      Int?                    @map("relevance_score")
@@ -3439,6 +3448,16 @@ enum ProductStatus {
   rejected
   deleted
   suspended
+}
+
+/// `Product.inactiveReason`'ın tek değeri. `inactive` statüsü kendi başına NEDEN
+/// pasif olunduğunu söylemez (satıcı elle pasife almış olabilir, stok bitmiş
+/// olabilir, ya da teslim SONRASI bir iade karantinaya almış olabilir) — bu enum
+/// yalnız "sistem karantinaya aldı, satıcı doğrudan aktive edebilir" durumunu
+/// işaretler. Diğer tüm pasif nedenleri (rejected zaten ayrı bir status; elle
+/// pasife alma, stok sıfırı) null bırakır ve eski admin-onay akışına düşer.
+enum ProductInactiveReason {
+  return_quarantine
 }
 
 enum ProductImportBatchStatus {

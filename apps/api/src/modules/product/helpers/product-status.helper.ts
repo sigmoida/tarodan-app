@@ -59,3 +59,27 @@ export function shouldQuarantineReturnedStock(
 ): boolean {
   return deliveredAt !== null;
 }
+
+/**
+ * `Product.inactiveReason` (bkz. şema) yalnız `return_quarantine` iken anlamlı:
+ * satıcı `inactive` bir ilanı DOĞRUDAN (admin onayı olmadan) aktive edebilir
+ * — bkz. `resolveUpdatedStatus`. Bayat bir işaret bu ayrıcalığı yanlış ilana
+ * (elle pasife alınmış veya moderasyonca reddedilmiş) sızdırabileceğinden,
+ * ilan `inactive` DIŞINA çıkan HER yazımda temizlenmeli.
+ *
+ * Tek entegrasyon noktası: `PrismaService`'in Product middleware'i (bkz.
+ * `registerProductInactiveReasonGuardMiddleware`), ~30 ayrı `status` yazıcısını
+ * (trade/payment/admin/moderation/scheduler) tek tek dolaşıp değiştirmek yerine
+ * her Product `update`/`updateMany` çağrısının `data`sına burada uygulanır. Çağıran
+ * `inactiveReason`'ı AYNI yazımda zaten belirtmişse (ör. payment-refund'ın
+ * karantina yolu) dokunulmaz — çağıranın niyeti her zaman kazanır.
+ */
+export function clearStaleInactiveReasonOnWrite(
+  data: Record<string, unknown> | undefined,
+): void {
+  if (!data) return;
+  if (!Object.prototype.hasOwnProperty.call(data, "status")) return;
+  if (data.status === ProductStatus.inactive) return;
+  if (Object.prototype.hasOwnProperty.call(data, "inactiveReason")) return;
+  data.inactiveReason = null;
+}

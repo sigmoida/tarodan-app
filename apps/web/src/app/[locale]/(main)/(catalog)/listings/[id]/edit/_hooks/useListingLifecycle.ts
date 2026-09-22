@@ -45,8 +45,18 @@ export function useListingLifecycle({
   const reactivateMutation = useMutation({
     mutationFn: (qty: number) =>
       listingsApi.update(id, { status: "active", quantity: qty } as any),
-    onSuccess: () => {
-      toast.success(t("product.sentForReviewRepublish"));
+    // API'nin gerçekten döndürdüğü statüye bak: çoğu ilan admin onayına
+    // (pending) gider, ama teslim SONRASI iade yüzünden karantinaya alınmış
+    // bir ilanda satıcı DOĞRUDAN aktive edilir (bkz. resolveUpdatedStatus,
+    // apps/api). İki yolda da "incelemeye gönderildi" demek ikinci durumda
+    // yanlış olurdu — statik toast yerine yanıtı okuyoruz.
+    onSuccess: (response: any) => {
+      const resultStatus = response?.data?.status;
+      toast.success(
+        resultStatus === "active"
+          ? t("product.reactivatedImmediately")
+          : t("product.sentForReviewRepublish"),
+      );
       router.push("/profile/listings");
     },
     onError: (error: any) => {

@@ -810,6 +810,7 @@
     "sendForReview": "İncelemeye Gönder",
     "sentForReviewRepublish": "İlanınız incelemeye gönderildi. Onaylandığında yeniden yayına girecek.",
     "sentForReview": "İlanınız incelemeye gönderildi. Onaylandığında yayına girecek.",
+    "reactivatedImmediately": "İlanınız tekrar yayında! Stok eklendi ve satışa açıldı, onay beklemez.",
     "reactivateFailed": "Yeniden satışa açılamadı",
     "invalidStockQuantity": "Geçerli bir stok miktarı giriniz",
     "listingRemoved": "İlan silindi",

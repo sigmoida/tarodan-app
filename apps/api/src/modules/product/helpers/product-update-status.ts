@@ -1,4 +1,4 @@
-import { ProductStatus } from "@prisma/client";
+import { ProductInactiveReason, ProductStatus } from "@prisma/client";
 import type { UpdateProductDto } from "../dto/update-product.dto";
 import type { ProductUpdateActor } from "./product-update-actor";
 
@@ -10,7 +10,11 @@ import type { ProductUpdateActor } from "./product-update-actor";
  * kablolaması olmadan okunabilir/test edilebilir olmaları gerekiyor.
  */
 export function resolveUpdatedStatus(
-  product: { status: ProductStatus; quantity: number | null },
+  product: {
+    status: ProductStatus;
+    quantity: number | null;
+    inactiveReason?: ProductInactiveReason | null;
+  },
   dto: UpdateProductDto,
   actor: ProductUpdateActor,
 ): ProductStatus | undefined {
@@ -39,6 +43,21 @@ export function resolveUpdatedStatus(
   // Reddedilen ürün düzenlenince otomatik yeniden incelemeye girer.
   if (product.status === ProductStatus.rejected) {
     return ProductStatus.pending;
+  }
+
+  // PO kararı: teslim SONRASI bir iade yüzünden SİSTEM tarafından karantinaya
+  // alınmış (`return_quarantine`) bir ilanı satıcı DOĞRUDAN aktive edebilir —
+  // admin onayı gerekmez, çünkü moderasyon değil hasar kontrolü bekleniyordu.
+  // Stok şart (0 ise "aktif ama satılamaz" ilan üretilir) — sınırsız (null) veya
+  // pozitif olmalı. Diğer TÜM pasif nedenleri (elle pasife alma, moderasyon
+  // reddi sonrası tekrar pasif, vb.) bu daldan geçmez, genel kurala düşer.
+  if (
+    requested === ProductStatus.active &&
+    product.status === ProductStatus.inactive &&
+    product.inactiveReason === ProductInactiveReason.return_quarantine &&
+    (newQuantity === null || newQuantity > 0)
+  ) {
+    return ProductStatus.active;
   }
 
   // Satıcı DOĞRUDAN aktifleştiremez: aktif olmayan bir ilanı aktif etme isteği

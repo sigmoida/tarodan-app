@@ -9,6 +9,7 @@ import { PrismaClient } from "@prisma/client";
 import { EventEmitter2 } from "@nestjs/event-emitter";
 import { isProduction, isTest } from "../config/environment";
 import { errorMessage } from "../common/helpers/error-message";
+import { clearStaleInactiveReasonOnWrite } from "../modules/product/helpers/product-status.helper";
 
 const WATCHED_WRITE_ACTIONS = ["create", "update", "upsert", "delete"];
 
@@ -42,6 +43,7 @@ export class PrismaService
     await this.$connect();
     this.logger.log("Database connection established");
     this.registerSearchSyncMiddleware();
+    this.registerProductInactiveReasonGuardMiddleware();
   }
 
   async onModuleDestroy() {
@@ -130,6 +132,32 @@ export class PrismaService
 
     this.logger.log(
       "Prisma search-sync middleware registered (Product, Collection, CarModel)",
+    );
+  }
+
+  /**
+   * Single integration point for `clearStaleInactiveReasonOnWrite` (see
+   * `modules/product/helpers/product-status.helper.ts` for the rule and why
+   * it lives here rather than at each of the ~30 call sites that write
+   * `Product.status`). Applies to every `Product` update/updateMany —
+   * including ones issued through an interactive `$transaction`'s `tx`,
+   * which shares this client's middleware stack.
+   */
+  private registerProductInactiveReasonGuardMiddleware(): void {
+    this.$use(async (params, next) => {
+      if (
+        params.model === "Product" &&
+        (params.action === "update" || params.action === "updateMany")
+      ) {
+        clearStaleInactiveReasonOnWrite(
+          params.args?.data as Record<string, unknown> | undefined,
+        );
+      }
+      return next(params);
+    });
+
+    this.logger.log(
+      "Prisma product-inactive-reason guard middleware registered",
     );
   }
 

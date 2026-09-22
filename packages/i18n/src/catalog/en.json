@@ -810,6 +810,7 @@
     "sendForReview": "Submit for Review",
     "sentForReviewRepublish": "Your listing has been submitted for review. It will go back online once approved.",
     "sentForReview": "Your listing has been submitted for review. It will go online once approved.",
+    "reactivatedImmediately": "Your listing is live again! Stock was added and it's back on sale, no approval needed.",
     "reactivateFailed": "The listing could not be put back on sale",
     "invalidStockQuantity": "Enter a valid stock quantity",
     "listingRemoved": "Listing deleted",

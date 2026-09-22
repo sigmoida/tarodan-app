@@ -5,6 +5,7 @@ import {
   RefundAttemptStatus,
   PaymentHoldStatus,
   ProductStatus,
+  ProductInactiveReason,
 } from "@prisma/client";
 
 /**
@@ -199,6 +200,7 @@ describe("PaymentRefundService.processRefund — post-delivery return stock quar
     expect(captured.productUpdate.data).toEqual({
       quantity: { increment: 1 },
       status: ProductStatus.inactive,
+      inactiveReason: ProductInactiveReason.return_quarantine,
     });
     expect((result as any).stockQuarantined).toBe(true);
   });
@@ -221,6 +223,9 @@ describe("PaymentRefundService.processRefund — post-delivery return stock quar
 
     expect(captured.productUpdate.data.status).toBe(ProductStatus.inactive);
     expect(captured.productUpdate.data.quantity).toEqual({ increment: 2 });
+    expect(captured.productUpdate.data.inactiveReason).toBe(
+      ProductInactiveReason.return_quarantine,
+    );
   });
 
   it("teslim SONRASI kısmi adet iadesi de PASİF sonucu verir", async () => {
@@ -241,6 +246,7 @@ describe("PaymentRefundService.processRefund — post-delivery return stock quar
     expect(captured.productUpdate.data).toEqual({
       quantity: { increment: 1 },
       status: ProductStatus.inactive,
+      inactiveReason: ProductInactiveReason.return_quarantine,
     });
   });
 
@@ -257,6 +263,7 @@ describe("PaymentRefundService.processRefund — post-delivery return stock quar
     expect(captured.productUpdate.data).toEqual({
       quantity: { increment: 1 },
       status: ProductStatus.active,
+      inactiveReason: null,
     });
     expect((result as any).stockQuarantined).toBe(false);
   });

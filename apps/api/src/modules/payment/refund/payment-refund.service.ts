@@ -15,6 +15,7 @@ import {
   OfferStatus,
   OrderStatus,
   ProductStatus,
+  ProductInactiveReason,
   RefundAttemptStatus,
   SellerAdjustmentType,
 } from "@prisma/client";
@@ -1020,6 +1021,14 @@ export class PaymentRefundService {
                     status: quarantine
                       ? ProductStatus.inactive
                       : getProductStatusFromQuantity(newQty),
+                    // Satıcının DOĞRUDAN (admin onayı olmadan) aktive edebileceği
+                    // TEK durumu işaretler — bkz. resolveUpdatedStatus. Karantina
+                    // dışı yolda `null` yazılır (Prisma middleware zaten temizler,
+                    // ama status/inactiveReason'ı burada birlikte yazmak niyeti
+                    // açık tutar — bkz. clearStaleInactiveReasonOnWrite).
+                    inactiveReason: quarantine
+                      ? ProductInactiveReason.return_quarantine
+                      : null,
                   },
                 });
                 stockQuarantined = quarantine;
