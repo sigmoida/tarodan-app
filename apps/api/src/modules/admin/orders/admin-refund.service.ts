@@ -22,6 +22,7 @@ import { ApproveRefundRequestDto, RefundRequestQueryDto } from "../dto";
 import { paginate, resolveOrderBy } from "../../../common/list";
 import { primaryCashPayment } from "../../trade/helpers/trade.constants";
 import { i18nMessage } from "../../i18n";
+import { refundRequestKindWhere } from "./helpers/refund-request-kind-where";
 
 /**
  * İade talepleri admin operasyonları (liste/detay, force-finalize) +
@@ -91,6 +92,7 @@ export class AdminRefundService {
       if (query.from) where.createdAt.gte = new Date(query.from);
       if (query.to) where.createdAt.lte = new Date(query.to);
     }
+    if (query.kind) where.AND = [refundRequestKindWhere(query.kind)];
     if (query.userSearch && query.userSearch.trim().length > 0) {
       const term = query.userSearch.trim();
       where.OR = [
