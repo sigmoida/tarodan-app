@@ -387,7 +387,10 @@ export class RefundCreationService {
     // `processRefund` resolves to null when the attempt was already finalized —
     // an idempotent no-op, not a failure — so the variable has to be able to
     // hold that, and readers fall back the same way a missing provider id does.
-    let refundResult: { providerRefundId?: string } | null;
+    let refundResult: {
+      providerRefundId?: string;
+      stockQuarantined?: boolean;
+    } | null;
     try {
       refundResult = await this.paymentService.processRefund(
         order.id,
@@ -676,7 +679,10 @@ export class RefundCreationService {
     // `processRefund` resolves to null when the attempt was already finalized —
     // an idempotent no-op, not a failure — so the variable has to be able to
     // hold that, and readers fall back the same way a missing provider id does.
-    let refundResult: { providerRefundId?: string } | null;
+    let refundResult: {
+      providerRefundId?: string;
+      stockQuarantined?: boolean;
+    } | null;
     try {
       refundResult = await this.paymentService.processRefund(
         order.id,
@@ -782,6 +788,9 @@ export class RefundCreationService {
         {
           refundNumber,
           orderId: order.id,
+          // Bu yol kargo/teslimat ÖNCESİ anlık iadedir → hep "no" gelir; alan
+          // yine de processRefund'un TEK karar noktasından okunur (drift yok).
+          stockQuarantined: refundResult?.stockQuarantined ? "yes" : "no",
         },
       );
     }

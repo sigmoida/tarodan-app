@@ -810,6 +810,7 @@
     "sendForReview": "Submit for Review",
     "sentForReviewRepublish": "Your listing has been submitted for review. It will go back online once approved.",
     "sentForReview": "Your listing has been submitted for review. It will go online once approved.",
+    "reactivatedImmediately": "Your listing is live again! Stock was added and it's back on sale, no approval needed.",
     "reactivateFailed": "The listing could not be put back on sale",
     "invalidStockQuantity": "Enter a valid stock quantity",
     "listingRemoved": "Listing deleted",
@@ -9341,7 +9342,7 @@
       },
       "refundCompletedSeller": {
         "title": "Refund Completed",
-        "message": "The refund for order {refundNumber} is complete; the amount was returned to the buyer."
+        "message": "The refund for order {refundNumber} is complete; the amount was returned to the buyer.{stockQuarantined, select, yes { The item was added back to your stock, but the listing is now inactive; you can reactivate it yourself once you've inspected it.} other {}}"
       },
       "refundAutoAcceptedSeller": {
         "title": "Refund Request Auto-Approved",

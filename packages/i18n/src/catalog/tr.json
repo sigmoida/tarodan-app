@@ -810,6 +810,7 @@
     "sendForReview": "İncelemeye Gönder",
     "sentForReviewRepublish": "İlanınız incelemeye gönderildi. Onaylandığında yeniden yayına girecek.",
     "sentForReview": "İlanınız incelemeye gönderildi. Onaylandığında yayına girecek.",
+    "reactivatedImmediately": "İlanınız tekrar yayında! Stok eklendi ve satışa açıldı, onay beklemez.",
     "reactivateFailed": "Yeniden satışa açılamadı",
     "invalidStockQuantity": "Geçerli bir stok miktarı giriniz",
     "listingRemoved": "İlan silindi",
@@ -9341,7 +9342,7 @@
       },
       "refundCompletedSeller": {
         "title": "İade Tamamlandı",
-        "message": "{refundNumber} numaralı sipariş için iade tamamlandı; tutar alıcıya iade edildi."
+        "message": "{refundNumber} numaralı sipariş için iade tamamlandı; tutar alıcıya iade edildi.{stockQuarantined, select, yes { Ürün stoğa geri eklendi ancak ilanınız pasif durumda; kontrol ettikten sonra siz yeniden aktive edebilirsiniz.} other {}}"
       },
       "refundAutoAcceptedSeller": {
         "title": "İade Talebi Otomatik Onaylandı",

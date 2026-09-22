@@ -14,11 +14,16 @@ import {
   PaymentHoldStatus,
   OfferStatus,
   OrderStatus,
+  ProductStatus,
+  ProductInactiveReason,
   RefundAttemptStatus,
   SellerAdjustmentType,
 } from "@prisma/client";
 import { OFFER_CANCEL_REASON } from "../../trade/helpers/trade-cancel-reasons";
-import { getProductStatusFromQuantity } from "../../product/helpers/product-status.helper";
+import {
+  getProductStatusFromQuantity,
+  shouldQuarantineReturnedStock,
+} from "../../product/helpers/product-status.helper";
 import { PaymentProviderRegistry } from "../../payment-providers/payment-provider.registry";
 import { PaymentProvider } from "../dto";
 import { EventService } from "../../events";
@@ -660,6 +665,10 @@ export class PaymentRefundService {
       // Update payment status after successful refund
       let invoiceAdjustment: InvoiceRefundReversePayload | null = null;
       let shipmentCancellationRequired = false;
+      // Teslim SONRASI iadede stok karantinaya girer (ilan pasif kalır) — tx
+      // içinde gerçekten uygulandıysa true olur, post-commit satıcı bildirimi
+      // bunu okur (bkz. shouldQuarantineReturnedStock).
+      let stockQuarantined = false;
       const refundCommitResult = await this.prisma
         .$transaction(async (tx) => {
           const oldStatus = payment.status;
@@ -904,6 +913,8 @@ export class PaymentRefundService {
                 stockRestoredAt: true,
                 offerId: true,
                 cancelledBy: true,
+                // Karantina kararının TEK sinyali: bkz. shouldQuarantineReturnedStock.
+                deliveredAt: true,
               },
             });
             const sellerAdjustments = (
@@ -996,15 +1007,36 @@ export class PaymentRefundService {
                 product?.quantity !== undefined
               ) {
                 const newQty = product.quantity + restoreQty;
+                // Ürün alıcıya TESLİM EDİLDİKTEN sonra iade ediliyorsa hasarlı
+                // olabilir: miktar geri yüklenir ama ilan PASİF kalır (adet
+                // fark etmez), satıcı inceleyip kendisi aktive eder. Teslimat
+                // öncesi iptalde (deliveredAt null) eski davranış korunur.
+                const quarantine = shouldQuarantineReturnedStock(
+                  orderRow?.deliveredAt ?? null,
+                );
                 await tx.product.update({
                   where: { id: orderRow.productId },
                   data: {
                     quantity: { increment: restoreQty },
-                    status: getProductStatusFromQuantity(newQty),
+                    status: quarantine
+                      ? ProductStatus.inactive
+                      : getProductStatusFromQuantity(newQty),
+                    // Satıcının DOĞRUDAN (admin onayı olmadan) aktive edebileceği
+                    // TEK durumu işaretler — bkz. resolveUpdatedStatus. Karantina
+                    // dışı yolda `null` yazılır (Prisma middleware zaten temizler,
+                    // ama status/inactiveReason'ı burada birlikte yazmak niyeti
+                    // açık tutar — bkz. clearStaleInactiveReasonOnWrite).
+                    inactiveReason: quarantine
+                      ? ProductInactiveReason.return_quarantine
+                      : null,
                   },
                 });
+                stockQuarantined = quarantine;
                 this.logger.log(
-                  `Restored ${restoreQty} stock for product ${orderRow.productId} after refund of order ${orderId}`,
+                  `Restored ${restoreQty} stock for product ${orderRow.productId} after refund of order ${orderId}` +
+                    (quarantine
+                      ? " (listing set inactive — post-delivery return)"
+                      : ""),
                 );
               }
               // Tam iadede işaretle → sonraki cron turlarında çift-restore engeli.
@@ -1031,6 +1063,9 @@ export class PaymentRefundService {
               refundResult.merchant_oid ||
               freshAttempt.providerRefundId ||
               undefined,
+            // Çağıran (ör. finalizeRefundForReturnedShipment) satıcıya "ilan
+            // pasife düştü" notunu YALNIZ bu true ise ekler.
+            stockQuarantined,
           };
 
           // 11.2d: iade sonucu bildirimleri (payment.refunded / order_cancelled) artık
