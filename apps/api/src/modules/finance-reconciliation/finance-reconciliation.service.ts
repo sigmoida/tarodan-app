@@ -16,6 +16,13 @@ import {
 } from "@prisma/client";
 import { ADMIN_TRADES_TAB_HREF } from "@tarodan/types";
 import { PrismaService } from "../../prisma";
+import {
+  LIVE_LEDGER_ENTRY,
+  LIVE_MEMBERSHIP_PAYMENT,
+  LIVE_ORDER,
+  LIVE_PAYMENT,
+  LIVE_PAYOUT_TRANSFER,
+} from "../account-lane/live-lane.where";
 import { paytrReportSyncEnabled } from "../../config/paytr";
 import { istanbulDayStart } from "../../common/helpers/tr-calendar";
 import {
@@ -44,27 +51,10 @@ const num = (v: unknown): number => (v == null ? 0 : Number(v));
 const sum = (lines: ReconciliationLine[]) =>
   lines.reduce((s, l) => s + l.amount, 0);
 
-// ─────────────────────────── Test şeridi (lane) ───────────────────────────
 // Mutabakat YALNIZ canlı şeridi raporlar. Bir bölümün Σ toplamı ile bileşenleri
 // aynı filtreden geçmezse ilk test siparişinde sahte fark alarmı çıkar; bu yüzden
-// predicate'ler tek yerde tanımlanır ve her aggregate'e uygulanır.
-/** Ödemesi test şeridinde olan satırlar dışarıda. */
-const LIVE_PAYMENT: Prisma.PaymentWhereInput = { isTest: false };
-/** Siparişi test şeridinde olan satırlar dışarıda. */
-const LIVE_ORDER: Prisma.OrderWhereInput = { isTest: false };
-/**
- * Payout'lar şerit damgası taşımaz (test şeridinde payout hiç açılmaz). Pozitif
- * bir ilişki filtresi hold'suz/TCP'siz canlı transferleri de düşürürdü; bu yüzden
- * yalnız AÇIKÇA test olan transferler NOT ile elenir.
- */
-const LIVE_PAYOUT: Prisma.PayoutTransferWhereInput = {
-  NOT: {
-    OR: [
-      { paymentHold: { payment: { isTest: true } } },
-      { tradeCashPayment: { payment: { isTest: true } } },
-    ],
-  },
-};
+// predicate'ler tek yerde (account-lane/live-lane.where) tanımlanır ve her
+// aggregate'e uygulanır.
 
 /**
  * Finans Özeti v2 — S2..S4. S1 (ciro bölünmesi) RevenueSplitService'te; burada
@@ -130,7 +120,7 @@ export class FinanceReconciliationService {
           _count: { id: true },
         }),
         this.prisma.paymentHold.aggregate({
-          where: { payment: { isTest: false }, status: PaymentHoldStatus.held },
+          where: { payment: LIVE_PAYMENT, status: PaymentHoldStatus.held },
           _sum: { amount: true, refundedAmount: true },
           _count: { id: true },
         }),
@@ -138,7 +128,7 @@ export class FinanceReconciliationService {
         // processing / retry / failed / returned): para platformda, satıcıda değil.
         this.prisma.paymentHold.aggregate({
           where: {
-            payment: { isTest: false },
+            payment: LIVE_PAYMENT,
             status: PaymentHoldStatus.released,
             OR: [
               { payoutTransfer: null },
@@ -162,14 +152,14 @@ export class FinanceReconciliationService {
         // ikisi de "satıcıya gitmedi" demektir).
         this.prisma.paymentHold.aggregate({
           where: {
-            payment: { isTest: false },
+            payment: LIVE_PAYMENT,
             status: { not: PaymentHoldStatus.cancelled },
           },
           _sum: { refundedAmount: true },
         }),
         this.prisma.paymentHold.aggregate({
           where: {
-            payment: { isTest: false },
+            payment: LIVE_PAYMENT,
             status: PaymentHoldStatus.cancelled,
           },
           _sum: { amount: true },
@@ -313,7 +303,7 @@ export class FinanceReconciliationService {
   private async pspFeeBooked(): Promise<number> {
     const agg = await this.prisma.ledgerEntry.aggregate({
       where: {
-        isTest: false,
+        ...LIVE_LEDGER_ENTRY,
         account: LedgerAccount.psp_fee,
         direction: LedgerDirection.debit,
       },
@@ -361,7 +351,7 @@ export class FinanceReconciliationService {
       // Sanal sipariş (üyelik/öne çıkarma) tam iadesi.
       this.prisma.order.aggregate({
         where: {
-          isTest: false,
+          ...LIVE_ORDER,
           origin: OrderOrigin.platform_service,
           payment: { status: PaymentStatus.refunded },
         },
@@ -555,7 +545,7 @@ export class FinanceReconciliationService {
       }),
       this.prisma.payment.aggregate({
         where: {
-          isTest: false,
+          ...LIVE_PAYMENT,
           provider: "paytr",
           status: { in: paid },
           ...(from ? { paidAt: { gte: from } } : {}),
@@ -566,7 +556,7 @@ export class FinanceReconciliationService {
         where: {
           // Recurring üyelik ödemesi şerit damgası taşımaz (orderId null);
           // şerit sahibin bayrağından okunur, yoksa PayTR ekstresiyle sapar.
-          membership: { user: { isTestAccount: false } },
+          ...LIVE_MEMBERSHIP_PAYMENT,
           provider: "paytr",
           orderId: null,
           status: { in: paid },
@@ -587,13 +577,13 @@ export class FinanceReconciliationService {
       }),
       pspFeeBooked,
       this.prisma.payoutTransfer.aggregate({
-        where: { ...LIVE_PAYOUT, submittedAt: { not: null } },
+        where: { ...LIVE_PAYOUT_TRANSFER, submittedAt: { not: null } },
         _sum: { submittedAmount: true },
         _count: { id: true },
       }),
       this.prisma.payoutTransfer.aggregate({
         where: {
-          ...LIVE_PAYOUT,
+          ...LIVE_PAYOUT_TRANSFER,
           submittedAt: { not: null },
           status: PayoutStatus.completed,
         },
@@ -602,7 +592,7 @@ export class FinanceReconciliationService {
       }),
       this.prisma.payoutTransfer.aggregate({
         where: {
-          ...LIVE_PAYOUT,
+          ...LIVE_PAYOUT_TRANSFER,
           submittedAt: { not: null },
           status: PayoutStatus.returned,
         },
@@ -611,7 +601,7 @@ export class FinanceReconciliationService {
       }),
       this.prisma.payoutTransfer.aggregate({
         where: {
-          ...LIVE_PAYOUT,
+          ...LIVE_PAYOUT_TRANSFER,
           submittedAt: { not: null },
           status: PayoutStatus.processing,
         },

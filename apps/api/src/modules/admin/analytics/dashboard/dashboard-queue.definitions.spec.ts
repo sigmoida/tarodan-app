@@ -42,9 +42,13 @@ describe("dashboard queue definitions", () => {
 
     it("reads refunds from the REQUEST's own status, not the order's", () => {
       expect(whereOf("refundsPendingReview")).toEqual({
+        order: { isTest: false },
         status: "pending_review",
       });
-      expect(whereOf("refundsDisputed")).toEqual({ status: "disputed" });
+      expect(whereOf("refundsDisputed")).toEqual({
+        order: { isTest: false },
+        status: "disputed",
+      });
       // The replaced endpoint counted Order.status = refund_requested here.
       expect(JSON.stringify(whereOf("refundsPendingReview"))).not.toContain(
         "refund_requested",
@@ -56,11 +60,16 @@ describe("dashboard queue definitions", () => {
         "at_warehouse",
         "admin_reviewing",
       ]);
-      expect(whereOf("tradeDisputesOpen")).toEqual({ resolvedAt: null });
+      expect(whereOf("tradeDisputesOpen")).toEqual({
+        trade: { isTest: false },
+        resolvedAt: null,
+      });
       expect(whereOf("tradeRefundFailures")).toEqual({
+        isTest: false,
         refundFailureAt: { not: null },
       });
       expect(whereOf("tradeCompensationPending")).toEqual({
+        isTest: false,
         compensationPendingUserId: { not: null },
         compensationResolvedAt: null,
       });
@@ -121,6 +130,52 @@ describe("dashboard queue definitions", () => {
         "cancelled",
         "returned",
       ]);
+    });
+  });
+
+  /**
+   * Test şeridi: para/teslimat kuyrukları test kaydını saymaz (kargo gitmez,
+   * payout açılmaz, belge kesilmez — kapanmayan iş gibi görünürlerdi);
+   * moderasyon kuyrukları şeritten bağımsızdır (inceleme hesabının ilanı da
+   * onay bekler).
+   */
+  describe("test lane", () => {
+    const whereOf = (key: keyof typeof QUEUE_PART_DEFINITIONS) =>
+      JSON.stringify(QUEUE_PART_DEFINITIONS[key].where(NOW));
+
+    it.each([
+      "refundsPendingReview",
+      "refundsDisputed",
+      "tradesAtWarehouse",
+      "tradeDisputesOpen",
+      "tradeRefundFailures",
+      "tradeCompensationPending",
+      "payoutsFailed",
+      "holdsOverdue",
+      "ordersUninvoiced",
+      "shipmentsWithoutTracking",
+    ] as const)("%s excludes the test lane", (key) => {
+      expect(whereOf(key)).toMatch(/"isTest":(false|true)/);
+    });
+
+    it("keeps the live-only predicate inside the shared finance set", () => {
+      expect(overdueHoldsWhere(NOW)).toMatchObject({
+        payment: { isTest: false },
+      });
+      expect(uninvoicedDeliveredWhere(NOW)).toMatchObject({ isTest: false });
+      // Payout'ta damga yok: yalnız açıkça test olanlar NOT ile elenir.
+      expect(JSON.stringify(failedTransfersWhere)).toContain('"NOT"');
+    });
+
+    it.each([
+      "productsPending",
+      "messagesPendingApproval",
+      "corporateApplications",
+      "sellerDocuments",
+      "ticketsOpen",
+      "reportsPending",
+    ] as const)("%s stays lane-agnostic (human moderation)", (key) => {
+      expect(whereOf(key)).not.toContain("isTest");
     });
   });
 

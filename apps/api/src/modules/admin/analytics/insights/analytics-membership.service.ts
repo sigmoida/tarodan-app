@@ -8,6 +8,11 @@ import {
 import { PrismaService } from "../../../../prisma";
 import { CacheService } from "../../../cache/cache.service";
 import type { DashboardDateWindow } from "../dashboard-period.helper";
+import {
+  LIVE_MEMBERSHIP_PAYMENT,
+  LIVE_USER_MEMBERSHIP,
+  liveMembershipPaymentSql,
+} from "../../../account-lane/live-lane.where";
 import { AnalyticsTabService } from "./analytics-tab.service";
 import {
   toAnalyticsRange,
@@ -93,7 +98,11 @@ export class AnalyticsMembershipService extends AnalyticsTabService<AnalyticsMem
   }
 
   private async totals(window: DashboardDateWindow): Promise<MembershipTotals> {
-    const paid = { status: PaymentStatus.completed, createdAt: window };
+    const paid = {
+      ...LIVE_MEMBERSHIP_PAYMENT,
+      status: PaymentStatus.completed,
+      createdAt: window,
+    };
 
     const [fresh, renewals, revenue, churned, pastDue, pastDueNow] =
       await Promise.all([
@@ -109,16 +118,21 @@ export class AnalyticsMembershipService extends AnalyticsTabService<AnalyticsMem
         }),
         // İPTAL ANI damgalıdır; "şu an iptal" değil "bu dönemde iptal edildi".
         this.prisma.userMembership.count({
-          where: { cancelledAt: window },
+          where: { ...LIVE_USER_MEMBERSHIP, cancelledAt: window },
         }),
         // AKIŞ: dönem içinde ödemesiz KALAN üyelik (düşüş anı). Bir ay boyunca
         // düşüp geri toparlanan üyelik dönem sonu fotoğrafında hiç görünmüyordu.
-        this.prisma.userMembership.count({ where: { pastDueAt: window } }),
+        this.prisma.userMembership.count({
+          where: { ...LIVE_USER_MEMBERSHIP, pastDueAt: window },
+        }),
         // STOK: şu an `past_due` duran üyelik. Damga bu göçle geldiği için eski
         // düşüşler akış rakamında YOK; fotoğraf onları da kapsıyor, bu yüzden
         // ikisi birlikte gösterilir ve kart hangisinin ne olduğunu yazar.
         this.prisma.userMembership.count({
-          where: { status: SubscriptionStatus.past_due },
+          where: {
+            ...LIVE_USER_MEMBERSHIP,
+            status: SubscriptionStatus.past_due,
+          },
         }),
       ]);
 
@@ -142,6 +156,7 @@ export class AnalyticsMembershipService extends AnalyticsTabService<AnalyticsMem
         FROM "membership_payments"
         WHERE "status" = ${PaymentStatus.completed}::"PaymentStatus"
           AND "created_at" >= ${window.gte} AND "created_at" <= ${window.lte}
+          AND ${liveMembershipPaymentSql("membership_payments")}
           AND "order_id" IS NOT NULL
         GROUP BY 1`,
       this.prisma.$queryRaw<BucketRow[]>`
@@ -149,6 +164,7 @@ export class AnalyticsMembershipService extends AnalyticsTabService<AnalyticsMem
         FROM "membership_payments"
         WHERE "status" = ${PaymentStatus.completed}::"PaymentStatus"
           AND "created_at" >= ${window.gte} AND "created_at" <= ${window.lte}
+          AND ${liveMembershipPaymentSql("membership_payments")}
           AND "order_id" IS NULL
         GROUP BY 1`,
       this.prisma.$queryRaw<BucketRow[]>`
@@ -156,6 +172,7 @@ export class AnalyticsMembershipService extends AnalyticsTabService<AnalyticsMem
         FROM "membership_payments"
         WHERE "status" = ${PaymentStatus.completed}::"PaymentStatus"
           AND "created_at" >= ${window.gte} AND "created_at" <= ${window.lte}
+          AND ${liveMembershipPaymentSql("membership_payments")}
         GROUP BY 1`,
     ]);
 
@@ -181,6 +198,7 @@ export class AnalyticsMembershipService extends AnalyticsTabService<AnalyticsMem
       WHERE mp."status" = ${PaymentStatus.completed}::"PaymentStatus"
         AND mp."created_at" >= ${window.gte}
         AND mp."created_at" <= ${window.lte}
+        AND ${liveMembershipPaymentSql("mp")}
       GROUP BY 1, 2`;
 
     return toBreakdown(

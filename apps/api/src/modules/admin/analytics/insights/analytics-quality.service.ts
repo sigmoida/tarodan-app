@@ -9,6 +9,14 @@ import { PrismaService } from "../../../../prisma";
 import { CacheService } from "../../../cache/cache.service";
 import type { DashboardDateWindow } from "../dashboard-period.helper";
 import { paidAtLateral, paidOrderWhere } from "../paid-order.predicate";
+import {
+  LIVE_ORDER,
+  LIVE_PAYMENT,
+  LIVE_REFUND_REQUEST,
+  col,
+  liveOrderRefSql,
+  liveRowSql,
+} from "../../../account-lane/live-lane.where";
 import { AnalyticsTabService } from "./analytics-tab.service";
 import {
   toAnalyticsRange,
@@ -137,10 +145,11 @@ export class AnalyticsQualityService extends AnalyticsTabService<AnalyticsQualit
       this.prisma.refundRequest.aggregate({
         _count: { _all: true },
         _sum: { amount: true },
-        where: { refundedAt: window },
+        where: { ...LIVE_REFUND_REQUEST, refundedAt: window },
       }),
       this.prisma.order.count({
         where: {
+          ...LIVE_ORDER,
           cancelledAt: window,
           origin: { not: OrderOrigin.platform_service },
         },
@@ -149,12 +158,17 @@ export class AnalyticsQualityService extends AnalyticsTabService<AnalyticsQualit
       // `paidAt` almaz, `paidAt` üzerinden bakan bir oran paydayı kaybederdi.
       this.prisma.payment.count({
         where: {
+          ...LIVE_PAYMENT,
           createdAt: window,
           status: { in: [PaymentStatus.completed, PaymentStatus.failed] },
         },
       }),
       this.prisma.payment.count({
-        where: { createdAt: window, status: PaymentStatus.failed },
+        where: {
+          ...LIVE_PAYMENT,
+          createdAt: window,
+          status: PaymentStatus.failed,
+        },
       }),
       this.durations(window),
     ]);
@@ -211,6 +225,7 @@ export class AnalyticsQualityService extends AnalyticsTabService<AnalyticsQualit
         FROM "refund_requests"
         WHERE "refunded_at" >= ${range.current.gte}
           AND "refunded_at" <= ${range.current.lte}
+          AND ${liveOrderRefSql(col("refund_requests", "order_id"))}
         GROUP BY 1`,
       this.prisma.$queryRaw<BucketRow[]>`
         SELECT ${bucketExpr('"cancelled_at"', range.groupBy)} AS bucket,
@@ -219,6 +234,7 @@ export class AnalyticsQualityService extends AnalyticsTabService<AnalyticsQualit
         WHERE "cancelled_at" >= ${range.current.gte}
           AND "cancelled_at" <= ${range.current.lte}
           AND "origin" <> ${OrderOrigin.platform_service}::"OrderOrigin"
+          AND ${liveRowSql("orders")}
         GROUP BY 1`,
       this.prisma.$queryRaw<BucketRow[]>`
         SELECT ${bucketExpr('"created_at"', range.groupBy)} AS bucket,
@@ -227,6 +243,7 @@ export class AnalyticsQualityService extends AnalyticsTabService<AnalyticsQualit
         WHERE "created_at" >= ${range.current.gte}
           AND "created_at" <= ${range.current.lte}
           AND "status" = ${PaymentStatus.failed}::"PaymentStatus"
+          AND ${liveRowSql("payments")}
         GROUP BY 1`,
     ]);
 
@@ -237,13 +254,15 @@ export class AnalyticsQualityService extends AnalyticsTabService<AnalyticsQualit
     const refunded = Prisma.sql`
       FROM "refund_requests" r
       WHERE r."refunded_at" >= ${window.gte}
-        AND r."refunded_at" <= ${window.lte}`;
+        AND r."refunded_at" <= ${window.lte}
+        AND ${liveOrderRefSql(col("r", "order_id"))}`;
 
     const cancelled = Prisma.sql`
       FROM "orders" o
       WHERE o."cancelled_at" >= ${window.gte}
         AND o."cancelled_at" <= ${window.lte}
-        AND o."origin" <> ${OrderOrigin.platform_service}::"OrderOrigin"`;
+        AND o."origin" <> ${OrderOrigin.platform_service}::"OrderOrigin"
+        AND ${liveRowSql("o")}`;
 
     const [
       reasons,
@@ -274,6 +293,7 @@ export class AnalyticsQualityService extends AnalyticsTabService<AnalyticsQualit
         JOIN "refund_requests" r ON r."id" = fc."refund_request_id"
         WHERE r."refunded_at" >= ${window.gte}
           AND r."refunded_at" <= ${window.lte}
+          AND ${liveOrderRefSql(col("r", "order_id"))}
         GROUP BY 1`,
       this.prisma.$queryRaw<BreakdownSqlRow[]>`
         SELECT COALESCE(o."cancellation_reason_code"::text, '') AS key,
@@ -292,6 +312,7 @@ export class AnalyticsQualityService extends AnalyticsTabService<AnalyticsQualit
         WHERE "status" = ${PaymentStatus.completed}::"PaymentStatus"
           AND "paid_at" >= ${window.gte}
           AND "paid_at" <= ${window.lte}
+          AND ${liveRowSql("payments")}
         GROUP BY 1`,
     ]);
 

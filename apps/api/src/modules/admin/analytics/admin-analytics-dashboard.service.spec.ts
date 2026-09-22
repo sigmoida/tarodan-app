@@ -471,12 +471,12 @@ describe("AdminAnalyticsDashboardService.getDashboardStats", () => {
       (call: unknown[]) => call[0] === customKey,
     )?.[2];
 
-    expect(liveKey).toContain("admin:dashboard:period:v3:daily:");
+    expect(liveKey).toContain("admin:dashboard:period:v4:daily:");
     expect(liveOptions.ttl).toBe(
       AdminAnalyticsDashboardService.PERIOD_CACHE_TTL_SECONDS,
     );
     // A window that has already closed cannot gain rows — hold it far longer.
-    expect(customKey).toContain("admin:dashboard:period:v3:custom:");
+    expect(customKey).toContain("admin:dashboard:period:v4:custom:");
     expect(customOptions.ttl).toBe(
       AdminAnalyticsDashboardService.CLOSED_RANGE_CACHE_TTL_SECONDS,
     );

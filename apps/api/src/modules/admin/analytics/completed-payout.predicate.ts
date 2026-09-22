@@ -1,5 +1,9 @@
 import { PayoutStatus, Prisma } from "@prisma/client";
 import type { DashboardDateWindow } from "./dashboard-period.helper";
+import {
+  LIVE_PAYOUT_TRANSFER,
+  livePayoutTransferSql,
+} from "../../account-lane/live-lane.where";
 
 /**
  * "Kullanıcılara ödenen hak ediş" yüklemi — TEK tanım, iki dilde.
@@ -10,6 +14,9 @@ import type { DashboardDateWindow } from "./dashboard-period.helper";
  *
  * Dönem `processedAt`ten okunur: PayTR'ye talimatın GÖNDERİLDİĞİ/onaylandığı
  * an, `createdAt`ten (talep oluşturma anı) değil.
+ *
+ * Test şeridi transferleri elenir (PayoutService zaten açmaz; bu savunma
+ * katmanı, yanlışlıkla açılmış bir test transferinin ciroya karışmasını önler).
  */
 
 /** Prisma filtresi — sayım için. */
@@ -17,6 +24,7 @@ export function completedPayoutWhere(
   window: DashboardDateWindow | undefined,
 ): Prisma.PayoutTransferWhereInput {
   return {
+    ...LIVE_PAYOUT_TRANSFER,
     status: PayoutStatus.completed,
     processedAt: window ?? { not: null },
   };
@@ -46,5 +54,6 @@ export function completedPayoutAmountSql(
     FROM "payout_transfers" pt
     WHERE pt."status" = ${PayoutStatus.completed}::"PayoutStatus"
       AND ${stamp}
+      AND ${livePayoutTransferSql("pt")}
   `;
 }

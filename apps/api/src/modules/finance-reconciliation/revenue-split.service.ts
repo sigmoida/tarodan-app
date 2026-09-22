@@ -2,6 +2,12 @@ import { Injectable, Optional } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { OrderOrigin, PaymentStatus, Prisma } from "@prisma/client";
 import { PrismaService } from "../../prisma";
+import {
+  LIVE_COMMISSION_LEDGER,
+  LIVE_MEMBERSHIP_PAYMENT,
+  LIVE_ORDER,
+  LIVE_PAYMENT,
+} from "../account-lane/live-lane.where";
 import { OrderTaxPolicyService } from "../order/pricing/order-tax-policy.service";
 import { TaxService } from "../tax/tax.service";
 import {
@@ -170,7 +176,7 @@ export class RevenueSplitService {
       this.resolveRates(),
       this.physicalSplit(),
       this.prisma.payment.aggregate({
-        where: { isTest: false, status: { in: paidStatuses } },
+        where: { ...LIVE_PAYMENT, status: { in: paidStatuses } },
         _sum: { amount: true },
         _count: { id: true },
       }),
@@ -179,7 +185,7 @@ export class RevenueSplitService {
       this.prisma.membershipPayment.aggregate({
         where: {
           // Yenilemede sipariş yok → şerit damgası da yok; sahibin bayrağından okunur.
-          membership: { user: { isTestAccount: false } },
+          ...LIVE_MEMBERSHIP_PAYMENT,
           status: { in: paidStatuses },
           orderId: null,
         },
@@ -187,7 +193,7 @@ export class RevenueSplitService {
         _count: { id: true },
       }),
       this.prisma.tradeCashPayment.aggregate({
-        where: { payment: { isTest: false, status: { in: paidStatuses } } },
+        where: { payment: { ...LIVE_PAYMENT, status: { in: paidStatuses } } },
         _sum: {
           amount: true,
           tradeFeeAmount: true,
@@ -200,7 +206,7 @@ export class RevenueSplitService {
       }),
       this.prisma.order.aggregate({
         where: {
-          isTest: false,
+          ...LIVE_ORDER,
           origin: OrderOrigin.platform_service,
           payment: { status: { in: paidStatuses } },
         },
@@ -208,7 +214,7 @@ export class RevenueSplitService {
         _count: { id: true },
       }),
       this.prisma.commissionLedger.aggregate({
-        where: { order: { isTest: false } },
+        where: LIVE_COMMISSION_LEDGER,
         _sum: { sellerCommission: true, buyerFee: true },
       }),
     ]);

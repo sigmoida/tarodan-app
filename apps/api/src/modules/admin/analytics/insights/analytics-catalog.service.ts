@@ -11,6 +11,12 @@ import { PrismaService } from "../../../../prisma";
 import { CacheService } from "../../../cache/cache.service";
 import { catalogProductWhere } from "../../../product/helpers/catalog-product-where";
 import type { DashboardDateWindow } from "../dashboard-period.helper";
+import {
+  LIVE_PRODUCT,
+  LIVE_PRODUCT_BOOST,
+  col,
+  liveUserRefSql,
+} from "../../../account-lane/live-lane.where";
 import { AnalyticsTabService } from "./analytics-tab.service";
 import {
   toAnalyticsRange,
@@ -125,7 +131,7 @@ export class AnalyticsCatalogService extends AnalyticsTabService<AnalyticsCatalo
   }
 
   private async totals(window: DashboardDateWindow): Promise<CatalogTotals> {
-    const listing = catalogProductWhere();
+    const listing = { ...catalogProductWhere(), ...LIVE_PRODUCT };
 
     const [created, published, sold, price, timings, boosts, uplift] =
       await Promise.all([
@@ -143,7 +149,11 @@ export class AnalyticsCatalogService extends AnalyticsTabService<AnalyticsCatalo
         this.prisma.productBoost.aggregate({
           _sum: { price: true },
           _count: { _all: true },
-          where: { purchasedAt: window, status: { not: BoostStatus.failed } },
+          where: {
+            ...LIVE_PRODUCT_BOOST,
+            purchasedAt: window,
+            status: { not: BoostStatus.failed },
+          },
         }),
         this.boostUplift(window),
       ]);
@@ -181,7 +191,8 @@ export class AnalyticsCatalogService extends AnalyticsTabService<AnalyticsCatalo
         FROM "products"
         WHERE "kind" = ${ProductKind.listing}::"ProductKind"
           AND "sold_at" >= ${window.gte}
-          AND "sold_at" <= ${window.lte}`,
+          AND "sold_at" <= ${window.lte}
+          AND ${liveUserRefSql(col("products", "seller_id"))}`,
 
       // Satıcının İLK satışı: ilanlarının en erken `sold_at`i bu döneme
       // düşenler. Ölçüm kaydolma anından başlar — "kaydoldum, ne kadar sonra
@@ -196,6 +207,7 @@ export class AnalyticsCatalogService extends AnalyticsTabService<AnalyticsCatalo
           FROM "products"
           WHERE "kind" = ${ProductKind.listing}::"ProductKind"
             AND "sold_at" IS NOT NULL
+            AND ${liveUserRefSql(col("products", "seller_id"))}
           GROUP BY "seller_id"
         ) first_sale
         JOIN "users" u ON u."id" = first_sale."seller_id"
@@ -222,7 +234,8 @@ export class AnalyticsCatalogService extends AnalyticsTabService<AnalyticsCatalo
       WHERE "purchased_at" >= ${window.gte}
         AND "purchased_at" <= ${window.lte}
         AND "final_view_count" IS NOT NULL
-        AND "baseline_view_count" IS NOT NULL`;
+        AND "baseline_view_count" IS NOT NULL
+        AND ${liveUserRefSql(col("product_boosts", "user_id"))}`;
 
     return round2(num(rows[0]?.value));
   }
@@ -236,6 +249,7 @@ export class AnalyticsCatalogService extends AnalyticsTabService<AnalyticsCatalo
         WHERE "kind" = ${ProductKind.listing}::"ProductKind"
           AND "published_at" >= ${range.current.gte}
           AND "published_at" <= ${range.current.lte}
+          AND ${liveUserRefSql(col("products", "seller_id"))}
         GROUP BY 1`,
       this.prisma.$queryRaw<BucketRow[]>`
         SELECT ${bucketExpr('"sold_at"', range.groupBy)} AS bucket,
@@ -244,6 +258,7 @@ export class AnalyticsCatalogService extends AnalyticsTabService<AnalyticsCatalo
         WHERE "kind" = ${ProductKind.listing}::"ProductKind"
           AND "sold_at" >= ${range.current.gte}
           AND "sold_at" <= ${range.current.lte}
+          AND ${liveUserRefSql(col("products", "seller_id"))}
         GROUP BY 1`,
       this.prisma.$queryRaw<BucketRow[]>`
         SELECT ${bucketExpr('"purchased_at"', range.groupBy)} AS bucket,
@@ -252,6 +267,7 @@ export class AnalyticsCatalogService extends AnalyticsTabService<AnalyticsCatalo
         WHERE "purchased_at" >= ${range.current.gte}
           AND "purchased_at" <= ${range.current.lte}
           AND "status" <> ${BoostStatus.failed}::"BoostStatus"
+          AND ${liveUserRefSql(col("product_boosts", "user_id"))}
         GROUP BY 1`,
     ]);
 
@@ -277,7 +293,8 @@ export class AnalyticsCatalogService extends AnalyticsTabService<AnalyticsCatalo
       LEFT JOIN "categories" c ON c."id" = p."category_id"
       WHERE p."kind" = ${ProductKind.listing}::"ProductKind"
         AND p."published_at" >= ${window.gte}
-        AND p."published_at" <= ${window.lte}`;
+        AND p."published_at" <= ${window.lte}
+        AND ${liveUserRefSql(col("p", "seller_id"))}`;
 
     const [categories, bands, conditions] = await Promise.all([
       this.prisma.$queryRaw<BreakdownSqlRow[]>`
@@ -338,6 +355,7 @@ export class AnalyticsCatalogService extends AnalyticsTabService<AnalyticsCatalo
       WHERE b."purchased_at" >= ${window.gte}
         AND b."purchased_at" <= ${window.lte}
         AND b."status" <> ${BoostStatus.failed}::"BoostStatus"
+        AND ${liveUserRefSql(col("b", "user_id"))}
       GROUP BY 1, 2`;
 
     const total = rows.reduce((sum, row) => sum + num(row.amount), 0);

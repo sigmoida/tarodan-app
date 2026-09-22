@@ -19,7 +19,7 @@ export const ANALYTICS_LIVE_TTL_SECONDS = 5 * 60;
 export const ANALYTICS_CLOSED_TTL_SECONDS = 24 * 60 * 60;
 
 /** Anahtar şeması değiştiğinde artırılır; eski gövdeler kendiliğinden düşer. */
-const VERSION = "v1";
+const VERSION = "v2"; // v2: sekmeler test şeridini dışlıyor
 
 export const ANALYTICS_CACHE_PREFIX = `admin:analytics:${VERSION}:`;
 
