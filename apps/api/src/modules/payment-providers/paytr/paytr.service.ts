@@ -735,6 +735,11 @@ export class PayTRService implements IPaymentProvider {
         ctoken: string;
         requireCvv: boolean;
       };
+      /**
+       * Test şeridi ödemesi: canlı merchant'ta `test_mode=1` (PayTR test kartı,
+       * gerçek tahsilat yok). Verilmezse ortam ayarı (`PAYTR_TEST_MODE`) geçer.
+       */
+      testMode?: boolean;
     },
   ): Promise<{
     action: string;
@@ -761,7 +766,8 @@ export class PayTRService implements IPaymentProvider {
         : 0,
     );
     const currency = "TL";
-    const testModeStr = this.testMode ? "1" : "0";
+    const testMode = options?.testMode ?? this.testMode;
+    const testModeStr = testMode ? "1" : "0";
     // Kullanıcının başlattığı checkout her zaman 3D Secure'dur. Non3D yalnız
     // ayrı recurring akışında, açık mağaza yetkisiyle sunucudan kullanılır.
     const non3d = "0";
@@ -818,7 +824,7 @@ export class PayTRService implements IPaymentProvider {
       user_address: buyer.address,
       user_phone: buyer.phone,
       user_basket: userBasket,
-      debug_on: this.testMode ? "1" : "0",
+      debug_on: testMode ? "1" : "0",
       client_lang: "tr",
     });
 
@@ -865,6 +871,8 @@ export class PayTRService implements IPaymentProvider {
     buyer: PayTRBuyer;
     basketItems: PayTRBasketItem[];
     cvv?: string;
+    /** Test şeridi üyeliği: `test_mode=1` (bkz. createDirectPaymentForm). */
+    testMode?: boolean;
   }): Promise<{
     status: "success" | "failed" | "wait_callback";
     reason?: string;
@@ -881,7 +889,8 @@ export class PayTRService implements IPaymentProvider {
     const paymentType = "card";
     const installmentCount = "0";
     const currency = "TL";
-    const testModeStr = this.testMode ? "1" : "0";
+    const testMode = params.testMode ?? this.testMode;
+    const testModeStr = testMode ? "1" : "0";
     const non3d = "1";
 
     // hashStr = mid + ip + oid + email + amount + payment_type + installment + currency + test_mode + non_3d
@@ -923,7 +932,7 @@ export class PayTRService implements IPaymentProvider {
       user_address: params.buyer.address,
       user_phone: params.buyer.phone,
       user_basket: userBasket,
-      debug_on: this.testMode ? "1" : "0",
+      debug_on: testMode ? "1" : "0",
       client_lang: "tr",
       installment_count: installmentCount,
       utoken: params.utoken,

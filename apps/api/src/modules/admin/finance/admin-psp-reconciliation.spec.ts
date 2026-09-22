@@ -252,6 +252,27 @@ describe("AdminPspReconciliationService.getReconciliationSummary", () => {
     expect(day?.missingInPaytr).toBe(1);
   });
 
+  /**
+   * Test şeridi işlemi (test_mode=1) canlı PayTR dökümünde hiç yer almaz; "bizim"
+   * kümeleri (ödeme, üyelik yenilemesi — iki mağaza —, iade denemesi) onu
+   * saymamalı, yoksa her test ödemesi kalıcı "dökümde yok" farkı olur.
+   */
+  it("keeps the test lane out of all three 'ours' sets", async () => {
+    const prisma = makePrisma({ lines: [SALE()] });
+    const { service } = makeService(prisma);
+
+    await service.getReconciliationSummary(7);
+
+    const payments = prisma.payment.findMany.mock.calls[0][0];
+    expect(payments.where).toMatchObject({ isTest: false });
+    const renewals = prisma.membershipPayment.findMany.mock.calls[0][0];
+    expect(renewals.where).toMatchObject({
+      membership: { user: { isTestAccount: false } },
+    });
+    const refunds = prisma.refundAttempt.findMany.mock.calls[0][0];
+    expect(refunds.where).toMatchObject({ payment: { isTest: false } });
+  });
+
   it("starts the window at the ISTANBUL day start, not UTC midnight", async () => {
     const prisma = makePrisma({});
     const { service } = makeService(prisma);

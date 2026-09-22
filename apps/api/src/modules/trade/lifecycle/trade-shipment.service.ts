@@ -418,6 +418,7 @@ export class TradeShipmentService {
           const result = await this.cargo.createShipment({
             idempotencyKey: `surat:trade-inbound:${item.ozelKargoTakipNo}`,
             correlationId: `trade-inbound-${tradeId}`,
+            testLane: trade.isTest,
             ...item.payload,
           });
           if (result.ok) {
@@ -567,6 +568,7 @@ export class TradeShipmentService {
           select: {
             tradeNumber: true,
             initiatorId: true,
+            isTest: true,
             items: { select: TRADE_DESI_ITEM_SELECT },
           },
         },
@@ -609,6 +611,7 @@ export class TradeShipmentService {
       const result = await this.cargo.createShipment({
         idempotencyKey: `surat:trade-inbound:${ship.trackingNumber}`,
         correlationId: `trade-inbound-retry-${ship.tradeId}`,
+        testLane: ship.trade.isTest,
         ...payload,
       });
       if (!result.ok) {

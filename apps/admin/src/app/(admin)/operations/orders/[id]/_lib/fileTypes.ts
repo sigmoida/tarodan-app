@@ -136,6 +136,8 @@ export interface OrderGroupFile {
     itemCount: number;
     packageCount: number;
     isMultiSeller: boolean;
+    /** Test şeridi sepeti (App Review / QA) — başlıkta "TEST" rozeti. */
+    isTest?: boolean;
     totals: {
       subtotal: number;
       shippingCost: number;

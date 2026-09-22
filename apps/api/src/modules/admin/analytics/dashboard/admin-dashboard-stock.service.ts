@@ -13,6 +13,12 @@ import type {
 } from "@tarodan/types";
 import { PrismaService } from "../../../../prisma";
 import { CacheService } from "../../../cache/cache.service";
+import {
+  LIVE_PAYMENT,
+  LIVE_PRODUCT,
+  LIVE_PRODUCT_BOOST,
+  LIVE_USER_MEMBERSHIP,
+} from "../../../account-lane/live-lane.where";
 
 const round2 = (value: number): number => Math.round(value * 100) / 100;
 
@@ -23,11 +29,15 @@ const round2 = (value: number): number => Math.round(value * 100) / 100;
  *
  * Aktif üyeliklerin katman kırılımını bugün hiçbir admin ekranı göstermiyor;
  * üyelik gelirinin nereden geldiğini ancak bu kırılım anlatıyor.
+ *
+ * Test şeridi hariç: test escrow'unda gerçek para yok, test ilanı/üyeliği/
+ * öne çıkarması canlı pazarın büyüklüğü değil.
  */
 @Injectable()
 export class AdminDashboardStockService {
   /** Bakiyeler dakikalar içinde anlamlı ölçüde değişmez: 60 sn yeterli. */
-  static readonly CACHE_KEY = "admin:dashboard:stock:v1";
+  // v2: test şeridi dışlandı.
+  static readonly CACHE_KEY = "admin:dashboard:stock:v2";
   static readonly CACHE_TTL_SECONDS = 60;
 
   constructor(
@@ -56,7 +66,7 @@ export class AdminDashboardStockService {
     // olduğundan yürütme yine transaction içinde olur.
     const byTierQuery = this.prisma.userMembership.groupBy({
       by: ["tierId"],
-      where: { status: SubscriptionStatus.active },
+      where: { ...LIVE_USER_MEMBERSHIP, status: SubscriptionStatus.active },
       _count: { id: true },
     });
 
@@ -64,7 +74,7 @@ export class AdminDashboardStockService {
       await this.prisma.$transaction([
         // Escrow'da GERÇEKTEN duran para = tutulan − kısmi iadelerle tüketilen.
         this.prisma.paymentHold.aggregate({
-          where: { status: PaymentHoldStatus.held },
+          where: { payment: LIVE_PAYMENT, status: PaymentHoldStatus.held },
           _sum: { amount: true, refundedAmount: true },
         }),
         this.prisma.sellerAccountAdjustment.aggregate({
@@ -72,13 +82,17 @@ export class AdminDashboardStockService {
           _sum: { remainingAmount: true },
         }),
         this.prisma.product.count({
-          where: { kind: ProductKind.listing, status: ProductStatus.active },
+          where: {
+            ...LIVE_PRODUCT,
+            kind: ProductKind.listing,
+            status: ProductStatus.active,
+          },
         }),
         this.prisma.userMembership.count({
-          where: { status: SubscriptionStatus.active },
+          where: { ...LIVE_USER_MEMBERSHIP, status: SubscriptionStatus.active },
         }),
         this.prisma.productBoost.count({
-          where: { status: BoostStatus.active },
+          where: { ...LIVE_PRODUCT_BOOST, status: BoostStatus.active },
         }),
         byTierQuery,
       ]);

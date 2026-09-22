@@ -500,6 +500,8 @@ export class AdminAnalyticsOrderService {
         createdAt: isGroup ? (group as any).createdAt : orders[0].createdAt,
         itemCount: orders.length,
         packageCount: packages.length,
+        // Test şeridi rozeti — sepetin bütün siparişleri aynı şeritte.
+        isTest: orders.some((o) => o.isTest),
         isMultiSeller: sellerIds.size > 1,
         totals: {
           subtotal: orders.reduce((s, o: any) => s + storedProductBaseOf(o), 0),

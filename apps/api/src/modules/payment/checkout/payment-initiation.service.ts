@@ -492,6 +492,7 @@ export class PaymentInitiationService {
         basketItems,
         {
           successQueryParams,
+          testMode: payment.isTest === true,
           savedCard: {
             utoken: saved.utoken,
             ctoken: saved.ctoken,
@@ -543,6 +544,8 @@ export class PaymentInitiationService {
         storeCard,
         utoken: existingCard?.utoken,
         successQueryParams,
+        // Test şeridi: DB trigger'ının damgaladığı Payment.isTest → test_mode=1.
+        testMode: payment.isTest === true,
       },
     );
 

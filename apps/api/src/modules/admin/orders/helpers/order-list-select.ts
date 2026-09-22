@@ -62,6 +62,8 @@ const LIST_LINE_BASE_SELECT = {
   createdAt: true,
   checkoutGroupId: true,
   packageId: true,
+  // Test şeridi damgası — satır "TEST" rozeti taşır (liste test kaydını gizlemez).
+  isTest: true,
   shippingAddress: true,
   financialSnapshot: true,
   sellerCommissionAmount: true,

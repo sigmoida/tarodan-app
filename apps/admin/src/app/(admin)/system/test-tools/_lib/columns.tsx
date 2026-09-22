@@ -1,6 +1,11 @@
-import { Button } from "@tarodan/ui";
+import { Badge, Button } from "@tarodan/ui";
 import { col } from "@/components/table";
-import { type SearchItem, type AdjustAction, fmt } from "./types";
+import {
+  type SearchItem,
+  type AdjustAction,
+  type TestAccount,
+  fmt,
+} from "./types";
 import type { useTranslations } from "next-intl";
 
 type T = ReturnType<typeof useTranslations<never>>;
@@ -66,6 +71,46 @@ export function timeAdjustColumns(
         </div>
       ),
       { grow: 3, minWidth: 260 },
+    ),
+  ];
+}
+
+/** Test şeridi hesap tablosu (ad-hoc liste; sayfalama/sıralama yok). */
+export function testLaneColumns(t: T) {
+  return [
+    col.code<TestAccount>(
+      t("admin.system.testTools.lane.columns.code"),
+      (a) => a.adminCode,
+    ),
+    col.text<TestAccount>(
+      t("admin.system.testTools.lane.columns.email"),
+      (a) => a.email,
+    ),
+    col.text<TestAccount>(
+      t("admin.system.testTools.lane.columns.name"),
+      (a) => a.displayName,
+    ),
+    col.custom<TestAccount>(
+      t("admin.system.testTools.lane.columns.role"),
+      (a) => (
+        <Badge variant={a.isSeller ? "warning" : "default"} size="sm">
+          {a.isSeller
+            ? t("admin.system.testTools.lane.seller")
+            : t("admin.system.testTools.lane.buyer")}
+        </Badge>
+      ),
+    ),
+    col.number<TestAccount>(
+      t("admin.system.testTools.lane.columns.orders"),
+      (a) => a.orders,
+    ),
+    col.number<TestAccount>(
+      t("admin.system.testTools.lane.columns.listings"),
+      (a) => a.listings,
+    ),
+    col.date<TestAccount>(
+      t("admin.system.testTools.lane.columns.createdAt"),
+      (a) => a.createdAt,
     ),
   ];
 }

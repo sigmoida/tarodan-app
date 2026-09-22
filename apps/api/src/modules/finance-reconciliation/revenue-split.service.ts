@@ -2,6 +2,12 @@ import { Injectable, Optional } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { OrderOrigin, PaymentStatus, Prisma } from "@prisma/client";
 import { PrismaService } from "../../prisma";
+import {
+  LIVE_COMMISSION_LEDGER,
+  LIVE_MEMBERSHIP_PAYMENT,
+  LIVE_ORDER,
+  LIVE_PAYMENT,
+} from "../account-lane/live-lane.where";
 import { OrderTaxPolicyService } from "../order/pricing/order-tax-policy.service";
 import { TaxService } from "../tax/tax.service";
 import {
@@ -94,6 +100,7 @@ export class RevenueSplitService {
         SELECT id AS payment_id, order_id, checkout_group_id
         FROM payments
         WHERE status IN ('completed', 'refunded') AND trade_cash_payment_id IS NULL
+          AND is_test = false
       ),
       paid_orders AS (
         SELECT o.*, p.payment_id FROM orders o JOIN paid p ON p.order_id = o.id
@@ -169,19 +176,24 @@ export class RevenueSplitService {
       this.resolveRates(),
       this.physicalSplit(),
       this.prisma.payment.aggregate({
-        where: { status: { in: paidStatuses } },
+        where: { ...LIVE_PAYMENT, status: { in: paidStatuses } },
         _sum: { amount: true },
         _count: { id: true },
       }),
       // MEM- siparişi hem Payment hem MembershipPayment üretir; yalnız yenilemeler
       // (order_id NULL) Payment tablosunun dışındadır.
       this.prisma.membershipPayment.aggregate({
-        where: { status: { in: paidStatuses }, orderId: null },
+        where: {
+          // Yenilemede sipariş yok → şerit damgası da yok; sahibin bayrağından okunur.
+          ...LIVE_MEMBERSHIP_PAYMENT,
+          status: { in: paidStatuses },
+          orderId: null,
+        },
         _sum: { amount: true },
         _count: { id: true },
       }),
       this.prisma.tradeCashPayment.aggregate({
-        where: { payment: { status: { in: paidStatuses } } },
+        where: { payment: { ...LIVE_PAYMENT, status: { in: paidStatuses } } },
         _sum: {
           amount: true,
           tradeFeeAmount: true,
@@ -194,6 +206,7 @@ export class RevenueSplitService {
       }),
       this.prisma.order.aggregate({
         where: {
+          ...LIVE_ORDER,
           origin: OrderOrigin.platform_service,
           payment: { status: { in: paidStatuses } },
         },
@@ -201,6 +214,7 @@ export class RevenueSplitService {
         _count: { id: true },
       }),
       this.prisma.commissionLedger.aggregate({
+        where: LIVE_COMMISSION_LEDGER,
         _sum: { sellerCommission: true, buyerFee: true },
       }),
     ]);

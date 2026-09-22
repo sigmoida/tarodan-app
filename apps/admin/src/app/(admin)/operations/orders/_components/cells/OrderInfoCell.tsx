@@ -4,11 +4,12 @@ import { Badge } from "@tarodan/ui";
 import type { AdminOrderListRow } from "@tarodan/types";
 import { fmtDateTime } from "@/lib/format";
 import { TruncatedText } from "@/components/table";
+import { TestLaneBadge } from "@/components/TestLaneBadge";
 import { rowDetailHref, rowLines } from "../../_lib/rowView";
 
 /**
  * Sipariş Bilgileri: satır numarası (GRP / ORD), oluşturulma zamanı ve teklif
- * siparişinde teklif rozeti. Açık bir hazırlama
+ * siparişinde teklif rozeti, test şeridi kaydında "TEST" rozeti. Açık bir hazırlama
  * süresi varsa en yakını da gösterilir — "Yeni" kovasında operatörün baktığı
  * ilk tarih odur.
  */
@@ -38,6 +39,7 @@ export function OrderInfoCell({ row }: { row: AdminOrderListRow }) {
           {t("admin.operations.orders.cells.offerBadge")}
         </Badge>
       )}
+      <TestLaneBadge isTest={row.isTest} />
       {deadline && (
         <span className="whitespace-nowrap text-xs text-warning-600">
           {t("admin.operations.orders.cells.preparingDeadline", {

@@ -37,6 +37,18 @@ import {
   completedPayoutAmountSql,
   completedPayoutWhere,
 } from "./completed-payout.predicate";
+import {
+  LIVE_COMMISSION_LEDGER,
+  LIVE_MEMBERSHIP_PAYMENT,
+  LIVE_ORDER,
+  LIVE_PRODUCT,
+  LIVE_PRODUCT_BOOST,
+  LIVE_REFUND_ATTEMPT,
+  LIVE_TRADE,
+  LIVE_TRADE_CASH_PAYMENT,
+  LIVE_USER,
+  liveRowSql,
+} from "../../account-lane/live-lane.where";
 
 type LedgerAggregate = { _sum: LedgerNetSums };
 
@@ -90,12 +102,13 @@ const stamped = (
 /** Teslim edilmiş siparişlerin ortak yüklemi — adet ve tutar aynı satırları okur. */
 const deliveredOrderWhere = (
   window: DashboardDateWindow | undefined,
-): Prisma.OrderWhereInput => ({ deliveredAt: stamped(window) });
+): Prisma.OrderWhereInput => ({ ...LIVE_ORDER, deliveredAt: stamped(window) });
 
 /** Tamamlanmış üyelik ödemesinin ortak yüklemi — gelir ve adet aynı satırları okur. */
 const membershipPaymentWhere = (
   window: DashboardDateWindow | undefined,
 ): Prisma.MembershipPaymentWhereInput => ({
+  ...LIVE_MEMBERSHIP_PAYMENT,
   status: PaymentStatus.completed,
   createdAt: window,
 });
@@ -104,6 +117,7 @@ const membershipPaymentWhere = (
 const boostWhere = (
   window: DashboardDateWindow | undefined,
 ): Prisma.ProductBoostWhereInput => ({
+  ...LIVE_PRODUCT_BOOST,
   purchasedAt: stamped(window),
   status: { not: BoostStatus.failed },
 });
@@ -116,6 +130,7 @@ const boostWhere = (
 const ledgerEarnedWhere = (
   window: DashboardDateWindow | undefined,
 ): Prisma.CommissionLedgerWhereInput => ({
+  ...LIVE_COMMISSION_LEDGER,
   earnedAt: stamped(window),
   status: { not: CommissionLedgerStatus.waived },
 });
@@ -155,6 +170,7 @@ const finalizedOrderRefundWhere = (
   window: DashboardDateWindow | undefined,
   delivered: boolean,
 ): Prisma.RefundAttemptWhereInput => ({
+  ...LIVE_REFUND_ATTEMPT,
   status: RefundAttemptStatus.finalized,
   finalizedAt: stamped(window),
   orderId: { not: null },
@@ -285,7 +301,7 @@ export class AdminAnalyticsDashboardService {
   ): Promise<
     Record<DashboardMetricKey, { yesterday: number; allTime: number }>
   > {
-    const key = `admin:dashboard:fixed:v1:closed:${trCalendarDate(now)}`;
+    const key = `admin:dashboard:fixed:v2:closed:${trCalendarDate(now)}`;
     return this.cache.getOrSet(key, () => this.computeClosedFixed(now), {
       ttl: AdminAnalyticsDashboardService.CLOSED_RANGE_CACHE_TTL_SECONDS,
     });
@@ -302,7 +318,7 @@ export class AdminAnalyticsDashboardService {
   ): Promise<Record<DashboardMetricKey, number>> {
     const ttl = AdminAnalyticsDashboardService.PERIOD_CACHE_TTL_SECONDS;
     const bucket = Math.floor(now.getTime() / (ttl * 1000));
-    const key = `admin:dashboard:fixed:v1:month:${trCalendarDate(now)}:${bucket}`;
+    const key = `admin:dashboard:fixed:v2:month:${trCalendarDate(now)}:${bucket}`;
     return this.cache.getOrSet(
       key,
       () => this.computeWindow(resolveThisMonthWindow(now)),
@@ -329,7 +345,10 @@ export class AdminAnalyticsDashboardService {
         // v3: dönem sözleşmesi "önceki dönem" trendini (previous/changePercent)
         // kaybetti, sabit Dün/Bu ay üçlüsü eklendi — eski anahtarın
         // önbelleğinde eski şekilli bir satır kalmasın diye sürüm arttı.
-        key: `admin:dashboard:period:v3:custom:${from}:${range.current.lte.toISOString()}`,
+        // v4 (sabitlerde v2): metrikler test şeridini dışlamaya başladı —
+        // kapalı aralıklar 6 saat tutulduğu için eski rakam sürüm artmadan
+        // düşmezdi.
+        key: `admin:dashboard:period:v4:custom:${from}:${range.current.lte.toISOString()}`,
         ttl: AdminAnalyticsDashboardService.CLOSED_RANGE_CACHE_TTL_SECONDS,
       };
     }
@@ -337,7 +356,7 @@ export class AdminAnalyticsDashboardService {
     const ttl = AdminAnalyticsDashboardService.PERIOD_CACHE_TTL_SECONDS;
     const bucket = Math.floor(now.getTime() / (ttl * 1000));
     return {
-      key: `admin:dashboard:period:v3:${range.type}:${from}:${bucket}`,
+      key: `admin:dashboard:period:v4:${range.type}:${from}:${bucket}`,
       ttl,
     };
   }
@@ -467,11 +486,15 @@ export class AdminAnalyticsDashboardService {
         // DİKKAT: `cancelledAt` bu göçten sonra yazılmaya başladı; daha eski
         // iptaller hiçbir dönemde görünmez (dürüst backfill yok).
         query: (window) =>
-          this.prisma.order.count({ where: { cancelledAt: stamped(window) } }),
+          this.prisma.order.count({
+            where: { ...LIVE_ORDER, cancelledAt: stamped(window) },
+          }),
       },
       completedTrades: {
         query: (window) =>
-          this.prisma.trade.count({ where: { completedAt: stamped(window) } }),
+          this.prisma.trade.count({
+            where: { ...LIVE_TRADE, completedAt: stamped(window) },
+          }),
       },
       completedTradeAmount: {
         // Takas ÜCRETİ değil, takasın kendisi için İKİ TARAFTAN toplam
@@ -482,7 +505,7 @@ export class AdminAnalyticsDashboardService {
             _sum: { totalAmount: true },
             where: {
               status: PaymentStatus.completed,
-              trade: { completedAt: stamped(window) },
+              trade: { ...LIVE_TRADE, completedAt: stamped(window) },
             },
           }),
         toValue: sumOf("totalAmount"),
@@ -498,7 +521,7 @@ export class AdminAnalyticsDashboardService {
               commission: true,
               commissionTaxAmount: true,
             },
-            where: { paidAt: stamped(window) },
+            where: { ...LIVE_TRADE_CASH_PAYMENT, paidAt: stamped(window) },
           }),
         toValue: sumOf("tradeFeeAmount", "commission", "commissionTaxAmount"),
       },
@@ -654,12 +677,17 @@ export class AdminAnalyticsDashboardService {
           this.prisma.productBoost.count({ where: boostWhere(window) }),
       },
       newUsers: {
-        query: (createdAt) => this.prisma.user.count({ where: { createdAt } }),
+        query: (createdAt) =>
+          this.prisma.user.count({ where: { ...LIVE_USER, createdAt } }),
       },
       newListings: {
         query: (window) =>
           this.prisma.product.count({
-            where: { kind: ProductKind.listing, publishedAt: stamped(window) },
+            where: {
+              ...LIVE_PRODUCT,
+              kind: ProductKind.listing,
+              publishedAt: stamped(window),
+            },
           }),
       },
       signedInUsers: {
@@ -671,7 +699,7 @@ export class AdminAnalyticsDashboardService {
         // olduğundan düşük görünür, bu yüzden trend satırı gösterilmez.
         query: (lastActivityAt) =>
           this.prisma.user.count({
-            where: { lastActivityAt: stamped(lastActivityAt) },
+            where: { ...LIVE_USER, lastActivityAt: stamped(lastActivityAt) },
           }),
       },
     };
@@ -683,6 +711,7 @@ export class AdminAnalyticsDashboardService {
    */
   async getRecentOrders(limit: number = 10) {
     const orders = await this.prisma.order.findMany({
+      where: LIVE_ORDER,
       take: limit,
       orderBy: { createdAt: "desc" },
       include: {
@@ -709,7 +738,7 @@ export class AdminAnalyticsDashboardService {
    */
   async getTopProducts(limit: number = 10) {
     const products = await this.prisma.product.findMany({
-      where: { kind: ProductKind.listing },
+      where: { ...LIVE_PRODUCT, kind: ProductKind.listing },
       take: limit,
       orderBy: [{ viewCount: "desc" }, { createdAt: "desc" }],
       select: {
@@ -748,7 +777,7 @@ export class AdminAnalyticsDashboardService {
   async getTopSellers(limit: number = 10) {
     const sellers = await this.prisma.user.findMany({
       take: limit,
-      where: { isSeller: true, isBanned: false, deletedAt: null },
+      where: { ...LIVE_USER, isSeller: true, isBanned: false, deletedAt: null },
       orderBy: [{ storeViewCount: "desc" }, { createdAt: "asc" }],
       select: {
         id: true,
@@ -809,6 +838,7 @@ export class AdminAnalyticsDashboardService {
       this.prisma.order.aggregate({
         _sum: { commissionAmount: true },
         where: {
+          ...LIVE_ORDER,
           createdAt: { gte: startDate, lte: endDate },
           status: { in: [OrderStatus.completed, OrderStatus.delivered] },
         },
@@ -828,6 +858,7 @@ export class AdminAnalyticsDashboardService {
           sellerShippingAmount: true,
         },
         where: {
+          ...LIVE_ORDER,
           createdAt: { gte: startDate, lte: endDate },
           status: { in: [OrderStatus.completed, OrderStatus.delivered] },
         },
@@ -841,12 +872,14 @@ export class AdminAnalyticsDashboardService {
         WHERE created_at >= ${startDate} 
           AND created_at <= ${endDate}
           AND status IN ('completed', 'delivered')
+          AND ${liveRowSql("orders")}
         GROUP BY DATE_TRUNC('month', created_at)
         ORDER BY month DESC
       ` as Promise<Array<{ month: Date; total: number }>>,
       // Commission by category
       this.prisma.order.findMany({
         where: {
+          ...LIVE_ORDER,
           createdAt: { gte: startDate, lte: endDate },
           status: { in: [OrderStatus.completed, OrderStatus.delivered] },
         },

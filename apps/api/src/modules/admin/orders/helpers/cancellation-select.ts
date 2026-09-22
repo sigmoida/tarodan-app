@@ -31,6 +31,7 @@ export const CANCELLATION_TRADE_SELECT = {
   id: true,
   tradeNumber: true,
   status: true,
+  isTest: true,
   createdAt: true,
   cancelledAt: true,
   cancelledBy: true,

@@ -22,6 +22,10 @@ model User {
   isEmailVerified         Boolean                  @default(false) @map("is_email_verified")
   isPhoneVerified         Boolean                  @default(false) @map("is_phone_verified")
   isSeller                Boolean                  @default(false) @map("is_seller")
+  // Canlı ortamdaki izole "test şeridi" (mağaza incelemesi / mobil QA). Test
+  // hesapları yalnız birbirleriyle etkileşir; ilanları canlı vitrine, sipariş/
+  // ödeme/takasları finans raporlarına girmez. Bayrağı yalnız süper-admin verir.
+  isTestAccount           Boolean                  @default(false) @map("is_test_account")
   showTrustScore          Boolean                  @default(true) @map("show_trust_score")
   sellerType              SellerType?              @map("seller_type")
   taxId                   String?                  @map("tax_id")
@@ -115,6 +119,7 @@ model User {
   // Dashboard: dönem içinde yeni kullanıcı + son girişi döneme düşen hesap.
   @@index([createdAt])
   @@index([lastActivityAt])
+  @@index([isTestAccount])
   @@map("users")
 }
 
@@ -1013,6 +1018,10 @@ model Trade {
   compensationPendingUserId String?            @map("compensation_pending_user_id")
   compensationResolvedAt    DateTime?          @map("compensation_resolved_at")
   createdAt                 DateTime           @default(now()) @map("created_at")
+  // Test şeridi damgası: alıcı/ödeyen test hesabıysa DB trigger'ı INSERT'te
+  // true yazar (uygulama koduna güvenilmez). Finans/mutabakat/fatura/kargo/
+  // payout bu bayrakla test kayıtlarını dışlar.
+  isTest                    Boolean            @default(false) @map("is_test")
   updatedAt                 DateTime           @updatedAt @map("updated_at")
   version                   Int                @default(1)
   /// v1'de en fazla BİR satır (yalnız farkı ödeyen taraf); v2'de taraf başına
@@ -1029,6 +1038,7 @@ model Trade {
   @@index([initiatorId])
   @@index([receiverId])
   @@index([status])
+  @@index([isTest])
   @@index([responseDeadline])
   // Dashboard: dönem içinde tamamlanan takas.
   @@index([completedAt])
@@ -1628,6 +1638,10 @@ model Order {
   status                     OrderStatus              @default(pending_payment)
   shippingAddress            Json?                    @map("shipping_address")
   createdAt                  DateTime                 @default(now()) @map("created_at")
+  // Test şeridi damgası: alıcı/ödeyen test hesabıysa DB trigger'ı INSERT'te
+  // true yazar (uygulama koduna güvenilmez). Finans/mutabakat/fatura/kargo/
+  // payout bu bayrakla test kayıtlarını dışlar.
+  isTest                     Boolean                  @default(false) @map("is_test")
   updatedAt                  DateTime                 @updatedAt @map("updated_at")
   version                    Int                      @default(1)
   buyerFeeAmount             Decimal                  @default(0) @map("buyer_fee_amount") @db.Decimal(10, 2)
@@ -1744,6 +1758,7 @@ model Order {
   @@index([buyerId])
   @@index([sellerId])
   @@index([status])
+  @@index([isTest])
   @@index([status, paymentExpiresAt])
   // Teslim faturası backfill'inin aday sorgusu (faturasız + en yeni teslimat önce).
   @@index([status, revenueInvoicedAt, deliveredAt])
@@ -1823,6 +1838,10 @@ model Payment {
   metadata               Json?
   paidAt                 DateTime?         @map("paid_at")
   createdAt              DateTime          @default(now()) @map("created_at")
+  // Test şeridi damgası: alıcı/ödeyen test hesabıysa DB trigger'ı INSERT'te
+  // true yazar (uygulama koduna güvenilmez). Finans/mutabakat/fatura/kargo/
+  // payout bu bayrakla test kayıtlarını dışlar.
+  isTest                 Boolean           @default(false) @map("is_test")
   updatedAt              DateTime          @updatedAt @map("updated_at")
   paymentHolds           PaymentHold[]
   refundAttempts         RefundAttempt[]
@@ -1834,6 +1853,7 @@ model Payment {
   // olmayan ödeme alarmı bu iki kolondan tarar; tabloda hiç indeks yoktu.
   @@index([status, paidAt])
   @@index([status, createdAt])
+  @@index([isTest])
   @@map("payments")
 }
 
@@ -4007,8 +4027,12 @@ model LedgerEntry {
   // kayıt (Postgres NULL'ları benzersiz saymaz, çoklu NULL serbest).
   idempotencyKey String?         @map("idempotency_key")
   lineNo         Int             @default(0) @map("line_no")
+  // Test şeridi damgası: bağlı ödeme/sipariş/takas test ise trigger INSERT'te
+  // true yazar; finans mutabakatı test satırlarını dışlar.
+  isTest         Boolean         @default(false) @map("is_test")
 
   @@unique([idempotencyKey, lineNo])
+  @@index([isTest])
   @@index([entryGroupId])
   @@index([account, createdAt])
   @@index([eventType, createdAt])

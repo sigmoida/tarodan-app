@@ -61,6 +61,11 @@ export function cancellationExportSheet(
 ): RenderedSheet {
   const columns: ExportColumn<CancellationExportLine>[] = [
     { header: t(`${HEADER}.rowNumber`), value: (x) => x.row.number },
+    // Test şeridi kaydı dökümden çıkarılmaz (liste gibi) — işaretlenir.
+    {
+      header: t(`${HEADER}.testLane`),
+      value: (x) => (x.row.isTest ? t("admin.shared.testLane.badge") : ""),
+    },
     {
       header: t(`${HEADER}.origin`),
       value: (x) => t(`${HEADER}.originValue.${x.row.origin}`),

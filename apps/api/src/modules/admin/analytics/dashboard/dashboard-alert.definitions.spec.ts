@@ -153,6 +153,48 @@ describe("dashboard alert definitions", () => {
       );
     });
 
+    /**
+     * Test şeridi uyarılara girmez: test kolisi taşıyıcıya gitmediği için hep
+     * "kargoda" kalır, test ödemesi PayTR dökümünde yoktur — sayılsalardı
+     * kalıcı sahte alarm olurlardı.
+     */
+    it.each([
+      "stuckShippedOrders",
+      "stuckWarehouseTrades",
+      "stuckOutboundTrades",
+      "preparingDeadlineWithin24h",
+    ] as const)("%s counts live-lane rows only", (key) => {
+      expect(captureWhere(key).isTest).toBe(false);
+    });
+
+    it.each([
+      ["paymentsMissingFromStatement", '"p"."is_test" = false'],
+      ["deliveredHoldsWithoutRelease", '"o"."is_test" = false'],
+      ["exhaustedPayoutRetries", '"is_test" = true'],
+    ] as const)("%s filters the test lane in SQL", (key, fragment) => {
+      const parts = ALERT_DEFINITIONS[key].query(
+        new Proxy(
+          {},
+          {
+            get:
+              () =>
+              (...args: unknown[]) =>
+                args,
+          },
+        ) as never,
+        NOW,
+      ) as unknown as unknown[];
+      const sqlText = parts
+        .slice(1)
+        .map((value) =>
+          value && typeof value === "object" && "sql" in value
+            ? String((value as { sql: string }).sql)
+            : "",
+        )
+        .join(" ");
+      expect(sqlText).toContain(fragment);
+    });
+
     it("reads a raw COUNT(*) result as a number, not a bigint", () => {
       expect(
         ALERT_DEFINITIONS.exhaustedPayoutRetries.read([{ count: 7n }]),

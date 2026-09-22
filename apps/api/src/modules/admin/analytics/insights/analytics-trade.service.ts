@@ -8,6 +8,15 @@ import {
 import { PrismaService } from "../../../../prisma";
 import { CacheService } from "../../../cache/cache.service";
 import type { DashboardDateWindow } from "../dashboard-period.helper";
+import {
+  LIVE_OFFER,
+  LIVE_ORDER,
+  LIVE_TRADE,
+  LIVE_TRADE_CASH_PAYMENT,
+  col,
+  liveRowSql,
+  liveTradeRefSql,
+} from "../../../account-lane/live-lane.where";
 import { AnalyticsTabService } from "./analytics-tab.service";
 import {
   toAnalyticsRange,
@@ -160,6 +169,7 @@ export class AnalyticsTradeService extends AnalyticsTabService<AnalyticsTradeRes
     window: DashboardDateWindow,
   ): Prisma.OfferWhereInput {
     return {
+      ...LIVE_OFFER,
       createdAt: window,
       OR: [{ status: OfferStatus.accepted }, { order: { isNot: null } }],
     };
@@ -179,13 +189,15 @@ export class AnalyticsTradeService extends AnalyticsTabService<AnalyticsTradeRes
       offersAccepted,
       offerOrders,
     ] = await Promise.all([
-      this.prisma.trade.count({ where: { createdAt: window } }),
-      this.prisma.trade.count({ where: { acceptedAt: window } }),
-      this.prisma.trade.count({ where: { completedAt: window } }),
-      this.prisma.trade.count({ where: { rejectedAt: window } }),
+      this.prisma.trade.count({ where: { ...LIVE_TRADE, createdAt: window } }),
+      this.prisma.trade.count({ where: { ...LIVE_TRADE, acceptedAt: window } }),
+      this.prisma.trade.count({
+        where: { ...LIVE_TRADE, completedAt: window },
+      }),
+      this.prisma.trade.count({ where: { ...LIVE_TRADE, rejectedAt: window } }),
       // Ret de bir iptaldir; çıkışlar birbirini saymasın diye ayrılır.
       this.prisma.trade.count({
-        where: { cancelledAt: window, rejectedAt: null },
+        where: { ...LIVE_TRADE, cancelledAt: window, rejectedAt: null },
       }),
       this.averageTradeValue(window),
       // v2 sabit hizmet bedeli + v1'in yüzde bazlı komisyonu (KDV'siyle) —
@@ -197,15 +209,16 @@ export class AnalyticsTradeService extends AnalyticsTabService<AnalyticsTradeRes
           commission: true,
           commissionTaxAmount: true,
         },
-        where: { paidAt: window },
+        where: { ...LIVE_TRADE_CASH_PAYMENT, paidAt: window },
       }),
-      this.prisma.offer.count({ where: { createdAt: window } }),
+      this.prisma.offer.count({ where: { ...LIVE_OFFER, createdAt: window } }),
       this.prisma.offer.count({
-        where: { createdAt: window, respondedAt: { not: null } },
+        where: { ...LIVE_OFFER, createdAt: window, respondedAt: { not: null } },
       }),
       this.prisma.offer.count({ where: this.acceptedOfferWhere(window) }),
       this.prisma.order.count({
         where: {
+          ...LIVE_ORDER,
           origin: OrderOrigin.offer,
           offer: { is: { createdAt: window } },
         },
@@ -250,6 +263,7 @@ export class AnalyticsTradeService extends AnalyticsTabService<AnalyticsTradeRes
         JOIN "trade_items" ti ON ti."trade_id" = t."id"
         WHERE t."completed_at" >= ${window.gte}
           AND t."completed_at" <= ${window.lte}
+          AND ${liveRowSql("t")}
         GROUP BY t."id"
       ) per_trade`;
 
@@ -264,6 +278,7 @@ export class AnalyticsTradeService extends AnalyticsTabService<AnalyticsTradeRes
         FROM "trades"
         WHERE "created_at" >= ${range.current.gte}
           AND "created_at" <= ${range.current.lte}
+          AND ${liveRowSql("trades")}
         GROUP BY 1`,
       this.prisma.$queryRaw<BucketRow[]>`
         SELECT ${bucketExpr('"completed_at"', range.groupBy)} AS bucket,
@@ -271,6 +286,7 @@ export class AnalyticsTradeService extends AnalyticsTabService<AnalyticsTradeRes
         FROM "trades"
         WHERE "completed_at" >= ${range.current.gte}
           AND "completed_at" <= ${range.current.lte}
+          AND ${liveRowSql("trades")}
         GROUP BY 1`,
       this.prisma.$queryRaw<BucketRow[]>`
         SELECT ${bucketExpr('"paid_at"', range.groupBy)} AS bucket,
@@ -281,6 +297,7 @@ export class AnalyticsTradeService extends AnalyticsTabService<AnalyticsTradeRes
         FROM "trade_cash_payments"
         WHERE "paid_at" >= ${range.current.gte}
           AND "paid_at" <= ${range.current.lte}
+          AND ${liveTradeRefSql(col("trade_cash_payments", "trade_id"))}
         GROUP BY 1`,
     ]);
 
@@ -307,6 +324,7 @@ export class AnalyticsTradeService extends AnalyticsTabService<AnalyticsTradeRes
         ON p."trade_id" = t."id" AND p."paid_at" IS NOT NULL
       WHERE t."completed_at" >= ${window.gte}
         AND t."completed_at" <= ${window.lte}
+        AND ${liveRowSql("t")}
       GROUP BY 1`;
 
     return toBreakdown(

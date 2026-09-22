@@ -16,6 +16,13 @@ import {
 } from "@prisma/client";
 import { ADMIN_TRADES_TAB_HREF } from "@tarodan/types";
 import { PrismaService } from "../../prisma";
+import {
+  LIVE_LEDGER_ENTRY,
+  LIVE_MEMBERSHIP_PAYMENT,
+  LIVE_ORDER,
+  LIVE_PAYMENT,
+  LIVE_PAYOUT_TRANSFER,
+} from "../account-lane/live-lane.where";
 import { paytrReportSyncEnabled } from "../../config/paytr";
 import { istanbulDayStart } from "../../common/helpers/tr-calendar";
 import {
@@ -43,6 +50,11 @@ export interface FinanceReconciliation {
 const num = (v: unknown): number => (v == null ? 0 : Number(v));
 const sum = (lines: ReconciliationLine[]) =>
   lines.reduce((s, l) => s + l.amount, 0);
+
+// Mutabakat YALNIZ canlı şeridi raporlar. Bir bölümün Σ toplamı ile bileşenleri
+// aynı filtreden geçmezse ilk test siparişinde sahte fark alarmı çıkar; bu yüzden
+// predicate'ler tek yerde (account-lane/live-lane.where) tanımlanır ve her
+// aggregate'e uygulanır.
 
 /**
  * Finans Özeti v2 — S2..S4. S1 (ciro bölünmesi) RevenueSplitService'te; burada
@@ -103,11 +115,12 @@ export class FinanceReconciliationService {
     const [all, held, inTransit, paid, refundedOnLive, cancelled] =
       await Promise.all([
         this.prisma.paymentHold.aggregate({
+          where: { payment: LIVE_PAYMENT },
           _sum: { amount: true },
           _count: { id: true },
         }),
         this.prisma.paymentHold.aggregate({
-          where: { status: PaymentHoldStatus.held },
+          where: { payment: LIVE_PAYMENT, status: PaymentHoldStatus.held },
           _sum: { amount: true, refundedAmount: true },
           _count: { id: true },
         }),
@@ -115,6 +128,7 @@ export class FinanceReconciliationService {
         // processing / retry / failed / returned): para platformda, satıcıda değil.
         this.prisma.paymentHold.aggregate({
           where: {
+            payment: LIVE_PAYMENT,
             status: PaymentHoldStatus.released,
             OR: [
               { payoutTransfer: null },
@@ -128,6 +142,7 @@ export class FinanceReconciliationService {
           where: {
             status: PayoutStatus.completed,
             paymentHoldId: { not: null },
+            paymentHold: { payment: LIVE_PAYMENT },
           },
           _sum: { netAmount: true, adjustmentDeduction: true },
           _count: { id: true },
@@ -136,11 +151,17 @@ export class FinanceReconciliationService {
         // hold'da tamamı (iade yolunda refundedAmount=amount, süre dolumunda 0 —
         // ikisi de "satıcıya gitmedi" demektir).
         this.prisma.paymentHold.aggregate({
-          where: { status: { not: PaymentHoldStatus.cancelled } },
+          where: {
+            payment: LIVE_PAYMENT,
+            status: { not: PaymentHoldStatus.cancelled },
+          },
           _sum: { refundedAmount: true },
         }),
         this.prisma.paymentHold.aggregate({
-          where: { status: PaymentHoldStatus.cancelled },
+          where: {
+            payment: LIVE_PAYMENT,
+            status: PaymentHoldStatus.cancelled,
+          },
           _sum: { amount: true },
           _count: { id: true },
         }),
@@ -197,7 +218,10 @@ export class FinanceReconciliationService {
   /** S2b — Takas karşı taraf parası: Σ TCP.amount = release bekleyen + yolda + ödendi + iade. */
   private async tradeCounterpartSection(): Promise<ReconciliationSection> {
     const collected: Prisma.TradeCashPaymentWhereInput = {
-      payment: { status: { in: [...COLLECTED_PAYMENT_STATUSES] } },
+      payment: {
+        ...LIVE_PAYMENT,
+        status: { in: [...COLLECTED_PAYMENT_STATUSES] },
+      },
     };
     const live: Prisma.TradeCashPaymentWhereInput = {
       ...collected,
@@ -279,6 +303,7 @@ export class FinanceReconciliationService {
   private async pspFeeBooked(): Promise<number> {
     const agg = await this.prisma.ledgerEntry.aggregate({
       where: {
+        ...LIVE_LEDGER_ENTRY,
         account: LedgerAccount.psp_fee,
         direction: LedgerDirection.debit,
       },
@@ -302,12 +327,15 @@ export class FinanceReconciliationService {
       pspFee,
     ] = await Promise.all([
       this.prisma.commissionLedger.aggregate({
-        where: { status: { not: CommissionLedgerStatus.waived } },
+        where: {
+          order: LIVE_ORDER,
+          status: { not: CommissionLedgerStatus.waived },
+        },
         _sum: { refundedSellerCommission: true, refundedBuyerFee: true },
       }),
       // Feragat: status waived, refunded* sıfır kalır — ayrı satır.
       this.prisma.commissionLedger.aggregate({
-        where: { status: CommissionLedgerStatus.waived },
+        where: { order: LIVE_ORDER, status: CommissionLedgerStatus.waived },
         _sum: { sellerCommission: true, buyerFee: true },
         _count: { id: true },
       }),
@@ -316,13 +344,14 @@ export class FinanceReconciliationService {
         where: {
           status: PaymentStatus.refunded,
           fullRefundEntitled: true,
-          payment: { status: PaymentStatus.refunded },
+          payment: { ...LIVE_PAYMENT, status: PaymentStatus.refunded },
         },
         _sum: { tradeFeeAmount: true, commission: true },
       }),
       // Sanal sipariş (üyelik/öne çıkarma) tam iadesi.
       this.prisma.order.aggregate({
         where: {
+          ...LIVE_ORDER,
           origin: OrderOrigin.platform_service,
           payment: { status: PaymentStatus.refunded },
         },
@@ -332,7 +361,10 @@ export class FinanceReconciliationService {
       this.prisma.refundFinancialComponent.aggregate({
         where: {
           treatment: RefundFinancialTreatment.platform_absorb,
-          refundRequest: { status: RefundRequestStatus.refunded },
+          refundRequest: {
+            order: LIVE_ORDER,
+            status: RefundRequestStatus.refunded,
+          },
         },
         _sum: { netAmount: true },
       }),
@@ -406,6 +438,7 @@ export class FinanceReconciliationService {
     const [attempts, requests] = await Promise.all([
       this.prisma.refundAttempt.aggregate({
         where: {
+          payment: LIVE_PAYMENT,
           status: {
             in: [RefundAttemptStatus.succeeded, RefundAttemptStatus.finalized],
           },
@@ -414,7 +447,7 @@ export class FinanceReconciliationService {
         _count: { id: true },
       }),
       this.prisma.refundRequest.aggregate({
-        where: { status: RefundRequestStatus.refunded },
+        where: { order: LIVE_ORDER, status: RefundRequestStatus.refunded },
         _sum: {
           refundedProductAmount: true,
           refundedOutboundShippingAmount: true,
@@ -512,6 +545,7 @@ export class FinanceReconciliationService {
       }),
       this.prisma.payment.aggregate({
         where: {
+          ...LIVE_PAYMENT,
           provider: "paytr",
           status: { in: paid },
           ...(from ? { paidAt: { gte: from } } : {}),
@@ -520,6 +554,9 @@ export class FinanceReconciliationService {
       }),
       this.prisma.membershipPayment.aggregate({
         where: {
+          // Recurring üyelik ödemesi şerit damgası taşımaz (orderId null);
+          // şerit sahibin bayrağından okunur, yoksa PayTR ekstresiyle sapar.
+          ...LIVE_MEMBERSHIP_PAYMENT,
           provider: "paytr",
           orderId: null,
           status: { in: paid },
@@ -529,6 +566,7 @@ export class FinanceReconciliationService {
       }),
       this.prisma.refundAttempt.aggregate({
         where: {
+          payment: LIVE_PAYMENT,
           provider: "paytr",
           status: {
             in: [RefundAttemptStatus.succeeded, RefundAttemptStatus.finalized],
@@ -539,22 +577,34 @@ export class FinanceReconciliationService {
       }),
       pspFeeBooked,
       this.prisma.payoutTransfer.aggregate({
-        where: { submittedAt: { not: null } },
+        where: { ...LIVE_PAYOUT_TRANSFER, submittedAt: { not: null } },
         _sum: { submittedAmount: true },
         _count: { id: true },
       }),
       this.prisma.payoutTransfer.aggregate({
-        where: { submittedAt: { not: null }, status: PayoutStatus.completed },
+        where: {
+          ...LIVE_PAYOUT_TRANSFER,
+          submittedAt: { not: null },
+          status: PayoutStatus.completed,
+        },
         _sum: { submittedAmount: true },
         _count: { id: true },
       }),
       this.prisma.payoutTransfer.aggregate({
-        where: { submittedAt: { not: null }, status: PayoutStatus.returned },
+        where: {
+          ...LIVE_PAYOUT_TRANSFER,
+          submittedAt: { not: null },
+          status: PayoutStatus.returned,
+        },
         _sum: { submittedAmount: true },
         _count: { id: true },
       }),
       this.prisma.payoutTransfer.aggregate({
-        where: { submittedAt: { not: null }, status: PayoutStatus.processing },
+        where: {
+          ...LIVE_PAYOUT_TRANSFER,
+          submittedAt: { not: null },
+          status: PayoutStatus.processing,
+        },
         _sum: { submittedAmount: true },
         _count: { id: true },
       }),

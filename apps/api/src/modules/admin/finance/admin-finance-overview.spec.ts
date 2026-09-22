@@ -77,9 +77,13 @@ describe("AdminFinanceService.getFinanceOverview", () => {
 
     await service.getFinanceOverview();
 
-    expect(prisma.payoutTransfer.count.mock.calls[0][0].where).toEqual({
-      status: { in: ["failed", "returned"] },
-    });
+    // Başarısız transfer kümesi tarihsiz: yalnız durum + test şeridi elemesi.
+    const failedTransfers = prisma.payoutTransfer.count.mock.calls[0][0].where;
+    expect(failedTransfers.status).toEqual({ in: ["failed", "returned"] });
+    expect(Object.keys(failedTransfers).sort()).toEqual(["NOT", "status"]);
+    expect(JSON.stringify(failedTransfers)).not.toMatch(
+      /createdAt|processedAt|submittedAt|"lt"|"lte"|"gte"/,
+    );
     expect(
       prisma.paymentHold.count.mock.calls[0][0].where.releaseAt.lte,
     ).toBeInstanceOf(Date);

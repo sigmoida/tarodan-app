@@ -83,4 +83,21 @@ describe("ödenmiş sipariş yüklemi", () => {
       expect(paidAtLateral("ord").sql).toContain('pay."order_id" = "ord"."id"');
     });
   });
+
+  /**
+   * Test şeridi (PayTR test modu, tahsilat yok) ciroya girmez. Prisma yazımı
+   * siparişin damgasına, SQL yazımı ödemenin damgasına bakar — ikisi aynı
+   * trigger'dan türer, aynı kümeyi verir.
+   */
+  describe("test şeridi", () => {
+    it("Prisma yüklemi yalnız canlı siparişleri sayar", () => {
+      expect(paidOrderWhere(window).isTest).toBe(false);
+      expect(paidOrderWhere(undefined).isTest).toBe(false);
+    });
+
+    it("lateral test ödemesini hiç eşlemez → CTE ve teslim süresi test siparişini düşürür", () => {
+      expect(paidAtLateral("o").sql).toContain('"pay"."is_test" = false');
+      expect(paidOrdersCte(window).sql).toContain('"pay"."is_test" = false');
+    });
+  });
 });

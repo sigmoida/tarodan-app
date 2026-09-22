@@ -22,6 +22,11 @@ import {
   uninvoicedDeliveredWhere,
 } from "../../finance/finance-health.where";
 import {
+  LIVE_ORDER,
+  LIVE_REFUND_REQUEST,
+  LIVE_TRADE,
+} from "../../../account-lane/live-lane.where";
+import {
   missingTrackingAlertHours,
   type ThresholdConfigReader,
 } from "../../../../config/alert-thresholds";
@@ -35,6 +40,13 @@ import {
  *
  * Kuyruklar ASLA tarihe göre filtrelenmez: mart'tan beri bekleyen iade talebi
  * tam olarak bugünün operatörünün görmesi gereken şeydir.
+ *
+ * Test şeridi: para/teslimat kuyrukları (iade, takas, payout, hold, belge,
+ * kargo) test kayıtlarını SAYMAZ — kargo taşıyıcıya gitmez, payout açılmaz,
+ * belge kesilmez; sayılırlarsa kapanmayan iş gibi görünürler. Test kayıtları
+ * kendi listelerinde "TEST" rozetiyle durur. İnsan kararı bekleyen moderasyon
+ * kuyrukları (ilan onayı, mesaj, başvuru, belge, destek, şikayet) şeritten
+ * BAĞIMSIZDIR: mağaza incelemesi hesabının ilanı da onaylanmadan yayına girmez.
  */
 
 export interface QueuePartReading {
@@ -96,20 +108,29 @@ export const QUEUE_PART_DEFINITIONS: Record<
   // O, iade TALEBİNİN kendi durumu değil siparişin durumudur: incelemeyi bekleyen
   // talep sipariş başka bir statüye geçtiği anda sayımdan düşüyordu.
   refundsPendingReview: {
-    where: () => ({ status: RefundRequestStatus.pending_review }),
+    where: () => ({
+      ...LIVE_REFUND_REQUEST,
+      status: RefundRequestStatus.pending_review,
+    }),
     query: (prisma) =>
       prisma.refundRequest.aggregate({
-        where: { status: RefundRequestStatus.pending_review },
+        where: {
+          ...LIVE_REFUND_REQUEST,
+          status: RefundRequestStatus.pending_review,
+        },
         _count: { _all: true },
         _min: { createdAt: true },
       }),
     read: reader("createdAt"),
   },
   refundsDisputed: {
-    where: () => ({ status: RefundRequestStatus.disputed }),
+    where: () => ({
+      ...LIVE_REFUND_REQUEST,
+      status: RefundRequestStatus.disputed,
+    }),
     query: (prisma) =>
       prisma.refundRequest.aggregate({
-        where: { status: RefundRequestStatus.disputed },
+        where: { ...LIVE_REFUND_REQUEST, status: RefundRequestStatus.disputed },
         _count: { _all: true },
         _min: { createdAt: true },
       }),
@@ -119,11 +140,13 @@ export const QUEUE_PART_DEFINITIONS: Record<
   // ── Takas operasyonu ──────────────────────────────────────────────────────
   tradesAtWarehouse: {
     where: () => ({
+      ...LIVE_TRADE,
       status: { in: [TradeStatus.at_warehouse, TradeStatus.admin_reviewing] },
     }),
     query: (prisma) =>
       prisma.trade.aggregate({
         where: {
+          ...LIVE_TRADE,
           status: {
             in: [TradeStatus.at_warehouse, TradeStatus.admin_reviewing],
           },
@@ -134,20 +157,20 @@ export const QUEUE_PART_DEFINITIONS: Record<
     read: reader("firstWarehouseArrivalAt"),
   },
   tradeDisputesOpen: {
-    where: () => ({ resolvedAt: null }),
+    where: () => ({ trade: LIVE_TRADE, resolvedAt: null }),
     query: (prisma) =>
       prisma.tradeDispute.aggregate({
-        where: { resolvedAt: null },
+        where: { trade: LIVE_TRADE, resolvedAt: null },
         _count: { _all: true },
         _min: { createdAt: true },
       }),
     read: reader("createdAt"),
   },
   tradeRefundFailures: {
-    where: () => ({ refundFailureAt: { not: null } }),
+    where: () => ({ ...LIVE_TRADE, refundFailureAt: { not: null } }),
     query: (prisma) =>
       prisma.trade.aggregate({
-        where: { refundFailureAt: { not: null } },
+        where: { ...LIVE_TRADE, refundFailureAt: { not: null } },
         _count: { _all: true },
         _min: { refundFailureAt: true },
       }),
@@ -155,12 +178,14 @@ export const QUEUE_PART_DEFINITIONS: Record<
   },
   tradeCompensationPending: {
     where: () => ({
+      ...LIVE_TRADE,
       compensationPendingUserId: { not: null },
       compensationResolvedAt: null,
     }),
     query: (prisma) =>
       prisma.trade.aggregate({
         where: {
+          ...LIVE_TRADE,
           compensationPendingUserId: { not: null },
           compensationResolvedAt: null,
         },
@@ -379,6 +404,7 @@ export function missingTrackingWhere(
     now.getTime() - missingTrackingAlertHours(config) * 60 * 60 * 1000,
   );
   return {
+    order: LIVE_ORDER,
     providerTrackingId: null,
     createdAt: { lt: cutoff },
     status: {

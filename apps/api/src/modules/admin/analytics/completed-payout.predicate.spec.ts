@@ -32,6 +32,17 @@ describe("tamamlanmış payout yüklemi", () => {
     });
   });
 
+  describe("test şeridi", () => {
+    it("Prisma ve SQL yazımı açıkça test olan transferi eler", () => {
+      expect(JSON.stringify(completedPayoutWhere(window))).toContain(
+        '"NOT":{"OR":[{"paymentHold":{"payment":{"isTest":true}}}',
+      );
+      const sql = completedPayoutAmountSql(window).sql;
+      expect(sql).toContain('"pt"."payment_hold_id"');
+      expect(sql).toContain('lane_p."is_test" = true');
+    });
+  });
+
   describe("completedPayoutAmountSql (SQL)", () => {
     it("yalnız tamamlanmış payout'ları toplar", () => {
       const sql = completedPayoutAmountSql(window);

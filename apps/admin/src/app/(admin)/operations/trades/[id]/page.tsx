@@ -10,6 +10,7 @@ import { fmtDateTime } from "@/lib/format";
 import { useConfirm } from "@/provider/ConfirmProvider";
 import { useAdminMutation } from "@/hooks/useAdminMutation";
 import { DetailPage } from "@/components/detail/DetailPage";
+import { TestLaneBadge } from "@/components/TestLaneBadge";
 import { Timeline } from "@/components/detail/Timeline";
 import type { TradeDetail } from "./types";
 import {
@@ -132,10 +133,13 @@ export default function TradeDetailPage() {
         })
       }
       badge={(trade) => (
-        <StatusBadge
-          status={trade.status}
-          config={statusConfig(tradeStatusConfig, t)}
-        />
+        <div className="flex flex-wrap items-center gap-2">
+          <StatusBadge
+            status={trade.status}
+            config={statusConfig(tradeStatusConfig, t)}
+          />
+          <TestLaneBadge isTest={trade.isTest} />
+        </div>
       )}
       actions={(trade) =>
         trade.status === "disputed" ? (

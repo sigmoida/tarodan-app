@@ -1,5 +1,6 @@
 import { OrderOrigin, PaymentStatus, Prisma } from "@prisma/client";
 import type { DashboardDateWindow } from "./dashboard-period.helper";
+import { LIVE_ORDER, liveRowSql } from "../../account-lane/live-lane.where";
 
 /**
  * "Ödenmiş sipariş" yüklemi — TEK tanım, iki dilde.
@@ -15,6 +16,11 @@ import type { DashboardDateWindow } from "./dashboard-period.helper";
  *
  * Dönem `Payment.paidAt`ten okunur — `status + createdAt`ten değil. Mart'ta
  * açılıp nisanda ödenen sipariş nisanın cirosudur.
+ *
+ * 3. Test şeridi DIŞARIDA kalır: PayTR test modunda ödenen siparişte tahsilat
+ *    yoktur (bkz. account-lane/live-lane.where). Prisma yazımı siparişin
+ *    damgasına, SQL yazımı ödeme satırının damgasına bakar — ikisi aynı
+ *    trigger'dan türediği için aynı kümeyi verir.
  */
 
 /** Prisma filtresi — tek kolonlu toplamalar ve sayımlar için. */
@@ -23,6 +29,7 @@ export function paidOrderWhere(
 ): Prisma.OrderWhereInput {
   const paid = { status: PaymentStatus.completed, paidAt: window };
   return {
+    ...LIVE_ORDER,
     origin: { not: OrderOrigin.platform_service },
     OR: [
       { payment: { is: paid } },
@@ -73,7 +80,8 @@ export function paidOrdersCte(window: DashboardDateWindow): Prisma.Sql {
  *
  * Teslim süresi ölçümü ödenmiş siparişleri ödeme anına göre DEĞİL teslim anına
  * göre pencereler, yani CTE'yi olduğu gibi kullanamaz; yüklemin kalbi olan bu
- * lateral yine de tek yerde durur.
+ * lateral yine de tek yerde durur — test şeridi elemesi de burada: test
+ * ödemesi olan sipariş lateral'den satır alamaz, dolayısıyla join'den düşer.
  *
  * @param alias Sorgudaki `orders` takma adı — çağıranların LİTERALİ, istekten
  *   türetilmiş hiçbir şey değil.
@@ -86,6 +94,7 @@ export function paidAtLateral(alias: string): Prisma.Sql {
       FROM "payments" pay
       WHERE pay."status" = ${PaymentStatus.completed}::"PaymentStatus"
         AND pay."paid_at" IS NOT NULL
+        AND ${liveRowSql("pay")}
         AND (
           pay."order_id" = ${order}."id"
           OR pay."checkout_group_id" = ${order}."checkout_group_id"

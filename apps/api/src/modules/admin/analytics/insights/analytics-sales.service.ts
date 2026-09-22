@@ -16,6 +16,12 @@ import {
 } from "../../../commission/ledger-net";
 import type { DashboardDateWindow } from "../dashboard-period.helper";
 import { paidOrdersCte } from "../paid-order.predicate";
+import {
+  LIVE_COMMISSION_LEDGER,
+  LIVE_REFUND_REQUEST,
+  col,
+  liveOrderRefSql,
+} from "../../../account-lane/live-lane.where";
 import { AnalyticsTabService } from "./analytics-tab.service";
 import {
   toAnalyticsRange,
@@ -188,6 +194,7 @@ export class AnalyticsSalesService extends AnalyticsTabService<AnalyticsSalesRes
           refundedBuyerFee: true,
         },
         where: {
+          ...LIVE_COMMISSION_LEDGER,
           earnedAt: window,
           status: { not: CommissionLedgerStatus.waived },
         },
@@ -195,7 +202,7 @@ export class AnalyticsSalesService extends AnalyticsTabService<AnalyticsSalesRes
 
       this.prisma.refundRequest.aggregate({
         _sum: { amount: true },
-        where: { refundedAt: window },
+        where: { ...LIVE_REFUND_REQUEST, refundedAt: window },
       }),
     ]);
 
@@ -253,6 +260,7 @@ export class AnalyticsSalesService extends AnalyticsTabService<AnalyticsSalesRes
       WHERE "earned_at" >= ${range.current.gte}
         AND "earned_at" <= ${range.current.lte}
         AND "status" <> ${CommissionLedgerStatus.waived}::"CommissionLedgerStatus"
+        AND ${liveOrderRefSql(col("commission_ledger", "order_id"))}
       GROUP BY 1`;
   }
 
@@ -263,6 +271,7 @@ export class AnalyticsSalesService extends AnalyticsTabService<AnalyticsSalesRes
       FROM "refund_requests"
       WHERE "refunded_at" >= ${range.current.gte}
         AND "refunded_at" <= ${range.current.lte}
+        AND ${liveOrderRefSql(col("refund_requests", "order_id"))}
       GROUP BY 1`;
   }
 

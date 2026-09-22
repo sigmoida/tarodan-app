@@ -10,6 +10,10 @@ import {
   RefundAttemptStatus,
 } from "@prisma/client";
 import { PrismaService } from "../../../prisma";
+import {
+  LIVE_MEMBERSHIP_PAYMENT,
+  LIVE_PAYMENT,
+} from "../../account-lane/live-lane.where";
 import { LedgerService } from "../../ledger/ledger.service";
 import { istanbulDayStart } from "../../../common/helpers/tr-calendar";
 
@@ -414,9 +418,12 @@ export class PaytrReportMatchingService {
         transactionDate.toISOString().slice(0, 10),
       );
       const dayEnd = new Date(dayStart.getTime() + DAY_MS);
+      // Test şeridi işlemi (test_mode=1) canlı dökümde hiç yer almaz — eksik
+      // sayılırsa her test ödemesi kalıcı PAYTR_MISSING_TRANSACTION alarmı olur.
       const [payments, renewals] = await Promise.all([
         this.prisma.payment.findMany({
           where: {
+            ...LIVE_PAYMENT,
             provider: "paytr",
             paytrMerchant,
             status: { in: [PaymentStatus.completed, PaymentStatus.refunded] },
@@ -431,6 +438,7 @@ export class PaytrReportMatchingService {
         }),
         this.prisma.membershipPayment.findMany({
           where: {
+            ...LIVE_MEMBERSHIP_PAYMENT,
             provider: "paytr",
             paytrMerchant,
             orderId: null,

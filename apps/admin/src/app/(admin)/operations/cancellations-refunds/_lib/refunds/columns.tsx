@@ -13,6 +13,7 @@ import {
 import { col } from "@/components/table";
 import { fmtTry } from "@/lib/format";
 import { statusConfig } from "@/lib/statusLabels";
+import { TestLaneBadge } from "@/components/TestLaneBadge";
 
 type T = ReturnType<typeof useTranslations<never>>;
 
@@ -36,6 +37,8 @@ export interface RefundRequestRow {
   order: {
     id: string;
     orderNumber: string;
+    /** Test şeridi siparişi — "TEST" rozeti (liste gizlemez). */
+    isTest?: boolean;
     totalAmount: number | string;
     seller: { id: string; displayName: string; email: string };
     product: { id: string; title: string; images?: { url: string }[] };
@@ -57,9 +60,12 @@ export const refundRequestColumns = (t: T) => [
     (r) => {
       const kind = refundRequestKindOf(r.policyCode);
       return (
-        <Badge variant={kind === "cancellation" ? "warning" : "info"}>
-          {t(REFUND_REQUEST_KIND_I18N_KEYS[kind])}
-        </Badge>
+        <div className="flex flex-wrap items-center gap-1">
+          <Badge variant={kind === "cancellation" ? "warning" : "info"}>
+            {t(REFUND_REQUEST_KIND_I18N_KEYS[kind])}
+          </Badge>
+          <TestLaneBadge isTest={r.order.isTest} />
+        </div>
       );
     },
     { sortKey: "policyCode", sortType: "text" },

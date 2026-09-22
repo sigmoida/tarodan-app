@@ -14,6 +14,8 @@ export interface Trade {
   /** Nakit farkını ödeyen taraf (initiator.id | receiver.id). null = eşit takas. */
   cashPayerId?: string | null;
   hasDispute: boolean;
+  /** Test şeridi takası (App Review / QA) — "TEST" rozeti; gizlenmez. */
+  isTest: boolean;
   createdAt: string;
   cancelReason?: string;
 }
@@ -69,6 +71,7 @@ export function mapTrades(raw: any[], t: T): Trade[] {
     cashAmount: Number(tr.cashAmount || 0),
     cashPayerId: tr.cashPayerId ?? null,
     hasDispute: !!tr.dispute,
+    isTest: tr.isTest === true,
     createdAt: tr.createdAt,
     cancelReason: tr.cancelReason ?? undefined,
   }));

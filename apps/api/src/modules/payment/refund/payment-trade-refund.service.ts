@@ -27,6 +27,7 @@ import { tradePaymentRefundableAmountFor } from "../../trade/helpers/trade-refun
 import { tradeHandedToCargo } from "../../trade/helpers/trade-handed-to-cargo";
 import { isProduction } from "../../../config/environment";
 import { PaymentRefundAttemptService } from "./payment-refund-attempt.service";
+import { testLaneRefundResult } from "../helpers/test-lane-refund";
 import { OutboxService } from "../../outbox/outbox.service";
 import {
   OUTBOX_INVOICE_TRADE_CASH_REFUND_REVERSE,
@@ -268,9 +269,17 @@ export class PaymentTradeRefundService {
     let refundResult =
       (refundAttempt.attempt.providerResponse as Record<string, unknown>) ||
       null;
+    // Test şeridi takası PayTR test modunda ödendi — canlı iade API'sine
+    // gidilmez (bkz. helpers/test-lane-refund; sipariş iadesiyle aynı kural).
+    const isTestLaneRefund = payment.isTest === true;
     if (refundAttempt.action === "submit") {
       await this.attempts.startRefundSubmission(refundAttempt.attempt.id);
-      if (bypassEnabled) {
+      if (isTestLaneRefund) {
+        this.logger.log(
+          `Test lane trade refund: PayTR skipped tradeId=${tradeId} payment=${payment.id} amount=${amount}`,
+        );
+        refundResult = testLaneRefundResult(refundAttempt.attempt.id, amount);
+      } else if (bypassEnabled) {
         this.logger.warn(
           `PAYMENT_BYPASS: PayTR trade refund atlandı tradeId=${tradeId} amount=${amount}`,
         );
@@ -357,18 +366,21 @@ export class PaymentTradeRefundService {
         );
       }
       try {
-        await this.providerEvents.record({
-          eventType: "refund",
-          merchantOid: oid,
-          paymentId: payment.id,
-          status: "success",
-          amount,
-          totalAmount: amount,
-          raw: {
-            ...refundResult,
-            refundAttemptId: refundAttempt.attempt.id,
-          },
-        });
+        // Sağlayıcıya gidilmeyen test şeridi iadesi PayTR olay günlüğüne yazılmaz.
+        if (!isTestLaneRefund) {
+          await this.providerEvents.record({
+            eventType: "refund",
+            merchantOid: oid,
+            paymentId: payment.id,
+            status: "success",
+            amount,
+            totalAmount: amount,
+            raw: {
+              ...refundResult,
+              refundAttemptId: refundAttempt.attempt.id,
+            },
+          });
+        }
       } catch (e: any) {
         this.logger.error(
           `Trade refund provider event could not be recorded attempt=${refundAttempt.attempt.id}: ${e?.message}`,

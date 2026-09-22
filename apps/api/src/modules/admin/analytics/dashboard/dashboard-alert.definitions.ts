@@ -23,6 +23,12 @@ import {
   type ThresholdConfigReader,
 } from "../../../../config/alert-thresholds";
 import { tradeLostParcelGraceDays } from "../../../../common/helpers/trade-escrow";
+import {
+  LIVE_ORDER,
+  LIVE_TRADE,
+  livePayoutTransferSql,
+  liveRowSql,
+} from "../../../account-lane/live-lane.where";
 
 /**
  * Zone B — "Uyarılar". Normalde OLMAMASI gereken durumlar; sıfırsa satır hiç
@@ -31,6 +37,10 @@ import { tradeLostParcelGraceDays } from "../../../../common/helpers/trade-escro
  * Her eşik kendi sahibinin okuduğu kaynaktan gelir (env/config/policy helper) —
  * burada hiçbir gün/saat sayısı yazılı DEĞİLDİR. Panel "10 günden uzun" derken
  * cron 14 günü bekliyor olamaz.
+ *
+ * Test şeridi hiçbir uyarıya girmez: test kolisi taşıyıcıya gitmez (hep
+ * "kargoda" kalır), test ödemesi PayTR dökümünde yoktur, test transferi hiç
+ * açılmaz — sayılsalar kalıcı sahte alarm olurlardı.
  */
 
 export interface AlertReading {
@@ -85,6 +95,7 @@ export const ALERT_DEFINITIONS: Record<QueryableAlertKey, AlertDefinition> = {
     query: (prisma, now, config) =>
       prisma.order.count({
         where: {
+          ...LIVE_ORDER,
           status: OrderStatus.shipped,
           shipment: {
             is: {
@@ -103,6 +114,7 @@ export const ALERT_DEFINITIONS: Record<QueryableAlertKey, AlertDefinition> = {
     query: (prisma, now) =>
       prisma.trade.count({
         where: {
+          ...LIVE_TRADE,
           status: TradeStatus.shipping_to_warehouse,
           shippingDeadline: { lt: daysAgo(now, tradeLostParcelGraceDays()) },
           firstWarehouseArrivalAt: null,
@@ -126,6 +138,7 @@ export const ALERT_DEFINITIONS: Record<QueryableAlertKey, AlertDefinition> = {
     query: (prisma, now) =>
       prisma.trade.count({
         where: {
+          ...LIVE_TRADE,
           status: TradeStatus.shipping_to_recipients,
           confirmationDeadline: null,
           shipments: {
@@ -159,6 +172,7 @@ export const ALERT_DEFINITIONS: Record<QueryableAlertKey, AlertDefinition> = {
         WHERE p."status" = 'completed'
           AND p."paid_at" >= ${from}
           AND p."paid_at" < ${to}
+          AND ${liveRowSql("p")}
           AND NOT EXISTS (
             SELECT 1 FROM "paytr_statement_lines" l
             WHERE l."payment_id" = p."id"
@@ -264,6 +278,7 @@ export const ALERT_DEFINITIONS: Record<QueryableAlertKey, AlertDefinition> = {
         WHERE h."status" = ${PaymentHoldStatus.held}::"PaymentHoldStatus"
           AND h."release_at" IS NULL
           AND o."status" IN ('delivered', 'completed')
+          AND ${liveRowSql("o")}
       `,
     read: (raw) => ({
       count: Number((raw as Array<{ count: bigint }>)?.[0]?.count ?? 0),
@@ -301,6 +316,7 @@ export const ALERT_DEFINITIONS: Record<QueryableAlertKey, AlertDefinition> = {
         FROM "payout_transfers"
         WHERE "status" = ${PayoutStatus.retry_pending}::"PayoutStatus"
           AND "retry_count" >= "max_retries"
+          AND ${livePayoutTransferSql("payout_transfers")}
       `,
     read: (raw) => ({
       count: Number((raw as Array<{ count: bigint }>)?.[0]?.count ?? 0),
@@ -317,6 +333,7 @@ export const ALERT_DEFINITIONS: Record<QueryableAlertKey, AlertDefinition> = {
     query: (prisma, now) =>
       prisma.order.count({
         where: {
+          ...LIVE_ORDER,
           status: OrderStatus.paid,
           preparingDeadline: {
             gte: now,

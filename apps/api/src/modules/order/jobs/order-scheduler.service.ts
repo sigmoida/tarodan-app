@@ -11,6 +11,7 @@ import {
   type ElogoInvoiceType,
 } from "@prisma/client";
 import { PrismaService } from "../../../prisma";
+import { LIVE_ORDER } from "../../account-lane/live-lane.where";
 import { OrderService } from "../order.service";
 import { ElogoInvoicingService } from "../../elogo/elogo-invoicing.service";
 import {
@@ -284,8 +285,11 @@ export class OrderSchedulerService implements OnModuleInit {
     // alanı) saati sıfırlıyordu ve gerçekten takılı sipariş alarmdan kaçıyordu.
     const stuckCutoff = new Date(Date.now() - stuckDays * 24 * 60 * 60 * 1000);
     const [stuckShippedOrders, uninvoicedDelivered] = await Promise.all([
+      // Test şeridi kolisi taşıyıcıya hiç gitmez: teslim poll'u gelmez, alıcı
+      // onaylayana dek "kargoda" kalır — alarm/bildirim üretmemeli.
       this.prisma.order.findMany({
         where: {
+          ...LIVE_ORDER,
           status: OrderStatus.shipped,
           shipment: { is: { shippedAt: { lt: stuckCutoff } } },
         },
@@ -301,6 +305,7 @@ export class OrderSchedulerService implements OnModuleInit {
       }),
       this.prisma.order.count({
         where: {
+          ...LIVE_ORDER,
           status: { in: [OrderStatus.delivered, OrderStatus.completed] },
           commissionLedger: { isNot: null },
           revenueInvoicedAt: null,
@@ -410,6 +415,10 @@ export class OrderSchedulerService implements OnModuleInit {
     // her turda boşa yeniden işlenip yanıltıcı "yeniFatura" sayacı üretiyorlardı; onları eleriz.
     const delivered = await this.prisma.order.findMany({
       where: {
+        // Test şeridi siparişine eLogo belgesi hiç kesilmez (ElogoDeliveryService
+        // kapısı); aday kümesinde kalsaydı her tur boşa denenir ve take:500
+        // penceresinde canlı teslimatların yerini tutardı.
+        ...LIVE_ORDER,
         status: { in: [OrderStatus.delivered, OrderStatus.completed] },
         commissionLedger: { isNot: null },
         // AÇIK işaret: faturası kesilmiş siparişler aday kümesinden ÇIKAR. Eskiden

@@ -6,6 +6,7 @@ import { col, TruncatedText } from "@/components/table";
 import { fmtTry } from "@/lib/format";
 import { type Trade, disputeConfig, cashPayer } from "./trades";
 import { statusConfig } from "@/lib/statusLabels";
+import { TestLaneBadge } from "@/components/TestLaneBadge";
 
 type T = ReturnType<typeof useTranslations<never>>;
 
@@ -14,14 +15,17 @@ export function tradeColumns(t: T) {
     col.custom<Trade>(
       t("admin.operations.trades.tradeNumber"),
       (trade) => (
-        <Link
-          href={`/operations/trades/${trade.id}`}
-          className="block text-primary-600 hover:underline"
-        >
-          <TruncatedText className="font-mono">
-            {trade.tradeNumber}
-          </TruncatedText>
-        </Link>
+        <div className="flex min-w-0 flex-col items-start gap-1">
+          <Link
+            href={`/operations/trades/${trade.id}`}
+            className="block max-w-full text-primary-600 hover:underline"
+          >
+            <TruncatedText className="font-mono">
+              {trade.tradeNumber}
+            </TruncatedText>
+          </Link>
+          <TestLaneBadge isTest={trade.isTest} />
+        </div>
       ),
       {
         minWidth: 240,

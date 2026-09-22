@@ -15,7 +15,9 @@ function makePrisma(overrides: Record<string, any> = {}) {
   const base: Record<string, any> = {
     paymentHold: {
       aggregate: jest.fn().mockImplementation(({ where }: any) => {
-        if (!where) return agg({ amount: 1098 }, 4);
+        // Σ toplamı = statü kırılımı OLMAYAN çağrı. (Şerit filtresi eklendiğinden
+        // beri `where` her çağrıda dolu: `payment: { isTest: false }`.)
+        if (!where?.status) return agg({ amount: 1098 }, 4);
         if (where.status === "held")
           return agg({ amount: 176, refundedAmount: 76 }, 2);
         if (where.status === "released")

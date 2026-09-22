@@ -232,6 +232,8 @@ export interface AdminCancellationRow {
   detailOrderId: string | null;
   /** Takas dosyası; siparişte null. */
   tradeId: string | null;
+  /** Test şeridi kaydı — panel "TEST" rozeti basar (bkz. AdminOrderListRow). */
+  isTest: boolean;
   /** Takasta teklifi açan taraf. */
   buyer: AdminOrderParty;
   /** Kalemlerin satıcıları (takasta ilan sahibi), tekrarsız. */

@@ -209,6 +209,39 @@ describe("PaymentService trade cash refund idempotency", () => {
     service = module.get(PaymentService);
   });
 
+  /**
+   * Test şeridi takası PayTR test modunda ödendi: canlı iade API'sine gidilmez,
+   * sentetik referansla başarı yazılır, yerel kapanış (ödeme refunded) aynen.
+   */
+  it("a test-lane trade payment is refunded locally without calling PayTR", async () => {
+    mockPrisma.payment.findMany.mockResolvedValue([
+      { ...basePayment(), isTest: true },
+    ]);
+
+    const result = await service.refundTradeCashPaymentIfCompleted(TRADE_ID);
+
+    expect(result).toEqual({ refunded: true, paymentId: "pay-1" });
+    expect(mockPaytr.createRefund).not.toHaveBeenCalled();
+    expect(mockPrisma.refundAttempt.updateMany).toHaveBeenCalledWith({
+      where: { id: ATTEMPT_ID, status: RefundAttemptStatus.submitting },
+      data: {
+        status: RefundAttemptStatus.succeeded,
+        providerRefundId: `TEST-REFUND-${ATTEMPT_ID}`,
+        providerResponse: expect.objectContaining({
+          status: "success",
+          testLane: true,
+        }),
+        providerSucceededAt: expect.any(Date),
+      },
+    });
+    expect(mockTx.payment.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: "pay-1" },
+        data: expect.objectContaining({ status: PaymentStatus.refunded }),
+      }),
+    );
+  });
+
   it("persists a prepared attempt before calling the provider", async () => {
     mockPrisma.payment.findMany.mockResolvedValue([basePayment()]);
 

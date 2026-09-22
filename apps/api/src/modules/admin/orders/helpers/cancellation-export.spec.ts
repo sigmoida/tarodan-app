@@ -28,6 +28,7 @@ function row(
     status: "cancelled",
     detailOrderId: "o1",
     tradeId: null,
+    isTest: false,
     buyer: party("b1"),
     sellers: [party("s1")],
     totalAmount: 240,
@@ -151,5 +152,32 @@ describe("cancellation export", () => {
       "[admin.operations.cancellations.actor.unknown]",
     );
     expect(second[col("cancelledAt")]).toBe("");
+  });
+
+  /** Test şeridi kaydı dökümden çıkarılmaz — işaretlenir (liste gibi). */
+  it("marks test-lane rows in their own column and leaves live rows blank", () => {
+    const sheet = cancellationExportSheet(
+      [row(), row({ id: "g2", number: "GRP-2", isTest: true })],
+      t,
+    );
+    const col = sheet.headers.indexOf(
+      "[admin.operations.cancellations.export.testLane]",
+    );
+    expect(col).toBeGreaterThan(-1);
+    const byNumber = (n: string) =>
+      sheet.rows.filter(
+        (r) =>
+          r[
+            sheet.headers.indexOf(
+              "[admin.operations.cancellations.export.rowNumber]",
+            )
+          ] === n,
+      );
+    expect(byNumber("GRP-1").every((r) => r[col] === "")).toBe(true);
+    expect(
+      byNumber("GRP-2").every(
+        (r) => r[col] === "[admin.shared.testLane.badge]",
+      ),
+    ).toBe(true);
   });
 });

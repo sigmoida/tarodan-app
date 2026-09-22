@@ -127,6 +127,15 @@ function lineOf(order: ListOfferOrder, ctx: RowMapContext): AdminOrderLine {
   };
 }
 
+/**
+ * Satırın test şeridi işareti. Damga alıcıdan türediği için bir sepetin bütün
+ * siparişleri aynı şerittedir; `some` yine de karışık bir veride rozeti
+ * kaybetmemeyi seçer.
+ */
+export function isTestRow(orders: readonly { isTest: boolean }[]): boolean {
+  return orders.some((order) => order.isTest);
+}
+
 function invoiceOf(invoice: ListInvoice): AdminOrderInvoice {
   return {
     id: invoice.id,
@@ -237,6 +246,7 @@ function cartRowOf(
     origin: first.origin,
     createdAt: head.createdAt.toISOString(),
     detailOrderId: first.id,
+    isTest: isTestRow(orders),
     buyer: buyerOf(first.buyer, first.shippingAddress),
     totalAmount: sum((o) => money(o.totalAmount)).toNumber(),
     subtotal: lines

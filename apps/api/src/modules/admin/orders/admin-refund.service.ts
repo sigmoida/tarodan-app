@@ -142,6 +142,8 @@ export class AdminRefundService {
               id: true,
               orderNumber: true,
               totalAmount: true,
+              // Test şeridi rozeti (liste test talebini gizlemez).
+              isTest: true,
               seller: { select: { id: true, displayName: true, email: true } },
               product: {
                 select: {

@@ -58,6 +58,7 @@ import { PaymentHoldReleaseService } from "./payment-hold-release.service";
 import { PaymentRefundAttemptService } from "./payment-refund-attempt.service";
 import { PaymentTradeRefundService } from "./payment-trade-refund.service";
 import { orderCancelledData } from "../../order/helpers/order-cancellation";
+import { testLaneRefundResult } from "../helpers/test-lane-refund";
 
 /**
  * İade / escrow serbest bırakma metodları — PaymentService'ten birebir taşındı
@@ -559,6 +560,11 @@ export class PaymentRefundService {
 
     let paytrRefunded = false;
     let providerOutcomeUncertain = false;
+    // Test şeridi ödemesi PayTR test modunda alındı — geri verilecek para yok,
+    // canlı iade API'sine gidilmez (bkz. helpers/test-lane-refund). Karar TEK
+    // yerde: sipariş iadesinin bütün yolları (admin iptali, alıcı talebi,
+    // cron'lar, kısmi iade) buradan geçer.
+    const isTestLaneRefund = payment.isTest === true;
     try {
       let refundResult: any;
       if (refundAttempt.action === "finalize") {
@@ -577,6 +583,14 @@ export class PaymentRefundService {
             return_amount: 0,
             zeroCashSettlement: true,
           };
+        } else if (isTestLaneRefund) {
+          this.logger.log(
+            `Test lane refund: PayTR skipped payment=${payment.id} order=${orderId} amount=${amountToRefund} attempt=${refundAttempt.attempt.id}`,
+          );
+          refundResult = testLaneRefundResult(
+            refundAttempt.attempt.id,
+            amountToRefund,
+          );
         } else {
           const bypassEnabled =
             !isProduction() &&
@@ -671,7 +685,9 @@ export class PaymentRefundService {
             i18nMessage("server.payment.refundInitiationFailed"),
           );
         }
-        if (!isZeroCashSettlement) {
+        // Sağlayıcıya gidilmeyen iadeler (sıfır nakit, test şeridi) PayTR olay
+        // günlüğüne yazılmaz — orada yalnız gerçek sağlayıcı etkileşimi durur.
+        if (!isZeroCashSettlement && !isTestLaneRefund) {
           await this.providerEvents.record({
             eventType: "refund",
             merchantOid: paytrOid,

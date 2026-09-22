@@ -7,7 +7,12 @@ import { AdminOfferQueryDto } from "../dto";
 import { i18nMessage } from "../../i18n";
 import { offerEffectiveStatus } from "./helpers/offer-effective-status";
 
-const PARTY_SELECT = { id: true, displayName: true, email: true } as const;
+const PARTY_SELECT = {
+  id: true,
+  displayName: true,
+  email: true,
+  isTestAccount: true,
+} as const;
 const PRODUCT_SELECT = {
   id: true,
   title: true,
@@ -117,6 +122,9 @@ export class AdminOfferQueryService {
       },
       buyer: row.buyer,
       seller: row.seller,
+      // Teklifin damgası yok; şerit kapısı iki tarafı aynı şeride zorladığı için
+      // taraflardan biri test hesabıysa teklif test şerididir.
+      isTest: row.buyer.isTestAccount || row.seller.isTestAccount,
       amount: Number(row.amount),
       status: AdminOfferQueryService.effectiveStatus(row, now),
       rawStatus: row.status,
