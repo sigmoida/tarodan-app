@@ -34,7 +34,7 @@
 ### Canlıda test şeridi (App Review / mobil QA hesapları)
 
 Canlıda `User.isTestAccount=true` hesaplar izole bir **test şeridi** oluşturur
-(bkz. `docs/mobile-parity/20-test-lane-2026-09-08.md`). Sipariş/ödeme/takas/ledger
+(bkz. `docs/mobile-parity/21-test-lane-2026-09-08.md`). Sipariş/ödeme/takas/ledger
 satırları DB trigger'ıyla `is_test` damgası alır; uygulama kodu bayrağı unutamaz.
 
 - **Hesap açma:** admin → Sistem → Test Araçları → Test Şeridi (yalnız süper-admin,
