@@ -101,7 +101,8 @@ describe("PaymentRefundService.processRefund — post-delivery return stock quar
       },
       product: {
         findUnique: jest.fn().mockResolvedValue({
-          quantity: opts.productQuantity ?? 0,
+          quantity:
+            opts.productQuantity === undefined ? 0 : opts.productQuantity,
         }),
         update: jest.fn().mockImplementation((arg: any) => {
           captured.productUpdate = arg;
