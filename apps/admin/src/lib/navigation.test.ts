@@ -68,6 +68,15 @@ describe("humanizeSegment", () => {
 });
 
 describe("breadcrumbsFor", () => {
+  it("places the refund-request file under the cancellations & refunds page", () => {
+    const crumbs = breadcrumbsFor(
+      "/operations/refund-requests/3f2a9c1e-0000-4000-8000-000000000000",
+      t,
+    );
+    expect(crumbs.at(-2)?.href).toBe("/operations/cancellations-refunds");
+    expect(crumbs.at(-1)).toEqual({ label: "admin.nav.detailSuffix" });
+  });
+
   it("returns [] for a path matching no nav item", () => {
     expect(breadcrumbsFor("/this/route/does/not/exist", t)).toEqual([]);
   });

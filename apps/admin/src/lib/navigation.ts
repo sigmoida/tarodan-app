@@ -34,6 +34,7 @@ import {
   PhotoIcon,
   ArchiveBoxIcon,
 } from "@heroicons/react/24/outline";
+import { ADMIN_CANCELLATIONS_REFUNDS_PATH } from "@tarodan/types";
 
 /**
  * The single source for the admin left menu. The nav data lives here
@@ -545,6 +546,24 @@ export function getNavGroups(t: T): NavGroup[] {
   ];
 }
 
+/**
+ * Detail routes whose list moved into another nav page. The trail and the
+ * page title resolve them as if they lived under their new parent, so the
+ * refund-request file reads "İptal & İade › Detay" instead of nothing.
+ */
+const NAV_PARENT_ALIASES: Record<string, string> = {
+  "/operations/refund-requests": ADMIN_CANCELLATIONS_REFUNDS_PATH,
+};
+
+/** The path the nav match runs against — aliased detail routes rewritten. */
+function navMatchPath(pathname: string): string {
+  for (const [from, to] of Object.entries(NAV_PARENT_ALIASES)) {
+    if (pathname === from || pathname.startsWith(`${from}/`))
+      return to + pathname.slice(from.length);
+  }
+  return pathname;
+}
+
 /** Suffix appended to every page title, e.g. "Kullanıcılar - Tarodan Admin". */
 export const APP_NAME = "Tarodan Admin";
 
@@ -559,6 +578,7 @@ export function pageMetadataFor(
   pathname: string,
   t: T,
 ): { title: string; description: string } {
+  pathname = navMatchPath(pathname);
   const defaultDescription = t("admin.nav.defaultDescription");
   const topLevelNav = getTopLevelNav(t);
   const navGroups = getNavGroups(t);
@@ -676,6 +696,7 @@ export function humanizeSegment(segment: string, t: T): string {
  * (the group points at its first page). Empty when the path matches no nav item.
  */
 export function breadcrumbsFor(pathname: string, t: T): Crumb[] {
+  pathname = navMatchPath(pathname);
   const topLevelNav = getTopLevelNav(t);
   const navGroups = getNavGroups(t);
 
