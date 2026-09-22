@@ -6645,7 +6645,7 @@
         "originCancellation": "{origin} iptali",
         "pageDescription": "Satın alma siparişleri, ürünlere verilen teklifler ve takaslar",
         "tabs": {
-          "directSale": "Doğrudan Satış",
+          "directSale": "Direkt Satış",
           "all": "Tüm Siparişler",
           "offers": "Teklifler",
           "offerOrders": "Siparişe Dönen Teklifler",
