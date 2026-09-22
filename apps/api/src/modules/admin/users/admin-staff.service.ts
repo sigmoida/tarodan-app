@@ -23,13 +23,18 @@ import {
   migrateLegacyPermissions,
 } from "../dto";
 import {
+  CancellationActor,
   ProductStatus,
   OfferStatus,
   TradeStatus,
   AdminRole,
 } from "@prisma/client";
 import { safeDecrementReserved } from "../../product/helpers/product-availability.helper";
-import { OFFER_CANCEL_REASON } from "../../trade/helpers/trade-cancel-reasons";
+import {
+  OFFER_CANCEL_REASON,
+  TRADE_CANCEL_REASON,
+} from "../../trade/helpers/trade-cancel-reasons";
+import { tradeCancelledData } from "../../trade/helpers/trade-cancellation";
 import { randomInt } from "crypto";
 import { i18nMessage } from "../../i18n";
 
@@ -579,9 +584,8 @@ export class AdminStaffService {
         await tx.trade.update({
           where: { id: trade.id, version: trade.version },
           data: {
-            status: TradeStatus.cancelled,
-            cancelReason: "Kullanıcı banlandığı için takas iptal edildi",
-            cancelledAt: new Date(),
+            ...tradeCancelledData(CancellationActor.platform),
+            cancelReason: TRADE_CANCEL_REASON.accountBanned,
             version: { increment: 1 },
           },
         });

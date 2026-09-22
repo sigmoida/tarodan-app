@@ -1,6 +1,7 @@
 import { PaymentRefundService } from "./payment-refund.service";
 import { PaymentRefundAttemptService } from "./payment-refund-attempt.service";
 import {
+  CancellationActor,
   PaymentStatus,
   RefundAttemptStatus,
   PaymentHoldStatus,
@@ -231,6 +232,7 @@ describe("PaymentRefundService.processRefund — MONEY-H3/H4 partial refund", ()
     });
 
     await service.processRefund(ORDER_ID, 50, {
+      cancelledBy: CancellationActor.buyer,
       idempotencyKey: "partial-refund-50",
     });
 
@@ -249,6 +251,7 @@ describe("PaymentRefundService.processRefund — MONEY-H3/H4 partial refund", ()
     });
 
     await service.processRefund(ORDER_ID, 400, {
+      cancelledBy: CancellationActor.buyer,
       idempotencyKey: "partial-refund-400",
     });
 
@@ -268,6 +271,7 @@ describe("PaymentRefundService.processRefund — MONEY-H3/H4 partial refund", ()
     });
 
     await service.processRefund(ORDER_ID, 600, {
+      cancelledBy: CancellationActor.buyer,
       idempotencyKey: "partial-refund-600",
     });
 
@@ -289,6 +293,7 @@ describe("PaymentRefundService.processRefund — MONEY-H3/H4 partial refund", ()
 
     await expect(
       service.processRefund(ORDER_ID, 300, {
+        cancelledBy: CancellationActor.buyer,
         idempotencyKey: "partial-refund-over-cap",
       }),
     ).rejects.toMatchObject({
@@ -320,6 +325,7 @@ describe("PaymentRefundService.processRefund — MONEY-H3/H4 partial refund", ()
     });
 
     await service.processRefund(ORDER_ID, 1000, {
+      cancelledBy: CancellationActor.buyer,
       idempotencyKey: "full-refund-offer",
     });
 
@@ -348,6 +354,7 @@ describe("PaymentRefundService.processRefund — MONEY-H3/H4 partial refund", ()
     });
 
     await service.processRefund(ORDER_ID, 400, {
+      cancelledBy: CancellationActor.buyer,
       idempotencyKey: "partial-refund-offer",
     });
 
@@ -366,6 +373,7 @@ describe("PaymentRefundService.processRefund — MONEY-H3/H4 partial refund", ()
 
     await expect(
       service.processRefund(ORDER_ID, 100, {
+        cancelledBy: CancellationActor.buyer,
         idempotencyKey: "partial-refund-conflict",
       }),
     ).rejects.toMatchObject({
@@ -385,6 +393,7 @@ describe("PaymentRefundService.processRefund — MONEY-H3/H4 partial refund", ()
     });
 
     await service.processRefund(ORDER_ID, 300, {
+      cancelledBy: CancellationActor.buyer,
       idempotencyKey: "partial-refund-recovery",
     });
 
@@ -402,6 +411,7 @@ describe("PaymentRefundService.processRefund — MONEY-H3/H4 partial refund", ()
 
     await expect(
       service.processRefund(ORDER_ID, 100, {
+        cancelledBy: CancellationActor.buyer,
         idempotencyKey: "partial-refund-new",
       }),
     ).rejects.toThrow();
@@ -415,6 +425,7 @@ describe("PaymentRefundService.processRefund — MONEY-H3/H4 partial refund", ()
     });
 
     await service.processRefund(ORDER_ID, 820, {
+      cancelledBy: CancellationActor.buyer,
       idempotencyKey: "policy-refund-full-return",
       refundQuantity: 1,
       settlement: {
@@ -446,10 +457,57 @@ describe("PaymentRefundService.processRefund — MONEY-H3/H4 partial refund", ()
         where: { id: ORDER_ID },
         // İptal yazan her yol `orderCancelledData` üzerinden geçer: damga da
         // beklenir, yoksa dönemsel iptal metriği bu yolu sessizce kaçırır.
-        data: { status: "cancelled", cancelledAt: expect.any(Date) },
+        data: {
+          status: "cancelled",
+          cancelledAt: expect.any(Date),
+          cancelledBy: CancellationActor.buyer,
+        },
       }),
     );
   });
+
+  /**
+   * Kargolamama cron'u / stok kaskadı siparişi ÖNCE iptal edip sonra iade
+   * eder. İade o iptalin aktörünü ezmemeli; göç öncesi (aktörsüz) iptalde de
+   * yanlış bir aktör uydurmamalı — "bilinmiyor" kalmalı.
+   */
+  it.each([
+    [CancellationActor.system, CancellationActor.system],
+    [null, null],
+  ])(
+    "zaten iptal edilmiş siparişin aktörünü korur (%s)",
+    async (existingActor, expectedActor) => {
+      const { service, mockTx } = makeService({
+        paymentAmount: 1000,
+        holdAmount: 800,
+      });
+      mockTx.order.findUnique.mockResolvedValue({
+        status: "cancelled",
+        productId: "prod-1",
+        quantity: 1,
+        stockRestoredAt: new Date(),
+        offerId: null,
+        sellerId: "s1",
+        cancelledBy: existingActor,
+      });
+
+      await service.processRefund(ORDER_ID, 1000, {
+        cancelledBy: CancellationActor.buyer,
+        idempotencyKey: "full-refund-after-cron-cancel",
+        settlement: { closeOrder: true, holdPortion: 1 },
+      });
+
+      expect(mockTx.order.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { id: ORDER_ID },
+          data: expect.objectContaining({
+            status: "cancelled",
+            cancelledBy: expectedActor,
+          }),
+        }),
+      );
+    },
+  );
 
   it("holdRetainedAmount satıcının kargo payını hold'da bırakır (tam iade)", async () => {
     // Escrow hold TAM kargoyu düştüğü için satıcı kendi payını peşin ödemiş sayılır.
@@ -460,6 +518,7 @@ describe("PaymentRefundService.processRefund — MONEY-H3/H4 partial refund", ()
     });
 
     await service.processRefund(ORDER_ID, 1000, {
+      cancelledBy: CancellationActor.buyer,
       idempotencyKey: "policy-refund-remorse-retain",
       refundQuantity: 1,
       settlement: {
@@ -486,6 +545,7 @@ describe("PaymentRefundService.processRefund — MONEY-H3/H4 partial refund", ()
     });
 
     await service.processRefund(ORDER_ID, 50, {
+      cancelledBy: CancellationActor.buyer,
       idempotencyKey: "policy-refund-retain-noop",
       refundQuantity: 1,
       settlement: { holdRetainedAmount: 100 },
@@ -504,6 +564,7 @@ describe("PaymentRefundService.processRefund — MONEY-H3/H4 partial refund", ()
     });
 
     await service.processRefund(ORDER_ID, 200, {
+      cancelledBy: CancellationActor.buyer,
       idempotencyKey: "policy-refund-retain-over",
       refundQuantity: 1,
       settlement: { closeOrder: true, holdPortion: 1, holdRetainedAmount: 40 },
@@ -535,6 +596,7 @@ describe("PaymentRefundService.processRefund — MONEY-H3/H4 partial refund", ()
       });
 
       await service.processRefund(ORDER_ID, 400, {
+        cancelledBy: CancellationActor.buyer,
         idempotencyKey: "ledger-refund-400",
       });
 
@@ -561,6 +623,7 @@ describe("PaymentRefundService.processRefund — MONEY-H3/H4 partial refund", ()
 
       await expect(
         service.processRefund(ORDER_ID, 400, {
+          cancelledBy: CancellationActor.buyer,
           idempotencyKey: "ledger-refund-fails",
         }),
       ).rejects.toThrow("ledger down");

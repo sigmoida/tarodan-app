@@ -12,7 +12,29 @@ export const TRADE_CANCEL_REASON = {
     "Depoya ulaşmayan (kayıp) koli nedeniyle otomatik iptal — bekleme süresi doldu",
   adminForceCancelStuck: (detail: string): string =>
     `Admin force-cancel (stuck): ${detail}`,
+  /** Yönetici taraflardan birini banladı. */
+  accountBanned: "Kullanıcı banlandığı için takas iptal edildi",
+  /** Takas hakkı olmayan katmana düşen kullanıcının bekleyen teklifleri. */
+  membershipDowngraded:
+    "Üyelik süresi sona erdiği için bekleyen takas teklifiniz otomatik iptal edildi.",
 } as const;
+
+/**
+ * SÜRE DOLUMU iptalleri — admin "İptal & İade" ekranı bunları "Süresi Dolan"
+ * gerekçesiyle "Tarodan iptali" sekmesinde gösterir (sipariş karşılığı:
+ * ORDER_EXPIRY_CANCEL_REASONS). Kayıp koli bilinçli olarak DIŞARIDA: metni
+ * "bekleme süresi doldu" dese de iptal sebebi kayıp kolidir.
+ * Metinler geçmiş satırlarla eşleşir — değiştirilmez.
+ */
+export const TRADE_EXPIRY_CANCEL_REASONS: readonly string[] = [
+  TRADE_CANCEL_REASON.autoExpired,
+];
+
+export function isTradeExpiryCancelReason(
+  reason: string | null | undefined,
+): boolean {
+  return reason != null && TRADE_EXPIRY_CANCEL_REASONS.includes(reason);
+}
 
 export const OFFER_CANCEL_REASON = {
   buyerCancelled: "Alıcı tarafından iptal edildi",

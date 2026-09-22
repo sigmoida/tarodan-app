@@ -1,4 +1,5 @@
 import {
+  CancellationActor,
   BusinessStatus,
   MembershipTierType,
   OrderStatus,
@@ -11,6 +12,7 @@ import { NotificationType } from "../notification/dto";
 import { BadRequestException, ForbiddenException } from "@nestjs/common";
 import { PaymentProvider } from "../payment/dto";
 import { MembershipSubscriptionService } from "./membership-subscription.service";
+import { TRADE_CANCEL_REASON } from "../trade/helpers/trade-cancel-reasons";
 import { OUTBOX_SAVED_CARD_PROVIDER_DELETE } from "../outbox/outbox.types";
 
 /**
@@ -1051,6 +1053,33 @@ describe("MembershipSubscriptionService", () => {
       );
 
       await expect(service.checkExpiredMemberships()).resolves.toBe(1);
+    });
+
+    it("takas hakkı olmayan katmana düşenin bekleyen tekliflerini SİSTEM iptali olarak kapatır", async () => {
+      const { service, prisma } = makeService();
+      const tradeUpdateMany = jest.fn().mockResolvedValue({ count: 1 });
+      (prisma as any).trade = { updateMany: tradeUpdateMany };
+      prisma.userMembership.findMany.mockResolvedValue([
+        { id: "membership-1", userId: "user-1", tier: { name: "Premium" } },
+      ]);
+      prisma.membershipTier.findUnique.mockResolvedValue({
+        id: "free-tier",
+        canTrade: false,
+      });
+      prisma.userMembership.update.mockResolvedValue({});
+
+      await service.checkExpiredMemberships();
+
+      expect(tradeUpdateMany).toHaveBeenCalledWith({
+        where: { initiatorId: "user-1", status: "pending" },
+        data: {
+          status: "cancelled",
+          cancelledAt: expect.any(Date),
+          cancelledBy: CancellationActor.system,
+          cancelReason: TRADE_CANCEL_REASON.membershipDowngraded,
+          version: { increment: 1 },
+        },
+      });
     });
   });
 });

@@ -1,4 +1,5 @@
 import {
+  CancellationActor,
   Prisma,
   PaymentStatus,
   PaymentHoldStatus,
@@ -155,7 +156,9 @@ describe("Order refund idempotency (#85) [P0]", () => {
   it("taze iade: PayTR bir kez çağrılır, marker yazılır, payment refunded olur", async () => {
     const { orderId, paymentId } = await setupPaidOrder();
 
-    await refund.processRefund(orderId);
+    await refund.processRefund(orderId, undefined, {
+      cancelledBy: CancellationActor.platform,
+    });
 
     expect(createRefund).toHaveBeenCalledTimes(1);
     const p = await prisma.payment.findUnique({ where: { id: paymentId } });
@@ -168,7 +171,9 @@ describe("Order refund idempotency (#85) [P0]", () => {
       inProgressMarker: true,
     });
 
-    await refund.processRefund(orderId);
+    await refund.processRefund(orderId, undefined, {
+      cancelledBy: CancellationActor.platform,
+    });
 
     // Kritik #85: ikinci kez PayTR çağrılmamalı → çift-iade yok.
     expect(createRefund).not.toHaveBeenCalled();
@@ -183,7 +188,11 @@ describe("Order refund idempotency (#85) [P0]", () => {
       err_msg: "insufficient",
     });
 
-    await expect(refund.processRefund(orderId)).rejects.toThrow();
+    await expect(
+      refund.processRefund(orderId, undefined, {
+        cancelledBy: CancellationActor.platform,
+      }),
+    ).rejects.toThrow();
 
     expect(createRefund).toHaveBeenCalledTimes(1);
     const p = await prisma.payment.findUnique({ where: { id: paymentId } });
@@ -195,10 +204,16 @@ describe("Order refund idempotency (#85) [P0]", () => {
   it("reconciliation-retry simülasyonu: iki ardışık processRefund çağrısı toplam TEK PayTR iadesi yapar", async () => {
     const { orderId } = await setupPaidOrder();
 
-    await refund.processRefund(orderId); // 1. çağrı: PayTR + refunded
+    await refund.processRefund(orderId, undefined, {
+      cancelledBy: CancellationActor.platform,
+    }); // 1. çağrı: PayTR + refunded
     // 2. çağrı: payment artık refunded → status=completed filtresi eşleşmez → NotFound.
     // (Marker + status guard birlikte çift-iadeyi engeller.)
-    await expect(refund.processRefund(orderId)).rejects.toThrow();
+    await expect(
+      refund.processRefund(orderId, undefined, {
+        cancelledBy: CancellationActor.platform,
+      }),
+    ).rejects.toThrow();
 
     expect(createRefund).toHaveBeenCalledTimes(1);
   });

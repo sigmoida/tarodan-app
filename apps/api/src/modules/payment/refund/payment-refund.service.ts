@@ -8,6 +8,7 @@ import {
 import { ConfigService } from "@nestjs/config";
 import { PrismaService } from "../../../prisma";
 import {
+  CancellationActor,
   Prisma,
   PaymentStatus,
   PaymentHoldStatus,
@@ -103,6 +104,13 @@ export interface RefundSettlementOptions {
 }
 
 export interface ProcessRefundOptions {
+  /**
+   * Bu iade siparişi TAMAMEN kapatırsa iptalin aktörü (`Order.cancelledBy`).
+   * ZORUNLU: iade yolları iptalin en kalabalık yazıcısıdır (alıcı talebi,
+   * yönetici manuel iadesi, cron'lar) ve aktörü yalnız çağıran bilir.
+   * Sipariş zaten başka bir yolla iptal edilmişse o yolun aktörü korunur.
+   */
+  cancelledBy: CancellationActor;
   skipRefundEvent?: boolean;
   refundQuantity?: number;
   idempotencyKey?: string;
@@ -279,8 +287,8 @@ export class PaymentRefundService {
    */
   async processRefund(
     orderId: string,
-    refundAmount?: number,
-    opts?: ProcessRefundOptions,
+    refundAmount: number | undefined,
+    opts: ProcessRefundOptions,
   ) {
     let payment = await this.prisma.payment.findFirst({
       where: {
@@ -895,6 +903,7 @@ export class PaymentRefundService {
                 quantity: true,
                 stockRestoredAt: true,
                 offerId: true,
+                cancelledBy: true,
               },
             });
             const sellerAdjustments = (
@@ -940,7 +949,16 @@ export class PaymentRefundService {
             if (isFullRefund) {
               await tx.order.update({
                 where: { id: orderId },
-                data: orderCancelledData(),
+                data: {
+                  ...orderCancelledData(opts.cancelledBy),
+                  // İptali başka yol ZATEN yazdıysa (kargolamama cron'u, stok
+                  // kaskadı, ödeme yarışı) aktör o yolundur; iade onu ezmez.
+                  // Göç öncesi iptalde null kalır — "bilinmiyor" yanlış bir
+                  // aktörden iyidir.
+                  ...(alreadyCancelled
+                    ? { cancelledBy: orderRow?.cancelledBy ?? null }
+                    : {}),
+                },
               });
               // Teklif siparişi: teklif `accepted` kalırsa reactivate/"Ödemeyi
               // tamamla" iade edilmiş siparişi yeniden ödemeye açar. Tam iade

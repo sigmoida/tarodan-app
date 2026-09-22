@@ -8,7 +8,12 @@ import {
 } from "@nestjs/common";
 import { PrismaService } from "../../../prisma";
 import { AdminAuditService } from "../ops/admin-audit.service";
-import { ProductStatus, TradeStatus, ShipmentStatus } from "@prisma/client";
+import {
+  CancellationActor,
+  ProductStatus,
+  TradeStatus,
+  ShipmentStatus,
+} from "@prisma/client";
 import { safeDecrementReserved } from "../../product/helpers/product-availability.helper";
 import { getProductStatusFromQuantity } from "../../product/helpers/product-status.helper";
 import { PaymentService } from "../../payment/payment.service";
@@ -30,6 +35,7 @@ import { REFERENCE_PREFIX } from "../../../common/helpers/code-prefixes";
 import { generateReferenceCode } from "../../../common/helpers/generate-reference";
 import { CarrierCancellationService } from "../../surat-cargo/sync/carrier-cancellation.service";
 import { TRADE_CANCEL_REASON } from "../../trade/helpers/trade-cancel-reasons";
+import { tradeCancelledData } from "../../trade/helpers/trade-cancellation";
 import { finalizeReturningTradeIfResolved } from "../../../common/helpers/trade-return-finalize";
 import { i18nMessage } from "../../i18n";
 
@@ -295,14 +301,15 @@ export class AdminTradeResolutionService {
         });
       }
 
+      // İade kolisi varsa takas `returning`de bekler; iptal (ve aktörü)
+      // bacaklar kapanınca finalizeReturningTradeIfResolved'da yazılır.
       await tx.trade.update({
         where: { id: tradeId },
         data: {
-          status: returnShipmentDraft
-            ? TradeStatus.returning
-            : TradeStatus.cancelled,
+          ...(returnShipmentDraft
+            ? { status: TradeStatus.returning }
+            : tradeCancelledData(CancellationActor.platform, now)),
           cancelReason: TRADE_CANCEL_REASON.adminForceCancelStuck(reason),
-          ...(returnShipmentDraft ? {} : { cancelledAt: now }),
           updatedAt: now,
         },
       });

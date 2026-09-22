@@ -13,6 +13,7 @@ import { i18nMessage } from "../i18n";
 import { CacheService } from "../cache/cache.service";
 import { CancelOrderDto, GuestOrderCancelDto } from "./dto";
 import {
+  CancellationActor,
   OrderCancellationReason,
   OrderStatus,
   OfferStatus,
@@ -34,7 +35,21 @@ import { RefundService } from "../refund/refund.service";
 import { PUBLIC_NAME_SELECT } from "../../common/helpers/public-identity";
 import { paymentWindowEnd } from "../payment/helpers/payment.constants";
 import { OFFER_CANCEL_REASON } from "../trade/helpers/trade-cancel-reasons";
+import { ORDER_CANCEL_REASON } from "./helpers/order-cancel-reasons";
 import { orderCancelledData } from "./helpers/order-cancellation";
+
+/**
+ * Ödenmemiş iptalin aktörü, ledger gerekçesinden türetilir: ikisi aynı olguyu
+ * (alıcı mı yönetici mi iptal etti) söyler, ayrı parametre olsalar
+ * birbirleriyle çelişebilirlerdi.
+ */
+const UNPAID_CANCEL_ACTOR: Record<
+  "buyer_cancelled" | "admin_cancelled",
+  CancellationActor
+> = {
+  buyer_cancelled: CancellationActor.buyer,
+  admin_cancelled: CancellationActor.platform,
+};
 
 /**
  * Sipariş yaşam döngüsü (adres güncelleme, durum geçişleri, tamamlama/onay,
@@ -447,7 +462,7 @@ export class OrderLifecycleService {
       // guard'ı cancelUnpaidOrderInTx içinde, tüm çağıranlar için tek yerde.
       // Ödenmemiş iptal: PSP'ye gidilmez, statü doğrudan cancelled olur.
       const cancelledOrder = await this.cancelUnpaidOrderInTx(tx, order, {
-        reason: dto?.reason?.trim() || "Alıcı tarafından iptal edildi",
+        reason: dto?.reason?.trim() || ORDER_CANCEL_REASON.buyerCancelled,
         reasonCode: dto?.reasonCode,
         ledgerReason: "buyer_cancelled",
         include: {
@@ -524,7 +539,7 @@ export class OrderLifecycleService {
     const cancelledOrder = await tx.order.update({
       where: { id: order.id, version: order.version },
       data: {
-        ...orderCancelledData(),
+        ...orderCancelledData(UNPAID_CANCEL_ACTOR[opts.ledgerReason]),
         cancellationType: "iptal",
         cancellationReasonCode: opts.reasonCode ?? undefined,
         cancelReason: opts.reason,
@@ -675,6 +690,10 @@ export class OrderLifecycleService {
           // başlatma "rezervasyon bırakılmış" dalına girip aynı adetleri
           // İKİNCİ kez rezerve eder (tekil üründe kalıcı stok-dışı görünüm).
           reservationReleasedAt: null,
+          // Sipariş artık iptal DEĞİL: aktör kalırsa canlı (sonra ödenen)
+          // sipariş İptal & İade ekranında "sistem iptali" görünürdü. Sonraki
+          // bir iptal aktörü yeniden yazar.
+          cancelledBy: null,
           version: { increment: 1 },
         },
       });

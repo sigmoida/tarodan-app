@@ -1,4 +1,6 @@
+import { CancellationActor } from "@prisma/client";
 import { PaymentExpiryReconciliationService } from "../reconciliation/payment-expiry-reconciliation.service";
+import { ORDER_CANCEL_REASON } from "../../order/helpers/order-cancel-reasons";
 
 /**
  * SEAM-B1: handleExpiredPreparingOrders süre-doldu iptalinde artık KARGO DURUMUNA bakar.
@@ -102,7 +104,9 @@ describe("PaymentExpiryReconciliationService.handleExpiredPreparingOrders — SE
     const res = await service.handleExpiredPreparingOrders();
 
     expect(res.cancelled).toBe(1);
-    expect(paymentRefund.processRefund).toHaveBeenCalledWith("o1");
+    expect(paymentRefund.processRefund).toHaveBeenCalledWith("o1", undefined, {
+      cancelledBy: CancellationActor.system,
+    });
     // restock TÜM adet (3), sabit +1 değil
     expect(mockTx.product.update).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -130,12 +134,32 @@ describe("PaymentExpiryReconciliationService.handleExpiredPreparingOrders — SE
     );
   });
 
+  it("süre dolumu iptalini sistem aktörü ve sabit gerekçeyle yazar (satıcı değil)", async () => {
+    const { service, mockTx } = makeService(order(), null);
+
+    await service.handleExpiredPreparingOrders();
+
+    expect(mockTx.order.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: "o1" },
+        data: expect.objectContaining({
+          status: "cancelled",
+          cancelledAt: expect.any(Date),
+          cancelledBy: CancellationActor.system,
+          cancelReason: ORDER_CANCEL_REASON.sellerShipDeadlineExpired,
+        }),
+      }),
+    );
+  });
+
   it("shipment yoksa iptal+iade EDER", async () => {
     const { service, paymentRefund } = makeService(order(), null);
 
     const res = await service.handleExpiredPreparingOrders();
 
     expect(res.cancelled).toBe(1);
-    expect(paymentRefund.processRefund).toHaveBeenCalledWith("o1");
+    expect(paymentRefund.processRefund).toHaveBeenCalledWith("o1", undefined, {
+      cancelledBy: CancellationActor.system,
+    });
   });
 });

@@ -1,4 +1,4 @@
-import { PaymentStatus } from "@prisma/client";
+import { CancellationActor, PaymentStatus } from "@prisma/client";
 import { PaymentFulfillmentService } from "../fulfillment/payment-fulfillment.service";
 
 /**
@@ -46,6 +46,7 @@ describe("PaymentFulfillmentService.processFailedPayment — idempotent guard", 
         checkoutGroupId: "grp-1",
       },
       "late failed callback",
+      CancellationActor.system,
     );
 
     // The flip is a conditional claim scoped to still-pending payments.
@@ -73,6 +74,7 @@ describe("PaymentFulfillmentService.processFailedPayment — idempotent guard", 
     await svc.processFailedPayment(
       { id: "pay-2", status: PaymentStatus.pending, checkoutGroupId: "grp-2" },
       "card declined",
+      CancellationActor.system,
     );
 
     expect(prisma.payment.updateMany).toHaveBeenCalled();

@@ -9,6 +9,7 @@ import { OrderCheckoutService } from "./order-checkout.service";
 import { OrderCheckoutCommonService } from "./order-checkout-common.service";
 import { OrderCheckoutDirectService } from "./order-checkout-direct.service";
 import { OrderCheckoutGroupService } from "./order-checkout-group.service";
+import { ORDER_CANCEL_REASON } from "../helpers/order-cancel-reasons";
 import { OrderGuestCheckoutService } from "./order-guest-checkout.service";
 import { OrderCommonService } from "../order-common.service";
 import { OrderQueryService } from "../order-query.service";
@@ -24,7 +25,12 @@ import { CommissionLedgerService } from "../../commission/commission-ledger.serv
 import { TaxService } from "../../tax/tax.service";
 import { ElogoInvoicingService } from "../../elogo";
 import { RefundService } from "../../refund/refund.service";
-import { OrderStatus, ProductKind, ProductStatus } from "@prisma/client";
+import {
+  CancellationActor,
+  OrderStatus,
+  ProductKind,
+  ProductStatus,
+} from "@prisma/client";
 import { flatPackageTiers } from "../../shipping/testing/tariff-fixture";
 import { OrderTaxPolicyService } from "../pricing/order-tax-policy.service";
 import { UserBlockService } from "../../user-block/user-block.service";
@@ -553,10 +559,17 @@ describe("OrderService checkout group (batch checkout)", () => {
 
     await service.checkout(buyerId, baseDto() as any);
 
+    // Terk edilmiş deneme yeni sepetçe devralınır: alıcı bu siparişi iptal
+    // etmeyi seçmedi → sistem temizliği.
     expect(mockTx.order.update).toHaveBeenCalledWith(
       expect.objectContaining({
         where: { id: "stale-order-1" },
-        data: expect.objectContaining({ status: OrderStatus.cancelled }),
+        data: expect.objectContaining({
+          status: OrderStatus.cancelled,
+          cancelledAt: expect.any(Date),
+          cancelledBy: CancellationActor.system,
+          cancelReason: ORDER_CANCEL_REASON.replacedByNewCheckout,
+        }),
       }),
     );
     expect(mockTx.product.update).toHaveBeenCalledWith({

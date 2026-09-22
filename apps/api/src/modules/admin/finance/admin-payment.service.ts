@@ -18,6 +18,7 @@ import {
   RefundAttemptResolution,
 } from "../dto";
 import {
+  CancellationActor,
   Prisma,
   PaymentStatus,
   RefundAttemptStatus,
@@ -967,7 +968,7 @@ export class AdminPaymentService {
     const refundResult = await this.paymentService.processRefund(
       payment.orderId,
       refundAmount,
-      { idempotencyKey },
+      { idempotencyKey, cancelledBy: CancellationActor.platform },
     );
 
     // Log admin action

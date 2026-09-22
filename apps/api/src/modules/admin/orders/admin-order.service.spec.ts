@@ -23,6 +23,7 @@ function lineRow(overrides: Record<string, unknown> = {}) {
     origin: "direct_sale",
     status: "paid",
     cancellationType: null,
+    cancelledBy: null,
     quantity: 1,
     unitPrice: D(100),
     subtotal: D(100),

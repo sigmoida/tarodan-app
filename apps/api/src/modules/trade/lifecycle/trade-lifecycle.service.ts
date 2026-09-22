@@ -9,10 +9,16 @@ import {
 } from "@nestjs/common";
 import { PrismaService } from "../../../prisma";
 import { tradeRejectedData } from "../helpers/trade-rejection";
+import {
+  tradeCancelledData,
+  tradePartyActor,
+} from "../helpers/trade-cancellation";
+import { ORDER_CANCEL_REASON } from "../../order/helpers/order-cancel-reasons";
 import { MembershipService } from "../../membership/membership.service";
 import { NotificationService } from "../../notification/notification.service";
 import { NotificationType } from "../../notification/dto";
 import {
+  CancellationActor,
   TradeStatus,
   ProductStatus,
   ShipmentStatus,
@@ -493,7 +499,7 @@ export class TradeLifecycleService {
         const available =
           (product.quantity ?? 0) - (product.reservedQuantity ?? 0);
         if (available <= 0) {
-          const reason = "Stok takas icin ayrildi";
+          const reason = ORDER_CANCEL_REASON.stockReservedForTrade;
           // Müsait adet bittiyse ürünü 'reserved' yap: status=active filtreleri
           // (liste/arama/öne çıkanlar) ve detay (findOne) artık gizler, başka
           // kullanıcı göremez/satın alamaz. Takas iptal/red/iade/tamamlanınca
@@ -1151,9 +1157,8 @@ export class TradeLifecycleService {
       await tx.trade.update({
         where: { id: tradeId, version: trade.version },
         data: {
-          status: TradeStatus.cancelled,
+          ...tradeCancelledData(tradePartyActor(trade, userId)),
           cancelReason: dto.reason,
-          cancelledAt: new Date(),
           version: { increment: 1 },
         },
       });

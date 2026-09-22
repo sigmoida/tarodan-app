@@ -1,4 +1,5 @@
 import type {
+  CancellationActorValue,
   OfferStatusValue,
   OrderOriginValue,
   OrderStatusValue,
@@ -40,6 +41,8 @@ export interface AdminOrderLine {
   orderNumber: string;
   status: OrderStatusValue;
   cancellationType: string | null;
+  /** İptali kimin yaptığı; iptal edilmemiş ya da aktörü bilinmeyen satırda null. */
+  cancelledBy: CancellationActorValue | null;
   quantity: number;
   unitPrice: number;
   subtotal: number;

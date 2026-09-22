@@ -52,6 +52,7 @@ const LIST_LINE_BASE_SELECT = {
   origin: true,
   status: true,
   cancellationType: true,
+  cancelledBy: true,
   quantity: true,
   unitPrice: true,
   subtotal: true,

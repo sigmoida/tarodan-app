@@ -1,4 +1,4 @@
-import { TradeStatus } from "@prisma/client";
+import { CancellationActor, TradeStatus } from "@prisma/client";
 import { unstampedTransitions } from "../../../common/helpers/stamped-transition.guard";
 import { tradeRejectedData } from "./trade-rejection";
 
@@ -10,7 +10,18 @@ describe("tradeRejectedData", () => {
       cancelReason: "Ürün beklediğim gibi değil",
       rejectedAt: at,
       cancelledAt: at,
+      cancelledBy: CancellationActor.seller,
     });
+  });
+
+  /**
+   * Reddi yalnız teklifin alıcısı (receiver = ilan sahibi) yapabilir —
+   * rejectTrade'in yetki kapısı. Aktör bu yüzden parametre değil, sabit.
+   */
+  it("records the listing owner (seller) as the actor", () => {
+    expect(tradeRejectedData("fikrimi değiştirdim").cancelledBy).toBe(
+      CancellationActor.seller,
+    );
   });
 
   /**

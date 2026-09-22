@@ -3,7 +3,7 @@ import { RefundFinancialService } from "./refund-financial.service";
 import { RefundShipmentService } from "./refund-shipment.service";
 import { RefundCreationService } from "./refund-creation.service";
 import { RefundDecisionService } from "./refund-decision.service";
-import { RefundRequestStatus } from "@prisma/client";
+import { CancellationActor, RefundRequestStatus } from "@prisma/client";
 import { warehouseAddressStub } from "../shipping/testing/warehouse-address-fixture";
 
 /**
@@ -101,6 +101,15 @@ describe("RefundService.finalizeRefundForReturnedShipment — MONEY-M1 CAS claim
     ).rejects.toThrow("PayTR down");
 
     expect(paymentService.processRefund).toHaveBeenCalledTimes(1);
+    // İade talebini alıcı açtı: iade siparişi kapatırsa aktör alıcıdır.
+    expect(paymentService.processRefund).toHaveBeenCalledWith(
+      "o1",
+      100,
+      expect.objectContaining({
+        idempotencyKey: "refund-request:rr-1",
+        cancelledBy: CancellationActor.buyer,
+      }),
+    );
     // revert: updateMany return_delivered + refundedAt:null ile çağrılmalı
     const revertCall = prisma.refundRequest.updateMany.mock.calls.find(
       ([arg]: [any]) =>

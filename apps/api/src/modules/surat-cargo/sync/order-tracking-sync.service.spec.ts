@@ -1,4 +1,4 @@
-import { OrderStatus, ShipmentStatus } from "@prisma/client";
+import { CancellationActor, OrderStatus, ShipmentStatus } from "@prisma/client";
 import { OrderTrackingSyncService } from "./order-tracking-sync.service";
 
 describe("OrderTrackingSyncService", () => {
@@ -188,7 +188,12 @@ describe("OrderTrackingSyncService", () => {
       },
       data: { status: OrderStatus.refund_requested },
     });
-    expect(paymentService.processRefund).toHaveBeenCalledWith("order-1");
+    expect(paymentService.processRefund).toHaveBeenCalledWith(
+      "order-1",
+      undefined,
+      // Taşıyıcı olayı kapatır; kimse "iptal et" demedi.
+      { cancelledBy: CancellationActor.system },
+    );
     expect(paymentService.handleOrderDelivered).not.toHaveBeenCalled();
   });
 

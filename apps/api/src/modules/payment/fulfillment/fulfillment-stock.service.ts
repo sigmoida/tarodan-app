@@ -7,6 +7,7 @@ import {
 import { safeDecrementReserved } from "../../product/helpers/product-availability.helper";
 import { productSoldData } from "../../product/helpers/product-sale";
 import { ProductLockService } from "../../product/lock/product-lock.service";
+import { ORDER_CANCEL_REASON } from "../../order/helpers/order-cancel-reasons";
 import {
   StockoutCancelledOrder,
   StockoutCancelledOffer,
@@ -131,7 +132,7 @@ export class FulfillmentStockService {
         await this.productLockService.invalidatePendingOrdersForProduct(
           tx,
           productId,
-          "Stok tükendi",
+          ORDER_CANCEL_REASON.stockDepleted,
         );
       const offerResult = await this.productLockService.invalidateRelatedOffers(
         tx,
