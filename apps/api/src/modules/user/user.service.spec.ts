@@ -16,6 +16,8 @@ import { NotificationService } from "../notification/notification.service";
 import { RatingService } from "../rating/rating.service";
 import { ModerationAiClient } from "../moderation/moderation-ai.client";
 import { UserBlockService } from "../user-block/user-block.service";
+import { AccountLaneService } from "../account-lane/account-lane.service";
+import { accountLaneServiceStub } from "../account-lane/account-lane.testing";
 
 describe("UserService deleteAddress (edge case 1.11)", () => {
   let service: UserService;
@@ -60,6 +62,7 @@ describe("UserService deleteAddress (edge case 1.11)", () => {
         { provide: NotificationService, useValue: {} },
         { provide: RatingService, useValue: {} },
         { provide: UserBlockService, useValue: {} },
+        { provide: AccountLaneService, useValue: accountLaneServiceStub() },
         {
           provide: ModerationAiClient,
           useValue: { assertTextClean: jest.fn(), assertImageClean: jest.fn() },
