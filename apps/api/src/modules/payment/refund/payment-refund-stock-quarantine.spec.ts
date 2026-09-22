@@ -1,3 +1,4 @@
+import { CancellationActor } from "@prisma/client";
 import { PaymentRefundService } from "./payment-refund.service";
 import { PaymentRefundAttemptService } from "./payment-refund-attempt.service";
 import {
@@ -181,6 +182,7 @@ describe("PaymentRefundService.processRefund — post-delivery return stock quar
   };
 
   const refundOpts = (over: Record<string, unknown> = {}) => ({
+    cancelledBy: CancellationActor.buyer,
     idempotencyKey: "quarantine-refund-1",
     refundQuantity: 1,
     settlement: { closeOrder: true, holdPortion: 1 },
