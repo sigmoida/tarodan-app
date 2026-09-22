@@ -41,6 +41,7 @@ import {
 } from "../../outbox/outbox.types";
 import { LedgerService } from "../../ledger/ledger.service";
 import { MONEY_EPSILON } from "../helpers/payment.constants";
+import { groupOrderRefundLimit } from "../helpers/group-refund-limit";
 import { errorMessage } from "../../../common/helpers/error-message";
 import { i18nMessage, localizedPayloadOf } from "../../i18n";
 import {
@@ -305,6 +306,7 @@ export class PaymentRefundService {
         orderNumber: true,
         totalAmount: true,
         checkoutGroupId: true,
+        packageId: true,
       },
     });
     if (!payment && refundTargetOrder?.checkoutGroupId) {
@@ -347,16 +349,52 @@ export class PaymentRefundService {
     }
 
     // O12: İade tutarı üst sınırı. Aksi halde tek çağrıda işlem tutarından FAZLA iade
-    // talep edilebilir (yalnız PayTR reddi engelliyordu). Üst sınır = ilgili siparişin
-    // tutarı (grup) veya ödeme tutarı (tekil).
+    // talep edilebilir (yalnız PayTR reddi engelliyordu). `refundCap` siparişin PAYIdır
+    // (grup: sipariş tutarı, tekil: ödeme tutarı) — varsayılan tutar, "tam iade"
+    // anahtarı ve tam-iade eşiği ona bakar. `refundLimit` ise kabul edilen EN YÜKSEK
+    // tutardır: grupta pay + bu iadenin kapattığı koli kargosu, ödemede kalanla
+    // sınırlı (kural ve çift-sayım koruması: groupOrderRefundLimit).
     const refundCap = isGroupPayment
       ? Number(refundTargetOrder!.totalAmount)
       : Number(payment.amount);
-    if (amountToRefund > refundCap + 0.01) {
+    const previouslyRefundedOrders: Record<string, number> =
+      ((payment.metadata as any)?.refundedOrders as Record<string, number>) ||
+      {};
+    const refundLimit = isGroupPayment
+      ? groupOrderRefundLimit({
+          orderTotal: refundCap,
+          paymentAmount: Number(payment.amount),
+          refundedOrders: previouslyRefundedOrders,
+          packageSiblings: refundTargetOrder!.packageId
+            ? (
+                await this.prisma.order.findMany({
+                  where: {
+                    packageId: refundTargetOrder!.packageId,
+                    id: { not: orderId },
+                  },
+                  select: {
+                    id: true,
+                    status: true,
+                    totalAmount: true,
+                    buyerShippingAmount: true,
+                    serviceVatRate: true,
+                  },
+                })
+              ).map((sibling) => ({
+                id: sibling.id,
+                status: sibling.status,
+                totalAmount: Number(sibling.totalAmount),
+                buyerShippingAmount: Number(sibling.buyerShippingAmount),
+                serviceVatRate: Number(sibling.serviceVatRate),
+              }))
+            : [],
+        })
+      : refundCap;
+    if (amountToRefund > refundLimit + 0.01) {
       throw new BadRequestException(
         i18nMessage("server.payment.refundAmountExceedsLimit", {
           amountToRefund,
-          refundCap,
+          refundCap: refundLimit,
         }),
       );
     }
@@ -406,9 +444,6 @@ export class PaymentRefundService {
     }
 
     // Grup ödemesinde aynı sipariş ikinci kez iade edilemez
-    const previouslyRefundedOrders: Record<string, number> =
-      ((payment.metadata as any)?.refundedOrders as Record<string, number>) ||
-      {};
     if (isGroupPayment && previouslyRefundedOrders[orderId]) {
       throw new BadRequestException(
         i18nMessage("server.payment.orderAlreadyRefunded"),
