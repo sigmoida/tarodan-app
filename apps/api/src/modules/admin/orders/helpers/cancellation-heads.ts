@@ -20,6 +20,7 @@ export function cancellationHeadComparator(dir: SortDirection) {
     if (!a.cancelledAt && !b.cancelledAt) return 0;
     if (!a.cancelledAt) return 1;
     if (!b.cancelledAt) return -1;
-    return (a.cancelledAt.getTime() - b.cancelledAt.getTime()) * sign;
+    const diff = a.cancelledAt.getTime() - b.cancelledAt.getTime();
+    return diff === 0 ? 0 : diff * sign;
   };
 }

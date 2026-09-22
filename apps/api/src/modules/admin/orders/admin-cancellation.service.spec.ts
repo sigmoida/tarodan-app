@@ -198,7 +198,8 @@ describe("AdminCancellationService.list", () => {
       {},
       new Date(),
     );
-    const groupBranch = lineQuery.where.OR[0].AND;
+    expect(lineQuery).toBeDefined();
+    const groupBranch = lineQuery!.where.OR[0].AND;
     expect(groupBranch[0]).toEqual({ checkoutGroupId: { in: ["g1"] } });
     // `new` alt sekmesi dışında `now`'a bağlı değildir: birebir eşit.
     expect(groupBranch[1]).toEqual(order);
