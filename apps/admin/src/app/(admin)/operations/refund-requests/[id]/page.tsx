@@ -10,6 +10,7 @@ import { useAdminMutation } from "@/hooks/useAdminMutation";
 import { useConfirm } from "@/provider/ConfirmProvider";
 import { useSession } from "@/context/SessionContext";
 import { DetailPage } from "@/components/detail/DetailPage";
+import { TestLaneBadge } from "@/components/TestLaneBadge";
 import { PartyCard } from "@/components/detail/PartyCard";
 import { RefundStatusStepper } from "./_components/RefundStatusStepper";
 import { RefundNextActionPanel } from "./_components/RefundNextActionPanel";
@@ -127,10 +128,13 @@ export default function RefundRequestDetailPage() {
         })
       }
       badge={(rr) => (
-        <StatusBadge
-          status={rr.status}
-          config={statusConfig(refundRequestStatusConfig, t)}
-        />
+        <div className="flex flex-wrap items-center gap-2">
+          <StatusBadge
+            status={rr.status}
+            config={statusConfig(refundRequestStatusConfig, t)}
+          />
+          <TestLaneBadge isTest={rr.order.isTest} />
+        </div>
       )}
     >
       {(rr) => {

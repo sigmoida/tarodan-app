@@ -7472,7 +7472,8 @@
           "cancelledAt": "Cancelled At",
           "cancelledBy": "Cancelled By",
           "reason": "Cancellation Reason",
-          "refundState": "Refund Status"
+          "refundState": "Refund Status",
+          "testLane": "Test lane"
         }
       }
     },
@@ -9069,6 +9070,10 @@
       },
       "list": {
         "totalLine": "Total {total} {unit}"
+      },
+      "testLane": {
+        "badge": "TEST",
+        "hint": "Test lane record — paid in PayTR test mode; no charge, shipment or e-invoice, excluded from reports"
       }
     },
     "auth": {

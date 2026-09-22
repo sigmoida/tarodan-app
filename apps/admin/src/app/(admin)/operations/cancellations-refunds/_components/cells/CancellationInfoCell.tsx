@@ -4,6 +4,7 @@ import { Badge } from "@tarodan/ui";
 import type { AdminCancellationRow } from "@tarodan/types";
 import { fmtDateTime } from "@/lib/format";
 import { TruncatedText } from "@/components/table";
+import { TestLaneBadge } from "@/components/TestLaneBadge";
 import {
   cancellationDetailHref,
   cancellationStatusKey,
@@ -44,6 +45,7 @@ export function CancellationInfoCell({ row }: { row: AdminCancellationRow }) {
             {t("admin.operations.cancellations.cells.tradeBadge")}
           </Badge>
         )}
+        <TestLaneBadge isTest={row.isTest} />
       </div>
       {isPartialCancellation(row) && (
         <span className="whitespace-nowrap text-xs text-warning-600">

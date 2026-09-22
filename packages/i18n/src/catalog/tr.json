@@ -7472,7 +7472,8 @@
           "cancelledAt": "İptal Tarihi",
           "cancelledBy": "İptal Eden",
           "reason": "İptal Nedeni",
-          "refundState": "İade Durumu"
+          "refundState": "İade Durumu",
+          "testLane": "Test şeridi"
         }
       }
     },
@@ -9069,6 +9070,10 @@
       },
       "list": {
         "totalLine": "Toplam {total} {unit}"
+      },
+      "testLane": {
+        "badge": "TEST",
+        "hint": "Test şeridi kaydı — PayTR test modunda ödendi; tahsilat, kargo ve e-fatura yok, raporlara girmez"
       }
     },
     "auth": {

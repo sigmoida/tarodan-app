@@ -5,6 +5,7 @@ import { col, RowActionMenu, TruncatedText } from "@/components/table";
 import { fmtTry } from "@/lib/format";
 import { cancelReasonLabel } from "@/lib/utils";
 import { statusConfig } from "@/lib/statusLabels";
+import { TestLaneBadge } from "@/components/TestLaneBadge";
 import {
   canCancelOffer,
   offerPercentOfList,
@@ -76,6 +77,7 @@ export function offerColumns({ t, onView, onCancel }: OfferColumnProps) {
             status={o.status}
             config={statusConfig(offerStatusConfig, t)}
           />
+          <TestLaneBadge isTest={o.isTest} />
           {o.status === "pending" && (
             <span className="text-xs text-muted">
               {o.buyerMustAccept

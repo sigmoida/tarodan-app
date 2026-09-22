@@ -43,6 +43,7 @@ function line(overrides: Partial<ListLine> = {}): ListLine {
     createdAt: NOW,
     checkoutGroupId: "g1",
     packageId: "p1",
+    isTest: false,
     shippingAddress: null,
     financialSnapshot: null,
     sellerCommissionAmount: D(10),
@@ -228,6 +229,32 @@ describe("mapCartRow", () => {
       ctx(),
     );
     expect(row.packages[0].lines[0].hasActiveRefund).toBe(true);
+  });
+
+  /**
+   * Test şeridi: liste test siparişini GİZLEMEZ, satır `isTest` ile "TEST"
+   * rozeti taşır. Damga alıcıdan türediği için sepetin siparişleri aynı
+   * şerittedir; karışık veride rozet kaybolmasın diye `some`.
+   */
+  it("marks a test-lane cart with isTest and leaves live carts unmarked", () => {
+    const head = {
+      kind: "group" as const,
+      id: "g1",
+      number: "GRP-1",
+      createdAt: NOW,
+    };
+    expect(mapCartRow(head, [line()], ctx()).isTest).toBe(false);
+    expect(
+      mapCartRow(
+        head,
+        [line({ isTest: true }), line({ id: "o2", isTest: true })],
+        ctx(),
+      ).isTest,
+    ).toBe(true);
+    expect(
+      mapCartRow(head, [line(), line({ id: "o2", isTest: true })], ctx())
+        .isTest,
+    ).toBe(true);
   });
 
   it("carries who cancelled the line, and null while nobody did", () => {

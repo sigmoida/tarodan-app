@@ -120,6 +120,11 @@ export interface AdminOrderListRow {
   createdAt: string;
   /** Sipariş dosyasını açan sipariş id'si (grup dosyası buradan çözülür). */
   detailOrderId: string;
+  /**
+   * Test şeridi kaydı (App Review / QA hesapları, PayTR test modu). Liste onu
+   * GİZLEMEZ — panel "TEST" rozeti basar; raporlar hiç saymaz.
+   */
+  isTest: boolean;
   buyer: AdminOrderParty;
   totalAmount: number;
   subtotal: number;

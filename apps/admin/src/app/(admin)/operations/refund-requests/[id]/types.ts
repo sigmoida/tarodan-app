@@ -73,6 +73,8 @@ export interface RefundRequestDetail {
   order: {
     id: string;
     orderNumber: string;
+    /** Test şeridi siparişi — başlıkta "TEST" rozeti. */
+    isTest?: boolean;
     totalAmount: number | string;
     subtotal?: number | string | null;
     shippingCost?: number | string;

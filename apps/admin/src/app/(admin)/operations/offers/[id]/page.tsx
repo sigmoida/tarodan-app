@@ -10,6 +10,7 @@ import { adminApi } from "@/lib/api";
 import { fmtDateTime } from "@/lib/format";
 import { statusConfig } from "@/lib/statusLabels";
 import { DetailPage } from "@/components/detail/DetailPage";
+import { TestLaneBadge } from "@/components/TestLaneBadge";
 import { PartyCard } from "@/components/detail/PartyCard";
 import { SectionCard } from "@/components/detail/SectionCard";
 import { canCancelOffer } from "../_lib/offers";
@@ -46,10 +47,13 @@ export default function OfferDetailPage() {
         })
       }
       badge={(d) => (
-        <Badge
-          status={d.offer.status}
-          config={statusConfig(offerStatusConfig, t)}
-        />
+        <div className="flex flex-wrap items-center gap-2">
+          <Badge
+            status={d.offer.status}
+            config={statusConfig(offerStatusConfig, t)}
+          />
+          <TestLaneBadge isTest={d.offer.isTest} />
+        </div>
       )}
       actions={(d) =>
         canCancelOffer(d.offer) ? (

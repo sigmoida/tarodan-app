@@ -55,6 +55,7 @@ function line(overrides: Partial<CancellationLine> = {}): CancellationLine {
     createdAt: new Date("2026-09-20T09:00:00.000Z"),
     checkoutGroupId: "g1",
     packageId: "p1",
+    isTest: false,
     shippingAddress: null,
     financialSnapshot: null,
     sellerCommissionAmount: D(10),
@@ -80,6 +81,7 @@ function trade(overrides: Partial<CancellationTrade> = {}): CancellationTrade {
     id: "t1",
     tradeNumber: "TKS-1",
     status: "cancelled",
+    isTest: false,
     createdAt: new Date("2026-09-10T09:00:00.000Z"),
     cancelledAt: new Date("2026-09-12T09:00:00.000Z"),
     cancelledBy: "system",
@@ -409,6 +411,22 @@ describe("mapCancelledTradeRow", () => {
     );
     expect(row.totalAmount).toBe(80);
     expect(row.fees).toEqual({ salesCommission: 5, platformFee: 50 });
+  });
+
+  it("carries the test-lane stamp of cart and trade rows (TEST badge)", () => {
+    const cart = (isTest: boolean) =>
+      mapCancelledCartRow(
+        { kind: "group", id: "g1", number: "GRP-1", createdAt: NOW },
+        [line({ isTest })],
+        1,
+        ctx,
+      );
+    expect(cart(false).isTest).toBe(false);
+    expect(cart(true).isTest).toBe(true);
+    expect(mapCancelledTradeRow(trade(), ctx).isTest).toBe(false);
+    expect(mapCancelledTradeRow(trade({ isTest: true }), ctx).isTest).toBe(
+      true,
+    );
   });
 
   it("a rejected trade keeps its status and the seller as actor", () => {
