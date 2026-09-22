@@ -251,6 +251,39 @@ verilmeden maliyet gerçek değildir → iki taraf da bütünlenir. Verildikten 
 maliyet kusurlu tarafa gider: `delivery_delayed`'de gidiş satıcıya yansır;
 cayma nedenlerinde alıcının kargo payı iade edilmez ve koruma bedeli hep kalır.
 
+**Platform (admin) iptali** — `POST /admin/orders/:id/cancel`, yalnız kargo
+öncesi (`paid`/`preparing`, koli taşıyıcıya geçmemiş; kural
+`@tarodan/types` `preShipmentCancelBlocker`, panel de aynısını okur) ve sipariş
+(sepet kalemi) başına; grup ödemesinde de çalışır. Para yolu alıcı iptaliyle
+TEK çekirdektir (`RefundCreationService.executePreShipmentCancellation`); fark
+yalnız spec'tedir (`helpers/pre-shipment-cancellation.ts`): kusur platformda
+(v2 `faultParty: "platform"`, v1 `resolvePlatformCancellationPolicy`) → alıcı
+ürün + alıcı komisyonu/hizmet bedeli + (paketin son canlı kalemiyse) gidiş
+kargosunu geri alır, kupon hakkı döner; satıcı kesintileri terslenir. Talep
+alıcı adına açılır, kararı admin verir, iki tarafa iptal duyurusu gider.
+Önizleme (`GET …/cancel-preview`) aynı hesabı koşar. İptal aktörü
+(`Order.cancelledBy`) spec'in `initiator`'ıdır (alıcı / platform) ve talebin
+`metadata.cancellationActor`'ına yazılır; talep sonradan admin onayı ya da
+takılı deneme kurtarmasıyla iade edilirse aktör oradan okunur
+(`refundRequestCancelActor`). Alıcı iptalinde duyuru yalnız satıcıya gider
+("kargoya vermeyin"). Kargo öncesi siparişte açık kalmış bir talep yarıda
+kalmış iptaldir (PSP hatası): yeniden iptal 409 döner ve İade Talepleri'ne
+yönlendirir.
+
+**Grup ödemesinde iade tavanı** (`payment/helpers/group-refund-limit.ts`,
+processRefund'da tek hesap): sepette kolinin alıcı kargo payı yalnız satıcının
+ilk satırına yazılır, v2 ise kargoyu paketin SON canlı kalemini kapatan
+iadede bir kez iade eder — bu kalem kargoyu taşımayan bir kardeş olabilir.
+Tavan = min(sipariş tutarı + kapanan koli kargosu, ödemede kalan iade
+edilebilir). Kapanan koli kargosu yalnız paketteki diğer bütün kalemler
+iptal/iade edilmişse doğar; miktarı kardeş satırlarda tahsil edilip o satırla
+iade EDİLMEMİŞ kargo payıdır (brüt), kardeşlerde kendi payını aşan iade kadar
+düşülür (kargo iki kez iade edilemez). Örnek: A = 1000 + 130 kargo = 1130,
+B = 500, ödeme 1630. A, B giderken iptal → 1000 iade (kargo tutulur). B son
+kalem → 500 + 130 = 630 iade; eski tavan (500) bunu reddedip talebi incelemeye
+düşürüyordu. Varsayılan tutar ve "tam iade" anahtarı sipariş tutarına bakmaya
+devam eder.
+
 **Hesap** (`calculateRefundFinancials`): "alıcı bedeli tam iade" =
 `buyerFeeAmount` (alıcı komisyonu **+** hizmet bedeli). Satır bazlı oranlama
 `refundQuantity/orderQuantity`; **kargo asla oranlanmaz** — satıcı kargo tazmini

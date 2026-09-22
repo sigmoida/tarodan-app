@@ -58,6 +58,8 @@ export interface AdminOrderShipment {
   /** Taşıyıcının takip numarası; yoksa iç takip numarası. */
   trackingNumber: string | null;
   status: ShipmentStatusValue;
+  /** Taşıyıcıya ilk fiziksel devir (ISO); kargo öncesi iptal kuralı bunu da okur. */
+  shippedAt: string | null;
 }
 
 /** Paketin e-Logo belgesi (hizmet başına bir belge). */

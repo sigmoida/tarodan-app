@@ -13,6 +13,9 @@ export * from "./offer";
 // Real (Prisma-aligned) order / shipment / offer status values
 export * from "./commerce-status";
 
+// Carrier-handover definition + pre-shipment cancel eligibility (API + admin)
+export * from "./order-cancellation";
+
 // Admin orders screen: tabs, buckets and the list row contract
 export * from "./order-buckets";
 export * from "./admin-order-list";

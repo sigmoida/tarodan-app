@@ -6856,6 +6856,24 @@
           "noShipment": "No shipment yet",
           "openOrder": "Open order file",
           "openOffer": "Open offer details"
+        },
+        "cancel": {
+          "action": "Cancel order",
+          "title": "Cancel order",
+          "description": "Order #{orderNumber} will be cancelled. Other items in the cart are not affected.",
+          "warning": "The buyer will be refunded and this cannot be undone. If a shipping label was created, the shipment is cancelled too; the stock is returned to the listing.",
+          "refundAmount": "Amount to be refunded to the buyer",
+          "shippingIncluded": "Shipping included",
+          "shippingExcluded": "Shipping excluded — the other items in the package will still be shipped",
+          "previewLoading": "Calculating the refund amount…",
+          "previewUnavailable": "The refund amount could not be calculated right now. The cancellation still refunds the amount the pre-shipment cancellation policy gives.",
+          "reason": "Cancellation reason",
+          "reasonPlaceholder": "The reason is written to the audit log and sent to the buyer and the seller in the cancellation email",
+          "confirm": "Cancel and refund",
+          "success": "Order cancelled and the buyer refunded",
+          "failed": "The order could not be cancelled",
+          "pendingManual": "This order's cancellation is waiting in Refund Requests for manual completion (the refund did not finish).",
+          "openPendingRefund": "Open request"
         }
       },
       "trades": {
@@ -9002,7 +9020,7 @@
       },
       "orderCancelledSeller": {
         "title": "Sale Cancelled",
-        "message": "Your order {orderNumber} has been cancelled."
+        "message": "Order {orderNumber} was cancelled. Do not ship the item."
       },
       "orderCancelledOutOfStock": {
         "title": "Your order was cancelled: out of stock",
@@ -9899,7 +9917,13 @@
         "tariffUnverifiable": "The order's shipping tariff can no longer be verified",
         "couponChangesShipping": "The coupon changes the shipping cost; the order must be recreated through a new checkout",
         "shipmentToDeliveredForbidden": "A shipment in the {status} state cannot be moved to delivered",
-        "shipmentToInTransitForbidden": "A shipment in the {status} state cannot be moved to in-transit"
+        "shipmentToInTransitForbidden": "A shipment in the {status} state cannot be moved to in-transit",
+        "cancelNotPaid": "An order whose payment is not completed cannot be cancelled; there is no charge to refund",
+        "cancelAlreadyClosed": "The order has already been cancelled or refunded",
+        "cancelActiveRefund": "The order has an open refund/cancellation request; continue from the Refund Requests screen",
+        "cancelAfterHandover": "An order handed to the carrier cannot be cancelled; use the refund request flow at this stage",
+        "cancelReasonRequired": "A cancellation reason is required",
+        "cancelPendingManualCompletion": "This order's cancellation ({refundNumber}) is waiting in Refund Requests for manual completion; resolve the request there instead of cancelling again"
       },
       "user": {
         "notBanned": "The user is not banned",

@@ -70,6 +70,19 @@ export class RefundService {
     return this.creation.createCancellationRefund(...args);
   }
 
+  /** Admin "Siparişi iptal et" — alıcı iptaliyle aynı çekirdek, platform kusuru. */
+  createPlatformCancellationRefund(
+    ...args: Parameters<
+      RefundCreationService["createPlatformCancellationRefund"]
+    >
+  ) {
+    return this.creation.createPlatformCancellationRefund(...args);
+  }
+
+  previewPlatformCancellationRefund(orderId: string) {
+    return this.creation.previewPlatformCancellationRefund(orderId);
+  }
+
   // ─────────────────────────────────────────────────────────────────────────────
   // Admin kararı — RefundDecisionService
   // ─────────────────────────────────────────────────────────────────────────────

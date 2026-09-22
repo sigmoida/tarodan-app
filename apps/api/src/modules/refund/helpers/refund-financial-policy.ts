@@ -14,6 +14,7 @@ export interface RefundPolicyDecision {
     | "manual_review_return"
     | "seller_fault_cancellation"
     | "buyer_remorse_cancellation"
+    | "platform_cancellation"
     | "manual_review_cancellation";
   returnShippingPayer: ReturnShippingPayer;
   refundOutboundShipping: boolean;
@@ -242,6 +243,31 @@ export function resolveCancellationPolicy(
     chargeSellerOutboundShipping: false,
     requiresEvidence: true,
     requiresAdminReview: true,
+    penaltyReviewRequired: false,
+  };
+}
+
+/**
+ * Platform (admin) iptali — yalnız KARGO ÖNCESİ açıktır (kargoya verilmiş
+ * sipariş iade talebi akışına gider), bu yüzden `hasShipped` parametresi yok.
+ *
+ * Kusur ne alıcıda ne satıcıda: alıcı ödediği her kalemi (ürün, koruma/hizmet
+ * bedeli, gidiş kargosu) geri alır; satıcının kesintileri terslenir ve taşıma
+ * hiç doğmadığı için kendi kargo payı da tazmin edilir. v2 hesabında
+ * `faultParty: "platform"` ile aynı sonuç — bu karar yalnız v1'e acil geri
+ * dönüşte (REFUND_POLICY_V2_ENABLED=false) kullanılır.
+ */
+export function resolvePlatformCancellationPolicy(): RefundPolicyDecision {
+  return {
+    policyCode: "platform_cancellation",
+    returnShippingPayer: null,
+    refundOutboundShipping: true,
+    refundBuyerProtectionFee: true,
+    refundSellerPlatformFee: true,
+    compensateSellerShipping: true,
+    chargeSellerOutboundShipping: false,
+    requiresEvidence: false,
+    requiresAdminReview: false,
     penaltyReviewRequired: false,
   };
 }

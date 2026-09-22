@@ -1,4 +1,8 @@
-import type { AdminOrderCounts } from "@tarodan/types";
+import type {
+  AdminOrderCancelPreview,
+  AdminOrderCancelResult,
+  AdminOrderCounts,
+} from "@tarodan/types";
 import { api } from "./client";
 
 /**
@@ -24,6 +28,12 @@ export const operationsApi = {
     },
   ) => api.post(`/admin/orders/${id}/tracking`, payload),
   getOrderInvoice: (id: string) => api.get(`/admin/orders/${id}/invoice`),
+  /** Kargo öncesi platform iptalinde alıcıya dönecek tutar (iptalle aynı hesap). */
+  getOrderCancelPreview: (id: string) =>
+    api.get<AdminOrderCancelPreview>(`/admin/orders/${id}/cancel-preview`),
+  /** Kargo öncesi platform iptali (sipariş / sepet kalemi başına, tam iade). */
+  cancelOrder: (id: string, reason: string) =>
+    api.post<AdminOrderCancelResult>(`/admin/orders/${id}/cancel`, { reason }),
 
   // Offers (Teklifler — /operations/offers; izin: orders)
   getOffers: (params?: any) => api.get("/admin/offers", { params }),

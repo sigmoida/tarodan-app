@@ -203,6 +203,7 @@ describe("PaymentRefundService.processRefund — MONEY-H3/H4 partial refund", ()
       {
         createInAppNotification: jest.fn().mockResolvedValue(undefined),
         sendOrderCancelledEmails: jest.fn().mockResolvedValue(undefined),
+        notifyOrderCancelledParties: jest.fn().mockResolvedValue(undefined),
       } as any,
       commissionLedger as any,
       { handleOrderRefund: jest.fn().mockResolvedValue(undefined) } as any,

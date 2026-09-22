@@ -5,14 +5,10 @@ import {
   Logger,
   NotFoundException,
 } from "@nestjs/common";
-import {
-  CancellationActor,
-  OrderStatus,
-  RefundReason,
-  RefundRequestStatus,
-} from "@prisma/client";
+import { OrderStatus, RefundReason, RefundRequestStatus } from "@prisma/client";
 import { PrismaService } from "../../prisma";
 import { PaymentService } from "../payment/payment.service";
+import { refundRequestCancelActor } from "../payment/helpers/refund-attempt-actor";
 import { NotificationType } from "../notification/dto/notification.dto";
 import { i18nMessage } from "../i18n";
 import { type RefundFaultPartyV2 } from "./helpers/refund-financial-policy-v2";
@@ -126,7 +122,9 @@ export class RefundDecisionService {
           skipRefundEvent: true,
           refundQuantity: rr.refundQuantity,
           idempotencyKey: `refund-request:${rr.id}`,
-          cancelledBy: CancellationActor.buyer,
+          // Admin yalnız onaylıyor; iptalin aktörü talebi başlatandır (alıcı
+          // ya da incelemeye düşmüş bir platform iptali).
+          cancelledBy: refundRequestCancelActor(rr.metadata),
           settlement: {
             closeOrder: rr.refundQuantity >= (rr.order.quantity ?? 1),
             holdPortion: Math.min(

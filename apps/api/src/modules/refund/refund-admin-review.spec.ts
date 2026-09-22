@@ -139,6 +139,38 @@ describe("RefundService admin review", () => {
     );
   });
 
+  it("approving a stuck admin (platform) cancellation keeps the PLATFORM as the actor", async () => {
+    // PSP hatasıyla incelemeye düşmüş admin iptali: onaylayan admin, ama
+    // iptalin aktörü talebin işaretinden gelir — alıcıya yazılmaz.
+    const processRefund = jest.fn().mockRejectedValue(new Error("stop here"));
+    const { service } = makeService(
+      {
+        policyCode: "platform_cancellation",
+        metadata: { cancellationActor: CancellationActor.platform },
+        order: {
+          id: "order-1",
+          sellerId: "seller-1",
+          status: "paid",
+          quantity: 1,
+        },
+      },
+      { processRefund },
+    );
+
+    await expect(
+      service.adminApproveRefundRequest("refund-1", "admin-1"),
+    ).rejects.toThrow("stop here");
+
+    expect(processRefund).toHaveBeenCalledWith(
+      "order-1",
+      1180,
+      expect.objectContaining({
+        idempotencyKey: "refund-request:refund-1",
+        cancelledBy: CancellationActor.platform,
+      }),
+    );
+  });
+
   it("rejects a reviewed return and releases the frozen seller hold", async () => {
     const { service, prisma } = makeService();
 
