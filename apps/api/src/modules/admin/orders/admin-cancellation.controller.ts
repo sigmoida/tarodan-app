@@ -17,7 +17,10 @@ import {
   AdminCancellationCountsQueryDto,
   AdminCancellationQueryDto,
 } from "../dto";
-import { AdminCancellationService } from "./admin-cancellation.service";
+import {
+  AdminCancellationService,
+  CANCELLATION_EXPORT_ROW_CAP,
+} from "./admin-cancellation.service";
 
 /**
  * "İptal & İade" ekranının İptaller sekmesi. Roller ve izin anahtarı iade
@@ -76,7 +79,13 @@ export class AdminCancellationController {
       "Content-Disposition",
       `attachment; filename="${file.filename}"`,
     );
-    res.setHeader("X-Export-Truncated", String(file.truncated));
+    // Tavan aşıldıysa panel uyarır: dosya yalnız ilk N satırı taşır.
+    if (file.truncated) {
+      res.setHeader(
+        "X-Export-Truncated-At",
+        String(CANCELLATION_EXPORT_ROW_CAP),
+      );
+    }
     res.send(file.body);
   }
 }

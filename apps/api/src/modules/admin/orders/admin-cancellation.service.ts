@@ -42,7 +42,7 @@ import type { Locale } from "@tarodan/i18n";
 
 /**
  * Excel'in satır (sepet/sipariş/takas) tavanı. Aşarsa dosya ilk N satırı taşır
- * ve `X-Export-Truncated` başlığı döner — sessiz kırpma yok.
+ * ve `X-Export-Truncated-At` başlığı döner — sessiz kırpma yok.
  */
 export const CANCELLATION_EXPORT_ROW_CAP = 5000;
 
