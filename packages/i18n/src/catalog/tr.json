@@ -9341,7 +9341,7 @@
       },
       "refundCompletedSeller": {
         "title": "İade Tamamlandı",
-        "message": "{refundNumber} numaralı sipariş için iade tamamlandı; tutar alıcıya iade edildi."
+        "message": "{refundNumber} numaralı sipariş için iade tamamlandı; tutar alıcıya iade edildi.{stockQuarantined, select, yes { Ürün stoğa geri eklendi ancak ilanınız pasif durumda; kontrol ettikten sonra siz yeniden aktive edebilirsiniz.} other {}}"
       },
       "refundAutoAcceptedSeller": {
         "title": "İade Talebi Otomatik Onaylandı",
