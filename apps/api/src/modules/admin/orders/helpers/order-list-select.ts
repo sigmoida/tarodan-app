@@ -78,6 +78,8 @@ const LIST_LINE_BASE_SELECT = {
       status: true,
       trackingNumber: true,
       providerTrackingId: true,
+      // Kargoya devir mührü — panelin iptal uygunluğu (preShipmentCancelBlocker).
+      shippedAt: true,
     },
   },
   refundRequests: {

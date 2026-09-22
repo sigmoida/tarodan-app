@@ -97,6 +97,7 @@ describe("mapCartRow", () => {
             status: "in_transit",
             trackingNumber: "INT-1",
             providerTrackingId: "SUR-1",
+            shippedAt: NOW,
           },
         }),
         line({ id: "o2", orderNumber: "ORD-2", product: product("pr2") }),
@@ -126,6 +127,7 @@ describe("mapCartRow", () => {
       provider: "surat",
       trackingNumber: "SUR-1",
       status: "in_transit",
+      shippedAt: NOW.toISOString(),
     });
     expect(row.packages[1].shipment).toBeNull();
     expect(row.packages[1].seller.code).toBe("K-s2");

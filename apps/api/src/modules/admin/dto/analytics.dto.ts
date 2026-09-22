@@ -117,6 +117,19 @@ export class UpdateOrderStatusDto {
   notes: string;
 }
 
+/** POST /admin/orders/:id/cancel — kargo öncesi platform iptali (tam iade). */
+export class AdminCancelOrderDto {
+  @ApiProperty({
+    description:
+      "İptal gerekçesi — denetim kaydına yazılır ve iptal e-postasında alıcıya/satıcıya iletilir",
+    maxLength: 500,
+  })
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(500)
+  reason: string;
+}
+
 export class AddOrderTrackingDto {
   @ApiProperty({ description: "Carrier tracking number", maxLength: 100 })
   @IsString()

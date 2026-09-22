@@ -343,6 +343,11 @@ export class AdminAnalyticsOrderService {
       },
       quantity: o.quantity ?? 1,
       unitPrice: o.unitPrice != null ? Number(o.unitPrice) : null,
+      // Siparişin KENDİ kargo satırı — panel kargo öncesi iptal uygunluğunu
+      // (preShipmentCancelBlocker) API ile aynı veriden hesaplar.
+      shipment: o.shipment
+        ? { status: o.shipment.status, shippedAt: o.shipment.shippedAt ?? null }
+        : null,
       finance: {
         subtotal: storedProductBaseOf(o),
         discountAmount: num(o.discountAmount),

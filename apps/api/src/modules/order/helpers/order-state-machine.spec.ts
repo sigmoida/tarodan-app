@@ -2,6 +2,7 @@ import { OrderStatus } from "@prisma/client";
 import {
   ORDER_TRANSITION_RULES,
   SHIPPABLE_ORDER_STATUSES,
+  isAdminOrderTransitionAllowed,
   isOrderTransitionAllowed,
 } from "./order-state-machine";
 
@@ -74,6 +75,29 @@ describe("sipariş durum grafiği — canlı kenar sözleşmesi", () => {
     expect(
       isOrderTransitionAllowed(OrderStatus.delivered, OrderStatus.cancelled),
     ).toBe(true);
+  });
+
+  it("admin iptali yalnız kargo öncesi statülerden cancelled üretir", () => {
+    const adminCancelSources = Object.entries(ORDER_TRANSITION_RULES)
+      .filter(([, rules]) =>
+        rules.some(
+          (rule) =>
+            rule.to === OrderStatus.cancelled && rule.allowedBy === "admin",
+        ),
+      )
+      .map(([from]) => from)
+      .sort();
+    expect(adminCancelSources).toEqual(
+      [OrderStatus.paid, OrderStatus.preparing].sort(),
+    );
+  });
+
+  it("genel admin statü setter'ı iptal üretmez — iptalin kendi komutu var", () => {
+    for (const from of [OrderStatus.paid, OrderStatus.preparing]) {
+      expect(isAdminOrderTransitionAllowed(from, OrderStatus.cancelled)).toBe(
+        false,
+      );
+    }
   });
 
   it("tabloda tanımsız bir hedefe geçiş yoktur (ör. teslimden kargoya dönüş)", () => {

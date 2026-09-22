@@ -72,6 +72,7 @@ import { WarehouseAddressModule } from "../shipping/warehouse/warehouse-address.
 import { AdminTradeQueryService } from "./trade/admin-trade-query.service";
 import { AdminOfferQueryService } from "./orders/admin-offer-query.service";
 import { AdminOfferService } from "./orders/admin-offer.service";
+import { AdminOrderCancelService } from "./orders/admin-order-cancel.service";
 import { AdminTradeWarehouseService } from "./trade/admin-trade-warehouse.service";
 import { AdminTradeResolutionService } from "./trade/admin-trade-resolution.service";
 import { AdminRefundService } from "./orders/admin-refund.service";
@@ -235,6 +236,7 @@ import { scheduledProcessors } from "../../workers/scheduled-processors";
     AdminTradeQueryService,
     AdminOfferQueryService,
     AdminOfferService,
+    AdminOrderCancelService,
     AdminTradeWarehouseService,
     AdminTradeResolutionService,
     AdminRefundService,

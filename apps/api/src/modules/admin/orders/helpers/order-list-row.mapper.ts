@@ -183,6 +183,7 @@ function packagesOf(
             trackingNumber:
               shipment.providerTrackingId ?? shipment.trackingNumber ?? null,
             status: shipment.status,
+            shippedAt: shipment.shippedAt?.toISOString() ?? null,
           }
         : null,
       invoices: packageInvoices(head.packageId, members, ctx),

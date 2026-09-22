@@ -1,6 +1,6 @@
 import { OrderStatus } from "@prisma/client";
 
-export type OrderTransitionActor = "buyer" | "seller" | "system";
+export type OrderTransitionActor = "buyer" | "seller" | "admin" | "system";
 
 export interface OrderTransitionRule {
   to: OrderStatus;
@@ -41,6 +41,9 @@ export const ORDER_TRANSITION_RULES: Record<
     // Kargo öncesi alıcı iptali (İPTAL tipi) — cancel() komutu üzerinden; tam
     // PSP iadesiyle birlikte processRefund siparişi cancelled yazar.
     { to: OrderStatus.cancelled, allowedBy: "buyer" },
+    // Admin "Siparişi iptal et" (POST /admin/orders/:id/cancel) — alıcı
+    // iptaliyle aynı çekirdek, kusur platformda.
+    { to: OrderStatus.cancelled, allowedBy: "admin" },
     { to: OrderStatus.cancelled, allowedBy: "system" },
   ],
   [OrderStatus.preparing]: [
@@ -50,8 +53,10 @@ export const ORDER_TRANSITION_RULES: Record<
     // ilerletir — taşıyıcı gerçeği kaybedilmez.
     { to: OrderStatus.delivered, allowedBy: "system" },
     { to: OrderStatus.awaiting_buyer_confirmation, allowedBy: "system" },
-    // Alıcı kargo öncesi iptali + "satıcı kargolamadı" zaman aşımı (cron).
+    // Alıcı kargo öncesi iptali + admin iptali + "satıcı kargolamadı" zaman
+    // aşımı (cron).
     { to: OrderStatus.cancelled, allowedBy: "buyer" },
+    { to: OrderStatus.cancelled, allowedBy: "admin" },
     { to: OrderStatus.cancelled, allowedBy: "system" },
   ],
   [OrderStatus.shipped]: [
@@ -140,7 +145,9 @@ export function isOrderTransitionAllowed(
 /**
  * The generic admin setter is deliberately narrow. Money-changing transitions
  * (cancel/refund/complete) have dedicated commands that run their stock, PSP,
- * ledger and invoice side effects. Shipping requires a tracking command.
+ * ledger and invoice side effects — admin cancel is
+ * `POST /admin/orders/:id/cancel` (AdminOrderCancelService). Shipping requires
+ * a tracking command.
  */
 export function isAdminOrderTransitionAllowed(
   from: OrderStatus,

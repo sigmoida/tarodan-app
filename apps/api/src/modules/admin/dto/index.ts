@@ -18,6 +18,7 @@ export {
   UserAnalyticsResponseDto,
   ReportQueryDto,
   UpdateOrderStatusDto,
+  AdminCancelOrderDto,
   AddOrderTrackingDto,
   DashboardStatsQueryDto,
   DashboardRangeConstraint,
