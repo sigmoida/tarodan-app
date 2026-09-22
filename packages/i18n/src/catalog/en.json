@@ -7224,7 +7224,13 @@
         "sellerImpactHint": "These lines are not part of the buyer refund; they hit the seller's payout deductions / escrow.",
         "chargeReturnToSeller": "Return shipping debt (to seller)",
         "chargeOutboundToSeller": "Outbound shipping debt (to seller)",
-        "sellerShippingCompensation": "Shipping share compensation (back to seller)"
+        "sellerShippingCompensation": "Shipping share compensation (back to seller)",
+        "kind": {
+          "label": "Type",
+          "all": "All types",
+          "cancellation": "Cancellation refund",
+          "return": "Product return"
+        }
       },
       "shipping": {
         "title": "Shipping Operations",
@@ -7343,6 +7349,105 @@
             "resolved": "Resolved",
             "dismissed": "Dismissed"
           }
+        }
+      },
+      "cancellations": {
+        "title": "Cancellations & Refunds",
+        "description": "Cancelled orders, offers and trades together with refund requests on one screen",
+        "views": {
+          "cancellations": "Cancellations",
+          "refunds": "Refunds"
+        },
+        "tabs": {
+          "all": "All Cancellations",
+          "directSale": "Direct Sale",
+          "offers": "Offers",
+          "trades": "Trades"
+        },
+        "buckets": {
+          "all": "All",
+          "new": "New",
+          "buyer": "Cancelled by Buyer",
+          "seller": "Cancelled by Seller",
+          "platform": "Cancelled by Tarodan"
+        },
+        "reason": {
+          "expired": "Expired"
+        },
+        "actor": {
+          "buyer": "Buyer",
+          "seller": "Seller",
+          "platform": "Tarodan (admin)",
+          "system": "Tarodan (automatic)",
+          "unknown": "Unknown"
+        },
+        "refundState": {
+          "notCharged": "Not charged",
+          "pending": "Refund pending",
+          "inReview": "Refund in review",
+          "refunded": "Refunded",
+          "failed": "Refund failed"
+        },
+        "columns": {
+          "orderInfo": "Order Info",
+          "buyer": "Buyer",
+          "seller": "Seller",
+          "products": "Details",
+          "unitPrice": "Unit Price",
+          "amountFees": "Amount / Commission",
+          "cancelledAt": "Cancelled At",
+          "reason": "Cancellation Reason",
+          "refundState": "Status"
+        },
+        "cells": {
+          "partial": "Partially cancelled · {cancelled}/{total} items",
+          "tradeBadge": "Trade",
+          "cancelledBy": "Cancelled by: {actor}",
+          "noDate": "No date recorded",
+          "tradeSide": "Product owner"
+        },
+        "status": {
+          "cancelled": "Cancelled",
+          "rejected": "Rejected",
+          "mixed": "Mixed"
+        },
+        "filters": {
+          "orderNumber": "Order No",
+          "cargoCode": "Cargo Code",
+          "groupNumber": "Group Code",
+          "party": "Buyer / Seller",
+          "partyPlaceholder": "Name, e-mail, user code or user ID",
+          "cancelledDate": "Cancellation date"
+        },
+        "resultCount": "Filter results: {count} cancellations in total",
+        "empty": "No cancellations yet",
+        "emptyFiltered": "No cancellations match the filter",
+        "export": {
+          "button": "Export to Excel",
+          "truncated": "The file only contains the first {count} rows — narrow the filter",
+          "sheetName": "Cancellations",
+          "rowNumber": "Row No",
+          "origin": "Type",
+          "originValue": {
+            "direct_sale": "Direct Sale",
+            "offer": "Offer",
+            "trade": "Trade"
+          },
+          "orderNumber": "Order No",
+          "orderDate": "Order Date",
+          "buyer": "Buyer",
+          "buyerCode": "Buyer Code",
+          "seller": "Seller",
+          "sellerCode": "Seller Code",
+          "product": "Product",
+          "productCode": "Product Code",
+          "quantity": "Quantity",
+          "unitPrice": "Unit Price",
+          "subtotal": "Subtotal",
+          "cancelledAt": "Cancelled At",
+          "cancelledBy": "Cancelled By",
+          "reason": "Cancellation Reason",
+          "refundState": "Refund Status"
         }
       }
     },
@@ -8724,6 +8829,11 @@
         "media": {
           "name": "Media",
           "description": "Bucket folders, files and ownership tracking."
+        },
+        "cancellationsRefunds": {
+          "name": "Cancellations & Refunds",
+          "description": "Review cancellations and resolve refund requests",
+          "keywords": "cancellation,refund,return,request,tracking,iptal,iade"
         }
       }
     },

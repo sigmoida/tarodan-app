@@ -7224,7 +7224,13 @@
         "sellerImpactHint": "Bu kalemler alıcı iadesine girmez; satıcının payout mahsubuna / escrow'una işlenir.",
         "chargeReturnToSeller": "Dönüş kargosu borcu (satıcıya)",
         "chargeOutboundToSeller": "Gidiş kargosu borcu (satıcıya)",
-        "sellerShippingCompensation": "Kargo payı tazmini (satıcıya iade)"
+        "sellerShippingCompensation": "Kargo payı tazmini (satıcıya iade)",
+        "kind": {
+          "label": "Tür",
+          "all": "Tüm türler",
+          "cancellation": "İptal iadesi",
+          "return": "Ürün iadesi"
+        }
       },
       "shipping": {
         "title": "Kargo İşlemleri",
@@ -7343,6 +7349,105 @@
             "resolved": "Tamamlandı",
             "dismissed": "Kapatıldı"
           }
+        }
+      },
+      "cancellations": {
+        "title": "İptal & İade",
+        "description": "İptal edilen siparişler, teklifler ve takaslar ile iade talepleri tek ekranda",
+        "views": {
+          "cancellations": "İptaller",
+          "refunds": "İadeler"
+        },
+        "tabs": {
+          "all": "Tüm İptaller",
+          "directSale": "Direkt Satış",
+          "offers": "Teklifler",
+          "trades": "Takaslar"
+        },
+        "buckets": {
+          "all": "Tümü",
+          "new": "Yeni",
+          "buyer": "Alıcının İptal Ettiği",
+          "seller": "Satıcının İptal Ettiği",
+          "platform": "Tarodan İptali"
+        },
+        "reason": {
+          "expired": "Süresi Dolan"
+        },
+        "actor": {
+          "buyer": "Alıcı",
+          "seller": "Satıcı",
+          "platform": "Tarodan (yönetici)",
+          "system": "Tarodan (otomatik)",
+          "unknown": "Bilinmiyor"
+        },
+        "refundState": {
+          "notCharged": "Tahsilat yok",
+          "pending": "İade bekliyor",
+          "inReview": "İade incelemede",
+          "refunded": "İade edildi",
+          "failed": "İade başarısız"
+        },
+        "columns": {
+          "orderInfo": "Sipariş Bilgileri",
+          "buyer": "Alıcı",
+          "seller": "Satıcı",
+          "products": "Bilgiler",
+          "unitPrice": "Birim Fiyat",
+          "amountFees": "Tutar / Komisyon",
+          "cancelledAt": "İptal Tarihi",
+          "reason": "İptal Nedeni",
+          "refundState": "Durum"
+        },
+        "cells": {
+          "partial": "Kısmi iptal · {cancelled}/{total} kalem",
+          "tradeBadge": "Takas",
+          "cancelledBy": "İptal eden: {actor}",
+          "noDate": "Tarih kaydı yok",
+          "tradeSide": "Ürün sahibi"
+        },
+        "status": {
+          "cancelled": "İptal edildi",
+          "rejected": "Reddedildi",
+          "mixed": "Karışık"
+        },
+        "filters": {
+          "orderNumber": "Sipariş No",
+          "cargoCode": "Kargo Kodu",
+          "groupNumber": "Grup Kodu",
+          "party": "Alıcı / Satıcı",
+          "partyPlaceholder": "Ad, e-posta, kullanıcı kodu ya da kullanıcı ID",
+          "cancelledDate": "İptal tarihi"
+        },
+        "resultCount": "Filtreleme sonuçları: toplam {count} iptal",
+        "empty": "Henüz iptal yok",
+        "emptyFiltered": "Filtreye uygun iptal bulunamadı",
+        "export": {
+          "button": "Excel'e aktar",
+          "truncated": "Dosya yalnız ilk {count} satırı içeriyor — filtreyi daraltın",
+          "sheetName": "İptaller",
+          "rowNumber": "Satır No",
+          "origin": "Tür",
+          "originValue": {
+            "direct_sale": "Direkt Satış",
+            "offer": "Teklif",
+            "trade": "Takas"
+          },
+          "orderNumber": "Sipariş No",
+          "orderDate": "Sipariş Tarihi",
+          "buyer": "Alıcı",
+          "buyerCode": "Alıcı Kodu",
+          "seller": "Satıcı",
+          "sellerCode": "Satıcı Kodu",
+          "product": "Ürün",
+          "productCode": "Ürün Kodu",
+          "quantity": "Adet",
+          "unitPrice": "Birim Fiyat",
+          "subtotal": "Ara Toplam",
+          "cancelledAt": "İptal Tarihi",
+          "cancelledBy": "İptal Eden",
+          "reason": "İptal Nedeni",
+          "refundState": "İade Durumu"
         }
       }
     },
@@ -8724,6 +8829,11 @@
         "media": {
           "name": "Medya",
           "description": "Bucket klasörleri, dosyalar ve sahiplik takibi."
+        },
+        "cancellationsRefunds": {
+          "name": "İptal & İade",
+          "description": "İptalleri ve iade taleplerini inceleyin ve sonuçlandırın",
+          "keywords": "iptal,iade,refund,cancellation,talep,takip"
         }
       }
     },
