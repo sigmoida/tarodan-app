@@ -37,6 +37,7 @@ function line(overrides: Partial<ListLine> = {}): ListLine {
     origin: "direct_sale",
     status: "paid",
     cancellationType: null,
+    cancelledBy: null,
     quantity: 2,
     unitPrice: D(50),
     subtotal: D(100),
@@ -229,6 +230,20 @@ describe("mapCartRow", () => {
       ctx(),
     );
     expect(row.packages[0].lines[0].hasActiveRefund).toBe(true);
+  });
+
+  it("carries who cancelled the line, and null while nobody did", () => {
+    const row = mapCartRow(
+      { kind: "group", id: "g1", number: "GRP-1", createdAt: NOW },
+      [
+        line({ id: "o1", status: "cancelled", cancelledBy: "seller" }),
+        line({ id: "o2" }),
+      ],
+      ctx(),
+    );
+    const lines = row.packages[0].lines;
+    expect(lines.find((l) => l.orderId === "o1")?.cancelledBy).toBe("seller");
+    expect(lines.find((l) => l.orderId === "o2")?.cancelledBy).toBeNull();
   });
 
   it("an offer order carries its offer and the frozen price difference", () => {

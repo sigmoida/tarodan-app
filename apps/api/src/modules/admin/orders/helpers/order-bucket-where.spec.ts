@@ -1,10 +1,12 @@
 import {
+  CancellationActor,
   OfferStatus,
   OrderOrigin,
   OrderStatus,
   ShipmentStatus,
 } from "@prisma/client";
 import {
+  CANCELLATION_ACTORS,
   OFFER_STATUSES,
   ORDER_ORIGINS,
   ORDER_LINE_STAGES,
@@ -31,6 +33,7 @@ describe("commerce status values mirror the Prisma enums", () => {
     ["ShipmentStatus", SHIPMENT_STATUSES, ShipmentStatus],
     ["OfferStatus", OFFER_STATUSES, OfferStatus],
     ["OrderOrigin", ORDER_ORIGINS, OrderOrigin],
+    ["CancellationActor", CANCELLATION_ACTORS, CancellationActor],
   ])("%s", (_name, shared, prismaEnum) => {
     expect([...shared].sort()).toEqual(Object.values(prismaEnum).sort());
   });

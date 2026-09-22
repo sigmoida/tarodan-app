@@ -57,3 +57,18 @@ export const ORDER_ORIGINS = [
 ] as const;
 
 export type OrderOriginValue = (typeof ORDER_ORIGINS)[number];
+
+/**
+ * Bir siparişi / takası KİMİN iptal ettiği — Prisma `CancellationActor` ile
+ * birebir. Takasta teklifi açan taraf `buyer`, ilan sahibi `seller` sayılır;
+ * `platform` yönetici kararı, `system` otomatik yoldur. Kolon null ise aktör
+ * bilinmiyor (bu değer eklenmeden önceki iptaller).
+ */
+export const CANCELLATION_ACTORS = [
+  "buyer",
+  "seller",
+  "platform",
+  "system",
+] as const;
+
+export type CancellationActorValue = (typeof CANCELLATION_ACTORS)[number];

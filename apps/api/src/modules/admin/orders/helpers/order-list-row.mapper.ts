@@ -116,6 +116,7 @@ function lineOf(order: ListOfferOrder, ctx: RowMapContext): AdminOrderLine {
     orderNumber: order.orderNumber,
     status: order.status,
     cancellationType: order.cancellationType ?? null,
+    cancelledBy: order.cancelledBy ?? null,
     quantity,
     unitPrice: money(unitPrice).toNumber(),
     subtotal: money(subtotal).toNumber(),
