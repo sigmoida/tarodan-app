@@ -17,6 +17,13 @@ import type { CancellationActorValue } from "./commerce-status";
  * kalemlerini taşır — kısmen iptal edilmiş bir sepette yalnız iptal kalemleri.
  */
 
+/** Ekranın adresi; üst sekme (`?view=cancellations|refunds`) sorguda yaşar. */
+export const ADMIN_CANCELLATIONS_REFUNDS_PATH =
+  "/operations/cancellations-refunds";
+
+/** İadeler sekmesi — eski `/operations/refund-requests` listesinin yeni yeri. */
+export const ADMIN_REFUNDS_VIEW_HREF = `${ADMIN_CANCELLATIONS_REFUNDS_PATH}?view=refunds`;
+
 export const ADMIN_CANCELLATION_TABS = [
   "all",
   "direct_sale",

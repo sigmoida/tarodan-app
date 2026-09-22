@@ -7030,8 +7030,6 @@
       "refundRequests": {
         "amountAndFee": "Tutar / Kesinti",
         "feeShort": "Kesinti",
-        "title": "İade Takibi",
-        "description": "Devam eden iadeler — otomatik akış izlenir; yalnız istisnai durumlarda admin müdahalesi gerekir",
         "loadError": "İade talepleri yüklenemedi",
         "emptyFiltered": "Bu filtrelerle eşleşen iade talebi yok.",
         "reason": "Sebep",
@@ -8656,11 +8654,6 @@
           "name": "Kargo",
           "description": "Gönderi, kargo etiketi ve takip işlemleri",
           "keywords": "kargo,shipping,gönderi,etiket,takip"
-        },
-        "refundRequests": {
-          "name": "İade Takibi",
-          "description": "Açık iade taleplerini inceleyin ve sonuçlandırın",
-          "keywords": "iade,refund,talep,takip"
         },
         "products": {
           "name": "Ürünler",

@@ -11,6 +11,20 @@ describe("routePermission", () => {
     expect(routePermission("/operations/orders")).toBe("orders");
   });
 
+  it("guards the cancellations & refunds screen and the refund-request file with the refund permission", () => {
+    expect(routePermission("/operations/cancellations-refunds")).toBe(
+      "refund_requests",
+    );
+    // Liste menüden çıktı, dosya yerinde: aynı izinle korunur.
+    expect(routePermission("/operations/refund-requests/rr-1")).toBe(
+      "refund_requests",
+    );
+    // Eski liste adresi yönlenmeden önce de korunur.
+    expect(routePermission("/operations/refund-requests")).toBe(
+      "refund_requests",
+    );
+  });
+
   it("matches a sub-path of a registered route (prefix match)", () => {
     expect(routePermission("/accounts/users/some-user-id")).toBe("users");
   });

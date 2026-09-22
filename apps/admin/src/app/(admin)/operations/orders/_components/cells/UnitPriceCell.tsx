@@ -9,7 +9,11 @@ import { PriceDiffCell } from "./PriceDiffCell";
  * tutarıdır; yanına ilan fiyatı ve farkı konur. Siparişe dönmemiş teklifte
  * yalnız fark bloğu vardır.
  */
-export function UnitPriceCell({ row }: { row: AdminOrderListRow }) {
+export function UnitPriceCell({
+  row,
+}: {
+  row: Pick<AdminOrderListRow, "packages" | "offer">;
+}) {
   const t = useTranslations();
   const offer = row.offer;
 

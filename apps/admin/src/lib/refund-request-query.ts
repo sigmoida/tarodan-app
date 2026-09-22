@@ -51,6 +51,7 @@ export function fetchRefundRequests(
   };
   if (params.search) apiParams.userSearch = params.search;
   if (params.status) apiParams.status = [params.status];
+  if (params.kind) apiParams.kind = params.kind;
   if (params.from) apiParams.from = params.from;
   if (params.to) apiParams.to = params.to;
   if (params.sortBy) apiParams.sortBy = params.sortBy;

@@ -1,3 +1,5 @@
+import { ADMIN_REFUNDS_VIEW_HREF } from "./admin-cancellations";
+
 /**
  * Admin dashboard period filter — the contract shared by the API endpoint
  * (`GET /admin/dashboard`), its DTO and the admin dashboard screen.
@@ -216,8 +218,9 @@ export const DASHBOARD_QUEUE_PARTS: Record<
  */
 export const DASHBOARD_QUEUE_PART_LINKS: Record<DashboardQueuePartKey, string> =
   {
-    refundsPendingReview: "/operations/refund-requests",
-    refundsDisputed: "/operations/refund-requests",
+    // İadeler sekmesi, kuyruğun kendi durumuyla süzülmüş.
+    refundsPendingReview: `${ADMIN_REFUNDS_VIEW_HREF}&status=pending_review`,
+    refundsDisputed: `${ADMIN_REFUNDS_VIEW_HREF}&status=disputed`,
     tradesAtWarehouse: "/operations/trades",
     tradeDisputesOpen: "/operations/trades",
     tradeRefundFailures: "/operations/trades",
@@ -240,7 +243,7 @@ export const DASHBOARD_QUEUE_PART_LINKS: Record<DashboardQueuePartKey, string> =
 
 /** The tile's own link — the screen that clears most of it. */
 export const DASHBOARD_QUEUE_LINKS: Record<DashboardQueueKey, string> = {
-  refundRequests: "/operations/refund-requests",
+  refundRequests: ADMIN_REFUNDS_VIEW_HREF,
   tradeOperations: "/operations/trades",
   listingModeration: "/catalog/products",
   sellerApplications: "/accounts/seller-applications",

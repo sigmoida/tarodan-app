@@ -7030,8 +7030,6 @@
       "refundRequests": {
         "amountAndFee": "Amount / Fee",
         "feeShort": "Fee reversed",
-        "title": "Refund Tracking",
-        "description": "Ongoing refunds — the automatic flow is monitored; admin intervention is only needed in exceptional cases",
         "loadError": "Failed to load refund requests",
         "emptyFiltered": "No refund requests match these filters.",
         "reason": "Reason",
@@ -8656,11 +8654,6 @@
           "name": "Shipping",
           "description": "Shipment, shipping label, and tracking operations",
           "keywords": "shipping,cargo,shipment,label,tracking"
-        },
-        "refundRequests": {
-          "name": "Refund Tracking",
-          "description": "Review and resolve open refund requests",
-          "keywords": "refund,return,request,tracking"
         },
         "products": {
           "name": "Products",

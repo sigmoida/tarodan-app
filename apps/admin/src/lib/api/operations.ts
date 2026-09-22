@@ -1,4 +1,5 @@
 import type {
+  AdminCancellationCounts,
   AdminOrderCancelPreview,
   AdminOrderCancelResult,
   AdminOrderCounts,
@@ -34,6 +35,16 @@ export const operationsApi = {
   /** Kargo öncesi platform iptali (sipariş / sepet kalemi başına, tam iade). */
   cancelOrder: (id: string, reason: string) =>
     api.post<AdminOrderCancelResult>(`/admin/orders/${id}/cancel`, { reason }),
+
+  // Cancellations (İptal & İade → İptaller; izin: refund_requests)
+  getCancellations: (params?: Record<string, unknown>) =>
+    api.get("/admin/cancellations", { params }),
+  /** Every cancellations tab's sub-tab counts in one call, honoring the filters. */
+  getCancellationCounts: (params?: Record<string, string>) =>
+    api.get<AdminCancellationCounts>("/admin/cancellations/counts", { params }),
+  /** The current filter as an XLSX file (one row per cancelled line). */
+  exportCancellations: (params?: Record<string, unknown>) =>
+    api.get("/admin/cancellations/export", { params, responseType: "blob" }),
 
   // Offers (Teklifler — /operations/offers; izin: orders)
   getOffers: (params?: any) => api.get("/admin/offers", { params }),

@@ -25,7 +25,15 @@ function FeeLine({
  * Sepetin tutarı ve platformun iki kesintisi: satış komisyonu ve platform
  * kesintisi (alıcı + satıcı tarafı toplamı), ürün ara toplamına oranlarıyla.
  */
-export function CommissionCell({ row }: { row: AdminOrderListRow }) {
+export function CommissionCell({
+  row,
+}: {
+  // `kind` geniş: İptaller satırı "trade" de olabilir; teklif satırının
+  // kesintisi yoktur.
+  row: Pick<AdminOrderListRow, "totalAmount" | "subtotal" | "fees"> & {
+    kind: string;
+  };
+}) {
   const t = useTranslations();
   return (
     <div className="flex flex-col items-start gap-0.5 leading-tight">
