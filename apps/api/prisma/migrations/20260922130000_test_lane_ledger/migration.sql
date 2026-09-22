@@ -1,5 +1,5 @@
 -- Test şeridi damgası: ledger satırları bağlı ödeme/sipariş/takastan türetilir
--- (bkz. 20260908100000_production_test_lane). Finans mutabakatı is_test=false süzer.
+-- (bkz. 20260922120000_production_test_lane). Finans mutabakatı is_test=false süzer.
 
 ALTER TABLE "ledger_entries" ADD COLUMN "is_test" BOOLEAN NOT NULL DEFAULT false;
 CREATE INDEX "ledger_entries_is_test_idx" ON "ledger_entries"("is_test");

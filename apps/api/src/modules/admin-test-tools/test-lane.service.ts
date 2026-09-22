@@ -194,7 +194,7 @@ export class TestLaneService {
         });
         // İade kalemleri/kargo mahsupları için dar tahliye kapısı: yalnız BU
         // transaction boyunca ve yalnız siparişi is_test olan satırlar silinebilir
-        // (bkz. 20260916130000_test_lane_purge_gate).
+        // (bkz. 20260922150000_test_lane_purge_gate).
         await tx.$executeRawUnsafe(`SET LOCAL app.test_lane_purge = 'on'`);
         count(
           "refundAttempts",

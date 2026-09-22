@@ -57,7 +57,7 @@ satırları DB trigger'ıyla `is_test` damgası alır; uygulama kodu bayrağı u
 app.test_lane_purge = 'on'` demiş olacak (yalnız `resetLane` transaction'ı
     verir, commit/rollback'te düşer) **ve** satırın iade talebinin siparişi
     `is_test=true` olacak. Canlı satırda ikinci koşul asla sağlanmaz; UPDATE her
-    koşulda yasaktır (`20260916130000_test_lane_purge_gate`).
+    koşulda yasaktır (`20260922150000_test_lane_purge_gate`).
 - **Guard:** prod'da test-modu PayTR callback'i yalnız `Payment.isTest=true`
   ödemeler için kabul edilir; canlı ödemeye gelen `test_mode=1` başarı bildirimi
   ve test ödemesine gelen `test_mode=0` başarı bildirimi reddedilir

@@ -1,6 +1,6 @@
 -- Ledger şerit damgasının kapsamını genişletir.
 --
--- 20260908110000_test_lane_ledger yalnız payment_id / order_id / trade_id'ye
+-- 20260922130000_test_lane_ledger yalnız payment_id / order_id / trade_id'ye
 -- bakıyordu. Yalnız hold_id ya da payout_id taşıyan satırlar (ör. payout
 -- settle ve seller_debt_recovery adjustment kayıtları: hold'suz siparişte
 -- orderId null kalabilir) is_test=false damgalanıyor, böylece hem finans
