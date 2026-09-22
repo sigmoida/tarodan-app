@@ -986,6 +986,10 @@ model Trade {
   /// bu yüzden analitik "iptal" çıkışını `rejectedAt IS NULL` ile ayırır —
   /// yoksa aynı takas iki çıkışta birden sayılırdı.
   rejectedAt                DateTime?          @map("rejected_at")
+  /// İptali / reddi KİMİN yaptığı (initiator = buyer, receiver = seller; bkz.
+  /// CancellationActor). `tradeCancelledData` / `tradeRejectedData` yazar.
+  /// null = bilinmiyor (göç öncesi, aktörü kesin olmayan iptaller).
+  cancelledBy               CancellationActor? @map("cancelled_by")
   cancelReason              String?            @map("cancel_reason")
   // Stamped when the first to_warehouse shipment is delivered. Once non-null,
   // user-side cancel is locked: only admin reject/force-cancel can resolve.
@@ -1023,6 +1027,8 @@ model Trade {
   @@index([createdAt])
   @@index([acceptedAt])
   @@index([rejectedAt])
+  // İptal & İade ekranı: sekme = aktör, sıra/"Yeni" = iptal anı.
+  @@index([cancelledBy, cancelledAt])
   @@map("trades")
 }
 
@@ -1685,6 +1691,11 @@ model Order {
   /// stok tükenmesi kaskadı, checkout temizliği, tam iade) bu damgayı yazar.
   /// GERİYE DÖNÜK DOLDURULAMAZ — eski iptallerde null kalır.
   cancelledAt                DateTime?                @map("cancelled_at")
+  /// İptali KİMİN yaptığı — `cancelledAt` ile aynı yardımcıdan
+  /// (`orderCancelledData`) yazılır, unutulamaz. null = bilinmiyor: bu göçten
+  /// önceki iptaller yalnız aktörün KESİN olduğu kurallarla dolduruldu.
+  /// Yeniden ödemeye açılan (reactivate) siparişte temizlenir.
+  cancelledBy                CancellationActor?       @map("cancelled_by")
   preparingDeadline          DateTime?                @map("preparing_deadline")
   preparingWarningSentAt     DateTime?                @map("preparing_warning_sent_at")
   reservationReleasedAt      DateTime?                @map("reservation_released_at")
@@ -1733,6 +1744,8 @@ model Order {
   // Dashboard dönem metrikleri olay damgalarından okunur (status + createdAt
   // değil); üçü de aralık taraması yapar.
   @@index([cancelledAt])
+  // İptal & İade ekranı: sekme = aktör, sıra/"Yeni" = iptal anı.
+  @@index([cancelledBy, cancelledAt])
   @@index([deliveredAt])
   @@index([preparingDeadline])
   @@index([createdAt])
@@ -3492,6 +3505,23 @@ enum OrderOrigin {
 enum OrderCancellationType {
   iptal
   iade
+}
+
+/// Bir siparişi / takası KİMİN iptal ettiği. Serbest metin `cancelReason`
+/// bunu söyleyemiyordu: admin "İptal & İade" ekranı iptalleri aktöre göre
+/// ayırır (alıcı / satıcı / Tarodan).
+/// - buyer / seller: kullanıcının kendi eylemi. Takasta teklifi AÇAN taraf
+///   (initiator) `buyer`, ilan sahibi (receiver) `seller` sayılır — ret yalnız
+///   receiver'ın elindedir.
+/// - platform: bir yöneticinin kararı (admin iptali, ban, depo reddi, zorla iptal).
+/// - system: otomatik yol (süre dolumu, stok kaskadı, ödeme hatası, kayıp koli).
+///   Süre dolumu ayrıca `cancelReason` sabitinden tanınır (bkz.
+///   ORDER_EXPIRY_CANCEL_REASONS / TRADE_EXPIRY_CANCEL_REASONS).
+enum CancellationActor {
+  buyer
+  seller
+  platform
+  system
 }
 
 enum PaymentStatus {
