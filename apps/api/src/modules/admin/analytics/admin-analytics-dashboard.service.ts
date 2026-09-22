@@ -22,9 +22,12 @@ import { AdminAnalyticsCommonService } from "./admin-analytics-common.service";
 import { CacheService } from "../../cache/cache.service";
 import {
   resolveDashboardRange,
+  resolveThisMonthWindow,
+  resolveYesterdayWindow,
   type DashboardDateWindow,
   type ResolvedDashboardRange,
 } from "./dashboard-period.helper";
+import { trCalendarDate } from "../../../common/helpers/tr-calendar";
 import {
   ledgerNetRevenue,
   type LedgerNetSums,
@@ -75,12 +78,6 @@ const sumFields = (
 };
 
 const roundMetric = (value: number): number => Math.round(value * 100) / 100;
-
-/** Seçili dönem ile bir önceki eşit pencere arasındaki yüzde değişim. */
-const changePercent = (current: number, previous: number): number => {
-  if (previous === 0) return current === 0 ? 0 : 100;
-  return roundMetric(((current - previous) / Math.abs(previous)) * 100);
-};
 
 /**
  * Bir olay damgası filtresi. Pencere yoksa "damga var" koşuluna düşer; böylece
@@ -184,11 +181,16 @@ const paidPackageWhere = (
  */
 @Injectable()
 export class AdminAnalyticsDashboardService {
-  /** Dönem özeti: 5 dk. Anahtar, ölçülen pencereyi birebir taşır. */
+  /**
+   * Seçili dönem (filtreyle değişen pencere): 5 dk. Anahtar, ölçülen
+   * pencereyi birebir taşır. "Bu ay" (bkz. aşağı) de büyümeye devam ettiği
+   * için aynı TTL'i paylaşır.
+   */
   static readonly PERIOD_CACHE_TTL_SECONDS = 5 * 60;
   /**
    * Tamamen GEÇMİŞTE kalan özel aralık bir daha değişmez (yeni satır o
-   * pencereye düşemez), bu yüzden çok daha uzun tutulabilir.
+   * pencereye düşemez), bu yüzden çok daha uzun tutulabilir. "Dün" + "tüm
+   * zamanlar" sabit üçlüsü de aynı süreyi paylaşır (bkz. aşağı).
    */
   static readonly CLOSED_RANGE_CACHE_TTL_SECONDS = 6 * 60 * 60;
 
@@ -203,27 +205,109 @@ export class AdminAnalyticsDashboardService {
   /**
    * Zone C — "Dönem özeti" (dashboard'un TEK tarih filtreli bölgesi).
    *
-   * Her metrik TEK yerde tanımlanır ({@link metricDefinitions}); seçilen dönem,
-   * ondan önceki eşit uzunluktaki pencere (trend için) ve tüm zamanlar aynı
-   * tanımdan, aynı `$transaction` içinde okunur. Böylece "dönem" ile "tüm
-   * zamanlar" arasında sessiz bir formül ayrışması olamaz.
+   * Her metrik TEK yerde tanımlanır ({@link metricDefinitions}). Her kart DÖRT
+   * rakam gösterir: filtrenin değiştirdiği TEK sayı (`period`) + filtreden
+   * TAMAMEN bağımsız üç sabit değer (`yesterday`, `thisMonth`, `allTime`).
+   * Dördü de aynı tanımdan okunur — "dönem" ile "tüm zamanlar" arasında sessiz
+   * bir formül ayrışması olamaz — ama İKİ AYRI önbellekte tutulur (bkz.
+   * {@link getPeriodMetrics}, {@link getClosedFixedMetrics},
+   * {@link getThisMonthMetrics}): filtreyi değiştirmek sabit üçlüyü yeniden
+   * hesaplatmaz.
    *
    * Ölçüm OLAY damgalarından yapılır (ödeme anı, teslim anı, iptal anı, iade
-   * anı, hak ediş anı) — `status + createdAt` değil.
+   * anı, hak ediş anı) — `status + createdAt` değil. Her tarih sınırı Türkiye
+   * takvimine göre çözülür (bkz. `dashboard-period.helper.ts`).
    */
   async getDashboardStats(
     query?: DashboardPeriodQuery,
   ): Promise<DashboardStatsResponse> {
     const now = new Date();
     const range = resolveDashboardRange(query, now);
-    const { key, ttl } = this.periodCacheKey(range, now);
 
-    return this.cache.getOrSet(key, () => this.computeStats(range), { ttl });
+    const [period, closed, thisMonth] = await Promise.all([
+      this.getPeriodMetrics(range, now),
+      this.getClosedFixedMetrics(now),
+      this.getThisMonthMetrics(now),
+    ]);
+
+    const metrics = {} as Record<DashboardMetricKey, DashboardMetric>;
+    DASHBOARD_METRIC_KEYS.forEach((key) => {
+      metrics[key] = {
+        period: period[key],
+        yesterday: closed[key].yesterday,
+        thisMonth: thisMonth[key],
+        allTime: closed[key].allTime,
+      };
+    });
+
+    return {
+      range: {
+        type: range.type,
+        from: range.current.gte.toISOString(),
+        to: range.current.lte.toISOString(),
+      },
+      metrics,
+    };
   }
 
-  /** Dönem özetinin önbelleğini düşürür (ekrandaki "yenile"). */
+  /**
+   * Dönem özetinin önbelleğini düşürür (ekrandaki "yenile") — seçili dönemin
+   * önbelleğini VE sabit üçlünün önbelleğini birlikte temizler; biri
+   * unutulursa "yenile" yarım iş yapmış olur.
+   */
   async invalidatePeriodCache(): Promise<void> {
-    await this.cache.delPattern("admin:dashboard:period:*");
+    await Promise.all([
+      this.cache.delPattern("admin:dashboard:period:*"),
+      this.cache.delPattern("admin:dashboard:fixed:*"),
+    ]);
+  }
+
+  /** Seçili dönem — filtre değiştikçe okunan TEK pencere, TEK `$transaction`. */
+  private async getPeriodMetrics(
+    range: ResolvedDashboardRange,
+    now: Date,
+  ): Promise<Record<DashboardMetricKey, number>> {
+    const { key, ttl } = this.periodCacheKey(range, now);
+    return this.cache.getOrSet(key, () => this.computeWindow(range.current), {
+      ttl,
+    });
+  }
+
+  /**
+   * "Dün" + "tüm zamanlar" — filtreden TAMAMEN bağımsız, Türkiye gününe göre
+   * anahtarlanır. İkisi de fiilen kapanmış sayılır (dün asla değişmez, tüm
+   * zamanlar günün geri kalanında sadece büyür ama ekranda hafif bayat kalması
+   * kabul edilebilir), bu yüzden uzun TTL'i paylaşırlar ve TEK `$transaction`
+   * içinde okunurlar.
+   */
+  private async getClosedFixedMetrics(
+    now: Date,
+  ): Promise<
+    Record<DashboardMetricKey, { yesterday: number; allTime: number }>
+  > {
+    const key = `admin:dashboard:fixed:v1:closed:${trCalendarDate(now)}`;
+    return this.cache.getOrSet(key, () => this.computeClosedFixed(now), {
+      ttl: AdminAnalyticsDashboardService.CLOSED_RANGE_CACHE_TTL_SECONDS,
+    });
+  }
+
+  /**
+   * "Bu ay" — filtreden bağımsız ama üst sınırı "şimdi" olduğundan gün
+   * boyunca büyümeye devam eder; seçili dönemle AYNI kısa TTL'i ve aynı
+   * zaman-kovası anahtarlama tekniğini kullanır (aksi halde her istek yeni
+   * anahtar üretir ve önbellek hiç tutmazdı).
+   */
+  private async getThisMonthMetrics(
+    now: Date,
+  ): Promise<Record<DashboardMetricKey, number>> {
+    const ttl = AdminAnalyticsDashboardService.PERIOD_CACHE_TTL_SECONDS;
+    const bucket = Math.floor(now.getTime() / (ttl * 1000));
+    const key = `admin:dashboard:fixed:v1:month:${trCalendarDate(now)}:${bucket}`;
+    return this.cache.getOrSet(
+      key,
+      () => this.computeWindow(resolveThisMonthWindow(now)),
+      { ttl },
+    );
   }
 
   /**
@@ -242,9 +326,10 @@ export class AdminAnalyticsDashboardService {
 
     if (closed) {
       return {
-        // v2: yeni finans metrikleriyle yanıt şekli değişti — eski anahtarın
+        // v3: dönem sözleşmesi "önceki dönem" trendini (previous/changePercent)
+        // kaybetti, sabit Dün/Bu ay üçlüsü eklendi — eski anahtarın
         // önbelleğinde eski şekilli bir satır kalmasın diye sürüm arttı.
-        key: `admin:dashboard:period:v2:custom:${from}:${range.current.lte.toISOString()}`,
+        key: `admin:dashboard:period:v3:custom:${from}:${range.current.lte.toISOString()}`,
         ttl: AdminAnalyticsDashboardService.CLOSED_RANGE_CACHE_TTL_SECONDS,
       };
     }
@@ -252,20 +337,38 @@ export class AdminAnalyticsDashboardService {
     const ttl = AdminAnalyticsDashboardService.PERIOD_CACHE_TTL_SECONDS;
     const bucket = Math.floor(now.getTime() / (ttl * 1000));
     return {
-      key: `admin:dashboard:period:v2:${range.type}:${from}:${bucket}`,
+      key: `admin:dashboard:period:v3:${range.type}:${from}:${bucket}`,
       ttl,
     };
   }
 
-  private async computeStats(
-    range: ResolvedDashboardRange,
-  ): Promise<DashboardStatsResponse> {
+  /** Bir pencereyi TEK `$transaction` içinde her metrik tanımından okur. */
+  private async computeWindow(
+    window: DashboardDateWindow | undefined,
+  ): Promise<Record<DashboardMetricKey, number>> {
     const definitions = this.metricDefinitions();
+    const rows = await this.prisma.$transaction(
+      DASHBOARD_METRIC_KEYS.map((key) => definitions[key].query(window)),
+    );
 
+    const result = {} as Record<DashboardMetricKey, number>;
+    DASHBOARD_METRIC_KEYS.forEach((key, index) => {
+      const toValue = definitions[key].toValue ?? countValue;
+      result[key] = roundMetric(toValue(rows[index]));
+    });
+    return result;
+  }
+
+  /** "Dün" + "tüm zamanlar", İKİ pencere TEK `$transaction` içinde. */
+  private async computeClosedFixed(
+    now: Date,
+  ): Promise<
+    Record<DashboardMetricKey, { yesterday: number; allTime: number }>
+  > {
+    const definitions = this.metricDefinitions();
     // `undefined` pencere = tarih filtresi yok = tüm zamanlar.
     const windows: Array<DashboardDateWindow | undefined> = [
-      range.current,
-      range.previous,
+      resolveYesterdayWindow(now),
       undefined,
     ];
 
@@ -275,30 +378,19 @@ export class AdminAnalyticsDashboardService {
       ),
     );
 
-    const metrics = {} as Record<DashboardMetricKey, DashboardMetric>;
+    const result = {} as Record<
+      DashboardMetricKey,
+      { yesterday: number; allTime: number }
+    >;
     DASHBOARD_METRIC_KEYS.forEach((key, index) => {
       const toValue = definitions[key].toValue ?? countValue;
       const offset = index * windows.length;
-      const period = roundMetric(toValue(rows[offset]));
-      const previous = roundMetric(toValue(rows[offset + 1]));
-      const allTime = roundMetric(toValue(rows[offset + 2]));
-
-      metrics[key] = {
-        period,
-        previous,
-        allTime,
-        changePercent: changePercent(period, previous),
+      result[key] = {
+        yesterday: roundMetric(toValue(rows[offset])),
+        allTime: roundMetric(toValue(rows[offset + 1])),
       };
     });
-
-    return {
-      range: {
-        type: range.type,
-        from: range.current.gte.toISOString(),
-        to: range.current.lte.toISOString(),
-      },
-      metrics,
-    };
+    return result;
   }
 
   /**

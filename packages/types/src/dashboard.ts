@@ -4,9 +4,11 @@ import { ADMIN_REFUNDS_VIEW_HREF } from "./admin-cancellations";
  * Admin dashboard period filter — the contract shared by the API endpoint
  * (`GET /admin/dashboard`), its DTO and the admin dashboard screen.
  *
- * One period selection drives every stat card: the card's headline number is
- * the selected period, and the all-time figure is always returned alongside it
- * so the card can show both without a second request.
+ * One period selection drives every stat card, but it only ever changes ONE
+ * number on the card: the headline (`DashboardMetric.period`). Three more
+ * figures — dün, bu ay, tüm zamanlar — are always returned alongside it, and
+ * they never move with the filter, so the card can show all four without a
+ * second request.
  */
 
 export const DASHBOARD_PERIODS = ["daily", "monthly", "custom"] as const;
@@ -69,16 +71,20 @@ export interface DashboardPeriodRange {
 }
 
 /**
- * One metric, measured three ways from a single definition:
- * the selected period, the preceding window of equal length (for the trend),
- * and the all-time figure.
+ * One metric, measured four ways from a single definition. `period` is the
+ * ONLY figure the period filter changes; `yesterday`, `thisMonth` and
+ * `allTime` are fixed and identical no matter what the filter is set to —
+ * there is no period-over-period trend (removed: a % next to a headline that
+ * also shows three fixed comparisons was one comparison too many).
  */
 export interface DashboardMetric {
   period: number;
-  previous: number;
+  /** The full calendar day before today (Europe/Istanbul), fixed. */
+  yesterday: number;
+  /** The 1st of the current month (Europe/Istanbul) through now, fixed. */
+  thisMonth: number;
+  /** Fixed. */
   allTime: number;
-  /** `period` vs `previous`, in percent. */
-  changePercent: number;
 }
 
 /**

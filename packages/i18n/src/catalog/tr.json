@@ -7545,7 +7545,8 @@
         "newListings": "Yeni ilan",
         "signedInUsers": "Giriş yapan kullanıcı",
         "cancelledFromMigration": "Yalnız yeni iptaller sayılır (eski kayıtlarda iptal anı tutulmuyordu)",
-        "feeSplitIncomplete": "Eski siparişlerde kalem kırılımı tutulmadığından bu sayı geçmiş dönemlerde eksik görünebilir (bkz. Net platform geliri kartı)"
+        "feeSplitIncomplete": "Eski siparişlerde kalem kırılımı tutulmadığından bu sayı geçmiş dönemlerde eksik görünebilir (bkz. Net platform geliri kartı)",
+        "signedInSingleStamp": "Bir kullanıcının yalnız SON girişi tutulur; birden çok pencerede aktifse yalnız sonrakinde sayılır"
       },
       "stock": {
         "escrowBalance": "Escrow bakiyesi",
@@ -7568,8 +7569,9 @@
         "custom": "Tarih aralığı",
         "from": "Başlangıç tarihi",
         "to": "Bitiş tarihi",
+        "yesterday": "Dün",
+        "thisMonth": "Bu ay",
         "allTime": "Tüm zamanlar",
-        "vsPrevious": "önceki döneme göre",
         "rangeIncomplete": "Başlangıç ve bitiş tarihi seçin",
         "rangeUnparseable": "Geçerli bir tarih seçin",
         "rangeReversed": "Başlangıç tarihi bitiş tarihinden sonra olamaz"

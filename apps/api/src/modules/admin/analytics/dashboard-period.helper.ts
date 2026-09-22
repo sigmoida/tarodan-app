@@ -8,6 +8,13 @@ import {
 } from "@tarodan/types";
 import type { MessageKey } from "@tarodan/i18n";
 import { i18nMessage } from "../../i18n";
+import {
+  istanbulDayEnd,
+  istanbulDayStart,
+  istanbulDayStartOf,
+  istanbulYesterdayWindow,
+  trMonthStart,
+} from "../../../common/helpers/tr-calendar";
 
 /** Shared range rule → the catalog key the API answers with. */
 const RANGE_ISSUE_KEY: Record<DashboardRangeIssue, MessageKey> = {
@@ -23,36 +30,28 @@ export interface DashboardDateWindow {
 }
 
 /**
- * The window the dashboard measures, plus the preceding window of equal length
- * used for the trend. One resolution for every metric — no metric computes its
- * own dates.
+ * The window the dashboard measures. One resolution for every metric — no
+ * metric computes its own dates.
+ *
+ * Every boundary is Türkiye calendar, not server-local: `apps/api` runs in
+ * UTC in production, so a server-local "today" starts three hours early
+ * (00:00 UTC = 03:00 Istanbul) and a server-local month can flip a day late.
+ * See `common/helpers/tr-calendar.ts`.
  */
 export interface ResolvedDashboardRange {
   type: DashboardPeriod;
   current: DashboardDateWindow;
-  previous: DashboardDateWindow;
 }
-
-const startOfDay = (date: Date) =>
-  new Date(date.getFullYear(), date.getMonth(), date.getDate());
-
-const endOfDay = (date: Date) =>
-  new Date(
-    date.getFullYear(),
-    date.getMonth(),
-    date.getDate(),
-    23,
-    59,
-    59,
-    999,
-  );
 
 /**
  * The window of the same length that ends where `current` begins.
  *
- * Exported because the analytics screen's "compare with previous period"
- * answers the SAME question as the dashboard's trend; a second copy of this
- * arithmetic is how two screens start disagreeing about last month.
+ * Exported for the analytics screen's "compare with previous period" — the
+ * dashboard's own period filter no longer has a trend (product decision: a
+ * period-over-period % next to a headline that also shows Dün/Bu ay/Tüm
+ * zamanlar was one comparison too many), but the analytics screen still
+ * answers the same "window before this one" question and must not grow a
+ * second copy of this arithmetic.
  */
 export function previousWindow(
   current: DashboardDateWindow,
@@ -65,11 +64,33 @@ export function previousWindow(
 }
 
 /**
- * Resolve the query into concrete windows.
+ * Dünün (Türkiye takvimi) TAM günü — the fixed "Dün" figure every stat card
+ * shows regardless of the period filter.
+ */
+export function resolveYesterdayWindow(
+  now: Date = new Date(),
+): DashboardDateWindow {
+  return istanbulYesterdayWindow(now);
+}
+
+/**
+ * Ayın Türkiye takvimindeki ilk gününden şimdiye kadar — the fixed "Bu ay"
+ * figure. Unlike "Dün" this keeps growing through the day, so its cache entry
+ * needs the same short TTL the live period gets (see the service).
+ */
+export function resolveThisMonthWindow(
+  now: Date = new Date(),
+): DashboardDateWindow {
+  return { gte: trMonthStart(now), lte: now };
+}
+
+/**
+ * Resolve the query into the concrete window the dashboard measures.
  *
- * - `daily` → today, midnight → now
- * - `monthly` → the 1st of the current month, midnight → now
- * - `custom` → `from` 00:00 → `to` 23:59:59.999 (both inclusive)
+ * - `daily` → today (Türkiye takvimi), midnight → now
+ * - `monthly` → the 1st of the current month (Türkiye takvimi), midnight → now
+ * - `custom` → `from` 00:00 → `to` 23:59:59.999, both Türkiye takvimi, both
+ *   inclusive
  */
 export function resolveDashboardRange(
   query: DashboardPeriodQuery | undefined,
@@ -85,20 +106,16 @@ export function resolveDashboardRange(
   const to = query?.to;
 
   if (type === "custom" && from && to) {
-    const current = {
-      gte: startOfDay(new Date(from)),
-      lte: endOfDay(new Date(to)),
+    return {
+      type,
+      current: { gte: istanbulDayStart(from), lte: istanbulDayEnd(to) },
     };
-    return { type, current, previous: previousWindow(current) };
   }
 
-  const current: DashboardDateWindow = {
-    gte:
-      type === "monthly"
-        ? new Date(now.getFullYear(), now.getMonth(), 1)
-        : startOfDay(now),
-    lte: now,
-  };
+  const current: DashboardDateWindow =
+    type === "monthly"
+      ? { gte: trMonthStart(now), lte: now }
+      : { gte: istanbulDayStartOf(now), lte: now };
 
-  return { type, current, previous: previousWindow(current) };
+  return { type, current };
 }

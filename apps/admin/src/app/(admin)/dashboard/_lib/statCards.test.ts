@@ -66,4 +66,15 @@ describe("STAT_CARDS", () => {
       }
     });
   });
+
+  it("never carries a trend flag — there is no period-over-period comparison", () => {
+    STAT_CARDS.forEach((card) => {
+      expect(card).not.toHaveProperty("hideChange");
+    });
+  });
+
+  it("flags the single-activity-stamp caveat on signedInUsers", () => {
+    const card = STAT_CARDS.find((c) => c.metric === "signedInUsers");
+    expect(card?.noteKey).toBe("admin.dashboard.stats.signedInSingleStamp");
+  });
 });

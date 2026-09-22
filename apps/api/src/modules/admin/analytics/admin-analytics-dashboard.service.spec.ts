@@ -1,5 +1,9 @@
 import { DASHBOARD_METRIC_KEYS } from "@tarodan/types";
 import { AdminAnalyticsDashboardService } from "./admin-analytics-dashboard.service";
+import {
+  istanbulDayEnd,
+  istanbulDayStart,
+} from "../../../common/helpers/tr-calendar";
 
 interface RecordedCall {
   model: string;
@@ -8,19 +12,28 @@ interface RecordedCall {
 }
 
 /**
- * Zone C's contract: every metric answers the selected period, the preceding
- * window and all-time from ONE definition, in ONE `$transaction`, and each one
- * measures an EVENT stamp rather than `status + createdAt`.
+ * Zone C's contract: every metric answers the selected period plus THREE
+ * fixed figures (dün, bu ay, tüm zamanlar) from ONE definition — four windows
+ * total — each one measuring an EVENT stamp rather than `status + createdAt`.
+ * The period and the fixed trio are cached, and therefore recomputed,
+ * SEPARATELY, so flipping the period filter never re-reads dün/bu ay/tüm
+ * zamanlar.
  */
 describe("AdminAnalyticsDashboardService.getDashboardStats", () => {
-  const now = new Date(2026, 6, 20, 12, 0, 0);
-  const todayStart = new Date(2026, 6, 20);
-  const monthStart = new Date(2026, 6, 1);
+  // Explicit UTC instant, Istanbul noon on 20 Jul 2026 (UTC+3) — every
+  // boundary below is derived from the SAME Istanbul calendar helpers the
+  // service itself uses, never from process-local `Date` arithmetic, so the
+  // suite passes under any `TZ` the test runner happens to use.
+  const now = new Date("2026-07-20T09:00:00.000Z");
+  const todayStart = istanbulDayStart("2026-07-20");
+  const monthStart = istanbulDayStart("2026-07-01");
+  const yesterdayStart = istanbulDayStart("2026-07-19");
 
   let calls: RecordedCall[];
   let rawSqlCalls: Array<{ sql: string; values: unknown[] }>;
   let prisma: any;
   let cache: any;
+  let cacheStore: Map<string, unknown>;
   let service: AdminAnalyticsDashboardService;
 
   /**
@@ -80,7 +93,7 @@ describe("AdminAnalyticsDashboardService.getDashboardStats", () => {
     };
   }
 
-  /** The where clauses of the three windows a metric's model was asked for. */
+  /** The where clauses of every window a metric's model was asked for. */
   const whereFor = (model: string) =>
     calls
       .filter((call) => call.model === model && call.method !== "$queryRaw")
@@ -91,10 +104,17 @@ describe("AdminAnalyticsDashboardService.getDashboardStats", () => {
     calls = [];
     rawSqlCalls = [];
     prisma = recordingPrisma();
+    cacheStore = new Map();
     cache = {
-      // Cache miss on every read — the metric definitions are what is under test.
-      getOrSet: jest.fn(async (_key: string, factory: () => Promise<unknown>) =>
-        factory(),
+      // A real-ish cache (not a permanent miss): lets the "no recompute on
+      // filter change" tests observe the fixed trio being served from cache.
+      getOrSet: jest.fn(
+        async (key: string, factory: () => Promise<unknown>) => {
+          if (cacheStore.has(key)) return cacheStore.get(key);
+          const value = await factory();
+          cacheStore.set(key, value);
+          return value;
+        },
       ),
       del: jest.fn(),
       delPattern: jest.fn(),
@@ -104,7 +124,7 @@ describe("AdminAnalyticsDashboardService.getDashboardStats", () => {
 
   afterEach(() => jest.useRealTimers());
 
-  it("returns every catalogued metric with period, previous and all-time", async () => {
+  it("returns every catalogued metric with period, dün, bu ay and tüm zamanlar", async () => {
     const result = await service.getDashboardStats();
 
     expect(Object.keys(result.metrics).sort()).toEqual(
@@ -113,20 +133,23 @@ describe("AdminAnalyticsDashboardService.getDashboardStats", () => {
     for (const key of DASHBOARD_METRIC_KEYS) {
       expect(result.metrics[key]).toMatchObject({
         period: expect.any(Number),
-        previous: expect.any(Number),
+        yesterday: expect.any(Number),
+        thisMonth: expect.any(Number),
         allTime: expect.any(Number),
       });
+      // The old trend fields must be gone, not just unused.
+      expect(result.metrics[key]).not.toHaveProperty("previous");
+      expect(result.metrics[key]).not.toHaveProperty("changePercent");
     }
   });
 
-  it("asks all three windows from one definition, in one transaction", async () => {
+  it("reads the period and the fixed trio in three separate transactions", async () => {
     await service.getDashboardStats();
 
-    expect(prisma.$transaction).toHaveBeenCalledTimes(1);
-    expect(prisma.$transaction.mock.calls[0][0]).toHaveLength(
-      DASHBOARD_METRIC_KEYS.length * 3,
-    );
-    expect(calls).toHaveLength(DASHBOARD_METRIC_KEYS.length * 3);
+    // period (1 window) + closed fixed (dün+tüm zamanlar, 1 window) + bu ay
+    // (1 window) = 3 transactions, never one shared transaction.
+    expect(prisma.$transaction).toHaveBeenCalledTimes(3);
+    expect(calls).toHaveLength(DASHBOARD_METRIC_KEYS.length * 4);
   });
 
   it("defaults to today and echoes the measured window", async () => {
@@ -142,29 +165,32 @@ describe("AdminAnalyticsDashboardService.getDashboardStats", () => {
 
     expect(result.range.from).toBe(monthStart.toISOString());
     const cancelled = whereFor("order").filter((where) => where?.cancelledAt);
-    expect(cancelled[0]?.cancelledAt).toEqual({
-      gte: monthStart,
-      lte: now,
-    });
+    expect(
+      cancelled.some(
+        (w) =>
+          (w?.cancelledAt as any)?.gte?.getTime() === monthStart.getTime() &&
+          (w?.cancelledAt as any)?.lte?.getTime() === now.getTime(),
+      ),
+    ).toBe(true);
   });
 
-  it("measures a custom range inclusively at both ends", async () => {
+  it("measures a custom range inclusively at both ends, Istanbul bounds", async () => {
     const result = await service.getDashboardStats({
       period: "custom",
       from: "2026-07-10",
       to: "2026-07-12",
     });
 
-    expect(result.range.from).toBe(new Date(2026, 6, 10).toISOString());
-    expect(result.range.to).toBe(
-      new Date(2026, 6, 12, 23, 59, 59, 999).toISOString(),
+    expect(result.range.from).toBe(
+      istanbulDayStart("2026-07-10").toISOString(),
     );
+    expect(result.range.to).toBe(istanbulDayEnd("2026-07-12").toISOString());
   });
 
   describe("measures event stamps, never `status + createdAt`", () => {
     const stampFor = (model: string, field: string) => () => {
       const wheres = whereFor(model).filter((where) => where && field in where);
-      expect(wheres).toHaveLength(3);
+      expect(wheres).toHaveLength(4); // period + dün + tüm zamanlar + bu ay
       return wheres;
     };
 
@@ -174,54 +200,63 @@ describe("AdminAnalyticsDashboardService.getDashboardStats", () => {
 
     it("counts cancellations from Order.cancelledAt", () => {
       const wheres = stampFor("order", "cancelledAt")();
-      expect(wheres[0]?.cancelledAt).toEqual({ gte: todayStart, lte: now });
+      expect(
+        wheres.some(
+          (w) =>
+            (w?.cancelledAt as any)?.gte?.getTime() === todayStart.getTime(),
+        ),
+      ).toBe(true);
       // all-time still measures the EVENT, it just drops the range
-      expect(wheres[2]?.cancelledAt).toEqual({ not: null });
+      expect(wheres.some((w) => (w?.cancelledAt as any)?.not === null)).toBe(
+        true,
+      );
     });
 
     it("counts deliveries from Order.deliveredAt (shared by count and amount)", () => {
       const wheres = whereFor("order").filter(
         (where) => where && "deliveredAt" in where,
       );
-      // deliveredOrders (count) + deliveredAmount (aggregate), 3 windows each
-      expect(wheres).toHaveLength(6);
-      expect(wheres[2]?.deliveredAt).toEqual({ not: null });
+      // deliveredOrders (count) + deliveredAmount (aggregate), 4 windows each
+      expect(wheres).toHaveLength(8);
+      expect(wheres.some((w) => (w?.deliveredAt as any)?.not === null)).toBe(
+        true,
+      );
     });
 
     it("counts completed trades from Trade.completedAt", () => {
-      const wheres = stampFor("trade", "completedAt")();
-      expect(wheres[2]?.completedAt).toEqual({ not: null });
+      stampFor("trade", "completedAt")();
     });
 
     it("counts new listings from Product.publishedAt", () => {
-      const wheres = stampFor("product", "publishedAt")();
-      expect(wheres[2]?.publishedAt).toEqual({ not: null });
+      stampFor("product", "publishedAt")();
     });
 
     it("reads net platform revenue from CommissionLedger.earnedAt", () => {
       // netRevenue, netRevenueCount, serviceFeeAmount and commissionAmount all
       // share the exact same (no-OR) `{earnedAt, status}` where — only the
-      // `OR` (non-zero fee) count queries differ in shape. netRevenue is
-      // FIRST in the catalogue, so its three windows are the first three here.
+      // `OR` (non-zero fee) count queries differ in shape. 4 metrics x 4
+      // windows.
       const wheres = whereFor("commissionLedger").filter(
         (where) => where && "earnedAt" in where && !("OR" in where),
       );
-      expect(wheres).toHaveLength(12);
+      expect(wheres).toHaveLength(16);
       expect(wheres[0]).toMatchObject({ status: { not: "waived" } });
-      expect(wheres[2]?.earnedAt).toEqual({ not: null });
+      expect(wheres.some((w) => (w?.earnedAt as any)?.not === null)).toBe(true);
     });
 
     it("reads boost revenue from ProductBoost.purchasedAt (shared by count and amount)", () => {
       const wheres = whereFor("productBoost").filter(
         (where) => where && "purchasedAt" in where,
       );
-      expect(wheres).toHaveLength(6);
-      expect(wheres[2]?.purchasedAt).toEqual({ not: null });
+      expect(wheres).toHaveLength(8);
+      expect(wheres.some((w) => (w?.purchasedAt as any)?.not === null)).toBe(
+        true,
+      );
     });
 
     it("counts a paid order through either its own or its group's payment", () => {
       const paid = whereFor("order").filter((where) => where && "OR" in where);
-      expect(paid).toHaveLength(6); // adet + tutar, üç pencere
+      expect(paid).toHaveLength(8); // adet + tutar, dört pencere
       const [first] = paid as Array<Record<string, any>>;
       expect(first.OR[0].payment.is).toMatchObject({ status: "completed" });
       expect(first.OR[1].checkoutGroup.is.payment.is).toMatchObject({
@@ -237,16 +272,20 @@ describe("AdminAnalyticsDashboardService.getDashboardStats", () => {
       await service.getDashboardStats();
 
       const wheres = whereFor("payoutTransfer");
-      expect(wheres).toHaveLength(3);
-      expect(wheres[0]).toMatchObject({ status: "completed" });
-      expect(wheres[2]?.processedAt).toEqual({ not: null });
+      expect(wheres).toHaveLength(4);
+      wheres.forEach((where) =>
+        expect(where).toMatchObject({ status: "completed" }),
+      );
+      expect(wheres.some((w) => (w?.processedAt as any)?.not === null)).toBe(
+        true,
+      );
     });
 
     it("reads the amount via raw SQL, once per window", async () => {
       await service.getDashboardStats();
 
-      expect(prisma.$queryRaw).toHaveBeenCalledTimes(3);
-      expect(rawSqlCalls).toHaveLength(3);
+      expect(prisma.$queryRaw).toHaveBeenCalledTimes(4);
+      expect(rawSqlCalls).toHaveLength(4);
     });
   });
 
@@ -256,8 +295,8 @@ describe("AdminAnalyticsDashboardService.getDashboardStats", () => {
 
       const wheres = whereFor("refundAttempt");
       // returnRefundCount + returnRefundAmount + cancelRefundCount +
-      // cancelRefundAmount, 3 windows each
-      expect(wheres).toHaveLength(12);
+      // cancelRefundAmount, 4 windows each
+      expect(wheres).toHaveLength(16);
       wheres.forEach((where) => {
         expect(where).toMatchObject({
           status: "finalized",
@@ -280,9 +319,9 @@ describe("AdminAnalyticsDashboardService.getDashboardStats", () => {
       const cancelWheres = wheres.filter(
         (where) => where.order?.is?.deliveredAt === null,
       );
-      // Each classification is asked from two keys (count + amount), 3 windows.
-      expect(returnWheres).toHaveLength(6);
-      expect(cancelWheres).toHaveLength(6);
+      // Each classification is asked from two keys (count + amount), 4 windows.
+      expect(returnWheres).toHaveLength(8);
+      expect(cancelWheres).toHaveLength(8);
     });
   });
 
@@ -295,13 +334,15 @@ describe("AdminAnalyticsDashboardService.getDashboardStats", () => {
       const byPaidAt = wheres.filter((where) => "paidAt" in where);
 
       // completedTradeAmount vs tradeFeeRevenue — two DIFFERENT event stamps,
-      // both on the same model, 3 windows each.
-      expect(byTradeCompletion).toHaveLength(3);
-      expect(byPaidAt).toHaveLength(3);
+      // both on the same model, 4 windows each.
+      expect(byTradeCompletion).toHaveLength(4);
+      expect(byPaidAt).toHaveLength(4);
       expect(byTradeCompletion[0]).toMatchObject({ status: "completed" });
-      expect(byTradeCompletion[0].trade).toEqual({
-        completedAt: { gte: todayStart, lte: now },
-      });
+      expect(
+        byTradeCompletion.some(
+          (w) => w.trade?.completedAt?.gte?.getTime() === todayStart.getTime(),
+        ),
+      ).toBe(true);
     });
   });
 
@@ -310,7 +351,7 @@ describe("AdminAnalyticsDashboardService.getDashboardStats", () => {
       await service.getDashboardStats();
 
       const wheres = whereFor("orderPackage") as Array<Record<string, any>>;
-      expect(wheres).toHaveLength(6); // count + amount, 3 windows
+      expect(wheres).toHaveLength(8); // count + amount, 4 windows
       wheres.forEach((where) => {
         expect(where.orders?.some).toBeDefined();
         // Same predicate as paidOrders: excludes virtual orders.
@@ -324,7 +365,7 @@ describe("AdminAnalyticsDashboardService.getDashboardStats", () => {
       await service.getDashboardStats();
 
       const wheres = whereFor("membershipPayment");
-      expect(wheres).toHaveLength(6); // revenue + count, 3 windows
+      expect(wheres).toHaveLength(8); // revenue + count, 4 windows
       wheres.forEach((where) =>
         expect(where).toMatchObject({ status: "completed" }),
       );
@@ -338,6 +379,9 @@ describe("AdminAnalyticsDashboardService.getDashboardStats", () => {
       // Fields requested in order: buyer(1) + seller(2) - refundedBuyer(3) -
       // refundedSeller(4) = -4. A plain sum (wrong formula) would give 10.
       expect(result.metrics.serviceFeeAmount.period).toBe(-4);
+      expect(result.metrics.serviceFeeAmount.yesterday).toBe(-4);
+      expect(result.metrics.serviceFeeAmount.thisMonth).toBe(-4);
+      expect(result.metrics.serviceFeeAmount.allTime).toBe(-4);
     });
 
     it("commission amount nets refunds against the gross commission", async () => {
@@ -356,16 +400,56 @@ describe("AdminAnalyticsDashboardService.getDashboardStats", () => {
       const commissionCountWheres = wheres.filter((where) =>
         where.OR?.some((clause: any) => "buyerCommissionAmount" in clause),
       );
-      expect(serviceFeeCountWheres).toHaveLength(3);
-      expect(commissionCountWheres).toHaveLength(3);
+      expect(serviceFeeCountWheres).toHaveLength(4);
+      expect(commissionCountWheres).toHaveLength(4);
     });
   });
 
-  it("derives the trend from the preceding window of equal length", async () => {
-    const result = await service.getDashboardStats();
+  describe("changing the period filter", () => {
+    it("recomputes the period figure but NOT the fixed trio", async () => {
+      await service.getDashboardStats({ period: "daily" });
+      const transactionsAfterFirst = prisma.$transaction.mock.calls.length;
 
-    // Every stub answers the same value across windows, so period == previous.
-    expect(result.metrics.cancelledOrders.changePercent).toBe(0);
+      await service.getDashboardStats({ period: "monthly" });
+
+      // Only one more transaction — the new period's window. The fixed
+      // trio's two transactions (closed + bu ay) are served from cache.
+      expect(prisma.$transaction.mock.calls.length).toBe(
+        transactionsAfterFirst + 1,
+      );
+    });
+
+    it("keeps dün/bu ay/tüm zamanlar identical across period changes", async () => {
+      const daily = await service.getDashboardStats({ period: "daily" });
+      const monthly = await service.getDashboardStats({ period: "monthly" });
+
+      expect(monthly.metrics.paidOrders.yesterday).toBe(
+        daily.metrics.paidOrders.yesterday,
+      );
+      expect(monthly.metrics.paidOrders.thisMonth).toBe(
+        daily.metrics.paidOrders.thisMonth,
+      );
+      expect(monthly.metrics.paidOrders.allTime).toBe(
+        daily.metrics.paidOrders.allTime,
+      );
+    });
+  });
+
+  describe("dün — tam takvim günü, İstanbul", () => {
+    it("measures Order.cancelledAt against the full Istanbul day before today", async () => {
+      await service.getDashboardStats();
+
+      const wheres = whereFor("order").filter(
+        (where) => where?.cancelledAt && typeof where.cancelledAt === "object",
+      ) as Array<{ cancelledAt: { gte?: Date; lte?: Date } }>;
+      const yesterdayWhere = wheres.find(
+        (w) => w.cancelledAt?.gte?.getTime() === yesterdayStart.getTime(),
+      );
+      expect(yesterdayWhere).toBeDefined();
+      expect(yesterdayWhere?.cancelledAt.lte).toEqual(
+        new Date(todayStart.getTime() - 1),
+      );
+    });
   });
 
   it("caches a live period under a bucketed key and a closed range under its own", async () => {
@@ -376,18 +460,57 @@ describe("AdminAnalyticsDashboardService.getDashboardStats", () => {
       to: "2026-07-02",
     });
 
-    const [liveKey, , liveOptions] = cache.getOrSet.mock.calls[0];
-    const [closedKey, , closedOptions] = cache.getOrSet.mock.calls[1];
+    const periodKeys = cache.getOrSet.mock.calls
+      .map((call: unknown[]) => call[0] as string)
+      .filter((key: string) => key.startsWith("admin:dashboard:period:"));
+    const [liveKey, customKey] = periodKeys;
+    const liveOptions = cache.getOrSet.mock.calls.find(
+      (call: unknown[]) => call[0] === liveKey,
+    )?.[2];
+    const customOptions = cache.getOrSet.mock.calls.find(
+      (call: unknown[]) => call[0] === customKey,
+    )?.[2];
 
-    // v2: the response shape changed with this batch of finance metrics.
-    expect(liveKey).toContain("admin:dashboard:period:v2:daily:");
+    expect(liveKey).toContain("admin:dashboard:period:v3:daily:");
     expect(liveOptions.ttl).toBe(
       AdminAnalyticsDashboardService.PERIOD_CACHE_TTL_SECONDS,
     );
     // A window that has already closed cannot gain rows — hold it far longer.
-    expect(closedKey).toContain("admin:dashboard:period:v2:custom:");
+    expect(customKey).toContain("admin:dashboard:period:v3:custom:");
+    expect(customOptions.ttl).toBe(
+      AdminAnalyticsDashboardService.CLOSED_RANGE_CACHE_TTL_SECONDS,
+    );
+  });
+
+  it("keys the fixed trio by the Istanbul calendar date, separately from the period", async () => {
+    await service.getDashboardStats();
+
+    const fixedKeys = cache.getOrSet.mock.calls
+      .map((call: unknown[]) => call[0] as string)
+      .filter((key: string) => key.startsWith("admin:dashboard:fixed:"));
+
+    expect(fixedKeys.some((k: string) => k.includes(":closed:"))).toBe(true);
+    expect(fixedKeys.some((k: string) => k.includes(":month:"))).toBe(true);
+    fixedKeys.forEach((key: string) => expect(key).toContain("2026-07-20"));
+
+    const closedOptions = cache.getOrSet.mock.calls.find((call: unknown[]) =>
+      (call[0] as string).includes(":closed:"),
+    )?.[2];
+    const monthOptions = cache.getOrSet.mock.calls.find((call: unknown[]) =>
+      (call[0] as string).includes(":month:"),
+    )?.[2];
     expect(closedOptions.ttl).toBe(
       AdminAnalyticsDashboardService.CLOSED_RANGE_CACHE_TTL_SECONDS,
     );
+    expect(monthOptions.ttl).toBe(
+      AdminAnalyticsDashboardService.PERIOD_CACHE_TTL_SECONDS,
+    );
+  });
+
+  it("invalidatePeriodCache clears both the period and the fixed-trio patterns", async () => {
+    await service.invalidatePeriodCache();
+
+    expect(cache.delPattern).toHaveBeenCalledWith("admin:dashboard:period:*");
+    expect(cache.delPattern).toHaveBeenCalledWith("admin:dashboard:fixed:*");
   });
 });

@@ -11,22 +11,22 @@ describe("toDashboardMetrics", () => {
     );
     expect(metrics.paidOrders).toEqual({
       period: 0,
-      previous: 0,
+      yesterday: 0,
+      thisMonth: 0,
       allTime: 0,
-      changePercent: 0,
     });
   });
 
-  it("keeps period and all-time apart", () => {
+  it("keeps period, yesterday, this month and all-time apart", () => {
     const metrics = toDashboardMetrics({
-      paidOrders: { period: 5, previous: 4, allTime: 300, changePercent: 25 },
+      paidOrders: { period: 5, yesterday: 2, thisMonth: 40, allTime: 300 },
     });
 
     expect(metrics.paidOrders).toEqual({
       period: 5,
-      previous: 4,
+      yesterday: 2,
+      thisMonth: 40,
       allTime: 300,
-      changePercent: 25,
     });
     // a metric the payload omitted still renders
     expect(metrics.signedInUsers.allTime).toBe(0);
@@ -34,11 +34,16 @@ describe("toDashboardMetrics", () => {
 
   it("coerces string figures (Decimal columns serialize as strings)", () => {
     const metrics = toDashboardMetrics({
-      paidAmount: { period: "1000.50", previous: "0", allTime: "90000" },
+      paidAmount: {
+        period: "1000.50",
+        yesterday: "0",
+        thisMonth: "500",
+        allTime: "90000",
+      },
     });
 
     expect(metrics.paidAmount.period).toBe(1000.5);
+    expect(metrics.paidAmount.thisMonth).toBe(500);
     expect(metrics.paidAmount.allTime).toBe(90000);
-    expect(metrics.paidAmount.changePercent).toBe(0);
   });
 });

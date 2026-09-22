@@ -27,16 +27,32 @@ import { TopSellersWidget } from "./_components/TopSellersWidget";
 /** Every metric at zero — what the cards read from while the period loads. */
 const EMPTY_METRICS = toDashboardMetrics(undefined);
 
-/** Zone C, with its own heading so the period filter's reach is unambiguous. */
-function PeriodZone({ selection }: { selection: DashboardPeriodSelection }) {
+/**
+ * Zone C, with its own heading — the filter sits ON that heading's row
+ * (right-aligned) rather than in the page header, so its reach is
+ * unambiguous: it touches this section and nothing else on the page.
+ */
+function PeriodZone({
+  selection,
+  onSelectionChange,
+}: {
+  selection: DashboardPeriodSelection;
+  onSelectionChange: (next: DashboardPeriodSelection) => void;
+}) {
   const t = useTranslations();
   const stats = useDashboardStats(selection);
 
   return (
     <section className="flex flex-col gap-3">
-      <h2 className="text-lg font-semibold text-heading">
-        {t("admin.dashboard.zones.period")}
-      </h2>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h2 className="text-lg font-semibold text-heading">
+          {t("admin.dashboard.zones.period")}
+        </h2>
+        <DashboardPeriodFilter
+          selection={selection}
+          onChange={onSelectionChange}
+        />
+      </div>
       <DashboardStats
         metrics={stats.data?.metrics ?? EMPTY_METRICS}
         isLoading={stats.isLoading}
@@ -60,13 +76,7 @@ export default function DashboardPage() {
         title={t("admin.dashboard.title")}
         description={t("admin.dashboard.description")}
       >
-        <div className="flex flex-wrap items-center gap-2">
-          <DashboardRefreshButton />
-          <DashboardPeriodFilter
-            selection={selection}
-            onChange={setSelection}
-          />
-        </div>
+        <DashboardRefreshButton />
       </PageHeader>
 
       {/* Zone A + B — never date-filtered, and they paint first. */}
@@ -77,7 +87,7 @@ export default function DashboardPage() {
       />
       <AlertsZone alerts={worklist.data?.alerts ?? []} />
 
-      <PeriodZone selection={selection} />
+      <PeriodZone selection={selection} onSelectionChange={setSelection} />
 
       <StockZone stock={stock.data} isLoading={stock.isLoading} />
 
