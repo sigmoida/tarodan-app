@@ -1,5 +1,9 @@
 import {
   TR_TIME_ZONE,
+  istanbulDayEnd,
+  istanbulDayStart,
+  istanbulDayStartOf,
+  istanbulYesterdayWindow,
   trCalendarDate,
   trCalendarTime,
   trCalendarYear,
@@ -58,5 +62,25 @@ describe("Türkiye takvimi", () => {
     const at = new Date("2026-01-02T00:00:00.000Z");
     expect(trCalendarDate(at)).toMatch(/^\d{4}-\d{2}-\d{2}$/);
     expect(trCalendarTime(at)).toMatch(/^\d{2}:\d{2}:\d{2}$/);
+  });
+
+  it("günün bitişi 23:59:59.999 İstanbul'dur", () => {
+    expect(istanbulDayEnd("2026-07-20").toISOString()).toBe(
+      "2026-07-20T20:59:59.999Z",
+    );
+  });
+
+  it("bir anın düştüğü Türkiye gününün başlangıcını verir", () => {
+    // 2026-07-20T22:30Z = 21 Temmuz 01:30 İstanbul → 21 Temmuz günü.
+    const at = new Date("2026-07-20T22:30:00.000Z");
+    expect(istanbulDayStartOf(at)).toEqual(istanbulDayStart("2026-07-21"));
+  });
+
+  it("dünün tam gününü verir — sunucu UTC koşarken bile", () => {
+    // Yine 21 Temmuz 01:30 İstanbul: "dün" 20 Temmuz'dur, tam gün.
+    const at = new Date("2026-07-20T22:30:00.000Z");
+    const window = istanbulYesterdayWindow(at);
+    expect(window.gte).toEqual(istanbulDayStart("2026-07-20"));
+    expect(window.lte).toEqual(istanbulDayEnd("2026-07-20"));
   });
 });
