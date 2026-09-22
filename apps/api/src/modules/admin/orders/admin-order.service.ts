@@ -39,6 +39,7 @@ import {
   mapOfferRow,
   type RowMapContext,
 } from "./helpers/order-list-row.mapper";
+import { resolveProductImageUrl } from "./helpers/product-image-url";
 
 /** Sepet sekmelerinde birleşik sıralamanın okuduğu alanlar. */
 interface CartHeadRow {
@@ -350,35 +351,11 @@ export class AdminOrderService {
     return {
       now,
       invoicesBySource,
-      imageUrl: (key) => this.resolveProductImageUrl(key),
+      imageUrl: (key) =>
+        resolveProductImageUrl(key, (k) =>
+          this.storageService?.getPublicAssetUrl(k),
+        ),
     };
-  }
-
-  private resolveProductImageUrl(
-    imageKeyOrUrl: string | null | undefined,
-  ): string | null {
-    if (!imageKeyOrUrl) return null;
-    // Süresi dolmuş presigned S3 parametrelerini at → kalıcı genel URL.
-    if (
-      (imageKeyOrUrl.startsWith("http://") ||
-        imageKeyOrUrl.startsWith("https://")) &&
-      imageKeyOrUrl.includes("X-Amz-Signature")
-    ) {
-      try {
-        const parsed = new URL(imageKeyOrUrl);
-        parsed.search = "";
-        return parsed.toString();
-      } catch {
-        // fall through
-      }
-    }
-    if (
-      imageKeyOrUrl.startsWith("http://") ||
-      imageKeyOrUrl.startsWith("https://") ||
-      imageKeyOrUrl.startsWith("/")
-    )
-      return imageKeyOrUrl;
-    return this.storageService?.getPublicAssetUrl(imageKeyOrUrl) ?? null;
   }
 }
 
