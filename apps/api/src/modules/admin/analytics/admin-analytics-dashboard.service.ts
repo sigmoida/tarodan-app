@@ -9,6 +9,7 @@ import {
   Prisma,
   ProductKind,
   ProductStatus,
+  RefundAttemptStatus,
 } from "@prisma/client";
 import {
   DASHBOARD_METRIC_KEYS,
@@ -29,6 +30,10 @@ import {
   type LedgerNetSums,
 } from "../../commission/ledger-net";
 import { paidOrderWhere } from "./paid-order.predicate";
+import {
+  completedPayoutAmountSql,
+  completedPayoutWhere,
+} from "./completed-payout.predicate";
 
 type LedgerAggregate = { _sum: LedgerNetSums };
 
@@ -54,6 +59,21 @@ const sumOf =
     return fields.reduce((total, field) => total + Number(sums[field] ?? 0), 0);
   };
 
+/**
+ * `aggregate` sonucundaki `_sum` alanlarını AYRI AYRI sayıya çevirir — brüt −
+ * iade edilen gibi işaretli birleşimler `sumOf` gibi düz toplamla ifade
+ * edilemediğinde (7 ve 8 numaralı kartlar) kullanılır.
+ */
+const sumFields = (
+  raw: unknown,
+  fields: readonly string[],
+): Record<string, number> => {
+  const sums = (raw as { _sum: Record<string, unknown> })?._sum ?? {};
+  return Object.fromEntries(
+    fields.map((field) => [field, Number(sums[field] ?? 0)]),
+  );
+};
+
 const roundMetric = (value: number): number => Math.round(value * 100) / 100;
 
 /** Seçili dönem ile bir önceki eşit pencere arasındaki yüzde değişim. */
@@ -69,6 +89,92 @@ const changePercent = (current: number, previous: number): number => {
 const stamped = (
   window: DashboardDateWindow | undefined,
 ): DashboardDateWindow | { not: null } => window ?? { not: null };
+
+/** Teslim edilmiş siparişlerin ortak yüklemi — adet ve tutar aynı satırları okur. */
+const deliveredOrderWhere = (
+  window: DashboardDateWindow | undefined,
+): Prisma.OrderWhereInput => ({ deliveredAt: stamped(window) });
+
+/** Tamamlanmış üyelik ödemesinin ortak yüklemi — gelir ve adet aynı satırları okur. */
+const membershipPaymentWhere = (
+  window: DashboardDateWindow | undefined,
+): Prisma.MembershipPaymentWhereInput => ({
+  status: PaymentStatus.completed,
+  createdAt: window,
+});
+
+/** Geçerli (başarısız olmayan) öne çıkarmanın ortak yüklemi. */
+const boostWhere = (
+  window: DashboardDateWindow | undefined,
+): Prisma.ProductBoostWhereInput => ({
+  purchasedAt: stamped(window),
+  status: { not: BoostStatus.failed },
+});
+
+/**
+ * Hak ediş defteri satırlarının ortak yüklemi (feragat edilmemiş, hak ediş
+ * ANI pencerede) — net gelir, net gelir adedi, hizmet bedeli ve komisyon
+ * kartlarının HEPSİ aynı satır kümesini okur.
+ */
+const ledgerEarnedWhere = (
+  window: DashboardDateWindow | undefined,
+): Prisma.CommissionLedgerWhereInput => ({
+  earnedAt: stamped(window),
+  status: { not: CommissionLedgerStatus.waived },
+});
+
+/**
+ * Hizmet bedeli/komisyon ADEDİ, kırılımı SIFIR OLMAYAN satırları sayar —
+ * `componentBreakdownComplete = false` eski satırlarda bu alanlar 0'dır,
+ * yani eski dönemler bu kartlarda dürüstçe eksik görünür (bkz. noteKey).
+ */
+const serviceFeeCountWhere = (
+  window: DashboardDateWindow | undefined,
+): Prisma.CommissionLedgerWhereInput => ({
+  ...ledgerEarnedWhere(window),
+  OR: [
+    { buyerPlatformFeeAmount: { gt: 0 } },
+    { sellerPlatformFeeAmount: { gt: 0 } },
+  ],
+});
+
+const commissionCountWhere = (
+  window: DashboardDateWindow | undefined,
+): Prisma.CommissionLedgerWhereInput => ({
+  ...ledgerEarnedWhere(window),
+  OR: [
+    { buyerCommissionAmount: { gt: 0 } },
+    { sellerCommissionAmount: { gt: 0 } },
+  ],
+});
+
+/**
+ * Sonuçlanmış (finalized) iade denemeleri — TAKAS iadeleri hariç (`orderId`
+ * dolu satırlar). `delivered` ayrımı RefundAttempt'te kendi başına
+ * tutulmuyor: karar, siparişin TESLİM EDİLMİŞ olup olmamasından türetilir
+ * (teslim edilmişse İADE, edilmemişse İPTAL — 2026 karar).
+ */
+const finalizedOrderRefundWhere = (
+  window: DashboardDateWindow | undefined,
+  delivered: boolean,
+): Prisma.RefundAttemptWhereInput => ({
+  status: RefundAttemptStatus.finalized,
+  finalizedAt: stamped(window),
+  orderId: { not: null },
+  order: { is: { deliveredAt: delivered ? { not: null } : null } },
+});
+
+/**
+ * Ödenmiş kolinin yüklemi: kolinin EN AZ BİR siparişi pencerede ödenmiş
+ * olmalı (aynı `paidOrderWhere`, platform_service hariç). Koli bazında
+ * sayıldığı için birden çok siparişi olan bir koli tek sefer sayılır —
+ * `orders: { some: … }` `Order` değil `OrderPackage` satırlarını döner.
+ */
+const paidPackageWhere = (
+  window: DashboardDateWindow | undefined,
+): Prisma.OrderPackageWhereInput => ({
+  orders: { some: paidOrderWhere(window) },
+});
 
 /**
  * Analitik & dashboard grubu (dönem özeti, snapshot, satış/gelir/kullanıcı
@@ -136,7 +242,9 @@ export class AdminAnalyticsDashboardService {
 
     if (closed) {
       return {
-        key: `admin:dashboard:period:v1:custom:${from}:${range.current.lte.toISOString()}`,
+        // v2: yeni finans metrikleriyle yanıt şekli değişti — eski anahtarın
+        // önbelleğinde eski şekilli bir satır kalmasın diye sürüm arttı.
+        key: `admin:dashboard:period:v2:custom:${from}:${range.current.lte.toISOString()}`,
         ttl: AdminAnalyticsDashboardService.CLOSED_RANGE_CACHE_TTL_SECONDS,
       };
     }
@@ -144,7 +252,7 @@ export class AdminAnalyticsDashboardService {
     const ttl = AdminAnalyticsDashboardService.PERIOD_CACHE_TTL_SECONDS;
     const bucket = Math.floor(now.getTime() / (ttl * 1000));
     return {
-      key: `admin:dashboard:period:v1:${range.type}:${from}:${bucket}`,
+      key: `admin:dashboard:period:v2:${range.type}:${from}:${bucket}`,
       ttl,
     };
   }
@@ -215,58 +323,51 @@ export class AdminAnalyticsDashboardService {
           }),
         toValue: sumOf("totalAmount"),
       },
-      deliveredOrders: {
+      // Kullanıcılara ödenen hak ediş: satıcı escrow'u + takas nakit hak
+      // edişi AYNI tabloda (`PayoutTransfer`), tek yüklem ikisini kapsar.
+      sellerPayoutCount: {
         query: (window) =>
-          this.prisma.order.count({ where: { deliveredAt: stamped(window) } }),
-      },
-      netRevenue: {
-        query: (window) =>
-          this.prisma.commissionLedger.aggregate({
-            _sum: {
-              sellerCommission: true,
-              refundedSellerCommission: true,
-              buyerFee: true,
-              refundedBuyerFee: true,
-            },
-            where: {
-              // Hak ediş ANI — defter satırının açıldığı an değil.
-              earnedAt: stamped(window),
-              status: { not: CommissionLedgerStatus.waived },
-            },
+          this.prisma.payoutTransfer.count({
+            where: completedPayoutWhere(window),
           }),
-        // TEK formül (ledgerNetRevenue) — finans özetiyle aynı kaynak. Brüt
-        // `Order.commissionAmount` kartı KALDIRILDI: aynı ekranda bu sayıyla
-        // çelişen ikinci bir "komisyon geliri" gösteriyordu.
-        toValue: (raw) => ledgerNetRevenue((raw as LedgerAggregate)._sum),
       },
-      membershipRevenue: {
-        // MembershipPayment TEK kaynaktır. Üyelik siparişi (origin =
-        // platform_service) ödenen sipariş tutarından zaten dışlandığı için
-        // burada çifte sayım olmaz.
+      sellerPayoutAmount: {
+        // COALESCE(submittedAmount, netAmount) satır satır seçim gerektirir;
+        // Prisma `_sum` tek kolon topladığı için ham SQL (bkz. predicate).
         query: (window) =>
-          this.prisma.membershipPayment.aggregate({
+          this.prisma.$queryRaw<
+            Array<{ total: unknown }>
+          >`${completedPayoutAmountSql(window)}`,
+        toValue: (raw) =>
+          Number((raw as Array<{ total: unknown }>)[0]?.total ?? 0),
+      },
+      // Kullanıcılara ödenen İADE: teslim edilmiş siparişin finalize iadesi.
+      returnRefundCount: {
+        query: (window) =>
+          this.prisma.refundAttempt.count({
+            where: finalizedOrderRefundWhere(window, true),
+          }),
+      },
+      returnRefundAmount: {
+        query: (window) =>
+          this.prisma.refundAttempt.aggregate({
             _sum: { amount: true },
-            where: { status: PaymentStatus.completed, createdAt: window },
+            where: finalizedOrderRefundWhere(window, true),
           }),
         toValue: sumOf("amount"),
       },
-      boostRevenue: {
-        // `purchasedAt` aktivasyon anında damgalanır — satın alma olayı budur.
+      // Kullanıcılara ödenen İPTAL: teslim edilMEMİŞ siparişin finalize iadesi.
+      cancelRefundCount: {
         query: (window) =>
-          this.prisma.productBoost.aggregate({
-            _sum: { price: true },
-            where: {
-              purchasedAt: stamped(window),
-              status: { not: BoostStatus.failed },
-            },
+          this.prisma.refundAttempt.count({
+            where: finalizedOrderRefundWhere(window, false),
           }),
-        toValue: sumOf("price"),
       },
-      refundedAmount: {
+      cancelRefundAmount: {
         query: (window) =>
-          this.prisma.refundRequest.aggregate({
+          this.prisma.refundAttempt.aggregate({
             _sum: { amount: true },
-            where: { refundedAt: stamped(window) },
+            where: finalizedOrderRefundWhere(window, false),
           }),
         toValue: sumOf("amount"),
       },
@@ -279,6 +380,20 @@ export class AdminAnalyticsDashboardService {
       completedTrades: {
         query: (window) =>
           this.prisma.trade.count({ where: { completedAt: stamped(window) } }),
+      },
+      completedTradeAmount: {
+        // Takas ÜCRETİ değil, takasın kendisi için İKİ TARAFTAN toplam
+        // tahsil edilen nakit. `Trade.completedAt`e göre pencerelenir —
+        // ödemenin kendi `paidAt`i değil, takasın TAMAMLANMA anı.
+        query: (window) =>
+          this.prisma.tradeCashPayment.aggregate({
+            _sum: { totalAmount: true },
+            where: {
+              status: PaymentStatus.completed,
+              trade: { completedAt: stamped(window) },
+            },
+          }),
+        toValue: sumOf("totalAmount"),
       },
       tradeFeeRevenue: {
         // v2 sabit hizmet bedeli + v1'in yüzde bazlı komisyonu (KDV'siyle) —
@@ -294,6 +409,157 @@ export class AdminAnalyticsDashboardService {
             where: { paidAt: stamped(window) },
           }),
         toValue: sumOf("tradeFeeAmount", "commission", "commissionTaxAmount"),
+      },
+      netRevenue: {
+        query: (window) =>
+          this.prisma.commissionLedger.aggregate({
+            _sum: {
+              sellerCommission: true,
+              refundedSellerCommission: true,
+              buyerFee: true,
+              refundedBuyerFee: true,
+            },
+            where: ledgerEarnedWhere(window),
+          }),
+        // TEK formül (ledgerNetRevenue) — finans özetiyle aynı kaynak. Brüt
+        // `Order.commissionAmount` kartı KALDIRILDI: aynı ekranda bu sayıyla
+        // çelişen ikinci bir "komisyon geliri" gösteriyordu.
+        toValue: (raw) => ledgerNetRevenue((raw as LedgerAggregate)._sum),
+      },
+      netRevenueCount: {
+        query: (window) =>
+          this.prisma.commissionLedger.count({
+            where: ledgerEarnedWhere(window),
+          }),
+      },
+      // Tarodan hizmet bedelleri (alıcı + satıcı, iadeler düşülmüş). `sellerCommission`/
+      // `buyerFee` (yukarıdaki `netRevenue`) TÜM satırlarda dolu tutulan
+      // toplam kolonlardır; bu kart yalnız v2 kırılımını (component split)
+      // okur — `componentBreakdownComplete = false` eski satırlarda 0'dır,
+      // yani eski dönemler için 7+8 toplamı 6'ya (netRevenue) eşit olmayabilir
+      // (bkz. admin kartındaki noteKey).
+      serviceFeeCount: {
+        query: (window) =>
+          this.prisma.commissionLedger.count({
+            where: serviceFeeCountWhere(window),
+          }),
+      },
+      serviceFeeAmount: {
+        query: (window) =>
+          this.prisma.commissionLedger.aggregate({
+            _sum: {
+              buyerPlatformFeeAmount: true,
+              sellerPlatformFeeAmount: true,
+              refundedBuyerPlatformFeeAmount: true,
+              refundedSellerPlatformFeeAmount: true,
+            },
+            where: ledgerEarnedWhere(window),
+          }),
+        toValue: (raw) => {
+          const s = sumFields(raw, [
+            "buyerPlatformFeeAmount",
+            "sellerPlatformFeeAmount",
+            "refundedBuyerPlatformFeeAmount",
+            "refundedSellerPlatformFeeAmount",
+          ]);
+          return (
+            s.buyerPlatformFeeAmount +
+            s.sellerPlatformFeeAmount -
+            s.refundedBuyerPlatformFeeAmount -
+            s.refundedSellerPlatformFeeAmount
+          );
+        },
+      },
+      // Tarodan komisyonları (alıcı + satıcı, iadeler düşülmüş) — aynı v2
+      // kırılımı kısıtı `serviceFee*` için yazılan notla burada da geçerli.
+      commissionCount: {
+        query: (window) =>
+          this.prisma.commissionLedger.count({
+            where: commissionCountWhere(window),
+          }),
+      },
+      commissionAmount: {
+        query: (window) =>
+          this.prisma.commissionLedger.aggregate({
+            _sum: {
+              buyerCommissionAmount: true,
+              sellerCommissionAmount: true,
+              refundedBuyerCommissionAmount: true,
+              refundedSellerCommissionAmount: true,
+            },
+            where: ledgerEarnedWhere(window),
+          }),
+        toValue: (raw) => {
+          const s = sumFields(raw, [
+            "buyerCommissionAmount",
+            "sellerCommissionAmount",
+            "refundedBuyerCommissionAmount",
+            "refundedSellerCommissionAmount",
+          ]);
+          return (
+            s.buyerCommissionAmount +
+            s.sellerCommissionAmount -
+            s.refundedBuyerCommissionAmount -
+            s.refundedSellerCommissionAmount
+          );
+        },
+      },
+      // Toplam kargo: paket başına TAM bedel (alıcı+satıcı payı birlikte),
+      // pencerede ÖDENMİŞ en az bir siparişi olan kolilerden. Koli bazında
+      // sayıldığı için birden çok siparişi olan koli çift sayılmaz.
+      shippingCount: {
+        query: (window) =>
+          this.prisma.orderPackage.count({ where: paidPackageWhere(window) }),
+      },
+      shippingAmount: {
+        query: (window) =>
+          this.prisma.orderPackage.aggregate({
+            _sum: { fullShippingAmount: true },
+            where: paidPackageWhere(window),
+          }),
+        toValue: sumOf("fullShippingAmount"),
+      },
+      deliveredOrders: {
+        query: (window) =>
+          this.prisma.order.count({ where: deliveredOrderWhere(window) }),
+      },
+      deliveredAmount: {
+        query: (window) =>
+          this.prisma.order.aggregate({
+            _sum: { totalAmount: true },
+            where: deliveredOrderWhere(window),
+          }),
+        toValue: sumOf("totalAmount"),
+      },
+      membershipRevenue: {
+        // MembershipPayment TEK kaynaktır. Üyelik siparişi (origin =
+        // platform_service) ödenen sipariş tutarından zaten dışlandığı için
+        // burada çifte sayım olmaz.
+        query: (window) =>
+          this.prisma.membershipPayment.aggregate({
+            _sum: { amount: true },
+            where: membershipPaymentWhere(window),
+          }),
+        toValue: sumOf("amount"),
+      },
+      membershipCount: {
+        query: (window) =>
+          this.prisma.membershipPayment.count({
+            where: membershipPaymentWhere(window),
+          }),
+      },
+      boostRevenue: {
+        // `purchasedAt` aktivasyon anında damgalanır — satın alma olayı budur.
+        query: (window) =>
+          this.prisma.productBoost.aggregate({
+            _sum: { price: true },
+            where: boostWhere(window),
+          }),
+        toValue: sumOf("price"),
+      },
+      boostCount: {
+        query: (window) =>
+          this.prisma.productBoost.count({ where: boostWhere(window) }),
       },
       newUsers: {
         query: (createdAt) => this.prisma.user.count({ where: { createdAt } }),

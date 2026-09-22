@@ -82,21 +82,49 @@ export interface DashboardMetric {
 /**
  * Zone C — "Dönem özeti". The only date-filtered zone, and every metric is
  * measured from an EVENT stamp (`Payment.paidAt`, `Order.deliveredAt`,
- * `Order.cancelledAt`, `CommissionLedger.earnedAt`, …) rather than from
+ * `Order.cancelledAt`, `CommissionLedger.earnedAt`, `PayoutTransfer.processedAt`,
+ * `RefundAttempt.finalizedAt`, `Trade.completedAt`, …) rather than from
  * `status + createdAt`: an order placed in March and delivered in April
  * belongs to April's delivered figure, not March's.
+ *
+ * Every money figure gets a SEPARATE count card next to it (how many, how
+ * much) — the two answer different operational questions, and folding them
+ * into one card hides whichever half wasn't the headline.
  */
 export const DASHBOARD_METRIC_KEYS = [
   "paidOrders",
   "paidAmount",
-  "deliveredOrders",
-  "netRevenue",
-  "membershipRevenue",
-  "boostRevenue",
-  "refundedAmount",
+  // Kullanıcılara ödenen hak ediş (satıcı escrow + takas nakit hak edişi).
+  "sellerPayoutCount",
+  "sellerPayoutAmount",
+  // Kullanıcılara ödenen İADE (teslim edilmiş siparişin finalize iadesi).
+  "returnRefundCount",
+  "returnRefundAmount",
+  // Kullanıcılara ödenen İPTAL (teslim edilmemiş siparişin finalize iadesi).
+  "cancelRefundCount",
+  "cancelRefundAmount",
   "cancelledOrders",
   "completedTrades",
+  // Tamamlanan takasta İKİ taraftan toplam tahsil edilen nakit.
+  "completedTradeAmount",
   "tradeFeeRevenue",
+  "netRevenue",
+  "netRevenueCount",
+  // Tarodan hizmet bedelleri (alıcı + satıcı, iadeler düşülmüş).
+  "serviceFeeCount",
+  "serviceFeeAmount",
+  // Tarodan komisyonları (alıcı + satıcı, iadeler düşülmüş).
+  "commissionCount",
+  "commissionAmount",
+  // Toplam kargo (paket başına, alıcı+satıcı payı birlikte).
+  "shippingCount",
+  "shippingAmount",
+  "deliveredOrders",
+  "deliveredAmount",
+  "membershipRevenue",
+  "membershipCount",
+  "boostRevenue",
+  "boostCount",
   "newUsers",
   "newListings",
   "signedInUsers",
