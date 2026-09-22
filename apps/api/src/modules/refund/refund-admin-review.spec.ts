@@ -1,4 +1,4 @@
-import { RefundRequestStatus } from "@prisma/client";
+import { CancellationActor, RefundRequestStatus } from "@prisma/client";
 import { RefundService } from "./refund.service";
 import { RefundFinancialService } from "./refund-financial.service";
 import { RefundShipmentService } from "./refund-shipment.service";
@@ -7,7 +7,10 @@ import { RefundDecisionService } from "./refund-decision.service";
 import { warehouseAddressStub } from "../shipping/testing/warehouse-address-fixture";
 
 describe("RefundService admin review", () => {
-  const makeService = () => {
+  const makeService = (
+    rowOverrides: Record<string, unknown> = {},
+    paymentService: Record<string, unknown> = {},
+  ) => {
     const row = {
       id: "refund-1",
       refundNumber: "RFD-1",
@@ -25,6 +28,7 @@ describe("RefundService admin review", () => {
         status: "shipped",
         quantity: 1,
       },
+      ...rowOverrides,
     };
     const prisma = {
       refundRequest: {
@@ -68,7 +72,7 @@ describe("RefundService admin review", () => {
     );
     const decisions = new RefundDecisionService(
       prisma as any,
-      {} as any,
+      paymentService as any,
       notifications as any,
       financials as any,
       shipments as any,
@@ -103,6 +107,36 @@ describe("RefundService admin review", () => {
         decidedBy: "admin-1",
       }),
     });
+  });
+
+  it("approving a buyer's pre-shipment cancellation refunds it as the BUYER's cancellation", async () => {
+    // Talebi alıcı açtı; yönetici yalnız onayladı — iptalin aktörü alıcıdır.
+    const processRefund = jest.fn().mockRejectedValue(new Error("stop here"));
+    const { service } = makeService(
+      {
+        policyCode: "buyer_remorse_cancellation",
+        order: {
+          id: "order-1",
+          sellerId: "seller-1",
+          status: "preparing",
+          quantity: 1,
+        },
+      },
+      { processRefund },
+    );
+
+    await expect(
+      service.adminApproveRefundRequest("refund-1", "admin-1"),
+    ).rejects.toThrow("stop here");
+
+    expect(processRefund).toHaveBeenCalledWith(
+      "order-1",
+      1180,
+      expect.objectContaining({
+        idempotencyKey: "refund-request:refund-1",
+        cancelledBy: CancellationActor.buyer,
+      }),
+    );
   });
 
   it("rejects a reviewed return and releases the frozen seller hold", async () => {

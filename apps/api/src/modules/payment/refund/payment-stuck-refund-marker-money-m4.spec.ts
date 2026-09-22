@@ -1,4 +1,8 @@
-import { RefundAttemptStatus, RefundRequestStatus } from "@prisma/client";
+import {
+  CancellationActor,
+  RefundAttemptStatus,
+  RefundRequestStatus,
+} from "@prisma/client";
 import { RefundReconciliationService } from "./refund-reconciliation.service";
 
 describe("RefundReconciliationService durable attempt recovery", () => {
@@ -71,8 +75,10 @@ describe("RefundReconciliationService durable attempt recovery", () => {
 
     const result = await service.reconcileStuckRefundMarkers();
 
+    // Serbest (yönetici) anahtarından aktör çıkarılamaz → sistem.
     expect(paymentRefund.processRefund).toHaveBeenCalledWith("order-1", 50, {
       idempotencyKey: "manual-refund-1",
+      cancelledBy: CancellationActor.system,
     });
     expect(result).toEqual({
       checked: 1,
@@ -100,6 +106,22 @@ describe("RefundReconciliationService durable attempt recovery", () => {
         refundedAt: expect.any(Date),
         providerRefundId: "provider-refund-1",
       },
+    });
+  });
+
+  it("recovers a refund-request attempt on behalf of the buyer who opened it", async () => {
+    const attempt = orderAttempt({
+      idempotencyKey: "refund-request:refund-request-1",
+    });
+    const { service, paymentRefund } = makeService({
+      orderAttempts: [attempt],
+    });
+
+    await service.reconcileStuckRefundMarkers();
+
+    expect(paymentRefund.processRefund).toHaveBeenCalledWith("order-1", 50, {
+      idempotencyKey: "refund-request:refund-request-1",
+      cancelledBy: CancellationActor.buyer,
     });
   });
 

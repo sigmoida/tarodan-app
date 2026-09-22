@@ -15,6 +15,7 @@ import { resolveSalePrice } from "../../product/helpers/product-sale-window";
 import { i18nMessage } from "../../i18n";
 import { CheckoutDto } from "../dto";
 import {
+  CancellationActor,
   OrderStatus,
   ProductKind,
   ProductStatus,
@@ -44,6 +45,7 @@ import {
   remainingDiscountAllowanceFor,
 } from "../../discount/engine/fee-discount.engine";
 import { distanceSalesConsent } from "../helpers/distance-sales-contract";
+import { ORDER_CANCEL_REASON } from "../helpers/order-cancel-reasons";
 import { orderCancelledData } from "../helpers/order-cancellation";
 import {
   calculatePackageDesi,
@@ -202,8 +204,10 @@ export class OrderCheckoutGroupService {
               await tx.order.update({
                 where: { id: stale.id },
                 data: {
-                  ...orderCancelledData(),
-                  cancelReason: "Yeni toplu sipariş ile değiştirildi",
+                  // Terk edilmiş ödeme denemesinin temizliği: alıcı bu
+                  // siparişi iptal etmeyi SEÇMEDİ, yeni sepet onu devraldı.
+                  ...orderCancelledData(CancellationActor.system),
+                  cancelReason: ORDER_CANCEL_REASON.replacedByNewCheckout,
                   reservationReleasedAt:
                     stale.reservationReleasedAt ?? new Date(),
                 },

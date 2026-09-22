@@ -1,5 +1,10 @@
 import * as request from 'supertest';
-import { OrderStatus, ProductStatus, PaymentStatus } from '@prisma/client';
+import {
+  CancellationActor,
+  OrderStatus,
+  ProductStatus,
+  PaymentStatus,
+} from '@prisma/client';
 import { createE2ETestApp, E2ETestApp } from '../test-utils/create-app';
 import { truncateAll, getPrisma, seedBaseline, disconnectPrisma } from '../test-utils/db';
 import { createUser, authHeader } from '../factories/user.factory';
@@ -182,7 +187,11 @@ describe('Stock edge cases — comprehensive (E2E)', () => {
         .set(authHeader(buyer))
         .send({ reason: 'iade istiyorum' })
         .expect(200);
-      await ctx.app.get(PaymentService).processRefund(r.body.orderId);
+      await ctx.app
+        .get(PaymentService)
+        .processRefund(r.body.orderId, undefined, {
+          cancelledBy: CancellationActor.platform,
+        });
 
       p = await prisma.product.findUnique({ where: { id: product.id } });
       expect(p?.quantity).toBe(1); // physical stock restored by refund
@@ -299,7 +308,11 @@ describe('Stock edge cases — comprehensive (E2E)', () => {
         .set(authHeader(buyer))
         .send({ reason: 'iade' })
         .expect(200);
-      await ctx.app.get(PaymentService).processRefund(order!.id);
+      await ctx.app
+        .get(PaymentService)
+        .processRefund(order!.id, undefined, {
+          cancelledBy: CancellationActor.platform,
+        });
 
       p = await prisma.product.findUnique({ where: { id: product.id } });
       expect(p?.quantity).toBe(5); // all 3 units restocked → back to 5

@@ -4,7 +4,12 @@ import { PrismaService } from "../../../prisma";
 import { isRejectableTestModeSuccess } from "./paytr-test-mode.guard";
 import { shouldDeferSupersededOidFailure } from "./paytr-superseded-oid.guard";
 import { PaymentProvider, PayTRCallbackDto } from "../dto";
-import { PaymentStatus, OrderStatus, PaytrMerchant } from "@prisma/client";
+import {
+  CancellationActor,
+  PaymentStatus,
+  OrderStatus,
+  PaytrMerchant,
+} from "@prisma/client";
 import { PaymentProviderRegistry } from "../../payment-providers/payment-provider.registry";
 import { PaymentCommonService } from "../payment-common.service";
 import { PaymentFulfillmentService } from "../fulfillment/payment-fulfillment.service";
@@ -583,6 +588,7 @@ export class PaymentCallbackService {
       await this.paymentFulfillment.processFailedPayment(
         payment,
         dto.failed_reason_msg || "PayTR payment failed",
+        CancellationActor.system,
       );
     }
 

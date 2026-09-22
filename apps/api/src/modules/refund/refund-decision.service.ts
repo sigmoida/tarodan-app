@@ -5,7 +5,12 @@ import {
   Logger,
   NotFoundException,
 } from "@nestjs/common";
-import { OrderStatus, RefundReason, RefundRequestStatus } from "@prisma/client";
+import {
+  CancellationActor,
+  OrderStatus,
+  RefundReason,
+  RefundRequestStatus,
+} from "@prisma/client";
 import { PrismaService } from "../../prisma";
 import { PaymentService } from "../payment/payment.service";
 import { NotificationType } from "../notification/dto/notification.dto";
@@ -121,6 +126,7 @@ export class RefundDecisionService {
           skipRefundEvent: true,
           refundQuantity: rr.refundQuantity,
           idempotencyKey: `refund-request:${rr.id}`,
+          cancelledBy: CancellationActor.buyer,
           settlement: {
             closeOrder: rr.refundQuantity >= (rr.order.quantity ?? 1),
             holdPortion: Math.min(

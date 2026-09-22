@@ -1,5 +1,6 @@
 import * as request from 'supertest';
 import {
+  CancellationActor,
   PaymentStatus,
   PaymentHoldStatus,
   PayoutStatus,
@@ -128,7 +129,11 @@ describe('Critical money fixes (E2E)', () => {
       expect(payoutBefore?.status).toBe(PayoutStatus.pending);
 
       // Refund while the payout is still pending.
-      await ctx.app.get(PaymentService).processRefund(orderId);
+      await ctx.app
+        .get(PaymentService)
+        .processRefund(orderId, undefined, {
+          cancelledBy: CancellationActor.platform,
+        });
 
       // Buyer was refunded via PayTR...
       expect(ctx.paytr.refundCalls.length).toBeGreaterThanOrEqual(1);
@@ -160,7 +165,9 @@ describe('Critical money fixes (E2E)', () => {
 
       // Refund must now be blocked — money already left to the seller.
       await expect(
-        ctx.app.get(PaymentService).processRefund(orderId),
+        ctx.app.get(PaymentService).processRefund(orderId, undefined, {
+          cancelledBy: CancellationActor.platform,
+        }),
       ).rejects.toThrow(/Transfer zaten başlatılmış/);
       // No PayTR refund attempted.
       expect(ctx.paytr.refundCalls.length).toBe(0);

@@ -1,4 +1,4 @@
-import { OrderStatus, ShipmentStatus } from "@prisma/client";
+import { CancellationActor, OrderStatus, ShipmentStatus } from "@prisma/client";
 import { OrderTrackingSyncService } from "./order-tracking-sync.service";
 
 /**
@@ -74,12 +74,10 @@ describe("post-delivery carrier return", () => {
       announceOrderDelivered: jest.fn(),
     };
     const client = {
-      lookupTracking: jest
-        .fn()
-        .mockResolvedValue({
-          kind: "found",
-          data: { Gonderiler: [returnedGonderi] },
-        }),
+      lookupTracking: jest.fn().mockResolvedValue({
+        kind: "found",
+        data: { Gonderiler: [returnedGonderi] },
+      }),
       parseSuratDate: jest.fn().mockReturnValue(DELIVERED_AT),
     };
     const service = new OrderTrackingSyncService(
@@ -139,7 +137,12 @@ describe("post-delivery carrier return", () => {
     await service.syncPostDeliveryShipments(48);
 
     expect(prisma.order.updateMany).toHaveBeenCalled();
-    expect(paymentService.processRefund).toHaveBeenCalledWith("order-1");
+    expect(paymentService.processRefund).toHaveBeenCalledWith(
+      "order-1",
+      undefined,
+      // Taşıyıcı olayı kapatır; kimse "iptal et" demedi.
+      { cancelledBy: CancellationActor.system },
+    );
   });
 
   it("does NOT refund again when a refund is already in flight", async () => {

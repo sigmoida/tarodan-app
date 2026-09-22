@@ -3,6 +3,7 @@ import { ConfigService } from "@nestjs/config";
 import { PrismaService } from "../../../prisma";
 import { CacheService } from "../../cache/cache.service";
 import {
+  CancellationActor,
   Prisma,
   PaymentStatus,
   OrderStatus,
@@ -30,6 +31,7 @@ import {
 } from "../../outbox/outbox.types";
 import { isTradeFullyPaid } from "../../trade/helpers/trade-payment-rows.helper";
 import { addDaysSkippingSundays } from "../../../common/helpers/preparing-deadline";
+import { ORDER_CANCEL_REASON } from "../../order/helpers/order-cancel-reasons";
 import { orderCancelledData } from "../../order/helpers/order-cancellation";
 import {
   PUBLIC_NAME_SELECT,
@@ -45,6 +47,12 @@ export interface ProviderPaymentData {
   paymentType?: string;
   installmentCount?: number;
   currency?: string;
+}
+
+/** Başarısız ödeme yüzünden kapanan siparişin iptal kaydı: kim ve (varsa) neden. */
+export interface FailedPaymentCancellation {
+  by: CancellationActor;
+  reason?: string;
 }
 
 @Injectable()
@@ -310,10 +318,9 @@ export class PaymentFulfillmentService {
           await tx.order.update({
             where: { id: payment.orderId },
             data: {
-              ...orderCancelledData(now),
+              ...orderCancelledData(CancellationActor.system, now),
               cancellationType: OrderCancellationType.iptal,
-              cancelReason:
-                "Stok tükendi: ödeme sonrası mevcut stok sipariş adedini karşılamadı",
+              cancelReason: ORDER_CANCEL_REASON.oversoldAfterPayment,
               preparingDeadline: null,
               reservationReleasedAt: now,
               // Bu sipariş için fiziksel stok hiç tüketilmedi. İade finalizer'ının
@@ -404,7 +411,11 @@ export class PaymentFulfillmentService {
         `Auto-refunding payment ${refundPaymentId} — order ${refundOrderId} was already cancelled`,
       );
       try {
-        await this.paymentRefund.processRefund(refundOrderId);
+        // Sipariş cron tarafından ZATEN iptal edildi; processRefund o aktörü
+        // korur, buradaki yalnız iadenin kendisini tanımlar.
+        await this.paymentRefund.processRefund(refundOrderId, undefined, {
+          cancelledBy: CancellationActor.system,
+        });
         this.logger.log(`Auto-refund completed for order ${refundOrderId}`);
       } catch (refundError: any) {
         this.logger.error(
@@ -427,6 +438,7 @@ export class PaymentFulfillmentService {
           {
             skipRefundEvent: true,
             idempotencyKey: `stock-shortage-refund:${payment.id}:${resultOrder.id}`,
+            cancelledBy: CancellationActor.system,
           },
         );
         this.logger.warn(
@@ -713,10 +725,9 @@ export class PaymentFulfillmentService {
             await tx.order.update({
               where: { id: order.id },
               data: {
-                ...orderCancelledData(now),
+                ...orderCancelledData(CancellationActor.system, now),
                 cancellationType: OrderCancellationType.iptal,
-                cancelReason:
-                  "Stok tükendi: ödeme sonrası mevcut stok sipariş adedini karşılamadı",
+                cancelReason: ORDER_CANCEL_REASON.oversoldAfterPayment,
                 preparingDeadline: null,
                 reservationReleasedAt: now,
                 stockRestoredAt: now,
@@ -785,6 +796,7 @@ export class PaymentFulfillmentService {
         await this.paymentRefund.processRefund(
           order.id,
           Number(order.totalAmount),
+          { cancelledBy: CancellationActor.system },
         );
         this.logger.log(
           `Partial auto-refund completed for group order ${order.id}`,
@@ -807,6 +819,7 @@ export class PaymentFulfillmentService {
           {
             skipRefundEvent: true,
             idempotencyKey: `stock-shortage-refund:${payment.id}:${order.id}`,
+            cancelledBy: CancellationActor.system,
           },
         );
         this.logger.log(
@@ -1099,8 +1112,16 @@ export class PaymentFulfillmentService {
 
   /**
    * Process failed payment
+   *
+   * @param cancelledBy Ödeme bağlı siparişi kapatırsa iptalin aktörü: alıcı
+   *   ödemeyi kendisi iptal ettiyse `buyer`; sağlayıcı reddi / fail sayfası
+   *   onayı gibi kimsenin "iptal et" demediği durumlarda `system`.
    */
-  async processFailedPayment(payment: any, reason: string) {
+  async processFailedPayment(
+    payment: any,
+    reason: string,
+    cancelledBy: CancellationActor,
+  ) {
     const oldStatus = payment.status;
 
     // Only a still-open payment may be marked failed. Direct payment temporarily
@@ -1158,7 +1179,9 @@ export class PaymentFulfillmentService {
       });
 
       for (const order of groupOrders) {
-        await this.releaseProductForFailedPayment(order.id);
+        await this.releaseProductForFailedPayment(order.id, {
+          by: cancelledBy,
+        });
         await this.paymentCommon.cancelSuratShipmentIfExists(
           order.id,
           order.orderNumber,
@@ -1204,7 +1227,9 @@ export class PaymentFulfillmentService {
 
     // Siparişi iptal et ve ürünü tekrar satışa aç (ilanlar listesinde görünsün)
     if (payment.orderId) {
-      await this.releaseProductForFailedPayment(payment.orderId);
+      await this.releaseProductForFailedPayment(payment.orderId, {
+        by: cancelledBy,
+      });
 
       // Cancel any auto-created Surat shipment for this failed order
       const order = await this.prisma.order.findUnique({
@@ -1271,8 +1296,16 @@ export class PaymentFulfillmentService {
   /**
    * Ödeme başarısız/iptal olduğunda rezervasyonu kaldır, siparişi iptal et.
    * Offer-based orderlarda teklif status'u payment_expired yapılır (tekrar ödenebilir).
+   *
+   * @param cancellation İptali kimin/neden yaptığı — çağıran bilir: alıcının
+   *   ödemeyi iptal etmesi (`buyer`), sağlayıcının ret dönmesi ya da ödeme
+   *   penceresinin dolması (`system`). Gerekçe verilmezse `cancelReason`
+   *   yazılmaz (eski davranış).
    */
-  async releaseProductForFailedPayment(orderId: string): Promise<void> {
+  async releaseProductForFailedPayment(
+    orderId: string,
+    cancellation: FailedPaymentCancellation,
+  ): Promise<void> {
     try {
       const order = await this.prisma.order.findUnique({
         where: { id: orderId },
@@ -1326,7 +1359,10 @@ export class PaymentFulfillmentService {
         this.prisma.order.update({
           where: { id: orderId },
           data: {
-            ...orderCancelledData(),
+            ...orderCancelledData(cancellation.by),
+            ...(cancellation.reason
+              ? { cancelReason: cancellation.reason }
+              : {}),
             // İlk kez burada bırakıyorsak işaretle (idempotency / çift-bırakma koruması).
             ...(alreadyReleased ? {} : { reservationReleasedAt: new Date() }),
           },

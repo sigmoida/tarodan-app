@@ -6,6 +6,7 @@ import { OrderStatus, OfferStatus, PaymentStatus } from "@prisma/client";
 import { getAvailableQuantity } from "../product/helpers/product-availability.helper";
 import { sellerNetAmountOf } from "./helpers/order-net.helper";
 import { storedProductBaseOf } from "./helpers/order-charged-base.helper";
+import { ORDER_CANCEL_REASON } from "./helpers/order-cancel-reasons";
 import { publicIdentityFields } from "../../common/helpers/public-identity";
 
 /**
@@ -154,11 +155,13 @@ export class OrderCommonService {
     if (order.status !== OrderStatus.cancelled) return null;
     const reason = (order.cancelReason ?? "").trim();
     if (!reason) return "buyer_cancelled";
-    if (reason === "Ödeme süresi (24 saat) doldu") return "payment_timeout";
-    if (reason.startsWith("Satıcı belirlenen süre")) return "seller_no_ship";
+    if (reason === ORDER_CANCEL_REASON.paymentWindowExpired)
+      return "payment_timeout";
+    if (reason === ORDER_CANCEL_REASON.sellerShipDeadlineExpired)
+      return "seller_no_ship";
     if (reason.includes("Stok tüken")) return "stockout";
     if (reason.includes("takas")) return "trade_reserved";
-    if (reason === "Yeni toplu sipariş ile değiştirildi")
+    if (reason === ORDER_CANCEL_REASON.replacedByNewCheckout)
       return "bulk_replaced";
     if (reason === "Alıcı lehine iptal edildi") return "admin_buyer_favor";
     if (

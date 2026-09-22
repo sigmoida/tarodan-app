@@ -2,6 +2,7 @@ import { Injectable, Logger, Optional } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { PrismaService } from "../../../prisma";
 import {
+  CancellationActor,
   PaymentStatus,
   OrderStatus,
   ShipmentStatus,
@@ -13,6 +14,7 @@ import { PaymentProviderRegistry } from "../../payment-providers/payment-provide
 import { PaymentProviderEventService } from "../payment-provider-event.service";
 import { errorMessage } from "../../../common/helpers/error-message";
 import { refundRequestIdOf } from "../../elogo/helpers/refund-request-key";
+import { refundAttemptCancelActor } from "../helpers/refund-attempt-actor";
 
 /**
  * İade sweep'inin aday satırı: siparişin kendi ödemesi (tekil) VEYA grubunun
@@ -369,7 +371,11 @@ export class RefundReconciliationService {
     const failures: string[] = [];
     for (const orderId of allOrderIds) {
       try {
-        await this.paymentRefund.processRefund(orderId);
+        // Dal 1-2: sipariş zaten iptal (aktörü korunur). Dal 3: paket
+        // göndericiye iade döndü — kimse "iptal et" demedi, sistem kapatır.
+        await this.paymentRefund.processRefund(orderId, undefined, {
+          cancelledBy: CancellationActor.system,
+        });
         refunded++;
       } catch (error) {
         failed++;
@@ -418,7 +424,10 @@ export class RefundReconciliationService {
         const result = await this.paymentRefund.processRefund(
           attempt.orderId,
           Number(attempt.amount),
-          { idempotencyKey: attempt.idempotencyKey },
+          {
+            idempotencyKey: attempt.idempotencyKey,
+            cancelledBy: refundAttemptCancelActor(attempt.idempotencyKey),
+          },
         );
         const refundRequestId = refundRequestIdOf(attempt.idempotencyKey);
         if (refundRequestId) {

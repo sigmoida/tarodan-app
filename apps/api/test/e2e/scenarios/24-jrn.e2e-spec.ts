@@ -26,6 +26,7 @@
  */
 import * as request from "supertest";
 import {
+  CancellationActor,
   OrderStatus,
   OfferStatus,
   PaymentStatus,
@@ -2627,7 +2628,11 @@ describe("24 — Uçtan Uca Entegrasyon Journeyleri (JRN)", () => {
       const prisma = getPrisma();
 
       // processRefund (anlık iade, preparing/shipment pending).
-      await ctx.app.get(PaymentService).processRefund(orderId);
+      await ctx.app
+        .get(PaymentService)
+        .processRefund(orderId, undefined, {
+          cancelledBy: CancellationActor.platform,
+        });
 
       const order = await prisma.order.findUnique({ where: { id: orderId } });
       expect(order?.status).toBe(OrderStatus.cancelled);

@@ -26,6 +26,7 @@
 import * as request from "supertest";
 import { randomUUID } from "crypto";
 import {
+  CancellationActor,
   OrderStatus,
   OfferStatus,
   PaymentStatus,
@@ -498,7 +499,9 @@ describe("15 — Stok Bütünlüğü & Rezervasyon (STK)", () => {
     expect(refundedOrder?.status).toBe(OrderStatus.refunded);
 
     // iade işle → stok +1, sipariş cancelled.
-    await paymentSvc().processRefund(orderId);
+    await paymentSvc().processRefund(orderId, undefined, {
+      cancelledBy: CancellationActor.platform,
+    });
     p = await readProduct(product.id);
     expect(p.quantity).toBe(1); // restok
     expect(p.status).toBe(ProductStatus.active); // tekrar satışta
@@ -528,7 +531,9 @@ describe("15 — Stok Bütünlüğü & Rezervasyon (STK)", () => {
       .set(authHeader(buyer))
       .send({ reason: "iade" })
       .expect(200);
-    await paymentSvc().processRefund(order!.id);
+    await paymentSvc().processRefund(order!.id, undefined, {
+      cancelledBy: CancellationActor.platform,
+    });
 
     p = await readProduct(product.id);
     expect(p.quantity).toBe(5); // 2 + 3
@@ -575,6 +580,7 @@ describe("15 — Stok Bütünlüğü & Rezervasyon (STK)", () => {
     // Kısmi tutar (1 adet) iadesi → stok 2→3, sipariş cancelled OLMAZ (tam iade eşiği altı).
     const unitTotal = Number(order!.totalAmount) / (order!.quantity ?? 3);
     await paymentSvc().processRefund(order!.id, unitTotal, {
+      cancelledBy: CancellationActor.platform,
       refundQuantity: 1,
     });
 
@@ -614,7 +620,9 @@ describe("15 — Stok Bütünlüğü & Rezervasyon (STK)", () => {
       .set(authHeader(buyer))
       .send({ reason: "iade" })
       .expect(200);
-    await paymentSvc().processRefund(order!.id);
+    await paymentSvc().processRefund(order!.id, undefined, {
+      cancelledBy: CancellationActor.platform,
+    });
     p = await readProduct(product.id);
     expect(p.quantity).toBe(5);
     expect(p.status).toBe(ProductStatus.active);
@@ -1192,7 +1200,9 @@ describe("15 — Stok Bütünlüğü & Rezervasyon (STK)", () => {
       .set(authHeader(buyer))
       .send({ reason: "iade" })
       .expect(200);
-    await paymentSvc().processRefund(orderId);
+    await paymentSvc().processRefund(orderId, undefined, {
+      cancelledBy: CancellationActor.platform,
+    });
 
     const p = await readProduct(product.id);
     expect(p.quantity).toBeNull(); // değişmez
@@ -1794,6 +1804,7 @@ describe("15 — Stok Bütünlüğü & Rezervasyon (STK)", () => {
 
     const unitTotal = Number(order!.totalAmount) / (order!.quantity ?? 3);
     const refund = await paymentSvc().processRefund(order!.id, unitTotal, {
+      cancelledBy: CancellationActor.platform,
       refundQuantity: 1,
     });
     if (!refund)

@@ -1,8 +1,14 @@
 /** @format */
 
-import { Prisma, ProductStatus, TradeStatus } from "@prisma/client";
+import {
+  CancellationActor,
+  Prisma,
+  ProductStatus,
+  TradeStatus,
+} from "@prisma/client";
 import { safeDecrementReserved } from "../../modules/product/helpers/product-availability.helper";
 import { getProductStatusFromQuantity } from "../../modules/product/helpers/product-status.helper";
+import { tradeCancelledData } from "../../modules/trade/helpers/trade-cancellation";
 
 /**
  * Takas iade bacaklarının kapanış şartı ve kapanışın kendisi — tek kaynak.
@@ -151,11 +157,13 @@ export async function finalizeReturningTradeIfResolved(
     }
   }
 
+  // `returning`e yalnız yönetici kararı (depo reddi, zorla iptal) götürür;
+  // kapanış o kararın tamamlanmasıdır → aktör platform. Gerekçeye dokunulmaz:
+  // yöneticinin yazdığı metin korunur.
   await tx.trade.update({
     where: { id: tradeId },
     data: {
-      status: TradeStatus.cancelled,
-      cancelledAt: now,
+      ...tradeCancelledData(CancellationActor.platform, now),
       updatedAt: now,
     },
   });

@@ -6,6 +6,7 @@ import {
   NotFoundException,
 } from "@nestjs/common";
 import {
+  CancellationActor,
   OrderStatus,
   OrderCancellationReason,
   PaymentStatus,
@@ -395,6 +396,7 @@ export class RefundCreationService {
           skipRefundEvent: true,
           refundQuantity: order.quantity ?? 1,
           idempotencyKey: `refund-request:${created.id}`,
+          cancelledBy: CancellationActor.buyer,
           settlement: {
             closeOrder: true,
             holdPortion: 1,
@@ -683,6 +685,7 @@ export class RefundCreationService {
           skipRefundEvent: true, // REFUND_COMPLETED'ı aşağıda kendimiz gönderiyoruz
           refundQuantity,
           idempotencyKey: `refund-request:${created.id}`,
+          cancelledBy: CancellationActor.buyer,
           settlement: {
             closeOrder: refundQuantity >= (order.quantity ?? 1),
             holdPortion: Math.min(

@@ -10,6 +10,8 @@ import type { NotificationAudience } from "./helpers/notification-link";
 import { StorageService } from "../storage/storage.service";
 import { NotificationDispatchService } from "./notification-dispatch.service";
 import { frontendUrl as resolveFrontendUrl } from "../../config/app-urls";
+import { ORDER_CANCEL_REASON } from "../order/helpers/order-cancel-reasons";
+import { TRADE_CANCEL_REASON } from "../trade/helpers/trade-cancel-reasons";
 
 @Injectable()
 export class NotificationCommerceService {
@@ -474,8 +476,8 @@ export class NotificationCommerceService {
   ): Promise<void> {
     const SEVEN_DAYS_AGO = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
     const STOCKOUT_REASONS = [
-      "Stok tükendi",
-      "Stok tükendiği için otomatik iptal edildi",
+      ORDER_CANCEL_REASON.stockDepleted,
+      TRADE_CANCEL_REASON.stockDepleted,
     ];
 
     const [wishlistItems, cancelledOrders, cancelledOffers] = await Promise.all(

@@ -16,6 +16,7 @@
 import * as request from "supertest";
 import { BadRequestException } from "@nestjs/common";
 import {
+  CancellationActor,
   PaymentStatus,
   PaymentHoldStatus,
   OrderStatus,
@@ -1512,7 +1513,11 @@ describe("10 — Ödeme & Escrow (PAY)", () => {
       expect(productPaid?.quantity).toBe(0);
       ctx.paytr.reset();
 
-      await ctx.app.get(PaymentService).processRefund(orderId);
+      await ctx.app
+        .get(PaymentService)
+        .processRefund(orderId, undefined, {
+          cancelledBy: CancellationActor.platform,
+        });
       const order = await prisma.order.findUnique({ where: { id: orderId } });
       expect(order?.status).toBe(OrderStatus.cancelled);
       const hold = await prisma.paymentHold.findFirst({ where: { orderId } });
@@ -1598,7 +1603,11 @@ describe("10 — Ödeme & Escrow (PAY)", () => {
         },
       });
       await expect(
-        ctx.app.get(PaymentService).processRefund(orderId),
+        ctx.app
+          .get(PaymentService)
+          .processRefund(orderId, undefined, {
+            cancelledBy: CancellationActor.platform,
+          }),
       ).rejects.toBeInstanceOf(BadRequestException);
     });
 
@@ -1623,7 +1632,11 @@ describe("10 — Ödeme & Escrow (PAY)", () => {
       ctx.paytr.reset();
       ctx.surat.reset();
 
-      await ctx.app.get(PaymentService).processRefund(orderId);
+      await ctx.app
+        .get(PaymentService)
+        .processRefund(orderId, undefined, {
+          cancelledBy: CancellationActor.platform,
+        });
       const shipment = await prisma.shipment.findFirst({ where: { orderId } });
       expect(shipment?.status).toBe("cancelled");
       expect(ctx.surat.cancelCalls).toContain(trackingNo);

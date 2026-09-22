@@ -1,5 +1,6 @@
 import * as request from "supertest";
 import {
+  CancellationActor,
   PaymentStatus,
   PaymentHoldStatus,
   PayoutStatus,
@@ -283,7 +284,9 @@ describe("Escrow Edge Cases (E2E)", () => {
       // Now try to refund — should fail because payout is already completed
       const paymentService = ctx.app.get(PaymentService);
       await expect(
-        paymentService.processRefund(buyRes.body.orderId),
+        paymentService.processRefund(buyRes.body.orderId, undefined, {
+          cancelledBy: CancellationActor.platform,
+        }),
       ).rejects.toThrow(/transfer zaten başlatılmış/i);
     });
 
@@ -625,7 +628,11 @@ describe("Escrow Edge Cases (E2E)", () => {
       expect(shipmentBefore?.status).toBe("pending");
 
       // Process refund — should cancel Surat shipment
-      await ctx.app.get(PaymentService).processRefund(buyRes.body.orderId);
+      await ctx.app
+        .get(PaymentService)
+        .processRefund(buyRes.body.orderId, undefined, {
+          cancelledBy: CancellationActor.platform,
+        });
 
       // Shipment should be cancelled (best-effort but stub returns Tamam)
       const shipmentAfter = await prisma.shipment.findUnique({
@@ -778,7 +785,11 @@ describe("Escrow Edge Cases (E2E)", () => {
       // Reset stub history before refund
       ctx.surat.reset();
 
-      await ctx.app.get(PaymentService).processRefund(buyRes.body.orderId);
+      await ctx.app
+        .get(PaymentService)
+        .processRefund(buyRes.body.orderId, undefined, {
+          cancelledBy: CancellationActor.platform,
+        });
 
       // Surat cancel was called with the order number
       const order = await prisma.order.findUnique({

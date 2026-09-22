@@ -119,8 +119,8 @@ export class PaymentService {
 
   async processRefund(
     orderId: string,
-    refundAmount?: number,
-    opts?: ProcessRefundOptions,
+    refundAmount: number | undefined,
+    opts: ProcessRefundOptions,
   ) {
     return this.paymentRefund.processRefund(orderId, refundAmount, opts);
   }

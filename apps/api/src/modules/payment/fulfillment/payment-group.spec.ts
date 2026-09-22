@@ -43,7 +43,12 @@ import { I18nService } from "../../i18n";
 import { OutboxService } from "../../outbox/outbox.service";
 import { OUTBOX_ORDER_FULFILLMENT } from "../../outbox/outbox.types";
 import { DiscountService } from "../../discount/discount.service";
-import { OrderStatus, PaymentStatus, ProductStatus } from "@prisma/client";
+import {
+  CancellationActor,
+  OrderStatus,
+  PaymentStatus,
+  ProductStatus,
+} from "@prisma/client";
 
 /**
  * Grup ödemesi (CheckoutGroup): tek Payment satırı gruptaki tüm siparişleri kapsar.
@@ -488,11 +493,17 @@ describe("PaymentService group payment (checkout group)", () => {
     await (fulfillment as any).processFailedPayment(
       basePayment(),
       "kart reddedildi",
+      CancellationActor.system,
     );
 
     expect(releaseSpy).toHaveBeenCalledTimes(2);
-    expect(releaseSpy).toHaveBeenCalledWith("order-1");
-    expect(releaseSpy).toHaveBeenCalledWith("order-2");
+    // Sağlayıcı reddi: kimse "iptal et" demedi → her sipariş sistem iptali.
+    expect(releaseSpy).toHaveBeenCalledWith("order-1", {
+      by: CancellationActor.system,
+    });
+    expect(releaseSpy).toHaveBeenCalledWith("order-2", {
+      by: CancellationActor.system,
+    });
     expect(cancelSuratSpy).toHaveBeenCalledTimes(2);
     expect(mockEvents.emitPaymentFailed).toHaveBeenCalledTimes(2);
     expect(logSpy).toHaveBeenCalled();

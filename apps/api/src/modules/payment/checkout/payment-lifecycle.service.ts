@@ -8,7 +8,12 @@ import {
 } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { PrismaService } from "../../../prisma";
-import { PaymentStatus, OrderStatus, ProductStatus } from "@prisma/client";
+import {
+  CancellationActor,
+  PaymentStatus,
+  OrderStatus,
+  ProductStatus,
+} from "@prisma/client";
 import { PaymentProviderRegistry } from "../../payment-providers/payment-provider.registry";
 import type { PayTRStatusInquirySuccess } from "../../payment-providers/paytr/paytr.service";
 import { EventService } from "../../events";
@@ -266,6 +271,7 @@ export class PaymentLifecycleService {
       await this.paymentFulfillment.processFailedPayment(
         payment,
         "Kullanıcı tarafından iptal edildi",
+        CancellationActor.buyer,
       );
       this.logger.log(`Group payment ${paymentId} cancelled by user ${userId}`);
       return {
@@ -321,6 +327,7 @@ export class PaymentLifecycleService {
     // Siparişi iptal et ve ürünü tekrar satışa aç
     await this.paymentFulfillment.releaseProductForFailedPayment(
       payment.order.id,
+      { by: CancellationActor.buyer },
     );
 
     this.logger.log(`Payment ${paymentId} cancelled by user ${userId}`);
@@ -404,9 +411,12 @@ export class PaymentLifecycleService {
       );
       return { released: false };
     }
+    // İstemci yalnız sağlayıcının verdiği başarısızlığı bildiriyor (misafir
+    // fail sayfası da çağırır) — iptal kararı kullanıcının değil.
     await this.paymentFulfillment.processFailedPayment(
       payment,
       "Fail sayfasından onay - rezervasyon serbest bırakıldı",
+      CancellationActor.system,
     );
     return { released: true };
   }

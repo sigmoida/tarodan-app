@@ -11,8 +11,9 @@ import { apiAppRoot } from "./app-root";
  * it. So the rule is enforced over the SOURCE.
  *
  * This is the one implementation of that scan; each stamped transition
- * (`Order.cancelledAt`, `Trade.rejectedAt`, `Product.soldAt`,
- * `Offer.respondedAt`) passes its own delegate and status instead of copying
+ * (`Order.cancelledAt`/`cancelledBy`, `Trade.cancelledAt`/`cancelledBy`,
+ * `Trade.rejectedAt`, `Product.soldAt`, `Offer.respondedAt`) passes its own
+ * delegate and status instead of copying
  * a directory walker into its spec.
  */
 

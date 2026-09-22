@@ -6,6 +6,7 @@ import {
   NotFoundException,
 } from "@nestjs/common";
 import {
+  CancellationActor,
   OrderStatus,
   Prisma,
   RefundRequestStatus,
@@ -296,6 +297,7 @@ export class RefundShipmentService {
           skipRefundEvent: true,
           refundQuantity: rr.refundQuantity,
           idempotencyKey: `refund-request:${rr.id}`,
+          cancelledBy: CancellationActor.buyer,
           settlement: {
             closeOrder: rr.refundQuantity >= (rr.order.quantity ?? 1),
             holdPortion: Math.min(

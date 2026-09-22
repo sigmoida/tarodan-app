@@ -1,5 +1,6 @@
 import { Injectable, Logger } from "@nestjs/common";
 import {
+  CancellationActor,
   Prisma,
   SubscriptionStatus,
   ProductStatus,
@@ -261,9 +262,11 @@ export class VirtualOrderFulfillmentService {
     });
     if (siblingPendings.length > 0) {
       const ids = siblingPendings.map((o) => o.id);
+      // Aynı üyeliği başka ödeme tamamladı — alıcı bunları iptal etmedi,
+      // yetim temizliğini sistem yapar.
       await tx.order.updateMany({
         where: { id: { in: ids } },
-        data: orderCancelledData(),
+        data: orderCancelledData(CancellationActor.system),
       });
       await tx.payment.updateMany({
         where: { orderId: { in: ids }, status: PaymentStatus.pending },

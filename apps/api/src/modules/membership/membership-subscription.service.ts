@@ -12,6 +12,7 @@ import { QUEUE_NAMES } from "../../workers/constants";
 import { enqueueSellerListingReindex } from "./helpers/seller-listing-reindex";
 import { PrismaService } from "../../prisma";
 import {
+  CancellationActor,
   MembershipTierType,
   SubscriptionStatus,
   ProductStatus,
@@ -52,6 +53,8 @@ import { VirtualOrderFulfillmentService } from "../payment/fulfillment/virtual-o
 import { REFERENCE_PREFIX } from "../../common/helpers/code-prefixes";
 import { generateUniqueReference } from "../../common/helpers/generate-reference";
 import { OutboxService } from "../outbox/outbox.service";
+import { TRADE_CANCEL_REASON } from "../trade/helpers/trade-cancel-reasons";
+import { tradeCancelledData } from "../trade/helpers/trade-cancellation";
 import {
   OUTBOX_SAVED_CARD_PROVIDER_DELETE,
   type SavedCardProviderDeletePayload,
@@ -1519,10 +1522,8 @@ export class MembershipSubscriptionService {
                 status: TradeStatus.pending,
               },
               data: {
-                status: TradeStatus.cancelled,
-                cancelReason:
-                  "Üyelik süresi sona erdiği için bekleyen takas teklifiniz otomatik iptal edildi.",
-                cancelledAt: now,
+                ...tradeCancelledData(CancellationActor.system, now),
+                cancelReason: TRADE_CANCEL_REASON.membershipDowngraded,
                 version: { increment: 1 },
               },
             });

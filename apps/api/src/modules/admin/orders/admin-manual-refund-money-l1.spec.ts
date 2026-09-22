@@ -1,5 +1,5 @@
 import { AdminPaymentService } from "../finance/admin-payment.service";
-import { PaymentStatus } from "@prisma/client";
+import { CancellationActor, PaymentStatus } from "@prisma/client";
 
 /**
  * MONEY-L1: manualRefund artık orderId NULL olan grup/trade ödemelerini doğru yönlendirir
@@ -79,8 +79,10 @@ describe("AdminPaymentService.manualRefund — MONEY-L1 group/trade routing", ()
       "admin-refund-1",
     );
 
+    // Yönetici manuel iadesi siparişi kapatırsa iptalin aktörü platformdur.
     expect(paymentService.processRefund).toHaveBeenCalledWith("o1", 50, {
       idempotencyKey: "admin-refund-1",
+      cancelledBy: CancellationActor.platform,
     });
     expect(paymentService.refundTradeCashTracked).not.toHaveBeenCalled();
   });
