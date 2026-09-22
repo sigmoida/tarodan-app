@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { DASHBOARD_METRIC_KEYS } from "@tarodan/types";
+import { DASHBOARD_METRIC_KEYS, type DashboardMetricKey } from "@tarodan/types";
 import { STAT_CARDS } from "./statCards";
 
 /**
@@ -19,14 +19,8 @@ describe("STAT_CARDS", () => {
     expect(new Set(cardMetrics).size).toBe(cardMetrics.length);
   });
 
-  it("removed the old refundedAmount card (split into İADE and İPTAL)", () => {
-    expect(STAT_CARDS.some((card) => card.metric === "refundedAmount")).toBe(
-      false,
-    );
-  });
-
   it("gives every count/amount pair for a two-sided metric its own card", () => {
-    const pairs: Array<[string, string]> = [
+    const pairs: Array<[DashboardMetricKey, DashboardMetricKey]> = [
       ["sellerPayoutCount", "sellerPayoutAmount"],
       ["returnRefundCount", "returnRefundAmount"],
       ["cancelRefundCount", "cancelRefundAmount"],
@@ -49,9 +43,12 @@ describe("STAT_CARDS", () => {
 
   it("flags the component-split caveat on both fee cards, count and amount", () => {
     const flagged = STAT_CARDS.filter((card) =>
-      ["serviceFeeCount", "serviceFeeAmount", "commissionCount", "commissionAmount"].includes(
-        card.metric,
-      ),
+      [
+        "serviceFeeCount",
+        "serviceFeeAmount",
+        "commissionCount",
+        "commissionAmount",
+      ].includes(card.metric),
     );
     expect(flagged).toHaveLength(4);
     flagged.forEach((card) =>

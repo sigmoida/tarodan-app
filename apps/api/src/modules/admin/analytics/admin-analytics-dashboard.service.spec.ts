@@ -82,7 +82,9 @@ describe("AdminAnalyticsDashboardService.getDashboardStats", () => {
 
   /** The where clauses of the three windows a metric's model was asked for. */
   const whereFor = (model: string) =>
-    calls.filter((call) => call.model === model).map((call) => call.args.where);
+    calls
+      .filter((call) => call.model === model && call.method !== "$queryRaw")
+      .map((call) => call.args.where);
 
   beforeEach(() => {
     jest.useFakeTimers().setSystemTime(now);

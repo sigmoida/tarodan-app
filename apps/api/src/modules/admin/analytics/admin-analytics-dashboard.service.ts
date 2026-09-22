@@ -69,7 +69,9 @@ const sumFields = (
   fields: readonly string[],
 ): Record<string, number> => {
   const sums = (raw as { _sum: Record<string, unknown> })?._sum ?? {};
-  return Object.fromEntries(fields.map((field) => [field, Number(sums[field] ?? 0)]));
+  return Object.fromEntries(
+    fields.map((field) => [field, Number(sums[field] ?? 0)]),
+  );
 };
 
 const roundMetric = (value: number): number => Math.round(value * 100) / 100;
@@ -426,7 +428,9 @@ export class AdminAnalyticsDashboardService {
       },
       netRevenueCount: {
         query: (window) =>
-          this.prisma.commissionLedger.count({ where: ledgerEarnedWhere(window) }),
+          this.prisma.commissionLedger.count({
+            where: ledgerEarnedWhere(window),
+          }),
       },
       // Tarodan hizmet bedelleri (alıcı + satıcı, iadeler düşülmüş). `sellerCommission`/
       // `buyerFee` (yukarıdaki `netRevenue`) TÜM satırlarda dolu tutulan

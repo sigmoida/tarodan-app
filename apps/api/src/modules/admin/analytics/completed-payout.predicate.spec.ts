@@ -17,9 +17,7 @@ const window = {
 describe("tamamlanmış payout yüklemi", () => {
   describe("completedPayoutWhere (Prisma)", () => {
     it("yalnız tamamlanmış payout'ları sayar", () => {
-      expect(completedPayoutWhere(window).status).toBe(
-        PayoutStatus.completed,
-      );
+      expect(completedPayoutWhere(window).status).toBe(PayoutStatus.completed);
     });
 
     it("dönemi processedAt'ten okur", () => {
