@@ -42,6 +42,8 @@ function signed(
 function setup(record: {
   payment?: Record<string, unknown> | null;
   recurring?: Record<string, unknown> | null;
+  /** Yenilemenin sahibi test şeridi hesabı mı (recurring şerit guard'ı). */
+  ownerIsTest?: boolean;
 }) {
   const config = {
     get: (key: string, fallback?: string) => ENV[key] ?? fallback,
@@ -69,6 +71,12 @@ function setup(record: {
     },
     membershipPayment: {
       findFirst: jest.fn().mockResolvedValue(record.recurring ?? null),
+    },
+    // Recurring yenilemede damga yok: şerit guard'ı sahibin bayrağını okur.
+    userMembership: {
+      findUnique: jest.fn().mockResolvedValue({
+        user: { isTestAccount: record.ownerIsTest ?? false },
+      }),
     },
   };
   const fulfillment = {
@@ -237,5 +245,96 @@ describe("PaymentCallbackService — per-merchant routing", () => {
     expect(
       right.virtualOrder.completeRecurringMembershipPayment,
     ).toHaveBeenCalledWith("mp-1", "RENabc", expect.anything());
+  });
+
+  /**
+   * Test şeridi (prod'da simetrik guard): bildirimin `test_mode`u kaydın
+   * şeridiyle eşleşmek zorunda — iki mağazada da. İlk üyelik alımı Payment
+   * satırıdır (damga siparişten), yenileme MembershipPayment'tır (damga yok,
+   * sahibin bayrağı).
+   */
+  describe("test lane on the membership merchant", () => {
+    const originalEnv = process.env.NODE_ENV;
+    beforeEach(() => {
+      process.env.NODE_ENV = "production";
+    });
+    afterEach(() => {
+      process.env.NODE_ENV = originalEnv;
+    });
+
+    const recurring = {
+      id: "mp-1",
+      provider: "paytr",
+      paytrMerchant: PaytrMerchant.membership,
+      status: PaymentStatus.processing,
+      amount: 199,
+      membershipId: "m-1",
+      metadata: {},
+    };
+    const renewal = { ...body, merchant_oid: "RENabc" };
+
+    it("applies a test-mode initial membership payment of a test-lane buyer", async () => {
+      const { svc, fulfillment } = setup({
+        payment: { ...membershipPayment, isTest: true },
+      });
+      await svc.handlePayTRCallback(
+        { ...signed(PaytrMerchant.membership, body), test_mode: "1" },
+        PaytrMerchant.membership,
+      );
+      expect(fulfillment.processSuccessfulPayment).toHaveBeenCalledTimes(1);
+    });
+
+    it("rejects a live-mode success for a test-lane initial membership payment", async () => {
+      const { svc, fulfillment } = setup({
+        payment: { ...membershipPayment, isTest: true },
+      });
+      await svc.handlePayTRCallback(
+        { ...signed(PaytrMerchant.membership, body), test_mode: "0" },
+        PaytrMerchant.membership,
+      );
+      expect(fulfillment.processSuccessfulPayment).not.toHaveBeenCalled();
+    });
+
+    it("rejects a test-mode success for a live initial membership payment", async () => {
+      const { svc, fulfillment } = setup({
+        payment: { ...membershipPayment, isTest: false },
+      });
+      await svc.handlePayTRCallback(
+        { ...signed(PaytrMerchant.membership, body), test_mode: "1" },
+        PaytrMerchant.membership,
+      );
+      expect(fulfillment.processSuccessfulPayment).not.toHaveBeenCalled();
+    });
+
+    it("completes a test-mode renewal of a test-lane owner", async () => {
+      const { svc, virtualOrder } = setup({ recurring, ownerIsTest: true });
+      await svc.handlePayTRCallback(
+        { ...signed(PaytrMerchant.membership, renewal), test_mode: "1" },
+        PaytrMerchant.membership,
+      );
+      expect(
+        virtualOrder.completeRecurringMembershipPayment,
+      ).toHaveBeenCalledWith("mp-1", "RENabc", expect.anything());
+    });
+
+    it("rejects a live-mode renewal success of a test-lane owner, and a test-mode one of a live owner", async () => {
+      const testOwner = setup({ recurring, ownerIsTest: true });
+      await testOwner.svc.handlePayTRCallback(
+        { ...signed(PaytrMerchant.membership, renewal), test_mode: "0" },
+        PaytrMerchant.membership,
+      );
+      expect(
+        testOwner.virtualOrder.completeRecurringMembershipPayment,
+      ).not.toHaveBeenCalled();
+
+      const liveOwner = setup({ recurring, ownerIsTest: false });
+      await liveOwner.svc.handlePayTRCallback(
+        { ...signed(PaytrMerchant.membership, renewal), test_mode: "1" },
+        PaytrMerchant.membership,
+      );
+      expect(
+        liveOwner.virtualOrder.completeRecurringMembershipPayment,
+      ).not.toHaveBeenCalled();
+    });
   });
 });

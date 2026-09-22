@@ -759,6 +759,64 @@ describe("MembershipSubscriptionService", () => {
       );
     });
 
+    /**
+     * Test şeridi üyeliği: yenileme de üyelik mağazasında `test_mode=1` ile
+     * çekilir (tahsilat yok); canlı üye gerçek modda kalır. Bayrak sahibin
+     * hesabından okunur — yenilemenin siparişi, dolayısıyla damgası yoktur.
+     */
+    it.each([
+      [true, true],
+      [false, false],
+    ] as const)(
+      "renews a test-lane owner (%s) on the membership merchant with testMode=%s",
+      async (isTestAccount, expected) => {
+        const harness = makeService();
+        recurringOn(harness);
+        const member = dueMember([
+          {
+            id: "card-1",
+            utoken: "ut",
+            ctoken: "ct",
+            last4: "4242",
+            mandateIp: "85.1.2.3",
+          },
+        ]);
+        mockRenewalQueries(harness.prisma, {
+          due: [
+            {
+              ...member,
+              user: {
+                ...(member.user as Record<string, unknown>),
+                isTestAccount,
+              },
+            },
+          ],
+        });
+        harness.prisma.membershipPayment.create.mockResolvedValue({
+          id: "renewal-1",
+          provider: "paytr",
+          paytrMerchant: PaytrMerchant.membership,
+        });
+        harness.provider.chargeRecurring.mockResolvedValue({
+          status: "success",
+          raw: {},
+        });
+        harness.virtualOrder.completeRecurringMembershipPayment.mockResolvedValue(
+          true,
+        );
+
+        await harness.service.runAutoRenewals();
+
+        expect(harness.paymentProviders.resolve).toHaveBeenCalledWith(
+          "paytr",
+          PaytrMerchant.membership,
+        );
+        expect(harness.provider.chargeRecurring).toHaveBeenCalledWith(
+          expect.objectContaining({ testMode: expected }),
+        );
+      },
+    );
+
     it("turns auto-renew off and asks the member to re-add a card when no usable membership card exists", async () => {
       const harness = makeService();
       recurringOn(harness);

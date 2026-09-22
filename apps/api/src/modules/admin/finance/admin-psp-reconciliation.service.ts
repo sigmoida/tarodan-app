@@ -13,6 +13,11 @@ import {
 } from "@prisma/client";
 import { PrismaService } from "../../../prisma";
 import {
+  LIVE_MEMBERSHIP_PAYMENT,
+  LIVE_PAYMENT,
+  LIVE_REFUND_ATTEMPT,
+} from "../../account-lane/live-lane.where";
+import {
   istanbulDayStart,
   trCalendarDate,
 } from "../../../common/helpers/tr-calendar";
@@ -133,8 +138,11 @@ export class AdminPspReconciliationService {
           },
           select: { merchantOid: true, transactionDate: true },
         }),
+        // Test şeridi (test_mode=1) canlı dökümde yoktur; "bizde var, PayTR'de
+        // yok" farkına girmesin. Üç "bizim" kümesi de aynı kuralla süzülür.
         this.prisma.payment.findMany({
           where: {
+            ...LIVE_PAYMENT,
             provider: "paytr",
             status: { in: [PaymentStatus.completed, PaymentStatus.refunded] },
             paidAt: { gte: since },
@@ -151,6 +159,7 @@ export class AdminPspReconciliationService {
         // Üyelik yenilemeleri Payment tablosunda değildir; ciroda ve dökümde vardır.
         this.prisma.membershipPayment.findMany({
           where: {
+            ...LIVE_MEMBERSHIP_PAYMENT,
             provider: "paytr",
             orderId: null,
             status: { in: [PaymentStatus.completed, PaymentStatus.refunded] },
@@ -166,6 +175,7 @@ export class AdminPspReconciliationService {
         }),
         this.prisma.refundAttempt.findMany({
           where: {
+            ...LIVE_REFUND_ATTEMPT,
             provider: "paytr",
             status: {
               in: [
@@ -365,8 +375,10 @@ export class AdminPspReconciliationService {
         },
         select: { merchantOid: true },
       }),
+      // Gün kartının "dökümde yok" sayısıyla AYNI küme: test şeridi hariç.
       this.prisma.payment.findMany({
         where: {
+          ...LIVE_PAYMENT,
           provider: "paytr",
           status: { in: [PaymentStatus.completed, PaymentStatus.refunded] },
           paidAt: { gte: dayStart, lt: dayEnd },
@@ -387,6 +399,7 @@ export class AdminPspReconciliationService {
       }),
       this.prisma.membershipPayment.findMany({
         where: {
+          ...LIVE_MEMBERSHIP_PAYMENT,
           provider: "paytr",
           orderId: null,
           status: { in: [PaymentStatus.completed, PaymentStatus.refunded] },
