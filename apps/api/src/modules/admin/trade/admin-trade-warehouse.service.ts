@@ -108,7 +108,12 @@ export class AdminTradeWarehouseService {
       };
     }
     const warehouse = await this.common.resolveWarehouseAddress();
+    const lane = await this.prisma.trade.findUnique({
+      where: { id: tradeId },
+      select: { isTest: true },
+    });
     const result = await this.cargo.createShipment({
+      testLane: lane?.isTest === true,
       idempotencyKey: `surat:trade-return:${oid}`,
       correlationId: `trade-reject-${tradeId}`,
       reference: oid,
@@ -179,7 +184,12 @@ export class AdminTradeWarehouseService {
       };
     }
     const warehouse = await this.common.resolveWarehouseAddress();
+    const lane = await this.prisma.trade.findUnique({
+      where: { id: tradeId },
+      select: { isTest: true },
+    });
     const result = await this.cargo.createShipment({
+      testLane: lane?.isTest === true,
       idempotencyKey: `surat:trade:${oid}`,
       correlationId: `trade-approve-${tradeId}`,
       reference: oid,

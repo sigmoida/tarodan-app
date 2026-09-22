@@ -8,6 +8,7 @@ import {
 } from "@nestjs/common";
 import { randomUUID } from "crypto";
 import { Prisma, type ElogoInvoice } from "@prisma/client";
+import { AccountLaneService } from "../account-lane/account-lane.service";
 import { PrismaService } from "../../prisma";
 import {
   ELOGO_MAX_SEND_ATTEMPTS,
@@ -72,6 +73,9 @@ export class ElogoDeliveryService {
     @Optional() private readonly storage?: StorageService,
     @Optional() private readonly smtp?: SmtpProvider,
     @Optional() private readonly notifications?: NotificationService,
+    // Test şeridi kapısı. AccountLaneModule @Global olduğu için runtime'da her
+    // zaman gelir; @Optional yalnız üç-argümanlı birim testleri için.
+    @Optional() private readonly lanes?: AccountLaneService,
   ) {}
 
   // ───────────────────────── core ─────────────────────────
@@ -84,6 +88,14 @@ export class ElogoDeliveryService {
     grossAmount: number,
     opts: CutOptions = {},
   ): Promise<void> {
+    // Test şeridi: alıcı test hesabıysa e-belge ÜRETME (GİB'e gerçek fatura
+    // gider, seri numarası tükenirdi). Kayıt da açılmaz; retry kuyruğuna girmez.
+    if (await this.lanes?.isTestLane(recipientUserId)) {
+      this.logger.log(
+        `eLogo skipped for test lane — ${type} source=${sourceId} recipient=${recipientUserId}`,
+      );
+      return;
+    }
     const {
       lineDescription,
       guestRecipient,

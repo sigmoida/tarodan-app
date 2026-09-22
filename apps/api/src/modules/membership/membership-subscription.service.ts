@@ -1034,6 +1034,8 @@ export class MembershipSubscriptionService {
             merchantOid,
             buyer,
             basketItems: basket,
+            // Test şeridi üyeliği (üyelik mağazasında da) test modunda yenilenir.
+            testMode: m.user.isTestAccount,
           });
 
         if (result.status === "success") {

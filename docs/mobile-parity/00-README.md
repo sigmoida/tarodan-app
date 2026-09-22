@@ -38,6 +38,7 @@ Sıra tesadüfi değil: para akışı ve yasal zorunluluk taşıyan alanlar önc
 | 17  | `17-api-delta-2026-08-04.md`    | **Değişiklik güncesi** (2 → 4 Ağu)                                                            |
 | 18  | `18-api-delta-2026-08-07.md`    | **Güncel değişiklik güncesi** (4 → 7 Ağu) — çelişkide bu kazanır                              |
 | 20  | `20-api-delta-2026-09-17.md`    | **Değişiklik güncesi** (17 Eyl) — üyelik ödemeleri ayrı PayTR mağazasında, kartlar amaca göre |
+| 20  | `20-test-lane-2026-09-08.md`    | **Canlı test şeridi** — App Review / QA hesapları, PayTR test modu                            |
 
 **Önce `11` ve `12` okunmalı.** Oradaki istemci sözleşmesi (bearer token, hata kodları,
 sayfalama) her domain dosyasında varsayılır ve tekrar edilmez.

@@ -2,6 +2,7 @@ import { Injectable, Logger } from "@nestjs/common";
 import { PrismaService } from "../../../prisma";
 import { ProductKind, ProductStatus } from "@prisma/client";
 import { saleCapableSellerWhere } from "../../membership/helpers/membership.util";
+import type { AccountLane } from "../../account-lane/account-lane";
 import { saleCapableEsFilters } from "../helpers/sale-capable-es-filter";
 import { StorageService } from "../../storage/storage.service";
 import { resolveBrandLogoUrl } from "../../brand/brand-logo-url";
@@ -49,9 +50,11 @@ export class SearchAutocompleteService {
     query: string,
     limit = 10,
     excludeSellerIds: string[] = [],
+    lane: AccountLane = "live",
   ): Promise<string[]> {
-    if (!this.common.isAvailable())
-      return this.fallbackAutocomplete(query, limit, excludeSellerIds);
+    // ES yalnız canlı ilanları indeksler → test şeridi her zaman Postgres yolu.
+    if (!this.common.isAvailable() || lane === "test")
+      return this.fallbackAutocomplete(query, limit, excludeSellerIds, lane);
 
     try {
       const response = await this.common.client.search({
@@ -113,7 +116,7 @@ export class SearchAutocompleteService {
         .slice(0, limit);
     } catch (error) {
       this.logger.warn("Elasticsearch autocomplete error, using fallback");
-      return this.fallbackAutocomplete(query, limit, excludeSellerIds);
+      return this.fallbackAutocomplete(query, limit, excludeSellerIds, lane);
     }
   }
 
@@ -121,6 +124,7 @@ export class SearchAutocompleteService {
     query: string,
     limit: number,
     excludeSellerIds: string[] = [],
+    lane: AccountLane = "live",
   ): Promise<string[]> {
     const productIds = await fulltextProductSearch(this.prisma, query, limit);
     if (productIds.length === 0) return [];
@@ -129,7 +133,7 @@ export class SearchAutocompleteService {
       where: {
         id: { in: productIds },
         status: ProductStatus.active,
-        seller: saleCapableSellerWhere(),
+        seller: saleCapableSellerWhere(undefined, lane),
         sellerId: excludeIds(excludeSellerIds),
         kind: ProductKind.listing,
       },
@@ -145,6 +149,7 @@ export class SearchAutocompleteService {
   async autocompleteRich(
     query: string,
     excludeSellerIds: string[] = [],
+    lane: AccountLane = "live",
   ): Promise<{
     products: Array<{
       id: string;
@@ -204,7 +209,7 @@ export class SearchAutocompleteService {
       conditions,
       suggestions,
     ] = await Promise.all([
-      this.richAutocompleteProducts(trimmed, 5, excludeSellerIds),
+      this.richAutocompleteProducts(trimmed, 5, excludeSellerIds, lane),
       this.richAutocompleteBrands(trimmed, 3),
       this.richAutocompleteCategories(trimmed, 3),
       this.richAutocompleteManufacturers(trimmed, 3),
@@ -212,7 +217,7 @@ export class SearchAutocompleteService {
       this.richAutocompleteScales(trimmed, 5),
       this.richAutocompleteMaterials(trimmed, 5),
       this.richAutocompleteConditions(trimmed, 5),
-      this.autocomplete(trimmed, 5, excludeSellerIds),
+      this.autocomplete(trimmed, 5, excludeSellerIds, lane),
     ]);
 
     return {
@@ -232,6 +237,7 @@ export class SearchAutocompleteService {
     query: string,
     limit: number,
     excludeSellerIds: string[] = [],
+    lane: AccountLane = "live",
   ): Promise<
     Array<{
       id: string;
@@ -241,7 +247,7 @@ export class SearchAutocompleteService {
       brandName?: string;
     }>
   > {
-    if (this.common.isAvailable()) {
+    if (this.common.isAvailable() && lane !== "test") {
       try {
         const response = await this.common.client.search({
           index: this.common.productsIndex,
@@ -318,7 +324,7 @@ export class SearchAutocompleteService {
             where: {
               id: { in: productIds },
               status: ProductStatus.active,
-              seller: saleCapableSellerWhere(),
+              seller: saleCapableSellerWhere(undefined, lane),
               sellerId: excludeIds(excludeSellerIds),
               kind: ProductKind.listing,
             },

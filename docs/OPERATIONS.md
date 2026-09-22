@@ -31,6 +31,40 @@
   API'den bağımsız acil yedek koddur. Erken erişim PIN'leri admin
   `System → Early Access`'ten yönetilir (unlock cookie 10 gün).
 
+### Canlıda test şeridi (App Review / mobil QA hesapları)
+
+Canlıda `User.isTestAccount=true` hesaplar izole bir **test şeridi** oluşturur
+(bkz. `docs/mobile-parity/20-test-lane-2026-09-08.md`). Sipariş/ödeme/takas/ledger
+satırları DB trigger'ıyla `is_test` damgası alır; uygulama kodu bayrağı unutamaz.
+
+- **Hesap açma:** admin → Sistem → Test Araçları → Test Şeridi (yalnız süper-admin,
+  audit'e yazılır). Hesap doğrulanmış ve adresli açılır.
+- **Ne olmaz:** PayTR gerçek tahsilat (form `test_mode=1`), Sürat gönderisi
+  (`TEST…` takip kodu), eLogo belgesi, payout, finans/dashboard sayımı, canlı
+  vitrinde görünürlük.
+- **Sıfırlama:** aynı karttaki "Şeridi sıfırla" test hesaplarının işlem
+  kayıtlarını siler; hesaplar ve ilanlar kalır. Canlı satırlar sorguya giremez
+  (filtre `is_test`/test hesap kimlikleri üzerinden). İki istisna:
+  - **Defter (`ledger_entries`) silinmez.** Tablo append-only (DELETE trigger'la
+    yasak) ve FK taşımaz — "kaynak satır silinse de iz kalır" tasarımı gereği.
+    Test satırları `is_test` damgalı olduğundan finans raporlarına girmez;
+    sıfırlama sonucu bunları `retainedLedgerEntries` olarak bildirir.
+  - **İade kalemleri için dar bir tahliye kapısı vardır.**
+    `refund_financial_components` ve `package_shipping_settlements` de
+    append-only; ama `refund_requests`'e ZORUNLU + `Restrict` ile bağlı oldukları
+    için silinmeden sipariş zinciri çözülemiyor. Guard yerinde kalır ve DELETE
+    yalnız iki koşul birden sağlanınca geçer: oturum `SET LOCAL
+app.test_lane_purge = 'on'` demiş olacak (yalnız `resetLane` transaction'ı
+    verir, commit/rollback'te düşer) **ve** satırın iade talebinin siparişi
+    `is_test=true` olacak. Canlı satırda ikinci koşul asla sağlanmaz; UPDATE her
+    koşulda yasaktır (`20260916130000_test_lane_purge_gate`).
+- **Guard:** prod'da test-modu PayTR callback'i yalnız `Payment.isTest=true`
+  ödemeler için kabul edilir; canlı ödemeye gelen `test_mode=1` başarı bildirimi
+  ve test ödemesine gelen `test_mode=0` başarı bildirimi reddedilir
+  (`PAYTR_TEST_MODE_CALLBACK_REJECTED`).
+- Yeni bir dış-dünya yan etkisi (fatura/kargo/para) eklenirse `isTest`
+  kapısı zorunludur; şerit kuralları `modules/account-lane/` altında.
+
 ### eLogo ortamı: demo ile canlı arasında "test bayrağı" yok
 
 eLogo'da PayTR/Sürat'taki gibi bir test modu yoktur; belgenin GİB'e gidip

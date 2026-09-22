@@ -1,5 +1,6 @@
 import { Prisma, ProductStatus } from "@prisma/client";
 import { saleCapableSellerWhere } from "../../membership/helpers/membership.util";
+import type { AccountLane } from "../../account-lane/account-lane";
 import { catalogProductWhere } from "./catalog-product-where";
 import {
   SCALE_GROUP_SLUG,
@@ -67,6 +68,12 @@ export interface ProductFilterParams {
    * Boş/undefined ise koşul eklenmez; anonim viewer için her zaman boştur.
    */
   hiddenSellerIds?: string[];
+
+  /**
+   * Viewer'ın hesap şeridi. Varsayılan `live`: test hesaplarının ilanları
+   * görünmez. Test şeridi viewer'ı yalnız test satıcılarını görür.
+   */
+  lane?: AccountLane;
 }
 
 export interface BuildWhereOptions {
@@ -116,6 +123,7 @@ export function buildProductWhere(
     attributeSlugs,
     attrGroups,
     hiddenSellerIds,
+    lane,
   } = params;
 
   const andConditions: Prisma.ProductWhereInput[] = [];
@@ -129,7 +137,7 @@ export function buildProductWhere(
   // Public catalog reads never expose a listing whose seller cannot currently
   // sell. The predicate is time-aware, so an expired BUSINESS term is hidden
   // even before the downgrade cron mutates the membership row.
-  andConditions.push({ seller: saleCapableSellerWhere() });
+  andConditions.push({ seller: saleCapableSellerWhere(undefined, lane) });
 
   const where: Prisma.ProductWhereInput = {
     ...catalogProductWhere(),

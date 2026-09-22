@@ -1,3 +1,4 @@
+import { accountLaneServiceStub } from "../../account-lane/account-lane.testing";
 import { ProductKind, ProductStatus } from "@prisma/client";
 import { ProductQueryService } from "./product-query.service";
 
@@ -31,6 +32,7 @@ describe("ProductQueryService.findSellerProducts", () => {
         isBlockedEither: async () => false,
         getHiddenUserIds: async () => [],
       } as any,
+      accountLaneServiceStub() as any,
     );
 
     const result = await service.findSellerProducts("seller-1", {

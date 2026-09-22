@@ -7,6 +7,8 @@ import {
 import { createHash } from "crypto";
 import { PrismaService } from "../../../prisma";
 import { UserBlockService } from "../../user-block/user-block.service";
+import { AccountLaneService } from "../../account-lane/account-lane.service";
+import type { AccountLane } from "../../account-lane/account-lane";
 import { excludeIds } from "../../user-block/user-block.helpers";
 import { i18nMessage } from "../../i18n";
 import { CacheService } from "../../cache/cache.service";
@@ -51,6 +53,7 @@ export class ProductQueryService {
     private readonly discountService: DiscountService,
     private readonly common: ProductCommonService,
     private readonly userBlocks: UserBlockService,
+    private readonly lanes: AccountLaneService,
   ) {}
 
   /**
@@ -65,6 +68,9 @@ export class ProductQueryService {
     // girer → anonim/çoğunluk aynı anahtarı paylaşmaya devam eder, sayfalama ve
     // total ise where'e girdiği için doğru kalır (post-filter olsa 17/20 sayfa).
     const hiddenSellerIds = await this.userBlocks.getHiddenUserIds(viewerId);
+    // Test şeridi: ES yalnız canlı ilanları indeksler; test viewer'ı her zaman
+    // Postgres yoluyla ve yalnız test satıcılarıyla listelenir.
+    const lane = await this.lanes.laneOfUser(viewerId);
     const {
       search,
       categoryId,
@@ -123,11 +129,12 @@ export class ProductQueryService {
       attributeSlugs: query.attributeSlugs,
       attrGroups: query.attrGroups,
       hidden: hashIds(hiddenSellerIds),
+      lane,
     })}`;
 
     const hasSearch = !!(search && String(search).trim());
     const isListAllOrPopular = !hasSearch && !discountOnly;
-    if (isListAllOrPopular) {
+    if (isListAllOrPopular || lane === "test") {
       // The plain browse / popular grid is the hottest surface and was the ONLY
       // list path bypassing the cache — so every request re-ran the per-product
       // fan-out in formatProductResponse (seller aggregates, campaign price, …).
@@ -136,7 +143,7 @@ export class ProductQueryService {
       // the search path (page/filters included), so pages don't cross-contaminate.
       return this.cache.getOrSet(
         cacheKey,
-        () => this.findAllViaPostgres(query, hiddenSellerIds),
+        () => this.findAllViaPostgres(query, hiddenSellerIds, lane),
         { ttl: 120 },
       );
     }
@@ -177,12 +184,15 @@ export class ProductQueryService {
    * GET /products/popular
    */
   async findPopular(limit: number, page: number, viewerId?: string) {
-    const hidden = await this.userBlocks.getHiddenUserIds(viewerId);
+    const [hidden, lane] = await Promise.all([
+      this.userBlocks.getHiddenUserIds(viewerId),
+      this.lanes.laneOfUser(viewerId),
+    ]);
     const where: Prisma.ProductWhereInput = {
       ...catalogProductWhere(),
       status: ProductStatus.active,
       AND: [{ OR: this.inStockOrConditions() }],
-      seller: saleCapableSellerWhere(),
+      seller: saleCapableSellerWhere(undefined, lane),
       sellerId: excludeIds(hidden),
     };
     const result = await paginate(
@@ -388,6 +398,7 @@ export class ProductQueryService {
   private async findAllViaPostgres(
     query: ProductQueryDto,
     hiddenSellerIds: string[] = [],
+    lane?: AccountLane,
   ) {
     const { discountOnly, sortBy, page = 1, limit = 20 } = query;
 
@@ -402,6 +413,7 @@ export class ProductQueryService {
         ...query,
         material: query.material,
         hiddenSellerIds,
+        lane,
         // Takas filtresinde satıcının GÜNCEL yetkisi de aranır (bayrak yalnız
         // niyettir; üyelik bitince üründe kalır).
         ...(query.tradeOnly
@@ -598,16 +610,19 @@ export class ProductQueryService {
     const cacheKey = `products:detail:${id}`;
     // Engelli satıcının ilanı viewer için yok: kontrol cache'in DIŞINDA
     // (detay projeksiyonu viewer-bağımsız kalır, anahtar patlamaz).
-    const hidden = await this.userBlocks.getHiddenUserIds(viewerId);
+    const [hidden, lane] = await Promise.all([
+      this.userBlocks.getHiddenUserIds(viewerId),
+      this.lanes.laneOfUser(viewerId),
+    ]);
 
     // Seller entitlement is evaluated outside the cached projection. Otherwise
     // a detail cached just before BUSINESS expiry remains purchasable-looking
-    // for the full cache TTL.
+    // for the full cache TTL. Şerit de burada: test ilanı canlı viewer'a 404.
     const publiclyViewable = await this.prisma.product.count({
       where: {
         ...catalogProductWhere(),
         id,
-        seller: saleCapableSellerWhere(),
+        seller: saleCapableSellerWhere(undefined, lane),
         sellerId: excludeIds(hidden),
         OR: [
           { status: ProductStatus.active },
@@ -776,14 +791,17 @@ export class ProductQueryService {
     });
     if (!product?.categoryId) return [];
 
-    const hidden = await this.userBlocks.getHiddenUserIds(viewerId);
+    const [hidden, lane] = await Promise.all([
+      this.userBlocks.getHiddenUserIds(viewerId),
+      this.lanes.laneOfUser(viewerId),
+    ]);
     const products = await this.prisma.product.findMany({
       where: {
         ...catalogProductWhere(),
         categoryId: product.categoryId,
         id: { not: productId },
         status: ProductStatus.active,
-        seller: saleCapableSellerWhere(),
+        seller: saleCapableSellerWhere(undefined, lane),
         sellerId: excludeIds(hidden),
         // Bulgu A: rezerv-duyarlı stok filtresi (kanonik inStockCondition ile aynı).
         // quantity = null → sınırsız stok (dijital/preorder) dahil; tamamen rezerve

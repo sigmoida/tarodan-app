@@ -79,6 +79,8 @@ export interface IPaymentProvider {
         ctoken: string;
         requireCvv: boolean;
       };
+      /** Test şeridi ödemesi: canlı merchant'ta test_mode=1. */
+      testMode?: boolean;
     },
   ): Promise<{
     action: string;
@@ -95,6 +97,8 @@ export interface IPaymentProvider {
     buyer: PayTRBuyer;
     basketItems: PayTRBasketItem[];
     cvv?: string;
+    /** Test şeridi üyeliği: test_mode=1. */
+    testMode?: boolean;
   }): Promise<{
     status: "success" | "failed" | "wait_callback";
     reason?: string;

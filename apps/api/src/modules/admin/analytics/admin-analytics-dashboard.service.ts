@@ -809,6 +809,7 @@ export class AdminAnalyticsDashboardService {
       this.prisma.order.aggregate({
         _sum: { commissionAmount: true },
         where: {
+          isTest: false,
           createdAt: { gte: startDate, lte: endDate },
           status: { in: [OrderStatus.completed, OrderStatus.delivered] },
         },
@@ -828,6 +829,7 @@ export class AdminAnalyticsDashboardService {
           sellerShippingAmount: true,
         },
         where: {
+          isTest: false,
           createdAt: { gte: startDate, lte: endDate },
           status: { in: [OrderStatus.completed, OrderStatus.delivered] },
         },
@@ -841,12 +843,14 @@ export class AdminAnalyticsDashboardService {
         WHERE created_at >= ${startDate} 
           AND created_at <= ${endDate}
           AND status IN ('completed', 'delivered')
+          AND is_test = false
         GROUP BY DATE_TRUNC('month', created_at)
         ORDER BY month DESC
       ` as Promise<Array<{ month: Date; total: number }>>,
       // Commission by category
       this.prisma.order.findMany({
         where: {
+          isTest: false,
           createdAt: { gte: startDate, lte: endDate },
           status: { in: [OrderStatus.completed, OrderStatus.delivered] },
         },

@@ -43,6 +43,13 @@ export interface CargoShipmentRequest {
    * raporlama tarafımız için taşınır.
    */
   isReturn?: boolean;
+  /**
+   * Test şeridi kolisi (bkz. account-lane): taşıyıcıya HİÇ gidilmez, sahte
+   * takip kodu ile yerel başarı döner. Sipariş/takas/iade akışı aynen ilerler,
+   * Sürat'ta fiziksel gönderi oluşmaz. Çağıran tarafın sorumluluğu: kaynağın
+   * (order/trade) `isTest` damgasını buraya taşımak.
+   */
+  testLane?: boolean;
 }
 
 export type CargoShipmentResult =
