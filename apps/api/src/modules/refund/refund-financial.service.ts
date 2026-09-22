@@ -19,6 +19,7 @@ import {
   SellerType,
   ShippingPackageTierCode,
 } from "@prisma/client";
+import { refundRequestKindOf } from "@tarodan/types";
 import { PrismaService } from "../../prisma";
 import { couponSurvivesFault } from "../discount/helpers/coupon-restore-policy";
 import type { CouponFaultParty } from "../discount/helpers/coupon-restore-policy";
@@ -764,9 +765,7 @@ export class RefundFinancialService {
         financials: preview.financials,
         ...(oldSnapshot ? { legacySnapshot: oldSnapshot } : {}),
       } as unknown as Prisma.InputJsonValue;
-      const suffix = current.policyCode.endsWith("_cancellation")
-        ? "cancellation"
-        : "return";
+      const suffix = refundRequestKindOf(current.policyCode);
 
       return tx.refundRequest.update({
         where: { id: current.id },
