@@ -31,11 +31,40 @@ import { NotificationType } from "../notification/dto/notification.dto";
 import { i18nMessage } from "../i18n";
 import {
   resolveCancellationPolicy,
+  resolvePlatformCancellationPolicy,
   resolveReturnPolicy,
 } from "./helpers/refund-financial-policy";
+import { isPreShipmentCancellableStatus } from "@tarodan/types";
+import { REFUND_REQUEST_ACTOR_KEY } from "../payment/helpers/refund-attempt-actor";
+import {
+  PLATFORM_CANCELLATION_FAULT_PARTY,
+  PLATFORM_CANCELLATION_REASON,
+  buyerCancellationSpec,
+  platformCancellationSpec,
+  type PreShipmentCancellationSpec,
+} from "./helpers/pre-shipment-cancellation";
 import { RefundNotificationService } from "./refund-notification.service";
 import { RefundFinancialService } from "./refund-financial.service";
 import { RefundShipmentService } from "./refund-shipment.service";
+
+/** Kargo öncesi iptalin okuduğu sipariş yükü (alıcı + platform iptali ortak). */
+const CANCELLATION_ORDER_INCLUDE = {
+  payment: true,
+  checkoutGroup: { include: { payment: true } },
+  shipment: true,
+  refundRequests: true,
+  package: {
+    select: {
+      shippingTariffId: true,
+      shippingTariffVersion: true,
+    },
+  },
+  product: { select: { shippingDesi: true } },
+} satisfies Prisma.OrderInclude;
+
+type CancellationOrder = Prisma.OrderGetPayload<{
+  include: typeof CANCELLATION_ORDER_INCLUDE;
+}>;
 
 /**
  * Cayma (iade talep) penceresi — satıcı payout takvimiyle AYNI kaynaktan gelir
@@ -195,40 +224,109 @@ export class RefundCreationService {
     );
   }
 
+  /**
+   * Alıcının kargo öncesi iptali. Burada yalnız yetki (siparişin alıcısı mı)
+   * kontrol edilir; para yolu platform iptaliyle ORTAK çekirdektir
+   * (executePreShipmentCancellation).
+   */
   async createCancellationRefund(
     orderId: string,
     requesterId: string,
     reasonCode: OrderCancellationReason,
     description?: string,
   ) {
-    const order = await this.prisma.order.findUnique({
-      where: { id: orderId },
-      include: {
-        payment: true,
-        checkoutGroup: { include: { payment: true } },
-        shipment: true,
-        refundRequests: true,
-        package: {
-          select: {
-            shippingTariffId: true,
-            shippingTariffVersion: true,
-          },
-        },
-        product: { select: { shippingDesi: true } },
-      },
-    });
-    if (!order) {
-      throw new NotFoundException(i18nMessage("server.refund.orderNotFound"));
-    }
+    const order = await this.loadOrderForCancellation(orderId);
     if (order.buyerId !== requesterId) {
       throw new ForbiddenException(
         i18nMessage("server.refund.onlyBuyerCanRequest"),
       );
     }
-    if (
-      order.status !== OrderStatus.paid &&
-      order.status !== OrderStatus.preparing
-    ) {
+    return this.executePreShipmentCancellation(
+      order,
+      buyerCancellationSpec(requesterId, reasonCode, description),
+    );
+  }
+
+  /**
+   * Platform (admin) iptali — kargo öncesi, SİPARİŞ (sepet kalemi) başına;
+   * grup (sepet) ödemesinde de çalışır, çünkü para yolu siparişin kendi
+   * payını iade eden processRefund'dur. Yetki kontrolü çağıranın (admin
+   * rolü) işidir. Alıcı iptaliyle AYNI çekirdekten geçer; fark yalnız
+   * platformCancellationSpec'tedir.
+   */
+  async createPlatformCancellationRefund(
+    orderId: string,
+    adminId: string,
+    reason: string,
+  ) {
+    const order = await this.loadOrderForCancellation(orderId);
+    return this.executePreShipmentCancellation(
+      order,
+      platformCancellationSpec(order.buyerId, adminId, reason),
+    );
+  }
+
+  /**
+   * Platform iptalinin önizlemesi: sipariş şimdi iptal edilse alıcıya dönecek
+   * tutar. İptalin kendisiyle AYNI hesap yolundan (v2: previewFullOrderRefund
+   * → computeV2Refund; v1: buildFinancialPolicySnapshot) gelir.
+   */
+  async previewPlatformCancellationRefund(orderId: string): Promise<{
+    refundAmount: number;
+    shippingRefunded: boolean;
+  }> {
+    if (this.financials.refundPolicyV2Enabled()) {
+      const financials = await this.financials.previewFullOrderRefund(
+        orderId,
+        PLATFORM_CANCELLATION_FAULT_PARTY,
+      );
+      return {
+        refundAmount: financials.buyerRefundAmount,
+        shippingRefunded: financials.components.some(
+          (component) =>
+            component.componentCode === "outbound_shipping" &&
+            component.treatment === "buyer_refund",
+        ),
+      };
+    }
+    const order = await this.loadOrderForCancellation(orderId);
+    const { financials } = await this.financials.buildFinancialPolicySnapshot(
+      order,
+      resolvePlatformCancellationPolicy(),
+      PLATFORM_CANCELLATION_REASON,
+      order.quantity ?? 1,
+      false,
+    );
+    return {
+      refundAmount: financials.buyerRefundAmount,
+      shippingRefunded: financials.outboundShippingRefundAmount > 0,
+    };
+  }
+
+  private async loadOrderForCancellation(orderId: string) {
+    const order = await this.prisma.order.findUnique({
+      where: { id: orderId },
+      include: CANCELLATION_ORDER_INCLUDE,
+    });
+    if (!order) {
+      throw new NotFoundException(i18nMessage("server.refund.orderNotFound"));
+    }
+    return order;
+  }
+
+  /**
+   * Kargo öncesi iptalin TEK para yolu — alıcı ve platform iptali buradan
+   * geçer. Uygunluk (statü, kargo devri, tamamlanmış ödeme, aktif talep yok)
+   * önce düz okumayla, sonra sipariş satırı KİLİTLİYKEN yeniden doğrulanır;
+   * talep satırı açılır, v2'de bileşenler kesinleşir, hold dondurulur ve
+   * iade processRefund ile (talep-bazlı idempotency anahtarıyla) yapılır.
+   * Kimin iptal ettiği yalnız `spec` üzerinden akar.
+   */
+  private async executePreShipmentCancellation(
+    order: CancellationOrder,
+    spec: PreShipmentCancellationSpec,
+  ) {
+    if (!isPreShipmentCancellableStatus(order.status)) {
       throw new BadRequestException(
         i18nMessage("server.refund.cancelPaidPreShipmentOnly"),
       );
@@ -242,8 +340,8 @@ export class RefundCreationService {
         i18nMessage("server.order.cancelAfterHandover"),
       );
     }
-    const payment =
-      order.payment ?? (order as any).checkoutGroup?.payment ?? null;
+    // Grup (sepet) ödemesinde ödeme satırı siparişe değil gruba bağlıdır.
+    const payment = order.payment ?? order.checkoutGroup?.payment ?? null;
     if (!payment || payment.status !== PaymentStatus.completed) {
       throw new BadRequestException(
         i18nMessage("server.refund.completedPaymentNotFound"),
@@ -257,12 +355,13 @@ export class RefundCreationService {
     }
 
     // Kargoya teslim edilmiş sipariş yukarıda reddedildi (iade talebine
-    // yönlendirilir), bu yüzden burada taşıma maliyeti hiç doğmamıştır.
-    const policy = resolveCancellationPolicy(reasonCode, { hasShipped: false });
+    // yönlendirilir), bu yüzden burada taşıma maliyeti hiç doğmamıştır —
+    // spec'in politikası `hasShipped: false` varsayımıyla kurulur.
+    const policy = spec.policy;
     const financial = await this.financials.buildFinancialPolicySnapshot(
       order,
       policy,
-      reasonCode,
+      spec.snapshotReason,
       order.quantity ?? 1,
       false,
     );
@@ -289,11 +388,7 @@ export class RefundCreationService {
             shipment: { select: { status: true, shippedAt: true } },
           },
         });
-        if (
-          !fresh ||
-          (fresh.status !== OrderStatus.paid &&
-            fresh.status !== OrderStatus.preparing)
-        ) {
+        if (!fresh || !isPreShipmentCancellableStatus(fresh.status)) {
           throw new BadRequestException(
             i18nMessage("server.refund.orderStatusChanged"),
           );
@@ -307,12 +402,12 @@ export class RefundCreationService {
           data: {
             refundNumber,
             orderId: order.id,
-            requesterId,
-            reason:
-              reasonCode === OrderCancellationReason.delivery_delayed
-                ? RefundReason.other
-                : RefundReason.changed_mind,
-            description: description?.trim() || null,
+            requesterId: spec.requesterId,
+            reason: spec.requestReason,
+            description: spec.description,
+            // Talep sonradan (admin onayı, takılı deneme kurtarması) iade
+            // edilirse iptal aktörü buradan okunur (refundRequestCancelActor).
+            metadata: { [REFUND_REQUEST_ACTOR_KEY]: spec.initiator },
             amount: financial.financials.buyerRefundAmount,
             refundQuantity: order.quantity ?? 1,
             status: policy.requiresAdminReview
@@ -327,7 +422,7 @@ export class RefundCreationService {
                   financialPolicySnapshot: {
                     version: 2,
                     provisional: true,
-                    claimReason: reasonCode,
+                    claimReason: spec.snapshotReason,
                     legacyProvisionalCalculation: financial.snapshot,
                   } as unknown as Prisma.InputJsonValue,
                 }
@@ -349,20 +444,16 @@ export class RefundCreationService {
     ) {
       created = await this.financials.finalizeAutomaticV2RefundDecision(
         created.id,
-        reasonCode === OrderCancellationReason.delivery_delayed
-          ? RefundReason.delivery_delayed
-          : RefundReason.changed_mind,
-        reasonCode === OrderCancellationReason.delivery_delayed
-          ? "seller"
-          : "buyer",
+        spec.resolvedReason,
+        spec.faultParty,
       );
     }
     await this.financials.freezeHoldForRefund(order.id, created.id);
     await this.prisma.order.update({
       where: { id: order.id },
       data: {
-        cancellationReasonCode: reasonCode,
-        cancelReason: description?.trim() || reasonCode,
+        cancellationReasonCode: spec.reasonCode,
+        cancelReason: spec.cancelReason,
         cancellationPolicySnapshot: financial.snapshot,
       },
     });
@@ -370,15 +461,15 @@ export class RefundCreationService {
     if (policy.requiresAdminReview) {
       await this.notifications.appendHistory(created.id, {
         action: "cancellation_pending_admin_review",
-        by: requesterId,
-        details: { reasonCode, policyCode: policy.policyCode },
+        by: spec.actorId,
+        details: { ...spec.historyDetails, policyCode: policy.policyCode },
       });
       await this.notifications.notifyRefundRequestOpened({
         refundRequestId: created.id,
         refundNumber,
         orderId: order.id,
         sellerId: order.sellerId,
-        reason: reasonCode,
+        reason: spec.snapshotReason,
         requiresAdminReview: true,
       });
       return created;
@@ -398,8 +489,11 @@ export class RefundCreationService {
         {
           skipRefundEvent: true,
           refundQuantity: order.quantity ?? 1,
+          // Talep başına sabit anahtar: çift tık / yeniden deneme aynı
+          // PayTR iadesine düşer, ikinci kez para çıkmaz.
           idempotencyKey: `refund-request:${created.id}`,
-          cancelledBy: CancellationActor.buyer,
+          // İptalin aktörü spec'ten — alıcı ya da platform (admin iptali).
+          cancelledBy: spec.initiator,
           settlement: {
             closeOrder: true,
             holdPortion: 1,
@@ -444,7 +538,7 @@ export class RefundCreationService {
       where: { id: created.id },
       data: {
         status: RefundRequestStatus.refunded,
-        decidedBy: "system",
+        decidedBy: spec.decidedBy,
         decidedAt: new Date(),
         refundedAt: new Date(),
         providerRefundId: refundResult?.providerRefundId ?? null,
@@ -456,9 +550,17 @@ export class RefundCreationService {
     });
     await this.notifications.appendHistory(created.id, {
       action: "cancellation_refunded",
-      by: "system",
-      details: { reasonCode },
+      by: spec.decidedBy,
+      details: spec.historyDetails,
     });
+    // processRefund `skipRefundEvent` ile çağrıldığından iptal duyurusunu o
+    // atmaz; kendisi iptal etmeyen taraflara (alıcı iptalinde satıcı, platform
+    // iptalinde ikisi) duyuru burada, para commit edildikten SONRA, best-effort.
+    await this.notifications.notifyOrderCancelled(
+      order.id,
+      Number(updated.amount),
+      spec.notifyParties,
+    );
     return updated;
   }
 

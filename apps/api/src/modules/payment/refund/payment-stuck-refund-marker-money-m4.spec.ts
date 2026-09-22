@@ -33,6 +33,8 @@ describe("RefundReconciliationService durable attempt recovery", () => {
     tradeAttempts?: Array<Record<string, unknown>>;
     staleCount?: number;
     manualReviewCount?: number;
+    /** Anahtarın gösterdiği iade talebinin metadata'sı. */
+    requestMetadata?: unknown;
   }) => {
     const prisma = {
       refundAttempt: {
@@ -47,6 +49,9 @@ describe("RefundReconciliationService durable attempt recovery", () => {
       },
       refundRequest: {
         updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+        findUnique: jest
+          .fn()
+          .mockResolvedValue({ metadata: opts?.requestMetadata ?? null }),
       },
     };
     const paymentRefund = {
@@ -122,6 +127,27 @@ describe("RefundReconciliationService durable attempt recovery", () => {
     expect(paymentRefund.processRefund).toHaveBeenCalledWith("order-1", 50, {
       idempotencyKey: "refund-request:refund-request-1",
       cancelledBy: CancellationActor.buyer,
+    });
+  });
+
+  it("recovers an admin (platform) cancellation attempt on behalf of the platform", async () => {
+    const attempt = orderAttempt({
+      idempotencyKey: "refund-request:refund-request-1",
+    });
+    const { service, paymentRefund, prisma } = makeService({
+      orderAttempts: [attempt],
+      requestMetadata: { cancellationActor: CancellationActor.platform },
+    });
+
+    await service.reconcileStuckRefundMarkers();
+
+    expect(prisma.refundRequest.findUnique).toHaveBeenCalledWith({
+      where: { id: "refund-request-1" },
+      select: { metadata: true },
+    });
+    expect(paymentRefund.processRefund).toHaveBeenCalledWith("order-1", 50, {
+      idempotencyKey: "refund-request:refund-request-1",
+      cancelledBy: CancellationActor.platform,
     });
   });
 

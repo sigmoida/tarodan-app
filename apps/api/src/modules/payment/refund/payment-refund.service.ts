@@ -29,7 +29,6 @@ import { PaymentProvider } from "../dto";
 import { EventService } from "../../events";
 import { NotificationService } from "../../notification/notification.service";
 import { DiscountService } from "../../discount/discount.service";
-import { NotificationType } from "../../notification/dto/notification.dto";
 import { CommissionLedgerService } from "../../commission/commission-ledger.service";
 import { ElogoInvoicingService } from "../../elogo";
 import { PaymentCommonService } from "../payment-common.service";
@@ -246,17 +245,10 @@ export class PaymentRefundService {
         if (order.cancellationType === "iptal") {
           // Kargo öncesi İPTAL: para iade ediliyor ama kullanıcıya "iade" değil "iptal"
           // denmeli. Alıcı + satıcıya iptal bildirimi + order-cancelled maili; refunded ATLA.
-          await this.notificationService.createInAppNotification(
-            order.buyerId,
-            NotificationType.ORDER_CANCELLED,
-            { orderId, orderNumber: order.orderNumber, amount: amountToRefund },
+          await this.notificationService.notifyOrderCancelledParties(
+            order,
+            amountToRefund,
           );
-          await this.notificationService.createInAppNotification(
-            order.sellerId,
-            NotificationType.ORDER_CANCELLED_SELLER,
-            { orderId, orderNumber: order.orderNumber },
-          );
-          await this.notificationService.sendOrderCancelledEmails(orderId);
           this.logger.log(
             `order_cancelled notification sent for order ${orderId} (cancellationType=iptal)`,
           );

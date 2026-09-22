@@ -70,6 +70,26 @@ export type RefundFinancialPersistenceData = Pick<
 >;
 
 /**
+ * v2 iade hesabının okuduğu sipariş yükü — talep önizlemesi (admin kararı,
+ * otomatik finalize) ile kargo öncesi iptal önizlemesi AYNI şekli okur.
+ */
+const V2_REFUND_ORDER_INCLUDE = {
+  shipment: true,
+  product: {
+    select: {
+      shippingPackageTier: true,
+      shippingDesi: true,
+    },
+  },
+  seller: { select: { sellerType: true } },
+  package: true,
+} satisfies Prisma.OrderInclude;
+
+type V2RefundOrder = Prisma.OrderGetPayload<{
+  include: typeof V2_REFUND_ORDER_INCLUDE;
+}>;
+
+/**
  * İade parasının hesabı ve kalıcılaştırılması — RefundService'in finansal
  * çekirdeği birebir taşındı. Burada yaşayanlar tek bir soruyu cevaplar:
  * "bu iade kime ne kadar para hareketi doğurur?" — talebin yaşam döngüsü,
@@ -194,21 +214,7 @@ export class RefundFinancialService {
   }> {
     const rr = await this.prisma.refundRequest.findUnique({
       where: { id: refundRequestId },
-      include: {
-        order: {
-          include: {
-            shipment: true,
-            product: {
-              select: {
-                shippingPackageTier: true,
-                shippingDesi: true,
-              },
-            },
-            seller: { select: { sellerType: true } },
-            package: true,
-          },
-        },
-      },
+      include: { order: { include: V2_REFUND_ORDER_INCLUDE } },
     });
     if (!rr) throw new NotFoundException(i18nMessage("server.refund.notFound"));
     if (
@@ -225,13 +231,95 @@ export class RefundFinancialService {
         i18nMessage("server.refund.policyAlreadyFinal"),
       );
     }
+
+    const order = rr.order;
+    const {
+      outboundTier,
+      outboundFullShippingAmount,
+      outboundAlreadySettled,
+      completesLine,
+      closesPackageShipping,
+      returnTariff,
+      financials,
+    } = await this.computeV2Refund(
+      order,
+      { refundQuantity: rr.refundQuantity, excludeRefundRequestId: rr.id },
+      faultParty,
+    );
+    const tokenPayload = {
+      refundRequestId: rr.id,
+      refundUpdatedAt: rr.updatedAt.toISOString(),
+      orderId: order.id,
+      orderVersion: order.version,
+      resolvedReason,
+      faultParty,
+      outboundTier,
+      outboundFullShippingAmount,
+      serviceVatRate: Number(order.serviceVatRate ?? 0),
+      outboundAlreadySettled,
+      completesLine,
+      closesPackageShipping,
+      returnTariff,
+      financials,
+    };
+    const calculationToken = createHash("sha256")
+      .update(JSON.stringify(tokenPayload))
+      .digest("hex");
+
+    return {
+      calculationToken,
+      resolvedReason,
+      faultParty,
+      outboundPackageTier: outboundTier,
+      outboundFullShippingAmount,
+      serviceVatRate: Number(order.serviceVatRate ?? 0),
+      returnTariff,
+      financials,
+    };
+  }
+
+  /**
+   * Kargo öncesi TAM iptalin önizlemesi — henüz talep satırı yokken "bu sipariş
+   * şimdi iptal edilse alıcıya ne döner?" sorusu. Talep önizlemesiyle
+   * (previewRefundDecision) AYNI hesabı koşar; admin iptal ekranında gösterilen
+   * tutar ile iptal anında yazılan tutar tek fonksiyondan gelir.
+   */
+  async previewFullOrderRefund(
+    orderId: string,
+    faultParty: RefundFaultPartyV2,
+  ): Promise<RefundFinancialResultV2> {
+    const order = await this.prisma.order.findUnique({
+      where: { id: orderId },
+      include: V2_REFUND_ORDER_INCLUDE,
+    });
+    if (!order) {
+      throw new NotFoundException(i18nMessage("server.refund.orderNotFound"));
+    }
+    const { financials } = await this.computeV2Refund(
+      order,
+      { refundQuantity: order.quantity ?? 1 },
+      faultParty,
+    );
+    return financials;
+  }
+
+  /**
+   * v2 iade hesabının sipariş tarafı: kargo kademeleri, koli mutabakatı, satır
+   * ve paket tamamlama, bileşen hesabı. `excludeRefundRequestId` hesaplanan
+   * talebin kendisidir (önceki iadeler sayılırken dışarıda kalır); talep henüz
+   * yoksa verilmez.
+   */
+  private async computeV2Refund(
+    order: V2RefundOrder,
+    refund: { refundQuantity: number; excludeRefundRequestId?: string },
+    faultParty: RefundFaultPartyV2,
+  ) {
     if (!this.shippingTariffService) {
       throw new BadRequestException(
         i18nMessage("server.refund.tariffServiceUnavailable"),
       );
     }
 
-    const order = rr.order;
     const originalTariff = order.package?.shippingTariffId
       ? await this.shippingTariffService.getById(order.package.shippingTariffId)
       : null;
@@ -255,7 +343,7 @@ export class RefundFinancialService {
     // yazılıyordu.)
     const returnBillableDesi = Math.max(
       1,
-      (order.product.shippingDesi ?? 1) * rr.refundQuantity,
+      (order.product.shippingDesi ?? 1) * refund.refundQuantity,
     );
     const returnTier = activeReturnTariff
       ? resolvePackageTier(activeReturnTariff, returnBillableDesi)
@@ -305,7 +393,9 @@ export class RefundFinancialService {
     const priorRefundedRows = await this.prisma.refundRequest.findMany({
       where: {
         orderId: order.id,
-        id: { not: rr.id },
+        ...(refund.excludeRefundRequestId
+          ? { id: { not: refund.excludeRefundRequestId } }
+          : {}),
         status: RefundRequestStatus.refunded,
       },
       select: { refundQuantity: true },
@@ -315,7 +405,7 @@ export class RefundFinancialService {
       0,
     );
     const completesLine =
-      priorRefundedQuantity + rr.refundQuantity >= (order.quantity ?? 1);
+      priorRefundedQuantity + refund.refundQuantity >= (order.quantity ?? 1);
     /**
      * Kargo bedeli PAKET başınadır (escrow hold'u da tam kargoyu paketten bir
      * kez düşer), bu yüzden satırın tamamlanması tek başına yetmez: koli hâlâ
@@ -349,7 +439,7 @@ export class RefundFinancialService {
       serviceVatRate: Number(order.serviceVatRate ?? 0),
       returnShippingAmount: Number(returnTier?.amount ?? 0),
       orderQuantity: order.quantity ?? 1,
-      refundQuantity: rr.refundQuantity,
+      refundQuantity: refund.refundQuantity,
       faultParty,
       hasShipped,
       outboundAlreadySettled,
@@ -365,33 +455,13 @@ export class RefundFinancialService {
           amount: Number(returnTier!.amount),
         }
       : null;
-    const tokenPayload = {
-      refundRequestId: rr.id,
-      refundUpdatedAt: rr.updatedAt.toISOString(),
-      orderId: order.id,
-      orderVersion: order.version,
-      resolvedReason,
-      faultParty,
+
+    return {
       outboundTier,
       outboundFullShippingAmount,
-      serviceVatRate: Number(order.serviceVatRate ?? 0),
       outboundAlreadySettled,
       completesLine,
       closesPackageShipping,
-      returnTariff,
-      financials,
-    };
-    const calculationToken = createHash("sha256")
-      .update(JSON.stringify(tokenPayload))
-      .digest("hex");
-
-    return {
-      calculationToken,
-      resolvedReason,
-      faultParty,
-      outboundPackageTier: outboundTier,
-      outboundFullShippingAmount,
-      serviceVatRate: Number(order.serviceVatRate ?? 0),
       returnTariff,
       financials,
     };

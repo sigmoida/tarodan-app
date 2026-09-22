@@ -421,15 +421,26 @@ export class RefundReconciliationService {
       if (!attempt.orderId) continue;
       checked++;
       try {
+        const refundRequestId = refundRequestIdOf(attempt.idempotencyKey);
+        // Talepten doğan denemede aktör talebin kendisindedir (alıcı ya da
+        // platform iptali) — anahtar tek başına ayırt edemez.
+        const request = refundRequestId
+          ? await this.prisma.refundRequest.findUnique({
+              where: { id: refundRequestId },
+              select: { metadata: true },
+            })
+          : null;
         const result = await this.paymentRefund.processRefund(
           attempt.orderId,
           Number(attempt.amount),
           {
             idempotencyKey: attempt.idempotencyKey,
-            cancelledBy: refundAttemptCancelActor(attempt.idempotencyKey),
+            cancelledBy: refundAttemptCancelActor(
+              attempt.idempotencyKey,
+              request?.metadata,
+            ),
           },
         );
-        const refundRequestId = refundRequestIdOf(attempt.idempotencyKey);
         if (refundRequestId) {
           await this.prisma.refundRequest.updateMany({
             where: {

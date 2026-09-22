@@ -7,6 +7,10 @@ import { Injectable, Logger } from "@nestjs/common";
 import { PrismaService } from "../../prisma";
 import { NotificationType, NotificationChannel } from "./dto";
 import type { NotificationAudience } from "./helpers/notification-link";
+import {
+  ALL_ORDER_CANCEL_PARTIES,
+  type OrderCancelNoticeParty,
+} from "./helpers/order-cancel-notice";
 import { StorageService } from "../storage/storage.service";
 import { NotificationDispatchService } from "./notification-dispatch.service";
 import { frontendUrl as resolveFrontendUrl } from "../../config/app-urls";
@@ -406,13 +410,55 @@ export class NotificationCommerceService {
   }
 
   /**
+   * Kargo öncesi İPTAL duyurusu. Para iade ediliyor ama kullanıcıya "iade"
+   * değil "iptal" denir: alıcıya ORDER_CANCELLED (iade tutarıyla), satıcıya
+   * ORDER_CANCELLED_SELLER ("kargoya vermeyin") + her birine iptal e-postası
+   * (gerekçe `Order.cancelReason`'dan). processRefund'ın iptal dalı, alıcı
+   * iptali (yalnız satıcıya) ve platform iptali (ikisine) bu tek tanımı
+   * kullanır; kime gideceğini çağıran söyler.
+   */
+  async notifyOrderCancelledParties(
+    order: {
+      id: string;
+      orderNumber: string;
+      buyerId: string;
+      sellerId: string;
+    },
+    refundAmount: number,
+    parties: readonly OrderCancelNoticeParty[] = ALL_ORDER_CANCEL_PARTIES,
+  ): Promise<void> {
+    if (parties.includes("buyer")) {
+      await this.dispatch.createInAppNotification(
+        order.buyerId,
+        NotificationType.ORDER_CANCELLED,
+        {
+          orderId: order.id,
+          orderNumber: order.orderNumber,
+          amount: refundAmount,
+        },
+      );
+    }
+    if (parties.includes("seller")) {
+      await this.dispatch.createInAppNotification(
+        order.sellerId,
+        NotificationType.ORDER_CANCELLED_SELLER,
+        { orderId: order.id, orderNumber: order.orderNumber },
+      );
+    }
+    await this.sendOrderCancelledEmails(order.id, parties);
+  }
+
+  /**
    * Sipariş iptali e-postaları: alıcıya `order-cancelled-buyer`, satıcıya
    * `order-cancelled-seller`. Stokout oto-iptal ve ödeme-süresi-doldu
    * senaryolarında çağrılır (in-app/push bildirimler ayrıca gönderilir; bu
    * metod yalnız e-posta fan-out'u yapar). Bu senaryolarda alıcıdan ücret
    * tahsil edilmediği için refundAmount geçilmez. Asla throw etmez.
    */
-  async sendOrderCancelledEmails(orderId: string): Promise<void> {
+  async sendOrderCancelledEmails(
+    orderId: string,
+    parties: readonly OrderCancelNoticeParty[] = ALL_ORDER_CANCEL_PARTIES,
+  ): Promise<void> {
     try {
       const order = await this.prisma.order.findUnique({
         where: { id: orderId },
@@ -431,19 +477,21 @@ export class NotificationCommerceService {
       const reason = order.cancelReason ?? undefined;
       const productTitle = order.product?.title ?? "";
 
-      await this.dispatch.sendTemplateEmailToUser(
-        order.buyerId,
-        "order-cancelled-buyer",
-        {
-          buyerName: order.buyer?.displayName ?? "",
-          orderNumber: order.orderNumber,
-          orderId: order.id,
-          productTitle,
-          reason,
-        },
-      );
+      if (parties.includes("buyer")) {
+        await this.dispatch.sendTemplateEmailToUser(
+          order.buyerId,
+          "order-cancelled-buyer",
+          {
+            buyerName: order.buyer?.displayName ?? "",
+            orderNumber: order.orderNumber,
+            orderId: order.id,
+            productTitle,
+            reason,
+          },
+        );
+      }
 
-      if (order.sellerId) {
+      if (order.sellerId && parties.includes("seller")) {
         await this.dispatch.sendTemplateEmailToUser(
           order.sellerId,
           "order-cancelled-seller",

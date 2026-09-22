@@ -1,6 +1,7 @@
 import {
   calculateRefundFinancials,
   resolveCancellationPolicy,
+  resolvePlatformCancellationPolicy,
   resolveReturnPolicy,
 } from "./refund-financial-policy";
 
@@ -91,6 +92,35 @@ describe("refund financial policy", () => {
       refundBuyerProtectionFee: true,
       refundSellerPlatformFee: false,
       requiresAdminReview: false,
+    });
+  });
+
+  it("refunds the buyer every charged line on a platform (admin) cancellation", () => {
+    const policy = resolvePlatformCancellationPolicy();
+    expect(policy).toMatchObject({
+      policyCode: "platform_cancellation",
+      requiresAdminReview: false,
+      requiresEvidence: false,
+    });
+
+    const result = calculateRefundFinancials(policy, {
+      ...orderAmounts,
+      returnShippingAmount: 0,
+    });
+
+    expect(result).toMatchObject({
+      productRefundAmount: 1000,
+      outboundShippingRefundAmount: 130,
+      buyerProtectionRefundAmount: 50,
+      buyerRefundAmount: 1180,
+      // Seller deductions are reversed and, since nothing was carried, the
+      // seller's prepaid shipping share is compensated.
+      sellerFeeRefundAmount: 100,
+      sellerPlatformFeeRetainedAmount: 0,
+      sellerShippingCompensationAmount: 40,
+      outboundShippingChargeToSeller: 0,
+      returnShippingChargeToBuyer: 0,
+      returnShippingChargeToSeller: 0,
     });
   });
 
