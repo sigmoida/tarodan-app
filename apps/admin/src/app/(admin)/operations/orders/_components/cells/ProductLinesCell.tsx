@@ -2,7 +2,6 @@ import { useTranslations } from "next-intl";
 import type { AdminOrderLineProduct, AdminOrderListRow } from "@tarodan/types";
 import { CellProduct } from "@/components/table";
 import { PackageStack } from "./PackageStack";
-import { PartyInline } from "./PartyCell";
 
 function ProductLine({
   product,
@@ -38,9 +37,10 @@ function ProductLine({
 }
 
 /**
- * Ürün bilgileri, paket (satıcı) başına gruplu: başlıkta satıcı ve paket
- * numarası, altında kalemler (görsel, ad, adet, marka, ürün/model kodu,
- * sipariş no). Siparişe dönmemiş teklifte tek ürün ve teklif alan satıcı.
+ * Ürün bilgileri, paket başına gruplu kalemler (görsel, ad, adet, marka,
+ * ürün/model kodu, sipariş no). Satıcı ve paket numarası yandaki Satıcı
+ * kolonundadır (`SellerLinesCell`), kalem kalem aynı hizada. Paketi olmayan
+ * teklif satırında teklif verilen tek ürün.
  */
 export function ProductLinesCell({
   row,
@@ -49,24 +49,14 @@ export function ProductLinesCell({
   // paket sözleşmesini taşır ve bu hücreyi yeniden kullanır.
   row: Pick<AdminOrderListRow, "packages" | "offer">;
 }) {
-  const t = useTranslations();
-
   if (row.packages.length === 0 && row.offer) {
     return (
-      <div className="flex min-w-0 flex-col">
-        <div className="flex h-6 min-w-0 items-center gap-2 text-xs text-muted">
-          <span className="shrink-0">
-            {t("admin.operations.common.seller")}
-          </span>
-          <PartyInline party={row.offer.seller} />
-        </div>
-        <div className="flex h-16 items-center">
-          <ProductLine
-            product={row.offer.product}
-            quantity={1}
-            orderNumber={null}
-          />
-        </div>
+      <div className="flex h-16 min-w-0 items-center">
+        <ProductLine
+          product={row.offer.product}
+          quantity={1}
+          orderNumber={null}
+        />
       </div>
     );
   }
@@ -74,17 +64,6 @@ export function ProductLinesCell({
   return (
     <PackageStack
       packages={row.packages}
-      header={(pkg) => (
-        <span className="flex min-w-0 items-center gap-2">
-          <span className="shrink-0">
-            {t("admin.operations.common.seller")}
-          </span>
-          <PartyInline party={pkg.seller} />
-          {pkg.packageNumber && (
-            <span className="shrink-0 font-mono">{pkg.packageNumber}</span>
-          )}
-        </span>
-      )}
       line={(line) => (
         <ProductLine
           product={line.product}
