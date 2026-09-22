@@ -6856,6 +6856,24 @@
           "noShipment": "Kargo kaydı yok",
           "openOrder": "Sipariş dosyasını aç",
           "openOffer": "Teklif detayını aç"
+        },
+        "cancel": {
+          "action": "Siparişi iptal et",
+          "title": "Siparişi iptal et",
+          "description": "#{orderNumber} numaralı sipariş iptal edilecek. Sepetteki diğer ürünler etkilenmez.",
+          "warning": "Alıcıya ödeme iadesi yapılır ve bu işlem geri alınamaz. Kargo etiketi oluşturulduysa kargo kaydı da iptal edilir; stok ürüne geri eklenir.",
+          "refundAmount": "Alıcıya iade edilecek tutar",
+          "shippingIncluded": "Kargo bedeli dahil",
+          "shippingExcluded": "Kargo bedeli hariç — paketteki diğer ürünler yine gönderilecek",
+          "previewLoading": "İade tutarı hesaplanıyor…",
+          "previewUnavailable": "İade tutarı şu an hesaplanamadı. İptal yine de kargo öncesi iptal politikasının tutarıyla yapılır.",
+          "reason": "İptal gerekçesi",
+          "reasonPlaceholder": "Gerekçe denetim kaydına yazılır ve iptal e-postasında alıcıya ve satıcıya iletilir",
+          "confirm": "İptal et ve iade et",
+          "success": "Sipariş iptal edildi, alıcıya iade yapıldı",
+          "failed": "Sipariş iptal edilemedi",
+          "pendingManual": "Bu siparişin iptali İade Talepleri'nde elle tamamlanmayı bekliyor (iade işlemi yarıda kaldı).",
+          "openPendingRefund": "Talebi aç"
         }
       },
       "trades": {
@@ -9002,7 +9020,7 @@
       },
       "orderCancelledSeller": {
         "title": "Satış İptal Edildi",
-        "message": "{orderNumber} numaralı siparişiniz iptal edildi."
+        "message": "{orderNumber} numaralı sipariş iptal edildi. Ürünü kargoya vermeyin."
       },
       "orderCancelledOutOfStock": {
         "title": "Siparişiniz iptal edildi: stok tükendi",
@@ -9899,7 +9917,13 @@
         "tariffUnverifiable": "Siparişin kargo tarifesi artık doğrulanamıyor",
         "couponChangesShipping": "Kupon kargo ücretini değiştiriyor; sipariş yeni checkout ile oluşturulmalı",
         "shipmentToDeliveredForbidden": "Kargo {status} durumundan teslim edildi durumuna geçirilemez",
-        "shipmentToInTransitForbidden": "Kargo {status} durumundan yolda durumuna geçirilemez"
+        "shipmentToInTransitForbidden": "Kargo {status} durumundan yolda durumuna geçirilemez",
+        "cancelNotPaid": "Ödemesi tamamlanmamış sipariş iptal edilemez; iade edilecek bir tahsilat yok",
+        "cancelAlreadyClosed": "Sipariş zaten iptal edilmiş veya iade edilmiş",
+        "cancelActiveRefund": "Siparişte açık bir iade/iptal talebi var; işlemi İade Talepleri ekranından sürdürün",
+        "cancelAfterHandover": "Kargoya verilmiş sipariş iptal edilemez; bu aşamada iade talebi akışını kullanın",
+        "cancelReasonRequired": "İptal gerekçesi zorunludur",
+        "cancelPendingManualCompletion": "Bu siparişin iptali ({refundNumber}) İade Talepleri'nde elle tamamlanmayı bekliyor; yeniden iptal etmek yerine talebi oradan sonuçlandırın"
       },
       "user": {
         "notBanned": "Kullanıcı zaten engelli değil",
