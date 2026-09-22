@@ -330,7 +330,11 @@ describe("AdminAnalyticsDashboardService.getDashboardStats", () => {
       await service.getDashboardStats();
 
       const wheres = whereFor("tradeCashPayment") as Array<Record<string, any>>;
-      const byTradeCompletion = wheres.filter((where) => where.trade);
+      // İki metrik de takasın şeridini süzer (`trade.isTest`); ayrım damgada:
+      // tamamlanan tutar takasın `completedAt`inden, ücret ödemenin `paidAt`inden.
+      const byTradeCompletion = wheres.filter(
+        (where) => where.trade && "completedAt" in where.trade,
+      );
       const byPaidAt = wheres.filter((where) => "paidAt" in where);
 
       // completedTradeAmount vs tradeFeeRevenue — two DIFFERENT event stamps,
@@ -338,6 +342,10 @@ describe("AdminAnalyticsDashboardService.getDashboardStats", () => {
       expect(byTradeCompletion).toHaveLength(4);
       expect(byPaidAt).toHaveLength(4);
       expect(byTradeCompletion[0]).toMatchObject({ status: "completed" });
+      expect(byPaidAt.every((w) => !("completedAt" in (w.trade ?? {})))).toBe(
+        true,
+      );
+      wheres.forEach((where) => expect(where.trade.isTest).toBe(false));
       expect(
         byTradeCompletion.some(
           (w) => w.trade?.completedAt?.gte?.getTime() === todayStart.getTime(),

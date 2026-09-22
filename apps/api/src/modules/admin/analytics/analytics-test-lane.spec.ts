@@ -1,4 +1,3 @@
-import { Prisma } from "@prisma/client";
 import { AdminAnalyticsDashboardService } from "./admin-analytics-dashboard.service";
 import { AdminDashboardStockService } from "./dashboard/admin-dashboard-stock.service";
 import { AnalyticsCatalogService } from "./insights/analytics-catalog.service";
@@ -32,12 +31,11 @@ function sqlText(strings: readonly string[], values: unknown[]): string {
   return strings
     .map((part, index) => {
       const value = values[index];
+      // Prisma.Sql şekli (`sql` metni): iç içe parçalar oluşturulurken düzleşir.
       const rendered =
-        value instanceof Prisma.Sql
-          ? value.sql
-          : value && typeof value === "object" && "sql" in value
-            ? String((value as { sql: unknown }).sql)
-            : "";
+        value && typeof value === "object" && "sql" in value
+          ? String((value as { sql: unknown }).sql)
+          : "";
       return part + rendered;
     })
     .join("");

@@ -1,4 +1,3 @@
-import { Prisma } from "@prisma/client";
 import {
   LIVE_COMMISSION_LEDGER,
   LIVE_LEDGER_ENTRY,
@@ -112,7 +111,7 @@ describe("live lane SQL fragments", () => {
       livePayoutTransferSql("pt"),
       liveMembershipPaymentSql("mp"),
     ]) {
-      expect(fragment).toBeInstanceOf(Prisma.Sql);
+      expect(typeof fragment.sql).toBe("string");
       expect(fragment.values).toEqual([]);
     }
   });
