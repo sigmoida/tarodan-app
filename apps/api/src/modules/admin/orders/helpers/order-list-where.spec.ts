@@ -1,18 +1,12 @@
+import { ADMIN_ORDER_TABS } from "@tarodan/types";
+import { cartBucketWhere, groupLines, singleLine } from "./order-bucket-where";
 import {
-  cartBucketWhere,
-  groupLines,
-  offerBucketWhere,
-  singleLine,
-} from "./order-bucket-where";
-import {
-  offerFilterWhere,
   orderLineFilterWhere,
   orderLineScopeWhere,
   orderListScopeOf,
   orderListSourceWheres,
 } from "./order-list-where";
 
-const NOW = new Date("2026-09-17T12:00:00.000Z");
 const contains = (term: string) => ({ contains: term, mode: "insensitive" });
 
 describe("orderLineFilterWhere", () => {
@@ -98,42 +92,6 @@ describe("orderLineFilterWhere", () => {
   });
 });
 
-describe("offerFilterWhere", () => {
-  it("reads order codes through the offer's order", () => {
-    expect(
-      offerFilterWhere({ orderNumber: "ORD-1", packageNumber: "PKG-1" }),
-    ).toEqual({
-      AND: [
-        { OR: [{ order: { orderNumber: contains("ORD-1") } }] },
-        {
-          OR: [{ order: { package: { packageNumber: contains("PKG-1") } } }],
-        },
-      ],
-    });
-  });
-
-  it("a group-number filter matches no offer (offers never have a group)", () => {
-    expect(offerFilterWhere({ groupNumber: "GRP-1" })).toEqual({
-      AND: [{ id: { in: [] } }],
-    });
-  });
-
-  it("uses the same party columns as orders", () => {
-    expect(offerFilterWhere({ party: "ali", userId: "u1" })).toEqual(
-      expect.objectContaining({
-        AND: expect.arrayContaining([
-          expect.objectContaining({
-            OR: expect.arrayContaining([
-              { seller: { adminCode: contains("ali") } },
-            ]),
-          }),
-          { OR: [{ buyerId: "u1" }, { sellerId: "u1" }] },
-        ]),
-      }),
-    );
-  });
-});
-
 describe("orderListSourceWheres", () => {
   const LOOSE = {
     checkoutGroupId: null,
@@ -141,7 +99,7 @@ describe("orderListSourceWheres", () => {
   };
 
   it("all tab = every checkout group + groupless direct/offer orders", () => {
-    expect(orderListSourceWheres("all", undefined, {}, NOW)).toEqual({
+    expect(orderListSourceWheres("all", undefined, {})).toEqual({
       group: { AND: [] },
       loose: {
         AND: [{ ...LOOSE, origin: { in: ["direct_sale", "offer"] } }],
@@ -151,18 +109,15 @@ describe("orderListSourceWheres", () => {
 
   it("the all bucket adds no bucket condition — same as no bucket", () => {
     const filters = { userId: "u1" };
-    for (const tab of ["all", "direct_sale", "offer"] as const) {
-      expect(orderListSourceWheres(tab, "all", filters, NOW)).toEqual(
-        orderListSourceWheres(tab, undefined, filters, NOW),
+    for (const tab of ADMIN_ORDER_TABS) {
+      expect(orderListSourceWheres(tab, "all", filters)).toEqual(
+        orderListSourceWheres(tab, undefined, filters),
       );
     }
-    expect(orderListSourceWheres("offer", "all", filters, NOW)).toEqual({
-      offer: { AND: [offerFilterWhere(filters)] },
-    });
   });
 
   it("direct sale tab keeps legacy groupless direct orders reachable", () => {
-    expect(orderListSourceWheres("direct_sale", "delivered", {}, NOW)).toEqual({
+    expect(orderListSourceWheres("direct_sale", "delivered", {})).toEqual({
       group: { AND: [cartBucketWhere("delivered", groupLines)] },
       loose: {
         AND: [
@@ -175,7 +130,7 @@ describe("orderListSourceWheres", () => {
 
   it("a group matches the filters through one of its lines", () => {
     const filters = { orderNumber: "ORD-1" };
-    expect(orderListSourceWheres("all", "new", filters, NOW).group).toEqual({
+    expect(orderListSourceWheres("all", "new", filters).group).toEqual({
       AND: [
         { orders: { some: orderLineFilterWhere(filters) } },
         cartBucketWhere("new", groupLines),
@@ -183,23 +138,38 @@ describe("orderListSourceWheres", () => {
     });
   });
 
-  it("offer tab lists offers only", () => {
+  it("offers turned into orders = groupless offer orders only, bucketed like any cart", () => {
     const filters = { party: "ali" };
-    expect(orderListSourceWheres("offer", "pending", filters, NOW)).toEqual({
-      offer: {
-        AND: [offerFilterWhere(filters), offerBucketWhere("pending", NOW)],
+    expect(orderListSourceWheres("offer_order", "shipped", filters)).toEqual({
+      loose: {
+        AND: [
+          { ...LOOSE, origin: { in: ["offer"] } },
+          orderLineFilterWhere(filters),
+          cartBucketWhere("shipped", singleLine),
+        ],
       },
     });
+  });
+
+  it("the all tab's groupless source is the union of the other two tabs' origins", () => {
+    const origins = (tab: (typeof ADMIN_ORDER_TABS)[number]) =>
+      (
+        orderListSourceWheres(tab, undefined, {}).loose
+          .AND as unknown as Array<{
+          origin?: { in: string[] };
+        }>
+      )[0].origin?.in;
+    expect(origins("all")).toEqual([
+      ...(origins("direct_sale") ?? []),
+      ...(origins("offer_order") ?? []),
+    ]);
   });
 });
 
 describe("legacy status filter", () => {
-  it("narrows orders by their status and offers through their order", () => {
+  it("narrows orders by their status", () => {
     expect(orderLineFilterWhere({ status: "delivered" })).toEqual({
       AND: [{ status: "delivered" }],
-    });
-    expect(offerFilterWhere({ status: "delivered" })).toEqual({
-      AND: [{ order: { is: { status: "delivered" } } }],
     });
   });
 });
@@ -209,7 +179,9 @@ describe("orderListScopeOf", () => {
     expect(orderListScopeOf({})).toEqual(
       expect.objectContaining({ tab: "all", bucket: "all" }),
     );
-    expect(orderListScopeOf({ tab: "offer", bucket: "" }).bucket).toBe("all");
+    expect(orderListScopeOf({ tab: "offer_order", bucket: "" }).bucket).toBe(
+      "all",
+    );
   });
 
   it("keeps an explicit all bucket (deep-link scope)", () => {
@@ -224,7 +196,7 @@ describe("orderListScopeOf", () => {
       fromDate: "2026-09-01",
       toDate: "2026-09-02",
     });
-    expect(scope.tab).toBe("offer");
+    expect(scope.tab).toBe("offer_order");
     expect(scope.filters).toEqual(
       expect.objectContaining({
         startDate: "2026-09-01",
@@ -237,12 +209,15 @@ describe("orderListScopeOf", () => {
     expect(orderListScopeOf({ tab: "all", origin: "offer" }).tab).toBe("all");
   });
 
-  it("a bucket the tab does not have falls back to all (unfiltered)", () => {
-    expect(orderListScopeOf({ tab: "direct_sale", bucket: "pending" })).toEqual(
-      expect.objectContaining({ tab: "direct_sale", bucket: "all" }),
-    );
-    expect(orderListScopeOf({ tab: "offer", bucket: "expired" }).bucket).toBe(
-      "expired",
-    );
+  it("the removed offer buckets fall back to all (unfiltered)", () => {
+    for (const bucket of ["pending", "expired", "lost"]) {
+      expect(orderListScopeOf({ tab: "offer_order", bucket })).toEqual(
+        expect.objectContaining({ tab: "offer_order", bucket: "all" }),
+      );
+    }
+  });
+
+  it("the removed offer tab key falls back to all orders", () => {
+    expect(orderListScopeOf({ tab: "offer" }).tab).toBe("all");
   });
 });

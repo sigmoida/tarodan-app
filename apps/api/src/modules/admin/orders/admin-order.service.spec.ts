@@ -103,12 +103,9 @@ describe("AdminOrderService.getOrders — cart tabs", () => {
       limit: 5,
     });
 
-    const sources = orderListSourceWheres(
-      "direct_sale",
-      "in_transit",
-      { party: "ali" },
-      T1,
-    );
+    const sources = orderListSourceWheres("direct_sale", "in_transit", {
+      party: "ali",
+    });
     expect(prisma.checkoutGroup.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
         where: sources.group,
@@ -307,126 +304,107 @@ describe("AdminOrderService.getOrders — cart tabs", () => {
   });
 });
 
-describe("AdminOrderService.getOrders — offer tab", () => {
-  beforeEach(() => jest.useFakeTimers().setSystemTime(T1));
-  afterEach(() => jest.useRealTimers());
-
-  it("pages offers directly with the offer bucket where", async () => {
+describe("AdminOrderService.getOrders — offers turned into orders", () => {
+  it("pages only groupless offer orders — no group source, never the Offer table", async () => {
     const prisma = makePrisma();
-    prisma.offer.count.mockResolvedValue(1);
-    prisma.offer.findMany.mockResolvedValue([
-      {
-        id: "of1",
-        status: "pending",
-        amount: D(900),
-        expiresAt: new Date("2026-09-20T00:00:00.000Z"),
-        createdAt: T0,
-        buyer: party("b1"),
-        seller: party("s1"),
-        // listing 1150 − offer 900 → priceDifference 250
-        product: { ...lineRow().product, price: D(1150) },
-        order: null,
-      },
-    ]);
+    prisma.order.count.mockResolvedValue(1);
+    prisma.order.findMany
+      .mockResolvedValueOnce([
+        {
+          id: "o9",
+          orderNumber: "ORD-9",
+          totalAmount: D(900),
+          createdAt: T1,
+          buyer: { displayName: "B" },
+        },
+      ])
+      .mockResolvedValueOnce([
+        lineRow({
+          id: "o9",
+          orderNumber: "ORD-9",
+          origin: "offer",
+          checkoutGroupId: null,
+          packageId: "p9",
+          package: { packageNumber: "PKG-9" },
+        }),
+      ]);
     const { service } = makeService(prisma);
 
     const result = await service.getOrders({
-      tab: "offer",
-      bucket: "pending",
-      page: 1,
-      limit: 20,
+      tab: "offer_order",
+      bucket: "new",
     });
 
-    const { offer } = orderListSourceWheres("offer", "pending", {}, T1);
-    expect(prisma.offer.findMany).toHaveBeenCalledWith(
-      expect.objectContaining({
-        where: offer,
-        orderBy: { createdAt: "desc" },
-        skip: 0,
-        take: 20,
-      }),
-    );
+    const { loose, group } = orderListSourceWheres("offer_order", "new", {});
+    expect(group).toBeUndefined();
+    expect(prisma.order.count).toHaveBeenCalledWith({ where: loose });
+    expect(prisma.checkoutGroup.count).not.toHaveBeenCalled();
     expect(prisma.checkoutGroup.findMany).not.toHaveBeenCalled();
-    expect(result.data[0]).toEqual(
-      expect.objectContaining({
-        kind: "offer",
-        offer: expect.objectContaining({ priceDifference: 250 }),
-      }),
-    );
+    expect(prisma.offer.findMany).not.toHaveBeenCalled();
+    expect(result.data.map((row) => [row.kind, row.number])).toEqual([
+      ["order", "ORD-9"],
+    ]);
+    expect(result.meta.total).toBe(1);
   });
 
-  it("the legacy origin=offer parameter selects the offer tab", async () => {
+  it("the legacy origin=offer parameter selects the offer-order tab", async () => {
     const { service, prisma } = makeService();
     await service.getOrders({ origin: "offer" });
-    expect(prisma.offer.findMany).toHaveBeenCalled();
+    expect(prisma.order.count).toHaveBeenCalledWith({
+      where: orderListSourceWheres("offer_order", "all", {}).loose,
+    });
     expect(prisma.checkoutGroup.findMany).not.toHaveBeenCalled();
+    expect(prisma.offer.findMany).not.toHaveBeenCalled();
   });
 });
 
 describe("AdminOrderService.getOrderCounts", () => {
-  beforeEach(() => jest.useFakeTimers().setSystemTime(T1));
-  afterEach(() => jest.useRealTimers());
-
   it("counts every tab's buckets in a single transaction with the filters applied", async () => {
     const prisma = makePrisma();
     prisma.checkoutGroup.count.mockResolvedValue(2);
     prisma.order.count.mockResolvedValue(1);
-    prisma.offer.count.mockResolvedValue(3);
     const { service } = makeService(prisma);
 
     const counts = await service.getOrderCounts({ party: "ali" });
 
     expect(prisma.$transaction).toHaveBeenCalledTimes(1);
-    // group source is identical for "all" and "direct_sale" → counted once
+    // group source is identical for "all" and "direct_sale" → counted once;
+    // the offer-order tab has no group source
     expect(prisma.checkoutGroup.count).toHaveBeenCalledTimes(6);
-    expect(prisma.order.count).toHaveBeenCalledTimes(12);
-    expect(prisma.offer.count).toHaveBeenCalledTimes(8);
+    // the groupless source differs per tab (its origins) → 3 tabs × 6 buckets
+    expect(prisma.order.count).toHaveBeenCalledTimes(18);
+    expect(prisma.offer.count).not.toHaveBeenCalled();
     // the same where-builder as the list, filters included
-    expect(prisma.offer.count).toHaveBeenCalledWith({
-      where: orderListSourceWheres("offer", "new", { party: "ali" }, T1).offer,
+    expect(prisma.order.count).toHaveBeenCalledWith({
+      where: orderListSourceWheres("offer_order", "new", { party: "ali" })
+        .loose,
     });
     expect(prisma.checkoutGroup.count).toHaveBeenCalledWith({
-      where: orderListSourceWheres("all", "other", { party: "ali" }, T1).group,
+      where: orderListSourceWheres("all", "other", { party: "ali" }).group,
     });
     // "Tümü" counts the tab with the list's own unbucketed where
-    expect(prisma.offer.count).toHaveBeenCalledWith({
-      where: orderListSourceWheres("offer", undefined, { party: "ali" }, T1)
-        .offer,
-    });
     expect(prisma.order.count).toHaveBeenCalledWith({
-      where: orderListSourceWheres(
-        "direct_sale",
-        undefined,
-        { party: "ali" },
-        T1,
-      ).loose,
+      where: orderListSourceWheres("direct_sale", undefined, { party: "ali" })
+        .loose,
     });
 
+    const cartBuckets = (n: number) => ({
+      total: n,
+      buckets: {
+        all: n,
+        new: n,
+        shipped: n,
+        in_transit: n,
+        delivered: n,
+        other: n,
+      },
+    });
     // the total is the all bucket's count, not a sum over the buckets
-    expect(counts.all).toEqual({
-      total: 3,
-      buckets: {
-        all: 3,
-        new: 3,
-        shipped: 3,
-        in_transit: 3,
-        delivered: 3,
-        other: 3,
-      },
-    });
-    expect(counts.direct_sale.total).toBe(3);
-    expect(counts.offer).toEqual({
-      total: 3,
-      buckets: {
-        all: 3,
-        new: 3,
-        pending: 3,
-        expired: 3,
-        shipped: 3,
-        in_transit: 3,
-        delivered: 3,
-        other: 3,
-      },
-    });
+    expect(counts.all).toEqual(cartBuckets(3));
+    expect(counts.direct_sale).toEqual(cartBuckets(3));
+    expect(counts.offer_order).toEqual(cartBuckets(1));
+    expect(Object.keys(counts).sort()).toEqual(
+      ["all", "direct_sale", "offer_order"].sort(),
+    );
   });
 });

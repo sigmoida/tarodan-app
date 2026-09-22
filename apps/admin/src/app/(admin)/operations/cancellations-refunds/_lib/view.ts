@@ -1,4 +1,5 @@
 import { ADMIN_CANCELLATIONS_REFUNDS_PATH } from "@tarodan/types";
+import { hrefWithPinnedParam, type QueryInput } from "@/lib/redirect-query";
 
 /**
  * "İptal & İade" ekranının adresi ve iki üst sekmesi (İptaller | İadeler).
@@ -56,31 +57,16 @@ export const VIEW_SCOPED_PARAMS = [
   "to",
 ] as const;
 
-type QueryInput =
-  URLSearchParams | Record<string, string | string[] | undefined> | undefined;
-
-function toSearchParams(query: QueryInput): URLSearchParams {
-  if (query instanceof URLSearchParams) return new URLSearchParams(query);
-  const params = new URLSearchParams();
-  for (const [key, value] of Object.entries(query ?? {})) {
-    if (value === undefined) continue;
-    for (const item of Array.isArray(value) ? value : [value]) {
-      params.append(key, item);
-    }
-  }
-  return params;
-}
-
 /**
  * İadeler sekmesinin adresi. Verilen sorgu (eski `/operations/refund-requests`
  * bağlantısının filtreleri — `status`, `from`, `to`, `q`…) aynen korunur;
  * yalnız `view` bu sekmeye sabitlenir.
  */
 export function refundsViewHref(query?: QueryInput): string {
-  const params = toSearchParams(query);
-  params.delete(CANCELLATION_REFUND_VIEW_PARAM);
-  const rest = params.toString();
-  return `${CANCELLATIONS_REFUNDS_PATH}?${CANCELLATION_REFUND_VIEW_PARAM}=refunds${
-    rest ? `&${rest}` : ""
-  }`;
+  return hrefWithPinnedParam(
+    CANCELLATIONS_REFUNDS_PATH,
+    CANCELLATION_REFUND_VIEW_PARAM,
+    "refunds",
+    query,
+  );
 }

@@ -38,9 +38,7 @@ export function orderRowMenu(
     const cancellable = canManage ? cancellableRowLine(row) : null;
     return [
       {
-        label: row.detailOrderId
-          ? t("admin.operations.orders.cells.openOrder")
-          : t("admin.operations.orders.cells.openOffer"),
+        label: t("admin.operations.orders.cells.openOrder"),
         icon: ArrowTopRightOnSquareIcon,
         onClick: () => open(rowDetailHref(row)),
       },

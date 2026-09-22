@@ -3,21 +3,19 @@ import type { AdminOrderLine, AdminOrderPackage } from "@tarodan/types";
 import { packageBlockMinHeight } from "../../_lib/rowView";
 
 /**
- * Paket bloklarını alt alta dizen iskelet. Ürün, birim fiyat, fatura ve kargo
- * kolonları AYNI iskeleti kullanır: her paket bloğu aynı yükseklikte başlık
- * şeridi + kalem başına sabit yükseklikte satır taşır, böylece çok satıcılı bir
- * sepette paketler kolonlar boyunca hizalı kalır.
+ * Paket bloklarını alt alta dizen iskelet. Ürün, satıcı, birim fiyat, fatura
+ * ve kargo kolonları AYNI iskeleti kullanır: her paket bloğu kalem başına sabit
+ * yükseklikte satır taşır, böylece çok satıcılı bir sepette kalemler ve
+ * paketler kolonlar boyunca hizalı kalır.
  *
  * Kolon ya kalem bazında (`line`) ya da paket bazında (`body`) içerik verir.
  */
 export function PackageStack({
   packages,
-  header,
   line,
   body,
 }: {
   packages: readonly AdminOrderPackage[];
-  header?: (pkg: AdminOrderPackage) => ReactNode;
   line?: (line: AdminOrderLine, pkg: AdminOrderPackage) => ReactNode;
   body?: (pkg: AdminOrderPackage) => ReactNode;
 }) {
@@ -29,9 +27,6 @@ export function PackageStack({
           className="min-w-0"
           style={{ minHeight: packageBlockMinHeight(pkg) }}
         >
-          <div className="flex h-6 min-w-0 items-center text-xs text-muted">
-            {header?.(pkg)}
-          </div>
           {line
             ? pkg.lines.map((item) => (
                 <div

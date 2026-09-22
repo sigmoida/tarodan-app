@@ -45,14 +45,16 @@ function listTotalQuery(
  * zarfın `total`'ı okunur. Sekme rozetleri ve başlık özetleri ("N kayıt") tek
  * yerden buradan geçer; anahtar `adminKeys.count(resource, params)` olduğundan
  * aynı parametrelerle çağıran bileşenler tek isteği paylaşır ve
- * `useAdminMutation` mutasyon sonrası hepsini birlikte tazeler.
+ * `useAdminMutation` mutasyon sonrası hepsini birlikte tazeler. `enabled:
+ * false` isteği atmaz (ör. yetkisi olmayan ya da zaten açık olan sekme).
  */
 export function useListTotal(
   resource: string,
   params: Record<string, unknown>,
   fetcher: ListTotalFetcher,
+  { enabled = true }: { enabled?: boolean } = {},
 ) {
-  return useQuery(listTotalQuery(resource, params, fetcher));
+  return useQuery({ ...listTotalQuery(resource, params, fetcher), enabled });
 }
 
 /**

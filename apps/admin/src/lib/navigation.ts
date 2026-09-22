@@ -5,7 +5,6 @@ import {
   UsersIcon,
   ShoppingBagIcon,
   ClipboardDocumentListIcon,
-  TagIcon,
   ChartBarIcon,
   Cog6ToothIcon,
   CurrencyDollarIcon,
@@ -34,7 +33,14 @@ import {
   PhotoIcon,
   ArchiveBoxIcon,
 } from "@heroicons/react/24/outline";
-import { ADMIN_CANCELLATIONS_REFUNDS_PATH } from "@tarodan/types";
+import {
+  ADMIN_CANCELLATIONS_REFUNDS_PATH,
+  ADMIN_OFFERS_TAB_HREF,
+  ADMIN_ORDERS_PATH,
+  ADMIN_ORDERS_SCREEN_PERMISSIONS,
+  ADMIN_ORDERS_SCREEN_TAB_PERMISSIONS,
+  ADMIN_TRADES_TAB_HREF,
+} from "@tarodan/types";
 
 /**
  * The single source for the admin left menu. The nav data lives here
@@ -52,6 +58,19 @@ import { ADMIN_CANCELLATIONS_REFUNDS_PATH } from "@tarodan/types";
 
 type T = ReturnType<typeof useTranslations<never>>;
 
+/** One permission key, or a list meaning "any of these keys". */
+export type RoutePermission = string | readonly string[];
+
+/** Does a holder of `has` satisfy `required`? (A list is any-of.) */
+export function satisfiesPermission(
+  required: RoutePermission,
+  has: (key: string) => boolean,
+): boolean {
+  return typeof required === "string"
+    ? has(required)
+    : required.some((key) => has(key));
+}
+
 export type NavItem = {
   name: string;
   href: string;
@@ -62,9 +81,10 @@ export type NavItem = {
   keywords?: string[];
   /**
    * Permission key required to show this item (from the role permission matrix).
+   * A list means ANY of them (a screen whose tabs need different keys).
    * Falls back to the `roles` array when not specified.
    */
-  permission?: string;
+  permission?: RoutePermission;
   /** Fallback: these roles are checked if the permission system fails to load. Defaults to super_admin + admin. */
   roles?: string[];
 };
@@ -118,36 +138,17 @@ export function getNavGroups(t: T): NavGroup[] {
       href: "/operations",
       items: [
         {
+          // Siparişler + Teklifler + Takaslar tek ekranda (sekmeler); eski
+          // teklif/takas listeleri buraya yönlenir. Ekrana `orders` ya da
+          // `trades` izniyle girilir, sekmeler izne göre gizlenir.
           name: t("admin.nav.items.orders.name"),
-          href: "/operations/orders",
+          href: ADMIN_ORDERS_PATH,
           icon: ClipboardDocumentListIcon,
           description: t("admin.nav.items.orders.description"),
           keywords: t("admin.nav.items.orders.keywords")
             .split(",")
             .map((k) => k.trim()),
-          permission: "orders",
-        },
-        {
-          name: t("admin.nav.items.offers.name"),
-          href: "/operations/offers",
-          icon: TagIcon,
-          description: t("admin.nav.items.offers.description"),
-          keywords: t("admin.nav.items.offers.keywords")
-            .split(",")
-            .map((k) => k.trim()),
-          // Teklifler sipariş operasyonunun parçası: ayrı izin anahtarı yok
-          // (API tarafında `offers` segmenti de `orders` iznine eşlenir).
-          permission: "orders",
-        },
-        {
-          name: t("admin.nav.items.trades.name"),
-          href: "/operations/trades",
-          icon: ArrowsRightLeftIcon,
-          description: t("admin.nav.items.trades.description"),
-          keywords: t("admin.nav.items.trades.keywords")
-            .split(",")
-            .map((k) => k.trim()),
-          permission: "trades",
+          permission: ADMIN_ORDERS_SCREEN_PERMISSIONS,
         },
         {
           name: t("admin.nav.items.shipping.name"),
@@ -550,18 +551,37 @@ export function getNavGroups(t: T): NavGroup[] {
  * Detail routes whose list moved into another nav page. The trail and the
  * page title resolve them as if they lived under their new parent, so the
  * refund-request file reads "İptal & İade › Detay" instead of nothing.
+ * `listHref` is where the parent crumb points when the list is a tab of the
+ * parent screen (the offer file's "Siparişler" crumb opens the Teklifler tab).
  */
-const NAV_PARENT_ALIASES: Record<string, string> = {
-  "/operations/refund-requests": ADMIN_CANCELLATIONS_REFUNDS_PATH,
+const NAV_PARENT_ALIASES: Record<
+  string,
+  { parent: string; listHref?: string }
+> = {
+  "/operations/refund-requests": { parent: ADMIN_CANCELLATIONS_REFUNDS_PATH },
+  "/operations/offers": {
+    parent: ADMIN_ORDERS_PATH,
+    listHref: ADMIN_OFFERS_TAB_HREF,
+  },
+  "/operations/trades": {
+    parent: ADMIN_ORDERS_PATH,
+    listHref: ADMIN_TRADES_TAB_HREF,
+  },
 };
 
-/** The path the nav match runs against — aliased detail routes rewritten. */
-function navMatchPath(pathname: string): string {
-  for (const [from, to] of Object.entries(NAV_PARENT_ALIASES)) {
+/**
+ * The path the nav match runs against — aliased detail routes rewritten — and
+ * the list the parent crumb should open (when the alias names one).
+ */
+function navMatch(pathname: string): { path: string; listHref?: string } {
+  for (const [from, alias] of Object.entries(NAV_PARENT_ALIASES)) {
     if (pathname === from || pathname.startsWith(`${from}/`))
-      return to + pathname.slice(from.length);
+      return {
+        path: alias.parent + pathname.slice(from.length),
+        listHref: alias.listHref,
+      };
   }
-  return pathname;
+  return { path: pathname };
 }
 
 /** Suffix appended to every page title, e.g. "Kullanıcılar - Tarodan Admin". */
@@ -578,7 +598,7 @@ export function pageMetadataFor(
   pathname: string,
   t: T,
 ): { title: string; description: string } {
-  pathname = navMatchPath(pathname);
+  pathname = navMatch(pathname).path;
   const defaultDescription = t("admin.nav.defaultDescription");
   const topLevelNav = getTopLevelNav(t);
   const navGroups = getNavGroups(t);
@@ -619,11 +639,27 @@ export function matchesQuery(item: NavItem, q: string): boolean {
 /**
  * Routes that don't appear in the nav but still need guarding (aliases /
  * disabled tabs). Exceptions that can't be derived from the nav items go here.
+ * Each entry guards the route AND its sub-routes.
  */
-const EXTRA_ROUTE_PERMISSIONS: Record<string, string> = {
+const EXTRA_ROUTE_PERMISSIONS: Record<string, RoutePermission> = {
   // İade talebi DOSYASI (`/operations/refund-requests/[id]`) menüden çıktı —
   // liste "İptal & İade" ekranına taşındı — ama aynı izinle korunmaya devam eder.
   "/operations/refund-requests": "refund_requests",
+  // Teklif ve takas listeleri Siparişler ekranının sekmeleri oldu; DOSYALARI
+  // (`/offers/[id]`, `/trades/[id]`) yerinde, sekmelerinin izniyle korunur —
+  // takas yetkilisi takas dosyasına girer, sipariş/teklif dosyasına giremez.
+  "/operations/offers": ADMIN_ORDERS_SCREEN_TAB_PERMISSIONS.offers,
+  "/operations/trades": ADMIN_ORDERS_SCREEN_TAB_PERMISSIONS.trades,
+};
+
+/**
+ * Sub-route-only guards: stricter than the screen itself. The orders screen
+ * opens with `orders` OR `trades` (tabs are hidden per permission), but the
+ * order FILE under it (`/operations/orders/[id]`) is order data → `orders`.
+ * Matched only strictly below the prefix, and more specific than the screen.
+ */
+const SUB_ROUTE_PERMISSIONS: Record<string, RoutePermission> = {
+  [ADMIN_ORDERS_PATH]: ADMIN_ORDERS_SCREEN_TAB_PERMISSIONS.all,
 };
 
 /**
@@ -642,8 +678,8 @@ const identityT = ((key: string) => key) as unknown as T;
  * (it's also the guard's redirect target — avoid a loop). Computed once at
  * module load (structural data only, no translation needed).
  */
-const ROUTE_PERMISSIONS: Record<string, string> = (() => {
-  const map: Record<string, string> = {};
+const ROUTE_PERMISSIONS: Record<string, RoutePermission> = (() => {
+  const map: Record<string, RoutePermission> = {};
   const add = (items: NavItem[]) => {
     for (const item of items) {
       if (item.permission && item.href !== "/dashboard")
@@ -656,21 +692,45 @@ const ROUTE_PERMISSIONS: Record<string, string> = (() => {
 })();
 
 /**
- * Required permission key for a given path — the most specific (longest)
- * matching prefix wins (order-independent). Null for unguarded routes.
+ * Required permission for a given path — the most specific (longest) matching
+ * prefix wins (order-independent). A sub-route guard counts as one character
+ * more specific than its prefix, so it beats the screen's own entry for the
+ * screen's sub-routes only. A list means any-of. Null for unguarded routes.
  */
-export function routePermission(pathname: string): string | null {
-  let best: string | null = null;
-  let bestLen = -1;
-  for (const [prefix, permission] of Object.entries(ROUTE_PERMISSIONS)) {
-    const matchesRoute =
-      pathname === prefix || pathname.startsWith(`${prefix}/`);
-    if (matchesRoute && prefix.length > bestLen) {
-      best = permission;
-      bestLen = prefix.length;
-    }
+export function routePermission(pathname: string): RoutePermission | null {
+  const candidates: Array<{
+    permission: RoutePermission;
+    specificity: number;
+  }> = [
+    ...Object.entries(ROUTE_PERMISSIONS)
+      .filter(
+        ([prefix]) => pathname === prefix || pathname.startsWith(`${prefix}/`),
+      )
+      .map(([prefix, permission]) => ({
+        permission,
+        specificity: prefix.length,
+      })),
+    ...Object.entries(SUB_ROUTE_PERMISSIONS)
+      .filter(([prefix]) => pathname.startsWith(`${prefix}/`))
+      .map(([prefix, permission]) => ({
+        permission,
+        specificity: prefix.length + 1,
+      })),
+  ];
+  let best: { permission: RoutePermission; specificity: number } | null = null;
+  for (const candidate of candidates) {
+    if (!best || candidate.specificity > best.specificity) best = candidate;
   }
-  return best;
+  return best?.permission ?? null;
+}
+
+/** Can a holder of `has` open `pathname`? Unguarded routes are open. */
+export function canAccessRoute(
+  pathname: string,
+  has: (key: string) => boolean,
+): boolean {
+  const required = routePermission(pathname);
+  return !required || satisfiesPermission(required, has);
 }
 
 export interface Crumb {
@@ -696,7 +756,8 @@ export function humanizeSegment(segment: string, t: T): string {
  * (the group points at its first page). Empty when the path matches no nav item.
  */
 export function breadcrumbsFor(pathname: string, t: T): Crumb[] {
-  pathname = navMatchPath(pathname);
+  const match = navMatch(pathname);
+  pathname = match.path;
   const topLevelNav = getTopLevelNav(t);
   const navGroups = getNavGroups(t);
 
@@ -723,7 +784,10 @@ export function breadcrumbsFor(pathname: string, t: T): Crumb[] {
   if (group) crumbs.push({ label: group.name, href: group.items[0]?.href });
 
   const isLeaf = pathname === item.href;
-  crumbs.push({ label: item.name, href: isLeaf ? undefined : item.href });
+  crumbs.push({
+    label: item.name,
+    href: isLeaf ? undefined : (match.listHref ?? item.href),
+  });
 
   if (!isLeaf) {
     const tail = pathname.slice(item.href.length).split("/").filter(Boolean);

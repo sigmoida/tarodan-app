@@ -19,6 +19,7 @@ export * from "./order-cancellation";
 // Admin orders screen: tabs, buckets and the list row contract
 export * from "./order-buckets";
 export * from "./admin-order-list";
+export * from "./admin-orders-screen";
 
 // Admin "İptal & İade" screen: cancellation tabs/buckets, rows, refund kind
 export * from "./admin-cancellations";

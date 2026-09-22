@@ -18,12 +18,9 @@ import {
 import {
   cartBucketWhere,
   groupLines,
-  offerBucketWhere,
   orderLineStageWhere,
   singleLine,
 } from "./order-bucket-where";
-
-const NOW = new Date("2026-09-17T12:00:00.000Z");
 
 describe("commerce status values mirror the Prisma enums", () => {
   // @tarodan/types taşıdığı değerler şemayla ayrışırsa kova builder'ı var
@@ -188,86 +185,6 @@ describe("cartBucketWhere — the least-advanced-package rule", () => {
           NOT: { OR: [stage("new"), stage("shipped"), stage("in_transit")] },
         },
       ],
-    });
-  });
-});
-
-describe("offerBucketWhere", () => {
-  const onOrder = (s: Parameters<typeof orderLineStageWhere>[0]) => ({
-    order: { is: orderLineStageWhere(s) },
-  });
-  const pendingRaw = {
-    OR: [
-      { status: { in: ["pending"] }, expiresAt: { gte: NOW } },
-      {
-        status: { in: ["accepted"] },
-        OR: [
-          { order: { is: null } },
-          { order: { is: { status: { in: ["pending_payment"] } } } },
-        ],
-      },
-    ],
-  };
-  const expiredRaw = {
-    OR: [
-      { status: { in: ["expired", "payment_expired"] } },
-      { status: { in: ["pending"] }, expiresAt: { lt: NOW } },
-    ],
-  };
-
-  it("an order-stage bucket reads the offer's order", () => {
-    expect(offerBucketWhere("new", NOW)).toEqual({ AND: [onOrder("new")] });
-  });
-
-  it("pending = open and not lapsed, or accepted but unpaid — never a progressed order", () => {
-    expect(offerBucketWhere("pending", NOW)).toEqual({
-      AND: [
-        pendingRaw,
-        {
-          NOT: {
-            OR: [
-              onOrder("new"),
-              onOrder("shipped"),
-              onOrder("in_transit"),
-              onOrder("delivered"),
-            ],
-          },
-        },
-      ],
-    });
-  });
-
-  it("expired = expired, payment_expired or lapsed pending — below pending in precedence", () => {
-    expect(offerBucketWhere("expired", NOW)).toEqual({
-      AND: [
-        expiredRaw,
-        {
-          NOT: {
-            OR: [
-              onOrder("new"),
-              onOrder("shipped"),
-              onOrder("in_transit"),
-              onOrder("delivered"),
-              pendingRaw,
-            ],
-          },
-        },
-      ],
-    });
-  });
-
-  it("other = everything no earlier bucket claims (rejected, cancelled, refunded orders…)", () => {
-    expect(offerBucketWhere("other", NOW)).toEqual({
-      NOT: {
-        OR: [
-          onOrder("new"),
-          onOrder("shipped"),
-          onOrder("in_transit"),
-          onOrder("delivered"),
-          pendingRaw,
-          expiredRaw,
-        ],
-      },
     });
   });
 });

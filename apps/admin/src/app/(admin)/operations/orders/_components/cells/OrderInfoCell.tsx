@@ -7,8 +7,8 @@ import { TruncatedText } from "@/components/table";
 import { rowDetailHref, rowLines } from "../../_lib/rowView";
 
 /**
- * Sipariş Bilgileri: satır numarası (GRP / ORD; henüz siparişe dönmemiş
- * teklifte "Teklif"), oluşturulma zamanı ve teklif rozeti. Açık bir hazırlama
+ * Sipariş Bilgileri: satır numarası (GRP / ORD), oluşturulma zamanı ve teklif
+ * siparişinde teklif rozeti. Açık bir hazırlama
  * süresi varsa en yakını da gösterilir — "Yeni" kovasında operatörün baktığı
  * ilk tarih odur.
  */
@@ -27,7 +27,7 @@ export function OrderInfoCell({ row }: { row: AdminOrderListRow }) {
         className="block max-w-full text-primary-600 hover:underline"
       >
         <TruncatedText className="font-mono font-medium">
-          {row.number ?? t("admin.operations.orders.cells.offerRow")}
+          {row.number}
         </TruncatedText>
       </Link>
       <span className="whitespace-nowrap text-xs text-muted">
@@ -37,13 +37,6 @@ export function OrderInfoCell({ row }: { row: AdminOrderListRow }) {
         <Badge variant="info">
           {t("admin.operations.orders.cells.offerBadge")}
         </Badge>
-      )}
-      {row.kind === "offer" && row.offer && (
-        <span className="whitespace-nowrap text-xs text-muted">
-          {t("admin.operations.orders.cells.offerExpires", {
-            date: fmtDateTime(row.offer.expiresAt) ?? "—",
-          })}
-        </span>
       )}
       {deadline && (
         <span className="whitespace-nowrap text-xs text-warning-600">

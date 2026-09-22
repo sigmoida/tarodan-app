@@ -19,11 +19,8 @@ export function UnitPriceCell({
 
   if (row.packages.length === 0) {
     return offer ? (
-      <div className="flex flex-col">
-        <div className="h-6" />
-        <div className="flex h-16 items-center">
-          <PriceDiffCell offer={offer} />
-        </div>
+      <div className="flex h-16 items-center">
+        <PriceDiffCell offer={offer} />
       </div>
     ) : null;
   }

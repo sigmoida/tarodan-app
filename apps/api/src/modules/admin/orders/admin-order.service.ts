@@ -14,9 +14,8 @@ import { StorageService } from "../../storage/storage.service";
 import { AdminAuditService } from "../ops/admin-audit.service";
 import { AdminOrderCountsQueryDto, AdminOrderQueryDto } from "../dto";
 import {
-  paginate,
   paginateMerged,
-  resolveOrderBy,
+  type MergedListSource,
   type PaginatedResult,
   type SortDirection,
 } from "../../../common/list";
@@ -29,14 +28,12 @@ import {
 import {
   LIST_INVOICE_SELECT,
   LIST_LINE_SELECT,
-  LIST_OFFER_SELECT,
   ORDER_INVOICE_TYPES,
   type ListInvoice,
   type ListLine,
 } from "./helpers/order-list-select";
 import {
   mapCartRow,
-  mapOfferRow,
   type RowMapContext,
 } from "./helpers/order-list-row.mapper";
 import { resolveProductImageUrl } from "./helpers/product-image-url";
@@ -66,8 +63,9 @@ const CART_SORT_ALIASES: Record<string, CartSortKey> = {
 /**
  * Admin sipariş listesi ve alt sekme sayaçları.
  *
- * Satır = sepet (doğrudan satışta CheckoutGroup, teklifte tekil sipariş) ya da
- * teklif sekmesinde teklifin kendisi. Kova tanımları `@tarodan/types`
+ * Satır = sepet (doğrudan satışta CheckoutGroup, teklifte tekil sipariş).
+ * Siparişe dönmemiş teklifler bu listede değildir — panelin Teklifler sekmesi
+ * `GET /admin/offers`'ı okur. Kova tanımları `@tarodan/types`
  * `order-buckets.ts`'te; Prisma karşılıkları `helpers/order-bucket-where.ts`'te
  * ve liste ile sayaçlar AYNI builder'ı kullanır.
  */
@@ -83,17 +81,9 @@ export class AdminOrderService {
   async getOrders(
     query: AdminOrderQueryDto,
   ): Promise<PaginatedResult<AdminOrderListRow>> {
-    const now = new Date();
     const { tab, bucket, filters } = orderListScopeOf(query);
-    const sources = orderListSourceWheres(tab, bucket, filters, now);
-    if (sources.offer) return this.listOffers(sources.offer, query, now);
-    return this.listCarts(
-      sources.group ?? {},
-      sources.loose ?? {},
-      filters,
-      query,
-      now,
-    );
+    const sources = orderListSourceWheres(tab, bucket, filters);
+    return this.listCarts(sources, filters, query, new Date());
   }
 
   /**
@@ -104,7 +94,6 @@ export class AdminOrderService {
   async getOrderCounts(
     query: AdminOrderCountsQueryDto,
   ): Promise<AdminOrderCounts> {
-    const now = new Date();
     const { filters } = orderListScopeOf(query);
 
     const queries = new Map<string, Prisma.PrismaPromise<number>>();
@@ -125,12 +114,7 @@ export class AdminOrderService {
 
     for (const tab of ADMIN_ORDER_TABS) {
       for (const bucket of ADMIN_ORDER_TAB_BUCKETS[tab]) {
-        const { group, loose, offer } = orderListSourceWheres(
-          tab,
-          bucket,
-          filters,
-          now,
-        );
+        const { group, loose } = orderListSourceWheres(tab, bucket, filters);
         const keys: string[] = [];
         if (group)
           keys.push(
@@ -138,18 +122,11 @@ export class AdminOrderService {
               this.prisma.checkoutGroup.count({ where: group }),
             ),
           );
-        if (loose)
-          keys.push(
-            enqueue("order", loose, () =>
-              this.prisma.order.count({ where: loose }),
-            ),
-          );
-        if (offer)
-          keys.push(
-            enqueue("offer", offer, () =>
-              this.prisma.offer.count({ where: offer }),
-            ),
-          );
+        keys.push(
+          enqueue("order", loose, () =>
+            this.prisma.order.count({ where: loose }),
+          ),
+        );
         plan.push({ tab, bucket, keys });
       }
     }
@@ -169,42 +146,18 @@ export class AdminOrderService {
     return counts;
   }
 
-  // ── Teklif sekmesi: tek kaynak (Offer) ────────────────────────────────────
-
-  private async listOffers(
-    where: Prisma.OfferWhereInput,
-    query: AdminOrderQueryDto,
-    now: Date,
-  ): Promise<PaginatedResult<AdminOrderListRow>> {
-    const orderBy = resolveOrderBy<Prisma.OfferOrderByWithRelationInput>(
-      "Offer",
-      query,
-      {
-        defaultSort: { createdAt: "desc" },
-        sortMap: {
-          number: (dir) => ({ order: { orderNumber: dir } }),
-          orderNumber: (dir) => ({ order: { orderNumber: dir } }),
-          totalAmount: (dir) => ({ amount: dir }),
-        },
-      },
-    );
-    const page = await paginate(
-      this.prisma.offer,
-      { where, select: LIST_OFFER_SELECT, orderBy },
-      query,
-    );
-    const orders = page.data.flatMap((offer) =>
-      offer.order ? [offer.order] : [],
-    );
-    const ctx = await this.rowContext(orders, now);
-    return { ...page, data: page.data.map((offer) => mapOfferRow(offer, ctx)) };
-  }
-
   // ── Sepet sekmeleri: CheckoutGroup + grupsuz sipariş ──────────────────────
 
+  /**
+   * Sekmenin kaynakları birleşik sıralamayla sayfalanır. Grup kaynağı yalnız
+   * doğrudan satış taşıyan sekmelerde vardır ("Siparişe Dönen Teklifler"de
+   * satırların hepsi grupsuz tekil siparişlerdir).
+   */
   private async listCarts(
-    groupWhere: Prisma.CheckoutGroupWhereInput,
-    looseWhere: Prisma.OrderWhereInput,
+    sources: {
+      group?: Prisma.CheckoutGroupWhereInput;
+      loose: Prisma.OrderWhereInput;
+    },
     filters: OrderListFilters,
     query: AdminOrderQueryDto,
     now: Date,
@@ -212,10 +165,35 @@ export class AdminOrderService {
     const sortKey = CART_SORT_ALIASES[query.sortBy ?? ""] ?? "createdAt";
     const dir: SortDirection =
       query.sortBy && query.sortOrder === "asc" ? "asc" : "desc";
+    const { group: groupWhere, loose: looseWhere } = sources;
 
-    const page = await paginateMerged<CartHeadRow>(
-      [
-        {
+    const looseSource: MergedListSource<CartHeadRow> = {
+      count: () => this.prisma.order.count({ where: looseWhere }),
+      head: async (take) =>
+        (
+          await this.prisma.order.findMany({
+            where: looseWhere,
+            select: {
+              id: true,
+              orderNumber: true,
+              totalAmount: true,
+              createdAt: true,
+              buyer: { select: { displayName: true } },
+            },
+            orderBy: looseOrderBy(sortKey, dir),
+            take,
+          })
+        ).map((order) => ({
+          kind: "order" as const,
+          id: order.id,
+          number: order.orderNumber,
+          totalAmount: Number(order.totalAmount),
+          buyerName: order.buyer?.displayName ?? "",
+          createdAt: order.createdAt,
+        })),
+    };
+    const groupSource: MergedListSource<CartHeadRow> | null = groupWhere
+      ? {
           count: () => this.prisma.checkoutGroup.count({ where: groupWhere }),
           head: async (take) =>
             (
@@ -239,33 +217,11 @@ export class AdminOrderService {
               buyerName: group.buyer?.displayName ?? "",
               createdAt: group.createdAt,
             })),
-        },
-        {
-          count: () => this.prisma.order.count({ where: looseWhere }),
-          head: async (take) =>
-            (
-              await this.prisma.order.findMany({
-                where: looseWhere,
-                select: {
-                  id: true,
-                  orderNumber: true,
-                  totalAmount: true,
-                  createdAt: true,
-                  buyer: { select: { displayName: true } },
-                },
-                orderBy: looseOrderBy(sortKey, dir),
-                take,
-              })
-            ).map((order) => ({
-              kind: "order" as const,
-              id: order.id,
-              number: order.orderNumber,
-              totalAmount: Number(order.totalAmount),
-              buyerName: order.buyer?.displayName ?? "",
-              createdAt: order.createdAt,
-            })),
-        },
-      ],
+        }
+      : null;
+
+    const page = await paginateMerged<CartHeadRow>(
+      groupSource ? [groupSource, looseSource] : [looseSource],
       cartComparator(sortKey, dir),
       query,
     );

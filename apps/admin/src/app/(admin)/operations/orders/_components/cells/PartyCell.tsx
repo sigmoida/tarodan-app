@@ -28,7 +28,7 @@ export function PartyCell({ party }: { party: AdminOrderParty }) {
   );
 }
 
-/** Paket başlığındaki tek satırlık satıcı etiketi. */
+/** Tek satırlık taraf etiketi (Satıcı kolonunun kalem yuvaları). */
 export function PartyInline({ party }: { party: AdminOrderParty }) {
   const href = partyHref(party);
   const label = (

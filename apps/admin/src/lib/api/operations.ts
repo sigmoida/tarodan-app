@@ -46,7 +46,7 @@ export const operationsApi = {
   exportCancellations: (params?: Record<string, unknown>) =>
     api.get("/admin/cancellations/export", { params, responseType: "blob" }),
 
-  // Offers (Teklifler — /operations/offers; izin: orders)
+  // Offers (Siparişler ekranının Teklifler sekmesi; izin: orders)
   getOffers: (params?: any) => api.get("/admin/offers", { params }),
   getOffer: (id: string) => api.get(`/admin/offers/${id}`),
   cancelOffer: (id: string, reason: string) =>

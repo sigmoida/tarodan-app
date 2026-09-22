@@ -4,15 +4,17 @@ import type { Translate } from "@/lib/statusLabels";
 import { OrderInfoCell } from "../_components/cells/OrderInfoCell";
 import { PartyCell } from "../_components/cells/PartyCell";
 import { ProductLinesCell } from "../_components/cells/ProductLinesCell";
+import { SellerLinesCell } from "../_components/cells/SellerLinesCell";
 import { UnitPriceCell } from "../_components/cells/UnitPriceCell";
 import { CommissionCell } from "../_components/cells/CommissionCell";
 import { InvoiceCell } from "../_components/cells/InvoiceCell";
 import { CargoStatusCell } from "../_components/cells/CargoStatusCell";
-import { rowLines } from "./rowView";
+import { rowLines, sellerSlotsExport } from "./rowView";
 
 /**
- * Satır = sepet. Paket bazlı kolonlar (ürün, birim fiyat, fatura, kargo) aynı
- * paket iskeletini kullanır ve çok satıcılı sepette hizalı kalır. Kargo ve
+ * Satır = sepet. Paket bazlı kolonlar (ürün, satıcı, birim fiyat, fatura,
+ * kargo) aynı paket iskeletini kullanır ve çok satıcılı sepette kalem kalem
+ * hizalı kalır; satıcı + PKG ürünün hemen yanındaki kolondadır. Kargo ve
  * durum son veri kolonundadır, ardından işlemler menüsü. Sıralama anahtarları
  * API'nin sepet sıralamasıyla birebir (`createdAt`, `buyer.displayName`,
  * `totalAmount`).
@@ -32,7 +34,7 @@ export function orderColumns({
         minWidth: 180,
         sortKey: "createdAt",
         sortType: "date",
-        exportValue: (row) => row.number ?? "",
+        exportValue: (row) => row.number,
       },
     ),
     col.custom<AdminOrderListRow>(
@@ -56,6 +58,11 @@ export function orderColumns({
             : [row.offer?.product.title ?? ""]
           ).join(" | "),
       },
+    ),
+    col.custom<AdminOrderListRow>(
+      t("admin.operations.common.seller"),
+      (row) => <SellerLinesCell row={row} />,
+      { minWidth: 200, exportValue: sellerSlotsExport },
     ),
     col.custom<AdminOrderListRow>(
       t("admin.operations.orders.columns.unitPrice"),

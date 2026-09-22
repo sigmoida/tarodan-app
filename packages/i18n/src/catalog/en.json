@@ -6572,7 +6572,6 @@
         "errorOccurred": "An error occurred"
       },
       "offers": {
-        "title": "Offers",
         "totalCount": "{count} offers",
         "empty": "No offers yet",
         "emptyFiltered": "No offers match the filter",
@@ -6644,11 +6643,13 @@
         "packageShipping": "Shipping: {amount}",
         "singleItem": "Single item",
         "originCancellation": "{origin} cancellation",
-        "pageDescription": "Purchase orders and offers made on products",
+        "pageDescription": "Purchase orders, offers made on products and trades",
         "tabs": {
           "directSale": "Direct Sales",
           "all": "All Orders",
-          "offers": "Offers"
+          "offers": "Offers",
+          "offerOrders": "Offers Turned into Orders",
+          "trades": "Trades"
         },
         "updateStatus": "Update Status",
         "newStatus": "New Status",
@@ -6816,8 +6817,6 @@
         "buckets": {
           "all": "All",
           "new": "New",
-          "pending": "Pending",
-          "expired": "Expired",
           "shipped": "Handed to Carrier",
           "inTransit": "In Transit",
           "delivered": "Delivered",
@@ -6839,9 +6838,7 @@
           "cargoStatus": "Cargo / Status"
         },
         "cells": {
-          "offerRow": "Offer",
           "offerBadge": "Offer",
-          "offerExpires": "Valid until: {date}",
           "preparingDeadline": "Prepare by: {date}",
           "quantity": "{count, plural, one {# pc} other {# pcs}}",
           "listingPrice": "Listing:",
@@ -6854,8 +6851,7 @@
           "noInvoice": "No invoice",
           "openInvoices": "Open invoices",
           "noShipment": "No shipment yet",
-          "openOrder": "Open order file",
-          "openOffer": "Open offer details"
+          "openOrder": "Open order file"
         },
         "cancel": {
           "action": "Cancel order",
@@ -8639,18 +8635,8 @@
         },
         "orders": {
           "name": "Orders",
-          "description": "View and manage all orders",
-          "keywords": "order"
-        },
-        "offers": {
-          "name": "Offers",
-          "description": "Track offers and negotiations on products",
-          "keywords": "offer,negotiation"
-        },
-        "trades": {
-          "name": "Trades",
-          "description": "Track and manage product trade requests",
-          "keywords": "trade,barter,exchange,swap"
+          "description": "View and manage orders, offers and trades",
+          "keywords": "order,offer,trade,barter"
         },
         "shipping": {
           "name": "Shipping",

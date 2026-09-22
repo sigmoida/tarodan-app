@@ -3,18 +3,21 @@ import type {
   AdminOrderLine,
   AdminOrderListRow,
   AdminOrderPackage,
+  AdminOrderParty,
 } from "@tarodan/types";
 import {
-  PACKAGE_HEADER_PX,
   PACKAGE_LINE_PX,
   feeRate,
   invoiceSearchHref,
   invoiceStatusSummary,
   packageBlockMinHeight,
   packageOrderStatuses,
+  packageSellerSlot,
   priceDiffTone,
   rowDetailHref,
   rowSingleLine,
+  sellerSlots,
+  sellerSlotsExport,
 } from "./rowView";
 
 const line = (orderId: string) => ({ orderId }) as AdminOrderLine;
@@ -34,17 +37,17 @@ describe("rowDetailHref", () => {
     expect(rowDetailHref(row({}))).toBe("/operations/orders/o1");
   });
 
-  it("opens the offer for an offer that has no order yet", () => {
+  it("opens the order file for an offer order too (offers live in their own tab)", () => {
     expect(
       rowDetailHref(
         row({
-          kind: "offer",
-          id: "of1",
-          detailOrderId: null,
+          kind: "order",
+          id: "o9",
+          detailOrderId: "o9",
           offer: { id: "of1" } as AdminOrderListRow["offer"],
         }),
       ),
-    ).toBe("/operations/offers/of1");
+    ).toBe("/operations/orders/o9");
   });
 });
 
@@ -77,11 +80,81 @@ describe("feeRate", () => {
 describe("packageBlockMinHeight", () => {
   it("grows with the package's lines so every column stays aligned", () => {
     expect(packageBlockMinHeight(pkg([line("a"), line("b")]))).toBe(
-      PACKAGE_HEADER_PX + 2 * PACKAGE_LINE_PX,
+      2 * PACKAGE_LINE_PX,
     );
-    expect(packageBlockMinHeight(pkg([]))).toBe(
-      PACKAGE_HEADER_PX + PACKAGE_LINE_PX,
+    expect(packageBlockMinHeight(pkg([]))).toBe(PACKAGE_LINE_PX);
+  });
+});
+
+describe("sellerSlots (Satıcı column)", () => {
+  const party = (id: string) =>
+    ({ id, displayName: `name-${id}` }) as AdminOrderParty;
+  const sellerPkg = (
+    key: string,
+    seller: string,
+    packageNumber: string | null,
+    lines: AdminOrderLine[],
+  ) =>
+    ({ key, seller: party(seller), packageNumber, lines }) as AdminOrderPackage;
+
+  it("gives every product line its own slot, repeating the same seller", () => {
+    const slots = sellerSlots({
+      offer: null,
+      packages: [
+        sellerPkg("p1", "s1", "PKG-1", [line("o1"), line("o2"), line("o3")]),
+      ],
+    });
+    expect(slots).toEqual([
+      { key: "o1", seller: party("s1"), packageNumber: "PKG-1" },
+      { key: "o2", seller: party("s1"), packageNumber: "PKG-1" },
+      { key: "o3", seller: party("s1"), packageNumber: "PKG-1" },
+    ]);
+  });
+
+  it("follows the product lines across packages, in the same order", () => {
+    const row = {
+      offer: null,
+      packages: [
+        sellerPkg("p1", "s1", "PKG-1", [line("o1")]),
+        sellerPkg("p2", "s2", null, [line("o2"), line("o3")]),
+      ],
+    };
+    const slots = sellerSlots(row);
+    expect(slots.map((slot) => slot.key)).toEqual(
+      row.packages.flatMap((p) => p.lines.map((l) => l.orderId)),
     );
+    expect(slots.map((slot) => slot.packageNumber)).toEqual([
+      "PKG-1",
+      null,
+      null,
+    ]);
+    expect(slots[1]).toEqual({
+      key: "o2",
+      ...packageSellerSlot(row.packages[1]),
+    });
+  });
+
+  it("an offer row without packages shows the offer's seller, no package number", () => {
+    const offer = {
+      id: "of1",
+      seller: party("s9"),
+    } as AdminOrderListRow["offer"];
+    expect(sellerSlots({ packages: [], offer })).toEqual([
+      { key: "of1", seller: party("s9"), packageNumber: null },
+    ]);
+    expect(sellerSlots({ packages: [], offer: null })).toEqual([]);
+  });
+
+  it("exports one 'seller PKG' entry per line", () => {
+    expect(
+      sellerSlotsExport({
+        offer: null,
+        packages: [
+          sellerPkg("p1", "s1", "PKG-1", [line("o1"), line("o2")]),
+          sellerPkg("p2", "s2", null, [line("o3")]),
+        ],
+      }),
+    ).toBe("name-s1 PKG-1 | name-s1 PKG-1 | name-s2");
   });
 });
 

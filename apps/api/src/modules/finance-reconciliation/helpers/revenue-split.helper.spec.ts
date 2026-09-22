@@ -85,6 +85,12 @@ describe("assembleRevenueSplit", () => {
     });
   });
 
+  it("links the trade counterpart to the orders screen's Takaslar tab (old list route redirects)", () => {
+    const { section } = assembleRevenueSplit(inputs, rates);
+    const trade = section.components.find((c) => c.key === "tradeCounterpart");
+    expect(trade?.href).toBe("/operations/orders?tab=trades");
+  });
+
   it("surfaces a missing hold as a red difference and a diagnostic count", () => {
     const { section, diagnostics } = assembleRevenueSplit(
       {

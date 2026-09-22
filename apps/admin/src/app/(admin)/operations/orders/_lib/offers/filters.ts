@@ -1,6 +1,6 @@
 import { dateRangeField, statusField } from "@/components/list/filters/fields";
 import type { FilterField, TranslateFn } from "@/components/list/filters/types";
-import { offerStatusOptions } from "./offers";
+import { offerStatusOptions } from "@/app/(admin)/operations/offers/_lib/offers";
 
 export const offerFilterFields = (t: TranslateFn): FilterField[] => [
   statusField(t, offerStatusOptions(t)),

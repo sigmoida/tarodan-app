@@ -28,11 +28,8 @@ function FeeLine({
 export function CommissionCell({
   row,
 }: {
-  // `kind` geniş: İptaller satırı "trade" de olabilir; teklif satırının
-  // kesintisi yoktur.
-  row: Pick<AdminOrderListRow, "totalAmount" | "subtotal" | "fees"> & {
-    kind: string;
-  };
+  // Yalnız tutarları okur: İptaller satırı (takas dahil) da aynı alanları taşır.
+  row: Pick<AdminOrderListRow, "totalAmount" | "subtotal" | "fees">;
 }) {
   const t = useTranslations();
   return (
@@ -40,20 +37,16 @@ export function CommissionCell({
       <span className="whitespace-nowrap text-sm font-semibold tabular-nums text-primary-700">
         {fmtTry(row.totalAmount)}
       </span>
-      {row.kind !== "offer" && (
-        <>
-          <FeeLine
-            label={t("admin.operations.orders.cells.salesCommission")}
-            amount={row.fees.salesCommission}
-            subtotal={row.subtotal}
-          />
-          <FeeLine
-            label={t("admin.operations.orders.cells.platformFee")}
-            amount={row.fees.platformFee}
-            subtotal={row.subtotal}
-          />
-        </>
-      )}
+      <FeeLine
+        label={t("admin.operations.orders.cells.salesCommission")}
+        amount={row.fees.salesCommission}
+        subtotal={row.subtotal}
+      />
+      <FeeLine
+        label={t("admin.operations.orders.cells.platformFee")}
+        amount={row.fees.platformFee}
+        subtotal={row.subtotal}
+      />
     </div>
   );
 }

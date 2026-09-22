@@ -2,6 +2,7 @@ import type {
   AdminOrderLine,
   AdminOrderListRow,
   AdminOrderPackage,
+  AdminOrderParty,
 } from "@tarodan/types";
 
 /**
@@ -9,10 +10,9 @@ import type {
  * yerde durur.
  */
 
-/** Satırın dosya sayfası: sipariş dosyası (grup buradan çözülür) ya da teklif. */
+/** Satırın dosya sayfası: sipariş dosyası (grup dosyası buradan çözülür). */
 export function rowDetailHref(row: AdminOrderListRow): string {
-  if (row.detailOrderId) return `/operations/orders/${row.detailOrderId}`;
-  return `/operations/offers/${row.offer?.id ?? row.id}`;
+  return `/operations/orders/${row.detailOrderId}`;
 }
 
 export function rowLines(row: AdminOrderListRow): AdminOrderLine[] {
@@ -36,15 +36,58 @@ export function feeRate(amount: number, subtotal: number): number | null {
 }
 
 /**
- * Paket blokları ürün, birim fiyat, fatura ve kargo kolonlarında AYNI hizada
- * durmalı: her kolon bloğa bu yüksekliği verir. Satır başına sabit bir kalem
- * yüksekliği + paket başlığı.
+ * Paket blokları ürün, satıcı, birim fiyat, fatura ve kargo kolonlarında AYNI
+ * hizada durmalı: her kolon bloğa bu yüksekliği verir — kalem başına sabit bir
+ * satır yüksekliği (kalemsiz paket de bir satır yer tutar).
  */
-export const PACKAGE_HEADER_PX = 24;
 export const PACKAGE_LINE_PX = 64;
 
 export function packageBlockMinHeight(pkg: AdminOrderPackage): number {
-  return PACKAGE_HEADER_PX + Math.max(pkg.lines.length, 1) * PACKAGE_LINE_PX;
+  return Math.max(pkg.lines.length, 1) * PACKAGE_LINE_PX;
+}
+
+/** Satıcı kolonunun bir yuvası: kalemin satıcısı ve paket numarası. */
+export interface SellerSlot {
+  key: string;
+  seller: AdminOrderParty;
+  packageNumber: string | null;
+}
+
+/** Bir paketin kalemlerine düşen satıcı bilgisi (her kalemde aynı). */
+export function packageSellerSlot(
+  pkg: AdminOrderPackage,
+): Omit<SellerSlot, "key"> {
+  return { seller: pkg.seller, packageNumber: pkg.packageNumber };
+}
+
+/**
+ * Satıcı kolonunun yuvaları, ürün kalemleriyle BİREBİR: her kaleme bir yuva
+ * (aynı satıcının üç kalemi → üç yuva), böylece satıcı ve PKG kendi ürününün
+ * hizasında durur. Paketi olmayan teklif satırında tek yuva teklifin
+ * satıcısıdır (paket numarası yok).
+ */
+export function sellerSlots(
+  row: Pick<AdminOrderListRow, "packages" | "offer">,
+): SellerSlot[] {
+  if (row.packages.length === 0) {
+    return row.offer
+      ? [{ key: row.offer.id, seller: row.offer.seller, packageNumber: null }]
+      : [];
+  }
+  return row.packages.flatMap((pkg) =>
+    pkg.lines.map((line) => ({ key: line.orderId, ...packageSellerSlot(pkg) })),
+  );
+}
+
+/** Dışa aktarım: yuva başına "satıcı PKG", kalem sırasıyla. */
+export function sellerSlotsExport(
+  row: Pick<AdminOrderListRow, "packages" | "offer">,
+): string {
+  return sellerSlots(row)
+    .map((slot) =>
+      [slot.seller.displayName, slot.packageNumber].filter(Boolean).join(" "),
+    )
+    .join(" | ");
 }
 
 /**

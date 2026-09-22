@@ -6572,7 +6572,6 @@
         "errorOccurred": "Hata oluştu"
       },
       "offers": {
-        "title": "Teklifler",
         "totalCount": "{count} teklif",
         "empty": "Henüz teklif yok",
         "emptyFiltered": "Filtreye uyan teklif yok",
@@ -6644,11 +6643,13 @@
         "packageShipping": "Kargo: {amount}",
         "singleItem": "Tek ürün",
         "originCancellation": "{origin} iptali",
-        "pageDescription": "Satın alma siparişleri ve ürünlere verilen teklifler",
+        "pageDescription": "Satın alma siparişleri, ürünlere verilen teklifler ve takaslar",
         "tabs": {
-          "directSale": "Doğrudan Satış",
+          "directSale": "Direkt Satış",
           "all": "Tüm Siparişler",
-          "offers": "Teklifler"
+          "offers": "Teklifler",
+          "offerOrders": "Siparişe Dönen Teklifler",
+          "trades": "Takaslar"
         },
         "updateStatus": "Durum Güncelle",
         "newStatus": "Yeni Durum",
@@ -6816,8 +6817,6 @@
         "buckets": {
           "all": "Tümü",
           "new": "Yeni",
-          "pending": "Bekleyen",
-          "expired": "Süresi Dolan",
           "shipped": "Kargoya Verilen",
           "inTransit": "Taşıma Durumunda",
           "delivered": "Teslim Edilen",
@@ -6839,9 +6838,7 @@
           "cargoStatus": "Kargo / Durum"
         },
         "cells": {
-          "offerRow": "Teklif",
           "offerBadge": "Teklif",
-          "offerExpires": "Son geçerlilik: {date}",
           "preparingDeadline": "Hazırlama son: {date}",
           "quantity": "{count} adet",
           "listingPrice": "İlan:",
@@ -6854,8 +6851,7 @@
           "noInvoice": "Fatura yok",
           "openInvoices": "Faturaları aç",
           "noShipment": "Kargo kaydı yok",
-          "openOrder": "Sipariş dosyasını aç",
-          "openOffer": "Teklif detayını aç"
+          "openOrder": "Sipariş dosyasını aç"
         },
         "cancel": {
           "action": "Siparişi iptal et",
@@ -8639,18 +8635,8 @@
         },
         "orders": {
           "name": "Siparişler",
-          "description": "Tüm siparişleri görüntüleyin ve yönetin",
-          "keywords": "order"
-        },
-        "offers": {
-          "name": "Teklifler",
-          "description": "Ürünlere verilen teklifleri ve pazarlıkları takip edin",
-          "keywords": "teklif,offer,pazarlık"
-        },
-        "trades": {
-          "name": "Takaslar",
-          "description": "Ürün takas taleplerini takip edin ve yönetin",
-          "keywords": "takas,trade,barter,değişim"
+          "description": "Siparişleri, teklifleri ve takasları görüntüleyin ve yönetin",
+          "keywords": "order,sipariş,teklif,offer,takas,trade"
         },
         "shipping": {
           "name": "Kargo",

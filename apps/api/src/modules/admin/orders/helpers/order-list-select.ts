@@ -99,21 +99,9 @@ export type ListLine = Prisma.OrderGetPayload<{
   select: typeof LIST_LINE_SELECT;
 }>;
 
-/** Teklif sekmesinin satırı: teklif + (varsa) siparişi. */
-export const LIST_OFFER_SELECT = {
-  ...LIST_OFFER_CORE_SELECT,
-  buyer: { select: PARTY_SELECT },
-  seller: { select: PARTY_SELECT },
-  product: { select: LIST_PRODUCT_SELECT },
-  order: { select: LIST_LINE_BASE_SELECT },
-} as const satisfies Prisma.OfferSelect;
-
+/** Sipariş satırının teklif ilişkisi hariç yükü — eşleyicinin kalem/paket adımları. */
 export type ListOfferOrder = Prisma.OrderGetPayload<{
   select: typeof LIST_LINE_BASE_SELECT;
-}>;
-
-export type ListOffer = Prisma.OfferGetPayload<{
-  select: typeof LIST_OFFER_SELECT;
 }>;
 
 export const LIST_INVOICE_SELECT = {

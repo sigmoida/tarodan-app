@@ -13,6 +13,7 @@ import { AdminTabs } from "@/components/AdminTabs";
 import { ModerationEventsPanel } from "@/components/ModerationEventsPanel";
 import { getProductEffectivePrice } from "@/lib/product-price";
 import { fmtDate, fmtTry } from "@/lib/format";
+import { ordersTabHref } from "@/app/(admin)/operations/orders/_lib/screenTabs";
 import {
   type UserBlockItem,
   type UserDetail,
@@ -320,7 +321,7 @@ export function UserActivityTabs({
               </div>
             ))}
             <Link
-              href={`/operations/trades?userId=${user.id}`}
+              href={ordersTabHref("trades", { userId: user.id })}
               className="block py-2 text-center text-primary-600 hover:underline"
             >
               {t("admin.users.detail.viewAllTrades")}
