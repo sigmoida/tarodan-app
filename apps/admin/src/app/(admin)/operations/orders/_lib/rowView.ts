@@ -10,10 +10,9 @@ import type {
  * yerde durur.
  */
 
-/** Satırın dosya sayfası: sipariş dosyası (grup buradan çözülür) ya da teklif. */
+/** Satırın dosya sayfası: sipariş dosyası (grup dosyası buradan çözülür). */
 export function rowDetailHref(row: AdminOrderListRow): string {
-  if (row.detailOrderId) return `/operations/orders/${row.detailOrderId}`;
-  return `/operations/offers/${row.offer?.id ?? row.id}`;
+  return `/operations/orders/${row.detailOrderId}`;
 }
 
 export function rowLines(row: AdminOrderListRow): AdminOrderLine[] {

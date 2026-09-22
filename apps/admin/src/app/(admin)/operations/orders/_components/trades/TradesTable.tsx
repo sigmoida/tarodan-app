@@ -4,8 +4,8 @@ import { useMemo } from "react";
 import { useTranslations } from "next-intl";
 import { DataTable } from "@/components/DataTable";
 import { useResourceList } from "@/components/list";
-import { tradeColumns } from "../_lib/columns";
-import { type Trade, mapTrades } from "../_lib/trades";
+import { tradeColumns } from "../../_lib/trades/columns";
+import { type Trade, mapTrades } from "../../_lib/trades/trades";
 
 export function TradesTable() {
   const t = useTranslations();

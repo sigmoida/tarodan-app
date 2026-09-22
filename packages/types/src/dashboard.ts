@@ -1,4 +1,8 @@
 import { ADMIN_REFUNDS_VIEW_HREF } from "./admin-cancellations";
+import {
+  ADMIN_ORDERS_PATH,
+  ADMIN_TRADES_TAB_HREF,
+} from "./admin-orders-screen";
 
 /**
  * Admin dashboard period filter — the contract shared by the API endpoint
@@ -227,10 +231,10 @@ export const DASHBOARD_QUEUE_PART_LINKS: Record<DashboardQueuePartKey, string> =
     // İadeler sekmesi, kuyruğun kendi durumuyla süzülmüş.
     refundsPendingReview: `${ADMIN_REFUNDS_VIEW_HREF}&status=pending_review`,
     refundsDisputed: `${ADMIN_REFUNDS_VIEW_HREF}&status=disputed`,
-    tradesAtWarehouse: "/operations/trades",
-    tradeDisputesOpen: "/operations/trades",
-    tradeRefundFailures: "/operations/trades",
-    tradeCompensationPending: "/operations/trades",
+    tradesAtWarehouse: ADMIN_TRADES_TAB_HREF,
+    tradeDisputesOpen: ADMIN_TRADES_TAB_HREF,
+    tradeRefundFailures: ADMIN_TRADES_TAB_HREF,
+    tradeCompensationPending: ADMIN_TRADES_TAB_HREF,
     productsPending: "/catalog/products",
     messagesPendingApproval: "/messaging/messages",
     corporateApplications: "/accounts/seller-applications",
@@ -250,7 +254,7 @@ export const DASHBOARD_QUEUE_PART_LINKS: Record<DashboardQueuePartKey, string> =
 /** The tile's own link — the screen that clears most of it. */
 export const DASHBOARD_QUEUE_LINKS: Record<DashboardQueueKey, string> = {
   refundRequests: ADMIN_REFUNDS_VIEW_HREF,
-  tradeOperations: "/operations/trades",
+  tradeOperations: ADMIN_TRADES_TAB_HREF,
   listingModeration: "/catalog/products",
   sellerApplications: "/accounts/seller-applications",
   supportAndReports: "/messaging/support",
@@ -328,8 +332,8 @@ export interface DashboardAlert {
 
 export const DASHBOARD_ALERT_LINKS: Record<DashboardAlertKey, string> = {
   stuckShippedOrders: "/operations/shipping",
-  stuckWarehouseTrades: "/operations/trades",
-  stuckOutboundTrades: "/operations/trades",
+  stuckWarehouseTrades: ADMIN_TRADES_TAB_HREF,
+  stuckOutboundTrades: ADMIN_TRADES_TAB_HREF,
   paymentsMissingFromStatement: "/finance/psp",
   unresolvedStatementLines: "/finance/psp",
   commissionLedgerDrift: "/finance/overview",
@@ -343,7 +347,7 @@ export const DASHBOARD_ALERT_LINKS: Record<DashboardAlertKey, string> = {
   deliveredHoldsWithoutRelease: "/finance/payouts",
   agedCarrierCancellations: "/operations/shipping",
   exhaustedPayoutRetries: "/finance/payouts",
-  preparingDeadlineWithin24h: "/operations/orders",
+  preparingDeadlineWithin24h: ADMIN_ORDERS_PATH,
 };
 
 /** Zone A + Zone B — one request, because both answer "what needs me now?". */

@@ -5,7 +5,11 @@ import { col, RowActionMenu, TruncatedText } from "@/components/table";
 import { fmtTry } from "@/lib/format";
 import { cancelReasonLabel } from "@/lib/utils";
 import { statusConfig } from "@/lib/statusLabels";
-import { canCancelOffer, offerPercentOfList, type OfferRow } from "./offers";
+import {
+  canCancelOffer,
+  offerPercentOfList,
+  type OfferRow,
+} from "@/app/(admin)/operations/offers/_lib/offers";
 
 type T = ReturnType<typeof useTranslations<never>>;
 

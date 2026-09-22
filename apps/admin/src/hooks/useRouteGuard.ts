@@ -1,9 +1,9 @@
-'use client';
+"use client";
 
-import { useEffect } from 'react';
-import { usePathname, useRouter } from 'next/navigation';
-import { routePermission } from '@/lib/navigation';
-import { usePermissions } from '@/context/PermissionsContext';
+import { useEffect } from "react";
+import { usePathname, useRouter } from "next/navigation";
+import { canAccessRoute } from "@/lib/navigation";
+import { usePermissions } from "@/context/PermissionsContext";
 
 /**
  * UX route guard: hide unauthorized page content immediately and redirect to the
@@ -15,12 +15,11 @@ export function useRouteGuard() {
   const pathname = usePathname();
   const router = useRouter();
   const { can } = usePermissions();
-  const required = routePermission(pathname);
-  const isAllowed = !required || can(required);
+  const isAllowed = canAccessRoute(pathname, can);
 
   useEffect(() => {
     if (!isAllowed) {
-      router.replace('/forbidden');
+      router.replace("/forbidden");
     }
   }, [isAllowed, router]);
 

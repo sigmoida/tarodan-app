@@ -5,6 +5,7 @@ import {
   type Prisma,
 } from "@prisma/client";
 import {
+  ADMIN_ORDER_TAB_ORIGINS,
   adminOrderBucketFilter,
   resolveAdminOrderBucket,
   resolveAdminOrderTab,
@@ -12,13 +13,7 @@ import {
   type AdminOrderTab,
 } from "@tarodan/types";
 import { buildSearchWhere, dateRangeWhere } from "../../../../common/list";
-import {
-  cartBucketWhere,
-  groupLines,
-  offerBucketWhere,
-  singleLine,
-  type CartBucket,
-} from "./order-bucket-where";
+import { cartBucketWhere, groupLines, singleLine } from "./order-bucket-where";
 
 /** Liste + sayaç uçlarının ortak filtre alanları (DTO'nun alt kümesi). */
 export interface OrderListFilters {
@@ -37,56 +32,26 @@ export interface OrderListFilters {
   status?: OrderStatus;
 }
 
-/**
- * Her metin filtresinin hangi kolonlarda arandığı. Sipariş ve teklif AYNI
- * buyer/seller/product ilişkilerini taşır; yalnız sipariş kodlarına teklif
- * kendi `order` ilişkisi üzerinden ulaşır. Teklifin grubu olmaz → boş liste
- * "hiçbir teklif eşleşmez" demektir (filtre yok değil).
- */
-interface TextFilterColumns {
-  party: readonly string[];
-  productQuery: readonly string[];
-  orderNumber: readonly string[];
-  packageNumber: readonly string[];
-  groupNumber: readonly string[];
-  /** Sipariş durumu filtresinin kaynağa göre koşulu. */
-  status: (status: OrderStatus) => Record<string, unknown>;
-}
-
 const PARTY_COLUMNS = ["buyer", "seller"].flatMap((side) =>
   ["displayName", "email", "adminCode"].map((field) => `${side}.${field}`),
 );
-const PRODUCT_COLUMNS = [
-  "product.title",
-  "product.modelCode",
-  "product.productCode",
-];
 
-const ORDER_COLUMNS: TextFilterColumns = {
+/**
+ * Her metin filtresinin bir sipariş satırında hangi kolonlarda arandığı. Bir
+ * kod yalnız kendi kolonunda aranır (paket numarası kullanıcı kodu değildir);
+ * serbest arama hepsini birden tarar.
+ */
+const TEXT_FILTER_COLUMNS = {
   party: PARTY_COLUMNS,
-  productQuery: PRODUCT_COLUMNS,
   orderNumber: ["orderNumber"],
   packageNumber: ["package.packageNumber"],
   groupNumber: ["checkoutGroup.groupNumber"],
-  status: (status) => ({ status }),
-};
+  productQuery: ["product.title", "product.modelCode", "product.productCode"],
+} as const satisfies Record<string, readonly string[]>;
 
-const OFFER_COLUMNS: TextFilterColumns = {
-  party: PARTY_COLUMNS,
-  productQuery: PRODUCT_COLUMNS,
-  orderNumber: ["order.orderNumber"],
-  packageNumber: ["order.package.packageNumber"],
-  groupNumber: [],
-  status: (status) => ({ order: { is: { status } } }),
-};
-
-const TEXT_FILTERS = [
-  "party",
-  "orderNumber",
-  "packageNumber",
-  "groupNumber",
-  "productQuery",
-] as const;
+const TEXT_FILTERS = Object.keys(TEXT_FILTER_COLUMNS) as Array<
+  keyof typeof TEXT_FILTER_COLUMNS
+>;
 
 const MATCH_NOTHING = { id: { in: [] as string[] } };
 
@@ -111,19 +76,16 @@ function scopeParts(filters: OrderListFilters): Record<string, unknown>[] {
   return parts;
 }
 
-function filterParts(
-  filters: OrderListFilters,
-  columns: TextFilterColumns,
-): Record<string, unknown>[] {
+function filterParts(filters: OrderListFilters): Record<string, unknown>[] {
   const parts: Record<string, unknown>[] = [];
-  const everyColumn = TEXT_FILTERS.flatMap((key) => columns[key]);
+  const everyColumn = TEXT_FILTERS.flatMap((key) => TEXT_FILTER_COLUMNS[key]);
   const search = textFilterWhere(filters.search, everyColumn);
   if (search) parts.push(search);
   for (const key of TEXT_FILTERS) {
-    const where = textFilterWhere(filters[key], columns[key]);
+    const where = textFilterWhere(filters[key], TEXT_FILTER_COLUMNS[key]);
     if (where) parts.push(where);
   }
-  if (filters.status) parts.push(columns.status(filters.status));
+  if (filters.status) parts.push({ status: filters.status });
   const dates = dateRangeWhere(filters);
   if (Object.keys(dates).length > 0) parts.push(dates);
   parts.push(...scopeParts(filters));
@@ -138,7 +100,7 @@ function andOf<TWhere>(parts: Record<string, unknown>[]): TWhere {
 export function orderLineFilterWhere(
   filters: OrderListFilters,
 ): Prisma.OrderWhereInput {
-  return andOf(filterParts(filters, ORDER_COLUMNS));
+  return andOf(filterParts(filters));
 }
 
 /**
@@ -152,60 +114,46 @@ export function orderLineScopeWhere(
   return andOf(scopeParts(filters));
 }
 
-export function offerFilterWhere(
-  filters: OrderListFilters,
-): Prisma.OfferWhereInput {
-  return andOf(filterParts(filters, OFFER_COLUMNS));
-}
-
 /**
- * Bir sekmenin satır kaynakları ve her kaynağın `where`'i.
- * - all / direct_sale: CheckoutGroup (sepet) + grupsuz tekil sipariş. Grupsuz
- *   kaynak ürün türüyle sınırlıdır: üyelik ve öne çıkarma siparişleri de grupsuz
+ * Bir sekmenin satır kaynakları ve her kaynağın `where`'i — liste ve sayaçlar
+ * bu fonksiyonu paylaşır.
+ * - group: CheckoutGroup (sepet). Yalnız doğrudan satış gruplanır; teklif
+ *   siparişi hiç gruba girmez, bu yüzden "Siparişe Dönen Teklifler"de yoktur.
+ * - loose: grupsuz tekil sipariş, sekmenin kökenleriyle (`ADMIN_ORDER_TAB_ORIGINS`)
+ *   ve ürün türüyle sınırlı: üyelik ve öne çıkarma siparişleri de grupsuz
  *   oluşur ama operasyon satırı değildir.
- * - offer: teklifin kendisi (sipariş olmuşsa siparişiyle birlikte).
  * "Tümü" (ya da kova yok) kova koşulu eklemez: sekmenin kapsamı + filtreler.
- * Liste ve sayaçlar bu fonksiyonu paylaşır.
  */
 export function orderListSourceWheres(
   tab: AdminOrderTab,
   bucket: AdminOrderBucket | undefined,
   filters: OrderListFilters,
-  now: Date,
 ): {
   group?: Prisma.CheckoutGroupWhereInput;
-  loose?: Prisma.OrderWhereInput;
-  offer?: Prisma.OfferWhereInput;
+  loose: Prisma.OrderWhereInput;
 } {
-  const filterBucket = adminOrderBucketFilter(bucket);
-  if (tab === "offer") {
-    const parts: Prisma.OfferWhereInput[] = [offerFilterWhere(filters)];
-    if (filterBucket) parts.push(offerBucketWhere(filterBucket, now));
-    return { offer: { AND: parts } };
-  }
-
-  const cartBucket = filterBucket as CartBucket | undefined;
+  const cartBucket = adminOrderBucketFilter(bucket);
   const lineFilter = orderLineFilterWhere(filters);
   const hasFilter = Object.keys(lineFilter).length > 0;
+  const origins = ADMIN_ORDER_TAB_ORIGINS[tab] as readonly OrderOrigin[];
 
-  const group: Prisma.CheckoutGroupWhereInput[] = [];
-  if (hasFilter) group.push(groupLines(lineFilter));
-  if (cartBucket) group.push(cartBucketWhere(cartBucket, groupLines));
-
-  const origins: OrderOrigin[] =
-    tab === "direct_sale"
-      ? [OrderOrigin.direct_sale]
-      : [OrderOrigin.direct_sale, OrderOrigin.offer];
   const loose: Prisma.OrderWhereInput[] = [
     {
       checkoutGroupId: null,
       product: { kind: ProductKind.listing },
-      origin: { in: origins },
+      origin: { in: [...origins] },
     },
   ];
   if (hasFilter) loose.push(lineFilter);
   if (cartBucket) loose.push(cartBucketWhere(cartBucket, singleLine));
 
+  if (!origins.includes(OrderOrigin.direct_sale)) {
+    return { loose: { AND: loose } };
+  }
+
+  const group: Prisma.CheckoutGroupWhereInput[] = [];
+  if (hasFilter) group.push(groupLines(lineFilter));
+  if (cartBucket) group.push(cartBucketWhere(cartBucket, groupLines));
   return { group: { AND: group }, loose: { AND: loose } };
 }
 
@@ -251,7 +199,7 @@ export function orderListScopeOf(query: OrderListQuery): {
 }
 
 function originTab(origin: OrderOrigin | undefined): AdminOrderTab | undefined {
-  if (origin === OrderOrigin.offer) return "offer";
+  if (origin === OrderOrigin.offer) return "offer_order";
   if (origin === OrderOrigin.direct_sale) return "direct_sale";
   return undefined;
 }

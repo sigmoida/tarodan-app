@@ -14,6 +14,7 @@ import {
   RefundFinancialTreatment,
   RefundRequestStatus,
 } from "@prisma/client";
+import { ADMIN_TRADES_TAB_HREF } from "@tarodan/types";
 import { PrismaService } from "../../prisma";
 import { paytrReportSyncEnabled } from "../../config/paytr";
 import { istanbulDayStart } from "../../common/helpers/tr-calendar";
@@ -266,7 +267,7 @@ export class FinanceReconciliationService {
         key: "tradeCounterpart",
         amount: round2(total),
         count: all._count.id,
-        href: "/operations/trades",
+        href: ADMIN_TRADES_TAB_HREF,
       },
       components,
       difference,

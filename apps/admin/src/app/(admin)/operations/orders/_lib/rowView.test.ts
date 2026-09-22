@@ -37,17 +37,17 @@ describe("rowDetailHref", () => {
     expect(rowDetailHref(row({}))).toBe("/operations/orders/o1");
   });
 
-  it("opens the offer for an offer that has no order yet", () => {
+  it("opens the order file for an offer order too (offers live in their own tab)", () => {
     expect(
       rowDetailHref(
         row({
-          kind: "offer",
-          id: "of1",
-          detailOrderId: null,
+          kind: "order",
+          id: "o9",
+          detailOrderId: "o9",
           offer: { id: "of1" } as AdminOrderListRow["offer"],
         }),
       ),
-    ).toBe("/operations/offers/of1");
+    ).toBe("/operations/orders/o9");
   });
 });
 

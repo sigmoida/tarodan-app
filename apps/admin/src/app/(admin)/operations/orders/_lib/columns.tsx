@@ -34,7 +34,7 @@ export function orderColumns({
         minWidth: 180,
         sortKey: "createdAt",
         sortType: "date",
-        exportValue: (row) => row.number ?? "",
+        exportValue: (row) => row.number,
       },
     ),
     col.custom<AdminOrderListRow>(

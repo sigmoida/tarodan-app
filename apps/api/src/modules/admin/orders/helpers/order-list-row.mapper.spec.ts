@@ -1,10 +1,6 @@
 import { Prisma } from "@prisma/client";
-import {
-  mapCartRow,
-  mapOfferRow,
-  type RowMapContext,
-} from "./order-list-row.mapper";
-import type { ListInvoice, ListLine, ListOffer } from "./order-list-select";
+import { mapCartRow, type RowMapContext } from "./order-list-row.mapper";
+import type { ListInvoice, ListLine } from "./order-list-select";
 
 const NOW = new Date("2026-09-17T12:00:00.000Z");
 const D = (n: number) => new Prisma.Decimal(n);
@@ -305,71 +301,5 @@ describe("mapCartRow", () => {
         priceDifference: -100,
       }),
     );
-  });
-});
-
-describe("mapOfferRow", () => {
-  function offer(overrides: Partial<ListOffer> = {}): ListOffer {
-    return {
-      id: "of1",
-      status: "pending",
-      amount: D(1000),
-      expiresAt: new Date("2026-09-16T00:00:00.000Z"),
-      createdAt: new Date("2026-09-15T00:00:00.000Z"),
-      buyer: party("b1"),
-      seller: party("s1"),
-      product: product("pr1", 1250),
-      order: null,
-      ...overrides,
-    } as ListOffer;
-  }
-
-  it("a not-yet-ordered offer is its own row, compared with the live listing price", () => {
-    const row = mapOfferRow(offer(), ctx());
-    expect(row).toEqual(
-      expect.objectContaining({
-        kind: "offer",
-        id: "of1",
-        number: null,
-        origin: "offer",
-        detailOrderId: null,
-        totalAmount: 1000,
-        packages: [],
-        fees: { salesCommission: 0, platformFee: 0 },
-      }),
-    );
-    expect(row.offer).toEqual(
-      expect.objectContaining({
-        // lapsed pending reads as expired, like the offer screens
-        status: "expired",
-        listingPrice: 1250,
-        listingPriceApproximate: false,
-        priceDifference: 250,
-      }),
-    );
-  });
-
-  it("an ordered offer becomes the order row with the offer attached", () => {
-    // An offer's order carries no nested `offer`: the offer is the parent row.
-    const orderLine: Partial<ListLine> = line({
-      id: "o9",
-      orderNumber: "ORD-9",
-      origin: "offer",
-      checkoutGroupId: null,
-      status: "shipped",
-    });
-    delete orderLine.offer;
-    const row = mapOfferRow(
-      offer({
-        status: "accepted",
-        order: orderLine as NonNullable<ListOffer["order"]>,
-      }),
-      ctx(),
-    );
-    expect(row.kind).toBe("order");
-    expect(row.number).toBe("ORD-9");
-    expect(row.detailOrderId).toBe("o9");
-    expect(row.offer?.id).toBe("of1");
-    expect(row.packages[0].lines[0].status).toBe("shipped");
   });
 });

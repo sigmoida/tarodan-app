@@ -1,6 +1,11 @@
 import { ShieldCheckIcon, UserGroupIcon } from "@heroicons/react/24/outline";
 import { useTranslations } from "next-intl";
 import type { BadgeProps } from "@tarodan/ui";
+import {
+  ADMIN_OFFERS_TAB_HREF,
+  ADMIN_ORDERS_PATH,
+  ADMIN_TRADES_TAB_HREF,
+} from "@tarodan/types";
 import type { PermGroup } from "./types";
 
 type T = ReturnType<typeof useTranslations<never>>;
@@ -82,13 +87,18 @@ export const getPermissionGroups = (t: T): PermGroup[] => [
         key: "orders",
         label: t("admin.roles.permissions.orders.label"),
         description: t("admin.roles.permissions.orders.description"),
-        pages: ["/operations/orders", "/operations/orders/:id"],
+        pages: [
+          ADMIN_ORDERS_PATH,
+          `${ADMIN_ORDERS_PATH}/:id`,
+          ADMIN_OFFERS_TAB_HREF,
+          "/operations/offers/:id",
+        ],
       },
       {
         key: "trades",
         label: t("admin.roles.permissions.trades.label"),
         description: t("admin.roles.permissions.trades.description"),
-        pages: ["/operations/trades", "/operations/trades/:id"],
+        pages: [ADMIN_TRADES_TAB_HREF, "/operations/trades/:id"],
       },
       {
         key: "shipping",

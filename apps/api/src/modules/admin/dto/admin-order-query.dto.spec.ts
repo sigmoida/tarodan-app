@@ -17,8 +17,8 @@ describe("AdminOrderQueryDto", () => {
   it("accepts the tab, bucket and every column filter", async () => {
     await expect(
       errorsOf(AdminOrderQueryDto, {
-        tab: "offer",
-        bucket: "expired",
+        tab: "offer_order",
+        bucket: "delivered",
         party: "K010001",
         orderNumber: "ORD-1",
         packageNumber: "PKG-1",
@@ -33,7 +33,7 @@ describe("AdminOrderQueryDto", () => {
   });
 
   it("accepts the all (Tümü) bucket on every tab", async () => {
-    for (const tab of ["all", "direct_sale", "offer"]) {
+    for (const tab of ["all", "direct_sale", "offer_order"]) {
       await expect(
         errorsOf(AdminOrderQueryDto, { tab, bucket: "all" }),
       ).resolves.toEqual([]);
@@ -44,6 +44,21 @@ describe("AdminOrderQueryDto", () => {
     await expect(
       errorsOf(AdminOrderQueryDto, { tab: "trades", bucket: "lost" }),
     ).resolves.toEqual(expect.arrayContaining(["tab", "bucket"]));
+  });
+
+  it("rejects the screen-only tabs and the removed offer buckets", async () => {
+    // Teklifler / Takaslar panel sekmeleri kendi uçlarını okur; eski teklif
+    // kovaları (Bekleyen / Süresi Dolan) Teklifler sekmesinin durum filtresidir.
+    for (const tab of ["offer", "offers"]) {
+      await expect(errorsOf(AdminOrderQueryDto, { tab })).resolves.toEqual([
+        "tab",
+      ]);
+    }
+    for (const bucket of ["pending", "expired"]) {
+      await expect(errorsOf(AdminOrderQueryDto, { bucket })).resolves.toEqual([
+        "bucket",
+      ]);
+    }
   });
 
   it("keeps accepting the legacy origin, status and date names", async () => {
@@ -70,7 +85,7 @@ describe("AdminOrderCountsQueryDto", () => {
   it("has the filters but not the tab (counts cover every tab)", async () => {
     const dto = plainToInstance(AdminOrderCountsQueryDto, {
       party: "ali",
-      tab: "offer",
+      tab: "offer_order",
     });
     await expect(validate(dto)).resolves.toEqual([]);
     expect("tab" in new AdminOrderCountsQueryDto()).toBe(false);

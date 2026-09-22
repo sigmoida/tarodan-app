@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useParams } from "next/navigation";
 import { Button, StatusBadge, tradeStatusConfig } from "@tarodan/ui";
+import { ADMIN_TRADES_TAB_HREF } from "@tarodan/types";
 import { useTranslations } from "next-intl";
 import { adminApi } from "@/lib/api";
 import { fmtDateTime } from "@/lib/format";
@@ -115,7 +116,7 @@ export default function TradeDetailPage() {
           .getTrade(tid)
           .then((r) => mapTradePayload(r.data?.data ?? r.data))
       }
-      backHref="/operations/trades"
+      backHref={ADMIN_TRADES_TAB_HREF}
       emptyTitle={t("admin.operations.trades.notFound")}
       title={(trade) => (
         <>

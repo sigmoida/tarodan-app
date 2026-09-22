@@ -224,7 +224,8 @@ export class AdminOrderCountsQueryDto extends AdminListQueryDto {
 export class AdminOrderQueryDto extends AdminOrderCountsQueryDto {
   @ApiPropertyOptional({
     enum: ADMIN_ORDER_TABS,
-    description: "Sekme: tüm siparişler / doğrudan satış / teklifler",
+    description:
+      "Sekme: tüm siparişler / doğrudan satış / siparişe dönen teklifler",
   })
   @IsOptional()
   @IsIn(ADMIN_ORDER_TABS)

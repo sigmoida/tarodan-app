@@ -14,7 +14,6 @@ import { offerEffectiveStatus } from "./offer-effective-status";
 import type {
   ListInvoice,
   ListLine,
-  ListOffer,
   ListOfferOrder,
   PARTY_SELECT,
   LIST_PRODUCT_SELECT,
@@ -196,14 +195,14 @@ function offerInfoOf(params: {
   offer: OfferCore;
   product: Product;
   seller: Party;
-  /** Siparişe dönmüşse snapshot'ı; dönmemişse `undefined` (canlı karşılaştırma). */
-  order?: { financialSnapshot: Prisma.JsonValue };
+  /** Teklifin siparişi: ilan fiyatı ödeme anındaki snapshot'tan okunur. */
+  order: { financialSnapshot: Prisma.JsonValue };
   ctx: RowMapContext;
 }): AdminOrderOfferInfo {
   const { offer, product, seller, order, ctx } = params;
   const offerAmount = money(offer.amount).toNumber();
   const comparison = compareOfferToListing({
-    financialSnapshot: order?.financialSnapshot ?? null,
+    financialSnapshot: order.financialSnapshot ?? null,
     currentListingPrice: money(product.price).toNumber(),
     offerAmount,
   });
@@ -212,8 +211,7 @@ function offerInfoOf(params: {
     status: offerEffectiveStatus(offer, ctx.now),
     amount: offerAmount,
     listingPrice: comparison.listingPrice,
-    // Sipariş yokken güncel ilan fiyatı zaten karşılaştırılan fiyattır.
-    listingPriceApproximate: order ? comparison.approximate : false,
+    listingPriceApproximate: comparison.approximate,
     priceDifference: comparison.difference,
     expiresAt: offer.expiresAt.toISOString(),
     createdAt: offer.createdAt.toISOString(),
@@ -273,47 +271,4 @@ export function mapCartRow(
   ctx: RowMapContext,
 ): AdminOrderListRow {
   return cartRowOf(head, lines, lines[0]?.offer ?? null, ctx);
-}
-
-/**
- * Teklif sekmesinin satırı. Siparişe dönmüş teklif sipariş satırıdır (ORD);
- * dönmemiş teklif kendi satırıdır, paketi olmaz.
- */
-export function mapOfferRow(
-  offer: ListOffer,
-  ctx: RowMapContext,
-): AdminOrderListRow {
-  if (offer.order) {
-    return cartRowOf(
-      {
-        kind: "order",
-        id: offer.order.id,
-        number: offer.order.orderNumber,
-        createdAt: offer.order.createdAt,
-      },
-      [offer.order],
-      offer,
-      ctx,
-    );
-  }
-  const amount = money(offer.amount).toNumber();
-  return {
-    kind: "offer",
-    id: offer.id,
-    number: null,
-    origin: "offer",
-    createdAt: offer.createdAt.toISOString(),
-    detailOrderId: null,
-    buyer: partyOf(offer.buyer),
-    totalAmount: amount,
-    subtotal: amount,
-    fees: { salesCommission: 0, platformFee: 0 },
-    offer: offerInfoOf({
-      offer,
-      product: offer.product,
-      seller: offer.seller,
-      ctx,
-    }),
-    packages: [],
-  };
 }

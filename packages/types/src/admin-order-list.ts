@@ -10,12 +10,13 @@ import type { AdminOrderBucket, AdminOrderTab } from "./order-buckets";
 /**
  * `GET /admin/orders` satır sözleşmesi — API üretir, panel okur.
  *
- * Satır = sepet: `group` (CheckoutGroup, GRP), `order` (grupsuz tekil sipariş —
- * teklif siparişi, ORD) ya da `offer` (siparişe dönmemiş teklif). Ürünler paket
- * (koli, satıcı başına) altında gruplanır; kargo ve faturalar paket başınadır.
+ * Satır = sepet: `group` (CheckoutGroup, GRP) ya da `order` (grupsuz tekil
+ * sipariş — teklif siparişi, ORD). Siparişe dönmemiş teklif bu listede yoktur
+ * (Teklifler sekmesi `GET /admin/offers`'ı okur). Ürünler paket (koli, satıcı
+ * başına) altında gruplanır; kargo ve faturalar paket başınadır.
  */
 
-export type AdminOrderRowKind = "group" | "order" | "offer";
+export type AdminOrderRowKind = "group" | "order";
 
 export interface AdminOrderParty {
   id: string;
@@ -103,8 +104,8 @@ export interface AdminOrderOfferInfo {
   expiresAt: string;
   createdAt: string;
   /**
-   * Teklif verilen ürün ve teklif alan (satıcı). Siparişe dönmemiş teklif
-   * satırında paket yoktur; hücreler ürünü ve satıcıyı buradan okur.
+   * Teklif verilen ürün ve teklif alan (satıcı). Paketi olmayan bir satırda
+   * (paylaşılan hücrelerin savunması) hücreler ürünü ve satıcıyı buradan okur.
    */
   product: AdminOrderLineProduct;
   seller: AdminOrderParty;
@@ -113,12 +114,12 @@ export interface AdminOrderOfferInfo {
 export interface AdminOrderListRow {
   kind: AdminOrderRowKind;
   id: string;
-  /** GRP-… / ORD-…; siparişe dönmemiş teklifte null. */
-  number: string | null;
+  /** GRP-… / ORD-…. */
+  number: string;
   origin: OrderOriginValue;
   createdAt: string;
   /** Sipariş dosyasını açan sipariş id'si (grup dosyası buradan çözülür). */
-  detailOrderId: string | null;
+  detailOrderId: string;
   buyer: AdminOrderParty;
   totalAmount: number;
   subtotal: number;

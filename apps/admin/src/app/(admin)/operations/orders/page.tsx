@@ -3,25 +3,25 @@
 "use client";
 
 import { useTranslations } from "next-intl";
-import { adminApi } from "@/lib/api";
+import { isAdminOrderListTab } from "@tarodan/types";
 import { AdminPage } from "@/components/page/AdminPage";
 import { PageHeader } from "@/components/AdminList";
-import { ResourceList } from "@/components/list";
-import { DeepLinkFilterSummary } from "@/components/list/DeepLinkFilterSummary";
-import { ORDER_DEEP_LINK_FILTERS, orderFilterFields } from "./_lib/filters";
-import { useOrderTabs } from "./_hooks/useOrderTabs";
-import { OrderTabBar } from "./_components/OrderTabBar";
-import { OrdersTable } from "./_components/OrdersTable";
+import { useOrdersScreenTab } from "./_hooks/useOrdersScreenTab";
+import { OrdersView } from "./_components/OrdersView";
+import { OffersView } from "./_components/offers/OffersView";
+import { TradesView } from "./_components/trades/TradesView";
 
 /**
- * Siparişler: sekme (Tüm / Direkt Satış / Teklifler) × alt sekme (kova).
- * Sekme ve kova URL'de yaşar ve her isteğe eklenir; filtre değil, liste
- * kapsamıdır. Liste kova değişince yeniden kurulur, filtreler URL'den geri
- * okunur. Takaslar ayrı ekrandadır (/operations/trades).
+ * Siparişler: beş üst sekme — Tüm Siparişler / Direkt Satış / Teklifler /
+ * Siparişe Dönen Teklifler / Takaslar. Sipariş sekmeleri tek sipariş
+ * listesini (kovalarıyla), Teklifler bütün teklifleri, Takaslar takasları
+ * listeler; her sekmenin tablosu kendi yapısındadır. Sekme URL'de yaşar,
+ * yalnız etkin sekmenin listesi bağlanır. Eski `/operations/offers` ve
+ * `/operations/trades` listeleri buraya yönlenir.
  */
 export default function OrdersPage() {
   const t = useTranslations();
-  const { tab, bucket } = useOrderTabs();
+  const { tab } = useOrdersScreenTab();
 
   return (
     <AdminPage>
@@ -29,26 +29,13 @@ export default function OrdersPage() {
         title={t("admin.operations.orders.title")}
         description={t("admin.operations.orders.pageDescription")}
       />
-      <ResourceList
-        key={`${tab}:${bucket}`}
-        resource="orders"
-        fetcher={(params) => adminApi.getOrders({ ...params, tab, bucket })}
-        scope={{ tab, bucket }}
-        getRowId={(row: { kind: string; id: string }) =>
-          `${row.kind}:${row.id}`
-        }
-        syncUrl
-        filters={orderFilterFields(t)}
-        initialFilters={ORDER_DEEP_LINK_FILTERS}
-      >
-        <OrderTabBar />
-        <ResourceList.Toolbar />
-        <p className="text-sm text-muted empty:hidden">
-          <DeepLinkFilterSummary />
-        </p>
-        <OrdersTable />
-        <ResourceList.Pagination />
-      </ResourceList>
+      {isAdminOrderListTab(tab) ? (
+        <OrdersView tab={tab} />
+      ) : tab === "offers" ? (
+        <OffersView />
+      ) : (
+        <TradesView />
+      )}
     </AdminPage>
   );
 }

@@ -1,5 +1,5 @@
 import type {
-  OfferStatusValue,
+  OrderOriginValue,
   OrderStatusValue,
   ShipmentStatusValue,
 } from "./commerce-status";
@@ -12,19 +12,22 @@ import type {
  * tanımı değişirse yalnız burası değişir.
  *
  * Satır birimi SEPETTİR: doğrudan satışta CheckoutGroup (GRP), teklifte tekil
- * sipariş (ORD). Teklif sekmesinin "Bekleyen" / "Süresi Dolan" kovalarında
- * henüz sipariş olmayabileceği için satır teklifin kendisidir.
+ * sipariş (ORD). Burada yalnız SİPARİŞ satırı taşıyan sekmeler vardır; aynı
+ * ekrandaki Teklifler (siparişe dönmemişler dahil bütün teklifler) ve Takaslar
+ * sekmeleri kendi listelerini okur (bkz. `admin-orders-screen.ts`).
  */
 
-export const ADMIN_ORDER_TABS = ["all", "direct_sale", "offer"] as const;
+/**
+ * Sipariş satırı taşıyan sekmeler: tüm siparişler, doğrudan satış ve siparişe
+ * dönen teklifler (`offer_order` — teklif kaynaklı ORD'ler).
+ */
+export const ADMIN_ORDER_TABS = ["all", "direct_sale", "offer_order"] as const;
 
 export type AdminOrderTab = (typeof ADMIN_ORDER_TABS)[number];
 
 export const ADMIN_ORDER_BUCKETS = [
   "all",
   "new",
-  "pending",
-  "expired",
   "shipped",
   "in_transit",
   "delivered",
@@ -47,7 +50,7 @@ export type AdminOrderFilterBucket = Exclude<
 
 /**
  * Kapsamsız açılışın alt sekmesi: operasyonun iş kuyruğu "Yeni". Kullanıcı /
- * ürün deep-link'i ise "Tümü"nde açılır (bkz. panel `useOrderTabs`).
+ * ürün deep-link'i ise "Tümü"nde açılır (bkz. panel `useOrderBucket`).
  */
 export const ADMIN_ORDER_DEFAULT_BUCKET = "new" satisfies AdminOrderBucket;
 
@@ -126,54 +129,36 @@ export const ORDER_LINE_STAGE_RULES: Record<
 };
 
 /**
- * Teklif sekmesinin siparişe dönmemiş kovaları.
- * - pending (Bekleyen): süresi geçmemiş açık teklif ya da kabul edilmiş ama
- *   siparişi henüz ödenmemiş teklif.
- * - expired (Süresi Dolan): cron'un `expired`'a çektiği, süresi geçtiği hâlde
- *   henüz çekilmemiş `pending` ve ödeme süresi dolmuş (`payment_expired`) teklif.
+ * Sekmenin kapsadığı sipariş kökenleri — listenin ve sayaçların kaynağı.
+ * Teklif siparişi grupsuz tekil siparişidir; CheckoutGroup kaynağı yalnız
+ * doğrudan satışı taşır (bkz. API `orderListSourceWheres`).
  */
-export const OFFER_PENDING_RULE = {
-  openStatuses: ["pending"] as readonly OfferStatusValue[],
-  acceptedStatuses: ["accepted"] as readonly OfferStatusValue[],
-  unpaidOrderStatuses: ["pending_payment"] as readonly OrderStatusValue[],
-} as const;
+export const ADMIN_ORDER_TAB_ORIGINS: Record<
+  AdminOrderTab,
+  readonly OrderOriginValue[]
+> = {
+  all: ["direct_sale", "offer"],
+  direct_sale: ["direct_sale"],
+  offer_order: ["offer"],
+};
 
-export const OFFER_EXPIRED_RULE = {
-  statuses: ["expired", "payment_expired"] as readonly OfferStatusValue[],
-  /** `expiresAt` geçmişse süresi dolmuş sayılan durumlar. */
-  lapsedStatuses: ["pending"] as readonly OfferStatusValue[],
-} as const;
-
-/** Sekme → alt sekmeler, ekrandaki sırayla. Her sekme "Tümü" ile başlar. */
+/**
+ * Sekme → alt sekmeler, ekrandaki sırayla. Her sekme "Tümü" ile başlar.
+ * Siparişe dönmemiş tekliflerin "Bekleyen" / "Süresi Dolan" ayrımı artık
+ * Teklifler sekmesinin durum filtresindedir (teklif satırı sipariş değildir).
+ */
 export const ADMIN_ORDER_TAB_BUCKETS: Record<
   AdminOrderTab,
   readonly AdminOrderBucket[]
 > = {
   all: ["all", "new", "shipped", "in_transit", "delivered", "other"],
   direct_sale: ["all", "new", "shipped", "in_transit", "delivered", "other"],
-  offer: [
-    "all",
-    "new",
-    "pending",
-    "expired",
-    "shipped",
-    "in_transit",
-    "delivered",
-    "other",
-  ],
+  offer_order: ["all", "new", "shipped", "in_transit", "delivered", "other"],
 };
-
-export const ADMIN_ORDER_TAB_I18N_KEYS = {
-  all: "admin.operations.orders.tabs.all",
-  direct_sale: "admin.operations.orders.tabs.directSale",
-  offer: "admin.operations.orders.tabs.offers",
-} as const satisfies Record<AdminOrderTab, string>;
 
 export const ADMIN_ORDER_BUCKET_I18N_KEYS = {
   all: "admin.operations.orders.buckets.all",
   new: "admin.operations.orders.buckets.new",
-  pending: "admin.operations.orders.buckets.pending",
-  expired: "admin.operations.orders.buckets.expired",
   shipped: "admin.operations.orders.buckets.shipped",
   in_transit: "admin.operations.orders.buckets.inTransit",
   delivered: "admin.operations.orders.buckets.delivered",
