@@ -1,6 +1,7 @@
 import { Injectable, Logger, Optional } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { PrismaService } from "../../../prisma";
+import { LIVE_PAYMENT } from "../../account-lane/live-lane.where";
 import {
   CancellationActor,
   PaymentStatus,
@@ -131,6 +132,8 @@ export class RefundReconciliationService {
       where: {
         status: RefundAttemptStatus.manual_review,
         provider: "paytr",
+        // Test şeridi iadesi PayTR'ye hiç gitmez; durum-sorguda karşılığı yoktur.
+        payment: LIVE_PAYMENT,
         updatedAt: { lt: cutoff },
       },
       // İade hangi mağazaya gönderildiyse durum-sorgu da oraya: ödemenin mağazası.
