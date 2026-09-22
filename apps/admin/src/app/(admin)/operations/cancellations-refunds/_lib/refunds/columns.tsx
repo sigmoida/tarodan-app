@@ -6,6 +6,10 @@ import {
   refundRequestStatusConfig,
   shipmentStatusConfig,
 } from "@tarodan/ui";
+import {
+  REFUND_REQUEST_KIND_I18N_KEYS,
+  refundRequestKindOf,
+} from "@tarodan/types";
 import { col } from "@/components/table";
 import { fmtTry } from "@/lib/format";
 import { statusConfig } from "@/lib/statusLabels";
@@ -16,6 +20,8 @@ export interface RefundRequestRow {
   id: string;
   refundNumber: string;
   status: string;
+  /** İade politikası; `*_cancellation` → kargo öncesi iptalin iadesi. */
+  policyCode?: string | null;
   amount: number | string;
   /** İadeyle geri çevrilen satıcı kesintisi (komisyon/hizmet bedeli iadesi). */
   refundedSellerFeeAmount?: number | string | null;
@@ -44,6 +50,19 @@ export const refundRequestColumns = (t: T) => [
       label: r.refundNumber,
     }),
     { sortKey: "refundNumber", sortType: "text" },
+  ),
+  // Tür: kargo öncesi iptalin iadesi mi, ürün iadesi mi (politikadan).
+  col.badge<RefundRequestRow>(
+    t("admin.operations.refundRequests.kind.label"),
+    (r) => {
+      const kind = refundRequestKindOf(r.policyCode);
+      return (
+        <Badge variant={kind === "cancellation" ? "warning" : "info"}>
+          {t(REFUND_REQUEST_KIND_I18N_KEYS[kind])}
+        </Badge>
+      );
+    },
+    { sortKey: "policyCode", sortType: "text" },
   ),
   col.link<RefundRequestRow>(
     t("admin.operations.common.order"),

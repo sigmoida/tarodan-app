@@ -42,7 +42,13 @@ function ProductLine({
  * numarası, altında kalemler (görsel, ad, adet, marka, ürün/model kodu,
  * sipariş no). Siparişe dönmemiş teklifte tek ürün ve teklif alan satıcı.
  */
-export function ProductLinesCell({ row }: { row: AdminOrderListRow }) {
+export function ProductLinesCell({
+  row,
+}: {
+  // Yalnız paketleri ve teklifi okur: İptaller listesinin satırı da aynı
+  // paket sözleşmesini taşır ve bu hücreyi yeniden kullanır.
+  row: Pick<AdminOrderListRow, "packages" | "offer">;
+}) {
   const t = useTranslations();
 
   if (row.packages.length === 0 && row.offer) {

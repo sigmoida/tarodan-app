@@ -34,6 +34,7 @@ import {
   PhotoIcon,
   ArchiveBoxIcon,
 } from "@heroicons/react/24/outline";
+import { ADMIN_CANCELLATIONS_REFUNDS_PATH } from "@tarodan/types";
 
 /**
  * The single source for the admin left menu. The nav data lives here
@@ -159,11 +160,12 @@ export function getNavGroups(t: T): NavGroup[] {
           permission: "shipping",
         },
         {
-          name: t("admin.nav.items.refundRequests.name"),
-          href: "/operations/refund-requests",
+          // İptaller + İadeler tek ekranda; eski iade listesi buraya yönlenir.
+          name: t("admin.nav.items.cancellationsRefunds.name"),
+          href: "/operations/cancellations-refunds",
           icon: BanknotesIcon,
-          description: t("admin.nav.items.refundRequests.description"),
-          keywords: t("admin.nav.items.refundRequests.keywords")
+          description: t("admin.nav.items.cancellationsRefunds.description"),
+          keywords: t("admin.nav.items.cancellationsRefunds.keywords")
             .split(",")
             .map((k) => k.trim()),
           permission: "refund_requests",
@@ -544,6 +546,24 @@ export function getNavGroups(t: T): NavGroup[] {
   ];
 }
 
+/**
+ * Detail routes whose list moved into another nav page. The trail and the
+ * page title resolve them as if they lived under their new parent, so the
+ * refund-request file reads "İptal & İade › Detay" instead of nothing.
+ */
+const NAV_PARENT_ALIASES: Record<string, string> = {
+  "/operations/refund-requests": ADMIN_CANCELLATIONS_REFUNDS_PATH,
+};
+
+/** The path the nav match runs against — aliased detail routes rewritten. */
+function navMatchPath(pathname: string): string {
+  for (const [from, to] of Object.entries(NAV_PARENT_ALIASES)) {
+    if (pathname === from || pathname.startsWith(`${from}/`))
+      return to + pathname.slice(from.length);
+  }
+  return pathname;
+}
+
 /** Suffix appended to every page title, e.g. "Kullanıcılar - Tarodan Admin". */
 export const APP_NAME = "Tarodan Admin";
 
@@ -558,6 +578,7 @@ export function pageMetadataFor(
   pathname: string,
   t: T,
 ): { title: string; description: string } {
+  pathname = navMatchPath(pathname);
   const defaultDescription = t("admin.nav.defaultDescription");
   const topLevelNav = getTopLevelNav(t);
   const navGroups = getNavGroups(t);
@@ -600,7 +621,9 @@ export function matchesQuery(item: NavItem, q: string): boolean {
  * disabled tabs). Exceptions that can't be derived from the nav items go here.
  */
 const EXTRA_ROUTE_PERMISSIONS: Record<string, string> = {
-  // Route exceptions that can't be derived from the nav go here. Currently all are defined in the nav.
+  // İade talebi DOSYASI (`/operations/refund-requests/[id]`) menüden çıktı —
+  // liste "İptal & İade" ekranına taşındı — ama aynı izinle korunmaya devam eder.
+  "/operations/refund-requests": "refund_requests",
 };
 
 /**
@@ -673,6 +696,7 @@ export function humanizeSegment(segment: string, t: T): string {
  * (the group points at its first page). Empty when the path matches no nav item.
  */
 export function breadcrumbsFor(pathname: string, t: T): Crumb[] {
+  pathname = navMatchPath(pathname);
   const topLevelNav = getTopLevelNav(t);
   const navGroups = getNavGroups(t);
 

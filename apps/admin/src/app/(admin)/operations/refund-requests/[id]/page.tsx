@@ -4,6 +4,7 @@ import { useParams } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { CheckCircleIcon } from "@heroicons/react/24/outline";
 import { StatusBadge, refundRequestStatusConfig } from "@tarodan/ui";
+import { ADMIN_REFUNDS_VIEW_HREF } from "@tarodan/types";
 import { adminApi } from "@/lib/api";
 import { useAdminMutation } from "@/hooks/useAdminMutation";
 import { useConfirm } from "@/provider/ConfirmProvider";
@@ -111,7 +112,7 @@ export default function RefundRequestDetailPage() {
       fetcher={(rid) =>
         adminApi.getRefundRequest(rid).then((r) => r.data?.data ?? r.data)
       }
-      backHref="/operations/refund-requests"
+      backHref={ADMIN_REFUNDS_VIEW_HREF}
       emptyTitle={t("admin.operations.refundRequests.notFound")}
       title={(rr) => (
         <>

@@ -11,6 +11,20 @@ describe("routePermission", () => {
     expect(routePermission("/operations/orders")).toBe("orders");
   });
 
+  it("guards the cancellations & refunds screen and the refund-request file with the refund permission", () => {
+    expect(routePermission("/operations/cancellations-refunds")).toBe(
+      "refund_requests",
+    );
+    // Liste menüden çıktı, dosya yerinde: aynı izinle korunur.
+    expect(routePermission("/operations/refund-requests/rr-1")).toBe(
+      "refund_requests",
+    );
+    // Eski liste adresi yönlenmeden önce de korunur.
+    expect(routePermission("/operations/refund-requests")).toBe(
+      "refund_requests",
+    );
+  });
+
   it("matches a sub-path of a registered route (prefix match)", () => {
     expect(routePermission("/accounts/users/some-user-id")).toBe("users");
   });
@@ -54,6 +68,15 @@ describe("humanizeSegment", () => {
 });
 
 describe("breadcrumbsFor", () => {
+  it("places the refund-request file under the cancellations & refunds page", () => {
+    const crumbs = breadcrumbsFor(
+      "/operations/refund-requests/3f2a9c1e-0000-4000-8000-000000000000",
+      t,
+    );
+    expect(crumbs.at(-2)?.href).toBe("/operations/cancellations-refunds");
+    expect(crumbs.at(-1)).toEqual({ label: "admin.nav.detailSuffix" });
+  });
+
   it("returns [] for a path matching no nav item", () => {
     expect(breadcrumbsFor("/this/route/does/not/exist", t)).toEqual([]);
   });

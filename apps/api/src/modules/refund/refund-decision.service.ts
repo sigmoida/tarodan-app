@@ -6,6 +6,7 @@ import {
   NotFoundException,
 } from "@nestjs/common";
 import { OrderStatus, RefundReason, RefundRequestStatus } from "@prisma/client";
+import { refundRequestKindOf } from "@tarodan/types";
 import { PrismaService } from "../../prisma";
 import { PaymentService } from "../payment/payment.service";
 import { refundRequestCancelActor } from "../payment/helpers/refund-attempt-actor";
@@ -113,7 +114,8 @@ export class RefundDecisionService {
       );
     }
 
-    const isPreShipmentCancellation = rr.policyCode.endsWith("_cancellation");
+    const isPreShipmentCancellation =
+      refundRequestKindOf(rr.policyCode) === "cancellation";
     if (isPreShipmentCancellation) {
       const refundResult = await this.paymentService.processRefund(
         rr.orderId,

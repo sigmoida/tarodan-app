@@ -12,6 +12,7 @@ import { AdminPaymentController } from "./finance/admin-payment.controller";
 import { AdminTradeController } from "./trade/admin-trade.controller";
 import { AdminOfferController } from "./orders/admin-offer.controller";
 import { AdminRefundController } from "./orders/admin-refund.controller";
+import { AdminCancellationController } from "./orders/admin-cancellation.controller";
 import { AdminContentController } from "./catalog/admin-content.controller";
 import { AdminMessagingController } from "./ops/admin-messaging.controller";
 import { AdminSupportController } from "./ops/admin-support.controller";
@@ -50,6 +51,7 @@ import {
   ProductImportBatchScheduler,
 } from "./jobs/product-import-batch.scheduler";
 import { AdminOrderService } from "./orders/admin-order.service";
+import { AdminCancellationService } from "./orders/admin-cancellation.service";
 import { AdminAnalyticsService } from "./analytics/admin-analytics.service";
 import { AdminAnalyticsCommonService } from "./analytics/admin-analytics-common.service";
 import { AdminAnalyticsDashboardService } from "./analytics/admin-analytics-dashboard.service";
@@ -181,6 +183,7 @@ import { scheduledProcessors } from "../../workers/scheduled-processors";
     AdminTradeController,
     AdminOfferController,
     AdminRefundController,
+    AdminCancellationController,
     AdminContentController,
     AdminMessagingController,
     AdminSupportController,
@@ -215,6 +218,7 @@ import { scheduledProcessors } from "../../workers/scheduled-processors";
     AdminProductService,
     AdminProductBulkImportService,
     AdminOrderService,
+    AdminCancellationService,
     AdminAnalyticsService,
     AdminAnalyticsCommonService,
     AdminAnalyticsDashboardService,
