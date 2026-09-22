@@ -87,6 +87,11 @@ export interface OrderFileEntry {
   product: { id: string; title: string | null; imageUrl: string | null };
   quantity: number;
   unitPrice: number | null;
+  /**
+   * Siparişin KENDİ kargo satırı (paket kargosu `OrderFilePackage.shipment`).
+   * Kargo öncesi iptal uygunluğu bununla, API ile aynı kuraldan hesaplanır.
+   */
+  shipment: { status: string; shippedAt: string | null } | null;
   finance: OrderFileFinance;
   escrow: OrderFileEscrow | null;
   refundRequests: OrderFileRefundRequest[];

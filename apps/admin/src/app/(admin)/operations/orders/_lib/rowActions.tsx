@@ -2,22 +2,25 @@ import {
   ArrowTopRightOnSquareIcon,
   PencilSquareIcon,
   TruckIcon,
+  XCircleIcon,
 } from "@heroicons/react/24/outline";
 import type { AdminOrderListRow } from "@tarodan/types";
 import type { RowActionItem } from "@/components/table";
 import type { Translate } from "@/lib/statusLabels";
 import { canManuallyUpdateOrderStatus } from "../[id]/_lib/status";
+import { cancellableRowLine } from "../[id]/_lib/cancel";
 import { rowDetailHref, rowSingleLine } from "./rowView";
 
 /** Satır menüsünün açtığı sipariş modalı (sipariş dosyasındakilerle aynı). */
 export type OrderRowModal =
   | { type: "status"; orderId: string; status: string }
-  | { type: "tracking"; orderId: string };
+  | { type: "tracking"; orderId: string }
+  | { type: "cancel"; orderId: string; orderNumber: string };
 
 export interface OrderRowActions {
   open: (href: string) => void;
   openModal: (modal: OrderRowModal) => void;
-  /** Durum/takip yazma yetkisi (super_admin, admin). */
+  /** Durum/takip/iptal yazma yetkisi (super_admin, admin). */
   canManage: boolean;
 }
 
@@ -32,6 +35,7 @@ export function orderRowMenu(
 ) {
   return (row: AdminOrderListRow): RowActionItem[] => {
     const line = canManage ? rowSingleLine(row) : null;
+    const cancellable = canManage ? cancellableRowLine(row) : null;
     return [
       {
         label: row.detailOrderId
@@ -57,6 +61,17 @@ export function orderRowMenu(
           icon: TruckIcon,
           onClick: () => openModal({ type: "tracking", orderId: line.orderId }),
         },
+      cancellable && {
+        label: t("admin.operations.orders.cancel.action"),
+        icon: XCircleIcon,
+        destructive: true,
+        onClick: () =>
+          openModal({
+            type: "cancel",
+            orderId: cancellable.orderId,
+            orderNumber: cancellable.orderNumber,
+          }),
+      },
     ];
   };
 }

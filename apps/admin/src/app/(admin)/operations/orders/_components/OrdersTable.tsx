@@ -11,6 +11,7 @@ import { orderColumns } from "../_lib/columns";
 import { orderRowMenu, type OrderRowModal } from "../_lib/rowActions";
 import { StatusUpdateModal } from "../[id]/_modals/StatusUpdateModal";
 import { AddTrackingModal } from "../[id]/_modals/AddTrackingModal";
+import { CancelOrderModal } from "../[id]/_modals/CancelOrderModal";
 
 /**
  * Sipariş tablosu: satır = sepet (API zaten sepet satırı döner, sayfada
@@ -68,6 +69,13 @@ export function OrdersTable() {
         open={modal?.type === "tracking"}
         onClose={() => setModal(null)}
         orderId={modal?.orderId ?? ""}
+      />
+      <CancelOrderModal
+        key={modal?.type === "cancel" ? modal.orderId : "cancel"}
+        open={modal?.type === "cancel"}
+        onClose={() => setModal(null)}
+        orderId={modal?.type === "cancel" ? modal.orderId : ""}
+        orderNumber={modal?.type === "cancel" ? modal.orderNumber : ""}
       />
     </>
   );
