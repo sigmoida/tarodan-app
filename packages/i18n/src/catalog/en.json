@@ -7545,7 +7545,8 @@
         "newListings": "New listings",
         "signedInUsers": "Users who signed in",
         "cancelledFromMigration": "Counts new cancellations only (older rows never recorded when they were cancelled)",
-        "feeSplitIncomplete": "Older orders never recorded this split, so the figure can understate past periods (compare with the Net platform revenue card)"
+        "feeSplitIncomplete": "Older orders never recorded this split, so the figure can understate past periods (compare with the Net platform revenue card)",
+        "signedInSingleStamp": "Only a user's LATEST sign-in is kept; active in more than one window, they only count in the later one"
       },
       "stock": {
         "escrowBalance": "Escrow balance",
@@ -7568,8 +7569,9 @@
         "custom": "Date range",
         "from": "Start date",
         "to": "End date",
+        "yesterday": "Yesterday",
+        "thisMonth": "This month",
         "allTime": "All time",
-        "vsPrevious": "vs previous period",
         "rangeIncomplete": "Pick a start and an end date",
         "rangeUnparseable": "Pick a valid date",
         "rangeReversed": "The start date cannot be after the end date"

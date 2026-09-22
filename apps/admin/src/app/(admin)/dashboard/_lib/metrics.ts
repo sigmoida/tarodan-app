@@ -8,9 +8,9 @@ export type DashboardMetrics = Record<DashboardMetricKey, DashboardMetric>;
 
 const EMPTY_METRIC: DashboardMetric = {
   period: 0,
-  previous: 0,
+  yesterday: 0,
+  thisMonth: 0,
   allTime: 0,
-  changePercent: 0,
 };
 
 /**
@@ -33,9 +33,9 @@ export function toDashboardMetrics(raw: unknown): DashboardMetrics {
     const value = entry as Partial<Record<keyof DashboardMetric, unknown>>;
     metrics[key] = {
       period: Number(value.period ?? 0),
-      previous: Number(value.previous ?? 0),
+      yesterday: Number(value.yesterday ?? 0),
+      thisMonth: Number(value.thisMonth ?? 0),
       allTime: Number(value.allTime ?? 0),
-      changePercent: Number(value.changePercent ?? 0),
     };
   }
 

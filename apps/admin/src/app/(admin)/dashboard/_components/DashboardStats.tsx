@@ -11,6 +11,18 @@ const FORMATTERS = {
   currency: (n: number) => fmtTry(n) ?? "—",
 } as const;
 
+/** One fixed footer figure — label above value, both truncated for tight columns. */
+function FooterStat({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex min-w-0 flex-col">
+      <span className="truncate text-[11px] text-muted">{label}</span>
+      <span className="truncate text-xs font-semibold tabular-nums text-heading">
+        {value}
+      </span>
+    </div>
+  );
+}
+
 function StatCard({
   config,
   metrics,
@@ -31,20 +43,27 @@ function StatCard({
       label={t(config.labelKey)}
       loading={loading}
       value={<span className="tabular-nums">{format(metric.period)}</span>}
-      change={config.hideChange ? undefined : metric.changePercent}
-      changeLabel={t("admin.dashboard.period.vsPrevious")}
       footer={
-        <div className="mt-2 flex w-full min-w-0 flex-col">
-          {/* The all-time figure never moves with the filter — that contrast
-              is the point of the card. */}
-          <span className="truncate text-xs text-muted">
-            {t("admin.dashboard.period.allTime")}
-          </span>
-          <span className="truncate text-sm font-semibold tabular-nums text-heading">
-            {format(metric.allTime)}
-          </span>
+        <div className="flex w-full min-w-0 flex-col gap-2">
+          {/* Three FIXED figures — none of them move with the period filter,
+              only the headline above does. That contrast is the point of the
+              card, so there is no trend/% row here. */}
+          <div className="grid w-full grid-cols-3 gap-2">
+            <FooterStat
+              label={t("admin.dashboard.period.yesterday")}
+              value={format(metric.yesterday)}
+            />
+            <FooterStat
+              label={t("admin.dashboard.period.thisMonth")}
+              value={format(metric.thisMonth)}
+            />
+            <FooterStat
+              label={t("admin.dashboard.period.allTime")}
+              value={format(metric.allTime)}
+            />
+          </div>
           {config.noteKey && (
-            <span className="mt-1 text-[11px] leading-tight text-subtle">
+            <span className="text-[11px] leading-tight text-subtle">
               {t(config.noteKey)}
             </span>
           )}
@@ -56,7 +75,8 @@ function StatCard({
 
 /**
  * Zone C — the ONLY zone the period filter touches. The headline number is the
- * selected period; the all-time figure underneath is not.
+ * selected period; the three footer figures (Dün / Bu ay / Tüm zamanlar)
+ * underneath never move with the filter.
  */
 export function DashboardStats({
   metrics,

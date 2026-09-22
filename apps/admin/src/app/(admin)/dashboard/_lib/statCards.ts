@@ -30,8 +30,6 @@ export interface StatCardConfig {
   tone: MetricTone;
   format: "count" | "currency";
   metric: DashboardMetricKey;
-  /** Hides the trend row where a period-over-period comparison would lie. */
-  hideChange?: boolean;
   /** A caveat printed under the card — what the number cannot tell you. */
   noteKey?: MessageKey;
 }
@@ -255,9 +253,9 @@ export const STAT_CARDS: StatCardConfig[] = [
     icon: UserGroupIcon,
     tone: "info",
     format: "count",
-    // `lastActivityAt` keeps one stamp per user, so someone active in two
-    // periods only counts in the later one — the earlier window is always
-    // understated and a period-over-period trend would be nonsense.
-    hideChange: true,
+    // `lastActivityAt` keeps ONE stamp per user, so someone active in two of
+    // the card's windows (e.g. yesterday AND this month) only counts in the
+    // LATER one — every window but the most recent is understated.
+    noteKey: "admin.dashboard.stats.signedInSingleStamp",
   },
 ];
