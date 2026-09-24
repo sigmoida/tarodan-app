@@ -84,11 +84,6 @@ export default function SellerHeader({
                 </Badge>
               )}
             </div>
-            {seller.bio && (
-              <p className="mt-1 line-clamp-2 text-sm text-muted">
-                {seller.bio}
-              </p>
-            )}
             <p className="mt-1 text-xs text-subtle">
               {membershipDuration}
               {hasRatings &&
