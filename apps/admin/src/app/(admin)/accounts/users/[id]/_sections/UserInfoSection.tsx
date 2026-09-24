@@ -77,14 +77,6 @@ export function UserInfoSection({ user }: { user: UserDetail }) {
               : t("admin.users.neverLoggedIn")}
           </p>
         </Item>
-        {user.bio && (
-          <Item
-            label={t("admin.users.detail.bioLabel")}
-            className="sm:col-span-2"
-          >
-            <p className="text-heading">{user.bio}</p>
-          </Item>
-        )}
       </div>
 
       {user.isSeller && (
