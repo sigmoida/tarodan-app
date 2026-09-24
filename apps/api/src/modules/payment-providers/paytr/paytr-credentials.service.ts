@@ -127,8 +127,11 @@ export class PayTRCredentials {
   readonly baseUrl = "https://www.paytr.com/odeme";
 
   /**
-   * O1: Tüm PayTR fetch'lerine uygulama-seviyesi HTTP timeout. (Retry,
-   * çift-submit riski nedeniyle bilinçli eklenmedi.)
+   * O1: Tüm PayTR fetch'lerine uygulama-seviyesi HTTP timeout. Para taşıyan
+   * çağrılara (transfer, iade, tahsilat) hâlâ retry eklenmedi — çift-submit
+   * riski bilinçli olarak kabul edilmedi. Yalnız okuma/idempotent çağrılar
+   * (rapor okuma, geri dönen transfer sorgusu) geçici ağ hatalarında
+   * `paytr-fetch-retry.util.ts` ile 2 kez yeniden dener.
    */
   readonly httpTimeoutMs: number;
 

@@ -1,6 +1,6 @@
 import { Test, TestingModule } from "@nestjs/testing";
 import { ConfigService } from "@nestjs/config";
-import { BadRequestException } from "@nestjs/common";
+import { BadRequestException, Logger } from "@nestjs/common";
 import * as crypto from "crypto";
 import { PayTRCredentials } from "./paytr-credentials.service";
 import { PayTRTransferService } from "./paytr-transfer.service";
@@ -226,6 +226,45 @@ describe("PayTRTransferService.createPlatformTransfer", () => {
       await expect(
         service.getReturnedTransfers({ startDate: START, endDate: END }),
       ).rejects.toBeInstanceOf(BadRequestException);
+      // PayTR business error, not a network failure → no retry.
+      expect(fetchSpy).toHaveBeenCalledTimes(2); // the "failed" call above + this one
+    });
+
+    it("does not log at 'error' level on rethrow (cron tracker owns the canonical alarm)", async () => {
+      const errorSpy = jest
+        .spyOn(Logger.prototype, "error")
+        .mockImplementation(() => undefined);
+      const warnSpy = jest
+        .spyOn(Logger.prototype, "warn")
+        .mockImplementation(() => undefined);
+      fetchSpy.mockResolvedValue({
+        text: async () => JSON.stringify({ status: "error", err_msg: "boom" }),
+      });
+
+      await expect(
+        service.getReturnedTransfers({ startDate: START, endDate: END }),
+      ).rejects.toBeInstanceOf(BadRequestException);
+
+      expect(errorSpy).not.toHaveBeenCalled();
+      expect(warnSpy).toHaveBeenCalledWith(
+        expect.stringContaining("Get returned transfers failed"),
+      );
+      errorSpy.mockRestore();
+      warnSpy.mockRestore();
+    });
+
+    it("retries a transient network failure and succeeds on the next attempt", async () => {
+      const networkError = Object.assign(new TypeError("fetch failed"), {
+        cause: { code: "ECONNRESET" },
+      });
+      fetchSpy.mockRejectedValueOnce(networkError).mockResolvedValueOnce({
+        text: async () => JSON.stringify({ status: "success", data: [] }),
+      });
+
+      await expect(
+        service.getReturnedTransfers({ startDate: START, endDate: END }),
+      ).resolves.toEqual([]);
+      expect(fetchSpy).toHaveBeenCalledTimes(2);
     });
   });
 });

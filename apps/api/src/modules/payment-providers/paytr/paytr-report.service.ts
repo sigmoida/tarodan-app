@@ -3,6 +3,10 @@ import { i18nMessage } from "../../i18n";
 import { PaytrMerchant } from "@prisma/client";
 import { PayTRCredentials } from "./paytr-credentials.service";
 import { parsePaytrMoneyString } from "./paytr-money.util";
+import {
+  networkErrorReason,
+  withPaytrFetchRetry,
+} from "./paytr-fetch-retry.util";
 import type {
   PaytrSettlementDetailEntry,
   PaytrSettlementSummaryEntry,
@@ -61,12 +65,15 @@ export class PayTRReportService {
     form: Record<string, string>,
   ): Promise<Record<string, unknown> | null> {
     try {
-      const response = await fetch(url, {
-        method: "POST",
-        headers: { "Content-Type": "application/x-www-form-urlencoded" },
-        body: new URLSearchParams(form).toString(),
-        signal: AbortSignal.timeout(this.httpTimeoutMs),
-      });
+      // Okuma çağrısı — para taşımaz, ağ kesintisinde güvenle denenir.
+      const response = await withPaytrFetchRetry(() =>
+        fetch(url, {
+          method: "POST",
+          headers: { "Content-Type": "application/x-www-form-urlencoded" },
+          body: new URLSearchParams(form).toString(),
+          signal: AbortSignal.timeout(this.httpTimeoutMs),
+        }),
+      );
       const rawText = await response.text();
       const data = this.parsePaytrJson<Record<string, unknown>>(rawText);
       if (!data) {
@@ -85,8 +92,10 @@ export class PayTRReportService {
       return data;
     } catch (error: any) {
       if (error instanceof BadRequestException) throw error;
-      this.logger.error(
-        `PayTR rapor isteği başarısız (${url}): ${error?.message}`,
+      // `warn`: rethrow ediyoruz, cron tracker asıl alarmı zaten üretecek —
+      // `error` seviyesinde loglamak aynı olayı ikinci kez alarma çevirir.
+      this.logger.warn(
+        `PayTR rapor isteği başarısız (${url}): ${networkErrorReason(error)}`,
       );
       throw new BadRequestException(
         i18nMessage("server.payment.paytrReportRequestFailed", {
