@@ -9004,6 +9004,10 @@
         "title": "Stuck Shipment — Admin Action Required",
         "message": "Order {orderNumber} has been in transit for a long time with no carrier delivery report; the seller payout stays on hold until delivery is recorded."
       },
+      "suratTrackingNetworkFailure": {
+        "title": "Sürat Tracking Network Failure — Admin Action Required",
+        "message": "Parcel(s) {parcels} have been failing with a network error from the Sürat tracking API for {consecutiveFailures} consecutive runs ({reason}) and cannot be synced. Escalate to Sürat."
+      },
       "elogoInvoiceExhausted": {
         "title": "e-Invoice Delivery Blocked — Admin Action Required",
         "message": "Document {invoiceNumber} ({typeLabel}) could not be sent to eLogo and has run out of attempts: {reason}. The legal deadline is running; fix the cause and use \"Retry\" on the Invoices screen."

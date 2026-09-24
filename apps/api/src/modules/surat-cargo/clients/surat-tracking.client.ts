@@ -169,9 +169,11 @@ export class SuratTrackingClient {
       const aborted = error?.name === "AbortError";
       const message = aborted
         ? `Surat tracking API timed out after ${this.timeoutMs()}ms for ${webSiparisKodu}`
-        : `Surat tracking API request failed for ${webSiparisKodu}: ${redactSuratUrl(String(error?.message ?? error))}`;
-      if (aborted) this.logger.warn(message);
-      else this.logger.error(message);
+        : `Surat tracking API request failed for ${webSiparisKodu}: ${redactSuratUrl(String(error?.message ?? error))}${this.describeCause(error)}`;
+      // Her ikisi de ağ-seviyesinde geçici hata: warn. error seviyesi bu servisin
+      // değil, çağıran cron katmanının kararı — burada da error basılırsa aynı
+      // arıza için çift Sentry olayı üretilirdi (bkz. syncShipmentsWhere.recordFailure).
+      this.logger.warn(message);
       return {
         kind: "failure",
         category: aborted ? "timeout" : "network",
@@ -180,6 +182,23 @@ export class SuratTrackingClient {
     } finally {
       clearTimeout(timer);
     }
+  }
+
+  /**
+   * fetch failed'in asıl sebebi undici'nin `error.cause`'unda (code/errno/message);
+   * `error.message` yalnız "fetch failed" der. Prod'da 4 koli her turda bu jenerik
+   * mesajla alarm üretiyordu, gerçek ağ nedeni (ECONNRESET, ETIMEDOUT, …) hiçbir
+   * yere yazılmıyordu. URL asla geçmediğinden redaksiyon gerekmez, ama olası bir
+   * mesaj-içi sızıntıya karşı yine de `redactSuratUrl`'den geçiriyoruz.
+   */
+  private describeCause(error: any): string {
+    const cause = error?.cause;
+    if (!cause) return "";
+    const code = cause?.code ? String(cause.code) : null;
+    const causeMessage = cause?.message ? String(cause.message) : null;
+    if (!code && !causeMessage) return "";
+    const parts = [code, causeMessage].filter(Boolean).join(" ");
+    return ` (cause: ${redactSuratUrl(parts)})`;
   }
 
   /**
@@ -263,7 +282,7 @@ export class SuratTrackingClient {
     } catch (error: any) {
       return {
         ok: false,
-        error: redactSuratUrl(error?.message || String(error)),
+        error: `${redactSuratUrl(error?.message || String(error))}${this.describeCause(error)}`,
       };
     } finally {
       clearTimeout(timer);

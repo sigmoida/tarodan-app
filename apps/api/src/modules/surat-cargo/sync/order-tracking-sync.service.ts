@@ -1,5 +1,6 @@
 import { Injectable, Logger } from "@nestjs/common";
 import { ModuleRef } from "@nestjs/core";
+import { ConfigService } from "@nestjs/config";
 import { PrismaService } from "../../../prisma";
 import {
   ShipmentStatus,
@@ -18,6 +19,26 @@ import {
 } from "../../shipping/helpers/shipment-state-machine";
 import { SHIPPABLE_ORDER_STATUSES } from "../../order/helpers/order-state-machine";
 import { SuratTrackingClient } from "../clients/surat-tracking.client";
+import { CacheService } from "../../cache/cache.service";
+import { NotificationService } from "../../notification/notification.service";
+import { NotificationType } from "../../notification/dto";
+import { adminUrl } from "../../../config/app-urls";
+
+/** Ardışık ağ/timeout takip-hatası sayacının cache anahtar öneki (koli referansı başına). */
+const NETWORK_FAILURE_CACHE_PREFIX = "surat:tracking-network-fail:";
+/**
+ * Sayaç TTL'i: bir koli bu süre boyunca hiç ağ hatası vermezse "iyileşti"
+ * sayılır ve bir sonraki hata sıfırdan sayılmaya başlar.
+ */
+const NETWORK_FAILURE_CACHE_TTL_SECONDS = 24 * 3600;
+/** Eskalasyon admin bildirimi dedup TTL'i — koli başına günde en fazla bir kez. */
+const NETWORK_FAILURE_NOTIFY_TTL_SECONDS = 24 * 3600;
+
+interface TransientFailureState {
+  count: number;
+  /** ISO timestamp — eşiğin "N saattir başarısız" bacağı için. */
+  firstFailureAt: string;
+}
 
 /**
  * OrderTrackingSyncService (Faz 11.3a): order Shipment satırlarının Sürat takip
@@ -32,7 +53,99 @@ export class OrderTrackingSyncService {
     private readonly prisma: PrismaService,
     private readonly moduleRef: ModuleRef,
     private readonly client: SuratTrackingClient,
+    private readonly configService: ConfigService,
+    private readonly cache: CacheService,
+    private readonly notifications: NotificationService,
   ) {}
+
+  /**
+   * Ardışık ağ/timeout hatası eşiği — bu sayıya ulaşınca tekil koli hatası
+   * cron adımını düşürür ve admine haber verir. Varsayılan 6 tur (~3 saat @
+   * 30dk cron). ConfigService üzerinden — `.env`'de yoksa varsayılan geçerli.
+   */
+  private networkFailureThreshold(): number {
+    const configured = Number(
+      this.configService.get<string>(
+        "SURAT_TRACKING_NETWORK_FAILURE_THRESHOLD",
+        "6",
+      ),
+    );
+    return Number.isFinite(configured) && configured > 0 ? configured : 6;
+  }
+
+  /** Eşiğin saat bacağı — art arda 6 turu beklemeden 3 saat dolunca da eskale et. */
+  private networkFailureHours(): number {
+    const configured = Number(
+      this.configService.get<string>(
+        "SURAT_TRACKING_NETWORK_FAILURE_HOURS",
+        "3",
+      ),
+    );
+    return Number.isFinite(configured) && configured > 0 ? configured : 3;
+  }
+
+  /**
+   * Bir kolinin ardışık ağ/timeout hata sayacını bir artırır ve eşik
+   * aşıldı mı döner. NO schema migration: sayaç Redis'te (CacheService), TTL
+   * dolunca kendiliğinden sıfırlanır — Shipment tablosuna yeni kolon eklemez.
+   */
+  private async recordTransientFailure(
+    ref: string,
+  ): Promise<{ escalate: boolean; count: number; firstFailureAt: Date }> {
+    const key = `${NETWORK_FAILURE_CACHE_PREFIX}${ref}`;
+    const existing = await this.cache.get<TransientFailureState>(key);
+    const now = new Date();
+    const firstFailureAt = existing?.firstFailureAt
+      ? new Date(existing.firstFailureAt)
+      : now;
+    const count = (existing?.count ?? 0) + 1;
+    await this.cache.set(
+      key,
+      { count, firstFailureAt: firstFailureAt.toISOString() },
+      { ttl: NETWORK_FAILURE_CACHE_TTL_SECONDS },
+    );
+    const elapsedHours =
+      (now.getTime() - firstFailureAt.getTime()) / 3_600_000;
+    const escalate =
+      count >= this.networkFailureThreshold() ||
+      elapsedHours >= this.networkFailureHours();
+    return { escalate, count, firstFailureAt };
+  }
+
+  /** Koli tekrar başarıyla yanıt verdiğinde (found/pending/cancelled) sayaç temizlenir. */
+  private async clearTransientFailure(ref: string): Promise<void> {
+    await this.cache.del(`${NETWORK_FAILURE_CACHE_PREFIX}${ref}`);
+  }
+
+  /**
+   * Eşik aşıldığında adminlere TEK seferlik (24h dedupe) uyarı — ops Sürat'a
+   * eskale etsin. Bildirim başarısız olursa (örn. cache/mail geçici arızası)
+   * yalnız warn loglanır; asıl alarm zaten cron'un ERROR logudur
+   * (CronStepFailuresError, `failed` sayacı zaten artırıldı).
+   */
+  private async notifyNetworkEscalation(
+    ref: string,
+    reason: string,
+    count: number,
+  ): Promise<void> {
+    try {
+      await this.notifications.notifyAllAdminsOnce(
+        `surat-tracking-network-failure:${ref}`,
+        NETWORK_FAILURE_NOTIFY_TTL_SECONDS,
+        NotificationType.SURAT_TRACKING_NETWORK_FAILURE,
+        {
+          parcels: ref,
+          consecutiveFailures: count,
+          reason,
+          adminLink: `${adminUrl()}/operations/shipping`,
+        },
+      );
+    } catch (err: unknown) {
+      this.logger.warn(
+        `Surat network-failure admin bildirimi başarısız (${ref}): ${(err as Error)?.message}`,
+      );
+    }
+  }
 
   /**
    * Sync a shipment's status from Sürat Kargo tracking API.
@@ -208,12 +321,16 @@ export class OrderTrackingSyncService {
               message: "koli takip referansı yok",
             } as const);
         if (lookup.kind === "pending") {
+          // Sürat'tan bir yanıt geldi (kabul bekliyor) — ağ katmanı sağlıklı,
+          // önceki turların ağ-hatası sayacı varsa temizle.
+          await this.clearTransientFailure(ref);
           pending += siblings.length;
           continue;
         }
         if (lookup.kind === "cancelled") {
           // Taşıyıcıda iptal: hata değil, sonuç. Yerelde de terminale çekilmezse
           // koli sorguda kalır ve her tur "başarısız" sayılıp alarm üretir.
+          await this.clearTransientFailure(ref);
           synced += await this.markParcelCancelled(siblings, lookup.message);
           continue;
         }
@@ -223,10 +340,36 @@ export class OrderTrackingSyncService {
           // aşağıdaki catch'e hiç girilmez. Burada yazmazsak sayaç sessizce artar,
           // cron "1 kayıt senkronlanamadı" der ve hangi koli hangi sebeple
           // düştüğü hiçbir yere yazılmaz (takas/iade senkronu kimliği logluyor).
+          //
+          // network/timeout İSTİSNA: geçici bağlantı sorunları taşıyıcı tarafında
+          // her 30 dakikada bir Sentry'de "1 kayıt senkronlanamadı" alarmı üretiyordu
+          // — kayıt ne cron'u düşürsün ne de tek başına teşhis edilemez kalsın diye
+          // eşik-altı turlar burada SESSİZCE (warn) atlanır; eşik aşılınca tek bir
+          // ERROR + admin bildirimi ile eskale edilir. Provider/auth/parse/http/
+          // configuration hataları eskale beklemez, her zaman cron'u düşürür.
+          const isTransientNetwork =
+            lookup.category === "network" || lookup.category === "timeout";
+          if (isTransientNetwork) {
+            const { escalate, count, firstFailureAt } =
+              await this.recordTransientFailure(ref);
+            if (!escalate) {
+              this.logger.warn(
+                `Surat parcel ${ref} geçici ağ hatası (${count}. ardışık tur, ilk hata ${firstFailureAt.toISOString()}) — ${lookup.category}: ${lookup.message}`,
+              );
+              continue;
+            }
+            const escalatedReason = `${lookup.category}: ${lookup.message} (eşik aşıldı: ${count} ardışık hata, ilk hata ${firstFailureAt.toISOString()})`;
+            recordFailure(ref, escalatedReason);
+            failed += siblings.length;
+            await this.notifyNetworkEscalation(ref, escalatedReason, count);
+            continue;
+          }
           recordFailure(ref, `${lookup.category}: ${lookup.message}`);
           failed += siblings.length;
           continue;
         }
+        // Başarılı yanıt: ağ katmanı sağlıklı, önceki ardışık-hata sayacını sıfırla.
+        await this.clearTransientFailure(ref);
         for (const shipment of siblings) {
           const outcome = await this.applyTrackingUpdate(
             shipment,
