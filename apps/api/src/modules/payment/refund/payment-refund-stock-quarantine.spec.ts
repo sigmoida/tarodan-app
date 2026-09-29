@@ -27,6 +27,7 @@ describe("PaymentRefundService.processRefund — post-delivery return stock quar
     deliveredAt?: Date | null;
     productQuantity?: number | null;
     productStatus?: ProductStatus;
+    productInactiveReason?: ProductInactiveReason | null;
     stockRestoredAt?: Date | null;
   }) => {
     const captured = {
@@ -105,6 +106,8 @@ describe("PaymentRefundService.processRefund — post-delivery return stock quar
         findUnique: jest.fn().mockResolvedValue({
           quantity:
             opts.productQuantity === undefined ? 0 : opts.productQuantity,
+          status: opts.productStatus ?? ProductStatus.active,
+          inactiveReason: opts.productInactiveReason ?? null,
         }),
         update: jest.fn().mockImplementation((arg: any) => {
           captured.productUpdate = arg;
@@ -267,6 +270,30 @@ describe("PaymentRefundService.processRefund — post-delivery return stock quar
       status: ProductStatus.active,
       inactiveReason: null,
     });
+    expect((result as any).stockQuarantined).toBe(false);
+  });
+
+  it("teslimat ÖNCESİ iptal, başka iadeden karantinadaki ilanı satışa geri AÇMAZ", async () => {
+    // 3 adetlik ilanın bir birimi teslim sonrası iade edildi → karantinada.
+    // Aynı ilanın kargolanmamış başka bir siparişi iptal ediliyor: miktar
+    // artar ama ilan karantinada kalır (satıcı incelemeden satılmasın).
+    const { service, captured } = makeService({
+      paymentAmount: 500,
+      orderQuantity: 1,
+      deliveredAt: null,
+      productQuantity: 2,
+      productStatus: ProductStatus.inactive,
+      productInactiveReason: ProductInactiveReason.return_quarantine,
+    });
+
+    const result = await service.processRefund(ORDER_ID, 500, refundOpts());
+
+    expect(captured.productUpdate.data).toEqual({
+      quantity: { increment: 1 },
+      status: ProductStatus.inactive,
+      inactiveReason: ProductInactiveReason.return_quarantine,
+    });
+    // Yeni karantina değil: "ilan pasife alındı" bildirimi tekrar gitmesin.
     expect((result as any).stockQuarantined).toBe(false);
   });
 

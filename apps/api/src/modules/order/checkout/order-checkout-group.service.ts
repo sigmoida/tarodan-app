@@ -8,6 +8,7 @@ import {
 } from "@nestjs/common";
 import { PrismaService } from "../../../prisma";
 import { UserBlockService } from "../../user-block/user-block.service";
+import { AccountLaneService } from "../../account-lane/account-lane.service";
 import { buyerTotalOf } from "../helpers/order-total.helper";
 import { chargedProductBaseOf } from "../helpers/order-charged-base.helper";
 import { paymentWindowEnd } from "../../payment/helpers/payment.constants";
@@ -76,6 +77,7 @@ export class OrderCheckoutGroupService {
     private readonly orderCommon: OrderCommonService,
     private readonly checkoutCommon: OrderCheckoutCommonService,
     private readonly userBlocks: UserBlockService,
+    private readonly lanes: AccountLaneService,
     @Optional()
     private readonly feeDiscounts?: OrderFeeDiscountService,
   ) {}
@@ -302,8 +304,13 @@ export class OrderCheckoutGroupService {
                 i18nMessage("server.order.cannotBuyOwnProduct"),
               );
             }
-            // Engelli çift arasında sipariş açılmaz (misafirde alıcı yok).
-            if (!isGuest) {
+            // Engelli çift arasında sipariş açılmaz; şerit kuralı da bu
+            // kapıda (isBlockedEither). Misafirde alıcı yok ama misafir her
+            // zaman canlı şerittir: test satıcısının ilanı sepetten de
+            // satın alınamaz.
+            if (isGuest) {
+              await this.lanes.assertSameLane(undefined, product.sellerId);
+            } else {
               await this.userBlocks.assertNotBlocked(
                 buyerId,
                 product.sellerId,

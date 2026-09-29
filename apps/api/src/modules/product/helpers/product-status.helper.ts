@@ -1,4 +1,4 @@
-import { ProductStatus } from "@prisma/client";
+import { ProductInactiveReason, ProductStatus } from "@prisma/client";
 
 /**
  * quantity'dan product status belirler.
@@ -82,4 +82,36 @@ export function clearStaleInactiveReasonOnWrite(
   if (data.status === ProductStatus.inactive) return;
   if (Object.prototype.hasOwnProperty.call(data, "inactiveReason")) return;
   data.inactiveReason = null;
+}
+
+/**
+ * İptal/iade sonrası stok GERİ YÜKLENİRKEN ilanın yeni durumu — tek karar yeri.
+ *
+ * - Bu iade teslimat SONRASI ise (`quarantine=true`) ilan karantinaya alınır.
+ * - İlan zaten BAŞKA bir iadeden karantinadaysa (inactive + return_quarantine),
+ *   teslimat öncesi bir iptal onu satışa geri açmaz: iade gelen (hasarlı
+ *   olabilecek) birim satıcı incelemeden satılmasın.
+ * - Aksi halde eski davranış: durum miktardan.
+ */
+export function statusAfterStockRestore(
+  current: {
+    status: ProductStatus;
+    inactiveReason: ProductInactiveReason | null;
+  },
+  newQuantity: number | null,
+  quarantine: boolean,
+): { status: ProductStatus; inactiveReason: ProductInactiveReason | null } {
+  const alreadyQuarantined =
+    current.status === ProductStatus.inactive &&
+    current.inactiveReason === ProductInactiveReason.return_quarantine;
+  if (quarantine || alreadyQuarantined) {
+    return {
+      status: ProductStatus.inactive,
+      inactiveReason: ProductInactiveReason.return_quarantine,
+    };
+  }
+  return {
+    status: getProductStatusFromQuantity(newQuantity),
+    inactiveReason: null,
+  };
 }

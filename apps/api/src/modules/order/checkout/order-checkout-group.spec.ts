@@ -81,6 +81,7 @@ const DEFAULT_COMMISSION_RULE = {
  */
 describe("OrderService checkout group (batch checkout)", () => {
   let service: OrderService;
+  let lanes: ReturnType<typeof accountLaneServiceStub>;
 
   const buyerId = "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa";
   const sellerId = "eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee";
@@ -334,6 +335,7 @@ describe("OrderService checkout group (batch checkout)", () => {
     service = module.get(OrderService);
     cache = module.get(CacheService);
     discountService = module.get(DiscountService);
+    lanes = module.get(AccountLaneService);
   });
 
   const baseDto = () => {
@@ -852,6 +854,19 @@ describe("OrderService checkout group (batch checkout)", () => {
         where: { id: productA },
         data: { reservedQuantity: { increment: 1 } },
       });
+    });
+
+    it("test satıcısının ilanı misafir sepetinden satın alınamaz (misafir = canlı şerit)", async () => {
+      lanes.assertSameLane.mockRejectedValueOnce(
+        new ForbiddenException("lane mismatch"),
+      );
+
+      await expect(
+        service.checkoutGuest(guestDto([{ productId: productA }]) as any),
+      ).rejects.toThrow(ForbiddenException);
+
+      expect(lanes.assertSameLane).toHaveBeenCalledWith(undefined, sellerId);
+      expect(mockTx.order.create).not.toHaveBeenCalled();
     });
 
     it("birleşik adet üst sınırı (20) misafirde de zorlanır: aynı ürün 15+15 → reddedilir", async () => {

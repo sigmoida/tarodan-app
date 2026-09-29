@@ -14,15 +14,13 @@ import {
   PaymentHoldStatus,
   OfferStatus,
   OrderStatus,
-  ProductStatus,
-  ProductInactiveReason,
   RefundAttemptStatus,
   SellerAdjustmentType,
 } from "@prisma/client";
 import { OFFER_CANCEL_REASON } from "../../trade/helpers/trade-cancel-reasons";
 import {
-  getProductStatusFromQuantity,
   shouldQuarantineReturnedStock,
+  statusAfterStockRestore,
 } from "../../product/helpers/product-status.helper";
 import { PaymentProviderRegistry } from "../../payment-providers/payment-provider.registry";
 import { PaymentProvider } from "../dto";
@@ -1043,7 +1041,7 @@ export class PaymentRefundService {
             ) {
               const product = await tx.product.findUnique({
                 where: { id: orderRow.productId },
-                select: { quantity: true },
+                select: { quantity: true, status: true, inactiveReason: true },
               });
               if (
                 product?.quantity !== null &&
@@ -1061,17 +1059,10 @@ export class PaymentRefundService {
                   where: { id: orderRow.productId },
                   data: {
                     quantity: { increment: restoreQty },
-                    status: quarantine
-                      ? ProductStatus.inactive
-                      : getProductStatusFromQuantity(newQty),
-                    // Satıcının DOĞRUDAN (admin onayı olmadan) aktive edebileceği
-                    // TEK durumu işaretler — bkz. resolveUpdatedStatus. Karantina
-                    // dışı yolda `null` yazılır (Prisma middleware zaten temizler,
-                    // ama status/inactiveReason'ı burada birlikte yazmak niyeti
-                    // açık tutar — bkz. clearStaleInactiveReasonOnWrite).
-                    inactiveReason: quarantine
-                      ? ProductInactiveReason.return_quarantine
-                      : null,
+                    // status + inactiveReason birlikte: karantinadaki ilan
+                    // teslimat öncesi bir iptalle satışa geri açılmaz — bkz.
+                    // statusAfterStockRestore / resolveUpdatedStatus.
+                    ...statusAfterStockRestore(product, newQty, quarantine),
                   },
                 });
                 stockQuarantined = quarantine;

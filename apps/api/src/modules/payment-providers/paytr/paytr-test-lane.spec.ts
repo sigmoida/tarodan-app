@@ -17,6 +17,7 @@ describe("PayTRService — per-payment test mode (test lane)", () => {
   const KEY = "merchant_key_xx";
   const SALT = "merchant_salt_yy";
   let service: PayTRService;
+  let envTestMode = "false";
 
   const buyer: PayTRBuyer = {
     name: "Ada",
@@ -29,7 +30,7 @@ describe("PayTRService — per-payment test mode (test lane)", () => {
     ip: "88.77.66.55",
   };
 
-  beforeEach(async () => {
+  const build = async () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         PayTRCredentials,
@@ -43,7 +44,7 @@ describe("PayTRService — per-payment test mode (test lane)", () => {
               if (key === "PAYTR_MERCHANT_ID") return MID;
               if (key === "PAYTR_MERCHANT_KEY") return KEY;
               if (key === "PAYTR_MERCHANT_SALT") return SALT;
-              if (key === "PAYTR_TEST_MODE") return "false";
+              if (key === "PAYTR_TEST_MODE") return envTestMode;
               if (key === "FRONTEND_URL") return "https://app.test";
               return undefined;
             }),
@@ -52,6 +53,11 @@ describe("PayTRService — per-payment test mode (test lane)", () => {
       ],
     }).compile();
     service = module.get(PayTRService);
+  };
+
+  beforeEach(async () => {
+    envTestMode = "false";
+    await build();
   });
 
   const fieldsOf = async (options?: { testMode?: boolean }) => {
@@ -98,9 +104,19 @@ describe("PayTRService — per-payment test mode (test lane)", () => {
     expect(fields.paytr_token).toBe(tokenFor("1"));
   });
 
-  it("an explicit false keeps the live mode even if the env were test", async () => {
+  it("a live-lane payment (explicit false) keeps the live env mode", async () => {
     const fields = await fieldsOf({ testMode: false });
     expect(fields.test_mode).toBe("0");
+  });
+
+  // Staging: env test modundayken canlı şerit ödemesi (`false`) ortamı EZMEMELİ;
+  // aksi halde staging'de gerçek karttan tahsilat yapılır.
+  it("a live-lane payment (explicit false) never overrides a test env", async () => {
+    envTestMode = "true";
+    await build();
+    const fields = await fieldsOf({ testMode: false });
+    expect(fields.test_mode).toBe("1");
+    expect(fields.paytr_token).toBe(tokenFor("1"));
   });
 });
 

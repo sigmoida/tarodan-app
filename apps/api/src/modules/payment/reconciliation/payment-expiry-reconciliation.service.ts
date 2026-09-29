@@ -10,8 +10,8 @@ import {
   RefundRequestStatus,
 } from "@prisma/client";
 import {
-  getProductStatusFromQuantity,
   getReservedAwareStatus,
+  statusAfterStockRestore,
 } from "../../product/helpers/product-status.helper";
 import { safeDecrementReserved } from "../../product/helpers/product-availability.helper";
 import { CacheService } from "../../cache/cache.service";
@@ -365,7 +365,15 @@ export class PaymentExpiryReconciliationService {
       include: {
         buyer: { select: { id: true, email: true, ...PUBLIC_NAME_SELECT } },
         seller: { select: { id: true, email: true, ...PUBLIC_NAME_SELECT } },
-        product: { select: { id: true, title: true, quantity: true } },
+        product: {
+          select: {
+            id: true,
+            title: true,
+            quantity: true,
+            status: true,
+            inactiveReason: true,
+          },
+        },
       },
     });
 
@@ -477,7 +485,9 @@ export class PaymentExpiryReconciliationService {
                 order.product.quantity !== null
                   ? { increment: restoreQty }
                   : undefined,
-              status: getProductStatusFromQuantity(newQuantity),
+              // Teslim edilmemiş siparişin iptali: yeni karantina yok, ama
+              // ilan başka bir iadeden karantinadaysa karantinada kalır.
+              ...statusAfterStockRestore(order.product, newQuantity, false),
             },
           });
         });

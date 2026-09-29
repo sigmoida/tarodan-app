@@ -257,6 +257,15 @@ export class PayTRService implements IPaymentProvider {
   private get testMode() {
     return this.creds.testMode;
   }
+  /**
+   * `test_mode` kararı: test şeridi (`forced=true`) her zaman test modunu açar;
+   * aksi halde mağazanın ortam ayarı geçer. Canlı hesap için `false` gelmesi
+   * ortam ayarını EZMEZ — staging'de `PAYTR_TEST_MODE=true` iken gerçek
+   * tahsilat yapılmasın.
+   */
+  private resolveTestMode(forced?: boolean): boolean {
+    return forced === true || this.testMode;
+  }
   private get httpTimeoutMs() {
     return this.paytr.httpTimeoutMs;
   }
@@ -737,7 +746,7 @@ export class PayTRService implements IPaymentProvider {
       };
       /**
        * Test şeridi ödemesi: canlı merchant'ta `test_mode=1` (PayTR test kartı,
-       * gerçek tahsilat yok). Verilmezse ortam ayarı (`PAYTR_TEST_MODE`) geçer.
+       * gerçek tahsilat yok). `false`/verilmezse ortam ayarı (`PAYTR_TEST_MODE`) geçer.
        */
       testMode?: boolean;
     },
@@ -766,7 +775,7 @@ export class PayTRService implements IPaymentProvider {
         : 0,
     );
     const currency = "TL";
-    const testMode = options?.testMode ?? this.testMode;
+    const testMode = this.resolveTestMode(options?.testMode);
     const testModeStr = testMode ? "1" : "0";
     // Kullanıcının başlattığı checkout her zaman 3D Secure'dur. Non3D yalnız
     // ayrı recurring akışında, açık mağaza yetkisiyle sunucudan kullanılır.
@@ -889,7 +898,7 @@ export class PayTRService implements IPaymentProvider {
     const paymentType = "card";
     const installmentCount = "0";
     const currency = "TL";
-    const testMode = params.testMode ?? this.testMode;
+    const testMode = this.resolveTestMode(params.testMode);
     const testModeStr = testMode ? "1" : "0";
     const non3d = "1";
 

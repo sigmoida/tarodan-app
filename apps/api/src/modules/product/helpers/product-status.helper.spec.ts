@@ -2,6 +2,7 @@ import { ProductInactiveReason, ProductStatus } from "@prisma/client";
 import {
   clearStaleInactiveReasonOnWrite,
   shouldQuarantineReturnedStock,
+  statusAfterStockRestore,
 } from "./product-status.helper";
 
 /**
@@ -63,5 +64,35 @@ describe("clearStaleInactiveReasonOnWrite", () => {
 
   it("data undefined ise güvenle no-op'tur", () => {
     expect(() => clearStaleInactiveReasonOnWrite(undefined)).not.toThrow();
+  });
+});
+
+describe("statusAfterStockRestore", () => {
+  const live = { status: ProductStatus.active, inactiveReason: null };
+  const quarantined = {
+    status: ProductStatus.inactive,
+    inactiveReason: ProductInactiveReason.return_quarantine,
+  };
+
+  it("teslim sonrası iade karantinaya alır", () => {
+    expect(statusAfterStockRestore(live, 5, true)).toEqual(quarantined);
+  });
+
+  it("karantinadaki ilan teslimat öncesi iptalle satışa açılmaz", () => {
+    expect(statusAfterStockRestore(quarantined, 5, false)).toEqual(quarantined);
+  });
+
+  it("karantinada değilse durum miktardan gelir", () => {
+    expect(statusAfterStockRestore(live, 1, false)).toEqual({
+      status: ProductStatus.active,
+      inactiveReason: null,
+    });
+    expect(
+      statusAfterStockRestore(
+        { status: ProductStatus.inactive, inactiveReason: null },
+        0,
+        false,
+      ),
+    ).toEqual({ status: ProductStatus.inactive, inactiveReason: null });
   });
 });
