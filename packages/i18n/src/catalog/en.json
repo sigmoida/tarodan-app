@@ -8361,6 +8361,7 @@
       "filterLoggedIn": "Logged In",
       "testAccount": "Test account",
       "testAccountHint": "Test lane: never mixes with live data",
+      "filterTestAccountAll": "All accounts",
       "testAccountOnly": "Test accounts only",
       "liveAccountsOnly": "Real accounts only"
     },
