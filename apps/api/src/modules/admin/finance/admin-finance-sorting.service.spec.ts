@@ -149,11 +149,13 @@ describe("admin finance list sorting", () => {
   it("sorts eLogo invoices by the displayed PDF availability", async () => {
     const elogoInvoice = createDelegate();
     elogoInvoice.findMany.mockResolvedValue([
-      { id: "missing", pdfUrl: null },
-      { id: "ready", pdfUrl: "invoice.pdf" },
+      { id: "missing", pdfUrl: null, type: "penalty", sourceId: "rr-1" },
+      { id: "ready", pdfUrl: "invoice.pdf", type: "penalty", sourceId: "rr-2" },
     ]);
+    // Satırların işlem referansı çözülürken iade talepleri okunur.
+    const refundRequest = createDelegate();
     const service = new AdminTaxService(
-      { elogoInvoice } as any,
+      { elogoInvoice, refundRequest } as any,
       {} as any,
       {} as any,
       {} as any,

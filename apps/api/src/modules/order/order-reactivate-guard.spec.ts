@@ -112,4 +112,23 @@ describe("order reactivate — ödenmiş/iade edilmiş sipariş kapısı", () =>
       expect.objectContaining({ data: { status: "accepted" } }),
     );
   });
+
+  it("yeniden açılan sipariş iptal aktörünü taşımaz (canlı sipariş İptal & İade'de görünmez)", async () => {
+    const { service, tx } = makeService({
+      ...baseOrder,
+      offer: { status: "payment_expired" },
+      cancelledBy: "system",
+    });
+
+    await service.reactivate("o1", "buyer-1");
+
+    expect(tx.order.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          status: "pending_payment",
+          cancelledBy: null,
+        }),
+      }),
+    );
+  });
 });

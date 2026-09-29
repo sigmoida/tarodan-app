@@ -6,11 +6,13 @@ import { AdminDeletedIdentityController } from "./users/admin-deleted-identity.c
 import { AdminProductController } from "./catalog/admin-product.controller";
 import { AdminOrderController } from "./orders/admin-order.controller";
 import { AdminAnalyticsController } from "./analytics/admin-analytics.controller";
+import { AdminAnalyticsInsightsController } from "./analytics/insights/admin-analytics-insights.controller";
 import { AdminModerationController } from "./ops/admin-moderation.controller";
 import { AdminPaymentController } from "./finance/admin-payment.controller";
 import { AdminTradeController } from "./trade/admin-trade.controller";
 import { AdminOfferController } from "./orders/admin-offer.controller";
 import { AdminRefundController } from "./orders/admin-refund.controller";
+import { AdminCancellationController } from "./orders/admin-cancellation.controller";
 import { AdminContentController } from "./catalog/admin-content.controller";
 import { AdminMessagingController } from "./ops/admin-messaging.controller";
 import { AdminSupportController } from "./ops/admin-support.controller";
@@ -49,11 +51,19 @@ import {
   ProductImportBatchScheduler,
 } from "./jobs/product-import-batch.scheduler";
 import { AdminOrderService } from "./orders/admin-order.service";
+import { AdminCancellationService } from "./orders/admin-cancellation.service";
 import { AdminAnalyticsService } from "./analytics/admin-analytics.service";
 import { AdminAnalyticsCommonService } from "./analytics/admin-analytics-common.service";
 import { AdminAnalyticsDashboardService } from "./analytics/admin-analytics-dashboard.service";
+import { AnalyticsSalesService } from "./analytics/insights/analytics-sales.service";
+import { AnalyticsTradeService } from "./analytics/insights/analytics-trade.service";
+import { AnalyticsCatalogService } from "./analytics/insights/analytics-catalog.service";
+import { AnalyticsQualityService } from "./analytics/insights/analytics-quality.service";
+import { AnalyticsMembershipService } from "./analytics/insights/analytics-membership.service";
+import { AnalyticsExportService } from "./analytics/insights/analytics-export.service";
+import { AdminDashboardWorklistService } from "./analytics/dashboard/admin-dashboard-worklist.service";
+import { AdminDashboardStockService } from "./analytics/dashboard/admin-dashboard-stock.service";
 import { AdminAnalyticsOrderService } from "./analytics/admin-analytics-order.service";
-import { AdminAnalyticsReportService } from "./analytics/admin-analytics-report.service";
 import { AdminModerationService } from "./ops/admin-moderation.service";
 import { AdminPaymentService } from "./finance/admin-payment.service";
 import { AdminPayoutService } from "./finance/admin-payout.service";
@@ -64,6 +74,7 @@ import { WarehouseAddressModule } from "../shipping/warehouse/warehouse-address.
 import { AdminTradeQueryService } from "./trade/admin-trade-query.service";
 import { AdminOfferQueryService } from "./orders/admin-offer-query.service";
 import { AdminOfferService } from "./orders/admin-offer.service";
+import { AdminOrderCancelService } from "./orders/admin-order-cancel.service";
 import { AdminTradeWarehouseService } from "./trade/admin-trade-warehouse.service";
 import { AdminTradeResolutionService } from "./trade/admin-trade-resolution.service";
 import { AdminRefundService } from "./orders/admin-refund.service";
@@ -166,11 +177,13 @@ import { scheduledProcessors } from "../../workers/scheduled-processors";
     AdminProductController,
     AdminOrderController,
     AdminAnalyticsController,
+    AdminAnalyticsInsightsController,
     AdminModerationController,
     AdminPaymentController,
     AdminTradeController,
     AdminOfferController,
     AdminRefundController,
+    AdminCancellationController,
     AdminContentController,
     AdminMessagingController,
     AdminSupportController,
@@ -205,11 +218,19 @@ import { scheduledProcessors } from "../../workers/scheduled-processors";
     AdminProductService,
     AdminProductBulkImportService,
     AdminOrderService,
+    AdminCancellationService,
     AdminAnalyticsService,
     AdminAnalyticsCommonService,
     AdminAnalyticsDashboardService,
+    AnalyticsSalesService,
+    AnalyticsTradeService,
+    AnalyticsCatalogService,
+    AnalyticsQualityService,
+    AnalyticsMembershipService,
+    AnalyticsExportService,
+    AdminDashboardWorklistService,
+    AdminDashboardStockService,
     AdminAnalyticsOrderService,
-    AdminAnalyticsReportService,
     AdminModerationService,
     AdminPaymentService,
     AdminPayoutService,
@@ -219,6 +240,7 @@ import { scheduledProcessors } from "../../workers/scheduled-processors";
     AdminTradeQueryService,
     AdminOfferQueryService,
     AdminOfferService,
+    AdminOrderCancelService,
     AdminTradeWarehouseService,
     AdminTradeResolutionService,
     AdminRefundService,

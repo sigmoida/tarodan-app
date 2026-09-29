@@ -1,29 +1,10 @@
 import { api } from "./client";
 
 /**
- * Finance domain: reports, commission config, payments & invoices, seller
+ * Finance domain: commission config, payments & invoices, seller
  * payouts, and tax (VAT/withholding) settings.
  */
 export const financeApi = {
-  // Reports
-  getSalesReport: (params?: {
-    startDate?: string;
-    endDate?: string;
-    format?: string;
-  }) => api.get("/admin/reports/sales", { params }),
-  getCommissionReport: (params?: { startDate?: string; endDate?: string }) =>
-    api.get("/admin/reports/commission", { params }),
-  getUserReport: (params?: any) => api.get("/admin/reports/users", { params }),
-  getTradeReport: (params?: any) =>
-    api.get("/admin/reports/trades", { params }),
-  getProductReport: (params?: any) =>
-    api.get("/admin/reports/products", { params }),
-  exportReport: (type: string, format: string, params?: any) =>
-    api.get(`/admin/reports/${type}`, {
-      params: { ...params, format },
-      responseType: "json",
-    }),
-
   // Commission
   getCommissionRevenue: (params?: { fromDate?: string; toDate?: string }) =>
     api.get("/admin/commission/revenue", { params }),
@@ -70,6 +51,8 @@ export const financeApi = {
     invoiceNumber?: string;
     description?: string;
     userCode?: string;
+    /** İşlem numarası (ORD-/TKS-/RFD-/BST-/MEM-), tam eşleşme. */
+    processRef?: string;
     search?: string;
     startDate?: string;
     endDate?: string;
@@ -78,7 +61,11 @@ export const financeApi = {
     sortBy?: string;
     sortOrder?: "asc" | "desc";
   }) => api.get("/admin/invoices", { params }),
-  getInvoicePdf: (id: string) => api.get(`/admin/invoices/${id}/pdf`),
+  // Uç İKİ biçim döndürür: S3 kopyası varsa `{url}` JSON'u, yoksa ham PDF
+  // gövdesi. Blob istenir, çağıran içerik tipine bakıp ayırır — JSON varsayan
+  // eski hâl, stream gelen belgede sessizce hiçbir şey yapmıyordu.
+  getInvoicePdf: (id: string) =>
+    api.get(`/admin/invoices/${id}/pdf`, { responseType: "blob" }),
   // Tek faturanın detay dökümü: kalem kırılımı + dayandığı işlem (Excel).
   getInvoiceDetailExport: (id: string) =>
     api.get(`/admin/invoices/${id}/detail`, { responseType: "blob" }),
@@ -190,13 +177,18 @@ export const financeApi = {
     page?: number;
     limit?: number;
     includeResolved?: boolean;
+    /** "marketplace" | "membership"; boş = tüm mağazalar. */
+    merchant?: string;
   }) => api.get("/admin/finance/psp/statement-lines", { params }),
   resolvePspStatementLine: (lineId: string, note: string) =>
     api.post(`/admin/finance/psp/statement-lines/${lineId}/resolve`, { note }),
   rematchPspStatementLine: (lineId: string) =>
     api.post(`/admin/finance/psp/statement-lines/${lineId}/rematch`),
-  getPspSettlements: (params?: { limit?: number; days?: number }) =>
-    api.get("/admin/finance/psp/settlements", { params }),
+  getPspSettlements: (params?: {
+    limit?: number;
+    days?: number;
+    merchant?: string;
+  }) => api.get("/admin/finance/psp/settlements", { params }),
 
   getPayoutsTransactions: (params?: {
     search?: string;

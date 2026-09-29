@@ -1,5 +1,6 @@
 import { Injectable, Logger } from "@nestjs/common";
 import {
+  CancellationActor,
   Prisma,
   SubscriptionStatus,
   ProductStatus,
@@ -23,6 +24,7 @@ import {
 } from "../../membership/helpers/membership.util";
 import { OutboxService } from "../../outbox/outbox.service";
 import { OUTBOX_REVENUE_INVOICE_ISSUE } from "../../outbox/outbox.types";
+import { orderCancelledData } from "../../order/helpers/order-cancellation";
 
 /**
  * VirtualOrderFulfillmentService (Faz 8.2) — SANAL sipariş (üyelik / boost) fulfillment'ı.
@@ -260,9 +262,11 @@ export class VirtualOrderFulfillmentService {
     });
     if (siblingPendings.length > 0) {
       const ids = siblingPendings.map((o) => o.id);
+      // Aynı üyeliği başka ödeme tamamladı — alıcı bunları iptal etmedi,
+      // yetim temizliğini sistem yapar.
       await tx.order.updateMany({
         where: { id: { in: ids } },
-        data: { status: OrderStatus.cancelled },
+        data: orderCancelledData(CancellationActor.system),
       });
       await tx.payment.updateMany({
         where: { orderId: { in: ids }, status: PaymentStatus.pending },

@@ -9,7 +9,10 @@ import { OrderCheckoutService } from "./order-checkout.service";
 import { OrderCheckoutCommonService } from "./order-checkout-common.service";
 import { OrderCheckoutDirectService } from "./order-checkout-direct.service";
 import { OrderCheckoutGroupService } from "./order-checkout-group.service";
+import { ORDER_CANCEL_REASON } from "../helpers/order-cancel-reasons";
 import { OrderGuestCheckoutService } from "./order-guest-checkout.service";
+import { AccountLaneService } from "../../account-lane/account-lane.service";
+import { accountLaneServiceStub } from "../../account-lane/account-lane.testing";
 import { OrderCommonService } from "../order-common.service";
 import { OrderQueryService } from "../order-query.service";
 import { OrderLifecycleService } from "../order-lifecycle.service";
@@ -24,7 +27,12 @@ import { CommissionLedgerService } from "../../commission/commission-ledger.serv
 import { TaxService } from "../../tax/tax.service";
 import { ElogoInvoicingService } from "../../elogo";
 import { RefundService } from "../../refund/refund.service";
-import { OrderStatus, ProductKind, ProductStatus } from "@prisma/client";
+import {
+  CancellationActor,
+  OrderStatus,
+  ProductKind,
+  ProductStatus,
+} from "@prisma/client";
 import { flatPackageTiers } from "../../shipping/testing/tariff-fixture";
 import { OrderTaxPolicyService } from "../pricing/order-tax-policy.service";
 import { UserBlockService } from "../../user-block/user-block.service";
@@ -73,6 +81,7 @@ const DEFAULT_COMMISSION_RULE = {
  */
 describe("OrderService checkout group (batch checkout)", () => {
   let service: OrderService;
+  let lanes: ReturnType<typeof accountLaneServiceStub>;
 
   const buyerId = "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa";
   const sellerId = "eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee";
@@ -149,7 +158,6 @@ describe("OrderService checkout group (batch checkout)", () => {
       findMany: jest.fn().mockResolvedValue([]),
       findUnique: jest.fn().mockResolvedValue(null),
     },
-    analyticsSnapshot: { upsert: jest.fn() },
     $transaction: jest.fn(),
   };
 
@@ -255,6 +263,7 @@ describe("OrderService checkout group (batch checkout)", () => {
         OrderCheckoutDirectService,
         OrderCheckoutGroupService,
         { provide: UserBlockService, useValue: userBlocksStub },
+        { provide: AccountLaneService, useValue: accountLaneServiceStub() },
         OrderGuestCheckoutService,
         OrderCommonService,
         OrderQueryService,
@@ -326,6 +335,7 @@ describe("OrderService checkout group (batch checkout)", () => {
     service = module.get(OrderService);
     cache = module.get(CacheService);
     discountService = module.get(DiscountService);
+    lanes = module.get(AccountLaneService);
   });
 
   const baseDto = () => {
@@ -554,10 +564,17 @@ describe("OrderService checkout group (batch checkout)", () => {
 
     await service.checkout(buyerId, baseDto() as any);
 
+    // Terk edilmiş deneme yeni sepetçe devralınır: alıcı bu siparişi iptal
+    // etmeyi seçmedi → sistem temizliği.
     expect(mockTx.order.update).toHaveBeenCalledWith(
       expect.objectContaining({
         where: { id: "stale-order-1" },
-        data: expect.objectContaining({ status: OrderStatus.cancelled }),
+        data: expect.objectContaining({
+          status: OrderStatus.cancelled,
+          cancelledAt: expect.any(Date),
+          cancelledBy: CancellationActor.system,
+          cancelReason: ORDER_CANCEL_REASON.replacedByNewCheckout,
+        }),
       }),
     );
     expect(mockTx.product.update).toHaveBeenCalledWith({
@@ -837,6 +854,19 @@ describe("OrderService checkout group (batch checkout)", () => {
         where: { id: productA },
         data: { reservedQuantity: { increment: 1 } },
       });
+    });
+
+    it("test satıcısının ilanı misafir sepetinden satın alınamaz (misafir = canlı şerit)", async () => {
+      lanes.assertSameLane.mockRejectedValueOnce(
+        new ForbiddenException("lane mismatch"),
+      );
+
+      await expect(
+        service.checkoutGuest(guestDto([{ productId: productA }]) as any),
+      ).rejects.toThrow(ForbiddenException);
+
+      expect(lanes.assertSameLane).toHaveBeenCalledWith(undefined, sellerId);
+      expect(mockTx.order.create).not.toHaveBeenCalled();
     });
 
     it("birleşik adet üst sınırı (20) misafirde de zorlanır: aynı ürün 15+15 → reddedilir", async () => {

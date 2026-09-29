@@ -387,6 +387,25 @@ describe("PaytrReportMatchingService.matchStatementLines", () => {
     expect(where.paidAt.lt.toISOString()).toBe("2026-07-31T21:00:00.000Z");
   });
 
+  it("checks a covered day only against payments taken on that statement's merchant", async () => {
+    const prisma = makePrisma({ lines: [], coveredDays: [DAY] });
+    const service = new PaytrReportMatchingService(prisma as any);
+
+    await service.matchStatementLines();
+
+    const covered = prisma.paytrStatementLine.findMany.mock.calls.find(
+      ([args]: any[]) => args?.distinct,
+    )[0];
+    expect(covered.distinct).toEqual(["paytrMerchant", "transactionDate"]);
+    // Mock satırı mağaza taşımıyor → pazaryeri varsayılır.
+    expect(prisma.payment.findMany.mock.calls[0][0].where.paytrMerchant).toBe(
+      "marketplace",
+    );
+    expect(
+      prisma.membershipPayment.findMany.mock.calls[0][0].where.paytrMerchant,
+    ).toBe("marketplace");
+  });
+
   it("skips the reverse sweep entirely when no day has statement coverage", async () => {
     const prisma = makePrisma({ lines: [], coveredDays: [] });
     const service = new PaytrReportMatchingService(prisma as any);

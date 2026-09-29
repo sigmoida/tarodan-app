@@ -1,4 +1,7 @@
+import { CancellationActor } from "@prisma/client";
 import { ProductLockService } from "./product-lock.service";
+import { ORDER_CANCEL_REASON } from "../../order/helpers/order-cancel-reasons";
+import { TRADE_CANCEL_REASON } from "../../trade/helpers/trade-cancel-reasons";
 
 /**
  * Regression: invalidatePendingOrdersForProduct must report each cancelled
@@ -119,5 +122,70 @@ describe("ProductLockService.invalidatePendingOrdersForProduct payload", () => {
       ["order-direct", "order-sibling"],
       tx,
     );
+  });
+
+  /**
+   * Stok kaskadı: alıcı da satıcı da iptal etmedi. Varsayılan gerekçe takasın
+   * son adedi ayırdığı durumdur (trade-lifecycle aynı sabiti geçer).
+   */
+  it("stamps the cascade as a system cancellation with the given or default reason", async () => {
+    const { service, tx } = buildService([directBuyOrder]);
+
+    await service.invalidatePendingOrdersForProduct(
+      tx as any,
+      productId,
+      ORDER_CANCEL_REASON.stockDepleted,
+    );
+    await service.invalidatePendingOrdersForProduct(tx as any, productId);
+
+    const [first, second] = tx.order.updateMany.mock.calls.map(
+      (call: any[]) => call[0].data,
+    );
+    expect(first).toEqual({
+      status: "cancelled",
+      cancelledAt: expect.any(Date),
+      cancelledBy: CancellationActor.system,
+      cancelReason: ORDER_CANCEL_REASON.stockDepleted,
+    });
+    expect(second).toEqual(
+      expect.objectContaining({
+        cancelledBy: CancellationActor.system,
+        cancelReason: ORDER_CANCEL_REASON.stockReservedForTrade,
+      }),
+    );
+  });
+});
+
+describe("ProductLockService.invalidateRelatedTrades", () => {
+  it("cancels pending trades as a system cancellation (stock depleted)", async () => {
+    const tx = {
+      tradeItem: {
+        findMany: jest.fn().mockResolvedValue([{ tradeId: "t1" }]),
+      },
+      trade: {
+        findMany: jest.fn().mockResolvedValue([
+          {
+            id: "t1",
+            initiatorId: "u1",
+            receiverId: "u2",
+            status: "pending",
+          },
+        ]),
+        updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+      },
+    };
+    const service = new ProductLockService({} as any, {} as any);
+
+    await service.invalidateRelatedTrades(tx as any, "prod-1");
+
+    expect(tx.trade.updateMany).toHaveBeenCalledWith({
+      where: { id: { in: ["t1"] } },
+      data: {
+        status: "cancelled",
+        cancelledAt: expect.any(Date),
+        cancelledBy: CancellationActor.system,
+        cancelReason: TRADE_CANCEL_REASON.stockDepleted,
+      },
+    });
   });
 });

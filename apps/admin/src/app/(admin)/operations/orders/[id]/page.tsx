@@ -7,6 +7,7 @@ import { adminApi } from "@/lib/api";
 import { fmtDateTime } from "@/lib/format";
 import { DetailPage } from "@/components/detail/DetailPage";
 import { PartyCard } from "@/components/detail/PartyCard";
+import { TestLaneBadge } from "@/components/TestLaneBadge";
 import type { OrderGroupFile } from "./_lib/fileTypes";
 import { GroupPaymentCard } from "./_sections/GroupPaymentCard";
 import { PackageFileSection } from "./_sections/PackageFileSection";
@@ -35,15 +36,18 @@ export default function OrderGroupFilePage() {
         })
       }
       subtitle={(file) => fmtDateTime(file.group.createdAt)}
-      badge={(file) =>
-        file.group.itemCount > 1 ? (
-          <Badge variant="outline">
-            {t("admin.operations.orders.cartItems", {
-              count: file.group.itemCount,
-            })}
-          </Badge>
-        ) : null
-      }
+      badge={(file) => (
+        <div className="flex flex-wrap items-center gap-2">
+          {file.group.itemCount > 1 && (
+            <Badge variant="outline">
+              {t("admin.operations.orders.cartItems", {
+                count: file.group.itemCount,
+              })}
+            </Badge>
+          )}
+          <TestLaneBadge isTest={file.group.isTest} />
+        </div>
+      )}
     >
       {(file) => (
         <div className="space-y-6">

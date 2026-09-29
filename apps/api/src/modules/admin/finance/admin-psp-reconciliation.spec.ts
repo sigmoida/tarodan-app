@@ -1,5 +1,6 @@
 import {
   PaytrMatchStatus,
+  PaytrMerchant,
   PaytrStatementLineType,
   PaymentStatus,
   RefundAttemptStatus,
@@ -33,12 +34,21 @@ function makePrisma(opts: {
   paymentRows?: any[];
   line?: any;
   lineCount?: number;
+  /** getMissingPayments: dökümü gelmiş mağazalar (varsayılan: lineCount>0 ise pazaryeri). */
+  coveredMerchants?: PaytrMerchant[];
 }) {
   return {
     paytrStatementLine: {
       findMany: jest.fn().mockImplementation((args: any) => {
         if (args?.skip !== undefined) {
           return Promise.resolve(opts.linesList ?? []);
+        }
+        // getMissingPayments: günün kapsamı (mağaza başına).
+        if (args?.distinct) {
+          const merchants =
+            opts.coveredMerchants ??
+            ((opts.lineCount ?? 0) > 0 ? [PaytrMerchant.marketplace] : []);
+          return Promise.resolve(merchants.map((m) => ({ paytrMerchant: m })));
         }
         // Özet: pencere öncesi günün satış oid'leri (type + transactionDate seçili) — testlerde boş.
         if (args?.where?.type !== undefined && args?.select?.transactionDate) {
@@ -200,6 +210,67 @@ describe("AdminPspReconciliationService.getReconciliationSummary", () => {
     expect(day.missingInPaytr).toBe(1);
     expect(day.salesDiff).toBeCloseTo(25);
     expect(day.tolerance).toBe(0.05);
+  });
+
+  it("counts a payment as missing only when ITS merchant's statement covers the day", async () => {
+    // Yalnız pazaryeri dökümü gelmiş: üyelik mağazasında alınan ödeme ve
+    // yenileme "dökümde yok" sayılmaz (o mağazanın raporu henüz yok).
+    const prisma = makePrisma({
+      lines: [SALE({ paytrMerchant: PaytrMerchant.marketplace })],
+      payments: [
+        {
+          id: "pay-member",
+          amount: 100,
+          paidAt: new Date("2026-07-31T10:00:00Z"),
+          paytrMerchant: PaytrMerchant.membership,
+          providerConversationId: "MEMBERORD",
+        },
+        {
+          id: "pay-market-ghost",
+          amount: 75,
+          paidAt: new Date("2026-07-31T12:00:00Z"),
+          paytrMerchant: PaytrMerchant.marketplace,
+          providerConversationId: "GHOST",
+        },
+      ],
+      renewals: [
+        {
+          id: "ren-1",
+          amount: 240,
+          createdAt: new Date("2026-07-31T09:00:00Z"),
+          paytrMerchant: PaytrMerchant.membership,
+          merchantOid: "REN1",
+        },
+      ],
+    });
+    const { service } = makeService(prisma);
+
+    const result = await service.getReconciliationSummary(7);
+    const day = result.days.find((d) => d.date === "2026-07-31");
+
+    expect(day?.paytrCovered).toBe(true);
+    expect(day?.missingInPaytr).toBe(1);
+  });
+
+  /**
+   * Test şeridi işlemi (test_mode=1) canlı PayTR dökümünde hiç yer almaz; "bizim"
+   * kümeleri (ödeme, üyelik yenilemesi — iki mağaza —, iade denemesi) onu
+   * saymamalı, yoksa her test ödemesi kalıcı "dökümde yok" farkı olur.
+   */
+  it("keeps the test lane out of all three 'ours' sets", async () => {
+    const prisma = makePrisma({ lines: [SALE()] });
+    const { service } = makeService(prisma);
+
+    await service.getReconciliationSummary(7);
+
+    const payments = prisma.payment.findMany.mock.calls[0][0];
+    expect(payments.where).toMatchObject({ isTest: false });
+    const renewals = prisma.membershipPayment.findMany.mock.calls[0][0];
+    expect(renewals.where).toMatchObject({
+      membership: { user: { isTestAccount: false } },
+    });
+    const refunds = prisma.refundAttempt.findMany.mock.calls[0][0];
+    expect(refunds.where).toMatchObject({ payment: { isTest: false } });
   });
 
   it("starts the window at the ISTANBUL day start, not UTC midnight", async () => {
@@ -369,6 +440,38 @@ describe("AdminPspReconciliationService.getMissingPayments", () => {
     expect(where.paidAt.gte.toISOString()).toBe("2026-07-30T21:00:00.000Z");
   });
 
+  it("skips payments of a merchant whose statement has not covered the day", async () => {
+    const prisma = makePrisma({
+      coveredMerchants: [PaytrMerchant.marketplace],
+      lines: [],
+      payments: [
+        {
+          id: "pay-member",
+          amount: 100,
+          paidAt: new Date("2026-07-31T10:00:00Z"),
+          paytrMerchant: PaytrMerchant.membership,
+          providerConversationId: "MEMBERORD",
+          order: { orderNumber: "ORD-M" },
+        },
+      ],
+      renewals: [
+        {
+          id: "ren-1",
+          amount: 240,
+          createdAt: new Date("2026-07-31T09:00:00Z"),
+          paytrMerchant: PaytrMerchant.membership,
+          merchantOid: "REN1",
+        },
+      ],
+    });
+    const { service } = makeService(prisma);
+
+    const result = await service.getMissingPayments("2026-07-31");
+
+    expect(result.paytrCovered).toBe(true);
+    expect(result.items).toEqual([]);
+  });
+
   it("returns an empty list when the day has no statement coverage", async () => {
     const prisma = makePrisma({ lineCount: 0, payments: [{ id: "x" }] });
     const { service } = makeService(prisma);
@@ -444,6 +547,28 @@ describe("AdminPspReconciliationService.getStatementLines", () => {
         where: { matchStatus: PaytrMatchStatus.amount_mismatch },
       }),
     );
+  });
+});
+
+describe("AdminPspReconciliationService — merchant filter", () => {
+  it("narrows statement lines and settlements to one PayTR merchant", async () => {
+    const prisma = makePrisma({
+      linesList: [],
+      linesCount: 0,
+      settlements: [],
+      settlementItemGroups: [],
+    });
+    const { service } = makeService(prisma);
+
+    await service.getStatementLines({ merchant: "membership" as never });
+    await service.getSettlements({ merchant: "membership" as never });
+
+    expect(
+      prisma.paytrStatementLine.findMany.mock.calls[0][0].where,
+    ).toMatchObject({ paytrMerchant: "membership" });
+    expect(
+      prisma.paytrSettlement.findMany.mock.calls[0][0].where,
+    ).toMatchObject({ paytrMerchant: "membership" });
   });
 });
 

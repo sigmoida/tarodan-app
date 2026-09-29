@@ -15,7 +15,6 @@ export function RecentOrders({ orders }: { orders: RecentOrder[] }) {
   return (
     <SectionCard
       title={t("admin.dashboard.recentOrders.title")}
-      className="lg:col-span-2"
       actions={
         <Button asChild variant="ghost" size="sm">
           <Link href="/operations/orders">

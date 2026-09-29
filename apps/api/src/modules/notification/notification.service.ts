@@ -20,6 +20,7 @@ import { NotificationDispatchService } from "./notification-dispatch.service";
 import { NotificationCommerceService } from "./notification-commerce.service";
 import { NotificationAccountService } from "./notification-account.service";
 import type { NotificationAudience } from "./helpers/notification-link";
+import type { OrderCancelNoticeParty } from "./helpers/order-cancel-notice";
 
 @Injectable()
 export class NotificationService {
@@ -292,6 +293,24 @@ export class NotificationService {
 
   async sendOrderCancelledEmails(orderId: string): Promise<void> {
     return this.commerce.sendOrderCancelledEmails(orderId);
+  }
+
+  /** Kargo öncesi iptalin duyurusu (in-app + e-posta); taraflar varsayılan ikisi. */
+  async notifyOrderCancelledParties(
+    order: {
+      id: string;
+      orderNumber: string;
+      buyerId: string;
+      sellerId: string;
+    },
+    refundAmount: number,
+    parties?: readonly OrderCancelNoticeParty[],
+  ): Promise<void> {
+    return this.commerce.notifyOrderCancelledParties(
+      order,
+      refundAmount,
+      parties,
+    );
   }
 
   async broadcastBackInStock(

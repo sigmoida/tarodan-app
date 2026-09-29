@@ -7,12 +7,12 @@ import { fmtTry } from "@/lib/format";
 import { InvoicePdfButton } from "../_components/InvoicePdfButton";
 import { InvoiceDetailButton } from "../_components/InvoiceDetailButton";
 import { InvoiceEmailButton } from "../_components/InvoiceEmailButton";
+import { InvoiceProcessCell } from "../_components/InvoiceProcessCell";
 import {
   type Invoice,
   type InvoiceParty,
   type SellerInvoice,
   documentTypeLabel,
-  invoiceContextLabels,
   invoiceStatusConfig,
   invoiceTypeLabels,
 } from "./types";
@@ -40,7 +40,6 @@ export const elogoColumns = (
   onRetry?: (invoice: Invoice) => void,
   retryingId?: string,
 ) => {
-  const contexts = invoiceContextLabels(t);
   const types = invoiceTypeLabels(t);
   return [
     col.user<Invoice>(
@@ -53,15 +52,12 @@ export const elogoColumns = (
       (i) => partyCell(i.buyer),
       { sortKey: "buyerName", sortType: "text", minWidth: 200 },
     ),
-    col.badge<Invoice>(
+    // Rozet + işlem numaraları alt alta: `badge` hücresi tek satıra kilitli
+    // olduğu için özel hücre.
+    col.custom<Invoice>(
       t("admin.finance.invoices.context"),
-      (i) =>
-        i.context ? (
-          <Badge variant="secondary">{contexts[i.context] ?? i.context}</Badge>
-        ) : (
-          <span className="text-muted">—</span>
-        ),
-      { sortKey: "context", sortType: "text", minWidth: 140 },
+      (i) => <InvoiceProcessCell invoice={i} />,
+      { sortKey: "context", sortType: "text", grow: 1, minWidth: 160 },
     ),
     col.custom<Invoice>(
       t("admin.finance.invoices.invoiceNumber"),

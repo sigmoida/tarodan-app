@@ -1,6 +1,6 @@
 import { PaymentInitiationService } from "./payment-initiation.service";
 import { PaymentLifecycleService } from "./payment-lifecycle.service";
-import { PaymentStatus } from "@prisma/client";
+import { CancellationActor, PaymentStatus } from "@prisma/client";
 
 /**
  * SEC-H1: bypass-complete üç katmanlı kilit — production'da SERT ret (PAYMENT_BYPASS
@@ -139,7 +139,12 @@ describe("Payment security — SEC-H1 bypass + SEC-M1 confirm-failed", () => {
       });
 
       expect(res.released).toBe(true);
-      expect(processFailedPayment).toHaveBeenCalled();
+      // İstemci yalnız sağlayıcının başarısızlığını bildiriyor: iptal sistemin.
+      expect(processFailedPayment).toHaveBeenCalledWith(
+        expect.objectContaining({ id: "pay-1" }),
+        expect.any(String),
+        CancellationActor.system,
+      );
     });
 
     it("ödeme pending değilse no-op", async () => {

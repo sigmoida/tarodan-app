@@ -132,6 +132,10 @@ describe("RolesGuard — admin iade yüzeyi URL-segment izin kapısı", () => {
       "/api/admin/refund-requests/abc/set-shipping-payer",
     ],
     ["manual-refund", "POST", "/api/admin/payments/abc/manual-refund"],
+    // İptal & İade ekranının İptaller sekmesi iade listesiyle aynı izni ister.
+    ["iptal listesi", "GET", "/api/admin/cancellations"],
+    ["iptal sayaçları", "GET", "/api/admin/cancellations/counts"],
+    ["iptal Excel", "GET", "/api/admin/cancellations/export"],
   ];
 
   describe("moderator iade yüzeyinin TAMAMINDAN bloke", () => {

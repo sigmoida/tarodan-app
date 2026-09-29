@@ -1,87 +1,103 @@
 "use client";
 
-import dynamic from "next/dynamic";
-import { useEffect, useState } from "react";
 import { useTranslations } from "next-intl";
-import { Spinner } from "@tarodan/ui";
 import { AdminPage } from "@/components/page/AdminPage";
 import { PageHeader } from "@/components/AdminList";
-import { SuspenseBoundary } from "@/components/page/SuspenseBoundary";
-import { useDashboard } from "./_lib/useDashboard";
+import { useDashboardPeriod } from "./_lib/useDashboardPeriod";
+import {
+  useDashboardLists,
+  useDashboardStats,
+  useDashboardStock,
+  useDashboardTopLists,
+  useDashboardWorklist,
+} from "./_lib/useDashboard";
+import type { DashboardPeriodSelection } from "./_lib/periodParams";
+import { toDashboardMetrics } from "./_lib/metrics";
+import { DashboardPeriodFilter } from "./_components/DashboardPeriodFilter";
+import { DashboardRefreshButton } from "./_components/DashboardRefreshButton";
+import { QueuesZone } from "./_components/QueuesZone";
+import { AlertsZone } from "./_components/AlertsZone";
 import { DashboardStats } from "./_components/DashboardStats";
-import { PendingActionsPanel } from "./_components/PendingActionsPanel";
-// Charts pull in chart.js/react-chartjs-2 (~150KB) and render below the stat
-// cards, so they load lazily off the /dashboard landing bundle (#102).
-const DashboardCharts = dynamic(
-  () => import("./_components/DashboardCharts").then((m) => m.DashboardCharts),
-  { ssr: false },
-);
-const CategoryChart = dynamic(
-  () => import("./_components/CategoryChart").then((m) => m.CategoryChart),
-  { ssr: false },
-);
+import { StockZone } from "./_components/StockZone";
 import { RecentOrders } from "./_components/RecentOrders";
 import { RecentTrades } from "./_components/RecentTrades";
 import { TopProductsWidget } from "./_components/TopProductsWidget";
 import { TopSellersWidget } from "./_components/TopSellersWidget";
 
-function DashboardContent() {
-  const data = useDashboard();
-
-  return (
-    <>
-      <DashboardStats stats={data.stats} visitors={data.visitors} />
-      <PendingActionsPanel pending={data.pendingActions} />
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-        <TopProductsWidget products={data.topProducts} />
-        <TopSellersWidget sellers={data.topSellers} />
-      </div>
-      <DashboardCharts
-        salesByDay={data.analytics.salesByDay}
-        ordersByDay={data.analytics.ordersByDay}
-      />
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-        <CategoryChart categories={data.analytics.categoryDistribution} />
-        <RecentOrders orders={data.recentOrders} />
-      </div>
-      <RecentTrades trades={data.recentTrades} />
-    </>
-  );
-}
+/** Every metric at zero — what the cards read from while the period loads. */
+const EMPTY_METRICS = toDashboardMetrics(undefined);
 
 /**
- * Dashboard data is loaded through the browser-only same-origin gateway. Wait
- * until hydration completes before starting those requests, so SSR and the
- * browser's first render share the same loading snapshot.
+ * Zone C, with its own heading — the filter sits ON that heading's row
+ * (right-aligned) rather than in the page header, so its reach is
+ * unambiguous: it touches this section and nothing else on the page.
  */
-function HydratedDashboardContent() {
-  const [hydrated, setHydrated] = useState(false);
+function PeriodZone({
+  selection,
+  onSelectionChange,
+}: {
+  selection: DashboardPeriodSelection;
+  onSelectionChange: (next: DashboardPeriodSelection) => void;
+}) {
+  const t = useTranslations();
+  const stats = useDashboardStats(selection);
 
-  useEffect(() => setHydrated(true), []);
-
-  if (!hydrated) {
-    return (
-      <div className="flex items-center justify-center py-16" aria-busy="true">
-        <Spinner size="lg" />
+  return (
+    <section className="flex flex-col gap-3">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h2 className="text-lg font-semibold text-heading">
+          {t("admin.dashboard.zones.period")}
+        </h2>
+        <DashboardPeriodFilter
+          selection={selection}
+          onChange={onSelectionChange}
+        />
       </div>
-    );
-  }
-
-  return <DashboardContent />;
+      <DashboardStats
+        metrics={stats.data?.metrics ?? EMPTY_METRICS}
+        isLoading={stats.isLoading}
+      />
+    </section>
+  );
 }
 
 export default function DashboardPage() {
   const t = useTranslations();
+  const [selection, setSelection] = useDashboardPeriod();
+
+  const worklist = useDashboardWorklist();
+  const stock = useDashboardStock();
+  const lists = useDashboardLists();
+  const top = useDashboardTopLists();
 
   return (
     <AdminPage>
       <PageHeader
         title={t("admin.dashboard.title")}
         description={t("admin.dashboard.description")}
+      >
+        <DashboardRefreshButton />
+      </PageHeader>
+
+      {/* Zone A + B — never date-filtered, and they paint first. */}
+      <QueuesZone
+        queues={worklist.data?.queues ?? []}
+        isLoading={worklist.isLoading}
+        isError={worklist.isError}
       />
-      <SuspenseBoundary>
-        <HydratedDashboardContent />
-      </SuspenseBoundary>
+      <AlertsZone alerts={worklist.data?.alerts ?? []} />
+
+      <PeriodZone selection={selection} onSelectionChange={setSelection} />
+
+      <StockZone stock={stock.data} isLoading={stock.isLoading} />
+
+      <RecentOrders orders={lists.data?.recentOrders ?? []} />
+      <RecentTrades trades={lists.data?.recentTrades ?? []} />
+
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+        <TopProductsWidget products={top.data?.topProducts ?? []} />
+        <TopSellersWidget sellers={top.data?.topSellers ?? []} />
+      </div>
     </AdminPage>
   );
 }

@@ -87,6 +87,11 @@ export interface OrderFileEntry {
   product: { id: string; title: string | null; imageUrl: string | null };
   quantity: number;
   unitPrice: number | null;
+  /**
+   * Siparişin KENDİ kargo satırı (paket kargosu `OrderFilePackage.shipment`).
+   * Kargo öncesi iptal uygunluğu bununla, API ile aynı kuraldan hesaplanır.
+   */
+  shipment: { status: string; shippedAt: string | null } | null;
   finance: OrderFileFinance;
   escrow: OrderFileEscrow | null;
   refundRequests: OrderFileRefundRequest[];
@@ -131,6 +136,8 @@ export interface OrderGroupFile {
     itemCount: number;
     packageCount: number;
     isMultiSeller: boolean;
+    /** Test şeridi sepeti (App Review / QA) — başlıkta "TEST" rozeti. */
+    isTest?: boolean;
     totals: {
       subtotal: number;
       shippingCost: number;

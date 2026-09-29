@@ -9,6 +9,12 @@ import {
   isBusinessMembershipEntitled,
   saleCapableSellerWhere,
 } from "../../membership/helpers/membership.util";
+import { AccountLaneService } from "../../account-lane/account-lane.service";
+import {
+  type AccountLane,
+  LIVE_LANE,
+  laneUserWhere,
+} from "../../account-lane/account-lane";
 import { publicUserRatingWhere } from "../../../common/helpers/public-rating";
 import {
   PUBLIC_IDENTITY_SELECT,
@@ -73,6 +79,7 @@ export class UserDiscoveryService {
     private readonly cache: CacheService,
     private readonly common: UserCommonService,
     private readonly userBlocks: UserBlockService,
+    private readonly lanes: AccountLaneService,
   ) {}
 
   /**
@@ -131,9 +138,12 @@ export class UserDiscoveryService {
    * En iyi koleksiyonlar (anasayfa). Görüntülenme/beğeniye göre sıralı, cache'li.
    */
   async getTopCollections(limit: number = 20, viewerId?: string) {
+    // Şerit anahtara girer: test viewer'ı canlı koleksiyonları görmez ve iki
+    // şerit aynı cache satırını paylaşmaz.
+    const lane = await this.lanes.laneOfUser(viewerId);
     const collections = await this.cacheFeatured(
-      `featured:top-collections:${limit}`,
-      () => this.computeTopCollections(limit),
+      `featured:top-collections:${lane}:${limit}`,
+      () => this.computeTopCollections(limit, lane),
     );
     // Site-geneli cache viewer'a özel değil: engelli sahipler cache SONRASI düşer.
     const hidden = await this.userBlocks.getHiddenUserIds(viewerId);
@@ -142,11 +152,15 @@ export class UserDiscoveryService {
     return collections.filter((c) => !hiddenSet.has(c.user?.id ?? ""));
   }
 
-  private async computeTopCollections(limit: number) {
+  private async computeTopCollections(
+    limit: number,
+    lane: AccountLane = LIVE_LANE,
+  ) {
     const collections = await this.prisma.collection.findMany({
       where: {
         isPublic: true,
         items: { some: {} },
+        user: laneUserWhere(lane),
       },
       include: {
         user: {
@@ -168,7 +182,7 @@ export class UserDiscoveryService {
             ...catalogProductWhere(),
             sellerId: collection.user.id,
             status: "active",
-            seller: saleCapableSellerWhere(),
+            seller: saleCapableSellerWhere(undefined, lane),
           },
           take: 5,
           include: { images: { take: 1, orderBy: { sortOrder: "asc" } } },
@@ -803,11 +817,14 @@ export class UserDiscoveryService {
    * Get top sellers (for homepage)
    */
   async getTopSellers(limit: number = 5, viewerId?: string) {
-    const hidden = await this.userBlocks.getHiddenUserIds(viewerId);
+    const [hidden, lane] = await Promise.all([
+      this.userBlocks.getHiddenUserIds(viewerId),
+      this.lanes.laneOfUser(viewerId),
+    ]);
     // Get sellers with most sales and good ratings
     const sellers = await this.prisma.user.findMany({
       where: {
-        ...saleCapableSellerWhere(),
+        ...saleCapableSellerWhere(undefined, lane),
         isSeller: true,
         id: excludeIds(hidden),
         products: {
@@ -882,10 +899,13 @@ export class UserDiscoveryService {
       return [];
     }
 
-    const hidden = await this.userBlocks.getHiddenUserIds(viewerId);
+    const [hidden, lane] = await Promise.all([
+      this.userBlocks.getHiddenUserIds(viewerId),
+      this.lanes.laneOfUser(viewerId),
+    ]);
     const sellers = await this.prisma.user.findMany({
       where: {
-        ...saleCapableSellerWhere(),
+        ...saleCapableSellerWhere(undefined, lane),
         isSeller: true,
         isBanned: false,
         id: excludeIds(hidden),

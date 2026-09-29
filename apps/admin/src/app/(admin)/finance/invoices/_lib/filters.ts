@@ -34,6 +34,12 @@ export const elogoInvoiceFilterFields = (t: TranslateFn): FilterField[] => [
     placeholder: t("admin.finance.invoices.filters.userCodePlaceholder"),
   },
   {
+    type: "text",
+    name: "processRef",
+    label: t("admin.finance.invoices.filters.processRef"),
+    placeholder: t("admin.finance.invoices.filters.processRefPlaceholder"),
+  },
+  {
     type: "select",
     name: "context",
     label: t("admin.finance.invoices.context"),

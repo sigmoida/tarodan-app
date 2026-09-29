@@ -2,6 +2,7 @@ import { Injectable, Logger, Optional } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { PrismaService } from "../../../prisma";
 import {
+  CancellationActor,
   PaymentStatus,
   PaymentHoldStatus,
   OrderStatus,
@@ -9,8 +10,8 @@ import {
   RefundRequestStatus,
 } from "@prisma/client";
 import {
-  getProductStatusFromQuantity,
   getReservedAwareStatus,
+  statusAfterStockRestore,
 } from "../../product/helpers/product-status.helper";
 import { safeDecrementReserved } from "../../product/helpers/product-availability.helper";
 import { CacheService } from "../../cache/cache.service";
@@ -20,9 +21,14 @@ import { CommissionLedgerService } from "../../commission/commission-ledger.serv
 import { PaymentRefundService } from "../refund/payment-refund.service";
 import { EventService } from "../../events";
 import { PaymentCommonService } from "../payment-common.service";
-import { PaymentFulfillmentService } from "../fulfillment/payment-fulfillment.service";
+import {
+  FailedPaymentCancellation,
+  PaymentFulfillmentService,
+} from "../fulfillment/payment-fulfillment.service";
 import { DiscountService } from "../../discount/discount.service";
 import { isShipmentHandedToCarrier } from "../../shipping/helpers/shipment-handover";
+import { ORDER_CANCEL_REASON } from "../../order/helpers/order-cancel-reasons";
+import { orderCancelledData } from "../../order/helpers/order-cancellation";
 import { ACTIVE_REFUND_REQUEST_STATUSES } from "../../refund/helpers/refund-active-statuses";
 import {
   PUBLIC_NAME_SELECT,
@@ -32,6 +38,12 @@ import {
 // SEAM-B1: Paket Sürat'ta HAREKET ettiyse "satıcı göndermedi" DEĞİLDİR — böyle
 // bir siparişi süre-doldu diye iptal+iade edersek alıcı hem malı hem parayı
 // alır. Tanım artık iptal kapılarıyla ORTAK: shipment-handover.ts.
+
+/** Ödeme penceresi dolan siparişin iptali — iki süpürme de aynısını yazar. */
+const PAYMENT_WINDOW_EXPIRED_CANCELLATION: FailedPaymentCancellation = {
+  by: CancellationActor.system,
+  reason: ORDER_CANCEL_REASON.paymentWindowExpired,
+};
 
 /**
  * Ödeme/sipariş süre-dolumu mutabakat süpürmeleri (cron). PaymentReconciliationService
@@ -156,8 +168,8 @@ export class PaymentExpiryReconciliationService {
           await tx.order.update({
             where: { id: order.id },
             data: {
-              status: OrderStatus.cancelled,
-              cancelReason: "Ödeme süresi (24 saat) doldu",
+              ...orderCancelledData(CancellationActor.system),
+              cancelReason: ORDER_CANCEL_REASON.paymentWindowExpired,
             },
           });
 
@@ -353,7 +365,15 @@ export class PaymentExpiryReconciliationService {
       include: {
         buyer: { select: { id: true, email: true, ...PUBLIC_NAME_SELECT } },
         seller: { select: { id: true, email: true, ...PUBLIC_NAME_SELECT } },
-        product: { select: { id: true, title: true, quantity: true } },
+        product: {
+          select: {
+            id: true,
+            title: true,
+            quantity: true,
+            status: true,
+            inactiveReason: true,
+          },
+        },
       },
     });
 
@@ -397,10 +417,11 @@ export class PaymentExpiryReconciliationService {
           await tx.order.update({
             where: { id: order.id },
             data: {
-              status: OrderStatus.cancelled,
+              // Aktör sistemdir (süre dolumu) — kusurun satıcıda olması
+              // iptali satıcının YAPTIĞI anlamına gelmez.
+              ...orderCancelledData(CancellationActor.system),
               cancellationType: "iptal",
-              cancelReason:
-                "Satıcı belirlenen süre içinde kargoya vermediği için otomatik iptal edildi",
+              cancelReason: ORDER_CANCEL_REASON.sellerShipDeadlineExpired,
               version: { increment: 1 },
             },
           });
@@ -464,7 +485,9 @@ export class PaymentExpiryReconciliationService {
                 order.product.quantity !== null
                   ? { increment: restoreQty }
                   : undefined,
-              status: getProductStatusFromQuantity(newQuantity),
+              // Teslim edilmemiş siparişin iptali: yeni karantina yok, ama
+              // ilan başka bir iadeden karantinadaysa karantinada kalır.
+              ...statusAfterStockRestore(order.product, newQuantity, false),
             },
           });
         });
@@ -481,7 +504,9 @@ export class PaymentExpiryReconciliationService {
 
         // Process refund via PayTR (outside transaction — calls external API)
         try {
-          await this.paymentRefund.processRefund(order.id);
+          await this.paymentRefund.processRefund(order.id, undefined, {
+            cancelledBy: CancellationActor.system,
+          });
           this.logger.log(
             `Refund processed for expired preparing order ${order.orderNumber}`,
           );
@@ -649,9 +674,12 @@ export class PaymentExpiryReconciliationService {
 
         if (!orderStillAlive) {
           // Order has been cancelled (or 24h passed): release stock + cleanup.
+          // Hâlâ pending_payment olan sipariş burada yalnız 24 saatlik pencere
+          // dolduğu için kapanır → kill-switch ile AYNI gerekçe ve aktör.
           if (payment.order) {
             await this.paymentFulfillment.releaseProductForFailedPayment(
               payment.order.id,
+              PAYMENT_WINDOW_EXPIRED_CANCELLATION,
             );
             await this.paymentCommon.cancelSuratShipmentIfExists(
               payment.order.id,
@@ -661,6 +689,7 @@ export class PaymentExpiryReconciliationService {
             for (const groupOrder of payment.checkoutGroup!.orders) {
               await this.paymentFulfillment.releaseProductForFailedPayment(
                 groupOrder.id,
+                PAYMENT_WINDOW_EXPIRED_CANCELLATION,
               );
               await this.paymentCommon.cancelSuratShipmentIfExists(
                 groupOrder.id,

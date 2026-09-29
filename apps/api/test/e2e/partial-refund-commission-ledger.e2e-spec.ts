@@ -1,4 +1,5 @@
 import {
+  CancellationActor,
   Prisma,
   PaymentStatus,
   PaymentHoldStatus,
@@ -199,7 +200,9 @@ describe("Partial-refund commission ledger pro-rating (#88) [P0]", () => {
     );
 
     // 100 üzerinden 50 kısmi iade → portion 0.5
-    await refundSvc.processRefund(orderId, 50);
+    await refundSvc.processRefund(orderId, 50, {
+      cancelledBy: CancellationActor.platform,
+    });
 
     expect(createRefund).toHaveBeenCalledTimes(1);
     const l = await prisma.commissionLedger.findUnique({ where: { orderId } });

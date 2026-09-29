@@ -22,6 +22,10 @@ model User {
   isEmailVerified         Boolean                  @default(false) @map("is_email_verified")
   isPhoneVerified         Boolean                  @default(false) @map("is_phone_verified")
   isSeller                Boolean                  @default(false) @map("is_seller")
+  // Canlı ortamdaki izole "test şeridi" (mağaza incelemesi / mobil QA). Test
+  // hesapları yalnız birbirleriyle etkileşir; ilanları canlı vitrine, sipariş/
+  // ödeme/takasları finans raporlarına girmez. Bayrağı yalnız süper-admin verir.
+  isTestAccount           Boolean                  @default(false) @map("is_test_account")
   showTrustScore          Boolean                  @default(true) @map("show_trust_score")
   sellerType              SellerType?              @map("seller_type")
   taxId                   String?                  @map("tax_id")
@@ -112,6 +116,10 @@ model User {
   @@index([adminCode])
   @@index([username])
   @@index([isSeller])
+  // Dashboard: dönem içinde yeni kullanıcı + son girişi döneme düşen hesap.
+  @@index([createdAt])
+  @@index([lastActivityAt])
+  @@index([isTestAccount])
   @@map("users")
 }
 
@@ -508,6 +516,11 @@ model UserMembership {
   currentPeriodStart     DateTime            @map("current_period_start")
   currentPeriodEnd       DateTime            @map("current_period_end")
   cancelledAt            DateTime?           @map("cancelled_at")
+  /// Üyeliğin ÖDEMESİ GECİKMİŞ (past_due) duruma DÜŞTÜĞÜ an. `status` yalnız
+  /// "şu an ne" sorusunu yanıtlar; "bu dönemde kaç üyelik ödemesiz kaldı"
+  /// ancak bu damgayla ölçülebilir. `updatedAt` düşüşten sonraki her dokunuşla
+  /// (self-heal denemesi, kart güncellemesi) kaydığı için kullanılamaz.
+  pastDueAt              DateTime?           @map("past_due_at")
   createdAt              DateTime            @default(now()) @map("created_at")
   updatedAt              DateTime            @updatedAt @map("updated_at")
   autoRenew              Boolean             @default(false) @map("auto_renew")
@@ -526,6 +539,8 @@ model UserMembership {
 
   @@index([userId])
   @@index([status])
+  // Analitik: dönem içinde ödemesiz kalan üyelik (düşüş ANI).
+  @@index([pastDueAt])
   @@map("user_memberships")
 }
 
@@ -543,6 +558,10 @@ model MembershipPayment {
   // + ham sağlayıcı yanıtı. Muhasebe/mutabakat/destek için (Faz 6.5 PSP reconciliation).
   merchantOid       String?         @map("merchant_oid")
   paymentType       String?         @map("payment_type") // card/eft
+  // Çekimin yapıldığı PayTR mağazası. Üyelik ödemeleri ayrı (non-3D yetkili)
+  // mağazada; iade/durum-sorgu/mutabakat her zaman KAYDIN mağazasına gider —
+  // geçiş öncesi alınmış üyelik ödemeleri eski mağazada kalır (backfill: marketplace).
+  paytrMerchant     PaytrMerchant   @default(marketplace) @map("paytr_merchant")
   metadata          Json?
   status            PaymentStatus   @default(pending)
   periodStart       DateTime        @map("period_start")
@@ -555,6 +574,8 @@ model MembershipPayment {
   @@index([merchantOid])
   @@index([membershipId, status])
   @@index([targetTierId])
+  // Dashboard: dönem içinde tahsil edilen üyelik geliri.
+  @@index([status, createdAt])
   @@map("membership_payments")
 }
 
@@ -707,9 +728,22 @@ model Product {
   /// sayılıyordu: süresi dolan ilan yeniden onaylansa bile ertesi cron yine
   /// kapatıyordu (yenileme imkânsızdı). null = eski kayıt → createdAt kullanılır.
   publishedAt         DateTime?               @map("published_at")
+  /// İlanın SATILDIĞI an — ilan hunisinin (oluşturuldu → yayın → satış) son
+  /// adımı ve "satışa kadar geçen süre" ölçümünün ikinci ucu. `updatedAt`
+  /// satıştan sonraki her dokunuşla kaydığı için kullanılamaz.
+  soldAt              DateTime?               @map("sold_at")
   /// Moderasyon reddinin gerekçesi — satıcıya kalıcı olarak gösterilir
   /// (bildirim tek seferlikti, gerekçe kayboluyordu). Onayda temizlenir.
   rejectionReason     String?                 @map("rejection_reason")
+  /// `inactive` statüsünün NEDENİ — yalnız `return_quarantine` değeri anlamlıdır:
+  /// teslim SONRASI bir iade yüzünden sistem tarafından pasife alındı (satıcı
+  /// hasar kontrolü yapmalı) ve bu satıcı DOĞRUDAN aktive edebilir (admin onayı
+  /// gerekmez). Diğer her pasif neden (elle pasife alma, stok=0) null bırakır →
+  /// eski davranış: yeniden aktifleştirme admin onayına düşer. Statü `inactive`
+  /// dışına çıkan HER yazım bunu temizlemeli (bkz. clearStaleInactiveReasonOnWrite,
+  /// PrismaService'in Product middleware'inde tek entegrasyon noktası) — aksi
+  /// hâlde bayat bir işaret ilerideki bir moderasyon turunu atlatabilir.
+  inactiveReason      ProductInactiveReason?  @map("inactive_reason")
   qualityScore        Int                     @default(0) @map("quality_score")
   rankTier            Int                     @default(0) @map("rank_tier")
   relevanceScore      Int?                    @map("relevance_score")
@@ -756,6 +790,9 @@ model Product {
   @@index([averageRating(sort: Desc), ratingCount(sort: Desc)])
   @@index([rankTier(sort: Desc), qualityScore(sort: Desc), createdAt(sort: Desc)])
   @@index([boostedUntil])
+  // Dashboard: dönem içinde yayına giren ilan (yayın damgası, oluşturma değil).
+  @@index([publishedAt])
+  @@index([soldAt])
   @@index([boostedUntil, boostedAt(sort: Desc)])
   @@index([homeShowcaseUntil, boostedAt(sort: Desc)])
   @@index([relevanceScore(sort: Desc)])
@@ -828,6 +865,8 @@ model ProductBoost {
   @@index([userId])
   @@index([status, endsAt])
   @@index([packageId])
+  // Dashboard: dönem içinde satın alınan öne çıkarma geliri.
+  @@index([purchasedAt])
   @@map("product_boosts")
 }
 
@@ -957,6 +996,14 @@ model Trade {
   acceptedAt                DateTime?          @map("accepted_at")
   completedAt               DateTime?          @map("completed_at")
   cancelledAt               DateTime?          @map("cancelled_at")
+  /// Takasın REDDEDİLDİĞİ an. `cancelledAt` de yazılır (ret bir iptaldir),
+  /// bu yüzden analitik "iptal" çıkışını `rejectedAt IS NULL` ile ayırır —
+  /// yoksa aynı takas iki çıkışta birden sayılırdı.
+  rejectedAt                DateTime?          @map("rejected_at")
+  /// İptali / reddi KİMİN yaptığı (initiator = buyer, receiver = seller; bkz.
+  /// CancellationActor). `tradeCancelledData` / `tradeRejectedData` yazar.
+  /// null = bilinmiyor (göç öncesi, aktörü kesin olmayan iptaller).
+  cancelledBy               CancellationActor? @map("cancelled_by")
   cancelReason              String?            @map("cancel_reason")
   // Stamped when the first to_warehouse shipment is delivered. Once non-null,
   // user-side cancel is locked: only admin reject/force-cancel can resolve.
@@ -971,6 +1018,10 @@ model Trade {
   compensationPendingUserId String?            @map("compensation_pending_user_id")
   compensationResolvedAt    DateTime?          @map("compensation_resolved_at")
   createdAt                 DateTime           @default(now()) @map("created_at")
+  // Test şeridi damgası: alıcı/ödeyen test hesabıysa DB trigger'ı INSERT'te
+  // true yazar (uygulama koduna güvenilmez). Finans/mutabakat/fatura/kargo/
+  // payout bu bayrakla test kayıtlarını dışlar.
+  isTest                    Boolean            @default(false) @map("is_test")
   updatedAt                 DateTime           @updatedAt @map("updated_at")
   version                   Int                @default(1)
   /// v1'de en fazla BİR satır (yalnız farkı ödeyen taraf); v2'de taraf başına
@@ -987,7 +1038,16 @@ model Trade {
   @@index([initiatorId])
   @@index([receiverId])
   @@index([status])
+  @@index([isTest])
   @@index([responseDeadline])
+  // Dashboard: dönem içinde tamamlanan takas.
+  @@index([completedAt])
+  // Analitik: takas hunisi (oluşturuldu → kabul → tamamlandı) ve çıkışlar.
+  @@index([createdAt])
+  @@index([acceptedAt])
+  @@index([rejectedAt])
+  // İptal & İade ekranı: sekme = aktör, sıra/"Yeni" = iptal anı.
+  @@index([cancelledBy, cancelledAt])
   @@map("trades")
 }
 
@@ -1127,6 +1187,8 @@ model TradeDispute {
   updatedAt       DateTime  @updatedAt @map("updated_at")
   trade           Trade     @relation(fields: [tradeId], references: [id], onDelete: Cascade)
 
+  // Açık itiraz kuyruğu (resolvedAt IS NULL).
+  @@index([resolvedAt])
   @@map("trade_disputes")
 }
 
@@ -1454,6 +1516,9 @@ model Offer {
   amount          Decimal     @db.Decimal(10, 2)
   message         String?
   status          OfferStatus @default(pending)
+  /// Teklifin CEVAPLANDIĞI an (kabul, ret veya karşı teklifle kapanış).
+  /// Süre dolması ve teklifi verenin geri çekmesi cevap değildir, damgalanmaz.
+  respondedAt     DateTime?   @map("responded_at")
   /// Satıcı karşı teklifinden sonra: kabul/red için sıra alıcıda (buyerId)
   buyerMustAccept Boolean     @default(false) @map("buyer_must_accept")
   expiresAt       DateTime    @map("expires_at")
@@ -1471,6 +1536,7 @@ model Offer {
   @@index([buyerId, status])
   @@index([sellerId, status])
   @@index([status, createdAt])
+  @@index([respondedAt])
   @@map("offers")
 }
 
@@ -1572,6 +1638,10 @@ model Order {
   status                     OrderStatus              @default(pending_payment)
   shippingAddress            Json?                    @map("shipping_address")
   createdAt                  DateTime                 @default(now()) @map("created_at")
+  // Test şeridi damgası: alıcı/ödeyen test hesabıysa DB trigger'ı INSERT'te
+  // true yazar (uygulama koduna güvenilmez). Finans/mutabakat/fatura/kargo/
+  // payout bu bayrakla test kayıtlarını dışlar.
+  isTest                     Boolean                  @default(false) @map("is_test")
   updatedAt                  DateTime                 @updatedAt @map("updated_at")
   version                    Int                      @default(1)
   buyerFeeAmount             Decimal                  @default(0) @map("buyer_fee_amount") @db.Decimal(10, 2)
@@ -1637,6 +1707,18 @@ model Order {
   cancellationReasonCode     OrderCancellationReason? @map("cancellation_reason_code")
   cancellationPolicySnapshot Json?                    @map("cancellation_policy_snapshot")
   cancellationType           OrderCancellationType?   @map("cancellation_type")
+  /// İptalin GERÇEKLEŞTİĞİ an. `status = cancelled` + `createdAt` ikilisi
+  /// "bu dönemde kaç sipariş iptal edildi" sorusuna cevap veremiyordu: sipariş
+  /// oluşturulduğu dönemde değil, iptal edildiği dönemde sayılmalı. Her iptal
+  /// yolu (alıcı/admin iptali, ödeme süresi dolumu, hazırlama süresi dolumu,
+  /// stok tükenmesi kaskadı, checkout temizliği, tam iade) bu damgayı yazar.
+  /// GERİYE DÖNÜK DOLDURULAMAZ — eski iptallerde null kalır.
+  cancelledAt                DateTime?                @map("cancelled_at")
+  /// İptali KİMİN yaptığı — `cancelledAt` ile aynı yardımcıdan
+  /// (`orderCancelledData`) yazılır, unutulamaz. null = bilinmiyor: bu göçten
+  /// önceki iptaller yalnız aktörün KESİN olduğu kurallarla dolduruldu.
+  /// Yeniden ödemeye açılan (reactivate) siparişte temizlenir.
+  cancelledBy                CancellationActor?       @map("cancelled_by")
   preparingDeadline          DateTime?                @map("preparing_deadline")
   preparingWarningSentAt     DateTime?                @map("preparing_warning_sent_at")
   reservationReleasedAt      DateTime?                @map("reservation_released_at")
@@ -1676,12 +1758,22 @@ model Order {
   @@index([buyerId])
   @@index([sellerId])
   @@index([status])
+  @@index([isTest])
   @@index([status, paymentExpiresAt])
   // Teslim faturası backfill'inin aday sorgusu (faturasız + en yeni teslimat önce).
   @@index([status, revenueInvoicedAt, deliveredAt])
   @@index([checkoutGroupId])
   @@index([packageId])
   @@index([origin])
+  // Dashboard dönem metrikleri olay damgalarından okunur (status + createdAt
+  // değil); üçü de aralık taraması yapar.
+  @@index([cancelledAt])
+  // İptal & İade ekranı: sekme = aktör, sıra/"Yeni" = iptal anı.
+  @@index([cancelledBy, cancelledAt])
+  @@index([deliveredAt])
+  @@index([preparingDeadline])
+  @@index([createdAt])
+  @@index([productId])
   @@map("orders")
 }
 
@@ -1732,6 +1824,10 @@ model Payment {
   checkoutGroupId        String?           @unique @map("checkout_group_id")
   tradeCashPaymentId     String?           @unique @map("trade_cash_payment_id")
   provider               String
+  // Çekimin yapıldığı PayTR mağazası (bkz. PaytrMerchant). Ödeme oluşturulurken
+  // amaçtan türetilir (`resolvePaytrMerchant`); sonraki her PayTR çağrısı
+  // (durum-sorgu, iade, mutabakat) oid önekine değil BU kolona bakar.
+  paytrMerchant          PaytrMerchant     @default(marketplace) @map("paytr_merchant")
   providerPaymentId      String?           @map("provider_payment_id")
   providerConversationId String?           @map("provider_conversation_id")
   amount                 Decimal           @db.Decimal(10, 2)
@@ -1742,6 +1838,10 @@ model Payment {
   metadata               Json?
   paidAt                 DateTime?         @map("paid_at")
   createdAt              DateTime          @default(now()) @map("created_at")
+  // Test şeridi damgası: alıcı/ödeyen test hesabıysa DB trigger'ı INSERT'te
+  // true yazar (uygulama koduna güvenilmez). Finans/mutabakat/fatura/kargo/
+  // payout bu bayrakla test kayıtlarını dışlar.
+  isTest                 Boolean           @default(false) @map("is_test")
   updatedAt              DateTime          @updatedAt @map("updated_at")
   paymentHolds           PaymentHold[]
   refundAttempts         RefundAttempt[]
@@ -1749,6 +1849,11 @@ model Payment {
   checkoutGroup          CheckoutGroup?    @relation(fields: [checkoutGroupId], references: [id])
   tradeCashPayment       TradeCashPayment? @relation(fields: [tradeCashPaymentId], references: [id])
 
+  // Tahsilat dönem metriği (ödenen sipariş) ve PayTR dökümünde karşılığı
+  // olmayan ödeme alarmı bu iki kolondan tarar; tabloda hiç indeks yoktu.
+  @@index([status, paidAt])
+  @@index([status, createdAt])
+  @@index([isTest])
   @@map("payments")
 }
 
@@ -1806,6 +1911,8 @@ model PaymentHold {
   @@index([paymentId])
   // Grup dosyası + payouts artık hold'ları orderId ile sorguluyor.
   @@index([orderId])
+  // Escrow bakiyesi + süresi geçmiş hold kuyruğu.
+  @@index([status, releaseAt])
   @@map("payment_holds")
 }
 
@@ -1859,6 +1966,8 @@ model SellerDocument {
   @@index([userId])
   @@index([applicationId, documentType, isCurrent])
   @@index([stakeholderId])
+  // Satıcı başvuru kuyruğu: incelenmeyi bekleyen güncel belgeler.
+  @@index([status, isCurrent])
   @@map("seller_documents")
 }
 
@@ -1891,6 +2000,10 @@ model SavedCard {
   id                  String          @id @default(uuid())
   userId              String          @map("user_id")
   provider            String          @default("paytr")
+  // Kart hangi PayTR mağazasının kasasında: utoken/ctoken mağazaya özeldir, başka
+  // mağazada çekilemez/silinemez. Oto-yenileme yalnız `membership` kartlarını,
+  // sepet ödemesi yalnız `marketplace` kartlarını kullanır.
+  paytrMerchant       PaytrMerchant   @default(marketplace) @map("paytr_merchant")
   utoken              String          @map("u_token")
   ctoken              String          @unique @map("c_token")
   last4               String          @map("last_4")
@@ -1915,6 +2028,7 @@ model SavedCard {
 
   @@index([userId])
   @@index([userId, status])
+  @@index([userId, paytrMerchant, status])
   @@map("saved_cards")
 }
 
@@ -1924,6 +2038,15 @@ enum SavedCardStatus {
   revoked
 }
 
+// PayTR mağaza (merchant) hesabı. PayTR non-3D (kullanıcısız recurring) yetkisini
+// pazaryeri mağazasına vermedi; üyelik ödemeleri (ilk satın alma + oto-yenileme)
+// bu yüzden ayrı bir mağazada alınır. Diğer her şey (sipariş, takas, öne çıkarma,
+// satıcı transferleri) pazaryeri mağazasında kalır.
+enum PaytrMerchant {
+  marketplace
+  membership
+}
+
 // PayTR işlem dökümü satırı (rapor/islem-dokumu) — PSP mutabakatının işlem-seviyesi
 // kaynağı. Gece sync'i dünün dökümünü (kayan 3 günlük pencereyle) upsert eder;
 // admin mutabakat ekranı PayTR'ye canlı sorgu atmaz, bu tablodan okur.
@@ -1931,6 +2054,8 @@ enum SavedCardStatus {
 // gerekçe): eşleştirme Faz 3'te doldurur, eşleşmeyen satır alarm listesine düşer.
 model PaytrStatementLine {
   id               String                 @id @default(uuid())
+  // Dökümün çekildiği mağaza — her mağaza kendi işlem dökümünü verir.
+  paytrMerchant    PaytrMerchant          @default(marketplace) @map("paytr_merchant")
   merchantOid      String                 @map("merchant_oid")
   type             PaytrStatementLineType
   amount           Decimal                @db.Decimal(12, 2)
@@ -1965,10 +2090,12 @@ model PaytrStatementLine {
 
   // Dedup: kayan pencereli sync aynı satırı iki kez yazamaz. PayTR satır kimliği
   // vermediğinden doğal anahtar (oid+tip+gün+tutar) kullanılır.
-  @@unique([merchantOid, type, transactionDate, amount], name: "statement_line_dedup")
+  @@unique([paytrMerchant, merchantOid, type, transactionDate, amount], name: "statement_line_dedup")
   @@index([transactionDate])
   @@index([matchStatus])
   @@index([matchStatus, lastMatchAttemptAt])
+  @@index([matchStatus, resolvedAt])
+  @@index([paymentId])
   @@index([membershipPaymentId])
   @@map("paytr_statement_lines")
 }
@@ -1989,6 +2116,8 @@ enum PaytrMatchStatus {
 // sync'te sil-yaz yenilenir (PayTR projeksiyonu her gün günceller).
 model PaytrSettlement {
   id           String                @id @default(uuid())
+  // Hakedişi veren mağaza: iki mağaza aynı gün ayrı hakediş üretir.
+  paytrMerchant PaytrMerchant         @default(marketplace) @map("paytr_merchant")
   datePaid     DateTime              @map("date_paid")
   currency     String                @default("TL")
   salesTotal   Decimal               @map("sales_total") @db.Decimal(12, 2)
@@ -2003,7 +2132,7 @@ model PaytrSettlement {
   updatedAt    DateTime              @updatedAt @map("updated_at")
   items        PaytrSettlementItem[]
 
-  @@unique([datePaid, currency, isProjection], name: "settlement_day")
+  @@unique([paytrMerchant, datePaid, currency, isProjection], name: "settlement_day")
   @@index([datePaid])
   @@map("paytr_settlements")
 }
@@ -2036,6 +2165,8 @@ model PaytrSettlementItem {
 model PaymentProviderEvent {
   id                  String                   @id @default(uuid())
   provider            String                   @default("paytr")
+  // Etkileşimin yapıldığı PayTR mağazası (callback'in geldiği uç / çağrılan mağaza).
+  paytrMerchant       PaytrMerchant            @default(marketplace) @map("paytr_merchant")
   eventType           PaymentProviderEventType @map("event_type")
   merchantOid         String?                  @map("merchant_oid")
   paymentId           String?                  @map("payment_id")
@@ -2417,6 +2548,11 @@ model Shipment {
   orderPackage        OrderPackage?   @relation(fields: [packageId], references: [id])
 
   @@index([packageId])
+  // Takılı kargo alarmı (status + shippedAt yaşı) ve taşıyıcı kodu hiç
+  // oluşmamış gönderi kuyruğu (providerTrackingId IS NULL + yaş).
+  @@index([status, shippedAt])
+  @@index([deliveredAt])
+  @@index([providerTrackingId, createdAt])
   @@map("shipments")
 }
 
@@ -2581,6 +2717,9 @@ model RefundRequest {
   @@index([requesterId])
   @@index([status])
   @@index([refundNumber])
+  // Dashboard: dönem içinde İADE EDİLEN tutar (talep tarihi değil, iade anı).
+  @@index([refundedAt])
+  @@index([createdAt])
   @@map("refund_requests")
 }
 
@@ -3267,6 +3406,8 @@ model CouponReservation {
   @@index([discountId, status, expiresAt])
   @@index([userId, discountId, status])
   @@index([voucherCodeId, status])
+  // Kampanyadan bağımsız süresi geçmiş rezervasyon taraması (bütçe sızıntısı).
+  @@index([status, expiresAt])
   @@map("coupon_reservations")
 }
 
@@ -3327,6 +3468,16 @@ enum ProductStatus {
   rejected
   deleted
   suspended
+}
+
+/// `Product.inactiveReason`'ın tek değeri. `inactive` statüsü kendi başına NEDEN
+/// pasif olunduğunu söylemez (satıcı elle pasife almış olabilir, stok bitmiş
+/// olabilir, ya da teslim SONRASI bir iade karantinaya almış olabilir) — bu enum
+/// yalnız "sistem karantinaya aldı, satıcı doğrudan aktive edebilir" durumunu
+/// işaretler. Diğer tüm pasif nedenleri (rejected zaten ayrı bir status; elle
+/// pasife alma, stok sıfırı) null bırakır ve eski admin-onay akışına düşer.
+enum ProductInactiveReason {
+  return_quarantine
 }
 
 enum ProductImportBatchStatus {
@@ -3393,6 +3544,23 @@ enum OrderOrigin {
 enum OrderCancellationType {
   iptal
   iade
+}
+
+/// Bir siparişi / takası KİMİN iptal ettiği. Serbest metin `cancelReason`
+/// bunu söyleyemiyordu: admin "İptal & İade" ekranı iptalleri aktöre göre
+/// ayırır (alıcı / satıcı / Tarodan).
+/// - buyer / seller: kullanıcının kendi eylemi. Takasta teklifi AÇAN taraf
+///   (initiator) `buyer`, ilan sahibi (receiver) `seller` sayılır — ret yalnız
+///   receiver'ın elindedir.
+/// - platform: bir yöneticinin kararı (admin iptali, ban, depo reddi, zorla iptal).
+/// - system: otomatik yol (süre dolumu, stok kaskadı, ödeme hatası, kayıp koli).
+///   Süre dolumu ayrıca `cancelReason` sabitinden tanınır (bkz.
+///   ORDER_EXPIRY_CANCEL_REASONS / TRADE_EXPIRY_CANCEL_REASONS).
+enum CancellationActor {
+  buyer
+  seller
+  platform
+  system
 }
 
 enum PaymentStatus {
@@ -3859,8 +4027,12 @@ model LedgerEntry {
   // kayıt (Postgres NULL'ları benzersiz saymaz, çoklu NULL serbest).
   idempotencyKey String?         @map("idempotency_key")
   lineNo         Int             @default(0) @map("line_no")
+  // Test şeridi damgası: bağlı ödeme/sipariş/takas test ise trigger INSERT'te
+  // true yazar; finans mutabakatı test satırlarını dışlar.
+  isTest         Boolean         @default(false) @map("is_test")
 
   @@unique([idempotencyKey, lineNo])
+  @@index([isTest])
   @@index([entryGroupId])
   @@index([account, createdAt])
   @@index([eventType, createdAt])

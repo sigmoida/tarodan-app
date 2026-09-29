@@ -1,4 +1,4 @@
-import { SavedCardStatus } from "@prisma/client";
+import { PaytrMerchant, SavedCardStatus } from "@prisma/client";
 import { OutboxHandlerRegistry } from "../outbox/outbox-handler.registry";
 import { OUTBOX_SAVED_CARD_PROVIDER_DELETE } from "../outbox/outbox.types";
 import { SavedCardOutboxHandlers } from "./saved-card-outbox-handlers.service";
@@ -26,6 +26,7 @@ describe("SavedCardOutboxHandlers", () => {
   const revokedCard = {
     id: "card-1",
     provider: "paytr",
+    paytrMerchant: PaytrMerchant.membership,
     utoken: "utoken-1",
     ctoken: "ctoken-1",
     status: SavedCardStatus.revoked,
@@ -38,7 +39,11 @@ describe("SavedCardOutboxHandlers", () => {
     await expect(
       handler({ savedCardId: "card-1" }, {} as any),
     ).resolves.toBeUndefined();
-    expect(paymentProviders.resolve).toHaveBeenCalledWith("paytr");
+    // Kart hangi mağazanın kasasındaysa silme oraya gider.
+    expect(paymentProviders.resolve).toHaveBeenCalledWith(
+      "paytr",
+      PaytrMerchant.membership,
+    );
     expect(provider.capiDeleteCard).toHaveBeenCalledWith(
       "utoken-1",
       "ctoken-1",

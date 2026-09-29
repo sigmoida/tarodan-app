@@ -4,11 +4,16 @@ import {
   LedgerDirection,
   LedgerEventType,
   PaytrMatchStatus,
+  PaytrMerchant,
   PaytrStatementLineType,
   PaymentStatus,
   RefundAttemptStatus,
 } from "@prisma/client";
 import { PrismaService } from "../../../prisma";
+import {
+  LIVE_MEMBERSHIP_PAYMENT,
+  LIVE_PAYMENT,
+} from "../../account-lane/live-lane.where";
 import { LedgerService } from "../../ledger/ledger.service";
 import { istanbulDayStart } from "../../../common/helpers/tr-calendar";
 
@@ -381,10 +386,14 @@ export class PaytrReportMatchingService {
    */
   private async sweepMissingPayments(): Promise<number> {
     const cutoff = new Date(Date.now() - REVERSE_SWEEP_DAYS * DAY_MS);
+    // Kapsam MAĞAZA başına: bir günün pazaryeri dökümü, üyelik mağazasının o
+    // gün aldığı ödemeleri kapsamaz (o mağazanın raporu ayrı gelir). Aksi halde
+    // üyelik raporu henüz senkronlanmamış bir günde her üyelik ödemesi "dökümde
+    // yok" alarmı üretirdi.
     const coveredDays = await this.prisma.paytrStatementLine.findMany({
       where: { transactionDate: { gte: cutoff } },
-      distinct: ["transactionDate"],
-      select: { transactionDate: true },
+      distinct: ["paytrMerchant", "transactionDate"],
+      select: { paytrMerchant: true, transactionDate: true },
     });
     if (coveredDays.length === 0) return 0;
 
@@ -400,17 +409,23 @@ export class PaytrReportMatchingService {
     const paytrOids = new Set(windowSaleLines.map((l) => l.merchantOid));
 
     let missing = 0;
-    for (const { transactionDate } of coveredDays) {
+    for (const covered of coveredDays) {
+      const { transactionDate } = covered;
+      const paytrMerchant = covered.paytrMerchant ?? PaytrMerchant.marketplace;
       // transactionDate İstanbul gününün 00:00'ını UTC-gece-yarısı olarak taşır;
       // gerçek pencere İstanbul gün başından başlar.
       const dayStart = istanbulDayStart(
         transactionDate.toISOString().slice(0, 10),
       );
       const dayEnd = new Date(dayStart.getTime() + DAY_MS);
+      // Test şeridi işlemi (test_mode=1) canlı dökümde hiç yer almaz — eksik
+      // sayılırsa her test ödemesi kalıcı PAYTR_MISSING_TRANSACTION alarmı olur.
       const [payments, renewals] = await Promise.all([
         this.prisma.payment.findMany({
           where: {
+            ...LIVE_PAYMENT,
             provider: "paytr",
+            paytrMerchant,
             status: { in: [PaymentStatus.completed, PaymentStatus.refunded] },
             paidAt: { gte: dayStart, lt: dayEnd },
           },
@@ -423,7 +438,9 @@ export class PaytrReportMatchingService {
         }),
         this.prisma.membershipPayment.findMany({
           where: {
+            ...LIVE_MEMBERSHIP_PAYMENT,
             provider: "paytr",
+            paytrMerchant,
             orderId: null,
             status: { in: [PaymentStatus.completed, PaymentStatus.refunded] },
             createdAt: { gte: dayStart, lt: dayEnd },

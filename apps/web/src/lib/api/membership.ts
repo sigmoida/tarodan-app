@@ -1,8 +1,11 @@
 import { api } from "./client";
+import type { PaymentPurpose } from "./payments";
 
 // Membership
 export type SavedCard = {
   id: string;
+  /** Kartın saklandığı mağazanın ödeme amacı (sepet / üyelik). */
+  purpose?: PaymentPurpose;
   last4: string;
   brand: string | null;
   /** PayTR CAPI meta (gözlemlenebilirlik/UX) — kartı çıkaran banka. */
@@ -35,8 +38,14 @@ export const membershipApi = {
   /** Oto-yenilemeyi aç/kapat */
   setAutoRenew: (autoRenew: boolean) =>
     api.patch("/membership/auto-renew", { autoRenew }),
-  /** Kayıtlı kartları listele (maskeli; PAN/CVV içermez) */
-  listCards: () => api.get<SavedCard[]>("/membership/cards"),
+  /**
+   * Kayıtlı kartları listele (maskeli; PAN/CVV içermez). `purpose` verilirse
+   * yalnız o ödeme amacında kullanılabilecek kartlar döner.
+   */
+  listCards: (purpose?: PaymentPurpose) =>
+    api.get<SavedCard[]>("/membership/cards", {
+      params: purpose ? { purpose } : undefined,
+    }),
   /** Kayıtlı kartı sil (PayTR'dan da silinir) */
   deleteCard: (id: string) =>
     api.delete<{ deleted: boolean }>(`/membership/cards/${id}`),

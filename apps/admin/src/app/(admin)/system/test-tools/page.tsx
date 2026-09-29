@@ -5,6 +5,7 @@ import { AdminPage } from "@/components/page/AdminPage";
 import { PageHeader } from "@/components/AdminList";
 import { CronsCard } from "./_components/CronsCard";
 import { TimeAdjustCard } from "./_components/TimeAdjustCard";
+import { TestLaneCard } from "./_components/TestLaneCard";
 import { useTestToolsPage } from "./_lib/useTestToolsPage";
 import { useTranslations } from "next-intl";
 
@@ -33,6 +34,7 @@ export default function TestToolsPage() {
         </Alert>
       )}
 
+      <TestLaneCard isProd={!!env?.isProd} />
       <CronsCard isProd={!!env?.isProd} />
       <TimeAdjustCard isProd={!!env?.isProd} />
     </AdminPage>

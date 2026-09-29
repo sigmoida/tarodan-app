@@ -1,5 +1,5 @@
 import { PaymentLifecycleService } from "./payment-lifecycle.service";
-import { PaymentStatus } from "@prisma/client";
+import { PaymentStatus, PaytrMerchant } from "@prisma/client";
 
 /**
  * FLOW-H1: verifyPaymentFromClient (çift-çekim guard'ı) artık TÜM oid'leri tarar
@@ -10,11 +10,13 @@ describe("PaymentLifecycleService.verifyPaymentFromClient — FLOW-H1 oid histor
   const makeService = (
     queryImpl: (oid: string) => any,
     oids = ["oid2", "oid1"],
+    paytrMerchant: PaytrMerchant = PaytrMerchant.marketplace,
   ) => {
     const payment = {
       id: "pay-1",
       status: PaymentStatus.pending,
       provider: "paytr",
+      paytrMerchant,
       providerConversationId: "oid2",
       metadata: { merchantOidHistory: ["oid1"] },
       amount: 100,
@@ -25,7 +27,9 @@ describe("PaymentLifecycleService.verifyPaymentFromClient — FLOW-H1 oid histor
       payment: { findUnique: jest.fn().mockResolvedValue(payment) },
     };
     const queryPaymentStatus = jest.fn(queryImpl);
-    const paymentProviders = { resolve: () => ({ queryPaymentStatus }) };
+    const paymentProviders = {
+      resolve: jest.fn(() => ({ queryPaymentStatus })),
+    };
     const paymentCommon = {
       collectPaymentOids: jest.fn().mockReturnValue(oids),
     };
@@ -44,8 +48,26 @@ describe("PaymentLifecycleService.verifyPaymentFromClient — FLOW-H1 oid histor
       paymentCommon as any,
       paymentFulfillment as any,
     );
-    return { service, queryPaymentStatus, processSuccessfulPayment };
+    return {
+      service,
+      queryPaymentStatus,
+      processSuccessfulPayment,
+      paymentProviders,
+    };
   };
+
+  it("queries the merchant the payment is charged on (membership)", async () => {
+    const { service, paymentProviders } = makeService(
+      () => ({ ok: false }),
+      ["oid2"],
+      PaytrMerchant.membership,
+    );
+    await service.verifyPaymentFromClient("pay-1", { internal: true });
+    expect(paymentProviders.resolve).toHaveBeenCalledWith(
+      "paytr",
+      PaytrMerchant.membership,
+    );
+  });
 
   it("capture ESKİ oid'de (history): güncel oid boş dönse bile yakalanır ve tamamlanır", async () => {
     const { service, queryPaymentStatus, processSuccessfulPayment } =

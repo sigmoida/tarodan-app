@@ -10,7 +10,7 @@ import { E2ETestApp } from "../test-utils/create-app";
 import { getPrisma } from "../test-utils/db";
 import { authHeader } from "./user.factory";
 import { createOfferRow } from "./offer.factory";
-import { signCallback } from "../mocks/paytr.mock";
+import { paytrCallbackPath, signCallback } from "../mocks/paytr.mock";
 import { OfferStatus } from "@prisma/client";
 
 type Auth = { accessToken: string };
@@ -159,10 +159,12 @@ export async function completePaymentByCallback(
       `completePaymentByCallback: order ${orderId} için payment/merchantOid yok`,
     );
   }
+  // Ödeme hangi mağazada alındıysa bildirim o mağazanın ucuna, onun anahtarıyla.
   const response = await request(server(ctx))
-    .post("/api/payments/callback/paytr")
+    .post(paytrCallbackPath(payment.paytrMerchant))
     .send(
       signCallback({
+        merchant: payment.paytrMerchant,
         merchantOid: payment.providerConversationId,
         status: "success",
         totalAmount: Math.round(Number(payment.amount) * 100),

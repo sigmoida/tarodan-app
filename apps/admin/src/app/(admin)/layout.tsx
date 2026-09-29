@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import { expiredLoginHref } from "@/lib/auth-redirect";
 import { getSession } from "@/lib/server/session";
 import { getPermissions } from "@/lib/server/permissions";
-import { routePermission } from "@/lib/navigation";
+import { canAccessRoute } from "@/lib/navigation";
 import { SessionProvider } from "@/context/SessionContext";
 import { PermissionsProvider } from "@/context/PermissionsContext";
 import { AdminProviders } from "@/provider/AdminProviders";
@@ -34,11 +34,10 @@ export default async function AdminRouteLayout({
   if (!user) redirect(expiredLoginHref("session", pathname ?? "/dashboard"));
 
   const permissions = await getPermissions(user);
-  const requiredPermission = pathname ? routePermission(pathname) : null;
   if (
-    requiredPermission &&
+    pathname &&
     !permissions.isSuperAdmin &&
-    !permissions.keys.includes(requiredPermission)
+    !canAccessRoute(pathname, (key) => permissions.keys.includes(key))
   ) {
     redirect("/forbidden");
   }

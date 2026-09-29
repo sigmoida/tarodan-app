@@ -7,6 +7,11 @@ import {
 import { InjectQueue } from "@nestjs/bull";
 import type { Queue } from "bull";
 import { PrismaService } from "../../../prisma";
+import {
+  LIVE_PAYMENT,
+  LIVE_PAYOUT_TRANSFER,
+} from "../../account-lane/live-lane.where";
+import { failedTransfersWhere } from "./finance-health.where";
 import { QUEUE_NAMES } from "../../../workers/constants";
 import { PayoutService } from "../../payout/payout.service";
 import { AdminAuditService } from "../ops/admin-audit.service";
@@ -94,6 +99,9 @@ export class AdminPayoutService {
     //   failed transfers   → başarısız/iade dönen transferler (müdahale ister)
     // Eski özet "released toplamı"nı "Ödenen" diye sunuyordu — para bankaya
     // gitmemiş olabilirdi.
+    // Test şeridi hold'u released olur ama payout'u bilinçli açılmaz; sayılsaydı
+    // "transfer bekleyen" tutarı kalıcı olarak şişirirdi.
+    const liveHold = { payment: LIVE_PAYMENT };
     const [
       heldAgg,
       releasedAgg,
@@ -105,16 +113,17 @@ export class AdminPayoutService {
       nextReleases,
     ] = await Promise.all([
       this.prisma.paymentHold.aggregate({
-        where: { status: PaymentHoldStatus.held },
+        where: { ...liveHold, status: PaymentHoldStatus.held },
         _sum: { amount: true },
       }),
       this.prisma.paymentHold.aggregate({
-        where: { status: PaymentHoldStatus.released },
+        where: { ...liveHold, status: PaymentHoldStatus.released },
         _sum: { amount: true },
       }),
       // Released ama tamamlanmış transferi olmayan hold'lar.
       this.prisma.paymentHold.aggregate({
         where: {
+          ...liveHold,
           status: PaymentHoldStatus.released,
           OR: [
             { payoutTransfer: null },
@@ -124,23 +133,23 @@ export class AdminPayoutService {
         _sum: { amount: true },
       }),
       this.prisma.paymentHold.count({
-        where: { status: PaymentHoldStatus.held },
+        where: { ...liveHold, status: PaymentHoldStatus.held },
       }),
       this.prisma.paymentHold.count({
-        where: { status: PaymentHoldStatus.released },
+        where: { ...liveHold, status: PaymentHoldStatus.released },
       }),
       this.prisma.payoutTransfer.aggregate({
-        where: { status: PayoutStatus.completed },
+        where: { ...LIVE_PAYOUT_TRANSFER, status: PayoutStatus.completed },
         _sum: { netAmount: true },
         _count: { id: true },
       }),
-      this.prisma.payoutTransfer.count({
-        where: {
-          status: { in: [PayoutStatus.failed, PayoutStatus.returned] },
-        },
-      }),
+      this.prisma.payoutTransfer.count({ where: failedTransfersWhere }),
       this.prisma.paymentHold.findMany({
-        where: { status: PaymentHoldStatus.held, releaseAt: { not: null } },
+        where: {
+          ...liveHold,
+          status: PaymentHoldStatus.held,
+          releaseAt: { not: null },
+        },
         orderBy: { releaseAt: "asc" },
         take: 5,
         select: {

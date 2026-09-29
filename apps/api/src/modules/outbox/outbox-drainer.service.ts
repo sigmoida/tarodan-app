@@ -7,6 +7,7 @@ import { OutboxStatus } from "@prisma/client";
 import { registerRepeatableCron } from "../../monitoring/bull-cron.helper";
 import { QUEUE_NAMES } from "../../workers/constants";
 import { OutboxHandlerRegistry } from "./outbox-handler.registry";
+import { outboxStaleProcessingMs } from "../../config/alert-thresholds";
 
 /**
  * OutboxDrainerService — `pending & nextAttemptAt<=now` satırlarını CAS ile claim edip
@@ -52,10 +53,7 @@ export class OutboxDrainerService implements OnModuleInit {
   }
 
   private get staleProcessingMs(): number {
-    return parseInt(
-      this.config.get("OUTBOX_STALE_PROCESSING_MS") || `${5 * 60 * 1000}`,
-      10,
-    );
+    return outboxStaleProcessingMs(this.config);
   }
 
   /**

@@ -810,6 +810,7 @@
     "sendForReview": "Submit for Review",
     "sentForReviewRepublish": "Your listing has been submitted for review. It will go back online once approved.",
     "sentForReview": "Your listing has been submitted for review. It will go online once approved.",
+    "reactivatedImmediately": "Your listing is live again! Stock was added and it's back on sale, no approval needed.",
     "reactivateFailed": "The listing could not be put back on sale",
     "invalidStockQuantity": "Enter a valid stock quantity",
     "listingRemoved": "Listing deleted",
@@ -1013,6 +1014,9 @@
     },
     "cardHolderPlaceholder": "Full name",
     "saveCardPaytr": "Save my card with PayTR for future payments",
+    "saveCardForRenewal": "Save my card for automatic renewal",
+    "saveCardForRenewalHint": "Your card is stored securely by PayTR and your membership renews automatically at the end of each period. You can turn auto-renewal off at any time.",
+    "saveCardForRenewalOffHint": "If you do not save your card, auto-renewal stays off and you will need to purchase your membership again when the period ends.",
     "payWithSavedCard": "Pay With Saved Card",
     "loadingCards": "Loading cards…",
     "savedCardCvv": "Saved card CVV",
@@ -4822,7 +4826,38 @@
         "cronResultFailed": "Job failed: {reason}",
         "cronResultPending": "Job still running — follow the result in the Bull history",
         "cronResultRunning": "Job running…",
-        "cronResultNotFound": "The job record was trimmed from the queue history — it most likely completed; the result is no longer viewable"
+        "cronResultNotFound": "The job record was trimmed from the queue history — it most likely completed; the result is no longer viewable",
+        "lane": {
+          "title": "Test Lane — Live Test Accounts",
+          "description": "Isolated accounts on production for store review and mobile QA. Test accounts only see each other; their listings stay out of the storefront and their orders/payments/trades out of finance reports. Payments open in PayTR test mode; no shipment or e-invoice is produced.",
+          "accountsEmpty": "No test accounts yet.",
+          "createTitle": "New test account",
+          "email": "Email",
+          "password": "Password",
+          "displayName": "Display name",
+          "phone": "Phone (optional)",
+          "isSeller": "Open as seller (can create listings)",
+          "create": "Create account",
+          "created": "Test account created: {email}",
+          "createFailed": "Could not create the test account",
+          "reset": "Reset lane",
+          "resetConfirmTitle": "Reset the test lane?",
+          "resetConfirmDescription": "All orders, payments, trades, offers, refunds and carts of the test accounts are deleted. Accounts and listings stay; sold listings go back on sale. Live data is not touched.",
+          "resetDone": "Lane reset: {accounts} accounts, {orders} orders deleted",
+          "resetFailed": "Could not reset the lane",
+          "buyer": "Buyer",
+          "seller": "Seller",
+          "columns": {
+            "code": "Code",
+            "email": "Email",
+            "name": "Name",
+            "role": "Role",
+            "orders": "Orders",
+            "listings": "Listings",
+            "createdAt": "Created"
+          },
+          "reviewHint": "Put the buyer account email and password in the App Store / Play review notes and add \"payments run in test mode, no charge is made\"."
+        }
       },
       "media": {
         "title": "Media",
@@ -5987,7 +6022,7 @@
         "platformTab": "Advertising, Discount & Membership Invoices",
         "loadError": "Invoices could not be loaded",
         "empty": "No invoice found",
-        "searchPlaceholder": "Search invoice number, party, tax ID, or ETTN",
+        "searchPlaceholder": "Search invoice number, transaction number, party, tax ID, or ETTN",
         "documentUnit": "documents",
         "invoiceUnit": "invoices",
         "invoiceNumber": "Invoice No.",
@@ -6009,6 +6044,14 @@
         "uploadedAt": "Uploaded At",
         "replaced": "Replaced",
         "returnReference": "Return → {reference}",
+        "processLinks": {
+          "order": "Order",
+          "offer": "Offer",
+          "trade": "Trade",
+          "refundRequest": "Refund request",
+          "boost": "Boost",
+          "membership": "Member page"
+        },
         "filters": {
           "allTypes": "All Types",
           "allStatuses": "All Statuses",
@@ -6018,7 +6061,9 @@
           "description": "Search by invoice description",
           "descriptionPlaceholder": "commission, shipping, platform fee…",
           "userCode": "Search by user ID",
-          "userCodePlaceholder": "B010001 / K010001"
+          "userCodePlaceholder": "B010001 / K010001",
+          "processRef": "Search by transaction number",
+          "processRefPlaceholder": "ORD-… / TKS-… / RFD-… / BST-… / MEM-…"
         },
         "contexts": {
           "directSale": "Direct sale",
@@ -6223,6 +6268,12 @@
       "psp": {
         "title": "PayTR Reconciliation",
         "subtitle": "Day-by-day comparison of PayTR reports against system records",
+        "merchant": {
+          "label": "Merchant",
+          "all": "All merchants",
+          "marketplace": "Marketplace",
+          "membership": "Membership"
+        },
         "tabs": {
           "summary": "Day Summaries",
           "lines": "Statement Lines",
@@ -6552,7 +6603,6 @@
         "errorOccurred": "An error occurred"
       },
       "offers": {
-        "title": "Offers",
         "totalCount": "{count} offers",
         "empty": "No offers yet",
         "emptyFiltered": "No offers match the filter",
@@ -6603,20 +6653,17 @@
         "filteringByProduct": "Filtering by product",
         "filteringByProductNamed": "Filtering by product: {title}",
         "orderNumber": "Order No",
-        "groupNumber": "Group No",
         "groupId": "Group ID",
         "packageId": "Package ID",
         "orderId": "Order ID",
         "productId": "Product ID",
         "shipmentId": "Shipment ID",
-        "internalTrackingNumber": "Internal tracking no",
         "buyer": "Buyer",
         "seller": "Seller",
         "sellerId": "Seller ID",
         "cargoStatus": "Shipping Status",
         "commission": "Commission",
         "productCount": "Product Count",
-        "itemCountUnit": "{count} items",
         "cartItems": "{count}-item cart",
         "expandCart": "Expand cart",
         "collapseCart": "Collapse cart",
@@ -6626,16 +6673,15 @@
         "sellerPackage": "Seller package",
         "packageShipping": "Shipping: {amount}",
         "singleItem": "Single item",
-        "groupDone": "Done",
-        "groupOngoing": "In progress",
         "originCancellation": "{origin} cancellation",
-        "pageDescription": "Purchase orders and offers made on products",
+        "pageDescription": "Purchase orders, offers made on products and trades",
         "tabs": {
           "directSale": "Direct Sales",
-          "acceptedOffers": "Accepted Offers"
+          "all": "All Orders",
+          "offers": "Offers",
+          "offerOrders": "Offers Turned into Orders",
+          "trades": "Trades"
         },
-        "amountCommission": "Amount / Commission",
-        "commissionShort": "Commission",
         "updateStatus": "Update Status",
         "newStatus": "New Status",
         "statusChangeReason": "Manual Operation Reason",
@@ -6798,6 +6844,63 @@
           "serviceVatOut": "Service VAT (to the state)",
           "commissionRule": "Commission rule",
           "commissionRuleUnnamed": "Unnamed rule"
+        },
+        "buckets": {
+          "all": "All",
+          "new": "New",
+          "shipped": "Handed to Carrier",
+          "inTransit": "In Transit",
+          "delivered": "Delivered",
+          "other": "Other"
+        },
+        "filters": {
+          "party": "Buyer / Seller",
+          "partyPlaceholder": "Name, e-mail or user code",
+          "packageNumber": "Package No",
+          "groupNumber": "Group Code",
+          "productQuery": "Product name / model code"
+        },
+        "columns": {
+          "orderInfo": "Order Details",
+          "products": "Products",
+          "unitPrice": "Unit Price",
+          "amountFees": "Amount / Fees",
+          "invoice": "Invoice",
+          "cargoStatus": "Cargo / Status"
+        },
+        "cells": {
+          "offerBadge": "Offer",
+          "preparingDeadline": "Prepare by: {date}",
+          "quantity": "{count, plural, one {# pc} other {# pcs}}",
+          "listingPrice": "Listing:",
+          "listingPriceApproximate": "The listing price at offer time was not recorded; the product's current price is shown.",
+          "offerAmount": "Offer:",
+          "priceDifference": "Difference:",
+          "lineSubtotal": "{count, plural, one {# pc} other {# pcs}} · {amount}",
+          "salesCommission": "Sales commission",
+          "platformFee": "Platform fee",
+          "noInvoice": "No invoice",
+          "openInvoices": "Open invoices",
+          "noShipment": "No shipment yet",
+          "openOrder": "Open order file"
+        },
+        "cancel": {
+          "action": "Cancel order",
+          "title": "Cancel order",
+          "description": "Order #{orderNumber} will be cancelled. Other items in the cart are not affected.",
+          "warning": "The buyer will be refunded and this cannot be undone. If a shipping label was created, the shipment is cancelled too; the stock is returned to the listing.",
+          "refundAmount": "Amount to be refunded to the buyer",
+          "shippingIncluded": "Shipping included",
+          "shippingExcluded": "Shipping excluded — the other items in the package will still be shipped",
+          "previewLoading": "Calculating the refund amount…",
+          "previewUnavailable": "The refund amount could not be calculated right now. The cancellation still refunds the amount the pre-shipment cancellation policy gives.",
+          "reason": "Cancellation reason",
+          "reasonPlaceholder": "The reason is written to the audit log and sent to the buyer and the seller in the cancellation email",
+          "confirm": "Cancel and refund",
+          "success": "Order cancelled and the buyer refunded",
+          "failed": "The order could not be cancelled",
+          "pendingManual": "This order's cancellation is waiting in Refund Requests for manual completion (the refund did not finish).",
+          "openPendingRefund": "Open request"
         }
       },
       "trades": {
@@ -6954,8 +7057,6 @@
       "refundRequests": {
         "amountAndFee": "Amount / Fee",
         "feeShort": "Fee reversed",
-        "title": "Refund Tracking",
-        "description": "Ongoing refunds — the automatic flow is monitored; admin intervention is only needed in exceptional cases",
         "loadError": "Failed to load refund requests",
         "emptyFiltered": "No refund requests match these filters.",
         "reason": "Reason",
@@ -7148,7 +7249,13 @@
         "sellerImpactHint": "These lines are not part of the buyer refund; they hit the seller's payout deductions / escrow.",
         "chargeReturnToSeller": "Return shipping debt (to seller)",
         "chargeOutboundToSeller": "Outbound shipping debt (to seller)",
-        "sellerShippingCompensation": "Shipping share compensation (back to seller)"
+        "sellerShippingCompensation": "Shipping share compensation (back to seller)",
+        "kind": {
+          "label": "Type",
+          "all": "All types",
+          "cancellation": "Cancellation refund",
+          "return": "Product return"
+        }
       },
       "shipping": {
         "title": "Shipping Operations",
@@ -7268,55 +7375,234 @@
             "dismissed": "Dismissed"
           }
         }
+      },
+      "cancellations": {
+        "title": "Cancellations & Refunds",
+        "description": "Cancelled orders, offers and trades together with refund requests on one screen",
+        "views": {
+          "cancellations": "Cancellations",
+          "refunds": "Refunds"
+        },
+        "tabs": {
+          "all": "All Cancellations",
+          "directSale": "Direct Sale",
+          "offers": "Offers",
+          "trades": "Trades"
+        },
+        "buckets": {
+          "all": "All",
+          "new": "New",
+          "buyer": "Cancelled by Buyer",
+          "seller": "Cancelled by Seller",
+          "platform": "Cancelled by Tarodan"
+        },
+        "reason": {
+          "expired": "Expired"
+        },
+        "actor": {
+          "buyer": "Buyer",
+          "seller": "Seller",
+          "platform": "Tarodan (admin)",
+          "system": "Tarodan (automatic)",
+          "unknown": "Unknown"
+        },
+        "refundState": {
+          "notCharged": "Not charged",
+          "pending": "Refund pending",
+          "inReview": "Refund in review",
+          "refunded": "Refunded",
+          "failed": "Refund failed"
+        },
+        "columns": {
+          "orderInfo": "Order Info",
+          "buyer": "Buyer",
+          "seller": "Seller",
+          "products": "Details",
+          "unitPrice": "Unit Price",
+          "amountFees": "Amount / Commission",
+          "cancelledAt": "Cancelled At",
+          "reason": "Cancellation Reason",
+          "refundState": "Status"
+        },
+        "cells": {
+          "partial": "Partially cancelled · {cancelled}/{total} items",
+          "tradeBadge": "Trade",
+          "cancelledBy": "Cancelled by: {actor}",
+          "noDate": "No date recorded",
+          "tradeSide": "Product owner"
+        },
+        "status": {
+          "cancelled": "Cancelled",
+          "rejected": "Rejected",
+          "mixed": "Mixed"
+        },
+        "filters": {
+          "orderNumber": "Order No",
+          "cargoCode": "Cargo Code",
+          "groupNumber": "Group Code",
+          "party": "Buyer / Seller",
+          "partyPlaceholder": "Name, e-mail, user code or user ID",
+          "cancelledDate": "Cancellation date"
+        },
+        "resultCount": "Filter results: {count} cancellations in total",
+        "empty": "No cancellations yet",
+        "emptyFiltered": "No cancellations match the filter",
+        "export": {
+          "button": "Export to Excel",
+          "truncated": "The file only contains the first {count} rows — narrow the filter",
+          "sheetName": "Cancellations",
+          "rowNumber": "Row No",
+          "origin": "Type",
+          "originValue": {
+            "direct_sale": "Direct Sale",
+            "offer": "Offer",
+            "trade": "Trade"
+          },
+          "orderNumber": "Order No",
+          "orderDate": "Order Date",
+          "buyer": "Buyer",
+          "buyerCode": "Buyer Code",
+          "seller": "Seller",
+          "sellerCode": "Seller Code",
+          "product": "Product",
+          "productCode": "Product Code",
+          "quantity": "Quantity",
+          "unitPrice": "Unit Price",
+          "subtotal": "Subtotal",
+          "cancelledAt": "Cancelled At",
+          "cancelledBy": "Cancelled By",
+          "reason": "Cancellation Reason",
+          "refundState": "Refund Status",
+          "testLane": "Test lane"
+        }
       }
     },
     "dashboard": {
       "title": "Dashboard",
-      "description": "Welcome! Here's today's overview.",
+      "description": "Work queues, alerts and the period summary.",
+      "refresh": "Refresh",
+      "refreshing": "Refreshing…",
+      "zones": {
+        "queues": "Waiting for you",
+        "queuesDescription": "Not date-filtered — it is still waiting whenever it arrived.",
+        "queuesEmpty": "Nothing is waiting.",
+        "alerts": "Alerts",
+        "period": "Period summary",
+        "stock": "Right now",
+        "loadFailed": "This section could not be loaded."
+      },
+      "queues": {
+        "refundRequests": "Refund requests",
+        "tradeOperations": "Trade operations",
+        "listingModeration": "Listing moderation",
+        "sellerApplications": "Seller applications",
+        "supportAndReports": "Support and reports",
+        "moneyOperations": "Money operations",
+        "documents": "Documents",
+        "shipping": "Shipping"
+      },
+      "queueParts": {
+        "refundsPendingReview": "Awaiting review",
+        "refundsDisputed": "Disputed",
+        "tradesAtWarehouse": "At warehouse / in review",
+        "tradeDisputesOpen": "Open disputes",
+        "tradeRefundFailures": "Refund failed",
+        "tradeCompensationPending": "Compensation pending",
+        "productsPending": "Listings awaiting approval",
+        "messagesPendingApproval": "Messages awaiting approval",
+        "corporateApplications": "Corporate applications",
+        "sellerDocuments": "Documents to review",
+        "ticketsOpen": "Open tickets",
+        "ticketsUrgent": "Urgent / high priority",
+        "reportsPending": "Pending reports",
+        "payoutsFailed": "Failed transfers",
+        "holdsOverdue": "Overdue escrow",
+        "adjustmentsOpen": "Open seller debt",
+        "invoicesExhausted": "Documents out of retries",
+        "ordersUninvoiced": "Uninvoiced deliveries",
+        "carrierCancellations": "Carrier cancellation tasks",
+        "shipmentsWithoutTracking": "Shipments without a tracking id"
+      },
+      "alerts": {
+        "stuckShippedOrders": "{count} orders have been shipped for over {threshold} days with no delivery report",
+        "stuckWarehouseTrades": "{count} trade parcels have not reached the warehouse in {threshold} days",
+        "stuckOutboundTrades": "{count} outbound trade parcels have had no delivery report for {threshold} days",
+        "paymentsMissingFromStatement": "{count} payments have no matching PayTR statement line",
+        "unresolvedStatementLines": "{count} statement lines are unmatched and unresolved",
+        "commissionLedgerDrift": "The commission ledger disagrees with the order totals: {amount}",
+        "paymentsWithoutOrders": "{count} completed payments have no order",
+        "ordersWithoutHold": "{count} paid orders have no escrow hold",
+        "outboxDead": "{count} side effects exhausted every attempt (DLQ)",
+        "outboxStuckProcessing": "{count} outbox rows have been processing for {threshold} minutes",
+        "noActiveCommissionRuleSet": "No active commission rule set — checkout is closed",
+        "noActiveShippingTariff": "No active shipping tariff — shipping cannot be priced",
+        "staleCouponReservations": "{count} coupon reservations hold budget past their expiry",
+        "deliveredHoldsWithoutRelease": "{count} delivered orders have an escrow hold with no release date",
+        "agedCarrierCancellations": "{count} carrier cancellation tasks have waited {threshold} hours",
+        "exhaustedPayoutRetries": "{count} payout instructions are out of retries",
+        "preparingDeadlineWithin24h": "{count} orders reach their preparation deadline within 24 hours"
+      },
       "stats": {
-        "totalOrders": "Total Sales",
-        "commissionRevenue": "Commission Revenue",
-        "activeProducts": "Active Products",
-        "totalUsers": "Total Users",
-        "products": "Products",
-        "users": "Users",
-        "grossSales": "Total Sales Amount",
-        "netCommission": "Net Commission",
-        "liveVisitors": "Live / Daily Active Visitors",
-        "cancellationsRefunds": "Cancellations / Refunds",
-        "active": "Active",
-        "passive": "Passive",
-        "live": "Live",
-        "daily": "Daily",
-        "cancellations": "Cancellations",
-        "refunds": "Refunds"
+        "paidOrders": "Paid orders",
+        "paidAmount": "Paid amount",
+        "sellerPayoutCount": "Payouts to users (count)",
+        "sellerPayoutAmount": "Payouts to users",
+        "returnRefundCount": "Returns paid to users (count)",
+        "returnRefundAmount": "Returns paid to users",
+        "cancelRefundCount": "Cancellations paid to users (count)",
+        "cancelRefundAmount": "Cancellations paid to users",
+        "deliveredOrders": "Delivered orders",
+        "deliveredAmount": "Delivered order amount",
+        "netRevenue": "Net platform revenue",
+        "netRevenueCount": "Net platform revenue (count)",
+        "serviceFeeCount": "Tarodan service fees (count)",
+        "serviceFeeAmount": "Tarodan service fees (buyer + seller)",
+        "commissionCount": "Tarodan commissions (count)",
+        "commissionAmount": "Tarodan commissions (buyer + seller)",
+        "shippingCount": "Total shipping (count)",
+        "shippingAmount": "Total shipping",
+        "membershipRevenue": "Membership revenue",
+        "membershipCount": "Membership revenue (count)",
+        "boostRevenue": "Boost revenue",
+        "boostCount": "Boost revenue (count)",
+        "cancelledOrders": "Cancelled orders",
+        "completedTrades": "Completed trades",
+        "completedTradeAmount": "Completed trade amount",
+        "tradeFeeRevenue": "Trade service revenue",
+        "newUsers": "New users",
+        "newListings": "New listings",
+        "signedInUsers": "Users who signed in",
+        "cancelledFromMigration": "Counts new cancellations only (older rows never recorded when they were cancelled)",
+        "feeSplitIncomplete": "Older orders never recorded this split, so the figure can understate past periods (compare with the Net platform revenue card)",
+        "signedInSingleStamp": "Only a user's LATEST sign-in is kept; active in more than one window, they only count in the later one"
+      },
+      "stock": {
+        "escrowBalance": "Escrow balance",
+        "openSellerDebt": "Open seller debt",
+        "activeListings": "Active listings",
+        "activeMemberships": "Active memberships",
+        "activeBoosts": "Active boosts",
+        "tierBreakdown": "By tier"
+      },
+      "age": {
+        "oldest": "Oldest waiting {age}",
+        "days": "{count} days",
+        "hours": "{count} hours",
+        "minutes": "{count} min"
       },
       "period": {
+        "label": "Period",
+        "daily": "Daily",
+        "monthly": "Monthly",
+        "custom": "Date range",
+        "from": "Start date",
+        "to": "End date",
         "yesterday": "Yesterday",
         "thisMonth": "This month",
-        "lastMonth": "Last month"
-      },
-      "quickActions": {
-        "products": "Products",
-        "orders": "Orders",
-        "users": "Users",
-        "messages": "Messages"
-      },
-      "pendingActions": {
-        "productsPending": "{count} products awaiting approval",
-        "refundRequests": "{count} refund requests",
-        "messagesPending": "{count} messages awaiting approval",
-        "identityVerification": "{count} identity verification requests",
-        "review": "Review"
-      },
-      "charts": {
-        "salesLabel": "Sales (₺)",
-        "ordersLabel": "Orders",
-        "sales30dTitle": "Last 30 Days Sales Performance",
-        "dailyOrdersTitle": "Daily Order Count",
-        "categoryTitle": "Category Distribution",
-        "noData": "No Data",
-        "uncategorized": "Uncategorized"
+        "allTime": "All time",
+        "rangeIncomplete": "Pick a start and an end date",
+        "rangeUnparseable": "Pick a valid date",
+        "rangeReversed": "The start date cannot be after the end date"
       },
       "recentOrders": {
         "title": "Recent Orders",
@@ -7327,7 +7613,8 @@
         "empty": "No trades yet"
       },
       "topProducts": {
-        "title": "Top Viewed Products",
+        "title": "Most Viewed Products",
+        "allTimeNote": "All time — view counts are cumulative and cannot be split by period",
         "empty": "No product views yet",
         "columns": {
           "product": "Product",
@@ -7337,91 +7624,215 @@
         }
       },
       "topSellers": {
-        "title": "Top Viewed Sellers",
+        "title": "Most Viewed Sellers",
+        "allTimeNote": "All time — view counts are cumulative and cannot be split by period",
         "empty": "No seller views yet",
         "columns": {
           "seller": "Seller",
           "views": "Views",
           "products": "Products",
-          "activeListings": "Active"
+          "activeListings": "Active Listings"
         }
-      },
-      "status": {
-        "refundRequested": "Refund Requested",
-        "inProgress": "In Progress"
       },
       "relativeTime": {
         "minutesAgo": "{count} min ago",
-        "hoursAgo": "{count} hr ago"
+        "hoursAgo": "{count}h ago"
       }
     },
     "analytics": {
       "title": "Analytics",
-      "description": "Detailed sales, user, and product analytics",
-      "emptyTitle": "No data for this period",
-      "emptyDescription": "Choose another date range or check again after new data is available.",
-      "dateRange": {
-        "7d": "7 Days",
-        "30d": "30 Days",
-        "90d": "90 Days",
-        "1y": "1 Year"
-      },
+      "description": "What happened over the selected period, and why",
+      "empty": "Nothing was measured in this period",
+      "uncategorized": "Unspecified",
       "tabs": {
-        "sales": "Sales Analytics",
-        "users": "User Analytics",
-        "products": "Product Analytics",
-        "trades": "Trade Analytics"
+        "sales": "Sales & Revenue",
+        "trade": "Trades & Offers",
+        "catalog": "Catalogue & Sellers",
+        "quality": "Quality & Operations",
+        "membership": "Memberships"
       },
-      "orderStatus": {
-        "pendingPayment": "Awaiting Payment",
-        "paid": "Paid",
-        "preparing": "Preparing",
-        "shipped": "Shipped",
-        "delivered": "Delivered",
-        "completed": "Completed",
-        "cancelled": "Cancelled",
-        "refundRequested": "Refund Requested",
-        "refunded": "Refunded"
+      "filters": {
+        "from": "From",
+        "to": "To",
+        "groupBy": "Grouping",
+        "day": "Daily",
+        "week": "Weekly",
+        "month": "Monthly",
+        "compare": "Compare with previous period",
+        "vsPrevious": "vs previous period",
+        "rangeIncomplete": "Pick both a start and an end",
+        "rangeUnparseable": "The dates must be valid",
+        "rangeReversed": "The start cannot be after the end",
+        "rangeTooLong": "The range can cover at most 366 days"
       },
-      "categoryOther": "Other",
       "export": {
         "csv": "Download CSV",
-        "json": "Download JSON"
+        "xlsx": "Download Excel"
       },
-      "sales": {
-        "salesLabel": "Sales (₺)",
-        "ordersLabel": "Orders",
-        "totalOrders": "Total Orders",
-        "totalRevenue": "Total Revenue",
-        "commissionRevenue": "Commission Revenue",
-        "avgOrderValue": "Avg. Order Value",
-        "revenueChartTitle": "Revenue Chart",
-        "orderCountTitle": "Order Count",
-        "statusDistributionTitle": "Order Status Distribution"
+      "notes": {
+        "stockElsewhere": "Current-state counts live on the Dashboard.",
+        "carrierCostReconciledOnly": "Covers only shipments whose carrier statement has arrived; so does the comparison.",
+        "truncated": "{stamp} has only been recorded since {date}; anything earlier is not in these figures."
       },
-      "users": {
-        "newUsers": "New Users",
-        "totalUsers": "Total Users",
-        "activeUsers": "Active Users",
-        "sellers": "Sellers",
-        "growthTitle": "User Growth"
+      "metric": {
+        "gmv": "Paid volume (GMV)",
+        "orderCount": "Paid orders",
+        "averageBasket": "Average basket",
+        "netRevenue": "Net platform revenue",
+        "discountCost": "Coupon discount",
+        "platformFundedDiscount": "Platform-funded discount",
+        "feeDiscountCost": "Fee discount",
+        "collectedShipping": "Shipping collected",
+        "carrierCost": "Carrier cost (reconciled)",
+        "refundedAmount": "Refunded amount",
+        "averageTradeValue": "Average trade value",
+        "tradeFeeRevenue": "Trade fee revenue",
+        "offersCreated": "Offers made",
+        "offersResponded": "Offers answered",
+        "offersAccepted": "Offers accepted",
+        "offerOrders": "Offer orders",
+        "offerResponseRate": "Offer response rate",
+        "offerConversionRate": "Offer-to-order rate",
+        "listingsCreated": "Listings created",
+        "listingsPublished": "Listings published",
+        "listingsSold": "Listings sold",
+        "averagePrice": "Average listing price",
+        "medianTimeToSellDays": "Time to sell (median)",
+        "medianSellerTimeToFirstSaleDays": "Time to first sale (median)",
+        "boostRevenue": "Boost revenue",
+        "boostCount": "Boosts sold",
+        "averageBoostViewUplift": "Boost view uplift",
+        "paidOrders": "Paid orders",
+        "refundedOrders": "Refunded orders",
+        "refundRate": "Refund rate (of paid orders)",
+        "cancelledOrders": "Cancelled orders",
+        "cancellationRate": "Cancellation rate (of paid orders)",
+        "paymentAttempts": "Payment attempts",
+        "failedPayments": "Failed payments",
+        "paymentFailureRate": "Payment failure rate",
+        "medianPaidToShippedHours": "Paid to shipped (median)",
+        "medianShippedToDeliveredHours": "Shipped to delivered (median)",
+        "medianPaidToDeliveredHours": "Paid to delivered (median)",
+        "newMemberships": "New memberships",
+        "renewals": "Renewals",
+        "churned": "Cancelled memberships",
+        "pastDue": "Fell past due in period",
+        "membershipRevenue": "Membership revenue",
+        "pastDueNow": "Past due right now",
+        "shipmentsAwaitingCarrierCost": "Shipments awaiting reconciliation",
+        "carrierCostReconciledShare": "Reconciled share"
       },
-      "trades": {
-        "totalTrades": "Total Trades",
+      "series": {
+        "gmv": "Volume",
+        "orderCount": "Orders",
+        "netRevenue": "Net revenue",
+        "refundedAmount": "Refunds",
+        "tradesCreated": "Trades opened",
+        "tradesCompleted": "Trades completed",
+        "tradeFeeRevenue": "Trade fees",
+        "listingsPublished": "Listings published",
+        "listingsSold": "Listings sold",
+        "boostRevenue": "Boost revenue",
+        "refundedOrders": "Refunds",
+        "cancelledOrders": "Cancellations",
+        "failedPayments": "Failed payments",
+        "newMemberships": "New memberships",
+        "renewals": "Renewals",
+        "membershipRevenue": "Membership revenue"
+      },
+      "section": {
+        "trend": "Over time",
+        "byCategory": "By category",
+        "byBrand": "By brand",
+        "byPriceBand": "By price band",
+        "byCondition": "By condition",
+        "byPricingVersion": "By pricing version",
+        "byTier": "By membership tier",
+        "topSellers": "Top sellers by real sales",
+        "topProducts": "Top listings by real sales",
+        "funnel": "Funnel",
+        "offerFunnel": "Offer funnel",
+        "exits": "Exits",
+        "boostPackages": "Boost packages",
+        "refundsByReason": "Refund reasons",
+        "refundsByFault": "Fault party",
+        "refundComponents": "Refund components",
+        "cancellationsByReason": "Cancellation reasons",
+        "cancellationsByType": "Cancellation type",
+        "installmentMix": "Installment mix"
+      },
+      "table": {
+        "label": "Name",
+        "count": "Count",
+        "amount": "Amount",
+        "share": "Share",
+        "orders": "Orders",
+        "gmv": "Volume",
+        "step": "Step",
+        "conversion": "Of first step",
+        "dropOff": "Lost from previous step",
+        "uplift": "View uplift",
+        "notMeasured": "Not measured"
+      },
+      "step": {
+        "created": "Created",
+        "accepted": "Accepted",
         "completed": "Completed",
-        "pending": "Pending",
-        "avgValue": "Avg. Value",
-        "statsTitle": "Trade Statistics",
-        "disputed": "Disputed",
-        "successRate": "Success Rate"
+        "published": "Published",
+        "sold": "Sold",
+        "responded": "Answered",
+        "ordered": "Ordered"
       },
-      "products": {
-        "totalProducts": "Total Products",
-        "activeProducts": "Active Products",
-        "pendingApproval": "Pending Approval",
-        "avgPrice": "Avg. Price",
-        "categoryDistributionTitle": "Category Distribution",
-        "byCategoryTitle": "Products by Category"
+      "enum": {
+        "rejected": "Rejected",
+        "cancelled": "Cancelled",
+        "v1": "v1 (commission)",
+        "v2": "v2 (flat fee)",
+        "buyer": "Buyer",
+        "seller": "Seller",
+        "carrier": "Carrier",
+        "platform": "Platform",
+        "delivery_delayed": "Delivery delayed",
+        "changed_mind": "Changed mind",
+        "damaged": "Damaged",
+        "wrong_item": "Wrong item",
+        "not_as_described": "Not as described",
+        "missing_parts": "Missing parts",
+        "counterfeit": "Counterfeit",
+        "defective": "Defective",
+        "buyer_damaged": "Buyer damaged it",
+        "lost_in_transit": "Lost in transit",
+        "other": "Other",
+        "wrong_product_selected": "Wrong product selected",
+        "wrong_card": "Wrong card",
+        "price_changed_mind": "Changed mind on price",
+        "unavailable_at_address": "Unavailable at address",
+        "iptal": "Cancellation",
+        "iade": "Return",
+        "product": "Product amount",
+        "outbound_shipping": "Outbound shipping",
+        "return_shipping": "Return shipping",
+        "buyer_commission": "Buyer commission",
+        "buyer_platform_fee": "Buyer service fee",
+        "seller_commission": "Seller commission",
+        "seller_platform_fee": "Seller service fee",
+        "new": "New",
+        "like_new": "Like new",
+        "very_good": "Very good",
+        "good": "Good",
+        "fair": "Fair"
+      },
+      "unit": {
+        "percent": "{value}%",
+        "days": "{value} d",
+        "hours": "{value} h"
+      },
+      "stamp": {
+        "orderCancelledAt": "Order cancellation time",
+        "tradeRejectedAt": "Trade rejection time",
+        "productSoldAt": "Listing sale time",
+        "offerRespondedAt": "Offer response time",
+        "membershipPastDueAt": "Membership past-due time"
       }
     },
     "reports": {
@@ -7947,7 +8358,11 @@
       "bulkResendQueuedPartial": "{ok} queued, {failed} failed",
       "bulkResendConfirmDesc": "Activation e-mails are sent from the background queue; track the outcome in the e-mail logs. Ineligible rows are skipped. Continue?",
       "filterLoginStateAll": "All Login States",
-      "filterLoggedIn": "Logged In"
+      "filterLoggedIn": "Logged In",
+      "testAccount": "Test account",
+      "testAccountHint": "Test lane: never mixes with live data",
+      "testAccountOnly": "Test accounts only",
+      "liveAccountsOnly": "Real accounts only"
     },
     "deletedIdentities": {
       "title": "Deleted Account Identities",
@@ -8256,28 +8671,13 @@
         },
         "orders": {
           "name": "Orders",
-          "description": "View and manage all orders",
-          "keywords": "order"
-        },
-        "offers": {
-          "name": "Offers",
-          "description": "Track offers and negotiations on products",
-          "keywords": "offer,negotiation"
-        },
-        "trades": {
-          "name": "Trades",
-          "description": "Track and manage product trade requests",
-          "keywords": "trade,barter,exchange,swap"
+          "description": "View and manage orders, offers and trades",
+          "keywords": "order,offer,trade,barter"
         },
         "shipping": {
           "name": "Shipping",
           "description": "Shipment, shipping label, and tracking operations",
           "keywords": "shipping,cargo,shipment,label,tracking"
-        },
-        "refundRequests": {
-          "name": "Refund Tracking",
-          "description": "Review and resolve open refund requests",
-          "keywords": "refund,return,request,tracking"
         },
         "products": {
           "name": "Products",
@@ -8446,6 +8846,11 @@
         "media": {
           "name": "Media",
           "description": "Bucket folders, files and ownership tracking."
+        },
+        "cancellationsRefunds": {
+          "name": "Cancellations & Refunds",
+          "description": "Review cancellations and resolve refund requests",
+          "keywords": "cancellation,refund,return,request,tracking,iptal,iade"
         }
       }
     },
@@ -8626,7 +9031,8 @@
           "action": "Action",
           "entityType": "Entity type",
           "shipmentLeg": "Shipment leg",
-          "loginState": "Login state"
+          "loginState": "Login state",
+          "testAccount": "Test account"
         }
       },
       "bulkActionBar": {
@@ -8664,6 +9070,10 @@
       },
       "list": {
         "totalLine": "Total {total} {unit}"
+      },
+      "testLane": {
+        "badge": "TEST",
+        "hint": "Test lane record — paid in PayTR test mode; no charge, shipment or e-invoice, excluded from reports"
       }
     },
     "auth": {
@@ -8742,7 +9152,7 @@
       },
       "orderCancelledSeller": {
         "title": "Sale Cancelled",
-        "message": "Your order {orderNumber} has been cancelled."
+        "message": "Order {orderNumber} was cancelled. Do not ship the item."
       },
       "orderCancelledOutOfStock": {
         "title": "Your order was cancelled: out of stock",
@@ -8924,6 +9334,10 @@
         "title": "Your Membership Has Ended",
         "message": "Your {tierName} membership has ended. Renew now and keep your benefits!"
       },
+      "membershipRenewalCardRequired": {
+        "title": "Auto-Renewal Turned Off",
+        "message": "Auto-renewal for your {tierName} membership has been turned off: our payment setup changed and your saved card can no longer be used for renewals. Your membership stays active until the end of the period; save your card when you renew and auto-renewal switches back on."
+      },
       "membershipUpgraded": {
         "title": "Your Membership Was Upgraded! 🎉",
         "message": "Welcome to {tierName} membership! Your new benefits are active."
@@ -9078,7 +9492,7 @@
       },
       "refundCompletedSeller": {
         "title": "Refund Completed",
-        "message": "The refund for order {refundNumber} is complete; the amount was returned to the buyer."
+        "message": "The refund for order {refundNumber} is complete; the amount was returned to the buyer.{stockQuarantined, select, yes { The item was added back to your stock, but the listing is now inactive; you can reactivate it yourself once you've inspected it.} other {}}"
       },
       "refundAutoAcceptedSeller": {
         "title": "Refund Request Auto-Approved",
@@ -9532,6 +9946,7 @@
       "documentsIncomplete": "The required documents, plus the front and back of every owner's or partner's ID or passport, must be complete",
       "interactionBlocked": "You cannot interact with this user",
       "invalidDocumentType": "Invalid document type",
+      "laneMismatch": "You cannot transact with this user (test account boundary)",
       "noFieldsToUpdate": "No fields to update were provided",
       "notBlocked": "This user is not blocked",
       "notFound": "User not found",
@@ -9635,7 +10050,13 @@
         "tariffUnverifiable": "The order's shipping tariff can no longer be verified",
         "couponChangesShipping": "The coupon changes the shipping cost; the order must be recreated through a new checkout",
         "shipmentToDeliveredForbidden": "A shipment in the {status} state cannot be moved to delivered",
-        "shipmentToInTransitForbidden": "A shipment in the {status} state cannot be moved to in-transit"
+        "shipmentToInTransitForbidden": "A shipment in the {status} state cannot be moved to in-transit",
+        "cancelNotPaid": "An order whose payment is not completed cannot be cancelled; there is no charge to refund",
+        "cancelAlreadyClosed": "The order has already been cancelled or refunded",
+        "cancelActiveRefund": "The order has an open refund/cancellation request; continue from the Refund Requests screen",
+        "cancelAfterHandover": "An order handed to the carrier cannot be cancelled; use the refund request flow at this stage",
+        "cancelReasonRequired": "A cancellation reason is required",
+        "cancelPendingManualCompletion": "This order's cancellation ({refundNumber}) is waiting in Refund Requests for manual completion; resolve the request there instead of cancelling again"
       },
       "user": {
         "notBanned": "The user is not banned",
@@ -9873,6 +10294,18 @@
         "invalidDate": "Invalid date (expected YYYY-MM-DD)",
         "lineNotFound": "Statement line not found",
         "lineAlreadyMatched": "A matched line cannot be resolved"
+      },
+      "dashboard": {
+        "rangeIncomplete": "A custom period needs both a start and an end date",
+        "rangeUnparseable": "The period dates must be valid dates",
+        "rangeReversed": "The start date cannot be after the end date"
+      },
+      "analytics": {
+        "rangeIncomplete": "A date range needs both a start and an end",
+        "rangeUnparseable": "Both ends of the date range must be valid dates",
+        "rangeReversed": "The start date cannot be after the end date",
+        "rangeTooLong": "The date range can cover at most 366 days",
+        "unknownTab": "Unknown analytics tab"
       }
     },
     "advertisement": {

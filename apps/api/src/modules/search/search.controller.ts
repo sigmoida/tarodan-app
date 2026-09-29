@@ -8,6 +8,7 @@ import {
 } from "./search.service";
 import { Public } from "../auth/decorators/public.decorator";
 import { CurrentUser } from "../auth/decorators/current-user.decorator";
+import { AccountLaneService } from "../account-lane/account-lane.service";
 import { UserBlockService } from "../user-block/user-block.service";
 import { Roles } from "../auth/decorators/roles.decorator";
 import { AdminRoute } from "../auth/decorators/admin-route.decorator";
@@ -22,6 +23,7 @@ export class SearchController {
     private readonly searchService: SearchService,
     private readonly configService: ConfigService,
     private readonly userBlocks: UserBlockService,
+    private readonly lanes: AccountLaneService,
   ) {}
 
   @Public()
@@ -49,9 +51,15 @@ export class SearchController {
     @Query("sortBy") sortBy?: string,
     @CurrentUser("id") viewerId?: string,
   ): Promise<SearchResponse> {
-    const options: SearchOptions = {
+    const [excludeSellerIds, lane] = await Promise.all([
       // Engelli satıcılar (simetrik) arama sonuçlarından düşer.
-      excludeSellerIds: await this.userBlocks.getHiddenUserIds(viewerId),
+      this.userBlocks.getHiddenUserIds(viewerId),
+      // Şerit: test hesabı canlı ilanları aramada DA göremez (ES canlı-only).
+      this.lanes.laneOfUser(viewerId),
+    ]);
+    const options: SearchOptions = {
+      excludeSellerIds,
+      lane,
       query: query || "",
       categoryId,
       brandId,
@@ -84,10 +92,15 @@ export class SearchController {
     @Query("limit") limit?: string,
     @CurrentUser("id") viewerId?: string,
   ): Promise<{ suggestions: string[] }> {
+    const [hidden, lane] = await Promise.all([
+      this.userBlocks.getHiddenUserIds(viewerId),
+      this.lanes.laneOfUser(viewerId),
+    ]);
     const suggestions = await this.searchService.autocomplete(
       query,
       limit ? parseInt(limit) : 10,
-      await this.userBlocks.getHiddenUserIds(viewerId),
+      hidden,
+      lane,
     );
     return { suggestions };
   }
@@ -99,10 +112,11 @@ export class SearchController {
     @CurrentUser("id") viewerId?: string,
   ): Promise<RichAutocompleteResult> {
     // Engelli satıcıların ilanları başlık önerilerinde de görünmez.
-    return this.searchService.autocompleteRich(
-      query || "",
-      await this.userBlocks.getHiddenUserIds(viewerId),
-    );
+    const [hidden, lane] = await Promise.all([
+      this.userBlocks.getHiddenUserIds(viewerId),
+      this.lanes.laneOfUser(viewerId),
+    ]);
+    return this.searchService.autocompleteRich(query || "", hidden, lane);
   }
 
   @Post("admin/reindex")

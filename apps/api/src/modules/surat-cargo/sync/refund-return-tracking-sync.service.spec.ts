@@ -154,4 +154,14 @@ describe("RefundReturnTrackingSyncService", () => {
       );
     });
   });
+
+  it("syncAllActiveRefundReturns scans live-lane orders only", async () => {
+    const { service, prisma } = makeService(1);
+    prisma.refundRequest.findMany.mockResolvedValue([]);
+    await service.syncAllActiveRefundReturns();
+    expect(prisma.refundRequest.findMany.mock.calls[0][0].where).toMatchObject({
+      returnProvider: "surat",
+      order: { isTest: false },
+    });
+  });
 });

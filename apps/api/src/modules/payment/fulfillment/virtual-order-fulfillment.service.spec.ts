@@ -1,5 +1,10 @@
 import { VirtualOrderFulfillmentService } from "./virtual-order-fulfillment.service";
-import { SubscriptionStatus, OrderStatus, PaymentStatus } from "@prisma/client";
+import {
+  CancellationActor,
+  SubscriptionStatus,
+  OrderStatus,
+  PaymentStatus,
+} from "@prisma/client";
 
 /**
  * Karakterizasyon: sanal sipariş (üyelik/boost) aktivasyonu — god-service'ten çıkarılan
@@ -167,7 +172,14 @@ describe("VirtualOrderFulfillmentService", () => {
 
       expect(tx.order.updateMany).toHaveBeenCalledWith({
         where: { id: { in: ["sib-1", "sib-2"] } },
-        data: { status: OrderStatus.cancelled },
+        // İptal yazan her yol `orderCancelledData` üzerinden geçer: damga da
+        // beklenir, yoksa dönemsel iptal metriği bu yolu sessizce kaçırır.
+        // Yetim kardeşleri alıcı iptal etmedi; temizliği sistem yapar.
+        data: {
+          status: OrderStatus.cancelled,
+          cancelledAt: expect.any(Date),
+          cancelledBy: CancellationActor.system,
+        },
       });
       expect(tx.payment.updateMany).toHaveBeenCalledWith(
         expect.objectContaining({

@@ -5,10 +5,12 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { Badge, Button, offerStatusConfig } from "@tarodan/ui";
+import { ADMIN_OFFERS_TAB_HREF } from "@tarodan/types";
 import { adminApi } from "@/lib/api";
 import { fmtDateTime } from "@/lib/format";
 import { statusConfig } from "@/lib/statusLabels";
 import { DetailPage } from "@/components/detail/DetailPage";
+import { TestLaneBadge } from "@/components/TestLaneBadge";
 import { PartyCard } from "@/components/detail/PartyCard";
 import { SectionCard } from "@/components/detail/SectionCard";
 import { canCancelOffer } from "../_lib/offers";
@@ -20,8 +22,9 @@ import { ProductOffersSection } from "./_sections/ProductOffersSection";
 import { CancelOfferModal } from "./_modals/CancelOfferModal";
 
 /**
- * Teklif detayı: /operations/offers/[id] — sipariş route'unun alt
- * sayfası (izin `orders`, breadcrumb Operasyon > Siparişler > Detay).
+ * Teklif detayı: /operations/offers/[id] — Siparişler ekranının Teklifler
+ * sekmesinin dosyası (izin `orders`, breadcrumb Operasyon > Siparişler >
+ * Detay; geri bağlantısı ve "Siparişler" kırıntısı Teklifler sekmesini açar).
  */
 export default function OfferDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -33,7 +36,7 @@ export default function OfferDetailPage() {
       resource="offers"
       id={id}
       fetcher={(oid) => adminApi.getOffer(oid).then((r) => r.data)}
-      backHref="/operations/offers"
+      backHref={ADMIN_OFFERS_TAB_HREF}
       emptyTitle={t("admin.operations.offers.notFound")}
       title={(d) =>
         t("admin.operations.offers.detailTitle", { product: d.product.title })
@@ -44,10 +47,13 @@ export default function OfferDetailPage() {
         })
       }
       badge={(d) => (
-        <Badge
-          status={d.offer.status}
-          config={statusConfig(offerStatusConfig, t)}
-        />
+        <div className="flex flex-wrap items-center gap-2">
+          <Badge
+            status={d.offer.status}
+            config={statusConfig(offerStatusConfig, t)}
+          />
+          <TestLaneBadge isTest={d.offer.isTest} />
+        </div>
       )}
       actions={(d) =>
         canCancelOffer(d.offer) ? (

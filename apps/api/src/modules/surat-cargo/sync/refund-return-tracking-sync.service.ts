@@ -32,6 +32,7 @@ export class RefundReturnTrackingSyncService {
     const activeReturns = await this.prisma.refundRequest.findMany({
       where: {
         returnProvider: "surat",
+        order: { isTest: false },
         status: {
           in: ["return_shipment_open", "return_in_transit"],
         },

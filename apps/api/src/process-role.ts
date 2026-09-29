@@ -21,6 +21,16 @@ export function getProcessRole(): ProcessRole {
   return (VALID_ROLES as string[]).includes(raw) ? (raw as ProcessRole) : "all";
 }
 
+/**
+ * Rolü bu process için sabitler. Yalnız AppModule YÜKLENMEDEN önce anlamlıdır:
+ * tek bir servis çağrısı için uygulamayı başsız açan bakım script'leri
+ * (`maintenance/*`) konteynerin `PROCESS_ROLE=all`'ını devralıp zamanlanmış
+ * işleri ikinci kez koşturmasın diye `web`'e çeker.
+ */
+export function pinProcessRole(role: ProcessRole): void {
+  process.env.PROCESS_ROLE = role;
+}
+
 /** Bu process ağır kuyruk worker'larını (WorkerModule) çalıştırmalı mı? (`web` hariç). */
 export function runsQueueWorkers(
   role: ProcessRole = getProcessRole(),

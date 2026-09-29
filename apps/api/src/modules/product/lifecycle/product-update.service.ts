@@ -187,8 +187,12 @@ export class ProductUpdateService {
     }
 
     // Sold or inactive (stok biten / pasife alınmış): satıcı yeniden satışa
-    // açmak isteyebilir ama DOĞRUDAN aktifleştiremez — istek admin onayına
-    // (pending) gider. Onaylanınca yayına girer. Stok girilmesi/var olması şart.
+    // açmak isteyebilir. Normalde DOĞRUDAN aktifleştiremez — istek admin
+    // onayına (pending) gider. TEK istisna: teslim SONRASI bir iade yüzünden
+    // SİSTEM tarafından karantinaya alınmış ilan (`inactiveReason ===
+    // return_quarantine`) — satıcı bunu doğrudan aktive edebilir, admin onayı
+    // beklemez (resolveUpdatedStatus tek karar yeri, bkz. orada). Hangi yolda
+    // olursa olsun üyelik limiti ve komisyon kuralı denetimi AYNI şekilde çalışır.
     if (
       product.status === ProductStatus.sold ||
       product.status === ProductStatus.inactive
@@ -208,6 +212,8 @@ export class ProductUpdateService {
         // reserved sayar, sold/inactive SAYILMAZ — kontrolsüz reaktivasyon,
         // limiti aşmanın arka kapısıydı (create ile AYNI kaynak: canCreateListing).
         // Zaten sayılan (aktif) ilanın normal düzenlemesi bu daldan geçmez.
+        // Karantina bypass'ında da GEÇERLİ: "admin onayı gerekmez" moderasyon
+        // içindir, üyelik/komisyon bir güvenlik/finans kapısıdır — atlanmaz.
         const canReopen =
           await this.membershipService.canCreateListing(sellerId);
         if (!canReopen.allowed) {
@@ -224,17 +230,24 @@ export class ProductUpdateService {
           categoryId: product.categoryId,
           amount: Number(product.price),
         });
+        // TEK karar yeri: return_quarantine + stok varsa `active` (bypass),
+        // aksi hâlde eski davranış `pending`. Asla undefined dönmez burada
+        // (requested=active, status sold/inactive ikisi de !==active), ama
+        // tip güvenliği için pending'e düşülür.
+        const reopenedStatus =
+          resolveUpdatedStatus(product, dto, actor) ?? ProductStatus.pending;
         await this.prisma.product.update({
           where: { id },
           data: {
-            status: ProductStatus.pending,
+            status: reopenedStatus,
             ...(dto.quantity != null ? { quantity: Number(dto.quantity) } : {}),
           },
         });
         await this.cache.del(`products:detail:${id}`);
         await this.cache.delPattern("products:list:*");
-        // NOT: back-in-stock bildirimi burada GÖNDERİLMEZ — ilan henüz yayında
-        // değil (pending). Bildirim, admin onayıyla active'e geçtiğinde gider.
+        // NOT: back-in-stock bildirimi burada GÖNDERİLMEZ — `pending` yolunda
+        // ilan henüz yayında değil (bildirim admin onayıyla active'e geçtiğinde
+        // gider); `active` bypass yolunda da (bugünkü kapsam) gönderilmiyor.
         const updated = await this.prisma.product.findUnique({
           where: { id },
           include: {

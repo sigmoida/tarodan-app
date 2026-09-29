@@ -8,6 +8,8 @@ import { OrderCheckoutCommonService } from "./checkout/order-checkout-common.ser
 import { OrderCheckoutDirectService } from "./checkout/order-checkout-direct.service";
 import { OrderCheckoutGroupService } from "./checkout/order-checkout-group.service";
 import { OrderGuestCheckoutService } from "./checkout/order-guest-checkout.service";
+import { AccountLaneService } from "../account-lane/account-lane.service";
+import { accountLaneServiceStub } from "../account-lane/account-lane.testing";
 import { OrderCommonService } from "./order-common.service";
 import { OrderQueryService } from "./order-query.service";
 import { OrderLifecycleService } from "./order-lifecycle.service";
@@ -153,6 +155,7 @@ describe("OrderService findOne (response shape for mobile order detail)", () => 
         OrderCheckoutDirectService,
         OrderCheckoutGroupService,
         { provide: UserBlockService, useValue: userBlocksStub },
+        { provide: AccountLaneService, useValue: accountLaneServiceStub() },
         OrderGuestCheckoutService,
         OrderCommonService,
         OrderQueryService,
@@ -342,6 +345,7 @@ describe("OrderService getCommissionPreview (stopaj / withholding)", () => {
         OrderCheckoutDirectService,
         OrderCheckoutGroupService,
         { provide: UserBlockService, useValue: userBlocksStub },
+        { provide: AccountLaneService, useValue: accountLaneServiceStub() },
         OrderGuestCheckoutService,
         OrderCommonService,
         OrderQueryService,

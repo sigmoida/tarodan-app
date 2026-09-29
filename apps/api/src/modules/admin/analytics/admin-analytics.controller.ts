@@ -27,6 +27,9 @@ import {
   ApiQuery,
 } from "@nestjs/swagger";
 import { AdminService } from "../admin.service";
+import { AdminAnalyticsDashboardService } from "./admin-analytics-dashboard.service";
+import { AdminDashboardStockService } from "./dashboard/admin-dashboard-stock.service";
+import { AdminDashboardWorklistService } from "./dashboard/admin-dashboard-worklist.service";
 import { AdvertisementService } from "../../advertisement/advertisement.service";
 import { MediaService } from "../../media/media.service";
 import {
@@ -67,6 +70,7 @@ import {
   UpdateStaffSettingsDto,
   SetRolePermissionsDto,
   AnalyticsQueryDto,
+  DashboardStatsQueryDto,
   UpdateOrderStatusDto,
   ReportQueryDto,
   AdminPaymentQueryDto,
@@ -103,15 +107,26 @@ import {
 @UseGuards(AdminJwtAuthGuard, RolesGuard)
 @ApiBearerAuth()
 export class AdminAnalyticsController {
-  constructor(private readonly adminService: AdminService) {}
+  constructor(
+    private readonly adminService: AdminService,
+    // Yeni dashboard bölgeleri facade'e eklenmez: AdminService zaten çözülmeye
+    // çalışılan tanrı-facade'dir (apps/api/CLAUDE.md §1/§15).
+    private readonly worklistService: AdminDashboardWorklistService,
+    private readonly stockService: AdminDashboardStockService,
+    private readonly dashboardStatsService: AdminAnalyticsDashboardService,
+  ) {}
 
   // ==================== ANALYTICS & REPORTS ====================
 
   @Get("dashboard")
   @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
-  @ApiOperation({ summary: "Get dashboard statistics" })
-  async getDashboardStats() {
-    return this.adminService.getDashboardStats();
+  @ApiOperation({
+    summary:
+      "Dashboard statistics for a period (daily | monthly | custom range), each metric also carrying its all-time figure",
+  })
+  @ApiResponse({ status: 400, description: "Invalid custom range" })
+  async getDashboardStats(@Query() query: DashboardStatsQueryDto) {
+    return this.adminService.getDashboardStats(query);
   }
 
   @Get("dashboard/recent-orders")
@@ -153,81 +168,47 @@ export class AdminAnalyticsController {
     return this.adminService.getTopSellers(safeLimit);
   }
 
-  @Get("dashboard/pending-actions")
+  /**
+   * Zone A + Zone B — bekleyen iş kuyrukları ve uyarılar. Dönem filtresinden
+   * BAĞIMSIZ: geçen aydan beri bekleyen iş bugünün işidir.
+   *
+   * Eski `dashboard/pending-actions` ucunun yerini alır. O uç iade talebini
+   * `Order.status = refund_requested` ile sayıyordu — talebin kendi durumu
+   * değil siparişin durumu — ve incelemeyi bekleyen talepleri kaçırıyordu.
+   */
+  @Get("dashboard/worklist")
   @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
-  @ApiOperation({ summary: "Get pending actions count for dashboard" })
-  async getPendingActions() {
-    return this.adminService.getPendingActions();
+  @ApiOperation({
+    summary:
+      "Action queues and alerts awaiting an operator, with the age of the oldest item in each",
+  })
+  async getDashboardWorklist() {
+    return this.worklistService.getWorklist();
   }
 
-  @Get("analytics/sales")
-  @Roles(AdminRole.super_admin, AdminRole.admin)
-  @ApiOperation({ summary: "Get sales analytics with date range" })
-  async getSalesAnalytics(@Query() query: AnalyticsQueryDto) {
-    return this.adminService.getSalesAnalytics(query);
+  @Get("dashboard/stock")
+  @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
+  @ApiOperation({
+    summary:
+      "Current balances: escrow, open seller debt, active listings, memberships by tier, active boosts",
+  })
+  async getDashboardStock() {
+    return this.stockService.getStock();
   }
 
-  @Get("analytics/revenue")
-  @Roles(AdminRole.super_admin, AdminRole.admin)
-  @ApiOperation({ summary: "Get revenue analytics with date range" })
-  async getRevenueAnalytics(@Query() query: AnalyticsQueryDto) {
-    return this.adminService.getRevenueAnalytics(query);
-  }
-
-  @Get("analytics/users")
-  @Roles(AdminRole.super_admin, AdminRole.admin)
-  @ApiOperation({ summary: "Get user analytics with date range" })
-  async getUserAnalytics(@Query() query: AnalyticsQueryDto) {
-    return this.adminService.getUserAnalytics(query);
-  }
-
-  @Post("analytics/snapshot")
-  @Roles(AdminRole.super_admin)
-  @ApiOperation({ summary: "Save analytics snapshot" })
-  async saveAnalyticsSnapshot() {
-    return this.adminService.saveAnalyticsSnapshot();
-  }
-
-  @Get("reports/sales")
-  @Roles(AdminRole.super_admin, AdminRole.admin)
-  @ApiOperation({ summary: "Generate sales report (JSON, CSV, or PDF)" })
-  async getSalesReport(@Query() query: ReportQueryDto) {
-    return this.adminService.generateSalesReport(query);
-  }
-
-  @Get("reports/commission")
-  @Roles(AdminRole.super_admin, AdminRole.admin)
-  @ApiOperation({ summary: "Get commission report by seller and category" })
-  async getCommissionReport(@Query() query: ReportQueryDto) {
-    return this.adminService.getCommissionReport(query);
-  }
-
-  @Get("reports/custom")
-  @Roles(AdminRole.super_admin, AdminRole.admin)
-  @ApiOperation({ summary: "Generate custom report with flexible parameters" })
-  async getCustomReport(@Query() query: ReportQueryDto) {
-    return this.adminService.generateCustomReport(query);
-  }
-
-  @Get("reports/users")
-  @Roles(AdminRole.super_admin, AdminRole.admin)
-  @ApiOperation({ summary: "Users report (CSV/PDF/JSON)" })
-  async getUsersReport(@Query() query: ReportQueryDto) {
-    return this.adminService.generateUsersReport(query);
-  }
-
-  @Get("reports/products")
-  @Roles(AdminRole.super_admin, AdminRole.admin)
-  @ApiOperation({ summary: "Products report (CSV/PDF/JSON)" })
-  async getProductsReport(@Query() query: ReportQueryDto) {
-    return this.adminService.generateProductsReport(query);
-  }
-
-  @Get("reports/trades")
-  @Roles(AdminRole.super_admin, AdminRole.admin)
-  @ApiOperation({ summary: "Trades report (CSV/PDF/JSON)" })
-  async getTradesReport(@Query() query: ReportQueryDto) {
-    return this.adminService.generateTradesReport(query);
+  @Post("dashboard/refresh")
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
+  @ApiOperation({
+    summary:
+      "Drop the dashboard caches so the next read recomputes (the screen's explicit refresh control)",
+  })
+  async refreshDashboard() {
+    await Promise.all([
+      this.worklistService.invalidate(),
+      this.stockService.invalidate(),
+      this.dashboardStatsService.invalidatePeriodCache(),
+    ]);
   }
 
   @Get("commission/revenue")

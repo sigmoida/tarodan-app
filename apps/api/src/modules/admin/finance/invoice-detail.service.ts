@@ -1,9 +1,17 @@
 import { Injectable, NotFoundException } from "@nestjs/common";
-import type { ElogoInvoiceContext, ElogoInvoiceType } from "@prisma/client";
+import type {
+  ElogoInvoiceContext,
+  ElogoInvoiceType,
+  Prisma,
+} from "@prisma/client";
 import { PrismaService } from "../../../prisma";
 import { i18nMessage } from "../../i18n";
 import { invoiceDescriptionOf } from "../../elogo/invoice/invoice-line-description";
 import { readInvoiceLineItems } from "../../elogo/invoice/invoice-lines";
+import {
+  invoiceSourceKindOf,
+  reversedInvoiceIdOf,
+} from "../../elogo/invoice/invoice-source";
 
 /** Belgenin üzerindeki tek kalem (çok kalemli belgede birden fazla). */
 export interface InvoiceDetailLine {
@@ -63,7 +71,7 @@ const partySelect = {
   adminCode: true,
   displayName: true,
   companyName: true,
-} as const;
+} satisfies Prisma.UserSelect;
 
 const partyName = (
   user: { displayName: string; companyName: string | null } | null,
@@ -209,27 +217,25 @@ export class InvoiceDetailService {
 
   /**
    * Kaynak işlemin kırılımı. `sourceId` faturanın TÜRÜNE göre başka tabloyu
-   * gösterir; hangi türün nereye baktığı `invoice-parties.ts` ile aynı
-   * eşlemedir — orası "kim", burası "ne" sorusunu cevaplar.
+   * gösterir; hangi türün nereye baktığı `invoice-source.ts`'teki tek
+   * eşlemedir — taraf çözümü "kim", burası "ne" sorusunu cevaplar.
    */
   private async buildSource(
     type: ElogoInvoiceType,
     sourceId: string,
   ): Promise<InvoiceSourceRow[]> {
-    switch (type) {
-      case "return_invoice":
+    switch (invoiceSourceKindOf(type)) {
+      case "reversed_invoice":
         return this.sourceOfReversedInvoice(sourceId);
-      case "trade_commission":
-      case "trade_service_fee":
-      case "trade_shipping":
+      case "trade_payment":
         return this.sourceOfTrade(sourceId);
-      case "penalty":
+      case "refund_request":
         return this.sourceOfRefundRequest(sourceId);
       case "boost":
         return this.sourceOfBoost(sourceId);
       case "membership":
         return this.sourceOfMembership(sourceId);
-      default:
+      case "package_or_order":
         return this.sourceOfPackageOrOrder(sourceId);
     }
   }
@@ -239,7 +245,7 @@ export class InvoiceDetailService {
     sourceId: string,
   ): Promise<InvoiceSourceRow[]> {
     const original = await this.prisma.elogoInvoice.findUnique({
-      where: { id: sourceId.split(":")[0] },
+      where: { id: reversedInvoiceIdOf(sourceId) },
       select: { type: true, sourceId: true },
     });
     // Bir iade faturasının kaynağı yine bir iade faturası olamaz; olsaydı bu
@@ -368,14 +374,18 @@ export class InvoiceDetailService {
   private async sourceOfPackageOrOrder(
     sourceId: string,
   ): Promise<InvoiceSourceRow[]> {
+    // `satisfies` ŞART: select bir DEĞİŞKENDE durduğu için Prisma'nın jeneriği
+    // alan adlarını doğrulamıyor — `paidAt` böyle geçmişti ve `Order`'da öyle
+    // bir alan olmadığı için döküm canlıda 500 veriyordu (TARODAN-API-20).
+    // Ödeme tarihi `Payment`'ta durur, siparişte değil.
     const orderSelect = {
       orderNumber: true,
       quantity: true,
       totalAmount: true,
       createdAt: true,
-      paidAt: true,
+      payment: { select: { paidAt: true } },
       product: { select: { title: true } },
-    } as const;
+    } satisfies Prisma.OrderSelect;
     const pkg = await this.prisma.orderPackage.findUnique({
       where: { id: sourceId },
       select: {
@@ -392,7 +402,7 @@ export class InvoiceDetailService {
       description: order.product?.title ?? "",
       quantity: order.quantity,
       amount: Number(order.totalAmount),
-      occurredAt: order.paidAt ?? order.createdAt,
+      occurredAt: order.payment?.paidAt ?? order.createdAt,
     }));
   }
 }

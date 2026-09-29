@@ -25,7 +25,9 @@ export function userColumns(t: T, rowMenu: (u: User) => RowActionItem[]) {
     col.user<User>(
       t("admin.users.columnUser"),
       (u) => ({
-        name: u.displayName,
+        name: u.isTestAccount
+          ? `${u.displayName} · ${t("admin.users.testAccount")}`
+          : u.displayName,
         secondary: u.email,
         avatar: u.avatarUrl,
         href: `/accounts/users/${u.id}`,

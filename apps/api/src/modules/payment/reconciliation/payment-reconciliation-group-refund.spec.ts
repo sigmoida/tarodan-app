@@ -1,3 +1,4 @@
+import { CancellationActor } from "@prisma/client";
 import { RefundReconciliationService } from "../refund/refund-reconciliation.service";
 
 /**
@@ -52,10 +53,22 @@ describe("RefundReconciliationService.processRefundedOrders — MONEY-H5 group +
 
     const res = await service.processRefundedOrders();
 
-    expect(paymentRefund.processRefund).toHaveBeenCalledWith("single-1");
-    expect(paymentRefund.processRefund).toHaveBeenCalledWith("group-1");
+    // Dal 1-2 zaten iptal edilmiş siparişler: aktör processRefund'da korunur,
+    // çağıran yalnız sistemin iadesi olduğunu söyler.
+    expect(paymentRefund.processRefund).toHaveBeenCalledWith(
+      "single-1",
+      undefined,
+      { cancelledBy: CancellationActor.system },
+    );
+    expect(paymentRefund.processRefund).toHaveBeenCalledWith(
+      "group-1",
+      undefined,
+      { cancelledBy: CancellationActor.system },
+    );
     // group-2 zaten iade edilmiş (refundedOrders map'inde) → atlanır
-    expect(paymentRefund.processRefund).not.toHaveBeenCalledWith("group-2");
+    expect(
+      paymentRefund.processRefund.mock.calls.map((call: unknown[]) => call[0]),
+    ).not.toContain("group-2");
     expect(res).toEqual({ refunded: 2, failed: 0 });
   });
 
@@ -122,10 +135,12 @@ describe("RefundReconciliationService.processRefundedOrders — MONEY-H5 group +
 
     expect(paymentRefund.processRefund).toHaveBeenCalledWith(
       "single-untouched",
+      undefined,
+      { cancelledBy: CancellationActor.system },
     );
-    expect(paymentRefund.processRefund).not.toHaveBeenCalledWith(
-      "single-partially-refunded",
-    );
+    expect(
+      paymentRefund.processRefund.mock.calls.map((call: unknown[]) => call[0]),
+    ).not.toContain("single-partially-refunded");
     expect(res).toEqual({ refunded: 1, failed: 0 });
   });
 
@@ -197,7 +212,12 @@ describe("RefundReconciliationService.processRefundedOrders — MONEY-H5 group +
 
     const res = await service.processRefundedOrders();
 
-    expect(paymentRefund.processRefund).toHaveBeenCalledWith("returned-1");
+    // Paket göndericiye döndü: iptali kimse istemedi → sistem.
+    expect(paymentRefund.processRefund).toHaveBeenCalledWith(
+      "returned-1",
+      undefined,
+      { cancelledBy: CancellationActor.system },
+    );
     expect(res).toEqual({ refunded: 1, failed: 0 });
 
     // returned-arm doğru filtreyi kullanmalı

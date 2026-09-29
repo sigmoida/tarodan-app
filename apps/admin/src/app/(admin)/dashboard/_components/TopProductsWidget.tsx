@@ -26,6 +26,12 @@ export function TopProductsWidget({ products }: { products: TopProduct[] }) {
         </Button>
       }
     >
+      {/* These counters are cumulative with no per-day history, so the
+          period filter cannot apply — the widget says so instead of
+          silently showing all-time numbers beside period ones. */}
+      <p className="mb-2 text-xs text-subtle">
+        {t("admin.dashboard.topProducts.allTimeNote")}
+      </p>
       <div className="space-y-0.5">
         {products.length > 0 ? (
           products.map((p) => (

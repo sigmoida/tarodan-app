@@ -132,6 +132,7 @@ describe("OrderCheckoutCommonService.createSingleSellerPackage", () => {
     const snap: any = service.buildOfferFinancialSnapshot({
       productId: "product-1",
       amount: 1000,
+      listingUnitPrice: 1250,
       shippingDesi: 3,
       shippingTariff,
       pricing,
@@ -165,5 +166,27 @@ describe("OrderCheckoutCommonService.createSingleSellerPackage", () => {
       buyerServiceAmount: 1,
       sellerServiceAmount: 2,
     });
+  });
+
+  it("teklif anındaki ilan fiyatı snapshot'a yazılır (fark ekranı bunu okur)", () => {
+    const { service } = makeService();
+    const snap: any = service.buildOfferFinancialSnapshot({
+      productId: "product-1",
+      amount: 1000,
+      listingUnitPrice: 1250,
+      shippingDesi: 3,
+      shippingTariff,
+      pricing: {
+        commission: {},
+        fullShippingAmount: 0,
+        buyerShippingAmount: 0,
+        sellerShippingAmount: 0,
+        taxAmount: 0,
+        withholdingTaxAmount: 0,
+        totalAmount: 1000,
+      } as any,
+    });
+
+    expect(snap.offer).toEqual({ listingUnitPrice: 1250, amount: 1000 });
   });
 });

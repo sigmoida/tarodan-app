@@ -207,6 +207,9 @@ describe("OfferService.accept — order carries shipping, VAT and withholding", 
       expect.objectContaining({
         productId: "product-1",
         amount: 1000,
+        // Ürünün kabul anındaki ilan fiyatı — fiyat farkı sonradan ürün
+        // fiyatı değişse de bu değerden hesaplanır.
+        listingUnitPrice: 1200,
         shippingDesi: 2,
         pricing: offerPricing,
       }),

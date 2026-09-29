@@ -1,6 +1,6 @@
 import { BadRequestException, Injectable, Logger } from "@nestjs/common";
 import { i18nMessage } from "../../i18n";
-import * as crypto from "crypto";
+import { PaytrMerchant } from "@prisma/client";
 import { PayTRCredentials } from "./paytr-credentials.service";
 import { isValidPayoutTransId } from "../../../common/helpers/payout-trans-id";
 import { parsePaytrMoneyString } from "./paytr-money.util";
@@ -49,6 +49,9 @@ export interface PaytrReturnedTransfer {
  * üzerinden hesaplanır — JSON parse edilip yeniden serialize edilirse
  * boşluk/kaçış farkı imzayı tutmaz ve geçerli bir transfer sonucu
  * reddedilir. Parse işi çağırana aittir.
+ *
+ * Transferler yalnız PAZARYERİ mağazasından yapılır: satıcı hakedişleri o
+ * mağazanın bakiyesindedir, üyelik mağazasının alt satıcısı yoktur.
  */
 @Injectable()
 export class PayTRTransferService {
@@ -56,14 +59,11 @@ export class PayTRTransferService {
 
   constructor(private readonly paytr: PayTRCredentials) {}
 
+  private get creds() {
+    return this.paytr.forMerchant(PaytrMerchant.marketplace);
+  }
   private get merchantId() {
-    return this.paytr.merchantId;
-  }
-  private get merchantKey() {
-    return this.paytr.merchantKey;
-  }
-  private get merchantSalt() {
-    return this.paytr.merchantSalt;
+    return this.creds.merchantId;
   }
   private get baseUrl() {
     return this.paytr.baseUrl;
@@ -114,13 +114,9 @@ export class PayTRTransferService {
       submerchantAmountKurus +
       totalAmountKurus +
       params.transferName +
-      params.transferIban +
-      this.merchantSalt;
+      params.transferIban;
 
-    const paytrToken = crypto
-      .createHmac("sha256", this.merchantKey)
-      .update(hashStr)
-      .digest("base64");
+    const paytrToken = this.creds.signWithSalt(hashStr);
 
     const postData = new URLSearchParams({
       merchant_id: this.merchantId,
@@ -173,15 +169,7 @@ export class PayTRTransferService {
    */
   verifyTransferCallback(params: { transIds: string; hash: string }): boolean {
     if (!params.transIds || !params.hash) return false;
-    const expected = crypto
-      .createHmac("sha256", this.merchantKey)
-      .update(params.transIds + this.merchantSalt)
-      .digest("base64");
-    const expectedBuf = Buffer.from(expected);
-    const receivedBuf = Buffer.from(params.hash);
-    // timingSafeEqual uzunluk farkında throw eder — kısa/sahte hash 500 üretmesin.
-    if (expectedBuf.length !== receivedBuf.length) return false;
-    return crypto.timingSafeEqual(expectedBuf, receivedBuf);
+    return this.creds.verifyWithSalt(params.transIds, params.hash);
   }
 
   /**
@@ -193,13 +181,9 @@ export class PayTRTransferService {
     startDate: string;
     endDate: string;
   }): Promise<PaytrReturnedTransfer[]> {
-    const hashStr =
-      this.merchantId + params.startDate + params.endDate + this.merchantSalt;
-
-    const paytrToken = crypto
-      .createHmac("sha256", this.merchantKey)
-      .update(hashStr)
-      .digest("base64");
+    const paytrToken = this.creds.signWithSalt(
+      this.merchantId + params.startDate + params.endDate,
+    );
 
     const postData = new URLSearchParams({
       merchant_id: this.merchantId,
@@ -273,12 +257,9 @@ export class PayTRTransferService {
     transId: string;
     transfers: Array<{ amount: number; receiver: string; iban: string }>;
   }): Promise<any> {
-    const hashStr = this.merchantId + params.transId + this.merchantSalt;
-
-    const paytrToken = crypto
-      .createHmac("sha256", this.merchantKey)
-      .update(hashStr)
-      .digest("base64");
+    const paytrToken = this.creds.signWithSalt(
+      this.merchantId + params.transId,
+    );
 
     const transInfo = params.transfers.map((t) => ({
       amount: Math.round(t.amount * 100).toString(),

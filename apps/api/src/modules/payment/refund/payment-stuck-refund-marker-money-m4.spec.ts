@@ -1,4 +1,8 @@
-import { RefundAttemptStatus, RefundRequestStatus } from "@prisma/client";
+import {
+  CancellationActor,
+  RefundAttemptStatus,
+  RefundRequestStatus,
+} from "@prisma/client";
 import { RefundReconciliationService } from "./refund-reconciliation.service";
 
 describe("RefundReconciliationService durable attempt recovery", () => {
@@ -29,6 +33,8 @@ describe("RefundReconciliationService durable attempt recovery", () => {
     tradeAttempts?: Array<Record<string, unknown>>;
     staleCount?: number;
     manualReviewCount?: number;
+    /** Anahtarın gösterdiği iade talebinin metadata'sı. */
+    requestMetadata?: unknown;
   }) => {
     const prisma = {
       refundAttempt: {
@@ -43,6 +49,9 @@ describe("RefundReconciliationService durable attempt recovery", () => {
       },
       refundRequest: {
         updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+        findUnique: jest
+          .fn()
+          .mockResolvedValue({ metadata: opts?.requestMetadata ?? null }),
       },
     };
     const paymentRefund = {
@@ -71,8 +80,10 @@ describe("RefundReconciliationService durable attempt recovery", () => {
 
     const result = await service.reconcileStuckRefundMarkers();
 
+    // Serbest (yönetici) anahtarından aktör çıkarılamaz → sistem.
     expect(paymentRefund.processRefund).toHaveBeenCalledWith("order-1", 50, {
       idempotencyKey: "manual-refund-1",
+      cancelledBy: CancellationActor.system,
     });
     expect(result).toEqual({
       checked: 1,
@@ -100,6 +111,43 @@ describe("RefundReconciliationService durable attempt recovery", () => {
         refundedAt: expect.any(Date),
         providerRefundId: "provider-refund-1",
       },
+    });
+  });
+
+  it("recovers a refund-request attempt on behalf of the buyer who opened it", async () => {
+    const attempt = orderAttempt({
+      idempotencyKey: "refund-request:refund-request-1",
+    });
+    const { service, paymentRefund } = makeService({
+      orderAttempts: [attempt],
+    });
+
+    await service.reconcileStuckRefundMarkers();
+
+    expect(paymentRefund.processRefund).toHaveBeenCalledWith("order-1", 50, {
+      idempotencyKey: "refund-request:refund-request-1",
+      cancelledBy: CancellationActor.buyer,
+    });
+  });
+
+  it("recovers an admin (platform) cancellation attempt on behalf of the platform", async () => {
+    const attempt = orderAttempt({
+      idempotencyKey: "refund-request:refund-request-1",
+    });
+    const { service, paymentRefund, prisma } = makeService({
+      orderAttempts: [attempt],
+      requestMetadata: { cancellationActor: CancellationActor.platform },
+    });
+
+    await service.reconcileStuckRefundMarkers();
+
+    expect(prisma.refundRequest.findUnique).toHaveBeenCalledWith({
+      where: { id: "refund-request-1" },
+      select: { metadata: true },
+    });
+    expect(paymentRefund.processRefund).toHaveBeenCalledWith("order-1", 50, {
+      idempotencyKey: "refund-request:refund-request-1",
+      cancelledBy: CancellationActor.platform,
     });
   });
 

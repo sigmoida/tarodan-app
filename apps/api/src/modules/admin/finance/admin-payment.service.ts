@@ -4,6 +4,7 @@ import {
   BadRequestException,
 } from "@nestjs/common";
 import { PrismaService } from "../../../prisma";
+import { LIVE_PAYMENT } from "../../account-lane/live-lane.where";
 import { AdminAuditService } from "../ops/admin-audit.service";
 import {
   fulltextUserSearch,
@@ -18,6 +19,7 @@ import {
   RefundAttemptResolution,
 } from "../dto";
 import {
+  CancellationActor,
   Prisma,
   PaymentStatus,
   RefundAttemptStatus,
@@ -638,7 +640,10 @@ export class AdminPaymentService {
       startDate.setMonth(startDate.getMonth() - 12);
     }
 
+    // İstatistik bir RAPORDUR: test şeridi ödemesi (PayTR test modu, tahsilat
+    // yok) başarı oranına ve ciroya girmez.
     const where: Prisma.PaymentWhereInput = {
+      ...LIVE_PAYMENT,
       createdAt: {
         gte: startDate,
         lte: endDate,
@@ -967,7 +972,7 @@ export class AdminPaymentService {
     const refundResult = await this.paymentService.processRefund(
       payment.orderId,
       refundAmount,
-      { idempotencyKey },
+      { idempotencyKey, cancelledBy: CancellationActor.platform },
     );
 
     // Log admin action

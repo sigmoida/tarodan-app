@@ -42,15 +42,45 @@ async function initiatePayment(
   return response;
 }
 
+/**
+ * Ödemenin AMACI. Sepet ödemesi ile üyelik ödemesi ayrı PayTR mağazalarında
+ * alınır; kayıtlı kartlar mağazaya özeldir, bu yüzden kart listesi ve kart
+ * saklama yeteneği amaca göre okunur.
+ */
+export type PaymentPurpose = "checkout" | "membership";
+
+export type PaymentPurposeCapabilities = {
+  cardStorageEnabled: boolean;
+  recurringEnabled: boolean;
+};
+
+export type PaymentConfig = {
+  bypassEnabled: boolean;
+  /** Geriye uyum: sepet ödemesinin kart saklama yeteneği. */
+  cardStorageEnabled: boolean;
+  /** Geriye uyum: oto-yenileme (üyelik mağazası) açık mı. */
+  recurringEnabled: boolean;
+  /** Eski API bu alanı döndürmeyebilir. */
+  purposes?: Record<PaymentPurpose, PaymentPurposeCapabilities>;
+};
+
+/** Amaca göre yetenekler — `purposes` yoksa (eski API) üst düzey alanlara düşer. */
+export function paymentCapabilities(
+  config: PaymentConfig,
+  purpose: PaymentPurpose,
+): PaymentPurposeCapabilities {
+  return (
+    config.purposes?.[purpose] ?? {
+      cardStorageEnabled: config.cardStorageEnabled,
+      recurringEnabled: config.recurringEnabled,
+    }
+  );
+}
+
 // Payments
 export const paymentsApi = {
-  /** Public ödeme yapılandırması: dev bypass, PayTR kart kasası ve recurring yetkileri. */
-  getConfig: () =>
-    api.get<{
-      bypassEnabled: boolean;
-      cardStorageEnabled: boolean;
-      recurringEnabled: boolean;
-    }>("/payments/config"),
+  /** Public ödeme yapılandırması: dev bypass ve amaç başına PayTR kart kasası / recurring yetkileri. */
+  getConfig: () => api.get<PaymentConfig>("/payments/config"),
   initiate: (orderId: string | number, provider: "paytr") =>
     initiatePayment("/payments/initiate", { orderId }, provider),
   /** Grup ödemesi: tek ödeme checkout grubundaki tüm siparişleri kapsar */

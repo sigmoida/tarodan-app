@@ -3,12 +3,14 @@
 import { useState } from "react";
 import { useParams } from "next/navigation";
 import { Button, StatusBadge, tradeStatusConfig } from "@tarodan/ui";
+import { ADMIN_TRADES_TAB_HREF } from "@tarodan/types";
 import { useTranslations } from "next-intl";
 import { adminApi } from "@/lib/api";
 import { fmtDateTime } from "@/lib/format";
 import { useConfirm } from "@/provider/ConfirmProvider";
 import { useAdminMutation } from "@/hooks/useAdminMutation";
 import { DetailPage } from "@/components/detail/DetailPage";
+import { TestLaneBadge } from "@/components/TestLaneBadge";
 import { Timeline } from "@/components/detail/Timeline";
 import type { TradeDetail } from "./types";
 import {
@@ -115,7 +117,7 @@ export default function TradeDetailPage() {
           .getTrade(tid)
           .then((r) => mapTradePayload(r.data?.data ?? r.data))
       }
-      backHref="/operations/trades"
+      backHref={ADMIN_TRADES_TAB_HREF}
       emptyTitle={t("admin.operations.trades.notFound")}
       title={(trade) => (
         <>
@@ -131,10 +133,13 @@ export default function TradeDetailPage() {
         })
       }
       badge={(trade) => (
-        <StatusBadge
-          status={trade.status}
-          config={statusConfig(tradeStatusConfig, t)}
-        />
+        <div className="flex flex-wrap items-center gap-2">
+          <StatusBadge
+            status={trade.status}
+            config={statusConfig(tradeStatusConfig, t)}
+          />
+          <TestLaneBadge isTest={trade.isTest} />
+        </div>
       )}
       actions={(trade) =>
         trade.status === "disputed" ? (

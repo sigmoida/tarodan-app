@@ -37,6 +37,7 @@ export default function PaymentPageClient() {
     directTarget,
     hasTarget,
     isMembershipPayment,
+    purpose,
   } = usePaymentStatus();
 
   if (phase === "auth-loading") return <AuthLoadingScreen />;
@@ -82,6 +83,7 @@ export default function PaymentPageClient() {
         // kendi özeti sepet ekranındadır).
         pricing={payment.tradeId ? payment.pricing : null}
         cardStorageEnabled={cardStorageEnabled}
+        purpose={purpose}
         hasTarget={hasTarget}
         onCancel={handleCancel}
         cancelling={cancelling}

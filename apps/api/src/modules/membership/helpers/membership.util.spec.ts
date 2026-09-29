@@ -211,7 +211,7 @@ describe("effectiveMembershipTierType", () => {
  * fulfillment D1 ve planlı geçiş D2 aynı sorguyu paylaşır.
  */
 describe("hasUsableRecurringCard", () => {
-  it("uygun kart varsa true, yoksa false; filtre CVV'siz aktif PayTR kartıdır", async () => {
+  it("uygun kart varsa true, yoksa false; filtre üyelik mağazasındaki CVV'siz aktif PayTR kartıdır", async () => {
     const findFirst = jest.fn().mockResolvedValue({ id: "card-1" });
     await expect(
       hasUsableRecurringCard({ savedCard: { findFirst } } as any, "user-1"),
@@ -220,6 +220,8 @@ describe("hasUsableRecurringCard", () => {
       where: {
         userId: "user-1",
         provider: "paytr",
+        // Pazaryeri mağazasındaki (geçiş öncesi) kart non-3D çekilemez.
+        paytrMerchant: "membership",
         status: "active",
         requireCvv: false,
       },
@@ -294,6 +296,13 @@ describe("corporate selling suspension", () => {
           },
         },
       ],
+    });
+  });
+
+  it("saleCapableSellerWhere pins the live lane by default and flips for test viewers", () => {
+    expect(saleCapableSellerWhere()).toMatchObject({ isTestAccount: false });
+    expect(saleCapableSellerWhere(undefined, "test")).toMatchObject({
+      isTestAccount: true,
     });
   });
 });

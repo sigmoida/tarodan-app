@@ -8,6 +8,7 @@ import {
 } from "@nestjs/common";
 import { PrismaService } from "../../../prisma";
 import { UserBlockService } from "../../user-block/user-block.service";
+import { AccountLaneService } from "../../account-lane/account-lane.service";
 import { buyerTotalOf } from "../helpers/order-total.helper";
 import { chargedProductBaseOf } from "../helpers/order-charged-base.helper";
 import { paymentWindowEnd } from "../../payment/helpers/payment.constants";
@@ -15,6 +16,7 @@ import { resolveSalePrice } from "../../product/helpers/product-sale-window";
 import { i18nMessage } from "../../i18n";
 import { CheckoutDto } from "../dto";
 import {
+  CancellationActor,
   OrderStatus,
   ProductKind,
   ProductStatus,
@@ -44,6 +46,8 @@ import {
   remainingDiscountAllowanceFor,
 } from "../../discount/engine/fee-discount.engine";
 import { distanceSalesConsent } from "../helpers/distance-sales-contract";
+import { ORDER_CANCEL_REASON } from "../helpers/order-cancel-reasons";
+import { orderCancelledData } from "../helpers/order-cancellation";
 import {
   calculatePackageDesi,
   type ShippingBuyerShareByTier,
@@ -73,6 +77,7 @@ export class OrderCheckoutGroupService {
     private readonly orderCommon: OrderCommonService,
     private readonly checkoutCommon: OrderCheckoutCommonService,
     private readonly userBlocks: UserBlockService,
+    private readonly lanes: AccountLaneService,
     @Optional()
     private readonly feeDiscounts?: OrderFeeDiscountService,
   ) {}
@@ -201,8 +206,10 @@ export class OrderCheckoutGroupService {
               await tx.order.update({
                 where: { id: stale.id },
                 data: {
-                  status: OrderStatus.cancelled,
-                  cancelReason: "Yeni toplu sipariş ile değiştirildi",
+                  // Terk edilmiş ödeme denemesinin temizliği: alıcı bu
+                  // siparişi iptal etmeyi SEÇMEDİ, yeni sepet onu devraldı.
+                  ...orderCancelledData(CancellationActor.system),
+                  cancelReason: ORDER_CANCEL_REASON.replacedByNewCheckout,
                   reservationReleasedAt:
                     stale.reservationReleasedAt ?? new Date(),
                 },
@@ -297,8 +304,13 @@ export class OrderCheckoutGroupService {
                 i18nMessage("server.order.cannotBuyOwnProduct"),
               );
             }
-            // Engelli çift arasında sipariş açılmaz (misafirde alıcı yok).
-            if (!isGuest) {
+            // Engelli çift arasında sipariş açılmaz; şerit kuralı da bu
+            // kapıda (isBlockedEither). Misafirde alıcı yok ama misafir her
+            // zaman canlı şerittir: test satıcısının ilanı sepetten de
+            // satın alınamaz.
+            if (isGuest) {
+              await this.lanes.assertSameLane(undefined, product.sellerId);
+            } else {
               await this.userBlocks.assertNotBlocked(
                 buyerId,
                 product.sellerId,
@@ -1074,14 +1086,6 @@ export class OrderCheckoutGroupService {
                 shippingAddress: shippingAddressJson as Prisma.InputJsonValue,
               },
             });
-
-            await this.checkoutCommon.recordCommissionSnapshot(
-              order.id,
-              input.orderNumber,
-              input.commissionResult.commissionAmount,
-              input.totalAmount,
-              input.commissionResult,
-            );
 
             // Kodsuz (otomatik) kampanyaların bütçesi sipariş oluşurken
             // harcanır; ödenmeyen sipariş kapanırken geri verilir. Kuponun

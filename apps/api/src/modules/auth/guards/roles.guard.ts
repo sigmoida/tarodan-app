@@ -34,6 +34,9 @@ export const PERMISSION_MAP: Record<string, string[]> = {
   trades: ["trades"],
   "trade-shipments": ["trades"],
   "refund-requests": ["refund_requests"],
+  // İptal & İade ekranının İptaller sekmesi: iade talepleriyle aynı ekran,
+  // aynı izin.
+  cancellations: ["refund_requests"],
   payments: ["payments"],
   // /finance/overview + /finance/psp/* ve ödeme ekranının mutabakat sekmesi —
   // hepsi menüde "payments" izniyle görünür.

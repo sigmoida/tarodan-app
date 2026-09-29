@@ -6,6 +6,7 @@ import {
   NotFoundException,
 } from "@nestjs/common";
 import {
+  CancellationActor,
   OrderStatus,
   Prisma,
   RefundRequestStatus,
@@ -160,6 +161,7 @@ export class RefundShipmentService {
     }
 
     const result = await this.cargo.createShipment({
+      testLane: rr.order.isTest,
       idempotencyKey: `surat:refund-return:${rr.refundNumber}`,
       correlationId: `refund-${rr.id}`,
       reference: rr.refundNumber,
@@ -287,7 +289,10 @@ export class RefundShipmentService {
     // `processRefund` resolves to null when the attempt was already finalized —
     // an idempotent no-op, not a failure — so the variable has to be able to
     // hold that, and readers fall back the same way a missing provider id does.
-    let refundResult: { providerRefundId?: string } | null;
+    let refundResult: {
+      providerRefundId?: string;
+      stockQuarantined?: boolean;
+    } | null;
     try {
       refundResult = await this.paymentService.processRefund(
         rr.orderId,
@@ -296,6 +301,7 @@ export class RefundShipmentService {
           skipRefundEvent: true,
           refundQuantity: rr.refundQuantity,
           idempotencyKey: `refund-request:${rr.id}`,
+          cancelledBy: CancellationActor.buyer,
           settlement: {
             closeOrder: rr.refundQuantity >= (rr.order.quantity ?? 1),
             holdPortion: Math.min(
@@ -387,6 +393,9 @@ export class RefundShipmentService {
       {
         refundNumber: rr.refundNumber,
         orderId: rr.orderId,
+        // Bu fonksiyon yalnız TESLİM SONRASI iadeyi finalize eder; ürün sınırlı
+        // stokluysa processRefund ilanı pasife alır — satıcıya burada bildirilir.
+        stockQuarantined: refundResult?.stockQuarantined ? "yes" : "no",
       },
     );
     await this.notifications.sendRefundEmail(

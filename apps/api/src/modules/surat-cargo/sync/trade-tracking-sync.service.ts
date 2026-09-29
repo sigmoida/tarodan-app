@@ -313,6 +313,7 @@ export class TradeTrackingSyncService {
     const activeTradeShipments = await this.prisma.tradeShipment.findMany({
       where: {
         carrier: "surat",
+        trade: { isTest: false },
         status: {
           notIn: [
             ShipmentStatus.delivered,

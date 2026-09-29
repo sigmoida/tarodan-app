@@ -1,210 +1,162 @@
 "use client";
 
-import { useSuspenseQuery } from "@tanstack/react-query";
-import { useTranslations } from "next-intl";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import type {
+  DashboardPeriodQuery,
+  DashboardStatsResponse,
+  DashboardStockResponse,
+  DashboardWorklistResponse,
+} from "@tarodan/types";
 import { adminApi } from "@/lib/api";
 import { adminKeys } from "@/lib/query/keys";
-import {
-  type DashboardData,
-  type DashboardStats,
-  EMPTY_PERIODS,
-  type MetricPeriods,
-  type PendingActions,
-  type TopProduct,
-  type TopSeller,
-  type VisitorStats,
-} from "./types";
+import { toDashboardMetrics, type DashboardMetrics } from "./metrics";
+import type { RecentOrder, RecentTrade, TopProduct, TopSeller } from "./types";
+import { toPeriodQuery, type DashboardPeriodSelection } from "./periodParams";
 
-type T = ReturnType<typeof useTranslations<never>>;
+/**
+ * The dashboard's four zones load INDEPENDENTLY.
+ *
+ * One request used to carry everything, so the slowest number on the page
+ * decided when any of it appeared — and a single failing endpoint blanked the
+ * screen. Each zone is now its own query with its own loading and error state:
+ * the work queues paint as soon as they arrive, whatever the rest is doing.
+ */
 
-/** Build a 30-entry series (oldest→newest) from a date→value map. */
-function last30Days(dayMap: Map<string, number>) {
-  return Array.from({ length: 30 }, (_, i) => {
-    const d = new Date();
-    d.setDate(d.getDate() - (29 - i));
-    return dayMap.get(d.toISOString().split("T")[0]) ?? 0;
+/** Never poll faster than this. Operations tempo, not a live ticker. */
+export const DASHBOARD_REFETCH_MS = 60_000;
+
+/** The API's response envelope varies by endpoint; unwrap it in one place. */
+function unwrap<T>(response: unknown, fallback: T): T {
+  const body = (response as { data?: unknown })?.data;
+  const inner = (body as { data?: unknown })?.data;
+  return (inner ?? body ?? fallback) as T;
+}
+
+const asArray = <T>(value: unknown): T[] =>
+  Array.isArray(value) ? (value as T[]) : [];
+
+/** Zone A + B — the action queues and the alert strip. */
+export function useDashboardWorklist() {
+  return useQuery({
+    queryKey: adminKeys.all("dashboard-worklist"),
+    queryFn: async (): Promise<DashboardWorklistResponse> => {
+      const response = await adminApi.getDashboardWorklist();
+      return unwrap<DashboardWorklistResponse>(response, {
+        generatedAt: new Date().toISOString(),
+        queues: [],
+        alerts: [],
+      });
+    },
+    refetchInterval: DASHBOARD_REFETCH_MS,
   });
 }
 
-/** Coerce whatever the API returns into a MetricPeriods object; missing → zeros. */
-function toPeriods(raw: unknown): MetricPeriods {
-  if (!raw || typeof raw !== "object") return EMPTY_PERIODS;
-  const r = raw as Partial<MetricPeriods>;
-  return {
-    yesterday: Number(r.yesterday ?? 0),
-    thisMonth: Number(r.thisMonth ?? 0),
-    lastMonth: Number(r.lastMonth ?? 0),
-    changePercent: Number(r.changePercent ?? 0),
-  };
+/** Zone C — the only zone the period filter touches. */
+export function useDashboardStats(selection: DashboardPeriodSelection) {
+  const query: DashboardPeriodQuery = toPeriodQuery(selection);
+
+  return useQuery({
+    queryKey: [...adminKeys.all("dashboard-stats"), query],
+    queryFn: async (): Promise<{
+      metrics: DashboardMetrics;
+      range: DashboardStatsResponse["range"] | null;
+    }> => {
+      const response = await adminApi.getDashboard(query);
+      const body = unwrap<Partial<DashboardStatsResponse>>(response, {});
+      return {
+        metrics: toDashboardMetrics(body.metrics),
+        range: body.range ?? null,
+      };
+    },
+  });
 }
 
-async function fetchDashboard(t: T): Promise<DashboardData> {
-  // Each widget loads independently: a single missing or failing endpoint (e.g.
-  // a dashboard endpoint not yet deployed to the target API) must not blank the
-  // whole page. Failed calls fall back to an empty response, so that one widget
-  // just renders its empty state while the rest of the dashboard stays up.
-  // (A 401 still redirects to login via the api-client interceptor.)
-  const settled = await Promise.allSettled([
-    adminApi.getDashboard(),
-    adminApi.getRecentOrders(5),
-    adminApi.getPendingActions(),
-    adminApi.getSalesAnalytics({ groupBy: "day" }),
-    adminApi.getTrades({ limit: 5, sort: "createdAt:desc" }),
-    adminApi.getRealtimeVisitors(),
-    adminApi.getTopProducts(10),
-    adminApi.getTopSellers(10),
-  ]);
-  const at = (i: number, fallback: any) =>
-    settled[i].status === "fulfilled"
-      ? (settled[i] as PromiseFulfilledResult<any>).value
-      : fallback;
+/** Zone D — balances. */
+export function useDashboardStock() {
+  return useQuery({
+    queryKey: adminKeys.all("dashboard-stock"),
+    queryFn: async (): Promise<DashboardStockResponse | null> =>
+      unwrap<DashboardStockResponse | null>(
+        await adminApi.getDashboardStock(),
+        null,
+      ),
+    refetchInterval: DASHBOARD_REFETCH_MS,
+  });
+}
 
-  const dashboardRes = at(0, { data: {} });
-  const ordersRes = at(1, { data: [] });
-  const pendingRes = at(2, { data: null });
-  const salesRes = at(3, { data: null });
-  const tradesRes = at(4, { data: [] });
-  const visitorsRes = at(5, { data: {} });
-  const topProductsRes = at(6, { data: [] });
-  const topSellersRes = at(7, { data: [] });
+/** Zone E — the two recent-activity lists, loaded together. */
+export function useDashboardLists() {
+  return useQuery({
+    queryKey: adminKeys.all("dashboard-lists"),
+    queryFn: async () => {
+      const [orders, trades] = await Promise.allSettled([
+        adminApi.getRecentOrders(8),
+        adminApi.getTrades({ limit: 5, sort: "createdAt:desc" }),
+      ]);
+      return {
+        recentOrders:
+          orders.status === "fulfilled"
+            ? asArray<RecentOrder>(unwrap(orders.value, []))
+            : [],
+        recentTrades:
+          trades.status === "fulfilled"
+            ? asArray<RecentTrade>(unwrap(trades.value, []))
+            : [],
+      };
+    },
+  });
+}
 
-  // Güvenli erişim: `at()` geri düşüşleri (`{ data: null }`) ve boş gövde
-  // dönen uçlar yüzünden `res.data` null olabiliyor. Bu fonksiyon aynı deseni
-  // bazı satırlarda `?.` ile, bazılarında `.` ile yazıyordu — düz olanlar
-  // panoyu komple çökertiyordu (sunucu render'ı düşüp istemciye geçiyordu).
-  const data = dashboardRes.data?.data || dashboardRes.data || {};
+/**
+ * The all-time widgets. `viewCount` / `storeViewCount` are cumulative counters
+ * with no per-day history, so these two CANNOT follow the period filter —
+ * the screen says so rather than implying otherwise.
+ */
+export function useDashboardTopLists() {
+  return useQuery({
+    queryKey: adminKeys.all("dashboard-top"),
+    queryFn: async () => {
+      const [products, sellers] = await Promise.allSettled([
+        adminApi.getTopProducts(10),
+        adminApi.getTopSellers(10),
+      ]);
+      return {
+        topProducts:
+          products.status === "fulfilled"
+            ? asArray<TopProduct>(unwrap(products.value, []))
+            : [],
+        topSellers:
+          sellers.status === "fulfilled"
+            ? asArray<TopSeller>(unwrap(sellers.value, []))
+            : [],
+      };
+    },
+  });
+}
 
-  // Gross sales and net commission are distinct backend fields (#295); no
-  // longer conflated into one `totalRevenue` scalar.
-  const grossSalesPeriods = toPeriods(data.grossSales);
-  const netCommissionPeriods = toPeriods(data.netCommission);
-  const activeProductsPeriods = toPeriods(data.activeProducts);
-  const passiveProductsPeriods = toPeriods(data.passiveProducts);
-  const activeUsersPeriods = toPeriods(data.activeUsers);
-  const passiveUsersPeriods = toPeriods(data.passiveUsers);
-  const cancellationsPeriods = toPeriods(data.cancellations);
-  const refundsPeriods = toPeriods(data.refunds);
-  const totalOrdersPeriods = toPeriods(data.orders);
+/**
+ * The explicit refresh control: drop the server-side caches, then re-read every
+ * zone. Without the first step the screen would just re-serve the same cached
+ * body and the button would look broken.
+ */
+export function useDashboardRefresh() {
+  const queryClient = useQueryClient();
 
-  const stats: DashboardStats = {
-    totalOrders: data.orders?.total || 0,
-    totalOrdersPeriods,
-    netCommissionTotal: Number(data.revenue?.total ?? 0),
-    netCommissionPeriods,
-    activeProducts: data.products?.active || 0,
-    passiveProducts:
-      typeof data.products?.passive === "number"
-        ? data.products.passive
-        : passiveProductsPeriods.thisMonth,
-    activeProductsPeriods,
-    passiveProductsPeriods,
-    activeUsers:
-      typeof data.users?.active === "number"
-        ? data.users.active
-        : activeUsersPeriods.thisMonth,
-    passiveUsers:
-      typeof data.users?.passive === "number"
-        ? data.users.passive
-        : passiveUsersPeriods.thisMonth,
-    activeUsersPeriods,
-    passiveUsersPeriods,
-    grossSales: grossSalesPeriods.thisMonth,
-    grossSalesPeriods,
-    netCommissionRow2: netCommissionPeriods,
-    cancellations: cancellationsPeriods.thisMonth,
-    refunds: refundsPeriods.thisMonth,
-    cancellationsPeriods,
-    refundsPeriods,
-    pendingApprovals: data.products?.pending || 0,
-  };
-
-  const visitorsData = visitorsRes.data?.data || visitorsRes.data;
-  const visitors: VisitorStats = {
-    liveVisitors: Number(visitorsData?.liveVisitors ?? 0),
-    dailyActiveVisitors: Number(visitorsData?.dailyActiveVisitors ?? 0),
-  };
-
-  const ordersData = ordersRes.data?.data || ordersRes.data || [];
-  const recentOrders = Array.isArray(ordersData) ? ordersData : [];
-
-  const tradesData = tradesRes.data?.data || tradesRes.data || [];
-  const recentTrades = Array.isArray(tradesData) ? tradesData : [];
-
-  const pendingData = pendingRes.data?.data || pendingRes.data;
-  const pendingActions: PendingActions | null = pendingData
-    ? {
-        ...pendingData,
-        identityVerificationRequests:
-          pendingData.identityVerificationRequests ?? 0,
-      }
-    : null;
-
-  // ── Analytics (30-day series + category distribution) ──────────────────────
-  let categoryDistribution: { name: string; count: number }[] = Array.isArray(
-    data.categoryDistribution,
-  )
-    ? data.categoryDistribution.map((c: { name: string; count: number }) => ({
-        name: c.name || t("admin.dashboard.charts.uncategorized"),
-        count: typeof c.count === "number" ? c.count : 0,
-      }))
-    : [];
-
-  let salesByDay = Array(30).fill(0);
-  let ordersByDay = Array(30).fill(0);
-
-  if (salesRes.data) {
-    const salesData = salesRes.data?.data ?? salesRes.data;
-    const dailyArray = Array.isArray(salesData)
-      ? salesData
-      : (salesData?.data ?? []);
-    const salesMap = new Map<string, number>();
-    const ordersMap = new Map<string, number>();
-    dailyArray.forEach((d: any) => {
-      const key = typeof d.date === "string" ? d.date.slice(0, 10) : d.date;
-      if (key) {
-        salesMap.set(key, Number(d.totalSales ?? d.amount ?? 0));
-        ordersMap.set(key, Number(d.orderCount ?? d.orders ?? 0));
-      }
-    });
-    salesByDay = last30Days(salesMap);
-    ordersByDay = last30Days(ordersMap);
-    if (salesData && !Array.isArray(salesData)) {
-      categoryDistribution =
-        salesData.categoryDistribution ??
-        salesData.categories ??
-        categoryDistribution;
+  return async () => {
+    try {
+      await adminApi.refreshDashboard();
+    } finally {
+      await Promise.all(
+        [
+          "dashboard-worklist",
+          "dashboard-stats",
+          "dashboard-stock",
+          "dashboard-lists",
+          "dashboard-top",
+        ].map((resource) =>
+          queryClient.invalidateQueries({ queryKey: adminKeys.all(resource) }),
+        ),
+      );
     }
-  }
-
-  const topProductsData =
-    topProductsRes.data?.data || topProductsRes.data || [];
-  const topProducts: TopProduct[] = Array.isArray(topProductsData)
-    ? topProductsData
-    : [];
-
-  const topSellersData = topSellersRes.data?.data || topSellersRes.data || [];
-  const topSellers: TopSeller[] = Array.isArray(topSellersData)
-    ? topSellersData
-    : [];
-
-  return {
-    stats,
-    visitors,
-    recentOrders,
-    recentTrades,
-    pendingActions,
-    analytics: { salesByDay, ordersByDay, categoryDistribution },
-    topProducts,
-    topSellers,
   };
-}
-
-/** Loads all dashboard data (stats, recent orders/trades, pending, analytics). */
-export function useDashboard() {
-  const t = useTranslations();
-  const query = useSuspenseQuery({
-    queryKey: adminKeys.all("dashboard"),
-    queryFn: () => fetchDashboard(t),
-  });
-  return query.data;
 }

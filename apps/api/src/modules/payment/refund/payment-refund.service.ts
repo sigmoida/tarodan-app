@@ -8,6 +8,7 @@ import {
 import { ConfigService } from "@nestjs/config";
 import { PrismaService } from "../../../prisma";
 import {
+  CancellationActor,
   Prisma,
   PaymentStatus,
   PaymentHoldStatus,
@@ -17,13 +18,15 @@ import {
   SellerAdjustmentType,
 } from "@prisma/client";
 import { OFFER_CANCEL_REASON } from "../../trade/helpers/trade-cancel-reasons";
-import { getProductStatusFromQuantity } from "../../product/helpers/product-status.helper";
+import {
+  shouldQuarantineReturnedStock,
+  statusAfterStockRestore,
+} from "../../product/helpers/product-status.helper";
 import { PaymentProviderRegistry } from "../../payment-providers/payment-provider.registry";
 import { PaymentProvider } from "../dto";
 import { EventService } from "../../events";
 import { NotificationService } from "../../notification/notification.service";
 import { DiscountService } from "../../discount/discount.service";
-import { NotificationType } from "../../notification/dto/notification.dto";
 import { CommissionLedgerService } from "../../commission/commission-ledger.service";
 import { ElogoInvoicingService } from "../../elogo";
 import { PaymentCommonService } from "../payment-common.service";
@@ -36,6 +39,7 @@ import {
 } from "../../outbox/outbox.types";
 import { LedgerService } from "../../ledger/ledger.service";
 import { MONEY_EPSILON } from "../helpers/payment.constants";
+import { groupOrderRefundLimit } from "../helpers/group-refund-limit";
 import { errorMessage } from "../../../common/helpers/error-message";
 import { i18nMessage, localizedPayloadOf } from "../../i18n";
 import {
@@ -51,6 +55,8 @@ import { isProduction } from "../../../config/environment";
 import { PaymentHoldReleaseService } from "./payment-hold-release.service";
 import { PaymentRefundAttemptService } from "./payment-refund-attempt.service";
 import { PaymentTradeRefundService } from "./payment-trade-refund.service";
+import { orderCancelledData } from "../../order/helpers/order-cancellation";
+import { testLaneRefundResult } from "../helpers/test-lane-refund";
 
 /**
  * İade / escrow serbest bırakma metodları — PaymentService'ten birebir taşındı
@@ -102,6 +108,13 @@ export interface RefundSettlementOptions {
 }
 
 export interface ProcessRefundOptions {
+  /**
+   * Bu iade siparişi TAMAMEN kapatırsa iptalin aktörü (`Order.cancelledBy`).
+   * ZORUNLU: iade yolları iptalin en kalabalık yazıcısıdır (alıcı talebi,
+   * yönetici manuel iadesi, cron'lar) ve aktörü yalnız çağıran bilir.
+   * Sipariş zaten başka bir yolla iptal edilmişse o yolun aktörü korunur.
+   */
+  cancelledBy: CancellationActor;
   skipRefundEvent?: boolean;
   refundQuantity?: number;
   idempotencyKey?: string;
@@ -232,17 +245,10 @@ export class PaymentRefundService {
         if (order.cancellationType === "iptal") {
           // Kargo öncesi İPTAL: para iade ediliyor ama kullanıcıya "iade" değil "iptal"
           // denmeli. Alıcı + satıcıya iptal bildirimi + order-cancelled maili; refunded ATLA.
-          await this.notificationService.createInAppNotification(
-            order.buyerId,
-            NotificationType.ORDER_CANCELLED,
-            { orderId, orderNumber: order.orderNumber, amount: amountToRefund },
+          await this.notificationService.notifyOrderCancelledParties(
+            order,
+            amountToRefund,
           );
-          await this.notificationService.createInAppNotification(
-            order.sellerId,
-            NotificationType.ORDER_CANCELLED_SELLER,
-            { orderId, orderNumber: order.orderNumber },
-          );
-          await this.notificationService.sendOrderCancelledEmails(orderId);
           this.logger.log(
             `order_cancelled notification sent for order ${orderId} (cancellationType=iptal)`,
           );
@@ -278,8 +284,8 @@ export class PaymentRefundService {
    */
   async processRefund(
     orderId: string,
-    refundAmount?: number,
-    opts?: ProcessRefundOptions,
+    refundAmount: number | undefined,
+    opts: ProcessRefundOptions,
   ) {
     let payment = await this.prisma.payment.findFirst({
       where: {
@@ -299,6 +305,7 @@ export class PaymentRefundService {
         orderNumber: true,
         totalAmount: true,
         checkoutGroupId: true,
+        packageId: true,
       },
     });
     if (!payment && refundTargetOrder?.checkoutGroupId) {
@@ -341,16 +348,52 @@ export class PaymentRefundService {
     }
 
     // O12: İade tutarı üst sınırı. Aksi halde tek çağrıda işlem tutarından FAZLA iade
-    // talep edilebilir (yalnız PayTR reddi engelliyordu). Üst sınır = ilgili siparişin
-    // tutarı (grup) veya ödeme tutarı (tekil).
+    // talep edilebilir (yalnız PayTR reddi engelliyordu). `refundCap` siparişin PAYIdır
+    // (grup: sipariş tutarı, tekil: ödeme tutarı) — varsayılan tutar, "tam iade"
+    // anahtarı ve tam-iade eşiği ona bakar. `refundLimit` ise kabul edilen EN YÜKSEK
+    // tutardır: grupta pay + bu iadenin kapattığı koli kargosu, ödemede kalanla
+    // sınırlı (kural ve çift-sayım koruması: groupOrderRefundLimit).
     const refundCap = isGroupPayment
       ? Number(refundTargetOrder!.totalAmount)
       : Number(payment.amount);
-    if (amountToRefund > refundCap + 0.01) {
+    const previouslyRefundedOrders: Record<string, number> =
+      ((payment.metadata as any)?.refundedOrders as Record<string, number>) ||
+      {};
+    const refundLimit = isGroupPayment
+      ? groupOrderRefundLimit({
+          orderTotal: refundCap,
+          paymentAmount: Number(payment.amount),
+          refundedOrders: previouslyRefundedOrders,
+          packageSiblings: refundTargetOrder!.packageId
+            ? (
+                await this.prisma.order.findMany({
+                  where: {
+                    packageId: refundTargetOrder!.packageId,
+                    id: { not: orderId },
+                  },
+                  select: {
+                    id: true,
+                    status: true,
+                    totalAmount: true,
+                    buyerShippingAmount: true,
+                    serviceVatRate: true,
+                  },
+                })
+              ).map((sibling) => ({
+                id: sibling.id,
+                status: sibling.status,
+                totalAmount: Number(sibling.totalAmount),
+                buyerShippingAmount: Number(sibling.buyerShippingAmount),
+                serviceVatRate: Number(sibling.serviceVatRate),
+              }))
+            : [],
+        })
+      : refundCap;
+    if (amountToRefund > refundLimit + 0.01) {
       throw new BadRequestException(
         i18nMessage("server.payment.refundAmountExceedsLimit", {
           amountToRefund,
-          refundCap,
+          refundCap: refundLimit,
         }),
       );
     }
@@ -400,9 +443,6 @@ export class PaymentRefundService {
     }
 
     // Grup ödemesinde aynı sipariş ikinci kez iade edilemez
-    const previouslyRefundedOrders: Record<string, number> =
-      ((payment.metadata as any)?.refundedOrders as Record<string, number>) ||
-      {};
     if (isGroupPayment && previouslyRefundedOrders[orderId]) {
       throw new BadRequestException(
         i18nMessage("server.payment.orderAlreadyRefunded"),
@@ -518,6 +558,11 @@ export class PaymentRefundService {
 
     let paytrRefunded = false;
     let providerOutcomeUncertain = false;
+    // Test şeridi ödemesi PayTR test modunda alındı — geri verilecek para yok,
+    // canlı iade API'sine gidilmez (bkz. helpers/test-lane-refund). Karar TEK
+    // yerde: sipariş iadesinin bütün yolları (admin iptali, alıcı talebi,
+    // cron'lar, kısmi iade) buradan geçer.
+    const isTestLaneRefund = payment.isTest === true;
     try {
       let refundResult: any;
       if (refundAttempt.action === "finalize") {
@@ -536,6 +581,14 @@ export class PaymentRefundService {
             return_amount: 0,
             zeroCashSettlement: true,
           };
+        } else if (isTestLaneRefund) {
+          this.logger.log(
+            `Test lane refund: PayTR skipped payment=${payment.id} order=${orderId} amount=${amountToRefund} attempt=${refundAttempt.attempt.id}`,
+          );
+          refundResult = testLaneRefundResult(
+            refundAttempt.attempt.id,
+            amountToRefund,
+          );
         } else {
           const bypassEnabled =
             !isProduction() &&
@@ -552,8 +605,9 @@ export class PaymentRefundService {
             };
           } else {
             try {
+              // İade, ödemenin ALINDIĞI mağazaya gider (kaydın paytrMerchant'ı).
               refundResult = await this.paymentProviders
-                .resolve(payment.provider)
+                .resolve(payment.provider, payment.paytrMerchant)
                 // reference_no = attempt id: PayTR durum-sorgu yanıtında geri
                 // döner, mutabakatta iade ↔ attempt eşlemesini mümkün kılar.
                 .createRefund(
@@ -629,7 +683,9 @@ export class PaymentRefundService {
             i18nMessage("server.payment.refundInitiationFailed"),
           );
         }
-        if (!isZeroCashSettlement) {
+        // Sağlayıcıya gidilmeyen iadeler (sıfır nakit, test şeridi) PayTR olay
+        // günlüğüne yazılmaz — orada yalnız gerçek sağlayıcı etkileşimi durur.
+        if (!isZeroCashSettlement && !isTestLaneRefund) {
           await this.providerEvents.record({
             eventType: "refund",
             merchantOid: paytrOid,
@@ -650,6 +706,10 @@ export class PaymentRefundService {
       // Update payment status after successful refund
       let invoiceAdjustment: InvoiceRefundReversePayload | null = null;
       let shipmentCancellationRequired = false;
+      // Teslim SONRASI iadede stok karantinaya girer (ilan pasif kalır) — tx
+      // içinde gerçekten uygulandıysa true olur, post-commit satıcı bildirimi
+      // bunu okur (bkz. shouldQuarantineReturnedStock).
+      let stockQuarantined = false;
       const refundCommitResult = await this.prisma
         .$transaction(async (tx) => {
           const oldStatus = payment.status;
@@ -893,6 +953,9 @@ export class PaymentRefundService {
                 quantity: true,
                 stockRestoredAt: true,
                 offerId: true,
+                cancelledBy: true,
+                // Karantina kararının TEK sinyali: bkz. shouldQuarantineReturnedStock.
+                deliveredAt: true,
               },
             });
             const sellerAdjustments = (
@@ -938,7 +1001,16 @@ export class PaymentRefundService {
             if (isFullRefund) {
               await tx.order.update({
                 where: { id: orderId },
-                data: { status: OrderStatus.cancelled },
+                data: {
+                  ...orderCancelledData(opts.cancelledBy),
+                  // İptali başka yol ZATEN yazdıysa (kargolamama cron'u, stok
+                  // kaskadı, ödeme yarışı) aktör o yolundur; iade onu ezmez.
+                  // Göç öncesi iptalde null kalır — "bilinmiyor" yanlış bir
+                  // aktörden iyidir.
+                  ...(alreadyCancelled
+                    ? { cancelledBy: orderRow?.cancelledBy ?? null }
+                    : {}),
+                },
               });
               // Teklif siparişi: teklif `accepted` kalırsa reactivate/"Ödemeyi
               // tamamla" iade edilmiş siparişi yeniden ödemeye açar. Tam iade
@@ -969,22 +1041,36 @@ export class PaymentRefundService {
             ) {
               const product = await tx.product.findUnique({
                 where: { id: orderRow.productId },
-                select: { quantity: true },
+                select: { quantity: true, status: true, inactiveReason: true },
               });
               if (
                 product?.quantity !== null &&
                 product?.quantity !== undefined
               ) {
                 const newQty = product.quantity + restoreQty;
+                // Ürün alıcıya TESLİM EDİLDİKTEN sonra iade ediliyorsa hasarlı
+                // olabilir: miktar geri yüklenir ama ilan PASİF kalır (adet
+                // fark etmez), satıcı inceleyip kendisi aktive eder. Teslimat
+                // öncesi iptalde (deliveredAt null) eski davranış korunur.
+                const quarantine = shouldQuarantineReturnedStock(
+                  orderRow?.deliveredAt ?? null,
+                );
                 await tx.product.update({
                   where: { id: orderRow.productId },
                   data: {
                     quantity: { increment: restoreQty },
-                    status: getProductStatusFromQuantity(newQty),
+                    // status + inactiveReason birlikte: karantinadaki ilan
+                    // teslimat öncesi bir iptalle satışa geri açılmaz — bkz.
+                    // statusAfterStockRestore / resolveUpdatedStatus.
+                    ...statusAfterStockRestore(product, newQty, quarantine),
                   },
                 });
+                stockQuarantined = quarantine;
                 this.logger.log(
-                  `Restored ${restoreQty} stock for product ${orderRow.productId} after refund of order ${orderId}`,
+                  `Restored ${restoreQty} stock for product ${orderRow.productId} after refund of order ${orderId}` +
+                    (quarantine
+                      ? " (listing set inactive — post-delivery return)"
+                      : ""),
                 );
               }
               // Tam iadede işaretle → sonraki cron turlarında çift-restore engeli.
@@ -1011,6 +1097,9 @@ export class PaymentRefundService {
               refundResult.merchant_oid ||
               freshAttempt.providerRefundId ||
               undefined,
+            // Çağıran (ör. finalizeRefundForReturnedShipment) satıcıya "ilan
+            // pasife düştü" notunu YALNIZ bu true ise ekler.
+            stockQuarantined,
           };
 
           // 11.2d: iade sonucu bildirimleri (payment.refunded / order_cancelled) artık

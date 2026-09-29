@@ -4,6 +4,7 @@ import { EventEmitter2 } from "@nestjs/event-emitter";
 import { UserBlockService } from "./user-block.service";
 import { PrismaService } from "../../prisma";
 import { CacheService } from "../cache/cache.service";
+import { AccountLaneService } from "../account-lane/account-lane.service";
 import { USER_BLOCKED_EVENT, blockedCacheKey } from "./user-block.constants";
 
 describe("UserBlockService", () => {
@@ -29,6 +30,7 @@ describe("UserBlockService", () => {
     ),
   };
   const events = { emit: jest.fn() };
+  const lanes = { lanesDiffer: jest.fn().mockResolvedValue(false) };
 
   beforeEach(async () => {
     jest.clearAllMocks();
@@ -39,6 +41,7 @@ describe("UserBlockService", () => {
         { provide: PrismaService, useValue: prisma },
         { provide: CacheService, useValue: cache },
         { provide: EventEmitter2, useValue: events },
+        { provide: AccountLaneService, useValue: lanes },
       ],
     }).compile();
     service = module.get(UserBlockService);
@@ -133,6 +136,13 @@ describe("UserBlockService", () => {
       ]);
       expect(await service.isBlockedEither("a", "b")).toBe(true);
       expect(await service.isBlockedEither("a", "a")).toBe(false);
+    });
+
+    it("isBlockedEither closes the gate across account lanes even without a block", async () => {
+      prisma.userBlock.findMany.mockResolvedValue([]);
+      lanes.lanesDiffer.mockResolvedValueOnce(true);
+      expect(await service.isBlockedEither("live", "test")).toBe(true);
+      expect(await service.isBlockedEither("live", "live2")).toBe(false);
     });
   });
 });

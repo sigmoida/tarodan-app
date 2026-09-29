@@ -1,60 +1,10 @@
-import { orderStatusConfig, tradeStatusConfig } from "@tarodan/ui";
+import { orderStatusConfig, tradeStatusConfig } from "@tarodan/shared";
 import type { StatusConfig } from "@tarodan/ui";
 import { useTranslations } from "next-intl";
 import { fmtDate } from "@/lib/format";
+import { statusConfig } from "@/lib/statusLabels";
 
 type T = ReturnType<typeof useTranslations<never>>;
-
-/**
- * Yesterday / this-month / last-month + changePercent breakdown for a single
- * metric. Mirrors the `MetricPeriods` interface returned by the API dashboard
- * endpoint (#295).
- */
-export interface MetricPeriods {
-  yesterday: number;
-  thisMonth: number;
-  lastMonth: number;
-  changePercent: number;
-}
-
-export const EMPTY_PERIODS: MetricPeriods = {
-  yesterday: 0,
-  thisMonth: 0,
-  lastMonth: 0,
-  changePercent: 0,
-};
-
-export interface DashboardStats {
-  // Row 1
-  totalOrders: number;
-  totalOrdersPeriods: MetricPeriods;
-  netCommissionTotal: number;
-  netCommissionPeriods: MetricPeriods;
-  activeProducts: number;
-  passiveProducts: number;
-  activeProductsPeriods: MetricPeriods;
-  passiveProductsPeriods: MetricPeriods;
-  activeUsers: number;
-  passiveUsers: number;
-  activeUsersPeriods: MetricPeriods;
-  passiveUsersPeriods: MetricPeriods;
-
-  // Row 2
-  grossSales: number;
-  grossSalesPeriods: MetricPeriods;
-  netCommissionRow2: MetricPeriods;
-  cancellations: number;
-  refunds: number;
-  cancellationsPeriods: MetricPeriods;
-  refundsPeriods: MetricPeriods;
-
-  pendingApprovals: number;
-}
-
-export interface VisitorStats {
-  liveVisitors: number;
-  dailyActiveVisitors: number;
-}
 
 export interface TopProduct {
   id: string;
@@ -102,51 +52,12 @@ export interface RecentTrade {
   }>;
 }
 
-export interface PendingActions {
-  pendingProducts: number;
-  refundRequests: number;
-  pendingMessages?: number;
-  identityVerificationRequests?: number;
-  totalPending: number;
-}
-
-export interface DashboardAnalytics {
-  salesByDay: number[];
-  ordersByDay: number[];
-  categoryDistribution: { name: string; count: number }[];
-}
-
-export interface DashboardData {
-  stats: DashboardStats;
-  visitors: VisitorStats;
-  recentOrders: RecentOrder[];
-  recentTrades: RecentTrade[];
-  pendingActions: PendingActions | null;
-  analytics: DashboardAnalytics;
-  topProducts: TopProduct[];
-  topSellers: TopSeller[];
-}
-
-/** Order config + refund_requested (not in the shared config). */
 export function dashboardOrderStatusConfig(t: T): Record<string, StatusConfig> {
-  return {
-    ...orderStatusConfig,
-    refund_requested: {
-      label: t("admin.dashboard.status.refundRequested"),
-      variant: "warning",
-    },
-  };
+  return statusConfig(orderStatusConfig, t);
 }
 
-/** Trade config + in_progress (not in the shared config). */
 export function dashboardTradeStatusConfig(t: T): Record<string, StatusConfig> {
-  return {
-    ...tradeStatusConfig,
-    in_progress: {
-      label: t("admin.dashboard.status.inProgress"),
-      variant: "info",
-    },
-  };
+  return statusConfig(tradeStatusConfig, t);
 }
 
 export function formatRelativeDate(dateString: string, t: T) {

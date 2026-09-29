@@ -27,21 +27,31 @@
  * Bu suite çoğunlukla API seviyesi (request fixture) ile çalışır; sonuçlar DB'den (dbFind)
  * ve HTTP status'tan assert edilir. UI doğrulaması gereken yerde loginViaToken kullanılır.
  */
-import { test, expect, APIRequestContext } from '@playwright/test';
+import { test, expect, APIRequestContext } from "@playwright/test";
 import {
-  API, USERS, apiLogin, apiMe, apiFirstBuyableProduct, apiBuyAndPay, apiGetOrder, uniquePhone,
-} from '../support/helpers';
-import { dbFind, dbCount } from '../support/db';
+  API,
+  USERS,
+  apiLogin,
+  apiMe,
+  apiFirstBuyableProduct,
+  apiBuyAndPay,
+  apiGetOrder,
+  uniquePhone,
+} from "../support/helpers";
+import { dbFind, dbCount } from "../support/db";
 
 const authHeader = (token: string) => ({ Authorization: `Bearer ${token}` });
 
 /** Admin login (ayrı endpoint) → admin accessToken. */
-async function adminLogin(request: APIRequestContext, user: { email: string; password: string }): Promise<string> {
+async function adminLogin(
+  request: APIRequestContext,
+  user: { email: string; password: string },
+): Promise<string> {
   const res = await request.post(`${API}/auth/admin/login`, { data: user });
   expect(res.ok(), `admin login ${user.email}`).toBeTruthy();
   const body = await res.json();
   const token = body?.tokens?.accessToken ?? body?.accessToken;
-  expect(token, 'admin accessToken').toBeTruthy();
+  expect(token, "admin accessToken").toBeTruthy();
   return token as string;
 }
 
@@ -51,15 +61,15 @@ async function registerFreshUser(
   opts: { isSeller?: boolean; displayName?: string } = {},
 ): Promise<{ id: string; email: string; password: string; token: string }> {
   const email = `pw-k-${Date.now()}-${Math.floor(Math.random() * 99999)}@test.local`;
-  const password = 'Pwtest123!';
+  const password = "Pwtest123!";
   const birth = new Date();
   birth.setFullYear(birth.getFullYear() - 25);
   const res = await request.post(`${API}/auth/register`, {
     data: {
       email,
       password,
-      displayName: opts.displayName ?? 'PW Suite K User',
-      birthDate: birth.toISOString().split('T')[0],
+      displayName: opts.displayName ?? "PW Suite K User",
+      birthDate: birth.toISOString().split("T")[0],
       phone: uniquePhone(),
       isSeller: opts.isSeller ?? false,
     },
@@ -68,8 +78,8 @@ async function registerFreshUser(
   const body = await res.json();
   const id = body?.user?.id;
   const token = body?.tokens?.accessToken;
-  expect(id, 'yeni kullanıcı id').toBeTruthy();
-  expect(token, 'yeni kullanıcı token').toBeTruthy();
+  expect(id, "yeni kullanıcı id").toBeTruthy();
+  expect(token, "yeni kullanıcı token").toBeTruthy();
   return { id, email, password, token };
 }
 
@@ -79,15 +89,21 @@ async function anyCategoryId(request: APIRequestContext): Promise<string> {
   if (res.ok()) {
     const body = await res.json();
     const flat: any[] = [];
-    const walk = (arr: any[]) => arr?.forEach((c) => { flat.push(c); if (c.children) walk(c.children); });
+    const walk = (arr: any[]) =>
+      arr?.forEach((c) => {
+        flat.push(c);
+        if (c.children) walk(c.children);
+      });
     walk(body?.data ?? body?.categories ?? (Array.isArray(body) ? body : []));
-    const leaf = flat.find((c) => c.id && (!c.children || c.children.length === 0)) ?? flat[0];
+    const leaf =
+      flat.find((c) => c.id && (!c.children || c.children.length === 0)) ??
+      flat[0];
     if (leaf?.id) return leaf.id;
   }
   // Fallback: aktif bir ürünün kategorisini kullan
   const p = await apiFirstBuyableProduct(request);
   const catId = p?.categoryId ?? p?.category?.id;
-  expect(catId, 'kategori id bulundu').toBeTruthy();
+  expect(catId, "kategori id bulundu").toBeTruthy();
   return catId;
 }
 
@@ -96,23 +112,23 @@ async function createPendingProduct(
   request: APIRequestContext,
   sellerToken: string,
   categoryId: string,
-  titleSuffix = '',
+  titleSuffix = "",
 ): Promise<string> {
   const res = await request.post(`${API}/products`, {
     headers: authHeader(sellerToken),
     data: {
       title: `PW Moderasyon Ürünü ${titleSuffix} ${Date.now()}`,
-      description: 'E2E moderasyon testi için oluşturulan ürün açıklaması.',
+      description: "E2E moderasyon testi için oluşturulan ürün açıklaması.",
       price: 199.99,
       categoryId,
-      condition: 'very_good',
+      condition: "very_good",
       quantity: 3,
     },
   });
   expect(res.ok(), `ürün oluştur ${titleSuffix}`).toBeTruthy();
   const body = await res.json();
   const id = body?.id ?? body?.data?.id ?? body?.product?.id;
-  expect(id, 'ürün id').toBeTruthy();
+  expect(id, "ürün id").toBeTruthy();
   return id;
 }
 
@@ -120,11 +136,13 @@ async function createPendingProduct(
 // J18 — Ürün moderasyon: red → satıcı düzeltir → onay → satış
 // ════════════════════════════════════════════════════════════════════════════
 
-test.describe('J36 — Komisyon/indirim rol-bazlı + raporlar', () => {
-  test('super_admin indirim+komisyon oluşturur, admin komisyon yetkisiz, moderatör komisyon göremez, raporlar', async ({ request }) => {
+test.describe("J36 — Komisyon/indirim rol-bazlı + raporlar", () => {
+  test("super_admin indirim+komisyon oluşturur, admin komisyon yetkisiz, moderatör komisyon göremez, raporlar", async ({
+    request,
+  }) => {
     test.setTimeout(60_000);
 
-    const superToken = await adminLogin(request, USERS.admin);   // admin@tarodan.com (seed: super_admin)
+    const superToken = await adminLogin(request, USERS.admin); // admin@tarodan.com (seed: super_admin)
     const moderatorToken = await adminLogin(request, USERS.moderator);
 
     // 1+2) Süper yönetici global indirim kampanyası oluşturur
@@ -133,50 +151,79 @@ test.describe('J36 — Komisyon/indirim rol-bazlı + raporlar', () => {
       headers: authHeader(superToken),
       data: {
         name: `PW Global Kampanya ${now}`,
-        type: 'percentage',
+        type: "percentage",
         value: 10,
-        scope: 'global',
+        scope: "global",
         startDate: new Date(now).toISOString(),
         endDate: new Date(now + 30 * 24 * 3600_000).toISOString(),
         isActive: true,
       },
     });
-    expect(discRes.ok(), 'super_admin indirim oluşturdu').toBeTruthy();
+    expect(discRes.ok(), "super_admin indirim oluşturdu").toBeTruthy();
     const discount = await discRes.json();
     const discountId = discount?.id ?? discount?.data?.id;
     if (discountId) {
-      const dbDisc = await dbFind(request, 'discount' as any, { id: discountId }, { scope: true, value: true });
-      expect(Number(dbDisc?.value), 'indirim değeri 10').toBe(10);
+      const dbDisc = await dbFind(
+        request,
+        "discount" as any,
+        { id: discountId },
+        { scope: true, value: true },
+      );
+      expect(Number(dbDisc?.value), "indirim değeri 10").toBe(10);
     }
 
     // 3) Süper yönetici komisyon kurallarını listeler + yeni kural ekler
-    const listComm = await request.get(`${API}/admin/commission-rules`, { headers: authHeader(superToken) });
-    expect(listComm.ok(), 'super komisyon listesi').toBeTruthy();
+    const listComm = await request.get(`${API}/admin/commission-rules`, {
+      headers: authHeader(superToken),
+    });
+    expect(listComm.ok(), "super komisyon listesi").toBeTruthy();
 
     const createComm = await request.post(`${API}/admin/commission-rules`, {
       headers: authHeader(superToken),
-      data: { name: `PW Komisyon ${now}`, sellerType: 'PREMIUM', appliesTo: 'SELLER', sellerRate: 7.5, isActive: true },
+      data: {
+        name: `PW Komisyon ${now}`,
+        sellerType: "PREMIUM",
+        appliesTo: "SELLER",
+        sellerRate: 7.5,
+        isActive: true,
+      },
     });
-    if (!createComm.ok()) expect(createComm.ok(), `super komisyon oluşturdu (${createComm.status()}) ${(await createComm.text()).slice(0, 120)}`).toBeTruthy();
+    if (!createComm.ok())
+      expect(
+        createComm.ok(),
+        `super komisyon oluşturdu (${createComm.status()}) ${(await createComm.text()).slice(0, 120)}`,
+      ).toBeTruthy();
 
     // 4) Moderatör komisyon kurallarını GÖRMEYE çalışır → engellenir
     //    (commission-rules sadece super_admin + admin; moderator değil)
-    const modComm = await request.get(`${API}/admin/commission-rules`, { headers: authHeader(moderatorToken) });
-    expect(modComm.ok(), 'moderatör komisyon görememeli').toBeFalsy();
+    const modComm = await request.get(`${API}/admin/commission-rules`, {
+      headers: authHeader(moderatorToken),
+    });
+    expect(modComm.ok(), "moderatör komisyon görememeli").toBeFalsy();
     expect([401, 403]).toContain(modComm.status());
 
     // 5) Moderatör komisyon kuralı OLUŞTURMAYA çalışır → engellenir (sadece super_admin)
     const modCreate = await request.post(`${API}/admin/commission-rules`, {
       headers: authHeader(moderatorToken),
-      data: { name: 'yetkisiz', sellerType: 'PREMIUM', appliesTo: 'SELLER', sellerRate: 5 },
+      data: {
+        name: "yetkisiz",
+        sellerType: "PREMIUM",
+        appliesTo: "SELLER",
+        sellerRate: 5,
+      },
     });
-    expect(modCreate.ok(), 'moderatör komisyon oluşturamamalı').toBeFalsy();
+    expect(modCreate.ok(), "moderatör komisyon oluşturamamalı").toBeFalsy();
     expect([401, 403]).toContain(modCreate.status());
 
     // 6) Süper yönetici satış ve gelir raporlarını inceler
-    const sales = await request.get(`${API}/admin/reports/sales`, { headers: authHeader(superToken) });
-    expect(sales.ok(), 'satış raporu').toBeTruthy();
-    const revenue = await request.get(`${API}/admin/analytics/revenue`, { headers: authHeader(superToken) });
-    expect(revenue.ok(), 'gelir analitiği').toBeTruthy();
+    const sales = await request.get(`${API}/admin/analytics/sales`, {
+      headers: authHeader(superToken),
+    });
+    expect(sales.ok(), "satış analitiği").toBeTruthy();
+    const revenue = await request.get(
+      `${API}/admin/analytics/sales/export?format=csv`,
+      { headers: authHeader(superToken) },
+    );
+    expect(revenue.ok(), "satış analitiği dosyası").toBeTruthy();
   });
 });

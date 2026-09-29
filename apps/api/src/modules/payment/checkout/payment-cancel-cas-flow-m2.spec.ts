@@ -1,5 +1,5 @@
 import { PaymentLifecycleService } from "./payment-lifecycle.service";
-import { PaymentStatus } from "@prisma/client";
+import { CancellationActor, PaymentStatus } from "@prisma/client";
 
 /**
  * FLOW-M2: cancelPayment artık CAS (updateMany + status guard) ile `failed` yapar.
@@ -66,9 +66,10 @@ describe("PaymentLifecycleService.cancelPayment — FLOW-M2 CAS", () => {
     });
     // KOŞULSUZ update kullanılMAMALI (completed'ı ezme riski).
     expect(prisma.payment.update).not.toHaveBeenCalled();
+    // Alıcı ödemeyi kendisi iptal etti → siparişin iptal aktörü alıcı.
     expect(
       paymentFulfillment.releaseProductForFailedPayment,
-    ).toHaveBeenCalledWith("order-1");
+    ).toHaveBeenCalledWith("order-1", { by: CancellationActor.buyer });
     expect(res.success).toBe(true);
   });
 

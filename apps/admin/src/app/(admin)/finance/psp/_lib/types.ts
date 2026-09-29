@@ -1,5 +1,8 @@
 /** @format */
 
+/** PayTR mağazası: pazaryeri (sipariş/takas/öne çıkarma) ya da üyelik. */
+export type PaytrMerchant = "marketplace" | "membership";
+
 /** `GET /admin/finance/psp/reconciliation` — API şekliyle birebir. */
 export interface PspSyncRun {
   at: string;
@@ -58,6 +61,7 @@ export interface PspMissingPayment {
 
 export interface PspStatementLine {
   id: string;
+  paytrMerchant: PaytrMerchant;
   merchantOid: string;
   type: "sale" | "refund";
   amount: string | number;
@@ -84,6 +88,7 @@ export interface PspStatementLine {
 
 export interface PspSettlement {
   id: string;
+  paytrMerchant: PaytrMerchant;
   datePaid: string;
   currency: string;
   salesTotal: string | number;

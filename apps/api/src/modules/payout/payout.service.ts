@@ -296,6 +296,9 @@ export class PayoutService {
       const payment = hold.payment;
       const order = orderById.get(hold.orderId);
       if (!payment || !order) continue;
+      // Test şeridi: PayTR test modunda tahsil edilen para yoktur → satıcıya
+      // gerçek transfer ÜRETME. Hold released kalır, payout satırı hiç oluşmaz.
+      if (payment.isTest || order.isTest) continue;
       if (!PAYOUT_ELIGIBLE_ORDER_STATUSES.includes(order.status)) {
         this.logger.warn(
           `Payout skipped: order ${hold.orderId} is not payout eligible (status=${order.status})`,
@@ -417,6 +420,7 @@ export class PayoutService {
           });
 
     for (const tcp of releasedTradeCash) {
+      if (tcp.trade.isTest || tcp.payment?.isTest) continue;
       if (tcp.payment) {
         const activeRefundAttempt = await this.prisma.refundAttempt.findFirst({
           where: {

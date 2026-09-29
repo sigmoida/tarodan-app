@@ -1,3 +1,9 @@
+import type {
+  AdminCancellationCounts,
+  AdminOrderCancelPreview,
+  AdminOrderCancelResult,
+  AdminOrderCounts,
+} from "@tarodan/types";
 import { api } from "./client";
 
 /**
@@ -7,6 +13,9 @@ import { api } from "./client";
 export const operationsApi = {
   // Orders
   getOrders: (params?: any) => api.get("/admin/orders", { params }),
+  /** Every orders tab's bucket counts in one call, honoring the list filters. */
+  getOrderCounts: (params?: Record<string, string>) =>
+    api.get<AdminOrderCounts>("/admin/orders/counts", { params }),
   /** Grup dosyası: order id grup çatısına çözülür (ödeme + paketler + sipariş finans/escrow/iade). */
   getOrderFile: (id: string) => api.get(`/admin/orders/${id}/file`),
   updateOrderStatus: (id: string, status: string, notes: string) =>
@@ -20,8 +29,24 @@ export const operationsApi = {
     },
   ) => api.post(`/admin/orders/${id}/tracking`, payload),
   getOrderInvoice: (id: string) => api.get(`/admin/orders/${id}/invoice`),
+  /** Kargo öncesi platform iptalinde alıcıya dönecek tutar (iptalle aynı hesap). */
+  getOrderCancelPreview: (id: string) =>
+    api.get<AdminOrderCancelPreview>(`/admin/orders/${id}/cancel-preview`),
+  /** Kargo öncesi platform iptali (sipariş / sepet kalemi başına, tam iade). */
+  cancelOrder: (id: string, reason: string) =>
+    api.post<AdminOrderCancelResult>(`/admin/orders/${id}/cancel`, { reason }),
 
-  // Offers (Teklifler — /operations/offers; izin: orders)
+  // Cancellations (İptal & İade → İptaller; izin: refund_requests)
+  getCancellations: (params?: Record<string, unknown>) =>
+    api.get("/admin/cancellations", { params }),
+  /** Every cancellations tab's sub-tab counts in one call, honoring the filters. */
+  getCancellationCounts: (params?: Record<string, string>) =>
+    api.get<AdminCancellationCounts>("/admin/cancellations/counts", { params }),
+  /** The current filter as an XLSX file (one row per cancelled line). */
+  exportCancellations: (params?: Record<string, unknown>) =>
+    api.get("/admin/cancellations/export", { params, responseType: "blob" }),
+
+  // Offers (Siparişler ekranının Teklifler sekmesi; izin: orders)
   getOffers: (params?: any) => api.get("/admin/offers", { params }),
   getOffer: (id: string) => api.get(`/admin/offers/${id}`),
   cancelOffer: (id: string, reason: string) =>

@@ -7,8 +7,13 @@ import {
 } from "@tarodan/shared";
 import Link from "next/link";
 import Image from "next/image";
-import { ChevronRightIcon, TruckIcon } from "@heroicons/react/24/outline";
 import {
+  ChevronRightIcon,
+  TruckIcon,
+  XCircleIcon,
+} from "@heroicons/react/24/outline";
+import {
+  Alert,
   Badge,
   Button,
   StatusBadge,
@@ -31,6 +36,8 @@ import {
 } from "../_lib/fileTypes";
 import { StatusUpdateModal } from "../_modals/StatusUpdateModal";
 import { AddTrackingModal } from "../_modals/AddTrackingModal";
+import { CancelOrderModal } from "../_modals/CancelOrderModal";
+import { canCancelFileEntry, pendingCancellationRefund } from "../_lib/cancel";
 import { statusConfig } from "@/lib/statusLabels";
 
 /**
@@ -48,6 +55,7 @@ export function OrderFileBlock({ entry }: { entry: OrderFileEntry }) {
   const { user } = useSession();
   const [statusOpen, setStatusOpen] = useState(false);
   const [trackingOpen, setTrackingOpen] = useState(false);
+  const [cancelOpen, setCancelOpen] = useState(false);
   const canManage = user.role === "super_admin" || user.role === "admin";
 
   const status = getOrderStatusInfo(
@@ -55,6 +63,7 @@ export function OrderFileBlock({ entry }: { entry: OrderFileEntry }) {
     t,
   );
   const f = entry.finance;
+  const pendingCancellation = pendingCancellationRefund(entry);
 
   return (
     <section className="mt-5 border-t border-border pt-5">
@@ -89,8 +98,35 @@ export function OrderFileBlock({ entry }: { entry: OrderFileEntry }) {
               {t("admin.operations.orders.addTracking")}
             </Button>
           )}
+          {canManage && canCancelFileEntry(entry) && (
+            <Button
+              variant="outline"
+              size="sm"
+              className="text-danger-600 hover:text-danger-700"
+              leftIcon={<XCircleIcon className="h-4 w-4" />}
+              onClick={() => setCancelOpen(true)}
+            >
+              {t("admin.operations.orders.cancel.action")}
+            </Button>
+          )}
         </div>
       </div>
+
+      {pendingCancellation && (
+        <Alert variant="warning" className="mb-4">
+          <span className="flex flex-wrap items-center justify-between gap-2">
+            <span>{t("admin.operations.orders.cancel.pendingManual")}</span>
+            <Button asChild variant="ghost" size="sm">
+              <Link
+                href={`/operations/refund-requests/${pendingCancellation.id}`}
+              >
+                {t("admin.operations.orders.cancel.openPendingRefund")}
+                <ChevronRightIcon className="ml-1 h-4 w-4" />
+              </Link>
+            </Button>
+          </span>
+        </Alert>
+      )}
 
       {/* Ürün satırı */}
       <div className="flex items-start gap-4">
@@ -314,6 +350,12 @@ export function OrderFileBlock({ entry }: { entry: OrderFileEntry }) {
         open={trackingOpen}
         onClose={() => setTrackingOpen(false)}
         orderId={entry.id}
+      />
+      <CancelOrderModal
+        open={cancelOpen}
+        onClose={() => setCancelOpen(false)}
+        orderId={entry.id}
+        orderNumber={entry.orderNumber}
       />
     </section>
   );

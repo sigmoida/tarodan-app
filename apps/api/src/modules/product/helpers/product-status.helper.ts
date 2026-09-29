@@ -1,4 +1,4 @@
-import { ProductStatus } from '@prisma/client';
+import { ProductInactiveReason, ProductStatus } from "@prisma/client";
 
 /**
  * quantity'dan product status belirler.
@@ -38,4 +38,80 @@ export function getReservedAwareStatus(
     return ProductStatus.active;
   }
   return quantity > 0 ? ProductStatus.reserved : ProductStatus.inactive;
+}
+
+/**
+ * İade edilen stok karantinaya mı girmeli? PO kararı: "İade edilen ürün otomatik
+ * stoğa döner ama hasarlı olabilir; ilan PASİF kalmalı, satıcı kendisi inceleyip
+ * aktive eder." Adet ne olursa olsun (çok adetli ilanda da) tüm ilan pasife
+ * düşer — kullanılabilirlikten önce güvenlik gelir.
+ *
+ * Tek sinyal: `Order.deliveredAt`. Bu alan yalnız TEK kanonik yoldan
+ * (`PaymentHoldReleaseService.handleOrderDelivered` — webhook/poller/admin
+ * hangisinden gelirse gelsin) damgalanır, bu yüzden "ürün alıcıya fiilen ulaştı
+ * mı" sorusunun tek güvenilir cevabı budur:
+ * - null  → sipariş hiç teslim edilmedi (kargo/ödeme öncesi iptal) → ürün
+ *           alıcının eline hiç geçmedi → eski davranış (miktardan status).
+ * - dolu  → teslim SONRASI iade → miktar geri yüklenir ama status karantinada.
+ */
+export function shouldQuarantineReturnedStock(
+  deliveredAt: Date | null,
+): boolean {
+  return deliveredAt !== null;
+}
+
+/**
+ * `Product.inactiveReason` (bkz. şema) yalnız `return_quarantine` iken anlamlı:
+ * satıcı `inactive` bir ilanı DOĞRUDAN (admin onayı olmadan) aktive edebilir
+ * — bkz. `resolveUpdatedStatus`. Bayat bir işaret bu ayrıcalığı yanlış ilana
+ * (elle pasife alınmış veya moderasyonca reddedilmiş) sızdırabileceğinden,
+ * ilan `inactive` DIŞINA çıkan HER yazımda temizlenmeli.
+ *
+ * Tek entegrasyon noktası: `PrismaService`'in Product middleware'i (bkz.
+ * `registerProductInactiveReasonGuardMiddleware`), ~30 ayrı `status` yazıcısını
+ * (trade/payment/admin/moderation/scheduler) tek tek dolaşıp değiştirmek yerine
+ * her Product `update`/`updateMany` çağrısının `data`sına burada uygulanır. Çağıran
+ * `inactiveReason`'ı AYNI yazımda zaten belirtmişse (ör. payment-refund'ın
+ * karantina yolu) dokunulmaz — çağıranın niyeti her zaman kazanır.
+ */
+export function clearStaleInactiveReasonOnWrite(
+  data: Record<string, unknown> | undefined,
+): void {
+  if (!data) return;
+  if (!Object.prototype.hasOwnProperty.call(data, "status")) return;
+  if (data.status === ProductStatus.inactive) return;
+  if (Object.prototype.hasOwnProperty.call(data, "inactiveReason")) return;
+  data.inactiveReason = null;
+}
+
+/**
+ * İptal/iade sonrası stok GERİ YÜKLENİRKEN ilanın yeni durumu — tek karar yeri.
+ *
+ * - Bu iade teslimat SONRASI ise (`quarantine=true`) ilan karantinaya alınır.
+ * - İlan zaten BAŞKA bir iadeden karantinadaysa (inactive + return_quarantine),
+ *   teslimat öncesi bir iptal onu satışa geri açmaz: iade gelen (hasarlı
+ *   olabilecek) birim satıcı incelemeden satılmasın.
+ * - Aksi halde eski davranış: durum miktardan.
+ */
+export function statusAfterStockRestore(
+  current: {
+    status: ProductStatus;
+    inactiveReason: ProductInactiveReason | null;
+  },
+  newQuantity: number | null,
+  quarantine: boolean,
+): { status: ProductStatus; inactiveReason: ProductInactiveReason | null } {
+  const alreadyQuarantined =
+    current.status === ProductStatus.inactive &&
+    current.inactiveReason === ProductInactiveReason.return_quarantine;
+  if (quarantine || alreadyQuarantined) {
+    return {
+      status: ProductStatus.inactive,
+      inactiveReason: ProductInactiveReason.return_quarantine,
+    };
+  }
+  return {
+    status: getProductStatusFromQuantity(newQuantity),
+    inactiveReason: null,
+  };
 }

@@ -41,6 +41,16 @@ export class ElogoInvoiceQueryDto extends AdminListQueryDto {
   @IsOptional()
   @IsString()
   userCode?: string;
+
+  /**
+   * İşlem numarası (ORD-/BST-/MEM-/TKS-/RFD-, tam eşleşme) — o işlemin
+   * belgeleri ve onları ters çeviren iade faturaları. Numara değilse sonuç boş.
+   */
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  processRef?: string;
+
   @ApiPropertyOptional()
   @IsOptional()
   @IsString()

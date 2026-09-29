@@ -11,6 +11,7 @@ import {
   PencilSquareIcon,
 } from "@heroicons/react/24/outline";
 import { SectionCard } from "@/components/detail/SectionCard";
+import { ordersTabHref } from "@/app/(admin)/operations/orders/_lib/screenTabs";
 import type { ProductDetail } from "../_lib/types";
 
 export interface ProductSidebarProps {
@@ -116,7 +117,7 @@ export function ProductSidebar({
           {t("admin.catalog.products.viewOrders")}
         </Link>
         <Link
-          href={`/operations/offers?productId=${product.id}`}
+          href={ordersTabHref("offers", { productId: product.id })}
           className="block rounded-lg px-4 py-2 text-body transition-colors hover:bg-surface"
         >
           {t("admin.catalog.products.viewOffers", {

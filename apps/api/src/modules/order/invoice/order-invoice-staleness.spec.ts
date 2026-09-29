@@ -76,8 +76,25 @@ describe("OrderSchedulerService — invoice staleness alarms", () => {
       {} as any,
     );
     (service as any).logger = logger;
-    return { service, logger, notifyAllAdminsOnce };
+    return { service, logger, notifyAllAdminsOnce, prisma };
   };
+
+  /**
+   * Test şeridi kolisi taşıyıcıya gitmez (hep "kargoda" kalır) ve test
+   * siparişine e-belge kesilmez — iki alarm da test siparişini saymamalı,
+   * yoksa hiç kapanmayan bir Sentry olayı üretirler.
+   */
+  it("stuck-shipped and uninvoiced alarms count live-lane orders only", async () => {
+    const { service, prisma } = makeService({ stuckShipped: 0, uninvoiced: 0 });
+
+    await service.reportInvoiceStaleness();
+
+    const shippedQuery = prisma.order.findMany.mock.calls.find(
+      ([args]: any[]) => args?.where?.status === OrderStatus.shipped,
+    );
+    expect(shippedQuery?.[0].where.isTest).toBe(false);
+    expect(prisma.order.count.mock.calls[0][0].where.isTest).toBe(false);
+  });
 
   it("uzun süre `shipped`'te takılı siparişler alarm verir", async () => {
     const { service, logger } = makeService({

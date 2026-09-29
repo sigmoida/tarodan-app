@@ -16,6 +16,7 @@
 import * as request from "supertest";
 import { BadRequestException } from "@nestjs/common";
 import {
+  CancellationActor,
   PaymentStatus,
   PaymentHoldStatus,
   OrderStatus,
@@ -36,7 +37,7 @@ import { createAddress } from "../../factories/address.factory";
 import { createOfferRow } from "../../factories/offer.factory";
 import { buyNow as createBuyNowRequest } from "../../factories/flows";
 import { scenario } from "../../test-utils/scenario";
-import { signCallback } from "../../mocks/paytr.mock";
+import { paytrCallbackPath, signCallback } from "../../mocks/paytr.mock";
 import { PaymentService } from "../../../src/modules/payment/payment.service";
 import { PayoutService } from "../../../src/modules/payout/payout.service";
 
@@ -137,8 +138,14 @@ describe("10 — Ödeme & Escrow (PAY)", () => {
     req.end = ((callback?: (err: any, res: any) => void) => {
       lastPayment(orderId).then(
         (payment) => {
+          // Üyelik ödemesi üyelik mağazasının ucuna gider (kayıt mağazası belirler).
+          req.url = req.url.replace(
+            "/api/payments/callback/paytr",
+            paytrCallbackPath(payment!.paytrMerchant),
+          );
           req.send(
             signCallback({
+              merchant: payment!.paytrMerchant,
               merchantOid: payment!.providerConversationId!,
               status: "success",
               totalAmount:
@@ -1506,7 +1513,9 @@ describe("10 — Ödeme & Escrow (PAY)", () => {
       expect(productPaid?.quantity).toBe(0);
       ctx.paytr.reset();
 
-      await ctx.app.get(PaymentService).processRefund(orderId);
+      await ctx.app.get(PaymentService).processRefund(orderId, undefined, {
+        cancelledBy: CancellationActor.platform,
+      });
       const order = await prisma.order.findUnique({ where: { id: orderId } });
       expect(order?.status).toBe(OrderStatus.cancelled);
       const hold = await prisma.paymentHold.findFirst({ where: { orderId } });
@@ -1592,7 +1601,9 @@ describe("10 — Ödeme & Escrow (PAY)", () => {
         },
       });
       await expect(
-        ctx.app.get(PaymentService).processRefund(orderId),
+        ctx.app.get(PaymentService).processRefund(orderId, undefined, {
+          cancelledBy: CancellationActor.platform,
+        }),
       ).rejects.toBeInstanceOf(BadRequestException);
     });
 
@@ -1617,7 +1628,9 @@ describe("10 — Ödeme & Escrow (PAY)", () => {
       ctx.paytr.reset();
       ctx.surat.reset();
 
-      await ctx.app.get(PaymentService).processRefund(orderId);
+      await ctx.app.get(PaymentService).processRefund(orderId, undefined, {
+        cancelledBy: CancellationActor.platform,
+      });
       const shipment = await prisma.shipment.findFirst({ where: { orderId } });
       expect(shipment?.status).toBe("cancelled");
       expect(ctx.surat.cancelCalls).toContain(trackingNo);

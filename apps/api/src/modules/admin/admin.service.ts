@@ -1,4 +1,5 @@
 import { Injectable, Optional, Logger } from "@nestjs/common";
+import type { DashboardPeriodQuery } from "@tarodan/types";
 import { AdminAuditService } from "./ops/admin-audit.service";
 import { AdminCommissionService } from "./finance/admin-commission.service";
 import { AdminSettingsService } from "./ops/admin-settings.service";
@@ -36,6 +37,7 @@ import {
   AdminUserQueryDto,
   AdminProductQueryDto,
   AdminOrderQueryDto,
+  AdminOrderCountsQueryDto,
   AdminTradeQueryDto,
   AdminMessageQueryDto,
   AdminShipmentQueryDto,
@@ -441,31 +443,19 @@ export class AdminService {
     return this.adminOrderService.getOrders(query);
   }
 
+  async getOrderCounts(query: AdminOrderCountsQueryDto) {
+    return this.adminOrderService.getOrderCounts(query);
+  }
+
   // ==================== ANALYTICS & REPORTS ====================
   // Taşındı: admin-analytics.service.ts — imzalar aynen korunuyor (facade delege).
   // Not: getOrderById, updateOrderStatus, addOrderTracking,
-  // generateOrderInvoice, unbanUser, getRecentOrders, getPendingActions da bu
+  // generateOrderInvoice, unbanUser, getRecentOrders da bu
   // banner aralığında olduğu için bölümle birlikte taşındı. getDateKey private
   // yardımcısı yalnız bu bölümde kullanılıyordu, o da taşındı.
 
-  async getDashboardStats() {
-    return this.analyticsService.getDashboardStats();
-  }
-
-  async saveAnalyticsSnapshot() {
-    return this.analyticsService.saveAnalyticsSnapshot();
-  }
-
-  async getSalesAnalytics(query: AnalyticsQueryDto) {
-    return this.analyticsService.getSalesAnalytics(query);
-  }
-
-  async getRevenueAnalytics(query: AnalyticsQueryDto) {
-    return this.analyticsService.getRevenueAnalytics(query);
-  }
-
-  async getUserAnalytics(query: AnalyticsQueryDto) {
-    return this.analyticsService.getUserAnalytics(query);
+  async getDashboardStats(query?: DashboardPeriodQuery) {
+    return this.analyticsService.getDashboardStats(query);
   }
 
   async getOrderById(orderId: string) {
@@ -512,36 +502,8 @@ export class AdminService {
     return this.analyticsService.getTopSellers(limit);
   }
 
-  async getPendingActions() {
-    return this.analyticsService.getPendingActions();
-  }
-
-  async generateSalesReport(query: ReportQueryDto) {
-    return this.analyticsService.generateSalesReport(query);
-  }
-
-  async generateUsersReport(query: ReportQueryDto) {
-    return this.analyticsService.generateUsersReport(query);
-  }
-
-  async generateProductsReport(query: ReportQueryDto) {
-    return this.analyticsService.generateProductsReport(query);
-  }
-
-  async generateTradesReport(query: ReportQueryDto) {
-    return this.analyticsService.generateTradesReport(query);
-  }
-
-  async getCommissionReport(query: ReportQueryDto) {
-    return this.analyticsService.getCommissionReport(query);
-  }
-
   async getCommissionRevenue(query: AnalyticsQueryDto) {
     return this.analyticsService.getCommissionRevenue(query);
-  }
-
-  async generateCustomReport(query: ReportQueryDto) {
-    return this.analyticsService.generateCustomReport(query);
   }
 
   // ==================== AUDIT LOGS ====================

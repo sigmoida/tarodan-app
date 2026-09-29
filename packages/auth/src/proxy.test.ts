@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { FORWARDED_REQUEST_HEADERS } from "./proxy";
+import { FORWARDED_REQUEST_HEADERS, FORWARDED_RESPONSE_HEADERS } from "./proxy";
 
 /**
  * Gateway başlık safelist'i sözleşmedir: burada olmayan başlık istemciden
@@ -34,5 +34,10 @@ describe("gateway forwarded headers", () => {
     for (const header of FORWARDED_REQUEST_HEADERS) {
       expect(header).toBe(header.toLowerCase());
     }
+  });
+
+  it("dışa aktarım kırpma başlığını tarayıcıya geri taşır", () => {
+    // Taşınmazsa panel kırpılmış Excel'i tam sanır — uyarı hiç çıkmaz.
+    expect(FORWARDED_RESPONSE_HEADERS).toContain("x-export-truncated-at");
   });
 });

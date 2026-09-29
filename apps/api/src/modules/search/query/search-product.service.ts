@@ -96,7 +96,9 @@ export class SearchProductService {
   // ──────────────────────────── Search ────────────────────────────
 
   async searchProducts(options: SearchOptions): Promise<SearchResponse> {
-    if (!this.common.isAvailable()) {
+    // Test şeridi ES'te yok (indexableProductWhere yalnız canlı satıcıları alır);
+    // ES'e gitmek test hesabına CANLI ilanları gösterirdi — sepete atınca 403.
+    if (!this.common.isAvailable() || options.lane === "test") {
       return this.fallbackSearch(options);
     }
 
@@ -775,6 +777,7 @@ export class SearchProductService {
         carModelId: options.carModelId,
         sellerId: options.sellerId,
         hiddenSellerIds: options.excludeSellerIds,
+        lane: options.lane,
         condition: options.condition,
         brand: options.brand,
         scale: options.scale,

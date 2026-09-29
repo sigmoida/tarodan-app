@@ -124,6 +124,11 @@ import { scheduledProcessors } from "../../workers/scheduled-processors";
 })
 export class PaymentModule implements NestModule {
   configure(consumer: MiddlewareConsumer) {
-    consumer.apply(RawBodyMiddleware).forRoutes("payments/callback/paytr");
+    consumer
+      .apply(RawBodyMiddleware)
+      .forRoutes(
+        "payments/callback/paytr",
+        "payments/callback/paytr/membership",
+      );
   }
 }

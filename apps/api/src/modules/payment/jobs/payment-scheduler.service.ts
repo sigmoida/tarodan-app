@@ -16,6 +16,21 @@ import { PaytrSyncStateService } from "../reconciliation/paytr-sync-state.servic
 import { PayoutService } from "../../payout/payout.service";
 
 /**
+ * Senkron izinin durumu: bazı mağazaların rapor senkronu düştüyse (diğerleri
+ * işlendi) iz "error" olur ve düşen mağazaları adlandırır.
+ */
+function partialFailure(
+  failedMerchants: readonly string[] | undefined,
+): { status: "ok" } | { status: "error"; error: string } {
+  return failedMerchants?.length
+    ? {
+        status: "error",
+        error: `PayTR report sync failed for merchant(s): ${failedMerchants.join(", ")}`,
+      }
+    : { status: "ok" };
+}
+
+/**
  * Payment Scheduler Service
  * Automatically cancels expired pending payments and sweeps out-of-stock products.
  */
@@ -108,14 +123,21 @@ export class PaymentSchedulerService implements OnModuleInit {
       );
     }
     await this.paytrSyncState.recordRun("statement", {
-      status: "ok",
+      // Bir mağazanın dökümü düştüyse diğerleri eşleştirildi ama ekran hatayı
+      // görmeli (sessiz "ok" o mağazanın verisini bayat bırakırdı).
+      ...partialFailure(result.failedMerchants),
       fetched: result.fetched,
       upserted: result.upserted,
       matched: match.matched,
     });
     return {
       summary: `${result.upserted} satır · ${match.matched} eşleşti${match.mismatched + match.missingInPaytr > 0 ? ` · ⚠ ${match.mismatched + match.missingInPaytr} fark` : ""}`,
-      stats: { ...result, ...match },
+      stats: {
+        fetched: result.fetched,
+        upserted: result.upserted,
+        failedMerchants: result.failedMerchants?.length ?? 0,
+        ...match,
+      },
     };
   }
 
@@ -148,13 +170,18 @@ export class PaymentSchedulerService implements OnModuleInit {
       `PayTR hakediş doğrulama: ${verify.checked} denetlendi · ${verify.mismatches} fark`,
     );
     await this.paytrSyncState.recordRun("settlement", {
-      status: "ok",
+      ...partialFailure(result.failedMerchants),
       fetched: result.settlements,
       upserted: result.settlements,
     });
     return {
       summary: `${result.settlements} hakediş${verify.mismatches > 0 ? ` · ⚠ ${verify.mismatches} fark` : ""}`,
-      stats: { ...result, ...verify },
+      stats: {
+        settlements: result.settlements,
+        itemsFetchedFor: result.itemsFetchedFor,
+        failedMerchants: result.failedMerchants?.length ?? 0,
+        ...verify,
+      },
     };
   }
 

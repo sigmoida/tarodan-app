@@ -9,6 +9,7 @@ import { Client } from "@elastic/elasticsearch";
 import { Prisma, ProductStatus } from "@prisma/client";
 import { catalogProductWhere } from "../product/helpers/catalog-product-where";
 import { saleCapableSellerWhere } from "../membership/helpers/membership.util";
+import type { AccountLane } from "../account-lane/account-lane";
 import { errorMessage } from "../../common/helpers/error-message";
 
 export interface ProductSearchResult {
@@ -59,6 +60,12 @@ export interface SearchOptions {
   sortBy?: string;
   /** Viewer için gizli satıcılar (engel, simetrik) — `must_not terms sellerId`. */
   excludeSellerIds?: string[];
+  /**
+   * Viewer'ın hesap şeridi. ES YALNIZ canlı ilanları indeksler; bu yüzden test
+   * şeridi viewer'ı ES'e hiç gitmez, Postgres yoluna düşer ve orada yalnız test
+   * satıcılarını görür. Varsayılan `live`.
+   */
+  lane?: AccountLane;
 }
 
 export interface SearchResponse {

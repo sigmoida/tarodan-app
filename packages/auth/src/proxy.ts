@@ -106,6 +106,8 @@ export const FORWARDED_REQUEST_HEADERS = [
  */
 export const FORWARDED_RESPONSE_HEADERS = [
   "x-admin-session-expires-at",
+  // Admin Excel dışa aktarımları: dosya tavanda kırpıldıysa satır tavanı.
+  "x-export-truncated-at",
 ] as const;
 
 /**

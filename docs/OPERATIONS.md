@@ -31,6 +31,68 @@
   API'den bağımsız acil yedek koddur. Erken erişim PIN'leri admin
   `System → Early Access`'ten yönetilir (unlock cookie 10 gün).
 
+### Canlıda test şeridi (App Review / mobil QA hesapları)
+
+Canlıda `User.isTestAccount=true` hesaplar izole bir **test şeridi** oluşturur
+(bkz. `docs/mobile-parity/21-test-lane-2026-09-08.md`). Sipariş/ödeme/takas/ledger
+satırları DB trigger'ıyla `is_test` damgası alır; uygulama kodu bayrağı unutamaz.
+
+- **Hesap açma:** admin → Sistem → Test Araçları → Test Şeridi (yalnız süper-admin,
+  audit'e yazılır). Hesap doğrulanmış ve adresli açılır.
+- **Ne olmaz:** PayTR gerçek tahsilat (form `test_mode=1` — pazaryeri VE üyelik
+  mağazasında; oto-yenileme de test modunda çekilir), PayTR iadesi (aşağıda),
+  Sürat gönderisi (`TEST…` takip kodu), eLogo belgesi (üyelik faturası dahil),
+  payout, canlı vitrinde görünürlük.
+- **Raporlar test şeridini saymaz:** dashboard (dönem özeti, sabit Dün/Bu ay/Tüm
+  zamanlar, stok bölgesi, para/teslimat kuyrukları ve uyarılar), `/analytics`
+  sekmeleri ve dışa aktarımı, Finans Özeti ve mutabakatı, ödeme istatistikleri,
+  payout özeti, satıcı hakediş dökümü, PayTR döküm mutabakatı ("dökümde yok"
+  listesi, iki mağaza) ve sipariş zamanlayıcısının "kargoda takılı"/"faturasız
+  teslimat" alarmları. Yüklem tek yerde: `modules/account-lane/live-lane.where.ts`.
+  İnsan kararı bekleyen moderasyon kuyrukları (ilan onayı, mesaj, başvuru,
+  belge, destek, şikayet) bilinçli olarak şeritten bağımsızdır — inceleme
+  hesabının ilanı da onaylanmadan yayına girmez.
+- **Operasyonel listeler test kaydını gösterir, "TEST" rozetiyle:** Siparişler
+  ekranı (sepet, teklif ve takas sekmeleri), İptaller ve İadeler, iade talebi
+  listesi ile sipariş/takas/teklif/iade detay başlıkları. Sekme ve kova
+  sayaçları listeyle aynı kümeyi sayar (test dahil). İptal dökümünde (Excel)
+  "Test şeridi" kolonu vardır.
+- **İade PayTR'ye gitmez:** test ödemesinin iadesi (admin sipariş iptali, alıcı
+  talebi, cron'lar, kısmi iade, takas nakit iadesi) canlı iade API'sini
+  çağırmaz; deneme satırına sentetik `TEST-REFUND-<attemptId>` referansıyla
+  başarı yazılır ve akışın geri kalanı (ödeme/sipariş durumu, hold, stok,
+  `cancelledBy`, bildirimler, test damgalı defter kaydı) aynen işler. PayTR
+  olay günlüğüne yazılmaz; tekrar deneme idempotenttir.
+- **Sıfırlama:** aynı karttaki "Şeridi sıfırla" test hesaplarının işlem
+  kayıtlarını siler; hesaplar ve ilanlar kalır. Canlı satırlar sorguya giremez
+  (filtre `is_test`/test hesap kimlikleri üzerinden). İki istisna:
+  - **Defter (`ledger_entries`) silinmez.** Tablo append-only (DELETE trigger'la
+    yasak) ve FK taşımaz — "kaynak satır silinse de iz kalır" tasarımı gereği.
+    Test satırları `is_test` damgalı olduğundan finans raporlarına girmez;
+    sıfırlama sonucu bunları `retainedLedgerEntries` olarak bildirir.
+  - **İade kalemleri için dar bir tahliye kapısı vardır.**
+    `refund_financial_components` ve `package_shipping_settlements` de
+    append-only; ama `refund_requests`'e ZORUNLU + `Restrict` ile bağlı oldukları
+    için silinmeden sipariş zinciri çözülemiyor. Guard yerinde kalır ve DELETE
+    yalnız iki koşul birden sağlanınca geçer: oturum `SET LOCAL
+app.test_lane_purge = 'on'` demiş olacak (yalnız `resetLane` transaction'ı
+    verir, commit/rollback'te düşer) **ve** satırın iade talebinin siparişi
+    `is_test=true` olacak. Canlı satırda ikinci koşul asla sağlanmaz; UPDATE her
+    koşulda yasaktır (`20260922150000_test_lane_purge_gate`).
+- **Guard:** prod'da test-modu PayTR callback'i yalnız `Payment.isTest=true`
+  ödemeler için kabul edilir; canlı ödemeye gelen `test_mode=1` başarı bildirimi
+  ve test ödemesine gelen `test_mode=0` başarı bildirimi reddedilir
+  (`PAYTR_TEST_MODE_CALLBACK_REJECTED`). Kural iki bildirim ucunda da geçerli;
+  üyelik yenilemesinde (siparişi olmadığı için damga yok) şerit sahibin
+  `isTestAccount` bayrağından okunur.
+- **Migrasyonlar:** `20260922120000_production_test_lane`,
+  `20260922130000_test_lane_ledger`, `20260922140000_test_lane_ledger_refs`,
+  `20260922150000_test_lane_purge_gate` — `prisma migrate deploy` ile, bu
+  sırayla. (PR #494'te 8–16 Eylül damgalıydılar; hiçbir ortama uygulanmadan
+  development'ın 22 Eylül migrasyonlarının ardına taşındılar.)
+- Yeni bir dış-dünya yan etkisi (fatura/kargo/para) eklenirse `isTest`
+  kapısı zorunludur; şerit kuralları `modules/account-lane/` altında.
+
 ### eLogo ortamı: demo ile canlı arasında "test bayrağı" yok
 
 eLogo'da PayTR/Sürat'taki gibi bir test modu yoktur; belgenin GİB'e gidip
@@ -180,6 +242,166 @@ Idempotenttir: yalnız üç kolonu da boş olan satırlara dokunur. `--dry-run`
 iade faturalarını "çözülemeyen" sayar — tarafları ters çevirdikleri belgeden
 devraldıkları için kaynakları henüz yazılmamıştır; gerçek koşuda dolarlar.
 
+### Bir kerelik: PayTR üyelik mağazası geçişi (2026-09)
+
+Üyelik ödemeleri (ilk satın alma + oto-yenileme) non-3D yetkili **ayrı bir PayTR
+mağazasına** taşındı; sipariş/takas/öne çıkarma/payout pazaryeri mağazasında
+kalır. Kartlar **taşınmaz** (token'lar mağazaya özel). Ayrıntı: `PAYMENTS.md` §1
+"İki PayTR mağazası", mobil sözleşme: `mobile-parity/20-api-delta-2026-09-17.md`.
+
+**1. Coolify secrets (production VE staging, API servisinde — worker dahil aynı env):**
+
+| Değişken                                  | Production                                                             | Staging                                                                 |
+| ----------------------------------------- | ---------------------------------------------------------------------- | ----------------------------------------------------------------------- |
+| `PAYTR_MEMBERSHIP_MERCHANT_ID`            | yeni mağaza no (**`PAYTR_MERCHANT_ID`'den farklı**, boot kontrol eder) | yeni mağaza no                                                          |
+| `PAYTR_MEMBERSHIP_MERCHANT_KEY` / `_SALT` | panelden                                                               | panelden                                                                |
+| `PAYTR_MEMBERSHIP_TEST_MODE`              | `false`                                                                | `true`                                                                  |
+| `PAYTR_MEMBERSHIP_CALLBACK_URL`           | `https://api.tarodan.com.tr/api/payments/callback/paytr/membership`    | `https://staging.tarodan.com.tr/api/payments/callback/paytr/membership` |
+| `PAYTR_RECURRING_ENABLED`                 | `true` (yalnız üyelik mağazasını etkiler)                              | `true`                                                                  |
+| `PAYTR_MEMBERSHIP_CARD_STORAGE_ENABLED`   | boş/`true` (acil kapatma: `false`)                                     | boş/`true`                                                              |
+
+Kimlik veya callback URL eksikse API production/staging'de **açılmaz**. Bu yüzden
+secrets deploy'dan ÖNCE girilir.
+
+**2. PayTR panelleri — Bildirim URL:**
+
+- Pazaryeri mağazası: `https://<api-host>/api/payments/callback/paytr` (değişmedi).
+- Üyelik mağazası: `https://<api-host>/api/payments/callback/paytr/membership`.
+  İki mağaza aynı URL'i KULLANAMAZ: her uç kendi mağazasının anahtarıyla doğrular,
+  yanlış uca düşen bildirim hash uyuşmazlığına düşer.
+
+> **UYARI — üyelik mağazasının Bildirim URL'i:** panelde yalnız
+> `/api/payments/callback/paytr/membership` girilir. Eski `/api/payments/callback`
+> alias'ı **ve** pazaryeri URL'i (`/api/payments/callback/paytr`) YASAKTIR: alias
+> her zaman pazaryeri mağazasına eşlenir, yani iki yanlış URL de bildirimi pazaryeri
+> anahtarıyla doğrular. Sonuç: **her** üyelik bildirimi hash doğrulamasından düşer,
+> hiçbir üyelik ödemesi callback ile tamamlanmaz (log'da
+> `PAYTR_MERCHANT_MISMATCH (invalid hash) ... route=marketplace record=membership`).
+> Panele kaydettikten sonra URL'i bir kez daha harf harf karşılaştırın.
+
+- Üyelik mağazasında canlı mod, non-3D, recurring, kart saklama (CAPI) ve Direkt
+  API yetkilerinin açık olduğu teyit edilir. Rapor senkronu açıksa rapor yetkisi de.
+
+**3. Deploy:** migration `20260917100000_paytr_membership_merchant` deploy'da
+kendiliğinden koşar (tüm mevcut satırlar `marketplace` olarak işaretlenir; tablo
+yeniden yazılmaz). Ayrı backfill yoktur.
+
+**4. Duman testi (staging, sonra production'da küçük tutarla):** premium satın
+al → direct-form alanlarında `merchant_id` üyelik mağazası → ödeme tamamlanır →
+admin'de ödeme; `saved_cards.paytr_merchant = membership`, `mandate_ip` dolu,
+üyelikte `autoRenew = true`. Log'da `PAYTR_MERCHANT_MISMATCH` görünmemeli.
+
+**5. Mevcut oto-yenilemeli üyeler — tek seferlik bildirim:** üyelik mağazasında
+kartı olmayan tüm oto-yenilemeli ücretli üyelerin `autoRenew`'i kapatılır ve
+`membership_renewal_card_required` bildirimi (zil + push, tercihlere uyar) gider.
+Script yapmasa da saatlik cron aynı işi yenileme zamanında yapar; script yalnız
+üyeyi dönem sonunu beklemeden bilgilendirir. Tekrar çalıştırmak güvenlidir.
+
+```
+docker exec "$API_CID" sh -c 'cd /app && node dist-seed/maintenance/notify-membership-card-readd.js'
+docker exec "$API_CID" sh -c 'cd /app && node dist-seed/maintenance/notify-membership-card-readd.js --apply'
+```
+
+Bayraksız koşu kurudur (yalnız sayar); yazma ve bildirim yalnız `--apply` ile.
+
+**Büyük olasılıkla no-op:** eski (pazaryeri) mağazanın non-3D yetkisi hiç olmadı,
+yani recurring hiç çalışmadı; oto-yenilemeye hazır saklı kartlı üye beklenmez.
+Önce **yalnız bayraksız (kuru) koşuyu** çalıştırın; sayı `0` ise `--apply`'ı
+**atlayın**. Sıfırdan büyükse sayıyı kaydedip `--apply` ile devam edin.
+
+Yerelde: `pnpm --filter @tarodan/api notify:prod:membership-card-readd -- --apply` (önce
+`build` + `build:seed`; script derlenmiş `dist/` uygulamasını `PROCESS_ROLE=web`
+ile başsız yükler, zamanlanmış işleri koşturmaz).
+
+**6. Geçiş sonrası kontrol — yarım kalmış ödemeler (geçişten 24-48 saat sonra, bir
+kez):** geçişten ÖNCE pazaryeri mağazasında başlatılıp geçişten SONRA yeniden
+denenen bir üyelik ödemesinin satırı artık `paytr_merchant = membership` taşır;
+eski oid'i `payments.metadata.merchantOidHistory`'de kalır. Eski oid için pazaryeri
+mağazasından gelen (hash'i geçerli) bildirim bu yüzden **uygulanmaz** ve
+`PAYTR_MERCHANT_MISMATCH` loglanır. Kullanıcı eski formda ödediyse para pazaryeri
+mağazasına geçmiş ama üyelik açılmamış olabilir.
+
+_a) Log araması:_ `PAYTR_MERCHANT_MISMATCH` `logger.error` ile yazılır; Sentry'ye
+ayrı bir issue olarak **gitmez** — kaynak API konteynerinin logudur (Coolify → API
+servisi → Logs'ta arama, ya da):
+
+```
+docker logs --since 72h "$API_CID" 2>&1 | grep PAYTR_MERCHANT_MISMATCH
+```
+
+Satırda `merchant_oid`, `route` (bildirimin geldiği uç), `record` (kaydın mağazası)
+ve `status` bulunur. `(invalid hash)` içeren satırlar yarım ödeme değil, panelde
+yanlış Bildirim URL'idir → 2. adımdaki uyarıya bakın. Aynı bilgi kalıcı olarak DB'de de
+vardır: bildirimler `payment_provider_events`'e mağazasıyla kaydedilir (sorgu b).
+
+_b) Salt-okunur SQL_ (production DB'de yalnız `SELECT`; `<GECIS_ANI>` yerine
+deploy'un UTC zamanını yazın, ör. `'2026-09-18 07:30:00+00'`):
+
+```sql
+-- Geçişten önce oluşturulmuş, geçişten sonra üyelik mağazasında yeniden
+-- başlatılmış (eski oid'leri geçmişte duran) ve tamamlanmamış üyelik ödemeleri.
+SELECT p.id                                    AS payment_id,
+       o.order_number,
+       o.buyer_id,
+       p.status,
+       p.amount,
+       p.created_at,
+       p.metadata->>'lastChargeStartedAt'      AS son_cekim_basi,
+       p.provider_conversation_id              AS guncel_oid,
+       p.metadata->'merchantOidHistory'        AS eski_oidler,
+       (SELECT json_agg(json_build_object(
+                 'oid', e.merchant_oid, 'magaza', e.paytr_merchant,
+                 'status', e.status, 'hash', e.hash_valid, 'at', e.created_at)
+               ORDER BY e.created_at)
+          FROM payment_provider_events e
+         WHERE e.event_type = 'callback'
+           AND e.merchant_oid IN (
+                 SELECT jsonb_array_elements_text(p.metadata->'merchantOidHistory'))
+       )                                       AS eski_oid_bildirimleri
+  FROM payments p
+  JOIN orders o ON o.id = p.order_id
+ WHERE p.provider = 'paytr'
+   AND p.paytr_merchant = 'membership'
+   AND o.product_id LIKE 'membership-%'
+   AND p.created_at < TIMESTAMPTZ '<GECIS_ANI>'
+   AND jsonb_typeof(p.metadata->'merchantOidHistory') = 'array'
+   AND jsonb_array_length(p.metadata->'merchantOidHistory') > 0
+   AND p.status NOT IN ('completed', 'refunded')
+ ORDER BY p.created_at;
+```
+
+Oid'lerin kendisinde tarih yoktur (sonek yalnız milisaniyenin son 6 hanesi); "geçiş
+öncesi oid" bu yüzden satırın `created_at`'i geçişten önce olmasıyla yakalanır —
+geçmişteki oid'lerden en az biri pazaryeri mağazasında başlatılmıştır. Satır
+dönmezse kontrol biter. `eski_oid_bildirimleri`'nde `magaza = marketplace`,
+`status = success` görülen satır **öncelikli**dir (para eski mağazada alınmış).
+`p.status = 'completed'` satırlarına da bir kez göz atmak isterseniz son filtreyi
+kaldırın: eski oid'de de `success` varsa çift çekimdir.
+
+_c) Manuel çözüm (her satır için):_
+
+1. **Eski mağazada sorgula:** `eski_oidler`'deki her oid için **pazaryeri** mağaza
+   panelinde (İşlemler → sipariş no araması) ya da pazaryeri mağazasının
+   kimlikleriyle PayTR durum-sorgu (`/odeme/durum-sorgu`) ile sonucu alın. Üyelik
+   mağazasının kimlikleriyle sorgulamayın — o oid orada yoktur.
+2. **Hiçbirinde başarılı çekim yoksa:** işlem gerekmez; ödeme kendi akışında
+   (yeni deneme ya da süre dolumu) kapanır.
+3. **Eski oid'de başarılı çekim varsa ve kullanıcı yeni mağazada da ödemediyse:**
+   ya kullanıcıya üyeliği admin panelinden elle tanımlayın (dönem = ödenen paket;
+   karar ve tutar destek kaydına yazılır) ya da tutarı **pazaryeri** mağaza
+   panelinden iade edip kullanıcıya yeniden satın almasını söyleyin. Uygulama bu
+   ödeme satırını eski mağazanın sonucuyla kendiliğinden tamamlamaz; iade de
+   uygulamadan yapılamaz (satırın mağazası artık `membership`) — iade panelden.
+4. **Hem eski hem yeni oid'de başarılı çekim varsa (çift çekim):** eski oid'in
+   tutarını pazaryeri mağaza panelinden iade edin.
+5. Yapılan işlemi oid, kullanıcı ve tutarla destek/muhasebe kaydına geçin (rapor
+   mutabakatında pazaryeri mağazasının dökümünde eşleşmeyen satır olarak görünür).
+
+**Bilinen sınır:** ayrı "kart ekle" akışı yoktur; kart yalnız bir üyelik
+ödemesinde saklanır. Dönemi süren üye kartını bir sonraki satın almada ekler.
+Geçiş öncesi alınmış üyelik ödemelerinin iadeleri eski (pazaryeri) mağazadan
+yapılır — ek iş gerekmez.
+
 ### Her ay: silinen hesap bildirimi
 
 Panelde **Kullanıcılar → Silinen Kimlikler** ekranından dönem seçilip Excel
@@ -311,6 +533,7 @@ Reset workflow'unun API container'ında aradığı değerler (biri tutmazsa hiç
 | `S3_ENV_PREFIX`                                                                        | `prod`                                           |                                                                                          |
 | `PAYMENT_BYPASS` / `PAYOUTS_DISABLED`                                                  | `false` (harfi harfine)                          |                                                                                          |
 | `PAYTR_TEST_MODE`                                                                      | `false` veya `0`                                 |                                                                                          |
+| `PAYTR_MEMBERSHIP_TEST_MODE`                                                           | `false`                                          | Üyelik mağazası; API boot'u da zorlar                                                    |
 | `ELASTICSEARCH_INDEX_PREFIX`                                                           | boş veya `production`                            |                                                                                          |
 | `REDIS_URL`, `REDIS_HOST`                                                              | dolu                                             | Cache ve **kuyruk** Redis'i ayrı; ikisi de temizlenir                                    |
 | `ELASTICSEARCH_NODE` (veya `_URL`), `ELASTICSEARCH_USERNAME`, `ELASTICSEARCH_PASSWORD` | dolu                                             | Uygulama bunları default'lar, runtime reset ZORUNLU kılar                                |
@@ -325,7 +548,8 @@ yolda patlamaya yol açıyordu. Artık dry run da kontrol eder.
 tanımlanmadan açılırsa hiçbir payout tamamlanamaz), `PAYTR_REPORT_SYNC_ENABLED`
 (panel yetkisi ister), `SHIPPING_WEBHOOK_ENABLED`,
 `FEATURE_48H_CONFIRMATION_WINDOW`, `PAYTR_CARD_STORAGE_ENABLED`,
-`PAYTR_RECURRING_ENABLED`, `BULLBOARD_ENABLED`, `ENABLE_SWAGGER`.
+`BULLBOARD_ENABLED`, `ENABLE_SWAGGER`. (`PAYTR_RECURRING_ENABLED` artık yalnız
+üyelik mağazasını etkiler; üyelik mağazası geçişi runbook'una bakın.)
 
 **İade politikası v2 — VARSAYILAN AÇIK:** Bileşen bazlı iade politikası (v2)
 artık kod tarafında varsayılan AÇIKTIR; launch'ta env eklemek GEREKMEZ.
@@ -334,9 +558,11 @@ para hesabında beklenmedik sorun çıkarsa v1 oransal formüle döndürür. Bir
 stabil haftadan sonra bayrağın ve v1 hesaplayıcının tamamen sökülmesi planlıdır
 (yeni kayıtlar zaten çift yazılır, geri dönüş güvenlidir).
 
-**PayTR panel tarafı:** ödeme bildirim URL'i
+**PayTR panel tarafı:** pazaryeri mağazasının ödeme bildirim URL'i
 `https://<api-host>/api/payments/callback/paytr` (env'deki `PAYTR_CALLBACK_URL`
-ile birebir aynı olmalı, düz `OK` döner) · payout transfer-sonuç URL'i
+ile birebir aynı olmalı, düz `OK` döner) · üyelik mağazasının bildirim URL'i
+`https://<api-host>/api/payments/callback/paytr/membership`
+(`PAYTR_MEMBERSHIP_CALLBACK_URL`) · payout transfer-sonuç URL'i
 `https://<api-host>/api/payouts/callback/paytr-transfer` (yalnız bayrağı
 açacağın gün) · mağaza canlı modda.
 

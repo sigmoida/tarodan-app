@@ -1,6 +1,12 @@
-import { Injectable, BadRequestException, Logger } from "@nestjs/common";
+import {
+  Injectable,
+  BadRequestException,
+  Inject,
+  Logger,
+  Optional,
+} from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
-import * as crypto from "crypto";
+import { PaytrMerchant } from "@prisma/client";
 import { i18nMessage } from "../../i18n";
 import type { IPaymentProvider } from "../payment-provider.interface";
 import { PAYMENT_PROVIDER_PAYTR } from "../payment-provider.interface";
@@ -164,7 +170,10 @@ export interface PaytrSettlementDetailEntry {
 }
 
 export { parsePaytrTestMode } from "./paytr-test-mode.util";
-import { PayTRCredentials } from "./paytr-credentials.service";
+import {
+  PayTRCredentials,
+  type PaytrMerchantCredentials,
+} from "./paytr-credentials.service";
 import { PayTRReportService } from "./paytr-report.service";
 import { PayTRTransferService } from "./paytr-transfer.service";
 import { parsePaytrMoneyString } from "./paytr-money.util";
@@ -173,11 +182,22 @@ import { parsePaytrMoneyString } from "./paytr-money.util";
 // PAYTR SERVICE
 // =============================================================================
 
+/**
+ * DI token'ı: PayTRService örneğinin bağlı olduğu mağaza. Kök örnek (Nest'in
+ * enjekte ettiği) bu token sağlanmadığı için pazaryerine bağlıdır; diğer
+ * mağazanın örneği `forMerchant()` ile türetilir.
+ */
+export const PAYTR_SERVICE_MERCHANT = Symbol("PAYTR_SERVICE_MERCHANT");
+
 @Injectable()
 export class PayTRService implements IPaymentProvider {
   /** #89: provider key used by PaymentProviderRegistry (matches Payment.provider). */
   readonly key = PAYMENT_PROVIDER_PAYTR;
+  /** Bu örneğin her çağrısının imzalandığı PayTR mağazası. */
+  readonly merchant: PaytrMerchant;
   private readonly logger = new Logger(PayTRService.name);
+  /** Mağaza → örnek; türetilen tüm örnekler aynı haritayı paylaşır. */
+  private bound: Map<PaytrMerchant, PayTRService>;
 
   constructor(
     private readonly paytr: PayTRCredentials,
@@ -190,24 +210,61 @@ export class PayTRService implements IPaymentProvider {
      * (CLAUDE.md §15 "Known, undecided").
      */
     private readonly configService: ConfigService,
-  ) {}
+    @Optional()
+    @Inject(PAYTR_SERVICE_MERCHANT)
+    merchant?: PaytrMerchant,
+  ) {
+    this.merchant = merchant ?? PaytrMerchant.marketplace;
+    this.bound = new Map([[this.merchant, this]]);
+  }
 
-  // Kimlik, imza ve yanıt okuma PayTRCredentials'ta yaşar; buradaki kısayollar
-  // yalnız çağrı yerlerini okunur tutar (davranış aynı).
+  /**
+   * Aynı servisin başka bir mağazaya bağlı örneği. Ödeme kaydı hangi mağazada
+   * alındıysa sonraki her PayTR çağrısı (durum-sorgu, iade, kart silme) o
+   * mağazanın örneğinden yapılır — bkz. PaymentProviderRegistry.resolve.
+   */
+  forMerchant(merchant: PaytrMerchant): PayTRService {
+    const existing = this.bound.get(merchant);
+    if (existing) return existing;
+    const created = new PayTRService(
+      this.paytr,
+      this.reports,
+      this.transfers,
+      this.configService,
+      merchant,
+    );
+    created.bound = this.bound;
+    this.bound.set(merchant, created);
+    return created;
+  }
+
+  /** Bağlı mağazanın kimliği + imzası (anahtar/tuz bu nesnenin dışına çıkmaz). */
+  private get creds(): PaytrMerchantCredentials {
+    return this.paytr.forMerchant(this.merchant);
+  }
+
+  // Kimlik ve yanıt okuma PayTRCredentials'ta yaşar; buradaki kısayollar
+  // yalnız çağrı yerlerini okunur tutar.
   private get merchantId() {
-    return this.paytr.merchantId;
+    return this.creds.merchantId;
   }
-  private get merchantKey() {
-    return this.paytr.merchantKey;
-  }
-  private get merchantSalt() {
-    return this.paytr.merchantSalt;
+  private get isConfigured() {
+    return this.creds.isConfigured;
   }
   private get baseUrl() {
     return this.paytr.baseUrl;
   }
   private get testMode() {
-    return this.paytr.testMode;
+    return this.creds.testMode;
+  }
+  /**
+   * `test_mode` kararı: test şeridi (`forced=true`) her zaman test modunu açar;
+   * aksi halde mağazanın ortam ayarı geçer. Canlı hesap için `false` gelmesi
+   * ortam ayarını EZMEZ — staging'de `PAYTR_TEST_MODE=true` iken gerçek
+   * tahsilat yapılmasın.
+   */
+  private resolveTestMode(forced?: boolean): boolean {
+    return forced === true || this.testMode;
   }
   private get httpTimeoutMs() {
     return this.paytr.httpTimeoutMs;
@@ -228,7 +285,7 @@ export class PayTRService implements IPaymentProvider {
   async queryPaymentStatus(
     merchantOid: string,
   ): Promise<PayTRStatusInquiryResult> {
-    if (!this.merchantId || !this.merchantKey || !this.merchantSalt) {
+    if (!this.isConfigured) {
       this.logger.warn("PayTR status inquiry skipped: credentials missing");
       return { ok: false, errMsg: "PayTR not configured" };
     }
@@ -236,11 +293,7 @@ export class PayTRService implements IPaymentProvider {
       return { ok: false, errMsg: "merchant_oid required" };
     }
 
-    const hashStr = this.merchantId + merchantOid + this.merchantSalt;
-    const paytrToken = crypto
-      .createHmac("sha256", this.merchantKey)
-      .update(hashStr)
-      .digest("base64");
+    const paytrToken = this.creds.signWithSalt(this.merchantId + merchantOid);
 
     const formData = new URLSearchParams({
       merchant_id: this.merchantId,
@@ -378,20 +431,14 @@ export class PayTRService implements IPaymentProvider {
    * Verify callback hash from PayTR
    */
   verifyCallback(callback: PayTRCallbackData): boolean {
-    const hashStr = `${callback.merchant_oid}${this.merchantSalt}${callback.status}${callback.total_amount}`;
-    const expectedHash = crypto
-      .createHmac("sha256", this.merchantKey)
-      .update(hashStr)
-      .digest("base64");
-
-    // Wave 4: sabit-zamanlı karşılaştırma (timing yan-kanalına karşı defense-in-depth).
-    // timingSafeEqual eşit uzunluk ister → farklı uzunlukta erken false.
-    const expected = Buffer.from(expectedHash);
-    const received = Buffer.from(callback.hash || "");
-    return (
-      expected.length === received.length &&
-      crypto.timingSafeEqual(expected, received)
-    );
+    // Wave 4: sabit-zamanlı karşılaştırma PaytrMerchantCredentials içinde.
+    // Hash BU örneğin mağazasının anahtarıyla doğrulanır.
+    return this.creds.verifyPaymentNotification({
+      merchantOid: callback.merchant_oid,
+      status: callback.status,
+      totalAmount: callback.total_amount,
+      hash: callback.hash,
+    });
   }
 
   /**
@@ -464,8 +511,9 @@ export class PayTRService implements IPaymentProvider {
     const returnAmount = amount.toFixed(2); // ONDALIK TL
 
     // Build hash for refund — reference_no doküman gereği token'a KATILMAZ.
-    const hashStr = `${this.merchantId}${oid}${returnAmount}${this.merchantSalt}`;
-    const paytrToken = this.generateHash(hashStr);
+    const paytrToken = this.creds.signWithSalt(
+      `${this.merchantId}${oid}${returnAmount}`,
+    );
 
     const formData = new URLSearchParams({
       merchant_id: this.merchantId,
@@ -556,16 +604,14 @@ export class PayTRService implements IPaymentProvider {
     allowNon3d?: boolean;
     errMsg?: string;
   }> {
-    if (!this.merchantId || !this.merchantKey || !this.merchantSalt) {
+    if (!this.isConfigured) {
       return { ok: false, errMsg: "PayTR not configured" };
     }
     const bin = (binNumber || "").replace(/\D/g, "").slice(0, 8);
     if (bin.length < 6) return { ok: false, errMsg: "bin_number too short" };
 
     // Doküman: hash_str = bin_number + merchant_id + merchant_salt
-    const paytrToken = this.generateHash(
-      bin + this.merchantId + this.merchantSalt,
-    );
+    const paytrToken = this.creds.signWithSalt(bin + this.merchantId);
     const form = new URLSearchParams({
       merchant_id: this.merchantId,
       bin_number: bin,
@@ -625,14 +671,12 @@ export class PayTRService implements IPaymentProvider {
     rates?: Record<string, unknown>;
     errMsg?: string;
   }> {
-    if (!this.merchantId || !this.merchantKey || !this.merchantSalt) {
+    if (!this.isConfigured) {
       return { ok: false, errMsg: "PayTR not configured" };
     }
     const reqId = (requestId || "").slice(0, 32);
     // Doküman: hash_str = merchant_id + request_id + merchant_salt
-    const paytrToken = this.generateHash(
-      this.merchantId + reqId + this.merchantSalt,
-    );
+    const paytrToken = this.creds.signWithSalt(this.merchantId + reqId);
     const form = new URLSearchParams({
       merchant_id: this.merchantId,
       request_id: reqId,
@@ -700,6 +744,11 @@ export class PayTRService implements IPaymentProvider {
         ctoken: string;
         requireCvv: boolean;
       };
+      /**
+       * Test şeridi ödemesi: canlı merchant'ta `test_mode=1` (PayTR test kartı,
+       * gerçek tahsilat yok). `false`/verilmezse ortam ayarı (`PAYTR_TEST_MODE`) geçer.
+       */
+      testMode?: boolean;
     },
   ): Promise<{
     action: string;
@@ -707,7 +756,7 @@ export class PayTRService implements IPaymentProvider {
     fields: Array<{ name: string; value: string }>;
     requireCvv: boolean;
   }> {
-    if (!this.merchantId || !this.merchantKey || !this.merchantSalt) {
+    if (!this.isConfigured) {
       throw new BadRequestException(
         i18nMessage("server.payment.notConfigured"),
       );
@@ -726,7 +775,8 @@ export class PayTRService implements IPaymentProvider {
         : 0,
     );
     const currency = "TL";
-    const testModeStr = this.testMode ? "1" : "0";
+    const testMode = this.resolveTestMode(options?.testMode);
+    const testModeStr = testMode ? "1" : "0";
     // Kullanıcının başlattığı checkout her zaman 3D Secure'dur. Non3D yalnız
     // ayrı recurring akışında, açık mağaza yetkisiyle sunucudan kullanılır.
     const non3d = "0";
@@ -751,10 +801,7 @@ export class PayTRService implements IPaymentProvider {
       currency +
       testModeStr +
       non3d;
-    const paytrToken = crypto
-      .createHmac("sha256", this.merchantKey)
-      .update(hashStr + this.merchantSalt)
-      .digest("base64");
+    const paytrToken = this.creds.signWithSalt(hashStr);
 
     // Direkt API basket: ONDALIK TL birim fiyat ("50.00") — resmi örnek kodla birebir
     // (payment_amount ile aynı birim). Kuruş GÖNDERME (×100 hatasına yol açar).
@@ -786,7 +833,7 @@ export class PayTRService implements IPaymentProvider {
       user_address: buyer.address,
       user_phone: buyer.phone,
       user_basket: userBasket,
-      debug_on: this.testMode ? "1" : "0",
+      debug_on: testMode ? "1" : "0",
       client_lang: "tr",
     });
 
@@ -833,6 +880,8 @@ export class PayTRService implements IPaymentProvider {
     buyer: PayTRBuyer;
     basketItems: PayTRBasketItem[];
     cvv?: string;
+    /** Test şeridi üyeliği: `test_mode=1` (bkz. createDirectPaymentForm). */
+    testMode?: boolean;
   }): Promise<{
     status: "success" | "failed" | "wait_callback";
     reason?: string;
@@ -840,7 +889,7 @@ export class PayTRService implements IPaymentProvider {
     /** Ham PayTR recurring yanıtı (gözlemlenebilirlik/mutabakat). PAN/CVV içermez. */
     raw?: Record<string, unknown>;
   }> {
-    if (!this.merchantId || !this.merchantKey || !this.merchantSalt) {
+    if (!this.isConfigured) {
       throw new BadRequestException(
         i18nMessage("server.payment.notConfigured"),
       );
@@ -849,7 +898,8 @@ export class PayTRService implements IPaymentProvider {
     const paymentType = "card";
     const installmentCount = "0";
     const currency = "TL";
-    const testModeStr = this.testMode ? "1" : "0";
+    const testMode = this.resolveTestMode(params.testMode);
+    const testModeStr = testMode ? "1" : "0";
     const non3d = "1";
 
     // hashStr = mid + ip + oid + email + amount + payment_type + installment + currency + test_mode + non_3d
@@ -864,10 +914,7 @@ export class PayTRService implements IPaymentProvider {
       currency +
       testModeStr +
       non3d;
-    const paytrToken = crypto
-      .createHmac("sha256", this.merchantKey)
-      .update(hashStr + this.merchantSalt)
-      .digest("base64");
+    const paytrToken = this.creds.signWithSalt(hashStr);
 
     // Recurring sepeti: düz JSON, ondalık fiyat (örnek kodla uyumlu — iframe base64'ünden farklı)
     const userBasket = JSON.stringify(
@@ -894,7 +941,7 @@ export class PayTRService implements IPaymentProvider {
       user_address: params.buyer.address,
       user_phone: params.buyer.phone,
       user_basket: userBasket,
-      debug_on: this.testMode ? "1" : "0",
+      debug_on: testMode ? "1" : "0",
       client_lang: "tr",
       installment_count: installmentCount,
       utoken: params.utoken,
@@ -968,15 +1015,12 @@ export class PayTRService implements IPaymentProvider {
       businessCard?: boolean;
     }>
   > {
-    if (!this.merchantId || !this.merchantKey || !this.merchantSalt) {
+    if (!this.isConfigured) {
       throw new BadRequestException(
         i18nMessage("server.payment.notConfigured"),
       );
     }
-    const paytrToken = crypto
-      .createHmac("sha256", this.merchantKey)
-      .update(utoken + this.merchantSalt)
-      .digest("base64");
+    const paytrToken = this.creds.signWithSalt(utoken);
     const form = new URLSearchParams({
       merchant_id: this.merchantId,
       utoken,
@@ -1033,15 +1077,12 @@ export class PayTRService implements IPaymentProvider {
     utoken: string,
     ctoken: string,
   ): Promise<{ status: string; reason?: string }> {
-    if (!this.merchantId || !this.merchantKey || !this.merchantSalt) {
+    if (!this.isConfigured) {
       throw new BadRequestException(
         i18nMessage("server.payment.notConfigured"),
       );
     }
-    const paytrToken = crypto
-      .createHmac("sha256", this.merchantKey)
-      .update(ctoken + utoken + this.merchantSalt)
-      .digest("base64");
+    const paytrToken = this.creds.signWithSalt(ctoken + utoken);
     const form = new URLSearchParams({
       merchant_id: this.merchantId,
       ctoken,
@@ -1070,35 +1111,46 @@ export class PayTRService implements IPaymentProvider {
   // HELPER METHODS
   // ==========================================================================
 
-  private generateHash(data: string): string {
-    return this.paytr.generateHash(data);
-  }
-
   // ==========================================================================
   // PLATFORM TRANSFER — gövde PayTRTransferService'te. İmzalar burada kalır:
   // IPaymentProvider sözleşmesinin parçalar ve payout.service onları sağlayıcı
   // üzerinden çağırır.
   // ==========================================================================
 
+  /** Transferler yalnız pazaryeri mağazasındandır; başka mağazaya bağlı örnek reddeder. */
+  private assertMarketplaceTransfer(): void {
+    if (this.merchant !== PaytrMerchant.marketplace) {
+      throw new BadRequestException(
+        i18nMessage("server.payment.paytrPlatformTransferFailed", {
+          reason: `platform transfer is only available on the marketplace merchant (got ${this.merchant})`,
+        }),
+      );
+    }
+  }
+
   createPlatformTransfer(
     ...args: Parameters<PayTRTransferService["createPlatformTransfer"]>
   ) {
+    this.assertMarketplaceTransfer();
     return this.transfers.createPlatformTransfer(...args);
   }
 
   verifyTransferCallback(params: { transIds: string; hash: string }): boolean {
+    if (this.merchant !== PaytrMerchant.marketplace) return false;
     return this.transfers.verifyTransferCallback(params);
   }
 
   getReturnedTransfers(
     ...args: Parameters<PayTRTransferService["getReturnedTransfers"]>
   ) {
+    this.assertMarketplaceTransfer();
     return this.transfers.getReturnedTransfers(...args);
   }
 
   resendReturnedTransfers(
     ...args: Parameters<PayTRTransferService["resendReturnedTransfers"]>
   ) {
+    this.assertMarketplaceTransfer();
     return this.transfers.resendReturnedTransfers(...args);
   }
 
@@ -1108,21 +1160,15 @@ export class PayTRService implements IPaymentProvider {
   // paytr-report-sync onları sağlayıcı üzerinden çağırır.
   // ==========================================================================
 
-  getTransactionStatement(
-    ...args: Parameters<PayTRReportService["getTransactionStatement"]>
-  ) {
-    return this.reports.getTransactionStatement(...args);
+  getTransactionStatement(params: { startDate: string; endDate: string }) {
+    return this.reports.getTransactionStatement(params, this.merchant);
   }
 
-  getSettlementSummary(
-    ...args: Parameters<PayTRReportService["getSettlementSummary"]>
-  ) {
-    return this.reports.getSettlementSummary(...args);
+  getSettlementSummary(params: { startDate: string; endDate: string }) {
+    return this.reports.getSettlementSummary(params, this.merchant);
   }
 
-  getSettlementDetail(
-    ...args: Parameters<PayTRReportService["getSettlementDetail"]>
-  ) {
-    return this.reports.getSettlementDetail(...args);
+  getSettlementDetail(params: { date: string }) {
+    return this.reports.getSettlementDetail(params, this.merchant);
   }
 }

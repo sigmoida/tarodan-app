@@ -8,7 +8,12 @@ import { AdminOfferQueryService } from "./admin-offer-query.service";
  */
 describe("AdminOfferQueryService", () => {
   const now = Date.now();
-  const party = (id: string) => ({ id, displayName: id, email: `${id}@x` });
+  const party = (id: string, isTestAccount = false) => ({
+    id,
+    displayName: id,
+    email: `${id}@x`,
+    isTestAccount,
+  });
   const product = {
     id: "p1",
     title: "Ürün",
@@ -56,6 +61,31 @@ describe("AdminOfferQueryService", () => {
     };
     return { service: new AdminOfferQueryService(prisma), prisma };
   };
+
+  /**
+   * Teklifin şerit damgası yok; şerit kapısı iki tarafı aynı şeride zorladığı
+   * için taraf bayrağı teklifin şerididir. Liste test teklifini GİZLEMEZ —
+   * satır `isTest` ile "TEST" rozeti taşır.
+   */
+  it("marks a test-lane offer with isTest and keeps it in the list", async () => {
+    const { service, prisma } = makeService();
+    prisma.offer.findMany.mockResolvedValue([
+      row({ id: "live" }),
+      row({ id: "test", buyer: party("tb", true), seller: party("ts", true) }),
+    ]);
+    prisma.offer.count.mockResolvedValue(2);
+
+    const result = await service.getOffers({} as any);
+
+    expect(result.data.map((o: any) => [o.id, o.isTest])).toEqual([
+      ["live", false],
+      ["test", true],
+    ]);
+    // Şerit filtresi YOK: operasyonel liste test kaydını da döner.
+    expect(
+      JSON.stringify(prisma.offer.findMany.mock.calls[0][0].where),
+    ).not.toContain("isTest");
+  });
 
   it("effectiveStatus: süresi geçmiş pending → expired, diğerleri aynen", () => {
     expect(
@@ -173,13 +203,11 @@ describe("AdminOfferQueryService", () => {
       },
       order: {
         count: jest.fn().mockResolvedValue(2),
-        findFirst: jest
-          .fn()
-          .mockResolvedValue({
-            id: "o9",
-            orderNumber: "ORD-9",
-            status: "paid",
-          }),
+        findFirst: jest.fn().mockResolvedValue({
+          id: "o9",
+          orderNumber: "ORD-9",
+          status: "paid",
+        }),
       },
     });
 

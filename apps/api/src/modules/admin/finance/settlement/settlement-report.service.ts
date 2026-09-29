@@ -1,6 +1,7 @@
 import { Injectable } from "@nestjs/common";
 import { Prisma } from "@prisma/client";
 import { PrismaService } from "../../../../prisma";
+import { LIVE_ORDER } from "../../../account-lane/live-lane.where";
 import {
   buildSearchWhere,
   dateRangeWhere,
@@ -196,7 +197,12 @@ export class SettlementReportService {
   private whereOf(query: SettlementReportQueryDto): Prisma.OrderWhereInput {
     // Dönem ORTAK yardımcıdan: bitiş günü gün SONUNA genişler, yoksa son günün
     // teslimatları dökümden (ve dolayısıyla faturanın dayanağından) düşerdi.
-    const where: Prisma.OrderWhereInput = { deliveredAt: { not: null } };
+    // Test şeridi siparişine komisyon faturası kesilmez; faturanın dayanağı olan
+    // dökümde de yer almaz.
+    const where: Prisma.OrderWhereInput = {
+      ...LIVE_ORDER,
+      deliveredAt: { not: null },
+    };
     Object.assign(where, dateRangeWhere(query, "deliveredAt"));
     if (query.sellerId) where.sellerId = query.sellerId;
     const search = buildSearchWhere(searchTermOf(query.search), SEARCH_FIELDS);

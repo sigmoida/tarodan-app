@@ -5,12 +5,18 @@ import {
 } from "@nestjs/common";
 import {
   PaytrMatchStatus,
+  PaytrMerchant,
   PaytrStatementLineType,
   PaymentStatus,
   Prisma,
   RefundAttemptStatus,
 } from "@prisma/client";
 import { PrismaService } from "../../../prisma";
+import {
+  LIVE_MEMBERSHIP_PAYMENT,
+  LIVE_PAYMENT,
+  LIVE_REFUND_ATTEMPT,
+} from "../../account-lane/live-lane.where";
 import {
   istanbulDayStart,
   trCalendarDate,
@@ -108,6 +114,7 @@ export class AdminPspReconciliationService {
         this.prisma.paytrStatementLine.findMany({
           where: { transactionDate: { gte: since } },
           select: {
+            paytrMerchant: true,
             merchantOid: true,
             type: true,
             amount: true,
@@ -131,8 +138,11 @@ export class AdminPspReconciliationService {
           },
           select: { merchantOid: true, transactionDate: true },
         }),
+        // Test şeridi (test_mode=1) canlı dökümde yoktur; "bizde var, PayTR'de
+        // yok" farkına girmesin. Üç "bizim" kümesi de aynı kuralla süzülür.
         this.prisma.payment.findMany({
           where: {
+            ...LIVE_PAYMENT,
             provider: "paytr",
             status: { in: [PaymentStatus.completed, PaymentStatus.refunded] },
             paidAt: { gte: since },
@@ -141,6 +151,7 @@ export class AdminPspReconciliationService {
             id: true,
             amount: true,
             paidAt: true,
+            paytrMerchant: true,
             providerConversationId: true,
             metadata: true,
           },
@@ -148,6 +159,7 @@ export class AdminPspReconciliationService {
         // Üyelik yenilemeleri Payment tablosunda değildir; ciroda ve dökümde vardır.
         this.prisma.membershipPayment.findMany({
           where: {
+            ...LIVE_MEMBERSHIP_PAYMENT,
             provider: "paytr",
             orderId: null,
             status: { in: [PaymentStatus.completed, PaymentStatus.refunded] },
@@ -157,11 +169,13 @@ export class AdminPspReconciliationService {
             id: true,
             amount: true,
             createdAt: true,
+            paytrMerchant: true,
             merchantOid: true,
           },
         }),
         this.prisma.refundAttempt.findMany({
           where: {
+            ...LIVE_REFUND_ATTEMPT,
             provider: "paytr",
             status: {
               in: [
@@ -223,6 +237,13 @@ export class AdminPspReconciliationService {
         line.merchantOid,
       );
     }
+    // Kapsam MAĞAZA başına (sweepMissingPayments ile aynı kural): bir günün
+    // pazaryeri dökümü, üyelik mağazasının o gün aldığı ödemeleri kapsamaz.
+    const coveredMerchantsByDay = new Map<string, Set<PaytrMerchant>>();
+    const coveredFor = (day: string, merchant: PaytrMerchant | null): boolean =>
+      coveredMerchantsByDay
+        .get(day)
+        ?.has(merchant ?? PaytrMerchant.marketplace) ?? false;
     for (const line of lines) {
       const day = line.transactionDate.toISOString().slice(0, 10);
       if (line.type === PaytrStatementLineType.sale) {
@@ -230,6 +251,9 @@ export class AdminPspReconciliationService {
       }
       const card = cardOf(day);
       card.paytrCovered = true;
+      let covered = coveredMerchantsByDay.get(day);
+      if (!covered) coveredMerchantsByDay.set(day, (covered = new Set()));
+      covered.add(line.paytrMerchant ?? PaytrMerchant.marketplace);
       const amount = Number(line.amount);
       if (line.type === PaytrStatementLineType.sale) {
         card.paytr.salesCount++;
@@ -257,7 +281,11 @@ export class AdminPspReconciliationService {
       card.ours.salesCount++;
       card.ours.salesTotal += Number(payment.amount);
       const oids = paymentOids(payment);
-      if (card.paytrCovered && oids.length > 0 && !seenInPaytr(day, oids)) {
+      if (
+        coveredFor(day, payment.paytrMerchant) &&
+        oids.length > 0 &&
+        !seenInPaytr(day, oids)
+      ) {
         card.missingInPaytr++;
       }
     }
@@ -267,7 +295,7 @@ export class AdminPspReconciliationService {
       card.ours.salesCount++;
       card.ours.salesTotal += Number(renewal.amount);
       if (
-        card.paytrCovered &&
+        coveredFor(day, renewal.paytrMerchant) &&
         renewal.merchantOid &&
         !seenInPaytr(day, [renewal.merchantOid])
       ) {
@@ -332,10 +360,13 @@ export class AdminPspReconciliationService {
     const oidWindowEnd = new Date(dayEnd.getTime() + DAY_MS);
 
     const [coverage, saleLines, payments, renewals] = await Promise.all([
-      this.prisma.paytrStatementLine.count({
+      // Dökümü gelmiş mağazalar: yalnız onların ödemeleri "dökümde yok" sayılabilir.
+      this.prisma.paytrStatementLine.findMany({
         where: {
           transactionDate: { gte: dayStart, lt: dayEnd },
         },
+        distinct: ["paytrMerchant"],
+        select: { paytrMerchant: true },
       }),
       this.prisma.paytrStatementLine.findMany({
         where: {
@@ -344,8 +375,10 @@ export class AdminPspReconciliationService {
         },
         select: { merchantOid: true },
       }),
+      // Gün kartının "dökümde yok" sayısıyla AYNI küme: test şeridi hariç.
       this.prisma.payment.findMany({
         where: {
+          ...LIVE_PAYMENT,
           provider: "paytr",
           status: { in: [PaymentStatus.completed, PaymentStatus.refunded] },
           paidAt: { gte: dayStart, lt: dayEnd },
@@ -354,6 +387,7 @@ export class AdminPspReconciliationService {
           id: true,
           amount: true,
           paidAt: true,
+          paytrMerchant: true,
           providerConversationId: true,
           metadata: true,
           order: { select: { orderNumber: true } },
@@ -365,23 +399,35 @@ export class AdminPspReconciliationService {
       }),
       this.prisma.membershipPayment.findMany({
         where: {
+          ...LIVE_MEMBERSHIP_PAYMENT,
           provider: "paytr",
           orderId: null,
           status: { in: [PaymentStatus.completed, PaymentStatus.refunded] },
           createdAt: { gte: dayStart, lt: dayEnd },
         },
-        select: { id: true, amount: true, createdAt: true, merchantOid: true },
+        select: {
+          id: true,
+          amount: true,
+          createdAt: true,
+          paytrMerchant: true,
+          merchantOid: true,
+        },
       }),
     ]);
     const paytrOids = new Set(saleLines.map((l) => l.merchantOid));
-    const paytrCovered = coverage > 0;
+    const coveredMerchants = new Set(
+      coverage.map((c) => c.paytrMerchant ?? PaytrMerchant.marketplace),
+    );
+    const isCovered = (merchant: PaytrMerchant | null) =>
+      coveredMerchants.has(merchant ?? PaytrMerchant.marketplace);
+    const paytrCovered = coveredMerchants.size > 0;
     if (!paytrCovered) return { date, paytrCovered, items: [] };
 
     const items: Awaited<
       ReturnType<AdminPspReconciliationService["getMissingPayments"]>
     >["items"] = [];
     for (const p of payments) {
-      if (!p.paidAt) continue;
+      if (!p.paidAt || !isCovered(p.paytrMerchant)) continue;
       const oids = paymentOids(p);
       if (oids.length === 0 || oids.some((o) => paytrOids.has(o))) continue;
       items.push({
@@ -398,6 +444,7 @@ export class AdminPspReconciliationService {
       });
     }
     for (const r of renewals) {
+      if (!isCovered(r.paytrMerchant)) continue;
       if (!r.merchantOid || paytrOids.has(r.merchantOid)) continue;
       items.push({
         kind: "membership",
@@ -432,10 +479,10 @@ export class AdminPspReconciliationService {
   ): Promise<{ data: unknown[]; meta: { total: number } }> {
     const page = params.page ?? 1;
     const limit = params.limit ?? 50;
-    const where = this.lineFilterWhere(
-      params.status,
-      params.includeResolved ?? false,
-    );
+    const where: Prisma.PaytrStatementLineWhereInput = {
+      ...this.lineFilterWhere(params.status, params.includeResolved ?? false),
+      ...(params.merchant ? { paytrMerchant: params.merchant } : {}),
+    };
 
     const [rows, total] = await Promise.all([
       this.prisma.paytrStatementLine.findMany({
@@ -573,11 +620,15 @@ export class AdminPspReconciliationService {
   async getSettlements(params: {
     limit?: number;
     days?: number;
+    merchant?: PaytrMerchant;
   }): Promise<{ data: unknown[] }> {
     const limit = params.limit ?? 60;
-    const where: Prisma.PaytrSettlementWhereInput = params.days
-      ? { datePaid: { gte: this.windowStart(params.days) } }
-      : {};
+    const where: Prisma.PaytrSettlementWhereInput = {
+      ...(params.days
+        ? { datePaid: { gte: this.windowStart(params.days) } }
+        : {}),
+      ...(params.merchant ? { paytrMerchant: params.merchant } : {}),
+    };
     const settlements = await this.prisma.paytrSettlement.findMany({
       where,
       orderBy: [{ isProjection: "asc" }, { datePaid: "desc" }],

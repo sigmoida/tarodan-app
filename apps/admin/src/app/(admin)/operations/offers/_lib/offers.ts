@@ -42,6 +42,8 @@ export interface OfferRow {
   };
   buyer: OfferParty;
   seller: OfferParty;
+  /** Test şeridi teklifi (taraflardan biri test hesabı) — "TEST" rozeti. */
+  isTest: boolean;
   amount: number;
   /** Görünen durum (süresi geçmiş pending → expired). */
   status: OfferStatus;

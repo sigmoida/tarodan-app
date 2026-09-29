@@ -153,6 +153,7 @@ describe("Card saving + management (CAPI, E2E)", () => {
         {
           userId: user.id,
           provider: "paytr",
+          paytrMerchant: "membership",
           utoken: "U1",
           ctoken: "A1",
           last4: "1000",
@@ -163,6 +164,7 @@ describe("Card saving + management (CAPI, E2E)", () => {
         {
           userId: user.id,
           provider: "paytr",
+          paytrMerchant: "membership",
           utoken: "U1",
           ctoken: "A2",
           last4: "2000",

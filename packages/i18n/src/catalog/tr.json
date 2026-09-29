@@ -810,6 +810,7 @@
     "sendForReview": "İncelemeye Gönder",
     "sentForReviewRepublish": "İlanınız incelemeye gönderildi. Onaylandığında yeniden yayına girecek.",
     "sentForReview": "İlanınız incelemeye gönderildi. Onaylandığında yayına girecek.",
+    "reactivatedImmediately": "İlanınız tekrar yayında! Stok eklendi ve satışa açıldı, onay beklemez.",
     "reactivateFailed": "Yeniden satışa açılamadı",
     "invalidStockQuantity": "Geçerli bir stok miktarı giriniz",
     "listingRemoved": "İlan silindi",
@@ -1013,6 +1014,9 @@
     },
     "cardHolderPlaceholder": "Ad Soyad",
     "saveCardPaytr": "Kartımı sonraki ödemeler için PayTR'da sakla",
+    "saveCardForRenewal": "Kartımı otomatik yenileme için sakla",
+    "saveCardForRenewalHint": "Kartınız PayTR güvencesinde saklanır ve üyeliğiniz dönem sonunda otomatik yenilenir. Otomatik yenilemeyi dilediğiniz zaman kapatabilirsiniz.",
+    "saveCardForRenewalOffHint": "Kartınızı saklamazsanız otomatik yenileme kapalı kalır; dönem sonunda üyeliğinizi yeniden satın almanız gerekir.",
     "payWithSavedCard": "Kayıtlı Kart İle Öde",
     "loadingCards": "Kartlar yükleniyor…",
     "savedCardCvv": "Kayıtlı kart CVV",
@@ -4822,7 +4826,38 @@
         "cronResultFailed": "İş başarısız: {reason}",
         "cronResultPending": "İş hâlâ çalışıyor — sonucu Bull geçmişinden izleyin",
         "cronResultRunning": "İş çalışıyor…",
-        "cronResultNotFound": "İş kaydı kuyruk geçmişinden temizlendi — büyük olasılıkla tamamlandı, sonuç artık görüntülenemiyor"
+        "cronResultNotFound": "İş kaydı kuyruk geçmişinden temizlendi — büyük olasılıkla tamamlandı, sonuç artık görüntülenemiyor",
+        "lane": {
+          "title": "Test Şeridi — Canlı Test Hesapları",
+          "description": "Mağaza incelemesi ve mobil QA için canlıda izole hesaplar. Test hesapları yalnız birbirini görür; ilanları vitrine, sipariş/ödeme/takasları finans raporlarına girmez. Ödeme PayTR test modunda açılır, kargo ve e-fatura üretilmez.",
+          "accountsEmpty": "Henüz test hesabı yok.",
+          "createTitle": "Yeni test hesabı",
+          "email": "E-posta",
+          "password": "Şifre",
+          "displayName": "Görünen ad",
+          "phone": "Telefon (isteğe bağlı)",
+          "isSeller": "Satıcı olarak aç (ilan verebilsin)",
+          "create": "Hesap aç",
+          "created": "Test hesabı açıldı: {email}",
+          "createFailed": "Test hesabı açılamadı",
+          "reset": "Şeridi sıfırla",
+          "resetConfirmTitle": "Test şeridi sıfırlansın mı?",
+          "resetConfirmDescription": "Tüm test hesaplarının sipariş, ödeme, takas, teklif, iade ve sepet kayıtları silinir. Hesaplar ve ilanlar kalır; satılan ilanlar yeniden satışa açılır. Canlı verilere dokunulmaz.",
+          "resetDone": "Şerit sıfırlandı: {accounts} hesap, {orders} sipariş silindi",
+          "resetFailed": "Şerit sıfırlanamadı",
+          "buyer": "Alıcı",
+          "seller": "Satıcı",
+          "columns": {
+            "code": "Kod",
+            "email": "E-posta",
+            "name": "Ad",
+            "role": "Rol",
+            "orders": "Sipariş",
+            "listings": "İlan",
+            "createdAt": "Açılış"
+          },
+          "reviewHint": "Apple/Google inceleme notuna alıcı hesabın e-posta ve şifresini yaz; \"ödemeler test modunda, tahsilat yapılmaz\" ibaresini ekle."
+        }
       },
       "media": {
         "title": "Medya",
@@ -5987,7 +6022,7 @@
         "platformTab": "Reklam, İndirim, Üyelik Faturaları",
         "loadError": "Faturalar yüklenemedi",
         "empty": "Fatura bulunamadı",
-        "searchPlaceholder": "Fatura no, taraf, VKN veya ETTN ara",
+        "searchPlaceholder": "Fatura no, işlem no, taraf, VKN veya ETTN ara",
         "documentUnit": "belge",
         "invoiceUnit": "fatura",
         "invoiceNumber": "Fatura No",
@@ -6009,6 +6044,14 @@
         "uploadedAt": "Yüklenme",
         "replaced": "Değiştirildi",
         "returnReference": "İade → {reference}",
+        "processLinks": {
+          "order": "Sipariş",
+          "offer": "Teklif",
+          "trade": "Takas",
+          "refundRequest": "İade talebi",
+          "boost": "Öne çıkarma",
+          "membership": "Üye sayfası"
+        },
         "filters": {
           "allTypes": "Tüm Türler",
           "allStatuses": "Tüm Durumlar",
@@ -6018,7 +6061,9 @@
           "description": "Fatura açıklaması ile arama",
           "descriptionPlaceholder": "komisyon, kargo, platform bedeli…",
           "userCode": "Kullanıcı ID ile arama",
-          "userCodePlaceholder": "B010001 / K010001"
+          "userCodePlaceholder": "B010001 / K010001",
+          "processRef": "İşlem No ile arama",
+          "processRefPlaceholder": "ORD-… / TKS-… / RFD-… / BST-… / MEM-…"
         },
         "contexts": {
           "directSale": "Doğrudan satış",
@@ -6223,6 +6268,12 @@
       "psp": {
         "title": "PayTR Mutabakat",
         "subtitle": "PayTR raporları ile sistem kayıtlarının gün bazlı karşılaştırması",
+        "merchant": {
+          "label": "Mağaza",
+          "all": "Tüm mağazalar",
+          "marketplace": "Pazaryeri",
+          "membership": "Üyelik"
+        },
         "tabs": {
           "summary": "Gün Özetleri",
           "lines": "Döküm Satırları",
@@ -6552,7 +6603,6 @@
         "errorOccurred": "Hata oluştu"
       },
       "offers": {
-        "title": "Teklifler",
         "totalCount": "{count} teklif",
         "empty": "Henüz teklif yok",
         "emptyFiltered": "Filtreye uyan teklif yok",
@@ -6603,20 +6653,17 @@
         "filteringByProduct": "Ürüne göre filtreleniyor",
         "filteringByProductNamed": "Ürüne göre filtreleniyor: {title}",
         "orderNumber": "Sipariş No",
-        "groupNumber": "Grup No",
         "groupId": "Grup ID",
         "packageId": "Paket ID",
         "orderId": "Sipariş ID",
         "productId": "Ürün ID",
         "shipmentId": "Gönderi ID",
-        "internalTrackingNumber": "Dahili takip no",
         "buyer": "Alıcı",
         "seller": "Satıcı",
         "sellerId": "Satıcı ID",
         "cargoStatus": "Kargo Durumu",
         "commission": "Komisyon",
         "productCount": "Ürün Sayısı",
-        "itemCountUnit": "{count} adet",
         "cartItems": "{count} ürünlük sepet",
         "expandCart": "Sepeti aç",
         "collapseCart": "Sepeti kapat",
@@ -6626,16 +6673,15 @@
         "sellerPackage": "Satıcı paketi",
         "packageShipping": "Kargo: {amount}",
         "singleItem": "Tek ürün",
-        "groupDone": "Bitti",
-        "groupOngoing": "Devam ediyor",
         "originCancellation": "{origin} iptali",
-        "pageDescription": "Satın alma siparişleri ve ürünlere verilen teklifler",
+        "pageDescription": "Satın alma siparişleri, ürünlere verilen teklifler ve takaslar",
         "tabs": {
-          "directSale": "Doğrudan Satış",
-          "acceptedOffers": "Kabul Edilen Teklifler"
+          "directSale": "Direkt Satış",
+          "all": "Tüm Siparişler",
+          "offers": "Teklifler",
+          "offerOrders": "Siparişe Dönen Teklifler",
+          "trades": "Takaslar"
         },
-        "amountCommission": "Tutar / Komisyon",
-        "commissionShort": "Komisyon",
         "updateStatus": "Durum Güncelle",
         "newStatus": "Yeni Durum",
         "statusChangeReason": "Manuel İşlem Gerekçesi",
@@ -6798,6 +6844,63 @@
           "serviceVatOut": "Hizmet KDV'si (devlete)",
           "commissionRule": "Komisyon kuralı",
           "commissionRuleUnnamed": "Adsız kural"
+        },
+        "buckets": {
+          "all": "Tümü",
+          "new": "Yeni",
+          "shipped": "Kargoya Verilen",
+          "inTransit": "Taşıma Durumunda",
+          "delivered": "Teslim Edilen",
+          "other": "Diğer"
+        },
+        "filters": {
+          "party": "Alıcı / Satıcı",
+          "partyPlaceholder": "Ad, e-posta veya kullanıcı kodu",
+          "packageNumber": "Paket No",
+          "groupNumber": "Grup Kodu",
+          "productQuery": "Ürün adı / model kodu"
+        },
+        "columns": {
+          "orderInfo": "Sipariş Bilgileri",
+          "products": "Ürün Bilgileri",
+          "unitPrice": "Birim Fiyat",
+          "amountFees": "Tutar / Kesintiler",
+          "invoice": "Fatura",
+          "cargoStatus": "Kargo / Durum"
+        },
+        "cells": {
+          "offerBadge": "Teklif",
+          "preparingDeadline": "Hazırlama son: {date}",
+          "quantity": "{count} adet",
+          "listingPrice": "İlan:",
+          "listingPriceApproximate": "Teklif anındaki ilan fiyatı kayıtlı değil; ürünün güncel fiyatı gösteriliyor.",
+          "offerAmount": "Teklif:",
+          "priceDifference": "Fark:",
+          "lineSubtotal": "{count} adet · {amount}",
+          "salesCommission": "Satış komisyonu",
+          "platformFee": "Platform kesintisi",
+          "noInvoice": "Fatura yok",
+          "openInvoices": "Faturaları aç",
+          "noShipment": "Kargo kaydı yok",
+          "openOrder": "Sipariş dosyasını aç"
+        },
+        "cancel": {
+          "action": "Siparişi iptal et",
+          "title": "Siparişi iptal et",
+          "description": "#{orderNumber} numaralı sipariş iptal edilecek. Sepetteki diğer ürünler etkilenmez.",
+          "warning": "Alıcıya ödeme iadesi yapılır ve bu işlem geri alınamaz. Kargo etiketi oluşturulduysa kargo kaydı da iptal edilir; stok ürüne geri eklenir.",
+          "refundAmount": "Alıcıya iade edilecek tutar",
+          "shippingIncluded": "Kargo bedeli dahil",
+          "shippingExcluded": "Kargo bedeli hariç — paketteki diğer ürünler yine gönderilecek",
+          "previewLoading": "İade tutarı hesaplanıyor…",
+          "previewUnavailable": "İade tutarı şu an hesaplanamadı. İptal yine de kargo öncesi iptal politikasının tutarıyla yapılır.",
+          "reason": "İptal gerekçesi",
+          "reasonPlaceholder": "Gerekçe denetim kaydına yazılır ve iptal e-postasında alıcıya ve satıcıya iletilir",
+          "confirm": "İptal et ve iade et",
+          "success": "Sipariş iptal edildi, alıcıya iade yapıldı",
+          "failed": "Sipariş iptal edilemedi",
+          "pendingManual": "Bu siparişin iptali İade Talepleri'nde elle tamamlanmayı bekliyor (iade işlemi yarıda kaldı).",
+          "openPendingRefund": "Talebi aç"
         }
       },
       "trades": {
@@ -6954,8 +7057,6 @@
       "refundRequests": {
         "amountAndFee": "Tutar / Kesinti",
         "feeShort": "Kesinti",
-        "title": "İade Takibi",
-        "description": "Devam eden iadeler — otomatik akış izlenir; yalnız istisnai durumlarda admin müdahalesi gerekir",
         "loadError": "İade talepleri yüklenemedi",
         "emptyFiltered": "Bu filtrelerle eşleşen iade talebi yok.",
         "reason": "Sebep",
@@ -7148,7 +7249,13 @@
         "sellerImpactHint": "Bu kalemler alıcı iadesine girmez; satıcının payout mahsubuna / escrow'una işlenir.",
         "chargeReturnToSeller": "Dönüş kargosu borcu (satıcıya)",
         "chargeOutboundToSeller": "Gidiş kargosu borcu (satıcıya)",
-        "sellerShippingCompensation": "Kargo payı tazmini (satıcıya iade)"
+        "sellerShippingCompensation": "Kargo payı tazmini (satıcıya iade)",
+        "kind": {
+          "label": "Tür",
+          "all": "Tüm türler",
+          "cancellation": "İptal iadesi",
+          "return": "Ürün iadesi"
+        }
       },
       "shipping": {
         "title": "Kargo İşlemleri",
@@ -7268,55 +7375,234 @@
             "dismissed": "Kapatıldı"
           }
         }
+      },
+      "cancellations": {
+        "title": "İptal & İade",
+        "description": "İptal edilen siparişler, teklifler ve takaslar ile iade talepleri tek ekranda",
+        "views": {
+          "cancellations": "İptaller",
+          "refunds": "İadeler"
+        },
+        "tabs": {
+          "all": "Tüm İptaller",
+          "directSale": "Direkt Satış",
+          "offers": "Teklifler",
+          "trades": "Takaslar"
+        },
+        "buckets": {
+          "all": "Tümü",
+          "new": "Yeni",
+          "buyer": "Alıcının İptal Ettiği",
+          "seller": "Satıcının İptal Ettiği",
+          "platform": "Tarodan İptali"
+        },
+        "reason": {
+          "expired": "Süresi Dolan"
+        },
+        "actor": {
+          "buyer": "Alıcı",
+          "seller": "Satıcı",
+          "platform": "Tarodan (yönetici)",
+          "system": "Tarodan (otomatik)",
+          "unknown": "Bilinmiyor"
+        },
+        "refundState": {
+          "notCharged": "Tahsilat yok",
+          "pending": "İade bekliyor",
+          "inReview": "İade incelemede",
+          "refunded": "İade edildi",
+          "failed": "İade başarısız"
+        },
+        "columns": {
+          "orderInfo": "Sipariş Bilgileri",
+          "buyer": "Alıcı",
+          "seller": "Satıcı",
+          "products": "Bilgiler",
+          "unitPrice": "Birim Fiyat",
+          "amountFees": "Tutar / Komisyon",
+          "cancelledAt": "İptal Tarihi",
+          "reason": "İptal Nedeni",
+          "refundState": "Durum"
+        },
+        "cells": {
+          "partial": "Kısmi iptal · {cancelled}/{total} kalem",
+          "tradeBadge": "Takas",
+          "cancelledBy": "İptal eden: {actor}",
+          "noDate": "Tarih kaydı yok",
+          "tradeSide": "Ürün sahibi"
+        },
+        "status": {
+          "cancelled": "İptal edildi",
+          "rejected": "Reddedildi",
+          "mixed": "Karışık"
+        },
+        "filters": {
+          "orderNumber": "Sipariş No",
+          "cargoCode": "Kargo Kodu",
+          "groupNumber": "Grup Kodu",
+          "party": "Alıcı / Satıcı",
+          "partyPlaceholder": "Ad, e-posta, kullanıcı kodu ya da kullanıcı ID",
+          "cancelledDate": "İptal tarihi"
+        },
+        "resultCount": "Filtreleme sonuçları: toplam {count} iptal",
+        "empty": "Henüz iptal yok",
+        "emptyFiltered": "Filtreye uygun iptal bulunamadı",
+        "export": {
+          "button": "Excel'e aktar",
+          "truncated": "Dosya yalnız ilk {count} satırı içeriyor — filtreyi daraltın",
+          "sheetName": "İptaller",
+          "rowNumber": "Satır No",
+          "origin": "Tür",
+          "originValue": {
+            "direct_sale": "Direkt Satış",
+            "offer": "Teklif",
+            "trade": "Takas"
+          },
+          "orderNumber": "Sipariş No",
+          "orderDate": "Sipariş Tarihi",
+          "buyer": "Alıcı",
+          "buyerCode": "Alıcı Kodu",
+          "seller": "Satıcı",
+          "sellerCode": "Satıcı Kodu",
+          "product": "Ürün",
+          "productCode": "Ürün Kodu",
+          "quantity": "Adet",
+          "unitPrice": "Birim Fiyat",
+          "subtotal": "Ara Toplam",
+          "cancelledAt": "İptal Tarihi",
+          "cancelledBy": "İptal Eden",
+          "reason": "İptal Nedeni",
+          "refundState": "İade Durumu",
+          "testLane": "Test şeridi"
+        }
       }
     },
     "dashboard": {
       "title": "Dashboard",
-      "description": "Hoş geldiniz! İşte bugünkü genel bakış.",
+      "description": "Bekleyen işler, uyarılar ve dönem özeti.",
+      "refresh": "Yenile",
+      "refreshing": "Yenileniyor…",
+      "zones": {
+        "queues": "Bekleyen işler",
+        "queuesDescription": "Tarih filtresinden bağımsız — ne zaman düştüğü fark etmez, hâlâ bekliyor.",
+        "queuesEmpty": "Bekleyen iş yok.",
+        "alerts": "Uyarılar",
+        "period": "Dönem özeti",
+        "stock": "Şu anki durum",
+        "loadFailed": "Bu bölüm yüklenemedi."
+      },
+      "queues": {
+        "refundRequests": "İade talepleri",
+        "tradeOperations": "Takas operasyonu",
+        "listingModeration": "İlan moderasyonu",
+        "sellerApplications": "Satıcı başvuruları",
+        "supportAndReports": "Destek ve şikayet",
+        "moneyOperations": "Para işlemleri",
+        "documents": "Belgeler",
+        "shipping": "Kargo"
+      },
+      "queueParts": {
+        "refundsPendingReview": "İnceleme bekleyen",
+        "refundsDisputed": "İtirazlı",
+        "tradesAtWarehouse": "Depoda / incelemede",
+        "tradeDisputesOpen": "Açık itiraz",
+        "tradeRefundFailures": "İadesi başarısız",
+        "tradeCompensationPending": "Tazminat bekleyen",
+        "productsPending": "Onay bekleyen ilan",
+        "messagesPendingApproval": "Onay bekleyen mesaj",
+        "corporateApplications": "Kurumsal başvuru",
+        "sellerDocuments": "İncelenecek belge",
+        "ticketsOpen": "Açık destek talebi",
+        "ticketsUrgent": "Acil / yüksek öncelikli",
+        "reportsPending": "Bekleyen şikayet",
+        "payoutsFailed": "Başarısız transfer",
+        "holdsOverdue": "Süresi geçmiş escrow",
+        "adjustmentsOpen": "Açık satıcı borcu",
+        "invoicesExhausted": "Denemesi tükenmiş belge",
+        "ordersUninvoiced": "Faturasız teslimat",
+        "carrierCancellations": "Taşıyıcı iptal görevi",
+        "shipmentsWithoutTracking": "Takip kodu oluşmamış gönderi"
+      },
+      "alerts": {
+        "stuckShippedOrders": "{count} sipariş {threshold} günden uzun süredir kargoda — teslim raporu gelmiyor",
+        "stuckWarehouseTrades": "{count} takas kolisi {threshold} gündür depoya ulaşmadı",
+        "stuckOutboundTrades": "{count} takas çıkış kolisinin teslim raporu {threshold} gündür gelmedi",
+        "paymentsMissingFromStatement": "{count} tahsilatın PayTR dökümünde karşılığı yok",
+        "unresolvedStatementLines": "{count} döküm satırı eşleşmedi ve kapatılmadı",
+        "commissionLedgerDrift": "Komisyon defteri sipariş toplamıyla uyuşmuyor: {amount}",
+        "paymentsWithoutOrders": "{count} tamamlanmış ödemenin siparişi bulunamadı",
+        "ordersWithoutHold": "{count} ödenmiş siparişin escrow kaydı yok",
+        "outboxDead": "{count} yan etki tüm denemelerini tüketti (DLQ)",
+        "outboxStuckProcessing": "{count} outbox satırı {threshold} dakikadır işlemede takılı",
+        "noActiveCommissionRuleSet": "Aktif komisyon kural seti yok — checkout kapalı",
+        "noActiveShippingTariff": "Aktif kargo tarifesi yok — kargo bedeli hesaplanamıyor",
+        "staleCouponReservations": "{count} kupon rezervasyonu süresi dolduğu hâlde bütçeyi tutuyor",
+        "deliveredHoldsWithoutRelease": "{count} teslim edilmiş siparişin escrow'unda serbest bırakma tarihi yok",
+        "agedCarrierCancellations": "{count} taşıyıcı iptal görevi {threshold} saattir bekliyor",
+        "exhaustedPayoutRetries": "{count} transfer talimatı deneme hakkını tüketti",
+        "preparingDeadlineWithin24h": "{count} siparişin hazırlama süresi 24 saat içinde doluyor"
+      },
       "stats": {
-        "totalOrders": "Toplam Satış",
-        "commissionRevenue": "Komisyon Geliri",
-        "activeProducts": "Aktif Ürünler",
-        "totalUsers": "Toplam Kullanıcı",
-        "products": "Ürünler",
-        "users": "Kullanıcılar",
-        "grossSales": "Toplam Satış Tutarı",
-        "netCommission": "Net Komisyon",
-        "liveVisitors": "Canlı / Günlük Aktif Ziyaretçi",
-        "cancellationsRefunds": "İptal / İade",
-        "active": "Aktif",
-        "passive": "Pasif",
-        "live": "Canlı",
-        "daily": "Günlük",
-        "cancellations": "İptal",
-        "refunds": "İade"
+        "paidOrders": "Ödenen sipariş",
+        "paidAmount": "Ödenen tutar",
+        "sellerPayoutCount": "Kullanıcılara ödenen hak ediş (adet)",
+        "sellerPayoutAmount": "Kullanıcılara ödenen hak ediş",
+        "returnRefundCount": "Kullanıcılara ödenen iade (adet)",
+        "returnRefundAmount": "Kullanıcılara ödenen iade",
+        "cancelRefundCount": "Kullanıcılara ödenen iptal (adet)",
+        "cancelRefundAmount": "Kullanıcılara ödenen iptal",
+        "deliveredOrders": "Teslim edilen sipariş",
+        "deliveredAmount": "Teslim edilen sipariş tutarı",
+        "netRevenue": "Net platform geliri",
+        "netRevenueCount": "Net platform geliri (adet)",
+        "serviceFeeCount": "Tarodan hizmet bedelleri (adet)",
+        "serviceFeeAmount": "Tarodan hizmet bedelleri (alıcı+satıcı)",
+        "commissionCount": "Tarodan komisyonları (adet)",
+        "commissionAmount": "Tarodan komisyonları (alıcı+satıcı)",
+        "shippingCount": "Toplam kargo (adet)",
+        "shippingAmount": "Toplam kargo",
+        "membershipRevenue": "Üyelik geliri",
+        "membershipCount": "Üyelik geliri (adet)",
+        "boostRevenue": "Öne çıkarma geliri",
+        "boostCount": "Öne çıkarma geliri (adet)",
+        "cancelledOrders": "İptal edilen sipariş",
+        "completedTrades": "Tamamlanan takas",
+        "completedTradeAmount": "Tamamlanan takas tutarı",
+        "tradeFeeRevenue": "Takas hizmet geliri",
+        "newUsers": "Yeni kullanıcı",
+        "newListings": "Yeni ilan",
+        "signedInUsers": "Giriş yapan kullanıcı",
+        "cancelledFromMigration": "Yalnız yeni iptaller sayılır (eski kayıtlarda iptal anı tutulmuyordu)",
+        "feeSplitIncomplete": "Eski siparişlerde kalem kırılımı tutulmadığından bu sayı geçmiş dönemlerde eksik görünebilir (bkz. Net platform geliri kartı)",
+        "signedInSingleStamp": "Bir kullanıcının yalnız SON girişi tutulur; birden çok pencerede aktifse yalnız sonrakinde sayılır"
+      },
+      "stock": {
+        "escrowBalance": "Escrow bakiyesi",
+        "openSellerDebt": "Açık satıcı borcu",
+        "activeListings": "Aktif ilan",
+        "activeMemberships": "Aktif üyelik",
+        "activeBoosts": "Aktif öne çıkarma",
+        "tierBreakdown": "Katman kırılımı"
+      },
+      "age": {
+        "oldest": "En eskisi {age} bekliyor",
+        "days": "{count} gün",
+        "hours": "{count} saat",
+        "minutes": "{count} dk"
       },
       "period": {
+        "label": "Dönem",
+        "daily": "Günlük",
+        "monthly": "Aylık",
+        "custom": "Tarih aralığı",
+        "from": "Başlangıç tarihi",
+        "to": "Bitiş tarihi",
         "yesterday": "Dün",
-        "thisMonth": "Bu Ay",
-        "lastMonth": "Geçen Ay"
-      },
-      "quickActions": {
-        "products": "Ürünler",
-        "orders": "Siparişler",
-        "users": "Kullanıcılar",
-        "messages": "Mesajlar"
-      },
-      "pendingActions": {
-        "productsPending": "{count} ürün onay bekliyor",
-        "refundRequests": "{count} iade talebi",
-        "messagesPending": "{count} mesaj onay bekliyor",
-        "identityVerification": "{count} kimlik doğrulama talebi",
-        "review": "İncele"
-      },
-      "charts": {
-        "salesLabel": "Satışlar (₺)",
-        "ordersLabel": "Siparişler",
-        "sales30dTitle": "Son 30 Gün Satış Performansı",
-        "dailyOrdersTitle": "Günlük Sipariş Sayısı",
-        "categoryTitle": "Kategori Dağılımı",
-        "noData": "Veri Yok",
-        "uncategorized": "Kategorisiz"
+        "thisMonth": "Bu ay",
+        "allTime": "Tüm zamanlar",
+        "rangeIncomplete": "Başlangıç ve bitiş tarihi seçin",
+        "rangeUnparseable": "Geçerli bir tarih seçin",
+        "rangeReversed": "Başlangıç tarihi bitiş tarihinden sonra olamaz"
       },
       "recentOrders": {
         "title": "Son Siparişler",
@@ -7328,6 +7614,7 @@
       },
       "topProducts": {
         "title": "En Çok Görüntülenen Ürünler",
+        "allTimeNote": "Tüm zamanlar — görüntülenme kümülatiftir, döneme göre ayrılamaz",
         "empty": "Henüz ürün görüntülemesi bulunmuyor",
         "columns": {
           "product": "Ürün",
@@ -7338,6 +7625,7 @@
       },
       "topSellers": {
         "title": "En Çok Görüntülenen Satıcılar",
+        "allTimeNote": "Tüm zamanlar — görüntülenme kümülatiftir, döneme göre ayrılamaz",
         "empty": "Henüz satıcı görüntülemesi bulunmuyor",
         "columns": {
           "seller": "Satıcı",
@@ -7346,10 +7634,6 @@
           "activeListings": "Aktif İlan"
         }
       },
-      "status": {
-        "refundRequested": "İade Talebi",
-        "inProgress": "Devam Ediyor"
-      },
       "relativeTime": {
         "minutesAgo": "{count} dk önce",
         "hoursAgo": "{count} saat önce"
@@ -7357,71 +7641,198 @@
     },
     "analytics": {
       "title": "Analizler",
-      "description": "Detaylı satış, kullanıcı ve ürün analizleri",
-      "emptyTitle": "Bu dönem için veri yok",
-      "emptyDescription": "Farklı bir tarih aralığı seçin veya yeni veriler oluştuğunda tekrar kontrol edin.",
-      "dateRange": {
-        "7d": "7 Gün",
-        "30d": "30 Gün",
-        "90d": "90 Gün",
-        "1y": "1 Yıl"
-      },
+      "description": "Seçilen dönemde ne olduğu ve neden olduğu",
+      "empty": "Bu dönemde ölçülecek bir hareket yok",
+      "uncategorized": "Belirtilmemiş",
       "tabs": {
-        "sales": "Satış Analitiği",
-        "users": "Kullanıcı Analitiği",
-        "products": "Ürün Analitiği",
-        "trades": "Takas Analitiği"
+        "sales": "Satış ve Gelir",
+        "trade": "Takas ve Teklif",
+        "catalog": "Katalog ve Satıcı",
+        "quality": "Kalite ve Operasyon",
+        "membership": "Üyelik"
       },
-      "orderStatus": {
-        "pendingPayment": "Ödeme Bekliyor",
-        "paid": "Ödendi",
-        "preparing": "Hazırlanıyor",
-        "shipped": "Kargoda",
-        "delivered": "Teslim Edildi",
-        "completed": "Tamamlandı",
-        "cancelled": "İptal",
-        "refundRequested": "İade Talebi",
-        "refunded": "İade Edildi"
+      "filters": {
+        "from": "Başlangıç",
+        "to": "Bitiş",
+        "groupBy": "Gruplama",
+        "day": "Günlük",
+        "week": "Haftalık",
+        "month": "Aylık",
+        "compare": "Önceki dönemle karşılaştır",
+        "vsPrevious": "önceki döneme göre",
+        "rangeIncomplete": "Başlangıç ve bitiş birlikte seçilmeli",
+        "rangeUnparseable": "Tarihler geçerli olmalı",
+        "rangeReversed": "Başlangıç, bitişten sonra olamaz",
+        "rangeTooLong": "Aralık en fazla 366 gün olabilir"
       },
-      "categoryOther": "Diğer",
       "export": {
         "csv": "CSV İndir",
-        "json": "JSON İndir"
+        "xlsx": "Excel İndir"
       },
-      "sales": {
-        "salesLabel": "Satışlar (₺)",
-        "ordersLabel": "Siparişler",
-        "totalOrders": "Toplam Sipariş",
-        "totalRevenue": "Toplam Gelir",
-        "commissionRevenue": "Komisyon Geliri",
-        "avgOrderValue": "Ort. Sipariş Tutarı",
-        "revenueChartTitle": "Gelir Grafiği",
-        "orderCountTitle": "Sipariş Sayısı",
-        "statusDistributionTitle": "Sipariş Durumu Dağılımı"
+      "notes": {
+        "stockElsewhere": "Anlık durum sayıları Kontrol Paneli'nde.",
+        "carrierCostReconciledOnly": "Yalnız taşıyıcı dökümü gelmiş gönderileri kapsar; karşılaştırma da yalnız onlar üzerinden.",
+        "truncated": "{stamp} {date} tarihinden itibaren kaydediliyor; daha eskiler bu sayılarda görünmez."
       },
-      "users": {
-        "newUsers": "Yeni Kullanıcılar",
-        "totalUsers": "Toplam Kullanıcı",
-        "activeUsers": "Aktif Kullanıcılar",
-        "sellers": "Satıcılar",
-        "growthTitle": "Kullanıcı Büyümesi"
+      "metric": {
+        "gmv": "Ödenen ciro (GMV)",
+        "orderCount": "Ödenen sipariş",
+        "averageBasket": "Ortalama sepet",
+        "netRevenue": "Platform net geliri",
+        "discountCost": "Kupon indirimi",
+        "platformFundedDiscount": "Platformun karşıladığı indirim",
+        "feeDiscountCost": "Hizmet bedeli indirimi",
+        "collectedShipping": "Tahsil edilen kargo",
+        "carrierCost": "Kargo maliyeti (mutabık)",
+        "refundedAmount": "İade edilen tutar",
+        "averageTradeValue": "Ortalama takas değeri",
+        "tradeFeeRevenue": "Takas ücreti geliri",
+        "offersCreated": "Verilen teklif",
+        "offersResponded": "Cevaplanan teklif",
+        "offersAccepted": "Kabul edilen teklif",
+        "offerOrders": "Teklif siparişi",
+        "offerResponseRate": "Teklif cevap oranı",
+        "offerConversionRate": "Teklif→sipariş oranı",
+        "listingsCreated": "Açılan ilan",
+        "listingsPublished": "Yayına giren ilan",
+        "listingsSold": "Satılan ilan",
+        "averagePrice": "Ortalama ilan fiyatı",
+        "medianTimeToSellDays": "Satışa kadar (medyan)",
+        "medianSellerTimeToFirstSaleDays": "İlk satışa kadar (medyan)",
+        "boostRevenue": "Öne çıkarma geliri",
+        "boostCount": "Öne çıkarma satışı",
+        "averageBoostViewUplift": "Öne çıkarma görüntülenme kazancı",
+        "paidOrders": "Ödenen sipariş",
+        "refundedOrders": "İade edilen sipariş",
+        "refundRate": "İade oranı (ödenen siparişe göre)",
+        "cancelledOrders": "İptal edilen sipariş",
+        "cancellationRate": "İptal oranı (ödenen siparişe göre)",
+        "paymentAttempts": "Ödeme denemesi",
+        "failedPayments": "Başarısız ödeme",
+        "paymentFailureRate": "Ödeme başarısızlık oranı",
+        "medianPaidToShippedHours": "Ödeme→kargo (medyan)",
+        "medianShippedToDeliveredHours": "Kargo→teslim (medyan)",
+        "medianPaidToDeliveredHours": "Ödeme→teslim (medyan)",
+        "newMemberships": "Yeni üyelik",
+        "renewals": "Yenileme",
+        "churned": "İptal edilen üyelik",
+        "pastDue": "Dönemde ödemesiz kalan üyelik",
+        "membershipRevenue": "Üyelik geliri",
+        "pastDueNow": "Şu an ödemesiz üyelik",
+        "shipmentsAwaitingCarrierCost": "Mutabakat bekleyen gönderi",
+        "carrierCostReconciledShare": "Mutabık gönderi oranı"
       },
-      "trades": {
-        "totalTrades": "Toplam Takas",
-        "completed": "Tamamlanan",
-        "pending": "Bekleyen",
-        "avgValue": "Ort. Değer",
-        "statsTitle": "Takas İstatistikleri",
-        "disputed": "Anlaşmazlık",
-        "successRate": "Başarı Oranı"
+      "series": {
+        "gmv": "Ciro",
+        "orderCount": "Sipariş",
+        "netRevenue": "Net gelir",
+        "refundedAmount": "İade",
+        "tradesCreated": "Açılan takas",
+        "tradesCompleted": "Tamamlanan takas",
+        "tradeFeeRevenue": "Takas ücreti",
+        "listingsPublished": "Yayına giren ilan",
+        "listingsSold": "Satılan ilan",
+        "boostRevenue": "Öne çıkarma geliri",
+        "refundedOrders": "İade",
+        "cancelledOrders": "İptal",
+        "failedPayments": "Başarısız ödeme",
+        "newMemberships": "Yeni üyelik",
+        "renewals": "Yenileme",
+        "membershipRevenue": "Üyelik geliri"
       },
-      "products": {
-        "totalProducts": "Toplam Ürün",
-        "activeProducts": "Aktif Ürünler",
-        "pendingApproval": "Onay Bekleyen",
-        "avgPrice": "Ort. Fiyat",
-        "categoryDistributionTitle": "Kategori Dağılımı",
-        "byCategoryTitle": "Kategorilere Göre Ürünler"
+      "section": {
+        "trend": "Zaman içinde",
+        "byCategory": "Kategoriye göre",
+        "byBrand": "Markaya göre",
+        "byPriceBand": "Fiyat bandına göre",
+        "byCondition": "Duruma göre",
+        "byPricingVersion": "Fiyatlama sürümüne göre",
+        "byTier": "Üyelik katmanına göre",
+        "topSellers": "En çok satan satıcılar",
+        "topProducts": "En çok satan ilanlar",
+        "funnel": "Huni",
+        "offerFunnel": "Teklif hunisi",
+        "exits": "Çıkışlar",
+        "boostPackages": "Öne çıkarma paketleri",
+        "refundsByReason": "İade gerekçeleri",
+        "refundsByFault": "Kusur tarafı",
+        "refundComponents": "İade kalemleri",
+        "cancellationsByReason": "İptal gerekçeleri",
+        "cancellationsByType": "İptal türü",
+        "installmentMix": "Taksit dağılımı"
+      },
+      "table": {
+        "label": "Ad",
+        "count": "Adet",
+        "amount": "Tutar",
+        "share": "Pay",
+        "orders": "Sipariş",
+        "gmv": "Ciro",
+        "step": "Adım",
+        "conversion": "İlk adıma göre",
+        "dropOff": "Önceki adımdan kayıp",
+        "uplift": "Görüntülenme kazancı",
+        "notMeasured": "Ölçülmedi"
+      },
+      "step": {
+        "created": "Oluşturuldu",
+        "accepted": "Kabul edildi",
+        "completed": "Tamamlandı",
+        "published": "Yayına girdi",
+        "sold": "Satıldı",
+        "responded": "Cevaplandı",
+        "ordered": "Siparişe döndü"
+      },
+      "enum": {
+        "rejected": "Reddedildi",
+        "cancelled": "İptal edildi",
+        "v1": "v1 (komisyonlu)",
+        "v2": "v2 (sabit ücret)",
+        "buyer": "Alıcı",
+        "seller": "Satıcı",
+        "carrier": "Kargo",
+        "platform": "Platform",
+        "delivery_delayed": "Teslimat gecikti",
+        "changed_mind": "Vazgeçti",
+        "damaged": "Hasarlı",
+        "wrong_item": "Yanlış ürün",
+        "not_as_described": "Açıklamaya uymuyor",
+        "missing_parts": "Eksik parça",
+        "counterfeit": "Taklit",
+        "defective": "Arızalı",
+        "buyer_damaged": "Alıcı hasar verdi",
+        "lost_in_transit": "Taşımada kayboldu",
+        "other": "Diğer",
+        "wrong_product_selected": "Yanlış ürün seçildi",
+        "wrong_card": "Yanlış kart",
+        "price_changed_mind": "Fiyattan vazgeçti",
+        "unavailable_at_address": "Adreste bulunamadı",
+        "iptal": "İptal",
+        "iade": "İade",
+        "product": "Ürün bedeli",
+        "outbound_shipping": "Gidiş kargosu",
+        "return_shipping": "İade kargosu",
+        "buyer_commission": "Alıcı komisyonu",
+        "buyer_platform_fee": "Alıcı hizmet bedeli",
+        "seller_commission": "Satıcı komisyonu",
+        "seller_platform_fee": "Satıcı hizmet bedeli",
+        "new": "Sıfır",
+        "like_new": "Sıfır gibi",
+        "very_good": "Çok iyi",
+        "good": "İyi",
+        "fair": "İdare eder"
+      },
+      "unit": {
+        "percent": "%{value}",
+        "days": "{value} gün",
+        "hours": "{value} sa"
+      },
+      "stamp": {
+        "orderCancelledAt": "Sipariş iptal anı",
+        "tradeRejectedAt": "Takas ret anı",
+        "productSoldAt": "İlan satış anı",
+        "offerRespondedAt": "Teklif cevap anı",
+        "membershipPastDueAt": "Üyelik ödemesiz kalma anı"
       }
     },
     "reports": {
@@ -7947,7 +8358,11 @@
       "bulkResendQueuedPartial": "{ok} kuyruğa alındı, {failed} başarısız",
       "bulkResendConfirmDesc": "Aktivasyon mailleri arka planda kuyruktan gönderilir; sonucu e-posta loglarından izleyebilirsiniz. Uygun olmayan satırlar atlanır. Devam edilsin mi?",
       "filterLoginStateAll": "Tüm Giriş Durumları",
-      "filterLoggedIn": "Giriş Yapmış"
+      "filterLoggedIn": "Giriş Yapmış",
+      "testAccount": "Test hesabı",
+      "testAccountHint": "Test şeridi: canlı verilere karışmaz",
+      "testAccountOnly": "Yalnız test hesapları",
+      "liveAccountsOnly": "Yalnız gerçek hesaplar"
     },
     "deletedIdentities": {
       "title": "Silinen Hesap Kimlikleri",
@@ -8256,28 +8671,13 @@
         },
         "orders": {
           "name": "Siparişler",
-          "description": "Tüm siparişleri görüntüleyin ve yönetin",
-          "keywords": "order"
-        },
-        "offers": {
-          "name": "Teklifler",
-          "description": "Ürünlere verilen teklifleri ve pazarlıkları takip edin",
-          "keywords": "teklif,offer,pazarlık"
-        },
-        "trades": {
-          "name": "Takaslar",
-          "description": "Ürün takas taleplerini takip edin ve yönetin",
-          "keywords": "takas,trade,barter,değişim"
+          "description": "Siparişleri, teklifleri ve takasları görüntüleyin ve yönetin",
+          "keywords": "order,sipariş,teklif,offer,takas,trade"
         },
         "shipping": {
           "name": "Kargo",
           "description": "Gönderi, kargo etiketi ve takip işlemleri",
           "keywords": "kargo,shipping,gönderi,etiket,takip"
-        },
-        "refundRequests": {
-          "name": "İade Takibi",
-          "description": "Açık iade taleplerini inceleyin ve sonuçlandırın",
-          "keywords": "iade,refund,talep,takip"
         },
         "products": {
           "name": "Ürünler",
@@ -8446,6 +8846,11 @@
         "media": {
           "name": "Medya",
           "description": "Bucket klasörleri, dosyalar ve sahiplik takibi."
+        },
+        "cancellationsRefunds": {
+          "name": "İptal & İade",
+          "description": "İptalleri ve iade taleplerini inceleyin ve sonuçlandırın",
+          "keywords": "iptal,iade,refund,cancellation,talep,takip"
         }
       }
     },
@@ -8626,7 +9031,8 @@
           "action": "İşlem",
           "entityType": "Varlık türü",
           "shipmentLeg": "Gönderi yönü",
-          "loginState": "Giriş durumu"
+          "loginState": "Giriş durumu",
+          "testAccount": "Test hesabı"
         }
       },
       "bulkActionBar": {
@@ -8664,6 +9070,10 @@
       },
       "list": {
         "totalLine": "Toplam {total} {unit}"
+      },
+      "testLane": {
+        "badge": "TEST",
+        "hint": "Test şeridi kaydı — PayTR test modunda ödendi; tahsilat, kargo ve e-fatura yok, raporlara girmez"
       }
     },
     "auth": {
@@ -8742,7 +9152,7 @@
       },
       "orderCancelledSeller": {
         "title": "Satış İptal Edildi",
-        "message": "{orderNumber} numaralı siparişiniz iptal edildi."
+        "message": "{orderNumber} numaralı sipariş iptal edildi. Ürünü kargoya vermeyin."
       },
       "orderCancelledOutOfStock": {
         "title": "Siparişiniz iptal edildi: stok tükendi",
@@ -8924,6 +9334,10 @@
         "title": "Üyeliğiniz Sona Erdi",
         "message": "{tierName} üyeliğiniz sona erdi. Yenileyin ve avantajlardan yararlanın!"
       },
+      "membershipRenewalCardRequired": {
+        "title": "Otomatik Yenileme Kapatıldı",
+        "message": "{tierName} üyeliğinizin otomatik yenilemesi kapatıldı: ödeme altyapımız değişti ve kayıtlı kartınız yenilemede kullanılamıyor. Üyeliğiniz dönem sonuna kadar sürer; yenilerken kartınızı kaydederseniz otomatik yenileme yeniden açılır."
+      },
       "membershipUpgraded": {
         "title": "Üyeliğiniz Yükseltildi! 🎉",
         "message": "{tierName} üyeliğine hoş geldiniz! Yeni avantajlarınız aktif."
@@ -9078,7 +9492,7 @@
       },
       "refundCompletedSeller": {
         "title": "İade Tamamlandı",
-        "message": "{refundNumber} numaralı sipariş için iade tamamlandı; tutar alıcıya iade edildi."
+        "message": "{refundNumber} numaralı sipariş için iade tamamlandı; tutar alıcıya iade edildi.{stockQuarantined, select, yes { Ürün stoğa geri eklendi ancak ilanınız pasif durumda; kontrol ettikten sonra siz yeniden aktive edebilirsiniz.} other {}}"
       },
       "refundAutoAcceptedSeller": {
         "title": "İade Talebi Otomatik Onaylandı",
@@ -9532,6 +9946,7 @@
       "documentsIncomplete": "Zorunlu belgeler ile her şirket sahibi/ortağının kimlik veya pasaport ön-arka yüzleri tamamlanmalıdır",
       "interactionBlocked": "Bu kullanıcıyla etkileşim kuramazsınız",
       "invalidDocumentType": "Geçersiz belge tipi",
+      "laneMismatch": "Bu kullanıcıyla işlem yapamazsınız (test hesabı sınırı)",
       "noFieldsToUpdate": "Güncellenecek alan bulunamadı",
       "notBlocked": "Bu kullanıcı engellenmemiş",
       "notFound": "Kullanıcı bulunamadı",
@@ -9635,7 +10050,13 @@
         "tariffUnverifiable": "Siparişin kargo tarifesi artık doğrulanamıyor",
         "couponChangesShipping": "Kupon kargo ücretini değiştiriyor; sipariş yeni checkout ile oluşturulmalı",
         "shipmentToDeliveredForbidden": "Kargo {status} durumundan teslim edildi durumuna geçirilemez",
-        "shipmentToInTransitForbidden": "Kargo {status} durumundan yolda durumuna geçirilemez"
+        "shipmentToInTransitForbidden": "Kargo {status} durumundan yolda durumuna geçirilemez",
+        "cancelNotPaid": "Ödemesi tamamlanmamış sipariş iptal edilemez; iade edilecek bir tahsilat yok",
+        "cancelAlreadyClosed": "Sipariş zaten iptal edilmiş veya iade edilmiş",
+        "cancelActiveRefund": "Siparişte açık bir iade/iptal talebi var; işlemi İade Talepleri ekranından sürdürün",
+        "cancelAfterHandover": "Kargoya verilmiş sipariş iptal edilemez; bu aşamada iade talebi akışını kullanın",
+        "cancelReasonRequired": "İptal gerekçesi zorunludur",
+        "cancelPendingManualCompletion": "Bu siparişin iptali ({refundNumber}) İade Talepleri'nde elle tamamlanmayı bekliyor; yeniden iptal etmek yerine talebi oradan sonuçlandırın"
       },
       "user": {
         "notBanned": "Kullanıcı zaten engelli değil",
@@ -9873,6 +10294,18 @@
         "invalidDate": "Geçersiz tarih (YYYY-MM-DD bekleniyor)",
         "lineNotFound": "Döküm satırı bulunamadı",
         "lineAlreadyMatched": "Eşleşmiş satır çözümlenemez"
+      },
+      "dashboard": {
+        "rangeIncomplete": "Özel dönem için başlangıç ve bitiş tarihi gerekir",
+        "rangeUnparseable": "Dönem tarihleri geçerli birer tarih olmalı",
+        "rangeReversed": "Başlangıç tarihi bitiş tarihinden sonra olamaz"
+      },
+      "analytics": {
+        "rangeIncomplete": "Tarih aralığı için başlangıç ve bitiş gerekir",
+        "rangeUnparseable": "Tarih aralığının uçları geçerli birer tarih olmalı",
+        "rangeReversed": "Başlangıç tarihi bitiş tarihinden sonra olamaz",
+        "rangeTooLong": "Tarih aralığı en fazla 366 gün olabilir",
+        "unknownTab": "Bilinmeyen analitik sekmesi"
       }
     },
     "advertisement": {

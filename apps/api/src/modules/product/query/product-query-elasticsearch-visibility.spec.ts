@@ -1,3 +1,4 @@
+import { accountLaneServiceStub } from "../../account-lane/account-lane.testing";
 import { ProductQueryService } from "./product-query.service";
 
 describe("ProductQueryService Elasticsearch visibility", () => {
@@ -23,6 +24,7 @@ describe("ProductQueryService Elasticsearch visibility", () => {
         isBlockedEither: async () => false,
         getHiddenUserIds: async () => [],
       } as any,
+      accountLaneServiceStub() as any,
     );
 
     await (service as any).findAllViaElasticsearch({

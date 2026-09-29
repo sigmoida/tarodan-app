@@ -26,5 +26,14 @@ export const userFilterFields = (t: TranslateFn): FilterField[] => [
     label: t("admin.shared.filterDialog.labels.loginState"),
     options: getLoginStateFilterOptions(t),
   },
+  {
+    type: "select",
+    name: "isTestAccount",
+    label: t("admin.shared.filterDialog.labels.testAccount"),
+    options: [
+      { value: "true", label: t("admin.users.testAccountOnly") },
+      { value: "false", label: t("admin.users.liveAccountsOnly") },
+    ],
+  },
   dateRangeField(t),
 ];

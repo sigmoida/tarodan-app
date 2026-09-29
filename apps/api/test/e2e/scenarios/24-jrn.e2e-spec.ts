@@ -26,6 +26,7 @@
  */
 import * as request from "supertest";
 import {
+  CancellationActor,
   OrderStatus,
   OfferStatus,
   PaymentStatus,
@@ -54,7 +55,7 @@ import { createProduct } from "../../factories/product.factory";
 import { createAddress } from "../../factories/address.factory";
 import { createOfferRow } from "../../factories/offer.factory";
 import { buyNow, buyAndInitiate } from "../../factories/flows";
-import { signCallback } from "../../mocks/paytr.mock";
+import { paytrCallbackPath, signCallback } from "../../mocks/paytr.mock";
 import { scenario } from "../../test-utils/scenario";
 import {
   getLastEmailTo,
@@ -163,8 +164,14 @@ describe("24 — Uçtan Uca Entegrasyon Journeyleri (JRN)", () => {
     let prepared: Promise<void> | undefined;
     const prepareBody = () =>
       (prepared ??= lastPayment(orderId).then((payment) => {
+        // Üyelik ödemesi üyelik mağazasının ucuna, o mağazanın anahtarıyla.
+        req.url = req.url.replace(
+          "/api/payments/callback/paytr",
+          paytrCallbackPath(payment!.paytrMerchant),
+        );
         req.send(
           signCallback({
+            merchant: payment!.paytrMerchant,
             merchantOid: payment!.providerConversationId!,
             status: "success",
             totalAmount:
@@ -2621,7 +2628,9 @@ describe("24 — Uçtan Uca Entegrasyon Journeyleri (JRN)", () => {
       const prisma = getPrisma();
 
       // processRefund (anlık iade, preparing/shipment pending).
-      await ctx.app.get(PaymentService).processRefund(orderId);
+      await ctx.app.get(PaymentService).processRefund(orderId, undefined, {
+        cancelledBy: CancellationActor.platform,
+      });
 
       const order = await prisma.order.findUnique({ where: { id: orderId } });
       expect(order?.status).toBe(OrderStatus.cancelled);

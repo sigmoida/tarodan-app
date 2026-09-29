@@ -17,11 +17,13 @@ import {
 } from "@tarodan/ui";
 import { detectBrand } from "./card";
 import type { NewCardValues } from "./schema";
+import type { PaymentPurpose } from "@/lib/api";
 import { BrandEmblem } from "./CardVisuals";
 
 interface NewCardFieldsProps {
   form: UseFormReturn<NewCardValues>;
   cardStorageEnabled: boolean;
+  purpose: PaymentPurpose;
   saveCard: boolean;
   onSaveCardChange: (v: boolean) => void;
 }
@@ -29,6 +31,7 @@ interface NewCardFieldsProps {
 export default function NewCardFields({
   form,
   cardStorageEnabled,
+  purpose,
   saveCard,
   onSaveCardChange,
 }: NewCardFieldsProps) {
@@ -132,10 +135,21 @@ export default function NewCardFields({
       {cardStorageEnabled && (
         <div className="rounded-xl border border-border bg-surface p-3">
           <Checkbox
-            label={t("checkout.saveCardPaytr")}
+            label={
+              purpose === "membership"
+                ? t("checkout.saveCardForRenewal")
+                : t("checkout.saveCardPaytr")
+            }
             checked={saveCard}
             onChange={(e) => onSaveCardChange(e.target.checked)}
           />
+          {purpose === "membership" && (
+            <p className="mt-2 text-xs text-muted">
+              {saveCard
+                ? t("checkout.saveCardForRenewalHint")
+                : t("checkout.saveCardForRenewalOffHint")}
+            </p>
+          )}
         </div>
       )}
     </div>

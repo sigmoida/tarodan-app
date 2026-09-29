@@ -1,4 +1,5 @@
 import { Injectable } from "@nestjs/common";
+import type { PaytrMerchant } from "@prisma/client";
 import { ReservationReconciliationService } from "./reservation-reconciliation.service";
 import { PaymentExpiryReconciliationService } from "./payment-expiry-reconciliation.service";
 import { PspReconciliationService } from "./psp-reconciliation.service";
@@ -36,8 +37,14 @@ export class PaymentReconciliationService {
     userId: string,
     utoken: string,
     mandate?: { ip?: string; termsVersion?: string },
+    merchant?: PaytrMerchant,
   ): Promise<number> {
-    return this.misc.syncSavedCardsFromUtoken(userId, utoken, mandate);
+    return this.misc.syncSavedCardsFromUtoken(
+      userId,
+      utoken,
+      mandate,
+      merchant,
+    );
   }
 
   reconcileMissingInvoices(): Promise<{ generated: number }> {

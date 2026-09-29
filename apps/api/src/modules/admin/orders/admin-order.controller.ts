@@ -58,6 +58,7 @@ import {
   AdminUserQueryDto,
   AdminProductQueryDto,
   AdminOrderQueryDto,
+  AdminOrderCountsQueryDto,
   AuditLogQueryDto,
   ApproveProductDto,
   RejectProductDto,
@@ -68,6 +69,7 @@ import {
   SetRolePermissionsDto,
   AnalyticsQueryDto,
   UpdateOrderStatusDto,
+  AdminCancelOrderDto,
   AddOrderTrackingDto,
   ReportQueryDto,
   AdminPaymentQueryDto,
@@ -97,6 +99,7 @@ import {
   RefundRequestQueryDto,
   AdminChangeMembershipDto,
 } from "../dto";
+import { AdminOrderCancelService } from "./admin-order-cancel.service";
 
 @ApiTags("admin")
 @Controller("admin")
@@ -104,15 +107,36 @@ import {
 @UseGuards(AdminJwtAuthGuard, RolesGuard)
 @ApiBearerAuth()
 export class AdminOrderController {
-  constructor(private readonly adminService: AdminService) {}
+  constructor(
+    private readonly adminService: AdminService,
+    private readonly orderCancel: AdminOrderCancelService,
+  ) {}
 
   // ==================== ORDER MANAGEMENT ====================
 
   @Get("orders")
   @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
-  @ApiOperation({ summary: "Get orders with filters" })
+  @ApiOperation({
+    summary:
+      "List order carts (groups, offer orders, offers) by tab and bucket",
+  })
+  @ApiResponse({
+    status: 200,
+    description: "{ data: AdminOrderListRow[], meta }",
+  })
   async getOrders(@Query() query: AdminOrderQueryDto) {
     return this.adminService.getOrders(query);
+  }
+
+  // `orders/:id`'den ÖNCE tanımlı olmalı; yoksa "counts" bir sipariş id'si sanılır.
+  @Get("orders/counts")
+  @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
+  @ApiOperation({
+    summary: "Bucket counts for every orders tab, honoring the list filters",
+  })
+  @ApiResponse({ status: 200, description: "AdminOrderCounts" })
+  async getOrderCounts(@Query() query: AdminOrderCountsQueryDto) {
+    return this.adminService.getOrderCounts(query);
   }
 
   @Get("orders/:id")
@@ -145,6 +169,53 @@ export class AdminOrderController {
     @Body() dto: UpdateOrderStatusDto,
   ) {
     return this.adminService.updateOrderStatus(adminId, id, dto);
+  }
+
+  /**
+   * Kargo öncesi platform iptalinin önizlemesi: alıcıya dönecek tutar. İptalle
+   * AYNI hesap yolundan gelir; sipariş iptal edilemiyorsa iptalle aynı hata.
+   */
+  @Get("orders/:id/cancel-preview")
+  @Roles(AdminRole.super_admin, AdminRole.admin)
+  @RequirePermission("orders")
+  @ApiOperation({
+    summary: "Preview the buyer refund of a pre-shipment admin cancellation",
+  })
+  @ApiParam({ name: "id", description: "Order ID" })
+  @ApiResponse({ status: 200, description: "AdminOrderCancelPreview" })
+  @ApiResponse({ status: 400, description: "Order cannot be cancelled" })
+  async getOrderCancelPreview(@Param("id") id: string) {
+    return this.orderCancel.previewCancel(id);
+  }
+
+  /**
+   * Admin "Siparişi iptal et": yalnız kargo öncesi (paid/preparing, koli
+   * taşıyıcıya geçmemiş), sipariş (sepet kalemi) başına; alıcıya kargo öncesi
+   * iptal politikasının tam iadesi yapılır. Kargolanmış sipariş → iade akışı.
+   */
+  @Post("orders/:id/cancel")
+  @Roles(AdminRole.super_admin, AdminRole.admin)
+  @RequirePermission("orders")
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: "Cancel a paid order before carrier handover and refund the buyer",
+  })
+  @ApiParam({ name: "id", description: "Order ID" })
+  @ApiResponse({ status: 200, description: "AdminOrderCancelResult" })
+  @ApiResponse({
+    status: 400,
+    description: "Not paid yet, or already handed to the carrier",
+  })
+  @ApiResponse({
+    status: 409,
+    description: "Already cancelled, or an active refund request exists",
+  })
+  async cancelOrder(
+    @Param("id") id: string,
+    @CurrentUser("id") adminId: string,
+    @Body() dto: AdminCancelOrderDto,
+  ) {
+    return this.orderCancel.cancelOrder(adminId, id, dto);
   }
 
   @Post("orders/:id/tracking")

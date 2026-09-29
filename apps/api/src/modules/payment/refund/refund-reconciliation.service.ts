@@ -1,7 +1,9 @@
 import { Injectable, Logger, Optional } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { PrismaService } from "../../../prisma";
+import { LIVE_PAYMENT } from "../../account-lane/live-lane.where";
 import {
+  CancellationActor,
   PaymentStatus,
   OrderStatus,
   ShipmentStatus,
@@ -13,6 +15,7 @@ import { PaymentProviderRegistry } from "../../payment-providers/payment-provide
 import { PaymentProviderEventService } from "../payment-provider-event.service";
 import { errorMessage } from "../../../common/helpers/error-message";
 import { refundRequestIdOf } from "../../elogo/helpers/refund-request-key";
+import { refundAttemptCancelActor } from "../helpers/refund-attempt-actor";
 
 /**
  * İade sweep'inin aday satırı: siparişin kendi ödemesi (tekil) VEYA grubunun
@@ -129,8 +132,12 @@ export class RefundReconciliationService {
       where: {
         status: RefundAttemptStatus.manual_review,
         provider: "paytr",
+        // Test şeridi iadesi PayTR'ye hiç gitmez; durum-sorguda karşılığı yoktur.
+        payment: LIVE_PAYMENT,
         updatedAt: { lt: cutoff },
       },
+      // İade hangi mağazaya gönderildiyse durum-sorgu da oraya: ödemenin mağazası.
+      include: { payment: { select: { paytrMerchant: true } } },
       orderBy: { updatedAt: "asc" },
       take: 25,
     });
@@ -149,7 +156,7 @@ export class RefundReconciliationService {
 
       try {
         const inquiry = await this.paymentProviders
-          .resolve(attempt.provider)
+          .resolve(attempt.provider, attempt.payment.paytrMerchant)
           .queryPaymentStatus(attempt.providerReference);
         checked++;
         if (!inquiry.ok) continue; // PayTR'ye ulaşamadık — sonraki tur.
@@ -367,7 +374,11 @@ export class RefundReconciliationService {
     const failures: string[] = [];
     for (const orderId of allOrderIds) {
       try {
-        await this.paymentRefund.processRefund(orderId);
+        // Dal 1-2: sipariş zaten iptal (aktörü korunur). Dal 3: paket
+        // göndericiye iade döndü — kimse "iptal et" demedi, sistem kapatır.
+        await this.paymentRefund.processRefund(orderId, undefined, {
+          cancelledBy: CancellationActor.system,
+        });
         refunded++;
       } catch (error) {
         failed++;
@@ -413,12 +424,26 @@ export class RefundReconciliationService {
       if (!attempt.orderId) continue;
       checked++;
       try {
+        const refundRequestId = refundRequestIdOf(attempt.idempotencyKey);
+        // Talepten doğan denemede aktör talebin kendisindedir (alıcı ya da
+        // platform iptali) — anahtar tek başına ayırt edemez.
+        const request = refundRequestId
+          ? await this.prisma.refundRequest.findUnique({
+              where: { id: refundRequestId },
+              select: { metadata: true },
+            })
+          : null;
         const result = await this.paymentRefund.processRefund(
           attempt.orderId,
           Number(attempt.amount),
-          { idempotencyKey: attempt.idempotencyKey },
+          {
+            idempotencyKey: attempt.idempotencyKey,
+            cancelledBy: refundAttemptCancelActor(
+              attempt.idempotencyKey,
+              request?.metadata,
+            ),
+          },
         );
-        const refundRequestId = refundRequestIdOf(attempt.idempotencyKey);
         if (refundRequestId) {
           await this.prisma.refundRequest.updateMany({
             where: {

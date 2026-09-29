@@ -276,6 +276,11 @@ export const NOTIFICATION_TEMPLATES: Partial<
     messageKey: "server.notification.membershipExpired.message",
     icon: "⚠️",
   },
+  [NotificationType.MEMBERSHIP_RENEWAL_CARD_REQUIRED]: {
+    titleKey: "server.notification.membershipRenewalCardRequired.title",
+    messageKey: "server.notification.membershipRenewalCardRequired.message",
+    icon: "💳",
+  },
   [NotificationType.MEMBERSHIP_UPGRADED]: {
     titleKey: "server.notification.membershipUpgraded.title",
     messageKey: "server.notification.membershipUpgraded.message",

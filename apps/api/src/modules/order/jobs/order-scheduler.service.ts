@@ -11,6 +11,7 @@ import {
   type ElogoInvoiceType,
 } from "@prisma/client";
 import { PrismaService } from "../../../prisma";
+import { LIVE_ORDER } from "../../account-lane/live-lane.where";
 import { OrderService } from "../order.service";
 import { ElogoInvoicingService } from "../../elogo/elogo-invoicing.service";
 import {
@@ -27,6 +28,10 @@ import { NotificationType } from "../../notification/dto";
 import { CacheService } from "../../cache/cache.service";
 import { adminUrl } from "../../../config/app-urls";
 import type { CronRunSummary } from "../../../monitoring/cron-run.helper";
+import {
+  invoiceDeadlineDays,
+  shippedStaleAlertDays,
+} from "../../../config/alert-thresholds";
 
 const OPEN_REFUND_STATUSES = [
   "pending_review",
@@ -270,21 +275,21 @@ export class OrderSchedulerService implements OnModuleInit {
     uninvoicedDelivered: number;
     missingSellerInvoices: number;
   }> {
-    const stuckDays =
-      Number(
-        this.configService.get<string>("SHIPPED_STALE_ALERT_DAYS") ?? "10",
-      ) || 10;
-    const invoiceDeadlineDays =
-      Number(this.configService.get<string>("INVOICE_DEADLINE_DAYS") ?? "5") ||
-      5;
+    // Eşikler TEK kaynakta (config/alert-thresholds): dashboard uyarısı ile bu
+    // cron aynı sayıyı okur.
+    const stuckDays = shippedStaleAlertDays(this.configService);
+    const invoiceDeadline = invoiceDeadlineDays(this.configService);
 
     // Eşik KARGO YAŞINA bakar (shipment.shippedAt), sipariş satırının
     // updatedAt'ine değil: alakasız bir güncelleme (bildirim, adres, fatura
     // alanı) saati sıfırlıyordu ve gerçekten takılı sipariş alarmdan kaçıyordu.
     const stuckCutoff = new Date(Date.now() - stuckDays * 24 * 60 * 60 * 1000);
     const [stuckShippedOrders, uninvoicedDelivered] = await Promise.all([
+      // Test şeridi kolisi taşıyıcıya hiç gitmez: teslim poll'u gelmez, alıcı
+      // onaylayana dek "kargoda" kalır — alarm/bildirim üretmemeli.
       this.prisma.order.findMany({
         where: {
+          ...LIVE_ORDER,
           status: OrderStatus.shipped,
           shipment: { is: { shippedAt: { lt: stuckCutoff } } },
         },
@@ -300,13 +305,12 @@ export class OrderSchedulerService implements OnModuleInit {
       }),
       this.prisma.order.count({
         where: {
+          ...LIVE_ORDER,
           status: { in: [OrderStatus.delivered, OrderStatus.completed] },
           commissionLedger: { isNot: null },
           revenueInvoicedAt: null,
           deliveredAt: {
-            lt: new Date(
-              Date.now() - invoiceDeadlineDays * 24 * 60 * 60 * 1000,
-            ),
+            lt: new Date(Date.now() - invoiceDeadline * 24 * 60 * 60 * 1000),
           },
         },
       }),
@@ -339,7 +343,7 @@ export class OrderSchedulerService implements OnModuleInit {
       else this.logger.warn(`${message} (daha önce bildirildi)`);
     }
     if (uninvoicedDelivered > 0) {
-      const message = `ORDERS_DELIVERED_UNINVOICED count=${uninvoicedDelivered} — teslimden ${invoiceDeadlineDays} günden uzun süre geçti, gelir faturası hâlâ kesilmedi (e-Arşiv süresi riski)`;
+      const message = `ORDERS_DELIVERED_UNINVOICED count=${uninvoicedDelivered} — teslimden ${invoiceDeadline} günden uzun süre geçti, gelir faturası hâlâ kesilmedi (e-Arşiv süresi riski)`;
       if (await this.alarmOncePerDay("delivered-uninvoiced")) {
         this.logger.error(message);
       } else {
@@ -411,6 +415,10 @@ export class OrderSchedulerService implements OnModuleInit {
     // her turda boşa yeniden işlenip yanıltıcı "yeniFatura" sayacı üretiyorlardı; onları eleriz.
     const delivered = await this.prisma.order.findMany({
       where: {
+        // Test şeridi siparişine eLogo belgesi hiç kesilmez (ElogoDeliveryService
+        // kapısı); aday kümesinde kalsaydı her tur boşa denenir ve take:500
+        // penceresinde canlı teslimatların yerini tutardı.
+        ...LIVE_ORDER,
         status: { in: [OrderStatus.delivered, OrderStatus.completed] },
         commissionLedger: { isNot: null },
         // AÇIK işaret: faturası kesilmiş siparişler aday kümesinden ÇIKAR. Eskiden

@@ -2,6 +2,7 @@ import { Injectable, Logger } from "@nestjs/common";
 import { ModuleRef } from "@nestjs/core";
 import { PrismaService } from "../../../prisma";
 import {
+  CancellationActor,
   ShipmentStatus,
   OrderStatus,
   RefundRequestStatus,
@@ -164,6 +165,8 @@ export class OrderTrackingSyncService {
     const activeShipments = await this.prisma.shipment.findMany({
       where: {
         provider: "surat",
+        // Test şeridi kolileri taşıyıcıya gitmedi; sorgulamak yalnız gürültü/alarm üretir.
+        order: { isTest: false },
         ...where,
         OR: [
           { providerTrackingId: { not: null } },
@@ -634,7 +637,11 @@ export class OrderTrackingSyncService {
             strict: false,
           });
           if (paymentService) {
-            await paymentService.processRefund(shipment.orderId);
+            // Alıcı teslim almadı / paket göndericiye döndü: iptal kararı
+            // kimsenin değil, taşıyıcı olayından sistem kapatır.
+            await paymentService.processRefund(shipment.orderId, undefined, {
+              cancelledBy: CancellationActor.system,
+            });
             this.logger.log(
               `Auto-refunded order ${shipment.orderId} after Sürat return completion (suratCode=${gonderi.KargonunDurumuSayi})`,
             );

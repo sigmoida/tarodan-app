@@ -83,6 +83,8 @@ export interface TradeDetail {
   id: string;
   tradeNumber?: string;
   status: string;
+  /** Test şeridi takası (App Review / QA) — başlıkta "TEST" rozeti. */
+  isTest?: boolean;
   cashAmount?: number;
   /** Nakit farkını ödeyen taraf (initiator.id | receiver.id). null = eşit takas. */
   cashPayerId?: string | null;

@@ -62,6 +62,8 @@ export class PspReconciliationService {
     const candidates = await this.prisma.payment.findMany({
       where: {
         provider: "paytr",
+        // Test şeridi ödemeleri PayTR'nin canlı sorgu/rapor akışına girmez.
+        isTest: false,
         status: PaymentStatus.pending,
         providerConversationId: { not: null },
         OR: [
@@ -95,10 +97,12 @@ export class PspReconciliationService {
         const oids = this.paymentCommon.collectPaymentOids(row);
         let capturedOid: string | null = null;
         let capturedInquiry: PayTRStatusInquirySuccess | null = null;
+        const provider = this.paymentProviders.resolve(
+          row.provider,
+          row.paytrMerchant,
+        );
         for (const candidateOid of oids) {
-          const inquiry = await this.paymentProviders
-            .resolve()
-            .queryPaymentStatus(candidateOid);
+          const inquiry = await provider.queryPaymentStatus(candidateOid);
           if (!inquiry.ok) continue;
           if (Math.abs(inquiry.paymentTotalTl - ourAmount) > tolerance) {
             // O10: tutar uyuşmazlığı → ALARM (yüksek öncelik), completed YAPMA.
@@ -226,6 +230,7 @@ export class PspReconciliationService {
     const candidates = await this.prisma.payment.findMany({
       where: {
         provider: "paytr",
+        isTest: false,
         status: PaymentStatus.failed,
         providerConversationId: { not: null },
         updatedAt: { gt: since },
@@ -247,10 +252,12 @@ export class PspReconciliationService {
         const oids = this.paymentCommon.collectPaymentOids(row);
         let capturedOid: string | null = null;
         let capturedInquiry: PayTRStatusInquirySuccess | null = null;
+        const provider = this.paymentProviders.resolve(
+          row.provider,
+          row.paytrMerchant,
+        );
         for (const oid of oids) {
-          const inquiry = await this.paymentProviders
-            .resolve()
-            .queryPaymentStatus(oid);
+          const inquiry = await provider.queryPaymentStatus(oid);
           if (!inquiry.ok) continue;
           if (Math.abs(inquiry.paymentTotalTl - ourAmount) > tolerance)
             continue;

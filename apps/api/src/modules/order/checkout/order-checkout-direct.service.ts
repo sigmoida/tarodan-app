@@ -657,15 +657,6 @@ export class OrderCheckoutDirectService {
         where: { cart: { userId: buyerId }, productId: dto.productId },
       });
 
-      // Record commission snapshot for analytics (3.3)
-      await this.checkoutCommon.recordCommissionSnapshot(
-        order.id,
-        orderNumber,
-        commissionResult.commissionAmount,
-        totalAmount,
-        commissionResult,
-      );
-
       // Kodsuz (otomatik) kampanyaların bütçesi sipariş oluşurken harcanır;
       // ödenmeyen sipariş kapanırken releaseReservedUsageForOrders geri verir.
       await this.feeDiscounts?.spendBudgets(feeDiscounted.applied, tx);

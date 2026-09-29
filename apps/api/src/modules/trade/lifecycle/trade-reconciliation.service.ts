@@ -5,6 +5,7 @@ import { NotificationService } from "../../notification/notification.service";
 import { NotificationType } from "../../notification/dto";
 import { EventService } from "../../events";
 import {
+  CancellationActor,
   TradeStatus,
   ProductStatus,
   ShipmentStatus,
@@ -21,6 +22,7 @@ import { PaymentService } from "../../payment/payment.service";
 import { TradeShipmentService } from "./trade-shipment.service";
 import { TradeCommonService } from "../trade-common.service";
 import { TRADE_CANCEL_REASON } from "../helpers/trade-cancel-reasons";
+import { tradeCancelledData } from "../helpers/trade-cancellation";
 import { adminUrl } from "../../../config/app-urls";
 
 /**
@@ -431,9 +433,8 @@ export class TradeReconciliationService {
           await tx.trade.update({
             where: { id: trade.id },
             data: {
-              status: TradeStatus.cancelled,
+              ...tradeCancelledData(CancellationActor.system, now),
               cancelReason: TRADE_CANCEL_REASON.autoExpired,
-              cancelledAt: now,
             },
           });
 
@@ -596,9 +597,8 @@ export class TradeReconciliationService {
           await tx.trade.update({
             where: { id: trade.id },
             data: {
-              status: TradeStatus.cancelled,
+              ...tradeCancelledData(CancellationActor.system, now),
               cancelReason: TRADE_CANCEL_REASON.lostParcel,
-              cancelledAt: now,
               // Ücret iadesi koli bedelini kapsamaz ve kaybolan ÜRÜNÜN değeri
               // iade değildir — ops out-of-band tazmin eder (CompensationPanel).
               compensationPendingUserId: [...lostShipperIds][0],

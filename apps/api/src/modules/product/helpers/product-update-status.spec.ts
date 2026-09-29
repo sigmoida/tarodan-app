@@ -1,4 +1,4 @@
-import { ProductStatus } from "@prisma/client";
+import { ProductInactiveReason, ProductStatus } from "@prisma/client";
 import { resolveUpdatedStatus } from "./product-update-status";
 import type { ProductUpdateActor } from "./product-update-actor";
 
@@ -8,7 +8,12 @@ const ADMIN: ProductUpdateActor = { kind: "admin", adminId: "a1" };
 const product = (
   status: ProductStatus,
   quantity: number | null = 5,
-): { status: ProductStatus; quantity: number | null } => ({ status, quantity });
+  inactiveReason: ProductInactiveReason | null = null,
+): {
+  status: ProductStatus;
+  quantity: number | null;
+  inactiveReason: ProductInactiveReason | null;
+} => ({ status, quantity, inactiveReason });
 
 describe("resolveUpdatedStatus — satıcı", () => {
   it("satıcı kendi ilanını pasife alabilir", () => {
@@ -39,6 +44,80 @@ describe("resolveUpdatedStatus — satıcı", () => {
         SELLER,
       ),
     ).toBe(ProductStatus.pending);
+  });
+
+  /**
+   * PO kararı (2026-09-22): teslim SONRASI iade yüzünden sistem tarafından
+   * karantinaya alınmış (`return_quarantine`) bir ilanı satıcı DOĞRUDAN
+   * aktive edebilir — admin onayı gerekmez. Bu, yukarıdaki genel "satıcı
+   * doğrudan aktifleştiremez" kuralının TEK istisnasıdır.
+   */
+  describe("teslim sonrası iade karantinası (return_quarantine)", () => {
+    it("karantinadaki ilanı satıcı DOĞRUDAN aktive edebilir (stok var)", () => {
+      expect(
+        resolveUpdatedStatus(
+          product(
+            ProductStatus.inactive,
+            3,
+            ProductInactiveReason.return_quarantine,
+          ),
+          { status: ProductStatus.active } as never,
+          SELLER,
+        ),
+      ).toBe(ProductStatus.active);
+    });
+
+    it("sınırsız stokta (quantity null) da doğrudan aktive edilir", () => {
+      expect(
+        resolveUpdatedStatus(
+          product(
+            ProductStatus.inactive,
+            null,
+            ProductInactiveReason.return_quarantine,
+          ),
+          { status: ProductStatus.active } as never,
+          SELLER,
+        ),
+      ).toBe(ProductStatus.active);
+    });
+
+    it("stok 0 iken bypass uygulanmaz — genel kurala (pending) düşer", () => {
+      expect(
+        resolveUpdatedStatus(
+          product(
+            ProductStatus.inactive,
+            0,
+            ProductInactiveReason.return_quarantine,
+          ),
+          { status: ProductStatus.active } as never,
+          SELLER,
+        ),
+      ).toBe(ProductStatus.pending);
+    });
+
+    it("aynı istekte gönderilen stok 0'sa da bypass uygulanmaz", () => {
+      expect(
+        resolveUpdatedStatus(
+          product(
+            ProductStatus.inactive,
+            5,
+            ProductInactiveReason.return_quarantine,
+          ),
+          { status: ProductStatus.active, quantity: 0 } as never,
+          SELLER,
+        ),
+      ).toBe(ProductStatus.pending);
+    });
+
+    it("düz pasif (inactiveReason null) hâlâ admin onayına gider — bypass YOK", () => {
+      expect(
+        resolveUpdatedStatus(
+          product(ProductStatus.inactive, 3, null),
+          { status: ProductStatus.active } as never,
+          SELLER,
+        ),
+      ).toBe(ProductStatus.pending);
+    });
   });
 
   it("aktif ilanın stoğu biterse pasife düşer", () => {

@@ -2,6 +2,7 @@ import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
 import {
   IsArray,
   IsEnum,
+  IsIn,
   IsOptional,
   IsString,
   MaxLength,
@@ -12,6 +13,7 @@ import {
   RefundReason,
   RefundRequestStatus,
 } from "@prisma/client";
+import { REFUND_REQUEST_KINDS, type RefundRequestKind } from "@tarodan/types";
 import { AdminListQueryDto } from "../../../common/list";
 
 export class RefundRequestQueryDto extends AdminListQueryDto {
@@ -39,6 +41,15 @@ export class RefundRequestQueryDto extends AdminListQueryDto {
   @IsOptional()
   @IsString()
   to?: string;
+
+  @ApiPropertyOptional({
+    enum: REFUND_REQUEST_KINDS,
+    description:
+      "Tür: kargo öncesi iptalin iadesi (`*_cancellation` politikası) ya da ürün iadesi",
+  })
+  @IsOptional()
+  @IsIn(REFUND_REQUEST_KINDS)
+  kind?: RefundRequestKind;
 }
 
 export class ApproveRefundRequestDto {

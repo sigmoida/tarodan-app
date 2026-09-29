@@ -1,4 +1,5 @@
 import { BadRequestException, Injectable } from "@nestjs/common";
+import { PaytrMerchant } from "@prisma/client";
 import { PayTRService } from "./paytr/paytr.service";
 import {
   IPaymentProvider,
@@ -24,10 +25,19 @@ export class PaymentProviderRegistry {
   }
 
   /**
-   * Resolve the provider for a payment's `provider` key. Falls back to PayTR when
-   * the key is absent (every current payment is PayTR); throws on an unknown key.
+   * Resolve the provider for a payment's `provider` key, bound to the merchant
+   * account the record was charged on. Falls back to PayTR when the key is
+   * absent (every current payment is PayTR) and to the marketplace merchant
+   * when no merchant is given; throws on an unknown key.
+   *
+   * Callers holding a record MUST pass its `paytrMerchant` — a refund or status
+   * inquiry signed for the wrong merchant is rejected by PayTR (or, worse,
+   * finds nothing and is read as "not paid").
    */
-  resolve(key?: string | null): IPaymentProvider {
+  resolve(
+    key?: string | null,
+    merchant?: PaytrMerchant | null,
+  ): IPaymentProvider {
     const providerKey = key || PAYMENT_PROVIDER_PAYTR;
     const provider = this.providers.get(providerKey);
     if (!provider) {
@@ -35,6 +45,6 @@ export class PaymentProviderRegistry {
         `Unsupported payment provider: ${providerKey}`,
       );
     }
-    return provider;
+    return provider.forMerchant(merchant ?? PaytrMerchant.marketplace);
   }
 }

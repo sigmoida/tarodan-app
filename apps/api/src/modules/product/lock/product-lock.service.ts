@@ -5,6 +5,7 @@ import {
   Optional,
 } from "@nestjs/common";
 import {
+  CancellationActor,
   OfferStatus,
   OrderStatus,
   ProductStatus,
@@ -21,6 +22,9 @@ import { getReservedAwareStatus } from "../helpers/product-status.helper";
 import { NotificationService } from "../../notification/notification.service";
 import { DiscountService } from "../../discount/discount.service";
 import { TRADE_CANCEL_REASON } from "../../trade/helpers/trade-cancel-reasons";
+import { tradeCancelledData } from "../../trade/helpers/trade-cancellation";
+import { ORDER_CANCEL_REASON } from "../../order/helpers/order-cancel-reasons";
+import { orderCancelledData } from "../../order/helpers/order-cancellation";
 
 type PrismaTx = Prisma.TransactionClient;
 
@@ -295,9 +299,8 @@ export class ProductLockService {
     await tx.trade.updateMany({
       where: { id: { in: tradeIds } },
       data: {
-        status: TradeStatus.cancelled,
+        ...tradeCancelledData(CancellationActor.system),
         cancelReason: TRADE_CANCEL_REASON.stockDepleted,
-        cancelledAt: new Date(),
       },
     });
 
@@ -326,7 +329,7 @@ export class ProductLockService {
   async invalidatePendingOrdersForProduct(
     tx: PrismaTx,
     productId: string,
-    cancelReason: string = "Stok takas icin ayrildi",
+    cancelReason: string = ORDER_CANCEL_REASON.stockReservedForTrade,
   ): Promise<InvalidateOrdersResult> {
     // Fetch each pending_payment order with the signals we need to tell
     // whether it currently holds a stock reservation:
@@ -364,11 +367,11 @@ export class ProductLockService {
       return { count: 0, cancelledOrders: [] };
     }
 
-    // Cancel the orders.
+    // Cancel the orders. Stok kaskadı: alıcı da satıcı da iptal etmedi.
     await tx.order.updateMany({
       where: { id: { in: orders.map((o) => o.id) } },
       data: {
-        status: OrderStatus.cancelled,
+        ...orderCancelledData(CancellationActor.system),
         cancelReason,
       },
     });

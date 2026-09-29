@@ -2,676 +2,705 @@ import { Injectable } from "@nestjs/common";
 import { PrismaService } from "../../../prisma";
 import { AnalyticsQueryDto } from "../dto";
 import {
+  BoostStatus,
   CommissionLedgerStatus,
-  OrderCancellationType,
   OrderStatus,
+  PaymentStatus,
+  Prisma,
   ProductKind,
   ProductStatus,
-  RefundRequestStatus,
+  RefundAttemptStatus,
 } from "@prisma/client";
+import {
+  DASHBOARD_METRIC_KEYS,
+  type DashboardMetric,
+  type DashboardMetricKey,
+  type DashboardPeriodQuery,
+  type DashboardStatsResponse,
+} from "@tarodan/types";
 import { AdminAnalyticsCommonService } from "./admin-analytics-common.service";
-import { ledgerNetRevenue } from "../../commission/ledger-net";
+import { CacheService } from "../../cache/cache.service";
+import {
+  resolveDashboardRange,
+  resolveThisMonthWindow,
+  resolveYesterdayWindow,
+  type DashboardDateWindow,
+  type ResolvedDashboardRange,
+} from "./dashboard-period.helper";
+import { trCalendarDate } from "../../../common/helpers/tr-calendar";
+import {
+  ledgerNetRevenue,
+  type LedgerNetSums,
+} from "../../commission/ledger-net";
+import { paidOrderWhere } from "./paid-order.predicate";
+import {
+  completedPayoutAmountSql,
+  completedPayoutWhere,
+} from "./completed-payout.predicate";
+import {
+  LIVE_COMMISSION_LEDGER,
+  LIVE_MEMBERSHIP_PAYMENT,
+  LIVE_ORDER,
+  LIVE_PRODUCT,
+  LIVE_PRODUCT_BOOST,
+  LIVE_REFUND_ATTEMPT,
+  LIVE_TRADE,
+  LIVE_TRADE_CASH_PAYMENT,
+  LIVE_USER,
+  liveRowSql,
+} from "../../account-lane/live-lane.where";
 
-export interface MetricPeriods {
-  yesterday: number;
-  thisMonth: number;
-  lastMonth: number;
-  changePercent: number;
-}
-
-type MetricPeriodKey = "yesterday" | "thisMonth" | "lastMonth";
-type PeriodRange = { gte: Date; lt?: Date; lte?: Date };
-type PeriodRanges = Record<MetricPeriodKey, PeriodRange>;
-
-const METRIC_PERIOD_KEYS: MetricPeriodKey[] = [
-  "yesterday",
-  "thisMonth",
-  "lastMonth",
-];
-
-const REALIZED_ORDER_STATUSES: OrderStatus[] = [
-  OrderStatus.paid,
-  OrderStatus.delivered,
-  OrderStatus.completed,
-];
+type LedgerAggregate = { _sum: LedgerNetSums };
 
 /**
- * Analitik & dashboard grubu (dashboard istatistikleri, snapshot, satış/gelir/
- * kullanıcı analitiği, komisyon geliri, son siparişler, bekleyen aksiyonlar) —
- * AdminAnalyticsService'ten birebir taşındı. AdminAnalyticsService ince alt-facade
- * olarak buraya delege eder. Tarih gruplama anahtarı (getDateKey) gruplar-arası
- * paylaşıldığı için AdminAnalyticsCommonService'te. Inject: prisma, common.
+ * Bir dashboard metriğinin TEK tanımı. `window` verilmediğinde sorgu tarih
+ * filtresi uygulamaz — yani "tüm zamanlar" da aynı tanımdan okunur.
+ */
+interface DashboardMetricDefinition {
+  query: (
+    window: DashboardDateWindow | undefined,
+  ) => Prisma.PrismaPromise<unknown>;
+  /** Ham sonucu sayıya çevirir; varsayılan: `count` sonucu. */
+  toValue?: (raw: unknown) => number;
+}
+
+const countValue = (raw: unknown): number => Number(raw ?? 0);
+
+/** `aggregate` sonucundaki `_sum` alanlarını toplar. */
+const sumOf =
+  (...fields: string[]) =>
+  (raw: unknown): number => {
+    const sums = (raw as { _sum: Record<string, unknown> })?._sum ?? {};
+    return fields.reduce((total, field) => total + Number(sums[field] ?? 0), 0);
+  };
+
+/**
+ * `aggregate` sonucundaki `_sum` alanlarını AYRI AYRI sayıya çevirir — brüt −
+ * iade edilen gibi işaretli birleşimler `sumOf` gibi düz toplamla ifade
+ * edilemediğinde (7 ve 8 numaralı kartlar) kullanılır.
+ */
+const sumFields = (
+  raw: unknown,
+  fields: readonly string[],
+): Record<string, number> => {
+  const sums = (raw as { _sum: Record<string, unknown> })?._sum ?? {};
+  return Object.fromEntries(
+    fields.map((field) => [field, Number(sums[field] ?? 0)]),
+  );
+};
+
+const roundMetric = (value: number): number => Math.round(value * 100) / 100;
+
+/**
+ * Bir olay damgası filtresi. Pencere yoksa "damga var" koşuluna düşer; böylece
+ * "tüm zamanlar" da AYNI olaydan sayılır, `createdAt`e kaymaz.
+ */
+const stamped = (
+  window: DashboardDateWindow | undefined,
+): DashboardDateWindow | { not: null } => window ?? { not: null };
+
+/** Teslim edilmiş siparişlerin ortak yüklemi — adet ve tutar aynı satırları okur. */
+const deliveredOrderWhere = (
+  window: DashboardDateWindow | undefined,
+): Prisma.OrderWhereInput => ({ ...LIVE_ORDER, deliveredAt: stamped(window) });
+
+/** Tamamlanmış üyelik ödemesinin ortak yüklemi — gelir ve adet aynı satırları okur. */
+const membershipPaymentWhere = (
+  window: DashboardDateWindow | undefined,
+): Prisma.MembershipPaymentWhereInput => ({
+  ...LIVE_MEMBERSHIP_PAYMENT,
+  status: PaymentStatus.completed,
+  createdAt: window,
+});
+
+/** Geçerli (başarısız olmayan) öne çıkarmanın ortak yüklemi. */
+const boostWhere = (
+  window: DashboardDateWindow | undefined,
+): Prisma.ProductBoostWhereInput => ({
+  ...LIVE_PRODUCT_BOOST,
+  purchasedAt: stamped(window),
+  status: { not: BoostStatus.failed },
+});
+
+/**
+ * Hak ediş defteri satırlarının ortak yüklemi (feragat edilmemiş, hak ediş
+ * ANI pencerede) — net gelir, net gelir adedi, hizmet bedeli ve komisyon
+ * kartlarının HEPSİ aynı satır kümesini okur.
+ */
+const ledgerEarnedWhere = (
+  window: DashboardDateWindow | undefined,
+): Prisma.CommissionLedgerWhereInput => ({
+  ...LIVE_COMMISSION_LEDGER,
+  earnedAt: stamped(window),
+  status: { not: CommissionLedgerStatus.waived },
+});
+
+/**
+ * Hizmet bedeli/komisyon ADEDİ, kırılımı SIFIR OLMAYAN satırları sayar —
+ * `componentBreakdownComplete = false` eski satırlarda bu alanlar 0'dır,
+ * yani eski dönemler bu kartlarda dürüstçe eksik görünür (bkz. noteKey).
+ */
+const serviceFeeCountWhere = (
+  window: DashboardDateWindow | undefined,
+): Prisma.CommissionLedgerWhereInput => ({
+  ...ledgerEarnedWhere(window),
+  OR: [
+    { buyerPlatformFeeAmount: { gt: 0 } },
+    { sellerPlatformFeeAmount: { gt: 0 } },
+  ],
+});
+
+const commissionCountWhere = (
+  window: DashboardDateWindow | undefined,
+): Prisma.CommissionLedgerWhereInput => ({
+  ...ledgerEarnedWhere(window),
+  OR: [
+    { buyerCommissionAmount: { gt: 0 } },
+    { sellerCommissionAmount: { gt: 0 } },
+  ],
+});
+
+/**
+ * Sonuçlanmış (finalized) iade denemeleri — TAKAS iadeleri hariç (`orderId`
+ * dolu satırlar). `delivered` ayrımı RefundAttempt'te kendi başına
+ * tutulmuyor: karar, siparişin TESLİM EDİLMİŞ olup olmamasından türetilir
+ * (teslim edilmişse İADE, edilmemişse İPTAL — 2026 karar).
+ */
+const finalizedOrderRefundWhere = (
+  window: DashboardDateWindow | undefined,
+  delivered: boolean,
+): Prisma.RefundAttemptWhereInput => ({
+  ...LIVE_REFUND_ATTEMPT,
+  status: RefundAttemptStatus.finalized,
+  finalizedAt: stamped(window),
+  orderId: { not: null },
+  order: { is: { deliveredAt: delivered ? { not: null } : null } },
+});
+
+/**
+ * Ödenmiş kolinin yüklemi: kolinin EN AZ BİR siparişi pencerede ödenmiş
+ * olmalı (aynı `paidOrderWhere`, platform_service hariç). Koli bazında
+ * sayıldığı için birden çok siparişi olan bir koli tek sefer sayılır —
+ * `orders: { some: … }` `Order` değil `OrderPackage` satırlarını döner.
+ */
+const paidPackageWhere = (
+  window: DashboardDateWindow | undefined,
+): Prisma.OrderPackageWhereInput => ({
+  orders: { some: paidOrderWhere(window) },
+});
+
+/**
+ * Analitik & dashboard grubu (dönem özeti, snapshot, satış/gelir/kullanıcı
+ * analitiği, komisyon geliri, son siparişler) — AdminAnalyticsService'ten
+ * birebir taşındı. Bekleyen işler ve uyarılar artık burada DEĞİL: onlar
+ * `dashboard/admin-dashboard-worklist.service.ts`in işi.
  */
 @Injectable()
 export class AdminAnalyticsDashboardService {
+  /**
+   * Seçili dönem (filtreyle değişen pencere): 5 dk. Anahtar, ölçülen
+   * pencereyi birebir taşır. "Bu ay" (bkz. aşağı) de büyümeye devam ettiği
+   * için aynı TTL'i paylaşır.
+   */
+  static readonly PERIOD_CACHE_TTL_SECONDS = 5 * 60;
+  /**
+   * Tamamen GEÇMİŞTE kalan özel aralık bir daha değişmez (yeni satır o
+   * pencereye düşemez), bu yüzden çok daha uzun tutulabilir. "Dün" + "tüm
+   * zamanlar" sabit üçlüsü de aynı süreyi paylaşır (bkz. aşağı).
+   */
+  static readonly CLOSED_RANGE_CACHE_TTL_SECONDS = 6 * 60 * 60;
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly common: AdminAnalyticsCommonService,
+    private readonly cache: CacheService,
   ) {}
 
   // ==================== ANALYTICS & REPORTS ====================
 
   /**
-   * Get dashboard statistics
-   * Requirement: Reporting dashboards (project.md)
+   * Zone C — "Dönem özeti" (dashboard'un TEK tarih filtreli bölgesi).
+   *
+   * Her metrik TEK yerde tanımlanır ({@link metricDefinitions}). Her kart DÖRT
+   * rakam gösterir: filtrenin değiştirdiği TEK sayı (`period`) + filtreden
+   * TAMAMEN bağımsız üç sabit değer (`yesterday`, `thisMonth`, `allTime`).
+   * Dördü de aynı tanımdan okunur — "dönem" ile "tüm zamanlar" arasında sessiz
+   * bir formül ayrışması olamaz — ama İKİ AYRI önbellekte tutulur (bkz.
+   * {@link getPeriodMetrics}, {@link getClosedFixedMetrics},
+   * {@link getThisMonthMetrics}): filtreyi değiştirmek sabit üçlüyü yeniden
+   * hesaplatmaz.
+   *
+   * Ölçüm OLAY damgalarından yapılır (ödeme anı, teslim anı, iptal anı, iade
+   * anı, hak ediş anı) — `status + createdAt` değil. Her tarih sınırı Türkiye
+   * takvimine göre çözülür (bkz. `dashboard-period.helper.ts`).
    */
-  async getDashboardStats() {
+  async getDashboardStats(
+    query?: DashboardPeriodQuery,
+  ): Promise<DashboardStatsResponse> {
     const now = new Date();
-    const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-    const periods = this.getPeriodRanges(now);
+    const range = resolveDashboardRange(query, now);
 
-    const [
-      users,
-      products,
-      orders,
-      totalSales,
-      commission,
-      activeProductsByPeriod,
-      passiveProducts,
-      activeUsers,
-      passiveUsers,
-      grossSales,
-      netCommission,
-      cancellations,
-      refunds,
-      cancellationsGrouped,
-      refundsGrouped,
-      totalUsers,
-      newUsers7d,
-      totalProducts,
-      activeProducts,
-      pendingProducts,
-      totalOrders,
-      orders7d,
-      completedOrders,
-      totalRevenue,
-      revenue7d,
-      byCategory,
-    ] = await Promise.all([
-      this.getMetricPeriods(periods, (createdAt) =>
-        this.prisma.user.count({ where: { createdAt } }),
-      ),
-      this.getMetricPeriods(periods, (createdAt) =>
-        this.prisma.product.count({
-          where: { kind: ProductKind.listing, createdAt },
-        }),
-      ),
-      this.getMetricPeriods(periods, (createdAt) =>
-        this.prisma.order.count({ where: { createdAt } }),
-      ),
-      this.getMetricPeriods(periods, (createdAt) =>
-        this.prisma.order.count({
-          where: {
-            createdAt,
-            status: { in: REALIZED_ORDER_STATUSES },
-          },
-        }),
-      ),
-      this.getMetricPeriods(periods, async (createdAt) => {
-        const result = await this.prisma.order.aggregate({
-          _sum: { commissionAmount: true },
-          where: {
-            createdAt,
-            status: { in: REALIZED_ORDER_STATUSES },
-          },
-        });
-        return Number(result._sum.commissionAmount ?? 0);
-      }),
-      // Product/User models do not keep status history. These period values
-      // therefore describe records created in the period that are currently in
-      // the requested account/catalog state.
-      this.getMetricPeriods(periods, (createdAt) =>
-        this.prisma.product.count({
-          where: {
-            kind: ProductKind.listing,
-            createdAt,
-            status: ProductStatus.active,
-          },
-        }),
-      ),
-      this.getMetricPeriods(periods, (createdAt) =>
-        this.prisma.product.count({
-          where: {
-            kind: ProductKind.listing,
-            createdAt,
-            status: {
-              in: [ProductStatus.inactive, ProductStatus.suspended],
-            },
-          },
-        }),
-      ),
-      this.getMetricPeriods(periods, (createdAt) =>
-        this.prisma.user.count({
-          where: { createdAt, isBanned: false, deletedAt: null },
-        }),
-      ),
-      this.getMetricPeriods(periods, (createdAt) =>
-        this.prisma.user.count({
-          where: {
-            createdAt,
-            OR: [{ isBanned: true }, { deletedAt: { not: null } }],
-          },
-        }),
-      ),
-      this.getMetricPeriods(periods, async (createdAt) => {
-        const result = await this.prisma.order.aggregate({
-          _sum: { totalAmount: true },
-          where: {
-            createdAt,
-            status: { in: REALIZED_ORDER_STATUSES },
-          },
-        });
-        return Number(result._sum.totalAmount ?? 0);
-      }),
-      this.getMetricPeriods(periods, async (createdAt) => {
-        const result = await this.prisma.commissionLedger.aggregate({
-          _sum: {
-            sellerCommission: true,
-            refundedSellerCommission: true,
-            buyerFee: true,
-            refundedBuyerFee: true,
-          },
-          where: {
-            createdAt,
-            status: { not: CommissionLedgerStatus.waived },
-          },
-        });
-        // TEK formül (ledgerNetRevenue) — finans özetiyle aynı kaynak.
-        // Withholding tax belongs to the seller's tax/payout flow and is not
-        // platform revenue, so it does not reduce net commission here.
-        return ledgerNetRevenue(result._sum);
-      }),
-      this.getMetricPeriods(periods, (createdAt) =>
-        this.prisma.order.count({
-          where: { createdAt, status: OrderStatus.cancelled },
-        }),
-      ),
-      this.getMetricPeriods(periods, (createdAt) =>
-        this.prisma.refundRequest.count({ where: { createdAt } }),
-      ),
-      Promise.all(
-        METRIC_PERIOD_KEYS.map((period) =>
-          this.prisma.order.groupBy({
-            by: ["cancellationType"],
-            where: {
-              createdAt: periods[period],
-              status: OrderStatus.cancelled,
-            },
-            _count: { id: true },
-          }),
-        ),
-      ),
-      Promise.all(
-        METRIC_PERIOD_KEYS.map((period) =>
-          this.prisma.refundRequest.groupBy({
-            by: ["status"],
-            where: { createdAt: periods[period] },
-            _count: { id: true },
-          }),
-        ),
-      ),
-      this.prisma.user.count(),
-      this.prisma.user.count({ where: { createdAt: { gte: sevenDaysAgo } } }),
-      this.prisma.product.count({ where: { kind: ProductKind.listing } }),
-      this.prisma.product.count({
-        where: { kind: ProductKind.listing, status: ProductStatus.active },
-      }),
-      this.prisma.product.count({
-        where: { kind: ProductKind.listing, status: ProductStatus.pending },
-      }),
-      this.prisma.order.count(),
-      this.prisma.order.count({ where: { createdAt: { gte: sevenDaysAgo } } }),
-      this.prisma.order.count({ where: { status: OrderStatus.completed } }),
-      this.prisma.order.aggregate({
-        _sum: { commissionAmount: true },
-        where: { status: { in: REALIZED_ORDER_STATUSES } },
-      }),
-      this.prisma.order.aggregate({
-        _sum: { commissionAmount: true },
-        where: {
-          createdAt: { gte: sevenDaysAgo },
-          status: { in: REALIZED_ORDER_STATUSES },
-        },
-      }),
-      this.prisma.product.groupBy({
-        by: ["categoryId"],
-        where: { kind: ProductKind.listing },
-        _count: { id: true },
-      }),
+    const [period, closed, thisMonth] = await Promise.all([
+      this.getPeriodMetrics(range, now),
+      this.getClosedFixedMetrics(now),
+      this.getThisMonthMetrics(now),
     ]);
 
-    const categoryIds = [
-      ...new Set(byCategory.map((c) => c.categoryId).filter(Boolean)),
-    ] as string[];
-    const categories =
-      categoryIds.length > 0
-        ? await this.prisma.category.findMany({
-            where: { id: { in: categoryIds } },
-            select: { id: true, name: true },
-          })
-        : [];
-    const categoryMap = new Map(categories.map((c) => [c.id, c.name]));
-    const categoryDistribution = byCategory
-      .map((c) => ({
-        name: c.categoryId
-          ? categoryMap.get(c.categoryId) || "Kategorisiz"
-          : "Kategorisiz",
-        count: c._count.id,
-      }))
-      .sort((a, b) => b.count - a.count);
-
-    const cancellationsByType = this.buildPeriodBreakdown(
-      Object.values(OrderCancellationType),
-      cancellationsGrouped,
-      "cancellationType",
-    );
-    const refundsByStatus = this.buildPeriodBreakdown(
-      Object.values(RefundRequestStatus),
-      refundsGrouped,
-      "status",
-    );
-
-    return {
-      users: {
-        ...users,
-        total: totalUsers,
-        new7d: newUsers7d,
-      },
-      products: {
-        ...products,
-        total: totalProducts,
-        active: activeProducts,
-        pending: pendingProducts,
-      },
-      orders: {
-        ...orders,
-        total: totalOrders,
-        last7d: orders7d,
-        completed: completedOrders,
-      },
-      revenue: {
-        ...commission,
-        total: Number(totalRevenue._sum.commissionAmount || 0),
-        last7d: Number(revenue7d._sum.commissionAmount || 0),
-      },
-      totalSales,
-      commission,
-      activeProducts: activeProductsByPeriod,
-      passiveProducts,
-      activeUsers,
-      passiveUsers,
-      grossSales,
-      netCommission,
-      cancellations,
-      cancellationsByType,
-      refunds,
-      refundsByStatus,
-      categoryDistribution,
-    };
-  }
-
-  private getPeriodRanges(now: Date): PeriodRanges {
-    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-    const yesterday = new Date(today);
-    yesterday.setDate(yesterday.getDate() - 1);
-    const thisMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-    const lastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-
-    return {
-      yesterday: { gte: yesterday, lt: today },
-      thisMonth: { gte: thisMonth, lte: now },
-      lastMonth: { gte: lastMonth, lt: thisMonth },
-    };
-  }
-
-  private async getMetricPeriods(
-    periods: PeriodRanges,
-    getValue: (range: PeriodRange) => Promise<number>,
-  ): Promise<MetricPeriods> {
-    const [yesterday, thisMonth, lastMonth] = await Promise.all(
-      METRIC_PERIOD_KEYS.map((period) => getValue(periods[period])),
-    );
-
-    return this.createMetricPeriods(yesterday, thisMonth, lastMonth);
-  }
-
-  private createMetricPeriods(
-    yesterday: number,
-    thisMonth: number,
-    lastMonth: number,
-  ): MetricPeriods {
-    const normalizedYesterday = this.roundMetric(yesterday);
-    const normalizedThisMonth = this.roundMetric(thisMonth);
-    const normalizedLastMonth = this.roundMetric(lastMonth);
-
-    return {
-      yesterday: normalizedYesterday,
-      thisMonth: normalizedThisMonth,
-      lastMonth: normalizedLastMonth,
-      changePercent: this.calculateChangePercent(
-        normalizedThisMonth,
-        normalizedLastMonth,
-      ),
-    };
-  }
-
-  private calculateChangePercent(current: number, previous: number): number {
-    if (previous === 0) return current === 0 ? 0 : 100;
-    return this.roundMetric(((current - previous) / Math.abs(previous)) * 100);
-  }
-
-  private roundMetric(value: number): number {
-    return Math.round(value * 100) / 100;
-  }
-
-  private buildPeriodBreakdown<T extends string>(
-    values: T[],
-    groupedPeriods: Array<
-      Array<Record<string, unknown> & { _count: { id: number } }>
-    >,
-    field: string,
-  ): Record<T, MetricPeriods> {
-    const result = {} as Record<T, MetricPeriods>;
-
-    values.forEach((value) => {
-      const counts = groupedPeriods.map(
-        (rows) => rows.find((row) => row[field] === value)?._count.id ?? 0,
-      );
-      result[value] = this.createMetricPeriods(counts[0], counts[1], counts[2]);
+    const metrics = {} as Record<DashboardMetricKey, DashboardMetric>;
+    DASHBOARD_METRIC_KEYS.forEach((key) => {
+      metrics[key] = {
+        period: period[key],
+        yesterday: closed[key].yesterday,
+        thisMonth: thisMonth[key],
+        allTime: closed[key].allTime,
+      };
     });
 
+    return {
+      range: {
+        type: range.type,
+        from: range.current.gte.toISOString(),
+        to: range.current.lte.toISOString(),
+      },
+      metrics,
+    };
+  }
+
+  /**
+   * Dönem özetinin önbelleğini düşürür (ekrandaki "yenile") — seçili dönemin
+   * önbelleğini VE sabit üçlünün önbelleğini birlikte temizler; biri
+   * unutulursa "yenile" yarım iş yapmış olur.
+   */
+  async invalidatePeriodCache(): Promise<void> {
+    await Promise.all([
+      this.cache.delPattern("admin:dashboard:period:*"),
+      this.cache.delPattern("admin:dashboard:fixed:*"),
+    ]);
+  }
+
+  /** Seçili dönem — filtre değiştikçe okunan TEK pencere, TEK `$transaction`. */
+  private async getPeriodMetrics(
+    range: ResolvedDashboardRange,
+    now: Date,
+  ): Promise<Record<DashboardMetricKey, number>> {
+    const { key, ttl } = this.periodCacheKey(range, now);
+    return this.cache.getOrSet(key, () => this.computeWindow(range.current), {
+      ttl,
+    });
+  }
+
+  /**
+   * "Dün" + "tüm zamanlar" — filtreden TAMAMEN bağımsız, Türkiye gününe göre
+   * anahtarlanır. İkisi de fiilen kapanmış sayılır (dün asla değişmez, tüm
+   * zamanlar günün geri kalanında sadece büyür ama ekranda hafif bayat kalması
+   * kabul edilebilir), bu yüzden uzun TTL'i paylaşırlar ve TEK `$transaction`
+   * içinde okunurlar.
+   */
+  private async getClosedFixedMetrics(
+    now: Date,
+  ): Promise<
+    Record<DashboardMetricKey, { yesterday: number; allTime: number }>
+  > {
+    const key = `admin:dashboard:fixed:v2:closed:${trCalendarDate(now)}`;
+    return this.cache.getOrSet(key, () => this.computeClosedFixed(now), {
+      ttl: AdminAnalyticsDashboardService.CLOSED_RANGE_CACHE_TTL_SECONDS,
+    });
+  }
+
+  /**
+   * "Bu ay" — filtreden bağımsız ama üst sınırı "şimdi" olduğundan gün
+   * boyunca büyümeye devam eder; seçili dönemle AYNI kısa TTL'i ve aynı
+   * zaman-kovası anahtarlama tekniğini kullanır (aksi halde her istek yeni
+   * anahtar üretir ve önbellek hiç tutmazdı).
+   */
+  private async getThisMonthMetrics(
+    now: Date,
+  ): Promise<Record<DashboardMetricKey, number>> {
+    const ttl = AdminAnalyticsDashboardService.PERIOD_CACHE_TTL_SECONDS;
+    const bucket = Math.floor(now.getTime() / (ttl * 1000));
+    const key = `admin:dashboard:fixed:v2:month:${trCalendarDate(now)}:${bucket}`;
+    return this.cache.getOrSet(
+      key,
+      () => this.computeWindow(resolveThisMonthWindow(now)),
+      { ttl },
+    );
+  }
+
+  /**
+   * Önbellek anahtarı ölçülen pencereyi taşımalı, yoksa iki farklı dönem aynı
+   * satırı okur. Canlı pencerenin `lte`si "şimdi" olduğundan anahtar TTL
+   * boyutunda kovalara yuvarlanır — aksi halde her istek yeni anahtar üretir
+   * ve önbellek hiç tutmazdı.
+   */
+  private periodCacheKey(
+    range: ResolvedDashboardRange,
+    now: Date,
+  ): { key: string; ttl: number } {
+    const from = range.current.gte.toISOString();
+    const closed =
+      range.type === "custom" && range.current.lte.getTime() < now.getTime();
+
+    if (closed) {
+      return {
+        // v3: dönem sözleşmesi "önceki dönem" trendini (previous/changePercent)
+        // kaybetti, sabit Dün/Bu ay üçlüsü eklendi — eski anahtarın
+        // önbelleğinde eski şekilli bir satır kalmasın diye sürüm arttı.
+        // v4 (sabitlerde v2): metrikler test şeridini dışlamaya başladı —
+        // kapalı aralıklar 6 saat tutulduğu için eski rakam sürüm artmadan
+        // düşmezdi.
+        key: `admin:dashboard:period:v4:custom:${from}:${range.current.lte.toISOString()}`,
+        ttl: AdminAnalyticsDashboardService.CLOSED_RANGE_CACHE_TTL_SECONDS,
+      };
+    }
+
+    const ttl = AdminAnalyticsDashboardService.PERIOD_CACHE_TTL_SECONDS;
+    const bucket = Math.floor(now.getTime() / (ttl * 1000));
+    return {
+      key: `admin:dashboard:period:v4:${range.type}:${from}:${bucket}`,
+      ttl,
+    };
+  }
+
+  /** Bir pencereyi TEK `$transaction` içinde her metrik tanımından okur. */
+  private async computeWindow(
+    window: DashboardDateWindow | undefined,
+  ): Promise<Record<DashboardMetricKey, number>> {
+    const definitions = this.metricDefinitions();
+    const rows = await this.prisma.$transaction(
+      DASHBOARD_METRIC_KEYS.map((key) => definitions[key].query(window)),
+    );
+
+    const result = {} as Record<DashboardMetricKey, number>;
+    DASHBOARD_METRIC_KEYS.forEach((key, index) => {
+      const toValue = definitions[key].toValue ?? countValue;
+      result[key] = roundMetric(toValue(rows[index]));
+    });
+    return result;
+  }
+
+  /** "Dün" + "tüm zamanlar", İKİ pencere TEK `$transaction` içinde. */
+  private async computeClosedFixed(
+    now: Date,
+  ): Promise<
+    Record<DashboardMetricKey, { yesterday: number; allTime: number }>
+  > {
+    const definitions = this.metricDefinitions();
+    // `undefined` pencere = tarih filtresi yok = tüm zamanlar.
+    const windows: Array<DashboardDateWindow | undefined> = [
+      resolveYesterdayWindow(now),
+      undefined,
+    ];
+
+    const rows = await this.prisma.$transaction(
+      DASHBOARD_METRIC_KEYS.flatMap((key) =>
+        windows.map((window) => definitions[key].query(window)),
+      ),
+    );
+
+    const result = {} as Record<
+      DashboardMetricKey,
+      { yesterday: number; allTime: number }
+    >;
+    DASHBOARD_METRIC_KEYS.forEach((key, index) => {
+      const toValue = definitions[key].toValue ?? countValue;
+      const offset = index * windows.length;
+      result[key] = {
+        yesterday: roundMetric(toValue(rows[offset])),
+        allTime: roundMetric(toValue(rows[offset + 1])),
+      };
+    });
     return result;
   }
 
   /**
-   * Save analytics snapshot
+   * Metrik kataloğu: anahtar → o metriğin TEK sorgu tanımı.
+   *
+   * Tanım bir pencere alır; `undefined` geldiğinde tarih filtresi uygulanmaz.
    */
-  async saveAnalyticsSnapshot() {
-    const stats = await this.getDashboardStats();
-
-    const snapshot = await this.prisma.analyticsSnapshot.create({
-      data: {
-        snapshotType: "daily",
-        snapshotDate: new Date(),
-        totalUsers: stats.users.total,
-        totalProducts: stats.products.total,
-        totalOrders: stats.orders.total,
-        totalRevenue: stats.revenue.total,
-        newUsers: stats.users.new7d,
-        newOrders: stats.orders.last7d,
-        data: stats as any,
-      },
-    });
-
-    return snapshot;
-  }
-
-  /**
-   * Get sales analytics with date range
-   * Requirement: GET /admin/analytics/sales (7.2)
-   */
-  async getSalesAnalytics(query: AnalyticsQueryDto) {
-    const endDateRaw = query.endDate ? new Date(query.endDate) : new Date();
-    const endDate = new Date(endDateRaw);
-    endDate.setHours(23, 59, 59, 999);
-    const startDate = query.startDate
-      ? new Date(query.startDate)
-      : new Date(endDate.getTime() - 30 * 24 * 60 * 60 * 1000);
-    startDate.setHours(0, 0, 0, 0);
-
-    const completedStatuses = [
-      OrderStatus.completed,
-      OrderStatus.delivered,
-      OrderStatus.paid,
-    ] as const;
-    const [orders, ordersByStatus] = await Promise.all([
-      this.prisma.order.findMany({
-        where: {
-          createdAt: { gte: startDate, lte: endDate },
-          status: { in: [...completedStatuses] },
-        },
-        select: {
-          createdAt: true,
-          totalAmount: true,
-        },
-        orderBy: { createdAt: "asc" },
-      }),
-      this.prisma.order.groupBy({
-        by: ["status"],
-        where: { createdAt: { gte: startDate, lte: endDate } },
-        _count: { id: true },
-      }),
-    ]);
-
-    const ordersByStatusMap: Record<string, number> = {};
-    ordersByStatus.forEach((row) => {
-      ordersByStatusMap[row.status] = row._count.id;
-    });
-
-    // Group by date (period data for charts and summary)
-    const groupedData = new Map<
-      string,
-      { totalSales: number; orderCount: number }
-    >();
-    orders.forEach((order) => {
-      const dateKey = this.common.getDateKey(order.createdAt, query.groupBy);
-      const existing = groupedData.get(dateKey) || {
-        totalSales: 0,
-        orderCount: 0,
-      };
-      groupedData.set(dateKey, {
-        totalSales: existing.totalSales + Number(order.totalAmount),
-        orderCount: existing.orderCount + 1,
-      });
-    });
-
-    const result = Array.from(groupedData.entries()).map(([date, data]) => ({
-      date,
-      totalSales: Math.round(data.totalSales * 100) / 100,
-      orderCount: data.orderCount,
-      averageOrderValue:
-        data.orderCount > 0
-          ? Math.round((data.totalSales / data.orderCount) * 100) / 100
-          : 0,
-    }));
-
-    const periodTotalSales = result.reduce((sum, r) => sum + r.totalSales, 0);
-    const periodTotalOrders = result.reduce((sum, r) => sum + r.orderCount, 0);
-    const periodAvgOrderValue =
-      periodTotalOrders > 0
-        ? Math.round((periodTotalSales / periodTotalOrders) * 100) / 100
-        : 0;
-
+  private metricDefinitions(): Record<
+    DashboardMetricKey,
+    DashboardMetricDefinition
+  > {
     return {
-      data: result,
-      summary: {
-        totalSales: periodTotalSales,
-        totalOrders: periodTotalOrders,
-        averageOrderValue: periodAvgOrderValue,
-        ordersByStatus: ordersByStatusMap,
-        startDate: startDate.toISOString(),
-        endDate: endDate.toISOString(),
+      paidOrders: {
+        query: (window) =>
+          this.prisma.order.count({ where: paidOrderWhere(window) }),
       },
-    };
-  }
-
-  /**
-   * Get revenue analytics with date range
-   * Requirement: GET /admin/analytics/revenue (7.2)
-   */
-  async getRevenueAnalytics(query: AnalyticsQueryDto) {
-    const endDateRaw = query.endDate ? new Date(query.endDate) : new Date();
-    const endDate = new Date(endDateRaw);
-    endDate.setHours(23, 59, 59, 999);
-    const startDate = query.startDate
-      ? new Date(query.startDate)
-      : new Date(endDate.getTime() - 30 * 24 * 60 * 60 * 1000);
-    startDate.setHours(0, 0, 0, 0);
-
-    const completedStatuses: OrderStatus[] = [
-      OrderStatus.completed,
-      OrderStatus.delivered,
-      OrderStatus.paid,
-    ];
-    const orders = await this.prisma.order.findMany({
-      where: {
-        createdAt: { gte: startDate, lte: endDate },
+      paidAmount: {
+        query: (window) =>
+          this.prisma.order.aggregate({
+            _sum: { totalAmount: true },
+            where: paidOrderWhere(window),
+          }),
+        toValue: sumOf("totalAmount"),
       },
-      select: {
-        createdAt: true,
-        totalAmount: true,
-        commissionAmount: true,
-        status: true,
+      // Kullanıcılara ödenen hak ediş: satıcı escrow'u + takas nakit hak
+      // edişi AYNI tabloda (`PayoutTransfer`), tek yüklem ikisini kapsar.
+      sellerPayoutCount: {
+        query: (window) =>
+          this.prisma.payoutTransfer.count({
+            where: completedPayoutWhere(window),
+          }),
       },
-      orderBy: { createdAt: "asc" },
-    });
-
-    // Group by date
-    const groupedData = new Map<
-      string,
-      { gross: number; commission: number; refunded: number }
-    >();
-    orders.forEach((order) => {
-      const dateKey = this.common.getDateKey(order.createdAt, query.groupBy);
-      const existing = groupedData.get(dateKey) || {
-        gross: 0,
-        commission: 0,
-        refunded: 0,
-      };
-      const isRefunded = order.status === OrderStatus.refunded;
-      const isCompleted = completedStatuses.includes(order.status);
-      groupedData.set(dateKey, {
-        gross: existing.gross + (isCompleted ? Number(order.totalAmount) : 0),
-        commission:
-          existing.commission +
-          (isCompleted ? Number(order.commissionAmount) : 0),
-        refunded:
-          existing.refunded + (isRefunded ? Number(order.totalAmount) : 0),
-      });
-    });
-
-    const result = Array.from(groupedData.entries()).map(([date, data]) => ({
-      date,
-      grossRevenue: Math.round(data.gross * 100) / 100,
-      commissionRevenue: Math.round(data.commission * 100) / 100,
-      netRevenue: Math.round((data.gross - data.refunded) * 100) / 100,
-    }));
-
-    const periodCommission = result.reduce(
-      (sum, r) => sum + r.commissionRevenue,
-      0,
-    );
-
-    return {
-      data: result,
-      summary: {
-        totalGrossRevenue: result.reduce((sum, r) => sum + r.grossRevenue, 0),
-        totalCommission: periodCommission,
-        totalNetRevenue: result.reduce((sum, r) => sum + r.netRevenue, 0),
-        startDate: startDate.toISOString(),
-        endDate: endDate.toISOString(),
+      sellerPayoutAmount: {
+        // COALESCE(submittedAmount, netAmount) satır satır seçim gerektirir;
+        // Prisma `_sum` tek kolon topladığı için ham SQL (bkz. predicate).
+        query: (window) =>
+          this.prisma.$queryRaw<
+            Array<{ total: unknown }>
+          >`${completedPayoutAmountSql(window)}`,
+        toValue: (raw) =>
+          Number((raw as Array<{ total: unknown }>)[0]?.total ?? 0),
       },
-    };
-  }
-
-  /**
-   * Get user analytics with date range
-   * Requirement: GET /admin/analytics/users (7.2)
-   */
-  async getUserAnalytics(query: AnalyticsQueryDto) {
-    const endDateRaw = query.endDate ? new Date(query.endDate) : new Date();
-    const endDate = new Date(endDateRaw);
-    endDate.setHours(23, 59, 59, 999);
-    const startDate = query.startDate
-      ? new Date(query.startDate)
-      : new Date(endDate.getTime() - 30 * 24 * 60 * 60 * 1000);
-    startDate.setHours(0, 0, 0, 0);
-
-    const [users, totalUsers, totalSellers] = await Promise.all([
-      this.prisma.user.findMany({
-        where: {
-          createdAt: { gte: startDate, lte: endDate },
+      // Kullanıcılara ödenen İADE: teslim edilmiş siparişin finalize iadesi.
+      returnRefundCount: {
+        query: (window) =>
+          this.prisma.refundAttempt.count({
+            where: finalizedOrderRefundWhere(window, true),
+          }),
+      },
+      returnRefundAmount: {
+        query: (window) =>
+          this.prisma.refundAttempt.aggregate({
+            _sum: { amount: true },
+            where: finalizedOrderRefundWhere(window, true),
+          }),
+        toValue: sumOf("amount"),
+      },
+      // Kullanıcılara ödenen İPTAL: teslim edilMEMİŞ siparişin finalize iadesi.
+      cancelRefundCount: {
+        query: (window) =>
+          this.prisma.refundAttempt.count({
+            where: finalizedOrderRefundWhere(window, false),
+          }),
+      },
+      cancelRefundAmount: {
+        query: (window) =>
+          this.prisma.refundAttempt.aggregate({
+            _sum: { amount: true },
+            where: finalizedOrderRefundWhere(window, false),
+          }),
+        toValue: sumOf("amount"),
+      },
+      cancelledOrders: {
+        // DİKKAT: `cancelledAt` bu göçten sonra yazılmaya başladı; daha eski
+        // iptaller hiçbir dönemde görünmez (dürüst backfill yok).
+        query: (window) =>
+          this.prisma.order.count({
+            where: { ...LIVE_ORDER, cancelledAt: stamped(window) },
+          }),
+      },
+      completedTrades: {
+        query: (window) =>
+          this.prisma.trade.count({
+            where: { ...LIVE_TRADE, completedAt: stamped(window) },
+          }),
+      },
+      completedTradeAmount: {
+        // Takas ÜCRETİ değil, takasın kendisi için İKİ TARAFTAN toplam
+        // tahsil edilen nakit. `Trade.completedAt`e göre pencerelenir —
+        // ödemenin kendi `paidAt`i değil, takasın TAMAMLANMA anı.
+        query: (window) =>
+          this.prisma.tradeCashPayment.aggregate({
+            _sum: { totalAmount: true },
+            where: {
+              status: PaymentStatus.completed,
+              trade: { ...LIVE_TRADE, completedAt: stamped(window) },
+            },
+          }),
+        toValue: sumOf("totalAmount"),
+      },
+      tradeFeeRevenue: {
+        // v2 sabit hizmet bedeli + v1'in yüzde bazlı komisyonu (KDV'siyle) —
+        // ikisi de BRÜT. Aynı satırda ikisi birden dolu olamaz, bu yüzden
+        // toplamak çifte saymaz; `pricingVersion`a göre dallanmaya gerek yok.
+        query: (window) =>
+          this.prisma.tradeCashPayment.aggregate({
+            _sum: {
+              tradeFeeAmount: true,
+              commission: true,
+              commissionTaxAmount: true,
+            },
+            where: { ...LIVE_TRADE_CASH_PAYMENT, paidAt: stamped(window) },
+          }),
+        toValue: sumOf("tradeFeeAmount", "commission", "commissionTaxAmount"),
+      },
+      netRevenue: {
+        query: (window) =>
+          this.prisma.commissionLedger.aggregate({
+            _sum: {
+              sellerCommission: true,
+              refundedSellerCommission: true,
+              buyerFee: true,
+              refundedBuyerFee: true,
+            },
+            where: ledgerEarnedWhere(window),
+          }),
+        // TEK formül (ledgerNetRevenue) — finans özetiyle aynı kaynak. Brüt
+        // `Order.commissionAmount` kartı KALDIRILDI: aynı ekranda bu sayıyla
+        // çelişen ikinci bir "komisyon geliri" gösteriyordu.
+        toValue: (raw) => ledgerNetRevenue((raw as LedgerAggregate)._sum),
+      },
+      netRevenueCount: {
+        query: (window) =>
+          this.prisma.commissionLedger.count({
+            where: ledgerEarnedWhere(window),
+          }),
+      },
+      // Tarodan hizmet bedelleri (alıcı + satıcı, iadeler düşülmüş). `sellerCommission`/
+      // `buyerFee` (yukarıdaki `netRevenue`) TÜM satırlarda dolu tutulan
+      // toplam kolonlardır; bu kart yalnız v2 kırılımını (component split)
+      // okur — `componentBreakdownComplete = false` eski satırlarda 0'dır,
+      // yani eski dönemler için 7+8 toplamı 6'ya (netRevenue) eşit olmayabilir
+      // (bkz. admin kartındaki noteKey).
+      serviceFeeCount: {
+        query: (window) =>
+          this.prisma.commissionLedger.count({
+            where: serviceFeeCountWhere(window),
+          }),
+      },
+      serviceFeeAmount: {
+        query: (window) =>
+          this.prisma.commissionLedger.aggregate({
+            _sum: {
+              buyerPlatformFeeAmount: true,
+              sellerPlatformFeeAmount: true,
+              refundedBuyerPlatformFeeAmount: true,
+              refundedSellerPlatformFeeAmount: true,
+            },
+            where: ledgerEarnedWhere(window),
+          }),
+        toValue: (raw) => {
+          const s = sumFields(raw, [
+            "buyerPlatformFeeAmount",
+            "sellerPlatformFeeAmount",
+            "refundedBuyerPlatformFeeAmount",
+            "refundedSellerPlatformFeeAmount",
+          ]);
+          return (
+            s.buyerPlatformFeeAmount +
+            s.sellerPlatformFeeAmount -
+            s.refundedBuyerPlatformFeeAmount -
+            s.refundedSellerPlatformFeeAmount
+          );
         },
-        select: {
-          createdAt: true,
-          isSeller: true,
+      },
+      // Tarodan komisyonları (alıcı + satıcı, iadeler düşülmüş) — aynı v2
+      // kırılımı kısıtı `serviceFee*` için yazılan notla burada da geçerli.
+      commissionCount: {
+        query: (window) =>
+          this.prisma.commissionLedger.count({
+            where: commissionCountWhere(window),
+          }),
+      },
+      commissionAmount: {
+        query: (window) =>
+          this.prisma.commissionLedger.aggregate({
+            _sum: {
+              buyerCommissionAmount: true,
+              sellerCommissionAmount: true,
+              refundedBuyerCommissionAmount: true,
+              refundedSellerCommissionAmount: true,
+            },
+            where: ledgerEarnedWhere(window),
+          }),
+        toValue: (raw) => {
+          const s = sumFields(raw, [
+            "buyerCommissionAmount",
+            "sellerCommissionAmount",
+            "refundedBuyerCommissionAmount",
+            "refundedSellerCommissionAmount",
+          ]);
+          return (
+            s.buyerCommissionAmount +
+            s.sellerCommissionAmount -
+            s.refundedBuyerCommissionAmount -
+            s.refundedSellerCommissionAmount
+          );
         },
-        orderBy: { createdAt: "asc" },
-      }),
-      this.prisma.user.count(),
-      this.prisma.user.count({ where: { isSeller: true } }),
-    ]);
-
-    // Get active users (those who placed orders or listed products in the period)
-    const [activeOrderUsers, activeSellerUsers] = await Promise.all([
-      this.prisma.order.findMany({
-        where: { createdAt: { gte: startDate, lte: endDate } },
-        select: { buyerId: true, createdAt: true },
-        distinct: ["buyerId"],
-      }),
-      this.prisma.product.findMany({
-        where: {
-          kind: ProductKind.listing,
-          createdAt: { gte: startDate, lte: endDate },
-        },
-        select: { sellerId: true, createdAt: true },
-        distinct: ["sellerId"],
-      }),
-    ]);
-
-    // Group new users by date
-    const groupedData = new Map<
-      string,
-      { newUsers: number; newSellers: number; activeUsers: Set<string> }
-    >();
-
-    users.forEach((user) => {
-      const dateKey = this.common.getDateKey(user.createdAt, query.groupBy);
-      const existing = groupedData.get(dateKey) || {
-        newUsers: 0,
-        newSellers: 0,
-        activeUsers: new Set(),
-      };
-      groupedData.set(dateKey, {
-        newUsers: existing.newUsers + 1,
-        newSellers: existing.newSellers + (user.isSeller ? 1 : 0),
-        activeUsers: existing.activeUsers,
-      });
-    });
-
-    // Add active users to their respective date groups
-    [...activeOrderUsers, ...activeSellerUsers].forEach((item) => {
-      const dateKey = this.common.getDateKey(item.createdAt, query.groupBy);
-      const existing = groupedData.get(dateKey);
-      if (existing) {
-        const userId = "buyerId" in item ? item.buyerId : item.sellerId;
-        existing.activeUsers.add(userId);
-      }
-    });
-
-    const result = Array.from(groupedData.entries()).map(([date, data]) => ({
-      date,
-      newUsers: data.newUsers,
-      activeUsers: data.activeUsers.size,
-      newSellers: data.newSellers,
-    }));
-
-    return {
-      data: result,
-      summary: {
-        totalUsers,
-        totalNewUsers: result.reduce((sum, r) => sum + r.newUsers, 0),
-        totalNewSellers: result.reduce((sum, r) => sum + r.newSellers, 0),
-        totalSellers,
-        averageDailyActiveUsers:
-          result.length > 0
-            ? Math.round(
-                result.reduce((sum, r) => sum + r.activeUsers, 0) /
-                  result.length,
-              )
-            : 0,
-        startDate: startDate.toISOString(),
-        endDate: endDate.toISOString(),
+      },
+      // Toplam kargo: paket başına TAM bedel (alıcı+satıcı payı birlikte),
+      // pencerede ÖDENMİŞ en az bir siparişi olan kolilerden. Koli bazında
+      // sayıldığı için birden çok siparişi olan koli çift sayılmaz.
+      shippingCount: {
+        query: (window) =>
+          this.prisma.orderPackage.count({ where: paidPackageWhere(window) }),
+      },
+      shippingAmount: {
+        query: (window) =>
+          this.prisma.orderPackage.aggregate({
+            _sum: { fullShippingAmount: true },
+            where: paidPackageWhere(window),
+          }),
+        toValue: sumOf("fullShippingAmount"),
+      },
+      deliveredOrders: {
+        query: (window) =>
+          this.prisma.order.count({ where: deliveredOrderWhere(window) }),
+      },
+      deliveredAmount: {
+        query: (window) =>
+          this.prisma.order.aggregate({
+            _sum: { totalAmount: true },
+            where: deliveredOrderWhere(window),
+          }),
+        toValue: sumOf("totalAmount"),
+      },
+      membershipRevenue: {
+        // MembershipPayment TEK kaynaktır. Üyelik siparişi (origin =
+        // platform_service) ödenen sipariş tutarından zaten dışlandığı için
+        // burada çifte sayım olmaz.
+        query: (window) =>
+          this.prisma.membershipPayment.aggregate({
+            _sum: { amount: true },
+            where: membershipPaymentWhere(window),
+          }),
+        toValue: sumOf("amount"),
+      },
+      membershipCount: {
+        query: (window) =>
+          this.prisma.membershipPayment.count({
+            where: membershipPaymentWhere(window),
+          }),
+      },
+      boostRevenue: {
+        // `purchasedAt` aktivasyon anında damgalanır — satın alma olayı budur.
+        query: (window) =>
+          this.prisma.productBoost.aggregate({
+            _sum: { price: true },
+            where: boostWhere(window),
+          }),
+        toValue: sumOf("price"),
+      },
+      boostCount: {
+        query: (window) =>
+          this.prisma.productBoost.count({ where: boostWhere(window) }),
+      },
+      newUsers: {
+        query: (createdAt) =>
+          this.prisma.user.count({ where: { ...LIVE_USER, createdAt } }),
+      },
+      newListings: {
+        query: (window) =>
+          this.prisma.product.count({
+            where: {
+              ...LIVE_PRODUCT,
+              kind: ProductKind.listing,
+              publishedAt: stamped(window),
+            },
+          }),
+      },
+      signedInUsers: {
+        // DİKKAT — bu "ziyaretçi" DEĞİL: `lastActivityAt` yalnız BAŞARILI
+        // GİRİŞTE damgalanıyor (auth/utils/login-stamp.ts), yani "son girişi bu
+        // pencereye düşen kayıtlı kullanıcı" demek. Anonim trafik hiçbir yerde
+        // ölçülmüyor. Tek bir "son" damga tutulduğu için iki dönemde de aktif
+        // olan kullanıcı yalnız SONRAKİ pencerede sayılır — geçmiş pencereler
+        // olduğundan düşük görünür, bu yüzden trend satırı gösterilmez.
+        query: (lastActivityAt) =>
+          this.prisma.user.count({
+            where: { ...LIVE_USER, lastActivityAt: stamped(lastActivityAt) },
+          }),
       },
     };
   }
@@ -682,6 +711,7 @@ export class AdminAnalyticsDashboardService {
    */
   async getRecentOrders(limit: number = 10) {
     const orders = await this.prisma.order.findMany({
+      where: LIVE_ORDER,
       take: limit,
       orderBy: { createdAt: "desc" },
       include: {
@@ -708,7 +738,7 @@ export class AdminAnalyticsDashboardService {
    */
   async getTopProducts(limit: number = 10) {
     const products = await this.prisma.product.findMany({
-      where: { kind: ProductKind.listing },
+      where: { ...LIVE_PRODUCT, kind: ProductKind.listing },
       take: limit,
       orderBy: [{ viewCount: "desc" }, { createdAt: "desc" }],
       select: {
@@ -747,7 +777,7 @@ export class AdminAnalyticsDashboardService {
   async getTopSellers(limit: number = 10) {
     const sellers = await this.prisma.user.findMany({
       take: limit,
-      where: { isSeller: true, isBanned: false, deletedAt: null },
+      where: { ...LIVE_USER, isSeller: true, isBanned: false, deletedAt: null },
       orderBy: [{ storeViewCount: "desc" }, { createdAt: "asc" }],
       select: {
         id: true,
@@ -789,30 +819,6 @@ export class AdminAnalyticsDashboardService {
   }
 
   /**
-   * Get pending actions for dashboard
-   * Requirement: Pending Actions Panel (7.1)
-   */
-  async getPendingActions() {
-    const [pendingProducts, refundRequests, pendingMessages] =
-      await Promise.all([
-        this.prisma.product.count({
-          where: { kind: ProductKind.listing, status: ProductStatus.pending },
-        }),
-        this.prisma.order.count({
-          where: { status: OrderStatus.refund_requested },
-        }),
-        this.prisma.message.count({ where: { status: "pending_approval" } }),
-      ]);
-
-    return {
-      pendingProducts,
-      refundRequests,
-      pendingMessages,
-      totalPending: pendingProducts + refundRequests + pendingMessages,
-    };
-  }
-
-  /**
    * Get commission revenue summary
    * Requirement: GET /admin/commission/revenue (project.txt)
    */
@@ -832,6 +838,7 @@ export class AdminAnalyticsDashboardService {
       this.prisma.order.aggregate({
         _sum: { commissionAmount: true },
         where: {
+          ...LIVE_ORDER,
           createdAt: { gte: startDate, lte: endDate },
           status: { in: [OrderStatus.completed, OrderStatus.delivered] },
         },
@@ -851,6 +858,7 @@ export class AdminAnalyticsDashboardService {
           sellerShippingAmount: true,
         },
         where: {
+          ...LIVE_ORDER,
           createdAt: { gte: startDate, lte: endDate },
           status: { in: [OrderStatus.completed, OrderStatus.delivered] },
         },
@@ -864,12 +872,14 @@ export class AdminAnalyticsDashboardService {
         WHERE created_at >= ${startDate} 
           AND created_at <= ${endDate}
           AND status IN ('completed', 'delivered')
+          AND ${liveRowSql("orders")}
         GROUP BY DATE_TRUNC('month', created_at)
         ORDER BY month DESC
       ` as Promise<Array<{ month: Date; total: number }>>,
       // Commission by category
       this.prisma.order.findMany({
         where: {
+          ...LIVE_ORDER,
           createdAt: { gte: startDate, lte: endDate },
           status: { in: [OrderStatus.completed, OrderStatus.delivered] },
         },

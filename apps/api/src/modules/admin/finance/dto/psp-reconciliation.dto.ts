@@ -11,7 +11,7 @@ import {
 } from "class-validator";
 import { Transform, Type } from "class-transformer";
 import { ApiPropertyOptional, ApiProperty } from "@nestjs/swagger";
-import { PaytrMatchStatus } from "@prisma/client";
+import { PaytrMatchStatus, PaytrMerchant } from "@prisma/client";
 import { BlankToUndefined } from "../../../../common/transforms";
 
 /** GET admin/finance/psp/reconciliation */
@@ -65,6 +65,13 @@ export class PspStatementLinesQueryDto {
   @Transform(({ value }) => value === true || value === "true")
   @IsBoolean()
   includeResolved?: boolean;
+
+  /** Yalnız bir PayTR mağazasının döküm satırları (pazaryeri / üyelik). */
+  @ApiPropertyOptional({ enum: PaytrMerchant })
+  @IsOptional()
+  @BlankToUndefined()
+  @IsIn(Object.values(PaytrMerchant))
+  merchant?: PaytrMerchant;
 }
 
 /** GET admin/finance/psp/missing-payments?date=YYYY-MM-DD */
@@ -97,6 +104,13 @@ export class PspSettlementsQueryDto {
   @Min(1)
   @Max(366)
   days?: number;
+
+  /** Yalnız bir PayTR mağazasının hakedişleri (pazaryeri / üyelik). */
+  @ApiPropertyOptional({ enum: PaytrMerchant })
+  @IsOptional()
+  @BlankToUndefined()
+  @IsIn(Object.values(PaytrMerchant))
+  merchant?: PaytrMerchant;
 }
 
 /** POST admin/finance/psp/statement-lines/:id/resolve */

@@ -1,3 +1,4 @@
+import { accountLaneServiceStub } from "../../account-lane/account-lane.testing";
 import { ProductQueryService } from "./product-query.service";
 
 describe("ProductQueryService — hidden sellers (user blocks)", () => {
@@ -18,6 +19,7 @@ describe("ProductQueryService — hidden sellers (user blocks)", () => {
       {} as any,
       {} as any,
       userBlocks as any,
+      accountLaneServiceStub() as any,
     );
     const pg = jest
       .spyOn(service as any, "findAllViaPostgres")
@@ -29,7 +31,7 @@ describe("ProductQueryService — hidden sellers (user blocks)", () => {
     const { service, cache, pg } = build([]);
     await service.findAll({ page: 1, limit: 20 } as any, "viewer");
     expect(cache.getOrSet.mock.calls[0][0]).not.toContain("hidden");
-    expect(pg).toHaveBeenCalledWith(expect.anything(), []);
+    expect(pg).toHaveBeenCalledWith(expect.anything(), [], "live");
   });
 
   it("keys the list cache by hidden sellers and threads them into the query", async () => {
@@ -37,7 +39,7 @@ describe("ProductQueryService — hidden sellers (user blocks)", () => {
     await service.findAll({ page: 1, limit: 20 } as any, "viewer");
     // Liste anahtara ham değil, kısa hash olarak girer (1000 id'lik anahtar yok).
     expect(cache.getOrSet.mock.calls[0][0]).toMatch(/"hidden":"[0-9a-f]{16}"/);
-    expect(pg).toHaveBeenCalledWith(expect.anything(), ["s9", "s2"]);
+    expect(pg).toHaveBeenCalledWith(expect.anything(), ["s9", "s2"], "live");
   });
 
   it("findOne treats a hidden seller's listing as not found", async () => {

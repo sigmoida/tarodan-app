@@ -4,11 +4,13 @@ import { useParams } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { CheckCircleIcon } from "@heroicons/react/24/outline";
 import { StatusBadge, refundRequestStatusConfig } from "@tarodan/ui";
+import { ADMIN_REFUNDS_VIEW_HREF } from "@tarodan/types";
 import { adminApi } from "@/lib/api";
 import { useAdminMutation } from "@/hooks/useAdminMutation";
 import { useConfirm } from "@/provider/ConfirmProvider";
 import { useSession } from "@/context/SessionContext";
 import { DetailPage } from "@/components/detail/DetailPage";
+import { TestLaneBadge } from "@/components/TestLaneBadge";
 import { PartyCard } from "@/components/detail/PartyCard";
 import { RefundStatusStepper } from "./_components/RefundStatusStepper";
 import { RefundNextActionPanel } from "./_components/RefundNextActionPanel";
@@ -111,7 +113,7 @@ export default function RefundRequestDetailPage() {
       fetcher={(rid) =>
         adminApi.getRefundRequest(rid).then((r) => r.data?.data ?? r.data)
       }
-      backHref="/operations/refund-requests"
+      backHref={ADMIN_REFUNDS_VIEW_HREF}
       emptyTitle={t("admin.operations.refundRequests.notFound")}
       title={(rr) => (
         <>
@@ -126,10 +128,13 @@ export default function RefundRequestDetailPage() {
         })
       }
       badge={(rr) => (
-        <StatusBadge
-          status={rr.status}
-          config={statusConfig(refundRequestStatusConfig, t)}
-        />
+        <div className="flex flex-wrap items-center gap-2">
+          <StatusBadge
+            status={rr.status}
+            config={statusConfig(refundRequestStatusConfig, t)}
+          />
+          <TestLaneBadge isTest={rr.order.isTest} />
+        </div>
       )}
     >
       {(rr) => {

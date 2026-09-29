@@ -1,5 +1,6 @@
 import { BadRequestException, Injectable, Logger } from "@nestjs/common";
 import { i18nMessage } from "../../i18n";
+import { PaytrMerchant } from "@prisma/client";
 import { PayTRCredentials } from "./paytr-credentials.service";
 import { parsePaytrMoneyString } from "./paytr-money.util";
 import type {
@@ -13,6 +14,9 @@ import type {
  * katmanının veri kaynağı: işlem dökümü (hangi işlemler oldu, PayTR ne kesti)
  * ve ödeme özeti/detayı (hesaba ne zaman ne aktarıldı).
  *
+ * Her mağaza kendi raporunu verir; çağıran hangi mağazanın dökümünü istediğini
+ * söyler (imza o mağazanın anahtarıyla atılır).
+ *
  * Tahsilat ya da iade YAPMAZ; yalnız olan biteni okur. Mutabakatın "bizim
  * defterimiz ile PayTR'ınki tutuyor mu" sorusunu cevaplayabilmesi, bu okuma
  * yolunun para hareketi yapan yollardan ayrı durmasına bağlı.
@@ -23,17 +27,8 @@ export class PayTRReportService {
 
   constructor(private readonly paytr: PayTRCredentials) {}
 
-  private get merchantId() {
-    return this.paytr.merchantId;
-  }
-  private get merchantSalt() {
-    return this.paytr.merchantSalt;
-  }
   private get httpTimeoutMs() {
     return this.paytr.httpTimeoutMs;
-  }
-  private generateHash(data: string) {
-    return this.paytr.generateHash(data);
   }
   private parsePaytrJson<T = any>(raw: string) {
     return this.paytr.parsePaytrJson<T>(raw);
@@ -105,17 +100,21 @@ export class PayTRReportService {
    * Satış + iade işlem dökümü. Tarihler "YYYY-MM-DD hh:mm:ss", aralık en fazla 3 gün.
    * Hash = merchant_id + start_date + end_date + merchant_salt.
    */
-  async getTransactionStatement(params: {
-    startDate: string;
-    endDate: string;
-  }): Promise<PaytrStatementEntry[]> {
-    const paytrToken = this.generateHash(
-      this.merchantId + params.startDate + params.endDate + this.merchantSalt,
+  async getTransactionStatement(
+    params: {
+      startDate: string;
+      endDate: string;
+    },
+    merchant: PaytrMerchant = PaytrMerchant.marketplace,
+  ): Promise<PaytrStatementEntry[]> {
+    const creds = this.paytr.forMerchant(merchant);
+    const paytrToken = creds.signWithSalt(
+      creds.merchantId + params.startDate + params.endDate,
     );
     const data = await this.postReport(
       "https://www.paytr.com/rapor/islem-dokumu",
       {
-        merchant_id: this.merchantId,
+        merchant_id: creds.merchantId,
         start_date: params.startDate,
         end_date: params.endDate,
         paytr_token: paytrToken,
@@ -148,17 +147,21 @@ export class PayTRReportService {
    * Ödeme özeti (hakediş): gerçekleşen aktarımlar + future_payments projeksiyonları.
    * Tarihler "YYYY-MM-DD", aralık en fazla 31 gün. Hash = mid + start + end + salt.
    */
-  async getSettlementSummary(params: {
-    startDate: string;
-    endDate: string;
-  }): Promise<PaytrSettlementSummaryEntry[]> {
-    const paytrToken = this.generateHash(
-      this.merchantId + params.startDate + params.endDate + this.merchantSalt,
+  async getSettlementSummary(
+    params: {
+      startDate: string;
+      endDate: string;
+    },
+    merchant: PaytrMerchant = PaytrMerchant.marketplace,
+  ): Promise<PaytrSettlementSummaryEntry[]> {
+    const creds = this.paytr.forMerchant(merchant);
+    const paytrToken = creds.signWithSalt(
+      creds.merchantId + params.startDate + params.endDate,
     );
     const data = await this.postReport(
       "https://www.paytr.com/rapor/odeme-dokumu",
       {
-        merchant_id: this.merchantId,
+        merchant_id: creds.merchantId,
         start_date: params.startDate,
         end_date: params.endDate,
         paytr_token: paytrToken,
@@ -208,16 +211,18 @@ export class PayTRReportService {
   /**
    * Ödeme detayı: hakediş günündeki sipariş dökümü. Hash = mid + date + salt.
    */
-  async getSettlementDetail(params: {
-    date: string; // YYYY-MM-DD
-  }): Promise<PaytrSettlementDetailEntry[]> {
-    const paytrToken = this.generateHash(
-      this.merchantId + params.date + this.merchantSalt,
-    );
+  async getSettlementDetail(
+    params: {
+      date: string; // YYYY-MM-DD
+    },
+    merchant: PaytrMerchant = PaytrMerchant.marketplace,
+  ): Promise<PaytrSettlementDetailEntry[]> {
+    const creds = this.paytr.forMerchant(merchant);
+    const paytrToken = creds.signWithSalt(creds.merchantId + params.date);
     const data = await this.postReport(
       "https://www.paytr.com/rapor/odeme-detayi/",
       {
-        merchant_id: this.merchantId,
+        merchant_id: creds.merchantId,
         date: params.date,
         paytr_token: paytrToken,
       },

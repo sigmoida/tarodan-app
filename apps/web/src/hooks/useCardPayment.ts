@@ -7,7 +7,12 @@ import toast from "react-hot-toast";
 import { useTranslations } from "next-intl";
 import { useZodForm } from "@tarodan/ui/form";
 import { CVV_REGEX } from "@tarodan/ui";
-import { paymentsApi, membershipApi, type SavedCard } from "@/lib/api";
+import {
+  paymentsApi,
+  membershipApi,
+  type PaymentPurpose,
+  type SavedCard,
+} from "@/lib/api";
 import { NEW_CARD } from "@/components/payment/card";
 import { newCardSchema, emptyNewCard } from "@/components/payment/schema";
 
@@ -23,6 +28,11 @@ export interface ResolvedPayment {
 }
 
 interface UseCardPaymentArgs {
+  /**
+   * Sepet mi üyelik mi: kayıtlı kartlar mağazaya özeldir, yalnız bu amacın
+   * kartları listelenir ("kartı sakla" metni de amaca göre değişir).
+   */
+  purpose: PaymentPurpose;
   cardStorageEnabled: boolean;
   /**
    * Ödenecek kaydı submit ANINDA çözer.
@@ -43,6 +53,7 @@ interface UseCardPaymentArgs {
  * posts those fields together with the server-signed form directly to PayTR.
  */
 export function useCardPayment({
+  purpose,
   cardStorageEnabled,
   resolvePayment,
 }: UseCardPaymentArgs) {
@@ -53,6 +64,7 @@ export function useCardPayment({
   const [loadingCards, setLoadingCards] = useState(cardStorageEnabled);
   const [selected, setSelected] = useState<string>(NEW_CARD);
   const [savedCvv, setSavedCvv] = useState("");
+  // Varsayılan işaretli: üyelikte oto-yenileme ancak saklanan kartla açılır.
   const [saveCard, setSaveCard] = useState(true);
   const [processing, setProcessing] = useState(false);
 
@@ -66,7 +78,7 @@ export function useCardPayment({
     let alive = true;
     (async () => {
       try {
-        const res = await membershipApi.listCards();
+        const res = await membershipApi.listCards(purpose);
         if (!alive) return;
         const list = res.data || [];
         setCards(list);
@@ -80,7 +92,7 @@ export function useCardPayment({
     return () => {
       alive = false;
     };
-  }, [cardStorageEnabled]);
+  }, [cardStorageEnabled, purpose]);
 
   const selectedCard = useMemo(
     () => cards.find((c) => c.id === selected) || null,
@@ -189,6 +201,7 @@ export function useCardPayment({
     saveCard,
     setSaveCard,
     cardStorageEnabled,
+    purpose,
     processing,
     submit,
   };

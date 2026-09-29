@@ -343,6 +343,11 @@ export class AdminAnalyticsOrderService {
       },
       quantity: o.quantity ?? 1,
       unitPrice: o.unitPrice != null ? Number(o.unitPrice) : null,
+      // Siparişin KENDİ kargo satırı — panel kargo öncesi iptal uygunluğunu
+      // (preShipmentCancelBlocker) API ile aynı veriden hesaplar.
+      shipment: o.shipment
+        ? { status: o.shipment.status, shippedAt: o.shipment.shippedAt ?? null }
+        : null,
       finance: {
         subtotal: storedProductBaseOf(o),
         discountAmount: num(o.discountAmount),
@@ -495,6 +500,8 @@ export class AdminAnalyticsOrderService {
         createdAt: isGroup ? (group as any).createdAt : orders[0].createdAt,
         itemCount: orders.length,
         packageCount: packages.length,
+        // Test şeridi rozeti — sepetin bütün siparişleri aynı şeritte.
+        isTest: orders.some((o) => o.isTest),
         isMultiSeller: sellerIds.size > 1,
         totals: {
           subtotal: orders.reduce((s, o: any) => s + storedProductBaseOf(o), 0),

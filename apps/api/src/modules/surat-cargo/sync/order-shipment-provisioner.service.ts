@@ -144,6 +144,7 @@ export class OrderShipmentProvisioner {
         shippingAddress: true,
         packageId: true,
         sellerId: true,
+        isTest: true,
         product: { select: { title: true, shippingDesi: true } },
         // Taşıyıcı GÖNDERİCİ bilgisi ister ve satışta gönderici satıcıdır.
         // Paket satırları da aynı satıcıya ait olduğundan (OrderPackage.sellerId)
@@ -247,6 +248,7 @@ export class OrderShipmentProvisioner {
         idempotencyKey,
         correlationId: ref,
         reference: ref,
+        testLane: order.isTest,
         // Adres yalnız v1'de null olabilir (yukarıdaki guard) ve orada bu blok
         // tele çıkmaz; yine de satıcı kimliği log/teşhis için taşınır.
         sender: {

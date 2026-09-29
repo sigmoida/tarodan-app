@@ -29,6 +29,7 @@ import {
   type ServiceTaxBreakdown,
 } from "../helpers/order-service-tax.helper";
 import { buyerTotalOf } from "../helpers/order-total.helper";
+import { OFFER_SNAPSHOT_KEY } from "../helpers/order-offer-snapshot";
 import { OrderTaxPolicyService } from "../pricing/order-tax-policy.service";
 
 /**
@@ -267,6 +268,13 @@ export class OrderCheckoutCommonService {
   buildOfferFinancialSnapshot(params: {
     productId: string;
     amount: number;
+    /**
+     * Ürünün kabul anındaki ilan fiyatı. Teklif siparişinin `originalUnitPrice`'ı
+     * pazarlık tutarıdır; ilan fiyatı başka yerde saklanmadığı için admin
+     * "ilan − teklif" farkını sonradan değişen ürün fiyatından okumasın diye
+     * burada donar (`readOfferListingUnitPrice`).
+     */
+    listingUnitPrice: number;
     shippingDesi: number;
     shippingTariff: ShippingTariffSnapshot;
     pricing: Awaited<
@@ -274,7 +282,7 @@ export class OrderCheckoutCommonService {
     >;
   }): Prisma.InputJsonObject {
     const { pricing, shippingTariff } = params;
-    return this.buildFinancialSnapshot({
+    const snapshot = this.buildFinancialSnapshot({
       pricingHash: this.orderPricing.computePricingHash([
         {
           productId: params.productId,
@@ -304,6 +312,13 @@ export class OrderCheckoutCommonService {
       sellerServiceTaxAmount: pricing.sellerServiceTaxAmount,
       totalAmount: pricing.totalAmount,
     });
+    return {
+      ...snapshot,
+      [OFFER_SNAPSHOT_KEY]: {
+        listingUnitPrice: params.listingUnitPrice,
+        amount: params.amount,
+      },
+    };
   }
 
   buildSuratIdempotencyKey(parts: string[]): string {
@@ -505,78 +520,5 @@ export class OrderCheckoutCommonService {
           where: { packageNumber: code },
         })) > 0,
     );
-  }
-
-  /**
-   * Record commission data to analytics snapshot
-   * Requirement: Store commission snapshot (3.3)
-   */
-  async recordCommissionSnapshot(
-    orderId: string,
-    orderNumber: string,
-    commissionAmount: number,
-    totalAmount: number,
-    result: CommissionResult,
-  ): Promise<void> {
-    try {
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-
-      // Try to update existing daily snapshot or create new one
-      await this.prisma.analyticsSnapshot.upsert({
-        where: {
-          snapshotType_snapshotDate: {
-            snapshotType: "daily_commission",
-            snapshotDate: today,
-          },
-        },
-        update: {
-          totalRevenue: {
-            increment: commissionAmount,
-          },
-          newOrders: {
-            increment: 1,
-          },
-          data: {
-            // Note: In production, you'd merge this with existing data
-            lastOrderId: orderId,
-            lastOrderNumber: orderNumber,
-            lastCommission: commissionAmount,
-            lastRuleId: result.ruleId,
-            lastRuleName: result.ruleName,
-            lastAppliedRate: result.appliedRate,
-          },
-        },
-        create: {
-          snapshotType: "daily_commission",
-          snapshotDate: today,
-          totalRevenue: commissionAmount,
-          newOrders: 1,
-          data: {
-            orders: [
-              {
-                orderId,
-                orderNumber,
-                totalAmount,
-                commissionAmount,
-                ruleId: result.ruleId,
-                ruleName: result.ruleName,
-                appliedRate: result.appliedRate,
-                wasMinApplied: result.wasMinApplied,
-                wasMaxApplied: result.wasMaxApplied,
-                timestamp: new Date().toISOString(),
-              },
-            ],
-          },
-        },
-      });
-
-      this.logger.debug(
-        `Commission snapshot recorded for order ${orderNumber}`,
-      );
-    } catch (error) {
-      // Don't fail the order if snapshot fails
-      this.logger.error(`Failed to record commission snapshot: ${error}`);
-    }
   }
 }

@@ -19,6 +19,7 @@ import {
   CreateMembershipTierDto,
   UpdateMembershipTierDto,
   ToggleAutoRenewDto,
+  ListSavedCardsQueryDto,
   MembershipTierResponseDto,
   UserMembershipResponseDto,
   MembershipLimitsDto,
@@ -148,12 +149,15 @@ export class MembershipController {
   // ==========================================================================
 
   /**
-   * Kullanıcının kayıtlı kartlarını listele (oto-yenileme için).
-   * GET /membership/cards
+   * Kullanıcının kayıtlı kartlarını listele.
+   * GET /membership/cards?purpose=checkout|membership
    */
   @Get("cards")
-  async listSavedCards(@Request() req: any) {
-    return this.membershipService.listSavedCards(req.user.id);
+  async listSavedCards(
+    @Request() req: any,
+    @Query() query: ListSavedCardsQueryDto,
+  ) {
+    return this.membershipService.listSavedCards(req.user.id, query.purpose);
   }
 
   /** PayTR silmeyi onayladıktan sonra yerelde revoke eder. */

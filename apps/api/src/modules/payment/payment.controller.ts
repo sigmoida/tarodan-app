@@ -46,6 +46,12 @@ import {
   PaymentQueryDto,
 } from "./dto";
 import { isProduction } from "../../config/environment";
+import { PaytrMerchant } from "@prisma/client";
+import {
+  PAYMENT_PURPOSE_MERCHANT,
+  paytrMerchantCapabilities,
+  type PaymentPurpose,
+} from "../../config/paytr";
 
 @ApiTags("payments")
 @Controller("payments")
@@ -165,22 +171,47 @@ export class PaymentController {
    */
   @Get("config")
   @Public()
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description:
+      "bypassEnabled + per-purpose card storage / recurring capabilities",
+  })
   getPublicConfig(): {
     bypassEnabled: boolean;
     cardStorageEnabled: boolean;
     recurringEnabled: boolean;
+    purposes: Record<
+      PaymentPurpose,
+      { cardStorageEnabled: boolean; recurringEnabled: boolean }
+    >;
   } {
+    // Yetenekler ödeme AMACINA göre: sepet ödemesi pazaryeri mağazasında, üyelik
+    // ödemesi (ve kullanıcısız yenileme) üyelik mağazasında. Kart saklama ile
+    // non-3D recurring ayrı PayTR yetkileridir.
+    const purpose = (p: PaymentPurpose) => {
+      const caps = paytrMerchantCapabilities(
+        this.configService,
+        PAYMENT_PURPOSE_MERCHANT[p],
+      );
+      return {
+        cardStorageEnabled: caps.cardStorage,
+        recurringEnabled: caps.recurring,
+      };
+    };
+    const purposes = {
+      checkout: purpose("checkout"),
+      membership: purpose("membership"),
+    };
     return {
       // SEC-H1: bypass yalnız non-production'da GERÇEKTEN çalışır; prod'da her zaman
       // false raporla — hem yanıltıcı bir "true" sızdırma hem de UI'ı yanlış yönlendirme.
       bypassEnabled:
         this.configService.get("PAYMENT_BYPASS") === "true" && !isProduction(),
-      // Kart saklama ve kullanıcı-mevcut kayıtlı kart ödemeleri, kullanıcı
-      // etkileşimi olmayan Non3D recurring çekimden ayrı yetkilerdir.
-      cardStorageEnabled:
-        this.configService.get("PAYTR_CARD_STORAGE_ENABLED") === "true",
-      recurringEnabled:
-        this.configService.get("PAYTR_RECURRING_ENABLED") === "true",
+      // Geriye uyum (eski web/mobil): üst düzey alanlar eski anlamlarını korur —
+      // cardStorageEnabled sepet kartları, recurringEnabled oto-yenileme.
+      cardStorageEnabled: purposes.checkout.cardStorageEnabled,
+      recurringEnabled: purposes.membership.recurringEnabled,
+      purposes,
     };
   }
 
@@ -299,9 +330,34 @@ export class PaymentController {
   // bounded separately in the hash-mismatch handler.
   @Throttle({ default: { limit: 60, ttl: 60000 } })
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: "PayTR payment callback (webhook)" })
+  @ApiOperation({
+    summary: "PayTR payment callback (webhook) — marketplace merchant",
+  })
   async paytrCallback(@Body() dto: PayTRCallbackDto) {
-    return this.paymentService.handlePayTRCallback(dto);
+    return this.paymentService.handlePayTRCallback(
+      dto,
+      PaytrMerchant.marketplace,
+    );
+  }
+
+  /**
+   * POST /payments/callback/paytr/membership - PayTR webhook of the MEMBERSHIP
+   * merchant (panel "Bildirim URL" of that store). Same handler; the hash is
+   * verified with the membership merchant's key.
+   */
+  @Post("callback/paytr/membership")
+  @Public()
+  @Throttle({ default: { limit: 60, ttl: 60000 } })
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: "PayTR payment callback (webhook) — membership merchant",
+  })
+  @ApiResponse({ status: HttpStatus.OK, description: 'Literal "OK"' })
+  async paytrMembershipCallback(@Body() dto: PayTRCallbackDto) {
+    return this.paymentService.handlePayTRCallback(
+      dto,
+      PaytrMerchant.membership,
+    );
   }
 
   // ============================================================

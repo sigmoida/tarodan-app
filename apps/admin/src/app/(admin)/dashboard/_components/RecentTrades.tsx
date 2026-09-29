@@ -6,6 +6,7 @@ import {
   ChevronRightIcon,
 } from "@heroicons/react/24/outline";
 import { Button, EmptyState, StatusBadge } from "@tarodan/ui";
+import { ADMIN_TRADES_TAB_HREF } from "@tarodan/types";
 import { useTranslations } from "next-intl";
 import { SectionCard } from "@/components/detail/SectionCard";
 import {
@@ -47,7 +48,7 @@ export function RecentTrades({ trades }: { trades: RecentTrade[] }) {
       title={t("admin.dashboard.recentTrades.title")}
       actions={
         <Button asChild variant="ghost" size="sm">
-          <Link href="/operations/trades">
+          <Link href={ADMIN_TRADES_TAB_HREF}>
             {t("common.seeAll")}
             <ChevronRightIcon className="ml-1 h-4 w-4" />
           </Link>

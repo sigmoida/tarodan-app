@@ -8,6 +8,7 @@ import { SearchProductService } from "./query/search-product.service";
 import { SearchAutocompleteService } from "./query/search-autocomplete.service";
 import { SearchCollectionService } from "./query/search-collection.service";
 import { SearchSyncService } from "./indexing/search-sync.service";
+import type { AccountLane } from "../account-lane/account-lane";
 
 // Geriye dönük uyumluluk: arama tip sözleşmeleri artık search-common.service'te
 // yaşıyor; mevcut tüketiciler (search.controller vb.) bu modülden import
@@ -109,13 +110,20 @@ export class SearchService implements OnModuleInit {
     query: string,
     limit = 10,
     excludeSellerIds: string[] = [],
+    lane: AccountLane = "live",
   ): Promise<string[]> {
-    return this.autocompleteSvc.autocomplete(query, limit, excludeSellerIds);
+    return this.autocompleteSvc.autocomplete(
+      query,
+      limit,
+      excludeSellerIds,
+      lane,
+    );
   }
 
   async autocompleteRich(
     query: string,
     excludeSellerIds: string[] = [],
+    lane: AccountLane = "live",
   ): Promise<{
     products: Array<{
       id: string;
@@ -148,7 +156,7 @@ export class SearchService implements OnModuleInit {
     conditions: Array<{ value: string; label: string }>;
     suggestions: string[];
   }> {
-    return this.autocompleteSvc.autocompleteRich(query, excludeSellerIds);
+    return this.autocompleteSvc.autocompleteRich(query, excludeSellerIds, lane);
   }
 
   // Taşındı: search-collection.service.ts — koleksiyon indeksleme + arama

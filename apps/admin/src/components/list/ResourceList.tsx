@@ -38,6 +38,8 @@ export interface ResourceListProps<T> {
   debounceMs?: number;
   /** #101: full-load (client-list) kaynakları için staleTime (ms) — mount'ta tekrar indirmeyi keser. */
   staleTime?: number;
+  /** Fixed request scope (e.g. a tab) — keys the cache; see `useAdminResource`. */
+  scope?: Record<string, string>;
   selectable?: boolean;
   children: ReactNode;
 }
@@ -99,6 +101,7 @@ function ResourceListInner<T>({
   initialFilters,
   debounceMs,
   staleTime,
+  scope,
   selectable = false,
   children,
 }: ResourceListProps<T>) {
@@ -111,6 +114,7 @@ function ResourceListInner<T>({
     queryKey: resource,
     fetcher,
     staleTime,
+    scope,
     limit,
     syncUrl,
     initialFilters: { ...filterDefaults(filters), ...initialFilters },

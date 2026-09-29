@@ -1,5 +1,6 @@
 import * as request from "supertest";
 import {
+  CancellationActor,
   PaymentStatus,
   PaymentHoldStatus,
   PrismaClient,
@@ -581,7 +582,9 @@ describe("Money Flow Timeline (E2E)", () => {
 
       // Refund
       const paymentService = ctx.app.get(PaymentService);
-      await paymentService.processRefund(buyRes.body.orderId);
+      await paymentService.processRefund(buyRes.body.orderId, undefined, {
+        cancelledBy: CancellationActor.platform,
+      });
 
       // Order should be cancelled
       const orderAfter = await prisma.order.findUnique({

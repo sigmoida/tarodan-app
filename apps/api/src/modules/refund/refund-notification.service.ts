@@ -9,6 +9,7 @@ import {
   toPublicIdentity,
 } from "../../common/helpers/public-identity";
 import { NotificationType } from "../notification/dto";
+import type { OrderCancelNoticeParty } from "../notification/helpers/order-cancel-notice";
 import { adminUrl } from "../../config/app-urls";
 
 /**
@@ -103,6 +104,37 @@ export class RefundNotificationService {
     } catch (err: any) {
       this.logger.error(
         `Notification ${type} → ${userId} failed: ${err?.message}`,
+      );
+    }
+  }
+
+  /**
+   * Kargo öncesi iptalin alıcıya ve satıcıya duyurusu (in-app + e-posta).
+   * Metinler ve kanallar NotificationService.notifyOrderCancelledParties'te
+   * TEK tanımdır — processRefund'ın "iptal" dalı da aynı metodu kullanır.
+   */
+  async notifyOrderCancelled(
+    orderId: string,
+    refundAmount: number,
+    parties: readonly OrderCancelNoticeParty[],
+  ): Promise<void> {
+    if (parties.length === 0) return;
+    try {
+      const order = await this.prisma.order.findUnique({
+        where: { id: orderId },
+        select: { id: true, orderNumber: true, buyerId: true, sellerId: true },
+      });
+      if (!order) return;
+      await this.notificationService.notifyOrderCancelledParties(
+        order,
+        refundAmount,
+        parties,
+      );
+    } catch (err: unknown) {
+      this.logger.error(
+        `Order ${orderId} cancellation notify failed: ${
+          err instanceof Error ? err.message : String(err)
+        }`,
       );
     }
   }

@@ -11,6 +11,7 @@ import {
 import { SectionCard } from "@/components/detail/SectionCard";
 import { fmtDateTime, fmtTry } from "@/lib/format";
 import { statusConfig } from "@/lib/statusLabels";
+import { ordersTabHref } from "@/app/(admin)/operations/orders/_lib/screenTabs";
 import type { OfferRow } from "../../_lib/offers";
 import type { AdminOfferDetail } from "../_lib/types";
 
@@ -37,7 +38,7 @@ export function ProductOffersSection({
       })}
       actions={
         <Link
-          href={`/operations/offers?productId=${productId}`}
+          href={ordersTabHref("offers", { productId })}
           className="text-sm text-primary-600 hover:underline"
         >
           {t("admin.operations.offers.viewAllForProduct")}

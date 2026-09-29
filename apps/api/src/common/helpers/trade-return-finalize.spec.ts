@@ -3,7 +3,7 @@ import {
   allReturnLegsResolved,
   finalizeReturningTradeIfResolved,
 } from "./trade-return-finalize";
-import { ProductStatus, TradeStatus } from "@prisma/client";
+import { CancellationActor, ProductStatus, TradeStatus } from "@prisma/client";
 
 /**
  * `returning` kapanışının tek-kaynak sözleşmesi:
@@ -153,6 +153,30 @@ describe("finalizeReturningTradeIfResolved", () => {
         data: expect.objectContaining({ status: TradeStatus.cancelled }),
       }),
     );
+  });
+
+  /**
+   * `returning`e yalnız yönetici kararı (depo reddi, zorla iptal) götürür; kapanış
+   * o kararın tamamlanmasıdır. Yöneticinin yazdığı gerekçe ezilmez.
+   */
+  it("kapanışı yönetici (platform) iptali olarak damgalar, gerekçeye dokunmaz", async () => {
+    const now = new Date("2026-09-20T10:00:00.000Z");
+    const tx = makeTx({
+      tradeStatus: TradeStatus.returning,
+      legs: [{ deliveredAt: now, lostAt: null, recipientUserId: INITIATOR }],
+    });
+
+    await finalizeReturningTradeIfResolved(tx as any, TRADE_ID, now);
+
+    const data = tx.trade.update.mock.calls[0][0].data;
+    expect(data).toEqual(
+      expect.objectContaining({
+        status: TradeStatus.cancelled,
+        cancelledAt: now,
+        cancelledBy: CancellationActor.platform,
+      }),
+    );
+    expect(data).not.toHaveProperty("cancelReason");
   });
 
   it("kapanış şartı yardımcıları: delivered-yalnız sayım ile çözülmüş sayım ayrışır", () => {

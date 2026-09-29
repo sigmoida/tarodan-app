@@ -1,3 +1,4 @@
+import { ADMIN_TRADES_TAB_HREF } from "@tarodan/types";
 import {
   balancedAmount,
   round2,
@@ -123,7 +124,7 @@ export function assembleRevenueSplit(
       key: "tradeCounterpart",
       amount: tradeCounterpart,
       count: trade.count,
-      href: "/operations/trades",
+      href: ADMIN_TRADES_TAB_HREF,
     },
     {
       key: "platformFeesNet",

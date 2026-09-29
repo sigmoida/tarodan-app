@@ -54,6 +54,12 @@ export function UserInfoSection({ user }: { user: UserDetail }) {
         <Item label={t("admin.users.detail.emailLabel")}>
           <p className="font-medium text-heading">{user.email}</p>
           <Verified kind="email" ok={user.isEmailVerified} />
+          {user.isTestAccount && (
+            <Badge className="mt-1" size="sm" variant="warning">
+              {t("admin.users.testAccount")} —{" "}
+              {t("admin.users.testAccountHint")}
+            </Badge>
+          )}
         </Item>
         <Item label={t("common.phone")}>
           <p className="font-medium text-heading">

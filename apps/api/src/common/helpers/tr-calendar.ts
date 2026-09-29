@@ -76,3 +76,33 @@ export function trMonthStart(at: Date): Date {
   const p = trCalendarParts(at);
   return new Date(`${p.year}-${p.month}-01T00:00:00+03:00`);
 }
+
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+/**
+ * "yyyy-mm-dd" Türkiye gününün BİTİŞ anı — o günün son milisaniyesi
+ * (23:59:59.999 Europe/Istanbul), UTC `Date`. Türkiye'nin DST'si olmadığı
+ * için gün her zaman tam 24 saattir; ay sonu/başı gibi köşe durumlar da
+ * dahil `istanbulDayStart` ile aynı aritmetik kullanılır.
+ */
+export function istanbulDayEnd(day: string): Date {
+  return new Date(istanbulDayStart(day).getTime() + DAY_MS - 1);
+}
+
+/** `at`'in düştüğü Türkiye GÜNÜNÜN BAŞLANGIÇ anı ("bugün, gece yarısı"). */
+export function istanbulDayStartOf(at: Date): Date {
+  return istanbulDayStart(trCalendarDate(at));
+}
+
+/**
+ * DÜNÜN (Türkiye takvimi) TAM günü — 00:00:00.000'dan 23:59:59.999'a. Eşit
+ * uzunlukta bir "önceki 24 saat" DEĞİL: takvim günü, saat kaçta bakılırsa
+ * bakılsın aynı sınırları verir.
+ */
+export function istanbulYesterdayWindow(at: Date): { gte: Date; lte: Date } {
+  const todayStart = istanbulDayStartOf(at);
+  return {
+    gte: new Date(todayStart.getTime() - DAY_MS),
+    lte: new Date(todayStart.getTime() - 1),
+  };
+}
