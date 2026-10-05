@@ -104,3 +104,7 @@ export * from "./invoice";
 
 // Early escrow release: planned vs actual release date, days early (API + admin)
 export * from "./early-release";
+
+// Durations & rules registry: every business duration, its bounds and expiry
+// actions (API resolution + validation, admin screen, public policy endpoint)
+export * from "./timing-rules";
