@@ -23,6 +23,10 @@ import { TradeShipmentService } from "./trade-shipment.service";
 import { TradeCommonService } from "../trade-common.service";
 import { TRADE_CANCEL_REASON } from "../helpers/trade-cancel-reasons";
 import { tradeCancelledData } from "../helpers/trade-cancellation";
+import {
+  cancelPreShipmentTradeInTx,
+  settlePreShipmentCancellation,
+} from "../helpers/trade-pre-shipment-cancel";
 import { adminUrl } from "../../../config/app-urls";
 import {
   tradeExtensionStageOf,
@@ -426,85 +430,22 @@ export class TradeReconciliationService {
             );
             return extendedUntil ? { extendedUntil } : ("skipped" as const);
           }
-          // Kargo kilidi anlık görüntüde DEĞİL, kilitli tx içinde doğrulanır:
-          // koli bu arada kargoya verildiyse ya da depoya vardıysa iptal etme —
-          // takas stuck kümesine düşer, admin/kayıp-koli akışı ilgilenir.
-          if (trade.status === TradeStatus.shipping_to_warehouse) {
-            if (freshTrade.firstWarehouseArrivalAt) return "skipped" as const;
-            const shippedLeg = await tx.tradeShipment.findFirst({
-              where: {
-                tradeId: trade.id,
-                leg: "to_warehouse",
-                shippedAt: { not: null },
-              },
-              select: { id: true },
-            });
-            if (shippedLeg) return "skipped" as const;
-          }
-
-          const allItems = await tx.tradeItem.findMany({
-            where: { tradeId: trade.id },
-          });
-
-          // Release reservations for any non-pending trade being auto-cancelled
-          const statusesWithReservation: TradeStatus[] = [
-            TradeStatus.accepted,
-            TradeStatus.awaiting_payment,
-            TradeStatus.shipping_to_warehouse,
-          ];
-          if (
-            statusesWithReservation.includes(trade.status) &&
-            allItems.length > 0
-          ) {
-            const byProduct = new Map<string, number>();
-            for (const item of allItems) {
-              byProduct.set(
-                item.productId,
-                (byProduct.get(item.productId) ?? 0) + item.quantity,
-              );
-            }
-            // Auto-cancel: kabul anında yapılan rezervasyonu geri al
-            for (const [productId, qty] of byProduct) {
-              await tx.$queryRaw`SELECT id FROM products WHERE id = ${productId} FOR UPDATE`;
-              const prod = await tx.product.findUnique({
-                where: { id: productId },
-                select: { reservedQuantity: true },
-              });
-              if (prod) {
-                const newReserved = safeDecrementReserved(
-                  prod.reservedQuantity,
-                  qty,
-                );
-                await tx.product.update({
-                  where: { id: productId },
-                  data: {
-                    reservedQuantity: newReserved,
-                    status:
-                      newReserved > 0
-                        ? ProductStatus.reserved
-                        : ProductStatus.active,
-                  },
-                });
-              }
-            }
-          }
-
-          await tx.trade.update({
-            where: { id: trade.id },
-            data: {
-              ...tradeCancelledData(CancellationActor.system, now),
-              cancelReason: TRADE_CANCEL_REASON.autoExpired,
+          // Kargo kilidi, rezervasyon çözümü, iptal yazımı ve kusur ataması
+          // tek çekirdekte (platform iptaliyle ortak): kilitli satırda koli
+          // kargoya verildiyse ya da depoya vardıysa `null` döner — takas
+          // stuck kümesine düşer, admin/kayıp-koli akışı ilgilenir.
+          const cancelled = await cancelPreShipmentTradeInTx(tx, {
+            trade: {
+              id: trade.id,
+              status: trade.status,
+              firstWarehouseArrivalAt: freshTrade.firstWarehouseArrivalAt,
             },
+            actor: CancellationActor.system,
+            reason: TRADE_CANCEL_REASON.autoExpired,
+            at: now,
+            faultless: paymentDefaultCancel ? "paid" : "none",
           });
-
-          if (paymentDefaultCancel) {
-            // Tamamlanmış her ödeme satırı, üstüne düşeni yapmış tarafa aittir.
-            await tx.tradeCashPayment.updateMany({
-              where: { tradeId: trade.id, status: PaymentStatus.completed },
-              data: { fullRefundEntitled: true },
-            });
-          }
-          return "cancelled" as const;
+          return cancelled ? ("cancelled" as const) : ("skipped" as const);
         });
         if (outcome === "skipped") continue;
         if (typeof outcome === "object") {
@@ -524,13 +465,16 @@ export class TradeReconciliationService {
           continue;
         }
 
-        // İade YALNIZ iptal commit olduktan sonra (yukarıdaki sıra notu).
-        await this.paymentService.refundTradeCashTracked(trade.id);
-
-        await this.tradeCommon.invalidateProductCachesForTrade(trade.id);
-
-        // Cancel Sürat shipments if any (best-effort)
-        await this.tradeShipment.cancelSuratShipmentsForTrade(trade.id);
+        // İade YALNIZ iptal commit olduktan sonra (yukarıdaki sıra notu);
+        // ardından ürün önbelleği ve taşıyıcıya geçmemiş Sürat etiketleri.
+        await settlePreShipmentCancellation(
+          {
+            paymentService: this.paymentService,
+            tradeCommon: this.tradeCommon,
+            tradeShipment: this.tradeShipment,
+          },
+          trade.id,
+        );
 
         cancelledCount++;
 
