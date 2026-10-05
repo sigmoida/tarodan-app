@@ -56,8 +56,9 @@ PAYTR_REPORT_SYNC_ENABLED=false
 # Sürat — tamamen sahte taşıyıcı (ağa hiç çıkmaz)
 SURAT_CARGO_ENABLED=true
 SURAT_SOAP_MODE=stub
-# Stub modunda GEREKMEZ: SURAT_KARGO_TEST_MODE, SURAT_KARGO_CARI_KODU,
-# SURAT_KARGO_SIFRE, SURAT_CREATE_API_VERSION, SURAT_FIRMA_ID
+# Stub modunda GEREKMEZ: SURAT_KARGO_CARI_KODU, SURAT_KARGO_SIFRE,
+# SURAT_CREATE_API_VERSION, SURAT_FIRMA_ID. SURAT_KARGO_TEST_MODE boş ya da
+# 'true' olabilir; 'false' (canlı host) staging'de açılışı durdurur.
 SURAT_STUB_RESPONSE=
 SURAT_STUB_THROW=
 SURAT_STUB_KARGO_TAKIP_NO=
@@ -80,6 +81,13 @@ Notlar:
   `SuratCargoModule` açılışı durdurur. Staging'de `rest` de geçerlidir (Sürat
   test host'u: `SURAT_KARGO_TEST_MODE=true` + kimlikler), ama o modda da koli
   fiziksel olarak ilerlemez; simülasyon iki modda da aynı çalışır.
+- **Stub'da hem gönderi açma hem takip sahtedir ve ağa çıkmaz.** Takip
+  istemcisi carrier istemcisiyle aynı `SURAT_SOAP_MODE` kararından seçilir;
+  stub'da her takip sorgusu "henüz haber yok" (`pending`) döner. Takip cron'ları
+  (`sync-surat-tracking`, teslim sonrası taramalar) koliyi beklemede sayar,
+  hata/alarm üretmez ve koliye dokunmaz; kimlik env'de kalmış olsa bile Sürat'a
+  (canlı ya da test) hiçbir istek gitmez. Admin "Sürat Endpoint Testi" stub'da
+  hata döner.
 - `SURAT_STUB_*` boş kalmalı. `SURAT_STUB_KARGO_TAKIP_NO` doluysa her koli aynı
   sahte taşıyıcı kodunu alır; `SURAT_STUB_THROW` kargo açılışını bilerek
   bozar (yalnız yerel hata testi içindir).
@@ -127,7 +135,9 @@ ve ara statüler (şubede, dağıtımda) simüle edilmez.
 
 **Canlı dağıtımda** (APP_ENV=production) kart yalnız **test şeridi** kolilerini
 listeler ve kabul eder (mağaza incelemesi siparişleri). Gerçek bir müşterinin
-kolisi canlıda hiçbir koşulda simüle edilemez (403).
+kolisi canlıda hiçbir koşulda simüle edilemez (403). Sipariş kolisinde kural
+kolinin **tüm** satırlarına uygulanır: seçilen satır test şeridinde olsa bile
+aynı PKG'yi paylaşan canlı-şerit bir satır varsa simülasyon reddedilir.
 
 Takas teslimi için admin takas detayındaki "depoya ulaştı / teslim edildi /
 iade teslim edildi" düğmeleri ayrıca vardır: onlar **operasyon** yoludur (depo
@@ -148,8 +158,16 @@ ardından ilgili cron'u **Cron'lar** kartından tetikleyin.
 | Sipariş        | `paymentExpiresAt`                                                                                                  | `payment-expired`          |
 | İade           | `RefundRequest.createdAt`                                                                                           | `refund-crons`             |
 
-"İade Penceresi" yalnız teslim edilmiş siparişte çalışır (pencere teslimde
-başlar). Takasın onay penceresi iki çıkış kolisi de teslim edilmeden kaydırılamaz.
+"İade Penceresi" yalnız teslim edilmiş ve escrow'u hâlâ **held** olan siparişte
+çalışır: pencere teslimde başlar, escrow tarihi ondan türer ve ikisi asla
+ayrışmaz. Escrow serbest bırakılmış (tamamlanmış) bir siparişte pencere
+kaydırılamaz — aksi halde satıcıya ödenmiş parayla alıcının iade hakkı yeniden
+açılırdı. Canlıda yalnız test şeridi siparişlerinde çalışır (403). Takasın onay
+penceresi iki çıkış kolisi de teslim edilmeden kaydırılamaz.
+
+Diğer tiplerin (Escrow Hold, Sipariş, Takas, İade, Öne Çıkarma, Üyelik,
+belirteçler) canlıda şerit kısıtı yoktur: süper-admin her kayıtta kullanabilir,
+ekran yalnız PROD uyarısı gösterir.
 
 ### Bilinen sınırlar
 
@@ -157,11 +175,6 @@ başlar). Takasın onay penceresi iki çıkış kolisi de teslim edilmeden kayd�
   **takas escrow'u** (`tradeHoldDays`, `TradeCashPayment.holdReleaseAt`) Test
   Araçları'ndan kaydırılamaz. Staging'de **Süreler ve Kurallar**'dan en küçük
   değere (1 saat / 1 gün) indirin ya da iade kararını admin iade ekranından verin.
-- **Takip cron'ları stub'da gürültü üretir.** `sync-surat-tracking` (30 dk) ve
-  teslim sonrası taramalar canlı-şerit kolileri Sürat'a sormaya devam eder; stub
-  modunda kimlik olmadığı için her aktif koli "configuration" hatası olarak
-  loglanır ve cron "senkronlanamadı" sayar. Para/statü etkisi yoktur (okuma
-  uygulanmaz), yalnız log/alarm gürültüsüdür.
 - Payout kapalıdır: `payment-release-holds` hold'u serbest bırakır, PayTR
   transferi oluşmaz.
 
@@ -249,6 +262,8 @@ Satıcının çıkış adresi kayıtlı olmalı (yoksa kargo etiketi açılmaz v
 | Simülasyonda adım yok                            | Koli terminal, sahibi kapanmış ya da takip referansı yok (etiket açılmamış). Kayıt statüsüne bakın. |
 | "Bu gönderiye … adımı uygulanamaz"               | Ekran eski; aramayı yenileyin — başka bir yol (cron, admin) koliyi ilerletmiş olabilir.             |
 | "Okuma uygulanmadı"                              | Durum makinesi reddetti ya da kayıt eşzamanlı değişti; aramayı yenileyin.                           |
-| Canlıda kart boş / 403                           | Beklenen: canlıda yalnız test şeridi kolileri.                                                      |
+| Canlıda kart boş / 403                           | Beklenen: canlıda yalnız test şeridi kolileri (kolinin tüm satırları test şeridinde olmalı).        |
+| İade Penceresi: "bekleyen (held) escrow yok"     | Escrow serbest bırakılmış; pencere escrow'dan ayrı kaydırılmaz. Yeni bir teslimle tekrar deneyin.   |
+| Açılış "SURAT_KARGO_TEST_MODE … staging" ile     | Staging'de `false` (canlı host) verilmiş; boş bırakın ya da `true` yapın.                           |
 | Açılış "SMS_FIXED_VERIFICATION_CODE" ile duruyor | `APP_ENV=production`'da sabit kod verilmiş ya da değer 6 rakam değil.                               |
 | Açılış "SURAT_SOAP_MODE" ile duruyor             | Staging'de `rest` ya da `stub` dışında bir değer / boş; canlıda `rest` dışı.                        |
