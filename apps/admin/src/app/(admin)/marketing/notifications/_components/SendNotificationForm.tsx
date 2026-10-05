@@ -20,6 +20,7 @@ import {
 } from "@heroicons/react/24/outline";
 import { adminApi } from "@/lib/api";
 import { useAdminMutation } from "@/hooks/useAdminMutation";
+import { DataList, Field } from "@/components/detail/DataList";
 import { Panel } from "@/components/detail/Panel";
 import { SectionCard } from "@/components/detail/SectionCard";
 import { EmailHtmlEditor } from "@/components/email/EmailHtmlEditor";
@@ -470,39 +471,27 @@ export function SendNotificationForm({
                 />
               )}
 
-              <div className="space-y-2 border-t border-border pt-2">
-                <div className="flex justify-between text-xs">
-                  <span className="text-muted">
-                    {t("admin.marketing.notifications.targetLabel")}
-                  </span>
-                  <span className="font-medium text-body">
-                    {
-                      targets.find((target) => target.key === values.targetType)
-                        ?.label
-                    }
-                  </span>
-                </div>
-                <div className="flex justify-between text-xs">
-                  <span className="text-muted">
-                    {t("admin.marketing.notifications.channels")}
-                  </span>
-                  <span className="font-medium text-body">
-                    {values.channels.length === 0
-                      ? "—"
-                      : values.channels
-                          .map(
-                            (channel) =>
-                              channels.find((item) => item.key === channel)
-                                ?.label,
-                          )
-                          .join(", ")}
-                  </span>
-                </div>
-                <div className="flex justify-between text-xs">
-                  <span className="text-muted">{t("common.status")}</span>
+              <DataList columns={1} className="gap-y-2 border-t border-border pt-2">
+                <Field label={t("admin.marketing.notifications.targetLabel")}>
+                  {
+                    targets.find((target) => target.key === values.targetType)
+                      ?.label
+                  }
+                </Field>
+                <Field label={t("admin.marketing.notifications.channels")}>
+                  {values.channels.length === 0
+                    ? "—"
+                    : values.channels
+                        .map(
+                          (channel) =>
+                            channels.find((item) => item.key === channel)
+                              ?.label,
+                        )
+                        .join(", ")}
+                </Field>
+                <Field label={t("common.status")}>
                   <span
                     className={clsx(
-                      "font-medium",
                       canSend ? "text-success-600" : "text-warning-600",
                     )}
                   >
@@ -510,8 +499,8 @@ export function SendNotificationForm({
                       ? t("admin.marketing.notifications.ready")
                       : t("admin.marketing.notifications.missingFields")}
                   </span>
-                </div>
-              </div>
+                </Field>
+              </DataList>
             </SectionCard>
           </div>
         </div>

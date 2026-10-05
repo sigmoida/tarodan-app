@@ -1,10 +1,12 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Button, Input, Select } from "@tarodan/ui";
+import { Alert, Button, Input, Select } from "@tarodan/ui";
 import toast from "react-hot-toast";
 import { adminApi } from "@/lib/api";
 import { useAdminMutation } from "@/hooks/useAdminMutation";
+import { DataList, Field } from "@/components/detail/DataList";
+import { Panel } from "@/components/detail/Panel";
 import { SectionCard } from "@/components/detail/SectionCard";
 import { DataTable } from "@/components/DataTable";
 import { useConfirm } from "@/provider/ConfirmProvider";
@@ -95,24 +97,20 @@ export function TimeAdjustCard({ isProd }: { isProd: boolean }) {
             {t("admin.system.testTools.adjustRecordMiddle")}{" "}
             <code>{field}</code> {t("admin.system.testTools.adjustRecordAfter")}
           </p>
-          <div className="space-y-1 rounded-lg bg-surface-alt p-3">
-            <div>
-              <span className="text-muted">
-                {t("admin.system.testTools.oldValue")}:
-              </span>{" "}
-              {fmt(item.dates[field] ?? null, t)}
-            </div>
-            <div>
-              <span className="text-muted">
-                {t("admin.system.testTools.newValue")}:
-              </span>{" "}
-              <b>{fmt(after, t)}</b>
-            </div>
-          </div>
+          <Panel tone="muted" padding="sm">
+            <DataList columns={1} className="gap-y-1">
+              <Field label={t("admin.system.testTools.oldValue")}>
+                {fmt(item.dates[field] ?? null, t)}
+              </Field>
+              <Field label={t("admin.system.testTools.newValue")}>
+                {fmt(after, t)}
+              </Field>
+            </DataList>
+          </Panel>
           {isProd && (
-            <p className="text-xs text-danger-700">
+            <Alert variant="danger">
               {t("admin.system.testTools.prodDataWarning")}
-            </p>
+            </Alert>
           )}
         </div>
       ),
