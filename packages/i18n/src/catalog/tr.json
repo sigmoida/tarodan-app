@@ -348,7 +348,9 @@
     "businessPendingEmailNotice": "Başvurunuz <b>{email}</b> adresi ile incelemede. Sonuç e-posta ile bildirilecek.",
     "businessRejectedEmailNotice": "<b>{email}</b> adresiyle yapılan kurumsal başvurunuz reddedildi.",
     "businessPendingDescription": "<b>{company}</b> adına yaptığınız başvuru onay sürecindedir. İnceleme tamamlandığında <b>{email}</b> adresinize bilgi gönderilecektir (genellikle 1–2 iş günü).",
-    "businessRejectedDescription": "<b>{company}</b> adına yaptığınız şirket hesabı başvurusu onaylanmadı. Red gerekçesi <b>{email}</b> adresinize e-posta ile gönderilmiştir."
+    "businessRejectedDescription": "<b>{company}</b> adına yaptığınız şirket hesabı başvurusu onaylanmadı. Red gerekçesi <b>{email}</b> adresinize e-posta ile gönderilmiştir.",
+    "kvkkAgreeRich": "<kvkk>KVKK Aydınlatma Metni</kvkk>'ni okudum ve kabul ediyorum.",
+    "mustAcceptKvkk": "KVKK Aydınlatma Metni'ni onaylamalısınız"
   },
   "brands": {
     "title": "Markalar",
@@ -3864,6 +3866,15 @@
       "phone": "Telefon",
       "email": "E-posta",
       "kep": "KEP"
+    },
+    "kvkkTitle": "KVKK Aydınlatma Metni",
+    "marketingConsentTitle": "Ticari Elektronik İleti İzni",
+    "consentGate": {
+      "title": "Onayınız gerekiyor",
+      "intro": "Devam etmek için aşağıdaki belgeleri okuyup onaylamanız gerekiyor.",
+      "updatedIntro": "Bazı belgelerimiz güncellendi. Devam etmek için güncel metinleri okuyup onaylamanız gerekiyor.",
+      "acceptRich": "<link>{document}</link> — okudum ve kabul ediyorum.",
+      "submit": "Onayla ve devam et"
     }
   },
   "information": {
@@ -7993,7 +8004,8 @@
         "message": "Mesaj",
         "warehouse": "Depo",
         "finance": "Finans",
-        "security": "Güvenlik"
+        "security": "Güvenlik",
+        "legal": "Yasal"
       },
       "tabTitle": {
         "listing": "İlan Ayarları",
@@ -8062,6 +8074,13 @@
         "required": "Zorunlu",
         "invalidValueMin": "Geçerli bir değer girin (en az {min})",
         "invalidValue": "Geçerli bir değer girin"
+      },
+      "legal": {
+        "title": "Mesafeli satış onayı",
+        "distanceSalesRequired": {
+          "label": "Ödemede mesafeli satış onayı zorunlu",
+          "helper": "Açıkken, mesafeli satış onayı alınmamış bir satın alma ödeme adımında reddedilir. Onay kutusunu göndermeyen eski mobil sürümler ödeme yapamaz — mobilin onayı gönderen sürümü yayıldıktan sonra açın."
+        }
       }
     },
     "shippingTariffs": {
@@ -8849,6 +8868,11 @@
           "name": "İptal & İade",
           "description": "İptalleri ve iade taleplerini inceleyin ve sonuçlandırın",
           "keywords": "iptal,iade,refund,cancellation,talep,takip"
+        },
+        "consents": {
+          "name": "Onay Kayıtları",
+          "description": "KVKK, sözleşme, çerez ve pazarlama onaylarının ispat kaydı",
+          "keywords": "onay,kvkk,sözleşme,çerez,pazarlama,consent,gdpr"
         }
       }
     },
@@ -9112,6 +9136,83 @@
         "title": "Oturumun sona ermek üzere",
         "description": "Güvenlik için hareketsiz kalan oturumlar kapatılır. Kalan süre: {time}",
         "stayLoggedIn": "Oturumda kal"
+      }
+    },
+    "consents": {
+      "title": "Onay Kayıtları",
+      "description": "Kullanıcıların verdiği hukuki onaylar: kim, hangi belge ve sürüm, ne zaman, nereden.",
+      "totalCount": "{count} kayıt",
+      "search": "Üye, e-posta, IP, ziyaretçi kimliği veya sipariş no ara…",
+      "empty": "Onay kaydı yok",
+      "outdatedVersion": "eski sürüm",
+      "exportButton": "Excel İndir",
+      "exported": "Döküm indirildi",
+      "exportFailed": "Döküm oluşturulamadı",
+      "exportTruncated": "Dosya ilk {count} kaydı içeriyor; tamamı için filtreyi daraltın.",
+      "columns": {
+        "createdAt": "Tarih",
+        "document": "Belge",
+        "version": "Sürüm",
+        "action": "İşlem",
+        "subject": "Kişi",
+        "source": "Kaynak",
+        "ipAddress": "IP adresi",
+        "userAgent": "Tarayıcı",
+        "reference": "Sipariş / Sepet",
+        "subjectType": "Kişi türü"
+      },
+      "filters": {
+        "document": "Belge",
+        "action": "İşlem",
+        "source": "Kaynak",
+        "subjectType": "Kişi türü"
+      },
+      "actions": {
+        "granted": "Verildi",
+        "withdrawn": "Geri çekildi"
+      },
+      "sources": {
+        "registration": "Kayıt formu",
+        "consentPrompt": "Yeniden onay penceresi",
+        "checkout": "Sepet ödemesi",
+        "payment": "Ödeme sayfası",
+        "cookieBanner": "Çerez bandı",
+        "accountSettings": "Bildirim ayarları",
+        "newsletterUnsubscribe": "Bülten çıkış bağlantısı",
+        "accountDeletion": "Hesap silme",
+        "legacyBackfill": "Geriye dönük aktarım"
+      },
+      "subjects": {
+        "user": "Üye",
+        "guest": "Misafir",
+        "visitor": "Ziyaretçi"
+      },
+      "userSection": {
+        "title": "Onaylar",
+        "viewAll": "Tüm kayıtlar",
+        "pending": "Yeniden onay bekliyor",
+        "none": "Kayıt yok",
+        "latest": "Sürüm {version} · {date} · {source}"
+      },
+      "export": {
+        "sheetName": "Onay Kayıtları",
+        "createdAt": "Tarih",
+        "document": "Belge",
+        "version": "Sürüm",
+        "currentVersion": "Güncel sürüm",
+        "action": "İşlem",
+        "source": "Kaynak",
+        "subjectType": "Kişi türü",
+        "userCode": "Üye kodu",
+        "userName": "Üye",
+        "userEmail": "Üye e-postası",
+        "guestEmail": "Misafir e-postası",
+        "visitorId": "Ziyaretçi kimliği",
+        "ipAddress": "IP adresi",
+        "userAgent": "Tarayıcı (user agent)",
+        "cookieCategories": "Çerez kategorileri",
+        "checkoutGroup": "Sepet no",
+        "order": "Sipariş no"
       }
     }
   },
@@ -10490,6 +10591,10 @@
       "downloadUnavailable": "Dosya indirme servisi şu anda kullanılamıyor.",
       "invalidBucketType": "Geçersiz bucket tipi: {bucket}",
       "invalidBucket": "Geçersiz bucket: {bucket}"
+    },
+    "consent": {
+      "distanceSalesRequired": "Ödemeye devam etmek için Mesafeli Satış Sözleşmesi'ni onaylamanız gerekiyor.",
+      "documentNotAcceptable": "\"{document}\" bu adımda onaylanabilecek bir belge değil."
     }
   },
   "status": {

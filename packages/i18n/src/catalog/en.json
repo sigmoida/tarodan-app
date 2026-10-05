@@ -348,7 +348,9 @@
     "businessPendingEmailNotice": "Başvurunuz <b>{email}</b> adresi ile incelemede. Sonuç e-posta ile bildirilecek.",
     "businessRejectedEmailNotice": "<b>{email}</b> adresiyle yapılan kurumsal başvurunuz reddedildi.",
     "businessPendingDescription": "<b>{company}</b> adına yaptığınız başvuru onay sürecindedir. İnceleme tamamlandığında <b>{email}</b> adresinize bilgi gönderilecektir (genellikle 1–2 iş günü).",
-    "businessRejectedDescription": "<b>{company}</b> adına yaptığınız şirket hesabı başvurusu onaylanmadı. Red gerekçesi <b>{email}</b> adresinize e-posta ile gönderilmiştir."
+    "businessRejectedDescription": "<b>{company}</b> adına yaptığınız şirket hesabı başvurusu onaylanmadı. Red gerekçesi <b>{email}</b> adresinize e-posta ile gönderilmiştir.",
+    "kvkkAgreeRich": "I have read and accept the <kvkk>KVKK Privacy Notice</kvkk>.",
+    "mustAcceptKvkk": "You must accept the KVKK privacy notice"
   },
   "brands": {
     "title": "Brands",
@@ -3864,6 +3866,15 @@
       "phone": "Phone",
       "email": "Email",
       "kep": "Registered Email (KEP)"
+    },
+    "kvkkTitle": "KVKK Privacy Notice",
+    "marketingConsentTitle": "Marketing Communications Consent",
+    "consentGate": {
+      "title": "Your consent is required",
+      "intro": "To continue, please read and accept the documents below.",
+      "updatedIntro": "Some of our documents have been updated. To continue, please read and accept the current versions.",
+      "acceptRich": "<link>{document}</link> — I have read and accept it.",
+      "submit": "Accept and continue"
     }
   },
   "information": {
@@ -7993,7 +8004,8 @@
         "message": "Message",
         "warehouse": "Warehouse",
         "finance": "Finance",
-        "security": "Security"
+        "security": "Security",
+        "legal": "Legal"
       },
       "tabTitle": {
         "listing": "Listing Settings",
@@ -8062,6 +8074,13 @@
         "required": "Required",
         "invalidValueMin": "Enter a valid value (at least {min})",
         "invalidValue": "Enter a valid value"
+      },
+      "legal": {
+        "title": "Distance sales consent",
+        "distanceSalesRequired": {
+          "label": "Require distance sales consent at payment",
+          "helper": "When on, a purchase without a recorded distance sales consent is rejected at payment. Older mobile builds that do not send the checkbox will be unable to pay — turn this on once the mobile release that sends it has rolled out."
+        }
       }
     },
     "shippingTariffs": {
@@ -8849,6 +8868,11 @@
           "name": "Cancellations & Refunds",
           "description": "Review cancellations and resolve refund requests",
           "keywords": "cancellation,refund,return,request,tracking,iptal,iade"
+        },
+        "consents": {
+          "name": "Consent Records",
+          "description": "Proof of KVKK, agreement, cookie and marketing consents",
+          "keywords": "consent,kvkk,agreement,cookie,marketing,gdpr"
         }
       }
     },
@@ -9112,6 +9136,83 @@
         "title": "Your session is about to end",
         "description": "Idle sessions are closed for security. Time left: {time}",
         "stayLoggedIn": "Stay signed in"
+      }
+    },
+    "consents": {
+      "title": "Consent Records",
+      "description": "Legal consents given by users: who, which document and version, when and from where.",
+      "totalCount": "{count} records",
+      "search": "Search member, email, IP, visitor ID or order no…",
+      "empty": "No consent records",
+      "outdatedVersion": "outdated",
+      "exportButton": "Download Excel",
+      "exported": "Export downloaded",
+      "exportFailed": "Could not create the export",
+      "exportTruncated": "The file contains the first {count} records; narrow the filter to get the rest.",
+      "columns": {
+        "createdAt": "Date",
+        "document": "Document",
+        "version": "Version",
+        "action": "Action",
+        "subject": "Subject",
+        "source": "Source",
+        "ipAddress": "IP address",
+        "userAgent": "Browser",
+        "reference": "Order / Cart",
+        "subjectType": "Subject type"
+      },
+      "filters": {
+        "document": "Document",
+        "action": "Action",
+        "source": "Source",
+        "subjectType": "Subject type"
+      },
+      "actions": {
+        "granted": "Granted",
+        "withdrawn": "Withdrawn"
+      },
+      "sources": {
+        "registration": "Registration form",
+        "consentPrompt": "Re-consent prompt",
+        "checkout": "Cart checkout",
+        "payment": "Payment page",
+        "cookieBanner": "Cookie banner",
+        "accountSettings": "Notification settings",
+        "newsletterUnsubscribe": "Newsletter unsubscribe",
+        "accountDeletion": "Account deletion",
+        "legacyBackfill": "Legacy import"
+      },
+      "subjects": {
+        "user": "Member",
+        "guest": "Guest",
+        "visitor": "Visitor"
+      },
+      "userSection": {
+        "title": "Consents",
+        "viewAll": "All records",
+        "pending": "Re-consent pending",
+        "none": "No record",
+        "latest": "Version {version} · {date} · {source}"
+      },
+      "export": {
+        "sheetName": "Consent Records",
+        "createdAt": "Date",
+        "document": "Document",
+        "version": "Version",
+        "currentVersion": "Current version",
+        "action": "Action",
+        "source": "Source",
+        "subjectType": "Subject type",
+        "userCode": "Member code",
+        "userName": "Member",
+        "userEmail": "Member email",
+        "guestEmail": "Guest email",
+        "visitorId": "Visitor ID",
+        "ipAddress": "IP address",
+        "userAgent": "Browser (user agent)",
+        "cookieCategories": "Cookie categories",
+        "checkoutGroup": "Cart no",
+        "order": "Order no"
       }
     }
   },
@@ -10490,6 +10591,10 @@
       "downloadUnavailable": "The file download service is unavailable right now.",
       "invalidBucketType": "Invalid bucket type: {bucket}",
       "invalidBucket": "Invalid bucket: {bucket}"
+    },
+    "consent": {
+      "distanceSalesRequired": "You need to accept the Distance Sales Agreement to continue with the payment.",
+      "documentNotAcceptable": "\"{document}\" cannot be accepted at this step."
     }
   },
   "status": {
