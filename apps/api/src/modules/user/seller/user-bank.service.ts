@@ -4,8 +4,22 @@ import { i18nMessage } from "../../i18n";
 
 /**
  * UserBankService — satıcı banka hesabı: getBankAccount, upsertBankAccount
- * (IBAN normalize + verified sıfırla), deleteBankAccount.
+ * (IBAN normalize), deleteBankAccount.
+ *
+ * IBAN için doğrulama adımı YOKTUR: satıcı girer, kayıt tutulur. Şemadaki
+ * `isVerified` / `verifiedAt` kolonları artık yazılmaz ve okunmaz; yanıta da
+ * girmez (BANK_ACCOUNT_SELECT).
  */
+const BANK_ACCOUNT_SELECT = {
+  id: true,
+  accountHolder: true,
+  iban: true,
+  tcKimlikNo: true,
+  taxId: true,
+  createdAt: true,
+  updatedAt: true,
+} as const;
+
 @Injectable()
 export class UserBankService {
   private readonly logger = new Logger(UserBankService.name);
@@ -15,6 +29,7 @@ export class UserBankService {
   async getBankAccount(userId: string) {
     return this.prisma.sellerBankAccount.findUnique({
       where: { userId },
+      select: BANK_ACCOUNT_SELECT,
     });
   }
 
@@ -40,6 +55,7 @@ export class UserBankService {
 
     const account = await this.prisma.sellerBankAccount.upsert({
       where: { userId },
+      select: BANK_ACCOUNT_SELECT,
       create: {
         userId,
         accountHolder: data.accountHolder.trim(),
@@ -52,8 +68,6 @@ export class UserBankService {
         iban: normalizedIban,
         tcKimlikNo: data.tcKimlikNo || null,
         taxId: data.taxId || null,
-        isVerified: false,
-        verifiedAt: null,
         ...(ibanChanged ? { ibanChangedAt: new Date() } : {}),
       },
     });

@@ -550,8 +550,6 @@ export class AdminUserService {
             iban: true,
             tcKimlikNo: true,
             taxId: true,
-            isVerified: true,
-            verifiedAt: true,
           },
         },
         // Apple App Review: admin engellemeleri görebilsin (iki yön).

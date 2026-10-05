@@ -211,12 +211,8 @@ describe("PayoutService.handleTransferResultCallback", () => {
     expect(ledger.record.mock.calls[0][1].idempotencyKey).toBe(
       "payout-completed:payout-1",
     );
-    // Başarılı transfer → IBAN otomatik doğrulanır.
-    expect(prisma.sellerBankAccount.update).toHaveBeenCalledWith(
-      expect.objectContaining({
-        data: expect.objectContaining({ isVerified: true }),
-      }),
-    );
+    // IBAN için doğrulama adımı yok: transfer sonucu banka kaydına dokunmaz.
+    expect(prisma.sellerBankAccount.update).not.toHaveBeenCalled();
   });
 
   /**
@@ -354,12 +350,8 @@ describe("PayoutService.checkReturnedTransfers with callback flow", () => {
 
     expect(updated).toEqual({ returned: 1, unmatched: 0 });
     expect(prisma.state.status).toBe(PayoutStatus.returned);
-    // Geri dönen transfer → IBAN doğrulaması geri alınır.
-    expect(prisma.sellerBankAccount.update).toHaveBeenCalledWith(
-      expect.objectContaining({
-        data: expect.objectContaining({ isVerified: false }),
-      }),
-    );
+    // IBAN için doğrulama adımı yok: geri dönen transfer banka kaydına dokunmaz.
+    expect(prisma.sellerBankAccount.update).not.toHaveBeenCalled();
   });
 });
 

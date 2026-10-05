@@ -86,8 +86,6 @@ export interface UserDetail {
     iban: string;
     tcKimlikNo?: string | null;
     taxId?: string | null;
-    isVerified: boolean;
-    verifiedAt?: string | null;
   } | null;
   membership?: {
     tier: { name: string; type: string };

@@ -23,7 +23,18 @@ function makeDeps() {
         Object.assign(users[where.id], data);
         return users[where.id];
       }),
+      updateMany: jest.fn(async ({ where, data }: any) => {
+        const rows = Object.values(users).filter(
+          (u: any) =>
+            u.phone === where.phone &&
+            u.isPhoneVerified === where.isPhoneVerified &&
+            u.id !== where.id?.not,
+        );
+        rows.forEach((u: any) => Object.assign(u, data));
+        return { count: rows.length };
+      }),
     },
+    $transaction: jest.fn(async (ops: Promise<unknown>[]) => Promise.all(ops)),
     phoneVerificationToken: {
       findFirst: jest.fn(async ({ where }: any) => {
         let filtered = tokenStore;
@@ -135,6 +146,26 @@ describe("PhoneVerificationService", () => {
     expect(res.isPhoneVerified).toBe(true);
     expect(users.u1.isPhoneVerified).toBe(true);
     expect(users.u1.phone).toBe("+905551234567");
+  });
+
+  it("doğrulayan kazanır: numara doğrulanmamış başka hesaptan düşürülür", async () => {
+    const { prisma, netgsm, users } = makeDeps();
+    users.u2 = { id: "u2", phone: "+905551234567", isPhoneVerified: false };
+    const svc = new PhoneVerificationService(prisma, netgsm);
+    let sentCode = "";
+    netgsm.sendOtp.mockImplementation(async (_p: string, c: string) => {
+      sentCode = c;
+      return { success: true };
+    });
+    await svc.sendCode("u1", "+905551234567");
+    await svc.verify("u1", sentCode);
+    // `phone` DB'de tekil: düşürülmeseydi verify P2002 ile "başka hesapta
+    // kayıtlı" hatasına dönerdi ve numarayı kanıtlayan kişi takılırdı.
+    expect(users.u2.phone).toBeNull();
+    expect(users.u1).toMatchObject({
+      phone: "+905551234567",
+      isPhoneVerified: true,
+    });
   });
 
   it("yanlış kodda hata fırlatır", async () => {

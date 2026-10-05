@@ -1025,7 +1025,7 @@ export class PayoutService {
 
   /**
    * "Para satıcıya ulaştı" yan etkileri — TEK kaynak. Eski senkron akış da
-   * 2. aşama callback'i de burayı çağırır: IBAN otomatik doğrulama, satıcıya
+   * 2. aşama callback'i de burayı çağırır: satıcıya
    * "ödemeniz aktarıldı" maili, ledger settle kaydı ve log. İki yerde
    * kopyalanırsa akışlar sessizce ayrışır.
    */
@@ -1036,12 +1036,6 @@ export class PayoutService {
     transferIban: string;
     netAmount: number;
   }): Promise<void> {
-    // Başarılı transfer = IBAN gerçek ve çalışıyor → otomatik doğrula.
-    await this.syncBankAccountVerification(
-      params.sellerId,
-      params.transferIban,
-      true,
-    );
     await this.sendPayoutReleasedEmail(
       params.sellerId,
       params.netAmount,
@@ -1423,12 +1417,6 @@ export class PayoutService {
       });
       if (claim.count === 0) continue;
 
-      // Transfer geri döndü = IBAN sorunlu → doğrulamayı geri al.
-      await this.syncBankAccountVerification(
-        transfer.sellerId,
-        transfer.transferIban,
-        false,
-      );
       // Satıcı haber almalı: para escrow'a döndü, IBAN güncellenmeli. PayTR sebep
       // vermez; e-posta şablonu sebep satırını koşullu basar.
       await this.sendPayoutProblemEmail({
@@ -1503,37 +1491,6 @@ export class PayoutService {
       );
     }
     return { kind: "unmatched" };
-  }
-
-  /**
-   * Satıcının banka hesabının doğrulama durumunu payout sonucuna göre günceller.
-   * IBAN, transfer anındaki IBAN ile eşleşmiyorsa (satıcı sonradan değiştirmişse) dokunmaz.
-   */
-  private async syncBankAccountVerification(
-    sellerId: string,
-    transferIban: string,
-    verified: boolean,
-  ): Promise<void> {
-    if (!sellerId || !transferIban) return;
-    try {
-      const account = await this.prisma.sellerBankAccount.findUnique({
-        where: { userId: sellerId },
-      });
-      if (!account || account.iban !== transferIban) return;
-      if (account.isVerified === verified) return;
-      await this.prisma.sellerBankAccount.update({
-        where: { userId: sellerId },
-        data: {
-          isVerified: verified,
-          verifiedAt: verified ? new Date() : null,
-        },
-      });
-      this.logger.log(
-        `Bank account for seller ${sellerId} isVerified=${verified} (payout sonucu).`,
-      );
-    } catch (error: any) {
-      this.logger.error(`syncBankAccountVerification failed: ${error.message}`);
-    }
   }
 
   private async handlePayoutFailure(

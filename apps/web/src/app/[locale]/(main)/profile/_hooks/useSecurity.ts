@@ -9,6 +9,7 @@ import { useTranslations } from "next-intl";
 import { useWebList } from "@/hooks/useWebResource";
 import { useWebMutation } from "@/hooks/useWebMutation";
 import type { ChangePasswordValues } from "../_lib/schemas";
+import { PROFILE_RESOURCES } from "./useProfileInfo";
 
 /** Whether TOTP two-factor auth is currently enabled. */
 export function use2faStatus(enabled: boolean) {
@@ -57,6 +58,9 @@ export function usePhoneVerification() {
   const verify = useWebMutation(
     (code: string) => api.post("/auth/phone/verify", { code }),
     {
+      // Doğrulama numarayı da yazar (başka hesapta doğrulanmamış duruyorsa
+      // profil kaydı yazamaz) → profil formu da tazelenmeli.
+      invalidates: PROFILE_RESOURCES,
       errorMessage: t("profile.invalidCode"),
       onSuccess: async () => {
         toast.success(t("profile.phoneVerified"));
