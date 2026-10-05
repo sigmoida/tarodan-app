@@ -9,9 +9,9 @@ import {
   MinLength,
   Min,
   Max,
-} from 'class-validator';
-import { Type } from 'class-transformer';
-import { FormBoolean } from '../../../common/transforms';
+} from "class-validator";
+import { Type } from "class-transformer";
+import { FormBoolean } from "../../../common/transforms";
 
 export class CreateCollectionDto {
   @IsString()
