@@ -214,20 +214,171 @@ fail/rezervasyon süreleri ve iç emniyet supapları dönmez.
 kadar kullanılacak **geri düşüş** kopyalarıdır; kayıt varsayılanlarıyla eşitliği
 `timing-rules.registry.spec.ts` ile korunur.
 
-## Bilinen, atanmış iş (paket 5 — kullanıcı metinleri)
+## Kullanıcıya gösterilen süreler (paket 5)
 
-Ön yüzler henüz `GET /api/timing-rules`'u ve siparişteki `returnWindowEndsAt`'i
-okumuyor; tarihleri hâlâ `@tarodan/shared` geri düşüş sabitlerinden hesaplıyor:
+Süreler artık ekranlarda ve mesajlarda sabit sayı olarak durmaz. Üç kaynak var,
+her gösterim yalnız birini kullanır:
 
-- web: `apps/web/src/app/[locale]/(main)/profile/(commerce)/orders/[id]/_lib/types.ts`
-  (`ESCROW_RELEASE_DAYS` ile ödeme tarihi, `REFUND_COOLING_OFF_DAYS` ile iade
-  penceresi),
-- admin: `apps/admin/src/lib/escrow.ts` (`ESCROW_RELEASE_DAYS`,
-  `REFUND_WINDOW_DAYS`).
+1. **Kayıt başına sunucu tarihi** — iade penceresinin damgalı sonu, escrow
+   serbest bırakma tarihi, teklif bitişi, takas süreleri, hazırlama son tarihi.
+   İstemci bunları gösterir ve karar verir; `deliveredAt + N gün` diye yeniden
+   hesaplamaz. Yalnız sunucu değerinin olmadığı eski kayıtta (damgadan önce
+   teslim edilmiş sipariş) politika değeriyle hesaplanır.
+2. **Politika değeri** — "iade için N gününüz var" gibi kayda bağlı olmayan
+   metinler. Kaynak `GET /api/timing-rules`.
+3. **Hukuki metin** — sözleşmedir, ayara bağlanmaz (aşağıda).
 
-Admin pencereyi değiştirdiğinde bu ekranlar yanlış tarih gösterir. Paket 5:
-sipariş tarihlerini sunucudan (`returnWindowEndsAt`, hold `releaseAt`), politika
-metinlerini `GET /api/timing-rules`'tan okuyacak.
+### Tek okuma noktası (uygulama başına bir)
+
+| Uygulama | Yer                                                                                                                                          |
+| -------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
+| web      | Server Component: `lib/server/timing-policy.ts` `getTimingPolicy()` (Next fetch önbelleği 5 dk, HTML'e basılır)                              |
+| web      | Client: `hooks/useTimingPolicy.ts` (`useTimingPolicy`, `useTimingValues`) — tek sorgu anahtarı                         |
+| admin    | `hooks/useTimingPolicy.ts` (Süreler ekranı kaydedince sorgu tazelenir)                                                                       |
+| api      | Bildirim: `NotificationDispatchService.renderTemplate` süreleri gönderim anında okur. E-posta: `withEmailTimingData` (`common/timing-rules`) |
+
+Ortak mantık `@tarodan/types` `timing-policy.ts`: geri düşüş (kayıt
+varsayılanı; iade penceresi ve payout grace için `@tarodan/shared` sabitleri),
+**yalnız geçersiz kimlik için** geri düşen toleranslı ayrıştırma ve
+`loadTimingPolicy` (uç hata verirse geri düşüş döner, ekran kırılmaz).
+Geri düşüş otoriter değildir; yalnız uç yüklenene/ulaşılamayana kadar kullanılır.
+
+### Metinlerde parametre adı = kayıt kimliği
+
+Katalog metinleri ICU parametresiyle yazılır: `{returnWindowDays}`,
+`{orderPaymentWindowHours}`, `{preparingDeadlineDays}`… (kimlikler
+`PUBLIC_TIMING_RULE_IDS`). İngilizce çoğul biçim
+`{returnWindowDays, plural, one {# day} other {# days}}`; sıfat olarak
+kullanıldığında (`{returnWindowDays}-day refund window`) çoğul yok.
+
+- Web client: `t("order.refundWindowPassed", useTimingValues())`.
+- Web server: `withTimingValues(await getTranslations(), await getTimingPolicy())`
+  — `t(key)` çağrıları parametreleri kendiliğinden alır (SEO sayfaları: değer
+  sunucu HTML'indedir).
+- API bildirimi: parametreler render anında eklenir; çağıranın `data`'sı önceliklidir.
+- API e-postası: şablon `emailTimingValue(data, "returnWindowDays")` okur
+  (`data.timing`, yoksa kayıt varsayılanı); saklı şablonlarda `{{timing.returnWindowDays}}`.
+- Yeni süre içeren metin: katalogda parametreyle yaz, çağıran `t`'ye değerleri ver.
+  Sabit sayı yazma.
+
+### Sunucunun yeni döndüğü alanlar
+
+- `escrowReleaseAt` (sipariş yanıtı, `formatOrderResponse`): bekleyen
+  (`held`) escrow hold'un `releaseAt`'i; yoksa `null`. Web satıcı ödeme tarihini
+  bundan gösterir; `null` ise (eski sipariş) pencere sonu + payout grace
+  politika değeriyle hesaplanır. Grup/sipariş detay sorguları `paymentHolds`
+  (`status`, `releaseAt`) seçer; liste sorguları seçmez (alan `null`).
+- `returnWindowEndsAt` (paket 1) artık web'de de kullanılıyor.
+
+Mobil için: aynı iki alan; iade/ödeme tarihini kendin hesaplama.
+
+### Envanter
+
+Sayımlar bu pakette elle taranan yerler içindir (katalog `tr`+`en` çifti
+tek satır sayılır).
+
+| Kategori                                       | Adet | Nerede                                                                                                                                                                                                                                                          |
+| ---------------------------------------------- | ---: | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Ayara bağlı metin (katalog, kullanıcıya)       |   15 | web `order.*` (6), `offer.*` (3), `faq.content.*` (3), `information.shippingDelivery.*` (1), ana sayfa güven rozeti (2 anahtar, tr+en)                                                                                                                          |
+| Ayara bağlı metin (katalog, admin)             |    5 | `admin.operations.orders.status.awaitingBuyerConfirmation`; Süreler ekranı yardım metinleri: `returnWindowDays`, `paymentFailTimeoutMinutes`, `payoutGraceDays`, `tradeHoldDays` (sayılar kayıt sınırından)                                                     |
+| Ayara bağlı metin (katalog, api bildirimi)     |    7 | `server.notification.` `orderDelivered`, `orderDeliveredConfirm`, `orderManuallyConfirmed`, `orderReservationReleased`, `offerCounterAccepted`, `offerPaymentExpired`, `refundReturnDeliveredSeller`                                                            |
+| Ayara bağlı metin (katalog, api hata)          |    1 | `server.refund.coolingOffExpired` (`returnWindowDays` parametresiyle fırlatılır)                                                                                                                                                                                |
+| Ayara bağlı e-posta şablonu                    |    5 | `order-paid-seller` (hazırlama + ödeme günü), `order-delivered` (2 metin), `offer-received` (bitiş tarihi yoksa saat)                                                                                                                                           |
+| Sunucu tarihinden gelen karar/gösterim         |    5 | web sipariş iade uygunluğu + iade fazı + iade-süresi-doldu bloğu (`returnWindowEndsAt`), satıcı ödeme tarihi (`escrowReleaseAt`), admin ödeme-bekleme nedeni (`releaseAt`, yeniden hesap kalktı), web takas geri sayımı ve teklif bitişi (zaten sunucu damgası) |
+| Hukuki metin, kayıtlı + uyarı kontrollü        |    8 | aşağıdaki tablo (A)                                                                                                                                                                                                                                             |
+| Hukuki metin / mevzuat, kuralsız (olduğu gibi) |   20 | aşağıdaki tablo (B)                                                                                                                                                                                                                                             |
+| Bilerek sabit bırakılan (kural yok / teknik)   |    — | aşağıdaki liste                                                                                                                                                                                                                                                 |
+
+#### Hukuki metinler — A: yönetilen kurala karşılık gelen ifadeler
+
+Metin değiştirilmez, parametreleştirilmez (müşteri kararı). Ayar metindeki
+sayıdan farklıysa Süreler ve Kurallar ekranı satırda **ve sayfa üstünde uyarı**
+gösterir (`@tarodan/types` `timing-legal.ts` → `LEGAL_TIMING_STATEMENTS`). Bir
+admin testi (`timing-legal.test.ts`) her ifadenin gerçekten o katalog anahtarında
+durduğunu ve metinlerin ICU parametresi taşımadığını doğrular. Satır numaraları
+`packages/i18n/src/catalog/tr.json` (en.json aynı satırlarda).
+
+| Belge             | Anahtar / satır                                                            | Metin                                      | Kural                   |
+| ----------------- | -------------------------------------------------------------------------- | ------------------------------------------ | ----------------------- |
+| Mesafeli satış    | `legal.distanceSales.caymaHakki14GunKapsamSure` — 3378                     | "Cayma Hakkı (14 Gün)" başlığı             | `returnWindowDays`      |
+| Mesafeli satış    | `legal.distanceSales.caymaHakkiVeKullanimi14Gun` — 3418                    | "(14 Gün)" başlığı                         | `returnWindowDays`      |
+| Mesafeli satış    | `legal.distanceSales.aliciUrunuTeslimAldigiTarihtenItibaren` — 3419        | teslimden 14 gün içinde cayma              | `returnWindowDays`      |
+| Mesafeli satış    | `legal.distanceSales.metaDescription` — 3455                               | "14 günlük cayma hakkı" (sayfa açıklaması) | `returnWindowDays`      |
+| İade politikası   | `legal.refundPolicy.kargonuzuTeslimAldiginizAndanItibarenYasal` — 3539     | 14 günlük iade talebi süresi               | `returnWindowDays`      |
+| Satıcı sözleşmesi | `legal.sellerAgreement.satisBedeliAliciUrunuTeslimAlip` — 3677             | bedel 14 gün havuzda                       | `returnWindowDays`      |
+| Satıcı sözleşmesi | `legal.sellerAgreement.satisiYapilanUrunEnGec3` — 3675                     | en geç 3 iş günü kargo                     | `preparingDeadlineDays` |
+| Satıcı sözleşmesi | `legal.sellerAgreement.kurumsalSaticiYuksekHacimliSiparislerdeDahi` — 3706 | 3 iş günü kargo                            | `preparingDeadlineDays` |
+
+**Çelişki bugün var mı?** Hayır: kayıt varsayılanları (14 / 3) metinlerle aynı.
+Admin `returnWindowDays`'i 14'ten büyük (en az 14 sınırı), `preparingDeadlineDays`'i
+3'ten farklı kaydederse uyarı çıkar. Mesafeli Satış Yönetmeliği 14 günden kısa
+pencereye izin vermez, bu yüzden pratik çelişki "pencereyi uzatmak"tır.
+Dikkat: satıcı sözleşmesi "iş günü" der, kural takvim günüdür (pazar sayılmaz).
+
+#### Hukuki metinler — B: kurala bağlı olmayanlar (kontrol yok, olduğu gibi)
+
+| Belge           | Anahtar / satır                                                                                                                      | İfade                                    | Neden bağlı değil                       |
+| --------------- | ------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------- | --------------------------------------- |
+| Mesafeli satış  | `legal.distanceSales.ticariAlicilarinTacirlerinVeSaticiNin` — 3384                                                                   | "14 günlük yasal cayma hakkı uygulanmaz" | kanun atfı (6502), platform ayarı değil |
+| Mesafeli satış  | `legal.distanceSales.platformPiyasaKosullariniGozeterekKomisyonOranlarinda` — 3441                                                   | 7 gün önceden bildirim                   | tarife bildirimi, kayıt yok             |
+| İade politikası | `legal.refundPolicy.iadeTalebinizSistemeUlastigiAndanItibaren` — 3545                                                                | 3–5 iş günü inceleme                     | operasyonel hedef, kayıt yok            |
+| İade politikası | `legal.refundPolicy.iadeEdilenUrunMerkezeUlastiktanVe` — 3555                                                                        | 1–3 iş günü banka yansıma                | banka süresi                            |
+| İade politikası | `legal.refundPolicy.iptalIsleminizOnaylandigindaVeyaKargodakiUrun` — 3586                                                            | 1–3 iş günü banka yansıma                | banka süresi                            |
+| Gizlilik / KVKK | `legal.privacy.basvurularEnGec30GunIcinde` — 3647                                                                                    | başvurular en geç 30 gün                 | mevzuat (KVKK m.13)                     |
+| Gizlilik / KVKK | `legal.cookies.page.retentionTrafficPeriod` — 3811                                                                                   | 2 yıl                                    | saklama süresi, kayıt yok               |
+| Gizlilik / KVKK | `legal.cookies.page.retentionFinancePeriod` — 3815                                                                                   | 5 / 10 yıl                               | mevzuat (vergi/ticaret)                 |
+| Gizlilik / KVKK | `legal.cookies.page.retentionEtkPeriod` — 3819                                                                                       | 3 yıl                                    | mevzuat (ETK)                           |
+| Gizlilik / KVKK | `legal.cookies.page.retentionMembershipPeriod` — 3823                                                                                | 10 yıl                                   | saklama süresi                          |
+| Gizlilik / KVKK | `legal.cookies.page.retentionConsentPeriod` — 3827                                                                                   | 1 yıl                                    | saklama süresi                          |
+| Çerezler        | `legal.cookies.duration.*` — 3753–3762 (9 anahtar: 15 dk/7 gün, 7, 10, 1 yıl, 179 gün/oturum, 2 yıl/24 saat, 90 gün, 13 ay, 1/13 ay) | çerez ömürleri                           | teknik, çerez tanımında                 |
+
+Kullanım Koşulları (`legal.terms.*`), fikri mülkiyet ve alıcı koruma metinleri
+süre ifadesi içermiyor (tarandı).
+
+#### Bilerek sabit bırakılan metinler
+
+- **Token / kod ömürleri** (iş kuralı değil): doğrulama bağlantısı 24 saat
+  (`auth.verificationSpamHint`, `email-verification-mail.ts`), şifre sıfırlama
+  1 saat (e-posta), hesap oluşturma bağlantısı 72 saat
+  (`admin.accounts.sellerApplications.approveConfirm`), e-posta değişikliği
+  kodu 15 dk, e-posta `expiresIn` yedeği.
+- **Kaydı olmayan operasyonel hedefler**: destek yanıtı 24 saat
+  (`support.formHint`), rapor incelemesi 24–48 saat (`report.reviewNotice`),
+  satıcının iadeye yanıtı 48 saat (`refund.next.pendingReview`,
+  `refundAutoAcceptedSeller`, e-posta `refund-request-received-buyer` /
+  `refund-auto-accepted`), admin iade incelemesi 1–3 iş günü
+  (`refund.next.disputed`, `refund.disputedBody`), banka yansıması 1–3 / 3–5
+  iş günü (`refund.refundedBody`, e-postalar), moderasyon kuyruğu 48 saat
+  (`moderationQueueStale`), ilan onayı 24 saat (`guides.content.*`),
+  alıcı koruma 5–10 iş günü, kargo 2–5 / 2–3 iş günü tahmini, sorun bildirimi
+  24 saat (`page.guides.guidesclient`). Bunlara kayıt eklemek ayrı bir iş.
+- **Takvim/ürün sabitleri**: öne çıkarma paketleri 3/7/30 gün (ilan fiyatı
+  boyutu; `server.product.invalidBoostDuration`, FAQ paket başlıkları),
+  analitik dönem etiketleri (7/30/90 gün), Sürat senkron aralığı 30 dk
+  (`order.trackingAppearsAfterDropoff`, admin kargo notları), dashboard
+  "24 saat içinde dolan hazırlama" ufku (`preparingDeadlineWithin24h`),
+  oturum zaman aşımı (`adminSessionTimeoutMinutes`), 1–2 dk PayTR senkron mesajı.
+- **Saklı geçmiş kayıt metinleri**: `ORDER_CANCEL_REASON.paymentWindowExpired`
+  ("Ödeme süresi (24 saat) doldu") ve `payment.failureReason` ("Sipariş 24 saat
+  içinde ödenmediği için iptal edildi") DB'ye yazılan, geçmiş satırlarla
+  birebir eşleşen metinlerdir (bkz. `order-cancel-reasons.ts` — "METİNLER
+  DEĞİŞTİRİLMEZ"); değiştirmek geriye dönük göç gerektirir.
+- **`FEATURE_48H_CONFIRMATION_WINDOW` bayrağı** (`server.notification.orderAutoCompleted`
+  "48 saatlik kontrol süresi", `information.platformFee` "48 saat onay süreci"):
+  bayrağa bağlı sabit 48 saattir, Süreler ve Kurallar kaydı değildir.
+- **Kullanılmayan katalog anahtarları** `information.returns.*`,
+  `information.shipping.*` (web bu depoda okumuyor, mobil katalogu paylaşıyor
+  olabilir): parametre eklemek mobilde eksik değer hatası üretebilir; mobil
+  tarafı karar verene kadar sabit.
+- **Örnek metinler**: `admin.operations.trades.forceCancelPlaceholder`,
+  `refundRequests.closeReasonPlaceholder` ("14 gün" örnek gerekçe),
+  `admin.marketing.emailTemplates.sample.twentyFourHours` (örnek değişken).
+
+Not (mevcut tutarsızlıklar, değiştirilmedi): `orderReservationReleased` metni
+daha önce "30 dakika" yazıyordu; stok rezervasyonunu kaldıran döngü
+`paymentReservationMinutes`'i (varsayılan **5**) kullanır — metin artık gerçek
+değeri basar. `orderManuallyConfirmed`/`order-paid-seller` "teslimden N gün sonra"
+der; gerçek ödeme `returnWindowDays + payoutGraceDays`'tir (varsayılan 15).
 
 ## Sonraki paketler için: yeni eylem açmak
 
