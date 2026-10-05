@@ -215,6 +215,11 @@ function makeRun(
     createInAppNotification: jest.fn(async () => true),
     notifySellerDidNotShipRefunded: jest.fn(async () => undefined),
     notifyCouponReturned: jest.fn(async () => undefined),
+    // Alıcı tarafı (zil + push + misafirde gerçek adrese e-posta) bildirim
+    // servisinde; adres çözümü order-buyer-contact.spec'te.
+    notifyPreparingExtendedBuyer: jest.fn(
+      async (_orderId: string, _data: Record<string, string>) => undefined,
+    ),
   };
   const paymentRefund = { processRefund: jest.fn(async () => ({})) };
   const commissionLedger = { markWaived: jest.fn(async () => undefined) };
@@ -342,6 +347,9 @@ describe("hazırlık son tarihi — uyarı ve tek seferlik uzatma", () => {
       expect(
         run.notificationService.createInAppNotification,
       ).not.toHaveBeenCalled();
+      expect(
+        run.notificationService.notifyPreparingExtendedBuyer,
+      ).not.toHaveBeenCalled();
       expect(store.row.preparingExtendedAt).toBeNull();
       expect(store.row.originalPreparingDeadline).toBeNull();
     });
@@ -464,20 +472,24 @@ describe("hazırlık son tarihi — uyarı ve tek seferlik uzatma", () => {
         first,
         NotificationType.ORDER_PREPARING_EXTENDED_SELLER,
       );
-      const [[buyerId, , buyerData]] = notificationsOf(
-        first,
-        NotificationType.ORDER_PREPARING_EXTENDED,
-      );
       expect(sellerId).toBe("u-seller");
-      expect(buyerId).toBe("u-buyer");
       const expectedData = {
-        orderId: "o1",
         orderNumber: "ORD-1",
         productTitle: "Ürün",
         deadline: formatPreparingDeadline(nextDeadline),
       };
-      expect(sellerData).toEqual({ ...expectedData, audience: "seller" });
-      expect(buyerData).toEqual({ ...expectedData, audience: "buyer" });
+      expect(sellerData).toEqual({
+        orderId: "o1",
+        ...expectedData,
+        audience: "seller",
+      });
+      // Alıcı: sipariş üzerinden (misafirde gerçek adrese e-posta dahil).
+      expect(
+        first.notificationService.notifyPreparingExtendedBuyer,
+      ).toHaveBeenCalledWith("o1", expectedData);
+      expect(
+        first.notificationService.notifyPreparingExtendedBuyer,
+      ).toHaveBeenCalledTimes(1);
 
       // 2) Aynı anda tekrar koşan tur: son tarih ileride, dokunmaz.
       const repeat = makeRun(store, EXTEND_ONCE);
@@ -533,6 +545,9 @@ describe("hazırlık son tarihi — uyarı ve tek seferlik uzatma", () => {
       expect(run.tx.order.updateMany).not.toHaveBeenCalled();
       expect(
         run.notificationService.createInAppNotification,
+      ).not.toHaveBeenCalled();
+      expect(
+        run.notificationService.notifyPreparingExtendedBuyer,
       ).not.toHaveBeenCalled();
       expectNoCancelPath(run);
       expect(store.row).toEqual(before);
@@ -592,8 +607,9 @@ describe("hazırlık son tarihi — uyarı ve tek seferlik uzatma", () => {
       expect(store.row.preparingDeadline).toEqual(
         addDaysSkippingSundays(T0, 3),
       );
-      const sent = [a, b].flatMap((run) =>
-        notificationsOf(run, NotificationType.ORDER_PREPARING_EXTENDED),
+      const sent = [a, b].flatMap(
+        (run) =>
+          run.notificationService.notifyPreparingExtendedBuyer.mock.calls,
       );
       expect(sent).toHaveLength(1);
       expectNoCancelPath(a);
@@ -631,9 +647,12 @@ describe("hazırlık son tarihi — uyarı ve tek seferlik uzatma", () => {
           expect(
             notificationsOf(
               extender,
-              NotificationType.ORDER_PREPARING_EXTENDED,
+              NotificationType.ORDER_PREPARING_EXTENDED_SELLER,
             ),
           ).toHaveLength(0);
+          expect(
+            extender.notificationService.notifyPreparingExtendedBuyer,
+          ).not.toHaveBeenCalled();
           expect(canceller.paymentRefund.processRefund).toHaveBeenCalledTimes(
             1,
           );

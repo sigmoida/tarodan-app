@@ -169,6 +169,14 @@ export class NotificationService {
     return this.commerce.notifySellerDidNotShipRefunded(buyerId, orderId);
   }
 
+  /** Hazırlık süresi bir kez uzatıldı — alıcıya (misafirde e-postayla). */
+  async notifyPreparingExtendedBuyer(
+    orderId: string,
+    data: { orderNumber: string; productTitle: string; deadline: string },
+  ) {
+    return this.commerce.notifyPreparingExtendedBuyer(orderId, data);
+  }
+
   async notifyOfferReceived(
     sellerId: string,
     productId: string,

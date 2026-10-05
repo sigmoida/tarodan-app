@@ -681,50 +681,46 @@ export class PaymentExpiryReconciliationService {
 
   /**
    * Tek seferlik uzatmanın bildirimleri — commit SONRASI, iki tarafa ayrı
-   * metinle: satıcıya yeni son tarih + bunun son süre olduğu; alıcıya gecikme,
-   * en geç kargo tarihi ve kargodan önce iptal hakkının sürdüğü. Bildirim
-   * hatası uzatmayı geri almaz, diğer tarafın bildirimini de engellemez.
+   * metinle: satıcıya yeni son tarih + bunun son süre olduğu (zil + push);
+   * alıcıya gecikme, en geç kargo tarihi ve kargodan önce iptal hakkının
+   * sürdüğü (zil + push + e-posta; misafir siparişinde e-posta teslimat
+   * verisindeki GERÇEK adrese gider). Bildirim hatası uzatmayı geri almaz,
+   * diğer tarafın bildirimini de engellemez.
    */
   private async notifyPreparingExtended(
     order: {
       id: string;
       orderNumber: string;
-      buyerId: string;
       sellerId: string;
       product: { title: string };
     },
     deadline: Date,
   ): Promise<void> {
     const data = {
-      orderId: order.id,
       orderNumber: order.orderNumber,
       productTitle: order.product.title,
       deadline: formatPreparingDeadline(deadline),
     };
-    const recipients = [
-      {
-        userId: order.sellerId,
-        type: NotificationType.ORDER_PREPARING_EXTENDED_SELLER,
-        audience: "seller",
-      },
-      {
-        userId: order.buyerId,
-        type: NotificationType.ORDER_PREPARING_EXTENDED,
-        audience: "buyer",
-      },
-    ] as const;
-    for (const recipient of recipients) {
-      try {
-        await this.notificationService.createInAppNotification(
-          recipient.userId,
-          recipient.type,
-          { ...data, audience: recipient.audience },
-        );
-      } catch (error) {
-        this.logger.warn(
-          `notify preparing-extended (${recipient.audience}) failed for ${order.id}: ${errorMessage(error)}`,
-        );
-      }
+    try {
+      await this.notificationService.createInAppNotification(
+        order.sellerId,
+        NotificationType.ORDER_PREPARING_EXTENDED_SELLER,
+        { orderId: order.id, ...data, audience: "seller" },
+      );
+    } catch (error) {
+      this.logger.warn(
+        `notify preparing-extended (seller) failed for ${order.id}: ${errorMessage(error)}`,
+      );
+    }
+    try {
+      await this.notificationService.notifyPreparingExtendedBuyer(
+        order.id,
+        data,
+      );
+    } catch (error) {
+      this.logger.warn(
+        `notify preparing-extended (buyer) failed for ${order.id}: ${errorMessage(error)}`,
+      );
     }
   }
 

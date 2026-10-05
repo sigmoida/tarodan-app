@@ -137,7 +137,9 @@ değişince geriye dönük yeniden yazılmaz.
   ekranlar hep bunu okur); `Order.preparingExtendedAt` uzatma anı + "bir kez"
   claim damgasıdır, `Order.originalPreparingDeadline` önceki tarihtir (yalnız
   görüntü). Satıcıya "yeni son tarih, son süre", alıcıya "gecikme, en geç
-  kargo tarihi, kargodan önce iptal hakkın sürüyor" bildirimi gider. İade,
+  kargo tarihi, kargodan önce iptal hakkın sürüyor" bildirimi gider (alıcıya
+  ayrıca e-posta; misafir siparişinde teslimat verisindeki gerçek adrese,
+  `notification/helpers/order-buyer-contact.ts`). İade,
   stok, kupon, defter yazımı yoktur. İkinci dolumda iptal + iade aynen çalışır.
 
 Süre dolumu kapıları, bu sırayla (her sipariş kendi işleminde):
