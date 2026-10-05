@@ -33,6 +33,7 @@ import {
   type TradeCancelledPaymentRefundPayload,
 } from "../../outbox/outbox.types";
 import { isTradeFullyPaid } from "../../trade/helpers/trade-payment-rows.helper";
+import { isPaymentExpiryCancellation } from "../../trade/helpers/trade-cancellation";
 import { addDaysSkippingSundays } from "../../../common/helpers/preparing-deadline";
 import { resolveTimingValue } from "../../../common/timing-rules";
 import { ORDER_CANCEL_REASON } from "../../order/helpers/order-cancel-reasons";
@@ -1074,6 +1075,18 @@ export class PaymentFulfillmentService {
         // tamamlanmamıştı) kapsamadı. Para burada kalamaz — mevcut izlenen iade
         // yoluna verilir; iş bu tx'le ATOMİK kuyruğa girer (çökmede drainer).
         if (trade && trade.status === TradeStatus.cancelled) {
+          // Karar (2026-10-05): ödeme SÜRESİ dolumu iptalinde, ödemesi iptalden
+          // sonra tamamlanan taraf da kusursuzdur — tarama yalnız iptal anında
+          // tamamlanmış satırları işaretleyebildi. Aynı bayrak ve aynı iade
+          // politikası (tam iade); iade satırıyla aynı tx'te yazılır ki drainer
+          // tutarı bayrakla hesaplasın. Kendi takasını iptal eden tarafın geç
+          // ödemesi bu kümeye GİRMEZ (aktör buyer/seller): kesintili kalır.
+          if (isPaymentExpiryCancellation(trade)) {
+            await tx.tradeCashPayment.update({
+              where: { id: tcp.id },
+              data: { fullRefundEntitled: true },
+            });
+          }
           const refund: TradeCancelledPaymentRefundPayload = {
             tradeId: trade.id,
             payerId: tcp.payerId,

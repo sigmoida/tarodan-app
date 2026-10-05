@@ -1,4 +1,9 @@
-import { OutboxStatus, PaymentStatus, TradeStatus } from "@prisma/client";
+import {
+  CancellationActor,
+  OutboxStatus,
+  PaymentStatus,
+  TradeStatus,
+} from "@prisma/client";
 import { PaymentFulfillmentService } from "./payment-fulfillment.service";
 import { PaymentOutboxHandlers } from "../payment-outbox-handlers.service";
 import { OutboxService } from "../../outbox/outbox.service";
@@ -7,6 +12,8 @@ import {
   OUTBOX_TRADE_CANCELLED_PAYMENT_REFUND,
   tradeCancelledPaymentRefundDedupeKey,
 } from "../../outbox/outbox.types";
+import { TRADE_CANCEL_REASON } from "../../trade/helpers/trade-cancel-reasons";
+import { tradePaymentRefundableAmountFor } from "../../trade/helpers/trade-refund-policy";
 
 /**
  * İPTAL EDİLMİŞ takasa sonradan tamamlanan ödeme — para platformda kalmaz.
@@ -28,11 +35,32 @@ describe("PaymentFulfillmentService — iptal edilmiş takasa gelen ödeme", () 
     status: OutboxStatus;
   }
 
+  /** İptalin nasıl yazıldığı (aktör, gerekçe, son tarihler). */
+  interface CancelShape {
+    cancelledBy?: CancellationActor | null;
+    cancelReason?: string | null;
+    paymentDeadline?: Date | null;
+    shippingDeadline?: Date | null;
+  }
+
   const makeService = (
-    opts: { tradeStatus?: TradeStatus; withOutbox?: boolean } = {},
+    opts: {
+      tradeStatus?: TradeStatus;
+      withOutbox?: boolean;
+      cancel?: CancelShape;
+    } = {},
   ) => {
     const calls: string[] = [];
     const outboxRows: OutboxRow[] = [];
+    /** Geç tamamlanan ödemenin satırı (v2: 150 hizmet bedeli + 80 kargo). */
+    const tcpRow = {
+      totalAmount: 230,
+      shippingAmount: 80,
+      tradeFeeAmount: 150,
+      commission: 0,
+      commissionTaxAmount: 0,
+      fullRefundEntitled: false,
+    };
     const tx = {
       $queryRaw: jest.fn(async (strings: TemplateStringsArray) => {
         calls.push(strings.join("?").trim());
@@ -41,10 +69,17 @@ describe("PaymentFulfillmentService — iptal edilmiş takasa gelen ödeme", () 
       payment: { update: jest.fn().mockResolvedValue({}) },
       tradeCashPayment: {
         findUnique: jest.fn().mockResolvedValue({ tradeId: "trade-1" }),
-        update: jest.fn(async () => {
-          calls.push("tcp.update");
-          return { id: "tcp-2", tradeId: "trade-1", payerId: "u2" };
-        }),
+        update: jest.fn(
+          async ({ data }: { data: { fullRefundEntitled?: boolean } }) => {
+            if (data.fullRefundEntitled !== undefined) {
+              tcpRow.fullRefundEntitled = data.fullRefundEntitled;
+              calls.push("tcp.faultless");
+            } else {
+              calls.push("tcp.update");
+            }
+            return { id: "tcp-2", tradeId: "trade-1", payerId: "u2" };
+          },
+        ),
         findMany: jest
           .fn()
           .mockResolvedValue([
@@ -59,6 +94,7 @@ describe("PaymentFulfillmentService — iptal edilmiş takasa gelen ödeme", () 
           version: 4,
           initiatorId: "u1",
           receiverId: "u2",
+          ...opts.cancel,
         }),
         updateMany: jest.fn().mockResolvedValue({ count: 1 }),
       },
@@ -71,6 +107,7 @@ describe("PaymentFulfillmentService — iptal edilmiş takasa gelen ödeme", () 
             where: { dedupeKey: string };
             create: { type: string; payload: unknown };
           }) => {
+            calls.push("outbox.enqueue");
             outboxRows.push({
               type: create.type,
               payload: create.payload,
@@ -167,6 +204,7 @@ describe("PaymentFulfillmentService — iptal edilmiş takasa gelen ödeme", () 
       outboxRows,
       eventService,
       paymentRefund,
+      tcpRow,
     };
   };
 
@@ -296,6 +334,117 @@ describe("PaymentFulfillmentService — iptal edilmiş takasa gelen ödeme", () 
       "trade-1",
       { payerId: "u2" },
     );
+  });
+
+  /**
+   * Karar (2026-10-05): ödeme süresi dolumu iptalinde geç tamamlanan ödeme
+   * hizmet bedeli dahil TAM iade alır; kendi takasını iptal eden tarafın geç
+   * ödemesi kesintili kalır; platform iptali değişmez.
+   */
+  describe("geç ödemenin kusur kararı", () => {
+    /** Satırın iade tutarı — iade yolunun kullandığı politika fonksiyonuyla. */
+    const refundAmountOf = (row: {
+      totalAmount: number;
+      shippingAmount: number;
+      tradeFeeAmount: number;
+      commission: number;
+      commissionTaxAmount: number;
+      fullRefundEntitled: boolean;
+    }) =>
+      tradePaymentRefundableAmountFor(
+        {
+          paymentStatus: PaymentStatus.completed,
+          provider: "paytr",
+          totalAmount: row.totalAmount,
+          shippingAmount: row.shippingAmount,
+          tradeFeeAmount: row.tradeFeeAmount,
+          commissionAmount: row.commission,
+          commissionTaxAmount: row.commissionTaxAmount,
+          fullRefundEntitled: row.fullRefundEntitled,
+        },
+        { handedToCargo: false },
+      );
+
+    const sweepCancel: CancelShape = {
+      cancelledBy: CancellationActor.system,
+      cancelReason: TRADE_CANCEL_REASON.autoExpired,
+      paymentDeadline: new Date("2026-10-05T10:00:00.000Z"),
+      shippingDeadline: null,
+    };
+
+    it("ödeme süresi dolumu iptali: satır kusursuz işaretlenir → hizmet bedeli dahil tam iade", async () => {
+      const h = makeService({ cancel: sweepCancel });
+
+      await h.run();
+
+      expect(h.tcpRow.fullRefundEntitled).toBe(true);
+      expect(refundAmountOf(h.tcpRow)).toBe(230);
+    });
+
+    it("bayrak, iade satırıyla AYNI tx'te ve kuyruğa almadan ÖNCE yazılır", async () => {
+      const h = makeService({ cancel: sweepCancel });
+
+      await h.run();
+
+      expect(h.tx.tradeCashPayment.update).toHaveBeenCalledWith({
+        where: { id: "tcp-2" },
+        data: { fullRefundEntitled: true },
+      });
+      expect(h.calls.indexOf("tcp.faultless")).toBeGreaterThan(-1);
+      expect(h.calls.indexOf("tcp.faultless")).toBeLessThan(
+        h.calls.indexOf("outbox.enqueue"),
+      );
+    });
+
+    it.each([CancellationActor.buyer, CancellationActor.seller])(
+      "taraf iptali (%s), iptal edenin kendi geç ödemesi: bayrak yazılmaz → hizmet bedeli düşülür",
+      async (cancelledBy) => {
+        const h = makeService({
+          cancel: {
+            ...sweepCancel,
+            cancelledBy,
+            // Taraf, sürenin dolum gerekçesiyle aynı metni yazsa bile.
+            cancelReason: TRADE_CANCEL_REASON.autoExpired,
+          },
+        });
+
+        await h.run();
+
+        expect(h.calls).not.toContain("tcp.faultless");
+        expect(h.tcpRow.fullRefundEntitled).toBe(false);
+        expect(refundAmountOf(h.tcpRow)).toBe(80);
+        // İade yine kuyruğa alınır (kesintili tutarla).
+        expect(h.outboxRows).toHaveLength(1);
+      },
+    );
+
+    it("platform iptali: bu yol bayrağa dokunmaz (iptal anında hepsi zaten kusursuz)", async () => {
+      const h = makeService({
+        cancel: {
+          ...sweepCancel,
+          cancelledBy: CancellationActor.platform,
+          cancelReason: "Tarodan tarafından iptal edildi: Stok hatası",
+        },
+      });
+
+      await h.run();
+
+      expect(h.calls).not.toContain("tcp.faultless");
+      expect(h.outboxRows).toHaveLength(1);
+    });
+
+    it("başka bir sistem iptali (stok tükendi) karar kapsamında değildir", async () => {
+      const h = makeService({
+        cancel: {
+          ...sweepCancel,
+          cancelReason: TRADE_CANCEL_REASON.stockDepleted,
+        },
+      });
+
+      await h.run();
+
+      expect(h.calls).not.toContain("tcp.faultless");
+    });
   });
 
   it.each([TradeStatus.awaiting_payment, TradeStatus.shipping_to_warehouse])(

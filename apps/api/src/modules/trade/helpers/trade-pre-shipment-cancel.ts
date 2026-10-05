@@ -37,8 +37,9 @@ export const PRE_SHIPMENT_RESERVED_STATUSES: readonly TradeStatus[] = [
  * Kusur ataması (bkz. `trade-refund-policy`):
  * - `none`: kimse kusursuz değil (kargolama süresi aşımı, hiçbir koli verilmedi).
  * - `paid`: ödemesini tamamlamış taraf kusursuz (ödeme süresi aşımı). Callback'i
- *   taramadan SONRA gelen ödeme işaretlenmez ve kesintili iade edilir — bu
- *   bir ürün kararı bekleyen AÇIK sorudur (docs/PAYMENTS.md §8).
+ *   taramadan SONRA gelen ödeme burada işaretlenemez; ödeme tamamlama yolu onu
+ *   kusursuz işaretler (`isPaymentExpiryCancellation`, karar 2026-10-05,
+ *   docs/PAYMENTS.md §8).
  * - `all`: iki taraf da kusursuz (platform iptali — kimsenin kusuru değil).
  *   Ödemesi henüz tamamlanmamış satır da işaretlenir: callback iptalden sonra
  *   gelip satırı tamamlarsa ödeme tamamlama yolu takasın iptal edildiğini
