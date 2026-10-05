@@ -1,8 +1,7 @@
 import Link from "next/link";
-import Image from "next/image";
 import { useTranslations } from "next-intl";
 import { ChevronRightIcon } from "@heroicons/react/24/outline";
-import { Button, EmptyState } from "@tarodan/ui";
+import { Avatar, Button, EmptyState } from "@tarodan/ui";
 import { SectionCard } from "@/components/detail/SectionCard";
 import { fmtNumber } from "@/lib/format";
 import { type TopSeller } from "../_lib/types";
@@ -40,22 +39,11 @@ export function TopSellersWidget({ sellers }: { sellers: TopSeller[] }) {
               href={`/accounts/users/${s.id}`}
               className="-mx-2 flex flex-wrap items-center gap-x-3 gap-y-1 rounded-lg px-2 py-2.5 hover:bg-surface-alt"
             >
-              <div className="relative h-10 w-10 shrink-0 overflow-hidden rounded-full bg-primary-100">
-                {s.avatarUrl ? (
-                  <Image
-                    src={s.avatarUrl}
-                    alt=""
-                    fill
-                    sizes="40px"
-                    unoptimized
-                    className="object-cover"
-                  />
-                ) : (
-                  <div className="flex h-full w-full items-center justify-center text-sm font-medium text-primary-600">
-                    {s.displayName?.charAt(0) || "?"}
-                  </div>
-                )}
-              </div>
+              <Avatar
+                src={s.avatarUrl ?? undefined}
+                alt=""
+                fallback={s.displayName?.charAt(0) || "?"}
+              />
               {/* min-w floor (not min-w-0), same reasoning as TopProductsWidget. */}
               <div className="min-w-[110px] flex-1">
                 <p className="truncate text-sm font-medium text-heading">

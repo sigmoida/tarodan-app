@@ -1,10 +1,11 @@
 "use client";
 
-import Link from "next/link";
 import { useTranslations } from "next-intl";
 import { productStatusConfig } from "@tarodan/ui";
 import type { AdminListingRemovalEvent } from "@tarodan/types";
+import { EmptyState } from "@tarodan/ui";
 import { SectionCard } from "@/components/detail/SectionCard";
+import { TextLink } from "@/components/TextLink";
 import { fmtDateTime } from "@/lib/format";
 import { statusLabel } from "@/lib/statusLabels";
 import {
@@ -31,9 +32,11 @@ export function ProductRemovalSection({
       bodyClassName="space-y-3"
     >
       {history.length === 0 ? (
-        <p className="text-sm text-muted">
-          {t("admin.catalog.products.removal.historyEmpty")}
-        </p>
+        <EmptyState
+          size="compact"
+          icon={false}
+          title={t("admin.catalog.products.removal.historyEmpty")}
+        />
       ) : (
         <>
           <ol className="divide-y divide-border">
@@ -69,12 +72,9 @@ function RemovalEventRow({ event }: { event: AdminListingRemovalEvent }) {
         {event.actorUserId && (
           <>
             {" · "}
-            <Link
-              href={`/accounts/users/${event.actorUserId}`}
-              className="text-primary-600 hover:underline"
-            >
+            <TextLink href={`/accounts/users/${event.actorUserId}`}>
               {t("admin.catalog.products.removal.actorUser")}
-            </Link>
+            </TextLink>
           </>
         )}
       </p>

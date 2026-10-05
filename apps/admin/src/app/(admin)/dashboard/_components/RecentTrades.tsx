@@ -1,11 +1,8 @@
 /** @format */
 
 import Link from "next/link";
-import {
-  ArrowsRightLeftIcon,
-  ChevronRightIcon,
-} from "@heroicons/react/24/outline";
-import { Button, EmptyState, StatusBadge } from "@tarodan/ui";
+import { ChevronRightIcon } from "@heroicons/react/24/outline";
+import { Avatar, Button, EmptyState, StatusBadge } from "@tarodan/ui";
 import { ADMIN_TRADES_TAB_HREF } from "@tarodan/types";
 import { useTranslations } from "next-intl";
 import { SectionCard } from "@/components/detail/SectionCard";
@@ -65,9 +62,10 @@ export function RecentTrades({ trades }: { trades: RecentTrade[] }) {
                 className="flex flex-col gap-2 border-b border-border py-3 last:border-0 sm:flex-row sm:items-center sm:justify-between"
               >
                 <div className="flex min-w-0 flex-1 items-center">
-                  <div className="mr-3 flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-success-500/20">
-                    <ArrowsRightLeftIcon className="h-5 w-5 text-success-700" />
-                  </div>
+                  <Avatar
+                    className="mr-3"
+                    fallback={s.initiatorName?.charAt(0) || "?"}
+                  />
                   <div className="min-w-0">
                     <p className="truncate text-sm text-heading">
                       <span className="font-medium">{s.initiatorName}</span>

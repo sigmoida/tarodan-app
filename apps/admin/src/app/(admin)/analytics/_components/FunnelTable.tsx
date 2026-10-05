@@ -3,6 +3,7 @@
 import { useTranslations } from "next-intl";
 import { EmptyState } from "@tarodan/ui";
 import type { AnalyticsFunnelStep } from "@tarodan/types";
+import { ProgressBar } from "@/components/ProgressBar";
 import { fmtNumber } from "@/lib/format";
 import { formatShare, stepLabel } from "../_lib/labels";
 
@@ -35,14 +36,7 @@ export function FunnelTable({ steps }: { steps: AnalyticsFunnelStep[] }) {
               {fmtNumber(step.count) ?? "0"}
             </span>
           </div>
-          <div className="h-2 w-full rounded-full bg-surface-alt">
-            <div
-              className="h-2 rounded-full bg-primary-500"
-              style={{
-                width: `${first === 0 ? 0 : Math.min(100, (step.count / first) * 100)}%`,
-              }}
-            />
-          </div>
+          <ProgressBar value={first === 0 ? 0 : (step.count / first) * 100} />
           <div className="flex flex-wrap justify-between gap-2 text-xs text-muted">
             <span>
               {t("admin.analytics.table.conversion")}:{" "}

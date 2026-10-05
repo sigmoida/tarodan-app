@@ -5,6 +5,8 @@ import { useTranslations } from "next-intl";
 import { EmptyState, Skeleton } from "@tarodan/ui";
 import type { DashboardListingRemovalsResponse } from "@tarodan/types";
 import { SectionCard } from "@/components/detail/SectionCard";
+import { Eyebrow, SectionTitle } from "@/components/detail/SectionTitle";
+import { ProgressBar } from "@/components/ProgressBar";
 import { fmtNumber } from "@/lib/format";
 import {
   removalActorLabel,
@@ -37,12 +39,7 @@ function ShareRow<K>({
           </span>
         </span>
       </div>
-      <div className="h-1.5 w-full overflow-hidden rounded-full bg-surface-alt">
-        <div
-          className="h-full rounded-full bg-primary-500"
-          style={{ width: `${row.share}%` }}
-        />
-      </div>
+      <ProgressBar value={row.share} />
     </li>
   );
 }
@@ -58,11 +55,18 @@ function Column({
 }) {
   return (
     <div className="flex min-w-0 flex-col gap-2">
-      <div className="flex items-baseline justify-between gap-2 border-b border-border pb-1">
-        <h3 className="text-sm font-semibold text-heading">{title}</h3>
-        <span className="tabular-nums text-sm text-muted">
-          {fmtNumber(total)}
-        </span>
+      <div className="border-b border-border pb-1">
+        <SectionTitle
+          as="h3"
+          size="sm"
+          actions={
+            <span className="tabular-nums text-sm font-normal text-muted">
+              {fmtNumber(total)}
+            </span>
+          }
+        >
+          {title}
+        </SectionTitle>
       </div>
       {children}
     </div>
@@ -126,9 +130,9 @@ export function ListingRemovalsPanel({
           >
             {view.byActor.map((group) => (
               <div key={group.actor} className="flex flex-col">
-                <p className="text-xs font-medium uppercase tracking-wide text-subtle">
+                <Eyebrow>
                   {removalActorLabel(group.actor, t)} · {fmtNumber(group.count)}
-                </p>
+                </Eyebrow>
                 <ul>
                   {group.reasons.map((row) => (
                     <ShareRow
