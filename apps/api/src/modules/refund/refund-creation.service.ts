@@ -32,7 +32,10 @@ import {
   resolvePlatformCancellationPolicy,
   resolveReturnPolicy,
 } from "./helpers/refund-financial-policy";
-import { isPreShipmentCancellableStatus } from "@tarodan/types";
+import {
+  isPreShipmentCancellableStatus,
+  type AdminCancelReasonCode,
+} from "@tarodan/types";
 import { REFUND_REQUEST_ACTOR_KEY } from "../payment/helpers/refund-attempt-actor";
 import {
   PLATFORM_CANCELLATION_FAULT_PARTY,
@@ -252,17 +255,19 @@ export class RefundCreationService {
    * grup (sepet) ödemesinde de çalışır, çünkü para yolu siparişin kendi
    * payını iade eden processRefund'dur. Yetki kontrolü çağıranın (admin
    * rolü) işidir. Alıcı iptaliyle AYNI çekirdekten geçer; fark yalnız
-   * platformCancellationSpec'tedir.
+   * platformCancellationSpec'tedir. Neden yalnız katalog KODU olarak gelir —
+   * yöneticinin iç notu çekirdeğe (ve taraflara görünen alanlara) girmez.
+   * Taraf duyurusu çağıranındır (spec `notifyParties: []`).
    */
   async createPlatformCancellationRefund(
     orderId: string,
     adminId: string,
-    reason: string,
+    reasonCode: AdminCancelReasonCode,
   ) {
     const order = await this.loadOrderForCancellation(orderId);
     return this.executePreShipmentCancellation(
       order,
-      platformCancellationSpec(order.buyerId, adminId, reason),
+      platformCancellationSpec(order.buyerId, adminId, reasonCode),
     );
   }
 
@@ -453,6 +458,7 @@ export class RefundCreationService {
       where: { id: order.id },
       data: {
         cancellationReasonCode: spec.reasonCode,
+        adminCancelReasonCode: spec.adminReasonCode,
         cancelReason: spec.cancelReason,
         cancellationPolicySnapshot: financial.snapshot,
       },

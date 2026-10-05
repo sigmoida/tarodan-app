@@ -37,6 +37,7 @@ import { paymentWindowEnd } from "../payment/helpers/payment.constants";
 import { OFFER_CANCEL_REASON } from "../trade/helpers/trade-cancel-reasons";
 import { ORDER_CANCEL_REASON } from "./helpers/order-cancel-reasons";
 import { orderCancelledData } from "./helpers/order-cancellation";
+import type { AdminCancelReasonCode } from "@tarodan/types";
 
 /**
  * Ödenmemiş iptalin aktörü, ledger gerekçesinden türetilir: ikisi aynı olguyu
@@ -523,8 +524,18 @@ export class OrderLifecycleService {
       reason: string;
       reasonCode?: OrderCancellationReason | null;
       ledgerReason: "buyer_cancelled" | "admin_cancelled";
-      /** Teklif satırını çağıran zaten yazdıysa (admin iptali) atla. */
+      /**
+       * Yönetici iptalinin katalog kodu (`Order.adminCancelReasonCode`) —
+       * yalnız `admin_cancelled` ile anlamlıdır; iç not buraya gelmez.
+       */
+      adminReasonCode?: AdminCancelReasonCode;
+      /** Teklif satırını çağıran zaten yazdıysa atla. */
       skipOfferUpdate?: boolean;
+      /**
+       * Bağlı teklife yazılacak gerekçe; verilmezse "bağlı sipariş iptal
+       * edildi". Yönetici iptali teklifte de yönetici gerekçesini taşır.
+       */
+      offerCancelReason?: string;
       include?: TInclude;
     },
   ) {
@@ -542,6 +553,7 @@ export class OrderLifecycleService {
         ...orderCancelledData(UNPAID_CANCEL_ACTOR[opts.ledgerReason]),
         cancellationType: "iptal",
         cancellationReasonCode: opts.reasonCode ?? undefined,
+        adminCancelReasonCode: opts.adminReasonCode ?? undefined,
         cancelReason: opts.reason,
         version: { increment: 1 },
       },
@@ -569,7 +581,8 @@ export class OrderLifecycleService {
         where: { id: order.offerId },
         data: {
           status: OfferStatus.cancelled,
-          cancelReason: OFFER_CANCEL_REASON.orderCancelled,
+          cancelReason:
+            opts.offerCancelReason ?? OFFER_CANCEL_REASON.orderCancelled,
         },
       });
     }

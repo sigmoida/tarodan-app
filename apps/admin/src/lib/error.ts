@@ -20,6 +20,17 @@ export function extractErrorMessage(error: unknown, fallback: string): string {
 }
 
 /**
+ * Sunucu hatasının katalog anahtarı (API `AllExceptionsFilter` gövdedeki
+ * `i18nKey`); yoksa null. Belirli bir hatada farklı davranmak için (ör.
+ * iptalde "tür değişti" → önizlemeyi tazele) metne değil anahtara bakılır.
+ */
+export function extractErrorI18nKey(error: unknown): string | null {
+  const key = (error as { response?: { data?: { i18nKey?: unknown } } })
+    ?.response?.data?.i18nKey;
+  return typeof key === "string" && key ? key : null;
+}
+
+/**
  * Toplu içe aktarma uçlarının satır bazlı hata listesini çıkarır.
  *
  * Sunucu `BadRequestException({ code, message, errors })` gövdesi döner; bu

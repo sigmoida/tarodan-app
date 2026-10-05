@@ -4,6 +4,11 @@ import type {
   AdminOrderPackage,
   AdminOrderParty,
 } from "./admin-order-list";
+import {
+  ADMIN_CANCEL_REASON_CODES,
+  ADMIN_CANCEL_REASON_I18N_KEYS,
+  type AdminCancelReasonCode,
+} from "./admin-cancellation";
 import type { CancellationActorValue } from "./commerce-status";
 
 /**
@@ -114,10 +119,12 @@ export function resolveAdminCancellationBucket(
 // ── İptal nedeni ─────────────────────────────────────────────────────────────
 
 /**
- * Bir iptalin gösterilecek nedeni. API ham alanlardan çözer (alıcının seçtiği
- * kod > süre dolumu sabiti > serbest metin); panel ve Excel aynı çözümü okur.
+ * Bir iptalin gösterilecek nedeni. API ham alanlardan çözer (yöneticinin
+ * katalog kodu > alıcının seçtiği kod > süre dolumu sabiti > serbest metin);
+ * panel ve Excel aynı çözümü okur.
  */
 export type AdminCancellationReason =
+  | { kind: "admin"; code: AdminCancelReasonCode }
   | { kind: "code"; code: string }
   | { kind: "expired" }
   | { kind: "text"; text: string }
@@ -140,6 +147,8 @@ export function cancellationReasonMessage(
   reason: AdminCancellationReason,
 ): AdminCancellationReasonMessage {
   switch (reason.kind) {
+    case "admin":
+      return { key: ADMIN_CANCEL_REASON_I18N_KEYS[reason.code] };
     case "code":
       return { key: `status.orderCancellationReason.${reason.code}` };
     case "expired":
@@ -149,6 +158,34 @@ export function cancellationReasonMessage(
     default:
       return { text: ADMIN_CANCELLATION_EMPTY_VALUE };
   }
+}
+
+// ── Yönetici iptali süzgeci ──────────────────────────────────────────────────
+
+/**
+ * "Yönetici iptali" süzgecinin değerleri: `any` yöneticinin katalog nedeniyle
+ * yaptığı bütün iptaller, bir kod yalnız o nedenle yapılanlar. Boş ya da
+ * tanınmayan değer süzgeç uygulamaz (aktör alt sekmesinden bağımsızdır: aktör
+ * "Tarodan" sistem iptallerini de kapsar, bu süzgeç yalnız yönetici kararını).
+ */
+export const ADMIN_CANCELLATION_ADMIN_REASON_ANY = "any";
+
+export const ADMIN_CANCELLATION_ADMIN_REASON_FILTERS = [
+  ADMIN_CANCELLATION_ADMIN_REASON_ANY,
+  ...ADMIN_CANCEL_REASON_CODES,
+] as const;
+
+export type AdminCancellationAdminReasonFilter =
+  (typeof ADMIN_CANCELLATION_ADMIN_REASON_FILTERS)[number];
+
+export function resolveAdminCancellationAdminReason(
+  value: unknown,
+): AdminCancellationAdminReasonFilter | null {
+  return (
+    ADMIN_CANCELLATION_ADMIN_REASON_FILTERS as readonly unknown[]
+  ).includes(value)
+    ? (value as AdminCancellationAdminReasonFilter)
+    : null;
 }
 
 // ── Aktör ────────────────────────────────────────────────────────────────────

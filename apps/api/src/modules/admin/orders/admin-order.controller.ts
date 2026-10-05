@@ -172,14 +172,16 @@ export class AdminOrderController {
   }
 
   /**
-   * Kargo öncesi platform iptalinin önizlemesi: alıcıya dönecek tutar. İptalle
-   * AYNI hesap yolundan gelir; sipariş iptal edilemiyorsa iptalle aynı hata.
+   * Yönetici iptalinin önizlemesi: türü (ödenmemiş / kargo öncesi ödenmiş) ve
+   * sonucu — iade tutarı ya da "ödeme alınmadı", serbest kalan stok. Tutar
+   * iptalle AYNI hesap yolundan gelir; iptal edilemiyorsa iptalle aynı hata.
    */
   @Get("orders/:id/cancel-preview")
   @Roles(AdminRole.super_admin, AdminRole.admin)
   @RequirePermission("orders")
   @ApiOperation({
-    summary: "Preview the buyer refund of a pre-shipment admin cancellation",
+    summary:
+      "Preview an admin cancellation: its kind, the refund or 'no payment taken', and the stock released",
   })
   @ApiParam({ name: "id", description: "Order ID" })
   @ApiResponse({ status: 200, description: "AdminOrderCancelPreview" })
@@ -189,26 +191,31 @@ export class AdminOrderController {
   }
 
   /**
-   * Admin "Siparişi iptal et": yalnız kargo öncesi (paid/preparing, koli
-   * taşıyıcıya geçmemiş), sipariş (sepet kalemi) başına; alıcıya kargo öncesi
-   * iptal politikasının tam iadesi yapılır. Kargolanmış sipariş → iade akışı.
+   * Admin "Siparişi iptal et" — sipariş (sepet kalemi) başına; ödenmemiş
+   * sipariş, kargo öncesi ödenmiş sipariş ve teklif siparişi için TEK uç.
+   * Neden katalog kodudur (taraflara etiketi söylenir), not yalnız denetime
+   * gider. Kargoya verilmiş / teslim edilmiş / tamamlanmış sipariş ve açık
+   * iade talebi olan sipariş reddedilir.
    */
   @Post("orders/:id/cancel")
   @Roles(AdminRole.super_admin, AdminRole.admin)
   @RequirePermission("orders")
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
-    summary: "Cancel a paid order before carrier handover and refund the buyer",
+    summary:
+      "Cancel an unpaid or a paid not-yet-shipped order (cart or offer order) as the platform",
   })
   @ApiParam({ name: "id", description: "Order ID" })
   @ApiResponse({ status: 200, description: "AdminOrderCancelResult" })
   @ApiResponse({
     status: 400,
-    description: "Not paid yet, or already handed to the carrier",
+    description:
+      "Invalid reason/note, or the order is handed to the carrier, delivered or completed",
   })
   @ApiResponse({
     status: 409,
-    description: "Already cancelled, or an active refund request exists",
+    description:
+      "Already cancelled, an open refund request, the order's kind changed since the preview, or a payment is in flight",
   })
   async cancelOrder(
     @Param("id") id: string,

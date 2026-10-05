@@ -7,8 +7,10 @@ import {
   type Prisma,
 } from "@prisma/client";
 import {
+  ADMIN_CANCELLATION_ADMIN_REASON_ANY,
   ADMIN_CANCELLATION_BUCKET_ACTORS,
   ADMIN_CANCELLATION_NEW_WINDOW_MS,
+  resolveAdminCancellationAdminReason,
   resolveAdminCancellationBucket,
   resolveAdminCancellationTab,
   type AdminCancellationBucket,
@@ -39,6 +41,11 @@ export interface CancellationListFilters {
   /** İptal anı aralığı (YYYY-MM-DD, dahil). */
   startDate?: string;
   endDate?: string;
+  /**
+   * Yönetici iptali süzgeci: `any` ya da katalog kodu (bkz.
+   * `ADMIN_CANCELLATION_ADMIN_REASON_FILTERS`); tanınmayan değer yok sayılır.
+   */
+  adminReason?: string;
 }
 
 export interface CancellationSourceWheres {
@@ -173,21 +180,41 @@ function orderTabWhere(
     origin: OrderOrigin.direct_sale,
   };
   // Ödenmemiş (vazgeçilmiş) teklif listelenmez: teklif siparişinin ödemesi
-  // doğrudan siparişe bağlıdır (teklif siparişi sepete girmez).
-  const paidOffer: Prisma.OrderWhereInput = {
+  // doğrudan siparişe bağlıdır (teklif siparişi sepete girmez). İstisna
+  // yöneticinin iptal ettiği ödenmemiş teklif siparişidir: bir yönetici
+  // kararıdır ve "Yönetici iptali" süzgecinde görünmelidir.
+  const listedOffer: Prisma.OrderWhereInput = {
     origin: OrderOrigin.offer,
-    payment: { is: { status: { in: PAID_PAYMENT_STATUSES } } },
+    OR: [
+      { payment: { is: { status: { in: PAID_PAYMENT_STATUSES } } } },
+      { adminCancelReasonCode: { not: null } },
+    ],
   };
   switch (tab) {
     case "direct_sale":
       return { AND: [base, directSale] };
     case "offer":
-      return { AND: [base, paidOffer] };
+      return { AND: [base, listedOffer] };
     case "all":
-      return { AND: [base, { OR: [directSale, paidOffer] }] };
+      return { AND: [base, { OR: [directSale, listedOffer] }] };
     default:
       return undefined;
   }
+}
+
+/**
+ * Yönetici iptali süzgecinin sipariş koşulu; süzgeç yoksa `undefined`.
+ * Takasın bu daldaki kaynağında yönetici neden kolonu yoktur: süzgeç
+ * etkinken takas eşleşmez (`MATCH_NOTHING`).
+ */
+function adminReasonOrderWhere(
+  filters: CancellationListFilters,
+): Prisma.OrderWhereInput | undefined {
+  const adminReason = resolveAdminCancellationAdminReason(filters.adminReason);
+  if (!adminReason) return undefined;
+  return adminReason === ADMIN_CANCELLATION_ADMIN_REASON_ANY
+    ? { adminCancelReasonCode: { not: null } }
+    : { adminCancelReasonCode: adminReason };
 }
 
 function tradeTabWhere(
@@ -208,6 +235,7 @@ export function cancellationSourceWheres(
   now: Date,
 ): CancellationSourceWheres {
   const bucketWhere = cancellationBucketWhere(bucket, now);
+  const adminReasonWhere = adminReasonOrderWhere(filters);
   const result: CancellationSourceWheres = {};
 
   const orderScope = orderTabWhere(tab);
@@ -217,6 +245,7 @@ export function cancellationSourceWheres(
       ...(textParts(filters, ORDER_TEXT) as Prisma.OrderWhereInput[]),
     ];
     if (bucketWhere) parts.push(bucketWhere as Prisma.OrderWhereInput);
+    if (adminReasonWhere) parts.push(adminReasonWhere);
     result.order = { AND: parts };
   }
 
@@ -227,6 +256,7 @@ export function cancellationSourceWheres(
       ...(textParts(filters, TRADE_TEXT) as Prisma.TradeWhereInput[]),
     ];
     if (bucketWhere) parts.push(bucketWhere as Prisma.TradeWhereInput);
+    if (adminReasonWhere) parts.push(MATCH_NOTHING);
     result.trade = { AND: parts };
   }
 
@@ -256,6 +286,7 @@ export function cancellationScopeOf(query: CancellationListQuery): {
       party: query.party,
       startDate: query.startDate,
       endDate: query.endDate,
+      adminReason: query.adminReason,
     },
   };
 }

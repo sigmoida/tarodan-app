@@ -7,6 +7,7 @@ export * from "./consent-record.dto";
 export * from "./catalog-query.dto";
 export * from "./operations-query.dto";
 export * from "./admin-offer.dto";
+export * from "./admin-order-cancel.dto";
 export * from "./moderation-query.dto";
 export * from "./finance-query.dto";
 export * from "./admin-action.dto";
@@ -21,7 +22,6 @@ export {
   UserAnalyticsResponseDto,
   ReportQueryDto,
   UpdateOrderStatusDto,
-  AdminCancelOrderDto,
   AddOrderTrackingDto,
   DashboardStatsQueryDto,
   DashboardRangeConstraint,

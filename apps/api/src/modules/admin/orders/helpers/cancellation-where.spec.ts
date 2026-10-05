@@ -23,7 +23,7 @@ const json = (value: unknown) => JSON.stringify(value);
 
 describe("cancellation where-builder", () => {
   describe("sources per tab", () => {
-    it("all = cancelled direct + PAID offer orders + cancelled/rejected trades", () => {
+    it("all = cancelled direct + PAID (or admin-cancelled) offer orders + cancelled/rejected trades", () => {
       const { order, trade } = cancellationSourceWheres("all", "all", {}, NOW);
       expect(order).toEqual({
         AND: [
@@ -38,9 +38,14 @@ describe("cancellation where-builder", () => {
                   { origin: OrderOrigin.direct_sale },
                   {
                     origin: OrderOrigin.offer,
-                    payment: {
-                      is: { status: { in: PAID_PAYMENT_STATUSES } },
-                    },
+                    OR: [
+                      {
+                        payment: {
+                          is: { status: { in: PAID_PAYMENT_STATUSES } },
+                        },
+                      },
+                      { adminCancelReasonCode: { not: null } },
+                    ],
                   },
                 ],
               },
@@ -65,7 +70,7 @@ describe("cancellation where-builder", () => {
       expect(trade).toBeUndefined();
     });
 
-    it("offer = cancelled offer orders that had been PAID — dropped unpaid offers never list", () => {
+    it("offer = cancelled offer orders that had been PAID — dropped unpaid offers never list, unless an admin cancelled them", () => {
       const { order, trade } = cancellationSourceWheres(
         "offer",
         "all",
@@ -78,6 +83,8 @@ describe("cancellation where-builder", () => {
           payment: { is: { status: { in: ["completed", "refunded"] } } },
         }).slice(1, -1),
       );
+      // Yöneticinin iptal ettiği ödenmemiş teklif siparişi bir karardır.
+      expect(json(order)).toContain(`"adminCancelReasonCode":{"not":null}`);
       expect(json(order)).not.toContain(`"origin":"direct_sale"`);
       expect(trade).toBeUndefined();
     });
@@ -222,6 +229,44 @@ describe("cancellation where-builder", () => {
         expect(json(where)).toContain(`"cancelledAt":{"gte"`);
         expect(json(where)).not.toContain(`"createdAt"`);
       }
+    });
+
+    it("admin-cancellation filter: 'any' = every admin reason, a code = that reason; trades never match", () => {
+      const any = cancellationSourceWheres(
+        "all",
+        "all",
+        { adminReason: "any" },
+        NOW,
+      );
+      const anyParts = (any.order as { AND: unknown[] }).AND;
+      expect(anyParts[anyParts.length - 1]).toEqual({
+        adminCancelReasonCode: { not: null },
+      });
+      expect(json(any.trade)).toContain(`"id":{"in":[]}`);
+
+      const one = cancellationSourceWheres(
+        "direct_sale",
+        "platform",
+        { adminReason: "stock_error" },
+        NOW,
+      );
+      const oneParts = (one.order as { AND: unknown[] }).AND;
+      expect(oneParts[oneParts.length - 1]).toEqual({
+        adminCancelReasonCode: "stock_error",
+      });
+    });
+
+    it("an unknown admin-reason value is ignored", () => {
+      const { order } = cancellationSourceWheres(
+        "direct_sale",
+        "all",
+        { adminReason: "not-a-code" },
+        NOW,
+      );
+      expect((order as { AND: unknown[] }).AND).toHaveLength(1);
+      expect(
+        cancellationScopeOf({ adminReason: "stock_error" }).filters,
+      ).toMatchObject({ adminReason: "stock_error" });
     });
 
     it("blank filters add nothing", () => {

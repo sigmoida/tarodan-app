@@ -4,14 +4,15 @@ import {
   Prisma,
   RefundAttemptStatus,
 } from "@prisma/client";
-import type {
-  AdminCancellationInfo,
-  AdminCancellationReason,
-  AdminCancellationRefundState,
-  AdminCancellationRow,
-  AdminOrderLine,
-  AdminOrderPackage,
-  AdminOrderParty,
+import {
+  isAdminCancelReasonCode,
+  type AdminCancellationInfo,
+  type AdminCancellationReason,
+  type AdminCancellationRefundState,
+  type AdminCancellationRow,
+  type AdminOrderLine,
+  type AdminOrderPackage,
+  type AdminOrderParty,
 } from "@tarodan/types";
 import { isOrderExpiryCancelReason } from "../../../order/helpers/order-cancel-reasons";
 import { isTradeExpiryCancelReason } from "../../../trade/helpers/trade-cancel-reasons";
@@ -41,6 +42,7 @@ const nonEmpty = (value: string | null | undefined): string | null =>
 
 /**
  * Sipariş iptalinin görünen nedeni.
+ * 0. Yöneticinin (platform) katalog kodu → katalog etiketi.
  * 1. Alıcının kendi iptali + seçtiği kod → kodun etiketi.
  * 2. Süre dolumu sabiti → "Süresi Dolan" (alıcının açık bir iptal talebi
  *    varken sistem süre dolumuyla kapattıysa kod bayattır; süre dolumu kazanır).
@@ -50,8 +52,15 @@ const nonEmpty = (value: string | null | undefined): string | null =>
 export function orderCancellationReason(order: {
   cancelledBy: CancellationActor | null;
   cancellationReasonCode: string | null;
+  adminCancelReasonCode: string | null;
   cancelReason: string | null;
 }): AdminCancellationReason {
+  if (
+    order.cancelledBy === CancellationActor.platform &&
+    isAdminCancelReasonCode(order.adminCancelReasonCode)
+  ) {
+    return { kind: "admin", code: order.adminCancelReasonCode };
+  }
   const code = order.cancellationReasonCode;
   if (code && order.cancelledBy === CancellationActor.buyer)
     return { kind: "code", code };

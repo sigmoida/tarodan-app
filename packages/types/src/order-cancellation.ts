@@ -1,3 +1,4 @@
+import type { AdminCancelRequest } from "./admin-cancellation";
 import type { OrderStatusValue, ShipmentStatusValue } from "./commerce-status";
 
 /**
@@ -66,7 +67,8 @@ export function isPreShipmentCancellableStatus(status: string): boolean {
 /**
  * Bir siparişin kargo öncesi iptalini engelleyen sebep; engel yoksa `null`.
  *
- * - `not_paid`: ödeme bekleyen sipariş — iade edilecek para yoktur.
+ * - `not_paid`: ödeme bekleyen sipariş — iade edilecek para yoktur (admin
+ *   iptalinde engel değil, `unpaid` türüdür: `adminOrderCancelEligibility`).
  * - `closed`: zaten iptal/iade edilmiş.
  * - `active_refund`: sipariş iade sürecinde (`refund_requested`).
  * - `pending_cancellation`: kargo öncesi siparişte açık talep var. Kargo
@@ -104,31 +106,143 @@ export function preShipmentCancelBlocker(
   return null;
 }
 
-/**
- * `GET /admin/orders/:id/cancel-preview` — sipariş şimdi iptal edilse alıcıya
- * dönecek tutar (iptalin kendisiyle aynı hesap).
- */
-export interface AdminOrderCancelPreview {
-  refundAmount: number;
-  /**
-   * Gidiş kargosu iadeye dahil mi? Paketin son canlı kalemi iptal edilirken
-   * dahildir; paketteki diğer kalemler hâlâ gönderilecekse koli yine yola
-   * çıkacağından kargo iade edilmez.
-   */
-  shippingRefunded: boolean;
-}
-
-/** `POST /admin/orders/:id/cancel` yanıtı. */
-export interface AdminOrderCancelResult {
-  orderId: string;
-  refundRequestId: string;
-  refundNumber: string;
-  refundAmount: number;
-}
-
-/** Kargo öncesi iptal (admin "Siparişi iptal et") bu sipariş için açık mı? */
+/** Kargo öncesi (ödenmiş) iptal bu sipariş için açık mı? */
 export function isPreShipmentCancellable(
   order: PreShipmentCancelSubject,
 ): boolean {
   return preShipmentCancelBlocker(order) === null;
 }
+
+// ── Admin (platform) iptali ─────────────────────────────────────────────────
+
+/**
+ * Admin "Siparişi iptal et"in TÜRÜ — hangi mevcut çekirdeğin çalışacağını
+ * söyler; yeni bir para yolu yoktur:
+ * - `unpaid`: ödeme bekleyen sipariş. Para hareketi yok; stok ve kupon
+ *   rezervasyonu serbest kalır (alıcı iptaliyle aynı çekirdek,
+ *   `OrderLifecycleService.cancelUnpaidOrderInTx`).
+ * - `paid_pre_handover`: ödenmiş, koli taşıyıcıya geçmemiş. Tam iade (alıcı
+ *   iptaliyle aynı çekirdek, `RefundService.createPlatformCancellationRefund`).
+ *
+ * Teklif siparişi ayrı bir tür DEĞİLDİR: aynı statüler, aynı çekirdekler,
+ * aynı uçlar — bağlı teklifin kapanması çekirdeklerin işidir.
+ */
+export const ADMIN_ORDER_CANCEL_KINDS = [
+  "unpaid",
+  "paid_pre_handover",
+] as const;
+
+export type AdminOrderCancelKind = (typeof ADMIN_ORDER_CANCEL_KINDS)[number];
+
+/**
+ * Admin iptalini engelleyen sebep. Kargo öncesi kuralın engelleridir
+ * (`not_paid` hariç — admin için o bir türdür) ve devir sonrası durumlar
+ * panelde net bir metin gösterilebilsin diye ayrıştırılır:
+ * - `handed_over`: koli taşıyıcıda / yolda → iade talebi akışı.
+ * - `delivered`: teslim edildi (alıcı onayı bekleniyor olabilir) → iade akışı.
+ * - `completed`: sipariş tamamlandı, satıcı ödemesi yapıldı/yapılacak.
+ * - `closed`, `active_refund`, `pending_cancellation`: bkz.
+ *   `PreShipmentCancelBlocker` (açık talebin kendi onay/ret/kapat aksiyonları
+ *   vardır; admin iptali onların yerine geçmez).
+ */
+export const ADMIN_ORDER_CANCEL_BLOCKERS = [
+  "closed",
+  "active_refund",
+  "pending_cancellation",
+  "handed_over",
+  "delivered",
+  "completed",
+] as const;
+
+export type AdminOrderCancelBlocker =
+  (typeof ADMIN_ORDER_CANCEL_BLOCKERS)[number];
+
+export type AdminOrderCancelEligibility =
+  | { allowed: true; kind: AdminOrderCancelKind }
+  | { allowed: false; blocker: AdminOrderCancelBlocker };
+
+/** Teslim edilmiş ama tamamlanmamış sipariş statüleri. */
+const DELIVERED_ORDER_STATUSES: readonly OrderStatusValue[] = [
+  "delivered",
+  "awaiting_buyer_confirmation",
+];
+
+/**
+ * Admin iptali uygunluğu — TEK kural. API (önizleme, iptal ve kilit altındaki
+ * yeniden değerlendirme) ve admin paneli (dosya düğmesi, satır menüsü, teklif
+ * ekranı, engel metni) bunu okur. Kargo öncesi kuralın (`preShipmentCancelBlocker`)
+ * üstüne kurulur; ikinci bir kural değildir.
+ */
+export function adminOrderCancelEligibility(
+  order: PreShipmentCancelSubject,
+): AdminOrderCancelEligibility {
+  const blocker = preShipmentCancelBlocker(order);
+  if (blocker === null) return { allowed: true, kind: "paid_pre_handover" };
+  if (blocker === "not_paid") return { allowed: true, kind: "unpaid" };
+  if (blocker !== "handed_over") return { allowed: false, blocker };
+  if (order.status === "completed") {
+    return { allowed: false, blocker: "completed" };
+  }
+  if ((DELIVERED_ORDER_STATUSES as readonly string[]).includes(order.status)) {
+    return { allowed: false, blocker: "delivered" };
+  }
+  return { allowed: false, blocker: "handed_over" };
+}
+
+/** Engelin paneldeki açıklaması (katalog anahtarı). */
+export const ADMIN_ORDER_CANCEL_BLOCKER_I18N_KEYS = {
+  closed: "admin.operations.orders.cancel.blockers.closed",
+  active_refund: "admin.operations.orders.cancel.blockers.activeRefund",
+  pending_cancellation:
+    "admin.operations.orders.cancel.blockers.pendingCancellation",
+  handed_over: "admin.operations.orders.cancel.blockers.handedOver",
+  delivered: "admin.operations.orders.cancel.blockers.delivered",
+  completed: "admin.operations.orders.cancel.blockers.completed",
+} as const satisfies Record<AdminOrderCancelBlocker, string>;
+
+/**
+ * `GET /admin/orders/:id/cancel-preview` — iptal şimdi yapılsa ne olur. Tutar
+ * iptalin kendisiyle AYNI hesaptan gelir. `kind` onay isteğinde
+ * `expectedKind` olarak geri gönderilir: önizleme ile onay arasında sipariş
+ * ödendiyse sunucu "para yok"tan "iade"ye SESSİZCE geçmez.
+ */
+export type AdminOrderCancelPreview =
+  | {
+      kind: "unpaid";
+      /** İptal edilen adet. */
+      quantity: number;
+      /**
+       * Stok rezervasyonu hâlâ tutuluyor mu? true → `quantity` adet
+       * rezervasyon serbest kalır; false → rezervasyonu süpürme zaten bıraktı.
+       */
+      reservationHeld: boolean;
+    }
+  | {
+      kind: "paid_pre_handover";
+      /** İptal edilen adet — iade ile stoğa geri eklenir. */
+      quantity: number;
+      refundAmount: number;
+      /**
+       * Gidiş kargosu iadeye dahil mi? Paketin son canlı kalemi iptal
+       * edilirken dahildir; paketteki diğer kalemler hâlâ gönderilecekse koli
+       * yine yola çıkacağından kargo iade edilmez.
+       */
+      shippingRefunded: boolean;
+    };
+
+/** `POST /admin/orders/:id/cancel` gövdesi. */
+export interface AdminOrderCancelRequest extends AdminCancelRequest {
+  /** Önizlemenin türü — kilit altında değişmişse iptal 409 ile durur. */
+  expectedKind: AdminOrderCancelKind;
+}
+
+/** `POST /admin/orders/:id/cancel` yanıtı. */
+export type AdminOrderCancelResult =
+  | { orderId: string; kind: "unpaid" }
+  | {
+      orderId: string;
+      kind: "paid_pre_handover";
+      refundRequestId: string;
+      refundNumber: string;
+      refundAmount: number;
+    };

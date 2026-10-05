@@ -123,3 +123,5 @@ export * from "./timing-legal";
 
 // Admin (platform) cancellation: shared reason catalog + request shape
 export * from "./admin-cancellation";
+// ...and the request's validity rule (reason code, note required for "other")
+export * from "./admin-cancel-request";

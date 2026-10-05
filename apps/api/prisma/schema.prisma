@@ -1831,6 +1831,12 @@ model Order {
   /// önceki iptaller yalnız aktörün KESİN olduğu kurallarla dolduruldu.
   /// Yeniden ödemeye açılan (reactivate) siparişte temizlenir.
   cancelledBy                CancellationActor?       @map("cancelled_by")
+  /// Yönetici (platform) iptalinin katalog nedeni — `@tarodan/types`
+  /// `ADMIN_CANCEL_REASON_CODES` (uygulama doğrular; katalog göçsüz
+  /// büyüyebilsin diye enum değil metin). İptaller ekranı bununla süzer ve
+  /// taraflara bu kodun ETİKETİ söylenir. Yöneticinin iç notu burada DEĞİL,
+  /// yalnız denetim kaydındadır. Yönetici iptali dışındaki yollarda null.
+  adminCancelReasonCode      String?                  @map("admin_cancel_reason_code")
   /// Satıcının kargoya verme son tarihi (ödemede damgalanır). Tek seferlik
   /// uzatmada (Süreler ve Kurallar → `preparingDeadlineDays` = `extend_once`)
   /// YENİ son tarih buraya yazılır: uyarı, süre dolumu, panel ve ekranlar hep

@@ -6700,13 +6700,13 @@
         "productStock": "Stok: {quantity} · Rezerve: {reserved}",
         "cancel": "Teklifi iptal et",
         "cancelTitle": "Teklifi iptal et",
-        "cancelDescription": "Teklif kapatılır; alıcı ve satıcıya gerekçeyle bildirim gider.",
+        "cancelDescription": "Siparişi olmayan teklif kapatılır; alıcı ve satıcıya gerekçeyle bildirim gider. Siparişi olan teklif sipariş üzerinden iptal edilir.",
         "cancelReason": "İptal gerekçesi",
         "cancelReasonPlaceholder": "Neden iptal ediliyor? (zorunlu)",
-        "cancelWillCancelOrder": "Bağlı ödeme bekleyen sipariş de iptal edilecek.",
         "cancelled": "Teklif iptal edildi",
         "cancelFailed": "Teklif iptal edilemedi",
-        "extendedAt": "Bir kez uzatıldı"
+        "extendedAt": "Bir kez uzatıldı",
+        "cancelledBy": "İptal eden"
       },
       "orders": {
         "title": "Siparişler",
@@ -6794,7 +6794,8 @@
           "refundRequestsLink": "İade Talepleri",
           "payoutHeldNote2": "sayfasını kullanın.",
           "cancelReason": "İptal nedeni: {reason}",
-          "origin": "Köken: {origin}"
+          "origin": "Köken: {origin}",
+          "cancelledBy": "İptal eden: {actor}"
         },
         "financial": {
           "title": "Finansal Özet",
@@ -6953,20 +6954,43 @@
         "cancel": {
           "action": "Siparişi iptal et",
           "title": "Siparişi iptal et",
-          "description": "#{orderNumber} numaralı sipariş iptal edilecek. Sepetteki diğer ürünler etkilenmez.",
+          "description": "#{orderNumber} numaralı sipariş Tarodan iptali olarak kapatılacak. Sepetteki diğer ürünler etkilenmez.",
           "warning": "Alıcıya ödeme iadesi yapılır ve bu işlem geri alınamaz. Kargo etiketi oluşturulduysa kargo kaydı da iptal edilir; stok ürüne geri eklenir.",
           "refundAmount": "Alıcıya iade edilecek tutar",
           "shippingIncluded": "Kargo bedeli dahil",
           "shippingExcluded": "Kargo bedeli hariç — paketteki diğer ürünler yine gönderilecek",
-          "previewLoading": "İade tutarı hesaplanıyor…",
-          "previewUnavailable": "İade tutarı şu an hesaplanamadı. İptal yine de kargo öncesi iptal politikasının tutarıyla yapılır.",
-          "reason": "İptal gerekçesi",
-          "reasonPlaceholder": "Gerekçe denetim kaydına yazılır ve iptal e-postasında alıcıya ve satıcıya iletilir",
+          "previewLoading": "İptal önizlemesi hazırlanıyor…",
+          "previewUnavailable": "İptal önizlemesi alınamadı; önizleme olmadan iptal onaylanamaz. Pencereyi kapatıp yeniden deneyin.",
+          "reason": "İptal nedeni",
+          "reasonPlaceholder": "Neden seçin",
           "confirm": "İptal et ve iade et",
           "success": "Sipariş iptal edildi, alıcıya iade yapıldı",
           "failed": "Sipariş iptal edilemedi",
           "pendingManual": "Bu siparişin iptali İade Talepleri'nde elle tamamlanmayı bekliyor (iade işlemi yarıda kaldı).",
-          "openPendingRefund": "Talebi aç"
+          "openPendingRefund": "Talebi aç",
+          "warningUnpaid": "Sipariş kapatılır ve bu işlem geri alınamaz. Ödeme alınmadığı için para iadesi yoktur; ayrılan stok ve kupon serbest kalır.",
+          "reasonHint": "Alıcıya ve satıcıya yalnız seçilen nedenin adı iletilir.",
+          "note": "İç not",
+          "notePlaceholder": "Yalnız yöneticiler görür; denetim kaydına yazılır. Taraflara gösterilmez.",
+          "noteRequired": "“Diğer” seçildiğinde iç not zorunludur",
+          "confirmUnpaid": "Siparişi iptal et",
+          "successUnpaid": "Sipariş iptal edildi",
+          "noPayment": "Ödeme alınmadı — iade edilecek tutar yok",
+          "reservationReleased": "{count} adet stok rezervasyonu serbest bırakılır",
+          "reservationAlreadyReleased": "Stok rezervasyonu zaten serbest bırakılmış",
+          "stockRestored": "{count} adet stok ilana geri eklenir",
+          "kindChanged": "Siparişin ödeme durumu değişti; önizleme güncellendi. Kontrol edip yeniden onaylayın.",
+          "offerOrder": "Teklif siparişi: bağlı teklif de kapatılır.",
+          "partiesNotice": "Alıcıya ve satıcıya uygulama içi bildirim ve e-posta gönderilir.",
+          "blocked": "Yönetici iptali kapalı: {reason}",
+          "blockers": {
+            "closed": "sipariş zaten iptal ya da iade edildi",
+            "activeRefund": "açık bir iade talebi var; talebin kendi onay/ret/kapat işlemlerini kullanın",
+            "pendingCancellation": "yarıda kalmış iptal İade Talepleri'nde elle tamamlanmayı bekliyor",
+            "handedOver": "koli kargoya verildi; bu aşamada iade talebi akışı işler",
+            "delivered": "sipariş teslim edildi; iade talebi akışı işler",
+            "completed": "sipariş tamamlandı; satıcı ödemesi yapıldı ya da yapılacak"
+          }
         }
       },
       "trades": {
@@ -7510,7 +7534,10 @@
           "groupNumber": "Grup Kodu",
           "party": "Alıcı / Satıcı",
           "partyPlaceholder": "Ad, e-posta, kullanıcı kodu ya da kullanıcı ID",
-          "cancelledDate": "İptal tarihi"
+          "cancelledDate": "İptal tarihi",
+          "adminReason": "Yönetici iptali",
+          "adminReasonAll": "Tümü",
+          "adminReasonAny": "Tüm yönetici iptalleri"
         },
         "resultCount": "Filtreleme sonuçları: toplam {count} iptal",
         "empty": "Henüz iptal yok",
@@ -10465,7 +10492,7 @@
       "shipmentToDeliveredForbidden": "Kargo {status} durumundan teslim edildi durumuna geçirilemez",
       "offer": {
         "notCancellableStatus": "Teklif {status} durumunda; yalnız bekleyen veya ödenmemiş kabul edilmiş teklif iptal edilebilir",
-        "orderAlreadyPaid": "Bağlı sipariş ödendiği için teklif iptal edilemez; iade akışını kullanın"
+        "useOrderCancel": "Bu teklifin bağlı bir siparişi var; iptali sipariş üzerinden yapın (Siparişi iptal et) — teklif de onunla kapanır"
       },
       "order": {
         "shipmentMissingForDelivery": "Teslim geçişi için siparişe bağlı kargo kaydı bulunamadı",
@@ -10482,12 +10509,17 @@
         "couponChangesShipping": "Kupon kargo ücretini değiştiriyor; sipariş yeni checkout ile oluşturulmalı",
         "shipmentToDeliveredForbidden": "Kargo {status} durumundan teslim edildi durumuna geçirilemez",
         "shipmentToInTransitForbidden": "Kargo {status} durumundan yolda durumuna geçirilemez",
-        "cancelNotPaid": "Ödemesi tamamlanmamış sipariş iptal edilemez; iade edilecek bir tahsilat yok",
         "cancelAlreadyClosed": "Sipariş zaten iptal edilmiş veya iade edilmiş",
         "cancelActiveRefund": "Siparişte açık bir iade/iptal talebi var; işlemi İade Talepleri ekranından sürdürün",
         "cancelAfterHandover": "Kargoya verilmiş sipariş iptal edilemez; bu aşamada iade talebi akışını kullanın",
-        "cancelReasonRequired": "İptal gerekçesi zorunludur",
-        "cancelPendingManualCompletion": "Bu siparişin iptali ({refundNumber}) İade Talepleri'nde elle tamamlanmayı bekliyor; yeniden iptal etmek yerine talebi oradan sonuçlandırın"
+        "cancelReasonRequired": "Katalogdan bir iptal nedeni seçilmelidir",
+        "cancelPendingManualCompletion": "Bu siparişin iptali ({refundNumber}) İade Talepleri'nde elle tamamlanmayı bekliyor; yeniden iptal etmek yerine talebi oradan sonuçlandırın",
+        "cancelAfterDelivery": "Teslim edilmiş sipariş iptal edilemez; bu aşamada iade talebi akışını kullanın",
+        "cancelAfterCompletion": "Tamamlanmış sipariş iptal edilemez; satıcı ödemesi yapıldı ya da yapılmak üzere",
+        "cancelKindChanged": "Siparişin ödeme durumu önizlemeden sonra değişti; iptal yapılmadı. Güncel önizlemeyi kontrol edip yeniden onaylayın",
+        "cancelPaymentInFlight": "Bu sipariş için şu anda süren bir ödeme işlemi var; ödeme sonuçlandıktan sonra yeniden deneyin",
+        "cancelNoteRequired": "“Diğer” nedeni seçildiğinde iç not zorunludur",
+        "cancelNoteTooLong": "İç not izin verilen uzunluğu aşıyor"
       },
       "user": {
         "notBanned": "Kullanıcı zaten engelli değil",

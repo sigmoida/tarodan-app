@@ -2430,7 +2430,9 @@ describe("22 — Admin Paneli & Yetkilendirme (ADM)", () => {
   });
 
   scenario("ADM-124", async () => {
-    // Kabul edilmiş + ödeme bekleyen sipariş: teklif iptali siparişi de kapatır (cancelled/iptal), rezerv bozulmaz.
+    // Kabul edilmiş + ödeme bekleyen teklif siparişi: teklif ucu sipariş
+    // iptaline yönlendirir; sipariş ucu (sepet siparişiyle aynı yol) siparişi
+    // ve teklifi kapatır, rezerv bozulmaz, iç not yalnız denetimdedir.
     const { seller, buyer, addr, product } = await offerFixture();
     const { offerId, orderId } = await acceptOfferToOrder(ctx, {
       buyer,
@@ -2446,18 +2448,45 @@ describe("22 — Admin Paneli & Yetkilendirme (ADM)", () => {
       select: { reservedQuantity: true },
     });
 
-    const res = await request(server())
+    await request(server())
       .post(`/api/admin/offers/${offerId}/cancel`)
       .set(authHeader(admin))
       .send({ reason: "Satıcı talebi" })
+      .expect(409);
+
+    const preview = await request(server())
+      .get(`/api/admin/orders/${orderId}/cancel-preview`)
+      .set(authHeader(admin))
       .expect(200);
-    expect(res.body.order.status).toBe("cancelled");
+    expect(preview.body).toMatchObject({ kind: "unpaid" });
+
+    const res = await request(server())
+      .post(`/api/admin/orders/${orderId}/cancel`)
+      .set(authHeader(admin))
+      .send({
+        reasonCode: "user_request",
+        note: "Satıcı telefonla istedi",
+        expectedKind: "unpaid",
+      })
+      .expect(200);
+    expect(res.body).toEqual({ orderId, kind: "unpaid" });
     const order = await prisma.order.findUnique({ where: { id: orderId } });
     expect(order?.status).toBe("cancelled");
     expect(order?.cancellationType).toBe("iptal");
+    expect(order?.cancelledBy).toBe("platform");
+    expect(order?.adminCancelReasonCode).toBe("user_request");
     expect(order?.cancelReason).toBe(
-      "Yönetici tarafından iptal edildi: Satıcı talebi",
+      "Yönetici tarafından iptal edildi: Kullanıcı talebi",
     );
+    const offerRow = await prisma.offer.findUnique({ where: { id: offerId } });
+    expect(offerRow?.status).toBe("cancelled");
+    expect(offerRow?.cancelReason).toBe(
+      "Yönetici tarafından iptal edildi: Kullanıcı talebi",
+    );
+    const log = await prisma.auditLog.findFirst({
+      where: { action: "order_cancel", entityType: "Order", entityId: orderId },
+    });
+    expect((log?.newValue as any)?.note).toBe("Satıcı telefonla istedi");
     // Teklif siparişi ödeme başlatılmadan rezerve edilmez → sayaç değişmez, negatife düşmez.
     const after = await prisma.product.findUnique({
       where: { id: product.id },
@@ -2467,7 +2496,7 @@ describe("22 — Admin Paneli & Yetkilendirme (ADM)", () => {
   });
 
   scenario("ADM-125", async () => {
-    // Ödenmiş teklif siparişi: iptal 400 (iade akışı), teklif accepted kalır.
+    // Ödenmiş teklif siparişi: teklif ucu sipariş iptaline yönlendirir (409), teklif accepted kalır.
     const { seller, buyer, addr, product } = await offerFixture();
     const { offerId, orderId } = await acceptOfferToOrder(ctx, {
       buyer,
@@ -2484,8 +2513,8 @@ describe("22 — Admin Paneli & Yetkilendirme (ADM)", () => {
       .post(`/api/admin/offers/${offerId}/cancel`)
       .set(authHeader(admin))
       .send({ reason: "x" })
-      .expect(400);
-    expect(String(res.body.message)).toMatch(/ödendi/i);
+      .expect(409);
+    expect(res.body.i18nKey).toBe("server.admin.offer.useOrderCancel");
     const row = await getPrisma().offer.findUnique({ where: { id: offerId } });
     expect(row?.status).toBe("accepted");
   });

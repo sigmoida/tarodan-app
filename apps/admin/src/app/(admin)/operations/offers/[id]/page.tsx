@@ -13,13 +13,13 @@ import { DetailPage } from "@/components/detail/DetailPage";
 import { TestLaneBadge } from "@/components/TestLaneBadge";
 import { PartyCard } from "@/components/detail/PartyCard";
 import { SectionCard } from "@/components/detail/SectionCard";
-import { canCancelOffer } from "../_lib/offers";
+import { offerCancelAction } from "../_lib/offers";
 import type { AdminOfferDetail } from "./_lib/types";
 import { OfferSummarySection } from "./_sections/OfferSummarySection";
 import { OfferChainSection } from "./_sections/OfferChainSection";
 import { LinkedOrderSection } from "./_sections/LinkedOrderSection";
 import { ProductOffersSection } from "./_sections/ProductOffersSection";
-import { CancelOfferModal } from "./_modals/CancelOfferModal";
+import { OfferCancelDialog } from "./_modals/OfferCancelDialog";
 
 /**
  * Teklif detayı: /operations/offers/[id] — Siparişler ekranının Teklifler
@@ -55,13 +55,17 @@ export default function OfferDetailPage() {
           <TestLaneBadge isTest={d.offer.isTest} />
         </div>
       )}
-      actions={(d) =>
-        canCancelOffer(d.offer) ? (
+      actions={(d) => {
+        const action = offerCancelAction(d.offer);
+        if (!action) return undefined;
+        return (
           <Button variant="danger" onClick={() => setShowCancel(true)}>
-            {t("admin.operations.offers.cancel")}
+            {action.kind === "order"
+              ? t("admin.operations.orders.cancel.action")
+              : t("admin.operations.offers.cancel")}
           </Button>
-        ) : undefined
-      }
+        );
+      }}
     >
       {(d) => (
         <>
@@ -105,10 +109,11 @@ export default function OfferDetailPage() {
               <LinkedOrderSection order={d.order} />
             </div>
           </div>
-          <CancelOfferModal
+          <OfferCancelDialog
+            action={offerCancelAction(d.offer)}
+            offerId={d.offer.id}
             open={showCancel}
             onClose={() => setShowCancel(false)}
-            offer={d.offer}
           />
         </>
       )}

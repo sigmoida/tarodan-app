@@ -1,6 +1,7 @@
 import type {
   AdminCancellationCounts,
   AdminOrderCancelPreview,
+  AdminOrderCancelRequest,
   AdminOrderCancelResult,
   AdminOrderCounts,
 } from "@tarodan/types";
@@ -29,12 +30,15 @@ export const operationsApi = {
     },
   ) => api.post(`/admin/orders/${id}/tracking`, payload),
   getOrderInvoice: (id: string) => api.get(`/admin/orders/${id}/invoice`),
-  /** Kargo öncesi platform iptalinde alıcıya dönecek tutar (iptalle aynı hesap). */
+  /** Yönetici iptalinin önizlemesi: tür + iade tutarı ya da "ödeme yok" + stok. */
   getOrderCancelPreview: (id: string) =>
     api.get<AdminOrderCancelPreview>(`/admin/orders/${id}/cancel-preview`),
-  /** Kargo öncesi platform iptali (sipariş / sepet kalemi başına, tam iade). */
-  cancelOrder: (id: string, reason: string) =>
-    api.post<AdminOrderCancelResult>(`/admin/orders/${id}/cancel`, { reason }),
+  /**
+   * Yönetici (platform) iptali — ödenmemiş, kargo öncesi ödenmiş ve teklif
+   * siparişi için tek uç (sipariş / sepet kalemi başına).
+   */
+  cancelOrder: (id: string, request: AdminOrderCancelRequest) =>
+    api.post<AdminOrderCancelResult>(`/admin/orders/${id}/cancel`, request),
 
   // Cancellations (İptal & İade → İptaller; izin: refund_requests)
   getCancellations: (params?: Record<string, unknown>) =>

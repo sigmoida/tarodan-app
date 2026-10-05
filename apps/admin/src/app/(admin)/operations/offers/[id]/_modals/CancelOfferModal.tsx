@@ -2,14 +2,14 @@
 
 import { useEffect, useState } from "react";
 import { useTranslations } from "next-intl";
-import { Alert, Modal, ModalFooter, Textarea } from "@tarodan/ui";
+import { Modal, ModalFooter, Textarea } from "@tarodan/ui";
 import { adminApi } from "@/lib/api";
 import { useAdminMutation } from "@/hooks/useAdminMutation";
-import { cancelClosesOrder } from "../../_lib/offers";
 
 /**
- * Teklif iptali: gerekçe zorunlu (alıcı ve satıcıya bildirim olarak gider).
- * Bağlı ödeme bekleyen sipariş varsa o da aynı işlemde kapanır.
+ * SİPARİŞİ OLMAYAN teklifin iptali: gerekçe zorunlu (alıcı ve satıcıya
+ * bildirim olarak gider). Canlı siparişi olan teklif bu diyaloğu açmaz;
+ * sipariş iptal diyaloğunu (CancelOrderModal) açar.
  */
 export function CancelOfferModal({
   open,
@@ -18,7 +18,7 @@ export function CancelOfferModal({
 }: {
   open: boolean;
   onClose: () => void;
-  offer: { id: string; order: { status: string } | null };
+  offer: { id: string };
 }) {
   const t = useTranslations();
   const [reason, setReason] = useState("");
@@ -56,11 +56,6 @@ export function CancelOfferModal({
         <p className="text-sm text-muted">
           {t("admin.operations.offers.cancelDescription")}
         </p>
-        {cancelClosesOrder(offer) && (
-          <Alert variant="warning">
-            {t("admin.operations.offers.cancelWillCancelOrder")}
-          </Alert>
-        )}
         <Textarea
           label={t("admin.operations.offers.cancelReason")}
           placeholder={t("admin.operations.offers.cancelReasonPlaceholder")}

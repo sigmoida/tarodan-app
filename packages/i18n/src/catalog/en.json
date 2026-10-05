@@ -6700,13 +6700,13 @@
         "productStock": "Stock: {quantity} · Reserved: {reserved}",
         "cancel": "Cancel offer",
         "cancelTitle": "Cancel offer",
-        "cancelDescription": "The offer is closed; buyer and seller are notified with the reason.",
+        "cancelDescription": "An offer without an order is closed; the buyer and the seller are notified with the reason. An offer with an order is cancelled through the order.",
         "cancelReason": "Cancellation reason",
         "cancelReasonPlaceholder": "Why is it being cancelled? (required)",
-        "cancelWillCancelOrder": "The linked order awaiting payment will be cancelled too.",
         "cancelled": "Offer cancelled",
         "cancelFailed": "Offer could not be cancelled",
-        "extendedAt": "Extended once on"
+        "extendedAt": "Extended once on",
+        "cancelledBy": "Cancelled by"
       },
       "orders": {
         "title": "Orders",
@@ -6794,7 +6794,8 @@
           "refundRequestsLink": "Refund Requests",
           "payoutHeldNote2": "page.",
           "cancelReason": "Cancellation reason: {reason}",
-          "origin": "Origin: {origin}"
+          "origin": "Origin: {origin}",
+          "cancelledBy": "Cancelled by: {actor}"
         },
         "financial": {
           "title": "Financial Summary",
@@ -6953,20 +6954,43 @@
         "cancel": {
           "action": "Cancel order",
           "title": "Cancel order",
-          "description": "Order #{orderNumber} will be cancelled. Other items in the cart are not affected.",
+          "description": "Order #{orderNumber} will be closed as a Tarodan cancellation. Other items in the cart are not affected.",
           "warning": "The buyer will be refunded and this cannot be undone. If a shipping label was created, the shipment is cancelled too; the stock is returned to the listing.",
           "refundAmount": "Amount to be refunded to the buyer",
           "shippingIncluded": "Shipping included",
           "shippingExcluded": "Shipping excluded — the other items in the package will still be shipped",
-          "previewLoading": "Calculating the refund amount…",
-          "previewUnavailable": "The refund amount could not be calculated right now. The cancellation still refunds the amount the pre-shipment cancellation policy gives.",
+          "previewLoading": "Preparing the cancellation preview…",
+          "previewUnavailable": "The cancellation preview could not be loaded; a cancellation cannot be confirmed without it. Close the dialog and try again.",
           "reason": "Cancellation reason",
-          "reasonPlaceholder": "The reason is written to the audit log and sent to the buyer and the seller in the cancellation email",
+          "reasonPlaceholder": "Select a reason",
           "confirm": "Cancel and refund",
           "success": "Order cancelled and the buyer refunded",
           "failed": "The order could not be cancelled",
           "pendingManual": "This order's cancellation is waiting in Refund Requests for manual completion (the refund did not finish).",
-          "openPendingRefund": "Open request"
+          "openPendingRefund": "Open request",
+          "warningUnpaid": "The order is closed and this cannot be undone. No payment was taken, so nothing is refunded; the reserved stock and coupon are released.",
+          "reasonHint": "The buyer and the seller are told only the selected reason's name.",
+          "note": "Internal note",
+          "notePlaceholder": "Only admins see this; it is written to the audit log and never shown to the parties.",
+          "noteRequired": "An internal note is required when “Other” is selected",
+          "confirmUnpaid": "Cancel order",
+          "successUnpaid": "Order cancelled",
+          "noPayment": "No payment taken — nothing to refund",
+          "reservationReleased": "{count, plural, one {# reserved unit is} other {# reserved units are}} released",
+          "reservationAlreadyReleased": "The stock reservation was already released",
+          "stockRestored": "{count, plural, one {# unit is} other {# units are}} added back to the listing",
+          "kindChanged": "The order's payment state changed; the preview was updated. Check it and confirm again.",
+          "offerOrder": "Offer order: the linked offer is closed too.",
+          "partiesNotice": "The buyer and the seller are notified in-app and by e-mail.",
+          "blocked": "Admin cancellation unavailable: {reason}",
+          "blockers": {
+            "closed": "the order is already cancelled or refunded",
+            "activeRefund": "there is an open refund request; use its own approve/reject/close actions",
+            "pendingCancellation": "a half-finished cancellation is waiting in Refund Requests for manual completion",
+            "handedOver": "the parcel is handed to the carrier; the refund request flow applies at this stage",
+            "delivered": "the order is delivered; the refund request flow applies",
+            "completed": "the order is completed; the seller has been or will be paid out"
+          }
         }
       },
       "trades": {
@@ -7510,7 +7534,10 @@
           "groupNumber": "Group Code",
           "party": "Buyer / Seller",
           "partyPlaceholder": "Name, e-mail, user code or user ID",
-          "cancelledDate": "Cancellation date"
+          "cancelledDate": "Cancellation date",
+          "adminReason": "Admin cancellation",
+          "adminReasonAll": "All",
+          "adminReasonAny": "All admin cancellations"
         },
         "resultCount": "Filter results: {count} cancellations in total",
         "empty": "No cancellations yet",
@@ -10465,7 +10492,7 @@
       "shipmentToDeliveredForbidden": "A shipment in the {status} state cannot be moved to delivered",
       "offer": {
         "notCancellableStatus": "Offer is {status}; only pending or unpaid accepted offers can be cancelled",
-        "orderAlreadyPaid": "The linked order is already paid; use the refund flow instead"
+        "useOrderCancel": "This offer has a linked order; cancel it through the order (Cancel order) — the offer closes with it"
       },
       "order": {
         "shipmentMissingForDelivery": "No shipment is linked to this order, so it cannot be marked delivered",
@@ -10482,12 +10509,17 @@
         "couponChangesShipping": "The coupon changes the shipping cost; the order must be recreated through a new checkout",
         "shipmentToDeliveredForbidden": "A shipment in the {status} state cannot be moved to delivered",
         "shipmentToInTransitForbidden": "A shipment in the {status} state cannot be moved to in-transit",
-        "cancelNotPaid": "An order whose payment is not completed cannot be cancelled; there is no charge to refund",
         "cancelAlreadyClosed": "The order has already been cancelled or refunded",
         "cancelActiveRefund": "The order has an open refund/cancellation request; continue from the Refund Requests screen",
         "cancelAfterHandover": "An order handed to the carrier cannot be cancelled; use the refund request flow at this stage",
-        "cancelReasonRequired": "A cancellation reason is required",
-        "cancelPendingManualCompletion": "This order's cancellation ({refundNumber}) is waiting in Refund Requests for manual completion; resolve the request there instead of cancelling again"
+        "cancelReasonRequired": "A cancellation reason from the catalog is required",
+        "cancelPendingManualCompletion": "This order's cancellation ({refundNumber}) is waiting in Refund Requests for manual completion; resolve the request there instead of cancelling again",
+        "cancelAfterDelivery": "A delivered order cannot be cancelled; use the refund request flow at this stage",
+        "cancelAfterCompletion": "A completed order cannot be cancelled; the seller has been or is about to be paid out",
+        "cancelKindChanged": "The order's payment state changed after the preview; nothing was cancelled. Check the updated preview and confirm again",
+        "cancelPaymentInFlight": "A payment for this order is in progress right now; try again once it settles",
+        "cancelNoteRequired": "An internal note is required when the reason is “Other”",
+        "cancelNoteTooLong": "The internal note is longer than allowed"
       },
       "user": {
         "notBanned": "The user is not banned",

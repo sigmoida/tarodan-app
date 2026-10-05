@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  ADMIN_CANCELLATION_ADMIN_REASON_FILTERS,
   DASHBOARD_QUEUE_LINKS,
   DASHBOARD_QUEUE_PART_LINKS,
 } from "@tarodan/types";
@@ -10,7 +11,7 @@ import {
   resolveCancellationRefundView,
 } from "./view";
 import { refundRequestFilterFields } from "./refunds/filters";
-import { cancellationFilterFields } from "./filters";
+import { adminReasonFilterField, cancellationFilterFields } from "./filters";
 import { fieldKeys } from "@/components/list/filters/schema";
 
 const t = ((key: string) => key) as unknown as Parameters<
@@ -79,5 +80,20 @@ describe("deep links", () => {
     expect(CANCELLATIONS_REFUNDS_PATH).toBe(
       "/operations/cancellations-refunds",
     );
+  });
+});
+
+describe("admin-cancellation filter", () => {
+  it("offers all / every admin cancellation / each catalog reason, matching the API's accepted values", () => {
+    const field = adminReasonFilterField(t);
+    if (field.type !== "select") throw new Error("expected a select field");
+    const values = field.options.map((option) => option.value);
+    // "all" is the no-filter default and is never sent to the API.
+    expect(values[0]).toBe("all");
+    expect(field.defaultValue).toBe("all");
+    expect(values.slice(1)).toEqual([
+      ...ADMIN_CANCELLATION_ADMIN_REASON_FILTERS,
+    ]);
+    expect(VIEW_SCOPED_PARAMS).toContain("adminReason");
   });
 });

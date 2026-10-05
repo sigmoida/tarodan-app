@@ -71,4 +71,66 @@ describe("OrderLifecycleService.cancelUnpaidOrderInTx — iptal aktörü", () =>
       }),
     );
   });
+
+  it("yönetici iptalinin katalog kodunu aynı yazımda saklar; alıcı iptalinde kod yazılmaz", async () => {
+    const { service, tx } = makeService();
+
+    await service.cancelUnpaidOrderInTx(tx, order, {
+      reason: "Yönetici tarafından iptal edildi: Stok hatası",
+      ledgerReason: "admin_cancelled",
+      adminReasonCode: "stock_error",
+    });
+    expect(tx.order.update.mock.calls[0][0].data).toEqual(
+      expect.objectContaining({ adminCancelReasonCode: "stock_error" }),
+    );
+
+    tx.order.update.mockClear();
+    await service.cancelUnpaidOrderInTx(tx, order, {
+      reason: "gerekçe",
+      ledgerReason: "buyer_cancelled",
+    });
+    expect(
+      tx.order.update.mock.calls[0][0].data.adminCancelReasonCode,
+    ).toBeUndefined();
+  });
+
+  describe("bağlı teklif", () => {
+    const offerOrder = { ...order, offerId: "offer-1" };
+
+    it("varsayılan: teklif 'bağlı sipariş iptal edildi' gerekçesiyle kapanır", async () => {
+      const { service, tx } = makeService();
+
+      await service.cancelUnpaidOrderInTx(tx, offerOrder, {
+        reason: "gerekçe",
+        ledgerReason: "buyer_cancelled",
+      });
+
+      expect(tx.offer.update).toHaveBeenCalledWith({
+        where: { id: "offer-1" },
+        data: {
+          status: "cancelled",
+          cancelReason: "Bağlı sipariş iptal edildiği için teklif kapatıldı",
+        },
+      });
+    });
+
+    it("yönetici iptali teklife kendi gerekçesini yazar (teklif ekranı yönetici iptalini görür)", async () => {
+      const { service, tx } = makeService();
+
+      await service.cancelUnpaidOrderInTx(tx, offerOrder, {
+        reason: "Yönetici tarafından iptal edildi: Şüpheli işlem",
+        ledgerReason: "admin_cancelled",
+        adminReasonCode: "suspicious_activity",
+        offerCancelReason: "Yönetici tarafından iptal edildi: Şüpheli işlem",
+      });
+
+      expect(tx.offer.update).toHaveBeenCalledWith({
+        where: { id: "offer-1" },
+        data: {
+          status: "cancelled",
+          cancelReason: "Yönetici tarafından iptal edildi: Şüpheli işlem",
+        },
+      });
+    });
+  });
 });
