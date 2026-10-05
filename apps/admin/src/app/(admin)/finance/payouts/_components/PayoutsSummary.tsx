@@ -1,14 +1,14 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
-import Link from "next/link";
 import { adminApi } from "@/lib/api";
 import { adminKeys } from "@/lib/query/keys";
 import { MetricCard } from "@/components/MetricCard";
 import { QueryErrorCard } from "@/components/page/QueryErrorCard";
 import { SkeletonText } from "@tarodan/ui";
 import { SectionCard } from "@/components/detail/SectionCard";
-import { fmtTry } from "@/lib/format";
+import { TextLink } from "@/components/TextLink";
+import { fmtDate, fmtTry } from "@/lib/format";
 import { type PayoutSummary } from "../_lib/types";
 import { useTranslations } from "next-intl";
 
@@ -79,23 +79,18 @@ export function PayoutsSummary() {
                     key={r.id}
                     className="flex min-w-0 justify-between gap-2 text-sm text-muted"
                   >
-                    <Link
+                    <TextLink
                       href={`/operations/orders/${r.orderId}`}
-                      className="truncate text-primary-600 hover:text-primary-700"
+                      className="truncate"
                     >
                       {r.orderNumber
                         ? `#${r.orderNumber}`
                         : t("admin.finance.payouts.orderShort", {
                             id: r.orderId.slice(0, 8),
                           })}
-                    </Link>
+                    </TextLink>
                     <span className="shrink-0 whitespace-nowrap">
-                      {fmtTry(r.amount)} —{" "}
-                      {r.releaseAt
-                        ? new Date(r.releaseAt).toLocaleDateString(
-                            t("common.dateLocale"),
-                          )
-                        : "-"}
+                      {fmtTry(r.amount)} — {fmtDate(r.releaseAt) ?? "-"}
                     </span>
                   </li>
                 ))

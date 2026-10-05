@@ -2,7 +2,7 @@
 
 import { Badge } from "@tarodan/ui";
 import { col } from "@/components/table";
-import { fmtTry } from "@/lib/format";
+import { fmtDate, fmtTry } from "@/lib/format";
 import type { SettlementRow } from "./types";
 import type { useTranslations } from "next-intl";
 
@@ -78,11 +78,7 @@ export const settlementColumns = (t: T) => [
     t("admin.finance.settlement.columns.maturity"),
     (r) => (
       <div className="whitespace-nowrap text-sm">
-        <p className="text-heading">
-          {r.maturityAt
-            ? new Date(r.maturityAt).toLocaleDateString("tr-TR")
-            : "—"}
-        </p>
+        <p className="text-heading">{fmtDate(r.maturityAt) ?? "—"}</p>
         <p className="text-xs text-muted">
           {r.maturityDays != null
             ? t("admin.finance.settlement.columns.maturityDays", {

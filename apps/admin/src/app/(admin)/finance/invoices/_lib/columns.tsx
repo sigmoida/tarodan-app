@@ -1,8 +1,8 @@
 /** @format */
 
 import { Badge, Button } from "@tarodan/ui";
-import Link from "next/link";
 import { col } from "@/components/table";
+import { CellLink } from "@/components/table/cells";
 import { fmtTry } from "@/lib/format";
 import { InvoicePdfButton } from "../_components/InvoicePdfButton";
 import { InvoiceDetailButton } from "../_components/InvoiceDetailButton";
@@ -187,12 +187,10 @@ export const sellerColumns = (t: T) => [
     (s) => (
       <div className="text-sm">
         {s.orderId ? (
-          <Link
+          <CellLink
             href={`/operations/orders/${s.orderId}`}
-            className="whitespace-nowrap font-mono font-medium text-primary-600 hover:text-primary-700"
-          >
-            #{s.orderNumber}
-          </Link>
+            label={`#${s.orderNumber}`}
+          />
         ) : (
           <p className="whitespace-nowrap font-mono font-medium text-heading">
             {s.orderNumber || "—"}
@@ -202,9 +200,9 @@ export const sellerColumns = (t: T) => [
           {s.fileName}
         </p>
         {s.replacedAt && (
-          <span className="mt-1 inline-flex rounded bg-warning-100 px-2 py-0.5 text-[11px] font-medium text-warning-700">
+          <Badge variant="warning" size="sm" className="mt-1">
             {t("admin.finance.invoices.replaced")}
-          </span>
+          </Badge>
         )}
       </div>
     ),

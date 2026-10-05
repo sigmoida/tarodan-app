@@ -2,6 +2,7 @@
 
 import { useMemo } from "react";
 import { earlyReleaseDays } from "@tarodan/types";
+import { Alert } from "@tarodan/ui";
 import { FormModal, FormTextarea, useZodForm } from "@tarodan/ui/form";
 import { useTranslations } from "next-intl";
 import { adminApi } from "@/lib/api";
@@ -79,9 +80,9 @@ export function ReleasePayoutModal({
         {t("admin.finance.payouts.releaseDescription")}
       </p>
       {early && (
-        <p className="rounded border border-warning-300 bg-warning-50 p-3 text-sm text-warning-800">
+        <Alert variant="warning">
           {t("admin.finance.payouts.earlyReleaseWarning")}
-        </p>
+        </Alert>
       )}
       {daysEarly !== null && (
         <p className="text-sm font-medium text-heading">

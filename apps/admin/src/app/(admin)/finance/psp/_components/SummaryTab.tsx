@@ -2,15 +2,20 @@
 
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
-import { Badge, Button, Modal, Select } from "@tarodan/ui";
+import { Badge, Button, EmptyState, Modal, Select } from "@tarodan/ui";
 import { useTranslations } from "next-intl";
 import { adminApi } from "@/lib/api";
 import { adminKeys } from "@/lib/query/keys";
-import { fmtDate, fmtDateTime, fmtTry } from "@/lib/format";
+import { fmtDate, fmtTry } from "@/lib/format";
+import { DataTable } from "@/components/DataTable";
+import { PageLoading } from "@/components/PageLoading";
 import { SectionCard } from "@/components/detail/SectionCard";
+import { SectionTitle } from "@/components/detail/SectionTitle";
+import { col } from "@/components/table/columns";
+import { CellLink, Empty } from "@/components/table/cells";
 import { QueryErrorCard } from "@/components/page/QueryErrorCard";
 import { SyncBanner } from "./SyncBanner";
 import {
@@ -64,7 +69,7 @@ export function SummaryTab() {
     );
   }
   if (query.isLoading) {
-    return <p className="py-8 text-center text-muted">{t("common.loading")}</p>;
+    return <PageLoading />;
   }
   const cards = query.data?.days ?? [];
 
@@ -84,11 +89,14 @@ export function SummaryTab() {
 
       {cards.length === 0 ? (
         <SectionCard>
-          <p className="py-8 text-center text-muted">
-            {query.data?.sync.enabled
-              ? t("admin.finance.psp.summary.empty")
-              : t("admin.finance.psp.summary.emptyDisabled")}
-          </p>
+          <EmptyState
+            size="compact"
+            title={
+              query.data?.sync.enabled
+                ? t("admin.finance.psp.summary.empty")
+                : t("admin.finance.psp.summary.emptyDisabled")
+            }
+          />
         </SectionCard>
       ) : (
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
@@ -112,6 +120,16 @@ export function SummaryTab() {
   );
 }
 
+/** Gün kartı tablosunun bir satırı — hücreler hazır basılır, hesap yok. */
+interface DayRow {
+  key: string;
+  label: string;
+  paytr: ReactNode;
+  ours: ReactNode;
+  oursTitle?: string;
+  diff: ReactNode;
+}
+
 function DayCardView({
   day,
   onShowMissing,
@@ -127,10 +145,76 @@ function DayCardView({
     Math.abs(day.refundDiff) <= day.tolerance;
   const clean = day.paytrCovered && problems === 0 && balanced;
 
+  const columns = useMemo(
+    () => [
+      col.custom(
+        "",
+        (r: DayRow) => <span className="text-muted">{r.label}</span>,
+        {
+          id: "label",
+        },
+      ),
+      col.custom("PayTR", (r: DayRow) => r.paytr),
+      col.custom(t("admin.finance.psp.summary.ours"), (r: DayRow) => (
+        <span title={r.oursTitle}>{r.ours}</span>
+      )),
+      col.custom(t("admin.finance.psp.summary.diff"), (r: DayRow) => r.diff),
+    ],
+    [t],
+  );
+  const noDiff = <Empty />;
+  const diffOf = (diff: number) =>
+    day.paytrCovered ? (
+      <DiffCell diff={diff} tolerance={day.tolerance} />
+    ) : (
+      noDiff
+    );
+  const rows: DayRow[] = [
+    {
+      key: "sales",
+      label: t("admin.finance.psp.summary.sales"),
+      paytr: (
+        <>
+          {fmtTry(day.paytr.salesTotal)}{" "}
+          <span className="text-xs text-subtle">({day.paytr.salesCount})</span>
+        </>
+      ),
+      ours: (
+        <>
+          {fmtTry(day.ours.salesTotal)}{" "}
+          <span className="text-xs text-subtle">({day.ours.salesCount})</span>
+        </>
+      ),
+      diff: diffOf(day.salesDiff),
+    },
+    {
+      key: "refunds",
+      label: t("admin.finance.psp.summary.refunds"),
+      paytr: fmtTry(day.paytr.refundTotal),
+      ours: fmtTry(day.ours.refundTotal),
+      diff: diffOf(day.refundDiff),
+    },
+    {
+      key: "fee",
+      label: t("admin.finance.psp.summary.fee"),
+      paytr: fmtTry(day.paytr.feeTotal),
+      ours: fmtTry(day.ours.feeBooked),
+      oursTitle: t("admin.finance.psp.summary.feeBookedHint"),
+      diff: diffOf(day.ours.feeBooked - day.paytr.feeTotal),
+    },
+    {
+      key: "net",
+      label: t("admin.finance.psp.summary.net"),
+      paytr: <span className="font-medium">{fmtTry(day.paytr.netTotal)}</span>,
+      ours: noDiff,
+      diff: noDiff,
+    },
+  ];
+
   return (
     <SectionCard>
       <div className="flex items-center justify-between gap-2">
-        <h3 className="font-semibold text-heading">{fmtDate(day.date)}</h3>
+        <SectionTitle>{fmtDate(day.date)}</SectionTitle>
         <div className="flex items-center gap-1">
           {day.provisional && (
             <Badge variant="outline">
@@ -155,90 +239,14 @@ function DayCardView({
         </div>
       </div>
 
-      <table className="mt-3 w-full text-sm">
-        <thead>
-          <tr className="text-left text-xs text-muted">
-            <th className="py-1 font-medium" />
-            <th className="py-1 font-medium">PayTR</th>
-            <th className="py-1 font-medium">
-              {t("admin.finance.psp.summary.ours")}
-            </th>
-            <th className="py-1 font-medium">
-              {t("admin.finance.psp.summary.diff")}
-            </th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr>
-            <td className="py-1 text-muted">
-              {t("admin.finance.psp.summary.sales")}
-            </td>
-            <td className="py-1">
-              {fmtTry(day.paytr.salesTotal)}{" "}
-              <span className="text-xs text-subtle">
-                ({day.paytr.salesCount})
-              </span>
-            </td>
-            <td className="py-1">
-              {fmtTry(day.ours.salesTotal)}{" "}
-              <span className="text-xs text-subtle">
-                ({day.ours.salesCount})
-              </span>
-            </td>
-            <td className="py-1">
-              {day.paytrCovered ? (
-                <DiffCell diff={day.salesDiff} tolerance={day.tolerance} />
-              ) : (
-                <span className="text-subtle">—</span>
-              )}
-            </td>
-          </tr>
-          <tr>
-            <td className="py-1 text-muted">
-              {t("admin.finance.psp.summary.refunds")}
-            </td>
-            <td className="py-1">{fmtTry(day.paytr.refundTotal)}</td>
-            <td className="py-1">{fmtTry(day.ours.refundTotal)}</td>
-            <td className="py-1">
-              {day.paytrCovered ? (
-                <DiffCell diff={day.refundDiff} tolerance={day.tolerance} />
-              ) : (
-                <span className="text-subtle">—</span>
-              )}
-            </td>
-          </tr>
-          <tr>
-            <td className="py-1 text-muted">
-              {t("admin.finance.psp.summary.fee")}
-            </td>
-            <td className="py-1">{fmtTry(day.paytr.feeTotal)}</td>
-            <td
-              className="py-1"
-              title={t("admin.finance.psp.summary.feeBookedHint")}
-            >
-              {fmtTry(day.ours.feeBooked)}
-            </td>
-            <td className="py-1">
-              {day.paytrCovered ? (
-                <DiffCell
-                  diff={day.ours.feeBooked - day.paytr.feeTotal}
-                  tolerance={day.tolerance}
-                />
-              ) : (
-                <span className="text-subtle">—</span>
-              )}
-            </td>
-          </tr>
-          <tr>
-            <td className="py-1 text-muted">
-              {t("admin.finance.psp.summary.net")}
-            </td>
-            <td className="py-1 font-medium">{fmtTry(day.paytr.netTotal)}</td>
-            <td className="py-1 text-subtle">—</td>
-            <td className="py-1 text-subtle">—</td>
-          </tr>
-        </tbody>
-      </table>
+      <div className="mt-3">
+        <DataTable
+          columns={columns}
+          data={rows}
+          dense
+          getRowId={(r) => r.key}
+        />
+      </div>
 
       {day.paytrCovered && (
         <div className="mt-3 flex flex-wrap gap-2 text-xs">
@@ -298,6 +306,36 @@ function MissingPaymentsModal({
   });
   const items = query.data?.items ?? [];
 
+  const columns = useMemo(
+    () => [
+      col.date(
+        t("admin.finance.psp.missing.paidAt"),
+        (i: PspMissingPayment) => i.paidAt,
+        {
+          withTime: true,
+        },
+      ),
+      col.custom(
+        t("admin.finance.psp.lines.reference"),
+        (i: PspMissingPayment) =>
+          i.kind === "payment" ? (
+            <CellLink
+              href={`/finance/payments/${i.id}`}
+              label={i.reference ?? i.id.slice(0, 8)}
+            />
+          ) : (
+            <span>{t("admin.finance.psp.missing.membership")}</span>
+          ),
+      ),
+      col.code("merchant_oid", (i: PspMissingPayment) => i.merchantOid),
+      col.money(
+        t("admin.finance.psp.lines.amount"),
+        (i: PspMissingPayment) => i.amount,
+      ),
+    ],
+    [t],
+  );
+
   return (
     <Modal
       isOpen
@@ -309,56 +347,14 @@ function MissingPaymentsModal({
       <p className="mb-3 text-sm text-muted">
         {t("admin.finance.psp.missing.description")}
       </p>
-      {query.isLoading ? (
-        <p className="py-6 text-center text-muted">{t("common.loading")}</p>
-      ) : items.length === 0 ? (
-        <p className="py-6 text-center text-muted">
-          {t("admin.finance.psp.missing.empty")}
-        </p>
-      ) : (
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="border-b border-border text-left text-muted">
-              <th className="px-2 py-2 font-medium">
-                {t("admin.finance.psp.missing.paidAt")}
-              </th>
-              <th className="px-2 py-2 font-medium">
-                {t("admin.finance.psp.lines.reference")}
-              </th>
-              <th className="px-2 py-2 font-medium">merchant_oid</th>
-              <th className="px-2 py-2 font-medium">
-                {t("admin.finance.psp.lines.amount")}
-              </th>
-            </tr>
-          </thead>
-          <tbody>
-            {items.map((item) => (
-              <tr
-                key={item.id}
-                className="border-b border-border last:border-0"
-              >
-                <td className="px-2 py-2">{fmtDateTime(item.paidAt)}</td>
-                <td className="px-2 py-2">
-                  {item.kind === "payment" ? (
-                    <Link
-                      href={`/finance/payments/${item.id}`}
-                      className="text-primary-600 hover:underline"
-                    >
-                      {item.reference ?? item.id.slice(0, 8)}
-                    </Link>
-                  ) : (
-                    <span>{t("admin.finance.psp.missing.membership")}</span>
-                  )}
-                </td>
-                <td className="px-2 py-2 font-mono text-xs">
-                  {item.merchantOid ?? "—"}
-                </td>
-                <td className="px-2 py-2 font-medium">{fmtTry(item.amount)}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      )}
+      <DataTable
+        columns={columns}
+        data={items}
+        loading={query.isLoading}
+        emptyText={t("admin.finance.psp.missing.empty")}
+        dense
+        getRowId={(item) => item.id}
+      />
     </Modal>
   );
 }

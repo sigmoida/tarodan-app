@@ -2,16 +2,17 @@
 
 "use client";
 
-import { useState } from "react";
-import Link from "next/link";
+import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Badge, Button, Checkbox, Modal, Select, Textarea } from "@tarodan/ui";
 import { useTranslations } from "next-intl";
 import { adminApi } from "@/lib/api";
 import { adminKeys } from "@/lib/query/keys";
 import { useAdminMutation } from "@/hooks/useAdminMutation";
-import { fmtDate, fmtTry } from "@/lib/format";
-import { SectionCard } from "@/components/detail/SectionCard";
+import { fmtTry } from "@/lib/format";
+import { DataTable } from "@/components/DataTable";
+import { col } from "@/components/table/columns";
+import { CellLink, Empty } from "@/components/table/cells";
 import { QueryErrorCard } from "@/components/page/QueryErrorCard";
 import type { PspStatementLine } from "../_lib/types";
 import {
@@ -67,6 +68,80 @@ export function LinesTab() {
       invalidates: ["psp-statement-lines", "psp-reconciliation"],
       successMessage: t("admin.finance.psp.lines.rematched"),
     },
+  );
+
+  const columns = useMemo(
+    () => [
+      col.date(
+        t("admin.finance.psp.lines.date"),
+        (l: PspStatementLine) => l.transactionDate,
+      ),
+      col.badge(t("admin.finance.psp.lines.type"), (l: PspStatementLine) => (
+        <Badge variant={l.type === "sale" ? "success" : "warning"}>
+          {t(
+            l.type === "sale"
+              ? "admin.finance.psp.lines.sale"
+              : "admin.finance.psp.lines.refund",
+          )}
+        </Badge>
+      )),
+      col.badge(
+        t("admin.finance.psp.merchant.label"),
+        (l: PspStatementLine) => <MerchantBadge merchant={l.paytrMerchant} />,
+      ),
+      col.code("merchant_oid", (l: PspStatementLine) => l.merchantOid),
+      col.money(
+        t("admin.finance.psp.lines.amount"),
+        (l: PspStatementLine) => l.amount,
+      ),
+      col.money(
+        t("admin.finance.psp.lines.fee"),
+        (l: PspStatementLine) => l.fee,
+      ),
+      col.custom(
+        t("admin.finance.psp.lines.matchStatus"),
+        (l: PspStatementLine) => (
+          <div className="flex flex-wrap items-center gap-1">
+            <Badge variant={STATUS_BADGE[l.matchStatus]}>
+              {t(`admin.finance.psp.lines.status.${l.matchStatus}`)}
+            </Badge>
+            {l.resolvedAt && (
+              <Badge variant="outline" title={l.resolutionNote ?? undefined}>
+                {t("admin.finance.psp.lines.status.resolved")}
+              </Badge>
+            )}
+          </div>
+        ),
+      ),
+      col.custom(
+        t("admin.finance.psp.lines.reference"),
+        (l: PspStatementLine) => <LineReference line={l} />,
+      ),
+      col.actions((l: PspStatementLine) =>
+        l.matchStatus !== "matched" ? (
+          <>
+            <Button
+              variant="secondary"
+              size="sm"
+              disabled={rematch.isPending}
+              onClick={() => rematch.mutate(l.id)}
+            >
+              {t("admin.finance.psp.lines.rematch")}
+            </Button>
+            {!l.resolvedAt && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setResolving(l)}
+              >
+                {t("admin.finance.psp.lines.resolve")}
+              </Button>
+            )}
+          </>
+        ) : null,
+      ),
+    ],
+    [t, rematch],
   );
 
   const rows = query.data?.data ?? [];
@@ -131,121 +206,13 @@ export function LinesTab() {
           isRetrying={query.isFetching}
         />
       ) : (
-        <SectionCard bodyClassName="overflow-x-auto">
-          {query.isLoading ? (
-            <p className="py-8 text-center text-muted">{t("common.loading")}</p>
-          ) : rows.length === 0 ? (
-            <p className="py-8 text-center text-muted">
-              {t("admin.finance.psp.lines.empty")}
-            </p>
-          ) : (
-            <table className="w-full min-w-[960px] text-sm">
-              <thead>
-                <tr className="border-b border-border text-left text-muted">
-                  <th className="px-3 py-3 font-medium">
-                    {t("admin.finance.psp.lines.date")}
-                  </th>
-                  <th className="px-3 py-3 font-medium">
-                    {t("admin.finance.psp.lines.type")}
-                  </th>
-                  <th className="px-3 py-3 font-medium">
-                    {t("admin.finance.psp.merchant.label")}
-                  </th>
-                  <th className="px-3 py-3 font-medium">merchant_oid</th>
-                  <th className="px-3 py-3 font-medium">
-                    {t("admin.finance.psp.lines.amount")}
-                  </th>
-                  <th className="px-3 py-3 font-medium">
-                    {t("admin.finance.psp.lines.fee")}
-                  </th>
-                  <th className="px-3 py-3 font-medium">
-                    {t("admin.finance.psp.lines.matchStatus")}
-                  </th>
-                  <th className="px-3 py-3 font-medium">
-                    {t("admin.finance.psp.lines.reference")}
-                  </th>
-                  <th className="px-3 py-3 font-medium" />
-                </tr>
-              </thead>
-              <tbody>
-                {rows.map((line) => (
-                  <tr
-                    key={line.id}
-                    className="border-b border-border last:border-0"
-                  >
-                    <td className="px-3 py-3">
-                      {fmtDate(line.transactionDate)}
-                    </td>
-                    <td className="px-3 py-3">
-                      <Badge
-                        variant={line.type === "sale" ? "success" : "warning"}
-                      >
-                        {t(
-                          line.type === "sale"
-                            ? "admin.finance.psp.lines.sale"
-                            : "admin.finance.psp.lines.refund",
-                        )}
-                      </Badge>
-                    </td>
-                    <td className="px-3 py-3">
-                      <MerchantBadge merchant={line.paytrMerchant} />
-                    </td>
-                    <td className="px-3 py-3 font-mono text-xs">
-                      {line.merchantOid}
-                    </td>
-                    <td className="px-3 py-3 font-medium">
-                      {fmtTry(line.amount)}
-                    </td>
-                    <td className="px-3 py-3">{fmtTry(line.fee) ?? "—"}</td>
-                    <td className="px-3 py-3">
-                      <div className="flex flex-wrap items-center gap-1">
-                        <Badge variant={STATUS_BADGE[line.matchStatus]}>
-                          {t(
-                            `admin.finance.psp.lines.status.${line.matchStatus}`,
-                          )}
-                        </Badge>
-                        {line.resolvedAt && (
-                          <Badge
-                            variant="outline"
-                            title={line.resolutionNote ?? undefined}
-                          >
-                            {t("admin.finance.psp.lines.status.resolved")}
-                          </Badge>
-                        )}
-                      </div>
-                    </td>
-                    <td className="px-3 py-3">
-                      <LineReference line={line} />
-                    </td>
-                    <td className="px-3 py-3">
-                      {line.matchStatus !== "matched" && (
-                        <div className="flex items-center gap-1">
-                          <Button
-                            variant="secondary"
-                            size="sm"
-                            disabled={rematch.isPending}
-                            onClick={() => rematch.mutate(line.id)}
-                          >
-                            {t("admin.finance.psp.lines.rematch")}
-                          </Button>
-                          {!line.resolvedAt && (
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => setResolving(line)}
-                            >
-                              {t("admin.finance.psp.lines.resolve")}
-                            </Button>
-                          )}
-                        </div>
-                      )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
-        </SectionCard>
+        <DataTable
+          columns={columns}
+          data={rows}
+          loading={query.isLoading}
+          emptyText={t("admin.finance.psp.lines.empty")}
+          getRowId={(line) => line.id}
+        />
       )}
 
       {pageCount > 1 && (
@@ -283,28 +250,26 @@ function LineReference({ line }: { line: PspStatementLine }) {
   const t = useTranslations();
   if (line.payment) {
     return (
-      <Link
+      <CellLink
         href={`/finance/payments/${line.payment.id}`}
-        className="text-primary-600 hover:underline"
-      >
-        {line.payment.orderNumber ??
+        label={
+          line.payment.orderNumber ??
           line.payment.groupNumber ??
           line.payment.tradeNumber ??
-          line.payment.id.slice(0, 8)}
-      </Link>
+          line.payment.id.slice(0, 8)
+        }
+      />
     );
   }
   if (line.membershipPayment) {
     return (
-      <Link
+      <CellLink
         href={`/users/${line.membershipPayment.userId}`}
-        className="text-primary-600 hover:underline"
-      >
-        {t("admin.finance.psp.missing.membership")}
-      </Link>
+        label={t("admin.finance.psp.missing.membership")}
+      />
     );
   }
-  return <span className="text-subtle">—</span>;
+  return <Empty />;
 }
 
 /** Satırı notla kapat: iş listesinden düşer, gün kartında sayılmaz, audit log'a yazılır. */
