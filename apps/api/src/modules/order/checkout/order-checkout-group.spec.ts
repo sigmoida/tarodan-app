@@ -36,9 +36,13 @@ import {
 import { flatPackageTiers } from "../../shipping/testing/tariff-fixture";
 import { OrderTaxPolicyService } from "../pricing/order-tax-policy.service";
 import { UserBlockService } from "../../user-block/user-block.service";
+import { DistanceSalesConsentService } from "../../consent/distance-sales-consent.service";
 
 // Engel kapısı: bu testlerde çift engelli değil.
 const userBlocksStub = { assertNotBlocked: async () => undefined };
+
+// Mesafeli satış onayı: grupla aynı transaction'da consent_records'a yazılır.
+const distanceSalesStub = { recordAtCheckout: jest.fn() };
 
 // Active shipping tariff stub (29.99 / free over 500) so the real OrderPricingService
 // resolves without a DB.
@@ -264,6 +268,7 @@ describe("OrderService checkout group (batch checkout)", () => {
         OrderCheckoutGroupService,
         { provide: UserBlockService, useValue: userBlocksStub },
         { provide: AccountLaneService, useValue: accountLaneServiceStub() },
+        { provide: DistanceSalesConsentService, useValue: distanceSalesStub },
         OrderGuestCheckoutService,
         OrderCommonService,
         OrderQueryService,
@@ -393,6 +398,30 @@ describe("OrderService checkout group (batch checkout)", () => {
         productId: { in: [productA, productB].sort() },
       },
     });
+  });
+
+  it("mesafeli satış onayını grupla AYNI transaction'da onay kaydına yazar", async () => {
+    await service.checkout(buyerId, {
+      ...baseDto(),
+      distanceSalesAccepted: true,
+    } as any);
+
+    expect(distanceSalesStub.recordAtCheckout).toHaveBeenCalledWith(mockTx, {
+      checkoutGroupId: "group-1",
+      userId: buyerId,
+      guestEmail: null,
+    });
+    // Tek kayıt: eski checkout_groups kolonları artık yazılmaz.
+    const data = mockTx.checkoutGroup.create.mock.calls[0][0].data;
+    expect(data.distanceSalesAcceptedAt).toBeUndefined();
+    expect(data.distanceSalesVersion).toBeUndefined();
+  });
+
+  it("onay gönderilmediyse (eski mobil) checkout sürer, onay kaydı yazılmaz", async () => {
+    const result: any = await service.checkout(buyerId, baseDto() as any);
+
+    expect(result.checkoutGroupId).toBe("group-1");
+    expect(distanceSalesStub.recordAtCheckout).not.toHaveBeenCalled();
   });
 
   // Faz 1: satıcı-bazlı kargo + OrderPackage (çatı) senaryoları.
@@ -823,6 +852,39 @@ describe("OrderService checkout group (batch checkout)", () => {
       expect(Number(data.subtotal)).toBe(80);
     });
 
+    it("tekil misafir alımı da mesafeli satış onayını misafir e-postasıyla kaydeder", async () => {
+      mockTx.product.findUnique.mockResolvedValue(
+        makeProduct(productA, { quantity: 100 }),
+      );
+
+      await service.guestCheckout({
+        productId: productA,
+        idempotencyKey,
+        email: guestEmail,
+        emailVerificationCode: guestCode,
+        phone: "+905551234567",
+        guestName: "Guest User",
+        shippingAddress: {
+          fullName: "Guest User",
+          phone: "+905551234567",
+          city: "İstanbul",
+          district: "Kadıköy",
+          address: "Test cad. 1",
+        },
+        expectedShippingTariffVersion: 1,
+        expectedCommissionRuleSetId: "set-1",
+        expectedCommissionRuleSetVersion: 1,
+        expectedPricingHash: pricingHashFor([{ productId: productA }]),
+        distanceSalesAccepted: true,
+      } as any);
+
+      expect(distanceSalesStub.recordAtCheckout).toHaveBeenCalledWith(mockTx, {
+        checkoutGroupId: "group-1",
+        userId: null,
+        guestEmail,
+      });
+    });
+
     it("quantity=3 → order.quantity=3, subtotal=fiyat*3, rezervasyon +3 (1 değil)", async () => {
       await service.checkoutGuest(
         guestDto([{ productId: productA, quantity: 3 }]) as any,
@@ -842,6 +904,22 @@ describe("OrderService checkout group (batch checkout)", () => {
         where: { id: productA },
         data: { reservedQuantity: { increment: 3 } },
       });
+    });
+
+    it("misafir onayı sistem hesabına değil misafir e-postasına yazılır", async () => {
+      await service.checkoutGuest({
+        ...guestDto([{ productId: productA }]),
+        distanceSalesAccepted: true,
+      } as any);
+
+      expect(distanceSalesStub.recordAtCheckout).toHaveBeenCalledWith(
+        mockTx,
+        expect.objectContaining({
+          checkoutGroupId: "group-1",
+          userId: null,
+          guestEmail,
+        }),
+      );
     });
 
     it("adet verilmezse (===1) davranış değişmez: order.quantity=1, rezervasyon +1", async () => {

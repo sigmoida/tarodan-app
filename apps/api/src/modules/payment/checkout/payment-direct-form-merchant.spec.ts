@@ -49,6 +49,7 @@ describe("PaymentInitiationService.buildDirectPaymentForm — merchant scope", (
       {} as never,
       {} as never,
       { record: jest.fn() } as never,
+      { ensureForPayment: jest.fn().mockResolvedValue(null) } as never, // distanceSalesConsent
     );
     const ctx = {
       payment: {

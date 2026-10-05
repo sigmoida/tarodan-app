@@ -37,6 +37,7 @@ describe("PaymentInitiationService — reserve uses order.quantity (#6)", () => 
       {} as any, // paymentFulfillment
       {} as any, // paymentLifecycle
       {} as any, // providerEvents
+      { ensureForPayment: jest.fn().mockResolvedValue(null) } as never, // distanceSalesConsent
     );
     return { service, reserveCalls };
   };

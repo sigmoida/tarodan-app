@@ -45,7 +45,7 @@ import {
   allocateCouponAcrossLines,
   remainingDiscountAllowanceFor,
 } from "../../discount/engine/fee-discount.engine";
-import { distanceSalesConsent } from "../helpers/distance-sales-contract";
+import { DistanceSalesConsentService } from "../../consent/distance-sales-consent.service";
 import { ORDER_CANCEL_REASON } from "../helpers/order-cancel-reasons";
 import { orderCancelledData } from "../helpers/order-cancellation";
 import {
@@ -78,6 +78,7 @@ export class OrderCheckoutGroupService {
     private readonly checkoutCommon: OrderCheckoutCommonService,
     private readonly userBlocks: UserBlockService,
     private readonly lanes: AccountLaneService,
+    private readonly distanceSalesConsent: DistanceSalesConsentService,
     @Optional()
     private readonly feeDiscounts?: OrderFeeDiscountService,
   ) {}
@@ -908,11 +909,20 @@ export class OrderCheckoutGroupService {
               idempotencyKey: dto.idempotencyKey,
               totalAmount: groupTotalAmount,
               isGuest,
-              // Onay damgası SUNUCUDA basılır: istemci yalnız "kabul ettim" der,
-              // zamanı ve sözleşme sürümünü söyleyemez.
-              ...distanceSalesConsent(dto.distanceSalesAccepted),
             },
           });
+
+          // Mesafeli satış onayı grupla AYNI transaction'da consent_records'a
+          // yazılır (tek kayıt). Damga SUNUCUDA basılır: istemci yalnız "kabul
+          // ettim" der, zamanı ve sözleşme sürümünü söyleyemez. Onay gelmediyse
+          // satır yok; ödeme kapısı (direct-form) onu ödeme adımında ister.
+          if (dto.distanceSalesAccepted === true) {
+            await this.distanceSalesConsent.recordAtCheckout(tx, {
+              checkoutGroupId: group.id,
+              userId: isGuest ? null : buyerId,
+              guestEmail: isGuest ? (guest?.email ?? null) : null,
+            });
+          }
 
           // Satıcı başına OrderPackage (çatı): o satıcının order'ları + tek kargo ücreti.
           // shippingCost KANONİK olarak alıcı payıdır (direct/guest ile aynı) + tarife
