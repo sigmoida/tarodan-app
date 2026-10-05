@@ -45,7 +45,9 @@ describe("resolveUatPassword", () => {
   });
 
   it("requires the variable", () => {
-    expect(() => resolveUatPassword({})).toThrow(/UAT_SEED_PASSWORD is required/);
+    expect(() => resolveUatPassword({})).toThrow(
+      /UAT_SEED_PASSWORD is required/,
+    );
     expect(() => resolveUatPassword({ [UAT_PASSWORD_ENV]: "   " })).toThrow(
       /required/,
     );
@@ -127,9 +129,7 @@ describe("planUatAccountSync (idempotency)", () => {
 describe("parseUatAccounts", () => {
   const valid = {
     members: [{ email: " Nur@Tarodan.com.tr ", displayName: "Nur" }],
-    staff: [
-      { email: "tarodan@tarodan.com.tr", role: "super_admin" },
-    ],
+    staff: [{ email: "tarodan@tarodan.com.tr", role: "super_admin" }],
   };
 
   it("normalizes emails and derives a missing display name", () => {
@@ -206,7 +206,10 @@ describe("parseUatListings", () => {
 
   it("rejects an owner that is not a seeded member", () => {
     expect(() =>
-      parseUatListings([{ ...listing, ownerEmail: "x@tarodan.com.tr" }], members),
+      parseUatListings(
+        [{ ...listing, ownerEmail: "x@tarodan.com.tr" }],
+        members,
+      ),
     ).toThrow(/not a seeded member/);
   });
 
@@ -221,10 +224,7 @@ describe("parseUatListings", () => {
 
   it("rejects a slug the image step could not map to its asset base", () => {
     expect(() =>
-      parseUatListings(
-        [{ ...listing, slug: "benim-mustang-ilanim" }],
-        members,
-      ),
+      parseUatListings([{ ...listing, slug: "benim-mustang-ilanim" }], members),
     ).toThrow(/imageAssetBase/);
   });
 });

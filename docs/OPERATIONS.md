@@ -493,13 +493,13 @@ yalnız lokal geliştirme içindir (`pnpm dev:seed`); silinmedi.
 
 **Seed neyi içerir**
 
-| Katman               | İçerik                                                                                                                                                                                                                                 |
-| -------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Referans (production'la aynı) | Üyelik katmanları, vergi, kargo tarifesi, ayarlar, katalog (`data/launch/*.json`) ve ACTIVE komisyon kural seti. Lansman seed'iyle aynı fonksiyonlar (`seed-launch-core.ts`) — ikinci kopya yok. |
-| Üyeler (düz kullanıcı) | `nur@tarodan.com.tr`, `serhat@tarodan.com.tr`: e-posta doğrulanmış, aktif, bireysel satıcı. Varsayılan katmanda (üyelik satırı yok = Free) alır/satar; takas Free'de kapalıdır. **Yasal ad/TCKN, onay kayıtları ve kullanıcı adı bilerek boş**: kişiler zorunlu onay/kimlik/kullanıcı-adı diyaloglarını kendileri geçer (UAT'nin parçası). |
-| Personel (admin panel) | `tarodan@tarodan.com.tr`, `developers@tarodan.com.tr`: `super_admin`. `users` + `admin_users` satırı (bootstrap-production-admin ile aynı biçim); personel web vitrinine giremez, üye hesabıyla karışmaz. |
-| Başlangıç ilanları   | Her üyeye 4 ACTIVE ilan (`data/uat/listings.json`), lansman kataloğundan; ilan sahipleri birbirinden alışveriş yapabilsin diye. Free katman kotasının (5) altında — spec bunu kilitler. |
-| Depo adresi          | İlk süper adminin adresi (`/health/ready` ister); adminlerin görünen adına dokunulmaz.                                                                                                                                                 |
+| Katman                        | İçerik                                                                                                                                                                                                                                                                                                                                     |
+| ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Referans (production'la aynı) | Üyelik katmanları, vergi, kargo tarifesi, ayarlar, katalog (`data/launch/*.json`) ve ACTIVE komisyon kural seti. Lansman seed'iyle aynı fonksiyonlar (`seed-launch-core.ts`) — ikinci kopya yok.                                                                                                                                           |
+| Üyeler (düz kullanıcı)        | `nur@tarodan.com.tr`, `serhat@tarodan.com.tr`: e-posta doğrulanmış, aktif, bireysel satıcı. Varsayılan katmanda (üyelik satırı yok = Free) alır/satar; takas Free'de kapalıdır. **Yasal ad/TCKN, onay kayıtları ve kullanıcı adı bilerek boş**: kişiler zorunlu onay/kimlik/kullanıcı-adı diyaloglarını kendileri geçer (UAT'nin parçası). |
+| Personel (admin panel)        | `tarodan@tarodan.com.tr`, `developers@tarodan.com.tr`: `super_admin`. `users` + `admin_users` satırı (bootstrap-production-admin ile aynı biçim); personel web vitrinine giremez, üye hesabıyla karışmaz.                                                                                                                                  |
+| Başlangıç ilanları            | Her üyeye 4 ACTIVE ilan (`data/uat/listings.json`), lansman kataloğundan; ilan sahipleri birbirinden alışveriş yapabilsin diye. Free katman kotasının (5) altında — spec bunu kilitler.                                                                                                                                                    |
+| Depo adresi                   | İlk süper adminin adresi (`/health/ready` ister); adminlerin görünen adına dokunulmaz.                                                                                                                                                                                                                                                     |
 
 Sipariş, teklif, takas, ödeme, bildirim vb. operasyonel veri **yoktur**. Kayıt
 herkese açıktır: izin listesi yok, yeni kişiler staging'e normal kayıt olur.
@@ -525,11 +525,11 @@ için derlenmiş seed'i elle koş (aşağıda) — mevcut hesaplara dokunmaz.
 
 **Gerekli secret / env**
 
-| Ad                          | Nerede                                    | Not                                                                                                                  |
-| --------------------------- | ----------------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
-| `UAT_SEED_PASSWORD`         | GitHub `staging` environment secret       | Zorunlu; 16+ karakter, en çok 72 bayt. Tüm sabit hesapların **başlangıç** şifresi; asla commit'lenmez/loglanmaz. Kişiler girişten sonra değiştirmeli. |
-| `UAT_SEED_RESET_PASSWORDS=1` | yalnız elle koşuda                        | Verilmezse var olan hesabın şifresi DEĞİŞMEZ. Workflow bunu geçmez (reset zaten DB'yi sıfırlıyor).                    |
-| `SERVER_*`, `COOLIFY_STAGING_UUIDS` | GitHub secrets                       | Mevcut reset secret'ları (değişmedi).                                                                                |
+| Ad                                  | Nerede                              | Not                                                                                                                                                   |
+| ----------------------------------- | ----------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `UAT_SEED_PASSWORD`                 | GitHub `staging` environment secret | Zorunlu; 16+ karakter, en çok 72 bayt. Tüm sabit hesapların **başlangıç** şifresi; asla commit'lenmez/loglanmaz. Kişiler girişten sonra değiştirmeli. |
+| `UAT_SEED_RESET_PASSWORDS=1`        | yalnız elle koşuda                  | Verilmezse var olan hesabın şifresi DEĞİŞMEZ. Workflow bunu geçmez (reset zaten DB'yi sıfırlıyor).                                                    |
+| `SERVER_*`, `COOLIFY_STAGING_UUIDS` | GitHub secrets                      | Mevcut reset secret'ları (değişmedi).                                                                                                                 |
 
 Staging api imajı bu commit'i içermeli (`dist-seed/prisma/seed-uat.js`): önce
 staging'i deploy et, sonra reset çalıştır. Eksikse pre-flight, veritabanına
@@ -627,8 +627,8 @@ adımı bunu ayrıca doğrular.
 | -------- | -------------------- | -------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Referans | `seed-production.ts` | her API açılışında         | Uygulama açılsın diye gereken iskelet: üyelik satırları, vergi, platform hesabı, tarife kabuğu. Tüm upsert'lerin `update` dalı boş — girilen değeri ASLA ezmez. |
 | Lansman  | `seed-launch.ts`     | yalnız reset workflow'unda | Onaylanmış iş değerleri + katalog + kurumsal satıcı + komisyon seti + ilanlar. Veri `data/launch/*.json`'da.                                                    |
-| UAT      | `seed-uat.ts`        | yalnız staging reset       | Lansman referans verisi (aynı fonksiyonlar) + sabit gerçek kişiler + başlangıç ilanları. Production'da çalışmayı reddeder. Bkz. "Staging / UAT".                 |
-| Demo     | `seed.ts`            | yalnız lokal geliştirme    | Demo kullanıcı/sipariş/takas senaryoları. Canlıya asla karışmaz; staging reset artık bunu koşmaz.                                                                |
+| UAT      | `seed-uat.ts`        | yalnız staging reset       | Lansman referans verisi (aynı fonksiyonlar) + sabit gerçek kişiler + başlangıç ilanları. Production'da çalışmayı reddeder. Bkz. "Staging / UAT".                |
+| Demo     | `seed.ts`            | yalnız lokal geliştirme    | Demo kullanıcı/sipariş/takas senaryoları. Canlıya asla karışmaz; staging reset artık bunu koşmaz.                                                               |
 
 Demo ile canlı arasındaki bağ `src/common/seed-independence.spec.ts` ile CI'da
 kilitli: komisyon oranları bir dönem ortak config'ten geliyordu ve yerel "Araba"

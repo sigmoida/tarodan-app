@@ -206,10 +206,7 @@ async function main(): Promise<void> {
   const hash = makeHasher(password);
   const userIds = new Map<string, string>();
   for (const staff of accounts.staff) {
-    userIds.set(
-      staff.email,
-      await syncAccount(staff, "staff", context, hash),
-    );
+    userIds.set(staff.email, await syncAccount(staff, "staff", context, hash));
   }
   for (const member of accounts.members) {
     userIds.set(

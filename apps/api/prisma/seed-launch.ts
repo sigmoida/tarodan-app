@@ -56,9 +56,7 @@ function assertProduction(): void {
 
 // ───────────────────────── hesaplar ─────────────────────────
 
-async function seedCorporateSeller(
-  accounts: Accounts,
-): Promise<string> {
+async function seedCorporateSeller(accounts: Accounts): Promise<string> {
   const seller = accounts.corporateSeller;
   const email = (process.env.LAUNCH_SELLER_EMAIL || seller.email)
     .trim()
@@ -140,7 +138,6 @@ async function seedCorporateSeller(
   );
   return user.id;
 }
-
 
 // ───────────────────────── ilanlar ─────────────────────────
 

@@ -42,8 +42,7 @@ export const loadJson = <T>(dir: string, file: string): T =>
 /** Lansman veri dosyalarını okur (`prisma/data/launch/`). */
 export const load = <T>(file: string): T => loadJson<T>("launch", file);
 
-export const log = (message: string) =>
-  console.log(`[launch-seed] ${message}`);
+export const log = (message: string) => console.log(`[launch-seed] ${message}`);
 
 /** Veri dosyalarındakiyle AYNI kural — slug'lar orada üretilmişti. */
 export const slugify = (value: string): string =>
