@@ -127,6 +127,17 @@ const withLater = (
   defaultAction: action,
 });
 
+/** Bugünkü davranış + AÇIK tek seferlik uzatma (`extend_once`). */
+const withExtendOnce = (
+  action: TimingExpiryAction,
+): Pick<TimingRuleDefinition, "actions" | "defaultAction"> => ({
+  actions: [
+    { action, available: true },
+    { action: "extend_once", available: true },
+  ],
+  defaultAction: action,
+});
+
 export const TIMING_RULES = {
   // ── İlan ──────────────────────────────────────────────────────────────
   /** İlanın yayında kalma süresi (yayın anından, her onayda tazelenir). */
@@ -258,11 +269,7 @@ export const TIMING_RULES = {
     max: 14,
     envKey: "PREPARING_DEADLINE_DAYS",
     appliesToInProgress: false,
-    actions: [
-      { action: "cancel_and_refund", available: true },
-      { action: "extend_once", available: true },
-    ],
-    defaultAction: "cancel_and_refund",
+    ...withExtendOnce("cancel_and_refund"),
   },
   /**
    * Hazırlık son tarihinden kaç saat önce satıcı uyarılır. Satıcı uyarısı ve
