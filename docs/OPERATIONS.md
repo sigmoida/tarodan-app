@@ -242,6 +242,38 @@ Idempotenttir: yalnız üç kolonu da boş olan satırlara dokunur. `--dry-run`
 iade faturalarını "çözülemeyen" sayar — tarafları ters çevirdikleri belgeden
 devraldıkları için kaynakları henüz yazılmamıştır; gerçek koşuda dolarlar.
 
+### Bir kerelik: onay kayıtları (consent_records) geçişi
+
+`20261005100000_consent_records` migration'ı hukuki onay kayıtları tablosunu
+ekler (yalnız ekleme; ayrıntı ve sözleşme: `CONSENTS.md`). Deploy'da kendiliğinden
+koşar. Ardından iki adım:
+
+**1. Eski sepet onaylarını aktar.** Mesafeli satış onayı daha önce
+`checkout_groups.distance_sales_*` kolonlarına yazılıyordu; artık tek kayıt
+`consent_records`. Aktarılmayan eski onaylar Onay Kayıtları ekranında görünmez:
+
+```
+docker exec "$API_CID" sh -c 'cd /app && node dist-seed/maintenance/backfill-distance-sales-consents.js --dry-run'
+docker exec "$API_CID" sh -c 'cd /app && node dist-seed/maintenance/backfill-distance-sales-consents.js'
+```
+
+Yerelde: `pnpm --filter @tarodan/api backfill:prod:distance-sales-consents`
+(önce `build:seed`). İdempotent; orijinal onay anı ve sürümüyle yazar, IP /
+kullanıcı ajanı o dönemde saklanmadığı için boştur.
+
+**2. Mesafeli satış zorunluluğunu (sonra) aç.** Ödeme formu (`direct-form`)
+onaysız satın almayı varsayılan olarak REDDETMEZ — onay kutusunu göndermeyen
+eski mobil sürümler ödeme yapabilsin diye. Mobilin onayı gönderen sürümü
+yeterince yayıldığında panelde **Ayarlar → Yasal** sekmesinden
+"Mesafeli satış onayı ödemede zorunlu" açılır (platform ayarı
+`distance_sales_consent_required = "true"`; deploy gerekmez). Açıkken onay
+kaydı olmayan satın alma `400 server.consent.distanceSalesRequired` alır.
+
+Hesap belgeleri (kullanım şartları / gizlilik / KVKK) için ayrı bir anahtar
+yoktur: onayı olmayan ya da belge sürümü değişen üye bir sonraki girişte web'de
+yeniden-onay penceresini görür. Belge metni değiştiğinde
+`packages/types/src/legal-consent.ts` içindeki sürüm güncellenmelidir.
+
 ### Bir kerelik: PayTR üyelik mağazası geçişi (2026-09)
 
 Üyelik ödemeleri (ilk satın alma + oto-yenileme) non-3D yetkili **ayrı bir PayTR
