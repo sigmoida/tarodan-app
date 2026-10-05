@@ -32,7 +32,11 @@ import {
   type EstimatedNet,
   type Listing,
 } from "../_lib/types";
-import { getListingActions, getListingStatus } from "../_lib/status";
+import {
+  getListingActions,
+  getListingStatus,
+  listingStatusKey,
+} from "../_lib/status";
 import { imagePlaceholder } from "@/lib/placeholder";
 
 const VIEWABLE = ["active", "sold"];
@@ -43,8 +47,10 @@ interface ListingCardProps {
   estimatedNet?: EstimatedNet;
   isDeleting: boolean;
   isDeactivating: boolean;
+  isRenewing: boolean;
   onDelete: (id: string) => void;
   onDeactivate: (id: string) => void;
+  onRenew: (id: string) => void;
   onBoost: (listing: Listing) => void;
 }
 
@@ -54,12 +60,14 @@ export default function ListingCard({
   estimatedNet,
   isDeleting,
   isDeactivating,
+  isRenewing,
   onDelete,
   onDeactivate,
+  onRenew,
   onBoost,
 }: ListingCardProps) {
   const t = useTranslations();
-  const status = getListingStatus(listing.status, t);
+  const status = getListingStatus(listingStatusKey(listing), t);
   const StatusIcon = status.icon;
   const viewable = VIEWABLE.includes(listing.status);
   const onSale = isProductOnSaleDisplay(listing);
@@ -113,6 +121,12 @@ export default function ListingCard({
           <h3 className="mb-2 line-clamp-2 font-semibold text-heading">
             {listing.title}
           </h3>
+        )}
+
+        {listingStatusKey(listing) === "expired" && (
+          <p className="mb-2 rounded-lg bg-warning-50 px-3 py-2 text-xs text-warning-800">
+            {t("profile.expiredListings.cardHint")}
+          </p>
         )}
 
         {listing.status === "rejected" && listing.rejectionReason && (
@@ -261,6 +275,22 @@ export default function ListingCard({
                     <ArrowPathIcon className="h-4 w-4" />
                     {t("product.relist")}
                   </ButtonLink>
+                );
+              case "renew":
+                return (
+                  <Button
+                    key={action}
+                    variant="warning"
+                    size="sm"
+                    onClick={() => onRenew(listing.id)}
+                    disabled={isRenewing}
+                    className={className}
+                  >
+                    <ArrowPathIcon className="h-4 w-4" />
+                    {isRenewing
+                      ? t("profile.expiredListings.renewing")
+                      : t("profile.expiredListings.renew")}
+                  </Button>
                 );
               case "reservation-status":
                 return (
