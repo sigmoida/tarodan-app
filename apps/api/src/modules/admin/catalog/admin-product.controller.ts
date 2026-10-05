@@ -84,6 +84,7 @@ import {
   PlatformSettingResponseDto,
   AdminUserQueryDto,
   AdminProductQueryDto,
+  AdminRemoveProductDto,
   AdminOrderQueryDto,
   AuditLogQueryDto,
   ApproveProductDto,
@@ -275,12 +276,16 @@ export class AdminProductController {
     @Query("status") status?: string,
     @Query("categoryId") categoryId?: string,
     @Query("sellerId") sellerId?: string,
+    @Query("removalReason") removalReason?: string,
+    @Query("removalActor") removalActor?: string,
     @Res() res?: any,
   ) {
     const result = await this.adminService.exportProducts({
       status,
       categoryId,
       sellerId,
+      removalReason,
+      removalActor,
     });
     res.setHeader("Content-Type", result.mimeType);
     res.setHeader(
@@ -465,7 +470,12 @@ export class AdminProductController {
     @CurrentUser("id") adminId: string,
     @Body() dto: BulkRejectProductsDto,
   ) {
-    return this.adminService.bulkRejectProducts(adminId, dto.ids, dto.reason);
+    return this.adminService.bulkRejectProducts(
+      adminId,
+      dto.ids,
+      dto.reason,
+      dto.violationCode,
+    );
   }
 
   // ==================== PRODUCT DELETION (ADMIN) ====================
@@ -479,9 +489,15 @@ export class AdminProductController {
   async deleteProduct(
     @Param("id") id: string,
     @CurrentUser("id") adminId: string,
+    @Body() dto: AdminRemoveProductDto,
     @Query("hardDelete") hardDelete?: string,
   ) {
-    return this.adminService.deleteProduct(adminId, id, hardDelete === "true");
+    return this.adminService.deleteProduct(
+      adminId,
+      id,
+      hardDelete === "true",
+      dto,
+    );
   }
 
   @Post("products/:id/restore")

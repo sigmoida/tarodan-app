@@ -18,6 +18,10 @@ import {
 } from "@prisma/client";
 import { Type } from "class-transformer";
 import { IsNumber, Min } from "class-validator";
+import {
+  LISTING_REMOVAL_DETAIL_MAX_LENGTH,
+  LISTING_VIOLATION_CODES,
+} from "@tarodan/types";
 
 export class ApproveProductDto {
   @ApiPropertyOptional({
@@ -38,6 +42,48 @@ export class RejectProductDto {
   @IsString()
   @MaxLength(500)
   reason: string;
+
+  /**
+   * Kaldırma kaydının ihlal kodu. Opsiyonel: kod eklenmeden önce yazılmış
+   * çağıranlar (moderasyon kuyruğu, e2e akışları) yalnız gerekçe gönderir.
+   * Admin paneli kodu zorunlu tutar; geçerliliği paylaşılan kural denetler.
+   */
+  @ApiPropertyOptional({
+    enum: [...LISTING_VIOLATION_CODES],
+    example: "counterfeit_replica",
+    description:
+      "Violation code (placeholder catalog in @tarodan/types). Omitted → recorded as policy_violation without a code.",
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(64)
+  violationCode?: string;
+}
+
+/**
+ * `DELETE /admin/products/:id` gövdesi — yönetici kaldırmasının ihlal kodu ve
+ * açıklaması (ikisi de opsiyonel: eski istemci; panel kodu zorunlu tutar).
+ */
+export class AdminRemoveProductDto {
+  @ApiPropertyOptional({
+    enum: [...LISTING_VIOLATION_CODES],
+    example: "counterfeit_replica",
+    description:
+      "Violation code (placeholder catalog in @tarodan/types). Omitted → recorded as policy_violation without a code.",
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(64)
+  violationCode?: string;
+
+  @ApiPropertyOptional({
+    example: "Aynı ilan üç kez açılmış",
+    description: `Admin note (max ${LISTING_REMOVAL_DETAIL_MAX_LENGTH}); required when violationCode = other.`,
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(LISTING_REMOVAL_DETAIL_MAX_LENGTH)
+  note?: string;
 }
 
 export class UpdateProductStatusDto {
@@ -139,6 +185,17 @@ export class BulkRejectProductsDto extends BulkProductIdsDto {
   @IsString()
   @MaxLength(500)
   reason: string;
+
+  @ApiPropertyOptional({
+    enum: [...LISTING_VIOLATION_CODES],
+    example: "counterfeit_replica",
+    description:
+      "Violation code (placeholder catalog in @tarodan/types). Omitted → recorded as policy_violation without a code.",
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(64)
+  violationCode?: string;
 }
 
 /** Toplu tek kullanımlık kupon kodu üretimi (aralık serviste de doğrulanır). */
