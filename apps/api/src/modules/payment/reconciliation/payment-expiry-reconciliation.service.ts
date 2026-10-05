@@ -20,7 +20,10 @@ import { NotificationType } from "../../notification/dto/notification.dto";
 import { CommissionLedgerService } from "../../commission/commission-ledger.service";
 import { PaymentRefundService } from "../refund/payment-refund.service";
 import { EventService } from "../../events";
-import { PaymentCommonService } from "../payment-common.service";
+import {
+  PaymentCommonService,
+  liveOrderPaymentWhere,
+} from "../payment-common.service";
 import {
   FailedPaymentCancellation,
   PaymentFulfillmentService,
@@ -145,15 +148,7 @@ export class PaymentExpiryReconciliationService {
           // son charge-start'ı pencere içindeyse bu tur atla; bir sonraki turda tekrar
           // bakılır (charge penceresi kapanınca iptal edilir).
           const livePayment = await tx.payment.findFirst({
-            where: {
-              OR: [
-                { orderId: order.id },
-                { checkoutGroup: { orders: { some: { id: order.id } } } },
-              ],
-              status: {
-                in: [PaymentStatus.pending, PaymentStatus.processing],
-              },
-            },
+            where: liveOrderPaymentWhere(order.id),
             select: { metadata: true },
           });
           if (

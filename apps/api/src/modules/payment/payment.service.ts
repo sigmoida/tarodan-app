@@ -315,6 +315,14 @@ export class PaymentService {
     return this.paymentReconciliation.reconcileReservedQuantities();
   }
 
+  /** Siparişin (ya da sepetinin) canlı 3DS çekimi var mı — bkz. PaymentCommonService. */
+  hasLiveCharge(
+    db: Prisma.TransactionClient,
+    orderId: string,
+  ): Promise<boolean> {
+    return this.paymentCommon.hasLiveCharge(db, orderId);
+  }
+
   // Taşındı: payment-reconciliation.service.ts — facade delege (imza aynı).
   async expireUnpaidOrders(): Promise<{ count: number }> {
     return this.paymentReconciliation.expireUnpaidOrders();
