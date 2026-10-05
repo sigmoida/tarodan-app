@@ -123,6 +123,23 @@ describe("resolveGibSellerIdentity — yasal ad zinciri", () => {
     });
   });
 
+  it("yarım yasal ad (kayıtta yalnız ad gönderildi) tam banka sahibi adını ezmez", () => {
+    const result = resolveGibSellerIdentity(
+      seller({
+        legalFirstName: "Ayşe",
+        bankAccount: {
+          accountHolder: "Ayşe Yılmaz",
+          tcKimlikNo: null,
+          taxId: null,
+        },
+      }),
+    );
+    expect(result).toMatchObject({
+      legalName: "Ayşe Yılmaz",
+      legalNameSource: "bank_account_holder",
+    });
+  });
+
   it("onaylı kurumsal satıcıda firma adı yasal adın da önündedir (yasal satıcı firma)", () => {
     const result = resolveGibSellerIdentity(
       corporate({ legalFirstName: "Ayşe", legalLastName: "Yılmaz" }),
@@ -169,6 +186,7 @@ describe("resolveGibSellerIdentity — silinmiş satıcı (arşiv)", () => {
     nationalId: null,
     bankAccountHolder: null,
     businessStatus: null,
+    sourceDetail: null,
     ...over,
   });
 
@@ -213,7 +231,7 @@ describe("resolveGibSellerIdentity — silinmiş satıcı (arşiv)", () => {
     });
   });
 
-  it("bireysel arşivde yasal ad banka sahibinden, beyan edilen TCKN vergi no'dan önce gelir", () => {
+  it("bireysel arşivde yasal ad banka sahibinden, BEYAN edilen TCKN vergi no'dan önce gelir", () => {
     expect(
       resolveGibSellerIdentity(
         deleted(
@@ -223,6 +241,8 @@ describe("resolveGibSellerIdentity — silinmiş satıcı (arşiv)", () => {
             bankAccountHolder: "Ali Veli",
             nationalId: "10000000146",
             taxId: "3333333333",
+            // Silme anında numara üyenin beyanından (User.nationalId) alındı.
+            sourceDetail: { nationalId: "user" },
           }),
         ),
       ),
@@ -231,6 +251,42 @@ describe("resolveGibSellerIdentity — silinmiş satıcı (arşiv)", () => {
       legalNameSource: "archive_legal_name",
       identityNumber: "10000000146",
       identityKind: "tckn",
+    });
+  });
+
+  it("eski arşiv satırında (TCKN banka hesabından) sıra DEĞİŞMEZ: vergi no önce", () => {
+    for (const sourceDetail of [
+      { nationalId: "seller_bank_account" },
+      { nationalId: "corporate_stakeholder" },
+      null,
+    ]) {
+      expect(
+        resolveGibSellerIdentity(
+          deleted(
+            archive({
+              nationalId: "12345678950",
+              taxId: "3333333333",
+              sourceDetail,
+            }),
+          ),
+        ),
+      ).toMatchObject({
+        identityNumber: "3333333333",
+        identityKind: "tax_number",
+      });
+    }
+  });
+
+  it("arşivde yarım yasal ad (yalnız ad) banka sahibinin tam adını ezmez", () => {
+    expect(
+      resolveGibSellerIdentity(
+        deleted(
+          archive({ legalFirstName: "Ayşe", bankAccountHolder: "Ayşe Yılmaz" }),
+        ),
+      ),
+    ).toMatchObject({
+      legalName: "Ayşe Yılmaz",
+      legalNameSource: "archive_bank_account_holder",
     });
   });
 

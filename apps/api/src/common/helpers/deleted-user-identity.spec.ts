@@ -2,6 +2,7 @@ import {
   ANONYMIZED_DISPLAY_NAME,
   anonymizedEmailFor,
   archiveLegalFullName,
+  archivedNationalIdIsDeclared,
   computeRetainUntil,
   IDENTITY_RETENTION_YEARS,
   isAnonymizedEmail,
@@ -319,5 +320,65 @@ describe("archiveLegalFullName", () => {
         displayName: null,
       }),
     ).toBeNull();
+  });
+});
+
+describe("archiveLegalFullName — yarım ad", () => {
+  it("yalnız ad ya da yalnız soyad yasal ad sayılmaz; silme anındaki ada düşülür", () => {
+    expect(
+      archiveLegalFullName({
+        legalFirstName: "Ahmet",
+        legalLastName: null,
+        displayName: "Ahmet Yılmaz",
+      }),
+    ).toBe("Ahmet Yılmaz");
+    expect(
+      archiveLegalFullName({
+        legalFirstName: null,
+        legalLastName: "Yılmaz",
+        displayName: null,
+      }),
+    ).toBeNull();
+  });
+});
+
+describe("archivedNationalIdIsDeclared", () => {
+  it("yalnız kaynağı üyenin kendi alanı olan numara beyan sayılır", () => {
+    expect(archivedNationalIdIsDeclared({ nationalId: "user" })).toBe(true);
+    expect(
+      archivedNationalIdIsDeclared({ nationalId: "seller_bank_account" }),
+    ).toBe(false);
+    expect(archivedNationalIdIsDeclared({ nationalId: null })).toBe(false);
+    expect(archivedNationalIdIsDeclared(null)).toBe(false);
+    expect(archivedNationalIdIsDeclared(["user"])).toBe(false);
+  });
+
+  it("canlı silmede beyan edilen numaranın kaynağı 'user' olarak yazılır (iki uç aynı anahtarı kullanır)", () => {
+    const { sourceDetail } = resolveIdentityFields({
+      user: {
+        id: "u1",
+        email: "a@example.com",
+        username: "a",
+        displayName: "A",
+        legalFirstName: "Ahmet",
+        legalLastName: "Yılmaz",
+        nationalId: "10000000146",
+        phone: null,
+        birthDate: null,
+        taxId: null,
+        taxOffice: null,
+        companyName: null,
+        companyType: null,
+        companyCity: null,
+        companyDistrict: null,
+        sellerType: null,
+        businessStatus: null,
+        isSeller: false,
+        adminCode: null,
+        createdAt: new Date("2024-01-01T00:00:00Z"),
+        deletedAt: null,
+      },
+    });
+    expect(archivedNationalIdIsDeclared(sourceDetail)).toBe(true);
   });
 });

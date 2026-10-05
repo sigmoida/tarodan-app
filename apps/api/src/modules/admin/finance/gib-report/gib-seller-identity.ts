@@ -1,11 +1,15 @@
 import { BusinessStatus, Prisma } from "@prisma/client";
-import type {
-  GibIdentityKind,
-  GibNameSource,
-  GibSellerKind,
+import {
+  legalFullName,
+  type GibIdentityKind,
+  type GibNameSource,
+  type GibSellerKind,
 } from "@tarodan/types";
 
-import { ANONYMIZED_DISPLAY_NAME } from "../../../../common/helpers/deleted-user-identity";
+import {
+  ANONYMIZED_DISPLAY_NAME,
+  archivedNationalIdIsDeclared,
+} from "../../../../common/helpers/deleted-user-identity";
 import {
   publicName,
   publicUsername,
@@ -28,7 +32,10 @@ import { hasApprovedCorporateIdentity } from "../../../membership/helpers/member
  * Kimlik numarası: kurumsalda firmanın vergi no'su (yasal satıcı firmadır);
  * bireyselde üyenin beyan ettiği TCKN (`User.nationalId`) önce, boşsa eski
  * zincir (vergi no → banka vergi no → banka TCKN). 2–5 ve bireysel TCKN eski
- * kaynaklara YALNIZ yeni alan boşken düşer.
+ * kaynaklara YALNIZ yeni alan boşken düşer. Yasal ad yalnız ad VE soyad
+ * birlikte doluysa kullanılır (yarım ad tam bir banka sahibi adını ezmez).
+ * Arşivde TCKN yalnız `sourceDetail` onu üyenin beyanı olarak işaretlediyse
+ * öne geçer; eski arşiv satırlarında sıra değişmez (vergi no → TCKN).
  *
  * Silinmiş hesap canlı satırdan DEĞİL kimlik arşivinden çözülür (anonimleştirme
  * adı "Silinmiş Kullanıcı" yapıp VKN'yi siler); arşiv yoksa ad boş kalır —
@@ -65,6 +72,8 @@ export interface GibSellerSource {
     nationalId: string | null;
     bankAccountHolder: string | null;
     businessStatus: BusinessStatus | null;
+    /** Alan → kaynak; `nationalId: "user"` = numara üyenin beyanı. */
+    sourceDetail: Prisma.JsonValue | null;
   } | null;
 }
 
@@ -99,6 +108,7 @@ export const GIB_SELLER_SELECT = {
       nationalId: true,
       bankAccountHolder: true,
       businessStatus: true,
+      sourceDetail: true,
     },
   },
 } satisfies Prisma.UserSelect;
@@ -131,17 +141,6 @@ function firstFilled(
     if (name) return { name, source };
   }
   return { name: null, source: "none" };
-}
-
-/** Ad-soyad tek metin; ikisi de boşsa null. */
-function fullName(
-  first: string | null | undefined,
-  last: string | null | undefined,
-): string | null {
-  return (
-    [clean(first), clean(last)].filter((part) => part !== null).join(" ") ||
-    null
-  );
 }
 
 type IdentityCandidate = [
@@ -191,7 +190,7 @@ export function resolveGibSellerIdentity(
       ? firstFilled([
           [corporate ? archive.companyName : null, "archive_company"],
           [
-            fullName(archive.legalFirstName, archive.legalLastName),
+            legalFullName(archive.legalFirstName, archive.legalLastName),
             "archive_legal_name",
           ],
           [archive.bankAccountHolder, "archive_bank_account_holder"],
@@ -202,14 +201,22 @@ export function resolveGibSellerIdentity(
       sellerKind: corporate ? "corporate" : "individual",
       sellerDeleted: true,
       membershipDate: seller.createdAt,
-      // Arşivin `nationalId`i silme anında zaten üyenin beyanını tercih etti.
+      // Arşivin TCKN'si yalnız üyenin beyanıysa (`sourceDetail`) vergi
+      // no'nun önüne geçer; eski kaynaktan gelen numara eski sırada kalır.
       ...pickIdentityNumber(
-        identityCandidates(
-          corporate,
-          archive?.nationalId,
-          [archive?.taxId],
-          null,
-        ),
+        archivedNationalIdIsDeclared(archive?.sourceDetail)
+          ? identityCandidates(
+              corporate,
+              archive?.nationalId,
+              [archive?.taxId],
+              null,
+            )
+          : identityCandidates(
+              corporate,
+              null,
+              [archive?.taxId],
+              archive?.nationalId,
+            ),
       ),
       legalName: name,
       legalNameSource: source,
@@ -221,7 +228,7 @@ export function resolveGibSellerIdentity(
   const corporate = hasApprovedCorporateIdentity(seller);
   const { name, source } = firstFilled([
     [corporate ? seller.companyName : null, "company"],
-    [fullName(seller.legalFirstName, seller.legalLastName), "legal_name"],
+    [legalFullName(seller.legalFirstName, seller.legalLastName), "legal_name"],
     [seller.bankAccount?.accountHolder, "bank_account_holder"],
     [seller.addresses[0]?.fullName, "address"],
     // Anonimleştirilmiş ama `deletedAt`i henüz yazılmamış satır beklenmez; yine

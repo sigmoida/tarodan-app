@@ -1,4 +1,5 @@
 import { BusinessStatus, SellerType } from "@prisma/client";
+import { legalFullName } from "@tarodan/types";
 
 /**
  * Silinen hesabın kimlik arşivi — alan çözümlemesi.
@@ -533,8 +534,9 @@ export function resolveIdentityFields(
 }
 
 /**
- * Bildirimdeki "Ad Soyad / Unvan" değeri: üyenin yasal adı varsa o, yoksa
- * silme anındaki ad (eski hesaplar). Kolon kümesi değişmez — yalnız değerin
+ * Bildirimdeki "Ad Soyad / Unvan" değeri: üyenin yasal adı (ad VE soyad
+ * birlikte) varsa o, yoksa silme anındaki ad (eski hesaplar). Yarım yasal ad
+ * ("Ayşe") tam addan üstün tutulmaz. Kolon kümesi değişmez — yalnız değerin
  * kaynağı güçlenir, bu yüzden biçim sürümü artmaz.
  */
 export function archiveLegalFullName(row: {
@@ -542,11 +544,28 @@ export function archiveLegalFullName(row: {
   legalLastName: string | null;
   displayName: string | null;
 }): string | null {
-  const legal = [row.legalFirstName, row.legalLastName]
-    .map((part) => clean(part))
-    .filter((part): part is string => part !== null)
-    .join(" ");
-  return legal || clean(row.displayName);
+  return (
+    legalFullName(row.legalFirstName, row.legalLastName) ??
+    clean(row.displayName)
+  );
+}
+
+/**
+ * Arşivdeki TCKN üyenin KENDİ beyanından mı (`User.nationalId`, kimlik kapısı)
+ * geldi? `sourceDetail.nationalId === "user"` bunu söyler; bu alandan önceki
+ * arşiv satırlarında numara eski kaynaklardan (banka hesabı, ortak kaydı,
+ * fatura) gelmiştir ve beyan sayılmaz.
+ */
+export function archivedNationalIdIsDeclared(sourceDetail: unknown): boolean {
+  if (
+    !sourceDetail ||
+    typeof sourceDetail !== "object" ||
+    Array.isArray(sourceDetail)
+  ) {
+    return false;
+  }
+  const source: IdentitySourceKey = "user";
+  return (sourceDetail as Record<string, unknown>).nationalId === source;
 }
 
 /**
