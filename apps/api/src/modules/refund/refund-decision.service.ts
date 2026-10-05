@@ -183,13 +183,16 @@ export class RefundDecisionService {
         details: { note: note?.trim() || null },
       });
       // Platform iptali bu onayla tamamlandı: iki tarafa nedenli platform
-      // duyurusu (iptal anında PSP düştüğü için o zaman gitmemişti). Yalnız
-      // bu çağrı iadeyi kesinleştirdiyse — eşzamanlı bir kurtarma önce
-      // kesinleştirdiyse duyuruyu o gönderdi.
-      if (platformReason && refundResult) {
+      // duyurusu (iptal anında PSP düştüğü için o zaman gitmemişti). YALNIZ
+      // bu çağrının iadesi siparişi platform iptali olarak kapattıysa:
+      // sipariş arada başka yoldan iptal edildiyse (aktör ve nedeni o yolun)
+      // ya da eşzamanlı bir kurtarma iadeyi önce sonlandırıp duyuruyu
+      // gönderdiyse sessiz kalınır — kayıtla çelişen ya da ikinci mesaj yok.
+      const closedReason = refundResult?.closedWithAdminReason ?? null;
+      if (closedReason) {
         await this.notifications.notifyPlatformCancellation(
           rr.orderId,
-          platformReason,
+          closedReason,
           Number(updated.amount),
         );
       }

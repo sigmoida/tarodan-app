@@ -341,7 +341,13 @@ Admin tarafından başlatılan **iade** (kargodan sonra) yoktur; toplu iptal yok
   değil, ayrı bir olgudur. İptal anında PSP düştüyse duyuru O AN gitmez;
   iptal sonradan tamamlanınca aynı platform duyurusu (genel iptal/iade metni
   yerine) tamamlayan yoldan bir kez gider: admin onayında
-  `RefundDecisionService`, kurtarmada `processRefund`.
+  `RefundDecisionService`, kurtarmada `processRefund`. Her gönderen yol
+  duyuruyu `processRefund`'ın döndürdüğü `closedWithAdminReason`'a bağlar —
+  yalnız siparişi BU çağrının iadesi platform iptali olarak kapattıysa dolu
+  olur. Sipariş arada başka yoldan iptal edildiyse ya da aynı denemeyi başka
+  bir çağrı (ör. kurtarma cron'u, eşzamanlı yönetici iptali) sonlandırıp
+  duyuruyu gönderdiyse null'dır ve bu yol sessiz kalır; taraf başına tek
+  mesaj.
 - **Teklif**: siparişi OLMAYAN teklifin iptali `POST /admin/offers/:id/cancel`
   ile kalır; canlı siparişi olan teklif o uçta 409 `useOrderCancel` döner ve
   panel sipariş iptal diyaloğunu açar.

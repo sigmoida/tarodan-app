@@ -488,7 +488,7 @@ export class RefundCreationService {
         reason: spec.snapshotReason,
         requiresAdminReview: true,
       });
-      return created;
+      return { ...created, closedWithAdminReason: null };
     }
 
     // `processRefund` resolves to null when the attempt was already finalized —
@@ -497,6 +497,7 @@ export class RefundCreationService {
     let refundResult: {
       providerRefundId?: string;
       stockQuarantined?: boolean;
+      closedWithAdminReason?: AdminCancelReasonCode | null;
     } | null;
     try {
       refundResult = await this.paymentService.processRefund(
@@ -580,7 +581,14 @@ export class RefundCreationService {
       Number(updated.amount),
       spec.notifyParties,
     );
-    return updated;
+    // Siparişi BU çağrının iadesi platform iptali olarak kapattıysa kodu; aksi
+    // halde null (ör. takılı deneme kurtarması aynı denemeyi önce sonlandırıp
+    // duyuruyu kendisi gönderdi). Platform duyurusunu gönderen çağıran
+    // (AdminOrderCancelService) yalnız buna bakar — çift mesaj olmaz.
+    return {
+      ...updated,
+      closedWithAdminReason: refundResult?.closedWithAdminReason ?? null,
+    };
   }
 
   /**
