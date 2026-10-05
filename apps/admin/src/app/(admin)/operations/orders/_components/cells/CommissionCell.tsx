@@ -1,6 +1,6 @@
 import { useTranslations } from "next-intl";
 import type { AdminOrderListRow } from "@tarodan/types";
-import { fmtTry } from "@/lib/format";
+import { fmtPercent, fmtTry } from "@/lib/format";
 import { feeRate } from "../../_lib/rowView";
 
 function FeeLine({
@@ -16,7 +16,8 @@ function FeeLine({
   return (
     <span className="whitespace-nowrap text-xs tabular-nums text-muted">
       {label} <span className="font-medium text-body">{fmtTry(amount)}</span>
-      {rate != null && ` · %${rate}`}
+      {rate != null &&
+        ` · ${fmtPercent(rate, Number.isInteger(rate) ? 0 : 1)}`}
     </span>
   );
 }

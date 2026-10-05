@@ -1,10 +1,12 @@
 "use client";
 
-import type { ReactNode } from "react";
 import Link from "next/link";
 import { Badge, Button, shipmentStatusConfig } from "@tarodan/ui";
 import { useTranslations } from "next-intl";
 import { PrinterIcon } from "@heroicons/react/24/outline";
+import { DataList, Field } from "@/components/detail/DataList";
+import { Eyebrow } from "@/components/detail/SectionTitle";
+import { Panel } from "@/components/detail/Panel";
 import { SectionCard } from "@/components/detail/SectionCard";
 import { printOrderInvoice } from "../_lib/printInvoice";
 import { fmtTry } from "@/lib/format";
@@ -65,58 +67,48 @@ export function PackageFileSection({
         </Button>
       }
     >
-      <div className="rounded-lg bg-surface-alt px-4 py-3">
-        <p className="text-xs uppercase tracking-wide text-subtle">
+      <Panel tone="muted">
+        <Eyebrow>
           {t("admin.operations.orders.file.shippingSplitTitle")}
-        </p>
-        <div className="mt-1.5 flex flex-wrap items-center gap-x-6 gap-y-2 text-sm">
-          <Stat label={t("admin.operations.orders.file.shippingFull")}>
+        </Eyebrow>
+        <DataList columns={3} className="mt-1.5">
+          <Field label={t("admin.operations.orders.file.shippingFull")}>
             {fmtTry(sh.fullShippingAmount)}
-          </Stat>
-          <Stat label={t("admin.operations.orders.file.shippingBuyer")}>
+          </Field>
+          <Field label={t("admin.operations.orders.file.shippingBuyer")}>
             {fmtTry(sh.buyerShippingAmount)}
-          </Stat>
-          <Stat label={t("admin.operations.orders.file.shippingSeller")}>
+          </Field>
+          <Field label={t("admin.operations.orders.file.shippingSeller")}>
             {fmtTry(sh.sellerShippingAmount)}
-          </Stat>
+          </Field>
           {sh.billableDesi != null && (
-            <Stat label={t("admin.operations.orders.file.billableDesi")}>
+            <Field label={t("admin.operations.orders.file.billableDesi")}>
               {sh.billableDesi}
-            </Stat>
+            </Field>
           )}
           {pkg.shipment && (
             <>
-              <Stat label={t("admin.operations.orders.cargoStatus")}>
+              <Field label={t("admin.operations.orders.cargoStatus")}>
                 <Badge
                   status={pkg.shipment.status}
                   config={statusConfig(shipmentStatusConfig, t)}
                 />
-              </Stat>
-              <Stat label={t("admin.operations.common.trackingNumber")}>
+              </Field>
+              <Field label={t("admin.operations.common.trackingNumber")}>
                 <span className="font-mono">
                   {pkg.shipment.providerTrackingId ??
                     pkg.shipment.trackingNumber ??
                     "—"}
                 </span>
-              </Stat>
+              </Field>
             </>
           )}
-        </div>
-      </div>
+        </DataList>
+      </Panel>
 
       {pkg.orders.map((entry) => (
         <OrderFileBlock key={entry.id} entry={entry} />
       ))}
     </SectionCard>
-  );
-}
-
-/** Şeritteki tek `etiket değer` çifti. */
-function Stat({ label, children }: { label: string; children: ReactNode }) {
-  return (
-    <span className="flex items-center gap-1.5">
-      <span className="text-muted">{label}</span>
-      <span className="font-medium text-heading">{children}</span>
-    </span>
   );
 }

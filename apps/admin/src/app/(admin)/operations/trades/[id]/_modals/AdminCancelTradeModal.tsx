@@ -12,6 +12,7 @@ import {
   ADMIN_CANCEL_NOTE_MAX,
   type AdminTradeCancelPreview,
 } from "@tarodan/types";
+import { Panel } from "@/components/detail/Panel";
 import { fmtTry } from "@/lib/format";
 import { extractErrorMessage } from "@/lib/error";
 import { adminCancelReasonOptions } from "@/lib/admin-cancel-reasons";
@@ -83,14 +84,14 @@ export function AdminCancelTradeModal({
       {preview.data ? (
         <CancelPreview preview={preview.data} trade={trade} />
       ) : (
-        <p className="rounded-lg bg-surface-alt px-4 py-3 text-sm text-muted">
+        <Panel tone="muted" className="text-sm text-muted">
           {preview.isError
             ? extractErrorMessage(
                 preview.error,
                 t("admin.operations.trades.adminCancel.previewUnavailable"),
               )
             : t("admin.operations.trades.adminCancel.previewLoading")}
-        </p>
+        </Panel>
       )}
       <FormSelect
         name="reasonCode"
@@ -126,7 +127,7 @@ function CancelPreview({
       : trade.receiver?.displayName;
 
   return (
-    <div className="space-y-3 rounded-lg bg-surface-alt px-4 py-3 text-sm">
+    <Panel tone="muted" className="space-y-3 text-sm">
       <div>
         <p className="mb-1 font-medium text-heading">
           {t("admin.operations.trades.adminCancel.refundsTitle")}
@@ -186,6 +187,6 @@ function CancelPreview({
           })}
         </p>
       )}
-    </div>
+    </Panel>
   );
 }

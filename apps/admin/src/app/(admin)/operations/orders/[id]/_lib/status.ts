@@ -1,5 +1,5 @@
 import type { useTranslations } from "next-intl";
-import type { BadgeVariant } from "@tarodan/ui";
+import { orderStatusConfig, type BadgeVariant } from "@tarodan/ui";
 
 type T = ReturnType<typeof useTranslations<never>>;
 
@@ -10,47 +10,23 @@ export interface OrderStatusSource {
   activeRefundRequest?: unknown;
 }
 
-const statusMeta: Record<string, { key: string; variant: BadgeVariant }> = {
-  pending_payment: {
-    key: "admin.operations.orders.status.pendingPayment",
-    variant: "warning",
-  },
-  paid: {
-    key: "admin.operations.orders.status.paid",
-    variant: "default",
-  },
-  preparing: {
-    key: "admin.operations.orders.status.preparing",
-    variant: "default",
-  },
-  shipped: {
-    key: "admin.operations.orders.status.shipped",
-    variant: "default",
-  },
-  delivered: {
-    key: "admin.operations.orders.status.delivered",
-    variant: "success",
-  },
-  awaiting_buyer_confirmation: {
-    key: "admin.operations.orders.status.awaitingBuyerConfirmation",
-    variant: "warning",
-  },
-  refund_requested: {
-    key: "admin.operations.orders.status.refundRequested",
-    variant: "danger",
-  },
-  completed: {
-    key: "admin.operations.orders.status.completed",
-    variant: "success",
-  },
-  cancelled: {
-    key: "admin.operations.orders.status.cancelled",
-    variant: "danger",
-  },
-  refunded: {
-    key: "admin.operations.orders.status.refunded",
-    variant: "outline",
-  },
+/**
+ * Başlık rozetinin ÖZEL etiketleri (iade penceresi gibi ifadeler taşır) — renk
+ * burada tutulmaz: varyant listedeki rozetle aynı tek kaynaktan, paylaşılan
+ * `orderStatusConfig`'ten gelir.
+ */
+const statusLabelKey: Record<string, string> = {
+  pending_payment: "admin.operations.orders.status.pendingPayment",
+  paid: "admin.operations.orders.status.paid",
+  preparing: "admin.operations.orders.status.preparing",
+  shipped: "admin.operations.orders.status.shipped",
+  delivered: "admin.operations.orders.status.delivered",
+  awaiting_buyer_confirmation:
+    "admin.operations.orders.status.awaitingBuyerConfirmation",
+  refund_requested: "admin.operations.orders.status.refundRequested",
+  completed: "admin.operations.orders.status.completed",
+  cancelled: "admin.operations.orders.status.cancelled",
+  refunded: "admin.operations.orders.status.refunded",
 };
 
 export interface OrderStatusView {
@@ -85,10 +61,13 @@ export function getOrderStatusInfo(
           variant: "danger" as const,
         }
       : (() => {
-          const meta = statusMeta[order.status] || statusMeta.pending_payment;
+          const status =
+            order.status in statusLabelKey ? order.status : "pending_payment";
           return {
-            label: t(meta.key as Parameters<T>[0], { returnWindowDays }),
-            variant: meta.variant,
+            label: t(statusLabelKey[status] as Parameters<T>[0], {
+              returnWindowDays,
+            }),
+            variant: orderStatusConfig[status].variant as BadgeVariant,
           };
         })();
   return { ...info, hasActiveRefund, isCancelledOrder };

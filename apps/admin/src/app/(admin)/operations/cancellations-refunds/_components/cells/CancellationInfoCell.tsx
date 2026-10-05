@@ -1,4 +1,4 @@
-import Link from "next/link";
+import { TextLink } from "@/components/TextLink";
 import { useTranslations } from "next-intl";
 import { Badge } from "@tarodan/ui";
 import type { AdminCancellationRow } from "@tarodan/types";
@@ -20,14 +20,14 @@ export function CancellationInfoCell({ row }: { row: AdminCancellationRow }) {
   const t = useTranslations();
   return (
     <div className="flex min-w-0 flex-col items-start gap-1">
-      <Link
+      <TextLink
         href={cancellationDetailHref(row)}
-        className="block max-w-full text-primary-600 hover:underline"
+        className="block max-w-full"
       >
         <TruncatedText className="font-mono font-medium">
           {row.number}
         </TruncatedText>
-      </Link>
+      </TextLink>
       <span className="whitespace-nowrap text-xs text-muted">
         {fmtDateTime(row.createdAt)}
       </span>

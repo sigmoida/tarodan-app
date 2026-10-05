@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import { useMemo } from "react";
 import { useTranslations } from "next-intl";
 import {
   Alert,
@@ -8,8 +8,10 @@ import {
   offerStatusConfig,
   orderStatusConfig,
 } from "@tarodan/ui";
+import { DataTable } from "@/components/DataTable";
 import { SectionCard } from "@/components/detail/SectionCard";
-import { fmtDateTime, fmtTry } from "@/lib/format";
+import { TextLink } from "@/components/TextLink";
+import { col } from "@/components/table/columns";
 import { statusConfig } from "@/lib/statusLabels";
 import { ordersTabHref } from "@/app/(admin)/operations/orders/_lib/screenTabs";
 import type { OfferRow } from "../../_lib/offers";
@@ -29,6 +31,40 @@ export function ProductOffersSection({
   competing: AdminOfferDetail["competing"];
 }) {
   const t = useTranslations();
+  const columns = useMemo(
+    () => [
+      col.link(t("admin.operations.common.buyer"), (s: OfferRow) => ({
+        href: `/operations/offers/${s.id}`,
+        label: s.buyer.displayName,
+      })),
+      col.money(t("common.amount"), (s: OfferRow) => s.amount),
+      col.badge(t("common.status"), (s: OfferRow) => (
+        <Badge
+          status={s.status}
+          config={statusConfig(offerStatusConfig, t)}
+        />
+      )),
+      col.custom(t("admin.operations.common.order"), (s: OfferRow) =>
+        s.order ? (
+          <span className="inline-flex items-center gap-2">
+            <TextLink href={`/operations/orders/${s.order.id}`} mono>
+              {s.order.orderNumber}
+            </TextLink>
+            <Badge
+              status={s.order.status}
+              config={statusConfig(orderStatusConfig, t)}
+            />
+          </span>
+        ) : (
+          <span className="text-muted">—</span>
+        ),
+      ),
+      col.date(t("common.date"), (s: OfferRow) => s.createdAt, {
+        withTime: true,
+      }),
+    ],
+    [t],
+  );
   const showCompeting =
     competing.acceptedOffers > 1 || competing.pendingPaymentOrders > 1;
   return (
@@ -37,12 +73,12 @@ export function ProductOffersSection({
         count: siblings.length,
       })}
       actions={
-        <Link
+        <TextLink
           href={ordersTabHref("offers", { productId })}
-          className="text-sm text-primary-600 hover:underline"
+          className="text-sm"
         >
           {t("admin.operations.offers.viewAllForProduct")}
-        </Link>
+        </TextLink>
       }
     >
       {showCompeting && (
@@ -63,12 +99,9 @@ export function ProductOffersSection({
       {competing.soldOrder && (
         <Alert variant="info" className="mb-3">
           {t("admin.operations.offers.productSold")}{" "}
-          <Link
-            href={`/operations/orders/${competing.soldOrder.id}`}
-            className="font-mono underline"
-          >
+          <TextLink href={`/operations/orders/${competing.soldOrder.id}`} mono>
             {competing.soldOrder.orderNumber}
-          </Link>
+          </TextLink>
         </Alert>
       )}
       {siblings.length === 0 ? (
@@ -76,65 +109,12 @@ export function ProductOffersSection({
           {t("admin.operations.offers.noOtherOffers")}
         </p>
       ) : (
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead className="text-left text-xs uppercase text-muted">
-              <tr>
-                <th className="py-1 pr-3">
-                  {t("admin.operations.common.buyer")}
-                </th>
-                <th className="py-1 pr-3">{t("common.amount")}</th>
-                <th className="py-1 pr-3">{t("common.status")}</th>
-                <th className="py-1 pr-3">
-                  {t("admin.operations.common.order")}
-                </th>
-                <th className="py-1 pr-3">{t("common.date")}</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-border">
-              {siblings.map((s) => (
-                <tr key={s.id}>
-                  <td className="py-2 pr-3">
-                    <Link
-                      href={`/operations/offers/${s.id}`}
-                      className="text-primary-600 hover:underline"
-                    >
-                      {s.buyer.displayName}
-                    </Link>
-                  </td>
-                  <td className="py-2 pr-3 tabular-nums">{fmtTry(s.amount)}</td>
-                  <td className="py-2 pr-3">
-                    <Badge
-                      status={s.status}
-                      config={statusConfig(offerStatusConfig, t)}
-                    />
-                  </td>
-                  <td className="py-2 pr-3">
-                    {s.order ? (
-                      <span className="inline-flex items-center gap-2">
-                        <Link
-                          href={`/operations/orders/${s.order.id}`}
-                          className="font-mono text-primary-600 hover:underline"
-                        >
-                          {s.order.orderNumber}
-                        </Link>
-                        <Badge
-                          status={s.order.status}
-                          config={statusConfig(orderStatusConfig, t)}
-                        />
-                      </span>
-                    ) : (
-                      <span className="text-muted">—</span>
-                    )}
-                  </td>
-                  <td className="py-2 pr-3 text-muted">
-                    {fmtDateTime(s.createdAt)}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+        <DataTable
+          dense
+          columns={columns}
+          data={siblings}
+          getRowId={(s) => s.id}
+        />
       )}
     </SectionCard>
   );

@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { TextLink } from "@/components/TextLink";
 import { Badge, tradeStatusConfig } from "@tarodan/ui";
 import { useTranslations } from "next-intl";
 import { col, TruncatedText } from "@/components/table";
@@ -20,14 +21,14 @@ export function tradeColumns(t: T) {
       t("admin.operations.trades.tradeNumber"),
       (trade) => (
         <div className="flex min-w-0 flex-col items-start gap-1">
-          <Link
+          <TextLink
             href={`/operations/trades/${trade.id}`}
-            className="block max-w-full text-primary-600 hover:underline"
+            className="block max-w-full"
           >
             <TruncatedText className="font-mono">
               {trade.tradeNumber}
             </TruncatedText>
-          </Link>
+          </TextLink>
           <TestLaneBadge isTest={trade.isTest} />
         </div>
       ),

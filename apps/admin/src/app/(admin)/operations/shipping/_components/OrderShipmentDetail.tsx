@@ -1,7 +1,9 @@
 "use client";
 
-import Link from "next/link";
 import { useTranslations } from "next-intl";
+import { DataList, Field } from "@/components/detail/DataList";
+import { Panel } from "@/components/detail/Panel";
+import { TextLink } from "@/components/TextLink";
 import { CellProduct, TruncatedText } from "@/components/table";
 import type { PhysicalShipmentRow } from "../_lib/types";
 
@@ -24,7 +26,7 @@ export function OrderShipmentDetail({
 
   return (
     <div className="bg-surface-alt/40 px-4 pb-4 pt-1">
-      <div className="overflow-hidden rounded-xl border border-border bg-surface shadow-sm">
+      <Panel className="overflow-hidden p-0">
         <div className="flex flex-wrap items-center gap-x-6 gap-y-1 border-b border-border-subtle bg-surface-alt/60 px-4 py-2 text-sm">
           <span className="inline-flex items-center gap-2">
             <span className="text-xs text-muted">
@@ -62,32 +64,33 @@ export function OrderShipmentDetail({
                       : undefined
                   }
                 />
-                <div className="min-w-0">
-                  <p className="text-[11px] uppercase tracking-wide text-muted">
-                    {t("admin.operations.common.order")}
-                  </p>
-                  <Link
-                    href={`/operations/orders/${item.orderId}`}
-                    className="block min-w-0 text-primary-600 hover:underline"
+                <DataList columns={1} className="min-w-0">
+                  <Field
+                    layout="stacked"
+                    label={t("admin.operations.common.order")}
                   >
-                    <TruncatedText className="font-mono text-sm">
-                      {item.orderNumber}
-                    </TruncatedText>
-                  </Link>
-                </div>
-                <div>
-                  <p className="text-[11px] uppercase tracking-wide text-muted">
-                    {t("common.quantity")}
-                  </p>
-                  <span className="text-sm font-semibold tabular-nums text-body">
-                    {item.quantity}
-                  </span>
-                </div>
+                    <TextLink
+                      href={`/operations/orders/${item.orderId}`}
+                      className="block min-w-0"
+                    >
+                      <TruncatedText className="font-mono text-sm">
+                        {item.orderNumber}
+                      </TruncatedText>
+                    </TextLink>
+                  </Field>
+                </DataList>
+                <DataList columns={1}>
+                  <Field layout="stacked" label={t("common.quantity")}>
+                    <span className="text-sm font-semibold tabular-nums text-body">
+                      {item.quantity}
+                    </span>
+                  </Field>
+                </DataList>
               </div>
             ))}
           </div>
         </div>
-      </div>
+      </Panel>
     </div>
   );
 }

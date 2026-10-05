@@ -1,16 +1,17 @@
 "use client";
 
-import Link from "next/link";
 import { useTranslations } from "next-intl";
 import {
+  Alert,
   StatusBadge,
   refundReasonConfig,
   orderStatusConfig,
 } from "@tarodan/ui";
+import { DataList, Field } from "@/components/detail/DataList";
 import { SectionCard } from "@/components/detail/SectionCard";
+import { TextLink } from "@/components/TextLink";
 import type { RefundRequestDetail } from "../types";
 import { fmtTry } from "../_lib/format";
-import { Field } from "../_components/Field";
 import { statusConfig } from "@/lib/statusLabels";
 
 export function RefundReasonSection({ rr }: { rr: RefundRequestDetail }) {
@@ -48,16 +49,17 @@ export function RefundReasonSection({ rr }: { rr: RefundRequestDetail }) {
           <div className="truncate font-medium text-body">
             {rr.order.product.title}
           </div>
-          <Link
+          <TextLink
             href={`/operations/orders/${rr.order.id}`}
-            className="font-mono text-sm text-primary-600 hover:underline"
+            mono
+            className="text-sm"
           >
             {rr.order.orderNumber}
-          </Link>
+          </TextLink>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 gap-x-6 gap-y-3 text-sm md:grid-cols-2">
+      <DataList columns={2}>
         <Field label={t("admin.operations.refundRequests.refundReason")}>
           <StatusBadge
             status={rr.reason}
@@ -93,41 +95,44 @@ export function RefundReasonSection({ rr }: { rr: RefundRequestDetail }) {
             {fmtTry(unitPrice)}
           </Field>
         )}
-      </div>
+      </DataList>
 
       {isPartialQty && unitPrice != null && (
-        <div className="space-y-1 rounded-lg border border-warning-200 bg-warning-50 p-3 text-sm">
-          <div className="font-medium text-warning-800">
-            {t("admin.operations.refundRequests.partialBreakdownTitle")}
-          </div>
-          <div className="flex justify-between text-warning-900">
-            <span>
-              {t("admin.operations.refundRequests.partialRefundedLine", {
-                qty: refundQty,
-                price: fmtTry(unitPrice),
+        <Alert
+          variant="warning"
+          title={t("admin.operations.refundRequests.partialBreakdownTitle")}
+          className="p-3"
+        >
+          <div className="space-y-1">
+            <div className="flex justify-between">
+              <span>
+                {t("admin.operations.refundRequests.partialRefundedLine", {
+                  qty: refundQty,
+                  price: fmtTry(unitPrice),
+                })}
+              </span>
+              <span className="font-semibold">
+                {fmtTry(unitPrice * refundQty)}
+              </span>
+            </div>
+            <div className="flex justify-between text-muted">
+              <span>
+                {t("admin.operations.refundRequests.partialRemainingLine", {
+                  qty: orderQty - refundQty,
+                  price: fmtTry(unitPrice),
+                })}
+              </span>
+              <span>{fmtTry(unitPrice * (orderQty - refundQty))}</span>
+            </div>
+            <p className="pt-1 text-xs">
+              {t("admin.operations.refundRequests.partialExplain", {
+                total: orderQty,
+                refund: refundQty,
+                remaining: orderQty - refundQty,
               })}
-            </span>
-            <span className="font-semibold">
-              {fmtTry(unitPrice * refundQty)}
-            </span>
+            </p>
           </div>
-          <div className="flex justify-between text-muted">
-            <span>
-              {t("admin.operations.refundRequests.partialRemainingLine", {
-                qty: orderQty - refundQty,
-                price: fmtTry(unitPrice),
-              })}
-            </span>
-            <span>{fmtTry(unitPrice * (orderQty - refundQty))}</span>
-          </div>
-          <p className="pt-1 text-xs text-warning-700">
-            {t("admin.operations.refundRequests.partialExplain", {
-              total: orderQty,
-              refund: refundQty,
-              remaining: orderQty - refundQty,
-            })}
-          </p>
-        </div>
+        </Alert>
       )}
 
       {rr.description && (

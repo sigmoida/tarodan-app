@@ -1,6 +1,7 @@
 "use client";
 
 import { useTranslations } from "next-intl";
+import { Panel } from "@/components/detail/Panel";
 import { Stepper, type StepperStep } from "@tarodan/ui";
 import {
   refundLifecycle,
@@ -35,8 +36,8 @@ export function RefundStatusStepper({ status }: { status: string }) {
   }
 
   return (
-    <div className="bg-surface-elevated rounded-xl shadow-sm p-4 sm:p-6">
+    <Panel>
       <Stepper steps={steps} current={current} />
-    </div>
+    </Panel>
   );
 }

@@ -11,6 +11,7 @@ import {
   enumLabel,
 } from "@tarodan/ui";
 import { fmtTry } from "@/lib/format";
+import { Panel } from "@/components/detail/Panel";
 import {
   InformationCircleIcon,
   ExclamationTriangleIcon,
@@ -24,6 +25,7 @@ import {
   type GuidanceVariant,
 } from "../_lib/refund-guidance";
 import type { RefundDecisionPreview } from "../types";
+import { FinancialComponentsTable } from "./FinancialComponentsTable";
 import { extractErrorMessage } from "@/lib/error";
 import { statusConfig } from "@/lib/statusLabels";
 
@@ -204,7 +206,7 @@ export function RefundNextActionPanel({
           )}
 
           {canClose && closeOpen && (
-            <div className="space-y-2 rounded-lg border border-danger-200 bg-surface-elevated p-3">
+            <Panel padding="sm" className="space-y-2 border-danger-200">
               <p className="text-sm">
                 {t("admin.operations.refundRequests.closeExplainer")}
               </p>
@@ -236,11 +238,11 @@ export function RefundNextActionPanel({
                   {t("common.cancel")}
                 </Button>
               </div>
-            </div>
+            </Panel>
           )}
 
           {canDispute && disputeOpen && (
-            <div className="space-y-2 rounded-lg border border-warning-200 bg-surface-elevated p-3">
+            <Panel padding="sm" className="space-y-2 border-warning-200">
               <Textarea
                 value={disputeNote}
                 placeholder={t(
@@ -269,7 +271,7 @@ export function RefundNextActionPanel({
                   {t("common.cancel")}
                 </Button>
               </div>
-            </div>
+            </Panel>
           )}
 
           {(status === "pending_review" || requiresV2Decision) && (
@@ -282,7 +284,7 @@ export function RefundNextActionPanel({
                 </Alert>
               )}
               {requiresV2Decision && (
-                <div className="space-y-3 rounded-lg border border-warning-200 bg-surface-elevated p-3">
+                <Panel padding="sm" className="space-y-3 border-warning-200">
                   <div className="grid gap-3 sm:grid-cols-2">
                     <Select
                       label={t(
@@ -332,7 +334,10 @@ export function RefundNextActionPanel({
                   )}
                   {preview && (
                     <div className="space-y-2 text-sm">
-                      <div className="grid grid-cols-1 gap-2 rounded-md bg-surface p-2 sm:grid-cols-2">
+                      <Panel
+                        padding="sm"
+                        className="grid grid-cols-1 gap-2 sm:grid-cols-2"
+                      >
                         <div>
                           {t(
                             "admin.operations.refundRequests.decisionV2.buyerRefund",
@@ -353,67 +358,13 @@ export function RefundNextActionPanel({
                             },
                           )}
                         </div>
-                      </div>
-                      <div className="overflow-x-auto">
-                        <table className="w-full text-left text-xs">
-                          <thead>
-                            <tr>
-                              <th className="py-1 pr-2">
-                                {t(
-                                  "admin.operations.refundRequests.decisionV2.component",
-                                )}
-                              </th>
-                              <th className="py-1 pr-2">
-                                {t(
-                                  "admin.operations.refundRequests.decisionV2.treatment",
-                                )}
-                              </th>
-                              <th className="py-1 pr-2">
-                                {t(
-                                  "admin.operations.refundRequests.decisionV2.net",
-                                )}
-                              </th>
-                              <th className="py-1 pr-2">
-                                {t(
-                                  "admin.operations.refundRequests.decisionV2.tax",
-                                )}
-                              </th>
-                              <th className="py-1">
-                                {t(
-                                  "admin.operations.refundRequests.decisionV2.gross",
-                                )}
-                              </th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {preview.financials.components.map((component) => (
-                              <tr
-                                key={`${component.componentCode}:${component.treatment}`}
-                                className="border-t"
-                              >
-                                <td className="py-1 pr-2">
-                                  {component.componentCode}
-                                </td>
-                                <td className="py-1 pr-2">
-                                  {component.treatment}
-                                </td>
-                                <td className="py-1 pr-2">
-                                  {fmtTry(component.netAmount)}
-                                </td>
-                                <td className="py-1 pr-2">
-                                  {fmtTry(component.taxAmount)}
-                                </td>
-                                <td className="py-1">
-                                  {fmtTry(component.grossAmount)}
-                                </td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      </div>
+                      </Panel>
+                      <FinancialComponentsTable
+                        components={preview.financials.components}
+                      />
                     </div>
                   )}
-                </div>
+                </Panel>
               )}
               <label className="block text-sm font-medium">
                 {t("admin.operations.refundRequests.reviewNote")}
