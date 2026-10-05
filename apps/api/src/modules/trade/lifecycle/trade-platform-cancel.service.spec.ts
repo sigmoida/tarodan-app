@@ -5,13 +5,17 @@ import {
 } from "@nestjs/common";
 import {
   CancellationActor,
+  OutboxStatus,
   PaymentStatus,
   ProductStatus,
   ShipmentStatus,
   TradeStatus,
 } from "@prisma/client";
 import type { AdminCancelReasonCode } from "@tarodan/types";
+import { OutboxService } from "../../outbox/outbox.service";
+import { OutboxHandlerRegistry } from "../../outbox/outbox-handler.registry";
 import {
+  OUTBOX_TRADE_CANCEL_SETTLE,
   OUTBOX_TRADE_PLATFORM_CANCEL_NOTICE,
   type TradePlatformCancelNoticePayload,
 } from "../../outbox/outbox.types";
@@ -21,8 +25,10 @@ import { TradePlatformCancelService } from "./trade-platform-cancel.service";
  * Platform (admin) takas iptali — süre dolumu taramasının kargo öncesi
  * çekirdeğiyle. Bellek içi sahte tablo `$transaction`'ı satır kilidi gibi
  * sıraya sokar ve hata fırlatan tx'i GERİ ALIR (fail-closed denetimi bununla
- * sınanır). Çekirdek (`cancelPreShipmentTradeInTx`) ve iade politikası
- * GERÇEK koddur; yalnız dış servisler (iade sağlayıcı, kargo, bildirim) sahte.
+ * sınanır). Çekirdek (`cancelPreShipmentTradeInTx`), iade politikası,
+ * OutboxService ve handler kaydı GERÇEK koddur; yalnız dış servisler (iade
+ * sağlayıcı, kargo, bildirim) sahte. `drain()` drainer'ın claim → handler →
+ * completed / retry döngüsünü taklit eder.
  */
 describe("TradePlatformCancelService", () => {
   const T0 = new Date("2026-10-05T12:00:00.000Z");
@@ -48,22 +54,32 @@ describe("TradePlatformCancelService", () => {
     deliveredAt: Date | null;
   }
 
+  interface OutboxRow {
+    id: string;
+    type: string;
+    payload: unknown;
+    dedupeKey: string;
+    status: OutboxStatus;
+  }
+
+  interface TradeRow {
+    id: string;
+    tradeNumber: string;
+    status: TradeStatus;
+    initiatorId: string;
+    receiverId: string;
+    firstWarehouseArrivalAt: Date | null;
+    cancelLockedAt: Date | null;
+    cancelledBy: CancellationActor | null;
+    cancelledAt?: Date | null;
+    cancelReason?: string | null;
+    adminCancelReasonCode: string | null;
+    paymentDeadline: Date | null;
+    paymentExtendedAt: Date | null;
+  }
+
   interface State {
-    trade: {
-      id: string;
-      tradeNumber: string;
-      status: TradeStatus;
-      initiatorId: string;
-      receiverId: string;
-      firstWarehouseArrivalAt: Date | null;
-      cancelLockedAt: Date | null;
-      cancelledBy: CancellationActor | null;
-      cancelledAt?: Date | null;
-      cancelReason?: string | null;
-      adminCancelReasonCode: string | null;
-      paymentDeadline: Date | null;
-      paymentExtendedAt: Date | null;
-    };
+    trade: TradeRow;
     shipments: ShipmentRow[];
     items: Array<{
       productId: string;
@@ -73,11 +89,19 @@ describe("TradePlatformCancelService", () => {
     }>;
     products: Record<string, { reservedQuantity: number; status: string }>;
     payments: PaymentRow[];
-    outbox: Array<{
-      type: string;
-      payload: TradePlatformCancelNoticePayload;
-      dedupeKey?: string;
-    }>;
+    outbox: OutboxRow[];
+  }
+
+  /** Sahte Prisma istemcisi; tx ile kök istemci aynı nesnedir. */
+  interface FakeDb {
+    $queryRaw: jest.Mock;
+    trade: { findUnique: jest.Mock; update: jest.Mock };
+    tradeShipment: { findFirst: jest.Mock; findMany: jest.Mock };
+    tradeItem: { findMany: jest.Mock };
+    product: { findUnique: jest.Mock; update: jest.Mock };
+    tradeCashPayment: { updateMany: jest.Mock; findMany: jest.Mock };
+    outboxEvent: { upsert: jest.Mock; updateMany: jest.Mock };
+    $transaction: jest.Mock;
   }
 
   /** v2 ödeme satırı: 150 hizmet bedeli + 80 kargo = 230 tahsilat. */
@@ -100,7 +124,7 @@ describe("TradePlatformCancelService", () => {
     payment: null,
   });
 
-  const makeState = (patch: Partial<State["trade"]> = {}): State => ({
+  const makeState = (patch: Partial<TradeRow> = {}): State => ({
     trade: {
       id: "t1",
       tradeNumber: "TKS-1",
@@ -138,44 +162,59 @@ describe("TradePlatformCancelService", () => {
     outbox: [],
   });
 
-  const pick = (row: Record<string, any>, select?: Record<string, any>) => {
-    if (!select) return { ...row };
-    const out: Record<string, any> = {};
+  /** `select: { alan: true }` alt kümesi (iç içe select'ler ayrıca eklenir). */
+  const pick = (
+    row: object,
+    select?: Record<string, unknown>,
+  ): Record<string, unknown> => {
+    const source = row as Record<string, unknown>;
+    if (!select) return { ...source };
+    const out: Record<string, unknown> = {};
     for (const key of Object.keys(select)) {
-      if (select[key] === true) out[key] = row[key];
+      if (select[key] === true) out[key] = source[key];
     }
     return out;
   };
+
+  type Where = Record<string, unknown>;
 
   const makeHarness = (state: State) => {
     const lockLog: string[] = [];
     const calls: string[] = [];
     let lock: Promise<unknown> = Promise.resolve();
 
-    const db = {
+    const db: FakeDb = {
       $queryRaw: jest.fn(async (strings: TemplateStringsArray) => {
         lockLog.push(strings.join("?").trim());
         return [];
       }),
       trade: {
-        findUnique: jest.fn(async ({ where, select }: any) => {
-          if (where.id !== state.trade.id) return null;
-          const row: Record<string, any> = pick(state.trade, select);
-          if (select?.shipments)
-            row.shipments = state.shipments.map((s) => ({ ...s }));
-          if (select?.cashPayments)
-            row.cashPayments = state.payments.map((p) => ({ ...p }));
-          if (select?.items) row.items = state.items.map((i) => ({ ...i }));
-          return row;
-        }),
-        update: jest.fn(async ({ data }: any) => {
+        findUnique: jest.fn(
+          async ({
+            where,
+            select,
+          }: {
+            where: { id: string };
+            select?: Record<string, unknown>;
+          }) => {
+            if (where.id !== state.trade.id) return null;
+            const row = pick(state.trade, select);
+            if (select?.shipments)
+              row.shipments = state.shipments.map((s) => ({ ...s }));
+            if (select?.cashPayments)
+              row.cashPayments = state.payments.map((p) => ({ ...p }));
+            if (select?.items) row.items = state.items.map((i) => ({ ...i }));
+            return row;
+          },
+        ),
+        update: jest.fn(async ({ data }: { data: Partial<TradeRow> }) => {
           Object.assign(state.trade, data);
           return state.trade;
         }),
       },
       tradeShipment: {
         findFirst: jest.fn(
-          async ({ where }: any) =>
+          async ({ where }: { where: { leg: string } }) =>
             state.shipments.find(
               (s) => s.leg === where.leg && s.shippedAt !== null,
             ) ?? null,
@@ -186,45 +225,114 @@ describe("TradePlatformCancelService", () => {
         findMany: jest.fn(async () => state.items.map((i) => ({ ...i }))),
       },
       product: {
-        findUnique: jest.fn(async ({ where }: any) =>
+        findUnique: jest.fn(async ({ where }: { where: { id: string } }) =>
           state.products[where.id] ? { ...state.products[where.id] } : null,
         ),
-        update: jest.fn(async ({ where, data }: any) => {
-          Object.assign(state.products[where.id], data);
-          return {};
-        }),
+        update: jest.fn(
+          async ({
+            where,
+            data,
+          }: {
+            where: { id: string };
+            data: Partial<State["products"][string]>;
+          }) => {
+            Object.assign(state.products[where.id], data);
+            return {};
+          },
+        ),
       },
       tradeCashPayment: {
-        updateMany: jest.fn(async ({ where, data }: any) => {
-          const hit = state.payments.filter(
-            (p) => !where.status || p.status === where.status,
-          );
-          hit.forEach((p) => Object.assign(p, data));
-          return { count: hit.length };
-        }),
+        updateMany: jest.fn(
+          async ({
+            where,
+            data,
+          }: {
+            where: { status?: PaymentStatus };
+            data: Partial<PaymentRow>;
+          }) => {
+            const hit = state.payments.filter(
+              (p) => !where.status || p.status === where.status,
+            );
+            hit.forEach((p) => Object.assign(p, data));
+            return { count: hit.length };
+          },
+        ),
         findMany: jest.fn(async () => state.payments.map((p) => ({ ...p }))),
       },
+      outboxEvent: {
+        upsert: jest.fn(
+          async ({
+            where,
+            create,
+          }: {
+            where: { dedupeKey: string };
+            create: { type: string; payload: unknown };
+          }) => {
+            const existing = state.outbox.find(
+              (row) => row.dedupeKey === where.dedupeKey,
+            );
+            if (existing) return existing;
+            const row: OutboxRow = {
+              id: `ob-${state.outbox.length + 1}`,
+              type: create.type,
+              payload: create.payload,
+              dedupeKey: where.dedupeKey,
+              status: OutboxStatus.pending,
+            };
+            state.outbox.push(row);
+            return row;
+          },
+        ),
+        updateMany: jest.fn(
+          async ({
+            where,
+            data,
+          }: {
+            where: Where;
+            data: { status?: OutboxStatus };
+          }) => {
+            const hit = state.outbox.filter(
+              (row) =>
+                (where.dedupeKey === undefined ||
+                  row.dedupeKey === where.dedupeKey) &&
+                (where.status === undefined || row.status === where.status),
+            );
+            hit.forEach((row) => {
+              if (data.status) row.status = data.status;
+            });
+            return { count: hit.length };
+          },
+        ),
+      },
       // Satır kilidi taklidi + geri alma: fırlatan tx'in yazdığı her şey geri döner.
-      $transaction: jest.fn((fn: (tx: unknown) => Promise<unknown>) => {
-        const run = lock.then(async () => {
-          const snapshot = structuredClone(state);
-          try {
-            return await fn(db);
-          } catch (error) {
-            Object.assign(state, snapshot);
-            throw error;
-          }
-        });
-        lock = run.catch(() => undefined);
-        return run;
-      }),
+      $transaction: jest.fn(
+        (fn: (tx: FakeDb) => Promise<unknown>): Promise<unknown> => {
+          const run: Promise<unknown> = lock.then(async () => {
+            const snapshot = structuredClone(state);
+            try {
+              return await fn(db);
+            } catch (error) {
+              Object.assign(state, snapshot);
+              throw error;
+            }
+          });
+          lock = run.catch(() => undefined);
+          return run;
+        },
+      ),
     };
 
     const paymentService = {
-      refundTradeCashTracked: jest.fn(async () => {
-        calls.push("refund");
-        return { refunded: true, failed: false };
-      }),
+      refundTradeCashTracked: jest.fn(
+        async (): Promise<{
+          refunded: boolean;
+          failed: boolean;
+          reason?: string;
+        }> => {
+          calls.push("refund");
+          return { refunded: true, failed: false };
+        },
+      ),
     };
     const tradeShipment = {
       cancelSuratShipmentsForTrade: jest.fn(async () => {
@@ -237,14 +345,12 @@ describe("TradePlatformCancelService", () => {
       }),
     };
     const notificationService = {
-      notifyTradeCancelledByPlatform: jest.fn().mockResolvedValue(undefined),
+      sendTradeCancelledByPlatformNotice: jest
+        .fn()
+        .mockResolvedValue(undefined),
     };
-    const outbox = {
-      enqueue: jest.fn(async (_tx: unknown, input: State["outbox"][number]) => {
-        state.outbox.push(input);
-      }),
-    };
-    const registry = { register: jest.fn() };
+    const outbox = new OutboxService();
+    const registry = new OutboxHandlerRegistry();
     const onCancelled = jest.fn().mockResolvedValue(undefined);
 
     const service = new TradePlatformCancelService(
@@ -253,9 +359,28 @@ describe("TradePlatformCancelService", () => {
       tradeShipment as never,
       tradeCommon as never,
       notificationService as never,
-      outbox as never,
-      registry as never,
+      outbox,
+      registry,
     );
+    service.onModuleInit();
+
+    /** Drainer turu: bekleyen her satırı claim et, handler'ı çalıştır. */
+    const drain = async (): Promise<void> => {
+      for (const row of state.outbox) {
+        if (row.status !== OutboxStatus.pending) continue;
+        row.status = OutboxStatus.processing;
+        try {
+          await registry.get(row.type)!(row.payload, row as never);
+          row.status = OutboxStatus.completed;
+        } catch {
+          row.status = OutboxStatus.pending;
+        }
+      }
+    };
+
+    const rowsOf = (type: string) =>
+      state.outbox.filter((row) => row.type === type);
+
     return {
       service,
       db,
@@ -268,6 +393,8 @@ describe("TradePlatformCancelService", () => {
       outbox,
       registry,
       onCancelled,
+      drain,
+      rowsOf,
       cancel: (code: AdminCancelReasonCode = "stock_error") =>
         service.cancel("t1", code, { onCancelled }),
     };
@@ -482,7 +609,7 @@ describe("TradePlatformCancelService", () => {
   });
 
   describe("yarışlar ve idempotency", () => {
-    it("çift gönderim: ikinci çağrı para, duyuru ve denetim üretmez", async () => {
+    it("çift gönderim: ikinci çağrı yeni iptal, duyuru, denetim ya da ikinci iade üretmez", async () => {
       const h = makeHarness(makeState());
 
       const [first, second] = await Promise.all([h.cancel(), h.cancel()]);
@@ -491,7 +618,8 @@ describe("TradePlatformCancelService", () => {
       expect(second.alreadyCancelled).toBe(true);
       expect(h.onCancelled).toHaveBeenCalledTimes(1);
       expect(h.paymentService.refundTradeCashTracked).toHaveBeenCalledTimes(1);
-      expect(h.state.outbox).toHaveLength(1);
+      expect(h.rowsOf(OUTBOX_TRADE_CANCEL_SETTLE)).toHaveLength(1);
+      expect(h.rowsOf(OUTBOX_TRADE_PLATFORM_CANCEL_NOTICE)).toHaveLength(4);
     });
 
     it("taraf önce iptal ettiyse → 409, ikinci iade yok", async () => {
@@ -578,6 +706,87 @@ describe("TradePlatformCancelService", () => {
     });
   });
 
+  describe("commit ile iade arasında çökme (dayanıklı commit sonrası iş)", () => {
+    /** Süreç commit'ten hemen sonra, anlık yol işi sahiplenemeden ölür. */
+    const crashAfterCommit = (h: ReturnType<typeof makeHarness>) =>
+      jest
+        .spyOn(h.outbox, "runInline")
+        .mockRejectedValueOnce(new Error("SIGKILL after commit"));
+
+    it("commit sonrası iş iptalle aynı tx'te pending olarak kuyruğa girer, anlık yol tamamlar", async () => {
+      const h = makeHarness(makeState());
+
+      await h.cancel();
+
+      expect(h.rowsOf(OUTBOX_TRADE_CANCEL_SETTLE)).toEqual([
+        expect.objectContaining({
+          dedupeKey: `${OUTBOX_TRADE_CANCEL_SETTLE}:t1`,
+          payload: { tradeId: "t1" },
+          status: OutboxStatus.completed,
+        }),
+      ]);
+      // Drainer tamamlanmış işi tekrar çalıştırmaz.
+      await h.drain();
+      expect(h.paymentService.refundTradeCashTracked).toHaveBeenCalledTimes(1);
+    });
+
+    it("çökme: iade hiç denenmedi; drainer iadeyi yapar ve etiketleri iptal eder", async () => {
+      const h = makeHarness(makeState());
+      crashAfterCommit(h);
+
+      await expect(h.cancel()).rejects.toThrow("SIGKILL after commit");
+      expect(h.state.trade.status).toBe(TradeStatus.cancelled);
+      expect(h.paymentService.refundTradeCashTracked).not.toHaveBeenCalled();
+      expect(h.rowsOf(OUTBOX_TRADE_CANCEL_SETTLE)[0].status).toBe(
+        OutboxStatus.pending,
+      );
+
+      await h.drain();
+
+      expect(h.paymentService.refundTradeCashTracked).toHaveBeenCalledTimes(1);
+      expect(h.paymentService.refundTradeCashTracked).toHaveBeenCalledWith(
+        "t1",
+      );
+      expect(h.tradeShipment.cancelSuratShipmentsForTrade).toHaveBeenCalledWith(
+        "t1",
+      );
+      expect(h.rowsOf(OUTBOX_TRADE_CANCEL_SETTLE)[0].status).toBe(
+        OutboxStatus.completed,
+      );
+    });
+
+    it("çökme sonrası admin yeniden gönderirse bekleyen iş o istekte tamamlanır; drainer ikinci kez çalıştırmaz", async () => {
+      const h = makeHarness(makeState());
+      crashAfterCommit(h);
+      await expect(h.cancel()).rejects.toThrow();
+
+      const retry = await h.cancel();
+
+      expect(retry.alreadyCancelled).toBe(true);
+      expect(retry.refundOutcome).toEqual({ refunded: true, failed: false });
+      expect(h.onCancelled).toHaveBeenCalledTimes(1);
+      expect(h.paymentService.refundTradeCashTracked).toHaveBeenCalledTimes(1);
+      expect(
+        h.tradeShipment.cancelSuratShipmentsForTrade,
+      ).toHaveBeenCalledTimes(1);
+
+      await h.drain();
+      expect(h.paymentService.refundTradeCashTracked).toHaveBeenCalledTimes(1);
+    });
+
+    it("drainer işi yürütürken gelen admin tekrarı işi ikinci kez çalıştırmaz", async () => {
+      const h = makeHarness(makeState());
+      crashAfterCommit(h);
+      await expect(h.cancel()).rejects.toThrow();
+      h.rowsOf(OUTBOX_TRADE_CANCEL_SETTLE)[0].status = OutboxStatus.processing;
+
+      const retry = await h.cancel();
+
+      expect(retry.refundOutcome).toBeNull();
+      expect(h.paymentService.refundTradeCashTracked).not.toHaveBeenCalled();
+    });
+  });
+
   describe("denetim (fail-closed) ve iade hatası", () => {
     it("denetim kancası iptalle aynı tx'te, kayıtla çağrılır", async () => {
       const h = makeHarness(makeState());
@@ -604,7 +813,7 @@ describe("TradePlatformCancelService", () => {
       });
     });
 
-    it("denetim yazılamazsa iptal, rezervasyon ve duyuru geri alınır; iade denenmez", async () => {
+    it("denetim yazılamazsa iptal, rezervasyon, iade işi ve duyuru geri alınır; iade denenmez", async () => {
       const state = makeState();
       const h = makeHarness(state);
       h.onCancelled.mockRejectedValueOnce(new Error("audit down"));
@@ -625,7 +834,7 @@ describe("TradePlatformCancelService", () => {
         refunded: false,
         failed: true,
         reason: "PayTR timeout",
-      } as never);
+      });
 
       const result = await h.cancel();
 
@@ -641,57 +850,105 @@ describe("TradePlatformCancelService", () => {
     });
   });
 
-  describe("duyuru (outbox)", () => {
-    it("iptalle aynı tx'te takas başına tek, nottan arınmış duyuru kuyruğa alınır", async () => {
+  describe("duyuru (outbox, alıcı × kanal)", () => {
+    const noticeRows = (h: ReturnType<typeof makeHarness>) =>
+      h
+        .rowsOf(OUTBOX_TRADE_PLATFORM_CANCEL_NOTICE)
+        .map((row) => row.payload as TradePlatformCancelNoticePayload);
+
+    it("iptalle aynı tx'te her taraf × kanal için bir, nottan arınmış satır kuyruğa alınır", async () => {
       const h = makeHarness(makeState());
       await h.cancel("other");
 
-      expect(h.state.outbox).toEqual([
-        {
-          type: OUTBOX_TRADE_PLATFORM_CANCEL_NOTICE,
-          dedupeKey: `${OUTBOX_TRADE_PLATFORM_CANCEL_NOTICE}:t1`,
-          payload: {
-            tradeId: "t1",
-            parties: [
-              { userId: "u1", refundAmount: 230 },
-              { userId: "u2", refundAmount: 0 },
-            ],
-          },
-        },
+      expect(noticeRows(h)).toEqual([
+        { tradeId: "t1", userId: "u1", refundAmount: 230, channel: "in_app" },
+        { tradeId: "t1", userId: "u1", refundAmount: 230, channel: "email" },
+        { tradeId: "t1", userId: "u2", refundAmount: 0, channel: "in_app" },
+        { tradeId: "t1", userId: "u2", refundAmount: 0, channel: "email" },
       ]);
-      // Platform iptali taramanın "otomatik iptal" duyurusunu üretmez; duyuru
-      // yalnız outbox'tan (handler) gider.
       expect(
-        h.notificationService.notifyTradeCancelledByPlatform,
+        h.rowsOf(OUTBOX_TRADE_PLATFORM_CANCEL_NOTICE).map((r) => r.dedupeKey),
+      ).toEqual([
+        `${OUTBOX_TRADE_PLATFORM_CANCEL_NOTICE}:t1:u1:in_app`,
+        `${OUTBOX_TRADE_PLATFORM_CANCEL_NOTICE}:t1:u1:email`,
+        `${OUTBOX_TRADE_PLATFORM_CANCEL_NOTICE}:t1:u2:in_app`,
+        `${OUTBOX_TRADE_PLATFORM_CANCEL_NOTICE}:t1:u2:email`,
+      ]);
+      // Duyuru anlık gitmez; yalnız drainer'dan (handler) gider.
+      expect(
+        h.notificationService.sendTradeCancelledByPlatformNotice,
       ).not.toHaveBeenCalled();
     });
 
-    it("handler kayıtlıdır ve platform iptalinde bildirimciyi bir kez çağırır", async () => {
+    it("drainer her taraf için tam bir in-app ve bir e-posta gönderir", async () => {
       const h = makeHarness(makeState());
-      h.service.onModuleInit();
-      expect(h.registry.register).toHaveBeenCalledWith(
-        OUTBOX_TRADE_PLATFORM_CANCEL_NOTICE,
-        expect.any(Function),
-      );
       await h.cancel("stock_error");
-      const handler = h.registry.register.mock.calls[0][1];
 
-      await handler(h.state.outbox[0].payload);
+      await h.drain();
+      await h.drain();
 
+      const sent =
+        h.notificationService.sendTradeCancelledByPlatformNotice.mock.calls;
+      expect(sent).toHaveLength(4);
+      expect(sent.map(([notice]) => notice)).toEqual([
+        {
+          tradeId: "t1",
+          tradeNumber: "TKS-1",
+          reasonCode: "stock_error",
+          userId: "u1",
+          refundAmount: 230,
+          channel: "in_app",
+        },
+        expect.objectContaining({ userId: "u1", channel: "email" }),
+        expect.objectContaining({
+          userId: "u2",
+          channel: "in_app",
+          refundAmount: 0,
+        }),
+        expect.objectContaining({ userId: "u2", channel: "email" }),
+      ]);
+    });
+
+    it("bir gönderim başarısızsa yalnız o satır yeniden denenir; başarılı olanlar ikinci kez gitmez", async () => {
+      const h = makeHarness(makeState());
+      await h.cancel();
+      const send = h.notificationService.sendTradeCancelledByPlatformNotice;
+      send.mockImplementation(
+        async (notice: { userId: string; channel: string }) => {
+          if (notice.userId === "u1" && notice.channel === "email") {
+            throw new Error("smtp down");
+          }
+        },
+      );
+
+      await h.drain();
+      expect(send).toHaveBeenCalledTimes(4);
       expect(
-        h.notificationService.notifyTradeCancelledByPlatform,
-      ).toHaveBeenCalledTimes(1);
+        h
+          .rowsOf(OUTBOX_TRADE_PLATFORM_CANCEL_NOTICE)
+          .filter((row) => row.status === OutboxStatus.pending)
+          .map((row) => row.dedupeKey),
+      ).toEqual([`${OUTBOX_TRADE_PLATFORM_CANCEL_NOTICE}:t1:u1:email`]);
+
+      send.mockResolvedValue(undefined);
+      await h.drain();
+      expect(send).toHaveBeenCalledTimes(5);
+      expect(send.mock.calls[4][0]).toEqual(
+        expect.objectContaining({ userId: "u1", channel: "email" }),
+      );
+    });
+
+    it("gönderimden ÖNCEKİ bir hata (takas okunamadı) fırlatılır → outbox yeniden dener", async () => {
+      const h = makeHarness(makeState());
+      await h.cancel();
+      h.db.trade.findUnique.mockRejectedValueOnce(new Error("db down"));
+
+      await expect(
+        h.service.sendCancellationNotice(noticeRows(h)[0]),
+      ).rejects.toThrow("db down");
       expect(
-        h.notificationService.notifyTradeCancelledByPlatform,
-      ).toHaveBeenCalledWith({
-        tradeId: "t1",
-        tradeNumber: "TKS-1",
-        reasonCode: "stock_error",
-        parties: [
-          { userId: "u1", refundAmount: 230 },
-          { userId: "u2", refundAmount: 0 },
-        ],
-      });
+        h.notificationService.sendTradeCancelledByPlatformNotice,
+      ).not.toHaveBeenCalled();
     });
 
     it("takas platform iptali değilse handler kimseye duyuru göndermez", async () => {
@@ -701,21 +958,15 @@ describe("TradePlatformCancelService", () => {
           cancelledBy: CancellationActor.system,
         }),
       );
-      await h.service.sendCancellationNotice({ tradeId: "t1", parties: [] });
+      await h.service.sendCancellationNotice({
+        tradeId: "t1",
+        userId: "u1",
+        refundAmount: 0,
+        channel: "in_app",
+      });
       expect(
-        h.notificationService.notifyTradeCancelledByPlatform,
+        h.notificationService.sendTradeCancelledByPlatformNotice,
       ).not.toHaveBeenCalled();
-    });
-
-    it("bildirimci patlarsa handler fırlatmaz (yeniden deneme ikinci duyuru üretmesin)", async () => {
-      const h = makeHarness(makeState());
-      await h.cancel();
-      h.notificationService.notifyTradeCancelledByPlatform.mockRejectedValueOnce(
-        new Error("smtp down"),
-      );
-      await expect(
-        h.service.sendCancellationNotice(h.state.outbox[0].payload),
-      ).resolves.toBeUndefined();
     });
   });
 

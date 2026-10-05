@@ -7,32 +7,52 @@ import { renderEmailTemplate } from "../../common/helpers/email-template-rendere
 import { isEmailTemplateKey } from "../../common/email/email-template-registry";
 
 /**
- * Platform (admin) takas iptali duyurusu: her tarafa TEK in-app bildirim ve TEK
- * e-posta. Gerekçe katalog etiketidir (alıcının dilinde), iade yalnız ödeyen
- * tarafa söylenir; adminin iç notu sözleşmede yoktur, hiçbir yüke giremez.
+ * Platform (admin) takas iptali duyurusu: TEK alıcıya TEK kanaldan (outbox
+ * satırı = alıcı × kanal). Gerekçe katalog etiketidir (in-app'te alıcının
+ * dilinde), iade yalnız ödeyen tarafa söylenir; adminin iç notu sözleşmede
+ * yoktur. Gönderim gerçekleşmezse fırlatır (outbox yalnız o satırı yeniden
+ * dener); gönderilecek bir şey yoksa fırlatmaz.
  */
-describe("NotificationCommerceService.notifyTradeCancelledByPlatform", () => {
-  const notice = {
+describe("NotificationCommerceService.sendTradeCancelledByPlatformNotice", () => {
+  const base = {
     tradeId: "t1",
     tradeNumber: "TKS-1",
     reasonCode: "stock_error" as const,
-    parties: [
-      { userId: "u1", refundAmount: 230 },
-      { userId: "u2", refundAmount: 0 },
-    ],
+  };
+  const users: Record<string, Record<string, unknown>> = {
+    u1: {
+      email: "ayse@example.com",
+      displayName: "Ayşe",
+      preferredLanguage: "tr",
+      notificationSettings: null,
+    },
+    u2: {
+      email: "john@example.com",
+      displayName: "John",
+      preferredLanguage: "en",
+      notificationSettings: null,
+    },
   };
 
-  const makeService = () => {
+  const makeService = (
+    opts: { emailConfigured?: boolean; user?: Record<string, unknown> } = {},
+  ) => {
     const dispatch = {
       createInAppNotification: jest.fn().mockResolvedValue(true),
-      sendTemplateEmailToUser: jest.fn().mockResolvedValue(undefined),
+      sendTemplateEmailToAddress: jest
+        .fn()
+        .mockResolvedValue({ success: true }),
+      getProviderStatus: jest.fn().mockReturnValue({
+        email: opts.emailConfigured ?? true,
+        expo: true,
+        sms: false,
+      }),
     };
     const prisma = {
       user: {
-        findMany: jest.fn().mockResolvedValue([
-          { id: "u1", displayName: "Ayşe", preferredLanguage: "tr" },
-          { id: "u2", displayName: "John", preferredLanguage: "en" },
-        ]),
+        findUnique: jest.fn(async ({ where }: { where: { id: string } }) =>
+          opts.user !== undefined ? opts.user : (users[where.id] ?? null),
+        ),
       },
     };
     const service = new NotificationCommerceService(
@@ -40,35 +60,26 @@ describe("NotificationCommerceService.notifyTradeCancelledByPlatform", () => {
       prisma as never,
       {} as never,
     );
-    return { service, dispatch };
+    return { service, dispatch, prisma };
   };
 
-  it("her tarafa tam olarak bir in-app ve bir e-posta", async () => {
+  it("in-app: platform iptali tipi, alıcının dilinde etiket, kendi iadesi; e-posta gönderilmez", async () => {
     const { service, dispatch } = makeService();
 
-    await service.notifyTradeCancelledByPlatform(notice);
+    await service.sendTradeCancelledByPlatformNotice({
+      ...base,
+      userId: "u1",
+      refundAmount: 230,
+      channel: "in_app",
+    });
+    await service.sendTradeCancelledByPlatformNotice({
+      ...base,
+      userId: "u2",
+      refundAmount: 0,
+      channel: "in_app",
+    });
 
     expect(dispatch.createInAppNotification).toHaveBeenCalledTimes(2);
-    expect(dispatch.sendTemplateEmailToUser).toHaveBeenCalledTimes(2);
-    for (const userId of ["u1", "u2"]) {
-      expect(
-        dispatch.createInAppNotification.mock.calls.filter(
-          ([target]) => target === userId,
-        ),
-      ).toHaveLength(1);
-      expect(
-        dispatch.sendTemplateEmailToUser.mock.calls.filter(
-          ([target]) => target === userId,
-        ),
-      ).toHaveLength(1);
-    }
-  });
-
-  it("in-app: platform iptali tipi, alıcının dilinde etiket, yalnız kendi iadesi", async () => {
-    const { service, dispatch } = makeService();
-
-    await service.notifyTradeCancelledByPlatform(notice);
-
     expect(dispatch.createInAppNotification).toHaveBeenCalledWith(
       "u1",
       NotificationType.TRADE_CANCELLED_BY_PLATFORM,
@@ -91,15 +102,22 @@ describe("NotificationCommerceService.notifyTradeCancelledByPlatform", () => {
         refundAmount: 0,
       },
     );
+    expect(dispatch.sendTemplateEmailToAddress).not.toHaveBeenCalled();
   });
 
-  it("e-posta: yönetilen şablon, varsayılan dilde etiket, takas linki", async () => {
+  it("e-posta: yönetilen şablon, varsayılan dilde etiket, takas linki; in-app gönderilmez", async () => {
     const { service, dispatch } = makeService();
 
-    await service.notifyTradeCancelledByPlatform(notice);
+    await service.sendTradeCancelledByPlatformNotice({
+      ...base,
+      userId: "u1",
+      refundAmount: 230,
+      channel: "email",
+    });
 
-    expect(dispatch.sendTemplateEmailToUser).toHaveBeenCalledWith(
-      "u1",
+    expect(dispatch.sendTemplateEmailToAddress).toHaveBeenCalledTimes(1);
+    expect(dispatch.sendTemplateEmailToAddress).toHaveBeenCalledWith(
+      "ayse@example.com",
       "trade-cancelled-platform",
       expect.objectContaining({
         name: "Ayşe",
@@ -109,29 +127,115 @@ describe("NotificationCommerceService.notifyTradeCancelledByPlatform", () => {
         tradeUrl: expect.stringMatching(/\/profile\/trades\/t1$/),
       }),
     );
+    expect(dispatch.createInAppNotification).not.toHaveBeenCalled();
     expect(isEmailTemplateKey("trade-cancelled-platform")).toBe(true);
   });
 
-  it("bir tarafın in-app hatası diğer tarafı ve e-postaları engellemez (fırlatmaz)", async () => {
-    const { service, dispatch } = makeService();
-    dispatch.createInAppNotification.mockRejectedValueOnce(new Error("db"));
+  it("kullanıcı okunamazsa (gönderimden önce) fırlatır → outbox yeniden dener", async () => {
+    const { service, prisma, dispatch } = makeService();
+    prisma.user.findUnique.mockRejectedValueOnce(new Error("db down"));
 
     await expect(
-      service.notifyTradeCancelledByPlatform(notice),
+      service.sendTradeCancelledByPlatformNotice({
+        ...base,
+        userId: "u1",
+        refundAmount: 230,
+        channel: "in_app",
+      }),
+    ).rejects.toThrow("db down");
+    expect(dispatch.createInAppNotification).not.toHaveBeenCalled();
+  });
+
+  it("in-app kaydedilemezse fırlatır", async () => {
+    const { service, dispatch } = makeService();
+    dispatch.createInAppNotification.mockResolvedValueOnce(false);
+
+    await expect(
+      service.sendTradeCancelledByPlatformNotice({
+        ...base,
+        userId: "u1",
+        refundAmount: 0,
+        channel: "in_app",
+      }),
+    ).rejects.toThrow();
+  });
+
+  it("e-posta sağlayıcıda başarısızsa fırlatır", async () => {
+    const { service, dispatch } = makeService();
+    dispatch.sendTemplateEmailToAddress.mockResolvedValueOnce({
+      success: false,
+      error: "SMTP 421",
+    });
+
+    await expect(
+      service.sendTradeCancelledByPlatformNotice({
+        ...base,
+        userId: "u1",
+        refundAmount: 0,
+        channel: "email",
+      }),
+    ).rejects.toThrow("SMTP 421");
+  });
+
+  it("gönderilecek bir şey yoksa fırlatmaz: kullanıcı yok / bildirim kategorisi kapalı / e-posta sağlayıcısı yok", async () => {
+    const missing = makeService({ user: null as never });
+    await expect(
+      missing.service.sendTradeCancelledByPlatformNotice({
+        ...base,
+        userId: "ghost",
+        refundAmount: 0,
+        channel: "in_app",
+      }),
     ).resolves.toBeUndefined();
-    expect(dispatch.createInAppNotification).toHaveBeenCalledTimes(2);
-    expect(dispatch.sendTemplateEmailToUser).toHaveBeenCalledTimes(2);
+
+    const optedOut = makeService({
+      user: {
+        ...users.u1,
+        notificationSettings: { orderUpdates: false },
+      },
+    });
+    await expect(
+      optedOut.service.sendTradeCancelledByPlatformNotice({
+        ...base,
+        userId: "u1",
+        refundAmount: 0,
+        channel: "in_app",
+      }),
+    ).resolves.toBeUndefined();
+    expect(optedOut.dispatch.createInAppNotification).not.toHaveBeenCalled();
+
+    const noProvider = makeService({ emailConfigured: false });
+    noProvider.dispatch.sendTemplateEmailToAddress.mockResolvedValueOnce({
+      success: false,
+      error: "No email provider configured",
+    });
+    await expect(
+      noProvider.service.sendTradeCancelledByPlatformNotice({
+        ...base,
+        userId: "u1",
+        refundAmount: 0,
+        channel: "email",
+      }),
+    ).resolves.toBeUndefined();
   });
 
   it("taraf yüklerinin hiçbirinde iç not alanı yoktur", async () => {
     const { service, dispatch } = makeService();
 
-    await service.notifyTradeCancelledByPlatform(notice);
+    for (const channel of ["in_app", "email"] as const) {
+      await service.sendTradeCancelledByPlatformNotice({
+        ...base,
+        userId: "u1",
+        refundAmount: 230,
+        channel,
+      });
+    }
 
     const payloads = [
       ...dispatch.createInAppNotification.mock.calls.map((call) => call[2]),
-      ...dispatch.sendTemplateEmailToUser.mock.calls.map((call) => call[2]),
+      ...dispatch.sendTemplateEmailToAddress.mock.calls.map((call) => call[2]),
     ];
+    expect(payloads).toHaveLength(2);
     for (const payload of payloads) {
       expect(Object.keys(payload)).not.toContain("note");
     }

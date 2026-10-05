@@ -372,11 +372,11 @@ export class NotificationService {
     return this.commerce.notifyTradeCompleted(userId, tradeId);
   }
 
-  /** Platform (admin) takas iptali: iki tarafa in-app + e-posta (birer tane). */
-  async notifyTradeCancelledByPlatform(
+  /** Platform (admin) takas iptali: tek alıcıya tek kanaldan; gönderemezse fırlatır. */
+  async sendTradeCancelledByPlatformNotice(
     notice: TradePlatformCancelNotice,
   ): Promise<void> {
-    return this.commerce.notifyTradeCancelledByPlatform(notice);
+    return this.commerce.sendTradeCancelledByPlatformNotice(notice);
   }
 
   // ==================== ACCOUNT NOTIFIERS ====================

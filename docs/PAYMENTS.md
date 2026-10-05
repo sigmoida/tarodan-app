@@ -408,21 +408,34 @@ duyurudur. Uygunluk kuralı `@tarodan/types` → `adminTradeCancelBlocker`
   metindir ("Tarodan tarafından iptal edildi: <etiket>"). Adminin iç notu YALNIZ
   denetim kaydındadır.
 - **Denetim:** `trade_admin_cancel` zorunlu ve iptalle aynı tx'te (yazılamazsa
-  iptal, rezervasyon çözümü ve duyuru geri alınır). İade harici sağlayıcı
-  çağrısıdır, iptalle atomik olamaz: commit sonrası yapılır; başarısızlıkta
-  takasa `refundFailureReason` yazılır (takas dosyasında "İadeyi yeniden dene" +
-  `retryFailedTradeRefunds` cron'u) ve sonuç `trade_admin_cancel_refund`
-  satırına düşer. Reddedilen denemeler `trade_admin_cancel_failed`.
-- **Duyuru:** iptalle aynı tx'te outbox'a (`trade.platform_cancel_notice`,
-  takas başına tek `dedupeKey`); handler her tarafa bir in-app bildirim
-  (`trade_cancelled_by_platform`, push'u dahil) ve bir e-posta
-  (`trade-cancelled-platform`) gönderir. Taramanın "otomatik iptal" push'u
-  gitmez. İade core'u başarılı iadede ayrıca kendi "iade tamamlandı" push'unu
-  gönderir (iade sonucu sinyali; her iptal yolunda aynı).
+  iptal, rezervasyon çözümü, commit sonrası iş ve duyurular geri alınır).
+  Reddedilen denemeler `trade_admin_cancel_failed`.
+- **Commit sonrası iş dayanıklıdır:** iade harici sağlayıcı çağrısıdır,
+  iptalle atomik olamaz. Bu yüzden iade + önbellek + etiket iptali iptalle
+  aynı tx'te `trade.cancel_settle` outbox satırı olarak yazılır ve commit
+  sonrası anlık yoldan (`OutboxService.runInline`: drainer'ın CAS'ıyla satırın
+  sahibi olur) hemen çalışır. Süreç commit ile anlık yol arasında ölürse satır
+  pending kalır ve drainer tamamlar; admin aynı iptali yeniden gönderirse de
+  bekleyen iş o istekte tamamlanır (iş sahipliği tek: ikisi aynı anda
+  çalışmaz; iade ödeme başına idempotent). Sağlayıcı hatasında takasa
+  `refundFailureReason` yazılır (takas dosyasında "İadeyi yeniden dene" +
+  `retryFailedTradeRefunds` cron'u); bu istekte çalışan işin sonucu
+  `trade_admin_cancel_refund` satırına düşer.
+- **Duyuru:** iptalle aynı tx'te outbox'a, **alıcı × kanal başına bir satır**
+  (`trade.platform_cancel_notice`, `dedupeKey` = takas:alıcı:kanal). Her satır
+  tek bir gönderim yapar: in-app bildirim (`trade_cancelled_by_platform`,
+  push'u dahil) ya da e-posta (`trade-cancelled-platform`). Gönderim
+  gerçekleşmezse handler fırlatır ve outbox yalnız o satırı yeniden dener —
+  kısmi başarıdan sonra başka bir alıcıya / kanala ikinci gönderim olmaz.
+  Gönderilecek bir şey yoksa (kullanıcı yok, bildirim kategorisi kapalı,
+  ortamda e-posta sağlayıcısı yok) satır kapanır. Taramanın "otomatik iptal"
+  push'u gitmez. İade core'u başarılı iadede ayrıca kendi "iade tamamlandı"
+  push'unu gönderir (iade sonucu sinyali; her iptal yolunda aynı).
 - **Yarışlar:** taraf iptali, süre dolumu taraması, uzatma hakkı ve ödeme
   geçişi aynı takas satırı kilidinde sıraya girer; kilit altında ortak kural
   yeniden çalışır. Kargo poller'ı devri bacak satırına yazdığı için bacaklar da
-  kilitlenir (sıra: takas → bacak). Aynı kodla ikinci gönderim no-op'tur.
+  kilitlenir (sıra: takas → bacak). Aynı kodla ikinci gönderim yeni bir iptal
+  üretmez.
 
 ---
 

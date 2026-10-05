@@ -26,10 +26,13 @@ import { NotificationService } from "../../notification/notification.service";
 import { OutboxService } from "../../outbox/outbox.service";
 import { OutboxHandlerRegistry } from "../../outbox/outbox-handler.registry";
 import {
+  OUTBOX_TRADE_CANCEL_SETTLE,
   OUTBOX_TRADE_PLATFORM_CANCEL_NOTICE,
+  tradeCancelSettleDedupeKey,
+  type TradeCancelSettlePayload,
+  type TradePlatformCancelNoticeChannel,
   type TradePlatformCancelNoticePayload,
 } from "../../outbox/outbox.types";
-import { errorMessage } from "../../../common/helpers/error-message";
 import { TradeShipmentService } from "./trade-shipment.service";
 import { TradeCommonService } from "../trade-common.service";
 import {
@@ -46,6 +49,10 @@ import {
 
 /** Kargo etiketi taşıyıcıya geçmemiş ve henüz iptal edilmemiş sayılan durumlar. */
 const OPEN_LABEL_STATUSES = ["pending", "label_created"] as const;
+
+/** Her tarafa giden duyuru kanalları — her biri ayrı outbox satırı. */
+const PLATFORM_CANCEL_NOTICE_CHANNELS: readonly TradePlatformCancelNoticeChannel[] =
+  ["in_app", "email"];
 
 /** Engel → admin'e dönen hata. Kapanmış takas 409, diğerleri 400. */
 function blockerError(
@@ -85,7 +92,11 @@ export interface TradePlatformCancelHooks {
 
 /** Commit sonrası iade sonucu (izlenen yol asla fırlatmaz). */
 export interface TradePlatformCancelOutcome extends AdminTradeCancelResult {
-  /** İade sonucunun ayrıntısı (yalnız gerçek iptalde dolu). */
+  /**
+   * Commit sonrası adımların bu istekte çalıştırılan iade sonucu. `null`: iş bu
+   * istekte çalışmadı (çift gönderimde önceki istek ya da drainer tamamlamış /
+   * yürütüyor).
+   */
   refundOutcome: {
     refunded: boolean;
     failed: boolean;
@@ -112,6 +123,12 @@ export interface TradePlatformCancelOutcome extends AdminTradeCancelResult {
  * Yarış güvenliği: uygunluk satır kilidi (FOR UPDATE) altında, ortak kuralla
  * yeniden değerlendirilir; to_warehouse bacakları da kilitlenir ki kargo
  * poller'ının devir yazımı karar anında araya giremesin.
+ *
+ * Dayanıklılık: commit sonrası adımlar (`trade.cancel_settle`) ve taraf
+ * duyuruları (`trade.platform_cancel_notice`, alıcı × kanal başına bir satır)
+ * iptalle AYNI tx'te outbox'a yazılır. Commit sonrası adımlar hemen anlık
+ * yoldan (`OutboxService.runInline`) çalışır; süreç arada ölürse drainer
+ * tamamlar.
  */
 @Injectable()
 export class TradePlatformCancelService implements OnModuleInit {
@@ -134,6 +151,13 @@ export class TradePlatformCancelService implements OnModuleInit {
         this.sendCancellationNotice(
           payload as TradePlatformCancelNoticePayload,
         ),
+    );
+    // Commit ile anlık yol arasında süreç ölürse drainer burada tamamlar.
+    this.outboxHandlers.register(
+      OUTBOX_TRADE_CANCEL_SETTLE,
+      async (payload) => {
+        await this.settle((payload as TradeCancelSettlePayload).tradeId);
+      },
     );
   }
 
@@ -195,7 +219,9 @@ export class TradePlatformCancelService implements OnModuleInit {
 
   /**
    * Platform iptali. İdempotent: aynı takas zaten platform tarafından (kodla)
-   * iptal edildiyse ikinci çağrı para, duyuru ya da denetim üretmeden döner.
+   * iptal edildiyse ikinci çağrı yeni bir iptal, duyuru ya da denetim üretmez;
+   * yalnız önceki isteğin commit sonrası işi hâlâ bekliyorsa onu tamamlar
+   * (idempotent iade — ikinci kez para çıkmaz).
    */
   async cancel(
     tradeId: string,
@@ -268,38 +294,65 @@ export class TradePlatformCancelService implements OnModuleInit {
         releasedReservations: outcome.releasedReservations,
       };
 
-      // Duyuru iptalle atomik: commit olduysa kesin gider, takas başına bir kez.
+      // Commit sonrası adımlar (iade, önbellek, etiket iptali) iptalle ATOMİK
+      // olarak kuyruğa girer: süreç commit ile anlık yol arasında ölürse
+      // drainer tamamlar — iade asla "hiç denenmedi" durumunda kalmaz.
       await this.outbox.enqueue(tx, {
-        type: OUTBOX_TRADE_PLATFORM_CANCEL_NOTICE,
-        payload: {
-          tradeId: trade.id,
-          parties: cancelRecord.refunds.map((line) => ({
-            userId: line.userId,
-            refundAmount: line.refundAmount,
-          })),
-        } satisfies TradePlatformCancelNoticePayload,
-        dedupeKey: `${OUTBOX_TRADE_PLATFORM_CANCEL_NOTICE}:${trade.id}`,
+        type: OUTBOX_TRADE_CANCEL_SETTLE,
+        payload: { tradeId: trade.id } satisfies TradeCancelSettlePayload,
+        dedupeKey: tradeCancelSettleDedupeKey(trade.id),
       });
 
-      // Zorunlu denetim kaydı — fırlatırsa iptal ve duyuru geri alınır.
+      // Duyuru da iptalle atomik; satır = tek alıcı × tek kanal, böylece bir
+      // gönderimin yeniden denenmesi diğerini tekrarlamaz.
+      for (const line of cancelRecord.refunds) {
+        for (const channel of PLATFORM_CANCEL_NOTICE_CHANNELS) {
+          await this.outbox.enqueue(tx, {
+            type: OUTBOX_TRADE_PLATFORM_CANCEL_NOTICE,
+            payload: {
+              tradeId: trade.id,
+              userId: line.userId,
+              refundAmount: line.refundAmount,
+              channel,
+            } satisfies TradePlatformCancelNoticePayload,
+            dedupeKey: `${OUTBOX_TRADE_PLATFORM_CANCEL_NOTICE}:${trade.id}:${line.userId}:${channel}`,
+          });
+        }
+      }
+
+      // Zorunlu denetim kaydı — fırlatırsa iptal ve kuyruk satırları geri alınır.
       await hooks.onCancelled(tx, cancelRecord);
       return cancelRecord;
     });
 
-    if (!record) {
-      return {
-        tradeId,
-        alreadyCancelled: true,
-        refunds: [],
-        refundFailed: false,
-        refundOutcome: null,
-      };
-    }
+    // Anlık yol: kuyruktaki commit sonrası işin sahibi olarak hemen çalış.
+    // Çift gönderimde de (iptal zaten yazılmış) aynı yol denenir: önceki istek
+    // işi hiç çalıştıramadan öldüyse satır hâlâ pending'dir ve iş şimdi
+    // tamamlanır; tamamlanmışsa ya da drainer'daysa hiçbir şey çalışmaz.
+    const settled = await this.outbox.runInline(
+      this.prisma,
+      tradeCancelSettleDedupeKey(tradeId),
+      () => this.settle(tradeId),
+    );
+    const refundOutcome = settled.ran ? settled.result : null;
 
-    // Commit sonrası, taramayla aynı adımlar: izlenen iade (asla fırlatmaz;
-    // hata `refundFailureReason` yazar → "İadeyi yeniden dene" + retry cron'u),
-    // ürün önbelleği, taşıyıcıya geçmemiş Sürat etiketlerinin iptali.
-    const refundOutcome = await settlePreShipmentCancellation(
+    return {
+      tradeId,
+      alreadyCancelled: record === null,
+      refunds: record?.refunds ?? [],
+      refundFailed: refundOutcome?.failed === true,
+      refundOutcome,
+    };
+  }
+
+  /**
+   * Commit sonrası adımlar, taramayla aynı çekirdek: izlenen iade (asla
+   * fırlatmaz; hata `refundFailureReason` yazar → "İadeyi yeniden dene" +
+   * retry cron'u), ürün önbelleği, taşıyıcıya geçmemiş Sürat etiketlerinin
+   * iptali. Her adım idempotenttir; anlık yol ve drainer aynı işi çalıştırır.
+   */
+  private settle(tradeId: string) {
+    return settlePreShipmentCancellation(
       {
         paymentService: this.paymentService,
         tradeCommon: this.tradeCommon,
@@ -308,21 +361,14 @@ export class TradePlatformCancelService implements OnModuleInit {
       },
       tradeId,
     );
-
-    return {
-      tradeId,
-      alreadyCancelled: false,
-      refunds: record.refunds,
-      refundFailed: refundOutcome.failed,
-      refundOutcome,
-    };
   }
 
   /**
-   * Outbox handler'ı: taraflara platform iptali duyurusu. Takas artık platform
-   * iptali değilse (beklenmez) sessizce çıkar. Gönderim hataları bildirimci
-   * içinde yutulur — handler yeniden denenirse diğer tarafa ikinci duyuru
-   * gitmesin diye kısmi başarıda fırlatılmaz.
+   * Outbox handler'ı: TEK alıcıya TEK kanaldan platform iptali duyurusu.
+   * Okuma ya da gönderim hatası FIRLATILIR → outbox yalnız bu satırı yeniden
+   * dener (satır başka bir alıcıyı / kanalı kapsamadığı için tekrar gönderim
+   * yalnız başarısız olanı yineler). Takas platform iptali değilse (beklenmez)
+   * gönderilecek bir şey yoktur, satır kapanır.
    */
   async sendCancellationNotice(
     payload: TradePlatformCancelNoticePayload,
@@ -348,18 +394,14 @@ export class TradePlatformCancelService implements OnModuleInit {
       );
       return;
     }
-    try {
-      await this.notificationService.notifyTradeCancelledByPlatform({
-        tradeId: trade.id,
-        tradeNumber: trade.tradeNumber,
-        reasonCode: trade.adminCancelReasonCode,
-        parties: payload.parties,
-      });
-    } catch (error: unknown) {
-      this.logger.error(
-        `platform iptal duyurusu gönderilemedi (takas ${trade.id}): ${errorMessage(error)}`,
-      );
-    }
+    await this.notificationService.sendTradeCancelledByPlatformNotice({
+      tradeId: trade.id,
+      tradeNumber: trade.tradeNumber,
+      reasonCode: trade.adminCancelReasonCode,
+      userId: payload.userId,
+      refundAmount: payload.refundAmount,
+      channel: payload.channel,
+    });
   }
 
   /** Ortak kuralı uygular; uygunsa iptal edilebilir aşamayı döner. */

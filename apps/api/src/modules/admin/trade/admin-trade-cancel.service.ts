@@ -19,10 +19,12 @@ import { AdminCancelTradeDto } from "../dto";
  * Denetim:
  *   - `trade_admin_cancel` ZORUNLU, iptalle AYNI tx'te (fail-closed): yazılamazsa
  *     iptal, rezervasyon çözümü ve duyuru geri alınır.
- *   - `trade_admin_cancel_refund`: commit SONRASI iade sonucu. İade harici bir
- *     sağlayıcı çağrısıdır, iptalle atomik olamaz; başarısızlığın kalıcı kaydı
- *     takastaki `refundFailureReason` işaretidir (retry-refund + retry cron'u).
- *     Bu satır best-effort'tur: iptal zaten commit oldu, hata 500'e dönmez.
+ *   - `trade_admin_cancel_refund`: commit SONRASI iade sonucu (bu istek işi
+ *     çalıştırdıysa — çift gönderimde önceki isteğin yarım kalan işi de
+ *     dahil). İade harici bir sağlayıcı çağrısıdır, iptalle atomik olamaz:
+ *     işin kendisi iptal tx'inde outbox'a yazılır (çökmede drainer tamamlar),
+ *     başarısızlığın kalıcı kaydı takastaki `refundFailureReason` işaretidir
+ *     (retry-refund + retry cron'u). Bu satır best-effort'tur.
  *   - `trade_admin_cancel_failed`: reddedilen / patlayan deneme (best-effort).
  */
 @Injectable()

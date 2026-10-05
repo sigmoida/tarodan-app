@@ -85,17 +85,41 @@ export interface SavedCardProviderDeletePayload {
 }
 
 /**
- * Platform (admin) takas iptalinin taraf duyurusu (in-app + e-posta). İptal ve
- * zorunlu denetim kaydıyla AYNI tx'te yazılır: iptal commit olduysa duyuru
- * kesin gider. `dedupeKey` takas başına tektir (ikinci iptal ikinci duyuru
- * üretemez). Tutarlar iptal anında politikadan hesaplanıp burada sabitlenir —
- * iade sonradan yapıldığında satır "iade edilmiş" olur ve yeniden hesap 0 verir.
+ * Platform (admin) takas iptalinin taraf duyurusu. İptal ve zorunlu denetim
+ * kaydıyla AYNI tx'te yazılır: iptal commit olduysa duyuru kesin gider.
+ *
+ * Satır = TEK alıcı × TEK kanal (in-app ya da e-posta), `dedupeKey` de öyle:
+ * handler tek bir gönderim yapar, hata fırlatırsa outbox yalnız O gönderimi
+ * yeniden dener — kısmi başarıdan sonra başka bir alıcıya / kanala ikinci kez
+ * gidilmez. Tutar iptal anında politikadan hesaplanıp burada sabitlenir
+ * (iade yapıldıktan sonra satır "iade edilmiş" olur ve yeniden hesap 0 verir).
  * Adminin iç notu payload'a YAZILMAZ.
  */
 export const OUTBOX_TRADE_PLATFORM_CANCEL_NOTICE =
   "trade.platform_cancel_notice";
 
+export type TradePlatformCancelNoticeChannel = "in_app" | "email";
+
 export interface TradePlatformCancelNoticePayload {
   tradeId: string;
-  parties: Array<{ userId: string; refundAmount: number }>;
+  userId: string;
+  refundAmount: number;
+  channel: TradePlatformCancelNoticeChannel;
 }
+
+/**
+ * Kargo öncesi iptalin commit SONRASI adımları (izlenen iade, ürün önbelleği,
+ * taşıyıcıya geçmemiş etiketlerin iptali — `settlePreShipmentCancellation`).
+ * İptal tx'iyle ATOMİK yazılır; anlık yol `OutboxService.runInline` ile satırın
+ * sahibi olarak hemen çalıştırır. Süreç commit ile anlık yol arasında ölürse
+ * satır pending kalır ve drainer işi tamamlar — iade hiçbir zaman "iptal
+ * edildi ama hiç denenmedi" durumunda kalmaz. Adımların hepsi idempotenttir.
+ */
+export const OUTBOX_TRADE_CANCEL_SETTLE = "trade.cancel_settle";
+
+export interface TradeCancelSettlePayload {
+  tradeId: string;
+}
+
+export const tradeCancelSettleDedupeKey = (tradeId: string): string =>
+  `${OUTBOX_TRADE_CANCEL_SETTLE}:${tradeId}`;

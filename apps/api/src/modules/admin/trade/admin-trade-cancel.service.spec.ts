@@ -231,6 +231,28 @@ describe("AdminTradeCancelService", () => {
     expect(audit.createAuditLog).not.toHaveBeenCalled();
   });
 
+  it("çift gönderim önceki isteğin yarım kalan iadesini tamamladıysa: yeni iptal denetimi yok, iade sonucu kaydedilir", async () => {
+    const { service, audit } = makeService({
+      alreadyCancelled: true,
+      refundOutcome: { refunded: true, failed: false },
+    });
+
+    const result = await service.cancelTrade("admin-1", "t1", {
+      reasonCode: "stock_error",
+    });
+
+    expect(result.alreadyCancelled).toBe(true);
+    expect(audit.createRequiredAuditLog).not.toHaveBeenCalled();
+    expect(audit.createAuditLog).toHaveBeenCalledWith(
+      "admin-1",
+      "trade_admin_cancel_refund",
+      "Trade",
+      "t1",
+      null,
+      expect.objectContaining({ refunded: true, failed: false }),
+    );
+  });
+
   it("önizleme domain servisine gider", async () => {
     const { service, tradeService } = makeService();
     await service.previewCancel("t1");

@@ -1,5 +1,5 @@
 import { Injectable } from "@nestjs/common";
-import { Prisma } from "@prisma/client";
+import { OutboxStatus, Prisma } from "@prisma/client";
 
 export interface OutboxEnqueueInput {
   /** Handler dispatch anahtarı (OutboxHandlerRegistry ile eşleşmeli). */
@@ -46,5 +46,62 @@ export class OutboxService {
     } else {
       await tx.outboxEvent.create({ data });
     }
+  }
+
+  /**
+   * Anlık yol + dayanıklı backstop: iş, kendi tx'inde `dedupeKey` ile kuyruğa
+   * alınmış bir satırın SAHİBİ olarak burada hemen çalıştırılır.
+   *
+   * Sahiplik drainer'ın kullandığı CAS'ın aynısıdır (`pending → processing`):
+   * satır pending değilse (drainer almış, iş bitmiş ya da başka bir istek
+   * çalıştırıyor) iş ÇALIŞMAZ ve `{ ran: false }` döner — aynı iş iki yerden
+   * eşzamanlı koşmaz. İş fırlatırsa satır pending'e geri bırakılır, drainer
+   * yeniden dener; süreç iş ortasında ölürse drainer'ın bayat-processing
+   * kurtarması (`reclaimStaleProcessing`) satırı geri alır. Bu yüzden iş,
+   * handler'ı gibi idempotent olmalıdır.
+   */
+  async runInline<T>(
+    db: Prisma.TransactionClient,
+    dedupeKey: string,
+    work: () => Promise<T>,
+  ): Promise<{ ran: true; result: T } | { ran: false }> {
+    const claim = await db.outboxEvent.updateMany({
+      where: { dedupeKey, status: OutboxStatus.pending },
+      data: { status: OutboxStatus.processing },
+    });
+    if (claim.count === 0) return { ran: false };
+
+    let result: T;
+    try {
+      result = await work();
+    } catch (error: unknown) {
+      await db.outboxEvent
+        .updateMany({
+          where: { dedupeKey, status: OutboxStatus.processing },
+          data: {
+            status: OutboxStatus.pending,
+            lastError: String(
+              error instanceof Error ? error.message : error,
+            ).slice(0, 1000),
+          },
+        })
+        // Bırakma da başarısızsa satır processing'te kalır; bayat-processing
+        // kurtarması onu pending'e döndürür.
+        .catch(() => undefined);
+      throw error;
+    }
+    await db.outboxEvent
+      .updateMany({
+        where: { dedupeKey, status: OutboxStatus.processing },
+        data: {
+          status: OutboxStatus.completed,
+          processedAt: new Date(),
+          lastError: null,
+        },
+      })
+      // İş bitti; kapatma yazılamazsa drainer işi en fazla bir kez daha
+      // (idempotent) çalıştırır. Başarılı işi hataya çevirmeyiz.
+      .catch(() => undefined);
+    return { ran: true, result };
   }
 }

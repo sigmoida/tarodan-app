@@ -23,6 +23,10 @@ import { adminCancelReasonLabel } from "../trade/helpers/trade-platform-cancel.h
 import { errorMessage } from "../../common/helpers/error-message";
 import { resolveLocale } from "@tarodan/i18n";
 import type { TradePlatformCancelNotice } from "./helpers/trade-platform-cancel-notice";
+import {
+  resolveSettings,
+  shouldDeliver,
+} from "./helpers/notification-preferences";
 
 /** Alıcı e-postasını çözmek için okunan alanlar (`orderBuyerContact`). */
 const ORDER_BUYER_SELECT = {
@@ -804,56 +808,87 @@ export class NotificationCommerceService {
   }
 
   /**
-   * Platform (admin) takas iptali — her tarafa TEK in-app bildirim (push'u
-   * dahil) ve TEK e-posta: platform iptali olduğu, gerekçenin katalog etiketi,
+   * Platform (admin) takas iptali — TEK alıcıya, TEK kanaldan (in-app ya da
+   * e-posta) duyuru: platform iptali olduğu, gerekçenin katalog etiketi,
    * tarafın kendi iadesi (varsa) ve ürünlerinin yeniden serbest olduğu.
    * Etiket in-app'te alıcının dilinde, e-postada şablonun dilinde (varsayılan;
-   * yönetilen şablonlar Türkçedir) çözülür. Gönderim hataları yutulur: bir
-   * tarafın/kanalın hatası diğerini engellemez ve çağıran outbox handler'ı
-   * yeniden denenip ilk tarafa ikinci duyuru üretmez.
+   * yönetilen şablonlar Türkçedir) çözülür.
+   *
+   * Gönderim gerçekleşmediyse FIRLATIR — çağıran outbox satırı yalnız bu
+   * alıcı × kanalı temsil ettiği için yeniden deneme başka bir gönderimi
+   * tekrarlamaz. "Gönderilecek bir şey yok" durumları fırlatmaz: kullanıcı
+   * bulunamadı, kullanıcı bu kategorinin bildirimlerini kapatmış (in-app) ya da
+   * ortamda e-posta sağlayıcısı yok (diğer bütün e-postalarla aynı).
    */
-  async notifyTradeCancelledByPlatform(
+  async sendTradeCancelledByPlatformNotice(
     notice: TradePlatformCancelNotice,
   ): Promise<void> {
-    const users = await this.prisma.user.findMany({
-      where: { id: { in: notice.parties.map((party) => party.userId) } },
-      select: { id: true, displayName: true, preferredLanguage: true },
+    const user = await this.prisma.user.findUnique({
+      where: { id: notice.userId },
+      select: {
+        email: true,
+        displayName: true,
+        preferredLanguage: true,
+        notificationSettings: true,
+      },
     });
-    const tradeUrl = `${resolveFrontendUrl()}/profile/trades/${notice.tradeId}`;
+    if (!user) {
+      this.logger.warn(
+        `trade ${notice.tradeId} platform iptal duyurusu: kullanıcı ${notice.userId} yok`,
+      );
+      return;
+    }
+    const hasRefund = notice.refundAmount > 0;
 
-    for (const party of notice.parties) {
-      const user = users.find((candidate) => candidate.id === party.userId);
-      const locale = resolveLocale(user?.preferredLanguage);
-      const hasRefund = party.refundAmount > 0;
-      try {
-        await this.dispatch.createInAppNotification(
-          party.userId,
-          NotificationType.TRADE_CANCELLED_BY_PLATFORM,
-          {
-            tradeId: notice.tradeId,
-            tradeNumber: notice.tradeNumber,
-            reason: adminCancelReasonLabel(notice.reasonCode, locale),
-            hasRefund: hasRefund ? "yes" : "no",
-            refundAmount: party.refundAmount,
-          },
-        );
-      } catch (err: unknown) {
-        this.logger.warn(
-          `trade ${notice.tradeId} platform iptal bildirimi (${party.userId}) başarısız: ${errorMessage(err)}`,
-        );
+    if (notice.channel === "in_app") {
+      const type = NotificationType.TRADE_CANCELLED_BY_PLATFORM;
+      // Tercihle susturulan bildirim "gönderilemedi" sayılmaz (yeniden denenmez).
+      if (
+        !shouldDeliver(
+          resolveSettings(user.notificationSettings),
+          type,
+          "in_app",
+        )
+      ) {
+        return;
       }
-      // sendTemplateEmailToUser kendi hatasını yutar.
-      await this.dispatch.sendTemplateEmailToUser(
-        party.userId,
-        "trade-cancelled-platform",
+      const saved = await this.dispatch.createInAppNotification(
+        notice.userId,
+        type,
         {
-          name: user?.displayName ?? "",
           tradeId: notice.tradeId,
           tradeNumber: notice.tradeNumber,
-          reason: adminCancelReasonLabel(notice.reasonCode),
-          refundAmount: hasRefund ? party.refundAmount : 0,
-          tradeUrl,
+          reason: adminCancelReasonLabel(
+            notice.reasonCode,
+            resolveLocale(user.preferredLanguage),
+          ),
+          hasRefund: hasRefund ? "yes" : "no",
+          refundAmount: notice.refundAmount,
         },
+      );
+      if (!saved) {
+        throw new Error(
+          `trade ${notice.tradeId}: in-app platform iptal bildirimi kaydedilemedi (${notice.userId})`,
+        );
+      }
+      return;
+    }
+
+    const sent = await this.dispatch.sendTemplateEmailToAddress(
+      user.email,
+      "trade-cancelled-platform",
+      {
+        name: user.displayName ?? "",
+        tradeId: notice.tradeId,
+        tradeNumber: notice.tradeNumber,
+        reason: adminCancelReasonLabel(notice.reasonCode),
+        refundAmount: hasRefund ? notice.refundAmount : 0,
+        tradeUrl: `${resolveFrontendUrl()}/profile/trades/${notice.tradeId}`,
+      },
+    );
+    if (!sent.success && this.dispatch.getProviderStatus().email) {
+      throw new Error(
+        `trade ${notice.tradeId}: platform iptal e-postası gönderilemedi (${notice.userId}): ${sent.error ?? "bilinmeyen hata"}`,
       );
     }
   }
