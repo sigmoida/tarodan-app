@@ -21,6 +21,7 @@ export * from "./media";
 export * from "./pages";
 export * from "./seller";
 export * from "./consents";
+export * from "./legal-identity";
 export * from "./timing-rules";
 import api from "./client";
 export default api;

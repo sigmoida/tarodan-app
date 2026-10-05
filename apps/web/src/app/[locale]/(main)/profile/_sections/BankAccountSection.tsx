@@ -20,7 +20,6 @@ import {
 const EMPTY: BankAccountValues = {
   accountHolder: "",
   iban: "",
-  tcKimlikNo: "",
   taxId: "",
 };
 
@@ -40,7 +39,6 @@ export default function BankAccountSection() {
       form.reset({
         accountHolder: account.accountHolder || "",
         iban: account.iban || "",
-        tcKimlikNo: account.tcKimlikNo || "",
         taxId: account.taxId || "",
       });
     }
@@ -93,22 +91,13 @@ export default function BankAccountSection() {
           placeholder={t("profile.bank.accountHolderPlaceholder")}
         />
         <FormIban name="iban" label="IBAN" className="font-mono" />
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-          <FormInput
-            name="tcKimlikNo"
-            label={t("profile.bank.tcOptional")}
-            placeholder={t("profile.bank.tcPlaceholder")}
-            inputMode="numeric"
-            maxLength={11}
-          />
-          <FormInput
-            name="taxId"
-            label={t("profile.bank.taxIdOptional")}
-            placeholder={t("profile.bank.taxIdPlaceholder")}
-            inputMode="numeric"
-            maxLength={10}
-          />
-        </div>
+        <FormInput
+          name="taxId"
+          label={t("profile.bank.taxIdOptional")}
+          placeholder={t("profile.bank.taxIdPlaceholder")}
+          inputMode="numeric"
+          maxLength={10}
+        />
       </Form>
     </SectionCard>
   );

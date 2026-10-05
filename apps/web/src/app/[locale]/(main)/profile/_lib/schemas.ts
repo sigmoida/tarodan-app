@@ -48,11 +48,9 @@ export const bankAccountSchema = (t: Translate) =>
   z.object({
     accountHolder: z.string().trim().min(2, t("validation.accountHolderMin2")),
     iban: z.string().refine(isValidIban, t("validation.ibanInvalid")),
-    tcKimlikNo: z
-      .string()
-      .optional()
-      .or(z.literal(""))
-      .refine((v) => !v || /^\d{11}$/.test(v), t("validation.tcKimlik11")),
+    // TCKN burada SORULMAZ: tek kaynak üyenin yasal kimliği (kimlik kapısı /
+    // profildeki "Kimlik bilgileri"). Banka formunda ikinci, çelişebilen bir
+    // kopya tutulmaz; sunucu da gönderilmeyen numaraya dokunmaz.
     taxId: z
       .string()
       .trim()

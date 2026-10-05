@@ -3,6 +3,9 @@ import { registerSchema, registrationConsentDocuments } from "./auth";
 
 const validValues = {
   displayName: "Kaan",
+  legalFirstName: "Murat Kaan",
+  legalLastName: "İlhan",
+  nationalId: "10000000146",
   username: "kaan",
   email: "kaan@example.com",
   phone: "",
@@ -43,5 +46,37 @@ describe("registerSchema — KVKK onayı", () => {
 
   it("iki zorunlu kutu da işaretliyse geçer", () => {
     expect(registerSchema("tr").safeParse(validValues).success).toBe(true);
+  });
+});
+
+describe("registerSchema — yasal kimlik", () => {
+  const issuesOf = (values: Record<string, unknown>) => {
+    const result = registerSchema("tr").safeParse(values);
+    return result.success ? [] : result.error.issues.map((i) => i.path[0]);
+  };
+
+  it("ad, soyad ve TCKN web formunda zorunludur", () => {
+    expect(
+      issuesOf({
+        ...validValues,
+        legalFirstName: "",
+        legalLastName: "",
+        nationalId: "",
+      }),
+    ).toEqual(
+      expect.arrayContaining(["legalFirstName", "legalLastName", "nationalId"]),
+    );
+  });
+
+  it("checksum'ı tutmayan TCKN reddedilir", () => {
+    expect(issuesOf({ ...validValues, nationalId: "12345678951" })).toContain(
+      "nationalId",
+    );
+  });
+
+  it("rakam içeren ad reddedilir", () => {
+    expect(issuesOf({ ...validValues, legalLastName: "İlhan2" })).toContain(
+      "legalLastName",
+    );
   });
 });

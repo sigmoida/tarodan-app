@@ -39,7 +39,8 @@ export function useSaveBankAccount() {
         accountHolder: values.accountHolder.trim(),
         // FormIban stores the normalized raw value (TR + digits, uppercased, no spaces).
         iban: values.iban,
-        ...(values.tcKimlikNo ? { tcKimlikNo: values.tcKimlikNo } : {}),
+        // TCKN gönderilmez (tek kaynak: yasal kimlik); sunucu mevcut değere
+        // dokunmaz.
         ...(values.taxId ? { taxId: values.taxId } : {}),
       });
     },

@@ -9,28 +9,29 @@ import {
   CONSENT_DOCUMENT_I18N_KEYS,
   type ConsentDocumentKey,
 } from "@tarodan/types";
-import { usePathname } from "@/i18n/navigation";
-import { usePendingConsents } from "@/hooks/usePendingConsents";
+import type { usePendingConsents } from "@/hooks/usePendingConsents";
 import { useAuthStore } from "@/stores/authStore";
-import { canSubmitConsents, isConsentGateExempt } from "@/lib/consentGate";
+import { canSubmitConsents } from "@/lib/consentGate";
+
+type PendingConsents = ReturnType<typeof usePendingConsents>;
 
 /**
- * Yeniden-onay kapısı — onayı olmayan ya da onayladığı belgenin sürümü
+ * Yeniden-onay penceresi — onayı olmayan ya da onayladığı belgenin sürümü
  * değişen üye, siteyi kullanmaya devam etmeden önce zorunlu belgeleri
  * (kullanım şartları, gizlilik, KVKK) onaylar.
  *
- * Kimin bekletileceğine sunucu karar verir (`GET /consents/me/pending`);
- * burada yalnız liste çizilir. Kapatılamaz: tek çıkış onaylamak ya da oturumu
- * kapatmaktır. Yasal metin sayfaları muaftır ki üye metni okuyabilsin.
+ * Kimin bekletileceğine sunucu karar verir (`GET /consents/me/pending`); ne
+ * zaman gösterileceğine `RequiredStepsGate` (zorunlu adımların sırası, yasal
+ * metin sayfası muafiyeti). Burada yalnız liste çizilir. Kapatılamaz: tek çıkış
+ * onaylamak ya da oturumu kapatmaktır.
  */
-export default function ConsentGate() {
+export default function ConsentGate({
+  pending,
+  accept,
+}: Pick<PendingConsents, "pending" | "accept">) {
   const t = useTranslations();
-  const pathname = usePathname();
-  const { pending, accept } = usePendingConsents();
   const logout = useAuthStore((state) => state.logout);
   const [checked, setChecked] = useState<Set<ConsentDocumentKey>>(new Set());
-
-  if (pending.length === 0 || isConsentGateExempt(pathname)) return null;
 
   const toggle = (document: ConsentDocumentKey, on: boolean) =>
     setChecked((prev) => {

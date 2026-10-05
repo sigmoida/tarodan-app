@@ -3,6 +3,7 @@ import { createTranslator } from "next-intl";
 import { getMessages, resolveLocale } from "@tarodan/i18n";
 import { trPhone, trPhoneOptional } from "@tarodan/ui/form";
 import type { ConsentDocumentKey } from "@tarodan/types";
+import { legalIdentityFields } from "@/lib/legalIdentity";
 
 /**
  * Auth form schemas — the single source of truth for validation AND types.
@@ -128,6 +129,12 @@ export const registerSchema = (locale: Locale) => {
   return z
     .object({
       displayName: z.string().trim().min(1, t("common.fillAllFields")),
+      // Yasal kimlik web'de ZORUNLU (sunucu DTO'su değil — eski mobil
+      // sürümler göndermiyor; onların üyelerini kimlik kapısı yakalar).
+      ...legalIdentityFields({
+        nameInvalid: t("identity.validation.nameInvalid"),
+        nationalIdInvalid: t("identity.validation.nationalIdInvalid"),
+      }),
       username: z
         .string()
         .trim()
