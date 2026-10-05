@@ -96,6 +96,9 @@ export interface ApiError {
 // Legal consent records: document keys + current versions (API, web, admin)
 export * from "./legal-consent";
 
+// GIB listing/seller report: row contract + legal-name source catalog (API + admin)
+export * from "./gib-report";
+
 // Attribute group rules (dedicated/hidden/global-custom groups, selection mode)
 export * from "./attribute-group";
 

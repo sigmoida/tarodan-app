@@ -8881,6 +8881,11 @@
           "name": "Consent Records",
           "description": "Proof of KVKK, agreement, cookie and marketing consents",
           "keywords": "consent,kvkk,agreement,cookie,marketing,gdpr"
+        },
+        "gibReport": {
+          "name": "Tax Authority Report",
+          "description": "Listing and seller data for the tax authority",
+          "keywords": "gib,tax,authority,listing,seller,tckn,report"
         }
       }
     },
@@ -9225,6 +9230,76 @@
         "cookieCategories": "Cookie categories",
         "checkoutGroup": "Cart no",
         "order": "Order no"
+      }
+    },
+    "gibReport": {
+      "title": "Tax Authority Listing and Seller Report",
+      "description": "Listing and seller data the tax authority is expected to request. Each row is the current state of one listing; the identity number is left empty when the system does not hold it.",
+      "totalCount": "{count} listings",
+      "search": "Search listing, seller, company, tax number or bank account holder…",
+      "empty": "No matching listings",
+      "exportButton": "Download Excel",
+      "exported": "Export downloaded (with full identity numbers)",
+      "exportFailed": "Could not generate the export",
+      "exportTruncated": "The file contains the first {count} listings; narrow the filter for the rest.",
+      "noIdentity": "Missing",
+      "columns": {
+        "publishedAt": "Published",
+        "title": "Listing title",
+        "description": "Description",
+        "price": "Price",
+        "status": "Status",
+        "listingUrl": "Listing URL",
+        "seller": "Name / company",
+        "identityNumber": "TCKN / Tax no",
+        "sellerKind": "Seller type",
+        "membershipDate": "Member since",
+        "store": "Store / profile"
+      },
+      "filters": {
+        "status": "Listing status",
+        "sellerKind": "Seller type",
+        "identityIncomplete": "Identity number",
+        "identityIncompleteOnly": "Missing only"
+      },
+      "deletedSeller": "Deleted account",
+      "nameSources": {
+        "company": "Company name",
+        "bankAccountHolder": "Bank account holder",
+        "address": "Name on an address record (may be someone else)",
+        "displayName": "Display name (may be a nickname)",
+        "archiveCompany": "Archive: company name",
+        "archiveBankAccountHolder": "Archive: bank account holder",
+        "archiveDisplayName": "Archive: name",
+        "none": "Not resolved"
+      },
+      "sellerKinds": {
+        "individual": "Individual",
+        "corporate": "Corporate"
+      },
+      "identityKinds": {
+        "tckn": "TCKN",
+        "taxNumber": "Tax number"
+      },
+      "export": {
+        "sheetName": "GIB Listing Seller",
+        "membershipDate": "Member since",
+        "identityNumber": "TCKN / Tax no",
+        "identityKind": "Identity type",
+        "legalName": "Name / company",
+        "legalNameSource": "Name source",
+        "sellerKind": "Seller type",
+        "sellerDeleted": "Deleted account",
+        "productCode": "Listing code",
+        "title": "Listing title",
+        "description": "Listing description",
+        "price": "Price (TRY)",
+        "status": "Listing status",
+        "publishedAt": "Published (latest approval)",
+        "createdAt": "Created",
+        "listingUrl": "Listing URL",
+        "storeName": "Store / profile name",
+        "profileUrl": "Profile URL"
       }
     }
   },
@@ -10676,7 +10751,8 @@
       "sold": "Sold",
       "reserved": "Reserved",
       "rejected": "Rejected",
-      "deleted": "Removed"
+      "deleted": "Removed",
+      "suspended": "Suspended"
     },
     "productCondition": {
       "new": "New",

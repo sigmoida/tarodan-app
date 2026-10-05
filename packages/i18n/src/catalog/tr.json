@@ -8881,6 +8881,11 @@
           "name": "Onay Kayıtları",
           "description": "KVKK, sözleşme, çerez ve pazarlama onaylarının ispat kaydı",
           "keywords": "onay,kvkk,sözleşme,çerez,pazarlama,consent,gdpr"
+        },
+        "gibReport": {
+          "name": "GİB Raporu",
+          "description": "Vergi idaresine bildirilecek ilan ve satıcı verisi",
+          "keywords": "gib,vergi,idare,ilan,satıcı,tckn,rapor"
         }
       }
     },
@@ -9225,6 +9230,76 @@
         "cookieCategories": "Çerez kategorileri",
         "checkoutGroup": "Sepet no",
         "order": "Sipariş no"
+      }
+    },
+    "gibReport": {
+      "title": "GİB İlan ve Satıcı Raporu",
+      "description": "Vergi idaresinin talep etmesi beklenen ilan ve satıcı verisi. Her satır bir ilanın bugünkü halidir; kimlik numarası sistemde yoksa boş bırakılır.",
+      "totalCount": "{count} ilan",
+      "search": "İlan, satıcı, firma, vergi no veya banka hesabı sahibi ara…",
+      "empty": "Eşleşen ilan yok",
+      "exportButton": "Excel İndir",
+      "exported": "Döküm indirildi (tam kimlik numaralarıyla)",
+      "exportFailed": "Döküm oluşturulamadı",
+      "exportTruncated": "Dosya ilk {count} ilanı içeriyor; tamamı için filtreyi daraltın.",
+      "noIdentity": "Yok",
+      "columns": {
+        "publishedAt": "Yayın tarihi",
+        "title": "İlan başlığı",
+        "description": "Açıklama",
+        "price": "Fiyat",
+        "status": "Durum",
+        "listingUrl": "İlan adresi",
+        "seller": "Ad soyad / unvan",
+        "identityNumber": "TCKN / Vergi no",
+        "sellerKind": "Satıcı türü",
+        "membershipDate": "Üyelik tarihi",
+        "store": "Mağaza / profil"
+      },
+      "filters": {
+        "status": "İlan durumu",
+        "sellerKind": "Satıcı türü",
+        "identityIncomplete": "Kimlik numarası",
+        "identityIncompleteOnly": "Yalnız eksik olanlar"
+      },
+      "deletedSeller": "Silinmiş hesap",
+      "nameSources": {
+        "company": "Firma adı",
+        "bankAccountHolder": "Banka hesabı sahibi",
+        "address": "Adres kaydındaki ad (başkası olabilir)",
+        "displayName": "Görünen ad (takma ad olabilir)",
+        "archiveCompany": "Arşiv: firma adı",
+        "archiveBankAccountHolder": "Arşiv: banka hesabı sahibi",
+        "archiveDisplayName": "Arşiv: ad",
+        "none": "Çözülemedi"
+      },
+      "sellerKinds": {
+        "individual": "Bireysel",
+        "corporate": "Kurumsal"
+      },
+      "identityKinds": {
+        "tckn": "TCKN",
+        "taxNumber": "Vergi no"
+      },
+      "export": {
+        "sheetName": "GİB İlan Satıcı",
+        "membershipDate": "Üyelik tarihi",
+        "identityNumber": "TCKN / Vergi no",
+        "identityKind": "Kimlik türü",
+        "legalName": "Ad soyad / unvan",
+        "legalNameSource": "Ad kaynağı",
+        "sellerKind": "Satıcı türü",
+        "sellerDeleted": "Silinmiş hesap",
+        "productCode": "İlan kodu",
+        "title": "İlan başlığı",
+        "description": "İlan açıklaması",
+        "price": "Fiyat (₺)",
+        "status": "İlan durumu",
+        "publishedAt": "Yayın tarihi (son onay)",
+        "createdAt": "Oluşturulma tarihi",
+        "listingUrl": "İlan adresi",
+        "storeName": "Mağaza / profil adı",
+        "profileUrl": "Profil adresi"
       }
     }
   },
@@ -10676,7 +10751,8 @@
       "sold": "Satıldı",
       "reserved": "Rezerve",
       "rejected": "Reddedildi",
-      "deleted": "Kaldırıldı"
+      "deleted": "Kaldırıldı",
+      "suspended": "Askıya Alındı"
     },
     "productCondition": {
       "new": "Yeni",

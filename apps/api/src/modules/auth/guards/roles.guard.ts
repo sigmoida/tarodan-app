@@ -77,6 +77,11 @@ export const PERMISSION_MAP: Record<string, string[]> = {
   commission: ["commission"],
   payouts: ["payouts"],
   tax: ["tax"],
+  // GİB ilan/satıcı raporu: toplu TCKN/vergi no taşır, Finans menüsünde Vergi
+  // Ayarları ile birlikte durur → aynı `tax` izni (varsayılan yalnız
+  // super_admin). `finance` segmenti `payments`e bağlı olduğu için kardeş
+  // literal segment kullanılır; `@Roles` moderator'ü ayrıca dışarıda tutar.
+  "gib-report": ["tax"],
   shipping: ["shipping"],
   settings: ["settings", "payment_settings"],
   "site-access-pins": ["settings"],
