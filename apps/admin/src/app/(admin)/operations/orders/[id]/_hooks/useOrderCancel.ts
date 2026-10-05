@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslations } from "next-intl";
 import type { AdminCancelRequest } from "@tarodan/types";
@@ -36,6 +36,12 @@ export function useOrderCancel({
   const t = useTranslations();
   const queryClient = useQueryClient();
   const [kindChanged, setKindChanged] = useState(false);
+  // Uyarı yalnız aynı diyalog oturumuna aittir: kapanınca ya da başka bir
+  // sipariş için açılınca temizlenir (modal dosyada ve tabloda mount'lu
+  // kalır; bayat uyarı başka siparişin diyaloğunda görünüyordu).
+  useEffect(() => {
+    setKindChanged(false);
+  }, [open, orderId]);
 
   const preview = useQuery({
     queryKey: adminKeys.preview("order-cancel", orderId),
