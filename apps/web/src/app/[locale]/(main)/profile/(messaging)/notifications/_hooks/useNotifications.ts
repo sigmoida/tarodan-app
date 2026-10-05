@@ -56,7 +56,9 @@ export function useNotifications(enabled: boolean) {
 
   const list = query.data;
   const listSettled = query.isSuccess && !query.isFetching;
-  const countSettled = unreadQuery.isSuccess && !unreadQuery.isFetching;
+  // Sayaç sorgusu hata verse de bekleme biter; o durumda liste esas alınır.
+  const countSettled =
+    (unreadQuery.isSuccess || unreadQuery.isError) && !unreadQuery.isFetching;
 
   useEffect(() => {
     if (!enabled || autoMarkStarted.current) return;
@@ -65,9 +67,23 @@ export function useNotifications(enabled: boolean) {
     autoMarkStarted.current = true;
     const unreadIds = collectUnreadIds(list);
     if (unreadIds.size === 0 && !serverUnread) return;
-    setHighlighted(unreadIds);
-    autoMarkAllMutate();
-  }, [enabled, listSettled, countSettled, list, serverUnread, autoMarkAllMutate]);
+    // Birleştir: başarısız bir deneme tekrarlandığında önceki küme kaybolmasın.
+    setHighlighted((prev) => new Set([...prev, ...unreadIds]));
+    autoMarkAllMutate(undefined, {
+      // Başarısızsa bir sonraki başarılı yenilemede (effect yeniden çalışınca)
+      // tekrar denenir; hata kendiliğinden yeni istek tetiklemediği için döngü yok.
+      onError: () => {
+        autoMarkStarted.current = false;
+      },
+    });
+  }, [
+    enabled,
+    listSettled,
+    countSettled,
+    list,
+    serverUnread,
+    autoMarkAllMutate,
+  ]);
 
   const notifications = useMemo(
     () => withUnreadHighlight(list ?? [], highlighted),
@@ -92,15 +108,26 @@ export function useNotifications(enabled: boolean) {
     [markAllMutate],
   );
 
-  const unreadServerCount = serverUnread ?? 0;
+  // Sayaç yoksa (hata/yükleniyor) liste esas alınır.
+  const listHasUnread = (list ?? []).some((n) => !n.isRead);
+  // Sunucuda okunmuş ama bu ziyaret boyunca "yeni" gösterilenler; sunucu sayacı
+  // bunları içermez. Sunucuda hâlâ okunmamış olanlar sayaçta zaten var, çift sayılmaz.
+  const highlightedReadCount = (list ?? []).filter(
+    (n) => n.isRead && highlighted.has(n.id),
+  ).length;
+  const unreadCount =
+    serverUnread === undefined
+      ? notifications.filter((n) => !n.isRead).length
+      : serverUnread + highlightedReadCount;
 
   return {
     notifications,
     isLoading: query.isLoading,
-    /** Sunucu sayacı ile ekranda hâlâ "yeni" görünenlerin büyüğü. */
-    unreadCount: Math.max(unreadServerCount, highlighted.size),
-    /** Buton yalnız sunucuda okunmamış varken görünür. */
-    canMarkAllRead: unreadServerCount > 0,
+    /** Kullanıcının ekranda okunmamış gördüğü bildirim sayısı. */
+    unreadCount,
+    /** Buton yalnız sunucuda okunmamış varken görünür (sayaç yoksa listeden). */
+    canMarkAllRead:
+      serverUnread === undefined ? listHasUnread : serverUnread > 0,
     markRead,
     markAllRead,
   };

@@ -25,7 +25,8 @@ export function useMarkNotificationRead() {
 
 /**
  * Tüm bildirimleri sunucuda okundu yapar (yüklenen 100 değil, hepsi).
- * `silent`: sayfa açılışındaki otomatik işaretleme için başarı toast'ı yok.
+ * `silent`: sayfa açılışındaki otomatik işaretleme; başarı da hata da toast
+ * basmaz (kullanıcı başlatmadı).
  */
 export function useMarkAllNotificationsRead({
   silent = false,
@@ -35,5 +36,6 @@ export function useMarkAllNotificationsRead({
     invalidates: NOTIFICATION_INVALIDATES,
     successMessage: silent ? undefined : t("notification.allRead"),
     errorMessage: t("common.operationFailed"),
+    silentError: silent,
   });
 }

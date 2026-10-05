@@ -67,6 +67,12 @@ const settledList = (data: unknown[]) => ({
   isFetching: false,
   isLoading: false,
 });
+const failedCount = () => ({
+  data: undefined,
+  isSuccess: false,
+  isError: true,
+  isFetching: false,
+});
 const settledCount = (data: number) => ({
   data,
   isSuccess: true,
@@ -136,5 +142,45 @@ describe("useNotifications — sayfa açılışında otomatik okundu", () => {
     h.list = settledList([item("a", true), item("b", true)]);
     render();
     expect(result.notifications.map((x) => x.isRead)).toEqual([true, true]);
+  });
+
+  it("ziyaret sırasında gelen yeni bildirimler vurgulananlara eklenir, çift sayılmaz", () => {
+    render();
+    // Otomatik işaretleme bitti: a sunucuda okundu, sayaç 0.
+    h.list = settledList([item("a", true), item("b", true)]);
+    h.count = settledCount(0);
+    render();
+    expect(result.unreadCount).toBe(1);
+    // İki yeni bildirim geldi.
+    h.list = settledList([
+      item("n1", false),
+      item("n2", false),
+      item("a", true),
+      item("b", true),
+    ]);
+    h.count = settledCount(2);
+    render();
+    expect(result.unreadCount).toBe(3);
+    expect(result.notifications.filter((x) => !x.isRead)).toHaveLength(3);
+  });
+
+  it("otomatik işaretleme başarısız olursa sonraki yenilemede yeniden dener", () => {
+    render();
+    expect(h.autoMark).toHaveBeenCalledTimes(1);
+    const [, options] = h.autoMark.mock.calls[0];
+    act(() => options.onError());
+    // Hata tek başına yeni çağrı tetiklemez.
+    expect(h.autoMark).toHaveBeenCalledTimes(1);
+    h.list = settledList([item("a", false), item("b", true)]);
+    render();
+    expect(h.autoMark).toHaveBeenCalledTimes(2);
+  });
+
+  it("sayaç sorgusu hata verirse listeye düşer: işaretler ve buton kalır", () => {
+    h.count = failedCount();
+    render();
+    expect(h.autoMark).toHaveBeenCalledTimes(1);
+    expect(result.canMarkAllRead).toBe(true);
+    expect(result.unreadCount).toBe(1);
   });
 });
