@@ -11,7 +11,7 @@ import { AdminOfferService } from "./admin-offer.service";
 describe("AdminOfferService.cancelOffer", () => {
   const baseOffer = {
     id: "of1",
-    status: OfferStatus.accepted,
+    status: OfferStatus.accepted as OfferStatus,
     version: 3,
     buyerId: "b1",
     sellerId: "s1",

@@ -3,6 +3,7 @@ import {
   ADMIN_CANCEL_REASON_I18N_KEYS,
   ADMIN_ORDER_CANCEL_BLOCKER_I18N_KEYS,
   adminCancelRequestProblem,
+  adminOrderCancelBlockerOf,
   adminOrderCancelEligibility,
   isAdminCancelReasonCode,
   type AdminCancelReasonCode,
@@ -54,12 +55,10 @@ export function canCancelFileEntry(entry: OrderFileEntry): boolean {
 export function fileEntryVisibleBlocker(
   entry: OrderFileEntry,
 ): AdminOrderCancelBlocker | null {
-  const eligibility = fileEntryCancelEligibility(entry);
-  if (eligibility.allowed) return null;
-  return eligibility.blocker === "closed" ||
-    eligibility.blocker === "pending_cancellation"
+  const blocker = adminOrderCancelBlockerOf(fileEntryCancelEligibility(entry));
+  return blocker === "closed" || blocker === "pending_cancellation"
     ? null
-    : eligibility.blocker;
+    : blocker;
 }
 
 /** Engelin panel metni ("Yönetici iptali kapalı: …"). */
@@ -79,8 +78,8 @@ export function cancelBlockerText(
 export function pendingCancellationRefund(
   entry: OrderFileEntry,
 ): OrderFileRefundRequest | null {
-  const eligibility = fileEntryCancelEligibility(entry);
-  return !eligibility.allowed && eligibility.blocker === "pending_cancellation"
+  return adminOrderCancelBlockerOf(fileEntryCancelEligibility(entry)) ===
+    "pending_cancellation"
     ? activeRefundOf(entry)
     : null;
 }

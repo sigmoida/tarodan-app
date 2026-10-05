@@ -189,6 +189,16 @@ export function adminOrderCancelEligibility(
   return { allowed: false, blocker: "handed_over" };
 }
 
+/**
+ * Sonucun engeli; izinliyse null. `in` ile daralır: `allowed` boolean
+ * ayırıcısı `strictNullChecks` kapalı derlemelerde (admin) daralmaz.
+ */
+export function adminOrderCancelBlockerOf(
+  eligibility: AdminOrderCancelEligibility,
+): AdminOrderCancelBlocker | null {
+  return "blocker" in eligibility ? eligibility.blocker : null;
+}
+
 /** Engelin paneldeki açıklaması (katalog anahtarı). */
 export const ADMIN_ORDER_CANCEL_BLOCKER_I18N_KEYS = {
   closed: "admin.operations.orders.cancel.blockers.closed",

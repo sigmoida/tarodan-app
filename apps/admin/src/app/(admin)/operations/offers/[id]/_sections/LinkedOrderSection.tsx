@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useTranslations } from "next-intl";
+import { adminOrderCancelBlockerOf } from "@tarodan/types";
 import { Badge, orderStatusConfig } from "@tarodan/ui";
 import { DataList, Field } from "@/components/detail/DataList";
 import { SectionCard } from "@/components/detail/SectionCard";
@@ -24,6 +25,7 @@ export function LinkedOrderSection({
 }) {
   const t = useTranslations();
   const eligibility = linkedOrderCancelEligibility({ order });
+  const blocker = eligibility ? adminOrderCancelBlockerOf(eligibility) : null;
   const cancelReason = order ? orderCancelReasonText(order, t) : null;
   return (
     <SectionCard title={t("admin.operations.offers.linkedOrder")}>
@@ -64,9 +66,9 @@ export function LinkedOrderSection({
               </Field>
             )}
           </DataList>
-          {eligibility && !eligibility.allowed && (
+          {blocker && (
             <p className="mt-3 text-xs text-muted">
-              {cancelBlockerText(eligibility.blocker, t)}
+              {cancelBlockerText(blocker, t)}
             </p>
           )}
         </>
