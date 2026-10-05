@@ -128,6 +128,13 @@ export function DataTable<T>({
     data,
     columns,
     getCoreRowModel: getCoreRowModel(),
+    // Bu tablo sayfalamayı/genişletmeyi kendi yönetmez (sayfalama sunucuda,
+    // genişletme `expandedId` ile). TanStack'in "veri değişti → sayfa indeksini
+    // sıfırla" durum yazımı kapalı olmalı: her render'da yeni `data` dizisi
+    // veren bir çağıranda (render içinde kurulan satırlar) bu yazım bitmeyen
+    // bir render döngüsü başlatıyordu.
+    autoResetPageIndex: false,
+    autoResetExpanded: false,
     getRowId,
   });
 
