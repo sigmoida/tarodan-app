@@ -66,6 +66,10 @@ export * from "./province";
 // Full-name splitting (carrier payloads need given/family name separately)
 export * from "./person-name";
 
+// Legal identity: TCKN + legal-name rules and the identity gate contract
+// (API validators, web/admin schemas, identity gate)
+export * from "./legal-identity";
+
 // Common types
 export interface PaginationMeta {
   total: number;

@@ -8416,7 +8416,23 @@
       "testAccountHint": "Test şeridi: canlı verilere karışmaz",
       "filterTestAccountAll": "Tüm hesaplar",
       "testAccountOnly": "Yalnız test hesapları",
-      "liveAccountsOnly": "Yalnız gerçek hesaplar"
+      "liveAccountsOnly": "Yalnız gerçek hesaplar",
+      "legalIdentity": {
+        "title": "Kimlik bilgileri",
+        "incomplete": "Kimlik eksik",
+        "missingFields": "Eksik: {fields}",
+        "exempt": "Muaf (personel / test hesabı)",
+        "notProvided": "Girilmedi",
+        "correct": "Düzelt",
+        "correctTitle": "Kimlik bilgilerini düzelt",
+        "correctHint": "Yalnız değiştirmek istediğiniz alanı doldurun; boş bıraktığınız alan değişmez. Düzeltme gerekçesiyle birlikte denetim kaydına yazılır.",
+        "reasonLabel": "Gerekçe",
+        "reasonPlaceholder": "Ör. nüfus cüzdanı görüldü, soyad yazımı düzeltildi",
+        "reasonRequired": "Gerekçe en az 5 karakter olmalıdır.",
+        "saved": "Kimlik bilgileri güncellendi."
+      },
+      "filterIdentityAll": "Tümü",
+      "filterIdentityIncomplete": "Yalnız kimliği eksik"
     },
     "deletedIdentities": {
       "title": "Silinen Hesap Kimlikleri",
@@ -9105,7 +9121,8 @@
           "entityType": "Varlık türü",
           "shipmentLeg": "Gönderi yönü",
           "loginState": "Giriş durumu",
-          "testAccount": "Test hesabı"
+          "testAccount": "Test hesabı",
+          "identity": "Kimlik bilgisi"
         }
       },
       "bulkActionBar": {
@@ -9305,7 +9322,9 @@
         "archiveCompany": "Arşiv: firma adı",
         "archiveBankAccountHolder": "Arşiv: banka hesabı sahibi",
         "archiveDisplayName": "Arşiv: ad",
-        "none": "Çözülemedi"
+        "none": "Çözülemedi",
+        "legalName": "Yasal ad (üye beyanı)",
+        "archiveLegalName": "Arşiv: yasal ad"
       },
       "sellerKinds": {
         "individual": "Bireysel",
@@ -10937,6 +10956,14 @@
     "consent": {
       "distanceSalesRequired": "Ödemeye devam etmek için Mesafeli Satış Sözleşmesi'ni onaylamanız gerekiyor.",
       "documentNotAcceptable": "\"{document}\" bu adımda onaylanabilecek bir belge değil."
+    },
+    "identity": {
+      "nationalIdUnavailable": "Bu T.C. Kimlik Numarası kullanılamıyor. Bir hata olduğunu düşünüyorsanız destek ekibimizle iletişime geçin.",
+      "locked": "Kimlik bilgileriniz kaydedildikten sonra değiştirilemez. Düzeltme için destek ekibimizle iletişime geçin.",
+      "incomplete": "Ad, soyad ve T.C. Kimlik Numarası birlikte girilmelidir.",
+      "correctionNoChange": "Kaydedilecek bir değişiklik yok.",
+      "tooManyAttempts": "Çok fazla deneme yapıldı. Lütfen {minutes} dakika sonra tekrar deneyin.",
+      "bankNationalIdMismatch": "Banka hesabındaki T.C. Kimlik Numarası, hesabınızda kayıtlı numarayla aynı olmalıdır."
     }
   },
   "status": {
@@ -11856,6 +11883,32 @@
         "ePostaVeyaSifreHatali": "E-posta veya şifre hatalı",
         "girisBasarisiz": "Giriş başarısız"
       }
+    }
+  },
+  "identity": {
+    "legalFirstName": "Ad",
+    "legalLastName": "Soyad",
+    "nationalId": "T.C. Kimlik Numarası",
+    "nationalIdPlaceholder": "11 haneli numara",
+    "legalNameHint": "Nüfus cüzdanınızdaki gibi yazın.",
+    "registerHint": "Ad, soyad ve T.C. Kimlik Numaranız yasal yükümlülüklerimiz gereği saklanır; profilinizde görünmez ve başka üyelerle paylaşılmaz.",
+    "validation": {
+      "nameInvalid": "Yalnız harf kullanın (2–50 karakter).",
+      "nationalIdInvalid": "Geçerli bir T.C. Kimlik Numarası girin."
+    },
+    "gate": {
+      "title": "Kimlik bilgileriniz gerekiyor",
+      "intro": "Yasal yükümlülüklerimiz gereği her üyemizin adını, soyadını ve T.C. Kimlik Numarasını kayıt altında tutmamız gerekiyor. Bu bilgiler profilinizde ya da ilanlarınızda görünmez, başka üyelerle paylaşılmaz.",
+      "lockedNote": "Kaydettikten sonra bu bilgileri kendiniz değiştiremezsiniz; hatalıysa destek ekibimize yazabilirsiniz.",
+      "prefilledHint": "Banka hesabınıza girdiğiniz numarayla dolduruldu; lütfen kontrol edin.",
+      "submit": "Kaydet ve devam et",
+      "saved": "Kimlik bilgileriniz kaydedildi."
+    },
+    "profile": {
+      "title": "Kimlik bilgileri",
+      "description": "Yasal yükümlülüğümüz için saklanır; herkese açık değildir.",
+      "lockedNote": "Bu bilgiler kaydedildikten sonra değiştirilemez. Hatalıysa destek ekibimizle iletişime geçin.",
+      "notProvided": "Henüz girilmedi"
     }
   }
 }
