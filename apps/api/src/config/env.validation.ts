@@ -514,8 +514,21 @@ const envSchema = z
             : "SURAT_SOAP_MODE must be 'rest' in production when SURAT_CARGO_ENABLED is set (only the documented REST create + tracking contract is supported)",
         });
       }
-      // Sahte taşıyıcı ağa çıkmaz: test-modu ve kimlik şartı yalnız gerçek
-      // REST istemcisi içindir.
+      // Sahte taşıyıcı ağa çıkmaz (carrier VE takip istemcisi stub'dır, bkz.
+      // SuratCargoModule): kimlik şartı yalnız gerçek REST istemcisi içindir.
+      // Yine de staging'de canlı host'u seçen bayrak kabul edilmez — biri
+      // modu 'rest'e çevirdiğinde ilk istek canlıya gitmesin.
+      if (
+        stagingStubCargo &&
+        (env.SURAT_KARGO_TEST_MODE ?? "").trim().toLowerCase() === "false"
+      ) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["SURAT_KARGO_TEST_MODE"],
+          message:
+            "SURAT_KARGO_TEST_MODE must not be 'false' on staging (it selects the live Sürat host); leave it unset or 'true'",
+        });
+      }
       if (!stagingStubCargo) {
         const cargoTestMode = (env.SURAT_KARGO_TEST_MODE ?? "")
           .trim()

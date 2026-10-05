@@ -1,4 +1,11 @@
-import { resolveSuratCarrierClient } from "../surat-cargo.module";
+import {
+  resolveSuratCarrierClient,
+  resolveSuratTrackingClient,
+} from "../surat-cargo.module";
+import {
+  StubSuratTrackingClient,
+  SuratTrackingClient,
+} from "./surat-tracking.client";
 import { RestSuratClient } from "./surat-rest.client";
 import { GonderiOlusturClient } from "./surat-gonderi-olustur.client";
 import { StubSuratSoapClient } from "./surat-soap.client";
@@ -132,5 +139,49 @@ describe("resolveSuratCarrierClient — stub fail-fast + mode seçimi", () => {
         StubSuratSoapClient,
       );
     });
+  });
+});
+
+/**
+ * Takip istemcisi carrier istemcisiyle AYNI mod kararından seçilir: sahte
+ * taşıyıcıda takip de sahtedir ve ağa çıkmaz — kimlik + TEST_MODE=false
+ * kalmış olsa bile canlı Sürat host'una sorgu gitmez.
+ */
+describe("resolveSuratTrackingClient", () => {
+  const makeConfig = (env: Record<string, string | undefined>) =>
+    ({
+      get: (key: string, def?: string) => env[key] ?? def,
+    }) as any;
+
+  it("'rest' → gerçek takip istemcisi", () => {
+    const client = resolveSuratTrackingClient(
+      makeConfig({ SURAT_SOAP_MODE: " REST " }),
+    );
+    expect(client).toBeInstanceOf(SuratTrackingClient);
+    expect(client).not.toBeInstanceOf(StubSuratTrackingClient);
+  });
+
+  it.each([["stub"], [undefined], [""]])(
+    "mode %p → ağa çıkmayan stub takip istemcisi",
+    (mode) => {
+      expect(
+        resolveSuratTrackingClient(makeConfig({ SURAT_SOAP_MODE: mode })),
+      ).toBeInstanceOf(StubSuratTrackingClient);
+    },
+  );
+
+  it("stub + canlı kimlik + TEST_MODE=false → yine stub (staging canlı host'a ulaşamaz)", () => {
+    expect(
+      resolveSuratTrackingClient(
+        makeConfig({
+          NODE_ENV: "production",
+          APP_ENV: "staging",
+          SURAT_SOAP_MODE: "stub",
+          SURAT_KARGO_CARI_KODU: "live-account",
+          SURAT_KARGO_SIFRE: "live-secret",
+          SURAT_KARGO_TEST_MODE: "false",
+        }),
+      ),
+    ).toBeInstanceOf(StubSuratTrackingClient);
   });
 });

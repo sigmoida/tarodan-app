@@ -1,4 +1,8 @@
-import { SuratTrackingClient } from "./surat-tracking.client";
+import {
+  STUB_TRACKING_PENDING_MESSAGE,
+  StubSuratTrackingClient,
+  SuratTrackingClient,
+} from "./surat-tracking.client";
 
 describe("SuratTrackingClient.lookupTracking", () => {
   const originalFetch = global.fetch;
@@ -95,5 +99,59 @@ describe("SuratTrackingClient.lookupTracking", () => {
       category: "timeout",
       message: "Surat tracking API timed out after 20000ms for PKG-TEST",
     });
+  });
+});
+
+/**
+ * Sahte taşıyıcıda takip: ağa ÇIKMAZ, "henüz haber yok" der. Poller hata
+ * saymaz, koliye dokunmaz; koli yalnız Test Araçları simülasyonuyla ilerler.
+ */
+describe("StubSuratTrackingClient", () => {
+  const originalFetch = global.fetch;
+  // Kasıtlı en kötü durum: canlı kimlik + TEST_MODE=false bırakılmış.
+  const config = {
+    get: jest.fn(
+      (key: string, fallback?: string) =>
+        (
+          ({
+            SURAT_KARGO_CARI_KODU: "live-account",
+            SURAT_KARGO_SIFRE: "live-secret",
+            SURAT_KARGO_TEST_MODE: "false",
+          }) as Record<string, string>
+        )[key] ?? fallback,
+    ),
+  };
+
+  beforeEach(() => {
+    global.fetch = jest.fn() as any;
+  });
+  afterEach(() => {
+    global.fetch = originalFetch;
+  });
+
+  it("answers 'pending' (no news yet) without any network call", async () => {
+    const client = new StubSuratTrackingClient(config as any);
+    await expect(client.lookupTracking("PKG-1")).resolves.toEqual({
+      kind: "pending",
+      message: STUB_TRACKING_PENDING_MESSAGE,
+    });
+    await expect(client.fetchTrackingInfo("PKG-1")).resolves.toBeNull();
+    expect(global.fetch).not.toHaveBeenCalled();
+  });
+
+  it("the admin probe does not reach the carrier either", async () => {
+    const client = new StubSuratTrackingClient(config as any);
+    await expect(client.probeTracking("PKG-1")).resolves.toEqual({
+      ok: false,
+      error: STUB_TRACKING_PENDING_MESSAGE,
+    });
+    expect(global.fetch).not.toHaveBeenCalled();
+  });
+
+  it("still parses Sürat dates (inherited)", () => {
+    const client = new StubSuratTrackingClient(config as any);
+    expect(
+      client.parseSuratDate("2026-10-05T13:00:00.000")?.toISOString(),
+    ).toBe("2026-10-05T10:00:00.000Z");
   });
 });

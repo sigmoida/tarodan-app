@@ -1,6 +1,7 @@
 import { CancellationActor, OrderStatus, ShipmentStatus } from "@prisma/client";
 import { OrderTrackingSyncService } from "./order-tracking-sync.service";
 import { buildSimulatedSuratReading } from "../helpers/surat-simulated-reading";
+import { StubSuratTrackingClient } from "../clients/surat-tracking.client";
 import { SHIPPABLE_ORDER_STATUSES } from "../../order/helpers/order-state-machine";
 
 describe("OrderTrackingSyncService", () => {
@@ -542,6 +543,34 @@ describe("OrderTrackingSyncService", () => {
       provider: "surat",
       order: { isTest: false },
     });
+  });
+
+  // Sahte taşıyıcı (staging UAT): poller koliyi Sürat'a sormaz, "henüz haber
+  // yok" alır — hata/alarm sayılmaz ve koliye hiçbir şey yazılmaz.
+  it("with the stub tracking client the cron reports pending, never failed, and writes nothing", async () => {
+    const { prisma, tx, moduleRef } = makeService();
+    prisma.shipment.findMany.mockResolvedValue([
+      shipment({ id: "s1", trackingNumber: "PKG-AAA" }),
+      shipment({ id: "s2", trackingNumber: "PKG-BBB" }),
+    ]);
+    const stubClient = new StubSuratTrackingClient({
+      get: (_key: string, fallback?: string) => fallback,
+    } as any);
+    const service = new OrderTrackingSyncService(
+      prisma as any,
+      moduleRef as any,
+      stubClient,
+    );
+
+    await expect(service.syncAllActiveShipments()).resolves.toEqual({
+      synced: 0,
+      pending: 2,
+      failed: 0,
+      skipped: 0,
+      failures: [],
+    });
+    expect(tx.shipment.updateMany).not.toHaveBeenCalled();
+    expect(prisma.shipment.updateMany).not.toHaveBeenCalled();
   });
 
   // UAT kargo simülasyonu: okuma Sürat'tan değil Test Araçları'ndan gelir, ama

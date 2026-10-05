@@ -761,6 +761,15 @@ describe("validateEnv", () => {
       ).toThrow(/SURAT_SOAP_MODE must be 'rest' in production/);
     });
 
+    it("refuses the live-host flag on staging even in stub mode", () => {
+      expect(() =>
+        validateEnv({ ...stagingStub, SURAT_KARGO_TEST_MODE: "false" }),
+      ).toThrow(/SURAT_KARGO_TEST_MODE must not be 'false' on staging/);
+      expect(() =>
+        validateEnv({ ...stagingStub, SURAT_KARGO_TEST_MODE: "true" }),
+      ).not.toThrow();
+    });
+
     it("keeps the test-host rules for staging on the real REST client", () => {
       expect(() =>
         validateEnv({ ...stagingBase, SURAT_KARGO_TEST_MODE: "false" }),
