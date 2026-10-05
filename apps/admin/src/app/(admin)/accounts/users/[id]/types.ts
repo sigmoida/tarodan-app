@@ -1,4 +1,3 @@
-import type { StatusConfig } from "@tarodan/ui";
 import type { AccountStatus, LegalIdentityField } from "@tarodan/types";
 import { useTranslations } from "next-intl";
 
@@ -140,49 +139,6 @@ export interface UserDetail {
     blocksReceivedCount?: number;
   };
 }
-
-/** Order/product/trade status → badge, shared across the activity tabs. */
-export const getUserStatusConfig = (t: T): Record<string, StatusConfig> => ({
-  pending: { label: t("admin.users.status.pending"), variant: "warning" },
-  pending_payment: {
-    label: t("admin.operations.orders.status.pendingPayment"),
-    variant: "warning",
-  },
-  paid: { label: t("admin.operations.orders.status.paid"), variant: "default" },
-  preparing: {
-    label: t("admin.operations.orders.status.preparing"),
-    variant: "default",
-  },
-  shipped: {
-    label: t("admin.operations.orders.status.shipped"),
-    variant: "default",
-  },
-  delivered: {
-    label: t("admin.operations.orders.status.delivered"),
-    variant: "success",
-  },
-  completed: {
-    label: t("admin.operations.orders.status.completed"),
-    variant: "success",
-  },
-  cancelled: {
-    label: t("admin.operations.orders.status.cancelled"),
-    variant: "danger",
-  },
-  rejected: { label: t("common.rejected"), variant: "danger" },
-  active: { label: t("common.active"), variant: "success" },
-  inactive: { label: t("common.inactive"), variant: "outline" },
-  sold: { label: t("admin.catalog.products.statusSold"), variant: "default" },
-  accepted: {
-    label: t("admin.operations.trades.timeline.accepted"),
-    variant: "default",
-  },
-  both_shipped: {
-    label: t("admin.users.status.bothShipped"),
-    variant: "default",
-  },
-  disputed: { label: t("admin.operations.trades.disputed"), variant: "danger" },
-});
 
 export const getMembershipTierOptions = (t: T) => [
   { value: "free", label: t("admin.users.membershipFree") },

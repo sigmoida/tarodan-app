@@ -2,16 +2,18 @@
 
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Badge, Button } from "@tarodan/ui";
+import { Badge, Button, Spinner } from "@tarodan/ui";
 import { FolderIcon, ArrowUturnLeftIcon } from "@heroicons/react/24/outline";
 import { useTranslations } from "next-intl";
 import { toast } from "react-hot-toast";
 import { adminApi } from "@/lib/api";
 import { adminKeys } from "@/lib/query/keys";
-import { fmtDateTime } from "@/lib/format";
+import { fmtFileSize } from "@/lib/format";
 import { SectionCard } from "@/components/detail/SectionCard";
+import { DataTable } from "@/components/DataTable";
+import { col } from "@/components/table";
 
 interface MediaFileRow {
   key: string;
@@ -36,12 +38,6 @@ const USAGE_BADGE: Record<string, "success" | "warning" | "default"> = {
   upload: "warning",
 };
 
-function fmtSize(bytes: number): string {
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-  return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
-}
-
 export function MediaBrowser() {
   const t = useTranslations();
   // API env prefix'ini kendisi ekler — burada env'siz göreli yol tutulur.
@@ -65,6 +61,74 @@ export function MediaBrowser() {
     const parts = fullPrefix.split("/");
     setPrefix(parts.slice(1).join("/"));
   };
+
+  const columns = useMemo(
+    () => [
+      col.custom<MediaFileRow>(
+        t("admin.system.media.preview"),
+        (file) =>
+          file.publicUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={file.publicUrl}
+              alt={file.name}
+              className="h-10 w-10 rounded object-cover"
+            />
+          ) : (
+            <Badge variant="outline">{t("admin.system.media.private")}</Badge>
+          ),
+        { id: "preview", minWidth: 100 },
+      ),
+      col.code<MediaFileRow>(
+        t("admin.system.media.file"),
+        (file) => file.name,
+        {
+          id: "file",
+        },
+      ),
+      col.text<MediaFileRow>(
+        t("admin.system.media.sizeCol"),
+        (file) => fmtFileSize(file.size),
+        { id: "size", minWidth: 100 },
+      ),
+      col.date<MediaFileRow>(
+        t("admin.system.media.date"),
+        (file) => file.lastModified,
+        { id: "date", withTime: true },
+      ),
+      col.custom<MediaFileRow>(
+        t("admin.system.media.usage"),
+        (file) =>
+          file.usage ? (
+            <Badge variant={USAGE_BADGE[file.usage.type] ?? "outline"}>
+              {t(`admin.system.media.usageType.${file.usage.type}` as never)}
+              {": "}
+              {file.usage.label}
+            </Badge>
+          ) : (
+            <Badge variant="warning">{t("admin.system.media.orphan")}</Badge>
+          ),
+        { id: "usage", minWidth: 200 },
+      ),
+      col.actions<MediaFileRow>(
+        (file) =>
+          file.publicUrl && (
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => {
+                navigator.clipboard.writeText(file.publicUrl!);
+                toast.success(t("admin.system.media.urlCopied"));
+              }}
+            >
+              {t("admin.system.media.copyUrl")}
+            </Button>
+          ),
+        { header: t("common.actions"), minWidth: 120 },
+      ),
+    ],
+    [t],
+  );
 
   const crumbs = prefix.replace(/\/$/, "").split("/").filter(Boolean);
   const data = query.data;
@@ -100,7 +164,9 @@ export function MediaBrowser() {
 
       {query.isLoading ? (
         <SectionCard>
-          <p className="py-8 text-center text-muted">{t("common.loading")}</p>
+          <div className="flex justify-center py-8">
+            <Spinner />
+          </div>
         </SectionCard>
       ) : (
         <>
@@ -123,99 +189,12 @@ export function MediaBrowser() {
             </div>
           )}
 
-          <SectionCard bodyClassName="overflow-x-auto">
-            {(data?.files.length ?? 0) === 0 ? (
-              <p className="py-8 text-center text-muted">
-                {t("admin.system.media.empty")}
-              </p>
-            ) : (
-              <table className="w-full min-w-[840px] text-sm">
-                <thead>
-                  <tr className="border-b border-border text-left text-muted">
-                    <th className="px-3 py-3 font-medium">
-                      {t("admin.system.media.preview")}
-                    </th>
-                    <th className="px-3 py-3 font-medium">
-                      {t("admin.system.media.file")}
-                    </th>
-                    <th className="px-3 py-3 font-medium">
-                      {t("admin.system.media.sizeCol")}
-                    </th>
-                    <th className="px-3 py-3 font-medium">
-                      {t("admin.system.media.date")}
-                    </th>
-                    <th className="px-3 py-3 font-medium">
-                      {t("admin.system.media.usage")}
-                    </th>
-                    <th className="px-3 py-3 text-right font-medium">
-                      {t("common.actions")}
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {data?.files.map((file) => (
-                    <tr
-                      key={file.key}
-                      className="border-b border-border last:border-0"
-                    >
-                      <td className="px-3 py-2">
-                        {file.publicUrl ? (
-                          // eslint-disable-next-line @next/next/no-img-element
-                          <img
-                            src={file.publicUrl}
-                            alt={file.name}
-                            className="h-10 w-10 rounded object-cover"
-                          />
-                        ) : (
-                          <Badge variant="outline">
-                            {t("admin.system.media.private")}
-                          </Badge>
-                        )}
-                      </td>
-                      <td className="px-3 py-2 font-mono text-xs">
-                        {file.name}
-                      </td>
-                      <td className="px-3 py-2">{fmtSize(file.size)}</td>
-                      <td className="px-3 py-2">
-                        {fmtDateTime(file.lastModified)}
-                      </td>
-                      <td className="px-3 py-2">
-                        {file.usage ? (
-                          <Badge
-                            variant={USAGE_BADGE[file.usage.type] ?? "outline"}
-                          >
-                            {t(
-                              `admin.system.media.usageType.${file.usage.type}` as never,
-                            )}
-                            {": "}
-                            {file.usage.label}
-                          </Badge>
-                        ) : (
-                          <Badge variant="warning">
-                            {t("admin.system.media.orphan")}
-                          </Badge>
-                        )}
-                      </td>
-                      <td className="px-3 py-2 text-right">
-                        {file.publicUrl && (
-                          <Button
-                            variant="secondary"
-                            size="sm"
-                            onClick={() => {
-                              navigator.clipboard.writeText(file.publicUrl!);
-                              toast.success(t("admin.system.media.urlCopied"));
-                            }}
-                          >
-                            {t("admin.system.media.copyUrl")}
-                          </Button>
-                        )}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            )}
-          </SectionCard>
+          <DataTable
+            columns={columns}
+            data={data?.files ?? []}
+            getRowId={(file) => file.key}
+            emptyText={t("admin.system.media.empty")}
+          />
         </>
       )}
     </div>

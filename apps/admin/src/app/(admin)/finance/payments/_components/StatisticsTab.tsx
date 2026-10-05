@@ -17,7 +17,8 @@ import { adminApi } from "@/lib/api";
 import { adminKeys } from "@/lib/query/keys";
 import { SectionCard } from "@/components/detail/SectionCard";
 import { MetricCard } from "@/components/MetricCard";
-import { fmtTry } from "@/lib/format";
+import { ProgressBar } from "@/components/ProgressBar";
+import { fmtDate, fmtPercent, fmtTry } from "@/lib/format";
 import { useTranslations } from "next-intl";
 import { statusConfig } from "@/lib/statusLabels";
 
@@ -57,15 +58,10 @@ function DistBar({
       <div className="mb-1 flex justify-between">
         <span className="text-sm font-medium text-body">{label}</span>
         <span className="text-sm text-muted">
-          {count} ({percentage.toFixed(1)}%)
+          {count} ({fmtPercent(percentage, 1)})
         </span>
       </div>
-      <div className="h-2 w-full rounded-full bg-surface-alt">
-        <div
-          className="h-2 rounded-full bg-primary-500"
-          style={{ width: `${percentage}%` }}
-        />
-      </div>
+      <ProgressBar value={percentage} aria-label={label} />
     </div>
   );
 }
@@ -101,8 +97,7 @@ export function StatisticsTab() {
     <div className="space-y-4">
       {data && (
         <p className="text-sm text-muted">
-          {new Date(data.startDate).toLocaleDateString(t("common.dateLocale"))}{" "}
-          - {new Date(data.endDate).toLocaleDateString(t("common.dateLocale"))}
+          {fmtDate(data.startDate)} - {fmtDate(data.endDate)}
         </p>
       )}
 
@@ -158,7 +153,7 @@ export function StatisticsTab() {
             />
             <MetricCard
               label={t("admin.finance.payments.successRate")}
-              value={`${s.successRate.toFixed(1)}%`}
+              value={fmtPercent(s.successRate, 1)}
             />
             <MetricCard
               label={t("admin.finance.payments.averageAmount")}
@@ -208,38 +203,19 @@ export function StatisticsTab() {
 
           <SectionCard title={t("admin.finance.payments.detailedSummary")}>
             <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
-              <div className="min-w-0 rounded-lg bg-success-50 p-4">
-                <p className="mb-1 truncate text-sm text-muted">
-                  {t("admin.finance.payments.completed")}
-                </p>
-                <p className="truncate text-2xl font-bold text-success-600">
-                  {s.completedPayments}
-                </p>
-              </div>
-              <div className="min-w-0 rounded-lg bg-danger-50 p-4">
-                <p className="mb-1 truncate text-sm text-muted">
-                  {t("admin.finance.payments.failed")}
-                </p>
-                <p className="truncate text-2xl font-bold text-danger-600">
-                  {s.failedPayments}
-                </p>
-              </div>
-              <div className="min-w-0 rounded-lg bg-warning-50 p-4">
-                <p className="mb-1 truncate text-sm text-muted">
-                  {t("admin.finance.payments.pending")}
-                </p>
-                <p className="truncate text-2xl font-bold text-warning-600">
-                  {s.pendingPayments}
-                </p>
-              </div>
-              <div className="min-w-0 rounded-lg bg-info-50 p-4">
-                <p className="mb-1 truncate text-sm text-muted">
-                  {t("common.total")}
-                </p>
-                <p className="truncate text-2xl font-bold text-info-600">
-                  {s.totalPayments}
-                </p>
-              </div>
+              <MetricCard
+                label={t("admin.finance.payments.completed")}
+                value={s.completedPayments}
+              />
+              <MetricCard
+                label={t("admin.finance.payments.failed")}
+                value={s.failedPayments}
+              />
+              <MetricCard
+                label={t("admin.finance.payments.pending")}
+                value={s.pendingPayments}
+              />
+              <MetricCard label={t("common.total")} value={s.totalPayments} />
             </div>
           </SectionCard>
         </>

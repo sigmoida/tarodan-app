@@ -21,10 +21,13 @@ import {
   paymentHoldStatusConfig,
   refundRequestStatusConfig,
 } from "@tarodan/ui";
-import { useLocale, useTranslations } from "next-intl";
+import { useTranslations } from "next-intl";
 import { DataList, Field } from "@/components/detail/DataList";
+import { Panel } from "@/components/detail/Panel";
+import { SectionTitle } from "@/components/detail/SectionTitle";
+import { TextLink } from "@/components/TextLink";
 import { EarlyReleaseBadge } from "@/components/finance/EarlyReleaseBadge";
-import { fmtDate, fmtDateTime, fmtTry } from "@/lib/format";
+import { fmtDate, fmtDateTime, fmtPercent, fmtTry } from "@/lib/format";
 import { useSession } from "@/context/SessionContext";
 import { usePspFeeRate } from "@/hooks/usePspFeeRate";
 import { useTimingPolicy } from "@/hooks/useTimingPolicy";
@@ -234,54 +237,50 @@ export function OrderFileBlock({ entry }: { entry: OrderFileEntry }) {
         }
       />
 
-      <div className="mt-4 flex flex-wrap items-center gap-x-6 gap-y-1 border-t border-border pt-3 text-sm">
+      <DataList columns={2} className="mt-4 border-t border-border pt-3">
         {/* Hangi komisyon kuralına düştüğü: sipariş anındaki snapshot. Tıklanınca
             kural ekranı açılır ve o kuralın dialogu kendiliğinden gelir —
             admin, oranların nereden geldiğini listede aramak zorunda kalmasın. */}
-        <span>
-          <span className="text-muted">
-            {t("admin.operations.orders.file.commissionRule")}:{" "}
-          </span>
+        <Field label={t("admin.operations.orders.file.commissionRule")}>
           {entry.commissionRule ? (
-            <Link
+            <TextLink
               href={`/finance/commission?ruleId=${entry.commissionRule.id}`}
-              className="font-medium text-primary-600 hover:underline"
             >
               {entry.commissionRule.name ??
                 t("admin.operations.orders.file.commissionRuleUnnamed")}
-            </Link>
+            </TextLink>
           ) : (
-            <span className="font-medium text-heading">—</span>
+            "—"
           )}
-        </span>
+        </Field>
         {entry.ledger && (
-          <span>
-            <span className="text-muted">
-              {t("admin.operations.orders.file.ledgerTitle")}:{" "}
-            </span>
-            <span className="font-medium text-heading">
-              {t(
-                `admin.operations.orders.file.ledgerStatus.${entry.ledger.status}` as Parameters<
-                  typeof t
-                >[0],
-              )}
-            </span>
-          </span>
+          <Field label={t("admin.operations.orders.file.ledgerTitle")}>
+            {t(
+              `admin.operations.orders.file.ledgerStatus.${entry.ledger.status}` as Parameters<
+                typeof t
+              >[0],
+            )}
+          </Field>
         )}
-      </div>
+      </DataList>
 
       {/* Escrow — TAHMİN değil gerçek hold kaydı; aksiyon Satıcı Ödemelerinde */}
-      <div className="mt-4 rounded-lg bg-surface-alt p-4 text-sm">
-        <div className="mb-2 flex items-center justify-between gap-3">
-          <p className="font-medium text-heading">
+      <Panel tone="muted" className="mt-4 text-sm">
+        <div className="mb-2">
+          <SectionTitle
+            as="h4"
+            size="sm"
+            actions={
+              entry.escrow && (
+                <Badge
+                  status={entry.escrow.status}
+                  config={statusConfig(paymentHoldStatusConfig, t)}
+                />
+              )
+            }
+          >
             {t("admin.operations.orders.escrow.title")}
-          </p>
-          {entry.escrow && (
-            <Badge
-              status={entry.escrow.status}
-              config={statusConfig(paymentHoldStatusConfig, t)}
-            />
-          )}
+          </SectionTitle>
         </div>
         {entry.escrow ? (
           <DataList columns={2}>
@@ -340,19 +339,20 @@ export function OrderFileBlock({ entry }: { entry: OrderFileEntry }) {
             </Link>
           </Button>
         )}
-      </div>
+      </Panel>
 
       {/* İade talepleri — K5: artık detayda da görünür ve talebe link verir */}
       {entry.refundRequests.length > 0 && (
         <div className="mt-4">
-          <p className="mb-2 text-sm font-medium text-heading">
+          <SectionTitle as="h4" size="sm" className="mb-2">
             {t("admin.operations.orders.file.refundsTitle")}
-          </p>
+          </SectionTitle>
           <div className="space-y-2">
             {entry.refundRequests.map((r) => (
-              <div
+              <Panel
                 key={r.id}
-                className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-border p-3 text-sm"
+                padding="sm"
+                className="flex flex-wrap items-center justify-between gap-2 text-sm"
               >
                 <div className="flex items-center gap-3">
                   <span className="font-mono">{r.refundNumber}</span>
@@ -379,7 +379,7 @@ export function OrderFileBlock({ entry }: { entry: OrderFileEntry }) {
                     </Link>
                   </Button>
                 </div>
-              </div>
+              </Panel>
             ))}
           </div>
         </div>
@@ -451,7 +451,6 @@ function OrderMoneyBreakdown({
   isRefunded: boolean;
 }) {
   const t = useTranslations();
-  const locale = useLocale();
   const pspFeeRate = usePspFeeRate();
   const b = buildOrderBreakdown({
     subtotal: f.subtotal,
@@ -466,13 +465,11 @@ function OrderMoneyBreakdown({
     pspFeeRate,
   });
 
+  // Tam sayı oran ondalıksız ("%20"), kesirli oran iki ondalıkla ("%18,25").
   const formatRate = (rate: number) =>
-    new Intl.NumberFormat(locale, {
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 2,
-    }).format(rate);
+    fmtPercent(rate, Number.isInteger(rate) ? 0 : 2);
   const withRate = (label: string, rate: number) => {
-    const rateText = `%${formatRate(rate)}`;
+    const rateText = formatRate(rate);
     return label.endsWith(")")
       ? label.replace(/\)$/, `, ${rateText})`)
       : `${label} (${rateText})`;
@@ -646,9 +643,9 @@ function OrderMoneyBreakdown({
   return (
     <div className="mt-4 space-y-4 border-t border-border pt-4 text-sm">
       {isRefunded && (
-        <p className="rounded-lg bg-warning-50 px-3 py-2 text-warning-800">
+        <Alert variant="warning" className="px-3 py-2">
           {t("admin.operations.orders.file.refundedBreakdownNote")}
-        </p>
+        </Alert>
       )}
       <div className="overflow-x-auto">
         <div className="min-w-[900px]">
@@ -760,7 +757,7 @@ function OrderMoneyBreakdown({
           <div className="grid grid-cols-[minmax(max-content,1fr)_7rem_5rem] gap-x-3 pt-1 text-xs text-subtle">
             <span>{t("admin.operations.orders.file.netTakeRate")}</span>
             <span className="text-right tabular-nums">
-              %{b.platform.netTakeRate}
+              {formatRate(b.platform.netTakeRate)}
             </span>
             <span />
           </div>

@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useTranslations } from "next-intl";
 import { useQuery } from "@tanstack/react-query";
-import { Button, Spinner } from "@tarodan/ui";
+import { Button, EmptyState, Spinner } from "@tarodan/ui";
 import {
   PlusIcon,
   PencilIcon,
@@ -14,6 +14,7 @@ import { adminApi } from "@/lib/api";
 import { adminKeys } from "@/lib/query/keys";
 import { useConfirm } from "@/provider/ConfirmProvider";
 import { useAdminMutation } from "@/hooks/useAdminMutation";
+import { Panel } from "@/components/detail/Panel";
 import { StatusToggle } from "@/components/ActiveBadge";
 import { ActionIconButton } from "@/components/AdminList";
 import { CarModelFormModal } from "../../car-models/_modals/CarModelFormModal";
@@ -65,20 +66,21 @@ export function BrandModelsPanel({ brand }: { brand: Brand }) {
           <Spinner size="sm" /> {t("admin.catalog.carModels.loading")}
         </div>
       ) : models.length === 0 ? (
-        <div className="flex flex-col items-center justify-center gap-3 py-6 text-center">
-          <TruckIcon className="h-8 w-8 text-subtle" />
-          <p className="text-muted">
-            {t("admin.catalog.carModels.emptyForBrand")}
-          </p>
-          <Button
-            variant="secondary"
-            size="sm"
-            leftIcon={<PlusIcon className="h-4 w-4" />}
-            onClick={() => setModal({})}
-          >
-            {t("admin.catalog.carModels.add")}
-          </Button>
-        </div>
+        <EmptyState
+          size="compact"
+          icon={<TruckIcon className="h-6 w-6" />}
+          title={t("admin.catalog.carModels.emptyForBrand")}
+          action={
+            <Button
+              variant="secondary"
+              size="sm"
+              leftIcon={<PlusIcon className="h-4 w-4" />}
+              onClick={() => setModal({})}
+            >
+              {t("admin.catalog.carModels.add")}
+            </Button>
+          }
+        />
       ) : (
         <div className="space-y-3">
           <div className="flex items-center justify-between">
@@ -99,9 +101,10 @@ export function BrandModelsPanel({ brand }: { brand: Brand }) {
           </div>
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {models.map((m) => (
-              <div
+              <Panel
                 key={m.id}
-                className="flex items-start justify-between gap-3 rounded-lg border border-border-subtle bg-surface-elevated p-3"
+                padding="sm"
+                className="flex items-start justify-between gap-3"
               >
                 <div className="min-w-0">
                   <p className="truncate font-medium text-heading">{m.name}</p>
@@ -133,7 +136,7 @@ export function BrandModelsPanel({ brand }: { brand: Brand }) {
                     />
                   </div>
                 </div>
-              </div>
+              </Panel>
             ))}
           </div>
         </div>

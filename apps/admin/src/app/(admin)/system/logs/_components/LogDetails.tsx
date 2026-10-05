@@ -1,3 +1,6 @@
+import { DataList, Field } from "@/components/detail/DataList";
+import { Panel } from "@/components/detail/Panel";
+import { SectionTitle } from "@/components/detail/SectionTitle";
 import { JsonBlock } from "./JsonBlock";
 import {
   type ErrorLog,
@@ -7,80 +10,56 @@ import {
 } from "../_lib/types";
 import { useTranslations } from "next-intl";
 
-function Field({
-  label,
-  value,
-  mono,
-}: {
-  label: string;
-  value: React.ReactNode;
-  mono?: boolean;
-}) {
-  return (
-    <>
-      <span className="font-medium text-heading">{label}</span>
-      <span className={mono ? "font-mono" : undefined}>{value}</span>
-    </>
-  );
-}
-
 export function ErrorDetail({ log }: { log: ErrorLog }) {
   const t = useTranslations();
   const m = log.metadata;
   return (
-    <div className="space-y-3 rounded-lg border border-border bg-surface-alt p-4 text-sm">
-      <div className="grid grid-cols-1 gap-x-6 gap-y-1 text-muted sm:grid-cols-2">
-        {log.endpoint && <Field label="Endpoint" value={log.endpoint} mono />}
+    <Panel tone="muted" className="space-y-3 text-sm">
+      <DataList className="gap-y-1">
+        {log.endpoint && (
+          <Field label="Endpoint" mono>
+            {log.endpoint}
+          </Field>
+        )}
         {m?.status && (
-          <Field
-            label={t("admin.system.logs.details.httpStatus")}
-            value={m.status}
-            mono
-          />
+          <Field label={t("admin.system.logs.details.httpStatus")} mono>
+            {m.status}
+          </Field>
         )}
         {m?.name && (
-          <Field
-            label={t("admin.system.logs.details.errorType")}
-            value={m.name}
-            mono
-          />
+          <Field label={t("admin.system.logs.details.errorType")} mono>
+            {m.name}
+          </Field>
         )}
         {log.userId && (
-          <Field
-            label={t("admin.system.logs.details.userId")}
-            value={log.userId}
-            mono
-          />
+          <Field label={t("admin.system.logs.details.userId")} mono>
+            {log.userId}
+          </Field>
         )}
         {/* Korelasyon kimliği: aynı isteğin konsol satırları bu kodla grep'lenir
             ve kullanıcı 500 ekranında aynı kodu görür. */}
         {log.requestId && (
-          <Field
-            label={t("admin.system.logs.details.requestId")}
-            value={log.requestId}
-            mono
-          />
+          <Field label={t("admin.system.logs.details.requestId")} mono>
+            {log.requestId}
+          </Field>
         )}
         {m?.ip && (
-          <Field
-            label={t("admin.system.logs.details.ipAddress")}
-            value={m.ip}
-            mono
-          />
+          <Field label={t("admin.system.logs.details.ipAddress")} mono>
+            {m.ip}
+          </Field>
         )}
         {m?.userAgent && (
-          <>
-            <span className="font-medium text-heading">User-Agent</span>
-            <span className="break-all font-mono">{m.userAgent}</span>
-          </>
+          <Field label="User-Agent" mono>
+            <span className="break-all">{m.userAgent}</span>
+          </Field>
         )}
-      </div>
+      </DataList>
 
       {m?.causes && m.causes.length > 0 && (
         <div>
-          <p className="mb-1 font-medium text-heading">
+          <SectionTitle as="h4" size="sm" className="mb-1">
             {t("admin.system.logs.details.errorChain")}
-          </p>
+          </SectionTitle>
           <ol className="list-inside list-decimal space-y-0.5 font-mono text-xs text-danger-600">
             {m.causes.map((c, i) => (
               <li key={i}>{c}</li>
@@ -91,85 +70,83 @@ export function ErrorDetail({ log }: { log: ErrorLog }) {
 
       {m?.response && (
         <div>
-          <p className="mb-1 font-medium text-heading">
+          <SectionTitle as="h4" size="sm" className="mb-1">
             {t("admin.system.logs.details.response")}
-          </p>
+          </SectionTitle>
           <JsonBlock value={m.response} />
         </div>
       )}
 
       {m?.body && (
         <div>
-          <p className="mb-1 font-medium text-heading">
+          <SectionTitle as="h4" size="sm" className="mb-1">
             {t("admin.system.logs.details.requestBody")}{" "}
             <span className="text-xs font-normal text-muted">
               {t("admin.system.logs.details.sensitiveHidden")}
             </span>
-          </p>
+          </SectionTitle>
           <JsonBlock value={m.body} />
         </div>
       )}
 
       {log.stackTrace && (
         <div>
-          <p className="mb-1 font-medium text-heading">Stack Trace</p>
+          <SectionTitle as="h4" size="sm" className="mb-1">
+            Stack Trace
+          </SectionTitle>
           <pre className="max-h-48 overflow-auto whitespace-pre-wrap rounded border border-border bg-surface p-2 text-xs text-muted">
             {log.stackTrace}
           </pre>
         </div>
       )}
-    </div>
+    </Panel>
   );
 }
 
 export function AuditDetail({ log }: { log: AuditLog }) {
   const t = useTranslations();
   return (
-    <div className="space-y-3 rounded-lg border border-border bg-surface-alt p-4 text-sm">
-      <div className="grid grid-cols-1 gap-x-6 gap-y-1 text-muted sm:grid-cols-2">
-        <Field label="Admin" value={log.admin?.email ?? log.adminUserId} />
-        <Field
-          label={t("admin.system.logs.action")}
-          value={actionLabels(t)[log.action] ?? log.action}
-        />
-        <Field
-          label={t("admin.system.logs.entityType")}
-          value={entityLabels(t)[log.entityType] ?? log.entityType}
-        />
-        <Field
-          label={t("admin.system.logs.details.entityId")}
-          value={log.entityId}
-          mono
-        />
+    <Panel tone="muted" className="space-y-3 text-sm">
+      <DataList className="gap-y-1">
+        <Field label="Admin">{log.admin?.email ?? log.adminUserId}</Field>
+        <Field label={t("admin.system.logs.action")}>
+          {actionLabels(t)[log.action] ?? log.action}
+        </Field>
+        <Field label={t("admin.system.logs.entityType")}>
+          {entityLabels(t)[log.entityType] ?? log.entityType}
+        </Field>
+        <Field label={t("admin.system.logs.details.entityId")} mono>
+          {log.entityId}
+        </Field>
         {/* IP adresi satırı KALDIRILDI: createAuditLog istek bağlamına
             erişemediği için (6 pozisyonel parametre, ~20 servisten çağrılıyor,
             uygulamada CLS yok) bu kolon hiç yazılmıyor ve satır hiç dolmuyordu.
             IP'yi gerçekten kaydetmek ayrı bir iş. */}
-      </div>
+      </DataList>
 
       {log.oldValue && (
         <div>
-          <p className="mb-1 font-medium text-heading">
+          <SectionTitle as="h4" size="sm" className="mb-1">
             {t("admin.system.logs.details.oldValues")}{" "}
             <span className="text-xs font-normal text-muted">
               {t("admin.system.logs.details.sensitiveHidden")}
             </span>
-          </p>
+          </SectionTitle>
           <JsonBlock value={log.oldValue} />
         </div>
       )}
 
       {log.newValue && (
         <div>
-          <p className="mb-1 font-medium text-heading">
+          <SectionTitle as="h4" size="sm" className="mb-1">
             {t("admin.system.logs.details.newValues")}{" "}
             <span className="text-xs font-normal text-muted">
               {t("admin.system.logs.details.sensitiveHidden")}
             </span>
-          </p>
+          </SectionTitle>
           <JsonBlock value={log.newValue} />
         </div>
       )}
-    </div>
+    </Panel>
   );
 }

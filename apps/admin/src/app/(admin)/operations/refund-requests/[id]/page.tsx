@@ -2,8 +2,7 @@
 
 import { useParams } from "next/navigation";
 import { useTranslations } from "next-intl";
-import { CheckCircleIcon } from "@heroicons/react/24/outline";
-import { StatusBadge, refundRequestStatusConfig } from "@tarodan/ui";
+import { Alert, StatusBadge, refundRequestStatusConfig } from "@tarodan/ui";
 import { ADMIN_REFUNDS_VIEW_HREF } from "@tarodan/types";
 import { adminApi } from "@/lib/api";
 import { useAdminMutation } from "@/hooks/useAdminMutation";
@@ -12,7 +11,9 @@ import { useSession } from "@/context/SessionContext";
 import { DetailPage } from "@/components/detail/DetailPage";
 import { TestLaneBadge } from "@/components/TestLaneBadge";
 import { PartyCard } from "@/components/detail/PartyCard";
+import { SectionCard } from "@/components/detail/SectionCard";
 import { RefundStatusStepper } from "./_components/RefundStatusStepper";
+import { FinancialComponentsTable } from "./_components/FinancialComponentsTable";
 import { RefundNextActionPanel } from "./_components/RefundNextActionPanel";
 import type {
   HistoryEntry,
@@ -209,83 +210,25 @@ export default function RefundRequestDetailPage() {
             <ReturnShippingSection rr={rr} />
 
             {!!rr.financialComponents?.length && (
-              <section className="rounded-xl border bg-surface-elevated p-4">
-                <h2 className="mb-3 text-base font-semibold">
-                  {t("admin.operations.refundRequests.decisionV2.title")}
-                </h2>
-                <div className="overflow-x-auto">
-                  <table className="w-full text-left text-sm">
-                    <thead>
-                      <tr>
-                        <th className="pb-2 pr-3">
-                          {t(
-                            "admin.operations.refundRequests.decisionV2.component",
-                          )}
-                        </th>
-                        <th className="pb-2 pr-3">
-                          {t(
-                            "admin.operations.refundRequests.decisionV2.treatment",
-                          )}
-                        </th>
-                        <th className="pb-2 pr-3">
-                          {t("admin.operations.refundRequests.decisionV2.net")}
-                        </th>
-                        <th className="pb-2 pr-3">
-                          {t("admin.operations.refundRequests.decisionV2.tax")}
-                        </th>
-                        <th className="pb-2">
-                          {t(
-                            "admin.operations.refundRequests.decisionV2.gross",
-                          )}
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {rr.financialComponents.map((component) => (
-                        <tr
-                          key={`${component.componentCode}:${component.treatment}`}
-                          className="border-t"
-                        >
-                          <td className="py-2 pr-3">
-                            {component.componentCode}
-                          </td>
-                          <td className="py-2 pr-3">{component.treatment}</td>
-                          <td className="py-2 pr-3">
-                            {fmtTry(component.netAmount)}
-                          </td>
-                          <td className="py-2 pr-3">
-                            {fmtTry(component.taxAmount)}
-                          </td>
-                          <td className="py-2">
-                            {fmtTry(component.grossAmount)}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </section>
+              <SectionCard
+                title={t("admin.operations.refundRequests.decisionV2.title")}
+              >
+                <FinancialComponentsTable components={rr.financialComponents} />
+              </SectionCard>
             )}
 
             {rr.refundedAt && (
-              <div className="rounded-xl border border-success-200 bg-success-50 p-4">
-                <div className="flex items-center gap-3">
-                  <CheckCircleIcon className="h-6 w-6 flex-shrink-0 text-success-600" />
-                  <div>
-                    <div className="font-semibold text-success-900">
-                      {t(
-                        "admin.operations.refundRequests.refundCompletedAmount",
-                        {
-                          amount: fmtTry(rr.amount),
-                        },
-                      )}
-                    </div>
-                    <div className="text-sm text-success-800">
-                      {fmtDate(rr.refundedAt)}
-                    </div>
-                  </div>
-                </div>
-              </div>
+              <Alert
+                variant="success"
+                title={t(
+                  "admin.operations.refundRequests.refundCompletedAmount",
+                  {
+                    amount: fmtTry(rr.amount),
+                  },
+                )}
+              >
+                {fmtDate(rr.refundedAt)}
+              </Alert>
             )}
 
             <RefundHistorySection history={history} />

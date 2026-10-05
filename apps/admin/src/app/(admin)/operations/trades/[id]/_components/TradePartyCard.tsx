@@ -1,7 +1,9 @@
-import Link from "next/link";
 import { getProductEffectivePrice } from "@/lib/product-price";
 import { fmtTry } from "@/lib/format";
+import { Panel } from "@/components/detail/Panel";
 import { SectionCard } from "@/components/detail/SectionCard";
+import { SectionTitle } from "@/components/detail/SectionTitle";
+import { TextLink } from "@/components/TextLink";
 import type { TradeItem } from "../types";
 import { useTranslations } from "next-intl";
 
@@ -21,18 +23,18 @@ export function TradePartyCard({
   return (
     <SectionCard title={title}>
       <div className="mb-4 space-y-2">
-        <Link
+        <TextLink
           href={`/accounts/users/${user.id}`}
-          className="block font-medium text-primary-600 hover:text-primary-700"
+          className="block font-medium"
         >
           {user.displayName}
-        </Link>
+        </TextLink>
         <p className="text-sm text-muted">{user.email}</p>
       </div>
       <div className="space-y-3">
-        <h3 className="font-medium text-heading">{itemsTitle}</h3>
+        <SectionTitle size="sm">{itemsTitle}</SectionTitle>
         {items.map((item) => (
-          <div key={item.id} className="flex gap-3 rounded-lg bg-surface p-3">
+          <Panel key={item.id} padding="sm" className="flex gap-3">
             {item.product.images && item.product.images.length > 0 && (
               <div className="h-16 w-16 flex-shrink-0 overflow-hidden rounded-lg bg-surface-alt">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -44,12 +46,12 @@ export function TradePartyCard({
               </div>
             )}
             <div className="flex-1">
-              <Link
+              <TextLink
                 href={`/catalog/products/${item.product.id}`}
-                className="text-sm font-medium text-primary-600 hover:text-primary-700"
+                className="text-sm font-medium"
               >
                 {item.product.title}
-              </Link>
+              </TextLink>
               <p className="text-xs text-muted">
                 {fmtTry(getProductEffectivePrice(item.product))}
               </p>
@@ -60,12 +62,12 @@ export function TradePartyCard({
                       ? t("admin.operations.trades.appliedCommissionRule")
                       : t("admin.operations.trades.currentCommissionRule")}
                   </p>
-                  <Link
+                  <TextLink
                     href={`/finance/commission?ruleId=${item.commissionRule.ruleId}`}
-                    className="font-medium text-primary-600 hover:underline"
+                    className="font-medium"
                   >
                     {item.commissionRule.ruleName}
-                  </Link>
+                  </TextLink>
                   <p className="mt-0.5 text-muted">
                     {t("admin.operations.trades.commissionRuleMeta", {
                       version: item.commissionRule.ruleSetVersion,
@@ -76,7 +78,7 @@ export function TradePartyCard({
                 </div>
               )}
             </div>
-          </div>
+          </Panel>
         ))}
       </div>
     </SectionCard>

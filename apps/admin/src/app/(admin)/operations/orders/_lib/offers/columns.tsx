@@ -1,4 +1,5 @@
 import { Badge, offerStatusConfig, orderStatusConfig } from "@tarodan/ui";
+import { TextLink } from "@/components/TextLink";
 import { EyeIcon, XCircleIcon } from "@heroicons/react/24/outline";
 import type { useTranslations } from "next-intl";
 import { col, RowActionMenu, TruncatedText } from "@/components/table";
@@ -99,12 +100,13 @@ export function offerColumns({ t, onView, onCancel }: OfferColumnProps) {
       (o) =>
         o.order ? (
           <div className="flex min-w-0 flex-col items-start gap-1">
-            <a
+            <TextLink
               href={`/operations/orders/${o.order.id}`}
-              className="font-mono text-sm text-primary-600 hover:underline"
+              mono
+              className="text-sm"
             >
               {o.order.orderNumber}
-            </a>
+            </TextLink>
             <Badge
               status={o.order.status}
               config={statusConfig(orderStatusConfig, t)}

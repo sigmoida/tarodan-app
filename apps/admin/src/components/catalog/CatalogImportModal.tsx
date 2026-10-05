@@ -1,5 +1,6 @@
 "use client";
 
+import { fmtFileSize } from "@/lib/format";
 import { useTranslations } from "next-intl";
 import {
   Alert,
@@ -22,10 +23,7 @@ import {
   ExclamationTriangleIcon,
 } from "@heroicons/react/24/outline";
 import type { CatalogImportResource } from "@/lib/api/catalog-import.types";
-import {
-  formatFileSize,
-  useCatalogBulkImport,
-} from "@/hooks/useCatalogBulkImport";
+import { useCatalogBulkImport } from "@/hooks/useCatalogBulkImport";
 import { importColumnLabel } from "./import-columns";
 
 const XLSX_ACCEPT =
@@ -189,7 +187,7 @@ export function CatalogImportModal({
             remove: t("common.fileDropzone.remove"),
             busy: t("admin.catalog.import.processing"),
             hint: t("admin.catalog.import.dropzoneHint", {
-              size: formatFileSize(limits.maxFileBytes),
+              size: fmtFileSize(limits.maxFileBytes) ?? "",
             }),
           }}
         />

@@ -9,6 +9,8 @@ import {
 } from "@tarodan/shared";
 import { useTranslations } from "next-intl";
 import { adminApi } from "@/lib/api";
+import { Panel } from "@/components/detail/Panel";
+import { Eyebrow, SectionTitle } from "@/components/detail/SectionTitle";
 import { extractList } from "@/lib/extract";
 import { fmtTry } from "@/lib/format";
 import { adminKeys } from "@/lib/query/keys";
@@ -117,10 +119,10 @@ function BreakdownHeader({
   vat: string;
 }) {
   return (
-    <div className="grid grid-cols-[minmax(0,1fr)_auto_auto] gap-x-4 text-xs font-medium uppercase tracking-wide text-muted">
-      <span>{title}</span>
-      <span className="text-right">{amount}</span>
-      <span className="w-24 text-right">{vat}</span>
+    <div className="grid grid-cols-[minmax(0,1fr)_auto_auto] gap-x-4">
+      <Eyebrow>{title}</Eyebrow>
+      <Eyebrow className="text-right">{amount}</Eyebrow>
+      <Eyebrow className="w-24 text-right">{vat}</Eyebrow>
     </div>
   );
 }
@@ -240,7 +242,7 @@ export function RuleResolutionPreview({
         </p>
       </div>
 
-      <div className="rounded-lg border border-border bg-surface p-4">
+      <Panel>
         <div className="grid gap-3 md:grid-cols-[minmax(14rem,22rem)_1fr] md:items-end">
           <Select
             label={t("admin.finance.commission.examplePackageTier")}
@@ -276,10 +278,10 @@ export function RuleResolutionPreview({
             </p>
           </div>
         </div>
-      </div>
+      </Panel>
 
       <div className="grid gap-4 xl:grid-cols-2">
-        <div className="space-y-2 rounded-lg border border-border bg-surface p-4">
+        <Panel className="space-y-2">
           <BreakdownHeader
             title={t("admin.finance.commission.buyerSide")}
             amount={t("admin.finance.commission.lineAmount")}
@@ -312,9 +314,9 @@ export function RuleResolutionPreview({
             tone="text-primary-700"
             strong
           />
-        </div>
+        </Panel>
 
-        <div className="space-y-2 rounded-lg border border-border bg-surface p-4">
+        <Panel className="space-y-2">
           <BreakdownHeader
             title={t("admin.finance.commission.sellerSide")}
             amount={t("admin.finance.commission.lineAmount")}
@@ -350,14 +352,14 @@ export function RuleResolutionPreview({
             tone="text-success-700"
             strong
           />
-        </div>
+        </Panel>
       </div>
 
-      <div className="rounded-lg border border-border bg-surface p-4">
-        <h4 className="mb-3 font-medium text-heading">
+      <Panel>
+        <SectionTitle as="h4" className="mb-3">
           {t("admin.finance.commission.platformSplitTitle")}
-        </h4>
-        <div className="space-y-1.5 rounded-lg bg-surface-alt p-4">
+        </SectionTitle>
+        <Panel tone="muted" className="space-y-1.5">
           <BreakdownRow
             label={t("admin.finance.commission.grossRetained")}
             value={breakdown.platform.grossRetained}
@@ -403,18 +405,18 @@ export function RuleResolutionPreview({
               %{breakdown.platform.netTakeRate}
             </span>
           </div>
-        </div>
-      </div>
+        </Panel>
+      </Panel>
 
-      <div className="rounded-lg border border-border bg-surface p-4">
-        <h4 className="mb-3 font-medium text-heading">
+      <Panel>
+        <SectionTitle as="h4" className="mb-3">
           {t("admin.finance.commission.shippingSharePreview")}
-        </h4>
+        </SectionTitle>
         <div className="grid gap-2 sm:grid-cols-3">
           {(["small", "medium", "large"] as PackageTierCode[]).map((code) => {
             const buyer = Number(preview.shippingBuyerShares[code] ?? 0);
             return (
-              <div key={code} className="rounded-lg bg-surface-alt p-3">
+              <Panel key={code} tone="muted" padding="sm">
                 <p className="text-xs font-medium text-muted">
                   {tierLabels[code]}
                 </p>
@@ -424,13 +426,13 @@ export function RuleResolutionPreview({
                     seller: 100 - buyer,
                   })}
                 </p>
-              </div>
+              </Panel>
             );
           })}
         </div>
-      </div>
+      </Panel>
 
-      <div className="space-y-2 rounded-lg border border-border bg-surface p-3 text-xs">
+      <Panel padding="sm" className="space-y-2 text-xs">
         <div className="min-w-0">
           <span className="text-muted">
             {t("admin.finance.commission.ruleId")}:{" "}
@@ -447,7 +449,7 @@ export function RuleResolutionPreview({
             {preview.ruleSetId}
           </span>
         </div>
-      </div>
+      </Panel>
     </div>
   );
 }

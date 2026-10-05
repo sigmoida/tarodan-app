@@ -3,7 +3,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { adminApi } from "@/lib/api";
 import { adminKeys } from "@/lib/query/keys";
-import { fmtNumber } from "@/lib/format";
+import { fmtNumber, fmtPercent } from "@/lib/format";
 import { MetricCard } from "@/components/MetricCard";
 import { QueryErrorCard } from "@/components/page/QueryErrorCard";
 import { type Ad } from "../_lib/types";
@@ -26,7 +26,7 @@ export function AdsStats() {
         active: ads.filter((a) => a.isActive).length,
         clicks,
         impressions,
-        ctr: impressions > 0 ? ((clicks / impressions) * 100).toFixed(2) : "0",
+        ctr: impressions > 0 ? (clicks / impressions) * 100 : 0,
       };
     },
     staleTime: 30_000,
@@ -37,7 +37,7 @@ export function AdsStats() {
     active: 0,
     clicks: 0,
     impressions: 0,
-    ctr: "0",
+    ctr: 0,
   };
 
   if (isError) {
@@ -70,7 +70,7 @@ export function AdsStats() {
       />
       <MetricCard
         label={t("admin.marketing.ads.averageCtr")}
-        value={`${s.ctr}%`}
+        value={fmtPercent(s.ctr, 2)}
         loading={isLoading}
       />
     </div>

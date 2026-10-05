@@ -1,10 +1,29 @@
 import type { ColumnDef } from "@tanstack/react-table";
 import { describe, expect, it } from "vitest";
-import { computeColumnLayout } from "./columnLayout";
+import { computeColumnLayout, flattenColumns } from "./columnLayout";
 
 interface Row {
   id: string;
 }
+
+describe("flattenColumns", () => {
+  it("returns flat columns untouched", () => {
+    const cols: ColumnDef<Row, any>[] = [{ id: "a" }, { id: "b" }];
+    expect(flattenColumns(cols)).toEqual(cols);
+  });
+
+  it("expands grouped columns (nested too) into their leaves, in order", () => {
+    const cols: ColumnDef<Row, any>[] = [
+      { id: "a" },
+      {
+        header: "G",
+        columns: [{ id: "b" }, { header: "H", columns: [{ id: "c" }] }],
+      },
+      { id: "d" },
+    ];
+    expect(flattenColumns(cols).map((c) => c.id)).toEqual(["a", "b", "c", "d"]);
+  });
+});
 
 function col(meta: ColumnDef<Row, any>["meta"]): ColumnDef<Row, any> {
   return { id: JSON.stringify(meta), meta };

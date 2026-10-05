@@ -8,6 +8,7 @@ import {
   DeviceTabletIcon,
 } from "@heroicons/react/24/outline";
 import { col, type RowActionItem } from "@/components/table";
+import { fmtPercent } from "@/lib/format";
 import { type Ad, positionLabels, deviceLabels } from "./types";
 import type { useTranslations } from "next-intl";
 
@@ -122,7 +123,7 @@ export function adColumns(
               count: ad.impressionCount,
             })}
           </div>
-          <div className="text-primary-600">{ad.ctr}% CTR</div>
+          <div className="text-primary-600">{fmtPercent(ad.ctr, 2)} CTR</div>
         </div>
       ),
       { grow: 1, minWidth: 120, sortKey: "clickCount", sortType: "number" },

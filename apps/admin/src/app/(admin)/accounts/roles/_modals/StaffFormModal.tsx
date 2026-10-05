@@ -6,6 +6,7 @@ import { useTranslations } from "next-intl";
 import { Button } from "@tarodan/ui";
 import { FormModal, FormInput, FormSelect, useZodForm } from "@tarodan/ui/form";
 import { adminApi } from "@/lib/api";
+import { Panel } from "@/components/detail/Panel";
 import { useAdminMutation } from "@/hooks/useAdminMutation";
 import { ROLES, getRoleMeta, type RoleId } from "../_lib/constants";
 import { staffSchema, type StaffFormValues } from "../_lib/schema";
@@ -129,7 +130,7 @@ export function StaffFormModal({
       />
 
       {selectedRole && (
-        <div className="rounded-lg border border-border bg-surface-alt px-3 py-2 text-xs">
+        <Panel tone="muted" padding="sm" className="text-xs">
           <p className="font-medium text-heading">
             {roleMeta[selectedRole]?.label}
           </p>
@@ -154,7 +155,7 @@ export function StaffFormModal({
               </Button>
             </p>
           )}
-        </div>
+        </Panel>
       )}
     </FormModal>
   );

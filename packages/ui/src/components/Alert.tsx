@@ -1,32 +1,39 @@
-import React from 'react';
-import { cva, type VariantProps } from 'class-variance-authority';
-import { cn } from '../lib/utils';
+import React from "react";
+import { cva, type VariantProps } from "class-variance-authority";
+import { cn } from "../lib/utils";
 
-const alertVariants = cva('relative w-full rounded-lg border p-4', {
+const alertVariants = cva("relative w-full rounded-lg border p-4", {
   variants: {
     variant: {
-      default: 'bg-surface-elevated border-border text-heading',
-      info: 'bg-info-50 border-info-200 text-info-800',
-      success: 'bg-success-50 border-success-200 text-success-800',
-      warning: 'bg-warning-50 border-warning-200 text-warning-800',
-      danger: 'bg-danger-50 border-danger-200 text-danger-800',
+      default: "bg-surface-elevated border-border text-heading",
+      info: "bg-info-50 border-info-200 text-info-800",
+      success: "bg-success-50 border-success-200 text-success-800",
+      warning: "bg-warning-50 border-warning-200 text-warning-800",
+      danger: "bg-danger-50 border-danger-200 text-danger-800",
     },
   },
   defaultVariants: {
-    variant: 'default',
+    variant: "default",
   },
 });
 
 export interface AlertProps
-  extends React.HTMLAttributes<HTMLDivElement>,
+  extends
+    Omit<React.HTMLAttributes<HTMLDivElement>, "title">,
     VariantProps<typeof alertVariants> {
-  title?: string;
+  /** Plain text or rich content (e.g. text with an inline badge). */
+  title?: React.ReactNode;
   icon?: React.ReactNode;
   onClose?: () => void;
+  /** Rendered below the body — typically buttons. */
+  action?: React.ReactNode;
 }
 
 export const Alert = React.forwardRef<HTMLDivElement, AlertProps>(
-  ({ className, variant, title, icon, onClose, children, ...props }, ref) => {
+  (
+    { className, variant, title, icon, onClose, action, children, ...props },
+    ref,
+  ) => {
     return (
       <div
         ref={ref}
@@ -43,6 +50,11 @@ export const Alert = React.forwardRef<HTMLDivElement, AlertProps>(
               </h5>
             )}
             <div className="text-sm [&_p]:leading-relaxed">{children}</div>
+            {action && (
+              <div className="mt-3 flex flex-wrap items-center gap-2">
+                {action}
+              </div>
+            )}
           </div>
           {onClose && (
             <button
@@ -72,4 +84,4 @@ export const Alert = React.forwardRef<HTMLDivElement, AlertProps>(
   },
 );
 
-Alert.displayName = 'Alert';
+Alert.displayName = "Alert";

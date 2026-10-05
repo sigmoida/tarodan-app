@@ -20,6 +20,7 @@ import { QueuesZone } from "./_components/QueuesZone";
 import { AlertsZone } from "./_components/AlertsZone";
 import { DashboardStats } from "./_components/DashboardStats";
 import { ListingRemovalsPanel } from "./_components/ListingRemovalsPanel";
+import { ZoneHeader } from "./_components/ZoneHeader";
 import { StockZone } from "./_components/StockZone";
 import { RecentOrders } from "./_components/RecentOrders";
 import { RecentTrades } from "./_components/RecentTrades";
@@ -47,15 +48,15 @@ function PeriodZone({
 
   return (
     <section className="flex flex-col gap-3">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <h2 className="text-lg font-semibold text-heading">
-          {t("admin.dashboard.zones.period")}
-        </h2>
-        <DashboardPeriodFilter
-          selection={selection}
-          onChange={onSelectionChange}
-        />
-      </div>
+      <ZoneHeader
+        title={t("admin.dashboard.zones.period")}
+        actions={
+          <DashboardPeriodFilter
+            selection={selection}
+            onChange={onSelectionChange}
+          />
+        }
+      />
       <DashboardStats
         metrics={stats.data?.metrics ?? EMPTY_METRICS}
         isLoading={stats.isLoading}

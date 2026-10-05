@@ -1,3 +1,4 @@
+import { TextLink } from "@/components/TextLink";
 import { Empty, TruncatedText } from "@/components/table";
 
 /**
@@ -13,13 +14,8 @@ export function ExternalUrlCell({
 }) {
   if (!href) return <Empty />;
   return (
-    <a
-      href={href}
-      target="_blank"
-      rel="noopener noreferrer"
-      className="block text-primary-600 hover:underline"
-    >
+    <TextLink href={href} external className="block">
       <TruncatedText>{label || href}</TruncatedText>
-    </a>
+    </TextLink>
   );
 }

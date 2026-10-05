@@ -1,9 +1,11 @@
 import { CheckCircleIcon } from "@heroicons/react/24/outline";
 import { useTranslations } from "next-intl";
-import { Badge } from "@tarodan/ui";
+import { Alert, Badge } from "@tarodan/ui";
 import { MaskedValue } from "@/components/MaskedValue";
 import { fmtDate, fmtDateTime } from "@/lib/format";
 import { SectionCard } from "@/components/detail/SectionCard";
+import { DataList, Field } from "@/components/detail/DataList";
+import { SectionTitle } from "@/components/detail/SectionTitle";
 import { type UserDetail } from "../types";
 
 /** "Doğrulanmış" tek başına neyin doğrulandığını söylemiyordu; rozet kanalını da söyler. */
@@ -29,29 +31,12 @@ function Verified({ kind, ok }: { kind: "email" | "phone"; ok: boolean }) {
   );
 }
 
-function Item({
-  label,
-  children,
-  className,
-}: {
-  label: string;
-  children: React.ReactNode;
-  className?: string;
-}) {
-  return (
-    <div className={className}>
-      <p className="text-sm text-muted">{label}</p>
-      {children}
-    </div>
-  );
-}
-
 export function UserInfoSection({ user }: { user: UserDetail }) {
   const t = useTranslations();
   return (
     <SectionCard title={t("admin.users.detail.infoTitle")}>
-      <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
-        <Item label={t("admin.users.detail.emailLabel")}>
+      <DataList columns={2}>
+        <Field layout="stacked" label={t("admin.users.detail.emailLabel")}>
           <p className="font-medium text-heading">{user.email}</p>
           <Verified kind="email" ok={user.isEmailVerified} />
           {user.isTestAccount && (
@@ -60,77 +45,98 @@ export function UserInfoSection({ user }: { user: UserDetail }) {
               {t("admin.users.testAccountHint")}
             </Badge>
           )}
-        </Item>
-        <Item label={t("common.phone")}>
+        </Field>
+        <Field layout="stacked" label={t("common.phone")}>
           <p className="font-medium text-heading">
             {user.phone || t("admin.operations.common.notSpecified")}
           </p>
           {user.phone && <Verified kind="phone" ok={user.isPhoneVerified} />}
-        </Item>
-        <Item label={t("admin.users.registeredAt")}>
+        </Field>
+        <Field layout="stacked" label={t("admin.users.registeredAt")}>
           <p className="text-heading">{fmtDate(user.createdAt)}</p>
-        </Item>
-        <Item label={t("admin.users.lastLogin")}>
+        </Field>
+        <Field layout="stacked" label={t("admin.users.lastLogin")}>
           <p className="text-heading">
             {user.lastLoginAt
               ? fmtDateTime(user.lastLoginAt)
               : t("admin.users.neverLoggedIn")}
           </p>
-        </Item>
-      </div>
+        </Field>
+      </DataList>
 
       {user.isSeller && (
         <div className="mt-6 border-t border-border pt-6">
-          <h3 className="mb-3 text-sm font-semibold text-heading">
+          <SectionTitle as="h3" size="sm" className="mb-3">
             {t("admin.users.detail.sellerInfoTitle")}
-          </h3>
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <Item label={t("admin.users.detail.sellerTypeLabel")}>
+          </SectionTitle>
+          <DataList columns={2}>
+            <Field
+              layout="stacked"
+              label={t("admin.users.detail.sellerTypeLabel")}
+            >
               <p className="text-heading">
                 {user.sellerType === "individual"
                   ? t("admin.users.detail.individual")
                   : t("admin.users.detail.corporate")}
               </p>
-            </Item>
+            </Field>
             {user.companyName && (
-              <Item label={t("admin.users.detail.companyNameLabel")}>
+              <Field
+                layout="stacked"
+                label={t("admin.users.detail.companyNameLabel")}
+              >
                 <p className="text-heading">{user.companyName}</p>
-              </Item>
+              </Field>
             )}
             {user.taxId && (
-              <Item label={t("admin.users.detail.taxIdLabel")}>
+              <Field
+                layout="stacked"
+                label={t("admin.users.detail.taxIdLabel")}
+              >
                 <p className="text-heading">{user.taxId}</p>
-              </Item>
+              </Field>
             )}
-          </div>
+          </DataList>
 
           <div className="mt-4 border-t border-border pt-4">
-            <h4 className="mb-3 text-sm font-semibold text-heading">
+            <SectionTitle as="h4" size="sm" className="mb-3">
               {t("admin.users.detail.bankAccountTitle")}
-            </h4>
+            </SectionTitle>
             {user.bankAccount ? (
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                <Item label={t("admin.users.detail.accountHolderLabel")}>
+              <DataList columns={2}>
+                <Field
+                  layout="stacked"
+                  label={t("admin.users.detail.accountHolderLabel")}
+                >
                   <p className="text-heading">
                     {user.bankAccount.accountHolder}
                   </p>
-                </Item>
-                <Item label={t("admin.users.detail.ibanLabel")}>
+                </Field>
+                <Field
+                  layout="stacked"
+                  label={t("admin.users.detail.ibanLabel")}
+                >
                   <MaskedValue value={user.bankAccount.iban} />
-                </Item>
+                </Field>
                 {user.bankAccount.tcKimlikNo && (
-                  <Item label={t("admin.users.detail.tcKimlikNoLabel")}>
+                  <Field
+                    layout="stacked"
+                    label={t("admin.users.detail.tcKimlikNoLabel")}
+                  >
                     <MaskedValue value={user.bankAccount.tcKimlikNo} />
-                  </Item>
+                  </Field>
                 )}
                 {user.bankAccount.taxId && (
-                  <Item label={t("admin.users.detail.taxIdLabel")}>
+                  <Field
+                    layout="stacked"
+                    label={t("admin.users.detail.taxIdLabel")}
+                  >
                     <p className="font-mono text-heading">
                       {user.bankAccount.taxId}
                     </p>
-                  </Item>
+                  </Field>
                 )}
-              </div>
+              </DataList>
             ) : (
               <p className="text-sm text-muted">
                 {t("admin.users.detail.noBankAccount")}
@@ -142,20 +148,20 @@ export function UserInfoSection({ user }: { user: UserDetail }) {
 
       {user.isBanned && (
         <div className="mt-6 border-t border-border pt-6">
-          <div className="rounded-lg border border-danger-500/30 bg-danger-500/10 p-4">
-            <p className="font-medium text-danger-600">
-              {t("admin.users.detail.banReasonLabel")}
-            </p>
-            <p className="mt-1 text-heading">
+          <Alert
+            variant="danger"
+            title={t("admin.users.detail.banReasonLabel")}
+          >
+            <p className="text-heading">
               {user.bannedReason || t("admin.operations.common.notSpecified")}
             </p>
             {user.bannedAt && (
-              <p className="mt-2 text-sm text-danger-600">
+              <p className="mt-2 text-sm">
                 {t("admin.users.detail.banDateLabel")}{" "}
                 {fmtDateTime(user.bannedAt)}
               </p>
             )}
-          </div>
+          </Alert>
         </div>
       )}
     </SectionCard>

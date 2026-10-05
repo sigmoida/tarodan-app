@@ -2,7 +2,7 @@
 
 import { useState, type ComponentType } from "react";
 import clsx from "clsx";
-import { Button } from "@tarodan/ui";
+import { Button, EmptyState } from "@tarodan/ui";
 import {
   FormDateTimePicker,
   FormInput,
@@ -20,6 +20,8 @@ import {
 } from "@heroicons/react/24/outline";
 import { adminApi } from "@/lib/api";
 import { useAdminMutation } from "@/hooks/useAdminMutation";
+import { DataList, Field } from "@/components/detail/DataList";
+import { Panel } from "@/components/detail/Panel";
 import { SectionCard } from "@/components/detail/SectionCard";
 import { EmailHtmlEditor } from "@/components/email/EmailHtmlEditor";
 import { EmailPreviewPane } from "@/components/email/EmailPreviewPane";
@@ -342,7 +344,10 @@ export function SendNotificationForm({
               {values.targetType === "user_ids" && <UserPicker />}
 
               {values.targetType === "segment" && (
-                <div className="grid grid-cols-1 gap-4 rounded-xl border border-border bg-surface-alt p-4 sm:grid-cols-2">
+                <Panel
+                  tone="muted"
+                  className="grid grid-cols-1 gap-4 sm:grid-cols-2"
+                >
                   <FormSelect
                     name="isSeller"
                     label={t("admin.marketing.notifications.sellerStatus")}
@@ -375,7 +380,7 @@ export function SendNotificationForm({
                       { value: "business", label: "Business" },
                     ]}
                   />
-                </div>
+                </Panel>
               )}
             </SectionCard>
 
@@ -447,55 +452,51 @@ export function SendNotificationForm({
                       onRetry={emailPreview.refetch}
                     />
                   ) : (
-                    <p className="rounded-xl border border-dashed border-border bg-surface-alt px-4 py-6 text-center text-xs italic text-subtle">
-                      {t("admin.marketing.notifications.emailPreviewEmpty")}
-                    </p>
+                    <EmptyState
+                      size="compact"
+                      icon={false}
+                      title={t(
+                        "admin.marketing.notifications.emailPreviewEmpty",
+                      )}
+                    />
                   )}
                 </div>
               )}
 
               {values.channels.length === 0 && (
-                <div className="py-8 text-center text-muted">
-                  <BellIcon className="mx-auto mb-2 h-10 w-10 text-subtle" />
-                  <p className="text-sm">
-                    {t("admin.marketing.notifications.selectPreviewChannel")}
-                  </p>
-                </div>
+                <EmptyState
+                  size="compact"
+                  icon={<BellIcon className="h-6 w-6" />}
+                  title={t(
+                    "admin.marketing.notifications.selectPreviewChannel",
+                  )}
+                />
               )}
 
-              <div className="space-y-2 border-t border-border pt-2">
-                <div className="flex justify-between text-xs">
-                  <span className="text-muted">
-                    {t("admin.marketing.notifications.targetLabel")}
-                  </span>
-                  <span className="font-medium text-body">
-                    {
-                      targets.find((target) => target.key === values.targetType)
-                        ?.label
-                    }
-                  </span>
-                </div>
-                <div className="flex justify-between text-xs">
-                  <span className="text-muted">
-                    {t("admin.marketing.notifications.channels")}
-                  </span>
-                  <span className="font-medium text-body">
-                    {values.channels.length === 0
-                      ? "—"
-                      : values.channels
-                          .map(
-                            (channel) =>
-                              channels.find((item) => item.key === channel)
-                                ?.label,
-                          )
-                          .join(", ")}
-                  </span>
-                </div>
-                <div className="flex justify-between text-xs">
-                  <span className="text-muted">{t("common.status")}</span>
+              <DataList
+                columns={1}
+                className="gap-y-2 border-t border-border pt-2"
+              >
+                <Field label={t("admin.marketing.notifications.targetLabel")}>
+                  {
+                    targets.find((target) => target.key === values.targetType)
+                      ?.label
+                  }
+                </Field>
+                <Field label={t("admin.marketing.notifications.channels")}>
+                  {values.channels.length === 0
+                    ? "—"
+                    : values.channels
+                        .map(
+                          (channel) =>
+                            channels.find((item) => item.key === channel)
+                              ?.label,
+                        )
+                        .join(", ")}
+                </Field>
+                <Field label={t("common.status")}>
                   <span
                     className={clsx(
-                      "font-medium",
                       canSend ? "text-success-600" : "text-warning-600",
                     )}
                   >
@@ -503,8 +504,8 @@ export function SendNotificationForm({
                       ? t("admin.marketing.notifications.ready")
                       : t("admin.marketing.notifications.missingFields")}
                   </span>
-                </div>
-              </div>
+                </Field>
+              </DataList>
             </SectionCard>
           </div>
         </div>

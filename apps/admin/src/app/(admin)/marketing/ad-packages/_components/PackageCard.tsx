@@ -1,7 +1,11 @@
 "use client";
 
-import { Badge, Button } from "@tarodan/ui";
+import { useMemo } from "react";
+import { Badge, Button, EmptyState } from "@tarodan/ui";
 import { PencilSquareIcon, TrashIcon } from "@heroicons/react/24/outline";
+import { DataTable } from "@/components/DataTable";
+import { SectionCard } from "@/components/detail/SectionCard";
+import { col } from "@/components/table";
 import { fmtTry } from "@/lib/format";
 import { useTranslations } from "next-intl";
 import {
@@ -11,6 +15,8 @@ import {
 } from "../_lib/types";
 
 const rangeKey = (t: AdPackageTier) => `${t.minAmount}|${t.maxAmount ?? "∞"}`;
+
+type PriceRange = { key: string; min: number; max: number | null };
 
 /** Unique product-price ranges across a package's tiers, sorted by lower bound. */
 function priceRanges(pkg: AdPackage) {
@@ -51,41 +57,73 @@ export function PackageCard({
     byCell.set(`${rangeKey(tier)}#${tier.durationDays}`, tier);
   }
 
+  // Fiyat aralığı sütunu + süre başına bir fiyat sütunu.
+  const columns = useMemo(
+    () => [
+      col.text<PriceRange>(t("admin.marketing.adPackages.priceRange"), (r) =>
+        rangeLabel(r, t("admin.marketing.adPackages.unlimited")),
+      ),
+      ...durations.map((d) =>
+        col.custom<PriceRange>(
+          `${d} ${t("admin.marketing.adPackages.days")}`,
+          (r) => {
+            const tier = byCell.get(`${r.key}#${d}`);
+            if (!tier) return <span className="text-subtle">—</span>;
+            return tier.campaignPrice != null ? (
+              <span className="flex items-center justify-end gap-1.5 tabular-nums">
+                <span className="text-xs text-subtle line-through">
+                  {fmtTry(tier.price)}
+                </span>
+                <span className="font-semibold text-primary">
+                  {fmtTry(tier.campaignPrice)}
+                </span>
+              </span>
+            ) : (
+              <span className="font-medium tabular-nums text-heading">
+                {fmtTry(tier.price)}
+              </span>
+            );
+          },
+          { id: `duration-${d}`, align: "right" },
+        ),
+      ),
+    ],
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [pkg, t],
+  );
+
   return (
-    <div className="rounded-xl border border-border bg-surface p-4 shadow-sm">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div className="min-w-0">
-          <div className="flex flex-wrap items-center gap-2">
-            <h3 className="truncate text-base font-semibold text-heading">
-              {pkg.name}
-            </h3>
-            {pkg.showcaseOnHome && (
-              <Badge variant="default" size="sm">
-                {t("admin.marketing.adPackages.showcaseBadge")}
-              </Badge>
-            )}
-            <Badge variant={pkg.isActive ? "success" : "outline"} size="sm">
-              {pkg.isActive ? t("common.active") : t("common.inactive")}
+    <SectionCard
+      title={
+        <span className="flex flex-wrap items-center gap-2">
+          <span className="truncate">{pkg.name}</span>
+          {pkg.showcaseOnHome && (
+            <Badge variant="default" size="sm">
+              {t("admin.marketing.adPackages.showcaseBadge")}
             </Badge>
-            <Badge variant="outline" size="sm">
-              {pkg.audienceMode === "everyone"
-                ? t("admin.marketing.adPackages.audienceEveryone")
-                : pkg.audienceMode === "membership_tiers"
-                  ? t("admin.marketing.adPackages.audienceTierCount", {
-                      count: pkg.targetTierTypes.length,
+          )}
+          <Badge variant={pkg.isActive ? "success" : "outline"} size="sm">
+            {pkg.isActive ? t("common.active") : t("common.inactive")}
+          </Badge>
+          <Badge variant="outline" size="sm">
+            {pkg.audienceMode === "everyone"
+              ? t("admin.marketing.adPackages.audienceEveryone")
+              : pkg.audienceMode === "membership_tiers"
+                ? t("admin.marketing.adPackages.audienceTierCount", {
+                    count: pkg.targetTierTypes.length,
+                  })
+                : pkg.audienceMode === "specific_users"
+                  ? t("admin.marketing.adPackages.audienceUserCount", {
+                      count: pkg.targetUsers.length,
                     })
-                  : pkg.audienceMode === "specific_users"
-                    ? t("admin.marketing.adPackages.audienceUserCount", {
-                        count: pkg.targetUsers.length,
-                      })
-                    : t("admin.marketing.adPackages.audienceMixedCount", {
-                        tiers: pkg.targetTierTypes.length,
-                        users: pkg.targetUsers.length,
-                      })}
-            </Badge>
-          </div>
-          <p className="mt-0.5 font-mono text-xs text-muted">{pkg.slug}</p>
-        </div>
+                  : t("admin.marketing.adPackages.audienceMixedCount", {
+                      tiers: pkg.targetTierTypes.length,
+                      users: pkg.targetUsers.length,
+                    })}
+          </Badge>
+        </span>
+      }
+      actions={
         <div className="flex items-center gap-1">
           <Button
             type="button"
@@ -106,73 +144,24 @@ export function PackageCard({
             <TrashIcon className="h-4 w-4 text-danger" />
           </Button>
         </div>
-      </div>
+      }
+    >
+      <p className="-mt-2 mb-4 font-mono text-xs text-muted">{pkg.slug}</p>
 
       {pkg.tiers.length === 0 ? (
-        <p className="mt-4 text-sm text-muted">
-          {t("admin.marketing.adPackages.noTiers")}
-        </p>
+        <EmptyState
+          size="compact"
+          icon={false}
+          title={t("admin.marketing.adPackages.noTiers")}
+        />
       ) : (
-        <div className="mt-4 overflow-x-auto">
-          <table className="w-full border-collapse text-sm">
-            <thead>
-              <tr className="border-b border-border text-left text-xs text-muted">
-                <th className="py-2 pr-3 font-medium">
-                  {t("admin.marketing.adPackages.priceRange")}
-                </th>
-                {durations.map((d) => (
-                  <th key={d} className="px-3 py-2 text-right font-medium">
-                    {d} {t("admin.marketing.adPackages.days")}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {ranges.map((r) => (
-                <tr key={r.key} className="border-b border-border/60">
-                  <td className="py-2 pr-3 text-body">
-                    {rangeLabel(r, t("admin.marketing.adPackages.unlimited"))}
-                  </td>
-                  {durations.map((d) => {
-                    const tier = byCell.get(`${r.key}#${d}`);
-                    if (!tier)
-                      return (
-                        <td
-                          key={d}
-                          className="px-3 py-2 text-right text-subtle"
-                        >
-                          —
-                        </td>
-                      );
-                    const hasCampaign = tier.campaignPrice != null;
-                    return (
-                      <td
-                        key={d}
-                        className="px-3 py-2 text-right tabular-nums text-heading"
-                      >
-                        {hasCampaign ? (
-                          <span className="flex items-center justify-end gap-1.5">
-                            <span className="text-xs text-subtle line-through">
-                              {fmtTry(tier.price)}
-                            </span>
-                            <span className="font-semibold text-primary">
-                              {fmtTry(tier.campaignPrice)}
-                            </span>
-                          </span>
-                        ) : (
-                          <span className="font-medium">
-                            {fmtTry(tier.price)}
-                          </span>
-                        )}
-                      </td>
-                    );
-                  })}
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+        <DataTable
+          dense
+          columns={columns}
+          data={ranges}
+          getRowId={(r) => r.key}
+        />
       )}
-    </div>
+    </SectionCard>
   );
 }

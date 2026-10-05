@@ -11,6 +11,7 @@ import {
 import { Avatar, IconButton } from "@tarodan/ui";
 import { cn } from "@/lib/utils";
 import { fmtDate, fmtDateTime, fmtNumber, fmtTime, fmtTry } from "@/lib/format";
+import { TextLink } from "@/components/TextLink";
 import { TruncatedText } from "./TruncatedText";
 
 /**
@@ -182,9 +183,9 @@ export function CellLink({
 }) {
   if (!href || label == null || label === "") return <Empty />;
   return (
-    <Link href={href} className="block text-primary-600 hover:underline">
+    <TextLink href={href} className="block">
       <TruncatedText>{label}</TruncatedText>
-    </Link>
+    </TextLink>
   );
 }
 

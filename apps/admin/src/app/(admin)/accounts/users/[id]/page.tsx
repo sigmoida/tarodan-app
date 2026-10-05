@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { useParams } from "next/navigation";
 import { StarIcon } from "@heroicons/react/24/outline";
 import { useTranslations } from "next-intl";
@@ -8,6 +7,8 @@ import { Alert, Badge, Button, accountStatusConfig } from "@tarodan/ui";
 import { adminApi } from "@/lib/api";
 import { statusConfig } from "@/lib/statusLabels";
 import { DetailPage } from "@/components/detail/DetailPage";
+import { DetailLayout } from "@/components/detail/DetailLayout";
+import { TextLink } from "@/components/TextLink";
 import { type UserDetail } from "./types";
 import { UserStats } from "./_sections/UserStats";
 import { UserInfoSection } from "./_sections/UserInfoSection";
@@ -89,24 +90,24 @@ export default function UserDetailPage() {
           {u.staff && (
             <Alert variant="warning" className="mb-4">
               {t("admin.users.staffAccountNotice", { role: u.staff.role })}{" "}
-              <Link href="/accounts/roles" className="font-medium underline">
+              <TextLink href="/accounts/roles">
                 {t("admin.users.staffAccountLink")}
-              </Link>
+              </TextLink>
             </Alert>
           )}
           {u.stats && <UserStats stats={u.stats} />}
-          <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-            <div className="space-y-6 lg:col-span-2">
-              <UserInfoSection user={u} />
-              <LegalIdentitySection user={u} />
-              <MembershipSection userId={u.id} membership={u.membership} />
-              <UserActivityTabs userId={u.id} user={u} />
-              <ConsentsSection userId={u.id} />
-            </div>
-            <div className="space-y-6">
-              <UserSidebar user={u} />
-            </div>
-          </div>
+          <DetailLayout
+            main={
+              <>
+                <UserInfoSection user={u} />
+                <LegalIdentitySection user={u} />
+                <MembershipSection userId={u.id} membership={u.membership} />
+                <UserActivityTabs userId={u.id} user={u} />
+                <ConsentsSection userId={u.id} />
+              </>
+            }
+            aside={<UserSidebar user={u} />}
+          />
         </>
       )}
     </DetailPage>

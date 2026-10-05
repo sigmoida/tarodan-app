@@ -5,6 +5,7 @@ import { Badge } from "@tarodan/ui";
 import type { DashboardStockResponse } from "@tarodan/types";
 import { MetricCard } from "@/components/MetricCard";
 import { fmtNumber, fmtTry } from "@/lib/format";
+import { ZoneHeader } from "./ZoneHeader";
 import { STOCK_CARDS } from "../_lib/zoneConfig";
 
 const FORMATTERS = {
@@ -28,9 +29,7 @@ export function StockZone({
 
   return (
     <section className="flex flex-col gap-3">
-      <h2 className="text-lg font-semibold text-heading">
-        {t("admin.dashboard.zones.stock")}
-      </h2>
+      <ZoneHeader title={t("admin.dashboard.zones.stock")} />
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {STOCK_CARDS.map((card) => (
           <MetricCard

@@ -18,7 +18,7 @@ Rule: if a shared component exists for a visual thing, pages must use it; no han
    `Eyebrow({ children: ReactNode; className?: string })` from the same file — `text-xs font-semibold uppercase tracking-wide text-muted`.
 
 4. `@/components/TextLink`
-   `TextLink({ href: string; children: ReactNode; external?: boolean; mono?: boolean; className?: string } )` — next/link (or `<a target="_blank" rel="noreferrer">` when external); `text-primary-600 underline underline-offset-2 hover:text-primary-700`. `CellLink` in `components/table/cells.tsx` is re-implemented on top of it.
+   `TextLink({ href: string; children: ReactNode; external?: boolean; mono?: boolean; title?: string; className?: string } )` — next/link (or `<a target="_blank" rel="noreferrer">` when external); `text-primary-600 underline underline-offset-2 hover:text-primary-700`. `CellLink` in `components/table/cells.tsx` is re-implemented on top of it.
 
 5. `@/components/detail/DetailLayout`
    `DetailLayout({ main: ReactNode; aside?: ReactNode; className?: string })` — `grid grid-cols-1 gap-6 lg:grid-cols-3`; main is `space-y-6 lg:col-span-2` (full width when there is no aside); aside is `space-y-6`.
@@ -33,7 +33,7 @@ Rule: if a shared component exists for a visual thing, pages must use it; no han
    `fmtFileSize(bytes?: number | null): string | undefined` → "1,2 MB".
    All dates/money/percent/file sizes in the UI go through this file; no ad hoc toLocaleString/date-fns formatting.
 
-9. `@/components/DataTable` (exists). NEW optional props: `footer?: ReactNode` (rendered inside `<tfoot>`; caller passes `TableRow`/`TableCell` from `@tarodan/ui`, e.g. a totals row), `dense?: boolean` (tighter row padding for embedded tables). Column groups: pass tanstack grouped columns (`{ header, columns: [...] }`); the header-group rows are rendered. Every `<table>` in admin goes through DataTable, except `PermissionMatrixGrid` (documented exception).
+9. `@/components/DataTable` (exists). NEW optional props: `footer?: ReactNode` (rendered inside `<tfoot>`; caller passes `TableRow`/`TableCell` from `@tarodan/ui`, e.g. a totals row), `dense?: boolean` (a table embedded INSIDE a card: tighter rows and no frame/shadow of its own, so there is never a border inside a border). Column groups: pass tanstack grouped columns (`{ header, columns: [...] }`); the header-group rows are rendered. Every `<table>` in admin goes through DataTable, except `PermissionMatrixGrid` (documented exception).
 
 10. Already existing, to be used instead of hand-rolled equivalents: `EmptyState` (`size="compact"` inside cards), `Spinner`, `Skeleton`, `Avatar`, `Badge` (variants: default, success, warning, danger, outline — nothing else exists), `Button`/`IconButton`, `MetricCard` (`@/components/MetricCard`: label, value, optional change/footer; no icon), `SectionCard`, `PageHeader`, `AdminTabs` (no icons; `badge` renders as "Label (n)").
 

@@ -2,8 +2,7 @@
 
 "use client";
 
-import { useState } from "react";
-import Link from "next/link";
+import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import {
   Badge,
@@ -19,10 +18,11 @@ import { useTranslations } from "next-intl";
 import { adminApi } from "@/lib/api";
 import { adminKeys } from "@/lib/query/keys";
 import { extractList } from "@/lib/extract";
-import { fmtDateTime, fmtTry } from "@/lib/format";
 import { useSession } from "@/context/SessionContext";
 import { useAdminMutation } from "@/hooks/useAdminMutation";
-import { SectionCard } from "@/components/detail/SectionCard";
+import { DataTable } from "@/components/DataTable";
+import { TextLink } from "@/components/TextLink";
+import { col } from "@/components/table/columns";
 
 type Resolution = "provider_succeeded" | "provider_not_processed";
 
@@ -58,6 +58,85 @@ export function ReconciliationTab() {
       ),
   });
 
+  const columns = useMemo(
+    () => [
+      col.custom(
+        t("admin.finance.payments.refundReconciliation.target"),
+        (attempt: RefundAttempt) => {
+          const href = attempt.order
+            ? `/operations/orders/${attempt.order.id}`
+            : attempt.trade
+              ? `/operations/trades/${attempt.trade.id}`
+              : null;
+          const label =
+            attempt.order?.orderNumber ??
+            attempt.trade?.tradeNumber ??
+            attempt.id;
+          // Paylaşılan grup ödemesinin kısmi iadesi: satır hangi sepete
+          // ait olduğunu ve ödemeyi söylemek zorunda (R3).
+          const groupNumber =
+            attempt.payment?.checkoutGroup?.groupNumber ?? null;
+          return (
+            <>
+              <span className="font-medium text-heading">
+                {href ? <TextLink href={href}>{label}</TextLink> : label}
+              </span>
+              {groupNumber && attempt.payment && (
+                <TextLink
+                  href={`/finance/payments/${attempt.payment.id}`}
+                  className="block text-xs"
+                >
+                  #{groupNumber}
+                </TextLink>
+              )}
+            </>
+          );
+        },
+      ),
+      col.badge(
+        t("admin.finance.payments.provider"),
+        (attempt: RefundAttempt) => (
+          <Badge variant="outline" size="sm">
+            {attempt.provider}
+          </Badge>
+        ),
+      ),
+      col.money(
+        t("admin.finance.payments.totalAmount"),
+        (attempt: RefundAttempt) => Number(attempt.amount),
+      ),
+      col.code(
+        t("admin.finance.payments.refundReconciliation.providerReference"),
+        (attempt: RefundAttempt) => attempt.providerReference,
+      ),
+      col.custom(
+        t("admin.finance.payments.failureReason"),
+        (attempt: RefundAttempt) => (
+          <span className="text-danger-700">
+            {attempt.failureReason ?? "-"}
+          </span>
+        ),
+      ),
+      col.date(
+        t("admin.finance.payments.paymentDate"),
+        (attempt: RefundAttempt) => attempt.updatedAt,
+        {
+          withTime: true,
+        },
+      ),
+      col.actions(
+        (attempt: RefundAttempt) =>
+          canResolve ? (
+            <Button size="sm" onClick={() => setSelected(attempt)}>
+              {t("admin.finance.payments.refundReconciliation.resolve")}
+            </Button>
+          ) : null,
+        { header: t("common.actions"), minWidth: 160 },
+      ),
+    ],
+    [t, canResolve],
+  );
+
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between gap-3">
@@ -74,116 +153,13 @@ export function ReconciliationTab() {
         </Button>
       </div>
 
-      <SectionCard bodyClassName="overflow-x-auto">
-        {query.isLoading ? (
-          <p className="py-8 text-center text-muted">{t("common.loading")}</p>
-        ) : (query.data?.length ?? 0) === 0 ? (
-          <p className="py-8 text-center text-muted">
-            {t("admin.finance.payments.refundReconciliation.empty")}
-          </p>
-        ) : (
-          <table className="w-full min-w-[880px] text-sm">
-            <thead>
-              <tr className="border-b border-border text-left text-muted">
-                <th className="px-3 py-3 font-medium">
-                  {t("admin.finance.payments.refundReconciliation.target")}
-                </th>
-                <th className="px-3 py-3 font-medium">
-                  {t("admin.finance.payments.provider")}
-                </th>
-                <th className="px-3 py-3 font-medium">
-                  {t("admin.finance.payments.totalAmount")}
-                </th>
-                <th className="px-3 py-3 font-medium">
-                  {t(
-                    "admin.finance.payments.refundReconciliation.providerReference",
-                  )}
-                </th>
-                <th className="px-3 py-3 font-medium">
-                  {t("admin.finance.payments.failureReason")}
-                </th>
-                <th className="px-3 py-3 font-medium">
-                  {t("admin.finance.payments.paymentDate")}
-                </th>
-                <th className="px-3 py-3 text-right font-medium">
-                  {t("common.actions")}
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {query.data?.map((attempt) => {
-                const target = attempt.order ?? attempt.trade;
-                const href = attempt.order
-                  ? `/operations/orders/${attempt.order.id}`
-                  : attempt.trade
-                    ? `/operations/trades/${attempt.trade.id}`
-                    : null;
-                const label =
-                  attempt.order?.orderNumber ??
-                  attempt.trade?.tradeNumber ??
-                  attempt.id;
-                // Paylaşılan grup ödemesinin kısmi iadesi: satır hangi sepete
-                // ait olduğunu ve ödemeyi söylemek zorunda (R3).
-                const groupNumber =
-                  attempt.payment?.checkoutGroup?.groupNumber ?? null;
-                return (
-                  <tr
-                    key={attempt.id}
-                    className="border-b border-border last:border-0"
-                  >
-                    <td className="px-3 py-3 font-medium text-heading">
-                      {href && target ? (
-                        <Link
-                          className="text-primary-600 hover:underline"
-                          href={href}
-                        >
-                          {label}
-                        </Link>
-                      ) : (
-                        label
-                      )}
-                      {groupNumber && attempt.payment && (
-                        <Link
-                          href={`/finance/payments/${attempt.payment.id}`}
-                          className="block text-xs text-muted hover:text-primary-600"
-                        >
-                          #{groupNumber}
-                        </Link>
-                      )}
-                    </td>
-                    <td className="px-3 py-3">
-                      <Badge variant="outline" size="sm">
-                        {attempt.provider}
-                      </Badge>
-                    </td>
-                    <td className="px-3 py-3">
-                      {fmtTry(Number(attempt.amount))}
-                    </td>
-                    <td className="px-3 py-3 font-mono text-xs">
-                      {attempt.providerReference ?? "-"}
-                    </td>
-                    <td className="max-w-64 px-3 py-3 text-danger-700">
-                      {attempt.failureReason ?? "-"}
-                    </td>
-                    <td className="px-3 py-3">
-                      {fmtDateTime(attempt.updatedAt)}
-                    </td>
-                    <td className="px-3 py-3 text-right">
-                      {canResolve && (
-                        <Button size="sm" onClick={() => setSelected(attempt)}>
-                          {t(
-                            "admin.finance.payments.refundReconciliation.resolve",
-                          )}
-                        </Button>
-                      )}
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        )}
-      </SectionCard>
+      <DataTable
+        columns={columns}
+        data={query.data ?? []}
+        loading={query.isLoading}
+        emptyText={t("admin.finance.payments.refundReconciliation.empty")}
+        getRowId={(attempt) => attempt.id}
+      />
 
       {selected && (
         <ResolveRefundAttemptModal

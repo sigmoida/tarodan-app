@@ -12,6 +12,7 @@ import type {
 import { adminKeys } from "@/lib/query/keys";
 import { useAdminMutation } from "@/hooks/useAdminMutation";
 import { downloadBlob } from "@/lib/download";
+import { fmtFileSize } from "@/lib/format";
 import { extractErrorMessage, extractImportErrors } from "@/lib/error";
 
 const XLSX_MIME =
@@ -32,12 +33,6 @@ const INVALIDATES: Record<CatalogImportResource, string[]> = {
   manufacturers: ["manufacturers"],
   "car-models": ["car-models", "brands"],
 };
-
-export function formatFileSize(bytes: number): string {
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-  return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
-}
 
 /**
  * Marka / üretici / araç modeli ekranlarının ortak toplu içe aktarma mantığı.
@@ -105,7 +100,7 @@ export function useCatalogBulkImport(
       reason === "size"
         ? t("admin.catalog.import.fileTooLarge", {
             name: rejected.name,
-            size: formatFileSize(limits.maxFileBytes),
+            size: fmtFileSize(limits.maxFileBytes) ?? "",
           })
         : t("admin.catalog.import.invalidFileType", { name: rejected.name }),
     ]);

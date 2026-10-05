@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { useTranslations } from "next-intl";
 import { Badge, shipmentStatusConfig } from "@tarodan/ui";
 import {
@@ -15,6 +14,7 @@ import type {
   TradeShipmentRow,
   SuratShipmentRow,
 } from "./types";
+import { TextLink } from "@/components/TextLink";
 import { statusConfig } from "@/lib/statusLabels";
 
 type T = ReturnType<typeof useTranslations<never>>;
@@ -109,15 +109,15 @@ export const physicalShipmentColumns = (t: T) => [
               t("admin.operations.shipping.orders.carrierPending")}
           </TruncatedText>
           {tracking && trackingUrl ? (
-            <a
+            <TextLink
               href={trackingUrl}
-              target="_blank"
-              rel="noreferrer"
-              className="block truncate font-mono text-xs text-primary-600 hover:underline"
+              external
+              mono
               title={tracking}
+              className="block truncate text-xs"
             >
               {tracking}
-            </a>
+            </TextLink>
           ) : tracking ? (
             <CellCode value={tracking} />
           ) : (
@@ -328,15 +328,15 @@ export function suratShipmentColumns(
       t("admin.operations.common.trackingNumber"),
       (r) =>
         r.trackingNumber && r.trackingUrl ? (
-          <a
+          <TextLink
             href={r.trackingUrl}
-            target="_blank"
-            rel="noreferrer"
-            className="block truncate font-mono text-xs text-primary-600 hover:underline"
+            external
+            mono
             title={r.trackingNumber}
+            className="block truncate text-xs"
           >
             {r.trackingNumber}
-          </a>
+          </TextLink>
         ) : (
           <CellCode value={r.trackingNumber} />
         ),

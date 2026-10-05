@@ -1,7 +1,5 @@
 import {
   Badge,
-  StatusBadge,
-  enumLabel,
   membershipTierConfig,
   subscriptionStatusConfig,
 } from "@tarodan/ui";
@@ -36,26 +34,19 @@ export function userColumns(t: T, rowMenu: (u: User) => RowActionItem[]) {
     ),
     col.badge<User>(
       t("admin.users.membership"),
-      (u) => {
-        const tier = (u.membershipTier || "").toLowerCase();
-        const label = enumLabel(
-          statusConfig(membershipTierConfig, t),
-          tier,
-          u.membershipTier || t("admin.users.membershipFree"),
-        );
-        return (
-          <Badge variant={tier === "premium" ? "warning" : "outline"}>
-            {label}
-          </Badge>
-        );
-      },
+      (u) => (
+        <Badge
+          status={(u.membershipTier || "free").toLowerCase()}
+          config={statusConfig(membershipTierConfig, t)}
+        />
+      ),
       { sortKey: "membership.tier.type", sortType: "text" },
     ),
     col.custom<User>(
       t("admin.users.membershipStatus"),
       (u) =>
         u.membershipStatus && (u.membershipTier || "free") !== "free" ? (
-          <StatusBadge
+          <Badge
             status={u.membershipStatus}
             config={statusConfig(subscriptionStatusConfig, t)}
           />

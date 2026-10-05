@@ -16,7 +16,6 @@ import {
   eventTypeLabels,
   actionLabels,
   entityLabels,
-  formatDate,
 } from "./types";
 import type { useTranslations } from "next-intl";
 import { statusConfig } from "@/lib/statusLabels";
@@ -187,15 +186,7 @@ export function buildEmailColumns(t: T) {
 export function buildAuditColumns(toggle: Toggle, t: T) {
   return [
     expandCol<AuditLog>(toggle, t),
-    col.custom<AuditLog>(
-      t("common.date"),
-      (r) => (
-        <span className="whitespace-nowrap text-sm text-muted">
-          {formatDate(r.createdAt, t("common.dateLocale"))}
-        </span>
-      ),
-      { sortKey: "createdAt", sortType: "date" },
-    ),
+    col.date<AuditLog>(t("common.date"), "createdAt", { withTime: true }),
     col.custom<AuditLog>(
       t("admin.system.logs.admin"),
       (r) => (
@@ -213,9 +204,9 @@ export function buildAuditColumns(toggle: Toggle, t: T) {
     col.custom<AuditLog>(
       t("admin.system.logs.action"),
       (r) => (
-        <span className="rounded-full bg-info-100 px-2 py-0.5 text-xs text-info-800">
+        <Badge variant="default" size="sm">
           {actionLabels(t)[r.action] ?? r.action}
-        </span>
+        </Badge>
       ),
       { sortKey: "action", sortType: "text" },
     ),

@@ -1,16 +1,15 @@
 "use client";
 
 import { useParams } from "next/navigation";
-import {
-  ExclamationTriangleIcon,
-  CheckCircleIcon,
-  XCircleIcon,
-} from "@heroicons/react/24/outline";
-import { Button, StatusBadge } from "@tarodan/ui";
+import { CheckCircleIcon, XCircleIcon } from "@heroicons/react/24/outline";
+import { Alert, Badge, Button } from "@tarodan/ui";
 import { adminApi } from "@/lib/api";
+import { fmtDateTime, fmtShortDateTime } from "@/lib/format";
 import { DetailPage } from "@/components/detail/DetailPage";
 import { SectionCard } from "@/components/detail/SectionCard";
 import { PartyCard } from "@/components/detail/PartyCard";
+import { DataList, Field } from "@/components/detail/DataList";
+import { Panel } from "@/components/detail/Panel";
 import { useAdminMutation } from "@/hooks/useAdminMutation";
 import { usePrompt } from "@/provider/PromptProvider";
 import { messageStatusConfig } from "../_lib/types";
@@ -83,12 +82,8 @@ export default function MessageDetailPage() {
       backHref="/messaging/messages"
       emptyTitle={t("admin.messaging.messages.notFound")}
       title={() => t("admin.messaging.messages.detailTitle")}
-      subtitle={(m) =>
-        new Date(m.createdAt).toLocaleString(t("common.dateLocale"))
-      }
-      badge={(m) => (
-        <StatusBadge status={m.status} config={messageStatusConfig(t)} />
-      )}
+      subtitle={(m) => fmtDateTime(m.createdAt)}
+      badge={(m) => <Badge status={m.status} config={messageStatusConfig(t)} />}
       actions={(m) =>
         isPending(m.status) && (
           <>
@@ -119,37 +114,43 @@ export default function MessageDetailPage() {
         return (
           <>
             <SectionCard title={t("common.message")}>
-              {m.originalContent && m.originalContent !== m.content && (
-                <div className="mb-3">
-                  <p className="mb-1 text-xs text-muted">
-                    {t("admin.messaging.messages.originalContent")}
-                  </p>
-                  <p className="rounded border border-border bg-surface-alt p-3 text-sm text-heading">
-                    {m.originalContent}
-                  </p>
-                </div>
-              )}
-              <div>
-                <p className="mb-1 text-xs text-muted">
-                  {t("admin.messaging.messages.content")}
-                </p>
-                <p className="rounded border border-border bg-surface-alt p-3 text-sm text-heading">
-                  {m.content}
-                </p>
-              </div>
+              <DataList columns={1}>
+                {m.originalContent && m.originalContent !== m.content && (
+                  <Field
+                    layout="stacked"
+                    label={t("admin.messaging.messages.originalContent")}
+                  >
+                    <Panel
+                      tone="muted"
+                      padding="sm"
+                      className="text-sm font-normal text-heading"
+                    >
+                      {m.originalContent}
+                    </Panel>
+                  </Field>
+                )}
+                <Field
+                  layout="stacked"
+                  label={t("admin.messaging.messages.content")}
+                >
+                  <Panel
+                    tone="muted"
+                    padding="sm"
+                    className="text-sm font-normal text-heading"
+                  >
+                    {m.content}
+                  </Panel>
+                </Field>
+              </DataList>
 
               {m.flaggedReason && (
-                <div className="mt-3 flex items-start gap-2 rounded border border-warning-200 bg-warning-50 p-3">
-                  <ExclamationTriangleIcon className="mt-0.5 h-4 w-4 shrink-0 text-warning-500" />
-                  <div>
-                    <p className="text-xs font-medium text-warning-700">
-                      {t("admin.messaging.messages.flaggedReason")}
-                    </p>
-                    <p className="text-sm text-warning-800">
-                      {m.flaggedReason}
-                    </p>
-                  </div>
-                </div>
+                <Alert
+                  variant="warning"
+                  title={t("admin.messaging.messages.flaggedReason")}
+                  className="mt-3"
+                >
+                  {m.flaggedReason}
+                </Alert>
               )}
 
               <p className="mt-4 text-xs text-muted">
@@ -205,15 +206,7 @@ export default function MessageDetailPage() {
                               isSender ? "text-inverted/80" : "text-muted"
                             }`}
                           >
-                            {new Date(msg.createdAt).toLocaleString(
-                              t("common.dateLocale"),
-                              {
-                                day: "2-digit",
-                                month: "2-digit",
-                                hour: "2-digit",
-                                minute: "2-digit",
-                              },
-                            )}
+                            {fmtShortDateTime(msg.createdAt)}
                           </p>
                         </div>
                       </div>

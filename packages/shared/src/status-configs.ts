@@ -302,6 +302,10 @@ export const productStatusConfig: StatusConfigDefMap = {
     labelKey: "status.product.deleted",
     variant: "danger",
   },
+  suspended: {
+    labelKey: "status.product.suspended",
+    variant: "danger",
+  },
 };
 
 /**

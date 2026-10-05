@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useTranslations } from "next-intl";
+import { Button } from "@tarodan/ui";
 
 export function ForbiddenScreen() {
   const t = useTranslations();
@@ -15,12 +16,9 @@ export function ForbiddenScreen() {
       <p className="max-w-md text-muted">
         {t("admin.shared.forbidden.description")}
       </p>
-      <Link
-        href="/dashboard"
-        className="mt-2 inline-flex items-center rounded-lg bg-primary-600 px-4 py-2 font-medium text-inverted transition-colors hover:bg-primary-700"
-      >
-        {t("admin.shared.errors.backToPanel")}
-      </Link>
+      <Button asChild className="mt-2">
+        <Link href="/dashboard">{t("admin.shared.errors.backToPanel")}</Link>
+      </Button>
     </section>
   );
 }
