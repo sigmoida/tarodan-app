@@ -8361,6 +8361,7 @@
       "filterLoggedIn": "Giriş Yapmış",
       "testAccount": "Test hesabı",
       "testAccountHint": "Test şeridi: canlı verilere karışmaz",
+      "filterTestAccountAll": "Tüm hesaplar",
       "testAccountOnly": "Yalnız test hesapları",
       "liveAccountsOnly": "Yalnız gerçek hesaplar"
     },

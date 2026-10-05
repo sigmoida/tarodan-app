@@ -30,7 +30,10 @@ export const userFilterFields = (t: TranslateFn): FilterField[] => [
     type: "select",
     name: "isTestAccount",
     label: t("admin.shared.filterDialog.labels.testAccount"),
+    // İlk seçenek filtrenin varsayılanıdır (filterDefaults): "all" olmazsa
+    // liste açılışta yalnız test hesaplarını gösterir.
     options: [
+      { value: "all", label: t("admin.users.filterTestAccountAll") },
       { value: "true", label: t("admin.users.testAccountOnly") },
       { value: "false", label: t("admin.users.liveAccountsOnly") },
     ],
