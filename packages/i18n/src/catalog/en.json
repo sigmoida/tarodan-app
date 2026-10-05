@@ -5595,7 +5595,26 @@
           "channelRequired": "Select at least one channel",
           "userIdRequired": "Enter at least one user ID",
           "scheduleFuture": "The send time must be in the future",
-          "scheduleRequired": "Delivery date and time are required"
+          "scheduleRequired": "Delivery date and time are required",
+          "emailSubjectRequired": "Email subject is required",
+          "emailSubjectMax": "Email subject can be at most 240 characters",
+          "emailHtmlRequired": "Email content is required",
+          "emailHtmlMax": "Email content can be at most 200,000 characters"
+        },
+        "pushTextTitle": "Push and in-app text",
+        "emailSectionTitle": "Email",
+        "emailSubjectPlaceholder": "Subject line recipients will see",
+        "emailHtmlPlaceholder": "Write the email body as HTML (links, images, tables and inline styles are supported)",
+        "emailPreviewEmpty": "Write the email HTML to see the preview",
+        "htmlEmailBadge": "HTML email",
+        "contentColumn": "Email",
+        "recipientCount": "Reaches {count} of {total} users",
+        "mailingType": {
+          "label": "Mailing type",
+          "announcement": "Announcement",
+          "marketing": "Marketing",
+          "announcementHint": "Sent to every audience member, regardless of marketing consent.",
+          "marketingHint": "Sent only to users who agreed to marketing emails, with an unsubscribe link."
         }
       },
       "pages": {
@@ -10411,6 +10430,7 @@
         "targetUserNotFound": "Target user not found",
         "sendFailed": "The notification could not be sent",
         "scheduleInFuture": "The scheduled time must be in the future",
+        "emailHtmlEmpty": "The email HTML has no usable content after removing unsafe markup",
         "scheduledNotFound": "Scheduled notification not found"
       },
       "payment": {

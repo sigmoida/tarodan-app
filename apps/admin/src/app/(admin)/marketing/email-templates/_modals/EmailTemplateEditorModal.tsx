@@ -3,14 +3,8 @@
 import { useCallback, useEffect, useRef } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Button } from "@tarodan/ui";
+import { FormInput, FormModal, useZodForm } from "@tarodan/ui/form";
 import {
-  FormInput,
-  FormModal,
-  FormTextarea,
-  useZodForm,
-} from "@tarodan/ui/form";
-import {
-  ArrowPathIcon,
   CheckIcon,
   PaperAirplaneIcon,
   TrashIcon,
@@ -21,6 +15,8 @@ import { extractErrorMessage } from "@/lib/error";
 import { adminKeys } from "@/lib/query/keys";
 import { useAdminMutation } from "@/hooks/useAdminMutation";
 import { useConfirm } from "@/provider/ConfirmProvider";
+import { EmailHtmlEditor } from "@/components/email/EmailHtmlEditor";
+import { EmailPreviewPane } from "@/components/email/EmailPreviewPane";
 import { sampleData } from "../_lib/sampleData";
 import {
   emailTemplateEditorSchema,
@@ -138,22 +134,6 @@ export function EmailTemplateEditorModal({
     );
     return () => clearTimeout(timer);
   }, [bodyHtml, subject, detailQuery.data, loadPreview]);
-
-  const onTabKey = (event: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    if (event.key !== "Tab") return;
-    event.preventDefault();
-    const textarea = event.currentTarget;
-    const start = textarea.selectionStart;
-    const end = textarea.selectionEnd;
-    form.setValue(
-      "bodyHtml",
-      textarea.value.substring(0, start) + "  " + textarea.value.substring(end),
-      { shouldDirty: true },
-    );
-    requestAnimationFrame(() => {
-      textarea.selectionStart = textarea.selectionEnd = start + 2;
-    });
-  };
 
   const insertVariable = (variable: string) => {
     const textarea = document.getElementById(
@@ -327,33 +307,14 @@ export function EmailTemplateEditorModal({
             )}
           />
 
-          <div className="flex min-h-0 flex-1 flex-col">
-            <div className="mb-1 flex items-center justify-between">
-              <span className="text-xs font-medium text-muted">
-                {t("admin.marketing.emailTemplates.htmlBody")}
-              </span>
-              <span className="text-xs text-subtle">
-                {bodyHtml.length > 0
-                  ? t("admin.marketing.emailTemplates.characterCount", {
-                      count: bodyHtml.length,
-                    })
-                  : t("admin.marketing.emailTemplates.emptyUsesDefault")}
-              </span>
-            </div>
-            <FormTextarea
-              name="bodyHtml"
-              bare
-              id="html-editor"
-              onKeyDown={onTabKey}
-              spellCheck={false}
-              autoCorrect="off"
-              autoCapitalize="off"
-              placeholder={t(
-                "admin.marketing.emailTemplates.htmlBodyPlaceholder",
-              )}
-              className="min-h-[280px] flex-1 resize-none rounded-lg border border-border bg-heading p-3 font-mono text-xs leading-relaxed text-inverted"
-            />
-          </div>
+          <EmailHtmlEditor
+            name="bodyHtml"
+            id="html-editor"
+            emptyHint={t("admin.marketing.emailTemplates.emptyUsesDefault")}
+            placeholder={t(
+              "admin.marketing.emailTemplates.htmlBodyPlaceholder",
+            )}
+          />
 
           <div className="flex flex-wrap items-end gap-2 border-t border-border pt-3">
             <FormInput
@@ -388,76 +349,14 @@ export function EmailTemplateEditorModal({
           </div>
         </div>
 
-        <div className="flex min-h-0 flex-col overflow-hidden rounded-lg border border-border bg-surface-alt/20">
-          <div className="flex shrink-0 items-center justify-between gap-2 border-b border-border bg-surface-elevated px-4 py-2.5">
-            <span className="text-xs font-semibold uppercase tracking-wider text-muted">
-              {t("admin.marketing.emailTemplates.preview")}
-            </span>
-            {preview.isPending && (
-              <span className="flex items-center gap-1 text-xs text-muted">
-                <ArrowPathIcon className="h-3 w-3 animate-spin" />{" "}
-                {t("common.updating")}
-              </span>
-            )}
-          </div>
-
-          {preview.isError ? (
-            <div className="flex flex-1 items-center justify-center p-8 text-center">
-              <div>
-                <p className="text-sm text-muted">
-                  {extractErrorMessage(
-                    preview.error,
-                    t("admin.marketing.emailTemplates.previewFailed"),
-                  )}
-                </p>
-                <Button
-                  variant="secondary"
-                  type="button"
-                  onClick={() =>
-                    loadPreview(bodyHtml || undefined, subject || undefined)
-                  }
-                  className="mt-3"
-                >
-                  {t("common.tryAgain")}
-                </Button>
-              </div>
-            </div>
-          ) : preview.data ? (
-            <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
-              <div className="shrink-0 border-b border-border bg-surface-elevated px-4 py-2">
-                <p className="text-xs text-muted">
-                  <span className="font-medium">
-                    {t("admin.marketing.emailTemplates.subject")}:
-                  </span>{" "}
-                  <span className="text-heading">
-                    {preview.data.subject ||
-                      t("admin.marketing.emailTemplates.noSubject")}
-                  </span>
-                </p>
-                {preview.data.unresolvedVariables.length > 0 && (
-                  <p className="mt-1 text-xs text-warning-700">
-                    {t("admin.marketing.emailTemplates.unresolvedVariables", {
-                      variables: preview.data.unresolvedVariables
-                        .map((variable) => `{{${variable}}}`)
-                        .join(", "),
-                    })}
-                  </p>
-                )}
-              </div>
-              <iframe
-                key={preview.data.html.substring(0, 100)}
-                srcDoc={preview.data.html}
-                className="w-full flex-1 border-0"
-                title={t("admin.marketing.emailTemplates.emailPreview")}
-                sandbox="allow-same-origin allow-top-navigation-by-user-activation"
-              />
-            </div>
-          ) : (
-            <div className="flex flex-1 items-center justify-center">
-              <ArrowPathIcon className="h-6 w-6 animate-spin text-muted" />
-            </div>
-          )}
-        </div>
+        <EmailPreviewPane
+          preview={preview.data}
+          isPending={preview.isPending}
+          error={preview.isError ? preview.error : undefined}
+          onRetry={() =>
+            loadPreview(bodyHtml || undefined, subject || undefined)
+          }
+        />
       </div>
     </FormModal>
   );

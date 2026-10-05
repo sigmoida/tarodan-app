@@ -1,4 +1,27 @@
+import type { MailingType } from "@tarodan/types";
 import { api } from "./client";
+
+/** E-posta kanalına özel alanlar; yalnız "email" kanalı seçiliyse gönderilir. */
+export interface BroadcastEmailPreviewPayload {
+  title: string;
+  body: string;
+  emailSubject?: string;
+  emailHtml?: string;
+  mailingType?: MailingType;
+}
+
+export interface NotificationBroadcastPayload {
+  title: string;
+  body: string;
+  channels: string[];
+  targetType: "all" | "segment" | "user_ids";
+  userIds?: string[];
+  segmentCriteria?: Record<string, any>;
+  data?: Record<string, any>;
+  emailSubject?: string;
+  emailHtml?: string;
+  mailingType?: MailingType;
+}
 
 /** Marketing domain: static pages, email templates, ads, and notifications. */
 export const marketingApi = {
@@ -63,24 +86,20 @@ export const marketingApi = {
     sortBy?: string;
     sortOrder?: "asc" | "desc";
   }) => api.get("/admin/notifications/history", { params }),
-  sendNotification: (data: {
-    title: string;
-    body: string;
-    channels: string[];
+  sendNotification: (data: NotificationBroadcastPayload) =>
+    api.post("/admin/notifications/send", data),
+  scheduleNotification: (
+    data: NotificationBroadcastPayload & { scheduledFor: string },
+  ) => api.post("/admin/notifications/schedule", data),
+  /** Gerçekte gidecek (sunucuda süzülmüş + iskeletli) e-postayı döner. */
+  previewBroadcastEmail: (data: BroadcastEmailPreviewPayload) =>
+    api.post("/admin/notifications/email-preview", data),
+  /** Hedef kitlenin toplam / pazarlama-izinli kullanıcı sayısı. */
+  countNotificationAudience: (data: {
     targetType: "all" | "segment" | "user_ids";
     userIds?: string[];
     segmentCriteria?: Record<string, any>;
-    data?: Record<string, any>;
-  }) => api.post("/admin/notifications/send", data),
-  scheduleNotification: (data: {
-    title: string;
-    body: string;
-    channels: string[];
-    targetType: "all" | "segment" | "user_ids";
-    userIds?: string[];
-    segmentCriteria?: Record<string, any>;
-    scheduledFor: string;
-  }) => api.post("/admin/notifications/schedule", data),
+  }) => api.post("/admin/notifications/audience-count", data),
   getScheduledNotifications: (params?: {
     page?: number;
     limit?: number;

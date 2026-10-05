@@ -107,3 +107,6 @@ export * from "./invoice";
 
 // Early escrow release: planned vs actual release date, days early (API + admin)
 export * from "./early-release";
+
+// Admin broadcast e-mail: mailing type (announcement | marketing) + limits
+export * from "./mailing-type";

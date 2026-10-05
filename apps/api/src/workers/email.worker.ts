@@ -37,6 +37,8 @@ export interface EmailJobData {
   overrideSubject?: string;
   from?: string;
   replyTo?: string;
+  /** Ek SMTP başlıkları (pazarlamada `List-Unsubscribe`). */
+  headers?: Record<string, string>;
   attachments?: Array<{
     filename: string;
     content: Buffer | string;
@@ -78,6 +80,7 @@ export class EmailWorker {
       text,
       from,
       replyTo,
+      headers,
       attachments,
       template,
       templateData,
@@ -101,6 +104,7 @@ export class EmailWorker {
       html,
       text: text || this.stripHtml(html),
       replyTo,
+      headers,
       attachments,
       template: template || undefined,
       userId: (templateData as Record<string, any>)?.userId || undefined,

@@ -4,6 +4,7 @@ import {
   notificationChannelConfig,
   deliveryStatusConfig,
 } from "@tarodan/ui";
+import type { MailingType } from "@tarodan/types";
 import { col } from "@/components/table";
 import { scheduledRowMenu } from "./rowActions";
 import { type NotificationLog, type ScheduledNotification } from "./types";
@@ -11,6 +12,36 @@ import type { useTranslations } from "next-intl";
 import { statusConfig } from "@/lib/statusLabels";
 
 type T = ReturnType<typeof useTranslations<never>>;
+
+/**
+ * "HTML e-postası var" ve "pazarlama" rozetleri — geçmiş ve zamanlanmış liste
+ * aynı görünümü kullanır (HTML'in kendisi tabloda gösterilmez).
+ */
+function EmailContentBadges({
+  hasHtml,
+  mailingType,
+  t,
+}: {
+  hasHtml?: boolean;
+  mailingType?: MailingType;
+  t: T;
+}) {
+  if (!hasHtml && mailingType !== "marketing") return null;
+  return (
+    <span className="inline-flex gap-1">
+      {hasHtml && (
+        <Badge variant="info" size="sm">
+          {t("admin.marketing.notifications.htmlEmailBadge")}
+        </Badge>
+      )}
+      {mailingType === "marketing" && (
+        <Badge variant="warning" size="sm">
+          {t("admin.marketing.notifications.mailingType.marketing")}
+        </Badge>
+      )}
+    </span>
+  );
+}
 
 export const historyColumns = (t: T) => [
   col.user<NotificationLog>(
@@ -31,6 +62,16 @@ export const historyColumns = (t: T) => [
     grow: 3,
     minWidth: 200,
   }),
+  col.badge<NotificationLog>(
+    t("admin.marketing.notifications.contentColumn"),
+    (n) => (
+      <EmailContentBadges
+        hasHtml={n.data?.hasHtmlEmail}
+        mailingType={n.data?.mailingType}
+        t={t}
+      />
+    ),
+  ),
   col.badge<NotificationLog>(
     t("common.status"),
     (n) => (
@@ -55,6 +96,16 @@ export function scheduledColumns(onCancel: (id: string) => void, t: T) {
     col.muted<ScheduledNotification>(
       t("admin.marketing.notifications.targetLabel"),
       "targetType",
+    ),
+    col.badge<ScheduledNotification>(
+      t("admin.marketing.notifications.contentColumn"),
+      (n) => (
+        <EmailContentBadges
+          hasHtml={n.hasEmailHtml}
+          mailingType={n.mailingType}
+          t={t}
+        />
+      ),
     ),
     col.date<ScheduledNotification>(t("common.date"), "scheduledFor"),
     col.badge<ScheduledNotification>(

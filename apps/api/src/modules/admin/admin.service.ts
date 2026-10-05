@@ -22,7 +22,12 @@ import { AdminTaxService } from "./finance/admin-tax.service";
 import { AdminMembershipService } from "./finance/admin-membership.service";
 import { AdminCatalogService } from "./catalog/admin-catalog.service";
 import { AdminCollectionService } from "./catalog/admin-collection.service";
-import { AdminNotificationService } from "./ops/admin-notification.service";
+import {
+  AdminNotificationService,
+  type AdminBroadcastInput,
+  type AudienceCountInput,
+  type PreviewBroadcastEmailInput,
+} from "./ops/admin-notification.service";
 import { AdminLogsService } from "./analytics/admin-logs.service";
 import { AdminShippingService } from "./orders/admin-shipping.service";
 import { AdminReviewService } from "./ops/admin-review.service";
@@ -1465,34 +1470,23 @@ export class AdminService {
     return this.adminNotificationService.getNotificationHistory(query);
   }
 
-  async sendNotification(
-    adminId: string,
-    dto: {
-      title: string;
-      body: string;
-      channels: string[];
-      targetType: "all" | "segment" | "user_ids";
-      userIds?: string[];
-      segmentCriteria?: Record<string, any>;
-      data?: Record<string, any>;
-    },
-  ) {
+  async sendNotification(adminId: string, dto: AdminBroadcastInput) {
     return this.adminNotificationService.sendNotification(adminId, dto);
   }
 
   async scheduleNotification(
     adminId: string,
-    dto: {
-      title: string;
-      body: string;
-      channels: string[];
-      targetType: "all" | "segment" | "user_ids";
-      userIds?: string[];
-      segmentCriteria?: Record<string, any>;
-      scheduledFor: string;
-    },
+    dto: AdminBroadcastInput & { scheduledFor: string },
   ) {
     return this.adminNotificationService.scheduleNotification(adminId, dto);
+  }
+
+  previewBroadcastEmail(dto: PreviewBroadcastEmailInput) {
+    return this.adminNotificationService.previewBroadcastEmail(dto);
+  }
+
+  countNotificationAudience(dto: AudienceCountInput) {
+    return this.adminNotificationService.countAudience(dto);
   }
 
   async getScheduledNotifications(query?: ScheduledNotificationQueryDto) {

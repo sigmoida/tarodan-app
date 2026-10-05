@@ -31,6 +31,7 @@ describe("AdminNotificationService — yayın linki güvenliği", () => {
       prisma as never,
       eventService as never,
       audit as never,
+      {} as never,
     );
     return { service, prisma, eventService };
   };

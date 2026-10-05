@@ -21,6 +21,8 @@ import {
 import { adminApi } from "@/lib/api";
 import { useAdminMutation } from "@/hooks/useAdminMutation";
 import { SectionCard } from "@/components/detail/SectionCard";
+import { EmailHtmlEditor } from "@/components/email/EmailHtmlEditor";
+import { EmailPreviewPane } from "@/components/email/EmailPreviewPane";
 import { useTranslations } from "next-intl";
 import {
   type SendForm,
@@ -28,10 +30,15 @@ import {
   emptySendForm,
   channelMeta,
   targetMeta,
+  mailingTypeOptions,
   sendFormToPayload,
   sendNotificationSchema,
   scheduleNotificationSchema,
 } from "../_lib/types";
+import {
+  useAudienceCounts,
+  useBroadcastEmailPreview,
+} from "../_lib/useBroadcastEmailPreview";
 import { UserPicker } from "./UserPicker";
 
 /** datetime-local için YEREL "şimdi" (yyyy-mm-ddTHH:mm). */
@@ -109,6 +116,10 @@ export function SendNotificationForm({
     defaultValues: { scheduledFor: "" },
   });
   const values = form.watch();
+  const emailPreview = useBroadcastEmailPreview(values);
+  const audienceCounts = useAudienceCounts(values);
+  const mailingTypes = mailingTypeOptions(t);
+  const emailSelected = values.channels.includes("email");
 
   const send = useAdminMutation(
     (formValues: SendForm) =>
@@ -156,7 +167,11 @@ export function SendNotificationForm({
 
   const titleOk = values.title.length > 0 && values.title.length <= 65;
   const bodyOk = values.body.length > 0 && values.body.length <= 240;
-  const canSend = titleOk && bodyOk && values.channels.length > 0;
+  const emailOk =
+    !emailSelected ||
+    (values.emailSubject.trim().length > 0 &&
+      values.emailHtml.trim().length > 0);
+  const canSend = titleOk && bodyOk && values.channels.length > 0 && emailOk;
 
   return (
     <>
@@ -173,7 +188,10 @@ export function SendNotificationForm({
       >
         <div className="grid grid-cols-1 items-start gap-6 xl:grid-cols-5">
           <div className="space-y-5 xl:col-span-3">
-            <SectionCard title={t("common.message")} bodyClassName="space-y-5">
+            <SectionCard
+              title={t("admin.marketing.notifications.pushTextTitle")}
+              bodyClassName="space-y-5"
+            >
               <div>
                 <div className="mb-1.5 flex items-center justify-between">
                   <span className="text-sm font-medium text-body">
@@ -245,6 +263,55 @@ export function SendNotificationForm({
                 </p>
               )}
             </SectionCard>
+
+            {emailSelected && (
+              <SectionCard
+                title={t("admin.marketing.notifications.emailSectionTitle")}
+                bodyClassName="space-y-5"
+              >
+                <FormInput
+                  name="emailSubject"
+                  label={t("admin.marketing.emailTemplates.emailSubject")}
+                  placeholder={t(
+                    "admin.marketing.notifications.emailSubjectPlaceholder",
+                  )}
+                />
+                <div className="space-y-2">
+                  <FormSelect
+                    name="mailingType"
+                    label={t("admin.marketing.notifications.mailingType.label")}
+                    options={mailingTypes}
+                  />
+                  <p className="text-xs text-muted">
+                    {values.mailingType === "marketing"
+                      ? t(
+                          "admin.marketing.notifications.mailingType.marketingHint",
+                        )
+                      : t(
+                          "admin.marketing.notifications.mailingType.announcementHint",
+                        )}
+                  </p>
+                  {audienceCounts && (
+                    <p className="text-xs font-medium text-body">
+                      {t("admin.marketing.notifications.recipientCount", {
+                        count:
+                          values.mailingType === "marketing"
+                            ? audienceCounts.marketing
+                            : audienceCounts.total,
+                        total: audienceCounts.total,
+                      })}
+                    </p>
+                  )}
+                </div>
+                <EmailHtmlEditor
+                  name="emailHtml"
+                  placeholder={t(
+                    "admin.marketing.notifications.emailHtmlPlaceholder",
+                  )}
+                  className="min-h-[260px]"
+                />
+              </SectionCard>
+            )}
 
             <SectionCard
               title={t("admin.marketing.notifications.audience")}
@@ -371,29 +438,19 @@ export function SendNotificationForm({
                     <EnvelopeIcon className="h-3.5 w-3.5" />{" "}
                     {t("admin.marketing.notifications.channel.email")}
                   </p>
-                  <div className="overflow-hidden rounded-xl border border-border bg-surface">
-                    <div className="border-b border-border bg-surface-alt px-4 py-2.5">
-                      <p className="text-xs text-muted">
-                        {t("admin.marketing.emailTemplates.subject")}:
-                      </p>
-                      <p className="truncate text-sm font-medium text-heading">
-                        {values.title || (
-                          <span className="italic text-subtle">
-                            {t("admin.marketing.notifications.enterTitle")}
-                          </span>
-                        )}
-                      </p>
-                    </div>
-                    <div className="px-4 py-3">
-                      <p className="line-clamp-3 text-sm leading-relaxed text-body">
-                        {values.body || (
-                          <span className="italic text-subtle">
-                            {t("admin.marketing.notifications.enterContent")}
-                          </span>
-                        )}
-                      </p>
-                    </div>
-                  </div>
+                  {values.emailHtml.trim() ? (
+                    <EmailPreviewPane
+                      className="h-[460px]"
+                      preview={emailPreview.preview}
+                      isPending={emailPreview.isPending}
+                      error={emailPreview.error}
+                      onRetry={emailPreview.refetch}
+                    />
+                  ) : (
+                    <p className="rounded-xl border border-dashed border-border bg-surface-alt px-4 py-6 text-center text-xs italic text-subtle">
+                      {t("admin.marketing.notifications.emailPreviewEmpty")}
+                    </p>
+                  )}
                 </div>
               )}
 

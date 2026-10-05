@@ -16,7 +16,12 @@ import {
   BadRequestException,
   Res,
 } from "@nestjs/common";
-import { AdminSendNotificationDto } from "../dto/admin-notification.dto";
+import {
+  AdminScheduleNotificationDto,
+  AdminSendNotificationDto,
+  AudienceCountDto,
+  PreviewBroadcastEmailDto,
+} from "../dto/admin-notification.dto";
 
 import { FileInterceptor } from "@nestjs/platform-express";
 import {
@@ -149,18 +154,32 @@ export class AdminNotificationController {
   })
   async scheduleNotification(
     @CurrentUser("id") adminId: string,
-    @Body()
-    body: {
-      title: string;
-      body: string;
-      channels: string[];
-      targetType: "all" | "segment" | "user_ids";
-      userIds?: string[];
-      segmentCriteria?: Record<string, any>;
-      scheduledFor: string;
-    },
+    // DTO: whitelist yoksa e-posta alanları (emailHtml…) sessizce düşerdi.
+    @Body() body: AdminScheduleNotificationDto,
   ) {
     return this.adminService.scheduleNotification(adminId, body);
+  }
+
+  @Post("notifications/email-preview")
+  @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: "Preview the broadcast email exactly as it will be sent",
+  })
+  @ApiResponse({ status: HttpStatus.OK, description: "Rendered email" })
+  previewBroadcastEmail(@Body() body: PreviewBroadcastEmailDto) {
+    return this.adminService.previewBroadcastEmail(body);
+  }
+
+  @Post("notifications/audience-count")
+  @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: "Count users a broadcast reaches (all / marketing-consented)",
+  })
+  @ApiResponse({ status: HttpStatus.OK, description: "Audience counts" })
+  async countNotificationAudience(@Body() body: AudienceCountDto) {
+    return this.adminService.countNotificationAudience(body);
   }
 
   @Get("notifications/scheduled")

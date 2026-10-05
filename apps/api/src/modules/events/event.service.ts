@@ -5,9 +5,10 @@ import { EventEmitter2 } from "@nestjs/event-emitter";
 import { QUEUE_NAMES } from "../../workers/constants";
 import { PrismaService } from "../../prisma";
 import {
-  escapeEmailHtml,
-  wrapEmailTemplateLayout,
-} from "../../common/helpers/email-template-renderer";
+  prepareBroadcastEmailContent,
+  newsletterUnsubscribeUrl,
+  renderBroadcastEmail,
+} from "../../common/helpers/broadcast-email";
 
 /** In-process (EventEmitter2) event adları — modüller-arası döngüsüz decoupling. */
 export const PAYMENT_TRADE_CASH_CLEARED = "payment.trade-cash-cleared";
@@ -223,6 +224,16 @@ export interface AdminBroadcastPayload {
   body: string;
   channels: string[];
   data?: Record<string, any>;
+  /** E-postaya özel konu / HTML (opsiyonel); yoksa e-posta push metninden üretilir. */
+  emailSubject?: string | null;
+  emailHtml?: string | null;
+  /**
+   * Doluysa PAZARLAMA e-postasıdır: yalnız bu haritadaki kullanıcılara gider
+   * (`userId → unsubscribeToken`, izni açık ve çıkmamış üyeler) ve her mail
+   * kendi çıkış linkini + `List-Unsubscribe` başlığını taşır. Boşsa duyurudur:
+   * herkese gider.
+   */
+  marketingUnsubscribeTokens?: Map<string, string>;
 }
 
 export interface InAppNotificationPayload {
@@ -1272,6 +1283,11 @@ export class EventService {
       `Emitting admin broadcast to ${payload.userIds.length} users`,
     );
 
+    // Alıcıdan bağımsız e-posta içeriği (HTML süzme dahil) BİR kez hazırlanır.
+    const emailContent = payload.channels.includes("email")
+      ? prepareBroadcastEmailContent(payload)
+      : undefined;
+
     // Fetch user details in chunks
     const chunkSize = 100;
     for (let i = 0; i < payload.userIds.length; i += chunkSize) {
@@ -1295,20 +1311,33 @@ export class EventService {
       for (const user of users) {
         // Send email if requested
         if (payload.channels.includes("email")) {
-          const title = escapeEmailHtml(payload.title);
-          const body = escapeEmailHtml(payload.body).replace(/\n/g, "<br>");
-          await this.emailQueue.add("send", {
-            to: user.email,
-            subject: payload.title,
-            html: wrapEmailTemplateLayout(
-              `
-                <h2 style="font-size: 24px; line-height: 1.3; color: #27272a; margin: 0 0 18px;">${title}</h2>
-                <p style="font-size: 15px; line-height: 1.7; color: #52525b; margin: 0;">${body}</p>
-              `,
-              payload.title,
-              { to: user.email },
-            ),
-          });
+          const unsubscribeToken = payload.marketingUnsubscribeTokens?.get(
+            user.id,
+          );
+          // Pazarlama: izni olmayan/çıkmış kullanıcıya e-posta GİTMEZ.
+          if (
+            emailContent &&
+            (!payload.marketingUnsubscribeTokens || unsubscribeToken)
+          ) {
+            const unsubscribeUrl = unsubscribeToken
+              ? newsletterUnsubscribeUrl(unsubscribeToken)
+              : undefined;
+            const email = renderBroadcastEmail(emailContent, {
+              to: user.email,
+              unsubscribeUrl,
+            });
+            await this.emailQueue.add("send", {
+              to: user.email,
+              subject: email.subject,
+              html: email.html,
+              ...(unsubscribeUrl && {
+                headers: {
+                  "List-Unsubscribe": `<${unsubscribeUrl}>`,
+                  "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
+                },
+              }),
+            });
+          }
         }
 
         // Send push if requested and the user has at least one active device token

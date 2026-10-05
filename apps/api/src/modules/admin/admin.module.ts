@@ -123,6 +123,7 @@ import { AdvertisementModule } from "../advertisement/advertisement.module";
 import { MediaModule } from "../media/media.module";
 import { DiscountModule } from "../discount/discount.module";
 import { EventModule } from "../events/event.module";
+import { MarketingModule } from "../marketing/marketing.module";
 import { StorageModule } from "../storage/storage.module";
 import { ModerationModule } from "../moderation/moderation.module";
 import { RatingModule } from "../rating/rating.module";
@@ -153,6 +154,8 @@ import { scheduledProcessors } from "../../workers/scheduled-processors";
     MediaModule,
     DiscountModule,
     EventModule,
+    // NewsletterService: pazarlama e-postası alıcıları + çıkış token'ları.
+    MarketingModule,
     StorageModule,
     RatingModule,
     SuratCargoModule,

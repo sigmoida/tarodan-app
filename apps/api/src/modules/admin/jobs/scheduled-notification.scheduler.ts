@@ -9,6 +9,8 @@ import { registerRepeatableCron } from "../../../monitoring/bull-cron.helper";
 import { QUEUE_NAMES } from "../../../workers/constants";
 import { PrismaService } from "../../../prisma";
 import { AdminService } from "../admin.service";
+import { audienceUserWhere } from "../ops/notification-audience";
+import type { MailingType } from "@tarodan/types";
 
 @Injectable()
 export class ScheduledNotificationScheduler implements OnModuleInit {
@@ -92,25 +94,15 @@ export class ScheduledNotificationScheduler implements OnModuleInit {
 
           if (notification.targetType === "user_ids") {
             userIds = (notification.targetData as string[]) || [];
-          } else if (notification.targetType === "all") {
+          } else if (
+            notification.targetType === "all" ||
+            notification.targetType === "segment"
+          ) {
             const users = await this.prisma.user.findMany({
-              where: { isBanned: false },
-              select: { id: true },
-            });
-            userIds = users.map((u) => u.id);
-          } else if (notification.targetType === "segment") {
-            const criteria = notification.targetData as Record<string, any>;
-            const where: any = { isBanned: false };
-
-            if (criteria?.isSeller !== undefined) {
-              where.isSeller = criteria.isSeller;
-            }
-            if (criteria?.membershipTier) {
-              where.membership = { tier: { type: criteria.membershipTier } };
-            }
-
-            const users = await this.prisma.user.findMany({
-              where,
+              where: audienceUserWhere(
+                notification.targetType,
+                notification.targetData as Record<string, any> | null,
+              ),
               select: { id: true },
             });
             userIds = users.map((u) => u.id);
@@ -134,14 +126,30 @@ export class ScheduledNotificationScheduler implements OnModuleInit {
           }
 
           // Send the notification using AdminService
-          await this.adminService.sendNotification(notification.createdBy, {
-            title: notification.title,
-            body: notification.body,
-            channels: notification.channels as string[],
-            targetType: "user_ids",
-            userIds,
-            data: undefined,
-          });
+          const result = await this.adminService.sendNotification(
+            notification.createdBy,
+            {
+              title: notification.title,
+              body: notification.body,
+              channels: notification.channels as string[],
+              targetType: "user_ids",
+              userIds,
+              data: undefined,
+              // Zamanlanırken saklanan e-posta içeriği ve tür aynen taşınır.
+              emailSubject: notification.emailSubject ?? undefined,
+              emailHtml: notification.emailHtml ?? undefined,
+              mailingType: notification.mailingType as MailingType,
+            },
+          );
+
+          // Yalnız e-posta kanalı seçildiyse gerçekten ulaşanlar e-posta alıcılarıdır
+          // (pazarlamada izinsiz/çıkmış kullanıcılar elenir); push/uygulama içi
+          // kanalda tüm hedef bildirilmiş sayılır.
+          const channels = notification.channels as string[];
+          const reached =
+            channels.length > 0 && channels.every((c) => c === "email")
+              ? (result?.emailRecipientCount ?? userIds.length)
+              : userIds.length;
 
           // Mark as sent
           await this.prisma.scheduledNotification.update({
@@ -149,13 +157,13 @@ export class ScheduledNotificationScheduler implements OnModuleInit {
             data: {
               status: "sent",
               sentAt: new Date(),
-              sentCount: userIds.length,
+              sentCount: reached,
             },
           });
 
           sent++;
           log(
-            `bildirim ${notification.id} → ${userIds.length} kullanıcıya gönderildi`,
+            `bildirim ${notification.id} → ${reached} kullanıcıya gönderildi`,
           );
           this.logger.log(
             `Scheduled notification ${notification.id} sent to ${userIds.length} users`,
