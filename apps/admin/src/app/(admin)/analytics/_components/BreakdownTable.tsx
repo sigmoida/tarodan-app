@@ -90,8 +90,7 @@ export function BoostPackageTable({
     () => [
       col.text<AnalyticsBoostPackageRow>(
         t("admin.analytics.table.label"),
-        (row) =>
-          row.label || row.key || t("admin.analytics.uncategorized"),
+        (row) => row.label || row.key || t("admin.analytics.uncategorized"),
       ),
       col.number<AnalyticsBoostPackageRow>(
         t("admin.analytics.table.count"),

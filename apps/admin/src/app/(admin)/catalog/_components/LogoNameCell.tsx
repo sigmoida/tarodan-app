@@ -22,7 +22,9 @@ export function LogoNameCell({
         fallback={name.charAt(0).toUpperCase()}
       />
       <div className="min-w-0">
-        <TruncatedText className="font-medium text-heading">{name}</TruncatedText>
+        <TruncatedText className="font-medium text-heading">
+          {name}
+        </TruncatedText>
         <TruncatedText className="text-xs text-muted">{slug}</TruncatedText>
       </div>
     </div>

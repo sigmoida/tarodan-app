@@ -79,9 +79,13 @@ export function MediaBrowser() {
           ),
         { id: "preview", minWidth: 100 },
       ),
-      col.code<MediaFileRow>(t("admin.system.media.file"), (file) => file.name, {
-        id: "file",
-      }),
+      col.code<MediaFileRow>(
+        t("admin.system.media.file"),
+        (file) => file.name,
+        {
+          id: "file",
+        },
+      ),
       col.text<MediaFileRow>(
         t("admin.system.media.sizeCol"),
         (file) => fmtFileSize(file.size),

@@ -20,10 +20,7 @@ export function CancellationInfoCell({ row }: { row: AdminCancellationRow }) {
   const t = useTranslations();
   return (
     <div className="flex min-w-0 flex-col items-start gap-1">
-      <TextLink
-        href={cancellationDetailHref(row)}
-        className="block max-w-full"
-      >
+      <TextLink href={cancellationDetailHref(row)} className="block max-w-full">
         <TruncatedText className="font-mono font-medium">
           {row.number}
         </TruncatedText>

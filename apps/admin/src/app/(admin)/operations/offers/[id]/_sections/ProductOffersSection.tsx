@@ -39,10 +39,7 @@ export function ProductOffersSection({
       })),
       col.money(t("common.amount"), (s: OfferRow) => s.amount),
       col.badge(t("common.status"), (s: OfferRow) => (
-        <Badge
-          status={s.status}
-          config={statusConfig(offerStatusConfig, t)}
-        />
+        <Badge status={s.status} config={statusConfig(offerStatusConfig, t)} />
       )),
       col.custom(t("admin.operations.common.order"), (s: OfferRow) =>
         s.order ? (

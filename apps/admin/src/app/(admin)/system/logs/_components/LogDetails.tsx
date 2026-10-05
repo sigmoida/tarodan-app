@@ -16,23 +16,37 @@ export function ErrorDetail({ log }: { log: ErrorLog }) {
   return (
     <Panel tone="muted" className="space-y-3 text-sm">
       <DataList className="gap-y-1">
-        {log.endpoint && <Field label="Endpoint" mono>{log.endpoint}</Field>}
+        {log.endpoint && (
+          <Field label="Endpoint" mono>
+            {log.endpoint}
+          </Field>
+        )}
         {m?.status && (
-          <Field label={t("admin.system.logs.details.httpStatus")} mono>{m.status}</Field>
+          <Field label={t("admin.system.logs.details.httpStatus")} mono>
+            {m.status}
+          </Field>
         )}
         {m?.name && (
-          <Field label={t("admin.system.logs.details.errorType")} mono>{m.name}</Field>
+          <Field label={t("admin.system.logs.details.errorType")} mono>
+            {m.name}
+          </Field>
         )}
         {log.userId && (
-          <Field label={t("admin.system.logs.details.userId")} mono>{log.userId}</Field>
+          <Field label={t("admin.system.logs.details.userId")} mono>
+            {log.userId}
+          </Field>
         )}
         {/* Korelasyon kimliği: aynı isteğin konsol satırları bu kodla grep'lenir
             ve kullanıcı 500 ekranında aynı kodu görür. */}
         {log.requestId && (
-          <Field label={t("admin.system.logs.details.requestId")} mono>{log.requestId}</Field>
+          <Field label={t("admin.system.logs.details.requestId")} mono>
+            {log.requestId}
+          </Field>
         )}
         {m?.ip && (
-          <Field label={t("admin.system.logs.details.ipAddress")} mono>{m.ip}</Field>
+          <Field label={t("admin.system.logs.details.ipAddress")} mono>
+            {m.ip}
+          </Field>
         )}
         {m?.userAgent && (
           <Field label="User-Agent" mono>
@@ -77,7 +91,9 @@ export function ErrorDetail({ log }: { log: ErrorLog }) {
 
       {log.stackTrace && (
         <div>
-          <SectionTitle as="h4" size="sm" className="mb-1">Stack Trace</SectionTitle>
+          <SectionTitle as="h4" size="sm" className="mb-1">
+            Stack Trace
+          </SectionTitle>
           <pre className="max-h-48 overflow-auto whitespace-pre-wrap rounded border border-border bg-surface p-2 text-xs text-muted">
             {log.stackTrace}
           </pre>
@@ -93,9 +109,15 @@ export function AuditDetail({ log }: { log: AuditLog }) {
     <Panel tone="muted" className="space-y-3 text-sm">
       <DataList className="gap-y-1">
         <Field label="Admin">{log.admin?.email ?? log.adminUserId}</Field>
-        <Field label={t("admin.system.logs.action")}>{actionLabels(t)[log.action] ?? log.action}</Field>
-        <Field label={t("admin.system.logs.entityType")}>{entityLabels(t)[log.entityType] ?? log.entityType}</Field>
-        <Field label={t("admin.system.logs.details.entityId")} mono>{log.entityId}</Field>
+        <Field label={t("admin.system.logs.action")}>
+          {actionLabels(t)[log.action] ?? log.action}
+        </Field>
+        <Field label={t("admin.system.logs.entityType")}>
+          {entityLabels(t)[log.entityType] ?? log.entityType}
+        </Field>
+        <Field label={t("admin.system.logs.details.entityId")} mono>
+          {log.entityId}
+        </Field>
         {/* IP adresi satırı KALDIRILDI: createAuditLog istek bağlamına
             erişemediği için (6 pozisyonel parametre, ~20 servisten çağrılıyor,
             uygulamada CLS yok) bu kolon hiç yazılmıyor ve satır hiç dolmuyordu.

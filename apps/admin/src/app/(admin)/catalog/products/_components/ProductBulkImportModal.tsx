@@ -249,28 +249,28 @@ export function ProductBulkImportModal({
                 {images.map((image) => (
                   <li key={productImportFileKey(image)}>
                     <Panel padding="sm" className="flex items-center gap-3">
-                    <PhotoIcon className="h-5 w-5 shrink-0 text-primary-600" />
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate text-sm font-medium text-heading">
-                        {image.name}
-                      </p>
-                      <p className="text-xs text-muted">
-                        {fmtFileSize(image.size)}
-                      </p>
-                    </div>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon"
-                      disabled={isProcessing}
-                      aria-label={t(
-                        "admin.catalog.products.bulkImportRemoveFile",
-                        { name: image.name },
-                      )}
-                      onClick={() => removeImage(image)}
-                    >
-                      <XMarkIcon className="h-5 w-5" />
-                    </Button>
+                      <PhotoIcon className="h-5 w-5 shrink-0 text-primary-600" />
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-sm font-medium text-heading">
+                          {image.name}
+                        </p>
+                        <p className="text-xs text-muted">
+                          {fmtFileSize(image.size)}
+                        </p>
+                      </div>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        disabled={isProcessing}
+                        aria-label={t(
+                          "admin.catalog.products.bulkImportRemoveFile",
+                          { name: image.name },
+                        )}
+                        onClick={() => removeImage(image)}
+                      >
+                        <XMarkIcon className="h-5 w-5" />
+                      </Button>
                     </Panel>
                   </li>
                 ))}
@@ -289,43 +289,43 @@ export function ProductBulkImportModal({
         {(isProcessing || errors.length > 0 || result) && (
           <div ref={statusRef} aria-live="polite">
             <Panel>
-            <p className="font-medium text-heading">
-              {t("admin.catalog.products.bulkImportProgressTitle")}
-            </p>
-            <div className="mt-3 flex items-start gap-3">
-              {isProcessing ? (
-                <Spinner size="sm" className="mt-0.5 shrink-0" />
-              ) : result ? (
-                <CheckCircleIcon className="h-5 w-5 shrink-0 text-success-600" />
-              ) : (
-                <ExclamationTriangleIcon className="h-5 w-5 shrink-0 text-danger-600" />
-              )}
-              <div>
-                <p className="text-sm font-medium text-heading">
-                  {isProcessing
-                    ? uploadProgress < 100
-                      ? t("admin.catalog.products.bulkImportUploading", {
-                          progress: uploadProgress,
-                        })
-                      : t("admin.catalog.products.bulkImportProcessing")
-                    : result
-                      ? t("admin.catalog.products.bulkImportProcessCompleted")
-                      : t("admin.catalog.products.bulkImportProcessFailed")}
-                </p>
-                <p className="mt-1 text-sm text-muted">
-                  {isProcessing
-                    ? uploadProgress < 100
-                      ? t("admin.catalog.products.bulkImportUploadingHelp")
-                      : t("admin.catalog.products.bulkImportProcessingHelp")
-                    : result
-                      ? t("admin.catalog.products.bulkImportCompletedHelp")
-                      : t("admin.catalog.products.bulkImportFailedHelp")}
-                </p>
+              <p className="font-medium text-heading">
+                {t("admin.catalog.products.bulkImportProgressTitle")}
+              </p>
+              <div className="mt-3 flex items-start gap-3">
+                {isProcessing ? (
+                  <Spinner size="sm" className="mt-0.5 shrink-0" />
+                ) : result ? (
+                  <CheckCircleIcon className="h-5 w-5 shrink-0 text-success-600" />
+                ) : (
+                  <ExclamationTriangleIcon className="h-5 w-5 shrink-0 text-danger-600" />
+                )}
+                <div>
+                  <p className="text-sm font-medium text-heading">
+                    {isProcessing
+                      ? uploadProgress < 100
+                        ? t("admin.catalog.products.bulkImportUploading", {
+                            progress: uploadProgress,
+                          })
+                        : t("admin.catalog.products.bulkImportProcessing")
+                      : result
+                        ? t("admin.catalog.products.bulkImportProcessCompleted")
+                        : t("admin.catalog.products.bulkImportProcessFailed")}
+                  </p>
+                  <p className="mt-1 text-sm text-muted">
+                    {isProcessing
+                      ? uploadProgress < 100
+                        ? t("admin.catalog.products.bulkImportUploadingHelp")
+                        : t("admin.catalog.products.bulkImportProcessingHelp")
+                      : result
+                        ? t("admin.catalog.products.bulkImportCompletedHelp")
+                        : t("admin.catalog.products.bulkImportFailedHelp")}
+                  </p>
+                </div>
               </div>
-            </div>
-            {isProcessing && uploadProgress < 100 && (
-              <ProgressBar value={uploadProgress} className="mt-3" />
-            )}
+              {isProcessing && uploadProgress < 100 && (
+                <ProgressBar value={uploadProgress} className="mt-3" />
+              )}
             </Panel>
           </div>
         )}

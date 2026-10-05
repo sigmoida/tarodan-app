@@ -81,4 +81,3 @@ export interface Review {
   isVerifiedPurchase: boolean;
   user: { id: string; displayName: string; email: string; avatarUrl?: string };
 }
-

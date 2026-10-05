@@ -455,7 +455,9 @@ export function SendNotificationForm({
                     <EmptyState
                       size="compact"
                       icon={false}
-                      title={t("admin.marketing.notifications.emailPreviewEmpty")}
+                      title={t(
+                        "admin.marketing.notifications.emailPreviewEmpty",
+                      )}
                     />
                   )}
                 </div>
@@ -471,7 +473,10 @@ export function SendNotificationForm({
                 />
               )}
 
-              <DataList columns={1} className="gap-y-2 border-t border-border pt-2">
+              <DataList
+                columns={1}
+                className="gap-y-2 border-t border-border pt-2"
+              >
                 <Field label={t("admin.marketing.notifications.targetLabel")}>
                   {
                     targets.find((target) => target.key === values.targetType)

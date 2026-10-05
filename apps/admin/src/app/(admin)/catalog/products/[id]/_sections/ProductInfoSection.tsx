@@ -85,7 +85,9 @@ export function ProductInfoSection({ product }: { product: ProductDetail }) {
         </Field>
       </DataList>
       <DataList className="border-t border-border pt-3">
-        <Field layout="stacked" label={t("product.productCode")}>{product.productCode}</Field>
+        <Field layout="stacked" label={t("product.productCode")}>
+          {product.productCode}
+        </Field>
         <Field layout="stacked" label={t("product.brand")}>
           {product.brand?.name ?? t("admin.catalog.products.notSpecified")}
         </Field>
