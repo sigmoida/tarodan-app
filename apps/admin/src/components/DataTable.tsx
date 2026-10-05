@@ -137,6 +137,17 @@ export function DataTable<T>({
   const isInitialLoad = loading && data.length === 0;
   const isRefetching = loading && data.length > 0;
 
+  // Boş liste: sütun başlıkları ve yatay kaydırmalı tablo yerine TEK bir boş
+  // durum kartı. (Tablo içindeki hücrede ortalanınca geniş tablolarda görünür
+  // alanın dışına kayıyordu.)
+  if (!loading && data.length === 0) {
+    return (
+      <div className="rounded-lg border border-border bg-surface-elevated shadow-sm">
+        <EmptyState title={resolvedEmptyText} action={emptyAction} />
+      </div>
+    );
+  }
+
   return (
     <div className="overflow-hidden rounded-lg border border-border bg-surface-elevated shadow-sm">
       <div className="overflow-x-auto overscroll-x-contain [-webkit-overflow-scrolling:touch]">
@@ -217,16 +228,6 @@ export function DataTable<T>({
                   className="p-8 text-center text-muted"
                 >
                   <Spinner size="md" className="mx-auto" />
-                </TableCell>
-              </TableRow>
-            ) : data.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={colSpan} className="p-0">
-                  <EmptyState
-                    size="compact"
-                    title={resolvedEmptyText}
-                    action={emptyAction}
-                  />
                 </TableCell>
               </TableRow>
             ) : (

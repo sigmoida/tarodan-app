@@ -35,7 +35,8 @@ export function ResourceListToolbar({
   className?: string;
 }) {
   const t = useTranslations();
-  const { rows, exportRef, exportRowsRef, exportName } = useResourceList();
+  const { rows, exportRef, exportRowsRef, exportName, isPristineEmpty } =
+    useResourceList();
 
   const onExport = () => {
     const columns = exportRef.current;
@@ -52,6 +53,10 @@ export function ResourceListToolbar({
       "text/csv;charset=utf-8;",
     );
   };
+
+  // Kayıt yok ve hiçbir arama/filtre daraltmıyor: aranacak, süzülecek ya da
+  // dışa aktarılacak bir şey yok — yalnız boş durum kartı görünür.
+  if (isPristineEmpty) return null;
 
   return (
     <div

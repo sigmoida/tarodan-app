@@ -1,6 +1,7 @@
 "use client";
 
 import { type ReactNode } from "react";
+import { useTranslations } from "next-intl";
 import { DataTable, type ColumnDef } from "@/components/DataTable";
 import { useResourceList } from "@/context/ResourceListContext";
 
@@ -22,8 +23,19 @@ export function ResourceListTable<T>({
   emptyText?: string;
   emptyAction?: ReactNode;
 }) {
-  const { rows, isLoading, getRowId, selection, sort, setSort } =
-    useResourceList<T>();
+  const {
+    rows,
+    isLoading,
+    getRowId,
+    selection,
+    sort,
+    setSort,
+    isPristineEmpty,
+  } = useResourceList<T>();
+  const t = useTranslations();
+  // Sayfanın "henüz kayıt yok" metni yalnız liste GERÇEKTEN boşken doğrudur;
+  // arama/filtre sonucu boşalan listede "sonuç bulunamadı" denir.
+  const resolvedEmptyText = isPristineEmpty ? emptyText : t("common.noResults");
   return (
     <DataTable
       columns={columns}
@@ -34,7 +46,7 @@ export function ResourceListTable<T>({
       rowClassName={rowClassName}
       renderExpanded={renderExpanded}
       expandedId={expandedId}
-      emptyText={emptyText}
+      emptyText={resolvedEmptyText}
       emptyAction={emptyAction}
       selectable={selection.selectable}
       selectedIds={selection.selectedIds}
