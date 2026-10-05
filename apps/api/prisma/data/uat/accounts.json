@@ -1,0 +1,19 @@
+{
+  "_note": "Şifre buraya YAZILMAZ; UAT_SEED_PASSWORD env'inden okunur. Yeni kişi eklemek = ilgili listeye tek satır. Üye ve personel listeleri ayrıdır: aynı adres ikisinde birden olamaz. Üyelerin yasal ad/TCKN ve onay kayıtları BİLİNÇLİ olarak boş: kişiler zorunlu onay ve kimlik diyaloglarını kendileri geçer.",
+  "members": [
+    { "email": "nur@tarodan.com.tr", "displayName": "Nur" },
+    { "email": "serhat@tarodan.com.tr", "displayName": "Serhat" }
+  ],
+  "staff": [
+    {
+      "email": "tarodan@tarodan.com.tr",
+      "displayName": "Tarodan",
+      "role": "super_admin"
+    },
+    {
+      "email": "developers@tarodan.com.tr",
+      "displayName": "Tarodan Developers",
+      "role": "super_admin"
+    }
+  ]
+}

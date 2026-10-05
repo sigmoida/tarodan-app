@@ -470,7 +470,7 @@ DEĞERLERİ değil yalnız dönem ve satır sayısı düşer.
 GitHub → Actions → **Staging Reset** → `confirm` alanına `STAGING` yaz.
 `.github/workflows/staging-reset.yml` SSH ile `scripts/staging-reset-remote.sh`
 çalıştırır: pg_dump yedeği (opsiyonel, `skip_backup`) → api+worker durdurulur →
-`prisma migrate reset --force` + derlenmiş seed → redis flush + bayat ES
+`prisma migrate reset --force` + derlenmiş UAT seed (+ görsel senkronu) → redis flush + bayat ES
 indeksleri silinir → container'lar açılır (API boş indeksleri taze DB'den
 kendisi doldurur, `syncIndexIfEmpty`).
 
@@ -484,6 +484,87 @@ staging host içermeli; (2) görselli seed için `S3_ENV_PREFIX=staging` zorunlu
 > (+ `.../dev/reindex-collections`) ya da 5 dk'lık delta / saatlik reconcile
 > cron'unu bekle. Listedeki sayı = `active` + `sold` ürünler; pending/rejected/
 > suspended/reserved indexlenmez.
+
+### Staging / UAT
+
+Staging artık gerçek bir kabul (UAT) ortamıdır: Staging Reset **demo seed'ini
+(`seed.ts`) değil UAT seed'ini (`apps/api/prisma/seed-uat.ts`) koşar**. Demo seed
+yalnız lokal geliştirme içindir (`pnpm dev:seed`); silinmedi.
+
+**Seed neyi içerir**
+
+| Katman                        | İçerik                                                                                                                                                                                                                                                                                                                                     |
+| ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Referans (production'la aynı) | Üyelik katmanları, vergi, kargo tarifesi, ayarlar, katalog (`data/launch/*.json`) ve ACTIVE komisyon kural seti. Lansman seed'iyle aynı fonksiyonlar (`seed-launch-core.ts`) — ikinci kopya yok.                                                                                                                                           |
+| Üyeler (düz kullanıcı)        | `nur@tarodan.com.tr`, `serhat@tarodan.com.tr`: e-posta doğrulanmış, aktif, bireysel satıcı. Varsayılan katmanda (üyelik satırı yok = Free) alır/satar; takas Free'de kapalıdır. **Yasal ad/TCKN, onay kayıtları ve kullanıcı adı bilerek boş**: kişiler zorunlu onay/kimlik/kullanıcı-adı diyaloglarını kendileri geçer (UAT'nin parçası). |
+| Personel (admin panel)        | `tarodan@tarodan.com.tr`, `developers@tarodan.com.tr`: `super_admin`. `users` + `admin_users` satırı (bootstrap-production-admin ile aynı biçim); personel web vitrinine giremez, üye hesabıyla karışmaz.                                                                                                                                  |
+| Başlangıç ilanları            | Her üyeye 4 ACTIVE ilan (`data/uat/listings.json`), lansman kataloğundan; ilan sahipleri birbirinden alışveriş yapabilsin diye. Free katman kotasının (5) altında — spec bunu kilitler.                                                                                                                                                    |
+| Depo adresi                   | İlk süper adminin adresi (`/health/ready` ister); adminlerin görünen adına dokunulmaz.                                                                                                                                                                                                                                                     |
+
+Sipariş, teklif, takas, ödeme, bildirim vb. operasyonel veri **yoktur**. Kayıt
+herkese açıktır: izin listesi yok, yeni kişiler staging'e normal kayıt olur.
+
+**İlan görselleri.** Seed yalnız Postgres'e yazar; reset workflow'u ardından
+mevcut mekanizmayı (`seed-media.js`, `seed-assets/` → env-prefix'li S3 kopyası)
+koşar. İlan slug'ları `<seed-assets taban adı>-<n>` biçimindedir (spec doğrular)
+ve görseller **kategori/model olarak yakın ama birebir aynı olmayan** demo
+fotoğraflarıdır (katalogda yalnız Mini GT var). `skip_images` görsel adımını
+atlar; ilanlar görselsiz kalır. `S3_ENV_PREFIX=prod` iken görselli reset zaten
+reddedilir.
+
+**Yeni kişi eklemek** = `apps/api/prisma/data/uat/accounts.json` içindeki
+`members` (düz kullanıcı) ya da `staff` (`role` ile) listesine tek satır:
+
+```json
+{ "email": "yeni@tarodan.com.tr", "displayName": "Yeni" }
+```
+
+Üye ve personel listeleri ayrıdır; aynı adres ikisinde olamaz (spec/doğrulama
+reddeder). Değişiklik bir sonraki reset'te devreye girer; reset yapmadan eklemek
+için derlenmiş seed'i elle koş (aşağıda) — mevcut hesaplara dokunmaz.
+
+**Gerekli secret / env**
+
+| Ad                                  | Nerede                              | Not                                                                                                                                                   |
+| ----------------------------------- | ----------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `UAT_SEED_PASSWORD`                 | GitHub `staging` environment secret | Zorunlu; 16+ karakter, en çok 72 bayt. Tüm sabit hesapların **başlangıç** şifresi; asla commit'lenmez/loglanmaz. Kişiler girişten sonra değiştirmeli. |
+| `UAT_SEED_RESET_PASSWORDS=1`        | yalnız elle koşuda                  | Verilmezse var olan hesabın şifresi DEĞİŞMEZ. Workflow bunu geçmez (reset zaten DB'yi sıfırlıyor).                                                    |
+| `SERVER_*`, `COOLIFY_STAGING_UUIDS` | GitHub secrets                      | Mevcut reset secret'ları (değişmedi).                                                                                                                 |
+
+Staging api imajı bu commit'i içermeli (`dist-seed/prisma/seed-uat.js`): önce
+staging'i deploy et, sonra reset çalıştır. Eksikse pre-flight, veritabanına
+dokunmadan durur.
+
+**Reset nasıl yapılır.** Actions → **Staging Reset** → `confirm=STAGING`. Önce
+`dry_run` ile dene: tüm guard'ları ve UAT seed pre-flight'ını (`seed-uat.js
+--check`: production reddi, şifre kuralı, veri dosyaları) veritabanına dokunmadan
+koşar. Guard'lar eskisi gibi: onay kelimesi, staging host kontrolü, S3 prefix
+kontrolü, yedek (`skip_backup`), ek olarak api `APP_ENV` tam olarak `staging`
+olmalı ve `UAT_SEED_PASSWORD` set olmalı. Seed de kendisi reddeder: derlenmiş
+konteynerde `APP_ENV=staging` değilse (boşsa bile) çalışmaz.
+
+Elle (reset'siz) koşu, yalnız api konteynerinde:
+
+```bash
+docker exec -e UAT_SEED_PASSWORD "$API_CID" sh -c 'cd /app && node dist-seed/prisma/seed-uat.js'
+```
+
+İdempotent: eksik hesabı/ilanı ekler, var olanın şifresini ve ilanını ezmez;
+mevcut personelin `admin_users` satırını veriyle eşitler.
+
+**Reset neyi yok eder.** Staging veritabanının TAMAMI (kayıt olan herkes dahil,
+siparişler, mesajlar, yüklenen içerik satırları) ve Redis'in seçili db'si
+silinir; ES indeksleri bayat kalır ve yeniden dolar. UAT'de testçilerin elle
+girdiği her şey gider — haftalık otomatik reset (`STAGING_WEEKLY_RESET=true`)
+açıksa bu her Pazartesi olur; UAT sürerken kapalı tut. Reset öncesi pg_dump
+yedeği `~/tarodan-staging-backups` altında son 5 kopya tutulur.
+
+**Elasticsearch.** Seed ES'e yazmaz. Workflow Redis'i temizleyip api'yi yeniden
+başlatır; açılışta api indeksleri garantiler ve 5 dakikada bir
+`search-periodic-sync` (DB↔ES fark > 2 ise delta senkron) ile saatlik
+`search-hourly-reconcile` işleri ACTIVE ilanları indeksler — ilanlar yeniden
+başlatmadan yaklaşık 5 dk içinde aranabilir olur. Bu işler worker rolünde
+koşar; staging'de worker (veya `PROCESS_ROLE=all`) ayakta olmalı.
 
 ### seed-assets
 
@@ -546,7 +627,8 @@ adımı bunu ayrıca doğrular.
 | -------- | -------------------- | -------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Referans | `seed-production.ts` | her API açılışında         | Uygulama açılsın diye gereken iskelet: üyelik satırları, vergi, platform hesabı, tarife kabuğu. Tüm upsert'lerin `update` dalı boş — girilen değeri ASLA ezmez. |
 | Lansman  | `seed-launch.ts`     | yalnız reset workflow'unda | Onaylanmış iş değerleri + katalog + kurumsal satıcı + komisyon seti + ilanlar. Veri `data/launch/*.json`'da.                                                    |
-| Demo     | `seed.ts`            | yalnız staging reset       | Demo kullanıcı/sipariş/takas senaryoları. Canlıya asla karışmaz.                                                                                                |
+| UAT      | `seed-uat.ts`        | yalnız staging reset       | Lansman referans verisi (aynı fonksiyonlar) + sabit gerçek kişiler + başlangıç ilanları. Production'da çalışmayı reddeder. Bkz. "Staging / UAT".                |
+| Demo     | `seed.ts`            | yalnız lokal geliştirme    | Demo kullanıcı/sipariş/takas senaryoları. Canlıya asla karışmaz; staging reset artık bunu koşmaz.                                                               |
 
 Demo ile canlı arasındaki bağ `src/common/seed-independence.spec.ts` ile CI'da
 kilitli: komisyon oranları bir dönem ortak config'ten geliyordu ve yerel "Araba"
