@@ -1,5 +1,5 @@
 import { ApiPropertyOptional } from "@nestjs/swagger";
-import { Transform } from "class-transformer";
+import { QueryBoolean } from "../../../common/transforms";
 import { IsBoolean, IsIn, IsOptional, IsString } from "class-validator";
 import {
   GIB_LISTING_STATUSES,
@@ -39,7 +39,7 @@ export class GibReportQueryDto extends AdminListQueryDto {
   /** Yalnız TCKN / vergi numarası hiçbir kaynakta bulunmayan satıcıların ilanları. */
   @ApiPropertyOptional({ example: true })
   @IsOptional()
-  @Transform(({ value }) => value === "true" || value === true)
+  @QueryBoolean()
   @IsBoolean()
   identityIncomplete?: boolean;
 }

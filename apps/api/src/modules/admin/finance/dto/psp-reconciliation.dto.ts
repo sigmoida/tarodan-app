@@ -10,6 +10,7 @@ import {
   Min,
 } from "class-validator";
 import { Transform, Type } from "class-transformer";
+import { QueryBoolean } from "../../../../common/transforms";
 import { ApiPropertyOptional, ApiProperty } from "@nestjs/swagger";
 import { PaytrMatchStatus, PaytrMerchant } from "@prisma/client";
 import { BlankToUndefined } from "../../../../common/transforms";
@@ -62,7 +63,7 @@ export class PspStatementLinesQueryDto {
   @ApiPropertyOptional({ example: false })
   @IsOptional()
   @BlankToUndefined()
-  @Transform(({ value }) => value === true || value === "true")
+  @QueryBoolean()
   @IsBoolean()
   includeResolved?: boolean;
 

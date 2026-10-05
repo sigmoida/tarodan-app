@@ -8,7 +8,7 @@ import {
   IsUUID,
 } from "class-validator";
 import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
-import { Transform } from "class-transformer";
+import { QueryBoolean } from "../../../common/transforms";
 import { AdminListQueryDto } from "../../../common/list";
 import { BULK_PRODUCT_ACTION_MAX } from "./admin-action.dto";
 
@@ -29,13 +29,13 @@ export class AdminCollectionQueryDto extends AdminListQueryDto {
 
   @ApiPropertyOptional({ example: true })
   @IsOptional()
-  @Transform(({ value }) => value === "true" || value === true)
+  @QueryBoolean()
   @IsBoolean()
   isPublic?: boolean;
 
   @ApiPropertyOptional({ example: true })
   @IsOptional()
-  @Transform(({ value }) => value === "true" || value === true)
+  @QueryBoolean()
   @IsBoolean()
   isFeatured?: boolean;
 

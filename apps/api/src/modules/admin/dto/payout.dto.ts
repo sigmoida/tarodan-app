@@ -7,7 +7,7 @@ import {
   IsNotEmpty,
   MaxLength,
 } from "class-validator";
-import { Transform } from "class-transformer";
+import { QueryBoolean } from "../../../common/transforms";
 import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
 import { AdminListQueryDto } from "../../../common/list";
 
@@ -46,7 +46,7 @@ export class PayoutTransactionsQueryDto extends AdminListQueryDto {
     example: true,
   })
   @IsOptional()
-  @Transform(({ value }) => value === "true" || value === true)
+  @QueryBoolean()
   @IsBoolean()
   earlyReleased?: boolean;
 }
@@ -92,7 +92,7 @@ export class PayoutExportQueryDto {
     example: true,
   })
   @IsOptional()
-  @Transform(({ value }) => value === "true" || value === true)
+  @QueryBoolean()
   @IsBoolean()
   earlyReleased?: boolean;
 }

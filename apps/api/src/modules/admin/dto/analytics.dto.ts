@@ -14,7 +14,7 @@ import {
   type ValidatorConstraintInterface,
 } from "class-validator";
 import { ApiPropertyOptional, ApiProperty } from "@nestjs/swagger";
-import { Transform } from "class-transformer";
+import { QueryBoolean } from "../../../common/transforms";
 import { OrderStatus } from "@prisma/client";
 import {
   ANALYTICS_EXPORT_FORMATS,
@@ -252,7 +252,7 @@ export class AnalyticsRangeQueryDto implements AnalyticsRangeQuery {
     description: "Also measure the preceding window of equal length",
   })
   @IsOptional()
-  @Transform(({ value }) => value === true || value === "true")
+  @QueryBoolean()
   @IsBoolean()
   compare?: boolean;
 }

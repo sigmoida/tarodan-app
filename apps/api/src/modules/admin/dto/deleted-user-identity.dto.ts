@@ -1,5 +1,6 @@
 import { ApiPropertyOptional, ApiProperty } from "@nestjs/swagger";
-import { Transform, Type } from "class-transformer";
+import { Type } from "class-transformer";
+import { QueryBoolean } from "../../../common/transforms";
 import {
   IsBoolean,
   IsIn,
@@ -27,7 +28,7 @@ export class DeletedUserIdentityQueryDto extends AdminListQueryDto {
 
   @ApiPropertyOptional({ example: true })
   @IsOptional()
-  @Transform(({ value }) => value === "true" || value === true)
+  @QueryBoolean()
   @IsBoolean()
   wasSeller?: boolean;
 
@@ -37,7 +38,7 @@ export class DeletedUserIdentityQueryDto extends AdminListQueryDto {
    */
   @ApiPropertyOptional({ example: true })
   @IsOptional()
-  @Transform(({ value }) => value === "true" || value === true)
+  @QueryBoolean()
   @IsBoolean()
   retentionExpired?: boolean;
 }
@@ -67,7 +68,7 @@ export class DeletedUserIdentityExportQueryDto {
 
   @ApiPropertyOptional({ example: true })
   @IsOptional()
-  @Transform(({ value }) => value === "true" || value === true)
+  @QueryBoolean()
   @IsBoolean()
   wasSeller?: boolean;
 }
