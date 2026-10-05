@@ -45,6 +45,8 @@ import { AdminUserAccountService } from "./users/admin-user-account.service";
 import { AdminDeletedIdentityService } from "./users/admin-deleted-identity.service";
 import { AdminConsentService } from "./users/admin-consent.service";
 import { AdminConsentController } from "./users/admin-consent.controller";
+import { AdminGibReportService } from "./finance/gib-report/admin-gib-report.service";
+import { AdminGibReportController } from "./finance/gib-report/admin-gib-report.controller";
 import { ConsentModule } from "../consent/consent.module";
 import { AdminStaffService } from "./users/admin-staff.service";
 import { AdminProductService } from "./catalog/admin-product.service";
@@ -180,6 +182,7 @@ import { scheduledProcessors } from "../../workers/scheduled-processors";
     AdminUserController,
     AdminDeletedIdentityController,
     AdminConsentController,
+    AdminGibReportController,
     AdminProductController,
     AdminOrderController,
     AdminAnalyticsController,
@@ -221,6 +224,7 @@ import { scheduledProcessors } from "../../workers/scheduled-processors";
     AdminUserAccountService,
     AdminDeletedIdentityService,
     AdminConsentService,
+    AdminGibReportService,
     AdminStaffService,
     AdminProductService,
     AdminProductBulkImportService,

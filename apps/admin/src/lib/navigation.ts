@@ -473,6 +473,19 @@ export function getNavGroups(t: T): NavGroup[] {
           description: t("admin.nav.items.tax.description"),
           permission: "tax",
         },
+        {
+          // Vergi idaresine bildirilecek ilan/satıcı verisi: toplu TCKN taşıdığı
+          // için Vergi Ayarları ile aynı `tax` iznine bağlı (API: PERMISSION_MAP
+          // "gib-report").
+          name: t("admin.nav.items.gibReport.name"),
+          href: "/finance/gib-report",
+          icon: ClipboardDocumentListIcon,
+          description: t("admin.nav.items.gibReport.description"),
+          keywords: t("admin.nav.items.gibReport.keywords")
+            .split(",")
+            .map((k) => k.trim()),
+          permission: "tax",
+        },
       ],
     },
     {
