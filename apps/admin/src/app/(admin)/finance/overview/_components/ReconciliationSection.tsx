@@ -2,7 +2,6 @@
 
 "use client";
 
-import Link from "next/link";
 import {
   CheckCircleIcon,
   ExclamationTriangleIcon,
@@ -10,6 +9,7 @@ import {
 import { Badge } from "@tarodan/ui";
 import { useTranslations } from "next-intl";
 import { MetricCard } from "@/components/MetricCard";
+import { TextLink } from "@/components/TextLink";
 import { SectionCard } from "@/components/detail/SectionCard";
 import { fmtTry } from "@/lib/format";
 import type {
@@ -50,13 +50,7 @@ function LineRow({
   );
   return (
     <div className="flex items-center justify-between gap-3 py-1.5">
-      {line.href ? (
-        <Link href={line.href} className="hover:underline">
-          {text}
-        </Link>
-      ) : (
-        text
-      )}
+      {line.href ? <TextLink href={line.href}>{text}</TextLink> : text}
       <span
         className={`tabular-nums ${emphasis ? "font-semibold text-heading" : ""}`}
       >
