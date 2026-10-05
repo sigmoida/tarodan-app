@@ -228,7 +228,22 @@ describe("eylem çözümü", () => {
   });
 
   it("henüz açılmamış bir eylem DB'ye yazılmış olsa bile uygulanmaz", () => {
-    expect(pickTimingAction("offerExpiryHours", "extend_once")).toBe("expire");
+    expect(pickTimingAction("preparingDeadlineDays", "extend_once")).toBe(
+      "cancel_and_refund",
+    );
+  });
+
+  it("açılmış ikinci eylemler (ilan, teklif, takas paketleri) seçilebilir", () => {
+    expect(pickTimingAction("listingTtlDays", "auto_renew")).toBe("auto_renew");
+    expect(pickTimingAction("offerExpiryHours", "extend_once")).toBe(
+      "extend_once",
+    );
+    expect(pickTimingAction("tradeResponseHours", "extend_once")).toBe(
+      "extend_once",
+    );
+    expect(pickTimingAction("tradePaymentHours", "extend_once")).toBe(
+      "extend_once",
+    );
   });
 
   it("kayıtta tanımsız eylem varsayılana düşer", () => {

@@ -53,6 +53,8 @@ export interface OfferRow {
   cancelReason?: string | null;
   version: number;
   expiresAt: string;
+  /** extend_once: süre bir kez uzatıldıysa uzatma anı (null = hak kullanılmadı). */
+  extendedAt: string | null;
   createdAt: string;
   updatedAt: string;
   order: OfferLinkedOrder | null;

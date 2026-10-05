@@ -76,9 +76,6 @@ describe("TIMING_RULES kaydı", () => {
 
   // Bugünkü davranış = varsayılan eylem. Sonraki paketler yalnız bayrağı çevirir.
   const LATER_ACTIONS = {
-    offerExpiryHours: ["expire", "extend_once"],
-    tradeResponseHours: ["cancel", "extend_once"],
-    tradePaymentHours: ["cancel", "extend_once"],
     preparingDeadlineDays: ["cancel_and_refund", "extend_once"],
   } satisfies Partial<
     Record<TimingRuleId, [TimingExpiryAction, TimingExpiryAction]>
@@ -95,20 +92,26 @@ describe("TIMING_RULES kaydı", () => {
   );
 
   // Bayrağı çevrilmiş (davranışı yazılmış) ikinci eylemler: ikisi de seçilebilir.
+  // extend_once davranışını ilgili zamanlayıcı okur (offer-scheduler,
+  // trade-reconciliation).
   const ENABLED_ACTIONS = {
     listingTtlDays: ["deactivate", "auto_renew"],
+    offerExpiryHours: ["expire", "extend_once"],
+    tradeResponseHours: ["cancel", "extend_once"],
+    tradePaymentHours: ["cancel", "extend_once"],
   } satisfies Partial<
     Record<TimingRuleId, [TimingExpiryAction, TimingExpiryAction]>
   >;
 
   it.each(Object.entries(ENABLED_ACTIONS))(
-    "%s — ikinci eylemi açık ve seçilebilir",
+    "%s — ikinci eylemi açık ve seçilebilir, varsayılan eylem değişmedi",
     (id, [current, enabled]) => {
       expect(TIMING_RULES[id as TimingRuleId].actions).toEqual([
         { action: current, available: true },
         { action: enabled, available: true },
       ]);
       expect(isSelectableTimingAction(id as TimingRuleId, enabled)).toBe(true);
+      expect(TIMING_RULES[id as TimingRuleId].defaultAction).toBe(current);
     },
   );
 

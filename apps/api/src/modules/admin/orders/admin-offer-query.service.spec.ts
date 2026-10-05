@@ -87,6 +87,24 @@ describe("AdminOfferQueryService", () => {
     ).not.toContain("isTest");
   });
 
+  /** extend_once: yönetici teklifin uzatıldığını ve ne zaman uzatıldığını görür. */
+  it("exposes extendedAt (null until the one-time extension is used)", async () => {
+    const { service, prisma } = makeService();
+    const extendedAt = new Date(now - 1800_000);
+    prisma.offer.findMany.mockResolvedValue([
+      row({ id: "plain" }),
+      row({ id: "extended", extendedAt }),
+    ]);
+    prisma.offer.count.mockResolvedValue(2);
+
+    const result = await service.getOffers({} as any);
+
+    expect(result.data.map((o: any) => [o.id, o.extendedAt ?? null])).toEqual([
+      ["plain", null],
+      ["extended", extendedAt],
+    ]);
+  });
+
   it("effectiveStatus: süresi geçmiş pending → expired, diğerleri aynen", () => {
     expect(
       AdminOfferQueryService.effectiveStatus({

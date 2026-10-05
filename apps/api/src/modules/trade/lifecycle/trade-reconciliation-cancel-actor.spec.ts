@@ -22,6 +22,8 @@ describe("TradeReconciliationService — iptal aktörü", () => {
       tradeCommon: { invalidateProductCachesForTrade: jest.fn() },
       tradeShipment: { cancelSuratShipmentsForTrade: jest.fn() },
       eventService: undefined,
+      // extend_once kapalı (varsayılan eylem): iptal yolu değişmeden çalışır.
+      tradeExtension: { planForRun: jest.fn().mockResolvedValue({}) },
       // Bu spec yalnız iptal yazımına bakar; yan süpürmeler susturulur.
       autoResolveLostParcelTrades: jest.fn().mockResolvedValue(0),
       startPendingTradeConfirmationWindows: jest.fn().mockResolvedValue(0),

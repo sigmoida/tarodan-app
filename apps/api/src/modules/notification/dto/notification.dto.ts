@@ -40,6 +40,8 @@ export enum NotificationType {
   OFFER_COUNTER_ACCEPTED = "offer_counter_accepted",
   OFFER_EXPIRED = "offer_expired",
   OFFER_EXPIRED_SELLER = "offer_expired_seller",
+  /** Teklif süresi bir kez uzatıldı (extend_once) — sırası gelen tarafa gider. */
+  OFFER_EXTENDED = "offer_extended",
   OFFER_PAYMENT_EXPIRED = "offer_payment_expired",
   OFFER_CANCELLED_OUT_OF_STOCK = "offer_cancelled_out_of_stock",
   /** İlan satıcı tarafından silindiği için teklif kapandı (stok bitişi DEĞİL). */
@@ -63,6 +65,11 @@ export enum NotificationType {
   TRADE_SHIPPED = "trade_shipped",
   TRADE_COMPLETED = "trade_completed",
   TRADE_AUTO_CANCELLED = "trade_auto_cancelled",
+  // Takas yanıt / ödeme süresi bir kez uzatıldı (extend_once) — işlem sırası gelen tarafa.
+  TRADE_RESPONSE_EXTENDED = "trade_response_extended",
+  TRADE_PAYMENT_EXTENDED = "trade_payment_extended",
+  // Ödemesini yapmış tarafa: karşı tarafa ödeme için ek süre verildi.
+  TRADE_PAYMENT_EXTENDED_PAID = "trade_payment_extended_paid",
   // Admin uyarısı: takas depoya ulaştı ama süresi doldu — elle force-cancel-stuck gerekiyor.
   TRADE_STUCK_AT_WAREHOUSE = "trade_stuck_at_warehouse",
   // Admin uyarısı: sipariş uzun süredir kargoda ve taşıyıcıdan teslim raporu yok.

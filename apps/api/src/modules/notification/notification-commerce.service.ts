@@ -11,6 +11,7 @@ import {
   ALL_ORDER_CANCEL_PARTIES,
   type OrderCancelNoticeParty,
 } from "./helpers/order-cancel-notice";
+import { formatNotificationDeadline } from "./helpers/notification-deadline";
 import { StorageService } from "../storage/storage.service";
 import { NotificationDispatchService } from "./notification-dispatch.service";
 import { frontendUrl as resolveFrontendUrl } from "../../config/app-urls";
@@ -265,6 +266,33 @@ export class NotificationCommerceService {
       type: NotificationType.OFFER_EXPIRED_SELLER,
       channels: [NotificationChannel.IN_APP],
       data,
+    });
+  }
+
+  /**
+   * Teklif süresi bir kez uzatıldı (extend_once) → yalnız SIRASI GELEN tarafa
+   * (satıcı: gelen teklif, alıcı: satıcının karşı teklifi). Yeni bitiş anı metinde.
+   */
+  async notifyOfferExtended(params: {
+    recipientId: string;
+    audience: NotificationAudience;
+    offerId: string;
+    productId: string;
+    productTitle: string;
+    until: Date;
+  }) {
+    await this.dispatch.send({
+      userId: params.recipientId,
+      type: NotificationType.OFFER_EXTENDED,
+      channels: [NotificationChannel.PUSH, NotificationChannel.IN_APP],
+      data: {
+        offerId: params.offerId,
+        productId: params.productId,
+        productTitle: params.productTitle,
+        audience: params.audience,
+        until: formatNotificationDeadline(params.until),
+        untilAt: params.until.toISOString(),
+      },
     });
   }
 

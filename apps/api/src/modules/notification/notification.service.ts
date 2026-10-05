@@ -220,6 +220,17 @@ export class NotificationService {
     return this.commerce.notifyOfferExpired(params);
   }
 
+  async notifyOfferExtended(params: {
+    recipientId: string;
+    audience: NotificationAudience;
+    offerId: string;
+    productId: string;
+    productTitle: string;
+    until: Date;
+  }) {
+    return this.commerce.notifyOfferExtended(params);
+  }
+
   async notifyOrderCancelledOutOfStock(
     buyerId: string,
     productId: string,

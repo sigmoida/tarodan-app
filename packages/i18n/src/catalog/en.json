@@ -6655,6 +6655,7 @@
         "paymentStatus": "Payment status",
         "noPayment": "Payment not started",
         "expiresAt": "Expires",
+        "extendedAt": "Extended once on",
         "message": "Message",
         "detailTitle": "Offer · {product}",
         "notFound": "Offer not found",
@@ -9500,6 +9501,10 @@
         "title": "Offer Closed Unanswered",
         "message": "The offer you received for {productTitle} expired before you responded."
       },
+      "offerExtended": {
+        "title": "Offer Extended",
+        "message": "The offer for {productTitle} has been extended once. You can respond until {until}."
+      },
       "offerPaymentExpired": {
         "title": "Payment Window Expired",
         "message": "Your 24-hour payment window for {productTitle} expired and the order was closed. If the product is still available you can reopen the order and pay."
@@ -9671,6 +9676,18 @@
       "tradeAutoCancelled": {
         "title": "Trade Cancelled Automatically",
         "message": "{cancelReason}"
+      },
+      "tradeResponseExtended": {
+        "title": "Trade Response Time Extended",
+        "message": "The response time for the trade offer you received has been extended once. You can respond until {until}."
+      },
+      "tradePaymentExtended": {
+        "title": "Trade Payment Time Extended",
+        "message": "The payment time for your trade has been extended once. Complete your payment by {until}, otherwise the trade is cancelled."
+      },
+      "tradePaymentExtendedPaid": {
+        "title": "Other Party Given More Time to Pay",
+        "message": "You have completed your payment; the other party's payment time was extended once. New deadline: {until}. Your item stays reserved until then. If they still do not pay, the trade is cancelled and your payment is refunded in full."
       },
       "tradeStuckAtWarehouse": {
         "title": "Stuck Trade — Admin Action Required",

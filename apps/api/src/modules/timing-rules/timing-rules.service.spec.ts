@@ -230,9 +230,6 @@ describe("TimingRulesService", () => {
     it("henüz açılmamış eylemi doğrudan gönderilse bile reddeder", async () => {
       const { service, prisma } = makeService();
       for (const [id, action] of [
-        ["offerExpiryHours", "extend_once"],
-        ["tradeResponseHours", "extend_once"],
-        ["tradePaymentHours", "extend_once"],
         ["preparingDeadlineDays", "extend_once"],
       ] as const) {
         await expectRejected(

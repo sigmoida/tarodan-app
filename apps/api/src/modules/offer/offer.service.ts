@@ -39,7 +39,8 @@ import {
   toPublicIdentity,
 } from "../../common/helpers/public-identity";
 import { paginate } from "../../common/list";
-import { resolveTimingValue } from "../../common/timing-rules";
+import { offerExpiresAt } from "./helpers/offer-expiry";
+import { OfferExtensionPolicy } from "./offer-extension-policy.service";
 
 @Injectable()
 export class OfferService {
@@ -62,6 +63,9 @@ export class OfferService {
     private readonly userBlocks: UserBlockService,
     @Optional()
     private readonly feeDiscounts?: OrderFeeDiscountService,
+    // extend_once: cron'un uzatacağı teklif süresi dolmuş sayılmaz (tek kural).
+    @Optional()
+    private readonly extensionPolicy?: OfferExtensionPolicy,
   ) {
     this.minOfferPercentage = parseInt(
       this.configService.get("MIN_OFFER_PERCENTAGE") || "50",
@@ -76,14 +80,19 @@ export class OfferService {
    * damgalanır — değişiklik bekleyen teklifleri etkilemez.
    */
   private async offerExpiresAt(): Promise<Date> {
-    const hours = await resolveTimingValue(
-      this.prisma,
-      "offerExpiryHours",
-      this.configService,
-    );
-    const expiresAt = new Date();
-    expiresAt.setHours(expiresAt.getHours() + hours);
-    return expiresAt;
+    return offerExpiresAt(this.prisma, this.configService);
+  }
+
+  /**
+   * Teklifin süresi DOLDU mu? Süresi geçmiş ama bir sonraki cron turunun
+   * extend_once ile uzatacağı teklif dolmuş sayılmaz (kullanıcıya "expired"
+   * gösterilip sonra yeniden açılmasın); uzatılmayacak teklif bugünkü gibi
+   * dolmuştur. Karar `OfferExtensionPolicy` ile cron'la AYNI kuraldır.
+   */
+  private async hasLapsed(offerId: string, expiresAt: Date): Promise<boolean> {
+    const now = new Date();
+    if (now <= new Date(expiresAt)) return false;
+    return !(await this.extensionPolicy?.willExtend(offerId, now));
   }
 
   /**
@@ -323,7 +332,7 @@ export class OfferService {
       await this.assertNotBlocked(offerData.buyerId, offerData.sellerId);
 
       // Check expiration
-      if (new Date() > new Date(offerData.expiresAt)) {
+      if (await this.hasLapsed(offerId, offerData.expiresAt)) {
         // Auto-expire the offer
         await tx.offer.update({
           where: { id: offerId },
@@ -724,7 +733,7 @@ export class OfferService {
       }
 
       // Check expiration
-      if (new Date() > offer.expiresAt) {
+      if (await this.hasLapsed(offerId, offer.expiresAt)) {
         await tx.offer.update({
           where: { id: offerId },
           data: { status: OfferStatus.expired },
@@ -852,7 +861,7 @@ export class OfferService {
         );
       }
 
-      if (new Date() > offer.expiresAt) {
+      if (await this.hasLapsed(offerId, offer.expiresAt)) {
         await tx.offer.update({
           where: { id: offerId },
           data: { status: OfferStatus.expired },
@@ -1253,11 +1262,15 @@ export class OfferService {
   private async formatOfferResponse(offer: any) {
     const now = new Date();
     const expiresAt = new Date(offer.expiresAt);
-    const isExpired = now > expiresAt && offer.status === OfferStatus.pending;
+    const isExpired =
+      now > expiresAt &&
+      offer.status === OfferStatus.pending &&
+      !(await this.extensionPolicy?.willExtend(offer.id, now));
 
     let timeRemaining: string | undefined;
     if (offer.status === OfferStatus.pending && !isExpired) {
-      const diff = expiresAt.getTime() - now.getTime();
+      // Süresi geçmiş ama uzatılacak teklif: sayaç 00:00:00'da bekler.
+      const diff = Math.max(0, expiresAt.getTime() - now.getTime());
       const hours = Math.floor(diff / (1000 * 60 * 60));
       const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
       const seconds = Math.floor((diff % (1000 * 60)) / 1000);

@@ -5,6 +5,7 @@ import { UserBlockModule } from "../user-block/user-block.module";
 import { OfferController } from "./offer.controller";
 import { OfferService } from "./offer.service";
 import { OfferSchedulerService } from "./offer-scheduler.service";
+import { OfferExtensionPolicy } from "./offer-extension-policy.service";
 import { OfferScheduledProcessor } from "./offer-scheduled.processor";
 import { QUEUE_NAMES } from "../../workers/constants";
 import { PrismaModule } from "../../prisma";
@@ -33,8 +34,9 @@ import { scheduledProcessors } from "../../workers/scheduled-processors";
   providers: [
     OfferService,
     OfferSchedulerService,
+    OfferExtensionPolicy,
     ...scheduledProcessors(OfferScheduledProcessor),
   ],
-  exports: [OfferService, OfferSchedulerService],
+  exports: [OfferService, OfferSchedulerService, OfferExtensionPolicy],
 })
 export class OfferModule {}

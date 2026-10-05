@@ -1091,7 +1091,13 @@ model Trade {
   initiatorAddressId        String?            @map("initiator_address_id")
   receiverAddressId         String?            @map("receiver_address_id")
   responseDeadline          DateTime           @map("response_deadline")
+  /// Yanıt süresinin extend_once ile uzatıldığı an (Süreler ve Kurallar →
+  /// tradeResponseHours). Dolu = bu aşamanın hakkı kullanıldı. Karşı teklif yanıt
+  /// aşamasını yeniden başlattığından sıfırlanır.
+  responseExtendedAt        DateTime?          @map("response_extended_at")
   paymentDeadline           DateTime?          @map("payment_deadline")
+  /// Ödeme süresinin extend_once ile uzatıldığı an (tradePaymentHours); aşama başına bir kez.
+  paymentExtendedAt         DateTime?          @map("payment_extended_at")
   shippingDeadline          DateTime?          @map("shipping_deadline")
   confirmationDeadline      DateTime?          @map("confirmation_deadline")
   acceptedAt                DateTime?          @map("accepted_at")
@@ -1623,6 +1629,10 @@ model Offer {
   /// Satıcı karşı teklifinden sonra: kabul/red için sıra alıcıda (buyerId)
   buyerMustAccept Boolean     @default(false) @map("buyer_must_accept")
   expiresAt       DateTime    @map("expires_at")
+  /// Geçerlilik süresinin ADMIN seçimiyle (Süreler ve Kurallar → offerExpiryHours
+  /// = extend_once) bir kez uzatıldığı an. Dolu = hak kullanıldı; ikinci dolumda
+  /// teklif her durumda expired olur. Karşı teklif yeni satırdır, kendi hakkıyla başlar.
+  extendedAt      DateTime?   @map("extended_at")
   createdAt       DateTime    @default(now()) @map("created_at")
   updatedAt       DateTime    @updatedAt @map("updated_at")
   version         Int         @default(1)

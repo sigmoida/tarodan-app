@@ -996,6 +996,8 @@ export class TradeLifecycleService {
           initiatorMessage: dto.message, // New initiator's message
           receiverMessage: null, // Clear old receiver message
           responseDeadline,
+          // Karşı teklif yanıt aşamasını baştan başlatır: extend_once hakkı da.
+          responseExtendedAt: null,
           version: { increment: 1 },
         },
       });

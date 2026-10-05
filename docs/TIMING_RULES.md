@@ -160,25 +160,66 @@ doğrulayın.
 
 ### Teklif
 
-| Kimlik             | Ayar anahtarı        | Birim | Vars. | Sınır | Env geri düşüşü      | Eylemler                             | Damga         |
-| ------------------ | -------------------- | ----- | ----- | ----- | -------------------- | ------------------------------------ | ------------- |
-| `offerExpiryHours` | `offer_expiry_hours` | saat  | 24    | 1–168 | `OFFER_EXPIRY_HOURS` | **expire** · extend_once _(yakında)_ | ✓ `expiresAt` |
+| Kimlik             | Ayar anahtarı        | Birim | Vars. | Sınır | Env geri düşüşü      | Eylemler                 | Damga         |
+| ------------------ | -------------------- | ----- | ----- | ----- | -------------------- | ------------------------ | ------------- |
+| `offerExpiryHours` | `offer_expiry_hours` | saat  | 24    | 1–168 | `OFFER_EXPIRY_HOURS` | **expire** · extend_once | ✓ `expiresAt` |
 
 `offer_expiry_hours` seed'de vardı ama kod env'i okuyordu (ölü ayar). Artık
 gerçekten okunur.
 
 ### Takas
 
-| Kimlik                     | Ayar anahtarı                      | Birim | Vars. | Sınır | Env geri düşüşü                | Eylemler                             | Damga                    |
-| -------------------------- | ---------------------------------- | ----- | ----- | ----- | ------------------------------ | ------------------------------------ | ------------------------ |
-| `tradeResponseHours`       | `trade_response_deadline_hours`    | saat  | 72    | 1–336 | —                              | **cancel** · extend_once _(yakında)_ | ✓ `responseDeadline`     |
-| `tradePaymentHours`        | `trade_payment_deadline_hours`     | saat  | 48    | 1–336 | —                              | **cancel** · extend_once _(yakında)_ | ✓ `paymentDeadline`      |
-| `tradeShippingDays`        | `trade_shipping_deadline_days`     | gün   | 7     | 1–30  | —                              | **cancel_and_refund**                | ✓ `shippingDeadline`     |
-| `tradeConfirmationDays`    | `trade_confirmation_deadline_days` | gün   | 3     | 1–30  | —                              | **complete**                         | ✓ `confirmationDeadline` |
-| `tradeHoldDays`            | `payment_hold_days`                | gün   | 3     | 1–30  | —                              | **release_funds**                    | ✓ `holdReleaseAt`        |
-| `tradeLostParcelGraceDays` | `trade_lost_parcel_grace_days`     | gün   | 14    | 1–90  | `TRADE_LOST_PARCEL_GRACE_DAYS` | **cancel_and_refund**                | ✗ (shippingDeadline + N) |
+| Kimlik                     | Ayar anahtarı                      | Birim | Vars. | Sınır | Env geri düşüşü                | Eylemler                 | Damga                    |
+| -------------------------- | ---------------------------------- | ----- | ----- | ----- | ------------------------------ | ------------------------ | ------------------------ |
+| `tradeResponseHours`       | `trade_response_deadline_hours`    | saat  | 72    | 1–336 | —                              | **cancel** · extend_once | ✓ `responseDeadline`     |
+| `tradePaymentHours`        | `trade_payment_deadline_hours`     | saat  | 48    | 1–336 | —                              | **cancel** · extend_once | ✓ `paymentDeadline`      |
+| `tradeShippingDays`        | `trade_shipping_deadline_days`     | gün   | 7     | 1–30  | —                              | **cancel_and_refund**    | ✓ `shippingDeadline`     |
+| `tradeConfirmationDays`    | `trade_confirmation_deadline_days` | gün   | 3     | 1–30  | —                              | **complete**             | ✓ `confirmationDeadline` |
+| `tradeHoldDays`            | `payment_hold_days`                | gün   | 3     | 1–30  | —                              | **release_funds**        | ✓ `holdReleaseAt`        |
+| `tradeLostParcelGraceDays` | `trade_lost_parcel_grace_days`     | gün   | 14    | 1–90  | `TRADE_LOST_PARCEL_GRACE_DAYS` | **cancel_and_refund**    | ✗ (shippingDeadline + N) |
 
 Takas süreleri eskiden Ayarlar → Takas sekmesindeydi; o sekme kaldırıldı.
+
+#### extend_once — teklif geçerliliği, takas yanıt ve ödeme süresi
+
+Admin bu üç kayıtta "Süreyi bir kez uzat" seçtiyse süresi dolan kayıt iptal /
+expire edilmek yerine **bir tam süre** (uzatma anındaki değer, "şimdi + N")
+uzatılır; ikinci dolumda varsayılan eylem (expire / cancel) aynen çalışır.
+
+- **Karar anı.** Eylem, süre **dolduğu anda** cron turunun başında
+  `resolveTimingAction` ile okunur. Damgalı hiçbir son tarih geriye dönük
+  yeniden yazılmaz; ayar değişikliği yalnız henüz dolmamış kayıtların dolum
+  anındaki kararını etkiler.
+- **"Bir kez" nerede tutulur.** `Offer.extendedAt`, `Trade.responseExtendedAt`,
+  `Trade.paymentExtendedAt` (aşama başına ayrı; dolu = hak kullanıldı).
+  Karşı teklif (takasta) yanıt aşamasını baştan başlattığından
+  `responseExtendedAt` sıfırlanır; tekliflerde karşı teklif zaten yeni satırdır.
+  Migration: `20261005170000_timing_extend_once`.
+- **Atomiklik.** Teklifte `updateMany(status=pending ∧ expiresAt<now ∧
+extendedAt=null)`; takasta iptal döngüsünün `FOR UPDATE` tx'i içinde aynı
+  koşullu talep. Eşzamanlı iki tur aynı kaydı iki kez uzatamaz ve uzatılanı
+  expire/iptal edemez; talebi kaybeden tur kaydı atlar (bildirim de atlar).
+  Uzatma `version` artırmaz: kabul / ödeme geçişi `version` guard'ıyla yazar,
+  uzatma bu guard'ı bozmamalıdır.
+- **Uzatılmayan durumlar (varsayılan eylem çalışır).** Teklif: ilan artık
+  `active` değil ya da müsait adet yok; taraflardan biri yasaklı/silinmiş ya da
+  taraflar arasında engel var. Takas yanıt: aynı taraf + engel kuralları, ayrıca
+  bir kalem satışta/stokta değil. Takas ödeme: aynı taraf + engel kuralları,
+  ayrıca ödeme satırı yok, **iade edilmiş satır var** ya da **bekleyen ödeme
+  kalmadı** (tüm satırlar tamamlanmış ama takas hâlâ `awaiting_payment` —
+  tutarsız durum, mevcut iptal/iade yolu çalışır).
+- **Para / stok.** Uzatma yalnız tarihi öteler: rezervasyon, stok tutma ve
+  alınmış ödemeler olduğu gibi kalır (`awaiting_payment` rezervasyon tutan
+  statüdür, mutabakat süpürmesi sayar). İptal ikinci dolumda gelirse mevcut yol
+  (rezervasyon çözümü, kusursuz taraf tam iadesi, `refundTradeCashTracked`)
+  değişmeden çalışır.
+- **Bildirim.** Sırası gelen tarafa yeni bitiş anıyla: teklifte satıcı
+  (alıcı, karşı teklifte), takas yanıtında alıcı, takas ödemesinde ödemesi
+  tamamlanmamış taraf(lar). Tipler: `offer_extended`,
+  `trade_response_extended`, `trade_payment_extended`.
+- **Gecikme.** Cron 5 dakikada bir koşar; son tarih ile uzatma arasındaki bu
+  aralıkta teklif ekranları "süresi doldu" gösterebilir, uzatma işlenince
+  yeniden açılır (kabul bu aralıkta, süre geçmiş görüldüğü için reddedilir).
 
 ### Sipariş
 
