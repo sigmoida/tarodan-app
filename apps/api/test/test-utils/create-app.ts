@@ -3,6 +3,7 @@ import { NestExpressApplication } from "@nestjs/platform-express";
 import { Test, TestingModule } from "@nestjs/testing";
 import { json, urlencoded } from "express";
 import { AppModule } from "../../src/app.module";
+import { GLOBAL_VALIDATION_PIPE_OPTIONS } from "../../src/common/validators/global-validation-pipe-options";
 import { PayTRService } from "../../src/modules/payment-providers/paytr/paytr.service";
 import { StorageService } from "../../src/modules/storage/storage.service";
 import { MockPayTRService } from "../mocks/paytr.mock";
@@ -98,16 +99,8 @@ export async function createE2ETestApp(): Promise<E2ETestApp> {
   app.use(json({ limit: "50mb" }));
   app.use(urlencoded({ extended: true, limit: "50mb" }));
 
-  app.useGlobalPipes(
-    new ValidationPipe({
-      whitelist: true,
-      forbidNonWhitelisted: false,
-      transform: true,
-      transformOptions: {
-        enableImplicitConversion: true,
-      },
-    }),
-  );
+  // main.ts ile AYNI ayar nesnesi (tek kaynak).
+  app.useGlobalPipes(new ValidationPipe(GLOBAL_VALIDATION_PIPE_OPTIONS));
 
   app.setGlobalPrefix("api");
 
