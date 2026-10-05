@@ -109,6 +109,34 @@ describe("OfferExtensionPolicy ve tüketicileri", () => {
     });
   });
 
+  describe("isExtendable (zamandan bağımsız, işlem öncesi okuma)", () => {
+    it("süresi henüz geçmemiş olsa da diğer koşullar tamamsa true (süre işlemde kıyaslanır)", async () => {
+      const policy = makePolicy(
+        lapsedOffer({ expiresAt: new Date(NOW.getTime() + 1000) }),
+      );
+      await expect(policy.isExtendable("of1")).resolves.toBe(true);
+    });
+
+    it.each([
+      ["varsayılan eylem (expire)", () => makePolicy(lapsedOffer(), null)],
+      [
+        "hak kullanılmış",
+        () => makePolicy(lapsedOffer({ extendedAt: new Date() })),
+      ],
+      [
+        "taraflar engelli",
+        () => makePolicy(lapsedOffer(), "extend_once", true),
+      ],
+      [
+        "pending değil",
+        () => makePolicy(lapsedOffer({ status: OfferStatus.accepted })),
+      ],
+      ["teklif yok", () => makePolicy(null)],
+    ])("%s → false", async (_label, build) => {
+      await expect(build().isExtendable("of1")).resolves.toBe(false);
+    });
+  });
+
   describe("admin görünen durumu (offerEffectiveStatus)", () => {
     const row = {
       status: OfferStatus.pending,
@@ -178,7 +206,10 @@ describe("OfferExtensionPolicy ve tüketicileri", () => {
 
   describe("OfferService (kullanıcı ekranı ve kabul/karşı teklif)", () => {
     const makeService = (willExtend: boolean) => {
-      const policy = { willExtend: jest.fn().mockResolvedValue(willExtend) };
+      const policy = {
+        willExtend: jest.fn().mockResolvedValue(willExtend),
+        isExtendable: jest.fn().mockResolvedValue(willExtend),
+      };
       const service = new OfferService(
         { platformSetting: { findUnique: jest.fn() } } as never,
         {} as never,
@@ -223,31 +254,33 @@ describe("OfferExtensionPolicy ve tüketicileri", () => {
       expect(res.status).toBe(OfferStatus.expired);
     });
 
-    it("uzatılmayacak teklifte kabul/karşı teklif kapısı (hasLapsed) reddeder", async () => {
-      const { service, policy } = makeService(false);
-      await expect(
-        (service as any).hasLapsed("of1", lapsedOffer().expiresAt),
-      ).resolves.toBe(true);
-      expect(policy.willExtend).toHaveBeenCalledWith("of1", expect.any(Date));
+    it("uzatılmayacak dolmuş teklifte kabul/karşı teklif kapısı (hasLapsed) reddeder", () => {
+      const { service } = makeService(false);
+      expect((service as any).hasLapsed(lapsedOffer().expiresAt, false)).toBe(
+        true,
+      );
     });
 
-    it("uzatılacak teklifte kapı reddetmez", async () => {
+    it("uzatılacak dolmuş teklifte kapı reddetmez", () => {
       const { service } = makeService(true);
-      await expect(
-        (service as any).hasLapsed("of1", lapsedOffer().expiresAt),
-      ).resolves.toBe(false);
+      expect((service as any).hasLapsed(lapsedOffer().expiresAt, true)).toBe(
+        false,
+      );
     });
 
-    it("süresi geçmemiş teklifte politikaya hiç sorulmaz", async () => {
-      const { service, policy } = makeService(false);
-      await expect(
-        (service as any).hasLapsed("of1", new Date(NOW.getTime() + 1000)),
-      ).resolves.toBe(false);
-      expect(policy.willExtend).not.toHaveBeenCalled();
+    it("süresi geçmemiş teklif uzatma kararından bağımsız dolmuş sayılmaz", () => {
+      const { service } = makeService(false);
+      expect(
+        (service as any).hasLapsed(new Date(NOW.getTime() + 1000), false),
+      ).toBe(false);
     });
 
-    it("politika yoksa (eski kurulum) bugünkü davranış: dolmuş", async () => {
-      const service = new OfferService(
+    it("uzatma kararı politikadan okunur; politika yoksa (eski kurulum) uzatılmaz", async () => {
+      const { service, policy } = makeService(true);
+      await expect((service as any).readExtendable("of1")).resolves.toBe(true);
+      expect(policy.isExtendable).toHaveBeenCalledWith("of1");
+
+      const legacy = new OfferService(
         {} as never,
         {} as never,
         { get: () => undefined } as never,
@@ -259,9 +292,10 @@ describe("OfferExtensionPolicy ve tüketicileri", () => {
         {} as never,
         {} as never,
       );
-      await expect(
-        (service as any).hasLapsed("of1", lapsedOffer().expiresAt),
-      ).resolves.toBe(true);
+      await expect((legacy as any).readExtendable("of1")).resolves.toBe(false);
+      expect((legacy as any).hasLapsed(lapsedOffer().expiresAt, false)).toBe(
+        true,
+      );
     });
 
     it("karşı teklif uzatılmayacak dolmuş teklifte hâlâ offerExpired fırlatır", async () => {
@@ -288,6 +322,71 @@ describe("OfferExtensionPolicy ve tüketicileri", () => {
       await expect(
         service.counter("of1", "s1", { amount: 20 } as never),
       ).rejects.toBeInstanceOf(BadRequestException);
+    });
+
+    it.each([
+      ["accept", (s: any) => s.accept("of1", "s1")],
+      ["counter", (s: any) => s.counter("of1", "s1", { amount: 20 })],
+      ["buyerCounter", (s: any) => s.buyerCounter("of1", "b1", { amount: 5 })],
+    ])(
+      "%s: uzatma kararı işlem AÇILMADAN okunur, işlem içinde politika sorgulanmaz",
+      async (_label, call) => {
+        const { service, policy } = makeService(true);
+        const order: string[] = [];
+        policy.isExtendable.mockImplementation(async () => {
+          order.push("isExtendable");
+          return true;
+        });
+        (service as any).prisma = {
+          $transaction: jest.fn(async () => {
+            order.push("transaction");
+            throw new Error("stop");
+          }),
+          platformSetting: { findUnique: jest.fn().mockResolvedValue(null) },
+        };
+        (service as any).checkoutCommon = {
+          resolveOfferOrderSnapshots: jest.fn().mockResolvedValue({}),
+        };
+
+        await expect(call(service)).rejects.toThrow("stop");
+
+        expect(order).toEqual(["isExtendable", "transaction"]);
+        expect(policy.willExtend).not.toHaveBeenCalled();
+      },
+    );
+
+    it("kabul: işlem öncesi karar bayatlasa da süre kilitli satırdan okunur (cron uzattıysa expire edilmez)", async () => {
+      const { service } = makeService(true);
+      const tx = {
+        $queryRaw: jest.fn().mockResolvedValue([{ id: "of1" }]),
+        offer: {
+          findUnique: jest.fn().mockResolvedValue({
+            ...lapsedOffer(),
+            buyerMustAccept: false,
+            // cron araya girip uzattı: kilitli satırdaki süre ileride
+            expiresAt: new Date(NOW.getTime() + 60_000),
+          }),
+          update: jest.fn(),
+        },
+      };
+      (service as any).prisma = {
+        $transaction: jest.fn((fn: any) => fn(tx)),
+        platformSetting: { findUnique: jest.fn().mockResolvedValue(null) },
+      };
+      (service as any).checkoutCommon = {
+        resolveOfferOrderSnapshots: jest.fn().mockResolvedValue({}),
+      };
+      (service as any).userBlocks = {
+        assertNotBlocked: jest.fn().mockResolvedValue(undefined),
+      };
+      (service as any).productLockService = {
+        lockProductForUpdate: jest.fn().mockResolvedValue(null),
+      };
+
+      // Süre kapısı geçilir (offer.update(expired) çağrılmaz); akış ürün
+      // bulunamadı hatasında durur.
+      await expect(service.accept("of1", "s1")).rejects.toThrow();
+      expect(tx.offer.update).not.toHaveBeenCalled();
     });
   });
 });

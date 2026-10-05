@@ -40,16 +40,15 @@ export class OfferExtensionPolicy {
   }
 
   /**
-   * Süresi geçmiş bir `pending` teklifi bir SONRAKİ cron turu uzatacak mı?
-   * (Eylem extend_once ∧ canExtend.) Süresi geçmemiş ya da pending olmayan
-   * teklif için `false` — çağıranlar yalnız süresi geçmiş teklifte sorar.
+   * Eylem extend_once ∧ teklif `pending`: karar için gereken adayı okur; değilse
+   * null. `willExtend` ve `isExtendable` aynı okumayı paylaşır (tek kaynak).
    */
-  async willExtend(offerId: string, now: Date = new Date()): Promise<boolean> {
+  private async loadPendingCandidate(offerId: string) {
     if (
       (await resolveTimingAction(this.prisma, "offerExpiryHours")) !==
       "extend_once"
     ) {
-      return false;
+      return null;
     }
     const offer = await this.prisma.offer.findUnique({
       where: { id: offerId },
@@ -66,13 +65,29 @@ export class OfferExtensionPolicy {
         seller: { select: { isBanned: true, deletedAt: true } },
       },
     });
-    if (
-      !offer ||
-      offer.status !== OfferStatus.pending ||
-      offer.expiresAt >= now
-    ) {
-      return false;
-    }
+    return offer && offer.status === OfferStatus.pending ? offer : null;
+  }
+
+  /**
+   * Süresi geçmiş bir `pending` teklifi bir SONRAKİ cron turu uzatacak mı?
+   * (Eylem extend_once ∧ canExtend.) Süresi geçmemiş ya da pending olmayan
+   * teklif için `false` — çağıranlar yalnız süresi geçmiş teklifte sorar.
+   */
+  async willExtend(offerId: string, now: Date = new Date()): Promise<boolean> {
+    const offer = await this.loadPendingCandidate(offerId);
+    if (!offer || offer.expiresAt >= now) return false;
     return this.canExtend(offer);
+  }
+
+  /**
+   * ZAMANDAN BAĞIMSIZ karar: teklif süresi geçmiş olsaydı uzatılır mıydı?
+   * (`willExtend`'in süre koşulu hariç hâli.) Kabul/karşı teklif işlem AÇILMADAN
+   * bunu okur: işlem bir bağlantı tutarken politika kendi sorgularıyla ikinci
+   * bir bağlantı beklemesin (havuz tükenmesi). Süre karşılaştırması işlem
+   * içinde, kilitli satırın `expiresAt`'ı ile yapılır.
+   */
+  async isExtendable(offerId: string): Promise<boolean> {
+    const offer = await this.loadPendingCandidate(offerId);
+    return offer ? this.canExtend(offer) : false;
   }
 }
