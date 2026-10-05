@@ -56,12 +56,21 @@ describe("listing removal — serbest metin yalnız admin uçlarında", () => {
     }
   });
 
-  it("admin dışı tek yazıcı serbest metni yazar ama OKUMAZ (select/include yok)", () => {
+  it("admin dışı tek yazıcı serbest metni yazar ama OKUMAZ (geçmiş okuması yalnız açık select ile, metinsiz)", () => {
     const writer = readFileSync(
       join(srcRoot, "modules/product/helpers/listing-removal.ts"),
       "utf8",
     );
-    expect(writer).not.toMatch(/productRemovalEvent\.find/);
+    // Geç "başka platformda satıldı" bayrağı için geçmiş okunur; bu okuma
+    // yalnız neden ve vitrin bayrağını seçer, serbest metni asla.
+    const reads = writer.match(
+      /productRemovalEvent\.find\w+\(\{[\s\S]*?\}\);/g,
+    );
+    expect(reads).toHaveLength(1);
+    expect(reads?.[0]).toMatch(
+      /select:\s*\{\s*reason:\s*true,\s*fromStorefront:\s*true\s*\}/,
+    );
+    expect(writer).not.toMatch(/detail\s*:\s*true/);
     expect(writer).not.toMatch(/removalEvents\s*:/);
   });
 

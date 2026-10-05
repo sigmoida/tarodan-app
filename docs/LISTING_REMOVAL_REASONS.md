@@ -13,18 +13,18 @@ Tek kaynak: `packages/types/src/listing-removal.ts` (katalog + doğrulama kural�
 
 ## Nedenler
 
-| Kod                  | Aktör   | Kim koyar / ne zaman                                                                           | Ek alan                                       |
-| -------------------- | ------- | ---------------------------------------------------------------------------------------------- | --------------------------------------------- |
-| `changed_mind`       | satıcı  | Silerken / pasife alırken "Vazgeçtim"                                                          | not (ops.)                                    |
-| `sold_elsewhere`     | satıcı  | Silerken / pasife alırken "Başka bir platformda sattım"                                        | **platform zorunlu**; `other` ise not zorunlu |
-| `paused_temporarily` | satıcı  | **Yalnız pasife alırken** "Geçici olarak durdurdum"                                            | not (ops.)                                    |
-| `not_given`          | satıcı  | Sunucu yazar: neden göndermeyen eski istemci (yayındaki mobil sürümler). Formda seçenek değil. | —                                             |
-| `expired`            | sistem  | İlan ömrü işi (`listingTtlDays`, eylem `deactivate`)                                           | —                                             |
-| `out_of_stock`       | sistem  | Stok 0'a indi: düzenleme (satıcı/yönetici), kargoda kayıp, rezervasyon bırakma. Satışla biten stok `sold` olur (kayıt yok) | —                                             |
+| Kod                  | Aktör   | Kim koyar / ne zaman                                                                                                             | Ek alan                                       |
+| -------------------- | ------- | -------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------- |
+| `changed_mind`       | satıcı  | Silerken / pasife alırken "Vazgeçtim"                                                                                            | not (ops.)                                    |
+| `sold_elsewhere`     | satıcı  | Silerken / pasife alırken "Başka bir platformda sattım"                                                                          | **platform zorunlu**; `other` ise not zorunlu |
+| `paused_temporarily` | satıcı  | **Yalnız pasife alırken** "Geçici olarak durdurdum"                                                                              | not (ops.)                                    |
+| `not_given`          | satıcı  | Sunucu yazar: neden göndermeyen eski istemci (yayındaki mobil sürümler). Formda seçenek değil.                                   | —                                             |
+| `expired`            | sistem  | İlan ömrü işi (`listingTtlDays`, eylem `deactivate`)                                                                             | —                                             |
+| `out_of_stock`       | sistem  | Stok 0'a indi: düzenleme (satıcı/yönetici), kargoda kayıp, rezervasyon bırakma. Satışla biten stok `sold` olur (kayıt yok)       | —                                             |
 | `traded`             | sistem  | Takas Tarodan'da TAMAMLANDI ve stoğu o bitirdi ("Tarodan'da takas edildi"). Tamamlanmadan stok düşen yollar `out_of_stock` kalır | —                                             |
-| `return_quarantine`  | sistem  | Teslim SONRASI iade stoğu geri yükledi, ilan karantinada                                       | —                                             |
-| `seller_suspended`   | sistem  | Satıcı yasaklandı: aktif ilanlar `suspended`, onay bekleyenler `rejected`                      | işlemi yapan yönetici kayda geçer             |
-| `policy_violation`   | Tarodan | Yönetici reddi (`rejected`) ya da yönetici kaldırması (`deleted`)                              | **ihlal kodu**; `other` ise açıklama zorunlu  |
+| `return_quarantine`  | sistem  | Teslim SONRASI iade stoğu geri yükledi, ilan karantinada                                                                         | —                                             |
+| `seller_suspended`   | sistem  | Satıcı yasaklandı: aktif ilanlar `suspended`, onay bekleyenler `rejected`                                                        | işlemi yapan yönetici kayda geçer             |
+| `policy_violation`   | Tarodan | Yönetici reddi (`rejected`) ya da yönetici kaldırması (`deleted`)                                                                | **ihlal kodu**; `other` ise açıklama zorunlu  |
 
 Başka platformda satış — platformlar: `letgo`, `instagram`, `dolap`,
 `sahibinden`, `in_person` (elden satış), `other` (serbest metinle).
@@ -122,7 +122,7 @@ dağılımına girer. Kural `@tarodan/types` `isLateSoldElsewhere`:
   `sold_elsewhere` kayıtları için ilanın önceki olaylarını bir sorguyla okur);
   dashboard yalnız saklanan bayrağı okur.
 - Platform sorgusu: `reason = sold_elsewhere AND (fromStorefront OR
-  lateSoldElsewhere)`. Neden toplamı (`byReason`, `total`) hâlâ yalnız
+lateSoldElsewhere)`. Neden toplamı (`byReason`, `total`) hâlâ yalnız
   `fromStorefront` olayları sayar; bu yüzden **platform toplamı nedenlerdeki
   `sold_elsewhere` sayısından büyük olabilir** (ör. süre dolumu → silme:
   toplamda `expired` 1, platform dağılımında dolap 1). Yalnız platform sayısı

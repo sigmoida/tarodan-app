@@ -89,9 +89,7 @@ describe("toListingRemovalsView", () => {
 
   it("counts a late sold-elsewhere answer in the platform split without adding to the total", () => {
     // Expired once (total 1); the seller later deleted it as sold on Dolap.
-    const view = toListingRemovalsView(
-      response({ expired: 1 }, { dolap: 1 }),
-    );
+    const view = toListingRemovalsView(response({ expired: 1 }, { dolap: 1 }));
 
     expect(view.total).toBe(1);
     expect(view.soldElsewhereTotal).toBe(1);

@@ -108,9 +108,9 @@ describe("buildListingRemovalBreakdown", () => {
       actor: "system",
       count: 3,
     });
-    expect(result.byReason.find((r) => r.reason === "out_of_stock")?.count).toBe(
-      2,
-    );
+    expect(
+      result.byReason.find((r) => r.reason === "out_of_stock")?.count,
+    ).toBe(2);
     expect(result.total).toBe(5);
   });
 

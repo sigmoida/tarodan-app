@@ -272,7 +272,10 @@ describe("recordListingRemovals — sayım kuralı ve güncel neden", () => {
         findMany: jest.fn(async () =>
           events
             .filter((e) => e.reason === "sold_elsewhere" || e.fromStorefront)
-            .map((e) => ({ reason: e.reason, fromStorefront: e.fromStorefront }))
+            .map((e) => ({
+              reason: e.reason,
+              fromStorefront: e.fromStorefront,
+            }))
             .reverse(),
         ),
       },
@@ -505,7 +508,10 @@ describe("recordListingRemovals — sayım kuralı ve güncel neden", () => {
   });
 
   it("vitrin dışı zincirde (reddedilmiş) iki satıcı cevabından yalnız ilki platforma girer", async () => {
-    const t = makeTable({ status: ProductStatus.rejected, removalReason: null });
+    const t = makeTable({
+      status: ProductStatus.rejected,
+      removalReason: null,
+    });
 
     await t.remove({
       statusAfter: ProductStatus.inactive,
