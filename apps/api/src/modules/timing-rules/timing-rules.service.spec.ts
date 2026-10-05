@@ -221,7 +221,6 @@ describe("TimingRulesService", () => {
         ["offerExpiryHours", "extend_once"],
         ["tradeResponseHours", "extend_once"],
         ["tradePaymentHours", "extend_once"],
-        ["preparingDeadlineDays", "extend_once"],
       ] as const) {
         await expectRejected(
           service.applyChanges([{ id, action }], "u"),
@@ -229,6 +228,17 @@ describe("TimingRulesService", () => {
         );
       }
       expect(prisma.platformSetting.upsert).not.toHaveBeenCalled();
+    });
+
+    it("hazırlık süresi için tek seferlik uzatma seçilebilir", async () => {
+      const { service, rows } = makeService();
+      await service.applyChanges(
+        [{ id: "preparingDeadlineDays", action: "extend_once" }],
+        "u",
+      );
+      expect(rows.get("preparing_deadline_days_on_expiry")?.settingValue).toBe(
+        "extend_once",
+      );
     });
 
     it("kayıtta tanımsız eylemi reddeder", async () => {

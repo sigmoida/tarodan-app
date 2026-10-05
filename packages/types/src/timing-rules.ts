@@ -243,7 +243,12 @@ export const TIMING_RULES = {
   },
 
   // ── Sipariş ───────────────────────────────────────────────────────────
-  /** Satıcının siparişi kargoya verme süresi (pazar sayılmaz). */
+  /**
+   * Satıcının siparişi kargoya verme süresi (pazar sayılmaz). Dolunca: iptal +
+   * iade (bugünkü davranış) ya da `extend_once` — son tarih BİR KEZ tam bir
+   * hazırlık süresi kadar uzatılır (`Order.preparingExtendedAt`),
+   * ikinci dolumda iptal + iade aynen çalışır.
+   */
   preparingDeadlineDays: {
     settingKey: "preparing_deadline_days",
     group: "order",
@@ -253,7 +258,26 @@ export const TIMING_RULES = {
     max: 14,
     envKey: "PREPARING_DEADLINE_DAYS",
     appliesToInProgress: false,
-    ...withLater("cancel_and_refund", "extend_once"),
+    actions: [
+      { action: "cancel_and_refund", available: true },
+      { action: "extend_once", available: true },
+    ],
+    defaultAction: "cancel_and_refund",
+  },
+  /**
+   * Hazırlık son tarihinden kaç saat önce satıcı uyarılır. Satıcı uyarısı ve
+   * dashboard'un "hazırlama süresi yaklaşıyor" uyarısı aynı değeri okur.
+   */
+  preparingWarningLeadHours: {
+    settingKey: "preparing_warning_lead_hours",
+    group: "order",
+    unit: "hours",
+    default: 24,
+    min: 1,
+    max: 72,
+    envKey: null,
+    appliesToInProgress: true,
+    ...only("notify_seller"),
   },
   /**
    * Teslimden sonraki koşulsuz cayma (iade talep) penceresi. Mesafeli Satış

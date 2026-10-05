@@ -76,6 +76,16 @@ export const NOTIFICATION_TEMPLATES: Partial<
     messageKey: "server.notification.orderPreparingDeadlineWarning.message",
     icon: "⚠️",
   },
+  [NotificationType.ORDER_PREPARING_EXTENDED]: {
+    titleKey: "server.notification.orderPreparingExtended.title",
+    messageKey: "server.notification.orderPreparingExtended.message",
+    icon: "⏳",
+  },
+  [NotificationType.ORDER_PREPARING_EXTENDED_SELLER]: {
+    titleKey: "server.notification.orderPreparingExtendedSeller.title",
+    messageKey: "server.notification.orderPreparingExtendedSeller.message",
+    icon: "⚠️",
+  },
   [NotificationType.ORDER_RESERVATION_RELEASED]: {
     titleKey: "server.notification.orderReservationReleased.title",
     messageKey: "server.notification.orderReservationReleased.message",

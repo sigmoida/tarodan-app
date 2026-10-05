@@ -1812,8 +1812,21 @@ model Order {
   /// önceki iptaller yalnız aktörün KESİN olduğu kurallarla dolduruldu.
   /// Yeniden ödemeye açılan (reactivate) siparişte temizlenir.
   cancelledBy                CancellationActor?       @map("cancelled_by")
+  /// Satıcının kargoya verme son tarihi (ödemede damgalanır). Tek seferlik
+  /// uzatmada (Süreler ve Kurallar → `preparingDeadlineDays` = `extend_once`)
+  /// YENİ son tarih buraya yazılır: uyarı, süre dolumu, panel ve ekranlar hep
+  /// bu kolonu okur, uzatmayı ayrıca bilmeleri gerekmez.
   preparingDeadline          DateTime?                @map("preparing_deadline")
+  /// Son tarih uyarısının gittiği an. Uzatmada temizlenir: satıcı yeni son
+  /// tarihten önce yeniden uyarılır.
   preparingWarningSentAt     DateTime?                @map("preparing_warning_sent_at")
+  /// Tek seferlik hazırlık uzatmasının verildiği an — aynı zamanda CLAIM
+  /// damgası: doluysa sipariş bir daha uzatılmaz, sonraki dolumda iptal +
+  /// iade çalışır. null = hiç uzatılmadı.
+  preparingExtendedAt        DateTime?                @map("preparing_extended_at")
+  /// Uzatmadan ÖNCEKİ (ilk) son tarih — yalnız kayıt/görüntü için; hiçbir
+  /// karar bunu okumaz. Uzatılmamış siparişte null.
+  originalPreparingDeadline  DateTime?                @map("original_preparing_deadline")
   reservationReleasedAt      DateTime?                @map("reservation_released_at")
   stockRestoredAt            DateTime?                @map("stock_restored_at")
   paymentExpiresAt           DateTime                 @map("payment_expires_at")

@@ -116,10 +116,49 @@ Takas süreleri eskiden Ayarlar → Takas sekmesindeydi; o sekme kaldırıldı.
 
 ### Sipariş
 
-| Kimlik                  | Ayar anahtarı             | Birim | Vars. | Sınır | Env geri düşüşü           | Eylemler                                        | Damga                  |
-| ----------------------- | ------------------------- | ----- | ----- | ----- | ------------------------- | ----------------------------------------------- | ---------------------- |
-| `preparingDeadlineDays` | `preparing_deadline_days` | gün   | 3     | 1–14  | `PREPARING_DEADLINE_DAYS` | **cancel_and_refund** · extend_once _(yakında)_ | ✓ `preparingDeadline`  |
-| `returnWindowDays`      | `return_window_days`      | gün   | 14    | 14–90 | `RETURN_WINDOW_DAYS`      | **complete**                                    | ✓ `returnWindowEndsAt` |
+| Kimlik                      | Ayar anahtarı                  | Birim | Vars. | Sınır | Env geri düşüşü           | Eylemler                            | Damga                     |
+| --------------------------- | ------------------------------ | ----- | ----- | ----- | ------------------------- | ----------------------------------- | ------------------------- |
+| `preparingDeadlineDays`     | `preparing_deadline_days`      | gün   | 3     | 1–14  | `PREPARING_DEADLINE_DAYS` | **cancel_and_refund** · extend_once | ✓ `preparingDeadline`     |
+| `preparingWarningLeadHours` | `preparing_warning_lead_hours` | saat  | 24    | 1–72  | — (eski sabit 24)         | **notify_seller**                   | ✗ (preparingDeadline − N) |
+| `returnWindowDays`          | `return_window_days`           | gün   | 14    | 14–90 | `RETURN_WINDOW_DAYS`      | **complete**                        | ✓ `returnWindowEndsAt`    |
+
+**Hazırlık süresi dolunca** (`handleExpiredPreparingOrders`, cron
+`payment-expired-preparing`, 30 dakikada bir). Eylem son tarihe ulaşıldığında, turun
+başında `resolveTimingAction` ile okunur; damgalanmış son tarihler eylem
+değişince geriye dönük yeniden yazılmaz.
+
+- `cancel_and_refund` (varsayılan, bugünkü davranış): iptal + tam iade + stok ve
+  kupon iadesi + komisyon feragati — değişmedi.
+- `extend_once`: siparişin İLK dolumunda son tarih, uzatma anından itibaren
+  tam bir hazırlık süresi (`preparingDeadlineDays`, pazar hariç) ileri alınır.
+  Yeni tarih `Order.preparingDeadline`'a yazılır (uyarı, süre dolumu, panel ve
+  ekranlar hep bunu okur); `Order.preparingExtendedAt` uzatma anı + "bir kez"
+  claim damgasıdır, `Order.originalPreparingDeadline` önceki tarihtir (yalnız
+  görüntü). Satıcıya "yeni son tarih, son süre", alıcıya "gecikme, en geç
+  kargo tarihi, kargodan önce iptal hakkın sürüyor" bildirimi gider. İade,
+  stok, kupon, defter yazımı yoktur. İkinci dolumda iptal + iade aynen çalışır.
+
+Süre dolumu kapıları, bu sırayla (her sipariş kendi işleminde):
+
+1. Satır kilidi (`SELECT … FOR UPDATE`).
+2. Kilit altında yeniden okuma: sipariş hâlâ `preparing` değilse dokunulmaz.
+3. Son tarih kilit altında hâlâ geçmiş mi — aynı anda koşan başka tur az önce
+   uzattıysa son tarih ileridedir, bu tur ne iptal eder ne yeniden uzatır.
+4. Koli taşıyıcıda hareket ediyorsa (`isShipmentHandedToCarrier`) ne iptal
+   edilir ne uzatılır.
+5. Eylem: `extend_once` ve hiç uzatılmamış → uzatma, koşullu yazımla
+   (yalnız `preparing_extended_at` hâlâ boşken); aksi halde iptal + iade.
+
+İade ve bildirimler yalnız işlem siparişi gerçekten iptal ettiyse çalışır
+(eskiden 2. kapıdan dönen sipariş de iadeye düşüyordu).
+
+**Uyarı öncesi süre** (`preparingWarningLeadHours`): satıcı uyarısı ve
+dashboard'un `preparingDeadlineApproaching` uyarısı aynı değeri ve aynı küme
+tanımını (`common/helpers/preparing-deadline.ts` →
+`preparingDeadlineApproachingWhere`) okur. Uzatmada uyarı damgası
+(`preparingWarningSentAt`) temizlenir: satıcı yeni son tarihten önce yeniden
+uyarılır. Uyarı metni, o son tarih dolunca iptal mi uzatma mı geleceğini
+söyler. Migration: `20261005180000_order_preparing_deadline_extension`.
 
 `returnWindowDays` teslimde siparişe **damgalanır**: `Order.returnWindowEndsAt =
 deliveredAt + pencere` (`modules/order/helpers/order-return-window.ts`,

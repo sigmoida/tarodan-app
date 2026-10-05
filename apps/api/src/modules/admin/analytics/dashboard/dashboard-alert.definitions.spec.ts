@@ -9,6 +9,7 @@ import {
 } from "./dashboard-alert.definitions";
 import type { AlertThresholdContext } from "../../../../config/alert-thresholds";
 import { defaultTimingValues } from "../../../../common/timing-rules";
+import { preparingDeadlineApproachingWhere } from "../../../../common/helpers/preparing-deadline";
 
 const NOW = new Date("2026-09-18T12:00:00.000Z");
 
@@ -108,6 +109,21 @@ describe("dashboard alert definitions", () => {
       ).toBe(5 * 24 * 60 * 60 * 1000);
     });
 
+    it("reads the preparing-deadline lead from preparingWarningLeadHours", () => {
+      const ctx = ctxWith({ preparingWarningLeadHours: 6 });
+      expect(
+        ALERT_DEFINITIONS.preparingDeadlineApproaching.threshold?.(ctx),
+      ).toEqual({ value: 6, unit: "hours" });
+      const where = captureWhere("preparingDeadlineApproaching", ctx);
+      expect(
+        (where.preparingDeadline.lte as Date).getTime() - NOW.getTime(),
+      ).toBe(6 * 60 * 60 * 1000);
+      // Default stays today's 24 hours.
+      expect(
+        ALERT_DEFINITIONS.preparingDeadlineApproaching.threshold?.(ctxWith()),
+      ).toEqual({ value: 24, unit: "hours" });
+    });
+
     it("reads the outbox threshold from OUTBOX_STALE_PROCESSING_MS, in minutes", () => {
       const ctx = ctxWith({}, { OUTBOX_STALE_PROCESSING_MS: "120000" });
       expect(ALERT_DEFINITIONS.outboxStuckProcessing.threshold?.(ctx)).toEqual({
@@ -147,6 +163,10 @@ describe("dashboard alert definitions", () => {
         ],
         ["stuckWarehouseTrades", ctxWith({ tradeLostParcelGraceDays: 77 })],
         ["stuckOutboundTrades", ctxWith({ tradeLostParcelGraceDays: 77 })],
+        [
+          "preparingDeadlineApproaching",
+          ctxWith({ preparingWarningLeadHours: 7 }),
+        ],
         [
           "outboxStuckProcessing",
           ctxWith({}, { OUTBOX_STALE_PROCESSING_MS: "999999" }),
@@ -194,13 +214,30 @@ describe("dashboard alert definitions", () => {
     });
 
     it("warns early — not late — about preparing deadlines", () => {
-      const where = captureWhere("preparingDeadlineWithin24h");
-      expect(where.preparingDeadline.gte).toEqual(NOW);
+      const where = captureWhere("preparingDeadlineApproaching");
+      expect(where.preparingDeadline.gt).toEqual(NOW);
       expect(
-        (where.preparingDeadline.lt as Date).getTime() - NOW.getTime(),
+        (where.preparingDeadline.lte as Date).getTime() - NOW.getTime(),
       ).toBe(24 * 60 * 60 * 1000);
-      expect(ALERT_DEFINITIONS.preparingDeadlineWithin24h.severity).toBe(
+      expect(ALERT_DEFINITIONS.preparingDeadlineApproaching.severity).toBe(
         "info",
+      );
+    });
+
+    /**
+     * The seller warning (payment-expiry sweep, phase 1) and this alert must
+     * count the same orders: same lead from Durations & Rules, same bounds,
+     * same status. The alert used to hardcode 24 hours AND `paid`, which no
+     * order with a preparing deadline is in, so it never fired.
+     */
+    it("counts exactly the set the seller warning targets", () => {
+      const ctx = ctxWith({ preparingWarningLeadHours: 6 });
+      expect(captureWhere("preparingDeadlineApproaching", ctx)).toEqual({
+        isTest: false,
+        ...preparingDeadlineApproachingWhere(NOW, 6),
+      });
+      expect(captureWhere("preparingDeadlineApproaching", ctx).status).toBe(
+        "preparing",
       );
     });
 
@@ -213,7 +250,7 @@ describe("dashboard alert definitions", () => {
       "stuckShippedOrders",
       "stuckWarehouseTrades",
       "stuckOutboundTrades",
-      "preparingDeadlineWithin24h",
+      "preparingDeadlineApproaching",
     ] as const)("%s counts live-lane rows only", (key) => {
       expect(captureWhere(key).isTest).toBe(false);
     });

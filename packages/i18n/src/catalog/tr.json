@@ -1171,6 +1171,12 @@
     "cancelMsgBuyerCancelled": "Alıcı bu siparişi iptal etti.",
     "cancelMsgPaymentTimeout": "Ödeme 24 saat içinde tamamlanmadığı için sipariş otomatik iptal edildi.",
     "cancelMsgSellerNoShip": "Satıcı siparişi süresinde kargoya vermediği için iptal edildi.",
+    "preparingDeadlineTitle": "Kargoya verme son tarihi: {date}",
+    "preparingExtendedTitle": "Kargo süresi bir kez uzatıldı — yeni son tarih: {date}",
+    "preparingDeadlineSeller": "Siparişi bu tarihe kadar kargoya vermeniz gerekiyor.",
+    "preparingDeadlineBuyer": "Satıcının siparişi en geç bu tarihe kadar kargoya vermesi gerekiyor.",
+    "preparingExtendedSeller": "Kargo süreniz doldu ve bir kez uzatıldı. Bu son süredir; sipariş bu tarihe kadar kargoya verilmezse otomatik iptal edilir ve alıcıya tam iade yapılır.",
+    "preparingExtendedBuyer": "Satıcı siparişi süresinde kargoya veremedi ve satıcıya bir kez ek süre tanındı. Bu tarihe kadar kargoya verilmezse sipariş otomatik iptal edilir ve ödemenizin tamamı iade edilir. Kargoya verilene kadar siparişi iptal edebilirsiniz.",
     "cancelMsgStockout": "Ürün stoğu tükendiği için bu sipariş iptal edildi.",
     "cancelMsgTradeReserved": "Ürün bir takas işlemi için ayrıldığından bu sipariş iptal edildi.",
     "cancelMsgBulkReplaced": "Bu sipariş yeni bir toplu sipariş ile birleştirildi.",
@@ -6829,6 +6835,8 @@
           },
           "deliveredAt": "Teslim",
           "confirmationDeadline": "Onay penceresi bitişi",
+          "preparingDeadline": "Kargoya verme son tarihi",
+          "preparingExtended": "Süre bir kez uzatıldı ({date}); ilk son tarih {original}",
           "guestBuyer": "Misafir alıcı",
           "sellerSide": "Satıcı tarafı",
           "buyerSide": "Alıcı tarafı",
@@ -6886,6 +6894,7 @@
         "cells": {
           "offerBadge": "Teklif",
           "preparingDeadline": "Hazırlama son: {date}",
+          "preparingExtended": "Süre bir kez uzatıldı",
           "quantity": "{count} adet",
           "listingPrice": "İlan:",
           "listingPriceApproximate": "Teklif anındaki ilan fiyatı kayıtlı değil; ürünün güncel fiyatı gösteriliyor.",
@@ -7557,7 +7566,7 @@
         "deliveredHoldsWithoutRelease": "{count} teslim edilmiş siparişin escrow'unda serbest bırakma tarihi yok",
         "agedCarrierCancellations": "{count} taşıyıcı iptal görevi {threshold} saattir bekliyor",
         "exhaustedPayoutRetries": "{count} transfer talimatı deneme hakkını tüketti",
-        "preparingDeadlineWithin24h": "{count} siparişin hazırlama süresi 24 saat içinde doluyor"
+        "preparingDeadlineApproaching": "{count} siparişin hazırlama süresi {threshold} saat içinde doluyor"
       },
       "stats": {
         "paidOrders": "Ödenen sipariş",
@@ -9304,7 +9313,11 @@
         },
         "preparingDeadlineDays": {
           "label": "Satıcı hazırlık süresi",
-          "helper": "Ödenen siparişin kargoya verilmesi için satıcıya tanınan süre (pazar sayılmaz). Dolmadan bir gün önce satıcı uyarılır."
+          "helper": "Ödenen siparişin kargoya verilmesi için satıcıya tanınan süre (pazar sayılmaz). Süre dolunca sipariş iptal edilip iade edilir ya da bir kez aynı süre kadar uzatılır; uzatılan süre de dolarsa iptal edilip iade edilir."
+        },
+        "preparingWarningLeadHours": {
+          "label": "Satıcı hazırlık uyarısı",
+          "helper": "Hazırlık süresi dolmadan bu kadar saat önce satıcı uyarılır; süre uzatıldıysa yeni son tarihten önce yeniden uyarılır. Paneldeki \"hazırlama süresi doluyor\" uyarısı da bu süreyi kullanır."
         },
         "returnWindowDays": {
           "label": "Cayma (iade) penceresi",
@@ -9423,7 +9436,15 @@
       },
       "orderPreparingDeadlineWarning": {
         "title": "Kargo Süresi Dolmak Üzere",
-        "message": "\"{productTitle}\" siparişini {deadline} tarihine kadar kargoya vermeniz gerekmektedir. Aksi halde sipariş otomatik iptal edilecektir."
+        "message": "\"{productTitle}\" siparişini {deadline} tarihine kadar kargoya vermeniz gerekmektedir. {final, select, no {Süre dolarsa size bir kez ek süre tanınır; ek süre de dolarsa sipariş otomatik iptal edilir.} other {Aksi halde sipariş otomatik iptal edilecektir.}}"
+      },
+      "orderPreparingExtended": {
+        "title": "Siparişinizin Kargoya Verilmesi Gecikiyor",
+        "message": "Satıcı \"{productTitle}\" siparişini süresinde kargoya veremedi ve satıcıya bir kez ek süre tanındı. Siparişin en geç {deadline} tarihine kadar kargoya verilmesi gerekiyor; verilmezse sipariş otomatik iptal edilir ve ödemenizin tamamı iade edilir. Kargoya verilene kadar siparişi dilediğiniz zaman iptal edebilirsiniz."
+      },
+      "orderPreparingExtendedSeller": {
+        "title": "Kargo Süreniz Bir Kez Uzatıldı",
+        "message": "\"{productTitle}\" siparişinin kargo süresi doldu ve bir kez uzatıldı. Yeni son tarih: {deadline}. Bu son süredir; sipariş bu tarihe kadar kargoya verilmezse otomatik iptal edilir ve alıcıya tam iade yapılır."
       },
       "orderReservationReleased": {
         "title": "Stok rezervasyonunuz kaldırıldı",

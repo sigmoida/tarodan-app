@@ -1171,6 +1171,12 @@
     "cancelMsgBuyerCancelled": "The buyer cancelled this order.",
     "cancelMsgPaymentTimeout": "This order was automatically cancelled because payment wasn't completed within 24 hours.",
     "cancelMsgSellerNoShip": "The seller didn't ship within the allowed time, so the order was cancelled.",
+    "preparingDeadlineTitle": "Ship-by date: {date}",
+    "preparingExtendedTitle": "Shipping deadline extended once — new deadline: {date}",
+    "preparingDeadlineSeller": "You need to ship this order by this date.",
+    "preparingDeadlineBuyer": "The seller has to ship this order by this date at the latest.",
+    "preparingExtendedSeller": "Your shipping deadline passed and was extended once. This is the final deadline; if the order is not shipped by then, it is cancelled automatically and the buyer refunded in full.",
+    "preparingExtendedBuyer": "The seller could not ship on time and was given one extension. If the order is not shipped by this date, it is cancelled automatically and your payment refunded in full. You can cancel the order any time before it ships.",
     "cancelMsgStockout": "This order was cancelled because the product is out of stock.",
     "cancelMsgTradeReserved": "This order was cancelled because the product was reserved for a trade.",
     "cancelMsgBulkReplaced": "This order was merged into a new combined order.",
@@ -6829,6 +6835,8 @@
           },
           "deliveredAt": "Delivered",
           "confirmationDeadline": "Confirmation window ends",
+          "preparingDeadline": "Ship by",
+          "preparingExtended": "Deadline extended once ({date}); original deadline {original}",
           "guestBuyer": "Guest buyer",
           "sellerSide": "Seller side",
           "buyerSide": "Buyer side",
@@ -6886,6 +6894,7 @@
         "cells": {
           "offerBadge": "Offer",
           "preparingDeadline": "Prepare by: {date}",
+          "preparingExtended": "Deadline extended once",
           "quantity": "{count, plural, one {# pc} other {# pcs}}",
           "listingPrice": "Listing:",
           "listingPriceApproximate": "The listing price at offer time was not recorded; the product's current price is shown.",
@@ -7557,7 +7566,7 @@
         "deliveredHoldsWithoutRelease": "{count} delivered orders have an escrow hold with no release date",
         "agedCarrierCancellations": "{count} carrier cancellation tasks have waited {threshold} hours",
         "exhaustedPayoutRetries": "{count} payout instructions are out of retries",
-        "preparingDeadlineWithin24h": "{count} orders reach their preparation deadline within 24 hours"
+        "preparingDeadlineApproaching": "{count} orders reach their preparation deadline within {threshold} hours"
       },
       "stats": {
         "paidOrders": "Paid orders",
@@ -9304,7 +9313,11 @@
         },
         "preparingDeadlineDays": {
           "label": "Seller preparation time",
-          "helper": "Time the seller has to hand a paid order to the carrier (Sundays excluded). The seller is warned one day before."
+          "helper": "Time the seller has to hand a paid order to the carrier (Sundays excluded). When it runs out, the order is cancelled and refunded, or extended once by the same period; if the extension also runs out, it is cancelled and refunded."
+        },
+        "preparingWarningLeadHours": {
+          "label": "Seller preparation warning",
+          "helper": "The seller is warned this many hours before the preparation deadline, and again before the new deadline if it was extended. The dashboard's \"preparation deadline approaching\" alert uses the same lead."
         },
         "returnWindowDays": {
           "label": "Cooling-off (return) window",
@@ -9423,7 +9436,15 @@
       },
       "orderPreparingDeadlineWarning": {
         "title": "Shipping Deadline Approaching",
-        "message": "You must ship the order for \"{productTitle}\" by {deadline}. Otherwise the order will be cancelled automatically."
+        "message": "You must ship the order for \"{productTitle}\" by {deadline}. {final, select, no {If the deadline passes you get one extension; if that also passes, the order is cancelled automatically.} other {Otherwise the order will be cancelled automatically.}}"
+      },
+      "orderPreparingExtended": {
+        "title": "Your Order Is Delayed",
+        "message": "The seller could not ship \"{productTitle}\" on time and has been given one extension. The order must be shipped by {deadline} at the latest; otherwise it will be cancelled automatically and your payment refunded in full. You can still cancel the order at any time before it is shipped."
+      },
+      "orderPreparingExtendedSeller": {
+        "title": "Your Shipping Deadline Was Extended Once",
+        "message": "The shipping deadline for \"{productTitle}\" passed and has been extended once. New deadline: {deadline}. This is the final deadline; if the order is not shipped by then, it will be cancelled automatically and the buyer refunded in full."
       },
       "orderReservationReleased": {
         "title": "Your stock reservation was released",

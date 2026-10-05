@@ -26,6 +26,7 @@ import {
   livePayoutTransferSql,
   liveRowSql,
 } from "../../../account-lane/live-lane.where";
+import { preparingDeadlineApproachingWhere } from "../../../../common/helpers/preparing-deadline";
 
 /**
  * Zone B — "Uyarılar". Normalde OLMAMASI gereken durumlar; sıfırsa satır hiç
@@ -334,21 +335,29 @@ export const ALERT_DEFINITIONS: Record<QueryableAlertKey, AlertDefinition> = {
   },
 
   /**
-   * ERKEN UYARI (henüz hata değil): önümüzdeki 24 saatte hazırlama süresi
-   * dolacak siparişler. Dolduğunda sipariş otomatik iptal olur.
+   * ERKEN UYARI (henüz hata değil): hazırlama süresi önümüzdeki
+   * `preparingWarningLeadHours` içinde dolacak siparişler. Dolduğunda sipariş
+   * otomatik iptal olur (ya da seçiliyse bir kez uzatılır).
+   *
+   * Küme satıcı uyarısıyla AYNI tanımdan gelir
+   * (`preparingDeadlineApproachingWhere`): aynı süre, aynı sınırlar, aynı durum.
+   * Eskiden burada sabit 24 saat ve `paid` durumu yazılıydı; ödeme siparişi
+   * doğrudan `preparing`'e geçirdiği için uyarı fiilen hiç saymıyordu.
    */
-  preparingDeadlineWithin24h: {
+  preparingDeadlineApproaching: {
     severity: "info",
-    threshold: () => ({ value: 24, unit: "hours" }),
-    query: (prisma, now) =>
+    threshold: (ctx) => ({
+      value: ctx.timing.preparingWarningLeadHours,
+      unit: "hours",
+    }),
+    query: (prisma, now, ctx) =>
       prisma.order.count({
         where: {
           ...LIVE_ORDER,
-          status: OrderStatus.paid,
-          preparingDeadline: {
-            gte: now,
-            lt: new Date(now.getTime() + 24 * 60 * 60 * 1000),
-          },
+          ...preparingDeadlineApproachingWhere(
+            now,
+            ctx.timing.preparingWarningLeadHours,
+          ),
         },
       }),
     read: count,

@@ -77,8 +77,10 @@ describe("bildirim üreticileri hedef kitleyi taşır", () => {
             // Faz 1: uyarılacak siparişler. Faz 2 (iptal) boş dönsün.
             .mockResolvedValueOnce([order])
             .mockResolvedValue([]),
-          update: jest.fn().mockResolvedValue(order),
+          updateMany: jest.fn().mockResolvedValue({ count: 1 }),
         },
+        // Süreler ve Kurallar: satır yok → varsayılan uyarı süresi ve eylem.
+        platformSetting: { findUnique: jest.fn().mockResolvedValue(null) },
       };
       const service = new PaymentExpiryReconciliationService(
         prisma as never,

@@ -80,7 +80,6 @@ describe("TIMING_RULES kaydı", () => {
     offerExpiryHours: ["expire", "extend_once"],
     tradeResponseHours: ["cancel", "extend_once"],
     tradePaymentHours: ["cancel", "extend_once"],
-    preparingDeadlineDays: ["cancel_and_refund", "extend_once"],
   } satisfies Partial<
     Record<TimingRuleId, [TimingExpiryAction, TimingExpiryAction]>
   >;
@@ -95,11 +94,33 @@ describe("TIMING_RULES kaydı", () => {
     },
   );
 
+  // Sonraki paketin AÇTIĞI seçenekler: varsayılan hâlâ bugünkü davranış,
+  // ikinci seçenek admin seçicisinde seçilebilir.
+  const ENABLED_ACTIONS = {
+    preparingDeadlineDays: ["cancel_and_refund", "extend_once"],
+  } satisfies Partial<
+    Record<TimingRuleId, [TimingExpiryAction, TimingExpiryAction]>
+  >;
+
+  it.each(Object.entries(ENABLED_ACTIONS))(
+    "%s — ikinci seçenek açık, varsayılan bugünkü davranış",
+    (id, [current, enabled]) => {
+      const rule = TIMING_RULES[id as TimingRuleId];
+      expect(rule.actions).toEqual([
+        { action: current, available: true },
+        { action: enabled, available: true },
+      ]);
+      expect(rule.defaultAction).toBe(current);
+    },
+  );
+
   it("diğer tüm kayıtlar tek eylemlidir", () => {
     const multi = TIMING_RULE_IDS.filter(
       (id) => TIMING_RULES[id].actions.length > 1,
     );
-    expect(multi.sort()).toEqual(Object.keys(LATER_ACTIONS).sort());
+    expect(multi.sort()).toEqual(
+      [...Object.keys(LATER_ACTIONS), ...Object.keys(ENABLED_ACTIONS)].sort(),
+    );
   });
 
   it("süresi kayda damgalanmayan (sürmekte olanlara da uygulanan) kayıtlar işaretli", () => {
@@ -111,6 +132,7 @@ describe("TIMING_RULES kaydı", () => {
       "listingTtlDays",
       "listingExpiryWarningDays",
       "tradeLostParcelGraceDays",
+      "preparingWarningLeadHours",
       "paymentReservationMinutes",
       "paymentFailTimeoutMinutes",
       "returnDropoffDays",
@@ -155,6 +177,8 @@ describe("TIMING_RULES kaydı", () => {
       tradeHoldDays: 3,
       tradeLostParcelGraceDays: 14,
       preparingDeadlineDays: 3,
+      // Eski sabit: satıcı uyarısı ve dashboard son tarihten 24 saat önce.
+      preparingWarningLeadHours: 24,
       returnWindowDays: 14,
       orderPaymentWindowHours: 24,
       paymentReservationMinutes: 5,
@@ -251,15 +275,15 @@ describe("değer doğrulaması (sınırlar)", () => {
 describe("eylem doğrulaması", () => {
   it("açık eylemi kabul eder", () => {
     expect(validateTimingAction("listingTtlDays", "deactivate")).toBeNull();
+    expect(
+      validateTimingAction("preparingDeadlineDays", "extend_once"),
+    ).toBeNull();
   });
 
   it("henüz açılmamış eylemi reddeder", () => {
     expect(validateTimingAction("listingTtlDays", "auto_renew")).toEqual({
       code: "actionUnavailable",
     });
-    expect(
-      validateTimingAction("preparingDeadlineDays", "extend_once"),
-    ).toEqual({ code: "actionUnavailable" });
   });
 
   it("kayıtta tanımsız eylemi reddeder", () => {

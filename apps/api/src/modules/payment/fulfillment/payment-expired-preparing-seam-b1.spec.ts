@@ -12,7 +12,12 @@ describe("PaymentExpiryReconciliationService.handleExpiredPreparingOrders — SE
   const makeService = (
     expiredOrder: any,
     shipment: any,
-    freshOrder: any = { status: "preparing" },
+    // Kilit altındaki tekrar okuma: hâlâ hazırlıkta, son tarihi geçmiş.
+    freshOrder: any = {
+      status: "preparing",
+      preparingDeadline: new Date(Date.now() - 60 * 60 * 1000),
+      preparingExtendedAt: null,
+    },
   ) => {
     const mockTx = {
       $queryRaw: jest.fn().mockResolvedValue([]),
@@ -34,6 +39,8 @@ describe("PaymentExpiryReconciliationService.handleExpiredPreparingOrders — SE
           .mockResolvedValueOnce([expiredOrder]), // Phase 2: expired
         update: jest.fn().mockResolvedValue({}),
       },
+      // Süreler ve Kurallar: satır yok → varsayılanlar (24 saat, iptal + iade).
+      platformSetting: { findUnique: jest.fn().mockResolvedValue(null) },
       $transaction: jest.fn((fn: any) => fn(mockTx)),
     };
     const paymentRefund = {

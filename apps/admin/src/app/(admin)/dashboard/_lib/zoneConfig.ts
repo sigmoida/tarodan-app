@@ -125,8 +125,8 @@ export const ALERT_MESSAGE_KEY: Record<DashboardAlertKey, MessageKey> = {
     "admin.dashboard.alerts.deliveredHoldsWithoutRelease",
   agedCarrierCancellations: "admin.dashboard.alerts.agedCarrierCancellations",
   exhaustedPayoutRetries: "admin.dashboard.alerts.exhaustedPayoutRetries",
-  preparingDeadlineWithin24h:
-    "admin.dashboard.alerts.preparingDeadlineWithin24h",
+  preparingDeadlineApproaching:
+    "admin.dashboard.alerts.preparingDeadlineApproaching",
 };
 
 /** Zone D strip: a balance is either money or a headcount. */

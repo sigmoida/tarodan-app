@@ -117,6 +117,7 @@ export const NOTIFICATION_LINKS: Record<
     "/profile/orders/{{orderId}}",
     "/seller/orders/{{orderId}}",
   ),
+  [NotificationType.ORDER_PREPARING_EXTENDED]: BUYER_ORDER,
   [NotificationType.ORDER_RESERVATION_RELEASED]: BUYER_ORDER,
   [NotificationType.ORDER_DELIVERED_CONFIRM]: BUYER_ORDER,
   [NotificationType.ORDER_AUTO_COMPLETED]: byAudience(
@@ -132,6 +133,7 @@ export const NOTIFICATION_LINKS: Record<
 
   // ── Sipariş (satıcı) ─────────────────────────────────────────────────────
   [NotificationType.ORDER_CANCELLED_SELLER]: SELLER_ORDER,
+  [NotificationType.ORDER_PREPARING_EXTENDED_SELLER]: SELLER_ORDER,
   [NotificationType.PRODUCT_SOLD]: SELLER_ORDER,
   [NotificationType.CARGO_MOVEMENT_MISSING]: SELLER_ORDER,
   // Alıcıya VE satıcıya gider (order-scheduler ikisine de atar): hedef ekran
