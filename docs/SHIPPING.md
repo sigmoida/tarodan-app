@@ -137,7 +137,7 @@ akar (bkz. PAYMENTS §5). Sürat durumları `surat-status.mapper.ts` ile eşleni
 CAS geçişi + `ShipmentEvent` kaydı transaction içinde yapılır.
 
 **Hazırlama süresi ve `seller_no_ship`:** ödeme sonrası sipariş `preparing` +
-`preparingDeadline = now + PREPARING_DEADLINE_DAYS` (varsayılan 3).
+`preparingDeadline = now + preparingDeadlineDays` (Süreler ve Kurallar, varsayılan 3; bkz. `TIMING_RULES.md`).
 `handleExpiredPreparingOrders` iki fazlıdır: son 24 saatte **uyarı** bildirimi;
 süre aşımında `FOR UPDATE` + yeniden okuma guard'ıyla **otomatik iptal + iade**
 (`seller_no_ship`). Kaçış kapısı: koli Sürat'ta fiilen hareket ediyorsa

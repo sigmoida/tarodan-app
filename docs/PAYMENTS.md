@@ -179,7 +179,7 @@ Aynı tx'te `pending` `CommissionLedger` satırı upsert edilir.
 `PaymentRefundService.handleOrderDelivered` (webhook/worker/poll/admin hepsi
 buraya akar) CAS ile siparişi günceller, `FEATURE_48H_CONFIRMATION_WINDOW`
 açıksa `awaiting_buyer_confirmation` + 48s onay penceresi kurar ve
-`releaseAt = deliveredAt + RETURN_WINDOW_DAYS (14) + PAYOUT_GRACE_DAYS` yazar.
+`releaseAt = deliveredAt + returnWindowDays (14) + payoutGraceDays (1)` yazar (Süreler ve Kurallar; bkz. `TIMING_RULES.md`).
 
 **Release**: `releaseHoldsDue()` saatlik `payment-release-holds` cron'unda;
 yalnız `held`, vadesi gelmiş, iade ile dondurulmamış hold'lar — ayrıca sipariş
