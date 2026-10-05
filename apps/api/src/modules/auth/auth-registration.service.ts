@@ -25,6 +25,12 @@ import {
 import { NotificationService } from "../notification/notification.service";
 import { NewsletterService } from "../marketing/newsletter.service";
 import { ConsentService } from "../consent/consent.service";
+import { LegalIdentityService } from "../legal-identity/legal-identity.service";
+import {
+  isNationalIdUniqueViolation,
+  nationalIdUnavailable,
+  normalizeLegalIdentityInput,
+} from "../legal-identity/helpers/legal-identity-status";
 import { PaymentService } from "../payment/payment.service";
 import { i18nMessage } from "../i18n";
 import { isUsernameAllowed, normalizeUsername } from "./utils/username.util";
@@ -71,6 +77,7 @@ export class AuthRegistrationService {
     private readonly moduleRef: ModuleRef,
     @InjectQueue(QUEUE_NAMES.EMAIL) private readonly emailQueue: Queue,
     private readonly consents: ConsentService,
+    private readonly legalIdentity: LegalIdentityService,
   ) {}
 
   /**
@@ -85,6 +92,8 @@ export class AuthRegistrationService {
   }
 
   private rethrowUserUniqueConstraint(error: unknown): never {
+    // TCKN yarışı: ön-kontrolle AYNI yanıt (başka hesap hakkında bilgi yok).
+    if (isNationalIdUniqueViolation(error)) throw nationalIdUnavailable();
     if (
       error instanceof Prisma.PrismaClientKnownRequestError &&
       error.code === "P2002"
@@ -182,6 +191,18 @@ export class AuthRegistrationService {
     // 18+ kontrolü yalnız değer geldiğinde uygulanır; yaş gerçekten gerektiğinde
     // (satıcı olma / ödeme-KYC) orada zorunlu istenir.
 
+    // Yasal kimlik: gönderildiyse yazılır (DTO doğruladı), gönderilmediyse
+    // (eski mobil) hesap açılır ve kimlik kapısı ilk girişte ister. TCKN
+    // gönderildiyse kayıt ucu da bir "numara kayıtlı mı" kahinidir: kapıyla
+    // aynı IP bütçesinden harcar ve aynı genel yanıtı verir.
+    const legalIdentity = normalizeLegalIdentityInput(dto);
+    if (legalIdentity.nationalId) {
+      await this.legalIdentity.consumeLookupBudget(null);
+      await this.legalIdentity.assertNationalIdAvailable(
+        legalIdentity.nationalId,
+      );
+    }
+
     // Hash password
     const passwordHash = await bcrypt.hash(dto.password, 12);
     // Tek okuma noktası: hem user satırına hem bülten listesine aynı değer gider.
@@ -205,6 +226,7 @@ export class AuthRegistrationService {
             phone: dto.phone,
             passwordHash,
             displayName: dto.displayName,
+            ...legalIdentity,
             birthDate: dto.birthDate ? new Date(dto.birthDate) : null,
             isSeller: dto.isSeller ?? false,
             sellerType: dto.isSeller ? SellerType.individual : null,

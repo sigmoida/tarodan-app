@@ -1,4 +1,5 @@
 import { Prisma } from "@prisma/client";
+import { LEGAL_IDENTITY_FIELDS, type LegalIdentityField } from "@tarodan/types";
 import { isLegacyUsername } from "../../modules/auth/utils/username.util";
 
 /**
@@ -85,12 +86,16 @@ export function publicIdentityFields(
   };
 }
 
-type PublicIdentityOutput<T> = Omit<T, "displayName" | "companyName"> &
+/** Herkese açık yüke HİÇBİR koşulda girmeyen alanlar (gerçek/yasal kimlik). */
+type PrivateIdentityKey = "displayName" | "companyName" | LegalIdentityField;
+
+type PublicIdentityOutput<T> = Omit<T, PrivateIdentityKey> &
   PublicIdentityFields;
 
 /**
  * Prisma satırını herkese açık yüke çevirir: gerçek ad düşer, `publicName`
- * eklenir, `displayName` uyumluluk için aynı değeri taşır.
+ * eklenir, `displayName` uyumluluk için aynı değeri taşır. Satır yasal kimlik
+ * alanlarını (ad, soyad, TCKN) taşısa bile çıktıya girmez.
  */
 export function toPublicIdentity<T extends PublicIdentityInput>(
   user: T,
@@ -102,9 +107,11 @@ export function toPublicIdentity<T extends PublicIdentityInput>(
   user: T | null | undefined,
 ): PublicIdentityOutput<T> | null {
   if (!user) return null;
-  const { companyName: _companyName, ...rest } = user;
+  const rest: Record<string, unknown> = { ...user };
+  delete rest.companyName;
+  for (const field of LEGAL_IDENTITY_FIELDS) delete rest[field];
   return {
-    ...(rest as Omit<T, "displayName" | "companyName">),
+    ...(rest as unknown as Omit<T, PrivateIdentityKey>),
     ...publicIdentityFields(user),
   };
 }

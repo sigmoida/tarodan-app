@@ -1,12 +1,10 @@
-import {
-  IsString,
-  IsOptional,
-  Matches,
-  Length,
-  MaxLength,
-} from "class-validator";
+import { IsString, IsOptional, Length, MaxLength } from "class-validator";
 import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
 import { IsTrIban } from "../../../common/validators/tr-iban";
+import {
+  IsTckn,
+  NormalizeTckn,
+} from "../../../common/validators/legal-identity";
 
 export class UpsertBankAccountDto {
   @ApiProperty({
@@ -27,13 +25,21 @@ export class UpsertBankAccountDto {
   @IsTrIban({ message: "Geçerli bir TR IBAN numarası giriniz (TR + 24 rakam)" })
   iban: string;
 
+  // ESKİ ALAN — web formu artık sormuyor; TCKN'nin tek kaynağı üyenin yasal
+  // kimliği (`User.nationalId`, kimlik kapısı). Mobil uyumluluk için kabul
+  // edilir: ortak TCKN kuralıyla doğrulanır ve üyenin kayıtlı numarasından
+  // FARKLIYSA reddedilir. Gönderilmezse mevcut değer korunur.
   @ApiPropertyOptional({
-    example: "12345678901",
-    description: "TC Kimlik Numarası (bireysel satıcılar için)",
+    example: "10000000146",
+    description:
+      "ESKİ: TC Kimlik Numarası. Üyenin yasal kimliğindeki numarayla aynı " +
+      "olmalı; gönderilmezse mevcut değer korunur.",
+    deprecated: true,
   })
   @IsOptional()
   @IsString()
-  @Matches(/^\d{11}$/, { message: "TC Kimlik numarası 11 haneli olmalıdır" })
+  @NormalizeTckn()
+  @IsTckn()
   tcKimlikNo?: string;
 
   @ApiPropertyOptional({

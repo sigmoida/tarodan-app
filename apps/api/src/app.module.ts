@@ -40,6 +40,7 @@ import { CollectionModule } from "./modules/collection";
 import { SupportModule } from "./modules/support";
 import { UserReportModule } from "./modules/user-report";
 import { ConsentModule } from "./modules/consent";
+import { LegalIdentityModule } from "./modules/legal-identity";
 
 // PHASE 3 - Security & Auth Hardening (AUDIT REMEDIATION)
 import { SecurityModule } from "./modules/security";
@@ -199,6 +200,7 @@ import { isTest } from "./config/environment";
     SupportModule, // GAP-013: Support Ticket System (MEDIUM)
     UserReportModule, // User-generated reports for products, users, collections
     ConsentModule, // Hukuki onay kayıtları (KVKK, sözleşmeler, çerez, pazarlama)
+    LegalIdentityModule, // Yasal kimlik (ad, soyad, TCKN) + kimlik kapısı
 
     // PHASE 3 - Security Modules
     SecurityModule, // GAP-004 to GAP-009, GAP-017, GAP-018: Security & Auth

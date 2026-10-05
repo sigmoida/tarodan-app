@@ -3,6 +3,7 @@ import { PrismaService } from "../../../prisma";
 import { AuditLogQueryDto } from "../dto";
 import { Prisma } from "@prisma/client";
 import { paginate, resolveOrderBy } from "../../../common/list";
+import { IDENTITY_LOG_KEYS } from "../../../common/security/redact-sensitive";
 
 /**
  * Admin audit log yazımı + sorgulama — tüm Admin* alt-servislerinin ortak
@@ -85,6 +86,10 @@ export class AdminAuditService {
     }
 
     const sensitiveKeys = new Set([
+      // Yasal kimlik (ad, soyad, TCKN) ve banka TCKN'si denetim kaydına değer
+      // olarak girmez: audit_logs purge edilmez, ikinci bir kalıcı kimlik
+      // deposu olurdu. Kimlik düzeltmesi yalnız maskeli değeri yazar.
+      ...IDENTITY_LOG_KEYS,
       "password",
       "passwordHash",
       "passwordConfirm",

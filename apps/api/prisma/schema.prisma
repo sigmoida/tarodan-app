@@ -16,6 +16,19 @@ model User {
   phone                   String?                  @unique
   passwordHash            String?                  @map("password_hash")
   displayName             String                   @map("display_name")
+  // Yasal kimlik (devlet bildirimi): ad, soyad ve TCKN. `displayName` takma ad
+  // olabildiği için kimlik SAYILMAZ. Boş (NULL) = üye henüz girmedi; web kapısı
+  // bir sonraki girişte ister (sunucu istekleri reddetmez, bkz. IDENTITY.md).
+  // Üye bir kez girer, sonra yalnız admin düzeltir (gerekçe + denetim kaydı).
+  // Hiçbiri herkese açık / karşı tarafa giden yüke, arama dizinine, bildirime
+  // ya da loga girmez. Hesap silmede arşive kopyalanıp NULL'lanır.
+  legalFirstName          String?                  @map("legal_first_name")
+  legalLastName           String?                  @map("legal_last_name")
+  // TCKN, yalnız rakam (11 hane, checksum'lı). Tekil: bir numara tek hesapta.
+  // Düz metin saklanır — taxId / SellerBankAccount.tcKimlikNo /
+  // DeletedUserIdentity.nationalId ile aynı uygulama (rapor ve arama düz değer
+  // ister); şifreleme kararı IDENTITY.md "Saklama" bölümünde.
+  nationalId              String?                  @unique @map("national_id")
   avatarUrl               String?                  @map("avatar_url")
   bio                     String?
   isVerified              Boolean                  @default(false) @map("is_verified")
@@ -139,9 +152,14 @@ model DeletedUserIdentity {
   email             String?
   username          String
   displayName       String?         @map("display_name")
+  /// Silme anındaki yasal ad / soyad (`User.legalFirstName/LastName`). Bu
+  /// alanlardan önce açılmış ve kapıyı hiç doldurmamış hesapta boş kalır.
+  legalFirstName    String?         @map("legal_first_name")
+  legalLastName     String?         @map("legal_last_name")
   phone             String?
   birthDate         DateTime?       @map("birth_date")
-  /// TCKN: bireysel satıcıda banka hesabından, kurumsalda ortak kaydından gelir.
+  /// TCKN: önce `User.nationalId`; boşsa bireysel satıcıda banka hesabından,
+  /// kurumsalda ortak kaydından gelir.
   nationalId        String?         @map("national_id")
   /// VKN: kurumsal satıcının User.taxId değeri (anonimleştirmede null'lanıyor).
   taxId             String?         @map("tax_id")

@@ -1,4 +1,10 @@
-import { Injectable, NotFoundException, Logger } from "@nestjs/common";
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+  Logger,
+} from "@nestjs/common";
+import { normalizeTckn } from "@tarodan/types";
 import { PrismaService } from "../../../prisma";
 import { i18nMessage } from "../../i18n";
 
@@ -43,6 +49,7 @@ export class UserBankService {
     },
   ) {
     const normalizedIban = data.iban.replace(/\s/g, "").toUpperCase();
+    const tcKimlikNo = await this.resolveBankTckn(userId, data.tcKimlikNo);
 
     // Yalnız IBAN GERÇEKTEN değişince cooldown saatini başlat (isim/tc güncellemesi
     // ödemeleri geciktirmesin). İlk kayıtta (create) ibanChangedAt null kalır → ilk
@@ -60,13 +67,15 @@ export class UserBankService {
         userId,
         accountHolder: data.accountHolder.trim(),
         iban: normalizedIban,
-        tcKimlikNo: data.tcKimlikNo || null,
+        tcKimlikNo: tcKimlikNo ?? null,
         taxId: data.taxId || null,
       },
       update: {
         accountHolder: data.accountHolder.trim(),
         iban: normalizedIban,
-        tcKimlikNo: data.tcKimlikNo || null,
+        // Gönderilmediyse DOKUNULMAZ: web formu alanı artık göstermiyor ve her
+        // IBAN kaydı eski TCKN'yi (kimlik kapısının ön doldurma kaynağı) silerdi.
+        ...(tcKimlikNo !== undefined ? { tcKimlikNo } : {}),
         taxId: data.taxId || null,
         ...(ibanChanged ? { ibanChangedAt: new Date() } : {}),
       },
@@ -106,6 +115,29 @@ export class UserBankService {
     }
 
     return account;
+  }
+
+  /**
+   * Banka hesabındaki TCKN ikinci, çelişen bir kimlik kaynağı olamaz: üyenin
+   * yasal kimliğinde numara varsa gönderilen numara onunla AYNI olmalıdır.
+   * `undefined` = gönderilmedi (mevcut değer korunur).
+   */
+  private async resolveBankTckn(
+    userId: string,
+    sent: string | undefined,
+  ): Promise<string | undefined> {
+    if (sent === undefined) return undefined;
+    const tckn = normalizeTckn(sent);
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { nationalId: true },
+    });
+    if (user?.nationalId && user.nationalId !== tckn) {
+      throw new BadRequestException(
+        i18nMessage("server.identity.bankNationalIdMismatch"),
+      );
+    }
+    return tckn;
   }
 
   async deleteBankAccount(userId: string) {
