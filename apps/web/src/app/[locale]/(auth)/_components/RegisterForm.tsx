@@ -14,6 +14,7 @@ import {
   FormError,
   useZodForm,
 } from "@tarodan/ui/form";
+import { CONSENT_DOCUMENTS } from "@tarodan/types";
 import { registerSchema, type RegisterValues } from "../_lib/auth";
 import { GoogleSignInButton } from "./GoogleSignInButton";
 import { AppleSignInButton } from "./AppleSignInButton";
@@ -47,6 +48,7 @@ export function RegisterForm() {
       password: "",
       confirmPassword: "",
       agreeTerms: false,
+      agreeKvkk: false,
       acceptsMarketingEmails: false,
     },
   });
@@ -61,6 +63,7 @@ export function RegisterForm() {
       password: v.password,
       confirmPassword: v.confirmPassword,
       agreeTerms: v.agreeTerms,
+      agreeKvkk: v.agreeKvkk,
       acceptMarketing: v.acceptsMarketingEmails,
     });
 
@@ -222,6 +225,24 @@ export function RegisterForm() {
                 privacy: (chunks) => (
                   <Link
                     href="/privacy"
+                    className="font-medium text-primary-600 hover:text-primary-700"
+                  >
+                    {chunks}
+                  </Link>
+                ),
+              })}
+            </span>
+          }
+        />
+
+        <FormCheckbox
+          name="agreeKvkk"
+          label={
+            <span className="text-sm text-muted leading-snug">
+              {t.rich("auth.kvkkAgreeRich", {
+                kvkk: (chunks) => (
+                  <Link
+                    href={CONSENT_DOCUMENTS.kvkk.path ?? "/privacy"}
                     className="font-medium text-primary-600 hover:text-primary-700"
                   >
                     {chunks}
