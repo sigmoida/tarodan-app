@@ -1,4 +1,5 @@
 import { EventService } from "./event.service";
+import * as sanitizer from "../../common/helpers/email-html-sanitizer";
 
 describe("EventService.emitAdminBroadcast — e-posta", () => {
   const makeService = (users: Array<{ id: string; email: string }>) => {
@@ -92,5 +93,28 @@ describe("EventService.emitAdminBroadcast — e-posta", () => {
     });
 
     expect(emailQueue.add).not.toHaveBeenCalled();
+  });
+
+  it("HTML alıcı sayısından bağımsız BİR kez süzülür; her mail yine süzülmüş içeriği taşır", async () => {
+    const many = Array.from({ length: 5 }, (_, n) => ({
+      id: `u${n}`,
+      email: `u${n}@example.com`,
+    }));
+    const { service, emailQueue } = makeService(many);
+    const spy = jest.spyOn(sanitizer, "sanitizeEmailHtml");
+
+    await service.emitAdminBroadcast({
+      ...base,
+      userIds: many.map((u) => u.id),
+      emailHtml: "<p>Selam</p><script>alert(1)</script>",
+    });
+
+    expect(spy).toHaveBeenCalledTimes(1);
+    expect(emailQueue.add).toHaveBeenCalledTimes(5);
+    for (const [, job] of emailQueue.add.mock.calls) {
+      expect(job.html).toContain("<p>Selam</p>");
+      expect(job.html).not.toContain("<script");
+    }
+    spy.mockRestore();
   });
 });

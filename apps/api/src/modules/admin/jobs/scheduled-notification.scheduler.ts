@@ -126,18 +126,30 @@ export class ScheduledNotificationScheduler implements OnModuleInit {
           }
 
           // Send the notification using AdminService
-          await this.adminService.sendNotification(notification.createdBy, {
-            title: notification.title,
-            body: notification.body,
-            channels: notification.channels as string[],
-            targetType: "user_ids",
-            userIds,
-            data: undefined,
-            // Zamanlanırken saklanan e-posta içeriği ve tür aynen taşınır.
-            emailSubject: notification.emailSubject ?? undefined,
-            emailHtml: notification.emailHtml ?? undefined,
-            mailingType: notification.mailingType as MailingType,
-          });
+          const result = await this.adminService.sendNotification(
+            notification.createdBy,
+            {
+              title: notification.title,
+              body: notification.body,
+              channels: notification.channels as string[],
+              targetType: "user_ids",
+              userIds,
+              data: undefined,
+              // Zamanlanırken saklanan e-posta içeriği ve tür aynen taşınır.
+              emailSubject: notification.emailSubject ?? undefined,
+              emailHtml: notification.emailHtml ?? undefined,
+              mailingType: notification.mailingType as MailingType,
+            },
+          );
+
+          // Yalnız e-posta kanalı seçildiyse gerçekten ulaşanlar e-posta alıcılarıdır
+          // (pazarlamada izinsiz/çıkmış kullanıcılar elenir); push/uygulama içi
+          // kanalda tüm hedef bildirilmiş sayılır.
+          const channels = notification.channels as string[];
+          const reached =
+            channels.length > 0 && channels.every((c) => c === "email")
+              ? (result?.emailRecipientCount ?? userIds.length)
+              : userIds.length;
 
           // Mark as sent
           await this.prisma.scheduledNotification.update({
@@ -145,13 +157,13 @@ export class ScheduledNotificationScheduler implements OnModuleInit {
             data: {
               status: "sent",
               sentAt: new Date(),
-              sentCount: userIds.length,
+              sentCount: reached,
             },
           });
 
           sent++;
           log(
-            `bildirim ${notification.id} → ${userIds.length} kullanıcıya gönderildi`,
+            `bildirim ${notification.id} → ${reached} kullanıcıya gönderildi`,
           );
           this.logger.log(
             `Scheduled notification ${notification.id} sent to ${userIds.length} users`,

@@ -82,4 +82,32 @@ describe("ScheduledNotificationScheduler — e-posta içeriği", () => {
       }),
     );
   });
+
+  it("yalnız e-posta + pazarlama: sentCount gerçek e-posta alıcı sayısıdır", async () => {
+    const { scheduler, prisma, adminService } = makeScheduler(row());
+    adminService.sendNotification.mockResolvedValue({ emailRecipientCount: 1 });
+
+    await scheduler.runProcessScheduledNotifications();
+
+    expect(prisma.scheduledNotification.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ status: "sent", sentCount: 1 }),
+      }),
+    );
+  });
+
+  it("push içeren kanalda sentCount tüm hedef kitledir", async () => {
+    const { scheduler, prisma, adminService } = makeScheduler(
+      row({ channels: ["push", "email"] }),
+    );
+    adminService.sendNotification.mockResolvedValue({ emailRecipientCount: 1 });
+
+    await scheduler.runProcessScheduledNotifications();
+
+    expect(prisma.scheduledNotification.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ status: "sent", sentCount: 2 }),
+      }),
+    );
+  });
 });

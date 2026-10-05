@@ -1,5 +1,6 @@
 "use client";
 
+import { useMemo } from "react";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { adminApi } from "@/lib/api";
 import { adminKeys } from "@/lib/query/keys";
@@ -11,14 +12,23 @@ const PREVIEW_DEBOUNCE_MS = 800;
 const AUDIENCE_DEBOUNCE_MS = 500;
 
 /**
+ * Nesne girdisini debounce eder. `useDebouncedValue` değerin REFERANSINA bağlı:
+ * her render'da yeni nesne verilirse zamanlayıcı sürekli sıfırlanır ve değer
+ * hiç güncellenmez. Bu yüzden girdi serileştirilip string (primitif) olarak
+ * debounce edilir; içerik değişmedikçe state yazılmaz, gereksiz render olmaz.
+ */
+export function useDebouncedObject<T>(value: T, delayMs: number): T {
+  const key = useDebouncedValue(JSON.stringify(value), delayMs);
+  return useMemo(() => JSON.parse(key) as T, [key]);
+}
+
+/**
  * E-posta önizlemesi: HTML'i SUNUCU render eder (süzme + ortak iskelet +
  * pazarlamada çıkış linki), böylece görünen gerçekte gidenle aynıdır. Yazarken
  * her tuşta istek atmamak için girdi debounce edilir.
  */
 export function useBroadcastEmailPreview(values: SendForm) {
-  const enabled =
-    values.channels.includes("email") && values.emailHtml.trim().length > 0;
-  const draft = useDebouncedValue(
+  const draft = useDebouncedObject(
     {
       title: values.title,
       body: values.body,
@@ -28,6 +38,10 @@ export function useBroadcastEmailPreview(values: SendForm) {
     },
     PREVIEW_DEBOUNCE_MS,
   );
+  // Debounce edilmiş taslağa bakılır: yazılan HTML henüz taslağa girmediyse
+  // eski (boş) taslakla istek atılmaz.
+  const enabled =
+    values.channels.includes("email") && draft.emailHtml.trim().length > 0;
 
   const query = useQuery({
     queryKey: adminKeys.preview("notification-email", draft),
@@ -58,7 +72,7 @@ export interface AudienceCounts {
  * Hedef henüz belirsizse (kullanıcı seçilmedi) sorgu atılmaz.
  */
 export function useAudienceCounts(values: SendForm) {
-  const audience = useDebouncedValue(
+  const audience = useDebouncedObject(
     audienceFromForm(values),
     AUDIENCE_DEBOUNCE_MS,
   );

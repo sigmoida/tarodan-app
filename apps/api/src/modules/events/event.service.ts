@@ -5,8 +5,9 @@ import { EventEmitter2 } from "@nestjs/event-emitter";
 import { QUEUE_NAMES } from "../../workers/constants";
 import { PrismaService } from "../../prisma";
 import {
-  buildBroadcastEmail,
+  prepareBroadcastEmailContent,
   newsletterUnsubscribeUrl,
+  renderBroadcastEmail,
 } from "../../common/helpers/broadcast-email";
 
 /** In-process (EventEmitter2) event adları — modüller-arası döngüsüz decoupling. */
@@ -1282,6 +1283,11 @@ export class EventService {
       `Emitting admin broadcast to ${payload.userIds.length} users`,
     );
 
+    // Alıcıdan bağımsız e-posta içeriği (HTML süzme dahil) BİR kez hazırlanır.
+    const emailContent = payload.channels.includes("email")
+      ? prepareBroadcastEmailContent(payload)
+      : undefined;
+
     // Fetch user details in chunks
     const chunkSize = 100;
     for (let i = 0; i < payload.userIds.length; i += chunkSize) {
@@ -1309,15 +1315,14 @@ export class EventService {
             user.id,
           );
           // Pazarlama: izni olmayan/çıkmış kullanıcıya e-posta GİTMEZ.
-          if (!payload.marketingUnsubscribeTokens || unsubscribeToken) {
+          if (
+            emailContent &&
+            (!payload.marketingUnsubscribeTokens || unsubscribeToken)
+          ) {
             const unsubscribeUrl = unsubscribeToken
               ? newsletterUnsubscribeUrl(unsubscribeToken)
               : undefined;
-            const email = buildBroadcastEmail({
-              title: payload.title,
-              body: payload.body,
-              emailSubject: payload.emailSubject,
-              emailHtml: payload.emailHtml,
+            const email = renderBroadcastEmail(emailContent, {
               to: user.email,
               unsubscribeUrl,
             });
