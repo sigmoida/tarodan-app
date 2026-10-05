@@ -28,9 +28,14 @@ import { i18nMessage } from "../../i18n";
 import {
   deriveAccountStatus,
   loginStateWhere,
+  missingLegalIdentityFields,
   type AccountStatus,
   type AccountStatusInput,
 } from "@tarodan/types";
+import {
+  isLegalIdentityExempt,
+  legalIdentityIncompleteWhere,
+} from "../../legal-identity/helpers/legal-identity-status";
 
 /**
  * Türetilmiş hesap durumu filtresi → Prisma where. Filtre verilmezse silinmiş
@@ -159,6 +164,12 @@ export class AdminUserService {
     // Giriş durumu ("hiç giriş yapmadı" / "giriş yapmış") — koşul
     // @tarodan/types'ta, panel seçeneğiyle aynı kaynaktan.
     Object.assign(where, loginStateWhere(query.loginState));
+
+    // Yasal kimliği eksik üyeler — kimlik kapısıyla AYNI kural (muaf hesaplar
+    // hariç). AND ile eklenir: test-hesabı filtresini ezmesin.
+    if (query.identityIncomplete === true) {
+      where.AND = [legalIdentityIncompleteWhere()];
+    }
 
     // Membership lifecycle filters (tier / status / "expiring soon"). All narrow
     // the to-one membership relation, so they compose within a single relation
@@ -410,6 +421,10 @@ export class AdminUserService {
         sellerType: true,
         taxId: true,
         companyName: true,
+        // Yasal kimlik: admin TAM değeri görür (ekran MaskedValue ile gizler).
+        legalFirstName: true,
+        legalLastName: true,
+        nationalId: true,
         // Personel hesabı detayda yalnız uyarı ve Personel ekranına bağlantı
         // gösterir; kullanıcı aksiyonları kapalıdır.
         adminUser: { select: { role: true, isActive: true } },
@@ -701,6 +716,13 @@ export class AdminUserService {
       staff: user.adminUser
         ? { role: user.adminUser.role, isActive: user.adminUser.isActive }
         : null,
+      legalFirstName: user.legalFirstName,
+      legalLastName: user.legalLastName,
+      nationalId: user.nationalId,
+      // Kimlik kapısıyla aynı kural: personel ve test hesabı için boş.
+      legalIdentityMissing: isLegalIdentityExempt(user)
+        ? []
+        : missingLegalIdentityFields(user),
       bankAccount: user.bankAccount,
       membership: membershipForUi,
       lastLoginAt: user.lastLoginAt ?? null,

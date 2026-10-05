@@ -100,6 +100,16 @@ export class AdminUserQueryDto extends AdminListQueryDto {
   @IsOptional()
   @IsIn(LOGIN_STATES)
   loginState?: LoginState;
+
+  /**
+   * Yalnız yasal kimliği (ad, soyad, TCKN) eksik üyeler — kimlik kapısının
+   * kuralıyla aynı (personel ve test hesabı muaf). `false` filtre uygulamaz.
+   */
+  @ApiPropertyOptional({ example: true })
+  @IsOptional()
+  @Transform(({ value }) => value === "true" || value === true)
+  @IsBoolean()
+  identityIncomplete?: boolean;
 }
 
 export class SellerApplicationQueryDto extends AdminListQueryDto {
