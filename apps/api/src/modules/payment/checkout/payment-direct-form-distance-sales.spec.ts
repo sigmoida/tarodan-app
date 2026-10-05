@@ -33,7 +33,12 @@ describe("PaymentInitiationService — direct-form mesafeli satış kapısı", (
           .fn()
           .mockResolvedValue({ id: "pay-1", metadata: null }),
       },
+      // Claim, ödeme + sipariş satırları kilitliyken yazılır (iptalle dışlama).
+      $queryRaw: jest
+        .fn()
+        .mockResolvedValue([{ status: OrderStatus.pending_payment }]),
     };
+    prisma.$transaction = jest.fn((fn: (tx: unknown) => unknown) => fn(prisma));
     const service = new PaymentInitiationService(
       prisma,
       {} as never,

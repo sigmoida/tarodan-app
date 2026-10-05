@@ -37,6 +37,7 @@ import {
   PAYER_IP_METADATA_KEY,
   resolvePaytrMerchant,
 } from "../helpers/paytr-merchant.helper";
+import { lockOrdersStillPayable } from "../helpers/payment-order-lock";
 import {
   DistanceSalesConsentService,
   type DistanceSalesSubject,
@@ -1069,31 +1070,49 @@ export class PaymentInitiationService {
     // yapılmaz. Çekim bitince prepareDirectPayment status'ü tekrar `pending`'e çeker
     // (callback CAS'ı `pending` bekler). Önceki kod burada koşulsuz `pending` yazıyordu
     // → guard ile gerçek çekim arasında kilit yoktu, iki eşzamanlı çekim mümkündü.
-    const claimed = await this.prisma.payment.updateMany({
-      where: {
-        id: payment.id,
-        status: { in: [PaymentStatus.pending, PaymentStatus.failed] },
-      },
-      data: {
-        providerConversationId: merchantOid,
-        providerPaymentId: null,
-        status: PaymentStatus.processing,
-        failureReason: null,
-        // Çekim bu mağazada başlıyor; sonraki her PayTR çağrısı bu kolona bakar.
-        paytrMerchant,
-        // FLOW-H2: 3DS çekiminin BAŞLADIĞI an. Ödeme-satırını-failed-yapma penceresi
-        // (cancelExpiredPayments) ve 24s sipariş kill-switch'i (expireUnpaidOrders)
-        // bunu `createdAt` yerine kullanır: kullanıcı initiate'ten çok sonra 3DS'e
-        // girse bile (createdAt eski, charge yeni) canlı 3DS oturumu iptal EDİLMEZ.
-        metadata: {
-          ...prevMeta,
-          merchantOidHistory: oidHistory,
-          lastChargeStartedAt: new Date().toISOString(),
-          // Kart saklanırsa vekâlet IP'si olur: kullanıcısız yenileme user_ip
-          // olarak bunu gönderir (0.0.0.0 değil).
-          [PAYER_IP_METADATA_KEY]: clientIp,
+    //
+    // İPTALLE DIŞLAMA: claim, siparişlerin HÂLÂ ödenebilir olduğu kilit
+    // altında doğrulanarak yazılır (bkz. payment-order-lock). Yukarıdaki
+    // `pending_payment` kontrolü düz okumadır; mesafeli satış kapısı ve PayTR
+    // durum sorgusu sürerken sipariş iptal edilmiş olabilir — o durumda
+    // çekim başlamaz. Kilit sırası: ödeme → sipariş (callback ve iade ile aynı).
+    const claimTarget = {
+      orderId: payment.orderId ?? null,
+      checkoutGroupId: payment.checkoutGroupId ?? null,
+    };
+    const claimed = await this.prisma.$transaction(async (tx) => {
+      await tx.$queryRaw`SELECT id FROM payments WHERE id = ${payment.id} FOR UPDATE`;
+      if (!(await lockOrdersStillPayable(tx, claimTarget))) {
+        throw new BadRequestException(
+          i18nMessage("server.payment.orderNotAwaitingPayment"),
+        );
+      }
+      return tx.payment.updateMany({
+        where: {
+          id: payment.id,
+          status: { in: [PaymentStatus.pending, PaymentStatus.failed] },
         },
-      },
+        data: {
+          providerConversationId: merchantOid,
+          providerPaymentId: null,
+          status: PaymentStatus.processing,
+          failureReason: null,
+          // Çekim bu mağazada başlıyor; sonraki her PayTR çağrısı bu kolona bakar.
+          paytrMerchant,
+          // FLOW-H2: 3DS çekiminin BAŞLADIĞI an. Ödeme-satırını-failed-yapma penceresi
+          // (cancelExpiredPayments) ve 24s sipariş kill-switch'i (expireUnpaidOrders)
+          // bunu `createdAt` yerine kullanır: kullanıcı initiate'ten çok sonra 3DS'e
+          // girse bile (createdAt eski, charge yeni) canlı 3DS oturumu iptal EDİLMEZ.
+          metadata: {
+            ...prevMeta,
+            merchantOidHistory: oidHistory,
+            lastChargeStartedAt: new Date().toISOString(),
+            // Kart saklanırsa vekâlet IP'si olur: kullanıcısız yenileme user_ip
+            // olarak bunu gönderir (0.0.0.0 değil).
+            [PAYER_IP_METADATA_KEY]: clientIp,
+          },
+        },
+      });
     });
     if (claimed.count === 0) {
       throw new BadRequestException(

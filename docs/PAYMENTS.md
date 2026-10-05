@@ -161,6 +161,17 @@ admin CRUD + doğrulamalar `modules/admin/admin-commission.service.ts`.
   id/adı, vergiler ve toplam siparişe yazılır (audit + yeniden hesap).
 - **Fail-closed 503'ler**: aktif kargo tarifesi yoksa ve satıcı tarafı komisyon
   kuralı eşleşmiyorsa.
+- **Çekim ↔ iptal dışlaması** (`payment/helpers/payment-order-lock.ts`):
+  ödenmemiş siparişi kapatan yollar (alıcı / yönetici iptali, 24s süpürmesi)
+  sipariş satırını yazar. Direct-form claim'i ödeme satırını, sonra
+  siparişleri `FOR SHARE` kilitleyip hepsi hâlâ `pending_payment` mı diye
+  claim'le aynı işlemde bakar — değilse çekim başlamaz
+  (`orderNotAwaitingPayment`). Başarı callback'i ödeme claim'inden sonra
+  siparişleri `FOR UPDATE` kilitleyip durumu öyle okur: iptal edilmiş sipariş
+  canlandırılmaz, otomatik iadeye (`processRefund`) gider. Kilit sırası her
+  yolda ödeme → sipariş (iade sonlandırmasıyla aynı). Claim commit ettikten
+  sonra gelen iptal, `lastChargeStartedAt` damgasını canlı çekim olarak görür
+  (yönetici iptali 409 `cancelPaymentInFlight`, süpürme atlar).
 
 ---
 

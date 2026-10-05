@@ -17,6 +17,7 @@ import { EventService } from "../../events";
 import { NotificationService } from "../../notification/notification.service";
 import { NotificationType } from "../../notification/dto";
 import { PaymentCommonService } from "../payment-common.service";
+import { lockPaymentOrders } from "../helpers/payment-order-lock";
 import { PaymentRefundService } from "../refund/payment-refund.service";
 import { FulfillmentNotifier } from "./fulfillment-notifier.service";
 import { FulfillmentFinalizer } from "./fulfillment-finalizer.service";
@@ -244,6 +245,15 @@ export class PaymentFulfillmentService {
       if (!claimed) {
         return null;
       }
+
+      // Sipariş satırı KİLİTLİYKEN okunur: kilitsiz okumada, okuma ile
+      // aşağıdaki `preparing` yazımı arasında commit eden bir iptal (alıcı,
+      // yönetici, 24s süpürmesi) eziliyor ve iptal edilmiş sipariş sessizce
+      // canlanıyordu. Kilit altında iptali görürüz → otomatik iade.
+      await lockPaymentOrders(tx, {
+        orderId: payment.orderId ?? null,
+        checkoutGroupId: null,
+      });
 
       // Verify order is still pending_payment before promoting to preparing.
       // Race window: cron may have cancelled the order while PayTR callback was in flight.
@@ -679,6 +689,13 @@ export class PaymentFulfillmentService {
         if (!claimed) {
           return null;
         }
+
+        // Tekil yolla aynı: sepetin siparişleri kilit altında okunur, araya
+        // giren iptal ezilmez; iptal edilen kalem kısmi otomatik iadeye gider.
+        await lockPaymentOrders(tx, {
+          orderId: null,
+          checkoutGroupId: payment.checkoutGroupId,
+        });
 
         const groupOrders = await tx.order.findMany({
           where: { checkoutGroupId: payment.checkoutGroupId },
