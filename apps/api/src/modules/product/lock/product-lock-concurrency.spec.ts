@@ -178,6 +178,49 @@ describe("ProductLockService.checkAndReserve — stok eş-zamanlılık matrisi",
     expect(store.p1.reservedQuantity).toBe(0);
   });
 
+  it("rezervasyon bırakıldığında fiziksel stok yoksa ilan pasife düşer: TEK, sayılan 'stok tükendi' kaydı", async () => {
+    const store = {
+      p1: row({
+        quantity: 0,
+        reservedQuantity: 1,
+        status: ProductStatus.reserved,
+      }),
+    };
+    const { release, tx } = makeSvc(store);
+
+    await release("p1", 1);
+
+    expect(store.p1.status).toBe(ProductStatus.inactive);
+    expect(tx.productRemovalEvent.createMany).toHaveBeenCalledTimes(1);
+    expect(tx.productRemovalEvent.createMany).toHaveBeenCalledWith({
+      data: [
+        expect.objectContaining({
+          productId: "p1",
+          reason: "out_of_stock",
+          statusBefore: ProductStatus.reserved,
+          statusAfter: ProductStatus.inactive,
+          fromStorefront: true,
+        }),
+      ],
+    });
+  });
+
+  it("rezervasyon bırakılıp ilan vitrine dönerse (reserved → active) kayıt düşülmez", async () => {
+    const store = {
+      p1: row({
+        quantity: 1,
+        reservedQuantity: 1,
+        status: ProductStatus.reserved,
+      }),
+    };
+    const { release, tx } = makeSvc(store);
+
+    await release("p1", 1);
+
+    expect(store.p1.status).toBe(ProductStatus.active);
+    expect(tx.productRemovalEvent.createMany).not.toHaveBeenCalled();
+  });
+
   it("release, tam dolu ürünü tekrar rezerve edilebilir yapar (lost-update DEĞİL)", async () => {
     // qty-1 ürün tam rezerve; bir akış release eder → başka akış yeniden rezerve edebilir.
     const store = { p1: row({ quantity: 1, reservedQuantity: 1 }) };

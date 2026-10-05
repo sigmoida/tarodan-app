@@ -127,8 +127,8 @@ describe("FulfillmentStockService.decrementForOrder", () => {
           reason: "out_of_stock",
           statusBefore: "reserved",
           statusAfter: "inactive",
-          // Rezerve ilan vitrinde değildi: kaydedilir, sayılmaz.
-          fromStorefront: false,
+          // Rezerve = yayındaki ilanın tutuluşu: kalıcı düşüş bir kez sayılır.
+          fromStorefront: true,
         }),
       ],
     });

@@ -39,7 +39,7 @@ CREATE TABLE "product_removal_events" (
     "detail" TEXT,
     "status_before" "ProductStatus" NOT NULL,
     "status_after" "ProductStatus" NOT NULL,
-    -- İlan olaydan önce vitrindeydi mi (status_before = active)? Dashboard
+    -- İlan olaydan önce vitrindeydi mi (status_before = active ya da reserved)? Dashboard
     -- yalnız bunları "vitrinden düşüş" sayar; kayıt anında yazılır.
     "from_storefront" BOOLEAN NOT NULL,
     "actor_user_id" TEXT,

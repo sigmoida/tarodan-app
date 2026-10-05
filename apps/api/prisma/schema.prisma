@@ -942,7 +942,8 @@ model ProductRemovalEvent {
   /// Geçişin iki ucu — aynı nedenin pasife alma mı silme mi olduğunu ayırır.
   statusBefore  ProductStatus        @map("status_before")
   statusAfter   ProductStatus        @map("status_after")
-  /// İlan bu olaydan önce VİTRİNDEYDİ (statusBefore = active). Dashboard'ın
+  /// İlan bu olaydan önce VİTRİNDEYDİ (statusBefore = active ya da reserved —
+  /// rezerve, yayındaki ilanın geçici tutuluşudur). Dashboard'ın
   /// "vitrinden düşen ilanlar" kırılımı yalnız bunları sayar; vitrin dışındaki
   /// ilanın sonraki kaldırması (reddedilmiş ilanın pasife alınması, süresi
   /// dolmuş ilanın silinmesi, bekleyen ilanın reddi) geçmişte kalır ama

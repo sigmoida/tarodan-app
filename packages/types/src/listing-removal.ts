@@ -130,14 +130,24 @@ export function isListingRemovedStatus(
 // ── Sayım kuralı: vitrinden düşüş ────────────────────────────────────────────
 
 /**
- * Vitrindeki (alıcının görüp satın alabildiği) statü. Bir kaldırma olayı
- * yalnız ilan bu statüden çıktıysa "vitrinden düşüş" sayılır — dashboard
- * kırılımı yalnız bunları sayar. Diğer başlangıç statülerinden (onay bekleyen,
- * reddedilmiş, zaten pasif, rezerve, satılmış) yapılan kaldırmalar geçmiş için
+ * Sayım açısından vitrindeki statüler. Bir kaldırma olayı yalnız ilan bu
+ * statülerden birinden çıktıysa "vitrinden düşüş" sayılır — dashboard kırılımı
+ * yalnız bunları sayar. Diğer başlangıç statülerinden (onay bekleyen,
+ * reddedilmiş, askıda, zaten pasif, satılmış) yapılan kaldırmalar geçmiş için
  * kaydedilir ama sayılmaz: ilan zaten vitrinde değildi. Kayıt anında olaya
  * `fromStorefront` olarak yazılır; sorgular statüden yeniden hesaplamaz.
+ *
+ * `reserved` NEDEN burada: rezerve ilan vitrinde GİZLİDİR (gözatma, arama
+ * dizini ve herkese açık detay yalnız active / sold / stoğu bitmiş inactive
+ * gösterir) ama bu, yayındaki bir ilanın ödeme ya da takas süren GEÇİCİ
+ * tutuluşudur — yalnız active'den girilir (checkAndReserve active/reserved
+ * ister, takas kabulü active ilanı tutar). Tutuluşa girmek kaldırma değildir
+ * (kayıt yok); tutuluş ya satışla (`sold`, kaldırma değil) ya vitrine dönüşle
+ * (`active`, kayıt yok) ya da kalıcı bir düşüşle (ör. takasla stok bitti →
+ * `inactive`) biter. Kalıcı düşüş ilanın vitrinden TEK çıkışıdır ve bir kez
+ * sayılır; reserved sayılmasaydı hiçbir dönemde görünmezdi.
  */
-export const LISTING_STOREFRONT_STATUSES = ["active"] as const;
+export const LISTING_STOREFRONT_STATUSES = ["active", "reserved"] as const;
 
 export function wasOnStorefront(statusBefore: unknown): boolean {
   return (

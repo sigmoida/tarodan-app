@@ -268,14 +268,16 @@ describe("listingRemovalIssue — doğrulama kuralı", () => {
  * sayılır; vitrin dışındaki ilanda satıcı eylemi yönetici/sistem nedenini ezmez.
  */
 describe("sayım kuralı", () => {
-  it("vitrin = yalnız active", () => {
+  it("vitrin = active ve onun geçici tutuluşu reserved", () => {
     expect(wasOnStorefront("active")).toBe(true);
+    // Rezerve ilan gizlidir ama yayındaki ilanın ödeme/takas tutuluşudur:
+    // tutuluştan kalıcı düşüş ilanın vitrinden tek çıkışıdır.
+    expect(wasOnStorefront("reserved")).toBe(true);
     for (const status of [
       "pending",
       "rejected",
       "inactive",
       "suspended",
-      "reserved",
       "sold",
       "deleted",
     ]) {

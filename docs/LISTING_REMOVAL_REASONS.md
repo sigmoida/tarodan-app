@@ -67,14 +67,22 @@ dışında), en fazla 500 karakter.
 Kural `@tarodan/types` içinde (`wasOnStorefront`, `replacesCurrentRemovalReason`);
 kayıt fonksiyonu uygular, dashboard yalnız saklanan bayrağı okur.
 
-1. **Vitrinden düşüş = önceki statü `active`.** Kayıt anında olaya
-   `fromStorefront` olarak yazılır; sorgular statülerden yeniden hesaplamaz.
-   Dashboard yalnız `fromStorefront = true` olayları sayar.
+1. **Vitrinden düşüş = önceki statü `active` ya da `reserved`.** Kayıt anında
+   olaya `fromStorefront` olarak yazılır; sorgular statülerden yeniden
+   hesaplamaz. Dashboard yalnız `fromStorefront = true` olayları sayar.
+   `reserved` vitrinde gizlidir (gözatma, arama dizini ve herkese açık detay
+   yalnız `active`, `sold` ve stoğu bitmiş `inactive` gösterir) ama yayındaki
+   bir ilanın ödeme/takas süren GEÇİCİ tutuluşudur ve yalnız `active`'den
+   girilir. Tutuluşa girmek kayıt üretmez; `reserved → active` (vitrine dönüş)
+   ve `reserved → sold` (satış) da üretmez. Tutuluş kalıcı bir düşüşle biterse
+   (ör. takasla stok bitti, rezervasyon bırakıldığında stok yok) o tek çıkış
+   bir kez sayılır. `reserved → active → inactive` de bir kez sayılır
+   (`active → inactive` olayı).
 2. **Vitrin dışındaki ilanın kaldırmaları kaydedilir ama sayılmaz:** onay
    bekleyen ilanın reddi (moderasyon ya da satıcının askıya alınması),
    reddedilmiş/askıdaki/onay bekleyen ilanın satıcı tarafından pasife alınması,
-   süresi dolmuş ya da duraklatılmış ilanın silinmesi, rezerve/satılmış ilanın
-   stok bırakmada pasife düşmesi, pasif ilanın karantinaya ya da "süresi doldu"
+   süresi dolmuş ya da duraklatılmış ilanın silinmesi, satılmış ilanın stok
+   bırakmada pasife düşmesi, pasif ilanın karantinaya ya da "süresi doldu"
    işaretine geçmesi. Bunlar ürün detayındaki geçmişte görünür ("vitrinde
    değildi — sayılmaz" notuyla).
 3. **Güncel neden önceliği:** vitrinden düşüş ve yönetici/sistem nedenleri

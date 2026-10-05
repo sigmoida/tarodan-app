@@ -308,6 +308,125 @@ describe("recordListingRemovals — sayım kuralı ve güncel neden", () => {
     expect(t.row.removalReason).toBe(ListingRemovalReason.policy_violation);
   });
 
+  /**
+   * Rezerve ilan vitrinde gizlidir ama yayındaki ilanın geçici tutuluşudur:
+   * tutuluşa girmek ve vitrine dönmek kayıt üretmez, satış kaldırma değildir;
+   * tutuluştan kalıcı düşüş ilanın TEK çıkışıdır ve bir kez sayılır.
+   */
+  describe("rezerve (geçici tutuluş)", () => {
+    it("takas tamamlanınca stoğu biten rezerve ilan (reserved → inactive) bir kez sayılır", async () => {
+      const t = makeTable({
+        status: ProductStatus.active,
+        removalReason: null,
+      });
+
+      // Takas kabulü: active → reserved — kaldırma değil, kayıt yok.
+      await t.remove({
+        statusAfter: ProductStatus.reserved,
+        reason: ListingRemovalReason.out_of_stock,
+      });
+      expect(t.events).toHaveLength(0);
+
+      await t.remove({
+        statusAfter: ProductStatus.inactive,
+        reason: ListingRemovalReason.out_of_stock,
+      });
+
+      expect(t.events).toEqual([
+        expect.objectContaining({
+          reason: ListingRemovalReason.out_of_stock,
+          statusBefore: ProductStatus.reserved,
+          statusAfter: ProductStatus.inactive,
+          fromStorefront: true,
+        }),
+      ]);
+      expect(t.counted()).toBe(1);
+      expect(t.row.removalReason).toBe(ListingRemovalReason.out_of_stock);
+    });
+
+    it("rezervasyon bırakılıp stok yoksa (reserved → inactive) bir kez sayılır", async () => {
+      const t = makeTable({
+        status: ProductStatus.reserved,
+        removalReason: null,
+      });
+
+      await t.remove({
+        statusAfter: ProductStatus.inactive,
+        reason: ListingRemovalReason.out_of_stock,
+      });
+
+      expect(t.counted()).toBe(1);
+    });
+
+    it("reserved → active → inactive bir kez sayılır (vitrine dönüş kayıt üretmez)", async () => {
+      const t = makeTable({
+        status: ProductStatus.reserved,
+        removalReason: null,
+      });
+
+      await t.remove({
+        statusAfter: ProductStatus.active,
+        reason: ListingRemovalReason.out_of_stock,
+      });
+      await t.remove({
+        statusAfter: ProductStatus.inactive,
+        reason: ListingRemovalReason.paused_temporarily,
+      });
+
+      expect(t.events).toEqual([
+        expect.objectContaining({
+          statusBefore: ProductStatus.active,
+          statusAfter: ProductStatus.inactive,
+          fromStorefront: true,
+        }),
+      ]);
+      expect(t.counted()).toBe(1);
+    });
+
+    it("reserved → sold kaldırma değildir: kayıt yok", async () => {
+      const t = makeTable({
+        status: ProductStatus.reserved,
+        removalReason: null,
+      });
+
+      await t.remove({
+        statusAfter: ProductStatus.sold,
+        reason: ListingRemovalReason.out_of_stock,
+      });
+
+      expect(t.events).toHaveLength(0);
+    });
+
+    it.each([
+      [
+        "yönetici reddi",
+        ProductStatus.rejected,
+        ListingRemovalReason.policy_violation,
+      ],
+      [
+        "satıcının askıya alınması",
+        ProductStatus.suspended,
+        ListingRemovalReason.seller_suspended,
+      ],
+    ])(
+      "rezerve ilanın %s ile kaldırılması bir kez sayılır",
+      async (_label, statusAfter, reason) => {
+        const t = makeTable({
+          status: ProductStatus.reserved,
+          removalReason: null,
+        });
+
+        await t.remove({ statusAfter, reason });
+
+        expect(t.events).toEqual([
+          expect.objectContaining({ reason, fromStorefront: true }),
+        ]);
+        expect(t.counted()).toBe(1);
+        expect(t.row.removalReason).toBe(reason);
+      },
+    );
+  });
+
   it("onay bekleyen ilanın askıya almayla reddi kaydedilir ama sayılmaz", async () => {
     const t = makeTable({ status: ProductStatus.pending, removalReason: null });
 
