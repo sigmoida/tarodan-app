@@ -13,17 +13,18 @@ Tek kaynak: `packages/types/src/listing-removal.ts` (katalog + doğrulama kural�
 
 ## Nedenler
 
-| Kod                  | Aktör   | Kim koyar / ne zaman                                                                           | Ek alan                                       |
-| -------------------- | ------- | ---------------------------------------------------------------------------------------------- | --------------------------------------------- |
-| `changed_mind`       | satıcı  | Silerken / pasife alırken "Vazgeçtim"                                                          | not (ops.)                                    |
-| `sold_elsewhere`     | satıcı  | Silerken / pasife alırken "Başka bir platformda sattım"                                        | **platform zorunlu**; `other` ise not zorunlu |
-| `paused_temporarily` | satıcı  | **Yalnız pasife alırken** "Geçici olarak durdurdum"                                            | not (ops.)                                    |
-| `not_given`          | satıcı  | Sunucu yazar: neden göndermeyen eski istemci (yayındaki mobil sürümler). Formda seçenek değil. | —                                             |
-| `expired`            | sistem  | İlan ömrü işi (`listingTtlDays`, eylem `deactivate`)                                           | —                                             |
-| `out_of_stock`       | sistem  | Stok 0'a indi: düzenleme (satıcı/yönetici), takasla düşüm, kargoda kayıp, rezervasyon bırakma  | —                                             |
-| `return_quarantine`  | sistem  | Teslim SONRASI iade stoğu geri yükledi, ilan karantinada                                       | —                                             |
-| `seller_suspended`   | sistem  | Satıcı yasaklandı: aktif ilanlar `suspended`, onay bekleyenler `rejected`                      | işlemi yapan yönetici kayda geçer             |
-| `policy_violation`   | Tarodan | Yönetici reddi (`rejected`) ya da yönetici kaldırması (`deleted`)                              | **ihlal kodu**; `other` ise açıklama zorunlu  |
+| Kod                  | Aktör   | Kim koyar / ne zaman                                                                                                             | Ek alan                                       |
+| -------------------- | ------- | -------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------- |
+| `changed_mind`       | satıcı  | Silerken / pasife alırken "Vazgeçtim"                                                                                            | not (ops.)                                    |
+| `sold_elsewhere`     | satıcı  | Silerken / pasife alırken "Başka bir platformda sattım"                                                                          | **platform zorunlu**; `other` ise not zorunlu |
+| `paused_temporarily` | satıcı  | **Yalnız pasife alırken** "Geçici olarak durdurdum"                                                                              | not (ops.)                                    |
+| `not_given`          | satıcı  | Sunucu yazar: neden göndermeyen eski istemci (yayındaki mobil sürümler). Formda seçenek değil.                                   | —                                             |
+| `expired`            | sistem  | İlan ömrü işi (`listingTtlDays`, eylem `deactivate`)                                                                             | —                                             |
+| `out_of_stock`       | sistem  | Stok 0'a indi: düzenleme (satıcı/yönetici), kargoda kayıp, rezervasyon bırakma. Satışla biten stok `sold` olur (kayıt yok)       | —                                             |
+| `traded`             | sistem  | Takas Tarodan'da TAMAMLANDI ve stoğu o bitirdi ("Tarodan'da takas edildi"). Tamamlanmadan stok düşen yollar `out_of_stock` kalır | —                                             |
+| `return_quarantine`  | sistem  | Teslim SONRASI iade stoğu geri yükledi, ilan karantinada                                                                         | —                                             |
+| `seller_suspended`   | sistem  | Satıcı yasaklandı: aktif ilanlar `suspended`, onay bekleyenler `rejected`                                                        | işlemi yapan yönetici kayda geçer             |
+| `policy_violation`   | Tarodan | Yönetici reddi (`rejected`) ya da yönetici kaldırması (`deleted`)                                                                | **ihlal kodu**; `other` ise açıklama zorunlu  |
 
 Başka platformda satış — platformlar: `letgo`, `instagram`, `dolap`,
 `sahibinden`, `in_person` (elden satış), `other` (serbest metinle).
@@ -44,11 +45,16 @@ izinli olmalı; platform yalnız `sold_elsewhere`de ve zorunlu; ihlal kodu yaln�
 `policy_violation`da ve zorunlu; serbest metin opsiyonel (yukarıdaki iki `other`
 dışında), en fazla 500 karakter.
 
+`traded` sonradan eklendi (göç `20261005220000_listing_removal_followups`,
+`ALTER TYPE ... ADD VALUE`): geçmiş kayıtlar geri doldurulmadı, bu göçten önce
+takasla düşen ilanlar `out_of_stock` kalır.
+
 ## Nerede kaydedilir
 
 - **`ProductRemovalEvent`** (`product_removal_events`) — her kaldırma için
   EKLEME-YALNIZ bir satır: neden, platform, ihlal kodu, serbest metin, önceki ve
-  sonraki statü, **`fromStorefront`** (bkz. sayım kuralı), işlemi yapan
+  sonraki statü, **`fromStorefront`** ve **`lateSoldElsewhere`** (bkz. sayım
+  kuralı), işlemi yapan
   kullanıcı (sistemde boş), an. UPDATE bir DB tetikleyicisiyle engellidir.
 - **`Product.removalReason`** — ilanın GÜNCEL nedeni; admin listesi ve filtre
   JOIN'siz okur. İlan kaldırma statülerinin dışına çıktığında (yeniden yayın,
@@ -97,6 +103,36 @@ Sonuç: vitrinden düşüp yeniden yayına girip tekrar düşen ilan iki kez say
 süre dolumu → silme gibi zincirler ilk düşüşte bir kez sayılır (çift sayım
 yok).
 
+### Platform kırılımı: geç gelen "başka platformda sattım"
+
+Dashboard'daki "başka platformda satış" dağılımı toplamdan ayrı bir sorunun
+cevabıdır: satıcılar nerede satıyor? Süresi dolup pasife düşen ilanı satıcı
+SONRA "başka platformda sattım" diye silerse bu cevap vitrinden düşüş değildir
+(toplamda ilan zaten "süresi doldu" olarak bir kez sayıldı) ama platform
+dağılımına girer. Kural `@tarodan/types` `isLateSoldElsewhere`:
+
+- Olay `sold_elsewhere` ve `fromStorefront = false` ise, ilanın SON vitrinden
+  düşüşünden bu yana (hiç düşüşü yoksa tüm geçmişte) başka bir `sold_elsewhere`
+  cevabı YOKSA `lateSoldElsewhere = true` yazılır. Aksi hâlde `false`.
+- Böylece bir düşüş zincirinde satıcı cevabı platforma en çok bir kez girer:
+  vitrinden `sold_elsewhere` ile pasife alınıp sonra silinen ilan iki kez
+  sayılmaz; reddedilmiş ilanı önce pasife alıp sonra silmek de tek kayıttır.
+  İlan yeniden yayına girip tekrar düşerse yeni zincir başlar.
+- Bayrak kayıt anında yazılır (`recordListingRemovals`, vitrin dışı
+  `sold_elsewhere` kayıtları için ilanın önceki olaylarını bir sorguyla okur);
+  dashboard yalnız saklanan bayrağı okur.
+- Platform sorgusu: `reason = sold_elsewhere AND (fromStorefront OR
+lateSoldElsewhere)`. Neden toplamı (`byReason`, `total`) hâlâ yalnız
+  `fromStorefront` olayları sayar; bu yüzden **platform toplamı nedenlerdeki
+  `sold_elsewhere` sayısından büyük olabilir** (ör. süre dolumu → silme:
+  toplamda `expired` 1, platform dağılımında dolap 1). Yalnız platform sayısı
+  olan dönemde panel boş görünmez.
+- Geçmişte (ürün detayı) bu olay "vitrinde değildi" notunun yerine "yalnız
+  platform dağılımına girer" notuyla görünür. Göçten önceki olaylar
+  `lateSoldElsewhere = false` kalır (geri doldurma yok).
+- Güncel neden önceliği değişmedi: süresi dolmuş ilanın silinmesi güncel nedeni
+  "süresi doldu" bırakır.
+
 ### `inactiveReason` ile ilişki
 
 `Product.inactiveReason` bir **davranış işaretidir**: satıcı bu pasif ilanla
@@ -129,8 +165,9 @@ andır.
 | `ReservationReconciliationService` (rezervasyon bırakma)                       | → `inactive` (stok 0)                          | `out_of_stock`                             |
 | `ProductLockService.releaseReservation`                                        | → `inactive` (stok 0)                          | `out_of_stock`                             |
 | `FulfillmentStockService.decrementForOrder` (oversell, rezervasyon bırakma)    | → `inactive` (stok 0)                          | `out_of_stock`                             |
-| `TradeLifecycleService` (takas tamamlandı — iki yol)                           | → `inactive` (stok 0)                          | `out_of_stock`                             |
-| `TradeReconciliationService` (oto-tamamlama, kargoda kayıp)                    | → `inactive` (stok 0)                          | `out_of_stock`                             |
+| `TradeLifecycleService` (takas tamamlandı — iki yol)                           | → `inactive` (stok 0)                          | `traded`                                   |
+| `TradeReconciliationService` (oto-tamamlama)                                   | → `inactive` (stok 0)                          | `traded`                                   |
+| `TradeReconciliationService` (kargoda kayıp; takas tamamlanmadı)               | → `inactive` (stok 0)                          | `out_of_stock`                             |
 | `finalizeReturningTradeIfResolved` (iade kolisi kayıp)                         | → `inactive` (stok 0)                          | `out_of_stock`                             |
 | `AdminStaffService.banUser`                                                    | `active` → `suspended`, `pending` → `rejected` | `seller_suspended`                         |
 | `AdminProductService.rejectProduct` (+ toplu red, moderasyon kuyruğu)          | → `rejected`                                   | `policy_violation` + ihlal kodu            |
@@ -174,9 +211,12 @@ bakiye değil). Zone C'nin kurallarını aynen izler:
 - **Olay damgası:** `ProductRemovalEvent.createdAt` (kaldırma anı). İlanın
   bugünkü statüsü sayımı etkilemez; Eylül'de düşüp Ekim'de yeniden açılan ilan
   Eylül'ün sayısında kalır.
-- Sunucu tarafı `groupBy` (neden; `sold_elsewhere` için platform;
+- Sunucu tarafı `groupBy` (neden; `sold_elsewhere` için platform — vitrinden
+  düşüşler + geç gelen cevaplar, bkz. "Platform kırılımı";
   `policy_violation` için ihlal kodu); test şeridi hariç (`LIVE_PRODUCT`).
-- Önbellek: canlı pencere 5 dk, kapalı özel aralık 6 saat; "Yenile" düşürür.
+- `traded` ("Tarodan'da takas edildi") sistem grubunda kendi satırıdır; "stok
+  tükendi"den ayrı sayılır.
+- Önbellek (anahtar öneki `v2`: platform kuralı değişince eski sonuçlar atıldı): canlı pencere 5 dk, kapalı özel aralık 6 saat; "Yenile" düşürür.
 - Dönem kartlarının dört rakamlı (dönem / dün / bu ay / tüm zamanlar) biçimini
   taşımaz — kırılım tek pencereyi okur.
 - Bu özellikten önceki kaldırmaların kaydı olmadığı için sayılmaz.

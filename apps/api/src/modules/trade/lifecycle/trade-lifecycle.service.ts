@@ -1420,13 +1420,14 @@ export class TradeLifecycleService {
             where: { id: product.id },
             data: updateData,
           });
-          // Takasla stoğu biten ilan vitrinden "stok tükendi" nedeniyle düşer.
+          // Takasla stoğu biten ilan "Tarodan'da takas edildi" nedeniyle düşer
+          // (stok tükendi değil: stoğu satış değil takas bitirdi).
           await recordListingRemovals(tx, [
             {
               productId: product.id,
               statusBefore: product.status,
               statusAfter: nextStatus,
-              reason: ListingRemovalReason.out_of_stock,
+              reason: ListingRemovalReason.traded,
             },
           ]);
         }
@@ -1683,13 +1684,14 @@ export class TradeLifecycleService {
           where: { id: product.id },
           data: updateData,
         });
-        // Takasla stoğu biten ilan vitrinden "stok tükendi" nedeniyle düşer.
+        // Takasla stoğu biten ilan "Tarodan'da takas edildi" nedeniyle düşer
+        // (stok tükendi değil: stoğu satış değil takas bitirdi).
         await recordListingRemovals(tx, [
           {
             productId: product.id,
             statusBefore: product.status,
             statusAfter: nextStatus,
-            reason: ListingRemovalReason.out_of_stock,
+            reason: ListingRemovalReason.traded,
           },
         ]);
       }

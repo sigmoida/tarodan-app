@@ -29,6 +29,8 @@ describe("ProductUpdateService — kaldırma nedeni", () => {
       },
       productRemovalEvent: {
         createMany: jest.fn().mockResolvedValue({ count: 1 }),
+        // Geç platform cevabı sorgusu (vitrin dışından gelen sold_elsewhere).
+        findMany: jest.fn().mockResolvedValue([]),
       },
       productImage: { deleteMany: jest.fn(), createMany: jest.fn() },
     };

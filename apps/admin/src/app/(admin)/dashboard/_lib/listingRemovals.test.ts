@@ -74,6 +74,35 @@ describe("toListingRemovalsView", () => {
     ]);
   });
 
+  it("shows traded as its own system row, apart from out-of-stock", () => {
+    const view = toListingRemovalsView(
+      response({ traded: 3, out_of_stock: 2, expired: 1 }),
+    );
+
+    const system = view.byActor.find((group) => group.actor === "system");
+    expect(system?.reasons).toEqual([
+      { key: "traded", count: 3, share: 50 },
+      { key: "out_of_stock", count: 2, share: 33 },
+      { key: "expired", count: 1, share: 17 },
+    ]);
+  });
+
+  it("counts a late sold-elsewhere answer in the platform split without adding to the total", () => {
+    // Expired once (total 1); the seller later deleted it as sold on Dolap.
+    const view = toListingRemovalsView(response({ expired: 1 }, { dolap: 1 }));
+
+    expect(view.total).toBe(1);
+    expect(view.soldElsewhereTotal).toBe(1);
+    expect(view.platforms).toEqual([{ key: "dolap", count: 1, share: 100 }]);
+  });
+
+  it("is not empty when only platform answers exist (never on the storefront)", () => {
+    const view = toListingRemovalsView(response({}, { letgo: 1 }));
+
+    expect(view.total).toBe(0);
+    expect(view.isEmpty).toBe(false);
+  });
+
   it("splits sold-elsewhere by platform, largest first, shares of that subtotal", () => {
     const view = toListingRemovalsView(
       response({ sold_elsewhere: 4 }, { dolap: 1, sahibinden: 3, letgo: 0 }),

@@ -6,6 +6,7 @@ import {
 } from "@prisma/client";
 import {
   LISTING_REMOVAL_REASONS_BY_ACTOR,
+  isLateSoldElsewhere,
   isListingRemovedStatus,
   listingRemovalActorOf,
   wasOnStorefront,
@@ -49,6 +50,39 @@ export type ListingRemovalDb = Pick<
   Prisma.TransactionClient,
   "product" | "productRemovalEvent"
 >;
+
+/**
+ * Geç gelen "başka platformda sattım" cevabı mı (bkz. @tarodan/types
+ * `isLateSoldElsewhere`)? Yalnız vitrin dışından gelen `sold_elsewhere`
+ * kayıtları için ilanın önceki olaylarını okur; diğer her kayıt sorgusuzdur.
+ */
+async function lateSoldElsewhereOf(
+  db: ListingRemovalDb,
+  entry: {
+    productId: string;
+    reason: ListingRemovalReason;
+    fromStorefront: boolean;
+  },
+): Promise<boolean> {
+  if (
+    entry.reason !== ListingRemovalReason.sold_elsewhere ||
+    entry.fromStorefront
+  ) {
+    return false;
+  }
+  const history = await db.productRemovalEvent.findMany({
+    where: {
+      productId: entry.productId,
+      OR: [
+        { reason: ListingRemovalReason.sold_elsewhere },
+        { fromStorefront: true },
+      ],
+    },
+    orderBy: { createdAt: "desc" },
+    select: { reason: true, fromStorefront: true },
+  });
+  return isLateSoldElsewhere({ ...entry, history });
+}
 
 /** Çağıran davranış işaretini bu yazımda DEĞİŞTİRDİ mi? */
 function inactiveReasonChanged(
@@ -118,6 +152,9 @@ export function currentReasonGuard(change: {
  *    `fromStorefront` kayıt anında yazılır (önceki statü vitrin miydi —
  *    `wasOnStorefront`): dashboard yalnız bunları "vitrinden düşüş" sayar;
  *    vitrin dışındaki ilanın sonraki kaldırmaları geçmişte kalır, sayılmaz.
+ *    `lateSoldElsewhere` da kayıt anında yazılır: zaten vitrinden düşmüş
+ *    ilanın ilk "başka platformda sattım" cevabı toplam sayıma girmez ama
+ *    dashboard'ın platform kırılımına girer (`isLateSoldElsewhere`).
  * 2. İlanın güncel nedeni `Product.removalReason` (liste/filtre için kopya).
  *    Yazım yeni statüye koşulludur (bu arada vitrine dönmüş ilana bayat neden
  *    yazılmaz) ve vitrin dışındaki ilanda satıcı nedeni yönetici/sistem
@@ -133,11 +170,19 @@ export async function recordListingRemovals(
   db: ListingRemovalDb,
   entries: readonly ListingRemovalEntry[],
 ): Promise<number> {
-  const removals = entries.filter(isListingRemovalTransition).map((entry) => ({
-    ...entry,
-    fromStorefront: wasOnStorefront(entry.statusBefore),
-  }));
-  if (removals.length === 0) return 0;
+  const transitions = entries
+    .filter(isListingRemovalTransition)
+    .map((entry) => ({
+      ...entry,
+      fromStorefront: wasOnStorefront(entry.statusBefore),
+    }));
+  if (transitions.length === 0) return 0;
+  const removals = await Promise.all(
+    transitions.map(async (entry) => ({
+      ...entry,
+      lateSoldElsewhere: await lateSoldElsewhereOf(db, entry),
+    })),
+  );
 
   await db.productRemovalEvent.createMany({
     data: removals.map((entry) => ({
@@ -149,6 +194,9 @@ export async function recordListingRemovals(
       statusBefore: entry.statusBefore,
       statusAfter: entry.statusAfter,
       fromStorefront: entry.fromStorefront,
+      // Yalnız true iken yazılır (kolon varsayılanı false): olağan kayıt
+      // şekli değişmez.
+      ...(entry.lateSoldElsewhere ? { lateSoldElsewhere: true } : {}),
       actorUserId: entry.actorUserId ?? null,
     })),
   });

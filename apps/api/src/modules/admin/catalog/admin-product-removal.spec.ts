@@ -273,6 +273,7 @@ describe("listingRemovalFilterWhere", () => {
           in: [
             "expired",
             "out_of_stock",
+            "traded",
             "return_quarantine",
             "seller_suspended",
           ],
@@ -385,6 +386,7 @@ describe("toAdminRemovalEvent", () => {
         statusBefore: ProductStatus.active,
         statusAfter: ProductStatus.inactive,
         fromStorefront: true,
+        lateSoldElsewhere: false,
         actorUserId: "seller-1",
         createdAt: new Date("2026-10-03T09:00:00Z"),
       }),
@@ -398,6 +400,7 @@ describe("toAdminRemovalEvent", () => {
       statusBefore: "active",
       statusAfter: "inactive",
       fromStorefront: true,
+      lateSoldElsewhere: false,
       actorUserId: "seller-1",
       createdAt: "2026-10-03T09:00:00.000Z",
     });

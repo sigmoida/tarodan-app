@@ -74,6 +74,46 @@ describe("buildListingRemovalBreakdown", () => {
     ]);
   });
 
+  it("süresi dolup sonra 'başka platformda sattım' diye silinen ilan: toplamda bir kez (süresi doldu), platform kırılımında bir kez", () => {
+    // Sorgu katmanı: toplam yalnız vitrinden düşüşü (expired) görür; platform
+    // sorgusu geç cevabı da görür. İki ayrı gruplama sonucu birleşince:
+    const result = buildListingRemovalBreakdown(range, {
+      byReason: [{ reason: "expired", ...counted(1) }],
+      byPlatform: [{ platform: "dolap", ...counted(1) }],
+      byViolation: [],
+    });
+
+    expect(result.total).toBe(1);
+    expect(result.byReason.find((r) => r.reason === "expired")?.count).toBe(1);
+    expect(
+      result.byReason.find((r) => r.reason === "sold_elsewhere")?.count,
+    ).toBe(0);
+    expect(
+      result.soldElsewhereByPlatform.find((p) => p.platform === "dolap")?.count,
+    ).toBe(1);
+  });
+
+  it("takasla düşen ilan kendi satırında 'traded' olarak, 'stok tükendi'den ayrı sayılır", () => {
+    const result = buildListingRemovalBreakdown(range, {
+      byReason: [
+        { reason: "traded", ...counted(3) },
+        { reason: "out_of_stock", ...counted(2) },
+      ],
+      byPlatform: [],
+      byViolation: [],
+    });
+
+    expect(result.byReason.find((r) => r.reason === "traded")).toEqual({
+      reason: "traded",
+      actor: "system",
+      count: 3,
+    });
+    expect(
+      result.byReason.find((r) => r.reason === "out_of_stock")?.count,
+    ).toBe(2);
+    expect(result.total).toBe(5);
+  });
+
   it("ihlal kodları çoktan aza; kodsuz (eski) red null olarak kalır", () => {
     const result = buildListingRemovalBreakdown(range, {
       byReason: [{ reason: "policy_violation", ...counted(5) }],
@@ -155,13 +195,15 @@ describe("AdminDashboardRemovalsService", () => {
     const platformCall = groupBy.mock.calls.find(
       ([args]) => (args as { by: string[] }).by[0] === "platform",
     )![0] as any;
-    expect(platformCall.where).toEqual(
-      expect.objectContaining({
-        reason: ListingRemovalReason.sold_elsewhere,
-        createdAt: reasonCall.where.createdAt,
-        fromStorefront: true,
-      }),
-    );
+    // Platform kırılımı: aynı pencere + test şeridi hariç; vitrinden düşüşler
+    // YA DA geç gelen "başka platformda sattım" cevapları. `fromStorefront`
+    // tek başına süzmez (toplam gibi) — yoksa geç cevap kaybolurdu.
+    expect(platformCall.where).toEqual({
+      reason: ListingRemovalReason.sold_elsewhere,
+      createdAt: reasonCall.where.createdAt,
+      product: reasonCall.where.product,
+      OR: [{ fromStorefront: true }, { lateSoldElsewhere: true }],
+    });
     const violationCall = groupBy.mock.calls.find(
       ([args]) => (args as { by: string[] }).by[0] === "violationCode",
     )![0] as any;
@@ -186,7 +228,7 @@ describe("AdminDashboardRemovalsService", () => {
     });
 
     const [key, , options] = cache.getOrSet.mock.calls[0];
-    expect(key).toMatch(/^admin:dashboard:removals:v1:custom:/);
+    expect(key).toMatch(/^admin:dashboard:removals:v2:custom:/);
     expect(options).toEqual({
       ttl: AdminDashboardRemovalsService.CLOSED_RANGE_CACHE_TTL_SECONDS,
     });
@@ -196,7 +238,7 @@ describe("AdminDashboardRemovalsService", () => {
     const { service, cache } = makeService();
     await service.invalidate();
     expect(cache.delPattern).toHaveBeenCalledWith(
-      "admin:dashboard:removals:v1:*",
+      "admin:dashboard:removals:v2:*",
     );
   });
 });

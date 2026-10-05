@@ -7,6 +7,7 @@ import {
   LISTING_REMOVAL_REASON_OPTIONS,
   LISTING_REMOVED_STATUSES,
   LISTING_VIOLATION_CODES,
+  isLateSoldElsewhere,
   isListingRemovedStatus,
   listingRemovalActorOf,
   listingRemovalIssue,
@@ -47,6 +48,7 @@ describe("listing removal catalog — kontrat", () => {
     expect(listingRemovalActorOf("not_given")).toBe("seller");
     expect(listingRemovalActorOf("sold_elsewhere")).toBe("seller");
     expect(listingRemovalActorOf("out_of_stock")).toBe("system");
+    expect(listingRemovalActorOf("traded")).toBe("system");
     expect(listingRemovalActorOf("seller_suspended")).toBe("system");
     expect(listingRemovalActorOf("policy_violation")).toBe("admin");
   });
@@ -360,5 +362,60 @@ describe("normalizeListingRemovalInput", () => {
       violationCode: null,
       detail: "not",
     });
+  });
+});
+
+/**
+ * Platform kırılımının kuralı: vitrinden düşmüş ilanın SONRADAN "başka
+ * platformda sattım" diye kaldırılması toplamda sayılmaz (fromStorefront
+ * false) ama aynı düşüş zincirindeki İLK platform cevabı olarak platform
+ * kırılımına girer. `history`: önceki olayların sold_elsewhere olanları ve
+ * vitrinden düşüşleri, en yenisi önce.
+ */
+describe("isLateSoldElsewhere — platform kırılımına geç giren cevap", () => {
+  const late = (
+    history: Array<{ reason: ListingRemovalReason; fromStorefront: boolean }>,
+    over: { reason?: ListingRemovalReason; fromStorefront?: boolean } = {},
+  ) =>
+    isLateSoldElsewhere({
+      reason: "sold_elsewhere",
+      fromStorefront: false,
+      history,
+      ...over,
+    });
+
+  it("süresi dolup düşen ilanın sonraki 'başka platformda sattım' silmesi geçtir", () => {
+    expect(late([{ reason: "expired", fromStorefront: true }])).toBe(true);
+  });
+
+  it("geçmişi olmayan (hiç vitrinde olmamış) ilanın ilk cevabı geçtir", () => {
+    expect(late([])).toBe(true);
+  });
+
+  it("vitrinden düşüş olayının kendisi geç değildir (kendi bayrağıyla sayılır)", () => {
+    expect(late([], { fromStorefront: true })).toBe(false);
+  });
+
+  it("başka nedenler geç değildir", () => {
+    expect(late([], { reason: "changed_mind" })).toBe(false);
+    expect(late([], { reason: "expired" })).toBe(false);
+  });
+
+  it("aynı düşüş zincirinde önceki bir platform cevabı varsa geç değildir (çift sayım yok)", () => {
+    expect(late([{ reason: "sold_elsewhere", fromStorefront: true }])).toBe(
+      false,
+    );
+    expect(late([{ reason: "sold_elsewhere", fromStorefront: false }])).toBe(
+      false,
+    );
+  });
+
+  it("ilan yeniden yayına girip tekrar düştüyse yeni zincir başlar", () => {
+    expect(
+      late([
+        { reason: "expired", fromStorefront: true },
+        { reason: "sold_elsewhere", fromStorefront: true },
+      ]),
+    ).toBe(true);
   });
 });

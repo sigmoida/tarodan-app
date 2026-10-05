@@ -43,6 +43,7 @@ export const LISTING_REMOVAL_REASONS = [
   // system
   "expired",
   "out_of_stock",
+  "traded",
   "return_quarantine",
   "seller_suspended",
   // admin
@@ -54,7 +55,13 @@ export type ListingRemovalReason = (typeof LISTING_REMOVAL_REASONS)[number];
 /** Nedeni kimin koyduğu — her neden TEK bir aktöre aittir. */
 export const LISTING_REMOVAL_REASONS_BY_ACTOR = {
   seller: ["not_given", "changed_mind", "sold_elsewhere", "paused_temporarily"],
-  system: ["expired", "out_of_stock", "return_quarantine", "seller_suspended"],
+  system: [
+    "expired",
+    "out_of_stock",
+    "traded",
+    "return_quarantine",
+    "seller_suspended",
+  ],
   admin: ["policy_violation"],
 } as const satisfies Record<
   ListingRemovalActor,
@@ -177,6 +184,45 @@ export function replacesCurrentRemovalReason(change: {
     change.current === null ||
     listingRemovalActorOf(change.current) === "seller"
   );
+}
+
+/**
+ * Platform kırılımına GEÇ giren "başka platformda sattım" kaydı mı?
+ *
+ * Vitrinden düşüş sayımı (`fromStorefront`) nedene göre toplamı verir ve ilan
+ * başına bir kez sayar. Platform kırılımı ise "satıcılar nerede satıyor?"
+ * sorusunun cevabıdır: ilan zaten vitrinden düşmüş (ör. süresi dolup pasife
+ * düşmüş) ve satıcı SONRA onu "başka platformda sattım" diye sildiyse, o cevap
+ * toplamda tekrar sayılmaz (ilk düşüş zaten sayıldı) ama platform kırılımına
+ * girer. Kural:
+ *
+ * - Neden `sold_elsewhere` ve olay vitrinden düşüş DEĞİL (vitrinden düşüş
+ *   kaydı platform kırılımına zaten kendi bayrağıyla girer).
+ * - İlanın SON vitrinden düşüşünden bu yana (hiç yoksa tüm geçmişte) başka bir
+ *   `sold_elsewhere` cevabı yok: aynı düşüşün zincirinde satıcı cevabı iki kez
+ *   saymaz (önce pasife, sonra silme = bir platform kaydı). İlan yeniden
+ *   yayına girip tekrar düşerse yeni bir düşüş başlar ve zincir sıfırlanır.
+ *
+ * `history`, ilanın önceki olaylarından yalnız `sold_elsewhere` olanlar ile
+ * vitrinden düşüş olanlardır, EN YENİDEN eskiye. Kayıt anında olaya
+ * `lateSoldElsewhere` olarak yazılır; dashboard yalnız saklanan bayrağı okur.
+ */
+export function isLateSoldElsewhere(change: {
+  reason: ListingRemovalReason;
+  fromStorefront: boolean;
+  history: ReadonlyArray<{
+    reason: ListingRemovalReason;
+    fromStorefront: boolean;
+  }>;
+}): boolean {
+  if (change.reason !== "sold_elsewhere" || change.fromStorefront) return false;
+  for (const past of change.history) {
+    // Aynı düşüş zincirinde bir platform cevabı zaten var.
+    if (past.reason === "sold_elsewhere") return false;
+    // Son vitrinden düşüşe ulaşıldı, ondan sonra cevap yok.
+    if (past.fromStorefront) return true;
+  }
+  return true;
 }
 
 // ── Eylemler ve izinli nedenler ──────────────────────────────────────────────
@@ -480,6 +526,12 @@ export interface AdminListingRemovalEvent {
    * `false` olaylar geçmişte görünür ama dashboard'da sayılmaz.
    */
   fromStorefront: boolean;
+  /**
+   * Vitrinden düşüş değil ama platform kırılımına girer (bkz.
+   * {@link isLateSoldElsewhere}): ilan zaten düşmüştü, satıcı sonra "başka
+   * platformda sattım" diye kaldırdı.
+   */
+  lateSoldElsewhere: boolean;
   actorUserId: string | null;
   createdAt: string;
 }
@@ -522,14 +574,24 @@ export interface DashboardListingRemovalViolationCount {
  * (ilan öncesinde vitrindeydi). Olay damgası = kaldırma anı; ilanın bugünkü
  * statüsü sayımı etkilemez. Vitrinden düşüp geri açılıp yeniden düşen ilan
  * iki olaydır; zaten vitrin dışındaki ilanın sonraki kaldırması (süresi
- * dolmuş ilanın silinmesi, reddedilmiş ilanın pasife alınması) sayılmaz.
+ * dolmuş ilanın silinmesi, reddedilmiş ilanın pasife alınması) toplamda
+ * sayılmaz.
+ *
+ * İSTİSNA yalnız `soldElsewhereByPlatform`: zaten vitrinden düşmüş ilanın
+ * sonradan "başka platformda sattım" diye kaldırılması (ör. süresi dolmuş
+ * ilanın silinmesi) toplamda tekrar sayılmaz ama platform kırılımına girer
+ * ({@link isLateSoldElsewhere}). Bu yüzden platform toplamı `byReason`
+ * içindeki `sold_elsewhere` sayısından büyük olabilir.
  */
 export interface DashboardListingRemovalsResponse {
   range: DashboardPeriodRange;
   total: number;
   /** Sıfır olanlar dahil her neden, katalog sırasıyla. */
   byReason: DashboardListingRemovalReasonCount[];
-  /** `sold_elsewhere` olaylarının platform kırılımı (her platform, sıfır dahil). */
+  /**
+   * `sold_elsewhere` cevaplarının platform kırılımı (her platform, sıfır dahil):
+   * vitrinden düşüşler + geç gelen cevaplar (`lateSoldElsewhere`).
+   */
   soldElsewhereByPlatform: DashboardListingRemovalPlatformCount[];
   /** `policy_violation` olaylarının ihlal kodu kırılımı (yalnız görülen kodlar). */
   byViolation: DashboardListingRemovalViolationCount[];

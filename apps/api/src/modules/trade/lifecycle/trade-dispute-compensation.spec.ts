@@ -104,7 +104,7 @@ describe("TradeLifecycleService.resolveDispute — tazminat sözleşmesi", () =>
     return { service, prisma, tx, txCashUpdateMany, paymentService };
   };
 
-  it("takasla stoğu biten REZERVE ilan vitrinden TEK kez düşer (stok tükendi, sayılır)", async () => {
+  it("takasla stoğu biten REZERVE ilan vitrinden TEK kez düşer (Tarodan'da takas edildi, sayılır)", async () => {
     const { service, tx } = makeService();
 
     await service.resolveDispute(TRADE_ID, "admin-1", {
@@ -117,7 +117,7 @@ describe("TradeLifecycleService.resolveDispute — tazminat sözleşmesi", () =>
       data: [
         expect.objectContaining({
           productId: "p1",
-          reason: "out_of_stock",
+          reason: "traded",
           statusBefore: "reserved",
           statusAfter: "inactive",
           fromStorefront: true,
