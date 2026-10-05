@@ -39,6 +39,7 @@ describe("AdminOrderCancelService", () => {
     totalAmount: 1180,
     shipment: null as { status: ShipmentStatus; shippedAt: Date | null } | null,
     refundRequests: [] as Array<{ id: string; refundNumber: string }>,
+    payment: null as { id: string } | null,
   };
   type Order = typeof baseOrder;
 
@@ -882,7 +883,7 @@ describe("AdminOrderCancelService", () => {
       await expect(service.previewCancel("order-1")).resolves.toEqual({
         kind: "unpaid",
         quantity: 2,
-        reservationHeld: true,
+        reservation: "held",
       });
       expect(
         refundService.previewPlatformCancellationRefund,
@@ -897,7 +898,35 @@ describe("AdminOrderCancelService", () => {
 
       await expect(service.previewCancel("order-1")).resolves.toMatchObject({
         kind: "unpaid",
-        reservationHeld: false,
+        reservation: "already_released",
+      });
+    });
+
+    it("ödemesi hiç başlatılmamış teklif siparişi: ayrılmış stok yok (serbest kalacak denmez)", async () => {
+      const { service } = makeService({
+        status: OrderStatus.pending_payment,
+        origin: "offer",
+        offerId: "offer-1",
+        payment: null,
+      });
+
+      await expect(service.previewCancel("order-1")).resolves.toMatchObject({
+        kind: "unpaid",
+        reservation: "not_reserved",
+      });
+    });
+
+    it("ilk ödeme denemesinden sonraki teklif siparişi rezervini tutar", async () => {
+      const { service } = makeService({
+        status: OrderStatus.pending_payment,
+        origin: "offer",
+        offerId: "offer-1",
+        payment: { id: "pay-1" },
+      });
+
+      await expect(service.previewCancel("order-1")).resolves.toMatchObject({
+        kind: "unpaid",
+        reservation: "held",
       });
     });
 

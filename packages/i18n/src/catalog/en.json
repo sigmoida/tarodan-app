@@ -6990,7 +6990,8 @@
             "handedOver": "the parcel is handed to the carrier; the refund request flow applies at this stage",
             "delivered": "the order is delivered; the refund request flow applies",
             "completed": "the order is completed; the seller has been or will be paid out"
-          }
+          },
+          "reservationNotReserved": "No stock was reserved for this order (its payment was never started)"
         }
       },
       "trades": {

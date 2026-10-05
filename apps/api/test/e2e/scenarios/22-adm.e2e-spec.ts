@@ -2458,7 +2458,11 @@ describe("22 — Admin Paneli & Yetkilendirme (ADM)", () => {
       .get(`/api/admin/orders/${orderId}/cancel-preview`)
       .set(authHeader(admin))
       .expect(200);
-    expect(preview.body).toMatchObject({ kind: "unpaid" });
+    // Ödemesi hiç başlatılmamış teklif siparişi rezerv tutmaz.
+    expect(preview.body).toMatchObject({
+      kind: "unpaid",
+      reservation: "not_reserved",
+    });
 
     const res = await request(server())
       .post(`/api/admin/orders/${orderId}/cancel`)

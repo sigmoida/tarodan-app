@@ -211,6 +211,13 @@ export const ADMIN_ORDER_CANCEL_BLOCKER_I18N_KEYS = {
 } as const satisfies Record<AdminOrderCancelBlocker, string>;
 
 /**
+ * Ödenmemiş siparişin stok rezervasyonu (kural API'de: `orderReservationState`).
+ * Teklif siparişi rezervi ilk ödeme başlatmada alır; o ana dek `not_reserved`.
+ */
+export type OrderReservationState =
+  "held" | "already_released" | "not_reserved";
+
+/**
  * `GET /admin/orders/:id/cancel-preview` — iptal şimdi yapılsa ne olur. Tutar
  * iptalin kendisiyle AYNI hesaptan gelir. `kind` onay isteğinde
  * `expectedKind` olarak geri gönderilir: önizleme ile onay arasında sipariş
@@ -222,10 +229,11 @@ export type AdminOrderCancelPreview =
       /** İptal edilen adet. */
       quantity: number;
       /**
-       * Stok rezervasyonu hâlâ tutuluyor mu? true → `quantity` adet
-       * rezervasyon serbest kalır; false → rezervasyonu süpürme zaten bıraktı.
+       * Siparişin stok rezervasyonu: `held` → `quantity` adet serbest kalır;
+       * `already_released` → süpürme zaten bıraktı; `not_reserved` → teklif
+       * siparişinin ödemesi hiç başlatılmadı, ayrılmış stok yok.
        */
-      reservationHeld: boolean;
+      reservation: OrderReservationState;
     }
   | {
       kind: "paid_pre_handover";

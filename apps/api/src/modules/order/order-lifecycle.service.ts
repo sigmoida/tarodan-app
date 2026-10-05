@@ -37,7 +37,11 @@ import { paymentWindowEnd } from "../payment/helpers/payment.constants";
 import { OFFER_CANCEL_REASON } from "../trade/helpers/trade-cancel-reasons";
 import { ORDER_CANCEL_REASON } from "./helpers/order-cancel-reasons";
 import { orderCancelledData } from "./helpers/order-cancellation";
-import type { AdminCancelReasonCode } from "@tarodan/types";
+import type {
+  AdminCancelReasonCode,
+  OrderReservationState,
+} from "@tarodan/types";
+import { orderReservationState } from "./helpers/order-reservation";
 
 /**
  * Ödenmemiş iptalin aktörü, ledger gerekçesinden türetilir: ikisi aynı olguyu
@@ -568,7 +572,10 @@ export class OrderLifecycleService {
     // invalidatePendingOrdersForProduct'taki pattern ile aynı.
     // (pending_payment'ta quantity hiç düşmediği için stok geri-yükleme yoktur;
     // ödenmiş iptallerin stok geri-yüklemesi processRefund'da tek yazıcıdır.)
-    if (!order.reservationReleasedAt) {
+    // GUARD 2: ödemesi hiç başlatılmamış TEKLİF siparişi rezerv tutmaz
+    // (rezerv ilk ödeme başlatmada alınır). Eskiden yine de düşülüyor, aynı
+    // üründe başka bir alıcının canlı rezervi siliniyordu (oversell).
+    if ((await this.reservationStateInTx(tx, order)) === "held") {
       await tx.$executeRaw`
         UPDATE "products"
         SET "reserved_quantity" = GREATEST("reserved_quantity" - ${order.quantity ?? 1}, 0)
@@ -622,6 +629,36 @@ export class OrderLifecycleService {
     }
 
     return cancelledOrder;
+  }
+
+  /**
+   * Ödenmemiş siparişin rezerv durumu, işlem içinde (`orderReservationState`).
+   * Teklif siparişinde Payment satırına bakılır; ilk ödeme başlatma rezervi
+   * ürün satırı kilitliyken Payment'la aynı işlemde aldığı için önce aynı
+   * kilit alınır: sürmekte olan bir ilk ödeme başlatma önce biterse Payment
+   * görünür ve rezerv bırakılır. Bu işlemden SONRA başlayan bir ödeme
+   * başlatma iptal edilmiş siparişe rezerv alabilir; çekimi claim'in
+   * ödenebilirlik kilidi durdurur, sayacı rezerv mutabakatı (iptal sipariş
+   * sayılmaz) düzeltir — eksik değil fazla rezerv, oversell değil.
+   */
+  private async reservationStateInTx(
+    tx: Prisma.TransactionClient,
+    order: {
+      id: string;
+      productId: string;
+      offerId: string | null;
+      reservationReleasedAt: Date | null;
+    },
+  ): Promise<OrderReservationState> {
+    if (order.reservationReleasedAt || !order.offerId) {
+      return orderReservationState({ ...order, hasPayment: false });
+    }
+    await tx.$queryRaw`SELECT id FROM products WHERE id = ${order.productId} FOR UPDATE`;
+    const payment = await tx.payment.findUnique({
+      where: { orderId: order.id },
+      select: { id: true },
+    });
+    return orderReservationState({ ...order, hasPayment: payment !== null });
   }
 
   async invalidateProductCaches(productId: string): Promise<void> {

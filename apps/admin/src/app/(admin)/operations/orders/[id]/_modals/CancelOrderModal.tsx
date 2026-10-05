@@ -6,6 +6,7 @@ import {
   ADMIN_CANCEL_NOTE_MAX,
   type AdminCancelReasonCode,
   type AdminOrderCancelPreview,
+  type OrderReservationState,
 } from "@tarodan/types";
 import { Alert, Modal, ModalFooter, Select, Textarea } from "@tarodan/ui";
 import { fmtTry } from "@/lib/format";
@@ -147,6 +148,12 @@ export function CancelOrderModal({
   );
 }
 
+/** Serbest bırakılacak rezerv yoksa nedeni (katalog anahtarı). */
+const RESERVATION_NOTE_KEYS = {
+  already_released: "admin.operations.orders.cancel.reservationAlreadyReleased",
+  not_reserved: "admin.operations.orders.cancel.reservationNotReserved",
+} as const satisfies Record<Exclude<OrderReservationState, "held">, string>;
+
 /** Önizlemenin türe göre özeti: para + stok. */
 function CancelPreviewSummary({
   preview,
@@ -161,11 +168,11 @@ function CancelPreviewSummary({
           {t("admin.operations.orders.cancel.noPayment")}
         </p>
         <p className="text-xs text-subtle">
-          {preview.reservationHeld
+          {preview.reservation === "held"
             ? t("admin.operations.orders.cancel.reservationReleased", {
                 count: preview.quantity,
               })
-            : t("admin.operations.orders.cancel.reservationAlreadyReleased")}
+            : t(RESERVATION_NOTE_KEYS[preview.reservation])}
         </p>
       </div>
     );

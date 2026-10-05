@@ -26,6 +26,7 @@ import { PaymentService } from "../../payment/payment.service";
 import { NotificationService } from "../../notification/notification.service";
 import { ACTIVE_REFUND_REQUEST_STATUSES } from "../../refund/helpers/refund-active-statuses";
 import { adminCancelReasonText } from "../../order/helpers/admin-cancel-reason";
+import { orderReservationState } from "../../order/helpers/order-reservation";
 import { i18nMessage } from "../../i18n";
 import { errorMessage } from "../../../common/helpers/error-message";
 
@@ -51,6 +52,8 @@ const CANCEL_ORDER_SELECT = {
   cancelReason: true,
   totalAmount: true,
   shipment: { select: { status: true, shippedAt: true } },
+  // Teklif siparişinin rezervi ilk ödeme başlatmada alınır (önizleme metni).
+  payment: { select: { id: true } },
   refundRequests: {
     where: { status: { in: ACTIVE_REFUND_REQUEST_STATUSES } },
     select: { id: true, refundNumber: true },
@@ -204,10 +207,16 @@ export class AdminOrderCancelService {
     const kind = cancellableKind(order);
     const quantity = order.quantity ?? 1;
     if (kind === "unpaid") {
+      // Çekirdekle AYNI kural: ödemesi başlatılmamış teklif siparişi rezerv
+      // tutmaz, "serbest kalacak" denmez.
       return {
         kind,
         quantity,
-        reservationHeld: order.reservationReleasedAt === null,
+        reservation: orderReservationState({
+          reservationReleasedAt: order.reservationReleasedAt,
+          offerId: order.offerId,
+          hasPayment: order.payment !== null,
+        }),
       };
     }
     const money =

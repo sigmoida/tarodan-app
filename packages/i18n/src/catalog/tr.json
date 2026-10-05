@@ -6990,7 +6990,8 @@
             "handedOver": "koli kargoya verildi; bu aşamada iade talebi akışı işler",
             "delivered": "sipariş teslim edildi; iade talebi akışı işler",
             "completed": "sipariş tamamlandı; satıcı ödemesi yapıldı ya da yapılacak"
-          }
+          },
+          "reservationNotReserved": "Bu sipariş için stok ayrılmamıştı (ödemesi hiç başlatılmadı)"
         }
       },
       "trades": {

@@ -13,12 +13,21 @@ describe("OrderLifecycleService.cancelUnpaidOrderInTx — iptal aktörü", () =>
     version: 2,
     quantity: 1,
     productId: "p1",
-    offerId: null,
+    offerId: null as string | null,
     checkoutGroupId: null,
-    reservationReleasedAt: null,
+    reservationReleasedAt: null as Date | null,
   };
 
-  const makeService = () => {
+  /**
+   * @param product ürünün rezerv sayacı (başka alıcıların rezervleri dahil);
+   *   rezerv düşümü bu sayaca uygulanır.
+   * @param hasPayment teklif siparişinin ödemesi başlatıldı mı (rezervin
+   *   alındığı an).
+   */
+  const makeService = (
+    product = { reservedQuantity: 1 },
+    hasPayment = false,
+  ) => {
     const tx: any = {
       order: {
         update: jest.fn().mockResolvedValue({ id: "o1" }),
@@ -26,7 +35,22 @@ describe("OrderLifecycleService.cancelUnpaidOrderInTx — iptal aktörü", () =>
         findMany: jest.fn().mockResolvedValue([]),
       },
       offer: { update: jest.fn().mockResolvedValue({}) },
-      $executeRaw: jest.fn().mockResolvedValue(1),
+      payment: {
+        findUnique: jest
+          .fn()
+          .mockResolvedValue(hasPayment ? { id: "pay-1" } : null),
+      },
+      $queryRaw: jest.fn().mockResolvedValue([{ id: "p1" }]),
+      // GREATEST(reserved - qty, 0) — sayaç modeli.
+      $executeRaw: jest
+        .fn()
+        .mockImplementation((_sql: TemplateStringsArray, qty: number) => {
+          product.reservedQuantity = Math.max(
+            product.reservedQuantity - qty,
+            0,
+          );
+          return Promise.resolve(1);
+        }),
     };
     const commissionLedger = {
       markWaived: jest.fn().mockResolvedValue(undefined),
@@ -131,6 +155,80 @@ describe("OrderLifecycleService.cancelUnpaidOrderInTx — iptal aktörü", () =>
           cancelReason: "Yönetici tarafından iptal edildi: Şüpheli işlem",
         },
       });
+    });
+  });
+
+  /**
+   * Rezerv yalnız gerçekten tutuluyorsa bırakılır. Teklif siparişi rezervi
+   * İLK ödeme başlatmada (Payment satırıyla aynı işlemde) alır; ondan önce
+   * iptal eden, aynı üründe başka bir alıcının canlı rezervini düşürüp
+   * oversell'e yol açıyordu.
+   */
+  describe("stok rezervasyonu", () => {
+    const offerOrder = { ...order, offerId: "offer-1", quantity: 1 };
+
+    it.each(["buyer_cancelled", "admin_cancelled"] as const)(
+      "ödemesi hiç başlatılmamış teklif siparişi (%s) başka alıcının rezervine dokunmaz",
+      async (ledgerReason) => {
+        // Ürünün tek rezervi BAŞKA bir alıcıya ait.
+        const product = { reservedQuantity: 1 };
+        const { service, tx } = makeService(product, false);
+
+        await service.cancelUnpaidOrderInTx(tx, offerOrder, {
+          reason: "gerekçe",
+          ledgerReason,
+        });
+
+        expect(tx.$executeRaw).not.toHaveBeenCalled();
+        expect(product.reservedQuantity).toBe(1);
+        // Ödeme başlatmayla aynı kilit sırasında bakılır.
+        expect(tx.$queryRaw).toHaveBeenCalled();
+        expect(tx.payment.findUnique).toHaveBeenCalledWith({
+          where: { orderId: "o1" },
+          select: { id: true },
+        });
+      },
+    );
+
+    it("ilk ödeme denemesinden SONRA teklif siparişi kendi rezervini bırakır; diğer alıcınınki kalır", async () => {
+      // Bu siparişin 1 + başka alıcının 1 rezervi.
+      const product = { reservedQuantity: 2 };
+      const { service, tx } = makeService(product, true);
+
+      await service.cancelUnpaidOrderInTx(tx, offerOrder, {
+        reason: "gerekçe",
+        ledgerReason: "admin_cancelled",
+      });
+
+      expect(tx.$executeRaw).toHaveBeenCalledTimes(1);
+      expect(product.reservedQuantity).toBe(1);
+    });
+
+    it("doğrudan satış siparişi rezervini her zaman tutar (Payment'a bakılmaz)", async () => {
+      const product = { reservedQuantity: 1 };
+      const { service, tx } = makeService(product, false);
+
+      await service.cancelUnpaidOrderInTx(tx, order, {
+        reason: "gerekçe",
+        ledgerReason: "buyer_cancelled",
+      });
+
+      expect(product.reservedQuantity).toBe(0);
+      expect(tx.payment.findUnique).not.toHaveBeenCalled();
+    });
+
+    it("süpürme rezervi zaten bıraktıysa ikinci kez düşülmez", async () => {
+      const product = { reservedQuantity: 1 };
+      const { service, tx } = makeService(product, true);
+
+      await service.cancelUnpaidOrderInTx(
+        tx,
+        { ...offerOrder, reservationReleasedAt: new Date() },
+        { reason: "gerekçe", ledgerReason: "admin_cancelled" },
+      );
+
+      expect(tx.$executeRaw).not.toHaveBeenCalled();
+      expect(product.reservedQuantity).toBe(1);
     });
   });
 });
