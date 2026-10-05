@@ -624,6 +624,8 @@ export class PaymentExpiryReconciliationService {
               productId: order.product.id,
               statusBefore: order.product.status,
               statusAfter: restored.status,
+              inactiveReasonBefore: order.product.inactiveReason,
+              inactiveReasonAfter: restored.inactiveReason,
               reason: stockStatusRemovalReason(restored.inactiveReason),
             },
           ]);

@@ -215,6 +215,7 @@ describe("ProductSchedulerService — ilan ömrü süreleri", () => {
             reason: ListingRemovalReason.expired,
             statusBefore: ProductStatus.active,
             statusAfter: ProductStatus.inactive,
+            fromStorefront: true,
             actorUserId: null,
           }),
         ],

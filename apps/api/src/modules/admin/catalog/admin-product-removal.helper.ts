@@ -48,7 +48,9 @@ export function listingRemovalFilterWhere(filter: {
 /** Listede ilanın son kaldırmasını okumak için ilişki seçimi (serbest metin YOK). */
 export const LATEST_REMOVAL_INCLUDE = {
   orderBy: { createdAt: "desc" },
-  take: 1,
+  // Güncel nedenin olayı en son olay olmayabilir: vitrin dışındaki ilanda
+  // satıcının sonraki eylemi kaydedilir ama yönetici/sistem nedenini ezmez.
+  take: 10,
   select: {
     reason: true,
     platform: true,
@@ -73,8 +75,8 @@ type LatestRemovalRow = {
 /**
  * İlanın GÜNCEL kaldırma özeti. Vitrindeki ilan → `null`. Kaldırma
  * statüsündeki ilan → `Product.removalReason` (yoksa "bilinmiyor"); platform /
- * ihlal kodu / tarih son olaydan, yalnız o olay güncel nedenle aynıysa
- * (aksi hâlde eski bir kaldırmanın ayrıntısı bugünkü nedene yapışırdı).
+ * ihlal kodu / tarih, güncel nedeni taşıyan EN SON olaydan (son olay, ezmeyen
+ * bir satıcı eylemi olabilir). Eşleşen olay yoksa ayrıntı boş kalır.
  */
 export function toAdminRemovalSummary(product: {
   status: ProductStatus;
@@ -83,8 +85,9 @@ export function toAdminRemovalSummary(product: {
 }): AdminListingRemovalSummary | null {
   if (!isListingRemovedStatus(product.status)) return null;
   const reason = product.removalReason;
-  const latest = product.removalEvents?.[0];
-  const event = reason && latest?.reason === reason ? latest : undefined;
+  const event = reason
+    ? product.removalEvents?.find((row) => row.reason === reason)
+    : undefined;
   return {
     reason,
     actor: reason ? listingRemovalActorOf(reason) : null,
@@ -103,6 +106,7 @@ export function toAdminRemovalEvent(row: {
   detail: string | null;
   statusBefore: ProductStatus;
   statusAfter: ProductStatus;
+  fromStorefront: boolean;
   actorUserId: string | null;
   createdAt: Date;
 }): AdminListingRemovalEvent {
@@ -115,6 +119,7 @@ export function toAdminRemovalEvent(row: {
     detail: row.detail,
     statusBefore: row.statusBefore,
     statusAfter: row.statusAfter,
+    fromStorefront: row.fromStorefront,
     actorUserId: row.actorUserId,
     createdAt: row.createdAt.toISOString(),
   };

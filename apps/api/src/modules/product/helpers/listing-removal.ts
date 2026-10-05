@@ -1,13 +1,24 @@
-import { ListingRemovalReason, Prisma, ProductStatus } from "@prisma/client";
-import { isListingRemovedStatus } from "@tarodan/types";
+import {
+  ListingRemovalReason,
+  Prisma,
+  ProductInactiveReason,
+  ProductStatus,
+} from "@prisma/client";
+import {
+  LISTING_REMOVAL_REASONS_BY_ACTOR,
+  isListingRemovedStatus,
+  listingRemovalActorOf,
+  wasOnStorefront,
+} from "@tarodan/types";
 
 /**
  * Bir ilanın vitrinden düşüşü — kim, hangi nedenle, hangi statüden hangisine.
  *
  * `statusBefore`/`statusAfter` çağıranın OKUDUĞU ve YAZDIĞI statülerdir; geçiş
  * gerçekten bir kaldırma değilse (yeni statü kaldırma statüsü değil ya da
- * statü değişmedi) kayıt düşülmez — çağıran stoktan türetilen statü gibi
- * "kaldırma olabilir de olmayabilir de" bir yazımdan sonra koşulsuz çağırabilir.
+ * statü ve davranış işareti değişmedi) kayıt düşülmez — çağıran stoktan
+ * türetilen statü gibi "kaldırma olabilir de olmayabilir de" bir yazımdan
+ * sonra koşulsuz çağırabilir.
  */
 export interface ListingRemovalEntry {
   productId: string;
@@ -22,6 +33,15 @@ export interface ListingRemovalEntry {
   detail?: string | null;
   /** Satıcı ya da yönetici; sistem işlerinde boş. */
   actorUserId?: string | null;
+  /**
+   * `inactiveReason` (davranış işareti) yazan çağıranlar okuduğu ve yazdığı
+   * değeri verir. Statü değişmese de işaret değiştiyse (ör. duraklatılmış ya
+   * da süresi dolmuş ilan iade karantinasına girdi) bu bir yeniden
+   * sınıflandırmadır: kaydedilir ve güncel neden onu izler. Verilmezse
+   * (`undefined`) yalnız statü değişimi bakılır.
+   */
+  inactiveReasonBefore?: ProductInactiveReason | null;
+  inactiveReasonAfter?: ProductInactiveReason | null;
 }
 
 /** Kaydın ihtiyaç duyduğu iki tablo — `PrismaService` de bir `tx` de olur. */
@@ -30,14 +50,62 @@ export type ListingRemovalDb = Pick<
   "product" | "productRemovalEvent"
 >;
 
-/** Bu yazım bir KALDIRMA mı? (kaldırma statüsüne geçiş, statü değişti) */
+/** Çağıran davranış işaretini bu yazımda DEĞİŞTİRDİ mi? */
+function inactiveReasonChanged(
+  entry: Pick<
+    ListingRemovalEntry,
+    "inactiveReasonBefore" | "inactiveReasonAfter"
+  >,
+): boolean {
+  return (
+    entry.inactiveReasonAfter !== undefined &&
+    (entry.inactiveReasonAfter ?? null) !== (entry.inactiveReasonBefore ?? null)
+  );
+}
+
+/**
+ * Bu yazım kaydedilecek bir kaldırma mı? Yeni statü bir kaldırma statüsü
+ * olmalı ve ya statü değişmiş ya da (aynı kaldırma statüsünde kalınırken)
+ * davranış işareti değişmiş olmalı. Aynı statünün aynı işaretle yeniden
+ * yazımı (stok yeniden hesabı vb.) kayıt üretmez.
+ */
 export function isListingRemovalTransition(
-  entry: Pick<ListingRemovalEntry, "statusBefore" | "statusAfter">,
+  entry: Pick<
+    ListingRemovalEntry,
+    | "statusBefore"
+    | "statusAfter"
+    | "inactiveReasonBefore"
+    | "inactiveReasonAfter"
+  >,
 ): boolean {
   return (
     isListingRemovedStatus(entry.statusAfter) &&
-    entry.statusBefore !== entry.statusAfter
+    (entry.statusBefore !== entry.statusAfter || inactiveReasonChanged(entry))
   );
+}
+
+/** Vitrin dışındaki ilanda satıcı nedeninin ezebileceği güncel nedenler. */
+const SELLER_REASONS = [
+  ...LISTING_REMOVAL_REASONS_BY_ACTOR.seller,
+] as ListingRemovalReason[];
+
+/**
+ * Güncel nedenin yazım koşulu — @tarodan/types `replacesCurrentRemovalReason`
+ * kuralının küme biçimi (tek satırı okumadan, tek UPDATE'te uygulanabilsin
+ * diye). Vitrinden düşüş ve yönetici/sistem nedeni koşulsuz yazar; vitrin
+ * dışındaki ilanda satıcı nedeni yalnız güncel neden boş ya da yine bir satıcı
+ * nedeniyse yazar (reddedilmiş ilanı pasife almak "kural ihlali"ni ezmez).
+ * Spec ikisinin aynı kararı verdiğini sabitler.
+ */
+export function currentReasonGuard(change: {
+  fromStorefront: boolean;
+  reason: ListingRemovalReason;
+}): Prisma.ProductWhereInput {
+  if (change.fromStorefront) return {};
+  if (listingRemovalActorOf(change.reason) !== "seller") return {};
+  return {
+    OR: [{ removalReason: null }, { removalReason: { in: SELLER_REASONS } }],
+  };
 }
 
 /**
@@ -46,11 +114,14 @@ export function isListingRemovalTransition(
  * `removalReason` yazılmaz.
  *
  * İki şey yazar:
- * 1. Her kaldırma için EKLEME-YALNIZ bir `ProductRemovalEvent` satırı (dashboard
- *    dönem sayımının kaynağı; yeniden açılıp tekrar kaldırılan ilan iki satır).
+ * 1. Her kaldırma için EKLEME-YALNIZ bir `ProductRemovalEvent` satırı.
+ *    `fromStorefront` kayıt anında yazılır (önceki statü vitrin miydi —
+ *    `wasOnStorefront`): dashboard yalnız bunları "vitrinden düşüş" sayar;
+ *    vitrin dışındaki ilanın sonraki kaldırmaları geçmişte kalır, sayılmaz.
  * 2. İlanın güncel nedeni `Product.removalReason` (liste/filtre için kopya).
- *    Yazım yeni statüye koşulludur: bu arada başka bir yazımla vitrine dönmüş
- *    ilana bayat neden yazılmaz.
+ *    Yazım yeni statüye koşulludur (bu arada vitrine dönmüş ilana bayat neden
+ *    yazılmaz) ve vitrin dışındaki ilanda satıcı nedeni yönetici/sistem
+ *    nedenini ezmez (bkz. {@link currentReasonGuard}).
  *
  * Statü ve `inactiveReason` yazımı ÇAĞIRANINDIR (davranış kuralları orada
  * kalır); bu fonksiyon yalnız NEDENİ kaydeder. Statü yazımıyla aynı
@@ -62,7 +133,10 @@ export async function recordListingRemovals(
   db: ListingRemovalDb,
   entries: readonly ListingRemovalEntry[],
 ): Promise<number> {
-  const removals = entries.filter(isListingRemovalTransition);
+  const removals = entries.filter(isListingRemovalTransition).map((entry) => ({
+    ...entry,
+    fromStorefront: wasOnStorefront(entry.statusBefore),
+  }));
   if (removals.length === 0) return 0;
 
   await db.productRemovalEvent.createMany({
@@ -74,21 +148,28 @@ export async function recordListingRemovals(
       detail: entry.detail ?? null,
       statusBefore: entry.statusBefore,
       statusAfter: entry.statusAfter,
+      fromStorefront: entry.fromStorefront,
       actorUserId: entry.actorUserId ?? null,
     })),
   });
 
-  // (neden, yeni statü) başına tek UPDATE: toplu askıya almada yüzlerce ilan
-  // tek yazımla damgalanır.
+  // (neden, yeni statü, vitrinden mi) başına tek UPDATE: toplu askıya almada
+  // yüzlerce ilan tek yazımla damgalanır.
   const groups = new Map<
     string,
-    { reason: ListingRemovalReason; status: ProductStatus; ids: string[] }
+    {
+      reason: ListingRemovalReason;
+      status: ProductStatus;
+      fromStorefront: boolean;
+      ids: string[];
+    }
   >();
   for (const entry of removals) {
-    const key = `${entry.reason}:${entry.statusAfter}`;
+    const key = `${entry.reason}:${entry.statusAfter}:${entry.fromStorefront}`;
     const group = groups.get(key) ?? {
       reason: entry.reason,
       status: entry.statusAfter,
+      fromStorefront: entry.fromStorefront,
       ids: [],
     };
     group.ids.push(entry.productId);
@@ -96,7 +177,11 @@ export async function recordListingRemovals(
   }
   for (const group of groups.values()) {
     await db.product.updateMany({
-      where: { id: { in: group.ids }, status: group.status },
+      where: {
+        id: { in: group.ids },
+        status: group.status,
+        ...currentReasonGuard(group),
+      },
       data: { removalReason: group.reason },
     });
   }

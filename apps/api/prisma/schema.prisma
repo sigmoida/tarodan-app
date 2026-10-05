@@ -838,10 +838,12 @@ model Product {
   /// PrismaService'in Product middleware'inde tek entegrasyon noktası) — aksi
   /// hâlde bayat bir işaret ilerideki bir moderasyon turunu atlatabilir.
   inactiveReason      ProductInactiveReason?  @map("inactive_reason")
-  /// İlanın vitrinden düşmesinin GÜNCEL nedeni — son `ProductRemovalEvent`
-  /// satırının `reason` kopyası; liste/filtre ekranları JOIN'siz okusun diye
-  /// burada. Tek yazıcısı `recordListingRemovals`dır (kaldırma olayıyla aynı
-  /// anda yazılır). `inactiveReason`tan FARKI: o bir DAVRANIŞ işaretidir
+  /// İlanın vitrinden düşmesinin GÜNCEL nedeni — liste/filtre ekranları
+  /// JOIN'siz okusun diye burada. Tek yazıcısı `recordListingRemovals`dır
+  /// (kaldırma olayıyla aynı anda). Genelde son olayın nedenidir; tek istisna:
+  /// vitrin dışındaki ilanda satıcının sonraki nedeni bir yönetici/sistem
+  /// nedenini ezmez (reddedilmiş ilanı pasife almak "kural ihlali"ni silmez —
+  /// kural @tarodan/types `replacesCurrentRemovalReason`). `inactiveReason`tan FARKI: o bir DAVRANIŞ işaretidir
   /// (satıcı bu pasif ilanla ne yapabilir — yenile / doğrudan aç), bu ise
   /// AÇIKLAMADIR (ilan neden vitrinde değil — dört kaldırma statüsünün hepsi
   /// için). `expired` / `return_quarantine` ikisinde de aynı adla yazılır.
@@ -940,6 +942,13 @@ model ProductRemovalEvent {
   /// Geçişin iki ucu — aynı nedenin pasife alma mı silme mi olduğunu ayırır.
   statusBefore  ProductStatus        @map("status_before")
   statusAfter   ProductStatus        @map("status_after")
+  /// İlan bu olaydan önce VİTRİNDEYDİ (statusBefore = active). Dashboard'ın
+  /// "vitrinden düşen ilanlar" kırılımı yalnız bunları sayar; vitrin dışındaki
+  /// ilanın sonraki kaldırması (reddedilmiş ilanın pasife alınması, süresi
+  /// dolmuş ilanın silinmesi, bekleyen ilanın reddi) geçmişte kalır ama
+  /// sayılmaz. Kayıt anında yazılır (kural: @tarodan/types `wasOnStorefront`),
+  /// sorgular statülerden yeniden hesaplamaz.
+  fromStorefront Boolean             @map("from_storefront")
   /// İşlemi yapan kullanıcı (satıcı ya da yönetici); sistem işlerinde null.
   /// FK yok: denetim satırı kişinin hesabından bağımsız kalır.
   actorUserId   String?              @map("actor_user_id")
@@ -947,7 +956,7 @@ model ProductRemovalEvent {
   createdAt     DateTime             @default(now()) @map("created_at")
   product       Product              @relation(fields: [productId], references: [id], onDelete: Cascade)
 
-  @@index([createdAt])
+  @@index([fromStorefront, createdAt])
   @@index([productId, createdAt(sort: Desc)])
   @@index([reason, createdAt])
   @@map("product_removal_events")

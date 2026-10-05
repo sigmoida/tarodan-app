@@ -89,6 +89,8 @@ describe("AdminProductService — kaldırma nedeni", () => {
             detail: "Replika olduğu belli",
             statusBefore: ProductStatus.pending,
             statusAfter: ProductStatus.rejected,
+            // Onay bekleyen ilan vitrinde değildi: kaydedilir, sayılmaz.
+            fromStorefront: false,
             actorUserId: "admin-1",
           },
         ],
@@ -339,6 +341,38 @@ describe("toAdminRemovalSummary", () => {
   });
 });
 
+describe("toAdminRemovalSummary — güncel nedenin olayı", () => {
+  it("son olay ezmeyen bir satıcı eylemiyse ayrıntı güncel nedeni taşıyan olaydan gelir", () => {
+    const rejectedAt = new Date("2026-10-01T08:00:00Z");
+    expect(
+      toAdminRemovalSummary({
+        status: ProductStatus.inactive,
+        removalReason: ListingRemovalReason.policy_violation,
+        removalEvents: [
+          {
+            reason: ListingRemovalReason.paused_temporarily,
+            platform: null,
+            violationCode: null,
+            createdAt: new Date("2026-10-02T08:00:00Z"),
+          },
+          {
+            reason: ListingRemovalReason.policy_violation,
+            platform: null,
+            violationCode: "prohibited_item",
+            createdAt: rejectedAt,
+          },
+        ],
+      }),
+    ).toEqual({
+      reason: ListingRemovalReason.policy_violation,
+      actor: "admin",
+      platform: null,
+      violationCode: "prohibited_item",
+      removedAt: rejectedAt.toISOString(),
+    });
+  });
+});
+
 describe("toAdminRemovalEvent", () => {
   it("aktörü nedenden türetir, serbest metni (yalnız admin ucu) taşır", () => {
     expect(
@@ -350,6 +384,7 @@ describe("toAdminRemovalEvent", () => {
         detail: "Satıcının notu",
         statusBefore: ProductStatus.active,
         statusAfter: ProductStatus.inactive,
+        fromStorefront: true,
         actorUserId: "seller-1",
         createdAt: new Date("2026-10-03T09:00:00Z"),
       }),
@@ -362,6 +397,7 @@ describe("toAdminRemovalEvent", () => {
       detail: "Satıcının notu",
       statusBefore: "active",
       statusAfter: "inactive",
+      fromStorefront: true,
       actorUserId: "seller-1",
       createdAt: "2026-10-03T09:00:00.000Z",
     });

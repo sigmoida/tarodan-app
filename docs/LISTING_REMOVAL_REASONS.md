@@ -48,17 +48,46 @@ dışında), en fazla 500 karakter.
 
 - **`ProductRemovalEvent`** (`product_removal_events`) — her kaldırma için
   EKLEME-YALNIZ bir satır: neden, platform, ihlal kodu, serbest metin, önceki ve
-  sonraki statü, işlemi yapan kullanıcı (sistemde boş), an. UPDATE bir DB
-  tetikleyicisiyle engellidir. İlan kaldırılıp yeniden açılıp tekrar
-  kaldırılırsa İKİ satır vardır.
-- **`Product.removalReason`** — ilanın GÜNCEL nedeni (son olayın kopyası);
-  admin listesi ve filtre JOIN'siz okur. İlan kaldırma statülerinin dışına
-  çıktığında (yeniden yayın, onaya gönderme, satış, rezervasyon) Prisma
-  middleware'i temizler. Boş + kaldırma statüsü = **bilinmiyor** (bu
-  özellikten önce düşmüş ilan; geri doldurma yapılmadı, yapılmayacak).
+  sonraki statü, **`fromStorefront`** (bkz. sayım kuralı), işlemi yapan
+  kullanıcı (sistemde boş), an. UPDATE bir DB tetikleyicisiyle engellidir.
+- **`Product.removalReason`** — ilanın GÜNCEL nedeni; admin listesi ve filtre
+  JOIN'siz okur. İlan kaldırma statülerinin dışına çıktığında (yeniden yayın,
+  onaya gönderme, satış, rezervasyon) Prisma middleware'i temizler. Boş +
+  kaldırma statüsü = **bilinmiyor** (bu özellikten önce düşmüş ilan; geri
+  doldurma yapılmadı, yapılmayacak).
 - **Tek yazıcı:** `recordListingRemovals` (`apps/api/src/modules/product/helpers/listing-removal.ts`).
-  Statü yazımıyla aynı transaction'da çağrılır; kaldırma olmayan geçişlerde
-  (vitrine dönüş, aynı statünün yeniden yazımı) hiçbir şey yazmaz.
+  Statü yazımıyla aynı transaction'da çağrılır. Kayıt düşer: ilan bir kaldırma
+  statüsüne GEÇERSE ya da kaldırma statüsünde kalırken davranış işareti
+  (`inactiveReason`) DEĞİŞİRSE (ör. duraklatılmış ya da süresi dolmuş ilan iade
+  karantinasına girer). Kaldırma olmayan geçişler (vitrine dönüş, aynı statünün
+  aynı işaretle yeniden yazımı) hiçbir şey yazmaz.
+
+### Sayım kuralı ve güncel neden — TEK yer
+
+Kural `@tarodan/types` içinde (`wasOnStorefront`, `replacesCurrentRemovalReason`);
+kayıt fonksiyonu uygular, dashboard yalnız saklanan bayrağı okur.
+
+1. **Vitrinden düşüş = önceki statü `active`.** Kayıt anında olaya
+   `fromStorefront` olarak yazılır; sorgular statülerden yeniden hesaplamaz.
+   Dashboard yalnız `fromStorefront = true` olayları sayar.
+2. **Vitrin dışındaki ilanın kaldırmaları kaydedilir ama sayılmaz:** onay
+   bekleyen ilanın reddi (moderasyon ya da satıcının askıya alınması),
+   reddedilmiş/askıdaki/onay bekleyen ilanın satıcı tarafından pasife alınması,
+   süresi dolmuş ya da duraklatılmış ilanın silinmesi, rezerve/satılmış ilanın
+   stok bırakmada pasife düşmesi, pasif ilanın karantinaya ya da "süresi doldu"
+   işaretine geçmesi. Bunlar ürün detayındaki geçmişte görünür ("vitrinde
+   değildi — sayılmaz" notuyla).
+3. **Güncel neden önceliği:** vitrinden düşüş ve yönetici/sistem nedenleri
+   güncel nedeni her zaman yazar. Vitrin dışındaki ilanda **satıcının** sonraki
+   nedeni yalnız güncel neden boşsa ya da yine bir satıcı nedeniyse yazar:
+   reddedilmiş ilanı satıcının pasife alması onu "kural ihlali" filtresinden
+   düşürmez; süresi dolmuş ilanı satıcının "başka platformda sattım" diye
+   silmesi güncel nedeni "süresi doldu" bırakır (satıcının cevabı geçmişte
+   durur). Duraklatılmış ilanı silen satıcının yeni nedeni ise yazılır.
+
+Sonuç: vitrinden düşüp yeniden yayına girip tekrar düşen ilan iki kez sayılır;
+süre dolumu → silme gibi zincirler ilk düşüşte bir kez sayılır (çift sayım
+yok).
 
 ### `inactiveReason` ile ilişki
 
@@ -70,10 +99,13 @@ süre-dolumu bakımı) değişmedi; yazanları da değişmedi (statüyle aynı y
 `removalReason` bir **açıklamadır** ve dört kaldırma statüsünün hepsini
 kapsar. İki değer ortaktır ve aynı adı taşır (`expired`, `return_quarantine`;
 bir kontrat spec'i her `inactiveReason` değerinin aynı adlı bir sistem nedeni
-olduğunu sabitler). O iki işareti koyan yollar nedeni de aynı adla kaydeder.
-Tek bilinçli istisna: yönetici bakım işlemi `markExpired` (bu özellikten önce
-süresi dolmuş eski ilanlara `expired` davranış işareti koyar) kaldırma olayı
-**yazmaz** — o kaldırma geçmişte oldu, nedeni tahmin edilmez.
+olduğunu sabitler). O iki işareti koyan HER yol nedeni de aynı adla ve aynı
+transaction'da kaydeder — işaret statü değişmeden değişse bile (pasif ilanın
+karantinaya girmesi; yönetici bakım işlemi `markExpired`ın eski pasif ilana
+`expired` işareti koyması). Bunlar vitrin dışındaki ilanın yeniden
+sınıflandırmasıdır: kaydedilir, güncel neden onu izler, dashboard'da sayılmaz.
+`markExpired` geçmişteki kaldırma anını tahmin etmez; olay işaretin konduğu
+andır.
 
 ### Yazıcılar (kaldırma statüsü yazan her yol)
 
@@ -83,7 +115,7 @@ süresi dolmuş eski ilanlara `expired` davranış işareti koyar) kaldırma ola
 | `ProductUpdateService.updateAsActor` (satıcı `status: inactive`)               | → `inactive`                                   | satıcının seçimi / `not_given`             |
 | `ProductUpdateService.updateAsActor` (satıcı ya da yönetici stok 0)            | `active` → `inactive`                          | `out_of_stock`                             |
 | `ProductSchedulerService.runExpireOldListings`                                 | `active` → `inactive`                          | `expired`                                  |
-| `PaymentRefundService.processRefund` (stok geri yükleme)                       | → `inactive` (karantina)                       | `return_quarantine` (yoksa `out_of_stock`) |
+| `PaymentRefundService.processRefund` (stok geri yükleme)                       | → `inactive` / işaret → karantina              | `return_quarantine` (yoksa `out_of_stock`) |
 | `PaymentExpiryReconciliationService` (satıcı göndermedi, stok geri yükleme)    | → `inactive`                                   | `return_quarantine` / `out_of_stock`       |
 | `PaymentExpiryReconciliationService` (ödeme süresi doldu, rezervasyon bırakma) | → `inactive` (stok 0)                          | `out_of_stock`                             |
 | `ReservationReconciliationService` (rezervasyon bırakma)                       | → `inactive` (stok 0)                          | `out_of_stock`                             |
@@ -95,6 +127,7 @@ süresi dolmuş eski ilanlara `expired` davranış işareti koyar) kaldırma ola
 | `AdminStaffService.banUser`                                                    | `active` → `suspended`, `pending` → `rejected` | `seller_suspended`                         |
 | `AdminProductService.rejectProduct` (+ toplu red, moderasyon kuyruğu)          | → `rejected`                                   | `policy_violation` + ihlal kodu            |
 | `AdminProductService.deleteProduct` (yumuşak)                                  | → `deleted`                                    | `policy_violation` + ihlal kodu            |
+| `ProductRenewalService.markExpired` (yönetici bakımı)                          | `inactive` işareti → `expired`                 | `expired` (sayılmaz)                       |
 
 Satışla stoğu biten ilan `sold` olur — bu bir kaldırma değildir, kayıt yok.
 Yönetici kalıcı silmesi ürün satırını sildiği için (yalnız siparişi/teklifi
@@ -115,7 +148,8 @@ platformu, ihlal kodunu ve tarihi içerir; serbest metni içermez.
   "Kaldırma nedeni" (her neden + **bilinmiyor**) ve "Kaldıran" (satıcı /
   sistem / Tarodan) filtreleri (`removalReason`, `removalActor`; nötr ilk
   seçenekle).
-- Ürün detayı: kaldırma geçmişi (serbest metin dahil).
+- Ürün detayı: kaldırma geçmişi (serbest metin dahil; sayılmayan olaylar
+  notla işaretli).
 - Red ve kaldırma pencereleri: ihlal türü seçimi (zorunlu) + açıklama.
 - Dışa aktarım (`GET /admin/products-export`): aynı filtreler + neden kolonları.
 
@@ -127,9 +161,11 @@ için orada: seçili dönemde kaç ilan vitrinden düştü (bekleyen iş, uyarı
 bakiye değil). Zone C'nin kurallarını aynen izler:
 
 - Aynı dönem seçicisi ve pencere çözümü (`resolveDashboardRange`, Türkiye takvimi).
+- **Yalnız vitrinden düşüşler** (`fromStorefront = true`) — kural yukarıda
+  ("Sayım kuralı ve güncel neden").
 - **Olay damgası:** `ProductRemovalEvent.createdAt` (kaldırma anı). İlanın
-  bugünkü statüsü sayımı etkilemez; Eylül'de kaldırılıp Ekim'de yeniden açılan
-  ilan Eylül'ün sayısında kalır. Kaldır → aç → kaldır iki olaydır.
+  bugünkü statüsü sayımı etkilemez; Eylül'de düşüp Ekim'de yeniden açılan ilan
+  Eylül'ün sayısında kalır.
 - Sunucu tarafı `groupBy` (neden; `sold_elsewhere` için platform;
   `policy_violation` için ihlal kodu); test şeridi hariç (`LIVE_PRODUCT`).
 - Önbellek: canlı pencere 5 dk, kapalı özel aralık 6 saat; "Yenile" düşürür.

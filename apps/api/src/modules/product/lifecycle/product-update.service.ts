@@ -472,6 +472,10 @@ export class ProductUpdateService {
     // `setQuantityToReopen` ile reddedilir. Yani zaten pasif bir ilanın yeniden
     // kaydedilmesi bu satıra hiç gelmez; ikinci bir kaldırma kaydı oluşamaz.
     // (`recordListingRemovals` ayrıca statü değişmeyen geçişi de yok sayar.)
+    // pending / rejected / suspended → inactive geçmişe kaydedilir ama ilan
+    // vitrinde değildi: "vitrinden düşüş" sayılmaz ve satıcının nedeni bir
+    // yönetici/sistem nedenini (ör. kural ihlali) ezmez — kuralın tek yeri
+    // `recordListingRemovals`.
     const removal: ListingRemovalEntry | null =
       resolvedStatus === ProductStatus.inactive
         ? {

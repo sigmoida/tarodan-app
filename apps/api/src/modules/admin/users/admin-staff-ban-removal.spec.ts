@@ -62,6 +62,8 @@ describe("AdminStaffService.banUser — ilan kaldırma nedenleri", () => {
           reason: ListingRemovalReason.seller_suspended,
           statusBefore: ProductStatus.active,
           statusAfter: ProductStatus.suspended,
+          // Vitrindeki ilan askıya alındı: vitrinden düşüş sayılır.
+          fromStorefront: true,
           actorUserId: "admin-1",
         }),
         expect.objectContaining({
@@ -73,6 +75,8 @@ describe("AdminStaffService.banUser — ilan kaldırma nedenleri", () => {
           reason: ListingRemovalReason.seller_suspended,
           statusBefore: ProductStatus.pending,
           statusAfter: ProductStatus.rejected,
+          // Onay bekleyen ilan vitrinde değildi: kaydedilir, sayılmaz.
+          fromStorefront: false,
         }),
       ],
     });

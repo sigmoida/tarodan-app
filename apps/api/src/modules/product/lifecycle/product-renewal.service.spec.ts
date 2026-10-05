@@ -4,7 +4,11 @@ import {
   ForbiddenException,
   NotFoundException,
 } from "@nestjs/common";
-import { ProductInactiveReason, ProductStatus } from "@prisma/client";
+import {
+  ListingRemovalReason,
+  ProductInactiveReason,
+  ProductStatus,
+} from "@prisma/client";
 import { computeProductContentFingerprint } from "../helpers/product-content-fingerprint";
 import { ProductRenewalService } from "./product-renewal.service";
 
@@ -65,7 +69,16 @@ describe("ProductRenewalService", () => {
           .mockResolvedValue({ count: opts.updateCount ?? 1 }),
         update: jest.fn().mockResolvedValue({}),
       },
+      // markExpired'ın yeniden sınıflandırma kaydı (recordListingRemovals).
+      productRemovalEvent: {
+        createMany: jest.fn().mockResolvedValue({ count: 1 }),
+      },
+      $transaction: jest.fn(),
     };
+    // Etkileşimli tx aynı istemciyle çalışır (yazımlar prisma mock'unda görünür).
+    prisma.$transaction.mockImplementation(
+      async (fn: (tx: typeof prisma) => unknown) => fn(prisma),
+    );
     const cache = {
       del: jest.fn().mockResolvedValue(undefined),
       delPattern: jest.fn().mockResolvedValue(0),
@@ -387,9 +400,12 @@ describe("ProductRenewalService", () => {
   describe("markExpired", () => {
     it("yalnız pasif + nedeni boş + gerçek ilanı işaretler; statüye dokunmaz", async () => {
       const { service, prisma } = makeService();
-      prisma.product.updateMany
-        .mockResolvedValueOnce({ count: 1 })
-        .mockResolvedValueOnce({ count: 0 });
+      // "a" işaretlenir (ve nedeni damgalanır), "b" koşula uymaz.
+      prisma.product.updateMany.mockImplementation(
+        async ({ where }: { where: { id: unknown } }) => ({
+          count: where.id === "b" ? 0 : 1,
+        }),
+      );
 
       await expect(service.markExpired(["a", "b"])).resolves.toEqual(["a"]);
 
@@ -413,6 +429,36 @@ describe("ProductRenewalService", () => {
           approvedContentFingerprint: computeProductContentFingerprint(content),
         },
       });
+    });
+
+    it("işaret değişimini sayılmayan bir 'expired' yeniden sınıflandırması olarak kaydeder", async () => {
+      const { service, prisma } = makeService();
+
+      await service.markExpired(["p1"]);
+
+      expect(prisma.productRemovalEvent.createMany).toHaveBeenCalledWith({
+        data: [
+          expect.objectContaining({
+            productId: "p1",
+            reason: ListingRemovalReason.expired,
+            statusBefore: ProductStatus.inactive,
+            statusAfter: ProductStatus.inactive,
+            fromStorefront: false,
+          }),
+        ],
+      });
+      expect(prisma.product.updateMany).toHaveBeenCalledWith({
+        where: { id: { in: ["p1"] }, status: ProductStatus.inactive },
+        data: { removalReason: ListingRemovalReason.expired },
+      });
+    });
+
+    it("işaretlenmeyen ilan için kayıt düşülmez", async () => {
+      const { service, prisma } = makeService({}, { updateCount: 0 });
+
+      await expect(service.markExpired(["p1"])).resolves.toEqual([]);
+
+      expect(prisma.productRemovalEvent.createMany).not.toHaveBeenCalled();
     });
 
     it("varsayılanda iz yazmaz (yenileme normal onay kuralından geçer)", async () => {

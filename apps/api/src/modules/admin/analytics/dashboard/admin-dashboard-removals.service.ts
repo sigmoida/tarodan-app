@@ -94,8 +94,10 @@ export function buildListingRemovalBreakdown(
  * C'nin kuralını aynen izler: aynı dönem seçicisi ve aynı pencere çözümü
  * (`resolveDashboardRange`), OLAY damgası (`ProductRemovalEvent.createdAt` —
  * kaldırmanın gerçekleştiği an, ilanın bugünkü statüsü değil), sunucu tarafı
- * gruplama ve test şeridi hariç (`LIVE_PRODUCT`). Kaldırılıp yeniden açılıp
- * tekrar kaldırılan ilan iki olaydır.
+ * gruplama ve test şeridi hariç (`LIVE_PRODUCT`). Yalnız `fromStorefront`
+ * olaylar sayılır (ilan öncesinde vitrindeydi — bkz. @tarodan/types
+ * `wasOnStorefront`). Vitrinden düşüp yeniden açılıp tekrar düşen ilan iki
+ * olaydır.
  *
  * Dönem kartlarının dört rakamlı (dönem/dün/bu ay/tüm zamanlar) biçimini
  * taşımaz: bir kırılımda tek pencere okunur; kartlar kendi uçlarında kalır.
@@ -146,8 +148,13 @@ export class AdminDashboardRemovalsService {
   private async compute(
     range: ResolvedDashboardRange,
   ): Promise<DashboardListingRemovalsResponse> {
+    // Yalnız VİTRİNDEN düşüşler: kayıt anında yazılan `fromStorefront`
+    // (önceki statü vitrindi). Vitrin dışındaki ilanın sonraki kaldırmaları
+    // (reddedilmiş ilanın pasife alınması, süresi dolmuş ilanın silinmesi)
+    // geçmişte durur ama burada sayılmaz.
     const where = {
       createdAt: range.current,
+      fromStorefront: true,
       product: LIVE_PRODUCT,
     } satisfies Prisma.ProductRemovalEventWhereInput;
 

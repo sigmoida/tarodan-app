@@ -41,6 +41,13 @@ describe("listing removal reasons migration", () => {
     expect(statements).not.toMatch(/removal_reason"[^,;]*DEFAULT/i);
   });
 
+  it("olay 'vitrinden mi' bayrağını zorunlu taşır (dashboard sayımı)", () => {
+    expect(statements).toMatch(/"from_storefront" BOOLEAN NOT NULL/);
+    expect(statements).toMatch(
+      /CREATE INDEX "product_removal_events_from_storefront_created_at_idx"/,
+    );
+  });
+
   it("hiçbir satırı geri doldurmaz, hiçbir şeyi silmez", () => {
     expect(statements).not.toMatch(/UPDATE\s+"?products"?/i);
     expect(statements).not.toMatch(/INSERT\s+INTO/i);

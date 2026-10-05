@@ -234,10 +234,53 @@ describe("PaymentRefundService.processRefund — post-delivery return stock quar
           reason: ListingRemovalReason.return_quarantine,
           statusBefore: ProductStatus.active,
           statusAfter: ProductStatus.inactive,
+          fromStorefront: true,
         }),
       ],
     });
   });
+
+  it.each([
+    ["satıcının duraklattığı (işaretsiz)", null],
+    ["süresi dolmuş", ProductInactiveReason.expired],
+  ])(
+    "zaten pasif %s ilan karantinaya girince yeniden sınıflandırma kaydedilir (sayılmaz)",
+    async (_label, inactiveReason) => {
+      const { service, captured, mockTx } = makeService({
+        paymentAmount: 500,
+        orderQuantity: 1,
+        deliveredAt: new Date("2026-09-10T10:00:00Z"),
+        productQuantity: 2,
+        productStatus: ProductStatus.inactive,
+        productInactiveReason: inactiveReason,
+      });
+
+      await service.processRefund(ORDER_ID, 500, refundOpts());
+
+      // Statü değişmez, davranış işareti karantinaya geçer.
+      expect(captured.productUpdate.data).toEqual(
+        expect.objectContaining({
+          status: ProductStatus.inactive,
+          inactiveReason: ProductInactiveReason.return_quarantine,
+        }),
+      );
+      expect(mockTx.productRemovalEvent.createMany).toHaveBeenCalledWith({
+        data: [
+          expect.objectContaining({
+            reason: ListingRemovalReason.return_quarantine,
+            statusBefore: ProductStatus.inactive,
+            statusAfter: ProductStatus.inactive,
+            fromStorefront: false,
+          }),
+        ],
+      });
+      // Güncel neden karantinayı izler (sistem nedeni: koşulsuz).
+      expect(mockTx.product.updateMany).toHaveBeenCalledWith({
+        where: { id: { in: ["prod-1"] }, status: ProductStatus.inactive },
+        data: { removalReason: ListingRemovalReason.return_quarantine },
+      });
+    },
+  );
 
   it("teslim SONRASI iade: çok adetli ilanda kalan adet > 0 olsa da TÜM ilan pasif", async () => {
     // 5 adetlik ilanın 2'si iade edildi; kalan 3 adet zaten stokta olsa da

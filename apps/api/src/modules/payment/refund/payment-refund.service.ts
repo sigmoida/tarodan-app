@@ -1075,13 +1075,17 @@ export class PaymentRefundService {
                     ...restored,
                   },
                 });
-                // Karantinaya alınan ilan vitrinden "iade kontrolü bekliyor"
-                // nedeniyle düşer (davranış işaretiyle AYNI ad).
+                // Karantinaya alınan ilan "iade kontrolü bekliyor" nedenini
+                // alır (davranış işaretiyle AYNI ad). Zaten pasif (satıcı
+                // duraklatmış / süresi dolmuş) ilanda statü değişmez ama işaret
+                // değişir: o da kaydedilir, güncel neden onu izler.
                 await recordListingRemovals(tx, [
                   {
                     productId: orderRow.productId,
                     statusBefore: product.status,
                     statusAfter: restored.status,
+                    inactiveReasonBefore: product.inactiveReason,
+                    inactiveReasonAfter: restored.inactiveReason,
                     reason: stockStatusRemovalReason(restored.inactiveReason),
                   },
                 ]);

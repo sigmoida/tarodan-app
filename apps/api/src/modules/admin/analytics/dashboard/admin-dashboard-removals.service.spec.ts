@@ -149,6 +149,8 @@ describe("AdminDashboardRemovalsService", () => {
     expect(reasonCall.where.product).toEqual({
       seller: { isTestAccount: false },
     });
+    // Yalnız vitrinden düşüşler sayılır (kayıt anında yazılan bayrak).
+    expect(reasonCall.where.fromStorefront).toBe(true);
     // Platform ve ihlal kırılımları aynı pencereden, kendi nedenleriyle.
     const platformCall = groupBy.mock.calls.find(
       ([args]) => (args as { by: string[] }).by[0] === "platform",
@@ -157,6 +159,7 @@ describe("AdminDashboardRemovalsService", () => {
       expect.objectContaining({
         reason: ListingRemovalReason.sold_elsewhere,
         createdAt: reasonCall.where.createdAt,
+        fromStorefront: true,
       }),
     );
     const violationCall = groupBy.mock.calls.find(

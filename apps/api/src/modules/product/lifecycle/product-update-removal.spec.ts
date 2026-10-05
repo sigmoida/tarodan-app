@@ -107,6 +107,7 @@ describe("ProductUpdateService — kaldırma nedeni", () => {
             detail: "DM'den sattım",
             statusBefore: ProductStatus.active,
             statusAfter: ProductStatus.deleted,
+            fromStorefront: true,
             actorUserId: SELLER,
           },
         ],
@@ -252,6 +253,47 @@ describe("ProductUpdateService — kaldırma nedeni", () => {
       await service.update(PRODUCT, SELLER, { modelCode: "HW-01" } as any);
 
       expect(tx.productRemovalEvent.createMany).not.toHaveBeenCalled();
+    });
+
+    it("reddedilmiş ilanı satıcının pasife alması kaydedilir ama sayılmaz ve kural ihlalini ezmez", async () => {
+      const { service, tx } = makeService({ status: ProductStatus.rejected });
+
+      await service.update(PRODUCT, SELLER, {
+        status: ProductStatus.inactive,
+        removalReason: "paused_temporarily",
+      } as any);
+
+      expect(
+        tx.productRemovalEvent.createMany.mock.calls[0][0].data[0],
+      ).toEqual(
+        expect.objectContaining({
+          reason: ListingRemovalReason.paused_temporarily,
+          statusBefore: ProductStatus.rejected,
+          statusAfter: ProductStatus.inactive,
+          fromStorefront: false,
+        }),
+      );
+      // Güncel neden yalnız boşsa ya da yine bir satıcı nedeniyse yazılır.
+      expect(tx.product.updateMany).toHaveBeenCalledWith({
+        where: {
+          id: { in: [PRODUCT] },
+          status: ProductStatus.inactive,
+          OR: [
+            { removalReason: null },
+            {
+              removalReason: {
+                in: [
+                  "not_given",
+                  "changed_mind",
+                  "sold_elsewhere",
+                  "paused_temporarily",
+                ],
+              },
+            },
+          ],
+        },
+        data: { removalReason: ListingRemovalReason.paused_temporarily },
+      });
     });
 
     it("zaten pasif ilanın yeniden kaydedilmesi (tekrar pasife alma) ikinci kayıt üretmez", async () => {

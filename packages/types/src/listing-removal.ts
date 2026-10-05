@@ -127,6 +127,48 @@ export function isListingRemovedStatus(
   );
 }
 
+// ── Sayım kuralı: vitrinden düşüş ────────────────────────────────────────────
+
+/**
+ * Vitrindeki (alıcının görüp satın alabildiği) statü. Bir kaldırma olayı
+ * yalnız ilan bu statüden çıktıysa "vitrinden düşüş" sayılır — dashboard
+ * kırılımı yalnız bunları sayar. Diğer başlangıç statülerinden (onay bekleyen,
+ * reddedilmiş, zaten pasif, rezerve, satılmış) yapılan kaldırmalar geçmiş için
+ * kaydedilir ama sayılmaz: ilan zaten vitrinde değildi. Kayıt anında olaya
+ * `fromStorefront` olarak yazılır; sorgular statüden yeniden hesaplamaz.
+ */
+export const LISTING_STOREFRONT_STATUSES = ["active"] as const;
+
+export function wasOnStorefront(statusBefore: unknown): boolean {
+  return (
+    typeof statusBefore === "string" &&
+    (LISTING_STOREFRONT_STATUSES as readonly string[]).includes(statusBefore)
+  );
+}
+
+/**
+ * İlanın GÜNCEL nedenini bu yeni olay değiştirebilir mi?
+ *
+ * - Vitrinden düşüş her zaman günceller.
+ * - Vitrin dışındaki bir ilanda (reddedilmiş, askıda, süresi dolmuş…)
+ *   satıcının sonraki eylemi (pasife alma, silme) bir yönetici ya da sistem
+ *   nedenini EZMEZ: reddedilmiş ilanı satıcının pasife alması onu "kural
+ *   ihlali" filtresinden düşürmemeli. Yönetici ve sistem nedenleri her zaman
+ *   günceller (ör. duraklatılmış ilan iade karantinasına girerse).
+ */
+export function replacesCurrentRemovalReason(change: {
+  fromStorefront: boolean;
+  reason: ListingRemovalReason;
+  current: ListingRemovalReason | null;
+}): boolean {
+  if (change.fromStorefront) return true;
+  if (listingRemovalActorOf(change.reason) !== "seller") return true;
+  return (
+    change.current === null ||
+    listingRemovalActorOf(change.current) === "seller"
+  );
+}
+
 // ── Eylemler ve izinli nedenler ──────────────────────────────────────────────
 
 /**
@@ -423,6 +465,11 @@ export interface AdminListingRemovalEvent {
   detail: string | null;
   statusBefore: string;
   statusAfter: string;
+  /**
+   * İlan bu olaydan önce vitrinde miydi (bkz. {@link wasOnStorefront})?
+   * `false` olaylar geçmişte görünür ama dashboard'da sayılmaz.
+   */
+  fromStorefront: boolean;
   actorUserId: string | null;
   createdAt: string;
 }
@@ -461,9 +508,11 @@ export interface DashboardListingRemovalViolationCount {
 
 /**
  * `GET /admin/dashboard/listing-removals` — seçili dönemde (aynı dönem
- * seçicisi) gerçekleşen kaldırma OLAYLARI. Olay damgası = kaldırma anı;
- * ilanın bugünkü statüsü sayımı etkilemez. Kaldırılıp geri açılıp yeniden
- * kaldırılan ilan iki olay sayılır.
+ * seçicisi) gerçekleşen VİTRİNDEN DÜŞÜŞLER: yalnız `fromStorefront` olaylar
+ * (ilan öncesinde vitrindeydi). Olay damgası = kaldırma anı; ilanın bugünkü
+ * statüsü sayımı etkilemez. Vitrinden düşüp geri açılıp yeniden düşen ilan
+ * iki olaydır; zaten vitrin dışındaki ilanın sonraki kaldırması (süresi
+ * dolmuş ilanın silinmesi, reddedilmiş ilanın pasife alınması) sayılmaz.
  */
 export interface DashboardListingRemovalsResponse {
   range: DashboardPeriodRange;

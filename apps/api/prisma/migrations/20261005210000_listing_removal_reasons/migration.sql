@@ -39,15 +39,18 @@ CREATE TABLE "product_removal_events" (
     "detail" TEXT,
     "status_before" "ProductStatus" NOT NULL,
     "status_after" "ProductStatus" NOT NULL,
+    -- İlan olaydan önce vitrindeydi mi (status_before = active)? Dashboard
+    -- yalnız bunları "vitrinden düşüş" sayar; kayıt anında yazılır.
+    "from_storefront" BOOLEAN NOT NULL,
     "actor_user_id" TEXT,
     "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
     CONSTRAINT "product_removal_events_pkey" PRIMARY KEY ("id")
 );
 
--- Dashboard: dönem penceresi.
-CREATE INDEX "product_removal_events_created_at_idx"
-ON "product_removal_events"("created_at");
+-- Dashboard: dönem penceresindeki vitrinden düşüşler.
+CREATE INDEX "product_removal_events_from_storefront_created_at_idx"
+ON "product_removal_events"("from_storefront", "created_at");
 
 -- Admin ürün detayı/listesi: ilanın son kaldırması ve geçmişi.
 CREATE INDEX "product_removal_events_product_id_created_at_idx"

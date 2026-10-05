@@ -12,6 +12,8 @@ import {
   listingRemovalIssue,
   listingRemovalReasonOptions,
   normalizeListingRemovalInput,
+  replacesCurrentRemovalReason,
+  wasOnStorefront,
 } from "@tarodan/types";
 
 /**
@@ -258,6 +260,87 @@ describe("listingRemovalIssue — doğrulama kuralı", () => {
     expect(
       listingRemovalIssue(admin("delete"), { reason: "changed_mind" }),
     ).toBe("reason_not_allowed");
+  });
+});
+
+/**
+ * Sayım kuralı: yalnız vitrindeki (active) ilanın düşüşü "vitrinden düşüş"
+ * sayılır; vitrin dışındaki ilanda satıcı eylemi yönetici/sistem nedenini ezmez.
+ */
+describe("sayım kuralı", () => {
+  it("vitrin = yalnız active", () => {
+    expect(wasOnStorefront("active")).toBe(true);
+    for (const status of [
+      "pending",
+      "rejected",
+      "inactive",
+      "suspended",
+      "reserved",
+      "sold",
+      "deleted",
+    ]) {
+      expect(wasOnStorefront(status)).toBe(false);
+    }
+  });
+
+  it("vitrinden düşüş güncel nedeni her zaman günceller", () => {
+    expect(
+      replacesCurrentRemovalReason({
+        fromStorefront: true,
+        reason: "changed_mind",
+        current: "policy_violation",
+      }),
+    ).toBe(true);
+  });
+
+  it("vitrin dışındaki ilanda satıcı nedeni yönetici/sistem nedenini ezmez", () => {
+    for (const current of [
+      "policy_violation",
+      "expired",
+      "seller_suspended",
+    ] as const) {
+      expect(
+        replacesCurrentRemovalReason({
+          fromStorefront: false,
+          reason: "paused_temporarily",
+          current,
+        }),
+      ).toBe(false);
+    }
+  });
+
+  it("vitrin dışındaki ilanda satıcı nedeni boş ya da satıcı nedenini günceller", () => {
+    expect(
+      replacesCurrentRemovalReason({
+        fromStorefront: false,
+        reason: "sold_elsewhere",
+        current: null,
+      }),
+    ).toBe(true);
+    expect(
+      replacesCurrentRemovalReason({
+        fromStorefront: false,
+        reason: "sold_elsewhere",
+        current: "paused_temporarily",
+      }),
+    ).toBe(true);
+  });
+
+  it("sistem ve yönetici nedenleri vitrin dışında da günceller", () => {
+    expect(
+      replacesCurrentRemovalReason({
+        fromStorefront: false,
+        reason: "return_quarantine",
+        current: "paused_temporarily",
+      }),
+    ).toBe(true);
+    expect(
+      replacesCurrentRemovalReason({
+        fromStorefront: false,
+        reason: "policy_violation",
+        current: "expired",
+      }),
+    ).toBe(true);
   });
 });
 

@@ -4,16 +4,21 @@ import {
   ProductStatus,
 } from "@prisma/client";
 import {
+  LISTING_REMOVAL_REASONS,
+  replacesCurrentRemovalReason,
+} from "@tarodan/types";
+import {
+  currentReasonGuard,
   isListingRemovalTransition,
   recordListingRemovals,
   stockStatusRemovalReason,
+  type ListingRemovalEntry,
 } from "./listing-removal";
 
 /**
  * Kaldırma nedenini kaydetmenin TEK yolu. Her kaldırma ekleme-yalnız bir olay
- * satırı + ilanın güncel nedeni (Product.removalReason) yazar; kaldırma
- * olmayan geçişler (vitrine dönüş, aynı statünün yeniden yazımı) hiçbir şey
- * yazmaz.
+ * satırı (+ kayıt anında `fromStorefront`) ve ilanın güncel nedenini
+ * (Product.removalReason) yazar; kaldırma olmayan geçişler hiçbir şey yazmaz.
  */
 describe("recordListingRemovals", () => {
   const makeDb = () => ({
@@ -23,7 +28,7 @@ describe("recordListingRemovals", () => {
     product: { updateMany: jest.fn().mockResolvedValue({ count: 1 }) },
   });
 
-  it("bir kaldırmayı olay olarak kaydeder ve ilanın güncel nedenini damgalar", async () => {
+  it("vitrinden düşüşü olay olarak kaydeder ve ilanın güncel nedenini damgalar", async () => {
     const db = makeDb();
 
     const count = await recordListingRemovals(db as any, [
@@ -49,11 +54,13 @@ describe("recordListingRemovals", () => {
           detail: "Dolap'ta sattım",
           statusBefore: ProductStatus.active,
           statusAfter: ProductStatus.deleted,
+          fromStorefront: true,
           actorUserId: "seller-1",
         },
       ],
     });
-    // Güncel neden yalnız ilan hâlâ yeni statüdeyse yazılır.
+    // Güncel neden yalnız ilan hâlâ yeni statüdeyse yazılır; vitrinden düşüş
+    // koşulsuz günceller.
     expect(db.product.updateMany).toHaveBeenCalledWith({
       where: { id: { in: ["p1"] }, status: ProductStatus.deleted },
       data: { removalReason: ListingRemovalReason.sold_elsewhere },
@@ -110,7 +117,7 @@ describe("recordListingRemovals", () => {
     },
   );
 
-  it("toplu kaldırmada (neden, statü) başına tek damga yazımı yapar", async () => {
+  it("toplu kaldırmada (neden, statü, vitrinden mi) başına tek damga yazımı yapar", async () => {
     const db = makeDb();
 
     const count = await recordListingRemovals(db as any, [
@@ -137,8 +144,18 @@ describe("recordListingRemovals", () => {
     expect(count).toBe(3);
     expect(db.productRemovalEvent.createMany).toHaveBeenCalledTimes(1);
     expect(
-      db.productRemovalEvent.createMany.mock.calls[0][0].data,
-    ).toHaveLength(3);
+      db.productRemovalEvent.createMany.mock.calls[0][0].data.map(
+        (row: { productId: string; fromStorefront: boolean }) => [
+          row.productId,
+          row.fromStorefront,
+        ],
+      ),
+    ).toEqual([
+      ["a", true],
+      ["b", true],
+      // Onay bekleyen ilan vitrinde değildi: kaydedilir, sayılmaz.
+      ["c", false],
+    ]);
     expect(db.product.updateMany).toHaveBeenCalledTimes(2);
     expect(db.product.updateMany).toHaveBeenCalledWith({
       where: { id: { in: ["a", "b"] }, status: ProductStatus.suspended },
@@ -157,8 +174,8 @@ describe("recordListingRemovals", () => {
   });
 
   /**
-   * Olaylar ekleme-yalnızdır: ilan kaldırılır, yeniden açılır, tekrar
-   * kaldırılırsa İKİ olay vardır (dashboard ikisini de kendi anında sayar).
+   * Olaylar ekleme-yalnızdır: ilan vitrinden düşer, yeniden açılır, tekrar
+   * düşerse İKİ olay vardır (dashboard ikisini de kendi anında sayar).
    * Aradaki yeniden açılış bir kaldırma değildir, kayıt üretmez.
    */
   it("kaldır → yeniden aç → tekrar kaldır: iki olay", async () => {
@@ -205,18 +222,241 @@ describe("recordListingRemovals", () => {
       expect.objectContaining({
         reason: ListingRemovalReason.paused_temporarily,
         statusAfter: ProductStatus.inactive,
+        fromStorefront: true,
       }),
       expect.objectContaining({
         reason: ListingRemovalReason.sold_elsewhere,
         platform: "letgo",
         statusAfter: ProductStatus.deleted,
+        fromStorefront: true,
       }),
     ]);
   });
 });
 
+/**
+ * Sayım kuralı ve güncel neden önceliği, gerçek `where` anlamını uygulayan
+ * bellek-içi bir ilan tablosuyla: yalnız vitrinden düşüş sayılır; vitrin
+ * dışındaki ilanda satıcının sonraki eylemi kaydedilir ama yönetici/sistem
+ * nedenini ezmez.
+ */
+describe("recordListingRemovals — sayım kuralı ve güncel neden", () => {
+  type Row = {
+    status: ProductStatus;
+    removalReason: ListingRemovalReason | null;
+  };
+
+  const matches = (row: Row, where: Record<string, any>): boolean => {
+    if (where.status && row.status !== where.status) return false;
+    if (!where.OR) return true;
+    return where.OR.some((cond: Record<string, any>) =>
+      cond.removalReason === null
+        ? row.removalReason === null
+        : (cond.removalReason.in as string[]).includes(
+            row.removalReason as string,
+          ),
+    );
+  };
+
+  /** Ürün satırları + kaydedilen olaylar; `apply` statü yazımını taklit eder. */
+  const makeTable = (initial: Row) => {
+    const row: Row = { ...initial };
+    const events: Array<Record<string, unknown>> = [];
+    const db = {
+      productRemovalEvent: {
+        createMany: jest.fn(async ({ data }: { data: any[] }) => {
+          events.push(...data);
+          return { count: data.length };
+        }),
+      },
+      product: {
+        updateMany: jest.fn(async ({ where, data }: any) => {
+          if (!matches(row, where)) return { count: 0 };
+          row.removalReason = data.removalReason;
+          return { count: 1 };
+        }),
+      },
+    };
+    const remove = async (
+      entry: Omit<ListingRemovalEntry, "productId" | "statusBefore">,
+    ) => {
+      const statusBefore = row.status;
+      row.status = entry.statusAfter; // çağıranın statü yazımı
+      await recordListingRemovals(db as any, [
+        { productId: "p1", statusBefore, ...entry },
+      ]);
+    };
+    const counted = () => events.filter((e) => e.fromStorefront).length;
+    return { row, events, remove, counted };
+  };
+
+  it("yönetici reddi → satıcı pasife alır: tek sayılan olay, neden 'kural ihlali' kalır", async () => {
+    const t = makeTable({ status: ProductStatus.active, removalReason: null });
+
+    await t.remove({
+      statusAfter: ProductStatus.rejected,
+      reason: ListingRemovalReason.policy_violation,
+      violationCode: "counterfeit_replica",
+    });
+    await t.remove({
+      statusAfter: ProductStatus.inactive,
+      reason: ListingRemovalReason.paused_temporarily,
+    });
+
+    expect(t.events).toHaveLength(2); // geçmiş ikisini de gösterir
+    expect(t.counted()).toBe(1);
+    expect(t.row.removalReason).toBe(ListingRemovalReason.policy_violation);
+  });
+
+  it("onay bekleyen ilanın askıya almayla reddi kaydedilir ama sayılmaz", async () => {
+    const t = makeTable({ status: ProductStatus.pending, removalReason: null });
+
+    await t.remove({
+      statusAfter: ProductStatus.rejected,
+      reason: ListingRemovalReason.seller_suspended,
+    });
+
+    expect(t.events).toEqual([
+      expect.objectContaining({
+        reason: ListingRemovalReason.seller_suspended,
+        fromStorefront: false,
+      }),
+    ]);
+    expect(t.counted()).toBe(0);
+    expect(t.row.removalReason).toBe(ListingRemovalReason.seller_suspended);
+  });
+
+  it("süre dolumu → satıcı siler: ikinci olay sayılmaz, neden 'süresi doldu' kalır", async () => {
+    const t = makeTable({ status: ProductStatus.active, removalReason: null });
+
+    await t.remove({
+      statusAfter: ProductStatus.inactive,
+      reason: ListingRemovalReason.expired,
+    });
+    await t.remove({
+      statusAfter: ProductStatus.deleted,
+      reason: ListingRemovalReason.sold_elsewhere,
+      platform: "dolap",
+    });
+
+    expect(t.events).toHaveLength(2);
+    expect(t.counted()).toBe(1);
+    expect(t.row.removalReason).toBe(ListingRemovalReason.expired);
+  });
+
+  it("satıcının duraklattığı ilanı satıcı silerse güncel neden satıcının son nedenine geçer", async () => {
+    const t = makeTable({ status: ProductStatus.active, removalReason: null });
+
+    await t.remove({
+      statusAfter: ProductStatus.inactive,
+      reason: ListingRemovalReason.paused_temporarily,
+    });
+    await t.remove({
+      statusAfter: ProductStatus.deleted,
+      reason: ListingRemovalReason.sold_elsewhere,
+      platform: "letgo",
+    });
+
+    expect(t.counted()).toBe(1);
+    expect(t.row.removalReason).toBe(ListingRemovalReason.sold_elsewhere);
+  });
+
+  it.each([
+    ["satıcının duraklattığı", ListingRemovalReason.paused_temporarily, null],
+    [
+      "süresi dolmuş",
+      ListingRemovalReason.expired,
+      ProductInactiveReason.expired,
+    ],
+  ])(
+    "%s pasif ilan iade karantinasına girince kayıt düşülür, güncel neden onu izler, sayılmaz",
+    async (_label, currentReason, inactiveReasonBefore) => {
+      const t = makeTable({
+        status: ProductStatus.inactive,
+        removalReason: currentReason,
+      });
+
+      // Statü değişmez (inactive → inactive), davranış işareti değişir.
+      await t.remove({
+        statusAfter: ProductStatus.inactive,
+        inactiveReasonBefore,
+        inactiveReasonAfter: ProductInactiveReason.return_quarantine,
+        reason: ListingRemovalReason.return_quarantine,
+      });
+
+      expect(t.events).toEqual([
+        expect.objectContaining({
+          reason: ListingRemovalReason.return_quarantine,
+          statusBefore: ProductStatus.inactive,
+          statusAfter: ProductStatus.inactive,
+          fromStorefront: false,
+        }),
+      ]);
+      expect(t.counted()).toBe(0);
+      expect(t.row.removalReason).toBe(ListingRemovalReason.return_quarantine);
+    },
+  );
+
+  it("karantinadaki ilana ikinci karantina (işaret değişmedi) kayıt üretmez", async () => {
+    const t = makeTable({
+      status: ProductStatus.inactive,
+      removalReason: ListingRemovalReason.return_quarantine,
+    });
+
+    await t.remove({
+      statusAfter: ProductStatus.inactive,
+      inactiveReasonBefore: ProductInactiveReason.return_quarantine,
+      inactiveReasonAfter: ProductInactiveReason.return_quarantine,
+      reason: ListingRemovalReason.return_quarantine,
+    });
+
+    expect(t.events).toHaveLength(0);
+  });
+});
+
+describe("currentReasonGuard ↔ replacesCurrentRemovalReason", () => {
+  /** Koşulun küme biçimi tek-satır kuralıyla aynı kararı verir. */
+  const guardAllows = (
+    guard: ReturnType<typeof currentReasonGuard>,
+    current: ListingRemovalReason | null,
+  ): boolean => {
+    if (!guard.OR) return true;
+    return (guard.OR as Array<Record<string, any>>).some((cond) =>
+      cond.removalReason === null
+        ? current === null
+        : current !== null &&
+          (cond.removalReason.in as string[]).includes(current),
+    );
+  };
+
+  it("her (vitrinden mi, yeni neden, güncel neden) üçlüsünde aynı karar", () => {
+    const currents = [
+      null,
+      ...LISTING_REMOVAL_REASONS,
+    ] as Array<ListingRemovalReason | null>;
+    for (const fromStorefront of [true, false]) {
+      for (const reason of LISTING_REMOVAL_REASONS as ListingRemovalReason[]) {
+        const guard = currentReasonGuard({ fromStorefront, reason });
+        for (const current of currents) {
+          expect([
+            fromStorefront,
+            reason,
+            current,
+            guardAllows(guard, current),
+          ]).toEqual([
+            fromStorefront,
+            reason,
+            current,
+            replacesCurrentRemovalReason({ fromStorefront, reason, current }),
+          ]);
+        }
+      }
+    }
+  });
+});
+
 describe("isListingRemovalTransition", () => {
-  it("yalnız kaldırma statüsüne ve statü değişince true", () => {
+  it("kaldırma statüsüne geçişte ya da işaret değişiminde true", () => {
     expect(
       isListingRemovalTransition({
         statusBefore: ProductStatus.active,
@@ -233,6 +473,21 @@ describe("isListingRemovalTransition", () => {
       isListingRemovalTransition({
         statusBefore: ProductStatus.deleted,
         statusAfter: ProductStatus.pending,
+      }),
+    ).toBe(false);
+    expect(
+      isListingRemovalTransition({
+        statusBefore: ProductStatus.inactive,
+        statusAfter: ProductStatus.inactive,
+        inactiveReasonBefore: null,
+        inactiveReasonAfter: ProductInactiveReason.expired,
+      }),
+    ).toBe(true);
+    // İşareti vermeyen çağıran için yalnız statü değişimi bakılır.
+    expect(
+      isListingRemovalTransition({
+        statusBefore: ProductStatus.inactive,
+        statusAfter: ProductStatus.inactive,
       }),
     ).toBe(false);
   });
