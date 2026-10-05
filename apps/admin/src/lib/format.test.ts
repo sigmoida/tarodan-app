@@ -4,6 +4,7 @@ import {
   fmtDateTime,
   fmtFileSize,
   fmtPercent,
+  fmtShortDateTime,
   fmtTime,
 } from "./format";
 
@@ -22,6 +23,7 @@ describe("format — Europe/Istanbul", () => {
     expect(fmtDate("2026-07-31T22:00:00.000Z")).toBe("01.08.2026");
     expect(fmtDateTime("2026-07-31T22:00:00.000Z")).toBe("01.08.2026 01:00");
     expect(fmtTime("2026-07-31T22:00:00.000Z")).toBe("01:00");
+    expect(fmtShortDateTime("2026-07-31T22:00:00.000Z")).toBe("01.08 01:00");
   });
 
   it("is independent of the process timezone", () => {

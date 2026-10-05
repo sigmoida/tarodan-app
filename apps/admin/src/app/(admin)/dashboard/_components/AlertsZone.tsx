@@ -23,13 +23,9 @@ export function AlertsZone({ alerts }: { alerts: DashboardAlert[] }) {
       <ul className="flex flex-col gap-2">
         {alerts.map((alert) => {
           const presentation = ALERT_PRESENTATION[alert.severity];
-          const Icon = presentation.icon;
           return (
             <li key={alert.key}>
-              <Alert
-                variant={presentation.variant}
-                icon={<Icon className="h-5 w-5" />}
-              >
+              <Alert variant={presentation.variant}>
                 <TextLink href={alert.href}>
                   {t(ALERT_MESSAGE_KEY[alert.key], {
                     count: alert.count,

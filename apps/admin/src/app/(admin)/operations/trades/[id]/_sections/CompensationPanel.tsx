@@ -1,7 +1,6 @@
 "use client";
 
 import { Alert, Button } from "@tarodan/ui";
-import { ExclamationTriangleIcon } from "@heroicons/react/24/outline";
 import { useTranslations } from "next-intl";
 import { adminApi } from "@/lib/api";
 import { usePrompt } from "@/provider/PromptProvider";
@@ -50,7 +49,6 @@ export function CompensationPanel({ trade }: { trade: TradeDetail }) {
   return (
     <Alert
       variant="warning"
-      icon={<ExclamationTriangleIcon className="h-6 w-6" />}
       title={t("admin.operations.trades.compensationTitle")}
       action={
         <Button

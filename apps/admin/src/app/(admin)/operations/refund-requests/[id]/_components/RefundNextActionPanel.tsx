@@ -13,17 +13,13 @@ import {
 import { fmtTry } from "@/lib/format";
 import { Panel } from "@/components/detail/Panel";
 import {
-  InformationCircleIcon,
   ExclamationTriangleIcon,
   CheckCircleIcon,
   XCircleIcon,
   BanknotesIcon,
   NoSymbolIcon,
 } from "@heroicons/react/24/outline";
-import {
-  guidanceForStatus,
-  type GuidanceVariant,
-} from "../_lib/refund-guidance";
+import { guidanceForStatus } from "../_lib/refund-guidance";
 import type { RefundDecisionPreview } from "../types";
 import { FinancialComponentsTable } from "./FinancialComponentsTable";
 import { extractErrorMessage } from "@/lib/error";
@@ -32,14 +28,6 @@ import { statusConfig } from "@/lib/statusLabels";
 // Tek doğru kaynak: @tarodan/shared refundReasonConfig (11 enum değeri).
 // Elle kopyalanan liste sessizce kayıyordu.
 const REFUND_REASONS = Object.keys(refundReasonConfig);
-
-const VARIANT_ICON: Record<GuidanceVariant, React.ReactNode> = {
-  info: <InformationCircleIcon className="h-6 w-6" />,
-  warning: <ExclamationTriangleIcon className="h-6 w-6" />,
-  success: <CheckCircleIcon className="h-6 w-6" />,
-  danger: <XCircleIcon className="h-6 w-6" />,
-  default: <InformationCircleIcon className="h-6 w-6" />,
-};
 
 export interface RefundNextActionPanelProps {
   status: string;
@@ -153,11 +141,7 @@ export function RefundNextActionPanel({
 
   return (
     <div className="space-y-4">
-      <Alert
-        variant={guidance.variant}
-        title={guidance.title}
-        icon={VARIANT_ICON[guidance.variant]}
-      >
+      <Alert variant={guidance.variant} title={guidance.title}>
         <div className="space-y-3">
           <p>{guidance.description}</p>
 
@@ -429,7 +413,6 @@ export function RefundNextActionPanel({
         <Alert
           variant="danger"
           title={t("admin.operations.refundRequests.counterfeitTitle")}
-          icon={<ExclamationTriangleIcon className="h-6 w-6" />}
         >
           {t("admin.operations.refundRequests.counterfeitBody")}
         </Alert>

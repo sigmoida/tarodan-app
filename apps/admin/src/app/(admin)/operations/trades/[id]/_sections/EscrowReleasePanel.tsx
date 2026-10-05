@@ -1,7 +1,6 @@
 "use client";
 
 import { Alert, Button } from "@tarodan/ui";
-import { BanknotesIcon } from "@heroicons/react/24/outline";
 import { useTranslations } from "next-intl";
 import { adminApi } from "@/lib/api";
 import { toastReleaseFastPath } from "@/components/finance/release-fast-path";
@@ -78,7 +77,6 @@ export function EscrowReleasePanel({ trade }: { trade: TradeDetail }) {
   return (
     <Alert
       variant="info"
-      icon={<BanknotesIcon className="h-6 w-6" />}
       title={t("admin.operations.trades.escrowPanelTitle")}
       action={
         <Button

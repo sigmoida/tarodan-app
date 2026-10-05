@@ -100,10 +100,7 @@ export function ProductBulkImportModal({
       }
     >
       <div className="space-y-5">
-        <Alert
-          variant="warning"
-          icon={<ExclamationTriangleIcon className="h-5 w-5" />}
-        >
+        <Alert variant="warning">
           {t("admin.catalog.products.bulkImportApprovalNotice")}
         </Alert>
 

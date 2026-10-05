@@ -2,7 +2,6 @@
 
 import { useParams } from "next/navigation";
 import { useTranslations } from "next-intl";
-import { CheckCircleIcon } from "@heroicons/react/24/outline";
 import { Alert, StatusBadge, refundRequestStatusConfig } from "@tarodan/ui";
 import { ADMIN_REFUNDS_VIEW_HREF } from "@tarodan/types";
 import { adminApi } from "@/lib/api";
@@ -221,7 +220,6 @@ export default function RefundRequestDetailPage() {
             {rr.refundedAt && (
               <Alert
                 variant="success"
-                icon={<CheckCircleIcon className="h-6 w-6" />}
                 title={t(
                   "admin.operations.refundRequests.refundCompletedAmount",
                   {

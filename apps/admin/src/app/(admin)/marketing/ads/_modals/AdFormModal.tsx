@@ -188,10 +188,7 @@ function AdImageField() {
       </div>
 
       {!!width && !!height && !compliant && (
-        <Alert
-          variant="warning"
-          icon={<ExclamationTriangleIcon className="h-5 w-5" />}
-        >
+        <Alert variant="warning">
           {t("admin.marketing.ads.iabWarning", { width, height })}
         </Alert>
       )}

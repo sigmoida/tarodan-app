@@ -1,10 +1,6 @@
 "use client";
 
-import {
-  PencilIcon,
-  ArrowUturnLeftIcon,
-  InformationCircleIcon,
-} from "@heroicons/react/24/outline";
+import { PencilIcon, ArrowUturnLeftIcon } from "@heroicons/react/24/outline";
 import { useTranslations } from "next-intl";
 import { Alert, Button, Spinner } from "@tarodan/ui";
 import { SectionCard } from "@/components/detail/SectionCard";
@@ -90,10 +86,7 @@ export function PermissionMatrixTab() {
 
       {/* Unsaved changes warning */}
       {editMode && matrixDirty && (
-        <Alert
-          variant="warning"
-          icon={<InformationCircleIcon className="h-4 w-4" />}
-        >
+        <Alert variant="warning">
           {t("admin.roles.matrix.unsavedWarning")}
         </Alert>
       )}

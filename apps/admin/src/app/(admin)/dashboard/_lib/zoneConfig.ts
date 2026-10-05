@@ -1,9 +1,3 @@
-import {
-  ExclamationTriangleIcon,
-  InformationCircleIcon,
-  ShieldExclamationIcon,
-} from "@heroicons/react/24/outline";
-import type { ComponentType } from "react";
 import type {
   DashboardAlertKey,
   DashboardAlertSeverity,
@@ -17,8 +11,6 @@ import type { MessageKey } from "@tarodan/i18n";
  * and which set they count come from `@tarodan/types` — both sides read the
  * same catalogue, so a new queue cannot exist on one side only.
  */
-
-type Icon = ComponentType<{ className?: string }>;
 
 /** Queue tile → its label. Order comes from the shared catalogue. */
 export const QUEUE_PRESENTATION: Record<
@@ -35,14 +27,14 @@ export const QUEUE_PRESENTATION: Record<
   shipping: { labelKey: "admin.dashboard.queues.shipping" },
 };
 
-/** Alert severity → the `Alert` variant + icon. Light theme only. */
+/** Alert severity → the `Alert` variant. Light theme only. */
 export const ALERT_PRESENTATION: Record<
   DashboardAlertSeverity,
-  { icon: Icon; variant: "danger" | "warning" | "info" }
+  { variant: "danger" | "warning" | "info" }
 > = {
-  critical: { icon: ShieldExclamationIcon, variant: "danger" },
-  warning: { icon: ExclamationTriangleIcon, variant: "warning" },
-  info: { icon: InformationCircleIcon, variant: "info" },
+  critical: { variant: "danger" },
+  warning: { variant: "warning" },
+  info: { variant: "info" },
 };
 
 /**

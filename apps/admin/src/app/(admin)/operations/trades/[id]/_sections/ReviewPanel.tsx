@@ -1,11 +1,7 @@
 "use client";
 
 import { Alert, Button } from "@tarodan/ui";
-import {
-  BuildingStorefrontIcon,
-  CheckCircleIcon,
-  XCircleIcon,
-} from "@heroicons/react/24/outline";
+import { CheckCircleIcon, XCircleIcon } from "@heroicons/react/24/outline";
 import { useTranslations } from "next-intl";
 
 /**
@@ -35,7 +31,6 @@ export function ReviewPanel({
   return (
     <Alert
       variant="warning"
-      icon={<BuildingStorefrontIcon className="h-6 w-6" />}
       title={t("admin.operations.trades.reviewTitle")}
       action={
         <div className="flex flex-wrap gap-2">

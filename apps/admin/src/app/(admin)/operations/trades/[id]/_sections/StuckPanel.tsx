@@ -1,7 +1,6 @@
 "use client";
 
 import { Alert, Button } from "@tarodan/ui";
-import { ClockIcon } from "@heroicons/react/24/outline";
 import { useTranslations } from "next-intl";
 import { fmtDateTime } from "@/lib/format";
 import type { TradeDetail } from "../types";
@@ -22,7 +21,6 @@ export function StuckPanel({
   return (
     <Alert
       variant="warning"
-      icon={<ClockIcon className="h-6 w-6" />}
       title={t("admin.operations.trades.stuckTitle")}
       action={
         <Button variant="danger" onClick={onResolve}>

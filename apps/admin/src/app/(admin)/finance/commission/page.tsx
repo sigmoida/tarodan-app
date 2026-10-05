@@ -4,12 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { useTranslations } from "next-intl";
 import { Alert, Button, Input, Select } from "@tarodan/ui";
-import {
-  CheckCircleIcon,
-  ExclamationTriangleIcon,
-  PencilSquareIcon,
-  PlusIcon,
-} from "@heroicons/react/24/outline";
+import { PencilSquareIcon, PlusIcon } from "@heroicons/react/24/outline";
 import { adminApi } from "@/lib/api";
 import { adminKeys } from "@/lib/query/keys";
 import { extractList } from "@/lib/extract";
@@ -185,7 +180,6 @@ function CommissionRulesContent({
           title={t("admin.finance.commission.coverageIssuesTitle", {
             count: validation.errors.length,
           })}
-          icon={<ExclamationTriangleIcon className="h-5 w-5" />}
         >
           {validation.errors.slice(0, 8).map((error) => (
             <div
@@ -207,7 +201,6 @@ function CommissionRulesContent({
         <Alert
           variant="success"
           title={t("admin.finance.commission.coverageCompleteTitle")}
-          icon={<CheckCircleIcon className="h-5 w-5" />}
         >
           {t("admin.finance.commission.coverageCompleteDescription", {
             categories: validation.activeCategoryCount,

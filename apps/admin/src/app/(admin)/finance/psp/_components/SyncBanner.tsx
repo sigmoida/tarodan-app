@@ -2,7 +2,6 @@
 
 "use client";
 
-import { ExclamationTriangleIcon } from "@heroicons/react/24/outline";
 import { Alert } from "@tarodan/ui";
 import { useTranslations } from "next-intl";
 import { fmtDateTime } from "@/lib/format";
@@ -48,11 +47,7 @@ export function SyncBanner({ sync }: { sync: PspSyncState | undefined }) {
         });
 
   return (
-    <Alert
-      role="status"
-      variant={tone}
-      icon={<ExclamationTriangleIcon className="h-5 w-5" />}
-    >
+    <Alert role="status" variant={tone}>
       {message}
     </Alert>
   );

@@ -4,7 +4,7 @@ import { useParams } from "next/navigation";
 import { CheckCircleIcon, XCircleIcon } from "@heroicons/react/24/outline";
 import { Alert, Badge, Button } from "@tarodan/ui";
 import { adminApi } from "@/lib/api";
-import { fmtDateTime } from "@/lib/format";
+import { fmtDateTime, fmtShortDateTime } from "@/lib/format";
 import { DetailPage } from "@/components/detail/DetailPage";
 import { SectionCard } from "@/components/detail/SectionCard";
 import { PartyCard } from "@/components/detail/PartyCard";
@@ -206,7 +206,7 @@ export default function MessageDetailPage() {
                               isSender ? "text-inverted/80" : "text-muted"
                             }`}
                           >
-                            {fmtDateTime(msg.createdAt)}
+                            {fmtShortDateTime(msg.createdAt)}
                           </p>
                         </div>
                       </div>

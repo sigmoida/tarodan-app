@@ -2,10 +2,7 @@
 
 import toast from "react-hot-toast";
 import { Alert, Button } from "@tarodan/ui";
-import {
-  ArrowUturnLeftIcon,
-  ExclamationTriangleIcon,
-} from "@heroicons/react/24/outline";
+import { ArrowUturnLeftIcon } from "@heroicons/react/24/outline";
 import { useTranslations } from "next-intl";
 import { adminApi } from "@/lib/api";
 import { fmtDateTime } from "@/lib/format";
@@ -46,7 +43,6 @@ export function RefundFailurePanel({ trade }: { trade: TradeDetail }) {
   return (
     <Alert
       variant="danger"
-      icon={<ExclamationTriangleIcon className="h-6 w-6" />}
       title={t("admin.operations.trades.refundFailureTitle")}
       action={
         <Button variant="danger" onClick={handle} isLoading={retry.isPending}>

@@ -30,6 +30,13 @@ const dateTimeFmt = new Intl.DateTimeFormat("tr-TR", {
   hour: "2-digit",
   minute: "2-digit",
 });
+const shortDateTimeFmt = new Intl.DateTimeFormat("tr-TR", {
+  timeZone: ADMIN_TIME_ZONE,
+  day: "2-digit",
+  month: "2-digit",
+  hour: "2-digit",
+  minute: "2-digit",
+});
 const timeFmt = new Intl.DateTimeFormat("tr-TR", {
   timeZone: ADMIN_TIME_ZONE,
   hour: "2-digit",
@@ -98,6 +105,15 @@ export function fmtDateTime(
   if (!value) return undefined;
   const d = new Date(value);
   return Number.isNaN(d.getTime()) ? undefined : dateTimeFmt.format(d);
+}
+
+/** `03.07 14:30` — yılsız kısa tarih-saat (sohbet balonu gibi dar yerler için). */
+export function fmtShortDateTime(
+  value?: string | number | Date | null,
+): string | undefined {
+  if (!value) return undefined;
+  const d = new Date(value);
+  return Number.isNaN(d.getTime()) ? undefined : shortDateTimeFmt.format(d);
 }
 
 /** `14:30` — time only (rendered next to the date in `CellDate withTime`). */
