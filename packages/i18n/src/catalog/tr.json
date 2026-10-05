@@ -4869,7 +4869,8 @@
           "trade": "Takas",
           "hold": "Escrow Hold",
           "emailVerification": "E-posta Doğrulama",
-          "passwordReset": "Şifre Sıfırlama"
+          "passwordReset": "Şifre Sıfırlama",
+          "returnWindow": "İade Penceresi"
         },
         "placeholders": {
           "product": "ürün başlığı veya slug",
@@ -4878,7 +4879,8 @@
           "order": "sipariş no",
           "offer": "teklif id veya ürün başlığı",
           "trade": "takas id",
-          "userEmail": "kullanıcı e-posta"
+          "userEmail": "kullanıcı e-posta",
+          "deliveredOrder": "teslim edilmiş sipariş no"
         },
         "cronConfirmTitle": "Cron'u tetikle",
         "cronConfirmDescription": "\"{label}\" işi kuyruğa alınacak ve worker'da hemen çalışacak. Devam edilsin mi?",
@@ -4919,6 +4921,52 @@
             "createdAt": "Açılış"
           },
           "reviewHint": "Apple/Google inceleme notuna alıcı hesabın e-posta ve şifresini yaz; \"ödemeler test modunda, tahsilat yapılmaz\" ibaresini ekle."
+        },
+        "simulation": {
+          "title": "Kargo Simülasyonu",
+          "description": "Taşıyıcıya hiç gitmeyen kolileri (staging sahte kargo, test şeridi) taşıyıcı haber vermiş gibi ilerlet. Okuma gerçek kargo takip hattından geçer: sipariş durumu, teslim tarihi, iade penceresi, escrow, bildirim ve e-postalar gerçekteki gibi oluşur.",
+          "liveNotice": "Canlı ortam: yalnız test şeridi kolileri listelenir ve simüle edilebilir.",
+          "searchLabel": "Sipariş no, iade no, takas no, PKG ya da takip kodu",
+          "noSteps": "Uygulanabilir adım yok",
+          "testLane": "Test şeridi",
+          "confirmTitle": "Taşıyıcı olayını simüle et",
+          "confirmDescription": "{reference} için \"{step}\" okuması gerçek kargo takip hattına verilecek. Sonuç gerçek bir taşıyıcı bildirimiyle aynıdır ve geri alınamaz.",
+          "apply": "Simüle et",
+          "applied": "{reference}: yeni kargo durumu {status}",
+          "notApplied": "{reference}: okuma uygulanmadı (durum makinesi reddetti ya da kayıt eşzamanlı değişti)",
+          "failed": "Simülasyon başarısız",
+          "columns": {
+            "kind": "Tür",
+            "reference": "Kayıt",
+            "tracking": "Takip",
+            "status": "Kargo durumu",
+            "ownerStatus": "Kayıt durumu",
+            "steps": "Sonraki adım"
+          },
+          "kinds": {
+            "order_shipment": "Sipariş kolisi",
+            "refund_return": "İade kolisi",
+            "trade_shipment": "Takas bacağı"
+          },
+          "legs": {
+            "to_warehouse": "depoya",
+            "from_warehouse": "yeni sahibine",
+            "return": "iade"
+          },
+          "steps": {
+            "order_shipment": {
+              "picked_up": "Kargoya verildi",
+              "delivered": "Alıcıya teslim edildi"
+            },
+            "refund_return": {
+              "picked_up": "İade kargoya verildi",
+              "delivered": "Satıcıya teslim edildi"
+            },
+            "trade_shipment": {
+              "picked_up": "Kargoya verildi",
+              "delivered": "Teslim edildi"
+            }
+          }
         }
       },
       "media": {
@@ -10873,7 +10921,11 @@
         "missingColumns": "Excel sütunları eksik: {columns}. Örnek dosyayı yeniden indirin."
       },
       "testTools": {
-        "jobIdRequired": "İş kimliği (jobId) zorunludur"
+        "jobIdRequired": "İş kimliği (jobId) zorunludur",
+        "orderNotDelivered": "Sipariş henüz teslim edilmedi; iade penceresi teslimde başlar",
+        "simulationLiveOrderForbidden": "Canlı ortamda yalnız test şeridi gönderileri simüle edilebilir",
+        "simulationTargetNotFound": "Simüle edilecek gönderi bulunamadı",
+        "simulationStepUnavailable": "Bu gönderiye \"{step}\" adımı uygulanamaz (kargo: {status}, kayıt: {ownerStatus})"
       },
       "psp": {
         "invalidDate": "Geçersiz tarih (YYYY-MM-DD bekleniyor)",

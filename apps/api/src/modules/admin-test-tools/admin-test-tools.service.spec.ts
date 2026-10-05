@@ -114,6 +114,150 @@ describe("AdminTestToolsService cron tetikleme (kuyruk üzerinden)", () => {
 });
 
 /**
+ * İade penceresi zaman ayarı: pencere `Order.returnWindowEndsAt`'e damgalı ve
+ * escrow tarihi ondan türer (releaseAt = pencere sonu + payout grace). Yalnız
+ * hold'u kaydırmak "iade penceresi kapandı" durumunu UAT'ta üretemiyordu.
+ */
+describe("AdminTestToolsService iade penceresi (return_window)", () => {
+  const makeService = (order: Record<string, unknown> | null) => {
+    const tx = {
+      platformSetting: {
+        findUnique: jest
+          .fn()
+          .mockResolvedValue({ settingValue: "2", updatedBy: "admin-1" }),
+      },
+      order: { update: jest.fn().mockResolvedValue({}) },
+      paymentHold: { updateMany: jest.fn().mockResolvedValue({ count: 1 }) },
+    };
+    const prisma = {
+      order: {
+        findUnique: jest.fn().mockResolvedValue(order),
+        findMany: jest.fn().mockResolvedValue([]),
+      },
+      paymentHold: { findMany: jest.fn().mockResolvedValue([]) },
+      $transaction: jest.fn((fn: (client: typeof tx) => Promise<unknown>) =>
+        fn(tx),
+      ),
+    };
+    const service = new AdminTestToolsService(prisma as any, {} as any);
+    return { service, prisma, tx };
+  };
+
+  it("moves the window AND the held escrow date together (release = window + grace)", async () => {
+    const { service, tx } = makeService({
+      deliveredAt: new Date("2026-09-01T10:00:00Z"),
+      returnWindowEndsAt: new Date("2026-09-15T10:00:00Z"),
+    });
+
+    const res = await service.adjust(
+      "return_window",
+      "order-1",
+      "expire_now",
+      0,
+    );
+
+    const windowEnd = new Date(res.after);
+    const expectedRelease = new Date(windowEnd);
+    expectedRelease.setDate(expectedRelease.getDate() + 2);
+    expect(tx.order.update).toHaveBeenCalledWith({
+      where: { id: "order-1" },
+      data: { returnWindowEndsAt: windowEnd },
+    });
+    expect(tx.paymentHold.updateMany).toHaveBeenCalledWith({
+      where: { orderId: "order-1", status: "held" },
+      data: { releaseAt: expectedRelease },
+    });
+    expect(res).toMatchObject({
+      field: "returnWindowEndsAt",
+      before: "2026-09-15T10:00:00.000Z",
+      related: { escrowReleaseAt: expectedRelease.toISOString() },
+    });
+  });
+
+  it("refuses an order that was never delivered (the window starts at delivery)", async () => {
+    const { service, prisma } = makeService({
+      deliveredAt: null,
+      returnWindowEndsAt: null,
+    });
+
+    await expect(
+      service.adjust("return_window", "order-1", "expire_now", 0),
+    ).rejects.toMatchObject({
+      response: { i18nKey: "server.admin.testTools.orderNotDelivered" },
+    });
+    expect(prisma.$transaction).not.toHaveBeenCalled();
+  });
+
+  it("search lists delivered orders with both dates", async () => {
+    const { service, prisma } = makeService(null);
+    prisma.order.findMany.mockResolvedValue([
+      {
+        id: "order-1",
+        orderNumber: "ORD-10001",
+        status: "delivered",
+        returnWindowEndsAt: new Date("2026-09-15T10:00:00Z"),
+      },
+    ]);
+    prisma.paymentHold.findMany.mockResolvedValue([
+      { orderId: "order-1", releaseAt: new Date("2026-09-16T10:00:00Z") },
+    ]);
+
+    const rows = await service.search("return_window", "ORD-1");
+
+    expect(prisma.order.findMany.mock.calls[0][0].where).toMatchObject({
+      deliveredAt: { not: null },
+    });
+    expect(rows).toEqual([
+      {
+        id: "order-1",
+        label: "ORD-10001",
+        status: "delivered",
+        dates: {
+          returnWindowEndsAt: "2026-09-15T10:00:00.000Z",
+          escrowReleaseAt: "2026-09-16T10:00:00.000Z",
+        },
+      },
+    ]);
+  });
+});
+
+/**
+ * Ortam rozeti: staging de NODE_ENV=production koşar; PROD uyarısı yalnız canlı
+ * dağıtımda (APP_ENV=production ya da APP_ENV'siz optimize build) çıkmalı.
+ */
+describe("AdminTestToolsService.getEnvironment", () => {
+  const saved = {
+    NODE_ENV: process.env.NODE_ENV,
+    APP_ENV: process.env.APP_ENV,
+  };
+  afterEach(() => {
+    if (saved.NODE_ENV === undefined) delete process.env.NODE_ENV;
+    else process.env.NODE_ENV = saved.NODE_ENV;
+    if (saved.APP_ENV === undefined) delete process.env.APP_ENV;
+    else process.env.APP_ENV = saved.APP_ENV;
+  });
+  const service = () => new AdminTestToolsService({} as any, {} as any);
+
+  it("staging is not flagged as production", () => {
+    process.env.NODE_ENV = "production";
+    process.env.APP_ENV = "staging";
+    expect(service().getEnvironment()).toEqual({
+      env: "staging",
+      isProd: false,
+    });
+  });
+
+  it("the live deployment is flagged", () => {
+    process.env.NODE_ENV = "production";
+    process.env.APP_ENV = "production";
+    expect(service().getEnvironment()).toEqual({
+      env: "production",
+      isProd: true,
+    });
+  });
+});
+
+/**
  * Zaman makinesi saf mantığı: aksiyon→tarih hesabı ve takas durum→deadline eşlemesi.
  */
 describe("AdminTestTools saf mantık", () => {

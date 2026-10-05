@@ -4,7 +4,10 @@ import type { Queue } from "bull";
 import { PrismaService } from "../../prisma";
 import { QUEUE_NAMES } from "../../workers/constants";
 import { CRON_CATALOG } from "../../workers/cron-catalog";
-import { nodeEnv } from "../../config/environment";
+import { PaymentHoldStatus } from "@prisma/client";
+import { appEnv, isLiveProduction, nodeEnv } from "../../config/environment";
+import { resolveTimingValue } from "../../common/timing-rules";
+import { escrowReleaseAt } from "../order/helpers/order-return-window";
 import { i18nMessage } from "../i18n";
 
 /**
@@ -28,6 +31,7 @@ export type TestToolType =
   | "offer"
   | "trade"
   | "hold"
+  | "return_window"
   | "email_verification"
   | "password_reset";
 
@@ -51,9 +55,14 @@ export class AdminTestToolsService {
   ) {}
 
   // ─────────────────────────── Ortam ───────────────────────────
+  /**
+   * `isProd` = CANLI dağıtım. Staging de NODE_ENV=production koşar; eskiden
+   * burada PROD görünüyor ve UAT ekranında yanlış uyarı veriyordu. Ad dağıtımı
+   * (APP_ENV) gösterir, yoksa çalışma modunu.
+   */
   getEnvironment(): { env: string; isProd: boolean } {
-    const env = nodeEnv() ?? "development";
-    return { env, isProd: env === "production" };
+    const env = appEnv() ?? nodeEnv() ?? "development";
+    return { env, isProd: isLiveProduction() };
   }
 
   // ─────────────────────────── Cron'lar ───────────────────────────
@@ -258,6 +267,39 @@ export class AdminTestToolsService {
           dates: { releaseAt: iso(r.releaseAt) },
         }));
       }
+      case "return_window": {
+        // Yalnız teslim edilmiş siparişler: pencere teslimde damgalanır. Escrow
+        // tarihi de gösterilir — kaydırma ikisini birlikte taşır.
+        const rows = await this.prisma.order.findMany({
+          where: { orderNumber: ci, deliveredAt: { not: null } },
+          select: {
+            id: true,
+            orderNumber: true,
+            status: true,
+            returnWindowEndsAt: true,
+          },
+          take,
+        });
+        const holds = await this.prisma.paymentHold.findMany({
+          where: {
+            orderId: { in: rows.map((r) => r.id) },
+            status: PaymentHoldStatus.held,
+          },
+          select: { orderId: true, releaseAt: true },
+        });
+        const releaseByOrderId = new Map(
+          holds.map((h) => [h.orderId, h.releaseAt]),
+        );
+        return rows.map((r) => ({
+          id: r.id,
+          label: r.orderNumber,
+          status: r.status,
+          dates: {
+            returnWindowEndsAt: iso(r.returnWindowEndsAt),
+            escrowReleaseAt: iso(releaseByOrderId.get(r.id)),
+          },
+        }));
+      }
       case "email_verification": {
         const rows = await this.prisma.emailVerificationToken.findMany({
           where: { usedAt: null, user: { email: ci } },
@@ -316,6 +358,8 @@ export class AdminTestToolsService {
     field: string;
     before: string | null;
     after: string;
+    /** Aynı işlemde birlikte kaydırılan türev tarihler (audit + UI). */
+    related?: Record<string, string | null>;
   }> {
     if (!id) throw new BadRequestException("id zorunlu");
     const target = this.targetDate(action, value);
@@ -478,6 +522,51 @@ export class AdminTestToolsService {
           field: "releaseAt",
           before: iso(before.releaseAt),
           after: afterIso,
+        };
+      }
+      case "return_window": {
+        // İade penceresi (cayma) ile escrow tarihi AYNI damgadan türer:
+        // releaseAt = returnWindowEndsAt + payoutGraceDays (TIMING_RULES.md).
+        // İkisi birlikte kaydırılır; yalnız pencereyi taşımak "pencere kapandı
+        // ama satıcı ödemesi haftalar sonra" gibi gerçekte olmayan bir durum
+        // üretirdi. Sadece escrow'u öne çekmek isteyen tester "hold" tipini
+        // kullanmaya devam eder.
+        const before = await this.prisma.order.findUnique({
+          where: { id },
+          select: { deliveredAt: true, returnWindowEndsAt: true },
+        });
+        if (!before)
+          throw new BadRequestException(
+            i18nMessage("server.refund.orderNotFound"),
+          );
+        if (!before.deliveredAt)
+          throw new BadRequestException(
+            i18nMessage("server.admin.testTools.orderNotDelivered"),
+          );
+        const releaseAt = await this.prisma.$transaction(async (tx) => {
+          const payoutGraceDays = await resolveTimingValue(
+            tx,
+            "payoutGraceDays",
+          );
+          const nextReleaseAt = escrowReleaseAt(target, payoutGraceDays);
+          await tx.order.update({
+            where: { id },
+            data: { returnWindowEndsAt: target },
+          });
+          // Teslimdeki planlamayla aynı küme: held olan hold'lar.
+          await tx.paymentHold.updateMany({
+            where: { orderId: id, status: PaymentHoldStatus.held },
+            data: { releaseAt: nextReleaseAt },
+          });
+          return nextReleaseAt;
+        });
+        return {
+          type,
+          id,
+          field: "returnWindowEndsAt",
+          before: iso(before.returnWindowEndsAt),
+          after: afterIso,
+          related: { escrowReleaseAt: releaseAt.toISOString() },
         };
       }
       case "email_verification": {

@@ -1,5 +1,6 @@
 import {
   effectiveReturnWindowEnd,
+  escrowReleaseAt,
   returnWindowEndsAt,
 } from "./order-return-window";
 
@@ -31,6 +32,15 @@ describe("order-return-window", () => {
         7,
       ),
     ).toBe(stamped);
+  });
+
+  it("escrow serbest bırakma = pencere sonu + grace (takvim günü)", () => {
+    const windowEnd = plusDays(14);
+    const expected = new Date(windowEnd);
+    expected.setDate(expected.getDate() + 1);
+    expect(escrowReleaseAt(windowEnd, 1)).toEqual(expected);
+    // Girdi tarihi kopyalanır, değiştirilmez.
+    expect(windowEnd).toEqual(plusDays(14));
   });
 
   it("damgasız eski siparişte bugünkü pencereyle hesaplanır", () => {
