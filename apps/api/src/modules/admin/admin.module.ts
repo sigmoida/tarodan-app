@@ -43,6 +43,9 @@ import { AdminUserService } from "./users/admin-user.service";
 import { UserModule } from "../user/user.module";
 import { AdminUserAccountService } from "./users/admin-user-account.service";
 import { AdminDeletedIdentityService } from "./users/admin-deleted-identity.service";
+import { AdminConsentService } from "./users/admin-consent.service";
+import { AdminConsentController } from "./users/admin-consent.controller";
+import { ConsentModule } from "../consent/consent.module";
 import { AdminStaffService } from "./users/admin-staff.service";
 import { AdminProductService } from "./catalog/admin-product.service";
 import { AdminProductBulkImportService } from "./catalog/admin-product-bulk-import.service";
@@ -165,6 +168,8 @@ import { scheduledProcessors } from "../../workers/scheduled-processors";
     MembershipModule,
     ProductModule,
     SiteAccessModule,
+    // Onay Kayıtları ekranı: üye durumu domain servisinden okunur.
+    ConsentModule,
     BullModule.registerQueue({ name: QUEUE_NAMES.MODERATION }),
     BullModule.registerQueue({ name: QUEUE_NAMES.SCHEDULED }),
     BullModule.registerQueue({ name: QUEUE_NAMES.SEARCH }),
@@ -174,6 +179,7 @@ import { scheduledProcessors } from "../../workers/scheduled-processors";
     AdminCommissionController,
     AdminUserController,
     AdminDeletedIdentityController,
+    AdminConsentController,
     AdminProductController,
     AdminOrderController,
     AdminAnalyticsController,
@@ -214,6 +220,7 @@ import { scheduledProcessors } from "../../workers/scheduled-processors";
     AdminUserService,
     AdminUserAccountService,
     AdminDeletedIdentityService,
+    AdminConsentService,
     AdminStaffService,
     AdminProductService,
     AdminProductBulkImportService,
