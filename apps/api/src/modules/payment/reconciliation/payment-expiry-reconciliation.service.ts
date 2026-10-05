@@ -24,6 +24,7 @@ import {
   PaymentCommonService,
   liveOrderPaymentWhere,
 } from "../payment-common.service";
+import { lockOrderPaymentRows } from "../helpers/payment-order-lock";
 import {
   FailedPaymentCancellation,
   PaymentFulfillmentService,
@@ -136,6 +137,11 @@ export class PaymentExpiryReconciliationService {
     for (const order of expired) {
       try {
         await this.prisma.$transaction(async (tx) => {
+          // Kilit sırası ödeme → sipariş (claim ile aynı; bkz.
+          // payment-order-lock). Eskiden sipariş önce kilitlenip ödeme satırı
+          // sonra yazılıyordu: aynı anda claim edilen siparişte ikisi ters
+          // sırada bekleyip kilitlenebiliyordu (deadlock).
+          await lockOrderPaymentRows(tx, order.id);
           await tx.$queryRaw`SELECT id FROM orders WHERE id = ${order.id} FOR UPDATE`;
           const fresh = await tx.order.findUnique({
             where: { id: order.id },

@@ -23,9 +23,16 @@ export interface PaymentOrderTarget {
  * - callback siparişi `pending_payment` okur, iptal commit eder, callback
  *   `preparing` yazar → iptal edilmiş sipariş sessizce canlanır.
  *
- * Kilit sırası para yollarıyla aynıdır: ÖNCE ödeme satırı, SONRA sipariş
- * satırları (iade sonlandırması da ödeme → sipariş sırasıyla kilitler);
- * sepette siparişler id sırasıyla kilitlenir.
+ * KİLİT SIRASI — hem ödeme hem sipariş satırı kilitleyen her yolda ÖNCE
+ * ödeme, SONRA sipariş (sepette ikisi de id sırasıyla):
+ * - claim: ödeme FOR UPDATE → siparişler FOR SHARE;
+ * - callback: ödeme CAS (claimPaymentCompleted) → siparişler FOR UPDATE;
+ * - iade sonlandırması: ödeme FOR UPDATE → sipariş yazımı;
+ * - 24s süpürmesi: ödeme(ler) FOR UPDATE (`lockOrderPaymentRows`) →
+ *   sipariş FOR UPDATE → ödeme yazımı.
+ * Yalnız sipariş kilitleyen iptaller (alıcı / yönetici iptali, hazırlama
+ * süresi süpürmesi) ödeme satırını KİLİTLEMEZ, yalnız okur; bekledikleri tek
+ * kilit sipariş kilididir, döngü oluşmaz.
  */
 
 /**
@@ -60,6 +67,28 @@ export async function lockOrdersStillPayable(
     rows.length > 0 &&
     rows.every((row) => row.status === OrderStatus.pending_payment)
   );
+}
+
+/**
+ * Siparişten başlayan bir yol (24s süpürmesi) siparişin ödeme satır(lar)ına
+ * dokunacaksa: ÖNCE bunları kilitler — siparişin kendi ödemesi ve (sepette)
+ * grubunun ödemesi, id sırasıyla. Böylece süpürme de ödeme → sipariş
+ * sırasına uyar; claim (ödeme → sipariş) ile ters sırada kilitleyip
+ * kilitlenmeye (deadlock) girmez.
+ */
+export async function lockOrderPaymentRows(
+  tx: Prisma.TransactionClient,
+  orderId: string,
+): Promise<void> {
+  await tx.$queryRaw`
+    SELECT p.id FROM payments p
+    WHERE p.order_id = ${orderId}
+       OR p.checkout_group_id = (
+         SELECT o.checkout_group_id FROM orders o WHERE o.id = ${orderId}
+       )
+    ORDER BY p.id
+    FOR UPDATE OF p
+  `;
 }
 
 /**

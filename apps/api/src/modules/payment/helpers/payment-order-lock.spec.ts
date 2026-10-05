@@ -1,5 +1,6 @@
 import { OrderStatus } from "@prisma/client";
 import {
+  lockOrderPaymentRows,
   lockOrdersStillPayable,
   lockPaymentOrders,
 } from "./payment-order-lock";
@@ -87,6 +88,18 @@ describe("payment-order-lock", () => {
         }),
       ).resolves.toBe(true);
       expect(tx.$queryRaw).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("lockOrderPaymentRows (24s süpürmesi)", () => {
+    it("siparişin kendi ve sepetinin ödeme satırlarını id sırasıyla FOR UPDATE kilitler", async () => {
+      const tx = txWith([]);
+      await lockOrderPaymentRows(tx as any, "o1");
+      const call = tx.$queryRaw.mock.calls[0];
+      expect(sqlOf(call)).toBe(
+        "SELECT p.id FROM payments p WHERE p.order_id = ? OR p.checkout_group_id = ( SELECT o.checkout_group_id FROM orders o WHERE o.id = ? ) ORDER BY p.id FOR UPDATE OF p",
+      );
+      expect(call.slice(1)).toEqual(["o1", "o1"]);
     });
   });
 

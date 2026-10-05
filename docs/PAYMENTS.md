@@ -168,10 +168,19 @@ admin CRUD + doğrulamalar `modules/admin/admin-commission.service.ts`.
   claim'le aynı işlemde bakar — değilse çekim başlamaz
   (`orderNotAwaitingPayment`). Başarı callback'i ödeme claim'inden sonra
   siparişleri `FOR UPDATE` kilitleyip durumu öyle okur: iptal edilmiş sipariş
-  canlandırılmaz, otomatik iadeye (`processRefund`) gider. Kilit sırası her
-  yolda ödeme → sipariş (iade sonlandırmasıyla aynı). Claim commit ettikten
-  sonra gelen iptal, `lastChargeStartedAt` damgasını canlı çekim olarak görür
-  (yönetici iptali 409 `cancelPaymentInFlight`, süpürme atlar).
+  canlandırılmaz, otomatik iadeye (`processRefund`) gider. Claim commit
+  ettikten sonra gelen iptal, `lastChargeStartedAt` damgasını canlı çekim
+  olarak görür (yönetici ve alıcı iptali 409 `cancelPaymentInFlight`,
+  süpürme atlar).
+  - **Kilit sırası** — hem ödeme hem sipariş satırı kilitleyen yollar ÖNCE
+    ödemeyi, SONRA siparişi kilitler (sepette ikisi de id sırasıyla): claim
+    (ödeme `FOR UPDATE` → siparişler `FOR SHARE`), callback (ödeme CAS →
+    siparişler `FOR UPDATE`), iade sonlandırması (ödeme `FOR UPDATE` →
+    sipariş yazımı), 24s süpürmesi (`lockOrderPaymentRows`: siparişin ve
+    sepetinin ödemeleri `FOR UPDATE` → sipariş `FOR UPDATE` → ödeme yazımı).
+    Yalnız sipariş kilitleyen yollar (alıcı / yönetici iptali, hazırlama
+    süresi süpürmesi, rezerv bırakma) ödeme satırını kilitlemez, yalnız okur
+    — bekledikleri tek kilit sipariş kilididir, döngü kurulamaz.
 
 ---
 
