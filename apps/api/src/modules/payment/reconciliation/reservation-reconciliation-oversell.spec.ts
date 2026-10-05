@@ -30,6 +30,11 @@ describe("ReservationReconciliationService.releaseExpiredOrderReservations (#1 o
           captured.productUpdate = arg;
           return Promise.resolve({});
         }),
+        updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+      },
+      // Rezervasyon bırakmanın kaldırma kaydı (recordListingRemovals).
+      productRemovalEvent: {
+        createMany: jest.fn().mockResolvedValue({ count: 1 }),
       },
     };
     const prisma = {

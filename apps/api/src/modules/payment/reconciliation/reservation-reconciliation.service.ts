@@ -1,8 +1,14 @@
 import { Injectable, Logger } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { PrismaService } from "../../../prisma";
-import { OrderStatus, ProductStatus, TradeStatus } from "@prisma/client";
+import {
+  ListingRemovalReason,
+  OrderStatus,
+  ProductStatus,
+  TradeStatus,
+} from "@prisma/client";
 import { getReservedAwareStatus } from "../../product/helpers/product-status.helper";
+import { recordListingRemovals } from "../../product/helpers/listing-removal";
 import { safeDecrementReserved } from "../../product/helpers/product-availability.helper";
 import { CacheService } from "../../cache/cache.service";
 import { NotificationService } from "../../notification/notification.service";
@@ -131,14 +137,26 @@ export class ReservationReconciliationService {
               product.reservedQuantity,
               freshOrder.quantity ?? 1,
             );
+            const nextStatus = getReservedAwareStatus(
+              product.quantity,
+              newReserved,
+            );
             await tx.product.update({
               where: { id: order.productId },
               data: {
                 reservedQuantity: newReserved,
                 // Bulgu C: rezerv-duyarlı status (quantity=null → active, quantity=0 → inactive).
-                status: getReservedAwareStatus(product.quantity, newReserved),
+                status: nextStatus,
               },
             });
+            await recordListingRemovals(tx, [
+              {
+                productId: order.productId,
+                statusBefore: product.status,
+                statusAfter: nextStatus,
+                reason: ListingRemovalReason.out_of_stock,
+              },
+            ]);
           }
 
           // Mark the reservation as released; order stays pending_payment so

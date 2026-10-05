@@ -52,6 +52,11 @@ describe("ProductUpdateService — reaktivasyonda ilan limiti", () => {
           images: [],
           productAttributes: [],
         }),
+        updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+      },
+      // Pasife düşüren düzenlemenin kaldırma kaydı (recordListingRemovals).
+      productRemovalEvent: {
+        createMany: jest.fn().mockResolvedValue({ count: 1 }),
       },
     };
 

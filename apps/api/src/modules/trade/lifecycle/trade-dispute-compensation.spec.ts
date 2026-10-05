@@ -40,10 +40,20 @@ describe("TradeLifecycleService.resolveDispute — tazminat sözleşmesi", () =>
           .mockResolvedValue([{ productId: "p1", quantity: 1 }]),
       },
       product: {
-        findMany: jest
-          .fn()
-          .mockResolvedValue([{ id: "p1", quantity: 1, reservedQuantity: 1 }]),
+        findMany: jest.fn().mockResolvedValue([
+          {
+            id: "p1",
+            status: "reserved",
+            quantity: 1,
+            reservedQuantity: 1,
+          },
+        ]),
         update: jest.fn().mockResolvedValue({}),
+        updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+      },
+      // Takasla stoğu biten ilanın kaldırma kaydı (recordListingRemovals).
+      productRemovalEvent: {
+        createMany: jest.fn().mockResolvedValue({ count: 1 }),
       },
       tradeCashPayment: { updateMany: txCashUpdateMany },
       platformSetting: { findUnique: jest.fn().mockResolvedValue(null) },
@@ -93,6 +103,28 @@ describe("TradeLifecycleService.resolveDispute — tazminat sözleşmesi", () =>
 
     return { service, prisma, tx, txCashUpdateMany, paymentService };
   };
+
+  it("takasla stoğu biten REZERVE ilan vitrinden TEK kez düşer (stok tükendi, sayılır)", async () => {
+    const { service, tx } = makeService();
+
+    await service.resolveDispute(TRADE_ID, "admin-1", {
+      resolution: "compensate_both",
+      notes: "iki koli de kayıp",
+    } as any);
+
+    expect(tx.productRemovalEvent.createMany).toHaveBeenCalledTimes(1);
+    expect(tx.productRemovalEvent.createMany).toHaveBeenCalledWith({
+      data: [
+        expect.objectContaining({
+          productId: "p1",
+          reason: "out_of_stock",
+          statusBefore: "reserved",
+          statusAfter: "inactive",
+          fromStorefront: true,
+        }),
+      ],
+    });
+  });
 
   it("compensate_both: iki satır da iadeden ÖNCE fullRefundEntitled damgası alır", async () => {
     const { service, prisma, paymentService } = makeService();

@@ -51,6 +51,10 @@ export * from "./dashboard";
 // Admin analytics screen — range/grouping controls and the per-tab contracts
 export * from "./analytics";
 
+// Why a listing left the storefront: reasons per actor, platforms, violation
+// codes, the validation rule and the admin/dashboard contracts (API, web, admin)
+export * from "./listing-removal";
+
 // Account lifecycle status derived from deletedAt / isBanned / isEmailVerified
 export * from "./account-status";
 

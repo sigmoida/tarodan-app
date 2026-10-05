@@ -2,7 +2,7 @@
 
 "use client";
 
-import { userApi, api, listingsApi } from "@/lib/api";
+import { userApi, listingsApi, type ListingRemovalPayload } from "@/lib/api";
 import { useAuthStore } from "@/stores/authStore";
 import { useWebList } from "@/hooks/useWebResource";
 import { useWebMutation } from "@/hooks/useWebMutation";
@@ -37,13 +37,19 @@ export function useMyListings(activeFilter: string, enabled: boolean) {
   return { listings: query.data ?? [], isLoading: query.isLoading };
 }
 
+/** A seller removal: which listing, and why (asked by `ListingRemovalModal`). */
+export interface ListingRemovalRequest {
+  id: string;
+  removal: ListingRemovalPayload;
+}
+
 /** Delete a listing — owns the toast + cache invalidation (the only way to mutate). */
 export function useDeleteListing() {
   const t = useTranslations();
   return useWebMutation(
-    async (listingId: string) => {
-      await api.delete(`/products/${listingId}`);
-      return listingId;
+    async ({ id, removal }: ListingRemovalRequest) => {
+      await listingsApi.delete(id, removal);
+      return id;
     },
     {
       invalidates: [RESOURCE, LISTING_RESOURCE],
@@ -56,12 +62,13 @@ export function useDeleteListing() {
   );
 }
 
+/** Deactivate (pause) a listing with the seller's reason. */
 export function useDeactivateListing() {
   const t = useTranslations();
   return useWebMutation(
-    async (listingId: string) => {
-      await listingsApi.update(listingId, { status: "inactive" } as any);
-      return listingId;
+    async ({ id, removal }: ListingRemovalRequest) => {
+      await listingsApi.deactivate(id, removal);
+      return id;
     },
     {
       invalidates: [RESOURCE, LISTING_RESOURCE],

@@ -85,6 +85,34 @@ export function resolveThisMonthWindow(
 }
 
 /**
+ * Bir dönem penceresinin önbellek YUVASI — dönem kartları ve dönem kırılımları
+ * (ör. kaldırılan ilanlar) aynı anahtarlama kuralını paylaşsın diye tek yerde.
+ *
+ * - Tamamen geçmişte kalan özel aralık (`closed`) bir daha değişmez: yuva
+ *   pencerenin iki ucunu taşır ve çağıran uzun TTL verebilir.
+ * - Canlı pencerenin `lte`si "şimdi"dir; yuva `liveTtlSeconds` boyutunda zaman
+ *   kovalarına yuvarlanır — aksi hâlde her istek yeni anahtar üretir ve
+ *   önbellek hiç tutmazdı.
+ */
+export function dashboardPeriodCacheSlot(
+  range: ResolvedDashboardRange,
+  now: Date,
+  liveTtlSeconds: number,
+): { slot: string; closed: boolean } {
+  const from = range.current.gte.toISOString();
+  const closed =
+    range.type === "custom" && range.current.lte.getTime() < now.getTime();
+  if (closed) {
+    return {
+      slot: `custom:${from}:${range.current.lte.toISOString()}`,
+      closed,
+    };
+  }
+  const bucket = Math.floor(now.getTime() / (liveTtlSeconds * 1000));
+  return { slot: `${range.type}:${from}:${bucket}`, closed };
+}
+
+/**
  * Resolve the query into the concrete window the dashboard measures.
  *
  * - `daily` → today (Türkiye takvimi), midnight → now

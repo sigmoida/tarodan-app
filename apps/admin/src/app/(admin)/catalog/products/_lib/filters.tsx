@@ -1,5 +1,10 @@
 import { Select } from "@tarodan/ui";
 import type { FilterField, TranslateFn } from "@/components/list/filters/types";
+import { fieldKeys } from "@/components/list/filters/schema";
+import {
+  removalActorFilterOptions,
+  removalReasonFilterOptions,
+} from "@/lib/listing-removal";
 
 interface Brand {
   id: string;
@@ -65,5 +70,34 @@ export const productFilterFields = (
       );
     },
   },
+  // Kaldırma nedeni / kaldıran: ilk seçenek nötr (boş) — liste süzülmüş açılmaz.
+  {
+    type: "select",
+    name: "removalReason",
+    label: t("admin.catalog.products.removal.reasonFilter"),
+    options: removalReasonFilterOptions(t),
+  },
+  {
+    type: "select",
+    name: "removalActor",
+    label: t("admin.catalog.products.removal.actorFilter"),
+    options: removalActorFilterOptions(t),
+  },
   { type: "dateRange", label: t("admin.shared.filterDialog.labels.dateRange") },
 ];
+
+/** Diyalogda alanı olmayan, derin bağlantıyla gelen filtre (satıcı detayından). */
+export const PRODUCT_DEEP_LINK_FILTER_KEYS = ["sellerId"] as const;
+
+/**
+ * Ürün listesinin TÜM filtre anahtarları — diyalog alanlarından türetilir, ayrı
+ * bir liste tutulmaz. Başlıktaki toplam ve tablonun "filtreli" boş durumu bunu
+ * okur: listeye yeni bir filtre eklenince ikisi de onu kendiliğinden görür.
+ * Seçenek listeleri anahtarları etkilemediği için boş marka/model verilir.
+ */
+export function productFilterKeys(t: TranslateFn): string[] {
+  return [
+    ...PRODUCT_DEEP_LINK_FILTER_KEYS,
+    ...productFilterFields(t, [], []).flatMap(fieldKeys),
+  ];
+}

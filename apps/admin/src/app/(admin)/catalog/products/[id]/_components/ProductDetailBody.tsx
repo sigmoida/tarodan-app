@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import { useTranslations } from "next-intl";
-import { useRouter } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
 import { CubeIcon, StarIcon } from "@heroicons/react/24/outline";
 import { adminApi } from "@/lib/api";
@@ -17,18 +16,21 @@ import { ProductInfoSection } from "../_sections/ProductInfoSection";
 import { ProductSellerSection } from "../_sections/ProductSellerSection";
 import { ProductSidebar } from "../_sections/ProductSidebar";
 import { ProductReviewsSection } from "../_sections/ProductReviewsSection";
+import { ProductRemovalSection } from "../_sections/ProductRemovalSection";
 import { ProductApproveModal } from "../_modals/ProductApproveModal";
 import { ProductRejectModal } from "../_modals/ProductRejectModal";
+import { ProductRemoveModal } from "../_modals/ProductRemoveModal";
 
 type Tab = "info" | "reviews" | "ai";
 
 export function ProductDetailBody({ product }: { product: ProductDetail }) {
   const t = useTranslations();
-  const router = useRouter();
   const confirm = useConfirm();
   const [tab, setTab] = useState<Tab>("info");
   const [approveOpen, setApproveOpen] = useState(false);
   const [rejectOpen, setRejectOpen] = useState(false);
+  // Kaldırma bir onay değil, bir FORM: ihlal kodu + açıklama kayda geçer.
+  const [removeOpen, setRemoveOpen] = useState(false);
 
   const { data: reviews = [] } = useQuery<Review[]>({
     queryKey: adminKeys.detail("product-reviews", product.id),
@@ -38,25 +40,11 @@ export function ProductDetailBody({ product }: { product: ProductDetail }) {
   });
   const reviewCount = reviews.filter((r) => r.status !== "deleted").length;
 
-  const del = useAdminMutation(() => adminApi.deleteProduct(product.id), {
-    invalidates: ["products"],
-    successMessage: t("admin.catalog.products.removed"),
-    onSuccess: () => router.push("/catalog/products"),
-  });
   const restore = useAdminMutation(() => adminApi.restoreProduct(product.id), {
     invalidates: ["products"],
     successMessage: t("admin.catalog.products.restored"),
   });
 
-  const onDelete = async () => {
-    await confirm({
-      title: t("admin.catalog.products.removeTitle"),
-      description: t("admin.catalog.products.removeDescription"),
-      confirmLabel: t("common.remove"),
-      destructive: true,
-      onConfirm: () => del.mutateAsync(),
-    });
-  };
   const onRestore = async () => {
     await confirm({
       title: t("admin.catalog.products.restoreTitle"),
@@ -93,6 +81,7 @@ export function ProductDetailBody({ product }: { product: ProductDetail }) {
             <ProductImagesSection product={product} />
             <ProductInfoSection product={product} />
             <ProductSellerSection seller={product.seller} />
+            <ProductRemovalSection history={product.removalHistory ?? []} />
           </div>
           <div className="space-y-6">
             <ProductSidebar
@@ -100,9 +89,8 @@ export function ProductDetailBody({ product }: { product: ProductDetail }) {
               onApprove={() => setApproveOpen(true)}
               onReject={() => setRejectOpen(true)}
               onRestore={onRestore}
-              onDelete={onDelete}
+              onDelete={() => setRemoveOpen(true)}
               busyRestore={restore.isPending}
-              busyDelete={del.isPending}
             />
           </div>
         </div>
@@ -131,6 +119,13 @@ export function ProductDetailBody({ product }: { product: ProductDetail }) {
         onClose={() => setRejectOpen(false)}
         productId={product.id}
       />
+      {removeOpen && (
+        <ProductRemoveModal
+          open
+          onClose={() => setRemoveOpen(false)}
+          productId={product.id}
+        />
+      )}
     </>
   );
 }

@@ -847,7 +847,20 @@
     "optionsLoadFailed": "Options could not be loaded — refresh the page",
     "additionalDetails": "Additional details",
     "globalAttrsHint": "Extra fields that apply to every listing. Buyers can filter by these.",
-    "requiredFieldLabel": "{name} *"
+    "requiredFieldLabel": "{name} *",
+    "removal": {
+      "deleteDescription": "The listing is removed permanently and cannot be reopened. Please tell us why you are removing it.",
+      "deactivateDescription": "The listing leaves the storefront; you can put it back on sale at any time. Please tell us why you are deactivating it.",
+      "reasonLabel": "Reason",
+      "reasonPlaceholder": "Choose a reason",
+      "platformLabel": "Where did you sell it?",
+      "platformPlaceholder": "Choose a platform",
+      "detailLabel": "Note (optional)",
+      "detailRequiredLabel": "Note",
+      "detailPlaceholder": "Anything you would like to add",
+      "otherPlatformPlaceholder": "Tell us where you sold the item",
+      "privacyNote": "Only the Tarodan team sees this; it is never shown on the listing page."
+    }
   },
   "cart": {
     "myCart": "My Cart",
@@ -2608,7 +2621,19 @@
     "discountPercentRange": "The discount percentage must be between 1 and 100",
     "selectCategory": "Please select a category",
     "subjectMin5": "The subject must be at least 5 characters",
-    "messageMin10": "Your message must be at least 10 characters"
+    "messageMin10": "Your message must be at least 10 characters",
+    "listingRemoval": {
+      "reason_required": "Please choose a reason",
+      "reason_not_allowed": "This reason cannot be chosen for this action",
+      "platform_required": "Please choose where you sold the item",
+      "platform_invalid": "Invalid platform",
+      "platform_not_allowed": "A platform can only be chosen when the item was sold elsewhere",
+      "violation_required": "Please choose the type of violation",
+      "violation_invalid": "Invalid violation type",
+      "violation_not_allowed": "A violation type can only be chosen for a policy violation",
+      "detail_required": "Please add a short explanation",
+      "detail_too_long": "The explanation can be at most {max} characters"
+    }
   },
   "time": {
     "justNow": "Just now",
@@ -5217,7 +5242,28 @@
         "bulkImportFileTooLarge": "{name} is too large. Each file can be at most {size}.",
         "bulkImportTooManyImages": "You can select at most {max} images.",
         "bulkImportTotalTooLarge": "The selected files cannot exceed {size} in total.",
-        "updated": "Listing updated"
+        "updated": "Listing updated",
+        "removal": {
+          "column": "Removal reason",
+          "reasonFilter": "Removal reason",
+          "actorFilter": "Removed by",
+          "allReasons": "All reasons",
+          "allActors": "Anyone",
+          "historyTitle": "Removal history",
+          "historyEmpty": "No removal is recorded for this listing. Listings removed before this feature have no known reason.",
+          "platform": "Platform",
+          "violation": "Violation",
+          "detail": "Note",
+          "statusChange": "Status",
+          "actorUser": "Done by",
+          "noViolationCode": "Not specified",
+          "detailAdminOnly": "The seller's note is visible to admins only.",
+          "violationLabel": "Violation",
+          "violationPlaceholder": "Choose the violation",
+          "removeNoteLabel": "Note (optional)",
+          "removeNotePlaceholder": "Explain the removal (required when \"Other\" is chosen)",
+          "notFromStorefront": "The listing was not on the storefront at the time — not counted as leaving it on the dashboard."
+        }
       },
       "import": {
         "button": "Import from Excel",
@@ -7761,6 +7807,18 @@
       "relativeTime": {
         "minutesAgo": "{count} min ago",
         "hoursAgo": "{count}h ago"
+      },
+      "removals": {
+        "title": "Listings taken off the storefront",
+        "description": "Listings that left the storefront in the selected period, by reason. Only a live listing leaving counts, at the moment it happened; a listing that goes live again and leaves again counts twice. A later removal of a listing already off the storefront (e.g. deleting an expired listing) is not counted.",
+        "total": "Total",
+        "byReason": "By reason",
+        "soldElsewhere": "Sold on another platform",
+        "violations": "Policy violations",
+        "empty": "No listing left the storefront in this period.",
+        "noViolationCode": "Not specified",
+        "unknownNote": "Removals from before this feature have no recorded reason and are not counted.",
+        "share": "{share}%"
       }
     },
     "analytics": {
@@ -11280,6 +11338,42 @@
       "pending_activation": "Pending Activation",
       "banned": "Banned",
       "deleted": "Deleted"
+    },
+    "listingRemoval": {
+      "unknown": "Unknown",
+      "reason": {
+        "not_given": "No reason given",
+        "changed_mind": "Changed my mind",
+        "sold_elsewhere": "Sold on another platform",
+        "paused_temporarily": "Paused temporarily",
+        "expired": "Listing expired",
+        "out_of_stock": "Out of stock",
+        "return_quarantine": "Awaiting return check",
+        "seller_suspended": "Seller account suspended",
+        "policy_violation": "Policy violation"
+      },
+      "actor": {
+        "seller": "Seller",
+        "system": "System",
+        "admin": "Tarodan"
+      },
+      "platform": {
+        "letgo": "Letgo",
+        "instagram": "Instagram",
+        "dolap": "Dolap",
+        "sahibinden": "Sahibinden",
+        "in_person": "Sold in person",
+        "other": "Other"
+      },
+      "violation": {
+        "counterfeit_replica": "Counterfeit / replica",
+        "prohibited_item": "Prohibited item",
+        "misleading_content": "Misleading description or photos",
+        "inappropriate_content": "Inappropriate content",
+        "duplicate_listing": "Duplicate listing",
+        "wrong_category_or_price": "Wrong category or price",
+        "other": "Other"
+      }
     }
   },
   "page": {

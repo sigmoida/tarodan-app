@@ -21,10 +21,15 @@ import {
   ACCOUNT_STATUSES,
   ADMIN_ORDER_BUCKETS,
   ADMIN_ORDER_TABS,
+  LISTING_REMOVAL_ACTORS,
+  LISTING_REMOVAL_REASONS,
+  LISTING_REMOVAL_REASON_FILTER_UNKNOWN,
   LOGIN_STATES,
   type AccountStatus,
   type AdminOrderBucket,
   type AdminOrderTab,
+  type ListingRemovalActor,
+  type ListingRemovalReasonFilter,
   type LoginState,
 } from "@tarodan/types";
 import { AdminListQueryDto } from "../../../common/list";
@@ -157,6 +162,23 @@ export class AdminProductQueryDto extends AdminListQueryDto {
   @IsOptional()
   @IsString()
   carModelId?: string;
+
+  /**
+   * Güncel kaldırma nedeni; `unknown` = vitrinden düşmüş ama nedeni kayıtsız
+   * (bu özellikten önceki) ilanlar.
+   */
+  @ApiPropertyOptional({
+    enum: [...LISTING_REMOVAL_REASONS, LISTING_REMOVAL_REASON_FILTER_UNKNOWN],
+  })
+  @IsOptional()
+  @IsIn([...LISTING_REMOVAL_REASONS, LISTING_REMOVAL_REASON_FILTER_UNKNOWN])
+  removalReason?: ListingRemovalReasonFilter;
+
+  /** Kaldıran: nedenin aktör grubu (satıcı / sistem / Tarodan). */
+  @ApiPropertyOptional({ enum: LISTING_REMOVAL_ACTORS })
+  @IsOptional()
+  @IsIn([...LISTING_REMOVAL_ACTORS])
+  removalActor?: ListingRemovalActor;
 }
 
 /**

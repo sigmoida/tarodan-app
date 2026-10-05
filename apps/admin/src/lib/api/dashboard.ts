@@ -16,6 +16,12 @@ export const dashboardApi = {
     api.get("/admin/dashboard/recent-orders", { params: { limit } }),
   /** Zone A + B — action queues and alerts; never date-filtered. */
   getDashboardWorklist: () => api.get("/admin/dashboard/worklist"),
+  /**
+   * Zone C breakdown — listings taken off the storefront in the period, by
+   * reason / sold-elsewhere platform / violation code (same period query).
+   */
+  getDashboardListingRemovals: (params?: DashboardPeriodQuery) =>
+    api.get("/admin/dashboard/listing-removals", { params }),
   /** Zone D — escrow, seller debt, active listings/memberships/boosts. */
   getDashboardStock: () => api.get("/admin/dashboard/stock"),
   /** Drops the server-side dashboard caches so the next read recomputes. */

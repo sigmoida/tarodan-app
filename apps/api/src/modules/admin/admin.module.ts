@@ -75,6 +75,7 @@ import { AnalyticsMembershipService } from "./analytics/insights/analytics-membe
 import { AnalyticsExportService } from "./analytics/insights/analytics-export.service";
 import { AdminDashboardWorklistService } from "./analytics/dashboard/admin-dashboard-worklist.service";
 import { AdminDashboardStockService } from "./analytics/dashboard/admin-dashboard-stock.service";
+import { AdminDashboardRemovalsService } from "./analytics/dashboard/admin-dashboard-removals.service";
 import { AdminAnalyticsOrderService } from "./analytics/admin-analytics-order.service";
 import { AdminModerationService } from "./ops/admin-moderation.service";
 import { AdminPaymentService } from "./finance/admin-payment.service";
@@ -264,6 +265,7 @@ import { scheduledProcessors } from "../../workers/scheduled-processors";
     AnalyticsExportService,
     AdminDashboardWorklistService,
     AdminDashboardStockService,
+    AdminDashboardRemovalsService,
     AdminAnalyticsOrderService,
     AdminModerationService,
     AdminPaymentService,

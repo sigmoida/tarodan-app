@@ -33,6 +33,17 @@ export interface RichAutocompleteResults {
   suggestions: string[];
 }
 
+/**
+ * Why the seller takes a listing down — the optional body of
+ * `DELETE /products/:id` and the extra fields of the deactivate PATCH. The API
+ * records it for Tarodan only; it never appears on the storefront.
+ */
+export interface ListingRemovalPayload {
+  removalReason?: string;
+  removalPlatform?: string;
+  removalDetail?: string;
+}
+
 // Products (was Listings - endpoint is /products in backend)
 export const listingsApi = {
   getFilters: (params?: { manufacturer?: string }) =>
@@ -56,7 +67,12 @@ export const listingsApi = {
   create: (data: Record<string, any>) => api.post("/products", data),
   update: (id: string | number, data: Record<string, any>) =>
     api.patch(`/products/${id}`, data),
-  delete: (id: string | number) => api.delete(`/products/${id}`),
+  /** Delete a listing; the removal reason travels as the request body. */
+  delete: (id: string | number, removal?: ListingRemovalPayload) =>
+    api.delete(`/products/${id}`, removal ? { data: removal } : undefined),
+  /** Take a listing off the storefront (seller pause) with its reason. */
+  deactivate: (id: string | number, removal: ListingRemovalPayload) =>
+    api.patch(`/products/${id}`, { status: "inactive", ...removal }),
   /** Renew one expired listing (live again, or sent for approval if its content changed). */
   renew: (id: string) => api.post(`/products/${id}/renew`),
   /** Renew several expired listings; every listing comes back with its own result. */

@@ -1,4 +1,5 @@
 import { productStatusConfig, type StatusConfig } from "@tarodan/ui";
+import type { AdminListingRemovalSummary } from "@tarodan/types";
 import { useTranslations } from "next-intl";
 import { statusLabel } from "@/lib/statusLabels";
 
@@ -49,6 +50,8 @@ export interface Product {
   imageUrl?: string;
   createdAt: string;
   aiCheckStatus?: string | null;
+  /** Güncel kaldırma özeti; vitrindeki ilan için `null`. */
+  removal: AdminListingRemovalSummary | null;
 }
 
 // eslint-disable-next-line @tarodan/no-hardcoded-turkish -- URL query payload, not display copy
@@ -85,6 +88,7 @@ export function mapProducts(raw: any[], t: T): Product[] {
     })(),
     createdAt: p.createdAt,
     aiCheckStatus: p.aiCheckStatus ?? null,
+    removal: p.removal ?? null,
   }));
 }
 

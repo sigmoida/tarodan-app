@@ -6,6 +6,7 @@ import { NotificationType } from "../../notification/dto";
 import { EventService } from "../../events";
 import {
   CancellationActor,
+  ListingRemovalReason,
   TradeStatus,
   ProductStatus,
   ShipmentStatus,
@@ -18,6 +19,7 @@ import {
 import { resolveTimingValue } from "../../../common/timing-rules";
 import { safeDecrementReserved } from "../../product/helpers/product-availability.helper";
 import { getProductStatusFromQuantity } from "../../product/helpers/product-status.helper";
+import { recordListingRemovals } from "../../product/helpers/listing-removal";
 import { PaymentService } from "../../payment/payment.service";
 import { TradeShipmentService } from "./trade-shipment.service";
 import { TradeCommonService } from "../trade-common.service";
@@ -572,7 +574,7 @@ export class TradeReconciliationService {
             await tx.$queryRaw`SELECT id FROM products WHERE id = ${item.productId} FOR UPDATE`;
             const prod = await tx.product.findUnique({
               where: { id: item.productId },
-              select: { quantity: true, reservedQuantity: true },
+              select: { quantity: true, reservedQuantity: true, status: true },
             });
             if (!prod) continue;
             const qty = item.quantity ?? 1;
@@ -587,14 +589,23 @@ export class TradeReconciliationService {
                 prod.quantity === null
                   ? null
                   : Math.max(0, prod.quantity - qty);
+              const nextStatus = getProductStatusFromQuantity(newQuantity);
               await tx.product.update({
                 where: { id: item.productId },
                 data: {
                   reservedQuantity: newReserved,
                   ...(prod.quantity === null ? {} : { quantity: newQuantity }),
-                  status: getProductStatusFromQuantity(newQuantity),
+                  status: nextStatus,
                 },
               });
+              await recordListingRemovals(tx, [
+                {
+                  productId: item.productId,
+                  statusBefore: prod.status,
+                  statusAfter: nextStatus,
+                  reason: ListingRemovalReason.out_of_stock,
+                },
+              ]);
             } else {
               // Kargolanmamış taraf: normal rezervasyon çözümü.
               await tx.product.update({
@@ -861,8 +872,9 @@ export class TradeReconciliationService {
               newQuantity = 0;
             }
 
+            const nextStatus = getProductStatusFromQuantity(newQuantity);
             const updateData: any = {
-              status: getProductStatusFromQuantity(newQuantity),
+              status: nextStatus,
               reservedQuantity: safeDecrementReserved(
                 product.reservedQuantity,
                 tradedQty,
@@ -876,6 +888,15 @@ export class TradeReconciliationService {
               where: { id: product.id },
               data: updateData,
             });
+            // Takasla stoğu biten ilan vitrinden "stok tükendi" nedeniyle düşer.
+            await recordListingRemovals(tx, [
+              {
+                productId: product.id,
+                statusBefore: product.status,
+                statusAfter: nextStatus,
+                reason: ListingRemovalReason.out_of_stock,
+              },
+            ]);
           }
 
           // Set escrow hold for cash payment

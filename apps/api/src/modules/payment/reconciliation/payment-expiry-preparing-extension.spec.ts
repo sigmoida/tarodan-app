@@ -192,7 +192,14 @@ function makeRun(
     shipment: { findUnique: jest.fn(async () => store.shipment) },
     paymentHold: { updateMany: jest.fn(async () => ({ count: 1 })) },
     refundRequest: { updateMany: jest.fn(async () => ({ count: 0 })) },
-    product: { update: jest.fn(async () => ({})) },
+    product: {
+      update: jest.fn(async () => ({})),
+      updateMany: jest.fn(async () => ({ count: 1 })),
+    },
+    // Stok geri yüklemenin kaldırma kaydı (recordListingRemovals).
+    productRemovalEvent: {
+      createMany: jest.fn().mockResolvedValue({ count: 1 }),
+    },
   };
   const prisma = {
     order,

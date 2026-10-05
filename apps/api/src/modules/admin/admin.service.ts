@@ -6,7 +6,10 @@ import { AdminSettingsService } from "./ops/admin-settings.service";
 import { AdminUserService } from "./users/admin-user.service";
 import { AdminUserAccountService } from "./users/admin-user-account.service";
 import { AdminStaffService } from "./users/admin-staff.service";
-import { AdminProductService } from "./catalog/admin-product.service";
+import {
+  AdminProductService,
+  type AdminProductExportQuery,
+} from "./catalog/admin-product.service";
 import { AdminOrderService } from "./orders/admin-order.service";
 import { AdminAnalyticsService } from "./analytics/admin-analytics.service";
 import { AdminModerationService } from "./ops/admin-moderation.service";
@@ -41,6 +44,7 @@ import {
   UpdateWarehouseAddressDto,
   AdminUserQueryDto,
   AdminProductQueryDto,
+  AdminRemoveProductDto,
   AdminOrderQueryDto,
   AdminOrderCountsQueryDto,
   AdminTradeQueryDto,
@@ -379,11 +383,7 @@ export class AdminService {
     return this.productService.getProducts(query);
   }
 
-  async exportProducts(query: {
-    status?: string;
-    categoryId?: string;
-    sellerId?: string;
-  }) {
+  async exportProducts(query: AdminProductExportQuery) {
     return this.productService.exportProducts(query);
   }
 
@@ -435,8 +435,14 @@ export class AdminService {
     adminId: string,
     ids: string[] | undefined,
     reason: string,
+    violationCode?: string,
   ) {
-    return this.productService.bulkRejectProducts(adminId, ids, reason);
+    return this.productService.bulkRejectProducts(
+      adminId,
+      ids,
+      reason,
+      violationCode,
+    );
   }
 
   // ==================== ORDER MANAGEMENT ====================
@@ -1307,8 +1313,14 @@ export class AdminService {
     adminId: string,
     productId: string,
     hardDelete: boolean = false,
+    removal?: AdminRemoveProductDto,
   ) {
-    return this.productService.deleteProduct(adminId, productId, hardDelete);
+    return this.productService.deleteProduct(
+      adminId,
+      productId,
+      hardDelete,
+      removal,
+    );
   }
 
   async restoreProduct(adminId: string, productId: string) {

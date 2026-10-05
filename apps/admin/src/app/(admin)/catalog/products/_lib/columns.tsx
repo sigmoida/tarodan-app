@@ -3,7 +3,7 @@
 import { CheckIcon, XMarkIcon } from "@heroicons/react/24/outline";
 import { productConditionConfig, enumLabel } from "@tarodan/ui";
 import { useTranslations } from "next-intl";
-import { col } from "@/components/table";
+import { CellMuted, CellText, col } from "@/components/table";
 import {
   getProductEffectivePrice,
   isProductOnSaleDisplay,
@@ -12,6 +12,7 @@ import {
 import { fmtTry } from "@/lib/format";
 import type { Product } from "./types";
 import { statusConfig } from "@/lib/statusLabels";
+import { removalCell } from "@/lib/listing-removal";
 
 // eslint-disable-next-line @tarodan/no-hardcoded-turkish -- URL query payload, not display copy
 const PLACEHOLDER = "https://placehold.co/100x100/f3f4f6/666?text=Ürün";
@@ -99,6 +100,25 @@ export function productColumns(t: T) {
       sortKey: "category.name",
       sortType: "text",
     }),
+    // Vitrinden düşmüş ilanın nedeni (+ kaldıran · platform/ihlal); vitrindeki
+    // ilanda boş. Nedeni kaydedilmemiş eski kaldırma "Bilinmiyor" okunur.
+    col.custom<Product>(
+      t("admin.catalog.products.removal.column"),
+      (p) => {
+        const cell = removalCell(p.removal, t);
+        if (!cell) return <CellText value={null} />;
+        return (
+          <div className="flex min-w-0 flex-col">
+            <CellText value={cell.label} />
+            {cell.secondary && <CellMuted value={cell.secondary} />}
+          </div>
+        );
+      },
+      {
+        minWidth: 220,
+        exportValue: (p) => removalCell(p.removal, t)?.label ?? "",
+      },
+    ),
     col.date<Product>(t("common.date"), "createdAt"),
   ];
 }

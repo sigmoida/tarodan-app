@@ -3,7 +3,12 @@ import {
   allReturnLegsResolved,
   finalizeReturningTradeIfResolved,
 } from "./trade-return-finalize";
-import { CancellationActor, ProductStatus, TradeStatus } from "@prisma/client";
+import {
+  CancellationActor,
+  ListingRemovalReason,
+  ProductStatus,
+  TradeStatus,
+} from "@prisma/client";
 
 /**
  * `returning` kapanışının tek-kaynak sözleşmesi:
@@ -30,11 +35,11 @@ describe("finalizeReturningTradeIfResolved", () => {
     items?: Array<{ productId: string; quantity: number; side: string }>;
     products?: Record<
       string,
-      { reservedQuantity: number; quantity: number | null }
+      { reservedQuantity: number; quantity: number | null; status?: string }
     >;
   }) => {
     const products = opts.products ?? {
-      p1: { reservedQuantity: 1, quantity: 1 },
+      p1: { reservedQuantity: 1, quantity: 1, status: ProductStatus.reserved },
     };
     const tx = {
       $queryRaw: jest.fn().mockResolvedValue([]),
@@ -61,6 +66,11 @@ describe("finalizeReturningTradeIfResolved", () => {
           Promise.resolve(products[where.id] ?? null),
         ),
         update: jest.fn().mockResolvedValue({}),
+        updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+      },
+      // Kaldırma kaydı (recordListingRemovals) — stok sıfırlanan kayıp bacak.
+      productRemovalEvent: {
+        createMany: jest.fn().mockResolvedValue({ count: 1 }),
       },
     };
     return tx;
@@ -78,12 +88,34 @@ describe("finalizeReturningTradeIfResolved", () => {
         { productId: "p-burak", quantity: 1, side: "receiver" },
       ],
       products: {
-        "p-ali": { reservedQuantity: 1, quantity: 1 },
-        "p-burak": { reservedQuantity: 1, quantity: 1 },
+        "p-ali": {
+          reservedQuantity: 1,
+          quantity: 1,
+          status: ProductStatus.reserved,
+        },
+        "p-burak": {
+          reservedQuantity: 1,
+          quantity: 1,
+          status: ProductStatus.reserved,
+        },
       },
     });
 
     const res = await finalizeReturningTradeIfResolved(tx as any, TRADE_ID);
+
+    // Stoğu sıfırlanan ilan vitrinden "stok tükendi" nedeniyle düşer (tek kayıt;
+    // teslim edilen bacağın ilanı satışa döner, kaldırma değildir).
+    expect(tx.productRemovalEvent.createMany).toHaveBeenCalledTimes(1);
+    expect(tx.productRemovalEvent.createMany).toHaveBeenCalledWith({
+      data: [
+        expect.objectContaining({
+          productId: "p-ali",
+          reason: ListingRemovalReason.out_of_stock,
+          statusBefore: ProductStatus.reserved,
+          statusAfter: ProductStatus.inactive,
+        }),
+      ],
+    });
 
     expect(res.finalized).toBe(true);
     // Kayıp bacağın ürünü: rezervasyon + stok düşer, satışa dönmez.

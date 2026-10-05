@@ -19,7 +19,8 @@ import { ButtonLink } from "@/components/ui/ButtonLink";
 import { EmptyStateCard } from "@/components/ui";
 import { PageShell } from "@/components/layout/PageShell";
 import { PageHeader } from "@/components/layout/PageHeader";
-import { useConfirm } from "@/components/ConfirmProvider";
+import ListingRemovalModal from "@/components/listings/ListingRemovalModal";
+import type { SellerRemovalAction } from "@/components/listings/listingRemovalSchema";
 import { useAuthStore } from "@/stores/authStore";
 import { useRequireAuth } from "../../_hooks/useRequireAuth";
 import {
@@ -45,7 +46,6 @@ import { useTranslations } from "next-intl";
 
 export default function ProfileListingsPage() {
   const t = useTranslations();
-  const confirm = useConfirm();
   const searchParams = useSearchParams();
   const { ready } = useRequireAuth();
   const user = useAuthStore((s) => s.user);
@@ -56,6 +56,11 @@ export default function ProfileListingsPage() {
     searchParams.get("status") || "all",
   );
   const [boostTarget, setBoostTarget] = useState<Listing | null>(null);
+  // Silme ve pasife alma önce NEDEN sorar; hangi ilan, hangi eylem.
+  const [removalTarget, setRemovalTarget] = useState<{
+    id: string;
+    action: SellerRemovalAction;
+  } | null>(null);
 
   const { listings, isLoading } = useMyListings(activeFilter, ready);
   // Süresi dolan ilan sayısı her sekmede banner'ı besler; expired sekmesindeyken
@@ -78,17 +83,10 @@ export default function ProfileListingsPage() {
 
   const pendingCount = listings.filter((l) => l.status === "pending").length;
 
-  const handleDelete = async (id: string) => {
-    const ok = await confirm({
-      title: t("profile.listingsPage.ilaniSil"),
-      description: t(
-        "profile.listingsPage.buIlaniSilmekIstediginizeEminMisiniz",
-      ),
-      confirmLabel: t("page.listings.page.sil"),
-      destructive: true,
-    });
-    if (ok) deleteMutation.mutate(id);
-  };
+  const removalMutation =
+    removalTarget?.action === "deactivate"
+      ? deactivateMutation
+      : deleteMutation;
 
   if (!ready) {
     return (
@@ -221,24 +219,43 @@ export default function ProfileListingsPage() {
                 estimatedNet={estimatedNets[listing.id]}
                 isDeleting={
                   deleteMutation.isPending &&
-                  deleteMutation.variables === listing.id
+                  deleteMutation.variables?.id === listing.id
                 }
                 isDeactivating={
                   deactivateMutation.isPending &&
-                  deactivateMutation.variables === listing.id
+                  deactivateMutation.variables?.id === listing.id
                 }
                 isRenewing={
                   renewMutation.isPending &&
                   renewMutation.variables === listing.id
                 }
-                onDelete={handleDelete}
-                onDeactivate={(id) => deactivateMutation.mutate(id)}
+                onDelete={(id) => setRemovalTarget({ id, action: "delete" })}
+                onDeactivate={(id) =>
+                  setRemovalTarget({ id, action: "deactivate" })
+                }
                 onRenew={(id) => renewMutation.mutate(id)}
                 onBoost={setBoostTarget}
               />
             </div>
           ))}
         </div>
+      )}
+
+      {removalTarget && (
+        <ListingRemovalModal
+          // Her açılış taze bir form: ilan ya da eylem değişince yeniden kurulur.
+          key={`${removalTarget.action}:${removalTarget.id}`}
+          action={removalTarget.action}
+          open
+          onClose={() => setRemovalTarget(null)}
+          isSubmitting={removalMutation.isPending}
+          onSubmit={(removal) =>
+            removalMutation.mutate(
+              { id: removalTarget.id, removal },
+              { onSuccess: () => setRemovalTarget(null) },
+            )
+          }
+        />
       )}
 
       {boostTarget && (

@@ -7,6 +7,7 @@ import {
   NotFoundException,
 } from "@nestjs/common";
 import {
+  ListingRemovalReason,
   Prisma,
   ProductInactiveReason,
   ProductKind,
@@ -31,6 +32,7 @@ import {
 } from "../helpers/product-renewal";
 import { assertListingMayReopen } from "../helpers/product-reopen-gate";
 import { refreshProductVisibility } from "../helpers/product-visibility";
+import { recordListingRemovals } from "../helpers/listing-removal";
 
 /** Bir yenilemenin sonucu: yayına döndü ya da onaya düştü. */
 export type RenewalOutcomeStatus =
@@ -180,6 +182,11 @@ export class ProductRenewalService {
    * boş + gerçek ilan olanlara. Statüye dokunmaz. `stampBaseline` açıksa güncel
    * içerik onaylı sayılır (yönetici kararı) → satıcı yenilemesi doğrudan yayına
    * döner; kapalıysa yenileme normal onay kuralından geçer.
+   *
+   * İşaret değişimi bir yeniden sınıflandırmadır: ilan pasif kalır ama nedeni
+   * artık "süresi doldu"dur — aynı transaction'da kaldırma kaydı düşülür ve
+   * güncel neden onu izler. İlan zaten vitrinde değildi, bu yüzden dashboard'ın
+   * "vitrinden düşen" sayısına girmez.
    */
   async markExpired(
     productIds: readonly string[],
@@ -187,16 +194,31 @@ export class ProductRenewalService {
   ): Promise<string[]> {
     const marked: string[] = [];
     for (const id of productIds) {
-      const res = await this.prisma.product.updateMany({
-        where: {
-          id,
-          kind: ProductKind.listing,
-          status: ProductStatus.inactive,
-          inactiveReason: null,
-        },
-        data: { inactiveReason: ProductInactiveReason.expired },
+      const count = await this.prisma.$transaction(async (tx) => {
+        const res = await tx.product.updateMany({
+          where: {
+            id,
+            kind: ProductKind.listing,
+            status: ProductStatus.inactive,
+            inactiveReason: null,
+          },
+          data: { inactiveReason: ProductInactiveReason.expired },
+        });
+        if (res.count > 0) {
+          await recordListingRemovals(tx, [
+            {
+              productId: id,
+              statusBefore: ProductStatus.inactive,
+              statusAfter: ProductStatus.inactive,
+              inactiveReasonBefore: null,
+              inactiveReasonAfter: ProductInactiveReason.expired,
+              reason: ListingRemovalReason.expired,
+            },
+          ]);
+        }
+        return res.count;
       });
-      if (res.count === 0) continue;
+      if (count === 0) continue;
       marked.push(id);
       if (options.stampBaseline) {
         await stampApprovedContentFingerprint(this.prisma, id);

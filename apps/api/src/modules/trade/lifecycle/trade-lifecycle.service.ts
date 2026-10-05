@@ -19,6 +19,7 @@ import { NotificationService } from "../../notification/notification.service";
 import { NotificationType } from "../../notification/dto";
 import {
   CancellationActor,
+  ListingRemovalReason,
   TradeStatus,
   ProductStatus,
   ShipmentStatus,
@@ -33,6 +34,7 @@ import {
   getProductStatusFromQuantity,
   getReservedAwareStatus,
 } from "../../product/helpers/product-status.helper";
+import { recordListingRemovals } from "../../product/helpers/listing-removal";
 import {
   computeTradeConfirmationDeadline,
   computeTradeHoldReleaseAt,
@@ -1402,8 +1404,9 @@ export class TradeLifecycleService {
             newQuantity = 0;
           }
 
+          const nextStatus = getProductStatusFromQuantity(newQuantity);
           const updateData: any = {
-            status: getProductStatusFromQuantity(newQuantity),
+            status: nextStatus,
             reservedQuantity: safeDecrementReserved(
               product.reservedQuantity,
               tradedQty,
@@ -1417,6 +1420,15 @@ export class TradeLifecycleService {
             where: { id: product.id },
             data: updateData,
           });
+          // Takasla stoğu biten ilan vitrinden "stok tükendi" nedeniyle düşer.
+          await recordListingRemovals(tx, [
+            {
+              productId: product.id,
+              statusBefore: product.status,
+              statusAfter: nextStatus,
+              reason: ListingRemovalReason.out_of_stock,
+            },
+          ]);
         }
 
         const cashPayment = await tx.tradeCashPayment.findFirst({
@@ -1656,8 +1668,9 @@ export class TradeLifecycleService {
         } else {
           newQuantity = 0;
         }
+        const nextStatus = getProductStatusFromQuantity(newQuantity);
         const updateData: any = {
-          status: getProductStatusFromQuantity(newQuantity),
+          status: nextStatus,
           reservedQuantity: safeDecrementReserved(
             product.reservedQuantity,
             tradedQty,
@@ -1670,6 +1683,15 @@ export class TradeLifecycleService {
           where: { id: product.id },
           data: updateData,
         });
+        // Takasla stoğu biten ilan vitrinden "stok tükendi" nedeniyle düşer.
+        await recordListingRemovals(tx, [
+          {
+            productId: product.id,
+            statusBefore: product.status,
+            statusAfter: nextStatus,
+            reason: ListingRemovalReason.out_of_stock,
+          },
+        ]);
       }
 
       // Escrow: itiraz çözümü confirmReceipt'ten geçmediği için holdReleaseAt

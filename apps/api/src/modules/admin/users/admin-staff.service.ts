@@ -24,12 +24,14 @@ import {
 } from "../dto";
 import {
   CancellationActor,
+  ListingRemovalReason,
   ProductStatus,
   OfferStatus,
   TradeStatus,
   AdminRole,
 } from "@prisma/client";
 import { safeDecrementReserved } from "../../product/helpers/product-availability.helper";
+import { recordListingRemovals } from "../../product/helpers/listing-removal";
 import {
   OFFER_CANCEL_REASON,
   TRADE_CANCEL_REASON,
@@ -611,6 +613,10 @@ export class AdminStaffService {
       });
 
       // 4. Bekleyen ürünleri rejected yap
+      const toReject = await tx.product.findMany({
+        where: { sellerId: userId, status: ProductStatus.pending },
+        select: { id: true },
+      });
       await tx.product.updateMany({
         where: {
           sellerId: userId,
@@ -620,6 +626,25 @@ export class AdminStaffService {
           status: ProductStatus.rejected,
         },
       });
+
+      // Vitrinden düşen her ilanın nedeni: satıcının hesabı askıya alındı
+      // (sistem nedeni; işlemi yapan yönetici kayda geçer).
+      await recordListingRemovals(tx, [
+        ...toSuspend.map((p) => ({
+          productId: p.id,
+          statusBefore: ProductStatus.active,
+          statusAfter: ProductStatus.suspended,
+          reason: ListingRemovalReason.seller_suspended,
+          actorUserId: adminId,
+        })),
+        ...toReject.map((p) => ({
+          productId: p.id,
+          statusBefore: ProductStatus.pending,
+          statusAfter: ProductStatus.rejected,
+          reason: ListingRemovalReason.seller_suspended,
+          actorUserId: adminId,
+        })),
+      ]);
 
       // 5. Bekleyen teklifleri kapat — alıcı VE satıcı olarak. Yasaklı satıcının
       //    aldığı teklifler açık kalırsa alıcılar süre dolana dek "yanıt bekliyor"

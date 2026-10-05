@@ -5,6 +5,7 @@ import { registerRepeatableCron } from "../../../monitoring/bull-cron.helper";
 import { QUEUE_NAMES } from "../../../workers/constants";
 import { PrismaService } from "../../../prisma";
 import {
+  ListingRemovalReason,
   Prisma,
   ProductInactiveReason,
   ProductKind,
@@ -30,6 +31,7 @@ import { SearchService } from "../../search/search.service";
 import { errorMessage } from "../../../common/helpers/error-message";
 import { isRenewableInPlace } from "../helpers/product-renewal";
 import { refreshProductVisibility } from "../helpers/product-visibility";
+import { recordListingRemovals } from "../helpers/listing-removal";
 
 /**
  * Product Scheduler Service
@@ -691,14 +693,29 @@ export class ProductSchedulerService implements OnModuleInit {
             if (res.count > 0) renewed.push(listing.id);
             continue;
           }
-          const res = await this.prisma.product.updateMany({
-            where: { ...expiryWhere, id: listing.id },
-            data: {
-              status: ProductStatus.inactive,
-              inactiveReason: ProductInactiveReason.expired,
-            },
+          // Davranış işareti (`inactiveReason`) statüyle aynı yazımda kalır;
+          // kaldırma nedeni aynı transaction'da kaydedilir.
+          const count = await this.prisma.$transaction(async (tx) => {
+            const res = await tx.product.updateMany({
+              where: { ...expiryWhere, id: listing.id },
+              data: {
+                status: ProductStatus.inactive,
+                inactiveReason: ProductInactiveReason.expired,
+              },
+            });
+            if (res.count > 0) {
+              await recordListingRemovals(tx, [
+                {
+                  productId: listing.id,
+                  statusBefore: ProductStatus.active,
+                  statusAfter: ProductStatus.inactive,
+                  reason: ListingRemovalReason.expired,
+                },
+              ]);
+            }
+            return res.count;
           });
-          if (res.count > 0) expired.push(listing);
+          if (count > 0) expired.push(listing);
         } catch (err: unknown) {
           failed += 1;
           this.logger.error(

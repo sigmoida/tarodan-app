@@ -1,4 +1,8 @@
-import { ProductInactiveReason, ProductStatus } from "@prisma/client";
+import {
+  ListingRemovalReason,
+  ProductInactiveReason,
+  ProductStatus,
+} from "@prisma/client";
 import { ProductSchedulerService } from "./product-scheduler.service";
 
 /**
@@ -49,6 +53,10 @@ describe("ProductSchedulerService — ilan ömrü süreleri", () => {
         findMany: jest.fn().mockResolvedValue(due),
         updateMany: jest.fn().mockResolvedValue({ count: 1 }),
       },
+      // Kaldırma kaydı (recordListingRemovals) süre dolumuyla aynı tx'te.
+      productRemovalEvent: {
+        createMany: jest.fn().mockResolvedValue({ count: 1 }),
+      },
       platformSetting: {
         findUnique: jest.fn(
           async ({ where }: { where: { settingKey: string } }) =>
@@ -57,7 +65,12 @@ describe("ProductSchedulerService — ilan ömrü süreleri", () => {
               : null,
         ),
       },
+      $transaction: jest.fn(),
     };
+    // Etkileşimli tx: aynı istemciyle çalışır (yazımlar prisma mock'unda görünür).
+    prisma.$transaction.mockImplementation(
+      async (fn: (tx: typeof prisma) => unknown) => fn(prisma),
+    );
     const notifications = { sendTemplateEmailToUser: jest.fn() };
     const cache = {
       del: jest.fn().mockResolvedValue(undefined),
@@ -80,6 +93,12 @@ describe("ProductSchedulerService — ilan ömrü süreleri", () => {
     date.setDate(date.getDate() - days);
     return date;
   };
+
+  /** Statü/ömür yazımları — kaldırma kaydının `removalReason` damgası hariç. */
+  const statusWrites = (prisma: { product: { updateMany: jest.Mock } }) =>
+    prisma.product.updateMany.mock.calls.filter(
+      ([args]) => !("removalReason" in args.data),
+    );
 
   const expiryCutoff = (prisma: { product: { updateMany: jest.Mock } }) =>
     prisma.product.updateMany.mock.calls[0][0].where.OR[0].publishedAt.lt;
@@ -183,6 +202,52 @@ describe("ProductSchedulerService — ilan ömrü süreleri", () => {
       );
     });
 
+    it("süre dolumu bir kaldırma olayı olarak 'expired' nedeniyle kaydedilir (sistem, aktörsüz)", async () => {
+      const { service, prisma } = makeService({}, [dueListing()]);
+
+      await service.runExpireOldListings();
+
+      expect(prisma.$transaction).toHaveBeenCalledTimes(1);
+      expect(prisma.productRemovalEvent.createMany).toHaveBeenCalledWith({
+        data: [
+          expect.objectContaining({
+            productId: "p1",
+            reason: ListingRemovalReason.expired,
+            statusBefore: ProductStatus.active,
+            statusAfter: ProductStatus.inactive,
+            fromStorefront: true,
+            actorUserId: null,
+          }),
+        ],
+      });
+      // İlanın güncel nedeni yalnız hâlâ pasifse damgalanır.
+      expect(prisma.product.updateMany).toHaveBeenCalledWith({
+        where: { id: { in: ["p1"] }, status: ProductStatus.inactive },
+        data: { removalReason: ListingRemovalReason.expired },
+      });
+    });
+
+    it("davranış işareti (inactiveReason = expired) statüyle AYNI yazımda kalır — yenileme akışı değişmez", async () => {
+      const { service, prisma } = makeService({}, [dueListing()]);
+
+      await service.runExpireOldListings();
+
+      const [first] = statusWrites(prisma);
+      expect(first[0].data).toEqual({
+        status: ProductStatus.inactive,
+        inactiveReason: ProductInactiveReason.expired,
+      });
+    });
+
+    it("yazılmayan ilan (0 satır) için kaldırma kaydı düşülmez", async () => {
+      const { service, prisma } = makeService({}, [dueListing()]);
+      prisma.product.updateMany.mockResolvedValue({ count: 0 });
+
+      await service.runExpireOldListings();
+
+      expect(prisma.productRemovalEvent.createMany).not.toHaveBeenCalled();
+    });
+
     it("pasife alınan ilan önbellekten ve arama dizininden düşürülür", async () => {
       const { service, cache, search } = makeService({}, [dueListing()]);
       await service.runExpireOldListings();
@@ -211,7 +276,13 @@ describe("ProductSchedulerService — ilan ömrü süreleri", () => {
         /1 ilan işlenemedi \(2 pasife alındı, 0 yenilendi\)/,
       );
 
-      expect(prisma.product.updateMany).toHaveBeenCalledTimes(3);
+      // Her ilan için bir süre dolumu yazımı denenir; başarılı ikisi ayrıca
+      // kaldırma nedenini aynı tx'te ilana işler (recordListingRemovals).
+      const expiryWrites = prisma.product.updateMany.mock.calls.filter(
+        ([args]) => args.data.status !== undefined,
+      );
+      expect(expiryWrites).toHaveLength(3);
+      expect(prisma.productRemovalEvent.createMany).toHaveBeenCalledTimes(2);
       expect(search.syncProduct.mock.calls.map((c) => c[0]).sort()).toEqual([
         "a",
         "c",
@@ -269,6 +340,8 @@ describe("ProductSchedulerService — ilan ömrü süreleri", () => {
       expect(prisma.product.updateMany).toHaveBeenCalledTimes(1);
       const call = prisma.product.updateMany.mock.calls[0][0];
       expect(call.data).toEqual({ publishedAt: NOW });
+      // Yerinde yenileme vitrinden düşürmez: kaldırma kaydı yok.
+      expect(prisma.productRemovalEvent.createMany).not.toHaveBeenCalled();
       expect(call.data).not.toHaveProperty("status");
       expect(call.where.id).toBe("p1");
       expect(result.stats).toEqual({ expired: 0, renewed: 1 });
@@ -313,9 +386,10 @@ describe("ProductSchedulerService — ilan ömrü süreleri", () => {
       const result = await service.runExpireOldListings();
 
       expect(result.stats).toEqual({ expired: 1, renewed: 1 });
-      expect(
-        prisma.product.updateMany.mock.calls.map((c) => c[0].where.id),
-      ).toEqual(["ok", "empty"]);
+      expect(statusWrites(prisma).map((c) => c[0].where.id)).toEqual([
+        "ok",
+        "empty",
+      ]);
     });
 
     it("yenilenen ilan dizinden/önbellekten düşürülmez (statüsü değişmedi)", async () => {

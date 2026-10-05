@@ -29,6 +29,7 @@ import {
 import { AdminService } from "../admin.service";
 import { AdminAnalyticsDashboardService } from "./admin-analytics-dashboard.service";
 import { AdminDashboardStockService } from "./dashboard/admin-dashboard-stock.service";
+import { AdminDashboardRemovalsService } from "./dashboard/admin-dashboard-removals.service";
 import { AdminDashboardWorklistService } from "./dashboard/admin-dashboard-worklist.service";
 import { AdvertisementService } from "../../advertisement/advertisement.service";
 import { MediaService } from "../../media/media.service";
@@ -114,6 +115,7 @@ export class AdminAnalyticsController {
     private readonly worklistService: AdminDashboardWorklistService,
     private readonly stockService: AdminDashboardStockService,
     private readonly dashboardStatsService: AdminAnalyticsDashboardService,
+    private readonly removalsService: AdminDashboardRemovalsService,
   ) {}
 
   // ==================== ANALYTICS & REPORTS ====================
@@ -196,6 +198,22 @@ export class AdminAnalyticsController {
     return this.stockService.getStock();
   }
 
+  /**
+   * Zone C — seçili dönemde vitrinden düşen ilanların nedene (ve başka
+   * platformda satışın platforma) göre kırılımı. Dönem kartlarıyla AYNI
+   * dönem sorgusu ve olay damgası kuralı (kaldırma anı).
+   */
+  @Get("dashboard/listing-removals")
+  @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
+  @ApiOperation({
+    summary:
+      "Listings taken off the storefront in a period (daily | monthly | custom), by reason, sold-elsewhere platform and violation code",
+  })
+  @ApiResponse({ status: 400, description: "Invalid custom range" })
+  async getDashboardListingRemovals(@Query() query: DashboardStatsQueryDto) {
+    return this.removalsService.getRemovals(query);
+  }
+
   @Post("dashboard/refresh")
   @HttpCode(HttpStatus.NO_CONTENT)
   @Roles(AdminRole.super_admin, AdminRole.admin, AdminRole.moderator)
@@ -208,6 +226,7 @@ export class AdminAnalyticsController {
       this.worklistService.invalidate(),
       this.stockService.invalidate(),
       this.dashboardStatsService.invalidatePeriodCache(),
+      this.removalsService.invalidate(),
     ]);
   }
 

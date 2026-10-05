@@ -23,6 +23,10 @@ import {
   shouldQuarantineReturnedStock,
   statusAfterStockRestore,
 } from "../../product/helpers/product-status.helper";
+import {
+  recordListingRemovals,
+  stockStatusRemovalReason,
+} from "../../product/helpers/listing-removal";
 import { PaymentProviderRegistry } from "../../payment-providers/payment-provider.registry";
 import { PaymentProvider } from "../dto";
 import { EventService } from "../../events";
@@ -1114,6 +1118,11 @@ export class PaymentRefundService {
                 const quarantine = shouldQuarantineReturnedStock(
                   orderRow?.deliveredAt ?? null,
                 );
+                const restored = statusAfterStockRestore(
+                  product,
+                  newQty,
+                  quarantine,
+                );
                 await tx.product.update({
                   where: { id: orderRow.productId },
                   data: {
@@ -1121,9 +1130,23 @@ export class PaymentRefundService {
                     // status + inactiveReason birlikte: karantinadaki ilan
                     // teslimat öncesi bir iptalle satışa geri açılmaz — bkz.
                     // statusAfterStockRestore / resolveUpdatedStatus.
-                    ...statusAfterStockRestore(product, newQty, quarantine),
+                    ...restored,
                   },
                 });
+                // Karantinaya alınan ilan "iade kontrolü bekliyor" nedenini
+                // alır (davranış işaretiyle AYNI ad). Zaten pasif (satıcı
+                // duraklatmış / süresi dolmuş) ilanda statü değişmez ama işaret
+                // değişir: o da kaydedilir, güncel neden onu izler.
+                await recordListingRemovals(tx, [
+                  {
+                    productId: orderRow.productId,
+                    statusBefore: product.status,
+                    statusAfter: restored.status,
+                    inactiveReasonBefore: product.inactiveReason,
+                    inactiveReasonAfter: restored.inactiveReason,
+                    reason: stockStatusRemovalReason(restored.inactiveReason),
+                  },
+                ]);
                 stockQuarantined = quarantine;
                 this.logger.log(
                   `Restored ${restoreQty} stock for product ${orderRow.productId} after refund of order ${orderId}` +
