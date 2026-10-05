@@ -454,6 +454,7 @@ export class OrderQueryService {
         refundRequests: {
           orderBy: { createdAt: "desc" },
         },
+        paymentHolds: { select: { status: true, releaseAt: true } },
       },
     });
 
@@ -530,6 +531,9 @@ export class OrderQueryService {
     shipment: true,
     refundRequests: { orderBy: { createdAt: "desc" as const } },
     offer: { select: { status: true } },
+    // Satıcı ödemesinin planlanan tarihi (`escrowReleaseAt`): yalnız bu iki
+    // alan okunur; istemci tarihi kendisi hesaplamaz.
+    paymentHolds: { select: { status: true, releaseAt: true } },
     // Koli numarası (PKG-…) satır bazında da taşınır: satıcı ekranı ve sipariş
     // detayı kargo etiketindeki kodu doğrudan gösterebilsin. id/sellerId/
     // shippingCost sentetik (grupsuz) görünümün paket meta'sı içindir.
