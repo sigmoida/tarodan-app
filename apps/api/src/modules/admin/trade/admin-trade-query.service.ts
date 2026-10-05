@@ -76,12 +76,19 @@ export class AdminTradeQueryService {
       fromDate,
       toDate,
       search,
+      adminCancelReasonCode,
     } = query;
 
     const where: Prisma.TradeWhereInput = {};
 
     if (status) {
       where.status = status;
+    }
+
+    // Platform iptallerini katalog koduna göre süz (kolon yalnız admin
+    // iptalinde dolu).
+    if (adminCancelReasonCode) {
+      where.adminCancelReasonCode = adminCancelReasonCode;
     }
 
     // AND koşulları: userId/initiatorId/receiverId filtresi ile search çakışmasın

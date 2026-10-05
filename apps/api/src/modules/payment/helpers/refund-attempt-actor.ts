@@ -1,4 +1,8 @@
 import { CancellationActor } from "@prisma/client";
+import {
+  isAdminCancelReasonCode,
+  type AdminCancelReasonCode,
+} from "@tarodan/types";
 import { refundRequestIdOf } from "../../elogo/helpers/refund-request-key";
 
 /**
@@ -31,6 +35,27 @@ export function refundRequestCancelActor(
   return actor === CancellationActor.platform
     ? CancellationActor.platform
     : CancellationActor.buyer;
+}
+
+/**
+ * Platform (yönetici) iptalinin katalog nedeni — talebin `metadata`'sında.
+ * İptal, talep açıldığı anda değil İADE TAMAMLANINCA kesinleşir; tamamlayan
+ * yol (eşzamanlı başarı, admin onayı, takılı deneme kurtarması) kodu buradan
+ * okuyup siparişi kapatırken yazar ve platform duyurusunu gönderir.
+ */
+export const REFUND_REQUEST_ADMIN_REASON_KEY = "adminCancelReasonCode";
+
+/** Talepteki yönetici neden kodu; platform talebi değilse ya da yoksa null. */
+export function refundRequestAdminReasonCode(
+  metadata: unknown,
+): AdminCancelReasonCode | null {
+  if (refundRequestCancelActor(metadata) !== CancellationActor.platform) {
+    return null;
+  }
+  const code = (metadata as Record<string, unknown>)[
+    REFUND_REQUEST_ADMIN_REASON_KEY
+  ];
+  return isAdminCancelReasonCode(code) ? code : null;
 }
 
 /**

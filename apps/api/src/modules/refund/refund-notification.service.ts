@@ -1,5 +1,6 @@
 import { Injectable, Logger } from "@nestjs/common";
 import { AdminRole } from "@prisma/client";
+import type { AdminCancelReasonCode } from "@tarodan/types";
 import { PrismaService } from "../../prisma";
 import { NotificationService } from "../notification/notification.service";
 import { StorageService } from "../storage/storage.service";
@@ -133,6 +134,31 @@ export class RefundNotificationService {
     } catch (err: unknown) {
       this.logger.error(
         `Order ${orderId} cancellation notify failed: ${
+          err instanceof Error ? err.message : String(err)
+        }`,
+      );
+    }
+  }
+
+  /**
+   * İncelemeye düşmüş bir platform (yönetici) iptalinin, iade sonradan
+   * tamamlanınca iki tarafa duyurusu — iptal anındaki duyuruyla AYNI tanım
+   * (nedenin etiketi + iade tutarı). Best-effort; asla throw etmez.
+   */
+  async notifyPlatformCancellation(
+    orderId: string,
+    reasonCode: AdminCancelReasonCode,
+    refundAmount: number,
+  ): Promise<void> {
+    try {
+      await this.notificationService.notifyOrderCancelledByPlatform({
+        orderId,
+        reasonCode,
+        refundAmount,
+      });
+    } catch (err: unknown) {
+      this.logger.error(
+        `Order ${orderId} platform cancellation notify failed: ${
           err instanceof Error ? err.message : String(err)
         }`,
       );

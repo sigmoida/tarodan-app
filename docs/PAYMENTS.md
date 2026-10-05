@@ -161,6 +161,28 @@ admin CRUD + doğrulamalar `modules/admin/admin-commission.service.ts`.
   id/adı, vergiler ve toplam siparişe yazılır (audit + yeniden hesap).
 - **Fail-closed 503'ler**: aktif kargo tarifesi yoksa ve satıcı tarafı komisyon
   kuralı eşleşmiyorsa.
+- **Çekim ↔ iptal dışlaması** (`payment/helpers/payment-order-lock.ts`):
+  ödenmemiş siparişi kapatan yollar (alıcı / yönetici iptali, 24s süpürmesi)
+  sipariş satırını yazar. Direct-form claim'i ödeme satırını, sonra
+  siparişleri `FOR SHARE` kilitleyip hepsi hâlâ `pending_payment` mı diye
+  claim'le aynı işlemde bakar — değilse çekim başlamaz
+  (`orderNotAwaitingPayment`). Başarı callback'i ödeme claim'inden sonra
+  siparişleri `FOR UPDATE` kilitleyip durumu öyle okur: iptal edilmiş sipariş
+  canlandırılmaz, otomatik iadeye (`processRefund`) gider. Claim commit
+  ettikten sonra gelen iptal, `lastChargeStartedAt` damgasını canlı çekim
+  olarak görür: ödenmemiş iptal çekirdeği (`cancelUnpaidOrderInTx`, alıcı —
+  misafir dahil — ve yönetici iptali) çağıranın sipariş kilidi altında
+  `orderHasLiveCharge` ile bakar ve 409 `server.order.cancelPaymentInFlight`
+  ("ödeme sürüyor, birazdan tekrar deneyin") döner; 24s süpürmesi atlar.
+  - **Kilit sırası** — hem ödeme hem sipariş satırı kilitleyen yollar ÖNCE
+    ödemeyi, SONRA siparişi kilitler (sepette ikisi de id sırasıyla): claim
+    (ödeme `FOR UPDATE` → siparişler `FOR SHARE`), callback (ödeme CAS →
+    siparişler `FOR UPDATE`), iade sonlandırması (ödeme `FOR UPDATE` →
+    sipariş yazımı), 24s süpürmesi (`lockOrderPaymentRows`: siparişin ve
+    sepetinin ödemeleri `FOR UPDATE` → sipariş `FOR UPDATE` → ödeme yazımı).
+    Yalnız sipariş kilitleyen yollar (alıcı / yönetici iptali, hazırlama
+    süresi süpürmesi, rezerv bırakma) ödeme satırını kilitlemez, yalnız okur
+    — bekledikleri tek kilit sipariş kilididir, döngü kurulamaz.
 
 ---
 
@@ -251,24 +273,97 @@ verilmeden maliyet gerçek değildir → iki taraf da bütünlenir. Verildikten 
 maliyet kusurlu tarafa gider: `delivery_delayed`'de gidiş satıcıya yansır;
 cayma nedenlerinde alıcının kargo payı iade edilmez ve koruma bedeli hep kalır.
 
-**Platform (admin) iptali** — `POST /admin/orders/:id/cancel`, yalnız kargo
-öncesi (`paid`/`preparing`, koli taşıyıcıya geçmemiş; kural
-`@tarodan/types` `preShipmentCancelBlocker`, panel de aynısını okur) ve sipariş
-(sepet kalemi) başına; grup ödemesinde de çalışır. Para yolu alıcı iptaliyle
-TEK çekirdektir (`RefundCreationService.executePreShipmentCancellation`); fark
-yalnız spec'tedir (`helpers/pre-shipment-cancellation.ts`): kusur platformda
-(v2 `faultParty: "platform"`, v1 `resolvePlatformCancellationPolicy`) → alıcı
-ürün + alıcı komisyonu/hizmet bedeli + (paketin son canlı kalemiyse) gidiş
-kargosunu geri alır, kupon hakkı döner; satıcı kesintileri terslenir. Talep
-alıcı adına açılır, kararı admin verir, iki tarafa iptal duyurusu gider.
-Önizleme (`GET …/cancel-preview`) aynı hesabı koşar. İptal aktörü
-(`Order.cancelledBy`) spec'in `initiator`'ıdır (alıcı / platform) ve talebin
-`metadata.cancellationActor`'ına yazılır; talep sonradan admin onayı ya da
-takılı deneme kurtarmasıyla iade edilirse aktör oradan okunur
-(`refundRequestCancelActor`). Alıcı iptalinde duyuru yalnız satıcıya gider
-("kargoya vermeyin"). Kargo öncesi siparişte açık kalmış bir talep yarıda
-kalmış iptaldir (PSP hatası): yeniden iptal 409 döner ve İade Talepleri'ne
-yönlendirir.
+**Platform (admin) iptali** — `POST /admin/orders/:id/cancel`
+(`AdminOrderCancelService`), sipariş (sepet kalemi) başına; sepet siparişi,
+teklif siparişi ve grup ödemesi için TEK uç. Yeni para yolu yoktur: iptalin
+türü mevcut bir çekirdeği seçer, admin yolu yalnız aktörü (`platform`), nedeni,
+denetimi ve duyuruyu ekler. Uygunluk kuralı `@tarodan/types`
+`adminOrderCancelEligibility`'dir (kargo öncesi kuralın — `preShipmentCancelBlocker`
+— üstüne kurulu; API önizleme, iptal ve kilit altı yeniden değerlendirme, panel
+dosya düğmesi, satır menüsü ve teklif ekranı aynısını okur).
+
+| Sipariş durumu                                                 | İzin                                       | Çekirdek                                                                                                                 | Para / stok                                                                                                                                                                     | Taraflar ne alır                                                                                                                             |
+| -------------------------------------------------------------- | ------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
+| `pending_payment` (sepet ya da teklif)                         | ✔ tür `unpaid`                             | `OrderLifecycleService.cancelUnpaidOrderInTx` (alıcı iptaliyle aynı; `ledgerReason: admin_cancelled` → aktör `platform`) | para hareketi yok; stok rezervasyonu (tutuluyorsa — teklif siparişi rezervi ilk ödeme başlatmada alır) + kupon rezervasyonu serbest; bağlı teklif yönetici gerekçesiyle kapanır | alıcı + satıcı: birer zil (+push) + birer e-posta, "Tarodan iptal etti", neden etiketi, "ödeme alınmamıştı"                                  |
+| `paid` / `preparing`, koli taşıyıcıya geçmemiş (sepet/teklif)  | ✔ tür `paid_pre_handover`                  | `RefundService.createPlatformCancellationRefund` → `executePreShipmentCancellation` (alıcı iptaliyle aynı para yolu)     | tam iade (platform kusuru, aşağıda); stok geri; kupon hakkı döner; defter/fatura düzeltmesi/kargo iptali processRefund'da                                                       | alıcı + satıcı: birer zil + birer e-posta, neden etiketi, alıcıya iade tutarı + "bankanızın olağan iade süresi"; satıcıya "kargoya vermeyin" |
+| kargoya verildi / yolda (`shipped`, hareket ya da `shippedAt`) | ✘ `handed_over`                            | —                                                                                                                        | —                                                                                                                                                                               | iade talebi akışı                                                                                                                            |
+| `delivered` / `awaiting_buyer_confirmation`                    | ✘ `delivered`                              | —                                                                                                                        | —                                                                                                                                                                               | iade talebi akışı                                                                                                                            |
+| `completed` (satıcı ödemesi yapıldı/yapılacak)                 | ✘ `completed`                              | —                                                                                                                        | —                                                                                                                                                                               | —                                                                                                                                            |
+| açık iade talebi (`refund_requested` ya da aktif talep)        | ✘ `active_refund` / `pending_cancellation` | —                                                                                                                        | —                                                                                                                                                                               | talebin kendi onay/ret/kapat aksiyonları; yarıda kalmış iptal İade Talepleri'nde tamamlanır                                                  |
+| `cancelled` / `refunded`                                       | ✘ `closed`                                 | —                                                                                                                        | —                                                                                                                                                                               | —                                                                                                                                            |
+
+Admin tarafından başlatılan **iade** (kargodan sonra) yoktur; toplu iptal yoktur.
+
+- **Neden zorunlu**: `AdminCancelRequest` — paylaşılan katalogdan kod
+  (`ADMIN_CANCEL_REASON_CODES`) + iç not ("Diğer"de zorunlu; kural
+  `adminCancelRequestProblem`). Taraflara yalnız kodun etiketi söylenir
+  (`Order.cancelReason` / `Offer.cancelReason` / iade talebi açıklaması =
+  "Yönetici tarafından iptal edildi: <etiket>"); not yalnız denetim kaydındadır,
+  hiçbir taraf-yüzlü alana (bildirim, e-posta, talep, iade geçmişi) girmez.
+  Kod `Order.adminCancelReasonCode`'a YALNIZ iptal tamamlanınca yazılır:
+  ödenmemişte iptalle aynı yazımda; ödenmişte kod iade talebinin
+  `metadata.adminCancelReasonCode`'unda taşınır ve iadeyi kim kesinleştirirse
+  (eşzamanlı başarı, İade Talepleri'nde admin onayı, takılı deneme
+  kurtarması) `processRefund` siparişi KAPATTIĞI işlemde yazar
+  (`ProcessRefundOptions.adminCancelReasonCode`). PSP hatasında yazılmaz.
+  İptal & İade ekranı nedeni oradan gösterir ve "Yönetici iptali" süzgeci
+  onunla — platform aktörüyle birlikte — süzer.
+- **Önizleme → onay**: `GET …/cancel-preview` türü ve sonucu döner (iade tutarı
+  ya da "ödeme yok", serbest kalan/geri eklenen adet). Onay `expectedKind`
+  taşır; sipariş arada ödendiyse (ön okumada ya da kilit altında) iptal 409
+  `cancelKindChanged` ile durur — "para yok"tan "iade"ye sessiz geçiş yoktur,
+  panel önizlemeyi tazeler. Ödenmemiş siparişte canlı bir 3DS çekimi varsa
+  (`paymentFailTimeoutMinutes` penceresi) çekirdek 409
+  `server.order.cancelPaymentInFlight` döner (alıcı iptaliyle aynı kontrol).
+- **Yarışlar**: ödenmemiş yol sipariş satırını `FOR UPDATE` ile kilitler ve
+  yeniden değerlendirir (alıcı iptali / 24s süpürmesi → `closed`, callback →
+  tür değişti); çekirdeğin `version` koşullu yazımı ikinci kapıdır. Ödenmiş yol
+  çekirdeğin satır kilidi + kilit altı devir kontrolü + aktif-talep tekil
+  indeksi + talep-bazlı idempotency anahtarına dayanır (satıcı az önce
+  kargoladıysa / ikinci gönderim → hata, ikinci iade yok).
+- **Denetim (zorunlu)**: `order_cancel` (aktör, hedef, tür, önce/sonra, kod,
+  not, taraflar; ödenmişte iade talebi id/no/tutar). Ödenmemiş yolda kayıt
+  iptalle AYNI işlemdedir (yazılamazsa iptal geri alınır). Ödenmiş yolda PSP
+  çağrısı tek işleme sığmaz: para yoluna girmeden ÖNCE zorunlu
+  `order_cancel_requested` niyet kaydı yazılır (yazılamazsa çekirdek hiç
+  çağrılmaz); para çıktıktan sonra tamamlanma kaydı yazılamazsa iptal geri
+  alınamaz — hata loglanır, iz niyet kaydı + iade talebinde (`decidedBy` =
+  admin) kalır. Engellenen ya da PSP'de düşen deneme `order_cancel_failed`
+  olarak (best-effort) kaydedilir.
+- **Duyuru**: iki tarafa TEK platform duyurusu
+  (`NotificationService.notifyOrderCancelledByPlatform`; tipler
+  `order_cancelled_by_platform` / `…_seller`, e-postalar
+  `order-cancelled-by-platform-buyer` / `…-seller`). Çekirdekler bu iptalde
+  kendi genel iptal duyurularını göndermez (platform spec'i
+  `notifyParties: []`); misafir alıcıya zil gönderilmez (ortak sistem hesabı),
+  e-posta `orderBuyerContact` ile gerçek adrese gider. Kupon iadesi olduğunda
+  ayrıca "kuponunuz geri verildi" (`COUPON_RETURNED`) gider — iptal duyurusu
+  değil, ayrı bir olgudur. İptal anında PSP düştüyse duyuru O AN gitmez;
+  iptal sonradan tamamlanınca aynı platform duyurusu (genel iptal/iade metni
+  yerine) tamamlayan yoldan bir kez gider: admin onayında
+  `RefundDecisionService`, kurtarmada `processRefund`. Her gönderen yol
+  duyuruyu `processRefund`'ın döndürdüğü `closedWithAdminReason`'a bağlar —
+  yalnız siparişi BU çağrının iadesi platform iptali olarak kapattıysa dolu
+  olur. Sipariş arada başka yoldan iptal edildiyse ya da aynı denemeyi başka
+  bir çağrı (ör. kurtarma cron'u, eşzamanlı yönetici iptali) sonlandırıp
+  duyuruyu gönderdiyse null'dır ve bu yol sessiz kalır; taraf başına tek
+  mesaj.
+- **Teklif**: siparişi OLMAYAN teklifin iptali `POST /admin/offers/:id/cancel`
+  ile kalır; canlı siparişi olan teklif o uçta 409 `useOrderCancel` döner ve
+  panel sipariş iptal diyaloğunu açar.
+
+Ödenmiş türün para kuralı: spec (`helpers/pre-shipment-cancellation.ts`)
+kusuru platforma yazar (v2 `faultParty: "platform"`, v1
+`resolvePlatformCancellationPolicy`) → alıcı ürün + alıcı komisyonu/hizmet
+bedeli + (paketin son canlı kalemiyse) gidiş kargosunu geri alır, kupon hakkı
+döner; satıcı kesintileri terslenir. Talep alıcı adına açılır, kararı admin
+verir. Önizleme aynı hesabı koşar. İptal aktörü (`Order.cancelledBy`) spec'in
+`initiator`'ıdır (alıcı / platform) ve talebin `metadata.cancellationActor`'ına
+yazılır; talep sonradan admin onayı ya da takılı deneme kurtarmasıyla iade
+edilirse aktör oradan okunur (`refundRequestCancelActor`). Alıcı iptalinde
+duyuru yalnız satıcıya gider ("kargoya vermeyin"). Kargo öncesi siparişte açık
+kalmış bir talep yarıda kalmış iptaldir (PSP hatası): yeniden iptal 409 döner
+ve İade Talepleri'ne yönlendirir.
 
 **Grup ödemesinde iade tavanı** (`payment/helpers/group-refund-limit.ts`,
 processRefund'da tek hesap): sepette kolinin alıcı kargo payı yalnız satıcının
@@ -360,6 +455,133 @@ kaldı.
 
 **v1 takaslar** eski kuralla biter: ayrım tek yerde, `Trade.pricingVersion`
 alanındadır.
+
+### Admin (platform) takas iptali
+
+Admin → Takas dosyası → "Takası iptal et" (`GET /admin/trades/:id/cancel-preview`,
+`POST /admin/trades/:id/cancel`, gövde `AdminCancelRequest`). **Yalnız
+super_admin**, toplu iptal yok. Yeni bir para ya da kargo yolu YOKTUR: iptal,
+süre dolumu taramasının kargo öncesi çekirdeğiyle yapılır
+(`trade/helpers/trade-pre-shipment-cancel.ts` →
+`cancelPreShipmentTradeInTx` + `settlePreShipmentCancellation`); değişen yalnız
+aktör (`CancellationActor.platform`), gerekçe, kusur ataması, denetim ve
+duyurudur. Uygunluk kuralı `@tarodan/types` → `adminTradeCancelBlocker`
+(API ve panel aynı kuralı okur; API onu satır kilidi altında yeniden çalıştırır).
+
+| Aşama                                                    | İzin?                            | Çekirdek         | İade                                                                                           | Rezervasyon / kargo                                                                          | Duyuru                      |
+| -------------------------------------------------------- | -------------------------------- | ---------------- | ---------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------- | --------------------------- |
+| `pending`                                                | evet                             | tarama çekirdeği | yok (para alınmadı)                                                                            | rezervasyon yok                                                                              | iki tarafa in-app + e-posta |
+| `accepted` (legacy)                                      | evet                             | tarama çekirdeği | yok                                                                                            | rezervasyon çözülür                                                                          | iki tarafa in-app + e-posta |
+| `awaiting_payment`                                       | evet                             | tarama çekirdeği | ödemiş taraf **tam** iade (taramanın ödeme-süresi sonucuyla aynı); ödememiş tarafın iadesi yok | rezervasyon çözülür                                                                          | iki tarafa; ödeyene tutar   |
+| `shipping_to_warehouse`, hiçbir koli taşıyıcıya geçmemiş | evet                             | tarama çekirdeği | iki taraf da **tam** iade (hizmet bedeli + kargo dahil)                                        | rezervasyon çözülür; basılmış ama devredilmemiş etiketler Sürat iptal göreviyle iptal edilir | iki tarafa; ödeyene tutar   |
+| `shipping_to_warehouse`, bir koli yolda / depoda         | **hayır** (`parcel_handed_over`) | —                | —                                                                                              | force-cancel-stuck / kayıp koli akışı                                                        | —                           |
+| `at_warehouse`, `admin_reviewing`                        | hayır (`at_warehouse`)           | —                | —                                                                                              | depo reddi (`reject`)                                                                        | —                           |
+| `shipping_to_recipients`                                 | hayır                            | —                | —                                                                                              | itiraz akışı                                                                                 | —                           |
+| `returning`                                              | hayır                            | —                | —                                                                                              | `mark-return-delivered` / `mark-return-lost`                                                 | —                           |
+| `disputed`                                               | hayır                            | —                | —                                                                                              | `resolve-dispute`                                                                            | —                           |
+| legacy `*_shipped` / `*_received`                        | hayır (`legacy_shipped`)         | —                | —                                                                                              | —                                                                                            | —                           |
+| `completed`, `cancelled`, `rejected`                     | hayır (`closed`, 409)            | —                | —                                                                                              | —                                                                                            | —                           |
+
+- **"Kargoya verildi" tanımı** takasın diğer iptal kapılarıyla aynıdır: bir
+  `to_warehouse` bacağının devri (`isShipmentHandedToCarrier`: hareket eden
+  durum ya da `shippedAt`), bacağın teslim damgası veya takasın
+  `firstWarehouseArrivalAt` / `cancelLockedAt` damgası. `pending` /
+  `label_created` etiket devir sayılmaz.
+- **Neden taramanın çekirdeği, kullanıcı iptali değil:** kullanıcı iptali
+  vazgeçen tarafı kusurlu sayar (hizmet bedelini kaybeder) ve aktörü bir
+  taraftan türetir. Tarama çekirdeği aktörü ve kusuru dışarıdan alır.
+- **Kusursuzluk:** platform iptali kimsenin kusuru değildir → çekirdek
+  `faultless: "all"` ile takasın HER ödeme satırına `fullRefundEntitled` yazar
+  (iade politikasının mevcut bayrağı; kayıp koli çözümünün kararıyla aynı).
+  Tutar yine `tradePaymentRefundableAmountFor`'dan gelir; önizleme, denetim
+  kaydı ve iade aynı fonksiyonu çağırır. Takas e-belgeleri (`trade_service_fee`,
+  `trade_shipping`) depoya varışta kesildiği için bu aşamalarda terslenecek
+  belge yoktur; iade yolu ters kayıt sinyalini yine her zamanki gibi kuyruğa
+  alır.
+- **Gerekçe:** katalog kodu `Trade.adminCancelReasonCode`'a yazılır (admin
+  listesi bununla gösterir/filtreler); `Trade.cancelReason` taraflara görünen
+  metindir ("Tarodan tarafından iptal edildi: <etiket>"). Adminin iç notu YALNIZ
+  denetim kaydındadır.
+- **Denetim:** `trade_admin_cancel` zorunlu ve iptalle aynı tx'te (yazılamazsa
+  iptal, rezervasyon çözümü, commit sonrası iş ve duyurular geri alınır).
+  Reddedilen denemeler `trade_admin_cancel_failed`.
+- **Commit sonrası iş dayanıklıdır:** iade harici sağlayıcı çağrısıdır,
+  iptalle atomik olamaz. Bu yüzden iade + önbellek + etiket iptali iptalle
+  aynı tx'te `trade.cancel_settle` outbox satırı olarak yazılır ve commit
+  sonrası anlık yoldan (`OutboxService.runInline`: drainer'ın CAS'ıyla satırın
+  sahibi olur) hemen çalışır. Süreç commit ile anlık yol arasında ölürse satır
+  pending kalır ve drainer tamamlar; admin aynı iptali yeniden gönderirse de
+  bekleyen iş o istekte tamamlanır (iş sahipliği tek: ikisi aynı anda
+  çalışmaz; iade ödeme başına idempotent). Sağlayıcı hatasında takasa
+  `refundFailureReason` yazılır (takas dosyasında "İadeyi yeniden dene" +
+  `retryFailedTradeRefunds` cron'u); bu istekte çalışan işin sonucu
+  `trade_admin_cancel_refund` satırına düşer.
+- **Duyuru:** iptalle aynı tx'te outbox'a, **alıcı × kanal başına bir satır**
+  (`trade.platform_cancel_notice`, `dedupeKey` = takas:alıcı:kanal). Her satır
+  tek bir gönderim yapar: in-app bildirim (`trade_cancelled_by_platform`,
+  push'u dahil) ya da e-posta (`trade-cancelled-platform`). Gönderim
+  gerçekleşmezse handler fırlatır ve outbox yalnız o satırı yeniden dener —
+  kısmi başarıdan sonra başka bir alıcıya / kanala ikinci gönderim olmaz.
+  Gönderilecek bir şey yoksa (kullanıcı yok, bildirim kategorisi kapalı,
+  ortamda e-posta sağlayıcısı yok) satır kapanır. Taramanın "otomatik iptal"
+  push'u gitmez. İade core'u başarılı iadede ayrıca kendi "iade tamamlandı"
+  push'unu gönderir (iade sonucu sinyali; her iptal yolunda aynı).
+- **Yarışlar:** taraf iptali, süre dolumu taraması, uzatma hakkı ve ödeme
+  geçişi aynı takas satırı kilidinde sıraya girer; kilit altında ortak kural
+  yeniden çalışır. Kargo poller'ı devri bacak satırına yazdığı için bacaklar da
+  kilitlenir (sıra: takas → bacak). Aynı kodla ikinci gönderim yeni bir iptal
+  üretmez.
+
+**İptalden sonra tamamlanan takas ödemesi (bütün iptal yolları).** İptal
+yolları iadeyi iptal anında tamamlanmış ödeme satırlarına yapar; ödemesi o an
+PayTR'da olan tarafın callback'i iptalden sonra gelirse satır `completed`
+olurdu ve hiçbir yol iade etmezdi. Ödemenin tamamlandığı tek yer
+(`payment-fulfillment` → takas nakit ödemesi) artık takas satırını ödeme
+satırından önce kilitler (iptal yollarıyla aynı sıra: takas → ödeme satırı) ve
+takas `cancelled` ise ödemeyi mevcut izlenen iadeye
+(`refundTradeCashTracked`, ödeyene kapsamlı) verir. İş ödeme tx'iyle atomik
+`trade.cancelled_payment_refund` outbox satırı olarak yazılır ve **yalnız
+drainer** (`PaymentOutboxHandlers`, callback yanıtlandıktan sonra, ~1 dk
+içinde) işler: iade PayTR callback'inin içinden, ödeme henüz "siteye
+bildirilmeden" denenmez — PayTR bu durumda iadeyi "odeme henuz siteye
+bildirilmemis" ile reddeder ve callback-içi iadenin kabul edildiğine dair bir
+kanıt yoktur (sipariş grup yolundaki callback-içi `processRefund` da başarısını
+kaydetmiyor, yalnız hatada elle müdahale ister). Handler erken denemeyi
+ertelemeli çağırır: bu red bir başarısızlık sayılmaz, işaret yazılmaz, yanlış
+"iade başarısız" alarmı gitmez ve satır drainer backoff'uyla yeniden denenir;
+SON denemede erteleme yapılmaz ve iş `refundFailureReason` + retry cron'una
+devredilir. Diğer sağlayıcı hataları da aynı işarete düşer. Tutar yeni bir
+hesap değildir: satırdaki kusur kararıyla (`fullRefundEntitled`) iade
+politikası. Platform iptalinde her satır kusursuz işaretlendiği için tam
+tutardır. Duyuru tarafında bu ödeme, iptal anında sabitlenen duyuruda
+görünmez; ödeyen taraf iade core'unun "iade tamamlandı" push'unu alır.
+
+**Kapsamlı iade ve hata işareti.** Tek tarafa kapsamlı bir iade
+(`refundTradeCashTracked(tradeId, { payerId })`) başarılı olunca takasın
+`refundFailureReason` işaretini yalnız başka bir tarafın iade borcu kalmadıysa
+temizler (iade yolunun kendi aday filtresiyle sayılır; okunamazsa işaret
+korunur). Aksi halde geç gelen B ödemesinin iadesi, A'nın başarısız iadesinin
+işaretini silerdi ve `retryFailedTradeRefunds` A'yı bir daha görmezdi.
+Kapsamsız çağrı takasın tüm borcunu ele aldığı için bugünkü gibi temizler.
+
+**Karar (2026-10-05) — iptalden sonra tamamlanan ödemenin kusur kararı.**
+
+- **Ödeme süresi dolumu iptali (tarama):** ödemesi iptalden SONRA tamamlanan
+  taraf da kusursuzdur ve **hizmet bedeli dahil tam** iade alır. Tarama
+  (`faultless: "paid"`) yalnız iptal anında `completed` olan satırları
+  işaretleyebildiği için bayrak, geç ödemeyi tespit eden yolda
+  (`payment-fulfillment` → iptal edilmiş takas dalı) iade satırıyla AYNI tx'te
+  yazılır; tutar yine iade politikasından (`fullRefundEntitled`) gelir. Takas
+  satırı aşamayı ayrıca kaydetmediği için karar en dar sinyallerin
+  birleşimidir (`isPaymentExpiryCancellation`): aktör `system`, gerekçe süre
+  dolumu sabiti (yalnız tarama yazar), ödeme son tarihi kurulu ve kargolama son
+  tarihi kurulu değil. Stok tükenmesi, ban, üyelik düşüşü gibi diğer sistem
+  iptalleri bu kümeye girmez.
+- **Taraf iptali:** takası kendisi iptal eden tarafın ödemesi sonradan
+  tamamlanırsa **hizmet bedeli düşülerek** iade edilir — bu yürürlükteki
+  kuraldır (iptal eden kusurludur). Karşı tarafın satırı iptal anında zaten
+  kusursuz işaretlenir ve tam iade alır.
+- **Platform iptali:** her satır iptal anında kusursuz işaretlenir (değişmedi).
 
 ---
 

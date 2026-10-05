@@ -329,6 +329,11 @@ export class AdminAnalyticsOrderService {
       status: o.status,
       cancellationType: o.cancellationType ?? null,
       cancelReason: o.cancelReason ?? null,
+      // Kim iptal etti + yönetici iptalinin katalog nedeni (dosyada etiketiyle).
+      cancelledBy: o.cancelledBy ?? null,
+      adminCancelReasonCode: o.adminCancelReasonCode ?? null,
+      // Teklif siparişi mi — iptal diyaloğu bağlı teklifin de kapanacağını söyler.
+      origin: o.origin,
       createdAt: o.createdAt,
       deliveredAt: o.deliveredAt ?? null,
       completedAt: o.completedAt ?? null,
@@ -348,8 +353,8 @@ export class AdminAnalyticsOrderService {
       },
       quantity: o.quantity ?? 1,
       unitPrice: o.unitPrice != null ? Number(o.unitPrice) : null,
-      // Siparişin KENDİ kargo satırı — panel kargo öncesi iptal uygunluğunu
-      // (preShipmentCancelBlocker) API ile aynı veriden hesaplar.
+      // Siparişin KENDİ kargo satırı — panel yönetici iptali uygunluğunu
+      // (adminOrderCancelEligibility) API ile aynı veriden hesaplar.
       shipment: o.shipment
         ? { status: o.shipment.status, shippedAt: o.shipment.shippedAt ?? null }
         : null,

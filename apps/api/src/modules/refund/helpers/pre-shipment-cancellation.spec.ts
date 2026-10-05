@@ -51,12 +51,15 @@ describe("pre-shipment cancellation specs", () => {
     });
   });
 
-  it("platform iptali: aktör platform, talep alıcı adına, duyuru iki tarafa", () => {
-    const spec = platformCancellationSpec(
-      "buyer-1",
-      "admin-1",
-      "  Satıcı stoğu bitti ",
-    );
+  it("alıcı iptali yönetici kodu taşımaz", () => {
+    expect(
+      buyerCancellationSpec("buyer-1", OrderCancellationReason.changed_mind)
+        .adminReasonCode,
+    ).toBeNull();
+  });
+
+  it("platform iptali: aktör platform, talep alıcı adına; görünen alanlar yalnız etiketten, duyuru çağıranın", () => {
+    const spec = platformCancellationSpec("buyer-1", "admin-1", "stock_error");
 
     expect(spec).toMatchObject({
       initiator: CancellationActor.platform,
@@ -64,12 +67,16 @@ describe("pre-shipment cancellation specs", () => {
       actorId: "admin-1",
       decidedBy: "admin-1",
       reasonCode: null,
-      description: "Satıcı stoğu bitti",
-      cancelReason: "Satıcı stoğu bitti",
+      adminReasonCode: "stock_error",
+      description: "Yönetici tarafından iptal edildi: Stok hatası",
+      cancelReason: "Yönetici tarafından iptal edildi: Stok hatası",
       requestReason: RefundReason.other,
       resolvedReason: RefundReason.other,
       faultParty: "platform",
-      notifyParties: ["buyer", "seller"],
+      historyDetails: { initiator: "platform", adminReasonCode: "stock_error" },
+      // Platform duyurusunu AdminOrderCancelService her tür için tek yerden
+      // gönderir; çekirdek göndermez (çift mesaj olmaz).
+      notifyParties: [],
     });
     expect(spec.policy).toMatchObject({
       policyCode: "platform_cancellation",

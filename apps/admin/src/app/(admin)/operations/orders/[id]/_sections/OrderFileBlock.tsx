@@ -40,8 +40,15 @@ import {
 import { StatusUpdateModal } from "../_modals/StatusUpdateModal";
 import { AddTrackingModal } from "../_modals/AddTrackingModal";
 import { CancelOrderModal } from "../_modals/CancelOrderModal";
-import { canCancelFileEntry, pendingCancellationRefund } from "../_lib/cancel";
+import {
+  canCancelFileEntry,
+  cancelBlockerText,
+  fileEntryVisibleBlocker,
+  orderCancelReasonText,
+  pendingCancellationRefund,
+} from "../_lib/cancel";
 import { statusConfig } from "@/lib/statusLabels";
+import { cancellationActorLabel } from "@/app/(admin)/operations/cancellations-refunds/_lib/cancellationView";
 
 /**
  * Grup dosyasında TEK siparişin tam bölümü: statü + tarihler, ürün, tam finansal
@@ -69,6 +76,8 @@ export function OrderFileBlock({ entry }: { entry: OrderFileEntry }) {
   );
   const f = entry.finance;
   const pendingCancellation = pendingCancellationRefund(entry);
+  const cancelBlocker = canManage ? fileEntryVisibleBlocker(entry) : null;
+  const cancelReason = orderCancelReasonText(entry, t);
 
   return (
     <section className="mt-5 border-t border-border pt-5">
@@ -116,6 +125,12 @@ export function OrderFileBlock({ entry }: { entry: OrderFileEntry }) {
           )}
         </div>
       </div>
+
+      {cancelBlocker && (
+        <p className="-mt-2 mb-4 text-xs text-muted">
+          {cancelBlockerText(cancelBlocker, t)}
+        </p>
+      )}
 
       {pendingCancellation && (
         <Alert variant="warning" className="mb-4">
@@ -372,11 +387,22 @@ export function OrderFileBlock({ entry }: { entry: OrderFileEntry }) {
         </div>
       )}
 
-      {entry.cancelReason && (
-        <p className="mt-3 text-xs text-muted">
-          {t("admin.operations.orders.banners.cancelReason", {
-            reason: entry.cancelReason,
-          })}
+      {(entry.cancelledBy || cancelReason) && (
+        <p className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted">
+          {entry.cancelledBy && (
+            <span>
+              {t("admin.operations.orders.banners.cancelledBy", {
+                actor: cancellationActorLabel(entry.cancelledBy, t),
+              })}
+            </span>
+          )}
+          {cancelReason && (
+            <span>
+              {t("admin.operations.orders.banners.cancelReason", {
+                reason: cancelReason,
+              })}
+            </span>
+          )}
         </p>
       )}
 
@@ -396,6 +422,7 @@ export function OrderFileBlock({ entry }: { entry: OrderFileEntry }) {
         onClose={() => setCancelOpen(false)}
         orderId={entry.id}
         orderNumber={entry.orderNumber}
+        isOfferOrder={entry.origin === "offer"}
       />
     </section>
   );

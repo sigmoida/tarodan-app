@@ -124,3 +124,11 @@ export * from "./timing-policy";
 
 // Durations quoted by legal texts: the statements + mismatch check (admin warning)
 export * from "./timing-legal";
+
+// Admin (platform) cancellation: shared reason catalog + request shape
+export * from "./admin-cancellation";
+// ...and the request's validity rule (reason code, note required for "other")
+export * from "./admin-cancel-request";
+
+// Admin (platform) trade cancellation: eligibility rule + preview/result shapes
+export * from "./admin-trade-cancellation";

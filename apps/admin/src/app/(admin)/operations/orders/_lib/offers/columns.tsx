@@ -7,7 +7,7 @@ import { cancelReasonLabel } from "@/lib/utils";
 import { statusConfig } from "@/lib/statusLabels";
 import { TestLaneBadge } from "@/components/TestLaneBadge";
 import {
-  canCancelOffer,
+  offerCancelAction,
   offerPercentOfList,
   type OfferRow,
 } from "@/app/(admin)/operations/offers/_lib/offers";
@@ -127,11 +127,16 @@ export function offerColumns({ t, onView, onCancel }: OfferColumnProps) {
             icon: EyeIcon,
             onClick: () => onView(o),
           },
+          // Canlı siparişi olan teklifte işlem sipariş iptalidir (sepet
+          // siparişiyle aynı diyalog/uç); siparişsiz teklifte teklif iptali.
           {
-            label: t("admin.operations.offers.cancel"),
+            label:
+              offerCancelAction(o)?.kind === "order"
+                ? t("admin.operations.orders.cancel.action")
+                : t("admin.operations.offers.cancel"),
             icon: XCircleIcon,
             destructive: true,
-            disabled: !canCancelOffer(o),
+            disabled: !offerCancelAction(o),
             onClick: () => onCancel(o),
           },
         ]}

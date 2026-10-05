@@ -157,6 +157,91 @@ describe("email template renderer", () => {
     );
   });
 
+  describe("platform (admin) cancellation", () => {
+    const base = {
+      orderNumber: "ORD-9",
+      orderId: "o9",
+      productTitle: "Model araba",
+      reason: "Stok hatası",
+    };
+    const brand = { frontendUrl: "https://tarodan.com.tr" };
+
+    it("paid: tells the buyer Tarodan cancelled, the reason label, the refund and the bank timing (no day literal)", () => {
+      const html = renderEmailTemplate(
+        "order-cancelled-by-platform-buyer",
+        { ...base, buyerName: "Ali", paid: true, refundAmount: 1180 },
+        brand,
+      );
+
+      expect(html).toContain("Tarodan Tarafından İptal Edildi");
+      expect(html).toContain("#ORD-9");
+      expect(html).toContain("Stok hatası");
+      expect(html).toContain("İade Tutarı");
+      expect(html).toContain("1.180,00 TL");
+      expect(html).toContain("bankanızın olağan iade süresi");
+      expect(html).not.toMatch(/\d\s*[–-]\s*\d\s*iş günü/);
+      expect(html).toContain("https://tarodan.com.tr/profile/orders/o9");
+    });
+
+    it("unpaid: says no payment was taken and shows no refund amount", () => {
+      const html = renderEmailTemplate(
+        "order-cancelled-by-platform-buyer",
+        { ...base, paid: false },
+        brand,
+      );
+
+      expect(html).toContain("ödeme alınmamıştı");
+      expect(html).not.toContain("İade Tutarı");
+    });
+
+    it("links a guest buyer to order tracking", () => {
+      const html = renderEmailTemplate(
+        "order-cancelled-by-platform-buyer",
+        {
+          ...base,
+          paid: true,
+          refundAmount: 100,
+          isGuestOrder: true,
+          buyerEmail: "misafir@example.com",
+        },
+        brand,
+      );
+
+      expect(html).toContain(
+        "https://tarodan.com.tr/track-order?orderNumber=ORD-9&amp;email=misafir%40example.com",
+      );
+    });
+
+    it("seller: do not ship (paid) vs. reservation released (unpaid), with the reason label", () => {
+      const paid = renderEmailTemplate(
+        "order-cancelled-by-platform-seller",
+        { ...base, sellerName: "Satıcı", paid: true },
+        brand,
+      );
+      const unpaid = renderEmailTemplate(
+        "order-cancelled-by-platform-seller",
+        { ...base, sellerName: "Satıcı", paid: false },
+        brand,
+      );
+
+      expect(paid).toContain("kargoya vermeyin");
+      expect(paid).toContain("Stok hatası");
+      expect(unpaid).toContain("ödeme alınmamıştı");
+      expect(unpaid).not.toContain("kargoya vermeyin");
+      expect(paid).toContain("https://tarodan.com.tr/seller/orders/o9");
+    });
+
+    it("escapes the reason text", () => {
+      const html = renderEmailTemplate(
+        "order-cancelled-by-platform-seller",
+        { ...base, reason: "<b>x</b>", paid: false },
+        brand,
+      );
+
+      expect(html).toContain("&lt;b&gt;x&lt;/b&gt;");
+    });
+  });
+
   it("extracts only the editable content from a wrapped email", () => {
     const wrapped = renderEmailTemplate(
       "password-reset",

@@ -60,6 +60,16 @@ export const EMAIL_TEMPLATE_DEFINITIONS = [
     name: "Sipariş iptal edildi (satıcı)",
     group: "Sipariş",
   },
+  {
+    key: "order-cancelled-by-platform-buyer",
+    name: "Sipariş Tarodan tarafından iptal edildi (alıcı)",
+    group: "Sipariş",
+  },
+  {
+    key: "order-cancelled-by-platform-seller",
+    name: "Sipariş Tarodan tarafından iptal edildi (satıcı)",
+    group: "Sipariş",
+  },
   { key: "payment-received", name: "Ödeme alındı", group: "Ödeme" },
   { key: "payment-failed", name: "Ödeme başarısız", group: "Ödeme" },
   {
@@ -212,6 +222,11 @@ export const EMAIL_TEMPLATE_DEFINITIONS = [
   { key: "trade-accepted", name: "Takas kabul edildi", group: "Takas" },
   { key: "trade-shipped", name: "Takas kargoya verildi", group: "Takas" },
   { key: "trade-completed", name: "Takas tamamlandı", group: "Takas" },
+  {
+    key: "trade-cancelled-platform",
+    name: "Takas Tarodan tarafından iptal edildi",
+    group: "Takas",
+  },
   {
     key: "guest-checkout-otp",
     name: "Misafir sipariş doğrulama kodu",

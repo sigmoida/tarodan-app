@@ -175,8 +175,12 @@ describe("AdminOfferQueryService", () => {
               totalAmount: 830,
               cancelReason: null,
               cancellationType: null,
+              cancelledBy: null,
+              adminCancelReasonCode: null,
               createdAt: new Date(),
               payment: null,
+              shipment: null,
+              refundRequests: [],
             },
           }),
         ]),
@@ -194,6 +198,9 @@ describe("AdminOfferQueryService", () => {
           orderNumber: "ORD-1",
           totalAmount: 830,
           paymentStatus: null,
+          // Panelin iptal uygunluğu için (adminOrderCancelEligibility girdisi).
+          shipment: null,
+          hasActiveRefund: false,
         }),
       }),
     );

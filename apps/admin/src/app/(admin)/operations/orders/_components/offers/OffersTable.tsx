@@ -6,8 +6,11 @@ import { useTranslations } from "next-intl";
 import { DataTable } from "@/components/DataTable";
 import { useResourceList } from "@/components/list";
 import { offerColumns } from "../../_lib/offers/columns";
-import type { OfferRow } from "@/app/(admin)/operations/offers/_lib/offers";
-import { CancelOfferModal } from "@/app/(admin)/operations/offers/[id]/_modals/CancelOfferModal";
+import {
+  offerCancelAction,
+  type OfferRow,
+} from "@/app/(admin)/operations/offers/_lib/offers";
+import { OfferCancelDialog } from "@/app/(admin)/operations/offers/[id]/_modals/OfferCancelDialog";
 
 export function OffersTable() {
   const t = useTranslations();
@@ -39,10 +42,11 @@ export function OffersTable() {
         onSort={setSort}
       />
       {cancelTarget && (
-        <CancelOfferModal
+        <OfferCancelDialog
+          action={offerCancelAction(cancelTarget)}
+          offerId={cancelTarget.id}
           open
           onClose={() => setCancelTarget(null)}
-          offer={cancelTarget}
         />
       )}
     </>

@@ -24,6 +24,7 @@ import { EscrowReleasePanel } from "./_sections/EscrowReleasePanel";
 import { EscrowReleasedInfo } from "./_sections/EscrowReleasedInfo";
 import { StuckPanel } from "./_sections/StuckPanel";
 import { ReviewPanel } from "./_sections/ReviewPanel";
+import { AdminCancelPanel } from "./_sections/AdminCancelPanel";
 import { TradeInfoCards } from "./_sections/TradeInfoCards";
 import { TradeBalanceCard } from "./_sections/TradeBalanceCard";
 import { TradePartyCard } from "./_components/TradePartyCard";
@@ -186,6 +187,7 @@ export default function TradeDetailPage() {
               onApprove={() => setShowApprove(true)}
               onReject={() => setShowReject(true)}
             />
+            <AdminCancelPanel trade={trade} />
 
             <TradeBalanceCard trade={trade} />
 

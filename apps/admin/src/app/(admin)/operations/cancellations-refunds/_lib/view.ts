@@ -50,6 +50,7 @@ export const VIEW_SCOPED_PARAMS = [
   "party",
   "startDate",
   "endDate",
+  "adminReason",
   // İadeler
   "status",
   "kind",

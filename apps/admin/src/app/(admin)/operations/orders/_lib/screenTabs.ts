@@ -47,6 +47,8 @@ export const ORDERS_TAB_SCOPED_PARAMS = [
   // Teklifler + Takaslar
   "fromDate",
   "toDate",
+  // Takaslar: platform (admin) iptal nedeni
+  "adminCancelReasonCode",
 ] as const;
 
 /**

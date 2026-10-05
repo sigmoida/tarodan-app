@@ -17,6 +17,7 @@ import {
   RefundAttemptStatus,
   SellerAdjustmentType,
 } from "@prisma/client";
+import type { AdminCancelReasonCode } from "@tarodan/types";
 import { OFFER_CANCEL_REASON } from "../../trade/helpers/trade-cancel-reasons";
 import {
   shouldQuarantineReturnedStock,
@@ -116,10 +117,34 @@ export interface ProcessRefundOptions {
    * Sipariş zaten başka bir yolla iptal edilmişse o yolun aktörü korunur.
    */
   cancelledBy: CancellationActor;
+  /**
+   * Platform (yönetici) iptalinin katalog nedeni. Bu iade siparişi kapatırsa
+   * ve aktör platform ise kod siparişe AYNI işlemde yazılır (iptalin
+   * kesinleştiği an) ve — `skipRefundEvent` yoksa — genel iptal duyurusu
+   * yerine platform duyurusu gider. Talepten doğan iadede çağıran kodu
+   * talebin metadata'sından okur (`refundRequestAdminReasonCode`).
+   */
+  adminCancelReasonCode?: AdminCancelReasonCode | null;
   skipRefundEvent?: boolean;
   refundQuantity?: number;
   idempotencyKey?: string;
   settlement?: RefundSettlementOptions;
+}
+
+/**
+ * Siparişi bu iadeyle kapatırken yazılacak yönetici neden kodu: yalnız
+ * aktör platform, kod verilmiş ve sipariş başka bir yolla ZATEN iptal
+ * edilmemişse (o yolun aktörü/nedeni korunur).
+ */
+function platformCancelReason(
+  opts: Pick<ProcessRefundOptions, "cancelledBy" | "adminCancelReasonCode">,
+  alreadyCancelled: boolean,
+): AdminCancelReasonCode | null {
+  return !alreadyCancelled &&
+    opts.cancelledBy === CancellationActor.platform &&
+    opts.adminCancelReasonCode
+    ? opts.adminCancelReasonCode
+    : null;
 }
 
 @Injectable()
@@ -231,7 +256,25 @@ export class PaymentRefundService {
     payment: any,
     providerRefundId: string | undefined,
     skipRefundEvent: boolean | undefined,
+    /** Bu iadeyle kesinleşen yönetici iptalinin kodu (siparişe yazıldıysa). */
+    adminReasonCode: AdminCancelReasonCode | null = null,
   ): Promise<void> {
+    // Yönetici iptali bu iadeyle tamamlandı (ör. takılı deneme kurtarması):
+    // taraflara genel iptal/iade metni değil, nedenli platform duyurusu.
+    if (adminReasonCode && !skipRefundEvent) {
+      await this.notificationService
+        .notifyOrderCancelledByPlatform({
+          orderId,
+          reasonCode: adminReasonCode,
+          refundAmount: amountToRefund,
+        })
+        .catch((error: unknown) =>
+          this.logger.error(
+            `platform cancel notice failed for order ${orderId}: ${errorMessage(error)}`,
+          ),
+        );
+      return;
+    }
     try {
       const order = await this.prisma.order.findUnique({
         where: { id: orderId },
@@ -435,6 +478,8 @@ export class PaymentRefundService {
         refundAmount: amountToRefund,
         providerRefundId: priorAttempt.providerRefundId ?? undefined,
         idempotent: true,
+        // Siparişi bu çağrı kapatmadı (önceki sonlandırma kapattı).
+        closedWithAdminReason: null,
       };
     }
     if (payment.status !== PaymentStatus.completed) {
@@ -497,6 +542,8 @@ export class PaymentRefundService {
         refundAmount: amountToRefund,
         providerRefundId: refundAttempt.attempt.providerRefundId ?? undefined,
         idempotent: true,
+        // Siparişi bu çağrı kapatmadı (önceki sonlandırma kapattı).
+        closedWithAdminReason: null,
       };
     }
 
@@ -707,6 +754,8 @@ export class PaymentRefundService {
       // Update payment status after successful refund
       let invoiceAdjustment: InvoiceRefundReversePayload | null = null;
       let shipmentCancellationRequired = false;
+      // Bu iadeyle kesinleşen yönetici iptalinin neden kodu (siparişe yazıldıysa).
+      let completedAdminReason: AdminCancelReasonCode | null = null;
       // Teslim SONRASI iadede stok karantinaya girer (ilan pasif kalır) — tx
       // içinde gerçekten uygulandıysa true olur, post-commit satıcı bildirimi
       // bunu okur (bkz. shouldQuarantineReturnedStock).
@@ -1000,6 +1049,10 @@ export class PaymentRefundService {
             // Tam iade → sipariş cancelled. Kısmi adet iadesinde sipariş açık kalır
             // (kalan adetler hâlâ alıcıda); yalnız stok ve para kısmen geri döner.
             if (isFullRefund) {
+              completedAdminReason = platformCancelReason(
+                opts,
+                alreadyCancelled,
+              );
               await tx.order.update({
                 where: { id: orderId },
                 data: {
@@ -1010,6 +1063,11 @@ export class PaymentRefundService {
                   // aktörden iyidir.
                   ...(alreadyCancelled
                     ? { cancelledBy: orderRow?.cancelledBy ?? null }
+                    : {}),
+                  // Yönetici iptali BU iadeyle kesinleşiyor: neden kodu
+                  // siparişin kapandığı yazımda (süzgeç/sayaç/Excel bunu okur).
+                  ...(completedAdminReason
+                    ? { adminCancelReasonCode: completedAdminReason }
                     : {}),
                 },
               });
@@ -1101,6 +1159,11 @@ export class PaymentRefundService {
             // Çağıran (ör. finalizeRefundForReturnedShipment) satıcıya "ilan
             // pasife düştü" notunu YALNIZ bu true ise ekler.
             stockQuarantined,
+            // Siparişi BU çağrı yönetici (platform) iptali olarak kapattıysa
+            // yazdığı neden kodu; aksi halde null. Platform duyurusu yalnız
+            // buna bağlanır: başka yol kapattıysa ya da başka çağrı
+            // sonlandırdıysa (null / idempotent) duyuru gönderilmez.
+            closedWithAdminReason: completedAdminReason,
           };
 
           // 11.2d: iade sonucu bildirimleri (payment.refunded / order_cancelled) artık
@@ -1156,6 +1219,7 @@ export class PaymentRefundService {
             payment,
             response.providerRefundId,
             opts?.skipRefundEvent,
+            completedAdminReason,
           );
           if (shipmentCancellationRequired) {
             // Para commit'inden sonra hızlı yol; aynı iş outbox'ta kalıcıdır.

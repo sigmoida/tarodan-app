@@ -32,8 +32,14 @@ import {
   resolvePlatformCancellationPolicy,
   resolveReturnPolicy,
 } from "./helpers/refund-financial-policy";
-import { isPreShipmentCancellableStatus } from "@tarodan/types";
-import { REFUND_REQUEST_ACTOR_KEY } from "../payment/helpers/refund-attempt-actor";
+import {
+  isPreShipmentCancellableStatus,
+  type AdminCancelReasonCode,
+} from "@tarodan/types";
+import {
+  REFUND_REQUEST_ACTOR_KEY,
+  REFUND_REQUEST_ADMIN_REASON_KEY,
+} from "../payment/helpers/refund-attempt-actor";
 import {
   PLATFORM_CANCELLATION_FAULT_PARTY,
   PLATFORM_CANCELLATION_REASON,
@@ -252,17 +258,19 @@ export class RefundCreationService {
    * grup (sepet) ödemesinde de çalışır, çünkü para yolu siparişin kendi
    * payını iade eden processRefund'dur. Yetki kontrolü çağıranın (admin
    * rolü) işidir. Alıcı iptaliyle AYNI çekirdekten geçer; fark yalnız
-   * platformCancellationSpec'tedir.
+   * platformCancellationSpec'tedir. Neden yalnız katalog KODU olarak gelir —
+   * yöneticinin iç notu çekirdeğe (ve taraflara görünen alanlara) girmez.
+   * Taraf duyurusu çağıranındır (spec `notifyParties: []`).
    */
   async createPlatformCancellationRefund(
     orderId: string,
     adminId: string,
-    reason: string,
+    reasonCode: AdminCancelReasonCode,
   ) {
     const order = await this.loadOrderForCancellation(orderId);
     return this.executePreShipmentCancellation(
       order,
-      platformCancellationSpec(order.buyerId, adminId, reason),
+      platformCancellationSpec(order.buyerId, adminId, reasonCode),
     );
   }
 
@@ -407,7 +415,15 @@ export class RefundCreationService {
             description: spec.description,
             // Talep sonradan (admin onayı, takılı deneme kurtarması) iade
             // edilirse iptal aktörü buradan okunur (refundRequestCancelActor).
-            metadata: { [REFUND_REQUEST_ACTOR_KEY]: spec.initiator },
+            // Platform iptalinde neden kodu da talepte taşınır: iptal, iade
+            // hangi yoldan tamamlanırsa (eşzamanlı, admin onayı, kurtarma)
+            // o an siparişe yazılır (refundRequestAdminReasonCode).
+            metadata: {
+              [REFUND_REQUEST_ACTOR_KEY]: spec.initiator,
+              ...(spec.adminReasonCode
+                ? { [REFUND_REQUEST_ADMIN_REASON_KEY]: spec.adminReasonCode }
+                : {}),
+            },
             amount: financial.financials.buyerRefundAmount,
             refundQuantity: order.quantity ?? 1,
             status: policy.requiresAdminReview
@@ -472,7 +488,7 @@ export class RefundCreationService {
         reason: spec.snapshotReason,
         requiresAdminReview: true,
       });
-      return created;
+      return { ...created, closedWithAdminReason: null };
     }
 
     // `processRefund` resolves to null when the attempt was already finalized —
@@ -481,6 +497,7 @@ export class RefundCreationService {
     let refundResult: {
       providerRefundId?: string;
       stockQuarantined?: boolean;
+      closedWithAdminReason?: AdminCancelReasonCode | null;
     } | null;
     try {
       refundResult = await this.paymentService.processRefund(
@@ -494,6 +511,9 @@ export class RefundCreationService {
           idempotencyKey: `refund-request:${created.id}`,
           // İptalin aktörü spec'ten — alıcı ya da platform (admin iptali).
           cancelledBy: spec.initiator,
+          // Platform iptali bu iadeyle kesinleşirse kod siparişe AYNI
+          // işlemde yazılır (PSP hatasında yazılmaz; talep taşır).
+          adminCancelReasonCode: spec.adminReasonCode,
           settlement: {
             closeOrder: true,
             holdPortion: 1,
@@ -561,7 +581,14 @@ export class RefundCreationService {
       Number(updated.amount),
       spec.notifyParties,
     );
-    return updated;
+    // Siparişi BU çağrının iadesi platform iptali olarak kapattıysa kodu; aksi
+    // halde null (ör. takılı deneme kurtarması aynı denemeyi önce sonlandırıp
+    // duyuruyu kendisi gönderdi). Platform duyurusunu gönderen çağıran
+    // (AdminOrderCancelService) yalnız buna bakar — çift mesaj olmaz.
+    return {
+      ...updated,
+      closedWithAdminReason: refundResult?.closedWithAdminReason ?? null,
+    };
   }
 
   /**

@@ -6700,13 +6700,13 @@
         "productStock": "Stok: {quantity} · Rezerve: {reserved}",
         "cancel": "Teklifi iptal et",
         "cancelTitle": "Teklifi iptal et",
-        "cancelDescription": "Teklif kapatılır; alıcı ve satıcıya gerekçeyle bildirim gider.",
+        "cancelDescription": "Siparişi olmayan teklif kapatılır; alıcı ve satıcıya gerekçeyle bildirim gider. Siparişi olan teklif sipariş üzerinden iptal edilir.",
         "cancelReason": "İptal gerekçesi",
         "cancelReasonPlaceholder": "Neden iptal ediliyor? (zorunlu)",
-        "cancelWillCancelOrder": "Bağlı ödeme bekleyen sipariş de iptal edilecek.",
         "cancelled": "Teklif iptal edildi",
         "cancelFailed": "Teklif iptal edilemedi",
-        "extendedAt": "Bir kez uzatıldı"
+        "extendedAt": "Bir kez uzatıldı",
+        "cancelledBy": "İptal eden"
       },
       "orders": {
         "title": "Siparişler",
@@ -6794,7 +6794,8 @@
           "refundRequestsLink": "İade Talepleri",
           "payoutHeldNote2": "sayfasını kullanın.",
           "cancelReason": "İptal nedeni: {reason}",
-          "origin": "Köken: {origin}"
+          "origin": "Köken: {origin}",
+          "cancelledBy": "İptal eden: {actor}"
         },
         "financial": {
           "title": "Finansal Özet",
@@ -6953,20 +6954,44 @@
         "cancel": {
           "action": "Siparişi iptal et",
           "title": "Siparişi iptal et",
-          "description": "#{orderNumber} numaralı sipariş iptal edilecek. Sepetteki diğer ürünler etkilenmez.",
+          "description": "#{orderNumber} numaralı sipariş Tarodan iptali olarak kapatılacak. Sepetteki diğer ürünler etkilenmez.",
           "warning": "Alıcıya ödeme iadesi yapılır ve bu işlem geri alınamaz. Kargo etiketi oluşturulduysa kargo kaydı da iptal edilir; stok ürüne geri eklenir.",
           "refundAmount": "Alıcıya iade edilecek tutar",
           "shippingIncluded": "Kargo bedeli dahil",
           "shippingExcluded": "Kargo bedeli hariç — paketteki diğer ürünler yine gönderilecek",
-          "previewLoading": "İade tutarı hesaplanıyor…",
-          "previewUnavailable": "İade tutarı şu an hesaplanamadı. İptal yine de kargo öncesi iptal politikasının tutarıyla yapılır.",
-          "reason": "İptal gerekçesi",
-          "reasonPlaceholder": "Gerekçe denetim kaydına yazılır ve iptal e-postasında alıcıya ve satıcıya iletilir",
+          "previewLoading": "İptal önizlemesi hazırlanıyor…",
+          "previewUnavailable": "İptal önizlemesi alınamadı; önizleme olmadan iptal onaylanamaz. Pencereyi kapatıp yeniden deneyin.",
+          "reason": "İptal nedeni",
+          "reasonPlaceholder": "Neden seçin",
           "confirm": "İptal et ve iade et",
           "success": "Sipariş iptal edildi, alıcıya iade yapıldı",
           "failed": "Sipariş iptal edilemedi",
           "pendingManual": "Bu siparişin iptali İade Talepleri'nde elle tamamlanmayı bekliyor (iade işlemi yarıda kaldı).",
-          "openPendingRefund": "Talebi aç"
+          "openPendingRefund": "Talebi aç",
+          "warningUnpaid": "Sipariş kapatılır ve bu işlem geri alınamaz. Ödeme alınmadığı için para iadesi yoktur; ayrılan stok ve kupon serbest kalır.",
+          "reasonHint": "Alıcıya ve satıcıya yalnız seçilen nedenin adı iletilir.",
+          "note": "İç not",
+          "notePlaceholder": "Yalnız yöneticiler görür; denetim kaydına yazılır. Taraflara gösterilmez.",
+          "noteRequired": "“Diğer” seçildiğinde iç not zorunludur",
+          "confirmUnpaid": "Siparişi iptal et",
+          "successUnpaid": "Sipariş iptal edildi",
+          "noPayment": "Ödeme alınmadı — iade edilecek tutar yok",
+          "reservationReleased": "{count} adet stok rezervasyonu serbest bırakılır",
+          "reservationAlreadyReleased": "Stok rezervasyonu zaten serbest bırakılmış",
+          "stockRestored": "{count} adet stok ilana geri eklenir",
+          "kindChanged": "Siparişin ödeme durumu değişti; önizleme güncellendi. Kontrol edip yeniden onaylayın.",
+          "offerOrder": "Teklif siparişi: bağlı teklif de kapatılır.",
+          "partiesNotice": "Alıcıya ve satıcıya uygulama içi bildirim ve e-posta gönderilir.",
+          "blocked": "Yönetici iptali kapalı: {reason}",
+          "blockers": {
+            "closed": "sipariş zaten iptal ya da iade edildi",
+            "activeRefund": "açık bir iade talebi var; talebin kendi onay/ret/kapat işlemlerini kullanın",
+            "pendingCancellation": "yarıda kalmış iptal İade Talepleri'nde elle tamamlanmayı bekliyor",
+            "handedOver": "koli kargoya verildi; bu aşamada iade talebi akışı işler",
+            "delivered": "sipariş teslim edildi; iade talebi akışı işler",
+            "completed": "sipariş tamamlandı; satıcı ödemesi yapıldı ya da yapılacak"
+          },
+          "reservationNotReserved": "Bu sipariş için stok ayrılmamıştı (ödemesi hiç başlatılmadı)"
         }
       },
       "trades": {
@@ -7120,7 +7145,35 @@
         "faultySideInitiator": "Teklifi başlatan tarafın ürünü",
         "faultySideReceiver": "Teklifi alan tarafın ürünü",
         "faultySideBoth": "Her iki tarafın ürünü",
-        "faultySideNeither": "Ürün kaynaklı değil (operasyonel red)"
+        "faultySideNeither": "Ürün kaynaklı değil (operasyonel red)",
+        "adminCancel": {
+          "action": "Takası iptal et",
+          "title": "Takası iptal et",
+          "description": "#{tradeNumber} numaralı takas Tarodan tarafından iptal edilecek. Bu iptal hiçbir tarafın kusuru sayılmaz: tahsil edilen tutarların tamamı iade edilir.",
+          "warning": "Bu işlem geri alınamaz. Taraflara iptal nedeni bildirim ve e-postayla iletilir; iç not yalnız denetim kaydında kalır.",
+          "reason": "İptal nedeni",
+          "reasonPlaceholder": "Neden seçin",
+          "note": "İç not",
+          "notePlaceholder": "Yalnız denetim kaydına yazılır, taraflara gösterilmez",
+          "noteRequired": "\"Diğer\" seçildiğinde iç not zorunludur",
+          "refundsTitle": "İadeler",
+          "notPaid": "Ödeme yapılmadı",
+          "refundTotal": "Toplam iade",
+          "releasedTitle": "Serbest kalacak ürünler",
+          "noReservation": "Teklif aşamasında rezervasyon yoktur; ürünler zaten serbest.",
+          "labelsToCancel": "{count} kargo etiketi iptal edilecek (henüz kargoya verilmedi)",
+          "previewLoading": "İadeler hesaplanıyor…",
+          "previewUnavailable": "Önizleme şu an alınamadı.",
+          "confirm": "İptal et ve iade et",
+          "success": "Takas iptal edildi",
+          "successRefundFailed": "Takas iptal edildi ancak iade başarısız oldu; \"İadeyi yeniden dene\" ile tamamlayın.",
+          "alreadyCancelled": "Takas zaten bu şekilde iptal edilmişti",
+          "failed": "Takas iptal edilemedi",
+          "blockedTitle": "Bu aşamada platform iptali yapılamaz",
+          "cancelledByPlatform": "Tarodan tarafından iptal edildi",
+          "reasonFilter": "Platform iptal nedeni",
+          "reasonRequired": "İptal nedeni seçin"
+        }
       },
       "refundRequests": {
         "amountAndFee": "Tutar / Kesinti",
@@ -7510,7 +7563,10 @@
           "groupNumber": "Grup Kodu",
           "party": "Alıcı / Satıcı",
           "partyPlaceholder": "Ad, e-posta, kullanıcı kodu ya da kullanıcı ID",
-          "cancelledDate": "İptal tarihi"
+          "cancelledDate": "İptal tarihi",
+          "adminReason": "Yönetici iptali",
+          "adminReasonAll": "Tümü",
+          "adminReasonAny": "Tüm yönetici iptalleri"
         },
         "resultCount": "Filtreleme sonuçları: toplam {count} iptal",
         "empty": "Henüz iptal yok",
@@ -9957,6 +10013,18 @@
       "tradePaymentExtendedPaid": {
         "title": "Takasta Karşı Tarafa Ek Ödeme Süresi Verildi",
         "message": "Ödemenizi tamamladınız; karşı tarafın ödeme süresi bir kez uzatıldı. Yeni son tarih: {until}. Ürününüz o zamana kadar rezerve kalır. Karşı taraf yine de ödemezse takas iptal edilir ve ödemeniz tam olarak iade edilir."
+      },
+      "orderCancelledByPlatform": {
+        "title": "Siparişiniz Tarodan tarafından iptal edildi",
+        "message": "{orderNumber} numaralı siparişiniz Tarodan tarafından iptal edildi. Neden: {reason}. {paid, select, yes {Ödediğiniz {amount} TL iade edildi; tutar bankanızın olağan iade süresi içinde hesabınıza yansır.} other {Bu sipariş için ödeme alınmamıştı.}}"
+      },
+      "orderCancelledByPlatformSeller": {
+        "title": "Sipariş Tarodan tarafından iptal edildi",
+        "message": "{orderNumber} numaralı sipariş Tarodan tarafından iptal edildi. Neden: {reason}. {paid, select, yes {Ürünü kargoya vermeyin; stok ilanınıza geri eklendi.} other {Ödeme alınmamıştı; ayrılan stok ilanınıza geri döndü.}}"
+      },
+      "tradeCancelledByPlatform": {
+        "title": "Takasınız Tarodan tarafından iptal edildi",
+        "message": "{tradeNumber} numaralı takas Tarodan tarafından iptal edildi. Neden: {reason}.{hasRefund, select, yes { Ödediğiniz {refundAmount} TL'nin tamamı iade edilecek.} other {}} Takastaki ürünleriniz yeniden serbest."
       }
     },
     "auth": {
@@ -10109,7 +10177,8 @@
       "shipToWarehouseDeprecated": "Bu uç nokta artık kullanılmıyor. Takas kabul edildiğinde sistem her iki taraf için Sürat Kargo takip numaralarını otomatik üretir; en yakın Sürat şubesine size atanan takip numarasıyla teslim edin.",
       "shipmentAlreadyConfirmed": "Bu gönderim zaten onaylandı",
       "someItemsNotOwnedOrInactive": "Bazı ürünler size ait değil veya aktif değil",
-      "tradeNotInDisputeStatus": "Takas itiraz durumunda değil"
+      "tradeNotInDisputeStatus": "Takas itiraz durumunda değil",
+      "platformCancelledReason": "Tarodan tarafından iptal edildi: {reason}"
     },
     "order": {
       "accountBanned": "Hesabınız banlanmış. Yeni sipariş oluşturamazsınız.",
@@ -10182,7 +10251,8 @@
       "statusChangeSystemOnly": "Bu durum değişikliği sistem tarafından yapılır",
       "statusTransitionNotAllowed": "Sipariş durumu {from}'den {to}'e değiştirilemez",
       "updateForbidden": "Bu siparişi güncelleme yetkiniz yok",
-      "viewForbidden": "Bu siparişi görüntüleme yetkiniz yok"
+      "viewForbidden": "Bu siparişi görüntüleme yetkiniz yok",
+      "cancelPaymentInFlight": "Bu sipariş için şu anda süren bir ödeme işlemi var; ödeme sonuçlandıktan sonra birkaç dakika içinde yeniden deneyin"
     },
     "payment": {
       "cancelPaymentForbidden": "Bu ödemeyi iptal etme yetkiniz yok",
@@ -10476,7 +10546,7 @@
       "shipmentToDeliveredForbidden": "Kargo {status} durumundan teslim edildi durumuna geçirilemez",
       "offer": {
         "notCancellableStatus": "Teklif {status} durumunda; yalnız bekleyen veya ödenmemiş kabul edilmiş teklif iptal edilebilir",
-        "orderAlreadyPaid": "Bağlı sipariş ödendiği için teklif iptal edilemez; iade akışını kullanın"
+        "useOrderCancel": "Bu teklifin bağlı bir siparişi var; iptali sipariş üzerinden yapın (Siparişi iptal et) — teklif de onunla kapanır"
       },
       "order": {
         "shipmentMissingForDelivery": "Teslim geçişi için siparişe bağlı kargo kaydı bulunamadı",
@@ -10493,12 +10563,16 @@
         "couponChangesShipping": "Kupon kargo ücretini değiştiriyor; sipariş yeni checkout ile oluşturulmalı",
         "shipmentToDeliveredForbidden": "Kargo {status} durumundan teslim edildi durumuna geçirilemez",
         "shipmentToInTransitForbidden": "Kargo {status} durumundan yolda durumuna geçirilemez",
-        "cancelNotPaid": "Ödemesi tamamlanmamış sipariş iptal edilemez; iade edilecek bir tahsilat yok",
         "cancelAlreadyClosed": "Sipariş zaten iptal edilmiş veya iade edilmiş",
         "cancelActiveRefund": "Siparişte açık bir iade/iptal talebi var; işlemi İade Talepleri ekranından sürdürün",
         "cancelAfterHandover": "Kargoya verilmiş sipariş iptal edilemez; bu aşamada iade talebi akışını kullanın",
-        "cancelReasonRequired": "İptal gerekçesi zorunludur",
-        "cancelPendingManualCompletion": "Bu siparişin iptali ({refundNumber}) İade Talepleri'nde elle tamamlanmayı bekliyor; yeniden iptal etmek yerine talebi oradan sonuçlandırın"
+        "cancelReasonRequired": "Katalogdan bir iptal nedeni seçilmelidir",
+        "cancelPendingManualCompletion": "Bu siparişin iptali ({refundNumber}) İade Talepleri'nde elle tamamlanmayı bekliyor; yeniden iptal etmek yerine talebi oradan sonuçlandırın",
+        "cancelAfterDelivery": "Teslim edilmiş sipariş iptal edilemez; bu aşamada iade talebi akışını kullanın",
+        "cancelAfterCompletion": "Tamamlanmış sipariş iptal edilemez; satıcı ödemesi yapıldı ya da yapılmak üzere",
+        "cancelKindChanged": "Siparişin ödeme durumu önizlemeden sonra değişti; iptal yapılmadı. Güncel önizlemeyi kontrol edip yeniden onaylayın",
+        "cancelNoteRequired": "“Diğer” nedeni seçildiğinde iç not zorunludur",
+        "cancelNoteTooLong": "İç not izin verilen uzunluğu aşıyor"
       },
       "user": {
         "notBanned": "Kullanıcı zaten engelli değil",
@@ -10590,7 +10664,17 @@
         "refundFailed": "Takas iadesi başarısız: {reason} (retry cron devreye girer)",
         "refundSkipped": "Takas iadesi yapılamadı: {reason}",
         "cashHoldReleaseStateInvalid": "Takas durumu '{status}' — yalnız 'completed' takasta nakit hold serbest bırakılabilir",
-        "forceCancelTradeStateInvalid": "Takas durumu '{status}' force-cancel için uygun değil. Beklenen: shipping_to_warehouse."
+        "forceCancelTradeStateInvalid": "Takas durumu '{status}' force-cancel için uygun değil. Beklenen: shipping_to_warehouse.",
+        "cancelNoteRequired": "\"Diğer\" nedeniyle iptalde iç not zorunludur",
+        "cancelBlocked": {
+          "closed": "Takas zaten kapandı (tamamlandı, iptal edildi ya da reddedildi).",
+          "disputed": "Takasta açık bir itiraz var; itiraz çözümüyle sonuçlandırın.",
+          "parcelHandedOver": "Kolilerden biri kargoya verildi ya da depoya ulaştı; platform iptali yapılamaz. Takılı takas çözümünü ya da kayıp koli akışını kullanın.",
+          "atWarehouse": "Ürünler depoda ya da kontrolde; depo reddiyle sonuçlandırın.",
+          "shippingToRecipients": "Ürünler yeni sahiplerine yolda; sorun varsa itiraz akışını kullanın.",
+          "returning": "İade kolileri yolda; iade bacaklarını teslim ya da kayıp olarak kapatın.",
+          "legacyShipped": "Eski akıştaki bu takasta ürünler kargolandı; platform iptali yapılamaz."
+        }
       },
       "sellerApplication": {
         "notFound": "Başvuru bulunamadı",
@@ -11911,6 +11995,16 @@
       "description": "Yasal yükümlülüğümüz için saklanır; herkese açık değildir.",
       "lockedNote": "Bu bilgiler kaydedildikten sonra değiştirilemez. Hatalıysa destek ekibimizle iletişime geçin.",
       "notProvided": "Henüz girilmedi"
+    }
+  },
+  "adminCancel": {
+    "reasons": {
+      "stock_error": "Stok hatası",
+      "suspicious_activity": "Şüpheli işlem",
+      "user_request": "Kullanıcı talebi",
+      "listing_violation": "İlan kurallarına aykırılık",
+      "duplicate_transaction": "Mükerrer işlem",
+      "other": "Diğer"
     }
   }
 }

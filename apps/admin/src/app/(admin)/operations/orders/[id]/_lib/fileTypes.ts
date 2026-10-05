@@ -1,3 +1,5 @@
+import type { CancellationActorValue } from "@tarodan/types";
+
 /**
  * GET /admin/orders/:id/file — grup dosyası payload'ı. Sipariş id'si sunucuda
  * grup çatısına çözülür; ekran her şeyi (ödeme, paket kargoları, sipariş başına
@@ -79,6 +81,12 @@ export interface OrderFileEntry {
   status: string;
   cancellationType: string | null;
   cancelReason: string | null;
+  /** İptali kim yaptı (null = bilinmiyor / iptal değil). */
+  cancelledBy: CancellationActorValue | null;
+  /** Yönetici iptalinin katalog nedeni (`adminCancel.reasons.*`). */
+  adminCancelReasonCode: string | null;
+  /** Sipariş kaynağı — teklif siparişinde iptal bağlı teklifi de kapatır. */
+  origin: string;
   createdAt: string;
   deliveredAt: string | null;
   completedAt: string | null;

@@ -21,6 +21,7 @@ import { NotificationCommerceService } from "./notification-commerce.service";
 import { NotificationAccountService } from "./notification-account.service";
 import type { NotificationAudience } from "./helpers/notification-link";
 import type { OrderCancelNoticeParty } from "./helpers/order-cancel-notice";
+import type { TradePlatformCancelNotice } from "./helpers/trade-platform-cancel-notice";
 
 @Injectable()
 export class NotificationService {
@@ -332,6 +333,15 @@ export class NotificationService {
     );
   }
 
+  /** Yönetici (platform) iptalinin iki tarafa duyurusu (zil + e-posta). */
+  async notifyOrderCancelledByPlatform(
+    ...args: Parameters<
+      NotificationCommerceService["notifyOrderCancelledByPlatform"]
+    >
+  ): Promise<void> {
+    return this.commerce.notifyOrderCancelledByPlatform(...args);
+  }
+
   async broadcastBackInStock(
     productId: string,
     productTitle: string,
@@ -369,6 +379,13 @@ export class NotificationService {
 
   async notifyTradeCompleted(userId: string, tradeId: string) {
     return this.commerce.notifyTradeCompleted(userId, tradeId);
+  }
+
+  /** Platform (admin) takas iptali: tek alıcıya tek kanaldan; gönderemezse fırlatır. */
+  async sendTradeCancelledByPlatformNotice(
+    notice: TradePlatformCancelNotice,
+  ): Promise<void> {
+    return this.commerce.sendTradeCancelledByPlatformNotice(notice);
   }
 
   // ==================== ACCOUNT NOTIFIERS ====================

@@ -21,6 +21,8 @@ import { CommissionLedgerService } from "../../commission/commission-ledger.serv
 import { PaymentRefundService } from "../refund/payment-refund.service";
 import { EventService } from "../../events";
 import { PaymentCommonService } from "../payment-common.service";
+import { liveOrderPaymentWhere } from "../helpers/live-charge";
+import { lockOrderPaymentRows } from "../helpers/payment-order-lock";
 import {
   FailedPaymentCancellation,
   PaymentFulfillmentService,
@@ -133,6 +135,11 @@ export class PaymentExpiryReconciliationService {
     for (const order of expired) {
       try {
         await this.prisma.$transaction(async (tx) => {
+          // Kilit sırası ödeme → sipariş (claim ile aynı; bkz.
+          // payment-order-lock). Eskiden sipariş önce kilitlenip ödeme satırı
+          // sonra yazılıyordu: aynı anda claim edilen siparişte ikisi ters
+          // sırada bekleyip kilitlenebiliyordu (deadlock).
+          await lockOrderPaymentRows(tx, order.id);
           await tx.$queryRaw`SELECT id FROM orders WHERE id = ${order.id} FOR UPDATE`;
           const fresh = await tx.order.findUnique({
             where: { id: order.id },
@@ -145,15 +152,7 @@ export class PaymentExpiryReconciliationService {
           // son charge-start'ı pencere içindeyse bu tur atla; bir sonraki turda tekrar
           // bakılır (charge penceresi kapanınca iptal edilir).
           const livePayment = await tx.payment.findFirst({
-            where: {
-              OR: [
-                { orderId: order.id },
-                { checkoutGroup: { orders: { some: { id: order.id } } } },
-              ],
-              status: {
-                in: [PaymentStatus.pending, PaymentStatus.processing],
-              },
-            },
+            where: liveOrderPaymentWhere(order.id),
             select: { metadata: true },
           });
           if (

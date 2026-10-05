@@ -18,7 +18,7 @@ import { EventService } from "../../events";
 import { DiscountService } from "../../discount/discount.service";
 import { PaymentProviderEventService } from "../payment-provider-event.service";
 import { LedgerService } from "../../ledger/ledger.service";
-import { i18nMessage } from "../../i18n";
+import { i18nMessage, localizedPayloadOf } from "../../i18n";
 import {
   ProviderRefundRejectedException,
   RefundPendingReconciliationException,
@@ -69,6 +69,83 @@ export class PaymentTradeRefundService {
   ) {}
 
   /**
+   * İade borcu olan ödemelerin filtresi — iade yolu ve hata işaretinin
+   * temizlenme kararı AYNI tanımı okur.
+   *
+   * COMPLETED takas guard'ı — SATIR bazlı niyet filtresi. İtiraz çözümü
+   * takası tamamlarken release EDİLECEK satırları holdReleaseAt ile damgalar;
+   * dolayısıyla completed bir takasta hâlâ iade borcu olan satırlar tam
+   * olarak damgasız (holdReleaseAt=null) kalanlardır. Kapsamsız bir çağrı
+   * (manuel iade, retry cron, reconciliation süpürmesi) completed takasta
+   * yalnız bu satırları iade eder: normal tamamlanmış takasta (confirmReceipt
+   * her satırı damgalar) güvenli no-op'tur, karşı tarafın escrow'u asla
+   * yanlışlıkla iade edilmez. Açık payerId kapsamı ise bilinçli admin
+   * niyetidir ve damga filtresine takılmaz.
+   */
+  private async refundablePaymentsWhere(
+    tradeId: string,
+    opts?: { payerId?: string },
+  ): Promise<Prisma.PaymentWhereInput> {
+    const tradeRow = await this.prisma.trade.findUnique({
+      where: { id: tradeId },
+      select: { status: true },
+    });
+    const restrictToUnstamped =
+      tradeRow?.status === TradeStatus.completed && !opts?.payerId;
+    return {
+      tradeCashPayment: {
+        tradeId,
+        ...(opts?.payerId ? { payerId: opts.payerId } : {}),
+        ...(restrictToUnstamped ? { holdReleaseAt: null } : {}),
+        // Escrow: sadece bırakılmamış ve daha önce iade edilmemiş olanlar
+        releasedAt: null,
+        refundedAt: null,
+      },
+      status: PaymentStatus.completed,
+      provider: PaymentProvider.paytr,
+    };
+  }
+
+  /**
+   * Başarılı (ya da no-op) bir iadeden sonra takasın hata işareti temizlenebilir
+   * mi? Kapsamsız çağrı takasın TÜM iade borcunu ele aldığı için evet (bugünkü
+   * davranış). Kapsamlı (tek taraf) çağrı yalnız KENDİ satırını ele alır: başka
+   * bir tarafın iade borcu hâlâ duruyorsa işaret ONUN başarısızlığını taşıyor
+   * olabilir — silinirse `retryFailedTradeRefunds` o takası bir daha görmez ve
+   * admin paneli "iade başarısız" uyarısını kaybeder. Okuma patlarsa işaret
+   * korunur (yanlış alarm, kayıp iadeden iyidir).
+   *
+   * "Başka iade borcu" yalnız İPTAL edilmiş takasta anlamlıdır: orada diğer
+   * tarafın tamamlanmış, iade edilmemiş satırı gerçekten iade borcudur. İtiraz
+   * çözümünde (takas `disputed`, tek tarafa tazminat) diğer tarafın satırı
+   * alıcısına BIRAKILACAKTIR, iade borcu değildir — sayılsaydı başarılı
+   * tazminat iadesi bayat işareti silemezdi. Diğer statülerde kapsamlı çağrı
+   * eskisi gibi temizler.
+   */
+  private async mayClearRefundFailure(
+    tradeId: string,
+    opts?: { payerId?: string },
+  ): Promise<boolean> {
+    if (!opts?.payerId) return true;
+    try {
+      const trade = await this.prisma.trade.findUnique({
+        where: { id: tradeId },
+        select: { status: true },
+      });
+      if (trade?.status !== TradeStatus.cancelled) return true;
+      const outstanding = await this.prisma.payment.count({
+        where: await this.refundablePaymentsWhere(tradeId),
+      });
+      return outstanding === 0;
+    } catch (error: unknown) {
+      this.logger.warn(
+        `refundFailureReason korunuyor (trade ${tradeId}): kalan iade borcu okunamadı: ${(error as Error)?.message ?? error}`,
+      );
+      return false;
+    }
+  }
+
+  /**
    * Takas nakit ödemesi PayTR ile tamamlanmışken iptal: PayTR iade API + payment / trade_cash_payment güncelleme.
    * Tamamlanmış PayTR trade ödemesi yoksa no-op (refunded: false).
    */
@@ -91,34 +168,8 @@ export class PaymentTradeRefundService {
     paymentId?: string;
     skippedReason?: string;
   }> {
-    // COMPLETED takas guard'ı — SATIR bazlı niyet filtresi. İtiraz çözümü
-    // takası tamamlarken release EDİLECEK satırları holdReleaseAt ile damgalar;
-    // dolayısıyla completed bir takasta hâlâ iade borcu olan satırlar tam
-    // olarak damgasız (holdReleaseAt=null) kalanlardır. Kapsamsız bir çağrı
-    // (manuel iade, retry cron, reconciliation süpürmesi) completed takasta
-    // yalnız bu satırları iade eder: normal tamamlanmış takasta (confirmReceipt
-    // her satırı damgalar) güvenli no-op'tur, karşı tarafın escrow'u asla
-    // yanlışlıkla iade edilmez. Açık payerId kapsamı ise bilinçli admin
-    // niyetidir ve damga filtresine takılmaz.
-    const tradeRow = await this.prisma.trade.findUnique({
-      where: { id: tradeId },
-      select: { status: true },
-    });
-    const restrictToUnstamped =
-      tradeRow?.status === TradeStatus.completed && !opts?.payerId;
     const payments = await this.prisma.payment.findMany({
-      where: {
-        tradeCashPayment: {
-          tradeId,
-          ...(opts?.payerId ? { payerId: opts.payerId } : {}),
-          ...(restrictToUnstamped ? { holdReleaseAt: null } : {}),
-          // Escrow: sadece bırakılmamış ve daha önce iade edilmemiş olanlar
-          releasedAt: null,
-          refundedAt: null,
-        },
-        status: PaymentStatus.completed,
-        provider: PaymentProvider.paytr,
-      },
+      where: await this.refundablePaymentsWhere(tradeId, opts),
       include: { tradeCashPayment: true },
       orderBy: { createdAt: "asc" },
     });
@@ -532,29 +583,40 @@ export class PaymentTradeRefundService {
    * ASLA throw ETMEZ: takas bu noktada zaten iptal/çözüm ile terminal duruma
    * commit edilmiştir; iade hatası iptali geri almaz (`rejectWarehouseTrade` ile
    * aynı felsefe). Çağıran, kullanıcıya sahte bir 500 döndürmek yerine sonucu okur.
+   *
+   * `deferIfNotYetSynced`: PayTR ödemeyi henüz "siteye bildirilmiş" saymıyorsa
+   * (ödemenin hemen ardından gelen iade) bu bir başarısızlık DEĞİL, erken
+   * denemedir. Seçenek verilirse işaret yazılmaz, "iade başarısız" yayınlanmaz;
+   * sonuç `deferred: true` döner ve çağıran (outbox handler'ı) yeniden kuyruğa
+   * alır. Seçenek yoksa davranış bugünkü gibidir (işaret + retry cron'u).
    */
   async refundTradeCashTracked(
     tradeId: string,
-    opts?: { payerId?: string },
+    opts?: { payerId?: string; deferIfNotYetSynced?: boolean },
   ): Promise<{
     refunded: boolean;
     failed: boolean;
+    deferred?: boolean;
     skippedReason?: string;
     reason?: string;
   }> {
+    const scope = opts?.payerId ? { payerId: opts.payerId } : undefined;
     try {
       const result = await this.refundTradeCashPaymentIfCompleted(
         tradeId,
-        opts,
+        scope,
       );
       // Başarı (veya "iade edilecek tamamlanmış ödeme yok" no-op) → varsa eski
-      // hata marker'ını temizle. Best-effort; iade zaten yapıldı.
-      await this.prisma.trade
-        .update({
-          where: { id: tradeId },
-          data: { refundFailureReason: null, refundFailureAt: null },
-        })
-        .catch(() => {});
+      // hata marker'ını temizle; kapsamlı çağrıda yalnız başka bir tarafın iade
+      // borcu kalmadıysa (bkz. mayClearRefundFailure). Best-effort.
+      if (await this.mayClearRefundFailure(tradeId, scope)) {
+        await this.prisma.trade
+          .update({
+            where: { id: tradeId },
+            data: { refundFailureReason: null, refundFailureAt: null },
+          })
+          .catch(() => {});
+      }
       if (result.refunded) {
         try {
           // Bildirim GERÇEKTEN iade edilen tarafa gitmeli: kapsam verildiyse o
@@ -588,6 +650,16 @@ export class PaymentTradeRefundService {
       };
     } catch (err: any) {
       const reason = err?.message ?? "Bilinmeyen hata (PayTR iade başarısız)";
+      if (
+        opts?.deferIfNotYetSynced &&
+        localizedPayloadOf(err)?.i18nKey ===
+          "server.payment.paymentNotYetSynced"
+      ) {
+        this.logger.warn(
+          `refundTradeCashTracked deferred for trade ${tradeId}: PayTR has not reported the payment yet`,
+        );
+        return { refunded: false, failed: false, deferred: true, reason };
+      }
       this.logger.error(
         `refundTradeCashTracked failed for trade ${tradeId}: ${reason}`,
       );

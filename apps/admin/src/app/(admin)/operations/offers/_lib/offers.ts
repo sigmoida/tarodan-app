@@ -1,3 +1,8 @@
+import {
+  adminOrderCancelEligibility,
+  type AdminOrderCancelEligibility,
+  type CancellationActorValue,
+} from "@tarodan/types";
 import { offerStatusConfig } from "@tarodan/ui";
 import type { useTranslations } from "next-intl";
 import { statusFilterOptions } from "@/lib/utils";
@@ -25,8 +30,13 @@ export interface OfferLinkedOrder {
   totalAmount: number;
   cancelReason?: string | null;
   cancellationType?: string | null;
+  cancelledBy?: CancellationActorValue | null;
+  adminCancelReasonCode?: string | null;
   createdAt: string;
   paymentStatus?: string | null;
+  /** Yönetici iptali uygunluğunun girdileri (sipariş dosyasıyla aynı). */
+  shipment: { status: string; shippedAt: string | null } | null;
+  hasActiveRefund: boolean;
 }
 
 /** API `AdminOfferQueryService.formatRow` satırı. */
@@ -73,27 +83,59 @@ export const OFFER_FILTER_STATUSES: OfferStatus[] = [
 export const offerStatusOptions = (t: T) =>
   statusFilterOptions(offerStatusConfig, t, { keys: OFFER_FILTER_STATUSES });
 
+/** Teklifin canlı (iptal edilmemiş) bağlı siparişi; yoksa null. */
+function liveOrderOf<O extends { status: string }>(offer: {
+  order: O | null;
+}): O | null {
+  return offer.order && offer.order.status !== "cancelled" ? offer.order : null;
+}
+
 /**
- * Admin iptali kuralı (API ile aynı): teklif pending veya accepted; bağlı
- * sipariş yok ya da henüz ödenmemiş/iptal. Ödenmiş sipariş → iade akışı.
+ * Teklif iptali kuralı (API `AdminOfferService` ile aynı): SİPARİŞİ OLMAYAN
+ * teklif — pending ya da siparişi kapanmış accepted. Canlı siparişi olan
+ * teklif sipariş üzerinden iptal edilir (`offerCancelAction`).
  */
 export function canCancelOffer(offer: {
   status: OfferStatus;
   order: { status: string } | null;
 }): boolean {
   if (offer.status !== "pending" && offer.status !== "accepted") return false;
-  if (!offer.order) return true;
-  return (
-    offer.order.status === "pending_payment" ||
-    offer.order.status === "cancelled"
-  );
+  return liveOrderOf(offer) === null;
 }
 
-/** Teklifin iptali ödeme bekleyen bir siparişi de kapatır mı? */
-export function cancelClosesOrder(offer: {
-  order: { status: string } | null;
-}): boolean {
-  return offer.order?.status === "pending_payment";
+/** Teklifin bağlı siparişinin yönetici iptali uygunluğu; canlı sipariş yoksa null. */
+export function linkedOrderCancelEligibility(offer: {
+  order: OfferLinkedOrder | null;
+}): AdminOrderCancelEligibility | null {
+  const order = liveOrderOf(offer);
+  return order
+    ? adminOrderCancelEligibility({
+        status: order.status,
+        shipment: order.shipment,
+        hasActiveRefund: order.hasActiveRefund,
+      })
+    : null;
+}
+
+/**
+ * Teklif ekranının iptal işlemi — TEK karar: canlı sipariş varsa sipariş
+ * iptali (sepet siparişiyle aynı diyalog ve uç), yoksa teklif iptali; hiçbiri
+ * uygun değilse null.
+ */
+export type OfferCancelAction =
+  { kind: "order"; order: OfferLinkedOrder } | { kind: "offer" } | null;
+
+export function offerCancelAction(offer: {
+  status: OfferStatus;
+  order: OfferLinkedOrder | null;
+}): OfferCancelAction {
+  const order = liveOrderOf(offer);
+  if (order) {
+    return linkedOrderCancelEligibility(offer)?.allowed
+      ? { kind: "order", order }
+      : null;
+  }
+  return canCancelOffer(offer) ? { kind: "offer" } : null;
 }
 
 /** Teklif tutarının liste fiyatına oranı (yüzde, tam sayı). */

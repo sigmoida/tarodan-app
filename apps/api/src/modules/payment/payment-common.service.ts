@@ -2,6 +2,7 @@ import { Injectable, Logger } from "@nestjs/common";
 import { PrismaService } from "../../prisma";
 import { PaymentStatus, OrderStatus } from "@prisma/client";
 import { asPaymentMetadata } from "./helpers/payment-metadata.types";
+import { chargeLikelyLive } from "./helpers/live-charge";
 import { CarrierCancellationService } from "../surat-cargo/sync/carrier-cancellation.service";
 import { canTransitionShipmentStatus } from "../shipping/helpers/shipment-state-machine";
 
@@ -293,12 +294,7 @@ export class PaymentCommonService {
    * → orphan capture. Saf fonksiyon; config'i çağıran okur.
    */
   isChargeLikelyLive(metadata: unknown, windowMinutes: number): boolean {
-    const meta = asPaymentMetadata(metadata);
-    const raw = meta.lastChargeStartedAt;
-    if (typeof raw !== "string") return false;
-    const startedAt = new Date(raw).getTime();
-    if (Number.isNaN(startedAt)) return false;
-    return Date.now() - startedAt < windowMinutes * 60 * 1000;
+    return chargeLikelyLive(metadata, windowMinutes);
   }
 
   async assignMerchantOid(

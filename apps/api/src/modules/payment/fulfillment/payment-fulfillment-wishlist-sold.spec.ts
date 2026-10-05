@@ -46,6 +46,8 @@ describe("PaymentFulfillmentService — WISHLIST_SOLD", () => {
   ) => {
     const createInAppNotification = jest.fn().mockResolvedValue(true);
     const tx: any = {
+      // Sipariş satırı kilidi (iptalle dışlama) + ürün kilidi.
+      $queryRaw: jest.fn().mockResolvedValue([]),
       payment: { updateMany: jest.fn().mockResolvedValue({ count: 1 }) },
       order: {
         findUnique: jest.fn(),

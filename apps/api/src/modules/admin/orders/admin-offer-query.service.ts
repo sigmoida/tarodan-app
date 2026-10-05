@@ -7,6 +7,7 @@ import { AdminOfferQueryDto } from "../dto";
 import { i18nMessage } from "../../i18n";
 import { offerEffectiveStatus } from "./helpers/offer-effective-status";
 import { OfferExtensionPolicy } from "../../offer/offer-extension-policy.service";
+import { ACTIVE_REFUND_REQUEST_STATUSES } from "../../refund/helpers/refund-active-statuses";
 
 const PARTY_SELECT = {
   id: true,
@@ -31,8 +32,18 @@ const ORDER_SELECT = {
   totalAmount: true,
   cancelReason: true,
   cancellationType: true,
+  cancelledBy: true,
+  adminCancelReasonCode: true,
   createdAt: true,
   payment: { select: { id: true, status: true } },
+  // Panelin "Siparişi iptal et" uygunluğu (adminOrderCancelEligibility)
+  // sipariş dosyasıyla aynı girdilerden hesaplanır.
+  shipment: { select: { status: true, shippedAt: true } },
+  refundRequests: {
+    where: { status: { in: ACTIVE_REFUND_REQUEST_STATUSES } },
+    select: { id: true },
+    take: 1,
+  },
 } as const;
 
 /** Ürün "satıldı" sayılan sipariş durumları (ilk ödeyen kazandı). */
@@ -167,8 +178,12 @@ export class AdminOfferQueryService {
             totalAmount: Number(row.order.totalAmount),
             cancelReason: row.order.cancelReason,
             cancellationType: row.order.cancellationType,
+            cancelledBy: row.order.cancelledBy,
+            adminCancelReasonCode: row.order.adminCancelReasonCode,
             createdAt: row.order.createdAt,
             paymentStatus: row.order.payment?.status ?? null,
+            shipment: row.order.shipment,
+            hasActiveRefund: row.order.refundRequests.length > 0,
           }
         : null,
     };

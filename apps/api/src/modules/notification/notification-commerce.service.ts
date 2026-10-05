@@ -18,8 +18,19 @@ import { StorageService } from "../storage/storage.service";
 import { NotificationDispatchService } from "./notification-dispatch.service";
 import { frontendUrl as resolveFrontendUrl } from "../../config/app-urls";
 import { ORDER_CANCEL_REASON } from "../order/helpers/order-cancel-reasons";
+import { adminCancelReasonLabel } from "../order/helpers/admin-cancel-reason";
+import {
+  ADMIN_CANCEL_REASON_I18N_KEYS,
+  type AdminCancelReasonCode,
+} from "@tarodan/types";
 import { TRADE_CANCEL_REASON } from "../trade/helpers/trade-cancel-reasons";
 import { errorMessage } from "../../common/helpers/error-message";
+import { resolveLocale } from "@tarodan/i18n";
+import type { TradePlatformCancelNotice } from "./helpers/trade-platform-cancel-notice";
+import {
+  resolveSettings,
+  shouldDeliver,
+} from "./helpers/notification-preferences";
 
 /** Alıcı e-postasını çözmek için okunan alanlar (`orderBuyerContact`). */
 const ORDER_BUYER_SELECT = {
@@ -547,6 +558,110 @@ export class NotificationCommerceService {
   }
 
   /**
+   * Yönetici (platform) iptalinin duyurusu — iptalin HER türü (ödenmemiş,
+   * kargo öncesi ödenmiş, teklif siparişi) için TEK tanım; çağıran
+   * AdminOrderCancelService'tir ve çekirdekler bu iptalde kendi genel iptal
+   * duyurularını göndermez. Her taraf bir zil (+push) ve bir e-posta alır:
+   * - Alıcı: ORDER_CANCELLED_BY_PLATFORM + `order-cancelled-by-platform-buyer`.
+   *   Misafir siparişinde zil gönderilmez (alıcı ortak sistem hesabıdır, zili
+   *   kimseye ulaşmaz); e-posta `orderBuyerContact` ile GERÇEK misafire gider.
+   * - Satıcı: ORDER_CANCELLED_BY_PLATFORM_SELLER + `…-seller` e-postası.
+   *
+   * Metinler "Tarodan iptal etti" der, nedenin KATALOG ETİKETİNİ ve (ödenmiş
+   * siparişte) iade tutarını taşır. Yöneticinin iç notu bu metoda hiç
+   * gelmez. Bir kanalın hatası diğerlerini engellemez; asla throw etmez.
+   *
+   * @param refundAmount Alıcıya iade edilen tutar; ödeme alınmamışsa null.
+   */
+  async notifyOrderCancelledByPlatform(input: {
+    orderId: string;
+    reasonCode: AdminCancelReasonCode;
+    refundAmount: number | null;
+  }): Promise<void> {
+    const order = await this.prisma.order
+      .findUnique({
+        where: { id: input.orderId },
+        select: {
+          id: true,
+          orderNumber: true,
+          buyerId: true,
+          sellerId: true,
+          product: { select: { title: true } },
+          seller: { select: { displayName: true } },
+          ...ORDER_BUYER_SELECT,
+        },
+      })
+      .catch((err: unknown) => {
+        this.logger.warn(
+          `platform-cancel notice: order ${input.orderId} okunamadı: ${errorMessage(err)}`,
+        );
+        return null;
+      });
+    if (!order) return;
+
+    const paid = input.refundAmount !== null;
+    const productTitle = order.product?.title ?? "";
+    // Bildirim verisine dile bağlı metin değil katalog ANAHTARI yazılır;
+    // şablon (`localizedValues`) her alıcının dilinde çevirir.
+    const inAppData = {
+      orderId: order.id,
+      orderNumber: order.orderNumber,
+      productTitle,
+      reasonCode: input.reasonCode,
+      reasonKey: ADMIN_CANCEL_REASON_I18N_KEYS[input.reasonCode],
+      paid: paid ? "yes" : "no",
+      amount: input.refundAmount ?? 0,
+    };
+    // E-posta şablonları Türkçedir: etiket varsayılan dilde.
+    const emailData = {
+      orderNumber: order.orderNumber,
+      orderId: order.id,
+      productTitle,
+      reason: adminCancelReasonLabel(input.reasonCode),
+      paid,
+      ...(paid ? { refundAmount: input.refundAmount } : {}),
+    };
+
+    const buyer = orderBuyerContact(order);
+    if (!buyer.isGuest) {
+      await this.safeInApp(
+        order.buyerId,
+        NotificationType.ORDER_CANCELLED_BY_PLATFORM,
+        inAppData,
+      );
+    }
+    await this.sendOrderBuyerEmail(
+      order,
+      "order-cancelled-by-platform-buyer",
+      emailData,
+    );
+
+    await this.safeInApp(
+      order.sellerId,
+      NotificationType.ORDER_CANCELLED_BY_PLATFORM_SELLER,
+      { ...inAppData, audience: "seller" },
+    );
+    await this.dispatch.sendTemplateEmailToUser(
+      order.sellerId,
+      "order-cancelled-by-platform-seller",
+      { ...emailData, sellerName: order.seller?.displayName ?? "" },
+    );
+  }
+
+  /** Zil (+push) — hatası aynı duyurunun diğer kanallarını engellemez. */
+  private async safeInApp(
+    userId: string,
+    type: NotificationType,
+    data: Record<string, unknown>,
+  ): Promise<void> {
+    try {
+      await this.dispatch.createInAppNotification(userId, type, data);
+    } catch (err: unknown) {
+      this.logger.warn(`${type} → ${userId} failed: ${errorMessage(err)}`);
+    }
+  }
+
+  /**
    * Sipariş iptali e-postaları: alıcıya `order-cancelled-buyer`, satıcıya
    * `order-cancelled-seller`. Stokout oto-iptal ve ödeme-süresi-doldu
    * senaryolarında çağrılır (in-app/push bildirimler ayrıca gönderilir; bu
@@ -798,5 +913,96 @@ export class NotificationCommerceService {
       tradeId,
       tradeUrl: `${frontendUrl}/profile/trades/${tradeId}`,
     });
+  }
+
+  /**
+   * Platform (admin) takas iptali — TEK alıcıya, TEK kanaldan (in-app ya da
+   * e-posta) duyuru: platform iptali olduğu, gerekçenin katalog etiketi,
+   * tarafın kendi iadesi (varsa) ve ürünlerinin yeniden serbest olduğu.
+   * Etiket in-app'te alıcının dilinde, e-postada şablonun dilinde (varsayılan;
+   * yönetilen şablonlar Türkçedir) çözülür.
+   *
+   * Gönderim gerçekleşmediyse FIRLATIR — çağıran outbox satırı yalnız bu
+   * alıcı × kanalı temsil ettiği için yeniden deneme başka bir gönderimi
+   * tekrarlamaz. In-app'in push'u yalnız kayıt yazıldığında gider
+   * (`pushRequiresRecord`), dolayısıyla kaydı tekrarlayan deneme push'u
+   * tekrarlamaz. "Gönderilecek bir şey yok" durumları fırlatmaz: kullanıcı
+   * bulunamadı, kullanıcı bu kategorinin bildirimlerini kapatmış (in-app) ya da
+   * ortamda e-posta sağlayıcısı yok (diğer bütün e-postalarla aynı).
+   */
+  async sendTradeCancelledByPlatformNotice(
+    notice: TradePlatformCancelNotice,
+  ): Promise<void> {
+    const user = await this.prisma.user.findUnique({
+      where: { id: notice.userId },
+      select: {
+        email: true,
+        displayName: true,
+        preferredLanguage: true,
+        notificationSettings: true,
+      },
+    });
+    if (!user) {
+      this.logger.warn(
+        `trade ${notice.tradeId} platform iptal duyurusu: kullanıcı ${notice.userId} yok`,
+      );
+      return;
+    }
+    const hasRefund = notice.refundAmount > 0;
+
+    if (notice.channel === "in_app") {
+      const type = NotificationType.TRADE_CANCELLED_BY_PLATFORM;
+      // Tercihle susturulan bildirim "gönderilemedi" sayılmaz (yeniden denenmez).
+      if (
+        !shouldDeliver(
+          resolveSettings(user.notificationSettings),
+          type,
+          "in_app",
+        )
+      ) {
+        return;
+      }
+      const saved = await this.dispatch.createInAppNotification(
+        notice.userId,
+        type,
+        {
+          tradeId: notice.tradeId,
+          tradeNumber: notice.tradeNumber,
+          reason: adminCancelReasonLabel(
+            notice.reasonCode,
+            resolveLocale(user.preferredLanguage),
+          ),
+          hasRefund: hasRefund ? "yes" : "no",
+          refundAmount: notice.refundAmount,
+        },
+        // Kayıt yazılamazsa push da gitmez: satır yeniden denendiğinde push
+        // kayıtla birlikte bir kez gider, her denemede tekrar atılmaz.
+        { pushRequiresRecord: true },
+      );
+      if (!saved) {
+        throw new Error(
+          `trade ${notice.tradeId}: in-app platform iptal bildirimi kaydedilemedi (${notice.userId})`,
+        );
+      }
+      return;
+    }
+
+    const sent = await this.dispatch.sendTemplateEmailToAddress(
+      user.email,
+      "trade-cancelled-platform",
+      {
+        name: user.displayName ?? "",
+        tradeId: notice.tradeId,
+        tradeNumber: notice.tradeNumber,
+        reason: adminCancelReasonLabel(notice.reasonCode),
+        refundAmount: hasRefund ? notice.refundAmount : 0,
+        tradeUrl: `${resolveFrontendUrl()}/profile/trades/${notice.tradeId}`,
+      },
+    );
+    if (!sent.success && this.dispatch.getProviderStatus().email) {
+      throw new Error(
+        `trade ${notice.tradeId}: platform iptal e-postası gönderilemedi (${notice.userId}): ${sent.error ?? "bilinmeyen hata"}`,
+      );
+    }
   }
 }

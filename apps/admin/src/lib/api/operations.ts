@@ -1,8 +1,12 @@
 import type {
+  AdminCancelRequest,
   AdminCancellationCounts,
   AdminOrderCancelPreview,
+  AdminOrderCancelRequest,
   AdminOrderCancelResult,
   AdminOrderCounts,
+  AdminTradeCancelPreview,
+  AdminTradeCancelResult,
 } from "@tarodan/types";
 import { api } from "./client";
 
@@ -29,12 +33,15 @@ export const operationsApi = {
     },
   ) => api.post(`/admin/orders/${id}/tracking`, payload),
   getOrderInvoice: (id: string) => api.get(`/admin/orders/${id}/invoice`),
-  /** Kargo öncesi platform iptalinde alıcıya dönecek tutar (iptalle aynı hesap). */
+  /** Yönetici iptalinin önizlemesi: tür + iade tutarı ya da "ödeme yok" + stok. */
   getOrderCancelPreview: (id: string) =>
     api.get<AdminOrderCancelPreview>(`/admin/orders/${id}/cancel-preview`),
-  /** Kargo öncesi platform iptali (sipariş / sepet kalemi başına, tam iade). */
-  cancelOrder: (id: string, reason: string) =>
-    api.post<AdminOrderCancelResult>(`/admin/orders/${id}/cancel`, { reason }),
+  /**
+   * Yönetici (platform) iptali — ödenmemiş, kargo öncesi ödenmiş ve teklif
+   * siparişi için tek uç (sipariş / sepet kalemi başına).
+   */
+  cancelOrder: (id: string, request: AdminOrderCancelRequest) =>
+    api.post<AdminOrderCancelResult>(`/admin/orders/${id}/cancel`, request),
 
   // Cancellations (İptal & İade → İptaller; izin: refund_requests)
   getCancellations: (params?: Record<string, unknown>) =>
@@ -88,6 +95,12 @@ export const operationsApi = {
       `/admin/trades/${tradeId}/resolve-compensation`,
       note ? { note } : {},
     ),
+  /** Platform iptalinin önizlemesi: taraf başına iade + serbest kalanlar (yalnız super_admin). */
+  getTradeCancelPreview: (tradeId: string) =>
+    api.get<AdminTradeCancelPreview>(`/admin/trades/${tradeId}/cancel-preview`),
+  /** Platform (admin) takas iptali — katalog kodu + iç not (yalnız super_admin). */
+  cancelTrade: (tradeId: string, body: AdminCancelRequest) =>
+    api.post<AdminTradeCancelResult>(`/admin/trades/${tradeId}/cancel`, body),
 
   // RefundRequest admin
   getRefundRequests: (params?: any) =>

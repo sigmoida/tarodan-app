@@ -76,6 +76,7 @@ export function OrdersTable() {
         onClose={() => setModal(null)}
         orderId={modal?.type === "cancel" ? modal.orderId : ""}
         orderNumber={modal?.type === "cancel" ? modal.orderNumber : ""}
+        isOfferOrder={modal?.type === "cancel" && modal.isOfferOrder}
       />
     </>
   );

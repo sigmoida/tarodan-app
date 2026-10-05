@@ -27,6 +27,9 @@ export const NOTIFICATION_CATEGORIES: Record<string, FilterType> = {
   order_delivered: "orders",
   order_completed: "orders",
   order_cancelled: "orders",
+  // Yönetici (platform) iptali — alıcı ve satıcı metinleri ayrı tiptir.
+  order_cancelled_by_platform: "orders",
+  order_cancelled_by_platform_seller: "orders",
   order_refunded: "orders",
   payment_received: "orders",
   payment_released: "orders",

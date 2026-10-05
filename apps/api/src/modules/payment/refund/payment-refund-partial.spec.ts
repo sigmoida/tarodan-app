@@ -200,16 +200,18 @@ describe("PaymentRefundService.processRefund — MONEY-H3/H4 partial refund", ()
       cancelSuratShipmentIfExists: jest.fn().mockResolvedValue(undefined),
     };
     const providerEvents = { record: jest.fn().mockResolvedValue(undefined) };
+    const notifications = {
+      createInAppNotification: jest.fn().mockResolvedValue(undefined),
+      sendOrderCancelledEmails: jest.fn().mockResolvedValue(undefined),
+      notifyOrderCancelledParties: jest.fn().mockResolvedValue(undefined),
+      notifyOrderCancelledByPlatform: jest.fn().mockResolvedValue(undefined),
+    };
     const service = new PaymentRefundService(
       prisma as any,
       { get: jest.fn().mockReturnValue(undefined) } as any,
       { resolve: () => paytr } as any,
       { emitPaymentRefunded: jest.fn().mockResolvedValue(undefined) } as any,
-      {
-        createInAppNotification: jest.fn().mockResolvedValue(undefined),
-        sendOrderCancelledEmails: jest.fn().mockResolvedValue(undefined),
-        notifyOrderCancelledParties: jest.fn().mockResolvedValue(undefined),
-      } as any,
+      notifications as any,
       commissionLedger as any,
       { handleOrderRefund: jest.fn().mockResolvedValue(undefined) } as any,
       paymentCommon as any,
@@ -229,6 +231,7 @@ describe("PaymentRefundService.processRefund — MONEY-H3/H4 partial refund", ()
       commissionLedger,
       paymentCommon,
       providerEvents,
+      notifications,
     };
   };
 
@@ -436,6 +439,135 @@ describe("PaymentRefundService.processRefund — MONEY-H3/H4 partial refund", ()
         status: "cancelled",
         cancelReason: "Bağlı sipariş iade edildiği için teklif kapatıldı",
       },
+    });
+  });
+
+  /**
+   * İncelemeye düşmüş yönetici iptali sonradan (admin onayı, takılı deneme
+   * kurtarması) bu iadeyle kesinleşir: neden kodu siparişin kapandığı AYNI
+   * yazımda, taraflara genel metin değil nedenli platform duyurusu.
+   */
+  describe("yönetici iptalinin geç tamamlanması", () => {
+    const platformOpts = {
+      cancelledBy: CancellationActor.platform,
+      adminCancelReasonCode: "stock_error" as const,
+      idempotencyKey: "refund-request:rr-1",
+      settlement: { closeOrder: true },
+    };
+
+    it("kodu siparişi kapatan yazıma koyar ve platform duyurusunu gönderir (genel duyuru yok)", async () => {
+      const { service, mockTx, notifications } = makeService({
+        paymentAmount: 1000,
+      });
+
+      const result = await service.processRefund(ORDER_ID, 1000, platformOpts);
+
+      expect(mockTx.order.update).toHaveBeenCalledWith({
+        where: { id: ORDER_ID },
+        data: expect.objectContaining({
+          status: "cancelled",
+          cancelledBy: CancellationActor.platform,
+          adminCancelReasonCode: "stock_error",
+        }),
+      });
+      // Çağıranlar duyuruyu bu dönüşe bağlar.
+      expect(result?.closedWithAdminReason).toBe("stock_error");
+      expect(
+        notifications.notifyOrderCancelledByPlatform,
+      ).toHaveBeenCalledTimes(1);
+      expect(notifications.notifyOrderCancelledByPlatform).toHaveBeenCalledWith(
+        {
+          orderId: ORDER_ID,
+          reasonCode: "stock_error",
+          refundAmount: 1000,
+        },
+      );
+      expect(notifications.notifyOrderCancelledParties).not.toHaveBeenCalled();
+    });
+
+    it("skipRefundEvent: kod yazılır ama duyuru çağıranındır (çift mesaj yok)", async () => {
+      const { service, mockTx, notifications } = makeService({
+        paymentAmount: 1000,
+      });
+
+      await service.processRefund(ORDER_ID, 1000, {
+        ...platformOpts,
+        skipRefundEvent: true,
+      });
+
+      expect(mockTx.order.update).toHaveBeenCalledWith({
+        where: { id: ORDER_ID },
+        data: expect.objectContaining({ adminCancelReasonCode: "stock_error" }),
+      });
+      expect(
+        notifications.notifyOrderCancelledByPlatform,
+      ).not.toHaveBeenCalled();
+    });
+
+    it("sipariş başka yolla zaten iptal edildiyse kod yazılmaz, platform duyurusu gitmez", async () => {
+      const { service, mockTx, notifications } = makeService({
+        paymentAmount: 1000,
+      });
+      mockTx.order.findUnique.mockResolvedValue({
+        status: "cancelled",
+        cancelledBy: CancellationActor.system,
+        productId: "prod-1",
+        quantity: 1,
+        stockRestoredAt: new Date(),
+        buyerId: "b1",
+        sellerId: "s1",
+        orderNumber: "ORD1",
+      });
+
+      const result = await service.processRefund(ORDER_ID, 1000, platformOpts);
+
+      const closeWrite = mockTx.order.update.mock.calls.find(
+        (call: any[]) => call[0].data?.status === "cancelled",
+      );
+      expect(closeWrite?.[0].data).not.toHaveProperty("adminCancelReasonCode");
+      expect(
+        notifications.notifyOrderCancelledByPlatform,
+      ).not.toHaveBeenCalled();
+      // Bu iade siparişi platform iptali olarak KAPATMADI: çağıran da duyuru
+      // göndermez (admin onayı / orkestratör).
+      expect(result?.closedWithAdminReason).toBeNull();
+    });
+
+    it("aynı deneme başka bir çağrıda zaten sonlandırıldıysa (kurtarma kazandı) idempotent döner: kod null, duyuru yok", async () => {
+      const { service, notifications, paytr } = makeService({
+        paymentAmount: 1000,
+        existingAttempt: {
+          idempotencyKey: "refund-request:rr-1",
+          amount: 1000,
+          status: RefundAttemptStatus.finalized,
+          providerRefundId: "REFUND1",
+        },
+      });
+
+      const result = await service.processRefund(ORDER_ID, 1000, platformOpts);
+
+      expect(result).toMatchObject({
+        idempotent: true,
+        closedWithAdminReason: null,
+      });
+      expect(paytr.createRefund).not.toHaveBeenCalled();
+      expect(
+        notifications.notifyOrderCancelledByPlatform,
+      ).not.toHaveBeenCalled();
+    });
+
+    it("alıcı aktörlü iadede kod verilse bile yazılmaz", async () => {
+      const { service, mockTx } = makeService({ paymentAmount: 1000 });
+
+      await service.processRefund(ORDER_ID, 1000, {
+        ...platformOpts,
+        cancelledBy: CancellationActor.buyer,
+      });
+
+      const closeWrite = mockTx.order.update.mock.calls.find(
+        (call: any[]) => call[0].data?.status === "cancelled",
+      );
+      expect(closeWrite?.[0].data).not.toHaveProperty("adminCancelReasonCode");
     });
   });
 

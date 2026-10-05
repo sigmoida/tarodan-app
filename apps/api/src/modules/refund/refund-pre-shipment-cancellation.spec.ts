@@ -353,7 +353,7 @@ describe("RefundCreationService — kargo öncesi iptal çekirdeği", () => {
       const result = await creation.createPlatformCancellationRefund(
         "order-1",
         "admin-1",
-        "  Satıcı stoğu bitti  ",
+        "stock_error",
       );
 
       expect(createdRows[0]).toMatchObject({
@@ -362,14 +362,16 @@ describe("RefundCreationService — kargo öncesi iptal çekirdeği", () => {
         resolvedReason: RefundReason.other,
         faultParty: "platform",
         policyCode: "v2_platform_cancellation",
-        description: "Satıcı stoğu bitti",
+        description: "Yönetici tarafından iptal edildi: Stok hatası",
         amount: 1180,
         status: RefundRequestStatus.refunded,
         decidedBy: "admin-1",
         providerRefundId: "paytr-1",
-        // Sonradan onay/kurtarma yolları aktörü buradan okur.
+        // Sonradan onay/kurtarma yolları aktörü ve neden kodunu buradan
+        // okur (iptal hangi yoldan tamamlanırsa kod o an siparişe yazılır).
         metadata: expect.objectContaining({
           cancellationActor: CancellationActor.platform,
+          adminCancelReasonCode: "stock_error",
         }),
       });
       expect(result.amount).toBe(1180);
@@ -398,8 +400,10 @@ describe("RefundCreationService — kargo öncesi iptal çekirdeği", () => {
         skipRefundEvent: true,
         refundQuantity: 1,
         idempotencyKey: "refund-request:refund-1",
-        // Sipariş Tarodan'ın iptali olarak kapanır.
+        // Sipariş Tarodan'ın iptali olarak kapanır; neden kodu siparişi
+        // kapatan iade işleminde yazılır (PSP düşerse yazılmaz).
         cancelledBy: CancellationActor.platform,
+        adminCancelReasonCode: "stock_error",
         settlement: expect.objectContaining({
           closeOrder: true,
           holdPortion: 1,
@@ -415,13 +419,54 @@ describe("RefundCreationService — kargo öncesi iptal çekirdeği", () => {
         where: { id: "order-1" },
         data: expect.objectContaining({
           cancellationReasonCode: null,
-          cancelReason: "Satıcı stoğu bitti",
+          cancelReason: "Yönetici tarafından iptal edildi: Stok hatası",
         }),
       });
+      // Çekirdeğin kendi sipariş yazımları kodu taşımaz (iade yazar).
+      expect(
+        prisma.order.update.mock.calls.some(
+          (call: any[]) => "adminCancelReasonCode" in call[0].data,
+        ),
+      ).toBe(false);
       expect(prisma.paymentHold.updateMany).toHaveBeenCalledWith(
         expect.objectContaining({ data: { frozenByRefundId: "refund-1" } }),
       );
     });
+
+    it.each([
+      [
+        "bu çağrının iadesi siparişi platform iptali olarak kapattı",
+        { providerRefundId: "paytr-1", closedWithAdminReason: "stock_error" },
+        "stock_error",
+      ],
+      [
+        "aynı denemeyi kurtarma önce sonlandırdı (idempotent)",
+        {
+          providerRefundId: "paytr-1",
+          idempotent: true,
+          closedWithAdminReason: null,
+        },
+        null,
+      ],
+      ["sonlandırma işlemi no-op (null)", null, null],
+    ])(
+      "çağırana kapanışı bildirir — %s",
+      async (_, processResult, expected) => {
+        const { creation } = makeService(
+          {},
+          { processRefund: jest.fn().mockResolvedValue(processResult) },
+        );
+
+        const result = await creation.createPlatformCancellationRefund(
+          "order-1",
+          "admin-1",
+          "stock_error",
+        );
+
+        // AdminOrderCancelService platform duyurusunu YALNIZ buna bağlar.
+        expect(result.closedWithAdminReason).toBe(expected);
+      },
+    );
 
     it("kupon hakkını geri verir (kusur alıcıda değil)", async () => {
       const { creation, discount } = makeService();
@@ -429,7 +474,7 @@ describe("RefundCreationService — kargo öncesi iptal çekirdeği", () => {
       await creation.createPlatformCancellationRefund(
         "order-1",
         "admin-1",
-        "Hata",
+        "stock_error",
       );
 
       expect(discount.revokeUsageForOrders).toHaveBeenCalledWith(
@@ -439,30 +484,24 @@ describe("RefundCreationService — kargo öncesi iptal çekirdeği", () => {
       );
     });
 
-    it("para commit edildikten sonra alıcıya VE satıcıya iptal duyurusu gönderir", async () => {
+    it("genel iptal duyurusunu göndermez — platform duyurusu çağıranın (tek mesaj)", async () => {
       const { creation, notification, createdRows } = makeService();
 
       await creation.createPlatformCancellationRefund(
         "order-1",
         "admin-1",
-        "Hata",
+        "stock_error",
       );
 
-      expect(notification.notifyOrderCancelledParties).toHaveBeenCalledWith(
-        expect.objectContaining({
-          id: "order-1",
-          orderNumber: "ORD-1001",
-          buyerId: "buyer-1",
-          sellerId: "seller-1",
-        }),
-        1180,
-        ["buyer", "seller"],
-      );
+      // AdminOrderCancelService her tür için platform duyurusunu tek yerden
+      // gönderir; çekirdek de gönderseydi taraflar iki mesaj alırdı.
+      expect(notification.notifyOrderCancelledParties).not.toHaveBeenCalled();
+      // İade geçmişi yalnız katalog kodunu taşır (iç not çekirdeğe gelmez).
       expect(createdRows[0].metadata.history).toEqual([
         expect.objectContaining({
           action: "cancellation_refunded",
           by: "admin-1",
-          details: { initiator: "platform", reason: "Hata" },
+          details: { initiator: "platform", adminReasonCode: "stock_error" },
         }),
       ]);
     });
@@ -477,7 +516,7 @@ describe("RefundCreationService — kargo öncesi iptal çekirdeği", () => {
       await creation.createPlatformCancellationRefund(
         "order-1",
         "admin-1",
-        "Hata",
+        "stock_error",
       );
 
       expect(payment.processRefund).toHaveBeenCalledWith(
@@ -496,7 +535,7 @@ describe("RefundCreationService — kargo öncesi iptal çekirdeği", () => {
       await creation.createPlatformCancellationRefund(
         "order-1",
         "admin-1",
-        "Hata",
+        "stock_error",
       );
 
       expect(createdRows[0].amount).toBe(1180);
@@ -518,7 +557,7 @@ describe("RefundCreationService — kargo öncesi iptal çekirdeği", () => {
       await creation.createPlatformCancellationRefund(
         "order-1",
         "admin-1",
-        "Hata",
+        "stock_error",
       );
 
       expect(createdRows[0].amount).toBe(1050);
@@ -548,7 +587,7 @@ describe("RefundCreationService — kargo öncesi iptal çekirdeği", () => {
       await creation.createPlatformCancellationRefund(
         "order-1",
         "admin-1",
-        "Hata",
+        "stock_error",
       );
 
       // Kargo iptali processRefund'ın closeOrder yolunda OUTBOX_SHIPMENT_CANCEL
@@ -602,7 +641,11 @@ describe("RefundCreationService — kargo öncesi iptal çekirdeği", () => {
       );
 
       await expect(
-        creation.createPlatformCancellationRefund("order-1", "admin-1", "Hata"),
+        creation.createPlatformCancellationRefund(
+          "order-1",
+          "admin-1",
+          "stock_error",
+        ),
       ).rejects.toBeInstanceOf(BadRequestException);
       expect(prisma.refundRequest.create).not.toHaveBeenCalled();
       expect(payment.processRefund).not.toHaveBeenCalled();
@@ -618,7 +661,11 @@ describe("RefundCreationService — kargo öncesi iptal çekirdeği", () => {
         });
 
       await expect(
-        creation.createPlatformCancellationRefund("order-1", "admin-1", "Hata"),
+        creation.createPlatformCancellationRefund(
+          "order-1",
+          "admin-1",
+          "stock_error",
+        ),
       ).rejects.toMatchObject({
         response: { i18nKey: "server.refund.orderStatusChanged" },
       });
@@ -637,7 +684,11 @@ describe("RefundCreationService — kargo öncesi iptal çekirdeği", () => {
       );
 
       await expect(
-        creation.createPlatformCancellationRefund("order-1", "admin-1", "Hata"),
+        creation.createPlatformCancellationRefund(
+          "order-1",
+          "admin-1",
+          "stock_error",
+        ),
       ).rejects.toMatchObject({
         response: { i18nKey: "server.refund.alreadyActive" },
       });
@@ -654,7 +705,11 @@ describe("RefundCreationService — kargo öncesi iptal çekirdeği", () => {
       );
 
       await expect(
-        creation.createPlatformCancellationRefund("order-1", "admin-1", "Hata"),
+        creation.createPlatformCancellationRefund(
+          "order-1",
+          "admin-1",
+          "stock_error",
+        ),
       ).rejects.toBe(failure);
       expect(createdRows[0]).toMatchObject({
         status: RefundRequestStatus.pending_review,
@@ -662,8 +717,16 @@ describe("RefundCreationService — kargo öncesi iptal çekirdeği", () => {
       });
       expect(notification.notifyOrderCancelledParties).not.toHaveBeenCalled();
       expect(prisma.order.update).not.toHaveBeenCalledWith(
-        expect.objectContaining({ data: { cancellationType: "iptal" } }),
+        expect.objectContaining({
+          data: expect.objectContaining({ cancellationType: "iptal" }),
+        }),
       );
+      // İptal tamamlanmadı: yönetici iptali süzgecine bayat kod yazılmaz.
+      expect(
+        prisma.order.update.mock.calls.some(
+          (call: any[]) => "adminCancelReasonCode" in call[0].data,
+        ),
+      ).toBe(false);
     });
   });
 
@@ -682,7 +745,7 @@ describe("RefundCreationService — kargo öncesi iptal çekirdeği", () => {
         await creation.createPlatformCancellationRefund(
           "order-1",
           "admin-1",
-          "Hata",
+          "stock_error",
         );
 
         expect(preview).toEqual({ refundAmount: amount, shippingRefunded });
@@ -700,7 +763,7 @@ describe("RefundCreationService — kargo öncesi iptal çekirdeği", () => {
       await creation.createPlatformCancellationRefund(
         "order-1",
         "admin-1",
-        "Hata",
+        "stock_error",
       );
 
       expect(preview).toEqual({ refundAmount: 1180, shippingRefunded: true });

@@ -79,5 +79,13 @@ describe("PaymentExpiryReconciliationService.expireUnpaidOrders — iptal aktör
         cancelReason: ORDER_CANCEL_REASON.paymentWindowExpired,
       },
     });
+    // Kilit sırası ödeme → sipariş (claim ile aynı; deadlock yok): ilk ham
+    // sorgu ödeme satırlarını, ikincisi siparişi kilitler.
+    const lockSql = tx.$queryRaw.mock.calls.map((call: unknown[]) =>
+      (call[0] as TemplateStringsArray).join("?").replace(/\s+/g, " "),
+    );
+    expect(lockSql[0]).toContain("FROM payments p");
+    expect(lockSql[0]).toContain("FOR UPDATE OF p");
+    expect(lockSql[1]).toContain("FROM orders WHERE id = ? FOR UPDATE");
   });
 });

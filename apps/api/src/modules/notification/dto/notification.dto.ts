@@ -22,6 +22,11 @@ export enum NotificationType {
   ORDER_CANCELLED = "order_cancelled",
   ORDER_CANCELLED_SELLER = "order_cancelled_seller",
   ORDER_CANCELLED_OUT_OF_STOCK = "order_cancelled_out_of_stock",
+  // Yönetici (platform) iptali — genel iptal metninden AYRI: "Tarodan iptal
+  // etti", katalog nedeninin etiketi ve (ödenmişse) iade tutarı. Alıcı ve
+  // satıcı metinleri farklı olduğu için iki tip.
+  ORDER_CANCELLED_BY_PLATFORM = "order_cancelled_by_platform",
+  ORDER_CANCELLED_BY_PLATFORM_SELLER = "order_cancelled_by_platform_seller",
   ORDER_REFUNDED = "order_refunded",
   ORDER_PREPARING_DEADLINE_WARNING = "order_preparing_deadline_warning",
   // Hazırlık süresi bir kez uzatıldı (Süreler ve Kurallar → extend_once):
@@ -70,6 +75,9 @@ export enum NotificationType {
   TRADE_SHIPPED = "trade_shipped",
   TRADE_COMPLETED = "trade_completed",
   TRADE_AUTO_CANCELLED = "trade_auto_cancelled",
+  // Takas Tarodan (admin) tarafından iptal edildi — iki tarafa da; gerekçe
+  // kodun katalog etiketidir, adminin iç notu asla taşınmaz.
+  TRADE_CANCELLED_BY_PLATFORM = "trade_cancelled_by_platform",
   // Takas yanıt / ödeme süresi bir kez uzatıldı (extend_once) — işlem sırası gelen tarafa.
   TRADE_RESPONSE_EXTENDED = "trade_response_extended",
   TRADE_PAYMENT_EXTENDED = "trade_payment_extended",
