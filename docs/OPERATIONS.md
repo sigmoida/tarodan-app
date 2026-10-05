@@ -539,9 +539,9 @@ dokunmadan durur.
 `dry_run` ile dene: tüm guard'ları ve UAT seed pre-flight'ını (`seed-uat.js
 --check`: production reddi, şifre kuralı, veri dosyaları) veritabanına dokunmadan
 koşar. Guard'lar eskisi gibi: onay kelimesi, staging host kontrolü, S3 prefix
-kontrolü, yedek (`skip_backup`), ek olarak api `APP_ENV` production olmamalı ve
-`UAT_SEED_PASSWORD` set olmalı. Seed `APP_ENV=production` iken kendisi de
-çalışmayı reddeder.
+kontrolü, yedek (`skip_backup`), ek olarak api `APP_ENV` tam olarak `staging`
+olmalı ve `UAT_SEED_PASSWORD` set olmalı. Seed de kendisi reddeder: derlenmiş
+konteynerde `APP_ENV=staging` değilse (boşsa bile) çalışmaz.
 
 Elle (reset'siz) koşu, yalnız api konteynerinde:
 

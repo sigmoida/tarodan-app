@@ -50,13 +50,24 @@ const isRecord = (value: unknown): value is Record<string, unknown> =>
 const isTruthyFlag = (value: string | undefined): boolean =>
   ["1", "true"].includes((value ?? "").trim().toLowerCase());
 
-/** `APP_ENV=production` iken UAT seed'i ASLA koşmaz (veritabanını ezer). */
+/**
+ * UAT seed yalnız `APP_ENV=staging` ile ya da yerel geliştirmede koşar. İzin
+ * LİSTESİDİR: derlenmiş (NODE_ENV=production) bir konteynerde `APP_ENV` boşsa
+ * ya da başka bir değerse reddedilir — "production değil" demek yetmez.
+ */
 export function assertUatSeedAllowed(
   env: Record<string, string | undefined>,
 ): void {
-  if ((env.APP_ENV ?? "").trim().toLowerCase() === "production") {
+  const appEnv = (env.APP_ENV ?? "").trim().toLowerCase();
+  const nodeEnv = (env.NODE_ENV ?? "").trim().toLowerCase();
+  if (appEnv === "production") {
     throw new Error(
       "UAT seed refuses to run with APP_ENV=production; it is for staging/UAT only.",
+    );
+  }
+  if (appEnv !== "staging" && nodeEnv === "production") {
+    throw new Error(
+      "UAT seed refuses to run in a production build unless APP_ENV=staging.",
     );
   }
 }

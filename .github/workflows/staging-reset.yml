@@ -131,7 +131,9 @@ jobs:
             [ -n "${API_UUID:-}" ] || die "API_UUID not set (first field of COOLIFY_STAGING_UUIDS)."
             [ -n "${UAT_SEED_PASSWORD:-}" ] || die "UAT_SEED_PASSWORD not set."
             # `docker exec -e NAME` (no value) copies it from this shell, so the
-            # password never lands on a command line / process list.
+            # password stays off the docker command line. It is still visible in
+            # this SSH session's own process on the host for the run's duration
+            # (ssh-action sends `envs` as exports inside the remote command).
             export UAT_SEED_PASSWORD
 
             # --- Discover the Coolify api application container -----------------
@@ -177,7 +179,7 @@ jobs:
             # The seed refuses APP_ENV=production itself; checking here as well
             # means a misdirected run dies BEFORE migrate reset, not after.
             APP_ENV_VALUE="$(docker exec "$API_CID" printenv APP_ENV 2>/dev/null || true)"
-            [ "$APP_ENV_VALUE" != "production" ] || die "api APP_ENV=production — refusing (UAT seed is for staging only)."
+            [ "$APP_ENV_VALUE" = "staging" ] || die "api APP_ENV is '${APP_ENV_VALUE:-unset}', not staging — refusing (UAT seed is for staging only)."
             # --check validates the guard, the password rule and the data files
             # without touching the database. A missing file means staging was not
             # yet redeployed with the UAT seed in its image.

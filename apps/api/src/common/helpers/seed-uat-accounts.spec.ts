@@ -27,12 +27,22 @@ describe("assertUatSeedAllowed", () => {
     },
   );
 
-  it.each([{ APP_ENV: "staging" }, { APP_ENV: "development" }, {}])(
-    "allows %j",
-    (env) => {
-      expect(() => assertUatSeedAllowed(env)).not.toThrow();
-    },
-  );
+  it.each([
+    { NODE_ENV: "production" },
+    { NODE_ENV: "production", APP_ENV: "" },
+    { NODE_ENV: "production", APP_ENV: "development" },
+  ])("refuses a production build without APP_ENV=staging: %j", (env) => {
+    expect(() => assertUatSeedAllowed(env)).toThrow(/APP_ENV=staging/);
+  });
+
+  it.each([
+    { APP_ENV: "staging" },
+    { NODE_ENV: "production", APP_ENV: "staging" },
+    { APP_ENV: "development" },
+    {},
+  ])("allows %j", (env) => {
+    expect(() => assertUatSeedAllowed(env)).not.toThrow();
+  });
 });
 
 describe("resolveUatPassword", () => {
