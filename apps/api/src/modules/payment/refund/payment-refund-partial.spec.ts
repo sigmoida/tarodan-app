@@ -460,7 +460,7 @@ describe("PaymentRefundService.processRefund — MONEY-H3/H4 partial refund", ()
         paymentAmount: 1000,
       });
 
-      await service.processRefund(ORDER_ID, 1000, platformOpts);
+      const result = await service.processRefund(ORDER_ID, 1000, platformOpts);
 
       expect(mockTx.order.update).toHaveBeenCalledWith({
         where: { id: ORDER_ID },
@@ -470,6 +470,8 @@ describe("PaymentRefundService.processRefund — MONEY-H3/H4 partial refund", ()
           adminCancelReasonCode: "stock_error",
         }),
       });
+      // Çağıranlar duyuruyu bu dönüşe bağlar.
+      expect(result?.closedWithAdminReason).toBe("stock_error");
       expect(
         notifications.notifyOrderCancelledByPlatform,
       ).toHaveBeenCalledTimes(1);
@@ -517,12 +519,38 @@ describe("PaymentRefundService.processRefund — MONEY-H3/H4 partial refund", ()
         orderNumber: "ORD1",
       });
 
-      await service.processRefund(ORDER_ID, 1000, platformOpts);
+      const result = await service.processRefund(ORDER_ID, 1000, platformOpts);
 
       const closeWrite = mockTx.order.update.mock.calls.find(
         (call: any[]) => call[0].data?.status === "cancelled",
       );
       expect(closeWrite?.[0].data).not.toHaveProperty("adminCancelReasonCode");
+      expect(
+        notifications.notifyOrderCancelledByPlatform,
+      ).not.toHaveBeenCalled();
+      // Bu iade siparişi platform iptali olarak KAPATMADI: çağıran da duyuru
+      // göndermez (admin onayı / orkestratör).
+      expect(result?.closedWithAdminReason).toBeNull();
+    });
+
+    it("aynı deneme başka bir çağrıda zaten sonlandırıldıysa (kurtarma kazandı) idempotent döner: kod null, duyuru yok", async () => {
+      const { service, notifications, paytr } = makeService({
+        paymentAmount: 1000,
+        existingAttempt: {
+          idempotencyKey: "refund-request:rr-1",
+          amount: 1000,
+          status: RefundAttemptStatus.finalized,
+          providerRefundId: "REFUND1",
+        },
+      });
+
+      const result = await service.processRefund(ORDER_ID, 1000, platformOpts);
+
+      expect(result).toMatchObject({
+        idempotent: true,
+        closedWithAdminReason: null,
+      });
+      expect(paytr.createRefund).not.toHaveBeenCalled();
       expect(
         notifications.notifyOrderCancelledByPlatform,
       ).not.toHaveBeenCalled();

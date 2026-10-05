@@ -478,6 +478,8 @@ export class PaymentRefundService {
         refundAmount: amountToRefund,
         providerRefundId: priorAttempt.providerRefundId ?? undefined,
         idempotent: true,
+        // Siparişi bu çağrı kapatmadı (önceki sonlandırma kapattı).
+        closedWithAdminReason: null,
       };
     }
     if (payment.status !== PaymentStatus.completed) {
@@ -540,6 +542,8 @@ export class PaymentRefundService {
         refundAmount: amountToRefund,
         providerRefundId: refundAttempt.attempt.providerRefundId ?? undefined,
         idempotent: true,
+        // Siparişi bu çağrı kapatmadı (önceki sonlandırma kapattı).
+        closedWithAdminReason: null,
       };
     }
 
@@ -1155,6 +1159,11 @@ export class PaymentRefundService {
             // Çağıran (ör. finalizeRefundForReturnedShipment) satıcıya "ilan
             // pasife düştü" notunu YALNIZ bu true ise ekler.
             stockQuarantined,
+            // Siparişi BU çağrı yönetici (platform) iptali olarak kapattıysa
+            // yazdığı neden kodu; aksi halde null. Platform duyurusu yalnız
+            // buna bağlanır: başka yol kapattıysa ya da başka çağrı
+            // sonlandırdıysa (null / idempotent) duyuru gönderilmez.
+            closedWithAdminReason: completedAdminReason,
           };
 
           // 11.2d: iade sonucu bildirimleri (payment.refunded / order_cancelled) artık

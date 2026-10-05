@@ -433,6 +433,41 @@ describe("RefundCreationService — kargo öncesi iptal çekirdeği", () => {
       );
     });
 
+    it.each([
+      [
+        "bu çağrının iadesi siparişi platform iptali olarak kapattı",
+        { providerRefundId: "paytr-1", closedWithAdminReason: "stock_error" },
+        "stock_error",
+      ],
+      [
+        "aynı denemeyi kurtarma önce sonlandırdı (idempotent)",
+        {
+          providerRefundId: "paytr-1",
+          idempotent: true,
+          closedWithAdminReason: null,
+        },
+        null,
+      ],
+      ["sonlandırma işlemi no-op (null)", null, null],
+    ])(
+      "çağırana kapanışı bildirir — %s",
+      async (_, processResult, expected) => {
+        const { creation } = makeService(
+          {},
+          { processRefund: jest.fn().mockResolvedValue(processResult) },
+        );
+
+        const result = await creation.createPlatformCancellationRefund(
+          "order-1",
+          "admin-1",
+          "stock_error",
+        );
+
+        // AdminOrderCancelService platform duyurusunu YALNIZ buna bağlar.
+        expect(result.closedWithAdminReason).toBe(expected);
+      },
+    );
+
     it("kupon hakkını geri verir (kusur alıcıda değil)", async () => {
       const { creation, discount } = makeService();
 

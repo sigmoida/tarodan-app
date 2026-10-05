@@ -64,6 +64,15 @@ type CancelOrderRow = Prisma.OrderGetPayload<{
   select: typeof CANCEL_ORDER_SELECT;
 }>;
 
+/**
+ * İptalin sonucu ve bu çağrının göndermesi gereken platform duyurusu; iptali
+ * başka bir yol sonlandırıp duyuruyu kendisi gönderdiyse `notice` null.
+ */
+interface CancelOutcome {
+  result: AdminOrderCancelResult;
+  notice: { refundAmount: number | null } | null;
+}
+
 /** Doğrulanmış neden: katalog kodu + (iç) not. */
 interface AdminCancelReason {
   code: AdminCancelReasonCode;
@@ -230,11 +239,11 @@ export class AdminOrderCancelService {
     const reason = this.validReason(request);
     const order = await this.loadOrder(orderId);
 
-    let result: AdminOrderCancelResult;
+    let outcome: CancelOutcome;
     try {
       const kind = cancellableKind(order);
       assertExpectedKind(request.expectedKind, kind);
-      result =
+      outcome =
         kind === "unpaid"
           ? await this.cancelUnpaid(adminId, order, reason)
           : await this.cancelPaid(adminId, order, reason);
@@ -266,21 +275,24 @@ export class AdminOrderCancelService {
         ),
       );
     // İki tarafa TEK duyuru (zil + e-posta) — çekirdekler bu iptalde
-    // kendi duyurularını göndermez. Not bu çağrıya hiç verilmez.
-    await this.notificationService
-      .notifyOrderCancelledByPlatform({
-        orderId,
-        reasonCode: reason.code,
-        refundAmount:
-          result.kind === "paid_pre_handover" ? result.refundAmount : null,
-      })
-      .catch((error: unknown) =>
-        this.logger.warn(
-          `order ${orderId} admin-cancel notice failed: ${errorMessage(error)}`,
-        ),
-      );
+    // kendi duyurularını göndermez. Not bu çağrıya hiç verilmez. Duyuru
+    // yoksa iptali başka bir yol (takılı deneme kurtarması) sonlandırdı ve
+    // duyuruyu o gönderdi.
+    if (outcome.notice) {
+      await this.notificationService
+        .notifyOrderCancelledByPlatform({
+          orderId,
+          reasonCode: reason.code,
+          refundAmount: outcome.notice.refundAmount,
+        })
+        .catch((error: unknown) =>
+          this.logger.warn(
+            `order ${orderId} admin-cancel notice failed: ${errorMessage(error)}`,
+          ),
+        );
+    }
 
-    return result;
+    return outcome.result;
   }
 
   /**
@@ -291,7 +303,7 @@ export class AdminOrderCancelService {
     adminId: string,
     order: CancelOrderRow,
     reason: AdminCancelReason,
-  ): Promise<AdminOrderCancelResult> {
+  ): Promise<CancelOutcome> {
     const visibleReason = adminCancelReasonText(reason.code);
     await this.prisma.$transaction(async (tx) => {
       await tx.$queryRaw`SELECT id FROM orders WHERE id = ${order.id} FOR UPDATE`;
@@ -323,7 +335,11 @@ export class AdminOrderCancelService {
         tx,
       );
     });
-    return { orderId: order.id, kind: "unpaid" };
+    return {
+      result: { orderId: order.id, kind: "unpaid" },
+      // İptal bu işlemde kesinleşti: duyuru bu çağrınındır.
+      notice: { refundAmount: null },
+    };
   }
 
   /**
@@ -335,7 +351,7 @@ export class AdminOrderCancelService {
     adminId: string,
     order: CancelOrderRow,
     reason: AdminCancelReason,
-  ): Promise<AdminOrderCancelResult> {
+  ): Promise<CancelOutcome> {
     const before = auditBefore(order);
     // Fail-closed kapı: yazılamazsa para yoluna hiç girilmez.
     await this.audit.createRequiredAuditLog(
@@ -384,11 +400,17 @@ export class AdminOrderCancelService {
       );
 
     return {
-      orderId: order.id,
-      kind: "paid_pre_handover",
-      refundRequestId: refund.id,
-      refundNumber: refund.refundNumber,
-      refundAmount,
+      result: {
+        orderId: order.id,
+        kind: "paid_pre_handover",
+        refundRequestId: refund.id,
+        refundNumber: refund.refundNumber,
+        refundAmount,
+      },
+      // Duyuru YALNIZ bu çağrının iadesi siparişi platform iptali olarak
+      // kapattıysa: aynı denemeyi takılı deneme kurtarması önce
+      // sonlandırdıysa iptali ve duyuruyu o yaptı (çift mesaj olmaz).
+      notice: refund.closedWithAdminReason ? { refundAmount } : null,
     };
   }
 

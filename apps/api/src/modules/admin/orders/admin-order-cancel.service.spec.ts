@@ -48,6 +48,8 @@ describe("AdminOrderCancelService", () => {
     refundNumber: "RFD-1",
     amount: 1180,
     status: "refunded",
+    // Bu çağrının iadesi siparişi platform iptali olarak kapattı.
+    closedWithAdminReason: "stock_error" as string | null,
   };
 
   const request = (
@@ -459,6 +461,36 @@ describe("AdminOrderCancelService", () => {
           notificationService.notifyOrderCancelledByPlatform.mock.calls,
         ),
       ).toBe(false);
+    });
+
+    it("takılı deneme kurtarması aynı denemeyi önce sonlandırdıysa (duyuruyu o gönderdi) bu çağrı duyuru göndermez — taraf başına tek mesaj", async () => {
+      const { service, refundService, notificationService, audit } =
+        makeService();
+      // Kurtarma cron'u iadeyi sonlandırıp siparişi kapattı ve platform
+      // duyurusunu gönderdi; eşzamanlı çekirdek çağrısı idempotent döndü.
+      refundService.createPlatformCancellationRefund.mockResolvedValueOnce({
+        ...refundRow,
+        closedWithAdminReason: null,
+      });
+
+      await expect(
+        service.cancelOrder("admin-1", "order-1", request()),
+      ).resolves.toMatchObject({
+        kind: "paid_pre_handover",
+        refundNumber: "RFD-1",
+      });
+      expect(
+        notificationService.notifyOrderCancelledByPlatform,
+      ).not.toHaveBeenCalled();
+      // İptal tamamlandı: tamamlanma kaydı yine yazılır.
+      expect(audit.createRequiredAuditLog).toHaveBeenLastCalledWith(
+        "admin-1",
+        "order_cancel",
+        "Order",
+        "order-1",
+        expect.anything(),
+        expect.objectContaining({ refundNumber: "RFD-1" }),
+      );
     });
 
     it("PSP hatası: başarısız deneme denetime düşer, duyuru gitmez, asıl hata yükselir", async () => {
