@@ -155,6 +155,11 @@ export const EMAIL_TEMPLATE_DEFINITIONS = [
     group: "İade",
   },
   {
+    key: "order-preparing-extended-buyer",
+    name: "Kargo süresi uzatıldı (alıcı)",
+    group: "Sipariş",
+  },
+  {
     key: "refund-requested-seller",
     name: "İade talebi alındı (satıcı)",
     group: "İade",

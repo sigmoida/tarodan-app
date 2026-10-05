@@ -1,6 +1,7 @@
 import { BadRequestException, ConflictException } from "@nestjs/common";
 import { Prisma } from "@prisma/client";
 import { PUBLIC_TIMING_RULE_IDS, TIMING_RULES } from "@tarodan/types";
+import { withActionUnavailable } from "../../common/timing-rules/timing-rules.test-helpers";
 import {
   TIMING_RULES_WRITE_ATTEMPTS,
   TimingRulesService,
@@ -227,17 +228,59 @@ describe("TimingRulesService", () => {
       );
     });
 
+    it("hazırlık uyarısı hazırlık süresine eşit ya da uzun olamaz (saat ↔ gün)", async () => {
+      const { service, prisma, rows } = makeService();
+      await expectRejected(
+        service.applyChanges([{ id: "preparingDeadlineDays", value: 1 }], "u"),
+        "server.admin.timingRules.invariant.preparingWarningBeforeDeadline",
+      );
+      await expectRejected(
+        service.applyChanges(
+          [{ id: "preparingWarningLeadHours", value: 72 }],
+          "u",
+        ),
+        "server.admin.timingRules.invariant.preparingWarningBeforeDeadline",
+      );
+      expect(prisma.platformSetting.upsert).not.toHaveBeenCalled();
+
+      // Birlikte değiştirilince geçerli: 1 gün + 12 saatlik uyarı.
+      await service.applyChanges(
+        [
+          { id: "preparingDeadlineDays", value: 1 },
+          { id: "preparingWarningLeadHours", value: 12 },
+        ],
+        "u",
+      );
+      expect(rows.get("preparing_deadline_days")?.settingValue).toBe("1");
+      expect(rows.get("preparing_warning_lead_hours")?.settingValue).toBe("12");
+    });
+
     it("henüz açılmamış eylemi doğrudan gönderilse bile reddeder", async () => {
       const { service, prisma } = makeService();
       for (const [id, action] of [
+        ["listingTtlDays", "auto_renew"],
+        ["offerExpiryHours", "extend_once"],
         ["preparingDeadlineDays", "extend_once"],
       ] as const) {
-        await expectRejected(
-          service.applyChanges([{ id, action }], "u"),
-          "server.admin.timingRules.actionUnavailable",
+        await withActionUnavailable(id, action, () =>
+          expectRejected(
+            service.applyChanges([{ id, action }], "u"),
+            "server.admin.timingRules.actionUnavailable",
+          ),
         );
       }
       expect(prisma.platformSetting.upsert).not.toHaveBeenCalled();
+    });
+
+    it("hazırlık süresi için tek seferlik uzatma seçilebilir", async () => {
+      const { service, rows } = makeService();
+      await service.applyChanges(
+        [{ id: "preparingDeadlineDays", action: "extend_once" }],
+        "u",
+      );
+      expect(rows.get("preparing_deadline_days_on_expiry")?.settingValue).toBe(
+        "extend_once",
+      );
     });
 
     it("kayıtta tanımsız eylemi reddeder", async () => {

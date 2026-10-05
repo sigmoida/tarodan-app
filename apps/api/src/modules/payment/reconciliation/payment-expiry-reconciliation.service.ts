@@ -34,7 +34,18 @@ import {
   PUBLIC_NAME_SELECT,
   publicName,
 } from "../../../common/helpers/public-identity";
-import { resolveTimingValue } from "../../../common/timing-rules";
+import {
+  resolveTimingAction,
+  resolveTimingValue,
+} from "../../../common/timing-rules";
+import { errorMessage } from "../../../common/helpers/error-message";
+import {
+  extendedPreparingDeadline,
+  formatPreparingDeadline,
+  isPreparingDeadlinePassed,
+  preparingDeadlineApproachingWhere,
+  shouldExtendPreparingDeadline,
+} from "../../../common/helpers/preparing-deadline";
 
 // SEAM-B1: Paket Sürat'ta HAREKET ettiyse "satıcı göndermedi" DEĞİLDİR — böyle
 // bir siparişi süre-doldu diye iptal+iade edersek alıcı hem malı hem parayı
@@ -45,6 +56,9 @@ const PAYMENT_WINDOW_EXPIRED_CANCELLATION: FailedPaymentCancellation = {
   by: CancellationActor.system,
   reason: ORDER_CANCEL_REASON.paymentWindowExpired,
 };
+
+/** Hazırlık süresi dolan bir siparişte turun vardığı sonuç. */
+type PreparingSweepOutcome = "skipped" | "in_motion" | "extended" | "cancelled";
 
 /**
  * Ödeme/sipariş süre-dolumu mutabakat süpürmeleri (cron). PaymentReconciliationService
@@ -302,21 +316,37 @@ export class PaymentExpiryReconciliationService {
   /**
    * Handle orders stuck in "preparing" status past their deadline.
    * Two phases:
-   * 1. Warn: Send notification to seller 24h before deadline (once only).
-   * 2. Cancel: Auto-cancel + refund orders past deadline, re-stock product.
+   * 1. Warn: notify the seller `preparingWarningLeadHours` before the deadline
+   *    (once per deadline — an extension clears the stamp, so the seller is
+   *    warned again before the extended deadline).
+   * 2. Expire: per the selected action (`preparingDeadlineDays`), either extend
+   *    the deadline once (`extend_once`) or auto-cancel + refund + re-stock.
    */
   async handleExpiredPreparingOrders(): Promise<{
     warned: number;
+    extended: number;
     cancelled: number;
   }> {
     const now = new Date();
-    const warningWindow = new Date(now.getTime() + 24 * 60 * 60 * 1000); // 24h from now
+    // Süreler ve Kurallar turun başında BİR KEZ okunur. Uyarı öncesi süre
+    // dashboard'un "hazırlama süresi yaklaşıyor" uyarısıyla aynı kayıttan ve
+    // aynı pencere tanımından (`preparingDeadlineApproachingWhere`) gelir.
+    // Süre dolunca ne olacağı son tarihe ULAŞILDIĞINDA buradan okunur;
+    // damgalanmış son tarihler eylem değişince geriye dönük yeniden yazılmaz.
+    const warningLeadHours = await resolveTimingValue(
+      this.prisma,
+      "preparingWarningLeadHours",
+      this.configService,
+    );
+    const onExpiry = await resolveTimingAction(
+      this.prisma,
+      "preparingDeadlineDays",
+    );
 
     // --- Phase 1: Warn sellers approaching deadline ---
     const approachingDeadline = await this.prisma.order.findMany({
       where: {
-        status: OrderStatus.preparing,
-        preparingDeadline: { gt: now, lte: warningWindow },
+        ...preparingDeadlineApproachingWhere(now, warningLeadHours),
         preparingWarningSentAt: null,
       },
       include: {
@@ -328,16 +358,6 @@ export class PaymentExpiryReconciliationService {
     let warned = 0;
     for (const order of approachingDeadline) {
       try {
-        const deadlineStr = order.preparingDeadline
-          ? order.preparingDeadline.toLocaleDateString("tr-TR", {
-              day: "numeric",
-              month: "long",
-              year: "numeric",
-              hour: "2-digit",
-              minute: "2-digit",
-            })
-          : "";
-
         await this.notificationService.createInAppNotification(
           order.sellerId,
           NotificationType.ORDER_PREPARING_DEADLINE_WARNING,
@@ -346,13 +366,24 @@ export class PaymentExpiryReconciliationService {
             audience: "seller",
             orderId: order.id,
             orderNumber: order.orderNumber,
-            deadline: deadlineStr,
+            deadline: formatPreparingDeadline(order.preparingDeadline),
             productTitle: order.product.title,
+            // Bu son tarih dolunca iptal mi (yes) yoksa tek seferlik uzatma mı
+            // (no) gelir — metin satıcıya gerçekte olacak olanı söyler.
+            final: shouldExtendPreparingDeadline(onExpiry, order)
+              ? "no"
+              : "yes",
           },
         );
 
-        await this.prisma.order.update({
-          where: { id: order.id },
+        // Damga yalnız uyarının ait olduğu son tarih hâlâ geçerliyse yazılır:
+        // arada sipariş uzatıldıysa yeni son tarihin uyarısı bastırılmasın.
+        await this.prisma.order.updateMany({
+          where: {
+            id: order.id,
+            preparingDeadline: order.preparingDeadline,
+            preparingWarningSentAt: null,
+          },
           data: { preparingWarningSentAt: now },
         });
 
@@ -367,7 +398,17 @@ export class PaymentExpiryReconciliationService {
       }
     }
 
-    // --- Phase 2: Auto-cancel orders past deadline ---
+    // --- Phase 2: Extend once or auto-cancel orders past deadline ---
+    // Uzatma süresi yalnız uzatma seçiliyken okunur: tam bir hazırlık süresi,
+    // ödemedeki damgayla aynı kayıttan.
+    const extensionDays =
+      onExpiry === "extend_once"
+        ? await resolveTimingValue(
+            this.prisma,
+            "preparingDeadlineDays",
+            this.configService,
+          )
+        : null;
     const expiredOrders = await this.prisma.order.findMany({
       where: {
         status: OrderStatus.preparing,
@@ -388,10 +429,21 @@ export class PaymentExpiryReconciliationService {
       },
     });
 
+    let extended = 0;
     let cancelled = 0;
     for (const order of expiredOrders) {
       try {
-        let skippedInMotion = false;
+        // Turun bu siparişte ne yaptığı. İade, bildirim ve sayaç YALNIZ işlem
+        // siparişi gerçekten iptal ettiyse çalışır. Kilit altındaki tekrar
+        // okuma siparişi atlarsa `return` yalnız işlem geri çağrısından çıkar;
+        // eskiden akış buna rağmen iadeye düşüyordu: aynı anda kargolanan
+        // (`shipped`) sipariş iade ediliyor, başka turun iptal ettiği sipariş
+        // ikinci kez iade deneniyor ve alıcıya ikinci bildirim gidiyordu.
+        // (`as`: değer işlem geri çağrısında atanır; açıklama tipi olsaydı TS
+        // değişkeni ilk değere daraltır ve aşağıdaki karşılaştırmalar derlenmezdi.)
+        let outcome = "skipped" as PreparingSweepOutcome;
+        // Uzatıldıysa yeni son tarih (bildirimler commit sonrası gider).
+        let extendedDeadline = null as Date | null;
         // Kupon iadesi bildirimi tx İÇİNDE atılmaz; commit sonrası gönderilir.
         let restoredCoupons: { userId: string; code: string }[] = [];
         await this.prisma.$transaction(async (tx) => {
@@ -400,10 +452,20 @@ export class PaymentExpiryReconciliationService {
 
           const freshOrder = await tx.order.findUnique({
             where: { id: order.id },
-            select: { status: true },
+            select: {
+              status: true,
+              preparingDeadline: true,
+              preparingExtendedAt: true,
+            },
           });
           if (!freshOrder || freshOrder.status !== OrderStatus.preparing) {
             return; // Already shipped or handled by another process
+          }
+          // Son tarih kilit altında hâlâ geçmiş olmalı. Aynı anda koşan başka
+          // tur siparişi az önce UZATTIYSA son tarih ileridedir: bu tur ne
+          // iptal eder ne yeniden uzatır (uzat-ve-iptal yarışı kapanır).
+          if (!isPreparingDeadlinePassed(freshOrder.preparingDeadline, now)) {
+            return;
           }
 
           // SEAM-B1: Satıcı "kargoladım" tıklamamış olsa bile paket Sürat'ta HAREKET
@@ -411,12 +473,46 @@ export class PaymentExpiryReconciliationService {
           // "göndermedi" değildir → iptal+iade edersek alıcı hem malı hem parayı alır
           // (çift kayıp). İptal ETME; atla. Sipariş `preparing`'de kalsa bile teslimde
           // handleOrderDelivered onu ilerletip escrow'u başlatır, satıcı yine ödenir.
+          // Uzatmadan ÖNCE bakılır: hareket eden koli uzatılmaz da.
           const shipment = await tx.shipment.findUnique({
             where: { orderId: order.id },
             select: { status: true, shippedAt: true },
           });
           if (isShipmentHandedToCarrier(shipment)) {
-            skippedInMotion = true;
+            outcome = "in_motion";
+            return;
+          }
+
+          // Tek seferlik uzatma (admin `extend_once` seçtiyse ve sipariş hiç
+          // uzatılmadıysa): iptal yerine son tarih tam bir hazırlık süresi
+          // ileri alınır. `preparingExtendedAt` claim damgasıdır — koşullu
+          // yazım (yalnız hâlâ null iken) ikinci uzatmayı veritabanında da
+          // imkânsız kılar. Uyarı damgası temizlenir: satıcı yeni son tarihten
+          // önce yeniden uyarılır. İkinci dolumda aşağıdaki iptal + iade
+          // değişmeden çalışır.
+          if (
+            extensionDays !== null &&
+            shouldExtendPreparingDeadline(onExpiry, freshOrder)
+          ) {
+            const nextDeadline = extendedPreparingDeadline(now, extensionDays);
+            const claim = await tx.order.updateMany({
+              where: {
+                id: order.id,
+                status: OrderStatus.preparing,
+                preparingExtendedAt: null,
+              },
+              data: {
+                preparingDeadline: nextDeadline,
+                originalPreparingDeadline: freshOrder.preparingDeadline,
+                preparingExtendedAt: now,
+                preparingWarningSentAt: null,
+                version: { increment: 1 },
+              },
+            });
+            if (claim.count === 1) {
+              outcome = "extended";
+              extendedDeadline = nextDeadline;
+            }
             return;
           }
 
@@ -501,17 +597,30 @@ export class PaymentExpiryReconciliationService {
               ...statusAfterStockRestore(order.product, newQuantity, false),
             },
           });
+          outcome = "cancelled";
         });
 
         // SEAM-B1: hareket eden paket yüzünden atlandıysa iade/restock/bildirim YOK.
         // Ops görünürlüğü için greplenebilir tek satır uyarı.
-        if (skippedInMotion) {
+        if (outcome === "in_motion") {
           this.logger.warn(
             `SELLER_NO_SHIP_SKIPPED_MOVING: sipariş ${order.orderNumber} süre doldu ama ` +
               `paket Sürat'ta hareket ediyor — iptal/iade EDİLMEDİ (satıcı 'kargoladım' işaretlememiş olabilir).`,
           );
           continue;
         }
+        // Tek seferlik uzatma: iade/restock YOK, iki tarafa yeni son tarih.
+        if (outcome === "extended" && extendedDeadline) {
+          await this.notifyPreparingExtended(order, extendedDeadline);
+          extended++;
+          this.logger.log(
+            `Extended preparing deadline once for order ${order.orderNumber} to ${extendedDeadline.toISOString()}`,
+          );
+          continue;
+        }
+        // Kilit altında sipariş artık iptal edilecek durumda değildi (başka
+        // süreç kargoladı, iptal etti ya da uzattı): iade, bildirim, sayaç YOK.
+        if (outcome !== "cancelled") continue;
 
         // Process refund via PayTR (outside transaction — calls external API)
         try {
@@ -567,7 +676,52 @@ export class PaymentExpiryReconciliationService {
       }
     }
 
-    return { warned, cancelled };
+    return { warned, extended, cancelled };
+  }
+
+  /**
+   * Tek seferlik uzatmanın bildirimleri — commit SONRASI, iki tarafa ayrı
+   * metinle: satıcıya yeni son tarih + bunun son süre olduğu (zil + push);
+   * alıcıya gecikme, en geç kargo tarihi ve kargodan önce iptal hakkının
+   * sürdüğü (zil + push + e-posta; misafir siparişinde e-posta teslimat
+   * verisindeki GERÇEK adrese gider). Bildirim hatası uzatmayı geri almaz,
+   * diğer tarafın bildirimini de engellemez.
+   */
+  private async notifyPreparingExtended(
+    order: {
+      id: string;
+      orderNumber: string;
+      sellerId: string;
+      product: { title: string };
+    },
+    deadline: Date,
+  ): Promise<void> {
+    const data = {
+      orderNumber: order.orderNumber,
+      productTitle: order.product.title,
+      deadline: formatPreparingDeadline(deadline),
+    };
+    try {
+      await this.notificationService.createInAppNotification(
+        order.sellerId,
+        NotificationType.ORDER_PREPARING_EXTENDED_SELLER,
+        { orderId: order.id, ...data, audience: "seller" },
+      );
+    } catch (error) {
+      this.logger.warn(
+        `notify preparing-extended (seller) failed for ${order.id}: ${errorMessage(error)}`,
+      );
+    }
+    try {
+      await this.notificationService.notifyPreparingExtendedBuyer(
+        order.id,
+        data,
+      );
+    } catch (error) {
+      this.logger.warn(
+        `notify preparing-extended (buyer) failed for ${order.id}: ${errorMessage(error)}`,
+      );
+    }
   }
 
   /**

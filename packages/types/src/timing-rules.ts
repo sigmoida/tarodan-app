@@ -263,7 +263,12 @@ export const TIMING_RULES = {
   },
 
   // ── Sipariş ───────────────────────────────────────────────────────────
-  /** Satıcının siparişi kargoya verme süresi (pazar sayılmaz). */
+  /**
+   * Satıcının siparişi kargoya verme süresi (pazar sayılmaz). Dolunca: iptal +
+   * iade (bugünkü davranış) ya da `extend_once` — son tarih BİR KEZ tam bir
+   * hazırlık süresi kadar uzatılır (`Order.preparingExtendedAt`),
+   * ikinci dolumda iptal + iade aynen çalışır.
+   */
   preparingDeadlineDays: {
     settingKey: "preparing_deadline_days",
     group: "order",
@@ -273,7 +278,22 @@ export const TIMING_RULES = {
     max: 14,
     envKey: "PREPARING_DEADLINE_DAYS",
     appliesToInProgress: false,
-    ...withLater("cancel_and_refund", "extend_once"),
+    ...withExtendOnce("cancel_and_refund"),
+  },
+  /**
+   * Hazırlık son tarihinden kaç saat önce satıcı uyarılır. Satıcı uyarısı ve
+   * dashboard'un "hazırlama süresi yaklaşıyor" uyarısı aynı değeri okur.
+   */
+  preparingWarningLeadHours: {
+    settingKey: "preparing_warning_lead_hours",
+    group: "order",
+    unit: "hours",
+    default: 24,
+    min: 1,
+    max: 72,
+    envKey: null,
+    appliesToInProgress: true,
+    ...only("notify_seller"),
   },
   /**
    * Teslimden sonraki koşulsuz cayma (iade talep) penceresi. Mesafeli Satış
@@ -530,10 +550,14 @@ export function isSelectableTimingAction(
 
 /**
  * Alanlar arası değişmezler: `lower` her zaman `upper`'dan küçük (strict) ya da
- * küçük-eşit kalmalı. İki tarafın birimi aynıdır.
+ * küçük-eşit kalmalı. Birimler farklı olabilir; karşılaştırma dakikaya
+ * çevrilerek yapılır (`TIMING_UNIT_MINUTES`).
  */
 export interface TimingRuleInvariant {
-  id: "dropoffHardNotBelowDropoff" | "listingWarningBeforeTtl";
+  id:
+    | "dropoffHardNotBelowDropoff"
+    | "listingWarningBeforeTtl"
+    | "preparingWarningBeforeDeadline";
   lower: TimingRuleId;
   upper: TimingRuleId;
   strict: boolean;
@@ -557,7 +581,29 @@ export const TIMING_RULE_INVARIANTS: readonly TimingRuleInvariant[] = [
     upper: "listingTtlDays",
     strict: true,
   },
+  // Hazırlık uyarısı (saat) hazırlık süresinden (gün) KISA olmalı; aksi halde
+  // satıcı ödeme anında "süre doluyor" uyarısı alır, uzatma bildiriminin
+  // hemen ardından "son uyarı" gelir ve dashboard her hazırlanan siparişi
+  // sayar. Gün en az 24 saat sayılır (pazar atlamak süreyi yalnız uzatır).
+  {
+    id: "preparingWarningBeforeDeadline",
+    lower: "preparingWarningLeadHours",
+    upper: "preparingDeadlineDays",
+    strict: true,
+  },
 ];
+
+/** Değişmez karşılaştırması için birimlerin dakika karşılığı. */
+export const TIMING_UNIT_MINUTES: Readonly<Record<TimingUnit, number>> = {
+  minutes: 1,
+  hours: 60,
+  days: 24 * 60,
+};
+
+/** Bir kaydın değeri dakika cinsinden — birimler arası karşılaştırma için. */
+function inMinutes(id: TimingRuleId, value: number): number {
+  return value * TIMING_UNIT_MINUTES[TIMING_RULES[id].unit];
+}
 
 export type TimingRuleViolation =
   | { code: "notInteger" }
@@ -602,8 +648,8 @@ export function findTimingInvariantViolation(
     const lowerChanged = changed.includes(invariant.lower);
     const upperChanged = changed.includes(invariant.upper);
     if (!lowerChanged && !upperChanged) continue;
-    const lower = values[invariant.lower];
-    const upper = values[invariant.upper];
+    const lower = inMinutes(invariant.lower, values[invariant.lower]);
+    const upper = inMinutes(invariant.upper, values[invariant.upper]);
     const holds = invariant.strict ? lower < upper : lower <= upper;
     if (holds) continue;
     const id = lowerChanged ? invariant.lower : invariant.upper;

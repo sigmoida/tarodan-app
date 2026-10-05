@@ -71,6 +71,17 @@ describe("bildirim hedefleri", () => {
     const cases: Array<[NotificationType, Record<string, string>, string]> = [
       [NotificationType.ORDER_CREATED, { orderId: "o1" }, "/profile/orders/o1"],
       [NotificationType.ORDER_SHIPPED, { orderId: "o1" }, "/profile/orders/o1"],
+      // Hazırlık uzatması: alıcı ve satıcı ayrı tiplerle kendi ekranına gider.
+      [
+        NotificationType.ORDER_PREPARING_EXTENDED,
+        { orderId: "o1" },
+        "/profile/orders/o1",
+      ],
+      [
+        NotificationType.ORDER_PREPARING_EXTENDED_SELLER,
+        { orderId: "o1" },
+        "/seller/orders/o1",
+      ],
       [NotificationType.OFFER_RECEIVED, {}, "/profile/offers?tab=received"],
       [NotificationType.OFFER_COUNTER, {}, "/profile/offers?tab=sent"],
       [

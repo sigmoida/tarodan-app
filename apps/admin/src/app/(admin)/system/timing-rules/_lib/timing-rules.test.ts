@@ -111,6 +111,25 @@ describe("timing rules schema — same rules as the server", () => {
     ).toEqual({});
   });
 
+  it("keeps the preparing warning (hours) shorter than the preparing time (days)", () => {
+    expect(issuesFor(valuesWith({ preparingWarningLeadHours: "72" }))).toEqual({
+      preparingWarningLeadHours:
+        "server.admin.timingRules.invariant.preparingWarningBeforeDeadline",
+    });
+    expect(issuesFor(valuesWith({ preparingDeadlineDays: "1" }))).toEqual({
+      preparingDeadlineDays:
+        "server.admin.timingRules.invariant.preparingWarningBeforeDeadline",
+    });
+    expect(
+      issuesFor(
+        valuesWith({
+          preparingDeadlineDays: "1",
+          preparingWarningLeadHours: "12",
+        }),
+      ),
+    ).toEqual({});
+  });
+
   it("validates only the rows that changed — an out-of-bounds effective value does not lock the form", () => {
     // Env'den gelen RETURN_WINDOW_DAYS=7 (min 14) ve eski ekrandan girilmiş
     // 500 saatlik takas yanıtı: ikisi de dokunulmadıkça başka bir satırı

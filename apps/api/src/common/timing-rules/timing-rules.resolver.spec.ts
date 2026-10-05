@@ -1,3 +1,4 @@
+import { withActionUnavailable } from "./timing-rules.test-helpers";
 import {
   TIMING_RULES,
   TIMING_RULE_IDS,
@@ -227,10 +228,12 @@ describe("eylem çözümü", () => {
     ).resolves.toBe("deactivate");
   });
 
-  it("henüz açılmamış bir eylem DB'ye yazılmış olsa bile uygulanmaz", () => {
-    expect(pickTimingAction("preparingDeadlineDays", "extend_once")).toBe(
-      "cancel_and_refund",
-    );
+  it("henüz açılmamış bir eylem DB'ye yazılmış olsa bile uygulanmaz", async () => {
+    await withActionUnavailable("preparingDeadlineDays", "extend_once", () => {
+      expect(pickTimingAction("preparingDeadlineDays", "extend_once")).toBe(
+        "cancel_and_refund",
+      );
+    });
   });
 
   it("açılmış ikinci eylemler (ilan, teklif, takas paketleri) seçilebilir", () => {

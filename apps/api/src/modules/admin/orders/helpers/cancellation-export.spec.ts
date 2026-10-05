@@ -55,6 +55,7 @@ function row(
           subtotal: 100,
           totalAmount: 120,
           preparingDeadline: null,
+          preparingExtendedAt: null,
           deliveredAt: null,
           hasActiveRefund: false,
           product: {

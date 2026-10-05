@@ -4,9 +4,11 @@
  * and delegates delivery to the shared NotificationDispatchService engine.
  */
 import { Injectable, Logger } from "@nestjs/common";
+import type { Prisma } from "@prisma/client";
 import { PrismaService } from "../../prisma";
 import { NotificationType, NotificationChannel } from "./dto";
 import type { NotificationAudience } from "./helpers/notification-link";
+import { orderBuyerContact } from "./helpers/order-buyer-contact";
 import {
   ALL_ORDER_CANCEL_PARTIES,
   type OrderCancelNoticeParty,
@@ -17,6 +19,13 @@ import { NotificationDispatchService } from "./notification-dispatch.service";
 import { frontendUrl as resolveFrontendUrl } from "../../config/app-urls";
 import { ORDER_CANCEL_REASON } from "../order/helpers/order-cancel-reasons";
 import { TRADE_CANCEL_REASON } from "../trade/helpers/trade-cancel-reasons";
+import { errorMessage } from "../../common/helpers/error-message";
+
+/** Alıcı e-postasını çözmek için okunan alanlar (`orderBuyerContact`). */
+const ORDER_BUYER_SELECT = {
+  shippingAddress: true,
+  buyer: { select: { email: true, displayName: true } },
+} as const satisfies Prisma.OrderSelect;
 
 @Injectable()
 export class NotificationCommerceService {
@@ -163,26 +172,87 @@ export class NotificationCommerceService {
       channels: [NotificationChannel.PUSH, NotificationChannel.IN_APP],
       data: { orderId },
     });
-    const [user, order] = await Promise.all([
-      this.prisma.user.findUnique({
-        where: { id: buyerId },
-        select: { displayName: true },
-      }),
-      this.prisma.order.findUnique({
-        where: { id: orderId },
-        select: { orderNumber: true, totalAmount: true },
-      }),
-    ]);
-    await this.dispatch.sendTemplateEmailToUser(
-      buyerId,
-      "seller-did-not-ship-refunded",
-      {
-        name: user?.displayName || "",
-        orderNumber: order?.orderNumber || orderId,
-        orderId,
-        refundAmount: order?.totalAmount ? Number(order.totalAmount) : 0,
-      },
-    );
+    const order = await this.prisma.order.findUnique({
+      where: { id: orderId },
+      select: { orderNumber: true, totalAmount: true, ...ORDER_BUYER_SELECT },
+    });
+    if (!order) return;
+    // Misafir siparişinde e-posta GERÇEK alıcıya gider (orderBuyerContact).
+    await this.sendOrderBuyerEmail(order, "seller-did-not-ship-refunded", {
+      orderNumber: order.orderNumber || orderId,
+      orderId,
+      refundAmount: order.totalAmount ? Number(order.totalAmount) : 0,
+    });
+  }
+
+  /**
+   * Hazırlık süresi bir kez uzatıldı — ALICIYA: gecikme, en geç kargo tarihi
+   * ve kargodan önce iptal hakkının sürdüğü. Zil + push alıcı hesabına;
+   * e-posta `orderBuyerContact` ile GERÇEK alıcıya (misafir siparişinde ortak
+   * sistem hesabının zili kimseye ulaşmaz, tek kanal e-postadır).
+   * `deadline` bildirim metniyle aynı biçimde (Türkiye saati) gelir.
+   */
+  async notifyPreparingExtendedBuyer(
+    orderId: string,
+    data: {
+      orderNumber: string;
+      productTitle: string;
+      deadline: string;
+    },
+  ): Promise<void> {
+    const order = await this.prisma.order.findUnique({
+      where: { id: orderId },
+      select: { buyerId: true, ...ORDER_BUYER_SELECT },
+    });
+    if (!order) return;
+    // Zil hatası e-postayı engellemesin: misafirin tek kanalı e-postadır.
+    await this.dispatch
+      .createInAppNotification(
+        order.buyerId,
+        NotificationType.ORDER_PREPARING_EXTENDED,
+        { orderId, ...data, audience: "buyer" },
+      )
+      .catch((error: unknown) =>
+        this.logger.warn(
+          `preparing-extended in-app failed for ${orderId}: ${errorMessage(error)}`,
+        ),
+      );
+    await this.sendOrderBuyerEmail(order, "order-preparing-extended-buyer", {
+      orderId,
+      ...data,
+    });
+  }
+
+  /**
+   * Siparişin ALICISINA şablon e-postası. Adres ve hitap `orderBuyerContact`
+   * ile çözülür: üyede hesap adresi, misafirde teslimat verisindeki gerçek
+   * adres. Kullanıcı kaydına gönderim (`sendTemplateEmailToUser`) misafir
+   * siparişinde sistem adresine gidiyordu. Adres yoksa gönderilmez; asla
+   * throw etmez.
+   */
+  private async sendOrderBuyerEmail(
+    order: {
+      buyer: { email: string | null; displayName: string | null } | null;
+      shippingAddress: unknown;
+    },
+    templateKey: string,
+    templateData: Record<string, unknown>,
+  ): Promise<void> {
+    const contact = orderBuyerContact(order);
+    if (!contact.email) {
+      this.logger.warn(
+        `${templateKey}: alıcı e-posta adresi yok (misafir=${contact.isGuest}) — gönderilmedi`,
+      );
+      return;
+    }
+    await this.dispatch.sendTemplateEmailToAddress(contact.email, templateKey, {
+      ...templateData,
+      name: contact.name,
+      buyerName: contact.name,
+      // Şablon misafirde "siparişi gör" linkini sipariş takip sayfasına kurar.
+      isGuestOrder: contact.isGuest,
+      buyerEmail: contact.email,
+    });
   }
 
   /**
@@ -497,8 +567,8 @@ export class NotificationCommerceService {
           buyerId: true,
           sellerId: true,
           product: { select: { title: true } },
-          buyer: { select: { displayName: true } },
           seller: { select: { displayName: true } },
+          ...ORDER_BUYER_SELECT,
         },
       });
       if (!order) return;
@@ -506,17 +576,13 @@ export class NotificationCommerceService {
       const productTitle = order.product?.title ?? "";
 
       if (parties.includes("buyer")) {
-        await this.dispatch.sendTemplateEmailToUser(
-          order.buyerId,
-          "order-cancelled-buyer",
-          {
-            buyerName: order.buyer?.displayName ?? "",
-            orderNumber: order.orderNumber,
-            orderId: order.id,
-            productTitle,
-            reason,
-          },
-        );
+        // Misafir siparişinde GERÇEK alıcıya (orderBuyerContact).
+        await this.sendOrderBuyerEmail(order, "order-cancelled-buyer", {
+          orderNumber: order.orderNumber,
+          orderId: order.id,
+          productTitle,
+          reason,
+        });
       }
 
       if (order.sellerId && parties.includes("seller")) {

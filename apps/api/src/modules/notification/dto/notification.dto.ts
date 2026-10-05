@@ -24,6 +24,11 @@ export enum NotificationType {
   ORDER_CANCELLED_OUT_OF_STOCK = "order_cancelled_out_of_stock",
   ORDER_REFUNDED = "order_refunded",
   ORDER_PREPARING_DEADLINE_WARNING = "order_preparing_deadline_warning",
+  // Hazırlık süresi bir kez uzatıldı (Süreler ve Kurallar → extend_once):
+  // alıcıya "gecikiyor, yeni son tarih, iptal hakkın sürüyor", satıcıya
+  // "yeni son tarih, son şans". Metinler farklı olduğu için iki tip.
+  ORDER_PREPARING_EXTENDED = "order_preparing_extended",
+  ORDER_PREPARING_EXTENDED_SELLER = "order_preparing_extended_seller",
   ORDER_RESERVATION_RELEASED = "order_reservation_released",
   // 48h pencere (Faz 3B.1)
   ORDER_DELIVERED_CONFIRM = "order_delivered_confirm",

@@ -349,6 +349,7 @@ export function getEmailTemplateSubject(
     "marketing-newsletter": "Tarodan Haftalık Bülteni",
     "marketing-monthly": "Tarodan Aylık Özel Fırsatlar",
     "seller-did-not-ship-refunded": "Satıcı Kargoya Vermedi — İadeniz Yapıldı",
+    "order-preparing-extended-buyer": `Siparişinizin Kargoya Verilmesi Gecikiyor - ${data?.orderNumber || ""}`,
     "trade-received": "Yeni Takas Teklifi Aldınız",
     "trade-accepted": "Takas Teklifiniz Kabul Edildi",
     "trade-shipped": "Takasınız Kargoya Verildi",
@@ -1051,10 +1052,35 @@ export function renderEmailTemplate(
       `)}
       <p style="font-size: 14px; color: #6b7280; margin: 16px 0;">İade tutarı ödeme yönteminize bağlı olarak 3–5 iş günü içinde yansıyacaktır.</p>
       <div style="text-align: center; margin: 32px 0;">
-        ${primaryButton("Siparişi Görüntüle", `${frontendUrl}/profile/orders/${data?.orderId || ""}`)}
+        ${primaryButton("Siparişi Görüntüle", orderPaidTrackUrl)}
       </div>
     `,
       "Satıcı Kargoya Vermedi — İadeniz Yapıldı",
+    ),
+
+    // Hazırlık süresi bir kez uzatıldı (alıcıya). Misafir siparişinde de
+    // gider: link misafirde sipariş takip sayfasıdır (orderPaidTrackUrl).
+    "order-preparing-extended-buyer": wrapEmail(
+      `
+      ${titleBlock("Siparişinizin Kargoya Verilmesi Gecikiyor")}
+      ${greeting(data?.name || data?.buyerName)}
+      <p style="font-size: 15px; color: #4b5563; line-height: 1.6; margin: 0 0 20px 0;">
+        Satıcı siparişinizi süresinde kargoya veremedi ve satıcıya bir kez ek süre tanındı.
+      </p>
+      ${detailsBox(`
+        <table width="100%" cellspacing="0" cellpadding="0">
+          ${detailRow("Sipariş No", "#" + (data?.orderNumber || data?.orderId || ""))}
+          ${data?.productTitle ? detailRow("Ürün", data.productTitle) : ""}
+          ${detailRow("En geç kargoya verilme", data?.deadline || "", true)}
+        </table>
+      `)}
+      ${warningBox(`<p style="margin: 0; font-size: 14px; color: #92400e;">Sipariş bu tarihe kadar kargoya verilmezse otomatik iptal edilir ve ödemenizin tamamı iade edilir.</p>`)}
+      ${infoBox(`<p style="margin: 0; font-size: 14px; color: #92400e;">Kargoya verilene kadar siparişinizi dilediğiniz zaman iptal edebilirsiniz.</p>`)}
+      <div style="text-align: center; margin: 32px 0;">
+        ${primaryButton("Siparişi Görüntüle", orderPaidTrackUrl)}
+      </div>
+    `,
+      "Siparişinizin Kargoya Verilmesi Gecikiyor",
     ),
 
     "trade-received": wrapEmail(

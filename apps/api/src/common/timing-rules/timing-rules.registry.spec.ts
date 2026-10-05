@@ -7,6 +7,7 @@ import {
   PAYTR_3DS_SESSION_MINUTES,
   PUBLIC_TIMING_RULE_IDS,
   TIMING_GROUPS,
+  TIMING_UNIT_MINUTES,
   TIMING_RULES,
   TIMING_RULE_IDS,
   TIMING_RULE_INVARIANTS,
@@ -20,6 +21,7 @@ import {
   type TimingExpiryAction,
   type TimingRuleId,
 } from "@tarodan/types";
+import { withActionUnavailable } from "./timing-rules.test-helpers";
 import { defaultTimingValues } from "./timing-rules.resolver";
 
 /**
@@ -74,31 +76,26 @@ describe("TIMING_RULES kaydı", () => {
     ).toEqual([...TIMING_RULE_IDS].sort());
   });
 
-  // Bugünkü davranış = varsayılan eylem. Sonraki paketler yalnız bayrağı çevirir.
-  const LATER_ACTIONS = {
-    preparingDeadlineDays: ["cancel_and_refund", "extend_once"],
-  } satisfies Partial<
-    Record<TimingRuleId, [TimingExpiryAction, TimingExpiryAction]>
-  >;
-
-  it.each(Object.entries(LATER_ACTIONS))(
-    "%s — gelecekteki seçeneği tanımlı ama henüz kapalı",
-    (id, [current, later]) => {
-      expect(TIMING_RULES[id as TimingRuleId].actions).toEqual([
-        { action: current, available: true },
-        { action: later, available: false },
-      ]);
-    },
-  );
+  // Bugünkü davranış = varsayılan eylem. Paketlerin hepsi birleşti: kayıtta
+  // "tanımlı ama kapalı" eylem KALMADI. Yeni bir kapalı eylem eklenirse bu test
+  // onu bilinçli bir karar olarak işaretletir.
+  it("hiçbir kayıt kapalı (henüz açılmamış) eylem taşımıyor", () => {
+    expect(
+      TIMING_RULE_IDS.filter((id) =>
+        TIMING_RULES[id].actions.some((option) => !option.available),
+      ),
+    ).toEqual([]);
+  });
 
   // Bayrağı çevrilmiş (davranışı yazılmış) ikinci eylemler: ikisi de seçilebilir.
   // extend_once davranışını ilgili zamanlayıcı okur (offer-scheduler,
-  // trade-reconciliation).
+  // trade-reconciliation, payment-expiry-reconciliation).
   const ENABLED_ACTIONS = {
     listingTtlDays: ["deactivate", "auto_renew"],
     offerExpiryHours: ["expire", "extend_once"],
     tradeResponseHours: ["cancel", "extend_once"],
     tradePaymentHours: ["cancel", "extend_once"],
+    preparingDeadlineDays: ["cancel_and_refund", "extend_once"],
   } satisfies Partial<
     Record<TimingRuleId, [TimingExpiryAction, TimingExpiryAction]>
   >;
@@ -120,7 +117,7 @@ describe("TIMING_RULES kaydı", () => {
       (id) => TIMING_RULES[id].actions.length > 1,
     );
     expect(multi.sort()).toEqual(
-      [...Object.keys(LATER_ACTIONS), ...Object.keys(ENABLED_ACTIONS)].sort(),
+      Object.keys(ENABLED_ACTIONS).sort(),
     );
   });
 
@@ -133,6 +130,7 @@ describe("TIMING_RULES kaydı", () => {
       "listingTtlDays",
       "listingExpiryWarningDays",
       "tradeLostParcelGraceDays",
+      "preparingWarningLeadHours",
       "paymentReservationMinutes",
       "paymentFailTimeoutMinutes",
       "returnDropoffDays",
@@ -177,6 +175,8 @@ describe("TIMING_RULES kaydı", () => {
       tradeHoldDays: 3,
       tradeLostParcelGraceDays: 14,
       preparingDeadlineDays: 3,
+      // Eski sabit: satıcı uyarısı ve dashboard son tarihten 24 saat önce.
+      preparingWarningLeadHours: 24,
       returnWindowDays: 14,
       orderPaymentWindowHours: 24,
       paymentReservationMinutes: 5,
@@ -273,12 +273,19 @@ describe("değer doğrulaması (sınırlar)", () => {
 describe("eylem doğrulaması", () => {
   it("açık eylemi kabul eder", () => {
     expect(validateTimingAction("listingTtlDays", "deactivate")).toBeNull();
-  });
-
-  it("henüz açılmamış eylemi reddeder", () => {
     expect(
       validateTimingAction("preparingDeadlineDays", "extend_once"),
-    ).toEqual({ code: "actionUnavailable" });
+    ).toBeNull();
+  });
+
+  it("henüz açılmamış eylemi reddeder", async () => {
+    await withActionUnavailable("listingTtlDays", "auto_renew", () => {
+      expect(validateTimingAction("listingTtlDays", "auto_renew")).toEqual({
+        code: "actionUnavailable",
+      });
+    });
+    // Bayrak geri açıldı: gerçek kayıt etkilenmedi.
+    expect(validateTimingAction("listingTtlDays", "auto_renew")).toBeNull();
   });
 
   it("kayıtta tanımsız eylemi reddeder", () => {
@@ -357,6 +364,55 @@ describe("alanlar arası değişmezler", () => {
         "listingTtlDays",
       ]),
     ).toMatchObject({ id: "listingTtlDays" });
+  });
+
+  it("hazırlık uyarısı (saat) hazırlık süresinden (gün) kısa olmalı — birimler arası", () => {
+    // 1 gün = 24 saat: 24 saatlik uyarı 1 günlük sürede ödeme anında gelirdi.
+    expect(
+      findTimingInvariantViolation(
+        withValues({ preparingDeadlineDays: 1, preparingWarningLeadHours: 24 }),
+        ["preparingWarningLeadHours"],
+      ),
+    ).toEqual({
+      id: "preparingWarningLeadHours",
+      violation: {
+        code: "invariant",
+        invariant: "preparingWarningBeforeDeadline",
+        other: "preparingDeadlineDays",
+      },
+    });
+    // Süreyi kısaltan değişiklik de aynı kurala takılır.
+    expect(
+      findTimingInvariantViolation(withValues({ preparingDeadlineDays: 1 }), [
+        "preparingDeadlineDays",
+      ]),
+    ).toMatchObject({
+      id: "preparingDeadlineDays",
+      violation: { invariant: "preparingWarningBeforeDeadline" },
+    });
+    expect(
+      findTimingInvariantViolation(
+        withValues({ preparingDeadlineDays: 1, preparingWarningLeadHours: 23 }),
+        ["preparingWarningLeadHours", "preparingDeadlineDays"],
+      ),
+    ).toBeNull();
+    // Üst sınırdaki 72 saatlik uyarı 3 günlük sürede de eşit sayılır → red.
+    expect(
+      findTimingInvariantViolation(
+        withValues({ preparingDeadlineDays: 3, preparingWarningLeadHours: 72 }),
+        ["preparingWarningLeadHours"],
+      ),
+    ).not.toBeNull();
+  });
+
+  it("aynı birimli değişmezler dakikaya çevrilince de aynı sonucu verir", () => {
+    expect(TIMING_UNIT_MINUTES).toEqual({ minutes: 1, hours: 60, days: 1440 });
+    expect(
+      findTimingInvariantViolation(
+        withValues({ listingTtlDays: 10, listingExpiryWarningDays: 9 }),
+        ["listingExpiryWarningDays"],
+      ),
+    ).toBeNull();
   });
 
   it("değişmeyen kayıtların mevcut ihlali yeni değişikliği engellemez", () => {

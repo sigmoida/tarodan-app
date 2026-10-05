@@ -112,6 +112,10 @@ export interface OrderDetail {
   cancelReason?: string | null;
   cancelCategory?: string | null;
   canReactivate?: boolean;
+  /** Satıcının kargoya verme son tarihi — tek seferlik uzatmada yeni tarih. */
+  preparingDeadline?: string | null;
+  /** Doluysa son tarih bir kez uzatıldı; bir daha uzatılmaz. */
+  preparingExtendedAt?: string | null;
   isBuyer: boolean;
   isSeller: boolean;
   hasProductRating?: boolean;
