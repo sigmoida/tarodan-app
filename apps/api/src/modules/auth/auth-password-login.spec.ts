@@ -20,6 +20,7 @@ import { CacheService } from "../cache/cache.service";
 import { StorageService } from "../storage/storage.service";
 import { SecurityService } from "../security/security.service";
 import { NewsletterService } from "../marketing/newsletter.service";
+import { ConsentService } from "../consent/consent.service";
 
 describe("AuthService.login - password login edge cases", () => {
   let service: AuthService;
@@ -69,6 +70,13 @@ describe("AuthService.login - password login edge cases", () => {
         {
           provide: NewsletterService,
           useValue: { syncUserConsent: jest.fn() },
+        },
+        {
+          provide: ConsentService,
+          useValue: {
+            recordAccountConsents: jest.fn().mockResolvedValue(0),
+            recordMarketingChange: jest.fn(),
+          },
         },
         // AuthRegistrationService toplu aktivasyon mailini kuyruğa yazıyor.
         {

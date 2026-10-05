@@ -28,6 +28,7 @@ import { PhoneVerificationService } from "./verification/phone-verification.serv
 import { EmailChangeService } from "./verification/email-change.service";
 import { SecurityModule } from "../security/security.module";
 import { MarketingModule } from "../marketing/marketing.module";
+import { ConsentModule } from "../consent/consent.module";
 
 @Module({
   imports: [
@@ -49,6 +50,9 @@ import { MarketingModule } from "../marketing/marketing.module";
     // Kayıtta pazarlama izni verilirse üye bülten listesine yazılır
     // (NewsletterService). MarketingModule Auth'a bağlı değil, döngü yok.
     MarketingModule,
+    // Kayıt formundaki onaylar (terms / privacy / KVKK / pazarlama) kayıtla
+    // aynı transaction'da yazılır. ConsentModule yaprak modül, döngü yok.
+    ConsentModule,
     // Toplu aktivasyon maili kuyruğa yazılır. Bull KÖK bağlantısı global
     // (BullRootModule), bu yüzden PROCESS_ROLE=web süreci de üretici olabilir;
     // işi tüketen worker ayrı rolde koşar.

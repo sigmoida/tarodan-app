@@ -15,9 +15,16 @@ import {
   CorporateInvitationDto,
   RegisterResponseDto,
 } from "./dto";
-import { SellerType, OrderStatus, PaymentStatus, Prisma } from "@prisma/client";
+import {
+  ConsentSource,
+  SellerType,
+  OrderStatus,
+  PaymentStatus,
+  Prisma,
+} from "@prisma/client";
 import { NotificationService } from "../notification/notification.service";
 import { NewsletterService } from "../marketing/newsletter.service";
+import { ConsentService } from "../consent/consent.service";
 import { PaymentService } from "../payment/payment.service";
 import { i18nMessage } from "../i18n";
 import { isUsernameAllowed, normalizeUsername } from "./utils/username.util";
@@ -63,6 +70,7 @@ export class AuthRegistrationService {
     private readonly newsletterService: NewsletterService,
     private readonly moduleRef: ModuleRef,
     @InjectQueue(QUEUE_NAMES.EMAIL) private readonly emailQueue: Queue,
+    private readonly consents: ConsentService,
   ) {}
 
   /**
@@ -183,25 +191,47 @@ export class AuthRegistrationService {
     // Bireysel satıcı da bireysel hesaptır: önek satıcılığa göre değişmez.
     const adminCode = await this.nextAdminCode(ENTITY_PREFIX.individualUser);
 
-    // Create user
+    // Kullanıcı ve formdaki onaylar TEK transaction'da: onay kaydı yazılamazsa
+    // hesap da açılmaz — "kayıt oldu ama onayı yok" ara durumu oluşmaz.
     let user;
     try {
-      user = await this.prisma.user.create({
-        data: {
-          adminCode,
-          username,
-          usernameClaimedAt: new Date(),
-          email: dto.email,
-          phone: dto.phone,
-          passwordHash,
-          displayName: dto.displayName,
-          birthDate: dto.birthDate ? new Date(dto.birthDate) : null,
-          isSeller: dto.isSeller ?? false,
-          sellerType: dto.isSeller ? SellerType.individual : null,
-          isVerified: false, // Email verification required
-          isEmailVerified: false, // Will be true after email verification
-          acceptsMarketingEmails: marketingConsent,
-        },
+      user = await this.prisma.$transaction(async (tx) => {
+        const created = await tx.user.create({
+          data: {
+            adminCode,
+            username,
+            usernameClaimedAt: new Date(),
+            email: dto.email,
+            phone: dto.phone,
+            passwordHash,
+            displayName: dto.displayName,
+            birthDate: dto.birthDate ? new Date(dto.birthDate) : null,
+            isSeller: dto.isSeller ?? false,
+            sellerType: dto.isSeller ? SellerType.individual : null,
+            isVerified: false, // Email verification required
+            isEmailVerified: false, // Will be true after email verification
+            acceptsMarketingEmails: marketingConsent,
+          },
+        });
+        // Terms, privacy ve KVKK ayrı satırlar. Göndermeyen (eski mobil)
+        // istemcide satır yok; yeniden-onay kapısı ilk girişte ister.
+        await this.consents.recordAccountConsents(
+          created.id,
+          dto.acceptedConsents,
+          ConsentSource.registration,
+          tx,
+        );
+        if (marketingConsent) {
+          await this.consents.recordMarketingChange(
+            {
+              userId: created.id,
+              granted: true,
+              source: ConsentSource.registration,
+            },
+            tx,
+          );
+        }
+        return created;
       });
     } catch (error) {
       this.rethrowUserUniqueConstraint(error);
