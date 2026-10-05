@@ -119,15 +119,16 @@ describe("PaymentTradeRefundService.refundTradeCashTracked — MONEY-H2 failure 
 describe("PaymentTradeRefundService.refundTradeCashTracked — kapsamlı iade ve hata işareti", () => {
   const TRADE_ID = "trade-1";
 
-  const makeService = (outstandingAfterRefund: number | Error) => {
+  const makeService = (
+    outstandingAfterRefund: number | Error,
+    tradeStatus: TradeStatus = TradeStatus.cancelled,
+  ) => {
     const state = {
       refundFailureReason: "PayTR 503 (A)" as string | null,
     };
     const prisma = {
       trade: {
-        findUnique: jest
-          .fn()
-          .mockResolvedValue({ status: TradeStatus.cancelled }),
+        findUnique: jest.fn().mockResolvedValue({ status: tradeStatus }),
         update: jest.fn(
           async ({
             data,
@@ -200,6 +201,21 @@ describe("PaymentTradeRefundService.refundTradeCashTracked — kapsamlı iade ve
     await service.refundTradeCashTracked(TRADE_ID, { payerId: "B" });
 
     expect(state.refundFailureReason).toBe("PayTR 503 (A)");
+  });
+
+  it("itiraz tazminatı yeniden denemesi: tek tarafa başarılı iade bayat işareti temizler (diğer satır borç sayılmaz)", async () => {
+    // İlk çözüm denemesinin iadesi patladı (işaret yazıldı), takas `disputed`
+    // kaldı. Admin yeniden dener; tazminat iadesi başarılı. Diğer tarafın
+    // satırı henüz damgasız ama alıcısına bırakılacak — iade borcu değil.
+    const { service, prisma, state } = makeService(1, TradeStatus.disputed);
+
+    const r = await service.refundTradeCashTracked(TRADE_ID, { payerId: "B" });
+
+    expect(r).toEqual(
+      expect.objectContaining({ refunded: true, failed: false }),
+    );
+    expect(prisma.payment.count).not.toHaveBeenCalled();
+    expect(state.refundFailureReason).toBeNull();
   });
 
   it("kapsamsız çağrı bugünkü gibi işareti temizler (kalan borç sorulmaz)", async () => {
