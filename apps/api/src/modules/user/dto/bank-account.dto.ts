@@ -1,10 +1,7 @@
 import { IsString, IsOptional, Length, MaxLength } from "class-validator";
 import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
 import { IsTrIban } from "../../../common/validators/tr-iban";
-import {
-  IsTckn,
-  NormalizeTckn,
-} from "../../../common/validators/legal-identity";
+import { NormalizeTckn } from "../../../common/validators/legal-identity";
 
 export class UpsertBankAccountDto {
   @ApiProperty({
@@ -27,19 +24,22 @@ export class UpsertBankAccountDto {
 
   // ESKİ ALAN — web formu artık sormuyor; TCKN'nin tek kaynağı üyenin yasal
   // kimliği (`User.nationalId`, kimlik kapısı). Mobil uyumluluk için kabul
-  // edilir: ortak TCKN kuralıyla doğrulanır ve üyenin kayıtlı numarasından
-  // FARKLIYSA reddedilir. Gönderilmezse mevcut değer korunur.
+  // edilir. Doğrulama BİLEREK serviste (`UserBankService.resolveBankTckn`):
+  // formunu GET yanıtıyla dolduran istemci kayıtlı eski değeri geri gönderir;
+  // o değer bugünkü kurala uymasa bile IBAN güncellemesini engellememeli.
+  // Yalnız YENİ bir değer ortak kuralla doğrulanır ve üyenin beyanıyla
+  // karşılaştırılır. Gönderilmezse (`null`/boş dahil) mevcut değer korunur.
   @ApiPropertyOptional({
     example: "10000000146",
     description:
-      "ESKİ: TC Kimlik Numarası. Üyenin yasal kimliğindeki numarayla aynı " +
-      "olmalı; gönderilmezse mevcut değer korunur.",
+      "ESKİ: TC Kimlik Numarası. Yeni değer geçerli bir TCKN olmalı ve " +
+      "üyenin yasal kimliğindeki numarayla aynı olmalı; kayıtlı değeri aynen " +
+      "geri göndermek serbesttir; gönderilmezse mevcut değer korunur.",
     deprecated: true,
   })
   @IsOptional()
   @IsString()
   @NormalizeTckn()
-  @IsTckn()
   tcKimlikNo?: string;
 
   @ApiPropertyOptional({

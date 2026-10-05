@@ -58,11 +58,13 @@ export function IsLegalName(validationOptions?: ValidationOptions) {
 }
 
 /**
- * Boş ya da yalnız boşluk metin "gönderilmedi" sayılır (`undefined`): formdan
- * boş gelen opsiyonel alan `@IsOptional` ile atlanır, dolu alanı silemez.
+ * `null`, boş ya da yalnız boşluk metin "gönderilmedi" sayılır (`undefined`):
+ * formdan boş gelen opsiyonel alan `@IsOptional` ile atlanır, dolu alanı
+ * silemez ve servise `""` olarak sızmaz.
  */
 const normalizeOrBlank = (normalize: (value: string) => string) =>
   Transform(({ value }) => {
+    if (value === null) return undefined;
     if (typeof value !== "string") return value;
     return value.trim() === "" ? undefined : normalize(value);
   });

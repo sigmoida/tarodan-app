@@ -164,4 +164,14 @@ describe("IsTckn / IsLegalName dekoratörleri", () => {
     expect(dto.nationalId).toBeUndefined();
     expect(dto.legalFirstName).toBeUndefined();
   });
+
+  it("null da 'gönderilmedi' sayılır (servise boş metin sızmaz)", async () => {
+    const { dto, invalid } = await run({
+      nationalId: null,
+      legalFirstName: null,
+    });
+    expect(invalid).toEqual([]);
+    expect(dto.nationalId).toBeUndefined();
+    expect(dto.legalFirstName).toBeUndefined();
+  });
 });

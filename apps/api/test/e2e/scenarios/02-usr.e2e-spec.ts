@@ -1194,7 +1194,8 @@ describe("02 — Kullanıcı Profili & Hesap Yönetimi (USR)", () => {
         .send({
           accountHolder: "Ahmet Yılmaz",
           iban: "TR330006100519786457841326",
-          tcKimlikNo: "12345678901",
+          // Checksum'ı tutan TCKN: yeni değer ortak kuralla doğrulanır.
+          tcKimlikNo: "10000000146",
         })
         .expect(200);
       const get = await request(server())

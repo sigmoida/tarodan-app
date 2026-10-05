@@ -1830,10 +1830,11 @@ describe("11 — Komisyon & Ödeme/Payout (COM)", () => {
       const res = await patchBank(user, {
         accountHolder: "Ahmet Yılmaz",
         iban: IBAN_A,
-        tcKimlikNo: "12345678901",
+        // Checksum'ı tutan TCKN: yeni değer ortak kuralla doğrulanır.
+        tcKimlikNo: "10000000146",
         taxId: "1234567890",
       }).expect(200);
-      expect(res.body.tcKimlikNo).toBe("12345678901");
+      expect(res.body.tcKimlikNo).toBe("10000000146");
       expect(res.body.taxId).toBe("1234567890");
     });
 

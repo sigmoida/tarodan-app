@@ -57,12 +57,13 @@ describe("Seller Bank Account (E2E)", () => {
         .send({
           accountHolder: "Test Şirket",
           iban: "TR330006100519786457841326",
-          tcKimlikNo: "12345678901",
+          // Checksum'ı tutan TCKN: yeni değer ortak kuralla doğrulanır.
+          tcKimlikNo: "10000000146",
           taxId: "1234567890",
         })
         .expect(200);
 
-      expect(res.body.tcKimlikNo).toBe("12345678901");
+      expect(res.body.tcKimlikNo).toBe("10000000146");
       expect(res.body.taxId).toBe("1234567890");
     });
 
