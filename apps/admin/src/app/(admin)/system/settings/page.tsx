@@ -11,6 +11,7 @@ import { SectionCard } from "@/components/detail/SectionCard";
 import { useSettingsPage } from "./_lib/useSettingsPage";
 import { SearchReindexButton } from "./_components/SearchReindexButton";
 import { WarehouseAddressCard } from "./_components/WarehouseAddressCard";
+import { LegalSettingsCard } from "./_components/LegalSettingsCard";
 
 export default function SettingsPage() {
   const {
@@ -19,6 +20,7 @@ export default function SettingsPage() {
     setTab,
     activeTab,
     isWarehouseTab,
+    isLegalTab,
     tabs,
     title,
     fields,
@@ -53,6 +55,8 @@ export default function SettingsPage() {
 
       {isWarehouseTab ? (
         <WarehouseAddressCard />
+      ) : isLegalTab ? (
+        <LegalSettingsCard />
       ) : (
         <>
           <Form

@@ -11,8 +11,15 @@ import {
   ValidatorConstraint,
   ValidatorConstraintInterface,
   ValidationArguments,
+  IsArray,
+  ArrayMaxSize,
+  IsIn,
 } from "class-validator";
 import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
+import {
+  ACCOUNT_REQUIRED_CONSENTS,
+  CONSENT_DOCUMENT_KEYS,
+} from "@tarodan/types";
 import { IsTrPhone } from "../../../common/validators/tr-phone";
 import {
   USERNAME_MAX_LENGTH,
@@ -146,4 +153,21 @@ export class RegisterDto {
   @IsOptional()
   @IsBoolean()
   notificationConsent?: boolean;
+
+  // OPSİYONEL — onay kutularını göndermeyen eski mobil sürümler kayıt
+  // olabilmeye devam eder; eksik kalan zorunlu belgeyi yeniden-onay kapısı
+  // ilk girişte ister. Sürüm sunucuda damgalanır (bkz. docs/CONSENTS.md).
+  @ApiPropertyOptional({
+    enum: ACCOUNT_REQUIRED_CONSENTS,
+    isArray: true,
+    example: ["terms", "privacy", "kvkk"],
+    description:
+      "Kayıt formunda onaylanan zorunlu belgeler (terms, privacy, kvkk). " +
+      "Her biri ayrı bir onay kaydı olur.",
+  })
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(CONSENT_DOCUMENT_KEYS.length)
+  @IsIn(CONSENT_DOCUMENT_KEYS, { each: true })
+  acceptedConsents?: string[];
 }

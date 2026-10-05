@@ -93,6 +93,9 @@ export interface ApiError {
   details?: Record<string, any>;
 }
 
+// Legal consent records: document keys + current versions (API, web, admin)
+export * from "./legal-consent";
+
 // Attribute group rules (dedicated/hidden/global-custom groups, selection mode)
 export * from "./attribute-group";
 

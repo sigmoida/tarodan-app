@@ -2,6 +2,7 @@ import { z } from "zod";
 import { createTranslator } from "next-intl";
 import { getMessages, resolveLocale } from "@tarodan/i18n";
 import { trPhone, trPhoneOptional } from "@tarodan/ui/form";
+import type { ConsentDocumentKey } from "@tarodan/types";
 
 /**
  * Auth form schemas — the single source of truth for validation AND types.
@@ -147,6 +148,8 @@ export const registerSchema = (locale: Locale) => {
         .regex(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/, t("auth.passwordComplexity")),
       confirmPassword: z.string(),
       agreeTerms: z.boolean(),
+      // KVKK, kullanım şartlarından AYRI bir zorunlu onaydır ve ayrı kayıt olur.
+      agreeKvkk: z.boolean(),
       acceptsMarketingEmails: z.boolean(),
     })
     .refine((d) => d.password === d.confirmPassword, {
@@ -160,9 +163,28 @@ export const registerSchema = (locale: Locale) => {
     .refine((d) => d.agreeTerms === true, {
       message: t("auth.mustAcceptTerms"),
       path: ["agreeTerms"],
+    })
+    .refine((d) => d.agreeKvkk === true, {
+      message: t("auth.mustAcceptKvkk"),
+      path: ["agreeKvkk"],
     });
 };
 export type RegisterValues = z.infer<ReturnType<typeof registerSchema>>;
+
+/**
+ * Kayıt formundaki onay kutularının sunucuya giden belge listesi. İlk kutu
+ * (Kullanım Şartları + Gizlilik Politikası) İKİ belgedir, KVKK kutusu ayrı
+ * bir belgedir; her biri sunucuda ayrı bir onay kaydı olur.
+ */
+export function registrationConsentDocuments(values: {
+  agreeTerms: boolean;
+  agreeKvkk: boolean;
+}): ConsentDocumentKey[] {
+  return [
+    ...(values.agreeTerms ? (["terms", "privacy"] as const) : []),
+    ...(values.agreeKvkk ? (["kvkk"] as const) : []),
+  ];
+}
 
 export const businessRegisterSchema = (locale: Locale) => {
   const t = translator(locale);

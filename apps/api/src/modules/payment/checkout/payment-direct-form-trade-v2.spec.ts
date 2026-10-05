@@ -64,6 +64,7 @@ describe("PaymentInitiationService — direct-form takas hedefi (v2)", () => {
       {} as any,
       {} as any,
       {} as any,
+      { ensureForPayment: jest.fn().mockResolvedValue(null) } as never, // distanceSalesConsent
     );
     return { service, prisma };
   };

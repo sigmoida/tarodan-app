@@ -177,6 +177,7 @@ export const getPermissionGroups = (t: T): PermGroup[] => [
           "/accounts/users",
           "/accounts/users/:id",
           "/accounts/deleted-identities",
+          "/accounts/consents",
         ],
       },
       {

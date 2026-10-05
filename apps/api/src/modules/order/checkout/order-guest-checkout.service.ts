@@ -40,6 +40,7 @@ import { OrderFeeDiscountService } from "../pricing/order-fee-discount.service";
 import { remainingDiscountAllowanceFor } from "../../discount/engine/fee-discount.engine";
 import { splitShippingByBuyerShare } from "../../shipping/helpers/shipping-tariff.helper";
 import { OrderCheckoutGroupService } from "./order-checkout-group.service";
+import { DistanceSalesConsentService } from "../../consent/distance-sales-consent.service";
 import {
   REFERENCE_PREFIX,
   reprefixReference,
@@ -68,6 +69,7 @@ export class OrderGuestCheckoutService {
     private readonly checkoutCommon: OrderCheckoutCommonService,
     private readonly group: OrderCheckoutGroupService,
     private readonly lanes: AccountLaneService,
+    private readonly distanceSalesConsent: DistanceSalesConsentService,
     @Optional()
     private readonly feeDiscounts?: OrderFeeDiscountService,
   ) {}
@@ -522,6 +524,16 @@ export class OrderGuestCheckoutService {
           isGuest: true,
         },
       });
+
+      // Mesafeli satış onayı grupla aynı transaction'da (sepet yoluyla aynı
+      // kural): kişi paylaşılan sistem hesabı değil, misafirin e-postasıdır.
+      if (dto.distanceSalesAccepted === true) {
+        await this.distanceSalesConsent.recordAtCheckout(tx, {
+          checkoutGroupId: guestOrderGroup.id,
+          userId: null,
+          guestEmail: normEmail,
+        });
+      }
 
       // Faz 1: misafir tek siparişi de satıcı-paketi altında (uniform model).
       const guestOrderPackage =

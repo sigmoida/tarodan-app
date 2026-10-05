@@ -1,3 +1,4 @@
+import type { ConsentDocumentKey } from "@tarodan/types";
 import { api } from "./client";
 
 // Auth
@@ -20,6 +21,8 @@ export const authApi = {
     phone?: string;
     birthDate?: string;
     acceptsMarketingEmails?: boolean;
+    /** Kayıt formunda onaylanan zorunlu belgeler (terms, privacy, kvkk). */
+    acceptedConsents?: ConsentDocumentKey[];
   }) => api.post("/auth/register", data),
   logout: () => api.post("/auth/logout"),
   getProfile: () => api.get("/auth/profile"),

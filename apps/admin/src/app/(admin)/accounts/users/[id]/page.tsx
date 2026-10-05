@@ -13,6 +13,7 @@ import { UserStats } from "./_sections/UserStats";
 import { UserInfoSection } from "./_sections/UserInfoSection";
 import { MembershipSection } from "./_sections/MembershipSection";
 import { UserActivityTabs } from "./_sections/UserActivityTabs";
+import { ConsentsSection } from "./_sections/ConsentsSection";
 import { UserSidebar } from "./_sections/UserSidebar";
 import { actionsFor, type UserAccountAction } from "../_lib/bulkEligibility";
 import {
@@ -98,6 +99,7 @@ export default function UserDetailPage() {
               <UserInfoSection user={u} />
               <MembershipSection userId={u.id} membership={u.membership} />
               <UserActivityTabs userId={u.id} user={u} />
+              <ConsentsSection userId={u.id} />
             </div>
             <div className="space-y-6">
               <UserSidebar user={u} />

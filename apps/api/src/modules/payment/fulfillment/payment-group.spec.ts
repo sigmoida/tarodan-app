@@ -26,6 +26,7 @@ import { FulfillmentStockService } from "./fulfillment-stock.service";
 import { VirtualOrderFulfillmentService } from "./virtual-order-fulfillment.service";
 import { PaymentLifecycleService } from "../checkout/payment-lifecycle.service";
 import { PrismaService } from "../../../prisma";
+import { DistanceSalesConsentService } from "../../consent/distance-sales-consent.service";
 import { CacheService } from "../../cache/cache.service";
 import { PaymentProviderRegistry } from "../../payment-providers/payment-provider.registry";
 import { EventService } from "../../events";
@@ -238,6 +239,11 @@ describe("PaymentService group payment (checkout group)", () => {
           },
         },
         { provide: PrismaService, useValue: mockPrisma },
+        // Ödeme formu kapısı bu testlerin konusu değil.
+        {
+          provide: DistanceSalesConsentService,
+          useValue: { ensureForPayment: jest.fn().mockResolvedValue(null) },
+        },
         {
           provide: CacheService,
           useValue: {

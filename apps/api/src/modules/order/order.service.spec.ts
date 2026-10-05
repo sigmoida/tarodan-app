@@ -9,6 +9,7 @@ import { OrderCheckoutDirectService } from "./checkout/order-checkout-direct.ser
 import { OrderCheckoutGroupService } from "./checkout/order-checkout-group.service";
 import { OrderGuestCheckoutService } from "./checkout/order-guest-checkout.service";
 import { AccountLaneService } from "../account-lane/account-lane.service";
+import { DistanceSalesConsentService } from "../consent/distance-sales-consent.service";
 import { accountLaneServiceStub } from "../account-lane/account-lane.testing";
 import { OrderCommonService } from "./order-common.service";
 import { OrderQueryService } from "./order-query.service";
@@ -156,6 +157,10 @@ describe("OrderService findOne (response shape for mobile order detail)", () => 
         OrderCheckoutGroupService,
         { provide: UserBlockService, useValue: userBlocksStub },
         { provide: AccountLaneService, useValue: accountLaneServiceStub() },
+        {
+          provide: DistanceSalesConsentService,
+          useValue: { recordAtCheckout: jest.fn() },
+        },
         OrderGuestCheckoutService,
         OrderCommonService,
         OrderQueryService,
@@ -346,6 +351,10 @@ describe("OrderService getCommissionPreview (stopaj / withholding)", () => {
         OrderCheckoutGroupService,
         { provide: UserBlockService, useValue: userBlocksStub },
         { provide: AccountLaneService, useValue: accountLaneServiceStub() },
+        {
+          provide: DistanceSalesConsentService,
+          useValue: { recordAtCheckout: jest.fn() },
+        },
         OrderGuestCheckoutService,
         OrderCommonService,
         OrderQueryService,

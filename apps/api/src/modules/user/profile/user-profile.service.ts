@@ -18,8 +18,11 @@ import {
   PaymentHoldStatus,
   DeletionActor,
   IdentitySnapshotSource,
+  ConsentSource,
 } from "@prisma/client";
 import { ModerationAiClient } from "../../moderation/moderation-ai.client";
+import { ConsentService } from "../../consent/consent.service";
+import { NewsletterService } from "../../marketing/newsletter.service";
 import { computeTrustScore } from "../helpers/trust-score";
 import { publicUserRatingWhere } from "../../../common/helpers/public-rating";
 import {
@@ -79,6 +82,8 @@ export class UserProfileService {
     private readonly moderationAi: ModerationAiClient,
     private readonly common: UserCommonService,
     private readonly userBlocks: UserBlockService,
+    private readonly consents: ConsentService,
+    private readonly newsletter: NewsletterService,
   ) {}
 
   /**
@@ -511,20 +516,55 @@ export class UserProfileService {
     }
     const merged: NotificationSettings = { ...current, ...patch };
 
-    await this.prisma.user.update({
-      where: { id: userId },
-      data: {
-        notificationSettings: merged as unknown as Prisma.InputJsonValue,
-        // marketingEmails düğmesi pazarlama e-postalarının kullanıcıya görünen
-        // TEK anahtarıdır; gerçek gönderim kapıları ise User.acceptsMarketingEmails
-        // kolonunu okur (bülten aboneliği, fiyat-düşüş e-postası, üyelik teklif
-        // e-postası). Senkronlanmazsa düğmeyi kapatan kullanıcı pazarlama
-        // e-postası almaya devam eder.
-        ...(patch.marketingEmails !== undefined
-          ? { acceptsMarketingEmails: patch.marketingEmails }
-          : {}),
-      },
+    // Pazarlama izninin ÖNCEKİ hâli: yalnız gerçek bir değişim (verdi / geri
+    // çekti) tarihli onay kaydı üretir; aynı değeri yeniden kaydetmek üretmez.
+    const marketingBefore =
+      patch.marketingEmails !== undefined
+        ? await this.prisma.user.findUnique({
+            where: { id: userId },
+            select: { email: true, acceptsMarketingEmails: true },
+          })
+        : null;
+    const marketingChanged =
+      marketingBefore !== null &&
+      marketingBefore.acceptsMarketingEmails !== patch.marketingEmails;
+
+    await this.prisma.$transaction(async (tx) => {
+      await tx.user.update({
+        where: { id: userId },
+        data: {
+          notificationSettings: merged as unknown as Prisma.InputJsonValue,
+          // marketingEmails düğmesi pazarlama e-postalarının kullanıcıya görünen
+          // TEK anahtarıdır; gerçek gönderim kapıları ise User.acceptsMarketingEmails
+          // kolonunu okur (bülten aboneliği, fiyat-düşüş e-postası, üyelik teklif
+          // e-postası). Senkronlanmazsa düğmeyi kapatan kullanıcı pazarlama
+          // e-postası almaya devam eder.
+          ...(patch.marketingEmails !== undefined
+            ? { acceptsMarketingEmails: patch.marketingEmails }
+            : {}),
+        },
+      });
+      if (marketingChanged) {
+        await this.consents.recordMarketingChange(
+          {
+            userId,
+            granted: patch.marketingEmails === true,
+            source: ConsentSource.account_settings,
+          },
+          tx,
+        );
+      }
     });
+
+    // Bülten listesi gönderimlerin TEK alıcı listesidir (NewsletterService):
+    // bayrak kapanıp liste açık kalırsa "geri çekildi" kaydına rağmen bülten
+    // gitmeye devam ederdi. Senkron hata fırlatmaz; commit sonrası yapılır.
+    if (marketingChanged && marketingBefore) {
+      await this.newsletter.syncUserConsent(
+        marketingBefore.email,
+        patch.marketingEmails === true,
+      );
+    }
 
     return merged;
   }
@@ -763,6 +803,18 @@ export class UserProfileService {
             where: { email: user.email.toLowerCase(), unsubscribedAt: null },
             data: { unsubscribedAt: new Date(), updatedAt: new Date() },
           });
+
+          // Pazarlama izni silmeyle kapanır: açıksa geri çekme tarihli kaydı.
+          if (user.acceptsMarketingEmails) {
+            await this.consents.recordMarketingChange(
+              {
+                userId,
+                granted: false,
+                source: ConsentSource.account_deletion,
+              },
+              tx,
+            );
+          }
 
           // 4) PII'yi anonimleştir + login engelle. Unique alanları (email/phone/companyName)
           //    serbest bırak ki kullanıcı aynı bilgiyle yeniden kayıt olabilsin.

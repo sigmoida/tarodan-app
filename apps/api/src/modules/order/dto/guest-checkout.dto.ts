@@ -1,4 +1,5 @@
 import {
+  IsBoolean,
   IsEmail,
   IsNotEmpty,
   IsString,
@@ -98,6 +99,16 @@ export class GuestCheckoutDto {
   @IsUUID()
   @IsOptional()
   offerId?: string;
+
+  @ApiPropertyOptional({
+    description:
+      "Alıcı mesafeli satış sözleşmesini onayladı mı. true ise onay, zamanı ve " +
+      "yürürlükteki sözleşme sürümüyle onay kayıtlarına (consent_records) " +
+      "yazılır. Gönderilmezse onay ödeme formu adımında istenir.",
+  })
+  @IsOptional()
+  @IsBoolean()
+  distanceSalesAccepted?: boolean;
 
   // NOTE: no client-supplied `price` field — the server always derives the
   // amount from the product (or accepted offer). A client "override price" here

@@ -111,6 +111,7 @@ model User {
   reports                 Report[]                 @relation("ReporterReports")
   productBoosts           ProductBoost[]
   deletedIdentity         DeletedUserIdentity?
+  consentRecords          ConsentRecord[]
 
   @@index([email])
   @@index([adminCode])
@@ -197,6 +198,97 @@ enum DeletionActor {
 enum IdentitySnapshotSource {
   live
   backfill
+}
+
+/// Hukuki onay kaydı — kim, hangi belgeyi, hangi sürümüyle, ne zaman ve
+/// nereden onayladı (ya da geri çekti). Müşterinin "kullanıcı KVKK'yı, mesafeli
+/// satış sözleşmesini, çerezleri kabul etti" ispatı bu tablodan okunur.
+///
+/// EKLEME-YALNIZ: satır güncellenmez, silinmez (DB tetikleyicisi zorlar). Onayın
+/// geri çekilmesi de yeni bir satırdır (`action = withdrawn`); bir belgenin
+/// güncel durumu, o belgenin EN SON satırıdır. Tek istisna aşağıdaki sipariş/
+/// sepet bağlarının `SET NULL` ile kopmasıdır (test şeridi temizliği).
+///
+/// Konu üç kimlikten biridir: üye (`userId`), misafir alıcı (`guestEmail` —
+/// misafir siparişinin alıcısı paylaşılan sistem hesabıdır, kişiyi göstermez)
+/// ya da giriş yapmamış ziyaretçi (`visitorId`, yalnız çerez tercihi).
+model ConsentRecord {
+  id              String         @id @default(uuid())
+  /// Belge anahtarı: `@tarodan/types` CONSENT_DOCUMENT_KEYS. Enum DEĞİL —
+  /// anahtar listesinin tek kaynağı o paket; müşteri yeni bir metin (ör. açık
+  /// rıza) verdiğinde şema göçü gerekmesin. Yazım yalnız ConsentService'ten,
+  /// anahtar doğrulanarak yapılır.
+  document        String
+  /// Onaylanan metnin sürümü — kayıt anında `CONSENT_DOCUMENTS[document]
+  /// .version`. Metin sonradan değişse de hangi metnin kabul edildiği kalır.
+  version         String
+  action          ConsentAction
+  source          ConsentSource
+  userId          String?        @map("user_id")
+  /// Giriş yapmamış ziyaretçinin tarayıcıda ürettiği kalıcı kimlik (UUID).
+  /// Yalnız çerez tercihinde dolar; üye girişliyse `userId` de yazılır.
+  visitorId       String?        @map("visitor_id")
+  /// Misafir checkout'ta alıcının e-postası (küçük harf).
+  guestEmail      String?        @map("guest_email")
+  /// Belgeye özgü ayrıntı: çerez kategorileri ({ functional, analytics,
+  /// marketing }) gibi. Hukuki metin buraya yazılmaz — sürüm yeter.
+  details         Json?
+  /// İstemci IP'si: web gateway'inden gelen istekte gateway'in taşıdığı
+  /// tarayıcı IP'si, doğrudan çağrıda (mobil) bağlantının IP'si.
+  ipAddress       String?        @map("ip_address")
+  userAgent       String?        @map("user_agent")
+  /// Mesafeli satış onayının ait olduğu sepet / tekil (teklif) sipariş.
+  /// SET NULL: kanıt, bağlı satır silinse bile (test şeridi temizliği) kalır.
+  checkoutGroupId String?        @map("checkout_group_id")
+  orderId         String?        @map("order_id")
+  createdAt       DateTime       @default(now()) @map("created_at")
+  /// Restrict: üyeler fiziksel silinmez (anonimleşir); kanıt satırı, kullanıcı
+  /// kaydının yanlışlıkla silinmesini de engeller (CLAUDE.md §13).
+  user            User?          @relation(fields: [userId], references: [id], onDelete: Restrict)
+  checkoutGroup   CheckoutGroup? @relation(fields: [checkoutGroupId], references: [id], onDelete: SetNull)
+  order           Order?         @relation(fields: [orderId], references: [id], onDelete: SetNull)
+
+  // Yeniden-onay hesabı: üyenin belge başına en son satırı.
+  @@index([userId, document, createdAt])
+  // Admin listesi: belge filtresi + tarih sırası.
+  @@index([document, createdAt])
+  @@index([createdAt])
+  @@index([visitorId])
+  // Ödeme kapısı: "bu sepet/sipariş için onay var mı".
+  @@index([checkoutGroupId])
+  @@index([orderId])
+  @@map("consent_records")
+}
+
+/// Onayın yönü. Hesap için zorunlu belgeler yalnız `granted` alır; pazarlama
+/// izni ve çerez kategorileri geri çekilebilir.
+enum ConsentAction {
+  granted
+  withdrawn
+}
+
+/// Onayın alındığı yer — `@tarodan/types` CONSENT_SOURCES ile birebir.
+enum ConsentSource {
+  /// Kayıt formu (bireysel).
+  registration
+  /// Yeniden-onay kapısı: hiç onayı olmayan (eski üye, sosyal giriş, eski
+  /// mobil kaydı) ya da belge sürümü değişen üye.
+  consent_prompt
+  /// Sepet checkout'u (üye ve misafir).
+  checkout
+  /// Ödeme formu adımı (teklif siparişi, sepet dışı ödemeler).
+  payment
+  /// Çerez bandı / çerez tercih paneli.
+  cookie_banner
+  /// Profil bildirim ayarları (pazarlama izni).
+  account_settings
+  /// E-postadaki bülten çıkış bağlantısı / e-posta ile çıkış.
+  newsletter_unsubscribe
+  /// Hesap silme (pazarlama izni kapanır).
+  account_deletion
+  /// Bu tablodan önceki kayıtların geriye dönük aktarımı
+  /// (`checkout_groups.distance_sales_*`).
+  legacy_backfill
 }
 
 /// Kurumsal hesap, ön başvuru onaylanmadan User oluşturmaz. Başvuru onaylanınca
@@ -1547,11 +1639,11 @@ model CheckoutGroup {
   idempotencyKey          String?        @unique @map("idempotency_key")
   totalAmount             Decimal        @map("total_amount") @db.Decimal(10, 2)
   isGuest                 Boolean        @default(false) @map("is_guest")
-  // Mesafeli satış sözleşmesi onayı. Alıcının ödeme ekranında verdiği kabul,
-  // ihtilafta kanıt olarak istendiği için ZAMANI ve o an yürürlükteki sözleşme
-  // SÜRÜMÜYLE saklanır; sözleşme sonradan güncellense de hangi metnin kabul
-  // edildiği belli kalır. Kabul göndermeyen istemcilerde (eski mobil sürümler)
-  // null'dır — alan doğrulama değil, kayıttır.
+  // ESKİ (yalnız okuma): mesafeli satış onayı artık `consent_records`'a
+  // (document = distance_sales, checkoutGroupId = bu grup) yazılıyor — tek
+  // kayıt, iki kopya değil. Bu iki kolon consent_records'tan önceki grupların
+  // onayını taşır; `backfill:prod:distance-sales-consents` onları oraya aktarır.
+  // Yeni satırda her zaman null'dır. Göç yalnız ekleme yaptığı için silinmedi.
   distanceSalesAcceptedAt DateTime?      @map("distance_sales_accepted_at")
   distanceSalesVersion    String?        @map("distance_sales_version")
   createdAt               DateTime       @default(now()) @map("created_at")
@@ -1560,6 +1652,7 @@ model CheckoutGroup {
   orders                  Order[]
   packages                OrderPackage[]
   payment                 Payment?
+  consentRecords          ConsentRecord[]
 
   @@index([buyerId, createdAt])
   @@map("checkout_groups")
@@ -1754,6 +1847,7 @@ model Order {
   checkoutGroup              CheckoutGroup?           @relation(fields: [checkoutGroupId], references: [id])
   package                    OrderPackage?            @relation(fields: [packageId], references: [id])
   couponReservation          CouponReservation?
+  consentRecords             ConsentRecord[]
 
   @@index([buyerId])
   @@index([sellerId])

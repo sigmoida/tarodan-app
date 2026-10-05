@@ -151,9 +151,10 @@ export class CheckoutDto {
   @ApiPropertyOptional({
     description:
       "Alıcı mesafeli satış sözleşmesini onayladı mı. true ise onay, zamanı ve " +
-      "yürürlükteki sözleşme sürümüyle birlikte sipariş grubuna yazılır. " +
-      "Zorunlu DEĞİLDİR: onay kutusunu henüz göndermeyen istemciler (eski mobil " +
-      "sürümler) sipariş verememezlik yaşamasın.",
+      "yürürlükteki sözleşme sürümüyle onay kayıtlarına (consent_records) " +
+      "sipariş grubuna bağlı yazılır. Checkout'ta zorunlu DEĞİLDİR (eski mobil " +
+      "sürümler sipariş verebilsin); onay yoksa ödeme formu adımında istenir " +
+      "ve `distance_sales_consent_required` ayarı açıksa orada zorunludur.",
   })
   @IsOptional()
   @IsBoolean()

@@ -49,6 +49,7 @@ import { CommissionModule } from "../commission/commission.module";
 import { StorageModule } from "../storage/storage.module";
 import { ElogoModule } from "../elogo";
 import { DiscountModule } from "../discount";
+import { ConsentModule } from "../consent/consent.module";
 import { scheduledProcessors } from "../../workers/scheduled-processors";
 
 @Module({
@@ -67,6 +68,8 @@ import { scheduledProcessors } from "../../workers/scheduled-processors";
     ProductLockModule,
     ElogoModule,
     DiscountModule,
+    // Ödeme formu kapısı: mesafeli satış onayı (consent_records).
+    ConsentModule,
     BullModule.registerQueue({ name: QUEUE_NAMES.SCHEDULED }),
     // Üyelik aktivasyonunda satıcının takas ilanları yeniden indekslenir.
     BullModule.registerQueue({ name: QUEUE_NAMES.SEARCH }),

@@ -32,6 +32,7 @@ import { ElogoModule } from "../elogo";
 import { ShippingTariffModule } from "../shipping/tariff/shipping-tariff.module";
 import { RefundModule } from "../refund/refund.module";
 import { UserBlockModule } from "../user-block/user-block.module";
+import { ConsentModule } from "../consent/consent.module";
 import { scheduledProcessors } from "../../workers/scheduled-processors";
 
 @Module({
@@ -50,6 +51,8 @@ import { scheduledProcessors } from "../../workers/scheduled-processors";
     ShippingTariffModule,
     UserBlockModule,
     RefundModule,
+    // Sepet checkout'undaki mesafeli satış onayı (consent_records).
+    ConsentModule,
     BullModule.registerQueue({ name: QUEUE_NAMES.SCHEDULED }),
   ],
   controllers: [OrderController, SellerInvoiceController],

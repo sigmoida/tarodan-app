@@ -1,11 +1,10 @@
 "use client";
 
-import { useQuery } from "@tanstack/react-query";
 import { useTranslations } from "next-intl";
 import { useZodForm } from "@tarodan/ui/form";
 import { adminApi } from "@/lib/api";
-import { adminKeys } from "@/lib/query/keys";
 import { useAdminMutation } from "@/hooks/useAdminMutation";
+import { usePlatformSettings } from "@/hooks/usePlatformSettings";
 import { useTabParam } from "@/hooks/useTabParam";
 import {
   type SettingsFormValues,
@@ -21,24 +20,19 @@ import {
 export function useSettingsPage() {
   const t = useTranslations();
   const [tab, setTab] = useTabParam("listing");
-  // "warehouse" has its own card/form; the numeric form falls back to a valid
-  // tab so `fieldsByTab`/`tabTitle` indexing stays safe while it's hidden.
+  // "warehouse" and "legal" render their own cards; the numeric form falls
+  // back to a valid tab so `fieldsByTab`/`tabTitle` indexing stays safe while
+  // it's hidden.
   const isWarehouseTab = tab === "warehouse";
-  const activeTab = (isWarehouseTab ? "listing" : tab) as SettingsTab;
+  const isLegalTab = tab === "legal";
+  const activeTab = (
+    isWarehouseTab || isLegalTab ? "listing" : tab
+  ) as SettingsTab;
   const fieldsByTab = tabFields(t);
 
-  // Ham yanıt cache'lenir, dönüşüm `select`te: `usePspFeeRate` AYNI anahtarı
-  // paylaşır — queryFn'ler farklı şekil döndürseydi cache'i kim önce doldurursa
-  // diğeri yanlış şekli okurdu (form ham diziyle seed'lenir ya da oran hep
-  // varsayılana düşerdi).
-  const query = useQuery({
-    queryKey: adminKeys.all("platform-settings"),
-    queryFn: async () => {
-      const response = await adminApi.getSettings();
-      return response.data?.data ?? response.data ?? [];
-    },
-    select: parseSettings,
-  });
+  // Ham yanıt cache'lenir, dönüşüm `select`te — PSP oranı ve yasal ayarlar
+  // aynı sorguyu paylaşır (bkz. usePlatformSettings).
+  const query = usePlatformSettings(parseSettings);
 
   // Reactively reseed from the query (including after invalidation) without an
   // effect-backed state mirror. All tabs remain valid on whole-form submit.
@@ -68,6 +62,7 @@ export function useSettingsPage() {
     setTab,
     activeTab,
     isWarehouseTab,
+    isLegalTab,
     tabs: settingsTabs(t),
     title: tabTitle(t)[activeTab],
     fields: fieldsByTab[activeTab],

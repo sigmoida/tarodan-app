@@ -20,6 +20,7 @@ describe("PaymentInitiationService — group redirect guard", () => {
       {} as any,
       {} as any,
       {} as any,
+      { ensureForPayment: jest.fn().mockResolvedValue(null) } as never, // distanceSalesConsent
     );
     const groupSpy = jest
       .spyOn(svc as any, "initiateGroupPayment")

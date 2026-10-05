@@ -11,6 +11,7 @@ import { PrismaService } from "../../../prisma";
 import { InitiatePaymentDto, PaymentProvider, DirectPaymentDto } from "../dto";
 import {
   PaymentStatus,
+  OrderOrigin,
   OrderStatus,
   TradeStatus,
   SavedCardStatus,
@@ -36,6 +37,23 @@ import {
   PAYER_IP_METADATA_KEY,
   resolvePaytrMerchant,
 } from "../helpers/paytr-merchant.helper";
+import {
+  DistanceSalesConsentService,
+  type DistanceSalesSubject,
+} from "../../consent/distance-sales-consent.service";
+
+/** Misafir siparişinin alıcı e-postası — `shippingAddress` JSON'ında saklanır. */
+function guestEmailOf(shippingAddress: Prisma.JsonValue | null): string | null {
+  if (
+    !shippingAddress ||
+    typeof shippingAddress !== "object" ||
+    Array.isArray(shippingAddress)
+  ) {
+    return null;
+  }
+  const email = shippingAddress.guestEmail;
+  return typeof email === "string" && email.trim() ? email : null;
+}
 
 @Injectable()
 export class PaymentInitiationService {
@@ -50,6 +68,7 @@ export class PaymentInitiationService {
     private readonly paymentFulfillment: PaymentFulfillmentService,
     private readonly paymentLifecycle: PaymentLifecycleService,
     private readonly providerEvents: PaymentProviderEventService,
+    private readonly distanceSalesConsent: DistanceSalesConsentService,
   ) {}
 
   /**
@@ -682,6 +701,9 @@ export class PaymentInitiationService {
     let baseOid: string;
     let amount: number;
     let successQueryParams: string;
+    // Mesafeli satış onayının ait olduğu satın alma. Satın alma olmayan
+    // hedeflerde (takas ücreti, üyelik / öne çıkarma) null kalır.
+    let distanceSalesSubject: DistanceSalesSubject | null = null;
 
     if (dto.orderId && !dto.checkoutGroupId) {
       const order = await this.prisma.order.findUnique({
@@ -792,6 +814,14 @@ export class PaymentInitiationService {
       ];
       baseOid = String(order.orderNumber || order.id).replace(/-/g, "");
       paytrMerchant = resolvePaytrMerchant({ order });
+      // Sepete bağlı olmayan tekil satın alma: teklif siparişi.
+      if (order.origin !== OrderOrigin.platform_service) {
+        distanceSalesSubject = {
+          orderId: order.id,
+          userId: isGuestOrder ? null : order.buyerId,
+          guestEmail: isGuestOrder ? guestEmailOf(order.shippingAddress) : null,
+        };
+      }
       const isMembershipOrder = paytrMerchant === PaytrMerchant.membership;
       // Misafir siparişinde başarı URL'ine guest=true taşı: aksi halde PayTR
       // dönüşünde /payment/success guest'i tanıyamayıp /login'e atıyor (fatura
@@ -885,6 +915,13 @@ export class PaymentInitiationService {
         quantity: 1,
       }));
       baseOid = String(group.groupNumber || group.id).replace(/-/g, "");
+      distanceSalesSubject = {
+        checkoutGroupId: group.id,
+        userId: group.isGuest ? null : group.buyerId,
+        guestEmail: group.isGuest
+          ? guestEmailOf(group.orders[0].shippingAddress)
+          : null,
+      };
       // Misafir grup ödemesinde başarı URL'ine guest=true taşı (yukarıdaki order
       // yolundaki ile aynı sebep: dönüşte /login'e atılmasın, fatura görünsün).
       successQueryParams = `paymentId=${payment.id}${group.isGuest ? "&guest=true" : ""}`;
@@ -985,6 +1022,15 @@ export class PaymentInitiationService {
         i18nMessage("server.payment.viewStatusForbidden"),
       );
     }
+
+    // MESAFELİ SATIŞ KAPISI — çekimden ÖNCE (claim'den de önce: ret, ödeme
+    // satırını `processing`e almadan döner). Bu form, her satın almanın PayTR
+    // çekiminden önceki ORTAK son adımıdır: checkout'ta alınmamış onay (teklif
+    // siparişi, eski istemci) burada alınır; ayar açıksa onaysız ödeme başlamaz.
+    await this.distanceSalesConsent.ensureForPayment(
+      distanceSalesSubject,
+      dto.distanceSalesAccepted,
+    );
 
     // ÇİFT-ÇEKİM KORUMASI: bu ödemenin önceki bir denemesi (providerConversationId) varsa,
     // YENİ çekimden ÖNCE PayTR'a durum-sorgu yap. Callback gecikmiş/ulaşmamış (ör. tünel ölü)

@@ -56,6 +56,7 @@ describe("PaymentInitiationService — teklif reserve+Payment atomikliği (#3)",
       {} as any,
       {} as any,
       {} as any,
+      { ensureForPayment: jest.fn().mockResolvedValue(null) } as never, // distanceSalesConsent
     );
     return { service, calls, tx };
   };

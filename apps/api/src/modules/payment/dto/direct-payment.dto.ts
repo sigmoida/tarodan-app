@@ -43,4 +43,16 @@ export class DirectPaymentDto {
   @IsOptional()
   @IsBoolean()
   saveCard?: boolean;
+
+  @ApiPropertyOptional({
+    description:
+      "Alıcı bu ödeme ekranında mesafeli satış sözleşmesini onayladı mı. " +
+      "Sepet/sipariş için henüz onay kaydı yoksa (teklif siparişi, checkout'ta " +
+      "onay göndermeyen istemci) onay burada kaydedilir. " +
+      "`distance_sales_consent_required` ayarı açıkken kayıtsız ve onaysız " +
+      "satın alma 400 server.consent.distanceSalesRequired ile reddedilir.",
+  })
+  @IsOptional()
+  @IsBoolean()
+  distanceSalesAccepted?: boolean;
 }

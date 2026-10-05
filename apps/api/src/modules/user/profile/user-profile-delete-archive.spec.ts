@@ -84,6 +84,8 @@ describe("UserProfileService.deleteAccount kimlik arşivi", () => {
       {} as never,
       {} as never,
       {} as never,
+      { recordMarketingChange: jest.fn() } as never, // consents
+      { syncUserConsent: jest.fn() } as never, // newsletter
     );
     return { service, prisma, tx };
   }

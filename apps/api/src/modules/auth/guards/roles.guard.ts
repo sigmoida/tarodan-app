@@ -64,6 +64,9 @@ export const PERMISSION_MAP: Record<string, string[]> = {
   // bir anahtar gerçek bir sınır kurmazdı (aynı izinle kullanıcı detayında
   // TCKN/IBAN zaten görülüyor) ama rol matrisi göçü gerektirirdi.
   "deleted-identities": ["users"],
+  // Onay Kayıtları (KVKK / sözleşme / çerez / pazarlama ispatı) kullanıcı
+  // verisinin parçası; kullanıcı detayındaki onaylar bölümü de aynı uçları okur.
+  consents: ["users"],
   "seller-applications": ["seller_applications", "seller_performance"],
   "user-ratings": ["reviews"],
   reviews: ["reviews"],

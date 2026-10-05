@@ -87,7 +87,7 @@ function useCheckoutValue() {
 
   const [isLoading, setIsLoading] = useState(false);
   // Mesafeli satış sözleşmesi onayı — kutu işaretlenmeden ödeme başlamaz ve
-  // onay siparişle birlikte sunucuya yazılır (CheckoutGroup'ta damgalanır).
+  // onay siparişle birlikte sunucuya yazılır (onay kayıtlarına, sepete bağlı).
   const [distanceSalesAccepted, setDistanceSalesAccepted] = useState(false);
   const [selectedAddressId, setSelectedAddressId] = useState<string | null>(
     null,
@@ -349,6 +349,9 @@ function useCheckoutValue() {
     purpose: "checkout",
     cardStorageEnabled,
     resolvePayment,
+    // Onay checkout'ta grupla birlikte kaydedilir; ödeme formu da taşır ki
+    // sunucu kaydı bulamazsa (ör. grup önceden oluşmuşsa) burada alsın.
+    distanceSalesAccepted,
   });
 
   // Default-select an address once the list first settles (default > last), or
