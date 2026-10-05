@@ -1169,7 +1169,7 @@
     "notPaidCancelInstead": "Bu sipariş henüz ödenmemiş, iptal etmelisiniz",
     "cancelMsgYouCancelled": "Bu siparişi iptal ettiniz.",
     "cancelMsgBuyerCancelled": "Alıcı bu siparişi iptal etti.",
-    "cancelMsgPaymentTimeout": "Ödeme 24 saat içinde tamamlanmadığı için sipariş otomatik iptal edildi.",
+    "cancelMsgPaymentTimeout": "Ödeme {orderPaymentWindowHours} saat içinde tamamlanmadığı için sipariş otomatik iptal edildi.",
     "cancelMsgSellerNoShip": "Satıcı siparişi süresinde kargoya vermediği için iptal edildi.",
     "cancelMsgStockout": "Ürün stoğu tükendiği için bu sipariş iptal edildi.",
     "cancelMsgTradeReserved": "Ürün bir takas işlemi için ayrıldığından bu sipariş iptal edildi.",
@@ -1191,8 +1191,8 @@
     "expiredReactivate": "Bu sipariş ödeme yapılmadan süre aşımına uğradı. Ödemeyi tamamlamak için siparişi yeniden aktive edebilirsiniz.",
     "paymentRefunded": "Ödemeniz iade edilmiştir.",
     "refundToOriginalMethod": "Ödeme yapıldıysa, iadeniz ödemeyi yaptığınız yönteme aktarılacaktır.",
-    "payoutReleaseWithDate": "Satıcıya ödeme teslimden 14 gün sonra serbest bırakılır ({date}). O tarihe kadar iade talep edebilirsiniz.",
-    "payoutRelease": "Satıcıya ödeme teslimden 14 gün sonra serbest bırakılır. Bu süre içinde iade talep edebilirsiniz.",
+    "payoutReleaseWithDate": "Satıcıya ödeme teslimden {returnWindowDays} gün sonra serbest bırakılır ({date}). O tarihe kadar iade talep edebilirsiniz.",
+    "payoutRelease": "Satıcıya ödeme teslimden {returnWindowDays} gün sonra serbest bırakılır. Bu süre içinde iade talep edebilirsiniz.",
     "paymentOnHoldRefund": "Açık iade talebiniz sonuçlanana kadar ödeme bekletiliyor.",
     "cargoRefInstructions": "Paketi Sürat Kargo şubesine teslim ederken bu numarayı veriniz. Gönderi zaten sistemde kayıtlıdır — şube tüm bilgileri otomatik olarak alacaktır.",
     "trackingAppearsAfterDropoff": "Şube paketinizi aldığında Sürat takip numarası burada otomatik olarak görünecektir (30 dakika içinde).",
@@ -1202,7 +1202,7 @@
     "cargoOneParcelPerOrder": "Bu kargo kodu bir SATICI PAKETİNİ temsil eder: paketteki tüm ürünleri TEK koliye koyup bu kodla teslim edin. Farklı kargo kodu olan siparişleri aynı koliye koymayın.",
     "cargoBranchIssueNotice": "Kargo şubesinde kod ile ilgili sorun yaşamanız durumunda “ENTEGRASYON ÜZERİNDEN BARKOD KESİLECEK” olarak belirtmeniz gerekmektedir.",
     "cargoFeeCoveredNotice": "Kargo ücreti Tarodan tarafından karşılanır; şubede sizden ücret talep edilmez. Şube, paketi teslim alırken ölçüm yapabilir.",
-    "refundWindowPassed": "14 günlük iade süresi doldu; bu sipariş için artık iade talebi oluşturulamaz.",
+    "refundWindowPassed": "{returnWindowDays} günlük iade süresi doldu; bu sipariş için artık iade talebi oluşturulamaz.",
     "cancelOrderConfirm": "Bu siparişi iptal etmek istediğinize emin misiniz? Ödemeniz iade edilecektir.",
     "refundTitle": "İade İşlemi",
     "refundShippedInfo": "Sipariş kargoya verildi. Vazgeçme iadesi otomatik ilerler; kusur ve yanlış ürün iddiaları kanıtla birlikte incelenir.",
@@ -1221,8 +1221,8 @@
     "descriptionMin20": "Açıklama en az 20 karakter olmalıdır",
     "photoEvidenceRequired": "Bu sebep için en az bir kanıt fotoğrafı gereklidir",
     "refundPhasePreparing": "Satıcı henüz kargoya vermedi. İadeniz anında işlenecek.",
-    "refundPhaseCoolingOff": "14 günlük cayma hakkı süresindesiniz. Vazgeçme talebi otomatik ilerler; kusur iddiaları admin incelemesine alınır.",
-    "refundPhasePastCoolingOff": "14 günlük cayma süresi dolmuş. Talebiniz satıcı ve admin tarafından incelenecek.",
+    "refundPhaseCoolingOff": "{returnWindowDays} günlük cayma hakkı süresindesiniz. Vazgeçme talebi otomatik ilerler; kusur iddiaları admin incelemesine alınır.",
+    "refundPhasePastCoolingOff": "{returnWindowDays} günlük cayma süresi dolmuş. Talebiniz satıcı ve admin tarafından incelenecek.",
     "refundQuantityHint": "Bu siparişte {quantity} adet var. Kaç adedini iade edeceğinizi seçin.",
     "describeIssuePlaceholder": "Sorunu detaylı açıklayın (en az 20 karakter)",
     "evidencePhotosMax5": "Kanıt fotoğrafları (maks 5)",
@@ -1543,10 +1543,10 @@
     "acceptCounter": "Karşı Teklifi Kabul Et",
     "acceptConfirmTitle": "Teklifi kabul et",
     "acceptConfirmDesc": "Bu teklifi kabul etmek istediğinizden emin misiniz? Kabul edilen teklif için sipariş oluşturulur.",
-    "acceptConfirmDescSeller": "Teklifi kabul ederseniz teklif fiyatıyla bir sipariş oluşur ve alıcının 24 saatlik ödeme süresi başlar. Kabul, ürünü kilitlemez: diğer teklifler açık kalır ve ürünü ilk ödeyen alır.",
-    "acceptConfirmDescBuyer": "Karşı teklifi kabul ederseniz teklif fiyatıyla sipariş oluşur ve 24 saat içinde ödemeniz gerekir. Ürün, ödeme adımında rezerve edilir; aynı ürünü başka bir alıcı önce öderse siparişiniz karşılanamaz.",
+    "acceptConfirmDescSeller": "Teklifi kabul ederseniz teklif fiyatıyla bir sipariş oluşur ve alıcının {orderPaymentWindowHours} saatlik ödeme süresi başlar. Kabul, ürünü kilitlemez: diğer teklifler açık kalır ve ürünü ilk ödeyen alır.",
+    "acceptConfirmDescBuyer": "Karşı teklifi kabul ederseniz teklif fiyatıyla sipariş oluşur ve {orderPaymentWindowHours} saat içinde ödemeniz gerekir. Ürün, ödeme adımında rezerve edilir; aynı ürünü başka bir alıcı önce öderse siparişiniz karşılanamaz.",
     "firstToPayWinsBuyer": "Ürün henüz size ayrılmadı. Aynı ürün için başka kabul edilmiş teklifler olabilir; ürünü ilk ödeyen alır.",
-    "firstToPayWinsSeller": "Alıcının 24 saatlik ödeme süresi var. Ürün ödeme tamamlandığında rezerve edilir; o ana kadar diğer teklifler açık kalır.",
+    "firstToPayWinsSeller": "Alıcının {orderPaymentWindowHours} saatlik ödeme süresi var. Ürün ödeme tamamlandığında rezerve edilir; o ana kadar diğer teklifler açık kalır.",
     "rejectConfirmTitle": "Teklifi reddet",
     "rejectConfirmDesc": "Bu teklifi reddetmek istediğinizden emin misiniz? Bu işlem geri alınamaz.",
     "cancelConfirmTitle": "Teklifi iptal et",
@@ -3159,7 +3159,7 @@
       "kargoGonderimUcretiniKimOder": "Kargo gönderim ücretini kim öder?",
       "kargoUcretiIlaniOlustururkenSaticininTercihine": "Kargo ücreti, ilanı oluştururken satıcının tercihine göre değişiklik gösterir. İlan detaylarında kargonun alıcıya mı ait olduğu yoksa satıcı tarafından mı karşılandığı net bir şekilde belirtilir. Alışveriş yapmadan önce bu detayı inceleyerek kargo maliyetini kolayca görebilirsiniz.",
       "siparisimNeZamanKargolanir": "Siparişim ne zaman kargolanır?",
-      "saticinizModeliniziOzenlePaketleyipHazirladiktanSonra": "Satıcınız modelinizi özenle paketleyip hazırladıktan sonra, genellikle yasal ve platform kuralları gereği 3 iş günü içinde kargoya teslim eder. Garajınıza katılacak yeni parçanın yola çıkış tarihini satıcınızla mesajlaşarak da teyit edebilirsiniz.",
+      "saticinizModeliniziOzenlePaketleyipHazirladiktanSonra": "Satıcınız modelinizi özenle paketleyip hazırladıktan sonra, genellikle yasal ve platform kuralları gereği {preparingDeadlineDays} iş günü içinde kargoya teslim eder. Garajınıza katılacak yeni parçanın yola çıkış tarihini satıcınızla mesajlaşarak da teyit edebilirsiniz.",
       "kargomuNasilTakipEdebilirim": "Kargomu nasıl takip edebilirim?",
       "modelinizKargoyaVerildiktenSonraSistemUzerinde": "Modeliniz kargoya verildikten sonra sistem üzerinde bir takip numarası oluşturulur. Tarodan uygulamasını açarak Hesabım → Siparişlerim veya Hesabım → Takaslarım adımlarını izleyebilir, kargonuzun adım adım garajınıza yaklaşmasını anlık olarak takip edebilirsiniz.",
       "siparisNeZamanTamamlanir": "Sipariş ne zaman tamamlanır?",
@@ -3167,7 +3167,7 @@
       "odememSaticiyaNeZamanGecer": "Ödemem satıcıya ne zaman geçer?",
       "sizKargonuzuTeslimAlipHerSey": "Siz kargonuzu teslim alıp “Her şey yolunda, siparişi onaylıyorum” diyene kadar ödemeniz Tarodan’ın güvenli havuzunda titizlikle saklanır. Onay butonuna bastığınız anda ödemeniz güvenle satıcının hesabına aktarılır.",
       "neZamanIadeTalebiOlusturabilirim": "Ne zaman iade talebi oluşturabilirim?",
-      "beklenmeyenBirDurumlaKarsilastiginizdaVeyaUrun": "Beklenmeyen bir durumla karşılaştığınızda veya ürün ilanla uyuşmadığında, kargonuzu teslim aldığınız andan itibaren geçerli olan yasal süre 14 gün içinde iade talebi oluşturabilirsiniz. Tarodan ekibi ve güvenli altyapımız bu süreçte her iki tarafın da haklarını korumak için devrededir.",
+      "beklenmeyenBirDurumlaKarsilastiginizdaVeyaUrun": "Beklenmeyen bir durumla karşılaştığınızda veya ürün ilanla uyuşmadığında, kargonuzu teslim aldığınız andan itibaren geçerli olan yasal süre {returnWindowDays} gün içinde iade talebi oluşturabilirsiniz. Tarodan ekibi ve güvenli altyapımız bu süreçte her iki tarafın da haklarını korumak için devrededir.",
       "aliciHizmetBedeliVeSaticiKomisyonu": "Alıcı hizmet bedeli ve satıcı komisyonu nedir?",
       "platformunGuvenliAltyapisiniOdemeHavuzuSistemini": "Platformun güvenli altyapısını, ödeme havuzu sistemini ve sunduğumuz tüm operasyonel kolaylıkları sürdürebilmek adına cüzi bir hizmet bedeli ve komisyon oranları uygulanmaktadır. Tüm bu kesintiler ve tutarlar, ödeme onay adımından önce şeffaf bir şekilde ekranınızda gösterilir; sürprizlerle karşılaşmazsınız.",
       "populerKonular": "Popüler Konular",
@@ -3194,7 +3194,7 @@
       "siparisimiNasilTakipEderim": "Siparişimi nasıl takip ederim?",
       "yeniGozBebeginizinYolaCikisHeyecanini": "Yeni göz bebeğinizin yola çıkış heyecanını anlık olarak yaşayabilirsiniz! Tarodan uygulamasını açtıktan sonra siparişleriniz için Hesabım → Siparişlerim, takas işlemleriniz için ise Hesabım → Takaslarım adımlarını izleyerek kargonuzun nerede olduğunu ve adım adım size nasıl yaklaştığını canlı olarak takip edebilirsiniz.",
       "iadeVeDegisimPolitikasiNedir": "İade ve değişim politikası nedir?",
-      "koleksiyonTutkunlugununNeKadarHassasBir": "Koleksiyon tutkunluğunun ne kadar hassas bir hobi olduğunu biliyoruz. Beklenmeyen bir kusurla karşılaştığınızda veya ürün ilan bilgileriyle uyuşmadığında, teslimat anından itibaren geçerli olan yasal süre 14 gün çerçevesinde iade veya değişim talebi oluşturabilirsiniz. Tarodan ekibi, güvenli altyapısı ve depo kontrolleri ile bu süreçte her iki tarafın da haklarını titizlikle korur."
+      "koleksiyonTutkunlugununNeKadarHassasBir": "Koleksiyon tutkunluğunun ne kadar hassas bir hobi olduğunu biliyoruz. Beklenmeyen bir kusurla karşılaştığınızda veya ürün ilan bilgileriyle uyuşmadığında, teslimat anından itibaren geçerli olan yasal süre {returnWindowDays} gün çerçevesinde iade veya değişim talebi oluşturabilirsiniz. Tarodan ekibi, güvenli altyapısı ve depo kontrolleri ile bu süreçte her iki tarafın da haklarını titizlikle korur."
     },
     "metaTitle": "Sıkça Sorulan Sorular · Tarodan",
     "metaDescription": "Tarodan sıkça sorulan sorular: sipariş oluşturma, ödeme ve güvenli havuz, kargo takibi, takas süreci, iade koşulları ve ilan öne çıkarma paketleri."
@@ -4035,7 +4035,7 @@
       "saticiUrununGuvenliTasinmasinaVeGercek": "Satıcı, ürünün güvenli taşınmasına ve gerçek boyutuna uygun paket seçmekle yükümlüdür. Taşıyıcının tespit ettiği ölçü farklılıkları kayıt altına alınabilir ve ilgili kullanıcıya yansıtılabilecek sonuçlar işlem koşullarına göre değerlendirilir.",
       "kargoIcinGecerliTutarOdemeVeya": "Kargo için geçerli tutar, ödeme veya takas onayı öncesinde ekranda gösterilen tutardır. Kampanya, tarife ve taşıyıcı değişiklikleri yeni işlemler için farklı bir tutar doğurabilir.",
       "siparisinHazirlanmasiVeKargoyaVerilmesi": "Siparişin Hazırlanması ve Kargoya Verilmesi",
-      "odemeOnaylandigindaSaticiIcinSiparisDetayinda": "Ödeme onaylandığında satıcı için sipariş detayında kesin bir hazırlama son tarihi oluşturulur. Standart akışta bu süre ödeme onayından itibaren üç gündür; işlem ekranında gösterilen tarih ve saat esas alınır. Satıcı ürünü, ilan açıklamasındaki durumunu koruyacak ve taşıma sırasında zarar görmesini önleyecek şekilde paketleyerek kendisine oluşturulan kargo numarasıyla taşıyıcıya teslim eder.",
+      "odemeOnaylandigindaSaticiIcinSiparisDetayinda": "Ödeme onaylandığında satıcı için sipariş detayında kesin bir hazırlama son tarihi oluşturulur. Standart akışta bu süre ödeme onayından itibaren {preparingDeadlineDays} gündür; işlem ekranında gösterilen tarih ve saat esas alınır. Satıcı ürünü, ilan açıklamasındaki durumunu koruyacak ve taşıma sırasında zarar görmesini önleyecek şekilde paketleyerek kendisine oluşturulan kargo numarasıyla taşıyıcıya teslim eder.",
       "hazirlamaSuresiDolduguHaldeTasiyiciKayitlarinda": "Hazırlama süresi dolduğu hâlde taşıyıcı kayıtlarında gönderinin fiilen hareket ettiği doğrulanamıyorsa sipariş otomatik olarak iptal ve ücret iadesi sürecine alınabilir. Gönderi taşıyıcıya teslim edilmiş ve taşıyıcı sisteminde hareket görmüşse yalnızca satıcının ekrandaki bildirimi eksik diye sipariş otomatik olarak iptal edilmez.",
       "tasiyiciTakipVeTahminiTeslimSuresi": "Taşıyıcı, Takip ve Tahmini Teslim Süresi",
       "tarodanInMevcutEntegreTasiyicisiSurat": "Tarodan'ın mevcut entegre taşıyıcısı Sürat Kargo'dur. Kargo kaydı oluşturulduğunda veya paket şubede kabul edildiğinde takip numarası sipariş detayında gösterilir. Taşıyıcı kabulünden sonraki standart teslimat tahmini 2–3 iş günüdür; bu süre taahhüt değil tahmindir.",
@@ -6732,7 +6732,7 @@
           "preparing": "Hazırlanıyor",
           "shipped": "Kargoda",
           "delivered": "Teslim Edildi",
-          "awaitingBuyerConfirmation": "İade Penceresinde (14 gün)",
+          "awaitingBuyerConfirmation": "İade Penceresinde ({returnWindowDays} gün)",
           "refundRequested": "İade Talebi Açık",
           "completed": "Tamamlandı",
           "cancelled": "İptal",
@@ -9296,7 +9296,7 @@
         },
         "tradeHoldDays": {
           "label": "Takas escrow bekletme süresi",
-          "helper": "Takas tamamlandıktan sonra nakit farkın karşı tarafa açılması için beklenen süre. Satış escrow'unu etkilemez; en az 1 gün."
+          "helper": "Takas tamamlandıktan sonra nakit farkın karşı tarafa açılması için beklenen süre. Satış escrow'unu etkilemez; en az {min} gün."
         },
         "tradeLostParcelGraceDays": {
           "label": "Kayıp koli bekleme süresi",
@@ -9308,7 +9308,7 @@
         },
         "returnWindowDays": {
           "label": "Cayma (iade) penceresi",
-          "helper": "Teslimden sonra alıcının koşulsuz iade hakkı. Mesafeli Satış Yönetmeliği gereği en az 14 gün. Pencere kapanınca sipariş tamamlanır."
+          "helper": "Teslimden sonra alıcının koşulsuz iade hakkı. Mesafeli Satış Yönetmeliği gereği en az {min} gün. Pencere kapanınca sipariş tamamlanır."
         },
         "orderPaymentWindowHours": {
           "label": "Sipariş ödeme süresi",
@@ -9320,11 +9320,11 @@
         },
         "paymentFailTimeoutMinutes": {
           "label": "Ödeme başarısız sayma süresi",
-          "helper": "Bekleyen ödeme bu süreden sonra başarısız sayılır. PayTR 3D Secure oturumu 30 dakika sürdüğü için en az 31 dakika olmalıdır."
+          "helper": "Bekleyen ödeme bu süreden sonra başarısız sayılır. PayTR 3D Secure oturumu {paytrSessionMinutes} dakika sürdüğü için en az {min} dakika olmalıdır."
         },
         "payoutGraceDays": {
           "label": "Satıcı ödemesi ek bekleme",
-          "helper": "Cayma penceresi kapandıktan sonra satıcıya ödeme yapılmadan önce beklenen ek süre; en az 1 gün."
+          "helper": "Cayma penceresi kapandıktan sonra satıcıya ödeme yapılmadan önce beklenen ek süre; en az {min} gün."
         },
         "returnDropoffDays": {
           "label": "İade kargoya verme süresi",
@@ -9373,7 +9373,14 @@
       },
       "errorsOnTabs": "Kaydetmeden önce düzeltilmesi gereken alanlar var: {tabs}",
       "outOfBoundsWarning": "Şu an geçerli değer izin verilen aralığın dışında ve olduğu gibi uygulanıyor. Aralık içinde bir değer kaydederek düzeltin.",
-      "appliesToInProgressWarning": "Bu süre kayıtlara yazılmaz; değişiklik süreci devam eden kayıtlara da hemen uygulanır."
+      "appliesToInProgressWarning": "Bu süre kayıtlara yazılmaz; değişiklik süreci devam eden kayıtlara da hemen uygulanır.",
+      "legalMismatchWarning": "Hukuki metinler bu süreyi {stated} gün olarak belirtiyor ({documents}); yapılandırılan değerle çelişiyor. Metinlerin güncellenmesi müşterinin kararıdır.",
+      "legalMismatchSummary": "Şu süreler hukuki metinlerle çelişiyor: {rules}. Satırlardaki uyarıya bakın.",
+      "legalDocuments": {
+        "distanceSales": "Mesafeli Satış Sözleşmesi",
+        "refundPolicy": "İade Politikası",
+        "sellerAgreement": "Satıcı Sözleşmesi"
+      }
     }
   },
   "server": {
@@ -9399,7 +9406,7 @@
       },
       "orderDelivered": {
         "title": "Siparişiniz Teslim Edildi",
-        "message": "Siparişiniz teslim edildi; teslim tarihinden itibaren 14 gün içinde koşulsuz iade hakkınız var."
+        "message": "Siparişiniz teslim edildi; teslim tarihinden itibaren {returnWindowDays} gün içinde koşulsuz iade hakkınız var."
       },
       "orderCompleted": {
         "title": "Sipariş Tamamlandı",
@@ -9427,11 +9434,11 @@
       },
       "orderReservationReleased": {
         "title": "Stok rezervasyonunuz kaldırıldı",
-        "message": "{productTitle} için 30 dakika içinde ödeme tamamlanmadığı için stok rezervasyonu kaldırıldı. Ürün stoktaysa 24 saat içinde tekrar ödeme yapabilirsiniz."
+        "message": "{productTitle} için {paymentReservationMinutes} dakika içinde ödeme tamamlanmadığı için stok rezervasyonu kaldırıldı. Ürün stoktaysa {orderPaymentWindowHours} saat içinde tekrar ödeme yapabilirsiniz."
       },
       "orderDeliveredConfirm": {
         "title": "Siparişin teslim edildi",
-        "message": "Siparişiniz teslim edildi; teslim tarihinden itibaren 14 gün içinde koşulsuz iade hakkınız var. Süre dolunca sipariş otomatik tamamlanır."
+        "message": "Siparişiniz teslim edildi; teslim tarihinden itibaren {returnWindowDays} gün içinde koşulsuz iade hakkınız var. Süre dolunca sipariş otomatik tamamlanır."
       },
       "orderAutoCompleted": {
         "title": "Sipariş otomatik tamamlandı",
@@ -9439,7 +9446,7 @@
       },
       "orderManuallyConfirmed": {
         "title": "Alıcı siparişini onayladı",
-        "message": "Alıcı siparişi onayladı. Ödemeniz, teslimden 14 gün sonra (iade süresi dolunca) hesabınıza aktarılır."
+        "message": "Alıcı siparişi onayladı. Ödemeniz, teslimden {returnWindowDays} gün sonra (iade süresi dolunca) hesabınıza aktarılır."
       },
       "sellerDidNotShipRefunded": {
         "title": "Sipariş iptal edildi",
@@ -9467,7 +9474,7 @@
       },
       "offerCounterAccepted": {
         "title": "Karşı Teklifiniz Kabul Edildi",
-        "message": "{productTitle} için alıcı {amount} TL karşı teklifinizi kabul etti. Ödeme yapması için 24 saati var."
+        "message": "{productTitle} için alıcı {amount} TL karşı teklifinizi kabul etti. Ödeme yapması için {orderPaymentWindowHours} saati var."
       },
       "offerExpired": {
         "title": "Teklifin Süresi Doldu",
@@ -9479,7 +9486,7 @@
       },
       "offerPaymentExpired": {
         "title": "Ödeme Süresi Doldu",
-        "message": "{productTitle} için 24 saatlik ödeme süreniz doldu ve sipariş kapandı. Ürün hâlâ uygunsa siparişi yeniden açıp ödeyebilirsiniz."
+        "message": "{productTitle} için {orderPaymentWindowHours} saatlik ödeme süreniz doldu ve sipariş kapandı. Ürün hâlâ uygunsa siparişi yeniden açıp ödeyebilirsiniz."
       },
       "offerCancelledByAdmin": {
         "title": "Teklif yönetici tarafından iptal edildi",
@@ -9747,7 +9754,7 @@
       },
       "refundReturnDeliveredSeller": {
         "title": "İade Ürünü Size Ulaştı",
-        "message": "{refundNumber} numaralı iade ürünü size teslim edildi. Lütfen paketi 24 saat içinde kontrol edin; bir sorun varsa destek ekibiyle iletişime geçin — aksi hâlde iade otomatik tamamlanır."
+        "message": "{refundNumber} numaralı iade ürünü size teslim edildi. Lütfen paketi {returnInspectionHours} saat içinde kontrol edin; bir sorun varsa destek ekibiyle iletişime geçin — aksi hâlde iade otomatik tamamlanır."
       },
       "refundCompletedSeller": {
         "title": "İade Tamamlandı",
@@ -10143,7 +10150,7 @@
       "cannotCancel": "Bu talebi iptal edemezsiniz",
       "cannotCancelAnymore": "Bu talep artık iptal edilemez (iade kargosu açılmış veya karara bağlanmış)",
       "completedPaymentNotFound": "Tamamlanmış ödeme bulunamadı",
-      "coolingOffExpired": "14 günlük iade süresi dolmuştur; bu sipariş için artık iade talebi oluşturulamaz.",
+      "coolingOffExpired": "{returnWindowDays} günlük iade süresi dolmuştur; bu sipariş için artık iade talebi oluşturulamaz.",
       "membershipOrderNotEligible": "Üyelik siparişleri için iade talebi oluşturulamaz; üyeliğinizi üyelik ayarlarından iptal edebilirsiniz.",
       "notFound": "İade talebi bulunamadı",
       "onlyBuyerCanRequest": "Sadece alıcı iade talebi oluşturabilir",
@@ -11429,7 +11436,7 @@
         "guvenliKargo": "Güvenli Kargo",
         "hizliTakipImkaniyla": "Hızlı takip imkanıyla",
         "iadeImkani": "İade İmkanı",
-        "14GunKosulsuzIade": "14 gün koşulsuz iade",
+        "14GunKosulsuzIade": "{returnWindowDays} gün koşulsuz iade",
         "taksitImkani": "Taksit İmkanı",
         "12AyaVaranTaksit": "12 aya varan taksit",
         "koleksiyonSergile": "Koleksiyon Sergile",
@@ -11441,7 +11448,7 @@
         "secureShipping": "Secure Shipping",
         "withFastTracking": "With fast tracking",
         "easyReturns": "Easy Returns",
-        "14DaysUnconditionalReturn": "14 days unconditional return",
+        "14DaysUnconditionalReturn": "{returnWindowDays} gün koşulsuz iade",
         "installments": "Installments",
         "upTo12MonthInstallments": "Up to 12 month installments",
         "displayCollection": "Display Collection",

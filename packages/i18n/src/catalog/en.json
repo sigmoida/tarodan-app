@@ -1169,7 +1169,7 @@
     "notPaidCancelInstead": "This order is not paid; cancel it instead",
     "cancelMsgYouCancelled": "You cancelled this order.",
     "cancelMsgBuyerCancelled": "The buyer cancelled this order.",
-    "cancelMsgPaymentTimeout": "This order was automatically cancelled because payment wasn't completed within 24 hours.",
+    "cancelMsgPaymentTimeout": "This order was automatically cancelled because payment wasn't completed within {orderPaymentWindowHours, plural, one {# hour} other {# hours}}.",
     "cancelMsgSellerNoShip": "The seller didn't ship within the allowed time, so the order was cancelled.",
     "cancelMsgStockout": "This order was cancelled because the product is out of stock.",
     "cancelMsgTradeReserved": "This order was cancelled because the product was reserved for a trade.",
@@ -1191,8 +1191,8 @@
     "expiredReactivate": "This order expired before payment. You can reactivate it to complete payment.",
     "paymentRefunded": "The payment has been refunded.",
     "refundToOriginalMethod": "If a payment was made, the refund will be processed to your original payment method.",
-    "payoutReleaseWithDate": "Payment to the seller is released 14 days after delivery (on {date}). You have until then to request a refund.",
-    "payoutRelease": "Payment to the seller is released 14 days after delivery. You can request a refund during this window.",
+    "payoutReleaseWithDate": "Payment to the seller is released {returnWindowDays, plural, one {# day} other {# days}} after delivery (on {date}). You have until then to request a refund.",
+    "payoutRelease": "Payment to the seller is released {returnWindowDays, plural, one {# day} other {# days}} after delivery. You can request a refund during this window.",
     "paymentOnHoldRefund": "Payment is on hold until the open refund request is resolved.",
     "cargoRefInstructions": "Hand this number to the Sürat Kargo branch when delivering your package. The shipment is already registered — the branch will retrieve all details automatically.",
     "trackingAppearsAfterDropoff": "Once the branch receives your package, the Sürat tracking number will appear here automatically (within 30 minutes).",
@@ -1202,7 +1202,7 @@
     "cargoOneParcelPerOrder": "This cargo code represents one SELLER PACKAGE: put all its items in a SINGLE parcel and hand it over with this code. Do not mix orders that have a different cargo code into the same parcel.",
     "cargoBranchIssueNotice": "If the branch has trouble with this code, tell them “ENTEGRASYON ÜZERİNDEN BARKOD KESİLECEK” — the barcode is issued through the integration.",
     "cargoFeeCoveredNotice": "Shipping is paid by Tarodan; the branch will not charge you. The branch may measure the package on drop-off.",
-    "refundWindowPassed": "The 14-day refund window has passed; a refund can no longer be requested for this order.",
+    "refundWindowPassed": "The {returnWindowDays}-day refund window has passed; a refund can no longer be requested for this order.",
     "cancelOrderConfirm": "Cancel this order? Your payment will be refunded.",
     "refundTitle": "Refund",
     "refundShippedInfo": "The order has shipped. Change-of-mind returns proceed automatically; fault and wrong-item claims are reviewed with evidence.",
@@ -1221,7 +1221,7 @@
     "descriptionMin20": "Description must be at least 20 characters",
     "photoEvidenceRequired": "Photo evidence is required for this reason",
     "refundPhasePreparing": "The seller has not shipped yet. Your refund will be processed instantly.",
-    "refundPhaseCoolingOff": "You are within the 14-day withdrawal period. Change-of-mind requests proceed automatically; fault claims require admin review.",
+    "refundPhaseCoolingOff": "You are within the {returnWindowDays}-day withdrawal period. Change-of-mind requests proceed automatically; fault claims require admin review.",
     "refundPhasePastCoolingOff": "The cooling-off period has expired. Your request will be reviewed by the seller and admin team.",
     "refundQuantityHint": "This order has {quantity} items. Choose how many to return.",
     "describeIssuePlaceholder": "Please describe the issue in detail (min 20 chars)",
@@ -1543,10 +1543,10 @@
     "acceptCounter": "Accept Counter-Offer",
     "acceptConfirmTitle": "Accept offer",
     "acceptConfirmDesc": "Are you sure you want to accept this offer? An order will be created for it.",
-    "acceptConfirmDescSeller": "Accepting creates an order at the offered price and starts the buyer's 24-hour payment window. Accepting does not lock the product: other offers stay open and whoever pays first gets it.",
-    "acceptConfirmDescBuyer": "Accepting the counter-offer creates an order at that price and you must pay within 24 hours. The product is reserved at payment; if another buyer pays for it first, your order cannot be fulfilled.",
+    "acceptConfirmDescSeller": "Accepting creates an order at the offered price and starts the buyer's {orderPaymentWindowHours}-hour payment window. Accepting does not lock the product: other offers stay open and whoever pays first gets it.",
+    "acceptConfirmDescBuyer": "Accepting the counter-offer creates an order at that price and you must pay within {orderPaymentWindowHours, plural, one {# hour} other {# hours}}. The product is reserved at payment; if another buyer pays for it first, your order cannot be fulfilled.",
     "firstToPayWinsBuyer": "The product is not reserved for you yet. Other accepted offers may exist for it — whoever pays first gets it.",
-    "firstToPayWinsSeller": "The buyer has 24 hours to pay. The product is reserved once payment completes; until then other offers stay open.",
+    "firstToPayWinsSeller": "The buyer has {orderPaymentWindowHours, plural, one {# hour} other {# hours}} to pay. The product is reserved once payment completes; until then other offers stay open.",
     "rejectConfirmTitle": "Reject offer",
     "rejectConfirmDesc": "Are you sure you want to reject this offer? This cannot be undone.",
     "cancelConfirmTitle": "Cancel offer",
@@ -3159,7 +3159,7 @@
       "kargoGonderimUcretiniKimOder": "Kargo gönderim ücretini kim öder?",
       "kargoUcretiIlaniOlustururkenSaticininTercihine": "Kargo ücreti, ilanı oluştururken satıcının tercihine göre değişiklik gösterir. İlan detaylarında kargonun alıcıya mı ait olduğu yoksa satıcı tarafından mı karşılandığı net bir şekilde belirtilir. Alışveriş yapmadan önce bu detayı inceleyerek kargo maliyetini kolayca görebilirsiniz.",
       "siparisimNeZamanKargolanir": "Siparişim ne zaman kargolanır?",
-      "saticinizModeliniziOzenlePaketleyipHazirladiktanSonra": "Satıcınız modelinizi özenle paketleyip hazırladıktan sonra, genellikle yasal ve platform kuralları gereği 3 iş günü içinde kargoya teslim eder. Garajınıza katılacak yeni parçanın yola çıkış tarihini satıcınızla mesajlaşarak da teyit edebilirsiniz.",
+      "saticinizModeliniziOzenlePaketleyipHazirladiktanSonra": "Satıcınız modelinizi özenle paketleyip hazırladıktan sonra, genellikle yasal ve platform kuralları gereği {preparingDeadlineDays} iş günü içinde kargoya teslim eder. Garajınıza katılacak yeni parçanın yola çıkış tarihini satıcınızla mesajlaşarak da teyit edebilirsiniz.",
       "kargomuNasilTakipEdebilirim": "Kargomu nasıl takip edebilirim?",
       "modelinizKargoyaVerildiktenSonraSistemUzerinde": "Modeliniz kargoya verildikten sonra sistem üzerinde bir takip numarası oluşturulur. Tarodan uygulamasını açarak Hesabım → Siparişlerim veya Hesabım → Takaslarım adımlarını izleyebilir, kargonuzun adım adım garajınıza yaklaşmasını anlık olarak takip edebilirsiniz.",
       "siparisNeZamanTamamlanir": "Sipariş ne zaman tamamlanır?",
@@ -3167,7 +3167,7 @@
       "odememSaticiyaNeZamanGecer": "Ödemem satıcıya ne zaman geçer?",
       "sizKargonuzuTeslimAlipHerSey": "Siz kargonuzu teslim alıp “Her şey yolunda, siparişi onaylıyorum” diyene kadar ödemeniz Tarodan’ın güvenli havuzunda titizlikle saklanır. Onay butonuna bastığınız anda ödemeniz güvenle satıcının hesabına aktarılır.",
       "neZamanIadeTalebiOlusturabilirim": "Ne zaman iade talebi oluşturabilirim?",
-      "beklenmeyenBirDurumlaKarsilastiginizdaVeyaUrun": "Beklenmeyen bir durumla karşılaştığınızda veya ürün ilanla uyuşmadığında, kargonuzu teslim aldığınız andan itibaren geçerli olan yasal süre 14 gün içinde iade talebi oluşturabilirsiniz. Tarodan ekibi ve güvenli altyapımız bu süreçte her iki tarafın da haklarını korumak için devrededir.",
+      "beklenmeyenBirDurumlaKarsilastiginizdaVeyaUrun": "Beklenmeyen bir durumla karşılaştığınızda veya ürün ilanla uyuşmadığında, kargonuzu teslim aldığınız andan itibaren geçerli olan yasal süre {returnWindowDays} gün içinde iade talebi oluşturabilirsiniz. Tarodan ekibi ve güvenli altyapımız bu süreçte her iki tarafın da haklarını korumak için devrededir.",
       "aliciHizmetBedeliVeSaticiKomisyonu": "Alıcı hizmet bedeli ve satıcı komisyonu nedir?",
       "platformunGuvenliAltyapisiniOdemeHavuzuSistemini": "Platformun güvenli altyapısını, ödeme havuzu sistemini ve sunduğumuz tüm operasyonel kolaylıkları sürdürebilmek adına cüzi bir hizmet bedeli ve komisyon oranları uygulanmaktadır. Tüm bu kesintiler ve tutarlar, ödeme onay adımından önce şeffaf bir şekilde ekranınızda gösterilir; sürprizlerle karşılaşmazsınız.",
       "populerKonular": "Popüler Konular",
@@ -3194,7 +3194,7 @@
       "siparisimiNasilTakipEderim": "Siparişimi nasıl takip ederim?",
       "yeniGozBebeginizinYolaCikisHeyecanini": "Yeni göz bebeğinizin yola çıkış heyecanını anlık olarak yaşayabilirsiniz! Tarodan uygulamasını açtıktan sonra siparişleriniz için Hesabım → Siparişlerim, takas işlemleriniz için ise Hesabım → Takaslarım adımlarını izleyerek kargonuzun nerede olduğunu ve adım adım size nasıl yaklaştığını canlı olarak takip edebilirsiniz.",
       "iadeVeDegisimPolitikasiNedir": "İade ve değişim politikası nedir?",
-      "koleksiyonTutkunlugununNeKadarHassasBir": "Koleksiyon tutkunluğunun ne kadar hassas bir hobi olduğunu biliyoruz. Beklenmeyen bir kusurla karşılaştığınızda veya ürün ilan bilgileriyle uyuşmadığında, teslimat anından itibaren geçerli olan yasal süre 14 gün çerçevesinde iade veya değişim talebi oluşturabilirsiniz. Tarodan ekibi, güvenli altyapısı ve depo kontrolleri ile bu süreçte her iki tarafın da haklarını titizlikle korur."
+      "koleksiyonTutkunlugununNeKadarHassasBir": "Koleksiyon tutkunluğunun ne kadar hassas bir hobi olduğunu biliyoruz. Beklenmeyen bir kusurla karşılaştığınızda veya ürün ilan bilgileriyle uyuşmadığında, teslimat anından itibaren geçerli olan yasal süre {returnWindowDays} gün çerçevesinde iade veya değişim talebi oluşturabilirsiniz. Tarodan ekibi, güvenli altyapısı ve depo kontrolleri ile bu süreçte her iki tarafın da haklarını titizlikle korur."
     },
     "metaTitle": "Sıkça Sorulan Sorular · Tarodan",
     "metaDescription": "Tarodan sıkça sorulan sorular: sipariş oluşturma, ödeme ve güvenli havuz, kargo takibi, takas süreci, iade koşulları ve ilan öne çıkarma paketleri."
@@ -4035,7 +4035,7 @@
       "saticiUrununGuvenliTasinmasinaVeGercek": "Satıcı, ürünün güvenli taşınmasına ve gerçek boyutuna uygun paket seçmekle yükümlüdür. Taşıyıcının tespit ettiği ölçü farklılıkları kayıt altına alınabilir ve ilgili kullanıcıya yansıtılabilecek sonuçlar işlem koşullarına göre değerlendirilir.",
       "kargoIcinGecerliTutarOdemeVeya": "Kargo için geçerli tutar, ödeme veya takas onayı öncesinde ekranda gösterilen tutardır. Kampanya, tarife ve taşıyıcı değişiklikleri yeni işlemler için farklı bir tutar doğurabilir.",
       "siparisinHazirlanmasiVeKargoyaVerilmesi": "Siparişin Hazırlanması ve Kargoya Verilmesi",
-      "odemeOnaylandigindaSaticiIcinSiparisDetayinda": "Ödeme onaylandığında satıcı için sipariş detayında kesin bir hazırlama son tarihi oluşturulur. Standart akışta bu süre ödeme onayından itibaren üç gündür; işlem ekranında gösterilen tarih ve saat esas alınır. Satıcı ürünü, ilan açıklamasındaki durumunu koruyacak ve taşıma sırasında zarar görmesini önleyecek şekilde paketleyerek kendisine oluşturulan kargo numarasıyla taşıyıcıya teslim eder.",
+      "odemeOnaylandigindaSaticiIcinSiparisDetayinda": "Ödeme onaylandığında satıcı için sipariş detayında kesin bir hazırlama son tarihi oluşturulur. Standart akışta bu süre ödeme onayından itibaren {preparingDeadlineDays} gündür; işlem ekranında gösterilen tarih ve saat esas alınır. Satıcı ürünü, ilan açıklamasındaki durumunu koruyacak ve taşıma sırasında zarar görmesini önleyecek şekilde paketleyerek kendisine oluşturulan kargo numarasıyla taşıyıcıya teslim eder.",
       "hazirlamaSuresiDolduguHaldeTasiyiciKayitlarinda": "Hazırlama süresi dolduğu hâlde taşıyıcı kayıtlarında gönderinin fiilen hareket ettiği doğrulanamıyorsa sipariş otomatik olarak iptal ve ücret iadesi sürecine alınabilir. Gönderi taşıyıcıya teslim edilmiş ve taşıyıcı sisteminde hareket görmüşse yalnızca satıcının ekrandaki bildirimi eksik diye sipariş otomatik olarak iptal edilmez.",
       "tasiyiciTakipVeTahminiTeslimSuresi": "Taşıyıcı, Takip ve Tahmini Teslim Süresi",
       "tarodanInMevcutEntegreTasiyicisiSurat": "Tarodan'ın mevcut entegre taşıyıcısı Sürat Kargo'dur. Kargo kaydı oluşturulduğunda veya paket şubede kabul edildiğinde takip numarası sipariş detayında gösterilir. Taşıyıcı kabulünden sonraki standart teslimat tahmini 2–3 iş günüdür; bu süre taahhüt değil tahmindir.",
@@ -6732,7 +6732,7 @@
           "preparing": "Preparing",
           "shipped": "Shipped",
           "delivered": "Delivered",
-          "awaitingBuyerConfirmation": "In Refund Window (14 days)",
+          "awaitingBuyerConfirmation": "In Refund Window ({returnWindowDays, plural, one {# day} other {# days}})",
           "refundRequested": "Refund Request Open",
           "completed": "Completed",
           "cancelled": "Cancelled",
@@ -9296,7 +9296,7 @@
         },
         "tradeHoldDays": {
           "label": "Trade escrow hold",
-          "helper": "Wait after a trade completes before the cash difference is released to the other party. Does not affect sale escrow; at least 1 day."
+          "helper": "Wait after a trade completes before the cash difference is released to the other party. Does not affect sale escrow; at least {min, plural, one {# day} other {# days}}."
         },
         "tradeLostParcelGraceDays": {
           "label": "Lost parcel grace",
@@ -9308,7 +9308,7 @@
         },
         "returnWindowDays": {
           "label": "Cooling-off (return) window",
-          "helper": "The buyer's unconditional return right after delivery. At least 14 days under the Distance Sales Regulation. The order completes when it closes."
+          "helper": "The buyer's unconditional return right after delivery. At least {min, plural, one {# day} other {# days}} under the Distance Sales Regulation. The order completes when it closes."
         },
         "orderPaymentWindowHours": {
           "label": "Order payment time",
@@ -9320,11 +9320,11 @@
         },
         "paymentFailTimeoutMinutes": {
           "label": "Payment failure timeout",
-          "helper": "A pending payment is marked failed after this time. Must be at least 31 minutes because the PayTR 3D Secure session lasts 30."
+          "helper": "A pending payment is marked failed after this time. Must be at least {min, plural, one {# minute} other {# minutes}} because the PayTR 3D Secure session lasts {paytrSessionMinutes}."
         },
         "payoutGraceDays": {
           "label": "Seller payout grace",
-          "helper": "Extra wait after the cooling-off window closes before the seller is paid; at least 1 day."
+          "helper": "Extra wait after the cooling-off window closes before the seller is paid; at least {min, plural, one {# day} other {# days}}."
         },
         "returnDropoffDays": {
           "label": "Return drop-off time",
@@ -9373,7 +9373,14 @@
       },
       "errorsOnTabs": "Fix these fields before saving: {tabs}",
       "outOfBoundsWarning": "The value in effect is outside the allowed range and is applied as is. Save a value within the range to correct it.",
-      "appliesToInProgressWarning": "This duration is not stamped on records; a change applies immediately to items already in progress."
+      "appliesToInProgressWarning": "This duration is not stamped on records; a change applies immediately to items already in progress.",
+      "legalMismatchWarning": "Legal texts state this period as {stated, plural, one {# day} other {# days}} ({documents}); it conflicts with the configured value. Updating the texts is the customer's decision.",
+      "legalMismatchSummary": "These durations conflict with the legal texts: {rules}. See the warning on each row.",
+      "legalDocuments": {
+        "distanceSales": "Distance Sales Agreement",
+        "refundPolicy": "Refund Policy",
+        "sellerAgreement": "Seller Agreement"
+      }
     }
   },
   "server": {
@@ -9399,7 +9406,7 @@
       },
       "orderDelivered": {
         "title": "Your Order Has Been Delivered",
-        "message": "Your order has been delivered; you have an unconditional right of return for 14 days from the delivery date."
+        "message": "Your order has been delivered; you have an unconditional right of return for {returnWindowDays, plural, one {# day} other {# days}} from the delivery date."
       },
       "orderCompleted": {
         "title": "Order Completed",
@@ -9427,11 +9434,11 @@
       },
       "orderReservationReleased": {
         "title": "Your stock reservation was released",
-        "message": "The stock reservation for {productTitle} was released because payment was not completed within 30 minutes. If the product is still in stock, you can pay again within 24 hours."
+        "message": "The stock reservation for {productTitle} was released because payment was not completed within {paymentReservationMinutes, plural, one {# minute} other {# minutes}}. If the product is still in stock, you can pay again within {orderPaymentWindowHours, plural, one {# hour} other {# hours}}."
       },
       "orderDeliveredConfirm": {
         "title": "Your order has been delivered",
-        "message": "Your order has been delivered; you have an unconditional right of return for 14 days from the delivery date. When the period ends, the order completes automatically."
+        "message": "Your order has been delivered; you have an unconditional right of return for {returnWindowDays, plural, one {# day} other {# days}} from the delivery date. When the period ends, the order completes automatically."
       },
       "orderAutoCompleted": {
         "title": "Order completed automatically",
@@ -9439,7 +9446,7 @@
       },
       "orderManuallyConfirmed": {
         "title": "The buyer confirmed the order",
-        "message": "The buyer confirmed the order. Your payout will be transferred to your account 14 days after delivery (once the return period ends)."
+        "message": "The buyer confirmed the order. Your payout will be transferred to your account {returnWindowDays, plural, one {# day} other {# days}} after delivery (once the return period ends)."
       },
       "sellerDidNotShipRefunded": {
         "title": "Order cancelled",
@@ -9467,7 +9474,7 @@
       },
       "offerCounterAccepted": {
         "title": "Your Counter-Offer Was Accepted",
-        "message": "The buyer accepted your {amount} TL counter-offer for {productTitle}. They have 24 hours to pay."
+        "message": "The buyer accepted your {amount} TL counter-offer for {productTitle}. They have {orderPaymentWindowHours, plural, one {# hour} other {# hours}} to pay."
       },
       "offerExpired": {
         "title": "Your Offer Has Expired",
@@ -9479,7 +9486,7 @@
       },
       "offerPaymentExpired": {
         "title": "Payment Window Expired",
-        "message": "Your 24-hour payment window for {productTitle} expired and the order was closed. If the product is still available you can reopen the order and pay."
+        "message": "Your {orderPaymentWindowHours}-hour payment window for {productTitle} expired and the order was closed. If the product is still available you can reopen the order and pay."
       },
       "offerCancelledByAdmin": {
         "title": "Offer cancelled by an administrator",
@@ -9747,7 +9754,7 @@
       },
       "refundReturnDeliveredSeller": {
         "title": "The Returned Product Reached You",
-        "message": "The returned product for refund {refundNumber} has been delivered to you. Please inspect the package within 24 hours; contact support if there is a problem — otherwise the refund completes automatically."
+        "message": "The returned product for refund {refundNumber} has been delivered to you. Please inspect the package within {returnInspectionHours, plural, one {# hour} other {# hours}}; contact support if there is a problem — otherwise the refund completes automatically."
       },
       "refundCompletedSeller": {
         "title": "Refund Completed",
@@ -10143,7 +10150,7 @@
       "cannotCancel": "You cannot cancel this request",
       "cannotCancelAnymore": "This request can no longer be cancelled (the return shipment has been opened or a decision has already been made)",
       "completedPaymentNotFound": "No completed payment was found",
-      "coolingOffExpired": "The 14-day refund period has expired; a refund request can no longer be created for this order.",
+      "coolingOffExpired": "The {returnWindowDays}-day refund period has expired; a refund request can no longer be created for this order.",
       "membershipOrderNotEligible": "A refund request cannot be created for membership orders; you can cancel your membership from your membership settings.",
       "notFound": "Refund request not found",
       "onlyBuyerCanRequest": "Only the buyer can create a refund request",
@@ -11429,7 +11436,7 @@
         "guvenliKargo": "Güvenli Kargo",
         "hizliTakipImkaniyla": "Hızlı takip imkanıyla",
         "iadeImkani": "İade İmkanı",
-        "14GunKosulsuzIade": "14 gün koşulsuz iade",
+        "14GunKosulsuzIade": "{returnWindowDays} gün koşulsuz iade",
         "taksitImkani": "Taksit İmkanı",
         "12AyaVaranTaksit": "12 aya varan taksit",
         "koleksiyonSergile": "Koleksiyon Sergile",
@@ -11441,7 +11448,7 @@
         "secureShipping": "Secure Shipping",
         "withFastTracking": "With fast tracking",
         "easyReturns": "Easy Returns",
-        "14DaysUnconditionalReturn": "14 days unconditional return",
+        "14DaysUnconditionalReturn": "{returnWindowDays, plural, one {# day} other {# days}} unconditional return",
         "installments": "Installments",
         "upTo12MonthInstallments": "Up to 12 month installments",
         "displayCollection": "Display Collection",
