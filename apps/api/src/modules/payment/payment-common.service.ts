@@ -1,23 +1,10 @@
 import { Injectable, Logger } from "@nestjs/common";
 import { PrismaService } from "../../prisma";
-import { PaymentStatus, OrderStatus, type Prisma } from "@prisma/client";
+import { PaymentStatus, OrderStatus } from "@prisma/client";
 import { asPaymentMetadata } from "./helpers/payment-metadata.types";
-import { resolveTimingValue } from "../../common/timing-rules";
+import { chargeLikelyLive } from "./helpers/live-charge";
 import { CarrierCancellationService } from "../surat-cargo/sync/carrier-cancellation.service";
 import { canTransitionShipmentStatus } from "../shipping/helpers/shipment-state-machine";
-
-/**
- * Siparişin henüz sonuçlanmamış ödeme satırı — siparişin kendi ödemesi ya da
- * (sepette) grubunun ödemesi. Canlı çekim kontrolleri bunu okur.
- */
-export function liveOrderPaymentWhere(
-  orderId: string,
-): Prisma.PaymentWhereInput {
-  return {
-    OR: [{ orderId }, { checkoutGroup: { orders: { some: { id: orderId } } } }],
-    status: { in: [PaymentStatus.pending, PaymentStatus.processing] },
-  };
-}
 
 export interface ShipmentCancellationResult {
   ok: boolean;
@@ -307,36 +294,7 @@ export class PaymentCommonService {
    * → orphan capture. Saf fonksiyon; config'i çağıran okur.
    */
   isChargeLikelyLive(metadata: unknown, windowMinutes: number): boolean {
-    const meta = asPaymentMetadata(metadata);
-    const raw = meta.lastChargeStartedAt;
-    if (typeof raw !== "string") return false;
-    const startedAt = new Date(raw).getTime();
-    if (Number.isNaN(startedAt)) return false;
-    return Date.now() - startedAt < windowMinutes * 60 * 1000;
-  }
-
-  /**
-   * Siparişin (ya da sepetinin) canlı bir 3DS çekimi var mı? Ödenmemiş
-   * siparişi kapatan bir yol (admin iptali) bunu sipariş satırı KİLİTLİYKEN
-   * sorar: çekim sürerken kapatmak, callback geldiğinde parası çekilmiş iptal
-   * sipariş demektir. Pencere 24s süpürmesiyle aynı süredir
-   * (Süreler ve Kurallar → `paymentFailTimeoutMinutes`). Süre de verilen
-   * istemciden okunur: işlem bir bağlantı tutarken ikinci bir bağlantı
-   * beklenmez.
-   */
-  async hasLiveCharge(
-    db: Prisma.TransactionClient,
-    orderId: string,
-  ): Promise<boolean> {
-    const windowMinutes = await resolveTimingValue(
-      db,
-      "paymentFailTimeoutMinutes",
-    );
-    const live = await db.payment.findFirst({
-      where: liveOrderPaymentWhere(orderId),
-      select: { metadata: true },
-    });
-    return !!live && this.isChargeLikelyLive(live.metadata, windowMinutes);
+    return chargeLikelyLive(metadata, windowMinutes);
   }
 
   async assignMerchantOid(

@@ -170,8 +170,10 @@ admin CRUD + doğrulamalar `modules/admin/admin-commission.service.ts`.
   siparişleri `FOR UPDATE` kilitleyip durumu öyle okur: iptal edilmiş sipariş
   canlandırılmaz, otomatik iadeye (`processRefund`) gider. Claim commit
   ettikten sonra gelen iptal, `lastChargeStartedAt` damgasını canlı çekim
-  olarak görür (yönetici ve alıcı iptali 409 `cancelPaymentInFlight`,
-  süpürme atlar).
+  olarak görür: ödenmemiş iptal çekirdeği (`cancelUnpaidOrderInTx`, alıcı —
+  misafir dahil — ve yönetici iptali) çağıranın sipariş kilidi altında
+  `orderHasLiveCharge` ile bakar ve 409 `server.order.cancelPaymentInFlight`
+  ("ödeme sürüyor, birazdan tekrar deneyin") döner; 24s süpürmesi atlar.
   - **Kilit sırası** — hem ödeme hem sipariş satırı kilitleyen yollar ÖNCE
     ödemeyi, SONRA siparişi kilitler (sepette ikisi de id sırasıyla): claim
     (ödeme `FOR UPDATE` → siparişler `FOR SHARE`), callback (ödeme CAS →
@@ -311,7 +313,8 @@ Admin tarafından başlatılan **iade** (kargodan sonra) yoktur; toplu iptal yok
   taşır; sipariş arada ödendiyse (ön okumada ya da kilit altında) iptal 409
   `cancelKindChanged` ile durur — "para yok"tan "iade"ye sessiz geçiş yoktur,
   panel önizlemeyi tazeler. Ödenmemiş siparişte canlı bir 3DS çekimi varsa
-  (`paymentFailTimeoutMinutes` penceresi) 409 `cancelPaymentInFlight`.
+  (`paymentFailTimeoutMinutes` penceresi) çekirdek 409
+  `server.order.cancelPaymentInFlight` döner (alıcı iptaliyle aynı kontrol).
 - **Yarışlar**: ödenmemiş yol sipariş satırını `FOR UPDATE` ile kilitler ve
   yeniden değerlendirir (alıcı iptali / 24s süpürmesi → `closed`, callback →
   tür değişti); çekirdeğin `version` koşullu yazımı ikinci kapıdır. Ödenmiş yol

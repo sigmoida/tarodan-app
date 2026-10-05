@@ -10199,7 +10199,8 @@
       "statusChangeSystemOnly": "This status change is performed by the system",
       "statusTransitionNotAllowed": "Order status cannot be changed from {from} to {to}",
       "updateForbidden": "You are not authorized to update this order",
-      "viewForbidden": "You are not authorized to view this order"
+      "viewForbidden": "You are not authorized to view this order",
+      "cancelPaymentInFlight": "A payment for this order is in progress right now; try again in a few minutes once it settles"
     },
     "payment": {
       "cancelPaymentForbidden": "You do not have permission to cancel this payment",
@@ -10518,7 +10519,6 @@
         "cancelAfterDelivery": "A delivered order cannot be cancelled; use the refund request flow at this stage",
         "cancelAfterCompletion": "A completed order cannot be cancelled; the seller has been or is about to be paid out",
         "cancelKindChanged": "The order's payment state changed after the preview; nothing was cancelled. Check the updated preview and confirm again",
-        "cancelPaymentInFlight": "A payment for this order is in progress right now; try again once it settles",
         "cancelNoteRequired": "An internal note is required when the reason is “Other”",
         "cancelNoteTooLong": "The internal note is longer than allowed"
       },

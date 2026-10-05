@@ -3,6 +3,7 @@ import {
   NotFoundException,
   ForbiddenException,
   BadRequestException,
+  ConflictException,
   Logger,
   Optional,
 } from "@nestjs/common";
@@ -34,6 +35,7 @@ import { DiscountService } from "../discount/discount.service";
 import { RefundService } from "../refund/refund.service";
 import { PUBLIC_NAME_SELECT } from "../../common/helpers/public-identity";
 import { paymentWindowEnd } from "../payment/helpers/payment.constants";
+import { orderHasLiveCharge } from "../payment/helpers/live-charge";
 import { OFFER_CANCEL_REASON } from "../trade/helpers/trade-cancel-reasons";
 import { ORDER_CANCEL_REASON } from "./helpers/order-cancel-reasons";
 import { orderCancelledData } from "./helpers/order-cancellation";
@@ -445,6 +447,9 @@ export class OrderLifecycleService {
     // iptalinde ise yalnız geçici CouponReservation serbest bırakılır.
     let productIdToInvalidate: string | null = null;
     const result = await this.prisma.$transaction(async (tx) => {
+      // Satır kilidi: claim siparişi aynı kilitle okuduğundan canlı çekim
+      // kontrolü (çekirdekte) onunla dışlayıcıdır.
+      await tx.$queryRaw`SELECT id FROM orders WHERE id = ${orderId} FOR UPDATE`;
       const order = await tx.order.findUnique({
         where: { id: orderId },
         include: { product: true },
@@ -510,7 +515,9 @@ export class OrderLifecycleService {
    * teklif iptali aynı adımları yürütür: statü cancelled + cancellationType
    * 'iptal' (raporlama "İADE değil İPTAL" der), rezervasyon serbest bırakma,
    * bağlı teklifin kapatılması, ledger waived, kupon rezervasyonu iadesi.
-   * Çağıran, satırı tx içinde okumuş ve yetkiyi doğrulamış olmalıdır.
+   * Çağıran, sipariş satırını tx içinde KİLİTLEYİP (`FOR UPDATE`) okumuş ve
+   * yetkiyi doğrulamış olmalıdır: canlı çekim kontrolü ancak o kilit altında
+   * claim'le dışlayıcıdır (bkz. payment-order-lock).
    */
   async cancelUnpaidOrderInTx<TInclude extends Prisma.OrderInclude | undefined>(
     tx: Prisma.TransactionClient,
@@ -548,6 +555,14 @@ export class OrderLifecycleService {
     if (order.status !== OrderStatus.pending_payment) {
       throw new BadRequestException(
         i18nMessage("server.order.cannotCancelShipped"),
+      );
+    }
+    // Alıcı 3DS ekranındayken (başka sekmeden alıcı, ya da yönetici) iptal
+    // edilirse kart yine çekilir; callback iade eder ama arada bırakılan stok
+    // başkasına satılabilir. Çekim penceresi kapanana dek iptal reddedilir.
+    if (await orderHasLiveCharge(tx, order.id)) {
+      throw new ConflictException(
+        i18nMessage("server.order.cancelPaymentInFlight"),
       );
     }
 

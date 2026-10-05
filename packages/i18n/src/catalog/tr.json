@@ -10199,7 +10199,8 @@
       "statusChangeSystemOnly": "Bu durum değişikliği sistem tarafından yapılır",
       "statusTransitionNotAllowed": "Sipariş durumu {from}'den {to}'e değiştirilemez",
       "updateForbidden": "Bu siparişi güncelleme yetkiniz yok",
-      "viewForbidden": "Bu siparişi görüntüleme yetkiniz yok"
+      "viewForbidden": "Bu siparişi görüntüleme yetkiniz yok",
+      "cancelPaymentInFlight": "Bu sipariş için şu anda süren bir ödeme işlemi var; ödeme sonuçlandıktan sonra birkaç dakika içinde yeniden deneyin"
     },
     "payment": {
       "cancelPaymentForbidden": "Bu ödemeyi iptal etme yetkiniz yok",
@@ -10518,7 +10519,6 @@
         "cancelAfterDelivery": "Teslim edilmiş sipariş iptal edilemez; bu aşamada iade talebi akışını kullanın",
         "cancelAfterCompletion": "Tamamlanmış sipariş iptal edilemez; satıcı ödemesi yapıldı ya da yapılmak üzere",
         "cancelKindChanged": "Siparişin ödeme durumu önizlemeden sonra değişti; iptal yapılmadı. Güncel önizlemeyi kontrol edip yeniden onaylayın",
-        "cancelPaymentInFlight": "Bu sipariş için şu anda süren bir ödeme işlemi var; ödeme sonuçlandıktan sonra yeniden deneyin",
         "cancelNoteRequired": "“Diğer” nedeni seçildiğinde iç not zorunludur",
         "cancelNoteTooLong": "İç not izin verilen uzunluğu aşıyor"
       },

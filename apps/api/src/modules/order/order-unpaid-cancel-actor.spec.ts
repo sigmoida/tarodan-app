@@ -27,6 +27,8 @@ describe("OrderLifecycleService.cancelUnpaidOrderInTx — iptal aktörü", () =>
   const makeService = (
     product = { reservedQuantity: 1 },
     hasPayment = false,
+    /** Ödeme satırının metadata'sı; canlı çekim kontrolü bunu okur. */
+    livePaymentMeta: Record<string, unknown> | null = null,
   ) => {
     const tx: any = {
       order: {
@@ -39,7 +41,14 @@ describe("OrderLifecycleService.cancelUnpaidOrderInTx — iptal aktörü", () =>
         findUnique: jest
           .fn()
           .mockResolvedValue(hasPayment ? { id: "pay-1" } : null),
+        findFirst: jest
+          .fn()
+          .mockResolvedValue(
+            livePaymentMeta ? { metadata: livePaymentMeta } : null,
+          ),
       },
+      // Canlı çekim penceresi Süreler ve Kurallar'dan (satır yok → varsayılan).
+      platformSetting: { findUnique: jest.fn().mockResolvedValue(null) },
       $queryRaw: jest.fn().mockResolvedValue([{ id: "p1" }]),
       // GREATEST(reserved - qty, 0) — sayaç modeli.
       $executeRaw: jest
@@ -229,6 +238,49 @@ describe("OrderLifecycleService.cancelUnpaidOrderInTx — iptal aktörü", () =>
 
       expect(tx.$executeRaw).not.toHaveBeenCalled();
       expect(product.reservedQuantity).toBe(1);
+    });
+  });
+
+  /**
+   * Alıcı 3DS ekranındayken (başka sekmeden alıcı ya da yönetici) iptal
+   * edilirse kart yine çekilir ve arada bırakılan stok başkasına satılabilir.
+   * Çekirdek, çağıranın sipariş kilidi altında canlı çekimi görüp reddeder —
+   * alıcı (misafir dahil) ve yönetici iptali aynı kontrolden geçer.
+   */
+  describe("canlı çekim", () => {
+    it.each(["buyer_cancelled", "admin_cancelled"] as const)(
+      "%s: çekim pencere içindeyse 409, hiçbir şey yazılmaz",
+      async (ledgerReason) => {
+        const product = { reservedQuantity: 1 };
+        const { service, tx } = makeService(product, false, {
+          lastChargeStartedAt: new Date(Date.now() - 60_000).toISOString(),
+        });
+
+        await expect(
+          service.cancelUnpaidOrderInTx(tx, order, {
+            reason: "gerekçe",
+            ledgerReason,
+          }),
+        ).rejects.toMatchObject({
+          status: 409,
+          response: { i18nKey: "server.order.cancelPaymentInFlight" },
+        });
+        expect(tx.order.update).not.toHaveBeenCalled();
+        expect(product.reservedQuantity).toBe(1);
+      },
+    );
+
+    it("pencere dışındaki eski çekim iptali engellemez", async () => {
+      const { service, tx } = makeService({ reservedQuantity: 1 }, false, {
+        lastChargeStartedAt: new Date(Date.now() - 24 * 3600_000).toISOString(),
+      });
+
+      await service.cancelUnpaidOrderInTx(tx, order, {
+        reason: "gerekçe",
+        ledgerReason: "buyer_cancelled",
+      });
+
+      expect(tx.order.update).toHaveBeenCalledTimes(1);
     });
   });
 });

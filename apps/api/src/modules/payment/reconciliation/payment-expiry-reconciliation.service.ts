@@ -20,10 +20,8 @@ import { NotificationType } from "../../notification/dto/notification.dto";
 import { CommissionLedgerService } from "../../commission/commission-ledger.service";
 import { PaymentRefundService } from "../refund/payment-refund.service";
 import { EventService } from "../../events";
-import {
-  PaymentCommonService,
-  liveOrderPaymentWhere,
-} from "../payment-common.service";
+import { PaymentCommonService } from "../payment-common.service";
+import { liveOrderPaymentWhere } from "../helpers/live-charge";
 import { lockOrderPaymentRows } from "../helpers/payment-order-lock";
 import {
   FailedPaymentCancellation,

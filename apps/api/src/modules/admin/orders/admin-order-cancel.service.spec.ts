@@ -96,9 +96,6 @@ describe("AdminOrderCancelService", () => {
       cancelUnpaidOrderInTx: jest.fn().mockResolvedValue({}),
       invalidateProductCaches: jest.fn().mockResolvedValue(undefined),
     };
-    const paymentService = {
-      hasLiveCharge: jest.fn().mockResolvedValue(false),
-    };
     const notificationService = {
       notifyOrderCancelledByPlatform: jest.fn().mockResolvedValue(undefined),
     };
@@ -107,7 +104,6 @@ describe("AdminOrderCancelService", () => {
       audit as any,
       refundService as any,
       orderService as any,
-      paymentService as any,
       notificationService as any,
     );
     return {
@@ -117,7 +113,6 @@ describe("AdminOrderCancelService", () => {
       audit,
       refundService,
       orderService,
-      paymentService,
       notificationService,
     };
   };
@@ -247,9 +242,15 @@ describe("AdminOrderCancelService", () => {
       expect(result.kind).toBe("unpaid");
     });
 
-    it("canlı 3DS çekimi varsa 409 — kapatılmaz (orphan capture'a karşı)", async () => {
-      const { service, paymentService, orderService, tx } = makeService(unpaid);
-      paymentService.hasLiveCharge.mockResolvedValue(true);
+    it("canlı 3DS çekimi varsa çekirdeğin 409'u yükselir; denetim yazılmaz, duyuru gitmez, deneme kaydedilir", async () => {
+      const { service, orderService, audit, notificationService } =
+        makeService(unpaid);
+      // Kontrol çekirdekte (alıcı iptaliyle aynı), bu satır kilidi altında.
+      orderService.cancelUnpaidOrderInTx.mockRejectedValue(
+        new ConflictException({
+          i18nKey: "server.order.cancelPaymentInFlight",
+        }),
+      );
 
       await expect(
         service.cancelOrder(
@@ -259,10 +260,20 @@ describe("AdminOrderCancelService", () => {
         ),
       ).rejects.toMatchObject({
         status: 409,
-        response: { i18nKey: "server.admin.order.cancelPaymentInFlight" },
+        response: { i18nKey: "server.order.cancelPaymentInFlight" },
       });
-      expect(paymentService.hasLiveCharge).toHaveBeenCalledWith(tx, "order-1");
-      expect(orderService.cancelUnpaidOrderInTx).not.toHaveBeenCalled();
+      expect(audit.createRequiredAuditLog).not.toHaveBeenCalled();
+      expect(
+        notificationService.notifyOrderCancelledByPlatform,
+      ).not.toHaveBeenCalled();
+      expect(audit.createAuditLog).toHaveBeenCalledWith(
+        "admin-1",
+        "order_cancel_failed",
+        "Order",
+        "order-1",
+        expect.anything(),
+        expect.objectContaining({ expectedKind: "unpaid" }),
+      );
     });
 
     it("denetim yazılamazsa iptal de olmaz (fail-closed): hata yükselir, duyuru gitmez", async () => {

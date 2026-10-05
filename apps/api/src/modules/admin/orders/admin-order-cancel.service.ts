@@ -22,7 +22,6 @@ import { PrismaService } from "../../../prisma";
 import { AdminAuditService } from "../ops/admin-audit.service";
 import { RefundService } from "../../refund/refund.service";
 import { OrderService } from "../../order/order.service";
-import { PaymentService } from "../../payment/payment.service";
 import { NotificationService } from "../../notification/notification.service";
 import { ACTIVE_REFUND_REQUEST_STATUSES } from "../../refund/helpers/refund-active-statuses";
 import { adminCancelReasonText } from "../../order/helpers/admin-cancel-reason";
@@ -198,7 +197,6 @@ export class AdminOrderCancelService {
     private readonly audit: AdminAuditService,
     private readonly refundService: RefundService,
     private readonly orderService: OrderService,
-    private readonly paymentService: PaymentService,
     private readonly notificationService: NotificationService,
   ) {}
 
@@ -307,13 +305,8 @@ export class AdminOrderCancelService {
       // Ön okumadan bu yana: alıcı iptal ettiyse / süpürme kapattıysa →
       // closed; ödeme callback'i tamamladıysa → tür değişti (409).
       assertExpectedKind("unpaid", cancellableKind(fresh));
-      // Çekim sürüyorsa kapatmak, callback geldiğinde parası çekilmiş iptal
-      // sipariş demektir (24s süpürmesi de bu durumda atlar).
-      if (await this.paymentService.hasLiveCharge(tx, fresh.id)) {
-        throw new ConflictException(
-          i18nMessage("server.admin.order.cancelPaymentInFlight"),
-        );
-      }
+      // Canlı çekim varsa çekirdek 409 `cancelPaymentInFlight` ile reddeder
+      // (alıcı iptaliyle aynı kontrol, bu satır kilidi altında).
       await this.orderService.cancelUnpaidOrderInTx(tx, fresh, {
         reason: visibleReason,
         ledgerReason: "admin_cancelled",
