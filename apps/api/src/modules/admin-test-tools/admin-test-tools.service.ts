@@ -1,4 +1,9 @@
-import { BadRequestException, Injectable, Logger } from "@nestjs/common";
+import {
+  BadRequestException,
+  ForbiddenException,
+  Injectable,
+  Logger,
+} from "@nestjs/common";
 import { InjectQueue } from "@nestjs/bull";
 import type { Queue } from "bull";
 import { PrismaService } from "../../prisma";
@@ -273,9 +278,14 @@ export class AdminTestToolsService {
       }
       case "return_window": {
         // Yalnız teslim edilmiş siparişler: pencere teslimde damgalanır. Escrow
-        // tarihi de gösterilir — kaydırma ikisini birlikte taşır.
+        // tarihi de gösterilir — kaydırma ikisini birlikte taşır. Canlıda yalnız
+        // test şeridi (kargo simülasyonuyla aynı kural).
         const rows = await this.prisma.order.findMany({
-          where: { orderNumber: ci, deliveredAt: { not: null } },
+          where: {
+            orderNumber: ci,
+            deliveredAt: { not: null },
+            ...(isLiveProduction() ? { isTest: true } : {}),
+          },
           select: {
             id: true,
             orderNumber: true,
@@ -542,34 +552,49 @@ export class AdminTestToolsService {
         // ama satıcı ödemesi haftalar sonra" gibi gerçekte olmayan bir durum
         // üretirdi. Sadece escrow'u öne çekmek isteyen tester "hold" tipini
         // kullanmaya devam eder.
+        //
+        // İkisinin AYRIŞMASI imkânsız tutulur: held durumda hold yoksa (escrow
+        // serbest bırakılmış ya da hiç olmamış) pencere de kaydırılmaz —
+        // aksi halde tamamlanmış bir siparişte alıcının iade hakkı, satıcıya
+        // çoktan ödenmiş parayla yeniden açılırdı.
         const before = await this.prisma.order.findUnique({
           where: { id },
-          select: { deliveredAt: true, returnWindowEndsAt: true },
+          select: { deliveredAt: true, returnWindowEndsAt: true, isTest: true },
         });
         if (!before)
           throw new BadRequestException(
             i18nMessage("server.refund.orderNotFound"),
           );
+        // Canlıda yalnız test şeridi siparişleri (kargo simülasyonuyla aynı kural).
+        if (isLiveProduction() && !before.isTest)
+          throw new ForbiddenException(
+            i18nMessage("server.admin.testTools.liveTestLaneOnly"),
+          );
         if (!before.deliveredAt)
           throw new BadRequestException(
             i18nMessage("server.admin.testTools.orderNotDelivered"),
           );
-        const releaseAt = await this.prisma.$transaction(async (tx) => {
+        const moved = await this.prisma.$transaction(async (tx) => {
           const payoutGraceDays = await resolveTimingValue(
             tx,
             "payoutGraceDays",
           );
           const nextReleaseAt = escrowReleaseAt(target, payoutGraceDays);
+          // Teslimdeki planlamayla aynı küme: held olan hold'lar. ÖNCE hold:
+          // hiçbiri kaymazsa istisna tx'i geri alır ve pencereye dokunulmaz.
+          const holds = await tx.paymentHold.updateMany({
+            where: { orderId: id, status: PaymentHoldStatus.held },
+            data: { releaseAt: nextReleaseAt },
+          });
+          if (holds.count === 0)
+            throw new BadRequestException(
+              i18nMessage("server.admin.testTools.orderHasNoHeldEscrow"),
+            );
           await tx.order.update({
             where: { id },
             data: { returnWindowEndsAt: target },
           });
-          // Teslimdeki planlamayla aynı küme: held olan hold'lar.
-          await tx.paymentHold.updateMany({
-            where: { orderId: id, status: PaymentHoldStatus.held },
-            data: { releaseAt: nextReleaseAt },
-          });
-          return nextReleaseAt;
+          return { releaseAt: nextReleaseAt, holds: holds.count };
         });
         return {
           type,
@@ -577,7 +602,11 @@ export class AdminTestToolsService {
           field: "returnWindowEndsAt",
           before: iso(before.returnWindowEndsAt),
           after: afterIso,
-          related: { escrowReleaseAt: releaseAt.toISOString() },
+          // Yalnız gerçekten yazılan: kaç held hold kaydı, hangi tarihe.
+          related: {
+            escrowReleaseAt: moved.releaseAt.toISOString(),
+            heldHoldsMoved: String(moved.holds),
+          },
         };
       }
       case "email_verification": {

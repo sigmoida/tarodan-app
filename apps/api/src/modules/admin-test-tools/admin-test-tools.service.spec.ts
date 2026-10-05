@@ -4,6 +4,7 @@ import {
   tradeDeadlineField,
 } from "./admin-test-tools.service";
 import { CRON_CATALOG } from "../../workers/cron-catalog";
+import { ForbiddenException } from "@nestjs/common";
 
 /**
  * Cron tetikleme artık KUYRUK üzerinden: servis doğrudan iş mantığı çağırmaz,
@@ -170,7 +171,78 @@ describe("AdminTestToolsService iade penceresi (return_window)", () => {
     expect(res).toMatchObject({
       field: "returnWindowEndsAt",
       before: "2026-09-15T10:00:00.000Z",
-      related: { escrowReleaseAt: expectedRelease.toISOString() },
+      related: {
+        escrowReleaseAt: expectedRelease.toISOString(),
+        heldHoldsMoved: "1",
+      },
+    });
+  });
+
+  it("refuses when no hold is still held — the window cannot drift from released escrow", async () => {
+    // Tamamlanmış sipariş, escrow serbest: pencereyi ileri almak alıcının iade
+    // hakkını satıcıya çoktan ödenmiş parayla yeniden açardı.
+    const { service, tx } = makeService({
+      deliveredAt: new Date("2026-08-01T10:00:00Z"),
+      returnWindowEndsAt: new Date("2026-08-15T10:00:00Z"),
+    });
+    tx.paymentHold.updateMany.mockResolvedValue({ count: 0 });
+
+    await expect(
+      service.adjust("return_window", "order-1", "set_minutes", 60 * 24 * 7),
+    ).rejects.toMatchObject({
+      response: { i18nKey: "server.admin.testTools.orderHasNoHeldEscrow" },
+    });
+    // Hold sorgusu önce koşar; hiçbiri kaymayınca pencereye dokunulmaz
+    // (gerçek DB'de tx de geri alınır).
+    expect(tx.order.update).not.toHaveBeenCalled();
+  });
+
+  describe("on the live deployment", () => {
+    const saved = {
+      NODE_ENV: process.env.NODE_ENV,
+      APP_ENV: process.env.APP_ENV,
+    };
+    beforeEach(() => {
+      process.env.NODE_ENV = "production";
+      process.env.APP_ENV = "production";
+    });
+    afterEach(() => {
+      if (saved.NODE_ENV === undefined) delete process.env.NODE_ENV;
+      else process.env.NODE_ENV = saved.NODE_ENV;
+      if (saved.APP_ENV === undefined) delete process.env.APP_ENV;
+      else process.env.APP_ENV = saved.APP_ENV;
+    });
+
+    it("refuses a real customer's order with 403", async () => {
+      const { service, prisma } = makeService({
+        deliveredAt: new Date("2026-09-01T10:00:00Z"),
+        returnWindowEndsAt: new Date("2026-09-15T10:00:00Z"),
+        isTest: false,
+      });
+
+      await expect(
+        service.adjust("return_window", "order-1", "expire_now", 0),
+      ).rejects.toBeInstanceOf(ForbiddenException);
+      expect(prisma.$transaction).not.toHaveBeenCalled();
+    });
+
+    it("allows a test-lane order", async () => {
+      const { service, tx } = makeService({
+        deliveredAt: new Date("2026-09-01T10:00:00Z"),
+        returnWindowEndsAt: new Date("2026-09-15T10:00:00Z"),
+        isTest: true,
+      });
+
+      await service.adjust("return_window", "order-1", "expire_now", 0);
+      expect(tx.order.update).toHaveBeenCalledTimes(1);
+    });
+
+    it("search lists test-lane orders only", async () => {
+      const { service, prisma } = makeService(null);
+      await service.search("return_window", "ORD-1");
+      expect(prisma.order.findMany.mock.calls[0][0].where).toMatchObject({
+        isTest: true,
+      });
     });
   });
 

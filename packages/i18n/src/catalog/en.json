@@ -10926,7 +10926,9 @@
         "simulationLiveOrderForbidden": "On the live deployment only test-lane parcels can be simulated",
         "simulationTargetNotFound": "Parcel to simulate not found",
         "simulationStepUnavailable": "Step \"{step}\" is not available for this parcel (shipment: {status}, record: {ownerStatus})",
-        "tradeConfirmationNotStarted": "The trade confirmation window has not started yet (both outbound parcels must be delivered)"
+        "tradeConfirmationNotStarted": "The trade confirmation window has not started yet (both outbound parcels must be delivered)",
+        "liveTestLaneOnly": "On the live deployment this tool only works on test-lane records",
+        "orderHasNoHeldEscrow": "The order has no escrow hold still held; the return window cannot be moved apart from the escrow date"
       },
       "psp": {
         "invalidDate": "Invalid date (expected YYYY-MM-DD)",

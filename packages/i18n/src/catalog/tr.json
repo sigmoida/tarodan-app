@@ -10926,7 +10926,9 @@
         "simulationLiveOrderForbidden": "Canlı ortamda yalnız test şeridi gönderileri simüle edilebilir",
         "simulationTargetNotFound": "Simüle edilecek gönderi bulunamadı",
         "simulationStepUnavailable": "Bu gönderiye \"{step}\" adımı uygulanamaz (kargo: {status}, kayıt: {ownerStatus})",
-        "tradeConfirmationNotStarted": "Takasın onay penceresi henüz başlamadı (iki çıkış kolisi de teslim edilmeli)"
+        "tradeConfirmationNotStarted": "Takasın onay penceresi henüz başlamadı (iki çıkış kolisi de teslim edilmeli)",
+        "liveTestLaneOnly": "Canlı ortamda bu araç yalnız test şeridi kayıtlarında kullanılabilir",
+        "orderHasNoHeldEscrow": "Siparişte bekleyen (held) escrow yok; iade penceresi escrow tarihinden ayrı kaydırılamaz"
       },
       "psp": {
         "invalidDate": "Geçersiz tarih (YYYY-MM-DD bekleniyor)",
