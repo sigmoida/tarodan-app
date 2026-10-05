@@ -191,6 +191,12 @@ async function main(): Promise<void> {
         email: true,
         username: true,
         displayName: true,
+        // Anonimleştirmede NULL'lanır; satır zaten silinmiş olduğundan burada
+        // boş gelir ve çözümleyici eski kaynaklara düşer. Seçim, kaynak
+        // sözleşmesinin (`IdentityUserSource`) tam karşılanması için.
+        legalFirstName: true,
+        legalLastName: true,
+        nationalId: true,
         phone: true,
         birthDate: true,
         taxId: true,

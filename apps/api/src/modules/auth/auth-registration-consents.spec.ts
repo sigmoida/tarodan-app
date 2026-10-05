@@ -44,6 +44,11 @@ describe("AuthRegistrationService.register — onay kayıtları", () => {
       undefined as never,
       { add: jest.fn() } as never,
       consents as never,
+      // Yasal kimlik: bu dto alanları göndermiyor, servis çağrılmaz.
+      {
+        consumeLookupBudget: jest.fn(),
+        assertNationalIdAvailable: jest.fn(),
+      } as never,
     );
     // E-posta doğrulaması bu testin konusu değil.
     jest
