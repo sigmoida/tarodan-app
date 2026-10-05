@@ -18,6 +18,10 @@ import {
   Min,
 } from "class-validator";
 import { Type } from "class-transformer";
+import {
+  ADMIN_CANCEL_REASON_CODES,
+  type AdminCancelReasonCode,
+} from "@tarodan/types";
 
 import { ADMIN_LIST_MAX_LIMIT, AdminListQueryDto } from "../../../common/list";
 
@@ -26,6 +30,14 @@ export class AdminTradeQueryDto extends AdminListQueryDto {
   @IsOptional()
   @IsEnum(TradeStatus)
   status?: TradeStatus;
+
+  @ApiPropertyOptional({
+    enum: ADMIN_CANCEL_REASON_CODES,
+    description: "Platform (admin) cancellation reason code",
+  })
+  @IsOptional()
+  @IsIn(ADMIN_CANCEL_REASON_CODES)
+  adminCancelReasonCode?: AdminCancelReasonCode;
 
   @ApiPropertyOptional()
   @IsOptional()

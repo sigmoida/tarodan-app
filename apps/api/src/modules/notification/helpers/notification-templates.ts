@@ -361,6 +361,11 @@ export const NOTIFICATION_TEMPLATES: Partial<
     messageKey: "server.notification.tradeAutoCancelled.message",
     icon: "🔄",
   },
+  [NotificationType.TRADE_CANCELLED_BY_PLATFORM]: {
+    titleKey: "server.notification.tradeCancelledByPlatform.title",
+    messageKey: "server.notification.tradeCancelledByPlatform.message",
+    icon: "🛡️",
+  },
   [NotificationType.TRADE_RESPONSE_EXTENDED]: {
     titleKey: "server.notification.tradeResponseExtended.title",
     messageKey: "server.notification.tradeResponseExtended.message",

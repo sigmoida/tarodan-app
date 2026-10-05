@@ -472,6 +472,7 @@ export class TradeReconciliationService {
             paymentService: this.paymentService,
             tradeCommon: this.tradeCommon,
             tradeShipment: this.tradeShipment,
+            logger: this.logger,
           },
           trade.id,
         );

@@ -93,10 +93,12 @@ import {
   MarkShipmentDto,
   MarkReturnLostDto,
   ForceCancelStuckDto,
+  AdminCancelTradeDto,
   TradeShipmentQueryDto,
   RefundRequestQueryDto,
   AdminChangeMembershipDto,
 } from "../dto";
+import { AdminTradeCancelService } from "./admin-trade-cancel.service";
 
 @ApiTags("admin")
 @Controller("admin")
@@ -104,7 +106,10 @@ import {
 @UseGuards(AdminJwtAuthGuard, RolesGuard)
 @ApiBearerAuth()
 export class AdminTradeController {
-  constructor(private readonly adminService: AdminService) {}
+  constructor(
+    private readonly adminService: AdminService,
+    private readonly tradeCancel: AdminTradeCancelService,
+  ) {}
 
   // ==================== TRADE MANAGEMENT ====================
 
@@ -364,5 +369,61 @@ export class AdminTradeController {
     @Body() body: ForceCancelStuckDto,
   ) {
     return this.adminService.forceCancelStuckWarehouseTrade(adminId, id, body);
+  }
+
+  /**
+   * Platform iptalinin önizlemesi: taraf başına iade, serbest kalacak ürünler
+   * ve iptal edilecek etiketler. İptalle AYNI kural ve iade fonksiyonu; takas
+   * iptal edilemiyorsa iptalle aynı engel hatası.
+   */
+  @Get("trades/:id/cancel-preview")
+  @Roles(AdminRole.super_admin)
+  @ApiOperation({
+    summary:
+      "Preview the refunds and releases of a platform trade cancellation",
+  })
+  @ApiParam({ name: "id", description: "Trade ID" })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: "AdminTradeCancelPreview",
+  })
+  @ApiResponse({
+    status: HttpStatus.BAD_REQUEST,
+    description: "Trade cannot be cancelled at its stage (blocker message)",
+  })
+  @ApiResponse({ status: HttpStatus.CONFLICT, description: "Trade closed" })
+  async getTradeCancelPreview(@Param("id") id: string) {
+    return this.tradeCancel.previewCancel(id);
+  }
+
+  /**
+   * Admin "Takası iptal et" (yalnız super_admin, toplu iptal yok): bir tarafın
+   * ya da süre dolumu taramasının zaten iptal edebildiği aşamalarda, hiçbir
+   * tarafın kusuru sayılmadan; ödeyen taraf tam iade alır, ürünler serbest
+   * kalır, iki tarafa duyuru gider. Diğer aşamalar kendi aksiyonlarında kalır.
+   */
+  @Post("trades/:id/cancel")
+  @Roles(AdminRole.super_admin)
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary:
+      "Cancel a trade as the platform before any parcel is handed to the carrier",
+  })
+  @ApiParam({ name: "id", description: "Trade ID" })
+  @ApiResponse({ status: HttpStatus.OK, description: "AdminTradeCancelResult" })
+  @ApiResponse({
+    status: HttpStatus.BAD_REQUEST,
+    description: "Not cancellable at this stage, or note missing for 'other'",
+  })
+  @ApiResponse({
+    status: HttpStatus.CONFLICT,
+    description: "Trade already closed by another actor",
+  })
+  async cancelTrade(
+    @Param("id") id: string,
+    @CurrentUser("id") adminId: string,
+    @Body() body: AdminCancelTradeDto,
+  ) {
+    return this.tradeCancel.cancelTrade(adminId, id, body);
   }
 }

@@ -27,6 +27,8 @@
  *   · kullanıcı iptali          → KARŞI taraf kusursuz (vazgeçen değil)
  *   · takılı takas çözümü       → kolisini kargoya vermiş taraf kusursuz
  *   · kayıp koli                → iki taraf da kusursuz (taşıyıcı kaynaklı)
+ *   · platform (admin) iptali   → iki taraf da kusursuz (kimsenin kusuru değil;
+ *                                 yalnız kargo öncesi aşamalarda açıktır)
  *   · depo reddi                → `faultySide` dışındaki taraf kusursuz
  *   · kargolama süresi aşımı, hiçbir koli verilmedi → iki taraf da kusurlu
  *

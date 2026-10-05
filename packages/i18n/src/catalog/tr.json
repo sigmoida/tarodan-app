@@ -7120,7 +7120,35 @@
         "faultySideInitiator": "Teklifi başlatan tarafın ürünü",
         "faultySideReceiver": "Teklifi alan tarafın ürünü",
         "faultySideBoth": "Her iki tarafın ürünü",
-        "faultySideNeither": "Ürün kaynaklı değil (operasyonel red)"
+        "faultySideNeither": "Ürün kaynaklı değil (operasyonel red)",
+        "adminCancel": {
+          "action": "Takası iptal et",
+          "title": "Takası iptal et",
+          "description": "#{tradeNumber} numaralı takas Tarodan tarafından iptal edilecek. Bu iptal hiçbir tarafın kusuru sayılmaz: tahsil edilen tutarların tamamı iade edilir.",
+          "warning": "Bu işlem geri alınamaz. Taraflara iptal nedeni bildirim ve e-postayla iletilir; iç not yalnız denetim kaydında kalır.",
+          "reason": "İptal nedeni",
+          "reasonPlaceholder": "Neden seçin",
+          "note": "İç not",
+          "notePlaceholder": "Yalnız denetim kaydına yazılır, taraflara gösterilmez",
+          "noteRequired": "\"Diğer\" seçildiğinde iç not zorunludur",
+          "refundsTitle": "İadeler",
+          "notPaid": "Ödeme yapılmadı",
+          "refundTotal": "Toplam iade",
+          "releasedTitle": "Serbest kalacak ürünler",
+          "noReservation": "Teklif aşamasında rezervasyon yoktur; ürünler zaten serbest.",
+          "labelsToCancel": "{count} kargo etiketi iptal edilecek (henüz kargoya verilmedi)",
+          "previewLoading": "İadeler hesaplanıyor…",
+          "previewUnavailable": "Önizleme şu an alınamadı.",
+          "confirm": "İptal et ve iade et",
+          "success": "Takas iptal edildi",
+          "successRefundFailed": "Takas iptal edildi ancak iade başarısız oldu; \"İadeyi yeniden dene\" ile tamamlayın.",
+          "alreadyCancelled": "Takas zaten bu şekilde iptal edilmişti",
+          "failed": "Takas iptal edilemedi",
+          "blockedTitle": "Bu aşamada platform iptali yapılamaz",
+          "cancelledByPlatform": "Tarodan tarafından iptal edildi",
+          "reasonFilter": "Platform iptal nedeni",
+          "reasonRequired": "İptal nedeni seçin"
+        }
       },
       "refundRequests": {
         "amountAndFee": "Tutar / Kesinti",
@@ -9938,6 +9966,10 @@
       "tradePaymentExtendedPaid": {
         "title": "Takasta Karşı Tarafa Ek Ödeme Süresi Verildi",
         "message": "Ödemenizi tamamladınız; karşı tarafın ödeme süresi bir kez uzatıldı. Yeni son tarih: {until}. Ürününüz o zamana kadar rezerve kalır. Karşı taraf yine de ödemezse takas iptal edilir ve ödemeniz tam olarak iade edilir."
+      },
+      "tradeCancelledByPlatform": {
+        "title": "Takasınız Tarodan tarafından iptal edildi",
+        "message": "{tradeNumber} numaralı takas Tarodan tarafından iptal edildi. Neden: {reason}.{hasRefund, select, yes { Ödediğiniz {refundAmount} TL'nin tamamı iade edilecek.} other {}} Takastaki ürünleriniz yeniden serbest."
       }
     },
     "auth": {
@@ -10090,7 +10122,8 @@
       "shipToWarehouseDeprecated": "Bu uç nokta artık kullanılmıyor. Takas kabul edildiğinde sistem her iki taraf için Sürat Kargo takip numaralarını otomatik üretir; en yakın Sürat şubesine size atanan takip numarasıyla teslim edin.",
       "shipmentAlreadyConfirmed": "Bu gönderim zaten onaylandı",
       "someItemsNotOwnedOrInactive": "Bazı ürünler size ait değil veya aktif değil",
-      "tradeNotInDisputeStatus": "Takas itiraz durumunda değil"
+      "tradeNotInDisputeStatus": "Takas itiraz durumunda değil",
+      "platformCancelledReason": "Tarodan tarafından iptal edildi: {reason}"
     },
     "order": {
       "accountBanned": "Hesabınız banlanmış. Yeni sipariş oluşturamazsınız.",
@@ -10571,7 +10604,17 @@
         "refundFailed": "Takas iadesi başarısız: {reason} (retry cron devreye girer)",
         "refundSkipped": "Takas iadesi yapılamadı: {reason}",
         "cashHoldReleaseStateInvalid": "Takas durumu '{status}' — yalnız 'completed' takasta nakit hold serbest bırakılabilir",
-        "forceCancelTradeStateInvalid": "Takas durumu '{status}' force-cancel için uygun değil. Beklenen: shipping_to_warehouse."
+        "forceCancelTradeStateInvalid": "Takas durumu '{status}' force-cancel için uygun değil. Beklenen: shipping_to_warehouse.",
+        "cancelNoteRequired": "\"Diğer\" nedeniyle iptalde iç not zorunludur",
+        "cancelBlocked": {
+          "closed": "Takas zaten kapandı (tamamlandı, iptal edildi ya da reddedildi).",
+          "disputed": "Takasta açık bir itiraz var; itiraz çözümüyle sonuçlandırın.",
+          "parcelHandedOver": "Kolilerden biri kargoya verildi ya da depoya ulaştı; platform iptali yapılamaz. Takılı takas çözümünü ya da kayıp koli akışını kullanın.",
+          "atWarehouse": "Ürünler depoda ya da kontrolde; depo reddiyle sonuçlandırın.",
+          "shippingToRecipients": "Ürünler yeni sahiplerine yolda; sorun varsa itiraz akışını kullanın.",
+          "returning": "İade kolileri yolda; iade bacaklarını teslim ya da kayıp olarak kapatın.",
+          "legacyShipped": "Eski akıştaki bu takasta ürünler kargolandı; platform iptali yapılamaz."
+        }
       },
       "sellerApplication": {
         "notFound": "Başvuru bulunamadı",

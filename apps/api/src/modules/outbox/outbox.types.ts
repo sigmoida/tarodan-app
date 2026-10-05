@@ -83,3 +83,19 @@ export const OUTBOX_SAVED_CARD_PROVIDER_DELETE = "saved_card.provider_delete";
 export interface SavedCardProviderDeletePayload {
   savedCardId: string;
 }
+
+/**
+ * Platform (admin) takas iptalinin taraf duyurusu (in-app + e-posta). İptal ve
+ * zorunlu denetim kaydıyla AYNI tx'te yazılır: iptal commit olduysa duyuru
+ * kesin gider. `dedupeKey` takas başına tektir (ikinci iptal ikinci duyuru
+ * üretemez). Tutarlar iptal anında politikadan hesaplanıp burada sabitlenir —
+ * iade sonradan yapıldığında satır "iade edilmiş" olur ve yeniden hesap 0 verir.
+ * Adminin iç notu payload'a YAZILMAZ.
+ */
+export const OUTBOX_TRADE_PLATFORM_CANCEL_NOTICE =
+  "trade.platform_cancel_notice";
+
+export interface TradePlatformCancelNoticePayload {
+  tradeId: string;
+  parties: Array<{ userId: string; refundAmount: number }>;
+}

@@ -173,6 +173,54 @@ describe("cancelPreShipmentTradeInTx", () => {
       data: { fullRefundEntitled: true },
     });
   });
+
+  it("faultless=all (platform iptali): durumundan bağımsız her ödeme satırı kusursuz işaretlenir", async () => {
+    const tx = makeTx({});
+
+    await cancelPreShipmentTradeInTx(
+      tx as never,
+      input(TradeStatus.shipping_to_warehouse, { faultless: "all" }),
+    );
+
+    expect(tx.tradeCashPayment.updateMany).toHaveBeenCalledWith({
+      where: { tradeId: "t1" },
+      data: { fullRefundEntitled: true },
+    });
+  });
+
+  it("platform kodu verilirse iptalle aynı yazımda saklanır", async () => {
+    const tx = makeTx({});
+
+    await cancelPreShipmentTradeInTx(
+      tx as never,
+      input(TradeStatus.awaiting_payment, {
+        actor: CancellationActor.platform,
+        reason: "Tarodan tarafından iptal edildi: Stok hatası",
+        faultless: "all",
+        adminCancelReasonCode: "stock_error",
+      }),
+    );
+
+    expect(tx.trade.update).toHaveBeenCalledWith({
+      where: { id: "t1" },
+      data: {
+        status: TradeStatus.cancelled,
+        cancelledAt: AT,
+        cancelledBy: CancellationActor.platform,
+        cancelReason: "Tarodan tarafından iptal edildi: Stok hatası",
+        adminCancelReasonCode: "stock_error",
+      },
+    });
+  });
+
+  it("kod verilmezse (süre dolumu) kolon yazıma hiç girmez", async () => {
+    const tx = makeTx({});
+
+    await cancelPreShipmentTradeInTx(tx as never, input(TradeStatus.pending));
+
+    const data = tx.trade.update.mock.calls[0][0].data;
+    expect(Object.keys(data)).not.toContain("adminCancelReasonCode");
+  });
 });
 
 describe("settlePreShipmentCancellation", () => {
@@ -196,6 +244,7 @@ describe("settlePreShipmentCancellation", () => {
           calls.push("labels");
         }),
       },
+      logger: { warn: jest.fn() },
     };
 
     await expect(
@@ -204,6 +253,34 @@ describe("settlePreShipmentCancellation", () => {
     expect(calls).toEqual(["refund", "cache", "labels"]);
     expect(deps.paymentService.refundTradeCashTracked).toHaveBeenCalledWith(
       "t1",
+    );
+  });
+
+  it("önbellek hatası etiket iptalini atlatmaz ve çağırana fırlatılmaz", async () => {
+    const refund = { refunded: false, failed: false };
+    const deps = {
+      paymentService: {
+        refundTradeCashTracked: jest.fn().mockResolvedValue(refund),
+      },
+      tradeCommon: {
+        invalidateProductCachesForTrade: jest
+          .fn()
+          .mockRejectedValue(new Error("redis down")),
+      },
+      tradeShipment: {
+        cancelSuratShipmentsForTrade: jest.fn().mockResolvedValue(undefined),
+      },
+      logger: { warn: jest.fn() },
+    };
+
+    await expect(
+      settlePreShipmentCancellation(deps as never, "t1"),
+    ).resolves.toBe(refund);
+    expect(
+      deps.tradeShipment.cancelSuratShipmentsForTrade,
+    ).toHaveBeenCalledWith("t1");
+    expect(deps.logger.warn).toHaveBeenCalledWith(
+      expect.stringContaining("redis down"),
     );
   });
 });

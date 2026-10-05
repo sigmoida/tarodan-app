@@ -5,7 +5,9 @@ import {
   ProductStatus,
   TradeStatus,
 } from "@prisma/client";
+import type { Logger } from "@nestjs/common";
 import { safeDecrementReserved } from "../../product/helpers/product-availability.helper";
+import { errorMessage } from "../../../common/helpers/error-message";
 import { tradeCancelledData } from "./trade-cancellation";
 import type { PaymentService } from "../../payment/payment.service";
 import type { TradeCommonService } from "../trade-common.service";
@@ -35,8 +37,11 @@ export const PRE_SHIPMENT_RESERVED_STATUSES: readonly TradeStatus[] = [
  * Kusur ataması (bkz. `trade-refund-policy`):
  * - `none`: kimse kusursuz değil (kargolama süresi aşımı, hiçbir koli verilmedi).
  * - `paid`: ödemesini tamamlamış taraf kusursuz (ödeme süresi aşımı).
+ * - `all`: iki taraf da kusursuz (platform iptali — kimsenin kusuru değil).
+ *   Ödemesi henüz tamamlanmamış satır da işaretlenir: callback iptalden sonra
+ *   gelip satırı tamamlarsa o ödeme de tam tutarla iade edilir.
  */
-export type PreShipmentFaultless = "none" | "paid";
+export type PreShipmentFaultless = "none" | "paid" | "all";
 
 export interface PreShipmentCancelInput {
   /** Kilitli satırın taze hâli. */
@@ -49,6 +54,8 @@ export interface PreShipmentCancelInput {
   reason: string;
   at: Date;
   faultless: PreShipmentFaultless;
+  /** Platform iptalinin katalog kodu — yalnız admin yolu yazar. */
+  adminCancelReasonCode?: string;
 }
 
 export interface PreShipmentCancelOutcome {
@@ -127,6 +134,9 @@ export async function cancelPreShipmentTradeInTx(
     data: {
       ...tradeCancelledData(input.actor, input.at),
       cancelReason: input.reason,
+      ...(input.adminCancelReasonCode
+        ? { adminCancelReasonCode: input.adminCancelReasonCode }
+        : {}),
     },
   });
 
@@ -134,6 +144,11 @@ export async function cancelPreShipmentTradeInTx(
     // Tamamlanmış her ödeme satırı, üstüne düşeni yapmış tarafa aittir.
     await tx.tradeCashPayment.updateMany({
       where: { tradeId: trade.id, status: PaymentStatus.completed },
+      data: { fullRefundEntitled: true },
+    });
+  } else if (input.faultless === "all") {
+    await tx.tradeCashPayment.updateMany({
+      where: { tradeId: trade.id },
       data: { fullRefundEntitled: true },
     });
   }
@@ -146,19 +161,30 @@ export interface PreShipmentSettleDeps {
   paymentService: Pick<PaymentService, "refundTradeCashTracked">;
   tradeCommon: Pick<TradeCommonService, "invalidateProductCachesForTrade">;
   tradeShipment: Pick<TradeShipmentService, "cancelSuratShipmentsForTrade">;
+  logger: Pick<Logger, "warn">;
 }
 
 /**
  * İptal COMMIT olduktan sonraki adımlar, taramayla aynı sırada: izlenen iade
  * (asla fırlatmaz; hata `refundFailureReason` yazar), ürün önbelleği, ve
- * taşıyıcıya geçmemiş Sürat etiketlerinin iptali (best-effort).
+ * taşıyıcıya geçmemiş Sürat etiketlerinin iptali (asla fırlatmaz).
+ *
+ * Önbellek tazelemesi best-effort'tur (TTL kendiliğinden düzeltir): hatası
+ * etiket iptalini atlatmamalı ve commit olmuş bir iptali çağırana hata olarak
+ * döndürmemeli.
  */
 export async function settlePreShipmentCancellation(
   deps: PreShipmentSettleDeps,
   tradeId: string,
 ): Promise<Awaited<ReturnType<PaymentService["refundTradeCashTracked"]>>> {
   const refund = await deps.paymentService.refundTradeCashTracked(tradeId);
-  await deps.tradeCommon.invalidateProductCachesForTrade(tradeId);
+  try {
+    await deps.tradeCommon.invalidateProductCachesForTrade(tradeId);
+  } catch (error: unknown) {
+    deps.logger.warn(
+      `takas ${tradeId} iptali: ürün önbelleği tazelenemedi: ${errorMessage(error)}`,
+    );
+  }
   await deps.tradeShipment.cancelSuratShipmentsForTrade(tradeId);
   return refund;
 }
