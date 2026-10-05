@@ -141,6 +141,11 @@ export const NOTIFICATION_TEMPLATES: Partial<
     messageKey: "server.notification.offerExpiredSeller.message",
     icon: "⏰",
   },
+  [NotificationType.OFFER_EXTENDED]: {
+    titleKey: "server.notification.offerExtended.title",
+    messageKey: "server.notification.offerExtended.message",
+    icon: "⏳",
+  },
   [NotificationType.OFFER_PAYMENT_EXPIRED]: {
     titleKey: "server.notification.offerPaymentExpired.title",
     messageKey: "server.notification.offerPaymentExpired.message",
@@ -345,6 +350,16 @@ export const NOTIFICATION_TEMPLATES: Partial<
     titleKey: "server.notification.tradeAutoCancelled.title",
     messageKey: "server.notification.tradeAutoCancelled.message",
     icon: "🔄",
+  },
+  [NotificationType.TRADE_RESPONSE_EXTENDED]: {
+    titleKey: "server.notification.tradeResponseExtended.title",
+    messageKey: "server.notification.tradeResponseExtended.message",
+    icon: "⏳",
+  },
+  [NotificationType.TRADE_PAYMENT_EXTENDED]: {
+    titleKey: "server.notification.tradePaymentExtended.title",
+    messageKey: "server.notification.tradePaymentExtended.message",
+    icon: "⏳",
   },
   [NotificationType.TRADE_AT_WAREHOUSE]: {
     titleKey: "server.notification.tradeAtWarehouse.title",

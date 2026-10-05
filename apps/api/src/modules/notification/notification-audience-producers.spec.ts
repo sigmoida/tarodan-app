@@ -47,6 +47,49 @@ describe("bildirim üreticileri hedef kitleyi taşır", () => {
       ).toBe("/seller/orders/o1");
     });
 
+    it("teklif uzatması: sırası gelen tarafın ekranına gider, yeni bitiş anı metinde", async () => {
+      const { send, service } = dispatchOf();
+      const until = new Date("2026-10-05T12:30:00.000Z");
+      const base = {
+        offerId: "of1",
+        productId: "p1",
+        productTitle: "Ürün",
+        until,
+      };
+      await service.notifyOfferExtended({
+        ...base,
+        recipientId: "u-seller",
+        audience: "seller",
+      });
+      await service.notifyOfferExtended({
+        ...base,
+        recipientId: "u-buyer",
+        audience: "buyer",
+      });
+
+      const [sellerCall, buyerCall] = send.mock.calls.map((c) => c[0]);
+      expect(sellerCall.userId).toBe("u-seller");
+      expect(sellerCall.type).toBe(NotificationType.OFFER_EXTENDED);
+      // Türkiye saati (UTC+3), sunucu saat diliminden bağımsız.
+      expect(sellerCall.data.until).toBe("05.10.2026 15:30");
+      expect(sellerCall.data.untilAt).toBe(until.toISOString());
+      expect(linkOf(NotificationType.OFFER_EXTENDED, sellerCall.data)).toBe(
+        "/profile/offers?tab=received",
+      );
+      expect(linkOf(NotificationType.OFFER_EXTENDED, buyerCall.data)).toBe(
+        "/profile/offers?tab=sent",
+      );
+    });
+
+    it("takas yanıt / ödeme uzatması takas ekranına gider", () => {
+      for (const type of [
+        NotificationType.TRADE_RESPONSE_EXTENDED,
+        NotificationType.TRADE_PAYMENT_EXTENDED,
+      ]) {
+        expect(linkOf(type, { tradeId: "t1" })).toBe("/profile/trades/t1");
+      }
+    });
+
     it("satıcı onayı satıcı ekranına gider", async () => {
       const { send, service } = dispatchOf();
       await service.notifyOrderManuallyConfirmed("u-seller", "o1");

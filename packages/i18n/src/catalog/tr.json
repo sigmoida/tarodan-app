@@ -6633,6 +6633,7 @@
         "paymentStatus": "Ödeme durumu",
         "noPayment": "Ödeme başlatılmadı",
         "expiresAt": "Son geçerlilik",
+        "extendedAt": "Bir kez uzatıldı",
         "message": "Mesaj",
         "detailTitle": "Teklif · {product}",
         "notFound": "Teklif bulunamadı",
@@ -9477,6 +9478,10 @@
         "title": "Teklif Yanıtsız Kapandı",
         "message": "{productTitle} için gelen teklifin süresi yanıt verilmeden doldu."
       },
+      "offerExtended": {
+        "title": "Teklif Süresi Uzatıldı",
+        "message": "{productTitle} için teklifin süresi bir kez uzatıldı. {until} tarihine kadar yanıt verebilirsiniz."
+      },
       "offerPaymentExpired": {
         "title": "Ödeme Süresi Doldu",
         "message": "{productTitle} için 24 saatlik ödeme süreniz doldu ve sipariş kapandı. Ürün hâlâ uygunsa siparişi yeniden açıp ödeyebilirsiniz."
@@ -9648,6 +9653,14 @@
       "tradeAutoCancelled": {
         "title": "Takas Otomatik İptal Edildi",
         "message": "{cancelReason}"
+      },
+      "tradeResponseExtended": {
+        "title": "Takas Yanıt Süresi Uzatıldı",
+        "message": "Size gelen takas teklifinin yanıt süresi bir kez uzatıldı. {until} tarihine kadar yanıt verebilirsiniz."
+      },
+      "tradePaymentExtended": {
+        "title": "Takas Ödeme Süresi Uzatıldı",
+        "message": "Takasınızın ödeme süresi bir kez uzatıldı. Ödemenizi {until} tarihine kadar tamamlayın; aksi halde takas iptal edilir."
       },
       "tradeStuckAtWarehouse": {
         "title": "Sıkışmış Takas — Yönetim Gerekli",
