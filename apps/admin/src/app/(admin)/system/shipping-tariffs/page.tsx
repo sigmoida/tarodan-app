@@ -3,12 +3,14 @@
 import { useState } from "react";
 import { useTranslations } from "next-intl";
 import { useQuery } from "@tanstack/react-query";
-import { Button } from "@tarodan/ui";
+import { Button, EmptyState, Spinner } from "@tarodan/ui";
 import { adminApi } from "@/lib/api";
 import { adminKeys } from "@/lib/query/keys";
 import { extractList } from "@/lib/extract";
 import { useAdminMutation } from "@/hooks/useAdminMutation";
 import { SectionCard } from "@/components/detail/SectionCard";
+import { AdminPage } from "@/components/page/AdminPage";
+import { PageHeader } from "@/components/AdminList";
 import { TariffCard } from "./_components/TariffCard";
 import { TariffFormModal } from "./_modals/TariffFormModal";
 import { type ShippingTariff } from "./_lib/types";
@@ -47,43 +49,38 @@ export default function ShippingTariffsPage() {
   const tariffs = query.data ?? [];
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-heading">
-            {t("admin.shippingTariffs.title")}
-          </h1>
-          <p className="mt-1 max-w-3xl text-sm text-muted">
-            {t("admin.shippingTariffs.description")}
-          </p>
-        </div>
-        <div className="flex shrink-0 gap-2">
-          {tariffs.some((tariff) => tariff.status === "active") && (
-            <Button
-              variant="secondary"
-              isLoading={clone.isPending}
-              onClick={() => clone.mutate(undefined)}
-            >
-              {t("admin.shippingTariffs.cloneActive")}
-            </Button>
-          )}
-          <Button onClick={() => setModal({})}>
-            {t("admin.shippingTariffs.new")}
+    <AdminPage>
+      <PageHeader
+        title={t("admin.shippingTariffs.title")}
+        description={t("admin.shippingTariffs.description")}
+      >
+        {tariffs.some((tariff) => tariff.status === "active") && (
+          <Button
+            variant="secondary"
+            isLoading={clone.isPending}
+            onClick={() => clone.mutate(undefined)}
+          >
+            {t("admin.shippingTariffs.cloneActive")}
           </Button>
-        </div>
-      </div>
+        )}
+        <Button onClick={() => setModal({})}>
+          {t("admin.shippingTariffs.new")}
+        </Button>
+      </PageHeader>
 
       {query.isLoading ? (
         <SectionCard>
-          <p className="py-8 text-center text-muted">
-            {t("admin.shippingTariffs.loading")}
-          </p>
+          <div className="flex justify-center py-8">
+            <Spinner />
+          </div>
         </SectionCard>
       ) : tariffs.length === 0 ? (
         <SectionCard>
-          <p className="py-8 text-center text-muted">
-            {t("admin.shippingTariffs.empty")}
-          </p>
+          <EmptyState
+            size="compact"
+            icon={false}
+            title={t("admin.shippingTariffs.empty")}
+          />
         </SectionCard>
       ) : (
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
@@ -109,6 +106,6 @@ export default function ShippingTariffsPage() {
           tariff={modal.tariff}
         />
       )}
-    </div>
+    </AdminPage>
   );
 }

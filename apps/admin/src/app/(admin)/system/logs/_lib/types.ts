@@ -182,13 +182,3 @@ export const emptyText = (t: T): Record<LogTab, string> => ({
   emails: t("admin.system.logs.empty.emails"),
   audit: t("admin.system.logs.empty.audit"),
 });
-
-export function formatDate(date: string, locale: string) {
-  return new Date(date).toLocaleString(locale, {
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-}
