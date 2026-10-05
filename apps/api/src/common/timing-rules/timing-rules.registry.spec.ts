@@ -116,9 +116,7 @@ describe("TIMING_RULES kaydı", () => {
     const multi = TIMING_RULE_IDS.filter(
       (id) => TIMING_RULES[id].actions.length > 1,
     );
-    expect(multi.sort()).toEqual(
-      Object.keys(ENABLED_ACTIONS).sort(),
-    );
+    expect(multi.sort()).toEqual(Object.keys(ENABLED_ACTIONS).sort());
   });
 
   it("süresi kayda damgalanmayan (sürmekte olanlara da uygulanan) kayıtlar işaretli", () => {

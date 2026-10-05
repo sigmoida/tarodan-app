@@ -5,6 +5,8 @@ import {
   TIMING_RULES,
   TIMING_RULE_IDS,
   type AdminTimingRuleState,
+  type TimingExpiryAction,
+  type TimingRuleId,
 } from "@tarodan/types";
 import {
   actionField,
@@ -22,6 +24,29 @@ import {
 } from "./timing-rules";
 
 type T = ReturnType<typeof useTranslations<never>>;
+
+/**
+ * Kayıttaki bir eylemi test süresince "henüz kapalı" yapar. Paketlerin hepsi
+ * birleştikten sonra kayıtta kapalı eylem kalmadı; `available: false` yolu
+ * (şema reddeder, seçici pasif ve "yakında" etiketiyle gösterir) ileride
+ * eklenecek eylemler için duruyor ve burada gerçek bir kayıt üzerinden sınanır.
+ */
+function withActionUnavailable(
+  id: TimingRuleId,
+  action: TimingExpiryAction,
+  run: () => void,
+) {
+  const option = (
+    TIMING_RULES[id].actions as { action: string; available: boolean }[]
+  ).find((candidate) => candidate.action === action);
+  if (!option) throw new Error(`${id} has no ${action} action`);
+  option.available = false;
+  try {
+    run();
+  } finally {
+    option.available = true;
+  }
+}
 /** Anahtarı (ve varsa parametreleri) geri döndüren sahte t. */
 const t = ((key: string, params?: Record<string, unknown>) =>
   params ? `${key}:${JSON.stringify(params)}` : key) as unknown as T;
@@ -152,12 +177,14 @@ describe("timing rules schema — same rules as the server", () => {
   });
 
   it("refuses an action that is not available yet", () => {
-    expect(
-      issuesFor(
-        valuesWith({ [actionField("offerExpiryHours")]: "extend_once" }),
-      ),
-    ).toEqual({
-      offerExpiryHoursAction: "server.admin.timingRules.actionUnavailable",
+    withActionUnavailable("offerExpiryHours", "extend_once", () => {
+      expect(
+        issuesFor(
+          valuesWith({ [actionField("offerExpiryHours")]: "extend_once" }),
+        ),
+      ).toEqual({
+        offerExpiryHoursAction: "server.admin.timingRules.actionUnavailable",
+      });
     });
   });
 
@@ -215,19 +242,30 @@ describe("timing rules screen helpers", () => {
     }
   });
 
-  it("shows later actions disabled with a coming-soon label", () => {
-    expect(actionOptions(t, "listingTtlDays")).toEqual([
-      {
-        value: "deactivate",
-        label: "admin.timingRules.actions.deactivate",
-        disabled: false,
-      },
-      {
-        value: "auto_renew",
-        label:
-          'admin.timingRules.comingSoon:{"action":"admin.timingRules.actions.auto_renew"}',
-        disabled: true,
-      },
-    ]);
+  it("shows every enabled second action as selectable", () => {
+    for (const id of ["listingTtlDays", "preparingDeadlineDays"] as const) {
+      expect(actionOptions(t, id).map((option) => option.disabled)).toEqual([
+        false,
+        false,
+      ]);
+    }
+  });
+
+  it("shows an action that is not available yet disabled with a coming-soon label", () => {
+    withActionUnavailable("listingTtlDays", "auto_renew", () => {
+      expect(actionOptions(t, "listingTtlDays")).toEqual([
+        {
+          value: "deactivate",
+          label: "admin.timingRules.actions.deactivate",
+          disabled: false,
+        },
+        {
+          value: "auto_renew",
+          label:
+            'admin.timingRules.comingSoon:{"action":"admin.timingRules.actions.auto_renew"}',
+          disabled: true,
+        },
+      ]);
+    });
   });
 });
