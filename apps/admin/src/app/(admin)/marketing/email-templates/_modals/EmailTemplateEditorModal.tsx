@@ -311,7 +311,9 @@ export function EmailTemplateEditorModal({
             name="bodyHtml"
             id="html-editor"
             emptyHint={t("admin.marketing.emailTemplates.emptyUsesDefault")}
-            placeholder={t("admin.marketing.emailTemplates.htmlBodyPlaceholder")}
+            placeholder={t(
+              "admin.marketing.emailTemplates.htmlBodyPlaceholder",
+            )}
           />
 
           <div className="flex flex-wrap items-end gap-2 border-t border-border pt-3">

@@ -132,35 +132,3 @@ export class AudienceCountDto {
   @IsObject()
   segmentCriteria?: Record<string, unknown>;
 }
-
-/** E-posta kanalına özel alanlar — gönderim, zamanlama ve önizleme ortak kullanır. */
-export class BroadcastEmailContentDto {
-  @ApiPropertyOptional({
-    description: "E-posta konusu; boşsa push başlığı kullanılır.",
-  })
-  @IsOptional()
-  @IsString()
-  @MaxLength(BROADCAST_EMAIL_SUBJECT_MAX)
-  emailSubject?: string;
-
-  @ApiPropertyOptional({
-    description:
-      "E-posta HTML gövdesi. Sunucuda süzülür (script/olay işleyicisi atılır) ve ortak mail iskeleti içinde gönderilir. Verilmezse eski düz metin e-posta gider.",
-  })
-  @IsOptional()
-  @IsString()
-  @MaxLength(BROADCAST_EMAIL_HTML_MAX)
-  emailHtml?: string;
-
-  @ApiPropertyOptional({
-    enum: MAILING_TYPES,
-    default: "announcement",
-    description:
-      "announcement: herkese (varsayılan). marketing: yalnız pazarlama izni olanlara, çıkış linkiyle.",
-  })
-  @IsOptional()
-  @IsIn(MAILING_TYPES)
-  mailingType?: MailingType;
-}
-
-export class AdminSendNotificationDto extends BroadcastEmailContentDto {

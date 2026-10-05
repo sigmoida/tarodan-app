@@ -67,7 +67,8 @@ const GLOBAL_ATTRIBUTES = [
 ];
 
 /** Stil değeri `url(`, `expression(`, `javascript:`, `@import` ya da `\` içermemeli. */
-const SAFE_STYLE_VALUE = /^(?!.*(?:url\s*\(|expression|javascript:|@import|\\)).*$/i;
+const SAFE_STYLE_VALUE =
+  /^(?!.*(?:url\s*\(|expression|javascript:|@import|\\)).*$/i;
 
 const STYLE_PROPERTIES = [
   "background-color",
@@ -134,7 +135,15 @@ const OPTIONS: sanitizeHtml.IOptions = {
   allowedSchemesByTag: { img: ["http", "https"] },
   allowProtocolRelative: false,
   // İçeriği de atılacak etiketler: <title> gibi metin taşıyanlar gövdeye sızmasın.
-  nonTextTags: ["script", "style", "textarea", "option", "noscript", "title", "head"],
+  nonTextTags: [
+    "script",
+    "style",
+    "textarea",
+    "option",
+    "noscript",
+    "title",
+    "head",
+  ],
   transformTags: {
     // Dışarı açılan her link referrer sızdırmasın / window.opener vermesin.
     a: sanitizeHtml.simpleTransform("a", { rel: "noopener noreferrer" }, true),

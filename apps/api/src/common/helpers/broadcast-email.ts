@@ -36,7 +36,9 @@ export function newsletterUnsubscribeUrl(token: string): string {
   return `${base}/newsletter/unsubscribe?token=${encodeURIComponent(token)}`;
 }
 
-export function buildBroadcastEmail(input: BroadcastEmailInput): BroadcastEmail {
+export function buildBroadcastEmail(
+  input: BroadcastEmailInput,
+): BroadcastEmail {
   const subject = input.emailSubject?.trim() || input.title;
   const customHtml = input.emailHtml?.trim()
     ? sanitizeEmailHtml(input.emailHtml)
@@ -56,7 +58,9 @@ export function buildBroadcastEmail(input: BroadcastEmailInput): BroadcastEmail 
       content,
       subject,
       { to: input.to },
-      input.unsubscribeUrl ? { unsubscribeUrl: input.unsubscribeUrl } : undefined,
+      input.unsubscribeUrl
+        ? { unsubscribeUrl: input.unsubscribeUrl }
+        : undefined,
     ),
   };
 }

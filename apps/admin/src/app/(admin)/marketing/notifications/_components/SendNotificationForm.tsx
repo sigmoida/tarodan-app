@@ -169,7 +169,8 @@ export function SendNotificationForm({
   const bodyOk = values.body.length > 0 && values.body.length <= 240;
   const emailOk =
     !emailSelected ||
-    (values.emailSubject.trim().length > 0 && values.emailHtml.trim().length > 0);
+    (values.emailSubject.trim().length > 0 &&
+      values.emailHtml.trim().length > 0);
   const canSend = titleOk && bodyOk && values.channels.length > 0 && emailOk;
 
   return (
@@ -283,7 +284,9 @@ export function SendNotificationForm({
                   />
                   <p className="text-xs text-muted">
                     {values.mailingType === "marketing"
-                      ? t("admin.marketing.notifications.mailingType.marketingHint")
+                      ? t(
+                          "admin.marketing.notifications.mailingType.marketingHint",
+                        )
                       : t(
                           "admin.marketing.notifications.mailingType.announcementHint",
                         )}

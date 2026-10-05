@@ -3,7 +3,7 @@ import { sanitizeEmailHtml } from "./email-html-sanitizer";
 describe("sanitizeEmailHtml", () => {
   describe("aktif içerik atılır", () => {
     it("script etiketini içeriğiyle birlikte kaldırır", () => {
-      const out = sanitizeEmailHtml('<p>Merhaba</p><script>alert(1)</script>');
+      const out = sanitizeEmailHtml("<p>Merhaba</p><script>alert(1)</script>");
       expect(out).toBe("<p>Merhaba</p>");
       expect(out).not.toContain("alert");
     });

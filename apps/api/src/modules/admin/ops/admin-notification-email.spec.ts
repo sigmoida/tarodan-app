@@ -97,7 +97,9 @@ describe("AdminNotificationService — HTML e-posta", () => {
         dto({ emailHtml: "<p>x</p>" }),
       );
 
-      expect(newsletter.resolveMarketingUnsubscribeTokens).not.toHaveBeenCalled();
+      expect(
+        newsletter.resolveMarketingUnsubscribeTokens,
+      ).not.toHaveBeenCalled();
       const emitted = eventService.emitAdminBroadcast.mock.calls[0][0];
       expect(emitted.marketingUnsubscribeTokens).toBeUndefined();
       expect(emitted.userIds).toEqual(["u1", "u2"]);
@@ -123,7 +125,9 @@ describe("AdminNotificationService — HTML e-posta", () => {
         dto({ channels: ["push"], mailingType: "marketing" }),
       );
 
-      expect(newsletter.resolveMarketingUnsubscribeTokens).not.toHaveBeenCalled();
+      expect(
+        newsletter.resolveMarketingUnsubscribeTokens,
+      ).not.toHaveBeenCalled();
       expect(
         eventService.emitAdminBroadcast.mock.calls[0][0]
           .marketingUnsubscribeTokens,
@@ -140,10 +144,9 @@ describe("AdminNotificationService — HTML e-posta", () => {
         dto({ mailingType: "marketing", emailHtml: "<p>x</p>" }),
       );
 
-      expect(newsletter.resolveMarketingUnsubscribeTokens).toHaveBeenCalledWith([
-        "u1",
-        "u2",
-      ]);
+      expect(newsletter.resolveMarketingUnsubscribeTokens).toHaveBeenCalledWith(
+        ["u1", "u2"],
+      );
       const emitted = eventService.emitAdminBroadcast.mock.calls[0][0];
       expect([...emitted.marketingUnsubscribeTokens.keys()]).toEqual(["u1"]);
 
@@ -182,7 +185,7 @@ describe("AdminNotificationService — HTML e-posta", () => {
       const result = await service.scheduleNotification("admin-1", {
         ...dto({
           emailSubject: "Konu",
-          emailHtml: '<p>Selam</p><script>alert(1)</script>',
+          emailHtml: "<p>Selam</p><script>alert(1)</script>",
           mailingType: "marketing",
         }),
         scheduledFor: future(),
@@ -219,7 +222,7 @@ describe("AdminNotificationService — HTML e-posta", () => {
         title: "Başlık",
         body: "Gövde",
         emailSubject: "Konu",
-        emailHtml: '<h1>Merhaba</h1><script>alert(1)</script>',
+        emailHtml: "<h1>Merhaba</h1><script>alert(1)</script>",
       });
 
       expect(preview.subject).toBe("Konu");
@@ -246,9 +249,7 @@ describe("AdminNotificationService — HTML e-posta", () => {
   describe("kitle sayacı", () => {
     it("toplam ve pazarlama-izinli sayıyı ayrı döner", async () => {
       const { service, prisma } = makeService();
-      prisma.user.count
-        .mockResolvedValueOnce(120)
-        .mockResolvedValueOnce(45);
+      prisma.user.count.mockResolvedValueOnce(120).mockResolvedValueOnce(45);
 
       const result = await service.countAudience({ targetType: "all" });
 

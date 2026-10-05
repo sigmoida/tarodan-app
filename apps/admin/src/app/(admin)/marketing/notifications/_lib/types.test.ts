@@ -27,12 +27,18 @@ describe("sendNotificationSchema — e-posta alanları", () => {
     const paths = result.success
       ? []
       : result.error.issues.map((issue) => issue.path[0]);
-    expect(paths).toEqual(expect.arrayContaining(["emailSubject", "emailHtml"]));
+    expect(paths).toEqual(
+      expect.arrayContaining(["emailSubject", "emailHtml"]),
+    );
   });
 
   it("email + dolu konu/HTML geçerli; yalnız e-posta (push yok) da çalışır", () => {
     const result = schema.safeParse(
-      form({ channels: ["email"], emailSubject: "Konu", emailHtml: "<p>x</p>" }),
+      form({
+        channels: ["email"],
+        emailSubject: "Konu",
+        emailHtml: "<p>x</p>",
+      }),
     );
     expect(result.success).toBe(true);
   });

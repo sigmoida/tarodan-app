@@ -49,12 +49,23 @@ describe("NewsletterService.resolveMarketingUnsubscribeTokens", () => {
         { id: "u2", email: "yeni@example.com" },
       ],
       subscribers: [
-        { email: "var@example.com", unsubscribeToken: "tok-1", unsubscribedAt: null },
-        { email: "yeni@example.com", unsubscribeToken: "tok-2", unsubscribedAt: null },
+        {
+          email: "var@example.com",
+          unsubscribeToken: "tok-1",
+          unsubscribedAt: null,
+        },
+        {
+          email: "yeni@example.com",
+          unsubscribeToken: "tok-2",
+          unsubscribedAt: null,
+        },
       ],
     });
 
-    const tokens = await service.resolveMarketingUnsubscribeTokens(["u1", "u2"]);
+    const tokens = await service.resolveMarketingUnsubscribeTokens([
+      "u1",
+      "u2",
+    ]);
 
     expect(Object.fromEntries(tokens)).toEqual({ u1: "tok-1", u2: "tok-2" });
     expect(prisma.newsletterSubscriber.createMany).toHaveBeenCalledWith(
@@ -74,11 +85,18 @@ describe("NewsletterService.resolveMarketingUnsubscribeTokens", () => {
           unsubscribeToken: "tok-1",
           unsubscribedAt: new Date(),
         },
-        { email: "aktif@example.com", unsubscribeToken: "tok-2", unsubscribedAt: null },
+        {
+          email: "aktif@example.com",
+          unsubscribeToken: "tok-2",
+          unsubscribedAt: null,
+        },
       ],
     });
 
-    const tokens = await service.resolveMarketingUnsubscribeTokens(["u1", "u2"]);
+    const tokens = await service.resolveMarketingUnsubscribeTokens([
+      "u1",
+      "u2",
+    ]);
 
     expect([...tokens.keys()]).toEqual(["u2"]);
   });

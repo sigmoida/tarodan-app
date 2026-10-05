@@ -31,10 +31,7 @@ import {
   isMarketingMailing,
   newsletterUnsubscribeUrl,
 } from "../../../common/helpers/broadcast-email";
-import {
-  DEFAULT_MAILING_TYPE,
-  type MailingType,
-} from "@tarodan/types";
+import { DEFAULT_MAILING_TYPE, type MailingType } from "@tarodan/types";
 
 /** Yayının hedef + e-posta alanları; anında ve zamanlanmış gönderim ortak kullanır. */
 export interface AdminBroadcastInput {
