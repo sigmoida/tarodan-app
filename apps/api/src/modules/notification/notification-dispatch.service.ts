@@ -511,10 +511,17 @@ export class NotificationDispatchService {
     }
   }
 
+  /**
+   * @param opts.pushRequiresRecord Push YALNIZ zil kaydı yazıldıysa gönderilir.
+   *   Kaydın yazılamaması `false` döndürür; çağıran bunu yeniden denerse
+   *   (outbox) push kayıtla birlikte BİR kez gider — aksi halde her deneme
+   *   cihaza tekrar push atardı. Varsayılan (false) bugünkü davranıştır.
+   */
   async createInAppNotification(
     userId: string,
     type: NotificationType,
     data?: Record<string, any>,
+    opts?: { pushRequiresRecord?: boolean },
   ): Promise<boolean> {
     this.logger.log(
       `[createInAppNotification] Called with userId=${userId}, type=${type}, data=${JSON.stringify(data)}`,
@@ -582,7 +589,11 @@ export class NotificationDispatchService {
     // type'ı data'ya ekliyoruz → mobil deep-link routing doğru ekrana gider.
     // Best-effort: push hatası in-app bildirimi etkilemez.
     // Push master anahtarı kapalıysa zil kalır ama cihaza push gönderilmez.
-    if (shouldDeliver(settings, type, "push")) {
+    if (opts?.pushRequiresRecord && !notificationId) {
+      this.logger.warn(
+        `[createInAppNotification] record not saved; push withheld for retry: user=${userId} type=${type}`,
+      );
+    } else if (shouldDeliver(settings, type, "push")) {
       try {
         await this.sendPushReal(userId, title, message, { ...data, type });
       } catch (e) {

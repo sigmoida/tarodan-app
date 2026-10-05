@@ -816,6 +816,8 @@ export class NotificationCommerceService {
    *
    * Gönderim gerçekleşmediyse FIRLATIR — çağıran outbox satırı yalnız bu
    * alıcı × kanalı temsil ettiği için yeniden deneme başka bir gönderimi
+   * tekrarlamaz. In-app'in push'u yalnız kayıt yazıldığında gider
+   * (`pushRequiresRecord`), dolayısıyla kaydı tekrarlayan deneme push'u
    * tekrarlamaz. "Gönderilecek bir şey yok" durumları fırlatmaz: kullanıcı
    * bulunamadı, kullanıcı bu kategorinin bildirimlerini kapatmış (in-app) ya da
    * ortamda e-posta sağlayıcısı yok (diğer bütün e-postalarla aynı).
@@ -865,6 +867,9 @@ export class NotificationCommerceService {
           hasRefund: hasRefund ? "yes" : "no",
           refundAmount: notice.refundAmount,
         },
+        // Kayıt yazılamazsa push da gitmez: satır yeniden denendiğinde push
+        // kayıtla birlikte bir kez gider, her denemede tekrar atılmaz.
+        { pushRequiresRecord: true },
       );
       if (!saved) {
         throw new Error(

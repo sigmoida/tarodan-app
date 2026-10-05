@@ -90,6 +90,8 @@ describe("NotificationCommerceService.sendTradeCancelledByPlatformNotice", () =>
         hasRefund: "yes",
         refundAmount: 230,
       },
+      // Kayıt yazılamazsa push da gitmez → yeniden deneme push tekrarlamaz.
+      { pushRequiresRecord: true },
     );
     expect(dispatch.createInAppNotification).toHaveBeenCalledWith(
       "u2",
@@ -101,6 +103,7 @@ describe("NotificationCommerceService.sendTradeCancelledByPlatformNotice", () =>
         hasRefund: "no",
         refundAmount: 0,
       },
+      { pushRequiresRecord: true },
     );
     expect(dispatch.sendTemplateEmailToAddress).not.toHaveBeenCalled();
   });
