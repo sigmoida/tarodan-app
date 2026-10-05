@@ -13,6 +13,7 @@ import {
   computeTradeCanCancel,
 } from "./trade.state-machine";
 import { SHIPMENT_IN_MOTION_STATUSES } from "../../shipping/helpers/shipment-handover";
+import { translateMessage } from "../../i18n/translate";
 
 /**
  * Admin (platform) takas iptali uygunluğu `@tarodan/types`'ta TEK kaynaktır:
@@ -74,11 +75,13 @@ describe("admin takas iptali uygunluğu", () => {
     ).toBe("closed");
   });
 
-  it("her engelin katalog anahtarı vardır", () => {
+  it("her engelin katalog anahtarı vardır (iki dilde de)", () => {
     for (const blocker of ADMIN_TRADE_CANCEL_BLOCKERS) {
-      expect(ADMIN_TRADE_CANCEL_BLOCKER_I18N_KEYS[blocker]).toMatch(
-        /^server\.admin\.trade\.cancelBlocked\./,
-      );
+      const key = ADMIN_TRADE_CANCEL_BLOCKER_I18N_KEYS[blocker];
+      expect(key).toMatch(/^server\.admin\.trade\.cancelBlocked\./);
+      // Eksik anahtar çevirmende anahtarın kendisine düşer.
+      expect(translateMessage(key, "tr")).not.toBe(key);
+      expect(translateMessage(key, "en")).not.toBe(key);
     }
   });
 
