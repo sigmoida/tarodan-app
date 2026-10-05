@@ -34,10 +34,6 @@ const INVALIDATES: Record<CatalogImportResource, string[]> = {
   "car-models": ["car-models", "brands"],
 };
 
-/** `CatalogImportModal` bunu buradan alır; biçimleme paylaşılan `fmtFileSize`'ta. */
-export const formatFileSize = (bytes: number): string =>
-  fmtFileSize(bytes) ?? "";
-
 /**
  * Marka / üretici / araç modeli ekranlarının ortak toplu içe aktarma mantığı.
  * Üç ekran da aynı hook'u yalnızca `resource` farkıyla kullanır.
@@ -104,7 +100,7 @@ export function useCatalogBulkImport(
       reason === "size"
         ? t("admin.catalog.import.fileTooLarge", {
             name: rejected.name,
-            size: formatFileSize(limits.maxFileBytes),
+            size: fmtFileSize(limits.maxFileBytes) ?? "",
           })
         : t("admin.catalog.import.invalidFileType", { name: rejected.name }),
     ]);

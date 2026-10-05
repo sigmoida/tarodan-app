@@ -159,16 +159,24 @@ export function DataTable<T>({
   // Boş liste: sütun başlıkları ve yatay kaydırmalı tablo yerine TEK bir boş
   // durum kartı. (Tablo içindeki hücrede ortalanınca geniş tablolarda görünür
   // alanın dışına kayıyordu.)
+  // `dense` = bir kartın İÇİNE gömülü tablo: kart zaten çerçeveyi çizer, tablo
+  // ikinci bir çerçeve/gölge eklemez ("çerçeve içinde çerçeve" olmasın).
+  const frame = dense ? undefined : TABLE_FRAME;
+
   if (!loading && data.length === 0) {
     return (
-      <div className={TABLE_FRAME}>
-        <EmptyState title={resolvedEmptyText} action={emptyAction} />
+      <div className={frame}>
+        <EmptyState
+          size={dense ? "compact" : "default"}
+          title={resolvedEmptyText}
+          action={emptyAction}
+        />
       </div>
     );
   }
 
   return (
-    <div className={cn(TABLE_FRAME, "overflow-hidden")}>
+    <div className={cn(frame, "overflow-hidden")}>
       <div className="overflow-x-auto overscroll-x-contain [-webkit-overflow-scrolling:touch]">
         <Table
           scrollable={false}

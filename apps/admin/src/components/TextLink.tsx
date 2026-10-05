@@ -8,12 +8,15 @@ export function TextLink({
   children,
   external,
   mono,
+  title,
   className,
 }: {
   href: string;
   children: ReactNode;
   external?: boolean;
   mono?: boolean;
+  /** İpucu metni (ör. kısaltılmış bir değerin tamamı). */
+  title?: string;
   className?: string;
 }) {
   const classes = cn(
@@ -23,13 +26,19 @@ export function TextLink({
   );
   if (external) {
     return (
-      <a href={href} target="_blank" rel="noreferrer" className={classes}>
+      <a
+        href={href}
+        target="_blank"
+        rel="noreferrer"
+        title={title}
+        className={classes}
+      >
         {children}
       </a>
     );
   }
   return (
-    <Link href={href} className={classes}>
+    <Link href={href} title={title} className={classes}>
       {children}
     </Link>
   );

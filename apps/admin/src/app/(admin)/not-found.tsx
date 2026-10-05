@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { getTranslations } from "next-intl/server";
-import { Button } from "@tarodan/ui";
+// Sunucu bileşeni: ana giriş (`@tarodan/ui`) istemci bileşenlerini de çeker,
+// bu yüzden düğme kendi alt yolundan alınır.
+import { Button } from "@tarodan/ui/button";
 
 /** Scoped 404: the surrounding admin layout keeps the sidebar and topbar. */
 export default async function AdminNotFound() {

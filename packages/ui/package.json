@@ -12,6 +12,7 @@
     "./logo": "./src/components/Logo.tsx",
     "./spinner": "./src/components/Spinner.tsx",
     "./alert": "./src/components/Alert.tsx",
+    "./button": "./src/components/Button.tsx",
     "./section-card": "./src/components/SectionCard.tsx"
   },
   "scripts": {
