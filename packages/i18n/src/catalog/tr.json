@@ -10417,6 +10417,21 @@
         "rangeReversed": "Başlangıç tarihi bitiş tarihinden sonra olamaz",
         "rangeTooLong": "Tarih aralığı en fazla 366 gün olabilir",
         "unknownTab": "Bilinmeyen analitik sekmesi"
+      },
+      "timingRules": {
+        "unknownRule": "Bilinmeyen süre kaydı.",
+        "duplicateRule": "Bir süre aynı istekte yalnız bir kez değiştirilebilir.",
+        "emptyChange": "Değiştirilecek bir değer ya da eylem gönderilmedi.",
+        "notInteger": "Süre tam sayı olmalıdır.",
+        "belowMin": "Süre en az {min} olmalıdır.",
+        "aboveMax": "Süre en fazla {max} olabilir.",
+        "actionNotAllowed": "Bu süre için tanımlı olmayan bir eylem seçildi.",
+        "actionUnavailable": "Bu eylem henüz kullanılamıyor.",
+        "useDedicatedEndpoint": "Bu ayar Sistem → Süreler ve Kurallar ekranından değiştirilir.",
+        "invariant": {
+          "dropoffHardNotBelowDropoff": "İade kargosu için kesin kapanış süresi, kargoya verme süresinden kısa olamaz.",
+          "listingWarningBeforeTtl": "İlan süresi uyarısı, ilanın yayın süresinden kısa olmalıdır."
+        }
       }
     },
     "advertisement": {

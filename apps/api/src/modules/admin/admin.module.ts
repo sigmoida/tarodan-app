@@ -46,6 +46,9 @@ import { AdminDeletedIdentityService } from "./users/admin-deleted-identity.serv
 import { AdminConsentService } from "./users/admin-consent.service";
 import { AdminConsentController } from "./users/admin-consent.controller";
 import { ConsentModule } from "../consent/consent.module";
+import { TimingRulesModule } from "../timing-rules/timing-rules.module";
+import { AdminTimingRulesService } from "./ops/admin-timing-rules.service";
+import { AdminTimingRulesController } from "./ops/admin-timing-rules.controller";
 import { AdminStaffService } from "./users/admin-staff.service";
 import { AdminProductService } from "./catalog/admin-product.service";
 import { AdminProductBulkImportService } from "./catalog/admin-product-bulk-import.service";
@@ -170,6 +173,8 @@ import { scheduledProcessors } from "../../workers/scheduled-processors";
     SiteAccessModule,
     // Onay Kayıtları ekranı: üye durumu domain servisinden okunur.
     ConsentModule,
+    // Süreler ve Kurallar ekranı: yazma domain servisinden, denetim burada.
+    TimingRulesModule,
     BullModule.registerQueue({ name: QUEUE_NAMES.MODERATION }),
     BullModule.registerQueue({ name: QUEUE_NAMES.SCHEDULED }),
     BullModule.registerQueue({ name: QUEUE_NAMES.SEARCH }),
@@ -208,6 +213,7 @@ import { scheduledProcessors } from "../../workers/scheduled-processors";
     AdminSellerApplicationController,
     AdminAdPackageController,
     AdminSiteAccessController,
+    AdminTimingRulesController,
   ],
   providers: [
     AdminService,
@@ -216,6 +222,7 @@ import { scheduledProcessors } from "../../workers/scheduled-processors";
     AdminAuditService,
     AdminCommissionService,
     AdminSettingsService,
+    AdminTimingRulesService,
     AdminSiteAccessService,
     AdminUserService,
     AdminUserAccountService,

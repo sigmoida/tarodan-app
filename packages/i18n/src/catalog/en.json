@@ -10417,6 +10417,21 @@
         "rangeReversed": "The start date cannot be after the end date",
         "rangeTooLong": "The date range can cover at most 366 days",
         "unknownTab": "Unknown analytics tab"
+      },
+      "timingRules": {
+        "unknownRule": "Unknown duration rule.",
+        "duplicateRule": "A duration can be changed only once per request.",
+        "emptyChange": "Nothing to change: send a value or an action.",
+        "notInteger": "The duration must be a whole number.",
+        "belowMin": "The duration must be at least {min}.",
+        "aboveMax": "The duration can be at most {max}.",
+        "actionNotAllowed": "This action is not defined for this duration.",
+        "actionUnavailable": "This action is not available yet.",
+        "useDedicatedEndpoint": "This setting is managed on System → Durations & Rules.",
+        "invariant": {
+          "dropoffHardNotBelowDropoff": "The hard close for a return parcel cannot be shorter than the drop-off window.",
+          "listingWarningBeforeTtl": "The listing expiry warning must come before the listing lifetime ends."
+        }
       }
     },
     "advertisement": {

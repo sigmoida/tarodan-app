@@ -114,3 +114,55 @@ describe("AdminSettingsService warehouse address", () => {
     );
   });
 });
+
+/**
+ * Süreler ve Kurallar anahtarları genel ayar ucundan yazılamaz: sınır,
+ * alanlar arası kural, açık-eylem doğrulaması ve zorunlu denetim yalnız
+ * PATCH /admin/timing-rules yolunda vardır. Doğrudan gönderilen bir "yakında"
+ * eylemi ya da 0 günlük pencere bu kapıdan sızamaz.
+ */
+describe("AdminSettingsService — Süreler ve Kurallar anahtarları", () => {
+  const makeService = () => {
+    const prisma = {
+      platformSetting: {
+        findUnique: jest.fn().mockResolvedValue(null),
+        upsert: jest.fn().mockResolvedValue({ id: "s1" }),
+      },
+      adminUser: { findFirst: jest.fn().mockResolvedValue({ id: "admin-1" }) },
+      $transaction: jest.fn((fn: any) => fn(prisma)),
+    };
+    const audit = { createAuditLog: jest.fn() };
+    return { service: new AdminSettingsService(prisma as any, audit as any), prisma };
+  };
+
+  it.each([
+    ["payment_hold_days", "0"],
+    ["trade_response_deadline_hours", "1"],
+    ["return_window_days", "7"],
+    ["listing_ttl_days_on_expiry", "auto_renew"],
+    ["offer_expiry_hours_on_expiry", "extend_once"],
+  ])("%s yazımını reddeder ve hiçbir şey yazmaz", async (key, value) => {
+    const { service, prisma } = makeService();
+
+    await expect(
+      service.updatePlatformSetting("user-1", { key, value }),
+    ).rejects.toMatchObject({
+      response: { i18nKey: "server.admin.timingRules.useDedicatedEndpoint" },
+    });
+    await expect(
+      service.updatePlatformSetting("user-1", { key, value }),
+    ).rejects.toBeInstanceOf(BadRequestException);
+    expect(prisma.platformSetting.upsert).not.toHaveBeenCalled();
+  });
+
+  it("ilgisiz anahtarları eskisi gibi yazar", async () => {
+    const { service, prisma } = makeService();
+
+    await service.updatePlatformSetting("user-1", {
+      key: "max_message_length",
+      value: "500",
+    });
+
+    expect(prisma.platformSetting.upsert).toHaveBeenCalled();
+  });
+});
