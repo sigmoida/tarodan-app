@@ -1,5 +1,6 @@
 import { BadRequestException } from "@nestjs/common";
 import {
+  dashboardPeriodCacheSlot,
   previousWindow,
   resolveDashboardRange,
   resolveThisMonthWindow,
@@ -132,5 +133,40 @@ describe("previousWindow", () => {
     const length = current.lte.getTime() - current.gte.getTime();
     expect(previous.lte.getTime()).toBe(current.gte.getTime() - 1);
     expect(previous.lte.getTime() - previous.gte.getTime()).toBe(length);
+  });
+});
+
+/**
+ * Dönem kartları ve dönem kırılımları (kaldırılan ilanlar) aynı yuva kuralını
+ * paylaşır: kapalı özel aralık iki ucuyla, canlı pencere TTL kovasıyla.
+ */
+describe("dashboardPeriodCacheSlot", () => {
+  const now = new Date("2026-07-20T22:30:00.000Z");
+
+  it("tamamen geçmişte kalan özel aralık: kapalı, iki uçla anahtarlanır", () => {
+    const range = resolveDashboardRange(
+      { period: "custom", from: "2026-06-01", to: "2026-06-03" },
+      now,
+    );
+    expect(dashboardPeriodCacheSlot(range, now, 300)).toEqual({
+      slot: `custom:${range.current.gte.toISOString()}:${range.current.lte.toISOString()}`,
+      closed: true,
+    });
+  });
+
+  it("canlı pencere: TTL boyutunda zaman kovasına yuvarlanır", () => {
+    const range = resolveDashboardRange({ period: "daily" }, now);
+    const { slot, closed } = dashboardPeriodCacheSlot(range, now, 300);
+
+    expect(closed).toBe(false);
+    expect(slot).toBe(
+      `daily:${range.current.gte.toISOString()}:${Math.floor(now.getTime() / 300_000)}`,
+    );
+    // Aynı kova içindeki iki istek aynı yuvayı okur.
+    const later = new Date(now.getTime() + 1_000);
+    expect(
+      dashboardPeriodCacheSlot(resolveDashboardRange({ period: "daily" }, later), later, 300)
+        .slot,
+    ).toBe(slot);
   });
 });
