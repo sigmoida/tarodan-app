@@ -43,10 +43,12 @@ export const GIB_LISTING_STATUS_I18N_KEYS = {
  */
 export const GIB_NAME_SOURCES = [
   "company",
+  "legal_name",
   "bank_account_holder",
   "address",
   "display_name",
   "archive_company",
+  "archive_legal_name",
   "archive_bank_account_holder",
   "archive_display_name",
   "none",
@@ -55,10 +57,12 @@ export type GibNameSource = (typeof GIB_NAME_SOURCES)[number];
 
 export const GIB_NAME_SOURCE_I18N_KEYS = {
   company: "admin.gibReport.nameSources.company",
+  legal_name: "admin.gibReport.nameSources.legalName",
   bank_account_holder: "admin.gibReport.nameSources.bankAccountHolder",
   address: "admin.gibReport.nameSources.address",
   display_name: "admin.gibReport.nameSources.displayName",
   archive_company: "admin.gibReport.nameSources.archiveCompany",
+  archive_legal_name: "admin.gibReport.nameSources.archiveLegalName",
   archive_bank_account_holder:
     "admin.gibReport.nameSources.archiveBankAccountHolder",
   archive_display_name: "admin.gibReport.nameSources.archiveDisplayName",

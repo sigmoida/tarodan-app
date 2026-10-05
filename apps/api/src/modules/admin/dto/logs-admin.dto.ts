@@ -1,5 +1,5 @@
 import { IsBoolean, IsOptional, IsString, IsDateString } from "class-validator";
-import { Transform } from "class-transformer";
+import { QueryBoolean } from "../../../common/transforms";
 import { ApiPropertyOptional } from "@nestjs/swagger";
 import { AdminListQueryDto } from "../../../common/list";
 
@@ -93,7 +93,7 @@ export class SecurityLogQueryDto extends AdminListQueryDto {
 
   @ApiPropertyOptional({ description: "Filter by resolved status" })
   @IsOptional()
-  @Transform(({ value }) => value === "true" || value === true)
+  @QueryBoolean()
   @IsBoolean()
   resolved?: boolean;
 

@@ -2,6 +2,7 @@
 
 import type { ConsentDocumentKey, PendingConsent } from "@tarodan/types";
 import { consentsApi } from "@/lib/api";
+import { requiredStepState } from "@/lib/requiredSteps";
 import { useAuthStore } from "@/stores/authStore";
 import { useWebList } from "./useWebResource";
 import { useWebMutation } from "./useWebMutation";
@@ -13,6 +14,7 @@ const RESOURCE = "consents-pending";
  * Yeniden-onay kapısının verisi: üyenin onaylaması gereken zorunlu belgeler
  * (sunucu hesaplar — hiç kaydı olmayan eski üye, sosyal girişle açılan hesap
  * ya da sürümü değişen belge). Misafirde sorgu çalışmaz, liste boştur.
+ * `state`, zorunlu adımların sırası için (`RequiredStepsGate`).
  */
 export function usePendingConsents() {
   const { isAuthenticated, isLoading } = useAuthStore();
@@ -29,5 +31,12 @@ export function usePendingConsents() {
     { invalidates: [RESOURCE] },
   );
 
-  return { pending: enabled ? (query.data ?? []) : [], accept };
+  const pending = enabled ? (query.data ?? []) : [];
+  const state = requiredStepState({
+    enabled,
+    isPending: query.isPending,
+    needed: pending.length > 0,
+  });
+
+  return { pending, accept, state };
 }

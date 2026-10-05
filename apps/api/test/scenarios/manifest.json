@@ -2446,7 +2446,7 @@
       "title": "Banka hesabı oluştur/getir (happy)",
       "tur": "Happy path",
       "pri": "P1",
-      "steps": "1. PATCH /api/users/me/bank-account body: { \"accountHolder\":\"Ahmet Yılmaz\", \"iban\":\"TR33 0006 1005 1978 6457 8413 26\", \"tcKimlikNo\":\"12345678901\" }. 2. GET /api/users/me/bank-account.",
+      "steps": "1. PATCH /api/users/me/bank-account body: { \"accountHolder\":\"Ahmet Yılmaz\", \"iban\":\"TR33 0006 1005 1978 6457 8413 26\", \"tcKimlikNo\":\"10000000146\" }. 2. GET /api/users/me/bank-account.",
       "exp": "PATCH 200/201; GET'te iban=\"TR330006100519786457841326\" (boşluksuz, upper), isVerified=false. (user.service.ts:2510,2526)",
       "gap": false,
       "gapRefs": []
@@ -13418,8 +13418,8 @@
       "title": "TC kimlik ve vergi no ile hesap",
       "tur": "Happy path",
       "pri": "P2",
-      "steps": "1. PATCH ... { accountHolder, iban, tcKimlikNo:\"12345678901\", taxId:\"1234567890\" }.",
-      "exp": "HTTP 200; tcKimlikNo='12345678901', taxId='1234567890'.",
+      "steps": "1. PATCH ... { accountHolder, iban, tcKimlikNo:\"10000000146\", taxId:\"1234567890\" }.",
+      "exp": "HTTP 200; tcKimlikNo='10000000146', taxId='1234567890'.",
       "gap": false,
       "gapRefs": []
     },

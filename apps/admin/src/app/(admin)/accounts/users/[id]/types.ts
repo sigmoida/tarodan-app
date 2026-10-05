@@ -1,5 +1,5 @@
 import type { StatusConfig } from "@tarodan/ui";
-import type { AccountStatus } from "@tarodan/types";
+import type { AccountStatus, LegalIdentityField } from "@tarodan/types";
 import { useTranslations } from "next-intl";
 
 type T = ReturnType<typeof useTranslations<never>>;
@@ -81,6 +81,12 @@ export interface UserDetail {
   sellerType?: string;
   companyName?: string;
   taxId?: string;
+  /** Yasal kimlik — tam değer (ekran TCKN'yi MaskedValue ile gizler). */
+  legalFirstName: string | null;
+  legalLastName: string | null;
+  nationalId: string | null;
+  /** Kimlik kapısıyla aynı kural; personel / test hesabında hep boş. */
+  legalIdentityMissing: LegalIdentityField[];
   bankAccount?: {
     accountHolder: string;
     iban: string;

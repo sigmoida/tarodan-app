@@ -28,6 +28,16 @@ export const userFilterFields = (t: TranslateFn): FilterField[] => [
   },
   {
     type: "select",
+    name: "identityIncomplete",
+    label: t("admin.shared.filterDialog.labels.identity"),
+    // İlk seçenek varsayılandır: "all" filtre göndermez (API'de false).
+    options: [
+      { value: "all", label: t("admin.users.filterIdentityAll") },
+      { value: "true", label: t("admin.users.filterIdentityIncomplete") },
+    ],
+  },
+  {
+    type: "select",
     name: "isTestAccount",
     label: t("admin.shared.filterDialog.labels.testAccount"),
     // İlk seçenek filtrenin varsayılanıdır (filterDefaults): "all" olmazsa

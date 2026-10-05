@@ -6,7 +6,7 @@ import { PlatformFeeAnnouncementBanner } from "@/components/banners/PlatformFeeA
 import { ConfirmProvider } from "@/components/ConfirmProvider";
 import BusinessMembershipGuard from "@/components/BusinessMembershipGuard";
 import SellerAddressPrompt from "@/components/SellerAddressPrompt";
-import ConsentGate from "@/components/legal/ConsentGate";
+import RequiredStepsGate from "@/components/required-steps/RequiredStepsGate";
 import Header from "@/components/layout/Header";
 import Footer from "@/components/layout/Footer";
 import { Container } from "@/components/layout/Container";
@@ -30,9 +30,10 @@ export default function MainLayout({
       <RealtimeProvider />
       <PlatformFeeAnnouncementBanner />
       <ConfirmProvider>
-        {/* Onayı eksik / belge sürümü değişen üye önce onaylar — üyelik
-            kapısından bağımsız, her storefront sayfasında. */}
-        <ConsentGate />
+        {/* Zorunlu adımlar (önce sözleşme onayları, sonra yasal kimlik) —
+            tek montaj noktası, aynı anda tek pencere. Üyelik kapısından
+            bağımsız, her storefront sayfasında. */}
+        <RequiredStepsGate />
         <BusinessMembershipGuard>
           <SellerAddressPrompt />
           <Header />

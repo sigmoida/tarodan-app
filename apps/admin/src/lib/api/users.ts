@@ -1,5 +1,7 @@
 import type {
   AdminConsentRecordRow,
+  AdminCorrectLegalIdentityRequest,
+  AdminLegalIdentity,
   ConsentDocumentStatus,
 } from "@tarodan/types";
 import { api } from "./client";
@@ -15,6 +17,11 @@ export const usersApi = {
   // Users
   getUsers: (params?: any) => api.get("/admin/users", { params }),
   getUser: (id: string) => api.get(`/admin/users/${id}`),
+  /** Yasal kimlik düzeltmesi — gerekçe zorunlu, denetim kaydı yazılır. */
+  correctUserLegalIdentity: (
+    id: string,
+    body: AdminCorrectLegalIdentityRequest,
+  ) => api.patch<AdminLegalIdentity>(`/admin/users/${id}/legal-identity`, body),
   updateUser: (id: string, data: any) => api.patch(`/admin/users/${id}`, data),
   banUser: (id: string, reason: string) =>
     api.post(`/admin/users/${id}/ban`, { reason }),

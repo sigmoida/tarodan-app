@@ -5,10 +5,14 @@ import { useMutation } from "@tanstack/react-query";
 import toast from "react-hot-toast";
 import { useTranslations } from "next-intl";
 import { api, authApi } from "@/lib/api";
+import { legalIdentitySubmission } from "@/lib/legalIdentity";
 import { registrationConsentDocuments } from "../_lib/auth";
 
 interface RegisterInput {
   displayName: string;
+  legalFirstName: string;
+  legalLastName: string;
+  nationalId: string;
   username: string;
   email: string;
   phone: string;
@@ -37,6 +41,12 @@ export function useRegister() {
       const formattedPhone = input.phone || undefined;
       return authApi.register({
         displayName: input.displayName,
+        // Kapıyla aynı normalizasyon (TCKN yalnız rakam, ad boşlukları teklenmiş).
+        ...legalIdentitySubmission(input, [
+          "legalFirstName",
+          "legalLastName",
+          "nationalId",
+        ]),
         username: input.username.trim().toLowerCase(),
         email: input.email,
         password: input.password,

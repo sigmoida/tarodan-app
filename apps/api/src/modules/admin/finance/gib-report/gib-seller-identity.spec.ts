@@ -8,6 +8,9 @@ const seller = (over: Partial<GibSellerSource> = {}): GibSellerSource => ({
   id: "u1",
   username: "ahmet_k",
   displayName: "ahmetcik",
+  legalFirstName: null,
+  legalLastName: null,
+  nationalId: null,
   companyName: null,
   taxId: null,
   businessStatus: null,
@@ -101,6 +104,49 @@ describe("resolveGibSellerIdentity — yasal ad zinciri", () => {
     expect(result.legalNameSource).toBe("address");
   });
 
+  it("üyenin beyan ettiği yasal ad banka sahibi / adres / görünen addan önce gelir", () => {
+    const result = resolveGibSellerIdentity(
+      seller({
+        legalFirstName: "Ayşe Nur",
+        legalLastName: "Yılmaz",
+        bankAccount: {
+          accountHolder: "Ali Veli",
+          tcKimlikNo: null,
+          taxId: null,
+        },
+        addresses: [{ fullName: "Başka Biri" }],
+      }),
+    );
+    expect(result).toMatchObject({
+      legalName: "Ayşe Nur Yılmaz",
+      legalNameSource: "legal_name",
+    });
+  });
+
+  it("yarım yasal ad (kayıtta yalnız ad gönderildi) tam banka sahibi adını ezmez", () => {
+    const result = resolveGibSellerIdentity(
+      seller({
+        legalFirstName: "Ayşe",
+        bankAccount: {
+          accountHolder: "Ayşe Yılmaz",
+          tcKimlikNo: null,
+          taxId: null,
+        },
+      }),
+    );
+    expect(result).toMatchObject({
+      legalName: "Ayşe Yılmaz",
+      legalNameSource: "bank_account_holder",
+    });
+  });
+
+  it("onaylı kurumsal satıcıda firma adı yasal adın da önündedir (yasal satıcı firma)", () => {
+    const result = resolveGibSellerIdentity(
+      corporate({ legalFirstName: "Ayşe", legalLastName: "Yılmaz" }),
+    );
+    expect(result.legalNameSource).toBe("company");
+  });
+
   it("hiçbiri yoksa görünen ada düşer ve kaynak display_name olarak işaretlenir", () => {
     const result = resolveGibSellerIdentity(seller());
     expect(result).toMatchObject({
@@ -133,11 +179,14 @@ describe("resolveGibSellerIdentity — silinmiş satıcı (arşiv)", () => {
     over: Partial<NonNullable<GibSellerSource["deletedIdentity"]>> = {},
   ) => ({
     displayName: "Gerçek Ad",
+    legalFirstName: null,
+    legalLastName: null,
     companyName: null,
     taxId: null,
     nationalId: null,
     bankAccountHolder: null,
     businessStatus: null,
+    sourceDetail: null,
     ...over,
   });
 
@@ -179,6 +228,65 @@ describe("resolveGibSellerIdentity — silinmiş satıcı (arşiv)", () => {
     expect(resolveGibSellerIdentity(deleted(archive()))).toMatchObject({
       legalName: "Gerçek Ad",
       legalNameSource: "archive_display_name",
+    });
+  });
+
+  it("bireysel arşivde yasal ad banka sahibinden, BEYAN edilen TCKN vergi no'dan önce gelir", () => {
+    expect(
+      resolveGibSellerIdentity(
+        deleted(
+          archive({
+            legalFirstName: "Ayşe",
+            legalLastName: "Yılmaz",
+            bankAccountHolder: "Ali Veli",
+            nationalId: "10000000146",
+            taxId: "3333333333",
+            // Silme anında numara üyenin beyanından (User.nationalId) alındı.
+            sourceDetail: { nationalId: "user" },
+          }),
+        ),
+      ),
+    ).toMatchObject({
+      legalName: "Ayşe Yılmaz",
+      legalNameSource: "archive_legal_name",
+      identityNumber: "10000000146",
+      identityKind: "tckn",
+    });
+  });
+
+  it("eski arşiv satırında (TCKN banka hesabından) sıra DEĞİŞMEZ: vergi no önce", () => {
+    for (const sourceDetail of [
+      { nationalId: "seller_bank_account" },
+      { nationalId: "corporate_stakeholder" },
+      null,
+    ]) {
+      expect(
+        resolveGibSellerIdentity(
+          deleted(
+            archive({
+              nationalId: "12345678950",
+              taxId: "3333333333",
+              sourceDetail,
+            }),
+          ),
+        ),
+      ).toMatchObject({
+        identityNumber: "3333333333",
+        identityKind: "tax_number",
+      });
+    }
+  });
+
+  it("arşivde yarım yasal ad (yalnız ad) banka sahibinin tam adını ezmez", () => {
+    expect(
+      resolveGibSellerIdentity(
+        deleted(
+          archive({ legalFirstName: "Ayşe", bankAccountHolder: "Ayşe Yılmaz" }),
+        ),
+      ),
+    ).toMatchObject({
+      legalName: "Ayşe Yılmaz",
+      legalNameSource: "archive_bank_account_holder",
     });
   });
 
@@ -258,6 +366,31 @@ describe("resolveGibSellerIdentity — kimlik numarası", () => {
         }),
       ),
     ).toMatchObject({ identityNumber: "22222222222", identityKind: "tckn" });
+  });
+
+  it("bireysel satıcıda beyan edilen TCKN eski kaynaklardan (vergi no, banka TCKN) önce gelir", () => {
+    expect(
+      resolveGibSellerIdentity(
+        seller({
+          nationalId: "10000000146",
+          taxId: "1111111111",
+          bankAccount: {
+            accountHolder: "A",
+            tcKimlikNo: "22222222222",
+            taxId: "3333333333",
+          },
+        }),
+      ),
+    ).toMatchObject({ identityNumber: "10000000146", identityKind: "tckn" });
+  });
+
+  it("onaylı kurumsal satıcıda firma vergi no'su yetkilinin TCKN'sinden önce gelir", () => {
+    expect(
+      resolveGibSellerIdentity(corporate({ nationalId: "10000000146" })),
+    ).toMatchObject({
+      identityNumber: "1234567890",
+      identityKind: "tax_number",
+    });
   });
 
   it("hiçbir kaynakta yoksa boş bırakılır (tahmin edilmez)", () => {

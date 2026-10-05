@@ -9,6 +9,7 @@ import { json, urlencoded } from "express";
 import { setupBullBoard } from "./bull-board.setup";
 import { requestIdMiddleware } from "./common/context/request-context";
 import { AppNestLogger } from "./common/logging/nest-logger";
+import { GLOBAL_VALIDATION_PIPE_OPTIONS } from "./common/validators/global-validation-pipe-options";
 import { getProcessRole } from "./process-role";
 import { resolveCorsOrigins } from "./config/cors-origins";
 import { isProduction, isDevelopment } from "./config/environment";
@@ -93,16 +94,7 @@ async function bootstrap() {
     });
 
     // Global validation pipe
-    app.useGlobalPipes(
-      new ValidationPipe({
-        whitelist: true,
-        forbidNonWhitelisted: false, // Changed to false to prevent 500 errors
-        transform: true,
-        transformOptions: {
-          enableImplicitConversion: true,
-        },
-      }),
-    );
+    app.useGlobalPipes(new ValidationPipe(GLOBAL_VALIDATION_PIPE_OPTIONS));
 
     // API prefix. PayTR "Bildirim URL" alias'ı /callback prefix DIŞINDA kalır
     // (panel .../callback ile bittiğinde çalışsın; kanonik /api/payments/callback/paytr da durur).

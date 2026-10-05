@@ -12,6 +12,7 @@ import {
 import {
   ARCHIVE_EXPORT_COLUMNS,
   EXPORT_FORMAT_VERSION,
+  archiveLegalFullName,
 } from "../../../common/helpers/deleted-user-identity";
 import type {
   DeletedUserIdentityExportQueryDto,
@@ -23,6 +24,8 @@ const SEARCH_FIELDS = [
   "email",
   "username",
   "displayName",
+  "legalFirstName",
+  "legalLastName",
   "phone",
   "nationalId",
   "taxId",
@@ -131,7 +134,8 @@ export class AdminDeletedIdentityService {
       sheet.addRow({
         adminCode: row.adminCode ?? "",
         username: row.username,
-        displayName: row.displayName ?? "",
+        // Yasal ad önce (kimlik kapısı), yoksa silme anındaki ad.
+        displayName: archiveLegalFullName(row) ?? "",
         email: row.email ?? "",
         phone: row.phone ?? "",
         nationalId: row.nationalId ?? "",

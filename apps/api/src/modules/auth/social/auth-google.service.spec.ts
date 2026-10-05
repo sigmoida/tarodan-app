@@ -20,6 +20,7 @@ import { StorageService } from "../../storage/storage.service";
 import { SecurityService } from "../../security/security.service";
 import { NewsletterService } from "../../marketing/newsletter.service";
 import { ConsentService } from "../../consent/consent.service";
+import { LegalIdentityService } from "../../legal-identity/legal-identity.service";
 
 describe("AuthService.loginWithGoogle", () => {
   let service: AuthService;
@@ -104,6 +105,8 @@ describe("AuthService.loginWithGoogle", () => {
             recordMarketingChange: jest.fn(),
           },
         },
+        // Kayıt formundaki yasal kimlik (bu spec'in konusu değil).
+        { provide: LegalIdentityService, useValue: {} },
         // AuthRegistrationService toplu aktivasyon mailini kuyruğa yazıyor.
         {
           provide: getQueueToken(QUEUE_NAMES.EMAIL),

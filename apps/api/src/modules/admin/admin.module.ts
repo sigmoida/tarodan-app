@@ -45,6 +45,9 @@ import { AdminUserAccountService } from "./users/admin-user-account.service";
 import { AdminDeletedIdentityService } from "./users/admin-deleted-identity.service";
 import { AdminConsentService } from "./users/admin-consent.service";
 import { AdminConsentController } from "./users/admin-consent.controller";
+import { AdminLegalIdentityService } from "./users/admin-legal-identity.service";
+import { AdminLegalIdentityController } from "./users/admin-legal-identity.controller";
+import { LegalIdentityModule } from "../legal-identity/legal-identity.module";
 import { AdminGibReportService } from "./finance/gib-report/admin-gib-report.service";
 import { AdminGibReportController } from "./finance/gib-report/admin-gib-report.controller";
 import { ConsentModule } from "../consent/consent.module";
@@ -182,6 +185,8 @@ import { scheduledProcessors } from "../../workers/scheduled-processors";
     SiteAccessModule,
     // Onay Kayıtları ekranı: üye durumu domain servisinden okunur.
     ConsentModule,
+    // Yasal kimlik düzeltmesi: yazım domain servisinden, denetim burada.
+    LegalIdentityModule,
     // Süreler ve Kurallar ekranı: yazma domain servisinden, denetim burada.
     TimingRulesModule,
     BullModule.registerQueue({ name: QUEUE_NAMES.MODERATION }),
@@ -194,6 +199,7 @@ import { scheduledProcessors } from "../../workers/scheduled-processors";
     AdminUserController,
     AdminDeletedIdentityController,
     AdminConsentController,
+    AdminLegalIdentityController,
     AdminGibReportController,
     AdminProductController,
     AdminOrderController,
@@ -238,6 +244,7 @@ import { scheduledProcessors } from "../../workers/scheduled-processors";
     AdminUserAccountService,
     AdminDeletedIdentityService,
     AdminConsentService,
+    AdminLegalIdentityService,
     AdminGibReportService,
     AdminStaffService,
     AdminProductService,

@@ -22,6 +22,12 @@ import {
 } from "@tarodan/types";
 import { IsTrPhone } from "../../../common/validators/tr-phone";
 import {
+  IsLegalName,
+  IsTckn,
+  NormalizeLegalName,
+  NormalizeTckn,
+} from "../../../common/validators/legal-identity";
+import {
   USERNAME_MAX_LENGTH,
   USERNAME_MIN_LENGTH,
   USERNAME_PATTERN,
@@ -108,6 +114,35 @@ export class RegisterDto {
   @MinLength(2, { message: "İsim en az 2 karakter olmalıdır" })
   @MaxLength(100, { message: "İsim en fazla 100 karakter olabilir" })
   displayName: string;
+
+  // YASAL KİMLİK — OPSİYONEL (DTO'da). Web kayıt formu üçünü de zorunlu ister;
+  // bugünkü mobil sürümler göndermediği için sunucu zorunlu tutmaz: alanları
+  // göndermeden açılan hesap kimlik kapısına ilk girişte düşer (bkz.
+  // docs/IDENTITY.md). Gönderilen alan ortak kuralla doğrulanır; TCKN başka
+  // bir hesaptaysa kayıt reddedilir (o hesap hakkında bilgi verilmeden).
+  @ApiPropertyOptional({ example: "Ayşe Nur", description: "Yasal ad" })
+  @IsOptional()
+  @IsString()
+  @NormalizeLegalName()
+  @IsLegalName()
+  legalFirstName?: string;
+
+  @ApiPropertyOptional({ example: "Yılmaz", description: "Yasal soyad" })
+  @IsOptional()
+  @IsString()
+  @NormalizeLegalName()
+  @IsLegalName()
+  legalLastName?: string;
+
+  @ApiPropertyOptional({
+    example: "10000000146",
+    description: "T.C. Kimlik Numarası (11 hane, checksum'lı)",
+  })
+  @IsOptional()
+  @IsString()
+  @NormalizeTckn()
+  @IsTckn()
+  nationalId?: string;
 
   // OPSİYONEL — App Store Review 5.1.1(v) (16 Tem 2026): pazar yerinin çekirdek
   // işlevi için gerekli olmayan kişisel veri kayıtta zorunlu tutulamaz. Alan

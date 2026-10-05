@@ -8416,7 +8416,23 @@
       "testAccountHint": "Test lane: never mixes with live data",
       "filterTestAccountAll": "All accounts",
       "testAccountOnly": "Test accounts only",
-      "liveAccountsOnly": "Real accounts only"
+      "liveAccountsOnly": "Real accounts only",
+      "legalIdentity": {
+        "title": "Identity details",
+        "incomplete": "Identity incomplete",
+        "missingFields": "Missing: {fields}",
+        "exempt": "Exempt (staff / test account)",
+        "notProvided": "Not provided",
+        "correct": "Correct",
+        "correctTitle": "Correct identity details",
+        "correctHint": "Fill in only the fields you want to change; empty fields stay as they are. The correction is written to the audit log with its reason.",
+        "reasonLabel": "Reason",
+        "reasonPlaceholder": "e.g. ID card checked, surname spelling corrected",
+        "reasonRequired": "The reason must be at least 5 characters.",
+        "saved": "Identity details updated."
+      },
+      "filterIdentityAll": "All",
+      "filterIdentityIncomplete": "Identity incomplete only"
     },
     "deletedIdentities": {
       "title": "Deleted Account Identities",
@@ -9105,7 +9121,8 @@
           "entityType": "Entity type",
           "shipmentLeg": "Shipment leg",
           "loginState": "Login state",
-          "testAccount": "Test account"
+          "testAccount": "Test account",
+          "identity": "Identity details"
         }
       },
       "bulkActionBar": {
@@ -9305,7 +9322,9 @@
         "archiveCompany": "Archive: company name",
         "archiveBankAccountHolder": "Archive: bank account holder",
         "archiveDisplayName": "Archive: name",
-        "none": "Not resolved"
+        "none": "Not resolved",
+        "legalName": "Legal name (member's declaration)",
+        "archiveLegalName": "Archive: legal name"
       },
       "sellerKinds": {
         "individual": "Individual",
@@ -10937,6 +10956,16 @@
     "consent": {
       "distanceSalesRequired": "You need to accept the Distance Sales Agreement to continue with the payment.",
       "documentNotAcceptable": "\"{document}\" cannot be accepted at this step."
+    },
+    "identity": {
+      "nationalIdUnavailable": "This Turkish ID number cannot be used. If you think this is a mistake, please contact our support team.",
+      "locked": "Your identity details cannot be changed once saved. Please contact our support team for a correction.",
+      "incomplete": "First name, last name and Turkish ID number must all be provided.",
+      "correctionNoChange": "There is no change to save.",
+      "tooManyAttempts": "Too many attempts. Please try again in {minutes} minutes.",
+      "bankNationalIdMismatch": "The Turkish ID number on the bank account must match the number registered on your account.",
+      "nationalIdInvalid": "Please enter a valid Turkish ID number.",
+      "correctionNotAllowed": "Identity details of a deleted or staff account cannot be corrected."
     }
   },
   "status": {
@@ -11856,6 +11885,32 @@
         "ePostaVeyaSifreHatali": "E-posta veya şifre hatalı",
         "girisBasarisiz": "Giriş başarısız"
       }
+    }
+  },
+  "identity": {
+    "legalFirstName": "First name",
+    "legalLastName": "Last name",
+    "nationalId": "Turkish ID number (T.C. Kimlik No)",
+    "nationalIdPlaceholder": "11-digit number",
+    "legalNameHint": "Write it as it appears on your ID card.",
+    "registerHint": "We keep your name and Turkish ID number to meet our legal obligations; they are not shown on your profile or shared with other members.",
+    "validation": {
+      "nameInvalid": "Use letters only (2–50 characters).",
+      "nationalIdInvalid": "Enter a valid Turkish ID number."
+    },
+    "gate": {
+      "title": "We need your identity details",
+      "intro": "To meet our legal obligations we must keep every member's first name, last name and Turkish ID number on file. These details are not shown on your profile or listings and are never shared with other members.",
+      "lockedNote": "Once saved you cannot change these details yourself; if something is wrong, contact our support team.",
+      "prefilledHint": "Filled in from the number on your bank account; please check it.",
+      "submit": "Save and continue",
+      "saved": "Your identity details have been saved."
+    },
+    "profile": {
+      "title": "Identity details",
+      "description": "Kept for our legal obligations; never public.",
+      "lockedNote": "These details cannot be changed once saved. If something is wrong, contact our support team.",
+      "notProvided": "Not provided yet"
     }
   }
 }

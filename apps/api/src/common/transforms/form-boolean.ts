@@ -14,8 +14,9 @@ const FALSE_LITERALS = new Set(["false", "0", "off"]);
  *   - boş / yalnız-boşluk → undefined (alan hiç gönderilmemiş sayılır)
  *   - tanınmayan değer → ham metin aynen kalır, `@IsBoolean` 400 üretir
  *
- * TODO: başka dalda aynı işi yapan paylaşımlı `QueryBoolean()` var; birleşimde
- * tek dekoratöre indirilmeli.
+ * `QueryBoolean()` ile bilinçli olarak ayrıdır: o, evet/hayır FİLTRELERİ içindir
+ * ve `"true"` dışındaki her şeyi (alan hiç gelmese de) `false` sayar; burada
+ * ise boş alan `undefined` kalır ve tanınmayan değer 400 üretir.
  */
 export function FormBoolean(): PropertyDecorator {
   return Transform(({ value, key, obj }) => {

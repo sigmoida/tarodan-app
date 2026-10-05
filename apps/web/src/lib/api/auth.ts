@@ -15,6 +15,10 @@ export const authApi = {
     api.post("/auth/forgot-password", { email }),
   register: (data: {
     displayName: string;
+    /** Yasal kimlik — web formunda zorunlu, API'de opsiyonel (eski mobil). */
+    legalFirstName?: string;
+    legalLastName?: string;
+    nationalId?: string;
     username: string;
     email: string;
     password: string;
