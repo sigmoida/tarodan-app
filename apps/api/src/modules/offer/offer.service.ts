@@ -84,15 +84,29 @@ export class OfferService {
   }
 
   /**
+   * Cron'un bu teklifi uzatacağı (extend_once) kararı — işlem AÇILMADAN okunur:
+   * `OfferExtensionPolicy` sorgularını kök bağlantıda atar; açık bir işlemin
+   * içinde çağrılırsa işlem bir bağlantı tutarken ikincisini bekler (havuz
+   * tükenmesi). Karar zamandan bağımsızdır; süre koşulu `hasLapsed`'te, işlem
+   * içinde kilitli satırdan gelir. Okuma ile işlem arasında kararı bayatlatacak
+   * her şey işlemde yeniden doğrulanır: durum ve süre (cron araya girip
+   * uzattıysa `expiresAt` ileridedir → dolmuş sayılmaz), taraflar arası engel
+   * (`assertNotBlocked`), ilanın satılabilirliği (ürün kilidi). Politika yoksa
+   * (eski kurulum) uzatılmaz.
+   */
+  private async readExtendable(offerId: string): Promise<boolean> {
+    return (await this.extensionPolicy?.isExtendable(offerId)) ?? false;
+  }
+
+  /**
    * Teklifin süresi DOLDU mu? Süresi geçmiş ama bir sonraki cron turunun
    * extend_once ile uzatacağı teklif dolmuş sayılmaz (kullanıcıya "expired"
    * gösterilip sonra yeniden açılmasın); uzatılmayacak teklif bugünkü gibi
-   * dolmuştur. Karar `OfferExtensionPolicy` ile cron'la AYNI kuraldır.
+   * dolmuştur. Karar `OfferExtensionPolicy` ile cron'la AYNI kuraldır
+   * (`extendable`: işlemden önce `readExtendable` ile okunmuş karar).
    */
-  private async hasLapsed(offerId: string, expiresAt: Date): Promise<boolean> {
-    const now = new Date();
-    if (now <= new Date(expiresAt)) return false;
-    return !(await this.extensionPolicy?.willExtend(offerId, now));
+  private hasLapsed(expiresAt: Date, extendable: boolean): boolean {
+    return new Date() > new Date(expiresAt) && !extendable;
   }
 
   /**
@@ -285,6 +299,7 @@ export class OfferService {
       await this.checkoutCommon.resolveOfferOrderSnapshots();
     // Ödeme penceresi işlem AÇILMADAN okunur (havuz tükenmesi; bkz. yukarı).
     const paymentExpiresAt = await paymentWindowEnd(this.prisma);
+    const extendable = await this.readExtendable(offerId);
     const result = await this.prisma.$transaction(async (tx) => {
       // Lock offer row with FOR UPDATE
       const lockedOffers = await tx.$queryRaw<{ id: string }[]>`
@@ -332,7 +347,7 @@ export class OfferService {
       await this.assertNotBlocked(offerData.buyerId, offerData.sellerId);
 
       // Check expiration
-      if (await this.hasLapsed(offerId, offerData.expiresAt)) {
+      if (this.hasLapsed(offerData.expiresAt, extendable)) {
         // Auto-expire the offer
         await tx.offer.update({
           where: { id: offerId },
@@ -696,9 +711,10 @@ export class OfferService {
    * POST /offers/:id/counter
    */
   async counter(offerId: string, sellerId: string, dto: CounterOfferDto) {
-    // Süre işlem AÇILMADAN okunur: işlem bir bağlantı tutarken ikinci bir
-    // bağlantı beklemesin (havuz tükenmesi).
+    // Süre ve uzatma kararı işlem AÇILMADAN okunur: işlem bir bağlantı tutarken
+    // ikinci bir bağlantı beklemesin (havuz tükenmesi).
     const expiresAt = await this.offerExpiresAt();
+    const extendable = await this.readExtendable(offerId);
     return this.prisma.$transaction(async (tx) => {
       const offer = await tx.offer.findUnique({
         where: { id: offerId },
@@ -733,7 +749,7 @@ export class OfferService {
       }
 
       // Check expiration
-      if (await this.hasLapsed(offerId, offer.expiresAt)) {
+      if (this.hasLapsed(offer.expiresAt, extendable)) {
         await tx.offer.update({
           where: { id: offerId },
           data: { status: OfferStatus.expired },
@@ -828,9 +844,10 @@ export class OfferService {
    * POST /offers/:id/buyer-counter
    */
   async buyerCounter(offerId: string, buyerId: string, dto: CounterOfferDto) {
-    // Süre işlem AÇILMADAN okunur: işlem bir bağlantı tutarken ikinci bir
-    // bağlantı beklemesin (havuz tükenmesi).
+    // Süre ve uzatma kararı işlem AÇILMADAN okunur: işlem bir bağlantı tutarken
+    // ikinci bir bağlantı beklemesin (havuz tükenmesi).
     const expiresAt = await this.offerExpiresAt();
+    const extendable = await this.readExtendable(offerId);
     return this.prisma.$transaction(async (tx) => {
       const offer = await tx.offer.findUnique({
         where: { id: offerId },
@@ -861,7 +878,7 @@ export class OfferService {
         );
       }
 
-      if (await this.hasLapsed(offerId, offer.expiresAt)) {
+      if (this.hasLapsed(offer.expiresAt, extendable)) {
         await tx.offer.update({
           where: { id: offerId },
           data: { status: OfferStatus.expired },

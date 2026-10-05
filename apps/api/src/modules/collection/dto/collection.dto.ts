@@ -9,8 +9,9 @@ import {
   MinLength,
   Min,
   Max,
-} from 'class-validator';
-import { Type } from 'class-transformer';
+} from "class-validator";
+import { Type } from "class-transformer";
+import { FormBoolean } from "../../../common/transforms";
 
 export class CreateCollectionDto {
   @IsString()
@@ -119,7 +120,9 @@ export class AddCollectionItemDto {
   @Min(0)
   sortOrder?: number;
 
+  // Multipart gövdede metin gelir ("false"); örtük dönüşüm bunu true yapardı.
   @IsOptional()
+  @FormBoolean()
   @IsBoolean()
   isFeatured?: boolean;
 }
