@@ -18,6 +18,11 @@ import { StorageService } from "../storage/storage.service";
 import { NotificationDispatchService } from "./notification-dispatch.service";
 import { frontendUrl as resolveFrontendUrl } from "../../config/app-urls";
 import { ORDER_CANCEL_REASON } from "../order/helpers/order-cancel-reasons";
+import { adminCancelReasonLabel } from "../order/helpers/admin-cancel-reason";
+import {
+  ADMIN_CANCEL_REASON_I18N_KEYS,
+  type AdminCancelReasonCode,
+} from "@tarodan/types";
 import { TRADE_CANCEL_REASON } from "../trade/helpers/trade-cancel-reasons";
 import { errorMessage } from "../../common/helpers/error-message";
 
@@ -544,6 +549,110 @@ export class NotificationCommerceService {
       );
     }
     await this.sendOrderCancelledEmails(order.id, parties);
+  }
+
+  /**
+   * Yönetici (platform) iptalinin duyurusu — iptalin HER türü (ödenmemiş,
+   * kargo öncesi ödenmiş, teklif siparişi) için TEK tanım; çağıran
+   * AdminOrderCancelService'tir ve çekirdekler bu iptalde kendi genel iptal
+   * duyurularını göndermez. Her taraf bir zil (+push) ve bir e-posta alır:
+   * - Alıcı: ORDER_CANCELLED_BY_PLATFORM + `order-cancelled-by-platform-buyer`.
+   *   Misafir siparişinde zil gönderilmez (alıcı ortak sistem hesabıdır, zili
+   *   kimseye ulaşmaz); e-posta `orderBuyerContact` ile GERÇEK misafire gider.
+   * - Satıcı: ORDER_CANCELLED_BY_PLATFORM_SELLER + `…-seller` e-postası.
+   *
+   * Metinler "Tarodan iptal etti" der, nedenin KATALOG ETİKETİNİ ve (ödenmiş
+   * siparişte) iade tutarını taşır. Yöneticinin iç notu bu metoda hiç
+   * gelmez. Bir kanalın hatası diğerlerini engellemez; asla throw etmez.
+   *
+   * @param refundAmount Alıcıya iade edilen tutar; ödeme alınmamışsa null.
+   */
+  async notifyOrderCancelledByPlatform(input: {
+    orderId: string;
+    reasonCode: AdminCancelReasonCode;
+    refundAmount: number | null;
+  }): Promise<void> {
+    const order = await this.prisma.order
+      .findUnique({
+        where: { id: input.orderId },
+        select: {
+          id: true,
+          orderNumber: true,
+          buyerId: true,
+          sellerId: true,
+          product: { select: { title: true } },
+          seller: { select: { displayName: true } },
+          ...ORDER_BUYER_SELECT,
+        },
+      })
+      .catch((err: unknown) => {
+        this.logger.warn(
+          `platform-cancel notice: order ${input.orderId} okunamadı: ${errorMessage(err)}`,
+        );
+        return null;
+      });
+    if (!order) return;
+
+    const paid = input.refundAmount !== null;
+    const productTitle = order.product?.title ?? "";
+    // Bildirim verisine dile bağlı metin değil katalog ANAHTARI yazılır;
+    // şablon (`localizedValues`) her alıcının dilinde çevirir.
+    const inAppData = {
+      orderId: order.id,
+      orderNumber: order.orderNumber,
+      productTitle,
+      reasonCode: input.reasonCode,
+      reasonKey: ADMIN_CANCEL_REASON_I18N_KEYS[input.reasonCode],
+      paid: paid ? "yes" : "no",
+      amount: input.refundAmount ?? 0,
+    };
+    // E-posta şablonları Türkçedir: etiket varsayılan dilde.
+    const emailData = {
+      orderNumber: order.orderNumber,
+      orderId: order.id,
+      productTitle,
+      reason: adminCancelReasonLabel(input.reasonCode),
+      paid,
+      ...(paid ? { refundAmount: input.refundAmount } : {}),
+    };
+
+    const buyer = orderBuyerContact(order);
+    if (!buyer.isGuest) {
+      await this.safeInApp(
+        order.buyerId,
+        NotificationType.ORDER_CANCELLED_BY_PLATFORM,
+        inAppData,
+      );
+    }
+    await this.sendOrderBuyerEmail(
+      order,
+      "order-cancelled-by-platform-buyer",
+      emailData,
+    );
+
+    await this.safeInApp(
+      order.sellerId,
+      NotificationType.ORDER_CANCELLED_BY_PLATFORM_SELLER,
+      { ...inAppData, audience: "seller" },
+    );
+    await this.dispatch.sendTemplateEmailToUser(
+      order.sellerId,
+      "order-cancelled-by-platform-seller",
+      { ...emailData, sellerName: order.seller?.displayName ?? "" },
+    );
+  }
+
+  /** Zil (+push) — hatası aynı duyurunun diğer kanallarını engellemez. */
+  private async safeInApp(
+    userId: string,
+    type: NotificationType,
+    data: Record<string, unknown>,
+  ): Promise<void> {
+    try {
+      await this.dispatch.createInAppNotification(userId, type, data);
+    } catch (err: unknown) {
+      this.logger.warn(`${type} → ${userId} failed: ${errorMessage(err)}`);
+    }
   }
 
   /**

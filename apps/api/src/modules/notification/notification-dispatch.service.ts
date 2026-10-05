@@ -38,7 +38,10 @@ import {
   DeliveryChannel,
 } from "./helpers/notification-preferences";
 import { NotificationSettings } from "../user/dto/notification-settings.dto";
-import { NOTIFICATION_TEMPLATES } from "./helpers/notification-templates";
+import {
+  NOTIFICATION_TEMPLATES,
+  type NotificationTemplate,
+} from "./helpers/notification-templates";
 import {
   normalizeLegacyNotificationLink,
   resolveWebNotificationLink,
@@ -153,19 +156,42 @@ export class NotificationDispatchService {
 
   /** Şablonu alıcının dilinde render et (ICU; eksik değerlerde anahtara düşer). */
   private async renderTemplate(
-    template: { titleKey: string; messageKey: string },
+    template: NotificationTemplate,
     locale: Locale,
     data?: Record<string, any>,
   ): Promise<{ title: string; message: string }> {
-    // Çağıranın verdiği değer süre parametresini ezer (veri önceliklidir).
+    // Çağıranın verdiği değer süre parametresini ezer (veri önceliklidir);
+    // değeri katalog anahtarı olan parametreler alıcının dilinde çevrilir.
     const values = {
       ...(await this.loadTimingCopyValues()),
       ...data,
+      ...this.localizedTemplateValues(template, locale, data),
     } as MessageValues;
     return {
       title: this.i18n.translate(template.titleKey, locale, values),
       message: this.i18n.translate(template.messageKey, locale, values),
     };
+  }
+
+  /**
+   * Şablonun `localizedValues` parametreleri: verideki katalog anahtarı
+   * alıcının dilinde metne çevrilir. Anahtar yoksa parametre eklenmez (ICU
+   * eksik değerde anahtara düşer — sessiz boş metin yerine görünür hata).
+   */
+  private localizedTemplateValues(
+    template: NotificationTemplate,
+    locale: Locale,
+    data?: Record<string, any>,
+  ): Record<string, string> {
+    const entries = Object.entries(template.localizedValues ?? {}).flatMap(
+      ([param, field]) => {
+        const key = data?.[field];
+        return typeof key === "string" && key
+          ? [[param, this.i18n.translate(key, locale)] as const]
+          : [];
+      },
+    );
+    return Object.fromEntries(entries);
   }
 
   substituteTemplateVariables(text: string, data: Record<string, any>): string {

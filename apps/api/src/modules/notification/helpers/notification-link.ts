@@ -112,6 +112,7 @@ export const NOTIFICATION_LINKS: Record<
   [NotificationType.ORDER_DELIVERED]: BUYER_ORDER,
   [NotificationType.ORDER_COMPLETED]: BUYER_ORDER,
   [NotificationType.ORDER_CANCELLED]: BUYER_ORDER,
+  [NotificationType.ORDER_CANCELLED_BY_PLATFORM]: BUYER_ORDER,
   [NotificationType.ORDER_REFUNDED]: BUYER_ORDER,
   [NotificationType.ORDER_PREPARING_DEADLINE_WARNING]: byAudience(
     "/profile/orders/{{orderId}}",
@@ -133,6 +134,7 @@ export const NOTIFICATION_LINKS: Record<
 
   // ── Sipariş (satıcı) ─────────────────────────────────────────────────────
   [NotificationType.ORDER_CANCELLED_SELLER]: SELLER_ORDER,
+  [NotificationType.ORDER_CANCELLED_BY_PLATFORM_SELLER]: SELLER_ORDER,
   [NotificationType.ORDER_PREPARING_EXTENDED_SELLER]: SELLER_ORDER,
   [NotificationType.PRODUCT_SOLD]: SELLER_ORDER,
   [NotificationType.CARGO_MOVEMENT_MISSING]: SELLER_ORDER,

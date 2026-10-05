@@ -13,6 +13,14 @@ export interface NotificationTemplate {
   titleKey: MessageKey;
   messageKey: MessageKey;
   icon?: string;
+  /**
+   * Değeri bir katalog ANAHTARI olan parametreler: `{ param: dataField }`.
+   * Render sırasında `data[dataField]` alıcının dilinde çevrilir ve metne
+   * `{param}` olarak girer (ör. yönetici iptal nedeninin etiketi). Bildirim
+   * verisine dile bağlı metin değil anahtar yazılır; her alıcı kendi dilini
+   * görür.
+   */
+  localizedValues?: Readonly<Record<string, string>>;
 }
 
 /**
@@ -60,6 +68,18 @@ export const NOTIFICATION_TEMPLATES: Partial<
     titleKey: "server.notification.orderCancelledSeller.title",
     messageKey: "server.notification.orderCancelledSeller.message",
     icon: "❌",
+  },
+  [NotificationType.ORDER_CANCELLED_BY_PLATFORM]: {
+    titleKey: "server.notification.orderCancelledByPlatform.title",
+    messageKey: "server.notification.orderCancelledByPlatform.message",
+    icon: "🛡️",
+    localizedValues: { reason: "reasonKey" },
+  },
+  [NotificationType.ORDER_CANCELLED_BY_PLATFORM_SELLER]: {
+    titleKey: "server.notification.orderCancelledByPlatformSeller.title",
+    messageKey: "server.notification.orderCancelledByPlatformSeller.message",
+    icon: "🛡️",
+    localizedValues: { reason: "reasonKey" },
   },
   [NotificationType.ORDER_CANCELLED_OUT_OF_STOCK]: {
     titleKey: "server.notification.orderCancelledOutOfStock.title",

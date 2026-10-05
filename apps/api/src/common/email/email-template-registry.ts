@@ -60,6 +60,16 @@ export const EMAIL_TEMPLATE_DEFINITIONS = [
     name: "Sipariş iptal edildi (satıcı)",
     group: "Sipariş",
   },
+  {
+    key: "order-cancelled-by-platform-buyer",
+    name: "Sipariş Tarodan tarafından iptal edildi (alıcı)",
+    group: "Sipariş",
+  },
+  {
+    key: "order-cancelled-by-platform-seller",
+    name: "Sipariş Tarodan tarafından iptal edildi (satıcı)",
+    group: "Sipariş",
+  },
   { key: "payment-received", name: "Ödeme alındı", group: "Ödeme" },
   { key: "payment-failed", name: "Ödeme başarısız", group: "Ödeme" },
   {

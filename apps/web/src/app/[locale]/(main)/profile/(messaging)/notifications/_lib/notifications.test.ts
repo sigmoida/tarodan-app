@@ -3,9 +3,21 @@
 import { describe, expect, it } from "vitest";
 import {
   collectUnreadIds,
+  getNotificationCategory,
   withUnreadHighlight,
   type Notification,
 } from "./notifications";
+
+describe("getNotificationCategory", () => {
+  it("Tarodan (yönetici) iptal bildirimleri Siparişler süzgecindedir", () => {
+    expect(getNotificationCategory("order_cancelled_by_platform")).toBe(
+      "orders",
+    );
+    expect(getNotificationCategory("order_cancelled_by_platform_seller")).toBe(
+      "orders",
+    );
+  });
+});
 
 const n = (id: string, isRead: boolean): Notification => ({
   id,

@@ -277,6 +277,24 @@ export const sampleData = (t: T): Record<string, Record<string, unknown>> => ({
     productTitle: "Hot Wheels Ferrari 458",
     reason: t("admin.marketing.emailTemplates.sample.buyerRequest"),
   },
+  // Yönetici (platform) iptali — neden katalog etiketidir, iç not yoktur.
+  "order-cancelled-by-platform-buyer": {
+    buyerName: t("admin.marketing.emailTemplates.sample.buyer"),
+    orderNumber: "TRD-12345",
+    orderId: "sample-id",
+    productTitle: "Hot Wheels Ferrari 458",
+    reason: t("adminCancel.reasons.stock_error"),
+    paid: true,
+    refundAmount: 199.99,
+  },
+  "order-cancelled-by-platform-seller": {
+    sellerName: t("admin.marketing.emailTemplates.sample.seller"),
+    orderNumber: "TRD-12345",
+    orderId: "sample-id",
+    productTitle: "Hot Wheels Ferrari 458",
+    reason: t("adminCancel.reasons.stock_error"),
+    paid: true,
+  },
   // Refund flow
   "refund-requested-seller": {
     sellerName: t("admin.marketing.emailTemplates.sample.seller"),

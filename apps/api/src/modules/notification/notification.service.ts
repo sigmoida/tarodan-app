@@ -332,6 +332,15 @@ export class NotificationService {
     );
   }
 
+  /** Yönetici (platform) iptalinin iki tarafa duyurusu (zil + e-posta). */
+  async notifyOrderCancelledByPlatform(
+    ...args: Parameters<
+      NotificationCommerceService["notifyOrderCancelledByPlatform"]
+    >
+  ): Promise<void> {
+    return this.commerce.notifyOrderCancelledByPlatform(...args);
+  }
+
   async broadcastBackInStock(
     productId: string,
     productTitle: string,

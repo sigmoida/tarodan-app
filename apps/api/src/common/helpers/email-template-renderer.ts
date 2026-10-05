@@ -383,6 +383,8 @@ export function getEmailTemplateSubject(
     "seller-invoice-reminder": `Fatura Bekleniyor - Sipariş #${data?.orderNumber || ""}`,
     "order-cancelled-buyer": `Siparişiniz İptal Edildi - ${data?.orderNumber || ""}`,
     "order-cancelled-seller": `Sipariş İptal Edildi - ${data?.orderNumber || ""}`,
+    "order-cancelled-by-platform-buyer": `Siparişiniz Tarodan Tarafından İptal Edildi - ${data?.orderNumber || ""}`,
+    "order-cancelled-by-platform-seller": `Sipariş Tarodan Tarafından İptal Edildi - ${data?.orderNumber || ""}`,
     "refund-requested-seller": `İade Talebi - ${data?.orderNumber || ""}`,
     "refund-approved-buyer": `İade Talebiniz Onaylandı - ${data?.orderNumber || ""}`,
     "refund-rejected-buyer": `İade Talebiniz Hakkında - ${data?.orderNumber || ""}`,
@@ -1325,6 +1327,59 @@ export function renderEmailTemplate(
       </div>
     `,
       "Sipariş İptal Edildi",
+    ),
+
+    // Yönetici (platform) iptali: neden yalnız katalog etiketidir (yöneticinin
+    // iç notu bu veriye hiç girmez). İade süresi bankaya bağlıdır; platform
+    // süresi değildir, bu yüzden metinde rakam yoktur.
+    "order-cancelled-by-platform-buyer": wrapEmail(
+      `
+      ${titleBlock("Siparişiniz Tarodan Tarafından İptal Edildi", "🛡️")}
+      ${greeting(data?.buyerName)}
+      <p style="font-size: 15px; color: #4b5563; line-height: 1.6; margin: 0 0 20px 0;">Aşağıdaki siparişiniz Tarodan tarafından iptal edildi.</p>
+      ${detailsBox(`
+        <table width="100%" cellspacing="0" cellpadding="0">
+          ${detailRow("Sipariş No", "#" + (data?.orderNumber || ""))}
+          ${data?.productTitle ? detailRow("Ürün", data.productTitle) : ""}
+          ${data?.paid ? detailRow("İade Tutarı", formatEmailPrice(data.refundAmount) + " TL", true) : ""}
+        </table>
+      `)}
+      ${data?.reason ? warningBox(`<p style="margin: 0; font-size: 14px; color: #92400e;"><strong>İptal nedeni:</strong> ${data.reason}</p>`) : ""}
+      ${infoBox(
+        `<p style="margin: 0; font-size: 14px; color: #92400e;">${
+          data?.paid
+            ? "Ödediğiniz tutarın tamamı iade edildi. Tutar, bankanızın olağan iade süresi içinde ödeme yönteminize yansır."
+            : "Bu sipariş için ödeme alınmamıştı; herhangi bir tutar tahsil edilmedi."
+        }</p>`,
+      )}
+      <div style="text-align: center; margin: 32px 0;">
+        ${primaryButton("Siparişi Görüntüle", orderPaidTrackUrl)}
+      </div>
+    `,
+      "Siparişiniz Tarodan Tarafından İptal Edildi",
+    ),
+
+    "order-cancelled-by-platform-seller": wrapEmail(
+      `
+      ${titleBlock("Sipariş Tarodan Tarafından İptal Edildi", "🛡️")}
+      ${greeting(data?.sellerName)}
+      <p style="font-size: 15px; color: #4b5563; line-height: 1.6; margin: 0 0 20px 0;">Ürününüze ait bir sipariş Tarodan tarafından iptal edildi. ${
+        data?.paid
+          ? "Lütfen ürünü kargoya vermeyin; alıcıya ödemesi iade edildi ve stok ilanınıza geri eklendi."
+          : "Sipariş için ödeme alınmamıştı; ayrılan stok ilanınıza geri döndü."
+      }</p>
+      ${detailsBox(`
+        <table width="100%" cellspacing="0" cellpadding="0">
+          ${detailRow("Sipariş No", "#" + (data?.orderNumber || ""))}
+          ${data?.productTitle ? detailRow("Ürün", data.productTitle) : ""}
+        </table>
+      `)}
+      ${data?.reason ? warningBox(`<p style="margin: 0; font-size: 14px; color: #92400e;"><strong>İptal nedeni:</strong> ${data.reason}</p>`) : ""}
+      <div style="text-align: center; margin: 32px 0;">
+        ${primaryButton("Satıcı Paneline Git", `${frontendUrl}/seller/orders/${data?.orderId || ""}`)}
+      </div>
+    `,
+      "Sipariş Tarodan Tarafından İptal Edildi",
     ),
 
     "refund-requested-seller": wrapEmail(

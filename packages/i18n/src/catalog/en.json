@@ -9938,6 +9938,14 @@
       "tradePaymentExtendedPaid": {
         "title": "Other Party Given More Time to Pay",
         "message": "You have completed your payment; the other party's payment time was extended once. New deadline: {until}. Your item stays reserved until then. If they still do not pay, the trade is cancelled and your payment is refunded in full."
+      },
+      "orderCancelledByPlatform": {
+        "title": "Your order was cancelled by Tarodan",
+        "message": "Your order {orderNumber} was cancelled by Tarodan. Reason: {reason}. {paid, select, yes {The {amount} TL you paid has been refunded; it reaches your account within your bank's usual refund time.} other {No payment had been taken for this order.}}"
+      },
+      "orderCancelledByPlatformSeller": {
+        "title": "An order was cancelled by Tarodan",
+        "message": "Order {orderNumber} was cancelled by Tarodan. Reason: {reason}. {paid, select, yes {Do not ship the item; the stock was added back to your listing.} other {No payment had been taken; the reserved stock is back on your listing.}}"
       }
     },
     "auth": {

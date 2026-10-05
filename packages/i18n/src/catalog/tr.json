@@ -9938,6 +9938,14 @@
       "tradePaymentExtendedPaid": {
         "title": "Takasta Karşı Tarafa Ek Ödeme Süresi Verildi",
         "message": "Ödemenizi tamamladınız; karşı tarafın ödeme süresi bir kez uzatıldı. Yeni son tarih: {until}. Ürününüz o zamana kadar rezerve kalır. Karşı taraf yine de ödemezse takas iptal edilir ve ödemeniz tam olarak iade edilir."
+      },
+      "orderCancelledByPlatform": {
+        "title": "Siparişiniz Tarodan tarafından iptal edildi",
+        "message": "{orderNumber} numaralı siparişiniz Tarodan tarafından iptal edildi. Neden: {reason}. {paid, select, yes {Ödediğiniz {amount} TL iade edildi; tutar bankanızın olağan iade süresi içinde hesabınıza yansır.} other {Bu sipariş için ödeme alınmamıştı.}}"
+      },
+      "orderCancelledByPlatformSeller": {
+        "title": "Sipariş Tarodan tarafından iptal edildi",
+        "message": "{orderNumber} numaralı sipariş Tarodan tarafından iptal edildi. Neden: {reason}. {paid, select, yes {Ürünü kargoya vermeyin; stok ilanınıza geri eklendi.} other {Ödeme alınmamıştı; ayrılan stok ilanınıza geri döndü.}}"
       }
     },
     "auth": {
