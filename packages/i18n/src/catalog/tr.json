@@ -5262,7 +5262,8 @@
           "violationPlaceholder": "İhlal türünü seçin",
           "removeNoteLabel": "Açıklama (isteğe bağlı)",
           "removeNotePlaceholder": "Kaldırma gerekçesini yazın (\"Diğer\" seçildiyse zorunlu)",
-          "notFromStorefront": "İlan bu sırada vitrinde değildi — dashboard'da vitrinden düşüş olarak sayılmaz."
+          "notFromStorefront": "İlan bu sırada vitrinde değildi — dashboard'da vitrinden düşüş olarak sayılmaz.",
+          "lateSoldElsewhere": "İlan bu sırada vitrinde değildi — vitrinden düşüş olarak sayılmaz; yalnız dashboard'daki \"başka platformda satış\" dağılımına girer."
         }
       },
       "import": {
@@ -7810,7 +7811,7 @@
       },
       "removals": {
         "title": "Vitrinden düşen ilanlar",
-        "description": "Seçili dönemde vitrinden düşen ilanlar, nedene göre. Yalnız yayındaki bir ilanın düşüşü sayılır, gerçekleştiği anda; ilan yeniden yayına girip tekrar düşerse iki kez sayılır. Zaten vitrin dışındaki ilanın sonraki kaldırması (ör. süresi dolmuş ilanın silinmesi) sayılmaz.",
+        "description": "Seçili dönemde vitrinden düşen ilanlar, nedene göre. Yalnız yayındaki bir ilanın düşüşü sayılır, gerçekleştiği anda; ilan yeniden yayına girip tekrar düşerse iki kez sayılır. Zaten vitrin dışındaki ilanın sonraki kaldırması (ör. süresi dolmuş ilanın silinmesi) toplamda sayılmaz; yalnız satıcı onu \"başka platformda sattım\" diye kaldırdıysa platform dağılımına girer, bu yüzden platform toplamı nedenlerdeki \"başka platformda sattım\" sayısından büyük olabilir.",
         "total": "Toplam",
         "byReason": "Nedene göre",
         "soldElsewhere": "Başka platformda satış",
@@ -11348,6 +11349,7 @@
         "paused_temporarily": "Geçici olarak durdurdum",
         "expired": "İlan süresi doldu",
         "out_of_stock": "Stok tükendi",
+        "traded": "Tarodan'da takas edildi",
         "return_quarantine": "İade kontrolü bekliyor",
         "seller_suspended": "Satıcı hesabı askıya alındı",
         "policy_violation": "Kural ihlali"

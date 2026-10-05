@@ -5262,7 +5262,8 @@
           "violationPlaceholder": "Choose the violation",
           "removeNoteLabel": "Note (optional)",
           "removeNotePlaceholder": "Explain the removal (required when \"Other\" is chosen)",
-          "notFromStorefront": "The listing was not on the storefront at the time — not counted as leaving it on the dashboard."
+          "notFromStorefront": "The listing was not on the storefront at the time — not counted as leaving it on the dashboard.",
+          "lateSoldElsewhere": "The listing was not on the storefront at the time — not counted as leaving it; it only counts in the dashboard's \"sold on another platform\" breakdown."
         }
       },
       "import": {
@@ -7810,7 +7811,7 @@
       },
       "removals": {
         "title": "Listings taken off the storefront",
-        "description": "Listings that left the storefront in the selected period, by reason. Only a live listing leaving counts, at the moment it happened; a listing that goes live again and leaves again counts twice. A later removal of a listing already off the storefront (e.g. deleting an expired listing) is not counted.",
+        "description": "Listings that left the storefront in the selected period, by reason. Only a live listing leaving counts, at the moment it happened; a listing that goes live again and leaves again counts twice. A later removal of a listing already off the storefront (e.g. deleting an expired listing) is not counted in the total; only if the seller removed it as \"sold on another platform\" does it count in the platform breakdown, so the platform total can exceed the \"sold on another platform\" count in the reasons.",
         "total": "Total",
         "byReason": "By reason",
         "soldElsewhere": "Sold on another platform",
@@ -11348,6 +11349,7 @@
         "paused_temporarily": "Paused temporarily",
         "expired": "Listing expired",
         "out_of_stock": "Out of stock",
+        "traded": "Traded on Tarodan",
         "return_quarantine": "Awaiting return check",
         "seller_suspended": "Seller account suspended",
         "policy_violation": "Policy violation"

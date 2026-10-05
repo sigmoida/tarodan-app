@@ -28,7 +28,9 @@ interface CountedRow {
  *
  * - `byReason`: katalogdaki HER neden, sıfırlar dahil (kart sabit bir düzende
  *   kalır, "bu dönem hiç yok" da bir bilgidir).
- * - `soldElsewhereByPlatform`: her platform, sıfırlar dahil; katalog dışı/boş
+ * - `soldElsewhereByPlatform`: her platform, sıfırlar dahil (vitrinden düşüşler
+ *   + geç gelen cevaplar, bu yüzden toplamı `byReason`daki `sold_elsewhere`
+ *   sayısından büyük olabilir); katalog dışı/boş
  *   platform `other`a eklenir (kural `sold_elsewhere`de platformu zorunlu
  *   tutar, bu yalnız katalogdan çıkarılmış eski kodlara karşı emniyet).
  * - `byViolation`: yalnız görülen ihlal kodları, çoktan aza; `null` = kodsuz
@@ -97,7 +99,10 @@ export function buildListingRemovalBreakdown(
  * gruplama ve test şeridi hariç (`LIVE_PRODUCT`). Yalnız `fromStorefront`
  * olaylar sayılır (ilan öncesinde vitrindeydi — bkz. @tarodan/types
  * `wasOnStorefront`). Vitrinden düşüp yeniden açılıp tekrar düşen ilan iki
- * olaydır.
+ * olaydır. TEK istisna platform kırılımıdır: zaten düşmüş ilanın sonradan
+ * "başka platformda sattım" diye kaldırılması toplamda sayılmaz ama platform
+ * kırılımına girer (`lateSoldElsewhere`; kural @tarodan/types
+ * `isLateSoldElsewhere`).
  *
  * Dönem kartlarının dört rakamlı (dönem/dün/bu ay/tüm zamanlar) biçimini
  * taşımaz: bir kırılımda tek pencere okunur; kartlar kendi uçlarında kalır.
@@ -110,7 +115,7 @@ export class AdminDashboardRemovalsService {
   static readonly PERIOD_CACHE_TTL_SECONDS = 5 * 60;
   /** Tamamen geçmişte kalan özel aralık değişmez. */
   static readonly CLOSED_RANGE_CACHE_TTL_SECONDS = 6 * 60 * 60;
-  static readonly CACHE_PREFIX = "admin:dashboard:removals:v1:";
+  static readonly CACHE_PREFIX = "admin:dashboard:removals:v2:";
 
   constructor(
     private readonly prisma: PrismaService,
@@ -152,10 +157,13 @@ export class AdminDashboardRemovalsService {
     // (önceki statü vitrindi). Vitrin dışındaki ilanın sonraki kaldırmaları
     // (reddedilmiş ilanın pasife alınması, süresi dolmuş ilanın silinmesi)
     // geçmişte durur ama burada sayılmaz.
-    const where = {
+    const windowWhere = {
       createdAt: range.current,
-      fromStorefront: true,
       product: LIVE_PRODUCT,
+    } satisfies Prisma.ProductRemovalEventWhereInput;
+    const where = {
+      ...windowWhere,
+      fromStorefront: true,
     } satisfies Prisma.ProductRemovalEventWhereInput;
 
     // Sorgular $transaction dizisinin dışında kurulur: dizi içinde yazıldığında
@@ -166,9 +174,18 @@ export class AdminDashboardRemovalsService {
       where,
       _count: { _all: true },
     });
+    // Platform kırılımı toplamdan ayrı bir sorudur ("satıcılar nerede
+    // satıyor?"): vitrinden düşüşlere, zaten düşmüş ilanın sonradan "başka
+    // platformda sattım" diye kaldırılmasını da ekler (`lateSoldElsewhere`,
+    // kayıt anında yazılan bayrak; zincir başına ilk cevap). Toplam
+    // (`byReason`) o kaydı saymaz — ilk düşüş zaten sayıldı.
     const byPlatformQuery = this.prisma.productRemovalEvent.groupBy({
       by: ["platform"],
-      where: { ...where, reason: ListingRemovalReason.sold_elsewhere },
+      where: {
+        ...windowWhere,
+        reason: ListingRemovalReason.sold_elsewhere,
+        OR: [{ fromStorefront: true }, { lateSoldElsewhere: true }],
+      },
       _count: { _all: true },
     });
     const byViolationQuery = this.prisma.productRemovalEvent.groupBy({

@@ -97,9 +97,14 @@ function RemovalEventRow({ event }: { event: AdminListingRemovalEvent }) {
         </p>
       )}
       {!event.fromStorefront && (
-        // Kayıt geçmişte kalır ama dashboard'daki vitrinden düşüş sayısına girmez.
+        // Kayıt geçmişte kalır ama dashboard'daki vitrinden düşüş sayısına girmez;
+        // geç gelen "başka platformda sattım" yalnız platform dağılımına girer.
         <p className="text-xs text-subtle">
-          {t("admin.catalog.products.removal.notFromStorefront")}
+          {t(
+            event.lateSoldElsewhere
+              ? "admin.catalog.products.removal.lateSoldElsewhere"
+              : "admin.catalog.products.removal.notFromStorefront",
+          )}
         </p>
       )}
       <p className="text-xs text-muted">

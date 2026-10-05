@@ -107,6 +107,7 @@ export function toAdminRemovalEvent(row: {
   statusBefore: ProductStatus;
   statusAfter: ProductStatus;
   fromStorefront: boolean;
+  lateSoldElsewhere: boolean;
   actorUserId: string | null;
   createdAt: Date;
 }): AdminListingRemovalEvent {
@@ -120,6 +121,7 @@ export function toAdminRemovalEvent(row: {
     statusBefore: row.statusBefore,
     statusAfter: row.statusAfter,
     fromStorefront: row.fromStorefront,
+    lateSoldElsewhere: row.lateSoldElsewhere,
     actorUserId: row.actorUserId,
     createdAt: row.createdAt.toISOString(),
   };

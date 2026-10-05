@@ -110,7 +110,9 @@ export function toListingRemovalsView(
 
   return {
     total,
-    isEmpty: total === 0,
+    // Platform kırılımı toplamdan bağımsız büyüyebilir (geç gelen "başka
+    // platformda sattım" cevapları): yalnız o varsa ekran boş sayılmaz.
+    isEmpty: total === 0 && platforms.total === 0,
     byActor,
     soldElsewhereTotal: platforms.total,
     platforms: platforms.rows,

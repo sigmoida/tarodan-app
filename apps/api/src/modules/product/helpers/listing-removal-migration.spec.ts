@@ -22,7 +22,7 @@ describe("listing removal reasons migration", () => {
     .filter((line) => !line.trim().startsWith("--"))
     .join("\n");
 
-  it("enum değerleri katalogla aynı sırada", () => {
+  it("enum değerleri katalogla aynı sırada (takip göçünün eklediği `traded` hariç)", () => {
     const match = statements.match(
       /CREATE TYPE "ListingRemovalReason" AS ENUM \(([^)]*)\)/,
     );
@@ -30,7 +30,10 @@ describe("listing removal reasons migration", () => {
     const values = (match?.[1] ?? "")
       .split(",")
       .map((value) => value.trim().replace(/'/g, ""));
-    expect(values).toEqual([...LISTING_REMOVAL_REASONS]);
+    // `traded` sonradan 20261005220000 göçüyle eklendi (bu göç düzenlenmez).
+    expect(values).toEqual(
+      LISTING_REMOVAL_REASONS.filter((reason) => reason !== "traded"),
+    );
   });
 
   it("products.removal_reason boş bırakılabilir ve varsayılansız eklenir", () => {
@@ -70,5 +73,54 @@ describe("listing removal reasons migration", () => {
     );
     expect(schema).toMatch(/model ProductRemovalEvent \{/);
     expect(schema).toMatch(/@@map\("product_removal_events"\)/);
+  });
+});
+
+/**
+ * `20261005220000_listing_removal_followups`: iki ürün kararı — `traded` nedeni
+ * ve platform kırılımına geç giren "başka platformda sattım" bayrağı. Yalnız
+ * toplamalı; geri doldurma yok, olay tablosu tetikleyicisi bozulmaz.
+ */
+describe("listing removal follow-ups migration", () => {
+  const sql = readFileSync(
+    join(
+      apiAppRoot(),
+      "prisma/migrations/20261005220000_listing_removal_followups/migration.sql",
+    ),
+    "utf8",
+  );
+  const statements = sql
+    .split("\n")
+    .filter((line) => !line.trim().startsWith("--"))
+    .join("\n");
+
+  it("`traded` değerini katalogdaki yerine (out_of_stock'tan sonra) ekler", () => {
+    expect(statements).toMatch(
+      /ALTER TYPE "ListingRemovalReason" ADD VALUE IF NOT EXISTS 'traded' AFTER 'out_of_stock';/,
+    );
+    const order = [...LISTING_REMOVAL_REASONS];
+    expect(order[order.indexOf("traded") - 1]).toBe("out_of_stock");
+  });
+
+  it("geç platform bayrağı varsayılanlı eklenir; hiçbir satır güncellenmez", () => {
+    expect(statements).toMatch(
+      /ADD COLUMN "late_sold_elsewhere" BOOLEAN NOT NULL DEFAULT false/,
+    );
+    expect(statements).not.toMatch(
+      /UPDATE\s+"?(products|product_removal_events)"?/i,
+    );
+    expect(statements).not.toMatch(/INSERT\s+INTO/i);
+    expect(statements).not.toMatch(/DROP\s+(TABLE|COLUMN|TYPE|TRIGGER)/i);
+  });
+
+  it("şema aynı adı ve enum değerini taşır", () => {
+    const schema = readFileSync(
+      join(apiAppRoot(), "prisma/schema.prisma"),
+      "utf8",
+    );
+    expect(schema).toMatch(
+      /lateSoldElsewhere\s+Boolean\s+@default\(false\)\s+@map\("late_sold_elsewhere"\)/,
+    );
+    expect(schema).toMatch(/out_of_stock\n\s+traded\n\s+return_quarantine/);
   });
 });

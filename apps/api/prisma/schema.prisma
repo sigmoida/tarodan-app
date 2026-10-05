@@ -968,6 +968,12 @@ model ProductRemovalEvent {
   /// sayılmaz. Kayıt anında yazılır (kural: @tarodan/types `wasOnStorefront`),
   /// sorgular statülerden yeniden hesaplamaz.
   fromStorefront Boolean             @map("from_storefront")
+  /// Vitrinden düşüş DEĞİL ama dashboard'ın PLATFORM kırılımına girer: ilan
+  /// zaten düşmüştü (ör. süresi dolmuştu), satıcı sonra "başka platformda
+  /// sattım" diye kaldırdı ve bu, ilanın son düşüşünden bu yana ilk platform
+  /// cevabı. Toplam sayıma girmez (ilk düşüş zaten sayıldı). Kayıt anında
+  /// yazılır (kural: @tarodan/types `isLateSoldElsewhere`).
+  lateSoldElsewhere Boolean          @default(false) @map("late_sold_elsewhere")
   /// İşlemi yapan kullanıcı (satıcı ya da yönetici); sistem işlerinde null.
   /// FK yok: denetim satırı kişinin hesabından bağımsız kalır.
   actorUserId   String?              @map("actor_user_id")
@@ -976,6 +982,7 @@ model ProductRemovalEvent {
   product       Product              @relation(fields: [productId], references: [id], onDelete: Cascade)
 
   @@index([fromStorefront, createdAt])
+  @@index([lateSoldElsewhere, createdAt])
   @@index([productId, createdAt(sort: Desc)])
   @@index([reason, createdAt])
   @@map("product_removal_events")
@@ -3719,7 +3726,7 @@ enum ProductInactiveReason {
 /// `ProductRemovalEvent.reason`). Değerler ve aktör grupları @tarodan/types
 /// `LISTING_REMOVAL_REASONS` ile BİREBİR aynıdır (kontrat spec'i korur):
 /// satıcı (not_given = nedensiz eski istemci, changed_mind, sold_elsewhere,
-/// paused_temporarily), sistem (expired, out_of_stock, return_quarantine,
+/// paused_temporarily), sistem (expired, out_of_stock, traded, return_quarantine,
 /// seller_suspended), yönetici (policy_violation).
 enum ListingRemovalReason {
   not_given
@@ -3728,6 +3735,7 @@ enum ListingRemovalReason {
   paused_temporarily
   expired
   out_of_stock
+  traded
   return_quarantine
   seller_suspended
   policy_violation

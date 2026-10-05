@@ -268,6 +268,13 @@ describe("recordListingRemovals — sayım kuralı ve güncel neden", () => {
           events.push(...data);
           return { count: data.length };
         }),
+        // Geçmiş sorgusu: sold_elsewhere ya da vitrinden düşüş olayları, en yenisi önce.
+        findMany: jest.fn(async () =>
+          events
+            .filter((e) => e.reason === "sold_elsewhere" || e.fromStorefront)
+            .map((e) => ({ reason: e.reason, fromStorefront: e.fromStorefront }))
+            .reverse(),
+        ),
       },
       product: {
         updateMany: jest.fn(async ({ where, data }: any) => {
@@ -287,7 +294,14 @@ describe("recordListingRemovals — sayım kuralı ve güncel neden", () => {
       ]);
     };
     const counted = () => events.filter((e) => e.fromStorefront).length;
-    return { row, events, remove, counted };
+    /** Platform kırılımına girenler: vitrinden düşüş + geç gelen cevap. */
+    const platformCounted = () =>
+      events.filter(
+        (e) =>
+          e.reason === "sold_elsewhere" &&
+          (e.fromStorefront || e.lateSoldElsewhere),
+      ).length;
+    return { row, events, remove, counted, platformCounted };
   };
 
   it("yönetici reddi → satıcı pasife alır: tek sayılan olay, neden 'kural ihlali' kalır", async () => {
@@ -323,25 +337,25 @@ describe("recordListingRemovals — sayım kuralı ve güncel neden", () => {
       // Takas kabulü: active → reserved — kaldırma değil, kayıt yok.
       await t.remove({
         statusAfter: ProductStatus.reserved,
-        reason: ListingRemovalReason.out_of_stock,
+        reason: ListingRemovalReason.traded,
       });
       expect(t.events).toHaveLength(0);
 
       await t.remove({
         statusAfter: ProductStatus.inactive,
-        reason: ListingRemovalReason.out_of_stock,
+        reason: ListingRemovalReason.traded,
       });
 
       expect(t.events).toEqual([
         expect.objectContaining({
-          reason: ListingRemovalReason.out_of_stock,
+          reason: ListingRemovalReason.traded,
           statusBefore: ProductStatus.reserved,
           statusAfter: ProductStatus.inactive,
           fromStorefront: true,
         }),
       ]);
       expect(t.counted()).toBe(1);
-      expect(t.row.removalReason).toBe(ListingRemovalReason.out_of_stock);
+      expect(t.row.removalReason).toBe(ListingRemovalReason.traded);
     });
 
     it("rezervasyon bırakılıp stok yoksa (reserved → inactive) bir kez sayılır", async () => {
@@ -461,6 +475,86 @@ describe("recordListingRemovals — sayım kuralı ve güncel neden", () => {
     expect(t.events).toHaveLength(2);
     expect(t.counted()).toBe(1);
     expect(t.row.removalReason).toBe(ListingRemovalReason.expired);
+    // Toplamda süre dolumu bir kez; platform kırılımında geç gelen cevap bir kez.
+    expect(t.events[1]).toEqual(
+      expect.objectContaining({
+        fromStorefront: false,
+        lateSoldElsewhere: true,
+      }),
+    );
+    expect(t.platformCounted()).toBe(1);
+  });
+
+  it("vitrinden 'başka platformda sattım' ile düşen ilanın sonraki silmesi platforma ikinci kez girmez", async () => {
+    const t = makeTable({ status: ProductStatus.active, removalReason: null });
+
+    await t.remove({
+      statusAfter: ProductStatus.inactive,
+      reason: ListingRemovalReason.sold_elsewhere,
+      platform: "dolap",
+    });
+    await t.remove({
+      statusAfter: ProductStatus.deleted,
+      reason: ListingRemovalReason.sold_elsewhere,
+      platform: "dolap",
+    });
+
+    expect(t.counted()).toBe(1);
+    expect(t.events[1]).not.toHaveProperty("lateSoldElsewhere");
+    expect(t.platformCounted()).toBe(1);
+  });
+
+  it("vitrin dışı zincirde (reddedilmiş) iki satıcı cevabından yalnız ilki platforma girer", async () => {
+    const t = makeTable({ status: ProductStatus.rejected, removalReason: null });
+
+    await t.remove({
+      statusAfter: ProductStatus.inactive,
+      reason: ListingRemovalReason.sold_elsewhere,
+      platform: "letgo",
+    });
+    await t.remove({
+      statusAfter: ProductStatus.deleted,
+      reason: ListingRemovalReason.sold_elsewhere,
+      platform: "letgo",
+    });
+
+    expect(t.counted()).toBe(0);
+    expect(t.platformCounted()).toBe(1);
+  });
+
+  it("yeniden yayına girip tekrar düşen ilanda yeni düşüş zinciri başlar: ikinci geç cevap yeniden sayılır", async () => {
+    const t = makeTable({ status: ProductStatus.active, removalReason: null });
+
+    await t.remove({
+      statusAfter: ProductStatus.inactive,
+      reason: ListingRemovalReason.sold_elsewhere,
+      platform: "dolap",
+    });
+    t.row.status = ProductStatus.active; // yeniden yayın
+    await t.remove({
+      statusAfter: ProductStatus.inactive,
+      reason: ListingRemovalReason.expired,
+    });
+    await t.remove({
+      statusAfter: ProductStatus.deleted,
+      reason: ListingRemovalReason.sold_elsewhere,
+      platform: "instagram",
+    });
+
+    expect(t.counted()).toBe(2);
+    expect(t.platformCounted()).toBe(2);
+  });
+
+  it("sold_elsewhere olmayan vitrin dışı kayıt geç bayrak almaz ve geçmişi okumaz", async () => {
+    const t = makeTable({ status: ProductStatus.pending, removalReason: null });
+
+    await t.remove({
+      statusAfter: ProductStatus.rejected,
+      reason: ListingRemovalReason.seller_suspended,
+    });
+
+    expect(t.events[0]).not.toHaveProperty("lateSoldElsewhere");
+    expect(t.platformCounted()).toBe(0);
   });
 
   it("satıcının duraklattığı ilanı satıcı silerse güncel neden satıcının son nedenine geçer", async () => {
