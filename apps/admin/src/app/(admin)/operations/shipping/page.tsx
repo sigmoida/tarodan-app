@@ -6,13 +6,6 @@ import { useTranslations } from "next-intl";
 import { AdminPage } from "@/components/page/AdminPage";
 import { PageHeader } from "@/components/AdminList";
 import { AdminTabs } from "@/components/AdminTabs";
-import {
-  TruckIcon,
-  ArrowsRightLeftIcon,
-  ArrowUturnLeftIcon,
-  MapPinIcon,
-  ExclamationTriangleIcon,
-} from "@heroicons/react/24/outline";
 import { OrderShipmentsTab } from "./_components/OrderShipmentsTab";
 import { TradeShipmentsTab } from "./_components/TradeShipmentsTab";
 import { ReturnShipmentsTab } from "./_components/ReturnShipmentsTab";
@@ -25,27 +18,22 @@ const TAB_DEFS = [
   {
     key: "siparisler",
     labelKey: "admin.operations.shipping.tabs.orders",
-    icon: TruckIcon,
   },
   {
     key: "takas",
     labelKey: "admin.operations.shipping.tabs.trades",
-    icon: ArrowsRightLeftIcon,
   },
   {
     key: "iade",
     labelKey: "admin.operations.shipping.tabs.returns",
-    icon: ArrowUturnLeftIcon,
   },
   {
     key: "surat",
     labelKey: "admin.operations.shipping.tabs.surat",
-    icon: MapPinIcon,
   },
   {
     key: "iptaller",
     labelKey: "admin.operations.shipping.tabs.cancellations",
-    icon: ExclamationTriangleIcon,
   },
 ] as const;
 
@@ -79,7 +67,6 @@ export default function ShippingPage() {
         tabs={TAB_DEFS.map((def) => ({
           key: def.key,
           label: t(def.labelKey),
-          icon: def.icon,
         }))}
         value={activeTab}
         onChange={handleTabChange}

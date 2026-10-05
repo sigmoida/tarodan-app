@@ -62,15 +62,15 @@ export const applicationStatusConfig = (
   },
   preliminary_approved: {
     label: t("admin.accounts.sellerApplications.status.preliminaryApproved"),
-    variant: "info",
+    variant: "default",
   },
   invited: {
     label: t("admin.accounts.sellerApplications.status.invited"),
-    variant: "info",
+    variant: "default",
   },
   activated: {
     label: t("admin.accounts.sellerApplications.status.activated"),
-    variant: "info",
+    variant: "default",
   },
   completing: {
     label: t("admin.accounts.sellerApplications.status.completing"),

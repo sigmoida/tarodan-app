@@ -66,7 +66,7 @@ export const elogoColumns = (
           <p className="whitespace-nowrap font-mono font-medium text-heading">
             {i.invoiceNumber || "—"}
           </p>
-          <Badge variant={i.isReturn ? "danger" : "secondary"} size="sm">
+          <Badge variant={i.isReturn ? "danger" : "outline"} size="sm">
             {documentTypeLabel(t, i.documentType)}
           </Badge>
           {i.sourceReference && (

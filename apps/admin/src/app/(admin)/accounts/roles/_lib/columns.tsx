@@ -30,7 +30,7 @@ export function staffColumns(
     col.badge<StaffItem>(
       t("admin.roles.columns.role"),
       (s) => (
-        <Badge variant={ROLE_BADGE_VARIANT[s.role as RoleId] ?? "default"}>
+        <Badge variant={ROLE_BADGE_VARIANT[s.role as RoleId] ?? "outline"}>
           {roleMeta[s.role as RoleId]?.label ?? s.role}
         </Badge>
       ),

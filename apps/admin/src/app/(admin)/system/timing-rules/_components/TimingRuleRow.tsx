@@ -46,7 +46,7 @@ export function TimingRuleRow({ id, state, canEdit }: TimingRuleRowProps) {
       <div className="min-w-0">
         <div className="flex flex-wrap items-center gap-2">
           <p className="font-medium text-heading">{label}</p>
-          <Badge variant={source === "setting" ? "primary" : "secondary"}>
+          <Badge variant={source === "setting" ? "default" : "outline"}>
             {t(`admin.timingRules.source.${source}`)}
           </Badge>
         </div>

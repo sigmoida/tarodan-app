@@ -100,7 +100,7 @@ export default function BoostPurchaseDetailPage() {
         <span className="flex items-center gap-2">
           <Badge status={purchase.status} config={statuses} />
           {purchase.isBestForBuyer && (
-            <Badge variant="primary">
+            <Badge variant="default">
               <TrophyIcon className="mr-1 h-4 w-4" />
               {t("admin.marketing.boostPurchases.bestBoost")}
             </Badge>

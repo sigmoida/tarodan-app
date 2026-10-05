@@ -1,11 +1,6 @@
 "use client";
 
 import { DatePicker, Select } from "@tarodan/ui";
-import {
-  CurrencyDollarIcon,
-  ChartBarIcon,
-  DocumentTextIcon,
-} from "@heroicons/react/24/outline";
 import { adminApi } from "@/lib/api";
 import { ResourceList, useResourceList } from "@/components/list";
 import { SectionCard } from "@/components/detail/SectionCard";
@@ -88,20 +83,14 @@ function TaxReportSummary() {
   return (
     <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
       <MetricCard
-        icon={CurrencyDollarIcon}
-        tone="success"
         label={t("admin.finance.tax.totalTaxCollected")}
         value={fmtTry(summary.totalTaxCollected)}
       />
       <MetricCard
-        icon={ChartBarIcon}
-        tone="primary"
         label={t("admin.finance.tax.totalRevenue")}
         value={fmtTry(summary.totalRevenue)}
       />
       <MetricCard
-        icon={DocumentTextIcon}
-        tone="info"
         label={t("admin.finance.tax.invoiceCount")}
         value={summary.invoiceCount}
       />

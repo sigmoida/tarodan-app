@@ -33,13 +33,15 @@ export function NavLink({
       onClick={onNavigate}
       className={clsx(
         "flex items-center rounded-lg text-sm font-medium transition-colors",
-        nested ? "pl-9 pr-3 py-2" : "px-3 py-2",
+        nested ? "pl-11 pr-3 py-2" : "px-3 py-2",
         isActive
           ? "bg-primary-50 text-primary-600"
           : "text-muted hover:bg-surface-alt hover:text-heading",
       )}
     >
-      <item.icon className="h-5 w-5 flex-shrink-0 mr-3" />
+      {!nested && item.icon && (
+        <item.icon className="h-5 w-5 flex-shrink-0 mr-3" />
+      )}
       {item.name}
     </Link>
   );

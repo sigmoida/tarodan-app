@@ -57,11 +57,11 @@ export const purchaseStatusConfig = (t: T): Record<string, StatusConfig> => ({
   },
   expired: {
     label: t("admin.marketing.boostPurchases.status.expired"),
-    variant: "secondary",
+    variant: "outline",
   },
   cancelled: {
     label: t("admin.marketing.boostPurchases.status.cancelled"),
-    variant: "secondary",
+    variant: "outline",
   },
   failed: {
     label: t("admin.marketing.boostPurchases.status.failed"),

@@ -70,7 +70,7 @@ export default function ImagesCard({
     <SectionCard
       title={t("product.images")}
       badge={
-        <Badge variant={isFull ? "success" : "secondary"} size="sm">
+        <Badge variant={isFull ? "success" : "outline"} size="sm">
           {isFull
             ? t("product.imageUpload.full")
             : t("product.imageUpload.counter", {

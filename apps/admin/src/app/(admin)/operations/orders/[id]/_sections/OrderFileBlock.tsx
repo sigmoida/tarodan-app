@@ -86,11 +86,9 @@ export function OrderFileBlock({ entry }: { entry: OrderFileEntry }) {
           <span className="font-mono text-sm font-medium text-heading">
             #{entry.orderNumber}
           </span>
-          <span
-            className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${status.color} ${status.bg}`}
-          >
+          <Badge variant={status.variant} size="sm">
             {status.label}
-          </span>
+          </Badge>
         </span>
         <div className="flex flex-wrap gap-2">
           {canManage && canManuallyUpdateOrderStatus(entry.status) && (

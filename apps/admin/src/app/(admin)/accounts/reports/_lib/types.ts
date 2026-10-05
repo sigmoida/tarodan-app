@@ -30,12 +30,12 @@ export function reportStatusConfig(t: T): Record<string, StatusConfig> {
     pending: { label: t("admin.reports.status.pending"), variant: "warning" },
     under_review: {
       label: t("admin.reports.status.underReview"),
-      variant: "info",
+      variant: "default",
     },
     resolved: { label: t("admin.reports.status.resolved"), variant: "success" },
     dismissed: {
       label: t("admin.reports.status.dismissed"),
-      variant: "default",
+      variant: "outline",
     },
   };
 }

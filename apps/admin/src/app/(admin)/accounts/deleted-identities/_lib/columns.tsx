@@ -71,7 +71,7 @@ export function deletedIdentityColumns(t: T) {
     col.badge<DeletedIdentity>(
       t("admin.deletedIdentities.wasSeller"),
       (r) => (
-        <Badge variant={r.wasSeller ? "warning" : "default"}>
+        <Badge variant={r.wasSeller ? "warning" : "outline"}>
           {r.wasSeller ? t("common.yes") : t("common.no")}
         </Badge>
       ),
@@ -84,13 +84,13 @@ export function deletedIdentityColumns(t: T) {
     ),
     col.badge<DeletedIdentity>(
       t("admin.deletedIdentities.deletedBy"),
-      (r) => <Badge>{actorLabel(t, r.deletedByActor)}</Badge>,
+      (r) => <Badge variant="outline">{actorLabel(t, r.deletedByActor)}</Badge>,
       { sortKey: "deletedByActor", sortType: "text" },
     ),
     col.badge<DeletedIdentity>(
       t("admin.deletedIdentities.source"),
       (r) => (
-        <Badge variant={r.source === "backfill" ? "default" : "success"}>
+        <Badge variant={r.source === "backfill" ? "outline" : "success"}>
           {sourceLabel(t, r.source)}
         </Badge>
       ),

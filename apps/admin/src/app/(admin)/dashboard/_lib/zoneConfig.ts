@@ -6,13 +6,10 @@ import {
   ExclamationTriangleIcon,
   InformationCircleIcon,
   LifebuoyIcon,
-  MegaphoneIcon,
   ReceiptRefundIcon,
   ShieldExclamationIcon,
   ShoppingBagIcon,
-  TagIcon,
   TruckIcon,
-  UserGroupIcon,
 } from "@heroicons/react/24/outline";
 import type { ComponentType } from "react";
 import type {
@@ -22,7 +19,6 @@ import type {
   DashboardStockKey,
 } from "@tarodan/types";
 import type { MessageKey } from "@tarodan/i18n";
-import type { MetricTone } from "@/components/MetricCard";
 
 /**
  * How each zone's rows are DRAWN. What they contain, which screen they link to
@@ -32,10 +28,13 @@ import type { MetricTone } from "@/components/MetricCard";
 
 type Icon = ComponentType<{ className?: string }>;
 
+/** Kuyruk karosunun ikon rengi. */
+export type QueueTone = "primary" | "info" | "success" | "warning" | "danger";
+
 /** Queue tile → its icon and tone. Order comes from the shared catalogue. */
 export const QUEUE_PRESENTATION: Record<
   DashboardQueueKey,
-  { labelKey: MessageKey; icon: Icon; tone: MetricTone }
+  { labelKey: MessageKey; icon: Icon; tone: QueueTone }
 > = {
   refundRequests: {
     labelKey: "admin.dashboard.queues.refundRequests",
@@ -133,43 +132,31 @@ export const ALERT_MESSAGE_KEY: Record<DashboardAlertKey, MessageKey> = {
 export const STOCK_CARDS: Array<{
   key: DashboardStockKey;
   labelKey: MessageKey;
-  icon: Icon;
-  tone: MetricTone;
   format: "count" | "currency";
 }> = [
   {
     key: "escrowBalance",
     labelKey: "admin.dashboard.stock.escrowBalance",
-    icon: BanknotesIcon,
-    tone: "success",
     format: "currency",
   },
   {
     key: "openSellerDebt",
     labelKey: "admin.dashboard.stock.openSellerDebt",
-    icon: ReceiptRefundIcon,
-    tone: "warning",
     format: "currency",
   },
   {
     key: "activeListings",
     labelKey: "admin.dashboard.stock.activeListings",
-    icon: TagIcon,
-    tone: "primary",
     format: "count",
   },
   {
     key: "activeMemberships",
     labelKey: "admin.dashboard.stock.activeMemberships",
-    icon: UserGroupIcon,
-    tone: "info",
     format: "count",
   },
   {
     key: "activeBoosts",
     labelKey: "admin.dashboard.stock.activeBoosts",
-    icon: MegaphoneIcon,
-    tone: "info",
     format: "count",
   },
 ];

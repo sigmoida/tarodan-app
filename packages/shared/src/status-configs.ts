@@ -53,11 +53,11 @@ export const orderStatusConfig: StatusConfigDefMap = {
   },
   preparing: {
     labelKey: "status.order.preparing",
-    variant: "info",
+    variant: "default",
   },
   shipped: {
     labelKey: "status.order.shipped",
-    variant: "info",
+    variant: "default",
   },
   delivered: {
     labelKey: "status.order.delivered",
@@ -81,7 +81,7 @@ export const orderStatusConfig: StatusConfigDefMap = {
   },
   refunded: {
     labelKey: "status.order.refunded",
-    variant: "secondary",
+    variant: "outline",
   },
 };
 
@@ -108,19 +108,19 @@ export const tradeStatusConfig: StatusConfigDefMap = {
   },
   shipping_to_warehouse: {
     labelKey: "status.trade.shipping_to_warehouse",
-    variant: "info",
+    variant: "default",
   },
   at_warehouse: {
     labelKey: "status.trade.at_warehouse",
-    variant: "info",
+    variant: "default",
   },
   admin_reviewing: {
     labelKey: "status.trade.admin_reviewing",
-    variant: "info",
+    variant: "default",
   },
   shipping_to_recipients: {
     labelKey: "status.trade.shipping_to_recipients",
-    variant: "info",
+    variant: "default",
   },
   returning: {
     labelKey: "status.trade.returning",
@@ -128,23 +128,23 @@ export const tradeStatusConfig: StatusConfigDefMap = {
   },
   initiator_shipped: {
     labelKey: "status.trade.initiator_shipped",
-    variant: "info",
+    variant: "default",
   },
   receiver_shipped: {
     labelKey: "status.trade.receiver_shipped",
-    variant: "info",
+    variant: "default",
   },
   both_shipped: {
     labelKey: "status.trade.both_shipped",
-    variant: "info",
+    variant: "default",
   },
   initiator_received: {
     labelKey: "status.trade.initiator_received",
-    variant: "info",
+    variant: "default",
   },
   receiver_received: {
     labelKey: "status.trade.receiver_received",
-    variant: "info",
+    variant: "default",
   },
   completed: {
     labelKey: "status.trade.completed",
@@ -156,7 +156,7 @@ export const tradeStatusConfig: StatusConfigDefMap = {
   },
   disputed: {
     labelKey: "status.trade.disputed",
-    variant: "destructive",
+    variant: "danger",
   },
 };
 
@@ -175,19 +175,19 @@ export const refundRequestStatusConfig: StatusConfigDefMap = {
   },
   wait_for_delivery: {
     labelKey: "status.refundRequest.wait_for_delivery",
-    variant: "info",
+    variant: "default",
   },
   return_shipment_open: {
     labelKey: "status.refundRequest.return_shipment_open",
-    variant: "info",
+    variant: "default",
   },
   return_in_transit: {
     labelKey: "status.refundRequest.return_in_transit",
-    variant: "info",
+    variant: "default",
   },
   return_delivered: {
     labelKey: "status.refundRequest.return_delivered",
-    variant: "info",
+    variant: "default",
   },
   refunded: {
     labelKey: "status.refundRequest.refunded",
@@ -199,11 +199,11 @@ export const refundRequestStatusConfig: StatusConfigDefMap = {
   },
   disputed: {
     labelKey: "status.refundRequest.disputed",
-    variant: "destructive",
+    variant: "danger",
   },
   cancelled: {
     labelKey: "status.refundRequest.cancelled",
-    variant: "secondary",
+    variant: "outline",
   },
 };
 
@@ -226,11 +226,11 @@ export const offerStatusConfig: StatusConfigDefMap = {
   },
   countered: {
     labelKey: "status.offer.countered",
-    variant: "info",
+    variant: "default",
   },
   expired: {
     labelKey: "status.offer.expired",
-    variant: "secondary",
+    variant: "outline",
   },
   cancelled: {
     labelKey: "status.offer.cancelled",
@@ -253,7 +253,7 @@ export const paymentStatusConfig: StatusConfigDefMap = {
   },
   processing: {
     labelKey: "status.payment.processing",
-    variant: "info",
+    variant: "default",
   },
   completed: {
     labelKey: "status.payment.completed",
@@ -265,7 +265,7 @@ export const paymentStatusConfig: StatusConfigDefMap = {
   },
   refunded: {
     labelKey: "status.payment.refunded",
-    variant: "secondary",
+    variant: "outline",
   },
 };
 
@@ -284,15 +284,15 @@ export const productStatusConfig: StatusConfigDefMap = {
   },
   inactive: {
     labelKey: "status.product.inactive",
-    variant: "secondary",
+    variant: "outline",
   },
   sold: {
     labelKey: "status.product.sold",
-    variant: "info",
+    variant: "default",
   },
   reserved: {
     labelKey: "status.product.reserved",
-    variant: "info",
+    variant: "default",
   },
   rejected: {
     labelKey: "status.product.rejected",
@@ -315,15 +315,15 @@ export const productConditionConfig: StatusConfigDefMap = {
   },
   like_new: {
     labelKey: "status.productCondition.like_new",
-    variant: "info",
+    variant: "default",
   },
   very_good: {
     labelKey: "status.productCondition.very_good",
-    variant: "info",
+    variant: "default",
   },
   good: {
     labelKey: "status.productCondition.good",
-    variant: "default",
+    variant: "outline",
   },
   fair: {
     labelKey: "status.productCondition.fair",
@@ -341,11 +341,11 @@ export const adminRoleConfig: StatusConfigDefMap = {
   },
   admin: {
     labelKey: "status.adminRole.admin",
-    variant: "primary",
+    variant: "default",
   },
   moderator: {
     labelKey: "status.adminRole.moderator",
-    variant: "info",
+    variant: "default",
   },
 };
 
@@ -359,7 +359,7 @@ export const ticketStatusConfig: StatusConfigDefMap = {
   },
   in_progress: {
     labelKey: "status.ticket.in_progress",
-    variant: "info",
+    variant: "default",
   },
   waiting_customer: {
     labelKey: "status.ticket.waiting_customer",
@@ -371,7 +371,7 @@ export const ticketStatusConfig: StatusConfigDefMap = {
   },
   closed: {
     labelKey: "status.ticket.closed",
-    variant: "secondary",
+    variant: "outline",
   },
 };
 
@@ -381,15 +381,15 @@ export const ticketStatusConfig: StatusConfigDefMap = {
 export const taxScopeConfig: StatusConfigDefMap = {
   default_rate: {
     labelKey: "status.taxScope.default_rate",
-    variant: "default",
+    variant: "outline",
   },
   category: {
     labelKey: "status.taxScope.category",
-    variant: "info",
+    variant: "default",
   },
   product: {
     labelKey: "status.taxScope.product",
-    variant: "secondary",
+    variant: "outline",
   },
 };
 
@@ -397,11 +397,11 @@ export const taxScopeConfig: StatusConfigDefMap = {
 export const membershipTierConfig: StatusConfigDefMap = {
   free: {
     labelKey: "status.membershipTier.free",
-    variant: "secondary",
+    variant: "outline",
   },
   basic: {
     labelKey: "status.membershipTier.basic",
-    variant: "info",
+    variant: "default",
   },
   premium: {
     labelKey: "status.membershipTier.premium",
@@ -409,7 +409,7 @@ export const membershipTierConfig: StatusConfigDefMap = {
   },
   business: {
     labelKey: "status.membershipTier.business",
-    variant: "primary",
+    variant: "default",
   },
 };
 
@@ -427,7 +427,7 @@ export const refundReasonConfig: StatusConfigDefMap = {
   },
   changed_mind: {
     labelKey: "status.refundReason.changed_mind",
-    variant: "secondary",
+    variant: "outline",
   },
   damaged: {
     labelKey: "status.refundReason.damaged",
@@ -463,7 +463,7 @@ export const refundReasonConfig: StatusConfigDefMap = {
   },
   other: {
     labelKey: "status.refundReason.other",
-    variant: "default",
+    variant: "outline",
   },
 };
 
@@ -484,27 +484,27 @@ export const orderCancellationReasonConfig: StatusConfigDefMap = {
   },
   wrong_product_selected: {
     labelKey: "status.orderCancellationReason.wrong_product_selected",
-    variant: "secondary",
+    variant: "outline",
   },
   changed_mind: {
     labelKey: "status.orderCancellationReason.changed_mind",
-    variant: "secondary",
+    variant: "outline",
   },
   wrong_card: {
     labelKey: "status.orderCancellationReason.wrong_card",
-    variant: "secondary",
+    variant: "outline",
   },
   price_changed_mind: {
     labelKey: "status.orderCancellationReason.price_changed_mind",
-    variant: "secondary",
+    variant: "outline",
   },
   unavailable_at_address: {
     labelKey: "status.orderCancellationReason.unavailable_at_address",
-    variant: "secondary",
+    variant: "outline",
   },
   other: {
     labelKey: "status.orderCancellationReason.other",
-    variant: "default",
+    variant: "outline",
   },
 };
 
@@ -525,23 +525,23 @@ export const shipmentStatusConfig: StatusConfigDefMap = {
   },
   label_created: {
     labelKey: "status.shipment.label_created",
-    variant: "info",
+    variant: "default",
   },
   picked_up: {
     labelKey: "status.shipment.picked_up",
-    variant: "info",
+    variant: "default",
   },
   in_transit: {
     labelKey: "status.shipment.in_transit",
-    variant: "info",
+    variant: "default",
   },
   at_delivery_branch: {
     labelKey: "status.shipment.at_delivery_branch",
-    variant: "info",
+    variant: "default",
   },
   out_for_delivery: {
     labelKey: "status.shipment.out_for_delivery",
-    variant: "info",
+    variant: "default",
   },
   delivered: {
     labelKey: "status.shipment.delivered",
@@ -557,7 +557,7 @@ export const shipmentStatusConfig: StatusConfigDefMap = {
   },
   returned: {
     labelKey: "status.shipment.returned",
-    variant: "secondary",
+    variant: "outline",
   },
   cancelled: {
     labelKey: "status.shipment.cancelled",
@@ -569,19 +569,19 @@ export const shipmentStatusConfig: StatusConfigDefMap = {
 export const notificationChannelConfig: StatusConfigDefMap = {
   push: {
     labelKey: "status.notificationChannel.push",
-    variant: "info",
+    variant: "default",
   },
   email: {
     labelKey: "status.notificationChannel.email",
-    variant: "info",
+    variant: "default",
   },
   sms: {
     labelKey: "status.notificationChannel.sms",
-    variant: "info",
+    variant: "default",
   },
   in_app: {
     labelKey: "status.notificationChannel.in_app",
-    variant: "info",
+    variant: "default",
   },
 };
 
@@ -593,11 +593,11 @@ export const deliveryStatusConfig: StatusConfigDefMap = {
   },
   scheduled: {
     labelKey: "status.delivery.scheduled",
-    variant: "info",
+    variant: "default",
   },
   sent: {
     labelKey: "status.delivery.sent",
-    variant: "info",
+    variant: "default",
   },
   delivered: {
     labelKey: "status.delivery.delivered",
@@ -609,7 +609,7 @@ export const deliveryStatusConfig: StatusConfigDefMap = {
   },
   cancelled: {
     labelKey: "status.delivery.cancelled",
-    variant: "secondary",
+    variant: "outline",
   },
 };
 
@@ -617,31 +617,31 @@ export const deliveryStatusConfig: StatusConfigDefMap = {
 export const ticketCategoryConfig: StatusConfigDefMap = {
   payment: {
     labelKey: "status.ticketCategory.payment",
-    variant: "info",
+    variant: "default",
   },
   shipping: {
     labelKey: "status.ticketCategory.shipping",
-    variant: "info",
+    variant: "default",
   },
   trade: {
     labelKey: "status.ticketCategory.trade",
-    variant: "info",
+    variant: "default",
   },
   account: {
     labelKey: "status.ticketCategory.account",
-    variant: "info",
+    variant: "default",
   },
   product: {
     labelKey: "status.ticketCategory.product",
-    variant: "info",
+    variant: "default",
   },
   technical: {
     labelKey: "status.ticketCategory.technical",
-    variant: "info",
+    variant: "default",
   },
   other: {
     labelKey: "status.ticketCategory.other",
-    variant: "default",
+    variant: "outline",
   },
 };
 
@@ -649,11 +649,11 @@ export const ticketCategoryConfig: StatusConfigDefMap = {
 export const ticketPriorityConfig: StatusConfigDefMap = {
   low: {
     labelKey: "status.ticketPriority.low",
-    variant: "secondary",
+    variant: "outline",
   },
   medium: {
     labelKey: "status.ticketPriority.medium",
-    variant: "info",
+    variant: "default",
   },
   high: {
     labelKey: "status.ticketPriority.high",
@@ -669,7 +669,7 @@ export const ticketPriorityConfig: StatusConfigDefMap = {
 export const sellerTypeConfig: StatusConfigDefMap = {
   individual: {
     labelKey: "status.sellerType.individual",
-    variant: "info",
+    variant: "default",
   },
   verified: {
     labelKey: "status.sellerType.verified",
@@ -677,7 +677,7 @@ export const sellerTypeConfig: StatusConfigDefMap = {
   },
   platform: {
     labelKey: "status.sellerType.platform",
-    variant: "primary",
+    variant: "default",
   },
 };
 
@@ -705,7 +705,7 @@ export const payoutStatusConfig: StatusConfigDefMap = {
   },
   processing: {
     labelKey: "status.payout.processing",
-    variant: "info",
+    variant: "default",
   },
   completed: {
     labelKey: "status.payout.completed",
@@ -717,7 +717,7 @@ export const payoutStatusConfig: StatusConfigDefMap = {
   },
   returned: {
     labelKey: "status.payout.returned",
-    variant: "secondary",
+    variant: "outline",
   },
   retry_pending: {
     labelKey: "status.payout.retry_pending",
@@ -733,11 +733,11 @@ export const subscriptionStatusConfig: StatusConfigDefMap = {
   },
   trialing: {
     labelKey: "status.subscription.trialing",
-    variant: "info",
+    variant: "default",
   },
   cancelled: {
     labelKey: "status.subscription.cancelled",
-    variant: "secondary",
+    variant: "outline",
   },
   expired: {
     labelKey: "status.subscription.expired",
@@ -765,7 +765,7 @@ export const accountStatusConfig: StatusConfigDefMap = {
   },
   deleted: {
     labelKey: "status.accountStatus.deleted",
-    variant: "secondary",
+    variant: "outline",
   },
 };
 
@@ -773,19 +773,19 @@ export const accountStatusConfig: StatusConfigDefMap = {
 export const discountTypeConfig: StatusConfigDefMap = {
   percentage: {
     labelKey: "status.discountType.percentage",
-    variant: "info",
+    variant: "default",
   },
   fixed_amount: {
     labelKey: "status.discountType.fixed_amount",
-    variant: "info",
+    variant: "default",
   },
   bogo: {
     labelKey: "status.discountType.bogo",
-    variant: "info",
+    variant: "default",
   },
   bulk_quantity: {
     labelKey: "status.discountType.bulk_quantity",
-    variant: "info",
+    variant: "default",
   },
 };
 
@@ -793,19 +793,19 @@ export const discountTypeConfig: StatusConfigDefMap = {
 export const discountScopeConfig: StatusConfigDefMap = {
   global: {
     labelKey: "status.discountScope.global",
-    variant: "primary",
+    variant: "default",
   },
   category: {
     labelKey: "status.discountScope.category",
-    variant: "info",
+    variant: "default",
   },
   product: {
     labelKey: "status.discountScope.product",
-    variant: "secondary",
+    variant: "outline",
   },
   seller: {
     labelKey: "status.discountScope.seller",
-    variant: "info",
+    variant: "default",
   },
 };
 
@@ -833,7 +833,7 @@ export const messageStatusConfig: StatusConfigDefMap = {
 export const severityConfig: StatusConfigDefMap = {
   critical: {
     labelKey: "status.severity.critical",
-    variant: "destructive",
+    variant: "danger",
   },
   error: {
     labelKey: "status.severity.error",
@@ -845,11 +845,11 @@ export const severityConfig: StatusConfigDefMap = {
   },
   info: {
     labelKey: "status.severity.info",
-    variant: "info",
+    variant: "default",
   },
   debug: {
     labelKey: "status.severity.debug",
-    variant: "secondary",
+    variant: "outline",
   },
 };
 
@@ -857,19 +857,19 @@ export const severityConfig: StatusConfigDefMap = {
 export const paymentProviderConfig: StatusConfigDefMap = {
   paytr: {
     labelKey: "status.paymentProvider.paytr",
-    variant: "default",
+    variant: "outline",
   },
   iyzico: {
     labelKey: "status.paymentProvider.iyzico",
-    variant: "default",
+    variant: "outline",
   },
   stripe: {
     labelKey: "status.paymentProvider.stripe",
-    variant: "default",
+    variant: "outline",
   },
   manual: {
     labelKey: "status.paymentProvider.manual",
-    variant: "secondary",
+    variant: "outline",
   },
 };
 
@@ -877,7 +877,7 @@ export const paymentProviderConfig: StatusConfigDefMap = {
 export const shipmentProviderConfig: StatusConfigDefMap = {
   surat: {
     labelKey: "status.shipmentProvider.surat",
-    variant: "default",
+    variant: "outline",
   },
 };
 

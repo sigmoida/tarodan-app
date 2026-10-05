@@ -22,7 +22,7 @@ export function InvoiceProcessCell({ invoice }: { invoice: Invoice }) {
   return (
     <div className="flex flex-col items-start gap-1">
       {context ? (
-        <Badge variant="secondary">
+        <Badge variant="outline">
           {invoiceContextLabels(t)[context] ?? context}
         </Badge>
       ) : (

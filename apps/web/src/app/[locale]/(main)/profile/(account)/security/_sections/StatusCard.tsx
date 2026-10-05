@@ -20,7 +20,7 @@ export default function StatusCard({ isEnabled }: { isEnabled: boolean }) {
             </p>
           </div>
         </div>
-        <Badge variant={isEnabled ? "success" : "secondary"}>
+        <Badge variant={isEnabled ? "success" : "outline"}>
           {isEnabled ? t("common.active") : t("common.inactive")}
         </Badge>
       </div>

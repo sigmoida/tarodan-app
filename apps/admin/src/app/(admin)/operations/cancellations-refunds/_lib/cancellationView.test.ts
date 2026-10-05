@@ -114,8 +114,8 @@ describe("row helpers", () => {
     expect(refundStateVariant("refunded")).toBe("success");
     expect(refundStateVariant("failed")).toBe("danger");
     expect(refundStateVariant("pending")).toBe("warning");
-    expect(refundStateVariant("in_review")).toBe("info");
-    expect(refundStateVariant("not_charged")).toBe("default");
+    expect(refundStateVariant("in_review")).toBe("default");
+    expect(refundStateVariant("not_charged")).toBe("outline");
   });
 
   it("maps row statuses to catalog keys, unknown ones to cancelled", () => {

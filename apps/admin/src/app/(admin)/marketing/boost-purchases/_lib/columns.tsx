@@ -45,7 +45,7 @@ export function purchaseColumns(t: T) {
             {p.packageName ?? "—"}
           </Link>
           {p.showcaseOnHome && (
-            <Badge variant="primary" size="sm">
+            <Badge variant="default" size="sm">
               {t("admin.marketing.boostPurchases.showcaseBadge")}
             </Badge>
           )}

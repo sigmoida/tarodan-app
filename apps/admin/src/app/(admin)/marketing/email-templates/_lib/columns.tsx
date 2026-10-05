@@ -31,7 +31,7 @@ export function templateColumns(onEdit: (key: string) => void, t: T) {
             {t("admin.marketing.emailTemplates.custom")}
           </Badge>
         ) : (
-          <Badge variant="secondary" size="sm">
+          <Badge variant="outline" size="sm">
             {t("common.default")}
           </Badge>
         ),

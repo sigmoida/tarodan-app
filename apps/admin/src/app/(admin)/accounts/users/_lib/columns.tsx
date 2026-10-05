@@ -44,7 +44,7 @@ export function userColumns(t: T, rowMenu: (u: User) => RowActionItem[]) {
           u.membershipTier || t("admin.users.membershipFree"),
         );
         return (
-          <Badge variant={tier === "premium" ? "warning" : "default"}>
+          <Badge variant={tier === "premium" ? "warning" : "outline"}>
             {label}
           </Badge>
         );
@@ -60,7 +60,7 @@ export function userColumns(t: T, rowMenu: (u: User) => RowActionItem[]) {
             config={statusConfig(subscriptionStatusConfig, t)}
           />
         ) : (
-          <Badge variant="default">{t("admin.users.membershipFree")}</Badge>
+          <Badge variant="outline">{t("admin.users.membershipFree")}</Badge>
         ),
       {
         grow: 1,

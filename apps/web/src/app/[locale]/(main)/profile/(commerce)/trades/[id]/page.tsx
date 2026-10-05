@@ -130,7 +130,7 @@ export default function TradeDetailPage() {
           <span className="inline-flex items-center gap-2">
             {t("trade.tradeNumberLabel")} {trade.tradeNumber}
             {trade.version && trade.version > 1 && (
-              <Badge variant="primary" size="sm">
+              <Badge variant="default" size="sm">
                 {t("trade.counterOfferNumber", { number: trade.version - 1 })}
               </Badge>
             )}

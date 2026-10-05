@@ -1,6 +1,4 @@
 import {
-  BellIcon,
-  ClockIcon,
   DevicePhoneMobileIcon,
   EnvelopeIcon,
   UsersIcon,
@@ -54,12 +52,10 @@ export const notificationTabs = (t: T) => [
   {
     key: "scheduled",
     label: t("admin.marketing.notifications.tabs.scheduled"),
-    icon: ClockIcon,
   },
   {
     key: "history",
     label: t("admin.marketing.notifications.tabs.history"),
-    icon: BellIcon,
   },
 ];
 

@@ -69,7 +69,7 @@ export default function SellerHeader({
                 {publicNameOf(seller)}
               </h1>
               {seller.isPremium && (
-                <Badge variant="primary" size="sm">
+                <Badge variant="default" size="sm">
                   Premium
                 </Badge>
               )}

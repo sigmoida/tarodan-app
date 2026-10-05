@@ -30,7 +30,7 @@ export interface Seller {
 export const membershipConfig = (t: T): Record<string, StatusConfig> => ({
   business: {
     label: t("admin.accounts.sellerPerformance.memberships.business"),
-    variant: "primary",
+    variant: "default",
   },
   premium: {
     label: t("admin.accounts.sellerPerformance.memberships.premium"),
@@ -38,10 +38,10 @@ export const membershipConfig = (t: T): Record<string, StatusConfig> => ({
   },
   basic: {
     label: t("admin.accounts.sellerPerformance.memberships.basic"),
-    variant: "info",
+    variant: "default",
   },
   free: {
     label: t("admin.accounts.sellerPerformance.memberships.free"),
-    variant: "secondary",
+    variant: "outline",
   },
 });

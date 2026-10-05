@@ -81,7 +81,7 @@ function PaymentStatusBadge({ status }: { status: string | null }) {
   }
   if (status === "refunded") {
     return (
-      <Badge variant="secondary" size="sm" className="rounded-full">
+      <Badge variant="outline" size="sm" className="rounded-full">
         {t("trade.paymentRefunded")}
       </Badge>
     );

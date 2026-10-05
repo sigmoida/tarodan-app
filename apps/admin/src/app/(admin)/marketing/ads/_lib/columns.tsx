@@ -80,7 +80,7 @@ export function adColumns(
     col.badge<Ad>(
       t("admin.marketing.ads.positionLabel"),
       (ad) => (
-        <Badge variant="secondary" size="sm">
+        <Badge variant="outline" size="sm">
           {positions[ad.position] || ad.position}
         </Badge>
       ),

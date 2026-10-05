@@ -30,7 +30,7 @@ function EmailContentBadges({
   return (
     <span className="inline-flex gap-1">
       {hasHtml && (
-        <Badge variant="info" size="sm">
+        <Badge variant="default" size="sm">
           {t("admin.marketing.notifications.htmlEmailBadge")}
         </Badge>
       )}

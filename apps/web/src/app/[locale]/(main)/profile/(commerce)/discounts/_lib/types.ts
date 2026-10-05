@@ -81,11 +81,11 @@ export const scopeLabels = (t: Translate): Record<string, string> => ({
 export const discountStatusConfig = (
   t: Translate,
 ): Record<string, StatusConfig> => ({
-  inactive: { label: t("common.inactive"), variant: "secondary" },
+  inactive: { label: t("common.inactive"), variant: "outline" },
   active: { label: t("common.active"), variant: "success" },
   pending: { label: t("common.pending"), variant: "warning" },
   expired: { label: t("seller.discounts.statusExpired"), variant: "danger" },
-  unknown: { label: t("seller.discounts.statusUnknown"), variant: "secondary" },
+  unknown: { label: t("seller.discounts.statusUnknown"), variant: "outline" },
 });
 
 export function getDiscountStatus(discount: Discount): string {

@@ -60,14 +60,14 @@ export function PackageCard({
               {pkg.name}
             </h3>
             {pkg.showcaseOnHome && (
-              <Badge variant="primary" size="sm">
+              <Badge variant="default" size="sm">
                 {t("admin.marketing.adPackages.showcaseBadge")}
               </Badge>
             )}
-            <Badge variant={pkg.isActive ? "success" : "default"} size="sm">
+            <Badge variant={pkg.isActive ? "success" : "outline"} size="sm">
               {pkg.isActive ? t("common.active") : t("common.inactive")}
             </Badge>
-            <Badge variant="secondary" size="sm">
+            <Badge variant="outline" size="sm">
               {pkg.audienceMode === "everyone"
                 ? t("admin.marketing.adPackages.audienceEveryone")
                 : pkg.audienceMode === "membership_tiers"

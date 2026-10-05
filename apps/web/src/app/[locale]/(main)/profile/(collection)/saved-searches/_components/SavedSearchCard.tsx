@@ -38,23 +38,23 @@ export default function SavedSearchCard({
           {hasFilters && (
             <div className="mb-3 flex flex-wrap gap-2">
               {filters?.category && (
-                <Badge variant="secondary" size="sm">
+                <Badge variant="outline" size="sm">
                   Kategori: {filters.category}
                 </Badge>
               )}
               {filters?.brand && (
-                <Badge variant="secondary" size="sm">
+                <Badge variant="outline" size="sm">
                   Marka: {filters.brand}
                 </Badge>
               )}
               {(filters?.minPrice || filters?.maxPrice) && (
-                <Badge variant="secondary" size="sm">
+                <Badge variant="outline" size="sm">
                   {t("search.priceLabel")} {filters.minPrice || 0}₺ -{" "}
                   {filters.maxPrice || "∞"}₺
                 </Badge>
               )}
               {filters?.condition && (
-                <Badge variant="secondary" size="sm">
+                <Badge variant="outline" size="sm">
                   Durum: {filters.condition}
                 </Badge>
               )}

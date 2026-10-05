@@ -106,7 +106,7 @@ export default function SellerProfileClient() {
             <span className="flex items-center gap-2">
               <CubeIcon className="h-4 w-4" />
               {t("nav.listings")}
-              <Badge variant="secondary" size="sm">
+              <Badge variant="outline" size="sm">
                 {products.length}
               </Badge>
             </span>
@@ -115,7 +115,7 @@ export default function SellerProfileClient() {
             <span className="flex items-center gap-2">
               <StarIcon className="h-4 w-4" />
               {t("review.reviews")}
-              <Badge variant="secondary" size="sm">
+              <Badge variant="outline" size="sm">
                 {totalRatings}
               </Badge>
             </span>
@@ -124,7 +124,7 @@ export default function SellerProfileClient() {
             <span className="flex items-center gap-2">
               <RectangleStackIcon className="h-4 w-4" />
               {t("nav.collections")}
-              <Badge variant="secondary" size="sm">
+              <Badge variant="outline" size="sm">
                 {collections.length}
               </Badge>
             </span>

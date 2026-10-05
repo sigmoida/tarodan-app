@@ -37,7 +37,7 @@ export default function NotificationCard({
           <div className="flex items-center gap-2">
             <h3 className="font-medium text-heading">{title}</h3>
             {!isRead && (
-              <Badge variant="primary" size="sm">
+              <Badge variant="default" size="sm">
                 {t("common.new")}
               </Badge>
             )}

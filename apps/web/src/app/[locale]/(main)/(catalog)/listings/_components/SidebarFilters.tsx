@@ -105,7 +105,7 @@ export default function SidebarFilters({
           </span>
           {activeFilterCount > 0 && (
             <Badge
-              variant="primary"
+              variant="default"
               appearance="solid"
               size="sm"
               className="min-w-[18px] justify-center rounded-full px-1.5"
@@ -207,7 +207,7 @@ export default function SidebarFilters({
               <span className="flex items-center">
                 {t("product.color")}
                 {(filters.colors?.length ?? 0) > 0 && (
-                  <Badge variant="primary" size="sm" className="ml-2">
+                  <Badge variant="default" size="sm" className="ml-2">
                     {filters.colors.length}
                   </Badge>
                 )}
@@ -260,7 +260,7 @@ export default function SidebarFilters({
                 <span className="flex items-center">
                   {group.name}
                   {selected.size > 0 && (
-                    <Badge variant="primary" size="sm" className="ml-2">
+                    <Badge variant="default" size="sm" className="ml-2">
                       {selected.size}
                     </Badge>
                   )}

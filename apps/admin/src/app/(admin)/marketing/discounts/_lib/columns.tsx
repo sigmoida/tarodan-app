@@ -55,7 +55,7 @@ export function discountColumns(
             </span>
           )}
           {d.isFlashSale && (
-            <Badge variant="primary" size="sm" className={BADGE_SIZE}>
+            <Badge variant="default" size="sm" className={BADGE_SIZE}>
               ⚡ Flash
             </Badge>
           )}
@@ -76,7 +76,7 @@ export function discountColumns(
       t("admin.marketing.discounts.scopeLabel"),
       (d) => (
         <div className="min-w-0">
-          <Badge variant="info" size="sm" className={BADGE_SIZE}>
+          <Badge variant="default" size="sm" className={BADGE_SIZE}>
             {scopes[d.scope] ?? d.scope}
           </Badge>
           {d.categoryName && (
@@ -92,7 +92,7 @@ export function discountColumns(
       (d) => (
         <div className="min-w-0">
           <Badge
-            variant={d.target === "product_price" ? "secondary" : "primary"}
+            variant={d.target === "product_price" ? "outline" : "default"}
             size="sm"
             className={BADGE_SIZE}
           >

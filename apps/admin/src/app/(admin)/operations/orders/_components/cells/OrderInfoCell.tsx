@@ -31,7 +31,7 @@ export function OrderInfoCell({ row }: { row: AdminOrderListRow }) {
         {fmtDateTime(row.createdAt)}
       </span>
       {row.origin === "offer" && (
-        <Badge variant="info">
+        <Badge variant="default">
           {t("admin.operations.orders.cells.offerBadge")}
         </Badge>
       )}

@@ -67,7 +67,7 @@ export const paymentStatusConfig = (t: T): Record<string, StatusConfig> => ({
   },
   processing: {
     label: t("admin.finance.payments.status.processing"),
-    variant: "info",
+    variant: "default",
   },
   completed: {
     label: t("admin.finance.payments.status.completed"),
@@ -79,7 +79,7 @@ export const paymentStatusConfig = (t: T): Record<string, StatusConfig> => ({
   },
   refunded: {
     label: t("admin.finance.payments.status.refunded"),
-    variant: "secondary",
+    variant: "outline",
   },
 });
 
@@ -104,19 +104,19 @@ export const tradePaymentStatusConfig = (
   },
   shipping_to_warehouse: {
     label: t("admin.finance.payments.tradeStatusLabels.shippingToWarehouse"),
-    variant: "info",
+    variant: "default",
   },
   at_warehouse: {
     label: t("admin.finance.payments.tradeStatusLabels.atWarehouse"),
-    variant: "info",
+    variant: "default",
   },
   admin_reviewing: {
     label: t("admin.finance.payments.tradeStatusLabels.adminReviewing"),
-    variant: "info",
+    variant: "default",
   },
   shipping_to_recipients: {
     label: t("admin.finance.payments.tradeStatusLabels.shippingToRecipients"),
-    variant: "info",
+    variant: "default",
   },
   returning: {
     label: t("admin.finance.payments.tradeStatusLabels.returning"),
@@ -124,23 +124,23 @@ export const tradePaymentStatusConfig = (
   },
   initiator_shipped: {
     label: t("admin.finance.payments.tradeStatusLabels.initiatorShipped"),
-    variant: "info",
+    variant: "default",
   },
   receiver_shipped: {
     label: t("admin.finance.payments.tradeStatusLabels.receiverShipped"),
-    variant: "info",
+    variant: "default",
   },
   both_shipped: {
     label: t("admin.finance.payments.tradeStatusLabels.bothShipped"),
-    variant: "info",
+    variant: "default",
   },
   initiator_received: {
     label: t("admin.finance.payments.tradeStatusLabels.initiatorReceived"),
-    variant: "info",
+    variant: "default",
   },
   receiver_received: {
     label: t("admin.finance.payments.tradeStatusLabels.receiverReceived"),
-    variant: "info",
+    variant: "default",
   },
   completed: {
     label: t("admin.finance.payments.tradeStatusLabels.completed"),
@@ -152,7 +152,7 @@ export const tradePaymentStatusConfig = (
   },
   disputed: {
     label: t("admin.finance.payments.tradeStatusLabels.disputed"),
-    variant: "destructive",
+    variant: "danger",
   },
 });
 

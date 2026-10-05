@@ -118,7 +118,7 @@ export const scopeLabels = (t: T): Record<string, string> => ({
 });
 
 export const discountStatusConfig = (t: T): Record<string, StatusConfig> => ({
-  inactive: { label: t("common.inactive"), variant: "secondary" },
+  inactive: { label: t("common.inactive"), variant: "outline" },
   active: { label: t("common.active"), variant: "success" },
   pending: { label: t("common.pending"), variant: "warning" },
   expired: {
@@ -127,7 +127,7 @@ export const discountStatusConfig = (t: T): Record<string, StatusConfig> => ({
   },
   unknown: {
     label: t("admin.marketing.discounts.status.unknown"),
-    variant: "secondary",
+    variant: "outline",
   },
 });
 

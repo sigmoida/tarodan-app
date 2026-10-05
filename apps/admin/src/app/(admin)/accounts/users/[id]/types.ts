@@ -148,14 +148,14 @@ export const getUserStatusConfig = (t: T): Record<string, StatusConfig> => ({
     label: t("admin.operations.orders.status.pendingPayment"),
     variant: "warning",
   },
-  paid: { label: t("admin.operations.orders.status.paid"), variant: "info" },
+  paid: { label: t("admin.operations.orders.status.paid"), variant: "default" },
   preparing: {
     label: t("admin.operations.orders.status.preparing"),
-    variant: "info",
+    variant: "default",
   },
   shipped: {
     label: t("admin.operations.orders.status.shipped"),
-    variant: "primary",
+    variant: "default",
   },
   delivered: {
     label: t("admin.operations.orders.status.delivered"),
@@ -171,15 +171,15 @@ export const getUserStatusConfig = (t: T): Record<string, StatusConfig> => ({
   },
   rejected: { label: t("common.rejected"), variant: "danger" },
   active: { label: t("common.active"), variant: "success" },
-  inactive: { label: t("common.inactive"), variant: "secondary" },
-  sold: { label: t("admin.catalog.products.statusSold"), variant: "primary" },
+  inactive: { label: t("common.inactive"), variant: "outline" },
+  sold: { label: t("admin.catalog.products.statusSold"), variant: "default" },
   accepted: {
     label: t("admin.operations.trades.timeline.accepted"),
-    variant: "info",
+    variant: "default",
   },
   both_shipped: {
     label: t("admin.users.status.bothShipped"),
-    variant: "primary",
+    variant: "default",
   },
   disputed: { label: t("admin.operations.trades.disputed"), variant: "danger" },
 });

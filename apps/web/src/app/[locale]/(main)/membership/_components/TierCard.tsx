@@ -65,7 +65,7 @@ export default function TierCard({
       <div className="flex items-start justify-between gap-3">
         <h3 className="text-lg font-semibold text-heading">{tier.name}</h3>
         {badge && (
-          <Badge variant="default" size="sm" className="flex-shrink-0">
+          <Badge variant="outline" size="sm" className="flex-shrink-0">
             {badge}
           </Badge>
         )}

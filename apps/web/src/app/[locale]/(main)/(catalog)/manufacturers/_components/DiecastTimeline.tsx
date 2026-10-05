@@ -32,7 +32,7 @@ export default function DiecastTimeline() {
               </div>
               <div className="pb-1 pt-1">
                 <div className="flex items-center gap-2 mb-1">
-                  <Badge variant="primary" size="sm">
+                  <Badge variant="default" size="sm">
                     {item.year}
                   </Badge>
                   <span className="text-sm font-bold text-heading">

@@ -40,7 +40,11 @@ export function gibReportColumns(t: TranslateFn) {
     ),
     col.badge<AdminGibReportRow>(
       t("admin.gibReport.columns.status"),
-      (r) => <Badge>{t(GIB_LISTING_STATUS_I18N_KEYS[r.status])}</Badge>,
+      (r) => (
+        <Badge variant="outline">
+          {t(GIB_LISTING_STATUS_I18N_KEYS[r.status])}
+        </Badge>
+      ),
       {
         sortKey: "status",
         sortType: "text",

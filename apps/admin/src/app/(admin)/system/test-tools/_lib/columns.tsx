@@ -190,7 +190,7 @@ export function testLaneColumns(t: T) {
     col.custom<TestAccount>(
       t("admin.system.testTools.lane.columns.role"),
       (a) => (
-        <Badge variant={a.isSeller ? "warning" : "default"} size="sm">
+        <Badge variant={a.isSeller ? "warning" : "outline"} size="sm">
           {a.isSeller
             ? t("admin.system.testTools.lane.seller")
             : t("admin.system.testTools.lane.buyer")}

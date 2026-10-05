@@ -34,12 +34,12 @@ export default function SavedCardCard({
             {card.brand || "Kart"} •••• {card.last4}
           </span>
           {card.cardScheme && (
-            <Badge variant="secondary" size="sm">
+            <Badge variant="outline" size="sm">
               {card.cardScheme.toUpperCase()}
             </Badge>
           )}
           {card.isDefault && (
-            <Badge variant="primary" size="sm">
+            <Badge variant="default" size="sm">
               {t("profile.savedCard.varsayilan")}
             </Badge>
           )}

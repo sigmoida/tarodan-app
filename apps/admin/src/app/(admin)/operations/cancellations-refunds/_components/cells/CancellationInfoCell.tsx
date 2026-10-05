@@ -36,12 +36,12 @@ export function CancellationInfoCell({ row }: { row: AdminCancellationRow }) {
           {t(cancellationStatusKey(row.status))}
         </Badge>
         {row.origin === "offer" && (
-          <Badge variant="info">
+          <Badge variant="default">
             {t("admin.operations.orders.cells.offerBadge")}
           </Badge>
         )}
         {row.origin === "trade" && (
-          <Badge variant="info">
+          <Badge variant="default">
             {t("admin.operations.cancellations.cells.tradeBadge")}
           </Badge>
         )}

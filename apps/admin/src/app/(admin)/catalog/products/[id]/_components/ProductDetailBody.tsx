@@ -3,7 +3,6 @@
 import { useState } from "react";
 import { useTranslations } from "next-intl";
 import { useQuery } from "@tanstack/react-query";
-import { CubeIcon, StarIcon } from "@heroicons/react/24/outline";
 import { adminApi } from "@/lib/api";
 import { adminKeys } from "@/lib/query/keys";
 import { AdminTabs } from "@/components/AdminTabs";
@@ -61,12 +60,10 @@ export function ProductDetailBody({ product }: { product: ProductDetail }) {
           {
             key: "info",
             label: t("admin.catalog.products.infoTab"),
-            icon: CubeIcon,
           },
           {
             key: "reviews",
             label: t("admin.catalog.products.reviewsTab"),
-            icon: StarIcon,
             badge: reviewCount,
           },
           { key: "ai", label: t("admin.catalog.common.aiModeration") },

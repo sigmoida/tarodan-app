@@ -1,13 +1,6 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
-import {
-  TicketIcon,
-  CheckCircleIcon,
-  TagIcon,
-  SparklesIcon,
-  BanknotesIcon,
-} from "@heroicons/react/24/outline";
 import { adminApi } from "@/lib/api";
 import { adminKeys } from "@/lib/query/keys";
 import { fmtTry } from "@/lib/format";
@@ -62,8 +55,6 @@ export function DiscountsStats() {
   return (
     <div className="grid grid-cols-2 gap-4 md:grid-cols-5">
       <MetricCard
-        icon={TicketIcon}
-        tone="info"
         label={t("admin.marketing.discounts.totalDiscounts")}
         value={s.total}
         footer={
@@ -74,29 +65,21 @@ export function DiscountsStats() {
         loading={isLoading}
       />
       <MetricCard
-        icon={CheckCircleIcon}
-        tone="success"
         label={t("common.active")}
         value={s.active}
         loading={isLoading}
       />
       <MetricCard
-        icon={TagIcon}
-        tone="info"
         label={t("admin.marketing.discounts.couponCodes")}
         value={s.coupons}
         loading={isLoading}
       />
       <MetricCard
-        icon={SparklesIcon}
-        tone="primary"
         label={t("admin.marketing.discounts.automaticCampaigns")}
         value={s.auto}
         loading={isLoading}
       />
       <MetricCard
-        icon={BanknotesIcon}
-        tone="warning"
         label={t("admin.marketing.discounts.platformCost")}
         value={fmtTry(s.spent) ?? "—"}
         footer={

@@ -29,7 +29,7 @@ export const CONSENT_STATUS_BADGE = {
     variant: "danger",
     labelKey: "admin.consents.actions.withdrawn",
   },
-  none: { variant: "default", labelKey: "admin.consents.userSection.none" },
+  none: { variant: "outline", labelKey: "admin.consents.userSection.none" },
 } as const satisfies Record<
   ConsentStatusTone,
   { variant: string; labelKey: string }

@@ -152,7 +152,7 @@ export function ReconciliationTab() {
                       )}
                     </td>
                     <td className="px-3 py-3">
-                      <Badge variant="default" size="sm">
+                      <Badge variant="outline" size="sm">
                         {attempt.provider}
                       </Badge>
                     </td>

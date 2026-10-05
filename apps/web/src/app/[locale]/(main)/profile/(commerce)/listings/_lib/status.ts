@@ -38,17 +38,17 @@ export const LISTING_STATUS = (
   },
   sold: {
     label: t("profile.listingStatus.satildi"),
-    variant: "primary",
+    variant: "default",
     icon: CheckCircleIcon,
   },
   reserved: {
     label: t("status.product.reserved"),
-    variant: "primary",
+    variant: "default",
     icon: ClockIcon,
   },
   inactive: {
     label: t("status.product.inactive"),
-    variant: "default",
+    variant: "outline",
     icon: XCircleIcon,
   },
   expired: {

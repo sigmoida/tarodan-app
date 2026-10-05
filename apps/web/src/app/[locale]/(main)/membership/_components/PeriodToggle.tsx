@@ -27,7 +27,7 @@ export default function PeriodToggle({
               {t("membership.yearly")}
               {/* Nötr rozet: ekranda tek vurgu rengi seçili plan kenarlığı. */}
               {discountPct > 0 && (
-                <Badge variant="default" size="sm">
+                <Badge variant="outline" size="sm">
                   %{discountPct} {t("membership.savePercent")}
                 </Badge>
               )}

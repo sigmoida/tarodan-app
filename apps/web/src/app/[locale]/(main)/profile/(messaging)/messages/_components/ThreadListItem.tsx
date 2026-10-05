@@ -50,7 +50,7 @@ export default function ThreadListItem({
             </span>
             {thread.unreadCount > 0 && (
               <Badge
-                variant="primary"
+                variant="default"
                 size="sm"
                 className="flex-shrink-0 px-1.5"
               >

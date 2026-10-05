@@ -3,37 +3,13 @@ import { useTranslations } from "next-intl";
 import {
   HomeIcon,
   UsersIcon,
-  ShoppingBagIcon,
-  ClipboardDocumentListIcon,
   ChartBarIcon,
   Cog6ToothIcon,
   CurrencyDollarIcon,
-  UserCircleIcon,
   ChatBubbleLeftRightIcon,
-  SwatchIcon,
-  CalculatorIcon,
-  BanknotesIcon,
-  DocumentTextIcon,
-  TruckIcon,
-  KeyIcon,
-  BellAlertIcon,
-  CubeIcon,
-  BuildingOffice2Icon,
-  ClipboardDocumentCheckIcon,
-  StarIcon,
-  CreditCardIcon,
-  ArrowsRightLeftIcon,
   MegaphoneIcon,
   Squares2X2Icon,
   ClipboardDocumentIcon,
-  FlagIcon,
-  BeakerIcon,
-  TicketIcon,
-  SparklesIcon,
-  PhotoIcon,
-  ArchiveBoxIcon,
-  ShieldCheckIcon,
-  ClockIcon,
 } from "@heroicons/react/24/outline";
 import {
   ADMIN_CANCELLATIONS_REFUNDS_PATH,
@@ -76,7 +52,11 @@ export function satisfiesPermission(
 export type NavItem = {
   name: string;
   href: string;
-  icon: ComponentType<{ className?: string }>;
+  /**
+   * Yalnız üst düzey satırlar ikon taşır. Grup altındaki satırlar ikonsuzdur:
+   * ikon grubun kendisindedir, alt satırları girinti ayırır.
+   */
+  icon?: ComponentType<{ className?: string }>;
   /** One-line page description — used for the document `<meta name="description">`. */
   description?: string;
   /** Extra search terms (e.g. English route, synonyms) */
@@ -145,7 +125,6 @@ export function getNavGroups(t: T): NavGroup[] {
           // `trades` izniyle girilir, sekmeler izne göre gizlenir.
           name: t("admin.nav.items.orders.name"),
           href: ADMIN_ORDERS_PATH,
-          icon: ClipboardDocumentListIcon,
           description: t("admin.nav.items.orders.description"),
           keywords: t("admin.nav.items.orders.keywords")
             .split(",")
@@ -155,7 +134,6 @@ export function getNavGroups(t: T): NavGroup[] {
         {
           name: t("admin.nav.items.shipping.name"),
           href: "/operations/shipping",
-          icon: TruckIcon,
           description: t("admin.nav.items.shipping.description"),
           keywords: t("admin.nav.items.shipping.keywords")
             .split(",")
@@ -166,7 +144,6 @@ export function getNavGroups(t: T): NavGroup[] {
           // İptaller + İadeler tek ekranda; eski iade listesi buraya yönlenir.
           name: t("admin.nav.items.cancellationsRefunds.name"),
           href: "/operations/cancellations-refunds",
-          icon: BanknotesIcon,
           description: t("admin.nav.items.cancellationsRefunds.description"),
           keywords: t("admin.nav.items.cancellationsRefunds.keywords")
             .split(",")
@@ -184,42 +161,36 @@ export function getNavGroups(t: T): NavGroup[] {
         {
           name: t("admin.nav.items.products.name"),
           href: "/catalog/products",
-          icon: ShoppingBagIcon,
           description: t("admin.nav.items.products.description"),
           permission: "products",
         },
         {
           name: t("admin.nav.items.categories.name"),
           href: "/catalog/categories",
-          icon: CubeIcon,
           description: t("admin.nav.items.categories.description"),
           permission: "categories",
         },
         {
           name: t("admin.nav.items.brands.name"),
           href: "/catalog/brands",
-          icon: SwatchIcon,
           description: t("admin.nav.items.brands.description"),
           permission: "brands",
         },
         {
           name: t("admin.nav.items.carModels.name"),
           href: "/catalog/car-models",
-          icon: TruckIcon,
           description: t("admin.nav.items.carModels.description"),
           permission: "car_models",
         },
         {
           name: t("admin.nav.items.manufacturers.name"),
           href: "/catalog/manufacturers",
-          icon: BuildingOffice2Icon,
           description: t("admin.nav.items.manufacturers.description"),
           permission: "manufacturers",
         },
         {
           name: t("admin.nav.items.attributes.name"),
           href: "/catalog/attributes",
-          icon: ClipboardDocumentListIcon,
           description: t("admin.nav.items.attributes.description"),
           keywords: t("admin.nav.items.attributes.keywords")
             .split(",")
@@ -229,7 +200,6 @@ export function getNavGroups(t: T): NavGroup[] {
         {
           name: t("admin.nav.items.collections.name"),
           href: "/catalog/collections",
-          icon: ClipboardDocumentCheckIcon,
           description: t("admin.nav.items.collections.description"),
           permission: "collections",
         },
@@ -244,7 +214,6 @@ export function getNavGroups(t: T): NavGroup[] {
         {
           name: t("admin.nav.items.users.name"),
           href: "/accounts/users",
-          icon: UsersIcon,
           description: t("admin.nav.items.users.description"),
           keywords: t("admin.nav.items.users.keywords")
             .split(",")
@@ -256,7 +225,6 @@ export function getNavGroups(t: T): NavGroup[] {
           // parçası olduğu için aynı `users` iznine bağlı.
           name: t("admin.nav.items.deletedIdentities.name"),
           href: "/accounts/deleted-identities",
-          icon: ArchiveBoxIcon,
           description: t("admin.nav.items.deletedIdentities.description"),
           keywords: t("admin.nav.items.deletedIdentities.keywords")
             .split(",")
@@ -268,7 +236,6 @@ export function getNavGroups(t: T): NavGroup[] {
           // Kullanıcı verisinin parçası → `users` izni (API PERMISSION_MAP ile aynı).
           name: t("admin.nav.items.consents.name"),
           href: "/accounts/consents",
-          icon: ShieldCheckIcon,
           description: t("admin.nav.items.consents.description"),
           keywords: t("admin.nav.items.consents.keywords")
             .split(",")
@@ -278,28 +245,24 @@ export function getNavGroups(t: T): NavGroup[] {
         {
           name: t("admin.nav.items.sellerApplications.name"),
           href: "/accounts/seller-applications",
-          icon: ClipboardDocumentCheckIcon,
           description: t("admin.nav.items.sellerApplications.description"),
           permission: "seller_applications",
         },
         {
           name: t("admin.nav.items.sellerPerformance.name"),
           href: "/accounts/seller-performance",
-          icon: ChartBarIcon,
           description: t("admin.nav.items.sellerPerformance.description"),
           permission: "seller_performance",
         },
         {
           name: t("admin.nav.items.reviews.name"),
           href: "/accounts/reviews",
-          icon: StarIcon,
           description: t("admin.nav.items.reviews.description"),
           permission: "reviews",
         },
         {
           name: t("admin.nav.items.reports.name"),
           href: "/accounts/reports",
-          icon: FlagIcon,
           description: t("admin.nav.items.reports.description"),
           keywords: t("admin.nav.items.reports.keywords")
             .split(",")
@@ -309,7 +272,6 @@ export function getNavGroups(t: T): NavGroup[] {
         {
           name: t("admin.nav.items.staff.name"),
           href: "/accounts/roles",
-          icon: UserCircleIcon,
           description: t("admin.nav.items.staff.description"),
           permission: "staff",
         },
@@ -324,14 +286,12 @@ export function getNavGroups(t: T): NavGroup[] {
         {
           name: t("admin.nav.items.messages.name"),
           href: "/messaging/messages",
-          icon: ChatBubbleLeftRightIcon,
           description: t("admin.nav.items.messages.description"),
           permission: "messages",
         },
         {
           name: t("admin.nav.items.support.name"),
           href: "/messaging/support",
-          icon: ChatBubbleLeftRightIcon,
           description: t("admin.nav.items.support.description"),
           keywords: t("admin.nav.items.support.keywords")
             .split(",")
@@ -349,7 +309,6 @@ export function getNavGroups(t: T): NavGroup[] {
         {
           name: t("admin.nav.items.ads.name"),
           href: "/marketing/ads",
-          icon: MegaphoneIcon,
           description: t("admin.nav.items.ads.description"),
           keywords: t("admin.nav.items.ads.keywords")
             .split(",")
@@ -359,7 +318,6 @@ export function getNavGroups(t: T): NavGroup[] {
         {
           name: t("admin.nav.items.discounts.name"),
           href: "/marketing/discounts",
-          icon: TicketIcon,
           description: t("admin.nav.items.discounts.description"),
           keywords: t("admin.nav.items.discounts.keywords")
             .split(",")
@@ -369,7 +327,6 @@ export function getNavGroups(t: T): NavGroup[] {
         {
           name: t("admin.nav.items.adPackages.name"),
           href: "/marketing/ad-packages",
-          icon: SparklesIcon,
           description: t("admin.nav.items.adPackages.description"),
           keywords: t("admin.nav.items.adPackages.keywords")
             .split(",")
@@ -379,7 +336,6 @@ export function getNavGroups(t: T): NavGroup[] {
         {
           name: t("admin.nav.items.boostPurchases.name"),
           href: "/marketing/boost-purchases",
-          icon: ShoppingBagIcon,
           description: t("admin.nav.items.boostPurchases.description"),
           keywords: t("admin.nav.items.boostPurchases.keywords")
             .split(",")
@@ -389,14 +345,12 @@ export function getNavGroups(t: T): NavGroup[] {
         {
           name: t("admin.nav.items.notifications.name"),
           href: "/marketing/notifications",
-          icon: BellAlertIcon,
           description: t("admin.nav.items.notifications.description"),
           permission: "notifications",
         },
         {
           name: t("admin.nav.items.emailTemplates.name"),
           href: "/marketing/email-templates",
-          icon: ChatBubbleLeftRightIcon,
           description: t("admin.nav.items.emailTemplates.description"),
           permission: "email_templates",
         },
@@ -414,14 +368,12 @@ export function getNavGroups(t: T): NavGroup[] {
         {
           name: t("admin.nav.items.financeOverview.name"),
           href: "/finance/overview",
-          icon: CurrencyDollarIcon,
           description: t("admin.nav.items.financeOverview.description"),
           permission: "payments",
         },
         {
           name: t("admin.nav.items.payments.name"),
           href: "/finance/payments",
-          icon: CreditCardIcon,
           description: t("admin.nav.items.payments.description"),
           keywords: t("admin.nav.items.payments.keywords")
             .split(",")
@@ -431,28 +383,24 @@ export function getNavGroups(t: T): NavGroup[] {
         {
           name: t("admin.nav.items.pspReconciliation.name"),
           href: "/finance/psp",
-          icon: ArrowsRightLeftIcon,
           description: t("admin.nav.items.pspReconciliation.description"),
           permission: "payments",
         },
         {
           name: t("admin.nav.items.commission.name"),
           href: "/finance/commission",
-          icon: CurrencyDollarIcon,
           description: t("admin.nav.items.commission.description"),
           permission: "commission",
         },
         {
           name: t("admin.nav.items.payouts.name"),
           href: "/finance/payouts",
-          icon: BanknotesIcon,
           description: t("admin.nav.items.payouts.description"),
           permission: "payouts",
         },
         {
           name: t("admin.nav.items.invoices.name"),
           href: "/finance/invoices",
-          icon: DocumentTextIcon,
           description: t("admin.nav.items.invoices.description"),
           keywords: t("admin.nav.items.invoices.keywords")
             .split(",")
@@ -462,7 +410,6 @@ export function getNavGroups(t: T): NavGroup[] {
         {
           name: t("admin.nav.items.settlement.name"),
           href: "/finance/settlement",
-          icon: DocumentTextIcon,
           description: t("admin.nav.items.settlement.description"),
           // Döküm faturanın dayanağıdır; fatura yetkisiyle aynı kapıdan geçer.
           permission: "invoices",
@@ -470,7 +417,6 @@ export function getNavGroups(t: T): NavGroup[] {
         {
           name: t("admin.nav.items.tax.name"),
           href: "/finance/tax",
-          icon: CalculatorIcon,
           description: t("admin.nav.items.tax.description"),
           permission: "tax",
         },
@@ -480,7 +426,6 @@ export function getNavGroups(t: T): NavGroup[] {
           // "gib-report").
           name: t("admin.nav.items.gibReport.name"),
           href: "/finance/gib-report",
-          icon: ClipboardDocumentListIcon,
           description: t("admin.nav.items.gibReport.description"),
           keywords: t("admin.nav.items.gibReport.keywords")
             .split(",")
@@ -498,7 +443,6 @@ export function getNavGroups(t: T): NavGroup[] {
         {
           name: t("admin.nav.items.aiModeration.name"),
           href: "/system/ai-moderation",
-          icon: ClipboardDocumentCheckIcon,
           description: t("admin.nav.items.aiModeration.description"),
           keywords: t("admin.nav.items.aiModeration.keywords")
             .split(",")
@@ -508,7 +452,6 @@ export function getNavGroups(t: T): NavGroup[] {
         {
           name: t("admin.nav.items.membershipTiers.name"),
           href: "/system/membership-tiers",
-          icon: StarIcon,
           description: t("admin.nav.items.membershipTiers.description"),
           keywords: t("admin.nav.items.membershipTiers.keywords")
             .split(",")
@@ -518,7 +461,6 @@ export function getNavGroups(t: T): NavGroup[] {
         {
           name: t("admin.shippingTariffs.title"),
           href: "/system/shipping-tariffs",
-          icon: TruckIcon,
           description: t("admin.shippingTariffs.description"),
           keywords: ["shipping", "tariff"],
           permission: "settings",
@@ -526,7 +468,6 @@ export function getNavGroups(t: T): NavGroup[] {
         {
           name: t("admin.nav.items.media.name"),
           href: "/system/media",
-          icon: PhotoIcon,
           description: t("admin.nav.items.media.description"),
           keywords: ["media", "bucket", "s3", "gorsel"],
           permission: "settings",
@@ -534,7 +475,6 @@ export function getNavGroups(t: T): NavGroup[] {
         {
           name: t("admin.nav.items.earlyAccess.name"),
           href: "/system/early-access",
-          icon: KeyIcon,
           description: t("admin.nav.items.earlyAccess.description"),
           keywords: t("admin.nav.items.earlyAccess.keywords")
             .split(",")
@@ -544,7 +484,6 @@ export function getNavGroups(t: T): NavGroup[] {
         {
           name: t("admin.nav.items.settings.name"),
           href: "/system/settings",
-          icon: Cog6ToothIcon,
           description: t("admin.nav.items.settings.description"),
           permission: "settings",
         },
@@ -553,7 +492,6 @@ export function getNavGroups(t: T): NavGroup[] {
           // ayrıca super_admin'e sınırlı (sayfa diğer rollere salt okunur).
           name: t("admin.nav.items.timingRules.name"),
           href: "/system/timing-rules",
-          icon: ClockIcon,
           description: t("admin.nav.items.timingRules.description"),
           keywords: t("admin.nav.items.timingRules.keywords")
             .split(",")
@@ -563,7 +501,6 @@ export function getNavGroups(t: T): NavGroup[] {
         {
           name: t("admin.nav.items.logs.name"),
           href: "/system/logs",
-          icon: ClipboardDocumentIcon,
           description: t("admin.nav.items.logs.description"),
           keywords: t("admin.nav.items.logs.keywords")
             .split(",")
@@ -573,7 +510,6 @@ export function getNavGroups(t: T): NavGroup[] {
         {
           name: t("admin.nav.items.testTools.name"),
           href: "/system/test-tools",
-          icon: BeakerIcon,
           description: t("admin.nav.items.testTools.description"),
           keywords: t("admin.nav.items.testTools.keywords")
             .split(",")

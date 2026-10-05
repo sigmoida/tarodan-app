@@ -133,12 +133,12 @@ function DayCardView({
         <h3 className="font-semibold text-heading">{fmtDate(day.date)}</h3>
         <div className="flex items-center gap-1">
           {day.provisional && (
-            <Badge variant="default">
+            <Badge variant="outline">
               {t("admin.finance.psp.summary.provisional")}
             </Badge>
           )}
           {!day.paytrCovered ? (
-            <Badge variant="default">
+            <Badge variant="outline">
               {t("admin.finance.psp.summary.notCovered")}
             </Badge>
           ) : clean ? (

@@ -21,7 +21,7 @@ function Verified({ kind, ok }: { kind: "email" | "phone"; ok: boolean }) {
     <Badge
       className="mt-1"
       size="sm"
-      variant={ok ? "success" : "default"}
+      variant={ok ? "success" : "outline"}
       icon={ok ? <CheckCircleIcon className="h-3.5 w-3.5" /> : undefined}
     >
       {label}

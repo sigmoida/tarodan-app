@@ -114,7 +114,7 @@ export function QueuesZone({
           title={t("admin.dashboard.zones.loadFailed")}
         />
       ) : isLoading ? (
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {Array.from({ length: 8 }, (_, index) => (
             <Skeleton key={index} className="h-32 w-full rounded-xl" />
           ))}
@@ -125,7 +125,7 @@ export function QueuesZone({
           title={t("admin.dashboard.zones.queuesEmpty")}
         />
       ) : (
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {queues.map((tile) => (
             <QueueTile key={tile.key} tile={tile} />
           ))}

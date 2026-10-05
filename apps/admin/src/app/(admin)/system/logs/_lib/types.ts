@@ -1,3 +1,4 @@
+import type { BadgeVariant } from "@tarodan/ui";
 import {
   ExclamationTriangleIcon,
   ShieldExclamationIcon,
@@ -116,21 +117,12 @@ export const logTabs = (
   },
 ];
 
-export const severityColors: Record<string, string> = {
-  critical: "bg-danger-500/10 text-danger-600 border-danger-500/20",
-  high: "bg-danger-500/10 text-danger-600 border-danger-500/20",
-  error: "bg-danger-500/10 text-danger-600 border-danger-500/20",
-  medium: "bg-warning-500/10 text-warning-700 border-warning-500/20",
-  warning: "bg-warning-500/10 text-warning-700 border-warning-500/20",
-  low: "bg-info-500/10 text-info-700 border-info-500/20",
-};
-
-export const statusColors: Record<string, string> = {
-  sent: "bg-success-500/10 text-success-700",
-  delivered: "bg-success-500/10 text-success-700",
-  queued: "bg-warning-500/10 text-warning-700",
-  bounced: "bg-danger-500/10 text-danger-600",
-  failed: "bg-danger-500/10 text-danger-600",
+export const emailStatusVariants: Record<string, BadgeVariant> = {
+  sent: "success",
+  delivered: "success",
+  queued: "warning",
+  bounced: "danger",
+  failed: "danger",
 };
 
 export const eventTypeLabels = (t: T): Record<string, string> => ({

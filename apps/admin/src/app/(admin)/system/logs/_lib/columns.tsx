@@ -1,4 +1,4 @@
-import { Badge, cn, severityConfig } from "@tarodan/ui";
+import { Badge, severityConfig } from "@tarodan/ui";
 import {
   CheckCircleIcon,
   ClockIcon,
@@ -12,7 +12,7 @@ import {
   type SecurityLog,
   type EmailLog,
   type AuditLog,
-  statusColors,
+  emailStatusVariants,
   eventTypeLabels,
   actionLabels,
   entityLabels,
@@ -174,14 +174,9 @@ export function buildEmailColumns(t: T) {
     col.custom<EmailLog>(
       t("common.status"),
       (r) => (
-        <span
-          className={cn(
-            "rounded-full px-2 py-1 text-xs",
-            statusColors[r.status],
-          )}
-        >
+        <Badge variant={emailStatusVariants[r.status] ?? "outline"} size="sm">
           {emailStatuses[r.status] ?? r.status}
-        </span>
+        </Badge>
       ),
       { minWidth: 100, sortKey: "status", sortType: "text" },
     ),

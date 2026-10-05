@@ -38,8 +38,6 @@ function StatCard({
 
   return (
     <MetricCard
-      icon={config.icon}
-      tone={config.tone}
       label={t(config.labelKey)}
       loading={loading}
       value={<span className="tabular-nums">{format(metric.period)}</span>}
@@ -86,7 +84,7 @@ export function DashboardStats({
   isLoading: boolean;
 }) {
   return (
-    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
       {STAT_CARDS.map((config) => (
         <StatCard
           key={config.metric}

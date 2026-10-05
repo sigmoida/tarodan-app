@@ -21,7 +21,7 @@ export default function TestToolsPage() {
         description={t("admin.system.testTools.description")}
       >
         {env && (
-          <Badge variant={env.isProd ? "danger" : "secondary"}>
+          <Badge variant={env.isProd ? "danger" : "outline"}>
             {env.isProd ? "⚠ PROD" : env.env}
           </Badge>
         )}

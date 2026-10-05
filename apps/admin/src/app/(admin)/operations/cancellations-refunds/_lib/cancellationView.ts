@@ -55,7 +55,7 @@ export function cancellationActorLabel(
 /** İade durumunun rozet tonu: bekleyen/başarısız dikkat ister. */
 export function refundStateVariant(
   state: AdminCancellationRefundState,
-): "success" | "warning" | "danger" | "info" | "default" {
+): "success" | "warning" | "danger" | "default" | "outline" {
   switch (state) {
     case "refunded":
       return "success";
@@ -64,9 +64,9 @@ export function refundStateVariant(
     case "pending":
       return "warning";
     case "in_review":
-      return "info";
-    default:
       return "default";
+    default:
+      return "outline";
   }
 }
 

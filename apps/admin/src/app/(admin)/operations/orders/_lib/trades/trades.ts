@@ -72,7 +72,7 @@ export const statusOptions = (t: T) =>
 export const disputeConfig = (t: T): Record<string, StatusConfig> => ({
   disputed_override: {
     label: t("admin.operations.trades.disputed"),
-    variant: "destructive",
+    variant: "danger",
   },
 });
 

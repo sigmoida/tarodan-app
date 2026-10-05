@@ -5,7 +5,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { CubeIcon, NoSymbolIcon, StarIcon } from "@heroicons/react/24/outline";
+import { CubeIcon, StarIcon } from "@heroicons/react/24/outline";
 import { useTranslations } from "next-intl";
 import { StatusBadge } from "@tarodan/ui";
 import { SectionCard } from "@/components/detail/SectionCard";
@@ -139,7 +139,6 @@ export function UserActivityTabs({
     {
       key: "blocks",
       label: t("admin.users.detail.blocksTab"),
-      icon: NoSymbolIcon,
       badge: blocksCount,
     },
     { key: "ai", label: t("admin.catalog.common.aiModeration") },

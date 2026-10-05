@@ -28,7 +28,7 @@ export const messageFilterOptions = (t: T) => [
 export const messageStatusConfig = (t: T): Record<string, StatusConfig> => ({
   sent: {
     label: t("admin.messaging.messages.status.sent"),
-    variant: "default",
+    variant: "outline",
   },
   pending: {
     label: t("admin.messaging.messages.status.pending"),

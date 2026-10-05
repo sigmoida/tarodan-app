@@ -32,7 +32,7 @@ export function paymentColumns(rowMenu: (p: Payment) => RowActionItem[], t: T) {
               <span className="font-mono">#{number}</span>
             )}
             {p.sourceType === "trade" && (
-              <Badge variant="secondary" size="sm">
+              <Badge variant="outline" size="sm">
                 {t("admin.finance.payments.tradeBadge")}
               </Badge>
             )}

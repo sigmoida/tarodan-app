@@ -28,7 +28,7 @@ export const settlementColumns = (t: T) => [
   ),
   col.badge<SettlementRow>(
     t("admin.finance.settlement.columns.transactionType"),
-    (r) => <Badge variant="secondary">{r.transactionType}</Badge>,
+    (r) => <Badge variant="outline">{r.transactionType}</Badge>,
   ),
   col.user<SettlementRow>(
     t("admin.finance.settlement.columns.seller"),

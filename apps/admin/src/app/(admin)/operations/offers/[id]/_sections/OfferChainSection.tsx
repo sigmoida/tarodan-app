@@ -27,7 +27,7 @@ export function OfferChainSection({ chain }: { chain: OfferChainEntry[] }) {
             }`}
           >
             <span className="w-6 text-muted">{index + 1}.</span>
-            <Badge variant={entry.actor === "seller" ? "info" : "default"}>
+            <Badge variant={entry.actor === "seller" ? "default" : "outline"}>
               {entry.actor === "seller"
                 ? t("admin.operations.offers.chainActor.seller")
                 : t("admin.operations.offers.chainActor.buyer")}

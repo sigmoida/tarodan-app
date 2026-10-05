@@ -9,7 +9,7 @@ import {
   XCircleIcon,
 } from "@heroicons/react/24/outline";
 import { StarIcon as StarIconSolid } from "@heroicons/react/24/solid";
-import { IconButton } from "@tarodan/ui";
+import { Badge, IconButton, type BadgeVariant } from "@tarodan/ui";
 import { adminApi } from "@/lib/api";
 import { useAdminMutation } from "@/hooks/useAdminMutation";
 import { SectionCard } from "@/components/detail/SectionCard";
@@ -31,20 +31,16 @@ function Stars({ score }: { score: number }) {
 
 function ReviewStatusBadge({ status }: { status: string }) {
   const t = useTranslations();
-  const map: Record<string, [string, string]> = {
-    approved: [
-      "bg-success-100 text-success-700",
-      t("admin.catalog.products.reviewApproved"),
-    ],
-    pending: [
-      "bg-warning-100 text-warning-700",
-      t("admin.catalog.products.reviewPending"),
-    ],
-    rejected: ["bg-danger-100 text-danger-700", t("common.rejected")],
+  const map: Record<string, [BadgeVariant, string]> = {
+    approved: ["success", t("admin.catalog.products.reviewApproved")],
+    pending: ["warning", t("admin.catalog.products.reviewPending")],
+    rejected: ["danger", t("common.rejected")],
   };
-  const [cls, label] = map[status] ?? ["bg-surface-alt text-body", status];
+  const [variant, label] = map[status] ?? ["outline", status];
   return (
-    <span className={`rounded-full px-2 py-1 text-xs ${cls}`}>{label}</span>
+    <Badge variant={variant} size="sm">
+      {label}
+    </Badge>
   );
 }
 

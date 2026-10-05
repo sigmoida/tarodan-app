@@ -153,7 +153,7 @@ export function CatalogImportModal({
                         {column.key}
                       </TableCell>
                       <TableCell>
-                        <Badge variant={column.required ? "danger" : "default"}>
+                        <Badge variant={column.required ? "danger" : "outline"}>
                           {column.required
                             ? t("admin.catalog.import.required")
                             : t("admin.catalog.import.optional")}

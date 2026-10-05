@@ -64,7 +64,7 @@ export default function DiscountCard({
             {t("product.discountSectionTitle")}
           </span>
           {productDiscounts.length > 0 && (
-            <Badge variant="primary" size="sm">
+            <Badge variant="default" size="sm">
               {productDiscounts.length} aktif
             </Badge>
           )}

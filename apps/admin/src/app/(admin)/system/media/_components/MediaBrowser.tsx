@@ -28,14 +28,13 @@ interface BrowseResult {
   files: MediaFileRow[];
 }
 
-const USAGE_BADGE: Record<string, "success" | "info" | "warning" | "primary"> =
-  {
-    product: "success",
-    collection: "info",
-    brand: "primary",
-    avatar: "info",
-    upload: "warning",
-  };
+const USAGE_BADGE: Record<string, "success" | "warning" | "default"> = {
+  product: "success",
+  collection: "default",
+  brand: "default",
+  avatar: "default",
+  upload: "warning",
+};
 
 function fmtSize(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
@@ -168,7 +167,7 @@ export function MediaBrowser() {
                             className="h-10 w-10 rounded object-cover"
                           />
                         ) : (
-                          <Badge variant="default">
+                          <Badge variant="outline">
                             {t("admin.system.media.private")}
                           </Badge>
                         )}
@@ -183,7 +182,7 @@ export function MediaBrowser() {
                       <td className="px-3 py-2">
                         {file.usage ? (
                           <Badge
-                            variant={USAGE_BADGE[file.usage.type] ?? "default"}
+                            variant={USAGE_BADGE[file.usage.type] ?? "outline"}
                           >
                             {t(
                               `admin.system.media.usageType.${file.usage.type}` as never,

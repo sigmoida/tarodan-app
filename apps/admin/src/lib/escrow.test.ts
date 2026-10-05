@@ -71,7 +71,7 @@ describe("describeHoldReason", () => {
       t,
     );
     expect(result.code).toBe("window_not_elapsed");
-    expect(result.tone).toBe("info");
+    expect(result.tone).toBe("default");
   });
 
   it("quotes the policy window length, not a hardcoded constant", () => {

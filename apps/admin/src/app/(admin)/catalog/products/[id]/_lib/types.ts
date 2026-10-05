@@ -12,6 +12,7 @@ export const PACKAGE_TIER_OPTIONS = [
 }>;
 
 import { useTranslations } from "next-intl";
+import type { BadgeVariant } from "@tarodan/ui";
 import type { ListingEditPayload } from "@tarodan/listing-form";
 import type {
   AdminListingRemovalEvent,
@@ -87,40 +88,33 @@ export interface Review {
 
 export const productStatusConfig = (
   t: T,
-): Record<string, { label: string; color: string; bg: string }> => ({
+): Record<string, { label: string; variant: BadgeVariant }> => ({
   pending: {
     label: t("common.pending"),
-    color: "text-warning-600",
-    bg: "bg-warning-100",
+    variant: "warning",
   },
   active: {
     label: t("common.active"),
-    color: "text-success-600",
-    bg: "bg-success-100",
+    variant: "success",
   },
   inactive: {
     label: t("common.inactive"),
-    color: "text-muted",
-    bg: "bg-surface-alt",
+    variant: "outline",
   },
   rejected: {
     label: t("common.rejected"),
-    color: "text-danger-600",
-    bg: "bg-danger-100",
+    variant: "danger",
   },
   reserved: {
     label: t("admin.catalog.products.statusReserved"),
-    color: "text-info-600",
-    bg: "bg-info-100",
+    variant: "default",
   },
   sold: {
     label: t("admin.catalog.products.statusSold"),
-    color: "text-primary-600",
-    bg: "bg-primary-100",
+    variant: "default",
   },
   deleted: {
     label: t("admin.catalog.products.statusDeleted"),
-    color: "text-danger-600",
-    bg: "bg-danger-100",
+    variant: "danger",
   },
 });

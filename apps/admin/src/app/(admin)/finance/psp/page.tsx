@@ -2,11 +2,6 @@
 
 "use client";
 
-import {
-  ArrowsRightLeftIcon,
-  BanknotesIcon,
-  ListBulletIcon,
-} from "@heroicons/react/24/outline";
 import { useTranslations } from "next-intl";
 import { AdminPage } from "@/components/page/AdminPage";
 import { PageHeader } from "@/components/AdminList";
@@ -30,17 +25,14 @@ export default function PspReconciliationPage() {
     {
       key: "summary",
       label: t("admin.finance.psp.tabs.summary"),
-      icon: ArrowsRightLeftIcon,
     },
     {
       key: "lines",
       label: t("admin.finance.psp.tabs.lines"),
-      icon: ListBulletIcon,
     },
     {
       key: "settlements",
       label: t("admin.finance.psp.tabs.settlements"),
-      icon: BanknotesIcon,
     },
   ];
 

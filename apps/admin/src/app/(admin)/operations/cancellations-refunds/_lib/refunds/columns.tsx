@@ -61,7 +61,7 @@ export const refundRequestColumns = (t: T) => [
       const kind = refundRequestKindOf(r.policyCode);
       return (
         <div className="flex flex-wrap items-center gap-1">
-          <Badge variant={kind === "cancellation" ? "warning" : "info"}>
+          <Badge variant={kind === "cancellation" ? "warning" : "default"}>
             {t(REFUND_REQUEST_KIND_I18N_KEYS[kind])}
           </Badge>
           <TestLaneBadge isTest={r.order.isTest} />

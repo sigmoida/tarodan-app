@@ -1,9 +1,3 @@
-import {
-  ListBulletIcon,
-  CalendarDaysIcon,
-  BanknotesIcon,
-  ReceiptRefundIcon,
-} from "@heroicons/react/24/outline";
 import { payoutStatusConfig } from "@tarodan/ui";
 import type { useTranslations } from "next-intl";
 
@@ -99,22 +93,18 @@ export const payoutTabs = (t: T) => [
     // ikisini karıştırıyordu; sekme adı artık ne olduğunu söylüyor.
     key: "escrow",
     label: t("admin.finance.payouts.escrowTab"),
-    icon: ListBulletIcon,
   },
   {
     key: "transfers",
     label: t("admin.finance.payouts.transfersTab"),
-    icon: BanknotesIcon,
   },
   {
     key: "adjustments",
     label: t("admin.finance.payouts.adjustmentsTab"),
-    icon: ReceiptRefundIcon,
   },
   {
     key: "schedule",
     label: t("admin.finance.payouts.schedule"),
-    icon: CalendarDaysIcon,
   },
 ];
 

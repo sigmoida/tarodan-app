@@ -192,7 +192,7 @@ export const invoiceStatusConfig = (t: T): Record<string, StatusConfig> => ({
   // yoksa "Beklemede" seçen operatör gönderimde takılmış belgeyi hiç bulamıyor.
   processing: {
     label: t("admin.finance.invoices.status.processing"),
-    variant: "info",
+    variant: "default",
   },
   sent: { label: t("admin.finance.invoices.status.sent"), variant: "success" },
   signed: {
@@ -205,7 +205,7 @@ export const invoiceStatusConfig = (t: T): Record<string, StatusConfig> => ({
   },
   cancelled: {
     label: t("admin.finance.invoices.status.cancelled"),
-    variant: "secondary",
+    variant: "outline",
   },
 });
 

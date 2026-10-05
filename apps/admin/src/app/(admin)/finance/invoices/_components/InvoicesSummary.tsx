@@ -3,12 +3,6 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
-import {
-  CheckCircleIcon,
-  ClockIcon,
-  ExclamationTriangleIcon,
-  XCircleIcon,
-} from "@heroicons/react/24/outline";
 import { adminApi } from "@/lib/api";
 import { adminKeys } from "@/lib/query/keys";
 import { MetricCard } from "@/components/MetricCard";
@@ -38,8 +32,6 @@ export function InvoicesSummary() {
   return (
     <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
       <MetricCard
-        icon={CheckCircleIcon}
-        tone="success"
         label={t("admin.finance.invoices.monthIssued")}
         value={data ? fmtTry(data.monthIssuedTotal) : "—"}
         loading={isLoading}
@@ -52,22 +44,16 @@ export function InvoicesSummary() {
         }
       />
       <MetricCard
-        icon={ClockIcon}
-        tone="info"
         label={t("admin.finance.invoices.pendingShort")}
         value={data ? String(data.pendingCount) : "—"}
         loading={isLoading}
       />
       <MetricCard
-        icon={XCircleIcon}
-        tone={data?.failedCount ? "warning" : "success"}
         label={t("admin.finance.invoices.failedShort")}
         value={data ? String(data.failedCount) : "—"}
         loading={isLoading}
       />
       <MetricCard
-        icon={ExclamationTriangleIcon}
-        tone={data?.exhaustedCount ? "danger" : "success"}
         label={t("admin.finance.invoices.exhaustedShort")}
         value={data ? String(data.exhaustedCount) : "—"}
         loading={isLoading}

@@ -67,8 +67,6 @@ export function AnalyticsTabView({
           return (
             <MetricCard
               key={card.metric}
-              icon={card.icon}
-              tone={card.tone}
               label={t(card.labelKey)}
               loading={isLoading}
               value={

@@ -1,4 +1,5 @@
 import type { useTranslations } from "next-intl";
+import type { BadgeVariant } from "@tarodan/ui";
 
 type T = ReturnType<typeof useTranslations<never>>;
 
@@ -9,63 +10,52 @@ export interface OrderStatusSource {
   activeRefundRequest?: unknown;
 }
 
-const statusMeta: Record<string, { key: string; color: string; bg: string }> = {
+const statusMeta: Record<string, { key: string; variant: BadgeVariant }> = {
   pending_payment: {
     key: "admin.operations.orders.status.pendingPayment",
-    color: "text-warning-600",
-    bg: "bg-warning-100",
+    variant: "warning",
   },
   paid: {
     key: "admin.operations.orders.status.paid",
-    color: "text-info-600",
-    bg: "bg-info-100",
+    variant: "default",
   },
   preparing: {
     key: "admin.operations.orders.status.preparing",
-    color: "text-primary-600",
-    bg: "bg-primary-100",
+    variant: "default",
   },
   shipped: {
     key: "admin.operations.orders.status.shipped",
-    color: "text-info-600",
-    bg: "bg-info-100",
+    variant: "default",
   },
   delivered: {
     key: "admin.operations.orders.status.delivered",
-    color: "text-success-600",
-    bg: "bg-success-100",
+    variant: "success",
   },
   awaiting_buyer_confirmation: {
     key: "admin.operations.orders.status.awaitingBuyerConfirmation",
-    color: "text-warning-600",
-    bg: "bg-warning-100",
+    variant: "warning",
   },
   refund_requested: {
     key: "admin.operations.orders.status.refundRequested",
-    color: "text-danger-600",
-    bg: "bg-danger-100",
+    variant: "danger",
   },
   completed: {
     key: "admin.operations.orders.status.completed",
-    color: "text-success-600",
-    bg: "bg-success-100",
+    variant: "success",
   },
   cancelled: {
     key: "admin.operations.orders.status.cancelled",
-    color: "text-danger-600",
-    bg: "bg-danger-100",
+    variant: "danger",
   },
   refunded: {
     key: "admin.operations.orders.status.refunded",
-    color: "text-muted",
-    bg: "bg-surface-alt",
+    variant: "outline",
   },
 };
 
 export interface OrderStatusView {
   label: string;
-  color: string;
-  bg: string;
+  variant: BadgeVariant;
   hasActiveRefund: boolean;
   isCancelledOrder: boolean;
 }
@@ -87,21 +77,18 @@ export function getOrderStatusInfo(
   const info = hasActiveRefund
     ? {
         label: t("admin.operations.orders.status.refundInProgress"),
-        color: "text-danger-600",
-        bg: "bg-danger-100",
+        variant: "danger" as const,
       }
     : order.cancellationType === "iptal"
       ? {
           label: t("admin.operations.orders.status.cancelledConfirmed"),
-          color: "text-danger-600",
-          bg: "bg-danger-100",
+          variant: "danger" as const,
         }
       : (() => {
           const meta = statusMeta[order.status] || statusMeta.pending_payment;
           return {
             label: t(meta.key as Parameters<T>[0], { returnWindowDays }),
-            color: meta.color,
-            bg: meta.bg,
+            variant: meta.variant,
           };
         })();
   return { ...info, hasActiveRefund, isCancelledOrder };

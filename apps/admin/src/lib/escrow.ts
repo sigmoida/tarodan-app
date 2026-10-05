@@ -23,7 +23,7 @@ export interface EscrowHoldReason {
   /** One-sentence description. */
   detail: string;
   /** Badge tone (for picking the tailwind class group). */
-  tone: "danger" | "warning" | "info" | "success";
+  tone: "danger" | "warning" | "default" | "success";
 }
 
 export interface EscrowHoldReasonInput {
@@ -92,7 +92,7 @@ export function describeHoldReason(
           dateStyle: "medium",
         }),
       }),
-      tone: "info",
+      tone: "default",
     };
   }
 

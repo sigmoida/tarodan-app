@@ -1,6 +1,6 @@
 "use client";
 
-import { type ComponentType, type ReactNode } from "react";
+import { type ReactNode } from "react";
 import { useTranslations } from "next-intl";
 import {
   ArrowTrendingUpIcon,
@@ -8,28 +8,16 @@ import {
 } from "@heroicons/react/24/outline";
 import { cn, Skeleton } from "@tarodan/ui";
 
-export type MetricTone = "primary" | "info" | "success" | "warning" | "danger";
-
-/** Static tone → soft icon box + colored icon (Tailwind can't build class names at runtime). */
-const TONES: Record<MetricTone, { box: string; icon: string }> = {
-  primary: { box: "bg-primary-500/10", icon: "text-primary-500" },
-  info: { box: "bg-info-500/10", icon: "text-info-500" },
-  success: { box: "bg-success-500/10", icon: "text-success-500" },
-  warning: { box: "bg-warning-500/10", icon: "text-warning-500" },
-  danger: { box: "bg-danger-500/10", icon: "text-danger-500" },
-};
-
 /**
- * The shared metric card — a soft-tinted icon box next to a label + value.
+ * The shared metric card — a label over its value. No icon: the label says
+ * what the number is, and a decorative icon per card carried no information.
  * The single source of truth for summary metrics across admin pages
  * (analytics, seller performance, dashboard, …). The trend row (`change`) and
  * footer (`footer`) are optional, for pages that surface more per-card data.
  */
 export function MetricCard({
-  icon: Icon,
   label,
   value,
-  tone = "primary",
   title,
   change,
   changeLabel,
@@ -37,10 +25,8 @@ export function MetricCard({
   className,
   loading = false,
 }: {
-  icon: ComponentType<{ className?: string }>;
   label: string;
   value: ReactNode;
-  tone?: MetricTone;
   /** Tooltip for the (truncated) value — e.g. a long name. */
   title?: string;
   /** Signed percentage delta — renders a colored up/down trend row when set. */
@@ -56,7 +42,6 @@ export function MetricCard({
   const translate = useTranslations();
   const resolvedChangeLabel =
     changeLabel ?? translate("admin.shared.metricCard.vsYesterday");
-  const t = TONES[tone];
   const up = (change ?? 0) >= 0;
   const hasBottom = change !== undefined || footer != null;
   return (
@@ -68,24 +53,18 @@ export function MetricCard({
       )}
     >
       {/* Single line — truncate with "…" when it doesn't fit (full text on
-          hover) rather than wrapping, so every card's icon+value row lines up. */}
+          hover) rather than wrapping, so every card's value lines up. */}
       <p
-        className="mb-3 truncate text-sm text-muted"
+        className="mb-2 truncate text-sm text-muted"
         title={typeof label === "string" ? label : undefined}
       >
         {label}
       </p>
-      {/* Icon and value share one centered row → they're always vertically aligned. */}
-      <div className="flex items-center gap-4">
-        <div className={cn("shrink-0 rounded-lg p-3", t.box)}>
-          <Icon className={cn("h-6 w-6", t.icon)} />
-        </div>
-        <div
-          className="min-w-0 truncate text-xl font-bold text-heading"
-          title={title}
-        >
-          {loading ? <Skeleton className="h-7 w-20" /> : value}
-        </div>
+      <div
+        className="min-w-0 truncate text-2xl font-bold text-heading"
+        title={title}
+      >
+        {loading ? <Skeleton className="h-8 w-20" /> : value}
       </div>
       {hasBottom && (
         <div className="mt-3 flex flex-wrap items-center justify-start gap-1 border-t border-border pt-3 text-sm">

@@ -14,7 +14,7 @@ function ItemBadges({ item }: { item: CollectionItem }) {
   return (
     <div className="flex flex-col items-start gap-1">
       {item.isCustom && (
-        <Badge variant="info" appearance="solid" size="sm">
+        <Badge variant="default" appearance="solid" size="sm">
           {t("collection.collection")}
         </Badge>
       )}

@@ -1,4 +1,3 @@
-import { ShieldCheckIcon, UserGroupIcon } from "@heroicons/react/24/outline";
 import { useTranslations } from "next-intl";
 import type { BadgeProps } from "@tarodan/ui";
 import {
@@ -43,9 +42,9 @@ export const getRoleMeta = (
  * super_admin is tinted, so the column reads at a glance without a rainbow.
  */
 export const ROLE_BADGE_VARIANT: Record<RoleId, BadgeProps["variant"]> = {
-  super_admin: "primary",
-  admin: "default",
-  moderator: "default",
+  super_admin: "default",
+  admin: "outline",
+  moderator: "outline",
 };
 
 // Varsayılan izin listesinin önyüz kopyası BİLEREK yok: tek kaynak backend'in
@@ -354,10 +353,9 @@ export const getPermissionGroups = (t: T): PermGroup[] => [
 
 /** Two tabs: permission matrix + user assignments. */
 export const getRoleTabs = (t: T) => [
-  { key: "matrix", label: t("admin.roles.tabs.matrix"), icon: ShieldCheckIcon },
+  { key: "matrix", label: t("admin.roles.tabs.matrix") },
   {
     key: "users",
     label: t("admin.roles.tabs.userAssignments"),
-    icon: UserGroupIcon,
   },
 ];

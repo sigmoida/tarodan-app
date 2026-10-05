@@ -2,12 +2,6 @@
 
 import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
-import {
-  BanknotesIcon,
-  CheckCircleIcon,
-  ClockIcon,
-  ExclamationTriangleIcon,
-} from "@heroicons/react/24/outline";
 import { adminApi } from "@/lib/api";
 import { adminKeys } from "@/lib/query/keys";
 import { MetricCard } from "@/components/MetricCard";
@@ -35,8 +29,6 @@ export function PayoutsSummary() {
   return (
     <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
       <MetricCard
-        icon={BanknotesIcon}
-        tone="warning"
         label={t("admin.finance.payouts.pendingTotal")}
         value={data ? fmtTry(data.totalPending) : "—"}
         loading={isLoading}
@@ -51,15 +43,11 @@ export function PayoutsSummary() {
       {/* Escrow gerçeği: "released" para bankaya GİTMİŞ demek değil. Kartlar
           released-bekleyen / gerçekten transfer edilen / başarısız diye ayrışır. */}
       <MetricCard
-        icon={ClockIcon}
-        tone="info"
         label={t("admin.finance.payouts.releasedAwaiting")}
         value={data ? fmtTry(data.releasedAwaitingTransfer) : "—"}
         loading={isLoading}
       />
       <MetricCard
-        icon={CheckCircleIcon}
-        tone="success"
         label={t("admin.finance.payouts.transferredTotal")}
         value={data ? fmtTry(data.transferredTotal) : "—"}
         loading={isLoading}
@@ -72,8 +60,6 @@ export function PayoutsSummary() {
         }
       />
       <MetricCard
-        icon={ExclamationTriangleIcon}
-        tone={data?.failedTransferCount ? "danger" : "success"}
         label={t("admin.finance.payouts.failedTransfers")}
         value={data ? String(data.failedTransferCount) : "—"}
         loading={isLoading}

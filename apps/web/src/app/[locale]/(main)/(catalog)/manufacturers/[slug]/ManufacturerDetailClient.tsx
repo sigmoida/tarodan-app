@@ -83,7 +83,7 @@ export default function ManufacturerDetailClient() {
           }
           title={brand.name}
           actions={
-            <Badge variant="info" size="sm">
+            <Badge variant="default" size="sm">
               {brand.productCount}{" "}
               {t("brands.activeListings") ||
                 t("brands.manufacturerDetail.aktifIlan")}

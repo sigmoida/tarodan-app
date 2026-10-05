@@ -133,7 +133,7 @@ function DocumentStatusBadge({ status, t }: { status: DocumentStatus; t: T }) {
     },
     appealed: {
       label: t("admin.accounts.sellerApplications.documentStatus.appealed"),
-      variant: "info" as const,
+      variant: "default" as const,
     },
   }[status];
 
@@ -273,7 +273,7 @@ export function ApplicationDetail({ app }: { app: Application }) {
         <div className="flex flex-wrap items-center gap-2">
           <Badge status={data.status} config={applicationStatusConfig(t)} />
           {data.user?.adminCode && (
-            <Badge variant="secondary">{data.user.adminCode}</Badge>
+            <Badge variant="outline">{data.user.adminCode}</Badge>
           )}
           {data.user?.username && (
             <span className="text-sm text-muted">@{data.user.username}</span>

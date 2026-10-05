@@ -206,7 +206,7 @@ export function LinesTab() {
                         </Badge>
                         {line.resolvedAt && (
                           <Badge
-                            variant="default"
+                            variant="outline"
                             title={line.resolutionNote ?? undefined}
                           >
                             {t("admin.finance.psp.lines.status.resolved")}

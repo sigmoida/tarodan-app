@@ -9067,7 +9067,7 @@
           "keywords": "test,zaman,cron,süre,boost,üyelik,iade,time"
         },
         "adPackages": {
-          "name": "Öne Çıkarma Paketleri",
+          "name": "Öne Çıkarma",
           "description": "Vitrin ve ekonomik öne çıkarma paketlerini yönetin",
           "keywords": "paket,vitrin,ekonomik,öne çıkarma,boost,showcase"
         },

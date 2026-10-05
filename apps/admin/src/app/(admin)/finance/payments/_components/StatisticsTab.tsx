@@ -13,12 +13,6 @@ import {
   paymentProviderConfig,
 } from "@tarodan/ui";
 import { PageLoading } from "@/components/PageLoading";
-import {
-  CurrencyDollarIcon,
-  CreditCardIcon,
-  CheckCircleIcon,
-  ChartBarIcon,
-} from "@heroicons/react/24/outline";
 import { adminApi } from "@/lib/api";
 import { adminKeys } from "@/lib/query/keys";
 import { SectionCard } from "@/components/detail/SectionCard";
@@ -155,26 +149,18 @@ export function StatisticsTab() {
         <>
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
             <MetricCard
-              icon={CurrencyDollarIcon}
-              tone="success"
               label={t("admin.finance.payments.totalRevenue")}
               value={fmtTry(s.totalRevenue)}
             />
             <MetricCard
-              icon={CreditCardIcon}
-              tone="info"
               label={t("admin.finance.payments.totalPayments")}
               value={s.totalPayments}
             />
             <MetricCard
-              icon={CheckCircleIcon}
-              tone="success"
               label={t("admin.finance.payments.successRate")}
               value={`${s.successRate.toFixed(1)}%`}
             />
             <MetricCard
-              icon={ChartBarIcon}
-              tone="primary"
               label={t("admin.finance.payments.averageAmount")}
               value={fmtTry(s.averageAmount)}
             />

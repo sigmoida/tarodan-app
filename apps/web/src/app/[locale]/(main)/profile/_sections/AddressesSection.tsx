@@ -58,7 +58,7 @@ export default function AddressesSection() {
     <SectionCard
       title={t("address.myAddresses")}
       badge={
-        <Badge variant="secondary" size="sm">
+        <Badge variant="outline" size="sm">
           {addresses.length}/{MAX_ADDRESSES}
         </Badge>
       }
@@ -99,7 +99,7 @@ export default function AddressesSection() {
                     </span>
                   )}
                   {address.isDefault && (
-                    <Badge variant="primary" size="sm">
+                    <Badge variant="default" size="sm">
                       {t("address.default")}
                     </Badge>
                   )}

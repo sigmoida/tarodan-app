@@ -1,5 +1,6 @@
 "use client";
 
+import { Badge } from "@tarodan/ui";
 import { useParams } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { adminApi } from "@/lib/api";
@@ -25,13 +26,7 @@ export default function ProductDetailPage() {
       }
       badge={(p) => {
         const s = statusConfig[p.status] ?? statusConfig.pending;
-        return (
-          <span
-            className={`rounded-full px-3 py-1 text-sm font-medium ${s.color} ${s.bg}`}
-          >
-            {s.label}
-          </span>
-        );
+        return <Badge variant={s.variant}>{s.label}</Badge>;
       }}
     >
       {(p) => <ProductDetailBody product={p} />}
