@@ -132,12 +132,18 @@ export class ShipmentSimulationService {
     step: SimulatedCarrierStep,
   ): Promise<ShipmentSimulationResult> {
     const before = await this.load(kind, id);
-    if (this.liveTestLaneOnly() && !before.isTest) {
+    const trackingRef = before.trackingNumber;
+    if (
+      this.liveTestLaneOnly() &&
+      (!before.isTest ||
+        (kind === "order_shipment" &&
+          trackingRef !== null &&
+          (await this.parcelHasLiveLaneRow(trackingRef))))
+    ) {
       throw new ForbiddenException(
         i18nMessage("server.admin.testTools.simulationLiveOrderForbidden"),
       );
     }
-    const trackingRef = before.trackingNumber;
     if (!trackingRef || !before.nextSteps.includes(step)) {
       throw new BadRequestException(
         i18nMessage("server.admin.testTools.simulationStepUnavailable", {
@@ -160,6 +166,20 @@ export class ShipmentSimulationService {
       `UAT carrier simulation: ${kind} ${before.reference} (${id}) step=${step} ${before.status ?? "-"} → ${after.status ?? "-"} applied=${applied}`,
     );
     return { applied, before, after };
+  }
+
+  /**
+   * Sipariş kolisinde okuma, aynı takip referansını taşıyan TÜM satırlara
+   * uygulanır (`applyParcelReading`, cron'la aynı birim). Canlıda kilit kendi
+   * içinde tam olmalı: seçilen satır test şeridinde olsa bile kolide canlı
+   * şeritten tek bir satır varsa simülasyon reddedilir. Gerçek poller'a
+   * dokunulmaz — süzme burada, simülasyonun kapısında.
+   */
+  private async parcelHasLiveLaneRow(trackingNumber: string): Promise<boolean> {
+    const liveRows = await this.prisma.shipment.count({
+      where: { provider: "surat", trackingNumber, order: { isTest: false } },
+    });
+    return liveRows > 0;
   }
 
   /**

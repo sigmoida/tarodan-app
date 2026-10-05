@@ -62,7 +62,11 @@ describe("ShipmentSimulationService", () => {
       return fn;
     };
     const prisma = {
-      shipment: { findMany: queue(opts.shipments) },
+      shipment: {
+        findMany: queue(opts.shipments),
+        // Kolideki canlı-şerit satır sayısı (canlıda kapı); varsayılan: yok.
+        count: jest.fn().mockResolvedValue(0),
+      },
       refundRequest: { findMany: queue(opts.refunds) },
       tradeShipment: { findMany: queue(opts.trades) },
     };
@@ -374,13 +378,49 @@ describe("ShipmentSimulationService", () => {
             isTest: true,
           },
         });
-        const { service, tracking } = makeService({
+        const { service, tracking, prisma } = makeService({
           shipments: [[testLane], [testLane]],
         });
 
         await service.simulate("order_shipment", "ship-1", "picked_up");
         expect(tracking.applyOrderParcelReading).toHaveBeenCalledTimes(1);
+        // Kolinin TÜM satırları denetlendi (seçilen satırla yetinilmedi).
+        expect(prisma.shipment.count).toHaveBeenCalledWith({
+          where: {
+            provider: "surat",
+            trackingNumber: "PKG-000123",
+            order: { isTest: false },
+          },
+        });
       });
+
+      it("refuses when any sibling row of the parcel belongs to a live-lane order", async () => {
+        const testLane = shipmentRow({
+          order: {
+            orderNumber: "ORD-10001",
+            status: OrderStatus.preparing,
+            isTest: true,
+          },
+        });
+        const { service, tracking, prisma } = makeService({
+          shipments: [[testLane]],
+        });
+        prisma.shipment.count.mockResolvedValue(1);
+
+        await expect(
+          service.simulate("order_shipment", "ship-1", "delivered"),
+        ).rejects.toBeInstanceOf(ForbiddenException);
+        expect(tracking.applyOrderParcelReading).not.toHaveBeenCalled();
+      });
+    });
+
+    it("does not run the sibling lane check outside the live deployment", async () => {
+      const { service, prisma } = makeService({
+        shipments: [[shipmentRow()], [shipmentRow()]],
+      });
+
+      await service.simulate("order_shipment", "ship-1", "picked_up");
+      expect(prisma.shipment.count).not.toHaveBeenCalled();
     });
   });
 });
