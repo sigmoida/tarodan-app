@@ -1,4 +1,6 @@
+import { GATEWAY_CLIENT_IP_HEADER } from "@tarodan/types";
 import {
+  getRequestClientInfo,
   getRequestId,
   requestIdMiddleware,
   runWithRequestId,
@@ -95,5 +97,36 @@ describe("request context", () => {
 
     expect(inside).not.toBe("x".repeat(200));
     expect(inside!.length).toBeLessThanOrEqual(64);
+  });
+
+  it("bağlam istemcinin IP'sini ve kullanıcı ajanını taşır (onay kanıtı)", () => {
+    const res = makeRes();
+    let info: ReturnType<typeof getRequestClientInfo> | undefined;
+
+    requestIdMiddleware(
+      {
+        ip: "172.18.0.4",
+        headers: {
+          [GATEWAY_CLIENT_IP_HEADER]: "85.105.10.20",
+          "user-agent": "Mozilla/5.0",
+        },
+      } as any,
+      res as any,
+      () => {
+        info = getRequestClientInfo();
+      },
+    );
+
+    expect(info).toEqual({
+      ipAddress: "85.105.10.20",
+      userAgent: "Mozilla/5.0",
+    });
+  });
+
+  it("istek bağlamı dışında (cron/worker) kanıt alanları null'dır", () => {
+    expect(getRequestClientInfo()).toEqual({
+      ipAddress: null,
+      userAgent: null,
+    });
   });
 });
