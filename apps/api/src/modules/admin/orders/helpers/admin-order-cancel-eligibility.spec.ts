@@ -4,6 +4,7 @@ import {
   ADMIN_ORDER_CANCEL_BLOCKERS,
   ADMIN_ORDER_CANCEL_BLOCKER_I18N_KEYS,
   adminCancelRequestProblem,
+  adminOrderCancelBlockerOf,
   adminOrderCancelEligibility,
   normalizeAdminCancelNote,
   preShipmentCancelBlocker,
@@ -77,6 +78,25 @@ describe("adminOrderCancelEligibility", () => {
         shipment: null,
       }),
     ).toBe("not_paid");
+  });
+
+  it("adminOrderCancelBlockerOf: engeli ya da null (strict kapalı panel için daraltma)", () => {
+    expect(
+      adminOrderCancelBlockerOf(
+        adminOrderCancelEligibility({
+          status: OrderStatus.delivered,
+          shipment: null,
+        }),
+      ),
+    ).toBe("delivered");
+    expect(
+      adminOrderCancelBlockerOf(
+        adminOrderCancelEligibility({
+          status: OrderStatus.pending_payment,
+          shipment: null,
+        }),
+      ),
+    ).toBeNull();
   });
 
   it("her engelin panel metni vardır", () => {
