@@ -76,6 +76,12 @@ export const testToolTypes = (
     placeholder: t("admin.system.testTools.placeholders.order"),
   },
   {
+    // İade penceresi + ona bağlı escrow tarihi birlikte kayar (API).
+    value: "return_window",
+    label: t("admin.system.testTools.types.returnWindow"),
+    placeholder: t("admin.system.testTools.placeholders.deliveredOrder"),
+  },
+  {
     value: "email_verification",
     label: t("admin.system.testTools.types.emailVerification"),
     placeholder: t("admin.system.testTools.placeholders.userEmail"),
