@@ -165,7 +165,11 @@ export const TIMING_RULES = {
     max: 168,
     envKey: "OFFER_EXPIRY_HOURS",
     appliesToInProgress: false,
-    ...withLater("expire", "extend_once"),
+    actions: [
+      { action: "expire", available: true },
+      { action: "extend_once", available: true },
+    ],
+    defaultAction: "expire",
   },
 
   // ── Takas ─────────────────────────────────────────────────────────────
@@ -179,7 +183,11 @@ export const TIMING_RULES = {
     max: 336,
     envKey: null,
     appliesToInProgress: false,
-    ...withLater("cancel", "extend_once"),
+    actions: [
+      { action: "cancel", available: true },
+      { action: "extend_once", available: true },
+    ],
+    defaultAction: "cancel",
   },
   /** Kabul sonrası takas ödemesi süresi. */
   tradePaymentHours: {
@@ -191,7 +199,11 @@ export const TIMING_RULES = {
     max: 336,
     envKey: null,
     appliesToInProgress: false,
-    ...withLater("cancel", "extend_once"),
+    actions: [
+      { action: "cancel", available: true },
+      { action: "extend_once", available: true },
+    ],
+    defaultAction: "cancel",
   },
   /** Ödeme sonrası ürünlerin depoya kargolanma süresi. */
   tradeShippingDays: {

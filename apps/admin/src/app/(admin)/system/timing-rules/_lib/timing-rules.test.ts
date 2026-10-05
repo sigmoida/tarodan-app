@@ -165,17 +165,30 @@ describe("timing rules screen helpers", () => {
     expect(isActionLocked("listingTtlDays")).toBe(false);
   });
 
+  it("shows enabled extend_once as selectable for offers and trades", () => {
+    for (const id of [
+      "offerExpiryHours",
+      "tradeResponseHours",
+      "tradePaymentHours",
+    ] as const) {
+      expect(actionOptions(t, id).map((option) => option.disabled)).toEqual([
+        false,
+        false,
+      ]);
+    }
+  });
+
   it("shows later actions disabled with a coming-soon label", () => {
-    expect(actionOptions(t, "offerExpiryHours")).toEqual([
+    expect(actionOptions(t, "listingTtlDays")).toEqual([
       {
-        value: "expire",
-        label: "admin.timingRules.actions.expire",
+        value: "deactivate",
+        label: "admin.timingRules.actions.deactivate",
         disabled: false,
       },
       {
-        value: "extend_once",
+        value: "auto_renew",
         label:
-          'admin.timingRules.comingSoon:{"action":"admin.timingRules.actions.extend_once"}',
+          'admin.timingRules.comingSoon:{"action":"admin.timingRules.actions.auto_renew"}',
         disabled: true,
       },
     ]);

@@ -218,9 +218,6 @@ describe("TimingRulesService", () => {
       const { service, prisma } = makeService();
       for (const [id, action] of [
         ["listingTtlDays", "auto_renew"],
-        ["offerExpiryHours", "extend_once"],
-        ["tradeResponseHours", "extend_once"],
-        ["tradePaymentHours", "extend_once"],
         ["preparingDeadlineDays", "extend_once"],
       ] as const) {
         await expectRejected(

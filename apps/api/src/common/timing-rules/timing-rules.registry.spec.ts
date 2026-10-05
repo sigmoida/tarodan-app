@@ -77,9 +77,6 @@ describe("TIMING_RULES kaydı", () => {
   // Bugünkü davranış = varsayılan eylem. Sonraki paketler yalnız bayrağı çevirir.
   const LATER_ACTIONS = {
     listingTtlDays: ["deactivate", "auto_renew"],
-    offerExpiryHours: ["expire", "extend_once"],
-    tradeResponseHours: ["cancel", "extend_once"],
-    tradePaymentHours: ["cancel", "extend_once"],
     preparingDeadlineDays: ["cancel_and_refund", "extend_once"],
   } satisfies Partial<
     Record<TimingRuleId, [TimingExpiryAction, TimingExpiryAction]>
@@ -95,11 +92,35 @@ describe("TIMING_RULES kaydı", () => {
     },
   );
 
+  // extend_once AÇILMIŞ kayıtlar (teklif + takas paketi): davranışı ilgili
+  // zamanlayıcı okur (offer-scheduler, trade-reconciliation).
+  const EXTEND_ONCE_ENABLED = {
+    offerExpiryHours: "expire",
+    tradeResponseHours: "cancel",
+    tradePaymentHours: "cancel",
+  } satisfies Partial<Record<TimingRuleId, TimingExpiryAction>>;
+
+  it.each(Object.entries(EXTEND_ONCE_ENABLED))(
+    "%s — extend_once açık, varsayılan eylem değişmedi",
+    (id, current) => {
+      expect(TIMING_RULES[id as TimingRuleId].actions).toEqual([
+        { action: current, available: true },
+        { action: "extend_once", available: true },
+      ]);
+      expect(TIMING_RULES[id as TimingRuleId].defaultAction).toBe(current);
+    },
+  );
+
   it("diğer tüm kayıtlar tek eylemlidir", () => {
     const multi = TIMING_RULE_IDS.filter(
       (id) => TIMING_RULES[id].actions.length > 1,
     );
-    expect(multi.sort()).toEqual(Object.keys(LATER_ACTIONS).sort());
+    expect(multi.sort()).toEqual(
+      [
+        ...Object.keys(LATER_ACTIONS),
+        ...Object.keys(EXTEND_ONCE_ENABLED),
+      ].sort(),
+    );
   });
 
   it("süresi kayda damgalanmayan (sürmekte olanlara da uygulanan) kayıtlar işaretli", () => {

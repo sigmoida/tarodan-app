@@ -229,7 +229,18 @@ describe("eylem çözümü", () => {
 
   it("henüz açılmamış bir eylem DB'ye yazılmış olsa bile uygulanmaz", () => {
     expect(pickTimingAction("listingTtlDays", "auto_renew")).toBe("deactivate");
-    expect(pickTimingAction("offerExpiryHours", "extend_once")).toBe("expire");
+  });
+
+  it("açılmış extend_once eylemi (teklif/takas paketi) seçilebilir", () => {
+    expect(pickTimingAction("offerExpiryHours", "extend_once")).toBe(
+      "extend_once",
+    );
+    expect(pickTimingAction("tradeResponseHours", "extend_once")).toBe(
+      "extend_once",
+    );
+    expect(pickTimingAction("tradePaymentHours", "extend_once")).toBe(
+      "extend_once",
+    );
   });
 
   it("kayıtta tanımsız eylem varsayılana düşer", () => {
