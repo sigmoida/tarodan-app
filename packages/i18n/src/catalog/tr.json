@@ -4878,7 +4878,7 @@
           "refund": "sipariş no veya iade id",
           "order": "sipariş no",
           "offer": "teklif id veya ürün başlığı",
-          "trade": "takas id",
+          "trade": "takas no veya id",
           "userEmail": "kullanıcı e-posta",
           "deliveredOrder": "teslim edilmiş sipariş no"
         },
@@ -10925,7 +10925,8 @@
         "orderNotDelivered": "Sipariş henüz teslim edilmedi; iade penceresi teslimde başlar",
         "simulationLiveOrderForbidden": "Canlı ortamda yalnız test şeridi gönderileri simüle edilebilir",
         "simulationTargetNotFound": "Simüle edilecek gönderi bulunamadı",
-        "simulationStepUnavailable": "Bu gönderiye \"{step}\" adımı uygulanamaz (kargo: {status}, kayıt: {ownerStatus})"
+        "simulationStepUnavailable": "Bu gönderiye \"{step}\" adımı uygulanamaz (kargo: {status}, kayıt: {ownerStatus})",
+        "tradeConfirmationNotStarted": "Takasın onay penceresi henüz başlamadı (iki çıkış kolisi de teslim edilmeli)"
       },
       "psp": {
         "invalidDate": "Geçersiz tarih (YYYY-MM-DD bekleniyor)",

@@ -222,6 +222,66 @@ describe("AdminTestToolsService iade penceresi (return_window)", () => {
 });
 
 /**
+ * Takas onay penceresi: iki çıkış kolisi teslim edilince kurulur ve dolunca
+ * `trade-expired` takası oto-onaylar. UAT'ta 3 gün beklenmesin diye kaydırılır;
+ * kurulmamış pencereye tarih yazılmaz.
+ */
+describe("AdminTestToolsService takas onay penceresi", () => {
+  const makeService = (trade: Record<string, unknown>) => {
+    const prisma = {
+      trade: {
+        findUnique: jest.fn().mockResolvedValue(trade),
+        update: jest.fn().mockResolvedValue({}),
+      },
+    };
+    return {
+      service: new AdminTestToolsService(prisma as any, {} as any),
+      prisma,
+    };
+  };
+
+  it("moves confirmationDeadline for a trade shipping to recipients", async () => {
+    const { service, prisma } = makeService({
+      status: "shipping_to_recipients",
+      responseDeadline: new Date("2026-09-01T10:00:00Z"),
+      paymentDeadline: null,
+      shippingDeadline: null,
+      confirmationDeadline: new Date("2026-10-08T10:00:00Z"),
+    });
+
+    const res = await service.adjust("trade", "t1", "expire_now", 0);
+
+    expect(res).toMatchObject({
+      field: "confirmationDeadline",
+      before: "2026-10-08T10:00:00.000Z",
+    });
+    expect(prisma.trade.update).toHaveBeenCalledWith({
+      where: { id: "t1" },
+      data: { confirmationDeadline: new Date(res.after) },
+    });
+  });
+
+  it("refuses to invent a window that has not started", async () => {
+    const { service, prisma } = makeService({
+      status: "shipping_to_recipients",
+      responseDeadline: new Date("2026-09-01T10:00:00Z"),
+      paymentDeadline: null,
+      shippingDeadline: null,
+      confirmationDeadline: null,
+    });
+
+    await expect(
+      service.adjust("trade", "t1", "expire_now", 0),
+    ).rejects.toMatchObject({
+      response: {
+        i18nKey: "server.admin.testTools.tradeConfirmationNotStarted",
+      },
+    });
+    expect(prisma.trade.update).not.toHaveBeenCalled();
+  });
+});
+
+/**
  * Ortam rozeti: staging de NODE_ENV=production koşar; PROD uyarısı yalnız canlı
  * dağıtımda (APP_ENV=production ya da APP_ENV'siz optimize build) çıkmalı.
  */
@@ -292,6 +352,11 @@ describe("AdminTestTools saf mantık", () => {
       expect(tradeDeadlineField("accepted")).toBe("shippingDeadline");
       expect(tradeDeadlineField("shipping_to_warehouse")).toBe(
         "shippingDeadline",
+      );
+    });
+    it("shipping_to_recipients → confirmationDeadline (oto-onay penceresi)", () => {
+      expect(tradeDeadlineField("shipping_to_recipients")).toBe(
+        "confirmationDeadline",
       );
     });
     it("pending / bilinmeyen → responseDeadline", () => {

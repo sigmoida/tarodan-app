@@ -220,25 +220,29 @@ export class AdminTestToolsService {
         }));
       }
       case "trade": {
+        // Takas no (TKS-…) ile de aranır: UAT'ta tester kodu ekrandan okur.
         const rows = await this.prisma.trade.findMany({
-          where: { id: ci },
+          where: { OR: [{ id: ci }, { tradeNumber: ci }] },
           select: {
             id: true,
+            tradeNumber: true,
             status: true,
             responseDeadline: true,
             paymentDeadline: true,
             shippingDeadline: true,
+            confirmationDeadline: true,
           },
           take,
         });
         return rows.map((r) => ({
           id: r.id,
-          label: `Takas ${r.id.slice(0, 8)}`,
+          label: r.tradeNumber,
           status: r.status,
           dates: {
             responseDeadline: iso(r.responseDeadline),
             paymentDeadline: iso(r.paymentDeadline),
             shippingDeadline: iso(r.shippingDeadline),
+            confirmationDeadline: iso(r.confirmationDeadline),
           },
         }));
       }
@@ -484,6 +488,7 @@ export class AdminTestToolsService {
             responseDeadline: true,
             paymentDeadline: true,
             shippingDeadline: true,
+            confirmationDeadline: true,
           },
         });
         if (!before)
@@ -491,6 +496,12 @@ export class AdminTestToolsService {
             i18nMessage("server.payment.tradeNotFound"),
           );
         const field = tradeDeadlineField(before.status);
+        // Onay penceresi iki çıkış kolisi de teslim edilince kurulur; kurulmamış
+        // pencereye tarih yazmak teslim olmamış takası oto-onaya sokardı.
+        if (field === "confirmationDeadline" && !before.confirmationDeadline)
+          throw new BadRequestException(
+            i18nMessage("server.admin.testTools.tradeConfirmationNotStarted"),
+          );
         await this.prisma.trade.update({
           where: { id },
           data: { [field]: target },
@@ -499,7 +510,7 @@ export class AdminTestToolsService {
           type,
           id,
           field,
-          before: iso((before as any)[field]),
+          before: iso(before[field]),
           after: afterIso,
         };
       }
@@ -642,13 +653,21 @@ export function computeTargetDate(
 /** Takas cron'u duruma göre farklı deadline'a bakar; aktif olanı hedefle. */
 export function tradeDeadlineField(
   status: string,
-): "responseDeadline" | "paymentDeadline" | "shippingDeadline" {
+):
+  | "responseDeadline"
+  | "paymentDeadline"
+  | "shippingDeadline"
+  | "confirmationDeadline" {
   switch (status) {
     case "awaiting_payment":
       return "paymentDeadline";
     case "accepted":
     case "shipping_to_warehouse":
       return "shippingDeadline";
+    // İki çıkış kolisi teslim edildi: onay/itiraz penceresi işliyor; dolunca
+    // `trade-expired` cron'u takası oto-onaylar (UAT'ta 3 gün beklenmez).
+    case "shipping_to_recipients":
+      return "confirmationDeadline";
     case "pending":
     default:
       return "responseDeadline";

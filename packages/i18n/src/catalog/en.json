@@ -4878,7 +4878,7 @@
           "refund": "order no. or refund ID",
           "order": "order no.",
           "offer": "offer ID or product title",
-          "trade": "trade ID",
+          "trade": "trade no or id",
           "userEmail": "user email",
           "deliveredOrder": "delivered order no"
         },
@@ -10925,7 +10925,8 @@
         "orderNotDelivered": "The order has not been delivered yet; the return window starts at delivery",
         "simulationLiveOrderForbidden": "On the live deployment only test-lane parcels can be simulated",
         "simulationTargetNotFound": "Parcel to simulate not found",
-        "simulationStepUnavailable": "Step \"{step}\" is not available for this parcel (shipment: {status}, record: {ownerStatus})"
+        "simulationStepUnavailable": "Step \"{step}\" is not available for this parcel (shipment: {status}, record: {ownerStatus})",
+        "tradeConfirmationNotStarted": "The trade confirmation window has not started yet (both outbound parcels must be delivered)"
       },
       "psp": {
         "invalidDate": "Invalid date (expected YYYY-MM-DD)",
