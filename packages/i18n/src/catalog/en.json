@@ -11857,5 +11857,15 @@
         "girisBasarisiz": "Giriş başarısız"
       }
     }
+  },
+  "adminCancel": {
+    "reasons": {
+      "stock_error": "Stock error",
+      "suspicious_activity": "Suspicious activity",
+      "user_request": "User request",
+      "listing_violation": "Listing rule violation",
+      "duplicate_transaction": "Duplicate transaction",
+      "other": "Other"
+    }
   }
 }

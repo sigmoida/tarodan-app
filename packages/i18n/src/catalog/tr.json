@@ -11857,5 +11857,15 @@
         "girisBasarisiz": "Giriş başarısız"
       }
     }
+  },
+  "adminCancel": {
+    "reasons": {
+      "stock_error": "Stok hatası",
+      "suspicious_activity": "Şüpheli işlem",
+      "user_request": "Kullanıcı talebi",
+      "listing_violation": "İlan kurallarına aykırılık",
+      "duplicate_transaction": "Mükerrer işlem",
+      "other": "Diğer"
+    }
   }
 }
