@@ -1,5 +1,6 @@
 import { OrderStatus, type Prisma } from "@prisma/client";
 import type { TimingExpiryAction } from "@tarodan/types";
+import { TR_TIME_ZONE } from "./tr-calendar";
 
 /**
  * Satıcının kargoya verme son tarihi TAKVİM günü değil, PAZAR HARİÇ gün
@@ -76,15 +77,25 @@ export function extendedPreparingDeadline(
   return addDaysSkippingSundays(now, preparingDays);
 }
 
-/** Bildirim metnindeki son tarih: uyarı ve uzatma bildirimleri aynı biçimi kullanır. */
+/**
+ * Bildirim metnindeki son tarih ("8 Ekim 2026 00:30"): uyarı ve uzatma
+ * bildirimleri aynı biçimi kullanır.
+ *
+ * Saat dilimi AÇIKÇA Europe/Istanbul'dur (`TR_TIME_ZONE`, tr-calendar):
+ * süreç saat dilimiyle biçimlendirildiğinde UTC koşan konteynerde (projede
+ * `TZ` tanımlı değil) alıcı ve satıcıya giden son tarih üç saat erken
+ * okunuyor, web/admin ekranlarındaki tarihle çelişiyordu.
+ */
+const PREPARING_DEADLINE_FORMAT = new Intl.DateTimeFormat("tr-TR", {
+  timeZone: TR_TIME_ZONE,
+  day: "numeric",
+  month: "long",
+  year: "numeric",
+  hour: "2-digit",
+  minute: "2-digit",
+});
+
+/** Son tarih Türkiye saatiyle; tarih yoksa boş metin. */
 export function formatPreparingDeadline(deadline: Date | null): string {
-  return deadline
-    ? deadline.toLocaleDateString("tr-TR", {
-        day: "numeric",
-        month: "long",
-        year: "numeric",
-        hour: "2-digit",
-        minute: "2-digit",
-      })
-    : "";
+  return deadline ? PREPARING_DEADLINE_FORMAT.format(deadline) : "";
 }

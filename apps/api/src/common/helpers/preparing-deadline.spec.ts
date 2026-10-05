@@ -1,6 +1,7 @@
 import {
   addDaysSkippingSundays,
   extendedPreparingDeadline,
+  formatPreparingDeadline,
   isPreparingDeadlinePassed,
   preparingDeadlineApproachingWhere,
   shouldExtendPreparingDeadline,
@@ -113,6 +114,22 @@ describe("shouldExtendPreparingDeadline", () => {
         preparingExtendedAt: new Date("2026-10-01T00:00:00.000Z"),
       }),
     ).toBe(false);
+  });
+});
+
+describe("formatPreparingDeadline", () => {
+  it("renders the deadline in Istanbul time whatever the process TZ is", () => {
+    // 21:30 UTC = ertesi gün 00:30 İstanbul: hem saat hem gün kayması yakalanır.
+    expect(formatPreparingDeadline(new Date("2026-10-07T21:30:00.000Z"))).toBe(
+      "8 Ekim 2026 00:30",
+    );
+    expect(formatPreparingDeadline(new Date("2026-10-07T09:00:00.000Z"))).toBe(
+      "7 Ekim 2026 12:00",
+    );
+  });
+
+  it("is empty without a deadline", () => {
+    expect(formatPreparingDeadline(null)).toBe("");
   });
 });
 
