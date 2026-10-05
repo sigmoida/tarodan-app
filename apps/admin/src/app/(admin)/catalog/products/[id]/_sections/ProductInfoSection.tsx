@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  Alert,
   Badge,
   Button,
   Select,
@@ -10,6 +11,7 @@ import {
 import { useTranslations } from "next-intl";
 import { useState } from "react";
 import { SectionCard } from "@/components/detail/SectionCard";
+import { DataList, Field } from "@/components/detail/DataList";
 import { adminApi } from "@/lib/api";
 import { useAdminMutation } from "@/hooks/useAdminMutation";
 import {
@@ -29,21 +31,6 @@ import {
   isDedicatedAttributeGroup,
   isHiddenAttributeGroup,
 } from "@tarodan/types";
-
-function Row({
-  label,
-  children,
-}: {
-  label: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <div>
-      <span className="text-sm text-muted">{label}</span>
-      <div className="mt-0.5 font-medium text-heading">{children}</div>
-    </div>
-  );
-}
 
 export function ProductInfoSection({ product }: { product: ProductDetail }) {
   const t = useTranslations();
@@ -69,16 +56,18 @@ export function ProductInfoSection({ product }: { product: ProductDetail }) {
       title={t("admin.catalog.products.infoTab")}
       bodyClassName="space-y-3"
     >
-      <Row label={t("common.title")}>{product.title}</Row>
-      <div>
-        <span className="text-sm text-muted">{t("common.description")}</span>
-        <p className="mt-1 whitespace-pre-wrap text-body">
-          {product.description}
-        </p>
-      </div>
-      <div className="grid grid-cols-1 gap-4 border-t border-border pt-3 sm:grid-cols-2">
-        <div>
-          <span className="text-sm text-muted">{t("common.price")}</span>
+      <DataList columns={1}>
+        <Field layout="stacked" label={t("common.title")}>
+          {product.title}
+        </Field>
+        <Field layout="stacked" label={t("common.description")}>
+          <p className="whitespace-pre-wrap font-normal text-body">
+            {product.description}
+          </p>
+        </Field>
+      </DataList>
+      <DataList className="border-t border-border pt-3">
+        <Field layout="stacked" label={t("common.price")}>
           {isProductOnSaleDisplay(product) && (
             <p className="text-base text-muted line-through">
               {fmtTry(getProductOriginalPriceForDisplay(product))}
@@ -87,45 +76,45 @@ export function ProductInfoSection({ product }: { product: ProductDetail }) {
           <p className="text-lg font-semibold text-heading">
             {fmtTry(getProductEffectivePrice(product))}
           </p>
-        </div>
-        <Row label={t("admin.catalog.products.condition")}>
+        </Field>
+        <Field layout="stacked" label={t("admin.catalog.products.condition")}>
           {enumLabel(
             statusConfig(productConditionConfig, t),
             product.condition,
           )}
-        </Row>
-      </div>
-      <div className="grid grid-cols-1 gap-4 border-t border-border pt-3 sm:grid-cols-2">
-        <Row label={t("product.productCode")}>{product.productCode}</Row>
-        <Row label={t("product.brand")}>
+        </Field>
+      </DataList>
+      <DataList className="border-t border-border pt-3">
+        <Field layout="stacked" label={t("product.productCode")}>{product.productCode}</Field>
+        <Field layout="stacked" label={t("product.brand")}>
           {product.brand?.name ?? t("admin.catalog.products.notSpecified")}
-        </Row>
-        <Row label={t("product.model")}>
+        </Field>
+        <Field layout="stacked" label={t("product.model")}>
           {product.carModel?.name ?? t("admin.catalog.products.notSpecified")}
-        </Row>
-        <Row label={t("product.modelCode")}>
+        </Field>
+        <Field layout="stacked" label={t("product.modelCode")}>
           {product.modelCode ?? t("admin.catalog.products.notSpecified")}
-        </Row>
-        <Row label={t("product.color")}>
+        </Field>
+        <Field layout="stacked" label={t("product.color")}>
           {product.color ?? t("admin.catalog.products.notSpecified")}
-        </Row>
-        <Row label={t("product.scale")}>
+        </Field>
+        <Field layout="stacked" label={t("product.scale")}>
           {product.scale ?? t("admin.catalog.products.notSpecified")}
-        </Row>
-        <Row label={t("product.material")}>
+        </Field>
+        <Field layout="stacked" label={t("product.material")}>
           {product.material ?? t("admin.catalog.products.notSpecified")}
-        </Row>
-        <Row label={t("product.manufacturer")}>
+        </Field>
+        <Field layout="stacked" label={t("product.manufacturer")}>
           {product.manufacturer?.name ??
             t("admin.catalog.products.notSpecified")}
-        </Row>
-        <Row label={t("product.boxedCondition")}>
+        </Field>
+        <Field layout="stacked" label={t("product.boxedCondition")}>
           {product.isBoxed == null
             ? t("admin.catalog.products.notSpecified")
             : product.isBoxed
               ? t("product.boxed")
               : t("product.unboxed")}
-        </Row>
+        </Field>
         {/* Özel grup seçimleri (genel + üreticiye bağlı); sabit üçlü yukarıda. */}
         {(product.edit?.attributes ?? [])
           .filter(
@@ -134,34 +123,30 @@ export function ProductInfoSection({ product }: { product: ProductDetail }) {
               !isHiddenAttributeGroup(attribute.groupSlug),
           )
           .map((attribute) => (
-            <Row
+            <Field
+              layout="stacked"
               key={`${attribute.groupSlug}:${attribute.slug}`}
               label={attribute.groupName ?? attribute.groupSlug}
             >
               {attribute.displayValue ?? attribute.value ?? attribute.slug}
-            </Row>
+            </Field>
           ))}
-      </div>
-      <div className="grid grid-cols-1 gap-4 border-t border-border pt-3 sm:grid-cols-2">
-        <Row label={t("admin.catalog.products.viewCount")}>
+      </DataList>
+      <DataList className="border-t border-border pt-3">
+        <Field layout="stacked" label={t("admin.catalog.products.viewCount")}>
           {product.viewCount || 0}
-        </Row>
-        <div>
-          <span className="text-sm text-muted">
-            {t("admin.catalog.products.createdAt")}
-          </span>
-          <p className="mt-0.5 text-sm text-body">
-            {fmtDateTime(product.createdAt)}
-          </p>
-        </div>
-      </div>
-      <div className="border-t border-border pt-3">
-        <Row label={t("admin.catalog.products.stock")}>
+        </Field>
+        <Field layout="stacked" label={t("admin.catalog.products.createdAt")}>
+          {fmtDateTime(product.createdAt)}
+        </Field>
+      </DataList>
+      <DataList columns={1} className="border-t border-border pt-3">
+        <Field layout="stacked" label={t("admin.catalog.products.stock")}>
           {product.quantity !== undefined
             ? product.quantity
             : t("admin.catalog.products.notSpecified")}
-        </Row>
-      </div>
+        </Field>
+      </DataList>
       <div className="border-t border-border pt-3">
         <label
           htmlFor="admin-product-package-tier"
@@ -198,33 +183,35 @@ export function ProductInfoSection({ product }: { product: ProductDetail }) {
       </div>
       {product.rejectionReason && (
         <div className="border-t border-border pt-3">
-          <div className="rounded-lg border border-danger-200 bg-danger-50 p-3">
-            <p className="text-sm text-danger-800">
-              <strong>
-                {t("admin.catalog.products.rejectionReasonLabel")}
-              </strong>{" "}
-              {product.rejectionReason}
-            </p>
-          </div>
+          <Alert variant="danger">
+            <strong>{t("admin.catalog.products.rejectionReasonLabel")}</strong>{" "}
+            {product.rejectionReason}
+          </Alert>
         </div>
       )}
       {product.aiCheckStatus && (
         <div className="border-t border-border pt-3">
-          <span className="text-sm text-muted">
-            {t("admin.catalog.products.aiImageCheck")}
-          </span>
-          <div className="mt-1 flex flex-wrap items-center gap-2">
-            <Badge
-              status={aiCheckKey(product.aiCheckStatus)}
-              config={aiCheckConfig(t)}
-            />
-            <span className="text-xs text-muted">
-              {t("admin.catalog.products.aiScores", {
-                relevance: Math.round((product.aiRelevanceScore ?? 0) * 100),
-                nsfw: ((product.aiNsfwScore ?? 0) * 100).toFixed(2),
-              })}
-            </span>
-          </div>
+          <DataList columns={1}>
+            <Field
+              layout="stacked"
+              label={t("admin.catalog.products.aiImageCheck")}
+            >
+              <div className="flex flex-wrap items-center gap-2">
+                <Badge
+                  status={aiCheckKey(product.aiCheckStatus)}
+                  config={aiCheckConfig(t)}
+                />
+                <span className="text-xs font-normal text-muted">
+                  {t("admin.catalog.products.aiScores", {
+                    relevance: Math.round(
+                      (product.aiRelevanceScore ?? 0) * 100,
+                    ),
+                    nsfw: ((product.aiNsfwScore ?? 0) * 100).toFixed(2),
+                  })}
+                </span>
+              </div>
+            </Field>
+          </DataList>
         </div>
       )}
     </SectionCard>

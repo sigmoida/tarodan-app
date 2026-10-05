@@ -1,17 +1,17 @@
 "use client";
 
-import { Badge } from "@tarodan/ui";
+import { Badge, productStatusConfig } from "@tarodan/ui";
 import { useParams } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { adminApi } from "@/lib/api";
 import { DetailPage } from "@/components/detail/DetailPage";
 import { ProductDetailBody } from "./_components/ProductDetailBody";
-import { productStatusConfig, type ProductDetail } from "./_lib/types";
+import { statusConfig } from "@/lib/statusLabels";
+import type { ProductDetail } from "./_lib/types";
 
 export default function ProductDetailPage() {
   const t = useTranslations();
   const { id } = useParams<{ id: string }>();
-  const statusConfig = productStatusConfig(t);
 
   return (
     <DetailPage<ProductDetail>
@@ -24,10 +24,12 @@ export default function ProductDetailPage() {
       subtitle={(p) =>
         t("admin.catalog.products.categoryLabel", { name: p.category.name })
       }
-      badge={(p) => {
-        const s = statusConfig[p.status] ?? statusConfig.pending;
-        return <Badge variant={s.variant}>{s.label}</Badge>;
-      }}
+      badge={(p) => (
+        <Badge
+          status={p.status}
+          config={statusConfig(productStatusConfig, t)}
+        />
+      )}
     >
       {(p) => <ProductDetailBody product={p} />}
     </DetailPage>

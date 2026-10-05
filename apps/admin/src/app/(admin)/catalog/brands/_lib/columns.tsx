@@ -1,8 +1,8 @@
-import Image from "next/image";
 import { ChevronRightIcon } from "@heroicons/react/24/outline";
 import { Badge, IconButton } from "@tarodan/ui";
 import { useTranslations } from "next-intl";
-import { col, TruncatedText } from "@/components/table";
+import { col } from "@/components/table";
+import { LogoNameCell } from "../../_components/LogoNameCell";
 import { brandRowMenu, type BrandRowActions } from "./rowActions";
 import type { Brand } from "./types";
 
@@ -41,31 +41,7 @@ export function brandColumns(t: T, actions: BrandRowActions) {
     ),
     col.custom<Brand>(
       t("admin.catalog.common.brand"),
-      (b) => (
-        <div className="flex min-w-0 items-center gap-3">
-          {b.logo ? (
-            <Image
-              src={b.logo}
-              alt={b.name}
-              width={40}
-              height={40}
-              className="h-10 w-10 rounded-lg bg-surface-alt object-contain"
-            />
-          ) : (
-            <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg bg-border-subtle font-bold text-muted">
-              {b.name.charAt(0).toUpperCase()}
-            </div>
-          )}
-          <div className="min-w-0">
-            <TruncatedText className="font-medium text-heading">
-              {b.name}
-            </TruncatedText>
-            <TruncatedText className="text-xs text-muted">
-              {b.slug}
-            </TruncatedText>
-          </div>
-        </div>
-      ),
+      (b) => <LogoNameCell name={b.name} slug={b.slug} logo={b.logo} />,
       { grow: 3, minWidth: 200, sortKey: "name", sortType: "text" },
     ),
     col.badge<Brand>(t("common.status"), (b) => <Badge active={b.isActive} />, {

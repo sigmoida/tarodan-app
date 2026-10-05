@@ -11,6 +11,7 @@ import {
   PencilSquareIcon,
 } from "@heroicons/react/24/outline";
 import { SectionCard } from "@/components/detail/SectionCard";
+import { TextLink } from "@/components/TextLink";
 import { ordersTabHref } from "@/app/(admin)/operations/orders/_lib/screenTabs";
 import type { ProductDetail } from "../_lib/types";
 
@@ -104,26 +105,26 @@ export function ProductSidebar({
         title={t("admin.catalog.products.quickLinks")}
         bodyClassName="space-y-2"
       >
-        <Link
+        <TextLink
           href={`/accounts/users/${product.seller.id}`}
-          className="block rounded-lg px-4 py-2 text-body transition-colors hover:bg-surface"
+          className="block"
         >
           {t("admin.catalog.products.viewSeller")}
-        </Link>
-        <Link
+        </TextLink>
+        <TextLink
           href={`/operations/orders?productId=${product.id}`}
-          className="block rounded-lg px-4 py-2 text-body transition-colors hover:bg-surface"
+          className="block"
         >
           {t("admin.catalog.products.viewOrders")}
-        </Link>
-        <Link
+        </TextLink>
+        <TextLink
           href={ordersTabHref("offers", { productId: product.id })}
-          className="block rounded-lg px-4 py-2 text-body transition-colors hover:bg-surface"
+          className="block"
         >
           {t("admin.catalog.products.viewOffers", {
             count: product._count?.offers ?? 0,
           })}
-        </Link>
+        </TextLink>
       </SectionCard>
     </>
   );

@@ -2,19 +2,16 @@
 
 import { useCallback, useEffect, useRef } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Button } from "@tarodan/ui";
+import { Badge, Button } from "@tarodan/ui";
 import { FormInput, FormModal, useZodForm } from "@tarodan/ui/form";
-import {
-  CheckIcon,
-  PaperAirplaneIcon,
-  TrashIcon,
-} from "@heroicons/react/24/outline";
+import { PaperAirplaneIcon, TrashIcon } from "@heroicons/react/24/outline";
 import toast from "react-hot-toast";
 import { adminApi } from "@/lib/api";
 import { extractErrorMessage } from "@/lib/error";
 import { adminKeys } from "@/lib/query/keys";
 import { useAdminMutation } from "@/hooks/useAdminMutation";
 import { useConfirm } from "@/provider/ConfirmProvider";
+import { Panel } from "@/components/detail/Panel";
 import { EmailHtmlEditor } from "@/components/email/EmailHtmlEditor";
 import { EmailPreviewPane } from "@/components/email/EmailPreviewPane";
 import { sampleData } from "../_lib/sampleData";
@@ -262,17 +259,16 @@ export function EmailTemplateEditorModal({
       <div className="flex flex-wrap items-center gap-2 text-xs text-muted">
         <span className="font-mono">{templateKey}</span>
         {detail?.isCustom && (
-          <span className="inline-flex items-center gap-1 rounded-full bg-success-500/10 px-2 py-0.5 font-medium text-success-600">
-            <CheckIcon className="h-3 w-3" />{" "}
+          <Badge variant="success" size="sm">
             {t("admin.marketing.emailTemplates.custom")}
-          </span>
+          </Badge>
         )}
       </div>
 
       <div className="grid grid-cols-1 gap-4 lg:h-[68vh] lg:grid-cols-2">
         <div className="flex min-h-0 flex-col gap-4 lg:overflow-y-auto lg:pr-1">
           {variables.length > 0 && (
-            <div className="rounded-lg border border-primary-500/20 bg-primary-500/5 p-3">
+            <Panel tone="muted" padding="sm">
               <p className="mb-1.5 text-xs font-medium text-muted">
                 {t("admin.marketing.emailTemplates.availableVariables")}
               </p>
@@ -289,7 +285,7 @@ export function EmailTemplateEditorModal({
                   </Button>
                 ))}
               </div>
-            </div>
+            </Panel>
           )}
 
           <FormInput

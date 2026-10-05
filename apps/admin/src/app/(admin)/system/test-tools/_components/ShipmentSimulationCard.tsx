@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Alert, Button, Input } from "@tarodan/ui";
+import { Alert, Button, EmptyState, Input } from "@tarodan/ui";
 import { useTranslations } from "next-intl";
 import { SectionCard } from "@/components/detail/SectionCard";
 import { DataTable } from "@/components/DataTable";
@@ -97,9 +97,11 @@ export function ShipmentSimulationCard({ isProd }: { isProd: boolean }) {
       ) : (
         hasSearched &&
         !isSearching && (
-          <p className="text-sm text-muted">
-            {t("admin.system.testTools.noResults")}
-          </p>
+          <EmptyState
+            size="compact"
+            icon={false}
+            title={t("admin.system.testTools.noResults")}
+          />
         )
       )}
     </SectionCard>

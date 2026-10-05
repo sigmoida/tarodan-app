@@ -2,46 +2,33 @@
 
 import Link from "next/link";
 import { useTranslations } from "next-intl";
-import { Card, EmptyState, Skeleton, cn } from "@tarodan/ui";
+import { Card, EmptyState, Skeleton } from "@tarodan/ui";
 import type { DashboardQueueTile } from "@tarodan/types";
 import type { MessageKey } from "@tarodan/i18n";
+import { TextLink } from "@/components/TextLink";
 import { fmtNumber, fmtTry } from "@/lib/format";
 import { QUEUE_PRESENTATION } from "../_lib/zoneConfig";
+import { ZoneHeader } from "./ZoneHeader";
 import { queueAge } from "../_lib/queueAge";
 
-const TONE_ICON = {
-  primary: "bg-primary-500/10 text-primary-500",
-  info: "bg-info-500/10 text-info-500",
-  success: "bg-success-500/10 text-success-500",
-  warning: "bg-warning-500/10 text-warning-500",
-  danger: "bg-danger-500/10 text-danger-500",
-} as const;
-
+/**
+ * A queue: its label (a link to the screen), the age of the oldest item and
+ * the count. Laid out like a `MetricCard` — the link is why it is its own
+ * component.
+ */
 function QueueTile({ tile }: { tile: DashboardQueueTile }) {
   const t = useTranslations();
   const presentation = QUEUE_PRESENTATION[tile.key];
-  const Icon = presentation.icon;
   const age = queueAge(tile.oldestAt);
   const lines = tile.parts.filter((part) => part.count > 0);
 
   return (
-    <Card variant="bordered" className="flex flex-col gap-3 p-4">
+    <Card variant="bordered" className="flex flex-col gap-3 p-4 shadow-sm">
       <div className="flex items-start gap-3">
-        <span
-          className={cn(
-            "flex h-10 w-10 shrink-0 items-center justify-center rounded-lg",
-            TONE_ICON[presentation.tone],
-          )}
-        >
-          <Icon className="h-5 w-5" />
-        </span>
         <div className="min-w-0 flex-1">
-          <Link
-            href={tile.href}
-            className="truncate text-sm font-medium text-heading hover:underline"
-          >
+          <TextLink href={tile.href} className="block truncate text-sm">
             {t(presentation.labelKey)}
-          </Link>
+          </TextLink>
           {/* The age is what turns a count into a priority. */}
           <p className="truncate text-xs text-muted">
             {age
@@ -51,7 +38,7 @@ function QueueTile({ tile }: { tile: DashboardQueueTile }) {
               : "—"}
           </p>
         </div>
-        <span className="shrink-0 text-2xl font-semibold tabular-nums text-heading">
+        <span className="shrink-0 text-2xl font-bold tabular-nums text-heading">
           {fmtNumber(tile.total)}
         </span>
       </div>
@@ -99,14 +86,10 @@ export function QueuesZone({
 
   return (
     <section className="flex flex-col gap-3">
-      <div>
-        <h2 className="text-lg font-semibold text-heading">
-          {t("admin.dashboard.zones.queues")}
-        </h2>
-        <p className="text-xs text-muted">
-          {t("admin.dashboard.zones.queuesDescription")}
-        </p>
-      </div>
+      <ZoneHeader
+        title={t("admin.dashboard.zones.queues")}
+        description={t("admin.dashboard.zones.queuesDescription")}
+      />
 
       {isError ? (
         <EmptyState

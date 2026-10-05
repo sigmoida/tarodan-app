@@ -7,6 +7,7 @@ import toast from "react-hot-toast";
 import { adminApi } from "@/lib/api";
 import { adminKeys } from "@/lib/query/keys";
 import { useAdminMutation } from "@/hooks/useAdminMutation";
+import { Panel } from "@/components/detail/Panel";
 import { SectionCard } from "@/components/detail/SectionCard";
 import { QueryErrorCard } from "@/components/page/QueryErrorCard";
 import { useConfirm } from "@/provider/ConfirmProvider";
@@ -172,17 +173,22 @@ export function CronsCard({ isProd }: { isProd: boolean }) {
         {t("admin.system.testTools.cronsDescription")}
       </p>
       {watched && statusLine && (
-        <div className="flex items-center gap-2 rounded-lg bg-surface-alt p-3 text-sm">
+        <Panel
+          tone="muted"
+          padding="sm"
+          className="flex items-center gap-2 text-sm"
+        >
           {statusLine.busy && <Spinner size="sm" />}
           <span className="font-medium text-heading">{watched.label}:</span>
           <span className={statusLine.tone}>{statusLine.text}</span>
-        </div>
+        </Panel>
       )}
       <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
         {crons.map((c) => (
-          <div
+          <Panel
             key={c.key}
-            className="flex items-center justify-between gap-3 rounded-lg border border-border p-3"
+            padding="sm"
+            className="flex items-center justify-between gap-3"
           >
             <div className="min-w-0">
               <p className="truncate font-medium text-heading">{c.label}</p>
@@ -195,7 +201,7 @@ export function CronsCard({ isProd }: { isProd: boolean }) {
             >
               {t("admin.system.testTools.run")}
             </Button>
-          </div>
+          </Panel>
         ))}
       </div>
     </SectionCard>

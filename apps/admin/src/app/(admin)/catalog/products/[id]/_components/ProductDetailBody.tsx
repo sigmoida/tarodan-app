@@ -6,6 +6,7 @@ import { useQuery } from "@tanstack/react-query";
 import { adminApi } from "@/lib/api";
 import { adminKeys } from "@/lib/query/keys";
 import { AdminTabs } from "@/components/AdminTabs";
+import { DetailLayout } from "@/components/detail/DetailLayout";
 import { ModerationEventsPanel } from "@/components/ModerationEventsPanel";
 import { useConfirm } from "@/provider/ConfirmProvider";
 import { useAdminMutation } from "@/hooks/useAdminMutation";
@@ -73,14 +74,16 @@ export function ProductDetailBody({ product }: { product: ProductDetail }) {
       />
 
       {tab === "info" && (
-        <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-          <div className="space-y-6 lg:col-span-2">
-            <ProductImagesSection product={product} />
-            <ProductInfoSection product={product} />
-            <ProductSellerSection seller={product.seller} />
-            <ProductRemovalSection history={product.removalHistory ?? []} />
-          </div>
-          <div className="space-y-6">
+        <DetailLayout
+          main={
+            <>
+              <ProductImagesSection product={product} />
+              <ProductInfoSection product={product} />
+              <ProductSellerSection seller={product.seller} />
+              <ProductRemovalSection history={product.removalHistory ?? []} />
+            </>
+          }
+          aside={
             <ProductSidebar
               product={product}
               onApprove={() => setApproveOpen(true)}
@@ -89,8 +92,8 @@ export function ProductDetailBody({ product }: { product: ProductDetail }) {
               onDelete={() => setRemoveOpen(true)}
               busyRestore={restore.isPending}
             />
-          </div>
-        </div>
+          }
+        />
       )}
 
       {tab === "reviews" && (
