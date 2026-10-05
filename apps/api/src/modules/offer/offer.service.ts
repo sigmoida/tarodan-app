@@ -39,7 +39,7 @@ import {
   toPublicIdentity,
 } from "../../common/helpers/public-identity";
 import { paginate } from "../../common/list";
-import { resolveTimingValue } from "../../common/timing-rules";
+import { offerExpiresAt } from "./helpers/offer-expiry";
 
 @Injectable()
 export class OfferService {
@@ -76,14 +76,7 @@ export class OfferService {
    * damgalanır — değişiklik bekleyen teklifleri etkilemez.
    */
   private async offerExpiresAt(): Promise<Date> {
-    const hours = await resolveTimingValue(
-      this.prisma,
-      "offerExpiryHours",
-      this.configService,
-    );
-    const expiresAt = new Date();
-    expiresAt.setHours(expiresAt.getHours() + hours);
-    return expiresAt;
+    return offerExpiresAt(this.prisma, this.configService);
   }
 
   /**

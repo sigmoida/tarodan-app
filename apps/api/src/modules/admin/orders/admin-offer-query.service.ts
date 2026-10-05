@@ -133,6 +133,8 @@ export class AdminOfferQueryService {
       cancelReason: row.cancelReason,
       version: row.version,
       expiresAt: row.expiresAt,
+      // extend_once: süre bir kez uzatıldıysa uzatma anı (null = hak kullanılmadı).
+      extendedAt: row.extendedAt,
       createdAt: row.createdAt,
       updatedAt: row.updatedAt,
       order: row.order
