@@ -5,9 +5,13 @@ import { useRouter, usePathname, useSearchParams } from "next/navigation";
 import { AsyncValue, Button } from "@tarodan/ui";
 import { adminApi } from "@/lib/api";
 import { useListTotal } from "@/hooks/useListTotal";
+import { listFilterParams } from "@/hooks/useAdminResource";
+import { productFilterKeys } from "../_lib/filters";
 
 /**
- * Page-level header subtitle — live total (respecting the active URL filters) +
+ * Page-level header subtitle — live total (respecting the active URL filters,
+ * the SAME key set the list sends — `productFilterKeys` — so a new filter can't
+ * be counted by the table but not by the header) +
  * the seller-filter notice. Reads state from the URL (the list syncs filters
  * there via `syncUrl`), so it lives in the page-level PageHeader, outside the
  * ResourceList/SuspenseBoundary — the header stays put while the list swaps.
@@ -22,17 +26,16 @@ export function ProductsCountText() {
   const status = searchParams.get("tab") ?? "active";
   const search = searchParams.get("q") ?? "";
   const sellerId = searchParams.get("sellerId") ?? "";
-  const brandId = searchParams.get("brandId") ?? "";
-  const carModelId = searchParams.get("carModelId") ?? "";
+  const filters = Object.fromEntries(
+    productFilterKeys(t).map((key) => [key, searchParams.get(key) ?? ""]),
+  );
 
   const { data: total, isLoading } = useListTotal(
     "products",
     {
       ...(status !== "ai" ? { status } : {}),
-      ...(search ? { search } : {}),
-      ...(sellerId ? { sellerId } : {}),
-      ...(brandId ? { brandId } : {}),
-      ...(carModelId ? { carModelId } : {}),
+      // Liste isteğiyle AYNI parametre kuralı (boş ve "all" düşer).
+      ...listFilterParams(search, filters),
     },
     adminApi.getProducts,
   );

@@ -6,6 +6,7 @@ import { DataTable } from "@/components/DataTable";
 import { useResourceList } from "@/components/list";
 import { mapProducts } from "../_lib/types";
 import { productColumns } from "../_lib/columns";
+import { productFilterKeys } from "../_lib/filters";
 
 /** Maps the raw product rows from context and renders the shared DataTable. */
 export function ProductsTable() {
@@ -15,12 +16,9 @@ export function ProductsTable() {
   const products = useMemo(() => mapProducts(rows, t), [rows, t]);
   const columns = useMemo(() => productColumns(t), [t]);
 
+  // Listenin filtre kümesi tek yerden (başlıktaki toplamla aynı).
   const filtered =
-    search ||
-    filters.brandId ||
-    filters.carModelId ||
-    filters.removalReason ||
-    filters.removalActor;
+    !!search || productFilterKeys(t).some((key) => !!filters[key]);
 
   return (
     <DataTable
