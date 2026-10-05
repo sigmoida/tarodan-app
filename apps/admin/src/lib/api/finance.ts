@@ -196,6 +196,8 @@ export const financeApi = {
     status?: string;
     dateFrom?: string;
     dateTo?: string;
+    /** "true" = yalnız ERKEN bırakılanlar (releasedAt < releaseAt). */
+    earlyReleased?: string;
     page?: number;
     limit?: number;
     sortBy?: string;
@@ -215,6 +217,7 @@ export const financeApi = {
     status?: string;
     dateFrom?: string;
     dateTo?: string;
+    earlyReleased?: string;
   }) => api.get("/admin/payouts/export", { params }),
   // force = erken bırakma: yalnız tarih şartını esnetir (teslim/iade/frozen
   // guard'ları backend'de aynen geçerli).

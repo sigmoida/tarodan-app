@@ -7,6 +7,7 @@ import {
   IsNotEmpty,
   MaxLength,
 } from "class-validator";
+import { Transform } from "class-transformer";
 import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
 import { AdminListQueryDto } from "../../../common/list";
 
@@ -37,6 +38,17 @@ export class PayoutTransactionsQueryDto extends AdminListQueryDto {
   @IsOptional()
   @IsDateString()
   dateTo?: string;
+
+  // Query string'den "false" gelince de false olmalı (dönüşümsüz hali truthy).
+  @ApiPropertyOptional({
+    description:
+      "Only holds released EARLY (releasedAt before the planned releaseAt)",
+    example: true,
+  })
+  @IsOptional()
+  @Transform(({ value }) => value === "true" || value === true)
+  @IsBoolean()
+  earlyReleased?: boolean;
 }
 
 export class PayoutScheduleQueryDto extends AdminListQueryDto {
@@ -73,6 +85,16 @@ export class PayoutExportQueryDto {
   @IsOptional()
   @IsDateString()
   dateTo?: string;
+
+  @ApiPropertyOptional({
+    description:
+      "Only holds released EARLY (releasedAt before the planned releaseAt)",
+    example: true,
+  })
+  @IsOptional()
+  @Transform(({ value }) => value === "true" || value === true)
+  @IsBoolean()
+  earlyReleased?: boolean;
 }
 
 export class ReleasePayoutDto {

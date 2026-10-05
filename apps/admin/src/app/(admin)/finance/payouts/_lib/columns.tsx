@@ -5,6 +5,8 @@ import {
   payoutStatusConfig,
 } from "@tarodan/ui";
 import { col } from "@/components/table";
+import { CellDate, Empty } from "@/components/table";
+import { EarlyReleaseBadge } from "@/components/finance/EarlyReleaseBadge";
 import { fmtTry } from "@/lib/format";
 import { HoldReasonBadge, holdReasonForRow } from "./holds";
 import {
@@ -58,7 +60,7 @@ export const scheduleColumns = (t: T) => [
 ];
 
 export function transactionColumns(
-  onRelease: ((orderId: string, early: boolean) => void) | undefined,
+  onRelease: ((row: PayoutTransaction, early: boolean) => void) | undefined,
   t: T,
 ) {
   return [
@@ -105,10 +107,28 @@ export function transactionColumns(
       ),
       { sortKey: "status", sortType: "text" },
     ),
+    // Planlanan tarih (releaseAt) bırakıldıktan sonra da yerinde kalır; gerçek
+    // tarih ayrı sütunda, erken bırakıldıysa "N gün erken" rozetiyle.
     col.date<PayoutTransaction>(
-      t("admin.finance.payouts.release"),
-      (row) => row.releasedAt || row.releaseAt,
+      t("admin.finance.payouts.plannedRelease"),
+      "releaseAt",
       { sortKey: "releaseAt", sortType: "date" },
+    ),
+    col.custom<PayoutTransaction>(
+      t("admin.finance.payouts.releasedOn"),
+      (row) =>
+        row.releasedAt ? (
+          <div className="flex flex-col items-start gap-1">
+            <CellDate value={row.releasedAt} />
+            <EarlyReleaseBadge
+              releaseAt={row.releaseAt}
+              releasedAt={row.releasedAt}
+            />
+          </div>
+        ) : (
+          <Empty />
+        ),
+      { grow: 1, minWidth: 140, sortKey: "releasedAt", sortType: "date" },
     ),
     col.badge<PayoutTransaction>(
       t("admin.finance.payouts.holdReason"),
@@ -149,7 +169,7 @@ export function transactionColumns(
                       ? undefined
                       : t("admin.finance.payouts.earlyReleaseHint")
                   }
-                  onClick={() => onRelease(row.orderId, !releaseDue)}
+                  onClick={() => onRelease(row, !releaseDue)}
                 >
                   {releaseDue
                     ? t("admin.finance.payouts.release")

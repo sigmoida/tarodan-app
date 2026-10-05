@@ -125,6 +125,12 @@ export const payoutStatusFilterOptions = (t: T) => [
   { value: "cancelled", label: t("admin.finance.payouts.status.cancelled") },
 ];
 
+/** "Erken bırakılanlar" süzgeci — değer API'ye `earlyReleased=true` gider. */
+export const earlyReleaseFilterOptions = (t: T) => [
+  { value: "all", label: t("admin.finance.payouts.filterAllReleases") },
+  { value: "true", label: t("admin.finance.payouts.filterEarlyOnly") },
+];
+
 /**
  * PayoutTransfer durum filtresi — etiketler TEK kaynaktan (`payoutStatusConfig`,
  * rozetle aynı) türetilir; ayrı bir çeviri listesi tutulmaz.

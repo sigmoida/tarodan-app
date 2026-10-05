@@ -22,6 +22,7 @@ export function PayoutsExport() {
         status: sp.get("status") || undefined,
         dateFrom: sp.get("dateFrom") || undefined,
         dateTo: sp.get("dateTo") || undefined,
+        earlyReleased: sp.get("earlyReleased") || undefined,
       });
       const { csv, filename } = res.data;
       downloadBlob(filename, csv);

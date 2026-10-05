@@ -1,23 +1,34 @@
 "use client";
 
+import { useMemo } from "react";
+import { earlyReleaseDays } from "@tarodan/types";
 import { FormModal, FormTextarea, useZodForm } from "@tarodan/ui/form";
 import { useTranslations } from "next-intl";
 import { adminApi } from "@/lib/api";
 import { toastReleaseFastPath } from "@/components/finance/release-fast-path";
 import { useAdminMutation } from "@/hooks/useAdminMutation";
+import { fmtDate } from "@/lib/format";
 import { releasePayoutSchema, type ReleasePayoutValues } from "../_lib/schema";
 
 export function ReleasePayoutModal({
   orderId,
   early = false,
+  releaseAt = null,
   onClose,
 }: {
   orderId: string;
   /** Hold süresi dolmadan (iade penceresi açıkken) bilinçli erken bırakma. */
   early?: boolean;
+  /** Planlanan serbest bırakma tarihi — erken bırakmada "N gün erken" satırı için. */
+  releaseAt?: string | null;
   onClose: () => void;
 }) {
   const t = useTranslations();
+  // Şimdi bırakılsa kaç gün erken olur — hesap tek helper'da (liste/CSV ile aynı).
+  const daysEarly = useMemo(
+    () => (early ? earlyReleaseDays(releaseAt, new Date()) : null),
+    [early, releaseAt],
+  );
   const form = useZodForm(releasePayoutSchema(t), {
     defaultValues: { reason: "" },
   });
@@ -70,6 +81,14 @@ export function ReleasePayoutModal({
       {early && (
         <p className="rounded border border-warning-300 bg-warning-50 p-3 text-sm text-warning-800">
           {t("admin.finance.payouts.earlyReleaseWarning")}
+        </p>
+      )}
+      {daysEarly !== null && (
+        <p className="text-sm font-medium text-heading">
+          {t("admin.finance.payouts.earlyReleaseNotice", {
+            date: fmtDate(releaseAt) ?? "",
+            days: daysEarly,
+          })}
         </p>
       )}
       <FormTextarea
