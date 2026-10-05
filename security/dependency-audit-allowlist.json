@@ -8,6 +8,12 @@
       "reason": "Build-time-only dependency of Sentry's Next.js tooling; await an SDK-compatible Rollup update instead of overriding its peer graph."
     },
     {
+      "ghsa": "GHSA-vfj7-8cjw-p6xm",
+      "package": "braces",
+      "expires": "2026-11-30",
+      "reason": "No patched release exists (3.0.3 is the latest and is affected). The only path is admin > @sentry/nextjs > @sentry/webpack-plugin > unplugin > chokidar, which runs at build time on file-watcher globs the build itself supplies; no request-controlled pattern reaches it. Re-check for an upstream fix before extending."
+    },
+    {
       "ghsa": "GHSA-f88m-g3jw-g9cj",
       "package": "sharp",
       "expires": "2026-11-30",

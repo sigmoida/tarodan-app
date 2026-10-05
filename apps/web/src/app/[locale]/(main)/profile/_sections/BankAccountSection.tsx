@@ -5,7 +5,7 @@
 import { useEffect } from "react";
 import { useTranslations } from "next-intl";
 import { TrashIcon } from "@heroicons/react/24/outline";
-import { Badge, Button } from "@tarodan/ui";
+import { Button } from "@tarodan/ui";
 import { Form, FormInput, FormIban, useZodForm } from "@tarodan/ui/form";
 import SectionCard from "@/components/ui/SectionCard";
 import { useConfirm } from "@/components/ConfirmProvider";
@@ -60,15 +60,6 @@ export default function BankAccountSection() {
   return (
     <SectionCard
       title={t("profile.bank.title")}
-      badge={
-        account ? (
-          <Badge variant={account.isVerified ? "success" : "warning"} size="sm">
-            {account.isVerified
-              ? t("profile.bank.verified")
-              : t("profile.bank.unverified")}
-          </Badge>
-        ) : undefined
-      }
       action={
         <div className="flex gap-2">
           {account && (
@@ -118,11 +109,6 @@ export default function BankAccountSection() {
             maxLength={10}
           />
         </div>
-        {account && (
-          <p className="text-xs text-muted">
-            {t("profile.bank.reverificationNote")}
-          </p>
-        )}
       </Form>
     </SectionCard>
   );

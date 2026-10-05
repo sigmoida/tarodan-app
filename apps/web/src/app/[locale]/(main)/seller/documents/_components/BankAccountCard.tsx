@@ -6,7 +6,7 @@ import { useEffect } from "react";
 import { z } from "zod";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import toast from "react-hot-toast";
-import { Badge, Button, isValidIban } from "@tarodan/ui";
+import { Button, isValidIban } from "@tarodan/ui";
 import { Form, FormInput, FormIban, useZodForm } from "@tarodan/ui/form";
 import { SectionCard } from "@/components/ui";
 import { bankAccountApi } from "@/lib/api";
@@ -70,15 +70,6 @@ export function BankAccountCard() {
 
   return (
     <SectionCard title={t("seller.documents.ibanTitle")}>
-      {data?.iban && (
-        <div className="mb-3">
-          <Badge variant={data.isVerified ? "success" : "warning"} size="sm">
-            {data.isVerified
-              ? t("seller.documents.ibanVerified")
-              : t("seller.documents.ibanUnverified")}
-          </Badge>
-        </div>
-      )}
       <Form form={form} onSubmit={(v) => save.mutate(v)} className="space-y-3">
         <FormInput
           name="accountHolder"

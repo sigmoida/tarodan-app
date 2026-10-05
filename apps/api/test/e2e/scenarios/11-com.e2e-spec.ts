@@ -1287,10 +1287,6 @@ describe("11 — Komisyon & Ödeme/Payout (COM)", () => {
       });
       expect(payout!.status).toBe(PayoutStatus.completed);
       expect(payout!.processedAt).toBeTruthy();
-      const bank = await prisma.sellerBankAccount.findUnique({
-        where: { userId: seller.id },
-      });
-      expect(bank!.isVerified).toBe(true);
     });
 
     scenario("COM-041", async () => {
@@ -1749,19 +1745,15 @@ describe("11 — Komisyon & Ödeme/Payout (COM)", () => {
   });
 
   scenario("COM-050", async () => {
-    // Returned transfer: completed → returned; failureReason 'Geri döndü: ...'; bank isVerified geri alınır.
+    // Returned transfer: completed → returned; failureReason 'Geri döndü: ...'. Banka kaydına dokunulmaz.
     // PayTR getReturnedTransfers'i spy'la data döndürecek şekilde override ederiz (mock sabit [] döner).
     const seller = await createUser(ctx.module, { isSeller: true });
     const prisma = getPrisma();
-    // Doğrulanmış (isVerified=true) banka hesabı — IBAN transferIban ile birebir eşleşmeli ki
-    // syncBankAccountVerification isVerified'i false'a çeksin.
     await prisma.sellerBankAccount.create({
       data: {
         userId: seller.id,
         accountHolder: "X",
         iban: IBAN_A,
-        isVerified: true,
-        verifiedAt: new Date(),
       },
     });
     const transId = `T${Date.now()}RET`;
@@ -1804,10 +1796,6 @@ describe("11 — Komisyon & Ödeme/Payout (COM)", () => {
       });
       expect(after!.status).toBe(PayoutStatus.returned);
       expect(after!.failureReason).toContain("Geri döndü");
-      const bank = await prisma.sellerBankAccount.findUnique({
-        where: { userId: seller.id },
-      });
-      expect(bank!.isVerified).toBe(false);
     } finally {
       spy.mockRestore();
     }

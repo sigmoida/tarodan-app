@@ -308,20 +308,27 @@ export class UserProfileService {
     // kendini "şirket" ilan edip guard'ın üyelik döngüsüne kilitlenebiliyordu.
     const canEditCompanyFields = user.businessStatus === "approved";
 
-    // Check phone uniqueness if being updated
-    if (data.phone) {
-      const existingPhone = await this.prisma.user.findFirst({
-        where: {
-          phone: data.phone,
-          NOT: { id: userId },
-        },
+    // Telefon kuralı PhoneVerificationService ile AYNIDIR: numarayı yalnız
+    // DOĞRULAMIŞ bir sahip kilitler. Doğrulanmamış bir kayıt (yanlış yazılmış
+    // numara dahil) gerçek sahibini engellemez. Ancak `phone` DB'de tekil olduğu
+    // için o durumda numara burada YAZILAMAZ; istemcinin hemen başlattığı SMS
+    // doğrulaması başarılı olunca numarayı devralır (verify). Yazıp diğer
+    // hesabınkini burada silmek, bir numarayı yalnızca yazarak başkasının
+    // profilinden düşürmeye izin verirdi.
+    const phoneChanged =
+      data.phone !== undefined && (data.phone || null) !== (user.phone || null);
+    let phoneHeldUnverified = false;
+    if (phoneChanged && data.phone) {
+      const holder = await this.prisma.user.findFirst({
+        where: { phone: data.phone, NOT: { id: userId } },
+        select: { isPhoneVerified: true },
       });
-
-      if (existingPhone) {
+      if (holder?.isPhoneVerified) {
         throw new BadRequestException(
           i18nMessage("server.user.phoneAlreadyInUse"),
         );
       }
+      phoneHeldUnverified = !!holder;
     }
 
     // Prepare update data
@@ -329,7 +336,12 @@ export class UserProfileService {
 
     if (data.displayName !== undefined)
       updateData.displayName = data.displayName;
-    if (data.phone !== undefined) updateData.phone = data.phone;
+    // Numara değişti → eski doğrulama yeni numara için geçerli değildir.
+    if (phoneChanged && !phoneHeldUnverified) {
+      // "" → null: `phone` tekil, boş dizgi ikinci kullanıcıda P2002 verirdi.
+      updateData.phone = data.phone || null;
+      updateData.isPhoneVerified = false;
+    }
     if (data.bio !== undefined) updateData.bio = data.bio;
     if (data.showTrustScore !== undefined)
       updateData.showTrustScore = data.showTrustScore;
@@ -363,6 +375,10 @@ export class UserProfileService {
 
     // Check if there's any data to update
     if (Object.keys(updateData).length === 0) {
+      // Yalnız telefon gönderildi ve numara doğrulanmamış başka bir hesapta
+      // duruyor: yazılacak bir şey yok ama istek hatalı değil — istemci SMS
+      // doğrulamasına geçebilsin diye mevcut profil döner.
+      if (phoneHeldUnverified) return this.findByIdWithAddresses(userId);
       throw new BadRequestException(
         i18nMessage("server.user.noFieldsToUpdate"),
       );

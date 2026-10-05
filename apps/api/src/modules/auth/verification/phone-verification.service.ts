@@ -143,12 +143,25 @@ export class PhoneVerificationService {
       );
     }
 
-    // I2: Telefon numarasını ve doğrulama durumunu atomik olarak yaz.
+    // I2: Telefon numarasını ve doğrulama durumunu atomik olarak yaz. Numara
+    // başka bir hesapta DOĞRULANMAMIŞ duruyorsa oradan düşürülür: `phone` tekil
+    // olduğu için aksi halde numarayı kanıtlayan kişi, onu yalnızca yazmış
+    // birine takılırdı. Doğrulayan kazanır.
     try {
-      await this.prisma.user.update({
-        where: { id: userId },
-        data: { phone: token.phone, isPhoneVerified: true },
-      });
+      await this.prisma.$transaction([
+        this.prisma.user.updateMany({
+          where: {
+            phone: token.phone,
+            isPhoneVerified: false,
+            id: { not: userId },
+          },
+          data: { phone: null },
+        }),
+        this.prisma.user.update({
+          where: { id: userId },
+          data: { phone: token.phone, isPhoneVerified: true },
+        }),
+      ]);
     } catch (error: any) {
       // P2002: unique constraint ihlali (nadir yarış durumu) — ek savunma katmanı
       if (error?.code === "P2002") {

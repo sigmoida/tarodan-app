@@ -1202,7 +1202,8 @@ describe("02 — Kullanıcı Profili & Hesap Yönetimi (USR)", () => {
         .set(authHeader(user))
         .expect(200);
       expect(get.body.iban).toBe("TR330006100519786457841326");
-      expect(get.body.isVerified).toBe(false);
+      // IBAN için doğrulama adımı yok: alan yanıta girmez.
+      expect(get.body).not.toHaveProperty("isVerified");
     });
 
     scenario("USR-063", async () => {
@@ -1216,11 +1217,7 @@ describe("02 — Kullanıcı Profili & Hesap Yönetimi (USR)", () => {
           iban: "TR330006100519786457841326",
         })
         .expect(200);
-      // Verify=true yap, sonra farklı IBAN ile upsert → verify reset.
-      await prisma.sellerBankAccount.update({
-        where: { userId: user.id },
-        data: { isVerified: true, verifiedAt: new Date() },
-      });
+      // Farklı IBAN ile upsert → tek kayıt güncellenir (doğrulama adımı yok).
       await request(server())
         .patch("/api/users/me/bank-account")
         .set(authHeader(user))
@@ -1237,8 +1234,6 @@ describe("02 — Kullanıcı Profili & Hesap Yönetimi (USR)", () => {
         where: { userId: user.id },
       });
       expect(row?.iban).toBe("TR000006100519786457841399");
-      expect(row?.isVerified).toBe(false);
-      expect(row?.verifiedAt).toBeNull();
     });
 
     scenario("USR-064", async () => {

@@ -16,6 +16,7 @@ import {
 import SectionCard from "@/components/ui/SectionCard";
 import { useAuthStore } from "@/stores/authStore";
 import UsernameField from "../_components/UsernameField";
+import PhoneVerificationModal from "../_modals/PhoneVerificationModal";
 import { profileInfoSchema, type ProfileInfoValues } from "../_lib/schemas";
 import {
   useProfileInfo,
@@ -128,6 +129,8 @@ export default function ProfileInfoSection() {
   const isBusiness =
     (profile?.membershipTier ?? user?.membershipTier) === "business";
   const [emailModalOpen, setEmailModalOpen] = useState(false);
+  /** A just-saved new number awaiting its SMS code; null keeps the dialog shut. */
+  const [phoneToVerify, setPhoneToVerify] = useState<string | null>(null);
 
   const form = useZodForm(profileInfoSchema(t), { defaultValues: EMPTY });
 
@@ -154,7 +157,17 @@ export default function ProfileInfoSection() {
       delete payload.taxId;
       delete payload.taxOffice;
     }
-    updateProfile.mutate(payload);
+    // Yeni bir numara kaydedildiyse doğrulama hemen başlar; kullanıcı pencereyi
+    // kapatırsa numara "Doğrulanmadı" rozetiyle kalır.
+    const newPhone =
+      values.phone && values.phone !== (profile?.phone || "")
+        ? values.phone
+        : null;
+    updateProfile.mutate(payload, {
+      onSuccess: () => {
+        if (newPhone) setPhoneToVerify(newPhone);
+      },
+    });
   };
 
   return (
@@ -247,6 +260,11 @@ export default function ProfileInfoSection() {
       <EmailChangeModal
         open={emailModalOpen}
         onClose={() => setEmailModalOpen(false)}
+      />
+      <PhoneVerificationModal
+        open={!!phoneToVerify}
+        pendingPhone={phoneToVerify}
+        onClose={() => setPhoneToVerify(null)}
       />
     </SectionCard>
   );

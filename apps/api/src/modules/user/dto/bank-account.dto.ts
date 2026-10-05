@@ -52,8 +52,6 @@ export class BankAccountResponseDto {
   iban: string;
   tcKimlikNo?: string;
   taxId?: string;
-  isVerified: boolean;
-  verifiedAt?: Date;
   createdAt: Date;
   updatedAt: Date;
 }

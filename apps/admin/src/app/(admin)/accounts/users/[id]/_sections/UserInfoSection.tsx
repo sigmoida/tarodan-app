@@ -105,21 +105,9 @@ export function UserInfoSection({ user }: { user: UserDetail }) {
           </div>
 
           <div className="mt-4 border-t border-border pt-4">
-            <div className="mb-3 flex items-center gap-2">
-              <h4 className="text-sm font-semibold text-heading">
-                {t("admin.users.detail.bankAccountTitle")}
-              </h4>
-              {user.bankAccount && (
-                <Badge
-                  size="sm"
-                  variant={user.bankAccount.isVerified ? "success" : "warning"}
-                >
-                  {user.bankAccount.isVerified
-                    ? t("profile.bank.verified")
-                    : t("profile.bank.unverified")}
-                </Badge>
-              )}
-            </div>
+            <h4 className="mb-3 text-sm font-semibold text-heading">
+              {t("admin.users.detail.bankAccountTitle")}
+            </h4>
             {user.bankAccount ? (
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <Item label={t("admin.users.detail.accountHolderLabel")}>
@@ -139,13 +127,6 @@ export function UserInfoSection({ user }: { user: UserDetail }) {
                   <Item label={t("admin.users.detail.taxIdLabel")}>
                     <p className="font-mono text-heading">
                       {user.bankAccount.taxId}
-                    </p>
-                  </Item>
-                )}
-                {user.bankAccount.verifiedAt && (
-                  <Item label={t("admin.users.detail.verifiedAtLabel")}>
-                    <p className="text-heading">
-                      {fmtDateTime(user.bankAccount.verifiedAt)}
                     </p>
                   </Item>
                 )}

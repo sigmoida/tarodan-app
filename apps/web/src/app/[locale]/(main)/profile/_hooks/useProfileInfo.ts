@@ -24,6 +24,8 @@ export interface ProfileMe {
 const RESOURCE = "profile-me";
 /** The overview query (see queryKeys.profile.overview) also reflects profile edits. */
 const OVERVIEW_RESOURCE = "profile";
+/** Every query a change to the user's own profile record must refresh. */
+export const PROFILE_RESOURCES = [RESOURCE, OVERVIEW_RESOURCE];
 
 /** Fresh profile record for the edit form (independent of the overview query). */
 export function useProfileInfo(enabled: boolean) {
@@ -53,7 +55,7 @@ export function useUpdateProfile() {
       await api.patch("/users/me", payload);
     },
     {
-      invalidates: [RESOURCE, OVERVIEW_RESOURCE],
+      invalidates: PROFILE_RESOURCES,
       successMessage: t("profile.profileUpdated"),
       errorMessage: t("profile.updateFailed"),
       onSuccess: () => {
@@ -84,7 +86,7 @@ export function useEmailChange() {
   const verify = useWebMutation(
     (code: string) => api.post("/auth/email/verify-change", { code }),
     {
-      invalidates: [RESOURCE, OVERVIEW_RESOURCE],
+      invalidates: PROFILE_RESOURCES,
       errorMessage: t("profile.invalidCode"),
       onSuccess: async () => {
         toast.success(t("profile.emailChanged"));

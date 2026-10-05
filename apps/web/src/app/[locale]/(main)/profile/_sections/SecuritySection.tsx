@@ -2,22 +2,13 @@
 
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Link } from "@/i18n/navigation";
 import {
   DevicePhoneMobileIcon,
   ShieldCheckIcon,
 } from "@heroicons/react/24/outline";
-import {
-  Badge,
-  Button,
-  Input,
-  Modal,
-  ModalFooter,
-  PhoneInput,
-  splitPhone,
-  combinePhone,
-} from "@tarodan/ui";
+import { Badge, Button } from "@tarodan/ui";
 import { useTranslations } from "next-intl";
 import { Form, FormInput, useZodForm } from "@tarodan/ui/form";
 import SectionCard from "@/components/ui/SectionCard";
@@ -26,11 +17,8 @@ import {
   changePasswordSchema,
   type ChangePasswordValues,
 } from "../_lib/schemas";
-import {
-  useChangePassword,
-  usePhoneVerification,
-  use2faStatus,
-} from "../_hooks/useSecurity";
+import PhoneVerificationModal from "../_modals/PhoneVerificationModal";
+import { useChangePassword, use2faStatus } from "../_hooks/useSecurity";
 
 const EMPTY: ChangePasswordValues = {
   currentPassword: "",
@@ -51,87 +39,6 @@ const RULES = [
   },
   { test: (p: string) => /\d/.test(p), key: "profile.security.ruleDigit" },
 ] as const;
-
-function PhoneModal({ open, onClose }: { open: boolean; onClose: () => void }) {
-  const t = useTranslations();
-  const { user } = useAuthStore();
-  const { sendCode, verify } = usePhoneVerification();
-  const [step, setStep] = useState<"enter" | "verify">("enter");
-  const initial = splitPhone(user?.phone);
-  const [phone, setPhone] = useState(initial.national);
-  const [isLegacy, setIsLegacy] = useState(initial.isLegacy);
-  const [code, setCode] = useState("");
-
-  useEffect(() => {
-    if (open) {
-      const p = splitPhone(user?.phone);
-      setStep("enter");
-      setPhone(p.national);
-      setIsLegacy(p.isLegacy);
-      setCode("");
-    }
-  }, [open, user?.phone]);
-
-  // "" until the national part is a complete Turkish mobile — this is what gates
-  // the submit button, so an incomplete number can never reach the API.
-  const fullPhone = combinePhone(phone);
-
-  return (
-    <Modal
-      isOpen={open}
-      onClose={onClose}
-      title={t("profile.security.phoneVerification")}
-      size="md"
-      closeLabel={t("common.close")}
-      dismissDisabled={sendCode.isPending || verify.isPending}
-      footer={
-        <ModalFooter
-          onCancel={step === "enter" ? onClose : () => setStep("enter")}
-          onConfirm={
-            step === "enter"
-              ? () =>
-                  sendCode.mutate(fullPhone, {
-                    onSuccess: () => setStep("verify"),
-                  })
-              : () => verify.mutate(code, { onSuccess: onClose })
-          }
-          cancelLabel={step === "enter" ? t("common.cancel") : t("common.back")}
-          confirmLabel={
-            step === "enter" ? t("profile.sendCode") : t("profile.verify")
-          }
-          isLoading={sendCode.isPending || verify.isPending}
-          disabled={step === "enter" ? !fullPhone : code.length !== 6}
-        />
-      }
-    >
-      {step === "enter" ? (
-        <div className="space-y-4">
-          <PhoneInput
-            label={t("profile.security.phoneNumber")}
-            phone={phone}
-            onPhoneChange={(next) => {
-              setPhone(next);
-              setIsLegacy(false);
-            }}
-            helperText={
-              isLegacy ? t("validation.phoneLegacyNotice") : undefined
-            }
-          />
-        </div>
-      ) : (
-        <div className="space-y-4">
-          <Input
-            label={t("profile.verificationCode")}
-            value={code}
-            onChange={(e) => setCode(e.target.value)}
-            placeholder="123456"
-            maxLength={6}
-          />
-        </div>
-      )}
-    </Modal>
-  );
-}
 
 /** Security: change password (RHF+zod) + SMS phone verification. */
 export default function SecuritySection() {
@@ -218,17 +125,24 @@ export default function SecuritySection() {
         </div>
         {user?.isPhoneVerified ? (
           <Badge variant="success" size="sm">
-            {t("profile.bank.verified")}
+            {t("profile.security.phoneVerifiedBadge")}
           </Badge>
         ) : (
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={() => setPhoneOpen(true)}
-          >
-            {t("profile.verify")}
-          </Button>
+          <div className="flex items-center gap-2">
+            {user?.phone && (
+              <Badge variant="warning" size="sm">
+                {t("profile.security.phoneUnverifiedBadge")}
+              </Badge>
+            )}
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => setPhoneOpen(true)}
+            >
+              {t("profile.verify")}
+            </Button>
+          </div>
         )}
       </div>
 
@@ -262,7 +176,10 @@ export default function SecuritySection() {
         </div>
       </div>
 
-      <PhoneModal open={phoneOpen} onClose={() => setPhoneOpen(false)} />
+      <PhoneVerificationModal
+        open={phoneOpen}
+        onClose={() => setPhoneOpen(false)}
+      />
     </SectionCard>
   );
 }
