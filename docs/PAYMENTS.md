@@ -361,6 +361,69 @@ kaldı.
 **v1 takaslar** eski kuralla biter: ayrım tek yerde, `Trade.pricingVersion`
 alanındadır.
 
+### Admin (platform) takas iptali
+
+Admin → Takas dosyası → "Takası iptal et" (`GET /admin/trades/:id/cancel-preview`,
+`POST /admin/trades/:id/cancel`, gövde `AdminCancelRequest`). **Yalnız
+super_admin**, toplu iptal yok. Yeni bir para ya da kargo yolu YOKTUR: iptal,
+süre dolumu taramasının kargo öncesi çekirdeğiyle yapılır
+(`trade/helpers/trade-pre-shipment-cancel.ts` →
+`cancelPreShipmentTradeInTx` + `settlePreShipmentCancellation`); değişen yalnız
+aktör (`CancellationActor.platform`), gerekçe, kusur ataması, denetim ve
+duyurudur. Uygunluk kuralı `@tarodan/types` → `adminTradeCancelBlocker`
+(API ve panel aynı kuralı okur; API onu satır kilidi altında yeniden çalıştırır).
+
+| Aşama                                                    | İzin?                            | Çekirdek         | İade                                                                                           | Rezervasyon / kargo                                                                          | Duyuru                      |
+| -------------------------------------------------------- | -------------------------------- | ---------------- | ---------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------- | --------------------------- |
+| `pending`                                                | evet                             | tarama çekirdeği | yok (para alınmadı)                                                                            | rezervasyon yok                                                                              | iki tarafa in-app + e-posta |
+| `accepted` (legacy)                                      | evet                             | tarama çekirdeği | yok                                                                                            | rezervasyon çözülür                                                                          | iki tarafa in-app + e-posta |
+| `awaiting_payment`                                       | evet                             | tarama çekirdeği | ödemiş taraf **tam** iade (taramanın ödeme-süresi sonucuyla aynı); ödememiş tarafın iadesi yok | rezervasyon çözülür                                                                          | iki tarafa; ödeyene tutar   |
+| `shipping_to_warehouse`, hiçbir koli taşıyıcıya geçmemiş | evet                             | tarama çekirdeği | iki taraf da **tam** iade (hizmet bedeli + kargo dahil)                                        | rezervasyon çözülür; basılmış ama devredilmemiş etiketler Sürat iptal göreviyle iptal edilir | iki tarafa; ödeyene tutar   |
+| `shipping_to_warehouse`, bir koli yolda / depoda         | **hayır** (`parcel_handed_over`) | —                | —                                                                                              | force-cancel-stuck / kayıp koli akışı                                                        | —                           |
+| `at_warehouse`, `admin_reviewing`                        | hayır (`at_warehouse`)           | —                | —                                                                                              | depo reddi (`reject`)                                                                        | —                           |
+| `shipping_to_recipients`                                 | hayır                            | —                | —                                                                                              | itiraz akışı                                                                                 | —                           |
+| `returning`                                              | hayır                            | —                | —                                                                                              | `mark-return-delivered` / `mark-return-lost`                                                 | —                           |
+| `disputed`                                               | hayır                            | —                | —                                                                                              | `resolve-dispute`                                                                            | —                           |
+| legacy `*_shipped` / `*_received`                        | hayır (`legacy_shipped`)         | —                | —                                                                                              | —                                                                                            | —                           |
+| `completed`, `cancelled`, `rejected`                     | hayır (`closed`, 409)            | —                | —                                                                                              | —                                                                                            | —                           |
+
+- **"Kargoya verildi" tanımı** takasın diğer iptal kapılarıyla aynıdır: bir
+  `to_warehouse` bacağının devri (`isShipmentHandedToCarrier`: hareket eden
+  durum ya da `shippedAt`), bacağın teslim damgası veya takasın
+  `firstWarehouseArrivalAt` / `cancelLockedAt` damgası. `pending` /
+  `label_created` etiket devir sayılmaz.
+- **Neden taramanın çekirdeği, kullanıcı iptali değil:** kullanıcı iptali
+  vazgeçen tarafı kusurlu sayar (hizmet bedelini kaybeder) ve aktörü bir
+  taraftan türetir. Tarama çekirdeği aktörü ve kusuru dışarıdan alır.
+- **Kusursuzluk:** platform iptali kimsenin kusuru değildir → çekirdek
+  `faultless: "all"` ile takasın HER ödeme satırına `fullRefundEntitled` yazar
+  (iade politikasının mevcut bayrağı; kayıp koli çözümünün kararıyla aynı).
+  Tutar yine `tradePaymentRefundableAmountFor`'dan gelir; önizleme, denetim
+  kaydı ve iade aynı fonksiyonu çağırır. Takas e-belgeleri (`trade_service_fee`,
+  `trade_shipping`) depoya varışta kesildiği için bu aşamalarda terslenecek
+  belge yoktur; iade yolu ters kayıt sinyalini yine her zamanki gibi kuyruğa
+  alır.
+- **Gerekçe:** katalog kodu `Trade.adminCancelReasonCode`'a yazılır (admin
+  listesi bununla gösterir/filtreler); `Trade.cancelReason` taraflara görünen
+  metindir ("Tarodan tarafından iptal edildi: <etiket>"). Adminin iç notu YALNIZ
+  denetim kaydındadır.
+- **Denetim:** `trade_admin_cancel` zorunlu ve iptalle aynı tx'te (yazılamazsa
+  iptal, rezervasyon çözümü ve duyuru geri alınır). İade harici sağlayıcı
+  çağrısıdır, iptalle atomik olamaz: commit sonrası yapılır; başarısızlıkta
+  takasa `refundFailureReason` yazılır (takas dosyasında "İadeyi yeniden dene" +
+  `retryFailedTradeRefunds` cron'u) ve sonuç `trade_admin_cancel_refund`
+  satırına düşer. Reddedilen denemeler `trade_admin_cancel_failed`.
+- **Duyuru:** iptalle aynı tx'te outbox'a (`trade.platform_cancel_notice`,
+  takas başına tek `dedupeKey`); handler her tarafa bir in-app bildirim
+  (`trade_cancelled_by_platform`, push'u dahil) ve bir e-posta
+  (`trade-cancelled-platform`) gönderir. Taramanın "otomatik iptal" push'u
+  gitmez. İade core'u başarılı iadede ayrıca kendi "iade tamamlandı" push'unu
+  gönderir (iade sonucu sinyali; her iptal yolunda aynı).
+- **Yarışlar:** taraf iptali, süre dolumu taraması, uzatma hakkı ve ödeme
+  geçişi aynı takas satırı kilidinde sıraya girer; kilit altında ortak kural
+  yeniden çalışır. Kargo poller'ı devri bacak satırına yazdığı için bacaklar da
+  kilitlenir (sıra: takas → bacak). Aynı kodla ikinci gönderim no-op'tur.
+
 ---
 
 ## 8b. Gelir e-belgeleri (eLogo)
