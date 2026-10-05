@@ -16,7 +16,13 @@ type Row = {
   nationalId: string | null;
   isTestAccount: boolean;
   adminUser: { id: string } | null;
+  deletedAt: Date | null;
   bankAccount: { tcKimlikNo: string | null } | null;
+};
+
+type UpdateManyArgs = {
+  where: { id: string } & Record<string, unknown>;
+  data: Partial<Row>;
 };
 
 /**
@@ -37,6 +43,7 @@ describe("LegalIdentityService", () => {
       nationalId: null,
       isTestAccount: false,
       adminUser: null,
+      deletedAt: null,
       bankAccount: null,
       ...opts.self,
     };
@@ -54,6 +61,15 @@ describe("LegalIdentityService", () => {
             { id: self.id }
           ),
         ),
+        // Postgres'in koşullu UPDATE'i: `where`deki alanların HEPSİ şu an
+        // eşleşiyorsa yazar (count 1), yoksa hiçbir şey yapmaz (count 0).
+        updateMany: jest.fn(async ({ where, data }: UpdateManyArgs) => {
+          const matches = Object.entries(where).every(
+            ([field, value]) => self[field as keyof Row] === value,
+          );
+          if (matches) Object.assign(self, data);
+          return { count: matches ? 1 : 0 };
+        }),
       },
     };
     const cache = {
@@ -113,11 +129,17 @@ describe("LegalIdentityService", () => {
 
       const status = await service.submit("u1", full);
 
-      expect(prisma.user.update).toHaveBeenCalledWith({
-        where: { id: "u1" },
+      // Yazım koşullu: yalnız alanlar hâlâ boşsa.
+      expect(prisma.user.updateMany).toHaveBeenCalledWith({
+        where: {
+          id: "u1",
+          legalFirstName: null,
+          legalLastName: null,
+          nationalId: null,
+        },
         data: full,
-        select: { id: true },
       });
+      expect(prisma.user.update).not.toHaveBeenCalled();
       expect(status.missing).toEqual([]);
       expect(status.nationalIdMasked).toBe("•••••••••46");
     });
@@ -130,7 +152,32 @@ describe("LegalIdentityService", () => {
       ).rejects.toMatchObject({
         response: { i18nKey: "server.identity.locked" },
       });
-      expect(prisma.user.update).not.toHaveBeenCalled();
+      expect(prisma.user.updateMany).not.toHaveBeenCalled();
+    });
+
+    it("eşzamanlı iki gönderimde kaybeden ilkini EZEMEZ, kilitli yanıtı alır", async () => {
+      const { service, prisma, self } = makeService({});
+      // Her iki istek de okumayı alanlar boşken yapar…
+      const first = service.submit("u1", full);
+      const second = service.submit("u1", {
+        legalFirstName: "Başka",
+        legalLastName: "Biri",
+        nationalId: "12345678950",
+      });
+
+      const results = await Promise.allSettled([first, second]);
+
+      expect(results[0].status).toBe("fulfilled");
+      expect(results[1]).toMatchObject({
+        status: "rejected",
+        reason: {
+          status: 409,
+          response: { i18nKey: "server.identity.locked" },
+        },
+      });
+      // …ama yalnız ilki yazar; kayıtlı kimlik ilk gönderimdir.
+      expect(self).toMatchObject(full);
+      expect(prisma.user.updateMany).toHaveBeenCalledTimes(2);
     });
 
     it("başka hesaptaki TCKN'yi o hesap hakkında hiçbir şey söylemeden reddeder", async () => {
@@ -148,12 +195,12 @@ describe("LegalIdentityService", () => {
       );
       expect(body).not.toContain("other-user");
       expect(body).not.toContain(TCKN);
-      expect(prisma.user.update).not.toHaveBeenCalled();
+      expect(prisma.user.updateMany).not.toHaveBeenCalled();
     });
 
     it("DB yarışında (P2002) ön-kontrolle aynı yanıtı verir", async () => {
       const { service, prisma } = makeService({});
-      prisma.user.update.mockRejectedValueOnce(
+      prisma.user.updateMany.mockRejectedValueOnce(
         new Prisma.PrismaClientKnownRequestError("unique", {
           code: "P2002",
           clientVersion: "test",
@@ -208,7 +255,7 @@ describe("LegalIdentityService", () => {
           ([args]) => args.where.nationalId !== undefined,
         ),
       ).toBe(false);
-      expect(prisma.user.update).not.toHaveBeenCalled();
+      expect(prisma.user.updateMany).not.toHaveBeenCalled();
     });
 
     it("TCKN'yi hiçbir log çağrısına yazmaz", async () => {
@@ -263,6 +310,37 @@ describe("LegalIdentityService", () => {
       ).rejects.toMatchObject({
         response: { i18nKey: "server.identity.nationalIdUnavailable" },
       });
+    });
+
+    it("silinmiş (anonimleştirilmiş) hesaba kimlik YAZMAZ — yalnız arayüz değil, sunucu da", async () => {
+      const { service, prisma } = makeService({
+        self: { deletedAt: new Date("2026-09-01T00:00:00Z") },
+      });
+
+      await expect(
+        service.applyCorrection("u1", { nationalId: TCKN }, prisma as never),
+      ).rejects.toMatchObject({
+        status: 400,
+        response: { i18nKey: "server.identity.correctionNotAllowed" },
+      });
+      expect(prisma.user.update).not.toHaveBeenCalled();
+    });
+
+    it("personel hesabına kimlik YAZMAZ (personel kimlikten muaf)", async () => {
+      const { service, prisma } = makeService({
+        self: { adminUser: { id: "a1" } },
+      });
+
+      await expect(
+        service.applyCorrection(
+          "u1",
+          { legalFirstName: "Ayşe" },
+          prisma as never,
+        ),
+      ).rejects.toMatchObject({
+        response: { i18nKey: "server.identity.correctionNotAllowed" },
+      });
+      expect(prisma.user.update).not.toHaveBeenCalled();
     });
   });
 });

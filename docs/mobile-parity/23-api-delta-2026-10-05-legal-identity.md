@@ -64,13 +64,13 @@ kopya yazılmamalı).
 
 ### Hatalar
 
-| Durum | i18n anahtarı                           | Anlamı                                                                     |
-| ----- | --------------------------------------- | -------------------------------------------------------------------------- |
-| 400   | (DTO doğrulaması)                       | Biçim/checksum hatası                                                      |
-| 400   | `server.identity.incomplete`            | Gönderim sonrası bir alan hâlâ boş                                         |
-| 409   | `server.identity.locked`                | Kayıtlı bir alanı değiştirme girişimi (düzeltme yalnız destek/admin)       |
-| 409   | `server.identity.nationalIdUnavailable` | Numara başka bir hesapta — hangi hesap olduğu söylenmez                    |
-| 429   | `server.identity.tooManyAttempts`       | Deneme sınırı: IP başına 5/dk; ayrıca üye başına 10/gün, IP başına 30/saat |
+| Durum | i18n anahtarı                           | Anlamı                                                                                               |
+| ----- | --------------------------------------- | ---------------------------------------------------------------------------------------------------- |
+| 400   | (DTO doğrulaması)                       | Biçim/checksum hatası                                                                                |
+| 400   | `server.identity.incomplete`            | Gönderim sonrası bir alan hâlâ boş                                                                   |
+| 409   | `server.identity.locked`                | Kayıtlı bir alanı değiştirme girişimi ya da eşzamanlı ikinci gönderim (düzeltme yalnız destek/admin) |
+| 409   | `server.identity.nationalIdUnavailable` | Numara başka bir hesapta — hangi hesap olduğu söylenmez                                              |
+| 429   | `server.identity.tooManyAttempts`       | Deneme sınırı: IP başına 5/dk; ayrıca üye başına 10/gün, IP başına 30/saat                           |
 
 ## 2. Kayıt: üç yeni opsiyonel alan
 
@@ -96,10 +96,15 @@ i18n: `identity.legalFirstName`, `identity.legalLastName`, `identity.nationalId`
 
 ## 3. Banka hesabı (`PATCH /users/me/bank-account`)
 
-`tcKimlikNo` alanı **eski**dir. Web formu artık göstermiyor. Gönderilirse
-ortak TCKN kuralıyla doğrulanır ve üyenin `nationalId`'si varsa ONUNLA AYNI
-olmalıdır (`400 server.identity.bankNationalIdMismatch`). Gönderilmezse
-mevcut değer **korunur** (eskiden null'lanıyordu).
+`tcKimlikNo` alanı **eski**dir. Web formu artık göstermiyor.
+
+- Gönderilmezse ya da `null` / boş gönderilirse mevcut değer **korunur**
+  (eskiden null'lanıyordu).
+- Kayıtlı değerin **aynısı** gönderilirse (form GET yanıtıyla dolduruldu)
+  dokunulmaz ve doğrulanmaz — eski bir değer IBAN güncellemesini engellemez.
+- **Yeni** bir değer ortak TCKN kuralıyla doğrulanır
+  (`400 server.identity.nationalIdInvalid`) ve üyenin `nationalId`'si varsa
+  ONUNLA AYNI olmalıdır (`400 server.identity.bankNationalIdMismatch`).
 
 ## 4. Sunucu zorlamıyor — bilinçli
 

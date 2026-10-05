@@ -18,12 +18,15 @@ import { getRequestClientInfo } from "../../common/context/request-context";
 import {
   LEGAL_IDENTITY_SUBJECT_SELECT,
   LEGAL_IDENTITY_SUBMIT_LIMITS,
+  assertCorrectable,
   buildLegalIdentityStatus,
+  legalIdentityLocked,
   legalIdentityRateLimitKeys,
   nationalIdUnavailable,
   planAdminCorrection,
   planMemberSubmission,
   rethrowNationalIdConflict,
+  stillEmptyWhere,
   type LegalIdentityChange,
 } from "./helpers/legal-identity-status";
 
@@ -71,7 +74,8 @@ export class LegalIdentityService {
   /**
    * Üyenin kapıdan gönderimi. Dolu alan değişmez; eksikler doldurulur. TCKN
    * yazılacaksa önce hız sınırı, sonra tekillik — uç bir "numara kayıtlı mı"
-   * kahini olduğu için.
+   * kahini olduğu için. Yazım koşulludur (alanlar hâlâ boşsa): aynı anda gelen
+   * iki gönderimden kaybeden, ilkini ezmek yerine "kilitli" yanıtı alır.
    */
   async submit(
     userId: string,
@@ -86,15 +90,13 @@ export class LegalIdentityService {
         await this.consumeLookupBudget(userId);
         await this.assertNationalIdAvailable(nationalId, userId);
       }
-      try {
-        await this.prisma.user.update({
-          where: { id: userId },
+      const written = await this.prisma.user
+        .updateMany({
+          where: { id: userId, ...stillEmptyWhere(change.changed) },
           data: change.data,
-          select: { id: true },
-        });
-      } catch (error) {
-        rethrowNationalIdConflict(error);
-      }
+        })
+        .catch((error: unknown) => rethrowNationalIdConflict(error));
+      if (written.count === 0) throw legalIdentityLocked();
     }
     return this.getStatus(userId);
   }
@@ -102,14 +104,31 @@ export class LegalIdentityService {
   /**
    * Admin düzeltmesi — çağıran (admin servisi) bunu denetim kaydıyla AYNI
    * transaction'da çalıştırır; DB tekillik yarışı (P2002) transaction'ı
-   * bozacağı için çağıran `rethrowNationalIdConflict` ile çevirir.
+   * bozacağı için çağıran `rethrowNationalIdConflict` ile çevirir. Silinmiş
+   * ve personel hesabı düzeltilemez (`assertCorrectable`).
    */
   async applyCorrection(
     userId: string,
     input: SubmitLegalIdentityRequest,
     db: LegalIdentityDb,
   ): Promise<LegalIdentityChange> {
-    const current = await this.readValues(userId, db);
+    const subject = await db.user.findUnique({
+      where: { id: userId },
+      select: {
+        ...VALUES_SELECT,
+        deletedAt: true,
+        adminUser: { select: { id: true } },
+      },
+    });
+    if (!subject) {
+      throw new NotFoundException(i18nMessage("server.user.notFound"));
+    }
+    assertCorrectable(subject);
+    const {
+      deletedAt: _deletedAt,
+      adminUser: _adminUser,
+      ...current
+    } = subject;
     const change = planAdminCorrection(current, input);
     if (change.data.nationalId) {
       await this.assertNationalIdAvailable(change.data.nationalId, userId, db);
@@ -169,11 +188,8 @@ export class LegalIdentityService {
     }
   }
 
-  private async readValues(
-    userId: string,
-    db: LegalIdentityDb = this.prisma,
-  ): Promise<LegalIdentityValues> {
-    const user = await db.user.findUnique({
+  private async readValues(userId: string): Promise<LegalIdentityValues> {
+    const user = await this.prisma.user.findUnique({
       where: { id: userId },
       select: VALUES_SELECT,
     });

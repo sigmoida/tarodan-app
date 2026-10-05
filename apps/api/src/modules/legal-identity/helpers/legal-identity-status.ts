@@ -136,12 +136,46 @@ export function planMemberSubmission(
 ): LegalIdentityChange {
   const change = diff(current, normalizeLegalIdentityInput(input));
   if (change.changed.some((field) => current[field])) {
-    throw new ConflictException(i18nMessage("server.identity.locked"));
+    throw legalIdentityLocked();
   }
   if (missingLegalIdentityFields(change.after).length > 0) {
     throw new BadRequestException(i18nMessage("server.identity.incomplete"));
   }
   return change;
+}
+
+/** Dolu bir alanı değiştirme girişimi (ya da eşzamanlı gönderimi kaybeden istek). */
+export function legalIdentityLocked(): ConflictException {
+  return new ConflictException(i18nMessage("server.identity.locked"));
+}
+
+/**
+ * Üye yazımının koşulu: yazılacak alanlar HÂLÂ boş. "Bir kez girilir" kuralı
+ * okuma-yazma arasında da geçerli kalsın diye yazım koşullu yapılır; aynı
+ * anda gelen iki gönderimden ikincisi hiçbir satırı güncelleyemez.
+ */
+export function stillEmptyWhere(
+  fields: readonly LegalIdentityField[],
+): Prisma.UserWhereInput {
+  const where: Prisma.UserWhereInput = {};
+  for (const field of fields) where[field] = null;
+  return where;
+}
+
+/**
+ * Admin düzeltmesinin sunucu kuralı (yalnız arayüzde değil): silinmiş
+ * (anonimleştirilmiş) hesaba kimlik yazılmaz — numarayı kişinin kendi yeni
+ * hesabından kilitler ve arşivle çelişir; personel hesabı kimlikten muaftır.
+ */
+export function assertCorrectable(subject: {
+  deletedAt: Date | null;
+  adminUser: object | null;
+}): void {
+  if (subject.deletedAt || subject.adminUser) {
+    throw new BadRequestException(
+      i18nMessage("server.identity.correctionNotAllowed"),
+    );
+  }
 }
 
 /**

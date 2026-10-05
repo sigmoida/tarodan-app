@@ -87,13 +87,13 @@ olmalıdır. `displayName` bunun yerine geçmez (takma ad olabilir). Alanlar
 API dekoratörleri (`@IsTckn`, `@IsLegalName`), web/admin zod alanları
 (`@tarodan/ui/form`: `legalName`, `tckn`, `…Optional`) aynı fonksiyonu çağırır.
 
-| Kural          | Değer                                                                                                                                                                                                                                |
-| -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| TCKN           | Yalnız rakam saklanır (boşluk/tire temizlenir); 11 hane, ilk hane ≠ 0, iki checksum kuralı. Yabancı kimlik no'ya özel muamele yok: algoritma geçerse kabul.                                                                          |
-| Ad / soyad     | Harf (Türkçe dahil), aralarında tek boşluk / tire / kesme; 2–50 karakter. Büyük-küçük harf korunur. AI moderasyonundan GEÇMEZ (herkese açık metin değil; gerçek soyadları yanlış pozitif verirdi).                                   |
-| Tekillik       | Bir TCKN tek hesapta (`users_national_id_key`). Çakışmada yanıt yalnız "bu numara kullanılamıyor" der — diğer hesap hakkında hiçbir bilgi yok.                                                                                       |
-| Kimden istenir | Herkes (alıcı dahil, onaylı kurumsal satıcı dahil). **Muaf:** personel (AdminUser satırı olan hesap) ve test şeridi (`isTestAccount`).                                                                                               |
-| Kim değiştirir | Üye bir kez girer; dolu alanı **değiştiremez**. Düzeltme yalnız admin: kullanıcı detayı → Kimlik bilgileri → Düzelt (super_admin / admin, gerekçe zorunlu, aynı transaction'da zorunlu denetim kaydı `user_legal_identity_correct`). |
+| Kural          | Değer                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| -------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| TCKN           | Yalnız rakam saklanır (boşluk/tire temizlenir); 11 hane, ilk hane ≠ 0, iki checksum kuralı. Yabancı kimlik no'ya özel muamele yok: algoritma geçerse kabul.                                                                                                                                                                                                                                                                  |
+| Ad / soyad     | Harf (Türkçe dahil), aralarında tek boşluk / tire / kesme; 2–50 karakter. Büyük-küçük harf korunur. AI moderasyonundan GEÇMEZ (herkese açık metin değil; gerçek soyadları yanlış pozitif verirdi).                                                                                                                                                                                                                           |
+| Tekillik       | Bir TCKN tek hesapta (`users_national_id_key`). Çakışmada yanıt yalnız "bu numara kullanılamıyor" der — diğer hesap hakkında hiçbir bilgi yok.                                                                                                                                                                                                                                                                               |
+| Kimden istenir | Herkes (alıcı dahil, onaylı kurumsal satıcı dahil). **Muaf:** personel (AdminUser satırı olan hesap) ve test şeridi (`isTestAccount`).                                                                                                                                                                                                                                                                                       |
+| Kim değiştirir | Üye bir kez girer; dolu alanı **değiştiremez** (yazım koşulludur: alanlar hâlâ boşsa — eşzamanlı ikinci gönderim `409 locked` alır). Düzeltme yalnız admin: kullanıcı detayı → Kimlik bilgileri → Düzelt (super_admin / admin, gerekçe zorunlu, aynı transaction'da zorunlu denetim kaydı `user_legal_identity_correct`). Silinmiş ve personel hesabı sunucuda da düzeltilemez (`400 server.identity.correctionNotAllowed`). |
 
 ### Nereden toplanır
 
@@ -178,8 +178,13 @@ yoksa silme anındaki ada düşer; kolon kümesi ve biçim sürümü değişmedi
 `SellerBankAccount.tcKimlikNo` ikinci bir kimlik kaynağı OLMAZ:
 
 - Web banka formu alanı artık göstermez; kaydetme mevcut değere dokunmaz.
-- API alanı mobil uyumluluğu için kabul eder, ortak kuralla doğrular ve
-  üyenin `nationalId`'si varsa **aynı olmasını** ister
+- API alanı mobil uyumluluğu için kabul eder. Gönderilmeyen (`null` / boş
+  dahil) ya da **kayıtlı değerin aynısı** olan numaraya dokunulmaz ve
+  doğrulanmaz — formunu GET yanıtıyla dolduran istemci eski (bugünkü
+  checksum'a uymayan ya da beyandan farklı) değeri geri gönderdiği için IBAN
+  güncellemesi kilitlenmemeli. Yalnız **yeni** bir değer ortak kuralla
+  doğrulanır (`400 server.identity.nationalIdInvalid`) ve üyenin
+  `nationalId`'si varsa **aynı olmalıdır**
   (`400 server.identity.bankNationalIdMismatch`).
 - Eski değer yalnız (a) kimlik kapısında ön doldurma önerisi, (b) GİB raporu
   ve silme arşivinde `User.nationalId` boşken geri düşüş olarak okunur.
