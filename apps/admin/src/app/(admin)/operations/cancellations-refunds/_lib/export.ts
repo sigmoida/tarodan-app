@@ -2,6 +2,11 @@ import type {
   AdminCancellationBucket,
   AdminCancellationTab,
 } from "@tarodan/types";
+import {
+  EXPORT_TRUNCATED_HEADER,
+  exportFilename as serverExportFilename,
+  exportTruncatedAt,
+} from "@/lib/serverExport";
 
 /**
  * Excel dışa aktarımının saf parçaları: istek parametreleri ve yanıt
@@ -9,7 +14,7 @@ import type {
  * anahtar tanımaz); tablo sıralaması kapalıysa API varsayılanı (yeni → eski).
  */
 
-export const CANCELLATION_EXPORT_TRUNCATED_HEADER = "x-export-truncated-at";
+export const CANCELLATION_EXPORT_TRUNCATED_HEADER = EXPORT_TRUNCATED_HEADER;
 
 const FALLBACK_FILENAME = "iptaller.xlsx";
 
@@ -36,12 +41,8 @@ type Headers = Record<string, unknown> | undefined;
 
 /** Sunucunun `Content-Disposition` adı; yoksa sabit ad. */
 export function exportFilename(headers: Headers): string {
-  const disposition = String(headers?.["content-disposition"] ?? "");
-  return /filename="([^"]+)"/.exec(disposition)?.[1] ?? FALLBACK_FILENAME;
+  return serverExportFilename(headers, FALLBACK_FILENAME);
 }
 
 /** Dosya kırpıldıysa tavan (satır sayısı), değilse null. */
-export function isTruncated(headers: Headers): number | null {
-  const value = Number(headers?.[CANCELLATION_EXPORT_TRUNCATED_HEADER]);
-  return Number.isFinite(value) && value > 0 ? value : null;
-}
+export const isTruncated = exportTruncatedAt;
