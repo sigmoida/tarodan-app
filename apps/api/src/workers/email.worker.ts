@@ -23,6 +23,7 @@ import {
   extractEmailTemplateVariables,
   renderStoredEmailTemplate,
 } from "../common/helpers/email-template-renderer";
+import { withEmailTimingData } from "../common/timing-rules";
 import { frontendUrlForEnvironment } from "../config/app-urls";
 import { NotificationDispatchService } from "../modules/notification/notification-dispatch.service";
 
@@ -167,7 +168,11 @@ export class EmailWorker {
         this.configService.get<string>("SUPPORT_EMAIL") ||
         "destek@tarodan.com.tr",
     };
-    const renderData = { ...data, to };
+    // İş süreleri ("14 gün", "24 saat"…) gönderim anında Süreler ve Kurallar'dan.
+    const renderData = await withEmailTimingData(this.prisma, {
+      ...data,
+      to,
+    });
 
     // Check DB for custom template first
     const dbTemplate = await this.prisma.emailTemplate.findUnique({

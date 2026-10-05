@@ -27,6 +27,7 @@ import { EarlyReleaseBadge } from "@/components/finance/EarlyReleaseBadge";
 import { fmtDate, fmtDateTime, fmtTry } from "@/lib/format";
 import { useSession } from "@/context/SessionContext";
 import { usePspFeeRate } from "@/hooks/usePspFeeRate";
+import { useTimingPolicy } from "@/hooks/useTimingPolicy";
 import {
   canManuallyUpdateOrderStatus,
   getOrderStatusInfo,
@@ -55,6 +56,7 @@ import { statusConfig } from "@/lib/statusLabels";
 export function OrderFileBlock({ entry }: { entry: OrderFileEntry }) {
   const t = useTranslations();
   const { user } = useSession();
+  const policy = useTimingPolicy();
   const [statusOpen, setStatusOpen] = useState(false);
   const [trackingOpen, setTrackingOpen] = useState(false);
   const [cancelOpen, setCancelOpen] = useState(false);
@@ -63,6 +65,7 @@ export function OrderFileBlock({ entry }: { entry: OrderFileEntry }) {
   const status = getOrderStatusInfo(
     { ...entry, activeRefundRequest: activeRefundOf(entry) },
     t,
+    policy.returnWindowDays.value,
   );
   const f = entry.finance;
   const pendingCancellation = pendingCancellationRefund(entry);

@@ -72,11 +72,13 @@ export interface OrderStatusView {
 
 /**
  * The order's headline status — priority: active refund > cancellation > raw
- * status. Mirrors the list badge logic.
+ * status. Mirrors the list badge logic. `returnWindowDays` is the Durations &
+ * Rules policy value quoted by the "in return window" label.
  */
 export function getOrderStatusInfo(
   order: OrderStatusSource,
   t: T,
+  returnWindowDays: number,
 ): OrderStatusView {
   const hasActiveRefund =
     !!order.activeRefundRequest || order.status === "refund_requested";
@@ -97,7 +99,7 @@ export function getOrderStatusInfo(
       : (() => {
           const meta = statusMeta[order.status] || statusMeta.pending_payment;
           return {
-            label: t(meta.key as Parameters<T>[0]),
+            label: t(meta.key as Parameters<T>[0], { returnWindowDays }),
             color: meta.color,
             bg: meta.bg,
           };

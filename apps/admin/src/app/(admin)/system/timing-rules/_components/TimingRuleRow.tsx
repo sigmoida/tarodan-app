@@ -4,6 +4,7 @@ import { useTranslations } from "next-intl";
 import { Badge } from "@tarodan/ui";
 import { FormInput, FormSelect } from "@tarodan/ui/form";
 import {
+  legalTimingMismatch,
   timingRule,
   type AdminTimingRuleState,
   type TimingRuleId,
@@ -14,7 +15,9 @@ import {
   actionOptions,
   boundsLabel,
   inProgressWarningKey,
+  helperParams,
   isActionLocked,
+  legalMismatchText,
   valueField,
 } from "../_lib/timing-rules";
 
@@ -34,6 +37,9 @@ export function TimingRuleRow({ id, state, canEdit }: TimingRuleRowProps) {
   const rule = timingRule(id);
   const label = t(`admin.timingRules.rules.${id}.label`);
   const source = state?.source ?? "default";
+  // Sözleşme metinleri bu süreyi sabit sayıyla yazıyorsa ve ayar ondan
+  // farklıysa personel bunu satırda görür (metni değiştirmek müşterinin kararı).
+  const legalMismatch = state ? legalTimingMismatch(id, state.value) : null;
 
   return (
     <div className="grid grid-cols-1 gap-4 border-b border-border py-4 last:border-b-0 md:grid-cols-[minmax(0,2fr)_minmax(0,1fr)_minmax(0,1.5fr)]">
@@ -45,7 +51,7 @@ export function TimingRuleRow({ id, state, canEdit }: TimingRuleRowProps) {
           </Badge>
         </div>
         <p className="mt-1 text-sm text-muted">
-          {t(`admin.timingRules.rules.${id}.helper`)}
+          {t(`admin.timingRules.rules.${id}.helper`, helperParams(id))}
         </p>
         <p className="mt-1 text-xs text-subtle">
           {boundsLabel(t, id)}
@@ -64,6 +70,11 @@ export function TimingRuleRow({ id, state, canEdit }: TimingRuleRowProps) {
         {rule.appliesToInProgress && (
           <p className="mt-1 text-xs text-warning-800">
             {t(inProgressWarningKey(id))}
+          </p>
+        )}
+        {legalMismatch && (
+          <p className="mt-1 text-xs font-medium text-warning-800">
+            {legalMismatchText(t, legalMismatch)}
           </p>
         )}
       </div>

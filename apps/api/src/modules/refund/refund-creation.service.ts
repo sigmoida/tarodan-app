@@ -213,7 +213,9 @@ export class RefundCreationService {
       // talebi oluşturamaz. (Escrow de gün 15'te payout ettiği için bu kural
       // sayesinde payout anında asla açık/açılabilir iade kalmaz.)
       throw new BadRequestException(
-        i18nMessage("server.refund.coolingOffExpired"),
+        i18nMessage("server.refund.coolingOffExpired", {
+          returnWindowDays: coolingOffDays,
+        }),
       );
     }
 

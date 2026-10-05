@@ -2,6 +2,7 @@
  * Shared email template rendering utilities.
  * Used by EmailWorker (queue processor) and AdminService (preview).
  */
+import { TIMING_RULES, type TimingRuleId } from "@tarodan/types";
 
 export interface EmailBrandOptions {
   frontendUrl?: string;
@@ -87,6 +88,26 @@ function safeEmailUrl(url: string, fallback: string): string {
     // Fall through to the configured safe URL.
   }
   return escapeEmailHtml(fallback);
+}
+
+/**
+ * Şablon metinlerindeki iş süresi ("14 gün", "24 saat"…). Değer şablon verisinin
+ * `timing` alanından gelir — gönderim anında Süreler ve Kurallar'dan okunup
+ * eklenir (`withEmailTimingData`, common/timing-rules). Alan yoksa (önizleme,
+ * doğrudan çağrı) kayıt varsayılanı kullanılır. Bu render katmanı senkron ve
+ * DB'siz kalır; süreyi kendisi OKUMAZ.
+ *
+ * Süre olmayan teknik ömürler (şifre sıfırlama bağlantısı, doğrulama kodu)
+ * buradan geçmez — iş kuralı değil, token ömrüdür.
+ */
+export function emailTimingValue(
+  data: Record<string, any> | undefined,
+  id: TimingRuleId,
+): number {
+  const value = Number(data?.timing?.[id]);
+  return Number.isFinite(value) && value >= 1
+    ? Math.floor(value)
+    : TIMING_RULES[id].default;
 }
 
 export function substituteEmailVariables(
@@ -588,7 +609,7 @@ export function renderEmailTemplate(
       `
       ${titleBlock("Yeni Sipariş!", "🎉")}
       ${greeting(data?.sellerName)}
-      <p style="font-size: 15px; color: #4b5563; line-height: 1.6; margin: 0 0 20px 0;">Tebrikler! Ürününüz satıldı ve ödemesi alındı. Lütfen ürünü <strong style="color: #dc2626;">en geç 3 iş günü</strong> içinde kargoya veriniz.</p>
+      <p style="font-size: 15px; color: #4b5563; line-height: 1.6; margin: 0 0 20px 0;">Tebrikler! Ürününüz satıldı ve ödemesi alındı. Lütfen ürünü <strong style="color: #dc2626;">en geç ${emailTimingValue(data, "preparingDeadlineDays")} iş günü</strong> içinde kargoya veriniz.</p>
       ${successBox(`<p style="margin: 0; font-size: 16px; color: #166534; font-weight: 600;">Ödeme hesabınıza yansıyacak</p>`)}
       ${detailsBox(`
         <table width="100%" cellspacing="0" cellpadding="0">
@@ -602,7 +623,7 @@ export function renderEmailTemplate(
       <div style="text-align: center; margin: 32px 0;">
         ${primaryButton("Kargo Bilgisi Gir", `${frontendUrl}/seller/orders/${data?.orderId || ""}`)}
       </div>
-      ${infoBox(`<p style="margin: 0; font-size: 14px; color: #92400e;">Not: Ödemeniz, alıcı ürünü teslim aldıktan 14 gün sonra hesabınıza aktarılacaktır.</p>`)}
+      ${infoBox(`<p style="margin: 0; font-size: 14px; color: #92400e;">Not: Ödemeniz, alıcı ürünü teslim aldıktan ${emailTimingValue(data, "returnWindowDays")} gün sonra hesabınıza aktarılacaktır.</p>`)}
     `,
       "Yeni Sipariş!",
     ),
@@ -636,11 +657,11 @@ export function renderEmailTemplate(
           ${detailRow("Sipariş No", "#" + (data?.orderNumber || ""))}
         </table>
       `)}
-      <p style="font-size: 14px; color: #4b5563; margin: 20px 0;">Siparişiniz teslim edildi. Teslim tarihinden itibaren <strong>14 gün içinde koşulsuz iade</strong> hakkınız bulunmaktadır.</p>
+      <p style="font-size: 14px; color: #4b5563; margin: 20px 0;">Siparişiniz teslim edildi. Teslim tarihinden itibaren <strong>${emailTimingValue(data, "returnWindowDays")} gün içinde koşulsuz iade</strong> hakkınız bulunmaktadır.</p>
       <div style="text-align: center; margin: 32px 0;">
         ${primaryButton("Siparişi Görüntüle", `${frontendUrl}/profile/orders/${data?.orderId || ""}`)}
       </div>
-      ${infoBox(`<p style="margin: 0; font-size: 14px; color: #92400e;">Not: 14 günlük iade süresi dolduğunda siparişiniz otomatik olarak tamamlanır.</p>`)}
+      ${infoBox(`<p style="margin: 0; font-size: 14px; color: #92400e;">Not: ${emailTimingValue(data, "returnWindowDays")} günlük iade süresi dolduğunda siparişiniz otomatik olarak tamamlanır.</p>`)}
     `,
       "Siparişiniz Teslim Edildi",
     ),
@@ -671,7 +692,7 @@ export function renderEmailTemplate(
           ${detailRow("Teklif Veren", data?.buyerName || "")}
         </table>
       `)}
-      ${warningBox(`<p style="margin: 0; font-size: 14px; color: #92400e;">Bu teklifin süresi ${data?.expiresAt ? new Date(data.expiresAt).toLocaleString("tr-TR") : "24 saat içinde"} dolacak.</p>`)}
+      ${warningBox(`<p style="margin: 0; font-size: 14px; color: #92400e;">Bu teklifin süresi ${data?.expiresAt ? new Date(data.expiresAt).toLocaleString("tr-TR") : `${emailTimingValue(data, "offerExpiryHours")} saat içinde`} dolacak.</p>`)}
       <div style="text-align: center; margin: 32px 0;">
         ${primaryButton("Teklifi İncele", `${frontendUrl}/profile/offers`)}
       </div>

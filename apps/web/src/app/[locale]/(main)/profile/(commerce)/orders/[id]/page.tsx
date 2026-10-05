@@ -12,6 +12,7 @@ import { PageShell } from "@/components/layout/PageShell";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { queryKeys } from "@/lib/query/keys";
 import { formatDate } from "@/lib/format";
+import { useTimingPolicy } from "@/hooks/useTimingPolicy";
 import RefundRequestModal from "./_modals/RefundRequestModal";
 import { useRequireAuth } from "../../../_hooks/useRequireAuth";
 import { useLocale, useTranslations } from "next-intl";
@@ -55,6 +56,7 @@ export default function OrderGroupDetailPage() {
   const { ready } = useRequireAuth();
   const t = useTranslations();
   const locale = useLocale();
+  const policy = useTimingPolicy();
   const orderId = params?.id as string;
 
   const [reviewingOrder, setReviewingOrder] = useState<OrderDetail | null>(
@@ -111,7 +113,9 @@ export default function OrderGroupDetailPage() {
   // kargoya devredilmemiş kalemler tek tek iptal edilebilir.
   const groupCancellable = isGroupCancellable(group);
   const allowLineCancel = isMulti || !groupCancellable;
-  const returnableOrders = orders.filter(isOrderReturnable);
+  const returnableOrders = orders.filter((order) =>
+    isOrderReturnable(order, policy),
+  );
 
   const handlers: OrderItemBlockHandlers = {
     onReview: setReviewingOrder,
@@ -261,7 +265,9 @@ export default function OrderGroupDetailPage() {
         onClose={() => setRefundOrder(null)}
         orderId={refundOrder?.id ?? ""}
         orderNumber={refundOrder?.orderNumber ?? ""}
-        phase={refundOrder ? inferRefundPhase(refundOrder) : "preparing"}
+        phase={
+          refundOrder ? inferRefundPhase(refundOrder, policy) : "preparing"
+        }
         quantity={refundOrder?.items?.[0]?.quantity ?? 1}
         onSuccess={() => {
           queryClient.invalidateQueries({

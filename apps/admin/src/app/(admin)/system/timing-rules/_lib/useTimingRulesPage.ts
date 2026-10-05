@@ -8,6 +8,7 @@ import { adminApi } from "@/lib/api";
 import { adminKeys } from "@/lib/query/keys";
 import { useAdminMutation } from "@/hooks/useAdminMutation";
 import { useTabParam } from "@/hooks/useTabParam";
+import { TIMING_POLICY_RESOURCE } from "@/hooks/useTimingPolicy";
 import { useSession } from "@/context/SessionContext";
 import {
   changedRules,
@@ -55,7 +56,9 @@ export function useTimingRulesPage() {
   const save = useAdminMutation(
     (changes: TimingRuleChange[]) => adminApi.updateTimingRules(changes),
     {
-      invalidates: [RESOURCE],
+      // Politika sorgusu da tazelenir: sipariş/ödeme ekranları yeni süreyi
+      // okur (iade penceresi, payout grace …).
+      invalidates: [RESOURCE, TIMING_POLICY_RESOURCE],
       successMessage: t("admin.timingRules.saved"),
     },
   );

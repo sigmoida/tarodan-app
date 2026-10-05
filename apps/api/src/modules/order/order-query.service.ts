@@ -466,7 +466,31 @@ export class OrderQueryService {
       throw new ForbiddenException(i18nMessage("server.order.viewForbidden"));
     }
 
+    await this.attachEscrowHolds([order]);
     return await this.orderCommon.formatOrderResponse(order, userId);
+  }
+
+  /**
+   * Satıcı ödemesinin planlanan tarihi (`escrowReleaseAt`) için bekleyen
+   * hold'ları yükler. `PaymentHold` Order'a Prisma ilişkisi değil, düz
+   * `orderId` kolonudur (indeksli); bu yüzden include yerine TEK toplu sorgu
+   * ile okunur ve sonuç siparişlere `paymentHolds` olarak eklenir. Yalnız tek
+   * sipariş / tek grup detayında çağrılır — liste yolları tarihi taşımaz
+   * (alan null), N+1 yok.
+   */
+  private async attachEscrowHolds(
+    orders: ReadonlyArray<{ id: string }>,
+  ): Promise<void> {
+    if (orders.length === 0) return;
+    const holds = await this.prisma.paymentHold.findMany({
+      where: { orderId: { in: orders.map((o) => o.id) }, status: "held" },
+      select: { orderId: true, status: true, releaseAt: true },
+    });
+    for (const order of orders) {
+      Object.assign(order, {
+        paymentHolds: holds.filter((hold) => hold.orderId === order.id),
+      });
+    }
   }
 
   /** Grup statüsü türetme: tüm siparişler aynıysa o statü, değilse 'mixed' */
@@ -675,6 +699,7 @@ export class OrderQueryService {
       return this.findCheckoutGroup(order.checkoutGroupId, userId);
     }
     const viewerRole = order.buyerId === userId ? "buyer" : "seller";
+    await this.attachEscrowHolds([order]);
     return this.formatSyntheticGroupView(order, userId, viewerRole);
   }
 
@@ -997,6 +1022,8 @@ export class OrderQueryService {
     const visiblePackages = isBuyer
       ? group.packages
       : group.packages.filter((p) => p.sellerId === userId);
+    // Satıcı ödeme tarihleri (escrowReleaseAt): grubun görünen siparişleri için tek sorgu.
+    await this.attachEscrowHolds(visibleOrders);
 
     return {
       kind: "group" as const,

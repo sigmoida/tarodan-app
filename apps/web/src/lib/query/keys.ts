@@ -207,6 +207,9 @@ export const queryKeys = {
   search: {
     autocomplete: (query: string) => ["autocomplete-rich", query] as const,
   },
+  timingPolicy: {
+    all: () => ["timing-policy"] as const,
+  },
 } as const;
 
 /**

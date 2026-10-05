@@ -1,16 +1,19 @@
 import { z } from "zod";
 import type { useTranslations } from "next-intl";
 import {
+  PAYTR_3DS_SESSION_MINUTES,
   TIMING_GROUPS,
   TIMING_RULES,
   describeTimingViolation,
   findTimingInvariantViolation,
   isTimingRuleId,
+  legalTimingMismatch,
   timingRule,
   timingRulesInGroup,
   validateTimingAction,
   validateTimingValue,
   type AdminTimingRuleState,
+  type LegalTimingMismatch,
   type TimingExpiryAction,
   type TimingGroup,
   type TimingRuleChange,
@@ -222,6 +225,39 @@ export function inProgressWarningKey(id: TimingRuleId) {
   return id === "listingTtlDays"
     ? ("admin.timingRules.rules.listingTtlDays.inProgressWarning" as const)
     : ("admin.timingRules.appliesToInProgressWarning" as const);
+}
+
+/**
+ * Yardım metinlerindeki sayılar (en az / en çok / PayTR oturumu) kayıttan gelir:
+ * metinde ikinci bir kopya tutulmaz, sınır değişirse metin de değişir.
+ */
+export function helperParams(id: TimingRuleId) {
+  const rule = timingRule(id);
+  return {
+    min: rule.min,
+    max: rule.max,
+    paytrSessionMinutes: PAYTR_3DS_SESSION_MINUTES,
+  };
+}
+
+/** Yapılandırılmış değeri hukuki metinlerle çelişen kayıtlar. */
+export function legalMismatchesOf(
+  states: readonly AdminTimingRuleState[],
+): { id: TimingRuleId; mismatch: LegalTimingMismatch }[] {
+  return states.flatMap((state) => {
+    const mismatch = legalTimingMismatch(state.id, state.value);
+    return mismatch ? [{ id: state.id, mismatch }] : [];
+  });
+}
+
+/** Satır uyarısı: hangi belgeler hangi sayıyı yazıyor. */
+export function legalMismatchText(t: T, mismatch: LegalTimingMismatch): string {
+  return t("admin.timingRules.legalMismatchWarning", {
+    stated: mismatch.stated,
+    documents: mismatch.documents
+      .map((document) => t(`admin.timingRules.legalDocuments.${document}`))
+      .join(", "),
+  });
 }
 
 /** Satırın yardım satırı için sınır metni ("1–30 gün"). */
