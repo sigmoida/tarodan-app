@@ -123,3 +123,6 @@ export * from "./timing-legal";
 
 // Admin (platform) cancellation: shared reason catalog + request shape
 export * from "./admin-cancellation";
+
+// Admin (platform) trade cancellation: eligibility rule + preview/result shapes
+export * from "./admin-trade-cancellation";
