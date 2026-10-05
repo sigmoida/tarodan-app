@@ -1,4 +1,5 @@
 import {
+  CancellationActor,
   OrderOrigin,
   OrderStatus,
   PaymentStatus,
@@ -168,6 +169,15 @@ export function cancellationBucketWhere(
   return { cancelledBy: { in: [...ADMIN_CANCELLATION_BUCKET_ACTORS[bucket]] } };
 }
 
+/**
+ * Yönetici (platform) iptali: katalog kodu YALNIZ platform aktörüyle birlikte
+ * sayılır — kod tek başına bir iptali yönetici iptali yapmaz.
+ */
+const ADMIN_CANCELLED = {
+  cancelledBy: CancellationActor.platform,
+  adminCancelReasonCode: { not: null },
+} as const;
+
 /** Sekmenin sipariş kapsamı; takas sekmesinde sipariş kaynağı yok. */
 function orderTabWhere(
   tab: AdminCancellationTab,
@@ -187,7 +197,7 @@ function orderTabWhere(
     origin: OrderOrigin.offer,
     OR: [
       { payment: { is: { status: { in: PAID_PAYMENT_STATUSES } } } },
-      { adminCancelReasonCode: { not: null } },
+      ADMIN_CANCELLED,
     ],
   };
   switch (tab) {
@@ -203,18 +213,33 @@ function orderTabWhere(
 }
 
 /**
- * Yönetici iptali süzgecinin sipariş koşulu; süzgeç yoksa `undefined`.
- * Takasın bu daldaki kaynağında yönetici neden kolonu yoktur: süzgeç
- * etkinken takas eşleşmez (`MATCH_NOTHING`).
+ * "Yönetici iptali" süzgecinin koşulu; süzgeç yoksa `undefined`. Sipariş ve
+ * takas aynı kolon adlarını kullanır (`cancelledBy`, `adminCancelReasonCode`),
+ * bu yüzden tek tanım iki kaynağa da yazılabilir.
  */
-function adminReasonOrderWhere(
+export function adminReasonWhere(
   filters: CancellationListFilters,
-): Prisma.OrderWhereInput | undefined {
+): Record<string, unknown> | undefined {
   const adminReason = resolveAdminCancellationAdminReason(filters.adminReason);
   if (!adminReason) return undefined;
   return adminReason === ADMIN_CANCELLATION_ADMIN_REASON_ANY
-    ? { adminCancelReasonCode: { not: null } }
-    : { adminCancelReasonCode: adminReason };
+    ? { ...ADMIN_CANCELLED }
+    : {
+        cancelledBy: CancellationActor.platform,
+        adminCancelReasonCode: adminReason,
+      };
+}
+
+/**
+ * MERGE NOKTASI — takasın yönetici iptali süzgeci. `Trade.adminCancelReasonCode`
+ * bu dalda yok; süzgeç etkinken takas eşleşmez. Kolon geldiğinde bu fonksiyonun
+ * gövdesi `return adminReasonWhere(filters) as Prisma.TradeWhereInput | undefined;`
+ * olur (tek değişiklik burası; liste, sayaçlar ve Excel bunu okur).
+ */
+function tradeAdminReasonWhere(
+  filters: CancellationListFilters,
+): Prisma.TradeWhereInput | undefined {
+  return adminReasonWhere(filters) ? MATCH_NOTHING : undefined;
 }
 
 function tradeTabWhere(
@@ -235,7 +260,8 @@ export function cancellationSourceWheres(
   now: Date,
 ): CancellationSourceWheres {
   const bucketWhere = cancellationBucketWhere(bucket, now);
-  const adminReasonWhere = adminReasonOrderWhere(filters);
+  const orderAdminReason = adminReasonWhere(filters);
+  const tradeAdminReason = tradeAdminReasonWhere(filters);
   const result: CancellationSourceWheres = {};
 
   const orderScope = orderTabWhere(tab);
@@ -245,7 +271,9 @@ export function cancellationSourceWheres(
       ...(textParts(filters, ORDER_TEXT) as Prisma.OrderWhereInput[]),
     ];
     if (bucketWhere) parts.push(bucketWhere as Prisma.OrderWhereInput);
-    if (adminReasonWhere) parts.push(adminReasonWhere);
+    if (orderAdminReason) {
+      parts.push(orderAdminReason as Prisma.OrderWhereInput);
+    }
     result.order = { AND: parts };
   }
 
@@ -256,7 +284,7 @@ export function cancellationSourceWheres(
       ...(textParts(filters, TRADE_TEXT) as Prisma.TradeWhereInput[]),
     ];
     if (bucketWhere) parts.push(bucketWhere as Prisma.TradeWhereInput);
-    if (adminReasonWhere) parts.push(MATCH_NOTHING);
+    if (tradeAdminReason) parts.push(tradeAdminReason);
     result.trade = { AND: parts };
   }
 

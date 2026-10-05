@@ -415,10 +415,22 @@ describe("RefundCreationService — kargo öncesi iptal çekirdeği", () => {
         where: { id: "order-1" },
         data: expect.objectContaining({
           cancellationReasonCode: null,
-          adminCancelReasonCode: "stock_error",
           cancelReason: "Yönetici tarafından iptal edildi: Stok hatası",
         }),
       });
+      // Yönetici neden kodu yalnız iade tamamlanınca, İPTAL tipiyle birlikte.
+      expect(prisma.order.update).toHaveBeenLastCalledWith({
+        where: { id: "order-1" },
+        data: {
+          cancellationType: "iptal",
+          adminCancelReasonCode: "stock_error",
+        },
+      });
+      expect(
+        prisma.order.update.mock.calls
+          .slice(0, -1)
+          .some((call: any[]) => "adminCancelReasonCode" in call[0].data),
+      ).toBe(false);
       expect(prisma.paymentHold.updateMany).toHaveBeenCalledWith(
         expect.objectContaining({ data: { frozenByRefundId: "refund-1" } }),
       );
@@ -673,8 +685,16 @@ describe("RefundCreationService — kargo öncesi iptal çekirdeği", () => {
       });
       expect(notification.notifyOrderCancelledParties).not.toHaveBeenCalled();
       expect(prisma.order.update).not.toHaveBeenCalledWith(
-        expect.objectContaining({ data: { cancellationType: "iptal" } }),
+        expect.objectContaining({
+          data: expect.objectContaining({ cancellationType: "iptal" }),
+        }),
       );
+      // İptal tamamlanmadı: yönetici iptali süzgecine bayat kod yazılmaz.
+      expect(
+        prisma.order.update.mock.calls.some(
+          (call: any[]) => "adminCancelReasonCode" in call[0].data,
+        ),
+      ).toBe(false);
     });
   });
 

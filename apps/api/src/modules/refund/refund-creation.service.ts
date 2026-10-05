@@ -458,7 +458,6 @@ export class RefundCreationService {
       where: { id: order.id },
       data: {
         cancellationReasonCode: spec.reasonCode,
-        adminCancelReasonCode: spec.adminReasonCode,
         cancelReason: spec.cancelReason,
         cancellationPolicySnapshot: financial.snapshot,
       },
@@ -552,7 +551,15 @@ export class RefundCreationService {
     });
     await this.prisma.order.update({
       where: { id: order.id },
-      data: { cancellationType: "iptal" },
+      data: {
+        cancellationType: "iptal",
+        // Yönetici neden kodu YALNIZ iptal gerçekten tamamlanınca yazılır:
+        // PSP hatasında talep incelemeye düşer ve sipariş sonra başka yoldan
+        // yaşar/kapanırsa "yönetici iptali" süzgecine bayat kodla düşmesin.
+        ...(spec.adminReasonCode
+          ? { adminCancelReasonCode: spec.adminReasonCode }
+          : {}),
+      },
     });
     await this.notifications.appendHistory(created.id, {
       action: "cancellation_refunded",

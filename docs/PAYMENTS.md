@@ -289,8 +289,10 @@ Admin tarafından başlatılan **iade** (kargodan sonra) yoktur; toplu iptal yok
   (`Order.cancelReason` / `Offer.cancelReason` / iade talebi açıklaması =
   "Yönetici tarafından iptal edildi: <etiket>"); not yalnız denetim kaydındadır,
   hiçbir taraf-yüzlü alana (bildirim, e-posta, talep, iade geçmişi) girmez.
-  Kod `Order.adminCancelReasonCode`'a yazılır; İptal & İade ekranı nedeni
-  oradan gösterir ve "Yönetici iptali" süzgeci onunla süzer.
+  Kod `Order.adminCancelReasonCode`'a YALNIZ iptal tamamlanınca yazılır
+  (ödenmemişte iptalle aynı yazımda, ödenmişte iade kesinleşince; PSP
+  hatasında yazılmaz). İptal & İade ekranı nedeni oradan gösterir ve
+  "Yönetici iptali" süzgeci onunla — platform aktörüyle birlikte — süzer.
 - **Önizleme → onay**: `GET …/cancel-preview` türü ve sonucu döner (iade tutarı
   ya da "ödeme yok", serbest kalan/geri eklenen adet). Onay `expectedKind`
   taşır; sipariş arada ödendiyse (ön okumada ya da kilit altında) iptal 409

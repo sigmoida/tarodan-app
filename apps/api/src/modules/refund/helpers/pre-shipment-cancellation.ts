@@ -38,7 +38,10 @@ export interface PreShipmentCancellationSpec {
   decidedBy: string;
   /** Order.cancellationReasonCode — alıcının yapılandırılmış nedeni. */
   reasonCode: OrderCancellationReason | null;
-  /** Order.adminCancelReasonCode — yalnız platform (yönetici) iptalinde. */
+  /**
+   * Order.adminCancelReasonCode — yalnız platform (yönetici) iptalinde ve
+   * yalnız iade tamamlanıp iptal kesinleşince yazılır.
+   */
   adminReasonCode: AdminCancelReasonCode | null;
   /**
    * RefundRequest.description (alıcının açıklaması / platform iptalinde

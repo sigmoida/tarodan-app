@@ -44,7 +44,10 @@ describe("cancellation where-builder", () => {
                           is: { status: { in: PAID_PAYMENT_STATUSES } },
                         },
                       },
-                      { adminCancelReasonCode: { not: null } },
+                      {
+                        cancelledBy: CancellationActor.platform,
+                        adminCancelReasonCode: { not: null },
+                      },
                     ],
                   },
                 ],
@@ -84,7 +87,9 @@ describe("cancellation where-builder", () => {
         }).slice(1, -1),
       );
       // Yöneticinin iptal ettiği ödenmemiş teklif siparişi bir karardır.
-      expect(json(order)).toContain(`"adminCancelReasonCode":{"not":null}`);
+      expect(json(order)).toContain(
+        `"cancelledBy":"platform","adminCancelReasonCode":{"not":null}`,
+      );
       expect(json(order)).not.toContain(`"origin":"direct_sale"`);
       expect(trade).toBeUndefined();
     });
@@ -231,7 +236,7 @@ describe("cancellation where-builder", () => {
       }
     });
 
-    it("admin-cancellation filter: 'any' = every admin reason, a code = that reason; trades never match", () => {
+    it("admin-cancellation filter: 'any' = every admin reason, a code = that reason, both only with the platform actor (a stale code on an order cancelled by someone else never matches); trades never match on this branch", () => {
       const any = cancellationSourceWheres(
         "all",
         "all",
@@ -240,6 +245,7 @@ describe("cancellation where-builder", () => {
       );
       const anyParts = (any.order as { AND: unknown[] }).AND;
       expect(anyParts[anyParts.length - 1]).toEqual({
+        cancelledBy: CancellationActor.platform,
         adminCancelReasonCode: { not: null },
       });
       expect(json(any.trade)).toContain(`"id":{"in":[]}`);
@@ -252,6 +258,7 @@ describe("cancellation where-builder", () => {
       );
       const oneParts = (one.order as { AND: unknown[] }).AND;
       expect(oneParts[oneParts.length - 1]).toEqual({
+        cancelledBy: CancellationActor.platform,
         adminCancelReasonCode: "stock_error",
       });
     });
