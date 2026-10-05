@@ -53,6 +53,11 @@ describe("routePermission", () => {
     );
   });
 
+  it("guards the consent records screen with the users permission", () => {
+    // API: PERMISSION_MAP.consents = ["users"] — menü ve uç aynı izni ister.
+    expect(routePermission("/accounts/consents")).toBe("users");
+  });
+
   it("matches a sub-path of a registered route (prefix match)", () => {
     expect(routePermission("/accounts/users/some-user-id")).toBe("users");
   });

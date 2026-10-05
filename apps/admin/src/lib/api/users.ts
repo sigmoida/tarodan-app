@@ -1,3 +1,7 @@
+import type {
+  AdminConsentRecordRow,
+  ConsentDocumentStatus,
+} from "@tarodan/types";
 import { api } from "./client";
 
 /** Toplu kullanıcı işlemi sonucu (API `runBulk` sözleşmesi). */
@@ -42,6 +46,19 @@ export const usersApi = {
       params,
       responseType: "blob",
     }),
+  // Onay Kayıtları (KVKK / sözleşme / çerez / pazarlama ispatı). Kardeş
+  // literal segment, izin `users` — deleted-identities ile aynı kalıp.
+  getConsents: (params?: Record<string, unknown>) =>
+    api.get<{ data: AdminConsentRecordRow[]; meta: { total: number } }>(
+      "/admin/consents",
+      { params },
+    ),
+  exportConsents: (params?: Record<string, unknown>) =>
+    api.get("/admin/consents/export", { params, responseType: "blob" }),
+  getUserConsentStatus: (userId: string) =>
+    api.get<{ documents: ConsentDocumentStatus[] }>(
+      `/admin/consents/status/${userId}`,
+    ),
   // Silme: yalnız hiç giriş yapmamış hesap (sunucu 400 ile korur).
   deleteUser: (id: string) => api.delete(`/admin/users/${id}`),
   bulkDeleteUsers: (ids: string[]) =>

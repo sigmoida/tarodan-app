@@ -32,6 +32,7 @@ import {
   SparklesIcon,
   PhotoIcon,
   ArchiveBoxIcon,
+  ShieldCheckIcon,
 } from "@heroicons/react/24/outline";
 import {
   ADMIN_CANCELLATIONS_REFUNDS_PATH,
@@ -257,6 +258,18 @@ export function getNavGroups(t: T): NavGroup[] {
           icon: ArchiveBoxIcon,
           description: t("admin.nav.items.deletedIdentities.description"),
           keywords: t("admin.nav.items.deletedIdentities.keywords")
+            .split(",")
+            .map((k) => k.trim()),
+          permission: "users",
+        },
+        {
+          // Hukuki onay kayıtları (KVKK, sözleşmeler, çerez, pazarlama izni).
+          // Kullanıcı verisinin parçası → `users` izni (API PERMISSION_MAP ile aynı).
+          name: t("admin.nav.items.consents.name"),
+          href: "/accounts/consents",
+          icon: ShieldCheckIcon,
+          description: t("admin.nav.items.consents.description"),
+          keywords: t("admin.nav.items.consents.keywords")
             .split(",")
             .map((k) => k.trim()),
           permission: "users",
