@@ -4,8 +4,11 @@ import type { OrderDetail } from "./types";
 
 /**
  * Kargoya verme son tarihi notu — tarih sunucudan gelir (uzatmada yeni tarih),
- * not yalnız parası alınmış, henüz yola çıkmamış siparişte görünür.
+ * not yalnız parası alınmış, koli taşıyıcıya devredilmemiş ve son tarihi
+ * geçmemiş siparişte görünür: sunucunun yapmayacağı bir iptali vaat etmez.
  */
+const NOW = new Date("2026-10-08T09:00:00.000Z");
+
 const order = (overrides: Partial<OrderDetail> = {}) =>
   ({
     id: "o1",
@@ -18,9 +21,20 @@ const order = (overrides: Partial<OrderDetail> = {}) =>
     ...overrides,
   }) as OrderDetail;
 
+const shipment = (
+  status: string,
+  shippedAt: string | null = null,
+): OrderDetail["shipment"] => ({
+  id: "s1",
+  provider: "surat",
+  trackingNumber: null,
+  status,
+  shippedAt,
+});
+
 describe("preparingDeadlineNoticeOf", () => {
   it("shows the server's deadline to the buyer", () => {
-    expect(preparingDeadlineNoticeOf(order())).toEqual({
+    expect(preparingDeadlineNoticeOf(order(), NOW)).toEqual({
       deadline: "2026-10-10T09:00:00.000Z",
       extended: false,
       audience: "buyer",
@@ -35,6 +49,7 @@ describe("preparingDeadlineNoticeOf", () => {
           isSeller: true,
           preparingExtendedAt: "2026-10-07T09:00:00.000Z",
         }),
+        NOW,
       ),
     ).toEqual({
       deadline: "2026-10-10T09:00:00.000Z",
@@ -43,34 +58,66 @@ describe("preparingDeadlineNoticeOf", () => {
     });
   });
 
-  it("is hidden once the parcel is with the carrier or the order is closed", () => {
+  it("keeps showing while the label exists but the parcel is not handed over", () => {
     expect(
       preparingDeadlineNoticeOf(
-        order({
-          shipment: {
-            id: "s1",
-            provider: "surat",
-            trackingNumber: null,
-            status: "in_transit",
-          },
-        }),
+        order({ shipment: shipment("label_created") }),
+        NOW,
+      ),
+    ).not.toBeNull();
+  });
+
+  it("is hidden once the parcel is with the carrier — same rule as the server sweep", () => {
+    // Hareket eden durum.
+    expect(
+      preparingDeadlineNoticeOf(
+        order({ shipment: shipment("in_transit") }),
+        NOW,
       ),
     ).toBeNull();
-    expect(preparingDeadlineNoticeOf(order({ status: "shipped" }))).toBeNull();
+    // SEAM-B1: durum hâlâ `pending` ama `shippedAt` mührü var → tarama iptal
+    // etmez; "otomatik iptal edilir" denmemeli.
     expect(
-      preparingDeadlineNoticeOf(order({ status: "cancelled" })),
+      preparingDeadlineNoticeOf(
+        order({ shipment: shipment("pending", "2026-10-08T08:00:00.000Z") }),
+        NOW,
+      ),
     ).toBeNull();
   });
 
-  it("is hidden without a deadline, for memberships and for outsiders", () => {
+  it("is hidden once the deadline has passed (the next sweep decides)", () => {
     expect(
-      preparingDeadlineNoticeOf(order({ preparingDeadline: null })),
+      preparingDeadlineNoticeOf(
+        order({ preparingDeadline: "2026-10-08T08:59:00.000Z" }),
+        NOW,
+      ),
     ).toBeNull();
     expect(
-      preparingDeadlineNoticeOf(order({ orderNumber: "MEM-1" })),
+      preparingDeadlineNoticeOf(
+        order({ preparingDeadline: NOW.toISOString() }),
+        NOW,
+      ),
+    ).toBeNull();
+  });
+
+  it("is hidden for closed orders, without a deadline, for memberships and outsiders", () => {
+    expect(
+      preparingDeadlineNoticeOf(order({ status: "shipped" }), NOW),
     ).toBeNull();
     expect(
-      preparingDeadlineNoticeOf(order({ isBuyer: false, isSeller: false })),
+      preparingDeadlineNoticeOf(order({ status: "cancelled" }), NOW),
+    ).toBeNull();
+    expect(
+      preparingDeadlineNoticeOf(order({ preparingDeadline: null }), NOW),
+    ).toBeNull();
+    expect(
+      preparingDeadlineNoticeOf(order({ orderNumber: "MEM-1" }), NOW),
+    ).toBeNull();
+    expect(
+      preparingDeadlineNoticeOf(
+        order({ isBuyer: false, isSeller: false }),
+        NOW,
+      ),
     ).toBeNull();
   });
 });
