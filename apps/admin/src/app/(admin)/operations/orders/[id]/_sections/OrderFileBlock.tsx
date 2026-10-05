@@ -260,9 +260,7 @@ export function OrderFileBlock({ entry }: { entry: OrderFileEntry }) {
             )}
             {entry.escrow.releasedAt ? (
               <>
-                <Field
-                  label={t("admin.operations.orders.file.escrowReleased")}
-                >
+                <Field label={t("admin.operations.orders.file.escrowReleased")}>
                   <span className="flex flex-wrap items-center gap-2">
                     {fmtDateTime(entry.escrow.releasedAt)}
                     <EarlyReleaseBadge
