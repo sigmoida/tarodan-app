@@ -113,7 +113,13 @@ export function fmtShortDateTime(
 ): string | undefined {
   if (!value) return undefined;
   const d = new Date(value);
-  return Number.isNaN(d.getTime()) ? undefined : shortDateTimeFmt.format(d);
+  if (Number.isNaN(d.getTime())) return undefined;
+  // tr-TR yılsız tarihte ayırıcıyı "/" yapar; parçalardan elle kurulur ki
+  // diğer biçimlerle aynı ("03.07 14:30") görünsün.
+  const part = Object.fromEntries(
+    shortDateTimeFmt.formatToParts(d).map((p) => [p.type, p.value]),
+  );
+  return `${part.day}.${part.month} ${part.hour}:${part.minute}`;
 }
 
 /** `14:30` — time only (rendered next to the date in `CellDate withTime`). */

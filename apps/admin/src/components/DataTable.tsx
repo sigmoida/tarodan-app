@@ -118,7 +118,8 @@ export function DataTable<T>({
   // offer a CSV export. Safe when standalone — the context is simply absent.
   const resourceList = useContext(ResourceListContext);
   if (resourceList) {
-    resourceList.exportRef.current = columns;
+    // Yaprak sütunlar: gruplu tanımda grup başlığı dışa aktarılacak sütun değildir.
+    resourceList.exportRef.current = flattenColumns(columns);
     // Kolonlar bu tabloya basılan satır şekline göre yazılır (örn. grup satırı)
     // — CSV de aynı veriyi kullanmalı, ham context satırlarını değil.
     resourceList.exportRowsRef.current = data as any[];
@@ -162,8 +163,12 @@ export function DataTable<T>({
   // `dense` = bir kartın İÇİNE gömülü tablo: kart zaten çerçeveyi çizer, tablo
   // ikinci bir çerçeve/gölge eklemez ("çerçeve içinde çerçeve" olmasın).
   const frame = dense ? undefined : TABLE_FRAME;
+  // Gömülü tablo kartın genişliğine SIĞAR: sabit sütun genişliği ve en küçük
+  // tablo genişliği uygulanmaz (dar kartta sütunlar yatay kaydırmaya düşmesin).
+  const sized = hasSizing && !dense;
 
-  if (!loading && data.length === 0) {
+  // Toplam satırı (footer) varsa boş tabloda da çizilir.
+  if (!loading && data.length === 0 && footer == null) {
     return (
       <div className={frame}>
         <EmptyState
@@ -180,10 +185,10 @@ export function DataTable<T>({
       <div className="overflow-x-auto overscroll-x-contain [-webkit-overflow-scrolling:touch]">
         <Table
           scrollable={false}
-          className={hasSizing ? "table-fixed" : undefined}
-          style={hasSizing ? { minWidth: `${tableMinWidth}px` } : undefined}
+          className={sized ? "table-fixed" : undefined}
+          style={sized ? { minWidth: `${tableMinWidth}px` } : undefined}
         >
-          {hasSizing && (
+          {sized && (
             <colgroup>
               {selectable && (
                 <col style={{ width: `${SELECTABLE_COLUMN_WIDTH}px` }} />

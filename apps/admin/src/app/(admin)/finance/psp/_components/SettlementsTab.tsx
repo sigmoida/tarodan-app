@@ -85,7 +85,8 @@ export function SettlementsTab() {
           </Badge>
         ),
       ),
-      col.code("IBAN", (s: PspSettlement) => s.merchantIban),
+      // 26 haneli IBAN kırpılmadan okunsun (PayTR paneliyle göz kontrolü).
+      col.code("IBAN", (s: PspSettlement) => s.merchantIban, { minWidth: 300 }),
       col.custom(
         t("admin.finance.psp.settlements.items"),
         (s: PspSettlement) =>

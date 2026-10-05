@@ -131,7 +131,7 @@ export function ReconciliationTab() {
               {t("admin.finance.payments.refundReconciliation.resolve")}
             </Button>
           ) : null,
-        { header: t("common.actions") },
+        { header: t("common.actions"), minWidth: 160 },
       ),
     ],
     [t, canResolve],

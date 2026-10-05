@@ -89,7 +89,9 @@ export function LinesTab() {
         t("admin.finance.psp.merchant.label"),
         (l: PspStatementLine) => <MerchantBadge merchant={l.paytrMerchant} />,
       ),
-      col.code("merchant_oid", (l: PspStatementLine) => l.merchantOid),
+      col.code("merchant_oid", (l: PspStatementLine) => l.merchantOid, {
+        minWidth: 260,
+      }),
       col.money(
         t("admin.finance.psp.lines.amount"),
         (l: PspStatementLine) => l.amount,
@@ -117,28 +119,31 @@ export function LinesTab() {
         t("admin.finance.psp.lines.reference"),
         (l: PspStatementLine) => <LineReference line={l} />,
       ),
-      col.actions((l: PspStatementLine) =>
-        l.matchStatus !== "matched" ? (
-          <>
-            <Button
-              variant="secondary"
-              size="sm"
-              disabled={rematch.isPending}
-              onClick={() => rematch.mutate(l.id)}
-            >
-              {t("admin.finance.psp.lines.rematch")}
-            </Button>
-            {!l.resolvedAt && (
+      col.actions(
+        (l: PspStatementLine) =>
+          l.matchStatus !== "matched" ? (
+            <>
               <Button
-                variant="outline"
+                variant="secondary"
                 size="sm"
-                onClick={() => setResolving(l)}
+                disabled={rematch.isPending}
+                onClick={() => rematch.mutate(l.id)}
               >
-                {t("admin.finance.psp.lines.resolve")}
+                {t("admin.finance.psp.lines.rematch")}
               </Button>
-            )}
-          </>
-        ) : null,
+              {!l.resolvedAt && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setResolving(l)}
+                >
+                  {t("admin.finance.psp.lines.resolve")}
+                </Button>
+              )}
+            </>
+          ) : null,
+        // İki düğme sığsın: varsayılan 96px sütunda yandaki bağlantının üstüne taşıyordu.
+        { minWidth: 240 },
       ),
     ],
     [t, rematch],

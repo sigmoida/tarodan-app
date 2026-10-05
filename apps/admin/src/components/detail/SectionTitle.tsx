@@ -23,9 +23,11 @@ export function SectionTitle({
   const title = <Tag className={cn(SIZE[size], className)}>{children}</Tag>;
   if (!actions) return title;
   return (
-    <div className="flex items-center justify-between gap-3">
+    // flex-wrap: geniş eylemler (ör. tarih aralığı seçici) dar ekranda başlığın
+    // altına iner, taşmaz.
+    <div className="flex flex-wrap items-center justify-between gap-3">
       {title}
-      <div className="flex shrink-0 items-center gap-2">{actions}</div>
+      <div className="flex flex-wrap items-center gap-2">{actions}</div>
     </div>
   );
 }
