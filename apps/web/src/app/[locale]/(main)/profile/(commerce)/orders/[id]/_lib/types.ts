@@ -1,12 +1,10 @@
 /** @format */
 
-import {
-  ESCROW_RELEASE_DAYS,
-  REFUND_COOLING_OFF_DAYS,
-  orderStatusConfig,
-} from "@tarodan/ui";
+import { orderStatusConfig } from "@tarodan/ui";
 import { createTranslator } from "next-intl";
 import { getMessages, resolveLocale } from "@tarodan/i18n";
+import { timingMessageValues, type PublicTimingPolicy } from "@tarodan/types";
+import { addCalendarDays } from "@/lib/timing-policy";
 
 export interface OrderDetail {
   id: string;
@@ -47,6 +45,14 @@ export interface OrderDetail {
   createdAt: string;
   updatedAt: string;
   deliveredAt?: string | null;
+  /**
+   * İade (cayma) penceresinin teslimde DAMGALANAN sonu — sunucu değeri, iade
+   * hakkı ve satıcı ödemesi bunu okur. null = damgadan önce teslim edilmiş ya
+   * da henüz teslim edilmemiş (bkz. `returnWindowEnd`).
+   */
+  returnWindowEndsAt?: string | null;
+  /** Satıcı ödemesinin (escrow hold) gerçek serbest bırakma tarihi; yoksa null. */
+  escrowReleaseAt?: string | null;
   product: {
     id: string;
     title: string;
@@ -175,6 +181,7 @@ export function getCancelMessage(
   isBuyer: boolean,
   rawReason: string | null | undefined,
   locale: string,
+  policy: PublicTimingPolicy,
 ): string | null {
   const t = createTranslator({
     locale,
@@ -186,7 +193,7 @@ export function getCancelMessage(
         ? t("order.cancelMsgYouCancelled")
         : t("order.cancelMsgBuyerCancelled");
     case "payment_timeout":
-      return t("order.cancelMsgPaymentTimeout");
+      return t("order.cancelMsgPaymentTimeout", timingMessageValues(policy));
     case "seller_no_ship":
       // İade durumu cümlesi BİLEREK yok: aşağıdaki ayrı iade bloğu (refunded →
       // "iade edilmiştir", completed → "aktarılacaktır") tek kaynak. Burada da
@@ -242,25 +249,49 @@ export const hasShipped = (o: OrderDetail): boolean => {
   return !!s && s !== "pending" && s !== "cancelled" && s !== "failed";
 };
 
-// Satıcıya escrow ödeme tarihi: teslim + iade penceresi + 1 gün grace.
-// Gün sayıları @tarodan/shared policy-constants'tan gelir (backend tek kaynak).
-export const computePayoutDate = (o: OrderDetail): Date | null => {
-  if (!o.deliveredAt) return null;
-  const d = new Date(o.deliveredAt);
-  if (Number.isNaN(d.getTime())) return null;
-  d.setDate(d.getDate() + ESCROW_RELEASE_DAYS);
-  return d;
+const parseDate = (value: string | null | undefined): Date | null => {
+  if (!value) return null;
+  const d = new Date(value);
+  return Number.isNaN(d.getTime()) ? null : d;
 };
 
-// PENCEREDEN SONRA İADE YOK: teslimden REFUND_COOLING_OFF_DAYS günden fazla
-// geçtiyse iade penceresi kapalıdır (backend de reddeder). Teslim edilmemişse
-// pencere henüz başlamadı.
-export const isPastRefundWindow = (o: OrderDetail): boolean => {
-  if (!o.deliveredAt) return false;
-  const d = new Date(o.deliveredAt);
-  if (Number.isNaN(d.getTime())) return false;
-  const ageDays = (Date.now() - d.getTime()) / (1000 * 3600 * 24);
-  return ageDays > REFUND_COOLING_OFF_DAYS;
+// İade penceresinin sonu — SUNUCU değeri esastır: teslimde siparişe damgalanan
+// `returnWindowEndsAt` (admin pencereyi sonradan değiştirse de bu sipariş için
+// değişmez). Yalnız damgadan önce teslim edilmiş eski siparişte (null) bugünkü
+// politikayla (`GET /timing-rules` → returnWindowDays) hesaplanır. Teslim
+// edilmemişse pencere henüz başlamadı → null.
+export const returnWindowEnd = (
+  o: OrderDetail,
+  policy: PublicTimingPolicy,
+): Date | null =>
+  parseDate(o.returnWindowEndsAt) ??
+  (o.deliveredAt
+    ? addCalendarDays(o.deliveredAt, policy.returnWindowDays.value)
+    : null);
+
+// Satıcıya escrow ödeme tarihi: sunucunun hold'a yazdığı `escrowReleaseAt`;
+// yoksa (eski sipariş / hold yok) pencere sonu + payout grace.
+export const computePayoutDate = (
+  o: OrderDetail,
+  policy: PublicTimingPolicy,
+): Date | null => {
+  const stamped = parseDate(o.escrowReleaseAt);
+  if (stamped) return stamped;
+  const windowEnd = returnWindowEnd(o, policy);
+  return windowEnd
+    ? addCalendarDays(windowEnd, policy.payoutGraceDays.value)
+    : null;
+};
+
+// PENCEREDEN SONRA İADE YOK: pencere sonu geçtiyse iade kapalıdır (backend de
+// aynı damgayla reddeder). Teslim edilmemişse pencere henüz başlamadı.
+export const isPastRefundWindow = (
+  o: OrderDetail,
+  policy: PublicTimingPolicy,
+  now: number = Date.now(),
+): boolean => {
+  const end = returnWindowEnd(o, policy);
+  return end !== null && now > end.getTime();
 };
 
 /**
@@ -268,7 +299,10 @@ export const isPastRefundWindow = (o: OrderDetail): boolean => {
  * kargolanmış/teslim edilmiş, iade penceresi içinde ve aktif iadesi olmayan
  * sipariş. Tek kalem iade butonu ile toplu iade seçimi aynı önkoşulu paylaşır.
  */
-export const isOrderReturnable = (o: OrderDetail): boolean =>
+export const isOrderReturnable = (
+  o: OrderDetail,
+  policy: PublicTimingPolicy,
+): boolean =>
   o.isBuyer &&
   !isMembershipOrder(o) &&
   !!o.payment &&
@@ -277,10 +311,11 @@ export const isOrderReturnable = (o: OrderDetail): boolean =>
   o.status !== "refunded" &&
   !o.activeRefundRequest &&
   hasShipped(o) &&
-  !isPastRefundWindow(o);
+  !isPastRefundWindow(o, policy);
 
 export const inferRefundPhase = (
   o: OrderDetail,
+  policy: PublicTimingPolicy,
 ): "preparing" | "in_cooling_off" | "past_cooling_off" => {
   const shipmentStatus = o.shipment?.status;
   if (
@@ -289,7 +324,7 @@ export const inferRefundPhase = (
   ) {
     return "preparing";
   }
-  if (isPastRefundWindow(o)) return "past_cooling_off";
+  if (isPastRefundWindow(o, policy)) return "past_cooling_off";
   return "in_cooling_off";
 };
 

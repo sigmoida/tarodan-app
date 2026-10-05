@@ -32,6 +32,7 @@ import { SellerChip } from "@/components/ui";
 import { useLocale, useTranslations } from "next-intl";
 import { getProductEffectivePrice } from "@/lib/productPrice";
 import { formatTL } from "@/lib/format";
+import { useTimingValues } from "@/hooks/useTimingPolicy";
 import {
   calculateDiscount,
   formatTimeAgo,
@@ -71,6 +72,7 @@ export default function OfferCard({
 }: OfferCardProps) {
   const locale = useLocale();
   const t = useTranslations();
+  const timingValues = useTimingValues();
 
   const listingPrice = getProductEffectivePrice(offer.product);
   const discount = calculateDiscount(offer.amount, listingPrice);
@@ -301,7 +303,7 @@ export default function OfferCard({
               <ExclamationTriangleIcon className="mt-0.5 h-5 w-5 flex-shrink-0" />
               <p className="text-sm">
                 {isReceived
-                  ? t("offer.firstToPayWinsSeller")
+                  ? t("offer.firstToPayWinsSeller", timingValues)
                   : t("offer.firstToPayWinsBuyer")}
               </p>
             </div>
