@@ -869,11 +869,20 @@ export class ProductQueryService {
    * Get seller's own products (all statuses)
    */
   async findSellerProducts(sellerId: string, query: ProductQueryDto) {
-    const { status, tradeEligible, page = 1, limit = 20 } = query;
+    const {
+      status,
+      inactiveReason,
+      tradeEligible,
+      page = 1,
+      limit = 20,
+    } = query;
 
     const where: Prisma.ProductWhereInput = {
       ...catalogProductWhere(),
       sellerId,
+      // "Süresi dolan" sekmesi: neden yalnız pasif ilanda anlamlıdır (statü
+      // inactive dışına çıkınca temizlenir) — status ile birlikte gönderilir.
+      ...(inactiveReason ? { inactiveReason } : {}),
       ...(status && status.trim() !== ""
         ? { status: status as ProductStatus }
         : {

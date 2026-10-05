@@ -24,6 +24,7 @@ import {
   UpdateEmailTemplateDto,
 } from "../dto";
 import { EventService } from "../../events/event.service";
+import { withEmailTimingData } from "../../../common/timing-rules";
 import { frontendUrlForEnvironment } from "../../../config/app-urls";
 import { i18nMessage } from "../../i18n";
 
@@ -306,7 +307,7 @@ export class AdminContentService {
   ) {
     this.getEmailTemplateMeta(key);
     const brand = this.getEmailBrandOptions();
-    const sample = templateData || {
+    const baseSample = templateData || {
       name: "Örnek Kullanıcı",
       buyerName: "Alıcı",
       sellerName: "Satıcı",
@@ -319,6 +320,9 @@ export class AdminContentService {
       trackingNumber: "1234567890",
       provider: "Sürat Kargo",
     };
+    // Önizlemede süreler (`timing`) gerçek ayarlardan gelir: yönetici,
+    // kullanıcının alacağı metni görür.
+    const sample = await withEmailTimingData(this.prisma, baseSample);
 
     const db = await this.prisma.emailTemplate.findUnique({ where: { key } });
     const defaultSubject = getEmailTemplateSubject(key, sample);

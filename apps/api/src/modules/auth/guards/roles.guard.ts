@@ -84,6 +84,9 @@ export const PERMISSION_MAP: Record<string, string[]> = {
   "gib-report": ["tax"],
   shipping: ["shipping"],
   settings: ["settings", "payment_settings"],
+  // Süreler ve Kurallar ayar ekranının parçası: aynı izinle görünür; yazma
+  // ayrıca @Roles(super_admin) ile korunur.
+  "timing-rules": ["settings"],
   "site-access-pins": ["settings"],
   logs: ["logs"],
   "audit-logs": ["audit_logs"],

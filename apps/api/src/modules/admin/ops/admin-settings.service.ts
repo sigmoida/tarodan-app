@@ -4,6 +4,7 @@ import {
   resetAdminSessionTimeoutCache,
 } from "../../security/helpers/admin-session-timeout";
 import { MembershipTierType, SellerType } from "@prisma/client";
+import { isTimingSettingKey } from "@tarodan/types";
 import { PrismaService } from "../../../prisma";
 import { AdminAuditService } from "./admin-audit.service";
 import { UpdatePlatformSettingDto, UpdateWarehouseAddressDto } from "../dto";
@@ -83,6 +84,14 @@ export class AdminSettingsService {
    * Update platform setting
    */
   async updatePlatformSetting(adminId: string, dto: UpdatePlatformSettingDto) {
+    // Süreler ve Kurallar anahtarları (değer + eylem) bu genel uçtan
+    // yazılamaz: sınır/değişmez/açık-eylem doğrulaması ve zorunlu denetim
+    // kaydı yalnız PATCH /admin/timing-rules yolunda vardır.
+    if (isTimingSettingKey(dto.key)) {
+      throw new BadRequestException(
+        i18nMessage("server.admin.timingRules.useDedicatedEndpoint"),
+      );
+    }
     const existing = await this.prisma.platformSetting.findUnique({
       where: { settingKey: dto.key },
     });

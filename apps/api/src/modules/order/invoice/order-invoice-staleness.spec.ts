@@ -49,6 +49,8 @@ describe("OrderSchedulerService — invoice staleness alarms", () => {
       adminUser: { findMany: jest.fn().mockResolvedValue([]) },
       elogoInvoice: { findMany: jest.fn().mockResolvedValue([]) },
       tradeCashPayment: { findMany: jest.fn().mockResolvedValue([]) },
+      // Alarm eşikleri Süreler ve Kurallar'dan; satır yok → varsayılan.
+      platformSetting: { findUnique: jest.fn().mockResolvedValue(null) },
     };
     const logger = { error: jest.fn(), warn: jest.fn(), log: jest.fn() };
     const notifyAllAdminsOnce = jest

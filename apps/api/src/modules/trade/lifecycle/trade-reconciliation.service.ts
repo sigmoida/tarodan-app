@@ -14,8 +14,8 @@ import {
 import {
   computeTradeHoldReleaseAt,
   startTradeConfirmationWindowIfDelivered,
-  tradeLostParcelGraceDays,
 } from "../../../common/helpers/trade-escrow";
+import { resolveTimingValue } from "../../../common/timing-rules";
 import { safeDecrementReserved } from "../../product/helpers/product-availability.helper";
 import { getProductStatusFromQuantity } from "../../product/helpers/product-status.helper";
 import { PaymentService } from "../../payment/payment.service";
@@ -24,6 +24,12 @@ import { TradeCommonService } from "../trade-common.service";
 import { TRADE_CANCEL_REASON } from "../helpers/trade-cancel-reasons";
 import { tradeCancelledData } from "../helpers/trade-cancellation";
 import { adminUrl } from "../../../config/app-urls";
+import {
+  tradeExtensionStageOf,
+  tradeStageDeadline,
+  tradeStageExtendedAt,
+} from "../helpers/trade-deadline-extension";
+import { TradeDeadlineExtensionService } from "./trade-deadline-extension.service";
 
 /**
  * Zamanlanmış (cron) takas mutabakat işleri — TradeService'ten birebir taşındı.
@@ -43,6 +49,8 @@ export class TradeReconciliationService {
     private readonly eventService: EventService,
     private readonly tradeShipment: TradeShipmentService,
     private readonly tradeCommon: TradeCommonService,
+    // Yanıt / ödeme süresi için extend_once kararı (iptal mantığı bu serviste kalır).
+    private readonly tradeExtension: TradeDeadlineExtensionService,
   ) {}
 
   // ==========================================================================
@@ -188,9 +196,11 @@ export class TradeReconciliationService {
   private async notifyAdminsOfUndeliveredOutboundTrades(
     now: Date,
   ): Promise<number> {
-    const cutoff = new Date(
-      now.getTime() - tradeLostParcelGraceDays() * 24 * 60 * 60 * 1000,
+    const graceDays = await resolveTimingValue(
+      this.prisma,
+      "tradeLostParcelGraceDays",
     );
+    const cutoff = new Date(now.getTime() - graceDays * 24 * 60 * 60 * 1000);
     const candidates = await this.prisma.trade.findMany({
       where: {
         status: TradeStatus.shipping_to_recipients,
@@ -328,6 +338,10 @@ export class TradeReconciliationService {
 
     let cancelledCount = lostResolved;
 
+    // extend_once politikası TUR BAŞINDA okunur: karar süre dolduğu andaki
+    // eyleme göredir ve damgalı son tarihler yeniden yazılmaz.
+    const extensionPlan = await this.tradeExtension.planForRun();
+
     for (const trade of [
       ...expiredPendingTrades,
       ...expiredAcceptedTrades,
@@ -353,7 +367,18 @@ export class TradeReconciliationService {
         // alıcıda. İade tx SONRASINDA tracked yoldan yapılır; hata iptali
         // geri almaz, marker + retryFailedTradeRefunds parayı toparlar
         // (status=cancelled süpürme kapsamındadır).
-        const cancelled = await this.prisma.$transaction(async (tx) => {
+        // extend_once: yalnız bekleyen (yanıt) ve ödeme bekleyen takaslarda,
+        // aşamanın eylemi extend_once ise ve hak kullanılmamışsa uzatma
+        // adayıdır. Uygunluk (taraflar, engel, stok, ödeme satırları) tx DIŞINDA
+        // okunur; hakkın kendisi kilitli tx içinde koşullu-atomik alınır.
+        const stage = tradeExtensionStageOf(trade.status);
+        const extensionHours = stage ? extensionPlan[stage] : undefined;
+        const extensionDecision =
+          stage && extensionHours !== undefined
+            ? await this.tradeExtension.evaluate(trade, stage)
+            : null;
+
+        const outcome = await this.prisma.$transaction(async (tx) => {
           // FOR UPDATE: trade satırını kilitle; başka bir işlem (örn. acceptTrade)
           // bu trade'i aynı anda değiştirmeye çalışırsa bekler.
           await tx.$queryRaw`SELECT id FROM trades WHERE id = ${trade.id} FOR UPDATE`;
@@ -361,17 +386,51 @@ export class TradeReconciliationService {
           // Kilitleme sonrası en güncel durumu oku ve UYGUNLUĞU yeniden doğrula.
           const freshTrade = await tx.trade.findUnique({
             where: { id: trade.id },
-            select: { status: true, firstWarehouseArrivalAt: true },
+            select: {
+              status: true,
+              firstWarehouseArrivalAt: true,
+              responseDeadline: true,
+              paymentDeadline: true,
+              responseExtendedAt: true,
+              paymentExtendedAt: true,
+            },
           });
           // Başka bir akış zaten işleme almışsa bu trade'i atla
           if (!freshTrade || freshTrade.status !== trade.status) {
-            return false;
+            return "skipped" as const;
+          }
+          // Yanıt/ödeme süresi anlık görüntüden SONRA ileri alındıysa (karşı
+          // teklif yeni yanıt süresi damgalar; eşzamanlı tur süreyi uzatmıştır)
+          // takas artık süresi dolmuş değildir: iptal ETME.
+          if (stage) {
+            const currentDeadline = tradeStageDeadline(freshTrade, stage);
+            if (currentDeadline && currentDeadline.getTime() >= now.getTime()) {
+              return "skipped" as const;
+            }
+          }
+          // extend_once: hak kilitli satırda koşullu-atomik alınır. Alınamazsa
+          // (başka tur kazandı) iptal ETMEZ, atlar. Hak bu aşamada zaten
+          // kullanılmışsa mevcut iptal yolu aynen çalışır.
+          if (
+            stage &&
+            extensionHours !== undefined &&
+            extensionDecision &&
+            !tradeStageExtendedAt(freshTrade, stage)
+          ) {
+            const extendedUntil = await this.tradeExtension.claim(
+              tx,
+              trade.id,
+              stage,
+              extensionHours,
+              now,
+            );
+            return extendedUntil ? { extendedUntil } : ("skipped" as const);
           }
           // Kargo kilidi anlık görüntüde DEĞİL, kilitli tx içinde doğrulanır:
           // koli bu arada kargoya verildiyse ya da depoya vardıysa iptal etme —
           // takas stuck kümesine düşer, admin/kayıp-koli akışı ilgilenir.
           if (trade.status === TradeStatus.shipping_to_warehouse) {
-            if (freshTrade.firstWarehouseArrivalAt) return false;
+            if (freshTrade.firstWarehouseArrivalAt) return "skipped" as const;
             const shippedLeg = await tx.tradeShipment.findFirst({
               where: {
                 tradeId: trade.id,
@@ -380,7 +439,7 @@ export class TradeReconciliationService {
               },
               select: { id: true },
             });
-            if (shippedLeg) return false;
+            if (shippedLeg) return "skipped" as const;
           }
 
           const allItems = await tx.tradeItem.findMany({
@@ -445,9 +504,25 @@ export class TradeReconciliationService {
               data: { fullRefundEntitled: true },
             });
           }
-          return true;
+          return "cancelled" as const;
         });
-        if (!cancelled) continue;
+        if (outcome === "skipped") continue;
+        if (typeof outcome === "object") {
+          // Commit sonrası: sırası gelen tarafa yeni son tarih. İptal/iade
+          // adımları bu takas için ÇALIŞMAZ.
+          if (stage && extensionDecision) {
+            await this.tradeExtension.notifyExtended(
+              trade.id,
+              stage,
+              extensionDecision,
+              outcome.extendedUntil,
+            );
+          }
+          this.logger.log(
+            `Trade ${trade.id} ${stage} süresi extend_once ile uzatıldı`,
+          );
+          continue;
+        }
 
         // İade YALNIZ iptal commit olduktan sonra (yukarıdaki sıra notu).
         await this.paymentService.refundTradeCashTracked(trade.id);
@@ -493,7 +568,10 @@ export class TradeReconciliationService {
    * süresiz askı üretmesini engeller.
    */
   private async autoResolveLostParcelTrades(now: Date): Promise<number> {
-    const graceDays = tradeLostParcelGraceDays();
+    const graceDays = await resolveTimingValue(
+      this.prisma,
+      "tradeLostParcelGraceDays",
+    );
     const cutoff = new Date(now.getTime() - graceDays * 24 * 60 * 60 * 1000);
     const candidates = await this.prisma.trade.findMany({
       where: {

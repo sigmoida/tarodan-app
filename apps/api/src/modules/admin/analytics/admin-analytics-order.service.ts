@@ -334,6 +334,11 @@ export class AdminAnalyticsOrderService {
       completedAt: o.completedAt ?? null,
       confirmationDeadline: o.confirmationDeadline ?? null,
       buyerConfirmedAt: o.buyerConfirmedAt ?? null,
+      // Geçerli kargoya verme son tarihi (uzatıldıysa uzatılmış olan) +
+      // tek seferlik uzatmanın kaydı: ne zaman verildi, önceki son tarih neydi.
+      preparingDeadline: o.preparingDeadline ?? null,
+      preparingExtendedAt: o.preparingExtendedAt ?? null,
+      originalPreparingDeadline: o.originalPreparingDeadline ?? null,
       product: {
         id: o.product?.id ?? o.productId,
         title: o.product?.title ?? null,

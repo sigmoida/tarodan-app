@@ -13,6 +13,7 @@ export * from "./admin-action.dto";
 export * from "./admin-staff.dto";
 export * from "./notifications-admin.dto";
 export * from "./admin-membership.dto";
+export * from "./expired-listings-maintenance.dto";
 export {
   AnalyticsQueryDto,
   SalesAnalyticsResponseDto,

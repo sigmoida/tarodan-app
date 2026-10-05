@@ -1,5 +1,5 @@
 import { ForbiddenException } from "@nestjs/common";
-import { ProductStatus } from "@prisma/client";
+import { ProductInactiveReason, ProductStatus } from "@prisma/client";
 import { ProductUpdateService } from "./product-update.service";
 
 /**
@@ -19,9 +19,11 @@ describe("ProductUpdateService — reaktivasyonda ilan limiti", () => {
   const makeService = ({
     status,
     canCreate,
+    inactiveReason = null,
   }: {
     status: ProductStatus;
     canCreate: boolean;
+    inactiveReason?: ProductInactiveReason | null;
   }) => {
     const product = {
       id: productId,
@@ -34,6 +36,7 @@ describe("ProductUpdateService — reaktivasyonda ilan limiti", () => {
       carModelId: null,
       manufacturerId: "manufacturer-1",
       status,
+      inactiveReason,
       quantity: 2,
       reservedQuantity: 0,
       title: "Test ürün",
@@ -166,5 +169,37 @@ describe("ProductUpdateService — reaktivasyonda ilan limiti", () => {
 
     expect(membershipService.canCreateListing).not.toHaveBeenCalled();
     expect(tx.product.update).toHaveBeenCalled();
+  });
+
+  it("karantinadan doğrudan aktife dönen ilan taze bir ömür alır (publishedAt tazelenir)", async () => {
+    const { service, prisma } = makeService({
+      status: ProductStatus.inactive,
+      canCreate: true,
+      inactiveReason: ProductInactiveReason.return_quarantine,
+    });
+
+    await service.update(productId, sellerId, {
+      status: ProductStatus.active,
+    } as any);
+
+    const data = prisma.product.update.mock.calls[0][0].data;
+    expect(data.status).toBe(ProductStatus.active);
+    // Aksi hâlde ömründen eski ilan ertesi gece yine pasife alınırdı.
+    expect(data.publishedAt).toBeInstanceOf(Date);
+  });
+
+  it("pending'e giden reaktivasyon publishedAt'e dokunmaz (onay tazeler)", async () => {
+    const { service, prisma } = makeService({
+      status: ProductStatus.inactive,
+      canCreate: true,
+    });
+
+    await service.update(productId, sellerId, {
+      status: ProductStatus.active,
+    } as any);
+
+    expect(prisma.product.update.mock.calls[0][0].data).not.toHaveProperty(
+      "publishedAt",
+    );
   });
 });

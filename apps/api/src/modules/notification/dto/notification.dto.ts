@@ -24,6 +24,11 @@ export enum NotificationType {
   ORDER_CANCELLED_OUT_OF_STOCK = "order_cancelled_out_of_stock",
   ORDER_REFUNDED = "order_refunded",
   ORDER_PREPARING_DEADLINE_WARNING = "order_preparing_deadline_warning",
+  // Hazırlık süresi bir kez uzatıldı (Süreler ve Kurallar → extend_once):
+  // alıcıya "gecikiyor, yeni son tarih, iptal hakkın sürüyor", satıcıya
+  // "yeni son tarih, son şans". Metinler farklı olduğu için iki tip.
+  ORDER_PREPARING_EXTENDED = "order_preparing_extended",
+  ORDER_PREPARING_EXTENDED_SELLER = "order_preparing_extended_seller",
   ORDER_RESERVATION_RELEASED = "order_reservation_released",
   // 48h pencere (Faz 3B.1)
   ORDER_DELIVERED_CONFIRM = "order_delivered_confirm",
@@ -40,6 +45,8 @@ export enum NotificationType {
   OFFER_COUNTER_ACCEPTED = "offer_counter_accepted",
   OFFER_EXPIRED = "offer_expired",
   OFFER_EXPIRED_SELLER = "offer_expired_seller",
+  /** Teklif süresi bir kez uzatıldı (extend_once) — sırası gelen tarafa gider. */
+  OFFER_EXTENDED = "offer_extended",
   OFFER_PAYMENT_EXPIRED = "offer_payment_expired",
   OFFER_CANCELLED_OUT_OF_STOCK = "offer_cancelled_out_of_stock",
   /** İlan satıcı tarafından silindiği için teklif kapandı (stok bitişi DEĞİL). */
@@ -63,6 +70,11 @@ export enum NotificationType {
   TRADE_SHIPPED = "trade_shipped",
   TRADE_COMPLETED = "trade_completed",
   TRADE_AUTO_CANCELLED = "trade_auto_cancelled",
+  // Takas yanıt / ödeme süresi bir kez uzatıldı (extend_once) — işlem sırası gelen tarafa.
+  TRADE_RESPONSE_EXTENDED = "trade_response_extended",
+  TRADE_PAYMENT_EXTENDED = "trade_payment_extended",
+  // Ödemesini yapmış tarafa: karşı tarafa ödeme için ek süre verildi.
+  TRADE_PAYMENT_EXTENDED_PAID = "trade_payment_extended_paid",
   // Admin uyarısı: takas depoya ulaştı ama süresi doldu — elle force-cancel-stuck gerekiyor.
   TRADE_STUCK_AT_WAREHOUSE = "trade_stuck_at_warehouse",
   // Admin uyarısı: sipariş uzun süredir kargoda ve taşıyıcıdan teslim raporu yok.

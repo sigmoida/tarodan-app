@@ -121,6 +121,7 @@ function lineOf(order: ListOfferOrder, ctx: RowMapContext): AdminOrderLine {
     subtotal: money(subtotal).toNumber(),
     totalAmount: money(order.totalAmount).toNumber(),
     preparingDeadline: order.preparingDeadline?.toISOString() ?? null,
+    preparingExtendedAt: order.preparingExtendedAt?.toISOString() ?? null,
     deliveredAt: order.deliveredAt?.toISOString() ?? null,
     hasActiveRefund: order.refundRequests.length > 0,
     product: productOf(order.product, ctx),

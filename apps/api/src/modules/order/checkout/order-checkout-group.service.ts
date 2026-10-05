@@ -175,6 +175,9 @@ export class OrderCheckoutGroupService {
 
     let result;
     try {
+      // Ödeme penceresi işlem AÇILMADAN okunur: işlem bir bağlantı tutarken
+      // ikinci bir bağlantı beklemesin (eşzamanlı checkout'ta havuz tükenmesi).
+      const paymentExpiresAt = await paymentWindowEnd(this.prisma);
       result = await this.prisma.$transaction(
         async (tx) => {
           const lockedRows = await tx.$queryRaw<{ id: string }[]>`
@@ -582,7 +585,6 @@ export class OrderCheckoutGroupService {
               })) > 0,
           );
 
-          const paymentExpiresAt = paymentWindowEnd();
           const orderInputs: Array<{
             pricingEntry: (typeof pricing)[number];
             orderNumber: string;

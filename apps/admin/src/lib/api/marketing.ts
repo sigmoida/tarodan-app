@@ -1,27 +1,8 @@
-import type { MailingType } from "@tarodan/types";
 import { api } from "./client";
-
-/** E-posta kanalına özel alanlar; yalnız "email" kanalı seçiliyse gönderilir. */
-export interface BroadcastEmailPreviewPayload {
-  title: string;
-  body: string;
-  emailSubject?: string;
-  emailHtml?: string;
-  mailingType?: MailingType;
-}
-
-export interface NotificationBroadcastPayload {
-  title: string;
-  body: string;
-  channels: string[];
-  targetType: "all" | "segment" | "user_ids";
-  userIds?: string[];
-  segmentCriteria?: Record<string, any>;
-  data?: Record<string, any>;
-  emailSubject?: string;
-  emailHtml?: string;
-  mailingType?: MailingType;
-}
+import type {
+  BroadcastEmailPreviewPayload,
+  NotificationBroadcastPayload,
+} from "./marketing.types";
 
 /** Marketing domain: static pages, email templates, ads, and notifications. */
 export const marketingApi = {

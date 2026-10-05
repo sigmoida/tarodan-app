@@ -117,6 +117,7 @@ export const NOTIFICATION_LINKS: Record<
     "/profile/orders/{{orderId}}",
     "/seller/orders/{{orderId}}",
   ),
+  [NotificationType.ORDER_PREPARING_EXTENDED]: BUYER_ORDER,
   [NotificationType.ORDER_RESERVATION_RELEASED]: BUYER_ORDER,
   [NotificationType.ORDER_DELIVERED_CONFIRM]: BUYER_ORDER,
   [NotificationType.ORDER_AUTO_COMPLETED]: byAudience(
@@ -132,6 +133,7 @@ export const NOTIFICATION_LINKS: Record<
 
   // ── Sipariş (satıcı) ─────────────────────────────────────────────────────
   [NotificationType.ORDER_CANCELLED_SELLER]: SELLER_ORDER,
+  [NotificationType.ORDER_PREPARING_EXTENDED_SELLER]: SELLER_ORDER,
   [NotificationType.PRODUCT_SOLD]: SELLER_ORDER,
   [NotificationType.CARGO_MOVEMENT_MISSING]: SELLER_ORDER,
   // Alıcıya VE satıcıya gider (order-scheduler ikisine de atar): hedef ekran
@@ -174,6 +176,12 @@ export const NOTIFICATION_LINKS: Record<
   [NotificationType.OFFER_COUNTER_DECLINED]: LISTING,
   [NotificationType.OFFER_EXPIRED]: LISTING,
   [NotificationType.OFFER_EXPIRED_SELLER]: LISTING,
+  // Sırası gelen tarafa gider: alıcıda karşı teklif (gönderilenler), satıcıda
+  // gelen teklif — hedef kitle `audience`tan seçilir.
+  [NotificationType.OFFER_EXTENDED]: byAudience(
+    "/profile/offers?tab=sent",
+    "/profile/offers?tab=received",
+  ),
   [NotificationType.OFFER_CANCELLED_OUT_OF_STOCK]: UNAVAILABLE,
   [NotificationType.OFFER_CANCELLED_LISTING_REMOVED]: UNAVAILABLE,
   [NotificationType.OFFER_CANCELLED_BY_ADMIN]: LISTING,
@@ -207,6 +215,9 @@ export const NOTIFICATION_LINKS: Record<
   [NotificationType.TRADE_COMPLETED]: TRADE,
   [NotificationType.TRADE_REJECTED]: pattern("/profile/trades"),
   [NotificationType.TRADE_AUTO_CANCELLED]: pattern("/profile/trades"),
+  [NotificationType.TRADE_RESPONSE_EXTENDED]: TRADE,
+  [NotificationType.TRADE_PAYMENT_EXTENDED]: TRADE,
+  [NotificationType.TRADE_PAYMENT_EXTENDED_PAID]: TRADE,
   [NotificationType.TRADE_AT_WAREHOUSE]: TRADE,
   // Admin alarmları: yalnız admin'lere gider — kullanıcı sitesindeki takas
   // listesi değil, admin panelindeki takas dosyası açılmalı (serbest link).

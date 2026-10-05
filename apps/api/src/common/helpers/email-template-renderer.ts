@@ -2,6 +2,7 @@
  * Shared email template rendering utilities.
  * Used by EmailWorker (queue processor) and AdminService (preview).
  */
+import { TIMING_RULES, type TimingRuleId } from "@tarodan/types";
 
 export interface EmailBrandOptions {
   frontendUrl?: string;
@@ -87,6 +88,26 @@ function safeEmailUrl(url: string, fallback: string): string {
     // Fall through to the configured safe URL.
   }
   return escapeEmailHtml(fallback);
+}
+
+/**
+ * Şablon metinlerindeki iş süresi ("14 gün", "24 saat"…). Değer şablon verisinin
+ * `timing` alanından gelir — gönderim anında Süreler ve Kurallar'dan okunup
+ * eklenir (`withEmailTimingData`, common/timing-rules). Alan yoksa (önizleme,
+ * doğrudan çağrı) kayıt varsayılanı kullanılır. Bu render katmanı senkron ve
+ * DB'siz kalır; süreyi kendisi OKUMAZ.
+ *
+ * Süre olmayan teknik ömürler (şifre sıfırlama bağlantısı, doğrulama kodu)
+ * buradan geçmez — iş kuralı değil, token ömrüdür.
+ */
+export function emailTimingValue(
+  data: Record<string, any> | undefined,
+  id: TimingRuleId,
+): number {
+  const value = Number(data?.timing?.[id]);
+  return Number.isFinite(value) && value >= 1
+    ? Math.floor(value)
+    : TIMING_RULES[id].default;
 }
 
 export function substituteEmailVariables(
@@ -349,6 +370,7 @@ export function getEmailTemplateSubject(
     "marketing-newsletter": "Tarodan Haftalık Bülteni",
     "marketing-monthly": "Tarodan Aylık Özel Fırsatlar",
     "seller-did-not-ship-refunded": "Satıcı Kargoya Vermedi — İadeniz Yapıldı",
+    "order-preparing-extended-buyer": `Siparişinizin Kargoya Verilmesi Gecikiyor - ${data?.orderNumber || ""}`,
     "trade-received": "Yeni Takas Teklifi Aldınız",
     "trade-accepted": "Takas Teklifiniz Kabul Edildi",
     "trade-shipped": "Takasınız Kargoya Verildi",
@@ -587,7 +609,7 @@ export function renderEmailTemplate(
       `
       ${titleBlock("Yeni Sipariş!", "🎉")}
       ${greeting(data?.sellerName)}
-      <p style="font-size: 15px; color: #4b5563; line-height: 1.6; margin: 0 0 20px 0;">Tebrikler! Ürününüz satıldı ve ödemesi alındı. Lütfen ürünü <strong style="color: #dc2626;">en geç 3 iş günü</strong> içinde kargoya veriniz.</p>
+      <p style="font-size: 15px; color: #4b5563; line-height: 1.6; margin: 0 0 20px 0;">Tebrikler! Ürününüz satıldı ve ödemesi alındı. Lütfen ürünü <strong style="color: #dc2626;">en geç ${emailTimingValue(data, "preparingDeadlineDays")} iş günü</strong> içinde kargoya veriniz.</p>
       ${successBox(`<p style="margin: 0; font-size: 16px; color: #166534; font-weight: 600;">Ödeme hesabınıza yansıyacak</p>`)}
       ${detailsBox(`
         <table width="100%" cellspacing="0" cellpadding="0">
@@ -601,7 +623,7 @@ export function renderEmailTemplate(
       <div style="text-align: center; margin: 32px 0;">
         ${primaryButton("Kargo Bilgisi Gir", `${frontendUrl}/seller/orders/${data?.orderId || ""}`)}
       </div>
-      ${infoBox(`<p style="margin: 0; font-size: 14px; color: #92400e;">Not: Ödemeniz, alıcı ürünü teslim aldıktan 14 gün sonra hesabınıza aktarılacaktır.</p>`)}
+      ${infoBox(`<p style="margin: 0; font-size: 14px; color: #92400e;">Not: Ödemeniz, alıcı ürünü teslim aldıktan ${emailTimingValue(data, "returnWindowDays")} gün sonra hesabınıza aktarılacaktır.</p>`)}
     `,
       "Yeni Sipariş!",
     ),
@@ -635,11 +657,11 @@ export function renderEmailTemplate(
           ${detailRow("Sipariş No", "#" + (data?.orderNumber || ""))}
         </table>
       `)}
-      <p style="font-size: 14px; color: #4b5563; margin: 20px 0;">Siparişiniz teslim edildi. Teslim tarihinden itibaren <strong>14 gün içinde koşulsuz iade</strong> hakkınız bulunmaktadır.</p>
+      <p style="font-size: 14px; color: #4b5563; margin: 20px 0;">Siparişiniz teslim edildi. Teslim tarihinden itibaren <strong>${emailTimingValue(data, "returnWindowDays")} gün içinde koşulsuz iade</strong> hakkınız bulunmaktadır.</p>
       <div style="text-align: center; margin: 32px 0;">
         ${primaryButton("Siparişi Görüntüle", `${frontendUrl}/profile/orders/${data?.orderId || ""}`)}
       </div>
-      ${infoBox(`<p style="margin: 0; font-size: 14px; color: #92400e;">Not: 14 günlük iade süresi dolduğunda siparişiniz otomatik olarak tamamlanır.</p>`)}
+      ${infoBox(`<p style="margin: 0; font-size: 14px; color: #92400e;">Not: ${emailTimingValue(data, "returnWindowDays")} günlük iade süresi dolduğunda siparişiniz otomatik olarak tamamlanır.</p>`)}
     `,
       "Siparişiniz Teslim Edildi",
     ),
@@ -670,7 +692,7 @@ export function renderEmailTemplate(
           ${detailRow("Teklif Veren", data?.buyerName || "")}
         </table>
       `)}
-      ${warningBox(`<p style="margin: 0; font-size: 14px; color: #92400e;">Bu teklifin süresi ${data?.expiresAt ? new Date(data.expiresAt).toLocaleString("tr-TR") : "24 saat içinde"} dolacak.</p>`)}
+      ${warningBox(`<p style="margin: 0; font-size: 14px; color: #92400e;">Bu teklifin süresi ${data?.expiresAt ? new Date(data.expiresAt).toLocaleString("tr-TR") : `${emailTimingValue(data, "offerExpiryHours")} saat içinde`} dolacak.</p>`)}
       <div style="text-align: center; margin: 32px 0;">
         ${primaryButton("Teklifi İncele", `${frontendUrl}/profile/offers`)}
       </div>
@@ -1051,10 +1073,35 @@ export function renderEmailTemplate(
       `)}
       <p style="font-size: 14px; color: #6b7280; margin: 16px 0;">İade tutarı ödeme yönteminize bağlı olarak 3–5 iş günü içinde yansıyacaktır.</p>
       <div style="text-align: center; margin: 32px 0;">
-        ${primaryButton("Siparişi Görüntüle", `${frontendUrl}/profile/orders/${data?.orderId || ""}`)}
+        ${primaryButton("Siparişi Görüntüle", orderPaidTrackUrl)}
       </div>
     `,
       "Satıcı Kargoya Vermedi — İadeniz Yapıldı",
+    ),
+
+    // Hazırlık süresi bir kez uzatıldı (alıcıya). Misafir siparişinde de
+    // gider: link misafirde sipariş takip sayfasıdır (orderPaidTrackUrl).
+    "order-preparing-extended-buyer": wrapEmail(
+      `
+      ${titleBlock("Siparişinizin Kargoya Verilmesi Gecikiyor")}
+      ${greeting(data?.name || data?.buyerName)}
+      <p style="font-size: 15px; color: #4b5563; line-height: 1.6; margin: 0 0 20px 0;">
+        Satıcı siparişinizi süresinde kargoya veremedi ve satıcıya bir kez ek süre tanındı.
+      </p>
+      ${detailsBox(`
+        <table width="100%" cellspacing="0" cellpadding="0">
+          ${detailRow("Sipariş No", "#" + (data?.orderNumber || data?.orderId || ""))}
+          ${data?.productTitle ? detailRow("Ürün", data.productTitle) : ""}
+          ${detailRow("En geç kargoya verilme", data?.deadline || "", true)}
+        </table>
+      `)}
+      ${warningBox(`<p style="margin: 0; font-size: 14px; color: #92400e;">Sipariş bu tarihe kadar kargoya verilmezse otomatik iptal edilir ve ödemenizin tamamı iade edilir.</p>`)}
+      ${infoBox(`<p style="margin: 0; font-size: 14px; color: #92400e;">Kargoya verilene kadar siparişinizi dilediğiniz zaman iptal edebilirsiniz.</p>`)}
+      <div style="text-align: center; margin: 32px 0;">
+        ${primaryButton("Siparişi Görüntüle", orderPaidTrackUrl)}
+      </div>
+    `,
+      "Siparişinizin Kargoya Verilmesi Gecikiyor",
     ),
 
     "trade-received": wrapEmail(
@@ -1485,7 +1532,7 @@ export function renderEmailTemplate(
       `
       ${titleBlock("İlanınızın Süresi Doluyor", "⏰")}
       ${greeting(data?.sellerName || data?.userName)}
-      <p style="font-size: 15px; color: #4b5563; line-height: 1.6; margin: 0 0 20px 0;"><strong style="color: #111827;">${data?.productTitle || "İlanınızın"}</strong> ilanının süresi ${data?.daysRemaining ? `${data.daysRemaining} gün içinde ` : "yakında "}dolacak. Yenileyerek görünürlüğünü koruyabilirsiniz.</p>
+      <p style="font-size: 15px; color: #4b5563; line-height: 1.6; margin: 0 0 20px 0;"><strong style="color: #111827;">${data?.productTitle || "İlanınızın"}</strong> ilanının süresi ${data?.daysRemaining ? `${data.daysRemaining} gün içinde ` : "yakında "}dolacak. Süre dolunca ilanlarım sayfasından tek tıkla yenileyip görünürlüğünü koruyabilirsiniz.</p>
       ${detailsBox(`
         <table width="100%" cellspacing="0" cellpadding="0">
           ${detailRow("İlan", data?.productTitle || "")}
@@ -1493,7 +1540,7 @@ export function renderEmailTemplate(
         </table>
       `)}
       <div style="text-align: center; margin: 32px 0;">
-        ${primaryButton("İlanı Yenile", data?.listingUrl || `${frontendUrl}/profile/listings`)}
+        ${primaryButton("İlanlarıma Git", data?.listingUrl || `${frontendUrl}/profile/listings`)}
       </div>
     `,
       "İlanınızın Süresi Doluyor",
@@ -1504,7 +1551,7 @@ export function renderEmailTemplate(
       ${titleBlock("İlanınızın Süresi Doldu", "📭")}
       ${greeting(data?.sellerName || data?.userName)}
       <p style="font-size: 15px; color: #4b5563; line-height: 1.6; margin: 0 0 20px 0;"><strong style="color: #111827;">${data?.productTitle || "İlanınızın"}</strong> ilanının süresi doldu ve yayından kaldırıldı. Tekrar yayınlayarak alıcılarla buluşmaya devam edebilirsiniz.</p>
-      ${infoBox(`<p style="margin: 0; font-size: 14px; color: #92400e;">İlanınızı birkaç tıklamayla yeniden yayınlayabilirsiniz.</p>`)}
+      ${infoBox(`<p style="margin: 0; font-size: 14px; color: #92400e;">İlanlarım sayfasındaki "Süresi dolan" sekmesinden ilanınızı tek tıkla, isterseniz birkaç ilanı birlikte yenileyebilirsiniz.</p>`)}
       <div style="text-align: center; margin: 32px 0;">
         ${primaryButton("İlanı Yeniden Yayınla", data?.listingUrl || `${frontendUrl}/profile/listings`)}
       </div>

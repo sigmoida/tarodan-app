@@ -137,6 +137,7 @@ describe("OrderService findOne (response shape for mobile order detail)", () => 
     order: { findUnique: jest.fn().mockResolvedValue(mockOrder) },
     productRating: { findFirst: jest.fn().mockResolvedValue(null) },
     rating: { findFirst: jest.fn().mockResolvedValue(null) },
+    paymentHold: { findMany: jest.fn().mockResolvedValue([]) },
   };
 
   beforeEach(async () => {
@@ -144,6 +145,7 @@ describe("OrderService findOne (response shape for mobile order detail)", () => 
     mockPrisma.order.findUnique.mockResolvedValue(mockOrder);
     mockPrisma.productRating.findFirst.mockResolvedValue(null);
     mockPrisma.rating.findFirst.mockResolvedValue(null);
+    mockPrisma.paymentHold.findMany.mockResolvedValue([]);
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [

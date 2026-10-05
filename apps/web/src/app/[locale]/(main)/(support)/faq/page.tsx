@@ -3,6 +3,8 @@
 import type { Metadata } from "next";
 import { getTranslations } from "next-intl/server";
 import { localizedCanonical } from "@/lib/seo";
+import { getTimingPolicy } from "@/lib/server/timing-policy";
+import { withTimingValues } from "@/lib/timing-policy";
 import { DocPage } from "@/components/layout/DocPage";
 import SectionCard from "@/components/ui/SectionCard";
 import { faqSections } from "./_lib/data";
@@ -25,7 +27,8 @@ export async function generateMetadata({
 }
 
 export default async function FAQPage() {
-  const t = await getTranslations();
+  // İade/hazırlama süreleri Süreler ve Kurallar'dan gelir (sunucu HTML'inde).
+  const t = withTimingValues(await getTranslations(), await getTimingPolicy());
   return (
     <DocPage title={t("faq.title")}>
       {faqSections(t).map((section) => (

@@ -18,20 +18,13 @@ import {
   LEGACY_PACKAGE_FEE_INVOICE_TYPES,
   PACKAGE_FEE_INVOICE_TYPES,
 } from "../../elogo/invoice/package-fee-components";
-import {
-  PAYMENT_CONFIG_KEYS,
-  resolvePaymentConfigNumber,
-} from "../../payment/helpers/payment.constants";
+import { resolveTimingValue } from "../../../common/timing-rules";
 import { SellerInvoiceService } from "../invoice/seller-invoice.service";
 import { NotificationService } from "../../notification/notification.service";
 import { NotificationType } from "../../notification/dto";
 import { CacheService } from "../../cache/cache.service";
 import { adminUrl } from "../../../config/app-urls";
 import type { CronRunSummary } from "../../../monitoring/cron-run.helper";
-import {
-  invoiceDeadlineDays,
-  shippedStaleAlertDays,
-} from "../../../config/alert-thresholds";
 
 const OPEN_REFUND_STATUSES = [
   "pending_review",
@@ -275,10 +268,18 @@ export class OrderSchedulerService implements OnModuleInit {
     uninvoicedDelivered: number;
     missingSellerInvoices: number;
   }> {
-    // Eşikler TEK kaynakta (config/alert-thresholds): dashboard uyarısı ile bu
-    // cron aynı sayıyı okur.
-    const stuckDays = shippedStaleAlertDays(this.configService);
-    const invoiceDeadline = invoiceDeadlineDays(this.configService);
+    // Eşikler TEK kaynakta (Süreler ve Kurallar → operasyon alarmları):
+    // dashboard uyarısı ile bu cron aynı sayıyı okur.
+    const stuckDays = await resolveTimingValue(
+      this.prisma,
+      "shippedStaleAlertDays",
+      this.configService,
+    );
+    const invoiceDeadline = await resolveTimingValue(
+      this.prisma,
+      "invoiceDeadlineDays",
+      this.configService,
+    );
 
     // Eşik KARGO YAŞINA bakar (shipment.shippedAt), sipariş satırının
     // updatedAt'ine değil: alakasız bir güncelleme (bildirim, adres, fatura
@@ -354,10 +355,11 @@ export class OrderSchedulerService implements OnModuleInit {
     // SATICI ürün faturası: Tarodan'ın kendi e-Arşivlerinin satıcı tarafındaki
     // karşılığı. Fatura kesmek satıcının yükümlülüğü ama takibi platformun
     // sorumluluğu; hatırlatılmazsa yüklenmeyen faturalar sessizce kayboluyor.
-    const sellerInvoiceDeadlineDays =
-      Number(
-        this.configService.get<string>("SELLER_INVOICE_DEADLINE_DAYS") ?? "7",
-      ) || 7;
+    const sellerInvoiceDeadlineDays = await resolveTimingValue(
+      this.prisma,
+      "sellerInvoiceDeadlineDays",
+      this.configService,
+    );
     const sellerInvoices = await this.sellerInvoice
       .remindMissing({ deadlineDays: sellerInvoiceDeadlineDays })
       .catch((e: any) => {
@@ -557,18 +559,26 @@ export class OrderSchedulerService implements OnModuleInit {
       }
     }
 
-    // 2) İade penceresi kapanan teslim edilmiş siparişler → tamamlandı
-    const returnWindowDays = resolvePaymentConfigNumber(
+    // 2) İade penceresi kapanan teslim edilmiş siparişler → tamamlandı.
+    // Pencere sonu teslimde siparişe damgalanır (`returnWindowEndsAt`; iade
+    // uygunluğu ve escrow aynı damgayı okur). Damgasız eski siparişlerde
+    // bugünkü değerle deliveredAt'ten hesaplanır (order-return-window).
+    const returnWindowDays = await resolveTimingValue(
+      this.prisma,
+      "returnWindowDays",
       this.configService,
-      PAYMENT_CONFIG_KEYS.RETURN_WINDOW_DAYS,
     );
-    const cutoff = new Date(
-      Date.now() - returnWindowDays * 24 * 60 * 60 * 1000,
+    const now = new Date();
+    const legacyCutoff = new Date(
+      now.getTime() - returnWindowDays * 24 * 60 * 60 * 1000,
     );
     const dueToComplete = await this.prisma.order.findMany({
       where: {
         status: OrderStatus.delivered,
-        deliveredAt: { lte: cutoff },
+        OR: [
+          { returnWindowEndsAt: { lte: now } },
+          { returnWindowEndsAt: null, deliveredAt: { lte: legacyCutoff } },
+        ],
         refundRequests: {
           none: { status: { in: OPEN_REFUND_STATUSES as any } },
         },

@@ -51,6 +51,12 @@ import {
 } from "@tarodan/i18n";
 import { I18nService } from "../i18n/i18n.service";
 import {
+  defaultTimingValues,
+  loadTimingValues,
+  withEmailTimingData,
+  type TimingValues,
+} from "../../common/timing-rules";
+import {
   frontendUrl as resolveFrontendUrl,
   frontendUrlForEnvironment,
 } from "../../config/app-urls";
@@ -127,13 +133,35 @@ export class NotificationDispatchService {
     };
   }
 
+  /**
+   * Metinlerde geçen süreler ("14 gün", "24 saat"…) — Süreler ve Kurallar'dan,
+   * GÖNDERİM ANINDA okunur (yazım anında değil: admin değeri değiştirdiyse
+   * kullanıcı güncel süreyi görür). Parametre adı = kayıt kimliği
+   * (`{returnWindowDays}`). Okunamazsa kayıt varsayılanlarına düşer: süre
+   * okunamadı diye bildirim kaybolmaz.
+   */
+  private async loadTimingCopyValues(): Promise<TimingValues> {
+    try {
+      return await loadTimingValues(this.prisma);
+    } catch (err: unknown) {
+      this.logger.warn(
+        `[renderTemplate] süreler okunamadı, varsayılanlar kullanılacak: ${(err as Error)?.message}`,
+      );
+      return defaultTimingValues();
+    }
+  }
+
   /** Şablonu alıcının dilinde render et (ICU; eksik değerlerde anahtara düşer). */
-  private renderTemplate(
+  private async renderTemplate(
     template: { titleKey: string; messageKey: string },
     locale: Locale,
     data?: Record<string, any>,
-  ): { title: string; message: string } {
-    const values = data as MessageValues | undefined;
+  ): Promise<{ title: string; message: string }> {
+    // Çağıranın verdiği değer süre parametresini ezer (veri önceliklidir).
+    const values = {
+      ...(await this.loadTimingCopyValues()),
+      ...data,
+    } as MessageValues;
     return {
       title: this.i18n.translate(template.titleKey, locale, values),
       message: this.i18n.translate(template.messageKey, locale, values),
@@ -170,7 +198,11 @@ export class NotificationDispatchService {
     const { settings, locale } = await this.loadRecipientPrefs(dto.userId);
 
     // Render the catalog template in the recipient's locale (#224).
-    const { title, message } = this.renderTemplate(template, locale, dto.data);
+    const { title, message } = await this.renderTemplate(
+      template,
+      locale,
+      dto.data,
+    );
 
     // Determine channels (default to email + in_app)
     const channels = dto.channels || [
@@ -507,7 +539,11 @@ export class NotificationDispatchService {
     }
 
     // Şablonu alıcının dilinde render et (#224).
-    const { title, message } = this.renderTemplate(template, locale, data);
+    const { title, message } = await this.renderTemplate(
+      template,
+      locale,
+      data,
+    );
 
     this.logger.log(
       `[createInAppNotification] Saving notification: title="${title}", message="${message}"`,
@@ -786,7 +822,8 @@ export class NotificationDispatchService {
       });
       const rendered = renderManagedEmailTemplate(
         templateKey,
-        { ...templateData, to: email },
+        // İş süreleri gönderim anında Süreler ve Kurallar'dan okunur.
+        await withEmailTimingData(this.prisma, { ...templateData, to: email }),
         dbTemplate,
         frontendUrl,
       );

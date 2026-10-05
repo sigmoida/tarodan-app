@@ -11,6 +11,7 @@ import { notifyWebRevalidate } from "../../../common/helpers/revalidate";
 import { AdminAuditService } from "../ops/admin-audit.service";
 import { fulltextProductSearch } from "../../product/helpers/fulltext-search";
 import { getProductStatusFromQuantity } from "../../product/helpers/product-status.helper";
+import { stampApprovedContentFingerprint } from "../../product/helpers/product-content-fingerprint";
 import { billableDesiForTier } from "../../shipping/helpers/shipping-package-tier";
 import {
   AdminProductQueryDto,
@@ -508,6 +509,9 @@ export class AdminProductService {
         rejectionReason: null,
       },
     });
+    // Onaylanan içeriğin izi: süresi dolunca satıcı yenilemesi içerik değişmediyse
+    // moderasyona girmeden yayına döner (bkz. ProductRenewalService).
+    await stampApprovedContentFingerprint(this.prisma, productId);
 
     await this.audit.createAuditLog(
       adminId,

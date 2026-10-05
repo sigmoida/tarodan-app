@@ -274,6 +274,24 @@ yoktur: onayı olmayan ya da belge sürümü değişen üye bir sonraki girişte
 yeniden-onay penceresini görür. Belge metni değiştiğinde
 `packages/types/src/legal-consent.ts` içindeki sürüm güncellenmelidir.
 
+### Bir kerelik: Süreler ve Kurallar geçişi
+
+İş süreleri artık **Sistem → Süreler ve Kurallar** ekranından yönetilir
+(ayrıntı: `TIMING_RULES.md`). Deploy hiçbir süreyi değiştirmez: admin bir
+değer kaydedene kadar eski env değişkeni, o da yoksa kod varsayılanı geçerlidir.
+Seed'deki eski satırlar (`offer_expiry_hours`, `payment_hold_days`; `updated_by`
+boş) env değişkeninin önüne geçmez — `OFFER_EXPIRY_HOURS` canlıda 24'ten farklıysa
+o değer korunur.
+
+`20261005150000_order_return_window_ends_at` migration'ı `orders`a boş bir
+kolon ekler (yalnız ekleme, geri doldurma YOK). Deploy'dan sonra teslim edilen
+siparişlerin cayma penceresi sonu teslimde damgalanır; öncekiler bugünkü
+pencereyle hesaplanmaya devam eder.
+
+Deploy sonrası ekranı bir kez açıp **"sınır dışı"** uyarısı taşıyan satır var
+mı bakın (ör. env'de `RETURN_WINDOW_DAYS` 14'ün altındaysa). Uyarılı değer
+uygulanmaya devam eder; aralık içinde bir değer kaydederek düzeltin.
+
 ### Bir kerelik: PayTR üyelik mağazası geçişi (2026-09)
 
 Üyelik ödemeleri (ilk satın alma + oto-yenileme) non-3D yetkili **ayrı bir PayTR

@@ -11,10 +11,7 @@ import {
   LIVE_PAYMENT,
   LIVE_PAYOUT_TRANSFER,
 } from "../../account-lane/live-lane.where";
-import {
-  invoiceDeadlineDays,
-  type ThresholdConfigReader,
-} from "../../../config/alert-thresholds";
+import type { AlertThresholdContext } from "../../../config/alert-thresholds";
 
 /**
  * Finans sağlık şeridinin KÜME TANIMLARI — tek kaynak.
@@ -72,10 +69,10 @@ export const openAdjustmentsWhere: Prisma.SellerAccountAdjustmentWhereInput = {
  */
 export function uninvoicedDeliveredWhere(
   now: Date,
-  config?: ThresholdConfigReader,
+  ctx: { timing: Pick<AlertThresholdContext["timing"], "invoiceDeadlineDays"> },
 ): Prisma.OrderWhereInput {
   const cutoff = new Date(
-    now.getTime() - invoiceDeadlineDays(config) * 24 * 60 * 60 * 1000,
+    now.getTime() - ctx.timing.invoiceDeadlineDays * 24 * 60 * 60 * 1000,
   );
   return {
     ...LIVE_ORDER,

@@ -53,6 +53,11 @@ describe("routePermission", () => {
     );
   });
 
+  it("guards the durations & rules screen with the settings permission", () => {
+    // API: PERMISSION_MAP["timing-rules"] = ["settings"] — menü ve uç aynı izni ister.
+    expect(routePermission("/system/timing-rules")).toBe("settings");
+  });
+
   it("guards the consent records screen with the users permission", () => {
     // API: PERMISSION_MAP.consents = ["users"] — menü ve uç aynı izni ister.
     expect(routePermission("/accounts/consents")).toBe("users");

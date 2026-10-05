@@ -22,6 +22,8 @@ describe("OrderSchedulerService.runProcessDeliveredOrders — invoice candidate 
       },
       elogoInvoice: { findMany: jest.fn().mockResolvedValue([]) },
       tradeCashPayment: { findMany: jest.fn().mockResolvedValue([]) },
+      // Süreler Süreler ve Kurallar'dan; satır yok → varsayılan.
+      platformSetting: { findUnique: jest.fn().mockResolvedValue(null) },
     };
     const service = new OrderSchedulerService(
       prisma as any,

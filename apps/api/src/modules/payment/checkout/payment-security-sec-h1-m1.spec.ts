@@ -102,6 +102,8 @@ describe("Payment security — SEC-H1 bypass + SEC-M1 confirm-failed", () => {
             order: { id: "o1" },
           }),
         },
+        // Fail penceresi Süreler ve Kurallar'dan; satır yok → env (35).
+        platformSetting: { findUnique: jest.fn().mockResolvedValue(null) },
       };
       const configService = {
         get: jest.fn(() => "35"),

@@ -9,6 +9,7 @@ import {
 import { i18nMessage } from "../../i18n";
 import type { ProductUpdateActor } from "../helpers/product-update-actor";
 import { resolveUpdatedStatus } from "../helpers/product-update-status";
+import { assertListingMayReopen } from "../helpers/product-reopen-gate";
 import { PrismaService } from "../../../prisma";
 import { assertValidProductImages } from "../helpers/product-image-keys";
 import { CacheService } from "../../cache/cache.service";
@@ -201,35 +202,19 @@ export class ProductUpdateService {
       // kuralı burada denetlenir. Yönetici statü göndermez (politika onu
       // yok sayar), bu dal ona hiç işlemez.
       if (!isAdmin && dto.status === ProductStatus.active) {
-        const newQuantity =
-          dto.quantity != null ? Number(dto.quantity) : product.quantity;
-        if (newQuantity != null && newQuantity <= 0) {
-          throw new BadRequestException(
-            i18nMessage("server.product.setQuantityToReopen"),
-          );
-        }
-        // İlan limiti yeniden satışa açarken de geçerli: limit pending+active+
-        // reserved sayar, sold/inactive SAYILMAZ — kontrolsüz reaktivasyon,
-        // limiti aşmanın arka kapısıydı (create ile AYNI kaynak: canCreateListing).
-        // Zaten sayılan (aktif) ilanın normal düzenlemesi bu daldan geçmez.
-        // Karantina bypass'ında da GEÇERLİ: "admin onayı gerekmez" moderasyon
-        // içindir, üyelik/komisyon bir güvenlik/finans kapısıdır — atlanmaz.
-        const canReopen =
-          await this.membershipService.canCreateListing(sellerId);
-        if (!canReopen.allowed) {
-          const limits = await this.membershipService.getUserLimits(sellerId);
-          throw new ForbiddenException(
-            i18nMessage("server.product.listingLimitReached", {
-              tierName: limits.tierName,
-              maxListings: limits.maxTotalListings,
-            }),
-          );
-        }
-        await this.commissionGuard.assertListingRuleExists({
-          sellerId,
-          categoryId: product.categoryId,
-          amount: Number(product.price),
-        });
+        // Stok + üyelik limiti + komisyon kuralı: yenileme (ProductRenewalService)
+        // ile AYNI kapı. Zaten sayılan (aktif) ilanın normal düzenlemesi bu
+        // daldan geçmez. Karantina bypass'ında da GEÇERLİ: "admin onayı
+        // gerekmez" moderasyon içindir, üyelik/komisyon bir güvenlik/finans
+        // kapısıdır — atlanmaz.
+        await assertListingMayReopen(
+          {
+            membershipService: this.membershipService,
+            commissionGuard: this.commissionGuard,
+          },
+          product,
+          dto.quantity,
+        );
         // TEK karar yeri: return_quarantine + stok varsa `active` (bypass),
         // aksi hâlde eski davranış `pending`. Asla undefined dönmez burada
         // (requested=active, status sold/inactive ikisi de !==active), ama
@@ -240,6 +225,13 @@ export class ProductUpdateService {
           where: { id },
           data: {
             status: reopenedStatus,
+            // Doğrudan yayına dönen ilan taze bir ömür alır: aksi hâlde ömründen
+            // eski bir ilan ertesi gece yine pasife alınırdı (publishedAt yalnız
+            // onayda tazeleniyordu, bu yol onaydan geçmez). `pending` yolunda
+            // onay tazeler.
+            ...(reopenedStatus === ProductStatus.active
+              ? { publishedAt: new Date() }
+              : {}),
             ...(dto.quantity != null ? { quantity: Number(dto.quantity) } : {}),
           },
         });

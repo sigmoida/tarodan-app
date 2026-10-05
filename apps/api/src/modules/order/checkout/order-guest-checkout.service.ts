@@ -231,6 +231,9 @@ export class OrderGuestCheckoutService {
     await this.assertGuestEmailNotRegistered(normEmail);
     await this.consumeGuestCheckoutOtp(normEmail, dto.emailVerificationCode);
 
+    // Ödeme penceresi işlem AÇILMADAN okunur: işlem bir bağlantı tutarken
+    // ikinci bir bağlantı beklemesin (eşzamanlı checkout'ta havuz tükenmesi).
+    const paymentExpiresAt = await paymentWindowEnd(this.prisma);
     const result = await this.prisma.$transaction(async (tx) => {
       const lockedRows = await tx.$queryRaw<{ id: string }[]>`
         SELECT p.id
@@ -608,7 +611,7 @@ export class OrderGuestCheckoutService {
             ? (feeDiscounted.applied as unknown as Prisma.InputJsonValue)
             : undefined,
           status: OrderStatus.pending_payment,
-          paymentExpiresAt: paymentWindowEnd(),
+          paymentExpiresAt,
           shippingAddress: guestShippingJson as Prisma.InputJsonValue,
         },
         include: {

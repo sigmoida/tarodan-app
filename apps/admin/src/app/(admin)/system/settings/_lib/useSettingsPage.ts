@@ -9,6 +9,7 @@ import { useTabParam } from "@/hooks/useTabParam";
 import {
   type SettingsFormValues,
   type SettingsTab,
+  isSettingsTab,
   parseSettings,
   settingsSchema,
   settingsTabs,
@@ -19,15 +20,15 @@ import {
 
 export function useSettingsPage() {
   const t = useTranslations();
-  const [tab, setTab] = useTabParam("listing");
-  // "warehouse" and "legal" render their own cards; the numeric form falls
-  // back to a valid tab so `fieldsByTab`/`tabTitle` indexing stays safe while
-  // it's hidden.
-  const isWarehouseTab = tab === "warehouse";
-  const isLegalTab = tab === "legal";
-  const activeTab = (
-    isWarehouseTab || isLegalTab ? "listing" : tab
-  ) as SettingsTab;
+  const [rawTab, setTab] = useTabParam("listing");
+  // "warehouse" and "legal" render their own cards; any other value that is
+  // not a numeric-form tab (e.g. an old `?tab=trade` link — trade durations
+  // moved to Durations & Rules) falls back to the first tab, so
+  // `fieldsByTab`/`tabTitle` indexing stays safe.
+  const isWarehouseTab = rawTab === "warehouse";
+  const isLegalTab = rawTab === "legal";
+  const activeTab: SettingsTab = isSettingsTab(rawTab) ? rawTab : "listing";
+  const tab = isWarehouseTab || isLegalTab ? rawTab : activeTab;
   const fieldsByTab = tabFields(t);
 
   // Ham yanıt cache'lenir, dönüşüm `select`te — PSP oranı ve yasal ayarlar

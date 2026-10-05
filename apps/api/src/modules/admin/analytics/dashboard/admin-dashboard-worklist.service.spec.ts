@@ -46,6 +46,8 @@ describe("AdminDashboardWorklistService", () => {
 
     prisma = {
       $transaction: jest.fn(async (ops: unknown[]) => ops),
+      // Eşikler turun başında Süreler ve Kurallar'dan tek sorguyla okunur.
+      platformSetting: { findMany: jest.fn().mockResolvedValue([]) },
     };
     cache = {
       getOrSet: jest.fn(async (_key: string, factory: () => Promise<unknown>) =>
@@ -173,5 +175,33 @@ describe("AdminDashboardWorklistService", () => {
     expect(AdminDashboardWorklistService.CACHE_TTL_SECONDS).toBeLessThanOrEqual(
       60,
     );
+  });
+
+  it("shows the admin-set threshold from Durations & Rules, read once per build", async () => {
+    prisma.platformSetting.findMany.mockResolvedValue([
+      {
+        settingKey: "shipped_stale_alert_days",
+        settingValue: "3",
+        updatedAt: new Date(),
+      },
+    ]);
+    alertCounts.stuckShippedOrders = 1;
+
+    const { alerts } = await service.getWorklist();
+
+    expect(prisma.platformSetting.findMany).toHaveBeenCalledTimes(1);
+    expect(
+      alerts.find((alert) => alert.key === "stuckShippedOrders")?.threshold,
+    ).toEqual({ value: 3, unit: "days" });
+  });
+
+  it("keeps today's default threshold when no admin value is set", async () => {
+    alertCounts.stuckShippedOrders = 1;
+
+    const { alerts } = await service.getWorklist();
+
+    expect(
+      alerts.find((alert) => alert.key === "stuckShippedOrders")?.threshold,
+    ).toEqual({ value: 10, unit: "days" });
   });
 });

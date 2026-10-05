@@ -1,8 +1,15 @@
-import { DASHBOARD_ALERT_KEYS, DASHBOARD_ALERT_LINKS } from "@tarodan/types";
+import {
+  DASHBOARD_ALERT_KEYS,
+  DASHBOARD_ALERT_LINKS,
+  type TimingRuleId,
+} from "@tarodan/types";
 import {
   ALERT_DEFINITIONS,
   DIAGNOSTIC_ALERT_KEYS,
 } from "./dashboard-alert.definitions";
+import type { AlertThresholdContext } from "../../../../config/alert-thresholds";
+import { defaultTimingValues } from "../../../../common/timing-rules";
+import { preparingDeadlineApproachingWhere } from "../../../../common/helpers/preparing-deadline";
 
 const NOW = new Date("2026-09-18T12:00:00.000Z");
 
@@ -11,10 +18,22 @@ const configWith = (values: Record<string, string>) => ({
   get: <T = string>(key: string) => values[key] as T | undefined,
 });
 
+/**
+ * Threshold context: Durations & Rules values (registry defaults unless a test
+ * overrides one) plus the env reader for technical thresholds.
+ */
+const ctxWith = (
+  timing: Partial<Record<TimingRuleId, number>> = {},
+  env: Record<string, string> = {},
+): AlertThresholdContext => ({
+  timing: { ...defaultTimingValues(), ...timing },
+  config: configWith(env),
+});
+
 /** Captures the `where` a definition builds, without touching a database. */
 function captureWhere(
   key: keyof typeof ALERT_DEFINITIONS,
-  config?: { get<T = string>(key: string): T | undefined },
+  ctx: AlertThresholdContext = ctxWith(),
 ): Record<string, any> {
   let captured: Record<string, any> = {};
   const delegate = {
@@ -30,7 +49,7 @@ function captureWhere(
         property === "$queryRaw" ? (...parts: unknown[]) => parts : delegate,
     },
   );
-  ALERT_DEFINITIONS[key].query(prisma as never, NOW, config);
+  ALERT_DEFINITIONS[key].query(prisma as never, NOW, ctx);
   return captured;
 }
 
@@ -49,65 +68,117 @@ describe("dashboard alert definitions", () => {
     }
   });
 
-  describe("thresholds come from configuration, never from a literal", () => {
-    it("reads the stuck-shipment threshold from SHIPPED_STALE_ALERT_DAYS", () => {
-      const config = configWith({ SHIPPED_STALE_ALERT_DAYS: "3" });
-      expect(ALERT_DEFINITIONS.stuckShippedOrders.threshold?.(config)).toEqual({
+  describe("thresholds come from Durations & Rules, never from a literal", () => {
+    it("reads the stuck-shipment threshold from shippedStaleAlertDays", () => {
+      const ctx = ctxWith({ shippedStaleAlertDays: 3 });
+      expect(ALERT_DEFINITIONS.stuckShippedOrders.threshold?.(ctx)).toEqual({
         value: 3,
         unit: "days",
       });
 
-      const where = captureWhere("stuckShippedOrders", config);
+      const where = captureWhere("stuckShippedOrders", ctx);
       const cutoff = where.shipment.is.shippedAt.lt as Date;
       expect(NOW.getTime() - cutoff.getTime()).toBe(3 * 24 * 60 * 60 * 1000);
     });
 
-    it("reads the carrier-task threshold from CARRIER_CANCELLATION_ALERT_HOURS", () => {
-      const config = configWith({ CARRIER_CANCELLATION_ALERT_HOURS: "6" });
+    it("reads the carrier-task threshold from carrierCancellationAlertHours", () => {
+      const ctx = ctxWith({ carrierCancellationAlertHours: 6 });
       expect(
-        ALERT_DEFINITIONS.agedCarrierCancellations.threshold?.(config),
+        ALERT_DEFINITIONS.agedCarrierCancellations.threshold?.(ctx),
       ).toEqual({ value: 6, unit: "hours" });
 
-      const where = captureWhere("agedCarrierCancellations", config);
+      const where = captureWhere("agedCarrierCancellations", ctx);
       const cutoff = where.requestedAt.lt as Date;
       expect(NOW.getTime() - cutoff.getTime()).toBe(6 * 60 * 60 * 1000);
     });
 
-    it("reads the outbox threshold from OUTBOX_STALE_PROCESSING_MS, in minutes", () => {
-      const config = configWith({ OUTBOX_STALE_PROCESSING_MS: "120000" });
+    it("reads both trade parcel alerts from tradeLostParcelGraceDays", () => {
+      const ctx = ctxWith({ tradeLostParcelGraceDays: 5 });
+      expect(ALERT_DEFINITIONS.stuckWarehouseTrades.threshold?.(ctx)).toEqual({
+        value: 5,
+        unit: "days",
+      });
+      const inbound = captureWhere("stuckWarehouseTrades", ctx);
       expect(
-        ALERT_DEFINITIONS.outboxStuckProcessing.threshold?.(config),
-      ).toEqual({ value: 2, unit: "minutes" });
+        NOW.getTime() - (inbound.shippingDeadline.lt as Date).getTime(),
+      ).toBe(5 * 24 * 60 * 60 * 1000);
+      const outbound = captureWhere("stuckOutboundTrades", ctx);
+      expect(
+        NOW.getTime() -
+          (outbound.shipments.some.shippedAt.lt as Date).getTime(),
+      ).toBe(5 * 24 * 60 * 60 * 1000);
     });
 
-    it("falls back to the documented default when nothing is configured", () => {
-      expect(ALERT_DEFINITIONS.stuckShippedOrders.threshold?.()).toEqual({
+    it("reads the preparing-deadline lead from preparingWarningLeadHours", () => {
+      const ctx = ctxWith({ preparingWarningLeadHours: 6 });
+      expect(
+        ALERT_DEFINITIONS.preparingDeadlineApproaching.threshold?.(ctx),
+      ).toEqual({ value: 6, unit: "hours" });
+      const where = captureWhere("preparingDeadlineApproaching", ctx);
+      expect(
+        (where.preparingDeadline.lte as Date).getTime() - NOW.getTime(),
+      ).toBe(6 * 60 * 60 * 1000);
+      // Default stays today's 24 hours.
+      expect(
+        ALERT_DEFINITIONS.preparingDeadlineApproaching.threshold?.(ctxWith()),
+      ).toEqual({ value: 24, unit: "hours" });
+    });
+
+    it("reads the outbox threshold from OUTBOX_STALE_PROCESSING_MS, in minutes", () => {
+      const ctx = ctxWith({}, { OUTBOX_STALE_PROCESSING_MS: "120000" });
+      expect(ALERT_DEFINITIONS.outboxStuckProcessing.threshold?.(ctx)).toEqual({
+        value: 2,
+        unit: "minutes",
+      });
+    });
+
+    it("keeps today's defaults when no admin value is set", () => {
+      const ctx = ctxWith();
+      expect(ALERT_DEFINITIONS.stuckShippedOrders.threshold?.(ctx)).toEqual({
         value: 10,
+        unit: "days",
+      });
+      expect(
+        ALERT_DEFINITIONS.agedCarrierCancellations.threshold?.(ctx),
+      ).toEqual({ value: 24, unit: "hours" });
+      expect(ALERT_DEFINITIONS.stuckWarehouseTrades.threshold?.(ctx)).toEqual({
+        value: 14,
         unit: "days",
       });
     });
 
     /**
-     * The point of the config indirection: a day/hour count baked into this
-     * file could not follow the cron that owns the same rule. So every
-     * threshold-bearing alert must MOVE when its key moves.
+     * The point of the indirection: a day/hour count baked into this file
+     * could not follow the cron that owns the same rule. So every
+     * threshold-bearing alert must MOVE when its source moves.
      */
-    it("moves every threshold when its configuration key moves", () => {
-      const keys = {
-        stuckShippedOrders: "SHIPPED_STALE_ALERT_DAYS",
-        agedCarrierCancellations: "CARRIER_CANCELLATION_ALERT_HOURS",
-        outboxStuckProcessing: "OUTBOX_STALE_PROCESSING_MS",
-      } as const;
+    it("moves every threshold when its source moves", () => {
+      const moved: Array<
+        [keyof typeof ALERT_DEFINITIONS, AlertThresholdContext]
+      > = [
+        ["stuckShippedOrders", ctxWith({ shippedStaleAlertDays: 77 })],
+        [
+          "agedCarrierCancellations",
+          ctxWith({ carrierCancellationAlertHours: 77 }),
+        ],
+        ["stuckWarehouseTrades", ctxWith({ tradeLostParcelGraceDays: 77 })],
+        ["stuckOutboundTrades", ctxWith({ tradeLostParcelGraceDays: 77 })],
+        [
+          "preparingDeadlineApproaching",
+          ctxWith({ preparingWarningLeadHours: 7 }),
+        ],
+        [
+          "outboxStuckProcessing",
+          ctxWith({}, { OUTBOX_STALE_PROCESSING_MS: "999999" }),
+        ],
+      ];
 
-      for (const [alert, envKey] of Object.entries(keys)) {
-        const definition =
-          ALERT_DEFINITIONS[alert as keyof typeof ALERT_DEFINITIONS];
-        const base = definition.threshold?.();
-        const moved = definition.threshold?.(
-          configWith({ [envKey]: "999999" }),
-        );
-        expect(moved).toBeDefined();
-        expect(moved).not.toEqual(base);
+      for (const [alert, ctx] of moved) {
+        const definition = ALERT_DEFINITIONS[alert];
+        const base = definition.threshold?.(ctxWith());
+        const next = definition.threshold?.(ctx);
+        expect(next).toBeDefined();
+        expect(next).not.toEqual(base);
       }
     });
   });
@@ -143,13 +214,30 @@ describe("dashboard alert definitions", () => {
     });
 
     it("warns early — not late — about preparing deadlines", () => {
-      const where = captureWhere("preparingDeadlineWithin24h");
-      expect(where.preparingDeadline.gte).toEqual(NOW);
+      const where = captureWhere("preparingDeadlineApproaching");
+      expect(where.preparingDeadline.gt).toEqual(NOW);
       expect(
-        (where.preparingDeadline.lt as Date).getTime() - NOW.getTime(),
+        (where.preparingDeadline.lte as Date).getTime() - NOW.getTime(),
       ).toBe(24 * 60 * 60 * 1000);
-      expect(ALERT_DEFINITIONS.preparingDeadlineWithin24h.severity).toBe(
+      expect(ALERT_DEFINITIONS.preparingDeadlineApproaching.severity).toBe(
         "info",
+      );
+    });
+
+    /**
+     * The seller warning (payment-expiry sweep, phase 1) and this alert must
+     * count the same orders: same lead from Durations & Rules, same bounds,
+     * same status. The alert used to hardcode 24 hours AND `paid`, which no
+     * order with a preparing deadline is in, so it never fired.
+     */
+    it("counts exactly the set the seller warning targets", () => {
+      const ctx = ctxWith({ preparingWarningLeadHours: 6 });
+      expect(captureWhere("preparingDeadlineApproaching", ctx)).toEqual({
+        isTest: false,
+        ...preparingDeadlineApproachingWhere(NOW, 6),
+      });
+      expect(captureWhere("preparingDeadlineApproaching", ctx).status).toBe(
+        "preparing",
       );
     });
 
@@ -162,7 +250,7 @@ describe("dashboard alert definitions", () => {
       "stuckShippedOrders",
       "stuckWarehouseTrades",
       "stuckOutboundTrades",
-      "preparingDeadlineWithin24h",
+      "preparingDeadlineApproaching",
     ] as const)("%s counts live-lane rows only", (key) => {
       expect(captureWhere(key).isTest).toBe(false);
     });
@@ -183,6 +271,7 @@ describe("dashboard alert definitions", () => {
           },
         ) as never,
         NOW,
+        ctxWith(),
       ) as unknown as unknown[];
       const sqlText = parts
         .slice(1)

@@ -62,7 +62,8 @@ import { testLaneRefundResult } from "../helpers/test-lane-refund";
  * İade / escrow serbest bırakma metodları — PaymentService'ten birebir taşındı
  * (facade-delege deseni). PaymentService aynı imzalarla buraya delege eder.
  * scheduleHoldReleaseOnDelivery'nin pencere değerleri (returnWindowDays/payoutGraceDays)
- * PAYMENT_CONFIG_KEYS'ten okunur — varsayılanlar orada tek kaynaktır.
+ * Süreler ve Kurallar kaydından (`@tarodan/types` TIMING_RULES) okunur — varsayılanlar
+ * orada tek kaynaktır.
  */
 /**
  * 11.4c — Kısmi iade ORANI (TEK otorite): hold tüketimi ve ledger pro-rate AYNI formülü

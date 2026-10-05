@@ -218,6 +218,14 @@ export const sampleData = (t: T): Record<string, Record<string, unknown>> => ({
     orderId: "sample-id",
     refundAmount: 199.99,
   },
+  // Order (seller's preparing deadline extended once)
+  "order-preparing-extended-buyer": {
+    buyerName: t("admin.marketing.emailTemplates.sample.buyer"),
+    orderNumber: "TRD-12345",
+    orderId: "sample-id",
+    productTitle: "Hot Wheels Ferrari 458",
+    deadline: "10.10.2026 18:00",
+  },
   // Trade
   "trade-received": {
     name: t("admin.marketing.emailTemplates.sample.userShort"),

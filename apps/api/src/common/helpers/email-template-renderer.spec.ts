@@ -119,6 +119,44 @@ describe("email template renderer", () => {
     expect(html).not.toContain("Ekibimizin açıklaması");
   });
 
+  describe("preparing deadline buyer emails", () => {
+    const base = {
+      name: "Misafir Alıcı",
+      orderNumber: "ORD-7",
+      orderId: "o7",
+      productTitle: "Model araba",
+      deadline: "10 Ekim 2026 12:00",
+    };
+
+    it("tells the buyer the new latest ship date and that cancelling is still possible", () => {
+      const html = renderEmailTemplate("order-preparing-extended-buyer", base, {
+        frontendUrl: "https://tarodan.com.tr",
+      });
+
+      expect(html).toContain("Siparişinizin Kargoya Verilmesi Gecikiyor");
+      expect(html).toContain("10 Ekim 2026 12:00");
+      expect(html).toContain("#ORD-7");
+      expect(html).toContain("iptal edebilirsiniz");
+      expect(html).toContain("https://tarodan.com.tr/profile/orders/o7");
+    });
+
+    it.each(["order-preparing-extended-buyer", "seller-did-not-ship-refunded"])(
+      "%s links a guest to order tracking, not to an account screen",
+      (template) => {
+        const html = renderEmailTemplate(
+          template,
+          { ...base, isGuestOrder: true, buyerEmail: "misafir@example.com" },
+          { frontendUrl: "https://tarodan.com.tr" },
+        );
+
+        expect(html).toContain(
+          "https://tarodan.com.tr/track-order?orderNumber=ORD-7&amp;email=misafir%40example.com",
+        );
+        expect(html).not.toContain("/profile/orders/o7");
+      },
+    );
+  });
+
   it("extracts only the editable content from a wrapped email", () => {
     const wrapped = renderEmailTemplate(
       "password-reset",

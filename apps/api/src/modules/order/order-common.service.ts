@@ -7,6 +7,7 @@ import { getAvailableQuantity } from "../product/helpers/product-availability.he
 import { sellerNetAmountOf } from "./helpers/order-net.helper";
 import { storedProductBaseOf } from "./helpers/order-charged-base.helper";
 import { ORDER_CANCEL_REASON } from "./helpers/order-cancel-reasons";
+import { escrowReleaseAtOf } from "./helpers/order-escrow-release";
 import { publicIdentityFields } from "../../common/helpers/public-identity";
 
 /**
@@ -391,6 +392,14 @@ export class OrderCommonService {
       paidAt: (order.payment ?? order.checkoutGroup?.payment)?.paidAt ?? null,
       shippedAt: order.shipment?.shippedAt ?? null,
       deliveredAt: order.deliveredAt ?? order.shipment?.deliveredAt ?? null,
+      // Cayma penceresinin teslimde damgalanan sonu — iade hakkı ve satıcı
+      // ödemesi bunu okur. İstemciler pencereyi kendileri hesaplamamalı;
+      // null = damgadan önce teslim edilmiş ya da henüz teslim edilmemiş.
+      returnWindowEndsAt: order.returnWindowEndsAt ?? null,
+      // Satıcı ödemesinin (escrow hold) planlanan tarihi — istemciler bunu
+      // gösterir, `deliveredAt + pencere + grace` diye kendileri hesaplamaz.
+      // null = hold yok / henüz teslim edilmedi / ilişki bu sorguda yüklenmedi.
+      escrowReleaseAt: escrowReleaseAtOf(order.paymentHolds),
       completedAt: order.completedAt ?? null,
       cancelledAt: order.cancelledAt ?? null,
       cancelReason: order.cancelReason ?? null,
@@ -401,6 +410,11 @@ export class OrderCommonService {
       canReactivate: this.computeCanReactivate(order, userId),
       confirmationDeadline: order.confirmationDeadline ?? null,
       buyerConfirmedAt: order.buyerConfirmedAt ?? null,
+      // Satıcının kargoya verme son tarihi. Tek seferlik uzatmada YENİ son
+      // tarih budur; `preparingExtendedAt` doluysa süre bir kez uzatılmıştır
+      // (bir daha uzatılmaz, dolunca sipariş iptal edilip iade edilir).
+      preparingDeadline: order.preparingDeadline ?? null,
+      preparingExtendedAt: order.preparingExtendedAt ?? null,
       isBuyer: order.buyerId === userId,
       isSeller: order.sellerId === userId,
       ...(await this.getOrderRatingFlags(order, userId)),

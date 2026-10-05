@@ -76,6 +76,16 @@ export const NOTIFICATION_TEMPLATES: Partial<
     messageKey: "server.notification.orderPreparingDeadlineWarning.message",
     icon: "⚠️",
   },
+  [NotificationType.ORDER_PREPARING_EXTENDED]: {
+    titleKey: "server.notification.orderPreparingExtended.title",
+    messageKey: "server.notification.orderPreparingExtended.message",
+    icon: "⏳",
+  },
+  [NotificationType.ORDER_PREPARING_EXTENDED_SELLER]: {
+    titleKey: "server.notification.orderPreparingExtendedSeller.title",
+    messageKey: "server.notification.orderPreparingExtendedSeller.message",
+    icon: "⚠️",
+  },
   [NotificationType.ORDER_RESERVATION_RELEASED]: {
     titleKey: "server.notification.orderReservationReleased.title",
     messageKey: "server.notification.orderReservationReleased.message",
@@ -140,6 +150,11 @@ export const NOTIFICATION_TEMPLATES: Partial<
     titleKey: "server.notification.offerExpiredSeller.title",
     messageKey: "server.notification.offerExpiredSeller.message",
     icon: "⏰",
+  },
+  [NotificationType.OFFER_EXTENDED]: {
+    titleKey: "server.notification.offerExtended.title",
+    messageKey: "server.notification.offerExtended.message",
+    icon: "⏳",
   },
   [NotificationType.OFFER_PAYMENT_EXPIRED]: {
     titleKey: "server.notification.offerPaymentExpired.title",
@@ -345,6 +360,21 @@ export const NOTIFICATION_TEMPLATES: Partial<
     titleKey: "server.notification.tradeAutoCancelled.title",
     messageKey: "server.notification.tradeAutoCancelled.message",
     icon: "🔄",
+  },
+  [NotificationType.TRADE_RESPONSE_EXTENDED]: {
+    titleKey: "server.notification.tradeResponseExtended.title",
+    messageKey: "server.notification.tradeResponseExtended.message",
+    icon: "⏳",
+  },
+  [NotificationType.TRADE_PAYMENT_EXTENDED]: {
+    titleKey: "server.notification.tradePaymentExtended.title",
+    messageKey: "server.notification.tradePaymentExtended.message",
+    icon: "⏳",
+  },
+  [NotificationType.TRADE_PAYMENT_EXTENDED_PAID]: {
+    titleKey: "server.notification.tradePaymentExtendedPaid.title",
+    messageKey: "server.notification.tradePaymentExtendedPaid.message",
+    icon: "⏳",
   },
   [NotificationType.TRADE_AT_WAREHOUSE]: {
     titleKey: "server.notification.tradeAtWarehouse.title",

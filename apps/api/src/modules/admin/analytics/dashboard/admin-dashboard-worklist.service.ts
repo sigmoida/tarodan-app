@@ -22,6 +22,8 @@ import {
   type QueryableAlertKey,
 } from "./dashboard-alert.definitions";
 import { QUEUE_PART_DEFINITIONS } from "./dashboard-queue.definitions";
+import type { AlertThresholdContext } from "../../../../config/alert-thresholds";
+import { loadTimingValues } from "../../../../common/timing-rules";
 
 /**
  * Zone A ("Bekleyen işler") + Zone B ("Uyarılar") — tek uç, çünkü ikisi de aynı
@@ -64,21 +66,30 @@ export class AdminDashboardWorklistService {
 
   private async buildWorklist(): Promise<DashboardWorklistResponse> {
     const now = new Date();
+    // Eşikler turun başında BİR KEZ çözülür (Süreler ve Kurallar + teknik env):
+    // aynı tur içinde kuyruk ve uyarı aynı sayıyı görür.
+    const ctx: AlertThresholdContext = {
+      timing: await loadTimingValues(this.prisma, this.config),
+      config: this.config,
+    };
     const [queues, alerts] = await Promise.all([
-      this.buildQueues(now),
-      this.buildAlerts(now),
+      this.buildQueues(now, ctx),
+      this.buildAlerts(now, ctx),
     ]);
     return { generatedAt: now.toISOString(), queues, alerts };
   }
 
-  private async buildQueues(now: Date): Promise<DashboardQueueTile[]> {
+  private async buildQueues(
+    now: Date,
+    ctx: AlertThresholdContext,
+  ): Promise<DashboardQueueTile[]> {
     const partKeys = DASHBOARD_QUEUE_KEYS.flatMap(
       (queue) => DASHBOARD_QUEUE_PARTS[queue],
     );
 
     const rows = await this.prisma.$transaction(
       partKeys.map((key) =>
-        QUEUE_PART_DEFINITIONS[key].query(this.prisma, now, this.config),
+        QUEUE_PART_DEFINITIONS[key].query(this.prisma, now, ctx),
       ),
     );
 
@@ -125,14 +136,15 @@ export class AdminDashboardWorklistService {
     });
   }
 
-  private async buildAlerts(now: Date): Promise<DashboardAlert[]> {
+  private async buildAlerts(
+    now: Date,
+    ctx: AlertThresholdContext,
+  ): Promise<DashboardAlert[]> {
     const keys = Object.keys(ALERT_DEFINITIONS) as QueryableAlertKey[];
 
     const [rows, diagnostics] = await Promise.all([
       this.prisma.$transaction(
-        keys.map((key) =>
-          ALERT_DEFINITIONS[key].query(this.prisma, now, this.config),
-        ),
+        keys.map((key) => ALERT_DEFINITIONS[key].query(this.prisma, now, ctx)),
       ),
       // Mutabakat teşhisleri (komisyon defteri sapması, siparişsiz ödeme,
       // hold'suz sipariş) tek kaynaktan gelir. Patlarsa şerit çizilmeye devam
@@ -159,7 +171,7 @@ export class AdminDashboardWorklistService {
         count: reading.count,
         ...(reading.amount === undefined ? {} : { amount: reading.amount }),
         ...(definition.threshold
-          ? { threshold: definition.threshold(this.config) }
+          ? { threshold: definition.threshold(ctx) }
           : {}),
         severity: definition.severity,
         href: DASHBOARD_ALERT_LINKS[key],

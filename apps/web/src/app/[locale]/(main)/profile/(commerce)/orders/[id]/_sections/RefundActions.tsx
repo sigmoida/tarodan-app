@@ -5,6 +5,7 @@
 import { Button } from "@tarodan/ui";
 import { SectionCard } from "@/components/ui";
 import { useTranslations } from "next-intl";
+import { useTimingPolicy, useTimingValues } from "@/hooks/useTimingPolicy";
 import { isOrderCancellable } from "../../_lib/types";
 import {
   hasShipped,
@@ -32,6 +33,8 @@ export default function RefundActions({
   showLineCancel?: boolean;
 }) {
   const t = useTranslations();
+  const policy = useTimingPolicy();
+  const timingValues = useTimingValues();
 
   if (
     !order.payment ||
@@ -66,14 +69,16 @@ export default function RefundActions({
   }
 
   const shipped = hasShipped(order);
-  const pastWindow = isPastRefundWindow(order);
+  const pastWindow = isPastRefundWindow(order, policy);
 
-  // 14 günden sonra iade yok: kargo sonrası + pencere kapalı ise
+  // Pencereden sonra iade yok: kargo sonrası + pencere kapalı ise
   // iade butonu yerine "süre doldu" bilgisi göster.
   if (shipped && pastWindow) {
     return (
       <SectionCard title={t("order.refundWindowClosed")}>
-        <p className="text-sm text-muted">{t("order.refundWindowPassed")}</p>
+        <p className="text-sm text-muted">
+          {t("order.refundWindowPassed", timingValues)}
+        </p>
       </SectionCard>
     );
   }

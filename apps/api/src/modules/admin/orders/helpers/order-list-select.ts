@@ -58,6 +58,7 @@ const LIST_LINE_BASE_SELECT = {
   subtotal: true,
   totalAmount: true,
   preparingDeadline: true,
+  preparingExtendedAt: true,
   deliveredAt: true,
   createdAt: true,
   checkoutGroupId: true,

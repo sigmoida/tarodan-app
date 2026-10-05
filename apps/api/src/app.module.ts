@@ -84,6 +84,7 @@ import { HealthModule } from "./modules/health";
 
 // Public mobile bootstrap config (min supported app version / force-update gate)
 import { AppConfigModule } from "./modules/app-config";
+import { TimingRulesModule } from "./modules/timing-rules";
 
 // Media/File uploads (AWS S3)
 import { MediaModule } from "./modules/media";
@@ -238,6 +239,9 @@ import { isTest } from "./config/environment";
 
     // Public mobile bootstrap config (#232): GET /app-config → minSupportedAppVersion
     AppConfigModule,
+
+    // Süreler ve Kurallar: GET /timing-rules (herkese açık politika süreleri)
+    TimingRulesModule,
 
     // Media/File uploads
     MediaModule, // Product images, Avatars, Documents

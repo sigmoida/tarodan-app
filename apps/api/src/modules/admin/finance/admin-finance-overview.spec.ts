@@ -41,6 +41,8 @@ describe("AdminFinanceService.getFinanceOverview", () => {
           _count: { id: 5 },
         }),
       },
+      // Fatura süresi eşiği Süreler ve Kurallar'dan; satır yok → varsayılan.
+      platformSetting: { findUnique: jest.fn().mockResolvedValue(null) },
     };
     const build = jest.fn().mockResolvedValue(reconciliation);
     return {

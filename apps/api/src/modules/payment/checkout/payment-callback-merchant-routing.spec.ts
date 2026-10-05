@@ -78,6 +78,8 @@ function setup(record: {
         user: { isTestAccount: record.ownerIsTest ?? false },
       }),
     },
+    // Fail penceresi Süreler ve Kurallar'dan; satır yok → env/varsayılan.
+    platformSetting: { findUnique: jest.fn().mockResolvedValue(null) },
   };
   const fulfillment = {
     processSuccessfulPayment: jest.fn().mockResolvedValue(true),

@@ -5,11 +5,6 @@ import { DEFAULT_PSP_FEE_RATE, settingsToMap } from "@/lib/settings";
 type T = ReturnType<typeof useTranslations<never>>;
 
 export interface Settings {
-  tradeResponseHours: number;
-  tradePaymentHours: number;
-  tradeShippingDays: number;
-  tradeConfirmationDays: number;
-  tradeHoldDays: number;
   minProductPrice: number;
   maxProductPrice: number;
   maxMessageLength: number;
@@ -19,13 +14,26 @@ export interface Settings {
   adminSessionTimeoutMinutes: number;
 }
 
-export type SettingsTab =
-  "listing" | "trade" | "message" | "finance" | "security";
+/**
+ * Takas süreleri burada YOK: her iş süresi Sistem → Süreler ve Kurallar
+ * ekranında (`/system/timing-rules`) tek yerden yönetilir.
+ */
+export type SettingsTab = "listing" | "message" | "finance" | "security";
 /**
  * All page tabs — "warehouse" and "legal" render their own cards, not the
  * numeric form.
  */
 export type SettingsPageTab = SettingsTab | "warehouse" | "legal";
+
+/** Numeric-form tabs — an unknown `?tab=` (e.g. the retired "trade") falls back. */
+export function isSettingsTab(value: string): value is SettingsTab {
+  return (
+    value === "listing" ||
+    value === "message" ||
+    value === "finance" ||
+    value === "security"
+  );
+}
 
 export interface FieldDef {
   key: keyof Settings;
@@ -60,20 +68,6 @@ const FIELD_DEFS: Record<SettingsTab, FieldMeta[]> = {
       step: 0.01,
     },
   ],
-  trade: [
-    { key: "tradeResponseHours", backendKey: "trade_response_deadline_hours" },
-    { key: "tradePaymentHours", backendKey: "trade_payment_deadline_hours" },
-    { key: "tradeShippingDays", backendKey: "trade_shipping_deadline_days" },
-    {
-      key: "tradeConfirmationDays",
-      backendKey: "trade_confirmation_deadline_days",
-    },
-    // Yalnız TAKAS escrow'unu etkiler (satış escrow'u teslim + iade penceresi +
-    // grace'tir, env'den gelir) — bu yüzden Takas sekmesinde durur. min 1:
-    // 0 gün, hold'u tamamlanma anında çökertip parayı beklemesiz açardı
-    // (backend resolveTradeEscrowDays de <1 değeri varsayılana düşürür).
-    { key: "tradeHoldDays", backendKey: "payment_hold_days", min: 1 },
-  ],
   message: [
     { key: "maxMessageLength", backendKey: "max_message_length", min: 1 },
   ],
@@ -104,26 +98,6 @@ const FIELD_LABEL_KEYS = {
     label: "admin.settings.fields.maxProductPrice.label",
     helper: "admin.settings.fields.maxProductPrice.helper",
   },
-  tradeResponseHours: {
-    label: "admin.settings.fields.tradeResponseHours.label",
-    helper: "admin.settings.fields.tradeResponseHours.helper",
-  },
-  tradePaymentHours: {
-    label: "admin.settings.fields.tradePaymentHours.label",
-    helper: "admin.settings.fields.tradePaymentHours.helper",
-  },
-  tradeShippingDays: {
-    label: "admin.settings.fields.tradeShippingDays.label",
-    helper: "admin.settings.fields.tradeShippingDays.helper",
-  },
-  tradeConfirmationDays: {
-    label: "admin.settings.fields.tradeConfirmationDays.label",
-    helper: "admin.settings.fields.tradeConfirmationDays.helper",
-  },
-  tradeHoldDays: {
-    label: "admin.settings.fields.tradeHoldDays.label",
-    helper: "admin.settings.fields.tradeHoldDays.helper",
-  },
   maxMessageLength: {
     label: "admin.settings.fields.maxMessageLength.label",
     helper: "admin.settings.fields.maxMessageLength.helper",
@@ -141,7 +115,6 @@ const FIELD_LABEL_KEYS = {
 export function settingsTabs(t: T): { key: SettingsPageTab; label: string }[] {
   return [
     { key: "listing", label: t("admin.settings.tabs.listing") },
-    { key: "trade", label: t("admin.settings.tabs.trade") },
     { key: "message", label: t("admin.settings.tabs.message") },
     { key: "finance", label: t("admin.settings.tabs.finance") },
     { key: "security", label: t("admin.settings.tabs.security") },
@@ -153,7 +126,6 @@ export function settingsTabs(t: T): { key: SettingsPageTab; label: string }[] {
 export function tabTitle(t: T): Record<SettingsTab, string> {
   return {
     listing: t("admin.settings.tabTitle.listing"),
-    trade: t("admin.settings.tabTitle.trade"),
     message: t("admin.settings.tabTitle.message"),
     finance: t("admin.settings.tabTitle.finance"),
     security: t("admin.settings.tabTitle.security"),
@@ -170,7 +142,6 @@ export function tabFields(t: T): Record<SettingsTab, FieldDef[]> {
     }));
   return {
     listing: withLabels(FIELD_DEFS.listing),
-    trade: withLabels(FIELD_DEFS.trade),
     message: withLabels(FIELD_DEFS.message),
     finance: withLabels(FIELD_DEFS.finance),
     security: withLabels(FIELD_DEFS.security),
@@ -178,11 +149,6 @@ export function tabFields(t: T): Record<SettingsTab, FieldDef[]> {
 }
 
 const DEFAULTS: Settings = {
-  tradeResponseHours: 72,
-  tradePaymentHours: 48,
-  tradeShippingDays: 7,
-  tradeConfirmationDays: 3,
-  tradeHoldDays: 3,
   minProductPrice: 10,
   maxProductPrice: 100000,
   maxMessageLength: 1000,

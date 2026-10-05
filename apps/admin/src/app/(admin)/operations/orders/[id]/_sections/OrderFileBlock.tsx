@@ -5,6 +5,7 @@ import {
   buildOrderBreakdown,
   type OrderBreakdownLineKey,
 } from "@tarodan/shared";
+import { isPreShipmentCancellableStatus } from "@tarodan/types";
 import Link from "next/link";
 import Image from "next/image";
 import {
@@ -26,6 +27,7 @@ import { EarlyReleaseBadge } from "@/components/finance/EarlyReleaseBadge";
 import { fmtDate, fmtDateTime, fmtTry } from "@/lib/format";
 import { useSession } from "@/context/SessionContext";
 import { usePspFeeRate } from "@/hooks/usePspFeeRate";
+import { useTimingPolicy } from "@/hooks/useTimingPolicy";
 import {
   canManuallyUpdateOrderStatus,
   getOrderStatusInfo,
@@ -54,6 +56,7 @@ import { statusConfig } from "@/lib/statusLabels";
 export function OrderFileBlock({ entry }: { entry: OrderFileEntry }) {
   const t = useTranslations();
   const { user } = useSession();
+  const policy = useTimingPolicy();
   const [statusOpen, setStatusOpen] = useState(false);
   const [trackingOpen, setTrackingOpen] = useState(false);
   const [cancelOpen, setCancelOpen] = useState(false);
@@ -62,6 +65,7 @@ export function OrderFileBlock({ entry }: { entry: OrderFileEntry }) {
   const status = getOrderStatusInfo(
     { ...entry, activeRefundRequest: activeRefundOf(entry) },
     t,
+    policy.returnWindowDays.value,
   );
   const f = entry.finance;
   const pendingCancellation = pendingCancellationRefund(entry);
@@ -180,7 +184,27 @@ export function OrderFileBlock({ entry }: { entry: OrderFileEntry }) {
                 {fmtDate(entry.confirmationDeadline)}
               </>
             )}
+            {/* Kargoya verme son tarihi yalnız kargolanmamış siparişte anlamlı;
+                uzatıldıysa API yeni tarihi bu alana yazar. */}
+            {entry.preparingDeadline &&
+              isPreShipmentCancellableStatus(entry.status) && (
+                <>
+                  {" · "}
+                  {t("admin.operations.orders.file.preparingDeadline")}:{" "}
+                  {fmtDateTime(entry.preparingDeadline)}
+                </>
+              )}
           </p>
+          {/* Uzatma kaydı sipariş kargolandıktan ya da iptal edildikten sonra
+              da görünür: ne zaman, hangi son tarihten uzatıldığı. */}
+          {entry.preparingExtendedAt && (
+            <p className="mt-0.5 text-xs font-medium text-warning-600">
+              {t("admin.operations.orders.file.preparingExtended", {
+                date: fmtDateTime(entry.preparingExtendedAt) ?? "—",
+                original: fmtDateTime(entry.originalPreparingDeadline) ?? "—",
+              })}
+            </p>
+          )}
         </div>
         <p className="flex-shrink-0 text-base font-semibold text-heading">
           {fmtTry(f.totalAmount)}

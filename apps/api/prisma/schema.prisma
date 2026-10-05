@@ -827,15 +827,24 @@ model Product {
   /// Moderasyon reddinin gerekçesi — satıcıya kalıcı olarak gösterilir
   /// (bildirim tek seferlikti, gerekçe kayboluyordu). Onayda temizlenir.
   rejectionReason     String?                 @map("rejection_reason")
-  /// `inactive` statüsünün NEDENİ — yalnız `return_quarantine` değeri anlamlıdır:
-  /// teslim SONRASI bir iade yüzünden sistem tarafından pasife alındı (satıcı
-  /// hasar kontrolü yapmalı) ve bu satıcı DOĞRUDAN aktive edebilir (admin onayı
-  /// gerekmez). Diğer her pasif neden (elle pasife alma, stok=0) null bırakır →
-  /// eski davranış: yeniden aktifleştirme admin onayına düşer. Statü `inactive`
-  /// dışına çıkan HER yazım bunu temizlemeli (bkz. clearStaleInactiveReasonOnWrite,
+  /// `inactive` statüsünün NEDENİ — iki değer anlamlıdır: `return_quarantine`
+  /// (teslim SONRASI bir iade yüzünden sistem pasife aldı; satıcı hasar kontrolü
+  /// yapmalı ve DOĞRUDAN aktive edebilir, admin onayı gerekmez) ve `expired`
+  /// (ilan ömrü doldu; satıcı tek eylemle yenileyebilir, içerik onaydan beri
+  /// değişmediyse moderasyona girmez — bkz. approvedContentFingerprint). Diğer
+  /// her pasif neden (elle pasife alma, stok=0) null bırakır → eski davranış:
+  /// yeniden aktifleştirme admin onayına düşer. Statü `inactive` dışına çıkan
+  /// HER yazım bunu temizlemeli (bkz. clearStaleInactiveReasonOnWrite,
   /// PrismaService'in Product middleware'inde tek entegrasyon noktası) — aksi
   /// hâlde bayat bir işaret ilerideki bir moderasyon turunu atlatabilir.
   inactiveReason      ProductInactiveReason?  @map("inactive_reason")
+  /// Son ONAY anındaki moderasyona konu içeriğin parmak izi (başlık, açıklama,
+  /// kategori/marka/üretici, görseller — bkz. computeProductContentFingerprint).
+  /// Süresi dolan ilanın satıcı yenilemesinde güncel içeriğin izi bununla
+  /// eşleşiyorsa ilan moderasyona girmeden yeniden yayına alınır; eşleşmiyorsa
+  /// ya da null ise (onay izi yok: eski kayıt, toplu import) normal onay kuralı
+  /// geçerlidir. Her onay yolu (admin, AI oto-onay, admin reaktivasyonu) yazar.
+  approvedContentFingerprint String?          @map("approved_content_fingerprint")
   qualityScore        Int                     @default(0) @map("quality_score")
   rankTier            Int                     @default(0) @map("rank_tier")
   relevanceScore      Int?                    @map("relevance_score")
@@ -1082,7 +1091,13 @@ model Trade {
   initiatorAddressId        String?            @map("initiator_address_id")
   receiverAddressId         String?            @map("receiver_address_id")
   responseDeadline          DateTime           @map("response_deadline")
+  /// Yanıt süresinin extend_once ile uzatıldığı an (Süreler ve Kurallar →
+  /// tradeResponseHours). Dolu = bu aşamanın hakkı kullanıldı. Karşı teklif yanıt
+  /// aşamasını yeniden başlattığından sıfırlanır.
+  responseExtendedAt        DateTime?          @map("response_extended_at")
   paymentDeadline           DateTime?          @map("payment_deadline")
+  /// Ödeme süresinin extend_once ile uzatıldığı an (tradePaymentHours); aşama başına bir kez.
+  paymentExtendedAt         DateTime?          @map("payment_extended_at")
   shippingDeadline          DateTime?          @map("shipping_deadline")
   confirmationDeadline      DateTime?          @map("confirmation_deadline")
   acceptedAt                DateTime?          @map("accepted_at")
@@ -1614,6 +1629,10 @@ model Offer {
   /// Satıcı karşı teklifinden sonra: kabul/red için sıra alıcıda (buyerId)
   buyerMustAccept Boolean     @default(false) @map("buyer_must_accept")
   expiresAt       DateTime    @map("expires_at")
+  /// Geçerlilik süresinin ADMIN seçimiyle (Süreler ve Kurallar → offerExpiryHours
+  /// = extend_once) bir kez uzatıldığı an. Dolu = hak kullanıldı; ikinci dolumda
+  /// teklif her durumda expired olur. Karşı teklif yeni satırdır, kendi hakkıyla başlar.
+  extendedAt      DateTime?   @map("extended_at")
   createdAt       DateTime    @default(now()) @map("created_at")
   updatedAt       DateTime    @updatedAt @map("updated_at")
   version         Int         @default(1)
@@ -1812,12 +1831,32 @@ model Order {
   /// önceki iptaller yalnız aktörün KESİN olduğu kurallarla dolduruldu.
   /// Yeniden ödemeye açılan (reactivate) siparişte temizlenir.
   cancelledBy                CancellationActor?       @map("cancelled_by")
+  /// Satıcının kargoya verme son tarihi (ödemede damgalanır). Tek seferlik
+  /// uzatmada (Süreler ve Kurallar → `preparingDeadlineDays` = `extend_once`)
+  /// YENİ son tarih buraya yazılır: uyarı, süre dolumu, panel ve ekranlar hep
+  /// bu kolonu okur, uzatmayı ayrıca bilmeleri gerekmez.
   preparingDeadline          DateTime?                @map("preparing_deadline")
+  /// Son tarih uyarısının gittiği an. Uzatmada temizlenir: satıcı yeni son
+  /// tarihten önce yeniden uyarılır.
   preparingWarningSentAt     DateTime?                @map("preparing_warning_sent_at")
+  /// Tek seferlik hazırlık uzatmasının verildiği an — aynı zamanda CLAIM
+  /// damgası: doluysa sipariş bir daha uzatılmaz, sonraki dolumda iptal +
+  /// iade çalışır. null = hiç uzatılmadı.
+  preparingExtendedAt        DateTime?                @map("preparing_extended_at")
+  /// Uzatmadan ÖNCEKİ (ilk) son tarih — yalnız kayıt/görüntü için; hiçbir
+  /// karar bunu okumaz. Uzatılmamış siparişte null.
+  originalPreparingDeadline  DateTime?                @map("original_preparing_deadline")
   reservationReleasedAt      DateTime?                @map("reservation_released_at")
   stockRestoredAt            DateTime?                @map("stock_restored_at")
   paymentExpiresAt           DateTime                 @map("payment_expires_at")
   deliveredAt                DateTime?                @map("delivered_at")
+  /// Cayma (iade talep) penceresinin bittiği an — teslimde, o an geçerli
+  /// `returnWindowDays` (Süreler ve Kurallar) ile DAMGALANIR. İade uygunluğu,
+  /// teslim → tamamlandı geçişi ve escrow `releaseAt` (= bu + payout grace)
+  /// hep bu damgayı okur: admin pencereyi sonradan değiştirse de bir siparişte
+  /// iade hakkı ile satıcı ödemesi çakışamaz. null = damgadan önce teslim
+  /// edilmiş eski sipariş; o zaman bugünkü pencereyle hesaplanır.
+  returnWindowEndsAt         DateTime?                @map("return_window_ends_at")
   confirmationDeadline       DateTime?                @map("confirmation_deadline")
   buyerConfirmedAt           DateTime?                @map("buyer_confirmed_at")
   buyerConfirmationType      BuyerConfirmationType?   @map("buyer_confirmation_type")
@@ -3570,14 +3609,17 @@ enum ProductStatus {
   suspended
 }
 
-/// `Product.inactiveReason`'ın tek değeri. `inactive` statüsü kendi başına NEDEN
+/// `Product.inactiveReason` değerleri. `inactive` statüsü kendi başına NEDEN
 /// pasif olunduğunu söylemez (satıcı elle pasife almış olabilir, stok bitmiş
-/// olabilir, ya da teslim SONRASI bir iade karantinaya almış olabilir) — bu enum
-/// yalnız "sistem karantinaya aldı, satıcı doğrudan aktive edebilir" durumunu
-/// işaretler. Diğer tüm pasif nedenleri (rejected zaten ayrı bir status; elle
-/// pasife alma, stok sıfırı) null bırakır ve eski admin-onay akışına düşer.
+/// olabilir, teslim SONRASI bir iade karantinaya almış olabilir ya da ilan ömrü
+/// dolmuş olabilir) — bu enum yalnız sistemin koyduğu iki işareti taşır:
+/// `return_quarantine` ("sistem karantinaya aldı, satıcı doğrudan aktive
+/// edebilir") ve `expired` ("ilan ömrü doldu, satıcı yenileyebilir"). Diğer tüm
+/// pasif nedenleri (rejected zaten ayrı bir status; elle pasife alma, stok
+/// sıfırı) null bırakır ve eski admin-onay akışına düşer.
 enum ProductInactiveReason {
   return_quarantine
+  expired
 }
 
 enum ProductImportBatchStatus {

@@ -6,6 +6,7 @@ import { QUEUE_NAMES } from "../../../workers/constants";
 import { PrismaService } from "../../../prisma";
 import {
   Prisma,
+  ProductInactiveReason,
   ProductKind,
   ProductStatus,
   MembershipTierType,
@@ -20,6 +21,15 @@ import {
   adminUrl,
 } from "../../../config/app-urls";
 import type { CronRunSummary } from "../../../monitoring/cron-run.helper";
+import {
+  resolveTimingAction,
+  resolveTimingValue,
+} from "../../../common/timing-rules";
+import { CacheService } from "../../cache/cache.service";
+import { SearchService } from "../../search/search.service";
+import { errorMessage } from "../../../common/helpers/error-message";
+import { isRenewableInPlace } from "../helpers/product-renewal";
+import { refreshProductVisibility } from "../helpers/product-visibility";
 
 /**
  * Product Scheduler Service
@@ -42,17 +52,19 @@ export class ProductSchedulerService implements OnModuleInit {
     recentLike: 10, // Bonus for likes in last 7 days
   };
 
-  // İlan yaşam süresi (gün) — env'den; süre publishedAt'ten (yoksa createdAt)
-  // sayılır ve HER onayda tazelenir (yenileme = yeniden onay → taze pencere).
-  private readonly LISTING_EXPIRY_DAYS = (() => {
-    const parsed = Number(process.env.LISTING_TTL_DAYS);
-    return Number.isFinite(parsed) && parsed > 0 ? Math.floor(parsed) : 60;
-  })();
+  // İlan yaşam süresi ve uyarı günü Süreler ve Kurallar'dan (`listingTtlDays`,
+  // `listingExpiryWarningDays`) her cron turunun başında okunur. Süre
+  // publishedAt'ten (yoksa createdAt) sayılır ve HER onayda tazelenir
+  // (yenileme = yeniden onay → taze pencere). DİKKAT: bitiş tarihi ilana
+  // damgalanmaz, her turda "şimdi − N gün" ile hesaplanır — değer
+  // değiştirildiğinde yayındaki ilanların tamamına geriye dönük uygulanır.
 
   constructor(
     private readonly prisma: PrismaService,
     private readonly notificationService: NotificationService,
     @InjectQueue(QUEUE_NAMES.SCHEDULED) private readonly scheduledQueue: Queue,
+    private readonly cache: CacheService,
+    private readonly searchService: SearchService,
   ) {}
 
   /**
@@ -593,17 +605,26 @@ export class ProductSchedulerService implements OnModuleInit {
   }
 
   /**
-   * Expire old listings (60 days)
+   * Expire old listings (listing lifetime — `listingTtlDays`)
    * Runs every day at 04:00 AM
-   * Sets active listings older than 60 days to inactive status
+   * Süresi dolan aktif ilana, seçili eylemin (`listingTtlDays` → "süre dolunca")
+   * gereğini uygular:
+   *  - `deactivate` (varsayılan): pasife alır ve `expired` nedeniyle işaretler
+   *    (satıcı tek eylemle yenileyebilsin; elle pasife alma/stok bitişinden ayırt
+   *    edilebilsin) + "süresi doldu" e-postası.
+   *  - `auto_renew`: hâlâ satılabilir ilanı (stokta, satıcı banlı/askıda değil)
+   *    YERİNDE yeniler — ömür baştan başlar, satıcıya e-posta gitmez; satılamaz
+   *    olan ilan `deactivate` yoluna düşer.
    * Gerçek iş — Bull processor 'expire-old-listings' buradan çağırır.
    */
   async runExpireOldListings(log: (msg: string) => void = () => {}) {
     this.logger.log("Starting listing expiration check...");
 
     try {
+      const ttlDays = await resolveTimingValue(this.prisma, "listingTtlDays");
+      const action = await resolveTimingAction(this.prisma, "listingTtlDays");
       const expiryDate = new Date();
-      expiryDate.setDate(expiryDate.getDate() - this.LISTING_EXPIRY_DAYS);
+      expiryDate.setDate(expiryDate.getDate() - ttlDays);
 
       // Süre YAYIN anından sayılır (publishedAt; eski kayıtlarda createdAt).
       // Yalnız gerçek ilanlar: membership/boost sanal ürünleri (kind != listing)
@@ -618,38 +639,87 @@ export class ProductSchedulerService implements OnModuleInit {
         ],
       };
 
-      // Bu turda dolacak ilanları, satıcıya "ilanınız sona erdi" e-postası
-      // gönderebilmek için updateMany'den ÖNCE topla (updateMany etkilenen
-      // satırları döndürmez). Aynı where ile güncellendiği için tutarlı.
-      const toExpire = await this.prisma.product.findMany({
+      // Bu turda dolacak ilanları, e-posta/eylem kararı için yazımdan ÖNCE topla.
+      const due = await this.prisma.product.findMany({
         where: expiryWhere,
         select: {
           id: true,
           title: true,
-          seller: { select: { id: true, displayName: true } },
+          quantity: true,
+          seller: {
+            select: {
+              id: true,
+              displayName: true,
+              isBanned: true,
+              businessStatus: true,
+              companyName: true,
+              taxId: true,
+              membership: {
+                select: {
+                  status: true,
+                  currentPeriodEnd: true,
+                  tier: { select: { type: true, isActive: true } },
+                },
+              },
+            },
+          },
         },
       });
 
-      // Find and update expired listings
-      const result = await this.prisma.product.updateMany({
-        where: expiryWhere,
-        data: {
-          status: ProductStatus.inactive,
-        },
-      });
+      // Yazım İLAN BAŞINA ve aynı süre koşuluyla yapılır: toplu updateMany ile
+      // seçim arasında yenilenen/onaylanan ilan (publishedAt şimdi) koşula
+      // artık uymaz → dokunulmaz, e-postası da gitmez ("az önce yenilenen ilanı
+      // pasife alma" yarışı). Etkilenen satır sayısı (0/1) gerçek sonucu verir.
+      const expired: typeof due = [];
+      const renewed: string[] = [];
+      const renewNow = new Date();
+      for (const listing of due) {
+        if (
+          action === "auto_renew" &&
+          isRenewableInPlace(listing, listing.seller)
+        ) {
+          const res = await this.prisma.product.updateMany({
+            where: { ...expiryWhere, id: listing.id },
+            data: { publishedAt: renewNow },
+          });
+          if (res.count > 0) renewed.push(listing.id);
+          continue;
+        }
+        const res = await this.prisma.product.updateMany({
+          where: { ...expiryWhere, id: listing.id },
+          data: {
+            status: ProductStatus.inactive,
+            inactiveReason: ProductInactiveReason.expired,
+          },
+        });
+        if (res.count > 0) expired.push(listing);
+      }
 
-      if (result.count > 0) {
+      if (expired.length > 0 || renewed.length > 0) {
         this.logger.log(
-          `Expired ${result.count} listings older than ${this.LISTING_EXPIRY_DAYS} days`,
+          `Listings past ${ttlDays} days: ${expired.length} expired, ${renewed.length} auto-renewed`,
         );
       } else {
         this.logger.log("No listings to expire");
       }
 
-      // "İlanınız sona erdi" e-postaları (ilan başına, satıcıya). İlan 60 günü
+      // Pasife alınanlar önbellekten ve arama dizininden düşer (toplu updateMany
+      // Prisma arama-senkron middleware'ini tetiklemez; elle senkronlanır).
+      await refreshProductVisibility(
+        {
+          cache: this.cache,
+          searchService: this.searchService,
+          logger: this.logger,
+        },
+        expired.map((l) => l.id),
+      );
+
+      // "İlanınız sona erdi" e-postaları (ilan başına, satıcıya). İlan ömrünü
       // doldurduğu ilk gün expire olup active'den çıktığı için mükerrer gitmez.
+      // Bağlantı, ilanın kendi sayfası değil satıcının "süresi dolan" sekmesidir:
+      // pasif ilanın herkese açık sayfası yok, yenileme orada.
       const frontendUrl = resolveFrontendUrl();
-      for (const listing of toExpire) {
+      for (const listing of expired) {
         try {
           await this.notificationService.sendTemplateEmailToUser(
             listing.seller.id,
@@ -657,22 +727,22 @@ export class ProductSchedulerService implements OnModuleInit {
             {
               sellerName: listing.seller.displayName ?? "",
               productTitle: listing.title,
-              listingUrl: `${frontendUrl}/products/${listing.id}`,
+              listingUrl: `${frontendUrl}/profile/listings?status=expired`,
             },
           );
-        } catch (err: any) {
+        } catch (err: unknown) {
           this.logger.warn(
-            `listing-expired email failed for ${listing.id}: ${err?.message}`,
+            `listing-expired email failed for ${listing.id}: ${errorMessage(err)}`,
           );
         }
       }
 
       log(
-        `${result.count} eski ilan pasif yapıldı (>${this.LISTING_EXPIRY_DAYS} gün)`,
+        `${expired.length} eski ilan pasif yapıldı, ${renewed.length} ilan otomatik yenilendi (>${ttlDays} gün)`,
       );
       return {
-        summary: `${result.count} eski ilan pasif yapıldı`,
-        stats: { expired: result.count },
+        summary: `${expired.length} eski ilan pasif yapıldı · ${renewed.length} yenilendi`,
+        stats: { expired: expired.length, renewed: renewed.length },
       };
     } catch (error: any) {
       this.logger.error(
@@ -740,30 +810,34 @@ export class ProductSchedulerService implements OnModuleInit {
   }
 
   /**
-   * Get listings that will expire soon (within 7 days)
+   * Get listings that will expire soon (within the warning lead time)
    * Can be used to send notifications to sellers
    */
-  async getExpiringListings(daysUntilExpiry: number = 7): Promise<any[]> {
+  async getExpiringListings(daysUntilExpiry?: number): Promise<any[]> {
+    const ttlDays = await resolveTimingValue(this.prisma, "listingTtlDays");
+    const leadDays =
+      daysUntilExpiry ??
+      (await resolveTimingValue(this.prisma, "listingExpiryWarningDays"));
     const expiryDate = new Date();
-    expiryDate.setDate(
-      expiryDate.getDate() - this.LISTING_EXPIRY_DAYS + daysUntilExpiry,
-    );
+    expiryDate.setDate(expiryDate.getDate() - ttlDays + leadDays);
 
     const warningDate = new Date();
-    warningDate.setDate(warningDate.getDate() - this.LISTING_EXPIRY_DAYS);
+    warningDate.setDate(warningDate.getDate() - ttlDays);
 
     return this.prisma.product.findMany({
       where: {
         status: ProductStatus.active,
-        createdAt: {
-          lt: expiryDate,
-          gt: warningDate,
-        },
+        // Süre yayın anından sayılır (publishedAt; eski kayıtta createdAt).
+        OR: [
+          { publishedAt: { lt: expiryDate, gt: warningDate } },
+          { publishedAt: null, createdAt: { lt: expiryDate, gt: warningDate } },
+        ],
       },
       select: {
         id: true,
         title: true,
         createdAt: true,
+        publishedAt: true,
         seller: {
           select: {
             id: true,
@@ -784,14 +858,32 @@ export class ProductSchedulerService implements OnModuleInit {
     this.logger.log("Checking for listings expiring soon...");
 
     try {
+      // `auto_renew` seçiliyken ilan dolmaz, yerinde yenilenir: "süresi doluyor"
+      // uyarısı yanlış (ve her ilan için boşuna) olurdu. Yenilenemeyen ilan
+      // (stok/satıcı) zaten dolumda "süresi doldu" e-postasını alır.
+      const expiryAction = await resolveTimingAction(
+        this.prisma,
+        "listingTtlDays",
+      );
+      if (expiryAction === "auto_renew") {
+        log("Otomatik yenileme açık: süre uyarısı gönderilmedi");
+        return {
+          summary: "0 yaklaşan ilan (otomatik yenileme)",
+          stats: { sellers: 0, listings: 0 },
+        };
+      }
+
       // Cron günlük çalışır. 7 günlük pencerenin TAMAMINI seçersek aynı ilana
       // 7 gün boyunca her gün uyarı gider. Bunun yerine yalnız BUGÜN 53 günü
       // (60 - 7) dolduran ilanları (1 günlük bant) seç → ilan başına tek uyarı.
-      const WARN_DAYS_BEFORE = 7;
-      const bandEnd = new Date();
-      bandEnd.setDate(
-        bandEnd.getDate() - (this.LISTING_EXPIRY_DAYS - WARN_DAYS_BEFORE),
+      // İki sayı da Süreler ve Kurallar'dan; kayıt uyarı < ömür dayatır.
+      const ttlDays = await resolveTimingValue(this.prisma, "listingTtlDays");
+      const warnDaysBefore = await resolveTimingValue(
+        this.prisma,
+        "listingExpiryWarningDays",
       );
+      const bandEnd = new Date();
+      bandEnd.setDate(bandEnd.getDate() - (ttlDays - warnDaysBefore));
       const bandStart = new Date(bandEnd);
       bandStart.setDate(bandStart.getDate() - 1);
 
@@ -809,12 +901,15 @@ export class ProductSchedulerService implements OnModuleInit {
           id: true,
           title: true,
           createdAt: true,
+          publishedAt: true,
           seller: { select: { id: true, displayName: true } },
         },
       });
 
       if (expiringListings.length === 0) {
-        this.logger.log("No listings entering the 7-day expiry warning window");
+        this.logger.log(
+          `No listings entering the ${warnDaysBefore}-day expiry warning window`,
+        );
         log("Süresi yaklaşan ilan yok");
         return {
           summary: "0 yaklaşan ilan",
@@ -823,17 +918,22 @@ export class ProductSchedulerService implements OnModuleInit {
       }
 
       this.logger.log(
-        `Warning sellers about ${expiringListings.length} listing(s) expiring in ~7 days`,
+        `Warning sellers about ${expiringListings.length} listing(s) expiring in ~${warnDaysBefore} days`,
       );
-      log(`${expiringListings.length} ilan 7 gün içinde sona eriyor`);
+      log(
+        `${expiringListings.length} ilan ${warnDaysBefore} gün içinde sona eriyor`,
+      );
 
       // "İlanınızın süresi doluyor" e-postası (ilan başına, satıcıya).
       const frontendUrl = resolveFrontendUrl();
       for (const listing of expiringListings) {
-        const expirationDate = new Date(listing.createdAt);
-        expirationDate.setDate(
-          expirationDate.getDate() + this.LISTING_EXPIRY_DAYS,
+        // Bitiş tarihi sayıma esas olan YAYIN anından (publishedAt; eski kayıtta
+        // createdAt) hesaplanır — eskiden createdAt'ten hesaplanıp yeniden
+        // onaylanmış ilanlara yanlış tarih yazılıyordu.
+        const expirationDate = new Date(
+          listing.publishedAt ?? listing.createdAt,
         );
+        expirationDate.setDate(expirationDate.getDate() + ttlDays);
         try {
           await this.notificationService.sendTemplateEmailToUser(
             listing.seller.id,
@@ -841,9 +941,10 @@ export class ProductSchedulerService implements OnModuleInit {
             {
               sellerName: listing.seller.displayName ?? "",
               productTitle: listing.title,
-              daysRemaining: WARN_DAYS_BEFORE,
+              daysRemaining: warnDaysBefore,
               expirationDate: expirationDate.toLocaleDateString("tr-TR"),
-              listingUrl: `${frontendUrl}/products/${listing.id}`,
+              // Süre dolunca yenileme "ilanlarım"dadır; ilan sayfası değil.
+              listingUrl: `${frontendUrl}/profile/listings`,
             },
           );
         } catch (err: any) {

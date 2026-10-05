@@ -303,7 +303,7 @@ export const DASHBOARD_ALERT_KEYS = [
   "deliveredHoldsWithoutRelease",
   "agedCarrierCancellations",
   "exhaustedPayoutRetries",
-  "preparingDeadlineWithin24h",
+  "preparingDeadlineApproaching",
 ] as const;
 
 export type DashboardAlertKey = (typeof DASHBOARD_ALERT_KEYS)[number];
@@ -347,7 +347,7 @@ export const DASHBOARD_ALERT_LINKS: Record<DashboardAlertKey, string> = {
   deliveredHoldsWithoutRelease: "/finance/payouts",
   agedCarrierCancellations: "/operations/shipping",
   exhaustedPayoutRetries: "/finance/payouts",
-  preparingDeadlineWithin24h: ADMIN_ORDERS_PATH,
+  preparingDeadlineApproaching: ADMIN_ORDERS_PATH,
 };
 
 /** Zone A + Zone B — one request, because both answer "what needs me now?". */

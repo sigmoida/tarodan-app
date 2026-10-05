@@ -78,6 +78,8 @@ describe("Teklif — bildirimler ve fiyat tabanı", () => {
       {
         $transaction: jest.fn().mockImplementation((fn: any) => fn(tx)),
         order: { count: jest.fn().mockResolvedValue(0) },
+        // Teklif geçerliliği ve ödeme penceresi Süreler ve Kurallar'dan.
+        platformSetting: { findUnique: jest.fn().mockResolvedValue(null) },
       } as any,
       { del: jest.fn(), delByPattern: jest.fn() } as any,
       { get: () => undefined } as any,
@@ -198,6 +200,8 @@ describe("Teklif — bildirimler ve fiyat tabanı", () => {
     const service = new OfferService(
       {
         $transaction: jest.fn().mockImplementation((fn: any) => fn(tx)),
+        // Teklif geçerliliği Süreler ve Kurallar'dan, işlem açılmadan okunur.
+        platformSetting: { findUnique: jest.fn().mockResolvedValue(null) },
       } as any,
       { del: jest.fn(), delByPattern: jest.fn() } as any,
       { get: () => undefined } as any,
@@ -236,6 +240,8 @@ describe("OfferSchedulerService — süre dolumu bildirimi", () => {
         findMany: jest.fn().mockResolvedValue(expiring),
         updateMany: jest.fn().mockResolvedValue({ count: 1 }),
       },
+      // Süre dolumu eylemi Süreler ve Kurallar'dan okunur; satır yok → expire.
+      platformSetting: { findUnique: jest.fn().mockResolvedValue(null) },
     };
     const notificationService = {
       notifyOfferExpired: jest.fn().mockResolvedValue(undefined),
@@ -243,6 +249,8 @@ describe("OfferSchedulerService — süre dolumu bildirimi", () => {
     const service = new OfferSchedulerService(
       prisma as any,
       {} as any,
+      {} as any,
+      { get: () => undefined } as any,
       notificationService as any,
     );
 
@@ -262,11 +270,14 @@ describe("OfferSchedulerService — süre dolumu bildirimi", () => {
         findMany: jest.fn().mockResolvedValue([]),
         updateMany: jest.fn().mockResolvedValue({ count: 0 }),
       },
+      platformSetting: { findUnique: jest.fn().mockResolvedValue(null) },
     };
     const notificationService = { notifyOfferExpired: jest.fn() };
     const service = new OfferSchedulerService(
       prisma as any,
       {} as any,
+      {} as any,
+      { get: () => undefined } as any,
       notificationService as any,
     );
 

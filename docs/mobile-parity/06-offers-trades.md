@@ -25,7 +25,7 @@ Kurallar (istemci + sunucu):
   (alt sınır `MIN_OFFER_PERCENTAGE`, varsayılan %50).
 - `message` opsiyonel, max 500.
 - İlan `active` olmalı; sahibi teklif veremez.
-- Teklif ömrü `OFFER_EXPIRY_HOURS`, varsayılan **24 saat**.
+- Teklif ömrü Süreler ve Kurallar → `offerExpiryHours` (varsayılan **24 saat**); güncel değer `GET /api/timing-rules` → `offerExpiryHours`.
 
 ---
 

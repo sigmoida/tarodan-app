@@ -10,6 +10,8 @@ import {
 } from "@heroicons/react/24/outline";
 import type { Translate } from "@/types/i18n";
 import { getTranslations } from "next-intl/server";
+import { getTimingPolicy } from "@/lib/server/timing-policy";
+import { withTimingValues } from "@/lib/timing-policy";
 
 const TRUST_BADGES = (t: Translate) => ({
   tr: [
@@ -79,7 +81,8 @@ const TRUST_BADGES = (t: Translate) => ({
 });
 
 export default async function TrustBadges({ locale }: { locale: string }) {
-  const t = await getTranslations();
+  // İade penceresi (returnWindowDays) Süreler ve Kurallar'dan gelir.
+  const t = withTimingValues(await getTranslations(), await getTimingPolicy());
   const badges = TRUST_BADGES(t)[locale as "tr" | "en"];
 
   return (

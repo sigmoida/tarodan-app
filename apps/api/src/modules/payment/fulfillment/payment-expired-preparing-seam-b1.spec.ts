@@ -9,11 +9,20 @@ import { ORDER_CANCEL_REASON } from "../../order/helpers/order-cancel-reasons";
  * order.quantity kadar (eskiden sabit +1).
  */
 describe("PaymentExpiryReconciliationService.handleExpiredPreparingOrders — SEAM-B1", () => {
-  const makeService = (expiredOrder: any, shipment: any) => {
+  const makeService = (
+    expiredOrder: any,
+    shipment: any,
+    // Kilit altındaki tekrar okuma: hâlâ hazırlıkta, son tarihi geçmiş.
+    freshOrder: any = {
+      status: "preparing",
+      preparingDeadline: new Date(Date.now() - 60 * 60 * 1000),
+      preparingExtendedAt: null,
+    },
+  ) => {
     const mockTx = {
       $queryRaw: jest.fn().mockResolvedValue([]),
       order: {
-        findUnique: jest.fn().mockResolvedValue({ status: "preparing" }),
+        findUnique: jest.fn().mockResolvedValue(freshOrder),
         update: jest.fn().mockResolvedValue({}),
       },
       shipment: { findUnique: jest.fn().mockResolvedValue(shipment) },
@@ -30,6 +39,8 @@ describe("PaymentExpiryReconciliationService.handleExpiredPreparingOrders — SE
           .mockResolvedValueOnce([expiredOrder]), // Phase 2: expired
         update: jest.fn().mockResolvedValue({}),
       },
+      // Süreler ve Kurallar: satır yok → varsayılanlar (24 saat, iptal + iade).
+      platformSetting: { findUnique: jest.fn().mockResolvedValue(null) },
       $transaction: jest.fn((fn: any) => fn(mockTx)),
     };
     const paymentRefund = {
@@ -53,7 +64,14 @@ describe("PaymentExpiryReconciliationService.handleExpiredPreparingOrders — SE
       {} as any, // paymentCommon
       {} as any, // paymentFulfillment
     );
-    return { service, prisma, mockTx, paymentRefund };
+    return {
+      service,
+      prisma,
+      mockTx,
+      paymentRefund,
+      notificationService,
+      commissionLedger,
+    };
   };
 
   const order = (over: any = {}) => ({
@@ -151,6 +169,34 @@ describe("PaymentExpiryReconciliationService.handleExpiredPreparingOrders — SE
       }),
     );
   });
+
+  /**
+   * Regresyon: kilit altındaki tekrar okuma siparişi atladığında (`return`
+   * yalnız işlem geri çağrısından çıkar) akış iadeye düşüyordu — aynı anda
+   * kargolanan sipariş iade ediliyor, başka turun iptal ettiği sipariş ikinci
+   * kez iade deneniyordu.
+   */
+  it.each([
+    ["kargolandı (shipped)", { status: "shipped" }],
+    ["başka tur iptal etti", { status: "cancelled" }],
+    ["sipariş bulunamadı", null],
+  ])(
+    "kilit altında sipariş artık hazırlıkta değilse (%s) iade/bildirim YAPMAZ",
+    async (_label, fresh) => {
+      const { service, mockTx, paymentRefund, notificationService } =
+        makeService(order(), null, fresh);
+
+      const res = await service.handleExpiredPreparingOrders();
+
+      expect(res.cancelled).toBe(0);
+      expect(mockTx.order.update).not.toHaveBeenCalled();
+      expect(mockTx.product.update).not.toHaveBeenCalled();
+      expect(paymentRefund.processRefund).not.toHaveBeenCalled();
+      expect(
+        notificationService.notifySellerDidNotShipRefunded,
+      ).not.toHaveBeenCalled();
+    },
+  );
 
   it("shipment yoksa iptal+iade EDER", async () => {
     const { service, paymentRefund } = makeService(order(), null);

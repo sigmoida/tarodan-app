@@ -1,4 +1,8 @@
 import { ShipmentStatus, TradeStatus } from "@prisma/client";
+import {
+  resolveTimingValue,
+  type TimingSettingReader,
+} from "../timing-rules/timing-rules.resolver";
 
 /**
  * TAKAS ESCROW ZAMANLAMASI — TEK KAYNAK.
@@ -15,28 +19,16 @@ import { ShipmentStatus, TradeStatus } from "@prisma/client";
  * kullanıcı `completed` statüde artık itiraz da açamıyordu. Sipariş tarafındaki
  * escrow da (teslim + iade penceresi + grace) aynı ilkeyi izler.
  *
- * İki süre de PlatformSetting'ten okunur (deploy'suz ayarlanabilir); anahtar ve
- * varsayılanlar YALNIZ burada tanımlıdır — kod, seed ve admin paneli hep bu
- * dosyadaki değerlere dayanır.
+ * İki süre de Süreler ve Kurallar kaydındadır (`tradeHoldDays`,
+ * `tradeConfirmationDays` — `@tarodan/types` TIMING_RULES): anahtar, varsayılan
+ * ve admin sınırları orada tanımlıdır, okuma `common/timing-rules` üzerindendir.
+ * Bir değer geçersizse (boş/NaN/1'den küçük) varsayılana düşer — hatalı bir
+ * ayar yüzünden pencere sıfırlanıp para erken serbest kalmasın; admin ekranı da
+ * en az 1 gün dayatır.
  */
-export const TRADE_ESCROW_SETTINGS = {
-  /** Takas tamamlandıktan sonra nakit hold'un açılma süresi (gün). */
-  HOLD_DAYS: { key: "payment_hold_days", default: 3 },
-  /** Teslimattan sonra tarafların onay/itiraz penceresi (gün). */
-  CONFIRMATION_DAYS: { key: "trade_confirmation_deadline_days", default: 3 },
-} as const;
-
-type TradeEscrowSetting =
-  (typeof TRADE_ESCROW_SETTINGS)[keyof typeof TRADE_ESCROW_SETTINGS];
 
 /** Ayar okuyabilen minimum Prisma yüzeyi (PrismaService veya tx client). */
-interface SettingReader {
-  platformSetting: {
-    findUnique(args: {
-      where: { settingKey: string };
-    }): Promise<{ settingValue: string } | null>;
-  };
-}
+type SettingReader = TimingSettingReader;
 
 /**
  * Teslim edilmemiş TERMİNAL çıkış bacakları (iptal/dönüş). Böyle bir bacak
@@ -50,30 +42,6 @@ const TERMINAL_NON_DELIVERED_STATUSES: ShipmentStatus[] = [
   ShipmentStatus.returned,
 ];
 
-/**
- * Ayardaki gün sayısı. Satır yoksa ya da değer geçersizse (boş/NaN/1'den
- * küçük) varsayılana düşer — hatalı bir ayar yüzünden pencere sıfırlanıp para
- * erken serbest kalmasın. 0 da reddedilir: sıfır gün, hold'u tamamlanma anında
- * çökertip parayı beklemesiz açar (admin paneli de min 1 dayatır).
- */
-export async function resolveTradeEscrowDays(
-  db: SettingReader,
-  setting: TradeEscrowSetting,
-): Promise<number> {
-  const row = await db.platformSetting.findUnique({
-    where: { settingKey: setting.key },
-  });
-  const raw = row?.settingValue;
-  // Boş dize Number("") === 0 verir: ayar boş bırakıldığında pencere sıfırlanıp
-  // para anında serbest kalmasın diye "yok" sayılır.
-  if (raw === undefined || raw === null || `${raw}`.trim() === "") {
-    return setting.default;
-  }
-  const parsed = Number(raw);
-  if (!Number.isFinite(parsed) || parsed < 1) return setting.default;
-  return Math.floor(parsed);
-}
-
 export function addDays(from: Date, days: number): Date {
   const result = new Date(from);
   result.setDate(result.getDate() + days);
@@ -85,10 +53,7 @@ export async function computeTradeHoldReleaseAt(
   db: SettingReader,
   from: Date = new Date(),
 ): Promise<Date> {
-  const days = await resolveTradeEscrowDays(
-    db,
-    TRADE_ESCROW_SETTINGS.HOLD_DAYS,
-  );
+  const days = await resolveTimingValue(db, "tradeHoldDays");
   return addDays(from, days);
 }
 
@@ -97,21 +62,8 @@ export async function computeTradeConfirmationDeadline(
   db: SettingReader,
   from: Date = new Date(),
 ): Promise<Date> {
-  const days = await resolveTradeEscrowDays(
-    db,
-    TRADE_ESCROW_SETTINGS.CONFIRMATION_DAYS,
-  );
+  const days = await resolveTimingValue(db, "tradeConfirmationDays");
   return addDays(from, days);
-}
-
-/**
- * Kayıp koli bekleme süresi (gün) — hem depoya varmayan giriş bacağının
- * otomatik çözümünde hem de teslim raporu hiç gelmeyen çıkış bacağının admin
- * alarmında kullanılır.
- */
-export function tradeLostParcelGraceDays(): number {
-  const parsed = Number(process.env.TRADE_LOST_PARCEL_GRACE_DAYS ?? 14);
-  return Number.isFinite(parsed) && parsed >= 1 ? Math.floor(parsed) : 14;
 }
 
 /** startTradeConfirmationWindowIfDelivered için gereken Prisma yüzeyi. */
