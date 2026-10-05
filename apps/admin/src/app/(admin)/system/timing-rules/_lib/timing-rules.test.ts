@@ -10,6 +10,7 @@ import {
   actionField,
   actionOptions,
   changedRules,
+  inProgressWarningKey,
   isActionLocked,
   isTimingGroup,
   readTimingRuleStates,
@@ -133,10 +134,18 @@ describe("timing rules schema — same rules as the server", () => {
 
   it("refuses an action that is not available yet", () => {
     expect(
-      issuesFor(valuesWith({ [actionField("listingTtlDays")]: "auto_renew" })),
+      issuesFor(
+        valuesWith({ [actionField("offerExpiryHours")]: "extend_once" }),
+      ),
     ).toEqual({
-      listingTtlDaysAction: "server.admin.timingRules.actionUnavailable",
+      offerExpiryHoursAction: "server.admin.timingRules.actionUnavailable",
     });
+  });
+
+  it("accepts the listing auto-renew action now that it is available", () => {
+    expect(
+      issuesFor(valuesWith({ [actionField("listingTtlDays")]: "auto_renew" })),
+    ).toEqual({});
   });
 });
 
@@ -158,6 +167,15 @@ describe("timing rules screen helpers", () => {
       }),
     ).toEqual(["listing", "payment"]);
     expect(tabsWithErrors({})).toEqual([]);
+  });
+
+  it("uses a listing-specific in-progress warning only for the listing lifetime", () => {
+    expect(inProgressWarningKey("listingTtlDays")).toBe(
+      "admin.timingRules.rules.listingTtlDays.inProgressWarning",
+    );
+    expect(inProgressWarningKey("returnWindowDays")).toBe(
+      "admin.timingRules.appliesToInProgressWarning",
+    );
   });
 
   it("locks the select for single-action rules", () => {

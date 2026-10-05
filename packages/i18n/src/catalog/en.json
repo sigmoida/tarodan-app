@@ -2235,7 +2235,29 @@
       "onayBekleyen": "Onay Bekleyen",
       "askiyaAlinan": "Askıya Alınan",
       "satilan": "Satılan",
-      "kaldirilan": "Kaldırılan"
+      "kaldirilan": "Kaldırılan",
+      "expired": "Expired"
+    },
+    "expiredListings": {
+      "tab": "Expired",
+      "bannerTitle": "{count} of your listings have expired",
+      "bannerDescription": "Renew them in one click. Listings whose content has not changed go straight back live.",
+      "cardHint": "Expired. Renew it to put it back live.",
+      "renew": "Renew",
+      "renewing": "Renewing...",
+      "select": "Select listing",
+      "selectAll": "Select all",
+      "clearSelection": "Clear selection",
+      "renewSelected": "Renew selected ({count})",
+      "renewed": "Listing renewed and live",
+      "submitted": "Listing sent for approval; it goes live once approved",
+      "renewFailed": "The listing could not be renewed",
+      "bulkRenewed": "{count} listings renewed and live",
+      "bulkSubmitted": "{count} listings sent for approval",
+      "bulkFailed": "{count} listings could not be renewed",
+      "failedItem": "{title}: {reason}",
+      "empty": "You have no expired listings.",
+      "emptyDescription": "Your expired listings are listed here."
     },
     "myListings": {
       "ilanSilindi": "İlan silindi",
@@ -9268,7 +9290,8 @@
       "rules": {
         "listingTtlDays": {
           "label": "Listing lifetime",
-          "helper": "An approved listing stays live this long; the clock restarts on every re-approval."
+          "helper": "An approved listing stays live for this long; the clock restarts on every approval or seller renewal. With \"Renew the listing automatically\", a listing that reaches its lifetime (while in stock and the seller is in good standing) renews itself instead of being deactivated.",
+          "inProgressWarning": "This duration is not stamped on listings; every night it is computed as \"now − N days\". If you shorten it, every live listing older than the new value is processed together on the next nightly run (04:00): it is deactivated and sellers get an \"expired\" email (with automatic renewal selected, their lifetime restarts instead). If you lengthen it, listings that were already deactivated do not come back."
         },
         "listingExpiryWarningDays": {
           "label": "Listing expiry warning",
@@ -10119,6 +10142,8 @@
       "reservedCannotUpdate": "Reserved products cannot be updated",
       "sellerIdNotFound": "Seller ID not found",
       "setQuantityToReopen": "Set a stock quantity to reopen for sale",
+      "renewNotExpired": "Only expired listings can be renewed.",
+      "renewFailed": "The listing could not be renewed. Please try again.",
       "soldOrReservedCannotDelete": "Sold or reserved products cannot be deleted",
       "statsForbidden": "You do not have permission to view this product's statistics",
       "tradeRequiresPremium": "Trade feature requires Premium membership. Upgrade your membership.",

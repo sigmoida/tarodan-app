@@ -213,6 +213,17 @@ export function isActionLocked(id: TimingRuleId): boolean {
   return TIMING_RULES[id].actions.length === 1;
 }
 
+/**
+ * "Sürmekte olanlara da uygulanır" uyarısının metni. Genel uyarı "değişiklik
+ * hemen uygulanır" der; ilan ömründe bu yanıltıcıdır (etki bir sonraki gece
+ * koşusunda ve toplu), o yüzden kayda özel metin vardır.
+ */
+export function inProgressWarningKey(id: TimingRuleId) {
+  return id === "listingTtlDays"
+    ? ("admin.timingRules.rules.listingTtlDays.inProgressWarning" as const)
+    : ("admin.timingRules.appliesToInProgressWarning" as const);
+}
+
 /** Satırın yardım satırı için sınır metni ("1–30 gün"). */
 export function boundsLabel(t: T, id: TimingRuleId): string {
   const rule = timingRule(id);

@@ -52,6 +52,7 @@ import { AdminTimingRulesController } from "./ops/admin-timing-rules.controller"
 import { AdminStaffService } from "./users/admin-staff.service";
 import { AdminProductService } from "./catalog/admin-product.service";
 import { AdminProductBulkImportService } from "./catalog/admin-product-bulk-import.service";
+import { AdminExpiredListingsService } from "./catalog/admin-expired-listings.service";
 import {
   ProductImportBatchProcessor,
   ProductImportBatchScheduler,
@@ -231,6 +232,7 @@ import { scheduledProcessors } from "../../workers/scheduled-processors";
     AdminStaffService,
     AdminProductService,
     AdminProductBulkImportService,
+    AdminExpiredListingsService,
     AdminOrderService,
     AdminCancellationService,
     AdminAnalyticsService,

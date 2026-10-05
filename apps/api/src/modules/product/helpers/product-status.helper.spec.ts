@@ -56,6 +56,39 @@ describe("clearStaleInactiveReasonOnWrite", () => {
     expect(data).not.toHaveProperty("inactiveReason");
   });
 
+  it.each([
+    ["yenileme (active)", ProductStatus.active],
+    ["yenileme/yeniden açma (pending)", ProductStatus.pending],
+    ["yönetici onayı sonrası silme (deleted)", ProductStatus.deleted],
+  ])(
+    "süresi dolmuş (expired) ilan %s ile inactive'den çıkınca işaret temizlenir",
+    (_label, status) => {
+      // Bayat `expired` işareti ilerideki bir pasife almada yenileme kısayolunu
+      // yanlış ilana sızdırırdı.
+      const data: Record<string, unknown> = { status };
+      clearStaleInactiveReasonOnWrite(data);
+      expect(data.inactiveReason).toBeNull();
+    },
+  );
+
+  it("süre dolumu yazımı (inactive + expired) işaretini korur", () => {
+    const data: Record<string, unknown> = {
+      status: ProductStatus.inactive,
+      inactiveReason: ProductInactiveReason.expired,
+    };
+    clearStaleInactiveReasonOnWrite(data);
+    expect(data.inactiveReason).toBe(ProductInactiveReason.expired);
+  });
+
+  it("yenileme yazımı (status + publishedAt, neden belirtilmemiş) nedeni null yapar", () => {
+    const data: Record<string, unknown> = {
+      status: ProductStatus.active,
+      publishedAt: new Date(),
+    };
+    clearStaleInactiveReasonOnWrite(data);
+    expect(data.inactiveReason).toBeNull();
+  });
+
   it("yazım status'a hiç dokunmuyorsa (ör. yalnız quantity) hiçbir şey yapmaz", () => {
     const data: Record<string, unknown> = { quantity: { increment: 1 } };
     clearStaleInactiveReasonOnWrite(data);

@@ -7,11 +7,12 @@ import { useAuthStore } from "@/stores/authStore";
 import { useWebList } from "@/hooks/useWebResource";
 import { useWebMutation } from "@/hooks/useWebMutation";
 import type { Listing } from "../_lib/types";
+import { listingFilterParams } from "../_lib/status";
 import { useTranslations } from "next-intl";
 
-const RESOURCE = "profile-listings";
+export const RESOURCE = "profile-listings";
 /** The listing detail cache (queryKeys.product.detail → ["listing", id]). */
-const LISTING_RESOURCE = "listing";
+export const LISTING_RESOURCE = "listing";
 
 /** The user's listings for the active status filter. `all` fetches everything. */
 export function useMyListings(activeFilter: string, enabled: boolean) {
@@ -19,8 +20,11 @@ export function useMyListings(activeFilter: string, enabled: boolean) {
     resource: RESOURCE,
     params: activeFilter,
     fetcher: async () => {
-      const params: Record<string, any> = { limit: 100, page: 1 };
-      if (activeFilter && activeFilter !== "all") params.status = activeFilter;
+      const params: Record<string, any> = {
+        limit: 100,
+        page: 1,
+        ...listingFilterParams(activeFilter),
+      };
       const response = await userApi.getMyProducts(params);
       const data =
         response.data?.data || response.data?.products || response.data || [];

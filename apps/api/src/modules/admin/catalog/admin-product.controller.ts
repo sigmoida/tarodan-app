@@ -75,6 +75,7 @@ import {
   PRODUCT_BULK_IMPORT_MAX_IMAGES,
 } from "./admin-product-bulk-import.constants";
 import { AdminProductBulkImportService } from "./admin-product-bulk-import.service";
+import { AdminExpiredListingsService } from "./admin-expired-listings.service";
 import {
   CreateCommissionRuleDto,
   UpdateCommissionRuleDto,
@@ -123,6 +124,7 @@ import {
   TradeShipmentQueryDto,
   RefundRequestQueryDto,
   AdminChangeMembershipDto,
+  ExpiredListingsMaintenanceDto,
 } from "../dto";
 
 @ApiTags("admin")
@@ -135,6 +137,7 @@ export class AdminProductController {
     private readonly adminService: AdminService,
     private readonly discountService: DiscountService,
     private readonly productBulkImport: AdminProductBulkImportService,
+    private readonly expiredListings: AdminExpiredListingsService,
   ) {}
 
   // ==================== PRODUCT MANAGEMENT ====================
@@ -430,6 +433,27 @@ export class AdminProductController {
     @Body() dto: BulkApproveProductsDto,
   ) {
     return this.adminService.bulkApproveProducts(adminId, dto.ids, dto.note);
+  }
+
+  /**
+   * Tek seferlik bakım: bu özellikten ÖNCE süresi dolmuş (işaretsiz) ilanları
+   * bulur ve işaretler/yeniden açar. Varsayılan: kuru çalıştırma + yalnız işaretleme.
+   * Literal rota (`products/expired-listings/…`) `products/:id/…` rotalarından
+   * önce tanımlı kalmalı.
+   */
+  @Post("products/expired-listings/maintenance")
+  @Roles(AdminRole.super_admin, AdminRole.admin)
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: "Süresi dolmuş eski ilanları işaretle / yeniden aç (tek seferlik)",
+    description:
+      "dryRun=true (varsayılan) yalnız raporlar. mode=mark ilanları 'süresi doldu' olarak işaretler (satıcı tek tıkla yeniler); mode=reactivate ayrıca yönetici onayıyla yayına alır (stok, üyelik limiti ve komisyon kapıları geçerli).",
+  })
+  async maintainExpiredListings(
+    @CurrentUser("id") adminId: string,
+    @Body() dto: ExpiredListingsMaintenanceDto,
+  ) {
+    return this.expiredListings.run(adminId, dto);
   }
 
   @Post("products/bulk-reject")

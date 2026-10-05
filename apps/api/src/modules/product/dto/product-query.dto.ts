@@ -10,7 +10,11 @@ import {
 } from "class-validator";
 import { ApiPropertyOptional } from "@nestjs/swagger";
 import { Type, Transform } from "class-transformer";
-import { ProductStatus, ProductCondition } from "@prisma/client";
+import {
+  ProductStatus,
+  ProductCondition,
+  ProductInactiveReason,
+} from "@prisma/client";
 
 export class ProductQueryDto {
   @ApiPropertyOptional({
@@ -54,6 +58,16 @@ export class ProductQueryDto {
   @IsOptional()
   @IsEnum(ProductStatus)
   status?: ProductStatus;
+
+  @ApiPropertyOptional({
+    enum: ProductInactiveReason,
+    example: "expired",
+    description:
+      "Pasif ilanın nedeni (yalnız satıcının kendi listesinde): expired = süresi dolan",
+  })
+  @IsOptional()
+  @IsEnum(ProductInactiveReason)
+  inactiveReason?: ProductInactiveReason;
 
   @ApiPropertyOptional({
     enum: ProductCondition,

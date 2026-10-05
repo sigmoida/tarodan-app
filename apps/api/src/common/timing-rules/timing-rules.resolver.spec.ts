@@ -228,7 +228,6 @@ describe("eylem çözümü", () => {
   });
 
   it("henüz açılmamış bir eylem DB'ye yazılmış olsa bile uygulanmaz", () => {
-    expect(pickTimingAction("listingTtlDays", "auto_renew")).toBe("deactivate");
     expect(pickTimingAction("offerExpiryHours", "extend_once")).toBe("expire");
   });
 
@@ -236,6 +235,18 @@ describe("eylem çözümü", () => {
     expect(pickTimingAction("tradeShippingDays", "deactivate")).toBe(
       "cancel_and_refund",
     );
+  });
+
+  it("ilan ömrü için otomatik yenileme seçilebilir ve okunur", async () => {
+    expect(pickTimingAction("listingTtlDays", "auto_renew")).toBe("auto_renew");
+    await expect(
+      resolveTimingAction(
+        settingReader({
+          [timingActionSettingKey("listingTtlDays")]: "auto_renew",
+        }),
+        "listingTtlDays",
+      ),
+    ).resolves.toBe("auto_renew");
   });
 
   it("seçilebilir eylemi okur", async () => {

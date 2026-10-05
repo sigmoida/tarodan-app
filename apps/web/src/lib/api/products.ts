@@ -57,6 +57,10 @@ export const listingsApi = {
   update: (id: string | number, data: Record<string, any>) =>
     api.patch(`/products/${id}`, data),
   delete: (id: string | number) => api.delete(`/products/${id}`),
+  /** Renew one expired listing (live again, or sent for approval if its content changed). */
+  renew: (id: string) => api.post(`/products/${id}/renew`),
+  /** Renew several expired listings; every listing comes back with its own result. */
+  renewMany: (ids: string[]) => api.post("/products/my/renew", { ids }),
 };
 
 // Search (ElasticSearch)

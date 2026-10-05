@@ -1485,7 +1485,7 @@ export function renderEmailTemplate(
       `
       ${titleBlock("İlanınızın Süresi Doluyor", "⏰")}
       ${greeting(data?.sellerName || data?.userName)}
-      <p style="font-size: 15px; color: #4b5563; line-height: 1.6; margin: 0 0 20px 0;"><strong style="color: #111827;">${data?.productTitle || "İlanınızın"}</strong> ilanının süresi ${data?.daysRemaining ? `${data.daysRemaining} gün içinde ` : "yakında "}dolacak. Yenileyerek görünürlüğünü koruyabilirsiniz.</p>
+      <p style="font-size: 15px; color: #4b5563; line-height: 1.6; margin: 0 0 20px 0;"><strong style="color: #111827;">${data?.productTitle || "İlanınızın"}</strong> ilanının süresi ${data?.daysRemaining ? `${data.daysRemaining} gün içinde ` : "yakında "}dolacak. Süre dolunca ilanlarım sayfasından tek tıkla yenileyip görünürlüğünü koruyabilirsiniz.</p>
       ${detailsBox(`
         <table width="100%" cellspacing="0" cellpadding="0">
           ${detailRow("İlan", data?.productTitle || "")}
@@ -1493,7 +1493,7 @@ export function renderEmailTemplate(
         </table>
       `)}
       <div style="text-align: center; margin: 32px 0;">
-        ${primaryButton("İlanı Yenile", data?.listingUrl || `${frontendUrl}/profile/listings`)}
+        ${primaryButton("İlanlarıma Git", data?.listingUrl || `${frontendUrl}/profile/listings`)}
       </div>
     `,
       "İlanınızın Süresi Doluyor",
@@ -1504,7 +1504,7 @@ export function renderEmailTemplate(
       ${titleBlock("İlanınızın Süresi Doldu", "📭")}
       ${greeting(data?.sellerName || data?.userName)}
       <p style="font-size: 15px; color: #4b5563; line-height: 1.6; margin: 0 0 20px 0;"><strong style="color: #111827;">${data?.productTitle || "İlanınızın"}</strong> ilanının süresi doldu ve yayından kaldırıldı. Tekrar yayınlayarak alıcılarla buluşmaya devam edebilirsiniz.</p>
-      ${infoBox(`<p style="margin: 0; font-size: 14px; color: #92400e;">İlanınızı birkaç tıklamayla yeniden yayınlayabilirsiniz.</p>`)}
+      ${infoBox(`<p style="margin: 0; font-size: 14px; color: #92400e;">İlanlarım sayfasındaki "Süresi dolan" sekmesinden ilanınızı tek tıkla, isterseniz birkaç ilanı birlikte yenileyebilirsiniz.</p>`)}
       <div style="text-align: center; margin: 32px 0;">
         ${primaryButton("İlanı Yeniden Yayınla", data?.listingUrl || `${frontendUrl}/profile/listings`)}
       </div>

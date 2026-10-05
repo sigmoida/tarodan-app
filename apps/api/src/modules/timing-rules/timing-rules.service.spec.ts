@@ -126,6 +126,19 @@ describe("TimingRulesService", () => {
       ]);
     });
 
+    it("ilan ömrü için otomatik yenileme eylemi artık kaydedilebilir", async () => {
+      const { service, rows } = makeService();
+
+      await service.applyChanges(
+        [{ id: "listingTtlDays", action: "auto_renew" }],
+        "user-1",
+      );
+
+      expect(rows.get("listing_ttl_days_on_expiry")?.settingValue).toBe(
+        "auto_renew",
+      );
+    });
+
     it.each([
       [0, "server.admin.timingRules.belowMin"],
       [-3, "server.admin.timingRules.belowMin"],
@@ -217,7 +230,6 @@ describe("TimingRulesService", () => {
     it("henüz açılmamış eylemi doğrudan gönderilse bile reddeder", async () => {
       const { service, prisma } = makeService();
       for (const [id, action] of [
-        ["listingTtlDays", "auto_renew"],
         ["offerExpiryHours", "extend_once"],
         ["tradeResponseHours", "extend_once"],
         ["tradePaymentHours", "extend_once"],

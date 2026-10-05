@@ -76,7 +76,6 @@ describe("TIMING_RULES kaydı", () => {
 
   // Bugünkü davranış = varsayılan eylem. Sonraki paketler yalnız bayrağı çevirir.
   const LATER_ACTIONS = {
-    listingTtlDays: ["deactivate", "auto_renew"],
     offerExpiryHours: ["expire", "extend_once"],
     tradeResponseHours: ["cancel", "extend_once"],
     tradePaymentHours: ["cancel", "extend_once"],
@@ -95,11 +94,31 @@ describe("TIMING_RULES kaydı", () => {
     },
   );
 
+  // Bayrağı çevrilmiş (davranışı yazılmış) ikinci eylemler: ikisi de seçilebilir.
+  const ENABLED_ACTIONS = {
+    listingTtlDays: ["deactivate", "auto_renew"],
+  } satisfies Partial<
+    Record<TimingRuleId, [TimingExpiryAction, TimingExpiryAction]>
+  >;
+
+  it.each(Object.entries(ENABLED_ACTIONS))(
+    "%s — ikinci eylemi açık ve seçilebilir",
+    (id, [current, enabled]) => {
+      expect(TIMING_RULES[id as TimingRuleId].actions).toEqual([
+        { action: current, available: true },
+        { action: enabled, available: true },
+      ]);
+      expect(isSelectableTimingAction(id as TimingRuleId, enabled)).toBe(true);
+    },
+  );
+
   it("diğer tüm kayıtlar tek eylemlidir", () => {
     const multi = TIMING_RULE_IDS.filter(
       (id) => TIMING_RULES[id].actions.length > 1,
     );
-    expect(multi.sort()).toEqual(Object.keys(LATER_ACTIONS).sort());
+    expect(multi.sort()).toEqual(
+      [...Object.keys(LATER_ACTIONS), ...Object.keys(ENABLED_ACTIONS)].sort(),
+    );
   });
 
   it("süresi kayda damgalanmayan (sürmekte olanlara da uygulanan) kayıtlar işaretli", () => {
@@ -254,9 +273,6 @@ describe("eylem doğrulaması", () => {
   });
 
   it("henüz açılmamış eylemi reddeder", () => {
-    expect(validateTimingAction("listingTtlDays", "auto_renew")).toEqual({
-      code: "actionUnavailable",
-    });
     expect(
       validateTimingAction("preparingDeadlineDays", "extend_once"),
     ).toEqual({ code: "actionUnavailable" });
