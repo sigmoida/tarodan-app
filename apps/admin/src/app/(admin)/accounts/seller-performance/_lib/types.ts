@@ -1,6 +1,7 @@
-import type { StatusConfig } from "@tarodan/ui";
+import { membershipTierConfig } from "@tarodan/ui";
 import type { AccountStatus } from "@tarodan/types";
 import type { useTranslations } from "next-intl";
+import { statusConfig } from "@/lib/statusLabels";
 
 type T = ReturnType<typeof useTranslations<never>>;
 
@@ -27,21 +28,5 @@ export interface Seller {
   };
 }
 
-export const membershipConfig = (t: T): Record<string, StatusConfig> => ({
-  business: {
-    label: t("admin.accounts.sellerPerformance.memberships.business"),
-    variant: "default",
-  },
-  premium: {
-    label: t("admin.accounts.sellerPerformance.memberships.premium"),
-    variant: "success",
-  },
-  basic: {
-    label: t("admin.accounts.sellerPerformance.memberships.basic"),
-    variant: "default",
-  },
-  free: {
-    label: t("admin.accounts.sellerPerformance.memberships.free"),
-    variant: "outline",
-  },
-});
+/** Üyelik paketi rozeti: paylaşılan `membershipTierConfig`'in çözülmüş hâli. */
+export const membershipConfig = (t: T) => statusConfig(membershipTierConfig, t);

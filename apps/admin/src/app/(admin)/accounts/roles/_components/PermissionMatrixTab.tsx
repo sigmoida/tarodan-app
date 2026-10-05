@@ -6,8 +6,9 @@ import {
   InformationCircleIcon,
 } from "@heroicons/react/24/outline";
 import { useTranslations } from "next-intl";
-import { Alert, Button } from "@tarodan/ui";
+import { Alert, Button, Spinner } from "@tarodan/ui";
 import { SectionCard } from "@/components/detail/SectionCard";
+import { SectionTitle } from "@/components/detail/SectionTitle";
 import { usePermissionMatrix } from "../_lib/usePermissionMatrix";
 import { RoleSummaryCards } from "./RoleSummaryCards";
 import { PermissionMatrixGrid } from "./PermissionMatrixGrid";
@@ -41,9 +42,7 @@ export function PermissionMatrixTab() {
       {/* Top control bar */}
       <SectionCard bodyClassName="flex flex-wrap items-start justify-between gap-4">
         <div className="min-w-0">
-          <h3 className="text-lg font-semibold text-heading">
-            {t("admin.roles.matrix.title")}
-          </h3>
+          <SectionTitle as="h3">{t("admin.roles.matrix.title")}</SectionTitle>
           <p className="mt-0.5 text-sm text-muted">
             {isSuperAdmin
               ? t("admin.roles.matrix.editHint")
@@ -104,7 +103,8 @@ export function PermissionMatrixTab() {
         // rollerin izinleri silinirdi) — düzenleme de kapalı kalır.
         <Alert variant="danger">{t("admin.roles.matrixLoadError")}</Alert>
       ) : matrixLoading ? (
-        <SectionCard bodyClassName="flex h-40 items-center justify-center text-sm text-muted">
+        <SectionCard bodyClassName="flex h-40 items-center justify-center gap-2 text-sm text-muted">
+          <Spinner size="sm" />
           {t("admin.roles.matrix.loading")}
         </SectionCard>
       ) : (

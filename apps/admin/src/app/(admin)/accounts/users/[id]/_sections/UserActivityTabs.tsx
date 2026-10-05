@@ -3,12 +3,21 @@
 "use client";
 
 import { useState } from "react";
-import Link from "next/link";
 import Image from "next/image";
 import { CubeIcon, StarIcon } from "@heroicons/react/24/outline";
 import { useTranslations } from "next-intl";
-import { StatusBadge } from "@tarodan/ui";
+import {
+  Badge,
+  EmptyState,
+  orderStatusConfig,
+  productStatusConfig,
+  tradeStatusConfig,
+} from "@tarodan/ui";
 import { SectionCard } from "@/components/detail/SectionCard";
+import { Panel } from "@/components/detail/Panel";
+import { SectionTitle } from "@/components/detail/SectionTitle";
+import { TextLink } from "@/components/TextLink";
+import { statusConfig } from "@/lib/statusLabels";
 import { AdminTabs } from "@/components/AdminTabs";
 import { ModerationEventsPanel } from "@/components/ModerationEventsPanel";
 import { getProductEffectivePrice } from "@/lib/product-price";
@@ -18,7 +27,6 @@ import {
   type UserBlockItem,
   type UserDetail,
   type UserRatingItem,
-  getUserStatusConfig,
 } from "../types";
 
 /** Engelleme satırı: karşı taraf + tarih + (varsa) gerekçe. */
@@ -32,15 +40,12 @@ function BlockRow({
   reasonLabel: string;
 }) {
   return (
-    <div className="flex items-center justify-between rounded-lg bg-surface-alt p-4">
+    <Panel tone="muted" className="flex items-center justify-between">
       <div className="min-w-0">
         {other ? (
-          <Link
-            href={`/accounts/users/${other.id}`}
-            className="font-medium text-heading hover:underline"
-          >
+          <TextLink href={`/accounts/users/${other.id}`}>
             {other.displayName}
-          </Link>
+          </TextLink>
         ) : (
           <span className="font-medium text-heading">—</span>
         )}
@@ -53,7 +58,7 @@ function BlockRow({
       <span className="ml-4 shrink-0 text-sm text-subtle">
         {fmtDate(item.createdAt)}
       </span>
-    </div>
+    </Panel>
   );
 }
 
@@ -82,7 +87,7 @@ function RatingCard({
 }) {
   const t = useTranslations();
   return (
-    <div className="rounded-lg bg-surface-alt p-4">
+    <Panel tone="muted">
       <div className="mb-2 flex items-center justify-between">
         <Stars score={rating.score} />
         <span className="text-sm text-muted">{fmtDate(rating.createdAt)}</span>
@@ -91,12 +96,12 @@ function RatingCard({
       <p className="mt-2 text-sm text-muted">
         {partyLabel}: {party || t("common.unknown")}
       </p>
-    </div>
+    </Panel>
   );
 }
 
-function EmptyLine({ children }: { children: React.ReactNode }) {
-  return <p className="py-8 text-center text-muted">{children}</p>;
+function EmptyLine({ children }: { children: string }) {
+  return <EmptyState size="compact" icon={false} title={children} />;
 }
 
 export function UserActivityTabs({
@@ -107,7 +112,9 @@ export function UserActivityTabs({
   user: UserDetail;
 }) {
   const t = useTranslations();
-  const userStatusConfig = getUserStatusConfig(t);
+  const orderStatuses = statusConfig(orderStatusConfig, t);
+  const productStatuses = statusConfig(productStatusConfig, t);
+  const tradeStatuses = statusConfig(tradeStatusConfig, t);
   const [tab, setTab] = useState<
     "orders" | "products" | "trades" | "ratings" | "blocks" | "ai"
   >("orders");
@@ -156,33 +163,25 @@ export function UserActivityTabs({
         (user.recentOrders && user.recentOrders.length > 0 ? (
           <div className="space-y-3">
             {user.recentOrders.map((order) => (
-              <div
+              <Panel
                 key={order.id}
-                className="flex items-center justify-between rounded-lg bg-surface-alt p-4"
+                tone="muted"
+                className="flex items-center justify-between"
               >
                 <div className="flex-1">
                   <div className="flex items-center gap-3">
-                    <span
-                      className={`rounded px-2 py-1 text-xs font-medium ${
-                        order.role === "buyer"
-                          ? "bg-info-500/20 text-info-700"
-                          : "bg-success-500/20 text-success-700"
-                      }`}
+                    <Badge
+                      size="sm"
+                      variant={order.role === "buyer" ? "default" : "outline"}
                     >
                       {order.role === "buyer"
                         ? t("admin.operations.common.buyer")
                         : t("admin.operations.common.seller")}
-                    </span>
-                    <Link
-                      href={`/operations/orders/${order.id}`}
-                      className="font-medium text-heading hover:text-primary-600"
-                    >
+                    </Badge>
+                    <TextLink href={`/operations/orders/${order.id}`}>
                       {order.orderNumber || `#${order.id.slice(0, 8)}`}
-                    </Link>
-                    <StatusBadge
-                      status={order.status}
-                      config={userStatusConfig}
-                    />
+                    </TextLink>
+                    <Badge status={order.status} config={orderStatuses} />
                   </div>
                   <p className="mt-1 text-sm text-muted">
                     {order.role === "buyer"
@@ -200,14 +199,13 @@ export function UserActivityTabs({
                     {fmtDate(order.createdAt)}
                   </p>
                 </div>
-              </div>
+              </Panel>
             ))}
-            <Link
-              href={`/operations/orders?userId=${user.id}`}
-              className="block py-2 text-center text-primary-600 hover:underline"
-            >
-              {t("admin.users.detail.viewAllOrders")}
-            </Link>
+            <div className="py-2 text-center">
+              <TextLink href={`/operations/orders?userId=${user.id}`}>
+                {t("admin.users.detail.viewAllOrders")}
+              </TextLink>
+            </div>
           </div>
         ) : (
           <EmptyLine>{t("admin.users.detail.noOrders")}</EmptyLine>
@@ -217,9 +215,10 @@ export function UserActivityTabs({
         (user.products && user.products.length > 0 ? (
           <div className="space-y-3">
             {user.products.map((product) => (
-              <div
+              <Panel
                 key={product.id}
-                className="flex items-center gap-4 rounded-lg bg-surface-alt p-4"
+                tone="muted"
+                className="flex items-center gap-4"
               >
                 {product.imageUrl ? (
                   <Image
@@ -235,17 +234,11 @@ export function UserActivityTabs({
                   </div>
                 )}
                 <div className="flex-1">
-                  <Link
-                    href={`/catalog/products/${product.id}`}
-                    className="font-medium text-heading hover:text-primary-600"
-                  >
+                  <TextLink href={`/catalog/products/${product.id}`}>
                     {product.title}
-                  </Link>
+                  </TextLink>
                   <div className="mt-1 flex items-center gap-2">
-                    <StatusBadge
-                      status={product.status}
-                      config={userStatusConfig}
-                    />
+                    <Badge status={product.status} config={productStatuses} />
                     <span className="text-sm text-muted">
                       {fmtDate(product.createdAt)}
                     </span>
@@ -254,14 +247,13 @@ export function UserActivityTabs({
                 <p className="font-medium text-heading">
                   {fmtTry(getProductEffectivePrice(product))}
                 </p>
-              </div>
+              </Panel>
             ))}
-            <Link
-              href={`/catalog/products?sellerId=${user.id}`}
-              className="block py-2 text-center text-primary-600 hover:underline"
-            >
-              {t("admin.users.detail.viewAllProducts")}
-            </Link>
+            <div className="py-2 text-center">
+              <TextLink href={`/catalog/products?sellerId=${user.id}`}>
+                {t("admin.users.detail.viewAllProducts")}
+              </TextLink>
+            </div>
           </div>
         ) : (
           <EmptyLine>{t("admin.users.detail.noProducts")}</EmptyLine>
@@ -271,30 +263,23 @@ export function UserActivityTabs({
         (user.recentTrades && user.recentTrades.length > 0 ? (
           <div className="space-y-3">
             {user.recentTrades.map((trade) => (
-              <div key={trade.id} className="rounded-lg bg-surface-alt p-4">
+              <Panel key={trade.id} tone="muted">
                 <div className="mb-2 flex items-center justify-between">
                   <div className="flex items-center gap-3">
-                    <span
-                      className={`rounded px-2 py-1 text-xs font-medium ${
-                        trade.role === "initiator"
-                          ? "bg-primary-500/20 text-primary-700"
-                          : "bg-info-500/20 text-info-400"
-                      }`}
+                    <Badge
+                      size="sm"
+                      variant={
+                        trade.role === "initiator" ? "default" : "outline"
+                      }
                     >
                       {trade.role === "initiator"
                         ? t("admin.users.detail.initiator")
                         : t("admin.operations.common.buyer")}
-                    </span>
-                    <Link
-                      href={`/operations/trades/${trade.id}`}
-                      className="font-medium text-heading hover:text-primary-600"
-                    >
+                    </Badge>
+                    <TextLink href={`/operations/trades/${trade.id}`}>
                       {trade.tradeNumber || `#${trade.id.slice(0, 8)}`}
-                    </Link>
-                    <StatusBadge
-                      status={trade.status}
-                      config={userStatusConfig}
-                    />
+                    </TextLink>
+                    <Badge status={trade.status} config={tradeStatuses} />
                   </div>
                   <span className="text-sm text-muted">
                     {fmtDate(trade.createdAt)}
@@ -317,14 +302,13 @@ export function UserActivityTabs({
                       ` + ${fmtTry(trade.cashAmount)}`}
                   </p>
                 </div>
-              </div>
+              </Panel>
             ))}
-            <Link
-              href={ordersTabHref("trades", { userId: user.id })}
-              className="block py-2 text-center text-primary-600 hover:underline"
-            >
-              {t("admin.users.detail.viewAllTrades")}
-            </Link>
+            <div className="py-2 text-center">
+              <TextLink href={ordersTabHref("trades", { userId: user.id })}>
+                {t("admin.users.detail.viewAllTrades")}
+              </TextLink>
+            </div>
           </div>
         ) : (
           <EmptyLine>{t("admin.users.detail.noTrades")}</EmptyLine>
@@ -332,9 +316,9 @@ export function UserActivityTabs({
 
       {tab === "ratings" && (
         <div className="space-y-4">
-          <h3 className="font-medium text-heading">
+          <SectionTitle as="h3" size="sm">
             {t("admin.users.detail.receivedRatingsTitle")}
-          </h3>
+          </SectionTitle>
           {user.receivedRatings && user.receivedRatings.length > 0 ? (
             <div className="space-y-3">
               {user.receivedRatings.map((rating) => (
@@ -350,14 +334,12 @@ export function UserActivityTabs({
               ))}
             </div>
           ) : (
-            <p className="py-4 text-muted">
-              {t("admin.users.detail.noReceivedRatings")}
-            </p>
+            <EmptyLine>{t("admin.users.detail.noReceivedRatings")}</EmptyLine>
           )}
 
-          <h3 className="mt-6 font-medium text-heading">
+          <SectionTitle as="h3" size="sm" className="mt-6">
             {t("admin.users.detail.givenRatingsTitle")}
-          </h3>
+          </SectionTitle>
           {user.givenRatings && user.givenRatings.length > 0 ? (
             <div className="space-y-3">
               {user.givenRatings.map((rating) => (
@@ -370,9 +352,7 @@ export function UserActivityTabs({
               ))}
             </div>
           ) : (
-            <p className="py-4 text-muted">
-              {t("admin.users.detail.noGivenRatings")}
-            </p>
+            <EmptyLine>{t("admin.users.detail.noGivenRatings")}</EmptyLine>
           )}
         </div>
       )}
@@ -381,10 +361,10 @@ export function UserActivityTabs({
         (blocksCount > 0 ? (
           <div className="space-y-6">
             <div className="space-y-3">
-              <h4 className="text-sm font-semibold text-heading">
+              <SectionTitle as="h4" size="sm">
                 {t("admin.users.detail.blocksGivenTitle")} (
                 {user.stats?.blocksGivenCount ?? user.blocksGiven?.length ?? 0})
-              </h4>
+              </SectionTitle>
               {(user.blocksGiven ?? []).map((b) => (
                 <BlockRow
                   key={b.id}
@@ -395,13 +375,13 @@ export function UserActivityTabs({
               ))}
             </div>
             <div className="space-y-3">
-              <h4 className="text-sm font-semibold text-heading">
+              <SectionTitle as="h4" size="sm">
                 {t("admin.users.detail.blocksReceivedTitle")} (
                 {user.stats?.blocksReceivedCount ??
                   user.blocksReceived?.length ??
                   0}
                 )
-              </h4>
+              </SectionTitle>
               {(user.blocksReceived ?? []).map((b) => (
                 <BlockRow
                   key={b.id}

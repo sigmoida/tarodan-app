@@ -2,7 +2,6 @@
 
 "use client";
 
-import Link from "next/link";
 import { useTranslations } from "next-intl";
 import { Badge } from "@tarodan/ui";
 import {
@@ -11,6 +10,7 @@ import {
   type ConsentDocumentStatus,
 } from "@tarodan/types";
 import { adminApi } from "@/lib/api";
+import { TextLink } from "@/components/TextLink";
 import { fmtDateTime } from "@/lib/format";
 import { useAdminItem } from "@/hooks/useAdminItem";
 import { SectionCard } from "@/components/detail/SectionCard";
@@ -31,12 +31,12 @@ export function ConsentsSection({ userId }: { userId: string }) {
     <SectionCard
       title={t("admin.consents.userSection.title")}
       actions={
-        <Link
+        <TextLink
           href={`/accounts/consents?userId=${userId}`}
-          className="text-sm font-medium text-primary-600 hover:underline"
+          className="text-sm"
         >
           {t("admin.consents.userSection.viewAll")}
-        </Link>
+        </TextLink>
       }
     >
       <SuspenseBoundary>
