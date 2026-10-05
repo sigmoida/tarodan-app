@@ -46,6 +46,24 @@ describe("buildGibReportWhere", () => {
     );
   });
 
+  it("satırda görünebilecek her kimlik kaynağında aranır: silinmiş kurumsal arşivi ve yalnız banka hesabı olan bireysel", () => {
+    const where = buildGibReportWhere({ search: "1234567890" });
+    const or = ((where.AND as unknown[])[0] as { OR: unknown[] }).OR;
+    expect(or).toEqual(
+      expect.arrayContaining([
+        // Silinmiş kurumsal: User.taxId anonimleşmede null'lanır, numara arşivde.
+        { seller: { deletedIdentity: { taxId: expect.anything() } } },
+        { seller: { deletedIdentity: { nationalId: expect.anything() } } },
+        {
+          seller: { deletedIdentity: { bankAccountHolder: expect.anything() } },
+        },
+        // Yalnız banka hesabında kimliği olan bireysel satıcı.
+        { seller: { bankAccount: { taxId: expect.anything() } } },
+        { seller: { bankAccount: { tcKimlikNo: expect.anything() } } },
+      ]),
+    );
+  });
+
   describe("kimlik eksik filtresi", () => {
     const incomplete = () =>
       (

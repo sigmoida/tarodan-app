@@ -71,7 +71,8 @@ describe("AdminGibReportController.export", () => {
       null,
       {
         filters: {
-          search: "ahmet",
+          searchApplied: true,
+          searchLength: 5,
           status: "active",
           sellerKind: "individual",
           identityIncomplete: true,
@@ -82,6 +83,22 @@ describe("AdminGibReportController.export", () => {
         truncated: false,
       },
     );
+  });
+
+  it("arama terimi (vergi no / TCKN olabilir) denetim kaydına yazılmaz", async () => {
+    const { controller, audit, res } = setup();
+    await controller.export(
+      "admin-1",
+      { search: "12345678901" },
+      "tr",
+      res as never,
+    );
+    const payload = audit.createRequiredAuditLog.mock.calls[0][5];
+    expect(JSON.stringify(payload)).not.toContain("12345678901");
+    expect(payload.filters).toMatchObject({
+      searchApplied: true,
+      searchLength: 11,
+    });
   });
 
   it("denetim kaydı yazılamazsa dosya GÖNDERİLMEZ (fail-closed)", async () => {

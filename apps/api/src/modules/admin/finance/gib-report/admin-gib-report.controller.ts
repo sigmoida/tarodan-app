@@ -85,7 +85,10 @@ export class AdminGibReportController {
       null,
       {
         filters: {
-          search: query.search ?? null,
+          // Arama terimi YAZILMAZ: vergi no / TCKN olabilir. Yalnız uygulanıp
+          // uygulanmadığı ve uzunluğu kaydedilir.
+          searchApplied: !!query.search?.trim(),
+          searchLength: query.search?.trim().length ?? 0,
           status: query.status ?? null,
           sellerKind: query.sellerKind ?? null,
           identityIncomplete: query.identityIncomplete ?? null,

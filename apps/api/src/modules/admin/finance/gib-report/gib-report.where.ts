@@ -101,7 +101,12 @@ const IDENTITY_INCOMPLETE: Prisma.UserWhereInput = {
   ],
 };
 
-/** Aranan alanlar: ilan başlığı/kodu ve satıcının görünen kimlikleri. */
+/**
+ * Aranan alanlar: ilan başlığı/kodu ve satıcı kimliğinin satırda GÖRÜNEBİLECEK
+ * her kaynağı — `resolveGibSellerIdentity`in okuduğu alanlarla birebir (ad:
+ * firma, banka sahibi, arşiv ad/firma/banka sahibi; numara: kullanıcı, banka,
+ * arşiv vergi no ve TCKN). Çözümleyiciye kaynak eklenirse buraya da eklenir.
+ */
 const SEARCH_FIELDS = [
   "title",
   "productCode",
@@ -111,8 +116,13 @@ const SEARCH_FIELDS = [
   "seller.taxId",
   "seller.adminCode",
   "seller.bankAccount.accountHolder",
+  "seller.bankAccount.taxId",
+  "seller.bankAccount.tcKimlikNo",
   "seller.deletedIdentity.displayName",
   "seller.deletedIdentity.companyName",
+  "seller.deletedIdentity.bankAccountHolder",
+  "seller.deletedIdentity.taxId",
+  "seller.deletedIdentity.nationalId",
 ] as const;
 
 export function buildGibReportWhere(

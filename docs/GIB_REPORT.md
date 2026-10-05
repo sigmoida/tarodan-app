@@ -64,8 +64,9 @@ olur — hiçbir şey tahmin edilmez, sentinel ad rapora sızmaz.
 ## Filtreler
 
 Yayın tarihi aralığı (`publishedAt`), ilan durumu, satıcı türü, arama (ilan
-başlığı/kodu, satıcı adı, kullanıcı adı, firma adı, vergi no, banka hesabı
-sahibi, silinmiş hesapta arşivdeki ad) ve **Kimlik numarası: yalnız eksik
+başlığı/kodu, satıcı adı, kullanıcı adı, firma adı, satırda görünebilecek her
+kimlik numarası kaynağı — kullanıcı, banka hesabı ve arşiv vergi no / TCKN —
+banka hesabı sahibi ve arşivdeki ad / firma / banka sahibi) ve **Kimlik numarası: yalnız eksik
 olanlar** (satıcının hiçbir kaynağında vergi no ya da TCKN yok). Sıralama
 sunucu tarafındadır; varsayılan sıra son yayın (yeni → eski). Kimlik numarası
 kolonu sıralanamaz (değer birden çok tabloda yaşar).
@@ -76,8 +77,9 @@ kolonu sıralanamaz (değer birden çok tabloda yaşar).
   tıkla-göster); toolbar'ın istemci CSV'si bu kolonu dışarı almaz.
 - Excel dökümü **tam değeri** taşır ve her indirme `gib_report_export` adıyla
   **zorunlu denetim kaydı** yazar (fail-closed: kayıt yazılamazsa dosya
-  gönderilmez). Denetim kaydına kimlik DEĞERLERİ değil filtre ve satır sayısı
-  yazılır (`audit_logs` purge edilmez; TCKN'leri oraya kopyalamak ikinci bir
+  gönderilmez). Denetim kaydına kimlik DEĞERLERİ değil, filtreler ve satır sayısı
+  yazılır; arama terimi de yazılmaz (vergi no / TCKN olabilir), yalnız aramanın
+  uygulandığı ve uzunluğu kaydedilir (`audit_logs` purge edilmez; TCKN'leri oraya kopyalamak ikinci bir
   kalıcı kimlik deposu olurdu).
 - Döküm 20.000 satırla sınırlıdır; aşılırsa dosya ilk 20.000 satırı taşır,
   `X-Export-Truncated-At` başlığı ve denetim kaydındaki `truncated` bunu bildirir
