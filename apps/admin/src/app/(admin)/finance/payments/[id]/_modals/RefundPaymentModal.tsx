@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef } from "react";
+import { Alert } from "@tarodan/ui";
 import {
   FormModal,
   FormInput,
@@ -64,18 +65,16 @@ export function RefundPaymentModal({
       destructive
     >
       {trade ? (
-        <div className="rounded-lg border border-warning-200 bg-warning-50 p-4 text-sm text-warning-900">
-          <p className="font-medium">
-            {t("admin.finance.payments.tradeRefundTitle", {
-              number: trade.tradeNumber,
-            })}
-          </p>
-          <p className="mt-1">
-            {t("admin.finance.payments.tradeRefundDescription", {
-              amount: fmtTry(trade.refundableTotal),
-            })}
-          </p>
-        </div>
+        <Alert
+          variant="warning"
+          title={t("admin.finance.payments.tradeRefundTitle", {
+            number: trade.tradeNumber,
+          })}
+        >
+          {t("admin.finance.payments.tradeRefundDescription", {
+            amount: fmtTry(trade.refundableTotal),
+          })}
+        </Alert>
       ) : (
         <>
           <p className="text-muted">

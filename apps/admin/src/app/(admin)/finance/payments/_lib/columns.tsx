@@ -1,7 +1,8 @@
-import Link from "next/link";
-import { Badge } from "@tarodan/ui";
+import { Badge, paymentStatusConfig } from "@tarodan/ui";
 import { col, type RowActionItem } from "@/components/table";
-import { type Payment, paymentStatusConfig } from "./types";
+import { statusConfig } from "@/lib/statusLabels";
+import { TextLink } from "@/components/TextLink";
+import { type Payment } from "./types";
 import type { useTranslations } from "next-intl";
 
 type T = ReturnType<typeof useTranslations<never>>;
@@ -22,12 +23,9 @@ export function paymentColumns(rowMenu: (p: Payment) => RowActionItem[], t: T) {
         return (
           <div className="flex items-center gap-2">
             {href ? (
-              <Link
-                href={href}
-                className="font-mono text-primary-600 hover:underline"
-              >
+              <TextLink href={href} mono>
                 #{number}
-              </Link>
+              </TextLink>
             ) : (
               <span className="font-mono">#{number}</span>
             )}
@@ -117,7 +115,10 @@ export function paymentColumns(rowMenu: (p: Payment) => RowActionItem[], t: T) {
       t("common.status"),
       (p) => (
         <div>
-          <Badge status={p.status} config={paymentStatusConfig(t)} />
+          <Badge
+            status={p.status}
+            config={statusConfig(paymentStatusConfig, t)}
+          />
           {p.failureReason && (
             <p className="mt-1 text-xs text-danger-600">{p.failureReason}</p>
           )}
