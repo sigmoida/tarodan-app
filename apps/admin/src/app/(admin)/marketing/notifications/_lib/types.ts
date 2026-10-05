@@ -8,6 +8,13 @@ import {
   AdjustmentsHorizontalIcon,
 } from "@heroicons/react/24/outline";
 import { z } from "zod";
+import {
+  BROADCAST_EMAIL_HTML_MAX,
+  BROADCAST_EMAIL_SUBJECT_MAX,
+  DEFAULT_MAILING_TYPE,
+  MAILING_TYPES,
+  type MailingType,
+} from "@tarodan/types";
 import type { useTranslations } from "next-intl";
 
 type T = ReturnType<typeof useTranslations<never>>;
@@ -21,6 +28,8 @@ export interface NotificationLog {
   body: string;
   status: string;
   createdAt: string;
+  /** E-posta satırlarında: `hasHtmlEmail` (HTML e-posta) + `mailingType`. */
+  data?: { hasHtmlEmail?: boolean; mailingType?: MailingType } | null;
   user?: { displayName: string; email: string };
 }
 
@@ -33,6 +42,9 @@ export interface ScheduledNotification {
   scheduledFor: string;
   status: string;
   createdAt: string;
+  /** API gövdeyi liste yanıtına koymaz; yalnız "HTML e-postası var" bilgisi gelir. */
+  hasEmailHtml?: boolean;
+  mailingType?: MailingType;
 }
 
 export type TabType = "scheduled" | "history";
@@ -126,6 +138,22 @@ export const sendNotificationSchema = (t: T) =>
       channels: z
         .array(z.enum(["push", "email"]))
         .min(1, t("admin.marketing.notifications.validation.channelRequired")),
+      // E-posta kanalına özel alanlar — yalnız "email" seçiliyken zorunlu
+      // (superRefine); push metni yukarıdaki kısa başlık/gövdede kalır.
+      emailSubject: z
+        .string()
+        .trim()
+        .max(
+          BROADCAST_EMAIL_SUBJECT_MAX,
+          t("admin.marketing.notifications.validation.emailSubjectMax"),
+        ),
+      emailHtml: z
+        .string()
+        .max(
+          BROADCAST_EMAIL_HTML_MAX,
+          t("admin.marketing.notifications.validation.emailHtmlMax"),
+        ),
+      mailingType: z.enum(MAILING_TYPES),
       targetType: z.enum(["all", "segment", "user_ids"]),
       // Seçimler {value: userId, label: görünen ad} olarak taşınır — çipler
       // arama sonuçları değişse de etiketini korur (SearchableMultiSelect).
@@ -140,6 +168,26 @@ export const sendNotificationSchema = (t: T) =>
           path: ["users"],
           message: t("admin.marketing.notifications.validation.userIdRequired"),
         });
+      }
+      if (values.channels.includes("email")) {
+        if (!values.emailSubject) {
+          ctx.addIssue({
+            code: "custom",
+            path: ["emailSubject"],
+            message: t(
+              "admin.marketing.notifications.validation.emailSubjectRequired",
+            ),
+          });
+        }
+        if (!values.emailHtml.trim()) {
+          ctx.addIssue({
+            code: "custom",
+            path: ["emailHtml"],
+            message: t(
+              "admin.marketing.notifications.validation.emailHtmlRequired",
+            ),
+          });
+        }
       }
     });
 
@@ -167,14 +215,18 @@ export const emptySendForm: SendForm = {
   title: "",
   body: "",
   channels: ["push"],
+  emailSubject: "",
+  emailHtml: "",
+  // Varsayılan duyuru: eski davranış (herkese) sessizce değişmez.
+  mailingType: DEFAULT_MAILING_TYPE,
   targetType: "all",
   users: [],
   isSeller: "",
   membershipTier: "",
 };
 
-/** Build the send/schedule API payload from the compose form. */
-export function sendFormToPayload(f: SendForm) {
+/** Hedef seçimini API'nin `targetType`/`userIds`/`segmentCriteria` alanlarına çevirir. */
+export function audienceFromForm(f: SendForm) {
   const userIds =
     f.targetType === "user_ids" ? f.users.map((u) => u.value) : undefined;
   const segmentCriteria =
@@ -184,12 +236,38 @@ export function sendFormToPayload(f: SendForm) {
           ...(f.membershipTier ? { membershipTier: f.membershipTier } : {}),
         }
       : undefined;
+  return { targetType: f.targetType, userIds, segmentCriteria };
+}
+
+/** E-posta kanalı seçiliyse e-postaya özel alanlar; değilse hiçbiri gönderilmez. */
+export function emailFieldsFromForm(f: SendForm) {
+  if (!f.channels.includes("email")) return {};
+  return {
+    emailSubject: f.emailSubject,
+    emailHtml: f.emailHtml,
+    mailingType: f.mailingType,
+  };
+}
+
+/** Build the send/schedule API payload from the compose form. */
+export function sendFormToPayload(f: SendForm) {
   return {
     title: f.title,
     body: f.body,
     channels: f.channels,
-    targetType: f.targetType,
-    userIds,
-    segmentCriteria,
+    ...audienceFromForm(f),
+    ...emailFieldsFromForm(f),
   };
 }
+
+export const mailingTypeOptions = (t: T) =>
+  [
+    {
+      value: "announcement",
+      label: t("admin.marketing.notifications.mailingType.announcement"),
+    },
+    {
+      value: "marketing",
+      label: t("admin.marketing.notifications.mailingType.marketing"),
+    },
+  ] satisfies Array<{ value: MailingType; label: string }>;
