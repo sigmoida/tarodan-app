@@ -1,5 +1,5 @@
 import { Injectable, Logger } from "@nestjs/common";
-import { ProductInactiveReason, ProductKind, ProductStatus } from "@prisma/client";
+import { ProductKind, ProductStatus } from "@prisma/client";
 import { PrismaService } from "../../../prisma";
 import { resolveTimingValue } from "../../../common/timing-rules";
 import { errorMessage } from "../../../common/helpers/error-message";
