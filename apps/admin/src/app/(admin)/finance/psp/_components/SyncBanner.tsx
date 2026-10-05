@@ -3,6 +3,7 @@
 "use client";
 
 import { ExclamationTriangleIcon } from "@heroicons/react/24/outline";
+import { Alert } from "@tarodan/ui";
 import { useTranslations } from "next-intl";
 import { fmtDateTime } from "@/lib/format";
 import type { PspSyncState } from "../_lib/types";
@@ -46,18 +47,13 @@ export function SyncBanner({ sync }: { sync: PspSyncState | undefined }) {
           at: fmtDateTime(sync.statement?.at) ?? "—",
         });
 
-  const cls =
-    tone === "danger"
-      ? "border-danger-200 bg-danger-50 text-danger-700"
-      : "border-warning-200 bg-warning-50 text-warning-700";
-
   return (
-    <div
+    <Alert
       role="status"
-      className={`flex items-start gap-2 rounded-lg border px-3 py-2 text-sm ${cls}`}
+      variant={tone}
+      icon={<ExclamationTriangleIcon className="h-5 w-5" />}
     >
-      <ExclamationTriangleIcon className="mt-0.5 h-5 w-5 flex-shrink-0" />
-      <span>{message}</span>
-    </div>
+      {message}
+    </Alert>
   );
 }
