@@ -75,6 +75,9 @@ export enum NotificationType {
   TRADE_SHIPPED = "trade_shipped",
   TRADE_COMPLETED = "trade_completed",
   TRADE_AUTO_CANCELLED = "trade_auto_cancelled",
+  // Takas Tarodan (admin) tarafından iptal edildi — iki tarafa da; gerekçe
+  // kodun katalog etiketidir, adminin iç notu asla taşınmaz.
+  TRADE_CANCELLED_BY_PLATFORM = "trade_cancelled_by_platform",
   // Takas yanıt / ödeme süresi bir kez uzatıldı (extend_once) — işlem sırası gelen tarafa.
   TRADE_RESPONSE_EXTENDED = "trade_response_extended",
   TRADE_PAYMENT_EXTENDED = "trade_payment_extended",

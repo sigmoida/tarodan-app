@@ -236,7 +236,7 @@ describe("cancellation where-builder", () => {
       }
     });
 
-    it("admin-cancellation filter: 'any' = every admin reason, a code = that reason, both only with the platform actor (a stale code on an order cancelled by someone else never matches); trades never match on this branch", () => {
+    it("admin-cancellation filter: 'any' = every admin reason, a code = that reason, both only with the platform actor (a stale code on an order cancelled by someone else never matches); trades use the same condition", () => {
       const any = cancellationSourceWheres(
         "all",
         "all",
@@ -248,7 +248,11 @@ describe("cancellation where-builder", () => {
         cancelledBy: CancellationActor.platform,
         adminCancelReasonCode: { not: null },
       });
-      expect(json(any.trade)).toContain(`"id":{"in":[]}`);
+      // Takas da aynı koşulla süzülür (Trade.cancelledBy + adminCancelReasonCode).
+      expect(json(any.trade)).toContain(
+        `"cancelledBy":"platform","adminCancelReasonCode":{"not":null}`,
+      );
+      expect(json(any.trade)).not.toContain(`"id":{"in":[]}`);
 
       const one = cancellationSourceWheres(
         "direct_sale",

@@ -21,6 +21,7 @@ import { NotificationCommerceService } from "./notification-commerce.service";
 import { NotificationAccountService } from "./notification-account.service";
 import type { NotificationAudience } from "./helpers/notification-link";
 import type { OrderCancelNoticeParty } from "./helpers/order-cancel-notice";
+import type { TradePlatformCancelNotice } from "./helpers/trade-platform-cancel-notice";
 
 @Injectable()
 export class NotificationService {
@@ -378,6 +379,13 @@ export class NotificationService {
 
   async notifyTradeCompleted(userId: string, tradeId: string) {
     return this.commerce.notifyTradeCompleted(userId, tradeId);
+  }
+
+  /** Platform (admin) takas iptali: tek alıcıya tek kanaldan; gönderemezse fırlatır. */
+  async sendTradeCancelledByPlatformNotice(
+    notice: TradePlatformCancelNotice,
+  ): Promise<void> {
+    return this.commerce.sendTradeCancelledByPlatformNotice(notice);
   }
 
   // ==================== ACCOUNT NOTIFIERS ====================

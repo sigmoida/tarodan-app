@@ -1112,6 +1112,12 @@ model Trade {
   /// null = bilinmiyor (göç öncesi, aktörü kesin olmayan iptaller).
   cancelledBy               CancellationActor? @map("cancelled_by")
   cancelReason              String?            @map("cancel_reason")
+  /// Platform (admin) iptalinin katalog kodu (`ADMIN_CANCEL_REASON_CODES`,
+  /// @tarodan/types). Admin ekranları iptal nedenini bu koddan gösterir ve
+  /// filtreler; taraflara kodun ETİKETİ gider. Adminin iç notu burada DEĞİL,
+  /// yalnız denetim kaydındadır. null = platform iptali değil (ya da bu kolondan
+  /// önceki bir iptal). Katalog tek kaynak olsun diye enum değil metin.
+  adminCancelReasonCode     String?            @map("admin_cancel_reason_code")
   // Stamped when the first to_warehouse shipment is delivered. Once non-null,
   // user-side cancel is locked: only admin reject/force-cancel can resolve.
   firstWarehouseArrivalAt   DateTime?          @map("first_warehouse_arrival_at")

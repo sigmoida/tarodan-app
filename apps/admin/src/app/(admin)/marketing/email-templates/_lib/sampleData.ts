@@ -245,6 +245,13 @@ export const sampleData = (t: T): Record<string, Record<string, unknown>> => ({
     name: t("admin.marketing.emailTemplates.sample.userShort"),
     tradeUrl: "https://tarodan.com.tr/trades/sample-trade",
   },
+  "trade-cancelled-platform": {
+    name: t("admin.marketing.emailTemplates.sample.userShort"),
+    tradeNumber: "TKS-1000012345",
+    reason: t("adminCancel.reasons.stock_error"),
+    refundAmount: 230,
+    tradeUrl: "https://tarodan.com.tr/profile/trades/sample-trade",
+  },
   // Guest
   "guest-checkout-otp": { code: "482913", expiresInMinutes: 10 },
   // Invoice

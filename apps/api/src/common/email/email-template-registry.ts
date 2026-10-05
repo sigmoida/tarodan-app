@@ -223,6 +223,11 @@ export const EMAIL_TEMPLATE_DEFINITIONS = [
   { key: "trade-shipped", name: "Takas kargoya verildi", group: "Takas" },
   { key: "trade-completed", name: "Takas tamamlandı", group: "Takas" },
   {
+    key: "trade-cancelled-platform",
+    name: "Takas Tarodan tarafından iptal edildi",
+    group: "Takas",
+  },
+  {
     key: "guest-checkout-otp",
     name: "Misafir sipariş doğrulama kodu",
     group: "Misafir",

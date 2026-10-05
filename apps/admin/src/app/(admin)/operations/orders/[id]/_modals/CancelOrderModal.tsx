@@ -9,10 +9,10 @@ import {
   type OrderReservationState,
 } from "@tarodan/types";
 import { Alert, Modal, ModalFooter, Select, Textarea } from "@tarodan/ui";
+import { adminCancelReasonOptions } from "@/lib/admin-cancel-reasons";
 import { fmtTry } from "@/lib/format";
 import { useOrderCancel } from "../_hooks/useOrderCancel";
 import {
-  cancelReasonOptions,
   cancelShippingNoteKey,
   isCancelRequestReady,
   isNoteMissing,
@@ -119,7 +119,7 @@ export function CancelOrderModal({
           label={t("admin.operations.orders.cancel.reason")}
           placeholder={t("admin.operations.orders.cancel.reasonPlaceholder")}
           helperText={t("admin.operations.orders.cancel.reasonHint")}
-          options={cancelReasonOptions(t)}
+          options={adminCancelReasonOptions(t)}
           value={reasonCode}
           onChange={(event) =>
             setReasonCode(event.target.value as AdminCancelReasonCode)

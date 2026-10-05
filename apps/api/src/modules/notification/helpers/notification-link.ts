@@ -217,6 +217,7 @@ export const NOTIFICATION_LINKS: Record<
   [NotificationType.TRADE_COMPLETED]: TRADE,
   [NotificationType.TRADE_REJECTED]: pattern("/profile/trades"),
   [NotificationType.TRADE_AUTO_CANCELLED]: pattern("/profile/trades"),
+  [NotificationType.TRADE_CANCELLED_BY_PLATFORM]: TRADE,
   [NotificationType.TRADE_RESPONSE_EXTENDED]: TRADE,
   [NotificationType.TRADE_PAYMENT_EXTENDED]: TRADE,
   [NotificationType.TRADE_PAYMENT_EXTENDED_PAID]: TRADE,

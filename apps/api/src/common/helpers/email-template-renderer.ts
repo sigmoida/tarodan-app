@@ -375,6 +375,7 @@ export function getEmailTemplateSubject(
     "trade-accepted": "Takas Teklifiniz Kabul Edildi",
     "trade-shipped": "Takasınız Kargoya Verildi",
     "trade-completed": "Takasınız Tamamlandı",
+    "trade-cancelled-platform": `Takasınız Tarodan Tarafından İptal Edildi - ${data?.tradeNumber || ""}`,
     "guest-checkout-otp": "Misafir Sipariş Doğrulama Kodu",
     "email-change-otp": "E-posta Değişikliği Doğrulama Kodu",
     "site-access-invite": "Tarodan Erken Erişim Davetiniz",
@@ -1170,6 +1171,30 @@ export function renderEmailTemplate(
       <p style="font-size: 14px; color: #6b7280; margin: 16px 0 0 0;">İyi takaslar dileriz!<br/><strong style="color: #f97316;">Tarodan Ekibi</strong></p>
     `,
       "Takasınız Tamamlandı!",
+    ),
+
+    // Platform (admin) iptali — iki tarafa da. Gerekçe katalog etiketidir;
+    // adminin iç notu bu şablona hiç gelmez. Süre ifadesi yoktur: iadenin
+    // karta yansıma süresi bankaya bağlıdır ve Süreler ve Kurallar'da değildir.
+    "trade-cancelled-platform": wrapEmail(
+      `
+      ${titleBlock("Takasınız Tarodan Tarafından İptal Edildi")}
+      ${greeting(data?.name)}
+      <p style="font-size: 15px; color: #4b5563; line-height: 1.6; margin: 0 0 20px 0;">Aşağıdaki takas Tarodan tarafından iptal edildi. Bu iptal sizin bir eyleminizden kaynaklanmıyor.</p>
+      ${detailsBox(`
+        <table width="100%" cellspacing="0" cellpadding="0">
+          ${detailRow("Takas No", "#" + (data?.tradeNumber || ""))}
+          ${data?.reason ? detailRow("İptal Nedeni", data.reason) : ""}
+          ${Number(rawData?.refundAmount) > 0 ? detailRow("İade Tutarı", formatEmailPrice(rawData.refundAmount) + " TL", true) : ""}
+        </table>
+      `)}
+      ${Number(rawData?.refundAmount) > 0 ? infoBox(`<p style="margin: 0; font-size: 14px; color: #92400e;">Bu takas için ödediğiniz tutarın tamamı, hizmet bedeli ve kargo dahil, ödeme yönteminize iade edilecek.</p>`) : ""}
+      ${successBox(`<p style="margin: 0; font-size: 14px; color: #166534;">Takasa konu ürünleriniz yeniden serbest; dilediğiniz gibi satışa ya da yeni bir takasa açabilirsiniz.</p>`)}
+      <div style="text-align: center; margin: 32px 0;">
+        ${primaryButton("Takası Görüntüle", data?.tradeUrl || `${frontendUrl}/profile/trades`)}
+      </div>
+    `,
+      "Takasınız Tarodan Tarafından İptal Edildi",
     ),
 
     "guest-checkout-otp": wrapEmail(

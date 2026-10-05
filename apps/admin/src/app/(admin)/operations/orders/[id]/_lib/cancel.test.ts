@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest";
 import {
-  ADMIN_CANCEL_REASON_CODES,
   type AdminOrderLine,
   type AdminOrderListRow,
   type AdminOrderPackage,
@@ -10,7 +9,6 @@ import type { Translate } from "@/lib/statusLabels";
 import {
   canCancelFileEntry,
   cancelBlockerText,
-  cancelReasonOptions,
   cancelShippingNoteKey,
   cancellableRowLine,
   fileEntryCancelEligibility,
@@ -261,15 +259,6 @@ describe("iptal isteği (paylaşılan kural)", () => {
     expect(isNoteMissing({ reasonCode: "other", note: "  " })).toBe(true);
     expect(isCancelRequestReady({ reasonCode: "other", note: "Ayrıntı" })).toBe(
       true,
-    );
-  });
-
-  it("seçenekler paylaşılan katalogdan, katalog sırasıyla gelir", () => {
-    expect(cancelReasonOptions(t).map((option) => option.value)).toEqual([
-      ...ADMIN_CANCEL_REASON_CODES,
-    ]);
-    expect(cancelReasonOptions(t)[0].label).toBe(
-      "[adminCancel.reasons.stock_error]",
     );
   });
 });

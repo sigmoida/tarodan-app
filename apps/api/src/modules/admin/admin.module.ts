@@ -86,6 +86,7 @@ import { AdminOfferService } from "./orders/admin-offer.service";
 import { AdminOrderCancelService } from "./orders/admin-order-cancel.service";
 import { AdminTradeWarehouseService } from "./trade/admin-trade-warehouse.service";
 import { AdminTradeResolutionService } from "./trade/admin-trade-resolution.service";
+import { AdminTradeCancelService } from "./trade/admin-trade-cancel.service";
 import { AdminRefundService } from "./orders/admin-refund.service";
 import { AdminMessagingService } from "./ops/admin-messaging.service";
 import { AdminSupportService } from "./ops/admin-support.service";
@@ -269,6 +270,7 @@ import { scheduledProcessors } from "../../workers/scheduled-processors";
     AdminOrderCancelService,
     AdminTradeWarehouseService,
     AdminTradeResolutionService,
+    AdminTradeCancelService,
     AdminRefundService,
     AdminMessagingService,
     AdminSupportService,

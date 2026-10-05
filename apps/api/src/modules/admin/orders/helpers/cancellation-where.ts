@@ -231,15 +231,14 @@ export function adminReasonWhere(
 }
 
 /**
- * MERGE NOKTASI — takasın yönetici iptali süzgeci. `Trade.adminCancelReasonCode`
- * bu dalda yok; süzgeç etkinken takas eşleşmez. Kolon geldiğinde bu fonksiyonun
- * gövdesi `return adminReasonWhere(filters) as Prisma.TradeWhereInput | undefined;`
- * olur (tek değişiklik burası; liste, sayaçlar ve Excel bunu okur).
+ * Takasın yönetici iptali süzgeci. `Trade.cancelledBy` ve
+ * `Trade.adminCancelReasonCode` siparişle aynı adı taşır; koşul tek yerden
+ * (`adminReasonWhere`) üretilir. Liste, sayaçlar ve Excel bunu okur.
  */
 function tradeAdminReasonWhere(
   filters: CancellationListFilters,
 ): Prisma.TradeWhereInput | undefined {
-  return adminReasonWhere(filters) ? MATCH_NOTHING : undefined;
+  return adminReasonWhere(filters) as Prisma.TradeWhereInput | undefined;
 }
 
 function tradeTabWhere(

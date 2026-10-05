@@ -83,3 +83,69 @@ export const OUTBOX_SAVED_CARD_PROVIDER_DELETE = "saved_card.provider_delete";
 export interface SavedCardProviderDeletePayload {
   savedCardId: string;
 }
+
+/**
+ * Platform (admin) takas iptalinin taraf duyurusu. İptal ve zorunlu denetim
+ * kaydıyla AYNI tx'te yazılır: iptal commit olduysa duyuru kesin gider.
+ *
+ * Satır = TEK alıcı × TEK kanal (in-app ya da e-posta), `dedupeKey` de öyle:
+ * handler tek bir gönderim yapar, hata fırlatırsa outbox yalnız O gönderimi
+ * yeniden dener — kısmi başarıdan sonra başka bir alıcıya / kanala ikinci kez
+ * gidilmez. Tutar iptal anında politikadan hesaplanıp burada sabitlenir
+ * (iade yapıldıktan sonra satır "iade edilmiş" olur ve yeniden hesap 0 verir).
+ * Adminin iç notu payload'a YAZILMAZ.
+ */
+export const OUTBOX_TRADE_PLATFORM_CANCEL_NOTICE =
+  "trade.platform_cancel_notice";
+
+export type TradePlatformCancelNoticeChannel = "in_app" | "email";
+
+export interface TradePlatformCancelNoticePayload {
+  tradeId: string;
+  userId: string;
+  refundAmount: number;
+  channel: TradePlatformCancelNoticeChannel;
+}
+
+/**
+ * Kargo öncesi iptalin commit SONRASI adımları (izlenen iade, ürün önbelleği,
+ * taşıyıcıya geçmemiş etiketlerin iptali — `settlePreShipmentCancellation`).
+ * İptal tx'iyle ATOMİK yazılır; anlık yol `OutboxService.runInline` ile satırın
+ * sahibi olarak hemen çalıştırır. Süreç commit ile anlık yol arasında ölürse
+ * satır pending kalır ve drainer işi tamamlar — iade hiçbir zaman "iptal
+ * edildi ama hiç denenmedi" durumunda kalmaz. Adımların hepsi idempotenttir.
+ */
+export const OUTBOX_TRADE_CANCEL_SETTLE = "trade.cancel_settle";
+
+export interface TradeCancelSettlePayload {
+  tradeId: string;
+}
+
+export const tradeCancelSettleDedupeKey = (tradeId: string): string =>
+  `${OUTBOX_TRADE_CANCEL_SETTLE}:${tradeId}`;
+
+/**
+ * İPTAL EDİLMİŞ takasa sonradan tamamlanan ödemenin iadesi. İptal yolları
+ * iadeyi iptal anında tamamlanmış satırlara yapar; ödemesi o an yolda olan
+ * tarafın (PayTR callback'i iptalden sonra gelir) parası aksi halde hiçbir
+ * yoldan dönmez. Ödemeyi tamamlayan tx'le ATOMİK yazılır ve YALNIZ drainer
+ * işler: iade PayTR callback'inin içinden (ödeme henüz "siteye bildirilmeden")
+ * denenmez. Erken denemeyi PayTR reddederse handler satırı yeniden kuyruğa
+ * alır; son denemede iş `refundFailureReason` + retry cron'una devredilir.
+ * Tutar mevcut politikadan (`refundTradeCashTracked`, satırdaki
+ * `fullRefundEntitled` kararıyla) gelir — yeni hesap yok. Ödeme satırı başına
+ * tek satır.
+ */
+export const OUTBOX_TRADE_CANCELLED_PAYMENT_REFUND =
+  "trade.cancelled_payment_refund";
+
+export interface TradeCancelledPaymentRefundPayload {
+  tradeId: string;
+  /** İade yalnız bu tarafın satırını kapsar (`refundTradeCashTracked` kapsamı). */
+  payerId: string;
+  tradeCashPaymentId: string;
+}
+
+export const tradeCancelledPaymentRefundDedupeKey = (
+  tradeCashPaymentId: string,
+): string => `${OUTBOX_TRADE_CANCELLED_PAYMENT_REFUND}:${tradeCashPaymentId}`;

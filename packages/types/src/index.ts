@@ -125,3 +125,6 @@ export * from "./timing-legal";
 export * from "./admin-cancellation";
 // ...and the request's validity rule (reason code, note required for "other")
 export * from "./admin-cancel-request";
+
+// Admin (platform) trade cancellation: eligibility rule + preview/result shapes
+export * from "./admin-trade-cancellation";

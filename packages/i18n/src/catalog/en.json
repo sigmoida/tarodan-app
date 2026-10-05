@@ -7145,7 +7145,35 @@
         "faultySideInitiator": "The offering party's item",
         "faultySideReceiver": "The receiving party's item",
         "faultySideBoth": "Both parties' items",
-        "faultySideNeither": "Not item related (operational rejection)"
+        "faultySideNeither": "Not item related (operational rejection)",
+        "adminCancel": {
+          "action": "Cancel trade",
+          "title": "Cancel trade",
+          "description": "Trade #{tradeNumber} will be cancelled by Tarodan. This cancellation is nobody's fault: every amount collected is refunded in full.",
+          "warning": "This cannot be undone. Both parties are told the cancellation reason by notification and email; the internal note stays in the audit log only.",
+          "reason": "Cancellation reason",
+          "reasonPlaceholder": "Select a reason",
+          "note": "Internal note",
+          "notePlaceholder": "Written to the audit log only, never shown to the parties",
+          "noteRequired": "An internal note is required when \"Other\" is selected",
+          "refundsTitle": "Refunds",
+          "notPaid": "Not paid",
+          "refundTotal": "Total refund",
+          "releasedTitle": "Items to be released",
+          "noReservation": "There is no reservation at the offer stage; the items are already free.",
+          "labelsToCancel": "{count, plural, one {# shipping label} other {# shipping labels}} will be cancelled (not yet handed to the carrier)",
+          "previewLoading": "Calculating refunds…",
+          "previewUnavailable": "The preview is unavailable right now.",
+          "confirm": "Cancel and refund",
+          "success": "Trade cancelled",
+          "successRefundFailed": "The trade was cancelled but the refund failed; finish it with \"Retry refund\".",
+          "alreadyCancelled": "The trade had already been cancelled this way",
+          "failed": "The trade could not be cancelled",
+          "blockedTitle": "A platform cancellation is not possible at this stage",
+          "cancelledByPlatform": "Cancelled by Tarodan",
+          "reasonFilter": "Platform cancel reason",
+          "reasonRequired": "Select a cancellation reason"
+        }
       },
       "refundRequests": {
         "amountAndFee": "Amount / Fee",
@@ -9974,6 +10002,10 @@
       "orderCancelledByPlatformSeller": {
         "title": "An order was cancelled by Tarodan",
         "message": "Order {orderNumber} was cancelled by Tarodan. Reason: {reason}. {paid, select, yes {Do not ship the item; the stock was added back to your listing.} other {No payment had been taken; the reserved stock is back on your listing.}}"
+      },
+      "tradeCancelledByPlatform": {
+        "title": "Your trade was cancelled by Tarodan",
+        "message": "Trade {tradeNumber} was cancelled by Tarodan. Reason: {reason}.{hasRefund, select, yes { The full {refundAmount} TL you paid will be refunded.} other {}} Your items in the trade are free again."
       }
     },
     "auth": {
@@ -10126,7 +10158,8 @@
       "shipToWarehouseDeprecated": "This endpoint is no longer in use. When a trade is accepted, the system automatically generates Sürat Kargo tracking numbers for both parties; drop off your item at the nearest Sürat branch using your assigned tracking number.",
       "shipmentAlreadyConfirmed": "This shipment has already been confirmed",
       "someItemsNotOwnedOrInactive": "Some products do not belong to you or are not active",
-      "tradeNotInDisputeStatus": "The trade is not in dispute status"
+      "tradeNotInDisputeStatus": "The trade is not in dispute status",
+      "platformCancelledReason": "Cancelled by Tarodan: {reason}"
     },
     "order": {
       "accountBanned": "Your account is banned. You cannot create new orders.",
@@ -10612,7 +10645,17 @@
         "refundFailed": "The trade refund failed: {reason} (the retry cron will take over)",
         "refundSkipped": "The trade refund could not be made: {reason}",
         "cashHoldReleaseStateInvalid": "Trade state is '{status}' — a cash hold can only be released on a 'completed' trade",
-        "forceCancelTradeStateInvalid": "A trade in the '{status}' state cannot be force-cancelled. Expected: shipping_to_warehouse."
+        "forceCancelTradeStateInvalid": "A trade in the '{status}' state cannot be force-cancelled. Expected: shipping_to_warehouse.",
+        "cancelNoteRequired": "An internal note is required when the reason is \"Other\"",
+        "cancelBlocked": {
+          "closed": "The trade is already closed (completed, cancelled or rejected).",
+          "disputed": "The trade has an open dispute; settle it through dispute resolution.",
+          "parcelHandedOver": "A parcel has been handed to the carrier or reached the warehouse; a platform cancellation is not possible. Use the stuck-trade resolution or the lost-parcel flow.",
+          "atWarehouse": "The items are at the warehouse or under inspection; use the warehouse rejection.",
+          "shippingToRecipients": "The items are on their way to their new owners; use the dispute flow if there is a problem.",
+          "returning": "The return parcels are on their way; close the return legs as delivered or lost.",
+          "legacyShipped": "The items of this legacy trade have been shipped; a platform cancellation is not possible."
+        }
       },
       "sellerApplication": {
         "notFound": "Application not found",

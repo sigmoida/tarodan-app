@@ -11,6 +11,7 @@ import { WarehouseAddressModule } from "../shipping/warehouse/warehouse-address.
 import { TradeLifecycleService } from "./lifecycle/trade-lifecycle.service";
 import { TradeReconciliationService } from "./lifecycle/trade-reconciliation.service";
 import { TradeDeadlineExtensionService } from "./lifecycle/trade-deadline-extension.service";
+import { TradePlatformCancelService } from "./lifecycle/trade-platform-cancel.service";
 import { TradeSchedulerService } from "./jobs/trade-scheduler.service";
 import { TradeScheduledProcessor } from "./jobs/trade-scheduled.processor";
 import { TradeCashClearedListener } from "./lifecycle/trade-cash-cleared.listener";
@@ -63,6 +64,8 @@ import { UserBlockModule } from "../user-block/user-block.module";
     TradeReconciliationService,
     // extend_once kararı (yanıt / ödeme süresi) — iptal mantığı mutabakatta kalır.
     TradeDeadlineExtensionService,
+    // Platform (admin) iptali: süre dolumu taramasının kargo öncesi çekirdeği.
+    TradePlatformCancelService,
     TradeSchedulerService,
     ...scheduledProcessors(TradeScheduledProcessor),
     TradeCashClearedListener,

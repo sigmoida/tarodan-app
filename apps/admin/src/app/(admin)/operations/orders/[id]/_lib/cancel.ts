@@ -1,12 +1,10 @@
 import {
-  ADMIN_CANCEL_REASON_CODES,
   ADMIN_CANCEL_REASON_I18N_KEYS,
   ADMIN_ORDER_CANCEL_BLOCKER_I18N_KEYS,
   adminCancelRequestProblem,
   adminOrderCancelBlockerOf,
   adminOrderCancelEligibility,
   isAdminCancelReasonCode,
-  type AdminCancelReasonCode,
   type AdminCancelRequest,
   type AdminOrderCancelBlocker,
   type AdminOrderCancelEligibility,
@@ -114,16 +112,6 @@ export function isCancelRequestReady(request: Partial<AdminCancelRequest>) {
 /** "Diğer" seçiliyken not zorunlu ama boş mu (alan hatası için). */
 export function isNoteMissing(request: Partial<AdminCancelRequest>): boolean {
   return adminCancelRequestProblem(request) === "note_required";
-}
-
-/** Neden seçicisinin seçenekleri — paylaşılan katalogdan, katalog sırasıyla. */
-export function cancelReasonOptions(
-  t: Translate,
-): { value: AdminCancelReasonCode; label: string }[] {
-  return ADMIN_CANCEL_REASON_CODES.map((code) => ({
-    value: code,
-    label: t(ADMIN_CANCEL_REASON_I18N_KEYS[code]),
-  }));
 }
 
 /** Önizlemenin kargo notu — kargo dahil mi, paket yine gidiyor mu. */

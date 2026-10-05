@@ -1,6 +1,7 @@
 import {
   ADMIN_CANCEL_NOTE_MAX,
   isAdminCancelReasonCode,
+  type AdminCancelReasonCode,
   type AdminCancelRequest,
 } from "./admin-cancellation";
 
@@ -21,6 +22,17 @@ export function normalizeAdminCancelNote(
   return trimmed.length > 0 ? trimmed : null;
 }
 
+/**
+ * "Diğer" seçilince iç not zorunludur (taraflara yalnız kodun etiketi gider;
+ * "Diğer" tek başına admin denetimi için yetersiz bir açıklamadır). Sipariş ve
+ * takas iptali aynı kuralı okur.
+ */
+export function isAdminCancelNoteRequired(
+  reasonCode: AdminCancelReasonCode,
+): boolean {
+  return reasonCode === "other";
+}
+
 /** İsteğin ilk sorunu; geçerliyse null. */
 export function adminCancelRequestProblem(
   request: Partial<AdminCancelRequest> | null | undefined,
@@ -30,6 +42,8 @@ export function adminCancelRequestProblem(
   }
   const note = normalizeAdminCancelNote(request.note);
   if (note && note.length > ADMIN_CANCEL_NOTE_MAX) return "note_too_long";
-  if (request.reasonCode === "other" && !note) return "note_required";
+  if (isAdminCancelNoteRequired(request.reasonCode) && !note) {
+    return "note_required";
+  }
   return null;
 }
