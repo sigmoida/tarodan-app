@@ -6,6 +6,7 @@ import { getReservedAwareStatus } from "../../product/helpers/product-status.hel
 import { safeDecrementReserved } from "../../product/helpers/product-availability.helper";
 import { CacheService } from "../../cache/cache.service";
 import { NotificationService } from "../../notification/notification.service";
+import { resolveTimingValue } from "../../../common/timing-rules";
 
 // Takasta reservedQuantity, takas KABUL edildiğinde (checkAndReserve) artar ve
 // ancak tamamlanma / iptal / red / iade-teslim adımlarında geri verilir. Bu
@@ -54,9 +55,13 @@ export class ReservationReconciliationService {
    * 24h kill-switch'i için ayrı method: expireUnpaidOrders.
    */
   async releaseExpiredOrderReservations(): Promise<{ count: number }> {
-    const timeoutMinutes = parseInt(
-      this.configService.get("PAYMENT_TIMEOUT_MINUTES") || "5",
-      10,
+    // Süreler ve Kurallar → `paymentReservationMinutes` (env PAYMENT_TIMEOUT_MINUTES
+    // yalnız ilk kurulum geri düşüşü). Süre sipariş satırına damgalanmaz:
+    // createdAt'ten her turda yeniden hesaplanır.
+    const timeoutMinutes = await resolveTimingValue(
+      this.prisma,
+      "paymentReservationMinutes",
+      this.configService,
     );
     const cutoff = new Date();
     cutoff.setMinutes(cutoff.getMinutes() - timeoutMinutes);

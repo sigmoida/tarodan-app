@@ -78,6 +78,8 @@ describe("Teklif — bildirimler ve fiyat tabanı", () => {
       {
         $transaction: jest.fn().mockImplementation((fn: any) => fn(tx)),
         order: { count: jest.fn().mockResolvedValue(0) },
+        // Teklif geçerliliği ve ödeme penceresi Süreler ve Kurallar'dan.
+        platformSetting: { findUnique: jest.fn().mockResolvedValue(null) },
       } as any,
       { del: jest.fn(), delByPattern: jest.fn() } as any,
       { get: () => undefined } as any,

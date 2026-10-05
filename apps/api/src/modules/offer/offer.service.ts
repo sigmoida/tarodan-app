@@ -39,11 +39,11 @@ import {
   toPublicIdentity,
 } from "../../common/helpers/public-identity";
 import { paginate } from "../../common/list";
+import { resolveTimingValue } from "../../common/timing-rules";
 
 @Injectable()
 export class OfferService {
   private readonly logger = new Logger(OfferService.name);
-  private readonly offerExpiryHours: number;
   private readonly minOfferPercentage: number;
 
   constructor(
@@ -63,14 +63,27 @@ export class OfferService {
     @Optional()
     private readonly feeDiscounts?: OrderFeeDiscountService,
   ) {
-    this.offerExpiryHours = parseInt(
-      this.configService.get("OFFER_EXPIRY_HOURS") || "24",
-      10,
-    );
     this.minOfferPercentage = parseInt(
       this.configService.get("MIN_OFFER_PERCENTAGE") || "50",
       10,
     );
+  }
+
+  /**
+   * Yeni teklif/karşı teklifin bitiş anı: şimdi + offerExpiryHours (Süreler ve
+   * Kurallar; seed'in `offer_expiry_hours` satırı artık gerçekten okunur, env
+   * OFFER_EXPIRY_HOURS yalnız geri düşüş). Teklife `expiresAt` olarak
+   * damgalanır — değişiklik bekleyen teklifleri etkilemez.
+   */
+  private async offerExpiresAt(): Promise<Date> {
+    const hours = await resolveTimingValue(
+      this.prisma,
+      "offerExpiryHours",
+      this.configService,
+    );
+    const expiresAt = new Date();
+    expiresAt.setHours(expiresAt.getHours() + hours);
+    return expiresAt;
   }
 
   /**
@@ -163,8 +176,7 @@ export class OfferService {
       }
 
       // Calculate expiration time
-      const expiresAt = new Date();
-      expiresAt.setHours(expiresAt.getHours() + this.offerExpiryHours);
+      const expiresAt = await this.offerExpiresAt();
 
       // Create offer
       const offer = await tx.offer.create({
@@ -470,7 +482,7 @@ export class OfferService {
             pricing: offerPricing,
           }),
           status: OrderStatus.pending_payment,
-          paymentExpiresAt: paymentWindowEnd(),
+          paymentExpiresAt: await paymentWindowEnd(this.prisma),
         },
       });
 
@@ -737,8 +749,7 @@ export class OfferService {
       });
 
       // Yeni kayıt: aynı alıcı/satıcı; kabul hakkı alıcıda (buyerMustAccept)
-      const expiresAt = new Date();
-      expiresAt.setHours(expiresAt.getHours() + this.offerExpiryHours);
+      const expiresAt = await this.offerExpiresAt();
 
       const counterOffer = await tx.offer.create({
         data: {
@@ -868,8 +879,7 @@ export class OfferService {
         },
       });
 
-      const expiresAt = new Date();
-      expiresAt.setHours(expiresAt.getHours() + this.offerExpiryHours);
+      const expiresAt = await this.offerExpiresAt();
 
       const newOffer = await tx.offer.create({
         data: {

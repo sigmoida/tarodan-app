@@ -17,12 +17,9 @@ import type {
 } from "@tarodan/types";
 import type { PrismaService } from "../../../../prisma";
 import {
-  carrierCancellationAlertHours,
   outboxStaleProcessingMs,
-  shippedStaleAlertDays,
-  type ThresholdConfigReader,
+  type AlertThresholdContext,
 } from "../../../../config/alert-thresholds";
-import { tradeLostParcelGraceDays } from "../../../../common/helpers/trade-escrow";
 import {
   LIVE_ORDER,
   LIVE_TRADE,
@@ -34,9 +31,10 @@ import {
  * Zone B — "Uyarılar". Normalde OLMAMASI gereken durumlar; sıfırsa satır hiç
  * çizilmez.
  *
- * Her eşik kendi sahibinin okuduğu kaynaktan gelir (env/config/policy helper) —
- * burada hiçbir gün/saat sayısı yazılı DEĞİLDİR. Panel "10 günden uzun" derken
- * cron 14 günü bekliyor olamaz.
+ * Her eşik kendi sahibinin okuduğu kaynaktan gelir (Süreler ve Kurallar
+ * değerleri `ctx.timing`, teknik eşikler `ctx.config`) — burada hiçbir gün/saat
+ * sayısı yazılı DEĞİLDİR. Panel "10 günden uzun" derken cron 14 günü bekliyor
+ * olamaz.
  *
  * Test şeridi hiçbir uyarıya girmez: test kolisi taşıyıcıya gitmez (hep
  * "kargoda" kalır), test ödemesi PayTR dökümünde yoktur, test transferi hiç
@@ -50,11 +48,11 @@ export interface AlertReading {
 
 export interface AlertDefinition {
   severity: DashboardAlertSeverity;
-  threshold?: (config?: ThresholdConfigReader) => DashboardAlertThreshold;
+  threshold?: (ctx: AlertThresholdContext) => DashboardAlertThreshold;
   query: (
     prisma: PrismaService,
     now: Date,
-    config?: ThresholdConfigReader,
+    ctx: AlertThresholdContext,
   ) => Prisma.PrismaPromise<unknown>;
   read: (raw: unknown) => AlertReading;
 }
@@ -88,18 +86,20 @@ export const ALERT_DEFINITIONS: Record<QueryableAlertKey, AlertDefinition> = {
   /** Kargo poll'u teslimatı hiç raporlamazsa sipariş asla faturalanamaz. */
   stuckShippedOrders: {
     severity: "critical",
-    threshold: (config) => ({
-      value: shippedStaleAlertDays(config),
+    threshold: (ctx) => ({
+      value: ctx.timing.shippedStaleAlertDays,
       unit: "days",
     }),
-    query: (prisma, now, config) =>
+    query: (prisma, now, ctx) =>
       prisma.order.count({
         where: {
           ...LIVE_ORDER,
           status: OrderStatus.shipped,
           shipment: {
             is: {
-              shippedAt: { lt: daysAgo(now, shippedStaleAlertDays(config)) },
+              shippedAt: {
+                lt: daysAgo(now, ctx.timing.shippedStaleAlertDays),
+              },
             },
           },
         },
@@ -110,13 +110,18 @@ export const ALERT_DEFINITIONS: Record<QueryableAlertKey, AlertDefinition> = {
   /** Kargoya verilmiş ama depoya HİÇ varmamış takas girişi (kayıp koli adayı). */
   stuckWarehouseTrades: {
     severity: "critical",
-    threshold: () => ({ value: tradeLostParcelGraceDays(), unit: "days" }),
-    query: (prisma, now) =>
+    threshold: (ctx) => ({
+      value: ctx.timing.tradeLostParcelGraceDays,
+      unit: "days",
+    }),
+    query: (prisma, now, ctx) =>
       prisma.trade.count({
         where: {
           ...LIVE_TRADE,
           status: TradeStatus.shipping_to_warehouse,
-          shippingDeadline: { lt: daysAgo(now, tradeLostParcelGraceDays()) },
+          shippingDeadline: {
+            lt: daysAgo(now, ctx.timing.tradeLostParcelGraceDays),
+          },
           firstWarehouseArrivalAt: null,
           shipments: {
             some: { leg: "to_warehouse", shippedAt: { not: null } },
@@ -134,8 +139,11 @@ export const ALERT_DEFINITIONS: Record<QueryableAlertKey, AlertDefinition> = {
    */
   stuckOutboundTrades: {
     severity: "warning",
-    threshold: () => ({ value: tradeLostParcelGraceDays(), unit: "days" }),
-    query: (prisma, now) =>
+    threshold: (ctx) => ({
+      value: ctx.timing.tradeLostParcelGraceDays,
+      unit: "days",
+    }),
+    query: (prisma, now, ctx) =>
       prisma.trade.count({
         where: {
           ...LIVE_TRADE,
@@ -144,7 +152,9 @@ export const ALERT_DEFINITIONS: Record<QueryableAlertKey, AlertDefinition> = {
           shipments: {
             some: {
               leg: "from_warehouse",
-              shippedAt: { lt: daysAgo(now, tradeLostParcelGraceDays()) },
+              shippedAt: {
+                lt: daysAgo(now, ctx.timing.tradeLostParcelGraceDays),
+              },
             },
           },
         },
@@ -210,16 +220,16 @@ export const ALERT_DEFINITIONS: Record<QueryableAlertKey, AlertDefinition> = {
   /** Drainer'ın kurtarma eşiğini aşmış `processing` claim'i — süreç çökmüş. */
   outboxStuckProcessing: {
     severity: "warning",
-    threshold: (config) => ({
-      value: Math.round(outboxStaleProcessingMs(config) / 60000),
+    threshold: (ctx) => ({
+      value: Math.round(outboxStaleProcessingMs(ctx.config) / 60000),
       unit: "minutes",
     }),
-    query: (prisma, now, config) =>
+    query: (prisma, now, ctx) =>
       prisma.outboxEvent.count({
         where: {
           status: OutboxStatus.processing,
           updatedAt: {
-            lt: new Date(now.getTime() - outboxStaleProcessingMs(config)),
+            lt: new Date(now.getTime() - outboxStaleProcessingMs(ctx.config)),
           },
         },
       }),
@@ -288,18 +298,18 @@ export const ALERT_DEFINITIONS: Record<QueryableAlertKey, AlertDefinition> = {
   /** Panelden elle kapatılması gereken, bayatlamış taşıyıcı iptal görevleri. */
   agedCarrierCancellations: {
     severity: "warning",
-    threshold: (config) => ({
-      value: carrierCancellationAlertHours(config),
+    threshold: (ctx) => ({
+      value: ctx.timing.carrierCancellationAlertHours,
       unit: "hours",
     }),
-    query: (prisma, now, config) =>
+    query: (prisma, now, ctx) =>
       prisma.carrierCancellationTask.count({
         where: {
           status: "pending",
           requestedAt: {
             lt: new Date(
               now.getTime() -
-                carrierCancellationAlertHours(config) * 60 * 60 * 1000,
+                ctx.timing.carrierCancellationAlertHours * 60 * 60 * 1000,
             ),
           },
         },

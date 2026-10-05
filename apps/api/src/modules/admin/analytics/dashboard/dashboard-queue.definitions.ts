@@ -26,10 +26,7 @@ import {
   LIVE_REFUND_REQUEST,
   LIVE_TRADE,
 } from "../../../account-lane/live-lane.where";
-import {
-  missingTrackingAlertHours,
-  type ThresholdConfigReader,
-} from "../../../../config/alert-thresholds";
+import type { AlertThresholdContext } from "../../../../config/alert-thresholds";
 
 /**
  * Zone A — "Bekleyen işler" kuyruklarının TEK tanımı.
@@ -63,11 +60,11 @@ interface AggregateRaw {
 
 export interface QueuePartDefinition {
   /** Kümeyi belirleyen where — spec bunu doğrudan doğrular. */
-  where: (now: Date, config?: ThresholdConfigReader) => unknown;
+  where: (now: Date, ctx: AlertThresholdContext) => unknown;
   query: (
     prisma: PrismaService,
     now: Date,
-    config?: ThresholdConfigReader,
+    ctx: AlertThresholdContext,
   ) => Prisma.PrismaPromise<unknown>;
   read: (raw: unknown) => QueuePartReading;
   /**
@@ -360,10 +357,10 @@ export const QUEUE_PART_DEFINITIONS: Record<
     read: reader("createdAt"),
   },
   ordersUninvoiced: {
-    where: (now, config) => uninvoicedDeliveredWhere(now, config),
-    query: (prisma, now, config) =>
+    where: (now, ctx) => uninvoicedDeliveredWhere(now, ctx),
+    query: (prisma, now, ctx) =>
       prisma.order.aggregate({
-        where: uninvoicedDeliveredWhere(now, config),
+        where: uninvoicedDeliveredWhere(now, ctx),
         _count: { _all: true },
         _min: { deliveredAt: true },
       }),
@@ -383,11 +380,11 @@ export const QUEUE_PART_DEFINITIONS: Record<
   },
   shipmentsWithoutTracking: {
     // Barkod hiç açılmamış gönderi takip edilemez ve sessizce askıda kalır.
-    // Yaş eşiği config'ten (MISSING_TRACKING_ALERT_HOURS) — sabit değil.
-    where: (now, config) => missingTrackingWhere(now, config),
-    query: (prisma, now, config) =>
+    // Yaş eşiği Süreler ve Kurallar'dan (missingTrackingAlertHours) — sabit değil.
+    where: (now, ctx) => missingTrackingWhere(now, ctx),
+    query: (prisma, now, ctx) =>
       prisma.shipment.aggregate({
-        where: missingTrackingWhere(now, config),
+        where: missingTrackingWhere(now, ctx),
         _count: { _all: true },
         _min: { createdAt: true },
       }),
@@ -398,10 +395,10 @@ export const QUEUE_PART_DEFINITIONS: Record<
 /** Taşıyıcı kodu oluşmamış, eşiği aşmış, hâlâ terminal olmayan gönderiler. */
 export function missingTrackingWhere(
   now: Date,
-  config?: ThresholdConfigReader,
+  ctx: AlertThresholdContext,
 ): Prisma.ShipmentWhereInput {
   const cutoff = new Date(
-    now.getTime() - missingTrackingAlertHours(config) * 60 * 60 * 1000,
+    now.getTime() - ctx.timing.missingTrackingAlertHours * 60 * 60 * 1000,
   );
   return {
     order: LIVE_ORDER,

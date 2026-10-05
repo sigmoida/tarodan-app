@@ -15,8 +15,13 @@ import {
   overdueHoldsWhere,
   uninvoicedDeliveredWhere,
 } from "../../finance/finance-health.where";
+import type { AlertThresholdContext } from "../../../../config/alert-thresholds";
+import { defaultTimingValues } from "../../../../common/timing-rules";
 
 const NOW = new Date("2026-09-18T12:00:00.000Z");
+
+/** Durations & Rules values a dashboard build resolves; registry defaults here. */
+const CTX: AlertThresholdContext = { timing: defaultTimingValues() };
 
 describe("dashboard queue definitions", () => {
   it("defines every catalogued line exactly once, under exactly one tile", () => {
@@ -38,7 +43,7 @@ describe("dashboard queue definitions", () => {
 
   describe("where clauses", () => {
     const whereOf = (key: keyof typeof QUEUE_PART_DEFINITIONS) =>
-      QUEUE_PART_DEFINITIONS[key].where(NOW) as Record<string, any>;
+      QUEUE_PART_DEFINITIONS[key].where(NOW, CTX) as Record<string, any>;
 
     it("reads refunds from the REQUEST's own status, not the order's", () => {
       expect(whereOf("refundsPendingReview")).toEqual({
@@ -116,12 +121,38 @@ describe("dashboard queue definitions", () => {
       expect(whereOf("adjustmentsOpen")).toEqual(openAdjustmentsWhere);
       expect(whereOf("invoicesExhausted")).toEqual(exhaustedInvoicesWhere);
       expect(whereOf("ordersUninvoiced")).toEqual(
-        uninvoicedDeliveredWhere(NOW),
+        uninvoicedDeliveredWhere(NOW, CTX),
+      );
+    });
+
+    it("ages the tracking and invoice queues by the Durations & Rules values", () => {
+      const ctx: AlertThresholdContext = {
+        timing: {
+          ...defaultTimingValues(),
+          missingTrackingAlertHours: 6,
+          invoiceDeadlineDays: 2,
+        },
+      };
+      const tracking = missingTrackingWhere(NOW, ctx) as Record<string, any>;
+      expect(NOW.getTime() - tracking.createdAt.lt.getTime()).toBe(
+        6 * 60 * 60 * 1000,
+      );
+      const uninvoiced = uninvoicedDeliveredWhere(NOW, ctx) as Record<
+        string,
+        any
+      >;
+      expect(NOW.getTime() - uninvoiced.deliveredAt.lt.getTime()).toBe(
+        2 * 24 * 60 * 60 * 1000,
+      );
+      // Admin değeri yokken bugünkü varsayılanlar (24 saat / 5 gün).
+      const base = missingTrackingWhere(NOW, CTX) as Record<string, any>;
+      expect(NOW.getTime() - base.createdAt.lt.getTime()).toBe(
+        24 * 60 * 60 * 1000,
       );
     });
 
     it("flags shipments that never got a carrier tracking id", () => {
-      const where = missingTrackingWhere(NOW) as Record<string, any>;
+      const where = missingTrackingWhere(NOW, CTX) as Record<string, any>;
       expect(where.providerTrackingId).toBeNull();
       expect(where.createdAt.lt.getTime()).toBeLessThan(NOW.getTime());
       // A finished shipment is not waiting on anyone.
@@ -141,7 +172,7 @@ describe("dashboard queue definitions", () => {
    */
   describe("test lane", () => {
     const whereOf = (key: keyof typeof QUEUE_PART_DEFINITIONS) =>
-      JSON.stringify(QUEUE_PART_DEFINITIONS[key].where(NOW));
+      JSON.stringify(QUEUE_PART_DEFINITIONS[key].where(NOW, CTX));
 
     it.each([
       "refundsPendingReview",
@@ -162,7 +193,9 @@ describe("dashboard queue definitions", () => {
       expect(overdueHoldsWhere(NOW)).toMatchObject({
         payment: { isTest: false },
       });
-      expect(uninvoicedDeliveredWhere(NOW)).toMatchObject({ isTest: false });
+      expect(uninvoicedDeliveredWhere(NOW, CTX)).toMatchObject({
+        isTest: false,
+      });
       // Payout'ta damga yok: yalnız açıkça test olanlar NOT ile elenir.
       expect(JSON.stringify(failedTransfersWhere)).toContain('"NOT"');
     });

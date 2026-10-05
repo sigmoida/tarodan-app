@@ -43,6 +43,8 @@ describe("PaymentFulfillmentService — ödeme sonrası stok yetersizliği iptal
       $transaction: jest.fn().mockImplementation((fn: any) => fn(tx)),
       wishlistItem: { findMany: jest.fn().mockResolvedValue([]) },
       productBoost: { findUnique: jest.fn().mockResolvedValue(null) },
+      // Hazırlık süresi Süreler ve Kurallar'dan; satır yok → varsayılan.
+      platformSetting: { findUnique: jest.fn().mockResolvedValue(null) },
     };
     const paymentRefund = {
       processRefund: jest.fn().mockResolvedValue({ success: true }),

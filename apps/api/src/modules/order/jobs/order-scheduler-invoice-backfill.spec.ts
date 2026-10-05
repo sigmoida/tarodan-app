@@ -37,6 +37,8 @@ describe("OrderSchedulerService — fatura backfill işareti", () => {
         findMany: jest.fn().mockResolvedValue(invoices),
       },
       tradeCashPayment: { findMany: jest.fn().mockResolvedValue([]) },
+      // İade penceresi Süreler ve Kurallar'dan; satır yok → varsayılan.
+      platformSetting: { findUnique: jest.fn().mockResolvedValue(null) },
     };
     const orderService = { emitDeliveryRevenueInvoices: jest.fn() };
     const service = new OrderSchedulerService(
@@ -128,5 +130,42 @@ describe("OrderSchedulerService — fatura backfill işareti", () => {
     expect(prisma.order.update).toHaveBeenCalledWith(
       expect.objectContaining({ where: { id: "order-1" } }),
     );
+  });
+
+  /**
+   * Teslim → tamamlandı geçişi iade penceresi kapanınca olur. Pencere Süreler
+   * ve Kurallar'dan (`returnWindowDays`) okunur ve teslime DAMGALANMAZ: tur
+   * bugünkü değerle `deliveredAt ≤ şimdi − N gün` keser.
+   */
+  describe("iade penceresi kapanışı — süre kaynağı", () => {
+    const NOW = new Date("2026-10-05T12:00:00.000Z");
+    const DAY = 24 * 60 * 60 * 1000;
+    afterEach(() => jest.useRealTimers());
+
+    const completionCutoffAge = async (setting: string | null) => {
+      jest.useFakeTimers({ now: NOW, doNotFake: ["setImmediate"] });
+      const { service, prisma } = makeService();
+      prisma.platformSetting.findUnique.mockImplementation(
+        async ({ where }: { where: { settingKey: string } }) =>
+          setting !== null && where.settingKey === "return_window_days"
+            ? { settingValue: setting }
+            : null,
+      );
+      await service.runProcessDeliveredOrders();
+      const completionCall: any[] =
+        prisma.order.findMany.mock.calls.find(
+          (call: any[]) => call[0]?.where?.deliveredAt?.lte,
+        ) ?? [];
+      const cutoff = completionCall[0].where.deliveredAt.lte as Date;
+      return (NOW.getTime() - cutoff.getTime()) / DAY;
+    };
+
+    it("admin değeri yokken bugünkü gibi 14 gün", async () => {
+      await expect(completionCutoffAge(null)).resolves.toBe(14);
+    });
+
+    it("admin değeri geçerlidir", async () => {
+      await expect(completionCutoffAge("21")).resolves.toBe(21);
+    });
   });
 });

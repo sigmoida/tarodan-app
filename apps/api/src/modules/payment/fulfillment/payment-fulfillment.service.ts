@@ -31,6 +31,7 @@ import {
 } from "../../outbox/outbox.types";
 import { isTradeFullyPaid } from "../../trade/helpers/trade-payment-rows.helper";
 import { addDaysSkippingSundays } from "../../../common/helpers/preparing-deadline";
+import { resolveTimingValue } from "../../../common/timing-rules";
 import { ORDER_CANCEL_REASON } from "../../order/helpers/order-cancel-reasons";
 import { orderCancelledData } from "../../order/helpers/order-cancellation";
 import {
@@ -226,6 +227,14 @@ export class PaymentFulfillmentService {
     }[] = [];
     let stockoutCategoryId: string | null = null;
 
+    // Satıcı hazırlık süresi Süreler ve Kurallar'dan (ayar → env → 3 gün);
+    // tx dışında okunur, son tarih siparişe damgalanır.
+    const preparingDays = await resolveTimingValue(
+      this.prisma,
+      "preparingDeadlineDays",
+      this.configService,
+    );
+
     const result = await this.prisma.$transaction(async (tx) => {
       const claimed = await this.claimPaymentCompleted(tx, payment, {
         transactionId,
@@ -257,11 +266,7 @@ export class PaymentFulfillmentService {
         };
       }
 
-      // Update order status to PREPARING with shipping deadline for the seller
-      const preparingDays = parseInt(
-        this.configService.get("PREPARING_DEADLINE_DAYS") || "3",
-        10,
-      );
+      // Update order status to PREPARING with shipping deadline for the seller.
       // Pazar hariç sayılır: kargo pazar çalışmaz, cuma ödemesinin süresi
       // fiilen kısalmasın (bkz. addDaysSkippingSundays).
       const preparingDeadline = addDaysSkippingSundays(
@@ -657,6 +662,13 @@ export class PaymentFulfillmentService {
     }[] = [];
     let stockoutCategoryId: string | null = null;
 
+    // Tekil ödemeyle aynı kaynak (tx dışında okunur, siparişlere damgalanır).
+    const preparingDays = await resolveTimingValue(
+      this.prisma,
+      "preparingDeadlineDays",
+      this.configService,
+    );
+
     const result = await this.prisma.$transaction(
       async (tx) => {
         const claimed = await this.claimPaymentCompleted(tx, payment, {
@@ -683,10 +695,6 @@ export class PaymentFulfillmentService {
         const fulfilledOrders: typeof aliveOrders = [];
         const stockShortageOrders: typeof aliveOrders = [];
 
-        const preparingDays = parseInt(
-          this.configService.get("PREPARING_DEADLINE_DAYS") || "3",
-          10,
-        );
         // Pazar hariç sayılır (bkz. addDaysSkippingSundays).
         const preparingDeadline = addDaysSkippingSundays(
           new Date(),
@@ -980,12 +988,11 @@ export class PaymentFulfillmentService {
     capturedMerchantOid?: string,
     providerData?: ProviderPaymentData,
   ): Promise<boolean> {
-    // Platform ayarı: takas kargo süresi (gün). Varsayılan 7 gün.
-    const shippingDaysSetting = await this.prisma.platformSetting.findUnique({
-      where: { settingKey: "trade_shipping_deadline_days" },
-    });
-    const shippingDays =
-      parseInt(shippingDaysSetting?.settingValue ?? "7", 10) || 7;
+    // Takas kargo süresi Süreler ve Kurallar'dan (ayar → varsayılan 7 gün).
+    const shippingDays = await resolveTimingValue(
+      this.prisma,
+      "tradeShippingDays",
+    );
 
     const result = await this.prisma.$transaction(async (tx) => {
       // Faz 8.3: tekil/grup ile ORTAK claim (audit trail dahil — takas ödemesi de artık

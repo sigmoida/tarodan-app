@@ -685,7 +685,7 @@ export class OrderLifecycleService {
           // TAZE ödeme penceresi: sıfırlanmazsa süresi geçmiş paymentExpiresAt
           // yüzünden bir sonraki cron taraması siparişi anında yeniden iptal
           // ederdi. Pencere, teklif kabulündekiyle aynı (24 saat).
-          paymentExpiresAt: paymentWindowEnd(),
+          paymentExpiresAt: await paymentWindowEnd(this.prisma),
           // Rezervasyon YUKARIDA tazelendi; bayrak temizlenmezse ödeme
           // başlatma "rezervasyon bırakılmış" dalına girip aynı adetleri
           // İKİNCİ kez rezerve eder (tekil üründe kalıcı stok-dışı görünüm).

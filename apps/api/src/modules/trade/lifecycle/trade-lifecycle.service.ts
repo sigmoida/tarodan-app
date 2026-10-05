@@ -38,6 +38,7 @@ import {
   computeTradeHoldReleaseAt,
   startTradeConfirmationWindowIfDelivered,
 } from "../../../common/helpers/trade-escrow";
+import { resolveTimingValue } from "../../../common/timing-rules";
 import {
   ACTIVE_TRADE_STATUSES,
   TRADE_PRICING_V2,
@@ -242,11 +243,11 @@ export class TradeLifecycleService {
       }
     }
 
-    // Get trade deadlines from platform settings
-    const responseHoursSetting = await this.prisma.platformSetting.findUnique({
-      where: { settingKey: "trade_response_deadline_hours" },
-    });
-    const responseHours = parseInt(responseHoursSetting?.settingValue ?? "72");
+    // Yanıt süresi Süreler ve Kurallar'dan (ayar → varsayılan 72 saat).
+    const responseHours = await resolveTimingValue(
+      this.prisma,
+      "tradeResponseHours",
+    );
 
     const responseDeadline = new Date();
     responseDeadline.setHours(responseDeadline.getHours() + responseHours);
@@ -390,16 +391,15 @@ export class TradeLifecycleService {
       }
     }
 
-    // Get deadline settings (read-only, safe outside tx)
-    const paymentHoursSetting = await this.prisma.platformSetting.findUnique({
-      where: { settingKey: "trade_payment_deadline_hours" },
-    });
-    const shippingDaysSetting = await this.prisma.platformSetting.findUnique({
-      where: { settingKey: "trade_shipping_deadline_days" },
-    });
-
-    const paymentHours = parseInt(paymentHoursSetting?.settingValue ?? "48");
-    const shippingDays = parseInt(shippingDaysSetting?.settingValue ?? "7");
+    // Süreler Süreler ve Kurallar'dan (read-only, tx dışında güvenli).
+    const paymentHours = await resolveTimingValue(
+      this.prisma,
+      "tradePaymentHours",
+    );
+    const shippingDays = await resolveTimingValue(
+      this.prisma,
+      "tradeShippingDays",
+    );
 
     let tradeInitiatorId: string;
     let acceptedNextStatus: TradeStatus | null = null;
@@ -938,11 +938,11 @@ export class TradeLifecycleService {
       }
     }
 
-    // Get trade deadlines from platform settings
-    const responseHoursSetting = await this.prisma.platformSetting.findUnique({
-      where: { settingKey: "trade_response_deadline_hours" },
-    });
-    const responseHours = parseInt(responseHoursSetting?.settingValue ?? "72");
+    // Yanıt süresi Süreler ve Kurallar'dan (ayar → varsayılan 72 saat).
+    const responseHours = await resolveTimingValue(
+      this.prisma,
+      "tradeResponseHours",
+    );
 
     const responseDeadline = new Date();
     responseDeadline.setHours(responseDeadline.getHours() + responseHours);

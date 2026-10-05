@@ -558,7 +558,7 @@ export class OrderCheckoutDirectService {
           buyerShippingAmount,
           sellerShippingAmount,
         });
-      const paymentExpiresAt = paymentWindowEnd();
+      const paymentExpiresAt = await paymentWindowEnd(this.prisma);
 
       // Create order with discount info
       const order = await tx.order.create({

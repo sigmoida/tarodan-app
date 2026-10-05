@@ -608,7 +608,7 @@ export class OrderGuestCheckoutService {
             ? (feeDiscounted.applied as unknown as Prisma.InputJsonValue)
             : undefined,
           status: OrderStatus.pending_payment,
-          paymentExpiresAt: paymentWindowEnd(),
+          paymentExpiresAt: await paymentWindowEnd(this.prisma),
           shippingAddress: guestShippingJson as Prisma.InputJsonValue,
         },
         include: {

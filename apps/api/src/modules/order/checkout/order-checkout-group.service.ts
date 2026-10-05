@@ -582,7 +582,7 @@ export class OrderCheckoutGroupService {
               })) > 0,
           );
 
-          const paymentExpiresAt = paymentWindowEnd();
+          const paymentExpiresAt = await paymentWindowEnd(this.prisma);
           const orderInputs: Array<{
             pricingEntry: (typeof pricing)[number];
             orderNumber: string;

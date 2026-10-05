@@ -15,6 +15,8 @@ describe("TradeReconciliationService — iptal aktörü", () => {
       prisma: {
         trade: { findMany },
         $transaction: jest.fn((fn: any) => fn(tx)),
+        // Kayıp koli bekleme süresi ayardan okunur; satır yok → varsayılan.
+        platformSetting: { findUnique: jest.fn().mockResolvedValue(null) },
       },
       paymentService: { refundTradeCashTracked: jest.fn() },
       tradeCommon: { invalidateProductCachesForTrade: jest.fn() },

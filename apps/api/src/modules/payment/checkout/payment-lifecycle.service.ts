@@ -26,6 +26,7 @@ import {
   PUBLIC_NAME_SELECT,
   publicName,
 } from "../../../common/helpers/public-identity";
+import { resolveTimingValue } from "../../../common/timing-rules";
 
 export type PaymentAccessContext =
   { internal: true } | { userId: string | null; capabilityAuthorized: boolean };
@@ -401,9 +402,10 @@ export class PaymentLifecycleService {
     // fail ederse, PayTR çekimi tamamlanıp callback geldiğinde satır failed olur →
     // orphan capture (para çekildi, sipariş yok). Charge penceresi kapanınca (ya da
     // gerçek fail callback'iyle) normal akış devreye girer.
-    const windowMin = parseInt(
-      this.configService.get("PAYMENT_FAIL_TIMEOUT_MINUTES") || "35",
-      10,
+    const windowMin = await resolveTimingValue(
+      this.prisma,
+      "paymentFailTimeoutMinutes",
+      this.configService,
     );
     if (this.paymentCommon.isChargeLikelyLive(payment.metadata, windowMin)) {
       this.logger.warn(

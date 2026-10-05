@@ -118,6 +118,9 @@ describe("PaymentService group payment (checkout group)", () => {
       create: jest.fn(),
     },
     checkoutGroup: { findUnique: jest.fn() },
+    // Süreler (hazırlık, iade penceresi…) Süreler ve Kurallar'dan okunur;
+    // satır yok → env/varsayılan, yani bugünkü davranış.
+    platformSetting: { findUnique: jest.fn().mockResolvedValue(null) },
     $transaction: jest.fn(),
   };
 

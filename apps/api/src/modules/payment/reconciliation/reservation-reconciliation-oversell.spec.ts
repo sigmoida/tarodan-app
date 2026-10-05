@@ -35,6 +35,8 @@ describe("ReservationReconciliationService.releaseExpiredOrderReservations (#1 o
     const prisma = {
       order: { findMany: jest.fn().mockResolvedValue(expiredOrders) },
       $transaction: jest.fn((fn: any) => fn(tx)),
+      // Rezervasyon süresi Süreler ve Kurallar'dan; satır yok → env (5).
+      platformSetting: { findUnique: jest.fn().mockResolvedValue(null) },
     } as any;
     const cache = { del: jest.fn().mockResolvedValue(undefined) } as any;
     const config = { get: jest.fn().mockReturnValue("5") } as any;

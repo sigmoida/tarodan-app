@@ -23,8 +23,20 @@ describe("RefundCreationService.classifyOrderPhase", () => {
     {} as any,
   );
 
-  const classify = (order: any): string =>
-    (service as any).classifyOrderPhase(order);
+  // Pencere çağıranda Süreler ve Kurallar'dan çözülüp verilir; bugünkü
+  // varsayılan 14 gün.
+  const classify = (order: any, coolingOffDays = 14): string =>
+    (service as any).classifyOrderPhase(order, coolingOffDays);
+
+  it("pencere admin tarafından uzatılınca 15. gün hâlâ cayma içindedir", () => {
+    const order = {
+      status: OrderStatus.delivered,
+      deliveredAt: new Date(Date.now() - 15 * 24 * 3600 * 1000),
+      shipment: { status: ShipmentStatus.delivered, deliveredAt: null },
+    };
+    expect(classify(order)).toBe("past_cooling_off");
+    expect(classify(order, 20)).toBe("in_cooling_off");
+  });
 
   const daysAgo = (n: number) => new Date(Date.now() - n * 24 * 3600 * 1000);
 

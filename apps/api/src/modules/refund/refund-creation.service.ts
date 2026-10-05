@@ -18,10 +18,7 @@ import {
 import { PrismaService } from "../../prisma";
 import { PaymentService } from "../payment/payment.service";
 import { RefundPendingReconciliationException } from "../payment-providers/refund-errors";
-import {
-  PAYMENT_CONFIG_KEYS,
-  envConfigNumber,
-} from "../payment/helpers/payment.constants";
+import { resolveTimingValue } from "../../common/timing-rules";
 import { isShipmentHandedToCarrier } from "../shipping/helpers/shipment-handover";
 import { ACTIVE_REFUND_REQUEST_STATUSES } from "./helpers/refund-active-statuses";
 import { generateUniqueReference } from "../../common/helpers/generate-reference";
@@ -65,14 +62,6 @@ const CANCELLATION_ORDER_INCLUDE = {
 type CancellationOrder = Prisma.OrderGetPayload<{
   include: typeof CANCELLATION_ORDER_INCLUDE;
 }>;
-
-/**
- * Cayma (iade talep) penceresi — satıcı payout takvimiyle AYNI kaynaktan gelir
- * (PAYMENT_CONFIG_KEYS.RETURN_WINDOW_DAYS). Burada gömülü bir 14 tutmak,
- * env'den okunan payout penceresiyle sessizce kaymasına yol açıyordu.
- */
-const coolingOffDays = () =>
-  envConfigNumber(PAYMENT_CONFIG_KEYS.RETURN_WINDOW_DAYS);
 
 /**
  * İade talebinin DOĞUŞU — RefundService'ten birebir taşındı. Bir talebin hangi
@@ -176,7 +165,14 @@ export class RefundCreationService {
       orderQty,
     );
 
-    const phase = this.classifyOrderPhase(order);
+    // Cayma penceresi satıcı payout takvimiyle AYNI kayıttan (Süreler ve
+    // Kurallar → returnWindowDays). Teslime damgalanmaz: talep anında bugünkü
+    // değerle teslim tarihinden hesaplanır.
+    const coolingOffDays = await resolveTimingValue(
+      this.prisma,
+      "returnWindowDays",
+    );
+    const phase = this.classifyOrderPhase(order, coolingOffDays);
     const policy =
       phase === "preparing" || phase === "paid"
         ? resolveCancellationPolicy(
@@ -592,15 +588,18 @@ export class RefundCreationService {
     );
   }
 
-  private classifyOrderPhase(order: {
-    status: OrderStatus;
-    deliveredAt?: Date | null;
-    shipment: {
-      status: ShipmentStatus;
-      deliveredAt: Date | null;
-      shippedAt?: Date | null;
-    } | null;
-  }): "paid" | "preparing" | "in_cooling_off" | "past_cooling_off" | "unknown" {
+  private classifyOrderPhase(
+    order: {
+      status: OrderStatus;
+      deliveredAt?: Date | null;
+      shipment: {
+        status: ShipmentStatus;
+        deliveredAt: Date | null;
+        shippedAt?: Date | null;
+      } | null;
+    },
+    coolingOffDays: number,
+  ): "paid" | "preparing" | "in_cooling_off" | "past_cooling_off" | "unknown" {
     if (
       order.status === OrderStatus.paid ||
       order.status === OrderStatus.preparing
@@ -628,7 +627,7 @@ export class RefundCreationService {
         order.deliveredAt ?? order.shipment?.deliveredAt ?? null;
       if (!deliveredAt) return "in_cooling_off";
       const ageDays = (Date.now() - deliveredAt.getTime()) / (1000 * 3600 * 24);
-      return ageDays <= coolingOffDays()
+      return ageDays <= coolingOffDays
         ? "in_cooling_off"
         : "past_cooling_off";
     }

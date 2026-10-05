@@ -5,20 +5,14 @@ import { registerRepeatableCron } from "../../../monitoring/bull-cron.helper";
 import { QUEUE_NAMES } from "../../../workers/constants";
 import { SuratTrackingService } from "../../surat-cargo/sync/surat-tracking.service";
 import { CronStepFailuresError } from "../../../monitoring/cron-step-runner";
-import {
-  PAYMENT_CONFIG_KEYS,
-  envConfigNumber,
-} from "../../payment/helpers/payment.constants";
+import { PrismaService } from "../../../prisma";
+import { resolveTimingValue } from "../../../common/timing-rules";
 
 /**
  * Teslim sonrası SICAK pencere. İade orijinal etiketle dönüyorsa teslimden hemen
  * sonra başlıyor; bu sınırın ötesi günlük taramaya bırakılıyor.
  */
 const POST_DELIVERY_HOT_HOURS = 48;
-
-/** İade hakkı süresi — teslim sonrası izlemenin dış sınırı. Ayrı sabit tutmuyoruz. */
-const returnWindowDays = (): number =>
-  envConfigNumber(PAYMENT_CONFIG_KEYS.RETURN_WINDOW_DAYS);
 
 /**
  * Başarısız koli listesini alarm metnine sığacak hâle getirir. Alarm tek satır
@@ -40,6 +34,7 @@ export class ShippingSchedulerService implements OnModuleInit {
   constructor(
     private readonly suratTracking: SuratTrackingService,
     @InjectQueue(QUEUE_NAMES.SCHEDULED) private readonly scheduledQueue: Queue,
+    private readonly prisma: PrismaService,
   ) {}
 
   async onModuleInit(): Promise<void> {
@@ -78,11 +73,19 @@ export class ShippingSchedulerService implements OnModuleInit {
     );
   }
 
-  /** Kuyruk: 2-14 gün önce teslim edilmiş koliler, günde bir. */
+  /**
+   * Kuyruk: 2-14 gün önce teslim edilmiş koliler, günde bir. Dış sınır iade
+   * hakkı süresidir (Süreler ve Kurallar → `returnWindowDays`); ayrı sabit
+   * tutulmaz.
+   */
   async runSyncSuratPostDeliveryTail(log: (msg: string) => void = () => {}) {
+    const returnWindowDays = await resolveTimingValue(
+      this.prisma,
+      "returnWindowDays",
+    );
     return this.runPostDeliverySweep(
       "sync-surat-post-delivery-tail",
-      returnWindowDays() * 24,
+      returnWindowDays * 24,
       POST_DELIVERY_HOT_HOURS,
       log,
     );

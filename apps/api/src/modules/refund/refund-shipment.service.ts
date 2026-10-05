@@ -13,10 +13,7 @@ import {
   ShipmentStatus,
 } from "@prisma/client";
 import { PrismaService } from "../../prisma";
-import {
-  PAYMENT_CONFIG_KEYS,
-  envConfigNumber,
-} from "../payment/helpers/payment.constants";
+import { resolveTimingValue } from "../../common/timing-rules";
 import { PaymentService } from "../payment/payment.service";
 import {
   CARGO_PROVIDER,
@@ -443,11 +440,13 @@ export class RefundShipmentService {
    * var → ops takibi.
    */
   async expireStaleOpenReturns(): Promise<number> {
-    const days = envConfigNumber(PAYMENT_CONFIG_KEYS.RETURN_DROPOFF_DAYS);
+    const days = await resolveTimingValue(this.prisma, "returnDropoffDays");
     const cutoff = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
-    // Emniyet supabı hiçbir koşulda normal pencereden kısa olamaz.
+    // Emniyet supabı hiçbir koşulda normal pencereden kısa olamaz. Admin
+    // ekranı bunu yazarken dayatır; env geri düşüşü dayatmadığı için okumada
+    // da korunur.
     const hardDays = Math.max(
-      envConfigNumber(PAYMENT_CONFIG_KEYS.RETURN_DROPOFF_HARD_DAYS),
+      await resolveTimingValue(this.prisma, "returnDropoffHardDays"),
       days,
     );
     const hardCutoff = new Date(Date.now() - hardDays * 24 * 60 * 60 * 1000);
@@ -565,7 +564,10 @@ export class RefundShipmentService {
    * ayrı bir sweep'le (D25) ele alınır; bu yalnız wait_for_delivery'yi hedefler.
    */
   async expireStaleWaitForDelivery(): Promise<number> {
-    const days = Number(process.env.REFUND_WAIT_DELIVERY_MAX_DAYS) || 30;
+    const days = await resolveTimingValue(
+      this.prisma,
+      "refundWaitDeliveryMaxDays",
+    );
     const cutoff = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
 
     let stale: Array<{
@@ -642,7 +644,10 @@ export class RefundShipmentService {
   // kayıt finalize edilmez. Pencere dolunca cron otomatik finalize eder.
   // (Poller'daki anlık finalize kaldırıldı — tek finalize yolu bu cron.)
   async findReturnDeliveredPendingFinalize(): Promise<string[]> {
-    const hours = envConfigNumber(PAYMENT_CONFIG_KEYS.RETURN_INSPECTION_HOURS);
+    const hours = await resolveTimingValue(
+      this.prisma,
+      "returnInspectionHours",
+    );
     const cutoff = new Date(Date.now() - hours * 60 * 60 * 1000);
     const rows = await this.prisma.refundRequest.findMany({
       where: {

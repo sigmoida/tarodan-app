@@ -76,6 +76,8 @@ describe("RefundService policy integration", () => {
         // 0 → bu iade paketi kapatır (tek satırlık sipariş davranışı).
         count: jest.fn().mockResolvedValue(0),
       },
+      // Cayma penceresi Süreler ve Kurallar'dan; satır yok → varsayılan.
+      platformSetting: { findUnique: jest.fn().mockResolvedValue(null) },
       refundRequest: {
         count: jest.fn().mockResolvedValue(0),
         findMany: jest.fn().mockResolvedValue([]),

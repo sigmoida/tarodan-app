@@ -1,6 +1,7 @@
 import { OrderStatus } from "@prisma/client";
 import { PaymentFulfillmentService } from "./payment-fulfillment.service";
 import { NotificationType } from "../../notification/dto";
+import { addDaysSkippingSundays } from "../../../common/helpers/preparing-deadline";
 
 /**
  * WISHLIST_SOLD ödeme BAŞARISINDA çıkar, sipariş oluşturmada değil.
@@ -39,7 +40,10 @@ describe("PaymentFulfillmentService — WISHLIST_SOLD", () => {
     product: { id: productId, title: "Ürün" },
   });
 
-  const makeHarness = () => {
+  const makeHarness = (
+    settings: Record<string, string> = {},
+    env: Record<string, string> = {},
+  ) => {
     const createInAppNotification = jest.fn().mockResolvedValue(true);
     const tx: any = {
       payment: { updateMany: jest.fn().mockResolvedValue({ count: 1 }) },
@@ -58,6 +62,15 @@ describe("PaymentFulfillmentService — WISHLIST_SOLD", () => {
       checkoutGroup: {
         findUnique: jest.fn().mockResolvedValue({ groupNumber: "GRP-1" }),
       },
+      // Hazırlık süresi Süreler ve Kurallar'dan; satır yok → env/varsayılan.
+      platformSetting: {
+        findUnique: jest.fn(
+          async ({ where }: { where: { settingKey: string } }) =>
+            where.settingKey in settings
+              ? { settingValue: settings[where.settingKey] }
+              : null,
+        ),
+      },
     };
     const service = new PaymentFulfillmentService(
       prisma,
@@ -65,7 +78,7 @@ describe("PaymentFulfillmentService — WISHLIST_SOLD", () => {
         del: jest.fn().mockResolvedValue(undefined),
         delPattern: jest.fn().mockResolvedValue(undefined),
       } as never,
-      { get: jest.fn() } as never,
+      { get: jest.fn((key: string) => env[key]) } as never,
       {
         emitOrderFulfillmentRequested: jest.fn().mockResolvedValue(undefined),
         emitGroupBuyerOrderPaid: jest.fn().mockResolvedValue(undefined),
@@ -203,5 +216,64 @@ describe("PaymentFulfillmentService — WISHLIST_SOLD", () => {
       "watcher-2",
     ]);
     expect(calls).toHaveLength(4);
+  });
+
+  /**
+   * Satıcı hazırlık süresi Süreler ve Kurallar'dan (`preparingDeadlineDays`):
+   * ayar → env PREPARING_DEADLINE_DAYS → 3 gün; pazar hariç sayılır ve
+   * siparişe damgalanır.
+   */
+  describe("hazırlık son tarihi — süre kaynağı", () => {
+    const NOW = new Date("2026-10-05T09:00:00.000Z");
+
+    afterEach(() => jest.useRealTimers());
+
+    const preparingDeadlineFor = async (
+      settings: Record<string, string>,
+      env: Record<string, string>,
+    ): Promise<Date> => {
+      jest.useFakeTimers({ now: NOW, doNotFake: ["setImmediate"] });
+      const { service, tx } = makeHarness(settings, env);
+      const order = makeOrder(1);
+      tx.order.findUnique
+        .mockResolvedValueOnce({
+          status: OrderStatus.pending_payment,
+          orderNumber: "ORD-1",
+        })
+        .mockResolvedValueOnce(order);
+      await service.processSuccessfulPayment(
+        {
+          id: "pay-1",
+          orderId: order.id,
+          order,
+          status: "pending",
+          metadata: {},
+          provider: "paytr",
+        },
+        "txn-1",
+      );
+      const preparingCall = tx.order.update.mock.calls.find(
+        (call: any[]) => call[0]?.data?.status === OrderStatus.preparing,
+      );
+      return preparingCall[0].data.preparingDeadline as Date;
+    };
+
+    it("admin değeri ve env yokken bugünkü gibi 3 gün (pazar hariç)", async () => {
+      await expect(preparingDeadlineFor({}, {})).resolves.toEqual(
+        addDaysSkippingSundays(NOW, 3),
+      );
+    });
+
+    it("env geri düşüşünü okur, admin değeri onu ezer", async () => {
+      await expect(
+        preparingDeadlineFor({}, { PREPARING_DEADLINE_DAYS: "5" }),
+      ).resolves.toEqual(addDaysSkippingSundays(NOW, 5));
+      await expect(
+        preparingDeadlineFor(
+          { preparing_deadline_days: "2" },
+          { PREPARING_DEADLINE_DAYS: "5" },
+        ),
+      ).resolves.toEqual(addDaysSkippingSundays(NOW, 2));
+    });
   });
 });

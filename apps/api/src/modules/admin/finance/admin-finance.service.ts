@@ -10,6 +10,7 @@ import {
   retryableFailedInvoicesWhere,
   uninvoicedDeliveredWhere,
 } from "./finance-health.where";
+import { resolveTimingValue } from "../../../common/timing-rules";
 
 /**
  * Finans ÖZETİ — admin'in "para nerede?" sorusuna tek bakışta cevap.
@@ -40,6 +41,12 @@ export class AdminFinanceService {
    */
   async getFinanceOverview() {
     const now = new Date();
+    // Fatura süresi eşiği Süreler ve Kurallar'dan — dashboard kuyruğu ve
+    // order-scheduler alarmı ile aynı değer.
+    const invoiceDeadlineDays = await resolveTimingValue(
+      this.prisma,
+      "invoiceDeadlineDays",
+    );
 
     const [
       reconciliation,
@@ -52,7 +59,11 @@ export class AdminFinanceService {
       this.reconciliation.build(),
       this.prisma.payoutTransfer.count({ where: failedTransfersWhere }),
       this.prisma.paymentHold.count({ where: overdueHoldsWhere(now) }),
-      this.prisma.order.count({ where: uninvoicedDeliveredWhere(now) }),
+      this.prisma.order.count({
+        where: uninvoicedDeliveredWhere(now, {
+          timing: { invoiceDeadlineDays },
+        }),
+      }),
       this.prisma.elogoInvoice.count({ where: exhaustedInvoicesWhere }),
       this.prisma.sellerAccountAdjustment.aggregate({
         where: openAdjustmentsWhere,

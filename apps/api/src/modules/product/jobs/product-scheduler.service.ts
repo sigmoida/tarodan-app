@@ -20,6 +20,7 @@ import {
   adminUrl,
 } from "../../../config/app-urls";
 import type { CronRunSummary } from "../../../monitoring/cron-run.helper";
+import { resolveTimingValue } from "../../../common/timing-rules";
 
 /**
  * Product Scheduler Service
@@ -42,12 +43,12 @@ export class ProductSchedulerService implements OnModuleInit {
     recentLike: 10, // Bonus for likes in last 7 days
   };
 
-  // İlan yaşam süresi (gün) — env'den; süre publishedAt'ten (yoksa createdAt)
-  // sayılır ve HER onayda tazelenir (yenileme = yeniden onay → taze pencere).
-  private readonly LISTING_EXPIRY_DAYS = (() => {
-    const parsed = Number(process.env.LISTING_TTL_DAYS);
-    return Number.isFinite(parsed) && parsed > 0 ? Math.floor(parsed) : 60;
-  })();
+  // İlan yaşam süresi ve uyarı günü Süreler ve Kurallar'dan (`listingTtlDays`,
+  // `listingExpiryWarningDays`) her cron turunun başında okunur. Süre
+  // publishedAt'ten (yoksa createdAt) sayılır ve HER onayda tazelenir
+  // (yenileme = yeniden onay → taze pencere). DİKKAT: bitiş tarihi ilana
+  // damgalanmaz, her turda "şimdi − N gün" ile hesaplanır — değer
+  // değiştirildiğinde yayındaki ilanların tamamına geriye dönük uygulanır.
 
   constructor(
     private readonly prisma: PrismaService,
@@ -602,8 +603,9 @@ export class ProductSchedulerService implements OnModuleInit {
     this.logger.log("Starting listing expiration check...");
 
     try {
+      const ttlDays = await resolveTimingValue(this.prisma, "listingTtlDays");
       const expiryDate = new Date();
-      expiryDate.setDate(expiryDate.getDate() - this.LISTING_EXPIRY_DAYS);
+      expiryDate.setDate(expiryDate.getDate() - ttlDays);
 
       // Süre YAYIN anından sayılır (publishedAt; eski kayıtlarda createdAt).
       // Yalnız gerçek ilanlar: membership/boost sanal ürünleri (kind != listing)
@@ -640,7 +642,7 @@ export class ProductSchedulerService implements OnModuleInit {
 
       if (result.count > 0) {
         this.logger.log(
-          `Expired ${result.count} listings older than ${this.LISTING_EXPIRY_DAYS} days`,
+          `Expired ${result.count} listings older than ${ttlDays} days`,
         );
       } else {
         this.logger.log("No listings to expire");
@@ -667,9 +669,7 @@ export class ProductSchedulerService implements OnModuleInit {
         }
       }
 
-      log(
-        `${result.count} eski ilan pasif yapıldı (>${this.LISTING_EXPIRY_DAYS} gün)`,
-      );
+      log(`${result.count} eski ilan pasif yapıldı (>${ttlDays} gün)`);
       return {
         summary: `${result.count} eski ilan pasif yapıldı`,
         stats: { expired: result.count },
@@ -740,17 +740,19 @@ export class ProductSchedulerService implements OnModuleInit {
   }
 
   /**
-   * Get listings that will expire soon (within 7 days)
+   * Get listings that will expire soon (within the warning lead time)
    * Can be used to send notifications to sellers
    */
-  async getExpiringListings(daysUntilExpiry: number = 7): Promise<any[]> {
+  async getExpiringListings(daysUntilExpiry?: number): Promise<any[]> {
+    const ttlDays = await resolveTimingValue(this.prisma, "listingTtlDays");
+    const leadDays =
+      daysUntilExpiry ??
+      (await resolveTimingValue(this.prisma, "listingExpiryWarningDays"));
     const expiryDate = new Date();
-    expiryDate.setDate(
-      expiryDate.getDate() - this.LISTING_EXPIRY_DAYS + daysUntilExpiry,
-    );
+    expiryDate.setDate(expiryDate.getDate() - ttlDays + leadDays);
 
     const warningDate = new Date();
-    warningDate.setDate(warningDate.getDate() - this.LISTING_EXPIRY_DAYS);
+    warningDate.setDate(warningDate.getDate() - ttlDays);
 
     return this.prisma.product.findMany({
       where: {
@@ -787,11 +789,14 @@ export class ProductSchedulerService implements OnModuleInit {
       // Cron günlük çalışır. 7 günlük pencerenin TAMAMINI seçersek aynı ilana
       // 7 gün boyunca her gün uyarı gider. Bunun yerine yalnız BUGÜN 53 günü
       // (60 - 7) dolduran ilanları (1 günlük bant) seç → ilan başına tek uyarı.
-      const WARN_DAYS_BEFORE = 7;
-      const bandEnd = new Date();
-      bandEnd.setDate(
-        bandEnd.getDate() - (this.LISTING_EXPIRY_DAYS - WARN_DAYS_BEFORE),
+      // İki sayı da Süreler ve Kurallar'dan; kayıt uyarı < ömür dayatır.
+      const ttlDays = await resolveTimingValue(this.prisma, "listingTtlDays");
+      const warnDaysBefore = await resolveTimingValue(
+        this.prisma,
+        "listingExpiryWarningDays",
       );
+      const bandEnd = new Date();
+      bandEnd.setDate(bandEnd.getDate() - (ttlDays - warnDaysBefore));
       const bandStart = new Date(bandEnd);
       bandStart.setDate(bandStart.getDate() - 1);
 
@@ -814,7 +819,9 @@ export class ProductSchedulerService implements OnModuleInit {
       });
 
       if (expiringListings.length === 0) {
-        this.logger.log("No listings entering the 7-day expiry warning window");
+        this.logger.log(
+          `No listings entering the ${warnDaysBefore}-day expiry warning window`,
+        );
         log("Süresi yaklaşan ilan yok");
         return {
           summary: "0 yaklaşan ilan",
@@ -823,17 +830,17 @@ export class ProductSchedulerService implements OnModuleInit {
       }
 
       this.logger.log(
-        `Warning sellers about ${expiringListings.length} listing(s) expiring in ~7 days`,
+        `Warning sellers about ${expiringListings.length} listing(s) expiring in ~${warnDaysBefore} days`,
       );
-      log(`${expiringListings.length} ilan 7 gün içinde sona eriyor`);
+      log(
+        `${expiringListings.length} ilan ${warnDaysBefore} gün içinde sona eriyor`,
+      );
 
       // "İlanınızın süresi doluyor" e-postası (ilan başına, satıcıya).
       const frontendUrl = resolveFrontendUrl();
       for (const listing of expiringListings) {
         const expirationDate = new Date(listing.createdAt);
-        expirationDate.setDate(
-          expirationDate.getDate() + this.LISTING_EXPIRY_DAYS,
-        );
+        expirationDate.setDate(expirationDate.getDate() + ttlDays);
         try {
           await this.notificationService.sendTemplateEmailToUser(
             listing.seller.id,
@@ -841,7 +848,7 @@ export class ProductSchedulerService implements OnModuleInit {
             {
               sellerName: listing.seller.displayName ?? "",
               productTitle: listing.title,
-              daysRemaining: WARN_DAYS_BEFORE,
+              daysRemaining: warnDaysBefore,
               expirationDate: expirationDate.toLocaleDateString("tr-TR"),
               listingUrl: `${frontendUrl}/products/${listing.id}`,
             },

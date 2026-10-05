@@ -20,6 +20,7 @@ import { VirtualOrderFulfillmentService } from "../fulfillment/virtual-order-ful
 import { nodeEnv } from "../../../config/environment";
 import { errorMessage } from "../../../common/helpers/error-message";
 import { payerIpFromPaymentMetadata } from "../helpers/paytr-merchant.helper";
+import { resolveTimingValue } from "../../../common/timing-rules";
 
 /**
  * A callback whose four protocol-required fields are present.
@@ -587,9 +588,10 @@ export class PaymentCallbackService {
       // çekimi sürüyorsa ertele: aksi halde attempt-1'in geç failed'i attempt-2
       // uçarken siparişi iptal eder, attempt-2 başarısı CAS'ta `failed` görüp
       // fulfillment'ı atlar ve alıcı parası çekilmiş halde manuel iadeye düşer.
-      const failWindowMin = parseInt(
-        this.configService.get("PAYMENT_FAIL_TIMEOUT_MINUTES") || "35",
-        10,
+      const failWindowMin = await resolveTimingValue(
+        this.prisma,
+        "paymentFailTimeoutMinutes",
+        this.configService,
       );
       const deferred = shouldDeferSupersededOidFailure({
         callbackOid: dto.merchant_oid,

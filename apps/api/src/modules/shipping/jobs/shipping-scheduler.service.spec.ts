@@ -2,7 +2,17 @@ import { CronStepFailuresError } from "../../../monitoring/cron-step-runner";
 import { ShippingSchedulerService } from "./shipping-scheduler.service";
 
 describe("ShippingSchedulerService", () => {
-  const makeService = () => {
+  const makeService = (settings: Record<string, string> = {}) => {
+    const prisma = {
+      platformSetting: {
+        findUnique: jest.fn(
+          async ({ where }: { where: { settingKey: string } }) =>
+            where.settingKey in settings
+              ? { settingValue: settings[where.settingKey] }
+              : null,
+        ),
+      },
+    };
     const tracking = {
       retryPendingBarcodes: jest.fn().mockResolvedValue({
         order: { retried: 0, failed: 0 },
@@ -18,12 +28,55 @@ describe("ShippingSchedulerService", () => {
         .fn()
         .mockResolvedValue({ synced: 0, pending: 0, failed: 0 }),
       alertStaleCargo: jest.fn().mockResolvedValue(undefined),
+      syncPostDeliveryShipments: jest
+        .fn()
+        .mockResolvedValue({ synced: 0, pending: 0, failed: 0 }),
     };
     return {
       tracking,
-      service: new ShippingSchedulerService(tracking as any, {} as any),
+      service: new ShippingSchedulerService(
+        tracking as any,
+        {} as any,
+        prisma as any,
+      ),
     };
   };
+
+  describe("teslim sonrası kuyruk taraması — dış sınır iade penceresi", () => {
+    const ORIGINAL = process.env.RETURN_WINDOW_DAYS;
+    beforeEach(() => {
+      delete process.env.RETURN_WINDOW_DAYS;
+    });
+    afterAll(() => {
+      if (ORIGINAL === undefined) delete process.env.RETURN_WINDOW_DAYS;
+      else process.env.RETURN_WINDOW_DAYS = ORIGINAL;
+    });
+
+    it("admin değeri yokken bugünkü gibi 14 gün (336 saat) geriye bakar", async () => {
+      const { service, tracking } = makeService();
+
+      await service.runSyncSuratPostDeliveryTail();
+
+      expect(tracking.syncPostDeliveryShipments).toHaveBeenCalledWith(336, 48);
+    });
+
+    it("env geri düşüşünü okur", async () => {
+      process.env.RETURN_WINDOW_DAYS = "20";
+      const { service, tracking } = makeService();
+
+      await service.runSyncSuratPostDeliveryTail();
+
+      expect(tracking.syncPostDeliveryShipments).toHaveBeenCalledWith(480, 48);
+    });
+
+    it("admin değeri geçerlidir", async () => {
+      const { service, tracking } = makeService({ return_window_days: "30" });
+
+      await service.runSyncSuratPostDeliveryTail();
+
+      expect(tracking.syncPostDeliveryShipments).toHaveBeenCalledWith(720, 48);
+    });
+  });
 
   it("bütün kargo adımları temizse başarılı stats döndürür", async () => {
     const { service } = makeService();

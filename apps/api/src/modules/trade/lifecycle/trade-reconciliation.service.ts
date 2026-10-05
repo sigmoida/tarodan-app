@@ -14,8 +14,8 @@ import {
 import {
   computeTradeHoldReleaseAt,
   startTradeConfirmationWindowIfDelivered,
-  tradeLostParcelGraceDays,
 } from "../../../common/helpers/trade-escrow";
+import { resolveTimingValue } from "../../../common/timing-rules";
 import { safeDecrementReserved } from "../../product/helpers/product-availability.helper";
 import { getProductStatusFromQuantity } from "../../product/helpers/product-status.helper";
 import { PaymentService } from "../../payment/payment.service";
@@ -188,9 +188,11 @@ export class TradeReconciliationService {
   private async notifyAdminsOfUndeliveredOutboundTrades(
     now: Date,
   ): Promise<number> {
-    const cutoff = new Date(
-      now.getTime() - tradeLostParcelGraceDays() * 24 * 60 * 60 * 1000,
+    const graceDays = await resolveTimingValue(
+      this.prisma,
+      "tradeLostParcelGraceDays",
     );
+    const cutoff = new Date(now.getTime() - graceDays * 24 * 60 * 60 * 1000);
     const candidates = await this.prisma.trade.findMany({
       where: {
         status: TradeStatus.shipping_to_recipients,
@@ -493,7 +495,10 @@ export class TradeReconciliationService {
    * süresiz askı üretmesini engeller.
    */
   private async autoResolveLostParcelTrades(now: Date): Promise<number> {
-    const graceDays = tradeLostParcelGraceDays();
+    const graceDays = await resolveTimingValue(
+      this.prisma,
+      "tradeLostParcelGraceDays",
+    );
     const cutoff = new Date(now.getTime() - graceDays * 24 * 60 * 60 * 1000);
     const candidates = await this.prisma.trade.findMany({
       where: {

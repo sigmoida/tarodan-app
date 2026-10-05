@@ -34,6 +34,7 @@ import {
   PUBLIC_NAME_SELECT,
   publicName,
 } from "../../../common/helpers/public-identity";
+import { resolveTimingValue } from "../../../common/timing-rules";
 
 // SEAM-B1: Paket Sürat'ta HAREKET ettiyse "satıcı göndermedi" DEĞİLDİR — böyle
 // bir siparişi süre-doldu diye iptal+iade edersek alıcı hem malı hem parayı
@@ -72,13 +73,16 @@ export class PaymentExpiryReconciliationService {
    * penceresi + grace) içindeyse EVET. Bu payment `failed` yapılmamalı / siparişi 24s
    * kill-switch'i öldürmemeli — aksi halde kullanıcı OTP ekranındayken PayTR parayı çeker
    * ve callback geldiğinde satır çoktan failed olur → orphan capture.
+   *
+   * Pencere Süreler ve Kurallar'dan (`paymentFailTimeoutMinutes`) turun başında
+   * BİR KEZ okunur ve tur boyunca aynı değer kullanılır.
    */
-  private isChargeLikelyLive(metadata: unknown): boolean {
-    const windowMin = parseInt(
-      this.configService.get("PAYMENT_FAIL_TIMEOUT_MINUTES") || "35",
-      10,
+  private failWindowMinutes(): Promise<number> {
+    return resolveTimingValue(
+      this.prisma,
+      "paymentFailTimeoutMinutes",
+      this.configService,
     );
-    return this.paymentCommon.isChargeLikelyLive(metadata, windowMin);
   }
 
   /**
@@ -103,6 +107,7 @@ export class PaymentExpiryReconciliationService {
         product: { select: { title: true } },
       },
     });
+    const failWindowMin = await this.failWindowMinutes();
 
     let cancelled = 0;
     const dispatched: {
@@ -137,7 +142,13 @@ export class PaymentExpiryReconciliationService {
             },
             select: { metadata: true },
           });
-          if (livePayment && this.isChargeLikelyLive(livePayment.metadata)) {
+          if (
+            livePayment &&
+            this.paymentCommon.isChargeLikelyLive(
+              livePayment.metadata,
+              failWindowMin,
+            )
+          ) {
             return;
           }
 
@@ -573,10 +584,7 @@ export class PaymentExpiryReconciliationService {
     // PayTR oturum süresi + grace üstüne çekerek bu yarışı kökten kapatıyoruz.
     // Stok zaten 5dk'da releaseExpiredOrderReservations ile boşaldığı için bu
     // gecikme stok'u bağlamaz; sadece terk edilen payment satırı daha geç failed olur.
-    const timeoutMinutes = parseInt(
-      this.configService.get("PAYMENT_FAIL_TIMEOUT_MINUTES") || "35",
-      10,
-    );
+    const timeoutMinutes = await this.failWindowMinutes();
     const timeoutDate = new Date();
     timeoutDate.setMinutes(timeoutDate.getMinutes() - timeoutMinutes);
 
@@ -636,7 +644,12 @@ export class PaymentExpiryReconciliationService {
         // Kullanıcı initiate'ten çok sonra 3DS'e girdiyse (createdAt eski, charge yeni)
         // canlı oturum hâlâ açıktır → bu payment'ı `failed` YAPMA (orphan capture).
         // Bir sonraki turda charge penceresi kapanınca failed edilir.
-        if (this.isChargeLikelyLive(payment.metadata)) {
+        if (
+          this.paymentCommon.isChargeLikelyLive(
+            payment.metadata,
+            timeoutMinutes,
+          )
+        ) {
           continue;
         }
 

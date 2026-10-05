@@ -23,10 +23,7 @@ import {
   OUTBOX_ORDER_REVENUE_INVOICE,
   type OrderRevenueInvoicePayload,
 } from "../../outbox/outbox.types";
-import {
-  PAYMENT_CONFIG_KEYS,
-  resolvePaymentConfigNumber,
-} from "../helpers/payment.constants";
+import { resolveTimingValue } from "../../../common/timing-rules";
 import { i18nMessage } from "../../i18n";
 import {
   PUBLIC_NAME_SELECT,
@@ -69,9 +66,9 @@ export class PaymentHoldReleaseService {
   // penceresi = teslim + returnWindowDays (14); satıcı payout uygunluğu =
   // teslim + returnWindowDays + payoutGraceDays. Grace, iade penceresi
   // kapandıktan SONRA payout'u başlatır → "14. günün son saniyesinde iade +
-  // payout çoktan gitti" çakışması imkânsız olur.
-  private readonly returnWindowDays: number;
-  private readonly payoutGraceDays: number;
+  // payout çoktan gitti" çakışması imkânsız olur. İki süre de Süreler ve
+  // Kurallar'dan teslim ANINDA okunur ve releaseAt'e damgalanır — sonradan
+  // yapılan değişiklik teslim edilmiş siparişin tarihini kaydırmaz.
 
   constructor(
     private readonly prisma: PrismaService,
@@ -85,16 +82,7 @@ export class PaymentHoldReleaseService {
     // (eksik bildirimdense fazlası yeğdir).
     @Optional()
     private readonly cache?: CacheService,
-  ) {
-    this.returnWindowDays = resolvePaymentConfigNumber(
-      this.configService,
-      PAYMENT_CONFIG_KEYS.RETURN_WINDOW_DAYS,
-    );
-    this.payoutGraceDays = resolvePaymentConfigNumber(
-      this.configService,
-      PAYMENT_CONFIG_KEYS.PAYOUT_GRACE_DAYS,
-    );
-  }
+  ) {}
 
   /**
    * Release held payment to seller (admin manuel release yolu).
@@ -199,16 +187,25 @@ export class PaymentHoldReleaseService {
     tx?: Prisma.TransactionClient,
   ): Promise<void> {
     const db = tx ?? this.prisma;
-    const releaseAt = new Date(deliveredAt.getTime());
-    releaseAt.setDate(
-      releaseAt.getDate() + this.returnWindowDays + this.payoutGraceDays,
+    // Ayar okuması kök istemciden: tx yalnız damgalama yazısını taşır.
+    const returnWindowDays = await resolveTimingValue(
+      this.prisma,
+      "returnWindowDays",
+      this.configService,
     );
+    const payoutGraceDays = await resolveTimingValue(
+      this.prisma,
+      "payoutGraceDays",
+      this.configService,
+    );
+    const releaseAt = new Date(deliveredAt.getTime());
+    releaseAt.setDate(releaseAt.getDate() + returnWindowDays + payoutGraceDays);
     await db.paymentHold.updateMany({
       where: { orderId, status: PaymentHoldStatus.held },
       data: { releaseAt },
     });
     this.logger.log(
-      `Hold release scheduled for order ${orderId} at ${releaseAt.toISOString()} (teslim+${this.returnWindowDays}+${this.payoutGraceDays}g)`,
+      `Hold release scheduled for order ${orderId} at ${releaseAt.toISOString()} (teslim+${returnWindowDays}+${payoutGraceDays}g)`,
     );
   }
 

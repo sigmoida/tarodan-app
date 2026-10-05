@@ -32,6 +32,9 @@ describe("TradeReconciliationService — admin alarm linkleri", () => {
         findMany: jest.fn().mockResolvedValue([{ userId: "u-admin" }]),
       },
       trade: { findMany: jest.fn().mockResolvedValue(candidates) },
+      // Kayıp koli bekleme süresi Süreler ve Kurallar'dan okunur; satır yok →
+      // bugünkü varsayılan (14 gün).
+      platformSetting: { findUnique: jest.fn().mockResolvedValue(null) },
     };
     const cache = {
       get: jest.fn().mockResolvedValue(null),
@@ -46,7 +49,7 @@ describe("TradeReconciliationService — admin alarm linkleri", () => {
       {} as never,
       {} as never,
     );
-    return { service, createInAppNotification };
+    return { service, createInAppNotification, prisma };
   };
 
   it("depoda takılı takas alarmı admin panelindeki takas dosyasına gider", async () => {
@@ -88,5 +91,38 @@ describe("TradeReconciliationService — admin alarm linkleri", () => {
     expect(resolveWebNotificationLink(type, data)).toBe(
       "https://admin.tarodan.com.tr/operations/trades/trade-2",
     );
+  });
+
+  describe("kayıp koli bekleme süresi (Süreler ve Kurallar)", () => {
+    const NOW = new Date("2026-10-05T12:00:00.000Z");
+    const DAY = 24 * 60 * 60 * 1000;
+    const ORIGINAL = process.env.TRADE_LOST_PARCEL_GRACE_DAYS;
+    beforeEach(() => delete process.env.TRADE_LOST_PARCEL_GRACE_DAYS);
+    afterAll(() => {
+      if (ORIGINAL === undefined) delete process.env.TRADE_LOST_PARCEL_GRACE_DAYS;
+      else process.env.TRADE_LOST_PARCEL_GRACE_DAYS = ORIGINAL;
+    });
+
+    const cutoffAge = async (setting: string | null) => {
+      const { service, prisma } = makeService();
+      prisma.platformSetting.findUnique.mockResolvedValue(
+        setting === null ? null : { settingValue: setting },
+      );
+      await (service as any).notifyAdminsOfUndeliveredOutboundTrades(NOW);
+      const where = prisma.trade.findMany.mock.calls[0][0].where;
+      return (
+        (NOW.getTime() - where.shipments.some.shippedAt.lt.getTime()) / DAY
+      );
+    };
+
+    it("admin değeri ve env yokken bugünkü gibi 14 gün", async () => {
+      await expect(cutoffAge(null)).resolves.toBe(14);
+    });
+
+    it("env geri düşüşü ve admin değeri sırayla geçerli", async () => {
+      process.env.TRADE_LOST_PARCEL_GRACE_DAYS = "7";
+      await expect(cutoffAge(null)).resolves.toBe(7);
+      await expect(cutoffAge("5")).resolves.toBe(5);
+    });
   });
 });

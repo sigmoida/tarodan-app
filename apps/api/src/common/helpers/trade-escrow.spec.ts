@@ -1,89 +1,57 @@
 import { ShipmentStatus, TradeStatus } from "@prisma/client";
 import {
-  TRADE_ESCROW_SETTINGS,
   computeTradeConfirmationDeadline,
   computeTradeHoldReleaseAt,
-  resolveTradeEscrowDays,
   startTradeConfirmationWindowIfDelivered,
-  tradeLostParcelGraceDays,
 } from "./trade-escrow";
 
-const settingReader = (value: string | null) => ({
+/** Anahtar → değer haritasından ayar okuyucusu (yalnız istenen anahtar döner). */
+const settingReader = (rows: Record<string, string> = {}) => ({
   platformSetting: {
-    findUnique: jest
-      .fn()
-      .mockResolvedValue(value === null ? null : { settingValue: value }),
+    findUnique: jest.fn(
+      async ({ where }: { where: { settingKey: string } }) =>
+        where.settingKey in rows
+          ? { settingValue: rows[where.settingKey] }
+          : null,
+    ),
   },
 });
 
 const DAY = 24 * 60 * 60 * 1000;
+const FROM = new Date("2026-08-12T09:00:00.000Z");
 
-describe("takas escrow ayarları (tek kaynak)", () => {
-  it("ayardaki değeri okur", async () => {
-    await expect(
-      resolveTradeEscrowDays(
-        settingReader("5"),
-        TRADE_ESCROW_SETTINGS.HOLD_DAYS,
-      ),
-    ).resolves.toBe(5);
+describe("takas escrow süreleri (Süreler ve Kurallar kaydından)", () => {
+  it("hold ve onay tarihlerini kendi ayar anahtarlarından hesaplar", async () => {
+    const db = settingReader({
+      payment_hold_days: "5",
+      trade_confirmation_deadline_days: "2",
+    });
+    await expect(computeTradeHoldReleaseAt(db, FROM)).resolves.toEqual(
+      new Date(FROM.getTime() + 5 * DAY),
+    );
+    await expect(computeTradeConfirmationDeadline(db, FROM)).resolves.toEqual(
+      new Date(FROM.getTime() + 2 * DAY),
+    );
   });
 
-  it("ayar satırı yoksa varsayılana düşer", async () => {
+  it("ayar satırı yokken bugünkü varsayılanlar (3 + 3 gün) geçerlidir", async () => {
     await expect(
-      resolveTradeEscrowDays(
-        settingReader(null),
-        TRADE_ESCROW_SETTINGS.HOLD_DAYS,
-      ),
-    ).resolves.toBe(TRADE_ESCROW_SETTINGS.HOLD_DAYS.default);
-  });
-
-  it("bozuk/negatif değerde varsayılana düşer (pencere sıfırlanmaz)", async () => {
-    await expect(
-      resolveTradeEscrowDays(
-        settingReader(""),
-        TRADE_ESCROW_SETTINGS.HOLD_DAYS,
-      ),
-    ).resolves.toBe(3);
-    await expect(
-      resolveTradeEscrowDays(
-        settingReader("abc"),
-        TRADE_ESCROW_SETTINGS.HOLD_DAYS,
-      ),
-    ).resolves.toBe(3);
-    await expect(
-      resolveTradeEscrowDays(
-        settingReader("-4"),
-        TRADE_ESCROW_SETTINGS.HOLD_DAYS,
-      ),
-    ).resolves.toBe(3);
-    // 0 gün = hold tamamlanma anında çöker, para beklemesiz açılır — reddedilir.
-    await expect(
-      resolveTradeEscrowDays(
-        settingReader("0"),
-        TRADE_ESCROW_SETTINGS.HOLD_DAYS,
-      ),
-    ).resolves.toBe(3);
-  });
-
-  it("hold ve onay tarihlerini verilen andan hesaplar", async () => {
-    const from = new Date("2026-08-12T09:00:00.000Z");
-    await expect(
-      computeTradeHoldReleaseAt(settingReader("3"), from),
+      computeTradeHoldReleaseAt(settingReader(), FROM),
     ).resolves.toEqual(new Date("2026-08-15T09:00:00.000Z"));
     await expect(
-      computeTradeConfirmationDeadline(settingReader("3"), from),
+      computeTradeConfirmationDeadline(settingReader(), FROM),
     ).resolves.toEqual(new Date("2026-08-15T09:00:00.000Z"));
   });
 
-  it("kayıp koli bekleme süresi env'den okunur, bozuksa 14", () => {
-    const prev = process.env.TRADE_LOST_PARCEL_GRACE_DAYS;
-    process.env.TRADE_LOST_PARCEL_GRACE_DAYS = "7";
-    expect(tradeLostParcelGraceDays()).toBe(7);
-    process.env.TRADE_LOST_PARCEL_GRACE_DAYS = "sıfır";
-    expect(tradeLostParcelGraceDays()).toBe(14);
-    if (prev === undefined) delete process.env.TRADE_LOST_PARCEL_GRACE_DAYS;
-    else process.env.TRADE_LOST_PARCEL_GRACE_DAYS = prev;
-  });
+  it.each(["", "abc", "-4", "0"])(
+    "bozuk/sıfır/negatif değer (%p) varsayılana düşer — hold çökmez",
+    async (raw) => {
+      // 0 gün = hold tamamlanma anında çöker, para beklemesiz açılır.
+      await expect(
+        computeTradeHoldReleaseAt(settingReader({ payment_hold_days: raw }), FROM),
+      ).resolves.toEqual(new Date(FROM.getTime() + 3 * DAY));
+    },
+  );
 });
 
 describe("startTradeConfirmationWindowIfDelivered", () => {
