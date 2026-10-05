@@ -430,12 +430,12 @@ describe("currentReasonGuard ↔ replacesCurrentRemovalReason", () => {
   };
 
   it("her (vitrinden mi, yeni neden, güncel neden) üçlüsünde aynı karar", () => {
-    const currents = [
-      null,
-      ...LISTING_REMOVAL_REASONS,
-    ] as Array<ListingRemovalReason | null>;
+    // Kopya, öğe tipi Prisma enum'una karşı DENETLENEREK kurulur (cast yok):
+    // katalog ile enum aynı kümeyi taşımasa bu satır derlenmez.
+    const reasons: ListingRemovalReason[] = [...LISTING_REMOVAL_REASONS];
+    const currents: Array<ListingRemovalReason | null> = [null, ...reasons];
     for (const fromStorefront of [true, false]) {
-      for (const reason of LISTING_REMOVAL_REASONS as ListingRemovalReason[]) {
+      for (const reason of reasons) {
         const guard = currentReasonGuard({ fromStorefront, reason });
         for (const current of currents) {
           expect([
