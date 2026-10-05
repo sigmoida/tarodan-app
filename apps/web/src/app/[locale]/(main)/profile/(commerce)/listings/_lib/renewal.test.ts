@@ -2,7 +2,11 @@
 
 import { describe, expect, it } from "vitest";
 import type { Translate } from "@/types/i18n";
-import { readRenewBatch, renewalFailureLines, type RenewBatch } from "./renewal";
+import {
+  readRenewBatch,
+  renewalFailureLines,
+  type RenewBatch,
+} from "./renewal";
 
 /** Anahtarı (ve varsa parametreleri) geri döndüren sahte t. */
 const t = ((key: string, params?: Record<string, unknown>) =>

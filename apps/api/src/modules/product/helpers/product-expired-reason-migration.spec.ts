@@ -30,8 +30,12 @@ describe("product expired-reason migration", () => {
 
   it("onay izi kolonunu boş bırakılabilir, varsayılansız ekler", () => {
     expect(statements).toContain('ADD COLUMN "approved_content_fingerprint"');
-    expect(statements).not.toMatch(/approved_content_fingerprint[^,;]*NOT NULL/i);
-    expect(statements).not.toMatch(/approved_content_fingerprint[^,;]*DEFAULT/i);
+    expect(statements).not.toMatch(
+      /approved_content_fingerprint[^,;]*NOT NULL/i,
+    );
+    expect(statements).not.toMatch(
+      /approved_content_fingerprint[^,;]*DEFAULT/i,
+    );
   });
 
   it("hiçbir satırı geri doldurmaz ya da yeniden yazmaz", () => {

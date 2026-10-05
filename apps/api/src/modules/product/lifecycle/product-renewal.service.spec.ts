@@ -70,9 +70,13 @@ describe("ProductRenewalService", () => {
       del: jest.fn().mockResolvedValue(undefined),
       delPattern: jest.fn().mockResolvedValue(0),
     };
-    const searchService = { syncProduct: jest.fn().mockResolvedValue(undefined) };
+    const searchService = {
+      syncProduct: jest.fn().mockResolvedValue(undefined),
+    };
     const membershipService = {
-      canCreateListing: jest.fn(async () => opts.canCreate?.() ?? { allowed: true }),
+      canCreateListing: jest.fn(
+        async () => opts.canCreate?.() ?? { allowed: true },
+      ),
       getUserLimits: jest
         .fn()
         .mockResolvedValue({ tierName: "Ücretsiz", maxTotalListings: 3 }),
@@ -85,7 +89,14 @@ describe("ProductRenewalService", () => {
       membershipService as any,
       commissionGuard as any,
     );
-    return { service, prisma, cache, searchService, membershipService, commissionGuard };
+    return {
+      service,
+      prisma,
+      cache,
+      searchService,
+      membershipService,
+      commissionGuard,
+    };
   };
 
   describe("renew — içerik değişmedi / değişti", () => {
@@ -147,9 +158,9 @@ describe("ProductRenewalService", () => {
     it("statü inactive dışına çıktığı için neden ELLE temizlenmez (middleware temizler)", async () => {
       const { service, prisma } = makeService();
       await service.renew(SELLER, "p1");
-      expect(prisma.product.updateMany.mock.calls[0][0].data).not.toHaveProperty(
-        "inactiveReason",
-      );
+      expect(
+        prisma.product.updateMany.mock.calls[0][0].data,
+      ).not.toHaveProperty("inactiveReason");
     });
 
     it("yenileme sonrası önbellek, arama dizini ve ISR tazelenir", async () => {
@@ -223,7 +234,10 @@ describe("ProductRenewalService", () => {
   describe("renew — yalnız süresi dolmuş, kendi ilanı", () => {
     it.each([
       ["elle pasife alınmış", { inactiveReason: null }],
-      ["iade karantinasında", { inactiveReason: ProductInactiveReason.return_quarantine }],
+      [
+        "iade karantinasında",
+        { inactiveReason: ProductInactiveReason.return_quarantine },
+      ],
       ["aktif", { status: ProductStatus.active, inactiveReason: null }],
       ["gerçek ilan değil", { kind: "membership" }],
     ])("%s ilanı yenilenemez", async (_label, patch) => {

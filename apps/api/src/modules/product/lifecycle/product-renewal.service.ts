@@ -34,8 +34,7 @@ import { refreshProductVisibility } from "../helpers/product-visibility";
 
 /** Bir yenilemenin sonucu: yayına döndü ya da onaya düştü. */
 export type RenewalOutcomeStatus =
-  | typeof ProductStatus.active
-  | typeof ProductStatus.pending;
+  typeof ProductStatus.active | typeof ProductStatus.pending;
 
 export type RenewalItemResult =
   | { id: string; ok: true; status: RenewalOutcomeStatus }

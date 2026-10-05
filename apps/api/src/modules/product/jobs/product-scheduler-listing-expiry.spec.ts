@@ -176,7 +176,9 @@ describe("ProductSchedulerService — ilan ömrü süreleri", () => {
         "listing-expired",
         expect.objectContaining({
           productTitle: "Hot Wheels Camaro",
-          listingUrl: expect.stringMatching(/\/profile\/listings\?status=expired$/),
+          listingUrl: expect.stringMatching(
+            /\/profile\/listings\?status=expired$/,
+          ),
         }),
       );
     });
@@ -248,9 +250,9 @@ describe("ProductSchedulerService — ilan ömrü süreleri", () => {
       const result = await service.runExpireOldListings();
 
       expect(result.stats).toEqual({ expired: 1, renewed: 1 });
-      expect(prisma.product.updateMany.mock.calls.map((c) => c[0].where.id)).toEqual(
-        ["ok", "empty"],
-      );
+      expect(
+        prisma.product.updateMany.mock.calls.map((c) => c[0].where.id),
+      ).toEqual(["ok", "empty"]);
     });
 
     it("yenilenen ilan dizinden/önbellekten düşürülmez (statüsü değişmedi)", async () => {

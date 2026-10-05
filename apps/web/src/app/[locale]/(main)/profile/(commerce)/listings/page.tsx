@@ -195,7 +195,9 @@ export default function ProfileListingsPage() {
           description={
             isExpiredTab
               ? t("profile.expiredListings.emptyDescription")
-              : t("profile.listingsPage.koleksiyonunuzdakiUrunleriSatisaCikarin")
+              : t(
+                  "profile.listingsPage.koleksiyonunuzdakiUrunleriSatisaCikarin",
+                )
           }
           action={
             <ButtonLink href="/listings/new">

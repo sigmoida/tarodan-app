@@ -40,7 +40,9 @@ describe("sellerSaleBlock", () => {
   });
 
   it("banlı satıcı engellenir", () => {
-    expect(sellerSaleBlock({ ...healthySeller, isBanned: true })).toBe("banned");
+    expect(sellerSaleBlock({ ...healthySeller, isBanned: true })).toBe(
+      "banned",
+    );
   });
 
   it("BUSINESS hakkı bitmiş onaylı kurumsal satıcı askıdadır", () => {

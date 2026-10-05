@@ -87,10 +87,10 @@ ekranında uyarı gösterir.
 
 ### İlan
 
-| Kimlik                     | Ayar anahtarı                 | Birim | Vars. | Sınır | Env geri düşüşü    | Eylemler                                | Damga |
-| -------------------------- | ----------------------------- | ----- | ----- | ----- | ------------------ | --------------------------------------- | ----- |
-| `listingTtlDays`           | `listing_ttl_days`            | gün   | 60    | 7–365 | `LISTING_TTL_DAYS` | **deactivate** · **auto_renew**         | ✗     |
-| `listingExpiryWarningDays` | `listing_expiry_warning_days` | gün   | 7     | 1–30  | — (eski sabit 7)   | **notify_seller**                       | ✗     |
+| Kimlik                     | Ayar anahtarı                 | Birim | Vars. | Sınır | Env geri düşüşü    | Eylemler                        | Damga |
+| -------------------------- | ----------------------------- | ----- | ----- | ----- | ------------------ | ------------------------------- | ----- |
+| `listingTtlDays`           | `listing_ttl_days`            | gün   | 60    | 7–365 | `LISTING_TTL_DAYS` | **deactivate** · **auto_renew** | ✗     |
+| `listingExpiryWarningDays` | `listing_expiry_warning_days` | gün   | 7     | 1–30  | — (eski sabit 7)   | **notify_seller**               | ✗     |
 
 #### İlan ömrü: süre dolumu, yenileme ve eski kayıtlar
 
@@ -117,7 +117,7 @@ yenilemede limit yarı yolda dolarsa kalanlar gerekçesiyle başarısız olur),
 komisyon kuralı, banlı/askıdaki kurumsal satıcı. Sonuç:
 
 - içerik **son onaydan beri değişmediyse** → doğrudan `active`, `publishedAt =
-  şimdi` (moderasyon kuyruğuna girmez);
+şimdi` (moderasyon kuyruğuna girmez);
 - değiştiyse ya da onay izi yoksa → `pending` (normal onay kuralı, ömür onayda
   başlar).
 

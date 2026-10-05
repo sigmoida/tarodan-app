@@ -50,9 +50,7 @@ export async function assertListingMayReopen(
     product.sellerId,
   );
   if (!canReopen.allowed) {
-    const limits = await deps.membershipService.getUserLimits(
-      product.sellerId,
-    );
+    const limits = await deps.membershipService.getUserLimits(product.sellerId);
     throw new ForbiddenException(
       i18nMessage("server.product.listingLimitReached", {
         tierName: limits.tierName,

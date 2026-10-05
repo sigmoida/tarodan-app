@@ -86,9 +86,9 @@ describe("classifyLegacyExpiry — eski, işaretsiz süre dolumlarının seçim 
   });
 
   it("ömür parametresi kuralı belirler (30 gün)", () => {
-    expect(classifyLegacyExpiry(listing(31), { ttlDays: 30, graceDays: 3 })).toBe(
-      "match",
-    );
+    expect(
+      classifyLegacyExpiry(listing(31), { ttlDays: 30, graceDays: 3 }),
+    ).toBe("match");
     expect(classifyLegacyExpiry(listing(31), RULE)).toBe("not_at_lifetime");
   });
 });

@@ -29,9 +29,9 @@ describe("computeProductContentFingerprint", () => {
 
   it("görsellerin dizi sırasından değil sortOrder'dan etkilenir", () => {
     const reversed = [...base.images!].reverse();
-    expect(computeProductContentFingerprint({ ...base, images: reversed })).toBe(
-      computeProductContentFingerprint(base),
-    );
+    expect(
+      computeProductContentFingerprint({ ...base, images: reversed }),
+    ).toBe(computeProductContentFingerprint(base));
   });
 
   it.each<[string, Partial<ProductFingerprintInput>]>([
@@ -76,7 +76,9 @@ describe("computeProductContentFingerprint", () => {
   it("null ve eksik alanı aynı sayar", () => {
     expect(
       computeProductContentFingerprint({ ...base, description: null }),
-    ).toBe(computeProductContentFingerprint({ ...base, description: undefined }));
+    ).toBe(
+      computeProductContentFingerprint({ ...base, description: undefined }),
+    );
   });
 });
 
@@ -91,22 +93,26 @@ describe("stampApprovedContentFingerprint", () => {
   it("güncel içeriğin izini ilana yazar", async () => {
     const db = makeDb(base);
 
-    await expect(stampApprovedContentFingerprint(db as any, "p1")).resolves.toBe(
-      true,
-    );
+    await expect(
+      stampApprovedContentFingerprint(db as any, "p1"),
+    ).resolves.toBe(true);
 
     expect(db.product.update).toHaveBeenCalledWith({
       where: { id: "p1" },
-      data: { approvedContentFingerprint: computeProductContentFingerprint(base) },
+      data: {
+        approvedContentFingerprint: computeProductContentFingerprint(base),
+      },
     });
   });
 
   it("ilan yoksa yazmaz", async () => {
     const db = makeDb(null);
-    await expect(loadProductContentFingerprint(db as any, "p1")).resolves.toBeNull();
-    await expect(stampApprovedContentFingerprint(db as any, "p1")).resolves.toBe(
-      false,
-    );
+    await expect(
+      loadProductContentFingerprint(db as any, "p1"),
+    ).resolves.toBeNull();
+    await expect(
+      stampApprovedContentFingerprint(db as any, "p1"),
+    ).resolves.toBe(false);
     expect(db.product.update).not.toHaveBeenCalled();
   });
 
@@ -114,8 +120,8 @@ describe("stampApprovedContentFingerprint", () => {
     const db = makeDb(base);
     db.product.update.mockRejectedValue(new Error("db down"));
 
-    await expect(stampApprovedContentFingerprint(db as any, "p1")).resolves.toBe(
-      false,
-    );
+    await expect(
+      stampApprovedContentFingerprint(db as any, "p1"),
+    ).resolves.toBe(false);
   });
 });

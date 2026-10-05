@@ -127,6 +127,18 @@ const withLater = (
   defaultAction: action,
 });
 
+/** Bugünkü davranış + davranışı yazılmış (açık) ikinci seçenek. */
+const withEnabled = (
+  action: TimingExpiryAction,
+  enabled: TimingExpiryAction,
+): Pick<TimingRuleDefinition, "actions" | "defaultAction"> => ({
+  actions: [
+    { action, available: true },
+    { action: enabled, available: true },
+  ],
+  defaultAction: action,
+});
+
 export const TIMING_RULES = {
   // ── İlan ──────────────────────────────────────────────────────────────
   /** İlanın yayında kalma süresi (yayın anından, her onayda tazelenir). */
@@ -141,11 +153,7 @@ export const TIMING_RULES = {
     appliesToInProgress: true,
     // auto_renew AÇIK: ömrü dolan, hâlâ satılabilir ilan pasife alınmak yerine
     // yerinde yenilenir (ProductSchedulerService.runExpireOldListings).
-    actions: [
-      { action: "deactivate", available: true },
-      { action: "auto_renew", available: true },
-    ],
-    defaultAction: "deactivate",
+    ...withEnabled("deactivate", "auto_renew"),
   },
   /** İlan süresi dolmadan kaç gün önce satıcı uyarılır. */
   listingExpiryWarningDays: {

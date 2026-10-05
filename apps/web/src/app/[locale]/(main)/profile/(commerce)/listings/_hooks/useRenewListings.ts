@@ -76,11 +76,7 @@ export function useRenewListings() {
           );
         }
         if (batch.failed > 0) {
-          const lines = renewalFailureLines(
-            batch,
-            (id) => titles[id] ?? id,
-            t,
-          );
+          const lines = renewalFailureLines(batch, (id) => titles[id] ?? id, t);
           toast.error(
             [
               t("profile.expiredListings.bulkFailed", { count: batch.failed }),

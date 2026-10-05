@@ -32,12 +32,14 @@ describe("AdminExpiredListingsService", () => {
         // Gerçek sayfalama davranışı: cursor'dan sonraki `take` kadar satır.
         findMany: jest.fn(
           async (args: {
+            where?: unknown;
             take: number;
             cursor?: { id: string };
             skip?: number;
           }) => {
             const start = args.cursor
-              ? rows.findIndex((r) => r.id === args.cursor!.id) + (args.skip ?? 0)
+              ? rows.findIndex((r) => r.id === args.cursor!.id) +
+                (args.skip ?? 0)
               : 0;
             return rows.slice(start, start + args.take);
           },
@@ -75,7 +77,10 @@ describe("AdminExpiredListingsService", () => {
 
       expect(report.scanned).toBe(6);
       expect(report.matched).toBe(2);
-      expect(report.sample.map((s) => s.id)).toEqual(["expired-1", "expired-2"]);
+      expect(report.sample.map((s) => s.id)).toEqual([
+        "expired-1",
+        "expired-2",
+      ]);
       expect(report.skipped).toEqual({
         not_at_lifetime: 1,
         touched_after_expiry: 1,
@@ -103,7 +108,10 @@ describe("AdminExpiredListingsService", () => {
 
     it("ömür ve tolerans parametreyle değiştirilebilir", async () => {
       const { service } = makeService([row("a", 31)]);
-      const report = await service.run("admin-1", { ttlDays: 30, graceDays: 2 });
+      const report = await service.run("admin-1", {
+        ttlDays: 30,
+        graceDays: 2,
+      });
       expect(report.rule).toEqual({ ttlDays: 30, graceDays: 2 });
       expect(report.matched).toBe(1);
     });
@@ -234,9 +242,9 @@ describe("AdminExpiredListingsService", () => {
       const { service, audit, renewal } = makeService(rows);
       audit.createRequiredAuditLog.mockRejectedValue(new Error("audit down"));
 
-      await expect(
-        service.run("admin-1", { dryRun: false }),
-      ).rejects.toThrow("audit down");
+      await expect(service.run("admin-1", { dryRun: false })).rejects.toThrow(
+        "audit down",
+      );
 
       expect(renewal.markExpired).not.toHaveBeenCalled();
     });
