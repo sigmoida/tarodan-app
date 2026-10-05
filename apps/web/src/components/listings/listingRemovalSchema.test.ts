@@ -13,7 +13,9 @@ import {
 
 const t = ((key: string) => key) as unknown as Translate;
 
-const values = (patch: Partial<ListingRemovalValues>): ListingRemovalValues => ({
+const values = (
+  patch: Partial<ListingRemovalValues>,
+): ListingRemovalValues => ({
   ...EMPTY_LISTING_REMOVAL,
   ...patch,
 });
@@ -81,7 +83,9 @@ describe("listingRemovalSchema — the shared rule on the seller form", () => {
   });
 
   it("a temporary pause is a deactivation reason only", () => {
-    expect(firstIssue("deactivate", { reason: "paused_temporarily" })).toBeNull();
+    expect(
+      firstIssue("deactivate", { reason: "paused_temporarily" }),
+    ).toBeNull();
     expect(firstIssue("delete", { reason: "paused_temporarily" })).toEqual({
       field: "reason",
       message: "validation.listingRemoval.reason_not_allowed",

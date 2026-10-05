@@ -1,8 +1,4 @@
-import {
-  ListingRemovalReason,
-  Prisma,
-  ProductStatus,
-} from "@prisma/client";
+import { ListingRemovalReason, Prisma, ProductStatus } from "@prisma/client";
 import {
   LISTING_REMOVAL_REASONS_BY_ACTOR,
   LISTING_REMOVAL_REASON_FILTER_UNKNOWN,

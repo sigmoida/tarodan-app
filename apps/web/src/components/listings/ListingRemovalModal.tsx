@@ -75,7 +75,9 @@ export default function ListingRemovalModal({
       open={open}
       onClose={onClose}
       title={
-        isDelete ? t("product.deleteListing") : t("product.deactivateListingFull")
+        isDelete
+          ? t("product.deleteListing")
+          : t("product.deactivateListingFull")
       }
       form={form}
       onSubmit={(values: ListingRemovalValues) =>
@@ -83,7 +85,9 @@ export default function ListingRemovalModal({
       }
       isSubmitting={isSubmitting}
       resetValues={EMPTY_LISTING_REMOVAL}
-      submitLabel={isDelete ? t("collection.yesDelete") : t("product.deactivate")}
+      submitLabel={
+        isDelete ? t("collection.yesDelete") : t("product.deactivate")
+      }
       destructive={isDelete}
       size="md"
       {...modalLabels}

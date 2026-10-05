@@ -138,7 +138,9 @@ export class AdminDashboardRemovalsService {
 
   /** Ekrandaki "yenile": kırılımın önbelleğini düşürür. */
   async invalidate(): Promise<void> {
-    await this.cache.delPattern(`${AdminDashboardRemovalsService.CACHE_PREFIX}*`);
+    await this.cache.delPattern(
+      `${AdminDashboardRemovalsService.CACHE_PREFIX}*`,
+    );
   }
 
   private async compute(
@@ -168,9 +170,11 @@ export class AdminDashboardRemovalsService {
       _count: { _all: true },
     });
 
-    const [byReason, byPlatform, byViolation] = await this.prisma.$transaction(
-      [byReasonQuery, byPlatformQuery, byViolationQuery],
-    );
+    const [byReason, byPlatform, byViolation] = await this.prisma.$transaction([
+      byReasonQuery,
+      byPlatformQuery,
+      byViolationQuery,
+    ]);
 
     return buildListingRemovalBreakdown(range, {
       byReason,

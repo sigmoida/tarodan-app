@@ -67,9 +67,9 @@ describe("listing removal catalog — kontrat", () => {
   });
 
   it("platform ve ihlal listeleri 'other' ile biter (serbest metin kaçışı)", () => {
-    expect(LISTING_REMOVAL_PLATFORMS[LISTING_REMOVAL_PLATFORMS.length - 1]).toBe(
-      "other",
-    );
+    expect(
+      LISTING_REMOVAL_PLATFORMS[LISTING_REMOVAL_PLATFORMS.length - 1],
+    ).toBe("other");
     expect(LISTING_VIOLATION_CODES[LISTING_VIOLATION_CODES.length - 1]).toBe(
       "other",
     );

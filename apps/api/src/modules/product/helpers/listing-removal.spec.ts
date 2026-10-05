@@ -85,23 +85,30 @@ describe("recordListingRemovals", () => {
   it.each([
     ["vitrine dönüş (active)", ProductStatus.inactive, ProductStatus.active],
     ["satış (sold)", ProductStatus.reserved, ProductStatus.sold],
-    ["aynı statünün yeniden yazımı", ProductStatus.inactive, ProductStatus.inactive],
-  ])("kaldırma olmayan geçişte (%s) hiçbir şey yazmaz", async (_l, from, to) => {
-    const db = makeDb();
+    [
+      "aynı statünün yeniden yazımı",
+      ProductStatus.inactive,
+      ProductStatus.inactive,
+    ],
+  ])(
+    "kaldırma olmayan geçişte (%s) hiçbir şey yazmaz",
+    async (_l, from, to) => {
+      const db = makeDb();
 
-    const count = await recordListingRemovals(db as any, [
-      {
-        productId: "p1",
-        statusBefore: from,
-        statusAfter: to,
-        reason: ListingRemovalReason.out_of_stock,
-      },
-    ]);
+      const count = await recordListingRemovals(db as any, [
+        {
+          productId: "p1",
+          statusBefore: from,
+          statusAfter: to,
+          reason: ListingRemovalReason.out_of_stock,
+        },
+      ]);
 
-    expect(count).toBe(0);
-    expect(db.productRemovalEvent.createMany).not.toHaveBeenCalled();
-    expect(db.product.updateMany).not.toHaveBeenCalled();
-  });
+      expect(count).toBe(0);
+      expect(db.productRemovalEvent.createMany).not.toHaveBeenCalled();
+      expect(db.product.updateMany).not.toHaveBeenCalled();
+    },
+  );
 
   it("toplu kaldırmada (neden, statü) başına tek damga yazımı yapar", async () => {
     const db = makeDb();
@@ -129,9 +136,9 @@ describe("recordListingRemovals", () => {
 
     expect(count).toBe(3);
     expect(db.productRemovalEvent.createMany).toHaveBeenCalledTimes(1);
-    expect(db.productRemovalEvent.createMany.mock.calls[0][0].data).toHaveLength(
-      3,
-    );
+    expect(
+      db.productRemovalEvent.createMany.mock.calls[0][0].data,
+    ).toHaveLength(3);
     expect(db.product.updateMany).toHaveBeenCalledTimes(2);
     expect(db.product.updateMany).toHaveBeenCalledWith({
       where: { id: { in: ["a", "b"] }, status: ProductStatus.suspended },

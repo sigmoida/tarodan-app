@@ -76,10 +76,7 @@ describe("toListingRemovalsView", () => {
 
   it("splits sold-elsewhere by platform, largest first, shares of that subtotal", () => {
     const view = toListingRemovalsView(
-      response(
-        { sold_elsewhere: 4 },
-        { dolap: 1, sahibinden: 3, letgo: 0 },
-      ),
+      response({ sold_elsewhere: 4 }, { dolap: 1, sahibinden: 3, letgo: 0 }),
     );
 
     expect(view.soldElsewhereTotal).toBe(4);

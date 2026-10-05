@@ -21,10 +21,7 @@ function refineAdminRemoval(
   action: Extract<ListingRemovalAction, "reject" | "delete">,
   detailField: "reason" | "note",
 ) {
-  return (
-    values: Record<string, string | undefined>,
-    ctx: z.RefinementCtx,
-  ) => {
+  return (values: Record<string, string | undefined>, ctx: z.RefinementCtx) => {
     const issue = listingRemovalIssue(
       { actor: "admin", action },
       {

@@ -112,14 +112,14 @@ describe("adminRemovalFields — yönetici reddi/kaldırması", () => {
   });
 
   it("kodsuz eski istemci (moderasyon kuyruğu, toplu red) kabul edilir: kod null", () => {
-    expect(adminRemovalFields("reject", { detail: "Görseller yetersiz" })).toEqual(
-      {
-        reason: ListingRemovalReason.policy_violation,
-        platform: null,
-        violationCode: null,
-        detail: "Görseller yetersiz",
-      },
-    );
+    expect(
+      adminRemovalFields("reject", { detail: "Görseller yetersiz" }),
+    ).toEqual({
+      reason: ListingRemovalReason.policy_violation,
+      platform: null,
+      violationCode: null,
+      detail: "Görseller yetersiz",
+    });
   });
 
   it("katalog dışı kod 400 violation_invalid", () => {

@@ -165,8 +165,11 @@ describe("dashboardPeriodCacheSlot", () => {
     // Aynı kova içindeki iki istek aynı yuvayı okur.
     const later = new Date(now.getTime() + 1_000);
     expect(
-      dashboardPeriodCacheSlot(resolveDashboardRange({ period: "daily" }, later), later, 300)
-        .slot,
+      dashboardPeriodCacheSlot(
+        resolveDashboardRange({ period: "daily" }, later),
+        later,
+        300,
+      ).slot,
     ).toBe(slot);
   });
 });

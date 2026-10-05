@@ -148,7 +148,10 @@ describe("clearStaleRemovalReasonOnWrite", () => {
     clearStaleRemovalReasonOnWrite(quantityOnly);
     expect(quantityOnly).not.toHaveProperty("removalReason");
 
-    const untouched: Record<string, unknown> = { status: undefined, title: "x" };
+    const untouched: Record<string, unknown> = {
+      status: undefined,
+      title: "x",
+    };
     clearStaleRemovalReasonOnWrite(untouched);
     expect(untouched).not.toHaveProperty("removalReason");
   });

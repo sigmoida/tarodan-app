@@ -50,9 +50,10 @@ export function shareOf(count: number, total: number): number {
   return total > 0 ? Math.round((count * 100) / total) : 0;
 }
 
-function withShares<K>(
-  rows: Array<{ key: K; count: number }>,
-): { total: number; rows: RemovalShareRow<K>[] } {
+function withShares<K>(rows: Array<{ key: K; count: number }>): {
+  total: number;
+  rows: RemovalShareRow<K>[];
+} {
   const visible = rows.filter((row) => row.count > 0);
   const total = visible.reduce((sum, row) => sum + row.count, 0);
   return {
@@ -79,8 +80,7 @@ export function toListingRemovalsView(
   const byActor = LISTING_REMOVAL_ACTORS.map((actor) => {
     const reasons = reasonRows
       .filter(
-        (row) =>
-          row.count > 0 && listingRemovalActorOf(row.reason) === actor,
+        (row) => row.count > 0 && listingRemovalActorOf(row.reason) === actor,
       )
       .map((row) => ({
         key: row.reason,

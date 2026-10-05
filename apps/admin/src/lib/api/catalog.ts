@@ -37,11 +37,8 @@ export const catalogApi = {
     api.post(`/admin/products/${id}/reject`, payload),
   bulkApproveProducts: (ids: string[], note?: string) =>
     api.post("/admin/products/bulk-approve", { ids, note }),
-  bulkRejectProducts: (
-    ids: string[],
-    reason: string,
-    violationCode?: string,
-  ) => api.post("/admin/products/bulk-reject", { ids, reason, violationCode }),
+  bulkRejectProducts: (ids: string[], reason: string, violationCode?: string) =>
+    api.post("/admin/products/bulk-reject", { ids, reason, violationCode }),
   /** Yönetici kaldırması (yumuşak silme): ihlal kodu + açıklama gövdede. */
   deleteProduct: (id: string, payload: RemoveProductPayload) =>
     api.delete(`/admin/products/${id}`, { data: payload }),

@@ -7,22 +7,23 @@ olduğunu söyler; bu özellik NEDEN olduğunu kaydeder: satıcı vazgeçti mi,
 mu bitti, yoksa Tarodan bir ihlal yüzünden mi kaldırdı.
 
 Tek kaynak: `packages/types/src/listing-removal.ts` (katalog + doğrulama kuralı
-+ etiket anahtarları + admin/dashboard sözleşmeleri). API, web ve admin aynı
-fonksiyonları çağırır.
+
+- etiket anahtarları + admin/dashboard sözleşmeleri). API, web ve admin aynı
+  fonksiyonları çağırır.
 
 ## Nedenler
 
-| Kod                  | Aktör   | Kim koyar / ne zaman                                                                           | Ek alan                                         |
-| -------------------- | ------- | ---------------------------------------------------------------------------------------------- | ----------------------------------------------- |
-| `changed_mind`       | satıcı  | Silerken / pasife alırken "Vazgeçtim"                                                          | not (ops.)                                      |
-| `sold_elsewhere`     | satıcı  | Silerken / pasife alırken "Başka bir platformda sattım"                                        | **platform zorunlu**; `other` ise not zorunlu   |
-| `paused_temporarily` | satıcı  | **Yalnız pasife alırken** "Geçici olarak durdurdum"                                            | not (ops.)                                      |
-| `not_given`          | satıcı  | Sunucu yazar: neden göndermeyen eski istemci (yayındaki mobil sürümler). Formda seçenek değil. | —                                               |
-| `expired`            | sistem  | İlan ömrü işi (`listingTtlDays`, eylem `deactivate`)                                           | —                                               |
-| `out_of_stock`       | sistem  | Stok 0'a indi: düzenleme (satıcı/yönetici), takasla düşüm, kargoda kayıp, rezervasyon bırakma | —                                               |
-| `return_quarantine`  | sistem  | Teslim SONRASI iade stoğu geri yükledi, ilan karantinada                                       | —                                               |
-| `seller_suspended`   | sistem  | Satıcı yasaklandı: aktif ilanlar `suspended`, onay bekleyenler `rejected`                      | işlemi yapan yönetici kayda geçer               |
-| `policy_violation`   | Tarodan | Yönetici reddi (`rejected`) ya da yönetici kaldırması (`deleted`)                              | **ihlal kodu**; `other` ise açıklama zorunlu    |
+| Kod                  | Aktör   | Kim koyar / ne zaman                                                                           | Ek alan                                       |
+| -------------------- | ------- | ---------------------------------------------------------------------------------------------- | --------------------------------------------- |
+| `changed_mind`       | satıcı  | Silerken / pasife alırken "Vazgeçtim"                                                          | not (ops.)                                    |
+| `sold_elsewhere`     | satıcı  | Silerken / pasife alırken "Başka bir platformda sattım"                                        | **platform zorunlu**; `other` ise not zorunlu |
+| `paused_temporarily` | satıcı  | **Yalnız pasife alırken** "Geçici olarak durdurdum"                                            | not (ops.)                                    |
+| `not_given`          | satıcı  | Sunucu yazar: neden göndermeyen eski istemci (yayındaki mobil sürümler). Formda seçenek değil. | —                                             |
+| `expired`            | sistem  | İlan ömrü işi (`listingTtlDays`, eylem `deactivate`)                                           | —                                             |
+| `out_of_stock`       | sistem  | Stok 0'a indi: düzenleme (satıcı/yönetici), takasla düşüm, kargoda kayıp, rezervasyon bırakma  | —                                             |
+| `return_quarantine`  | sistem  | Teslim SONRASI iade stoğu geri yükledi, ilan karantinada                                       | —                                             |
+| `seller_suspended`   | sistem  | Satıcı yasaklandı: aktif ilanlar `suspended`, onay bekleyenler `rejected`                      | işlemi yapan yönetici kayda geçer             |
+| `policy_violation`   | Tarodan | Yönetici reddi (`rejected`) ya da yönetici kaldırması (`deleted`)                              | **ihlal kodu**; `other` ise açıklama zorunlu  |
 
 Başka platformda satış — platformlar: `letgo`, `instagram`, `dolap`,
 `sahibinden`, `in_person` (elden satış), `other` (serbest metinle).
@@ -76,24 +77,24 @@ süresi dolmuş eski ilanlara `expired` davranış işareti koyar) kaldırma ola
 
 ### Yazıcılar (kaldırma statüsü yazan her yol)
 
-| Yol                                                                                    | Geçiş                                             | Neden                                         |
-| -------------------------------------------------------------------------------------- | ------------------------------------------------- | --------------------------------------------- |
-| `ProductUpdateService.remove` (satıcı silmesi)                                         | → `deleted`                                       | satıcının seçimi / `not_given`                |
-| `ProductUpdateService.updateAsActor` (satıcı `status: inactive`)                       | → `inactive`                                      | satıcının seçimi / `not_given`                |
-| `ProductUpdateService.updateAsActor` (satıcı ya da yönetici stok 0)                    | `active` → `inactive`                             | `out_of_stock`                                |
-| `ProductSchedulerService.runExpireOldListings`                                         | `active` → `inactive`                             | `expired`                                     |
-| `PaymentRefundService.processRefund` (stok geri yükleme)                               | → `inactive` (karantina)                          | `return_quarantine` (yoksa `out_of_stock`)    |
-| `PaymentExpiryReconciliationService` (satıcı göndermedi, stok geri yükleme)            | → `inactive`                                      | `return_quarantine` / `out_of_stock`          |
-| `PaymentExpiryReconciliationService` (ödeme süresi doldu, rezervasyon bırakma)         | → `inactive` (stok 0)                             | `out_of_stock`                                |
-| `ReservationReconciliationService` (rezervasyon bırakma)                               | → `inactive` (stok 0)                             | `out_of_stock`                                |
-| `ProductLockService.releaseReservation`                                                | → `inactive` (stok 0)                             | `out_of_stock`                                |
-| `FulfillmentStockService.decrementForOrder` (oversell, rezervasyon bırakma)            | → `inactive` (stok 0)                             | `out_of_stock`                                |
-| `TradeLifecycleService` (takas tamamlandı — iki yol)                                   | → `inactive` (stok 0)                             | `out_of_stock`                                |
-| `TradeReconciliationService` (oto-tamamlama, kargoda kayıp)                            | → `inactive` (stok 0)                             | `out_of_stock`                                |
-| `finalizeReturningTradeIfResolved` (iade kolisi kayıp)                                 | → `inactive` (stok 0)                             | `out_of_stock`                                |
-| `AdminStaffService.banUser`                                                            | `active` → `suspended`, `pending` → `rejected`    | `seller_suspended`                            |
-| `AdminProductService.rejectProduct` (+ toplu red, moderasyon kuyruğu)                  | → `rejected`                                      | `policy_violation` + ihlal kodu               |
-| `AdminProductService.deleteProduct` (yumuşak)                                          | → `deleted`                                       | `policy_violation` + ihlal kodu               |
+| Yol                                                                            | Geçiş                                          | Neden                                      |
+| ------------------------------------------------------------------------------ | ---------------------------------------------- | ------------------------------------------ |
+| `ProductUpdateService.remove` (satıcı silmesi)                                 | → `deleted`                                    | satıcının seçimi / `not_given`             |
+| `ProductUpdateService.updateAsActor` (satıcı `status: inactive`)               | → `inactive`                                   | satıcının seçimi / `not_given`             |
+| `ProductUpdateService.updateAsActor` (satıcı ya da yönetici stok 0)            | `active` → `inactive`                          | `out_of_stock`                             |
+| `ProductSchedulerService.runExpireOldListings`                                 | `active` → `inactive`                          | `expired`                                  |
+| `PaymentRefundService.processRefund` (stok geri yükleme)                       | → `inactive` (karantina)                       | `return_quarantine` (yoksa `out_of_stock`) |
+| `PaymentExpiryReconciliationService` (satıcı göndermedi, stok geri yükleme)    | → `inactive`                                   | `return_quarantine` / `out_of_stock`       |
+| `PaymentExpiryReconciliationService` (ödeme süresi doldu, rezervasyon bırakma) | → `inactive` (stok 0)                          | `out_of_stock`                             |
+| `ReservationReconciliationService` (rezervasyon bırakma)                       | → `inactive` (stok 0)                          | `out_of_stock`                             |
+| `ProductLockService.releaseReservation`                                        | → `inactive` (stok 0)                          | `out_of_stock`                             |
+| `FulfillmentStockService.decrementForOrder` (oversell, rezervasyon bırakma)    | → `inactive` (stok 0)                          | `out_of_stock`                             |
+| `TradeLifecycleService` (takas tamamlandı — iki yol)                           | → `inactive` (stok 0)                          | `out_of_stock`                             |
+| `TradeReconciliationService` (oto-tamamlama, kargoda kayıp)                    | → `inactive` (stok 0)                          | `out_of_stock`                             |
+| `finalizeReturningTradeIfResolved` (iade kolisi kayıp)                         | → `inactive` (stok 0)                          | `out_of_stock`                             |
+| `AdminStaffService.banUser`                                                    | `active` → `suspended`, `pending` → `rejected` | `seller_suspended`                         |
+| `AdminProductService.rejectProduct` (+ toplu red, moderasyon kuyruğu)          | → `rejected`                                   | `policy_violation` + ihlal kodu            |
+| `AdminProductService.deleteProduct` (yumuşak)                                  | → `deleted`                                    | `policy_violation` + ihlal kodu            |
 
 Satışla stoğu biten ilan `sold` olur — bu bir kaldırma değildir, kayıt yok.
 Yönetici kalıcı silmesi ürün satırını sildiği için (yalnız siparişi/teklifi

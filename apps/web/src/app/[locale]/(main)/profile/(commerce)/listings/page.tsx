@@ -84,7 +84,9 @@ export default function ProfileListingsPage() {
   const pendingCount = listings.filter((l) => l.status === "pending").length;
 
   const removalMutation =
-    removalTarget?.action === "deactivate" ? deactivateMutation : deleteMutation;
+    removalTarget?.action === "deactivate"
+      ? deactivateMutation
+      : deleteMutation;
 
   if (!ready) {
     return (

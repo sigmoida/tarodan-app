@@ -114,7 +114,10 @@ export function ListingRemovalsPanel({
       ) : isLoading ? (
         <Skeleton className="h-40 w-full rounded-xl" />
       ) : view.isEmpty ? (
-        <EmptyState size="compact" title={t("admin.dashboard.removals.empty")} />
+        <EmptyState
+          size="compact"
+          title={t("admin.dashboard.removals.empty")}
+        />
       ) : (
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
           <Column
@@ -124,8 +127,7 @@ export function ListingRemovalsPanel({
             {view.byActor.map((group) => (
               <div key={group.actor} className="flex flex-col">
                 <p className="text-xs font-medium uppercase tracking-wide text-subtle">
-                  {removalActorLabel(group.actor, t)} ·{" "}
-                  {fmtNumber(group.count)}
+                  {removalActorLabel(group.actor, t)} · {fmtNumber(group.count)}
                 </p>
                 <ul>
                   {group.reasons.map((row) => (

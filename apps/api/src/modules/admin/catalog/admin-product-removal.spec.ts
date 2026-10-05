@@ -41,9 +41,7 @@ describe("AdminProductService — kaldırma nedeni", () => {
         findMany: jest.fn().mockResolvedValue([]),
       },
       productBoost: { count: jest.fn().mockResolvedValue(0) },
-      $transaction: jest.fn(async (fn: (client: unknown) => unknown) =>
-        fn(tx),
-      ),
+      $transaction: jest.fn(async (fn: (client: unknown) => unknown) => fn(tx)),
     };
     const audit = { createAuditLog: jest.fn().mockResolvedValue(undefined) };
     const notifications = {
@@ -270,7 +268,12 @@ describe("listingRemovalFilterWhere", () => {
     expect(listingRemovalFilterWhere({ removalActor: "system" })).toEqual([
       {
         removalReason: {
-          in: ["expired", "out_of_stock", "return_quarantine", "seller_suspended"],
+          in: [
+            "expired",
+            "out_of_stock",
+            "return_quarantine",
+            "seller_suspended",
+          ],
         },
       },
     ]);

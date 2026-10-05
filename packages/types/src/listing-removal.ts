@@ -133,12 +133,19 @@ export function isListingRemovedStatus(
  * Bir kaldırmayı başlatan eylem. Satıcı ilanını siler ya da pasife alır;
  * yönetici reddeder ya da kaldırır (yönetici "silmesi" = `delete`).
  */
-export const LISTING_REMOVAL_ACTIONS = ["delete", "deactivate", "reject"] as const;
+export const LISTING_REMOVAL_ACTIONS = [
+  "delete",
+  "deactivate",
+  "reject",
+] as const;
 
 export type ListingRemovalAction = (typeof LISTING_REMOVAL_ACTIONS)[number];
 
 /** Nedeni bir formdan seçen aktörler (sistem nedenleri kodda sabittir). */
-export type ListingRemovalChoosingActor = Exclude<ListingRemovalActor, "system">;
+export type ListingRemovalChoosingActor = Exclude<
+  ListingRemovalActor,
+  "system"
+>;
 
 /**
  * Aktör × eylem → seçilebilen nedenler. Listede olmayan eylem o aktöre kapalıdır
@@ -392,8 +399,7 @@ export function listingRemovalIssueI18nKey(issue: ListingRemovalIssue): string {
 export const LISTING_REMOVAL_REASON_FILTER_UNKNOWN = "unknown" as const;
 
 export type ListingRemovalReasonFilter =
-  | ListingRemovalReason
-  | typeof LISTING_REMOVAL_REASON_FILTER_UNKNOWN;
+  ListingRemovalReason | typeof LISTING_REMOVAL_REASON_FILTER_UNKNOWN;
 
 export function isListingRemovalReasonFilter(
   value: unknown,

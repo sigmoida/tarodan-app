@@ -66,7 +66,10 @@ const ISSUE_FIELD: Record<ListingRemovalIssue, keyof ListingRemovalValues> = {
  * receive — the API runs the same rule, so the form cannot accept something the
  * server rejects (or the other way round).
  */
-export const listingRemovalSchema = (t: Translate, action: SellerRemovalAction) =>
+export const listingRemovalSchema = (
+  t: Translate,
+  action: SellerRemovalAction,
+) =>
   z
     .object({
       reason: z.string(),
