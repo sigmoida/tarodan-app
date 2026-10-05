@@ -233,7 +233,7 @@ her gösterim yalnız birini kullanır:
 | Uygulama | Yer                                                                                                                                          |
 | -------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
 | web      | Server Component: `lib/server/timing-policy.ts` `getTimingPolicy()` (Next fetch önbelleği 5 dk, HTML'e basılır)                              |
-| web      | Client: `hooks/useTimingPolicy.ts` (`useTimingPolicy`, `useTimingValues`) — tek sorgu anahtarı                         |
+| web      | Client: `hooks/useTimingPolicy.ts` (`useTimingPolicy`, `useTimingValues`) — tek sorgu anahtarı                                               |
 | admin    | `hooks/useTimingPolicy.ts` (Süreler ekranı kaydedince sorgu tazelenir)                                                                       |
 | api      | Bildirim: `NotificationDispatchService.renderTemplate` süreleri gönderim anında okur. E-posta: `withEmailTimingData` (`common/timing-rules`) |
 
@@ -266,8 +266,10 @@ kullanıldığında (`{returnWindowDays}-day refund window`) çoğul yok.
 - `escrowReleaseAt` (sipariş yanıtı, `formatOrderResponse`): bekleyen
   (`held`) escrow hold'un `releaseAt`'i; yoksa `null`. Web satıcı ödeme tarihini
   bundan gösterir; `null` ise (eski sipariş) pencere sonu + payout grace
-  politika değeriyle hesaplanır. Grup/sipariş detay sorguları `paymentHolds`
-  (`status`, `releaseAt`) seçer; liste sorguları seçmez (alan `null`).
+  politika değeriyle hesaplanır. `PaymentHold` Order'a Prisma ilişkisi değil
+  düz `orderId` kolonudur; tek sipariş / tek grup detayı bekleyen hold'ları
+  `OrderQueryService.attachEscrowHolds` ile TEK toplu sorguda okur. Liste
+  sorguları okumaz (alan `null`).
 - `returnWindowEndsAt` (paket 1) artık web'de de kullanılıyor.
 
 Mobil için: aynı iki alan; iade/ödeme tarihini kendin hesaplama.
