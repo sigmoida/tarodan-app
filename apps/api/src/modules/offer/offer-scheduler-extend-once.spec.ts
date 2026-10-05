@@ -1,4 +1,5 @@
 import { OfferStatus, ProductStatus } from "@prisma/client";
+import { OfferExtensionPolicy } from "./offer-extension-policy.service";
 import { OfferSchedulerService } from "./offer-scheduler.service";
 
 /**
@@ -109,7 +110,7 @@ describe("OfferSchedulerService — süre dolumu eylemi (extend_once)", () => {
     const service = new OfferSchedulerService(
       prisma as any,
       {} as any,
-      userBlocks as any,
+      new OfferExtensionPolicy(prisma as any, userBlocks as any),
       { get: () => undefined } as any,
       notificationService as any,
     );
@@ -343,5 +344,59 @@ describe("OfferSchedulerService — süre dolumu eylemi (extend_once)", () => {
 
     expect(h.rows[0].status).toBe(OfferStatus.pending);
     expect(h.rows[0].expiresAt).toEqual(new Date(T0.getTime() + 8 * HOUR));
+  });
+
+  it("bir teklifin hatası kalanları durdurmaz; tur sonunda başarısız olarak yükseltilir", async () => {
+    const h = makeHarness([
+      offerRow({
+        id: "bad",
+        expiresAt: new Date(T0.getTime() - 2 * HOUR),
+      }),
+      offerRow({ id: "good" }),
+    ]);
+    const original = h.prisma.offer.updateMany.getMockImplementation()!;
+    h.prisma.offer.updateMany.mockImplementation(async (args: any) => {
+      if (args.where.id === "bad") throw new Error("db down");
+      return original(args);
+    });
+
+    await expect(h.service.runHandleExpiredOffers()).rejects.toThrow(
+      "1 teklif işlenemedi",
+    );
+
+    // Sıradaki sağlam teklif yine de işlendi; bozuk olan dokunulmadan kaldı.
+    expect(h.rows.find((r) => r.id === "good")!.status).toBe(
+      OfferStatus.expired,
+    );
+    expect(h.rows.find((r) => r.id === "bad")!.status).toBe(
+      OfferStatus.pending,
+    );
+    expect(h.notificationService.notifyOfferExpired).toHaveBeenCalledTimes(1);
+  });
+
+  it("engel okuması hata verirse o teklif atlanır (ne uzatılır ne expire), diğerleri işlenir", async () => {
+    const h = makeHarness(
+      [
+        offerRow({
+          id: "bad",
+          expiresAt: new Date(T0.getTime() - 2 * HOUR),
+        }),
+        offerRow({ id: "good", buyerId: "b2" }),
+      ],
+      EXTEND,
+    );
+    h.userBlocks.isBlockedEither.mockImplementation(async (a: string) => {
+      if (a === "buyer-1") throw new Error("redis down");
+      return false;
+    });
+
+    await expect(h.service.runHandleExpiredOffers()).rejects.toThrow(
+      "1 teklif işlenemedi",
+    );
+
+    expect(h.rows.find((r) => r.id === "bad")!.status).toBe(
+      OfferStatus.pending,
+    );
+    expect(h.rows.find((r) => r.id === "good")!.extendedAt).toEqual(T0);
   });
 });

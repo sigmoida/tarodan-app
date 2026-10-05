@@ -7,13 +7,9 @@ import { QUEUE_NAMES } from "../../workers/constants";
 import { PrismaService } from "../../prisma";
 import { OfferStatus } from "@prisma/client";
 import { NotificationService } from "../notification/notification.service";
-import { UserBlockService } from "../user-block/user-block.service";
+import { OfferExtensionPolicy } from "./offer-extension-policy.service";
 import { resolveTimingAction } from "../../common/timing-rules";
-import {
-  offerExpiresAt,
-  offerExtensionBlocker,
-  type OfferExtensionCandidate,
-} from "./helpers/offer-expiry";
+import { offerExpiresAt } from "./helpers/offer-expiry";
 
 /** Bir turda işlenen en fazla teklif (en eski önce; kalan sonraki turda). */
 const EXPIRY_BATCH_SIZE = 500;
@@ -43,7 +39,7 @@ export class OfferSchedulerService implements OnModuleInit {
   constructor(
     private readonly prisma: PrismaService,
     @InjectQueue(QUEUE_NAMES.SCHEDULED) private readonly scheduledQueue: Queue,
-    private readonly userBlocks: UserBlockService,
+    private readonly extensionPolicy: OfferExtensionPolicy,
     private readonly configService: ConfigService,
     @Optional()
     private readonly notificationService?: NotificationService,
@@ -105,54 +101,66 @@ export class OfferSchedulerService implements OnModuleInit {
 
       let expired = 0;
       let extended = 0;
+      let failed = 0;
       for (const offer of due) {
-        const productTitle = offer.product?.title ?? "";
+        // Bir teklifin hatası (engel/şerit okuması, güncelleme) kalanları
+        // durdurmaz: aksi halde kalıcı hatalı bir satır, sıradaki her teklifi
+        // her turda açıkta bırakırdı. Hata sayılır ve tur sonunda yükseltilir.
+        try {
+          const productTitle = offer.product?.title ?? "";
 
-        // Her teklif kendi koşullu-atomik adımıyla işlenir; kaybeden (count 0)
-        // tur bildirim göndermez.
-        if (newExpiresAt && (await this.canExtend(offer))) {
-          const claimed = await this.prisma.offer.updateMany({
+          // Her teklif kendi koşullu-atomik adımıyla işlenir; kaybeden (count 0)
+          // tur bildirim göndermez.
+          if (newExpiresAt && (await this.extensionPolicy.canExtend(offer))) {
+            const claimed = await this.prisma.offer.updateMany({
+              where: {
+                id: offer.id,
+                status: OfferStatus.pending,
+                expiresAt: { lt: now },
+                extendedAt: null,
+              },
+              // `version` artırılmaz: kabul/geri çekme yolları sürüm guard'ıyla
+              // yazar; uzatma iş durumunu değil yalnız tarihi öteler.
+              data: { expiresAt: newExpiresAt, extendedAt: now },
+            });
+            if (claimed.count === 1) {
+              extended += 1;
+              await this.notifyExtended(offer, productTitle, newExpiresAt);
+            }
+            // Başka tur kazandıysa (count 0) bu teklif artık süresi dolmuş değil:
+            // expire dalına DÜŞMEZ.
+            continue;
+          }
+
+          const closed = await this.prisma.offer.updateMany({
             where: {
               id: offer.id,
               status: OfferStatus.pending,
               expiresAt: { lt: now },
-              extendedAt: null,
             },
-            // `version` artırılmaz: kabul/geri çekme yolları sürüm guard'ıyla
-            // yazar; uzatma iş durumunu değil yalnız tarihi öteler.
-            data: { expiresAt: newExpiresAt, extendedAt: now },
+            data: { status: OfferStatus.expired },
           });
-          if (claimed.count === 1) {
-            extended += 1;
-            await this.notifyExtended(offer, productTitle, newExpiresAt);
-          }
-          // Başka tur kazandıysa (count 0) bu teklif artık süresi dolmuş değil:
-          // expire dalına DÜŞMEZ.
-          continue;
-        }
-
-        const closed = await this.prisma.offer.updateMany({
-          where: {
-            id: offer.id,
-            status: OfferStatus.pending,
-            expiresAt: { lt: now },
-          },
-          data: { status: OfferStatus.expired },
-        });
-        if (closed.count !== 1) continue;
-        expired += 1;
-        await this.notificationService
-          ?.notifyOfferExpired({
-            buyerId: offer.buyerId,
-            sellerId: offer.sellerId,
-            productId: offer.productId,
-            productTitle,
-          })
-          .catch((err: any) =>
-            this.logger.warn(
-              `offer-expired notify failed for ${offer.id}: ${err.message}`,
-            ),
+          if (closed.count !== 1) continue;
+          expired += 1;
+          await this.notificationService
+            ?.notifyOfferExpired({
+              buyerId: offer.buyerId,
+              sellerId: offer.sellerId,
+              productId: offer.productId,
+              productTitle,
+            })
+            .catch((err: any) =>
+              this.logger.warn(
+                `offer-expired notify failed for ${offer.id}: ${err.message}`,
+              ),
+            );
+        } catch (err: any) {
+          failed += 1;
+          this.logger.error(
+            `expire-offers failed for offer ${offer.id}: ${err.message}`,
+            err.stack,
           );
+        }
       }
 
       log(`${expired} süresi dolmuş teklif 'expired' yapıldı`);
@@ -162,6 +170,13 @@ export class OfferSchedulerService implements OnModuleInit {
       }
       if (extended > 0) {
         this.logger.log(`Extended ${extended} offer(s) once (extend_once)`);
+      }
+      if (failed > 0) {
+        // Tüm teklifler işlendikten SONRA yükselt: tracked job "failed" olsun
+        // (Sentry cron alarmı), kalan teklifler yine de işlenmiş olsun.
+        throw new Error(
+          `${failed} teklif işlenemedi (${expired} expired, ${extended} uzatıldı)`,
+        );
       }
       return {
         summary: `${expired} teklif süresi doldu · ${extended} teklif uzatıldı`,
@@ -178,22 +193,6 @@ export class OfferSchedulerService implements OnModuleInit {
       // "başarılı" görünür ve hata yalnız log satırında kalır).
       throw error;
     }
-  }
-
-  /**
-   * extend_once uygunluğu: saf kural (`offerExtensionBlocker`: hak kullanılmış
-   * mı, ilan satışta mı, taraflar yasaklı/silinmiş mi) + taraflar arası engel.
-   * Engel varsa teklif varsayılan davranışla (expire) kapanır.
-   */
-  private async canExtend(
-    offer: OfferExtensionCandidate & { buyerId: string; sellerId: string },
-  ): Promise<boolean> {
-    if (offerExtensionBlocker(offer)) return false;
-    // Engelleme / hesap şeridi (canlı ↔ test) — teklif akışıyla aynı kapı.
-    return !(await this.userBlocks.isBlockedEither(
-      offer.buyerId,
-      offer.sellerId,
-    ));
   }
 
   /** Sırası gelen tarafa: karşı teklifte alıcı, aksi halde satıcı. */

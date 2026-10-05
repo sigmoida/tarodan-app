@@ -131,6 +131,7 @@ import { SuratCargoModule } from "../surat-cargo/surat-cargo.module";
 import { RefundModule } from "../refund/refund.module";
 import { NotificationModule } from "../notification/notification.module";
 import { OrderModule } from "../order/order.module";
+import { OfferModule } from "../offer/offer.module";
 import { ElogoModule } from "../elogo/elogo.module";
 import { ShippingTariffModule } from "../shipping/tariff/shipping-tariff.module";
 import { TradeModule } from "../trade/trade.module";
@@ -160,6 +161,8 @@ import { scheduledProcessors } from "../../workers/scheduled-processors";
     RefundModule,
     NotificationModule,
     OrderModule,
+    // extend_once kuralı (teklifin görünen durumu) — OfferExtensionPolicy.
+    OfferModule,
     UserModule,
     ModerationModule,
     ElogoModule,
