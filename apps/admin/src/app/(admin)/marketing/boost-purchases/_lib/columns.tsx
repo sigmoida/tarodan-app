@@ -1,9 +1,8 @@
 import { Badge } from "@tarodan/ui";
-import { col } from "@/components/table";
+import { CellLink, col } from "@/components/table";
 import { fmtDate } from "@/lib/format";
 import { type BoostPurchase, purchaseStatusConfig } from "./types";
 import type { useTranslations } from "next-intl";
-import Link from "next/link";
 
 type T = ReturnType<typeof useTranslations<never>>;
 
@@ -38,12 +37,10 @@ export function purchaseColumns(t: T) {
       t("admin.marketing.boostPurchases.package"),
       (p) => (
         <div className="flex min-w-0 items-center gap-2">
-          <Link
+          <CellLink
             href={`/marketing/boost-purchases/${p.id}`}
-            className="truncate font-medium text-primary hover:underline"
-          >
-            {p.packageName ?? "—"}
-          </Link>
+            label={p.packageName ?? "—"}
+          />
           {p.showcaseOnHome && (
             <Badge variant="default" size="sm">
               {t("admin.marketing.boostPurchases.showcaseBadge")}

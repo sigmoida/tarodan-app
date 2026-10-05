@@ -1,10 +1,12 @@
 "use client";
 
 import { useFieldArray, useFormContext } from "react-hook-form";
-import { Button } from "@tarodan/ui";
+import { Button, EmptyState } from "@tarodan/ui";
 import { FormInput, FormDatePicker, FormCheckbox } from "@tarodan/ui/form";
 import { PlusIcon, TrashIcon } from "@heroicons/react/24/outline";
 import { useTranslations } from "next-intl";
+import { Panel } from "@/components/detail/Panel";
+import { SectionTitle } from "@/components/detail/SectionTitle";
 import { emptyTierRow, type PackageFormValues } from "../_lib/types";
 
 /**
@@ -21,9 +23,9 @@ export function TierRowsEditor() {
     <div className="space-y-3">
       <div className="flex items-center justify-between">
         <div>
-          <p className="text-sm font-medium text-heading">
+          <SectionTitle as="h4" size="sm">
             {t("admin.marketing.adPackages.tiers")}
-          </p>
+          </SectionTitle>
           <p className="text-xs text-muted">
             {t("admin.marketing.adPackages.tiersHelper")}
           </p>
@@ -40,17 +42,16 @@ export function TierRowsEditor() {
       </div>
 
       {fields.length === 0 && (
-        <p className="rounded-lg border border-dashed border-border p-4 text-center text-sm text-muted">
-          {t("admin.marketing.adPackages.noTiers")}
-        </p>
+        <EmptyState
+          size="compact"
+          icon={false}
+          title={t("admin.marketing.adPackages.noTiers")}
+        />
       )}
 
       <div className="space-y-3">
         {fields.map((field, index) => (
-          <div
-            key={field.id}
-            className="rounded-lg border border-border bg-surface-alt/40 p-3"
-          >
+          <Panel key={field.id} tone="muted" padding="sm">
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
               <FormInput
                 name={`tiers.${index}.durationDays`}
@@ -118,7 +119,7 @@ export function TierRowsEditor() {
             <p className="mt-2 text-xs text-muted">
               {t("admin.marketing.adPackages.campaignHelper")}
             </p>
-          </div>
+          </Panel>
         ))}
       </div>
     </div>

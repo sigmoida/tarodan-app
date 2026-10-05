@@ -10,7 +10,7 @@ import {
   FormCheckbox,
   useZodForm,
 } from "@tarodan/ui/form";
-import { Button, FileDropzone, Input } from "@tarodan/ui";
+import { Alert, Button, FileDropzone, Input } from "@tarodan/ui";
 import {
   CheckCircleIcon,
   ExclamationTriangleIcon,
@@ -18,6 +18,7 @@ import {
 import toast from "react-hot-toast";
 import { useTranslations } from "next-intl";
 import { adminApi } from "@/lib/api";
+import { Panel } from "@/components/detail/Panel";
 import { extractErrorMessage } from "@/lib/error";
 import { useAdminMutation } from "@/hooks/useAdminMutation";
 import {
@@ -88,7 +89,7 @@ function AdImageField() {
         {t("admin.marketing.ads.image")}
       </span>
       {imageUrl ? (
-        <div className="space-y-3 rounded-lg border border-border p-4 text-center">
+        <Panel className="space-y-3 text-center">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src={imageUrl}
@@ -125,7 +126,7 @@ function AdImageField() {
           >
             {t("admin.marketing.ads.removeImage")}
           </Button>
-        </div>
+        </Panel>
       ) : null}
 
       {/*
@@ -187,10 +188,12 @@ function AdImageField() {
       </div>
 
       {!!width && !!height && !compliant && (
-        <div className="flex items-start gap-2 rounded-lg border border-warning-500/30 bg-warning-500/10 p-3 text-sm text-warning-700">
-          <ExclamationTriangleIcon className="h-5 w-5 shrink-0 text-warning-500" />
+        <Alert
+          variant="warning"
+          icon={<ExclamationTriangleIcon className="h-5 w-5" />}
+        >
           {t("admin.marketing.ads.iabWarning", { width, height })}
-        </div>
+        </Alert>
       )}
     </div>
   );

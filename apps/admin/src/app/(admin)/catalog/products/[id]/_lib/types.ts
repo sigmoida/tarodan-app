@@ -11,15 +11,11 @@ export const PACKAGE_TIER_OPTIONS = [
   labelKey: string;
 }>;
 
-import { useTranslations } from "next-intl";
-import type { BadgeVariant } from "@tarodan/ui";
 import type { ListingEditPayload } from "@tarodan/listing-form";
 import type {
   AdminListingRemovalEvent,
   AdminListingRemovalSummary,
 } from "@tarodan/types";
-
-type T = ReturnType<typeof useTranslations<never>>;
 
 export interface ProductDetail {
   id: string;
@@ -86,35 +82,3 @@ export interface Review {
   user: { id: string; displayName: string; email: string; avatarUrl?: string };
 }
 
-export const productStatusConfig = (
-  t: T,
-): Record<string, { label: string; variant: BadgeVariant }> => ({
-  pending: {
-    label: t("common.pending"),
-    variant: "warning",
-  },
-  active: {
-    label: t("common.active"),
-    variant: "success",
-  },
-  inactive: {
-    label: t("common.inactive"),
-    variant: "outline",
-  },
-  rejected: {
-    label: t("common.rejected"),
-    variant: "danger",
-  },
-  reserved: {
-    label: t("admin.catalog.products.statusReserved"),
-    variant: "default",
-  },
-  sold: {
-    label: t("admin.catalog.products.statusSold"),
-    variant: "default",
-  },
-  deleted: {
-    label: t("admin.catalog.products.statusDeleted"),
-    variant: "danger",
-  },
-});
