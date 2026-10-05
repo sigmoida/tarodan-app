@@ -46,6 +46,11 @@ describe("ProductLockService.checkAndReserve — stok eş-zamanlılık matrisi",
           if (row && typeof data.status === "string") row.status = data.status;
           return Promise.resolve({ ...row });
         }),
+        updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+      },
+      // releaseReservation stoğu bitmiş ilanı pasife düşürürse kaldırma kaydı.
+      productRemovalEvent: {
+        createMany: jest.fn().mockResolvedValue({ count: 1 }),
       },
     };
     const svc = new ProductLockService({} as any, {} as any);

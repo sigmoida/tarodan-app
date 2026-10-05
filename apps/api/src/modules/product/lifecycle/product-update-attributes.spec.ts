@@ -25,7 +25,14 @@ describe("ProductUpdateService — nitelik sıfırlaması", () => {
         deleteMany: jest.fn().mockResolvedValue({ count: 0 }),
         createMany: jest.fn().mockResolvedValue({ count: 0 }),
       },
-      product: { update: jest.fn().mockResolvedValue(updatedRow) },
+      product: {
+        update: jest.fn().mockResolvedValue(updatedRow),
+        updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+      },
+      // Pasife düşüren düzenlemenin kaldırma kaydı (recordListingRemovals).
+      productRemovalEvent: {
+        createMany: jest.fn().mockResolvedValue({ count: 1 }),
+      },
     };
     const prisma = {
       product: {

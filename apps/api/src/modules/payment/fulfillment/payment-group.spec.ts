@@ -46,6 +46,7 @@ import { OUTBOX_ORDER_FULFILLMENT } from "../../outbox/outbox.types";
 import { DiscountService } from "../../discount/discount.service";
 import {
   CancellationActor,
+  ListingRemovalReason,
   OrderStatus,
   PaymentStatus,
   ProductStatus,
@@ -179,6 +180,12 @@ describe("PaymentService group payment (checkout group)", () => {
           callSequence.push(`product.update:${where.id}`);
           return Promise.resolve({});
         }),
+        updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+      },
+      // Stok düşümünün kaldırma kaydı (recordListingRemovals): oversell yolu
+      // stoğu bitmiş ilanı pasife düşürür.
+      productRemovalEvent: {
+        createMany: jest.fn().mockResolvedValue({ count: 1 }),
       },
       paymentHold: {
         create: jest.fn().mockImplementation(({ data }: any) => {
@@ -428,6 +435,26 @@ describe("PaymentService group payment (checkout group)", () => {
         idempotencyKey: `stock-shortage-refund:${paymentId}:order-1`,
       }),
     );
+    // Oversell yolu stoğu bitmiş her ilanı pasife düşürür: ilan başına TAM
+    // BİR "stok tükendi" kaydı (iki sipariş, iki ayrı ilan). Önceki statü
+    // vitrin değil (sold) → vitrinden düşüş sayılmaz.
+    const events = mockTx.productRemovalEvent.createMany.mock.calls.flatMap(
+      ([args]: any[]) => args.data,
+    );
+    expect(events).toEqual([
+      expect.objectContaining({
+        productId: "product-1",
+        reason: ListingRemovalReason.out_of_stock,
+        statusBefore: ProductStatus.sold,
+        statusAfter: ProductStatus.inactive,
+        fromStorefront: false,
+      }),
+      expect.objectContaining({
+        productId: "product-2",
+        reason: ListingRemovalReason.out_of_stock,
+        fromStorefront: false,
+      }),
+    ]);
   });
 
   it("is idempotent: second success callback does nothing (CAS claim fails)", async () => {

@@ -17,6 +17,11 @@ describe("FulfillmentStockService.decrementForOrder", () => {
             .mockResolvedValueOnce(product) // ilk fetch
             .mockResolvedValueOnce(refreshed), // refreshed fetch
           update,
+          updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+        },
+        // Kaldırma kaydı (recordListingRemovals) — oversell'de stok bitmişse.
+        productRemovalEvent: {
+          createMany: jest.fn().mockResolvedValue({ count: 1 }),
         },
       } as any,
       update,
@@ -97,6 +102,36 @@ describe("FulfillmentStockService.decrementForOrder", () => {
     expect(
       productLock.invalidatePendingOrdersForProduct,
     ).not.toHaveBeenCalled();
+  });
+
+  it("oversell stoğu bitmiş ilanı pasife düşürürse TAM BİR 'stok tükendi' kaydı düşer", async () => {
+    const productLock = lock() as any;
+    const { tx } = makeTx(
+      {
+        quantity: 0,
+        reservedQuantity: 1,
+        status: "reserved",
+      },
+      { quantity: 0, reservedQuantity: 0, categoryId: null },
+    );
+    const svc = new FulfillmentStockService(productLock);
+
+    const r = await svc.decrementForOrder(tx, "p1", 1);
+
+    expect(r.oversold).toEqual({ productId: "p1", paidQty: 1, physicalQty: 0 });
+    expect(tx.productRemovalEvent.createMany).toHaveBeenCalledTimes(1);
+    expect(tx.productRemovalEvent.createMany).toHaveBeenCalledWith({
+      data: [
+        expect.objectContaining({
+          productId: "p1",
+          reason: "out_of_stock",
+          statusBefore: "reserved",
+          statusAfter: "inactive",
+          // Rezerve ilan vitrinde değildi: kaydedilir, sayılmaz.
+          fromStorefront: false,
+        }),
+      ],
+    });
   });
 
   it("stok yeterliyse oversold undefined (yanlış-pozitif yok)", async () => {

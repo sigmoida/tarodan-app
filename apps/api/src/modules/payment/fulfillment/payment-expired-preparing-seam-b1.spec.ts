@@ -29,7 +29,14 @@ describe("PaymentExpiryReconciliationService.handleExpiredPreparingOrders — SE
       paymentHold: { updateMany: jest.fn().mockResolvedValue({ count: 1 }) },
       // Süre aşımı iptali, incelemede bekleyen alıcı talebini de devralır.
       refundRequest: { updateMany: jest.fn().mockResolvedValue({ count: 0 }) },
-      product: { update: jest.fn().mockResolvedValue({}) },
+      product: {
+        update: jest.fn().mockResolvedValue({}),
+        updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+      },
+      // Stok geri yüklemenin kaldırma kaydı (recordListingRemovals).
+      productRemovalEvent: {
+        createMany: jest.fn().mockResolvedValue({ count: 1 }),
+      },
     };
     const prisma = {
       order: {

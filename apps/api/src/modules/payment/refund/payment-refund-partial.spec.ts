@@ -147,6 +147,11 @@ describe("PaymentRefundService.processRefund — MONEY-H3/H4 partial refund", ()
       product: {
         findUnique: jest.fn().mockResolvedValue({ quantity: 5 }),
         update: jest.fn().mockResolvedValue({}),
+        updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+      },
+      // Stok geri yüklemenin kaldırma kaydı (recordListingRemovals).
+      productRemovalEvent: {
+        createMany: jest.fn().mockResolvedValue({ count: 1 }),
       },
       offer: { updateMany: jest.fn().mockResolvedValue({ count: 1 }) },
     };
