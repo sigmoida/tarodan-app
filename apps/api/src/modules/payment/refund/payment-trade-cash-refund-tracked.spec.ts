@@ -1,5 +1,11 @@
+import { BadRequestException } from "@nestjs/common";
+import { TradeStatus } from "@prisma/client";
 import { PaymentTradeRefundService } from "./payment-trade-refund.service";
 import { PaymentRefundAttemptService } from "./payment-refund-attempt.service";
+import { PaymentOutboxHandlers } from "../payment-outbox-handlers.service";
+import { OutboxHandlerRegistry } from "../../outbox/outbox-handler.registry";
+import { OUTBOX_TRADE_CANCELLED_PAYMENT_REFUND } from "../../outbox/outbox.types";
+import { i18nMessage } from "../../i18n";
 
 /**
  * MONEY-H2: refundTradeCashTracked — takas nakit iadesini failure-tracking ile yapar.
@@ -99,5 +105,196 @@ describe("PaymentTradeRefundService.refundTradeCashTracked — MONEY-H2 failure 
       }),
     );
     expect(eventService.emitTradeRefundCompleted).not.toHaveBeenCalled();
+  });
+});
+
+/**
+ * Kapsamlı (tek taraf) iade, BAŞKA bir tarafın başarısız iadesinin işaretini
+ * silmemeli. Senaryo: platform iptali; A ödemiş, B'nin ödemesi PayTR'da.
+ * A'nın iadesi sağlayıcıda patlar → `refundFailureReason`. B'nin callback'i
+ * gelir; B'nin kapsamlı iadesi (drainer handler'ı) başarılı olur. İşaret
+ * silinseydi `retryFailedTradeRefunds` A'yı bir daha görmez, admin panelindeki
+ * "iade başarısız" uyarısı da kaybolurdu.
+ */
+describe("PaymentTradeRefundService.refundTradeCashTracked — kapsamlı iade ve hata işareti", () => {
+  const TRADE_ID = "trade-1";
+
+  const makeService = (outstandingAfterRefund: number | Error) => {
+    const state = {
+      refundFailureReason: "PayTR 503 (A)" as string | null,
+    };
+    const prisma = {
+      trade: {
+        findUnique: jest
+          .fn()
+          .mockResolvedValue({ status: TradeStatus.cancelled }),
+        update: jest.fn(
+          async ({
+            data,
+          }: {
+            data: { refundFailureReason: string | null };
+          }) => {
+            state.refundFailureReason = data.refundFailureReason;
+            return {};
+          },
+        ),
+      },
+      payment: {
+        count:
+          outstandingAfterRefund instanceof Error
+            ? jest.fn().mockRejectedValue(outstandingAfterRefund)
+            : jest.fn().mockResolvedValue(outstandingAfterRefund),
+      },
+      tradeCashPayment: {
+        findFirst: jest.fn().mockResolvedValue({ payerId: "B" }),
+        findMany: jest.fn().mockResolvedValue([]),
+      },
+    };
+    const eventService = {
+      emitTradeRefundCompleted: jest.fn().mockResolvedValue(undefined),
+      emitTradeRefundFailed: jest.fn().mockResolvedValue(undefined),
+    };
+    const service = new PaymentTradeRefundService(
+      prisma as never,
+      { get: jest.fn() } as never,
+      {} as never,
+      eventService as never,
+      { record: jest.fn() } as never,
+      new PaymentRefundAttemptService(prisma as never),
+    );
+    jest
+      .spyOn(service, "refundTradeCashPaymentIfCompleted")
+      .mockResolvedValue({ refunded: true, paymentId: "pay-B" });
+    return { service, prisma, state, eventService };
+  };
+
+  it("A'nın iadesi hâlâ bekliyorsa B'nin kapsamlı başarısı işareti SİLMEZ", async () => {
+    const { service, prisma, state } = makeService(1);
+
+    const r = await service.refundTradeCashTracked(TRADE_ID, { payerId: "B" });
+
+    expect(r).toEqual(
+      expect.objectContaining({ refunded: true, failed: false }),
+    );
+    expect(state.refundFailureReason).toBe("PayTR 503 (A)");
+    // Kalan borç, iade yolunun kendi (kapsamsız) filtresiyle sayılır.
+    expect(prisma.payment.count).toHaveBeenCalledWith({
+      where: expect.objectContaining({
+        tradeCashPayment: expect.not.objectContaining({ payerId: "B" }),
+        status: "completed",
+      }),
+    });
+  });
+
+  it("başka iade borcu kalmadıysa kapsamlı başarı işareti temizler", async () => {
+    const { service, state } = makeService(0);
+
+    await service.refundTradeCashTracked(TRADE_ID, { payerId: "B" });
+
+    expect(state.refundFailureReason).toBeNull();
+  });
+
+  it("kalan borç okunamazsa işaret korunur (kayıp iadeden yanlış alarm iyidir)", async () => {
+    const { service, state } = makeService(new Error("db down"));
+
+    await service.refundTradeCashTracked(TRADE_ID, { payerId: "B" });
+
+    expect(state.refundFailureReason).toBe("PayTR 503 (A)");
+  });
+
+  it("kapsamsız çağrı bugünkü gibi işareti temizler (kalan borç sorulmaz)", async () => {
+    const { service, prisma, state } = makeService(1);
+
+    await service.refundTradeCashTracked(TRADE_ID);
+
+    expect(prisma.payment.count).not.toHaveBeenCalled();
+    expect(state.refundFailureReason).toBeNull();
+  });
+
+  it("drainer yolu: geç gelen B ödemesinin handler'ı A'nın işaretini korur", async () => {
+    const { service, state } = makeService(1);
+    const registry = new OutboxHandlerRegistry();
+    new PaymentOutboxHandlers(
+      registry,
+      {} as never,
+      {} as never,
+      {} as never,
+      {} as never,
+      {
+        refundTradeCashTracked: service.refundTradeCashTracked.bind(service),
+      } as never,
+    ).onModuleInit();
+
+    await registry.get(OUTBOX_TRADE_CANCELLED_PAYMENT_REFUND)!(
+      { tradeId: TRADE_ID, payerId: "B", tradeCashPaymentId: "tcp-B" },
+      { attempts: 0, maxAttempts: 8 } as never,
+    );
+
+    expect(state.refundFailureReason).toBe("PayTR 503 (A)");
+  });
+});
+
+describe("PaymentTradeRefundService.refundTradeCashTracked — 'henüz bildirilmedi' ertelemesi", () => {
+  const makeService = () => {
+    const prisma = {
+      trade: { update: jest.fn().mockResolvedValue({}) },
+      tradeCashPayment: { findMany: jest.fn().mockResolvedValue([]) },
+    };
+    const eventService = {
+      emitTradeRefundCompleted: jest.fn(),
+      emitTradeRefundFailed: jest.fn().mockResolvedValue(undefined),
+    };
+    const service = new PaymentTradeRefundService(
+      prisma as never,
+      { get: jest.fn() } as never,
+      {} as never,
+      eventService as never,
+      { record: jest.fn() } as never,
+      new PaymentRefundAttemptService(prisma as never),
+    );
+    jest
+      .spyOn(service, "refundTradeCashPaymentIfCompleted")
+      .mockRejectedValue(
+        new BadRequestException(
+          i18nMessage("server.payment.paymentNotYetSynced"),
+        ),
+      );
+    return { service, prisma, eventService };
+  };
+
+  it("erteleme istenirse: işaret yazılmaz, 'iade başarısız' yayınlanmaz, deferred döner", async () => {
+    const { service, prisma, eventService } = makeService();
+
+    const r = await service.refundTradeCashTracked("trade-1", {
+      payerId: "B",
+      deferIfNotYetSynced: true,
+    });
+
+    expect(r).toEqual(
+      expect.objectContaining({
+        refunded: false,
+        failed: false,
+        deferred: true,
+      }),
+    );
+    expect(prisma.trade.update).not.toHaveBeenCalled();
+    expect(eventService.emitTradeRefundFailed).not.toHaveBeenCalled();
+  });
+
+  it("erteleme istenmezse (son deneme / diğer yollar) bugünkü gibi işaret yazılır", async () => {
+    const { service, prisma } = makeService();
+
+    const r = await service.refundTradeCashTracked("trade-1", {
+      payerId: "B",
+    });
+
+    expect(r.failed).toBe(true);
+    expect(prisma.trade.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          refundFailureReason: expect.any(String),
+        }),
+      }),
+    );
   });
 });

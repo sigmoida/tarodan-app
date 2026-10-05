@@ -128,10 +128,13 @@ export const tradeCancelSettleDedupeKey = (tradeId: string): string =>
  * İPTAL EDİLMİŞ takasa sonradan tamamlanan ödemenin iadesi. İptal yolları
  * iadeyi iptal anında tamamlanmış satırlara yapar; ödemesi o an yolda olan
  * tarafın (PayTR callback'i iptalden sonra gelir) parası aksi halde hiçbir
- * yoldan dönmez. Ödemeyi tamamlayan tx'le ATOMİK yazılır, anlık yol
- * `runInline` ile hemen iade eder; çökmede drainer tamamlar. Tutar mevcut
- * politikadan (`refundTradeCashTracked`, satırdaki `fullRefundEntitled`
- * kararıyla) gelir — yeni hesap yok. Ödeme satırı başına tek satır.
+ * yoldan dönmez. Ödemeyi tamamlayan tx'le ATOMİK yazılır ve YALNIZ drainer
+ * işler: iade PayTR callback'inin içinden (ödeme henüz "siteye bildirilmeden")
+ * denenmez. Erken denemeyi PayTR reddederse handler satırı yeniden kuyruğa
+ * alır; son denemede iş `refundFailureReason` + retry cron'una devredilir.
+ * Tutar mevcut politikadan (`refundTradeCashTracked`, satırdaki
+ * `fullRefundEntitled` kararıyla) gelir — yeni hesap yok. Ödeme satırı başına
+ * tek satır.
  */
 export const OUTBOX_TRADE_CANCELLED_PAYMENT_REFUND =
   "trade.cancelled_payment_refund";

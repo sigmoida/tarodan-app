@@ -16,7 +16,9 @@ import {
  * iptalden sonra gelirse satır `completed` olur ama hiçbir yol onu iade etmez.
  * Ödemenin tamamlandığı TEK yerde (bu servis) iptal edilmiş takas görülür ve
  * ödeme mevcut izlenen iadeye (`refundTradeCashTracked`, ödeyene kapsamlı)
- * verilir; iş ödeme tx'iyle atomik kuyruğa girer, çökmede drainer tamamlar.
+ * verilir. İş ödeme tx'iyle atomik kuyruğa girer ve YALNIZ drainer işler —
+ * PayTR callback'inin içinden (ödeme henüz "siteye bildirilmeden") iade
+ * denenmez; erken denemeyi PayTR reddederse satır yeniden kuyruğa girer.
  */
 describe("PaymentFulfillmentService — iptal edilmiş takasa gelen ödeme", () => {
   interface OutboxRow {
@@ -182,22 +184,20 @@ describe("PaymentFulfillmentService — iptal edilmiş takasa gelen ödeme", () 
           tradeCashPaymentId: "tcp-2",
         },
         dedupeKey: tradeCancelledPaymentRefundDedupeKey("tcp-2"),
-        status: OutboxStatus.completed,
+        // Drainer'a bırakılır (callback yanıtlandıktan sonra işlenir).
+        status: OutboxStatus.pending,
       },
     ]);
   });
 
-  it("iadeyi mevcut izlenen yoldan, ödeyene kapsamlı yapar — defter yakalamasından SONRA", async () => {
+  it("PayTR callback'inin içinden iade DENEMEZ (ödeme henüz 'siteye bildirilmedi')", async () => {
     const h = makeService();
 
     await h.run();
 
-    expect(h.paymentRefund.refundTradeCashTracked).toHaveBeenCalledTimes(1);
-    expect(h.paymentRefund.refundTradeCashTracked).toHaveBeenCalledWith(
-      "trade-1",
-      { payerId: "u2" },
-    );
-    expect(h.calls.indexOf("capture")).toBeLessThan(h.calls.indexOf("refund"));
+    expect(h.paymentRefund.refundTradeCashTracked).not.toHaveBeenCalled();
+    // Defter yakalaması yine yazılır; iade bunu drainer'da tersler.
+    expect(h.calls).toContain("capture");
   });
 
   it("iptal edilmiş takası kargoya almaz, sevkiyat duyurusu yapmaz", async () => {
@@ -222,45 +222,69 @@ describe("PaymentFulfillmentService — iptal edilmiş takasa gelen ödeme", () 
     expect(lock).toBeLessThan(h.calls.indexOf("tcp.update"));
   });
 
-  it("süreç commit ile iade arasında ölürse satır pending kalır ve drainer handler'ı iadeyi yapar", async () => {
-    const h = makeService();
-    jest
-      .spyOn(h.outbox, "runInline")
-      .mockRejectedValueOnce(new Error("SIGKILL after commit"));
+  describe("drainer handler'ı", () => {
+    type RefundResult = {
+      refunded: boolean;
+      failed: boolean;
+      deferred?: boolean;
+    };
+    const makeHandler = (result: RefundResult) => {
+      const paymentRefund = {
+        refundTradeCashTracked: jest.fn().mockResolvedValue(result),
+      };
+      const registry = new OutboxHandlerRegistry();
+      new PaymentOutboxHandlers(
+        registry,
+        {} as never,
+        {} as never,
+        {} as never,
+        {} as never,
+        paymentRefund as never,
+      ).onModuleInit();
+      const handler = registry.get(OUTBOX_TRADE_CANCELLED_PAYMENT_REFUND)!;
+      const payload = {
+        tradeId: "trade-1",
+        payerId: "u2",
+        tradeCashPaymentId: "tcp-2",
+      };
+      const run = (attempts: number, maxAttempts = 8) =>
+        handler(payload, { attempts, maxAttempts } as never);
+      return { paymentRefund, run };
+    };
 
-    await expect(h.run()).rejects.toThrow("SIGKILL after commit");
-    expect(h.paymentRefund.refundTradeCashTracked).not.toHaveBeenCalled();
-    expect(h.outboxRows[0].status).toBe(OutboxStatus.pending);
+    it("iadeyi mevcut izlenen yoldan, ödeyene kapsamlı ve erken-deneme ertelemesiyle yapar", async () => {
+      const h = makeHandler({ refunded: true, failed: false });
 
-    const registry = new OutboxHandlerRegistry();
-    new PaymentOutboxHandlers(
-      registry,
-      {} as never,
-      {} as never,
-      {} as never,
-      {} as never,
-      h.paymentRefund as never,
-    ).onModuleInit();
-    await registry.get(OUTBOX_TRADE_CANCELLED_PAYMENT_REFUND)!(
-      h.outboxRows[0].payload,
-      {} as never,
-    );
+      await expect(h.run(0)).resolves.toBeUndefined();
 
-    expect(h.paymentRefund.refundTradeCashTracked).toHaveBeenCalledWith(
-      "trade-1",
-      { payerId: "u2" },
-    );
-  });
-
-  it("iade sağlayıcıda başarısızsa iş yine kapanır (izlenen yol marker + retry cron'una bırakır)", async () => {
-    const h = makeService();
-    h.paymentRefund.refundTradeCashTracked.mockResolvedValueOnce({
-      refunded: false,
-      failed: true,
+      expect(h.paymentRefund.refundTradeCashTracked).toHaveBeenCalledWith(
+        "trade-1",
+        { payerId: "u2", deferIfNotYetSynced: true },
+      );
     });
 
-    await expect(h.run()).resolves.toBe(true);
-    expect(h.outboxRows[0].status).toBe(OutboxStatus.completed);
+    it("PayTR 'henüz bildirilmedi' derse satırı tamamlamaz, yeniden kuyruğa alır (fırlatır)", async () => {
+      const h = makeHandler({ refunded: false, failed: false, deferred: true });
+
+      await expect(h.run(2)).rejects.toThrow(/re-queued/);
+    });
+
+    it("son denemede erteleme yapmaz: iş işaret + retry cron'una devredilir, satır kapanır", async () => {
+      const h = makeHandler({ refunded: false, failed: true });
+
+      await expect(h.run(7, 8)).resolves.toBeUndefined();
+
+      expect(h.paymentRefund.refundTradeCashTracked).toHaveBeenCalledWith(
+        "trade-1",
+        { payerId: "u2", deferIfNotYetSynced: false },
+      );
+    });
+
+    it("diğer sağlayıcı hataları satırı kapatır (izlenen yol işaret + retry cron'una bırakır)", async () => {
+      const h = makeHandler({ refunded: false, failed: true });
+
+      await expect(h.run(0)).resolves.toBeUndefined();
+    });
   });
 
   it("outbox yoksa (dar kurulum) iade yine anında yapılır", async () => {

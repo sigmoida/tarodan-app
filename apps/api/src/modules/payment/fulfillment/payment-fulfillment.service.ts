@@ -1147,10 +1147,16 @@ export class PaymentFulfillmentService {
       );
     }
 
-    // İptal edilmiş takasa gelen ödeme: yakalamadan SONRA (defter ters kaydı
-    // yakalamayı bulsun) iade edilir. Kuyruktaki işin sahibi olarak hemen.
+    // İptal edilmiş takasa gelen ödeme: iade burada (PayTR callback'inin
+    // içinde, "OK" yanıtından önce) YAPILMAZ — PayTR henüz bildirmediği ödemenin
+    // iadesini "odeme henuz siteye bildirilmemis" ile reddeder ve callback-içi
+    // bir iadenin kabul edildiğine dair kanıt yok. Tx'te yazılan outbox satırını
+    // drainer (callback yanıtlandıktan sonra, ~1 dk içinde) işler.
     if (result.kind === "cancelled_trade") {
-      await this.refundPaymentOfCancelledTrade(result.refund);
+      this.logger.warn(
+        `Trade ${result.refund.tradeId} was cancelled before payment ${result.refund.tradeCashPaymentId} completed; refund queued`,
+      );
+      await this.refundWithoutOutbox(result.refund);
       return true;
     }
 
@@ -1190,32 +1196,18 @@ export class PaymentFulfillmentService {
   }
 
   /**
-   * İptal edilmiş takasa sonradan tamamlanan ödemenin iadesi — mevcut izlenen
-   * yol (`refundTradeCashTracked`, ödeyen tarafa kapsamlı; tutar satırdaki
-   * kusur kararıyla politikadan). Asla fırlatmaz: sağlayıcı hatası
-   * `refundFailureReason` yazar ve retry cron'u toparlar. Ödeme tx'inde
-   * kuyruğa alınmış işin sahibi olarak çalışır; süreç burada ölürse drainer
-   * (`PaymentOutboxHandlers`) aynı işi tamamlar.
+   * Outbox YOKSA (yalnız dar unit test kurulumları — production'da OutboxModule
+   * globaldir) iadeyi yürütecek drainer de yoktur; para askıda kalmasın diye
+   * izlenen iade doğrudan denenir. Erteleme seçeneği verilmez: PayTR erken
+   * denemeyi reddederse `refundFailureReason` + retry cron'u toparlar.
    */
-  private async refundPaymentOfCancelledTrade(
+  private async refundWithoutOutbox(
     ref: TradeCancelledPaymentRefundPayload,
   ): Promise<void> {
-    const work = () =>
-      this.paymentRefund.refundTradeCashTracked(ref.tradeId, {
-        payerId: ref.payerId,
-      });
-    this.logger.warn(
-      `Trade ${ref.tradeId} was cancelled before payment ${ref.tradeCashPaymentId} completed; refunding`,
-    );
-    if (!this.outbox) {
-      await work();
-      return;
-    }
-    await this.outbox.runInline(
-      this.prisma,
-      tradeCancelledPaymentRefundDedupeKey(ref.tradeCashPaymentId),
-      work,
-    );
+    if (this.outbox) return;
+    await this.paymentRefund.refundTradeCashTracked(ref.tradeId, {
+      payerId: ref.payerId,
+    });
   }
 
   /**

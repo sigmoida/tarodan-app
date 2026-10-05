@@ -48,20 +48,34 @@ export class PaymentOutboxHandlers implements OnModuleInit {
   ) {}
 
   onModuleInit(): void {
-    // İptal edilmiş takasa sonradan tamamlanan ödeme: ödeme tx'iyle atomik
-    // yazılan satır, anlık yol çalışamadan süreç ölürse burada tamamlanır.
-    // `refundTradeCashTracked` idempotenttir (ödeme başına deneme defteri) ve
-    // asla fırlatmaz; sağlayıcı hatası `refundFailureReason` + retry cron'una
-    // düşer. Servis yoksa fırlatılır ki satır kaybolmasın.
+    // İptal edilmiş takasa sonradan tamamlanan ödemenin iadesi — YALNIZ buradan
+    // (drainer, PayTR callback'i yanıtlandıktan sonra) çalışır; callback'in
+    // içinden iade edilmez (bkz. PaymentFulfillmentService). İade idempotenttir
+    // (ödeme başına deneme defteri). PayTR ödemeyi henüz "siteye bildirilmiş"
+    // saymıyorsa bu erken bir denemedir: işaret yazılmaz, yanlış "iade
+    // başarısız" alarmı gitmez, satır geri bırakılır (drainer backoff'uyla
+    // yeniden dener). SON denemede erteleme yapılmaz: iş olağan yoldan
+    // `refundFailureReason` + retry cron'una devredilir, para asla askıda
+    // kalmaz. Diğer sağlayıcı hataları da aynı işarete düşer. Servis yoksa
+    // fırlatılır ki satır kaybolmasın.
     this.registry.register(
       OUTBOX_TRADE_CANCELLED_PAYMENT_REFUND,
-      async (payload) => {
+      async (payload, event) => {
         const { tradeId, payerId } =
           payload as TradeCancelledPaymentRefundPayload;
         if (!this.paymentRefund) {
           throw new Error("PaymentRefundService is not available");
         }
-        await this.paymentRefund.refundTradeCashTracked(tradeId, { payerId });
+        const lastAttempt = event.attempts + 1 >= event.maxAttempts;
+        const result = await this.paymentRefund.refundTradeCashTracked(
+          tradeId,
+          { payerId, deferIfNotYetSynced: !lastAttempt },
+        );
+        if (result.deferred) {
+          throw new Error(
+            `trade ${tradeId}: PayTR has not reported payer ${payerId}'s payment yet; refund re-queued`,
+          );
+        }
       },
     );
 

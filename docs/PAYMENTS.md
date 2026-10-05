@@ -445,13 +445,39 @@ olurdu ve hiçbir yol iade etmezdi. Ödemenin tamamlandığı tek yer
 satırından önce kilitler (iptal yollarıyla aynı sıra: takas → ödeme satırı) ve
 takas `cancelled` ise ödemeyi mevcut izlenen iadeye
 (`refundTradeCashTracked`, ödeyene kapsamlı) verir. İş ödeme tx'iyle atomik
-`trade.cancelled_payment_refund` outbox satırı olarak yazılır ve anlık yoldan
-hemen çalışır; çökmede drainer (`PaymentOutboxHandlers`) tamamlar, sağlayıcı
-hatası `refundFailureReason` + retry cron'una düşer. Tutar yeni bir hesap
-değildir: satırdaki kusur kararıyla (`fullRefundEntitled`) iade politikası.
-Platform iptalinde her satır kusursuz işaretlendiği için tam tutardır.
-Duyuru tarafında bu ödeme, iptal anında sabitlenen duyuruda görünmez; ödeyen
-taraf iade core'unun "iade tamamlandı" push'unu alır.
+`trade.cancelled_payment_refund` outbox satırı olarak yazılır ve **yalnız
+drainer** (`PaymentOutboxHandlers`, callback yanıtlandıktan sonra, ~1 dk
+içinde) işler: iade PayTR callback'inin içinden, ödeme henüz "siteye
+bildirilmeden" denenmez — PayTR bu durumda iadeyi "odeme henuz siteye
+bildirilmemis" ile reddeder ve callback-içi iadenin kabul edildiğine dair bir
+kanıt yoktur (sipariş grup yolundaki callback-içi `processRefund` da başarısını
+kaydetmiyor, yalnız hatada elle müdahale ister). Handler erken denemeyi
+ertelemeli çağırır: bu red bir başarısızlık sayılmaz, işaret yazılmaz, yanlış
+"iade başarısız" alarmı gitmez ve satır drainer backoff'uyla yeniden denenir;
+SON denemede erteleme yapılmaz ve iş `refundFailureReason` + retry cron'una
+devredilir. Diğer sağlayıcı hataları da aynı işarete düşer. Tutar yeni bir
+hesap değildir: satırdaki kusur kararıyla (`fullRefundEntitled`) iade
+politikası. Platform iptalinde her satır kusursuz işaretlendiği için tam
+tutardır. Duyuru tarafında bu ödeme, iptal anında sabitlenen duyuruda
+görünmez; ödeyen taraf iade core'unun "iade tamamlandı" push'unu alır.
+
+**Kapsamlı iade ve hata işareti.** Tek tarafa kapsamlı bir iade
+(`refundTradeCashTracked(tradeId, { payerId })`) başarılı olunca takasın
+`refundFailureReason` işaretini yalnız başka bir tarafın iade borcu kalmadıysa
+temizler (iade yolunun kendi aday filtresiyle sayılır; okunamazsa işaret
+korunur). Aksi halde geç gelen B ödemesinin iadesi, A'nın başarısız iadesinin
+işaretini silerdi ve `retryFailedTradeRefunds` A'yı bir daha görmezdi.
+Kapsamsız çağrı takasın tüm borcunu ele aldığı için bugünkü gibi temizler.
+
+**AÇIK KARAR — süre dolumu iptalinde geç gelen ödeme.** Ödeme süresi aşımıyla
+iptalde (tarama, `faultless: "paid"`) yalnız iptal anında `completed` olan
+satırlar kusursuz işaretlenir. 3D doğrulamasını son tarihten ÖNCE bitirmiş ama
+callback'i taramadan SONRA gelmiş bir ödeyenin satırı `fullRefundEntitled =
+false` kalır; yukarıdaki geç-ödeme iadesi onu **hizmet bedeli düşülerek** iade
+eder — gerçekleşmemiş bir takas için. Bu bilinçli bir kural değildir, ürün
+kararı bekleyen açık bir sorudur; karar verilene kadar davranış böyledir.
+(Kullanıcı iptalinde iptal edenin kendi geç ödemesi de aynı şekilde kesintili
+iade edilir; platform iptalinde bu durum yoktur.)
 
 ---
 
