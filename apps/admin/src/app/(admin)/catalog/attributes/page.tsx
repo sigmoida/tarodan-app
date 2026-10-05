@@ -1,6 +1,6 @@
 "use client";
 
-import { Button, Spinner } from "@tarodan/ui";
+import { Button, EmptyState, Spinner } from "@tarodan/ui";
 import {
   PlusIcon,
   PencilIcon,
@@ -92,9 +92,11 @@ function AttributesPageContent() {
             placeholder={t("admin.catalog.attributes.searchGroup")}
           />
           {groups.length === 0 ? (
-            <div className="py-8 text-center text-muted">
-              {t("admin.catalog.attributes.noMatchingGroup")}
-            </div>
+            <EmptyState
+              size="compact"
+              icon={false}
+              title={t("admin.catalog.attributes.noMatchingGroup")}
+            />
           ) : (
             groups.map((g) => (
               <div
@@ -143,9 +145,11 @@ function AttributesPageContent() {
             />
           ) : !selectedGroup ? (
             <SectionCard>
-              <div className="py-12 text-center text-muted">
-                {t("admin.catalog.attributes.selectGroupHint")}
-              </div>
+              <EmptyState
+                size="compact"
+                icon={false}
+                title={t("admin.catalog.attributes.selectGroupHint")}
+              />
             </SectionCard>
           ) : (
             <SectionCard
@@ -164,13 +168,15 @@ function AttributesPageContent() {
               }
             >
               {loadingAttrs ? (
-                <div className="py-8 text-center">
-                  <Spinner size="md" className="mx-auto" />
+                <div className="flex justify-center py-8">
+                  <Spinner size="md" />
                 </div>
               ) : attributes.length === 0 ? (
-                <div className="py-8 text-center text-muted">
-                  {t("admin.catalog.attributes.noValues")}
-                </div>
+                <EmptyState
+                  size="compact"
+                  icon={false}
+                  title={t("admin.catalog.attributes.noValues")}
+                />
               ) : (
                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                   {attributes.map((a) => (
