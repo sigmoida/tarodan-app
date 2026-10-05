@@ -19,6 +19,7 @@ import {
 import { RestSuratClient } from "./clients/surat-rest.client";
 import { GonderiOlusturClient } from "./clients/surat-gonderi-olustur.client";
 import { suratCreateApiVersion } from "../../config/surat";
+import { isLiveDeployment } from "../../config/environment";
 import { OrderShipmentProvisioner } from "./sync/order-shipment-provisioner.service";
 import { CarrierCancellationService } from "./sync/carrier-cancellation.service";
 
@@ -36,7 +37,8 @@ import { CarrierCancellationService } from "./sync/carrier-cancellation.service"
  * Fail-fast: production'da kargo ENTEGRASYONU AÇIKken gerçek bir taşıyıcı modu
  * ZORUNLUDUR. Aksi halde stub sessizce devreye girer (sahte başarı + sahte takip
  * kodu) → siparişler "kargolandı" görünür ama Sürat'ta fiziksel gönderi HİÇ oluşmaz.
- * Boot'ta patlayarak yanlış-konfigli üretimi engelle.
+ * Boot'ta patlayarak yanlış-konfigli üretimi engelle. Bu kural CANLI dağıtım
+ * içindir; staging (APP_ENV=staging) UAT'ta taşıyıcıyı bilerek sahteler.
  */
 export function resolveSuratCarrierClient(
   config: ConfigService,
@@ -53,12 +55,18 @@ export function resolveSuratCarrierClient(
     );
   }
 
-  const isProduction =
-    (config.get<string>("NODE_ENV") ?? "").trim() === "production";
+  // Canlı dağıtım: optimize build VE APP_ENV staging değil (fail-closed — APP_ENV
+  // yoksa canlı sayılır). Staging aynı build'i koşar ama UAT için taşıyıcıyı
+  // bilinçli olarak sahteleyebilir (docs/UAT.md); env doğrulaması orada yalnız
+  // 'rest' ya da 'stub'a izin verir.
+  const isLiveProduction = isLiveDeployment(
+    config.get<string>("NODE_ENV"),
+    config.get<string>("APP_ENV"),
+  );
   const cargoEnabled = ["true", "1"].includes(
     (config.get<string>("SURAT_CARGO_ENABLED", "false") ?? "").trim(),
   );
-  if (isProduction && cargoEnabled && mode !== "rest") {
+  if (isLiveProduction && cargoEnabled && mode !== "rest") {
     throw new Error(
       `FATAL: SURAT_CARGO_ENABLED=true ancak SURAT_SOAP_MODE gerçek bir ` +
         `taşıyıcı moduna ayarlı değil (mevcut="${mode}"). Production'da ` +

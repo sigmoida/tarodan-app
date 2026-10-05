@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { SMS_VERIFICATION_CODE_PATTERN } from "./sms";
 
 /**
  * Startup environment validation (issues #62 + #68).
@@ -145,6 +146,9 @@ const envSchema = z
     NETGSM_PASSWORD: z.string().optional(),
     NETGSM_MSGHEADER: z.string().optional(),
     NETGSM_BASE_URL: z.string().optional(),
+    // UAT: telefon doğrulama kodunu sabitler ve SMS göndermez (config/sms.ts).
+    // Canlı dağıtımda (APP_ENV=production) verilirse açılış durur — aşağıda.
+    SMS_FIXED_VERIFICATION_CODE: z.string().optional(),
 
     // eLogo — when enabled in production it must use the live SOAP client.
     ELOGO_ENABLED: z.string().optional(),
@@ -187,6 +191,26 @@ const envSchema = z
   })
   .strip()
   .superRefine((env, ctx) => {
+    // Sabit SMS kodu NODE_ENV'den bağımsız denetlenir: canlı dağıtımda tek bir
+    // değer bile herkesin telefonunu tek kodla doğrulanabilir kılar.
+    const smsFixedCode = env.SMS_FIXED_VERIFICATION_CODE?.trim() ?? "";
+    if (smsFixedCode && !SMS_VERIFICATION_CODE_PATTERN.test(smsFixedCode)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["SMS_FIXED_VERIFICATION_CODE"],
+        message:
+          "SMS_FIXED_VERIFICATION_CODE must be exactly 6 digits (the verify endpoint accepts nothing else)",
+      });
+    }
+    if (smsFixedCode && env.APP_ENV === "production") {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["SMS_FIXED_VERIFICATION_CODE"],
+        message:
+          "SMS_FIXED_VERIFICATION_CODE must not be set on the production deployment (every phone would verify with one known code)",
+      });
+    }
+
     if (env.NODE_ENV !== "production") return;
 
     if (!env.APP_ENV) {
@@ -474,45 +498,57 @@ const envSchema = z
       });
     }
     if (cargoEnabled) {
-      if ((env.SURAT_SOAP_MODE ?? "").trim().toLowerCase() !== "rest") {
+      const suratMode = (env.SURAT_SOAP_MODE ?? "").trim().toLowerCase();
+      // UAT: staging taşıyıcıyı tamamen sahteleyebilir ('stub'). Gönderi yerelde
+      // sahte takip koduyla açılır, Sürat'a hiçbir çağrı gitmez; koliyi ileri
+      // götüren dış olayı (kabul, teslim) tester Test Araçları'ndan tetikler
+      // (docs/UAT.md). Kimlik ve test-modu şartları yalnız gerçek REST
+      // istemcisi içindir. Canlıda stub ASLA kabul edilmez.
+      const stagingStubCargo = isStagingDeployment && suratMode === "stub";
+      if (suratMode !== "rest" && !stagingStubCargo) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
           path: ["SURAT_SOAP_MODE"],
-          message:
-            "SURAT_SOAP_MODE must be 'rest' in production when SURAT_CARGO_ENABLED is set (only the documented REST create + tracking contract is supported)",
+          message: isStagingDeployment
+            ? "SURAT_SOAP_MODE must be 'rest' (Sürat test host) or 'stub' (no carrier calls, UAT) on staging when SURAT_CARGO_ENABLED is set"
+            : "SURAT_SOAP_MODE must be 'rest' in production when SURAT_CARGO_ENABLED is set (only the documented REST create + tracking contract is supported)",
         });
       }
-      const cargoTestMode = (env.SURAT_KARGO_TEST_MODE ?? "")
-        .trim()
-        .toLowerCase();
-      if (isProductionDeployment && cargoTestMode !== "false") {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          path: ["SURAT_KARGO_TEST_MODE"],
-          message:
-            "SURAT_KARGO_TEST_MODE must be 'false' in production when SURAT_CARGO_ENABLED is set; test mode does not create live shipments",
-        });
-      } else if (
-        isStagingDeployment &&
-        !["true", "1"].includes(cargoTestMode)
-      ) {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          path: ["SURAT_KARGO_TEST_MODE"],
-          message:
-            "SURAT_KARGO_TEST_MODE must be enabled in staging to prevent live shipments",
-        });
-      }
-      for (const key of [
-        "SURAT_KARGO_CARI_KODU",
-        "SURAT_KARGO_SIFRE",
-      ] as const) {
-        if (!env[key]) {
+      // Sahte taşıyıcı ağa çıkmaz: test-modu ve kimlik şartı yalnız gerçek
+      // REST istemcisi içindir.
+      if (!stagingStubCargo) {
+        const cargoTestMode = (env.SURAT_KARGO_TEST_MODE ?? "")
+          .trim()
+          .toLowerCase();
+        if (isProductionDeployment && cargoTestMode !== "false") {
           ctx.addIssue({
             code: z.ZodIssueCode.custom,
-            path: [key],
-            message: `${key} is required in production when SURAT_CARGO_ENABLED is set`,
+            path: ["SURAT_KARGO_TEST_MODE"],
+            message:
+              "SURAT_KARGO_TEST_MODE must be 'false' in production when SURAT_CARGO_ENABLED is set; test mode does not create live shipments",
           });
+        } else if (
+          isStagingDeployment &&
+          !["true", "1"].includes(cargoTestMode)
+        ) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: ["SURAT_KARGO_TEST_MODE"],
+            message:
+              "SURAT_KARGO_TEST_MODE must be enabled in staging to prevent live shipments",
+          });
+        }
+        for (const key of [
+          "SURAT_KARGO_CARI_KODU",
+          "SURAT_KARGO_SIFRE",
+        ] as const) {
+          if (!env[key]) {
+            ctx.addIssue({
+              code: z.ZodIssueCode.custom,
+              path: [key],
+              message: `${key} is required in production when SURAT_CARGO_ENABLED is set`,
+            });
+          }
         }
       }
       const createApiVersion = (env.SURAT_CREATE_API_VERSION ?? "")
@@ -527,8 +563,8 @@ const envSchema = z
         });
       }
       // GonderiOlustur FirmaId olmadan her çağrıda reddeder; boot'ta yakala,
-      // her gönderide değil.
-      if (createApiVersion === "v2") {
+      // her gönderide değil. Sahte taşıyıcıda create sözleşmesi devreye girmez.
+      if (createApiVersion === "v2" && !stagingStubCargo) {
         const firmaId = Number((env.SURAT_FIRMA_ID ?? "").trim());
         if (!Number.isInteger(firmaId) || firmaId <= 0) {
           ctx.addIssue({
@@ -551,12 +587,15 @@ const envSchema = z
     // NetGSM OTP: bu üçü eksikse sağlayıcı mock'a düşer, kodu log'a yazar ve
     // BAŞARILI döner. Kullanıcı "kod gönderildi" görür, SMS hiç gelmez ve telefon
     // doğrulaması canlıda sessizce ölür — bu yüzden production'da zorunlu.
+    // İstisna: staging'de sabit kod modu açıksa SMS hiç gönderilmez (UAT), o
+    // yüzden NetGSM kimliği istenmez. Canlıda sabit kod yukarıda zaten yasak.
+    const smsDispatchSkipped = isStagingDeployment && Boolean(smsFixedCode);
     for (const key of [
       "NETGSM_USERCODE",
       "NETGSM_PASSWORD",
       "NETGSM_MSGHEADER",
     ] as const) {
-      if (!env[key]?.trim()) {
+      if (!smsDispatchSkipped && !env[key]?.trim()) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
           path: [key],

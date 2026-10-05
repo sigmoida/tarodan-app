@@ -51,6 +51,28 @@ describe("resolveSuratCarrierClient — stub fail-fast + mode seçimi", () => {
     );
   });
 
+  it("APP_ENV=production + cargo AÇIK + stub → FATAL (canlı açıkça söylenmiş)", () => {
+    const config = makeConfig({
+      NODE_ENV: "production",
+      APP_ENV: "production",
+      SURAT_CARGO_ENABLED: "true",
+      SURAT_SOAP_MODE: "stub",
+    });
+    expect(() => resolveSuratCarrierClient(config)).toThrow(/FATAL/);
+  });
+
+  it("staging (APP_ENV=staging) + cargo AÇIK + stub → izin ver (UAT, taşıyıcı sahte)", () => {
+    const config = makeConfig({
+      NODE_ENV: "production",
+      APP_ENV: "staging",
+      SURAT_CARGO_ENABLED: "true",
+      SURAT_SOAP_MODE: "stub",
+    });
+    expect(resolveSuratCarrierClient(config)).toBeInstanceOf(
+      StubSuratSoapClient,
+    );
+  });
+
   it("non-production + cargo AÇIK + stub → izin ver (dev/test)", () => {
     const config = makeConfig({
       NODE_ENV: "development",
