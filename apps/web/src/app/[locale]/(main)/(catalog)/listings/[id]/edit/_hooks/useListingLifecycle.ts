@@ -5,7 +5,7 @@ import { useMutation } from "@tanstack/react-query";
 import type { UseFormReturn } from "react-hook-form";
 import toast from "react-hot-toast";
 import { useTranslations } from "next-intl";
-import { listingsApi, api } from "@/lib/api";
+import { listingsApi, type ListingRemovalPayload } from "@/lib/api";
 import { useAuthStore } from "@/stores/authStore";
 import type { EditListingValues } from "@tarodan/listing-form";
 
@@ -26,6 +26,8 @@ export function useListingLifecycle({
 
   const [reactivateQuantity, setReactivateQuantity] = useState("1");
   const [showDeleteModal, setShowDeleteModal] = useState(false);
+  // Pasife alma da silme gibi önce nedeni sorar (ListingRemovalModal).
+  const [showDeactivateModal, setShowDeactivateModal] = useState(false);
 
   const status = form.watch("status");
   const quantity = form.watch("quantity");
@@ -76,13 +78,15 @@ export function useListingLifecycle({
   };
 
   const deactivateMutation = useMutation({
-    mutationFn: () => listingsApi.update(id, { status: "inactive" } as any),
+    mutationFn: (removal: ListingRemovalPayload) =>
+      listingsApi.deactivate(id, removal),
     onMutate: () => {
       setIsLoading(true);
     },
     onSuccess: () => {
       form.setValue("status", "inactive");
       toast.success(t("product.listingDeactivated"));
+      setShowDeactivateModal(false);
     },
     onError: (error: any) => {
       toast.error(error.response?.data?.message || t("common.operationFailed"));
@@ -92,7 +96,8 @@ export function useListingLifecycle({
     },
   });
 
-  const handleDeactivate = () => deactivateMutation.mutate();
+  const handleDeactivate = (removal: ListingRemovalPayload) =>
+    deactivateMutation.mutate(removal);
 
   // Satıcı doğrudan aktifleştiremez: istek admin onayına (pending) gider.
   const activateMutation = useMutation({
@@ -115,11 +120,14 @@ export function useListingLifecycle({
   const handleActivate = () => activateMutation.mutate();
 
   const deleteMutation = useMutation({
-    mutationFn: () => api.delete(`/products/${id}`),
+    mutationFn: (removal: ListingRemovalPayload) =>
+      listingsApi.delete(id, removal),
     onMutate: () => {
       setIsLoading(true);
     },
     onSuccess: async () => {
+      // Dialog yalnız başarıda kapanır: reddedilen istekte seçilen neden kaybolmaz.
+      setShowDeleteModal(false);
       toast.success(t("product.listingRemoved"));
       // Refresh user data to update listing count
       await refreshUserData();
@@ -132,11 +140,11 @@ export function useListingLifecycle({
     },
     onSettled: () => {
       setIsLoading(false);
-      setShowDeleteModal(false);
     },
   });
 
-  const handleDelete = () => deleteMutation.mutate();
+  const handleDelete = (removal: ListingRemovalPayload) =>
+    deleteMutation.mutate(removal);
 
   const reactivating = reactivateMutation.isPending;
 
@@ -146,6 +154,10 @@ export function useListingLifecycle({
     reactivating,
     showDeleteModal,
     setShowDeleteModal,
+    showDeactivateModal,
+    setShowDeactivateModal,
+    deleting: deleteMutation.isPending,
+    deactivating: deactivateMutation.isPending,
     handleReactivate,
     handleDeactivate,
     handleActivate,
