@@ -5595,7 +5595,26 @@
           "channelRequired": "En az bir kanal seçin",
           "userIdRequired": "En az bir kullanıcı ID girin",
           "scheduleFuture": "Gönderim zamanı gelecekte olmalı",
-          "scheduleRequired": "Gönderim tarihi ve saati zorunludur"
+          "scheduleRequired": "Gönderim tarihi ve saati zorunludur",
+          "emailSubjectRequired": "E-posta konusu zorunludur",
+          "emailSubjectMax": "E-posta konusu en fazla 240 karakter olabilir",
+          "emailHtmlRequired": "E-posta içeriği zorunludur",
+          "emailHtmlMax": "E-posta içeriği en fazla 200.000 karakter olabilir"
+        },
+        "pushTextTitle": "Push ve uygulama içi metin",
+        "emailSectionTitle": "E-posta",
+        "emailSubjectPlaceholder": "Alıcıların göreceği konu satırı",
+        "emailHtmlPlaceholder": "E-posta gövdesini HTML olarak yazın (link, görsel, tablo ve satır içi stil desteklenir)",
+        "emailPreviewEmpty": "Önizlemeyi görmek için e-posta HTML'ini yazın",
+        "htmlEmailBadge": "HTML e-posta",
+        "contentColumn": "E-posta",
+        "recipientCount": "{total} kullanıcıdan {count} kişiye ulaşır",
+        "mailingType": {
+          "label": "Gönderim türü",
+          "announcement": "Duyuru",
+          "marketing": "Pazarlama",
+          "announcementHint": "Pazarlama iznine bakılmaksızın kitledeki herkese gider.",
+          "marketingHint": "Yalnızca pazarlama e-postası almayı kabul eden kullanıcılara, abonelikten çıkış linkiyle gider."
         }
       },
       "pages": {
@@ -10336,6 +10355,7 @@
         "targetUserNotFound": "Hedef kullanıcı bulunamadı",
         "sendFailed": "Bildirim gönderilemedi",
         "scheduleInFuture": "Zamanlama tarihi gelecekte olmalıdır",
+        "emailHtmlEmpty": "E-posta HTML'i güvensiz işaretlemeler çıkarıldıktan sonra kullanılabilir içerik barındırmıyor",
         "scheduledNotFound": "Zamanlanmış bildirim bulunamadı"
       },
       "payment": {

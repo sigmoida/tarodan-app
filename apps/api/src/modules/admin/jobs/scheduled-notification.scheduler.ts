@@ -9,6 +9,8 @@ import { registerRepeatableCron } from "../../../monitoring/bull-cron.helper";
 import { QUEUE_NAMES } from "../../../workers/constants";
 import { PrismaService } from "../../../prisma";
 import { AdminService } from "../admin.service";
+import { audienceUserWhere } from "../ops/notification-audience";
+import type { MailingType } from "@tarodan/types";
 
 @Injectable()
 export class ScheduledNotificationScheduler implements OnModuleInit {
@@ -92,25 +94,15 @@ export class ScheduledNotificationScheduler implements OnModuleInit {
 
           if (notification.targetType === "user_ids") {
             userIds = (notification.targetData as string[]) || [];
-          } else if (notification.targetType === "all") {
+          } else if (
+            notification.targetType === "all" ||
+            notification.targetType === "segment"
+          ) {
             const users = await this.prisma.user.findMany({
-              where: { isBanned: false },
-              select: { id: true },
-            });
-            userIds = users.map((u) => u.id);
-          } else if (notification.targetType === "segment") {
-            const criteria = notification.targetData as Record<string, any>;
-            const where: any = { isBanned: false };
-
-            if (criteria?.isSeller !== undefined) {
-              where.isSeller = criteria.isSeller;
-            }
-            if (criteria?.membershipTier) {
-              where.membership = { tier: { type: criteria.membershipTier } };
-            }
-
-            const users = await this.prisma.user.findMany({
-              where,
+              where: audienceUserWhere(
+                notification.targetType,
+                notification.targetData as Record<string, any> | null,
+              ),
               select: { id: true },
             });
             userIds = users.map((u) => u.id);
@@ -141,6 +133,10 @@ export class ScheduledNotificationScheduler implements OnModuleInit {
             targetType: "user_ids",
             userIds,
             data: undefined,
+            // Zamanlanırken saklanan e-posta içeriği ve tür aynen taşınır.
+            emailSubject: notification.emailSubject ?? undefined,
+            emailHtml: notification.emailHtml ?? undefined,
+            mailingType: notification.mailingType as MailingType,
           });
 
           // Mark as sent

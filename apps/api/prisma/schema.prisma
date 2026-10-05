@@ -3540,6 +3540,12 @@ model ScheduledNotification {
   targetType   String    @map("target_type")
   targetData   Json?     @map("target_data")
   scheduledFor DateTime  @map("scheduled_for")
+  // E-postaya özel içerik (HTML kanalı seçildiyse): konu + SÜZÜLMÜŞ HTML.
+  // Boşsa e-posta eski yolla push başlığı/metninden üretilir.
+  emailSubject String?   @map("email_subject")
+  emailHtml    String?   @map("email_html") @db.Text
+  // "announcement" | "marketing" — pazarlama yalnız izinli kullanıcılara gider.
+  mailingType  String    @default("announcement") @map("mailing_type")
   status       String    @default("pending")
   sentAt       DateTime? @map("sent_at")
   sentCount    Int       @default(0) @map("sent_count")

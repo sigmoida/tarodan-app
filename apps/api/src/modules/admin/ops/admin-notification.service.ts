@@ -23,6 +23,55 @@ import {
   errorStack,
 } from "../../../common/helpers/error-message";
 import { i18nMessage } from "../../i18n";
+import { NewsletterService } from "../../marketing/newsletter.service";
+import { audienceUserWhere } from "./notification-audience";
+import { sanitizeEmailHtml } from "../../../common/helpers/email-html-sanitizer";
+import {
+  buildBroadcastEmail,
+  isMarketingMailing,
+  newsletterUnsubscribeUrl,
+} from "../../../common/helpers/broadcast-email";
+import {
+  DEFAULT_MAILING_TYPE,
+  type MailingType,
+} from "@tarodan/types";
+
+/** Yayının hedef + e-posta alanları; anında ve zamanlanmış gönderim ortak kullanır. */
+export interface AdminBroadcastInput {
+  title: string;
+  body: string;
+  channels: string[];
+  targetType: "all" | "segment" | "user_ids";
+  userIds?: string[];
+  segmentCriteria?: Record<string, any>;
+  data?: Record<string, any>;
+  emailSubject?: string;
+  emailHtml?: string;
+  mailingType?: MailingType;
+}
+
+export interface PreviewBroadcastEmailInput {
+  title: string;
+  body: string;
+  emailSubject?: string;
+  emailHtml?: string;
+  mailingType?: MailingType;
+}
+
+export interface AudienceCountInput {
+  targetType: "all" | "segment" | "user_ids";
+  userIds?: string[];
+  segmentCriteria?: Record<string, any>;
+}
+
+/**
+ * Zamanlanmış satırı liste yanıtına çevirir: büyük HTML gövdesi tabloya
+ * taşınmaz, yalnız "HTML e-postası var" bilgisi gider.
+ */
+function toScheduledListRow<T extends { emailHtml?: string | null }>(row: T) {
+  const { emailHtml, ...rest } = row;
+  return { ...rest, hasEmailHtml: Boolean(emailHtml) };
+}
 
 /**
  * Bildirim admin operasyonları (geçmiş, toplu gönderim, zamanlama) —
@@ -37,7 +86,70 @@ export class AdminNotificationService {
     private readonly prisma: PrismaService,
     private readonly eventService: EventService,
     private readonly audit: AdminAuditService,
+    private readonly newsletter: NewsletterService,
   ) {}
+
+  /**
+   * E-posta alanlarını normalleştirir. HTML SUNUCUDA süzülür (istemciye
+   * güvenilmez); verilmişse ama süzülünce boş kalıyorsa (yalnız script vb.)
+   * sessizce düz metne düşmek yerine istek reddedilir.
+   */
+  private normalizeEmailContent(dto: {
+    emailSubject?: string;
+    emailHtml?: string;
+    mailingType?: MailingType;
+  }) {
+    const rawHtml = dto.emailHtml?.trim();
+    const emailHtml = rawHtml ? sanitizeEmailHtml(rawHtml) : undefined;
+    if (rawHtml && !emailHtml) {
+      throw new BadRequestException(
+        i18nMessage("server.admin.notification.emailHtmlEmpty"),
+      );
+    }
+    return {
+      emailSubject: dto.emailSubject?.trim() || undefined,
+      emailHtml,
+      mailingType: dto.mailingType ?? DEFAULT_MAILING_TYPE,
+    };
+  }
+
+  /**
+   * Önizleme: gönderimle AYNI üretici (`buildBroadcastEmail`) — süzülmüş,
+   * iskeletli, pazarlamada çıkış linkli hâli döner.
+   */
+  previewBroadcastEmail(dto: PreviewBroadcastEmailInput) {
+    const content = this.normalizeEmailContent(dto);
+    return buildBroadcastEmail({
+      title: dto.title,
+      body: dto.body,
+      emailSubject: content.emailSubject,
+      emailHtml: content.emailHtml,
+      to: "ornek@tarodan.com.tr",
+      unsubscribeUrl: isMarketingMailing(content.mailingType)
+        ? newsletterUnsubscribeUrl("onizleme")
+        : undefined,
+    });
+  }
+
+  /**
+   * Kitle sayacı: `total` duyurunun, `marketing` pazarlama e-postasının
+   * ulaşacağı kullanıcı sayısı (izin bayrağı açık olanlar). Abonelik
+   * tablosundaki ayrı çıkış kayıtları sayıya dahil değildir; gönderimde
+   * onlar da atlanır, yani gerçek sayı bundan biraz düşük olabilir.
+   */
+  async countAudience(dto: AudienceCountInput) {
+    const where: Prisma.UserWhereInput =
+      dto.targetType === "user_ids"
+        ? { id: { in: dto.userIds ?? [] }, isBanned: false }
+        : audienceUserWhere(dto.targetType, dto.segmentCriteria);
+    const [total, marketing] = await Promise.all([
+      this.prisma.user.count({ where }),
+      this.prisma.user.count({
+        where: { ...where, acceptsMarketingEmails: true },
+      }),
+    ]);
+    return { total, marketing };
+  }
 
   // ==================== NOTIFICATION MANAGEMENT ====================
 
@@ -140,19 +252,11 @@ export class AdminNotificationService {
   /**
    * Send notification to users
    */
-  async sendNotification(
-    adminId: string,
-    dto: {
-      title: string;
-      body: string;
-      channels: string[];
-      targetType: "all" | "segment" | "user_ids";
-      userIds?: string[];
-      segmentCriteria?: Record<string, any>;
-      data?: Record<string, any>;
-    },
-  ) {
+  async sendNotification(adminId: string, dto: AdminBroadcastInput) {
     let targetUserIds: string[] = [];
+    const emailContent = this.normalizeEmailContent(dto);
+    const sendsEmail = dto.channels.includes("email");
+    const isMarketing = isMarketingMailing(emailContent.mailingType);
 
     // ADMIN_BROADCAST serbest link taşır (harita: free("link")). DTO kapısına
     // (SafeNotificationLinkData) ek olarak burada da süzülür: bu servis iç
@@ -173,24 +277,12 @@ export class AdminNotificationService {
     try {
       if (dto.targetType === "user_ids") {
         targetUserIds = dto.userIds || [];
-      } else if (dto.targetType === "all") {
+      } else if (
+        dto.targetType === "all" ||
+        (dto.targetType === "segment" && dto.segmentCriteria)
+      ) {
         const users = await this.prisma.user.findMany({
-          where: { isBanned: false },
-          select: { id: true },
-        });
-        targetUserIds = users.map((u) => u.id);
-      } else if (dto.targetType === "segment" && dto.segmentCriteria) {
-        const where: Prisma.UserWhereInput = { isBanned: false };
-        if (dto.segmentCriteria.isSeller !== undefined) {
-          where.isSeller = dto.segmentCriteria.isSeller;
-        }
-        if (dto.segmentCriteria.membershipTier) {
-          where.membership = {
-            tier: { type: dto.segmentCriteria.membershipTier as any },
-          };
-        }
-        const users = await this.prisma.user.findMany({
-          where,
+          where: audienceUserWhere(dto.targetType, dto.segmentCriteria),
           select: { id: true },
         });
         targetUserIds = users.map((u) => u.id);
@@ -201,6 +293,25 @@ export class AdminNotificationService {
           i18nMessage("server.admin.notification.targetUserNotFound"),
         );
       }
+
+      // Pazarlama e-postası: yalnız izni açık, çıkmamış üyeler (+ çıkış token'ı).
+      // Duyuruda harita yok → herkese gider (eski davranış).
+      const marketingTokens =
+        sendsEmail && isMarketing
+          ? await this.newsletter.resolveMarketingUnsubscribeTokens(
+              targetUserIds,
+            )
+          : undefined;
+      // Geçmişte "gönderildi" satırı yalnız gerçekten e-posta gidenlere yazılır.
+      const emailRecipientCount = sendsEmail
+        ? (marketingTokens?.size ?? targetUserIds.length)
+        : 0;
+      // Geçmiş listesinde "HTML e-postası" rozeti için e-posta satırlarının işareti.
+      const emailRowData = {
+        ...data,
+        mailingType: emailContent.mailingType,
+        ...(emailContent.emailHtml && { hasHtmlEmail: true }),
+      };
 
       // Create notification logs - always include in_app for user visibility
       const notificationLogs: Array<{
@@ -229,17 +340,31 @@ export class AdminNotificationService {
 
         // Create entries for other selected channels (for tracking/audit)
         for (const channel of dto.channels) {
-          if (channel !== "in_app") {
+          if (channel === "in_app") continue;
+          if (channel === "email") {
+            if (marketingTokens && !marketingTokens.has(userId)) continue;
             notificationLogs.push({
               userId,
               channel,
               type: "admin_broadcast",
+              // Başlık push ile aynı kalır: aşağıdaki "sent" güncellemesi
+              // satırları (title, body) ile eşler.
               title: dto.title,
               body: dto.body,
-              data,
+              data: emailRowData,
               status: "pending",
             });
+            continue;
           }
+          notificationLogs.push({
+            userId,
+            channel,
+            type: "admin_broadcast",
+            title: dto.title,
+            body: dto.body,
+            data,
+            status: "pending",
+          });
         }
       }
 
@@ -262,6 +387,9 @@ export class AdminNotificationService {
         channels: dto.channels,
         // Süzülmüş data: push payload'ına da ham link sızmasın.
         data,
+        emailSubject: emailContent.emailSubject,
+        emailHtml: emailContent.emailHtml,
+        marketingUnsubscribeTokens: marketingTokens,
       });
 
       // Update the logs we created to 'sent' status since we just emitted them
@@ -291,6 +419,9 @@ export class AdminNotificationService {
           channels: dto.channels,
           title: dto.title,
           targetType: dto.targetType,
+          mailingType: emailContent.mailingType,
+          hasHtmlEmail: Boolean(emailContent.emailHtml),
+          emailRecipientCount,
         },
       );
 
@@ -302,6 +433,7 @@ export class AdminNotificationService {
         success: true,
         targetCount: targetUserIds.length,
         channels: dto.channels,
+        emailRecipientCount,
         message: `Bildirim ${targetUserIds.length} kullanıcıya gönderildi`,
       };
     } catch (error) {
@@ -321,15 +453,7 @@ export class AdminNotificationService {
    */
   async scheduleNotification(
     adminId: string,
-    dto: {
-      title: string;
-      body: string;
-      channels: string[];
-      targetType: "all" | "segment" | "user_ids";
-      userIds?: string[];
-      segmentCriteria?: Record<string, any>;
-      scheduledFor: string;
-    },
+    dto: AdminBroadcastInput & { scheduledFor: string },
   ) {
     const scheduledDate = new Date(dto.scheduledFor);
     if (scheduledDate <= new Date()) {
@@ -337,11 +461,17 @@ export class AdminNotificationService {
         i18nMessage("server.admin.notification.scheduleInFuture"),
       );
     }
+    // Süzülmüş HTML saklanır: zamanlanmış gönderim, anındakiyle aynı içeriği
+    // taşır ve gönderim anında bir daha ham girdiye güvenilmez.
+    const emailContent = this.normalizeEmailContent(dto);
 
     const scheduled = await this.prisma.scheduledNotification.create({
       data: {
         title: dto.title,
         body: dto.body,
+        emailSubject: emailContent.emailSubject,
+        emailHtml: emailContent.emailHtml,
+        mailingType: emailContent.mailingType,
         channels: dto.channels,
         targetType: dto.targetType,
         targetData:
@@ -360,14 +490,14 @@ export class AdminNotificationService {
       "ScheduledNotification",
       scheduled.id,
       null,
-      scheduled,
+      toScheduledListRow(scheduled),
     );
 
     this.logger.log(
       `Notification scheduled for ${dto.scheduledFor} by admin ${adminId}`,
     );
 
-    return scheduled;
+    return toScheduledListRow(scheduled);
   }
 
   /**
@@ -393,11 +523,12 @@ export class AdminNotificationService {
 
     if (query.sortBy === "channels") {
       const rows = await this.prisma.scheduledNotification.findMany({ where });
-      return paginateComputedRows(
+      const sorted = paginateComputedRows(
         rows,
         (notification) => notification.channels.join(", "),
         { ...query, sortType: "text" },
       );
+      return { ...sorted, data: sorted.data.map(toScheduledListRow) };
     }
 
     const orderBy =
@@ -406,11 +537,17 @@ export class AdminNotificationService {
         query,
         { defaultSort: { scheduledFor: "asc" } },
       );
-    return paginate(
+    const page = await paginate(
       this.prisma.scheduledNotification,
       { where, orderBy },
       query,
     );
+    return {
+      ...page,
+      data: (page.data as Array<{ emailHtml?: string | null }>).map(
+        toScheduledListRow,
+      ),
+    };
   }
 
   /**
@@ -443,8 +580,8 @@ export class AdminNotificationService {
       "notification_cancel",
       "ScheduledNotification",
       notificationId,
-      existing,
-      updated,
+      toScheduledListRow(existing),
+      toScheduledListRow(updated),
     );
 
     return { success: true };
