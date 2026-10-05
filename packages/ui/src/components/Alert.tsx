@@ -20,13 +20,19 @@ const alertVariants = cva('relative w-full rounded-lg border p-4', {
 export interface AlertProps
   extends React.HTMLAttributes<HTMLDivElement>,
     VariantProps<typeof alertVariants> {
-  title?: string;
+  /** Plain text or rich content (e.g. text with an inline badge). */
+  title?: React.ReactNode;
   icon?: React.ReactNode;
   onClose?: () => void;
+  /** Rendered below the body — typically buttons. */
+  action?: React.ReactNode;
 }
 
 export const Alert = React.forwardRef<HTMLDivElement, AlertProps>(
-  ({ className, variant, title, icon, onClose, children, ...props }, ref) => {
+  (
+    { className, variant, title, icon, onClose, action, children, ...props },
+    ref,
+  ) => {
     return (
       <div
         ref={ref}
@@ -43,6 +49,11 @@ export const Alert = React.forwardRef<HTMLDivElement, AlertProps>(
               </h5>
             )}
             <div className="text-sm [&_p]:leading-relaxed">{children}</div>
+            {action && (
+              <div className="mt-3 flex flex-wrap items-center gap-2">
+                {action}
+              </div>
+            )}
           </div>
           {onClose && (
             <button
