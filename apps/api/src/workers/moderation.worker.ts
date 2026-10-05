@@ -18,6 +18,7 @@ import { notifyWebRevalidate } from "../common/helpers/revalidate";
 import { NotificationService } from "../modules/notification/notification.service";
 import { NotificationType } from "../modules/notification/dto";
 import { CommissionRuleGuardService } from "../modules/commission/commission-rule-guard.service";
+import { stampApprovedContentFingerprint } from "../modules/product/helpers/product-content-fingerprint";
 import { QUEUE_NAMES } from "./constants";
 import { errorMessage } from "../common/helpers/error-message";
 
@@ -173,6 +174,8 @@ export class ModerationWorker {
         },
       });
       if (res.count > 0) {
+        // Oto-onaylanan içeriğin izi — admin onayıyla aynı kural.
+        await stampApprovedContentFingerprint(this.prisma, productId);
         await this.refreshProductVisibility(productId);
         this.logger.log(`Ürün ${productId} AI ile oto-onaylandı (active)`);
         // Satıcıya "ilanınız yayında" — admin onay yoluyla aynı bildirim.

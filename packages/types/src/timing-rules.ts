@@ -139,7 +139,13 @@ export const TIMING_RULES = {
     max: 365,
     envKey: "LISTING_TTL_DAYS",
     appliesToInProgress: true,
-    ...withLater("deactivate", "auto_renew"),
+    // auto_renew AÇIK: ömrü dolan, hâlâ satılabilir ilan pasife alınmak yerine
+    // yerinde yenilenir (ProductSchedulerService.runExpireOldListings).
+    actions: [
+      { action: "deactivate", available: true },
+      { action: "auto_renew", available: true },
+    ],
+    defaultAction: "deactivate",
   },
   /** İlan süresi dolmadan kaç gün önce satıcı uyarılır. */
   listingExpiryWarningDays: {

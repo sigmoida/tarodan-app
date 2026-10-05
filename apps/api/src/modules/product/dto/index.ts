@@ -3,3 +3,4 @@ export * from './update-product.dto';
 export * from './product-query.dto';
 export * from './product-response.dto';
 export * from './boost.dto';
+export * from './renew-products.dto';
