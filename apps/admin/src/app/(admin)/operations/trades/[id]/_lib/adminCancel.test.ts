@@ -3,7 +3,7 @@ import type { useTranslations } from "next-intl";
 import { ADMIN_CANCEL_NOTE_MAX } from "@tarodan/types";
 import type { TradeDetail, TradeShipment } from "../types";
 import { tradeCancelBlocker, tradeCancelPanelState } from "./adminCancel";
-import { adminCancelTradeSchema } from "./schema";
+import { NO_ADMIN_CANCEL_REASON, adminCancelTradeSchema } from "./schema";
 
 type T = ReturnType<typeof useTranslations<never>>;
 const t = ((key: string) => key) as unknown as T;
@@ -124,10 +124,18 @@ describe("adminCancelTradeSchema", () => {
     );
   });
 
-  it("katalog kodu + boş not geçerlidir", () => {
+  it("katalog kodu + boş not geçerlidir; çıktı yalnız katalog kodunu taşır", () => {
+    const result = schema.safeParse({ reasonCode: "stock_error", note: "" });
+    expect(result.success).toBe(true);
+    expect(result.data?.reasonCode).toBe("stock_error");
+  });
+
+  it("form 'seçilmedi' hâliyle açılır ve öyle gönderilemez", () => {
+    expect(NO_ADMIN_CANCEL_REASON).toBe("");
     expect(
-      schema.safeParse({ reasonCode: "stock_error", note: "" }).success,
-    ).toBe(true);
+      schema.safeParse({ reasonCode: NO_ADMIN_CANCEL_REASON, note: "x" })
+        .success,
+    ).toBe(false);
   });
 
   it("'Diğer'de boş ya da yalnız boşluk not reddedilir", () => {

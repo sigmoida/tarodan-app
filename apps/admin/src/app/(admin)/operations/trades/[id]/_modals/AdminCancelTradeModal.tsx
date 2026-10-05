@@ -10,7 +10,6 @@ import {
 } from "@tarodan/ui/form";
 import {
   ADMIN_CANCEL_NOTE_MAX,
-  type AdminCancelReasonCode,
   type AdminTradeCancelPreview,
 } from "@tarodan/types";
 import { fmtTry } from "@/lib/format";
@@ -18,12 +17,16 @@ import { extractErrorMessage } from "@/lib/error";
 import { adminCancelReasonOptions } from "@/lib/admin-cancel-reasons";
 import { useTradeAdminCancel } from "../_hooks/useTradeAdminCancel";
 import {
+  NO_ADMIN_CANCEL_REASON,
   adminCancelTradeSchema,
   type AdminCancelTradeValues,
 } from "../_lib/schema";
 import type { TradeDetail } from "../types";
 
-const RESET_VALUES: AdminCancelTradeValues = { reasonCode: "", note: "" };
+const RESET_VALUES: AdminCancelTradeValues = {
+  reasonCode: NO_ADMIN_CANCEL_REASON,
+  note: "",
+};
 
 /**
  * Platform (admin) takas iptali: katalog nedeni zorunlu, iç not ("Diğer"de
@@ -55,12 +58,15 @@ export function AdminCancelTradeModal({
       onClose={onClose}
       title={t("admin.operations.trades.adminCancel.title")}
       form={form}
-      onSubmit={(values) =>
+      onSubmit={(values) => {
+        // Şema "seçilmedi"yi reddettiği için buraya ulaşmaz; daraltma tipi
+        // katalog koduna indirir (cast yok).
+        if (values.reasonCode === NO_ADMIN_CANCEL_REASON) return;
         cancel.mutate({
-          reasonCode: values.reasonCode as AdminCancelReasonCode,
+          reasonCode: values.reasonCode,
           note: values.note.trim() || undefined,
-        })
-      }
+        });
+      }}
       isSubmitting={cancel.isPending}
       submitLabel={t("admin.operations.trades.adminCancel.confirm")}
       destructive

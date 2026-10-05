@@ -2,32 +2,41 @@ import { z } from "zod";
 import type { useTranslations } from "next-intl";
 import {
   ADMIN_CANCEL_NOTE_MAX,
+  ADMIN_CANCEL_REASON_CODES,
   isAdminCancelNoteRequired,
-  isAdminCancelReasonCode,
+  type AdminCancelReasonCode,
 } from "@tarodan/types";
 
 type T = ReturnType<typeof useTranslations<never>>;
 
+/** Formda "henüz neden seçilmedi" hâli — select'in boş değeri. */
+export const NO_ADMIN_CANCEL_REASON = "" as const;
+
 /**
  * Platform (admin) takas iptali — katalog kodu zorunlu; iç not opsiyonel ama
  * "Diğer"de zorunlu (kural `@tarodan/types`'ta, API aynı kuralla reddeder).
- * Kod formda metin olarak tutulur; `AdminCancelReasonCode`'a mutationFn'de
- * çevrilir (seçilmemiş hâli boş metindir).
+ *
+ * Girdi tipi "seçilmedi" hâlini (`""`) açıkça taşır; çıktı tipi yalnız katalog
+ * kodudur — doğrulama "seçilmedi"yi reddettiği için neden seçilmeden gönderim
+ * mümkün değildir (`AdminCancelTradeSubmit`).
  */
 export const adminCancelTradeSchema = (t: T) =>
   z
     .object({
-      reasonCode: z.string().refine((value) => isAdminCancelReasonCode(value), {
-        message: t("admin.operations.trades.adminCancel.reasonRequired"),
-      }),
+      reasonCode: z
+        .union([
+          z.literal(NO_ADMIN_CANCEL_REASON),
+          z.enum(ADMIN_CANCEL_REASON_CODES),
+        ])
+        .refine(
+          (value): value is AdminCancelReasonCode =>
+            value !== NO_ADMIN_CANCEL_REASON,
+          { message: t("admin.operations.trades.adminCancel.reasonRequired") },
+        ),
       note: z.string().trim().max(ADMIN_CANCEL_NOTE_MAX),
     })
     .superRefine((values, ctx) => {
-      if (
-        isAdminCancelReasonCode(values.reasonCode) &&
-        isAdminCancelNoteRequired(values.reasonCode) &&
-        !values.note
-      ) {
+      if (isAdminCancelNoteRequired(values.reasonCode) && !values.note) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
           path: ["note"],
@@ -35,7 +44,12 @@ export const adminCancelTradeSchema = (t: T) =>
         });
       }
     });
-export type AdminCancelTradeValues = z.infer<
+/** Form değerleri (girdi): neden seçilmemiş olabilir. */
+export type AdminCancelTradeValues = z.input<
+  ReturnType<typeof adminCancelTradeSchema>
+>;
+/** Doğrulanmış gönderim (çıktı): neden her zaman bir katalog kodudur. */
+export type AdminCancelTradeSubmit = z.output<
   ReturnType<typeof adminCancelTradeSchema>
 >;
 
