@@ -8,7 +8,11 @@ import { PrismaService } from "../../../prisma";
 import { EventService } from "../../events/event.service";
 import { isSafeFreeLink } from "../../notification/helpers/notification-link-safety";
 import { AdminAuditService } from "./admin-audit.service";
-import { Prisma, type NotificationLog } from "@prisma/client";
+import {
+  Prisma,
+  type NotificationLog,
+  type ScheduledNotification,
+} from "@prisma/client";
 import {
   NotificationHistoryQueryDto,
   ScheduledNotificationQueryDto,
@@ -541,9 +545,7 @@ export class AdminNotificationService {
     );
     return {
       ...page,
-      data: (page.data as Array<{ emailHtml?: string | null }>).map(
-        toScheduledListRow,
-      ),
+      data: (page.data as ScheduledNotification[]).map(toScheduledListRow),
     };
   }
 

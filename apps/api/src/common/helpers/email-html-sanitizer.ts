@@ -11,7 +11,9 @@
  * regex süzgeçleri HTML ayrıştırma tuhaflıkları yüzünden atlatılabildiği için
  * ayrıştırıcıya dayanıyoruz.
  */
-import sanitizeHtml from "sanitize-html";
+// `export =` tipli CommonJS paket: varsayılan import interop'u olmadığından
+// çalışma zamanında undefined olurdu.
+import sanitizeHtml = require("sanitize-html");
 import { extractEmailTemplateContent } from "./email-template-renderer";
 
 const ALLOWED_TAGS = [
