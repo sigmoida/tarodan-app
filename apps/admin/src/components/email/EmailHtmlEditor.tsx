@@ -47,7 +47,10 @@ export function EmailHtmlEditor({
   };
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col">
+    // `min-h-0` YOK: kısa pencerede sarmalayıcı, alanın en küçük yüksekliğinin
+    // altına inip alttaki kardeşin (test e-postası satırı) üstüne taşıyordu.
+    // Varsayılan en küçük yükseklik içeriktir; sığmazsa sütun kayar.
+    <div className="flex flex-1 flex-col">
       <div className="mb-1 flex items-center justify-between">
         <span className="text-xs font-medium text-muted">
           {t("admin.marketing.emailTemplates.htmlBody")}
