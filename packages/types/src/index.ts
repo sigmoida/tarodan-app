@@ -108,3 +108,9 @@ export * from "./early-release";
 // Durations & rules registry: every business duration, its bounds and expiry
 // actions (API resolution + validation, admin screen, public policy endpoint)
 export * from "./timing-rules";
+
+// Client-side read of GET /timing-rules: fallback + tolerant parse + ICU values
+export * from "./timing-policy";
+
+// Durations quoted by legal texts: the statements + mismatch check (admin warning)
+export * from "./timing-legal";
