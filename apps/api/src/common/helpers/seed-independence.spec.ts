@@ -27,7 +27,15 @@ const DEMO_MODULES = [
   "./seed-commerce",
   "./seed-media",
 ];
-const PRODUCTION_SEEDS = ["seed-production.ts", "seed-launch.ts"];
+// UAT seed'i ve paylaşılan lansman çekirdeği de demo katmanına bağlanamaz;
+// görselleri `seed-media.ts` ayrı bir adım olarak workflow'dan bağlanır, import
+// edilmez.
+const PRODUCTION_SEEDS = [
+  "seed-production.ts",
+  "seed-launch.ts",
+  "seed-launch-core.ts",
+  "seed-uat.ts",
+];
 
 describe("production seeds are independent of the demo seed", () => {
   it.each(PRODUCTION_SEEDS)("%s imports no demo module", (file) => {
@@ -78,5 +86,25 @@ describe("production seeds are independent of the demo seed", () => {
     expect(source).not.toMatch(
       /\b(?:buyerCommissionRate|sellerCommissionRate|tradeFee\w*)\s*:\s*\d/,
     );
+  });
+
+  it("keeps the UAT seed on the shared launch pieces and behind its guard", () => {
+    const source = read("seed-uat.ts");
+    // Referans veri paylaşılan fonksiyonlardan gelir: kopya yok.
+    expect(source).toContain("seedBusinessConfig(prisma, businessConfig)");
+    expect(source).toContain("seedCatalog(prisma)");
+    expect(source).toContain("seedCommissionRuleSet(prisma, commission)");
+    expect(source).toContain('load<BusinessConfig>("business-config.json")');
+    // Production'da çalışmayı reddeden guard, herhangi bir yazımdan önce.
+    expect(source).toContain("assertUatSeedAllowed(process.env)");
+    const main = source.slice(source.indexOf("async function main"));
+    expect(main.indexOf("assertUatSeedAllowed(process.env)")).toBeGreaterThan(
+      -1,
+    );
+    expect(main.indexOf("assertUatSeedAllowed(process.env)")).toBeLessThan(
+      main.indexOf("seedBusinessConfig("),
+    );
+    // Şifre kaynakta sabit durmaz.
+    expect(source).not.toMatch(/passwordHash:\s*["']/);
   });
 });
