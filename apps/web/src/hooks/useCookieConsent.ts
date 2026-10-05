@@ -4,12 +4,14 @@ import { useCallback, useEffect, useState } from "react";
 import {
   ALL_ACCEPTED,
   DEFAULT_PREFERENCES,
+  getOrCreateVisitorId,
   hasConsent,
   readPreferences,
   saveConsent,
   type CookieCategory,
   type CookiePreferences,
 } from "@/lib/cookieConsent";
+import { consentsApi } from "@/lib/api";
 
 /**
  * Çerez rızası durumu — banner ve /cookies tercih paneli aynı hook'u kullanır,
@@ -33,8 +35,22 @@ export function useCookieConsent() {
   }, []);
 
   const save = useCallback((prefs: CookiePreferences) => {
-    setPreferences(saveConsent(prefs));
+    const saved = saveConsent(prefs);
+    setPreferences(saved);
     setNeedsConsent(false);
+    // KVKK ispat kaydı: sunucu sürümü, IP'yi ve kullanıcı ajanını damgalar;
+    // oturum varsa kaydı üyeye de bağlar. İstemcideki rıza kayıttan bağımsız
+    // geçerlidir — kayıt en iyi çaba.
+    void consentsApi
+      .recordCookiePreferences({
+        visitorId: getOrCreateVisitorId(),
+        preferences: {
+          functional: saved.functional,
+          analytics: saved.analytics,
+          marketing: saved.marketing,
+        },
+      })
+      .catch(() => undefined);
   }, []);
 
   return {
