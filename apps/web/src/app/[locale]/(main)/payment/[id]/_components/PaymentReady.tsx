@@ -51,14 +51,17 @@ export default function PaymentReady({
     async () => ({ paymentId, target }),
     [paymentId, target],
   );
+  // Checkout ile aynı ön koşul: sözleşme onaylanmadan tahsilat başlatılmaz.
+  // Onay ödeme formu isteğiyle sunucuya gider — teklif siparişinin checkout
+  // adımı yok, onayın kaydedildiği yer burası.
+  const [distanceSalesAccepted, setDistanceSalesAccepted] = useState(false);
   const card = useCardPayment({
     purpose,
     cardStorageEnabled,
     resolvePayment,
+    distanceSalesAccepted,
   });
   const { processing, loadingCards, submit } = card;
-  // Checkout ile aynı ön koşul: sözleşme onaylanmadan tahsilat başlatılmaz.
-  const [distanceSalesAccepted, setDistanceSalesAccepted] = useState(false);
 
   return (
     <div className="grid grid-cols-1 gap-8 lg:grid-cols-3">

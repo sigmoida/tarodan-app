@@ -45,6 +45,13 @@ interface UseCardPaymentArgs {
    * `null` döndürmek "iptal" demektir (hata mesajı çözücünün sorumluluğunda).
    */
   resolvePayment: () => Promise<ResolvedPayment | null>;
+  /**
+   * Satın almada mesafeli satış onayı (checkout / ödeme sayfası kutusu).
+   * Ödeme formu isteğiyle gider: checkout adımı olmayan teklif siparişinde
+   * onayın sunucuya ulaştığı TEK yer burasıdır. Üyelik gibi satın alma
+   * olmayan ödemelerde verilmez.
+   */
+  distanceSalesAccepted?: boolean;
 }
 
 /**
@@ -56,6 +63,7 @@ export function useCardPayment({
   purpose,
   cardStorageEnabled,
   resolvePayment,
+  distanceSalesAccepted,
 }: UseCardPaymentArgs) {
   const t = useTranslations();
   const form = useZodForm(newCardSchema(t), { defaultValues: emptyNewCard });
@@ -138,6 +146,9 @@ export function useCardPayment({
         ...resolved.target,
         paymentId: resolved.paymentId,
         ...cardBody,
+        ...(distanceSalesAccepted !== undefined
+          ? { distanceSalesAccepted }
+          : {}),
       };
       const res = await paymentsApi.prepareDirectForm(body);
       const data = res.data;
