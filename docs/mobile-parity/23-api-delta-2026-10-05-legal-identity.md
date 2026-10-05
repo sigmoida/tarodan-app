@@ -112,3 +112,21 @@ Kimliği eksik üye diğer uçları kullanmaya devam eder. Kapıyı istemci uygu
 (onay kapısıyla aynı karar). App Store incelemesi açısından notlar
 `IDENTITY.md` §6 ve PR açıklamasında; ekran metni "neden istiyoruz" sorusunu
 cevaplar (`identity.gate.intro`).
+
+## 5. Query boolean'ları: `=false` artık gerçekten false
+
+Global ValidationPipe'ın örtük dönüşümü yüzünden boolean query parametreleri
+`"false"` değerini `true` okuyordu. Artık yalnız `"true"` `true`'dur;
+`"false"` (ve `"true"` dışındaki her değer) `false`, parametre hiç
+gönderilmezse "filtre yok"tur. Mobili ilgilendiren uçlar:
+
+| Uç                              | Parametreler                                                                                              | `=false` önce        | `=false` şimdi                  |
+| ------------------------------- | --------------------------------------------------------------------------------------------------------- | -------------------- | ------------------------------- |
+| `GET /products`, `/products/my` | `tradeOnly`, `tradeEligible`, `boostedOnly`, `homeShowcase`, `discountOnly`, `preOrder`, `limited`, `set` | filtre uygulanıyordu | filtre yok (gönderilmemiş gibi) |
+| `GET /orders`                   | `refundsOnly`                                                                                             | yalnız iadeler       | tüm siparişler                  |
+| `GET /discounts`                | `isActive`                                                                                                | yalnız aktifler      | yalnız pasifler                 |
+| `GET /discounts`                | `couponsOnly`, `autoOnly`                                                                                 | filtre uygulanıyordu | filtre yok                      |
+
+Web bu parametreleri yalnız `true` iken gönderir; davranışı değişmedi.
+Mobil `=false` gönderiyorsa sonuç değişir. "Filtre kapalı" için parametreyi
+hiç göndermemek her iki sürümde de doğrudur.
