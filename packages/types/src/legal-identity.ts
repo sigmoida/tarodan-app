@@ -103,6 +103,20 @@ export function isValidLegalName(value: string | null | undefined): boolean {
   );
 }
 
+/**
+ * "First Last" — only when BOTH parts are present. A half-filled legal name
+ * (e.g. registration sent only the first name) is not a legal name and must
+ * not outrank a complete name from another source in a report.
+ */
+export function legalFullName(
+  first: string | null | undefined,
+  last: string | null | undefined,
+): string | null {
+  const given = normalizeLegalName(first);
+  const family = normalizeLegalName(last);
+  return given && family ? `${given} ${family}` : null;
+}
+
 // ─── Completeness ────────────────────────────────────────────────────────────
 
 export type LegalIdentityValues = Record<LegalIdentityField, string | null>;

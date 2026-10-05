@@ -10963,7 +10963,9 @@
       "incomplete": "First name, last name and Turkish ID number must all be provided.",
       "correctionNoChange": "There is no change to save.",
       "tooManyAttempts": "Too many attempts. Please try again in {minutes} minutes.",
-      "bankNationalIdMismatch": "The Turkish ID number on the bank account must match the number registered on your account."
+      "bankNationalIdMismatch": "The Turkish ID number on the bank account must match the number registered on your account.",
+      "nationalIdInvalid": "Please enter a valid Turkish ID number.",
+      "correctionNotAllowed": "Identity details of a deleted or staff account cannot be corrected."
     }
   },
   "status": {

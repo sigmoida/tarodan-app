@@ -10963,7 +10963,9 @@
       "incomplete": "Ad, soyad ve T.C. Kimlik Numarası birlikte girilmelidir.",
       "correctionNoChange": "Kaydedilecek bir değişiklik yok.",
       "tooManyAttempts": "Çok fazla deneme yapıldı. Lütfen {minutes} dakika sonra tekrar deneyin.",
-      "bankNationalIdMismatch": "Banka hesabındaki T.C. Kimlik Numarası, hesabınızda kayıtlı numarayla aynı olmalıdır."
+      "bankNationalIdMismatch": "Banka hesabındaki T.C. Kimlik Numarası, hesabınızda kayıtlı numarayla aynı olmalıdır.",
+      "nationalIdInvalid": "Geçerli bir T.C. Kimlik Numarası giriniz.",
+      "correctionNotAllowed": "Silinmiş ya da personel hesabının kimlik bilgileri düzeltilemez."
     }
   },
   "status": {
