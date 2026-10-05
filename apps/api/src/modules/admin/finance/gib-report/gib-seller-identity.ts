@@ -20,9 +20,15 @@ import { hasApprovedCorporateIdentity } from "../../../membership/helpers/member
  * birlikte döner ki personel güvenilirliği yargılayabilsin):
  *
  *   1. Onaylı kurumsal satıcı → firma adı                      (company)
- *   2. Banka hesabı sahibi                                      (bank_account_holder)
- *   3. Varsayılan adresin ad-soyadı (başkasının adı olabilir)   (address)
- *   4. Görünen ad (takma ad olabilir — en zayıf kaynak)         (display_name)
+ *   2. Üyenin beyan ettiği yasal ad-soyad (kimlik kapısı)       (legal_name)
+ *   3. Banka hesabı sahibi                                      (bank_account_holder)
+ *   4. Varsayılan adresin ad-soyadı (başkasının adı olabilir)   (address)
+ *   5. Görünen ad (takma ad olabilir — en zayıf kaynak)         (display_name)
+ *
+ * Kimlik numarası: kurumsalda firmanın vergi no'su (yasal satıcı firmadır);
+ * bireyselde üyenin beyan ettiği TCKN (`User.nationalId`) önce, boşsa eski
+ * zincir (vergi no → banka vergi no → banka TCKN). 2–5 ve bireysel TCKN eski
+ * kaynaklara YALNIZ yeni alan boşken düşer.
  *
  * Silinmiş hesap canlı satırdan DEĞİL kimlik arşivinden çözülür (anonimleştirme
  * adı "Silinmiş Kullanıcı" yapıp VKN'yi siler); arşiv yoksa ad boş kalır —
@@ -35,6 +41,9 @@ export interface GibSellerSource {
   id: string;
   username: string;
   displayName: string;
+  legalFirstName: string | null;
+  legalLastName: string | null;
+  nationalId: string | null;
   companyName: string | null;
   taxId: string | null;
   businessStatus: BusinessStatus | null;
@@ -49,6 +58,8 @@ export interface GibSellerSource {
   addresses: { fullName: string | null }[];
   deletedIdentity: {
     displayName: string | null;
+    legalFirstName: string | null;
+    legalLastName: string | null;
     companyName: string | null;
     taxId: string | null;
     nationalId: string | null;
@@ -62,6 +73,9 @@ export const GIB_SELLER_SELECT = {
   id: true,
   username: true,
   displayName: true,
+  legalFirstName: true,
+  legalLastName: true,
+  nationalId: true,
   companyName: true,
   taxId: true,
   businessStatus: true,
@@ -78,6 +92,8 @@ export const GIB_SELLER_SELECT = {
   deletedIdentity: {
     select: {
       displayName: true,
+      legalFirstName: true,
+      legalLastName: true,
       companyName: true,
       taxId: true,
       nationalId: true,
@@ -117,19 +133,50 @@ function firstFilled(
   return { name: null, source: "none" };
 }
 
-/** Vergi no önce (kurumsalda VKN, bireysel esnafta vergi no), yoksa TCKN. */
+/** Ad-soyad tek metin; ikisi de boşsa null. */
+function fullName(
+  first: string | null | undefined,
+  last: string | null | undefined,
+): string | null {
+  return (
+    [clean(first), clean(last)].filter((part) => part !== null).join(" ") ||
+    null
+  );
+}
+
+type IdentityCandidate = [
+  value: string | null | undefined,
+  kind: GibIdentityKind,
+];
+
+/** İlk dolu numara kazanır; türüyle birlikte. */
 function pickIdentityNumber(
-  taxNumbers: (string | null | undefined)[],
-  tckn: string | null | undefined,
+  candidates: IdentityCandidate[],
 ): Pick<GibSellerIdentity, "identityNumber" | "identityKind"> {
-  for (const taxNumber of taxNumbers) {
-    const value = clean(taxNumber);
-    if (value) return { identityNumber: value, identityKind: "tax_number" };
+  for (const [candidate, kind] of candidates) {
+    const value = clean(candidate);
+    if (value) return { identityNumber: value, identityKind: kind };
   }
-  const nationalId = clean(tckn);
-  return nationalId
-    ? { identityNumber: nationalId, identityKind: "tckn" }
-    : { identityNumber: null, identityKind: null };
+  return { identityNumber: null, identityKind: null };
+}
+
+/**
+ * Kurumsalda firma vergi no'su önce (yasal satıcı firmadır); bireyselde
+ * üyenin beyan ettiği TCKN önce, ardından eski sıra (vergi no → TCKN).
+ */
+function identityCandidates(
+  corporate: boolean,
+  declaredTckn: string | null | undefined,
+  taxNumbers: (string | null | undefined)[],
+  legacyTckn: string | null | undefined,
+): IdentityCandidate[] {
+  const taxes = taxNumbers.map((value): IdentityCandidate => [
+    value,
+    "tax_number",
+  ]);
+  return corporate
+    ? [...taxes, [declaredTckn, "tckn"], [legacyTckn, "tckn"]]
+    : [[declaredTckn, "tckn"], ...taxes, [legacyTckn, "tckn"]];
 }
 
 export function resolveGibSellerIdentity(
@@ -143,6 +190,10 @@ export function resolveGibSellerIdentity(
     const { name, source } = archive
       ? firstFilled([
           [corporate ? archive.companyName : null, "archive_company"],
+          [
+            fullName(archive.legalFirstName, archive.legalLastName),
+            "archive_legal_name",
+          ],
           [archive.bankAccountHolder, "archive_bank_account_holder"],
           [archive.displayName, "archive_display_name"],
         ])
@@ -151,7 +202,15 @@ export function resolveGibSellerIdentity(
       sellerKind: corporate ? "corporate" : "individual",
       sellerDeleted: true,
       membershipDate: seller.createdAt,
-      ...pickIdentityNumber([archive?.taxId], archive?.nationalId),
+      // Arşivin `nationalId`i silme anında zaten üyenin beyanını tercih etti.
+      ...pickIdentityNumber(
+        identityCandidates(
+          corporate,
+          archive?.nationalId,
+          [archive?.taxId],
+          null,
+        ),
+      ),
       legalName: name,
       legalNameSource: source,
       storeName: null,
@@ -162,6 +221,7 @@ export function resolveGibSellerIdentity(
   const corporate = hasApprovedCorporateIdentity(seller);
   const { name, source } = firstFilled([
     [corporate ? seller.companyName : null, "company"],
+    [fullName(seller.legalFirstName, seller.legalLastName), "legal_name"],
     [seller.bankAccount?.accountHolder, "bank_account_holder"],
     [seller.addresses[0]?.fullName, "address"],
     // Anonimleştirilmiş ama `deletedAt`i henüz yazılmamış satır beklenmez; yine
@@ -178,8 +238,12 @@ export function resolveGibSellerIdentity(
     sellerDeleted: false,
     membershipDate: seller.createdAt,
     ...pickIdentityNumber(
-      [seller.taxId, seller.bankAccount?.taxId],
-      seller.bankAccount?.tcKimlikNo,
+      identityCandidates(
+        corporate,
+        seller.nationalId,
+        [seller.taxId, seller.bankAccount?.taxId],
+        seller.bankAccount?.tcKimlikNo,
+      ),
     ),
     legalName: name,
     legalNameSource: source,

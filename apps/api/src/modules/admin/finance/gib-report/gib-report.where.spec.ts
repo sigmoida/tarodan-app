@@ -60,6 +60,10 @@ describe("buildGibReportWhere", () => {
         // Yalnız banka hesabında kimliği olan bireysel satıcı.
         { seller: { bankAccount: { taxId: expect.anything() } } },
         { seller: { bankAccount: { tcKimlikNo: expect.anything() } } },
+        // Üyenin beyan ettiği TCKN ve yasal ad (kimlik kapısı).
+        { seller: { nationalId: expect.anything() } },
+        { seller: { legalLastName: expect.anything() } },
+        { seller: { deletedIdentity: { legalLastName: expect.anything() } } },
       ]),
     );
   });
@@ -79,7 +83,9 @@ describe("buildGibReportWhere", () => {
       expect(live).toMatchObject({ deletedAt: null });
       const parts = live.AND as Record<string, unknown>[];
       expect(parts[0]).toEqual(absent("taxId"));
-      expect(parts[1]).toEqual({
+      // Üyenin beyan ettiği TCKN de boş olmalı.
+      expect(parts[1]).toEqual(absent("nationalId"));
+      expect(parts[2]).toEqual({
         OR: [
           { bankAccount: { is: null } },
           {

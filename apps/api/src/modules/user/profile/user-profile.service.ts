@@ -830,6 +830,12 @@ export class UserProfileService {
               fcmToken: null,
               companyName: null,
               taxId: null,
+              // Yasal kimlik arşive (0. adım) kopyalandı; canlı satırda kalmaz.
+              // TCKN tekil olduğu için NULL'lanması numarayı da serbest bırakır
+              // (e-posta/telefon gibi: aynı kişi yeniden kayıt olabilir).
+              legalFirstName: null,
+              legalLastName: null,
+              nationalId: null,
               acceptsMarketingEmails: false,
               isSeller: false,
               deletedAt: new Date(),
@@ -878,6 +884,9 @@ export class UserProfileService {
         email: true,
         username: true,
         displayName: true,
+        legalFirstName: true,
+        legalLastName: true,
+        nationalId: true,
         phone: true,
         birthDate: true,
         taxId: true,

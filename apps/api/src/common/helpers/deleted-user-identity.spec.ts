@@ -1,6 +1,7 @@
 import {
   ANONYMIZED_DISPLAY_NAME,
   anonymizedEmailFor,
+  archiveLegalFullName,
   computeRetainUntil,
   IDENTITY_RETENTION_YEARS,
   isAnonymizedEmail,
@@ -19,6 +20,9 @@ describe("resolveIdentityFields", () => {
     email: "ahmet@example.com",
     username: "ahmet",
     displayName: "Ahmet Yılmaz",
+    legalFirstName: null,
+    legalLastName: null,
+    nationalId: null,
     phone: "+905551112233",
     birthDate: new Date("1985-06-01T00:00:00Z"),
     taxId: null,
@@ -34,6 +38,53 @@ describe("resolveIdentityFields", () => {
     createdAt: new Date("2024-01-01T00:00:00Z"),
     deletedAt: null,
   };
+
+  it("TCKN'de üyenin beyanı (User.nationalId) banka hesabından ÖNCE gelir", () => {
+    const { values, sourceDetail } = resolveIdentityFields({
+      user: { ...baseUser, nationalId: "10000000146" },
+      bankAccount: {
+        tcKimlikNo: "12345678950",
+        taxId: null,
+        iban: null,
+        accountHolder: null,
+      },
+    });
+
+    expect(values.nationalId).toBe("10000000146");
+    expect(sourceDetail.nationalId).toBe("user");
+  });
+
+  it("üyenin beyanı boşsa eski kaynağa (banka hesabı) düşer", () => {
+    const { values, sourceDetail } = resolveIdentityFields({
+      user: baseUser,
+      bankAccount: {
+        tcKimlikNo: "12345678950",
+        taxId: null,
+        iban: null,
+        accountHolder: null,
+      },
+    });
+
+    expect(values.nationalId).toBe("12345678950");
+    expect(sourceDetail.nationalId).toBe("seller_bank_account");
+  });
+
+  it("yasal ad yalnız üyenin beyanından gelir, görünen addan tahmin edilmez", () => {
+    const declared = resolveIdentityFields({
+      user: {
+        ...baseUser,
+        legalFirstName: "Ahmet Can",
+        legalLastName: "Yılmaz",
+      },
+    });
+    expect(declared.values.legalFirstName).toBe("Ahmet Can");
+    expect(declared.values.legalLastName).toBe("Yılmaz");
+    expect(declared.sourceDetail.legalFirstName).toBe("user");
+
+    const legacy = resolveIdentityFields({ user: baseUser });
+    expect(legacy.values.legalFirstName).toBeNull();
+    expect(legacy.sourceDetail).toHaveProperty("legalLastName", null);
+  });
 
   it("silme anında canlı kullanıcı satırını tercih eder", () => {
     const { values, sourceDetail } = resolveIdentityFields({ user: baseUser });
@@ -242,5 +293,31 @@ describe("anonim e-posta tespiti", () => {
     expect(isAnonymizedEmail(anonymizedEmailFor("abc"))).toBe(true);
     expect(isAnonymizedEmail("ahmet@example.com")).toBe(false);
     expect(isAnonymizedEmail(null)).toBe(false);
+  });
+});
+
+describe("archiveLegalFullName", () => {
+  it("bildirimde yasal ad-soyadı tercih eder, yoksa silme anındaki ada düşer", () => {
+    expect(
+      archiveLegalFullName({
+        legalFirstName: "Ahmet Can",
+        legalLastName: "Yılmaz",
+        displayName: "ahmetcik",
+      }),
+    ).toBe("Ahmet Can Yılmaz");
+    expect(
+      archiveLegalFullName({
+        legalFirstName: null,
+        legalLastName: null,
+        displayName: "Ahmet Yılmaz",
+      }),
+    ).toBe("Ahmet Yılmaz");
+    expect(
+      archiveLegalFullName({
+        legalFirstName: null,
+        legalLastName: null,
+        displayName: null,
+      }),
+    ).toBeNull();
   });
 });

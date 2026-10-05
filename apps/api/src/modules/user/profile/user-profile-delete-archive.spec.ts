@@ -12,6 +12,9 @@ describe("UserProfileService.deleteAccount kimlik arşivi", () => {
     email: "ahmet@example.com",
     username: "ahmet",
     displayName: "Ahmet Yılmaz",
+    legalFirstName: "Ahmet Can",
+    legalLastName: "Yılmaz",
+    nationalId: "10000000146",
     phone: "+905551112233",
     birthDate: null,
     taxId: "1234567890",
@@ -105,7 +108,7 @@ describe("UserProfileService.deleteAccount kimlik arşivi", () => {
     );
   });
 
-  it("silme öncesi gerçek kimliği ve banka hesabındaki TCKN'yi saklar", async () => {
+  it("silme öncesi gerçek kimliği saklar; TCKN'de üyenin beyanı banka hesabından önce gelir", async () => {
     const { service, tx } = makeService();
 
     await service.deleteAccount("user-1");
@@ -114,13 +117,46 @@ describe("UserProfileService.deleteAccount kimlik arşivi", () => {
     expect(create.email).toBe("ahmet@example.com");
     expect(create.username).toBe("ahmet");
     expect(create.displayName).toBe("Ahmet Yılmaz");
-    expect(create.nationalId).toBe("12345678901");
+    expect(create.legalFirstName).toBe("Ahmet Can");
+    expect(create.legalLastName).toBe("Yılmaz");
+    expect(create.nationalId).toBe("10000000146");
+    expect(create.sourceDetail.nationalId).toBe("user");
     expect(create.taxId).toBe("1234567890");
     expect(create.addressCity).toBe("İstanbul");
     expect(create.wasSeller).toBe(true);
     expect(create.deletedByActor).toBe("self");
     expect(create.source).toBe("live");
+  });
+
+  it("üyenin beyanı yoksa banka hesabındaki TCKN'yi saklar (eski hesap)", async () => {
+    const { service, tx } = makeService();
+    tx.user.findUnique.mockResolvedValueOnce({
+      ...user,
+      legalFirstName: null,
+      legalLastName: null,
+      nationalId: null,
+    });
+
+    await service.deleteAccount("user-1");
+
+    const { create } = tx.deletedUserIdentity.upsert.mock.calls[0][0];
+    expect(create.nationalId).toBe("12345678901");
     expect(create.sourceDetail.nationalId).toBe("seller_bank_account");
+    expect(create.legalFirstName).toBeNull();
+  });
+
+  it("yasal kimliği arşivden SONRA canlı satırda NULL'lar (TCKN serbest kalır)", async () => {
+    const { service, tx } = makeService();
+
+    await service.deleteAccount("user-1");
+
+    const { data } = tx.user.update.mock.calls[0][0];
+    expect(data.legalFirstName).toBeNull();
+    expect(data.legalLastName).toBeNull();
+    expect(data.nationalId).toBeNull();
+    expect(
+      tx.deletedUserIdentity.upsert.mock.invocationCallOrder[0],
+    ).toBeLessThan(tx.user.update.mock.invocationCallOrder[0]);
   });
 
   it("saklama bitişini silme tarihine 10 yıl ekleyerek yazar", async () => {

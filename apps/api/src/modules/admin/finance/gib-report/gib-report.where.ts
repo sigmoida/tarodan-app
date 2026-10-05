@@ -73,6 +73,8 @@ const IDENTITY_INCOMPLETE: Prisma.UserWhereInput = {
       deletedAt: null,
       AND: [
         absent("taxId"),
+        // Üyenin beyan ettiği TCKN (kimlik kapısı).
+        absent("nationalId"),
         {
           OR: [
             { bankAccount: { is: null } },
@@ -113,12 +115,17 @@ const SEARCH_FIELDS = [
   "seller.displayName",
   "seller.username",
   "seller.companyName",
+  "seller.legalFirstName",
+  "seller.legalLastName",
+  "seller.nationalId",
   "seller.taxId",
   "seller.adminCode",
   "seller.bankAccount.accountHolder",
   "seller.bankAccount.taxId",
   "seller.bankAccount.tcKimlikNo",
   "seller.deletedIdentity.displayName",
+  "seller.deletedIdentity.legalFirstName",
+  "seller.deletedIdentity.legalLastName",
   "seller.deletedIdentity.companyName",
   "seller.deletedIdentity.bankAccountHolder",
   "seller.deletedIdentity.taxId",

@@ -66,6 +66,13 @@ export interface IdentityUserSource {
   email: string | null;
   username: string;
   displayName: string | null;
+  /**
+   * Üyenin beyan ettiği yasal kimlik (`User.legalFirstName/LastName/nationalId`).
+   * Her alanın İLK kaynağıdır; boşsa eski kalıntı kaynaklara düşülür.
+   */
+  legalFirstName: string | null;
+  legalLastName: string | null;
+  nationalId: string | null;
   phone: string | null;
   birthDate: Date | null;
   taxId: string | null;
@@ -176,6 +183,8 @@ export interface ResolvedIdentityValues {
   email: string | null;
   username: string;
   displayName: string | null;
+  legalFirstName: string | null;
+  legalLastName: string | null;
   phone: string | null;
   birthDate: Date | null;
   nationalId: string | null;
@@ -364,7 +373,9 @@ export function resolveIdentityFields(
       clean(s.fullName) !== null &&
       clean(s.fullName) === clean(corp.authorizedFullName),
   );
+  // Üyenin kendi beyanı (kimlik kapısı) önce; eski kaynaklar yalnız o boşsa.
   const nationalId = r.pick("nationalId", [
+    { value: tcknOrNull(user.nationalId), source: "user" },
     {
       value: tcknOrNull(bankAccount?.tcKimlikNo),
       source: "seller_bank_account",
@@ -490,6 +501,14 @@ export function resolveIdentityFields(
       email,
       username: user.username,
       displayName,
+      // Yasal ad yalnız üyenin beyanından gelir; tahmin edilmez (görünen ad /
+      // adres adı başka bir kişinin ya da takma ad olabilir).
+      legalFirstName: r.pick("legalFirstName", [
+        { value: user.legalFirstName, source: "user" },
+      ]),
+      legalLastName: r.pick("legalLastName", [
+        { value: user.legalLastName, source: "user" },
+      ]),
       phone,
       birthDate: r.fromUser("birthDate", user.birthDate),
       nationalId,
@@ -511,6 +530,23 @@ export function resolveIdentityFields(
     sourceDetail: r.sourceDetail,
     sourceRefs: r.sourceRefs,
   };
+}
+
+/**
+ * Bildirimdeki "Ad Soyad / Unvan" değeri: üyenin yasal adı varsa o, yoksa
+ * silme anındaki ad (eski hesaplar). Kolon kümesi değişmez — yalnız değerin
+ * kaynağı güçlenir, bu yüzden biçim sürümü artmaz.
+ */
+export function archiveLegalFullName(row: {
+  legalFirstName: string | null;
+  legalLastName: string | null;
+  displayName: string | null;
+}): string | null {
+  const legal = [row.legalFirstName, row.legalLastName]
+    .map((part) => clean(part))
+    .filter((part): part is string => part !== null)
+    .join(" ");
+  return legal || clean(row.displayName);
 }
 
 /**
