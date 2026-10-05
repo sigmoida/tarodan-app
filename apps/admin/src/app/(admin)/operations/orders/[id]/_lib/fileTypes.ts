@@ -84,6 +84,12 @@ export interface OrderFileEntry {
   completedAt: string | null;
   confirmationDeadline: string | null;
   buyerConfirmedAt: string | null;
+  /** Geçerli kargoya verme son tarihi — uzatıldıysa uzatılmış olanı. */
+  preparingDeadline: string | null;
+  /** Tek seferlik hazırlık uzatmasının verildiği an; hiç uzatılmadıysa null. */
+  preparingExtendedAt: string | null;
+  /** Uzatmadan önceki son tarih (yalnız kayıt); uzatılmadıysa null. */
+  originalPreparingDeadline: string | null;
   product: { id: string; title: string | null; imageUrl: string | null };
   quantity: number;
   unitPrice: number | null;

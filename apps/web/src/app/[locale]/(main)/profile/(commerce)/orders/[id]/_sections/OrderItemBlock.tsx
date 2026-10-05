@@ -7,6 +7,7 @@ import { useLocale, useTranslations } from "next-intl";
 import { formatPrice } from "@/lib/format";
 import { getOrderStatusLabel, type OrderDetail } from "../_lib/types";
 import OrderBanners from "./OrderBanners";
+import PreparingDeadlineNotice from "./PreparingDeadlineNotice";
 import ProductInfoCard from "./ProductInfoCard";
 import RefundRequestBanner from "./RefundRequestBanner";
 import SellerActions from "./SellerActions";
@@ -81,6 +82,7 @@ export default function OrderItemBlock({
       )}
 
       <OrderBanners order={order} />
+      <PreparingDeadlineNotice order={order} />
       <ProductInfoCard order={order} />
       <RefundRequestBanner order={order} />
       <SellerActions order={order} showCargoRef={showCargoRef} />

@@ -238,6 +238,7 @@ export function mapCancelledTradeRow(
       subtotal: subtotal.toNumber(),
       totalAmount: subtotal.toNumber(),
       preparingDeadline: null,
+      preparingExtendedAt: null,
       deliveredAt: null,
       hasActiveRefund: false,
       product: {

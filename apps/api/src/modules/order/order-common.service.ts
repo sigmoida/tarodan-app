@@ -405,6 +405,11 @@ export class OrderCommonService {
       canReactivate: this.computeCanReactivate(order, userId),
       confirmationDeadline: order.confirmationDeadline ?? null,
       buyerConfirmedAt: order.buyerConfirmedAt ?? null,
+      // Satıcının kargoya verme son tarihi. Tek seferlik uzatmada YENİ son
+      // tarih budur; `preparingExtendedAt` doluysa süre bir kez uzatılmıştır
+      // (bir daha uzatılmaz, dolunca sipariş iptal edilip iade edilir).
+      preparingDeadline: order.preparingDeadline ?? null,
+      preparingExtendedAt: order.preparingExtendedAt ?? null,
       isBuyer: order.buyerId === userId,
       isSeller: order.sellerId === userId,
       ...(await this.getOrderRatingFlags(order, userId)),
