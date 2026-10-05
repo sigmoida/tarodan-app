@@ -46,6 +46,9 @@ const PAYMENT_WINDOW_EXPIRED_CANCELLATION: FailedPaymentCancellation = {
   reason: ORDER_CANCEL_REASON.paymentWindowExpired,
 };
 
+/** Hazırlık süresi dolan bir siparişte turun vardığı sonuç. */
+type PreparingSweepOutcome = "skipped" | "in_motion" | "cancelled";
+
 /**
  * Ödeme/sipariş süre-dolumu mutabakat süpürmeleri (cron). PaymentReconciliationService
  * facade'i aynı imzalarla buraya delege eder.
@@ -391,7 +394,15 @@ export class PaymentExpiryReconciliationService {
     let cancelled = 0;
     for (const order of expiredOrders) {
       try {
-        let skippedInMotion = false;
+        // Turun bu siparişte ne yaptığı. İade, bildirim ve sayaç YALNIZ işlem
+        // siparişi gerçekten iptal ettiyse çalışır. Kilit altındaki tekrar
+        // okuma siparişi atlarsa `return` yalnız işlem geri çağrısından çıkar;
+        // eskiden akış buna rağmen iadeye düşüyordu: aynı anda kargolanan
+        // (`shipped`) sipariş iade ediliyor, başka turun iptal ettiği sipariş
+        // ikinci kez iade deneniyor ve alıcıya ikinci bildirim gidiyordu.
+        // (`as`: değer işlem geri çağrısında atanır; açıklama tipi olsaydı TS
+        // değişkeni ilk değere daraltır ve aşağıdaki karşılaştırmalar derlenmezdi.)
+        let outcome = "skipped" as PreparingSweepOutcome;
         // Kupon iadesi bildirimi tx İÇİNDE atılmaz; commit sonrası gönderilir.
         let restoredCoupons: { userId: string; code: string }[] = [];
         await this.prisma.$transaction(async (tx) => {
@@ -416,7 +427,7 @@ export class PaymentExpiryReconciliationService {
             select: { status: true, shippedAt: true },
           });
           if (isShipmentHandedToCarrier(shipment)) {
-            skippedInMotion = true;
+            outcome = "in_motion";
             return;
           }
 
@@ -501,17 +512,21 @@ export class PaymentExpiryReconciliationService {
               ...statusAfterStockRestore(order.product, newQuantity, false),
             },
           });
+          outcome = "cancelled";
         });
 
         // SEAM-B1: hareket eden paket yüzünden atlandıysa iade/restock/bildirim YOK.
         // Ops görünürlüğü için greplenebilir tek satır uyarı.
-        if (skippedInMotion) {
+        if (outcome === "in_motion") {
           this.logger.warn(
             `SELLER_NO_SHIP_SKIPPED_MOVING: sipariş ${order.orderNumber} süre doldu ama ` +
               `paket Sürat'ta hareket ediyor — iptal/iade EDİLMEDİ (satıcı 'kargoladım' işaretlememiş olabilir).`,
           );
           continue;
         }
+        // Kilit altında sipariş artık iptal edilecek durumda değildi (başka
+        // süreç kargoladı ya da iptal etti): iade, bildirim, sayaç YOK.
+        if (outcome !== "cancelled") continue;
 
         // Process refund via PayTR (outside transaction — calls external API)
         try {
