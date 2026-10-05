@@ -25,7 +25,10 @@ export type TradeExtensionPlan = Partial<Record<TradeExtensionStage, number>>;
 
 /** Uzatılabilir bulunan takas: kime hatırlatılacak. */
 export interface TradeExtensionDecision {
+  /** İşlem sırası kendinde olanlar (yanıt: alıcı; ödeme: ödemesi eksik taraflar). */
   recipients: string[];
+  /** Ödeme aşamasında ödemesini TAMAMLAMIŞ taraflar: karşı tarafa süre verildi. */
+  paidParties: string[];
 }
 
 /** Uzatma kararı için takasın bakılan hâli (cron'un okuduğu satır). */
@@ -111,7 +114,7 @@ export class TradeDeadlineExtensionService {
 
     if (stage === "response") {
       if (!(await this.itemsStillAvailable(trade.id))) return null;
-      return { recipients: [trade.receiverId] };
+      return { recipients: [trade.receiverId], paidParties: [] };
     }
 
     const rows = await this.prisma.tradeCashPayment.findMany({
@@ -120,7 +123,10 @@ export class TradeDeadlineExtensionService {
     });
     const verdict = evaluatePaymentExtension(rows);
     if (verdict.blocker !== null) return null;
-    return { recipients: verdict.recipients };
+    return {
+      recipients: verdict.recipients,
+      paidParties: verdict.paidParties,
+    };
   }
 
   /**
@@ -153,17 +159,23 @@ export class TradeDeadlineExtensionService {
     decision: TradeExtensionDecision,
     until: Date,
   ): Promise<void> {
-    for (const userId of decision.recipients) {
+    const targets: Array<[string, NotificationType]> = [
+      ...decision.recipients.map((userId): [string, NotificationType] => [
+        userId,
+        NOTIFICATION_BY_STAGE[stage],
+      ]),
+      ...decision.paidParties.map((userId): [string, NotificationType] => [
+        userId,
+        NotificationType.TRADE_PAYMENT_EXTENDED_PAID,
+      ]),
+    ];
+    for (const [userId, type] of targets) {
       try {
-        await this.notificationService.createInAppNotification(
-          userId,
-          NOTIFICATION_BY_STAGE[stage],
-          {
-            tradeId,
-            until: formatNotificationDeadline(until),
-            untilAt: until.toISOString(),
-          },
-        );
+        await this.notificationService.createInAppNotification(userId, type, {
+          tradeId,
+          until: formatNotificationDeadline(until),
+          untilAt: until.toISOString(),
+        });
       } catch (err) {
         this.logger.warn(
           `trade-${stage}-extended notify failed (trade=${tradeId}, user=${userId}): ${err}`,

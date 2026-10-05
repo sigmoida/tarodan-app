@@ -68,6 +68,8 @@ export enum NotificationType {
   // Takas yanıt / ödeme süresi bir kez uzatıldı (extend_once) — işlem sırası gelen tarafa.
   TRADE_RESPONSE_EXTENDED = "trade_response_extended",
   TRADE_PAYMENT_EXTENDED = "trade_payment_extended",
+  // Ödemesini yapmış tarafa: karşı tarafa ödeme için ek süre verildi.
+  TRADE_PAYMENT_EXTENDED_PAID = "trade_payment_extended_paid",
   // Admin uyarısı: takas depoya ulaştı ama süresi doldu — elle force-cancel-stuck gerekiyor.
   TRADE_STUCK_AT_WAREHOUSE = "trade_stuck_at_warehouse",
   // Admin uyarısı: sipariş uzun süredir kargoda ve taşıyıcıdan teslim raporu yok.

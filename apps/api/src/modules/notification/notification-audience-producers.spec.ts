@@ -85,6 +85,7 @@ describe("bildirim üreticileri hedef kitleyi taşır", () => {
       for (const type of [
         NotificationType.TRADE_RESPONSE_EXTENDED,
         NotificationType.TRADE_PAYMENT_EXTENDED,
+        NotificationType.TRADE_PAYMENT_EXTENDED_PAID,
       ]) {
         expect(linkOf(type, { tradeId: "t1" })).toBe("/profile/trades/t1");
       }

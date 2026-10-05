@@ -215,6 +215,7 @@ export const NOTIFICATION_LINKS: Record<
   [NotificationType.TRADE_AUTO_CANCELLED]: pattern("/profile/trades"),
   [NotificationType.TRADE_RESPONSE_EXTENDED]: TRADE,
   [NotificationType.TRADE_PAYMENT_EXTENDED]: TRADE,
+  [NotificationType.TRADE_PAYMENT_EXTENDED_PAID]: TRADE,
   [NotificationType.TRADE_AT_WAREHOUSE]: TRADE,
   // Admin alarmları: yalnız admin'lere gider — kullanıcı sitesindeki takas
   // listesi değil, admin panelindeki takas dosyası açılmalı (serbest link).

@@ -361,6 +361,11 @@ export const NOTIFICATION_TEMPLATES: Partial<
     messageKey: "server.notification.tradePaymentExtended.message",
     icon: "⏳",
   },
+  [NotificationType.TRADE_PAYMENT_EXTENDED_PAID]: {
+    titleKey: "server.notification.tradePaymentExtendedPaid.title",
+    messageKey: "server.notification.tradePaymentExtendedPaid.message",
+    icon: "⏳",
+  },
   [NotificationType.TRADE_AT_WAREHOUSE]: {
     titleKey: "server.notification.tradeAtWarehouse.title",
     messageKey: "server.notification.tradeAtWarehouse.message",

@@ -132,20 +132,27 @@ export type PaymentExtensionBlocker =
 export function evaluatePaymentExtension(
   rows: readonly TradePaymentRowLike[],
 ):
-  | { blocker: PaymentExtensionBlocker; recipients: [] }
-  | { blocker: null; recipients: string[] } {
-  if (rows.length === 0) return { blocker: "noPaymentRows", recipients: [] };
+  | { blocker: PaymentExtensionBlocker; recipients: []; paidParties: [] }
+  | { blocker: null; recipients: string[]; paidParties: string[] } {
+  if (rows.length === 0) {
+    return { blocker: "noPaymentRows", recipients: [], paidParties: [] };
+  }
   if (rows.some((row) => row.status === PaymentStatus.refunded)) {
-    return { blocker: "refundedRow", recipients: [] };
+    return { blocker: "refundedRow", recipients: [], paidParties: [] };
   }
   const outstanding = rows.filter(
     (row) => row.status !== PaymentStatus.completed,
   );
   if (outstanding.length === 0) {
-    return { blocker: "nothingOutstanding", recipients: [] };
+    return { blocker: "nothingOutstanding", recipients: [], paidParties: [] };
   }
   return {
     blocker: null,
     recipients: [...new Set(outstanding.map((row) => row.payerId))],
+    // Ödemesini tamamlamış taraflar: parası ve ürünü yeni süre boyunca
+    // bekler, bu yüzden onlar da yeni son tarihten haberdar edilir.
+    paidParties: rows
+      .filter((row) => row.status === PaymentStatus.completed)
+      .map((row) => row.payerId),
   };
 }

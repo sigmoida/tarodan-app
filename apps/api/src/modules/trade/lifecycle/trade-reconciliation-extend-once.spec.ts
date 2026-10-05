@@ -546,11 +546,21 @@ describe("TradeReconciliationService — extend_once (yanıt / ödeme)", () => {
       expect(h.productUpdates).toEqual([]);
       expect(h.refundEntitlements).toEqual([]);
       expect(h.paymentService.refundTradeCashTracked).not.toHaveBeenCalled();
-      expect(h.createInAppNotification).toHaveBeenCalledTimes(1);
+      // Ödemeyen taraf (u2) "öde" hatırlatması, ödeyen taraf (u1) "karşı
+      // tarafa süre verildi" bilgisi alır.
+      expect(h.createInAppNotification).toHaveBeenCalledTimes(2);
       expect(h.createInAppNotification).toHaveBeenCalledWith(
         "u2",
         NotificationType.TRADE_PAYMENT_EXTENDED,
         expect.objectContaining({ tradeId: "t1" }),
+      );
+      expect(h.createInAppNotification).toHaveBeenCalledWith(
+        "u1",
+        NotificationType.TRADE_PAYMENT_EXTENDED_PAID,
+        expect.objectContaining({
+          tradeId: "t1",
+          untilAt: new Date(T0.getTime() + 48 * HOUR).toISOString(),
+        }),
       );
     });
 
@@ -660,7 +670,8 @@ describe("TradeReconciliationService — extend_once (yanıt / ödeme)", () => {
 
       expect(a + b).toBe(0);
       expect(h.events).toEqual(["t1:payment"]);
-      expect(h.createInAppNotification).toHaveBeenCalledTimes(1);
+      // Tek uzatma = u2'ye hatırlatma + u1'e bilgi; ikinci tur bildirmez.
+      expect(h.createInAppNotification).toHaveBeenCalledTimes(2);
       expect(h.paymentService.refundTradeCashTracked).not.toHaveBeenCalled();
     });
 

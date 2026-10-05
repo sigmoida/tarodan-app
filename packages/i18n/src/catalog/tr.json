@@ -9662,6 +9662,10 @@
         "title": "Takas Ödeme Süresi Uzatıldı",
         "message": "Takasınızın ödeme süresi bir kez uzatıldı. Ödemenizi {until} tarihine kadar tamamlayın; aksi halde takas iptal edilir."
       },
+      "tradePaymentExtendedPaid": {
+        "title": "Takasta Karşı Tarafa Ek Ödeme Süresi Verildi",
+        "message": "Ödemenizi tamamladınız; karşı tarafın ödeme süresi bir kez uzatıldı. Yeni son tarih: {until}. Ürününüz o zamana kadar rezerve kalır. Karşı taraf yine de ödemezse takas iptal edilir ve ödemeniz tam olarak iade edilir."
+      },
       "tradeStuckAtWarehouse": {
         "title": "Sıkışmış Takas — Yönetim Gerekli",
         "message": "{tradeNumber} takası depoya ulaştı fakat süresi doldu; elle force-cancel-stuck gerekiyor."

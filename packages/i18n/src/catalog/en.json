@@ -9662,6 +9662,10 @@
         "title": "Trade Payment Time Extended",
         "message": "The payment time for your trade has been extended once. Complete your payment by {until}, otherwise the trade is cancelled."
       },
+      "tradePaymentExtendedPaid": {
+        "title": "Other Party Given More Time to Pay",
+        "message": "You have completed your payment; the other party's payment time was extended once. New deadline: {until}. Your item stays reserved until then. If they still do not pay, the trade is cancelled and your payment is refunded in full."
+      },
       "tradeStuckAtWarehouse": {
         "title": "Stuck Trade — Admin Action Required",
         "message": "Trade {tradeNumber} reached the warehouse but timed out; a manual force-cancel-stuck is required."

@@ -101,7 +101,7 @@ describe("trade-deadline-extension helpers", () => {
           row("u1", PaymentStatus.completed),
           row("u2", PaymentStatus.pending),
         ]),
-      ).toEqual({ blocker: null, recipients: ["u2"] });
+      ).toEqual({ blocker: null, recipients: ["u2"], paidParties: ["u1"] });
     });
 
     it("processing ve failed satırlar bekleyen sayılır", () => {
@@ -110,13 +110,14 @@ describe("trade-deadline-extension helpers", () => {
           row("u1", PaymentStatus.processing),
           row("u2", PaymentStatus.failed),
         ]),
-      ).toEqual({ blocker: null, recipients: ["u1", "u2"] });
+      ).toEqual({ blocker: null, recipients: ["u1", "u2"], paidParties: [] });
     });
 
     it("satır yoksa uzatılamaz", () => {
       expect(evaluatePaymentExtension([])).toEqual({
         blocker: "noPaymentRows",
         recipients: [],
+        paidParties: [],
       });
     });
 
