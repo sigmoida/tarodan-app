@@ -18,11 +18,17 @@ export function TransactionsTab() {
   const [releaseTarget, setReleaseTarget] = useState<{
     orderId: string;
     early: boolean;
+    releaseAt: string | null;
   } | null>(null);
 
   const columns = transactionColumns(
     user?.role === "super_admin"
-      ? (orderId, early) => setReleaseTarget({ orderId, early })
+      ? (row, early) =>
+          setReleaseTarget({
+            orderId: row.orderId,
+            early,
+            releaseAt: row.releaseAt,
+          })
       : undefined,
     t,
   );
@@ -38,6 +44,7 @@ export function TransactionsTab() {
           status: p.status,
           dateFrom: p.dateFrom,
           dateTo: p.dateTo,
+          earlyReleased: p.earlyReleased,
           sortBy: p.sortBy,
           sortOrder: p.sortOrder,
         })
@@ -56,6 +63,7 @@ export function TransactionsTab() {
         <ReleasePayoutModal
           orderId={releaseTarget.orderId}
           early={releaseTarget.early}
+          releaseAt={releaseTarget.releaseAt}
           onClose={() => setReleaseTarget(null)}
         />
       )}

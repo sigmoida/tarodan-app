@@ -22,6 +22,7 @@ import {
 } from "@tarodan/ui";
 import { useLocale, useTranslations } from "next-intl";
 import { DataList, Field } from "@/components/detail/DataList";
+import { EarlyReleaseBadge } from "@/components/finance/EarlyReleaseBadge";
 import { fmtDate, fmtDateTime, fmtTry } from "@/lib/format";
 import { useSession } from "@/context/SessionContext";
 import { usePspFeeRate } from "@/hooks/usePspFeeRate";
@@ -258,9 +259,26 @@ export function OrderFileBlock({ entry }: { entry: OrderFileEntry }) {
               </Field>
             )}
             {entry.escrow.releasedAt ? (
-              <Field label={t("admin.operations.orders.file.escrowReleased")}>
-                {fmtDateTime(entry.escrow.releasedAt)}
-              </Field>
+              <>
+                <Field
+                  label={t("admin.operations.orders.file.escrowReleased")}
+                >
+                  <span className="flex flex-wrap items-center gap-2">
+                    {fmtDateTime(entry.escrow.releasedAt)}
+                    <EarlyReleaseBadge
+                      releaseAt={entry.escrow.releaseAt}
+                      releasedAt={entry.escrow.releasedAt}
+                    />
+                  </span>
+                </Field>
+                {/* Planlanan tarih bırakıldıktan sonra da görünür: ne kadar
+                    erken/geç bırakıldığı buradan okunur. */}
+                <Field label={t("admin.shared.earlyRelease.plannedDate")}>
+                  {entry.escrow.releaseAt
+                    ? fmtDateTime(entry.escrow.releaseAt)
+                    : "—"}
+                </Field>
+              </>
             ) : (
               <Field label={t("admin.operations.orders.file.escrowRelease")}>
                 {entry.escrow.releaseAt

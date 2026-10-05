@@ -6409,6 +6409,12 @@
           "settled": "Kapandı"
         },
         "releaseEarly": "Erken Serbest Bırak",
+        "plannedRelease": "Planlanan Serbest Bırakma",
+        "releasedOn": "Serbest Bırakıldı",
+        "earlyReleaseNotice": "Normalde {date} tarihinde serbest kalacaktı; {days} gün erken bırakıyorsunuz.",
+        "filterReleaseTiming": "Serbest bırakma zamanı",
+        "filterAllReleases": "Tümü",
+        "filterEarlyOnly": "Erken bırakılanlar",
         "earlyReleaseHint": "İade penceresi dolmadan bilinçli erken bırakma — gerekçe istenir.",
         "earlyReleaseWarning": "İade penceresi henüz kapanmadı: bu ödemeyi ERKEN serbest bırakıyorsunuz. İşlem geri alınamaz; sonrasında açılan bir iadede tahsilat satıcıdan yapılmak zorunda kalır. Teslim edilmemiş ya da iadesi süren siparişte sistem yine reddeder.",
         "transferQueuedInfo": "Transfer kuyruğa alındı — birkaç saniye içinde işlenir; Transferler sekmesinden izleyin",
@@ -7038,6 +7044,8 @@
         "escrowPanelBodyEarly": "Nakit fark {date} tarihinde otomatik serbest bırakılacak. Gerekirse süreyi beklemeden erken bırakabilirsiniz; işlem geri alınamaz ve iade borcu taşıyan satırlara dokunulmaz.",
         "escrowReleaseTitle": "Serbest Bırak",
         "escrowReleaseEarlyTitle": "Erken Serbest Bırak",
+        "escrowReleasedTitle": "Takas Escrow — Serbest Bırakıldı",
+        "escrowReleasedBody": "Nakit fark {releasedAt} tarihinde serbest bırakıldı; planlanan tarih {plannedAt} idi.",
         "escrowReleaseReasonLabel": "Gerekçe",
         "escrowReleaseReasonPlaceholder": "Örn. iki taraf da teslimatı ve ürünleri teyit etti",
         "escrowReleaseConfirm": "Serbest Bırak",
@@ -8853,6 +8861,10 @@
       }
     },
     "shared": {
+      "earlyRelease": {
+        "daysEarly": "{days} gün erken",
+        "plannedDate": "Planlanan tarih"
+      },
       "moderation": {
         "title": "AI Denetim",
         "count": "{count} AI denetim kaydı",

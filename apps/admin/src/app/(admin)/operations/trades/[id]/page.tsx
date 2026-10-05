@@ -21,6 +21,7 @@ import {
 import { CompensationPanel } from "./_sections/CompensationPanel";
 import { RefundFailurePanel } from "./_sections/RefundFailurePanel";
 import { EscrowReleasePanel } from "./_sections/EscrowReleasePanel";
+import { EscrowReleasedInfo } from "./_sections/EscrowReleasedInfo";
 import { StuckPanel } from "./_sections/StuckPanel";
 import { ReviewPanel } from "./_sections/ReviewPanel";
 import { TradeInfoCards } from "./_sections/TradeInfoCards";
@@ -171,6 +172,7 @@ export default function TradeDetailPage() {
             <CompensationPanel trade={trade} />
             <RefundFailurePanel trade={trade} />
             <EscrowReleasePanel trade={trade} />
+            <EscrowReleasedInfo trade={trade} />
             <StuckPanel
               trade={trade}
               show={canForceCancelStuck}
