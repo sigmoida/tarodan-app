@@ -92,7 +92,7 @@ export function ShipmentSimulationCard({ isProd }: { isProd: boolean }) {
         <DataTable
           columns={columns}
           data={parcels}
-          getRowId={simulationRowId}
+          getRowId={(parcel: SimulatableParcel) => simulationRowId(parcel)}
         />
       ) : (
         hasSearched &&
