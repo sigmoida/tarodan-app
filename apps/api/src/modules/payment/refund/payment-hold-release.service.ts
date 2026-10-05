@@ -24,6 +24,7 @@ import {
   type OrderRevenueInvoicePayload,
 } from "../../outbox/outbox.types";
 import { resolveTimingValue } from "../../../common/timing-rules";
+import { returnWindowEndsAt } from "../../order/helpers/order-return-window";
 import { i18nMessage } from "../../i18n";
 import {
   PUBLIC_NAME_SELECT,
@@ -67,8 +68,10 @@ export class PaymentHoldReleaseService {
   // teslim + returnWindowDays + payoutGraceDays. Grace, iade penceresi
   // kapandıktan SONRA payout'u başlatır → "14. günün son saniyesinde iade +
   // payout çoktan gitti" çakışması imkânsız olur. İki süre de Süreler ve
-  // Kurallar'dan teslim ANINDA okunur ve releaseAt'e damgalanır — sonradan
-  // yapılan değişiklik teslim edilmiş siparişin tarihini kaydırmaz.
+  // Kurallar'dan teslim ANINDA okunur; iade penceresi sonu siparişe
+  // (`returnWindowEndsAt`), ödeme tarihi hold'a (`releaseAt`) damgalanır.
+  // İade uygunluğu da aynı damgayı okur — sonradan yapılan değişiklik teslim
+  // edilmiş siparişin ne iade hakkını ne ödeme tarihini kaydırır.
 
   constructor(
     private readonly prisma: PrismaService,
@@ -176,10 +179,16 @@ export class PaymentHoldReleaseService {
    * Returns the number of order holds and trade cash payments released.
    */
   /**
-   * Teslimde çağrılır: ürünün PaymentHold(ler)inin releaseAt'ini
-   * deliveredAt + returnWindowDays + payoutGraceDays olarak ayarlar.
-   * Tek otorite kaynağı: hold serbestliği SADECE bu tarihten sonra (ve açık iade
-   * yokken) olur. Idempotent: held olmayan hold'a dokunmaz.
+   * Teslimde çağrılır — iki damgayı BİRLİKTE yazar:
+   *   1) `Order.returnWindowEndsAt` = deliveredAt + returnWindowDays (o an
+   *      geçerli değer). Sipariş zaten damgalıysa (tekrar çağrı) damga korunur.
+   *   2) PaymentHold `releaseAt` = returnWindowEndsAt + payoutGraceDays.
+   * İade uygunluğu ve teslim → tamamlandı geçişi de aynı damgayı okur
+   * (`order-return-window`), bu yüzden admin pencereyi sonradan değiştirse de
+   * iade hakkı satıcı ödemesiyle çakışamaz. Tek otorite kaynağı: hold
+   * serbestliği SADECE bu tarihten sonra (ve açık iade yokken) olur.
+   * Idempotent: held olmayan hold'a dokunmaz. Ayar okumaları da çağıranın
+   * işlem istemcisinden yapılır (işlem içinde ikinci bağlantı beklenmez).
    */
   async scheduleHoldReleaseOnDelivery(
     orderId: string,
@@ -187,25 +196,36 @@ export class PaymentHoldReleaseService {
     tx?: Prisma.TransactionClient,
   ): Promise<void> {
     const db = tx ?? this.prisma;
-    // Ayar okuması kök istemciden: tx yalnız damgalama yazısını taşır.
-    const returnWindowDays = await resolveTimingValue(
-      this.prisma,
-      "returnWindowDays",
-      this.configService,
-    );
+    const order = await db.order.findUnique({
+      where: { id: orderId },
+      select: { returnWindowEndsAt: true },
+    });
+    let windowEndsAt = order?.returnWindowEndsAt ?? null;
+    if (!windowEndsAt) {
+      const returnWindowDays = await resolveTimingValue(
+        db,
+        "returnWindowDays",
+        this.configService,
+      );
+      windowEndsAt = returnWindowEndsAt(deliveredAt, returnWindowDays);
+      await db.order.updateMany({
+        where: { id: orderId, returnWindowEndsAt: null },
+        data: { returnWindowEndsAt: windowEndsAt },
+      });
+    }
     const payoutGraceDays = await resolveTimingValue(
-      this.prisma,
+      db,
       "payoutGraceDays",
       this.configService,
     );
-    const releaseAt = new Date(deliveredAt.getTime());
-    releaseAt.setDate(releaseAt.getDate() + returnWindowDays + payoutGraceDays);
+    const releaseAt = new Date(windowEndsAt.getTime());
+    releaseAt.setDate(releaseAt.getDate() + payoutGraceDays);
     await db.paymentHold.updateMany({
       where: { orderId, status: PaymentHoldStatus.held },
       data: { releaseAt },
     });
     this.logger.log(
-      `Hold release scheduled for order ${orderId} at ${releaseAt.toISOString()} (teslim+${returnWindowDays}+${payoutGraceDays}g)`,
+      `Hold release scheduled for order ${orderId} at ${releaseAt.toISOString()} (iade penceresi sonu ${windowEndsAt.toISOString()} + ${payoutGraceDays}g)`,
     );
   }
 

@@ -1818,6 +1818,13 @@ model Order {
   stockRestoredAt            DateTime?                @map("stock_restored_at")
   paymentExpiresAt           DateTime                 @map("payment_expires_at")
   deliveredAt                DateTime?                @map("delivered_at")
+  /// Cayma (iade talep) penceresinin bittiği an — teslimde, o an geçerli
+  /// `returnWindowDays` (Süreler ve Kurallar) ile DAMGALANIR. İade uygunluğu,
+  /// teslim → tamamlandı geçişi ve escrow `releaseAt` (= bu + payout grace)
+  /// hep bu damgayı okur: admin pencereyi sonradan değiştirse de bir siparişte
+  /// iade hakkı ile satıcı ödemesi çakışamaz. null = damgadan önce teslim
+  /// edilmiş eski sipariş; o zaman bugünkü pencereyle hesaplanır.
+  returnWindowEndsAt         DateTime?                @map("return_window_ends_at")
   confirmationDeadline       DateTime?                @map("confirmation_deadline")
   buyerConfirmedAt           DateTime?                @map("buyer_confirmed_at")
   buyerConfirmationType      BuyerConfirmationType?   @map("buyer_confirmation_type")

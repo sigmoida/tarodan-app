@@ -133,16 +133,17 @@ describe("OrderSchedulerService — fatura backfill işareti", () => {
   });
 
   /**
-   * Teslim → tamamlandı geçişi iade penceresi kapanınca olur. Pencere Süreler
-   * ve Kurallar'dan (`returnWindowDays`) okunur ve teslime DAMGALANMAZ: tur
-   * bugünkü değerle `deliveredAt ≤ şimdi − N gün` keser.
+   * Teslim → tamamlandı geçişi iade penceresi kapanınca olur. Damgalı
+   * siparişte teslimdeki pencere sonu (`returnWindowEndsAt ≤ şimdi`) geçerlidir
+   * — escrow ve iade uygunluğu da onu okur. Damgasız eski siparişte bugünkü
+   * değerle `deliveredAt ≤ şimdi − N gün` kesilir.
    */
-  describe("iade penceresi kapanışı — süre kaynağı", () => {
+  describe("iade penceresi kapanışı — damga ve süre kaynağı", () => {
     const NOW = new Date("2026-10-05T12:00:00.000Z");
     const DAY = 24 * 60 * 60 * 1000;
     afterEach(() => jest.useRealTimers());
 
-    const completionCutoffAge = async (setting: string | null) => {
+    const completionWhere = async (setting: string | null) => {
       jest.useFakeTimers({ now: NOW, doNotFake: ["setImmediate"] });
       const { service, prisma } = makeService();
       prisma.platformSetting.findUnique.mockImplementation(
@@ -154,18 +155,26 @@ describe("OrderSchedulerService — fatura backfill işareti", () => {
       await service.runProcessDeliveredOrders();
       const completionCall: any[] =
         prisma.order.findMany.mock.calls.find(
-          (call: any[]) => call[0]?.where?.deliveredAt?.lte,
+          (call: any[]) => call[0]?.where?.OR?.[1]?.deliveredAt?.lte,
         ) ?? [];
-      const cutoff = completionCall[0].where.deliveredAt.lte as Date;
-      return (NOW.getTime() - cutoff.getTime()) / DAY;
+      return completionCall[0].where;
     };
+    const legacyCutoffAge = (where: any) =>
+      (NOW.getTime() - (where.OR[1].deliveredAt.lte as Date).getTime()) / DAY;
 
-    it("admin değeri yokken bugünkü gibi 14 gün", async () => {
-      await expect(completionCutoffAge(null)).resolves.toBe(14);
+    it("damgalı sipariş kendi pencere sonunda tamamlanır", async () => {
+      const where = await completionWhere("30");
+      expect(where.OR[0]).toEqual({ returnWindowEndsAt: { lte: NOW } });
     });
 
-    it("admin değeri geçerlidir", async () => {
-      await expect(completionCutoffAge("21")).resolves.toBe(21);
+    it("damgasız eski sipariş: admin değeri yokken bugünkü gibi 14 gün", async () => {
+      const where = await completionWhere(null);
+      expect(where.OR[1].returnWindowEndsAt).toBeNull();
+      expect(legacyCutoffAge(where)).toBe(14);
+    });
+
+    it("damgasız eski sipariş: admin değeri geçerlidir", async () => {
+      expect(legacyCutoffAge(await completionWhere("21"))).toBe(21);
     });
   });
 });

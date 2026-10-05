@@ -559,22 +559,26 @@ export class OrderSchedulerService implements OnModuleInit {
       }
     }
 
-    // 2) İade penceresi kapanan teslim edilmiş siparişler → tamamlandı
-    // DİKKAT: pencere teslim anına damgalanmaz, her turda bugünkü değerle
-    // deliveredAt'ten hesaplanır — değişiklik teslim edilmiş siparişlere de
-    // uygulanır (escrow releaseAt ise damgalıdır, bkz. payment-hold-release).
+    // 2) İade penceresi kapanan teslim edilmiş siparişler → tamamlandı.
+    // Pencere sonu teslimde siparişe damgalanır (`returnWindowEndsAt`; iade
+    // uygunluğu ve escrow aynı damgayı okur). Damgasız eski siparişlerde
+    // bugünkü değerle deliveredAt'ten hesaplanır (order-return-window).
     const returnWindowDays = await resolveTimingValue(
       this.prisma,
       "returnWindowDays",
       this.configService,
     );
-    const cutoff = new Date(
-      Date.now() - returnWindowDays * 24 * 60 * 60 * 1000,
+    const now = new Date();
+    const legacyCutoff = new Date(
+      now.getTime() - returnWindowDays * 24 * 60 * 60 * 1000,
     );
     const dueToComplete = await this.prisma.order.findMany({
       where: {
         status: OrderStatus.delivered,
-        deliveredAt: { lte: cutoff },
+        OR: [
+          { returnWindowEndsAt: { lte: now } },
+          { returnWindowEndsAt: null, deliveredAt: { lte: legacyCutoff } },
+        ],
         refundRequests: {
           none: { status: { in: OPEN_REFUND_STATUSES as any } },
         },

@@ -19,6 +19,7 @@ import { PrismaService } from "../../prisma";
 import { PaymentService } from "../payment/payment.service";
 import { RefundPendingReconciliationException } from "../payment-providers/refund-errors";
 import { resolveTimingValue } from "../../common/timing-rules";
+import { effectiveReturnWindowEnd } from "../order/helpers/order-return-window";
 import { isShipmentHandedToCarrier } from "../shipping/helpers/shipment-handover";
 import { ACTIVE_REFUND_REQUEST_STATUSES } from "./helpers/refund-active-statuses";
 import { generateUniqueReference } from "../../common/helpers/generate-reference";
@@ -165,9 +166,10 @@ export class RefundCreationService {
       orderQty,
     );
 
-    // Cayma penceresi satıcı payout takvimiyle AYNI kayıttan (Süreler ve
-    // Kurallar → returnWindowDays). Teslime damgalanmaz: talep anında bugünkü
-    // değerle teslim tarihinden hesaplanır.
+    // Cayma penceresi: teslimde damgalanan sonu (`returnWindowEndsAt`) varsa o
+    // geçerlidir — escrow ödemesi de aynı damgadan hesaplanır. Bugünkü değer
+    // (Süreler ve Kurallar → returnWindowDays) yalnız damgasız eski siparişte
+    // kullanılır.
     const coolingOffDays = await resolveTimingValue(
       this.prisma,
       "returnWindowDays",
@@ -592,6 +594,8 @@ export class RefundCreationService {
     order: {
       status: OrderStatus;
       deliveredAt?: Date | null;
+      /** Teslimde damgalanan cayma penceresi sonu (eski siparişte null). */
+      returnWindowEndsAt?: Date | null;
       shipment: {
         status: ShipmentStatus;
         deliveredAt: Date | null;
@@ -626,8 +630,15 @@ export class RefundCreationService {
       const deliveredAt =
         order.deliveredAt ?? order.shipment?.deliveredAt ?? null;
       if (!deliveredAt) return "in_cooling_off";
-      const ageDays = (Date.now() - deliveredAt.getTime()) / (1000 * 3600 * 24);
-      return ageDays <= coolingOffDays
+      // Pencere sonu teslimde damgalandı; escrow ödemesi de aynı damgadan
+      // hesaplanır, bu yüzden iade hakkı ödemeyle çakışamaz. Damgasız eski
+      // siparişte bugünkü pencere geçerlidir.
+      const windowEnd = effectiveReturnWindowEnd(
+        order,
+        deliveredAt,
+        coolingOffDays,
+      );
+      return Date.now() <= windowEnd.getTime()
         ? "in_cooling_off"
         : "past_cooling_off";
     }

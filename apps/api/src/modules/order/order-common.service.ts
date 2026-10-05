@@ -391,6 +391,10 @@ export class OrderCommonService {
       paidAt: (order.payment ?? order.checkoutGroup?.payment)?.paidAt ?? null,
       shippedAt: order.shipment?.shippedAt ?? null,
       deliveredAt: order.deliveredAt ?? order.shipment?.deliveredAt ?? null,
+      // Cayma penceresinin teslimde damgalanan sonu — iade hakkı ve satıcı
+      // ödemesi bunu okur. İstemciler pencereyi kendileri hesaplamamalı;
+      // null = damgadan önce teslim edilmiş ya da henüz teslim edilmemiş.
+      returnWindowEndsAt: order.returnWindowEndsAt ?? null,
       completedAt: order.completedAt ?? null,
       cancelledAt: order.cancelledAt ?? null,
       cancelReason: order.cancelReason ?? null,

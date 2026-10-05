@@ -28,17 +28,43 @@ describe("RefundCreationService.classifyOrderPhase", () => {
   const classify = (order: any, coolingOffDays = 14): string =>
     (service as any).classifyOrderPhase(order, coolingOffDays);
 
-  it("pencere admin tarafından uzatılınca 15. gün hâlâ cayma içindedir", () => {
-    const order = {
-      status: OrderStatus.delivered,
-      deliveredAt: new Date(Date.now() - 15 * 24 * 3600 * 1000),
-      shipment: { status: ShipmentStatus.delivered, deliveredAt: null },
-    };
-    expect(classify(order)).toBe("past_cooling_off");
-    expect(classify(order, 20)).toBe("in_cooling_off");
-  });
-
   const daysAgo = (n: number) => new Date(Date.now() - n * 24 * 3600 * 1000);
+  const daysFromNow = (n: number) =>
+    new Date(Date.now() + n * 24 * 3600 * 1000);
+
+  describe("teslimde damgalanan pencere sonu (returnWindowEndsAt) geçerlidir", () => {
+    it("pencere teslimden SONRA uzatılsa da damga 14 gündeyse 20. gün cayma dışıdır", () => {
+      // Escrow da damga + grace'te serbest kalır: iade ile ödeme çakışamaz.
+      const order = {
+        status: OrderStatus.delivered,
+        deliveredAt: daysAgo(20),
+        returnWindowEndsAt: daysAgo(6),
+        shipment: { status: ShipmentStatus.delivered, deliveredAt: null },
+      };
+      expect(classify(order, 30)).toBe("past_cooling_off");
+    });
+
+    it("pencere teslimden SONRA kısaltılsa da damga 30 gündeyse 20. gün cayma içindedir", () => {
+      const order = {
+        status: OrderStatus.delivered,
+        deliveredAt: daysAgo(20),
+        returnWindowEndsAt: daysFromNow(10),
+        shipment: { status: ShipmentStatus.delivered, deliveredAt: null },
+      };
+      expect(classify(order, 14)).toBe("in_cooling_off");
+    });
+
+    it("damgasız eski siparişte bugünkü pencere geçerlidir", () => {
+      const order = {
+        status: OrderStatus.delivered,
+        deliveredAt: daysAgo(15),
+        returnWindowEndsAt: null,
+        shipment: { status: ShipmentStatus.delivered, deliveredAt: null },
+      };
+      expect(classify(order)).toBe("past_cooling_off");
+      expect(classify(order, 20)).toBe("in_cooling_off");
+    });
+  });
 
   it("awaiting_buyer_confirmation (yeni teslim) → in_cooling_off", () => {
     expect(
