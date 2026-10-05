@@ -36,7 +36,10 @@ import {
   isPreShipmentCancellableStatus,
   type AdminCancelReasonCode,
 } from "@tarodan/types";
-import { REFUND_REQUEST_ACTOR_KEY } from "../payment/helpers/refund-attempt-actor";
+import {
+  REFUND_REQUEST_ACTOR_KEY,
+  REFUND_REQUEST_ADMIN_REASON_KEY,
+} from "../payment/helpers/refund-attempt-actor";
 import {
   PLATFORM_CANCELLATION_FAULT_PARTY,
   PLATFORM_CANCELLATION_REASON,
@@ -412,7 +415,15 @@ export class RefundCreationService {
             description: spec.description,
             // Talep sonradan (admin onayı, takılı deneme kurtarması) iade
             // edilirse iptal aktörü buradan okunur (refundRequestCancelActor).
-            metadata: { [REFUND_REQUEST_ACTOR_KEY]: spec.initiator },
+            // Platform iptalinde neden kodu da talepte taşınır: iptal, iade
+            // hangi yoldan tamamlanırsa (eşzamanlı, admin onayı, kurtarma)
+            // o an siparişe yazılır (refundRequestAdminReasonCode).
+            metadata: {
+              [REFUND_REQUEST_ACTOR_KEY]: spec.initiator,
+              ...(spec.adminReasonCode
+                ? { [REFUND_REQUEST_ADMIN_REASON_KEY]: spec.adminReasonCode }
+                : {}),
+            },
             amount: financial.financials.buyerRefundAmount,
             refundQuantity: order.quantity ?? 1,
             status: policy.requiresAdminReview
@@ -499,6 +510,9 @@ export class RefundCreationService {
           idempotencyKey: `refund-request:${created.id}`,
           // İptalin aktörü spec'ten — alıcı ya da platform (admin iptali).
           cancelledBy: spec.initiator,
+          // Platform iptali bu iadeyle kesinleşirse kod siparişe AYNI
+          // işlemde yazılır (PSP hatasında yazılmaz; talep taşır).
+          adminCancelReasonCode: spec.adminReasonCode,
           settlement: {
             closeOrder: true,
             holdPortion: 1,
@@ -551,15 +565,7 @@ export class RefundCreationService {
     });
     await this.prisma.order.update({
       where: { id: order.id },
-      data: {
-        cancellationType: "iptal",
-        // Yönetici neden kodu YALNIZ iptal gerçekten tamamlanınca yazılır:
-        // PSP hatasında talep incelemeye düşer ve sipariş sonra başka yoldan
-        // yaşar/kapanırsa "yönetici iptali" süzgecine bayat kodla düşmesin.
-        ...(spec.adminReasonCode
-          ? { adminCancelReasonCode: spec.adminReasonCode }
-          : {}),
-      },
+      data: { cancellationType: "iptal" },
     });
     await this.notifications.appendHistory(created.id, {
       action: "cancellation_refunded",

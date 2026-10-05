@@ -367,9 +367,11 @@ describe("RefundCreationService — kargo öncesi iptal çekirdeği", () => {
         status: RefundRequestStatus.refunded,
         decidedBy: "admin-1",
         providerRefundId: "paytr-1",
-        // Sonradan onay/kurtarma yolları aktörü buradan okur.
+        // Sonradan onay/kurtarma yolları aktörü ve neden kodunu buradan
+        // okur (iptal hangi yoldan tamamlanırsa kod o an siparişe yazılır).
         metadata: expect.objectContaining({
           cancellationActor: CancellationActor.platform,
+          adminCancelReasonCode: "stock_error",
         }),
       });
       expect(result.amount).toBe(1180);
@@ -398,8 +400,10 @@ describe("RefundCreationService — kargo öncesi iptal çekirdeği", () => {
         skipRefundEvent: true,
         refundQuantity: 1,
         idempotencyKey: "refund-request:refund-1",
-        // Sipariş Tarodan'ın iptali olarak kapanır.
+        // Sipariş Tarodan'ın iptali olarak kapanır; neden kodu siparişi
+        // kapatan iade işleminde yazılır (PSP düşerse yazılmaz).
         cancelledBy: CancellationActor.platform,
+        adminCancelReasonCode: "stock_error",
         settlement: expect.objectContaining({
           closeOrder: true,
           holdPortion: 1,
@@ -418,18 +422,11 @@ describe("RefundCreationService — kargo öncesi iptal çekirdeği", () => {
           cancelReason: "Yönetici tarafından iptal edildi: Stok hatası",
         }),
       });
-      // Yönetici neden kodu yalnız iade tamamlanınca, İPTAL tipiyle birlikte.
-      expect(prisma.order.update).toHaveBeenLastCalledWith({
-        where: { id: "order-1" },
-        data: {
-          cancellationType: "iptal",
-          adminCancelReasonCode: "stock_error",
-        },
-      });
+      // Çekirdeğin kendi sipariş yazımları kodu taşımaz (iade yazar).
       expect(
-        prisma.order.update.mock.calls
-          .slice(0, -1)
-          .some((call: any[]) => "adminCancelReasonCode" in call[0].data),
+        prisma.order.update.mock.calls.some(
+          (call: any[]) => "adminCancelReasonCode" in call[0].data,
+        ),
       ).toBe(false);
       expect(prisma.paymentHold.updateMany).toHaveBeenCalledWith(
         expect.objectContaining({ data: { frozenByRefundId: "refund-1" } }),

@@ -289,10 +289,14 @@ Admin tarafından başlatılan **iade** (kargodan sonra) yoktur; toplu iptal yok
   (`Order.cancelReason` / `Offer.cancelReason` / iade talebi açıklaması =
   "Yönetici tarafından iptal edildi: <etiket>"); not yalnız denetim kaydındadır,
   hiçbir taraf-yüzlü alana (bildirim, e-posta, talep, iade geçmişi) girmez.
-  Kod `Order.adminCancelReasonCode`'a YALNIZ iptal tamamlanınca yazılır
-  (ödenmemişte iptalle aynı yazımda, ödenmişte iade kesinleşince; PSP
-  hatasında yazılmaz). İptal & İade ekranı nedeni oradan gösterir ve
-  "Yönetici iptali" süzgeci onunla — platform aktörüyle birlikte — süzer.
+  Kod `Order.adminCancelReasonCode`'a YALNIZ iptal tamamlanınca yazılır:
+  ödenmemişte iptalle aynı yazımda; ödenmişte kod iade talebinin
+  `metadata.adminCancelReasonCode`'unda taşınır ve iadeyi kim kesinleştirirse
+  (eşzamanlı başarı, İade Talepleri'nde admin onayı, takılı deneme
+  kurtarması) `processRefund` siparişi KAPATTIĞI işlemde yazar
+  (`ProcessRefundOptions.adminCancelReasonCode`). PSP hatasında yazılmaz.
+  İptal & İade ekranı nedeni oradan gösterir ve "Yönetici iptali" süzgeci
+  onunla — platform aktörüyle birlikte — süzer.
 - **Önizleme → onay**: `GET …/cancel-preview` türü ve sonucu döner (iade tutarı
   ya da "ödeme yok", serbest kalan/geri eklenen adet). Onay `expectedKind`
   taşır; sipariş arada ödendiyse (ön okumada ya da kilit altında) iptal 409
@@ -322,7 +326,10 @@ Admin tarafından başlatılan **iade** (kargodan sonra) yoktur; toplu iptal yok
   `notifyParties: []`); misafir alıcıya zil gönderilmez (ortak sistem hesabı),
   e-posta `orderBuyerContact` ile gerçek adrese gider. Kupon iadesi olduğunda
   ayrıca "kuponunuz geri verildi" (`COUPON_RETURNED`) gider — iptal duyurusu
-  değil, ayrı bir olgudur.
+  değil, ayrı bir olgudur. İptal anında PSP düştüyse duyuru O AN gitmez;
+  iptal sonradan tamamlanınca aynı platform duyurusu (genel iptal/iade metni
+  yerine) tamamlayan yoldan bir kez gider: admin onayında
+  `RefundDecisionService`, kurtarmada `processRefund`.
 - **Teklif**: siparişi OLMAYAN teklifin iptali `POST /admin/offers/:id/cancel`
   ile kalır; canlı siparişi olan teklif o uçta 409 `useOrderCancel` döner ve
   panel sipariş iptal diyaloğunu açar.

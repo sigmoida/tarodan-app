@@ -9,7 +9,10 @@ import { OrderStatus, RefundReason, RefundRequestStatus } from "@prisma/client";
 import { refundRequestKindOf } from "@tarodan/types";
 import { PrismaService } from "../../prisma";
 import { PaymentService } from "../payment/payment.service";
-import { refundRequestCancelActor } from "../payment/helpers/refund-attempt-actor";
+import {
+  refundRequestAdminReasonCode,
+  refundRequestCancelActor,
+} from "../payment/helpers/refund-attempt-actor";
 import { NotificationType } from "../notification/dto/notification.dto";
 import { i18nMessage } from "../i18n";
 import { type RefundFaultPartyV2 } from "./helpers/refund-financial-policy-v2";
@@ -117,6 +120,7 @@ export class RefundDecisionService {
     const isPreShipmentCancellation =
       refundRequestKindOf(rr.policyCode) === "cancellation";
     if (isPreShipmentCancellation) {
+      const platformReason = refundRequestAdminReasonCode(rr.metadata);
       const refundResult = await this.paymentService.processRefund(
         rr.orderId,
         Number(rr.amount),
@@ -127,6 +131,9 @@ export class RefundDecisionService {
           // Admin yalnız onaylıyor; iptalin aktörü talebi başlatandır (alıcı
           // ya da incelemeye düşmüş bir platform iptali).
           cancelledBy: refundRequestCancelActor(rr.metadata),
+          // İncelemeye düşmüş platform iptali şimdi kesinleşiyor: neden kodu
+          // siparişin kapandığı işlemde yazılır.
+          adminCancelReasonCode: platformReason,
           settlement: {
             closeOrder: rr.refundQuantity >= (rr.order.quantity ?? 1),
             holdPortion: Math.min(
@@ -175,6 +182,17 @@ export class RefundDecisionService {
         by: adminId,
         details: { note: note?.trim() || null },
       });
+      // Platform iptali bu onayla tamamlandı: iki tarafa nedenli platform
+      // duyurusu (iptal anında PSP düştüğü için o zaman gitmemişti). Yalnız
+      // bu çağrı iadeyi kesinleştirdiyse — eşzamanlı bir kurtarma önce
+      // kesinleştirdiyse duyuruyu o gönderdi.
+      if (platformReason && refundResult) {
+        await this.notifications.notifyPlatformCancellation(
+          rr.orderId,
+          platformReason,
+          Number(updated.amount),
+        );
+      }
       return updated;
     }
 

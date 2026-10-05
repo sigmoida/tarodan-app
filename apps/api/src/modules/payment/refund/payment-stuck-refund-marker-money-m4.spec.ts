@@ -84,6 +84,7 @@ describe("RefundReconciliationService durable attempt recovery", () => {
     expect(paymentRefund.processRefund).toHaveBeenCalledWith("order-1", 50, {
       idempotencyKey: "manual-refund-1",
       cancelledBy: CancellationActor.system,
+      adminCancelReasonCode: null,
     });
     expect(result).toEqual({
       checked: 1,
@@ -127,6 +128,7 @@ describe("RefundReconciliationService durable attempt recovery", () => {
     expect(paymentRefund.processRefund).toHaveBeenCalledWith("order-1", 50, {
       idempotencyKey: "refund-request:refund-request-1",
       cancelledBy: CancellationActor.buyer,
+      adminCancelReasonCode: null,
     });
   });
 
@@ -148,6 +150,29 @@ describe("RefundReconciliationService durable attempt recovery", () => {
     expect(paymentRefund.processRefund).toHaveBeenCalledWith("order-1", 50, {
       idempotencyKey: "refund-request:refund-request-1",
       cancelledBy: CancellationActor.platform,
+      adminCancelReasonCode: null,
+    });
+  });
+
+  it("completes an admin cancellation that fell to review: the request's reason code goes to processRefund (stamped on the order + platform notice there)", async () => {
+    const attempt = orderAttempt({
+      status: RefundAttemptStatus.succeeded,
+      idempotencyKey: "refund-request:refund-request-1",
+    });
+    const { service, paymentRefund } = makeService({
+      orderAttempts: [attempt],
+      requestMetadata: {
+        cancellationActor: CancellationActor.platform,
+        adminCancelReasonCode: "suspicious_activity",
+      },
+    });
+
+    await service.reconcileStuckRefundMarkers();
+
+    expect(paymentRefund.processRefund).toHaveBeenCalledWith("order-1", 50, {
+      idempotencyKey: "refund-request:refund-request-1",
+      cancelledBy: CancellationActor.platform,
+      adminCancelReasonCode: "suspicious_activity",
     });
   });
 
