@@ -1,11 +1,11 @@
 "use client";
 
-import Link from "next/link";
 import { useTranslations } from "next-intl";
 import { adminOrderCancelBlockerOf } from "@tarodan/types";
 import { Badge, orderStatusConfig } from "@tarodan/ui";
 import { DataList, Field } from "@/components/detail/DataList";
 import { SectionCard } from "@/components/detail/SectionCard";
+import { TextLink } from "@/components/TextLink";
 import { fmtDateTime, fmtTry } from "@/lib/format";
 import { statusConfig } from "@/lib/statusLabels";
 import {
@@ -33,12 +33,9 @@ export function LinkedOrderSection({
         <>
           <DataList columns={2}>
             <Field label={t("admin.operations.orders.orderNumber")}>
-              <Link
-                href={`/operations/orders/${order.id}`}
-                className="font-mono text-primary-600 hover:underline"
-              >
+              <TextLink href={`/operations/orders/${order.id}`} mono>
                 {order.orderNumber}
-              </Link>
+              </TextLink>
             </Field>
             <Field label={t("common.status")}>
               <Badge

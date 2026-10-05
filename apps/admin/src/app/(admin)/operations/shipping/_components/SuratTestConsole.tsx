@@ -6,7 +6,9 @@ import toast from "react-hot-toast";
 import { Button, Input } from "@tarodan/ui";
 import { adminApi } from "@/lib/api";
 import { extractErrorMessage } from "@/lib/error";
+import { Panel } from "@/components/detail/Panel";
 import { SectionCard } from "@/components/detail/SectionCard";
+import { TextLink } from "@/components/TextLink";
 import { useConfirm } from "@/provider/ConfirmProvider";
 
 /**
@@ -97,7 +99,11 @@ export function SuratTestConsole() {
       </div>
 
       {testResult && (
-        <div className="space-y-2 rounded-lg bg-surface-alt p-3 font-mono text-xs">
+        <Panel
+          tone="muted"
+          padding="sm"
+          className="space-y-2 font-mono text-xs"
+        >
           {testResult.error ? (
             <div className="text-danger-600">
               {t("common.error")}: {String(testResult.error)}
@@ -160,14 +166,9 @@ export function SuratTestConsole() {
                 <div>
                   {t("admin.operations.common.trackingNumber")}:{" "}
                   {testResult.track?.takipUrl ? (
-                    <a
-                      href={testResult.track.takipUrl}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="text-primary-600 hover:underline"
-                    >
+                    <TextLink external href={testResult.track.takipUrl}>
                       {testResult.track.kargoTakipNo}
-                    </a>
+                    </TextLink>
                   ) : (
                     <span className="text-body">
                       {testResult.track.kargoTakipNo}
@@ -177,7 +178,7 @@ export function SuratTestConsole() {
               )}
             </>
           )}
-        </div>
+        </Panel>
       )}
 
       <div className="space-y-2 border-t border-border pt-3">
@@ -201,9 +202,11 @@ export function SuratTestConsole() {
           </Button>
         </div>
         {opResult && (
-          <pre className="max-h-56 overflow-auto whitespace-pre-wrap rounded-lg bg-surface-alt p-3 font-mono text-xs text-body">
-            {JSON.stringify(opResult, null, 2)}
-          </pre>
+          <Panel tone="muted" padding="sm">
+            <pre className="max-h-56 overflow-auto whitespace-pre-wrap font-mono text-xs text-body">
+              {JSON.stringify(opResult, null, 2)}
+            </pre>
+          </Panel>
         )}
       </div>
 

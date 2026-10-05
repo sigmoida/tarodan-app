@@ -10,6 +10,7 @@ import {
 } from "@tarodan/types";
 import { Alert, Modal, ModalFooter, Select, Textarea } from "@tarodan/ui";
 import { adminCancelReasonOptions } from "@/lib/admin-cancel-reasons";
+import { Panel } from "@/components/detail/Panel";
 import { fmtTry } from "@/lib/format";
 import { useOrderCancel } from "../_hooks/useOrderCancel";
 import {
@@ -99,7 +100,7 @@ export function CancelOrderModal({
             ? t("admin.operations.orders.cancel.warningUnpaid")
             : t("admin.operations.orders.cancel.warning")}
         </Alert>
-        <div className="rounded-lg bg-surface-alt px-4 py-3 text-sm">
+        <Panel tone="muted" className="text-sm">
           {preview.data ? (
             <CancelPreviewSummary preview={preview.data} />
           ) : (
@@ -109,7 +110,7 @@ export function CancelOrderModal({
                 : t("admin.operations.orders.cancel.previewLoading")}
             </p>
           )}
-        </div>
+        </Panel>
         {isOfferOrder && (
           <p className="text-sm text-muted">
             {t("admin.operations.orders.cancel.offerOrder")}

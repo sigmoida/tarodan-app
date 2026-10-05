@@ -207,7 +207,7 @@ export default function TradeDetailPage() {
             </div>
 
             {trade.shipments && trade.shipments.length > 0 && (
-              <div className="space-y-6">
+              <>
                 {toWarehouse.length > 0 && (
                   <ShipmentLegCard
                     title={t("admin.operations.trades.legToWarehouse")}
@@ -267,7 +267,7 @@ export default function TradeDetailPage() {
                     }
                   />
                 )}
-              </div>
+              </>
             )}
 
             <TradeInfoCards trade={trade} />
