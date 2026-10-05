@@ -97,6 +97,9 @@ export class OfferService {
    * - Uses FOR UPDATE SKIP LOCKED to prevent race conditions
    */
   async create(buyerId: string, dto: CreateOfferDto) {
+    // Süre işlem AÇILMADAN okunur: işlem bir bağlantı tutarken ikinci bir
+    // bağlantı beklemesin (havuz tükenmesi).
+    const expiresAt = await this.offerExpiresAt();
     // Use transaction with row locking for race condition prevention
     const result = await this.prisma.$transaction(async (tx) => {
       // Lock product row with FOR UPDATE SKIP LOCKED to prevent race conditions
@@ -176,7 +179,6 @@ export class OfferService {
       }
 
       // Calculate expiration time
-      const expiresAt = await this.offerExpiresAt();
 
       // Create offer
       const offer = await tx.offer.create({
@@ -272,6 +274,8 @@ export class OfferService {
     // (direct/group checkout ile aynı sıra; tx içinde dış okuma yapılmaz).
     const { shippingTariff, commissionRuleSet } =
       await this.checkoutCommon.resolveOfferOrderSnapshots();
+    // Ödeme penceresi işlem AÇILMADAN okunur (havuz tükenmesi; bkz. yukarı).
+    const paymentExpiresAt = await paymentWindowEnd(this.prisma);
     const result = await this.prisma.$transaction(async (tx) => {
       // Lock offer row with FOR UPDATE
       const lockedOffers = await tx.$queryRaw<{ id: string }[]>`
@@ -482,7 +486,7 @@ export class OfferService {
             pricing: offerPricing,
           }),
           status: OrderStatus.pending_payment,
-          paymentExpiresAt: await paymentWindowEnd(this.prisma),
+          paymentExpiresAt,
         },
       });
 
@@ -683,6 +687,9 @@ export class OfferService {
    * POST /offers/:id/counter
    */
   async counter(offerId: string, sellerId: string, dto: CounterOfferDto) {
+    // Süre işlem AÇILMADAN okunur: işlem bir bağlantı tutarken ikinci bir
+    // bağlantı beklemesin (havuz tükenmesi).
+    const expiresAt = await this.offerExpiresAt();
     return this.prisma.$transaction(async (tx) => {
       const offer = await tx.offer.findUnique({
         where: { id: offerId },
@@ -749,7 +756,6 @@ export class OfferService {
       });
 
       // Yeni kayıt: aynı alıcı/satıcı; kabul hakkı alıcıda (buyerMustAccept)
-      const expiresAt = await this.offerExpiresAt();
 
       const counterOffer = await tx.offer.create({
         data: {
@@ -813,6 +819,9 @@ export class OfferService {
    * POST /offers/:id/buyer-counter
    */
   async buyerCounter(offerId: string, buyerId: string, dto: CounterOfferDto) {
+    // Süre işlem AÇILMADAN okunur: işlem bir bağlantı tutarken ikinci bir
+    // bağlantı beklemesin (havuz tükenmesi).
+    const expiresAt = await this.offerExpiresAt();
     return this.prisma.$transaction(async (tx) => {
       const offer = await tx.offer.findUnique({
         where: { id: offerId },
@@ -878,8 +887,6 @@ export class OfferService {
           cancelReason: OFFER_CANCEL_REASON.supersededByBuyerCounter,
         },
       });
-
-      const expiresAt = await this.offerExpiresAt();
 
       const newOffer = await tx.offer.create({
         data: {

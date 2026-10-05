@@ -123,16 +123,19 @@ describe("AdminSettingsService warehouse address", () => {
  */
 describe("AdminSettingsService — Süreler ve Kurallar anahtarları", () => {
   const makeService = () => {
-    const prisma = {
+    const prisma: any = {
       platformSetting: {
         findUnique: jest.fn().mockResolvedValue(null),
         upsert: jest.fn().mockResolvedValue({ id: "s1" }),
       },
       adminUser: { findFirst: jest.fn().mockResolvedValue({ id: "admin-1" }) },
-      $transaction: jest.fn((fn: any) => fn(prisma)),
     };
+    prisma.$transaction = jest.fn((fn: (tx: unknown) => unknown) => fn(prisma));
     const audit = { createAuditLog: jest.fn() };
-    return { service: new AdminSettingsService(prisma as any, audit as any), prisma };
+    return {
+      service: new AdminSettingsService(prisma as any, audit as any),
+      prisma,
+    };
   };
 
   it.each([

@@ -18,7 +18,11 @@ describe("OfferService — user blocks", () => {
     };
     const userBlocks = userBlockServiceStub({ blockedEither: blocked });
     const service = new OfferService(
-      { $transaction: jest.fn((fn: any) => fn(tx)) } as any,
+      {
+        $transaction: jest.fn((fn: any) => fn(tx)),
+        // Süreler işlem açılmadan Süreler ve Kurallar'dan okunur.
+        platformSetting: { findUnique: jest.fn().mockResolvedValue(null) },
+      } as any,
       { del: jest.fn(), delByPattern: jest.fn() } as any,
       { get: () => "24" } as any,
       {} as any,

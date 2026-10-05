@@ -115,6 +115,9 @@ export class OrderCheckoutDirectService {
       throw new ForbiddenException(i18nMessage("server.order.accountBanned"));
     }
 
+    // Ödeme penceresi işlem AÇILMADAN okunur: işlem bir bağlantı tutarken
+    // ikinci bir bağlantı beklemesin (eşzamanlı checkout'ta havuz tükenmesi).
+    const paymentExpiresAt = await paymentWindowEnd(this.prisma);
     const result = await this.prisma.$transaction(async (tx) => {
       const lockedRows = await tx.$queryRaw<{ id: string }[]>`
         SELECT p.id
@@ -558,7 +561,6 @@ export class OrderCheckoutDirectService {
           buyerShippingAmount,
           sellerShippingAmount,
         });
-      const paymentExpiresAt = await paymentWindowEnd(this.prisma);
 
       // Create order with discount info
       const order = await tx.order.create({

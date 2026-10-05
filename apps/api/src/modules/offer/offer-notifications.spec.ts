@@ -200,6 +200,8 @@ describe("Teklif — bildirimler ve fiyat tabanı", () => {
     const service = new OfferService(
       {
         $transaction: jest.fn().mockImplementation((fn: any) => fn(tx)),
+        // Teklif geçerliliği Süreler ve Kurallar'dan, işlem açılmadan okunur.
+        platformSetting: { findUnique: jest.fn().mockResolvedValue(null) },
       } as any,
       { del: jest.fn(), delByPattern: jest.fn() } as any,
       { get: () => undefined } as any,

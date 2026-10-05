@@ -675,6 +675,9 @@ export class OrderLifecycleService {
       );
     }
 
+    // Ödeme penceresi işlem AÇILMADAN okunur: işlem bir bağlantı tutarken
+    // ikinci bir bağlantı beklemesin (eşzamanlı checkout'ta havuz tükenmesi).
+    const paymentExpiresAt = await paymentWindowEnd(this.prisma);
     await this.prisma.$transaction(async (tx) => {
       // Yeniden rezerve et (FOR UPDATE ile)
       await this.productLockService.checkAndReserve(tx, order.productId, 1);
@@ -685,7 +688,7 @@ export class OrderLifecycleService {
           // TAZE ödeme penceresi: sıfırlanmazsa süresi geçmiş paymentExpiresAt
           // yüzünden bir sonraki cron taraması siparişi anında yeniden iptal
           // ederdi. Pencere, teklif kabulündekiyle aynı (24 saat).
-          paymentExpiresAt: await paymentWindowEnd(this.prisma),
+          paymentExpiresAt,
           // Rezervasyon YUKARIDA tazelendi; bayrak temizlenmezse ödeme
           // başlatma "rezervasyon bırakılmış" dalına girip aynı adetleri
           // İKİNCİ kez rezerve eder (tekil üründe kalıcı stok-dışı görünüm).
