@@ -40,10 +40,20 @@ describe("TradeLifecycleService.resolveDispute — tazminat sözleşmesi", () =>
           .mockResolvedValue([{ productId: "p1", quantity: 1 }]),
       },
       product: {
-        findMany: jest
-          .fn()
-          .mockResolvedValue([{ id: "p1", quantity: 1, reservedQuantity: 1 }]),
+        findMany: jest.fn().mockResolvedValue([
+          {
+            id: "p1",
+            status: "reserved",
+            quantity: 1,
+            reservedQuantity: 1,
+          },
+        ]),
         update: jest.fn().mockResolvedValue({}),
+        updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+      },
+      // Takasla stoğu biten ilanın kaldırma kaydı (recordListingRemovals).
+      productRemovalEvent: {
+        createMany: jest.fn().mockResolvedValue({ count: 1 }),
       },
       tradeCashPayment: { updateMany: txCashUpdateMany },
       platformSetting: { findUnique: jest.fn().mockResolvedValue(null) },

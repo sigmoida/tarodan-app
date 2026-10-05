@@ -1,6 +1,11 @@
-import { ProductInactiveReason, ProductStatus } from "@prisma/client";
+import {
+  ListingRemovalReason,
+  ProductInactiveReason,
+  ProductStatus,
+} from "@prisma/client";
 import {
   clearStaleInactiveReasonOnWrite,
+  clearStaleRemovalReasonOnWrite,
   shouldQuarantineReturnedStock,
   statusAfterStockRestore,
 } from "./product-status.helper";
@@ -97,6 +102,82 @@ describe("clearStaleInactiveReasonOnWrite", () => {
 
   it("data undefined ise güvenle no-op'tur", () => {
     expect(() => clearStaleInactiveReasonOnWrite(undefined)).not.toThrow();
+  });
+});
+
+/**
+ * `removalReason` ilan vitrinden düşmüşken anlamlıdır; vitrine dönen (ya da
+ * satılan, onaya giden) her yazımda temizlenir. Kaldırma statüsüne yapılan
+ * yazımlara dokunulmaz: nedeni o yazımın ardından `recordListingRemovals`
+ * damgalar ve aynı statünün yeniden yazılması mevcut nedeni silmemelidir.
+ */
+describe("clearStaleRemovalReasonOnWrite", () => {
+  it.each([
+    ["yeniden yayın (active)", ProductStatus.active],
+    ["onaya gönderme / geri yükleme (pending)", ProductStatus.pending],
+    ["satış (sold)", ProductStatus.sold],
+    ["rezervasyon (reserved)", ProductStatus.reserved],
+  ])("ilan %s ile vitrine dönünce neden temizlenir", (_label, status) => {
+    const data: Record<string, unknown> = { status };
+    clearStaleRemovalReasonOnWrite(data);
+    expect(data.removalReason).toBeNull();
+  });
+
+  it.each([
+    ProductStatus.inactive,
+    ProductStatus.deleted,
+    ProductStatus.rejected,
+    ProductStatus.suspended,
+  ])("kaldırma statüsüne (%s) yazımda nedene dokunmaz", (status) => {
+    const data: Record<string, unknown> = { status };
+    clearStaleRemovalReasonOnWrite(data);
+    expect(data).not.toHaveProperty("removalReason");
+  });
+
+  it("çağıran nedeni AYNI yazımda belirtmişse dokunmaz", () => {
+    const data: Record<string, unknown> = {
+      status: ProductStatus.active,
+      removalReason: ListingRemovalReason.changed_mind,
+    };
+    clearStaleRemovalReasonOnWrite(data);
+    expect(data.removalReason).toBe(ListingRemovalReason.changed_mind);
+  });
+
+  it("statü yazılmıyorsa (ya da `status: undefined` = dokunma) hiçbir şey yapmaz", () => {
+    const quantityOnly: Record<string, unknown> = { quantity: 3 };
+    clearStaleRemovalReasonOnWrite(quantityOnly);
+    expect(quantityOnly).not.toHaveProperty("removalReason");
+
+    const untouched: Record<string, unknown> = { status: undefined, title: "x" };
+    clearStaleRemovalReasonOnWrite(untouched);
+    expect(untouched).not.toHaveProperty("removalReason");
+  });
+
+  it("inactiveReason kuralını DEĞİŞTİRMEZ: iki temizleyici birlikte çalışır", () => {
+    // Middleware ikisini aynı `data` üzerinde sırayla uygular.
+    const renew: Record<string, unknown> = { status: ProductStatus.active };
+    clearStaleInactiveReasonOnWrite(renew);
+    clearStaleRemovalReasonOnWrite(renew);
+    expect(renew).toEqual({
+      status: ProductStatus.active,
+      inactiveReason: null,
+      removalReason: null,
+    });
+
+    const expire: Record<string, unknown> = {
+      status: ProductStatus.inactive,
+      inactiveReason: ProductInactiveReason.expired,
+    };
+    clearStaleInactiveReasonOnWrite(expire);
+    clearStaleRemovalReasonOnWrite(expire);
+    expect(expire).toEqual({
+      status: ProductStatus.inactive,
+      inactiveReason: ProductInactiveReason.expired,
+    });
+  });
+
+  it("data undefined ise güvenle no-op'tur", () => {
+    expect(() => clearStaleRemovalReasonOnWrite(undefined)).not.toThrow();
   });
 });
 

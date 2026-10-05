@@ -7,6 +7,7 @@ import {
   PaymentHoldStatus,
   ProductStatus,
   ProductInactiveReason,
+  ListingRemovalReason,
 } from "@prisma/client";
 
 /**
@@ -113,6 +114,11 @@ describe("PaymentRefundService.processRefund — post-delivery return stock quar
           captured.productUpdate = arg;
           return Promise.resolve({});
         }),
+        updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+      },
+      // Karantinanın kaldırma kaydı (recordListingRemovals).
+      productRemovalEvent: {
+        createMany: jest.fn().mockResolvedValue({ count: 1 }),
       },
       offer: { updateMany: jest.fn().mockResolvedValue({ count: 0 }) },
     };
@@ -210,6 +216,29 @@ describe("PaymentRefundService.processRefund — post-delivery return stock quar
     expect((result as any).stockQuarantined).toBe(true);
   });
 
+  it("karantina vitrinden düşüşü 'return_quarantine' nedeniyle kaydeder (davranış işaretiyle aynı ad)", async () => {
+    const { service, mockTx } = makeService({
+      paymentAmount: 500,
+      orderQuantity: 1,
+      deliveredAt: new Date("2026-09-10T10:00:00Z"),
+      productQuantity: 2,
+      productStatus: ProductStatus.active,
+    });
+
+    await service.processRefund(ORDER_ID, 500, refundOpts());
+
+    expect(mockTx.productRemovalEvent.createMany).toHaveBeenCalledWith({
+      data: [
+        expect.objectContaining({
+          productId: "prod-1",
+          reason: ListingRemovalReason.return_quarantine,
+          statusBefore: ProductStatus.active,
+          statusAfter: ProductStatus.inactive,
+        }),
+      ],
+    });
+  });
+
   it("teslim SONRASI iade: çok adetli ilanda kalan adet > 0 olsa da TÜM ilan pasif", async () => {
     // 5 adetlik ilanın 2'si iade edildi; kalan 3 adet zaten stokta olsa da
     // (newQty = 3 + 2 = 5 > 0) güvenlik önceliği ile ilan pasife düşer.
@@ -277,7 +306,7 @@ describe("PaymentRefundService.processRefund — post-delivery return stock quar
     // 3 adetlik ilanın bir birimi teslim sonrası iade edildi → karantinada.
     // Aynı ilanın kargolanmamış başka bir siparişi iptal ediliyor: miktar
     // artar ama ilan karantinada kalır (satıcı incelemeden satılmasın).
-    const { service, captured } = makeService({
+    const { service, captured, mockTx } = makeService({
       paymentAmount: 500,
       orderQuantity: 1,
       deliveredAt: null,
@@ -295,6 +324,8 @@ describe("PaymentRefundService.processRefund — post-delivery return stock quar
     });
     // Yeni karantina değil: "ilan pasife alındı" bildirimi tekrar gitmesin.
     expect((result as any).stockQuarantined).toBe(false);
+    // Zaten vitrin dışındaki ilan için ikinci kaldırma kaydı düşülmez.
+    expect(mockTx.productRemovalEvent.createMany).not.toHaveBeenCalled();
   });
 
   it("sınırsız stok (quantity null) → karantina uygulanmaz, ürün hiç güncellenmez", async () => {

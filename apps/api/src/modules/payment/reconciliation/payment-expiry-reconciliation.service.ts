@@ -3,6 +3,7 @@ import { ConfigService } from "@nestjs/config";
 import { PrismaService } from "../../../prisma";
 import {
   CancellationActor,
+  ListingRemovalReason,
   PaymentStatus,
   PaymentHoldStatus,
   OrderStatus,
@@ -14,6 +15,10 @@ import {
   statusAfterStockRestore,
 } from "../../product/helpers/product-status.helper";
 import { safeDecrementReserved } from "../../product/helpers/product-availability.helper";
+import {
+  recordListingRemovals,
+  stockStatusRemovalReason,
+} from "../../product/helpers/listing-removal";
 import { CacheService } from "../../cache/cache.service";
 import { NotificationService } from "../../notification/notification.service";
 import { NotificationType } from "../../notification/dto/notification.dto";
@@ -171,7 +176,7 @@ export class PaymentExpiryReconciliationService {
             await tx.$queryRaw`SELECT id FROM products WHERE id = ${order.productId} FOR UPDATE`;
             const product = await tx.product.findUnique({
               where: { id: order.productId },
-              select: { reservedQuantity: true, quantity: true },
+              select: { reservedQuantity: true, quantity: true, status: true },
             });
             if (product) {
               // Adet bazlı: rezervasyonu sipariş adedi kadar serbest bırak (1 değil).
@@ -179,14 +184,26 @@ export class PaymentExpiryReconciliationService {
                 product.reservedQuantity,
                 fresh.quantity ?? 1,
               );
+              const nextStatus = getReservedAwareStatus(
+                product.quantity,
+                newReserved,
+              );
               await tx.product.update({
                 where: { id: order.productId },
                 data: {
                   reservedQuantity: newReserved,
                   // Bulgu C: rezerv-duyarlı status (quantity=null → active, quantity=0 → inactive).
-                  status: getReservedAwareStatus(product.quantity, newReserved),
+                  status: nextStatus,
                 },
               });
+              await recordListingRemovals(tx, [
+                {
+                  productId: order.productId,
+                  statusBefore: product.status,
+                  statusAfter: nextStatus,
+                  reason: ListingRemovalReason.out_of_stock,
+                },
+              ]);
             }
           }
 
@@ -585,6 +602,13 @@ export class PaymentExpiryReconciliationService {
             order.product.quantity !== null
               ? order.product.quantity + restoreQty
               : null;
+          // Teslim edilmemiş siparişin iptali: yeni karantina yok, ama
+          // ilan başka bir iadeden karantinadaysa karantinada kalır.
+          const restored = statusAfterStockRestore(
+            order.product,
+            newQuantity,
+            false,
+          );
           await tx.product.update({
             where: { id: order.product.id },
             data: {
@@ -592,11 +616,17 @@ export class PaymentExpiryReconciliationService {
                 order.product.quantity !== null
                   ? { increment: restoreQty }
                   : undefined,
-              // Teslim edilmemiş siparişin iptali: yeni karantina yok, ama
-              // ilan başka bir iadeden karantinadaysa karantinada kalır.
-              ...statusAfterStockRestore(order.product, newQuantity, false),
+              ...restored,
             },
           });
+          await recordListingRemovals(tx, [
+            {
+              productId: order.product.id,
+              statusBefore: order.product.status,
+              statusAfter: restored.status,
+              reason: stockStatusRemovalReason(restored.inactiveReason),
+            },
+          ]);
           outcome = "cancelled";
         });
 

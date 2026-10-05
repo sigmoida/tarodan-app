@@ -33,6 +33,7 @@ import { ProductBoostService } from "./ranking/product-boost.service";
 import { ProductRenewalService } from "./lifecycle/product-renewal.service";
 import {
   CreateProductDto,
+  DeleteProductDto,
   UpdateProductDto,
   ProductQueryDto,
   ProductResponseDto,
@@ -544,15 +545,24 @@ export class ProductController {
 
   /**
    * DELETE /products/:id
-   * Delete product (owner only)
+   * Delete product (owner only). Opsiyonel gövde: silme nedeni
+   * (`removalReason`, `removalPlatform`, `removalDetail`) — gönderilmezse
+   * `not_given` kaydedilir (eski mobil sürümler).
    */
   @Delete(":id")
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
-  @ApiOperation({ summary: "Ürün sil" })
+  @ApiOperation({
+    summary: "Ürün sil",
+    description:
+      "Optional JSON body with the removal reason (DeleteProductDto). Omitted reason is recorded as not_given.",
+  })
   @ApiParam({ name: "id", description: "Product ID (UUID format)" })
   @ApiResponse({ status: 200, description: "Ürün silindi" })
-  @ApiResponse({ status: 400, description: "Geçersiz ürün ID formatı" })
+  @ApiResponse({
+    status: 400,
+    description: "Geçersiz ürün ID formatı ya da geçersiz silme nedeni",
+  })
   @ApiResponse({ status: 403, description: "Yetkiniz yok" })
   @ApiResponse({ status: 404, description: "Ürün bulunamadı" })
   async remove(
@@ -569,8 +579,9 @@ export class ProductController {
     id: string,
     @CurrentUser("id") sellerId: string,
     @ReqLocale() locale: Locale,
+    @Body() dto: DeleteProductDto,
   ) {
-    await this.productService.remove(id, sellerId);
+    await this.productService.remove(id, sellerId, dto);
     return { message: this.i18n.translate("server.product.deleted", locale) };
   }
 

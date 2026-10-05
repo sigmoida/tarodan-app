@@ -18,8 +18,13 @@ import { notifyWebRevalidate } from "../../../common/helpers/revalidate";
 import { NotificationService } from "../../notification/notification.service";
 import { NotificationType } from "../../notification/dto";
 import { SmtpProvider } from "../../mail/smtp.provider";
-import { UpdateProductDto } from "../dto";
-import { OfferStatus, ProductStatus, Prisma } from "@prisma/client";
+import { DeleteProductDto, UpdateProductDto, removalInputOf } from "../dto";
+import {
+  ListingRemovalReason,
+  OfferStatus,
+  ProductStatus,
+  Prisma,
+} from "@prisma/client";
 import { renderManagedEmailTemplate } from "../../../common/helpers/email-template-renderer";
 import { ProductCommonService } from "../product-common.service";
 import { PUBLIC_IDENTITY_SELECT } from "../../../common/helpers/public-identity";
@@ -42,6 +47,14 @@ import {
   productPriceLimitViolation,
 } from "../helpers/product-price-limits";
 import { frontendUrl as resolveFrontendUrl } from "../../../config/app-urls";
+import {
+  recordListingRemovals,
+  type ListingRemovalEntry,
+} from "../helpers/listing-removal";
+import {
+  sellerRemovalFields,
+  type ListingRemovalReasonFields,
+} from "../helpers/listing-removal-input";
 
 /**
  * ProductUpdateService — ilan güncelleme + silme (soft delete). Optimistic lock,
@@ -448,6 +461,22 @@ export class ProductUpdateService {
           : dto.price;
 
     const resolvedStatus = resolveUpdatedStatus(product, dto, actor);
+    // Bu düzenleme ilanı vitrinden düşürüyorsa NEDENİ: satıcının pasife alması
+    // kendi seçtiği nedeni taşır (eski istemci → not_given); stoğun 0'a
+    // çekilmesi (satıcı ya da yönetici düzenlemesi) "stok tükendi"dir. Neden
+    // yazımdan ÖNCE doğrulanır — geçersiz neden hiçbir şey yazdırmaz.
+    const removal: ListingRemovalEntry | null =
+      resolvedStatus === ProductStatus.inactive &&
+      product.status !== ProductStatus.inactive
+        ? {
+            productId: id,
+            statusBefore: product.status,
+            statusAfter: ProductStatus.inactive,
+            actorUserId:
+              actor.kind === "seller" ? actor.sellerId : actor.adminId,
+            ...this.deactivationReason(actor, dto),
+          }
+        : null;
     const remainsListable =
       dto.status !== ProductStatus.inactive &&
       resolvedStatus !== ProductStatus.inactive;
@@ -622,7 +651,7 @@ export class ProductUpdateService {
             });
           }
         }
-        return tx.product.update({
+        const row = await tx.product.update({
           where: {
             id,
             version: product.version, // Optimistic lock check
@@ -663,6 +692,9 @@ export class ProductUpdateService {
             },
           },
         });
+        // Neden statüyle AYNI transaction'da: iyimser kilit düşerse kayıt da düşer.
+        if (removal) await recordListingRemovals(tx, [removal]);
+        return row;
       });
 
       // `attributesChanged` yerine çözülmüş sonucun kendisiyle daraltılır:
@@ -817,6 +849,22 @@ export class ProductUpdateService {
    */
 
   /**
+   * Düzenlemeyle pasife düşen ilanın nedeni. Satıcı `status: inactive`
+   * istediyse bu onun kararıdır (seçtiği neden; eski istemci → `not_given`);
+   * aksi hâlde pasife düşüşün tek sebebi stoğun 0'a çekilmesidir
+   * (`resolveUpdatedStatus`) — kimin düzenlediğinden bağımsız "stok tükendi".
+   */
+  private deactivationReason(
+    actor: ProductUpdateActor,
+    dto: UpdateProductDto,
+  ): ListingRemovalReasonFields {
+    if (actor.kind === "seller" && dto.status === ProductStatus.inactive) {
+      return sellerRemovalFields("deactivate", removalInputOf(dto));
+    }
+    return { reason: ListingRemovalReason.out_of_stock };
+  }
+
+  /**
    * Notify users who have this product in their wishlist about price change
    * Sends both in-app notifications and emails
    */
@@ -926,10 +974,17 @@ export class ProductUpdateService {
   }
 
   /**
-   * Delete product (soft delete by setting inactive)
+   * Delete product (soft delete by setting `deleted`)
    * DELETE /products/:id
+   *
+   * `removal` satıcının nedenidir (opsiyonel gövde): neden gönderilmediyse
+   * (yayındaki mobil sürümler) silme yine yapılır ve `not_given` kaydedilir.
    */
-  async remove(id: string, sellerId: string): Promise<void> {
+  async remove(
+    id: string,
+    sellerId: string,
+    removal?: DeleteProductDto,
+  ): Promise<void> {
     const product = await this.prisma.product.findUnique({
       where: { id },
     });
@@ -955,12 +1010,29 @@ export class ProductUpdateService {
       );
     }
 
+    // Neden yazımdan ÖNCE doğrulanır: geçersiz neden ilanı silmez.
+    const reasonFields = sellerRemovalFields(
+      "delete",
+      removalInputOf(removal),
+    );
+
     // Soft delete: set status to deleted (pasiften AYRI state — silinen ürün
     // yeniden aktive edilemez; "pasife alma"dan farklı). Tekrar satmak için
-    // satıcı yeni ilan açar.
-    await this.prisma.product.update({
-      where: { id },
-      data: { status: ProductStatus.deleted },
+    // satıcı yeni ilan açar. Neden statüyle aynı transaction'da kaydedilir.
+    await this.prisma.$transaction(async (tx) => {
+      await tx.product.update({
+        where: { id },
+        data: { status: ProductStatus.deleted },
+      });
+      await recordListingRemovals(tx, [
+        {
+          productId: id,
+          statusBefore: product.status,
+          statusAfter: ProductStatus.deleted,
+          actorUserId: sellerId,
+          ...reasonFields,
+        },
+      ]);
     });
 
     // Bekleyen teklifler ANINDA gerekçeyle kapatılır — eskiden açık kalıp

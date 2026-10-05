@@ -22,6 +22,10 @@ import {
   shouldQuarantineReturnedStock,
   statusAfterStockRestore,
 } from "../../product/helpers/product-status.helper";
+import {
+  recordListingRemovals,
+  stockStatusRemovalReason,
+} from "../../product/helpers/listing-removal";
 import { PaymentProviderRegistry } from "../../payment-providers/payment-provider.registry";
 import { PaymentProvider } from "../dto";
 import { EventService } from "../../events";
@@ -1056,6 +1060,11 @@ export class PaymentRefundService {
                 const quarantine = shouldQuarantineReturnedStock(
                   orderRow?.deliveredAt ?? null,
                 );
+                const restored = statusAfterStockRestore(
+                  product,
+                  newQty,
+                  quarantine,
+                );
                 await tx.product.update({
                   where: { id: orderRow.productId },
                   data: {
@@ -1063,9 +1072,19 @@ export class PaymentRefundService {
                     // status + inactiveReason birlikte: karantinadaki ilan
                     // teslimat öncesi bir iptalle satışa geri açılmaz — bkz.
                     // statusAfterStockRestore / resolveUpdatedStatus.
-                    ...statusAfterStockRestore(product, newQty, quarantine),
+                    ...restored,
                   },
                 });
+                // Karantinaya alınan ilan vitrinden "iade kontrolü bekliyor"
+                // nedeniyle düşer (davranış işaretiyle AYNI ad).
+                await recordListingRemovals(tx, [
+                  {
+                    productId: orderRow.productId,
+                    statusBefore: product.status,
+                    statusAfter: restored.status,
+                    reason: stockStatusRemovalReason(restored.inactiveReason),
+                  },
+                ]);
                 stockQuarantined = quarantine;
                 this.logger.log(
                   `Restored ${restoreQty} stock for product ${orderRow.productId} after refund of order ${orderId}` +

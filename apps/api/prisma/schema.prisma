@@ -838,6 +838,17 @@ model Product {
   /// PrismaService'in Product middleware'inde tek entegrasyon noktası) — aksi
   /// hâlde bayat bir işaret ilerideki bir moderasyon turunu atlatabilir.
   inactiveReason      ProductInactiveReason?  @map("inactive_reason")
+  /// İlanın vitrinden düşmesinin GÜNCEL nedeni — son `ProductRemovalEvent`
+  /// satırının `reason` kopyası; liste/filtre ekranları JOIN'siz okusun diye
+  /// burada. Tek yazıcısı `recordListingRemovals`dır (kaldırma olayıyla aynı
+  /// anda yazılır). `inactiveReason`tan FARKI: o bir DAVRANIŞ işaretidir
+  /// (satıcı bu pasif ilanla ne yapabilir — yenile / doğrudan aç), bu ise
+  /// AÇIKLAMADIR (ilan neden vitrinde değil — dört kaldırma statüsünün hepsi
+  /// için). `expired` / `return_quarantine` ikisinde de aynı adla yazılır.
+  /// İlan kaldırma statülerinin (inactive/deleted/rejected/suspended) dışına
+  /// çıktığında PrismaService middleware'i temizler. null + kaldırma statüsü =
+  /// bu özellikten ÖNCE düşmüş ilan → "bilinmiyor" (geri doldurma yok).
+  removalReason       ListingRemovalReason?   @map("removal_reason")
   /// Son ONAY anındaki moderasyona konu içeriğin parmak izi (başlık, açıklama,
   /// kategori/marka/üretici, görseller — bkz. computeProductContentFingerprint).
   /// Süresi dolan ilanın satıcı yenilemesinde güncel içeriğin izi bununla
@@ -868,6 +879,7 @@ model Product {
   likes               ProductLike[]
   productRatings      ProductRating[]
   boosts              ProductBoost[]
+  removalEvents       ProductRemovalEvent[]
   brand               Brand?                  @relation(fields: [brandId], references: [id])
   carModel            CarModel?               @relation(fields: [carModelId], references: [id])
   category            Category                @relation(fields: [categoryId], references: [id])
@@ -897,7 +909,48 @@ model Product {
   @@index([boostedUntil, boostedAt(sort: Desc)])
   @@index([homeShowcaseUntil, boostedAt(sort: Desc)])
   @@index([relevanceScore(sort: Desc)])
+  // Admin ürün listesi: kaldırma nedeni / kaldıran filtresi.
+  @@index([removalReason])
   @@map("products")
+}
+
+/// İlanın vitrinden düşüşlerinin EKLEME-YALNIZ kaydı — her kaldırma (satıcı
+/// silmesi/pasife alması, sistem işi, yönetici reddi/kaldırması) bir satır.
+/// Kaldırılıp yeniden açılıp tekrar kaldırılan ilan İKİ satır taşır; dashboard
+/// dönem kırılımı bu satırları `createdAt` (olay anı) ile sayar. UPDATE bir
+/// tetikleyiciyle engellenir; tek yazıcı `recordListingRemovals`dır.
+/// Bkz. docs/LISTING_REMOVAL_REASONS.md.
+model ProductRemovalEvent {
+  id            String               @id @default(uuid())
+  /// CASCADE: yalnız siparişi/teklifi hiç olmamış ilanın yönetici "kalıcı
+  /// silmesi" (ve dev sıfırlaması) ürün satırını siler; bağlanacak ilanı
+  /// kalmayan kaldırma kaydının tutulacak bir anlamı yoktur.
+  productId     String               @map("product_id")
+  reason        ListingRemovalReason
+  /// `sold_elsewhere`de satışın gerçekleştiği platform — kod listesi
+  /// @tarodan/types `LISTING_REMOVAL_PLATFORMS` (enum değil: liste göçsüz
+  /// değişebilsin). Diğer nedenlerde null.
+  platform      String?
+  /// `policy_violation`da ihlal kodu — @tarodan/types `LISTING_VIOLATION_CODES`
+  /// (yer tutucu liste, göçsüz değişir). null = kodsuz (eski istemciden) red.
+  violationCode String?              @map("violation_code")
+  /// Serbest metin: satıcının notu ya da yöneticinin açıklaması. YALNIZ admin
+  /// uçları döndürür; vitrin ve satıcı yanıtları bu tabloyu hiç okumaz.
+  detail        String?
+  /// Geçişin iki ucu — aynı nedenin pasife alma mı silme mi olduğunu ayırır.
+  statusBefore  ProductStatus        @map("status_before")
+  statusAfter   ProductStatus        @map("status_after")
+  /// İşlemi yapan kullanıcı (satıcı ya da yönetici); sistem işlerinde null.
+  /// FK yok: denetim satırı kişinin hesabından bağımsız kalır.
+  actorUserId   String?              @map("actor_user_id")
+  /// Olay damgası — dashboard dönem sayımı buradan yapılır.
+  createdAt     DateTime             @default(now()) @map("created_at")
+  product       Product              @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@index([createdAt])
+  @@index([productId, createdAt(sort: Desc)])
+  @@index([reason, createdAt])
+  @@map("product_removal_events")
 }
 
 /// Admin toplu ürün yüklemelerinin idempotency ve yeniden bağlanma kaydı.
@@ -3620,6 +3673,24 @@ enum ProductStatus {
 enum ProductInactiveReason {
   return_quarantine
   expired
+}
+
+/// İlanın vitrinden düşme nedeni (`Product.removalReason`,
+/// `ProductRemovalEvent.reason`). Değerler ve aktör grupları @tarodan/types
+/// `LISTING_REMOVAL_REASONS` ile BİREBİR aynıdır (kontrat spec'i korur):
+/// satıcı (not_given = nedensiz eski istemci, changed_mind, sold_elsewhere,
+/// paused_temporarily), sistem (expired, out_of_stock, return_quarantine,
+/// seller_suspended), yönetici (policy_violation).
+enum ListingRemovalReason {
+  not_given
+  changed_mind
+  sold_elsewhere
+  paused_temporarily
+  expired
+  out_of_stock
+  return_quarantine
+  seller_suspended
+  policy_violation
 }
 
 enum ProductImportBatchStatus {
