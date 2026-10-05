@@ -98,3 +98,6 @@ export * from "./attribute-group";
 
 // Admin invoice list: the process an invoice was issued for
 export * from "./invoice";
+
+// Early escrow release: planned vs actual release date, days early (API + admin)
+export * from "./early-release";

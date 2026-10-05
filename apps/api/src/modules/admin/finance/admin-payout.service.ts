@@ -27,6 +27,7 @@ import { PaymentService } from "../../payment/payment.service";
 import { paginate, resolveOrderBy } from "../../../common/list";
 import { generatePayoutTransId } from "../../../common/helpers/payout-trans-id";
 import { i18nMessage } from "../../i18n";
+import { earlyReleaseDays } from "@tarodan/types";
 
 /**
  * Satıcı ödemeleri (escrow özet/işlem/plan/CSV, manuel release, transfer retry) —
@@ -400,10 +401,23 @@ export class AdminPayoutService {
   }
 
   /**
-   * Payout transaction history (payment holds with order/seller info)
+   * Hold listesi + CSV'nin ORTAK süzgeci (satıcı/durum/oluşturma tarihi/erken).
+   * İki yüzey aynı kümeyi görsün diye tek yerde kurulur.
+   *
+   * `earlyReleased`: ERKEN bırakılanlar = `releasedAt < releaseAt`. İki sütun
+   * karşılaştırıldığı için Prisma alan referansı (`fields.releaseAt`) kullanılır
+   * — sunucu tarafında kaldığından sayfalama ve toplam doğru kalır. NULL
+   * karşılaştırması SQL'de elenir: bırakılmamış ya da planlanmamış satır girmez.
+   * Kural `earlyReleaseDays` (@tarodan/types) ile aynıdır.
    */
-  async getPayoutsTransactions(query: PayoutTransactionsQueryDto) {
-    const { search, sellerId, status, dateFrom, dateTo } = query;
+  private holdListWhere(filter: {
+    sellerId?: string;
+    status?: string;
+    dateFrom?: string;
+    dateTo?: string;
+    earlyReleased?: boolean;
+  }): Prisma.PaymentHoldWhereInput {
+    const { sellerId, status, dateFrom, dateTo, earlyReleased } = filter;
     const where: Prisma.PaymentHoldWhereInput = {};
     if (sellerId) where.sellerId = sellerId;
     if (status) where.status = status as PaymentHoldStatus;
@@ -412,6 +426,18 @@ export class AdminPayoutService {
       if (dateFrom) where.createdAt.gte = new Date(dateFrom);
       if (dateTo) where.createdAt.lte = new Date(dateTo);
     }
+    if (earlyReleased) {
+      where.releasedAt = { lt: this.prisma.paymentHold.fields.releaseAt };
+    }
+    return where;
+  }
+
+  /**
+   * Payout transaction history (payment holds with order/seller info)
+   */
+  async getPayoutsTransactions(query: PayoutTransactionsQueryDto) {
+    const { search } = query;
+    const where = this.holdListWhere(query);
     if (search) {
       const searchOr: Prisma.PaymentHoldWhereInput[] = [
         {
@@ -581,15 +607,7 @@ export class AdminPayoutService {
    * Export payout transactions as CSV
    */
   async getPayoutsExport(query: PayoutExportQueryDto) {
-    const { sellerId, status, dateFrom, dateTo } = query;
-    const where: Prisma.PaymentHoldWhereInput = {};
-    if (sellerId) where.sellerId = sellerId;
-    if (status) where.status = status as PaymentHoldStatus;
-    if (dateFrom || dateTo) {
-      where.createdAt = {};
-      if (dateFrom) where.createdAt.gte = new Date(dateFrom);
-      if (dateTo) where.createdAt.lte = new Date(dateTo);
-    }
+    const where = this.holdListWhere(query);
 
     const holds = await this.prisma.paymentHold.findMany({
       where,
@@ -617,6 +635,7 @@ export class AdminPayoutService {
       "status",
       "releaseAt",
       "releasedAt",
+      "earlyReleaseDays",
       "createdAt",
     ];
     const rows = holds.map((h) =>
@@ -631,6 +650,8 @@ export class AdminPayoutService {
         h.status,
         h.releaseAt ? new Date(h.releaseAt).toISOString() : "",
         h.releasedAt ? new Date(h.releasedAt).toISOString() : "",
+        // Erken bırakılmadıysa boş — gün hesabı tüm yüzeylerde tek helper.
+        earlyReleaseDays(h.releaseAt, h.releasedAt) ?? "",
         new Date(h.createdAt).toISOString(),
       ]
         .map((c) =>
