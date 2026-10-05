@@ -1,7 +1,12 @@
 import { Injectable, Logger } from "@nestjs/common";
 import { ModuleRef } from "@nestjs/core";
 import { PrismaService } from "../../../prisma";
-import { ShipmentStatus, TradeStatus, PaymentStatus } from "@prisma/client";
+import {
+  ShipmentStatus,
+  TradeStatus,
+  PaymentStatus,
+  type TradeShipment,
+} from "@prisma/client";
 import { NotificationService } from "../../notification/notification.service";
 import { NotificationType } from "../../notification/dto";
 import { ElogoInvoicingService } from "../../elogo/elogo-invoicing.service";
@@ -12,6 +17,11 @@ import { TRADE_VALID_TRANSITIONS } from "../../trade/helpers/trade.state-machine
 import { startTradeConfirmationWindowIfDelivered } from "../../../common/helpers/trade-escrow";
 import { finalizeReturningTradeIfResolved } from "../../../common/helpers/trade-return-finalize";
 import { SuratTrackingClient } from "../clients/surat-tracking.client";
+
+/** Okumanın uygulandığı bacak: alıcıyı çözmek için tarafları da taşır. */
+type SuratTradeLeg = TradeShipment & {
+  trade: { initiatorId: string; receiverId: string };
+};
 
 /**
  * TradeTrackingSyncService (Faz 11.3a): takas bacaklarının (TradeShipment) Sürat
@@ -40,10 +50,27 @@ export class TradeTrackingSyncService {
     );
   }
 
-  private async syncTradeShipmentTrackingState(
+  /**
+   * Hazır bir taşıyıcı okumasını, Sürat'a SORMADAN, takas bacağına uygular —
+   * poll'un bulduğu okumayla aynı çekirdek (`applyReading`): aynı durum
+   * makinesi ve CAS, depoya-varış kilidi, at_warehouse geçişi, onay penceresi
+   * ve iade kapanışı. Tek çağıranı Test Araçları'nın kargo simülasyonudur;
+   * ikinci bir statü yazımı yoktur.
+   */
+  async applyCarrierReading(
     tradeShipmentId: string,
-  ): Promise<"synced" | "pending" | "ignored"> {
-    const tradeShipment = await this.prisma.tradeShipment.findUnique({
+    gonderi: SuratTakipGonderi,
+  ): Promise<"synced" | "ignored"> {
+    const tracked = await this.findSuratLeg(tradeShipmentId);
+    if (!tracked) return "ignored";
+    return this.applyReading(tracked.leg, gonderi, tracked.trackingRef);
+  }
+
+  /** Sürat'la izlenen, sorgu referansı olan bacak; değilse null. */
+  private async findSuratLeg(
+    tradeShipmentId: string,
+  ): Promise<{ leg: SuratTradeLeg; trackingRef: string } | null> {
+    const leg = await this.prisma.tradeShipment.findUnique({
       where: { id: tradeShipmentId },
       include: {
         trade: {
@@ -52,16 +79,24 @@ export class TradeTrackingSyncService {
       },
     });
 
-    if (!tradeShipment || tradeShipment.carrier !== "surat") {
-      return "ignored";
+    if (!leg || leg.carrier !== "surat") {
+      return null;
     }
 
     // For TradeShipment we don't store a providerTrackingId column, so the
     // tracking reference is the trackingNumber we recorded at label creation.
-    const webSiparisKodu = tradeShipment.trackingNumber;
-    if (!webSiparisKodu) {
-      return "ignored";
+    if (!leg.trackingNumber) {
+      return null;
     }
+    return { leg, trackingRef: leg.trackingNumber };
+  }
+
+  private async syncTradeShipmentTrackingState(
+    tradeShipmentId: string,
+  ): Promise<"synced" | "pending" | "ignored"> {
+    const tracked = await this.findSuratLeg(tradeShipmentId);
+    if (!tracked) return "ignored";
+    const { leg: tradeShipment, trackingRef: webSiparisKodu } = tracked;
 
     const lookup = await this.client.lookupTracking(webSiparisKodu);
     if (lookup.kind === "pending") return "pending";
@@ -92,7 +127,15 @@ export class TradeTrackingSyncService {
     const data = lookup.data;
     if (data.Gonderiler.length === 0) return "pending";
 
-    const gonderi = data.Gonderiler[0];
+    return this.applyReading(tradeShipment, data.Gonderiler[0], webSiparisKodu);
+  }
+
+  /** Okumayı bacağa uygular — poll ve simülasyonun ORTAK çekirdeği. */
+  private async applyReading(
+    tradeShipment: SuratTradeLeg,
+    gonderi: SuratTakipGonderi,
+    webSiparisKodu: string,
+  ): Promise<"synced" | "ignored"> {
     // Tek karar mercii (order path ile aynı): kod + iade bayrağı birlikte okunur.
     // `status: null` (bilinmeyen/belirsiz) statüyü değiştirmez; backfill/shippedAt
     // yine işlenir.

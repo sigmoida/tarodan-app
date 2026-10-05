@@ -314,3 +314,44 @@ export class SuratTrackingClient {
     return parsed;
   }
 }
+
+/** Sahte taşıyıcıda takip sorgusunun "henüz haber yok" cevabı. */
+export const STUB_TRACKING_PENDING_MESSAGE =
+  "stub carrier: no carrier tracking — advance the parcel from admin Test Tools";
+
+/**
+ * Sahte taşıyıcı modunun takip istemcisi (SURAT_SOAP_MODE=stub ya da boş).
+ *
+ * Stub'da koli Sürat'a hiç gönderilmez; onu Sürat'a sormak ya kimliksiz bir
+ * "configuration" hatası (cron her turda başarısızlık sayar) ya da — kimlik ve
+ * TEST_MODE=false kalmışsa — CANLI Sürat host'una sahte takip koduyla sorgu
+ * demekti; oradan dönen bir "bulundu/iptal" cevabı staging kolisine
+ * uygulanabilirdi. Bu istemci AĞA HİÇ ÇIKMAZ: her sorguya "henüz haber yok"
+ * (`pending`) der, poller hata saymaz ve koliye dokunmaz. Koli yalnız Test
+ * Araçları'nın kargo simülasyonuyla ilerler (docs/UAT.md).
+ *
+ * Gerçek istemciyle aynı DI belirteci altında, carrier istemcisiyle AYNI mod
+ * kararıyla seçilir (`resolveSuratTrackingClient`); tarih ayrıştırma kalıtılır.
+ */
+export class StubSuratTrackingClient extends SuratTrackingClient {
+  private readonly stubLogger = new Logger(StubSuratTrackingClient.name);
+
+  constructor(configService: ConfigService) {
+    super(configService);
+  }
+
+  async lookupTracking(
+    webSiparisKodu: string,
+  ): Promise<SuratTrackingLookupResult> {
+    this.stubLogger.debug(
+      `Stub tracking: no carrier lookup for ${webSiparisKodu}`,
+    );
+    return { kind: "pending", message: STUB_TRACKING_PENDING_MESSAGE };
+  }
+
+  async probeTracking(
+    _webSiparisKodu: string,
+  ): ReturnType<SuratTrackingClient["probeTracking"]> {
+    return { ok: false, error: STUB_TRACKING_PENDING_MESSAGE };
+  }
+}

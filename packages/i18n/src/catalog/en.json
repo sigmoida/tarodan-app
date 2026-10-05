@@ -4869,7 +4869,8 @@
           "trade": "Trade",
           "hold": "Escrow Hold",
           "emailVerification": "Email Verification",
-          "passwordReset": "Password Reset"
+          "passwordReset": "Password Reset",
+          "returnWindow": "Return Window"
         },
         "placeholders": {
           "product": "product title or slug",
@@ -4877,8 +4878,9 @@
           "refund": "order no. or refund ID",
           "order": "order no.",
           "offer": "offer ID or product title",
-          "trade": "trade ID",
-          "userEmail": "user email"
+          "trade": "trade no or id",
+          "userEmail": "user email",
+          "deliveredOrder": "delivered order no"
         },
         "cronConfirmTitle": "Trigger cron",
         "cronConfirmDescription": "The \"{label}\" job will be queued and run on the worker immediately. Continue?",
@@ -4919,6 +4921,52 @@
             "createdAt": "Created"
           },
           "reviewHint": "Put the buyer account email and password in the App Store / Play review notes and add \"payments run in test mode, no charge is made\"."
+        },
+        "simulation": {
+          "title": "Shipment Simulation",
+          "description": "Advance parcels that never reach the carrier (staging stub cargo, test lane) as if the carrier had reported them. The reading goes through the real cargo tracking path: order status, delivery date, return window, escrow, notifications and emails happen exactly as in reality.",
+          "liveNotice": "Live deployment: only test-lane parcels are listed and can be simulated.",
+          "searchLabel": "Order no, refund no, trade no, PKG or tracking code",
+          "noSteps": "No step available",
+          "testLane": "Test lane",
+          "confirmTitle": "Simulate a carrier event",
+          "confirmDescription": "A \"{step}\" reading for {reference} will be fed into the real cargo tracking path. The outcome is the same as a real carrier update and cannot be undone.",
+          "apply": "Simulate",
+          "applied": "{reference}: new shipment status {status}",
+          "notApplied": "{reference}: the reading was not applied (rejected by the state machine or the record changed concurrently)",
+          "failed": "Simulation failed",
+          "columns": {
+            "kind": "Kind",
+            "reference": "Record",
+            "tracking": "Tracking",
+            "status": "Shipment status",
+            "ownerStatus": "Record status",
+            "steps": "Next step"
+          },
+          "kinds": {
+            "order_shipment": "Order parcel",
+            "refund_return": "Return parcel",
+            "trade_shipment": "Trade leg"
+          },
+          "legs": {
+            "to_warehouse": "to warehouse",
+            "from_warehouse": "to new owner",
+            "return": "return"
+          },
+          "steps": {
+            "order_shipment": {
+              "picked_up": "Handed to carrier",
+              "delivered": "Delivered to buyer"
+            },
+            "refund_return": {
+              "picked_up": "Return handed to carrier",
+              "delivered": "Delivered to seller"
+            },
+            "trade_shipment": {
+              "picked_up": "Handed to carrier",
+              "delivered": "Delivered"
+            }
+          }
         }
       },
       "media": {
@@ -10874,7 +10922,14 @@
         "missingColumns": "Missing Excel columns: {columns}. Download the sample file again."
       },
       "testTools": {
-        "jobIdRequired": "A job id is required"
+        "jobIdRequired": "A job id is required",
+        "orderNotDelivered": "The order has not been delivered yet; the return window starts at delivery",
+        "simulationLiveOrderForbidden": "On the live deployment only test-lane parcels can be simulated",
+        "simulationTargetNotFound": "Parcel to simulate not found",
+        "simulationStepUnavailable": "Step \"{step}\" is not available for this parcel (shipment: {status}, record: {ownerStatus})",
+        "tradeConfirmationNotStarted": "The trade confirmation window has not started yet (both outbound parcels must be delivered)",
+        "liveTestLaneOnly": "On the live deployment this tool only works on test-lane records",
+        "orderHasNoHeldEscrow": "The order has no escrow hold still held; the return window cannot be moved apart from the escrow date"
       },
       "psp": {
         "invalidDate": "Invalid date (expected YYYY-MM-DD)",

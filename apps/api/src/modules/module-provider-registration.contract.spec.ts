@@ -62,7 +62,9 @@ describe("module providers cover their own injectables", () => {
       const open = moduleSource.indexOf("[", m.index ?? 0);
       if (open === -1) continue;
       for (const token of balancedSlice(moduleSource, open).split(/[,\n]/)) {
-        const name = token.trim();
+        // `{ provide: Sinif, useFactory: … }` de bir kayıttır: sınıf, factory
+        // ile sağlansa bile aynı enjeksiyon anahtarıdır.
+        const name = token.trim().replace(/^provide:\s*/, "");
         if (/^[A-Z][A-Za-z0-9_]*$/.test(name)) names.add(name);
       }
     }

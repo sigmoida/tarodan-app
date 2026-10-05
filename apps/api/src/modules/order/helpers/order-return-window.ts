@@ -20,6 +20,20 @@ export function returnWindowEndsAt(deliveredAt: Date, days: number): Date {
   return end;
 }
 
+/**
+ * Escrow serbest bırakma anı = pencere sonu + payout grace (takvim günü).
+ * Teslimde hold'u planlayan yol ve Test Araçları'nın pencere kaydırması aynı
+ * formülü kullanır; iki tarih hiçbir yoldan birbirinden kopamaz.
+ */
+export function escrowReleaseAt(
+  windowEndsAt: Date,
+  payoutGraceDays: number,
+): Date {
+  const releaseAt = new Date(windowEndsAt.getTime());
+  releaseAt.setDate(releaseAt.getDate() + payoutGraceDays);
+  return releaseAt;
+}
+
 /** Siparişin geçerli pencere sonu: damga varsa o, yoksa bugünkü pencere. */
 export function effectiveReturnWindowEnd(
   order: { returnWindowEndsAt?: Date | null },

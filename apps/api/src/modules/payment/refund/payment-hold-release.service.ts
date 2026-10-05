@@ -24,7 +24,11 @@ import {
   type OrderRevenueInvoicePayload,
 } from "../../outbox/outbox.types";
 import { resolveTimingValue } from "../../../common/timing-rules";
-import { returnWindowEndsAt } from "../../order/helpers/order-return-window";
+import {
+  escrowReleaseAt,
+  returnWindowEndsAt,
+} from "../../order/helpers/order-return-window";
+import { NON_DELIVERABLE_ORDER_STATUSES } from "../../order/helpers/order-state-machine";
 import { i18nMessage } from "../../i18n";
 import {
   PUBLIC_NAME_SELECT,
@@ -218,8 +222,7 @@ export class PaymentHoldReleaseService {
       "payoutGraceDays",
       this.configService,
     );
-    const releaseAt = new Date(windowEndsAt.getTime());
-    releaseAt.setDate(releaseAt.getDate() + payoutGraceDays);
+    const releaseAt = escrowReleaseAt(windowEndsAt, payoutGraceDays);
     await db.paymentHold.updateMany({
       where: { orderId, status: PaymentHoldStatus.held },
       data: { releaseAt },
@@ -353,14 +356,7 @@ export class PaymentHoldReleaseService {
       where: {
         id: orderId,
         deliveredAt: null,
-        status: {
-          notIn: [
-            OrderStatus.completed,
-            OrderStatus.cancelled,
-            OrderStatus.refund_requested,
-            OrderStatus.refunded,
-          ],
-        },
+        status: { notIn: [...NON_DELIVERABLE_ORDER_STATUSES] },
       },
       data: {
         status: targetStatus,

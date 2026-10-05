@@ -647,6 +647,136 @@ describe("validateEnv", () => {
     ).not.toThrow();
   });
 
+  // UAT: staging'de telefon doğrulama sabit kodla yapılır, SMS gitmez. Canlıda
+  // tek bir sabit kod herkesin telefonunu doğrulanabilir kılar → açılış durur.
+  describe("SMS_FIXED_VERIFICATION_CODE", () => {
+    const devBase = {
+      NODE_ENV: "development",
+      DATABASE_URL: "postgresql://u:p@db:5432/app",
+      JWT_SECRET: "dev",
+      JWT_REFRESH_SECRET: "dev",
+      ADMIN_JWT_SECRET: "dev",
+      PAYMENT_CAPABILITY_SECRET: "dev",
+      TWO_FACTOR_ENCRYPTION_KEY: "dev",
+      GUEST_CHECKOUT_OTP_SECRET: "dev",
+    };
+
+    it("refuses the fixed code on the production deployment", () => {
+      expect(() =>
+        validateEnv({ ...prodBase, SMS_FIXED_VERIFICATION_CODE: "123456" }),
+      ).toThrow(/SMS_FIXED_VERIFICATION_CODE.*production deployment/);
+    });
+
+    it("refuses it on APP_ENV=production even outside an optimized build", () => {
+      expect(() =>
+        validateEnv({
+          ...devBase,
+          APP_ENV: "production",
+          SMS_FIXED_VERIFICATION_CODE: "123456",
+        }),
+      ).toThrow(/SMS_FIXED_VERIFICATION_CODE/);
+    });
+
+    it("accepts it on staging and no longer requires NetGSM there", () => {
+      expect(() =>
+        validateEnv({
+          ...without(
+            stagingBase,
+            "NETGSM_USERCODE",
+            "NETGSM_PASSWORD",
+            "NETGSM_MSGHEADER",
+          ),
+          SMS_FIXED_VERIFICATION_CODE: "123456",
+        }),
+      ).not.toThrow();
+    });
+
+    it("still requires NetGSM on staging when the fixed code is not set", () => {
+      expect(() =>
+        validateEnv(
+          without(
+            stagingBase,
+            "NETGSM_USERCODE",
+            "NETGSM_PASSWORD",
+            "NETGSM_MSGHEADER",
+          ),
+        ),
+      ).toThrow(/NETGSM_USERCODE/);
+    });
+
+    it("rejects a value the verify endpoint could never accept", () => {
+      expect(() =>
+        validateEnv({ ...devBase, SMS_FIXED_VERIFICATION_CODE: "12345" }),
+      ).toThrow(/exactly 6 digits/);
+      expect(() =>
+        validateEnv({ ...devBase, SMS_FIXED_VERIFICATION_CODE: "12ab56" }),
+      ).toThrow(/exactly 6 digits/);
+    });
+
+    it("is allowed in local development and survives validation", () => {
+      const result = validateEnv({
+        ...devBase,
+        SMS_FIXED_VERIFICATION_CODE: "000000",
+      });
+      expect(result.SMS_FIXED_VERIFICATION_CODE).toBe("000000");
+    });
+  });
+
+  // UAT: staging tamamen sahte taşıyıcıyla koşabilir; koliyi tester Test
+  // Araçları'ndan ilerletir. Canlıda stub her koşulda reddedilir.
+  describe("full-stub cargo on staging", () => {
+    const stagingStub = {
+      ...without(
+        stagingBase,
+        "SURAT_KARGO_TEST_MODE",
+        "SURAT_KARGO_CARI_KODU",
+        "SURAT_KARGO_SIFRE",
+      ),
+      SURAT_CARGO_ENABLED: "true",
+      SURAT_SOAP_MODE: "stub",
+    };
+
+    it("accepts SURAT_SOAP_MODE=stub without credentials or test-mode flag", () => {
+      expect(() => validateEnv({ ...stagingStub })).not.toThrow();
+    });
+
+    it("does not ask for a FirmaId when the carrier is stubbed", () => {
+      expect(() =>
+        validateEnv({ ...stagingStub, SURAT_CREATE_API_VERSION: "v2" }),
+      ).not.toThrow();
+    });
+
+    it("still rejects an unset or unknown mode on staging", () => {
+      expect(() =>
+        validateEnv(without(stagingStub, "SURAT_SOAP_MODE")),
+      ).toThrow(/SURAT_SOAP_MODE.*'stub'/);
+      expect(() =>
+        validateEnv({ ...stagingStub, SURAT_SOAP_MODE: "live" }),
+      ).toThrow(/SURAT_SOAP_MODE/);
+    });
+
+    it("never accepts the stub on the production deployment", () => {
+      expect(() =>
+        validateEnv({ ...prodBase, SURAT_SOAP_MODE: "stub" }),
+      ).toThrow(/SURAT_SOAP_MODE must be 'rest' in production/);
+    });
+
+    it("refuses the live-host flag on staging even in stub mode", () => {
+      expect(() =>
+        validateEnv({ ...stagingStub, SURAT_KARGO_TEST_MODE: "false" }),
+      ).toThrow(/SURAT_KARGO_TEST_MODE must not be 'false' on staging/);
+      expect(() =>
+        validateEnv({ ...stagingStub, SURAT_KARGO_TEST_MODE: "true" }),
+      ).not.toThrow();
+    });
+
+    it("keeps the test-host rules for staging on the real REST client", () => {
+      expect(() =>
+        validateEnv({ ...stagingBase, SURAT_KARGO_TEST_MODE: "false" }),
+      ).toThrow(/SURAT_KARGO_TEST_MODE/);
+    });
+  });
+
   it("still requires presence of every secret outside production", () => {
     expect(() =>
       validateEnv({
