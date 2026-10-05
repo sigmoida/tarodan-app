@@ -214,6 +214,33 @@ describe("TimingRulesService", () => {
       );
     });
 
+    it("hazırlık uyarısı hazırlık süresine eşit ya da uzun olamaz (saat ↔ gün)", async () => {
+      const { service, prisma, rows } = makeService();
+      await expectRejected(
+        service.applyChanges([{ id: "preparingDeadlineDays", value: 1 }], "u"),
+        "server.admin.timingRules.invariant.preparingWarningBeforeDeadline",
+      );
+      await expectRejected(
+        service.applyChanges(
+          [{ id: "preparingWarningLeadHours", value: 72 }],
+          "u",
+        ),
+        "server.admin.timingRules.invariant.preparingWarningBeforeDeadline",
+      );
+      expect(prisma.platformSetting.upsert).not.toHaveBeenCalled();
+
+      // Birlikte değiştirilince geçerli: 1 gün + 12 saatlik uyarı.
+      await service.applyChanges(
+        [
+          { id: "preparingDeadlineDays", value: 1 },
+          { id: "preparingWarningLeadHours", value: 12 },
+        ],
+        "u",
+      );
+      expect(rows.get("preparing_deadline_days")?.settingValue).toBe("1");
+      expect(rows.get("preparing_warning_lead_hours")?.settingValue).toBe("12");
+    });
+
     it("henüz açılmamış eylemi doğrudan gönderilse bile reddeder", async () => {
       const { service, prisma } = makeService();
       for (const [id, action] of [

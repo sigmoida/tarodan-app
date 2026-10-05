@@ -7,6 +7,7 @@ import {
   PAYTR_3DS_SESSION_MINUTES,
   PUBLIC_TIMING_RULE_IDS,
   TIMING_GROUPS,
+  TIMING_UNIT_MINUTES,
   TIMING_RULES,
   TIMING_RULE_IDS,
   TIMING_RULE_INVARIANTS,
@@ -362,6 +363,55 @@ describe("alanlar arası değişmezler", () => {
         "listingTtlDays",
       ]),
     ).toMatchObject({ id: "listingTtlDays" });
+  });
+
+  it("hazırlık uyarısı (saat) hazırlık süresinden (gün) kısa olmalı — birimler arası", () => {
+    // 1 gün = 24 saat: 24 saatlik uyarı 1 günlük sürede ödeme anında gelirdi.
+    expect(
+      findTimingInvariantViolation(
+        withValues({ preparingDeadlineDays: 1, preparingWarningLeadHours: 24 }),
+        ["preparingWarningLeadHours"],
+      ),
+    ).toEqual({
+      id: "preparingWarningLeadHours",
+      violation: {
+        code: "invariant",
+        invariant: "preparingWarningBeforeDeadline",
+        other: "preparingDeadlineDays",
+      },
+    });
+    // Süreyi kısaltan değişiklik de aynı kurala takılır.
+    expect(
+      findTimingInvariantViolation(withValues({ preparingDeadlineDays: 1 }), [
+        "preparingDeadlineDays",
+      ]),
+    ).toMatchObject({
+      id: "preparingDeadlineDays",
+      violation: { invariant: "preparingWarningBeforeDeadline" },
+    });
+    expect(
+      findTimingInvariantViolation(
+        withValues({ preparingDeadlineDays: 1, preparingWarningLeadHours: 23 }),
+        ["preparingWarningLeadHours", "preparingDeadlineDays"],
+      ),
+    ).toBeNull();
+    // Üst sınırdaki 72 saatlik uyarı 3 günlük sürede de eşit sayılır → red.
+    expect(
+      findTimingInvariantViolation(
+        withValues({ preparingDeadlineDays: 3, preparingWarningLeadHours: 72 }),
+        ["preparingWarningLeadHours"],
+      ),
+    ).not.toBeNull();
+  });
+
+  it("aynı birimli değişmezler dakikaya çevrilince de aynı sonucu verir", () => {
+    expect(TIMING_UNIT_MINUTES).toEqual({ minutes: 1, hours: 60, days: 1440 });
+    expect(
+      findTimingInvariantViolation(
+        withValues({ listingTtlDays: 10, listingExpiryWarningDays: 9 }),
+        ["listingExpiryWarningDays"],
+      ),
+    ).toBeNull();
   });
 
   it("değişmeyen kayıtların mevcut ihlali yeni değişikliği engellemez", () => {

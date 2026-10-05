@@ -65,7 +65,9 @@ bir sekmedeyse sekme işaretlenir ve sayfada adıyla listelenir.
 - Ödeme fail penceresi PayTR 3DS oturumunun (**30 dk**) üstünde olmalı → en az 31.
 - Alanlar arası kurallar (değişikliklerin tamamı uygulanmış aday küme üzerinde):
   - `returnDropoffDays ≤ returnDropoffHardDays` (emniyet supabı drop-off'tan kısa olamaz),
-  - `listingExpiryWarningDays < listingTtlDays`.
+  - `listingExpiryWarningDays < listingTtlDays`,
+  - `preparingWarningLeadHours < preparingDeadlineDays × 24` (birimler
+    farklıysa değerler dakikaya çevrilip karşılaştırılır).
 - Eylem kayıtta tanımlı **ve açık** olmalı; "yakında" eylemler doğrudan
   gönderilse bile 400 alır.
 - Değişiklikler tek `Serializable` işlemde yazılır; biri geçersizse hiçbiri yazılmaz.

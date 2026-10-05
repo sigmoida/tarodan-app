@@ -9317,7 +9317,7 @@
         },
         "preparingWarningLeadHours": {
           "label": "Satıcı hazırlık uyarısı",
-          "helper": "Hazırlık süresi dolmadan bu kadar saat önce satıcı uyarılır; süre uzatıldıysa yeni son tarihten önce yeniden uyarılır. Paneldeki \"hazırlama süresi doluyor\" uyarısı da bu süreyi kullanır."
+          "helper": "Hazırlık süresi dolmadan bu kadar saat önce satıcı uyarılır; süre uzatıldıysa yeni son tarihten önce yeniden uyarılır. Paneldeki \"hazırlama süresi doluyor\" uyarısı da bu süreyi kullanır. Satıcı hazırlık süresinden kısa olmalıdır."
         },
         "returnWindowDays": {
           "label": "Cayma (iade) penceresi",
@@ -10599,7 +10599,8 @@
         "useDedicatedEndpoint": "Bu ayar Sistem → Süreler ve Kurallar ekranından değiştirilir.",
         "invariant": {
           "dropoffHardNotBelowDropoff": "İade kargosu için kesin kapanış süresi, kargoya verme süresinden kısa olamaz.",
-          "listingWarningBeforeTtl": "İlan süresi uyarısı, ilanın yayın süresinden kısa olmalıdır."
+          "listingWarningBeforeTtl": "İlan süresi uyarısı, ilanın yayın süresinden kısa olmalıdır.",
+          "preparingWarningBeforeDeadline": "Satıcı hazırlık uyarısı (saat), satıcı hazırlık süresinden (gün × 24 saat) kısa olmalıdır."
         },
         "conflict": "Süreler aynı anda başka bir yönetici tarafından değiştirildi. Sayfayı yenileyip tekrar deneyin."
       }

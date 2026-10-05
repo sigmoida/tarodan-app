@@ -9317,7 +9317,7 @@
         },
         "preparingWarningLeadHours": {
           "label": "Seller preparation warning",
-          "helper": "The seller is warned this many hours before the preparation deadline, and again before the new deadline if it was extended. The dashboard's \"preparation deadline approaching\" alert uses the same lead."
+          "helper": "The seller is warned this many hours before the preparation deadline, and again before the new deadline if it was extended. The dashboard's \"preparation deadline approaching\" alert uses the same lead. It must be shorter than the seller preparation time."
         },
         "returnWindowDays": {
           "label": "Cooling-off (return) window",
@@ -10599,7 +10599,8 @@
         "useDedicatedEndpoint": "This setting is managed on System → Durations & Rules.",
         "invariant": {
           "dropoffHardNotBelowDropoff": "The hard close for a return parcel cannot be shorter than the drop-off window.",
-          "listingWarningBeforeTtl": "The listing expiry warning must come before the listing lifetime ends."
+          "listingWarningBeforeTtl": "The listing expiry warning must come before the listing lifetime ends.",
+          "preparingWarningBeforeDeadline": "The seller preparation warning (hours) must be shorter than the seller preparation time (days × 24 hours)."
         },
         "conflict": "Another admin changed the durations at the same time. Reload the page and try again."
       }
