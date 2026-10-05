@@ -1,8 +1,11 @@
-# Manual button (+ optional weekly cron) that resets the STAGING database to
-# the known-clean seeded state on the COOLIFY-managed staging server. SSHes in
+# Manual button (+ optional weekly cron) that resets the STAGING (UAT) database
+# to the known-clean seeded state on the COOLIFY-managed staging server. SSHes in
 # and, inside the Coolify api application container, runs prisma migrate reset +
-# the compiled seed (the automated form of the manual reset we run by hand),
-# then flushes Redis and restarts api so Elasticsearch reindexes.
+# the compiled UAT seed (reference data + the fixed people in
+# apps/api/prisma/data/uat/accounts.json + their starter listings), then the
+# image sync (seed-media), flushes Redis and restarts api so Elasticsearch
+# reindexes. The big demo seed (prisma/seed.ts) is NOT run here any more; it
+# stays available for local development (pnpm dev:seed).
 #
 # PROD GUARDS (in the inline script) — any failure aborts before touching data:
 #   1. RESET_CONFIRM=STAGING must be set.
@@ -11,10 +14,15 @@
 #      be a bare production domain.
 #   3. Seeding WITH images is refused while S3_ENV_PREFIX=prod (would copy demo
 #      assets into production storage) — set S3_ENV_PREFIX=staging or skip images.
+#   4. The api container must NOT run with APP_ENV=production, and the UAT seed's
+#      own pre-flight (`seed-uat.js --check`: production refusal, password
+#      strength, data files) must pass — all BEFORE the database is wiped.
 #
 # Required repository secrets:
 #   SERVER_HOST, SERVER_USERNAME, SERVER_PASSWORD     (SSH into the Coolify VPS)
 #   COOLIFY_STAGING_UUIDS                             (api,web,admin UUIDs; api = first)
+#   UAT_SEED_PASSWORD                                 (initial password of the fixed UAT
+#                                                      accounts; 16+ chars, max 72 bytes)
 #
 # The SSH credentials are the shared SERVER_* pair, not a staging-only set: the
 # staging apps live on the same Coolify host. Which environment gets wiped is
@@ -82,12 +90,14 @@ jobs:
           HOST: ${{ secrets.SERVER_HOST }}
           USERNAME: ${{ secrets.SERVER_USERNAME }}
           PASSWORD: ${{ secrets.SERVER_PASSWORD }}
+          UAT_PASSWORD: ${{ secrets.UAT_SEED_PASSWORD }}
         run: |
           set -euo pipefail
           missing=""
           [ -n "${HOST:-}" ] || missing="$missing SERVER_HOST"
           [ -n "${USERNAME:-}" ] || missing="$missing SERVER_USERNAME"
           [ -n "${PASSWORD:-}" ] || missing="$missing SERVER_PASSWORD"
+          [ -n "${UAT_PASSWORD:-}" ] || missing="$missing UAT_SEED_PASSWORD"
           if [ -n "$missing" ]; then
             echo "::error::Missing repository secret(s):$missing"
             exit 1
@@ -102,12 +112,13 @@ jobs:
           DRY_RUN: ${{ (github.event_name == 'workflow_dispatch' && inputs.dry_run) && '1' || '0' }}
           SKIP_BACKUP: ${{ (github.event_name == 'workflow_dispatch' && inputs.skip_backup) && '1' || '0' }}
           SEED_SKIP_IMAGES: ${{ (github.event_name == 'workflow_dispatch' && inputs.skip_images) && '1' || '0' }}
+          UAT_SEED_PASSWORD: ${{ secrets.UAT_SEED_PASSWORD }}
         with:
           host: ${{ secrets.SERVER_HOST }}
           username: ${{ secrets.SERVER_USERNAME }}
           password: ${{ secrets.SERVER_PASSWORD }}
           command_timeout: 30m
-          envs: RESET_CONFIRM,API_UUID,DRY_RUN,SKIP_BACKUP,SEED_SKIP_IMAGES
+          envs: RESET_CONFIRM,API_UUID,DRY_RUN,SKIP_BACKUP,SEED_SKIP_IMAGES,UAT_SEED_PASSWORD
           # Staging runs under Coolify: no docker-compose, DB/Redis/ES containers
           # are named by their Coolify UUIDs. We target the Coolify api APPLICATION
           # container and derive DATABASE_URL / REDIS_URL from its own env.
@@ -118,6 +129,10 @@ jobs:
 
             [ "${RESET_CONFIRM:-}" = "STAGING" ] || die "RESET_CONFIRM=STAGING not set."
             [ -n "${API_UUID:-}" ] || die "API_UUID not set (first field of COOLIFY_STAGING_UUIDS)."
+            [ -n "${UAT_SEED_PASSWORD:-}" ] || die "UAT_SEED_PASSWORD not set."
+            # `docker exec -e NAME` (no value) copies it from this shell, so the
+            # password never lands on a command line / process list.
+            export UAT_SEED_PASSWORD
 
             # --- Discover the Coolify api application container -----------------
             API_CID="$(docker ps --filter "label=coolify.applicationId=$API_UUID" --format '{{.ID}}' | head -1)"
@@ -158,8 +173,19 @@ jobs:
               die "seed WITH images but S3_ENV_PREFIX=prod would write demo assets into PROD storage. Set S3_ENV_PREFIX=staging or enable skip_images."
             fi
 
+            # --- Guard: the UAT seed must be able to run (before any wipe) ------
+            # The seed refuses APP_ENV=production itself; checking here as well
+            # means a misdirected run dies BEFORE migrate reset, not after.
+            APP_ENV_VALUE="$(docker exec "$API_CID" printenv APP_ENV 2>/dev/null || true)"
+            [ "$APP_ENV_VALUE" != "production" ] || die "api APP_ENV=production — refusing (UAT seed is for staging only)."
+            # --check validates the guard, the password rule and the data files
+            # without touching the database. A missing file means staging was not
+            # yet redeployed with the UAT seed in its image.
+            docker exec -e UAT_SEED_PASSWORD "$API_CID" sh -c "cd /app && node dist-seed/prisma/seed-uat.js --check" \
+              || die "UAT seed pre-flight failed (is the staging api image built from a commit that includes seed-uat? is UAT_SEED_PASSWORD 16+ chars?)."
+
             if [ "${DRY_RUN:-0}" = "1" ]; then
-              log "DRY_RUN=1 — guards passed, api container discovered. No changes made."
+              log "DRY_RUN=1 — guards + UAT seed pre-flight passed, api container discovered. No changes made."
               exit 0
             fi
 
@@ -185,9 +211,16 @@ jobs:
             fi
 
             # --- Reset + seed inside the api container --------------------------
-            if [ "${SEED_SKIP_IMAGES:-0}" = "1" ]; then SEED_PREFIX="SEED_SKIP_IMAGES=1 "; IMG="skipped"; else SEED_PREFIX=""; IMG="included"; fi
-            log "prisma migrate reset --force + compiled seed (images: $IMG)..."
-            docker exec "$API_CID" sh -c "cd /app && npx prisma migrate reset --force --skip-seed --schema=prisma/schema.prisma && ${SEED_PREFIX}node dist-seed/prisma/seed.js"
+            if [ "${SEED_SKIP_IMAGES:-0}" = "1" ]; then IMG="skipped"; else IMG="included"; fi
+            log "prisma migrate reset --force + compiled UAT seed (images: $IMG)..."
+            docker exec -e UAT_SEED_PASSWORD "$API_CID" sh -c "cd /app && npx prisma migrate reset --force --skip-seed --schema=prisma/schema.prisma && node dist-seed/prisma/seed-uat.js"
+            if [ "$IMG" = "included" ]; then
+              # Starter listings carry slugs shaped for seed-media's asset mapping;
+              # it copies seed-assets/products/* into this env's S3 prefix (the
+              # S3_ENV_PREFIX != prod guard above applies) and attaches the rows.
+              log "syncing listing images from seed-assets..."
+              docker exec "$API_CID" sh -c "cd /app && node dist-seed/prisma/seed-media.js"
+            fi
 
             # --- Flush Redis via the api container's own ioredis + REDIS_URL ---
             # flushdb, never flushall: staging and production run on the same
@@ -197,6 +230,13 @@ jobs:
             docker exec "$API_CID" node -e "const R=require('ioredis');const r=new R(process.env.REDIS_URL);r.flushdb().then(()=>{console.log('redis flushed');process.exit(0)}).catch(e=>{console.error('flush failed:',e.message);process.exit(0)})" || log "redis flush failed (non-fatal)"
 
             # --- Refresh Elasticsearch: restart api so boot sync reconciles ----
+            # The seed writes only to Postgres. On boot the api ensures its
+            # (APP_ENV-prefixed) indices exist and registers the repeatable
+            # search-periodic-sync (every 5 min; delta-syncs when |DB-ES| > 2) and
+            # search-hourly-reconcile jobs, which index every ACTIVE listing the DB
+            # holds and drop orphans from the previous data set. The worker role
+            # must be running for those jobs; listings become searchable within
+            # ~5 minutes of the restart.
             log "restarting api so Elasticsearch reindexes from the fresh DB..."
             docker restart "$API_CID" >/dev/null
 
