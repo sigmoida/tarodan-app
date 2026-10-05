@@ -6,6 +6,8 @@ import {
 } from "@nestjs/common";
 import { randomBytes } from "crypto";
 import { PrismaService } from "../../prisma";
+import { ConsentSource } from "@prisma/client";
+import { ConsentService } from "../consent/consent.service";
 import { NewsletterSubscribeDto } from "./dto/newsletter-subscribe.dto";
 import { i18nMessage } from "../i18n";
 
@@ -31,7 +33,10 @@ export interface NewsletterRecipient {
 export class NewsletterService {
   private readonly logger = new Logger(NewsletterService.name);
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly consents: ConsentService,
+  ) {}
 
   private generateUnsubscribeToken(): string {
     return randomBytes(32).toString("hex");
@@ -177,12 +182,36 @@ export class NewsletterService {
       }));
   }
 
-  /** Çıkış yapan e-posta bir üyeye aitse profil tercihini de kapat. */
+  /**
+   * Çıkış yapan e-posta bir üyeye aitse profil tercihini de kapat ve izin
+   * geri çekmesini tarihli onay kaydı olarak yaz (bayrak + kayıt tek
+   * transaction'da). İzni zaten kapalı üyede satır yazılmaz.
+   */
   private async clearUserConsent(email: string): Promise<void> {
     try {
-      await this.prisma.user.updateMany({
+      const members = await this.prisma.user.findMany({
         where: { email, acceptsMarketingEmails: true },
-        data: { acceptsMarketingEmails: false },
+        select: { id: true },
+      });
+      if (members.length === 0) return;
+      await this.prisma.$transaction(async (tx) => {
+        await tx.user.updateMany({
+          where: {
+            id: { in: members.map((m) => m.id) },
+            acceptsMarketingEmails: true,
+          },
+          data: { acceptsMarketingEmails: false },
+        });
+        for (const member of members) {
+          await this.consents.recordMarketingChange(
+            {
+              userId: member.id,
+              granted: false,
+              source: ConsentSource.newsletter_unsubscribe,
+            },
+            tx,
+          );
+        }
       });
     } catch (error: any) {
       this.logger.error(

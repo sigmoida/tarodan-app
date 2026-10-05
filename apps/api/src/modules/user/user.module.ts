@@ -22,6 +22,8 @@ import { RatingModule } from "../rating/rating.module";
 import { ModerationModule } from "../moderation/moderation.module";
 import { scheduledProcessors } from "../../workers/scheduled-processors";
 import { UserBlockModule } from "../user-block/user-block.module";
+import { ConsentModule } from "../consent/consent.module";
+import { MarketingModule } from "../marketing/marketing.module";
 import { UserBlockAdminListener } from "./social/user-block-admin.listener";
 
 @Module({
@@ -31,6 +33,10 @@ import { UserBlockAdminListener } from "./social/user-block-admin.listener";
     RatingModule,
     ModerationModule,
     UserBlockModule,
+    // Pazarlama izni değişimi: tarihli onay kaydı + bülten listesi senkronu.
+    // İkisi de User'a bağlı değil, döngü yok.
+    ConsentModule,
+    MarketingModule,
     BullModule.registerQueue({ name: QUEUE_NAMES.SCHEDULED }),
   ],
   controllers: [UserController, SellerDocumentController],

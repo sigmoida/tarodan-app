@@ -8,6 +8,7 @@ import { QUEUE_NAMES } from "../../workers/constants";
 import { PrismaModule } from "../../prisma";
 import { NotificationModule } from "../notification/notification.module";
 import { StorageModule } from "../storage/storage.module";
+import { ConsentModule } from "../consent/consent.module";
 import { scheduledProcessors } from "../../workers/scheduled-processors";
 
 @Module({
@@ -15,6 +16,8 @@ import { scheduledProcessors } from "../../workers/scheduled-processors";
     PrismaModule,
     NotificationModule,
     StorageModule,
+    // Bülten çıkışı pazarlama iznini geri çeker → tarihli onay kaydı.
+    ConsentModule,
     BullModule.registerQueue({ name: QUEUE_NAMES.SCHEDULED }),
   ],
   controllers: [NewsletterController],

@@ -39,6 +39,8 @@ describe("UserProfileService account deletion obligations", () => {
       {} as any,
       {} as any,
       {} as any,
+      { recordMarketingChange: jest.fn() } as never, // consents
+      { syncUserConsent: jest.fn() } as never, // newsletter
     );
 
     await expect(service.deleteAccount("user-1")).rejects.toThrow();
