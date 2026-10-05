@@ -2235,7 +2235,29 @@
       "onayBekleyen": "Onay Bekleyen",
       "askiyaAlinan": "Askıya Alınan",
       "satilan": "Satılan",
-      "kaldirilan": "Kaldırılan"
+      "kaldirilan": "Kaldırılan",
+      "expired": "Süresi doldu"
+    },
+    "expiredListings": {
+      "tab": "Süresi dolan",
+      "bannerTitle": "{count} ilanınızın süresi doldu",
+      "bannerDescription": "Tek tıkla yenileyebilirsiniz. İçeriği değişmemiş ilanlar doğrudan yayına döner.",
+      "cardHint": "Süresi doldu. Yenileyerek yeniden yayına alın.",
+      "renew": "Yenile",
+      "renewing": "Yenileniyor...",
+      "select": "İlanı seç",
+      "selectAll": "Tümünü seç",
+      "clearSelection": "Seçimi temizle",
+      "renewSelected": "Seçilenleri yenile ({count})",
+      "renewed": "İlan yenilendi ve yayında",
+      "submitted": "İlan onaya gönderildi; onaylanınca yayına girer",
+      "renewFailed": "İlan yenilenemedi",
+      "bulkRenewed": "{count} ilan yenilendi ve yayında",
+      "bulkSubmitted": "{count} ilan onaya gönderildi",
+      "bulkFailed": "{count} ilan yenilenemedi",
+      "failedItem": "{title}: {reason}",
+      "empty": "Süresi dolan ilanınız yok.",
+      "emptyDescription": "Süresi dolan ilanlarınız burada listelenir."
     },
     "myListings": {
       "ilanSilindi": "İlan silindi",
@@ -9268,7 +9290,8 @@
       "rules": {
         "listingTtlDays": {
           "label": "İlan yayın süresi",
-          "helper": "Onaylanan ilan bu süre boyunca yayında kalır; süre her yeniden onayda baştan başlar."
+          "helper": "Onaylanan ilan bu süre boyunca yayında kalır; süre her onayda ya da satıcı yenilemesinde baştan başlar. \"İlanı otomatik yenile\" seçiliyse süresi dolan ilan (stokta ve satıcısı aktifse) pasife alınmak yerine kendiliğinden yenilenir.",
+          "inProgressWarning": "Bu süre ilanlara yazılmaz; her gece \"şimdi − N gün\" ile hesaplanır. Süreyi kısaltırsanız yeni süreden eski tüm yayındaki ilanlar bir sonraki gece koşusunda (04:00) aynı anda işleme girer: pasife alınır ve satıcılara \"süresi doldu\" e-postası gider (otomatik yenileme seçiliyse bunun yerine süreleri baştan başlar). Süreyi uzatırsanız önceden pasife alınmış ilanlar geri gelmez."
         },
         "listingExpiryWarningDays": {
           "label": "İlan bitiş uyarısı",
@@ -10119,6 +10142,8 @@
       "reservedCannotUpdate": "Rezerve edilmiş ürünler güncellenemez",
       "sellerIdNotFound": "Satıcı kimliği bulunamadı",
       "setQuantityToReopen": "Yeniden satışa açmak için stok miktarı belirleyin",
+      "renewNotExpired": "Yalnızca süresi dolmuş ilanlar yenilenebilir.",
+      "renewFailed": "İlan yenilenemedi. Lütfen tekrar deneyin.",
       "soldOrReservedCannotDelete": "Satılmış veya rezerve edilmiş ürünler silinemez",
       "statsForbidden": "Bu ürünün istatistiklerini görme yetkiniz yok",
       "tradeRequiresPremium": "Takas özelliği için Premium üyelik gereklidir. Üyeliğinizi yükseltin.",
