@@ -31,9 +31,11 @@ describe("buildListingRemovalBreakdown", () => {
     expect(result.byReason.map((row) => row.reason)).toEqual([
       ...LISTING_REMOVAL_REASONS,
     ]);
-    expect(result.byReason.find((r) => r.reason === "sold_elsewhere")).toEqual(
-      { reason: "sold_elsewhere", actor: "seller", count: 4 },
-    );
+    expect(result.byReason.find((r) => r.reason === "sold_elsewhere")).toEqual({
+      reason: "sold_elsewhere",
+      actor: "seller",
+      count: 4,
+    });
     expect(result.byReason.find((r) => r.reason === "expired")).toEqual({
       reason: "expired",
       actor: "system",
@@ -112,8 +114,13 @@ describe("AdminDashboardRemovalsService", () => {
       ),
     };
     const cache = {
+      // Gerçek imza: (anahtar, üretici, { ttl }) — servis üçünü de geçirir.
       getOrSet: jest.fn(
-        async (_key: string, factory: () => Promise<unknown>) => factory(),
+        async (
+          _key: string,
+          factory: () => Promise<unknown>,
+          _options?: { ttl?: number },
+        ) => factory(),
       ),
       delPattern: jest.fn().mockResolvedValue(0),
     };
@@ -129,15 +136,15 @@ describe("AdminDashboardRemovalsService", () => {
 
     const result = await service.getRemovals({
       period: "custom",
-      from: "2026-09-01",
-      to: "2026-09-30",
+      from: "2025-09-01",
+      to: "2025-09-30",
     });
 
     const reasonCall = groupBy.mock.calls.find(
       ([args]) => (args as { by: string[] }).by[0] === "reason",
     )![0] as any;
     expect(reasonCall.where.createdAt.gte).toEqual(
-      istanbulDayStart("2026-09-01"),
+      istanbulDayStart("2025-09-01"),
     );
     expect(reasonCall.where.product).toEqual({
       seller: { isTestAccount: false },
@@ -171,8 +178,8 @@ describe("AdminDashboardRemovalsService", () => {
 
     await service.getRemovals({
       period: "custom",
-      from: "2026-09-01",
-      to: "2026-09-30",
+      from: "2025-09-01",
+      to: "2025-09-30",
     });
 
     const [key, , options] = cache.getOrSet.mock.calls[0];

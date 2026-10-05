@@ -48,7 +48,7 @@ describe("ProductSchedulerService — ilan ömrü süreleri", () => {
     settings: Record<string, string> = {},
     due: ReturnType<typeof dueListing>[] = [],
   ) => {
-    const prisma: Record<string, any> = {
+    const prisma = {
       product: {
         findMany: jest.fn().mockResolvedValue(due),
         updateMany: jest.fn().mockResolvedValue({ count: 1 }),
@@ -65,10 +65,11 @@ describe("ProductSchedulerService — ilan ömrü süreleri", () => {
               : null,
         ),
       },
+      $transaction: jest.fn(),
     };
     // Etkileşimli tx: aynı istemciyle çalışır (yazımlar prisma mock'unda görünür).
-    prisma.$transaction = jest.fn(async (fn: (tx: unknown) => unknown) =>
-      fn(prisma),
+    prisma.$transaction.mockImplementation(
+      async (fn: (tx: typeof prisma) => unknown) => fn(prisma),
     );
     const notifications = { sendTemplateEmailToUser: jest.fn() };
     const cache = {

@@ -465,9 +465,15 @@ export class ProductUpdateService {
     // kendi seçtiği nedeni taşır (eski istemci → not_given); stoğun 0'a
     // çekilmesi (satıcı ya da yönetici düzenlemesi) "stok tükendi"dir. Neden
     // yazımdan ÖNCE doğrulanır — geçersiz neden hiçbir şey yazdırmaz.
+    //
+    // Buraya yalnız active / pending / rejected / suspended ilan ulaşır:
+    // reserved ve deleted yukarıda reddedilir; sold ve inactive ya yeniden
+    // satışa açma dalında döner (active/pending yazar — kaldırma değil) ya da
+    // `setQuantityToReopen` ile reddedilir. Yani zaten pasif bir ilanın yeniden
+    // kaydedilmesi bu satıra hiç gelmez; ikinci bir kaldırma kaydı oluşamaz.
+    // (`recordListingRemovals` ayrıca statü değişmeyen geçişi de yok sayar.)
     const removal: ListingRemovalEntry | null =
-      resolvedStatus === ProductStatus.inactive &&
-      product.status !== ProductStatus.inactive
+      resolvedStatus === ProductStatus.inactive
         ? {
             productId: id,
             statusBefore: product.status,
@@ -1011,10 +1017,7 @@ export class ProductUpdateService {
     }
 
     // Neden yazımdan ÖNCE doğrulanır: geçersiz neden ilanı silmez.
-    const reasonFields = sellerRemovalFields(
-      "delete",
-      removalInputOf(removal),
-    );
+    const reasonFields = sellerRemovalFields("delete", removalInputOf(removal));
 
     // Soft delete: set status to deleted (pasiften AYRI state — silinen ürün
     // yeniden aktive edilemez; "pasife alma"dan farklı). Tekrar satmak için

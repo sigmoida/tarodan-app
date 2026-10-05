@@ -51,9 +51,7 @@ describe("ProductUpdateService — kaldırma nedeni", () => {
           ...productPatch,
         }),
       },
-      $transaction: jest.fn(async (fn: (client: unknown) => unknown) =>
-        fn(tx),
-      ),
+      $transaction: jest.fn(async (fn: (client: unknown) => unknown) => fn(tx)),
       user: {
         findUnique: jest.fn().mockResolvedValue({
           isBanned: false,
@@ -75,7 +73,9 @@ describe("ProductUpdateService — kaldırma nedeni", () => {
       {} as any, // notification
       {} as any, // smtp
       { formatProductResponse: jest.fn().mockResolvedValue({}) } as any,
-      { recomputeProductRanking: jest.fn().mockResolvedValue(undefined) } as any,
+      {
+        recomputeProductRanking: jest.fn().mockResolvedValue(undefined),
+      } as any,
       {} as any, // membershipService
       { assertListingRuleExists: jest.fn() } as any,
       { assertTextClean: jest.fn(), isEnabled: false } as any,
@@ -251,6 +251,24 @@ describe("ProductUpdateService — kaldırma nedeni", () => {
 
       await service.update(PRODUCT, SELLER, { modelCode: "HW-01" } as any);
 
+      expect(tx.productRemovalEvent.createMany).not.toHaveBeenCalled();
+    });
+
+    it("zaten pasif ilanın yeniden kaydedilmesi (tekrar pasife alma) ikinci kayıt üretmez", async () => {
+      // Pasif ilan düzenleme gövdesine hiç ulaşmaz: yeniden satışa açma
+      // dışındaki her istek `setQuantityToReopen` ile yazımdan önce reddedilir.
+      const { service, prisma, tx } = makeService({
+        status: ProductStatus.inactive,
+      });
+
+      await expect(
+        service.update(PRODUCT, SELLER, {
+          status: ProductStatus.inactive,
+          removalReason: "changed_mind",
+        } as any),
+      ).rejects.toBeInstanceOf(BadRequestException);
+
+      expect(prisma.$transaction).not.toHaveBeenCalled();
       expect(tx.productRemovalEvent.createMany).not.toHaveBeenCalled();
     });
   });
