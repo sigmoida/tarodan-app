@@ -89,8 +89,74 @@ ekranında uyarı gösterir.
 
 | Kimlik                     | Ayar anahtarı                 | Birim | Vars. | Sınır | Env geri düşüşü    | Eylemler                                | Damga |
 | -------------------------- | ----------------------------- | ----- | ----- | ----- | ------------------ | --------------------------------------- | ----- |
-| `listingTtlDays`           | `listing_ttl_days`            | gün   | 60    | 7–365 | `LISTING_TTL_DAYS` | **deactivate** · auto_renew _(yakında)_ | ✗     |
+| `listingTtlDays`           | `listing_ttl_days`            | gün   | 60    | 7–365 | `LISTING_TTL_DAYS` | **deactivate** · **auto_renew**         | ✗     |
 | `listingExpiryWarningDays` | `listing_expiry_warning_days` | gün   | 7     | 1–30  | — (eski sabit 7)   | **notify_seller**                       | ✗     |
+
+#### İlan ömrü: süre dolumu, yenileme ve eski kayıtlar
+
+Her gece 04:00 (`ProductSchedulerService.runExpireOldListings`) ömrü dolan
+(`yayın anı + ömür`, yayın anı = `publishedAt ?? createdAt`) aktif ilanlara
+seçili eylem uygulanır. Yazım **ilan başına ve aynı süre koşuluyla** yapılır:
+seçimle yazım arasında yenilenen/onaylanan ilan (`publishedAt` şimdi) koşula
+uymaz, dokunulmaz ve e-posta gitmez.
+
+- **deactivate:** ilan `inactive` olur ve `inactiveReason = expired` ile
+  işaretlenir (elle pasife alma / stok bitişi / iade karantinasından ayırt
+  edilsin diye); satıcıya "süresi doldu" e-postası gider, bağlantısı
+  `/profile/listings?status=expired`.
+- **auto_renew:** hâlâ satılabilir ilan (stokta, satıcı banlı/askıda değil)
+  pasife alınmaz, **yerinde yenilenir** (`publishedAt = şimdi`). Satıcıya
+  **bildirim gitmez** (günlük/yinelenen e-posta yok) ve "süresi doluyor"
+  uyarısı da gönderilmez (yanlış olurdu). Satılamaz ilan `deactivate` yoluna
+  düşer ve o e-postayı alır.
+
+**Satıcı yenilemesi** (`POST /products/:id/renew`, toplu: `POST /products/my/renew`,
+en çok 100 ilan): yalnız `inactive + expired` gerçek ilan, kendi ilanı. Eski
+kapıların hepsi çalışır: stok, üyelik ilan limiti (sıralı denetlenir, toplu
+yenilemede limit yarı yolda dolarsa kalanlar gerekçesiyle başarısız olur),
+komisyon kuralı, banlı/askıdaki kurumsal satıcı. Sonuç:
+
+- içerik **son onaydan beri değişmediyse** → doğrudan `active`, `publishedAt =
+  şimdi` (moderasyon kuyruğuna girmez);
+- değiştiyse ya da onay izi yoksa → `pending` (normal onay kuralı, ömür onayda
+  başlar).
+
+"Değişmedi" kararı `Product.approvedContentFingerprint` ile verilir: her onay
+yolu (admin onayı/toplu onay, AI oto-onay, admin reaktivasyonu) o anki
+moderasyona konu içeriğin SHA-256 izini yazar (başlık, açıklama, kategori, marka,
+model, üretici, model kodu, durum, görseller sırasıyla — fiyat/stok/indirim
+**hariç**, bkz. `computeProductContentFingerprint`). Yenilemede güncel içeriğin
+izi eşleşirse atlanır. İz yoksa (eski kayıtlar, toplu import ile açılmış
+ilanlar) "değişmedi" kanıtlanamaz → `pending`.
+
+`inactiveReason`, ilan `inactive` dışına çıkan her yazımda `PrismaService`
+middleware'i tarafından temizlenir (`return_quarantine` ile aynı kural).
+Karantinadan doğrudan aktife dönen ilan da artık `publishedAt`'i tazeler;
+aksi halde ömründen eski ilan ertesi gece yine pasife alınıyordu.
+
+**Eski, işaretsiz kayıtlar için tek seferlik bakım**
+(`POST /admin/products/expired-listings/maintenance`, super_admin + admin):
+önce kuru çalıştırma (varsayılan `dryRun: true`), sonra `dryRun: false`.
+`mode: "mark"` (varsayılan) yalnız `expired` işareti koyar — satıcı tek tıkla
+yeniler; `mode: "reactivate"` işaretler ve yönetici onayıyla yayına alır (kapılar
+aynen çalışır; başarısız olan işaretli kalır). `stampBaseline: true` (yalnız
+mark) güncel içeriği onaylı sayar → satıcı yenilemesi doğrudan yayına döner;
+kapalıysa eski ilanlar yenilemede `pending`e düşer.
+
+Seçim kuralı (`classifyLegacyExpiry`, muhafazakâr): `kind = listing`,
+`status = inactive`, `inactiveReason` boş, stok null ya da > 0, satıcı banlı/silinmiş
+değil ve **`ömür ≤ updatedAt − yayın anı ≤ ömür + tolerans`** (varsayılan tolerans
+3 gün). Eski gece işi yalnız `status`'u yazdığı için tek izi `updatedAt`'tir:
+dolum anında yazılır. Ömür dolmadan elle pasife alınan ilan alt sınırda, pasife
+alındıktan sonra bir kez daha yazılmış ilan üst sınırda elenir. Belirsiz kalanlar:
+(1) ömür sonradan **kısaltıldıysa** eski ömürle yapılmış, yeni ömre göre pencerede
+kalan bir elle pasife alma yanlış eşleşebilir (uzatıldıysa eski dolumlar kaçar);
+(2) pasife alındıktan sonra herhangi bir yazım (`updatedAt` kayar) ilanı pencere
+dışına atar; (3) gece işi tolerans günlerinden uzun durduysa geç dolumlar kaçar;
+(4) pencerede kalan, stoklu bir ilanı o gece satıcı da pasife almış olabilir
+(zaten dolacaktı). Rapor, dışarıda kalanları nedene göre sayar
+(`skipped.*`); `reactivate` modunu önce `mark` + kuru çalıştırma çıktısıyla
+doğrulayın.
 
 ### Teklif
 
@@ -238,7 +304,8 @@ Kayıtta `available: false` duran eylemler (`auto_renew`, `extend_once`)
 2. Davranışı yaz: süre dolumunu işleyen cron/servis
    `resolveTimingAction(db, id)` ile seçili eylemi okuyup dallanır (bugün hiçbir
    yer okumaz, çünkü her kaydın tek açık eylemi var).
-3. `timing-rules.registry.spec.ts`teki `LATER_ACTIONS` sözleşmesini güncelle.
+3. `timing-rules.registry.spec.ts`teki `LATER_ACTIONS` sözleşmesini güncelle
+   (açılan eylem `ENABLED_ACTIONS`a taşınır; `listingTtlDays` → `auto_renew` ilk örnek).
 
 Yeni bir süre eklemek: `TIMING_RULES`'a kayıt + `admin.timingRules.rules.<id>`
 etiketleri (tr/en) + okuyan yerde `resolveTimingValue(db, "<id>")`.
