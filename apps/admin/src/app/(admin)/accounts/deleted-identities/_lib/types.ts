@@ -71,12 +71,17 @@ export function actorLabel(t: T, actor: DeletionActor): string {
   return t("admin.deletedIdentities.actorUnknown");
 }
 
+// İlk seçenek filtrenin varsayılanıdır (filterDefaults): nötr "all" olmazsa
+// liste açılışta ilk gerçek değerle (ör. "yalnız satıcılar", "saklama süresi
+// dolmuş") süzülmüş açılır. "all" API'ye gönderilmez.
 export const getSourceFilterOptions = (t: T) => [
+  { value: "all", label: t("common.all") },
   { value: "live", label: t("admin.deletedIdentities.sourceLive") },
   { value: "backfill", label: t("admin.deletedIdentities.sourceBackfill") },
 ];
 
 export const getBooleanFilterOptions = (t: T) => [
+  { value: "all", label: t("common.all") },
   { value: "true", label: t("common.yes") },
   { value: "false", label: t("common.no") },
 ];
