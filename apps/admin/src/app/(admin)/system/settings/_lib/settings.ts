@@ -21,8 +21,11 @@ export interface Settings {
 
 export type SettingsTab =
   "listing" | "trade" | "message" | "finance" | "security";
-/** All page tabs — "warehouse" renders its own card, not the numeric form. */
-export type SettingsPageTab = SettingsTab | "warehouse";
+/**
+ * All page tabs — "warehouse" and "legal" render their own cards, not the
+ * numeric form.
+ */
+export type SettingsPageTab = SettingsTab | "warehouse" | "legal";
 
 export interface FieldDef {
   key: keyof Settings;
@@ -143,6 +146,7 @@ export function settingsTabs(t: T): { key: SettingsPageTab; label: string }[] {
     { key: "finance", label: t("admin.settings.tabs.finance") },
     { key: "security", label: t("admin.settings.tabs.security") },
     { key: "warehouse", label: t("admin.settings.tabs.warehouse") },
+    { key: "legal", label: t("admin.settings.tabs.legal") },
   ];
 }
 
