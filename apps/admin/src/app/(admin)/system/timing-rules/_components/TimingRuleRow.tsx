@@ -13,6 +13,7 @@ import {
   actionField,
   actionOptions,
   boundsLabel,
+  inProgressWarningKey,
   isActionLocked,
   valueField,
 } from "../_lib/timing-rules";
@@ -62,7 +63,7 @@ export function TimingRuleRow({ id, state, canEdit }: TimingRuleRowProps) {
         )}
         {rule.appliesToInProgress && (
           <p className="mt-1 text-xs text-warning-800">
-            {t("admin.timingRules.appliesToInProgressWarning")}
+            {t(inProgressWarningKey(id))}
           </p>
         )}
       </div>
