@@ -564,15 +564,24 @@ korunur). Aksi halde geç gelen B ödemesinin iadesi, A'nın başarısız iadesi
 işaretini silerdi ve `retryFailedTradeRefunds` A'yı bir daha görmezdi.
 Kapsamsız çağrı takasın tüm borcunu ele aldığı için bugünkü gibi temizler.
 
-**AÇIK KARAR — süre dolumu iptalinde geç gelen ödeme.** Ödeme süresi aşımıyla
-iptalde (tarama, `faultless: "paid"`) yalnız iptal anında `completed` olan
-satırlar kusursuz işaretlenir. 3D doğrulamasını son tarihten ÖNCE bitirmiş ama
-callback'i taramadan SONRA gelmiş bir ödeyenin satırı `fullRefundEntitled =
-false` kalır; yukarıdaki geç-ödeme iadesi onu **hizmet bedeli düşülerek** iade
-eder — gerçekleşmemiş bir takas için. Bu bilinçli bir kural değildir, ürün
-kararı bekleyen açık bir sorudur; karar verilene kadar davranış böyledir.
-(Kullanıcı iptalinde iptal edenin kendi geç ödemesi de aynı şekilde kesintili
-iade edilir; platform iptalinde bu durum yoktur.)
+**Karar (2026-10-05) — iptalden sonra tamamlanan ödemenin kusur kararı.**
+
+- **Ödeme süresi dolumu iptali (tarama):** ödemesi iptalden SONRA tamamlanan
+  taraf da kusursuzdur ve **hizmet bedeli dahil tam** iade alır. Tarama
+  (`faultless: "paid"`) yalnız iptal anında `completed` olan satırları
+  işaretleyebildiği için bayrak, geç ödemeyi tespit eden yolda
+  (`payment-fulfillment` → iptal edilmiş takas dalı) iade satırıyla AYNI tx'te
+  yazılır; tutar yine iade politikasından (`fullRefundEntitled`) gelir. Takas
+  satırı aşamayı ayrıca kaydetmediği için karar en dar sinyallerin
+  birleşimidir (`isPaymentExpiryCancellation`): aktör `system`, gerekçe süre
+  dolumu sabiti (yalnız tarama yazar), ödeme son tarihi kurulu ve kargolama son
+  tarihi kurulu değil. Stok tükenmesi, ban, üyelik düşüşü gibi diğer sistem
+  iptalleri bu kümeye girmez.
+- **Taraf iptali:** takası kendisi iptal eden tarafın ödemesi sonradan
+  tamamlanırsa **hizmet bedeli düşülerek** iade edilir — bu yürürlükteki
+  kuraldır (iptal eden kusurludur). Karşı tarafın satırı iptal anında zaten
+  kusursuz işaretlenir ve tam iade alır.
+- **Platform iptali:** her satır iptal anında kusursuz işaretlenir (değişmedi).
 
 ---
 
