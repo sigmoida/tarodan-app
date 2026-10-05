@@ -1,5 +1,4 @@
 import { useTranslations } from "next-intl";
-import type { BadgeProps } from "@tarodan/ui";
 import {
   ADMIN_OFFERS_TAB_HREF,
   ADMIN_ORDERS_PATH,
@@ -36,16 +35,6 @@ export const getRoleMeta = (
     description: t("admin.roles.meta.moderator.description"),
   },
 });
-
-/**
- * Role badge in the staff table. Neutral by default — only the privileged
- * super_admin is tinted, so the column reads at a glance without a rainbow.
- */
-export const ROLE_BADGE_VARIANT: Record<RoleId, BadgeProps["variant"]> = {
-  super_admin: "default",
-  admin: "outline",
-  moderator: "outline",
-};
 
 // Varsayılan izin listesinin önyüz kopyası BİLEREK yok: tek kaynak backend'in
 // DEFAULT_ROLE_PERMISSIONS'ı, "Varsayılanlara sıfırla" onu API'den okur

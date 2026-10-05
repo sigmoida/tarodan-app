@@ -4,6 +4,7 @@ import {
   ticketCategoryConfig,
 } from "@tarodan/ui";
 import { resolvedFilterOptions } from "@/lib/utils";
+import { statusConfig } from "@/lib/statusLabels";
 import type { StatusConfig } from "@tarodan/ui";
 import type { useTranslations } from "next-intl";
 
@@ -38,30 +39,8 @@ export const supportTabs = (t: T) => [
   { key: "guest", label: t("admin.messaging.support.tabs.guest") },
 ];
 
-export const supportTicketStatusConfig = (
-  t: T,
-): Record<string, StatusConfig> => ({
-  open: {
-    ...ticketStatusConfig.open,
-    label: t("admin.messaging.support.status.open"),
-  },
-  in_progress: {
-    ...ticketStatusConfig.in_progress,
-    label: t("admin.messaging.support.status.inProgress"),
-  },
-  waiting_customer: {
-    ...ticketStatusConfig.waiting_customer,
-    label: t("admin.messaging.support.status.waitingCustomer"),
-  },
-  resolved: {
-    ...ticketStatusConfig.resolved,
-    label: t("admin.messaging.support.status.resolved"),
-  },
-  closed: {
-    ...ticketStatusConfig.closed,
-    label: t("admin.messaging.support.status.closed"),
-  },
-});
+export const supportTicketStatusConfig = (t: T) =>
+  statusConfig(ticketStatusConfig, t);
 
 export const supportTicketPriorityConfig = (
   t: T,

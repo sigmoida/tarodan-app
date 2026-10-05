@@ -1,7 +1,8 @@
-import { Badge } from "@tarodan/ui";
+import { Badge, adminRoleConfig } from "@tarodan/ui";
 import { useTranslations } from "next-intl";
 import { col, type RowActionItem } from "@/components/table";
-import { getRoleMeta, ROLE_BADGE_VARIANT, type RoleId } from "./constants";
+import { statusConfig } from "@/lib/statusLabels";
+import { getRoleMeta, type RoleId } from "./constants";
 import type { StaffItem } from "./types";
 
 type T = ReturnType<typeof useTranslations<never>>;
@@ -16,6 +17,7 @@ export function staffColumns(
   rowMenu: (s: StaffItem) => RowActionItem[],
 ) {
   const roleMeta = getRoleMeta(t);
+  const roleBadges = statusConfig(adminRoleConfig, t);
   return [
     col.user<StaffItem>(
       t("common.user"),
@@ -30,9 +32,11 @@ export function staffColumns(
     col.badge<StaffItem>(
       t("admin.roles.columns.role"),
       (s) => (
-        <Badge variant={ROLE_BADGE_VARIANT[s.role as RoleId] ?? "outline"}>
-          {roleMeta[s.role as RoleId]?.label ?? s.role}
-        </Badge>
+        <Badge
+          status={s.role}
+          config={roleBadges}
+          label={roleMeta[s.role as RoleId]?.label ?? s.role}
+        />
       ),
       { sortKey: "role", sortType: "text" },
     ),

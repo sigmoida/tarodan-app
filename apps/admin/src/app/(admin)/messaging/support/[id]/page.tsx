@@ -6,13 +6,16 @@ import {
   ArrowUturnLeftIcon,
   PencilSquareIcon,
 } from "@heroicons/react/24/outline";
-import { Button, StatusBadge, enumLabel } from "@tarodan/ui";
+import { Badge, Button, EmptyState, enumLabel } from "@tarodan/ui";
 import { adminApi } from "@/lib/api";
+import { fmtDateTime } from "@/lib/format";
 import { DetailPage } from "@/components/detail/DetailPage";
 import { SectionCard } from "@/components/detail/SectionCard";
 import { PartyCard } from "@/components/detail/PartyCard";
 import { Timeline } from "@/components/detail/Timeline";
 import { DataList, Field } from "@/components/detail/DataList";
+import { DetailLayout } from "@/components/detail/DetailLayout";
+import { Panel } from "@/components/detail/Panel";
 import { TicketReplyModal } from "./_modals/TicketReplyModal";
 import { TicketStatusModal } from "./_modals/TicketStatusModal";
 import {
@@ -63,11 +66,11 @@ export default function SupportTicketDetailPage() {
       subtitle={(ticket) => `#${ticket.ticketNumber}`}
       badge={(ticket) => (
         <span className="flex items-center gap-2">
-          <StatusBadge
+          <Badge
             status={ticket.priority}
             config={supportTicketPriorityConfig(translate)}
           />
-          <StatusBadge
+          <Badge
             status={ticket.status}
             config={supportTicketStatusConfig(translate)}
           />
@@ -94,20 +97,21 @@ export default function SupportTicketDetailPage() {
     >
       {(ticket) => (
         <>
-          <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-            <div className="space-y-6 lg:col-span-2">
+          <DetailLayout
+            main={
               <SectionCard
                 title={translate("admin.messaging.support.messages")}
               >
                 <div className="space-y-4">
                   {ticket.messages.map((message) => (
-                    <div
+                    <Panel
                       key={message.id}
-                      className={`rounded-lg p-4 ${
+                      tone={message.isInternal ? "default" : "muted"}
+                      className={
                         message.isInternal
-                          ? "border border-warning-200 bg-warning-50"
-                          : "bg-surface-alt"
-                      }`}
+                          ? "border-warning-200 bg-warning-50"
+                          : undefined
+                      }
                     >
                       <div className="mb-2 flex items-center justify-between gap-2">
                         <div className="flex items-center gap-2">
@@ -115,93 +119,94 @@ export default function SupportTicketDetailPage() {
                             {message.senderName}
                           </span>
                           {message.isInternal && (
-                            <span className="rounded bg-warning-200 px-2 py-0.5 text-xs text-warning-800">
+                            <Badge variant="warning" size="sm">
                               {translate(
                                 "admin.messaging.support.internalNote",
                               )}
-                            </span>
+                            </Badge>
                           )}
                         </div>
                         <span className="text-xs text-muted">
-                          {new Date(message.createdAt).toLocaleString(
-                            translate("common.dateLocale"),
-                          )}
+                          {fmtDateTime(message.createdAt)}
                         </span>
                       </div>
                       <p className="whitespace-pre-wrap text-body">
                         {message.content}
                       </p>
-                    </div>
+                    </Panel>
                   ))}
                   {ticket.messages.length === 0 && (
-                    <p className="text-sm text-muted">
-                      {translate("admin.messaging.support.noMessages")}
-                    </p>
+                    <EmptyState
+                      size="compact"
+                      icon={false}
+                      title={translate("admin.messaging.support.noMessages")}
+                    />
                   )}
                 </div>
               </SectionCard>
-            </div>
-
-            <div className="space-y-6">
-              <SectionCard
-                title={translate("admin.messaging.support.ticketInfo")}
-              >
-                <DataList columns={1}>
-                  <Field label={translate("common.category")}>
-                    {enumLabel(
-                      supportTicketCategoryConfig(translate),
-                      ticket.category,
-                      ticket.category,
-                    )}
-                  </Field>
-                  <Field
-                    label={translate("admin.messaging.support.priorityLabel")}
-                  >
-                    <StatusBadge
-                      status={ticket.priority}
-                      config={supportTicketPriorityConfig(translate)}
-                    />
-                  </Field>
-                  <Field label={translate("common.status")}>
-                    <StatusBadge
-                      status={ticket.status}
-                      config={supportTicketStatusConfig(translate)}
-                    />
-                  </Field>
-                  {ticket.assigneeName && (
-                    <Field
-                      label={translate("admin.messaging.support.assignee")}
-                    >
-                      {ticket.assigneeName}
+            }
+            aside={
+              <>
+                <SectionCard
+                  title={translate("admin.messaging.support.ticketInfo")}
+                >
+                  <DataList columns={1}>
+                    <Field label={translate("common.category")}>
+                      {enumLabel(
+                        supportTicketCategoryConfig(translate),
+                        ticket.category,
+                        ticket.category,
+                      )}
                     </Field>
-                  )}
-                </DataList>
-              </SectionCard>
+                    <Field
+                      label={translate("admin.messaging.support.priorityLabel")}
+                    >
+                      <Badge
+                        status={ticket.priority}
+                        config={supportTicketPriorityConfig(translate)}
+                      />
+                    </Field>
+                    <Field label={translate("common.status")}>
+                      <Badge
+                        status={ticket.status}
+                        config={supportTicketStatusConfig(translate)}
+                      />
+                    </Field>
+                    {ticket.assigneeName && (
+                      <Field
+                        label={translate("admin.messaging.support.assignee")}
+                      >
+                        {ticket.assigneeName}
+                      </Field>
+                    )}
+                  </DataList>
+                </SectionCard>
 
-              <PartyCard
-                title={translate("admin.messaging.support.creator")}
-                name={ticket.creatorName}
-                userHref={`/accounts/users/${ticket.creatorId}`}
-              />
+                <PartyCard
+                  title={translate("admin.messaging.support.creator")}
+                  name={ticket.creatorName}
+                  userHref={`/accounts/users/${ticket.creatorId}`}
+                />
 
-              <Timeline
-                items={[
-                  {
-                    label: translate("admin.messaging.support.createdAt"),
-                    at: ticket.createdAt,
-                  },
-                  {
-                    label: translate("admin.messaging.support.lastUpdated"),
-                    at: ticket.updatedAt,
-                  },
-                  {
-                    label: translate("admin.messaging.support.resolvedAt"),
-                    at: ticket.resolvedAt,
-                  },
-                ]}
-              />
-            </div>
-          </div>
+                <Timeline
+                  items={[
+                    {
+                      label: translate("admin.messaging.support.createdAt"),
+                      at: ticket.createdAt,
+                    },
+                    {
+                      label: translate("admin.messaging.support.lastUpdated"),
+                      at: ticket.updatedAt,
+                    },
+                    {
+                      label: translate("admin.messaging.support.resolvedAt"),
+                      at: ticket.resolvedAt,
+                    },
+                  ]}
+                />
+              </>
+            }
+          />
 
           {replyOpen && (
             <TicketReplyModal

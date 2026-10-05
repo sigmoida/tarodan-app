@@ -7,20 +7,22 @@ import {
   XCircleIcon,
 } from "@heroicons/react/24/outline";
 import { useTranslations } from "next-intl";
+import { Badge } from "@tarodan/ui";
 import { SectionCard } from "@/components/detail/SectionCard";
+import { DataList, Field } from "@/components/detail/DataList";
+import { Panel } from "@/components/detail/Panel";
 import { ordersTabHref } from "@/app/(admin)/operations/orders/_lib/screenTabs";
 import { type UserDetail } from "../types";
 
 function VerifiedRow({ label, ok }: { label: string; ok: boolean }) {
   return (
-    <div className="flex items-center justify-between">
-      <span className="text-muted">{label}</span>
+    <Field label={label}>
       {ok ? (
         <CheckCircleIcon className="h-5 w-5 text-success-500" />
       ) : (
         <XCircleIcon className="h-5 w-5 text-muted" />
       )}
-    </div>
+    </Field>
   );
 }
 
@@ -71,7 +73,7 @@ export function UserSidebar({ user }: { user: UserDetail }) {
       </SectionCard>
 
       <SectionCard title={t("admin.users.detail.verificationStatusTitle")}>
-        <div className="space-y-3">
+        <DataList columns={1}>
           <VerifiedRow
             label={t("admin.users.detail.emailLabel")}
             ok={user.isEmailVerified}
@@ -82,7 +84,7 @@ export function UserSidebar({ user }: { user: UserDetail }) {
             ok={user.isVerified}
           />
           <VerifiedRow label={t("admin.users.seller")} ok={user.isSeller} />
-        </div>
+        </DataList>
       </SectionCard>
 
       {user.addresses && user.addresses.length > 0 && (
@@ -93,13 +95,11 @@ export function UserSidebar({ user }: { user: UserDetail }) {
         >
           <div className="space-y-3">
             {user.addresses.map((address) => (
-              <div key={address.id} className="rounded-lg bg-surface-alt p-3">
+              <Panel key={address.id} tone="muted" padding="sm">
                 <div className="mb-1 flex items-center gap-2">
                   <p className="font-medium text-heading">{address.title}</p>
                   {address.isDefault && (
-                    <span className="rounded bg-primary-100 px-2 py-0.5 text-xs text-primary-700">
-                      {t("common.default")}
-                    </span>
+                    <Badge size="sm">{t("common.default")}</Badge>
                   )}
                 </div>
                 <p className="text-sm text-muted">{address.fullAddress}</p>
@@ -107,7 +107,7 @@ export function UserSidebar({ user }: { user: UserDetail }) {
                   {address.district}, {address.city}
                   {address.postalCode && ` - ${address.postalCode}`}
                 </p>
-              </div>
+              </Panel>
             ))}
           </div>
         </SectionCard>

@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import Link from "next/link";
 import { useParams } from "next/navigation";
 import {
   ArrowTopRightOnSquareIcon,
@@ -20,6 +19,9 @@ import { SectionCard } from "@/components/detail/SectionCard";
 import { PartyCard } from "@/components/detail/PartyCard";
 import { Timeline } from "@/components/detail/Timeline";
 import { DataList, Field } from "@/components/detail/DataList";
+import { DetailLayout } from "@/components/detail/DetailLayout";
+import { Panel } from "@/components/detail/Panel";
+import { TextLink } from "@/components/TextLink";
 import {
   reportReasonLabels,
   reportStatusConfig,
@@ -100,223 +102,237 @@ export default function ReportDetailPage() {
         const target = report.target;
         return (
           <>
-            <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-              <div className="space-y-6 lg:col-span-2">
-                <SectionCard title={t("admin.reports.detail.reportInfo")}>
-                  <DataList columns={2}>
-                    <Field label={t("admin.reports.columns.type")}>
-                      {typeLabels[report.type] ?? report.type}
-                    </Field>
-                    <Field label={t("admin.reports.columns.reason")}>
-                      {reasonLabels[report.reason] ?? report.reason}
-                    </Field>
-                  </DataList>
-                  <p className="mt-4 text-sm font-medium text-muted">
-                    {t("admin.reports.detail.userDescription")}
-                  </p>
-                  <p className="mt-1 whitespace-pre-wrap text-body">
-                    {report.description || (
-                      <span className="text-subtle">
-                        {t("admin.reports.detail.noDescription")}
-                      </span>
-                    )}
-                  </p>
-                </SectionCard>
-
-                <SectionCard
-                  title={t("admin.reports.detail.targetTitle")}
-                  actions={
-                    href ? (
-                      <Link
-                        href={href}
-                        className="inline-flex items-center gap-1 text-sm text-primary-600 hover:underline"
+            <DetailLayout
+              main={
+                <>
+                  <SectionCard title={t("admin.reports.detail.reportInfo")}>
+                    <DataList columns={2}>
+                      <Field label={t("admin.reports.columns.type")}>
+                        {typeLabels[report.type] ?? report.type}
+                      </Field>
+                      <Field label={t("admin.reports.columns.reason")}>
+                        {reasonLabels[report.reason] ?? report.reason}
+                      </Field>
+                    </DataList>
+                    <DataList columns={1} className="mt-4">
+                      <Field
+                        layout="stacked"
+                        label={t("admin.reports.detail.userDescription")}
                       >
-                        {t("admin.reports.detail.openTarget")}
-                        <ArrowTopRightOnSquareIcon className="h-4 w-4" />
-                      </Link>
-                    ) : undefined
-                  }
-                >
-                  {!target || target.deleted ? (
-                    <p className="text-sm text-subtle">
-                      {t("admin.reports.detail.targetDeleted")}
-                    </p>
-                  ) : (
-                    <>
-                      <DataList columns={2}>
-                        {report.type === "product" && (
-                          <>
-                            <Field label={t("common.title")}>
-                              {target.title}
-                            </Field>
-                            <Field
-                              label={t("admin.reports.detail.listingStatus")}
-                            >
-                              {statusLabel(
-                                productStatusConfig,
-                                target.status,
-                                t,
-                              )}
-                            </Field>
-                            <Field
-                              label={t("admin.reports.detail.sellerLabel")}
-                            >
-                              {target.seller && (
-                                <Link
-                                  href={`/accounts/users/${target.seller.id}`}
-                                  className="text-primary-600 hover:underline"
-                                >
-                                  {target.seller.displayName}
-                                </Link>
-                              )}
-                            </Field>
-                          </>
-                        )}
-                        {report.type === "user" && (
-                          <>
-                            <Field label={t("common.name")}>
-                              {target.displayName}
-                            </Field>
-                            <Field label={t("common.email")}>
-                              {target.email}
-                            </Field>
-                            <Field
-                              label={t("admin.reports.detail.accountStatus")}
-                            >
-                              {target.isBanned
-                                ? t("admin.reports.detail.banned")
-                                : t("admin.reports.detail.active")}
-                            </Field>
-                          </>
-                        )}
-                        {report.type === "collection" && (
-                          <>
-                            <Field label={t("common.name")}>
-                              {target.name}
-                            </Field>
-                            <Field label={t("admin.reports.detail.ownerLabel")}>
-                              {target.user && (
-                                <Link
-                                  href={`/accounts/users/${target.user.id}`}
-                                  className="text-primary-600 hover:underline"
-                                >
-                                  {target.user.displayName}
-                                </Link>
-                              )}
-                            </Field>
-                          </>
-                        )}
-                        {report.type === "message" && (
-                          <Field label={t("admin.reports.detail.senderLabel")}>
-                            {target.sender && (
-                              <Link
-                                href={`/accounts/users/${target.sender.id}`}
-                                className="text-primary-600 hover:underline"
-                              >
-                                {target.sender.displayName}
-                              </Link>
-                            )}
-                          </Field>
-                        )}
-                      </DataList>
+                        <p className="whitespace-pre-wrap font-normal text-body">
+                          {report.description || (
+                            <span className="text-subtle">
+                              {t("admin.reports.detail.noDescription")}
+                            </span>
+                          )}
+                        </p>
+                      </Field>
+                    </DataList>
+                  </SectionCard>
 
-                      {report.type === "message" && target.content && (
-                        <>
-                          <p className="mt-4 text-sm font-medium text-muted">
-                            {t("admin.reports.detail.messageContent")}
-                          </p>
-                          <p className="mt-1 whitespace-pre-wrap rounded-lg bg-surface-alt p-3 text-body">
-                            {target.content}
-                          </p>
-                        </>
-                      )}
-
-                      {(report.type === "product" ||
-                        report.type === "user") && (
-                        <div className="mt-4 flex flex-wrap gap-2 border-t border-border pt-4">
+                  <SectionCard
+                    title={t("admin.reports.detail.targetTitle")}
+                    actions={
+                      href ? (
+                        <TextLink
+                          href={href}
+                          className="inline-flex items-center gap-1 text-sm"
+                        >
+                          {t("admin.reports.detail.openTarget")}
+                          <ArrowTopRightOnSquareIcon className="h-4 w-4" />
+                        </TextLink>
+                      ) : undefined
+                    }
+                  >
+                    {!target || target.deleted ? (
+                      <p className="text-sm text-subtle">
+                        {t("admin.reports.detail.targetDeleted")}
+                      </p>
+                    ) : (
+                      <>
+                        <DataList columns={2}>
                           {report.type === "product" && (
-                            <Button
-                              variant="danger"
-                              size="sm"
-                              leftIcon={<TrashIcon className="h-4 w-4" />}
-                              isLoading={removeListing.isPending}
-                              onClick={() =>
-                                askAndRun(
-                                  t(
-                                    "admin.reports.actions.removeListingReason",
-                                  ),
-                                  (reason) =>
-                                    removeListing.mutate({
-                                      productId: report.targetId,
-                                      reason,
-                                    }),
-                                )
-                              }
-                            >
-                              {t("admin.reports.actions.removeListing")}
-                            </Button>
+                            <>
+                              <Field label={t("common.title")}>
+                                {target.title}
+                              </Field>
+                              <Field
+                                label={t("admin.reports.detail.listingStatus")}
+                              >
+                                {statusLabel(
+                                  productStatusConfig,
+                                  target.status,
+                                  t,
+                                )}
+                              </Field>
+                              <Field
+                                label={t("admin.reports.detail.sellerLabel")}
+                              >
+                                {target.seller && (
+                                  <TextLink
+                                    href={`/accounts/users/${target.seller.id}`}
+                                  >
+                                    {target.seller.displayName}
+                                  </TextLink>
+                                )}
+                              </Field>
+                            </>
                           )}
-                          {report.type === "user" && !target.isBanned && (
-                            <Button
-                              variant="danger"
-                              size="sm"
-                              leftIcon={<NoSymbolIcon className="h-4 w-4" />}
-                              isLoading={banUser.isPending}
-                              onClick={() =>
-                                askAndRun(
-                                  t("admin.reports.actions.banUserReason"),
-                                  (reason) =>
-                                    banUser.mutate({
-                                      userId: report.targetId,
-                                      reason,
-                                    }),
-                                )
-                              }
-                            >
-                              {t("admin.reports.actions.banUser")}
-                            </Button>
+                          {report.type === "user" && (
+                            <>
+                              <Field label={t("common.name")}>
+                                {target.displayName}
+                              </Field>
+                              <Field label={t("common.email")}>
+                                {target.email}
+                              </Field>
+                              <Field
+                                label={t("admin.reports.detail.accountStatus")}
+                              >
+                                {target.isBanned
+                                  ? t("admin.reports.detail.banned")
+                                  : t("admin.reports.detail.active")}
+                              </Field>
+                            </>
                           )}
-                        </div>
-                      )}
-                    </>
-                  )}
-                </SectionCard>
-              </div>
+                          {report.type === "collection" && (
+                            <>
+                              <Field label={t("common.name")}>
+                                {target.name}
+                              </Field>
+                              <Field
+                                label={t("admin.reports.detail.ownerLabel")}
+                              >
+                                {target.user && (
+                                  <TextLink
+                                    href={`/accounts/users/${target.user.id}`}
+                                  >
+                                    {target.user.displayName}
+                                  </TextLink>
+                                )}
+                              </Field>
+                            </>
+                          )}
+                          {report.type === "message" && (
+                            <Field
+                              label={t("admin.reports.detail.senderLabel")}
+                            >
+                              {target.sender && (
+                                <TextLink
+                                  href={`/accounts/users/${target.sender.id}`}
+                                >
+                                  {target.sender.displayName}
+                                </TextLink>
+                              )}
+                            </Field>
+                          )}
+                        </DataList>
 
-              <div className="space-y-6">
-                {report.reporter && (
-                  <PartyCard
-                    title={t("admin.reports.detail.reporterTitle")}
-                    name={report.reporter.displayName}
-                    email={report.reporter.email}
-                    userHref={`/accounts/users/${report.reporter.id}`}
-                  />
-                )}
+                        {report.type === "message" && target.content && (
+                          <DataList columns={1} className="mt-4">
+                            <Field
+                              layout="stacked"
+                              label={t("admin.reports.detail.messageContent")}
+                            >
+                              <Panel
+                                tone="muted"
+                                padding="sm"
+                                className="whitespace-pre-wrap font-normal text-body"
+                              >
+                                {target.content}
+                              </Panel>
+                            </Field>
+                          </DataList>
+                        )}
 
-                <SectionCard title={t("admin.reports.detail.adminNote")}>
-                  <p className="whitespace-pre-wrap text-body">
-                    {report.adminNote || (
-                      <span className="text-subtle">
-                        {t("admin.reports.detail.noAdminNote")}
-                      </span>
+                        {(report.type === "product" ||
+                          report.type === "user") && (
+                          <div className="mt-4 flex flex-wrap gap-2 border-t border-border pt-4">
+                            {report.type === "product" && (
+                              <Button
+                                variant="danger"
+                                size="sm"
+                                leftIcon={<TrashIcon className="h-4 w-4" />}
+                                isLoading={removeListing.isPending}
+                                onClick={() =>
+                                  askAndRun(
+                                    t(
+                                      "admin.reports.actions.removeListingReason",
+                                    ),
+                                    (reason) =>
+                                      removeListing.mutate({
+                                        productId: report.targetId,
+                                        reason,
+                                      }),
+                                  )
+                                }
+                              >
+                                {t("admin.reports.actions.removeListing")}
+                              </Button>
+                            )}
+                            {report.type === "user" && !target.isBanned && (
+                              <Button
+                                variant="danger"
+                                size="sm"
+                                leftIcon={<NoSymbolIcon className="h-4 w-4" />}
+                                isLoading={banUser.isPending}
+                                onClick={() =>
+                                  askAndRun(
+                                    t("admin.reports.actions.banUserReason"),
+                                    (reason) =>
+                                      banUser.mutate({
+                                        userId: report.targetId,
+                                        reason,
+                                      }),
+                                  )
+                                }
+                              >
+                                {t("admin.reports.actions.banUser")}
+                              </Button>
+                            )}
+                          </div>
+                        )}
+                      </>
                     )}
-                  </p>
-                </SectionCard>
+                  </SectionCard>
+                </>
+              }
+              aside={
+                <>
+                  {report.reporter && (
+                    <PartyCard
+                      title={t("admin.reports.detail.reporterTitle")}
+                      name={report.reporter.displayName}
+                      email={report.reporter.email}
+                      userHref={`/accounts/users/${report.reporter.id}`}
+                    />
+                  )}
 
-                <Timeline
-                  items={[
-                    {
-                      label: t("admin.reports.detail.reportedAt"),
-                      at: report.createdAt,
-                    },
-                    {
-                      label: t("admin.reports.detail.resolvedAt"),
-                      at: report.resolvedAt,
-                    },
-                  ]}
-                />
-              </div>
-            </div>
+                  <SectionCard title={t("admin.reports.detail.adminNote")}>
+                    <p className="whitespace-pre-wrap text-body">
+                      {report.adminNote || (
+                        <span className="text-subtle">
+                          {t("admin.reports.detail.noAdminNote")}
+                        </span>
+                      )}
+                    </p>
+                  </SectionCard>
+
+                  <Timeline
+                    items={[
+                      {
+                        label: t("admin.reports.detail.reportedAt"),
+                        at: report.createdAt,
+                      },
+                      {
+                        label: t("admin.reports.detail.resolvedAt"),
+                        at: report.resolvedAt,
+                      },
+                    ]}
+                  />
+                </>
+              }
+            />
 
             {statusOpen && (
               <ReportStatusModal

@@ -12,6 +12,7 @@ import { adminApi } from "@/lib/api";
 import { adminKeys } from "@/lib/query/keys";
 import { DataTable } from "@/components/DataTable";
 import { SectionCard } from "@/components/detail/SectionCard";
+import { SectionTitle } from "@/components/detail/SectionTitle";
 import { useAdminMutation } from "@/hooks/useAdminMutation";
 import { useClientTableSort } from "@/hooks/useClientTableSort";
 import { useSession } from "@/context/SessionContext";
@@ -138,9 +139,7 @@ export function StaffAssignmentsTab({
 
       <SectionCard bodyClassName="flex flex-wrap items-center justify-between gap-3">
         <div className="flex min-w-0 flex-wrap items-center gap-3">
-          <h3 className="text-lg font-semibold text-heading">
-            {t("admin.roles.staffHeading")}
-          </h3>
+          <SectionTitle as="h3">{t("admin.roles.staffHeading")}</SectionTitle>
           <div className="flex items-center gap-1.5">
             {ROLES.map((r) => {
               const active = roleFilter === r;

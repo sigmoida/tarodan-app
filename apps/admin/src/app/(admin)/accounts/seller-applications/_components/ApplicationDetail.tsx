@@ -14,9 +14,14 @@ import {
   UserGroupIcon,
   XCircleIcon,
 } from "@heroicons/react/24/outline";
-import { Badge, Button, Spinner } from "@tarodan/ui";
+import { Alert, Badge, Button, Spinner } from "@tarodan/ui";
 import { useTranslations } from "next-intl";
 import { MaskedValue } from "@/components/MaskedValue";
+import { TextLink } from "@/components/TextLink";
+import { DataList, Field } from "@/components/detail/DataList";
+import { Panel } from "@/components/detail/Panel";
+import { SectionTitle } from "@/components/detail/SectionTitle";
+import { fmtDateTime } from "@/lib/format";
 import { adminApi } from "@/lib/api";
 import { adminKeys } from "@/lib/query/keys";
 import { useAdminMutation } from "@/hooks/useAdminMutation";
@@ -101,16 +106,6 @@ interface ApplicationDetailData {
   } | null;
   stakeholders: Stakeholder[];
   documents: DocumentSlot[];
-}
-
-function Field({ label, value }: { label: string; value?: string | null }) {
-  if (!value) return null;
-  return (
-    <div>
-      <span className="block text-xs text-muted">{label}</span>
-      <span className="break-words font-medium text-heading">{value}</span>
-    </div>
-  );
 }
 
 function DocumentStatusBadge({ status, t }: { status: DocumentStatus; t: T }) {
@@ -229,9 +224,11 @@ export function ApplicationDetail({ app }: { app: Application }) {
   }
   if (isError || !data) {
     return (
-      <p className="border-t border-border bg-surface-alt/40 p-6 text-sm text-danger-600">
-        {t("admin.accounts.sellerApplications.loadError")}
-      </p>
+      <div className="border-t border-border bg-surface-alt/40 p-6">
+        <Alert variant="danger">
+          {t("admin.accounts.sellerApplications.loadError")}
+        </Alert>
+      </div>
     );
   }
 
@@ -293,95 +290,155 @@ export function ApplicationDetail({ app }: { app: Application }) {
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
         <section>
-          <h4 className="mb-3 flex items-center gap-1.5 text-xs font-semibold text-muted">
+          <SectionTitle
+            as="h4"
+            size="sm"
+            className="mb-3 flex items-center gap-1.5"
+          >
             <BuildingOfficeIcon className="h-4 w-4" />
             {t("admin.accounts.sellerApplications.companyInformation")}
-          </h4>
-          <div className="space-y-2 text-sm">
-            <Field
-              label={t("admin.accounts.sellerApplications.companyFullName")}
-              value={data.companyLegalName}
-            />
-            <Field
-              label={t("admin.accounts.sellerApplications.companyTitle")}
-              value={data.companyTitle}
-            />
-            <Field
-              label={t("admin.accounts.sellerApplications.companyAddress")}
-              value={data.companyAddress}
-            />
-            <Field
-              label={t("admin.accounts.sellerApplications.companyType")}
-              value={data.companyType}
-            />
-            <Field
-              label={t("admin.accounts.sellerApplications.taxOffice")}
-              value={data.taxOffice}
-            />
+          </SectionTitle>
+          <DataList columns={1}>
+            {data.companyLegalName && (
+              <Field
+                layout="stacked"
+                label={t("admin.accounts.sellerApplications.companyFullName")}
+              >
+                {data.companyLegalName}
+              </Field>
+            )}
+            {data.companyTitle && (
+              <Field
+                layout="stacked"
+                label={t("admin.accounts.sellerApplications.companyTitle")}
+              >
+                {data.companyTitle}
+              </Field>
+            )}
+            {data.companyAddress && (
+              <Field
+                layout="stacked"
+                label={t("admin.accounts.sellerApplications.companyAddress")}
+              >
+                {data.companyAddress}
+              </Field>
+            )}
+            {data.companyType && (
+              <Field
+                layout="stacked"
+                label={t("admin.accounts.sellerApplications.companyType")}
+              >
+                {data.companyType}
+              </Field>
+            )}
+            {data.taxOffice && (
+              <Field
+                layout="stacked"
+                label={t("admin.accounts.sellerApplications.taxOffice")}
+              >
+                {data.taxOffice}
+              </Field>
+            )}
             {data.taxId && (
-              <div>
-                <span className="flex items-center gap-1 text-xs text-muted">
-                  <HashtagIcon className="h-3 w-3" />
-                  {t("admin.accounts.sellerApplications.taxNumber")}
-                </span>
-                <span className="font-medium text-heading">{data.taxId}</span>
-              </div>
+              <Field
+                layout="stacked"
+                label={
+                  <span className="flex items-center gap-1">
+                    <HashtagIcon className="h-3 w-3" />
+                    {t("admin.accounts.sellerApplications.taxNumber")}
+                  </span>
+                }
+              >
+                {data.taxId}
+              </Field>
+            )}
+            {data.companyCity && (
+              <Field
+                layout="stacked"
+                label={t("admin.accounts.sellerApplications.city")}
+              >
+                {data.companyCity}
+              </Field>
+            )}
+            {data.companyDistrict && (
+              <Field
+                layout="stacked"
+                label={t("admin.accounts.sellerApplications.district")}
+              >
+                {data.companyDistrict}
+              </Field>
+            )}
+          </DataList>
+        </section>
+
+        <section>
+          <SectionTitle as="h4" size="sm" className="mb-3">
+            {t("admin.accounts.sellerApplications.communication")}
+          </SectionTitle>
+          <DataList columns={1}>
+            {data.authorizedFullName && (
+              <Field
+                layout="stacked"
+                label={t("admin.accounts.sellerApplications.authorizedPerson")}
+              >
+                {data.authorizedFullName}
+              </Field>
+            )}
+            {data.companyEmail && (
+              <Field layout="stacked" label={t("common.email")}>
+                {data.companyEmail}
+              </Field>
+            )}
+            {data.kepAddress && (
+              <Field
+                layout="stacked"
+                label={t("admin.accounts.sellerApplications.kepAddress")}
+              >
+                {data.kepAddress}
+              </Field>
             )}
             <Field
-              label={t("admin.accounts.sellerApplications.city")}
-              value={data.companyCity}
-            />
+              layout="stacked"
+              label={
+                <span className="flex items-center gap-1">
+                  <PhoneIcon className="h-3 w-3" />
+                  {t("common.phone")}
+                </span>
+              }
+            >
+              {data.phone}
+            </Field>
+            {data.contactPhone && (
+              <Field
+                layout="stacked"
+                label={t("admin.accounts.sellerApplications.contactPhone")}
+              >
+                {data.contactPhone}
+              </Field>
+            )}
             <Field
-              label={t("admin.accounts.sellerApplications.district")}
-              value={data.companyDistrict}
-            />
-          </div>
+              layout="stacked"
+              label={
+                <span className="flex items-center gap-1">
+                  <CalendarIcon className="h-3 w-3" />
+                  {t("admin.accounts.sellerApplications.applicationDate")}
+                </span>
+              }
+            >
+              {fmtDateTime(data.createdAt)}
+            </Field>
+          </DataList>
         </section>
 
         <section>
-          <h4 className="mb-3 text-xs font-semibold text-muted">
-            {t("admin.accounts.sellerApplications.communication")}
-          </h4>
-          <div className="space-y-2 text-sm">
-            <Field
-              label={t("admin.accounts.sellerApplications.authorizedPerson")}
-              value={data.authorizedFullName}
-            />
-            <Field label={t("common.email")} value={data.companyEmail} />
-            <Field
-              label={t("admin.accounts.sellerApplications.kepAddress")}
-              value={data.kepAddress}
-            />
-            <div>
-              <span className="flex items-center gap-1 text-xs text-muted">
-                <PhoneIcon className="h-3 w-3" />
-                {t("common.phone")}
-              </span>
-              <span className="text-heading">{data.phone}</span>
-            </div>
-            <Field
-              label={t("admin.accounts.sellerApplications.contactPhone")}
-              value={data.contactPhone}
-            />
-            <div>
-              <span className="flex items-center gap-1 text-xs text-muted">
-                <CalendarIcon className="h-3 w-3" />
-                {t("admin.accounts.sellerApplications.applicationDate")}
-              </span>
-              <span className="text-heading">
-                {new Date(data.createdAt).toLocaleString(
-                  t("common.dateLocale"),
-                )}
-              </span>
-            </div>
-          </div>
-        </section>
-
-        <section>
-          <h4 className="mb-3 flex items-center gap-1.5 text-xs font-semibold text-muted">
+          <SectionTitle
+            as="h4"
+            size="sm"
+            className="mb-3 flex items-center gap-1.5"
+          >
             <UserGroupIcon className="h-4 w-4" />
             {t("admin.accounts.sellerApplications.stakeholders")}
-          </h4>
+          </SectionTitle>
           <div className="space-y-3 text-sm">
             {data.stakeholders.length === 0 ? (
               <span className="text-muted">
@@ -411,34 +468,41 @@ export function ApplicationDetail({ app }: { app: Application }) {
                 </div>
               ))
             )}
-            <Field
-              label={t("admin.accounts.sellerApplications.accountHolder")}
-              value={data.bankAccountHolder}
-            />
-            {data.iban && (
-              <div>
-                <span className="block text-xs text-muted">
-                  {t("admin.accounts.sellerApplications.iban")}
-                </span>
-                <MaskedValue value={data.iban} className="font-medium" />
-              </div>
-            )}
+            <DataList columns={1}>
+              {data.bankAccountHolder && (
+                <Field
+                  layout="stacked"
+                  label={t("admin.accounts.sellerApplications.accountHolder")}
+                >
+                  {data.bankAccountHolder}
+                </Field>
+              )}
+              {data.iban && (
+                <Field
+                  layout="stacked"
+                  label={t("admin.accounts.sellerApplications.iban")}
+                >
+                  <MaskedValue value={data.iban} className="font-medium" />
+                </Field>
+              )}
+            </DataList>
           </div>
         </section>
       </div>
 
       <section>
-        <h4 className="mb-3 flex items-center gap-1.5 text-xs font-semibold text-muted">
+        <SectionTitle
+          as="h4"
+          size="sm"
+          className="mb-3 flex items-center gap-1.5"
+        >
           <DocumentTextIcon className="h-4 w-4" />
           {t("admin.accounts.sellerApplications.documents")}
-        </h4>
+        </SectionTitle>
         <div className="grid grid-cols-1 gap-3 xl:grid-cols-2">
           {documentRows.map(({ key, type, stakeholderName, document }) => {
             return (
-              <div
-                key={key}
-                className="space-y-3 rounded-lg border border-border bg-surface p-4"
-              >
+              <Panel key={key} className="space-y-3">
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
                     <p className="font-medium text-heading">
@@ -463,28 +527,35 @@ export function ApplicationDetail({ app }: { app: Application }) {
                     )}
                   </div>
                   {document?.url && (
-                    <a
+                    <TextLink
                       href={document.url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="flex flex-shrink-0 items-center gap-1 text-xs font-medium text-primary-600 hover:underline"
+                      external
+                      className="flex flex-shrink-0 items-center gap-1 text-xs"
                     >
                       <EyeIcon className="h-4 w-4" />
                       {t("admin.accounts.sellerApplications.view")}
-                    </a>
+                    </TextLink>
                   )}
                 </div>
 
                 {document?.reviewNote && (
-                  <p className="rounded-md bg-surface-alt p-2 text-xs text-body">
+                  <Panel
+                    tone="muted"
+                    padding="sm"
+                    className="text-xs text-body"
+                  >
                     {document.reviewNote}
-                  </p>
+                  </Panel>
                 )}
                 {document?.appealNote && (
-                  <p className="rounded-md bg-surface-alt p-2 text-xs text-body">
+                  <Panel
+                    tone="muted"
+                    padding="sm"
+                    className="text-xs text-body"
+                  >
                     {t("admin.accounts.sellerApplications.appeal")}:{" "}
                     {document.appealNote}
-                  </p>
+                  </Panel>
                 )}
 
                 {document && document.status !== "approved" && (
@@ -526,7 +597,7 @@ export function ApplicationDetail({ app }: { app: Application }) {
                     </Button>
                   </div>
                 )}
-              </div>
+              </Panel>
             );
           })}
         </div>

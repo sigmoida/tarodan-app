@@ -1,4 +1,5 @@
-import type { StatusConfig } from "@tarodan/ui";
+import { messageStatusConfig as sharedMessageStatusConfig } from "@tarodan/ui";
+import { statusConfig } from "@/lib/statusLabels";
 import type { useTranslations } from "next-intl";
 
 type T = ReturnType<typeof useTranslations<never>>;
@@ -25,22 +26,14 @@ export const messageFilterOptions = (t: T) => [
   { value: "rejected", label: t("admin.messaging.messages.filters.rejected") },
 ];
 
-export const messageStatusConfig = (t: T): Record<string, StatusConfig> => ({
-  sent: {
-    label: t("admin.messaging.messages.status.sent"),
-    variant: "outline",
-  },
-  pending: {
-    label: t("admin.messaging.messages.status.pending"),
-    variant: "warning",
-  },
-  pending_approval: {
-    label: t("admin.messaging.messages.status.pending"),
-    variant: "warning",
-  },
-  approved: { label: t("common.approved"), variant: "success" },
-  rejected: { label: t("common.rejected"), variant: "danger" },
-});
+/**
+ * Paylaşılan `messageStatusConfig` + yalnız önyüzün eşlediği "pending" takma
+ * adı (`mapMessage`, API'nin `pending_approval` değerini "pending" yapar).
+ */
+export const messageStatusConfig = (t: T) => {
+  const shared = statusConfig(sharedMessageStatusConfig, t);
+  return { ...shared, pending: shared.pending_approval };
+};
 
 /** Frontend filter value → API status ("pending" is stored as "pending_approval"). */
 export function mapFilterToApiStatus(
