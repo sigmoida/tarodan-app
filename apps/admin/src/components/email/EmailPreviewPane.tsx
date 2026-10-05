@@ -45,8 +45,7 @@ export function EmailPreviewPane({
         </span>
         {isPending && (
           <span className="flex items-center gap-1 text-xs text-muted">
-            <Spinner size="sm" className="h-3 w-3" />{" "}
-            {t("common.updating")}
+            <Spinner size="sm" className="h-3 w-3" /> {t("common.updating")}
           </span>
         )}
       </div>

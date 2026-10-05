@@ -19,7 +19,11 @@ export function DataList({
 }) {
   return (
     <dl
-      className={cn("grid gap-x-6 gap-y-3 text-sm", COLUMNS[columns], className)}
+      className={cn(
+        "grid gap-x-6 gap-y-3 text-sm",
+        COLUMNS[columns],
+        className,
+      )}
     >
       {children}
     </dl>
