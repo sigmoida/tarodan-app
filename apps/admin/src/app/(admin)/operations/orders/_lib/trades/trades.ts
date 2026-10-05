@@ -1,6 +1,11 @@
 import { tradeStatusConfig, type StatusConfig } from "@tarodan/ui";
+import type { CancellationActorValue } from "@tarodan/types";
 import { useTranslations } from "next-intl";
-import { statusFilterOptions } from "@/lib/utils";
+import { cancelReasonLabel, statusFilterOptions } from "@/lib/utils";
+import {
+  adminCancelReasonLabel,
+  platformCancelReasonCode,
+} from "@/lib/admin-cancel-reasons";
 
 type T = ReturnType<typeof useTranslations<never>>;
 
@@ -18,6 +23,22 @@ export interface Trade {
   isTest: boolean;
   createdAt: string;
   cancelReason?: string;
+  cancelledBy?: CancellationActorValue | null;
+  /** Platform (admin) iptalinin katalog kodu — yalnız admin iptalinde dolu. */
+  adminCancelReasonCode?: string | null;
+}
+
+/**
+ * İptal edilmiş satırın kısa neden notu: platform iptalinde "Tarodan · <neden>"
+ * (katalog etiketi, admin'in dilinde), diğerlerinde ham gerekçenin kısa etiketi.
+ */
+export function tradeCancelNote(trade: Trade, t: T): string | null {
+  if (trade.status !== "cancelled") return null;
+  const code = platformCancelReasonCode(trade);
+  if (code) {
+    return `${t("admin.operations.trades.adminCancel.cancelledByPlatform")} · ${adminCancelReasonLabel(code, t)}`;
+  }
+  return cancelReasonLabel(trade.cancelReason, t);
 }
 
 /** Resolve the user paying the cash difference. */
@@ -74,5 +95,7 @@ export function mapTrades(raw: any[], t: T): Trade[] {
     isTest: tr.isTest === true,
     createdAt: tr.createdAt,
     cancelReason: tr.cancelReason ?? undefined,
+    cancelledBy: tr.cancelledBy ?? null,
+    adminCancelReasonCode: tr.adminCancelReasonCode ?? null,
   }));
 }

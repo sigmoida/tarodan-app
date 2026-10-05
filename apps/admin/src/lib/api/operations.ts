@@ -1,8 +1,11 @@
 import type {
+  AdminCancelRequest,
   AdminCancellationCounts,
   AdminOrderCancelPreview,
   AdminOrderCancelResult,
   AdminOrderCounts,
+  AdminTradeCancelPreview,
+  AdminTradeCancelResult,
 } from "@tarodan/types";
 import { api } from "./client";
 
@@ -88,6 +91,12 @@ export const operationsApi = {
       `/admin/trades/${tradeId}/resolve-compensation`,
       note ? { note } : {},
     ),
+  /** Platform iptalinin önizlemesi: taraf başına iade + serbest kalanlar (yalnız super_admin). */
+  getTradeCancelPreview: (tradeId: string) =>
+    api.get<AdminTradeCancelPreview>(`/admin/trades/${tradeId}/cancel-preview`),
+  /** Platform (admin) takas iptali — katalog kodu + iç not (yalnız super_admin). */
+  cancelTrade: (tradeId: string, body: AdminCancelRequest) =>
+    api.post<AdminTradeCancelResult>(`/admin/trades/${tradeId}/cancel`, body),
 
   // RefundRequest admin
   getRefundRequests: (params?: any) =>

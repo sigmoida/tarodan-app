@@ -1,10 +1,14 @@
 import Link from "next/link";
 import { Badge, tradeStatusConfig } from "@tarodan/ui";
 import { useTranslations } from "next-intl";
-import { cancelReasonLabel } from "@/lib/utils";
 import { col, TruncatedText } from "@/components/table";
 import { fmtTry } from "@/lib/format";
-import { type Trade, disputeConfig, cashPayer } from "./trades";
+import {
+  type Trade,
+  disputeConfig,
+  cashPayer,
+  tradeCancelNote,
+} from "./trades";
 import { statusConfig } from "@/lib/statusLabels";
 import { TestLaneBadge } from "@/components/TestLaneBadge";
 
@@ -49,12 +53,11 @@ export function tradeColumns(t: T) {
               status={r.status}
               config={statusConfig(tradeStatusConfig, t)}
             />
-            {r.status === "cancelled" &&
-              cancelReasonLabel(r.cancelReason, t) && (
-                <span className="truncate text-xs text-muted">
-                  {cancelReasonLabel(r.cancelReason, t)}
-                </span>
-              )}
+            {tradeCancelNote(r, t) && (
+              <span className="truncate text-xs text-muted">
+                {tradeCancelNote(r, t)}
+              </span>
+            )}
           </div>
         ),
       { grow: 2, minWidth: 200, sortKey: "status", sortType: "text" },

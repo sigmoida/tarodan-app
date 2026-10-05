@@ -3,6 +3,10 @@
 import { enumLabel, refundReasonConfig } from "@tarodan/ui";
 import { useTranslations } from "next-intl";
 import { cancelReasonLabel } from "@/lib/utils";
+import {
+  adminCancelReasonLabel,
+  platformCancelReasonCode,
+} from "@/lib/admin-cancel-reasons";
 import { SectionCard } from "@/components/detail/SectionCard";
 import type { TradeDetail } from "../types";
 import { statusConfig } from "@/lib/statusLabels";
@@ -10,14 +14,33 @@ import { statusConfig } from "@/lib/statusLabels";
 /** Rejection/cancellation reason + admin notes + legacy dispute cards. */
 export function TradeInfoCards({ trade }: { trade: TradeDetail }) {
   const t = useTranslations();
-  const rawReason =
-    trade.rejectionReason || trade.cancellationReason || trade.cancelReason;
+  // Platform (admin) iptali: neden katalog kodundan, admin'in dilinde. Ham
+  // `cancelReason` taraflara gösterilen (varsayılan dilde) metindir; iç not
+  // takasta değil denetim kaydındadır.
+  const platformCode = platformCancelReasonCode(trade);
+  const rawReason = platformCode
+    ? null
+    : trade.rejectionReason || trade.cancellationReason || trade.cancelReason;
   const shortReason = trade.rejectionReason
     ? null
     : cancelReasonLabel(trade.cancellationReason || trade.cancelReason, t);
 
   return (
     <>
+      {platformCode && (
+        <div className="rounded-lg border border-danger-200 bg-danger-50 p-6 shadow-sm">
+          <h2 className="mb-2 text-lg font-semibold text-danger-900">
+            {t("admin.operations.trades.adminCancel.cancelledByPlatform")}
+          </h2>
+          <p className="text-sm text-danger-800">
+            <span className="font-medium">
+              {t("admin.operations.trades.cancelReason")}:
+            </span>{" "}
+            {adminCancelReasonLabel(platformCode, t)}
+          </p>
+        </div>
+      )}
+
       {rawReason && (
         <div className="rounded-lg border border-danger-200 bg-danger-50 p-6 shadow-sm">
           <h2 className="mb-2 text-lg font-semibold text-danger-900">
