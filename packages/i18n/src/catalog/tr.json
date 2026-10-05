@@ -9370,7 +9370,10 @@
           "label": "Hareketsiz kargo alarmı",
           "helper": "Bu süre boyunca hareket görmeyen sipariş, takas ve iade kolileri için alarm verilir."
         }
-      }
+      },
+      "errorsOnTabs": "Kaydetmeden önce düzeltilmesi gereken alanlar var: {tabs}",
+      "outOfBoundsWarning": "Şu an geçerli değer izin verilen aralığın dışında ve olduğu gibi uygulanıyor. Aralık içinde bir değer kaydederek düzeltin.",
+      "appliesToInProgressWarning": "Bu süre kayıtlara yazılmaz; değişiklik süreci devam eden kayıtlara da hemen uygulanır."
     }
   },
   "server": {
@@ -10576,7 +10579,8 @@
         "invariant": {
           "dropoffHardNotBelowDropoff": "İade kargosu için kesin kapanış süresi, kargoya verme süresinden kısa olamaz.",
           "listingWarningBeforeTtl": "İlan süresi uyarısı, ilanın yayın süresinden kısa olmalıdır."
-        }
+        },
+        "conflict": "Süreler aynı anda başka bir yönetici tarafından değiştirildi. Sayfayı yenileyip tekrar deneyin."
       }
     },
     "advertisement": {

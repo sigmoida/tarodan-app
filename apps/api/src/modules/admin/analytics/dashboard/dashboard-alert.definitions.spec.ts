@@ -93,9 +93,10 @@ describe("dashboard alert definitions", () => {
 
     it("reads both trade parcel alerts from tradeLostParcelGraceDays", () => {
       const ctx = ctxWith({ tradeLostParcelGraceDays: 5 });
-      expect(
-        ALERT_DEFINITIONS.stuckWarehouseTrades.threshold?.(ctx),
-      ).toEqual({ value: 5, unit: "days" });
+      expect(ALERT_DEFINITIONS.stuckWarehouseTrades.threshold?.(ctx)).toEqual({
+        value: 5,
+        unit: "days",
+      });
       const inbound = captureWhere("stuckWarehouseTrades", ctx);
       expect(
         NOW.getTime() - (inbound.shippingDeadline.lt as Date).getTime(),
@@ -109,9 +110,10 @@ describe("dashboard alert definitions", () => {
 
     it("reads the outbox threshold from OUTBOX_STALE_PROCESSING_MS, in minutes", () => {
       const ctx = ctxWith({}, { OUTBOX_STALE_PROCESSING_MS: "120000" });
-      expect(ALERT_DEFINITIONS.outboxStuckProcessing.threshold?.(ctx)).toEqual(
-        { value: 2, unit: "minutes" },
-      );
+      expect(ALERT_DEFINITIONS.outboxStuckProcessing.threshold?.(ctx)).toEqual({
+        value: 2,
+        unit: "minutes",
+      });
     });
 
     it("keeps today's defaults when no admin value is set", () => {
@@ -123,9 +125,10 @@ describe("dashboard alert definitions", () => {
       expect(
         ALERT_DEFINITIONS.agedCarrierCancellations.threshold?.(ctx),
       ).toEqual({ value: 24, unit: "hours" });
-      expect(
-        ALERT_DEFINITIONS.stuckWarehouseTrades.threshold?.(ctx),
-      ).toEqual({ value: 14, unit: "days" });
+      expect(ALERT_DEFINITIONS.stuckWarehouseTrades.threshold?.(ctx)).toEqual({
+        value: 14,
+        unit: "days",
+      });
     });
 
     /**
@@ -134,20 +137,21 @@ describe("dashboard alert definitions", () => {
      * threshold-bearing alert must MOVE when its source moves.
      */
     it("moves every threshold when its source moves", () => {
-      const moved: Array<[keyof typeof ALERT_DEFINITIONS, AlertThresholdContext]> =
+      const moved: Array<
+        [keyof typeof ALERT_DEFINITIONS, AlertThresholdContext]
+      > = [
+        ["stuckShippedOrders", ctxWith({ shippedStaleAlertDays: 77 })],
         [
-          ["stuckShippedOrders", ctxWith({ shippedStaleAlertDays: 77 })],
-          [
-            "agedCarrierCancellations",
-            ctxWith({ carrierCancellationAlertHours: 77 }),
-          ],
-          ["stuckWarehouseTrades", ctxWith({ tradeLostParcelGraceDays: 77 })],
-          ["stuckOutboundTrades", ctxWith({ tradeLostParcelGraceDays: 77 })],
-          [
-            "outboxStuckProcessing",
-            ctxWith({}, { OUTBOX_STALE_PROCESSING_MS: "999999" }),
-          ],
-        ];
+          "agedCarrierCancellations",
+          ctxWith({ carrierCancellationAlertHours: 77 }),
+        ],
+        ["stuckWarehouseTrades", ctxWith({ tradeLostParcelGraceDays: 77 })],
+        ["stuckOutboundTrades", ctxWith({ tradeLostParcelGraceDays: 77 })],
+        [
+          "outboxStuckProcessing",
+          ctxWith({}, { OUTBOX_STALE_PROCESSING_MS: "999999" }),
+        ],
+      ];
 
       for (const [alert, ctx] of moved) {
         const definition = ALERT_DEFINITIONS[alert];

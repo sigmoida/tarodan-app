@@ -99,7 +99,8 @@ describe("TradeReconciliationService — admin alarm linkleri", () => {
     const ORIGINAL = process.env.TRADE_LOST_PARCEL_GRACE_DAYS;
     beforeEach(() => delete process.env.TRADE_LOST_PARCEL_GRACE_DAYS);
     afterAll(() => {
-      if (ORIGINAL === undefined) delete process.env.TRADE_LOST_PARCEL_GRACE_DAYS;
+      if (ORIGINAL === undefined)
+        delete process.env.TRADE_LOST_PARCEL_GRACE_DAYS;
       else process.env.TRADE_LOST_PARCEL_GRACE_DAYS = ORIGINAL;
     });
 

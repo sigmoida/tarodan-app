@@ -144,9 +144,7 @@ export class AdminDashboardWorklistService {
 
     const [rows, diagnostics] = await Promise.all([
       this.prisma.$transaction(
-        keys.map((key) =>
-          ALERT_DEFINITIONS[key].query(this.prisma, now, ctx),
-        ),
+        keys.map((key) => ALERT_DEFINITIONS[key].query(this.prisma, now, ctx)),
       ),
       // Mutabakat teşhisleri (komisyon defteri sapması, siparişsiz ödeme,
       // hold'suz sipariş) tek kaynaktan gelir. Patlarsa şerit çizilmeye devam

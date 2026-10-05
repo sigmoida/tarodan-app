@@ -10,9 +10,9 @@ import { AdminAuditService } from "./admin-audit.service";
  * Süreler ve Kurallar ekranının admin yüzü. Yazma domain servisinden geçer
  * (§1: admin yazmaları domain servisine gider); bu katman yalnız ZORUNLU
  * denetim kaydını ekler — her değişen kayıt için önce/sonra çiftiyle bir
- * `timing_rule_update` satırı. Süreler para ve sipariş akışlarını yönettiği
- * için denetim `createRequiredAuditLog` ile fail-closed yazılır (komisyon,
- * vergi ve üyelik katmanı yazmalarıyla aynı kalıp).
+ * `timing_rule_update` satırı. Denetim, ayar yazımıyla AYNI işlemde yazılır
+ * (`afterWrite`): denetim yazılamazsa süreler de değişmez — "değişti ama
+ * kaydı yok" durumu oluşamaz.
  */
 @Injectable()
 export class AdminTimingRulesService {
@@ -29,17 +29,23 @@ export class AdminTimingRulesService {
     adminUserId: string,
     changes: readonly TimingRuleChangeInput[],
   ): Promise<AdminTimingRulesResponse> {
-    const applied = await this.timingRules.applyChanges(changes, adminUserId);
-    for (const change of applied) {
-      await this.audit.createRequiredAuditLog(
-        adminUserId,
-        "timing_rule_update",
-        "TimingRule",
-        change.id,
-        change.before,
-        change.after,
-      );
-    }
+    await this.timingRules.applyChanges(
+      changes,
+      adminUserId,
+      async (tx, applied) => {
+        for (const change of applied) {
+          await this.audit.createRequiredAuditLog(
+            adminUserId,
+            "timing_rule_update",
+            "TimingRule",
+            change.id,
+            change.before,
+            change.after,
+            tx,
+          );
+        }
+      },
+    );
     return this.list();
   }
 }

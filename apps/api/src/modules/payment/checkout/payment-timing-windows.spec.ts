@@ -46,7 +46,9 @@ describe("ödeme pencereleri — süre kaynağı", () => {
         platformSetting: settingsReader(settings),
       };
       // Canlı say → erken dönsün; yalnız pencere argümanı ölçülür.
-      const paymentCommon = { isChargeLikelyLive: jest.fn().mockReturnValue(true) };
+      const paymentCommon = {
+        isChargeLikelyLive: jest.fn().mockReturnValue(true),
+      };
       const service = new PaymentLifecycleService(
         prisma as any,
         configOf(env) as any,
@@ -64,9 +66,9 @@ describe("ödeme pencereleri — süre kaynağı", () => {
     });
 
     it("env geri düşüşünü okur", async () => {
-      await expect(run({}, { PAYMENT_FAIL_TIMEOUT_MINUTES: "40" })).resolves.toBe(
-        40,
-      );
+      await expect(
+        run({}, { PAYMENT_FAIL_TIMEOUT_MINUTES: "40" }),
+      ).resolves.toBe(40);
     });
 
     it("admin değeri env'i ezer", async () => {

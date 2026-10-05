@@ -1,4 +1,8 @@
-import { BadRequestException, Injectable } from "@nestjs/common";
+import {
+  BadRequestException,
+  ConflictException,
+  Injectable,
+} from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { Prisma } from "@prisma/client";
 import {
@@ -37,6 +41,26 @@ export interface AppliedTimingRuleChange {
 }
 
 /**
+ * Yazmayla AYNI işlemde çalışan adım (admin katmanının zorunlu denetimi).
+ * Fırlatırsa ayar değişikliği de geri alınır.
+ */
+export type TimingRulesAfterWrite = (
+  tx: Prisma.TransactionClient,
+  applied: readonly AppliedTimingRuleChange[],
+) => Promise<void>;
+
+/** Serializable çakışmasında işlemin baştan denenme sayısı (ilk deneme dahil). */
+export const TIMING_RULES_WRITE_ATTEMPTS = 3;
+
+/** Postgres serialization failure / deadlock → Prisma P2034. */
+function isWriteConflict(error: unknown): boolean {
+  return (
+    error instanceof Prisma.PrismaClientKnownRequestError &&
+    error.code === "P2034"
+  );
+}
+
+/**
  * Kayıt ihlalini yerelleştirilmiş 400'e çevirir. Anahtar/parametre eşlemesi
  * kayıtla birlikte durur (`describeTimingViolation`) — admin formu aynı
  * metni gösterir.
@@ -58,9 +82,11 @@ function violationError(violation: TimingRuleViolation): BadRequestException {
  *     doğrudan gönderilse bile reddedilir).
  * Okuma + doğrulama + yazma Serializable tek işlemde yürür: aynı anda iki
  * admin ilişkili iki alanı değiştirirse ikisi birden değişmezi bozamaz.
+ * Çakışmada (P2034) işlem baştan denenir — doğrulama yeni duruma göre
+ * yeniden yapılır; denemeler tükenirse 409 döner (ham 500 değil).
  *
- * Denetim kaydı admin katmanındadır (AdminTimingRulesService); bu servis
- * önce/sonra çiftini döndürür.
+ * Denetim kaydı admin katmanındadır (AdminTimingRulesService) ama `afterWrite`
+ * ile AYNI işlemde yazılır: denetim yazılamazsa değişiklik de geri alınır.
  */
 @Injectable()
 export class TimingRulesService {
@@ -87,14 +113,35 @@ export class TimingRulesService {
 
   /**
    * Değişiklikleri doğrular ve tek işlemde yazar. Herhangi biri geçersizse
-   * hiçbiri yazılmaz.
+   * hiçbiri yazılmaz. `afterWrite` (denetim) aynı işlemde çalışır.
    */
   async applyChanges(
     changes: readonly TimingRuleChangeInput[],
     actorUserId: string,
+    afterWrite?: TimingRulesAfterWrite,
   ): Promise<AppliedTimingRuleChange[]> {
     const ids = this.assertChangeShape(changes);
 
+    for (let attempt = 1; ; attempt++) {
+      try {
+        return await this.writeOnce(changes, ids, actorUserId, afterWrite);
+      } catch (error) {
+        if (!isWriteConflict(error)) throw error;
+        if (attempt >= TIMING_RULES_WRITE_ATTEMPTS) {
+          throw new ConflictException(
+            i18nMessage("server.admin.timingRules.conflict"),
+          );
+        }
+      }
+    }
+  }
+
+  private writeOnce(
+    changes: readonly TimingRuleChangeInput[],
+    ids: readonly TimingRuleId[],
+    actorUserId: string,
+    afterWrite?: TimingRulesAfterWrite,
+  ): Promise<AppliedTimingRuleChange[]> {
     return this.prisma.$transaction(
       async (tx) => {
         const before = this.byId(await loadTimingRuleStates(tx, this.config));
@@ -144,7 +191,13 @@ export class TimingRulesService {
         }
 
         const after = this.byId(await loadTimingRuleStates(tx, this.config));
-        return ids.map((id) => ({ id, before: before[id], after: after[id] }));
+        const applied = ids.map((id) => ({
+          id,
+          before: before[id],
+          after: after[id],
+        }));
+        if (afterWrite) await afterWrite(tx, applied);
+        return applied;
       },
       { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
     );

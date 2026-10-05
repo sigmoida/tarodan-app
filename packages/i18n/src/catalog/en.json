@@ -9370,7 +9370,10 @@
           "label": "Stale cargo alert",
           "helper": "Admins are alerted when an order, trade or return parcel shows no movement for this long."
         }
-      }
+      },
+      "errorsOnTabs": "Fix these fields before saving: {tabs}",
+      "outOfBoundsWarning": "The value in effect is outside the allowed range and is applied as is. Save a value within the range to correct it.",
+      "appliesToInProgressWarning": "This duration is not stamped on records; a change applies immediately to items already in progress."
     }
   },
   "server": {
@@ -10576,7 +10579,8 @@
         "invariant": {
           "dropoffHardNotBelowDropoff": "The hard close for a return parcel cannot be shorter than the drop-off window.",
           "listingWarningBeforeTtl": "The listing expiry warning must come before the listing lifetime ends."
-        }
+        },
+        "conflict": "Another admin changed the durations at the same time. Reload the page and try again."
       }
     },
     "advertisement": {

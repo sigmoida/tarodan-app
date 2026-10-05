@@ -1,7 +1,10 @@
-import { BadRequestException } from "@nestjs/common";
+import { BadRequestException, ConflictException } from "@nestjs/common";
 import { Prisma } from "@prisma/client";
 import { PUBLIC_TIMING_RULE_IDS, TIMING_RULES } from "@tarodan/types";
-import { TimingRulesService } from "./timing-rules.service";
+import {
+  TIMING_RULES_WRITE_ATTEMPTS,
+  TimingRulesService,
+} from "./timing-rules.service";
 
 /** Bellek içi PlatformSetting tablosu — servisin okuduğu/yazdığı tek yüzey. */
 function makeStore(initial: Record<string, string> = {}) {
@@ -171,10 +174,7 @@ describe("TimingRulesService", () => {
     it("emniyet supabını drop-off penceresinin altına indirmez", async () => {
       const { service, prisma } = makeService();
       await expectRejected(
-        service.applyChanges(
-          [{ id: "returnDropoffHardDays", value: 10 }],
-          "u",
-        ),
+        service.applyChanges([{ id: "returnDropoffHardDays", value: 10 }], "u"),
         "server.admin.timingRules.invariant.dropoffHardNotBelowDropoff",
       );
       expect(prisma.platformSetting.upsert).not.toHaveBeenCalled();
@@ -182,7 +182,9 @@ describe("TimingRulesService", () => {
 
     it("değişmez mevcut ADMIN değerine göre de denetlenir", async () => {
       // Emniyet supabı admin tarafından 15'e çekilmiş; drop-off 16 olamaz.
-      const { service } = makeService({ refund_return_dropoff_hard_days: "15" });
+      const { service } = makeService({
+        refund_return_dropoff_hard_days: "15",
+      });
       await expectRejected(
         service.applyChanges([{ id: "returnDropoffDays", value: 16 }], "u"),
         "server.admin.timingRules.invariant.dropoffHardNotBelowDropoff",
@@ -290,6 +292,80 @@ describe("TimingRulesService", () => {
         "u",
       );
       expect(rows.get("return_window_days")?.settingValue).toBe("14");
+    });
+  });
+
+  describe("işlem içi adım ve eşzamanlılık", () => {
+    const conflict = () =>
+      new Prisma.PrismaClientKnownRequestError("write conflict", {
+        code: "P2034",
+        clientVersion: "test",
+      });
+
+    it("afterWrite (denetim) yazmayla AYNI işlem istemcisini ve önce/sonra çiftini alır", async () => {
+      const { service, prisma } = makeService();
+      const afterWrite = jest.fn().mockResolvedValue(undefined);
+
+      await service.applyChanges(
+        [{ id: "offerExpiryHours", value: 48 }],
+        "user-1",
+        afterWrite,
+      );
+
+      expect(afterWrite).toHaveBeenCalledWith(prisma, [
+        expect.objectContaining({
+          id: "offerExpiryHours",
+          before: expect.objectContaining({ value: 24 }),
+          after: expect.objectContaining({ value: 48 }),
+        }),
+      ]);
+    });
+
+    it("afterWrite fırlatırsa hata yükselir (işlem geri alınır)", async () => {
+      const { service } = makeService();
+      await expect(
+        service.applyChanges(
+          [{ id: "offerExpiryHours", value: 48 }],
+          "user-1",
+          jest.fn().mockRejectedValue(new Error("audit down")),
+        ),
+      ).rejects.toThrow("audit down");
+    });
+
+    it("Serializable çakışmasında işlemi baştan dener", async () => {
+      const { service, prisma, rows } = makeService();
+      const run = prisma.$transaction.getMockImplementation();
+      prisma.$transaction
+        .mockRejectedValueOnce(conflict())
+        .mockImplementation(run);
+
+      await service.applyChanges(
+        [{ id: "offerExpiryHours", value: 48 }],
+        "user-1",
+      );
+
+      expect(prisma.$transaction).toHaveBeenCalledTimes(2);
+      expect(rows.get("offer_expiry_hours")?.settingValue).toBe("48");
+    });
+
+    it("denemeler tükenirse ham 500 değil, açık bir 409 döner", async () => {
+      const { service, prisma } = makeService();
+      prisma.$transaction.mockRejectedValue(conflict());
+
+      await expect(
+        service.applyChanges([{ id: "offerExpiryHours", value: 48 }], "u"),
+      ).rejects.toBeInstanceOf(ConflictException);
+      expect(prisma.$transaction).toHaveBeenCalledTimes(
+        TIMING_RULES_WRITE_ATTEMPTS,
+      );
+    });
+
+    it("doğrulama hatası yeniden denenmez", async () => {
+      const { service, prisma } = makeService();
+      await expect(
+        service.applyChanges([{ id: "payoutGraceDays", value: 0 }], "u"),
+      ).rejects.toBeInstanceOf(BadRequestException);
+      expect(prisma.$transaction).toHaveBeenCalledTimes(1);
     });
   });
 });

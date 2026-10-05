@@ -14,6 +14,7 @@ import {
   isTimingGroup,
   readTimingRuleStates,
   rulesInTab,
+  tabsWithErrors,
   timingRulesSchema,
   toFormValues,
   valueField,
@@ -28,6 +29,7 @@ const STATES: AdminTimingRuleState[] = TIMING_RULE_IDS.map((id) => ({
   id,
   value: TIMING_RULES[id].default,
   source: "default",
+  outOfBounds: false,
   action: TIMING_RULES[id].defaultAction,
   updatedAt: null,
 }));
@@ -37,8 +39,11 @@ const valuesWith = (patch: Record<string, string>) => ({
   ...patch,
 });
 
-const issuesFor = (values: Record<string, string>) => {
-  const result = timingRulesSchema(t, STATES).safeParse(values);
+const issuesFor = (
+  values: Record<string, string>,
+  states: AdminTimingRuleState[] = STATES,
+) => {
+  const result = timingRulesSchema(t, states).safeParse(values);
   return result.success
     ? {}
     : Object.fromEntries(
@@ -88,12 +93,9 @@ describe("timing rules schema — same rules as the server", () => {
     expect(issuesFor(valuesWith({ returnWindowDays: "13" }))).toEqual({
       returnWindowDays: 'server.admin.timingRules.belowMin:{"min":14}',
     });
-    expect(issuesFor(valuesWith({ paymentFailTimeoutMinutes: "30" }))).toEqual(
-      {
-        paymentFailTimeoutMinutes:
-          'server.admin.timingRules.belowMin:{"min":31}',
-      },
-    );
+    expect(issuesFor(valuesWith({ paymentFailTimeoutMinutes: "30" }))).toEqual({
+      paymentFailTimeoutMinutes: 'server.admin.timingRules.belowMin:{"min":31}',
+    });
   });
 
   it("checks cross-field rules on the edited values", () => {
@@ -106,6 +108,27 @@ describe("timing rules schema — same rules as the server", () => {
         valuesWith({ returnDropoffDays: "30", returnDropoffHardDays: "40" }),
       ),
     ).toEqual({});
+  });
+
+  it("validates only the rows that changed — an out-of-bounds effective value does not lock the form", () => {
+    // Env'den gelen RETURN_WINDOW_DAYS=7 (min 14) ve eski ekrandan girilmiş
+    // 500 saatlik takas yanıtı: ikisi de dokunulmadıkça başka bir satırı
+    // kaydetmeye engel değil — satırda uyarı olarak görünürler.
+    const states = STATES.map((state) =>
+      state.id === "returnWindowDays"
+        ? { ...state, value: 7, source: "env" as const, outOfBounds: true }
+        : state.id === "tradeResponseHours"
+          ? { ...state, value: 500, outOfBounds: true }
+          : state,
+    );
+    const values = { ...toFormValues(states), offerExpiryHours: "48" };
+    expect(issuesFor(values, states)).toEqual({});
+    // Sınır dışı satır düzeltilmeye çalışılırsa sınırlar uygulanır.
+    expect(
+      issuesFor({ ...toFormValues(states), returnWindowDays: "10" }, states),
+    ).toEqual({
+      returnWindowDays: 'server.admin.timingRules.belowMin:{"min":14}',
+    });
   });
 
   it("refuses an action that is not available yet", () => {
@@ -124,6 +147,17 @@ describe("timing rules screen helpers", () => {
     );
     expect(isTimingGroup("trade")).toBe(true);
     expect(isTimingGroup("security")).toBe(false);
+  });
+
+  it("names the tabs that hold an error, including hidden ones", () => {
+    expect(
+      tabsWithErrors({
+        payoutGraceDays: { message: "x" },
+        listingTtlDaysAction: { message: "y" },
+        unknownField: { message: "z" },
+      }),
+    ).toEqual(["listing", "payment"]);
+    expect(tabsWithErrors({})).toEqual([]);
   });
 
   it("locks the select for single-action rules", () => {

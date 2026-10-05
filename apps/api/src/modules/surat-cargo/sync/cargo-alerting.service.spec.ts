@@ -57,7 +57,9 @@ describe("CargoAlertingService.alertStaleCargo — eşik kaynakları", () => {
       ageOf(prisma.shipment.findMany.mock.calls[0][0].where.updatedAt.lt),
     ).toBe(3);
     expect(
-      ageOf(prisma.refundRequest.findMany.mock.calls[0][0].where.returnCreatedAt.lt),
+      ageOf(
+        prisma.refundRequest.findMany.mock.calls[0][0].where.returnCreatedAt.lt,
+      ),
     ).toBe(14);
   });
 
@@ -67,7 +69,9 @@ describe("CargoAlertingService.alertStaleCargo — eşik kaynakları", () => {
     const fromEnv = makeService();
     await fromEnv.service.alertStaleCargo();
     expect(
-      ageOf(fromEnv.prisma.shipment.findMany.mock.calls[0][0].where.updatedAt.lt),
+      ageOf(
+        fromEnv.prisma.shipment.findMany.mock.calls[0][0].where.updatedAt.lt,
+      ),
     ).toBe(2);
     expect(
       ageOf(

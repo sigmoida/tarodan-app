@@ -5,6 +5,7 @@ import {
   TIMING_RULES,
   describeTimingViolation,
   findTimingInvariantViolation,
+  isTimingRuleId,
   timingRule,
   timingRulesInGroup,
   validateTimingAction,
@@ -36,7 +37,10 @@ export const actionField = (id: TimingRuleId): string => `${id}Action`;
 /** API yanıtını (zarflı ya da düz) kayıt durumlarına çevirir. */
 export function readTimingRuleStates(raw: unknown): AdminTimingRuleState[] {
   const body = raw as
-    | { rules?: AdminTimingRuleState[]; data?: { rules?: AdminTimingRuleState[] } }
+    | {
+        rules?: AdminTimingRuleState[];
+        data?: { rules?: AdminTimingRuleState[] };
+      }
     | undefined;
   return body?.data?.rules ?? body?.rules ?? [];
 }
@@ -86,9 +90,12 @@ function violationMessage(t: T, violation: TimingRuleViolation): string {
 }
 
 /**
- * Formun zod şeması. Her değer tam sayı + kayıt sınırları; değişen değerler
- * için alanlar arası kurallar aday küme üzerinde (sunucuyla aynı fonksiyon).
- * Kapalı ("yakında") eylem seçici zaten devre dışıdır; şema yine de reddeder.
+ * Formun zod şeması — sunucuyla AYNI kural: yalnız DEĞİŞEN satırlar
+ * doğrulanır (tam sayı + kayıt sınırları + açık eylem), alanlar arası kurallar
+ * değişenleri içeren aday küme üzerinde denetlenir. Dokunulmamış bir satırın
+ * etkin değeri sınır dışıysa (ör. eski env değeri) bu bir KİLİT değil, satırdaki
+ * uyarıdır (`state.outOfBounds`): admin başka bir satırı kaydedebilir, o satırı
+ * düzelttiğinde de sınırlar uygulanır.
  */
 export function timingRulesSchema(
   t: T,
@@ -98,55 +105,68 @@ export function timingRulesSchema(
     const candidate = Object.fromEntries(
       states.map((state) => [state.id, state.value]),
     ) as Record<TimingRuleId, number>;
-    const changed: TimingRuleId[] = [];
+    const changedValues: TimingRuleId[] = [];
+    const fail = (path: string, message: string) =>
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: [path], message });
 
     for (const state of states) {
       const field = valueField(state.id);
       const raw = values[field]?.trim() ?? "";
       if (raw === "") {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          path: [field],
-          message: t("admin.timingRules.validation.required"),
-        });
-        continue;
+        fail(field, t("admin.timingRules.validation.required"));
+      } else if (Number(raw) !== state.value) {
+        const value = Number(raw);
+        const violation = Number.isFinite(value)
+          ? validateTimingValue(state.id, value)
+          : ({ code: "notInteger" } as const);
+        if (violation) {
+          fail(field, violationMessage(t, violation));
+        } else {
+          candidate[state.id] = value;
+          changedValues.push(state.id);
+        }
       }
-      const value = Number(raw);
-      const violation = Number.isFinite(value)
-        ? validateTimingValue(state.id, value)
-        : ({ code: "notInteger" } as const);
-      if (violation) {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          path: [field],
-          message: violationMessage(t, violation),
-        });
-        continue;
-      }
-      candidate[state.id] = value;
-      if (value !== state.value) changed.push(state.id);
 
       const action = values[actionField(state.id)];
-      const actionViolation =
-        action === undefined ? null : validateTimingAction(state.id, action);
-      if (actionViolation) {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          path: [actionField(state.id)],
-          message: violationMessage(t, actionViolation),
-        });
+      if (action !== undefined && action !== state.action) {
+        const actionViolation = validateTimingAction(state.id, action);
+        if (actionViolation) {
+          fail(actionField(state.id), violationMessage(t, actionViolation));
+        }
       }
     }
 
-    const crossField = findTimingInvariantViolation(candidate, changed);
+    const crossField = findTimingInvariantViolation(candidate, changedValues);
     if (crossField) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: [valueField(crossField.id)],
-        message: violationMessage(t, crossField.violation),
-      });
+      fail(
+        valueField(crossField.id),
+        violationMessage(t, crossField.violation),
+      );
     }
   });
+}
+
+/** Form alan adından kayıt kimliği (değer ya da `<kimlik>Action`). */
+function ruleIdOfField(field: string): TimingRuleId | null {
+  const id = field.endsWith("Action")
+    ? field.slice(0, -"Action".length)
+    : field;
+  return isTimingRuleId(id) ? id : null;
+}
+
+/**
+ * Hatalı alan taşıyan sekmeler. Gizli bir sekmedeki hata Kaydet'i sessizce
+ * durdurmasın: sekme çubuğu ve sayfa uyarısı bunu gösterir.
+ */
+export function tabsWithErrors(
+  errors: Readonly<Record<string, unknown>>,
+): TimingGroup[] {
+  const groups = new Set<TimingGroup>();
+  for (const field of Object.keys(errors)) {
+    const id = ruleIdOfField(field);
+    if (id) groups.add(timingRule(id).group);
+  }
+  return TIMING_GROUPS.filter((group) => groups.has(group));
 }
 
 /** Sekmeler — kayıttaki grup sırası. */

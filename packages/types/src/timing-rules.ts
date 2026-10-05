@@ -88,6 +88,13 @@ export interface TimingRuleDefinition {
   max: number;
   /** Eski env değişkeni: yalnız ayar satırı yokken okunan ilk kurulum değeri. */
   envKey: string | null;
+  /**
+   * true = değişiklik SÜRMEKTE olan kayıtlara da uygulanır: süre kayda
+   * damgalanmaz, her cron turu "şimdi − N" ile yeniden hesaplar (ör. ilan
+   * ömrü). false = süre olay anında kayda yazılır; değişiklik yalnız yeni
+   * kayıtları etkiler. Admin ekranı true olan satırlarda uyarı gösterir.
+   */
+  appliesToInProgress: boolean;
   actions: readonly TimingActionOption[];
   defaultAction: TimingExpiryAction;
 }
@@ -131,6 +138,7 @@ export const TIMING_RULES = {
     min: 7,
     max: 365,
     envKey: "LISTING_TTL_DAYS",
+    appliesToInProgress: true,
     ...withLater("deactivate", "auto_renew"),
   },
   /** İlan süresi dolmadan kaç gün önce satıcı uyarılır. */
@@ -142,6 +150,7 @@ export const TIMING_RULES = {
     min: 1,
     max: 30,
     envKey: null,
+    appliesToInProgress: true,
     ...only("notify_seller"),
   },
 
@@ -155,6 +164,7 @@ export const TIMING_RULES = {
     min: 1,
     max: 168,
     envKey: "OFFER_EXPIRY_HOURS",
+    appliesToInProgress: false,
     ...withLater("expire", "extend_once"),
   },
 
@@ -168,6 +178,7 @@ export const TIMING_RULES = {
     min: 1,
     max: 336,
     envKey: null,
+    appliesToInProgress: false,
     ...withLater("cancel", "extend_once"),
   },
   /** Kabul sonrası takas ödemesi süresi. */
@@ -179,6 +190,7 @@ export const TIMING_RULES = {
     min: 1,
     max: 336,
     envKey: null,
+    appliesToInProgress: false,
     ...withLater("cancel", "extend_once"),
   },
   /** Ödeme sonrası ürünlerin depoya kargolanma süresi. */
@@ -190,6 +202,7 @@ export const TIMING_RULES = {
     min: 1,
     max: 30,
     envKey: null,
+    appliesToInProgress: false,
     ...only("cancel_and_refund"),
   },
   /** Teslimattan sonra tarafların onay/itiraz penceresi. */
@@ -201,6 +214,7 @@ export const TIMING_RULES = {
     min: 1,
     max: 30,
     envKey: null,
+    appliesToInProgress: false,
     ...only("complete"),
   },
   /** Takas tamamlandıktan sonra nakit farkın açılma süresi (en az 1). */
@@ -212,6 +226,7 @@ export const TIMING_RULES = {
     min: 1,
     max: 30,
     envKey: null,
+    appliesToInProgress: false,
     ...only("release_funds"),
   },
   /** Depoya varmayan koli için bekleme; çıkış kolisi teslim alarmı da bunu okur. */
@@ -223,6 +238,7 @@ export const TIMING_RULES = {
     min: 1,
     max: 90,
     envKey: "TRADE_LOST_PARCEL_GRACE_DAYS",
+    appliesToInProgress: true,
     ...only("cancel_and_refund"),
   },
 
@@ -236,11 +252,15 @@ export const TIMING_RULES = {
     min: 1,
     max: 14,
     envKey: "PREPARING_DEADLINE_DAYS",
+    appliesToInProgress: false,
     ...withLater("cancel_and_refund", "extend_once"),
   },
   /**
    * Teslimden sonraki koşulsuz cayma (iade talep) penceresi. Mesafeli Satış
-   * Yönetmeliği gereği 14 günün altına inemez.
+   * Yönetmeliği gereği 14 günün altına inemez. Pencere sonu teslimde siparişe
+   * damgalanır (`Order.returnWindowEndsAt`); iade uygunluğu, tamamlanma ve
+   * escrow aynı damgayı okur. Yalnız damgadan önce teslim edilmiş eski
+   * siparişler bugünkü değerle hesaplanır.
    */
   returnWindowDays: {
     settingKey: "return_window_days",
@@ -250,6 +270,7 @@ export const TIMING_RULES = {
     min: 14,
     max: 90,
     envKey: "RETURN_WINDOW_DAYS",
+    appliesToInProgress: false,
     ...only("complete"),
   },
 
@@ -263,6 +284,7 @@ export const TIMING_RULES = {
     min: 1,
     max: 168,
     envKey: "ORDER_PAYMENT_WINDOW_HOURS",
+    appliesToInProgress: false,
     ...only("cancel"),
   },
   /** Ödenmemiş siparişin stok rezervasyonunu tutma süresi. */
@@ -274,6 +296,7 @@ export const TIMING_RULES = {
     min: 1,
     max: 60,
     envKey: "PAYMENT_TIMEOUT_MINUTES",
+    appliesToInProgress: true,
     ...only("release_reservation"),
   },
   /** Bekleyen ödeme satırını `failed` yapma penceresi (PayTR oturumundan uzun). */
@@ -285,6 +308,7 @@ export const TIMING_RULES = {
     min: PAYTR_3DS_SESSION_MINUTES + 1,
     max: 240,
     envKey: "PAYMENT_FAIL_TIMEOUT_MINUTES",
+    appliesToInProgress: true,
     ...only("fail_payment"),
   },
   /** İade penceresi kapandıktan sonra satıcı ödemesinden önceki bekleme (en az 1). */
@@ -296,6 +320,7 @@ export const TIMING_RULES = {
     min: 1,
     max: 30,
     envKey: "PAYOUT_GRACE_DAYS",
+    appliesToInProgress: false,
     ...only("release_funds"),
   },
 
@@ -309,6 +334,7 @@ export const TIMING_RULES = {
     min: 1,
     max: 60,
     envKey: "REFUND_RETURN_DROPOFF_DAYS",
+    appliesToInProgress: true,
     ...only("close_refund"),
   },
   /** Takip doğrulanamasa bile iadenin kapatılacağı üst sınır (emniyet supabı). */
@@ -320,6 +346,7 @@ export const TIMING_RULES = {
     min: 1,
     max: 120,
     envKey: "REFUND_RETURN_DROPOFF_HARD_DAYS",
+    appliesToInProgress: true,
     ...only("close_refund"),
   },
   /** Satıcıya teslim edilen iade kolisinin inceleme süresi. */
@@ -331,6 +358,7 @@ export const TIMING_RULES = {
     min: 1,
     max: 168,
     envKey: "REFUND_RETURN_INSPECTION_HOURS",
+    appliesToInProgress: true,
     ...only("finalize_refund"),
   },
   /** Orijinal sipariş teslim edilmeyen (wait_for_delivery) iadenin üst süresi. */
@@ -342,6 +370,7 @@ export const TIMING_RULES = {
     min: 1,
     max: 180,
     envKey: "REFUND_WAIT_DELIVERY_MAX_DAYS",
+    appliesToInProgress: true,
     ...only("close_refund"),
   },
 
@@ -355,6 +384,7 @@ export const TIMING_RULES = {
     min: 1,
     max: 90,
     envKey: "SHIPPED_STALE_ALERT_DAYS",
+    appliesToInProgress: true,
     ...only("raise_alert"),
   },
   /** Taşıyıcı kodu oluşmamış gönderi alarmı. */
@@ -366,6 +396,7 @@ export const TIMING_RULES = {
     min: 1,
     max: 720,
     envKey: "MISSING_TRACKING_ALERT_HOURS",
+    appliesToInProgress: true,
     ...only("raise_alert"),
   },
   /** Elle kapatılması gereken taşıyıcı iptal görevi alarmı. */
@@ -377,6 +408,7 @@ export const TIMING_RULES = {
     min: 1,
     max: 720,
     envKey: "CARRIER_CANCELLATION_ALERT_HOURS",
+    appliesToInProgress: true,
     ...only("raise_alert"),
   },
   /** Teslim edilmiş siparişin gelir faturası kesilmeden kalabileceği süre. */
@@ -388,6 +420,7 @@ export const TIMING_RULES = {
     min: 1,
     max: 30,
     envKey: "INVOICE_DEADLINE_DAYS",
+    appliesToInProgress: true,
     ...only("raise_alert"),
   },
   /** Satıcının ürün faturasını yüklemesi beklenen süre (hatırlatma + alarm). */
@@ -399,6 +432,7 @@ export const TIMING_RULES = {
     min: 1,
     max: 60,
     envKey: "SELLER_INVOICE_DEADLINE_DAYS",
+    appliesToInProgress: true,
     ...only("raise_alert"),
   },
   /** "Kargoya verdim" denip taşıyıcıdan hiç veri gelmeyen gönderi alarmı. */
@@ -410,6 +444,7 @@ export const TIMING_RULES = {
     min: 1,
     max: 30,
     envKey: "CARGO_PICKUP_NO_DATA_DAYS",
+    appliesToInProgress: true,
     ...only("raise_alert"),
   },
   /** Hareketsiz kalan kargo alarmı. */
@@ -421,6 +456,7 @@ export const TIMING_RULES = {
     min: 1,
     max: 90,
     envKey: "CARGO_STALE_MOVEMENT_DAYS",
+    appliesToInProgress: true,
     ...only("raise_alert"),
   },
 } satisfies Record<string, TimingRuleDefinition>;
@@ -595,7 +631,9 @@ export function describeTimingViolation(
         params: { max: violation.max },
       };
     case "invariant":
-      return { key: `server.admin.timingRules.invariant.${violation.invariant}` };
+      return {
+        key: `server.admin.timingRules.invariant.${violation.invariant}`,
+      };
     case "actionNotAllowed":
       return { key: "server.admin.timingRules.actionNotAllowed" };
     case "actionUnavailable":
@@ -613,6 +651,11 @@ export interface AdminTimingRuleState {
   id: TimingRuleId;
   value: number;
   source: TimingValueSource;
+  /**
+   * Etkin değer admin sınırlarının dışında (ör. eski env değeri). Değer
+   * uygulanmaya devam eder; ekran bunu düzeltilebilir bir uyarı olarak gösterir.
+   */
+  outOfBounds: boolean;
   action: TimingExpiryAction;
   /** Değer ya da eylem satırının son admin güncellemesi; hiç yoksa null. */
   updatedAt: string | null;

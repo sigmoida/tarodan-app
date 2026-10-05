@@ -8,11 +8,10 @@ import {
 /** Anahtar → değer haritasından ayar okuyucusu (yalnız istenen anahtar döner). */
 const settingReader = (rows: Record<string, string> = {}) => ({
   platformSetting: {
-    findUnique: jest.fn(
-      async ({ where }: { where: { settingKey: string } }) =>
-        where.settingKey in rows
-          ? { settingValue: rows[where.settingKey] }
-          : null,
+    findUnique: jest.fn(async ({ where }: { where: { settingKey: string } }) =>
+      where.settingKey in rows
+        ? { settingValue: rows[where.settingKey] }
+        : null,
     ),
   },
 });
@@ -48,7 +47,10 @@ describe("takas escrow süreleri (Süreler ve Kurallar kaydından)", () => {
     async (raw) => {
       // 0 gün = hold tamamlanma anında çöker, para beklemesiz açılır.
       await expect(
-        computeTradeHoldReleaseAt(settingReader({ payment_hold_days: raw }), FROM),
+        computeTradeHoldReleaseAt(
+          settingReader({ payment_hold_days: raw }),
+          FROM,
+        ),
       ).resolves.toEqual(new Date(FROM.getTime() + 3 * DAY));
     },
   );

@@ -29,7 +29,9 @@ import { defaultTimingValues } from "./timing-rules.resolver";
  */
 describe("TIMING_RULES kaydı", () => {
   it("ayar anahtarları ve env anahtarları tekildir", () => {
-    const settingKeys = TIMING_RULE_IDS.map((id) => TIMING_RULES[id].settingKey);
+    const settingKeys = TIMING_RULE_IDS.map(
+      (id) => TIMING_RULES[id].settingKey,
+    );
     const actionKeys = TIMING_RULE_IDS.map(timingActionSettingKey);
     const all = [...settingKeys, ...actionKeys];
     expect(new Set(all).size).toBe(all.length);
@@ -98,6 +100,33 @@ describe("TIMING_RULES kaydı", () => {
       (id) => TIMING_RULES[id].actions.length > 1,
     );
     expect(multi.sort()).toEqual(Object.keys(LATER_ACTIONS).sort());
+  });
+
+  it("süresi kayda damgalanmayan (sürmekte olanlara da uygulanan) kayıtlar işaretli", () => {
+    // Bu kayıtlar her cron turunda "şimdi − N" ile hesaplanır: değişiklik
+    // yürürlükteki kayıtları da etkiler, admin ekranı uyarı gösterir.
+    expect(
+      TIMING_RULE_IDS.filter((id) => TIMING_RULES[id].appliesToInProgress),
+    ).toEqual([
+      "listingTtlDays",
+      "listingExpiryWarningDays",
+      "tradeLostParcelGraceDays",
+      "paymentReservationMinutes",
+      "paymentFailTimeoutMinutes",
+      "returnDropoffDays",
+      "returnDropoffHardDays",
+      "returnInspectionHours",
+      "refundWaitDeliveryMaxDays",
+      "shippedStaleAlertDays",
+      "missingTrackingAlertHours",
+      "carrierCancellationAlertHours",
+      "invoiceDeadlineDays",
+      "sellerInvoiceDeadlineDays",
+      "cargoPickupNoDataDays",
+      "cargoStaleMovementDays",
+    ]);
+    // İade penceresi teslimde siparişe damgalanır (Order.returnWindowEndsAt).
+    expect(TIMING_RULES.returnWindowDays.appliesToInProgress).toBe(false);
   });
 
   it("varsayılan değerler tüm alanlar arası değişmezleri sağlar", () => {
@@ -201,16 +230,22 @@ describe("değer doğrulaması (sınırlar)", () => {
 
   it("üst sınırı aşan değeri reddeder", () => {
     expect(
-      validateTimingValue("listingTtlDays", TIMING_RULES.listingTtlDays.max + 1),
+      validateTimingValue(
+        "listingTtlDays",
+        TIMING_RULES.listingTtlDays.max + 1,
+      ),
     ).toEqual({ code: "aboveMax", max: TIMING_RULES.listingTtlDays.max });
   });
 
-  it.each(TIMING_RULE_IDS)("%s — min ve max sınırın kendisi geçerlidir", (id) => {
-    expect(validateTimingValue(id, TIMING_RULES[id].min)).toBeNull();
-    expect(validateTimingValue(id, TIMING_RULES[id].max)).toBeNull();
-    expect(validateTimingValue(id, TIMING_RULES[id].min - 1)).not.toBeNull();
-    expect(validateTimingValue(id, TIMING_RULES[id].max + 1)).not.toBeNull();
-  });
+  it.each(TIMING_RULE_IDS)(
+    "%s — min ve max sınırın kendisi geçerlidir",
+    (id) => {
+      expect(validateTimingValue(id, TIMING_RULES[id].min)).toBeNull();
+      expect(validateTimingValue(id, TIMING_RULES[id].max)).toBeNull();
+      expect(validateTimingValue(id, TIMING_RULES[id].min - 1)).not.toBeNull();
+      expect(validateTimingValue(id, TIMING_RULES[id].max + 1)).not.toBeNull();
+    },
+  );
 });
 
 describe("eylem doğrulaması", () => {
@@ -222,9 +257,9 @@ describe("eylem doğrulaması", () => {
     expect(validateTimingAction("listingTtlDays", "auto_renew")).toEqual({
       code: "actionUnavailable",
     });
-    expect(validateTimingAction("preparingDeadlineDays", "extend_once")).toEqual(
-      { code: "actionUnavailable" },
-    );
+    expect(
+      validateTimingAction("preparingDeadlineDays", "extend_once"),
+    ).toEqual({ code: "actionUnavailable" });
   });
 
   it("kayıtta tanımsız eylemi reddeder", () => {

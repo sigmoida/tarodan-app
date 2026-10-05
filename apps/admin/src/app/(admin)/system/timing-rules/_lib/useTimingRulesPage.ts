@@ -14,6 +14,7 @@ import {
   isTimingGroup,
   readTimingRuleStates,
   rulesInTab,
+  tabsWithErrors,
   timingRuleTabs,
   timingRulesSchema,
   toFormValues,
@@ -64,12 +65,23 @@ export function useTimingRulesPage() {
     if (changes.length > 0) save.mutate(changes);
   };
 
+  // Gizli sekmedeki bir hata Kaydet'i sessizce durdurmasın: hatalı sekmeler
+  // sekme çubuğunda işaretlenir ve sayfada adlarıyla listelenir.
+  const errorTabs = tabsWithErrors(form.formState.errors);
+  const tabs = timingRuleTabs(t).map((item) =>
+    errorTabs.includes(item.key) ? { ...item, badge: "!" } : item,
+  );
+  const errorTabLabels = tabs
+    .filter((item) => errorTabs.includes(item.key))
+    .map((item) => item.label);
+
   return {
     t,
     canEdit,
     tab: activeTab,
     setTab,
-    tabs: timingRuleTabs(t),
+    tabs,
+    errorTabLabels,
     ruleIds: rulesInTab(activeTab),
     states,
     query,

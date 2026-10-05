@@ -24,6 +24,7 @@ export default function TimingRulesPage() {
     tab,
     setTab,
     tabs,
+    errorTabLabels,
     ruleIds,
     states,
     query,
@@ -59,6 +60,14 @@ export default function TimingRulesPage() {
       )}
 
       <AdminTabs tabs={tabs} value={tab} onChange={setTab} />
+
+      {errorTabLabels.length > 0 && (
+        <Alert variant="danger">
+          {t("admin.timingRules.errorsOnTabs", {
+            tabs: errorTabLabels.join(", "),
+          })}
+        </Alert>
+      )}
 
       <Form form={form} onSubmit={submit} className="space-y-6">
         <SectionCard title={t(`admin.timingRules.groups.${tab}`)}>

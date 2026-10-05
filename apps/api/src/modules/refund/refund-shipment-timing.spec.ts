@@ -65,8 +65,9 @@ describe("RefundShipmentService — süre kaynakları", () => {
     field: string,
   ): number =>
     NOW.getTime() -
-    (prisma.refundRequest.findMany.mock.calls[0][0].where[field].lt as Date)
-      .getTime();
+    (
+      prisma.refundRequest.findMany.mock.calls[0][0].where[field].lt as Date
+    ).getTime();
 
   describe("drop-off penceresi", () => {
     it("admin değeri yokken bugünkü gibi 14 gün", async () => {

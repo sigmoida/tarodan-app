@@ -6,21 +6,34 @@ import { RolesGuard, PERMISSION_MAP } from "../../auth/guards/roles.guard";
 import { AdminTimingRulesController } from "./admin-timing-rules.controller";
 import { AdminTimingRulesService } from "./admin-timing-rules.service";
 
-describe("AdminTimingRulesService — zorunlu denetim", () => {
+describe("AdminTimingRulesService — zorunlu denetim, aynı işlemde", () => {
   const before = {
     id: "returnWindowDays" as const,
     value: 14,
     source: "default" as const,
+    outOfBounds: false,
     action: "complete" as const,
     updatedAt: null,
   };
   const after = { ...before, value: 21, source: "setting" as const };
+  /** Ayar yazımının işlem istemcisi — denetim de buna yazılmalı. */
+  const TX = { tag: "settings-transaction" };
 
   const makeService = () => {
+    const applied = [{ id: "returnWindowDays", before, after }];
     const timingRules = {
-      applyChanges: jest
-        .fn()
-        .mockResolvedValue([{ id: "returnWindowDays", before, after }]),
+      // Gerçek servis gibi: yaz, sonra AYNI işlemde afterWrite'ı çağır;
+      // afterWrite fırlatırsa işlem (ve yazım) geri alınır → hata yükselir.
+      applyChanges: jest.fn(
+        async (
+          _changes: unknown,
+          _actor: string,
+          afterWrite?: (tx: unknown, applied: unknown[]) => Promise<void>,
+        ) => {
+          await afterWrite?.(TX, applied);
+          return applied;
+        },
+      ),
       listStates: jest.fn().mockResolvedValue([after]),
     };
     const audit = {
@@ -34,7 +47,7 @@ describe("AdminTimingRulesService — zorunlu denetim", () => {
     };
   };
 
-  it("her değişen kayıt için önce/sonra içeren ZORUNLU denetim yazar", async () => {
+  it("her değişen kayıt için önce/sonra içeren ZORUNLU denetimi ayar işleminin içinde yazar", async () => {
     const { service, timingRules, audit } = makeService();
 
     const result = await service.update("user-1", [
@@ -44,6 +57,7 @@ describe("AdminTimingRulesService — zorunlu denetim", () => {
     expect(timingRules.applyChanges).toHaveBeenCalledWith(
       [{ id: "returnWindowDays", value: 21 }],
       "user-1",
+      expect.any(Function),
     );
     expect(audit.createRequiredAuditLog).toHaveBeenCalledWith(
       "user-1",
@@ -52,13 +66,14 @@ describe("AdminTimingRulesService — zorunlu denetim", () => {
       "returnWindowDays",
       before,
       after,
+      TX,
     );
-    // Best-effort yol KULLANILMAZ: denetim yazılamazsa istek başarısız olur.
+    // Best-effort yol KULLANILMAZ.
     expect(audit.createAuditLog).not.toHaveBeenCalled();
     expect(result).toEqual({ rules: [after] });
   });
 
-  it("denetim yazılamazsa hata yükselir (fail-closed)", async () => {
+  it("denetim yazılamazsa hata yükselir ve işlem (ayar yazımı dahil) geri alınır", async () => {
     const { service, audit } = makeService();
     audit.createRequiredAuditLog.mockRejectedValue(new Error("audit down"));
 
@@ -80,7 +95,10 @@ describe("AdminTimingRulesService — zorunlu denetim", () => {
 
 describe("AdminTimingRulesController — yetki", () => {
   const rolesOf = (method: keyof AdminTimingRulesController) =>
-    Reflect.getMetadata(ROLES_KEY, AdminTimingRulesController.prototype[method]);
+    Reflect.getMetadata(
+      ROLES_KEY,
+      AdminTimingRulesController.prototype[method],
+    );
 
   it("değiştirme yalnız super_admin, okuma super_admin + admin", () => {
     expect(rolesOf("update")).toEqual([AdminRole.super_admin]);

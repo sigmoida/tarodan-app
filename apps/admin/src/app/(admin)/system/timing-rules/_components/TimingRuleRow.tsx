@@ -55,6 +55,16 @@ export function TimingRuleRow({ id, state, canEdit }: TimingRuleRowProps) {
             ? ` · ${t("admin.timingRules.updatedAt", { date: fmtDateTime(state.updatedAt) ?? "" })}`
             : ""}
         </p>
+        {state?.outOfBounds && (
+          <p className="mt-1 text-xs font-medium text-danger-700">
+            {t("admin.timingRules.outOfBoundsWarning")}
+          </p>
+        )}
+        {rule.appliesToInProgress && (
+          <p className="mt-1 text-xs text-warning-800">
+            {t("admin.timingRules.appliesToInProgressWarning")}
+          </p>
+        )}
       </div>
       <FormInput
         name={valueField(id)}
