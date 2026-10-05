@@ -1,3 +1,4 @@
+import type { TimingRuleChange } from "@tarodan/types";
 import { api } from "./client";
 
 /**
@@ -10,6 +11,11 @@ export const systemApi = {
   updateSettings: (data: any) => api.patch("/admin/settings", data),
   updateSetting: (key: string, value: string) =>
     api.patch(`/admin/settings/${key}`, { value }),
+
+  // Durations & rules (business durations + their expiry actions)
+  getTimingRules: () => api.get("/admin/timing-rules"),
+  updateTimingRules: (changes: TimingRuleChange[]) =>
+    api.patch("/admin/timing-rules", { changes }),
 
   // Early-access invite codes (pre-launch site lock)
   getSiteAccessPins: (params?: any) =>

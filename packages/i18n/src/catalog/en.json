@@ -8008,7 +8008,6 @@
       },
       "tabs": {
         "listing": "Listing",
-        "trade": "Trade",
         "message": "Message",
         "warehouse": "Warehouse",
         "finance": "Finance",
@@ -8017,7 +8016,6 @@
       },
       "tabTitle": {
         "listing": "Listing Settings",
-        "trade": "Trade Settings",
         "message": "Message Settings",
         "finance": "Finance settings",
         "security": "Security"
@@ -8044,26 +8042,6 @@
         "maxProductPrice": {
           "label": "Maximum Product Price (₺)",
           "helper": "Maximum price for new listings (existing listings unaffected)"
-        },
-        "tradeResponseHours": {
-          "label": "Response Time (Hours)",
-          "helper": "Time to respond to a trade offer"
-        },
-        "tradePaymentHours": {
-          "label": "Payment Time (Hours)",
-          "helper": "Time to pay after acceptance (for cash trades)"
-        },
-        "tradeShippingDays": {
-          "label": "Shipping Time (Days)",
-          "helper": "Time to ship after acceptance"
-        },
-        "tradeConfirmationDays": {
-          "label": "Confirmation Time (Days)",
-          "helper": "Time to confirm after delivery"
-        },
-        "tradeHoldDays": {
-          "label": "Trade Escrow Hold (Days)",
-          "helper": "How long the cash difference waits after a trade completes before it is released. Does not affect sale escrow."
         },
         "maxMessageLength": {
           "label": "Maximum Message Length",
@@ -8881,6 +8859,11 @@
           "name": "Consent Records",
           "description": "Proof of KVKK, agreement, cookie and marketing consents",
           "keywords": "consent,kvkk,agreement,cookie,marketing,gdpr"
+        },
+        "timingRules": {
+          "name": "Durations & Rules",
+          "description": "Business durations and what happens when they run out",
+          "keywords": "duration, timeout, listing lifetime, offer validity, return window, trade, alert"
         }
       }
     },
@@ -9225,6 +9208,168 @@
         "cookieCategories": "Cookie categories",
         "checkoutGroup": "Cart no",
         "order": "Order no"
+      }
+    },
+    "timingRules": {
+      "page": {
+        "title": "Durations & Rules",
+        "description": "Every business duration on the platform and the action taken when it runs out. A change applies from the next event; records whose end date is already stamped are not affected."
+      },
+      "error": {
+        "title": "Durations could not be loaded",
+        "description": "Your session may have expired. Try again; if it persists, sign out and sign back in."
+      },
+      "readOnly": "Only a super admin can change durations; you are viewing this screen read-only.",
+      "saveButton": "Save changes",
+      "saved": "Durations saved",
+      "onExpiry": "When it runs out",
+      "comingSoon": "{action} (coming soon)",
+      "bounds": "Allowed range: {min}–{max} {unit}",
+      "envFallback": "currently coming from the {envKey} environment variable",
+      "updatedAt": "last changed {date}",
+      "source": {
+        "setting": "Admin setting",
+        "env": "Environment variable",
+        "default": "Default"
+      },
+      "units": {
+        "minutes": "Minutes",
+        "hours": "Hours",
+        "days": "Days"
+      },
+      "groups": {
+        "listing": "Listing",
+        "offer": "Offer",
+        "trade": "Trade",
+        "order": "Order",
+        "refund": "Refund",
+        "payment": "Payment",
+        "alerts": "Operational alerts"
+      },
+      "actions": {
+        "deactivate": "Deactivate the listing and notify the seller",
+        "auto_renew": "Renew the listing automatically",
+        "notify_seller": "Send the seller a warning",
+        "expire": "Close as expired and notify",
+        "extend_once": "Extend once",
+        "cancel": "Cancel",
+        "cancel_and_refund": "Cancel and refund the payment",
+        "complete": "Complete automatically",
+        "release_funds": "Release the held funds",
+        "release_reservation": "Release the stock reservation",
+        "fail_payment": "Mark the payment as failed",
+        "close_refund": "Close the refund request",
+        "finalize_refund": "Finalise the refund",
+        "raise_alert": "Alert the admins"
+      },
+      "validation": {
+        "required": "Required"
+      },
+      "rules": {
+        "listingTtlDays": {
+          "label": "Listing lifetime",
+          "helper": "An approved listing stays live this long; the clock restarts on every re-approval."
+        },
+        "listingExpiryWarningDays": {
+          "label": "Listing expiry warning",
+          "helper": "The seller gets an email this many days before the listing expires. Must be shorter than the listing lifetime."
+        },
+        "offerExpiryHours": {
+          "label": "Offer validity",
+          "helper": "An offer or counter-offer lapses if it is not answered within this time. Pending offers keep their end date."
+        },
+        "tradeResponseHours": {
+          "label": "Trade response time",
+          "helper": "Time allowed to answer a trade offer."
+        },
+        "tradePaymentHours": {
+          "label": "Trade payment time",
+          "helper": "Time allowed to pay the service fee and cash difference of an accepted trade."
+        },
+        "tradeShippingDays": {
+          "label": "Trade shipping time",
+          "helper": "Time allowed after payment to ship the items to the warehouse."
+        },
+        "tradeConfirmationDays": {
+          "label": "Trade confirmation time",
+          "helper": "Time for both parties to confirm or dispute after both parcels are delivered; the trade completes when it ends."
+        },
+        "tradeHoldDays": {
+          "label": "Trade escrow hold",
+          "helper": "Wait after a trade completes before the cash difference is released to the other party. Does not affect sale escrow; at least 1 day."
+        },
+        "tradeLostParcelGraceDays": {
+          "label": "Lost parcel grace",
+          "helper": "A trade parcel that never reaches the warehouse is treated as lost this many days after the shipping deadline; an outbound parcel without a delivery report raises an alert."
+        },
+        "preparingDeadlineDays": {
+          "label": "Seller preparation time",
+          "helper": "Time the seller has to hand a paid order to the carrier (Sundays excluded). The seller is warned one day before."
+        },
+        "returnWindowDays": {
+          "label": "Cooling-off (return) window",
+          "helper": "The buyer's unconditional return right after delivery. At least 14 days under the Distance Sales Regulation. The order completes when it closes."
+        },
+        "orderPaymentWindowHours": {
+          "label": "Order payment time",
+          "helper": "Time the buyer has to pay a newly created order; the order is cancelled when it ends."
+        },
+        "paymentReservationMinutes": {
+          "label": "Stock reservation time",
+          "helper": "Stock is held this long for an unpaid order, then offered to other buyers; the order lives on for the payment time."
+        },
+        "paymentFailTimeoutMinutes": {
+          "label": "Payment failure timeout",
+          "helper": "A pending payment is marked failed after this time. Must be at least 31 minutes because the PayTR 3D Secure session lasts 30."
+        },
+        "payoutGraceDays": {
+          "label": "Seller payout grace",
+          "helper": "Extra wait after the cooling-off window closes before the seller is paid; at least 1 day."
+        },
+        "returnDropoffDays": {
+          "label": "Return drop-off time",
+          "helper": "An approved return is closed if its parcel is not handed to the carrier within this time."
+        },
+        "returnDropoffHardDays": {
+          "label": "Return hard close",
+          "helper": "Upper limit after which a return is closed even if tracking cannot be verified. Cannot be shorter than the drop-off time."
+        },
+        "returnInspectionHours": {
+          "label": "Return inspection time",
+          "helper": "Time the seller has to inspect a delivered return parcel; the refund is finalised when it ends."
+        },
+        "refundWaitDeliveryMaxDays": {
+          "label": "Undelivered refund limit",
+          "helper": "A refund request waiting for an order that was never delivered is closed after this time."
+        },
+        "shippedStaleAlertDays": {
+          "label": "Stuck shipment alert",
+          "helper": "Admins are alerted when an order is still undelivered this many days after it was shipped."
+        },
+        "missingTrackingAlertHours": {
+          "label": "Missing tracking code alert",
+          "helper": "Admins are alerted when a shipment gets no carrier tracking code within this time."
+        },
+        "carrierCancellationAlertHours": {
+          "label": "Pending carrier cancellation alert",
+          "helper": "Admins are alerted when a carrier cancellation task that must be closed manually exceeds this age."
+        },
+        "invoiceDeadlineDays": {
+          "label": "Uninvoiced delivery alert",
+          "helper": "Admins are alerted when a delivered order's revenue invoice is not issued within this time."
+        },
+        "sellerInvoiceDeadlineDays": {
+          "label": "Seller invoice reminder",
+          "helper": "If the seller does not upload the product invoice within this time, the seller is reminded and admins are notified."
+        },
+        "cargoPickupNoDataDays": {
+          "label": "No carrier data alert",
+          "helper": "Admins are alerted when a parcel marked as handed over has no carrier data for this long."
+        },
+        "cargoStaleMovementDays": {
+          "label": "Stale cargo alert",
+          "helper": "Admins are alerted when an order, trade or return parcel shows no movement for this long."
+        }
       }
     }
   },

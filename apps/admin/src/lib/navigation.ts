@@ -33,6 +33,7 @@ import {
   PhotoIcon,
   ArchiveBoxIcon,
   ShieldCheckIcon,
+  ClockIcon,
 } from "@heroicons/react/24/outline";
 import {
   ADMIN_CANCELLATIONS_REFUNDS_PATH,
@@ -532,6 +533,18 @@ export function getNavGroups(t: T): NavGroup[] {
           href: "/system/settings",
           icon: Cog6ToothIcon,
           description: t("admin.nav.items.settings.description"),
+          permission: "settings",
+        },
+        {
+          // API: PERMISSION_MAP["timing-rules"] = ["settings"]; değiştirme
+          // ayrıca super_admin'e sınırlı (sayfa diğer rollere salt okunur).
+          name: t("admin.nav.items.timingRules.name"),
+          href: "/system/timing-rules",
+          icon: ClockIcon,
+          description: t("admin.nav.items.timingRules.description"),
+          keywords: t("admin.nav.items.timingRules.keywords")
+            .split(",")
+            .map((k) => k.trim()),
           permission: "settings",
         },
         {

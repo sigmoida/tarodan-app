@@ -560,6 +560,49 @@ export function findTimingInvariantViolation(
   return null;
 }
 
+/**
+ * İhlalin katalog anahtarı + parametreleri. API 400 mesajı ve admin form
+ * hatası AYNI anahtarı kullanır (metin bir kez yazılır). Anahtarlar
+ * `@tarodan/i18n` kataloğundaki `server.admin.timingRules.*` dalındadır.
+ */
+export type TimingViolationMessageKey =
+  | "server.admin.timingRules.notInteger"
+  | "server.admin.timingRules.belowMin"
+  | "server.admin.timingRules.aboveMax"
+  | `server.admin.timingRules.invariant.${TimingInvariantId}`
+  | "server.admin.timingRules.actionNotAllowed"
+  | "server.admin.timingRules.actionUnavailable";
+
+export interface TimingViolationMessage {
+  key: TimingViolationMessageKey;
+  params?: { min: number } | { max: number };
+}
+
+export function describeTimingViolation(
+  violation: TimingRuleViolation,
+): TimingViolationMessage {
+  switch (violation.code) {
+    case "notInteger":
+      return { key: "server.admin.timingRules.notInteger" };
+    case "belowMin":
+      return {
+        key: "server.admin.timingRules.belowMin",
+        params: { min: violation.min },
+      };
+    case "aboveMax":
+      return {
+        key: "server.admin.timingRules.aboveMax",
+        params: { max: violation.max },
+      };
+    case "invariant":
+      return { key: `server.admin.timingRules.invariant.${violation.invariant}` };
+    case "actionNotAllowed":
+      return { key: "server.admin.timingRules.actionNotAllowed" };
+    case "actionUnavailable":
+      return { key: "server.admin.timingRules.actionUnavailable" };
+  }
+}
+
 // ── API sözleşmeleri ─────────────────────────────────────────────────────
 
 /** Etkin değerin nereden geldiği: admin ayarı, env geri düşüşü, kayıt varsayılanı. */

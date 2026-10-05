@@ -8008,7 +8008,6 @@
       },
       "tabs": {
         "listing": "İlan",
-        "trade": "Takas",
         "message": "Mesaj",
         "warehouse": "Depo",
         "finance": "Finans",
@@ -8017,7 +8016,6 @@
       },
       "tabTitle": {
         "listing": "İlan Ayarları",
-        "trade": "Takas Ayarları",
         "message": "Mesaj Ayarları",
         "finance": "Finans Ayarları",
         "security": "Güvenlik"
@@ -8044,26 +8042,6 @@
         "maxProductPrice": {
           "label": "Maksimum Ürün Fiyatı (₺)",
           "helper": "Yeni ilanlar için maksimum fiyat (mevcut ilanlar etkilenmez)"
-        },
-        "tradeResponseHours": {
-          "label": "Yanıt Süresi (Saat)",
-          "helper": "Takas teklifine yanıt süresi"
-        },
-        "tradePaymentHours": {
-          "label": "Ödeme Süresi (Saat)",
-          "helper": "Kabul sonrası ödeme süresi (nakit takaslar için)"
-        },
-        "tradeShippingDays": {
-          "label": "Kargo Süresi (Gün)",
-          "helper": "Kabul sonrası kargo gönderim süresi"
-        },
-        "tradeConfirmationDays": {
-          "label": "Onay Süresi (Gün)",
-          "helper": "Teslim sonrası onay süresi"
-        },
-        "tradeHoldDays": {
-          "label": "Takas Escrow Bekletme (Gün)",
-          "helper": "Takas tamamlandıktan sonra nakit farkın karşı tarafa açılması için beklenen süre. Satış escrow'unu etkilemez."
         },
         "maxMessageLength": {
           "label": "Maksimum Mesaj Uzunluğu",
@@ -8881,6 +8859,11 @@
           "name": "Onay Kayıtları",
           "description": "KVKK, sözleşme, çerez ve pazarlama onaylarının ispat kaydı",
           "keywords": "onay,kvkk,sözleşme,çerez,pazarlama,consent,gdpr"
+        },
+        "timingRules": {
+          "name": "Süreler ve Kurallar",
+          "description": "İş süreleri ve süre dolunca ne olacağı",
+          "keywords": "süre, zaman aşımı, ilan süresi, teklif süresi, iade penceresi, takas, alarm"
         }
       }
     },
@@ -9225,6 +9208,168 @@
         "cookieCategories": "Çerez kategorileri",
         "checkoutGroup": "Sepet no",
         "order": "Sipariş no"
+      }
+    },
+    "timingRules": {
+      "page": {
+        "title": "Süreler ve Kurallar",
+        "description": "Platformdaki her iş süresi ve süre dolunca uygulanacak eylem. Değişiklik bir sonraki işlemde geçerli olur; bitiş tarihi önceden yazılmış kayıtlar etkilenmez."
+      },
+      "error": {
+        "title": "Süreler yüklenemedi",
+        "description": "Oturumun sona ermiş olabilir. Tekrar dene; sürerse çıkış yapıp yeniden giriş yap."
+      },
+      "readOnly": "Süreleri yalnız süper yönetici değiştirebilir; bu ekranı salt okunur görüyorsun.",
+      "saveButton": "Değişiklikleri Kaydet",
+      "saved": "Süreler kaydedildi",
+      "onExpiry": "Süre dolunca",
+      "comingSoon": "{action} (yakında)",
+      "bounds": "İzin verilen aralık: {min}–{max} {unit}",
+      "envFallback": "şu an {envKey} ortam değişkeninden geliyor",
+      "updatedAt": "son değişiklik {date}",
+      "source": {
+        "setting": "Yönetici ayarı",
+        "env": "Ortam değişkeni",
+        "default": "Varsayılan"
+      },
+      "units": {
+        "minutes": "Dakika",
+        "hours": "Saat",
+        "days": "Gün"
+      },
+      "groups": {
+        "listing": "İlan",
+        "offer": "Teklif",
+        "trade": "Takas",
+        "order": "Sipariş",
+        "refund": "İade",
+        "payment": "Ödeme",
+        "alerts": "Operasyon Alarmları"
+      },
+      "actions": {
+        "deactivate": "İlanı pasife al ve satıcıya bildir",
+        "auto_renew": "İlanı otomatik yenile",
+        "notify_seller": "Satıcıya uyarı gönder",
+        "expire": "Süresi doldu olarak kapat ve bildir",
+        "extend_once": "Süreyi bir kez uzat",
+        "cancel": "İptal et",
+        "cancel_and_refund": "İptal et ve ödemeyi iade et",
+        "complete": "Otomatik tamamla",
+        "release_funds": "Tutulan parayı serbest bırak",
+        "release_reservation": "Stok rezervasyonunu bırak",
+        "fail_payment": "Ödemeyi başarısız say",
+        "close_refund": "İade talebini kapat",
+        "finalize_refund": "İadeyi kesinleştir",
+        "raise_alert": "Yöneticiye alarm ver"
+      },
+      "validation": {
+        "required": "Zorunlu"
+      },
+      "rules": {
+        "listingTtlDays": {
+          "label": "İlan yayın süresi",
+          "helper": "Onaylanan ilan bu süre boyunca yayında kalır; süre her yeniden onayda baştan başlar."
+        },
+        "listingExpiryWarningDays": {
+          "label": "İlan bitiş uyarısı",
+          "helper": "İlan süresi dolmadan bu kadar gün önce satıcıya e-posta gider. İlan yayın süresinden kısa olmalıdır."
+        },
+        "offerExpiryHours": {
+          "label": "Teklif geçerlilik süresi",
+          "helper": "Teklif ve karşı teklif bu süre içinde yanıtlanmazsa düşer. Bekleyen tekliflerin bitişi değişmez."
+        },
+        "tradeResponseHours": {
+          "label": "Takas yanıt süresi",
+          "helper": "Takas teklifine yanıt verilmesi için tanınan süre."
+        },
+        "tradePaymentHours": {
+          "label": "Takas ödeme süresi",
+          "helper": "Kabul edilen takasın hizmet bedeli ve nakit farkının ödenmesi için tanınan süre."
+        },
+        "tradeShippingDays": {
+          "label": "Takas kargolama süresi",
+          "helper": "Ödeme sonrası ürünlerin depoya kargolanması için tanınan süre."
+        },
+        "tradeConfirmationDays": {
+          "label": "Takas onay süresi",
+          "helper": "Her iki koli de teslim edildikten sonra tarafların onay ya da itiraz süresi; dolunca takas tamamlanır."
+        },
+        "tradeHoldDays": {
+          "label": "Takas escrow bekletme süresi",
+          "helper": "Takas tamamlandıktan sonra nakit farkın karşı tarafa açılması için beklenen süre. Satış escrow'unu etkilemez; en az 1 gün."
+        },
+        "tradeLostParcelGraceDays": {
+          "label": "Kayıp koli bekleme süresi",
+          "helper": "Depoya hiç varmayan takas kolisi kargolama süresinden bu kadar gün sonra kayıp sayılır; teslim raporu gelmeyen çıkış kolisi için de alarm verilir."
+        },
+        "preparingDeadlineDays": {
+          "label": "Satıcı hazırlık süresi",
+          "helper": "Ödenen siparişin kargoya verilmesi için satıcıya tanınan süre (pazar sayılmaz). Dolmadan bir gün önce satıcı uyarılır."
+        },
+        "returnWindowDays": {
+          "label": "Cayma (iade) penceresi",
+          "helper": "Teslimden sonra alıcının koşulsuz iade hakkı. Mesafeli Satış Yönetmeliği gereği en az 14 gün. Pencere kapanınca sipariş tamamlanır."
+        },
+        "orderPaymentWindowHours": {
+          "label": "Sipariş ödeme süresi",
+          "helper": "Oluşturulan siparişin ödenmesi için alıcıya tanınan süre; dolunca sipariş iptal edilir."
+        },
+        "paymentReservationMinutes": {
+          "label": "Stok rezervasyon süresi",
+          "helper": "Ödenmemiş siparişin stoğu bu kadar tutulur; sonra stok başka alıcılara açılır, sipariş ödeme süresi boyunca yaşar."
+        },
+        "paymentFailTimeoutMinutes": {
+          "label": "Ödeme başarısız sayma süresi",
+          "helper": "Bekleyen ödeme bu süreden sonra başarısız sayılır. PayTR 3D Secure oturumu 30 dakika sürdüğü için en az 31 dakika olmalıdır."
+        },
+        "payoutGraceDays": {
+          "label": "Satıcı ödemesi ek bekleme",
+          "helper": "Cayma penceresi kapandıktan sonra satıcıya ödeme yapılmadan önce beklenen ek süre; en az 1 gün."
+        },
+        "returnDropoffDays": {
+          "label": "İade kargoya verme süresi",
+          "helper": "Onaylanan iadenin kolisi bu süre içinde kargoya verilmezse iade talebi kapanır."
+        },
+        "returnDropoffHardDays": {
+          "label": "İade kargosu kesin kapanış",
+          "helper": "Kargo takibi doğrulanamasa bile iadenin kapatılacağı üst sınır. Kargoya verme süresinden kısa olamaz."
+        },
+        "returnInspectionHours": {
+          "label": "İade inceleme süresi",
+          "helper": "Satıcıya teslim edilen iade kolisinin incelenmesi için tanınan süre; dolunca iade kesinleşir."
+        },
+        "refundWaitDeliveryMaxDays": {
+          "label": "Teslim bekleyen iade üst süresi",
+          "helper": "Sipariş hiç teslim edilmediği için bekleyen iade talebi bu süreden sonra kapatılır."
+        },
+        "shippedStaleAlertDays": {
+          "label": "Kargoda takılı sipariş alarmı",
+          "helper": "Kargoya verildikten bu kadar gün sonra hâlâ teslim edilmemiş sipariş için yöneticiye alarm verilir."
+        },
+        "missingTrackingAlertHours": {
+          "label": "Takip kodu oluşmayan gönderi alarmı",
+          "helper": "Taşıyıcı takip kodu bu süre içinde oluşmayan gönderi için alarm verilir."
+        },
+        "carrierCancellationAlertHours": {
+          "label": "Bekleyen taşıyıcı iptali alarmı",
+          "helper": "Panelden elle kapatılması gereken taşıyıcı iptal görevi bu süreyi aşınca alarm verilir."
+        },
+        "invoiceDeadlineDays": {
+          "label": "Faturasız teslimat alarmı",
+          "helper": "Teslim edilen siparişin gelir faturası bu süre içinde kesilmezse alarm verilir."
+        },
+        "sellerInvoiceDeadlineDays": {
+          "label": "Satıcı faturası hatırlatması",
+          "helper": "Satıcı ürün faturasını bu süre içinde yüklemezse satıcıya hatırlatma, yöneticiye bildirim gider."
+        },
+        "cargoPickupNoDataDays": {
+          "label": "Taşıyıcıdan veri gelmeyen kargo alarmı",
+          "helper": "\"Kargoya verdim\" denen ama taşıyıcıdan bu süre boyunca hiç veri gelmeyen gönderi için alarm verilir."
+        },
+        "cargoStaleMovementDays": {
+          "label": "Hareketsiz kargo alarmı",
+          "helper": "Bu süre boyunca hareket görmeyen sipariş, takas ve iade kolileri için alarm verilir."
+        }
       }
     }
   },

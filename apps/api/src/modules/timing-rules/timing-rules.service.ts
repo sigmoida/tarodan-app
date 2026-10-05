@@ -4,6 +4,7 @@ import { Prisma } from "@prisma/client";
 import {
   PUBLIC_TIMING_RULE_IDS,
   TIMING_RULES,
+  describeTimingViolation,
   findTimingInvariantViolation,
   isTimingRuleId,
   timingActionSettingKey,
@@ -11,11 +12,9 @@ import {
   validateTimingValue,
   type AdminTimingRuleState,
   type PublicTimingPolicy,
-  type TimingInvariantId,
   type TimingRuleId,
   type TimingRuleViolation,
 } from "@tarodan/types";
-import type { MessageKey } from "@tarodan/i18n";
 import { PrismaService } from "../../prisma";
 import { i18nMessage } from "../i18n";
 import {
@@ -37,45 +36,14 @@ export interface AppliedTimingRuleChange {
   after: AdminTimingRuleState;
 }
 
-const INVARIANT_MESSAGE: Record<TimingInvariantId, MessageKey> = {
-  dropoffHardNotBelowDropoff:
-    "server.admin.timingRules.invariant.dropoffHardNotBelowDropoff",
-  listingWarningBeforeTtl:
-    "server.admin.timingRules.invariant.listingWarningBeforeTtl",
-};
-
-/** Kayıt ihlalini yerelleştirilmiş 400'e çevirir. */
+/**
+ * Kayıt ihlalini yerelleştirilmiş 400'e çevirir. Anahtar/parametre eşlemesi
+ * kayıtla birlikte durur (`describeTimingViolation`) — admin formu aynı
+ * metni gösterir.
+ */
 function violationError(violation: TimingRuleViolation): BadRequestException {
-  switch (violation.code) {
-    case "notInteger":
-      return new BadRequestException(
-        i18nMessage("server.admin.timingRules.notInteger"),
-      );
-    case "belowMin":
-      return new BadRequestException(
-        i18nMessage("server.admin.timingRules.belowMin", {
-          min: violation.min,
-        }),
-      );
-    case "aboveMax":
-      return new BadRequestException(
-        i18nMessage("server.admin.timingRules.aboveMax", {
-          max: violation.max,
-        }),
-      );
-    case "invariant":
-      return new BadRequestException(
-        i18nMessage(INVARIANT_MESSAGE[violation.invariant]),
-      );
-    case "actionNotAllowed":
-      return new BadRequestException(
-        i18nMessage("server.admin.timingRules.actionNotAllowed"),
-      );
-    case "actionUnavailable":
-      return new BadRequestException(
-        i18nMessage("server.admin.timingRules.actionUnavailable"),
-      );
-  }
+  const { key, params } = describeTimingViolation(violation);
+  return new BadRequestException(i18nMessage(key, params));
 }
 
 /**
