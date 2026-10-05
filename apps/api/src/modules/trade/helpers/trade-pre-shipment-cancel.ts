@@ -39,7 +39,9 @@ export const PRE_SHIPMENT_RESERVED_STATUSES: readonly TradeStatus[] = [
  * - `paid`: ödemesini tamamlamış taraf kusursuz (ödeme süresi aşımı).
  * - `all`: iki taraf da kusursuz (platform iptali — kimsenin kusuru değil).
  *   Ödemesi henüz tamamlanmamış satır da işaretlenir: callback iptalden sonra
- *   gelip satırı tamamlarsa o ödeme de tam tutarla iade edilir.
+ *   gelip satırı tamamlarsa ödeme tamamlama yolu takasın iptal edildiğini
+ *   görüp ödemeyi izlenen iadeye verir (`payment-fulfillment` →
+ *   `trade.cancelled_payment_refund`); tutar bu bayrak sayesinde tamdır.
  */
 export type PreShipmentFaultless = "none" | "paid" | "all";
 

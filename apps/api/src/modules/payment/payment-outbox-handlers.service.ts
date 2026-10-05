@@ -1,6 +1,8 @@
-import { Injectable, Logger, OnModuleInit } from "@nestjs/common";
+import { Injectable, Logger, OnModuleInit, Optional } from "@nestjs/common";
 import { OutboxHandlerRegistry } from "../outbox/outbox-handler.registry";
 import {
+  OUTBOX_TRADE_CANCELLED_PAYMENT_REFUND,
+  type TradeCancelledPaymentRefundPayload,
   OUTBOX_SHIPMENT_CANCEL,
   OUTBOX_INVOICE_REFUND_REVERSE,
   OUTBOX_INVOICE_TRADE_CASH_REFUND_REVERSE,
@@ -19,6 +21,7 @@ import { ElogoInvoicingService } from "../elogo";
 import { refundRequestIdOf } from "../elogo/helpers/refund-request-key";
 import { PrismaService } from "../../prisma";
 import { FulfillmentFinalizer } from "./fulfillment/fulfillment-finalizer.service";
+import { PaymentRefundService } from "./refund/payment-refund.service";
 import { PaymentStatus } from "@prisma/client";
 
 /**
@@ -39,9 +42,29 @@ export class PaymentOutboxHandlers implements OnModuleInit {
     private readonly elogoInvoicing: ElogoInvoicingService,
     private readonly prisma: PrismaService,
     private readonly fulfillmentFinalizer: FulfillmentFinalizer,
+    // İptal edilmiş takasa sonradan gelen ödemenin iadesi (aynı modülün
+    // izlenen takas iade yolu). @Optional: dar unit test kurulumları için.
+    @Optional() private readonly paymentRefund?: PaymentRefundService,
   ) {}
 
   onModuleInit(): void {
+    // İptal edilmiş takasa sonradan tamamlanan ödeme: ödeme tx'iyle atomik
+    // yazılan satır, anlık yol çalışamadan süreç ölürse burada tamamlanır.
+    // `refundTradeCashTracked` idempotenttir (ödeme başına deneme defteri) ve
+    // asla fırlatmaz; sağlayıcı hatası `refundFailureReason` + retry cron'una
+    // düşer. Servis yoksa fırlatılır ki satır kaybolmasın.
+    this.registry.register(
+      OUTBOX_TRADE_CANCELLED_PAYMENT_REFUND,
+      async (payload) => {
+        const { tradeId, payerId } =
+          payload as TradeCancelledPaymentRefundPayload;
+        if (!this.paymentRefund) {
+          throw new Error("PaymentRefundService is not available");
+        }
+        await this.paymentRefund.refundTradeCashTracked(tradeId, { payerId });
+      },
+    );
+
     this.registry.register(OUTBOX_SHIPMENT_CANCEL, async (payload) => {
       const { orderId, orderNumber } = payload as ShipmentCancelPayload;
       const result = await this.paymentCommon.cancelSuratShipmentIfExists(

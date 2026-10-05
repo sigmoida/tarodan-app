@@ -123,3 +123,26 @@ export interface TradeCancelSettlePayload {
 
 export const tradeCancelSettleDedupeKey = (tradeId: string): string =>
   `${OUTBOX_TRADE_CANCEL_SETTLE}:${tradeId}`;
+
+/**
+ * İPTAL EDİLMİŞ takasa sonradan tamamlanan ödemenin iadesi. İptal yolları
+ * iadeyi iptal anında tamamlanmış satırlara yapar; ödemesi o an yolda olan
+ * tarafın (PayTR callback'i iptalden sonra gelir) parası aksi halde hiçbir
+ * yoldan dönmez. Ödemeyi tamamlayan tx'le ATOMİK yazılır, anlık yol
+ * `runInline` ile hemen iade eder; çökmede drainer tamamlar. Tutar mevcut
+ * politikadan (`refundTradeCashTracked`, satırdaki `fullRefundEntitled`
+ * kararıyla) gelir — yeni hesap yok. Ödeme satırı başına tek satır.
+ */
+export const OUTBOX_TRADE_CANCELLED_PAYMENT_REFUND =
+  "trade.cancelled_payment_refund";
+
+export interface TradeCancelledPaymentRefundPayload {
+  tradeId: string;
+  /** İade yalnız bu tarafın satırını kapsar (`refundTradeCashTracked` kapsamı). */
+  payerId: string;
+  tradeCashPaymentId: string;
+}
+
+export const tradeCancelledPaymentRefundDedupeKey = (
+  tradeCashPaymentId: string,
+): string => `${OUTBOX_TRADE_CANCELLED_PAYMENT_REFUND}:${tradeCashPaymentId}`;

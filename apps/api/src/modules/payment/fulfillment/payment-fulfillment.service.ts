@@ -28,6 +28,9 @@ import { DiscountService } from "../../discount/discount.service";
 import {
   OUTBOX_ORDER_FULFILLMENT,
   OUTBOX_REVENUE_INVOICE_ISSUE,
+  OUTBOX_TRADE_CANCELLED_PAYMENT_REFUND,
+  tradeCancelledPaymentRefundDedupeKey,
+  type TradeCancelledPaymentRefundPayload,
 } from "../../outbox/outbox.types";
 import { isTradeFullyPaid } from "../../trade/helpers/trade-payment-rows.helper";
 import { addDaysSkippingSundays } from "../../../common/helpers/preparing-deadline";
@@ -1006,6 +1009,21 @@ export class PaymentFulfillmentService {
         return { didComplete: false } as const;
       }
 
+      // Takas satırı, ödeme satırına dokunmadan ÖNCE kilitlenir: iptal yolları
+      // (kullanıcı, süre dolumu, platform) aynı sırayla kilitler (takas →
+      // ödeme satırı). Böylece "takas iptal mi?" sorusu aşağıda kesin cevaplanır
+      // — yarışan bir iptal ya önce commit olur (burada `cancelled` görülür ve
+      // ödeme iade edilir) ya da bu tx'ten sonra gelir (ödemeyi `completed`
+      // görür ve kendi iadesine katar). Ters kilit sırası kilitlenmeye de yol
+      // açardı.
+      const tcpRef = await tx.tradeCashPayment.findUnique({
+        where: { id: payment.tradeCashPaymentId },
+        select: { tradeId: true },
+      });
+      if (tcpRef) {
+        await tx.$queryRaw`SELECT id FROM trades WHERE id = ${tcpRef.tradeId} FOR UPDATE`;
+      }
+
       const tcp = await tx.tradeCashPayment.update({
         where: { id: payment.tradeCashPaymentId },
         data: {
@@ -1030,6 +1048,27 @@ export class PaymentFulfillmentService {
       const fullyPaid = isTradeFullyPaid(siblingPayments);
       let tradeTransitioned = false;
       let shippingDeadline: Date | null = null;
+
+      // Takas bu ödeme yoldayken iptal edildi: iptalin iadesi bu satırı (o an
+      // tamamlanmamıştı) kapsamadı. Para burada kalamaz — mevcut izlenen iade
+      // yoluna verilir; iş bu tx'le ATOMİK kuyruğa girer (çökmede drainer).
+      if (trade && trade.status === TradeStatus.cancelled) {
+        const cancelledTradeRefund: TradeCancelledPaymentRefundPayload = {
+          tradeId: trade.id,
+          payerId: tcp.payerId,
+          tradeCashPaymentId: tcp.id,
+        };
+        await this.outbox?.enqueue(tx, {
+          type: OUTBOX_TRADE_CANCELLED_PAYMENT_REFUND,
+          payload: { ...cancelledTradeRefund },
+          dedupeKey: tradeCancelledPaymentRefundDedupeKey(tcp.id),
+        });
+        return {
+          didComplete: true,
+          tradeTransitioned: false,
+          cancelledTradeRefund,
+        } as const;
+      }
 
       if (trade && trade.status === TradeStatus.awaiting_payment && fullyPaid) {
         const now = new Date();
@@ -1083,6 +1122,13 @@ export class PaymentFulfillmentService {
       );
     }
 
+    // İptal edilmiş takasa gelen ödeme: yakalamadan SONRA (defter ters kaydı
+    // yakalamayı bulsun) iade edilir. Kuyruktaki işin sahibi olarak hemen.
+    if ("cancelledTradeRefund" in result) {
+      await this.refundPaymentOfCancelledTrade(result.cancelledTradeRefund);
+      return true;
+    }
+
     // NOT: Takas nakit komisyonu e-Arşivi ARTIK BURADA (ödeme anında) DEĞİL, ürünler DEPOYA VARINCA
     // (at_warehouse) kesilir — surat-tracking.maybeTransitionTradeToAtWarehouse. İptal penceresi
     // ödeme sonrası/depo öncesi olduğundan, iptalde henüz fatura kesilmemiş olur (iade faturası gerekmez).
@@ -1115,6 +1161,35 @@ export class PaymentFulfillmentService {
     }
 
     return true;
+  }
+
+  /**
+   * İptal edilmiş takasa sonradan tamamlanan ödemenin iadesi — mevcut izlenen
+   * yol (`refundTradeCashTracked`, ödeyen tarafa kapsamlı; tutar satırdaki
+   * kusur kararıyla politikadan). Asla fırlatmaz: sağlayıcı hatası
+   * `refundFailureReason` yazar ve retry cron'u toparlar. Ödeme tx'inde
+   * kuyruğa alınmış işin sahibi olarak çalışır; süreç burada ölürse drainer
+   * (`PaymentOutboxHandlers`) aynı işi tamamlar.
+   */
+  private async refundPaymentOfCancelledTrade(
+    ref: TradeCancelledPaymentRefundPayload,
+  ): Promise<void> {
+    const work = () =>
+      this.paymentRefund.refundTradeCashTracked(ref.tradeId, {
+        payerId: ref.payerId,
+      });
+    this.logger.warn(
+      `Trade ${ref.tradeId} was cancelled before payment ${ref.tradeCashPaymentId} completed; refunding`,
+    );
+    if (!this.outbox) {
+      await work();
+      return;
+    }
+    await this.outbox.runInline(
+      this.prisma,
+      tradeCancelledPaymentRefundDedupeKey(ref.tradeCashPaymentId),
+      work,
+    );
   }
 
   /**

@@ -437,6 +437,22 @@ duyurudur. Uygunluk kuralı `@tarodan/types` → `adminTradeCancelBlocker`
   kilitlenir (sıra: takas → bacak). Aynı kodla ikinci gönderim yeni bir iptal
   üretmez.
 
+**İptalden sonra tamamlanan takas ödemesi (bütün iptal yolları).** İptal
+yolları iadeyi iptal anında tamamlanmış ödeme satırlarına yapar; ödemesi o an
+PayTR'da olan tarafın callback'i iptalden sonra gelirse satır `completed`
+olurdu ve hiçbir yol iade etmezdi. Ödemenin tamamlandığı tek yer
+(`payment-fulfillment` → takas nakit ödemesi) artık takas satırını ödeme
+satırından önce kilitler (iptal yollarıyla aynı sıra: takas → ödeme satırı) ve
+takas `cancelled` ise ödemeyi mevcut izlenen iadeye
+(`refundTradeCashTracked`, ödeyene kapsamlı) verir. İş ödeme tx'iyle atomik
+`trade.cancelled_payment_refund` outbox satırı olarak yazılır ve anlık yoldan
+hemen çalışır; çökmede drainer (`PaymentOutboxHandlers`) tamamlar, sağlayıcı
+hatası `refundFailureReason` + retry cron'una düşer. Tutar yeni bir hesap
+değildir: satırdaki kusur kararıyla (`fullRefundEntitled`) iade politikası.
+Platform iptalinde her satır kusursuz işaretlendiği için tam tutardır.
+Duyuru tarafında bu ödeme, iptal anında sabitlenen duyuruda görünmez; ödeyen
+taraf iade core'unun "iade tamamlandı" push'unu alır.
+
 ---
 
 ## 8b. Gelir e-belgeleri (eLogo)
