@@ -18,6 +18,8 @@ export interface UseWebMutationOptions<TData, TVars> {
   invalidates?: string[];
   successMessage?: string;
   errorMessage?: string;
+  /** Hata toast'ını bastırır (kullanıcının başlatmadığı arka plan yazmaları için). */
+  silentError?: boolean;
   onSuccess?: (data: TData, vars: TVars) => void;
   mutation?: Omit<
     UseMutationOptions<TData, unknown, TVars>,
@@ -52,6 +54,7 @@ export function useWebMutation<TData, TVars = void>(
     invalidates = [],
     successMessage,
     errorMessage,
+    silentError = false,
     onSuccess,
     mutation,
   }: UseWebMutationOptions<TData, TVars> = {},
@@ -70,6 +73,7 @@ export function useWebMutation<TData, TVars = void>(
       onSuccess?.(data, vars);
     },
     onError: (error) => {
+      if (silentError) return;
       toast.error(
         apiErrorMessage(error) ?? errorMessage ?? t("common.operationFailed"),
       );

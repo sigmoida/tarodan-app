@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from "react";
 import { Link, useRouter } from "@/i18n/navigation";
 import { resolveNotificationHref } from "@/lib/notification-href";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { BellIcon, XMarkIcon } from "@heroicons/react/24/outline";
 import { BellIcon as BellSolidIcon } from "@heroicons/react/24/solid";
 import { Button, Spinner } from "@tarodan/ui";
@@ -12,6 +12,10 @@ import { api } from "@/lib/api";
 import { queryKeys } from "@/lib/query/keys";
 import { useAuthStore } from "@/stores/authStore";
 import { useUnreadNotificationCount } from "@/hooks/useHeaderBadgeCounts";
+import {
+  useMarkAllNotificationsRead,
+  useMarkNotificationRead,
+} from "@/hooks/useNotificationMutations";
 import { useTranslations } from "next-intl";
 
 interface Notification {
@@ -63,7 +67,6 @@ function ExternalNotificationLink({
 
 export default function NotificationBell() {
   const router = useRouter();
-  const queryClient = useQueryClient();
   const t = useTranslations();
   const { isAuthenticated } = useAuthStore();
   const [showDropdown, setShowDropdown] = useState(false);
@@ -71,6 +74,9 @@ export default function NotificationBell() {
 
   const unreadCountQuery = useUnreadNotificationCount(isAuthenticated);
   const unreadCount = unreadCountQuery.data ?? 0;
+  const { mutate: markAsRead } = useMarkNotificationRead();
+  const { mutate: markAllAsRead, isPending: markingAll } =
+    useMarkAllNotificationsRead();
 
   const notificationsQuery = useQuery({
     queryKey: queryKeys.notifications.bell(),
@@ -99,46 +105,6 @@ export default function NotificationBell() {
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
-
-  const markAsRead = async (id: string) => {
-    try {
-      await api.patch(`/notifications/${id}/read`);
-      await Promise.all([
-        queryClient.invalidateQueries({
-          queryKey: queryKeys.notifications.unreadCount(),
-        }),
-        queryClient.invalidateQueries({
-          queryKey: queryKeys.notifications.bell(),
-        }),
-        queryClient.invalidateQueries({
-          queryKey: queryKeys.notifications.all(),
-        }),
-      ]);
-    } catch (error) {
-      if (process.env.NODE_ENV === "development")
-        console.error("Failed to mark as read:", error);
-    }
-  };
-
-  const dismissNotification = async (id: string) => {
-    try {
-      await api.patch(`/notifications/${id}/read`);
-      await Promise.all([
-        queryClient.invalidateQueries({
-          queryKey: queryKeys.notifications.unreadCount(),
-        }),
-        queryClient.invalidateQueries({
-          queryKey: queryKeys.notifications.bell(),
-        }),
-        queryClient.invalidateQueries({
-          queryKey: queryKeys.notifications.all(),
-        }),
-      ]);
-    } catch (error) {
-      if (process.env.NODE_ENV === "development")
-        console.error("Failed to dismiss:", error);
-    }
-  };
 
   const handleBellClick = () => {
     setShowDropdown(!showDropdown);
@@ -190,9 +156,19 @@ export default function NotificationBell() {
                 {t("notification.notifications")}
               </h3>
               {unreadCount > 0 && (
-                <span className="px-2 py-0.5 text-xs font-medium bg-primary-500 text-inverted rounded-full">
-                  {unreadCount} {t("notification.newBadge")}
-                </span>
+                <div className="flex items-center gap-2">
+                  <span className="px-2 py-0.5 text-xs font-medium bg-primary-500 text-inverted rounded-full">
+                    {unreadCount} {t("notification.newBadge")}
+                  </span>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => markAllAsRead()}
+                    disabled={markingAll}
+                  >
+                    {t("notification.markAllReadShort")}
+                  </Button>
+                </div>
               )}
             </div>
           </div>
@@ -284,7 +260,7 @@ export default function NotificationBell() {
                         size="icon"
                         onClick={(e) => {
                           e.stopPropagation();
-                          dismissNotification(notification.id);
+                          markAsRead(notification.id);
                         }}
                         className="absolute top-2 right-2 h-6 w-6 rounded-md text-subtle opacity-0 group-hover:opacity-100 transition-opacity"
                         aria-label={t("common.close")}

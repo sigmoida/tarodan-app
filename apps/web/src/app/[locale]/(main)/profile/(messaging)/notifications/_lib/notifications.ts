@@ -61,6 +61,26 @@ export const FILTER_LABELS: Record<FilterType, MessageKey> = {
 export const getNotificationCategory = (type: string): FilterType =>
   NOTIFICATION_CATEGORIES[type] || "other";
 
+/** Okunmamış bildirimlerin kimlikleri — sayfa açıldığı andaki "yeni" kümesi. */
+export function collectUnreadIds(list: Notification[]): Set<string> {
+  return new Set(list.filter((n) => !n.isRead).map((n) => n.id));
+}
+
+/**
+ * Listeyi, `highlightedIds` içindekiler hâlâ okunmamış sayılacak şekilde döner.
+ * Sunucuda okundu olsa bile o ziyaret boyunca "yeni" görünmeye devam ederler;
+ * kümeye girmeyenler olduğu gibi (aynı referans) kalır.
+ */
+export function withUnreadHighlight(
+  list: Notification[],
+  highlightedIds: ReadonlySet<string>,
+): Notification[] {
+  if (highlightedIds.size === 0) return list;
+  return list.map((n) =>
+    highlightedIds.has(n.id) && n.isRead ? { ...n, isRead: false } : n,
+  );
+}
+
 export function getTimeAgo(dateString: string, locale: string): string {
   const date = new Date(dateString);
   const diffMs = Date.now() - date.getTime();
