@@ -16,6 +16,8 @@ export const systemApi = {
   getTimingRules: () => api.get("/admin/timing-rules"),
   updateTimingRules: (changes: TimingRuleChange[]) =>
     api.patch("/admin/timing-rules", { changes }),
+  // Public policy values (return window, payout grace …) the screens quote
+  getTimingPolicy: () => api.get("/timing-rules"),
 
   // Early-access invite codes (pre-launch site lock)
   getSiteAccessPins: (params?: any) =>

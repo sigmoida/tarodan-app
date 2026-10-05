@@ -10,11 +10,13 @@ import { type PayoutTransaction } from "../_lib/types";
 import { payoutTransactionFilterFields } from "../_lib/filters";
 import { useTranslations } from "next-intl";
 import { useSession } from "@/context/SessionContext";
+import { useTimingPolicy } from "@/hooks/useTimingPolicy";
 import { ReleasePayoutModal } from "./ReleasePayoutModal";
 
 export function TransactionsTab() {
   const t = useTranslations();
   const { user } = useSession();
+  const policy = useTimingPolicy();
   const [releaseTarget, setReleaseTarget] = useState<{
     orderId: string;
     early: boolean;
@@ -31,6 +33,7 @@ export function TransactionsTab() {
           })
       : undefined,
     t,
+    policy.returnWindowDays.value,
   );
 
   return (

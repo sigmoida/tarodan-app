@@ -20,7 +20,7 @@ import { statusConfig } from "@/lib/statusLabels";
 
 type T = ReturnType<typeof useTranslations<never>>;
 
-export const scheduleColumns = (t: T) => [
+export const scheduleColumns = (t: T, returnWindowDays: number) => [
   // Sipariş no artık grup dosyasına link (düz metin kopyala-ara devri bitti).
   col.link<ScheduleItem>(
     t("admin.finance.common.order"),
@@ -51,6 +51,7 @@ export const scheduleColumns = (t: T) => [
             releaseAt: s.releaseAt,
             frozenByRefundId: s.frozenByRefundId,
           },
+          returnWindowDays,
           t,
         )}
       />
@@ -62,6 +63,7 @@ export const scheduleColumns = (t: T) => [
 export function transactionColumns(
   onRelease: ((row: PayoutTransaction, early: boolean) => void) | undefined,
   t: T,
+  returnWindowDays: number,
 ) {
   return [
     col.link<PayoutTransaction>(
@@ -140,6 +142,7 @@ export function transactionColumns(
               releaseAt: row.releaseAt,
               frozenByRefundId: row.frozenByRefundId,
             },
+            returnWindowDays,
             t,
           )}
         />

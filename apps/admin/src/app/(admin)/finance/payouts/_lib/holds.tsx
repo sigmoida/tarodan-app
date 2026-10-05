@@ -16,16 +16,17 @@ export function holdReasonForRow(
     releaseAt: string | null;
     frozenByRefundId?: string | null;
   },
+  returnWindowDays: number,
   t: T,
 ): EscrowHoldReason | null {
   if (args.status !== "held") return null;
+  // releaseAt teslimde sunucuda yazılır: varlığı "teslim edildi" demektir ve
+  // tarih ASLA yeniden hesaplanmaz.
   return describeHoldReason(
     {
       hasOpenRefund: !!args.frozenByRefundId,
       releaseAt: args.releaseAt,
-      // releaseAt teslimde yazılır: varlığı "teslim edildi" demektir; gerçek
-      // deliveredAt payload'da olmadığından bu türetme güvenli vekildir.
-      deliveredAt: args.releaseAt,
+      returnWindowDays,
     },
     t,
   );

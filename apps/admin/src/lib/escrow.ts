@@ -1,53 +1,17 @@
-import {
-  ESCROW_RELEASE_DAYS,
-  PAYOUT_GRACE_DAYS,
-  REFUND_COOLING_OFF_DAYS,
-} from "@tarodan/shared";
-
 /**
- * Escrow / payout scheduling helpers (new escrow model).
+ * Escrow / payout hold-reason helpers.
  *
- * Rule (mirrors the backend): payout to seller = delivery (deliveredAt) + 14-day
- * refund window + 1-day grace. NO payout on approval/payment; PaymentHold.releaseAt
- * is set at delivery. While a refund is open the hold is locked via frozenByRefundId
- * and cannot be released.
+ * Rule (mirrors the backend): payout to the seller happens at the hold's
+ * `releaseAt` = delivery + the order's return window + payout grace. The server
+ * stamps `PaymentHold.releaseAt` at delivery; NO payout on approval/payment.
+ * While a refund is open the hold is locked via frozenByRefundId and cannot be
+ * released.
  *
- * This module is a read-only UI computation — the backend writes the real release
- * date. The date derived from deliveredAt is shown as an "estimated release"; if the
- * payout list has a releaseAt, that real value takes precedence.
+ * This module is a read-only UI derivation. It NEVER recomputes a date from
+ * constants: the real release date comes from the server row (`releaseAt`), the
+ * window length quoted in the label comes from the Durations & Rules policy
+ * (`GET /timing-rules`, see `hooks/useTimingPolicy`).
  */
-
-// Gün sayıları @tarodan/shared'ta TEK yerde tanımlıdır (policy-constants);
-// burada yerel kopya TUTMA — sürüklenip backend'le çelişiyordu.
-export { PAYOUT_GRACE_DAYS, ESCROW_RELEASE_DAYS };
-
-/** Refund window: unconditional returns after delivery, in days. */
-export const REFUND_WINDOW_DAYS = REFUND_COOLING_OFF_DAYS;
-
-const DAY_MS = 86_400_000;
-
-/**
- * deliveredAt + 14 + 1 days → estimated release date.
- * Null if no deliveredAt (not yet delivered → escrow clock hasn't started).
- */
-export function computeEstimatedReleaseAt(
-  deliveredAt: string | Date | null | undefined,
-): Date | null {
-  if (!deliveredAt) return null;
-  const base = new Date(deliveredAt).getTime();
-  if (Number.isNaN(base)) return null;
-  return new Date(base + ESCROW_RELEASE_DAYS * DAY_MS);
-}
-
-/** End date of the refund window (delivery + 14 days). */
-export function computeRefundWindowEnd(
-  deliveredAt: string | Date | null | undefined,
-): Date | null {
-  if (!deliveredAt) return null;
-  const base = new Date(deliveredAt).getTime();
-  if (Number.isNaN(base)) return null;
-  return new Date(base + REFUND_WINDOW_DAYS * DAY_MS);
-}
 
 export type EscrowHoldReasonCode =
   "frozen" | "open_refund" | "window_not_elapsed" | "not_delivered" | "ready";
@@ -67,17 +31,20 @@ export interface EscrowHoldReasonInput {
   frozen?: boolean;
   /** Is there an open refund request for the order/hold. */
   hasOpenRefund?: boolean;
-  /** Delivery date (start of the escrow clock). */
-  deliveredAt?: string | Date | null;
-  /** Real release date (takes precedence if the backend wrote it). */
+  /**
+   * Real release date stamped by the server at delivery. Absent = the order
+   * has not been delivered yet (the escrow clock hasn't started).
+   */
   releaseAt?: string | Date | null;
+  /** Return window in days, quoted in the "not elapsed" label (policy value). */
+  returnWindowDays: number;
   /** Comparison instant (for testability). */
   now?: Date;
 }
 
 /**
  * Why is a hold waiting? Priority order:
- *   frozen > open refund > delivery+14 not elapsed > not delivered > ready.
+ *   frozen > open refund > not delivered > release date not reached > ready.
  */
 export function describeHoldReason(
   input: EscrowHoldReasonInput,
@@ -103,11 +70,9 @@ export function describeHoldReason(
     };
   }
 
-  const release = input.releaseAt
-    ? new Date(input.releaseAt)
-    : computeEstimatedReleaseAt(input.deliveredAt);
+  const release = input.releaseAt ? new Date(input.releaseAt) : null;
 
-  if (!input.deliveredAt && !input.releaseAt) {
+  if (!release) {
     return {
       code: "not_delivered",
       label: t("admin.shared.escrow.reasons.notDelivered.label"),
@@ -116,11 +81,11 @@ export function describeHoldReason(
     };
   }
 
-  if (release && release.getTime() > now.getTime()) {
+  if (release.getTime() > now.getTime()) {
     return {
       code: "window_not_elapsed",
       label: t("admin.shared.escrow.reasons.windowNotElapsed.label", {
-        days: REFUND_WINDOW_DAYS,
+        days: input.returnWindowDays,
       }),
       detail: t("admin.shared.escrow.reasons.windowNotElapsed.detail", {
         date: release.toLocaleDateString(t("common.dateLocale"), {

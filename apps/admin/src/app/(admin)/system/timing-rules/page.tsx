@@ -8,6 +8,7 @@ import { PageHeader } from "@/components/AdminList";
 import { PageLoading } from "@/components/PageLoading";
 import { AdminTabs } from "@/components/AdminTabs";
 import { SectionCard } from "@/components/detail/SectionCard";
+import { legalMismatchesOf } from "./_lib/timing-rules";
 import { useTimingRulesPage } from "./_lib/useTimingRulesPage";
 import { TimingRuleRow } from "./_components/TimingRuleRow";
 
@@ -47,6 +48,8 @@ export default function TimingRulesPage() {
   if (query.isLoading || !query.data) return <PageLoading />;
 
   const stateOf = (id: string) => states.find((state) => state.id === id);
+  // Hukuki metinlerde sabit sayı olarak geçen ve ayarla çelişen süreler.
+  const legalConflicts = legalMismatchesOf(states);
 
   return (
     <AdminPage>
@@ -60,6 +63,16 @@ export default function TimingRulesPage() {
       )}
 
       <AdminTabs tabs={tabs} value={tab} onChange={setTab} />
+
+      {legalConflicts.length > 0 && (
+        <Alert variant="warning">
+          {t("admin.timingRules.legalMismatchSummary", {
+            rules: legalConflicts
+              .map(({ id }) => t(`admin.timingRules.rules.${id}.label`))
+              .join(", "),
+          })}
+        </Alert>
+      )}
 
       {errorTabLabels.length > 0 && (
         <Alert variant="danger">
