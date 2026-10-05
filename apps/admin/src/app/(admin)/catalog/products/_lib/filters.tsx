@@ -1,5 +1,9 @@
 import { Select } from "@tarodan/ui";
 import type { FilterField, TranslateFn } from "@/components/list/filters/types";
+import {
+  removalActorFilterOptions,
+  removalReasonFilterOptions,
+} from "@/lib/listing-removal";
 
 interface Brand {
   id: string;
@@ -64,6 +68,19 @@ export const productFilterFields = (
         />
       );
     },
+  },
+  // Kaldırma nedeni / kaldıran: ilk seçenek nötr (boş) — liste süzülmüş açılmaz.
+  {
+    type: "select",
+    name: "removalReason",
+    label: t("admin.catalog.products.removal.reasonFilter"),
+    options: removalReasonFilterOptions(t),
+  },
+  {
+    type: "select",
+    name: "removalActor",
+    label: t("admin.catalog.products.removal.actorFilter"),
+    options: removalActorFilterOptions(t),
   },
   { type: "dateRange", label: t("admin.shared.filterDialog.labels.dateRange") },
 ];

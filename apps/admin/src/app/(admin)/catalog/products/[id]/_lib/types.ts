@@ -13,6 +13,10 @@ export const PACKAGE_TIER_OPTIONS = [
 
 import { useTranslations } from "next-intl";
 import type { ListingEditPayload } from "@tarodan/listing-form";
+import type {
+  AdminListingRemovalEvent,
+  AdminListingRemovalSummary,
+} from "@tarodan/types";
 
 type T = ReturnType<typeof useTranslations<never>>;
 
@@ -59,6 +63,13 @@ export interface ProductDetail {
   edit?: Pick<ListingEditPayload, "attributes"> | null;
   /** Ürüne verilen toplam teklif sayısı (tüm durumlar) — hızlı link rozeti. */
   _count?: { offers: number };
+  /** Güncel kaldırma özeti; vitrindeki ilan için `null`. */
+  removal?: AdminListingRemovalSummary | null;
+  /**
+   * Kaldırma geçmişi (yeniden eskiye) — satıcının serbest metni DAHİL; yalnız
+   * bu admin ucu döndürür.
+   */
+  removalHistory?: AdminListingRemovalEvent[];
 }
 
 export interface Review {

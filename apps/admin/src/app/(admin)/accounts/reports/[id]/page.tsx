@@ -41,7 +41,9 @@ export default function ReportDetailPage() {
   // kalmasın. Gerekçe ilgili tarafa (satıcıya / kullanıcıya) iletilir.
   const removeListing = useAdminMutation(
     (input: { productId: string; reason: string }) =>
-      adminApi.rejectProduct(input.productId, input.reason),
+      // İhlal kodu bu kısa yoldan sorulmaz: kayıt "kural ihlali, kod
+      // belirtilmedi" düşer (ürün detayındaki red formu kodu zorunlu tutar).
+      adminApi.rejectProduct(input.productId, { reason: input.reason }),
     {
       invalidates: ["reports", "products"],
       successMessage: t("admin.reports.actions.listingRemoved"),

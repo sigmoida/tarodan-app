@@ -5,6 +5,7 @@ import { AdminPage } from "@/components/page/AdminPage";
 import { PageHeader } from "@/components/AdminList";
 import { useDashboardPeriod } from "./_lib/useDashboardPeriod";
 import {
+  useDashboardListingRemovals,
   useDashboardLists,
   useDashboardStats,
   useDashboardStock,
@@ -18,6 +19,7 @@ import { DashboardRefreshButton } from "./_components/DashboardRefreshButton";
 import { QueuesZone } from "./_components/QueuesZone";
 import { AlertsZone } from "./_components/AlertsZone";
 import { DashboardStats } from "./_components/DashboardStats";
+import { ListingRemovalsPanel } from "./_components/ListingRemovalsPanel";
 import { StockZone } from "./_components/StockZone";
 import { RecentOrders } from "./_components/RecentOrders";
 import { RecentTrades } from "./_components/RecentTrades";
@@ -41,6 +43,7 @@ function PeriodZone({
 }) {
   const t = useTranslations();
   const stats = useDashboardStats(selection);
+  const removals = useDashboardListingRemovals(selection);
 
   return (
     <section className="flex flex-col gap-3">
@@ -56,6 +59,12 @@ function PeriodZone({
       <DashboardStats
         metrics={stats.data?.metrics ?? EMPTY_METRICS}
         isLoading={stats.isLoading}
+      />
+      {/* Same period, same event-stamp counting: a flow, so it belongs here. */}
+      <ListingRemovalsPanel
+        data={removals.data}
+        isLoading={removals.isLoading}
+        isError={removals.isError}
       />
     </section>
   );

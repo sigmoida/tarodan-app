@@ -15,7 +15,12 @@ export function ProductsTable() {
   const products = useMemo(() => mapProducts(rows, t), [rows, t]);
   const columns = useMemo(() => productColumns(t), [t]);
 
-  const filtered = search || filters.brandId || filters.carModelId;
+  const filtered =
+    search ||
+    filters.brandId ||
+    filters.carModelId ||
+    filters.removalReason ||
+    filters.removalActor;
 
   return (
     <DataTable

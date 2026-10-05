@@ -2,6 +2,7 @@
 
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import type {
+  DashboardListingRemovalsResponse,
   DashboardPeriodQuery,
   DashboardStatsResponse,
   DashboardStockResponse,
@@ -68,6 +69,26 @@ export function useDashboardStats(selection: DashboardPeriodSelection) {
         range: body.range ?? null,
       };
     },
+  });
+}
+
+/**
+ * Zone C breakdown — listings taken off the storefront in the SAME period as
+ * the stat cards (same selection, same event-stamp counting on the API). Its
+ * own query, so a slow or failing breakdown never blanks the cards.
+ */
+export function useDashboardListingRemovals(
+  selection: DashboardPeriodSelection,
+) {
+  const query: DashboardPeriodQuery = toPeriodQuery(selection);
+
+  return useQuery({
+    queryKey: [...adminKeys.all("dashboard-listing-removals"), query],
+    queryFn: async (): Promise<DashboardListingRemovalsResponse | null> =>
+      unwrap<DashboardListingRemovalsResponse | null>(
+        await adminApi.getDashboardListingRemovals(query),
+        null,
+      ),
   });
 }
 
@@ -150,6 +171,7 @@ export function useDashboardRefresh() {
         [
           "dashboard-worklist",
           "dashboard-stats",
+          "dashboard-listing-removals",
           "dashboard-stock",
           "dashboard-lists",
           "dashboard-top",

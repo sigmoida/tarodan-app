@@ -4,6 +4,11 @@ import type {
   CatalogImportResult,
   CatalogImportSchema,
 } from "./catalog-import.types";
+import type {
+  ProductExportParams,
+  RejectProductPayload,
+  RemoveProductPayload,
+} from "./catalog.types";
 
 type CatalogListParams = {
   page?: number;
@@ -27,19 +32,22 @@ export const catalogApi = {
     const body = note ? { note } : {};
     return api.post(`/admin/products/${id}/approve`, body);
   },
-  rejectProduct: (id: string, reason: string) =>
-    api.post(`/admin/products/${id}/reject`, { reason }),
+  /** Red: satıcıya giden gerekçe + kaldırma kaydının ihlal kodu. */
+  rejectProduct: (id: string, payload: RejectProductPayload) =>
+    api.post(`/admin/products/${id}/reject`, payload),
   bulkApproveProducts: (ids: string[], note?: string) =>
     api.post("/admin/products/bulk-approve", { ids, note }),
-  bulkRejectProducts: (ids: string[], reason: string) =>
-    api.post("/admin/products/bulk-reject", { ids, reason }),
-  deleteProduct: (id: string) => api.delete(`/admin/products/${id}`),
+  bulkRejectProducts: (
+    ids: string[],
+    reason: string,
+    violationCode?: string,
+  ) => api.post("/admin/products/bulk-reject", { ids, reason, violationCode }),
+  /** Yönetici kaldırması (yumuşak silme): ihlal kodu + açıklama gövdede. */
+  deleteProduct: (id: string, payload: RemoveProductPayload) =>
+    api.delete(`/admin/products/${id}`, { data: payload }),
   restoreProduct: (id: string) => api.post(`/admin/products/${id}/restore`),
-  exportProducts: (params?: {
-    status?: string;
-    categoryId?: string;
-    sellerId?: string;
-  }) => api.get("/admin/products-export", { params, responseType: "blob" }),
+  exportProducts: (params?: ProductExportParams) =>
+    api.get("/admin/products-export", { params, responseType: "blob" }),
   getProductImportSellers: (search?: string) =>
     api.get("/admin/products/bulk-import/sellers", {
       params: search ? { search } : undefined,
