@@ -847,7 +847,20 @@
     "optionsLoadFailed": "Seçenekler yüklenemedi — sayfayı yenileyin",
     "additionalDetails": "Ek Özellikler",
     "globalAttrsHint": "Tüm ilanlar için geçerli ek alanlar. Alıcılar bunlara göre filtreleyebilir.",
-    "requiredFieldLabel": "{name} *"
+    "requiredFieldLabel": "{name} *",
+    "removal": {
+      "deleteDescription": "İlan kalıcı olarak kaldırılır ve yeniden açılamaz. Neden kaldırdığınızı seçin.",
+      "deactivateDescription": "İlan vitrinden kalkar; istediğiniz zaman yeniden satışa açabilirsiniz. Neden pasife aldığınızı seçin.",
+      "reasonLabel": "Neden",
+      "reasonPlaceholder": "Bir neden seçin",
+      "platformLabel": "Hangi platformda sattınız?",
+      "platformPlaceholder": "Platform seçin",
+      "detailLabel": "Açıklama (isteğe bağlı)",
+      "detailRequiredLabel": "Açıklama",
+      "detailPlaceholder": "Eklemek istediğiniz bir not varsa yazın",
+      "otherPlatformPlaceholder": "Ürünü hangi platformda sattığınızı yazın",
+      "privacyNote": "Bu bilgi yalnız Tarodan ekibi tarafından görülür, ilan sayfasında gösterilmez."
+    }
   },
   "cart": {
     "myCart": "Sepetim",
@@ -2608,7 +2621,19 @@
     "discountPercentRange": "İndirim yüzdesi 1-100 arası olmalı",
     "selectCategory": "Lütfen bir kategori seçin",
     "subjectMin5": "Konu en az 5 karakter olmalıdır",
-    "messageMin10": "Mesajınız en az 10 karakter olmalıdır"
+    "messageMin10": "Mesajınız en az 10 karakter olmalıdır",
+    "listingRemoval": {
+      "reason_required": "Lütfen bir neden seçin",
+      "reason_not_allowed": "Bu neden bu işlem için seçilemez",
+      "platform_required": "Lütfen ürünü sattığınız platformu seçin",
+      "platform_invalid": "Geçersiz platform",
+      "platform_not_allowed": "Platform yalnız başka bir platformda satışta seçilebilir",
+      "violation_required": "Lütfen ihlal türünü seçin",
+      "violation_invalid": "Geçersiz ihlal türü",
+      "violation_not_allowed": "İhlal türü yalnız kural ihlalinde seçilebilir",
+      "detail_required": "Lütfen kısaca açıklayın",
+      "detail_too_long": "Açıklama en fazla {max} karakter olabilir"
+    }
   },
   "time": {
     "justNow": "Az önce",
@@ -5217,7 +5242,27 @@
         "bulkImportFileTooLarge": "{name} dosyası çok büyük. Tek dosya en fazla {size} olabilir.",
         "bulkImportTooManyImages": "En fazla {max} görsel seçebilirsiniz.",
         "bulkImportTotalTooLarge": "Seçilen dosyaların toplam boyutu {size} sınırını aşamaz.",
-        "updated": "İlan güncellendi"
+        "updated": "İlan güncellendi",
+        "removal": {
+          "column": "Kaldırma nedeni",
+          "reasonFilter": "Kaldırma nedeni",
+          "actorFilter": "Kaldıran",
+          "allReasons": "Tüm nedenler",
+          "allActors": "Tümü",
+          "historyTitle": "Kaldırma geçmişi",
+          "historyEmpty": "Bu ilan için kayıtlı bir kaldırma yok. Bu özellikten önce kaldırılan ilanların nedeni bilinmiyor.",
+          "platform": "Platform",
+          "violation": "İhlal türü",
+          "detail": "Açıklama",
+          "statusChange": "Durum",
+          "actorUser": "İşlemi yapan",
+          "noViolationCode": "Belirtilmedi",
+          "detailAdminOnly": "Satıcının açıklaması yalnız yöneticilere görünür.",
+          "violationLabel": "İhlal türü",
+          "violationPlaceholder": "İhlal türünü seçin",
+          "removeNoteLabel": "Açıklama (isteğe bağlı)",
+          "removeNotePlaceholder": "Kaldırma gerekçesini yazın (\"Diğer\" seçildiyse zorunlu)"
+        }
       },
       "import": {
         "button": "Excel ile İçe Aktar",
@@ -7705,6 +7750,18 @@
       "relativeTime": {
         "minutesAgo": "{count} dk önce",
         "hoursAgo": "{count} saat önce"
+      },
+      "removals": {
+        "title": "Vitrinden düşen ilanlar",
+        "description": "Seçili dönemde vitrinden düşen ilanlar, nedene göre. Her kaldırma gerçekleştiği anda sayılır; aynı ilan yeniden açılıp tekrar kaldırılırsa iki kez sayılır.",
+        "total": "Toplam",
+        "byReason": "Nedene göre",
+        "soldElsewhere": "Başka platformda satış",
+        "violations": "Kural ihlalleri",
+        "empty": "Bu dönemde vitrinden düşen ilan yok.",
+        "noViolationCode": "Belirtilmedi",
+        "unknownNote": "Bu özellikten önceki kaldırmaların nedeni kaydedilmediği için sayılmaz.",
+        "share": "%{share}"
       }
     },
     "analytics": {
@@ -11167,6 +11224,42 @@
       "pending_activation": "Aktivasyon Bekliyor",
       "banned": "Engelli",
       "deleted": "Silinmiş"
+    },
+    "listingRemoval": {
+      "unknown": "Bilinmiyor",
+      "reason": {
+        "not_given": "Neden belirtilmedi",
+        "changed_mind": "Vazgeçtim",
+        "sold_elsewhere": "Başka bir platformda sattım",
+        "paused_temporarily": "Geçici olarak durdurdum",
+        "expired": "İlan süresi doldu",
+        "out_of_stock": "Stok tükendi",
+        "return_quarantine": "İade kontrolü bekliyor",
+        "seller_suspended": "Satıcı hesabı askıya alındı",
+        "policy_violation": "Kural ihlali"
+      },
+      "actor": {
+        "seller": "Satıcı",
+        "system": "Sistem",
+        "admin": "Tarodan"
+      },
+      "platform": {
+        "letgo": "Letgo",
+        "instagram": "Instagram",
+        "dolap": "Dolap",
+        "sahibinden": "Sahibinden",
+        "in_person": "Elden satış",
+        "other": "Diğer"
+      },
+      "violation": {
+        "counterfeit_replica": "Sahte / replika ürün",
+        "prohibited_item": "Yasaklı ürün",
+        "misleading_content": "Yanıltıcı açıklama veya görsel",
+        "inappropriate_content": "Uygunsuz içerik",
+        "duplicate_listing": "Mükerrer ilan",
+        "wrong_category_or_price": "Yanlış kategori veya fiyat",
+        "other": "Diğer"
+      }
     }
   },
   "page": {
