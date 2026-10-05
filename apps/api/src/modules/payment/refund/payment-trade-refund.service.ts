@@ -114,6 +114,13 @@ export class PaymentTradeRefundService {
    * olabilir — silinirse `retryFailedTradeRefunds` o takası bir daha görmez ve
    * admin paneli "iade başarısız" uyarısını kaybeder. Okuma patlarsa işaret
    * korunur (yanlış alarm, kayıp iadeden iyidir).
+   *
+   * "Başka iade borcu" yalnız İPTAL edilmiş takasta anlamlıdır: orada diğer
+   * tarafın tamamlanmış, iade edilmemiş satırı gerçekten iade borcudur. İtiraz
+   * çözümünde (takas `disputed`, tek tarafa tazminat) diğer tarafın satırı
+   * alıcısına BIRAKILACAKTIR, iade borcu değildir — sayılsaydı başarılı
+   * tazminat iadesi bayat işareti silemezdi. Diğer statülerde kapsamlı çağrı
+   * eskisi gibi temizler.
    */
   private async mayClearRefundFailure(
     tradeId: string,
@@ -121,6 +128,11 @@ export class PaymentTradeRefundService {
   ): Promise<boolean> {
     if (!opts?.payerId) return true;
     try {
+      const trade = await this.prisma.trade.findUnique({
+        where: { id: tradeId },
+        select: { status: true },
+      });
+      if (trade?.status !== TradeStatus.cancelled) return true;
       const outstanding = await this.prisma.payment.count({
         where: await this.refundablePaymentsWhere(tradeId),
       });
