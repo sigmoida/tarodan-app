@@ -673,26 +673,38 @@ export class ProductSchedulerService implements OnModuleInit {
       const expired: typeof due = [];
       const renewed: string[] = [];
       const renewNow = new Date();
+      // Tek ilanın yazım hatası turu yarıda kesmez: hata sayılır, döngü sürer.
+      // Yazılmış ilanların yan etkileri (dizin/önbellek, e-posta) aşağıda her
+      // durumda çalışır; yoksa artık `active` olmadıkları için bir sonraki tur
+      // onları seçmez ve satıcı haberdar edilmeden aramada görünür kalırlardı.
+      let failed = 0;
       for (const listing of due) {
-        if (
-          action === "auto_renew" &&
-          isRenewableInPlace(listing, listing.seller)
-        ) {
+        try {
+          if (
+            action === "auto_renew" &&
+            isRenewableInPlace(listing, listing.seller)
+          ) {
+            const res = await this.prisma.product.updateMany({
+              where: { ...expiryWhere, id: listing.id },
+              data: { publishedAt: renewNow },
+            });
+            if (res.count > 0) renewed.push(listing.id);
+            continue;
+          }
           const res = await this.prisma.product.updateMany({
             where: { ...expiryWhere, id: listing.id },
-            data: { publishedAt: renewNow },
+            data: {
+              status: ProductStatus.inactive,
+              inactiveReason: ProductInactiveReason.expired,
+            },
           });
-          if (res.count > 0) renewed.push(listing.id);
-          continue;
+          if (res.count > 0) expired.push(listing);
+        } catch (err: unknown) {
+          failed += 1;
+          this.logger.error(
+            `expire-old-listings failed for listing ${listing.id}: ${errorMessage(err)}`,
+          );
         }
-        const res = await this.prisma.product.updateMany({
-          where: { ...expiryWhere, id: listing.id },
-          data: {
-            status: ProductStatus.inactive,
-            inactiveReason: ProductInactiveReason.expired,
-          },
-        });
-        if (res.count > 0) expired.push(listing);
       }
 
       if (expired.length > 0 || renewed.length > 0) {
@@ -740,6 +752,13 @@ export class ProductSchedulerService implements OnModuleInit {
       log(
         `${expired.length} eski ilan pasif yapıldı, ${renewed.length} ilan otomatik yenilendi (>${ttlDays} gün)`,
       );
+      if (failed > 0) {
+        // Tüm ilanlar ve yan etkileri işlendikten SONRA yükselt: tracked job
+        // "failed" olsun (Sentry cron alarmı), kalan ilanlar yine de işlenmiş olsun.
+        throw new Error(
+          `${failed} ilan işlenemedi (${expired.length} pasife alındı, ${renewed.length} yenilendi)`,
+        );
+      }
       return {
         summary: `${expired.length} eski ilan pasif yapıldı · ${renewed.length} yenilendi`,
         stats: { expired: expired.length, renewed: renewed.length },

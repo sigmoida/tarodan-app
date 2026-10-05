@@ -193,6 +193,69 @@ describe("ProductSchedulerService — ilan ömrü süreleri", () => {
     });
   });
 
+  describe("ilan başına hata yalıtımı", () => {
+    it("bir ilanın yazımı patlarsa diğerleri yan etkileriyle işlenir ve tur yine de reddedilir", async () => {
+      const { service, prisma, notifications, search } = makeService({}, [
+        dueListing({ id: "a" }),
+        dueListing({ id: "bad" }),
+        dueListing({ id: "c" }),
+      ]);
+      prisma.product.updateMany.mockImplementation(
+        async ({ where }: { where: { id: string } }) => {
+          if (where.id === "bad") throw new Error("db down");
+          return { count: 1 };
+        },
+      );
+
+      await expect(service.runExpireOldListings()).rejects.toThrow(
+        /1 ilan işlenemedi \(2 pasife alındı, 0 yenilendi\)/,
+      );
+
+      expect(prisma.product.updateMany).toHaveBeenCalledTimes(3);
+      expect(search.syncProduct.mock.calls.map((c) => c[0]).sort()).toEqual([
+        "a",
+        "c",
+      ]);
+      expect(notifications.sendTemplateEmailToUser).toHaveBeenCalledTimes(2);
+    });
+
+    it("hata sonrası bile önceki ilanın dizin/önbellek tazelemesi yapılır", async () => {
+      const { service, prisma, cache } = makeService({}, [
+        dueListing({ id: "a" }),
+        dueListing({ id: "bad" }),
+      ]);
+      prisma.product.updateMany.mockImplementation(
+        async ({ where }: { where: { id: string } }) => {
+          if (where.id === "bad") throw new Error("db down");
+          return { count: 1 };
+        },
+      );
+
+      await expect(service.runExpireOldListings()).rejects.toThrow();
+
+      expect(cache.del).toHaveBeenCalledWith("products:detail:a");
+      expect(cache.del).not.toHaveBeenCalledWith("products:detail:bad");
+    });
+
+    it("auto_renew dalında da aynı: patlayan ilan sayılır, kalanlar yenilenir, tur reddedilir", async () => {
+      const { service, prisma } = makeService(
+        { listing_ttl_days_on_expiry: "auto_renew" },
+        [dueListing({ id: "bad" }), dueListing({ id: "ok" })],
+      );
+      prisma.product.updateMany.mockImplementation(
+        async ({ where }: { where: { id: string } }) => {
+          if (where.id === "bad") throw new Error("db down");
+          return { count: 1 };
+        },
+      );
+
+      await expect(service.runExpireOldListings()).rejects.toThrow(
+        /1 ilan işlenemedi \(0 pasife alındı, 1 yenilendi\)/,
+      );
+      expect(prisma.product.updateMany).toHaveBeenCalledTimes(2);
+    });
+  });
+
   describe("auto_renew eylemi", () => {
     const autoRenew = { listing_ttl_days_on_expiry: "auto_renew" };
 
