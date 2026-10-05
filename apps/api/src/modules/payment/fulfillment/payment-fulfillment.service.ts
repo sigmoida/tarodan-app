@@ -53,6 +53,28 @@ export interface ProviderPaymentData {
   currency?: string;
 }
 
+/**
+ * Takas nakit ödemesi tx'inin sonucu — commit sonrası adımlar YALNIZ buna göre
+ * dallanır, böylece "iptal edilmiş takas" dalına iade yükü olmadan girilemez.
+ * - `not_claimed`: ödeme zaten tamamlanmıştı (idempotent tekrar / yarış).
+ * - `cancelled_trade`: takas bu ödeme yoldayken iptal edildi; `refund` iadeye
+ *   verilecek satırdır (aynı tx'te kuyruğa da alındı).
+ * - `completed`: olağan tamamlama; `shipping` doluysa takas bu callback'le
+ *   kargoya alındı (sevkiyat duyurusu + inbound etiketleri tetiklenir).
+ */
+type TradeCashCompletion =
+  | { kind: "not_claimed" }
+  | { kind: "cancelled_trade"; refund: TradeCancelledPaymentRefundPayload }
+  | {
+      kind: "completed";
+      shipping: {
+        tradeId: string;
+        initiatorId: string;
+        receiverId: string;
+        shippingDeadline: Date;
+      } | null;
+    };
+
 /** Başarısız ödeme yüzünden kapanan siparişin iptal kaydı: kim ve (varsa) neden. */
 export interface FailedPaymentCancellation {
   by: CancellationActor;
@@ -997,116 +1019,119 @@ export class PaymentFulfillmentService {
       "tradeShippingDays",
     );
 
-    const result = await this.prisma.$transaction(async (tx) => {
-      // Faz 8.3: tekil/grup ile ORTAK claim (audit trail dahil — takas ödemesi de artık
-      // tutarlı şekilde denetim izine yazılır; eskiden auditHistory eklenmiyordu).
-      const claimed = await this.claimPaymentCompleted(tx, payment, {
-        transactionId,
-        capturedMerchantOid,
-        providerData,
-      });
-      if (!claimed) {
-        return { didComplete: false } as const;
-      }
-
-      // Takas satırı, ödeme satırına dokunmadan ÖNCE kilitlenir: iptal yolları
-      // (kullanıcı, süre dolumu, platform) aynı sırayla kilitler (takas →
-      // ödeme satırı). Böylece "takas iptal mi?" sorusu aşağıda kesin cevaplanır
-      // — yarışan bir iptal ya önce commit olur (burada `cancelled` görülür ve
-      // ödeme iade edilir) ya da bu tx'ten sonra gelir (ödemeyi `completed`
-      // görür ve kendi iadesine katar). Ters kilit sırası kilitlenmeye de yol
-      // açardı.
-      const tcpRef = await tx.tradeCashPayment.findUnique({
-        where: { id: payment.tradeCashPaymentId },
-        select: { tradeId: true },
-      });
-      if (tcpRef) {
-        await tx.$queryRaw`SELECT id FROM trades WHERE id = ${tcpRef.tradeId} FOR UPDATE`;
-      }
-
-      const tcp = await tx.tradeCashPayment.update({
-        where: { id: payment.tradeCashPaymentId },
-        data: {
-          status: PaymentStatus.completed,
-          providerPaymentId: transactionId || payment.providerPaymentId,
-          paidAt: new Date(),
-        },
-      });
-
-      // Safe-trade geçişi: awaiting_payment -> shipping_to_warehouse.
-      //
-      // v2'de takasın İKİ ödemesi vardır ve depo süreci ancak İKİSİ de
-      // tamamlanınca başlar: tek taraf ödediğinde ürünler kargoya çıkmaz.
-      // İki callback aynı anda gelebileceği için sayım bu tx İÇİNDE yapılır ve
-      // geçiş `version` guard'ıyla yazılır — yarışan ikinci callback'in update'i
-      // 0 satır etkiler, ikinci kez sevkiyat tetiklenmez.
-      const trade = await tx.trade.findUnique({ where: { id: tcp.tradeId } });
-      const siblingPayments = await tx.tradeCashPayment.findMany({
-        where: { tradeId: tcp.tradeId },
-        select: { status: true },
-      });
-      const fullyPaid = isTradeFullyPaid(siblingPayments);
-      let tradeTransitioned = false;
-      let shippingDeadline: Date | null = null;
-
-      // Takas bu ödeme yoldayken iptal edildi: iptalin iadesi bu satırı (o an
-      // tamamlanmamıştı) kapsamadı. Para burada kalamaz — mevcut izlenen iade
-      // yoluna verilir; iş bu tx'le ATOMİK kuyruğa girer (çökmede drainer).
-      if (trade && trade.status === TradeStatus.cancelled) {
-        const cancelledTradeRefund: TradeCancelledPaymentRefundPayload = {
-          tradeId: trade.id,
-          payerId: tcp.payerId,
-          tradeCashPaymentId: tcp.id,
-        };
-        await this.outbox?.enqueue(tx, {
-          type: OUTBOX_TRADE_CANCELLED_PAYMENT_REFUND,
-          payload: { ...cancelledTradeRefund },
-          dedupeKey: tradeCancelledPaymentRefundDedupeKey(tcp.id),
+    const result = await this.prisma.$transaction(
+      async (tx): Promise<TradeCashCompletion> => {
+        // Faz 8.3: tekil/grup ile ORTAK claim (audit trail dahil — takas ödemesi de artık
+        // tutarlı şekilde denetim izine yazılır; eskiden auditHistory eklenmiyordu).
+        const claimed = await this.claimPaymentCompleted(tx, payment, {
+          transactionId,
+          capturedMerchantOid,
+          providerData,
         });
-        return {
-          didComplete: true,
-          tradeTransitioned: false,
-          cancelledTradeRefund,
-        } as const;
-      }
-
-      if (trade && trade.status === TradeStatus.awaiting_payment && fullyPaid) {
-        const now = new Date();
-        shippingDeadline = new Date(now);
-        shippingDeadline.setDate(shippingDeadline.getDate() + shippingDays);
-
-        const moved = await tx.trade.updateMany({
-          where: {
-            id: trade.id,
-            version: trade.version,
-            status: TradeStatus.awaiting_payment,
-          },
-          data: {
-            status: TradeStatus.shipping_to_warehouse,
-            shippingDeadline,
-            version: { increment: 1 },
-          },
-        });
-        // Yarışı KAYBEDEN callback burada 0 satır günceller ve sevkiyatı
-        // tetiklemez (aksi halde etiketler iki kez oluşurdu).
-        if (moved.count === 0) {
-          return { didComplete: true, tradeTransitioned: false } as const;
+        if (!claimed) {
+          return { kind: "not_claimed" };
         }
 
-        // Etiketler + Sürat sevkiyatı tx SONRASI tek kaynaktan
-        // (TradeService.createInboundTradeShipments) yapılır — aşağıda çağrılıyor.
-        tradeTransitioned = true;
-      }
+        // Takas satırı, ödeme satırına dokunmadan ÖNCE kilitlenir: iptal yolları
+        // (kullanıcı, süre dolumu, platform) aynı sırayla kilitler (takas →
+        // ödeme satırı). Böylece "takas iptal mi?" sorusu aşağıda kesin cevaplanır
+        // — yarışan bir iptal ya önce commit olur (burada `cancelled` görülür ve
+        // ödeme iade edilir) ya da bu tx'ten sonra gelir (ödemeyi `completed`
+        // görür ve kendi iadesine katar). Ters kilit sırası kilitlenmeye de yol
+        // açardı.
+        const tcpRef = await tx.tradeCashPayment.findUnique({
+          where: { id: payment.tradeCashPaymentId },
+          select: { tradeId: true },
+        });
+        if (tcpRef) {
+          await tx.$queryRaw`SELECT id FROM trades WHERE id = ${tcpRef.tradeId} FOR UPDATE`;
+        }
 
-      return {
-        didComplete: true,
-        tradeTransitioned,
-        trade,
-        shippingDeadline,
-      } as const;
-    });
+        const tcp = await tx.tradeCashPayment.update({
+          where: { id: payment.tradeCashPaymentId },
+          data: {
+            status: PaymentStatus.completed,
+            providerPaymentId: transactionId || payment.providerPaymentId,
+            paidAt: new Date(),
+          },
+        });
 
-    if (!result.didComplete) {
+        // Safe-trade geçişi: awaiting_payment -> shipping_to_warehouse.
+        //
+        // v2'de takasın İKİ ödemesi vardır ve depo süreci ancak İKİSİ de
+        // tamamlanınca başlar: tek taraf ödediğinde ürünler kargoya çıkmaz.
+        // İki callback aynı anda gelebileceği için sayım bu tx İÇİNDE yapılır ve
+        // geçiş `version` guard'ıyla yazılır — yarışan ikinci callback'in update'i
+        // 0 satır etkiler, ikinci kez sevkiyat tetiklenmez.
+        const trade = await tx.trade.findUnique({ where: { id: tcp.tradeId } });
+        const siblingPayments = await tx.tradeCashPayment.findMany({
+          where: { tradeId: tcp.tradeId },
+          select: { status: true },
+        });
+        const fullyPaid = isTradeFullyPaid(siblingPayments);
+
+        // Takas bu ödeme yoldayken iptal edildi: iptalin iadesi bu satırı (o an
+        // tamamlanmamıştı) kapsamadı. Para burada kalamaz — mevcut izlenen iade
+        // yoluna verilir; iş bu tx'le ATOMİK kuyruğa girer (çökmede drainer).
+        if (trade && trade.status === TradeStatus.cancelled) {
+          const refund: TradeCancelledPaymentRefundPayload = {
+            tradeId: trade.id,
+            payerId: tcp.payerId,
+            tradeCashPaymentId: tcp.id,
+          };
+          await this.outbox?.enqueue(tx, {
+            type: OUTBOX_TRADE_CANCELLED_PAYMENT_REFUND,
+            payload: { ...refund },
+            dedupeKey: tradeCancelledPaymentRefundDedupeKey(tcp.id),
+          });
+          return { kind: "cancelled_trade", refund };
+        }
+
+        if (
+          trade &&
+          trade.status === TradeStatus.awaiting_payment &&
+          fullyPaid
+        ) {
+          const now = new Date();
+          const shippingDeadline = new Date(now);
+          shippingDeadline.setDate(shippingDeadline.getDate() + shippingDays);
+
+          const moved = await tx.trade.updateMany({
+            where: {
+              id: trade.id,
+              version: trade.version,
+              status: TradeStatus.awaiting_payment,
+            },
+            data: {
+              status: TradeStatus.shipping_to_warehouse,
+              shippingDeadline,
+              version: { increment: 1 },
+            },
+          });
+          // Yarışı KAYBEDEN callback burada 0 satır günceller ve sevkiyatı
+          // tetiklemez (aksi halde etiketler iki kez oluşurdu).
+          if (moved.count === 0) {
+            return { kind: "completed", shipping: null };
+          }
+
+          // Etiketler + Sürat sevkiyatı tx SONRASI tek kaynaktan
+          // (TradeService.createInboundTradeShipments) yapılır — aşağıda çağrılıyor.
+          return {
+            kind: "completed",
+            shipping: {
+              tradeId: trade.id,
+              initiatorId: trade.initiatorId,
+              receiverId: trade.receiverId,
+              shippingDeadline,
+            },
+          };
+        }
+
+        return { kind: "completed", shipping: null };
+      },
+    );
+
+    if (result.kind === "not_claimed") {
       return false;
     }
 
@@ -1124,8 +1149,8 @@ export class PaymentFulfillmentService {
 
     // İptal edilmiş takasa gelen ödeme: yakalamadan SONRA (defter ters kaydı
     // yakalamayı bulsun) iade edilir. Kuyruktaki işin sahibi olarak hemen.
-    if ("cancelledTradeRefund" in result) {
-      await this.refundPaymentOfCancelledTrade(result.cancelledTradeRefund);
+    if (result.kind === "cancelled_trade") {
+      await this.refundPaymentOfCancelledTrade(result.refund);
       return true;
     }
 
@@ -1134,16 +1159,17 @@ export class PaymentFulfillmentService {
     // ödeme sonrası/depo öncesi olduğundan, iptalde henüz fatura kesilmemiş olur (iade faturası gerekmez).
 
     // İşlem tamamlandıktan sonra bildirim emit et (her iki tarafa)
-    if (result.tradeTransitioned && result.trade && result.shippingDeadline) {
+    const shipping = result.shipping;
+    if (shipping) {
       try {
         await this.eventService.emitTradeReadyForShipping({
-          tradeId: result.trade.id,
-          initiatorId: result.trade.initiatorId,
-          receiverId: result.trade.receiverId,
-          shippingDeadline: result.shippingDeadline,
+          tradeId: shipping.tradeId,
+          initiatorId: shipping.initiatorId,
+          receiverId: shipping.receiverId,
+          shippingDeadline: shipping.shippingDeadline,
         });
         this.logger.log(
-          `trade.ready-for-shipping event emitted for trade ${result.trade.id}`,
+          `trade.ready-for-shipping event emitted for trade ${shipping.tradeId}`,
         );
       } catch (error) {
         // Log but don't fail - payment was already completed
@@ -1157,7 +1183,7 @@ export class PaymentFulfillmentService {
       // ediliyordu (Trade↔Payment döngüsünü aşmak için). Artık in-process event yayınlanıp
       // Trade tarafındaki dinleyici (TradeCashClearedListener) createInboundTradeShipments'ı
       // çağırır → Payment, Trade'e statik veya runtime bağımlılık taşımaz (döngü tamamen kalktı).
-      this.eventService.emitTradeCashCleared({ tradeId: result.trade.id });
+      this.eventService.emitTradeCashCleared({ tradeId: shipping.tradeId });
     }
 
     return true;
