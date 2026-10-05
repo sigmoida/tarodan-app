@@ -22,19 +22,26 @@ import {
   Table,
   TableHeader,
   TableBody,
+  TableFooter,
   TableRow,
   TableHead,
   TableCell,
+  cn,
 } from "@tarodan/ui";
 import { type SetSort, type SortState } from "@/components/table/meta";
 import { SortableHeader } from "@/components/table/SortableHeader";
 import {
   computeColumnLayout,
+  flattenColumns,
   SELECTABLE_COLUMN_WIDTH,
 } from "@/components/table/columnLayout";
 import { ResourceListContext } from "@/context/ResourceListContext";
 
 export type { ColumnDef };
+
+/** Tablo ve boş-durum kartının ortak çerçevesi (tek kaynak). */
+const TABLE_FRAME =
+  "rounded-lg border border-border bg-surface-elevated shadow-sm";
 
 export interface DataTableProps<T> {
   columns: ColumnDef<T, any>[];
@@ -70,6 +77,11 @@ export interface DataTableProps<T> {
    * carries `meta.sortable` — legacy tables (no handler / no meta) are untouched.
    */
   onSort?: SetSort;
+  // ── Görünüm (optional) ──
+  /** `<tfoot>` içine basılır; çağıran `TableRow`/`TableCell` verir (örn. toplam satırı). */
+  footer?: ReactNode;
+  /** Gömülü tablolar için daha sıkı satır/başlık dolgusu. */
+  dense?: boolean;
 }
 
 /**
@@ -96,6 +108,8 @@ export function DataTable<T>({
   expandAll = false,
   sort,
   onSort,
+  footer,
+  dense = false,
 }: DataTableProps<T>) {
   const t = useTranslations();
   const resolvedEmptyText = emptyText ?? t("admin.shared.table.noRecords");
@@ -121,16 +135,21 @@ export function DataTable<T>({
     selectable &&
     rowIds.length > 0 &&
     rowIds.every((id) => selectedIds.includes(id));
-  const colSpan = columns.length + (selectable ? 1 : 0);
+  // Gruplu kolonlarda boyut/colSpan yaprak kolonlar üzerinden hesaplanır.
+  const leafColumns = useMemo(() => flattenColumns(columns), [columns]);
+  const colSpan = leafColumns.length + (selectable ? 1 : 0);
 
   // `columns` is a module-level static array per the `col.*` factory
   // convention, so this only actually needs to recompute when it or
   // `selectable` change — not on every unrelated re-render (search-box
   // keystrokes, row hover/selection, the isRefetching dim/undim).
   const { hasSizing, tableMinWidth, widthOf, alignOf } = useMemo(
-    () => computeColumnLayout(columns, selectable),
-    [columns, selectable],
+    () => computeColumnLayout(leafColumns, selectable),
+    [leafColumns, selectable],
   );
+  // Sıkı mod: hücre/başlık dolgusu (twMerge ile ui varsayılanını ezer).
+  const cellDensity = dense ? "py-2" : undefined;
+  const headDensity = dense ? "h-9" : undefined;
 
   // Initial load (no data yet) shows a full spinner; on search/filter refetch the
   // existing rows are kept and slightly dimmed (keepPreviousData behavior).
@@ -142,14 +161,14 @@ export function DataTable<T>({
   // alanın dışına kayıyordu.)
   if (!loading && data.length === 0) {
     return (
-      <div className="rounded-lg border border-border bg-surface-elevated shadow-sm">
+      <div className={TABLE_FRAME}>
         <EmptyState title={resolvedEmptyText} action={emptyAction} />
       </div>
     );
   }
 
   return (
-    <div className="overflow-hidden rounded-lg border border-border bg-surface-elevated shadow-sm">
+    <div className={cn(TABLE_FRAME, "overflow-hidden")}>
       <div className="overflow-x-auto overscroll-x-contain [-webkit-overflow-scrolling:touch]">
         <Table
           scrollable={false}
@@ -161,18 +180,23 @@ export function DataTable<T>({
               {selectable && (
                 <col style={{ width: `${SELECTABLE_COLUMN_WIDTH}px` }} />
               )}
-              {columns.map((c, i) => (
+              {leafColumns.map((c, i) => (
                 <col key={c.id ?? i} style={{ width: widthOf(c) }} />
               ))}
             </colgroup>
           )}
           <TableHeader>
-            {table.getHeaderGroups().map((hg) => (
+            {table.getHeaderGroups().map((hg, groupIndex, groups) => (
               <TableRow key={hg.id}>
                 {/* w-11 = 44px, matching SELECTABLE_COLUMN_WIDTH — see
-                    columnLayout.ts for why this can't be the same constant. */}
-                {selectable && (
-                  <TableHead className="w-11">
+                    columnLayout.ts for why this can't be the same constant.
+                    Gruplu başlıkta onay kutusu yalnız ilk satırda, tüm
+                    başlık satırlarını kapsayacak şekilde çizilir. */}
+                {selectable && groupIndex === 0 && (
+                  <TableHead
+                    className={cn("w-11", headDensity)}
+                    rowSpan={groups.length}
+                  >
                     <Checkbox
                       checked={!!allSelected}
                       onChange={() => onToggleAll?.(rowIds)}
@@ -187,9 +211,13 @@ export function DataTable<T>({
                   return (
                     <TableHead
                       key={h.id}
-                      className={["whitespace-nowrap", alignOf(meta?.align)]
-                        .filter(Boolean)
-                        .join(" ")}
+                      colSpan={h.colSpan}
+                      className={cn(
+                        "whitespace-nowrap",
+                        headDensity,
+                        // Grup başlığı kapsadığı kolonların üstünde ortalanır.
+                        h.colSpan > 1 ? "text-center" : alignOf(meta?.align),
+                      )}
                     >
                       {h.isPlaceholder ? null : canSort ? (
                         <SortableHeader
@@ -264,7 +292,10 @@ export function DataTable<T>({
                         .join(" ")}
                     >
                       {selectable && (
-                        <TableCell onClick={(e) => e.stopPropagation()}>
+                        <TableCell
+                          className={cellDensity}
+                          onClick={(e) => e.stopPropagation()}
+                        >
                           <Checkbox
                             checked={selectedIds.includes(id)}
                             onChange={() => onToggleRow?.(id)}
@@ -275,7 +306,10 @@ export function DataTable<T>({
                       {row.getVisibleCells().map((cell) => (
                         <TableCell
                           key={cell.id}
-                          className={alignOf(cell.column.columnDef.meta?.align)}
+                          className={cn(
+                            cellDensity,
+                            alignOf(cell.column.columnDef.meta?.align),
+                          )}
                         >
                           {flexRender(
                             cell.column.columnDef.cell,
@@ -298,6 +332,7 @@ export function DataTable<T>({
               })
             )}
           </TableBody>
+          {footer && <TableFooter>{footer}</TableFooter>}
         </Table>
       </div>
     </div>

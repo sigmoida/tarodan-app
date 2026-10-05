@@ -50,6 +50,38 @@ export function fmtNumber(value?: number | string | null): string | undefined {
   return Number.isFinite(n) ? numFmt.format(n) : undefined;
 }
 
+/** `%12`, `%12,5` — Türkçe yazım: işaret önde, ondalık virgül. */
+export function fmtPercent(
+  value?: number | string | null,
+  fractionDigits = 0,
+): string | undefined {
+  if (value == null || value === "") return undefined;
+  const n = Number(value);
+  if (!Number.isFinite(n)) return undefined;
+  const formatted = new Intl.NumberFormat("tr-TR", {
+    minimumFractionDigits: fractionDigits,
+    maximumFractionDigits: fractionDigits,
+  }).format(n);
+  return `%${formatted}`;
+}
+
+const FILE_SIZE_UNITS = ["B", "KB", "MB", "GB", "TB"] as const;
+
+/** `1,2 MB` — 1024 tabanlı; bayt için ondalık yok, diğer birimlerde en çok 1. */
+export function fmtFileSize(bytes?: number | null): string | undefined {
+  if (bytes == null || !Number.isFinite(bytes) || bytes < 0) return undefined;
+  let size = bytes;
+  let unit = 0;
+  while (size >= 1024 && unit < FILE_SIZE_UNITS.length - 1) {
+    size /= 1024;
+    unit += 1;
+  }
+  const formatted = new Intl.NumberFormat("tr-TR", {
+    maximumFractionDigits: unit === 0 ? 0 : 1,
+  }).format(size);
+  return `${formatted} ${FILE_SIZE_UNITS[unit]}`;
+}
+
 /** `03.07.2026` — short date (narrow in tables). */
 export function fmtDate(
   value?: string | number | Date | null,

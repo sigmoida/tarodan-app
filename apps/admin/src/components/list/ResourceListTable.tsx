@@ -14,6 +14,8 @@ export function ResourceListTable<T>({
   expandedId,
   emptyText,
   emptyAction,
+  footer,
+  dense,
 }: {
   columns: ColumnDef<T, any>[];
   onRowClick?: (row: T) => void;
@@ -22,6 +24,8 @@ export function ResourceListTable<T>({
   expandedId?: string | null;
   emptyText?: string;
   emptyAction?: ReactNode;
+  footer?: ReactNode;
+  dense?: boolean;
 }) {
   const {
     rows,
@@ -54,6 +58,8 @@ export function ResourceListTable<T>({
       onToggleAll={selection.toggleAll}
       sort={sort}
       onSort={setSort}
+      footer={footer}
+      dense={dense}
     />
   );
 }

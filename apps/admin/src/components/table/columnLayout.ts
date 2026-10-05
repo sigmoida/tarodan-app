@@ -15,6 +15,19 @@ const ALIGN_CLASS: Record<CellAlign, string> = {
  */
 export const SELECTABLE_COLUMN_WIDTH = 44;
 
+/**
+ * Gruplu (`{ header, columns: [...] }`) kolonları yaprak kolonlara açar — tablo
+ * boyutlama (`colgroup`), `colSpan` ve CSV yalnız yaprakları sayar; grup başlığı
+ * yalnız üst başlık satırında çizilir.
+ */
+export function flattenColumns<T>(
+  columns: ColumnDef<T, any>[],
+): ColumnDef<T, any>[] {
+  return columns.flatMap((c) =>
+    "columns" in c && c.columns ? flattenColumns(c.columns) : [c],
+  );
+}
+
 export interface ColumnLayout<T> {
   /**
    * Sizing is opt-in: true when columns come from the `col.*` factory (carry

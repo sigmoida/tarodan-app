@@ -1,8 +1,7 @@
 "use client";
 
 import clsx from "clsx";
-import { Button } from "@tarodan/ui";
-import { ArrowPathIcon } from "@heroicons/react/24/outline";
+import { Button, Spinner } from "@tarodan/ui";
 import { extractErrorMessage } from "@/lib/error";
 import { useTranslations } from "next-intl";
 
@@ -46,7 +45,7 @@ export function EmailPreviewPane({
         </span>
         {isPending && (
           <span className="flex items-center gap-1 text-xs text-muted">
-            <ArrowPathIcon className="h-3 w-3 animate-spin" />{" "}
+            <Spinner size="sm" className="h-3 w-3" />{" "}
             {t("common.updating")}
           </span>
         )}
@@ -104,7 +103,7 @@ export function EmailPreviewPane({
         </div>
       ) : (
         <div className="flex flex-1 items-center justify-center">
-          <ArrowPathIcon className="h-6 w-6 animate-spin text-muted" />
+          <Spinner size="md" />
         </div>
       )}
     </div>
