@@ -5261,7 +5261,8 @@
           "violationLabel": "İhlal türü",
           "violationPlaceholder": "İhlal türünü seçin",
           "removeNoteLabel": "Açıklama (isteğe bağlı)",
-          "removeNotePlaceholder": "Kaldırma gerekçesini yazın (\"Diğer\" seçildiyse zorunlu)"
+          "removeNotePlaceholder": "Kaldırma gerekçesini yazın (\"Diğer\" seçildiyse zorunlu)",
+          "notFromStorefront": "İlan bu sırada vitrinde değildi — dashboard'da vitrinden düşüş olarak sayılmaz."
         }
       },
       "import": {
@@ -7753,7 +7754,7 @@
       },
       "removals": {
         "title": "Vitrinden düşen ilanlar",
-        "description": "Seçili dönemde vitrinden düşen ilanlar, nedene göre. Her kaldırma gerçekleştiği anda sayılır; aynı ilan yeniden açılıp tekrar kaldırılırsa iki kez sayılır.",
+        "description": "Seçili dönemde vitrinden düşen ilanlar, nedene göre. Yalnız yayındaki bir ilanın düşüşü sayılır, gerçekleştiği anda; ilan yeniden yayına girip tekrar düşerse iki kez sayılır. Zaten vitrin dışındaki ilanın sonraki kaldırması (ör. süresi dolmuş ilanın silinmesi) sayılmaz.",
         "total": "Toplam",
         "byReason": "Nedene göre",
         "soldElsewhere": "Başka platformda satış",

@@ -5261,7 +5261,8 @@
           "violationLabel": "Violation",
           "violationPlaceholder": "Choose the violation",
           "removeNoteLabel": "Note (optional)",
-          "removeNotePlaceholder": "Explain the removal (required when \"Other\" is chosen)"
+          "removeNotePlaceholder": "Explain the removal (required when \"Other\" is chosen)",
+          "notFromStorefront": "The listing was not on the storefront at the time — not counted as leaving it on the dashboard."
         }
       },
       "import": {
@@ -7753,7 +7754,7 @@
       },
       "removals": {
         "title": "Listings taken off the storefront",
-        "description": "Listings that left the storefront in the selected period, by reason. Each removal counts at the moment it happened; a listing reopened and removed again counts twice.",
+        "description": "Listings that left the storefront in the selected period, by reason. Only a live listing leaving counts, at the moment it happened; a listing that goes live again and leaves again counts twice. A later removal of a listing already off the storefront (e.g. deleting an expired listing) is not counted.",
         "total": "Total",
         "byReason": "By reason",
         "soldElsewhere": "Sold on another platform",

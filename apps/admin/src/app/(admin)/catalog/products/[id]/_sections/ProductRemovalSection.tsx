@@ -96,6 +96,12 @@ function RemovalEventRow({ event }: { event: AdminListingRemovalEvent }) {
           {event.detail}
         </p>
       )}
+      {!event.fromStorefront && (
+        // Kayıt geçmişte kalır ama dashboard'daki vitrinden düşüş sayısına girmez.
+        <p className="text-xs text-subtle">
+          {t("admin.catalog.products.removal.notFromStorefront")}
+        </p>
+      )}
       <p className="text-xs text-muted">
         {t("admin.catalog.products.removal.statusChange")}:{" "}
         {statusLabel(productStatusConfig, event.statusBefore, t)} →{" "}
