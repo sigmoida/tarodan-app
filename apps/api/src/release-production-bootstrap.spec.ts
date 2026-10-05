@@ -18,6 +18,8 @@ describe("production reference-data bootstrap", () => {
     "maintenance/verify-production-launch.ts",
   );
   const launchSeedPath = resolve(apiRoot, "prisma/seed-launch.ts");
+  // Katalog/depo/ilan yazımı UAT seed'iyle paylaşılan çekirdekte yaşar.
+  const launchCorePath = resolve(apiRoot, "prisma/seed-launch-core.ts");
   const resetWorkflowPath = resolve(
     repoRoot,
     ".github/workflows/production-reset.yml",
@@ -128,7 +130,9 @@ describe("production reference-data bootstrap", () => {
 
   it("seeds the launch catalog from data files, independently of the demo seed", () => {
     expect(existsSync(launchSeedPath)).toBe(true);
-    const source = readFileSync(launchSeedPath, "utf8");
+    const source =
+      readFileSync(launchSeedPath, "utf8") +
+      readFileSync(launchCorePath, "utf8");
 
     expect(source).toContain('process.env.APP_ENV !== "production"');
     expect(source).toContain("LAUNCH_SELLER_PASSWORD");
