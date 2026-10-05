@@ -21,6 +21,12 @@ import { SHIPPABLE_ORDER_STATUSES } from "../../order/helpers/order-state-machin
 import { SuratTrackingClient } from "../clients/surat-tracking.client";
 
 /**
+ * Bir okumanın tek koli satırına uygulanma sonucu. "skipped" hata DEĞİLDİR:
+ * durum makinesinin reddettiği (geri saran) ya da yarışta bayatlayan okuma.
+ */
+export type TrackingApplyOutcome = "updated" | "skipped" | "failed";
+
+/**
  * OrderTrackingSyncService (Faz 11.3a): order Shipment satırlarının Sürat takip
  * senkronizasyonu — durum çekme, ShipmentEvent üretimi ve teslim/iade akış işleme
  * (11.2c atomik CAS + escrow tx dahil).
@@ -295,6 +301,35 @@ export class OrderTrackingSyncService {
     return closed;
   }
 
+  /**
+   * Hazır bir taşıyıcı okumasını, Sürat'a SORMADAN, kolinin tüm sipariş
+   * satırlarına uygular — poll'un bulduğu okumayla aynı çekirdek
+   * (`applyTrackingUpdate`): aynı yorum (`interpretSuratTracking`), aynı durum
+   * makinesi ve CAS, aynı teslim/escrow işlemi, aynı bildirimler ve iade akışı.
+   *
+   * Tek çağıranı Test Araçları'nın kargo simülasyonudur (UAT: koli taşıyıcıya
+   * hiç gitmez, dış olayı tester tetikler). Burada ikinci bir statü yazımı
+   * YOKTUR; simülasyon yalnız okumanın kaynağını değiştirir. Koli birimi cron
+   * ile aynıdır: aynı takip referansını taşıyan kardeş satırlar birlikte ilerler.
+   */
+  async applyParcelReading(
+    trackingNumber: string,
+    gonderi: SuratTakipGonderi,
+  ): Promise<{ shipmentId: string; outcome: TrackingApplyOutcome }[]> {
+    const siblings = await this.prisma.shipment.findMany({
+      where: { provider: "surat", trackingNumber },
+      include: { order: true },
+    });
+    const results: { shipmentId: string; outcome: TrackingApplyOutcome }[] = [];
+    for (const shipment of siblings) {
+      results.push({
+        shipmentId: shipment.id,
+        outcome: await this.applyTrackingUpdate(shipment, gonderi),
+      });
+    }
+    return results;
+  }
+
   /** Bir koliyi Sürat'tan tek sorguyla çeker (OzelKargoTakipNo = PKG-…). */
   private async fetchParcel(
     ref: string,
@@ -321,7 +356,7 @@ export class OrderTrackingSyncService {
   private async applyTrackingUpdate(
     shipment: any,
     gonderi: SuratTakipGonderi,
-  ): Promise<"updated" | "skipped" | "failed"> {
+  ): Promise<TrackingApplyOutcome> {
     // Tek karar mercii: kod + iade bayrağı + tamamlanma sinyalleri birlikte
     // okunur (mapper'daki gerekçe). `status: null` = statüye dokunma; ham kod
     // yine kaydedilir.

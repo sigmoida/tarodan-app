@@ -1,5 +1,9 @@
 import { ShipmentStatus } from "@prisma/client";
-import { RefundReturnTrackingSyncService } from "./refund-return-tracking-sync.service";
+import {
+  ACTIVE_RETURN_REFUND_STATUSES,
+  RefundReturnTrackingSyncService,
+} from "./refund-return-tracking-sync.service";
+import { buildSimulatedSuratReading } from "../helpers/surat-simulated-reading";
 
 describe("RefundReturnTrackingSyncService", () => {
   const makeService = (
@@ -162,6 +166,79 @@ describe("RefundReturnTrackingSyncService", () => {
     expect(prisma.refundRequest.findMany.mock.calls[0][0].where).toMatchObject({
       returnProvider: "surat",
       order: { isTest: false },
+      status: { in: [...ACTIVE_RETURN_REFUND_STATUSES] },
+    });
+  });
+
+  // UAT kargo simülasyonu: aynı çekirdek, Sürat'a sorulmadan.
+  describe("applyCarrierReading (Test Tools simulation seam)", () => {
+    const at = new Date("2026-10-05T10:00:00.000Z");
+
+    it("a simulated handover moves the return into transit without asking the carrier", async () => {
+      const { service, client, refundService } = makeService(1);
+
+      await expect(
+        service.applyCarrierReading(
+          "refund-1",
+          buildSimulatedSuratReading({
+            step: "picked_up",
+            carrierCode: "STUB1",
+            at,
+          }),
+        ),
+      ).resolves.toBe("synced");
+
+      expect(client.lookupTracking).not.toHaveBeenCalled();
+      expect(refundService.applyReturnTrackingUpdate).toHaveBeenCalledWith(
+        "refund-1",
+        {
+          status: ShipmentStatus.picked_up,
+          shippedAt: expect.any(Date),
+          deliveredAt: undefined,
+        },
+      );
+    });
+
+    it("a simulated delivery is written as 'returned' so the inspection window starts", async () => {
+      const { service, refundService } = makeService(1);
+
+      await service.applyCarrierReading(
+        "refund-1",
+        buildSimulatedSuratReading({
+          step: "delivered",
+          carrierCode: "STUB1",
+          at,
+        }),
+      );
+
+      expect(refundService.applyReturnTrackingUpdate).toHaveBeenCalledWith(
+        "refund-1",
+        expect.objectContaining({
+          status: ShipmentStatus.returned,
+          deliveredAt: new Date("2026-07-28T09:00:00.000Z"),
+        }),
+      );
+    });
+
+    it("ignores a return that is not tracked through Sürat (same guard as the poller)", async () => {
+      const { service, prisma, refundService } = makeService(1);
+      prisma.refundRequest.findUnique.mockResolvedValue({
+        id: "refund-1",
+        returnProvider: "manual",
+        returnTrackingNumber: "RF-1",
+      });
+
+      await expect(
+        service.applyCarrierReading(
+          "refund-1",
+          buildSimulatedSuratReading({
+            step: "delivered",
+            carrierCode: "STUB1",
+            at,
+          }),
+        ),
+      ).resolves.toBe("ignored");
+      expect(refundService.applyReturnTrackingUpdate).not.toHaveBeenCalled();
     });
   });
 });

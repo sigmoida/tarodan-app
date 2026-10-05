@@ -1,5 +1,8 @@
 import { Injectable } from "@nestjs/common";
-import type { SuratTakipResponse } from "../helpers/surat-cargo.types";
+import type {
+  SuratTakipGonderi,
+  SuratTakipResponse,
+} from "../helpers/surat-cargo.types";
 import { SuratTrackingClient } from "../clients/surat-tracking.client";
 import { OrderTrackingSyncService } from "./order-tracking-sync.service";
 import { TradeTrackingSyncService } from "./trade-tracking-sync.service";
@@ -125,5 +128,30 @@ export class SuratTrackingService {
     failed: number;
   }> {
     return this.tradeSync.syncAllActiveTradeShipments();
+  }
+
+  // ─── Hazır okumayı uygula (Test Araçları kargo simülasyonu) ───────────────
+  // Sürat'a sormadan, verilen okumayı poll'un kullandığı AYNI çekirdeğe verir.
+  // Yan etkiler (statü, teslim/escrow, bildirim, iade akışı) gerçekle aynıdır.
+
+  applyOrderParcelReading(
+    trackingNumber: string,
+    gonderi: SuratTakipGonderi,
+  ): ReturnType<OrderTrackingSyncService["applyParcelReading"]> {
+    return this.orderSync.applyParcelReading(trackingNumber, gonderi);
+  }
+
+  applyRefundReturnReading(
+    refundRequestId: string,
+    gonderi: SuratTakipGonderi,
+  ): ReturnType<RefundReturnTrackingSyncService["applyCarrierReading"]> {
+    return this.refundSync.applyCarrierReading(refundRequestId, gonderi);
+  }
+
+  applyTradeShipmentReading(
+    tradeShipmentId: string,
+    gonderi: SuratTakipGonderi,
+  ): ReturnType<TradeTrackingSyncService["applyCarrierReading"]> {
+    return this.tradeSync.applyCarrierReading(tradeShipmentId, gonderi);
   }
 }

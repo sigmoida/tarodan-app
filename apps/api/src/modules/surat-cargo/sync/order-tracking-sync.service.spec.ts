@@ -1,5 +1,7 @@
 import { CancellationActor, OrderStatus, ShipmentStatus } from "@prisma/client";
 import { OrderTrackingSyncService } from "./order-tracking-sync.service";
+import { buildSimulatedSuratReading } from "../helpers/surat-simulated-reading";
+import { SHIPPABLE_ORDER_STATUSES } from "../../order/helpers/order-state-machine";
 
 describe("OrderTrackingSyncService", () => {
   const shipment = (overrides: Record<string, unknown> = {}) => ({
@@ -539,6 +541,132 @@ describe("OrderTrackingSyncService", () => {
     expect(prisma.shipment.findMany.mock.calls[0][0].where).toMatchObject({
       provider: "surat",
       order: { isTest: false },
+    });
+  });
+
+  // UAT kargo simülasyonu: okuma Sürat'tan değil Test Araçları'ndan gelir, ama
+  // uygulandığı çekirdek poll'unkiyle AYNIDIR — ayrı bir statü yazımı yoktur.
+  describe("applyParcelReading (Test Tools simulation seam)", () => {
+    const at = new Date("2026-10-05T10:00:00.000Z");
+
+    it("never asks the carrier and moves every sibling row of the parcel", async () => {
+      const { service, prisma, client, tx } = makeService();
+      prisma.shipment.findMany.mockResolvedValue([
+        shipment({ id: "s1", orderId: "o1", trackingNumber: "PKG-AAA" }),
+        shipment({ id: "s2", orderId: "o2", trackingNumber: "PKG-AAA" }),
+      ]);
+
+      const res = await service.applyParcelReading(
+        "PKG-AAA",
+        buildSimulatedSuratReading({
+          step: "delivered",
+          carrierCode: "STUB1",
+          at,
+        }),
+      );
+
+      expect(client.lookupTracking).not.toHaveBeenCalled();
+      expect(prisma.shipment.findMany).toHaveBeenCalledWith({
+        where: { provider: "surat", trackingNumber: "PKG-AAA" },
+        include: { order: true },
+      });
+      expect(tx.shipment.updateMany).toHaveBeenCalledTimes(2);
+      expect(res).toEqual([
+        { shipmentId: "s1", outcome: "updated" },
+        { shipmentId: "s2", outcome: "updated" },
+      ]);
+    });
+
+    it("a simulated delivery runs the real delivery + escrow handler inside the CAS transaction", async () => {
+      const { service, prisma, tx, paymentService } = makeService();
+      prisma.shipment.findMany.mockResolvedValue([shipment()]);
+
+      await service.applyParcelReading(
+        "PACKAGE-REF-1",
+        buildSimulatedSuratReading({
+          step: "delivered",
+          carrierCode: "STUB1",
+          at,
+        }),
+      );
+
+      expect(tx.shipment.updateMany).toHaveBeenCalledWith({
+        where: { id: "shipment-1", status: ShipmentStatus.in_transit },
+        data: expect.objectContaining({
+          status: ShipmentStatus.delivered,
+          providerStatusCode: 6,
+        }),
+      });
+      // parseSuratDate mock'unun döndürdüğü an (gerçek istemci okumanın
+      // TeslimTarihi'ni kayıpsız çözer — bkz. surat-simulated-reading.spec).
+      expect(paymentService.handleOrderDelivered).toHaveBeenCalledWith(
+        "order-1",
+        new Date("2026-07-28T09:00:00.000Z"),
+        tx,
+      );
+    });
+
+    it("a simulated pickup marks a not-yet-shipped order shipped (same shippable guard)", async () => {
+      const { service, prisma, tx, paymentService } = makeService();
+      prisma.shipment.findMany.mockResolvedValue([
+        shipment({
+          status: ShipmentStatus.label_created,
+          shippedAt: null,
+          order: {
+            id: "order-1",
+            buyerId: "buyer-1",
+            status: OrderStatus.preparing,
+          },
+        }),
+      ]);
+
+      await service.applyParcelReading(
+        "PACKAGE-REF-1",
+        buildSimulatedSuratReading({
+          step: "picked_up",
+          carrierCode: "STUB1",
+          at,
+        }),
+      );
+
+      expect(tx.shipment.updateMany).toHaveBeenCalledWith({
+        where: {
+          id: "shipment-1",
+          status: ShipmentStatus.label_created,
+          shippedAt: null,
+        },
+        data: expect.objectContaining({
+          status: ShipmentStatus.picked_up,
+          shippedAt: expect.any(Date),
+        }),
+      });
+      expect(tx.order.updateMany).toHaveBeenCalledWith({
+        where: {
+          id: "order-1",
+          status: { in: [...SHIPPABLE_ORDER_STATUSES] },
+        },
+        data: { status: OrderStatus.shipped, version: { increment: 1 } },
+      });
+      expect(paymentService.handleOrderDelivered).not.toHaveBeenCalled();
+    });
+
+    it("keeps the terminal-regression guard: a delivered parcel is not picked up again", async () => {
+      const { service, prisma, tx } = makeService();
+      prisma.shipment.findMany.mockResolvedValue([
+        shipment({ status: ShipmentStatus.delivered }),
+      ]);
+
+      const res = await service.applyParcelReading(
+        "PACKAGE-REF-1",
+        buildSimulatedSuratReading({
+          step: "picked_up",
+          carrierCode: "STUB1",
+          at,
+        }),
+      );
+
+      expect(res).toEqual([{ shipmentId: "shipment-1", outcome: "skipped" }]);
+      expect(tx.shipment.updateMany).not.toHaveBeenCalled();
     });
   });
 });
