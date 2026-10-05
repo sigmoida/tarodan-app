@@ -1,3 +1,4 @@
+import type { AdminGibReportRow } from "@tarodan/types";
 import { api } from "./client";
 
 /**
@@ -250,4 +251,13 @@ export const financeApi = {
     api.patch("/admin/tax/withholding", { rate }),
   getWithholdingReport: (params: { year: number; month: number }) =>
     api.get("/admin/tax/withholding-report", { params }),
+  // GİB ilan / satıcı raporu. Kardeş literal segment (izin `tax`) —
+  // `finance/...` altında DEĞİL, çünkü o segment `payments` iznine bağlı.
+  getGibReport: (params?: Record<string, unknown>) =>
+    api.get<{ data: AdminGibReportRow[]; meta: { total: number } }>(
+      "/admin/gib-report",
+      { params },
+    ),
+  exportGibReport: (params?: Record<string, unknown>) =>
+    api.get("/admin/gib-report/export", { params, responseType: "blob" }),
 };

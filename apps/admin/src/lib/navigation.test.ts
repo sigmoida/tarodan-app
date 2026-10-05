@@ -58,6 +58,11 @@ describe("routePermission", () => {
     expect(routePermission("/accounts/consents")).toBe("users");
   });
 
+  it("guards the GIB report screen with the tax permission", () => {
+    // API: PERMISSION_MAP["gib-report"] = ["tax"] — menü ve uç aynı izni ister.
+    expect(routePermission("/finance/gib-report")).toBe("tax");
+  });
+
   it("matches a sub-path of a registered route (prefix match)", () => {
     expect(routePermission("/accounts/users/some-user-id")).toBe("users");
   });

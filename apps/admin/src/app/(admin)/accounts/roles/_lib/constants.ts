@@ -294,7 +294,7 @@ export const getPermissionGroups = (t: T): PermGroup[] => [
         key: "tax",
         label: t("admin.roles.permissions.tax.label"),
         description: t("admin.roles.permissions.tax.description"),
-        pages: ["/finance/tax"],
+        pages: ["/finance/tax", "/finance/gib-report"],
       },
       {
         key: "invoices",
