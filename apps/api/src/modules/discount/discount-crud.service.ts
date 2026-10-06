@@ -323,7 +323,7 @@ export class DiscountCrudService {
     );
     // Personel bildirimi (Mail Yönlendirme): yalnız SATICININ kendi
     // ilanlarında açtığı indirim; admin indirimleri bildirilmez.
-    if (!isAdmin) {
+    if (!isAdmin && actorId) {
       void this.notifyStaffSellerDiscount(discount, actorId);
     }
     return toDiscountResponse(discount);

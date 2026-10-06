@@ -342,10 +342,10 @@ export class SmtpProvider {
             address: account.address,
           }),
         );
-        result = this.succeeded(options, this.fromTextOf(sender), info);
+        result = await this.succeeded(options, this.fromTextOf(sender), info);
       } catch (error) {
         this.dropAccountTransport(account.id);
-        result = this.failed(
+        result = await this.failed(
           options,
           this.fromTextOf(sender),
           describeSmtpError(error),

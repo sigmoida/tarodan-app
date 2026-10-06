@@ -264,9 +264,7 @@ describe("recipients", () => {
     });
   });
   it("removes an address", () => {
-    expect(removeRecipient(["a@b.co", "c@d.co"], "a@b.co")).toEqual([
-      "c@d.co",
-    ]);
+    expect(removeRecipient(["a@b.co", "c@d.co"], "a@b.co")).toEqual(["c@d.co"]);
   });
 });
 
@@ -375,8 +373,8 @@ describe("person form", () => {
     const schema = personSchema(t, areas);
     const values = personToFormValues(areas);
     expect(schema.safeParse(values).success).toBe(false);
-    expect(
-      schema.safeParse({ ...values, address: "a@b.co" }).success,
-    ).toBe(true);
+    expect(schema.safeParse({ ...values, address: "a@b.co" }).success).toBe(
+      true,
+    );
   });
 });

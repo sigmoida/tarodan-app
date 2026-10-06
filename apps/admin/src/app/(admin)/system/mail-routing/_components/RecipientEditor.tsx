@@ -3,7 +3,11 @@
 import { useState } from "react";
 import { useTranslations } from "next-intl";
 import { Badge, Button, Input } from "@tarodan/ui";
-import { MAX_RECIPIENTS, addRecipient, removeRecipient } from "../_lib/mail-routing";
+import {
+  MAX_RECIPIENTS,
+  addRecipient,
+  removeRecipient,
+} from "../_lib/mail-routing";
 
 /**
  * Bir alanın alıcı listesi: adres ekle / çıkar. Doğrulama `addRecipient`
@@ -26,7 +30,8 @@ export function RecipientEditor({
   const add = () => {
     if (draft.trim() === "") return;
     const result = addRecipient(value, draft);
-    if (!result.ok) {
+    // admin `strict: false` ile derlenir; `ok` üzerinden daraltma çalışmaz.
+    if ("error" in result) {
       setError(
         t(`admin.mailRouting.validation.recipient.${result.error}`, {
           max: MAX_RECIPIENTS,

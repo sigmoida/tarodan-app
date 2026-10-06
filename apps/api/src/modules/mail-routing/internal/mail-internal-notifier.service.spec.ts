@@ -67,7 +67,9 @@ describe("internalNoticeRoute — gönderim kararı (notifier + handler ortak)",
   describe("misafir mesajı geri düşüşü (eski davranış korunur)", () => {
     const original = process.env.SUPPORT_NOTIFICATION_EMAIL;
     afterEach(() => {
-      process.env.SUPPORT_NOTIFICATION_EMAIL = original;
+      // `process.env.X = undefined` değeri "undefined" METNİ yapar; tanımsızsa sil.
+      if (original === undefined) delete process.env.SUPPORT_NOTIFICATION_EMAIL;
+      else process.env.SUPPORT_NOTIFICATION_EMAIL = original;
     });
 
     it("alanın alıcısı yokken olay kapalı olsa bile SUPPORT_NOTIFICATION_EMAIL'e anında gider", () => {

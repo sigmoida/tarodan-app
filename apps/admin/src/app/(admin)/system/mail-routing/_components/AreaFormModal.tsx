@@ -1,12 +1,7 @@
 "use client";
 
 import { useTranslations } from "next-intl";
-import {
-  FormInput,
-  FormModal,
-  FormSelect,
-  useZodForm,
-} from "@tarodan/ui/form";
+import { FormInput, FormModal, FormSelect, useZodForm } from "@tarodan/ui/form";
 import type {
   MailAreaState,
   MailSenderAccountView,

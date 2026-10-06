@@ -143,57 +143,57 @@ model User {
 /// karşılanamıyordu. Snapshot silme transaction'ının İLK adımında, hiçbir alan
 /// üzerine yazılmadan alınır. Satır DB tetikleyicisiyle silinemez.
 model DeletedUserIdentity {
-  id                String          @id @default(uuid())
+  id                   String                 @id @default(uuid())
   /// Anonimleştirilmiş User satırıyla tek-tek bağ. Restrict: arşiv, kullanıcı
   /// kaydının yanlışlıkla fiziksel silinmesini de engeller (CLAUDE.md §13).
-  userId            String          @unique @map("user_id")
+  userId               String                 @unique @map("user_id")
   /// Silme anındaki gerçek kimlik. Backfill satırlarında kaynak bulunamayan
   /// alanlar boş kalır — tahmin edilmez.
-  email             String?
-  username          String
-  displayName       String?         @map("display_name")
+  email                String?
+  username             String
+  displayName          String?                @map("display_name")
   /// Silme anındaki yasal ad / soyad (`User.legalFirstName/LastName`). Bu
   /// alanlardan önce açılmış ve kapıyı hiç doldurmamış hesapta boş kalır.
-  legalFirstName    String?         @map("legal_first_name")
-  legalLastName     String?         @map("legal_last_name")
-  phone             String?
-  birthDate         DateTime?       @map("birth_date")
+  legalFirstName       String?                @map("legal_first_name")
+  legalLastName        String?                @map("legal_last_name")
+  phone                String?
+  birthDate            DateTime?              @map("birth_date")
   /// TCKN: önce `User.nationalId`; boşsa bireysel satıcıda banka hesabından,
   /// kurumsalda ortak kaydından gelir.
-  nationalId        String?         @map("national_id")
+  nationalId           String?                @map("national_id")
   /// VKN: kurumsal satıcının User.taxId değeri (anonimleştirmede null'lanıyor).
-  taxId             String?         @map("tax_id")
-  taxOffice         String?         @map("tax_office")
-  companyName       String?         @map("company_name")
-  companyType       String?         @map("company_type")
-  sellerType        SellerType?     @map("seller_type")
-  businessStatus    BusinessStatus? @map("business_status")
-  addressCity       String?         @map("address_city")
-  addressDistrict   String?         @map("address_district")
-  addressLine       String?         @map("address_line")
-  iban              String?
-  bankAccountHolder String?         @map("bank_account_holder")
+  taxId                String?                @map("tax_id")
+  taxOffice            String?                @map("tax_office")
+  companyName          String?                @map("company_name")
+  companyType          String?                @map("company_type")
+  sellerType           SellerType?            @map("seller_type")
+  businessStatus       BusinessStatus?        @map("business_status")
+  addressCity          String?                @map("address_city")
+  addressDistrict      String?                @map("address_district")
+  addressLine          String?                @map("address_line")
+  iban                 String?
+  bankAccountHolder    String?                @map("bank_account_holder")
   /// Silme anında satıcı mıydı: silme `isSeller`'ı false'a çekiyor, bildirimde
   /// satıcı ayrımı bu alandan yapılır.
-  wasSeller         Boolean         @default(false) @map("was_seller")
-  adminCode         String?         @map("admin_code")
-  registeredAt      DateTime        @map("registered_at")
-  deletedAt         DateTime        @map("deleted_at")
-  deletedByActor    DeletionActor   @default(self) @map("deleted_by_actor")
+  wasSeller            Boolean                @default(false) @map("was_seller")
+  adminCode            String?                @map("admin_code")
+  registeredAt         DateTime               @map("registered_at")
+  deletedAt            DateTime               @map("deleted_at")
+  deletedByActor       DeletionActor          @default(self) @map("deleted_by_actor")
   /// İşlemi yapan yöneticinin USER id'si (AdminUser.id DEĞİL — AdminAuditService
   /// ile aynı sözleşme). Backfill satırlarında bilinemez.
-  deletedByAdminUserId String?      @map("deleted_by_admin_user_id")
-  source            IdentitySnapshotSource @default(live)
+  deletedByAdminUserId String?                @map("deleted_by_admin_user_id")
+  source               IdentitySnapshotSource @default(live)
   /// Kolon başına kaynak: {"nationalId":"seller_bank_account","email":null,...}.
   /// Denetimde "bu TCKN nereden geldi / bu alan neden boş" sorusunun tek cevabı.
-  sourceDetail      Json?           @map("source_detail")
+  sourceDetail         Json?                  @map("source_detail")
   /// Kullanılan kayıtların id'leri: {"corporateApplicationId":"...","orderId":"..."}.
-  sourceRefs        Json?           @map("source_refs")
+  sourceRefs           Json?                  @map("source_refs")
   /// Yasal saklama bitişi (silme + 10 yıl, TTK m.82). Otomatik imha YOK; bu
   /// tarih yalnızca politikayı belgeler ve panelde süresi dolanlar filtrelenir.
-  retainUntil       DateTime        @map("retain_until")
-  createdAt         DateTime        @default(now()) @map("created_at")
-  user              User            @relation(fields: [userId], references: [id], onDelete: Restrict)
+  retainUntil          DateTime               @map("retain_until")
+  createdAt            DateTime               @default(now()) @map("created_at")
+  user                 User                   @relation(fields: [userId], references: [id], onDelete: Restrict)
 
   @@index([deletedAt])
   @@index([retainUntil])
@@ -773,78 +773,78 @@ model Manufacturer {
 }
 
 model Product {
-  id                  String                  @id @default(uuid())
+  id                         String                  @id @default(uuid())
   /// İnsan-okunur ilan numarası: "U" + 6 hane sıra no (U010001). Kalıcı,
   /// kullanıcıya gösterilir (ilan detayı, şikayet formu, destek). Postgres
   /// tarafında generate_product_code() ile üretilir; uygulama yazmaz.
-  productCode         String                  @unique @default(dbgenerated("generate_product_code()")) @map("product_code")
-  sellerId            String                  @map("seller_id")
-  categoryId          String                  @map("category_id")
-  title               String
-  description         String?
-  price               Decimal                 @db.Decimal(10, 2)
-  condition           ProductCondition
+  productCode                String                  @unique @default(dbgenerated("generate_product_code()")) @map("product_code")
+  sellerId                   String                  @map("seller_id")
+  categoryId                 String                  @map("category_id")
+  title                      String
+  description                String?
+  price                      Decimal                 @db.Decimal(10, 2)
+  condition                  ProductCondition
   /// Catalog listings are publicly discoverable. Membership and boost rows are
   /// payment-only products and must never be exposed through catalog surfaces.
-  kind                ProductKind             @default(listing)
-  status              ProductStatus           @default(pending)
-  isTradeEnabled      Boolean                 @default(false) @map("is_trade_enabled")
-  viewCount           Int                     @default(0) @map("view_count")
-  clickCount          Int                     @default(0) @map("click_count")
-  createdAt           DateTime                @default(now()) @map("created_at")
-  updatedAt           DateTime                @updatedAt @map("updated_at")
-  version             Int                     @default(1)
-  likeCount           Int                     @default(0) @map("like_count")
-  maxQuantityPerOrder Int?                    @map("max_quantity_per_order")
-  popularityScore     Int?                    @map("popularity_score")
-  popularityUpdatedAt DateTime?               @map("popularity_updated_at")
-  quantity            Int?                    @map("quantity")
-  reservedQuantity    Int?                    @default(0) @map("reserved_quantity")
+  kind                       ProductKind             @default(listing)
+  status                     ProductStatus           @default(pending)
+  isTradeEnabled             Boolean                 @default(false) @map("is_trade_enabled")
+  viewCount                  Int                     @default(0) @map("view_count")
+  clickCount                 Int                     @default(0) @map("click_count")
+  createdAt                  DateTime                @default(now()) @map("created_at")
+  updatedAt                  DateTime                @updatedAt @map("updated_at")
+  version                    Int                     @default(1)
+  likeCount                  Int                     @default(0) @map("like_count")
+  maxQuantityPerOrder        Int?                    @map("max_quantity_per_order")
+  popularityScore            Int?                    @map("popularity_score")
+  popularityUpdatedAt        DateTime?               @map("popularity_updated_at")
+  quantity                   Int?                    @map("quantity")
+  reservedQuantity           Int?                    @default(0) @map("reserved_quantity")
   // Satıcının seçtiği paket boyutu — ilan formundaki TEK kargo girdisi.
-  shippingPackageTier ShippingPackageTierCode @default(small) @map("shipping_package_tier")
+  shippingPackageTier        ShippingPackageTierCode @default(small) @map("shipping_package_tier")
   // Kademeden TÜRETİLİR (kademenin üst sınırı): admin görür, paket desisi
   // toplanırken (Σ desi × adet) bu değer kullanılır. Satıcı doğrudan girmez.
-  shippingDesi        Int                     @default(1) @map("shipping_desi")
-  slug                String?                 @unique
-  oldPrice            Decimal?                @map("old_price") @db.Decimal(10, 2)
-  originalPrice       Decimal?                @map("original_price") @db.Decimal(10, 2)
-  saleEndDate         DateTime?               @map("sale_end_date")
-  salePrice           Decimal?                @map("sale_price") @db.Decimal(10, 2)
-  saleStartDate       DateTime?               @map("sale_start_date")
-  brandId             String?                 @map("brand_id")
-  bundleSize          Int?                    @map("bundle_size")
-  editionNumber       String?                 @map("edition_number")
-  editionTotal        Int?                    @map("edition_total")
-  isLimited           Boolean                 @default(false) @map("is_limited")
-  isPreorder          Boolean                 @default(false) @map("is_preorder")
-  isSet               Boolean                 @default(false) @map("is_set")
-  releaseDate         DateTime?               @map("release_date")
-  carModelId          String?                 @map("car_model_id")
-  manufacturerId      String?                 @map("manufacturer_id")
-  modelCode           String?                 @map("model_code")
-  color               String?
-  isBoxed             Boolean?                @map("is_boxed")
-  averageRating       Decimal?                @map("average_rating") @db.Decimal(3, 2)
-  ratingCount         Int                     @default(0) @map("rating_count")
-  boostedUntil        DateTime?               @map("boosted_until")
+  shippingDesi               Int                     @default(1) @map("shipping_desi")
+  slug                       String?                 @unique
+  oldPrice                   Decimal?                @map("old_price") @db.Decimal(10, 2)
+  originalPrice              Decimal?                @map("original_price") @db.Decimal(10, 2)
+  saleEndDate                DateTime?               @map("sale_end_date")
+  salePrice                  Decimal?                @map("sale_price") @db.Decimal(10, 2)
+  saleStartDate              DateTime?               @map("sale_start_date")
+  brandId                    String?                 @map("brand_id")
+  bundleSize                 Int?                    @map("bundle_size")
+  editionNumber              String?                 @map("edition_number")
+  editionTotal               Int?                    @map("edition_total")
+  isLimited                  Boolean                 @default(false) @map("is_limited")
+  isPreorder                 Boolean                 @default(false) @map("is_preorder")
+  isSet                      Boolean                 @default(false) @map("is_set")
+  releaseDate                DateTime?               @map("release_date")
+  carModelId                 String?                 @map("car_model_id")
+  manufacturerId             String?                 @map("manufacturer_id")
+  modelCode                  String?                 @map("model_code")
+  color                      String?
+  isBoxed                    Boolean?                @map("is_boxed")
+  averageRating              Decimal?                @map("average_rating") @db.Decimal(3, 2)
+  ratingCount                Int                     @default(0) @map("rating_count")
+  boostedUntil               DateTime?               @map("boosted_until")
   /// Timestamp of the current active boost purchase — drives LIFO ordering
   /// (most-recently-boosted first) in search/category and the home showcase.
-  boostedAt           DateTime?               @map("boosted_at")
+  boostedAt                  DateTime?               @map("boosted_at")
   /// Active only while a `showcaseOnHome` (Vitrin) package is running; the home
   /// showcase area queries `homeShowcaseUntil > now` ordered by `boostedAt` desc.
-  homeShowcaseUntil   DateTime?               @map("home_showcase_until")
+  homeShowcaseUntil          DateTime?               @map("home_showcase_until")
   /// İlanın son YAYINA GİRİŞ anı — 60 günlük yaşam süresi (LISTING_TTL_DAYS)
   /// buradan sayılır ve HER onayda tazelenir. Eskiden süre createdAt'ten
   /// sayılıyordu: süresi dolan ilan yeniden onaylansa bile ertesi cron yine
   /// kapatıyordu (yenileme imkânsızdı). null = eski kayıt → createdAt kullanılır.
-  publishedAt         DateTime?               @map("published_at")
+  publishedAt                DateTime?               @map("published_at")
   /// İlanın SATILDIĞI an — ilan hunisinin (oluşturuldu → yayın → satış) son
   /// adımı ve "satışa kadar geçen süre" ölçümünün ikinci ucu. `updatedAt`
   /// satıştan sonraki her dokunuşla kaydığı için kullanılamaz.
-  soldAt              DateTime?               @map("sold_at")
+  soldAt                     DateTime?               @map("sold_at")
   /// Moderasyon reddinin gerekçesi — satıcıya kalıcı olarak gösterilir
   /// (bildirim tek seferlikti, gerekçe kayboluyordu). Onayda temizlenir.
-  rejectionReason     String?                 @map("rejection_reason")
+  rejectionReason            String?                 @map("rejection_reason")
   /// `inactive` statüsünün NEDENİ — iki değer anlamlıdır: `return_quarantine`
   /// (teslim SONRASI bir iade yüzünden sistem pasife aldı; satıcı hasar kontrolü
   /// yapmalı ve DOĞRUDAN aktive edebilir, admin onayı gerekmez) ve `expired`
@@ -855,7 +855,7 @@ model Product {
   /// HER yazım bunu temizlemeli (bkz. clearStaleInactiveReasonOnWrite,
   /// PrismaService'in Product middleware'inde tek entegrasyon noktası) — aksi
   /// hâlde bayat bir işaret ilerideki bir moderasyon turunu atlatabilir.
-  inactiveReason      ProductInactiveReason?  @map("inactive_reason")
+  inactiveReason             ProductInactiveReason?  @map("inactive_reason")
   /// İlanın vitrinden düşmesinin GÜNCEL nedeni — liste/filtre ekranları
   /// JOIN'siz okusun diye burada. Tek yazıcısı `recordListingRemovals`dır
   /// (kaldırma olayıyla aynı anda). Genelde son olayın nedenidir; tek istisna:
@@ -868,45 +868,45 @@ model Product {
   /// İlan kaldırma statülerinin (inactive/deleted/rejected/suspended) dışına
   /// çıktığında PrismaService middleware'i temizler. null + kaldırma statüsü =
   /// bu özellikten ÖNCE düşmüş ilan → "bilinmiyor" (geri doldurma yok).
-  removalReason       ListingRemovalReason?   @map("removal_reason")
+  removalReason              ListingRemovalReason?   @map("removal_reason")
   /// Son ONAY anındaki moderasyona konu içeriğin parmak izi (başlık, açıklama,
   /// kategori/marka/üretici, görseller — bkz. computeProductContentFingerprint).
   /// Süresi dolan ilanın satıcı yenilemesinde güncel içeriğin izi bununla
   /// eşleşiyorsa ilan moderasyona girmeden yeniden yayına alınır; eşleşmiyorsa
   /// ya da null ise (onay izi yok: eski kayıt, toplu import) normal onay kuralı
   /// geçerlidir. Her onay yolu (admin, AI oto-onay, admin reaktivasyonu) yazar.
-  approvedContentFingerprint String?          @map("approved_content_fingerprint")
-  qualityScore        Int                     @default(0) @map("quality_score")
-  rankTier            Int                     @default(0) @map("rank_tier")
-  relevanceScore      Int?                    @map("relevance_score")
+  approvedContentFingerprint String?                 @map("approved_content_fingerprint")
+  qualityScore               Int                     @default(0) @map("quality_score")
+  rankTier                   Int                     @default(0) @map("rank_tier")
+  relevanceScore             Int?                    @map("relevance_score")
   /// AI görsel moderasyonu (services/ai-moderation). null = henüz denetlenmedi.
-  aiCheckStatus       String?                 @map("ai_check_status")
-  aiRelevanceScore    Float?                  @map("ai_relevance_score")
-  aiNsfwScore         Float?                  @map("ai_nsfw_score")
-  aiCheckLabels       Json?                   @map("ai_check_labels")
-  aiCheckReason       String?                 @map("ai_check_reason")
-  aiCheckedAt         DateTime?               @map("ai_checked_at")
+  aiCheckStatus              String?                 @map("ai_check_status")
+  aiRelevanceScore           Float?                  @map("ai_relevance_score")
+  aiNsfwScore                Float?                  @map("ai_nsfw_score")
+  aiCheckLabels              Json?                   @map("ai_check_labels")
+  aiCheckReason              String?                 @map("ai_check_reason")
+  aiCheckedAt                DateTime?               @map("ai_checked_at")
   /// Denormalized concat of title + description + model code + color + attribute display values.
   /// Maintained by Postgres triggers; never write directly from application code.
   /// Used for full-text search via the GIN index `products_search_text_fts_idx`.
-  searchText          String?                 @map("search_text")
-  cartItems           CartItem[]
-  collectionItems     CollectionItem[]
-  offers              Offer[]
-  orders              Order[]
-  productAttributes   ProductAttribute[]
-  images              ProductImage[]
-  likes               ProductLike[]
-  productRatings      ProductRating[]
-  boosts              ProductBoost[]
-  removalEvents       ProductRemovalEvent[]
-  brand               Brand?                  @relation(fields: [brandId], references: [id])
-  carModel            CarModel?               @relation(fields: [carModelId], references: [id])
-  category            Category                @relation(fields: [categoryId], references: [id])
-  manufacturer        Manufacturer?           @relation(fields: [manufacturerId], references: [id])
-  seller              User                    @relation("SellerProducts", fields: [sellerId], references: [id])
-  tradeItemsOffered   TradeItem[]             @relation("TradeItemProduct")
-  wishlistItems       WishlistItem[]
+  searchText                 String?                 @map("search_text")
+  cartItems                  CartItem[]
+  collectionItems            CollectionItem[]
+  offers                     Offer[]
+  orders                     Order[]
+  productAttributes          ProductAttribute[]
+  images                     ProductImage[]
+  likes                      ProductLike[]
+  productRatings             ProductRating[]
+  boosts                     ProductBoost[]
+  removalEvents              ProductRemovalEvent[]
+  brand                      Brand?                  @relation(fields: [brandId], references: [id])
+  carModel                   CarModel?               @relation(fields: [carModelId], references: [id])
+  category                   Category                @relation(fields: [categoryId], references: [id])
+  manufacturer               Manufacturer?           @relation(fields: [manufacturerId], references: [id])
+  seller                     User                    @relation("SellerProducts", fields: [sellerId], references: [id])
+  tradeItemsOffered          TradeItem[]             @relation("TradeItemProduct")
+  wishlistItems              WishlistItem[]
 
   @@index([sellerId])
   @@index([brandId])
@@ -941,25 +941,25 @@ model Product {
 /// tetikleyiciyle engellenir; tek yazıcı `recordListingRemovals`dır.
 /// Bkz. docs/LISTING_REMOVAL_REASONS.md.
 model ProductRemovalEvent {
-  id            String               @id @default(uuid())
+  id                String               @id @default(uuid())
   /// CASCADE: yalnız siparişi/teklifi hiç olmamış ilanın yönetici "kalıcı
   /// silmesi" (ve dev sıfırlaması) ürün satırını siler; bağlanacak ilanı
   /// kalmayan kaldırma kaydının tutulacak bir anlamı yoktur.
-  productId     String               @map("product_id")
-  reason        ListingRemovalReason
+  productId         String               @map("product_id")
+  reason            ListingRemovalReason
   /// `sold_elsewhere`de satışın gerçekleştiği platform — kod listesi
   /// @tarodan/types `LISTING_REMOVAL_PLATFORMS` (enum değil: liste göçsüz
   /// değişebilsin). Diğer nedenlerde null.
-  platform      String?
+  platform          String?
   /// `policy_violation`da ihlal kodu — @tarodan/types `LISTING_VIOLATION_CODES`
   /// (yer tutucu liste, göçsüz değişir). null = kodsuz (eski istemciden) red.
-  violationCode String?              @map("violation_code")
+  violationCode     String?              @map("violation_code")
   /// Serbest metin: satıcının notu ya da yöneticinin açıklaması. YALNIZ admin
   /// uçları döndürür; vitrin ve satıcı yanıtları bu tabloyu hiç okumaz.
-  detail        String?
+  detail            String?
   /// Geçişin iki ucu — aynı nedenin pasife alma mı silme mi olduğunu ayırır.
-  statusBefore  ProductStatus        @map("status_before")
-  statusAfter   ProductStatus        @map("status_after")
+  statusBefore      ProductStatus        @map("status_before")
+  statusAfter       ProductStatus        @map("status_after")
   /// İlan bu olaydan önce VİTRİNDEYDİ (statusBefore = active ya da reserved —
   /// rezerve, yayındaki ilanın geçici tutuluşudur). Dashboard'ın
   /// "vitrinden düşen ilanlar" kırılımı yalnız bunları sayar; vitrin dışındaki
@@ -967,19 +967,19 @@ model ProductRemovalEvent {
   /// dolmuş ilanın silinmesi, bekleyen ilanın reddi) geçmişte kalır ama
   /// sayılmaz. Kayıt anında yazılır (kural: @tarodan/types `wasOnStorefront`),
   /// sorgular statülerden yeniden hesaplamaz.
-  fromStorefront Boolean             @map("from_storefront")
+  fromStorefront    Boolean              @map("from_storefront")
   /// Vitrinden düşüş DEĞİL ama dashboard'ın PLATFORM kırılımına girer: ilan
   /// zaten düşmüştü (ör. süresi dolmuştu), satıcı sonra "başka platformda
   /// sattım" diye kaldırdı ve bu, ilanın son düşüşünden bu yana ilk platform
   /// cevabı. Toplam sayıma girmez (ilk düşüş zaten sayıldı). Kayıt anında
   /// yazılır (kural: @tarodan/types `isLateSoldElsewhere`).
-  lateSoldElsewhere Boolean          @default(false) @map("late_sold_elsewhere")
+  lateSoldElsewhere Boolean              @default(false) @map("late_sold_elsewhere")
   /// İşlemi yapan kullanıcı (satıcı ya da yönetici); sistem işlerinde null.
   /// FK yok: denetim satırı kişinin hesabından bağımsız kalır.
-  actorUserId   String?              @map("actor_user_id")
+  actorUserId       String?              @map("actor_user_id")
   /// Olay damgası — dashboard dönem sayımı buradan yapılır.
-  createdAt     DateTime             @default(now()) @map("created_at")
-  product       Product              @relation(fields: [productId], references: [id], onDelete: Cascade)
+  createdAt         DateTime             @default(now()) @map("created_at")
+  product           Product              @relation(fields: [productId], references: [id], onDelete: Cascade)
 
   @@index([fromStorefront, createdAt])
   @@index([lateSoldElsewhere, createdAt])
@@ -1322,50 +1322,50 @@ model TradeShipmentEvent {
 /// taraf). v2'de HER İKİ taraf ödeyecek → takas başına iki satır olacak ve depo
 /// süreci ancak ikisi de `completed` olunca başlayacak (PR2).
 model TradeCashPayment {
-  id                  String           @id @default(uuid())
-  tradeId             String           @map("trade_id")
-  payerId             String           @map("payer_id")
+  id                     String           @id @default(uuid())
+  tradeId                String           @map("trade_id")
+  payerId                String           @map("payer_id")
   /// Farkın gideceği taraf — yalnız fark taşıyan satırda dolu. Hizmet bedeli ve
   /// kargo platformda kalır, alıcısı yoktur.
-  recipientId         String?          @map("recipient_id")
+  recipientId            String?          @map("recipient_id")
   /// Nakit fark (v2'de yalnız fark ödeyen tarafın satırında > 0).
-  amount              Decimal          @db.Decimal(10, 2)
+  amount                 Decimal          @db.Decimal(10, 2)
   /// v2: takas hizmet bedeli — kural sabitlerinin toplamı (KDV DAHİL). Kampanya
   /// varsa İNDİRİM SONRASI tutar yazılır (sipariş kolonlarıyla aynı ilke).
-  tradeFeeAmount      Decimal          @default(0) @map("trade_fee_amount") @db.Decimal(10, 2)
+  tradeFeeAmount         Decimal          @default(0) @map("trade_fee_amount") @db.Decimal(10, 2)
   /// Takas hizmet bedeli kampanyasının bu satıra verdiği indirim (rapor + bütçe iadesi).
-  tradeFeeDiscountAmount Decimal       @default(0) @map("trade_fee_discount_amount") @db.Decimal(10, 2)
+  tradeFeeDiscountAmount Decimal          @default(0) @map("trade_fee_discount_amount") @db.Decimal(10, 2)
   /// İndirimi veren kampanya — bütçe iadesi tam iadede bu kimlikle yapılır.
-  tradeFeeCampaignId  String?          @map("trade_fee_campaign_id")
+  tradeFeeCampaignId     String?          @map("trade_fee_campaign_id")
   /// v2: bu tarafın 2 bacaklık kargo bedeli. İPTALDE İADE EDİLMEZ (ürün kargoya
   /// verildikten sonra); kargoya verilmeden önceki iptalde tam iade edilir.
-  shippingAmount      Decimal          @default(0) @map("shipping_amount") @db.Decimal(10, 2)
+  shippingAmount         Decimal          @default(0) @map("shipping_amount") @db.Decimal(10, 2)
   /// LEGACY (v1): yüzde bazlı aracılık komisyonu. v2 sabit takas bedelini
   /// `tradeFeeAmount` alanında taşır; bu alan v2'de 0'dır.
-  commission          Decimal          @default(0) @db.Decimal(10, 2)
+  commission             Decimal          @default(0) @db.Decimal(10, 2)
   /// LEGACY (v1): yüzde bazlı komisyonun KDV'si. v2'de 0'dır.
-  commissionTaxAmount Decimal          @default(0) @map("commission_tax_amount") @db.Decimal(10, 2)
-  totalAmount         Decimal          @map("total_amount") @db.Decimal(10, 2)
-  provider            String
-  providerPaymentId   String?          @map("provider_payment_id")
-  status              PaymentStatus    @default(pending)
-  paidAt              DateTime?        @map("paid_at")
+  commissionTaxAmount    Decimal          @default(0) @map("commission_tax_amount") @db.Decimal(10, 2)
+  totalAmount            Decimal          @map("total_amount") @db.Decimal(10, 2)
+  provider               String
+  providerPaymentId      String?          @map("provider_payment_id")
+  status                 PaymentStatus    @default(pending)
+  paidAt                 DateTime?        @map("paid_at")
   // Escrow hold: set when trade completes; released when holdReleaseAt passes
-  holdReleaseAt       DateTime?        @map("hold_release_at")
-  releasedAt          DateTime?        @map("released_at")
-  refundedAt          DateTime?        @map("refunded_at")
+  holdReleaseAt          DateTime?        @map("hold_release_at")
+  releasedAt             DateTime?        @map("released_at")
+  refundedAt             DateTime?        @map("refunded_at")
   /// KUSURSUZ TARAF işareti. Takas, bu satırın sahibinin kusuru OLMADAN
   /// bozulduğunda (karşı taraf ödemedi/kargolamadı, karşı tarafın ürünü depo
   /// kontrolünden geçmedi, koli kayboldu, karşı taraf vazgeçti) iptali kararla
   /// yazan yol bu bayrağı işaretler ve iade TAM tutar üzerinden yapılır —
   /// hizmet bedeli ve kargo dahil. Karar satıra yazılır ki iade PayTR'da
   /// patlayıp retry cron'una düşse bile aynı tutar hesaplansın.
-  fullRefundEntitled  Boolean          @default(false) @map("full_refund_entitled")
-  createdAt           DateTime         @default(now()) @map("created_at")
-  updatedAt           DateTime         @updatedAt @map("updated_at")
-  trade               Trade            @relation(fields: [tradeId], references: [id], onDelete: Cascade)
-  payment             Payment?
-  payoutTransfers     PayoutTransfer[] @relation("TradeCashPayoutTransfers")
+  fullRefundEntitled     Boolean          @default(false) @map("full_refund_entitled")
+  createdAt              DateTime         @default(now()) @map("created_at")
+  updatedAt              DateTime         @updatedAt @map("updated_at")
+  trade                  Trade            @relation(fields: [tradeId], references: [id], onDelete: Cascade)
+  payment                Payment?
+  payoutTransfers        PayoutTransfer[] @relation("TradeCashPayoutTransfers")
 
   /// Taraf başına TEK ödeme satırı (v2'de aynı takasta iki taraf, iki satır).
   @@unique([tradeId, payerId])
@@ -1746,22 +1746,22 @@ model Offer {
 }
 
 model CheckoutGroup {
-  id                      String         @id @default(uuid())
-  groupNumber             String         @unique @map("group_number")
-  buyerId                 String         @map("buyer_id")
-  idempotencyKey          String?        @unique @map("idempotency_key")
-  totalAmount             Decimal        @map("total_amount") @db.Decimal(10, 2)
-  isGuest                 Boolean        @default(false) @map("is_guest")
+  id                      String          @id @default(uuid())
+  groupNumber             String          @unique @map("group_number")
+  buyerId                 String          @map("buyer_id")
+  idempotencyKey          String?         @unique @map("idempotency_key")
+  totalAmount             Decimal         @map("total_amount") @db.Decimal(10, 2)
+  isGuest                 Boolean         @default(false) @map("is_guest")
   // ESKİ (yalnız okuma): mesafeli satış onayı artık `consent_records`'a
   // (document = distance_sales, checkoutGroupId = bu grup) yazılıyor — tek
   // kayıt, iki kopya değil. Bu iki kolon consent_records'tan önceki grupların
   // onayını taşır; `backfill:prod:distance-sales-consents` onları oraya aktarır.
   // Yeni satırda her zaman null'dır. Göç yalnız ekleme yaptığı için silinmedi.
-  distanceSalesAcceptedAt DateTime?      @map("distance_sales_accepted_at")
-  distanceSalesVersion    String?        @map("distance_sales_version")
-  createdAt               DateTime       @default(now()) @map("created_at")
-  updatedAt               DateTime       @updatedAt @map("updated_at")
-  buyer                   User           @relation("BuyerCheckoutGroups", fields: [buyerId], references: [id])
+  distanceSalesAcceptedAt DateTime?       @map("distance_sales_accepted_at")
+  distanceSalesVersion    String?         @map("distance_sales_version")
+  createdAt               DateTime        @default(now()) @map("created_at")
+  updatedAt               DateTime        @updatedAt @map("updated_at")
+  buyer                   User            @relation("BuyerCheckoutGroups", fields: [buyerId], references: [id])
   orders                  Order[]
   packages                OrderPackage[]
   payment                 Payment?
@@ -1819,174 +1819,174 @@ model OrderPackage {
 }
 
 model Order {
-  id                         String                   @id @default(uuid())
-  orderNumber                String                   @unique @map("order_number")
-  buyerId                    String                   @map("buyer_id")
-  sellerId                   String                   @map("seller_id")
-  productId                  String                   @map("product_id")
-  offerId                    String?                  @unique @map("offer_id")
+  id                          String                   @id @default(uuid())
+  orderNumber                 String                   @unique @map("order_number")
+  buyerId                     String                   @map("buyer_id")
+  sellerId                    String                   @map("seller_id")
+  productId                   String                   @map("product_id")
+  offerId                     String?                  @unique @map("offer_id")
   // Sipariş kaynağı: `offerId` tek ayırt edici olmasın (rapor/filtre; ilişki
   // sonradan kopsa da kaynak kalıcı). offer = kabul edilen tekliften (misafir
   // teklif dahil), platform_service = üyelik/öne çıkarma sanal ürün siparişi.
-  origin                     OrderOrigin              @default(direct_sale)
-  checkoutGroupId            String?                  @map("checkout_group_id")
+  origin                      OrderOrigin              @default(direct_sale)
+  checkoutGroupId             String?                  @map("checkout_group_id")
   // Satıcı-paketi (çatı): aynı sepet+satıcı order'ları burada birleşir. Nullable —
   // Faz 1'de grup/direct checkout doldurur; eski/diğer yollar null kalabilir.
-  packageId                  String?                  @map("package_id")
-  shippingAddressId          String?                  @map("shipping_address_id")
+  packageId                   String?                  @map("package_id")
+  shippingAddressId           String?                  @map("shipping_address_id")
   // Adet (sepet çoklu-adet): çoğu ikinci-el ürün tekildir → default 1. unitPrice
   // birim fiyatı. Adet bazlı kısmi iade buna dayanır.
-  quantity                   Int                      @default(1)
-  unitPrice                  Decimal?                 @map("unit_price") @db.Decimal(10, 2)
-  totalAmount                Decimal                  @map("total_amount") @db.Decimal(10, 2)
-  shippingCost               Decimal                  @default(0) @map("shipping_cost") @db.Decimal(10, 2)
-  commissionAmount           Decimal                  @map("commission_amount") @db.Decimal(10, 2)
-  status                     OrderStatus              @default(pending_payment)
-  shippingAddress            Json?                    @map("shipping_address")
-  createdAt                  DateTime                 @default(now()) @map("created_at")
+  quantity                    Int                      @default(1)
+  unitPrice                   Decimal?                 @map("unit_price") @db.Decimal(10, 2)
+  totalAmount                 Decimal                  @map("total_amount") @db.Decimal(10, 2)
+  shippingCost                Decimal                  @default(0) @map("shipping_cost") @db.Decimal(10, 2)
+  commissionAmount            Decimal                  @map("commission_amount") @db.Decimal(10, 2)
+  status                      OrderStatus              @default(pending_payment)
+  shippingAddress             Json?                    @map("shipping_address")
+  createdAt                   DateTime                 @default(now()) @map("created_at")
   // Test şeridi damgası: alıcı/ödeyen test hesabıysa DB trigger'ı INSERT'te
   // true yazar (uygulama koduna güvenilmez). Finans/mutabakat/fatura/kargo/
   // payout bu bayrakla test kayıtlarını dışlar.
-  isTest                     Boolean                  @default(false) @map("is_test")
-  updatedAt                  DateTime                 @updatedAt @map("updated_at")
-  version                    Int                      @default(1)
-  buyerFeeAmount             Decimal                  @default(0) @map("buyer_fee_amount") @db.Decimal(10, 2)
-  sellerFeeAmount            Decimal                  @default(0) @map("seller_fee_amount") @db.Decimal(10, 2)
+  isTest                      Boolean                  @default(false) @map("is_test")
+  updatedAt                   DateTime                 @updatedAt @map("updated_at")
+  version                     Int                      @default(1)
+  buyerFeeAmount              Decimal                  @default(0) @map("buyer_fee_amount") @db.Decimal(10, 2)
+  sellerFeeAmount             Decimal                  @default(0) @map("seller_fee_amount") @db.Decimal(10, 2)
   // v2 kesinti kırılımı (CommissionRule v2). buyerFeeAmount = buyerCommission + buyerServiceFee,
   // sellerFeeAmount = sellerCommission + sellerPlatformFee (geriye-uyum için toplamlar korunur).
-  buyerCommissionAmount      Decimal                  @default(0) @map("buyer_commission_amount") @db.Decimal(10, 2)
-  buyerServiceFeeAmount      Decimal                  @default(0) @map("buyer_service_fee_amount") @db.Decimal(10, 2)
-  sellerCommissionAmount     Decimal                  @default(0) @map("seller_commission_amount") @db.Decimal(10, 2)
-  sellerPlatformFeeAmount    Decimal                  @default(0) @map("seller_platform_fee_amount") @db.Decimal(10, 2)
+  buyerCommissionAmount       Decimal                  @default(0) @map("buyer_commission_amount") @db.Decimal(10, 2)
+  buyerServiceFeeAmount       Decimal                  @default(0) @map("buyer_service_fee_amount") @db.Decimal(10, 2)
+  sellerCommissionAmount      Decimal                  @default(0) @map("seller_commission_amount") @db.Decimal(10, 2)
+  sellerPlatformFeeAmount     Decimal                  @default(0) @map("seller_platform_fee_amount") @db.Decimal(10, 2)
   // Kargo tutarının taraflara dağılımı. shippingCost geriye uyumlu alıcı payıdır;
   // tam paket bedeli OrderPackage.fullShippingAmount snapshot'ında tutulur.
-  buyerShippingAmount        Decimal                  @default(0) @map("buyer_shipping_amount") @db.Decimal(10, 2)
-  sellerShippingAmount       Decimal                  @default(0) @map("seller_shipping_amount") @db.Decimal(10, 2)
-  discountAmount             Decimal                  @default(0) @map("discount_amount") @db.Decimal(10, 2)
-  discountBreakdown          Json?                    @map("discount_breakdown")
-  discountCode               String?                  @map("discount_code")
+  buyerShippingAmount         Decimal                  @default(0) @map("buyer_shipping_amount") @db.Decimal(10, 2)
+  sellerShippingAmount        Decimal                  @default(0) @map("seller_shipping_amount") @db.Decimal(10, 2)
+  discountAmount              Decimal                  @default(0) @map("discount_amount") @db.Decimal(10, 2)
+  discountBreakdown           Json?                    @map("discount_breakdown")
+  discountCode                String?                  @map("discount_code")
   // Bu siparişteki kupon indiriminin PLATFORM tarafından finanse edilen kısmı (F2.4).
   // Satıcı payout tabanı bu kadar geri EKLENİR (escrow) → platform-fonlu kampanyada
   // satıcı indirim öncesi tutar üzerinden ödenir. Varsayılan 0 (satıcı-fonlu, eski davranış).
-  platformFundedDiscount     Decimal                  @default(0) @map("platform_funded_discount") @db.Decimal(10, 2)
+  platformFundedDiscount      Decimal                  @default(0) @map("platform_funded_discount") @db.Decimal(10, 2)
   // Platformun BEDEL kalemlerinden verdiği indirimler. Kesinti kolonları
   // (komisyon / hizmet bedeli / kargo payı) zaten indirim SONRASI tutarı taşır;
   // bu iki toplam yalnız raporlama ve iade denetimi içindir. Alıcı tarafı
   // alıcının ödediğini, satıcı tarafı satıcının hak edişini etkiler.
-  buyerFeeDiscountAmount     Decimal                  @default(0) @map("buyer_fee_discount_amount") @db.Decimal(10, 2)
-  sellerFeeDiscountAmount    Decimal                  @default(0) @map("seller_fee_discount_amount") @db.Decimal(10, 2)
+  buyerFeeDiscountAmount      Decimal                  @default(0) @map("buyer_fee_discount_amount") @db.Decimal(10, 2)
+  sellerFeeDiscountAmount     Decimal                  @default(0) @map("seller_fee_discount_amount") @db.Decimal(10, 2)
   // Kalem bazında hangi kampanyadan ne kadar indirim verildiğinin snapshot'ı.
-  feeDiscountBreakdown       Json?                    @map("fee_discount_breakdown")
+  feeDiscountBreakdown        Json?                    @map("fee_discount_breakdown")
   // Kodsuz (otomatik) kampanyaların bütçesi sipariş oluşurken harcanır; ödenmeyen
   // sipariş kapanırken geri verilir. Bu damga geri vermeyi TEK seferlik yapar
   // (claim) — kupon bütçesi ise CouponReservation üzerinden döner.
-  feeDiscountBudgetReleasedAt DateTime?               @map("fee_discount_budget_released_at")
+  feeDiscountBudgetReleasedAt DateTime?                @map("fee_discount_budget_released_at")
   // Siparişin ÜRÜN TABANI: alıcıdan ürün için gerçekten tahsil edilen tutar
   // (indirim ve kupon sonrası). Komisyon, kargo kararı, vergiler, alıcı toplamı ve
   // satıcı hak edişi hep bu tabandan türer — `order-charged-base.helper.ts`.
   // İndirim ÖNCESİ liste fiyatı burada DEĞİL; discountAmount, discountBreakdown
   // ve financialSnapshot.pricing.originalUnitPrice alanlarında durur.
-  subtotal                   Decimal?                 @db.Decimal(10, 2)
+  subtotal                    Decimal?                 @db.Decimal(10, 2)
   // ÜRÜN bedelinin KDV'si. `product_vat_enabled` ayarıyla yönetilir; varsayılan
   // KAPALI olduğu için yeni siparişlerde 0'dır (vitrin fiyatı KDV dahil sayılır,
   // beyanı satıcı yapar). Ayar açılırsa TaxRule/TaxRate altyapısı devreye girer.
-  taxAmount                  Decimal                  @default(0) @map("tax_amount") @db.Decimal(10, 2)
+  taxAmount                   Decimal                  @default(0) @map("tax_amount") @db.Decimal(10, 2)
   // HİZMET bedellerinin KDV'si — "hizmeti kim aldıysa KDV'sini o öder".
   // Alıcı tarafı (alıcı komisyonu + koruma hizmeti + alıcı kargo payı) alıcının
   // ödediğine EKLENİR; satıcı tarafı (satıcı komisyonu + platform hizmet bedeli +
   // satıcı kargo payı) satıcı payout'undan KESİLİR. Matrahlar yukarıdaki kolonlarda
   // durduğu için kalem bazında KDV saklanmaz — iki taraf toplamı yeterlidir.
-  buyerServiceTaxAmount      Decimal                  @default(0) @map("buyer_service_tax_amount") @db.Decimal(10, 2)
-  sellerServiceTaxAmount     Decimal                  @default(0) @map("seller_service_tax_amount") @db.Decimal(10, 2)
+  buyerServiceTaxAmount       Decimal                  @default(0) @map("buyer_service_tax_amount") @db.Decimal(10, 2)
+  sellerServiceTaxAmount      Decimal                  @default(0) @map("seller_service_tax_amount") @db.Decimal(10, 2)
   // Tahsil anındaki hizmet KDV oranı (%). Toplamlar yukarıda duruyor ama ekranlar
   // "komisyon KDV'si / kargo KDV'si / hizmet bedeli KDV'si" kırılımını gösterebilsin
   // diye oran da snapshot'lanır: ayar sonradan değişse bile eski sipariş, tahsil
   // edildiği oranla görüntülenir.
-  serviceVatRate             Decimal                  @default(0) @map("service_vat_rate") @db.Decimal(5, 2)
+  serviceVatRate              Decimal                  @default(0) @map("service_vat_rate") @db.Decimal(5, 2)
   // E-ticaret stopajı (GVK 94/19, varsayılan %1): yalnız vergi mükellefi (kurumsal onaylı)
   // satıcıda, KDV hariç ürün bedeli üzerinden. Satıcı payout'undan kesilir; alıcı tutarını etkilemez.
-  withholdingTaxAmount       Decimal                  @default(0) @map("withholding_tax_amount") @db.Decimal(10, 2)
+  withholdingTaxAmount        Decimal                  @default(0) @map("withholding_tax_amount") @db.Decimal(10, 2)
   // Checkout anındaki fiyat, vergi, komisyon, üyelik, indirim ve kargo kararları.
   // Sonradan değişen kurallar geçmiş siparişin finansal sonucunu değiştirmemelidir.
-  financialSnapshot          Json?                    @map("financial_snapshot")
-  cancelReason               String?                  @map("cancel_reason")
-  cancellationReasonCode     OrderCancellationReason? @map("cancellation_reason_code")
-  cancellationPolicySnapshot Json?                    @map("cancellation_policy_snapshot")
-  cancellationType           OrderCancellationType?   @map("cancellation_type")
+  financialSnapshot           Json?                    @map("financial_snapshot")
+  cancelReason                String?                  @map("cancel_reason")
+  cancellationReasonCode      OrderCancellationReason? @map("cancellation_reason_code")
+  cancellationPolicySnapshot  Json?                    @map("cancellation_policy_snapshot")
+  cancellationType            OrderCancellationType?   @map("cancellation_type")
   /// İptalin GERÇEKLEŞTİĞİ an. `status = cancelled` + `createdAt` ikilisi
   /// "bu dönemde kaç sipariş iptal edildi" sorusuna cevap veremiyordu: sipariş
   /// oluşturulduğu dönemde değil, iptal edildiği dönemde sayılmalı. Her iptal
   /// yolu (alıcı/admin iptali, ödeme süresi dolumu, hazırlama süresi dolumu,
   /// stok tükenmesi kaskadı, checkout temizliği, tam iade) bu damgayı yazar.
   /// GERİYE DÖNÜK DOLDURULAMAZ — eski iptallerde null kalır.
-  cancelledAt                DateTime?                @map("cancelled_at")
+  cancelledAt                 DateTime?                @map("cancelled_at")
   /// İptali KİMİN yaptığı — `cancelledAt` ile aynı yardımcıdan
   /// (`orderCancelledData`) yazılır, unutulamaz. null = bilinmiyor: bu göçten
   /// önceki iptaller yalnız aktörün KESİN olduğu kurallarla dolduruldu.
   /// Yeniden ödemeye açılan (reactivate) siparişte temizlenir.
-  cancelledBy                CancellationActor?       @map("cancelled_by")
+  cancelledBy                 CancellationActor?       @map("cancelled_by")
   /// Yönetici (platform) iptalinin katalog nedeni — `@tarodan/types`
   /// `ADMIN_CANCEL_REASON_CODES` (uygulama doğrular; katalog göçsüz
   /// büyüyebilsin diye enum değil metin). İptaller ekranı bununla süzer ve
   /// taraflara bu kodun ETİKETİ söylenir. Yöneticinin iç notu burada DEĞİL,
   /// yalnız denetim kaydındadır. Yönetici iptali dışındaki yollarda null.
-  adminCancelReasonCode      String?                  @map("admin_cancel_reason_code")
+  adminCancelReasonCode       String?                  @map("admin_cancel_reason_code")
   /// Satıcının kargoya verme son tarihi (ödemede damgalanır). Tek seferlik
   /// uzatmada (Süreler ve Kurallar → `preparingDeadlineDays` = `extend_once`)
   /// YENİ son tarih buraya yazılır: uyarı, süre dolumu, panel ve ekranlar hep
   /// bu kolonu okur, uzatmayı ayrıca bilmeleri gerekmez.
-  preparingDeadline          DateTime?                @map("preparing_deadline")
+  preparingDeadline           DateTime?                @map("preparing_deadline")
   /// Son tarih uyarısının gittiği an. Uzatmada temizlenir: satıcı yeni son
   /// tarihten önce yeniden uyarılır.
-  preparingWarningSentAt     DateTime?                @map("preparing_warning_sent_at")
+  preparingWarningSentAt      DateTime?                @map("preparing_warning_sent_at")
   /// Tek seferlik hazırlık uzatmasının verildiği an — aynı zamanda CLAIM
   /// damgası: doluysa sipariş bir daha uzatılmaz, sonraki dolumda iptal +
   /// iade çalışır. null = hiç uzatılmadı.
-  preparingExtendedAt        DateTime?                @map("preparing_extended_at")
+  preparingExtendedAt         DateTime?                @map("preparing_extended_at")
   /// Uzatmadan ÖNCEKİ (ilk) son tarih — yalnız kayıt/görüntü için; hiçbir
   /// karar bunu okumaz. Uzatılmamış siparişte null.
-  originalPreparingDeadline  DateTime?                @map("original_preparing_deadline")
-  reservationReleasedAt      DateTime?                @map("reservation_released_at")
-  stockRestoredAt            DateTime?                @map("stock_restored_at")
-  paymentExpiresAt           DateTime                 @map("payment_expires_at")
-  deliveredAt                DateTime?                @map("delivered_at")
+  originalPreparingDeadline   DateTime?                @map("original_preparing_deadline")
+  reservationReleasedAt       DateTime?                @map("reservation_released_at")
+  stockRestoredAt             DateTime?                @map("stock_restored_at")
+  paymentExpiresAt            DateTime                 @map("payment_expires_at")
+  deliveredAt                 DateTime?                @map("delivered_at")
   /// Cayma (iade talep) penceresinin bittiği an — teslimde, o an geçerli
   /// `returnWindowDays` (Süreler ve Kurallar) ile DAMGALANIR. İade uygunluğu,
   /// teslim → tamamlandı geçişi ve escrow `releaseAt` (= bu + payout grace)
   /// hep bu damgayı okur: admin pencereyi sonradan değiştirse de bir siparişte
   /// iade hakkı ile satıcı ödemesi çakışamaz. null = damgadan önce teslim
   /// edilmiş eski sipariş; o zaman bugünkü pencereyle hesaplanır.
-  returnWindowEndsAt         DateTime?                @map("return_window_ends_at")
-  confirmationDeadline       DateTime?                @map("confirmation_deadline")
-  buyerConfirmedAt           DateTime?                @map("buyer_confirmed_at")
-  buyerConfirmationType      BuyerConfirmationType?   @map("buyer_confirmation_type")
-  completedAt                DateTime?                @map("completed_at")
+  returnWindowEndsAt          DateTime?                @map("return_window_ends_at")
+  confirmationDeadline        DateTime?                @map("confirmation_deadline")
+  buyerConfirmedAt            DateTime?                @map("buyer_confirmed_at")
+  buyerConfirmationType       BuyerConfirmationType?   @map("buyer_confirmation_type")
+  completedAt                 DateTime?                @map("completed_at")
   // Teslim gelir faturaları (komisyon / hizmet bedeli / platform satışı) kesildi mi?
   // AÇIK işaret: eskiden backfill cron'u her turda TÜM delivered+completed siparişleri
   // (take:500, sırasız) tarıyordu; tamamlanan siparişler aday kümesinden hiç çıkmadığı
   // için 500 sipariş sonrası yeni teslimatlar pencereye giremeyip faturasız kalabiliyordu.
-  revenueInvoicedAt          DateTime?                @map("revenue_invoiced_at")
+  revenueInvoicedAt           DateTime?                @map("revenue_invoiced_at")
   /// Kurumsal satıcıya "ürün faturasını yükle" hatırlatmasının gönderildiği an.
   /// Ürün faturası SATICININ yasal yükümlülüğüdür ve elle yüklenir; hiçbir şey
   /// takip etmediği için yüklenmeyen faturalar sessizce kayboluyordu. Tek atışlık
   /// işaret: hatırlatma sipariş başına bir kez gider.
-  sellerInvoiceReminderAt    DateTime?                @map("seller_invoice_reminder_at")
-  invoice                    Invoice?
-  buyer                      User                     @relation("BuyerOrders", fields: [buyerId], references: [id])
-  offer                      Offer?                   @relation(fields: [offerId], references: [id])
-  product                    Product                  @relation(fields: [productId], references: [id])
-  seller                     User                     @relation("SellerOrders", fields: [sellerId], references: [id])
-  payment                    Payment?
-  shipment                   Shipment?
-  refundRequests             RefundRequest[]
-  refundAttempts             RefundAttempt[]
-  commissionLedger           CommissionLedger?
-  sellerUploadedInvoice      SellerUploadedInvoice?
-  membershipPayment          MembershipPayment?
-  checkoutGroup              CheckoutGroup?           @relation(fields: [checkoutGroupId], references: [id])
-  package                    OrderPackage?            @relation(fields: [packageId], references: [id])
-  couponReservation          CouponReservation?
-  consentRecords             ConsentRecord[]
+  sellerInvoiceReminderAt     DateTime?                @map("seller_invoice_reminder_at")
+  invoice                     Invoice?
+  buyer                       User                     @relation("BuyerOrders", fields: [buyerId], references: [id])
+  offer                       Offer?                   @relation(fields: [offerId], references: [id])
+  product                     Product                  @relation(fields: [productId], references: [id])
+  seller                      User                     @relation("SellerOrders", fields: [sellerId], references: [id])
+  payment                     Payment?
+  shipment                    Shipment?
+  refundRequests              RefundRequest[]
+  refundAttempts              RefundAttempt[]
+  commissionLedger            CommissionLedger?
+  sellerUploadedInvoice       SellerUploadedInvoice?
+  membershipPayment           MembershipPayment?
+  checkoutGroup               CheckoutGroup?           @relation(fields: [checkoutGroupId], references: [id])
+  package                     OrderPackage?            @relation(fields: [packageId], references: [id])
+  couponReservation           CouponReservation?
+  consentRecords              ConsentRecord[]
 
   @@index([buyerId])
   @@index([sellerId])
@@ -2288,40 +2288,40 @@ enum PaytrMerchant {
 // paymentId/refundAttemptId YUMUŞAK bağ (FK yok — PaymentProviderEvent ile aynı
 // gerekçe): eşleştirme Faz 3'te doldurur, eşleşmeyen satır alarm listesine düşer.
 model PaytrStatementLine {
-  id               String                 @id @default(uuid())
+  id                  String                 @id @default(uuid())
   // Dökümün çekildiği mağaza — her mağaza kendi işlem dökümünü verir.
-  paytrMerchant    PaytrMerchant          @default(marketplace) @map("paytr_merchant")
-  merchantOid      String                 @map("merchant_oid")
-  type             PaytrStatementLineType
-  amount           Decimal                @db.Decimal(12, 2)
+  paytrMerchant       PaytrMerchant          @default(marketplace) @map("paytr_merchant")
+  merchantOid         String                 @map("merchant_oid")
+  type                PaytrStatementLineType
+  amount              Decimal                @db.Decimal(12, 2)
   // PayTR'nin bu işlemden kestiği komisyon (kesinti_tutari/orani) ve kalan net.
-  fee              Decimal?               @db.Decimal(12, 2)
-  feeRate          Decimal?               @map("fee_rate") @db.Decimal(6, 3)
-  net              Decimal?               @db.Decimal(12, 2)
-  currency         String                 @default("TL")
-  installment      Int?
-  cardBrand        String?                @map("card_brand")
-  maskedPan        String?                @map("masked_pan")
-  paymentType      String?                @map("payment_type") // KART | EFT
+  fee                 Decimal?               @db.Decimal(12, 2)
+  feeRate             Decimal?               @map("fee_rate") @db.Decimal(6, 3)
+  net                 Decimal?               @db.Decimal(12, 2)
+  currency            String                 @default("TL")
+  installment         Int?
+  cardBrand           String?                @map("card_brand")
+  maskedPan           String?                @map("masked_pan")
+  paymentType         String?                @map("payment_type") // KART | EFT
   // İşlem günü (PayTR "GG.AA.YYYY" verir; gün hassasiyetinde saklanır).
-  transactionDate  DateTime               @map("transaction_date")
-  matchStatus      PaytrMatchStatus       @default(unmatched) @map("match_status")
-  paymentId        String?                @map("payment_id")
-  refundAttemptId  String?                @map("refund_attempt_id")
+  transactionDate     DateTime               @map("transaction_date")
+  matchStatus         PaytrMatchStatus       @default(unmatched) @map("match_status")
+  paymentId           String?                @map("payment_id")
+  refundAttemptId     String?                @map("refund_attempt_id")
   // Üyelik yenilemesi (MembershipPayment) karşılığı — Payment tablosunda değildir.
-  membershipPaymentId String?             @map("membership_payment_id")
+  membershipPaymentId String?                @map("membership_payment_id")
   // psp_fee_accrued ledger kaydı yazıldı mı (idempotens damgası) — Faz 5.
-  ledgerRecordedAt DateTime?              @map("ledger_recorded_at")
+  ledgerRecordedAt    DateTime?              @map("ledger_recorded_at")
   // Eşleştirme motoru son ne zaman denedi: kalıcı karşılıksız satırlar her gece
   // sırayı tıkamasın (yeni satır önce, eskiler günde bir).
-  lastMatchAttemptAt DateTime?            @map("last_match_attempt_at")
+  lastMatchAttemptAt  DateTime?              @map("last_match_attempt_at")
   // Çözümleme akışı: admin satırı inceleyip kapattı (iş listesinden düşer).
-  resolvedAt       DateTime?              @map("resolved_at")
-  resolvedById     String?                @map("resolved_by_id")
-  resolutionNote   String?                @map("resolution_note")
-  raw              Json?
-  createdAt        DateTime               @default(now()) @map("created_at")
-  updatedAt        DateTime               @updatedAt @map("updated_at")
+  resolvedAt          DateTime?              @map("resolved_at")
+  resolvedById        String?                @map("resolved_by_id")
+  resolutionNote      String?                @map("resolution_note")
+  raw                 Json?
+  createdAt           DateTime               @default(now()) @map("created_at")
+  updatedAt           DateTime               @updatedAt @map("updated_at")
 
   // Dedup: kayan pencereli sync aynı satırı iki kez yazamaz. PayTR satır kimliği
   // vermediğinden doğal anahtar (oid+tip+gün+tutar) kullanılır.
@@ -2350,22 +2350,22 @@ enum PaytrMatchStatus {
 // toplamlar. isProjection=true satırlar future_payments bloğundan gelir ve her
 // sync'te sil-yaz yenilenir (PayTR projeksiyonu her gün günceller).
 model PaytrSettlement {
-  id           String                @id @default(uuid())
+  id            String                @id @default(uuid())
   // Hakedişi veren mağaza: iki mağaza aynı gün ayrı hakediş üretir.
   paytrMerchant PaytrMerchant         @default(marketplace) @map("paytr_merchant")
-  datePaid     DateTime              @map("date_paid")
-  currency     String                @default("TL")
-  salesTotal   Decimal               @map("sales_total") @db.Decimal(12, 2)
-  returnTotal  Decimal               @map("return_total") @db.Decimal(12, 2)
-  netTotal     Decimal               @map("net_total") @db.Decimal(12, 2)
-  merchantIban String?               @map("merchant_iban")
-  isProjection Boolean               @default(false) @map("is_projection")
+  datePaid      DateTime              @map("date_paid")
+  currency      String                @default("TL")
+  salesTotal    Decimal               @map("sales_total") @db.Decimal(12, 2)
+  returnTotal   Decimal               @map("return_total") @db.Decimal(12, 2)
+  netTotal      Decimal               @map("net_total") @db.Decimal(12, 2)
+  merchantIban  String?               @map("merchant_iban")
+  isProjection  Boolean               @default(false) @map("is_projection")
   // odeme-detayi kalemleri çekildi (boş dönse bile): her gece yeniden istenmesin.
-  itemsSyncedAt DateTime?            @map("items_synced_at")
-  raw          Json?
-  createdAt    DateTime              @default(now()) @map("created_at")
-  updatedAt    DateTime              @updatedAt @map("updated_at")
-  items        PaytrSettlementItem[]
+  itemsSyncedAt DateTime?             @map("items_synced_at")
+  raw           Json?
+  createdAt     DateTime              @default(now()) @map("created_at")
+  updatedAt     DateTime              @updatedAt @map("updated_at")
+  items         PaytrSettlementItem[]
 
   @@unique([paytrMerchant, datePaid, currency, isProjection], name: "settlement_day")
   @@index([datePaid])
@@ -2558,83 +2558,83 @@ model Invoice {
 /// İlişki (User/Order) bilerek eklenmedi (daha az invaziv); kimlikler düz alan olarak tutulur.
 /// Tutarlar olay anındaki KAYITLI snapshot'tan gelir (oran/fiyat sonradan değişse de etkilenmez).
 model ElogoInvoice {
-  id                        String             @id @default(uuid())
+  id                        String               @id @default(uuid())
   type                      ElogoInvoiceType
   /// Kaynak kaydın id'si (orderId / membershipPaymentId / boostId). type+sourceId tekil → idempotency.
-  sourceId                  String             @map("source_id")
+  sourceId                  String               @map("source_id")
   /// FATURA KAYIT NO (ör. KYT-K7X9M2QF3N) — kesim anında snapshot'lanır. Koli/sipariş
   /// referansından türetilir (gövde aynı, önek KYT); faturaya "Kayıt No" olarak basılır
   /// ve hakediş dökümünün aynı adlı kolonunda durur. sourceId bir UUID, belgede yeri yok.
-  sourceReference           String?            @map("source_reference")
+  sourceReference           String?              @map("source_reference")
   /// İşlemin SATICI tarafı — belgenin MUHATABI değil (o `recipientUserId`),
   /// dayandığı işlemin satan tarafıdır. Üyelik/öne çıkarma gibi Tarodan'ın
   /// kendi satışlarında PLATFORM SATICISI kullanıcısıdır; takasta bedeli
   /// ödemeyen taraftır. Kaynak çözülemezse NULL kalır.
-  sellerUserId              String?            @map("seller_user_id")
+  sellerUserId              String?              @map("seller_user_id")
   /// İşlemin ALICI tarafı = bedeli ödeyen taraf. Takasta ödeyen taraftır.
-  buyerUserId               String?            @map("buyer_user_id")
+  buyerUserId               String?              @map("buyer_user_id")
   /// İşlemin GERÇEKLEŞME ŞEKLİ — belgenin hangi işlemden doğduğu (doğrudan
   /// satış / teklif / takas / platform hizmeti). Kaynak kayıttan kesim anında
   /// çözülür; çözülemeyen eski kayıtlarda NULL kalır.
   context                   ElogoInvoiceContext? @map("context")
-  recipientUserId           String?            @map("recipient_user_id")
-  recipientVknTckn          String?            @map("recipient_vkn_tckn")
-  recipientName             String?            @map("recipient_name")
+  recipientUserId           String?              @map("recipient_user_id")
+  recipientVknTckn          String?              @map("recipient_vkn_tckn")
+  recipientName             String?              @map("recipient_name")
   // Misafir siparişleri tek sistem kullanıcısını paylaşır; gönderim anında alıcıyı
   // kullanıcı kaydından çözmek faturayı sistem e-postasına/boş adrese yazıyordu.
   // Kesim anındaki GERÇEK iletişim bilgisi burada snapshot'lanır.
-  recipientEmail            String?            @map("recipient_email")
-  recipientCity             String?            @map("recipient_city")
-  recipientDistrict         String?            @map("recipient_district")
-  recipientStreet           String?            @map("recipient_street")
-  documentType              String             @default("EARCHIVE") @map("document_type") // EARCHIVE | EINVOICE
-  sendType                  String             @default("ELEKTRONIK") @map("send_type")
-  invoiceNumber             String?            @unique @map("invoice_number")
-  ettn                      String?            @unique
-  netAmount                 Decimal            @map("net_amount") @db.Decimal(10, 2)
+  recipientEmail            String?              @map("recipient_email")
+  recipientCity             String?              @map("recipient_city")
+  recipientDistrict         String?              @map("recipient_district")
+  recipientStreet           String?              @map("recipient_street")
+  documentType              String               @default("EARCHIVE") @map("document_type") // EARCHIVE | EINVOICE
+  sendType                  String               @default("ELEKTRONIK") @map("send_type")
+  invoiceNumber             String?              @unique @map("invoice_number")
+  ettn                      String?              @unique
+  netAmount                 Decimal              @map("net_amount") @db.Decimal(10, 2)
   /// Belgede gösterilen İSKONTO toplamı (KDV hariç). Kesinti kolonları indirim
   /// SONRASI tutarı taşır; brüt bedel = netAmount + discountTotal. Raporlama için
   /// kolon, kalem kırılımı lineItems'ta.
-  discountTotal             Decimal            @default(0) @map("discount_total") @db.Decimal(10, 2)
-  taxAmount                 Decimal            @map("tax_amount") @db.Decimal(10, 2)
-  total                     Decimal            @db.Decimal(10, 2)
+  discountTotal             Decimal              @default(0) @map("discount_total") @db.Decimal(10, 2)
+  taxAmount                 Decimal              @map("tax_amount") @db.Decimal(10, 2)
+  total                     Decimal              @db.Decimal(10, 2)
   /// İlk oluşturma anındaki brüt tutar. Pending belge iadede netleştirilse bile
   /// tekrarlı kısmi iadeler bu immutable baz üzerinden hesaplanır.
-  originalTotal             Decimal            @map("original_total") @db.Decimal(10, 2)
-  vatRate                   Decimal            @default(20) @map("vat_rate") @db.Decimal(5, 2)
-  status                    ElogoInvoiceStatus @default(pending)
-  elogoRefId                String?            @map("elogo_ref_id")
-  elogoResultCode           Int?               @map("elogo_result_code")
-  elogoResultMsg            String?            @map("elogo_result_msg")
+  originalTotal             Decimal              @map("original_total") @db.Decimal(10, 2)
+  vatRate                   Decimal              @default(20) @map("vat_rate") @db.Decimal(5, 2)
+  status                    ElogoInvoiceStatus   @default(pending)
+  elogoRefId                String?              @map("elogo_ref_id")
+  elogoResultCode           Int?                 @map("elogo_result_code")
+  elogoResultMsg            String?              @map("elogo_result_msg")
   /// İADE faturasında iadesi yapılan orijinal faturanın numarası.
-  billingReference          String?            @map("billing_reference")
+  billingReference          String?              @map("billing_reference")
   /// İADE faturasında referans verilen orijinal faturanın düzenlenme tarihi.
   /// Retry sırasında "bugünün tarihi" kullanılmaması için immutable snapshot.
-  billingReferenceIssueDate DateTime?          @map("billing_reference_issue_date")
+  billingReferenceIssueDate DateTime?            @map("billing_reference_issue_date")
   /// Fatura kaleminin açıklaması — kesim anında snapshot'lanır (ör. boost için
   /// paket adını içerir). Boşsa tipin varsayılan etiketi (LINE_DESCRIPTION) kullanılır.
-  lineDescription           String?            @map("line_description")
+  lineDescription           String?              @map("line_description")
   /// ÇOK KALEMLİ belgenin satırları (ürün + kargo + hizmet bedeli), kesim anında
   /// snapshot'lanır: `[{ name, quantity, net, unitPrice, vatRate }]`. Yalnız ürün
   /// faturasında (platform satışı) dolar; hizmet faturaları tek kalemdir ve burası
   /// NULL kalır. Fiyat/oran/ürün adı sonradan değişse bile retry aynı belgeyi üretir.
-  lineItems                 Json?              @map("line_items")
+  lineItems                 Json?                @map("line_items")
   /// eLogo'dan çekilip S3'e kaydedilen PDF'in S3 anahtarı (documents bucket).
-  pdfUrl                    String?            @map("pdf_url")
+  pdfUrl                    String?              @map("pdf_url")
   /// PDF alıcıya kendi SMTP'mizden e-postalandığı an.
-  emailSentAt               DateTime?          @map("email_sent_at")
-  attemptCount              Int                @default(0) @map("attempt_count")
-  lastAttemptAt             DateTime?          @map("last_attempt_at")
+  emailSentAt               DateTime?            @map("email_sent_at")
+  attemptCount              Int                  @default(0) @map("attempt_count")
+  lastAttemptAt             DateTime?            @map("last_attempt_at")
   /// Pending/failed belgenin hangi refund finalize anına kadar netleştirildiği.
-  refundAdjustedAt          DateTime?          @map("refund_adjusted_at")
-  issuedAt                  DateTime?          @map("issued_at")
-  sentAt                    DateTime?          @map("sent_at")
-  cancelledAt               DateTime?          @map("cancelled_at")
-  cancelReason              String?            @map("cancel_reason")
-  createdAt                 DateTime           @default(now()) @map("created_at")
-  updatedAt                 DateTime           @updatedAt @map("updated_at")
-  seller                    User?              @relation("ElogoInvoiceSeller", fields: [sellerUserId], references: [id])
-  buyer                     User?              @relation("ElogoInvoiceBuyer", fields: [buyerUserId], references: [id])
+  refundAdjustedAt          DateTime?            @map("refund_adjusted_at")
+  issuedAt                  DateTime?            @map("issued_at")
+  sentAt                    DateTime?            @map("sent_at")
+  cancelledAt               DateTime?            @map("cancelled_at")
+  cancelReason              String?              @map("cancel_reason")
+  createdAt                 DateTime             @default(now()) @map("created_at")
+  updatedAt                 DateTime             @updatedAt @map("updated_at")
+  seller                    User?                @relation("ElogoInvoiceSeller", fields: [sellerUserId], references: [id])
+  buyer                     User?                @relation("ElogoInvoiceBuyer", fields: [buyerUserId], references: [id])
 
   @@unique([type, sourceId])
   @@index([status])
@@ -3398,30 +3398,30 @@ model EmailLog {
 /// atar. Sunucu From == oturum açan kullanıcı şartı koyduğu için her kutu kendi
 /// SMTP oturumuyla gönderir (SmtpProvider'daki kutu başına transport havuzu).
 model MailSenderAccount {
-  id          String   @id @default(uuid())
+  id                String    @id @default(uuid())
   /// Posta kutusu adresi; küçük harfe çevrilmiş, benzersiz. From adresi budur.
-  address     String   @unique
+  address           String    @unique
   /// From başlığındaki görünen ad ("Tarodan Sipariş"); alan kendi adını verebilir.
-  displayName String   @map("display_name")
+  displayName       String    @map("display_name")
   /// null = env'deki varsayılan SMTP_HOST / SMTP_PORT / SMTP_SECURE.
-  host        String?
-  port        Int?
-  secure      Boolean?
+  host              String?
+  port              Int?
+  secure            Boolean?
   /// SMTP oturum kullanıcısı; boş bırakılırsa adresin kendisi yazılır.
-  username    String
+  username          String
   /// AES-256-GCM (`MAIL_ACCOUNT_ENCRYPTION_KEY`), `v1:iv:tag:ciphertext`.
   /// Hiçbir yanıtta, logda ya da denetim kaydında dönmez.
-  passwordEncrypted String @map("password_encrypted")
+  passwordEncrypted String    @map("password_encrypted")
   /// Son deneme sonucu: admin "Test gönder" + gerçek gönderimde kutunun oturum /
   /// bağlantı hatası (gönderim o an varsayılan kimliğe düşer ve burası işaretlenir).
-  lastTestAt    DateTime? @map("last_test_at")
-  lastTestOk    Boolean?  @map("last_test_ok")
-  lastTestError String?   @map("last_test_error")
-  createdAt     DateTime  @default(now()) @map("created_at")
-  updatedAt     DateTime  @updatedAt @map("updated_at")
+  lastTestAt        DateTime? @map("last_test_at")
+  lastTestOk        Boolean?  @map("last_test_ok")
+  lastTestError     String?   @map("last_test_error")
+  createdAt         DateTime  @default(now()) @map("created_at")
+  updatedAt         DateTime  @updatedAt @map("updated_at")
   /// User.id (admin); FK yok ki personel silinse de geçmiş kalsın.
-  createdBy     String?   @map("created_by")
-  updatedBy     String?   @map("updated_by")
+  createdBy         String?   @map("created_by")
+  updatedBy         String?   @map("updated_by")
 
   areas MailAreaSetting[]
 
@@ -3432,22 +3432,22 @@ model MailSenderAccount {
 /// (env kimliği), alıcı yok, her iç olay kapalı, teslim `instant`.
 model MailAreaSetting {
   /// `@tarodan/types` MAIL_AREAS değeri (ör. "order", "cancellation").
-  areaId          String             @id @map("area_id")
+  areaId             String             @id @map("area_id")
   /// Kullanımdaki hesap silinemez (RESTRICT; servis 409 döner).
-  senderAccountId String?            @map("sender_account_id")
-  senderAccount   MailSenderAccount? @relation(fields: [senderAccountId], references: [id], onDelete: Restrict)
+  senderAccountId    String?            @map("sender_account_id")
+  senderAccount      MailSenderAccount? @relation(fields: [senderAccountId], references: [id], onDelete: Restrict)
   /// Hesabın görünen adını bu alan için ezer; null = hesabın kendi adı.
-  displayName     String?            @map("display_name")
+  displayName        String?            @map("display_name")
   /// Bu alanın müşteri postalarına Reply-To; null = gönderen adres.
-  replyTo         String?            @map("reply_to")
+  replyTo            String?            @map("reply_to")
   /// İç bildirim alıcıları: küçük harf, tekil, en çok 20 adres (yazarken doğrulanır).
-  internalRecipients Json            @default("[]") @map("internal_recipients")
+  internalRecipients Json               @default("[]") @map("internal_recipients")
   /// İç olay ayarları: `{ "<eventId>": { "enabled": bool, "delivery": "instant"|"hourly"|"daily" } }`
   /// (yazarken doğrulanır; kayıtta olmayan olay = kapalı + instant).
-  events          Json               @default("{}")
-  createdAt       DateTime           @default(now()) @map("created_at")
-  updatedAt       DateTime           @updatedAt @map("updated_at")
-  updatedBy       String?            @map("updated_by")
+  events             Json               @default("{}")
+  createdAt          DateTime           @default(now()) @map("created_at")
+  updatedAt          DateTime           @updatedAt @map("updated_at")
+  updatedBy          String?            @map("updated_by")
 
   @@index([senderAccountId])
   @@map("mail_area_settings")

@@ -55,7 +55,7 @@ export function AccountTestModal({
       form={form}
       onSubmit={(values) => {
         setResult(null);
-        send.mutate(values);
+        send.mutate(values as { to: string });
       }}
       isSubmitting={send.isPending}
       submitLabel={t("admin.mailRouting.accountsTab.test.send")}

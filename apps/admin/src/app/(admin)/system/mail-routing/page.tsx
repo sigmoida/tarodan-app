@@ -40,7 +40,9 @@ export default function MailRoutingPage() {
         description={t("admin.mailRouting.page.description")}
       />
 
-      {!canEdit && <Alert variant="info">{t("admin.mailRouting.readOnly")}</Alert>}
+      {!canEdit && (
+        <Alert variant="info">{t("admin.mailRouting.readOnly")}</Alert>
+      )}
 
       <AdminTabs tabs={tabs} value={tab} onChange={setTab} />
 

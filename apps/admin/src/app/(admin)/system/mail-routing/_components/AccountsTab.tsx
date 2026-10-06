@@ -38,13 +38,10 @@ export function AccountsTab({
 
   // 409 (hesap hâlâ bir alanda kullanımda) mesajını kapanmayan onay
   // penceresinin yanında useAdminMutation'ın hata bildirimi gösterir.
-  const del = useAdminMutation(
-    (id: string) => adminApi.deleteMailAccount(id),
-    {
-      invalidates: [MAIL_ROUTING_RESOURCE],
-      successMessage: t("admin.mailRouting.accountsTab.deleted"),
-    },
-  );
+  const del = useAdminMutation((id: string) => adminApi.deleteMailAccount(id), {
+    invalidates: [MAIL_ROUTING_RESOURCE],
+    successMessage: t("admin.mailRouting.accountsTab.deleted"),
+  });
 
   const columns = useMemo(
     () => [

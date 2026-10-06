@@ -27,6 +27,11 @@ import { AdminAuditService } from "./admin-audit.service";
  * ya da şifreli) bu görünümde YOKTUR. Şifre değişimi yalnız
  * `passwordChanged: true` bayrağıyla izlenir.
  */
+/** Denetim kaydına şifrenin kendisi değil, yalnız değiştiği bilgisi yazılır. */
+interface AuditPasswordFlag {
+  passwordChanged: boolean;
+}
+
 @Injectable()
 export class AdminMailRoutingService {
   constructor(
@@ -61,7 +66,9 @@ export class AdminMailRoutingService {
   ): Promise<MailSenderAccountView> {
     const passwordChanged = Boolean(patch.password?.trim());
     return this.accounts.update(id, patch, adminUserId, (tx, change) =>
-      this.writeAudit(tx, adminUserId, "mail_sender_account_update", id, {
+      this.writeAudit<
+        MailSenderAccountView | (MailSenderAccountView & AuditPasswordFlag)
+      >(tx, adminUserId, "mail_sender_account_update", id, {
         before: change.before,
         after: change.after ? { ...change.after, passwordChanged } : null,
       }),

@@ -3,10 +3,7 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslations } from "next-intl";
 import { adminApi } from "@/lib/api";
-import type {
-  MailAreaId,
-  MailAreaUpdate,
-} from "@/lib/api/mail-routing.types";
+import type { MailAreaId, MailAreaUpdate } from "@/lib/api/mail-routing.types";
 import { adminKeys } from "@/lib/query/keys";
 import { useAdminMutation } from "@/hooks/useAdminMutation";
 import { useTabParam } from "@/hooks/useTabParam";
@@ -15,7 +12,11 @@ import { readMailRoutingState, type PersonChangePlan } from "./mail-routing";
 
 export const MAIL_ROUTING_RESOURCE = "mail-routing";
 
-export const MAIL_ROUTING_TABS = ["accounts", "areas", "notifications"] as const;
+export const MAIL_ROUTING_TABS = [
+  "accounts",
+  "areas",
+  "notifications",
+] as const;
 export type MailRoutingTab = (typeof MAIL_ROUTING_TABS)[number];
 
 const isTab = (value: string): value is MailRoutingTab =>

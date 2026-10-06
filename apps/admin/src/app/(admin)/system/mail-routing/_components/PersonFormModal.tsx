@@ -2,7 +2,12 @@
 
 import { useTranslations } from "next-intl";
 import toast from "react-hot-toast";
-import { FormCheckbox, FormInput, FormModal, useZodForm } from "@tarodan/ui/form";
+import {
+  FormCheckbox,
+  FormInput,
+  FormModal,
+  useZodForm,
+} from "@tarodan/ui/form";
 import type { MailAreaState } from "@/lib/api/mail-routing.types";
 import {
   areaLabel,

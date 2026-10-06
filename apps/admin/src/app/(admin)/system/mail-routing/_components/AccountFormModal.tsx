@@ -1,14 +1,10 @@
 "use client";
 
 import { useState } from "react";
+import type { z } from "zod";
 import { useTranslations } from "next-intl";
 import { Button } from "@tarodan/ui";
-import {
-  FormInput,
-  FormModal,
-  FormSelect,
-  useZodForm,
-} from "@tarodan/ui/form";
+import { FormInput, FormModal, FormSelect, useZodForm } from "@tarodan/ui/form";
 import { adminApi } from "@/lib/api";
 import type { MailSenderAccountView } from "@/lib/api/mail-routing.types";
 import { useAdminMutation } from "@/hooks/useAdminMutation";
@@ -40,11 +36,17 @@ export function AccountFormModal({
   const isEdit = Boolean(account);
   const [showAdvanced, setShowAdvanced] = useState(
     account
-      ? Boolean(account.host) || account.port !== null || account.secure !== null
+      ? Boolean(account.host) ||
+          account.port !== null ||
+          account.secure !== null
       : false,
   );
   const form = useZodForm(accountSchema(t, isEdit), {
-    defaultValues: account ? accountToFormValues(account) : emptyAccountValues,
+    // Şema çıktısı `secure` alanını dar birleşim olarak üretir; form değerleri
+    // aynı üç metinden biridir.
+    defaultValues: (account
+      ? accountToFormValues(account)
+      : emptyAccountValues) as z.infer<ReturnType<typeof accountSchema>>,
   });
 
   const save = useAdminMutation(
@@ -76,7 +78,7 @@ export function AccountFormModal({
           : t("admin.mailRouting.accountsTab.addTitle")
       }
       form={form}
-      onSubmit={(values) => save.mutate(values)}
+      onSubmit={(values) => save.mutate(values as AccountFormValues)}
       isSubmitting={save.isPending}
       submitLabel={isEdit ? t("common.update") : t("common.add")}
     >

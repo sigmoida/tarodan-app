@@ -69,9 +69,12 @@ export function PeopleView({
                 onClick: () => {
                   void confirm({
                     title: t("admin.mailRouting.people.removeTitle"),
-                    description: t("admin.mailRouting.people.removeDescription", {
-                      address: p.address,
-                    }),
+                    description: t(
+                      "admin.mailRouting.people.removeDescription",
+                      {
+                        address: p.address,
+                      },
+                    ),
                     destructive: true,
                     onConfirm: () =>
                       remove.mutateAsync(

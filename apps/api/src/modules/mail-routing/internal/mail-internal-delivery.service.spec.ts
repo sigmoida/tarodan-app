@@ -105,6 +105,17 @@ function build(areaRouting: MailAreaRouting, rows: NoticeRow[] = []) {
   return { service, prisma, registry, smtp, store };
 }
 
+type UpdateManyArgs = {
+  data: Record<string, unknown>;
+  where: { claimId?: unknown };
+};
+
+/** `updateMany` çağrılarının tipli görünümü (jest mock.calls `any[][]` döner). */
+const updateManyCalls = (t: {
+  prisma: { mailInternalNotice: { updateMany: jest.Mock } };
+}): Array<[UpdateManyArgs]> =>
+  t.prisma.mailInternalNotice.updateMany.mock.calls as Array<[UpdateManyArgs]>;
+
 describe("MailInternalDeliveryService — outbox handler", () => {
   it("handler'ını outbox kaydına bağlar", () => {
     const { service, registry } = build(orderArea("instant"));
@@ -243,9 +254,7 @@ describe("MailInternalDeliveryService.runDigest — özet işi", () => {
     expect(mail.to).toBe("siparis@tarodan.com.tr, serhat@tarodan.com.tr");
     expect(mail.template).toBe("internal-digest:hourly");
     expect(summary.stats).toMatchObject({ mails: 1, events: 2 });
-    const markSent = t.prisma.mailInternalNotice.updateMany.mock.calls.find(
-      ([args]: [{ data: Record<string, unknown> }]) => "sentAt" in args.data,
-    );
+    const markSent = updateManyCalls(t).find(([args]) => "sentAt" in args.data);
     expect(markSent).toBeDefined();
   });
 
@@ -254,11 +263,11 @@ describe("MailInternalDeliveryService.runDigest — özet işi", () => {
     t.smtp.sendEmail.mockResolvedValue({ success: false, error: "down" });
 
     await expect(t.service.runDigest("hourly")).rejects.toThrow();
-    const release = t.prisma.mailInternalNotice.updateMany.mock.calls.find(
-      ([args]: [{ data: Record<string, unknown> }]) =>
+    const release = updateManyCalls(t).find(
+      ([args]) =>
         args.data.claimId === null &&
         "claimedAt" in args.data &&
-        (args as { where: { claimId?: unknown } }).where.claimId !== undefined,
+        args.where.claimId !== undefined,
     );
     expect(release).toBeDefined();
   });
