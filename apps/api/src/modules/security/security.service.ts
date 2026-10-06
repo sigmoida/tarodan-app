@@ -19,6 +19,12 @@ import {
   AdminSessionListDto,
 } from "./dto";
 import { generateTotpSecret, verifyTotpCode } from "./totp.util";
+import {
+  decryptSecret,
+  deriveSecretKey,
+  encryptSecret,
+  isEncryptedSecret,
+} from "../../common/security/secret-cipher";
 import { i18nMessage } from "../i18n";
 import {
   adminSessionExpiryFrom,
@@ -694,42 +700,16 @@ export class SecurityService {
   }
 
   private encryptSecret(secret: string): string {
-    const iv = crypto.randomBytes(12);
-    const cipher = crypto.createCipheriv(
-      "aes-256-gcm",
-      this.getTwoFactorEncryptionKey(),
-      iv,
-    );
-    const ciphertext = Buffer.concat([
-      cipher.update(secret, "utf8"),
-      cipher.final(),
-    ]);
-    const tag = cipher.getAuthTag();
-
-    return `v1:${iv.toString("base64")}:${tag.toString("base64")}:${ciphertext.toString("base64")}`;
+    return encryptSecret(secret, this.getTwoFactorEncryptionKey());
   }
 
   private decryptSecret(encrypted: string): string {
-    if (!encrypted.startsWith("v1:")) {
+    // Şifreleme öncesi dönemden kalan düz base64 kayıtlar okunmaya devam eder;
+    // bir sonraki yazımda v1 biçimine geçerler.
+    if (!isEncryptedSecret(encrypted)) {
       return Buffer.from(encrypted, "base64").toString("utf8");
     }
-
-    const [, iv, tag, ciphertext] = encrypted.split(":");
-    if (!iv || !tag || !ciphertext) {
-      throw new Error("Invalid encrypted two-factor secret");
-    }
-
-    const decipher = crypto.createDecipheriv(
-      "aes-256-gcm",
-      this.getTwoFactorEncryptionKey(),
-      Buffer.from(iv, "base64"),
-    );
-    decipher.setAuthTag(Buffer.from(tag, "base64"));
-
-    return Buffer.concat([
-      decipher.update(Buffer.from(ciphertext, "base64")),
-      decipher.final(),
-    ]).toString("utf8");
+    return decryptSecret(encrypted, this.getTwoFactorEncryptionKey());
   }
 
   private verifyTOTP(secret: string, code: string): boolean {
@@ -737,9 +717,9 @@ export class SecurityService {
   }
 
   private getTwoFactorEncryptionKey(): Buffer {
-    const material =
+    return deriveSecretKey(
       this.configService.get<string>("TWO_FACTOR_ENCRYPTION_KEY") ||
-      this.configService.getOrThrow<string>("JWT_SECRET");
-    return crypto.createHash("sha256").update(material).digest();
+        this.configService.getOrThrow<string>("JWT_SECRET"),
+    );
   }
 }
