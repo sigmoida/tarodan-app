@@ -50,6 +50,68 @@ describe("AdminTradeQueryService payment quote", () => {
     ]);
   });
 
+  it("exposes the PayTR id of each cash payment without leaking raw payment metadata", async () => {
+    const prisma = {
+      trade: {
+        findUnique: jest.fn().mockResolvedValue({
+          ...baseTrade,
+          cashPayments: [
+            {
+              id: "cash-1",
+              payment: {
+                providerConversationId: "TRADETKSK7X9M2QF3NT000002",
+                metadata: { merchantOidHistory: ["TRADETKSK7X9M2QF3NT000001"] },
+              },
+            },
+            { id: "cash-2", payment: null },
+          ],
+        }),
+      },
+    };
+    const service = new AdminTradeQueryService(prisma as never, {} as never);
+
+    const result = await service.getTradeById("trade-1");
+
+    expect(result.cashPayments).toEqual([
+      {
+        id: "cash-1",
+        paytrOid: "TRADETKSK7X9M2QF3NT000002",
+        paytrOidHistory: ["TRADETKSK7X9M2QF3NT000001"],
+      },
+      { id: "cash-2", paytrOid: null, paytrOidHistory: [] },
+    ]);
+  });
+
+  it("a PayTR id resolves payments once and searches trade cash payments by id", async () => {
+    const prisma = {
+      trade: {
+        findMany: jest.fn().mockResolvedValue([]),
+        count: jest.fn().mockResolvedValue(0),
+      },
+      payment: {
+        findMany: jest.fn().mockResolvedValue([
+          {
+            id: "p1",
+            orderId: null,
+            checkoutGroupId: null,
+            tradeCashPaymentId: "c1",
+          },
+        ]),
+      },
+    };
+    const service = new AdminTradeQueryService(prisma as never, {} as never);
+
+    await service.getTrades({ search: "TRADETKSK7X9M2QF3NT123456" } as never);
+    expect(prisma.payment.findMany).toHaveBeenCalledTimes(1);
+    const paytr = JSON.stringify(prisma.trade.findMany.mock.calls[0][0].where);
+    expect(paytr).toContain("TKS-K7X9M2QF3N");
+    expect(paytr).toContain('"cashPayments":{"some":{"id":{"in":["c1"]}}}');
+    expect(paytr).not.toContain("merchantOidHistory");
+
+    await service.getTrades({ search: "TKS-K7X9M2QF3N" } as never);
+    expect(prisma.payment.findMany).toHaveBeenCalledTimes(1);
+  });
+
   it("keeps accepted trade payment snapshots instead of recalculating", async () => {
     const prisma = {
       trade: {

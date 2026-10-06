@@ -36,7 +36,9 @@ export function OrdersView({ tab }: { tab: AdminOrderTab }) {
         <OrdersScreenTabBar />
         <OrderBucketBar tab={tab} />
       </div>
-      <ResourceList.Toolbar />
+      <ResourceList.Toolbar
+        searchPlaceholder={t("admin.operations.orders.searchPlaceholder")}
+      />
       <p className="text-sm text-muted empty:hidden">
         <DeepLinkFilterSummary />
       </p>

@@ -105,6 +105,30 @@ describe("AdminOfferQueryService", () => {
     ]);
   });
 
+  it("a PayTR id resolves payments once and searches the offer's order by id; an ordinary term does not", async () => {
+    const { service, prisma } = makeService({
+      payment: {
+        findMany: jest.fn().mockResolvedValue([
+          {
+            id: "p1",
+            orderId: "o1",
+            checkoutGroupId: null,
+            tradeCashPaymentId: null,
+          },
+        ]),
+      },
+    });
+    await service.getOffers({ search: "ORDNGGCF4J4V4T790149" } as any);
+    expect(prisma.payment.findMany).toHaveBeenCalledTimes(1);
+    const paytr = JSON.stringify(prisma.offer.findMany.mock.calls[0][0].where);
+    expect(paytr).toContain('"id":{"in":["o1"]}');
+    expect(paytr).toContain("ORD-NGGCF4J4V4");
+    expect(paytr).not.toContain("merchantOidHistory");
+
+    await service.getOffers({ search: "ORD-NGGCF4J4V4" } as any);
+    expect(prisma.payment.findMany).toHaveBeenCalledTimes(1);
+  });
+
   it("effectiveStatus: süresi geçmiş pending → expired, diğerleri aynen", () => {
     expect(
       AdminOfferQueryService.effectiveStatus({

@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { useState, type ReactNode } from "react";
+import { type ReactNode } from "react";
 import {
   CheckIcon,
   ClipboardIcon,
@@ -10,6 +10,7 @@ import {
 } from "@heroicons/react/24/outline";
 import { Avatar, IconButton } from "@tarodan/ui";
 import { cn } from "@/lib/utils";
+import { useCopyToClipboard } from "@/hooks/useCopyToClipboard";
 import { fmtDate, fmtDateTime, fmtNumber, fmtTime, fmtTry } from "@/lib/format";
 import { TextLink } from "@/components/TextLink";
 import { TruncatedText } from "./TruncatedText";
@@ -143,7 +144,7 @@ export function CellCode({ value }: { value?: ReactNode }) {
  * instead of spilling a 25-char cuid across the row.
  */
 export function CellId({ value }: { value?: string | null }) {
-  const [copied, setCopied] = useState(false);
+  const { copied, copy } = useCopyToClipboard();
   if (!value) return <Empty />;
   const short =
     value.length > 12 ? `${value.slice(0, 6)}…${value.slice(-4)}` : value;
@@ -155,9 +156,7 @@ export function CellId({ value }: { value?: string | null }) {
       <IconButton
         onClick={(e) => {
           e.stopPropagation();
-          navigator.clipboard?.writeText(value);
-          setCopied(true);
-          setTimeout(() => setCopied(false), 1200);
+          void copy(value);
         }}
         aria-label="Copy id"
         variant="ghost"

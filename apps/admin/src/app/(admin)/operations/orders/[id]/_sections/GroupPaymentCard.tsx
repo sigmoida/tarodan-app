@@ -11,6 +11,7 @@ import {
 import { useTranslations } from "next-intl";
 import { SectionCard } from "@/components/detail/SectionCard";
 import { DataList, Field } from "@/components/detail/DataList";
+import { PaytrOidField } from "@/components/detail/PaytrOidField";
 import { fmtDateTime, fmtTry } from "@/lib/format";
 import type { OrderGroupFile } from "../_lib/fileTypes";
 import { statusConfig } from "@/lib/statusLabels";
@@ -57,6 +58,10 @@ export function GroupPaymentCard({ file }: { file: OrderGroupFile }) {
         {payment.paidAt && (
           <Field label={t("common.date")}>{fmtDateTime(payment.paidAt)}</Field>
         )}
+        <PaytrOidField
+          paytrOid={payment.paytrOid}
+          paytrOidHistory={payment.paytrOidHistory}
+        />
       </DataList>
       {payment.coversWholeGroup && file.group.itemCount > 1 && (
         <p className="mt-3 text-xs text-muted">

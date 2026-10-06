@@ -27,7 +27,9 @@ export function OffersView() {
       initialFilters={{ userId: "", userRole: "", productId: "" }}
     >
       <OrdersScreenTabBar />
-      <ResourceList.Toolbar />
+      <ResourceList.Toolbar
+        searchPlaceholder={t("admin.operations.orders.searchPlaceholder")}
+      />
       <p className="text-sm text-muted empty:hidden">
         <DeepLinkFilterSummary
           totalLabel={(count) =>

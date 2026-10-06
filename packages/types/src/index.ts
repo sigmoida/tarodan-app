@@ -136,3 +136,6 @@ export * from "./admin-cancel-request";
 
 // Admin (platform) trade cancellation: eligibility rule + preview/result shapes
 export * from "./admin-trade-cancellation";
+
+// PayTR merchant_oid ("sipariş no"): build + parse a pasted id back to our numbers
+export * from "./paytr-merchant-oid";

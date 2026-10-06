@@ -7,6 +7,8 @@ import {
   Logger,
 } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
+import { buildPaytrMerchantOid } from "@tarodan/types";
+import { nextMerchantOidHistory } from "../helpers/payment-oids";
 import { PrismaService } from "../../../prisma";
 import { InitiatePaymentDto, PaymentProvider, DirectPaymentDto } from "../dto";
 import {
@@ -1051,18 +1053,13 @@ export class PaymentInitiationService {
     }
 
     // merchant_oid + Y8 deseni: eski oid'li callback de eşleşsin diye geçmişini koru.
-    const merchantOid = `${baseOid}T${Date.now().toString().slice(-6)}`;
+    const merchantOid = buildPaytrMerchantOid(baseOid);
     const prevMeta = (payment.metadata as any) || {};
-    const oidHistory: string[] = Array.isArray(prevMeta.merchantOidHistory)
-      ? prevMeta.merchantOidHistory
-      : [];
-    if (
-      payment.providerConversationId &&
-      payment.providerConversationId !== merchantOid &&
-      !oidHistory.includes(payment.providerConversationId)
-    ) {
-      oidHistory.push(payment.providerConversationId);
-    }
+    const oidHistory = nextMerchantOidHistory(
+      prevMeta,
+      payment.providerConversationId,
+      merchantOid,
+    );
     // H2: ÇİFT-ÇEKİM YARIŞI KORUMASI. Bu payment satırını PayTR çekiminden ÖNCE
     // atomik olarak `processing`'e CLAIM et. Eşzamanlı ikinci bir direct-form
     // (aynı payment satırı, ör. çift tıklama) status'ü `pending`/`failed` BULAMAZ

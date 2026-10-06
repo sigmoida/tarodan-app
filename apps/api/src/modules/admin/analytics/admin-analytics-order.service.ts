@@ -10,13 +10,20 @@ import { i18nMessage } from "../../i18n";
 import { AdminAuditService } from "../ops/admin-audit.service";
 import { isAdminOrderTransitionAllowed } from "../../order/helpers/order-state-machine";
 import { AddOrderTrackingDto, UpdateOrderStatusDto } from "../dto";
-import { OrderStatus, ProductStatus, ShipmentStatus } from "@prisma/client";
+import {
+  OrderStatus,
+  Prisma,
+  ProductStatus,
+  RefundAttemptStatus,
+  ShipmentStatus,
+} from "@prisma/client";
 import { canTransitionShipmentStatus } from "../../shipping/helpers/shipment-state-machine";
 import { SearchService } from "../../search/search.service";
 import { CacheService } from "../../cache/cache.service";
 import { AdminAnalyticsCommonService } from "./admin-analytics-common.service";
 import { OrderService } from "../../order/order.service";
 import { PaymentService } from "../../payment/payment.service";
+import { paytrOidViewOf } from "../../payment/helpers/payment-paytr-oid";
 import { NotificationService } from "../../notification/notification.service";
 import { sellerNetAmountOf } from "../../order/helpers/order-net.helper";
 import { storedProductBaseOf } from "../../order/helpers/order-charged-base.helper";
@@ -277,9 +284,13 @@ export class AdminAnalyticsOrderService {
     });
     const holdByOrderId = new Map(holds.map((h: any) => [h.orderId, h]));
 
-    const rawPayment: any = isGroup
-      ? (group as any)?.payment
-      : (orders[0] as any)?.payment;
+    type PaymentWithAttempts = Prisma.PaymentGetPayload<{
+      include: { refundAttempts: true };
+    }>;
+    type HoldsPayment = { payment?: PaymentWithAttempts | null };
+    const rawPayment: PaymentWithAttempts | null | undefined = isGroup
+      ? (group as HoldsPayment | null)?.payment
+      : (orders[0] as HoldsPayment | undefined)?.payment;
     const payment = rawPayment
       ? {
           id: rawPayment.id,
@@ -287,15 +298,19 @@ export class AdminAnalyticsOrderService {
           amount: Number(rawPayment.amount),
           provider: rawPayment.provider ?? null,
           providerPaymentId: rawPayment.providerPaymentId ?? null,
+          // PayTR panelindeki "sipariş no" (güncel + önceki denemeler).
+          ...paytrOidViewOf(rawPayment),
           paidAt: rawPayment.paidAt ?? null,
           // Grup ödemesi sepetin TAMAMINI kapsar — UI tek siparişin yanında
           // gösterirken bunu etiketlemek zorunda.
           coversWholeGroup: isGroup,
           refundedTotal: (rawPayment.refundAttempts ?? [])
             .filter(
-              (a: any) => a.status === "succeeded" || a.status === "finalized",
+              (a) =>
+                a.status === RefundAttemptStatus.succeeded ||
+                a.status === RefundAttemptStatus.finalized,
             )
-            .reduce((sum: number, a: any) => sum + Number(a.amount), 0),
+            .reduce((sum, a) => sum + Number(a.amount), 0),
         }
       : null;
 

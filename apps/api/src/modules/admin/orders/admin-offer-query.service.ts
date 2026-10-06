@@ -3,6 +3,10 @@ import { OfferStatus, OrderStatus, Prisma } from "@prisma/client";
 import { PrismaService } from "../../../prisma";
 import { StorageService } from "../../storage/storage.service";
 import { paginate, resolveOrderBy } from "../../../common/list";
+import {
+  orderPaytrOidClauses,
+  resolvePaytrOidMatch,
+} from "../../payment/helpers/paytr-oid-search";
 import { AdminOfferQueryDto } from "../dto";
 import { i18nMessage } from "../../i18n";
 import { offerEffectiveStatus } from "./helpers/offer-effective-status";
@@ -229,6 +233,11 @@ export class AdminOfferQueryService {
           order: { orderNumber: { contains: search, mode: "insensitive" } },
         },
       ];
+      // PayTR "sipariş no": teklifin siparişinin ödemesi / iş numarası
+      const paytrClauses = orderPaytrOidClauses(
+        await resolvePaytrOidMatch(this.prisma, search),
+      );
+      if (paytrClauses.length > 0) or.push({ order: { OR: paytrClauses } });
       if (Number.isFinite(numeric)) or.push({ amount: numeric });
       and.push({ OR: or });
     }

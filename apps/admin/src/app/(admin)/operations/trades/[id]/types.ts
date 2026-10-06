@@ -1,4 +1,5 @@
 import type { CancellationActorValue } from "@tarodan/types";
+import type { PaytrOidFields } from "@/lib/paytr-oid";
 
 export interface TradeShipment {
   id: string;
@@ -49,7 +50,7 @@ export interface TradeCommissionRuleMatch {
   source: "snapshot" | "live";
 }
 
-export interface TradeCashPayment {
+export interface TradeCashPayment extends PaytrOidFields {
   id?: string;
   payerId: string;
   /** Farkın gideceği taraf — yalnız fark taşıyan satırda dolu. */

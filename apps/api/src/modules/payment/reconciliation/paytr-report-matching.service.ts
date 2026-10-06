@@ -16,6 +16,8 @@ import {
 } from "../../account-lane/live-lane.where";
 import { LedgerService } from "../../ledger/ledger.service";
 import { istanbulDayStart } from "../../../common/helpers/tr-calendar";
+import { paymentOids } from "../helpers/payment-oids";
+import { paymentOidHistoryWhere } from "../helpers/paytr-oid-search";
 
 /** Tutar eşlemesi toleransı (kuruş yuvarlamaları). Gün kartı farkı da bunu kullanır. */
 export const MATCH_TOLERANCE_TL = 0.05;
@@ -37,28 +39,6 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 export type StatementCounterpart =
   | { kind: "payment"; id: string; amount: unknown }
   | { kind: "membership"; id: string; amount: unknown };
-
-/**
- * Bir ödemenin PayTR'de görünebileceği tüm oid'ler: güncel oid + yeniden başlatma
- * geçmişi (`metadata.merchantOidHistory`). Gün kartı ve ters yön taraması bu
- * çözümleyiciyi kullanır; eşleştiriciyle aynı gerçek. İki katman ayrışırsa aynı
- * kartta "eşleşti" + "dökümde yok" çıkar.
- */
-export function paymentOids(payment: {
-  providerConversationId: string | null;
-  metadata?: unknown;
-}): string[] {
-  const oids: string[] = [];
-  if (payment.providerConversationId) oids.push(payment.providerConversationId);
-  const history =
-    payment.metadata && typeof payment.metadata === "object"
-      ? (payment.metadata as Record<string, unknown>).merchantOidHistory
-      : undefined;
-  if (Array.isArray(history)) {
-    for (const h of history) if (typeof h === "string" && h) oids.push(h);
-  }
-  return oids;
-}
 
 /**
  * Faz 3 — PSP mutabakat fark motoru. Rapor sync'inin (Faz 2) doldurduğu yerel
@@ -99,9 +79,7 @@ export class PaytrReportMatchingService {
     });
     if (direct) return { kind: "payment", ...direct };
     const historical = await this.prisma.payment.findFirst({
-      where: {
-        metadata: { path: ["merchantOidHistory"], array_contains: oid },
-      },
+      where: paymentOidHistoryWhere(oid),
       select: { id: true, amount: true },
     });
     if (historical) return { kind: "payment", ...historical };

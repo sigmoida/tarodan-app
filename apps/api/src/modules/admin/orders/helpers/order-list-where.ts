@@ -13,6 +13,10 @@ import {
   type AdminOrderTab,
 } from "@tarodan/types";
 import { buildSearchWhere, dateRangeWhere } from "../../../../common/list";
+import {
+  orderPaytrOidClauses,
+  type PaytrOidMatch,
+} from "../../../payment/helpers/paytr-oid-search";
 import { cartBucketWhere, groupLines, singleLine } from "./order-bucket-where";
 
 /** Liste + sayaç uçlarının ortak filtre alanları (DTO'nun alt kümesi). */
@@ -30,6 +34,11 @@ export interface OrderListFilters {
   productId?: string;
   /** Eski deep-link'ler (`?status=delivered`): tek sipariş durumu. */
   status?: OrderStatus;
+  /**
+   * `search` bir PayTR "sipariş no"suysa isteğin başında BİR KEZ çözülmüş
+   * kayıtlar (`resolvePaytrOidMatch`); `where`'ler yalnız `id IN (...)` taşır.
+   */
+  paytr?: PaytrOidMatch | null;
 }
 
 const PARTY_COLUMNS = ["buyer", "seller"].flatMap((side) =>
@@ -63,6 +72,21 @@ function textFilterWhere(
   return buildSearchWhere(term, columns) ?? MATCH_NOTHING;
 }
 
+/**
+ * Serbest arama: kolonlarda arama + (terim PayTR "sipariş no"su gibiyse) o
+ * id'nin ödemesi/iş numarası. Diğer terimlerde yalnız kolon araması kalır.
+ */
+function freeSearchWhere(
+  term: string | undefined,
+  columns: readonly string[],
+  paytr: PaytrOidMatch | null | undefined,
+): Record<string, unknown> | undefined {
+  const byColumns = textFilterWhere(term, columns);
+  const byPaytrOid = orderPaytrOidClauses(paytr);
+  if (!byColumns || byPaytrOid.length === 0) return byColumns;
+  return { OR: [byColumns, ...byPaytrOid] };
+}
+
 /** Deep-link kapsamı (kullanıcı / ürün detayından gelen). */
 function scopeParts(filters: OrderListFilters): Record<string, unknown>[] {
   const parts: Record<string, unknown>[] = [];
@@ -79,7 +103,7 @@ function scopeParts(filters: OrderListFilters): Record<string, unknown>[] {
 function filterParts(filters: OrderListFilters): Record<string, unknown>[] {
   const parts: Record<string, unknown>[] = [];
   const everyColumn = TEXT_FILTERS.flatMap((key) => TEXT_FILTER_COLUMNS[key]);
-  const search = textFilterWhere(filters.search, everyColumn);
+  const search = freeSearchWhere(filters.search, everyColumn, filters.paytr);
   if (search) parts.push(search);
   for (const key of TEXT_FILTERS) {
     const where = textFilterWhere(filters[key], TEXT_FILTER_COLUMNS[key]);

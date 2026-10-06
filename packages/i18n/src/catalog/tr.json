@@ -6321,6 +6321,7 @@
         "manualRefund": "Manuel İade",
         "forceCancel": "Zorla İptal",
         "paymentInfo": "Ödeme Bilgileri",
+        "transactionId": "İşlem ID",
         "paymentId": "Ödeme ID",
         "currency": "Para Birimi",
         "paymentDate": "Ödeme Tarihi",
@@ -6860,6 +6861,8 @@
         "cancelClosedSuffix": " (kargo sonrası kapalı)",
         "provider": "Sağlayıcı",
         "viewPaymentDetail": "Ödeme Detayını Görüntüle",
+        "searchPlaceholder": "Numara, kişi, ürün veya PayTR sipariş no ile ara",
+        "tradesSearchPlaceholder": "Takas no, kullanıcı veya PayTR sipariş no ile ara",
         "paymentTitle": "Ödeme Bilgileri",
         "productTitle": "Ürün Bilgileri",
         "shippingTitle": "Kargo Bilgileri",
@@ -9251,6 +9254,13 @@
       },
       "metricCard": {
         "vsYesterday": "vs dün"
+      },
+      "copyFailed": "Panoya kopyalanamadı",
+      "paytrOid": {
+        "label": "PayTR sipariş no",
+        "previousAttempts": "Önceki denemeler",
+        "copy": "PayTR sipariş no'yu kopyala",
+        "copied": "Kopyalandı"
       },
       "filterToolbar": {
         "placeholder": "Ara"
