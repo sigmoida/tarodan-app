@@ -23,6 +23,7 @@ import { DetailPage } from "@/components/detail/DetailPage";
 import { SectionCard } from "@/components/detail/SectionCard";
 import { PartyCard } from "@/components/detail/PartyCard";
 import { DataList, Field } from "@/components/detail/DataList";
+import { PaytrOidField } from "@/components/detail/PaytrOidField";
 import { Panel } from "@/components/detail/Panel";
 import { DetailLayout } from "@/components/detail/DetailLayout";
 import { TextLink } from "@/components/TextLink";
@@ -121,9 +122,18 @@ export default function PaymentDetailPage() {
                         p.provider,
                       )}
                     </Field>
-                    <Field label="Transaction ID" mono>
-                      {p.providerPaymentId || p.providerConversationId || "N/A"}
-                    </Field>
+                    <PaytrOidField
+                      paytrOid={p.paytrOid}
+                      paytrOidHistory={p.paytrOidHistory}
+                    />
+                    {p.providerPaymentId && (
+                      <Field
+                        label={t("admin.finance.payments.transactionId")}
+                        mono
+                      >
+                        {p.providerPaymentId}
+                      </Field>
+                    )}
                     <Field label={t("admin.finance.common.createdAt")}>
                       {fmtDateTime(p.createdAt)}
                     </Field>
