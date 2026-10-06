@@ -136,3 +136,6 @@ export * from "./admin-cancel-request";
 
 // Admin (platform) trade cancellation: eligibility rule + preview/result shapes
 export * from "./admin-trade-cancellation";
+
+// Mail routing: areas, sender accounts, staff notification events + admin shapes
+export * from "./mail-routing";
