@@ -1,6 +1,7 @@
 import { Injectable, Logger } from "@nestjs/common";
 import { PrismaService } from "../../prisma";
 import { PaymentStatus, OrderStatus } from "@prisma/client";
+import { buildPaytrMerchantOid } from "@tarodan/types";
 import { asPaymentMetadata } from "./helpers/payment-metadata.types";
 import { chargeLikelyLive } from "./helpers/live-charge";
 import { CarrierCancellationService } from "../surat-cargo/sync/carrier-cancellation.service";
@@ -301,8 +302,7 @@ export class PaymentCommonService {
     paymentId: string,
     baseOidRaw: string,
   ): Promise<string> {
-    const baseOid = String(baseOidRaw).replace(/-/g, "");
-    const merchantOid = `${baseOid}T${Date.now().toString().slice(-6)}`;
+    const merchantOid = buildPaytrMerchantOid(baseOidRaw);
     const current = await this.prisma.payment.findUnique({
       where: { id: paymentId },
       select: { providerConversationId: true, metadata: true },
