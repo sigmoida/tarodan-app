@@ -57,6 +57,11 @@ export function AreaNotificationsCard({
           <SectionTitle as="h4" size="sm">
             {t("admin.mailRouting.notificationsTab.recipients")}
           </SectionTitle>
+          {area.id === "guestMessage" && (
+            <p className="text-sm text-muted">
+              {t("admin.mailRouting.notificationsTab.guestMessageNote")}
+            </p>
+          )}
           <RecipientEditor
             value={draft.internalRecipients}
             canEdit={canEdit}

@@ -1,11 +1,11 @@
 import { describe, expect, it } from "vitest";
 import type { useTranslations } from "next-intl";
+import { MAIL_INTERNAL_RECIPIENTS_MAX } from "@tarodan/types";
 import type {
   MailAreaState,
   MailSenderAccountView,
 } from "@/lib/api/mail-routing.types";
 import {
-  MAX_RECIPIENTS,
   accountCreatePayload,
   accountPatchPayload,
   accountSchema,
@@ -144,6 +144,15 @@ describe("accountSchema", () => {
     expect(accountSchema(t, false).safeParse(noPassword).success).toBe(false);
     expect(accountSchema(t, true).safeParse(noPassword).success).toBe(true);
   });
+  it("rejects display names with quotes or angle brackets", () => {
+    const schema = accountSchema(t, false);
+    expect(
+      schema.safeParse({ ...valid, displayName: 'Tarodan "Sipariş"' }).success,
+    ).toBe(false);
+    expect(
+      schema.safeParse({ ...valid, displayName: "Tarodan <x>" }).success,
+    ).toBe(false);
+  });
   it("rejects a bad address and an out-of-range port", () => {
     const schema = accountSchema(t, false);
     expect(schema.safeParse({ ...valid, address: "nope" }).success).toBe(false);
@@ -184,6 +193,36 @@ describe("account payloads", () => {
 
   it("never prefills the password when editing", () => {
     expect(accountToFormValues(account()).password).toBe("");
+  });
+
+  it("shows a default (address) username empty so it is not sent", () => {
+    expect(accountToFormValues(account()).username).toBe("");
+  });
+
+  it("does not send a username when the address changes under a default username", () => {
+    const original = account();
+    const values = {
+      ...accountToFormValues(original),
+      address: "info@tarodan.com.tr",
+    };
+    expect(accountPatchPayload(values, original)).toEqual({
+      address: "info@tarodan.com.tr",
+    });
+  });
+
+  it("keeps an explicit custom username and sends a changed one", () => {
+    const original = account({ username: "custom-login" });
+    const form = accountToFormValues(original);
+    expect(form.username).toBe("custom-login");
+    expect(
+      accountPatchPayload({ ...form, address: "info@tarodan.com.tr" }, original),
+    ).toEqual({ address: "info@tarodan.com.tr" });
+    expect(
+      accountPatchPayload({ ...form, username: "other" }, original),
+    ).toEqual({ username: "other" });
+    expect(accountPatchPayload({ ...form, username: "" }, original)).toEqual({
+      username: null,
+    });
   });
 
   it("returns null when nothing changed", () => {
@@ -232,6 +271,17 @@ describe("area sender form", () => {
     ).toBe(true);
   });
 
+  it("validates the area display-name override like the account's", () => {
+    const schema = areaSchema(t);
+    const base = { senderAccountId: "", displayName: "", replyTo: "" };
+    expect(schema.safeParse({ ...base, displayName: "a<b" }).success).toBe(
+      false,
+    );
+    expect(schema.safeParse({ ...base, displayName: "Tarodan" }).success).toBe(
+      true,
+    );
+  });
+
   it("returns null without changes and only changed fields otherwise", () => {
     const current = area({ senderAccountId: "acc-1", replyTo: "a@b.co" });
     expect(areaSenderUpdate(areaToFormValues(current), current)).toBeNull();
@@ -257,7 +307,7 @@ describe("recipients", () => {
       ok: false,
       error: "duplicate",
     });
-    const full = Array.from({ length: MAX_RECIPIENTS }, (_, i) => `u${i}@b.co`);
+    const full = Array.from({ length: MAIL_INTERNAL_RECIPIENTS_MAX }, (_, i) => `u${i}@b.co`);
     expect(addRecipient(full, "new@b.co")).toEqual({
       ok: false,
       error: "limit",
@@ -344,7 +394,7 @@ describe("planPersonChange", () => {
     const full = area({
       id: "order",
       internalRecipients: Array.from(
-        { length: MAX_RECIPIENTS },
+        { length: MAIL_INTERNAL_RECIPIENTS_MAX },
         (_, i) => `u${i}@b.co`,
       ),
     });

@@ -9769,14 +9769,14 @@
       "validation": {
         "required": "This field is required.",
         "email": "Enter a valid email address.",
-        "maxChars": "Must be at most {max} characters.",
         "port": "Port must be a number between 1 and 65535.",
         "passwordRequired": "Enter a password for the new account.",
         "recipient": {
           "invalid": "Enter a valid email address.",
           "duplicate": "This address is already in the list.",
           "limit": "An area can have at most {max} recipients."
-        }
+        },
+        "displayName": "The display name can't contain quotes (\") or angle brackets (< >) or line breaks, and must be at most {max} characters."
       },
       "accountsTab": {
         "title": "Sender accounts",
@@ -9799,7 +9799,7 @@
           "address": "Address",
           "displayName": "Display name",
           "areas": "Used by areas",
-          "lastTest": "Last test",
+          "lastTest": "Latest status",
           "password": "Password"
         },
         "test": {
@@ -9868,7 +9868,8 @@
         "noRecipients": "This area has no recipients.",
         "recipientPlaceholder": "name@tarodan.com.tr",
         "remove": "Remove",
-        "removeRecipient": "Remove {address}"
+        "removeRecipient": "Remove {address}",
+        "guestMessageNote": "While the recipient list is empty these notifications go to the default support address; once you add recipients they go only to those."
       },
       "people": {
         "title": "Recipients",
