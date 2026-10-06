@@ -263,6 +263,46 @@ describe("AdminAnalyticsOrderService.getOrderGroupFile", () => {
     expect(file.packages[0].shipping.sellerShippingAmount).toBe(10);
   });
 
+  it("ödeme bloğu PayTR sipariş no'yu ve önceki denemeleri (yeniden eskiye) taşır, ham metadata'yı sızdırmaz", async () => {
+    const { svc, prisma } = makeService();
+    prisma.order.findUnique.mockResolvedValue({
+      id: "o9",
+      checkoutGroupId: null,
+    });
+    prisma.order.findMany.mockResolvedValue([
+      baseOrder("o9", {
+        checkoutGroupId: null,
+        packageId: null,
+        package: null,
+        payment: {
+          id: "pay-9",
+          status: "completed",
+          amount: 245,
+          provider: "paytr",
+          providerPaymentId: null,
+          providerConversationId: "ORDAAAAAAAAAAT000003",
+          metadata: {
+            merchantOidHistory: [
+              "ORDAAAAAAAAAAT000001",
+              "ORDAAAAAAAAAAT000002",
+            ],
+            lastChargeStartedAt: "2026-07-01T00:00:00.000Z",
+          },
+          paidAt: new Date("2026-07-01"),
+          refundAttempts: [],
+        },
+      }),
+    ]);
+
+    const file = await svc.getOrderGroupFile("o9");
+
+    expect(file.payment).toMatchObject({
+      paytrOid: "ORDAAAAAAAAAAT000003",
+      paytrOidHistory: ["ORDAAAAAAAAAAT000002", "ORDAAAAAAAAAAT000001"],
+    });
+    expect(file.payment).not.toHaveProperty("metadata");
+  });
+
   it("hazırlık son tarihini ve tek seferlik uzatmanın kaydını taşır", async () => {
     const { svc, prisma } = makeService();
     prisma.order.findUnique.mockResolvedValue({

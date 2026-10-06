@@ -2087,6 +2087,8 @@ model Payment {
   @@index([status, paidAt])
   @@index([status, createdAt])
   @@index([isTest])
+  // Admin sipariş araması PayTR "sipariş no"yu (merchant_oid) tam eşleşmeyle arar.
+  @@index([providerConversationId])
   @@map("payments")
 }
 

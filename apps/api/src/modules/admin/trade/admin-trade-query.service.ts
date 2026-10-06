@@ -8,6 +8,8 @@ import {
   paginate,
   resolveOrderBy,
 } from "../../../common/list";
+import { paytrOidViewOf } from "../../payment/helpers/payment-paytr-oid";
+import { tradePaytrOidClauses } from "../../../common/helpers/paytr-oid-search";
 import { TradeQuoteService } from "../../trade/trade-quote.service";
 import { TRADE_PRICING_V2 } from "../../trade/helpers/trade.constants";
 import { readTradeCommissionRuleSnapshot } from "../../trade/helpers/trade-commission-snapshot";
@@ -120,6 +122,8 @@ export class AdminTradeQueryService {
           },
           { initiator: { email: { contains: search, mode: "insensitive" } } },
           { receiver: { email: { contains: search, mode: "insensitive" } } },
+          // PayTR "sipariş no": takasın nakit ödemesi / takas numarası
+          ...tradePaytrOidClauses(search),
         ],
       });
     }
@@ -325,7 +329,13 @@ export class AdminTradeQueryService {
             events: { orderBy: { eventTime: "asc" } },
           },
         },
-        cashPayments: true,
+        cashPayments: {
+          include: {
+            payment: {
+              select: { providerConversationId: true, metadata: true },
+            },
+          },
+        },
         dispute: true,
       },
     });
@@ -369,6 +379,12 @@ export class AdminTradeQueryService {
       }
     }
 
-    return { ...trade, paymentQuote, commissionRuleMatches };
+    // Ham `payment` (metadata JSON) istemciye gitmez; yalnız PayTR id'leri.
+    const cashPayments = trade.cashPayments.map(({ payment, ...row }) => ({
+      ...row,
+      ...paytrOidViewOf(payment),
+    }));
+
+    return { ...trade, cashPayments, paymentQuote, commissionRuleMatches };
   }
 }

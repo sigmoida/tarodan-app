@@ -81,6 +81,28 @@ describe("AdminPaymentService group surfaces", () => {
     expect(hasGroupCondition).toBe(true);
   });
 
+  it("getPayments: PayTR id'si eski bir denemeden (merchantOidHistory) de bulunur; sıradan terimde eklenmez", async () => {
+    const { svc, prisma } = makeService();
+    const oid = "GRPDBN4NPYYTZT790149";
+
+    await (svc as any).getPayments({ page: 1, limit: 20, search: oid });
+    const withOid = prisma.payment.findMany.mock.calls[0][0].where.OR;
+    expect(withOid).toContainEqual({
+      OR: [
+        { providerConversationId: oid },
+        { metadata: { path: ["merchantOidHistory"], array_contains: oid } },
+      ],
+    });
+
+    await (svc as any).getPayments({
+      page: 1,
+      limit: 20,
+      search: "GRP-DBN4NPYYTZ",
+    });
+    const plain = prisma.payment.findMany.mock.calls[1][0].where.OR;
+    expect(JSON.stringify(plain)).not.toContain("merchantOidHistory");
+  });
+
   it("getFailedPayments: order'sız (grup) ödemede patlamaz, grup alıcısına düşer", async () => {
     const { svc, prisma } = makeService();
     prisma.payment.findMany.mockResolvedValue([

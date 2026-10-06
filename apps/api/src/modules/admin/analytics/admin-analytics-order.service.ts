@@ -17,6 +17,7 @@ import { CacheService } from "../../cache/cache.service";
 import { AdminAnalyticsCommonService } from "./admin-analytics-common.service";
 import { OrderService } from "../../order/order.service";
 import { PaymentService } from "../../payment/payment.service";
+import { paytrOidViewOf } from "../../payment/helpers/payment-paytr-oid";
 import { NotificationService } from "../../notification/notification.service";
 import { sellerNetAmountOf } from "../../order/helpers/order-net.helper";
 import { storedProductBaseOf } from "../../order/helpers/order-charged-base.helper";
@@ -287,6 +288,8 @@ export class AdminAnalyticsOrderService {
           amount: Number(rawPayment.amount),
           provider: rawPayment.provider ?? null,
           providerPaymentId: rawPayment.providerPaymentId ?? null,
+          // PayTR panelindeki "sipariş no" (güncel + önceki denemeler).
+          ...paytrOidViewOf(rawPayment),
           paidAt: rawPayment.paidAt ?? null,
           // Grup ödemesi sepetin TAMAMINI kapsar — UI tek siparişin yanında
           // gösterirken bunu etiketlemek zorunda.

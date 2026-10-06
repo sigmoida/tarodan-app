@@ -105,6 +105,18 @@ describe("AdminOfferQueryService", () => {
     ]);
   });
 
+  it("a PayTR id also searches the offer's order payment; an ordinary term does not", async () => {
+    const { service, prisma } = makeService();
+    await service.getOffers({ search: "ORDNGGCF4J4V4T790149" } as any);
+    const paytr = JSON.stringify(prisma.offer.findMany.mock.calls[0][0].where);
+    expect(paytr).toContain("merchantOidHistory");
+    expect(paytr).toContain("ORD-NGGCF4J4V4");
+
+    await service.getOffers({ search: "ORD-NGGCF4J4V4" } as any);
+    const plain = JSON.stringify(prisma.offer.findMany.mock.calls[1][0].where);
+    expect(plain).not.toContain("merchantOidHistory");
+  });
+
   it("effectiveStatus: süresi geçmiş pending → expired, diğerleri aynen", () => {
     expect(
       AdminOfferQueryService.effectiveStatus({

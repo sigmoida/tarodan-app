@@ -90,6 +90,46 @@ describe("orderLineFilterWhere", () => {
       ]),
     );
   });
+
+  describe("PayTR sipariş no araması", () => {
+    const GROUP_OID = "GRPDBN4NPYYTZT790149";
+    const payment = {
+      OR: [
+        { providerConversationId: GROUP_OID },
+        {
+          metadata: {
+            path: ["merchantOidHistory"],
+            array_contains: GROUP_OID,
+          },
+        },
+      ],
+    };
+
+    it("a PayTR id also searches the payment (current + history) and the parsed number", () => {
+      const where = orderLineFilterWhere({ search: GROUP_OID }) as {
+        AND: Array<{ OR: Array<{ OR?: unknown[] }> }>;
+      };
+      const [columns, ...paytr] = where.AND[0].OR;
+      // kolon araması aynen korunur
+      expect(columns.OR).toContainEqual({ orderNumber: contains(GROUP_OID) });
+      expect(paytr).toEqual([
+        { payment },
+        { checkoutGroup: { payment } },
+        { checkoutGroup: { groupNumber: { in: ["GRP-DBN4NPYYTZ"] } } },
+      ]);
+    });
+
+    it("an ordinary term keeps the exact column-only search (no JSON scan)", () => {
+      const where = orderLineFilterWhere({ search: "GRP-DBN4NPYYTZ" });
+      expect(JSON.stringify(where)).not.toContain("merchantOidHistory");
+      expect(JSON.stringify(where)).not.toContain("providerConversationId");
+    });
+
+    it("code filters (orderNumber, groupNumber...) never take the PayTR path", () => {
+      const where = orderLineFilterWhere({ orderNumber: GROUP_OID });
+      expect(JSON.stringify(where)).not.toContain("merchantOidHistory");
+    });
+  });
 });
 
 describe("orderListSourceWheres", () => {

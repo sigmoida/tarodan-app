@@ -50,6 +50,57 @@ describe("AdminTradeQueryService payment quote", () => {
     ]);
   });
 
+  it("exposes the PayTR id of each cash payment without leaking raw payment metadata", async () => {
+    const prisma = {
+      trade: {
+        findUnique: jest.fn().mockResolvedValue({
+          ...baseTrade,
+          cashPayments: [
+            {
+              id: "cash-1",
+              payment: {
+                providerConversationId: "TRADETKSK7X9M2QF3NT000002",
+                metadata: { merchantOidHistory: ["TRADETKSK7X9M2QF3NT000001"] },
+              },
+            },
+            { id: "cash-2", payment: null },
+          ],
+        }),
+      },
+    };
+    const service = new AdminTradeQueryService(prisma as never);
+
+    const result = await service.getTradeById("trade-1");
+
+    expect(result.cashPayments).toEqual([
+      {
+        id: "cash-1",
+        paytrOid: "TRADETKSK7X9M2QF3NT000002",
+        paytrOidHistory: ["TRADETKSK7X9M2QF3NT000001"],
+      },
+      { id: "cash-2", paytrOid: null, paytrOidHistory: [] },
+    ]);
+  });
+
+  it("a PayTR id also searches trade cash payments in the admin list", async () => {
+    const prisma = {
+      trade: {
+        findMany: jest.fn().mockResolvedValue([]),
+        count: jest.fn().mockResolvedValue(0),
+      },
+    };
+    const service = new AdminTradeQueryService(prisma as never);
+
+    await service.getTrades({ search: "TRADETKSK7X9M2QF3NT123456" } as never);
+    const paytr = JSON.stringify(prisma.trade.findMany.mock.calls[0][0].where);
+    expect(paytr).toContain("TKS-K7X9M2QF3N");
+    expect(paytr).toContain("merchantOidHistory");
+
+    await service.getTrades({ search: "TKS-K7X9M2QF3N" } as never);
+    const plain = JSON.stringify(prisma.trade.findMany.mock.calls[1][0].where);
+    expect(plain).not.toContain("merchantOidHistory");
+  });
+
   it("keeps accepted trade payment snapshots instead of recalculating", async () => {
     const prisma = {
       trade: {
