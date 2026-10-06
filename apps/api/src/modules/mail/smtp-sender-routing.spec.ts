@@ -54,6 +54,7 @@ const ORDER_ACCOUNT: MailSenderAccountRecord = {
   secure: null,
   username: "siparis@tarodan.com.tr",
   passwordEncrypted: "v1:enc",
+  lastTestOk: null,
 };
 
 function snapshotWith(
@@ -85,6 +86,7 @@ function build(snapshot: MailRoutingSnapshot | Error) {
     ),
     passwordOf: jest.fn(() => "mailbox-pass"),
     recordAccountResult: jest.fn().mockResolvedValue(undefined),
+    clearAccountFailure: jest.fn().mockResolvedValue(undefined),
   };
   const env: Record<string, string> = {
     SMTP_HOST: "mail.example.com",
@@ -439,6 +441,56 @@ describe("SmtpProvider — Mail Yönlendirme gönderen çözümü", () => {
         false,
         expect.stringContaining("Invalid login"),
       );
+    });
+
+    it("alıcı reddi kutunun sağlığına DOKUNMAZ; çağırana ok:false + hata döner", async () => {
+      const t = build(snapshotWith({}));
+      behaviour.set(ORDER_ACCOUNT.username, () =>
+        Promise.reject(
+          Object.assign(new Error("550 5.1.1 mailbox unavailable"), {
+            command: "RCPT TO",
+            responseCode: 550,
+          }),
+        ),
+      );
+
+      const result = await t.provider.sendThroughAccount(
+        ORDER_ACCOUNT,
+        message,
+      );
+
+      expect(result).toEqual({
+        ok: false,
+        error: expect.stringContaining("mailbox unavailable"),
+      });
+      expect(t.routing.recordAccountResult).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("sağlık işareti — yalnız geçişte yazılır", () => {
+    it("hatalı işaretli kutudan başarılı gönderim işareti kaldırır", async () => {
+      const flagged = { ...ORDER_ACCOUNT, lastTestOk: false };
+      const t = build(snapshotWith({ order: { account: flagged } }, [flagged]));
+
+      await t.provider.sendEmail(orderMail);
+
+      expect(t.routing.clearAccountFailure).toHaveBeenCalledWith(flagged.id);
+      expect(t.routing.recordAccountResult).not.toHaveBeenCalled();
+    });
+
+    it("sağlıklı (ya da hiç test edilmemiş) kutunun her gönderiminde yazım yok", async () => {
+      for (const lastTestOk of [true, null]) {
+        const healthy = { ...ORDER_ACCOUNT, lastTestOk };
+        const t = build(
+          snapshotWith({ order: { account: healthy } }, [healthy]),
+        );
+
+        await t.provider.sendEmail(orderMail);
+        await t.provider.sendEmail(orderMail);
+
+        expect(t.routing.clearAccountFailure).not.toHaveBeenCalled();
+        expect(t.routing.recordAccountResult).not.toHaveBeenCalled();
+      }
     });
   });
 });

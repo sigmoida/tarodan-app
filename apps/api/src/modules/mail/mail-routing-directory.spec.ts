@@ -4,9 +4,12 @@ import {
   senderAccountFingerprint,
 } from "./mail-routing-directory";
 import {
+  MAIL_DISPLAY_NAME_MAX_LENGTH,
+  isValidMailDisplayName,
+} from "@tarodan/types";
+import {
   formatMailFrom,
   isValidMailAddress,
-  isValidMailDisplayName,
   mailEventsOfArea,
   parseInternalRecipients,
   parseMailEventStates,
@@ -21,6 +24,7 @@ const account = {
   secure: null,
   username: "siparis@tarodan.com.tr",
   passwordEncrypted: "v1:x",
+  lastTestOk: null,
 };
 
 describe("mail-area-settings — hoşgörülü okuma", () => {
@@ -51,11 +55,37 @@ describe("mail-area-settings — hoşgörülü okuma", () => {
     expect(mailEventsOfArea("account")).toEqual([]);
   });
 
-  it("görünen ad başlığa satır sonu / tırnak sokamaz", () => {
+  it("misafir mesajı varsayılan olarak AÇIK + anlık; diğer olaylar kapalı", () => {
+    expect(parseMailEventStates("guestMessage", null)).toEqual([
+      { id: "support.guestMessage", enabled: true, delivery: "instant" },
+    ]);
+    // Admin açıkça kapatabilir.
+    expect(
+      parseMailEventStates("guestMessage", {
+        "support.guestMessage": { enabled: false, delivery: "daily" },
+      }),
+    ).toEqual([
+      { id: "support.guestMessage", enabled: false, delivery: "daily" },
+    ]);
+    expect(parseMailEventStates("support", null)).toEqual([
+      { id: "support.ticketOpened", enabled: false, delivery: "instant" },
+    ]);
+  });
+
+  it("görünen ad başlığa satır sonu / tırnak / <> / ters bölü sokamaz (@tarodan/types kuralı)", () => {
     expect(isValidMailDisplayName("Tarodan Sipariş")).toBe(true);
+    expect(isValidMailDisplayName("  Tarodan & Co. (Destek)  ")).toBe(true);
     expect(isValidMailDisplayName('Ta"rodan')).toBe(false);
     expect(isValidMailDisplayName("Tarodan\r\nBcc: x@y.z")).toBe(false);
+    expect(isValidMailDisplayName("Tarodan <x@y.z>")).toBe(false);
+    expect(isValidMailDisplayName("Taro\\dan")).toBe(false);
     expect(isValidMailDisplayName("   ")).toBe(false);
+    expect(
+      isValidMailDisplayName("a".repeat(MAIL_DISPLAY_NAME_MAX_LENGTH)),
+    ).toBe(true);
+    expect(
+      isValidMailDisplayName("a".repeat(MAIL_DISPLAY_NAME_MAX_LENGTH + 1)),
+    ).toBe(false);
   });
 
   it("adres doğrulaması satır sonunu reddeder", () => {
@@ -174,9 +204,32 @@ describe("MailRoutingDirectory", () => {
     });
   });
 
+  it("canlı başarı işareti yalnız hatalı işaretli satırda kaldırır (koşullu yazım)", async () => {
+    const { directory, prisma } = build();
+
+    await directory.clearAccountFailure("acc-1");
+
+    expect(prisma.mailSenderAccount.updateMany).toHaveBeenCalledWith({
+      where: { id: "acc-1", lastTestOk: false },
+      data: expect.objectContaining({ lastTestOk: true, lastTestError: null }),
+    });
+  });
+
+  it("işaret temizleme best-effort: hata fırlatmaz", async () => {
+    const { directory, prisma } = build();
+    prisma.mailSenderAccount.updateMany.mockRejectedValueOnce(new Error("x"));
+
+    await expect(
+      directory.clearAccountFailure("acc-1"),
+    ).resolves.toBeUndefined();
+  });
+
   it("parmak izi son-test alanlarından etkilenmez, şifreden etkilenir", () => {
     const base = senderAccountFingerprint(account);
     expect(senderAccountFingerprint({ ...account })).toBe(base);
+    expect(senderAccountFingerprint({ ...account, lastTestOk: false })).toBe(
+      base,
+    );
     expect(
       senderAccountFingerprint({ ...account, passwordEncrypted: "v1:y" }),
     ).not.toBe(base);

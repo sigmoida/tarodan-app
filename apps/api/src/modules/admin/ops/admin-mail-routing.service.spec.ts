@@ -161,9 +161,8 @@ describe("AdminMailRoutingService — zorunlu denetim, şifresiz", () => {
   });
 });
 
-describe("AdminMailRoutingController — yalnız super_admin", () => {
-  const methods = [
-    "getState",
+describe("AdminMailRoutingController — okuma settings izniyle, yazma yalnız super_admin", () => {
+  const writes = [
     "createAccount",
     "updateAccount",
     "deleteAccount",
@@ -171,13 +170,22 @@ describe("AdminMailRoutingController — yalnız super_admin", () => {
     "updateArea",
   ] as const;
 
-  it.each(methods)("%s yalnız super_admin'e açık", (method) => {
-    expect(
-      Reflect.getMetadata(
-        ROLES_KEY,
-        AdminMailRoutingController.prototype[method],
-      ),
-    ).toEqual([AdminRole.super_admin]);
+  const rolesOf = (method: keyof AdminMailRoutingController) =>
+    Reflect.getMetadata(
+      ROLES_KEY,
+      AdminMailRoutingController.prototype[method],
+    );
+
+  it.each(writes)("%s yalnız super_admin'e açık", (method) => {
+    expect(rolesOf(method)).toEqual([AdminRole.super_admin]);
+  });
+
+  it("okuma her admin rolüne açık; asıl kapı izin matrisidir", () => {
+    expect(rolesOf("getState")).toEqual([
+      AdminRole.super_admin,
+      AdminRole.admin,
+      AdminRole.moderator,
+    ]);
   });
 
   it("segment izin matrisinde settings iznine bağlı (fail-closed değil)", () => {
@@ -195,28 +203,62 @@ describe("AdminMailRoutingController — yalnız super_admin", () => {
         getRequest: () => ({
           user: { isAdmin: true, role },
           method,
-          originalUrl: "/api/admin/mail-routing",
+          originalUrl:
+            method === "GET"
+              ? "/api/admin/mail-routing"
+              : "/api/admin/mail-routing/areas/order",
         }),
       }),
     }) as unknown as ExecutionContext;
 
-  const guard = () =>
+  /** Rol matrisi: `settings` izni verilmiş roller (null = varsayılan matris). */
+  const guard = (matrix: Record<string, string[]> | null) =>
     new RolesGuard(new Reflector(), {
-      platformSetting: { findUnique: jest.fn().mockResolvedValue(null) },
+      platformSetting: {
+        findUnique: jest
+          .fn()
+          .mockResolvedValue(
+            matrix ? { settingValue: JSON.stringify(matrix) } : null,
+          ),
+      },
     } as never);
 
+  const granted = {
+    super_admin: ["settings"],
+    admin: ["settings"],
+    moderator: ["settings"],
+  };
+
   it.each([AdminRole.admin, AdminRole.moderator])(
-    "%s okumada da 403 alır",
+    "settings izni olan %s okuyabilir",
     async (role) => {
       await expect(
-        guard().canActivate(contextFor(role, "GET")),
+        guard(granted).canActivate(contextFor(role, "GET")),
+      ).resolves.toBe(true);
+    },
+  );
+
+  it.each([AdminRole.admin, AdminRole.moderator])(
+    "settings izni olmayan %s okuyamaz (varsayılan matris)",
+    async (role) => {
+      await expect(
+        guard(null).canActivate(contextFor(role, "GET")),
+      ).rejects.toBeInstanceOf(ForbiddenException);
+    },
+  );
+
+  it.each([AdminRole.admin, AdminRole.moderator])(
+    "settings izni olsa da %s değiştiremez",
+    async (role) => {
+      await expect(
+        guard(granted).canActivate(contextFor(role, "PATCH")),
       ).rejects.toBeInstanceOf(ForbiddenException);
     },
   );
 
   it("super_admin geçer", async () => {
     await expect(
-      guard().canActivate(contextFor(AdminRole.super_admin, "PATCH")),
+      guard(null).canActivate(contextFor(AdminRole.super_admin, "PATCH")),
     ).resolves.toBe(true);
   });
 });

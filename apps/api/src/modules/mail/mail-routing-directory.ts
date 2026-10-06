@@ -19,6 +19,11 @@ export interface MailSenderAccountRecord {
   secure: boolean | null;
   username: string;
   passwordEncrypted: string;
+  /**
+   * Kutunun son bilinen sağlığı; `false` iken başarılı bir gönderim işareti
+   * kaldırır (yalnız o geçişte yazılır). Bağlantı parmak izine girmez.
+   */
+  lastTestOk: boolean | null;
 }
 
 /** Bir alanın etkin yönlendirmesi (satır yoksa varsayılanlar). */
@@ -54,6 +59,7 @@ const ACCOUNT_SELECT = {
   secure: true,
   username: true,
   passwordEncrypted: true,
+  lastTestOk: true,
 } as const;
 
 /**
@@ -160,9 +166,33 @@ export class MailRoutingDirectory {
           lastTestError: ok ? null : error,
         },
       });
+      // Bu süreçteki görüntü sağlık işaretini hemen görsün (temizleme
+      // kararı `lastTestOk`a bakar).
+      this.invalidate();
     } catch (writeError: unknown) {
       this.logger.warn(
         `Gönderici kutu sonucu yazılamadı (${accountId}): ${writeError instanceof Error ? writeError.message : String(writeError)}`,
+      );
+    }
+  }
+
+  /**
+   * Gerçek gönderim başarılı oldu: kutu "hatalı" işaretliyse işareti kaldırır.
+   * Koşullu yazım (`lastTestOk = false` olan satır) — işaret zaten kalkmışsa
+   * (başka süreç ya da önbellek bayat) hiçbir satır değişmez. Best-effort.
+   */
+  async clearAccountFailure(accountId: string): Promise<void> {
+    try {
+      await this.prisma.mailSenderAccount.updateMany({
+        where: { id: accountId, lastTestOk: false },
+        data: { lastTestAt: new Date(), lastTestOk: true, lastTestError: null },
+      });
+      // Satır değişmediyse de görüntü bayattır (başka süreç temizledi):
+      // tazele ki sonraki gönderimler tekrar yazmaya kalkmasın.
+      this.invalidate();
+    } catch (writeError: unknown) {
+      this.logger.warn(
+        `Gönderici kutu işareti temizlenemedi (${accountId}): ${writeError instanceof Error ? writeError.message : String(writeError)}`,
       );
     }
   }

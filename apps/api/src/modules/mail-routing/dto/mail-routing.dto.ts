@@ -17,16 +17,14 @@ import { Type } from "class-transformer";
 import { ApiProperty, ApiPropertyOptional, PartialType } from "@nestjs/swagger";
 import {
   MAIL_DELIVERY_MODES,
+  MAIL_DISPLAY_NAME_MAX_LENGTH,
+  MAIL_INTERNAL_RECIPIENTS_MAX,
   type MailAreaUpdate,
   type MailDeliveryMode,
   type MailInternalEventId,
   type MailSenderAccountInput,
 } from "@tarodan/types";
-import {
-  MAIL_INTERNAL_EVENT_IDS,
-  MAX_INTERNAL_RECIPIENTS,
-  MAX_MAIL_DISPLAY_NAME_LENGTH,
-} from "../../mail/helpers/mail-area-settings";
+import { MAIL_INTERNAL_EVENT_IDS } from "../../mail/helpers/mail-area-settings";
 
 /**
  * Mail Yönlendirme admin uçlarının girdileri. Şekil burada; iş kuralları
@@ -44,7 +42,7 @@ export class CreateMailSenderAccountDto implements MailSenderAccountInput {
   @ApiProperty({ example: "Tarodan Sipariş" })
   @IsString()
   @IsNotEmpty()
-  @MaxLength(MAX_MAIL_DISPLAY_NAME_LENGTH)
+  @MaxLength(MAIL_DISPLAY_NAME_MAX_LENGTH)
   displayName: string;
 
   @ApiPropertyOptional({
@@ -126,7 +124,7 @@ export class UpdateMailAreaDto implements MailAreaUpdate {
   @ApiPropertyOptional({ nullable: true })
   @IsOptional()
   @IsString()
-  @MaxLength(MAX_MAIL_DISPLAY_NAME_LENGTH)
+  @MaxLength(MAIL_DISPLAY_NAME_MAX_LENGTH)
   displayName?: string | null;
 
   @ApiPropertyOptional({ nullable: true })
@@ -135,11 +133,14 @@ export class UpdateMailAreaDto implements MailAreaUpdate {
   @MaxLength(254)
   replyTo?: string | null;
 
-  @ApiPropertyOptional({ type: [String], maxItems: MAX_INTERNAL_RECIPIENTS })
+  @ApiPropertyOptional({
+    type: [String],
+    maxItems: MAIL_INTERNAL_RECIPIENTS_MAX,
+  })
   @IsOptional()
   @IsArray()
   // Tekilleştirme sonrası sınır serviste; burada kaba üst sınır.
-  @ArrayMaxSize(MAX_INTERNAL_RECIPIENTS * 2)
+  @ArrayMaxSize(MAIL_INTERNAL_RECIPIENTS_MAX * 2)
   @IsString({ each: true })
   @MaxLength(254, { each: true })
   internalRecipients?: string[];

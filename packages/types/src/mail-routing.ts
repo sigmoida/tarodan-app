@@ -125,3 +125,25 @@ export interface MailAccountTestResult {
   ok: boolean;
   error: string | null;
 }
+
+// ── Kurallar — API (doğrulama) ve admin (form) AYNI tanımı kullanır ────────
+
+/** Görünen adın (alan ezmesi ya da hesabın adı) en çok uzunluğu, kırpılmış. */
+export const MAIL_DISPLAY_NAME_MAX_LENGTH = 100;
+
+/** Bir alanın en çok iç bildirim alıcısı (tekilleştirme sonrası). */
+export const MAIL_INTERNAL_RECIPIENTS_MAX = 20;
+
+/**
+ * Display name goes into the From header: non-empty after trim, at most
+ * MAIL_DISPLAY_NAME_MAX_LENGTH (after trim), and none of: CR, LF, double
+ * quote, `<`, `>`, backslash. Turkish letters and other punctuation are fine.
+ */
+export function isValidMailDisplayName(value: string): boolean {
+  const trimmed = value.trim();
+  return (
+    trimmed.length > 0 &&
+    trimmed.length <= MAIL_DISPLAY_NAME_MAX_LENGTH &&
+    !/[\r\n"<>\\]/.test(trimmed)
+  );
+}

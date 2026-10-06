@@ -34,13 +34,27 @@ import {
 
 export type MailDigestMode = Exclude<MailDeliveryMode, "instant">;
 
-/** Tek özet e-postasına giren en çok olay; kalanı bir sonraki koşuya kalır. */
+/** Tek özet e-postasına giren en çok olay. */
 export const MAIL_DIGEST_BATCH_LIMIT = 200;
+
+/**
+ * Bir koşuda alan başına en çok özet e-postası (her biri en çok
+ * `MAIL_DIGEST_BATCH_LIMIT` olay). Birikmiş kuyruk bu sınıra kadar aynı koşuda
+ * boşaltılır; sınır aşılırsa loglanır, kalan bir sonraki koşuya kalır.
+ */
+export const MAIL_DIGEST_MAX_MAILS_PER_AREA = 20;
 
 /** Bu süreden eski, gönderilmemiş sahiplenme bayattır (koşu yarıda ölmüş). */
 export const MAIL_DIGEST_STALE_CLAIM_MS = 30 * 60 * 1000;
 
-/** Gönderilmiş kayıtların saklama süresi (günlük koşu temizler). */
+/**
+ * Anlık bildirimin outbox denemeleri bu süre içinde biter (5 deneme, üstel
+ * bekleme ~2,5 dk). Bu süreden eski, hâlâ gönderilmemiş `instant` kayıt ölü
+ * sayılır ve saatlik özete katılır — hiçbir olay sessizce kaybolmaz.
+ */
+export const MAIL_INSTANT_GRACE_MS = 15 * 60 * 1000;
+
+/** Kayıtların saklama süresi (günlük koşu temizler; gönderilmemişler dahil). */
 export const MAIL_NOTICE_RETENTION_DAYS = 90;
 
 /**
@@ -105,7 +119,10 @@ export class MailInternalDeliveryService implements OnModuleInit {
       },
       update: {},
     });
-    if (notice.sentAt || notice.delivery !== "instant") return;
+    // Özet işi ölü sayıp sahiplendiyse (claimId) gönderim onundur.
+    if (notice.sentAt || notice.claimId || notice.delivery !== "instant") {
+      return;
+    }
 
     const mail = renderInternalNotice(
       eventId,
@@ -126,46 +143,69 @@ export class MailInternalDeliveryService implements OnModuleInit {
         `Personel bildirimi gönderilemedi (${eventId} ${payload.notice.ref}): ${result.error ?? "unknown"}`,
       );
     }
-    await this.prisma.mailInternalNotice.update({
-      where: { id: notice.id },
+    await this.prisma.mailInternalNotice.updateMany({
+      where: { id: notice.id, sentAt: null },
       data: { sentAt: new Date() },
     });
   }
 
   /**
-   * Özet işi: `delivery` modundaki gönderilmemiş kayıtları alan başına tek
-   * e-postada gönderir. Bir alanın gönderimi başarısızsa diğerleri yine
-   * gider; koşu sonunda hata yükselir (iş "başarısız" görünür, yeniden dener).
+   * Özet işi: modun gönderilmemiş kayıtlarını alan başına özet e-postalarında
+   * gönderir — her e-posta en çok `MAIL_DIGEST_BATCH_LIMIT` olay, kuyruk
+   * boşalana (ya da `MAIL_DIGEST_MAX_MAILS_PER_AREA`e) kadar. Saatlik koşu
+   * ayrıca ölü anlık kayıtları (outbox denemeleri tükenmiş) toplar. Bir alanın
+   * gönderimi başarısızsa diğerleri yine gider; koşu sonunda hata yükselir
+   * (iş "başarısız" görünür, yeniden dener).
    */
   async runDigest(
     delivery: MailDigestMode,
     log: (msg: string) => void = () => undefined,
   ): Promise<CronRunSummary> {
     const now = new Date();
+    const pending = this.pendingWhere(delivery, now);
     await this.prisma.mailInternalNotice.updateMany({
       where: {
-        delivery,
-        sentAt: null,
+        ...pending,
+        claimId: { not: null },
         claimedAt: { lt: new Date(now.getTime() - MAIL_DIGEST_STALE_CLAIM_MS) },
       },
       data: { claimId: null, claimedAt: null },
     });
 
     const pendingAreas = await this.prisma.mailInternalNotice.findMany({
-      where: { delivery, sentAt: null, claimId: null },
+      where: { ...pending, claimId: null },
       select: { areaId: true },
       distinct: ["areaId"],
       orderBy: { areaId: "asc" },
     });
 
-    const stats = { mails: 0, events: 0, dropped: 0, failed: 0 };
+    const stats = { mails: 0, events: 0, dropped: 0, failed: 0, capped: 0 };
     for (const { areaId } of pendingAreas) {
       if (!isMailAreaId(areaId)) continue;
       try {
-        const outcome = await this.sendAreaDigest(areaId, delivery, now);
-        stats.events += outcome.events;
-        stats.dropped += outcome.dropped;
-        if (outcome.events > 0) stats.mails += 1;
+        let mails = 0;
+        for (;;) {
+          const outcome = await this.sendAreaDigest(
+            areaId,
+            delivery,
+            pending,
+            now,
+          );
+          if (outcome.events === 0 && outcome.dropped === 0) break;
+          stats.events += outcome.events;
+          stats.dropped += outcome.dropped;
+          if (outcome.events > 0) {
+            stats.mails += 1;
+            mails += 1;
+          }
+          if (mails >= MAIL_DIGEST_MAX_MAILS_PER_AREA) {
+            stats.capped += 1;
+            this.logger.warn(
+              `Özet sınırı doldu (${areaId}/${delivery}): ${mails} e-posta gönderildi, kalan olaylar sonraki koşuya kaldı`,
+            );
+            break;
+          }
+        }
       } catch (error: unknown) {
         stats.failed += 1;
         this.logger.error(
@@ -175,11 +215,17 @@ export class MailInternalDeliveryService implements OnModuleInit {
     }
 
     if (delivery === "daily") {
+      // Saklama: gönderilmiş ve (ne olursa olsun) gönderilememiş eski kayıtlar.
       const cutoff = new Date(
         now.getTime() - MAIL_NOTICE_RETENTION_DAYS * 24 * 60 * 60 * 1000,
       );
       await this.prisma.mailInternalNotice.deleteMany({
-        where: { sentAt: { lt: cutoff } },
+        where: {
+          OR: [
+            { sentAt: { lt: cutoff } },
+            { sentAt: null, createdAt: { lt: cutoff } },
+          ],
+        },
       });
     }
 
@@ -192,13 +238,36 @@ export class MailInternalDeliveryService implements OnModuleInit {
     return { summary: `${stats.mails} özet`, stats };
   }
 
+  /**
+   * Modun gönderilmemiş kayıtları. Saatlik koşu, outbox denemeleri tükenmiş
+   * (süresi geçmiş) anlık kayıtları da kapsar.
+   */
+  private pendingWhere(
+    delivery: MailDigestMode,
+    now: Date,
+  ): Prisma.MailInternalNoticeWhereInput {
+    if (delivery === "daily") return { delivery: "daily", sentAt: null };
+    return {
+      sentAt: null,
+      OR: [
+        { delivery: "hourly" },
+        {
+          delivery: "instant",
+          createdAt: { lt: new Date(now.getTime() - MAIL_INSTANT_GRACE_MS) },
+        },
+      ],
+    };
+  }
+
+  /** Tek özet e-postası: en çok `MAIL_DIGEST_BATCH_LIMIT` olay sahiplenir ve gönderir. */
   private async sendAreaDigest(
     area: MailAreaId,
     delivery: MailDigestMode,
+    pending: Prisma.MailInternalNoticeWhereInput,
     now: Date,
   ): Promise<{ events: number; dropped: number }> {
     const candidates = await this.prisma.mailInternalNotice.findMany({
-      where: { delivery, areaId: area, sentAt: null, claimId: null },
+      where: { ...pending, areaId: area, claimId: null },
       orderBy: { createdAt: "asc" },
       take: MAIL_DIGEST_BATCH_LIMIT,
       select: { id: true },
