@@ -68,7 +68,7 @@ describe("AdminTradeQueryService payment quote", () => {
         }),
       },
     };
-    const service = new AdminTradeQueryService(prisma as never);
+    const service = new AdminTradeQueryService(prisma as never, {} as never);
 
     const result = await service.getTradeById("trade-1");
 
@@ -89,7 +89,7 @@ describe("AdminTradeQueryService payment quote", () => {
         count: jest.fn().mockResolvedValue(0),
       },
     };
-    const service = new AdminTradeQueryService(prisma as never);
+    const service = new AdminTradeQueryService(prisma as never, {} as never);
 
     await service.getTrades({ search: "TRADETKSK7X9M2QF3NT123456" } as never);
     const paytr = JSON.stringify(prisma.trade.findMany.mock.calls[0][0].where);
