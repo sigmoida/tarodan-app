@@ -41,6 +41,8 @@ import {
 import { paginate } from "../../common/list";
 import { offerExpiresAt } from "./helpers/offer-expiry";
 import { OfferExtensionPolicy } from "./offer-extension-policy.service";
+import { MailInternalNotifier } from "../mail-routing/internal/mail-internal-notifier.service";
+import { offerConvertedNotice } from "../mail-routing/helpers/mail-internal-notices";
 
 @Injectable()
 export class OfferService {
@@ -66,6 +68,9 @@ export class OfferService {
     // extend_once: cron'un uzatacağı teklif süresi dolmuş sayılmaz (tek kural).
     @Optional()
     private readonly extensionPolicy?: OfferExtensionPolicy,
+    // Personel bildirimi (Mail Yönlendirme) — @Global; dar test kurulumlarında yok.
+    @Optional()
+    private readonly mailNotifier?: MailInternalNotifier,
   ) {
     this.minOfferPercentage = parseInt(
       this.configService.get("MIN_OFFER_PERCENTAGE") || "50",
@@ -584,6 +589,21 @@ export class OfferService {
     } catch (error) {
       this.logger.error(`Failed to emit offer.accepted event: ${error}`);
     }
+
+    // Personel bildirimi (Mail Yönlendirme): teklif siparişe dönüştü.
+    // Commit sonrası; emit fırlatmaz, test şeridi siparişleri atlanır.
+    void this.mailNotifier?.emit(
+      "offer.converted",
+      offerConvertedNotice({
+        offerId: result.offer.id,
+        orderNumber: result.order.orderNumber,
+        buyerName: publicName(result.offer.buyer),
+        sellerName: publicName(result.offer.seller),
+        productTitle: result.offer.product.title,
+        amount: result.order.totalAmount,
+      }),
+      { isTest: result.order.isTest },
+    );
 
     // Zil bildirimleri: `notifyOfferAccepted` tanımlıydı ama HİÇ çağrılmıyordu —
     // alıcı, 24 saatlik ödeme penceresini yalnız e-postadan öğreniyordu.

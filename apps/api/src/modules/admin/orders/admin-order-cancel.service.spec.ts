@@ -97,6 +97,7 @@ describe("AdminOrderCancelService", () => {
     const orderService = {
       cancelUnpaidOrderInTx: jest.fn().mockResolvedValue({}),
       invalidateProductCaches: jest.fn().mockResolvedValue(undefined),
+      notifyStaffUnpaidCancelled: jest.fn().mockResolvedValue(undefined),
     };
     const notificationService = {
       notifyOrderCancelledByPlatform: jest.fn().mockResolvedValue(undefined),
@@ -149,6 +150,42 @@ describe("AdminOrderCancelService", () => {
         refundService.createPlatformCancellationRefund,
       ).not.toHaveBeenCalled();
       expect(result).toEqual({ orderId: "order-1", kind: "unpaid" });
+    });
+
+    it("personel bildirimi işlem içinde değil, commit SONRASI istenir", async () => {
+      const { service, prisma, orderService } = makeService(unpaid);
+      let insideTx = false;
+      let calledInsideTx: boolean | null = null;
+      prisma.$transaction.mockImplementation(async (fn) => {
+        insideTx = true;
+        try {
+          return await fn({
+            $queryRaw: jest.fn().mockResolvedValue([{ id: "order-1" }]),
+            order: {
+              findUnique: jest
+                .fn()
+                .mockResolvedValue({ ...baseOrder, ...unpaid }),
+            },
+          } as never);
+        } finally {
+          insideTx = false;
+        }
+      });
+      orderService.notifyStaffUnpaidCancelled.mockImplementation(async () => {
+        calledInsideTx = insideTx;
+      });
+
+      await service.cancelOrder(
+        "admin-1",
+        "order-1",
+        request({ expectedKind: "unpaid" }),
+      );
+
+      expect(orderService.notifyStaffUnpaidCancelled).toHaveBeenCalledWith(
+        "order-1",
+        "admin_cancelled",
+      );
+      expect(calledInsideTx).toBe(false);
     });
 
     it("zorunlu denetimi iptalle AYNI işlemde yazar (önce/sonra, neden, not, taraflar)", async () => {

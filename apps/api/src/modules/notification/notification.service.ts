@@ -394,16 +394,6 @@ export class NotificationService {
     return this.account.sendWelcomeEmail(userId);
   }
 
-  async sendGuestContactAdminEmail(data: {
-    referenceNumber: string;
-    name: string;
-    email: string;
-    subject: string;
-    message: string;
-  }) {
-    return this.account.sendGuestContactAdminEmail(data);
-  }
-
   async sendPasswordResetEmail(userId: string, resetToken: string) {
     return this.account.sendPasswordResetEmail(userId, resetToken);
   }

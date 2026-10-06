@@ -149,3 +149,11 @@ export interface TradeCancelledPaymentRefundPayload {
 export const tradeCancelledPaymentRefundDedupeKey = (
   tradeCashPaymentId: string,
 ): string => `${OUTBOX_TRADE_CANCELLED_PAYMENT_REFUND}:${tradeCashPaymentId}`;
+
+/**
+ * Personele giden iç bildirim (Mail Yönlendirme, docs/MAIL_ROUTING.md). İş
+ * olayının yanında yazılır; handler alanın ayarına göre hemen gönderir ya da
+ * saatlik/günlük özete bırakır. SMTP hiçbir zaman iş transaction'ının içinde
+ * beklenmez. Yük: `MailInternalOutboxPayload` (mail-routing modülü).
+ */
+export const OUTBOX_MAIL_INTERNAL_EVENT = "mail.internal_event";

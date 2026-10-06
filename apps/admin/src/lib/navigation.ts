@@ -499,6 +499,17 @@ export function getNavGroups(t: T): NavGroup[] {
           permission: "settings",
         },
         {
+          // API: PERMISSION_MAP["mail-routing"] = ["settings"]; değiştirme
+          // ayrıca super_admin'e sınırlı (sayfa diğer rollere salt okunur).
+          name: t("admin.nav.items.mailRouting.name"),
+          href: "/system/mail-routing",
+          description: t("admin.nav.items.mailRouting.description"),
+          keywords: t("admin.nav.items.mailRouting.keywords")
+            .split(",")
+            .map((k) => k.trim()),
+          permission: "settings",
+        },
+        {
           name: t("admin.nav.items.logs.name"),
           href: "/system/logs",
           description: t("admin.nav.items.logs.description"),

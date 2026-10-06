@@ -180,6 +180,11 @@ const envSchema = z
     MAIL_FROM: z.string().optional(),
     SUPPORT_EMAIL: z.string().optional(),
     SUPPORT_NOTIFICATION_EMAIL: z.string().optional(),
+    // Mail Yönlendirme gönderici kutularının şifrelerini (AES-256-GCM) açan
+    // anahtar. Kendi anahtarıdır: 2FA anahtarı döndürülünce kutu şifreleri
+    // okunmaz hale gelmesin. Canlıda ilk kutu eklenmeden önce verilmeli; yoksa
+    // panel kutu kaydını reddeder (bkz. docs/MAIL_ROUTING.md).
+    MAIL_ACCOUNT_ENCRYPTION_KEY: z.string().optional(),
     EMAIL_LOGO_URL: z.string().optional(),
     AWS_ACCESS_KEY_ID: z.string().optional(),
     AWS_SECRET_ACCESS_KEY: z.string().optional(),
@@ -409,6 +414,31 @@ const envSchema = z
         message:
           "Authentication, payment capability, guest OTP and two-factor encryption secrets must be present and mutually distinct in production",
       });
+    }
+
+    // Gönderici kutu şifre anahtarı OPSİYONEL (hiç kutu yokken gerekmez) ama
+    // verildiyse güçlü ve diğer sırlardan ayrı olmalı: 2FA anahtarıyla aynı
+    // olursa ikisinin döndürülmesi birbirine bağlanır.
+    const mailAccountKey = env.MAIL_ACCOUNT_ENCRYPTION_KEY?.trim() ?? "";
+    if (mailAccountKey) {
+      if (
+        mailAccountKey.length < MIN_PROD_SECRET_LENGTH ||
+        KNOWN_PLACEHOLDER.test(mailAccountKey)
+      ) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["MAIL_ACCOUNT_ENCRYPTION_KEY"],
+          message: `MAIL_ACCOUNT_ENCRYPTION_KEY must be at least ${MIN_PROD_SECRET_LENGTH} characters and not the committed placeholder in production`,
+        });
+      }
+      if (signing.includes(mailAccountKey)) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["MAIL_ACCOUNT_ENCRYPTION_KEY"],
+          message:
+            "MAIL_ACCOUNT_ENCRYPTION_KEY must differ from the authentication, payment capability, guest OTP and two-factor secrets",
+        });
+      }
     }
 
     for (const key of [

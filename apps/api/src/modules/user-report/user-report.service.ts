@@ -7,6 +7,7 @@ import {
   Logger,
   BadRequestException,
   NotFoundException,
+  Optional,
 } from "@nestjs/common";
 import { PrismaService } from "../../prisma";
 import {
@@ -28,6 +29,8 @@ import {
   PUBLIC_NAME_SELECT,
   publicName,
 } from "../../common/helpers/public-identity";
+import { MailInternalNotifier } from "../mail-routing/internal/mail-internal-notifier.service";
+import { productReportedNotice } from "../mail-routing/helpers/mail-internal-notices";
 
 @Injectable()
 export class UserReportService {
@@ -36,6 +39,8 @@ export class UserReportService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly notifications: NotificationService,
+    // Personel bildirimi (Mail Yönlendirme) — @Global; dar test kurulumlarında yok.
+    @Optional() private readonly mailNotifier?: MailInternalNotifier,
   ) {}
 
   /**
@@ -80,8 +85,51 @@ export class UserReportService {
     );
 
     await this.notifyAdmins(report.id, reporterId, dto);
+    if (dto.type === ReportType.PRODUCT) {
+      void this.notifyStaffProductReported(report.id, reporterId, dto);
+    }
 
     return this.mapToResponse(report);
+  }
+
+  /**
+   * Personel bildirimi (Mail Yönlendirme, `report.productReported`). Şikayet
+   * açıklaması (serbest metin) e-postaya girmez; neden kodu ve panel linki
+   * yeter. Test hesabının şikayeti bildirilmez.
+   */
+  private async notifyStaffProductReported(
+    reportId: string,
+    reporterId: string,
+    dto: CreateReportDto,
+  ): Promise<void> {
+    if (!this.mailNotifier) return;
+    try {
+      const [reporter, product] = await Promise.all([
+        this.prisma.user.findUnique({
+          where: { id: reporterId },
+          select: { ...PUBLIC_NAME_SELECT, isTestAccount: true },
+        }),
+        this.prisma.product.findUnique({
+          where: { id: dto.targetId },
+          select: { productCode: true, title: true },
+        }),
+      ]);
+      await this.mailNotifier.emit(
+        "report.productReported",
+        productReportedNotice({
+          reportId,
+          productRef: product?.productCode ?? dto.targetId,
+          reporterName: publicName(reporter),
+          reason: dto.reason,
+          productTitle: product?.title,
+        }),
+        { isTest: reporter?.isTestAccount ?? false, dedupeKey: reportId },
+      );
+    } catch (error: unknown) {
+      this.logger.warn(
+        `report.productReported personel bildirimi hazırlanamadı (${reportId}): ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
   }
 
   /**

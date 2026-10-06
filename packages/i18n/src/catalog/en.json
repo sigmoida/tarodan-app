@@ -9102,6 +9102,11 @@
           "name": "Durations & Rules",
           "description": "Business durations and what happens when they run out",
           "keywords": "duration, timeout, listing lifetime, offer validity, return window, trade, alert"
+        },
+        "mailRouting": {
+          "name": "Email Routing",
+          "description": "Sender mailbox per area and internal notification recipients",
+          "keywords": "email, mail, sender, smtp, notification, recipient, mailbox, digest"
         }
       }
     },
@@ -9703,6 +9708,185 @@
         "distanceSales": "Distance Sales Agreement",
         "refundPolicy": "Refund Policy",
         "sellerAgreement": "Seller Agreement"
+      }
+    },
+    "mailRouting": {
+      "page": {
+        "title": "Email Routing",
+        "description": "Which mailbox each area's customer email is sent from, and who on the team receives operational events by email and how often. Changes apply from the next send."
+      },
+      "readOnly": "Only a super admin can change these settings; you can view them.",
+      "saved": "Changes saved.",
+      "error": {
+        "title": "Couldn't load email settings",
+        "description": "Refresh the page or try again in a moment."
+      },
+      "tabs": {
+        "accounts": "Sender Accounts",
+        "areas": "Areas",
+        "notifications": "Internal Notifications"
+      },
+      "areas": {
+        "account": "Account",
+        "order": "Order",
+        "cancellation": "Cancellation",
+        "refund": "Refund",
+        "trade": "Trade",
+        "offer": "Offer",
+        "payment": "Payment",
+        "invoice": "Invoice",
+        "membership": "Membership",
+        "listing": "New Product / Listing",
+        "discount": "Discount",
+        "boost": "Boost",
+        "ad": "Advertising",
+        "support": "Support Ticket",
+        "guestMessage": "Guest Messages",
+        "report": "Product Reports",
+        "sellerApplication": "Business Application",
+        "marketing": "Marketing",
+        "social": "Social"
+      },
+      "events": {
+        "order_paid": "Order paid",
+        "order_cancelled": "Order cancelled",
+        "refund_requested": "Refund requested",
+        "trade_started": "Trade started",
+        "trade_disputed": "Trade disputed",
+        "offer_converted": "Offer converted to an order",
+        "support_ticketOpened": "Support ticket opened",
+        "support_guestMessage": "New message from a guest",
+        "report_productReported": "Product reported",
+        "listing_pendingApproval": "Listing awaiting approval",
+        "discount_createdBySeller": "Seller created a discount",
+        "boost_purchased": "Boost purchased"
+      },
+      "delivery": {
+        "instant": "Instant",
+        "hourly": "Hourly digest",
+        "daily": "Daily digest"
+      },
+      "validation": {
+        "required": "This field is required.",
+        "email": "Enter a valid email address.",
+        "port": "Port must be a number between 1 and 65535.",
+        "passwordRequired": "Enter a password for the new account.",
+        "recipient": {
+          "invalid": "Enter a valid email address.",
+          "duplicate": "This address is already in the list.",
+          "limit": "An area can have at most {max} recipients."
+        },
+        "displayName": "The display name can't contain quotes (\") or angle brackets (< >) or line breaks, and must be at most {max} characters."
+      },
+      "accountsTab": {
+        "title": "Sender accounts",
+        "fallbackInfo": "An area with no account, or whose account fails, sends from the default identity ({defaultFrom}).",
+        "add": "Add account",
+        "addTitle": "Add sender account",
+        "editTitle": "Edit sender account",
+        "created": "Account added.",
+        "updated": "Account updated.",
+        "deleted": "Account deleted.",
+        "empty": "No sender accounts yet. Areas currently send from the default identity.",
+        "noAreas": "Not used by any area",
+        "notTested": "Not tested yet",
+        "passwordSet": "Password set",
+        "passwordMissing": "No password",
+        "testSend": "Send test",
+        "deleteTitle": "Delete this account?",
+        "deleteDescription": "The account {address} will be deleted. It can't be deleted while an area uses it; change that area's account first.",
+        "columns": {
+          "address": "Address",
+          "displayName": "Display name",
+          "areas": "Used by areas",
+          "lastTest": "Latest status",
+          "password": "Password"
+        },
+        "test": {
+          "title": "Send test: {address}",
+          "to": "Recipient address",
+          "toHelper": "A test email is sent to this address from the selected account.",
+          "send": "Send",
+          "ok": "Test email sent.",
+          "failed": "Could not send: {error}",
+          "badge": {
+            "ok": "Passed",
+            "failed": "Failed"
+          }
+        },
+        "form": {
+          "address": "Mailbox address",
+          "displayName": "Display name",
+          "displayNameHelper": "The sender name recipients see, for example Tarodan Orders.",
+          "password": "Password",
+          "passwordKeep": "Type a new password to change it",
+          "passwordEditHelper": "Leave empty to keep the stored password. The stored password is never shown.",
+          "showAdvanced": "Show advanced settings",
+          "hideAdvanced": "Hide advanced settings",
+          "advancedNote": "Leave these empty to use the default mail server. Fill them in only if this account lives on a different server.",
+          "username": "Username",
+          "usernameHelper": "Uses the mailbox address when empty.",
+          "host": "Server (host)",
+          "port": "Port",
+          "secure": "Secure connection",
+          "secureDefault": "Default",
+          "secureOn": "On (SSL/TLS)",
+          "secureOff": "Off (STARTTLS)"
+        }
+      },
+      "areasTab": {
+        "title": "Areas",
+        "editTitle": "Sender settings for {area}",
+        "defaultSender": "Default identity",
+        "noTemplates": "No templates",
+        "templateCount": "{count, plural, one {# template} other {# templates}}",
+        "templateKeys": "Customer templates in this area",
+        "columns": {
+          "area": "Area",
+          "sender": "Sender account",
+          "displayName": "Display name",
+          "replyTo": "Reply-to",
+          "templates": "Customer templates"
+        },
+        "form": {
+          "sender": "Sender account",
+          "displayName": "Display name (optional)",
+          "displayNameHelper": "Uses the account's display name when empty.",
+          "replyTo": "Reply-to address (optional)",
+          "replyToHelper": "Where a customer's reply goes. Uses the sender address when empty."
+        }
+      },
+      "notificationsTab": {
+        "info": "Operational events also arrive by email to the recipients of the matching area. For each event choose whether it is on, and whether it arrives instantly or as an hourly / daily digest.",
+        "views": {
+          "byArea": "By area",
+          "byPerson": "By person"
+        },
+        "recipients": "Recipients",
+        "events": "Events",
+        "delivery": "Delivery",
+        "noRecipients": "This area has no recipients.",
+        "recipientPlaceholder": "name@tarodan.com.tr",
+        "remove": "Remove",
+        "removeRecipient": "Remove {address}",
+        "guestMessageNote": "While the recipient list is empty these notifications go to the default support address; once you add recipients they go only to those."
+      },
+      "people": {
+        "title": "Recipients",
+        "add": "Add person",
+        "addTitle": "Add a person to areas",
+        "editTitle": "Edit a person's areas",
+        "address": "Email address",
+        "areasLabel": "Areas received",
+        "removeAll": "Remove from all",
+        "removeTitle": "Remove this person from all areas?",
+        "removeDescription": "{address} will be removed from every area's recipient list.",
+        "empty": "No recipients added yet.",
+        "overLimit": "These areas' recipient lists are full, so the person could not be added: {areas}",
+        "columns": {
+          "person": "Person",
+          "areas": "Areas received"
+        }
       }
     }
   },
@@ -11174,6 +11358,152 @@
       "bankNationalIdMismatch": "The Turkish ID number on the bank account must match the number registered on your account.",
       "nationalIdInvalid": "Please enter a valid Turkish ID number.",
       "correctionNotAllowed": "Identity details of a deleted or staff account cannot be corrected."
+    },
+    "mailRouting": {
+      "unknownArea": "Unknown mail area.",
+      "accountNotFound": "Sender mailbox not found.",
+      "invalidAddress": "Invalid email address: {address}",
+      "invalidDisplayName": "The display name must not be empty, may be at most 100 characters and must not contain quotes, < > or line breaks.",
+      "invalidReplyTo": "The reply-to address must be a valid email address.",
+      "invalidRecipient": "Invalid recipient address: {address}",
+      "tooManyRecipients": "An area can have at most {max} recipients.",
+      "eventNotInArea": "This event ({event}) does not belong to this area.",
+      "duplicateEvent": "An event can only be changed once per request.",
+      "invalidDelivery": "Invalid delivery mode.",
+      "passwordRequired": "The mailbox password is required.",
+      "addressTaken": "A sender mailbox with this address already exists.",
+      "accountInUse": "This mailbox is used by: {areas}. Remove it from those areas first.",
+      "encryptionKeyMissing": "The encryption key for mailbox passwords (MAIL_ACCOUNT_ENCRYPTION_KEY) is not configured.",
+      "invalidHost": "Invalid SMTP host name.",
+      "invalidPort": "The SMTP port must be between 1 and 65535.",
+      "invalidUsername": "Invalid SMTP username.",
+      "testMail": {
+        "subject": "Tarodan mailbox test",
+        "body": "This email was sent to confirm that the {address} mailbox can send mail from Tarodan."
+      },
+      "internal": {
+        "openInAdmin": "Open in admin",
+        "footer": "This notification was sent to staff according to the Mail Routing settings.",
+        "yes": "Yes",
+        "no": "No",
+        "actors": {
+          "buyer": "Buyer",
+          "seller": "Seller",
+          "platform": "Tarodan (admin)",
+          "system": "System"
+        },
+        "tradeStatus": {
+          "awaitingPayment": "Awaiting payment",
+          "shippingToWarehouse": "Shipping to warehouse"
+        },
+        "facts": {
+          "buyer": "Buyer",
+          "seller": "Seller",
+          "user": "User",
+          "amount": "Amount",
+          "total": "Total",
+          "orderCount": "Orders",
+          "productCount": "Products",
+          "order": "Order",
+          "product": "Product",
+          "reason": "Reason",
+          "cancelledBy": "Cancelled by",
+          "requiresReview": "Needs review",
+          "initiator": "Proposer",
+          "receiver": "Counterparty",
+          "cashAmount": "Cash difference",
+          "raisedBy": "Dispute opened by",
+          "category": "Category",
+          "priority": "Priority",
+          "subject": "Subject",
+          "name": "Name",
+          "email": "Email",
+          "message": "Message",
+          "reporter": "Reported by",
+          "price": "Price",
+          "discount": "Discount",
+          "validity": "Valid",
+          "package": "Package",
+          "duration": "Duration (days)",
+          "status": "Status"
+        },
+        "areas": {
+          "account": "Account",
+          "order": "Orders",
+          "cancellation": "Cancellations",
+          "refund": "Refunds",
+          "trade": "Trades",
+          "offer": "Offers",
+          "payment": "Payments",
+          "invoice": "Invoices",
+          "membership": "Membership",
+          "listing": "Listings",
+          "discount": "Discounts",
+          "boost": "Boosts",
+          "ad": "Ads",
+          "support": "Support",
+          "guestMessage": "Guest messages",
+          "report": "Reports",
+          "sellerApplication": "Seller applications",
+          "marketing": "Marketing",
+          "social": "Social"
+        },
+        "digest": {
+          "subject": "{area} {period}: {count, plural, one {# event} other {# events}}",
+          "hourly": "hourly digest",
+          "daily": "daily digest"
+        },
+        "events": {
+          "order_paid": {
+            "subject": "New payment: {ref}",
+            "title": "Payment received"
+          },
+          "order_cancelled": {
+            "subject": "Order cancelled: {ref}",
+            "title": "Order cancellation"
+          },
+          "refund_requested": {
+            "subject": "New refund request: {ref}",
+            "title": "Refund request"
+          },
+          "trade_started": {
+            "subject": "Trade started: {ref}",
+            "title": "Trade accepted"
+          },
+          "trade_disputed": {
+            "subject": "Trade dispute: {ref}",
+            "title": "Trade dispute"
+          },
+          "offer_converted": {
+            "subject": "Offer turned into an order: {ref}",
+            "title": "Offer accepted"
+          },
+          "support_ticketOpened": {
+            "subject": "New support ticket: {ref}",
+            "title": "Support ticket"
+          },
+          "support_guestMessage": {
+            "subject": "New contact message: {ref}",
+            "title": "Guest contact message"
+          },
+          "report_productReported": {
+            "subject": "Product reported: {ref}",
+            "title": "Product report"
+          },
+          "listing_pendingApproval": {
+            "subject": "Listing awaiting approval: {ref}",
+            "title": "Listing awaiting approval"
+          },
+          "discount_createdBySeller": {
+            "subject": "Seller discount created: {ref}",
+            "title": "Seller discount"
+          },
+          "boost_purchased": {
+            "subject": "Boost purchased: {ref}",
+            "title": "Boost sale"
+          }
+        }
+      }
     }
   },
   "status": {

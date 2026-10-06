@@ -13,6 +13,7 @@ import {
   CsrfGuard,
 } from "./modules/auth";
 import { OutboxModule } from "./modules/outbox/outbox.module";
+import { MailRoutingModule } from "./modules/mail-routing/mail-routing.module";
 import { LedgerModule } from "./modules/ledger/ledger.module";
 import { UserModule } from "./modules/user";
 import { ProductModule } from "./modules/product";
@@ -171,6 +172,9 @@ import { isTest } from "./config/environment";
 
     // Immutable double-entry ledger + drift reconciliation (Faz 6) — @Global
     LedgerModule,
+
+    // Mail Yönlendirme: gönderici kutuları + personel bildirimleri — @Global
+    MailRoutingModule,
 
     // Core Feature modules
     AuthModule,

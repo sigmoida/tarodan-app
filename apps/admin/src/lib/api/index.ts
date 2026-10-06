@@ -1,11 +1,12 @@
-import { api } from './client';
-import { dashboardApi } from './dashboard';
-import { usersApi } from './users';
-import { catalogApi } from './catalog';
-import { operationsApi } from './operations';
-import { financeApi } from './finance';
-import { marketingApi } from './marketing';
-import { systemApi } from './system';
+import { api } from "./client";
+import { dashboardApi } from "./dashboard";
+import { usersApi } from "./users";
+import { catalogApi } from "./catalog";
+import { operationsApi } from "./operations";
+import { financeApi } from "./finance";
+import { marketingApi } from "./marketing";
+import { systemApi } from "./system";
+import { mailRoutingApi } from "./mail-routing";
 
 /**
  * The single admin API surface, recomposed from the per-domain modules. Kept as
@@ -22,7 +23,8 @@ import { systemApi } from './system';
 export const adminApi = {
   get: (url: string, config?: any) => api.get(url, config),
   post: (url: string, data?: any, config?: any) => api.post(url, data, config),
-  patch: (url: string, data?: any, config?: any) => api.patch(url, data, config),
+  patch: (url: string, data?: any, config?: any) =>
+    api.patch(url, data, config),
   delete: (url: string, config?: any) => api.delete(url, config),
 
   ...dashboardApi,
@@ -32,6 +34,7 @@ export const adminApi = {
   ...financeApi,
   ...marketingApi,
   ...systemApi,
+  ...mailRoutingApi,
 };
 
 export { api };

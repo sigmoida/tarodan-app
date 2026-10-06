@@ -44,6 +44,8 @@ import type {
   OrderReservationState,
 } from "@tarodan/types";
 import { orderReservationState } from "./helpers/order-reservation";
+import { MailInternalNotifier } from "../mail-routing/internal/mail-internal-notifier.service";
+import { orderCancelledNotice } from "../mail-routing/helpers/mail-internal-notices";
 
 /**
  * Ödenmemiş iptalin aktörü, ledger gerekçesinden türetilir: ikisi aynı olguyu
@@ -78,6 +80,8 @@ export class OrderLifecycleService {
     private readonly elogoInvoicing: ElogoInvoicingService,
     @Optional() private readonly discountService?: DiscountService,
     private readonly refundService?: RefundService,
+    // Personel bildirimi (Mail Yönlendirme) — @Global; dar test kurulumlarında yok.
+    @Optional() private readonly mailNotifier?: MailInternalNotifier,
   ) {}
 
   /**
@@ -507,6 +511,11 @@ export class OrderLifecycleService {
     if (productIdToInvalidate) {
       await this.orderCommon.invalidateProductCaches(productIdToInvalidate);
     }
+    void this.notifyStaffUnpaidCancelled(
+      orderId,
+      "buyer_cancelled",
+      dto?.reason?.trim() || undefined,
+    );
     return result;
   }
 
@@ -643,7 +652,56 @@ export class OrderLifecycleService {
       );
     }
 
+    // Personel bildirimi bu fonksiyonda DEĞİL: işlem açıkken ek sorgu ya da
+    // ikinci bağlantıdan ayar okuması yapılmasın diye çağıranlar commit
+    // SONRASI `notifyStaffUnpaidCancelled` çağırır.
     return cancelledOrder;
+  }
+
+  /**
+   * Personel bildirimi (Mail Yönlendirme, `order.cancelled`) — ödenmemiş
+   * iptalin COMMIT SONRASI adımı; `cancelUnpaidOrderInTx`'i çağıran her yol
+   * işlemi bitirdikten sonra çağırır (alıcı/misafir/sepet iptali `cancel`,
+   * yönetici iptali AdminOrderCancelService). Ödenmiş iptaller processRefund'dan
+   * aynı anahtarla (sipariş id) gelir. Fırlatmaz; olay kapalıysa notifier ön
+   * elemesi önbellekten karar verir, outbox satırı yazılmaz.
+   */
+  async notifyStaffUnpaidCancelled(
+    orderId: string,
+    ledgerReason: "buyer_cancelled" | "admin_cancelled",
+    reason?: string,
+  ): Promise<void> {
+    if (!this.mailNotifier) return;
+    try {
+      const order = await this.prisma.order.findUnique({
+        where: { id: orderId },
+        select: {
+          orderNumber: true,
+          totalAmount: true,
+          isTest: true,
+          status: true,
+        },
+      });
+      if (!order || order.status !== OrderStatus.cancelled) return;
+      const actor = UNPAID_CANCEL_ACTOR[ledgerReason];
+      await this.mailNotifier.emit(
+        "order.cancelled",
+        orderCancelledNotice({
+          orderId,
+          orderNumber: order.orderNumber,
+          cancelledBy: actor,
+          amount: order.totalAmount,
+          // Yönetici iptalinin serbest metni personel postasına girmez;
+          // nedeni panelde (katalog kodu) görünür.
+          reason: actor === CancellationActor.buyer ? reason : undefined,
+        }),
+        { isTest: order.isTest, dedupeKey: orderId },
+      );
+    } catch (error: unknown) {
+      this.logger.warn(
+        `order.cancelled personel bildirimi hazırlanamadı (${orderId}): ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
   }
 
   /**

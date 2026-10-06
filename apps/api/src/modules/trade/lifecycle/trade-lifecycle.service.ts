@@ -69,6 +69,11 @@ import {
 } from "../dto";
 import { i18nMessage } from "../../i18n";
 import { UserBlockService } from "../../user-block/user-block.service";
+import { MailInternalNotifier } from "../../mail-routing/internal/mail-internal-notifier.service";
+import {
+  tradeDisputedNotice,
+  tradeStartedNotice,
+} from "../../mail-routing/helpers/mail-internal-notices";
 import { REFERENCE_PREFIX } from "../../../common/helpers/code-prefixes";
 import {
   generateReferenceCode,
@@ -105,7 +110,62 @@ export class TradeLifecycleService {
     private readonly userBlocks: UserBlockService,
     // Takas hizmet bedeli kampanyası (İ25) — yoksa takas indirimsiz akar.
     @Optional() private readonly discountService?: DiscountService,
+    // Personel bildirimi (Mail Yönlendirme) — @Global; commit SONRASI, fırlatmaz.
+    @Optional() private readonly mailNotifier?: MailInternalNotifier,
   ) {}
+
+  /**
+   * Personel bildirimi (`trade.started` / `trade.disputed`). Commit sonrası
+   * taze okunur; test şeridi takasları atlanır. Anlaşmazlık açıklaması
+   * (mesaj gövdesi) e-postaya girmez — yalnız neden alıntısı.
+   */
+  private async notifyStaffTrade(
+    eventId: "trade.started" | "trade.disputed",
+    tradeId: string,
+    dispute?: { raisedById: string; reason: string },
+  ): Promise<void> {
+    if (!this.mailNotifier) return;
+    try {
+      const trade = await this.prisma.trade.findUnique({
+        where: { id: tradeId },
+        select: {
+          tradeNumber: true,
+          status: true,
+          isTest: true,
+          cashAmount: true,
+          initiatorId: true,
+          initiator: { select: PUBLIC_NAME_SELECT },
+          receiver: { select: PUBLIC_NAME_SELECT },
+        },
+      });
+      if (!trade) return;
+      const notice =
+        eventId === "trade.started"
+          ? tradeStartedNotice({
+              tradeId,
+              tradeNumber: trade.tradeNumber,
+              initiatorName: publicName(trade.initiator),
+              receiverName: publicName(trade.receiver),
+              cashAmount: trade.cashAmount,
+              awaitingPayment: trade.status === TradeStatus.awaiting_payment,
+            })
+          : tradeDisputedNotice({
+              tradeId,
+              tradeNumber: trade.tradeNumber,
+              raisedByName: publicName(
+                dispute?.raisedById === trade.initiatorId
+                  ? trade.initiator
+                  : trade.receiver,
+              ),
+              reason: dispute?.reason,
+            });
+      await this.mailNotifier.emit(eventId, notice, { isTest: trade.isTest });
+    } catch (error: unknown) {
+      this.logger.warn(
+        `${eventId} personel bildirimi hazırlanamadı (${tradeId}): ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
+  }
 
   // ==========================================================================
   // TRADE STATE MACHINE
@@ -664,6 +724,7 @@ export class TradeLifecycleService {
     } catch (error) {
       this.logger.warn("Failed to send trade accepted notification");
     }
+    void this.notifyStaffTrade("trade.started", tradeId);
 
     // Non-cash safe-trade: trade is already shipping_to_warehouse, so we
     // auto-create both inbound TradeShipment rows + dispatch them to Sürat.
@@ -1519,6 +1580,10 @@ export class TradeLifecycleService {
       });
     });
 
+    void this.notifyStaffTrade("trade.disputed", tradeId, {
+      raisedById: userId,
+      reason: dto.reason,
+    });
     return this.tradeQuery.getTradeById(tradeId, userId);
   }
 
