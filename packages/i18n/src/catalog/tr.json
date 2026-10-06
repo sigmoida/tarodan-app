@@ -9769,14 +9769,14 @@
       "validation": {
         "required": "Bu alan zorunludur.",
         "email": "Geçerli bir e-posta adresi girin.",
-        "maxChars": "En fazla {max} karakter olabilir.",
         "port": "Port 1 ile 65535 arasında bir sayı olmalıdır.",
         "passwordRequired": "Yeni hesap için parola girin.",
         "recipient": {
           "invalid": "Geçerli bir e-posta adresi girin.",
           "duplicate": "Bu adres listede zaten var.",
           "limit": "Bir alana en fazla {max} alıcı eklenebilir."
-        }
+        },
+        "displayName": "Görünen ad tırnak (\") ve açı parantezi (< >) içeremez, satır sonu içermemeli ve en fazla {max} karakter olmalıdır."
       },
       "accountsTab": {
         "title": "Gönderen hesaplar",
@@ -9799,7 +9799,7 @@
           "address": "Adres",
           "displayName": "Görünen ad",
           "areas": "Kullanan alanlar",
-          "lastTest": "Son test",
+          "lastTest": "Son durum",
           "password": "Parola"
         },
         "test": {
@@ -9868,7 +9868,8 @@
         "noRecipients": "Bu alanın alıcısı yok.",
         "recipientPlaceholder": "ad@tarodan.com.tr",
         "remove": "Kaldır",
-        "removeRecipient": "{address} adresini kaldır"
+        "removeRecipient": "{address} adresini kaldır",
+        "guestMessageNote": "Alıcı listesi boşken bu bildirimler varsayılan destek adresine gider; alıcı eklerseniz yalnızca eklediğiniz adreslere gider."
       },
       "people": {
         "title": "Alıcılar",

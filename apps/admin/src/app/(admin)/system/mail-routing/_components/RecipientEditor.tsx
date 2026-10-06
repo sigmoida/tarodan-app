@@ -3,8 +3,8 @@
 import { useState } from "react";
 import { useTranslations } from "next-intl";
 import { Badge, Button, Input } from "@tarodan/ui";
+import { MAIL_INTERNAL_RECIPIENTS_MAX } from "@tarodan/types";
 import {
-  MAX_RECIPIENTS,
   addRecipient,
   removeRecipient,
 } from "../_lib/mail-routing";
@@ -34,7 +34,7 @@ export function RecipientEditor({
     if ("error" in result) {
       setError(
         t(`admin.mailRouting.validation.recipient.${result.error}`, {
-          max: MAX_RECIPIENTS,
+          max: MAIL_INTERNAL_RECIPIENTS_MAX,
         }),
       );
       return;

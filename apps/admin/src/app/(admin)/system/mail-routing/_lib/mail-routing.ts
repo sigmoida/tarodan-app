@@ -1,7 +1,12 @@
 import { z } from "zod";
 import type { useTranslations } from "next-intl";
 import type { MessageKey } from "@tarodan/i18n";
-import { MAIL_DELIVERY_MODES } from "@tarodan/types";
+import {
+  MAIL_DELIVERY_MODES,
+  MAIL_DISPLAY_NAME_MAX_LENGTH,
+  MAIL_INTERNAL_RECIPIENTS_MAX,
+  isValidMailDisplayName,
+} from "@tarodan/types";
 import type {
   MailAreaId,
   MailAreaState,
@@ -24,9 +29,6 @@ type T = ReturnType<typeof useTranslations<never>>;
  * kuralları (geçerli adres, küçük harf, alan başına en çok 20 alıcı, tekrar
  * yok) yeniden uygular.
  */
-
-/** Alan başına en çok iç bildirim alıcısı (sunucu sözleşmesi). */
-export const MAX_RECIPIENTS = 20;
 
 /** Gönderen seçicisinde "hesap yok, varsayılan kimlik" seçeneğinin değeri. */
 export const DEFAULT_SENDER_VALUE = "";
@@ -119,7 +121,9 @@ export function accountSchema(t: T, isEdit: boolean) {
       .string()
       .trim()
       .min(1, t("admin.mailRouting.validation.required"))
-      .max(120, t("admin.mailRouting.validation.maxChars", { max: 120 })),
+      .refine(isValidMailDisplayName, t("admin.mailRouting.validation.displayName", {
+          max: MAIL_DISPLAY_NAME_MAX_LENGTH,
+        })),
     username: z.string().trim().max(200),
     password: isEdit
       ? z.string().max(500)
@@ -158,7 +162,9 @@ export function accountToFormValues(
   return {
     address: account.address,
     displayName: account.displayName,
-    username: account.username,
+    // Varsayılan (= adres) kullanıcı adı boş gösterilir: adres değişince sunucu
+    // onu da adrese taşır; yalnız özel bir kullanıcı adı alana yazılır.
+    username: account.username === account.address ? "" : account.username,
     password: "",
     host: account.host ?? "",
     port: account.port == null ? "" : String(account.port),
@@ -203,8 +209,13 @@ export function accountPatchPayload(
   if (next.host !== original.host) patch.host = next.host;
   if (next.port !== original.port) patch.port = next.port;
   if (next.secure !== original.secure) patch.secure = next.secure;
-  // Boş kullanıcı adı "adres kullan" demektir; etkin değer değişmediyse gönderilmez.
-  if ((next.username ?? next.address) !== original.username) {
+  // Boş alan "adres kullan" demektir. Varsayılan kullanıcı adı gönderilmez
+  // (adres değişirse sunucu onu da taşır); yalnız farklı yazılan ya da özel
+  // kullanıcı adını sıfırlayan değer gider.
+  const defaultUsername = original.username === original.address;
+  if (next.username === null) {
+    if (!defaultUsername) patch.username = null;
+  } else if (next.username !== original.username) {
     patch.username = next.username;
   }
   if (values.password !== "") patch.password = values.password;
@@ -236,7 +247,12 @@ export function areaSchema(t: T) {
     displayName: z
       .string()
       .trim()
-      .max(120, t("admin.mailRouting.validation.maxChars", { max: 120 })),
+      .refine(
+        (value) => value === "" || isValidMailDisplayName(value),
+        t("admin.mailRouting.validation.displayName", {
+          max: MAIL_DISPLAY_NAME_MAX_LENGTH,
+        }),
+      ),
     replyTo: z
       .string()
       .trim()
@@ -291,7 +307,7 @@ export function addRecipient(
   const address = normalizeEmail(raw);
   if (!isValidEmail(address)) return { ok: false, error: "invalid" };
   if (list.includes(address)) return { ok: false, error: "duplicate" };
-  if (list.length >= MAX_RECIPIENTS) return { ok: false, error: "limit" };
+  if (list.length >= MAIL_INTERNAL_RECIPIENTS_MAX) return { ok: false, error: "limit" };
   return { ok: true, list: [...list, address] };
 }
 
@@ -417,7 +433,7 @@ export function planPersonChange(
     const has = area.internalRecipients.includes(address);
     const wants = selected.includes(area.id);
     if (has === wants) continue;
-    if (wants && area.internalRecipients.length >= MAX_RECIPIENTS) {
+    if (wants && area.internalRecipients.length >= MAIL_INTERNAL_RECIPIENTS_MAX) {
       plan.overLimit.push(area.id);
       continue;
     }
