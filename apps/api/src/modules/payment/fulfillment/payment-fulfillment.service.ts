@@ -42,7 +42,13 @@ import { orderCancelledData } from "../../order/helpers/order-cancellation";
 import {
   PUBLIC_NAME_SELECT,
   publicName,
+  type PublicIdentityInput,
 } from "../../../common/helpers/public-identity";
+import { MailInternalNotifier } from "../../mail-routing/internal/mail-internal-notifier.service";
+import {
+  boostPurchasedNotice,
+  orderPaidNotice,
+} from "../../mail-routing/helpers/mail-internal-notices";
 
 /**
  * PayTR bildiriminden/durum-sorgudan çıkarılan ödeme-yöntemi verisi. Gözlemlenebilirlik:
@@ -200,6 +206,9 @@ export class PaymentFulfillmentService {
     // #8: fulfillment sonlandırmasını ödeme tx'iyle atomik olarak dayanıklı kılan backstop.
     // @Optional: OutboxModule @Global; yoksa (test) anlık yol yine çalışır (graceful degrade).
     @Optional() private readonly outbox?: OutboxService,
+    // Personel bildirimi (Mail Yönlendirme) — @Global; commit SONRASI çağrılır,
+    // fırlatmaz. Dar test kurulumlarında yoksa bildirim atlanır.
+    @Optional() private readonly mailNotifier?: MailInternalNotifier,
   ) {}
 
   /**
@@ -549,6 +558,10 @@ export class PaymentFulfillmentService {
         resultOrder.sellerId,
         resultOrder.buyerId,
       );
+      // Personel bildirimi: grupsuz fiziksel sipariş (teklif siparişi).
+      void this.notifyStaffOrderPaid(resultOrder.checkoutGroupId, [
+        resultOrder,
+      ]);
     }
 
     // Tarodan gelir e-Arşivi (sanal hizmet): üyelik → üyeye, boost → satıcıya.
@@ -568,9 +581,102 @@ export class PaymentFulfillmentService {
       // Satın alana "öne çıkarma aktif" bildirimi — post-commit, hata
       // aktivasyonu bozmaz. (Eskiden hiçbir aktivasyon bildirimi yoktu.)
       void this.notifyBoostActivated(resultOrder.id, resultOrder.buyerId);
+      void this.notifyStaffBoostPurchased(resultOrder);
     }
 
     return true;
+  }
+
+  /**
+   * Personel bildirimi (Mail Yönlendirme, `order.paid`): sepet başına TEK
+   * e-posta — tekilleştirme anahtarı sepet (grupsuzda sipariş) kimliğidir.
+   * Commit sonrası, fırlatmaz; test şeridi siparişleri atlanır.
+   */
+  private async notifyStaffOrderPaid(
+    checkoutGroupId: string | null,
+    orders: ReadonlyArray<{
+      id: string;
+      orderNumber: string;
+      totalAmount: { valueOf(): unknown } | number;
+      isTest: boolean;
+      product?: { title: string } | null;
+      buyer: PublicIdentityInput;
+      seller: PublicIdentityInput;
+    }>,
+  ): Promise<void> {
+    if (!this.mailNotifier || orders.length === 0) return;
+    try {
+      const first = orders[0];
+      const group = checkoutGroupId
+        ? await this.prisma.checkoutGroup.findUnique({
+            where: { id: checkoutGroupId },
+            select: { groupNumber: true },
+          })
+        : null;
+      await this.mailNotifier.emit(
+        "order.paid",
+        orderPaidNotice({
+          ref: group?.groupNumber ?? first.orderNumber,
+          buyerName: publicName(first.buyer),
+          total: orders.reduce((sum, o) => sum + Number(o.totalAmount), 0),
+          orders: orders.map((o) => ({
+            id: o.id,
+            orderNumber: o.orderNumber,
+            productTitle: o.product?.title,
+            amount: o.totalAmount,
+            sellerName: publicName(o.seller),
+          })),
+        }),
+        {
+          isTest: orders.some((o) => o.isTest),
+          dedupeKey: checkoutGroupId ?? first.id,
+        },
+      );
+    } catch (err: unknown) {
+      this.logger.warn(
+        `order.paid personel bildirimi hazırlanamadı (${checkoutGroupId ?? orders[0]?.id}): ${err instanceof Error ? err.message : String(err)}`,
+      );
+    }
+  }
+
+  /** Personel bildirimi (`boost.purchased`): ödenen öne çıkarma paketi. */
+  private async notifyStaffBoostPurchased(order: {
+    id: string;
+    orderNumber: string;
+    isTest: boolean;
+    buyer: PublicIdentityInput;
+  }): Promise<void> {
+    if (!this.mailNotifier) return;
+    try {
+      const boost = await this.prisma.productBoost.findUnique({
+        where: { orderId: order.id },
+        select: {
+          id: true,
+          packageName: true,
+          durationDays: true,
+          price: true,
+          product: { select: { title: true } },
+        },
+      });
+      if (!boost) return;
+      await this.mailNotifier.emit(
+        "boost.purchased",
+        boostPurchasedNotice({
+          boostId: boost.id,
+          orderNumber: order.orderNumber,
+          userName: publicName(order.buyer),
+          packageName: boost.packageName,
+          durationDays: boost.durationDays,
+          amount: boost.price,
+          productTitle: boost.product?.title,
+        }),
+        { isTest: order.isTest },
+      );
+    } catch (err: unknown) {
+      this.logger.warn(
+        `boost.purchased personel bildirimi hazırlanamadı (${order.id}): ${err instanceof Error ? err.message : String(err)}`,
+      );
+    }
   }
 
   /** Boost aktivasyon bildirimi: gerçek ürünün başlığı ProductBoost'tan gelir. */
@@ -980,6 +1086,11 @@ export class PaymentFulfillmentService {
           `Failed to emit group buyer order.paid for payment ${payment.id}: ${error}`,
         );
       }
+      // Personel bildirimi: sepet başına TEK e-posta, siparişleri listeler.
+      void this.notifyStaffOrderPaid(
+        payment.checkoutGroupId,
+        result.fulfilledOrders,
+      );
     }
 
     // Sipariş başına: order.paid eventi (SATICI tarafı; alıcı atlanır), fatura, kargo kaydı

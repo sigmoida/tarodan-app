@@ -5,8 +5,11 @@ import {
   ForbiddenException,
   BadRequestException,
   ConflictException,
+  Optional,
 } from "@nestjs/common";
 import { i18nMessage } from "../../i18n";
+import { MailInternalNotifier } from "../../mail-routing/internal/mail-internal-notifier.service";
+import { emitListingPendingApproval } from "../helpers/listing-pending-approval-notice";
 import type { ProductUpdateActor } from "../helpers/product-update-actor";
 import { resolveUpdatedStatus } from "../helpers/product-update-status";
 import { assertListingMayReopen } from "../helpers/product-reopen-gate";
@@ -79,6 +82,8 @@ export class ProductUpdateService {
     private readonly commissionGuard: CommissionRuleGuardService,
     // Düzenleme, oluşturma ile aynı içerik kapılarından geçer (L2).
     private readonly moderationAi: ModerationAiClient,
+    // Personel bildirimi (Mail Yönlendirme) — @Global; dar test kurulumlarında yok.
+    @Optional() private readonly mailNotifier?: MailInternalNotifier,
   ) {}
 
   /**
@@ -250,6 +255,14 @@ export class ProductUpdateService {
         });
         await this.cache.del(`products:detail:${id}`);
         await this.cache.delPattern("products:list:*");
+        if (reopenedStatus === ProductStatus.pending) {
+          void emitListingPendingApproval(
+            this.prisma,
+            this.mailNotifier,
+            id,
+            `reopened:${Date.now()}`,
+          );
+        }
         // NOT: back-in-stock bildirimi burada GÖNDERİLMEZ — `pending` yolunda
         // ilan henüz yayında değil (bildirim admin onayıyla active'e geçtiğinde
         // gider); `active` bypass yolunda da (bugünkü kapsam) gönderilmiyor.
@@ -770,6 +783,19 @@ export class ProductUpdateService {
       // Web ISR'yi anında tazele: fiyat/indirim değişimi ana sayfa rail'lerine +
       // ürün sayfasına hemen yansısın (WEB_REVALIDATE_URL yoksa no-op).
       void notifyWebRevalidate(["products:list", `product:${id}`]);
+
+      // Düzenleme ilanı yeniden onaya gönderdiyse personel bildirimi.
+      if (
+        updated.status === ProductStatus.pending &&
+        product.status !== ProductStatus.pending
+      ) {
+        void emitListingPendingApproval(
+          this.prisma,
+          this.mailNotifier,
+          id,
+          `resubmitted:${updated.updatedAt.toISOString()}`,
+        );
+      }
 
       // If price changed, notify users who have this product in their wishlist
       if (priceChanged && updated.status === ProductStatus.active) {
