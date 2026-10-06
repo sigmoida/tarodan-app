@@ -1330,6 +1330,8 @@ export class EventService {
               to: user.email,
               subject: email.subject,
               html: email.html,
+              // Toplu duyuru/pazarlama: Mail Yönlendirme'de pazarlama kutusu.
+              area: "marketing",
               ...(unsubscribeUrl && {
                 headers: {
                   "List-Unsubscribe": `<${unsubscribeUrl}>`,

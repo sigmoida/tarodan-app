@@ -15,6 +15,7 @@ import {
 import { Logger } from "@nestjs/common";
 import { Job } from "bull";
 import { ConfigService } from "@nestjs/config";
+import type { MailAreaId } from "@tarodan/types";
 import { PrismaService } from "../prisma";
 import { SmtpProvider } from "../modules/mail/smtp.provider";
 import {
@@ -36,7 +37,12 @@ export interface EmailJobData {
   templateData?: Record<string, any>;
   overrideHtml?: string;
   overrideSubject?: string;
-  from?: string;
+  /**
+   * Mail Yönlendirme alanı — yalnız şablonsuz gönderimler için (toplu duyuru
+   * → `marketing`). Şablonlu işlerde alan şablondan türetilir. Gönderen
+   * adresi iş verisiyle SEÇİLEMEZ: kimliği yalnız yönlendirme belirler.
+   */
+  area?: MailAreaId;
   replyTo?: string;
   /** Ek SMTP başlıkları (pazarlamada `List-Unsubscribe`). */
   headers?: Record<string, string>;
@@ -79,7 +85,7 @@ export class EmailWorker {
       subject,
       html,
       text,
-      from,
+      area,
       replyTo,
       headers,
       attachments,
@@ -89,7 +95,6 @@ export class EmailWorker {
       redactTemplateData,
     } = job.data;
     if (!html) throw new Error("Email HTML content is required");
-    const fromEmail = from || this.smtp.defaultFrom;
 
     // EmailLog kaydı ARTIK BURADA YAZILMAZ: tek yazar SmtpProvider.sendEmail
     // (her gönderim oradan geçer). Burada da yazsaydık kuyruktan giden
@@ -98,8 +103,9 @@ export class EmailWorker {
     //
     // SmtpProvider handles the unconfigured case itself (logs and reports a
     // mock message id), so there is no separate mock branch here.
+    // Gönderen kimliği SmtpProvider'da çözülür (şablon/alan → kutu).
     const result = await this.smtp.sendEmail({
-      from: fromEmail,
+      area,
       to,
       subject,
       html,

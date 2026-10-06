@@ -11174,6 +11174,152 @@
       "bankNationalIdMismatch": "Banka hesabındaki T.C. Kimlik Numarası, hesabınızda kayıtlı numarayla aynı olmalıdır.",
       "nationalIdInvalid": "Geçerli bir T.C. Kimlik Numarası giriniz.",
       "correctionNotAllowed": "Silinmiş ya da personel hesabının kimlik bilgileri düzeltilemez."
+    },
+    "mailRouting": {
+      "unknownArea": "Bilinmeyen mail alanı.",
+      "accountNotFound": "Gönderici posta kutusu bulunamadı.",
+      "invalidAddress": "Geçersiz e-posta adresi: {address}",
+      "invalidDisplayName": "Görünen ad boş olamaz, en fazla 100 karakter olabilir ve tırnak, < > ya da satır sonu içeremez.",
+      "invalidReplyTo": "Yanıt adresi (Reply-To) geçerli bir e-posta adresi olmalıdır.",
+      "invalidRecipient": "Geçersiz alıcı adresi: {address}",
+      "tooManyRecipients": "Bir alana en fazla {max} alıcı eklenebilir.",
+      "eventNotInArea": "Bu olay ({event}) bu alana ait değil.",
+      "duplicateEvent": "Bir olay aynı istekte yalnız bir kez değiştirilebilir.",
+      "invalidDelivery": "Geçersiz teslim şekli.",
+      "passwordRequired": "Posta kutusu şifresi zorunludur.",
+      "addressTaken": "Bu adresle kayıtlı bir gönderici posta kutusu zaten var.",
+      "accountInUse": "Bu posta kutusu şu alanlarda kullanılıyor: {areas}. Önce alanlardan kaldırın.",
+      "encryptionKeyMissing": "Posta kutusu şifreleri için şifreleme anahtarı (MAIL_ACCOUNT_ENCRYPTION_KEY) tanımlı değil.",
+      "invalidHost": "Geçersiz SMTP sunucu adı.",
+      "invalidPort": "SMTP portu 1 ile 65535 arasında olmalıdır.",
+      "invalidUsername": "Geçersiz SMTP kullanıcı adı.",
+      "testMail": {
+        "subject": "Tarodan posta kutusu testi",
+        "body": "Bu e-posta {address} posta kutusunun Tarodan'dan gönderim yapabildiğini doğrulamak için gönderildi."
+      },
+      "internal": {
+        "openInAdmin": "Panelde aç",
+        "footer": "Bu bildirim Mail Yönlendirme ayarlarına göre personele gönderildi.",
+        "yes": "Evet",
+        "no": "Hayır",
+        "actors": {
+          "buyer": "Alıcı",
+          "seller": "Satıcı",
+          "platform": "Tarodan (yönetici)",
+          "system": "Sistem"
+        },
+        "tradeStatus": {
+          "awaitingPayment": "Ödeme bekleniyor",
+          "shippingToWarehouse": "Depoya gönderim"
+        },
+        "facts": {
+          "buyer": "Alıcı",
+          "seller": "Satıcı",
+          "user": "Kullanıcı",
+          "amount": "Tutar",
+          "total": "Toplam",
+          "orderCount": "Sipariş sayısı",
+          "productCount": "Ürün sayısı",
+          "order": "Sipariş",
+          "product": "Ürün",
+          "reason": "Neden",
+          "cancelledBy": "İptal eden",
+          "requiresReview": "İnceleme gerekiyor",
+          "initiator": "Teklif eden",
+          "receiver": "Karşı taraf",
+          "cashAmount": "Nakit fark",
+          "raisedBy": "Anlaşmazlığı açan",
+          "category": "Kategori",
+          "priority": "Öncelik",
+          "subject": "Konu",
+          "name": "Ad",
+          "email": "E-posta",
+          "message": "Mesaj",
+          "reporter": "Şikayet eden",
+          "price": "Fiyat",
+          "discount": "İndirim",
+          "validity": "Geçerlilik",
+          "package": "Paket",
+          "duration": "Süre (gün)",
+          "status": "Durum"
+        },
+        "areas": {
+          "account": "Hesap",
+          "order": "Sipariş",
+          "cancellation": "İptal",
+          "refund": "İade",
+          "trade": "Takas",
+          "offer": "Teklif",
+          "payment": "Ödeme",
+          "invoice": "Fatura",
+          "membership": "Üyelik",
+          "listing": "İlan",
+          "discount": "İndirim",
+          "boost": "Öne çıkarma",
+          "ad": "Reklam",
+          "support": "Destek",
+          "guestMessage": "Misafir mesajı",
+          "report": "Şikayet",
+          "sellerApplication": "Kurumsal başvuru",
+          "marketing": "Pazarlama",
+          "social": "Sosyal"
+        },
+        "digest": {
+          "subject": "{area} {period}: {count, plural, one {# olay} other {# olay}}",
+          "hourly": "saatlik özeti",
+          "daily": "günlük özeti"
+        },
+        "events": {
+          "order_paid": {
+            "subject": "Yeni ödeme: {ref}",
+            "title": "Ödeme alındı"
+          },
+          "order_cancelled": {
+            "subject": "Sipariş iptal edildi: {ref}",
+            "title": "Sipariş iptali"
+          },
+          "refund_requested": {
+            "subject": "Yeni iade talebi: {ref}",
+            "title": "İade talebi"
+          },
+          "trade_started": {
+            "subject": "Takas başladı: {ref}",
+            "title": "Takas kabul edildi"
+          },
+          "trade_disputed": {
+            "subject": "Takas anlaşmazlığı: {ref}",
+            "title": "Takasta anlaşmazlık"
+          },
+          "offer_converted": {
+            "subject": "Teklif siparişe dönüştü: {ref}",
+            "title": "Teklif kabul edildi"
+          },
+          "support_ticketOpened": {
+            "subject": "Yeni destek talebi: {ref}",
+            "title": "Destek talebi"
+          },
+          "support_guestMessage": {
+            "subject": "Yeni iletişim mesajı: {ref}",
+            "title": "Misafir iletişim mesajı"
+          },
+          "report_productReported": {
+            "subject": "Ürün şikayeti: {ref}",
+            "title": "Ürün şikayeti"
+          },
+          "listing_pendingApproval": {
+            "subject": "Onay bekleyen ilan: {ref}",
+            "title": "İlan onay bekliyor"
+          },
+          "discount_createdBySeller": {
+            "subject": "Satıcı indirimi oluşturuldu: {ref}",
+            "title": "Satıcı indirimi"
+          },
+          "boost_purchased": {
+            "subject": "Öne çıkarma satın alındı: {ref}",
+            "title": "Öne çıkarma satışı"
+          }
+        }
+      }
     }
   },
   "status": {

@@ -175,6 +175,23 @@ export const CRON_CATALOG: CronCatalogEntry[] = [
       "Moderasyonda 48 saatten uzun bekleyen ilanlar için adminlere günlük özet",
     triggerable: true,
   },
+  // Mail Yönlendirme özetleri: yalnız personele gider ve satırlar sahiplenilip
+  // gönderildi işaretlendiği için elle tetiklemek mükerrer e-posta üretmez —
+  // yalnız özeti öne çeker.
+  {
+    key: "mail-digest-hourly",
+    label: "Personel bildirimi saatlik özeti",
+    description:
+      "Saatlik teslim seçilmiş iç bildirimleri alan başına tek e-postada gönderir",
+    triggerable: true,
+  },
+  {
+    key: "mail-digest-daily",
+    label: "Personel bildirimi günlük özeti",
+    description:
+      "Günlük teslim seçilmiş iç bildirimleri 09:00'da alan başına tek e-postada gönderir; 90 günden eski gönderilmiş kayıtları siler",
+    triggerable: true,
+  },
 
   // ── Elle tetiklenmez: zaten dakikada bir koşuyor — butonun kazancı yok ─────
   {

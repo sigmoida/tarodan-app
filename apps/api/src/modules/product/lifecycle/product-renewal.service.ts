@@ -5,7 +5,10 @@ import {
   Injectable,
   Logger,
   NotFoundException,
+  Optional,
 } from "@nestjs/common";
+import { MailInternalNotifier } from "../../mail-routing/internal/mail-internal-notifier.service";
+import { emitListingPendingApproval } from "../helpers/listing-pending-approval-notice";
 import {
   ListingRemovalReason,
   Prisma,
@@ -111,6 +114,8 @@ export class ProductRenewalService {
     private readonly searchService: SearchService,
     private readonly membershipService: MembershipService,
     private readonly commissionGuard: CommissionRuleGuardService,
+    // Personel bildirimi (Mail Yönlendirme) — @Global; dar test kurulumlarında yok.
+    @Optional() private readonly mailNotifier?: MailInternalNotifier,
   ) {}
 
   /** Satıcı: tek ilanı yenile. Hata semantik istisna olarak fırlar. */
@@ -313,6 +318,15 @@ export class ProductRenewalService {
       throw new ConflictException(i18nMessage("server.product.updateConflict"));
     }
     await this.refreshVisibility([productId]);
+    // İçeriği değişmiş ilan yenilemede yeniden onaya gider → personel bildirimi.
+    if (status === ProductStatus.pending) {
+      void emitListingPendingApproval(
+        this.prisma,
+        this.mailNotifier,
+        productId,
+        `renewed:${Date.now()}`,
+      );
+    }
   }
 
   private failureOf(

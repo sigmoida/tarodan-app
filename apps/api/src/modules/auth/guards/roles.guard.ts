@@ -87,6 +87,9 @@ export const PERMISSION_MAP: Record<string, string[]> = {
   // Süreler ve Kurallar ayar ekranının parçası: aynı izinle görünür; yazma
   // ayrıca @Roles(super_admin) ile korunur.
   "timing-rules": ["settings"],
+  // Mail Yönlendirme (gönderici kutuları + personel bildirimleri) da Sistem
+  // ayarlarının parçası; bütün uçlar ayrıca @Roles(super_admin).
+  "mail-routing": ["settings"],
   "site-access-pins": ["settings"],
   logs: ["logs"],
   "audit-logs": ["audit_logs"],

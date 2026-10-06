@@ -557,6 +557,44 @@ describe("validateEnv", () => {
     ).toThrow(/distinct/i);
   });
 
+  describe("MAIL_ACCOUNT_ENCRYPTION_KEY", () => {
+    it("is optional (no sender account needs it yet)", () => {
+      expect(() => validateEnv(prodBase)).not.toThrow();
+    });
+
+    it("accepts a strong, distinct key", () => {
+      expect(() =>
+        validateEnv({
+          ...prodBase,
+          MAIL_ACCOUNT_ENCRYPTION_KEY: "m".repeat(40),
+        }),
+      ).not.toThrow();
+    });
+
+    it("rejects a short key in production", () => {
+      expect(() =>
+        validateEnv({ ...prodBase, MAIL_ACCOUNT_ENCRYPTION_KEY: "short" }),
+      ).toThrow(/MAIL_ACCOUNT_ENCRYPTION_KEY/);
+    });
+
+    it("rejects reusing the two-factor key", () => {
+      expect(() =>
+        validateEnv({
+          ...prodBase,
+          MAIL_ACCOUNT_ENCRYPTION_KEY: strongSecrets.TWO_FACTOR_ENCRYPTION_KEY,
+        }),
+      ).toThrow(/MAIL_ACCOUNT_ENCRYPTION_KEY must differ/);
+    });
+
+    it("is kept in the validated config so an env file value reaches the app", () => {
+      const result = validateEnv({
+        ...prodBase,
+        MAIL_ACCOUNT_ENCRYPTION_KEY: "m".repeat(40),
+      });
+      expect(result.MAIL_ACCOUNT_ENCRYPTION_KEY).toBe("m".repeat(40));
+    });
+  });
+
   describe("PayTR membership merchant", () => {
     it("requires the membership merchant credentials in production", () => {
       for (const key of [

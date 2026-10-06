@@ -62,6 +62,8 @@ import { PaymentRefundAttemptService } from "./payment-refund-attempt.service";
 import { PaymentTradeRefundService } from "./payment-trade-refund.service";
 import { orderCancelledData } from "../../order/helpers/order-cancellation";
 import { testLaneRefundResult } from "../helpers/test-lane-refund";
+import { MailInternalNotifier } from "../../mail-routing/internal/mail-internal-notifier.service";
+import { orderCancelledNotice } from "../../mail-routing/helpers/mail-internal-notices";
 
 /**
  * İade / escrow serbest bırakma metodları — PaymentService'ten birebir taşındı
@@ -181,7 +183,60 @@ export class PaymentRefundService {
     // İ25: bedel dahil TAM iadede takas kampanya bütçesi geri döner.
     @Optional()
     private readonly discountService?: DiscountService,
+    // Personel bildirimi (Mail Yönlendirme) — @Global; commit SONRASI, fırlatmaz.
+    @Optional()
+    private readonly mailNotifier?: MailInternalNotifier,
   ) {}
+
+  /**
+   * `order.cancelled` personel bildirimi — ödenmiş siparişin iptali para
+   * iadesiyle kesinleştiğinde. Teslim sonrası iade (cancellationType `iade`)
+   * iptal değildir, bildirilmez. Tekilleştirme sipariş kimliğiyle: ödenmemiş
+   * iptal yolu (OrderLifecycleService) aynı anahtarı kullanır.
+   */
+  private async notifyStaffOrderCancelled(
+    orderId: string,
+    refundAmount: number,
+  ): Promise<void> {
+    if (!this.mailNotifier) return;
+    try {
+      const order = await this.prisma.order.findUnique({
+        where: { id: orderId },
+        select: {
+          orderNumber: true,
+          status: true,
+          cancellationType: true,
+          cancelledBy: true,
+          isTest: true,
+          buyer: { select: PUBLIC_NAME_SELECT },
+          seller: { select: PUBLIC_NAME_SELECT },
+        },
+      });
+      if (
+        !order ||
+        order.status !== OrderStatus.cancelled ||
+        order.cancellationType === "iade"
+      ) {
+        return;
+      }
+      await this.mailNotifier.emit(
+        "order.cancelled",
+        orderCancelledNotice({
+          orderId,
+          orderNumber: order.orderNumber,
+          cancelledBy: order.cancelledBy,
+          amount: refundAmount,
+          buyerName: publicName(order.buyer),
+          sellerName: publicName(order.seller),
+        }),
+        { isTest: order.isTest, dedupeKey: orderId },
+      );
+    } catch (error: unknown) {
+      this.logger.warn(
+        `order.cancelled personel bildirimi hazırlanamadı (${orderId}): ${errorMessage(error)}`,
+      );
+    }
+  }
 
   // ───────────────────────────────────────────────────────────────────────────
   // Escrow serbest bırakma — PaymentHoldReleaseService'e delege edilir. İmzalar
@@ -1245,6 +1300,10 @@ export class PaymentRefundService {
             completedAdminReason,
           );
           if (shipmentCancellationRequired) {
+            // Personel bildirimi: sipariş bu iadeyle kapandı (tam iade).
+            // Kargo öncesi iptal, stok kaskadı, kargolamama ve yönetici iptali
+            // hepsi buradan geçer; teslim sonrası iade (`iade`) iptal sayılmaz.
+            void this.notifyStaffOrderCancelled(orderId, amountToRefund);
             // Para commit'inden sonra hızlı yol; aynı iş outbox'ta kalıcıdır.
             try {
               await this.paymentCommon.cancelSuratShipmentIfExists(

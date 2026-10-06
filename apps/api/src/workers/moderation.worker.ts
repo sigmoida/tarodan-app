@@ -21,6 +21,8 @@ import { CommissionRuleGuardService } from "../modules/commission/commission-rul
 import { stampApprovedContentFingerprint } from "../modules/product/helpers/product-content-fingerprint";
 import { QUEUE_NAMES } from "./constants";
 import { errorMessage } from "../common/helpers/error-message";
+import { MailInternalNotifier } from "../modules/mail-routing/internal/mail-internal-notifier.service";
+import { emitListingPendingApproval } from "../modules/product/helpers/listing-pending-approval-notice";
 
 export interface ProductModerationJob {
   productId: string;
@@ -49,10 +51,29 @@ export class ModerationWorker {
     // yeterli değil — kural onay anına kadar silinmiş olabilir).
     @Optional()
     private readonly commissionGuard?: CommissionRuleGuardService,
+    // Personel bildirimi (Mail Yönlendirme) — @Global; dar test kurulumlarında yok.
+    @Optional() private readonly mailNotifier?: MailInternalNotifier,
   ) {}
 
   @Process("product-image")
   async handleProductImage(job: Job<ProductModerationJob>) {
+    const result = await this.moderateProductImages(job);
+    // Oto-onaylanmayan (AI kapalı/erişilemedi, inceleme, işaret, komisyon
+    // kuralı eksik) satıcı ilanı admin kuyruğundadır → personel bildirimi.
+    // Yardımcı ilan hâlâ pending değilse (oto-onay) hiçbir şey yapmaz; toplu
+    // admin içe aktarımı (directApproval) satıcı başvurusu değildir.
+    if (!job.data.directApproval) {
+      await emitListingPendingApproval(
+        this.prisma,
+        this.mailNotifier,
+        job.data.productId,
+        "submitted",
+      );
+    }
+    return result;
+  }
+
+  private async moderateProductImages(job: Job<ProductModerationJob>) {
     const { productId } = job.data;
     const imageKeys = job.data.imageKeys?.length
       ? job.data.imageKeys

@@ -3393,6 +3393,94 @@ model EmailLog {
   @@map("email_logs")
 }
 
+/// Mail Yönlendirme — gönderici posta kutusu (docs/MAIL_ROUTING.md). Kutular
+/// posta sunucusunda zaten vardır; admin burada adres + şifre girer ve alanlara
+/// atar. Sunucu From == oturum açan kullanıcı şartı koyduğu için her kutu kendi
+/// SMTP oturumuyla gönderir (SmtpProvider'daki kutu başına transport havuzu).
+model MailSenderAccount {
+  id          String   @id @default(uuid())
+  /// Posta kutusu adresi; küçük harfe çevrilmiş, benzersiz. From adresi budur.
+  address     String   @unique
+  /// From başlığındaki görünen ad ("Tarodan Sipariş"); alan kendi adını verebilir.
+  displayName String   @map("display_name")
+  /// null = env'deki varsayılan SMTP_HOST / SMTP_PORT / SMTP_SECURE.
+  host        String?
+  port        Int?
+  secure      Boolean?
+  /// SMTP oturum kullanıcısı; boş bırakılırsa adresin kendisi yazılır.
+  username    String
+  /// AES-256-GCM (`MAIL_ACCOUNT_ENCRYPTION_KEY`), `v1:iv:tag:ciphertext`.
+  /// Hiçbir yanıtta, logda ya da denetim kaydında dönmez.
+  passwordEncrypted String @map("password_encrypted")
+  /// Son deneme sonucu: admin "Test gönder" + gerçek gönderimde kutunun oturum /
+  /// bağlantı hatası (gönderim o an varsayılan kimliğe düşer ve burası işaretlenir).
+  lastTestAt    DateTime? @map("last_test_at")
+  lastTestOk    Boolean?  @map("last_test_ok")
+  lastTestError String?   @map("last_test_error")
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+  /// User.id (admin); FK yok ki personel silinse de geçmiş kalsın.
+  createdBy     String?   @map("created_by")
+  updatedBy     String?   @map("updated_by")
+
+  areas MailAreaSetting[]
+
+  @@map("mail_sender_accounts")
+}
+
+/// Mail Yönlendirme — alan başına ayar. Satır yoksa varsayılan: hesap yok
+/// (env kimliği), alıcı yok, her iç olay kapalı, teslim `instant`.
+model MailAreaSetting {
+  /// `@tarodan/types` MAIL_AREAS değeri (ör. "order", "cancellation").
+  areaId          String             @id @map("area_id")
+  /// Kullanımdaki hesap silinemez (RESTRICT; servis 409 döner).
+  senderAccountId String?            @map("sender_account_id")
+  senderAccount   MailSenderAccount? @relation(fields: [senderAccountId], references: [id], onDelete: Restrict)
+  /// Hesabın görünen adını bu alan için ezer; null = hesabın kendi adı.
+  displayName     String?            @map("display_name")
+  /// Bu alanın müşteri postalarına Reply-To; null = gönderen adres.
+  replyTo         String?            @map("reply_to")
+  /// İç bildirim alıcıları: küçük harf, tekil, en çok 20 adres (yazarken doğrulanır).
+  internalRecipients Json            @default("[]") @map("internal_recipients")
+  /// İç olay ayarları: `{ "<eventId>": { "enabled": bool, "delivery": "instant"|"hourly"|"daily" } }`
+  /// (yazarken doğrulanır; kayıtta olmayan olay = kapalı + instant).
+  events          Json               @default("{}")
+  createdAt       DateTime           @default(now()) @map("created_at")
+  updatedAt       DateTime           @updatedAt @map("updated_at")
+  updatedBy       String?            @map("updated_by")
+
+  @@index([senderAccountId])
+  @@map("mail_area_settings")
+}
+
+/// Personele giden iç bildirimin kalıcı kaydı. Outbox handler'ı her olay için
+/// TEK satır yazar (`sourceKey` = outbox olay kimliği → yeniden deneme çift
+/// satır üretmez). `instant` satır hemen gönderilir; `hourly` / `daily` satırları
+/// özet işi (mail-digest-*) toplayıp alan başına TEK e-posta yapar.
+model MailInternalNotice {
+  id         String    @id @default(uuid())
+  sourceKey  String    @unique @map("source_key")
+  areaId     String    @map("area_id")
+  eventId    String    @map("event_id")
+  /// Olay anındaki teslim modu; sonradan değişen ayar bekleyen satırı taşımaz.
+  delivery   String
+  /// Render edilmiş içeriğin girdisi (iş numarası, kısa olgular, admin yolu).
+  /// Kimlik no / IBAN / tam adres / mesaj gövdesi YAZILMAZ (kısa alıntı hariç).
+  payload    Json
+  occurredAt DateTime  @map("occurred_at")
+  /// Özet işinin sahiplenmesi: iki koşu aynı satırı göndermesin. Bayat
+  /// sahiplenme (gönderilmemiş, 30 dk'dan eski) bir sonraki koşuda bırakılır.
+  claimId    String?   @map("claim_id")
+  claimedAt  DateTime? @map("claimed_at")
+  /// Gönderildi ya da (alıcısı kalmadığı için) bırakıldı.
+  sentAt     DateTime? @map("sent_at")
+  createdAt  DateTime  @default(now()) @map("created_at")
+
+  @@index([delivery, sentAt, createdAt])
+  @@index([claimId])
+  @@map("mail_internal_notices")
+}
+
 model PushToken {
   id        String   @id @default(uuid())
   userId    String   @map("user_id")

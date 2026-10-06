@@ -4,9 +4,16 @@ import {
   ForbiddenException,
   BadRequestException,
   Logger,
+  Optional,
 } from "@nestjs/common";
 import { PrismaService } from "../../prisma";
 import { CacheService } from "../cache/cache.service";
+import {
+  PUBLIC_NAME_SELECT,
+  publicName,
+} from "../../common/helpers/public-identity";
+import { MailInternalNotifier } from "../mail-routing/internal/mail-internal-notifier.service";
+import { sellerDiscountCreatedNotice } from "../mail-routing/helpers/mail-internal-notices";
 import { SearchService } from "../search/search.service";
 import { notifyWebRevalidate } from "../../common/helpers/revalidate";
 import { fulltextDiscountSearch } from "../../common/helpers/fulltext-search";
@@ -104,6 +111,8 @@ export class DiscountCrudService {
     private readonly prisma: PrismaService,
     private readonly cache: CacheService,
     private readonly searchService: SearchService,
+    // Personel bildirimi (Mail Yönlendirme) — @Global; dar test kurulumlarında yok.
+    @Optional() private readonly mailNotifier?: MailInternalNotifier,
   ) {}
 
   /**
@@ -312,7 +321,52 @@ export class DiscountCrudService {
     await this.invalidateProductCaches(
       discount.scope === DiscountScope.product ? discount.targetProductIds : [],
     );
+    // Personel bildirimi (Mail Yönlendirme): yalnız SATICININ kendi
+    // ilanlarında açtığı indirim; admin indirimleri bildirilmez.
+    if (!isAdmin) {
+      void this.notifyStaffSellerDiscount(discount, actorId);
+    }
     return toDiscountResponse(discount);
+  }
+
+  /** `discount.createdBySeller` — commit sonrası, fırlatmaz; test hesabı atlanır. */
+  private async notifyStaffSellerDiscount(
+    discount: {
+      id: string;
+      code: string | null;
+      name: string;
+      type: string;
+      value: Prisma.Decimal;
+      targetProductIds: string[];
+      startDate: Date;
+      endDate: Date;
+    },
+    sellerId: string,
+  ): Promise<void> {
+    if (!this.mailNotifier) return;
+    try {
+      const seller = await this.prisma.user.findUnique({
+        where: { id: sellerId },
+        select: { ...PUBLIC_NAME_SELECT, isTestAccount: true },
+      });
+      await this.mailNotifier.emit(
+        "discount.createdBySeller",
+        sellerDiscountCreatedNotice({
+          discountRef: discount.code ?? discount.name,
+          sellerName: publicName(seller),
+          type: discount.type,
+          value: discount.value,
+          productCount: discount.targetProductIds.length,
+          startDate: discount.startDate,
+          endDate: discount.endDate,
+        }),
+        { isTest: seller?.isTestAccount ?? false, dedupeKey: discount.id },
+      );
+    } catch (error: unknown) {
+      this.logger.warn(
+        `discount.createdBySeller personel bildirimi hazırlanamadı (${discount.id}): ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
   }
 
   /**

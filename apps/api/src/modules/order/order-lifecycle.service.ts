@@ -44,6 +44,8 @@ import type {
   OrderReservationState,
 } from "@tarodan/types";
 import { orderReservationState } from "./helpers/order-reservation";
+import { MailInternalNotifier } from "../mail-routing/internal/mail-internal-notifier.service";
+import { orderCancelledNotice } from "../mail-routing/helpers/mail-internal-notices";
 
 /**
  * Ödenmemiş iptalin aktörü, ledger gerekçesinden türetilir: ikisi aynı olguyu
@@ -78,6 +80,8 @@ export class OrderLifecycleService {
     private readonly elogoInvoicing: ElogoInvoicingService,
     @Optional() private readonly discountService?: DiscountService,
     private readonly refundService?: RefundService,
+    // Personel bildirimi (Mail Yönlendirme) — @Global; dar test kurulumlarında yok.
+    @Optional() private readonly mailNotifier?: MailInternalNotifier,
   ) {}
 
   /**
@@ -641,6 +645,32 @@ export class OrderLifecycleService {
         reservationOrderIds,
         tx,
       );
+    }
+
+    // Personel bildirimi (Mail Yönlendirme, `order.cancelled`): outbox satırı
+    // İPTALLE AYNI işlemde — iptal geri alınırsa bildirim de yok. SMTP commit
+    // sonrası drainer'da. Ödenmiş iptaller processRefund'dan aynı anahtarla.
+    if (this.mailNotifier) {
+      const summary = await tx.order.findUnique({
+        where: { id: order.id },
+        select: { orderNumber: true, totalAmount: true, isTest: true },
+      });
+      if (summary) {
+        const actor = UNPAID_CANCEL_ACTOR[opts.ledgerReason];
+        await this.mailNotifier.emit(
+          "order.cancelled",
+          orderCancelledNotice({
+            orderId: order.id,
+            orderNumber: summary.orderNumber,
+            cancelledBy: actor,
+            amount: summary.totalAmount,
+            // Yönetici iptalinin serbest metni personel postasına girmez;
+            // nedeni panelde (katalog kodu) görünür.
+            reason: actor === CancellationActor.buyer ? opts.reason : undefined,
+          }),
+          { isTest: summary.isTest, dedupeKey: order.id, tx },
+        );
+      }
     }
 
     return cancelledOrder;

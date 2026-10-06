@@ -139,3 +139,5 @@ export * from "./admin-trade-cancellation";
 
 // PayTR merchant_oid ("sipariş no"): build + parse a pasted id back to our numbers
 export * from "./paytr-merchant-oid";
+// Mail routing: areas, sender accounts, staff notification events + admin shapes
+export * from "./mail-routing";

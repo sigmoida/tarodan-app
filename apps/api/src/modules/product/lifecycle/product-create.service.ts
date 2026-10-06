@@ -4,8 +4,11 @@ import {
   ForbiddenException,
   BadRequestException,
   InternalServerErrorException,
+  Optional,
 } from "@nestjs/common";
 import { i18nMessage } from "../../i18n";
+import { MailInternalNotifier } from "../../mail-routing/internal/mail-internal-notifier.service";
+import { emitListingPendingApproval } from "../helpers/listing-pending-approval-notice";
 import { PrismaService } from "../../../prisma";
 import { assertValidProductImages } from "../helpers/product-image-keys";
 import { CacheService } from "../../cache/cache.service";
@@ -57,6 +60,8 @@ export class ProductCreateService {
     private readonly ranking: ProductRankingService,
     private readonly stats: ProductStatsService,
     private readonly commissionGuard: CommissionRuleGuardService,
+    // Personel bildirimi (Mail Yönlendirme) — @Global; dar test kurulumlarında yok.
+    @Optional() private readonly mailNotifier?: MailInternalNotifier,
   ) {}
 
   /**
@@ -390,6 +395,17 @@ export class ProductCreateService {
           .catch((err) =>
             this.logger.warn(`Moderation job eklenemedi: ${err.message}`),
           );
+      }
+      // Personel bildirimi: AI görsel denetimi devredeyse kararı moderasyon
+      // işi verir (oto-onaylanan ilan personele bildirilmez); değilse ilan
+      // doğrudan admin kuyruğundadır.
+      if (!(product.images?.length && this.moderationAi.isEnabled)) {
+        void emitListingPendingApproval(
+          this.prisma,
+          this.mailNotifier,
+          product.id,
+          "submitted",
+        );
       }
 
       // Invalidate product list cache

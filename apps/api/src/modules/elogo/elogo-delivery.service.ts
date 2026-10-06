@@ -760,6 +760,8 @@ export class ElogoDeliveryService {
           to: recipientEmail,
           subject: email.subject,
           html: email.html,
+          // EmailLog + Mail Yönlendirme alanı (fatura) şablondan.
+          template: tplKey,
           attachments: [{ filename: `${inv.invoiceNumber}.pdf`, content: pdf }],
         } as any);
         emailedAt = new Date();
@@ -967,6 +969,7 @@ export class ElogoDeliveryService {
       to,
       subject: email.subject,
       html: email.html,
+      template: "elogo-invoice",
       attachments: [{ filename: `${invoice.invoiceNumber}.pdf`, content: pdf }],
     } as any);
     await this.prisma.elogoInvoice.update({
