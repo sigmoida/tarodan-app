@@ -184,6 +184,8 @@ export class SellerInvoiceService {
         to: order.buyer.email,
         subject: email.subject,
         html: email.html,
+        // EmailLog + Mail Yönlendirme alanı (fatura) şablondan.
+        template: "seller-invoice",
         attachments: [
           { filename: `fatura-${order.orderNumber}.pdf`, content: pdf },
         ],
@@ -322,6 +324,9 @@ export class SellerInvoiceService {
         to: order.seller.email,
         subject: email.subject,
         html: email.html,
+        // Hatırlatma şablonu yönlendirme kaydında yok: alan açıkça fatura.
+        template: "seller-invoice-reminder",
+        area: "invoice",
       } as any);
       return true;
     } catch (e: any) {

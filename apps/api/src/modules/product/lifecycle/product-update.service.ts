@@ -961,6 +961,8 @@ export class ProductUpdateService {
               to: user.email,
               subject: email.subject,
               html: email.html,
+              // EmailLog + Mail Yönlendirme alanı şablondan.
+              template: "wishlist-price-change",
             });
           }
         } catch (emailError: any) {

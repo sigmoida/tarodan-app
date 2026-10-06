@@ -82,6 +82,8 @@ describe("EventService.emitAdminBroadcast — e-posta", () => {
     expect(job.headers["List-Unsubscribe-Post"]).toBe(
       "List-Unsubscribe=One-Click",
     );
+    // Mail Yönlendirme: toplu gönderim pazarlama kutusundan çıkar.
+    expect(job.area).toBe("marketing");
   });
 
   it("pazarlama + boş harita: kimseye e-posta gitmez", async () => {
