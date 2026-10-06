@@ -9102,6 +9102,11 @@
           "name": "Süreler ve Kurallar",
           "description": "İş süreleri ve süre dolunca ne olacağı",
           "keywords": "süre, zaman aşımı, ilan süresi, teklif süresi, iade penceresi, takas, alarm"
+        },
+        "mailRouting": {
+          "name": "E-posta Yönlendirme",
+          "description": "Alan bazında gönderen posta kutusu ve iç bildirim alıcıları",
+          "keywords": "e-posta, mail, gönderen, smtp, bildirim, alıcı, posta kutusu, özet"
         }
       }
     },
@@ -9703,6 +9708,184 @@
         "distanceSales": "Mesafeli Satış Sözleşmesi",
         "refundPolicy": "İade Politikası",
         "sellerAgreement": "Satıcı Sözleşmesi"
+      }
+    },
+    "mailRouting": {
+      "page": {
+        "title": "E-posta Yönlendirme",
+        "description": "Her alanın müşteri postası hangi posta kutusundan gitsin ve operasyon olayları personele kime, ne sıklıkla e-posta olarak ulaşsın. Değişiklik bir sonraki gönderimde geçerli olur."
+      },
+      "readOnly": "Bu ayarları yalnızca süper yönetici değiştirebilir; siz görüntüleyebilirsiniz.",
+      "saved": "Değişiklikler kaydedildi.",
+      "error": {
+        "title": "E-posta ayarları yüklenemedi",
+        "description": "Sayfayı yenileyin ya da biraz sonra tekrar deneyin."
+      },
+      "tabs": {
+        "accounts": "Gönderen Hesaplar",
+        "areas": "Alanlar",
+        "notifications": "İç Bildirimler"
+      },
+      "areas": {
+        "account": "Hesap",
+        "order": "Sipariş",
+        "cancellation": "İptal",
+        "refund": "İade",
+        "trade": "Takas",
+        "offer": "Teklif",
+        "payment": "Ödeme",
+        "invoice": "Fatura",
+        "membership": "Üyelik",
+        "listing": "Yeni Ürün / İlan",
+        "discount": "İndirim",
+        "boost": "Öne Çıkarma",
+        "ad": "Reklam",
+        "support": "Destek Talebi",
+        "guestMessage": "Misafir Mesajları",
+        "report": "Ürün Şikayetleri",
+        "sellerApplication": "Kurumsal Başvuru",
+        "marketing": "Pazarlama",
+        "social": "Sosyal"
+      },
+      "events": {
+        "order_paid": "Sipariş ödendi",
+        "order_cancelled": "Sipariş iptal edildi",
+        "refund_requested": "İade talebi açıldı",
+        "trade_started": "Takas başladı",
+        "trade_disputed": "Takas için uyuşmazlık açıldı",
+        "offer_converted": "Teklif siparişe dönüştü",
+        "support_ticketOpened": "Yeni destek talebi açıldı",
+        "support_guestMessage": "Misafirden yeni mesaj geldi",
+        "report_productReported": "Ürün şikayet edildi",
+        "listing_pendingApproval": "İlan onay bekliyor",
+        "discount_createdBySeller": "Satıcı indirim oluşturdu",
+        "boost_purchased": "Öne çıkarma satın alındı"
+      },
+      "delivery": {
+        "instant": "Anlık",
+        "hourly": "Saatlik özet",
+        "daily": "Günlük özet"
+      },
+      "validation": {
+        "required": "Bu alan zorunludur.",
+        "email": "Geçerli bir e-posta adresi girin.",
+        "maxChars": "En fazla {max} karakter olabilir.",
+        "port": "Port 1 ile 65535 arasında bir sayı olmalıdır.",
+        "passwordRequired": "Yeni hesap için parola girin.",
+        "recipient": {
+          "invalid": "Geçerli bir e-posta adresi girin.",
+          "duplicate": "Bu adres listede zaten var.",
+          "limit": "Bir alana en fazla {max} alıcı eklenebilir."
+        }
+      },
+      "accountsTab": {
+        "title": "Gönderen hesaplar",
+        "fallbackInfo": "Hesabı olmayan ya da hesabı çalışmayan bir alan, varsayılan kimlikten ({defaultFrom}) gönderir.",
+        "add": "Hesap ekle",
+        "addTitle": "Gönderen hesap ekle",
+        "editTitle": "Gönderen hesabı düzenle",
+        "created": "Hesap eklendi.",
+        "updated": "Hesap güncellendi.",
+        "deleted": "Hesap silindi.",
+        "empty": "Henüz gönderen hesap yok. Alanlar şimdilik varsayılan kimlikten gönderir.",
+        "noAreas": "Hiçbir alanda kullanılmıyor",
+        "notTested": "Henüz denenmedi",
+        "passwordSet": "Parola kayıtlı",
+        "passwordMissing": "Parola yok",
+        "testSend": "Test gönder",
+        "deleteTitle": "Hesap silinsin mi?",
+        "deleteDescription": "{address} hesabı silinecek. Bir alanda kullanılıyorsa silinemez; önce o alanın hesabını değiştirin.",
+        "columns": {
+          "address": "Adres",
+          "displayName": "Görünen ad",
+          "areas": "Kullanan alanlar",
+          "lastTest": "Son test",
+          "password": "Parola"
+        },
+        "test": {
+          "title": "Test gönder: {address}",
+          "to": "Alıcı adresi",
+          "toHelper": "Deneme postası bu adrese, seçili hesaptan gönderilir.",
+          "send": "Gönder",
+          "ok": "Deneme postası gönderildi.",
+          "failed": "Gönderilemedi: {error}",
+          "badge": {
+            "ok": "Başarılı",
+            "failed": "Başarısız"
+          }
+        },
+        "form": {
+          "address": "Posta kutusu adresi",
+          "displayName": "Görünen ad",
+          "displayNameHelper": "Alıcının gördüğü gönderen adı, örneğin Tarodan Sipariş.",
+          "password": "Parola",
+          "passwordKeep": "Değiştirmek için yeni parola yazın",
+          "passwordEditHelper": "Boş bırakırsanız kayıtlı parola korunur. Kayıtlı parola gösterilmez.",
+          "showAdvanced": "Gelişmiş ayarları göster",
+          "hideAdvanced": "Gelişmiş ayarları gizle",
+          "advancedNote": "Bu alanları boş bırakırsanız varsayılan posta sunucusu kullanılır. Yalnızca hesap farklı bir sunucudaysa doldurun.",
+          "username": "Kullanıcı adı",
+          "usernameHelper": "Boşsa posta kutusu adresi kullanılır.",
+          "host": "Sunucu (host)",
+          "port": "Port",
+          "secure": "Güvenli bağlantı",
+          "secureDefault": "Varsayılan",
+          "secureOn": "Açık (SSL/TLS)",
+          "secureOff": "Kapalı (STARTTLS)"
+        }
+      },
+      "areasTab": {
+        "title": "Alanlar",
+        "editTitle": "{area} alanı gönderen ayarı",
+        "defaultSender": "Varsayılan kimlik",
+        "noTemplates": "Şablon yok",
+        "templateCount": "{count, plural, one {# şablon} other {# şablon}}",
+        "templateKeys": "Bu alandaki müşteri şablonları",
+        "columns": {
+          "area": "Alan",
+          "sender": "Gönderen hesap",
+          "displayName": "Görünen ad",
+          "replyTo": "Yanıt adresi",
+          "templates": "Müşteri şablonları"
+        },
+        "form": {
+          "sender": "Gönderen hesap",
+          "displayName": "Görünen ad (isteğe bağlı)",
+          "displayNameHelper": "Boşsa hesabın görünen adı kullanılır.",
+          "replyTo": "Yanıt adresi (isteğe bağlı)",
+          "replyToHelper": "Müşteri yanıtladığında gideceği adres. Boşsa gönderen adres kullanılır."
+        }
+      },
+      "notificationsTab": {
+        "info": "Operasyon olayları, ilgili alanın alıcılarına e-posta olarak da gelir. Her olay için açık ya da kapalı olduğunu ve anlık mı yoksa saatlik / günlük özet olarak mı geleceğini seçin.",
+        "views": {
+          "byArea": "Alana göre",
+          "byPerson": "Kişiye göre"
+        },
+        "recipients": "Alıcılar",
+        "events": "Olaylar",
+        "delivery": "Teslim şekli",
+        "noRecipients": "Bu alanın alıcısı yok.",
+        "recipientPlaceholder": "ad@tarodan.com.tr",
+        "remove": "Kaldır",
+        "removeRecipient": "{address} adresini kaldır"
+      },
+      "people": {
+        "title": "Alıcılar",
+        "add": "Kişi ekle",
+        "addTitle": "Kişiyi alanlara ekle",
+        "editTitle": "Kişinin alanlarını düzenle",
+        "address": "E-posta adresi",
+        "areasLabel": "Aldığı alanlar",
+        "removeAll": "Hepsinden kaldır",
+        "removeTitle": "Kişi tüm alanlardan kaldırılsın mı?",
+        "removeDescription": "{address} adresi bütün alanların alıcı listesinden çıkarılacak.",
+        "empty": "Henüz alıcı eklenmemiş.",
+        "overLimit": "Şu alanların alıcı listesi dolu, kişi eklenemedi: {areas}",
+        "columns": {
+          "person": "Kişi",
+          "areas": "Aldığı alanlar"
+        }
       }
     }
   },

@@ -53,6 +53,11 @@ describe("routePermission", () => {
     );
   });
 
+  it("guards the mail routing screen with the settings permission", () => {
+    // API: PERMISSION_MAP["mail-routing"] = ["settings"] — menü ve uç aynı izni ister.
+    expect(routePermission("/system/mail-routing")).toBe("settings");
+  });
+
   it("guards the durations & rules screen with the settings permission", () => {
     // API: PERMISSION_MAP["timing-rules"] = ["settings"] — menü ve uç aynı izni ister.
     expect(routePermission("/system/timing-rules")).toBe("settings");

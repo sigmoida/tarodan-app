@@ -6,6 +6,7 @@ import { operationsApi } from './operations';
 import { financeApi } from './finance';
 import { marketingApi } from './marketing';
 import { systemApi } from './system';
+import { mailRoutingApi } from './mail-routing';
 
 /**
  * The single admin API surface, recomposed from the per-domain modules. Kept as
@@ -32,6 +33,7 @@ export const adminApi = {
   ...financeApi,
   ...marketingApi,
   ...systemApi,
+  ...mailRoutingApi,
 };
 
 export { api };
