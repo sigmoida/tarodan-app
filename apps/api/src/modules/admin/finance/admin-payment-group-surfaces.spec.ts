@@ -81,26 +81,33 @@ describe("AdminPaymentService group surfaces", () => {
     expect(hasGroupCondition).toBe(true);
   });
 
-  it("getPayments: PayTR id'si eski bir denemeden (merchantOidHistory) de bulunur; sıradan terimde eklenmez", async () => {
+  it("getPayments: PayTR id (any prefix, incl. an old attempt) resolves once and filters by payment id; ordinary term adds nothing", async () => {
     const { svc, prisma } = makeService();
-    const oid = "GRPDBN4NPYYTZT790149";
+    prisma.payment.findMany.mockResolvedValueOnce([
+      {
+        id: "pay-old",
+        orderId: null,
+        checkoutGroupId: null,
+        tradeCashPaymentId: null,
+      },
+    ]);
+    // BST- öneki çözümleyicinin listesinde yok: tam eşleşme yine de çalışır
+    const oid = "BSTK7X9M2QF3NT123456";
 
     await (svc as any).getPayments({ page: 1, limit: 20, search: oid });
-    const withOid = prisma.payment.findMany.mock.calls[0][0].where.OR;
-    expect(withOid).toContainEqual({
-      OR: [
-        { providerConversationId: oid },
-        { metadata: { path: ["merchantOidHistory"], array_contains: oid } },
-      ],
-    });
 
+    const [lookup, main] = prisma.payment.findMany.mock.calls;
+    expect(JSON.stringify(lookup[0].where)).toContain("merchantOidHistory");
+    expect(main[0].where.OR).toContainEqual({ id: { in: ["pay-old"] } });
+    expect(JSON.stringify(main[0].where)).not.toContain("merchantOidHistory");
+
+    prisma.payment.findMany.mockClear();
     await (svc as any).getPayments({
       page: 1,
       limit: 20,
       search: "GRP-DBN4NPYYTZ",
     });
-    const plain = prisma.payment.findMany.mock.calls[1][0].where.OR;
-    expect(JSON.stringify(plain)).not.toContain("merchantOidHistory");
+    expect(prisma.payment.findMany).toHaveBeenCalledTimes(1);
   });
 
   it("getFailedPayments: order'sız (grup) ödemede patlamaz, grup alıcısına düşer", async () => {

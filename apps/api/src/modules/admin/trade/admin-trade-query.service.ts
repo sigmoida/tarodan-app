@@ -9,7 +9,10 @@ import {
   resolveOrderBy,
 } from "../../../common/list";
 import { paytrOidViewOf } from "../../payment/helpers/payment-paytr-oid";
-import { tradePaytrOidClauses } from "../../../common/helpers/paytr-oid-search";
+import {
+  resolvePaytrOidMatch,
+  tradePaytrOidClauses,
+} from "../../payment/helpers/paytr-oid-search";
 import { TradeQuoteService } from "../../trade/trade-quote.service";
 import { TRADE_PRICING_V2 } from "../../trade/helpers/trade.constants";
 import { readTradeCommissionRuleSnapshot } from "../../trade/helpers/trade-commission-snapshot";
@@ -106,6 +109,10 @@ export class AdminTradeQueryService {
     }
 
     if (search) {
+      // PayTR "sipariş no": istek başına bir kez çözülür
+      const paytrClauses = tradePaytrOidClauses(
+        await resolvePaytrOidMatch(this.prisma, search),
+      );
       // Takas no, başlatan displayName/email veya alıcı displayName/email araması
       and.push({
         OR: [
@@ -123,7 +130,7 @@ export class AdminTradeQueryService {
           { initiator: { email: { contains: search, mode: "insensitive" } } },
           { receiver: { email: { contains: search, mode: "insensitive" } } },
           // PayTR "sipariş no": takasın nakit ödemesi / takas numarası
-          ...tradePaytrOidClauses(search),
+          ...paytrClauses,
         ],
       });
     }

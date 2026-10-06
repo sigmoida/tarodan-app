@@ -28,7 +28,7 @@ export function TradesView() {
     >
       <OrdersScreenTabBar />
       <ResourceList.Toolbar
-        searchPlaceholder={t("admin.operations.orders.searchPlaceholder")}
+        searchPlaceholder={t("admin.operations.orders.tradesSearchPlaceholder")}
       />
       <div className="flex min-w-0 flex-wrap items-center justify-between gap-2">
         <p className="text-sm text-muted">

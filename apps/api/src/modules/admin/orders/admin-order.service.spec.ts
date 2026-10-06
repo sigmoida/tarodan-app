@@ -408,3 +408,50 @@ describe("AdminOrderService.getOrderCounts", () => {
     );
   });
 });
+
+describe("AdminOrderService — PayTR sipariş no araması", () => {
+  const OID = "GRPDBN4NPYYTZT790149";
+  const withPayments = () => {
+    const prisma = {
+      ...makePrisma(),
+      payment: {
+        findMany: jest.fn().mockResolvedValue([
+          {
+            id: "p1",
+            orderId: null,
+            checkoutGroupId: "g1",
+            tradeCashPaymentId: null,
+          },
+        ]),
+      },
+    };
+    return { ...makeService(prisma as never), prisma };
+  };
+
+  it("list: resolves the payment once and puts only id lists into the where", async () => {
+    const { service, prisma } = withPayments();
+
+    await service.getOrders({ search: OID, page: 1, limit: 5 } as never);
+
+    expect(prisma.payment.findMany).toHaveBeenCalledTimes(1);
+    const where = JSON.stringify(prisma.order.findMany.mock.calls[0][0].where);
+    expect(where).toContain('"checkoutGroupId":{"in":["g1"]}');
+    expect(where).not.toContain("merchantOidHistory");
+  });
+
+  it("counts: one resolution shared by every tab/bucket count query", async () => {
+    const { service, prisma } = withPayments();
+
+    await service.getOrderCounts({ search: OID } as never);
+
+    expect(prisma.payment.findMany).toHaveBeenCalledTimes(1);
+  });
+
+  it("an ordinary search never touches payments", async () => {
+    const { service, prisma } = withPayments();
+
+    await service.getOrders({ search: "ORD-NGGCF4J4V4" } as never);
+
+    expect(prisma.payment.findMany).not.toHaveBeenCalled();
+  });
+});

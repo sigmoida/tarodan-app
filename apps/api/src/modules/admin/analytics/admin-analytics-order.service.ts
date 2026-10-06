@@ -10,7 +10,13 @@ import { i18nMessage } from "../../i18n";
 import { AdminAuditService } from "../ops/admin-audit.service";
 import { isAdminOrderTransitionAllowed } from "../../order/helpers/order-state-machine";
 import { AddOrderTrackingDto, UpdateOrderStatusDto } from "../dto";
-import { OrderStatus, ProductStatus, ShipmentStatus } from "@prisma/client";
+import {
+  OrderStatus,
+  Prisma,
+  ProductStatus,
+  RefundAttemptStatus,
+  ShipmentStatus,
+} from "@prisma/client";
 import { canTransitionShipmentStatus } from "../../shipping/helpers/shipment-state-machine";
 import { SearchService } from "../../search/search.service";
 import { CacheService } from "../../cache/cache.service";
@@ -278,9 +284,13 @@ export class AdminAnalyticsOrderService {
     });
     const holdByOrderId = new Map(holds.map((h: any) => [h.orderId, h]));
 
-    const rawPayment: any = isGroup
-      ? (group as any)?.payment
-      : (orders[0] as any)?.payment;
+    type PaymentWithAttempts = Prisma.PaymentGetPayload<{
+      include: { refundAttempts: true };
+    }>;
+    type HoldsPayment = { payment?: PaymentWithAttempts | null };
+    const rawPayment: PaymentWithAttempts | null | undefined = isGroup
+      ? (group as HoldsPayment | null)?.payment
+      : (orders[0] as HoldsPayment | undefined)?.payment;
     const payment = rawPayment
       ? {
           id: rawPayment.id,
@@ -296,9 +306,11 @@ export class AdminAnalyticsOrderService {
           coversWholeGroup: isGroup,
           refundedTotal: (rawPayment.refundAttempts ?? [])
             .filter(
-              (a: any) => a.status === "succeeded" || a.status === "finalized",
+              (a) =>
+                a.status === RefundAttemptStatus.succeeded ||
+                a.status === RefundAttemptStatus.finalized,
             )
-            .reduce((sum: number, a: any) => sum + Number(a.amount), 0),
+            .reduce((sum, a) => sum + Number(a.amount), 0),
         }
       : null;
 

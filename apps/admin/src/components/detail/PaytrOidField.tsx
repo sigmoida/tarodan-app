@@ -34,7 +34,7 @@ export function PaytrOidField(props: PaytrOidFields) {
                   ? t("admin.shared.paytrOid.copied")
                   : t("admin.shared.paytrOid.copy")
               }
-              onClick={() => copy(current)}
+              onClick={() => void copy(current)}
             >
               {copied ? (
                 <CheckIcon className="h-3.5 w-3.5 text-success-600" />

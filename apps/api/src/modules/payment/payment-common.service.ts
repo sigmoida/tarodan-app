@@ -2,6 +2,7 @@ import { Injectable, Logger } from "@nestjs/common";
 import { PrismaService } from "../../prisma";
 import { PaymentStatus, OrderStatus } from "@prisma/client";
 import { buildPaytrMerchantOid } from "@tarodan/types";
+import { nextMerchantOidHistory } from "./helpers/payment-oids";
 import { asPaymentMetadata } from "./helpers/payment-metadata.types";
 import { chargeLikelyLive } from "./helpers/live-charge";
 import { CarrierCancellationService } from "../surat-cargo/sync/carrier-cancellation.service";
@@ -308,13 +309,11 @@ export class PaymentCommonService {
       select: { providerConversationId: true, metadata: true },
     });
     const prevMeta = (current?.metadata as any) || {};
-    const oidHistory: string[] = Array.isArray(prevMeta.merchantOidHistory)
-      ? prevMeta.merchantOidHistory
-      : [];
-    const prevOid = current?.providerConversationId;
-    if (prevOid && prevOid !== merchantOid && !oidHistory.includes(prevOid)) {
-      oidHistory.push(prevOid);
-    }
+    const oidHistory = nextMerchantOidHistory(
+      prevMeta,
+      current?.providerConversationId,
+      merchantOid,
+    );
     await this.prisma.payment.update({
       where: { id: paymentId },
       data: {

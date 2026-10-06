@@ -1,4 +1,4 @@
-import { paymentOids } from "../reconciliation/paytr-report-matching.service";
+import { merchantOidHistoryOf } from "./payment-oids";
 
 /** Admin ekranlarında bir ödemenin PayTR "sipariş no" görünümü. */
 export interface PaytrOidView {
@@ -10,7 +10,7 @@ export interface PaytrOidView {
 
 /**
  * Bir ödeme satırından PayTR id'sini ve önceki denemelerini çıkarır. Oid
- * toplama kuralı `paymentOids` ile aynıdır (tek gerçek); burada yalnız
+ * okuma kuralı `merchantOidHistoryOf` ile aynıdır (tek gerçek); burada yalnız
  * güncel/geçmiş ayrımı ve tekilleştirme yapılır.
  */
 export function paytrOidViewOf(
@@ -21,11 +21,7 @@ export function paytrOidViewOf(
 ): PaytrOidView {
   if (!payment) return { paytrOid: null, paytrOidHistory: [] };
   const paytrOid = payment.providerConversationId || null;
-  const history = paymentOids({
-    providerConversationId: null,
-    metadata: payment.metadata,
-  });
-  const paytrOidHistory = [...new Set(history)]
+  const paytrOidHistory = [...new Set(merchantOidHistoryOf(payment.metadata))]
     .filter((oid) => oid !== paytrOid)
     .reverse();
   return { paytrOid, paytrOidHistory };

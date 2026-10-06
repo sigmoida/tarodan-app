@@ -1,6 +1,7 @@
 import {
   PAYTR_OID_SUBJECTS,
   buildPaytrMerchantOid,
+  looksLikePaytrMerchantOid,
   parsePaytrMerchantOid,
 } from "@tarodan/types";
 import { REFERENCE_PREFIX } from "./code-prefixes";
@@ -115,6 +116,46 @@ describe("parsePaytrMerchantOid", () => {
       "GRP" + "A".repeat(500),
     ]) {
       expect(parsePaytrMerchantOid(input)).toBeNull();
+    }
+  });
+});
+
+describe("looksLikePaytrMerchantOid", () => {
+  it("accepts every generated id, whatever the subject prefix", () => {
+    for (const base of [
+      "ORD-NGGCF4J4V4",
+      "GRP-DBN4NPYYTZ",
+      "TRADE-TKS-K7X9M2QF3N",
+      "BST-K7X9M2QF3N",
+      "MEM-K7X9M2QF3N",
+      "5c1f0a2e-0b1d-4c3e-9a77-123456789abc",
+    ]) {
+      expect(
+        looksLikePaytrMerchantOid(
+          buildPaytrMerchantOid(base, 1_700_000_790_149),
+        ),
+      ).toBe(true);
+    }
+  });
+
+  it("is whitespace tolerant", () => {
+    expect(looksLikePaytrMerchantOid(" GRPDBN4NPYYTZT790149 ")).toBe(true);
+  });
+
+  it("rejects normal search terms and garbage", () => {
+    for (const term of [
+      "ORD-NGGCF4J4V4",
+      "GRPDBN4NPYYTZ",
+      "ali veli",
+      "ali@example.com",
+      "T123456",
+      "",
+      "  ",
+      null,
+      undefined,
+      42,
+    ]) {
+      expect(looksLikePaytrMerchantOid(term)).toBe(false);
     }
   });
 });

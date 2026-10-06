@@ -6862,6 +6862,7 @@
         "provider": "Provider",
         "viewPaymentDetail": "View Payment Detail",
         "searchPlaceholder": "Search by number, person, product or PayTR order no",
+        "tradesSearchPlaceholder": "Search by trade number, user or PayTR order no",
         "paymentTitle": "Payment Details",
         "productTitle": "Product Details",
         "shippingTitle": "Shipping Details",
@@ -9254,6 +9255,7 @@
       "metricCard": {
         "vsYesterday": "vs yesterday"
       },
+      "copyFailed": "Could not copy to the clipboard",
       "paytrOid": {
         "label": "PayTR order no",
         "previousAttempts": "Previous attempts",

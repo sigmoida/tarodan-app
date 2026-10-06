@@ -12,7 +12,7 @@ import {
   fulltextOrderSearch,
 } from "../../../common/helpers/fulltext-search";
 import { paytrOidViewOf } from "../../payment/helpers/payment-paytr-oid";
-import { paytrOidSearchOf } from "../../../common/helpers/paytr-oid-search";
+import { resolvePaytrOidMatch } from "../../payment/helpers/paytr-oid-search";
 import {
   AdminPaymentQueryDto,
   PaymentStatisticsQueryDto,
@@ -176,8 +176,9 @@ export class AdminPaymentService {
       });
       // Eski PayTR denemeleri (metadata.merchantOidHistory): tam-metin yalnız
       // güncel id'yi görür. Terim PayTR id'si değilse eklenmez.
-      const byPaytrOid = paytrOidSearchOf(search);
-      if (byPaytrOid) conditions.push(byPaytrOid.payment);
+      const byPaytrOid = await resolvePaytrOidMatch(this.prisma, search);
+      if (byPaytrOid && byPaytrOid.paymentIds.length > 0)
+        conditions.push({ id: { in: byPaytrOid.paymentIds } });
       if (Number.isFinite(numericAmount))
         conditions.push({ amount: numericAmount });
       if (Object.values(PaymentStatus).includes(normalized as PaymentStatus))

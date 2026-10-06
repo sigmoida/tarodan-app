@@ -20,6 +20,7 @@ import { VirtualOrderFulfillmentService } from "../fulfillment/virtual-order-ful
 import { nodeEnv } from "../../../config/environment";
 import { errorMessage } from "../../../common/helpers/error-message";
 import { payerIpFromPaymentMetadata } from "../helpers/paytr-merchant.helper";
+import { paymentOidHistoryWhere } from "../helpers/paytr-oid-search";
 import { resolveTimingValue } from "../../../common/timing-rules";
 
 /**
@@ -154,12 +155,7 @@ export class PaymentCallbackService {
     // PayTR token'ıdır, merchant_oid içermez — kaldırıldı.)
     if (!payment) {
       payment = await this.prisma.payment.findFirst({
-        where: {
-          metadata: {
-            path: ["merchantOidHistory"],
-            array_contains: merchantOid,
-          },
-        },
+        where: paymentOidHistoryWhere(merchantOid),
         include: callbackInclude,
       });
     }

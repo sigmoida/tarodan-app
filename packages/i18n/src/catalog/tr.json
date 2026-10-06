@@ -6862,6 +6862,7 @@
         "provider": "Sağlayıcı",
         "viewPaymentDetail": "Ödeme Detayını Görüntüle",
         "searchPlaceholder": "Numara, kişi, ürün veya PayTR sipariş no ile ara",
+        "tradesSearchPlaceholder": "Takas no, kullanıcı veya PayTR sipariş no ile ara",
         "paymentTitle": "Ödeme Bilgileri",
         "productTitle": "Ürün Bilgileri",
         "shippingTitle": "Kargo Bilgileri",
@@ -9254,6 +9255,7 @@
       "metricCard": {
         "vsYesterday": "vs dün"
       },
+      "copyFailed": "Panoya kopyalanamadı",
       "paytrOid": {
         "label": "PayTR sipariş no",
         "previousAttempts": "Önceki denemeler",

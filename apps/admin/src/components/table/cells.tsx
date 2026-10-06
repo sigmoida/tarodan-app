@@ -156,7 +156,7 @@ export function CellId({ value }: { value?: string | null }) {
       <IconButton
         onClick={(e) => {
           e.stopPropagation();
-          copy(value);
+          void copy(value);
         }}
         aria-label="Copy id"
         variant="ghost"

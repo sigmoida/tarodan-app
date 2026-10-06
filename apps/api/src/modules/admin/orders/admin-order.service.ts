@@ -11,6 +11,7 @@ import {
 } from "@tarodan/types";
 import { PrismaService } from "../../../prisma";
 import { StorageService } from "../../storage/storage.service";
+import { resolvePaytrOidMatch } from "../../payment/helpers/paytr-oid-search";
 import { AdminAuditService } from "../ops/admin-audit.service";
 import { AdminOrderCountsQueryDto, AdminOrderQueryDto } from "../dto";
 import {
@@ -78,10 +79,17 @@ export class AdminOrderService {
     private readonly storageService: StorageService,
   ) {}
 
+  /** Liste/sayaç kapsamı + (PayTR id'si aranıyorsa) istek başına tek çözümleme. */
+  private async scopeOf(query: AdminOrderQueryDto | AdminOrderCountsQueryDto) {
+    const scope = orderListScopeOf(query);
+    const paytr = await resolvePaytrOidMatch(this.prisma, query.search);
+    return { ...scope, filters: { ...scope.filters, paytr } };
+  }
+
   async getOrders(
     query: AdminOrderQueryDto,
   ): Promise<PaginatedResult<AdminOrderListRow>> {
-    const { tab, bucket, filters } = orderListScopeOf(query);
+    const { tab, bucket, filters } = await this.scopeOf(query);
     const sources = orderListSourceWheres(tab, bucket, filters);
     return this.listCarts(sources, filters, query, new Date());
   }
@@ -94,7 +102,7 @@ export class AdminOrderService {
   async getOrderCounts(
     query: AdminOrderCountsQueryDto,
   ): Promise<AdminOrderCounts> {
-    const { filters } = orderListScopeOf(query);
+    const { filters } = await this.scopeOf(query);
 
     const queries = new Map<string, Prisma.PrismaPromise<number>>();
     const plan: Array<{

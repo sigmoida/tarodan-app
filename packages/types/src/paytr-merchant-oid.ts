@@ -51,6 +51,21 @@ export function buildPaytrMerchantOid(
   return `${base}T${now.toString().slice(-SUFFIX_DIGITS)}`;
 }
 
+/**
+ * Bir metin PayTR `merchant_oid` biçiminde mi: yalnız harf/rakam (tire, boşluk
+ * yok) ve `T` + 6 rakamla biter. İş numarası bilinmeyen öneklerin (BST-, MEM-,
+ * numara yerine id'den kurulanlar) id'leri de bu testi geçer — TAM eşleşme
+ * aramasının kapısı budur; iş numarası çıkarmak ise `parsePaytrMerchantOid`'ın işi.
+ * Normal arama terimleri (`ORD-…`, e-posta, ad) tire/boşluk/`@` içerdiğinden geçmez.
+ */
+const MERCHANT_OID_SHAPE = new RegExp(
+  `^[A-Za-z0-9]{4,}T\\d{${SUFFIX_DIGITS}}$`,
+);
+
+export function looksLikePaytrMerchantOid(input: unknown): input is string {
+  return typeof input === "string" && MERCHANT_OID_SHAPE.test(input.trim());
+}
+
 /** Bir PayTR id'sinin işaret ettiği olası iş numarası. */
 export interface PaytrOidCandidate {
   subject: PaytrOidSubject;

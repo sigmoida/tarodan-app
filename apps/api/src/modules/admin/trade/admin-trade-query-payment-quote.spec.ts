@@ -82,23 +82,34 @@ describe("AdminTradeQueryService payment quote", () => {
     ]);
   });
 
-  it("a PayTR id also searches trade cash payments in the admin list", async () => {
+  it("a PayTR id resolves payments once and searches trade cash payments by id", async () => {
     const prisma = {
       trade: {
         findMany: jest.fn().mockResolvedValue([]),
         count: jest.fn().mockResolvedValue(0),
       },
+      payment: {
+        findMany: jest.fn().mockResolvedValue([
+          {
+            id: "p1",
+            orderId: null,
+            checkoutGroupId: null,
+            tradeCashPaymentId: "c1",
+          },
+        ]),
+      },
     };
     const service = new AdminTradeQueryService(prisma as never, {} as never);
 
     await service.getTrades({ search: "TRADETKSK7X9M2QF3NT123456" } as never);
+    expect(prisma.payment.findMany).toHaveBeenCalledTimes(1);
     const paytr = JSON.stringify(prisma.trade.findMany.mock.calls[0][0].where);
     expect(paytr).toContain("TKS-K7X9M2QF3N");
-    expect(paytr).toContain("merchantOidHistory");
+    expect(paytr).toContain('"cashPayments":{"some":{"id":{"in":["c1"]}}}');
+    expect(paytr).not.toContain("merchantOidHistory");
 
     await service.getTrades({ search: "TKS-K7X9M2QF3N" } as never);
-    const plain = JSON.stringify(prisma.trade.findMany.mock.calls[1][0].where);
-    expect(plain).not.toContain("merchantOidHistory");
+    expect(prisma.payment.findMany).toHaveBeenCalledTimes(1);
   });
 
   it("keeps accepted trade payment snapshots instead of recalculating", async () => {
